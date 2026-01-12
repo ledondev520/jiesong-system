@@ -1,698 +1,707 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<!--
- * 捷淞进销存系统 - UI Demo
- * 设计风格：现代简约，中性黑灰，Notion风格左侧边栏
- * 更新时间：2026-01-13
+<!-- 
+  捷淞进销存系统 - 高级版 Demo V3
+  风格：极简黑白灰 (Linear/Notion Style)
+  功能：全功能交互演示版
 -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>捷淞进销存系统</title>
+    <title>捷淞进销存</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- 登录页面 -->
-    <div id="login-page" class="login-container">
-        <div class="login-card">
-            <div class="login-header">
-                <div class="logo">
-                    <span class="logo-icon">◈</span>
-                </div>
-                <h1>捷淞进销存</h1>
-                <p>外贸出口业务管理平台</p>
-            </div>
+    <!-- Toast 容器 -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- 登录页 -->
+    <div id="login-page" class="login-wrap">
+        <div class="login-box">
+            <div class="login-logo">J</div>
+            <h1 class="login-title">Welcome back</h1>
+            <p class="login-subtitle">请输入账号密码登录捷淞进销存系统</p>
             <form id="login-form">
-                <div class="form-group">
-                    <label>用户名</label>
-                    <input type="text" value="admin" placeholder="请输入用户名">
+                <div class="form-row">
+                    <label class="form-label">Email / Username</label>
+                    <input type="text" class="input-field" value="admin" placeholder="name@company.com">
                 </div>
-                <div class="form-group">
-                    <label>密码</label>
-                    <input type="password" value="admin123" placeholder="请输入密码">
+                <div class="form-row">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="input-field" value="admin123">
                 </div>
-                <div class="form-options">
-                    <label class="checkbox-label">
-                        <input type="checkbox" checked>
-                        <span>记住我</span>
-                    </label>
-                </div>
-                <button type="submit" class="btn btn-primary btn-block">登录系统</button>
+                <button type="submit" class="btn btn-primary" style="width: 100%; height: 40px;">Sign In</button>
             </form>
-            <p class="login-footer">Demo版本 · 点击登录查看系统界面</p>
         </div>
     </div>
 
-    <!-- 主系统界面 -->
-    <div id="main-app" class="app-container hidden">
+    <!-- 主界面 -->
+    <div id="main-app" class="hidden" style="display: flex; width: 100%; height: 100%;">
         <!-- 侧边栏 -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <span class="logo-icon">◈</span>
-                <span class="logo-text">捷淞进销存</span>
+                <div class="app-logo">J</div>
+                <div class="app-name">Jiesong System</div>
             </div>
             
-            <nav class="sidebar-nav">
+            <div class="nav-section">
                 <a href="#" class="nav-item active" data-page="dashboard">
-                    <span class="nav-icon">⌂</span>
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
                     <span>首页</span>
                 </a>
                 
-                <div class="nav-group-title">基础数据</div>
-                <a href="#" class="nav-item" data-page="products">
-                    <span class="nav-icon">☐</span>
-                    <span>商品管理</span>
-                </a>
-                <a href="#" class="nav-item" data-page="suppliers">
-                    <span class="nav-icon">⚑</span>
-                    <span>供应商管理</span>
-                </a>
-                <a href="#" class="nav-item" data-page="stores">
-                    <span class="nav-icon">⚐</span>
-                    <span>客户门店</span>
-                </a>
-                <a href="#" class="nav-item" data-page="ports">
-                    <span class="nav-icon">⚓</span>
-                    <span>港口管理</span>
-                </a>
-                
-                <div class="nav-group-title">采购管理</div>
+                <div class="nav-group-label">业务管理</div>
                 <a href="#" class="nav-item" data-page="purchase">
-                    <span class="nav-icon">📄</span>
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                     <span>采购合同</span>
                 </a>
-                <a href="#" class="nav-item" data-page="purchase-new">
-                    <span class="nav-icon">✚</span>
-                    <span>新建采购</span>
-                </a>
-                
-                <div class="nav-group-title">销售管理</div>
                 <a href="#" class="nav-item" data-page="sales">
-                    <span class="nav-icon">💰</span>
-                    <span>出口合同</span>
+                    <svg class="icon" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                    <span>销售发货</span>
                 </a>
-                
-                <div class="nav-group-title">仓储物流</div>
                 <a href="#" class="nav-item" data-page="inventory">
-                    <span class="nav-icon">📦</span>
+                    <svg class="icon" viewBox="0 0 24 24"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
                     <span>库存管理</span>
                 </a>
                 <a href="#" class="nav-item" data-page="containers">
-                    <span class="nav-icon">🚢</span>
+                    <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
                     <span>货柜管理</span>
                 </a>
-                
-                <div class="nav-group-title">系统</div>
-                <a href="#" class="nav-item" data-page="settings">
-                    <span class="nav-icon">⚙</span>
-                    <span>系统设置</span>
+
+                <div class="nav-group-label">财务报表</div>
+                <a href="#" class="nav-item" data-page="finance">
+                    <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                    <span>财务管理</span>
                 </a>
-            </nav>
-            
-            <div class="sidebar-footer">
-                <div class="user-info">
-                    <div class="user-avatar">管</div>
-                    <div class="user-details">
-                        <span class="user-name">管理员</span>
-                        <span class="user-role">超级管理员</span>
-                    </div>
-                </div>
-                <button id="logout-btn" class="btn-icon" title="退出登录">⏻</button>
+
+                <div class="nav-group-label">基础数据</div>
+                <a href="#" class="nav-item" data-page="products">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"></path><line x1="16" y1="8" x2="2" y2="22"></line><line x1="17.5" y1="15" x2="9" y2="15"></line></svg>
+                    <span>商品库</span>
+                </a>
+                <a href="#" class="nav-item" data-page="suppliers">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    <span>供应商</span>
+                </a>
+                <a href="#" class="nav-item" data-page="settings">
+                    <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>设置</span>
+                </a>
+            </div>
+
+            <div class="user-profile">
+                <div class="avatar"></div>
+                <div class="font-medium text-sm">Admin</div>
+                <button id="logout-btn" class="btn-icon" style="margin-left: auto;" title="退出">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                </button>
             </div>
         </aside>
 
         <!-- 主内容区 -->
-        <main class="main-content">
-            <!-- Dashboard 页面 -->
-            <div id="page-dashboard" class="page-content">
-                <div class="page-header">
-                    <div>
-                        <h1>下午好，管理员</h1>
-                        <p class="text-secondary">2026年1月13日 星期一</p>
+        <main class="main-layout">
+            <header class="top-bar">
+                <div class="page-title">Dashboard</div>
+                <div class="flex items-center gap-4">
+                    <div class="search-wrapper">
+                        <svg class="search-icon icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="text" class="search-input" placeholder="Search (Cmd+K)">
                     </div>
-                    <div class="header-actions">
-                        <button class="btn btn-secondary">导入数据</button>
-                        <button class="btn btn-primary">新建采购</button>
-                    </div>
+                    <button class="btn-icon" title="通知">
+                        <svg class="icon" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                    </button>
                 </div>
-                
-                <!-- 数据概览卡片 -->
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-content">
-                            <span class="stat-label">待发货柜</span>
-                            <span class="stat-value">3</span>
-                            <span class="stat-change positive">↑ 较上周 +1</span>
-                        </div>
-                        <div class="stat-icon blue">🚢</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-content">
-                            <span class="stat-label">本月采购额</span>
-                            <span class="stat-value">¥128.5<small>万</small></span>
-                            <span class="stat-change positive">↑ +12.3%</span>
-                        </div>
-                        <div class="stat-icon green">💵</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-content">
-                            <span class="stat-label">应收账款</span>
-                            <span class="stat-value">$45.2<small>万</small></span>
-                            <span class="stat-change warning">3笔待收</span>
-                        </div>
-                        <div class="stat-icon yellow">📊</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-content">
-                            <span class="stat-label">库存商品</span>
-                            <span class="stat-value">156</span>
-                            <span class="stat-change neutral">42 种商品</span>
-                        </div>
-                        <div class="stat-icon purple">📦</div>
-                    </div>
-                </div>
-                
-                <!-- 快捷操作 -->
-                <div class="section-card">
-                    <h2 class="section-title">快捷操作</h2>
-                    <div class="quick-actions">
-                        <button class="quick-action-btn">
-                            <span class="action-icon">📝</span>
-                            <span>新建采购合同</span>
-                        </button>
-                        <button class="quick-action-btn">
-                            <span class="action-icon">💼</span>
-                            <span>新建出口合同</span>
-                        </button>
-                        <button class="quick-action-btn">
-                            <span class="action-icon">🚢</span>
-                            <span>创建货柜</span>
-                        </button>
-                        <button class="quick-action-btn">
-                            <span class="action-icon">📊</span>
-                            <span>库存入库</span>
-                        </button>
-                        <button class="quick-action-btn">
-                            <span class="action-icon">📤</span>
-                            <span>导入CSV</span>
-                        </button>
-                        <button class="quick-action-btn">
-                            <span class="action-icon">🔍</span>
-                            <span>商品查询</span>
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- 最近采购合同 -->
-                <div class="section-card">
-                    <div class="section-header">
-                        <h2 class="section-title">最近采购合同</h2>
-                        <a href="#" class="link" data-page="purchase">查看全部 →</a>
-                    </div>
-                    <div class="card-list">
-                        <div class="list-card">
-                            <div class="card-main">
-                                <div class="card-title">CG2500048</div>
-                                <div class="card-subtitle">黎总 · 瓷砖800*800</div>
-                            </div>
-                            <div class="card-meta">
-                                <span class="badge badge-green">已完成</span>
-                                <span class="card-amount">¥144,300</span>
-                            </div>
-                        </div>
-                        <div class="list-card">
-                            <div class="card-main">
-                                <div class="card-title">CG2500047</div>
-                                <div class="card-subtitle">叶总 · 火锅器材一批</div>
-                            </div>
-                            <div class="card-meta">
-                                <span class="badge badge-yellow">生产中</span>
-                                <span class="card-amount">¥89,000</span>
-                            </div>
-                        </div>
-                        <div class="list-card">
-                            <div class="card-main">
-                                <div class="card-title">CG2500046</div>
-                                <div class="card-subtitle">郭总 · 不锈钢门10套</div>
-                            </div>
-                            <div class="card-meta">
-                                <span class="badge badge-blue">运输中</span>
-                                <span class="card-amount">¥56,800</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            </header>
 
-            <!-- 采购合同列表页面 -->
-            <div id="page-purchase" class="page-content hidden">
-                <div class="page-header">
-                    <div>
-                        <h1>采购合同</h1>
-                        <p class="text-secondary">管理所有采购合同记录</p>
-                    </div>
-                    <div class="header-actions">
-                        <div class="search-box">
-                            <span class="search-icon">🔍</span>
-                            <input type="text" placeholder="搜索合同号、供应商...">
-                        </div>
-                        <button class="btn btn-secondary">
-                            <span>筛选</span>
-                            <span class="btn-icon-right">▾</span>
-                        </button>
-                        <button class="btn btn-primary" data-page="purchase-new">✚ 新建采购</button>
-                    </div>
-                </div>
-                
-                <!-- 状态筛选标签 -->
-                <div class="filter-tabs">
-                    <button class="filter-tab active">全部 <span class="count">48</span></button>
-                    <button class="filter-tab">草稿 <span class="count">3</span></button>
-                    <button class="filter-tab">生产中 <span class="count">12</span></button>
-                    <button class="filter-tab">运输中 <span class="count">5</span></button>
-                    <button class="filter-tab">已完成 <span class="count">28</span></button>
-                </div>
-                
-                <!-- 卡片列表 -->
-                <div class="card-grid">
-                    <div class="contract-card">
-                        <div class="card-header">
-                            <span class="contract-no">CG2500048</span>
-                            <span class="badge badge-green">已完成</span>
-                        </div>
-                        <div class="card-body">
-                            <div class="info-row">
-                                <span class="label">供应商</span>
-                                <span class="value">黎总（佛山瓷砖厂）</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="label">商品</span>
-                                <span class="value">瓷砖800*800 × 500㎡</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="label">金额</span>
-                                <span class="value amount">¥144,300</span>
-                            </div>
-                        </div>
-                        <div class="card-footer">
-                            <span class="date">2025-01-10 签订</span>
-                            <div class="card-actions">
-                                <button class="btn-text">查看</button>
-                                <button class="btn-text">编辑</button>
-                            </div>
-                        </div>
-                    </div>
+            <div class="content-scroll">
+                <div class="container">
                     
-                    <div class="contract-card">
-                        <div class="card-header">
-                            <span class="contract-no">CG2500047</span>
-                            <span class="badge badge-yellow">生产中</span>
-                        </div>
-                        <div class="card-body">
-                            <div class="info-row">
-                                <span class="label">供应商</span>
-                                <span class="value">叶总（火锅器材）</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="label">商品</span>
-                                <span class="value">电磁炉 × 20台</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="label">金额</span>
-                                <span class="value amount">¥89,000</span>
+                    <!-- 1. Dashboard -->
+                    <div id="page-dashboard" class="page-content">
+                        <div class="flex justify-between items-center mb-6">
+                            <h1 class="text-xl font-bold">Good Afternoon, Admin</h1>
+                            <div class="flex gap-2">
+                                <button class="btn btn-secondary action-import">导入数据</button>
+                                <button class="btn btn-primary" data-page="purchase-new">新建采购</button>
                             </div>
                         </div>
-                        <div class="card-footer">
-                            <span class="date">2025-01-08 签订</span>
-                            <div class="card-actions">
-                                <button class="btn-text">查看</button>
-                                <button class="btn-text">编辑</button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="contract-card">
-                        <div class="card-header">
-                            <span class="contract-no">CG2500046</span>
-                            <span class="badge badge-blue">运输中</span>
-                        </div>
-                        <div class="card-body">
-                            <div class="info-row">
-                                <span class="label">供应商</span>
-                                <span class="value">郭总（不锈钢门）</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="label">商品</span>
-                                <span class="value">不锈钢门 × 10套</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="label">金额</span>
-                                <span class="value amount">¥56,800</span>
-                            </div>
-                        </div>
-                        <div class="card-footer">
-                            <span class="date">2025-01-05 签订</span>
-                            <div class="card-actions">
-                                <button class="btn-text">查看</button>
-                                <button class="btn-text">编辑</button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="contract-card">
-                        <div class="card-header">
-                            <span class="contract-no">CG2500045</span>
-                            <span class="badge badge-gray">草稿</span>
-                        </div>
-                        <div class="card-body">
-                            <div class="info-row">
-                                <span class="label">供应商</span>
-                                <span class="value">阿宗（大理石材）</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="label">商品</span>
-                                <span class="value">大理石板 × 200㎡</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="label">金额</span>
-                                <span class="value amount">¥78,500</span>
-                            </div>
-                        </div>
-                        <div class="card-footer">
-                            <span class="date">2025-01-12 创建</span>
-                            <div class="card-actions">
-                                <button class="btn-text">编辑</button>
-                                <button class="btn-text danger">删除</button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="contract-card">
-                        <div class="card-header">
-                            <span class="contract-no">CG2500044</span>
-                            <span class="badge badge-green">已完成</span>
-                        </div>
-                        <div class="card-body">
-                            <div class="info-row">
-                                <span class="label">供应商</span>
-                                <span class="value">刘总（卡座家具）</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="label">商品</span>
-                                <span class="value">餐厅卡座 × 15套</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="label">金额</span>
-                                <span class="value amount">¥123,000</span>
-                            </div>
-                        </div>
-                        <div class="card-footer">
-                            <span class="date">2025-01-02 签订</span>
-                            <div class="card-actions">
-                                <button class="btn-text">查看</button>
-                                <button class="btn-text">编辑</button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="contract-card">
-                        <div class="card-header">
-                            <span class="contract-no">CG2500043</span>
-                            <span class="badge badge-yellow">生产中</span>
-                        </div>
-                        <div class="card-body">
-                            <div class="info-row">
-                                <span class="label">供应商</span>
-                                <span class="value">何总布菲传奇</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="label">商品</span>
-                                <span class="value">自助餐台 × 3套</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="label">金额</span>
-                                <span class="value amount">¥245,000</span>
-                            </div>
-                        </div>
-                        <div class="card-footer">
-                            <span class="date">2024-12-28 签订</span>
-                            <div class="card-actions">
-                                <button class="btn-text">查看</button>
-                                <button class="btn-text">编辑</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 分页 -->
-                <div class="pagination">
-                    <button class="page-btn" disabled>‹</button>
-                    <button class="page-btn active">1</button>
-                    <button class="page-btn">2</button>
-                    <button class="page-btn">3</button>
-                    <span class="page-ellipsis">...</span>
-                    <button class="page-btn">8</button>
-                    <button class="page-btn">›</button>
-                </div>
-            </div>
 
-            <!-- 新建采购合同页面 -->
-            <div id="page-purchase-new" class="page-content hidden">
-                <div class="page-header">
-                    <div>
-                        <h1>新建采购合同</h1>
-                        <p class="text-secondary">创建新的采购合同记录</p>
-                    </div>
-                    <div class="header-actions">
-                        <button class="btn btn-ai" id="ai-input-btn">
-                            <span>🤖</span>
-                            <span>AI辅助录入</span>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="form-container">
-                    <form id="purchase-form">
-                        <div class="form-section">
-                            <h3 class="form-section-title">基本信息</h3>
-                            <div class="form-grid">
-                                <div class="form-group">
-                                    <label>合同编号</label>
-                                    <input type="text" value="CG2500049" readonly class="input-readonly">
-                                    <span class="form-hint">系统自动生成</span>
+                        <div class="overview-grid">
+                            <div class="card">
+                                <div class="stat-header">
+                                    <span class="stat-label">待发货柜</span>
+                                    <svg class="icon text-secondary" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
                                 </div>
-                                <div class="form-group">
-                                    <label>供应商 <span class="required">*</span></label>
-                                    <select>
-                                        <option value="">请选择供应商</option>
-                                        <option value="1">黎总（佛山瓷砖厂）</option>
-                                        <option value="2">叶总（火锅器材）</option>
-                                        <option value="3">郭总（不锈钢门）</option>
-                                        <option value="4">阿宗（大理石材）</option>
+                                <div class="stat-number">3</div>
+                                <div class="stat-trend trend-up">
+                                    <svg class="icon" style="width:12px;height:12px;" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                                    <span>+1</span>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="stat-header">
+                                    <span class="stat-label">本月采购</span>
+                                    <svg class="icon text-secondary" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                                </div>
+                                <div class="stat-number">¥128.5w</div>
+                                <div class="stat-trend trend-up">
+                                    <svg class="icon" style="width:12px;height:12px;" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                                    <span>+12.3%</span>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="stat-header">
+                                    <span class="stat-label">应收账款</span>
+                                    <svg class="icon text-secondary" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                                </div>
+                                <div class="stat-number">$45.2w</div>
+                                <div class="stat-trend trend-neutral">
+                                    <span>3 笔待收</span>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="stat-header">
+                                    <span class="stat-label">库存种类</span>
+                                    <svg class="icon text-secondary" viewBox="0 0 24 24"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+                                </div>
+                                <div class="stat-number">42</div>
+                                <div class="stat-trend trend-neutral">
+                                    <span>正常</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 快捷操作 -->
+                        <div class="mb-8">
+                            <h2 class="section-title mb-4">快捷操作</h2>
+                            <div class="flex gap-4">
+                                <button class="btn btn-secondary" data-page="purchase-new">
+                                    <svg class="icon mr-2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                    新建采购
+                                </button>
+                                <button class="btn btn-secondary" data-page="containers">
+                                    <svg class="icon mr-2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                    创建货柜
+                                </button>
+                                <button class="btn btn-secondary" data-page="inventory">
+                                    <svg class="icon mr-2" viewBox="0 0 24 24"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+                                    库存查询
+                                </button>
+                                <button class="btn btn-secondary action-search">
+                                    <svg class="icon mr-2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                    商品查询
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="section-header">
+                            <h2 class="section-title">最近活动</h2>
+                            <button class="btn-ghost btn-sm" data-page="purchase">查看全部</button>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>编号</th>
+                                        <th>类型</th>
+                                        <th>关联方</th>
+                                        <th>摘要</th>
+                                        <th>状态</th>
+                                        <th>时间</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="font-medium">CG2500048</td>
+                                        <td>采购合同</td>
+                                        <td>黎总</td>
+                                        <td>瓷砖800*800 (500㎡)</td>
+                                        <td><span class="status-badge status-green">已完成</span></td>
+                                        <td class="text-secondary">2小时前</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-medium">CG2500047</td>
+                                        <td>采购合同</td>
+                                        <td>叶总</td>
+                                        <td>火锅器材一批</td>
+                                        <td><span class="status-badge status-yellow">生产中</span></td>
+                                        <td class="text-secondary">昨天</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-medium">25-003-LA</td>
+                                        <td>货柜发运</td>
+                                        <td>禧瑞都</td>
+                                        <td>预计1月20日到达</td>
+                                        <td><span class="status-badge status-blue">运输中</span></td>
+                                        <td class="text-secondary">3天前</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 2. 采购合同列表 -->
+                    <div id="page-purchase" class="page-content hidden">
+                        <div class="flex justify-between items-center mb-6">
+                            <h1 class="text-xl font-bold">采购合同</h1>
+                            <button class="btn btn-primary" data-page="purchase-new">新建合同</button>
+                        </div>
+                        
+                        <div class="tabs">
+                            <div class="tab-item active">全部</div>
+                            <div class="tab-item">草稿</div>
+                            <div class="tab-item">生产中</div>
+                            <div class="tab-item">运输中</div>
+                            <div class="tab-item">已完成</div>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>合同编号</th>
+                                        <th>供应商</th>
+                                        <th>商品摘要</th>
+                                        <th>金额</th>
+                                        <th>签订日期</th>
+                                        <th>状态</th>
+                                        <th class="cell-action">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="font-medium">CG2500048</td>
+                                        <td>黎总</td>
+                                        <td>瓷砖800*800</td>
+                                        <td>¥144,300</td>
+                                        <td>2025-01-10</td>
+                                        <td><span class="status-badge status-green">已完成</span></td>
+                                        <td class="cell-action">
+                                            <button class="btn-text action-view">查看</button>
+                                            <button class="btn-text action-edit">编辑</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-medium">CG2500047</td>
+                                        <td>叶总</td>
+                                        <td>火锅器材</td>
+                                        <td>¥89,000</td>
+                                        <td>2025-01-08</td>
+                                        <td><span class="status-badge status-yellow">生产中</span></td>
+                                        <td class="cell-action">
+                                            <button class="btn-text action-view">查看</button>
+                                            <button class="btn-text action-edit">编辑</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-medium">CG2500046</td>
+                                        <td>郭总</td>
+                                        <td>不锈钢门</td>
+                                        <td>¥56,800</td>
+                                        <td>2025-01-05</td>
+                                        <td><span class="status-badge status-blue">运输中</span></td>
+                                        <td class="cell-action">
+                                            <button class="btn-text action-view">查看</button>
+                                            <button class="btn-text action-edit">编辑</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 3. 新建采购表单 -->
+                    <div id="page-purchase-new" class="page-content hidden">
+                        <div class="flex justify-between items-center mb-6">
+                            <div class="flex items-center gap-4">
+                                <button class="btn-icon" data-page="purchase"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg></button>
+                                <h1 class="text-xl font-bold">新建采购合同</h1>
+                            </div>
+                            <div class="flex gap-2">
+                                <button class="btn btn-secondary" id="ai-input-btn">✨ AI 辅助录入</button>
+                                <button class="btn btn-primary action-submit">提交合同</button>
+                            </div>
+                        </div>
+
+                        <div class="form-card mb-6">
+                            <h3 class="section-title mb-4">基本信息</h3>
+                            <div class="input-group">
+                                <div class="form-row">
+                                    <label class="form-label">合同编号</label>
+                                    <input type="text" class="input-field" value="CG2500049" readonly style="background: var(--bg-hover);">
+                                </div>
+                                <div class="form-row">
+                                    <label class="form-label">供应商</label>
+                                    <select class="input-field">
+                                        <option>选择供应商...</option>
+                                        <option>黎总</option>
+                                        <option>叶总</option>
+                                        <option>郭总</option>
                                     </select>
                                 </div>
-                                <div class="form-group">
-                                    <label>签订日期 <span class="required">*</span></label>
-                                    <input type="date" value="2026-01-13">
+                                <div class="form-row">
+                                    <label class="form-label">签订日期</label>
+                                    <input type="date" class="input-field" value="2026-01-13">
                                 </div>
-                                <div class="form-group">
-                                    <label>预计交货日期</label>
-                                    <input type="date">
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-section">
-                            <div class="form-section-header">
-                                <h3 class="form-section-title">商品明细</h3>
-                                <button type="button" class="btn btn-secondary btn-sm" id="add-item-btn">✚ 添加商品</button>
-                            </div>
-                            <div class="items-table">
-                                <div class="table-header">
-                                    <span class="col-product">商品名称</span>
-                                    <span class="col-spec">规格</span>
-                                    <span class="col-qty">数量</span>
-                                    <span class="col-unit">单位</span>
-                                    <span class="col-price">单价(¥)</span>
-                                    <span class="col-total">小计(¥)</span>
-                                    <span class="col-action">操作</span>
-                                </div>
-                                <div class="table-body" id="items-list">
-                                    <div class="table-row">
-                                        <input type="text" class="col-product" placeholder="商品名称" value="瓷砖">
-                                        <input type="text" class="col-spec" placeholder="规格" value="800*800">
-                                        <input type="number" class="col-qty" placeholder="0" value="500">
-                                        <select class="col-unit">
-                                            <option>平方米</option>
-                                            <option>件</option>
-                                            <option>个</option>
-                                        </select>
-                                        <input type="number" class="col-price" placeholder="0" value="78">
-                                        <span class="col-total">39,000</span>
-                                        <button type="button" class="btn-icon-sm danger">✕</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="items-summary">
-                                <span>合计金额：</span>
-                                <span class="total-amount">¥39,000.00</span>
-                            </div>
-                        </div>
-                        
-                        <div class="form-section">
-                            <h3 class="form-section-title">付款信息</h3>
-                            <div class="form-grid">
-                                <div class="form-group">
-                                    <label>定金比例</label>
-                                    <div class="input-with-suffix">
-                                        <input type="number" value="30">
-                                        <span class="suffix">%</span>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label>定金金额</label>
-                                    <input type="text" value="¥11,700" readonly class="input-readonly">
+                                <div class="form-row">
+                                    <label class="form-label">预计交货</label>
+                                    <input type="date" class="input-field">
                                 </div>
                             </div>
                         </div>
-                        
-                        <div class="form-section">
-                            <h3 class="form-section-title">备注</h3>
-                            <div class="form-group full-width">
-                                <textarea rows="3" placeholder="输入备注信息..."></textarea>
-                            </div>
-                        </div>
-                        
-                        <div class="form-actions">
-                            <button type="button" class="btn btn-secondary" data-page="purchase">取消</button>
-                            <button type="button" class="btn btn-secondary">保存草稿</button>
-                            <button type="submit" class="btn btn-primary">提交合同</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
 
-            <!-- 其他页面占位 -->
-            <div id="page-products" class="page-content hidden">
-                <div class="page-header"><h1>商品管理</h1></div>
-                <div class="placeholder-content">
-                    <span class="placeholder-icon">☐</span>
-                    <p>商品管理页面开发中...</p>
-                </div>
-            </div>
-            <div id="page-suppliers" class="page-content hidden">
-                <div class="page-header"><h1>供应商管理</h1></div>
-                <div class="placeholder-content">
-                    <span class="placeholder-icon">⚑</span>
-                    <p>供应商管理页面开发中...</p>
-                </div>
-            </div>
-            <div id="page-stores" class="page-content hidden">
-                <div class="page-header"><h1>客户门店</h1></div>
-                <div class="placeholder-content">
-                    <span class="placeholder-icon">⚐</span>
-                    <p>客户门店页面开发中...</p>
-                </div>
-            </div>
-            <div id="page-ports" class="page-content hidden">
-                <div class="page-header"><h1>港口管理</h1></div>
-                <div class="placeholder-content">
-                    <span class="placeholder-icon">⚓</span>
-                    <p>港口管理页面开发中...</p>
-                </div>
-            </div>
-            <div id="page-sales" class="page-content hidden">
-                <div class="page-header"><h1>出口合同</h1></div>
-                <div class="placeholder-content">
-                    <span class="placeholder-icon">💰</span>
-                    <p>出口合同页面开发中...</p>
-                </div>
-            </div>
-            <div id="page-inventory" class="page-content hidden">
-                <div class="page-header"><h1>库存管理</h1></div>
-                <div class="placeholder-content">
-                    <span class="placeholder-icon">📦</span>
-                    <p>库存管理页面开发中...</p>
-                </div>
-            </div>
-            <div id="page-containers" class="page-content hidden">
-                <div class="page-header"><h1>货柜管理</h1></div>
-                <div class="placeholder-content">
-                    <span class="placeholder-icon">🚢</span>
-                    <p>货柜管理页面开发中...</p>
-                </div>
-            </div>
-            <div id="page-settings" class="page-content hidden">
-                <div class="page-header"><h1>系统设置</h1></div>
-                <div class="placeholder-content">
-                    <span class="placeholder-icon">⚙</span>
-                    <p>系统设置页面开发中...</p>
+                        <div class="form-card mb-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="section-title">商品明细</h3>
+                                <button class="btn btn-secondary btn-sm" id="add-item-btn">+ 添加商品</button>
+                            </div>
+                            
+                            <div class="table-container mb-4">
+                                <table class="data-table" id="items-table">
+                                    <thead>
+                                        <tr>
+                                            <th>商品名称</th>
+                                            <th>规格</th>
+                                            <th style="width: 100px;">数量</th>
+                                            <th style="width: 100px;">单位</th>
+                                            <th style="width: 120px;">单价(¥)</th>
+                                            <th style="width: 120px; text-align: right;">小计</th>
+                                            <th style="width: 50px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="items-list">
+                                        <tr class="item-row">
+                                            <td><input type="text" class="input-field" placeholder="输入名称"></td>
+                                            <td><input type="text" class="input-field" placeholder="规格"></td>
+                                            <td><input type="number" class="input-field col-qty" placeholder="0"></td>
+                                            <td><input type="text" class="input-field" placeholder="单位"></td>
+                                            <td><input type="number" class="input-field col-price" placeholder="0.00"></td>
+                                            <td class="text-right font-medium col-total">0.00</td>
+                                            <td class="text-right"><button class="btn-icon btn-del text-secondary hover:text-danger">×</button></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="flex justify-end items-center gap-4">
+                                <span class="text-secondary">合计金额:</span>
+                                <span class="text-xl font-bold" id="total-amount">¥0.00</span>
+                            </div>
+                        </div>
+
+                        <div class="form-card mb-6">
+                            <h3 class="section-title mb-4">付款信息</h3>
+                            <div class="input-group">
+                                <div class="form-row">
+                                    <label class="form-label">定金比例 (%)</label>
+                                    <input type="number" class="input-field" value="30">
+                                </div>
+                                <div class="form-row">
+                                    <label class="form-label">定金金额</label>
+                                    <input type="text" class="input-field" placeholder="自动计算" readonly>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-card">
+                            <h3 class="section-title mb-4">备注</h3>
+                            <textarea class="input-field" style="height: 80px; resize: vertical;" placeholder="填写备注信息..."></textarea>
+                        </div>
+                        
+                        <div class="flex justify-end gap-2 mt-6 pb-8">
+                            <button class="btn btn-secondary action-cancel" data-page="purchase">取消</button>
+                            <button class="btn btn-secondary action-save">保存草稿</button>
+                            <button class="btn btn-primary action-submit">提交合同</button>
+                        </div>
+                    </div>
+
+                    <!-- 4. 销售发货 (新内容) -->
+                    <div id="page-sales" class="page-content hidden">
+                        <div class="flex justify-between items-center mb-6">
+                            <h1 class="text-xl font-bold">销售合同</h1>
+                            <button class="btn btn-primary action-create">新建出口合同</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>合同号</th>
+                                        <th>门店</th>
+                                        <th>港口</th>
+                                        <th>金额($)</th>
+                                        <th>状态</th>
+                                        <th class="cell-action">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="font-medium">EXP250012</td>
+                                        <td>禧瑞都</td>
+                                        <td>LA (洛杉矶)</td>
+                                        <td>$45,200.00</td>
+                                        <td><span class="status-badge status-blue">运输中</span></td>
+                                        <td class="cell-action"><button class="btn-text">查看</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-medium">EXP250011</td>
+                                        <td>安纳汉姆</td>
+                                        <td>LA (洛杉矶)</td>
+                                        <td>$32,150.00</td>
+                                        <td><span class="status-badge status-green">已完成</span></td>
+                                        <td class="cell-action"><button class="btn-text">查看</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 5. 库存管理 (新内容) -->
+                    <div id="page-inventory" class="page-content hidden">
+                        <div class="flex justify-between items-center mb-6">
+                            <h1 class="text-xl font-bold">库存查询</h1>
+                            <div class="flex gap-2">
+                                <button class="btn btn-secondary">导出报表</button>
+                                <button class="btn btn-primary action-create">库存入库</button>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>商品名称</th>
+                                        <th>规格</th>
+                                        <th>供应商</th>
+                                        <th>库存数量</th>
+                                        <th>状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="font-medium">瓷砖 800*800</td>
+                                        <td>800x800mm</td>
+                                        <td>黎总</td>
+                                        <td>500 ㎡</td>
+                                        <td><span class="status-badge status-green">充足</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-medium">不锈钢门</td>
+                                        <td>定制尺寸</td>
+                                        <td>郭总</td>
+                                        <td>10 套</td>
+                                        <td><span class="status-badge status-yellow">生产中</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 6. 货柜管理 (新内容) -->
+                    <div id="page-containers" class="page-content hidden">
+                        <div class="flex justify-between items-center mb-6">
+                            <h1 class="text-xl font-bold">货柜管理</h1>
+                            <button class="btn btn-primary action-create">创建货柜</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>货柜编号</th>
+                                        <th>港口</th>
+                                        <th>包含合同</th>
+                                        <th>发货日期</th>
+                                        <th>状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="font-medium">25-003-LA</td>
+                                        <td>LA (洛杉矶)</td>
+                                        <td>EXP250012</td>
+                                        <td>2025-01-05</td>
+                                        <td><span class="status-badge status-blue">运输中</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-medium">25-002-OAK</td>
+                                        <td>OAK (奥克兰)</td>
+                                        <td>EXP250010</td>
+                                        <td>2024-12-28</td>
+                                        <td><span class="status-badge status-green">已到达</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 7. 财务管理 (新内容) -->
+                    <div id="page-finance" class="page-content hidden">
+                        <div class="flex justify-between items-center mb-6">
+                            <h1 class="text-xl font-bold">财务概览</h1>
+                        </div>
+                        <div class="overview-grid">
+                            <div class="card">
+                                <div class="stat-header"><span class="stat-label">本月支出</span></div>
+                                <div class="stat-number">¥45.2w</div>
+                            </div>
+                            <div class="card">
+                                <div class="stat-header"><span class="stat-label">本月收入</span></div>
+                                <div class="stat-number">$82.1w</div>
+                            </div>
+                            <div class="card">
+                                <div class="stat-header"><span class="stat-label">待付款</span></div>
+                                <div class="stat-number">¥12.5w</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 8. 商品库 (新内容) -->
+                    <div id="page-products" class="page-content hidden">
+                        <div class="flex justify-between items-center mb-6">
+                            <h1 class="text-xl font-bold">商品库</h1>
+                            <button class="btn btn-primary action-create">添加商品</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>商品名称</th>
+                                        <th>报关名</th>
+                                        <th>默认供应商</th>
+                                        <th>单位</th>
+                                        <th class="cell-action">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="font-medium">瓷砖 800*800</td>
+                                        <td>瓷砖</td>
+                                        <td>黎总</td>
+                                        <td>平米</td>
+                                        <td class="cell-action"><button class="btn-text">编辑</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-medium">火锅电磁炉</td>
+                                        <td>电磁炉</td>
+                                        <td>叶总</td>
+                                        <td>台</td>
+                                        <td class="cell-action"><button class="btn-text">编辑</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 9. 供应商 (新内容) -->
+                    <div id="page-suppliers" class="page-content hidden">
+                        <div class="flex justify-between items-center mb-6">
+                            <h1 class="text-xl font-bold">供应商管理</h1>
+                            <button class="btn btn-primary action-create">添加供应商</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>昵称</th>
+                                        <th>公司全称</th>
+                                        <th>联系人</th>
+                                        <th>主营产品</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="font-medium">黎总</td>
+                                        <td>佛山XX陶瓷有限公司</td>
+                                        <td>黎先生</td>
+                                        <td>瓷砖、地砖</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-medium">叶总</td>
+                                        <td>广州XX餐饮设备厂</td>
+                                        <td>叶经理</td>
+                                        <td>火锅桌、电磁炉</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 10. 设置 (新内容) -->
+                    <div id="page-settings" class="page-content hidden">
+                        <h1 class="text-xl font-bold mb-6">系统设置</h1>
+                        <div class="form-card" style="max-width: 600px;">
+                            <div class="settings-section">
+                                <div class="settings-title">基础配置</div>
+                                <div class="form-row">
+                                    <label class="form-label">默认汇率</label>
+                                    <div class="flex gap-2">
+                                        <input type="number" class="input-field" value="6.8">
+                                        <button class="btn btn-secondary">更新</button>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <label class="form-label">利润率系数</label>
+                                    <input type="number" class="input-field" value="1.3">
+                                </div>
+                            </div>
+                            <div class="settings-section">
+                                <div class="settings-title">通知设置</div>
+                                <div class="flex justify-between items-center mb-4">
+                                    <span class="text-sm text-secondary">启用库存预警通知</span>
+                                    <div class="toggle-switch active"></div>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm text-secondary">启用付款到期提醒</span>
+                                    <div class="toggle-switch active"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </main>
 
-        <!-- AI助手浮窗按钮 -->
-        <button id="ai-btn" class="ai-float-btn">
-            <span class="ai-icon">🤖</span>
-        </button>
+        <!-- AI 助手入口 -->
+        <div id="ai-btn" class="ai-trigger">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            <span>Ask AI</span>
+        </div>
 
-        <!-- AI助手对话窗口 -->
-        <div id="ai-chat" class="ai-chat-window hidden">
-            <div class="chat-header">
-                <div class="chat-title">
-                    <span class="chat-icon">🤖</span>
-                    <div>
-                        <div class="chat-name">AI 智能助手</div>
-                        <div class="chat-subtitle">Powered by Kimi</div>
-                    </div>
-                </div>
-                <button id="close-chat" class="btn-icon">✕</button>
+        <!-- AI 助手面板 -->
+        <div id="ai-chat" class="ai-panel hidden">
+            <div class="ai-header">
+                <h3>AI Assistant</h3>
+                <button id="close-chat" class="btn-icon">
+                    <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
             </div>
-            <div id="chat-messages" class="chat-messages">
-                <div class="message ai">
-                    <div class="message-avatar">🤖</div>
-                    <div class="message-content">
-                        <p>您好！我是AI智能助手，可以帮您：</p>
-                        <ul>
-                            <li>查询业务数据</li>
-                            <li>辅助录入采购信息</li>
-                            <li>查询商品位置</li>
-                            <li>计算售价</li>
-                        </ul>
-                        <p>请问有什么可以帮您？</p>
-                    </div>
+            <div id="chat-messages" class="chat-area">
+                <div class="chat-bubble ai">
+                    您好，我是您的智能助手。您可以问我关于库存、合同的问题，或者让我帮您录入数据。
                 </div>
             </div>
-            <div class="chat-input-area">
-                <div class="quick-prompts">
-                    <button class="prompt-btn">本月采购汇总</button>
-                    <button class="prompt-btn">查库存</button>
-                    <button class="prompt-btn">计算售价</button>
-                </div>
-                <div class="chat-input-wrapper">
-                    <input type="text" id="chat-input" placeholder="输入问题，按Enter发送...">
-                    <button class="send-btn">➤</button>
-                </div>
+            <div class="ai-input-box">
+                <input type="text" id="chat-input" class="ai-input" placeholder="输入问题或指令...">
             </div>
         </div>
 
-        <!-- AI辅助录入弹窗 -->
-        <div id="ai-input-modal" class="modal hidden">
-            <div class="modal-backdrop"></div>
-            <div class="modal-content">
+        <!-- AI 录入弹窗 -->
+        <div id="ai-input-modal" class="modal-overlay hidden">
+            <div class="modal-card">
                 <div class="modal-header">
-                    <h3>AI辅助录入</h3>
-                    <button class="btn-icon modal-close">✕</button>
+                    <h3 class="font-bold">AI 辅助录入</h3>
+                    <button class="btn-icon modal-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
                 </div>
                 <div class="modal-body">
-                    <p class="modal-hint">粘贴供应商发来的报价信息，AI会自动解析并填写表单</p>
-                    <textarea id="ai-input-text" rows="6" placeholder="示例：
-瓷砖800*800，数量500平方米，单价78元，供应商黎总
-预计1月20号到货"></textarea>
+                    <p class="text-secondary text-sm mb-3">粘贴供应商报价文本，AI 将自动解析并填充表单。</p>
+                    <textarea id="ai-text-source" class="input-field" style="height: 120px; resize: vertical;" placeholder="例如：瓷砖800*800，500平，单价78元..."></textarea>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary modal-close">取消</button>
-                    <button class="btn btn-primary" id="ai-parse-btn">🤖 开始解析</button>
+                    <button class="btn btn-primary" id="ai-parse-btn">开始解析</button>
                 </div>
             </div>
         </div>

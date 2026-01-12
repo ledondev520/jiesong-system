@@ -1,9 +1,39 @@
 /**
  * 捷淞进销存系统 - Demo交互逻辑
- * 功能：页面切换、AI助手交互、表单处理
+ * 适配风格：极简黑白灰 (Linear/Notion Style)
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+    // === 核心功能函数 ===
+    
+    // 显示 Toast 提示
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        
+        let icon = '✨';
+        if (type === 'success') icon = '✓';
+        if (type === 'error') icon = '✕';
+        if (type === 'loading') icon = '⟳';
+
+        toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+        container.appendChild(toast);
+
+        // 3秒后自动消失
+        setTimeout(() => {
+            toast.classList.add('hidden');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    // 格式化金额
+    function formatMoney(amount) {
+        return '¥' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
     // === 登录逻辑 ===
     const loginForm = document.getElementById('login-form');
     if (loginForm) {
@@ -11,286 +41,302 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const btn = loginForm.querySelector('button');
             const originalText = btn.innerText;
-            btn.innerText = '登录中...';
-            btn.disabled = true;
+            btn.innerText = 'Signing in...';
+            btn.style.opacity = '0.7';
             
-            // 模拟登录延迟
             setTimeout(() => {
                 document.getElementById('login-page').classList.add('hidden');
                 document.getElementById('main-app').classList.remove('hidden');
-                btn.innerText = originalText;
-                btn.disabled = false;
+                showToast('登录成功', 'success');
+                // 默认选中 Dashboard
+                document.querySelector('.nav-item[data-page="dashboard"]').click();
             }, 800);
         });
     }
 
     // === 退出登录 ===
-    document.getElementById('logout-btn')?.addEventListener('click', () => {
-        if(confirm('确定要退出系统吗？')) {
-            document.getElementById('main-app').classList.add('hidden');
-            document.getElementById('login-page').classList.remove('hidden');
-            // 重置到首页
-            document.querySelector('[data-page="dashboard"]').click();
-        }
-    });
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            if(confirm('Confirm logout?')) {
+                document.getElementById('main-app').classList.add('hidden');
+                document.getElementById('login-page').classList.remove('hidden');
+                showToast('已安全退出');
+            }
+        });
+    }
 
     // === 侧边栏导航 ===
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
         item.addEventListener('click', (e) => {
             e.preventDefault();
-            
-            // 移除所有激活状态
-            navItems.forEach(i => i.classList.remove('active'));
-            // 激活当前项
-            item.classList.add('active');
-            
-            // 页面切换
             const pageId = item.dataset.page;
+            if (!pageId) return;
+
+            // 更新导航状态
+            navItems.forEach(nav => nav.classList.remove('active'));
+            item.classList.add('active');
+
+            // 切换页面
             document.querySelectorAll('.page-content').forEach(page => {
                 page.classList.add('hidden');
             });
-            
+
             const targetPage = document.getElementById(`page-${pageId}`);
             if (targetPage) {
                 targetPage.classList.remove('hidden');
             } else {
-                // 如果页面不存在（开发中），显示Dashboard或占位
-                document.getElementById('page-dashboard').classList.remove('hidden');
-            }
-            
-            // 移动端收起侧边栏
-            if (window.innerWidth <= 768) {
-                document.querySelector('.sidebar').classList.remove('open');
+                // 如果页面未实现，显示提示并停留在当前页
+                showToast(`${item.querySelector('span').innerText} 页面开发中`, 'info');
+                // 恢复上一个选中状态（简化处理，暂不回滚DOM状态）
             }
         });
     });
 
-    // === 页面内链接跳转 ===
-    document.querySelectorAll('[data-page]').forEach(link => {
-        if (!link.classList.contains('nav-item')) { // 排除导航项，避免重复绑定
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const pageId = link.dataset.page;
-                // 找到对应的导航项并点击，以保持状态同步
-                const navItem = document.querySelector(`.nav-item[data-page="${pageId}"]`);
-                if (navItem) navItem.click();
-            });
+    // === 页面内跳转按钮 ===
+    // 绑定所有带有 data-page 属性的按钮
+    document.body.addEventListener('click', (e) => {
+        // 查找带有 data-page 的元素（可能是按钮本身或其父元素）
+        const target = e.target.closest('[data-page]');
+        if (target && !target.classList.contains('nav-item')) {
+            const pageId = target.dataset.page;
+            const navItem = document.querySelector(`.nav-item[data-page="${pageId}"]`);
+            if (navItem) {
+                navItem.click();
+            } else {
+                // 如果没有对应的导航项（例如 action-cancel 返回列表），手动切换
+                document.querySelectorAll('.page-content').forEach(page => {
+                    page.classList.add('hidden');
+                });
+                const targetContent = document.getElementById(`page-${pageId}`);
+                if (targetContent) targetContent.classList.remove('hidden');
+            }
         }
     });
 
-    // === AI助手交互 ===
-    const aiBtn = document.getElementById('ai-btn');
-    const aiChat = document.getElementById('ai-chat');
-    const closeChat = document.getElementById('close-chat');
-    const chatInput = document.getElementById('chat-input');
-    const sendBtn = document.querySelector('.send-btn');
-    const messagesContainer = document.getElementById('chat-messages');
-
-    // 切换窗口
-    aiBtn?.addEventListener('click', () => {
-        aiChat.classList.toggle('hidden');
-        if (!aiChat.classList.contains('hidden')) {
-            setTimeout(() => chatInput.focus(), 100);
-        }
-    });
-
-    closeChat?.addEventListener('click', () => {
-        aiChat.classList.add('hidden');
-    });
-
-    // 发送消息
-    function sendMessage() {
-        const text = chatInput.value.trim();
-        if (!text) return;
-
-        // 添加用户消息
-        addMessage(text, 'user');
-        chatInput.value = '';
-
-        // 模拟AI思考和回复
-        showTyping();
-        
-        setTimeout(() => {
-            removeTyping();
-            const reply = getAIReply(text);
-            addMessage(reply, 'ai');
-        }, 1000 + Math.random() * 1000);
-    }
-
-    sendBtn?.addEventListener('click', sendMessage);
-    chatInput?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendMessage();
-    });
-
-    // 快捷提示词
-    document.querySelectorAll('.prompt-btn').forEach(btn => {
+    // === 功能按钮反馈 ===
+    // 导入数据
+    document.querySelectorAll('.action-import').forEach(btn => {
         btn.addEventListener('click', () => {
-            chatInput.value = btn.innerText;
-            sendMessage();
+            showToast('正在打开导入向导...', 'loading');
+            setTimeout(() => showToast('请选择 CSV 文件'), 1000);
         });
     });
 
-    function addMessage(text, type) {
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `message ${type}`;
-        
-        const avatar = type === 'ai' ? '🤖' : '👤';
-        
-        msgDiv.innerHTML = `
-            <div class="message-avatar">${avatar}</div>
-            <div class="message-content">
-                ${text}
-            </div>
-        `;
-        
-        messagesContainer.appendChild(msgDiv);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
-
-    function showTyping() {
-        const typingDiv = document.createElement('div');
-        typingDiv.id = 'typing-indicator';
-        typingDiv.className = 'message ai';
-        typingDiv.innerHTML = `
-            <div class="message-avatar">🤖</div>
-            <div class="message-content" style="color: #999;">
-                思考中...
-            </div>
-        `;
-        messagesContainer.appendChild(typingDiv);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
-
-    function removeTyping() {
-        const typing = document.getElementById('typing-indicator');
-        if (typing) typing.remove();
-    }
-
-    function getAIReply(text) {
-        // 简单的关键词匹配模拟AI回复
-        if (text.includes('库存') || text.includes('多少')) {
-            return '<p>当前系统库存总数为 <strong>156</strong> 件。</p><ul><li>瓷砖 800*800: 500㎡</li><li>不锈钢门: 10套</li><li>火锅桌: 25张</li></ul>';
-        }
-        if (text.includes('采购') || text.includes('合同')) {
-            return '<p>本月共签订采购合同 <strong>5</strong> 份，总金额 <strong>¥128.5万</strong>。</p><p>最近一份是与黎总签订的瓷砖采购。</p>';
-        }
-        if (text.includes('售价') || text.includes('计算')) {
-            return '<p>根据公式：采购价 ÷ (6.8 - 0.2) × 1.3</p><p>如果您采购价是 ¥100，建议售价为 <strong>$19.69</strong></p>';
-        }
-        return '收到您的请求。在实际系统中，我会调用Kimi API来分析您的具体业务数据并给出准确回答。';
-    }
-
-    // === AI辅助录入模态框 ===
-    const aiInputBtn = document.getElementById('ai-input-btn');
-    const modal = document.getElementById('ai-input-modal');
-    const modalCloseBtns = document.querySelectorAll('.modal-close');
-    const aiParseBtn = document.getElementById('ai-parse-btn');
-
-    aiInputBtn?.addEventListener('click', () => {
-        modal.classList.remove('hidden');
-    });
-
-    modalCloseBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            modal.classList.add('hidden');
-        });
-    });
-
-    aiParseBtn?.addEventListener('click', () => {
-        const btn = aiParseBtn;
-        const originalText = btn.innerText;
-        btn.innerText = '🤖 解析中...';
-        btn.disabled = true;
-
-        // 模拟解析过程
-        setTimeout(() => {
-            modal.classList.add('hidden');
-            btn.innerText = originalText;
-            btn.disabled = false;
-            
-            // 填充表单（模拟）
-            alert('解析成功！已自动填充商品明细：\n- 瓷砖 800*800\n- 数量：500平方米\n- 单价：78元');
-            
-            // 这里可以添加实际填充表单的逻辑
-            const firstRow = document.querySelector('.table-row');
-            if (firstRow) {
-                firstRow.querySelector('.col-product').value = '瓷砖';
-                firstRow.querySelector('.col-spec').value = '800*800';
-                firstRow.querySelector('.col-qty').value = '500';
-                firstRow.querySelector('.col-price').value = '78';
-                firstRow.querySelector('.col-total').innerText = '39,000';
-                document.querySelector('.total-amount').innerText = '¥39,000.00';
+    // 创建货柜/库存入库 等快捷操作
+    document.querySelectorAll('.action-create').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            // 如果按钮本身没有 data-page 跳转，则显示提示
+            if (!e.target.closest('[data-page]')) {
+                showToast('正在初始化创建表单...', 'loading');
             }
+        });
+    });
+
+    // 列表操作按钮
+    document.querySelectorAll('.action-view').forEach(btn => {
+        btn.addEventListener('click', () => showToast('正在加载详情...'));
+    });
+    document.querySelectorAll('.action-edit').forEach(btn => {
+        btn.addEventListener('click', () => showToast('进入编辑模式'));
+    });
+
+    // 商品查询
+    document.querySelectorAll('.action-search').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelector('.search-input').focus();
+            showToast('请输入关键词搜索');
+        });
+    });
+
+    // Tab 切换
+    const tabs = document.querySelectorAll('.tab-item');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tab.parentElement.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            showToast(`已筛选: ${tab.innerText}`);
+        });
+    });
+
+    // === 表单交互 ===
+    // 保存/提交
+    document.querySelector('.action-save')?.addEventListener('click', () => {
+        showToast('草稿保存成功', 'success');
+    });
+
+    document.querySelector('.action-submit')?.addEventListener('click', () => {
+        showToast('正在提交合同...', 'loading');
+        setTimeout(() => {
+            showToast('提交成功！', 'success');
+            // 返回列表页
+            document.querySelector('.nav-item[data-page="purchase"]').click();
         }, 1500);
     });
 
-    // === 动态计算小计 ===
+    // 动态添加商品行
+    const addItemBtn = document.getElementById('add-item-btn');
+    const itemsList = document.getElementById('items-list');
+    
+    if (addItemBtn && itemsList) {
+        addItemBtn.addEventListener('click', () => {
+            const row = document.createElement('tr');
+            row.className = 'item-row';
+            row.innerHTML = `
+                <td><input type="text" class="input-field" placeholder="输入名称"></td>
+                <td><input type="text" class="input-field" placeholder="规格"></td>
+                <td><input type="number" class="input-field col-qty" placeholder="0"></td>
+                <td><input type="text" class="input-field" placeholder="单位"></td>
+                <td><input type="number" class="input-field col-price" placeholder="0.00"></td>
+                <td class="text-right font-medium col-total">0.00</td>
+                <td class="text-right"><button class="btn-icon btn-del text-secondary hover:text-danger">×</button></td>
+            `;
+            itemsList.appendChild(row);
+            // 绑定新行的删除事件
+            const delBtn = row.querySelector('.btn-del');
+            delBtn.addEventListener('click', () => {
+                row.remove();
+                updateTotal();
+            });
+        });
+    }
+
+    // 初始删除按钮
+    document.querySelectorAll('.btn-del').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.target.closest('tr').remove();
+            updateTotal();
+        });
+    });
+
+    // 自动计算金额
     document.addEventListener('input', (e) => {
-        if (e.target.matches('.col-qty') || e.target.matches('.col-price')) {
-            const row = e.target.closest('.table-row');
+        if (e.target.classList.contains('col-qty') || e.target.classList.contains('col-price')) {
+            const row = e.target.closest('tr');
             const qty = parseFloat(row.querySelector('.col-qty').value) || 0;
             const price = parseFloat(row.querySelector('.col-price').value) || 0;
             const total = qty * price;
-            
-            row.querySelector('.col-total').innerText = total.toLocaleString();
-            
-            // 更新总计
+            row.querySelector('.col-total').innerText = total.toFixed(2);
             updateTotal();
         }
     });
 
     function updateTotal() {
         let sum = 0;
-        document.querySelectorAll('.table-row').forEach(row => {
-            const txt = row.querySelector('.col-total').innerText.replace(/,/g, '');
-            sum += parseFloat(txt) || 0;
+        document.querySelectorAll('.col-total').forEach(el => {
+            sum += parseFloat(el.innerText);
         });
-        document.querySelector('.total-amount').innerText = '¥' + sum.toLocaleString(undefined, {minimumFractionDigits: 2});
+        const totalEl = document.getElementById('total-amount');
+        if (totalEl) totalEl.innerText = formatMoney(sum);
     }
 
-    // === 添加/删除商品行 ===
-    const addItemBtn = document.getElementById('add-item-btn');
-    const itemsList = document.getElementById('items-list');
+    // === AI 助手交互 ===
+    const aiBtn = document.getElementById('ai-btn');
+    const aiPanel = document.getElementById('ai-chat');
+    const closeChat = document.getElementById('close-chat');
+    const chatInput = document.getElementById('chat-input');
+    const chatArea = document.getElementById('chat-messages');
 
-    addItemBtn?.addEventListener('click', () => {
-        const newRow = document.createElement('div');
-        newRow.className = 'table-row';
-        newRow.innerHTML = `
-            <input type="text" class="col-product" placeholder="商品名称">
-            <input type="text" class="col-spec" placeholder="规格">
-            <input type="number" class="col-qty" placeholder="0">
-            <select class="col-unit">
-                <option>平方米</option>
-                <option>件</option>
-                <option>个</option>
-            </select>
-            <input type="number" class="col-price" placeholder="0">
-            <span class="col-total">0</span>
-            <button type="button" class="btn-icon-sm danger">✕</button>
-        `;
-        itemsList.appendChild(newRow);
+    aiBtn?.addEventListener('click', () => {
+        aiPanel.classList.toggle('hidden');
+        if (!aiPanel.classList.contains('hidden')) {
+            setTimeout(() => chatInput.focus(), 100);
+        }
+    });
+
+    closeChat?.addEventListener('click', () => {
+        aiPanel.classList.add('hidden');
+    });
+
+    chatInput?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && chatInput.value.trim()) {
+            const text = chatInput.value.trim();
+            
+            // 用户消息
+            const userMsg = document.createElement('div');
+            userMsg.className = 'chat-bubble user';
+            userMsg.innerText = text;
+            chatArea.appendChild(userMsg);
+            
+            chatInput.value = '';
+            chatArea.scrollTop = chatArea.scrollHeight;
+
+            // 模拟 AI 回复
+            setTimeout(() => {
+                const aiMsg = document.createElement('div');
+                aiMsg.className = 'chat-bubble ai';
+                
+                if (text.includes('库存') || text.includes('多少')) {
+                    aiMsg.innerHTML = '当前库存总计 <strong>42</strong> 种商品。其中瓷砖类库存较低，建议补货。';
+                } else if (text.includes('采购')) {
+                    aiMsg.innerHTML = '本月采购总额 <strong>¥128.5万</strong>，共签订 5 份合同。';
+                } else {
+                    aiMsg.innerText = '好的，我记下了。';
+                }
+                
+                chatArea.appendChild(aiMsg);
+                chatArea.scrollTop = chatArea.scrollHeight;
+            }, 600);
+        }
+    });
+
+    // === AI 辅助录入弹窗 ===
+    const aiInputBtn = document.getElementById('ai-input-btn');
+    const aiModal = document.getElementById('ai-input-modal');
+    const modalCloseBtns = document.querySelectorAll('.modal-close');
+    const aiParseBtn = document.getElementById('ai-parse-btn');
+
+    aiInputBtn?.addEventListener('click', () => {
+        aiModal.classList.remove('hidden');
+    });
+
+    modalCloseBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            aiModal.classList.add('hidden');
+        });
+    });
+
+    aiParseBtn?.addEventListener('click', () => {
+        const btn = aiParseBtn;
+        const originalText = btn.innerText;
+        btn.innerText = 'Parsing...';
         
-        // 绑定删除事件
-        newRow.querySelector('.danger').addEventListener('click', function() {
-            this.closest('.table-row').remove();
-            updateTotal();
+        setTimeout(() => {
+            aiModal.classList.add('hidden');
+            btn.innerText = originalText;
+            showToast('AI 解析成功！数据已填充', 'success');
+            
+            // 模拟填充第一行
+            const firstRow = document.querySelector('.item-row');
+            if (firstRow) {
+                firstRow.querySelector('input[placeholder="输入名称"]').value = '瓷砖 800*800';
+                firstRow.querySelector('input[placeholder="规格"]').value = '800x800mm';
+                firstRow.querySelector('.col-qty').value = 500;
+                firstRow.querySelector('input[placeholder="单位"]').value = '平米';
+                firstRow.querySelector('.col-price').value = 78;
+                firstRow.querySelector('.col-total').innerText = '39000.00';
+                updateTotal();
+            }
+        }, 1000);
+    });
+
+    // === 设置页交互 ===
+    document.querySelectorAll('.toggle-switch').forEach(toggle => {
+        toggle.addEventListener('click', () => {
+            toggle.classList.toggle('active');
+            const state = toggle.classList.contains('active') ? '已开启' : '已关闭';
+            showToast(state);
         });
     });
 
-    // 初始绑定现有删除按钮
-    document.querySelectorAll('.btn-icon-sm.danger').forEach(btn => {
-        btn.addEventListener('click', function() {
-            this.closest('.table-row').remove();
-            updateTotal();
-        });
-    });
-    
-    // 状态筛选切换
-    document.querySelectorAll('.filter-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-        });
+    // === 顶部搜索框 ===
+    document.querySelector('.search-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            showToast(`正在搜索: ${e.target.value}...`, 'loading');
+            setTimeout(() => {
+                showToast(`找到 3 个关于 "${e.target.value}" 的结果`);
+            }, 800);
+        }
     });
 });
