@@ -1,232 +1,698 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <!--
- * Input: styles.css, app.js
- * Output: Demo展示页面
- * Pos: Demo入口文件
- * 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ * 捷淞进销存系统 - UI Demo
+ * 设计风格：现代简约，中性黑灰，Notion风格左侧边栏
+ * 更新时间：2026-01-13
 -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>捷淞进销存系统 - Demo</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>捷淞进销存系统</title>
     <link rel="stylesheet" href="styles.css">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Noto Sans SC', 'sans-serif'] },
-                    colors: {
-                        primary: { 50:'#f0f9ff',100:'#e0f2fe',200:'#bae6fd',300:'#7dd3fc',400:'#38bdf8',500:'#0ea5e9',600:'#0284c7',700:'#0369a1',800:'#075985',900:'#0c4a6e' },
-                        accent: { 500:'#f59e0b',600:'#d97706' }
-                    }
-                }
-            }
-        }
-    </script>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body>
     <!-- 登录页面 -->
-    <div id="login-page" class="min-h-screen flex items-center justify-center gradient-bg p-4">
-        <div class="glass rounded-2xl shadow-2xl p-8 w-full max-w-md">
-            <div class="text-center mb-8">
-                <div class="inline-flex items-center justify-center w-16 h-16 bg-primary-500 rounded-xl mb-4">
-                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                    </svg>
+    <div id="login-page" class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo">
+                    <span class="logo-icon">◈</span>
                 </div>
-                <h1 class="text-2xl font-bold text-gray-800">捷淞进销存系统</h1>
-                <p class="text-gray-500 mt-2">外贸出口业务管理平台</p>
+                <h1>捷淞进销存</h1>
+                <p>外贸出口业务管理平台</p>
             </div>
-            <form id="login-form" class="space-y-5">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">用户名</label>
-                    <input type="text" value="admin" class="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition" placeholder="请输入用户名">
+            <form id="login-form">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" value="admin" placeholder="请输入用户名">
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">密码</label>
-                    <input type="password" value="admin123" class="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition" placeholder="请输入密码">
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" value="admin123" placeholder="请输入密码">
                 </div>
-                <div class="flex items-center justify-between">
-                    <label class="flex items-center">
-                        <input type="checkbox" checked class="w-4 h-4 text-primary-500 border-gray-300 rounded">
-                        <span class="ml-2 text-sm text-gray-600">记住我</span>
+                <div class="form-options">
+                    <label class="checkbox-label">
+                        <input type="checkbox" checked>
+                        <span>记住我</span>
                     </label>
-                    <a href="#" class="text-sm text-primary-600 hover:text-primary-700">忘记密码？</a>
                 </div>
-                <button type="submit" class="w-full py-3 px-4 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-lg transition shadow-lg shadow-primary-500/30">登录系统</button>
+                <button type="submit" class="btn btn-primary btn-block">登录系统</button>
             </form>
-            <p class="text-center text-gray-500 text-sm mt-6">Demo版本 · 点击登录查看系统界面</p>
+            <p class="login-footer">Demo版本 · 点击登录查看系统界面</p>
         </div>
     </div>
 
     <!-- 主系统界面 -->
-    <div id="main-app" class="hidden">
+    <div id="main-app" class="app-container hidden">
         <!-- 侧边栏 -->
-        <aside id="sidebar" class="fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-200 z-40">
-            <div class="h-16 flex items-center px-6 border-b border-gray-100">
-                <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
-                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                        </svg>
-                    </div>
-                    <span class="font-bold text-gray-800">捷淞进销存</span>
-                </div>
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="logo-icon">◈</span>
+                <span class="logo-text">捷淞进销存</span>
             </div>
-            <nav class="p-4 space-y-1">
-                <a href="#" class="sidebar-item active flex items-center px-4 py-3 rounded-lg text-gray-700" data-page="dashboard">
-                    <svg class="w-5 h-5 mr-3 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-                    <span class="font-medium">首页</span>
+            
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-page="dashboard">
+                    <span class="nav-icon">⌂</span>
+                    <span>首页</span>
                 </a>
-                <div class="pt-4"><p class="px-4 text-xs font-semibold text-gray-400 uppercase">基础数据</p></div>
-                <a href="#" class="sidebar-item flex items-center px-4 py-3 rounded-lg text-gray-600" data-page="products">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                
+                <div class="nav-group-title">基础数据</div>
+                <a href="#" class="nav-item" data-page="products">
+                    <span class="nav-icon">☐</span>
                     <span>商品管理</span>
                 </a>
-                <a href="#" class="sidebar-item flex items-center px-4 py-3 rounded-lg text-gray-600" data-page="suppliers">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                <a href="#" class="nav-item" data-page="suppliers">
+                    <span class="nav-icon">⚑</span>
                     <span>供应商管理</span>
                 </a>
-                <a href="#" class="sidebar-item flex items-center px-4 py-3 rounded-lg text-gray-600" data-page="stores">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <a href="#" class="nav-item" data-page="stores">
+                    <span class="nav-icon">⚐</span>
                     <span>客户门店</span>
                 </a>
-                <div class="pt-4"><p class="px-4 text-xs font-semibold text-gray-400 uppercase">业务管理</p></div>
-                <a href="#" class="sidebar-item flex items-center px-4 py-3 rounded-lg text-gray-600" data-page="purchase">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                    <span>采购管理</span>
+                <a href="#" class="nav-item" data-page="ports">
+                    <span class="nav-icon">⚓</span>
+                    <span>港口管理</span>
                 </a>
-                <a href="#" class="sidebar-item flex items-center px-4 py-3 rounded-lg text-gray-600" data-page="sales">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                    <span>销售管理</span>
+                
+                <div class="nav-group-title">采购管理</div>
+                <a href="#" class="nav-item" data-page="purchase">
+                    <span class="nav-icon">📄</span>
+                    <span>采购合同</span>
                 </a>
-                <a href="#" class="sidebar-item flex items-center px-4 py-3 rounded-lg text-gray-600" data-page="inventory">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+                <a href="#" class="nav-item" data-page="purchase-new">
+                    <span class="nav-icon">✚</span>
+                    <span>新建采购</span>
+                </a>
+                
+                <div class="nav-group-title">销售管理</div>
+                <a href="#" class="nav-item" data-page="sales">
+                    <span class="nav-icon">💰</span>
+                    <span>出口合同</span>
+                </a>
+                
+                <div class="nav-group-title">仓储物流</div>
+                <a href="#" class="nav-item" data-page="inventory">
+                    <span class="nav-icon">📦</span>
                     <span>库存管理</span>
                 </a>
-                <a href="#" class="sidebar-item flex items-center px-4 py-3 rounded-lg text-gray-600" data-page="containers">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
+                <a href="#" class="nav-item" data-page="containers">
+                    <span class="nav-icon">🚢</span>
                     <span>货柜管理</span>
                 </a>
-                <div class="pt-4"><p class="px-4 text-xs font-semibold text-gray-400 uppercase">系统</p></div>
-                <a href="#" class="sidebar-item flex items-center px-4 py-3 rounded-lg text-gray-600" data-page="settings">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                
+                <div class="nav-group-title">系统</div>
+                <a href="#" class="nav-item" data-page="settings">
+                    <span class="nav-icon">⚙</span>
                     <span>系统设置</span>
                 </a>
             </nav>
+            
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar">管</div>
+                    <div class="user-details">
+                        <span class="user-name">管理员</span>
+                        <span class="user-role">超级管理员</span>
+                    </div>
+                </div>
+                <button id="logout-btn" class="btn-icon" title="退出登录">⏻</button>
+            </div>
         </aside>
 
         <!-- 主内容区 -->
-        <main class="ml-64 min-h-screen">
-            <!-- 顶部导航 -->
-            <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-30">
-                <div class="flex items-center space-x-4">
-                    <button id="mobile-menu-btn" class="lg:hidden p-2 rounded-lg hover:bg-gray-100">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-                    </button>
-                    <div class="relative">
-                        <input type="text" placeholder="搜索商品、合同、货柜..." class="w-80 pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm">
-                        <svg class="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <main class="main-content">
+            <!-- Dashboard 页面 -->
+            <div id="page-dashboard" class="page-content">
+                <div class="page-header">
+                    <div>
+                        <h1>下午好，管理员</h1>
+                        <p class="text-secondary">2026年1月13日 星期一</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary">导入数据</button>
+                        <button class="btn btn-primary">新建采购</button>
                     </div>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <button class="relative p-2 rounded-lg hover:bg-gray-100 transition">
-                        <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-                        <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                    </button>
-                    <div class="flex items-center space-x-3 pl-4 border-l border-gray-200">
-                        <div class="w-9 h-9 bg-primary-100 rounded-full flex items-center justify-center">
-                            <span class="text-primary-600 font-medium">管</span>
+                
+                <!-- 数据概览卡片 -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-content">
+                            <span class="stat-label">待发货柜</span>
+                            <span class="stat-value">3</span>
+                            <span class="stat-change positive">↑ 较上周 +1</span>
                         </div>
-                        <div class="hidden sm:block">
-                            <p class="text-sm font-medium text-gray-700">管理员</p>
-                            <p class="text-xs text-gray-500">admin@jiesong.com</p>
+                        <div class="stat-icon blue">🚢</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-content">
+                            <span class="stat-label">本月采购额</span>
+                            <span class="stat-value">¥128.5<small>万</small></span>
+                            <span class="stat-change positive">↑ +12.3%</span>
                         </div>
-                        <button id="logout-btn" class="p-2 rounded-lg hover:bg-gray-100 transition" title="退出登录">
-                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                        <div class="stat-icon green">💵</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-content">
+                            <span class="stat-label">应收账款</span>
+                            <span class="stat-value">$45.2<small>万</small></span>
+                            <span class="stat-change warning">3笔待收</span>
+                        </div>
+                        <div class="stat-icon yellow">📊</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-content">
+                            <span class="stat-label">库存商品</span>
+                            <span class="stat-value">156</span>
+                            <span class="stat-change neutral">42 种商品</span>
+                        </div>
+                        <div class="stat-icon purple">📦</div>
+                    </div>
+                </div>
+                
+                <!-- 快捷操作 -->
+                <div class="section-card">
+                    <h2 class="section-title">快捷操作</h2>
+                    <div class="quick-actions">
+                        <button class="quick-action-btn">
+                            <span class="action-icon">📝</span>
+                            <span>新建采购合同</span>
+                        </button>
+                        <button class="quick-action-btn">
+                            <span class="action-icon">💼</span>
+                            <span>新建出口合同</span>
+                        </button>
+                        <button class="quick-action-btn">
+                            <span class="action-icon">🚢</span>
+                            <span>创建货柜</span>
+                        </button>
+                        <button class="quick-action-btn">
+                            <span class="action-icon">📊</span>
+                            <span>库存入库</span>
+                        </button>
+                        <button class="quick-action-btn">
+                            <span class="action-icon">📤</span>
+                            <span>导入CSV</span>
+                        </button>
+                        <button class="quick-action-btn">
+                            <span class="action-icon">🔍</span>
+                            <span>商品查询</span>
                         </button>
                     </div>
                 </div>
-            </header>
-
-            <!-- 页面内容容器 -->
-            <div class="p-6">
-                <!-- Dashboard页面内容在 pages/dashboard.html -->
-                <div id="page-dashboard" class="page-content">
-                    <div class="mb-6">
-                        <h1 class="text-2xl font-bold text-gray-800">欢迎回来，管理员</h1>
-                        <p class="text-gray-500 mt-1">这是今天的业务概览</p>
+                
+                <!-- 最近采购合同 -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h2 class="section-title">最近采购合同</h2>
+                        <a href="#" class="link" data-page="purchase">查看全部 →</a>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                        <div class="bg-white rounded-xl p-6 shadow-sm card-hover border border-gray-100">
-                            <div class="flex items-center justify-between">
-                                <div><p class="text-sm text-gray-500">待发货柜</p><p class="text-3xl font-bold text-gray-800 mt-2">3</p><p class="text-xs text-green-600 mt-2">↑ 较上周 +1</p></div>
-                                <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center"><svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg></div>
+                    <div class="card-list">
+                        <div class="list-card">
+                            <div class="card-main">
+                                <div class="card-title">CG2500048</div>
+                                <div class="card-subtitle">黎总 · 瓷砖800*800</div>
+                            </div>
+                            <div class="card-meta">
+                                <span class="badge badge-green">已完成</span>
+                                <span class="card-amount">¥144,300</span>
                             </div>
                         </div>
-                        <div class="bg-white rounded-xl p-6 shadow-sm card-hover border border-gray-100">
-                            <div class="flex items-center justify-between">
-                                <div><p class="text-sm text-gray-500">本月采购额</p><p class="text-3xl font-bold text-gray-800 mt-2">¥128.5<span class="text-lg">万</span></p><p class="text-xs text-green-600 mt-2">↑ 较上月 +12.3%</p></div>
-                                <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center"><svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+                        <div class="list-card">
+                            <div class="card-main">
+                                <div class="card-title">CG2500047</div>
+                                <div class="card-subtitle">叶总 · 火锅器材一批</div>
+                            </div>
+                            <div class="card-meta">
+                                <span class="badge badge-yellow">生产中</span>
+                                <span class="card-amount">¥89,000</span>
                             </div>
                         </div>
-                        <div class="bg-white rounded-xl p-6 shadow-sm card-hover border border-gray-100">
-                            <div class="flex items-center justify-between">
-                                <div><p class="text-sm text-gray-500">应收账款</p><p class="text-3xl font-bold text-gray-800 mt-2">$45.2<span class="text-lg">万</span></p><p class="text-xs text-amber-600 mt-2">3笔待收款</p></div>
-                                <div class="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center"><svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg></div>
+                        <div class="list-card">
+                            <div class="card-main">
+                                <div class="card-title">CG2500046</div>
+                                <div class="card-subtitle">郭总 · 不锈钢门10套</div>
                             </div>
-                        </div>
-                        <div class="bg-white rounded-xl p-6 shadow-sm card-hover border border-gray-100">
-                            <div class="flex items-center justify-between">
-                                <div><p class="text-sm text-gray-500">库存商品</p><p class="text-3xl font-bold text-gray-800 mt-2">156</p><p class="text-xs text-gray-500 mt-2">共 42 种商品</p></div>
-                                <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center"><svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg></div>
+                            <div class="card-meta">
+                                <span class="badge badge-blue">运输中</span>
+                                <span class="card-amount">¥56,800</span>
                             </div>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                        <h2 class="text-lg font-semibold text-gray-800 mb-4">快捷操作</h2>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <button class="flex flex-col items-center p-4 rounded-lg bg-primary-50 hover:bg-primary-100 transition"><svg class="w-8 h-8 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg><span class="text-sm text-primary-700 mt-2">新建采购</span></button>
-                            <button class="flex flex-col items-center p-4 rounded-lg bg-green-50 hover:bg-green-100 transition"><svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg><span class="text-sm text-green-700 mt-2">新建出口</span></button>
-                            <button class="flex flex-col items-center p-4 rounded-lg bg-amber-50 hover:bg-amber-100 transition"><svg class="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg><span class="text-sm text-amber-700 mt-2">创建货柜</span></button>
-                            <button class="flex flex-col items-center p-4 rounded-lg bg-purple-50 hover:bg-purple-100 transition"><svg class="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg><span class="text-sm text-purple-700 mt-2">导入数据</span></button>
                         </div>
                     </div>
                 </div>
-                <!-- 其他页面暂时隐藏 -->
-                <div id="page-products" class="page-content hidden"><h1 class="text-2xl font-bold">商品管理</h1><p class="text-gray-500">等待UI设计稿</p></div>
+            </div>
+
+            <!-- 采购合同列表页面 -->
+            <div id="page-purchase" class="page-content hidden">
+                <div class="page-header">
+                    <div>
+                        <h1>采购合同</h1>
+                        <p class="text-secondary">管理所有采购合同记录</p>
+                    </div>
+                    <div class="header-actions">
+                        <div class="search-box">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" placeholder="搜索合同号、供应商...">
+                        </div>
+                        <button class="btn btn-secondary">
+                            <span>筛选</span>
+                            <span class="btn-icon-right">▾</span>
+                        </button>
+                        <button class="btn btn-primary" data-page="purchase-new">✚ 新建采购</button>
+                    </div>
+                </div>
+                
+                <!-- 状态筛选标签 -->
+                <div class="filter-tabs">
+                    <button class="filter-tab active">全部 <span class="count">48</span></button>
+                    <button class="filter-tab">草稿 <span class="count">3</span></button>
+                    <button class="filter-tab">生产中 <span class="count">12</span></button>
+                    <button class="filter-tab">运输中 <span class="count">5</span></button>
+                    <button class="filter-tab">已完成 <span class="count">28</span></button>
+                </div>
+                
+                <!-- 卡片列表 -->
+                <div class="card-grid">
+                    <div class="contract-card">
+                        <div class="card-header">
+                            <span class="contract-no">CG2500048</span>
+                            <span class="badge badge-green">已完成</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-row">
+                                <span class="label">供应商</span>
+                                <span class="value">黎总（佛山瓷砖厂）</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">商品</span>
+                                <span class="value">瓷砖800*800 × 500㎡</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">金额</span>
+                                <span class="value amount">¥144,300</span>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <span class="date">2025-01-10 签订</span>
+                            <div class="card-actions">
+                                <button class="btn-text">查看</button>
+                                <button class="btn-text">编辑</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="contract-card">
+                        <div class="card-header">
+                            <span class="contract-no">CG2500047</span>
+                            <span class="badge badge-yellow">生产中</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-row">
+                                <span class="label">供应商</span>
+                                <span class="value">叶总（火锅器材）</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">商品</span>
+                                <span class="value">电磁炉 × 20台</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">金额</span>
+                                <span class="value amount">¥89,000</span>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <span class="date">2025-01-08 签订</span>
+                            <div class="card-actions">
+                                <button class="btn-text">查看</button>
+                                <button class="btn-text">编辑</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="contract-card">
+                        <div class="card-header">
+                            <span class="contract-no">CG2500046</span>
+                            <span class="badge badge-blue">运输中</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-row">
+                                <span class="label">供应商</span>
+                                <span class="value">郭总（不锈钢门）</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">商品</span>
+                                <span class="value">不锈钢门 × 10套</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">金额</span>
+                                <span class="value amount">¥56,800</span>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <span class="date">2025-01-05 签订</span>
+                            <div class="card-actions">
+                                <button class="btn-text">查看</button>
+                                <button class="btn-text">编辑</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="contract-card">
+                        <div class="card-header">
+                            <span class="contract-no">CG2500045</span>
+                            <span class="badge badge-gray">草稿</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-row">
+                                <span class="label">供应商</span>
+                                <span class="value">阿宗（大理石材）</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">商品</span>
+                                <span class="value">大理石板 × 200㎡</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">金额</span>
+                                <span class="value amount">¥78,500</span>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <span class="date">2025-01-12 创建</span>
+                            <div class="card-actions">
+                                <button class="btn-text">编辑</button>
+                                <button class="btn-text danger">删除</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="contract-card">
+                        <div class="card-header">
+                            <span class="contract-no">CG2500044</span>
+                            <span class="badge badge-green">已完成</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-row">
+                                <span class="label">供应商</span>
+                                <span class="value">刘总（卡座家具）</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">商品</span>
+                                <span class="value">餐厅卡座 × 15套</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">金额</span>
+                                <span class="value amount">¥123,000</span>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <span class="date">2025-01-02 签订</span>
+                            <div class="card-actions">
+                                <button class="btn-text">查看</button>
+                                <button class="btn-text">编辑</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="contract-card">
+                        <div class="card-header">
+                            <span class="contract-no">CG2500043</span>
+                            <span class="badge badge-yellow">生产中</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-row">
+                                <span class="label">供应商</span>
+                                <span class="value">何总布菲传奇</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">商品</span>
+                                <span class="value">自助餐台 × 3套</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">金额</span>
+                                <span class="value amount">¥245,000</span>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <span class="date">2024-12-28 签订</span>
+                            <div class="card-actions">
+                                <button class="btn-text">查看</button>
+                                <button class="btn-text">编辑</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 分页 -->
+                <div class="pagination">
+                    <button class="page-btn" disabled>‹</button>
+                    <button class="page-btn active">1</button>
+                    <button class="page-btn">2</button>
+                    <button class="page-btn">3</button>
+                    <span class="page-ellipsis">...</span>
+                    <button class="page-btn">8</button>
+                    <button class="page-btn">›</button>
+                </div>
+            </div>
+
+            <!-- 新建采购合同页面 -->
+            <div id="page-purchase-new" class="page-content hidden">
+                <div class="page-header">
+                    <div>
+                        <h1>新建采购合同</h1>
+                        <p class="text-secondary">创建新的采购合同记录</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-ai" id="ai-input-btn">
+                            <span>🤖</span>
+                            <span>AI辅助录入</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="form-container">
+                    <form id="purchase-form">
+                        <div class="form-section">
+                            <h3 class="form-section-title">基本信息</h3>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>合同编号</label>
+                                    <input type="text" value="CG2500049" readonly class="input-readonly">
+                                    <span class="form-hint">系统自动生成</span>
+                                </div>
+                                <div class="form-group">
+                                    <label>供应商 <span class="required">*</span></label>
+                                    <select>
+                                        <option value="">请选择供应商</option>
+                                        <option value="1">黎总（佛山瓷砖厂）</option>
+                                        <option value="2">叶总（火锅器材）</option>
+                                        <option value="3">郭总（不锈钢门）</option>
+                                        <option value="4">阿宗（大理石材）</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>签订日期 <span class="required">*</span></label>
+                                    <input type="date" value="2026-01-13">
+                                </div>
+                                <div class="form-group">
+                                    <label>预计交货日期</label>
+                                    <input type="date">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-section">
+                            <div class="form-section-header">
+                                <h3 class="form-section-title">商品明细</h3>
+                                <button type="button" class="btn btn-secondary btn-sm" id="add-item-btn">✚ 添加商品</button>
+                            </div>
+                            <div class="items-table">
+                                <div class="table-header">
+                                    <span class="col-product">商品名称</span>
+                                    <span class="col-spec">规格</span>
+                                    <span class="col-qty">数量</span>
+                                    <span class="col-unit">单位</span>
+                                    <span class="col-price">单价(¥)</span>
+                                    <span class="col-total">小计(¥)</span>
+                                    <span class="col-action">操作</span>
+                                </div>
+                                <div class="table-body" id="items-list">
+                                    <div class="table-row">
+                                        <input type="text" class="col-product" placeholder="商品名称" value="瓷砖">
+                                        <input type="text" class="col-spec" placeholder="规格" value="800*800">
+                                        <input type="number" class="col-qty" placeholder="0" value="500">
+                                        <select class="col-unit">
+                                            <option>平方米</option>
+                                            <option>件</option>
+                                            <option>个</option>
+                                        </select>
+                                        <input type="number" class="col-price" placeholder="0" value="78">
+                                        <span class="col-total">39,000</span>
+                                        <button type="button" class="btn-icon-sm danger">✕</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="items-summary">
+                                <span>合计金额：</span>
+                                <span class="total-amount">¥39,000.00</span>
+                            </div>
+                        </div>
+                        
+                        <div class="form-section">
+                            <h3 class="form-section-title">付款信息</h3>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>定金比例</label>
+                                    <div class="input-with-suffix">
+                                        <input type="number" value="30">
+                                        <span class="suffix">%</span>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>定金金额</label>
+                                    <input type="text" value="¥11,700" readonly class="input-readonly">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-section">
+                            <h3 class="form-section-title">备注</h3>
+                            <div class="form-group full-width">
+                                <textarea rows="3" placeholder="输入备注信息..."></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-secondary" data-page="purchase">取消</button>
+                            <button type="button" class="btn btn-secondary">保存草稿</button>
+                            <button type="submit" class="btn btn-primary">提交合同</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 其他页面占位 -->
+            <div id="page-products" class="page-content hidden">
+                <div class="page-header"><h1>商品管理</h1></div>
+                <div class="placeholder-content">
+                    <span class="placeholder-icon">☐</span>
+                    <p>商品管理页面开发中...</p>
+                </div>
+            </div>
+            <div id="page-suppliers" class="page-content hidden">
+                <div class="page-header"><h1>供应商管理</h1></div>
+                <div class="placeholder-content">
+                    <span class="placeholder-icon">⚑</span>
+                    <p>供应商管理页面开发中...</p>
+                </div>
+            </div>
+            <div id="page-stores" class="page-content hidden">
+                <div class="page-header"><h1>客户门店</h1></div>
+                <div class="placeholder-content">
+                    <span class="placeholder-icon">⚐</span>
+                    <p>客户门店页面开发中...</p>
+                </div>
+            </div>
+            <div id="page-ports" class="page-content hidden">
+                <div class="page-header"><h1>港口管理</h1></div>
+                <div class="placeholder-content">
+                    <span class="placeholder-icon">⚓</span>
+                    <p>港口管理页面开发中...</p>
+                </div>
+            </div>
+            <div id="page-sales" class="page-content hidden">
+                <div class="page-header"><h1>出口合同</h1></div>
+                <div class="placeholder-content">
+                    <span class="placeholder-icon">💰</span>
+                    <p>出口合同页面开发中...</p>
+                </div>
+            </div>
+            <div id="page-inventory" class="page-content hidden">
+                <div class="page-header"><h1>库存管理</h1></div>
+                <div class="placeholder-content">
+                    <span class="placeholder-icon">📦</span>
+                    <p>库存管理页面开发中...</p>
+                </div>
+            </div>
+            <div id="page-containers" class="page-content hidden">
+                <div class="page-header"><h1>货柜管理</h1></div>
+                <div class="placeholder-content">
+                    <span class="placeholder-icon">🚢</span>
+                    <p>货柜管理页面开发中...</p>
+                </div>
+            </div>
+            <div id="page-settings" class="page-content hidden">
+                <div class="page-header"><h1>系统设置</h1></div>
+                <div class="placeholder-content">
+                    <span class="placeholder-icon">⚙</span>
+                    <p>系统设置页面开发中...</p>
+                </div>
             </div>
         </main>
 
-        <!-- AI助手悬浮按钮 -->
-        <button id="ai-btn" class="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition z-50">
-            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+        <!-- AI助手浮窗按钮 -->
+        <button id="ai-btn" class="ai-float-btn">
+            <span class="ai-icon">🤖</span>
         </button>
 
         <!-- AI助手对话窗口 -->
-        <div id="ai-chat" class="fixed bottom-24 right-6 w-96 bg-white rounded-2xl shadow-2xl hidden z-50 chat-window overflow-hidden">
-            <div class="bg-gradient-to-r from-purple-500 to-indigo-600 px-4 py-3 flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center"><svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg></div>
-                    <div><p class="text-white font-medium text-sm">AI 智能助手</p><p class="text-white/70 text-xs">Powered by Kimi</p></div>
+        <div id="ai-chat" class="ai-chat-window hidden">
+            <div class="chat-header">
+                <div class="chat-title">
+                    <span class="chat-icon">🤖</span>
+                    <div>
+                        <div class="chat-name">AI 智能助手</div>
+                        <div class="chat-subtitle">Powered by Kimi</div>
+                    </div>
                 </div>
-                <button id="close-chat" class="text-white/70 hover:text-white"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                <button id="close-chat" class="btn-icon">✕</button>
             </div>
-            <div id="chat-messages" class="h-64 overflow-y-auto p-4 space-y-4">
-                <div class="flex items-start space-x-3">
-                    <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg></div>
-                    <div class="bg-gray-100 rounded-2xl rounded-tl-none px-4 py-3 max-w-[80%]">
-                        <p class="text-sm text-gray-700">您好！我是AI智能助手，可以帮您查询业务数据、辅助录入采购信息。</p>
+            <div id="chat-messages" class="chat-messages">
+                <div class="message ai">
+                    <div class="message-avatar">🤖</div>
+                    <div class="message-content">
+                        <p>您好！我是AI智能助手，可以帮您：</p>
+                        <ul>
+                            <li>查询业务数据</li>
+                            <li>辅助录入采购信息</li>
+                            <li>查询商品位置</li>
+                            <li>计算售价</li>
+                        </ul>
+                        <p>请问有什么可以帮您？</p>
                     </div>
                 </div>
             </div>
-            <div class="p-4 border-t border-gray-100">
-                <div class="flex items-center space-x-2">
-                    <input type="text" id="chat-input" placeholder="输入问题..." class="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-purple-500 outline-none text-sm">
-                    <button class="w-10 h-10 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center"><svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg></button>
+            <div class="chat-input-area">
+                <div class="quick-prompts">
+                    <button class="prompt-btn">本月采购汇总</button>
+                    <button class="prompt-btn">查库存</button>
+                    <button class="prompt-btn">计算售价</button>
+                </div>
+                <div class="chat-input-wrapper">
+                    <input type="text" id="chat-input" placeholder="输入问题，按Enter发送...">
+                    <button class="send-btn">➤</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI辅助录入弹窗 -->
+        <div id="ai-input-modal" class="modal hidden">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>AI辅助录入</h3>
+                    <button class="btn-icon modal-close">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p class="modal-hint">粘贴供应商发来的报价信息，AI会自动解析并填写表单</p>
+                    <textarea id="ai-input-text" rows="6" placeholder="示例：
+瓷砖800*800，数量500平方米，单价78元，供应商黎总
+预计1月20号到货"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary modal-close">取消</button>
+                    <button class="btn btn-primary" id="ai-parse-btn">🤖 开始解析</button>
                 </div>
             </div>
         </div>
