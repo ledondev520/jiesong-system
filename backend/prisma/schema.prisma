@@ -1,0 +1,444 @@
+// Input: 数据库设计文档 (docs/数据库设计.md)
+// Output: Prisma ORM 数据模型定义
+// Pos: 数据层核心Schema，定义所有实体及关系
+// Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 用户与权限 ====================
+
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  password      String
+  name          String
+  role          String    @default("SALES")
+  email         String?
+  phone         String?
+  avatar        String?
+  isActive      Boolean   @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  operationLogs OperationLog[]
+  chatHistories ChatHistory[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+// ==================== 基础数据 ====================
+
+model Port {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  code      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stores     Store[]
+  containers Container[]
+
+  @@map("ports")
+}
+
+model Supplier {
+  id              String    @id @default(cuid())
+  name            String
+  shortName       String?
+  contactName     String?
+  contactPhone    String?
+  contactEmail    String?
+  address         String?
+  bankAccount     String?
+  hasQualityIssue Boolean   @default(false)
+  qualityNote     String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  aliases           SupplierAlias[]
+  purchaseContracts PurchaseContract[]
+  products          ProductSupplier[]
+
+  @@map("suppliers")
+}
+
+model SupplierAlias {
+  id         String   @id @default(cuid())
+  alias      String   @unique
+  supplierId String
+  createdAt  DateTime @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  @@map("supplier_aliases")
+}
+
+model Store {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  portId       String
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+  address      String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  port       Port        @relation(fields: [portId], references: [id])
+  salesItems SalesItem[]
+
+  @@map("stores")
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  customsName   String
+  description   String?
+  specification String?
+  unit          String?
+  categoryId    String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  category       ProductCategory? @relation(fields: [categoryId], references: [id])
+  suppliers      ProductSupplier[]
+  purchaseItems  PurchaseItem[]
+  salesItems     SalesItem[]
+  inventories    Inventory[]
+  containerItems ContainerItem[]
+  priceHistories PriceHistory[]
+
+  @@map("products")
+}
+
+model ProductCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  parentId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent   ProductCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children ProductCategory[] @relation("CategoryHierarchy")
+  products Product[]
+
+  @@map("product_categories")
+}
+
+model ProductSupplier {
+  id         String   @id @default(cuid())
+  productId  String
+  supplierId String
+  price      Float?
+  updatedAt  DateTime @updatedAt
+
+  product  Product  @relation(fields: [productId], references: [id])
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  @@unique([productId, supplierId])
+  @@map("product_suppliers")
+}
+
+model PriceHistory {
+  id         String   @id @default(cuid())
+  productId  String
+  supplierId String?
+  price      Float
+  recordedAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("price_histories")
+}
+
+// ==================== 采购管理 ====================
+
+model PurchaseContract {
+  id           String   @id @default(cuid())
+  contractNo   String   @unique
+  supplierId   String
+  totalAmount  Float    @default(0)
+  paidAmount   Float    @default(0)
+  status       String   @default("DRAFT")
+  signedAt     DateTime?
+  expectedDate DateTime?
+  invoiceNo    String?
+  note         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  supplier Supplier         @relation(fields: [supplierId], references: [id])
+  items    PurchaseItem[]
+  payments Payment[]
+  files    ContractFile[]
+
+  @@map("purchase_contracts")
+}
+
+model PurchaseItem {
+  id                 String   @id @default(cuid())
+  purchaseContractId String
+  productId          String
+  quantity           Float
+  unit               String?
+  unitPrice          Float
+  totalPrice         Float
+  specification      String?
+  note               String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  purchaseContract PurchaseContract @relation(fields: [purchaseContractId], references: [id], onDelete: Cascade)
+  product          Product          @relation(fields: [productId], references: [id])
+  inventories      Inventory[]
+
+  @@map("purchase_items")
+}
+
+// ==================== 销售管理 ====================
+
+model SalesContract {
+  id             String   @id @default(cuid())
+  contractNo     String   @unique
+  totalAmount    Float    @default(0)
+  receivedAmount Float    @default(0)
+  exchangeRate   Float
+  status         String   @default("DRAFT")
+  signedAt       DateTime?
+  note           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items    SalesItem[]
+  payments Payment[]
+
+  @@map("sales_contracts")
+}
+
+model SalesItem {
+  id              String   @id @default(cuid())
+  salesContractId String
+  productId       String
+  storeId         String
+  quantity        Float
+  unit            String?
+  costPrice       Float
+  sellingPrice    Float
+  specification   String?
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  salesContract SalesContract @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+  store         Store         @relation(fields: [storeId], references: [id])
+  inventories   Inventory[]
+
+  @@map("sales_items")
+}
+
+// ==================== 库存管理 ====================
+
+model Inventory {
+  id             String    @id @default(cuid())
+  productId      String
+  purchaseItemId String?
+  salesItemId    String?
+  containerId    String?
+  quantity       Float
+  unit           String?
+  status         String    @default("PRODUCING")
+  inboundAt      DateTime?
+  outboundAt     DateTime?
+  note           String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  product      Product       @relation(fields: [productId], references: [id])
+  purchaseItem PurchaseItem? @relation(fields: [purchaseItemId], references: [id])
+  salesItem    SalesItem?    @relation(fields: [salesItemId], references: [id])
+  container    Container?    @relation(fields: [containerId], references: [id])
+
+  @@map("inventories")
+}
+
+// ==================== 货柜管理 ====================
+
+model Container {
+  id               String    @id @default(cuid())
+  containerNo      String    @unique
+  portId           String
+  status           String    @default("PENDING")
+  totalBoxes       Int       @default(0)
+  grossWeight      Float     @default(0)
+  netWeight        Float     @default(0)
+  volume           Float     @default(0)
+  shippedAt        DateTime?
+  estimatedArrival DateTime?
+  note             String?
+  customsBroker    String?
+  isFumigated      Boolean?
+  hasTaxRefund     Boolean?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  port        Port            @relation(fields: [portId], references: [id])
+  items       ContainerItem[]
+  inventories Inventory[]
+
+  @@map("containers")
+}
+
+model ContainerItem {
+  id          String   @id @default(cuid())
+  containerId String
+  productId   String
+  storeId     String?
+  quantity    Float
+  unit        String?
+  boxes       Int?
+  grossWeight Float?
+  netWeight   Float?
+  volume      Float?
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  container Container @relation(fields: [containerId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id])
+
+  @@map("container_items")
+}
+
+// ==================== 财务管理 ====================
+
+model Payment {
+  id                 String   @id @default(cuid())
+  type               String
+  purchaseContractId String?
+  salesContractId    String?
+  amount             Float
+  currency           String   @default("CNY")
+  paymentMethod      String?
+  paymentDate        DateTime
+  note               String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  purchaseContract PurchaseContract? @relation(fields: [purchaseContractId], references: [id])
+  salesContract    SalesContract?    @relation(fields: [salesContractId], references: [id])
+
+  @@map("payments")
+}
+
+// ==================== 文件管理 ====================
+
+model ContractFile {
+  id                 String   @id @default(cuid())
+  purchaseContractId String
+  fileName           String
+  filePath           String
+  fileType           String
+  fileSize           Int
+  uploadedAt         DateTime @default(now())
+
+  purchaseContract PurchaseContract @relation(fields: [purchaseContractId], references: [id], onDelete: Cascade)
+
+  @@map("contract_files")
+}
+
+// ==================== AI与日志 ====================
+
+model ChatHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  sessionId String
+  role      String
+  content   String
+  metadata  String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, sessionId])
+  @@map("chat_histories")
+}
+
+model OperationLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  entity    String
+  entityId  String?
+  oldValue  String?
+  newValue  String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("operation_logs")
+}
+
+// ==================== 系统配置 ====================
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  note      String?
+  updatedAt DateTime @updatedAt
+
+  @@map("system_configs")
+}
+
+// ==================== 通知 ====================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  content   String
+  isRead    Boolean  @default(false)
+  metadata  String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+// ==================== 数据导入 ====================
+
+model ImportRecord {
+  id          String   @id @default(cuid())
+  fileName    String
+  totalRows   Int
+  successRows Int
+  failedRows  Int
+  status      String
+  errorLog    String?
+  importedAt  DateTime @default(now())
+  importedBy  String
+
+  @@map("import_records")
+}

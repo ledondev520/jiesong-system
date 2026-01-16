@@ -20,9 +20,10 @@
 
 ## 技术栈
 
-- **前端**: Next.js 14 + React + Tailwind CSS + shadcn/ui
-- **后端**: Next.js API Routes + Prisma
-- **数据库**: SQLite
+系统采用前后端分离架构：
+
+- **Frontend**: Next.js 14 (App Router) + Tailwind CSS + shadcn/ui
+- **Backend**: Express + Prisma + SQLite (详见 `backend/`)
 - **AI**: Kimi API
 
 ## 项目结构
@@ -30,19 +31,18 @@
 ```
 jiesong_system/
 ├── docs/                    # 项目文档
-│   ├── README.md            # 文档目录索引
-│   ├── 需求总结_v2.0.md     # 需求规格说明
-│   ├── PRD.md              # 产品需求文档
-│   ├── 技术方案.md          # 技术架构设计
-│   ├── 数据库设计.md        # 数据库Schema
-│   └── 数据导入与清洗方案.md # 历史数据导入方案
-├── demo/                    # UI Demo
-│   ├── README.md            # Demo说明
-│   ├── index.html
-│   ├── styles.css
-│   └── app.js
-├── src/                     # 源代码（待开发）
-└── 出货汇总(1).csv          # 历史数据（324条记录）
+├── frontend/                # 前端项目 (Next.js 14)
+│   ├── src/
+│   │   ├── app/             # App Router Pages
+│   │   ├── components/      # UI Components
+│   │   ├── lib/             # Utils & Config
+│   │   ├── services/        # API Services
+│   │   ├── store/           # Zustand Stores
+│   │   └── types/           # TypeScript Interfaces
+│   └── README.md
+├── backend/                 # 后端项目 (Express + Prisma)
+├── demo/                    # 旧版UI Demo (废弃)
+└── README.md                # 本文件
 ```
 
 ## 开发状态
@@ -53,42 +53,35 @@ jiesong_system/
 | ✅ PRD文档 | 完成 |
 | ✅ 技术方案 | 完成 |
 | ✅ 数据库设计 | 完成 |
-| ✅ 数据导入方案 | 完成 |
-| ⏳ UI设计 | 等待设计稿 |
-| ⬜ 系统开发 | 待开始 |
+| 🚧 系统开发 | 进行中 (Frontend Phase 3/5) |
 
 ## 快速开始
 
-### 查看Demo
+### 前端 (Frontend)
 
 ```bash
-# 打开Demo页面
-open demo/index.html
+cd frontend
+npm install
+npm run dev
+# 访问 http://localhost:3000
 ```
 
-### 开发环境（待实现）
+### 后端 (Backend)
 
 ```bash
-# 安装依赖
+cd backend
 npm install
-
-# 启动开发服务器
 npm run dev
-
-# 数据库迁移
-npx prisma migrate dev
-
-# 导入历史数据
-npm run import-csv
+# API 服务运行在 http://localhost:3001 (假设)
 ```
 
 ## 文档导航
 
 - [需求总结](docs/需求总结_v2.0.md) - 完整需求规格
-- [PRD文档](docs/PRD.md) - 产品需求、功能清单、用户故事
-- [技术方案](docs/技术方案.md) - 系统架构、API设计、AI集成
-- [数据库设计](docs/数据库设计.md) - Schema、ER图、数据字典
-- [数据导入方案](docs/数据导入与清洗方案.md) - CSV导入规则、数据清洗、异常处理
+- [PRD文档](docs/PRD.md) - 产品需求、功能清单
+- [技术方案](docs/技术方案.md) - 系统架构设计
+- [数据库设计](docs/数据库设计.md) - Schema 定义
+- [前端文档](frontend/README.md) - 前端开发指南
 
 ## License
 

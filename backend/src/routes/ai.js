@@ -1,0 +1,41 @@
+/**
+ * Input: AI控制器
+ * Output: AI助手路由
+ * Pos: AI路由，处理智能问答和辅助录入
+ * 
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
+
+const { Router } = require('express');
+const aiController = require('../controllers/aiController');
+const { authenticate, adminOnly } = require('../middleware/auth');
+const { body, handleValidation } = require('../utils/validators');
+
+const router = Router();
+
+router.use(authenticate);
+
+// POST /api/v1/ai/chat - 智能问答
+router.post('/chat', [
+  body('message').notEmpty().withMessage('消息不能为空'),
+], handleValidation, aiController.chat);
+
+// POST /api/v1/ai/parse - 解析输入内容（辅助录入）
+router.post('/parse', [
+  body('content').notEmpty().withMessage('内容不能为空'),
+  body('type').notEmpty().withMessage('解析类型不能为空'),
+], handleValidation, aiController.parseInput);
+
+// GET /api/v1/ai/history - 获取对话历史
+router.get('/history', aiController.getChatHistory);
+
+// GET /api/v1/ai/sessions - 获取会话列表
+router.get('/sessions', aiController.getSessions);
+
+// DELETE /api/v1/ai/sessions/:sessionId - 删除会话
+router.delete('/sessions/:sessionId', aiController.deleteSession);
+
+// PUT /api/v1/ai/config - 配置AI设置（仅管理员）
+router.put('/config', adminOnly, aiController.updateConfig);
+
+module.exports = router;
