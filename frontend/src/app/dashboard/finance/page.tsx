@@ -44,10 +44,10 @@ export default function FinancePage() {
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline">
-            <Link href="/finance/payable">查看应付</Link>
+            <Link href="/dashboard/finance/payable">查看应付</Link>
           </Button>
           <Button asChild>
-            <Link href="/finance/receivable">查看应收</Link>
+            <Link href="/dashboard/finance/receivable">查看应收</Link>
           </Button>
         </div>
       </div>

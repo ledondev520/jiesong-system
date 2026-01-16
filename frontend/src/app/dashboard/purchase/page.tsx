@@ -82,7 +82,7 @@ export default function PurchasePage() {
           <h2 className="text-3xl font-bold tracking-tight">采购管理</h2>
           <p className="text-muted-foreground">管理采购合同与付款进度。</p>
         </div>
-        <Button onClick={() => router.push('/purchase/create')}>
+        <Button onClick={() => router.push('/dashboard/purchase/create')}>
           <Plus className="mr-2 h-4 w-4" /> 新增采购合同
         </Button>
       </div>

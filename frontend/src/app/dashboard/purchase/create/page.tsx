@@ -126,7 +126,7 @@ export default function CreatePurchasePage() {
     try {
       // await purchaseService.create(data);
       toast.success('采购合同创建成功');
-      router.push('/purchase');
+      router.push('/dashboard/purchase');
     } catch (error) {
       toast.error('创建失败');
     }

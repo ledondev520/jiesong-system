@@ -107,7 +107,7 @@ export default function CreateSalesPage() {
     try {
       // await salesService.create(data);
       toast.success('出口合同创建成功');
-      router.push('/sales');
+      router.push('/dashboard/sales');
     } catch (error) {
       toast.error('创建失败');
     }

@@ -80,7 +80,7 @@ export default function SalesPage() {
           <h2 className="text-3xl font-bold tracking-tight">销售管理</h2>
           <p className="text-muted-foreground">管理出口合同与收款。</p>
         </div>
-        <Button onClick={() => router.push('/sales/create')}>
+        <Button onClick={() => router.push('/dashboard/sales/create')}>
           <Plus className="mr-2 h-4 w-4" /> 新增出口合同
         </Button>
       </div>

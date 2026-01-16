@@ -22,17 +22,17 @@ import { Button } from '@/components/ui/button';
 
 const navItems = [
   { href: '/dashboard', label: '工作台', icon: LayoutDashboard },
-  { href: '/products', label: '商品管理', icon: Package },
-  { href: '/suppliers', label: '供应商', icon: Users },
-  { href: '/purchase', label: '采购管理', icon: ShoppingCart },
-  { href: '/sales', label: '销售管理', icon: TrendingUp },
-  { href: '/inventory', label: '库存管理', icon: Warehouse },
-  { href: '/containers', label: '货柜管理', icon: Container },
-  { href: '/finance', label: '财务管理', icon: DollarSign },
-  { href: '/reports', label: '报表统计', icon: FileBarChart },
-  { href: '/users', label: '用户管理', icon: Users }, // Admin only usually
-  { href: '/settings', label: '系统设置', icon: Settings },
-  { href: '/logs', label: '操作日志', icon: History },
+  { href: '/dashboard/products', label: '商品管理', icon: Package },
+  { href: '/dashboard/suppliers', label: '供应商', icon: Users },
+  { href: '/dashboard/purchase', label: '采购管理', icon: ShoppingCart },
+  { href: '/dashboard/sales', label: '销售管理', icon: TrendingUp },
+  { href: '/dashboard/inventory', label: '库存管理', icon: Warehouse },
+  { href: '/dashboard/containers', label: '货柜管理', icon: Container },
+  { href: '/dashboard/finance', label: '财务管理', icon: DollarSign },
+  { href: '/dashboard/reports', label: '报表统计', icon: FileBarChart },
+  { href: '/dashboard/users', label: '用户管理', icon: Users }, // Admin only usually
+  { href: '/dashboard/settings', label: '系统设置', icon: Settings },
+  { href: '/dashboard/logs', label: '操作日志', icon: History },
 ];
 
 export function Sidebar() {
