@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create Axios instance
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api', // Default to 3001 for Express backend if not set
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1', // Backend runs on port 3000
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

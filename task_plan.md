@@ -6,11 +6,11 @@
 - [x] Phase 3: Layout & Auth
 - [ ] Phase 4: Feature Implementation (P0/P1)
   - [x] Dashboard Home
-  - [x] Product Management (Basic CRUD)
+  - [x] Product Management
   - [x] Supplier Management (Aliases, Quality Issues)
   - [x] Store Management (Port Association)
-  - [ ] Purchase Management (Contract, AI Input, Payments)
-  - [ ] Sales Management (Contract, Pricing, Collections)
+  - [x] Purchase Management (Contract, AI Input, File Upload)
+  - [x] Sales Management (Contract, Smart Pricing)
   - [ ] Inventory Management (Status Flow)
   - [ ] Container Management (Loading, Tracking)
 - [ ] Phase 5: Alignment & Integration
@@ -23,13 +23,13 @@
 
 ## Phase 1: Initialization
 - [x] Initialize Next.js project: `frontend`
-- [x] Install dependencies (`lucide-react`, `zustand`, `axios`, `sonner`, etc.)
+- [x] Install dependencies
 - [x] Initialize shadcn-ui
 - [x] Setup Directory Structure
 
 ## Phase 2: Core Architecture
 - [x] Define Types (`src/types/index.ts`) matching Database Schema.
-- [x] Setup Axios Client (`src/lib/axios.ts`) with Base URL and Interceptors.
+- [x] Setup Axios Client (`src/lib/axios.ts`).
 - [x] Create Auth Store (`src/store/auth.store.ts`).
 - [x] Create Shared Constants (`src/lib/constants.ts`).
 
@@ -43,19 +43,17 @@
 ## Phase 4: Feature Implementation (P0)
 - [x] Dashboard Home (`src/app/(dashboard)/page.tsx`)
 - [x] Product Management
-  - [x] List View
-  - [x] Create/Edit Dialog
-  - [x] Service Layer
+  - [x] List View, Create/Edit Dialog
 - [x] Supplier Management
-  - [x] List View (Quality Badges)
-  - [x] Create/Edit Dialog (Alias Array, Quality Issue Toggle)
-  - [x] Service Layer
+  - [x] List View (Quality Badges), Create/Edit Dialog (Alias Array)
 - [x] Store Management
-  - [x] List View (Port Badges)
-  - [x] Create/Edit Dialog (Port Selection)
-  - [x] Service Layer
-- [ ] Purchase Management
-- [ ] Sales Management
+  - [x] List View (Port Badges), Create/Edit Dialog
+- [x] Purchase Management
+  - [x] List View
+  - [x] Create Page (AI Parsing Mock, File Upload UI, DatePicker)
+- [x] Sales Management
+  - [x] List View
+  - [x] Create Page (Smart Pricing Calculator, Multi-store Support)
 - [ ] Inventory Management
 - [ ] Container Management
 

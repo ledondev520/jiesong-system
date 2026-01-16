@@ -81,6 +81,7 @@ npm run dev
 - [PRD文档](docs/PRD.md) - 产品需求、功能清单
 - [技术方案](docs/技术方案.md) - 系统架构设计
 - [数据库设计](docs/数据库设计.md) - Schema 定义
+- [测试样例](docs/测试样例.md) - 测试先行样例与用例清单
 - [前端文档](frontend/README.md) - 前端开发指南
 
 ## License

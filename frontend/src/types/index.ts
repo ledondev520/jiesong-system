@@ -260,15 +260,11 @@ export interface Payment {
   updatedAt: string;
 }
 
-// API Response Wrappers
+// API Response Wrappers (匹配后端响应格式)
 export interface ApiResponse<T> {
-  success: boolean;
+  code: number;
+  message: string;
   data: T;
-  message?: string;
-  error?: {
-    code: string;
-    message: string;
-  };
 }
 
 export interface PaginatedResponse<T> {

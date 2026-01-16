@@ -45,32 +45,24 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      // TODO: Replace with actual API call
-      // const response = await api.post('/auth/login', data);
+      // 调用后端登录API
+      const response = await fetch('http://localhost:3000/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
       
-      // Mock login for now
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const result = await response.json();
       
-      if (data.username === 'admin' && data.password === 'admin') {
-         login(
-          {
-            id: '1',
-            username: 'admin',
-            name: 'Administrator',
-            role: Role.ADMIN,
-            isActive: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
-          'mock-token-123'
-        );
-        router.push('/dashboard');
+      if (result.code === 200 && result.data) {
+        login(result.data.user, result.data.token);
+        router.push('/');
       } else {
-        throw new Error('Invalid credentials');
+        throw new Error(result.message || '登录失败');
       }
       
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      setError(err.message || '登录失败，请检查用户名和密码');
     } finally {
       setIsLoading(false);
     }
@@ -124,7 +116,7 @@ export default function LoginPage() {
           </Form>
         </CardContent>
         <CardFooter className="flex justify-center text-sm text-muted-foreground">
-           Demo: admin / admin
+           默认账号: admin / admin123
         </CardFooter>
       </Card>
     </div>
