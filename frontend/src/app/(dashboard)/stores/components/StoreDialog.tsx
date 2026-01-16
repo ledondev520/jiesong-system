@@ -31,11 +31,11 @@ import {
 } from '@/components/ui/select';
 
 const storeSchema = z.object({
-  name: z.string().min(1, 'Store Name is required'),
-  portId: z.string().min(1, 'Port is required'),
+  name: z.string().min(1, '门店名称必填'),
+  portId: z.string().min(1, '所属港口必填'),
   contactName: z.string().optional(),
   contactPhone: z.string().optional(),
-  contactEmail: z.string().email('Invalid email').optional().or(z.literal('')),
+  contactEmail: z.string().email('邮箱格式不正确').optional().or(z.literal('')),
   address: z.string().optional(),
 });
 
@@ -83,7 +83,7 @@ export function StoreDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>{store ? 'Edit Store' : 'Add Store'}</DialogTitle>
+          <DialogTitle>{store ? '编辑门店' : '新增门店'}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -92,7 +92,7 @@ export function StoreDialog({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Store Name</FormLabel>
+                  <FormLabel>门店名称</FormLabel>
                   <FormControl>
                     <Input placeholder="Store Name" {...field} />
                   </FormControl>
@@ -106,11 +106,11 @@ export function StoreDialog({
               name="portId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Port</FormLabel>
+                  <FormLabel>所属港口</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a port" />
+                        <SelectValue placeholder="选择港口" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -132,9 +132,9 @@ export function StoreDialog({
                 name="contactName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Contact Person</FormLabel>
+                    <FormLabel>联系人</FormLabel>
                     <FormControl>
-                      <Input placeholder="Name" {...field} />
+                      <Input placeholder="姓名" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -145,9 +145,9 @@ export function StoreDialog({
                 name="contactPhone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone</FormLabel>
+                    <FormLabel>电话</FormLabel>
                     <FormControl>
-                      <Input placeholder="Phone" {...field} />
+                      <Input placeholder="电话" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -160,9 +160,9 @@ export function StoreDialog({
               name="address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Address</FormLabel>
+                  <FormLabel>地址</FormLabel>
                   <FormControl>
-                    <Input placeholder="Address" {...field} />
+                    <Input placeholder="详细地址" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -170,7 +170,7 @@ export function StoreDialog({
             />
 
             <DialogFooter>
-              <Button type="submit">Save Store</Button>
+              <Button type="submit">保存门店</Button>
             </DialogFooter>
           </form>
         </Form>

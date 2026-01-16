@@ -1,0 +1,217 @@
+'use client';
+
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Container, ContainerStatus } from '@/types';
+import { PORTS } from '@/lib/constants';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/date-picker';
+
+const containerSchema = z.object({
+  containerNo: z.string().optional(),
+  portId: z.string().min(1, '请选择目的港口'),
+  estimatedArrival: z.date().optional(),
+  totalBoxes: z.coerce.number().min(0, '箱数必须大于等于0'),
+  grossWeight: z.coerce.number().min(0, '毛重必须大于等于0'),
+  netWeight: z.coerce.number().min(0, '净重必须大于等于0'),
+  volume: z.coerce.number().min(0, '体积必须大于等于0'),
+  note: z.string().optional(),
+});
+
+type ContainerFormValues = z.infer<typeof containerSchema>;
+
+interface ContainerDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  container?: Container | null;
+  onSubmit: (data: any) => Promise<void>;
+}
+
+export function ContainerDialog({
+  open,
+  onOpenChange,
+  container,
+  onSubmit,
+}: ContainerDialogProps) {
+  const form = useForm<ContainerFormValues>({
+    resolver: zodResolver(containerSchema),
+    defaultValues: {
+      containerNo: '',
+      portId: '',
+      estimatedArrival: undefined,
+      totalBoxes: 0,
+      grossWeight: 0,
+      netWeight: 0,
+      volume: 0,
+      note: '',
+    },
+    values: container ? {
+      containerNo: container.containerNo,
+      portId: container.portId,
+      estimatedArrival: container.estimatedArrival ? new Date(container.estimatedArrival) : undefined,
+      totalBoxes: container.totalBoxes,
+      grossWeight: container.grossWeight,
+      netWeight: container.netWeight,
+      volume: container.volume,
+      note: container.note || '',
+    } : undefined,
+  });
+
+  const handleSubmit = async (data: ContainerFormValues) => {
+    // Generate container No if empty (Mock)
+    if (!data.containerNo) {
+      const portCode = PORTS.find(p => p.id === data.portId)?.code || 'XX';
+      data.containerNo = `25-${Math.floor(Math.random() * 900) + 100}-${portCode}`;
+    }
+    await onSubmit(data);
+    form.reset();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>{container ? '编辑货柜' : '创建货柜'}</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="portId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>目的港口</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="选择港口" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {PORTS.map((port) => (
+                          <SelectItem key={port.id} value={port.id}>
+                            {port.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="estimatedArrival"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel className="mb-1.5">预计到达时间 (ETA)</FormLabel>
+                    <DatePicker date={field.value} setDate={field.onChange} />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-4 gap-4">
+              <FormField
+                control={form.control}
+                name="totalBoxes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>总箱数</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="grossWeight"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>毛重 (kg)</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="netWeight"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>净重 (kg)</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="volume"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>体积 (CBM)</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="note"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>备注</FormLabel>
+                  <FormControl>
+                    <Input placeholder="备注信息" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <DialogFooter>
+              <Button type="submit">保存货柜</Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}

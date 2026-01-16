@@ -4,59 +4,53 @@
 - [x] Phase 1: Initialization
 - [x] Phase 2: Core Architecture
 - [x] Phase 3: Layout & Auth
-- [ ] Phase 4: Feature Implementation (P0/P1)
-  - [x] Dashboard Home
-  - [x] Product Management
-  - [x] Supplier Management (Aliases, Quality Issues)
-  - [x] Store Management (Port Association)
-  - [x] Purchase Management (Contract, AI Input, File Upload)
-  - [x] Sales Management (Contract, Smart Pricing)
-  - [ ] Inventory Management (Status Flow)
-  - [ ] Container Management (Loading, Tracking)
+- [x] Phase 4: Feature Implementation (P0)
+- [x] Phase 4-Ext: Feature Implementation (P1/P2/P3 - Full Scope)
+  - [x] **系统管理 (System Settings)**
+    - [x] 基础配置 (汇率, 利润率)
+    - [x] 枚举管理 (报关公司, 单位)
+    - [x] 用户管理 (用户列表, 权限分配)
+  - [x] **财务管理 (Finance)**
+    - [x] 应付账款 (Payable)
+    - [x] 应收账款 (Receivable)
+    - [x] 收付款流水 (Transaction Records via Dialog)
+  - [x] **报表统计 (Reports)**
+    - [x] 采购/销售汇总
+    - [x] 利润分析
+  - [x] **业务增强 (Enhancements)**
+    - [x] 商品位置查询 (Global Search UI)
+    - [x] 库存预警视图 (Notifications)
+    - [x] 操作日志 (Audit Logs)
+    - [x] 消息通知中心 (Notification UI)
 - [ ] Phase 5: Alignment & Integration
 
 ## Goals
-- Build a responsive frontend using Next.js 14, Tailwind CSS, and shadcn/ui.
-- Implement core features as per `docs/PRD.md` and `docs/技术方案.md`.
-- Ensure data models align with `docs/数据库设计.md`.
-- Collaborate with backend (Express + Prisma) via RESTful API.
+- Complete ALL frontend features defined in PRD (P0-P3).
+- Strict Localization (All Chinese).
+- Ready for Backend Integration.
 
-## Phase 1: Initialization
-- [x] Initialize Next.js project: `frontend`
-- [x] Install dependencies
-- [x] Initialize shadcn-ui
-- [x] Setup Directory Structure
+## Feature Inventory
 
-## Phase 2: Core Architecture
-- [x] Define Types (`src/types/index.ts`) matching Database Schema.
-- [x] Setup Axios Client (`src/lib/axios.ts`).
-- [x] Create Auth Store (`src/store/auth.store.ts`).
-- [x] Create Shared Constants (`src/lib/constants.ts`).
+### 1. 核心业务 (Core Business)
+- **商品管理**: List, Create/Edit.
+- **供应商管理**: List, Create/Edit, Quality Flag, Aliases.
+- **门店管理**: List, Create/Edit, Port Selection.
+- **采购管理**: Contract List, Create (AI Parse, File Upload), Payment Tracking.
+- **销售管理**: Contract List, Create (Smart Pricing), Multi-store Support.
+- **库存管理**: List, Status Flow (Producing -> Outbound).
+- **货柜管理**: List, Create (Logistics Info), Tracking.
 
-## Phase 3: Layout & Auth
-- [x] Implement Login Page (`src/app/(auth)/login/page.tsx`).
-- [x] Implement Dashboard Layout (`src/app/(dashboard)/layout.tsx`).
-  - [x] Sidebar Component
-  - [x] Header Component
-  - [x] Global Toaster
+### 2. 财务与统计 (Finance & Reports)
+- **财务概览**: Cash Flow Stats.
+- **应收应付**: Payable/Receivable Tracking & Recording.
+- **报表中心**: Purchase/Sales Summary Tables.
 
-## Phase 4: Feature Implementation (P0)
-- [x] Dashboard Home (`src/app/(dashboard)/page.tsx`)
-- [x] Product Management
-  - [x] List View, Create/Edit Dialog
-- [x] Supplier Management
-  - [x] List View (Quality Badges), Create/Edit Dialog (Alias Array)
-- [x] Store Management
-  - [x] List View (Port Badges), Create/Edit Dialog
-- [x] Purchase Management
-  - [x] List View
-  - [x] Create Page (AI Parsing Mock, File Upload UI, DatePicker)
-- [x] Sales Management
-  - [x] List View
-  - [x] Create Page (Smart Pricing Calculator, Multi-store Support)
-- [ ] Inventory Management
-- [ ] Container Management
+### 3. 系统与运维 (System & Admin)
+- **用户管理**: RBAC (Admin/Purchase/Sales).
+- **系统设置**: Exchange Rate, Profit Rate, Enum Management.
+- **日志审计**: Operation Log View.
+- **通知中心**: Alert System.
 
-## Phase 5: Alignment & Integration
-- [ ] Review API calls against backend implementation.
-- [ ] Test end-to-end flows.
+## Next Steps
+- Backend API Integration.
+- End-to-end Testing.

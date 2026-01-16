@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -24,7 +23,7 @@ import {
 } from '@/components/ui/form';
 
 const productSchema = z.object({
-  customsName: z.string().min(1, 'Name is required'),
+  customsName: z.string().min(1, '请输入报关名称'),
   description: z.string().optional(),
   specification: z.string().optional(),
   unit: z.string().optional(),
@@ -70,7 +69,7 @@ export function ProductDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{product ? 'Edit Product' : 'Add Product'}</DialogTitle>
+          <DialogTitle>{product ? '编辑商品' : '新增商品'}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -79,9 +78,9 @@ export function ProductDialog({
               name="customsName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Product Name</FormLabel>
+                  <FormLabel>报关名称 *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Customs Name" {...field} />
+                    <Input placeholder="请输入商品报关名" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -92,9 +91,9 @@ export function ProductDialog({
               name="specification"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Specification</FormLabel>
+                  <FormLabel>规格</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. 800*800" {...field} />
+                    <Input placeholder="例如: 800*800" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -105,9 +104,9 @@ export function ProductDialog({
               name="unit"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Unit</FormLabel>
+                  <FormLabel>单位</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. sqm, pcs" {...field} />
+                    <Input placeholder="例如: 平方米, 个" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -118,16 +117,16 @@ export function ProductDialog({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel>补充信息</FormLabel>
                   <FormControl>
-                    <Input placeholder="Additional info" {...field} />
+                    <Input placeholder="其他备注信息" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <DialogFooter>
-              <Button type="submit">Save changes</Button>
+              <Button type="submit">保存</Button>
             </DialogFooter>
           </form>
         </Form>

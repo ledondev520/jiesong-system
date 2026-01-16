@@ -363,18 +363,38 @@ model ContractFile {
 // ==================== AI与日志 ====================
 
 model ChatHistory {
-  id        String   @id @default(cuid())
-  userId    String
-  sessionId String
-  role      String
-  content   String
-  metadata  String?
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  userId       String
+  sessionId    String
+  role         String
+  content      String
+  imageUrl     String?  // 图片URL（用于视觉模型）
+  metadata     String?
+  promptTokens Int?     // 输入token数
+  outputTokens Int?     // 输出token数
+  modelUsed    String?  // 使用的模型
+  createdAt    DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId, sessionId])
   @@map("chat_histories")
+}
+
+model TokenUsage {
+  id           String   @id @default(cuid())
+  userId       String
+  sessionId    String?
+  model        String   // 使用的模型
+  promptTokens Int      // 输入token数
+  outputTokens Int      // 输出token数
+  totalTokens  Int      // 总token数
+  requestType  String   // chat/parse/vision
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("token_usages")
 }
 
 model OperationLog {

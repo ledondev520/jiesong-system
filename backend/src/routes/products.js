@@ -41,4 +41,16 @@ router.post('/:id/suppliers', validateId, handleValidation, productController.ad
 // GET /api/v1/products/categories - 获取商品分类
 router.get('/options/categories', productController.getCategories);
 
+// GET /api/v1/products/:id/price-history - 获取商品历史价格
+router.get('/:id/price-history', validateId, handleValidation, productController.getPriceHistory);
+
+// POST /api/v1/products/:id/price-history - 记录商品价格
+router.post('/:id/price-history', [
+  validateId,
+  body('price').isFloat({ min: 0 }).withMessage('价格必须为正数'),
+], handleValidation, productController.recordPrice);
+
+// GET /api/v1/products/:id/price-trend - 获取价格趋势
+router.get('/:id/price-trend', validateId, handleValidation, productController.getPriceTrend);
+
 module.exports = router;

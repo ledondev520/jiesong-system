@@ -11,6 +11,7 @@ const jwt = require('jsonwebtoken');
 const prisma = require('../utils/prisma');
 const config = require('../config');
 const { createError } = require('../middleware/errorHandler');
+const { log: auditLog } = require('../utils/auditLog');
 
 /**
  * 职责：用户登录验证并生成Token
@@ -55,6 +56,9 @@ const login = async (username, password) => {
     where: { id: user.id },
     data: { lastLoginAt: new Date() },
   });
+  
+  // 4.1 记录登录日志
+  await auditLog.login(user.id, null);
   
   // 5. 返回结果（排除密码）
   const { password: _, ...userWithoutPassword } = user;

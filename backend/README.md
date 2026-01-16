@@ -38,6 +38,12 @@ npm start     # 生产模式
 
 服务默认运行在 `http://localhost:3000`
 
+### 5. 运行测试
+
+```bash
+npm run test
+```
+
 ## 目录结构
 
 ```
@@ -87,8 +93,39 @@ Authorization: Bearer <token>
 | 货柜 | `/api/v1/containers` | 货柜管理 |
 | 库存 | `/api/v1/inventory` | 库存查询和状态变更 |
 | 财务 | `/api/v1/finance` | 付款记录和账款查询 |
-| 系统 | `/api/v1/system` | 系统配置/日志/通知 |
-| AI | `/api/v1/ai` | 智能问答和辅助录入 |
+| 系统 | `/api/v1/system` | 系统配置/日志/通知/数据导入导出 |
+| AI | `/api/v1/ai` | 智能问答/辅助录入/对话历史 |
+
+### 核心功能说明
+
+#### 1. 数据导入导出
+
+- **CSV导入**: `POST /api/v1/system/import` - 导入历史CSV数据
+- **导入记录**: `GET /api/v1/system/import/records` - 查看导入历史
+- **数据导出**: `GET /api/v1/system/export/:type` - 导出各类数据为CSV
+
+#### 2. AI辅助录入
+
+- **智能问答**: `POST /api/v1/ai/chat` - 与AI助手对话
+- **内容解析**: `POST /api/v1/ai/parse` - 解析报价单/合同信息
+- **对话历史**: `GET /api/v1/ai/history` - 获取对话记录
+
+#### 3. 历史价格查询
+
+- **价格历史**: `GET /api/v1/products/:id/price-history` - 商品历史价格
+- **价格趋势**: `GET /api/v1/products/:id/price-trend` - 价格趋势分析
+- **记录价格**: `POST /api/v1/products/:id/price-history` - 记录新价格
+
+#### 4. 合同文件管理
+
+- **上传文件**: `POST /api/v1/purchases/:id/files` - 上传合同附件
+- **文件列表**: `GET /api/v1/purchases/:id/files` - 获取合同文件
+- **删除文件**: `DELETE /api/v1/purchases/files/:fileId` - 删除文件
+
+#### 5. 操作审计
+
+- **操作日志**: `GET /api/v1/system/logs` - 查看用户操作记录（管理员）
+- 自动记录：登录、创建、更新、删除等关键操作
 
 ### 响应格式
 
@@ -132,6 +169,7 @@ Authorization: Bearer <token>
 - 每个文件不超过 500 行
 - 文件头注释必须包含 Input/Output/Pos
 - 函数必须有职责注释
+- 单元测试使用 Node 内置 test runner（`node --test`）
 
 ## 默认账户
 

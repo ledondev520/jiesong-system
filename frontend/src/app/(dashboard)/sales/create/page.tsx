@@ -39,14 +39,14 @@ const salesSchema = z.object({
   exchangeRate: z.coerce.number().min(0.1),
   note: z.string().optional(),
   items: z.array(z.object({
-    productId: z.string().min(1, 'Product is required'),
-    storeId: z.string().min(1, 'Store is required'),
-    quantity: z.coerce.number().min(0.01, 'Qty required'),
+    productId: z.string().min(1, '请选择商品'),
+    storeId: z.string().min(1, '请选择门店'),
+    quantity: z.coerce.number().min(0.01, '数量必填'),
     unit: z.string().optional(),
-    costPrice: z.coerce.number().min(0, 'Cost required'),
-    sellingPrice: z.coerce.number().min(0, 'Price required'),
+    costPrice: z.coerce.number().min(0, '成本必填'),
+    sellingPrice: z.coerce.number().min(0, '售价必填'),
     note: z.string().optional(),
-  })).min(1, 'At least one item is required'),
+  })).min(1, '至少添加一项商品'),
 });
 
 type SalesFormValues = z.infer<typeof salesSchema>;
@@ -84,8 +84,8 @@ export default function CreateSalesPage() {
     const loadData = async () => {
       // Mock loading
       setProducts([
-        { id: '1', customsName: 'Porcelain Tiles', unit: 'sqm', isActive: true, createdAt: '', updatedAt: '' },
-        { id: '2', customsName: 'Wash Basin', unit: 'pcs', isActive: true, createdAt: '', updatedAt: '' },
+        { id: '1', customsName: '800x800瓷砖', unit: '平方米', isActive: true, createdAt: '', updatedAt: '' },
+        { id: '2', customsName: '洗手盆', unit: '个', isActive: true, createdAt: '', updatedAt: '' },
       ]);
       setStores([
          { id: '1', name: 'Ceritos Store', portId: '1', isActive: true, createdAt: '', updatedAt: '' },
@@ -106,10 +106,10 @@ export default function CreateSalesPage() {
   const onSubmit = async (data: SalesFormValues) => {
     try {
       // await salesService.create(data);
-      toast.success('Sales Contract Created');
+      toast.success('出口合同创建成功');
       router.push('/sales');
     } catch (error) {
-      toast.error('Failed to create contract');
+      toast.error('创建失败');
     }
   };
 
@@ -120,8 +120,8 @@ export default function CreateSalesPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Create Export Contract</h2>
-          <p className="text-muted-foreground">Create new sales contract and calculate pricing.</p>
+          <h2 className="text-3xl font-bold tracking-tight">创建出口合同</h2>
+          <p className="text-muted-foreground">创建新的销售合同并自动计算报价。</p>
         </div>
       </div>
 
@@ -129,7 +129,7 @@ export default function CreateSalesPage() {
         <form onSubmit={form.handleSubmit(onSubmit)} className="contents">
           <Card>
             <CardHeader>
-              <CardTitle>Contract Details</CardTitle>
+              <CardTitle>合同详情</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-6 md:grid-cols-3">
               <FormField
@@ -137,11 +137,11 @@ export default function CreateSalesPage() {
                 name="contractNo"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Contract No</FormLabel>
+                    <FormLabel>合同编号</FormLabel>
                     <FormControl>
                       <Input {...field} disabled />
                     </FormControl>
-                    <FormDescription>Auto-generated</FormDescription>
+                    <FormDescription>自动生成</FormDescription>
                   </FormItem>
                 )}
               />
@@ -151,7 +151,7 @@ export default function CreateSalesPage() {
                 name="signedAt"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel className="mb-1.5">Date Signed</FormLabel>
+                    <FormLabel className="mb-1.5">签订日期</FormLabel>
                     <DatePicker date={field.value} setDate={field.onChange} />
                     <FormMessage />
                   </FormItem>
@@ -163,11 +163,11 @@ export default function CreateSalesPage() {
                 name="exchangeRate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Exchange Rate</FormLabel>
+                    <FormLabel>汇率</FormLabel>
                     <FormControl>
                       <Input type="number" step="0.01" {...field} />
                     </FormControl>
-                    <FormDescription>Default: {DEFAULT_EXCHANGE_RATE}</FormDescription>
+                    <FormDescription>默认: {DEFAULT_EXCHANGE_RATE}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -177,9 +177,9 @@ export default function CreateSalesPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Sales Items</CardTitle>
+              <CardTitle>销售明细</CardTitle>
               <div className="text-lg font-bold">
-                Total: ${totalAmount.toLocaleString()}
+                总计: ${totalAmount.toLocaleString()}
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -191,11 +191,11 @@ export default function CreateSalesPage() {
                       name={`items.${index}.productId`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className={index !== 0 ? "sr-only" : ""}>Product</FormLabel>
+                          <FormLabel className={index !== 0 ? "sr-only" : ""}>商品</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select Product" />
+                                <SelectValue placeholder="选择商品" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -216,11 +216,11 @@ export default function CreateSalesPage() {
                       name={`items.${index}.storeId`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className={index !== 0 ? "sr-only" : ""}>Store</FormLabel>
+                          <FormLabel className={index !== 0 ? "sr-only" : ""}>门店</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select Store" />
+                                <SelectValue placeholder="选择门店" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -241,7 +241,7 @@ export default function CreateSalesPage() {
                       name={`items.${index}.quantity`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className={index !== 0 ? "sr-only" : ""}>Quantity</FormLabel>
+                          <FormLabel className={index !== 0 ? "sr-only" : ""}>数量</FormLabel>
                           <FormControl>
                             <Input type="number" {...field} />
                           </FormControl>
@@ -257,7 +257,7 @@ export default function CreateSalesPage() {
                       name={`items.${index}.costPrice`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className={index !== 0 ? "sr-only" : ""}>Cost (¥)</FormLabel>
+                          <FormLabel className={index !== 0 ? "sr-only" : ""}>成本 (¥)</FormLabel>
                           <FormControl>
                             <Input 
                               type="number" 
@@ -277,7 +277,7 @@ export default function CreateSalesPage() {
                       name={`items.${index}.sellingPrice`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className={index !== 0 ? "sr-only" : ""}>Price ($)</FormLabel>
+                          <FormLabel className={index !== 0 ? "sr-only" : ""}>售价 ($)</FormLabel>
                           <div className="flex gap-2">
                              <FormControl>
                               <Input type="number" {...field} />
@@ -295,14 +295,14 @@ export default function CreateSalesPage() {
               ))}
               
               <Button type="button" variant="outline" onClick={() => append({ productId: '', storeId: '', quantity: 0, unit: '', costPrice: 0, sellingPrice: 0, note: '' })}>
-                <Plus className="h-4 w-4 mr-2" /> Add Item
+                <Plus className="h-4 w-4 mr-2" /> 添加商品
               </Button>
             </CardContent>
           </Card>
 
           <div className="flex justify-end gap-4">
-            <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
-            <Button type="submit" size="lg">Create Contract</Button>
+            <Button type="button" variant="outline" onClick={() => router.back()}>取消</Button>
+            <Button type="submit" size="lg">创建合同</Button>
           </div>
         </form>
       </Form>

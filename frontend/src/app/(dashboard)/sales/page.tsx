@@ -56,7 +56,7 @@ export default function SalesPage() {
         },
       ]);
     } catch (error) {
-      toast.error('Failed to load sales contracts');
+      toast.error('加载销售合同失败');
     } finally {
       setLoading(false);
     }
@@ -64,11 +64,11 @@ export default function SalesPage() {
 
   const getStatusBadge = (status: SalesStatus) => {
     switch (status) {
-      case SalesStatus.DRAFT: return <Badge variant="outline">Draft</Badge>;
-      case SalesStatus.CONFIRMED: return <Badge className="bg-blue-500">Confirmed</Badge>;
-      case SalesStatus.PAID: return <Badge className="bg-green-500">Paid</Badge>;
-      case SalesStatus.SHIPPED: return <Badge className="bg-purple-500">Shipped</Badge>;
-      case SalesStatus.COMPLETED: return <Badge className="bg-gray-500">Completed</Badge>;
+      case SalesStatus.DRAFT: return <Badge variant="outline">草稿</Badge>;
+      case SalesStatus.CONFIRMED: return <Badge className="bg-blue-500">已确认</Badge>;
+      case SalesStatus.PAID: return <Badge className="bg-green-500">已收款</Badge>;
+      case SalesStatus.SHIPPED: return <Badge className="bg-purple-500">已发货</Badge>;
+      case SalesStatus.COMPLETED: return <Badge className="bg-gray-500">已完成</Badge>;
       default: return <Badge variant="secondary">{status}</Badge>;
     }
   };
@@ -77,11 +77,11 @@ export default function SalesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Sales Contracts</h2>
-          <p className="text-muted-foreground">Manage export contracts and revenue.</p>
+          <h2 className="text-3xl font-bold tracking-tight">销售管理</h2>
+          <p className="text-muted-foreground">管理出口合同与收款。</p>
         </div>
         <Button onClick={() => router.push('/sales/create')}>
-          <Plus className="mr-2 h-4 w-4" /> New Export Contract
+          <Plus className="mr-2 h-4 w-4" /> 新增出口合同
         </Button>
       </div>
 
@@ -89,22 +89,22 @@ export default function SalesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Contract No</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Total Amount ($)</TableHead>
-              <TableHead className="text-right">Received ($)</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
+              <TableHead>合同编号</TableHead>
+              <TableHead>日期</TableHead>
+              <TableHead>状态</TableHead>
+              <TableHead className="text-right">总金额 ($)</TableHead>
+              <TableHead className="text-right">已收 ($)</TableHead>
+              <TableHead className="w-[100px]">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
                <TableRow>
-                 <TableCell colSpan={6} className="text-center py-10">Loading...</TableCell>
+                 <TableCell colSpan={6} className="text-center py-10">加载中...</TableCell>
                </TableRow>
             ) : contracts.length === 0 ? (
                <TableRow>
-                 <TableCell colSpan={6} className="text-center py-10">No contracts found.</TableCell>
+                 <TableCell colSpan={6} className="text-center py-10">暂无合同。</TableCell>
                </TableRow>
             ) : (
               contracts.map((contract) => (
@@ -113,7 +113,7 @@ export default function SalesPage() {
                     <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     {contract.contractNo}
                   </TableCell>
-                  <TableCell>{contract.signedAt ? format(new Date(contract.signedAt), 'MMM dd, yyyy') : '-'}</TableCell>
+                  <TableCell>{contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}</TableCell>
                   <TableCell>{getStatusBadge(contract.status)}</TableCell>
                   <TableCell className="text-right">${contract.totalAmount.toLocaleString()}</TableCell>
                   <TableCell className="text-right">

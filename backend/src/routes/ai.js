@@ -1,7 +1,7 @@
 /**
  * Input: AI控制器
  * Output: AI助手路由
- * Pos: AI路由，处理智能问答和辅助录入
+ * Pos: AI路由，处理智能问答和辅助录入（含图像）
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -15,14 +15,13 @@ const router = Router();
 
 router.use(authenticate);
 
-// POST /api/v1/ai/chat - 智能问答
+// POST /api/v1/ai/chat - 智能问答（支持图片）
 router.post('/chat', [
   body('message').notEmpty().withMessage('消息不能为空'),
 ], handleValidation, aiController.chat);
 
-// POST /api/v1/ai/parse - 解析输入内容（辅助录入）
+// POST /api/v1/ai/parse - 解析输入内容（辅助录入，支持图片）
 router.post('/parse', [
-  body('content').notEmpty().withMessage('内容不能为空'),
   body('type').notEmpty().withMessage('解析类型不能为空'),
 ], handleValidation, aiController.parseInput);
 
@@ -37,5 +36,11 @@ router.delete('/sessions/:sessionId', aiController.deleteSession);
 
 // PUT /api/v1/ai/config - 配置AI设置（仅管理员）
 router.put('/config', adminOnly, aiController.updateConfig);
+
+// GET /api/v1/ai/token-stats - 获取Token使用统计
+router.get('/token-stats', aiController.getTokenStats);
+
+// GET /api/v1/ai/models - 获取可用模型列表
+router.get('/models', aiController.getModels);
 
 module.exports = router;

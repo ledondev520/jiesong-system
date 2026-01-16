@@ -188,6 +188,111 @@ const getCategories = async (req, res, next) => {
   }
 };
 
+/**
+ * 职责：获取商品历史价格
+ * 思路：查询priceHistories表，按时间倒序返回
+ */
+const getPriceHistory = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { limit = 20 } = req.query;
+    
+    const history = await prisma.priceHistory.findMany({
+      where: { productId: id },
+      orderBy: { recordedAt: 'desc' },
+      take: parseInt(limit),
+    });
+    
+    // 获取相关供应商信息
+    const supplierIds = [...new Set(history.filter(h => h.supplierId).map(h => h.supplierId))];
+    const suppliers = await prisma.supplier.findMany({
+      where: { id: { in: supplierIds } },
+      select: { id: true, name: true, shortName: true },
+    });
+    const supplierMap = new Map(suppliers.map(s => [s.id, s]));
+    
+    // 组装结果
+    const result = history.map(h => ({
+      ...h,
+      supplier: h.supplierId ? supplierMap.get(h.supplierId) : null,
+    }));
+    
+    success(res, result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：记录商品价格
+ */
+const recordPrice = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { price, supplierId } = req.body;
+    
+    const record = await prisma.priceHistory.create({
+      data: {
+        productId: id,
+        supplierId,
+        price,
+      },
+    });
+    
+    // 同时更新商品-供应商关联表的价格
+    if (supplierId) {
+      await prisma.productSupplier.upsert({
+        where: { productId_supplierId: { productId: id, supplierId } },
+        update: { price },
+        create: { productId: id, supplierId, price },
+      });
+    }
+    
+    success(res, record, '价格记录成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：获取价格趋势统计
+ */
+const getPriceTrend = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { days = 90 } = req.query;
+    
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+    
+    const history = await prisma.priceHistory.findMany({
+      where: {
+        productId: id,
+        recordedAt: { gte: startDate },
+      },
+      orderBy: { recordedAt: 'asc' },
+    });
+    
+    // 计算统计数据
+    const prices = history.map(h => h.price);
+    const stats = {
+      count: prices.length,
+      min: prices.length ? Math.min(...prices) : 0,
+      max: prices.length ? Math.max(...prices) : 0,
+      avg: prices.length ? (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2) : 0,
+      latest: prices.length ? prices[prices.length - 1] : 0,
+      trend: history.map(h => ({
+        date: h.recordedAt.toISOString().slice(0, 10),
+        price: h.price,
+      })),
+    };
+    
+    success(res, stats);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   list,
   getById,
@@ -197,4 +302,7 @@ module.exports = {
   getSuppliers,
   addSupplier,
   getCategories,
+  getPriceHistory,
+  recordPrice,
+  getPriceTrend,
 };

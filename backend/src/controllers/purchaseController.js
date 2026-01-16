@@ -196,11 +196,83 @@ const updateStatus = async (req, res, next) => {
 
 /**
  * 职责：上传合同文件
+ * 思路：
+ * 1. multer中间件处理文件上传
+ * 2. 保存文件信息到数据库
+ * 3. 返回文件记录
  */
 const uploadFile = async (req, res, next) => {
   try {
-    // TODO: 实现文件上传逻辑
-    success(res, null, '文件上传功能开发中');
+    const { id } = req.params;
+    
+    if (!req.file) {
+      throw createError('请选择要上传的文件', 400);
+    }
+    
+    const file = req.file;
+    const { getRelativePath } = require('../utils/upload');
+    
+    // 保存文件记录
+    const contractFile = await prisma.contractFile.create({
+      data: {
+        purchaseContractId: id,
+        fileName: file.originalname,
+        filePath: getRelativePath(file.path),
+        fileType: file.mimetype,
+        fileSize: file.size,
+      },
+    });
+    
+    created(res, contractFile, '文件上传成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：获取合同文件列表
+ */
+const getFiles = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    const files = await prisma.contractFile.findMany({
+      where: { purchaseContractId: id },
+      orderBy: { uploadedAt: 'desc' },
+    });
+    
+    success(res, files);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：删除合同文件
+ */
+const deleteFile = async (req, res, next) => {
+  try {
+    const { fileId } = req.params;
+    const { deleteFile: removeFile } = require('../utils/upload');
+    
+    // 获取文件记录
+    const file = await prisma.contractFile.findUnique({
+      where: { id: fileId },
+    });
+    
+    if (!file) {
+      throw createError('文件不存在', 404);
+    }
+    
+    // 删除物理文件（可选，根据PRD要求保留文件）
+    // removeFile(file.filePath);
+    
+    // 删除数据库记录
+    await prisma.contractFile.delete({
+      where: { id: fileId },
+    });
+    
+    success(res, null, '文件删除成功');
   } catch (error) {
     next(error);
   }
@@ -232,5 +304,7 @@ module.exports = {
   addItem,
   updateStatus,
   uploadFile,
+  getFiles,
+  deleteFile,
   getNextContractNo,
 };

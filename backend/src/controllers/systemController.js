@@ -175,11 +175,50 @@ const getExchangeRate = async (req, res, next) => {
 
 /**
  * 职责：导入CSV数据
+ * 思路：
+ * 1. 接收上传的CSV文件
+ * 2. 调用导入服务处理数据
+ * 3. 返回导入结果
  */
 const importData = async (req, res, next) => {
   try {
-    // TODO: 实现CSV导入逻辑
-    success(res, null, 'CSV导入功能开发中');
+    const importService = require('../services/importService');
+    
+    if (!req.file) {
+      throw new Error('请选择要导入的CSV文件');
+    }
+    
+    const result = await importService.importCSVData(req.file.path, req.user.id);
+    
+    success(res, result, `导入完成：成功${result.successRows}条，失败${result.failedRows}条`);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：获取导入记录列表
+ */
+const getImportRecords = async (req, res, next) => {
+  try {
+    const importService = require('../services/importService');
+    const { page = 1, pageSize = 20 } = req.query;
+    
+    const result = await importService.getImportRecords(parseInt(page), parseInt(pageSize));
+    
+    res.json({
+      code: 200,
+      message: '获取成功',
+      data: {
+        items: result.records,
+        pagination: {
+          total: result.total,
+          page: parseInt(page),
+          pageSize: parseInt(pageSize),
+          totalPages: Math.ceil(result.total / parseInt(pageSize)),
+        },
+      },
+    });
   } catch (error) {
     next(error);
   }
@@ -191,8 +230,14 @@ const importData = async (req, res, next) => {
 const exportData = async (req, res, next) => {
   try {
     const { type } = req.params;
-    // TODO: 实现数据导出逻辑
-    success(res, null, `${type}导出功能开发中`);
+    const exportService = require('../services/exportService');
+    
+    const result = await exportService.exportData(type, req.query);
+    
+    // 设置响应头
+    res.setHeader('Content-Type', result.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res.send(result.data);
   } catch (error) {
     next(error);
   }
@@ -206,5 +251,6 @@ module.exports = {
   markNotificationRead,
   getExchangeRate,
   importData,
+  getImportRecords,
   exportData,
 };

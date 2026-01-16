@@ -27,17 +27,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { Plus, Trash } from 'lucide-react';
 
 const supplierSchema = z.object({
-  name: z.string().min(1, 'Company Name is required'),
+  name: z.string().min(1, '公司名称必填'),
   shortName: z.string().optional(),
   contactName: z.string().optional(),
   contactPhone: z.string().optional(),
-  contactEmail: z.string().email('Invalid email').optional().or(z.literal('')),
+  contactEmail: z.string().email('邮箱格式不正确').optional().or(z.literal('')),
   address: z.string().optional(),
   bankAccount: z.string().optional(),
   hasQualityIssue: z.boolean().default(false),
   qualityNote: z.string().optional(),
   aliases: z.array(z.object({
-    alias: z.string().min(1, 'Alias cannot be empty')
+    alias: z.string().min(1, '别名不能为空')
   })).optional(),
 });
 
@@ -90,8 +90,6 @@ export function SupplierDialog({
   });
 
   const handleSubmit = async (data: SupplierFormValues) => {
-    // Transform aliases array of objects to whatever the backend expects (or keep as is if backend adapts)
-    // For now passing as is, assuming backend handles relation update
     await onSubmit(data);
     form.reset();
   };
@@ -100,7 +98,7 @@ export function SupplierDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{supplier ? 'Edit Supplier' : 'Add Supplier'}</DialogTitle>
+          <DialogTitle>{supplier ? '编辑供应商' : '新增供应商'}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -110,9 +108,9 @@ export function SupplierDialog({
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Company Name *</FormLabel>
+                    <FormLabel>公司名称 *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Official Name" {...field} />
+                      <Input placeholder="工商注册名称" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -123,9 +121,9 @@ export function SupplierDialog({
                 name="shortName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Short Name</FormLabel>
+                    <FormLabel>简称</FormLabel>
                     <FormControl>
-                      <Input placeholder="Abbreviation" {...field} />
+                      <Input placeholder="内部称呼" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -136,14 +134,14 @@ export function SupplierDialog({
             {/* Aliases Section */}
             <div>
               <FormLabel className="flex items-center justify-between mb-2">
-                <span>Aliases (Nicknames)</span>
+                <span>供应商别名 (昵称)</span>
                 <Button 
                   type="button" 
                   variant="outline" 
                   size="sm"
                   onClick={() => append({ alias: '' })}
                 >
-                  <Plus className="h-3 w-3 mr-1" /> Add
+                  <Plus className="h-3 w-3 mr-1" /> 添加
                 </Button>
               </FormLabel>
               <div className="space-y-2">
@@ -155,7 +153,7 @@ export function SupplierDialog({
                       render={({ field }) => (
                         <FormItem className="flex-1">
                           <FormControl>
-                            <Input placeholder="e.g. Mr. Li" {...field} />
+                            <Input placeholder="例如: 黎总" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -172,7 +170,7 @@ export function SupplierDialog({
                   </div>
                 ))}
                 {fields.length === 0 && (
-                  <p className="text-sm text-muted-foreground italic">No aliases added.</p>
+                  <p className="text-sm text-muted-foreground italic">暂无别名。</p>
                 )}
               </div>
             </div>
@@ -183,9 +181,9 @@ export function SupplierDialog({
                 name="contactName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Contact Person</FormLabel>
+                    <FormLabel>联系人</FormLabel>
                     <FormControl>
-                      <Input placeholder="Name" {...field} />
+                      <Input placeholder="姓名" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -196,9 +194,9 @@ export function SupplierDialog({
                 name="contactPhone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone</FormLabel>
+                    <FormLabel>电话</FormLabel>
                     <FormControl>
-                      <Input placeholder="Phone Number" {...field} />
+                      <Input placeholder="手机或座机" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -211,9 +209,9 @@ export function SupplierDialog({
                 name="contactEmail"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>邮箱</FormLabel>
                     <FormControl>
-                      <Input placeholder="Email Address" {...field} />
+                      <Input placeholder="电子邮箱" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -225,9 +223,9 @@ export function SupplierDialog({
                 name="address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Address</FormLabel>
+                    <FormLabel>地址</FormLabel>
                     <FormControl>
-                      <Input placeholder="Company Address" {...field} />
+                      <Input placeholder="公司地址" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -239,9 +237,9 @@ export function SupplierDialog({
                 name="bankAccount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Bank Account</FormLabel>
+                    <FormLabel>银行账号</FormLabel>
                     <FormControl>
-                      <Input placeholder="Bank Info" {...field} />
+                      <Input placeholder="开户行及账号" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -262,10 +260,10 @@ export function SupplierDialog({
                     </FormControl>
                     <div className="space-y-1 leading-none">
                       <FormLabel className="text-destructive font-semibold">
-                        Quality Issue Flag
+                        质量问题标记
                       </FormLabel>
                       <FormDescription>
-                        Mark this supplier if they have delivered poor quality goods.
+                        如果该供应商出现过质量问题，请勾选此项。
                       </FormDescription>
                     </div>
                   </FormItem>
@@ -278,10 +276,10 @@ export function SupplierDialog({
                   name="qualityNote"
                   render={({ field }) => (
                     <FormItem className="mt-4">
-                      <FormLabel>Issue Description</FormLabel>
+                      <FormLabel>问题描述</FormLabel>
                       <FormControl>
                         <Textarea 
-                          placeholder="Describe the quality issues..." 
+                          placeholder="请描述具体的质量问题..." 
                           className="resize-none" 
                           {...field} 
                         />
@@ -294,7 +292,7 @@ export function SupplierDialog({
             </div>
 
             <DialogFooter>
-              <Button type="submit">Save Supplier</Button>
+              <Button type="submit">保存供应商</Button>
             </DialogFooter>
           </form>
         </Form>

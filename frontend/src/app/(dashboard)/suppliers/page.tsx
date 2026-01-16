@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { Supplier } from '@/types';
-// import { supplierService } from '@/services/supplier.service';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -35,28 +34,28 @@ export default function SuppliersPage() {
       setSuppliers([
         { 
           id: '1', 
-          name: 'Foshan Ceramic Co., Ltd', 
-          shortName: 'Foshan Ceramic', 
-          contactName: 'Mr. Li', 
+          name: '佛山XX陶瓷有限公司', 
+          shortName: '佛山陶瓷', 
+          contactName: '黎总', 
           hasQualityIssue: false, 
           isActive: true, 
           createdAt: '', 
           updatedAt: '',
-          aliases: [{ id: 'a1', alias: 'Li Zong', supplierId: '1', createdAt: '' }]
+          aliases: [{ id: 'a1', alias: '黎总', supplierId: '1', createdAt: '' }]
         },
         { 
           id: '2', 
-          name: 'Guangzhou Sanitary Ware', 
-          shortName: 'GZ Sanitary', 
+          name: '广州XX卫浴厂', 
+          shortName: '广州卫浴', 
           hasQualityIssue: true, 
-          qualityNote: 'Cracked sinks in last shipment',
+          qualityNote: '上一批货有裂纹',
           isActive: true, 
           createdAt: '', 
           updatedAt: '' 
         },
       ]);
     } catch (error) {
-      toast.error('Failed to load suppliers');
+      toast.error('加载供应商失败');
     } finally {
       setLoading(false);
     }
@@ -73,20 +72,19 @@ export default function SuppliersPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this supplier?')) {
+    if (confirm('确定要删除此供应商吗？')) {
       setSuppliers(suppliers.filter(s => s.id !== id));
-      toast.success('Supplier deleted');
+      toast.success('供应商已删除');
     }
   };
 
   const handleSubmit = async (data: any) => {
-    // Simulate API call
     if (editingSupplier) {
       setSuppliers(suppliers.map(s => s.id === editingSupplier.id ? { ...s, ...data, id: s.id } : s));
-      toast.success('Supplier updated successfully');
+      toast.success('供应商更新成功');
     } else {
       setSuppliers([...suppliers, { id: Math.random().toString(), ...data, isActive: true, createdAt: '', updatedAt: '' }]);
-      toast.success('Supplier created successfully');
+      toast.success('供应商创建成功');
     }
     setIsDialogOpen(false);
   };
@@ -95,11 +93,11 @@ export default function SuppliersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Suppliers</h2>
-          <p className="text-muted-foreground">Manage suppliers and quality records.</p>
+          <h2 className="text-3xl font-bold tracking-tight">供应商管理</h2>
+          <p className="text-muted-foreground">管理供应商档案与质量记录。</p>
         </div>
         <Button onClick={handleCreate}>
-          <Plus className="mr-2 h-4 w-4" /> Add Supplier
+          <Plus className="mr-2 h-4 w-4" /> 新增供应商
         </Button>
       </div>
 
@@ -107,21 +105,21 @@ export default function SuppliersPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Aliases</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>Quality Status</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
+              <TableHead>公司名称</TableHead>
+              <TableHead>别名</TableHead>
+              <TableHead>联系人</TableHead>
+              <TableHead>质量状态</TableHead>
+              <TableHead className="w-[100px]">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
                <TableRow>
-                 <TableCell colSpan={5} className="text-center py-10">Loading...</TableCell>
+                 <TableCell colSpan={5} className="text-center py-10">加载中...</TableCell>
                </TableRow>
             ) : suppliers.length === 0 ? (
                <TableRow>
-                 <TableCell colSpan={5} className="text-center py-10">No suppliers found.</TableCell>
+                 <TableCell colSpan={5} className="text-center py-10">暂无供应商数据。</TableCell>
                </TableRow>
             ) : (
               suppliers.map((supplier) => (
@@ -145,10 +143,10 @@ export default function SuppliersPage() {
                     {supplier.hasQualityIssue ? (
                       <div className="flex items-center gap-2 text-destructive">
                         <AlertTriangle className="h-4 w-4" />
-                        <span className="text-sm font-medium">Issue Reported</span>
+                        <span className="text-sm font-medium">质量问题</span>
                       </div>
                     ) : (
-                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Good</Badge>
+                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">正常</Badge>
                     )}
                   </TableCell>
                   <TableCell className="flex gap-2">

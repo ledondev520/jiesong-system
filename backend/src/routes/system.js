@@ -10,6 +10,7 @@ const { Router } = require('express');
 const systemController = require('../controllers/systemController');
 const { authenticate, adminOnly } = require('../middleware/auth');
 const { validatePagination, handleValidation } = require('../utils/validators');
+const { upload } = require('../utils/upload');
 
 const router = Router();
 
@@ -34,7 +35,10 @@ router.put('/notifications/:id/read', systemController.markNotificationRead);
 router.get('/exchange-rate', systemController.getExchangeRate);
 
 // POST /api/v1/system/import - 导入CSV数据（仅管理员）
-router.post('/import', adminOnly, systemController.importData);
+router.post('/import', adminOnly, upload.single('file'), systemController.importData);
+
+// GET /api/v1/system/import/records - 获取导入记录（仅管理员）
+router.get('/import/records', adminOnly, validatePagination, handleValidation, systemController.getImportRecords);
 
 // GET /api/v1/system/export/:type - 导出数据
 router.get('/export/:type', systemController.exportData);

@@ -10,6 +10,7 @@ const { Router } = require('express');
 const purchaseController = require('../controllers/purchaseController');
 const { authenticate } = require('../middleware/auth');
 const { validateId, validatePagination, handleValidation, body } = require('../utils/validators');
+const { upload } = require('../utils/upload');
 
 const router = Router();
 
@@ -39,7 +40,13 @@ router.post('/:id/items', validateId, handleValidation, purchaseController.addIt
 router.put('/:id/status', validateId, handleValidation, purchaseController.updateStatus);
 
 // POST /api/v1/purchases/:id/files - 上传合同文件
-router.post('/:id/files', validateId, handleValidation, purchaseController.uploadFile);
+router.post('/:id/files', validateId, handleValidation, upload.single('file'), purchaseController.uploadFile);
+
+// GET /api/v1/purchases/:id/files - 获取合同文件列表
+router.get('/:id/files', validateId, handleValidation, purchaseController.getFiles);
+
+// DELETE /api/v1/purchases/files/:fileId - 删除合同文件
+router.delete('/files/:fileId', purchaseController.deleteFile);
 
 // GET /api/v1/purchases/next-no - 获取下一个合同编号
 router.get('/options/next-no', purchaseController.getNextContractNo);

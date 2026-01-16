@@ -53,18 +53,9 @@ export default function StoresPage() {
           createdAt: '', 
           updatedAt: '' 
         },
-         { 
-          id: '3', 
-          name: 'Michigan Depot', 
-          portId: '3', // MI
-          contactName: 'Mike', 
-          isActive: true, 
-          createdAt: '', 
-          updatedAt: '' 
-        },
       ]);
     } catch (error) {
-      toast.error('Failed to load stores');
+      toast.error('加载门店失败');
     } finally {
       setLoading(false);
     }
@@ -72,7 +63,7 @@ export default function StoresPage() {
 
   const getPortName = (portId: string) => {
     const port = PORTS.find(p => p.id === portId);
-    return port ? `${port.name} (${port.code})` : 'Unknown Port';
+    return port ? `${port.name} (${port.code})` : '未知港口';
   };
 
   const handleCreate = () => {
@@ -86,19 +77,19 @@ export default function StoresPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this store?')) {
+    if (confirm('确定要删除此门店吗？')) {
       setStores(stores.filter(s => s.id !== id));
-      toast.success('Store deleted');
+      toast.success('门店已删除');
     }
   };
 
   const handleSubmit = async (data: any) => {
     if (editingStore) {
       setStores(stores.map(s => s.id === editingStore.id ? { ...s, ...data } : s));
-      toast.success('Store updated successfully');
+      toast.success('门店更新成功');
     } else {
       setStores([...stores, { id: Math.random().toString(), ...data, isActive: true, createdAt: '', updatedAt: '' }]);
-      toast.success('Store created successfully');
+      toast.success('门店创建成功');
     }
     setIsDialogOpen(false);
   };
@@ -107,11 +98,11 @@ export default function StoresPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Stores</h2>
-          <p className="text-muted-foreground">Manage customer stores and port associations.</p>
+          <h2 className="text-3xl font-bold tracking-tight">客户门店</h2>
+          <p className="text-muted-foreground">管理客户门店及所属港口。</p>
         </div>
         <Button onClick={handleCreate}>
-          <Plus className="mr-2 h-4 w-4" /> Add Store
+          <Plus className="mr-2 h-4 w-4" /> 新增门店
         </Button>
       </div>
 
@@ -119,21 +110,21 @@ export default function StoresPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Store Name</TableHead>
-              <TableHead>Port</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>Address</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
+              <TableHead>门店名称</TableHead>
+              <TableHead>港口</TableHead>
+              <TableHead>联系人</TableHead>
+              <TableHead>地址</TableHead>
+              <TableHead className="w-[100px]">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
                <TableRow>
-                 <TableCell colSpan={5} className="text-center py-10">Loading...</TableCell>
+                 <TableCell colSpan={5} className="text-center py-10">加载中...</TableCell>
                </TableRow>
             ) : stores.length === 0 ? (
                <TableRow>
-                 <TableCell colSpan={5} className="text-center py-10">No stores found.</TableCell>
+                 <TableCell colSpan={5} className="text-center py-10">暂无门店数据。</TableCell>
                </TableRow>
             ) : (
               stores.map((store) => (
