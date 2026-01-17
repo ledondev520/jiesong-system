@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { useAuthStore } from '@/store/auth.store';
-import { useRouter } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 
@@ -11,32 +11,20 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const router = useRouter();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [mounted, setMounted] = useState(false);
 
-  const checkAuth = useCallback(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
-    }
-  }, [isAuthenticated, router]);
-
-  useEffect(() => {
+  useLayoutEffect(() => {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (mounted) {
-      checkAuth();
-    }
-  }, [mounted, checkAuth]);
+  // Client-side only redirect check
+  if (mounted && !isAuthenticated) {
+    redirect('/login');
+  }
 
   if (!mounted) {
     return null; // Prevent hydration mismatch
-  }
-
-  if (!isAuthenticated) {
-    return null; // Or a loading spinner
   }
 
   return (

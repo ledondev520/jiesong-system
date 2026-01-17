@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { PurchaseContract, PurchaseStatus } from '@/types';
+import { purchaseService } from '@/services/purchase.service';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -29,34 +30,8 @@ export default function PurchasePage() {
   const loadContracts = async () => {
     setLoading(true);
     try {
-      // Mock Data
-      await new Promise(r => setTimeout(r, 500));
-      setContracts([
-        { 
-          id: '1', 
-          contractNo: 'CG250001', 
-          supplierId: '1',
-          supplier: { id: '1', name: '佛山XX陶瓷有限公司', hasQualityIssue: false, isActive: true, createdAt: '', updatedAt: '' },
-          totalAmount: 45000,
-          paidAmount: 13500,
-          status: PurchaseStatus.PRODUCING,
-          signedAt: new Date().toISOString(),
-          createdAt: '', 
-          updatedAt: '' 
-        },
-        { 
-          id: '2', 
-          contractNo: 'CG250002', 
-          supplierId: '2',
-          supplier: { id: '2', name: '广州XX卫浴厂', hasQualityIssue: true, isActive: true, createdAt: '', updatedAt: '' },
-          totalAmount: 12000,
-          paidAmount: 0,
-          status: PurchaseStatus.DRAFT,
-          signedAt: new Date().toISOString(),
-          createdAt: '', 
-          updatedAt: '' 
-        },
-      ]);
+      const response = await purchaseService.getAll({ page: 1, pageSize: 100 });
+      setContracts(response.data?.items || []);
     } catch (error) {
       toast.error('加载采购合同失败');
     } finally {

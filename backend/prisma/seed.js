@@ -15,7 +15,7 @@ async function main() {
   console.log('开始初始化数据库...');
   
   // 1. 创建管理员用户
-  const adminPassword = await bcrypt.hash('123456', 12);
+  const adminPassword = await bcrypt.hash('admin123', 12);
   await prisma.user.upsert({
     where: { username: 'admin' },
     update: { password: adminPassword },
@@ -26,7 +26,7 @@ async function main() {
       role: 'ADMIN',
     },
   });
-  console.log('✓ 管理员用户创建成功 (admin / 123456)');
+  console.log('✓ 管理员用户创建成功 (admin / admin123)');
   
   // 2. 创建港口数据
   const ports = [

@@ -1,0 +1,90 @@
+/**
+ * Input: 采购服务与API实例
+ * Output: 采购服务接口单元测试
+ * Pos: 前端业务服务测试
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
+
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import api from '@/lib/axios';
+import { purchaseService } from './purchase.service';
+
+vi.mock('@/lib/axios', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  },
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe('purchaseService api', () => {
+  it('getAll: 传递查询参数', async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+
+    await purchaseService.getAll({ page: 1, pageSize: 20, query: '采购' });
+
+    expect(api.get).toHaveBeenCalledWith('/purchase/contracts', {
+      params: { page: 1, pageSize: 20, query: '采购' },
+    });
+  });
+
+  it('getById: 通过id获取详情', async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+
+    await purchaseService.getById('pc1');
+
+    expect(api.get).toHaveBeenCalledWith('/purchase/contracts/pc1');
+  });
+
+  it('create: 提交新增数据', async () => {
+    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+    const payload = { contractNo: 'CG25001' };
+
+    await purchaseService.create(payload);
+
+    expect(api.post).toHaveBeenCalledWith('/purchase/contracts', payload);
+  });
+
+  it('update: 提交更新数据', async () => {
+    (api.put as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+    const payload = { note: 'updated' };
+
+    await purchaseService.update('pc1', payload);
+
+    expect(api.put).toHaveBeenCalledWith('/purchase/contracts/pc1', payload);
+  });
+
+  it('delete: 通过id删除', async () => {
+    (api.delete as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+
+    await purchaseService.delete('pc1');
+
+    expect(api.delete).toHaveBeenCalledWith('/purchase/contracts/pc1');
+  });
+});
+
+describe('purchaseService.parseQuote', () => {
+  it('返回模拟解析结果', async () => {
+    vi.useFakeTimers();
+    const promise = purchaseService.parseQuote('报价文本');
+
+    vi.runAllTimers();
+    const result = await promise;
+
+    expect(result).toEqual({
+      success: true,
+      data: [
+        { productId: '1', quantity: 100, unitPrice: 45, unit: 'sqm', note: 'AI Parsed' },
+        { productId: '2', quantity: 50, unitPrice: 120, unit: 'pcs', note: 'AI Parsed' },
+      ],
+    });
+
+    vi.useRealTimers();
+  });
+});

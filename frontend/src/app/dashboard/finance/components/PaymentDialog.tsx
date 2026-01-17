@@ -25,7 +25,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const paymentSchema = z.object({
-  amount: z.coerce.number().min(0.01, '金额必须大于0'),
+  amount: z.number().min(0.01, '金额必须大于0'),
   paymentDate: z.date(),
   paymentMethod: z.string().min(1, '请选择支付方式'),
   note: z.string().optional(),

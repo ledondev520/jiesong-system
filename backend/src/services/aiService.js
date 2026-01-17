@@ -9,11 +9,22 @@
 const config = require('../config');
 const prisma = require('../utils/prisma');
 
+const OpenAI = require('openai');
+
 // Kimi K2模型配置
 const MODELS = {
-  thinking: 'kimi-k2-thinking-turbo', // 推理增强模型
+  default: 'kimi-k2-turbo-preview', // 默认模型
   vision: 'moonshot-v1-128k-vision-preview', // 视觉模型
   fast: 'moonshot-v1-8k', // 快速响应模型
+};
+
+// 初始化OpenAI客户端（用于流式调用）
+const getOpenAIClient = () => {
+  if (!config.kimi.apiKey) return null;
+  return new OpenAI({
+    apiKey: config.kimi.apiKey,
+    baseURL: config.kimi.baseUrl,
+  });
 };
 
 /**
@@ -48,8 +59,8 @@ const chat = async (userId, sessionId, message, imageUrl = null) => {
   const userMessage = buildUserMessage(message, imageUrl);
   messages.push(userMessage);
   
-  // 3. 选择模型（有图片用视觉模型，否则用思考模型）
-  const model = imageUrl ? MODELS.vision : MODELS.thinking;
+  // 3. 选择模型（有图片用视觉模型，否则用默认模型）
+  const model = imageUrl ? MODELS.vision : MODELS.default;
   
   // 4. 保存用户消息
   await prisma.chatHistory.create({
@@ -88,6 +99,120 @@ const chat = async (userId, sessionId, message, imageUrl = null) => {
   
   return {
     message: aiResponse,
+    sessionId,
+    tokenUsage: {
+      prompt: tokenUsage.promptTokens,
+      completion: tokenUsage.outputTokens,
+      total: tokenUsage.promptTokens + tokenUsage.outputTokens,
+    },
+    model,
+  };
+};
+
+/**
+ * 职责：流式调用Kimi API进行对话
+ * 思路：
+ * 1. 构建消息列表
+ * 2. 使用流式API调用
+ * 3. 逐个chunk返回给调用者
+ * @param {string} userId - 用户ID
+ * @param {string} sessionId - 会话ID
+ * @param {string} message - 用户消息
+ * @param {string} imageUrl - 图片URL（可选）
+ * @param {function} onChunk - 每个chunk的回调函数
+ * @returns {Object} 最终结果
+ */
+const chatStream = async (userId, sessionId, message, imageUrl = null, onChunk) => {
+  const client = getOpenAIClient();
+  
+  // 0. 获取历史对话（最近10条）
+  const history = await prisma.chatHistory.findMany({
+    where: { userId, sessionId },
+    orderBy: { createdAt: 'asc' },
+    take: 10,
+  });
+  
+  // 1. 构建消息列表
+  const messages = [
+    { role: 'system', content: getSystemPrompt() },
+    ...history.map(h => buildMessageFromHistory(h)),
+  ];
+  
+  // 2. 构建当前用户消息
+  const userMessage = buildUserMessage(message, imageUrl);
+  messages.push(userMessage);
+  
+  // 3. 选择模型
+  const model = imageUrl ? MODELS.vision : MODELS.default;
+  
+  // 4. 保存用户消息
+  await prisma.chatHistory.create({
+    data: { userId, sessionId, role: 'user', content: message, imageUrl },
+  });
+  
+  // 5. 流式调用Kimi API
+  let fullContent = '';
+  let tokenUsage = { promptTokens: 0, outputTokens: 0 };
+  
+  if (client) {
+    try {
+      // 估算输入Token
+      const tokenEstimate = await estimateTokens(messages, model);
+      tokenUsage.promptTokens = tokenEstimate.data?.total_tokens || 0;
+      
+      // 流式调用
+      const stream = await client.chat.completions.create({
+        model,
+        messages,
+        temperature: 0.6,
+        stream: true,
+      });
+      
+      // 逐个chunk处理
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta;
+        if (delta?.content) {
+          fullContent += delta.content;
+          // 调用回调函数发送chunk
+          if (onChunk) {
+            onChunk(delta.content);
+          }
+        }
+      }
+      
+      // 估算输出Token
+      tokenUsage.outputTokens = Math.ceil(fullContent.length / 2);
+      
+    } catch (error) {
+      console.error('流式调用失败:', error.message);
+      fullContent = '抱歉，AI服务暂时不可用，请稍后再试。';
+      if (onChunk) onChunk(fullContent);
+    }
+  } else {
+    fullContent = await generateLocalResponse(message);
+    if (onChunk) onChunk(fullContent);
+  }
+  
+  // 6. 记录Token消耗
+  if (tokenUsage.promptTokens > 0) {
+    await recordTokenUsage(userId, sessionId, model, tokenUsage, 'chat_stream');
+  }
+  
+  // 7. 保存AI响应
+  await prisma.chatHistory.create({
+    data: {
+      userId,
+      sessionId,
+      role: 'assistant',
+      content: fullContent,
+      promptTokens: tokenUsage.promptTokens,
+      outputTokens: tokenUsage.outputTokens,
+      modelUsed: model,
+    },
+  });
+  
+  return {
+    message: fullContent,
     sessionId,
     tokenUsage: {
       prompt: tokenUsage.promptTokens,
@@ -170,44 +295,54 @@ const getSystemPrompt = () => {
 };
 
 /**
- * 职责：调用Kimi API
+ * 职责：调用Kimi API（流式调用）
  * 思路：
- * 1. 使用OpenAI兼容格式发送请求
- * 2. 提取Token使用量
- * 3. 返回响应内容和Token信息
+ * 1. 使用OpenAI SDK进行流式请求
+ * 2. 收集所有chunk并拼接完整响应
+ * 3. 调用token统计接口获取消耗量
  * @param {Array} messages - 消息列表
  * @param {string} model - 模型名称
  * @returns {Object} { content, tokenUsage }
  */
-const callKimiAPI = async (messages, model = MODELS.thinking) => {
+const callKimiAPI = async (messages, model = MODELS.default) => {
+  const client = getOpenAIClient();
+  if (!client) {
+    return {
+      content: '抱歉，AI服务未配置API Key。',
+      tokenUsage: { promptTokens: 0, outputTokens: 0 },
+    };
+  }
+  
   try {
-    const response = await fetch(`${config.kimi.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.kimi.apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: 0.7,
-        max_tokens: 4096,
-      }),
+    // 1. 使用流式调用
+    const stream = await client.chat.completions.create({
+      model,
+      messages,
+      temperature: 0.6,
+      stream: true,
     });
     
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Kimi API响应错误:', response.status, errorData);
-      throw new Error(`Kimi API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+    // 2. 收集所有chunk
+    let fullContent = '';
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta;
+      if (delta?.content) {
+        fullContent += delta.content;
+      }
     }
     
-    const data = await response.json();
+    // 3. 调用token统计接口估算消耗
+    const tokenEstimate = await estimateTokens(messages, model);
+    const promptTokens = tokenEstimate.data?.total_tokens || 0;
+    
+    // 估算输出token（约为输出字符数/2）
+    const outputTokens = Math.ceil(fullContent.length / 2);
     
     return {
-      content: data.choices?.[0]?.message?.content || '抱歉，我暂时无法回答这个问题。',
+      content: fullContent || '抱歉，我暂时无法回答这个问题。',
       tokenUsage: {
-        promptTokens: data.usage?.prompt_tokens || 0,
-        outputTokens: data.usage?.completion_tokens || 0,
+        promptTokens,
+        outputTokens,
       },
     };
   } catch (error) {
@@ -220,12 +355,16 @@ const callKimiAPI = async (messages, model = MODELS.thinking) => {
 };
 
 /**
- * 职责：估算Token数量
+ * 职责：估算Token数量（调用Kimi官方API）
  * @param {Array} messages - 消息列表
  * @param {string} model - 模型名称
- * @returns {Object} Token估算结果
+ * @returns {Object} Token估算结果 { data: { total_tokens: number } }
  */
-const estimateTokens = async (messages, model = MODELS.thinking) => {
+const estimateTokens = async (messages, model = MODELS.default) => {
+  if (!config.kimi.apiKey) {
+    return { data: { total_tokens: 0 } };
+  }
+  
   try {
     const response = await fetch(`${config.kimi.baseUrl}/tokenizers/estimate-token-count`, {
       method: 'POST',
@@ -237,13 +376,15 @@ const estimateTokens = async (messages, model = MODELS.thinking) => {
     });
     
     if (!response.ok) {
-      return { total_tokens: 0 };
+      console.error('Token估算请求失败:', response.status);
+      return { data: { total_tokens: 0 } };
     }
     
-    return await response.json();
+    const result = await response.json();
+    return result;
   } catch (error) {
     console.error('Token估算失败:', error.message);
-    return { total_tokens: 0 };
+    return { data: { total_tokens: 0 } };
   }
 };
 
@@ -461,6 +602,7 @@ const getTokenStats = async (userId, days = 30) => {
 
 module.exports = {
   chat,
+  chatStream,
   parseInput,
   callKimiAPI,
   estimateTokens,

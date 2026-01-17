@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Supplier } from '@/types';
+import { supplierService } from '@/services/supplier.service';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -29,31 +30,8 @@ export default function SuppliersPage() {
   const loadSuppliers = async () => {
     setLoading(true);
     try {
-      // Mock Data
-      await new Promise(r => setTimeout(r, 500));
-      setSuppliers([
-        { 
-          id: '1', 
-          name: '佛山XX陶瓷有限公司', 
-          shortName: '佛山陶瓷', 
-          contactName: '黎总', 
-          hasQualityIssue: false, 
-          isActive: true, 
-          createdAt: '', 
-          updatedAt: '',
-          aliases: [{ id: 'a1', alias: '黎总', supplierId: '1', createdAt: '' }]
-        },
-        { 
-          id: '2', 
-          name: '广州XX卫浴厂', 
-          shortName: '广州卫浴', 
-          hasQualityIssue: true, 
-          qualityNote: '上一批货有裂纹',
-          isActive: true, 
-          createdAt: '', 
-          updatedAt: '' 
-        },
-      ]);
+      const response = await supplierService.getAll({ page: 1, pageSize: 100 });
+      setSuppliers(response.data?.items || []);
     } catch (error) {
       toast.error('加载供应商失败');
     } finally {
@@ -73,20 +51,30 @@ export default function SuppliersPage() {
 
   const handleDelete = async (id: string) => {
     if (confirm('确定要删除此供应商吗？')) {
-      setSuppliers(suppliers.filter(s => s.id !== id));
-      toast.success('供应商已删除');
+      try {
+        await supplierService.delete(id);
+        setSuppliers(suppliers.filter(s => s.id !== id));
+        toast.success('供应商已删除');
+      } catch (error) {
+        toast.error('删除失败');
+      }
     }
   };
 
-  const handleSubmit = async (data: any) => {
-    if (editingSupplier) {
-      setSuppliers(suppliers.map(s => s.id === editingSupplier.id ? { ...s, ...data, id: s.id } : s));
-      toast.success('供应商更新成功');
-    } else {
-      setSuppliers([...suppliers, { id: Math.random().toString(), ...data, isActive: true, createdAt: '', updatedAt: '' }]);
-      toast.success('供应商创建成功');
+  const handleSubmit = async (data: Partial<Supplier>) => {
+    try {
+      if (editingSupplier) {
+        await supplierService.update(editingSupplier.id, data);
+        toast.success('供应商更新成功');
+      } else {
+        await supplierService.create(data);
+        toast.success('供应商创建成功');
+      }
+      setIsDialogOpen(false);
+      loadSuppliers();
+    } catch (error) {
+      toast.error(editingSupplier ? '更新失败' : '创建失败');
     }
-    setIsDialogOpen(false);
   };
 
   return (

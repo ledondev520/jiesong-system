@@ -22,6 +22,8 @@
 - `src/services`: API 服务层
 - `src/store`: 全局状态管理 (Zustand)
 - `src/types`: TypeScript 类型定义 (与数据库 Schema 对齐)
+- `src/**/*.test.ts`: 前端单元测试文件
+- `vitest.config.ts`: Vitest 测试配置
 
 ## 核心依赖
 
@@ -51,4 +53,10 @@ npm run build
 
 # 运行 Lint
 npm run lint
+
+# 运行单元测试
+npm run test
+
+# 单元测试开发模式
+npm run test:watch
 ```

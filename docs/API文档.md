@@ -627,6 +627,8 @@ PUT /system/notifications/:id/read
 |--------|------|------|
 | admin | admin123 | ADMIN |
 
+> 注意：密码在 `backend/prisma/seed.js` 中定义，默认为 `admin123`
+
 ---
 
 ## 状态码说明

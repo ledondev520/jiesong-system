@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Container, ContainerStatus } from '@/types';
+import { containerService } from '@/services/container.service';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -31,35 +32,8 @@ export default function ContainersPage() {
   const loadContainers = async () => {
     setLoading(true);
     try {
-      // Mock Data
-      await new Promise(r => setTimeout(r, 500));
-      setContainers([
-        { 
-          id: '1', 
-          containerNo: '25-001-LA', 
-          portId: '1', 
-          status: ContainerStatus.SHIPPED, 
-          totalBoxes: 500,
-          grossWeight: 12000,
-          netWeight: 11500,
-          volume: 28,
-          estimatedArrival: new Date('2026-02-15').toISOString(),
-          createdAt: '', 
-          updatedAt: '' 
-        },
-        { 
-          id: '2', 
-          containerNo: '25-002-OAK', 
-          portId: '2', 
-          status: ContainerStatus.LOADING, 
-          totalBoxes: 0,
-          grossWeight: 0,
-          netWeight: 0,
-          volume: 0,
-          createdAt: '', 
-          updatedAt: '' 
-        },
-      ]);
+      const response = await containerService.getAll({ page: 1, pageSize: 100 });
+      setContainers(response.data?.items || []);
     } catch (error) {
       toast.error('加载货柜失败');
     } finally {
@@ -93,20 +67,30 @@ export default function ContainersPage() {
 
   const handleDelete = async (id: string) => {
     if (confirm('确定要删除此货柜吗？')) {
-      setContainers(containers.filter(c => c.id !== id));
-      toast.success('货柜已删除');
+      try {
+        await containerService.delete(id);
+        setContainers(containers.filter(c => c.id !== id));
+        toast.success('货柜已删除');
+      } catch (error) {
+        toast.error('删除失败');
+      }
     }
   };
 
-  const handleSubmit = async (data: any) => {
-    if (editingContainer) {
-      setContainers(containers.map(c => c.id === editingContainer.id ? { ...c, ...data } : c));
-      toast.success('货柜更新成功');
-    } else {
-      setContainers([...containers, { id: Math.random().toString(), ...data, status: ContainerStatus.PENDING, createdAt: '', updatedAt: '' }]);
-      toast.success('货柜创建成功');
+  const handleSubmit = async (data: Partial<Container>) => {
+    try {
+      if (editingContainer) {
+        await containerService.update(editingContainer.id, data);
+        toast.success('货柜更新成功');
+      } else {
+        await containerService.create(data);
+        toast.success('货柜创建成功');
+      }
+      setIsDialogOpen(false);
+      loadContainers();
+    } catch (error) {
+      toast.error(editingContainer ? '更新失败' : '创建失败');
     }
-    setIsDialogOpen(false);
   };
 
   return (

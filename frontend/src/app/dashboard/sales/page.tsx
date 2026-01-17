@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { SalesContract, SalesStatus } from '@/types';
+import { salesService } from '@/services/sales.service';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -29,32 +30,8 @@ export default function SalesPage() {
   const loadContracts = async () => {
     setLoading(true);
     try {
-      // Mock Data
-      await new Promise(r => setTimeout(r, 500));
-      setContracts([
-        { 
-          id: '1', 
-          contractNo: 'EXP250001', 
-          totalAmount: 15000,
-          receivedAmount: 15000,
-          exchangeRate: 6.8,
-          status: SalesStatus.PAID,
-          signedAt: new Date().toISOString(),
-          createdAt: '', 
-          updatedAt: '' 
-        },
-        { 
-          id: '2', 
-          contractNo: 'EXP250002', 
-          totalAmount: 8500,
-          receivedAmount: 0,
-          exchangeRate: 6.8,
-          status: SalesStatus.CONFIRMED,
-          signedAt: new Date().toISOString(),
-          createdAt: '', 
-          updatedAt: '' 
-        },
-      ]);
+      const response = await salesService.getAll({ page: 1, pageSize: 100 });
+      setContracts(response.data?.items || []);
     } catch (error) {
       toast.error('加载销售合同失败');
     } finally {

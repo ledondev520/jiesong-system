@@ -40,8 +40,8 @@ const purchaseSchema = z.object({
   note: z.string().optional(),
   items: z.array(z.object({
     productId: z.string().min(1, '请选择商品'),
-    quantity: z.coerce.number().min(0.01, '数量必须大于0'),
-    unitPrice: z.coerce.number().min(0, '单价必须大于等于0'),
+    quantity: z.number().min(0.01, '数量必须大于0'),
+    unitPrice: z.number().min(0, '单价必须大于等于0'),
     unit: z.string().optional(),
     note: z.string().optional(),
   })).min(1, '至少添加一项商品'),

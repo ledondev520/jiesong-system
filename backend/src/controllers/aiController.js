@@ -41,6 +41,58 @@ const chat = async (req, res, next) => {
 };
 
 /**
+ * 职责：流式智能问答（SSE）
+ * 思路：
+ * 1. 设置SSE响应头
+ * 2. 调用aiService的流式聊天
+ * 3. 逐个chunk发送给前端
+ */
+const chatStream = async (req, res, next) => {
+  try {
+    const { message, sessionId, imageUrl } = req.body;
+    const userId = req.user.id;
+    
+    // 生成会话ID
+    const currentSessionId = sessionId || `session_${Date.now()}`;
+    
+    // 设置SSE响应头
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // 禁用nginx缓冲
+    res.flushHeaders();
+    
+    // 发送sessionId
+    res.write(`data: ${JSON.stringify({ type: 'session', sessionId: currentSessionId })}\n\n`);
+    
+    // 流式调用AI服务
+    const result = await aiService.chatStream(
+      userId, 
+      currentSessionId, 
+      message, 
+      imageUrl,
+      (chunk) => {
+        // 每个chunk都发送给前端
+        res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`);
+      }
+    );
+    
+    // 发送完成消息
+    res.write(`data: ${JSON.stringify({ 
+      type: 'done', 
+      tokenUsage: result.tokenUsage,
+      model: result.model 
+    })}\n\n`);
+    
+    res.end();
+  } catch (error) {
+    // 发送错误消息
+    res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+    res.end();
+  }
+};
+
+/**
  * 职责：解析输入内容（辅助录入，支持图片）
  * 思路：
  * 1. 接收文本或图片
@@ -191,6 +243,7 @@ const getModels = async (req, res, next) => {
 
 module.exports = {
   chat,
+  chatStream,
   parseInput,
   getChatHistory,
   getSessions,

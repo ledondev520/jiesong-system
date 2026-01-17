@@ -29,12 +29,8 @@ export default function ProductsPage() {
   const loadProducts = async () => {
     setLoading(true);
     try {
-      // Mock Data
-      await new Promise(r => setTimeout(r, 500));
-      setProducts([
-        { id: '1', customsName: '800x800瓷砖', specification: '800*800', unit: '平方米', isActive: true, createdAt: '', updatedAt: '' },
-        { id: '2', customsName: '洗手盆', specification: '陶瓷', unit: '个', isActive: true, createdAt: '', updatedAt: '' },
-      ]);
+      const response = await productService.getAll({ page: 1, pageSize: 100 });
+      setProducts(response.data?.items || []);
     } catch (error) {
       toast.error('加载商品失败');
     } finally {
@@ -54,23 +50,30 @@ export default function ProductsPage() {
 
   const handleDelete = async (id: string) => {
     if (confirm('确定要删除这个商品吗？')) {
-      // await productService.delete(id);
-      setProducts(products.filter(p => p.id !== id));
-      toast.success('商品已删除');
+      try {
+        await productService.delete(id);
+        setProducts(products.filter(p => p.id !== id));
+        toast.success('商品已删除');
+      } catch (error) {
+        toast.error('删除失败');
+      }
     }
   };
 
-  const handleSubmit = async (data: any) => {
-    if (editingProduct) {
-      // await productService.update(editingProduct.id, data);
-      setProducts(products.map(p => p.id === editingProduct.id ? { ...p, ...data } : p));
-      toast.success('商品更新成功');
-    } else {
-      // await productService.create(data);
-      setProducts([...products, { id: Math.random().toString(), ...data, isActive: true, createdAt: '', updatedAt: '' }]);
-      toast.success('商品创建成功');
+  const handleSubmit = async (data: Record<string, unknown>) => {
+    try {
+      if (editingProduct) {
+        await productService.update(editingProduct.id, data);
+        toast.success('商品更新成功');
+      } else {
+        await productService.create(data);
+        toast.success('商品创建成功');
+      }
+      setIsDialogOpen(false);
+      loadProducts();
+    } catch (error) {
+      toast.error(editingProduct ? '更新失败' : '创建失败');
     }
-    setIsDialogOpen(false);
   };
 
   return (

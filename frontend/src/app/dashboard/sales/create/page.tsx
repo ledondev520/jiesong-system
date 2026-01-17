@@ -36,15 +36,15 @@ import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE } from '@/lib/constants';
 const salesSchema = z.object({
   contractNo: z.string().optional(),
   signedAt: z.date().optional(),
-  exchangeRate: z.coerce.number().min(0.1),
+  exchangeRate: z.number().min(0.1),
   note: z.string().optional(),
   items: z.array(z.object({
     productId: z.string().min(1, '请选择商品'),
     storeId: z.string().min(1, '请选择门店'),
-    quantity: z.coerce.number().min(0.01, '数量必填'),
+    quantity: z.number().min(0.01, '数量必填'),
     unit: z.string().optional(),
-    costPrice: z.coerce.number().min(0, '成本必填'),
-    sellingPrice: z.coerce.number().min(0, '售价必填'),
+    costPrice: z.number().min(0, '成本必填'),
+    sellingPrice: z.number().min(0, '售价必填'),
     note: z.string().optional(),
   })).min(1, '至少添加一项商品'),
 });

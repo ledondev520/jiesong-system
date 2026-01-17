@@ -3,23 +3,23 @@ import { PurchaseContract, ApiResponse, PaginatedResponse } from '@/types';
 
 export const purchaseService = {
   getAll: async (params?: { page?: number; pageSize?: number; query?: string }) => {
-    return api.get<any, ApiResponse<PaginatedResponse<PurchaseContract>>>('/purchase/contracts', { params });
+    return api.get<any, ApiResponse<PaginatedResponse<PurchaseContract>>>('/purchases', { params });
   },
 
   getById: async (id: string) => {
-    return api.get<any, ApiResponse<PurchaseContract>>(`/purchase/contracts/${id}`);
+    return api.get<any, ApiResponse<PurchaseContract>>(`/purchases/${id}`);
   },
 
   create: async (data: Partial<PurchaseContract>) => {
-    return api.post<any, ApiResponse<PurchaseContract>>('/purchase/contracts', data);
+    return api.post<any, ApiResponse<PurchaseContract>>('/purchases', data);
   },
 
   update: async (id: string, data: Partial<PurchaseContract>) => {
-    return api.put<any, ApiResponse<PurchaseContract>>(`/purchase/contracts/${id}`, data);
+    return api.put<any, ApiResponse<PurchaseContract>>(`/purchases/${id}`, data);
   },
 
   delete: async (id: string) => {
-    return api.delete<any, ApiResponse<void>>(`/purchase/contracts/${id}`);
+    return api.delete<any, ApiResponse<void>>(`/purchases/${id}`);
   },
 
   // Mock AI Parse

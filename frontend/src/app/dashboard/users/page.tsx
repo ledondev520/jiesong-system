@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { User, Role } from '@/types';
+import { userService } from '@/services/user.service';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -29,13 +30,8 @@ export default function UsersPage() {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      // Mock Data
-      await new Promise(r => setTimeout(r, 500));
-      setUsers([
-        { id: '1', username: 'admin', name: '系统管理员', role: Role.ADMIN, isActive: true, createdAt: '', updatedAt: '' },
-        { id: '2', username: 'buyer01', name: '采购小李', role: Role.PURCHASE, isActive: true, createdAt: '', updatedAt: '' },
-        { id: '3', username: 'sales01', name: '销售小王', role: Role.SALES, isActive: true, createdAt: '', updatedAt: '' },
-      ]);
+      const response = await userService.getAll({ page: 1, pageSize: 100 });
+      setUsers(response.data?.items || []);
     } catch (error) {
       toast.error('加载用户失败');
     } finally {
@@ -64,20 +60,30 @@ export default function UsersPage() {
 
   const handleDelete = async (id: string) => {
     if (confirm('确定要删除此用户吗？')) {
-      setUsers(users.filter(u => u.id !== id));
-      toast.success('用户已删除');
+      try {
+        await userService.delete(id);
+        setUsers(users.filter(u => u.id !== id));
+        toast.success('用户已删除');
+      } catch (error) {
+        toast.error('删除失败');
+      }
     }
   };
 
-  const handleSubmit = async (data: any) => {
-    if (editingUser) {
-      setUsers(users.map(u => u.id === editingUser.id ? { ...u, ...data } : u));
-      toast.success('用户更新成功');
-    } else {
-      setUsers([...users, { id: Math.random().toString(), ...data, isActive: true, createdAt: '', updatedAt: '' }]);
-      toast.success('用户创建成功');
+  const handleSubmit = async (data: Partial<User>) => {
+    try {
+      if (editingUser) {
+        await userService.update(editingUser.id, data);
+        toast.success('用户更新成功');
+      } else {
+        await userService.create(data);
+        toast.success('用户创建成功');
+      }
+      setIsDialogOpen(false);
+      loadUsers();
+    } catch (error) {
+      toast.error(editingUser ? '更新失败' : '创建失败');
     }
-    setIsDialogOpen(false);
   };
 
   return (

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Inventory, InventoryStatus } from '@/types';
+import { inventoryService } from '@/services/inventory.service';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -32,28 +33,8 @@ export default function InventoryPage() {
   const loadInventory = async () => {
     setLoading(true);
     try {
-      // Mock Data
-      await new Promise(r => setTimeout(r, 500));
-      setInventory([
-        { 
-          id: '1', 
-          productId: '1', 
-          product: { id: '1', customsName: '800x800瓷砖', unit: '平方米', isActive: true, createdAt: '', updatedAt: '' },
-          quantity: 1000, 
-          status: InventoryStatus.PRODUCING, 
-          createdAt: '', 
-          updatedAt: '' 
-        },
-        { 
-          id: '2', 
-          productId: '2', 
-          product: { id: '2', customsName: '洗手盆', unit: '个', isActive: true, createdAt: '', updatedAt: '' },
-          quantity: 50, 
-          status: InventoryStatus.SHIPPING, 
-          createdAt: '', 
-          updatedAt: '' 
-        },
-      ]);
+      const response = await inventoryService.getAll({ page: 1, pageSize: 100 });
+      setInventory(response.data?.items || []);
     } catch (error) {
       toast.error('加载库存失败');
     } finally {
@@ -73,9 +54,13 @@ export default function InventoryPage() {
   };
 
   const handleStatusChange = async (id: string, newStatus: InventoryStatus) => {
-    // await inventoryService.updateStatus(id, newStatus);
-    setInventory(inventory.map(item => item.id === id ? { ...item, status: newStatus } : item));
-    toast.success(`状态已更新为: ${newStatus}`);
+    try {
+      await inventoryService.updateStatus(id, newStatus);
+      setInventory(inventory.map(item => item.id === id ? { ...item, status: newStatus } : item));
+      toast.success(`状态已更新为: ${newStatus}`);
+    } catch (error) {
+      toast.error('状态更新失败');
+    }
   };
 
   return (

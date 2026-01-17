@@ -23,8 +23,8 @@ import { toast } from 'sonner';
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE, UNITS as INITIAL_UNITS } from '@/lib/constants';
 
 const configSchema = z.object({
-  exchangeRate: z.coerce.number().min(0.1, '汇率必须大于0'),
-  profitRate: z.coerce.number().min(1.0, '利润率必须大于1.0'),
+  exchangeRate: z.number().min(0.1, '汇率必须大于0'),
+  profitRate: z.number().min(1.0, '利润率必须大于1.0'),
   apiKey: z.string().optional(),
 });
 

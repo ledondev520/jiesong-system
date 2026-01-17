@@ -35,10 +35,10 @@ const containerSchema = z.object({
   containerNo: z.string().optional(),
   portId: z.string().min(1, '请选择目的港口'),
   estimatedArrival: z.date().optional(),
-  totalBoxes: z.coerce.number().min(0, '箱数必须大于等于0'),
-  grossWeight: z.coerce.number().min(0, '毛重必须大于等于0'),
-  netWeight: z.coerce.number().min(0, '净重必须大于等于0'),
-  volume: z.coerce.number().min(0, '体积必须大于等于0'),
+  totalBoxes: z.number().min(0, '箱数必须大于等于0'),
+  grossWeight: z.number().min(0, '毛重必须大于等于0'),
+  netWeight: z.number().min(0, '净重必须大于等于0'),
+  volume: z.number().min(0, '体积必须大于等于0'),
   note: z.string().optional(),
 });
 

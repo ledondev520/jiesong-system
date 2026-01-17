@@ -34,7 +34,7 @@ const supplierSchema = z.object({
   contactEmail: z.string().email('邮箱格式不正确').optional().or(z.literal('')),
   address: z.string().optional(),
   bankAccount: z.string().optional(),
-  hasQualityIssue: z.boolean().default(false),
+  hasQualityIssue: z.boolean(),
   qualityNote: z.string().optional(),
   aliases: z.array(z.object({
     alias: z.string().min(1, '别名不能为空')

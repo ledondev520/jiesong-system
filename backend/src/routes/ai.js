@@ -20,6 +20,11 @@ router.post('/chat', [
   body('message').notEmpty().withMessage('消息不能为空'),
 ], handleValidation, aiController.chat);
 
+// POST /api/v1/ai/chat/stream - 流式智能问答（SSE）
+router.post('/chat/stream', [
+  body('message').notEmpty().withMessage('消息不能为空'),
+], handleValidation, aiController.chatStream);
+
 // POST /api/v1/ai/parse - 解析输入内容（辅助录入，支持图片）
 router.post('/parse', [
   body('type').notEmpty().withMessage('解析类型不能为空'),

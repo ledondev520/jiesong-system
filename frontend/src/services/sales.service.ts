@@ -3,23 +3,23 @@ import { SalesContract, ApiResponse, PaginatedResponse } from '@/types';
 
 export const salesService = {
   getAll: async (params?: { page?: number; pageSize?: number; query?: string }) => {
-    return api.get<any, ApiResponse<PaginatedResponse<SalesContract>>>('/sales/contracts', { params });
+    return api.get<any, ApiResponse<PaginatedResponse<SalesContract>>>('/sales', { params });
   },
 
   getById: async (id: string) => {
-    return api.get<any, ApiResponse<SalesContract>>(`/sales/contracts/${id}`);
+    return api.get<any, ApiResponse<SalesContract>>(`/sales/${id}`);
   },
 
   create: async (data: Partial<SalesContract>) => {
-    return api.post<any, ApiResponse<SalesContract>>('/sales/contracts', data);
+    return api.post<any, ApiResponse<SalesContract>>('/sales', data);
   },
 
   update: async (id: string, data: Partial<SalesContract>) => {
-    return api.put<any, ApiResponse<SalesContract>>(`/sales/contracts/${id}`, data);
+    return api.put<any, ApiResponse<SalesContract>>(`/sales/${id}`, data);
   },
 
   delete: async (id: string) => {
-    return api.delete<any, ApiResponse<void>>(`/sales/contracts/${id}`);
+    return api.delete<any, ApiResponse<void>>(`/sales/${id}`);
   },
 
   // Helper to calculate price

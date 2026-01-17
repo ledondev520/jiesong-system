@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Store } from '@/types';
+import { storeService } from '@/services/store.service';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -30,30 +31,8 @@ export default function StoresPage() {
   const loadStores = async () => {
     setLoading(true);
     try {
-      // Mock Data
-      await new Promise(r => setTimeout(r, 500));
-      setStores([
-        { 
-          id: '1', 
-          name: 'Ceritos Store', 
-          portId: '1', // LA
-          contactName: 'John Doe', 
-          contactPhone: '555-0123',
-          address: '123 Main St, Ceritos, CA',
-          isActive: true, 
-          createdAt: '', 
-          updatedAt: '' 
-        },
-        { 
-          id: '2', 
-          name: 'Anaheim Store', 
-          portId: '1', // LA
-          contactName: 'Jane Smith', 
-          isActive: true, 
-          createdAt: '', 
-          updatedAt: '' 
-        },
-      ]);
+      const response = await storeService.getAll({ page: 1, pageSize: 100 });
+      setStores(response.data?.items || []);
     } catch (error) {
       toast.error('加载门店失败');
     } finally {
@@ -78,20 +57,30 @@ export default function StoresPage() {
 
   const handleDelete = async (id: string) => {
     if (confirm('确定要删除此门店吗？')) {
-      setStores(stores.filter(s => s.id !== id));
-      toast.success('门店已删除');
+      try {
+        await storeService.delete(id);
+        setStores(stores.filter(s => s.id !== id));
+        toast.success('门店已删除');
+      } catch (error) {
+        toast.error('删除失败');
+      }
     }
   };
 
-  const handleSubmit = async (data: any) => {
-    if (editingStore) {
-      setStores(stores.map(s => s.id === editingStore.id ? { ...s, ...data } : s));
-      toast.success('门店更新成功');
-    } else {
-      setStores([...stores, { id: Math.random().toString(), ...data, isActive: true, createdAt: '', updatedAt: '' }]);
-      toast.success('门店创建成功');
+  const handleSubmit = async (data: Partial<Store>) => {
+    try {
+      if (editingStore) {
+        await storeService.update(editingStore.id, data);
+        toast.success('门店更新成功');
+      } else {
+        await storeService.create(data);
+        toast.success('门店创建成功');
+      }
+      setIsDialogOpen(false);
+      loadStores();
+    } catch (error) {
+      toast.error(editingStore ? '更新失败' : '创建失败');
     }
-    setIsDialogOpen(false);
   };
 
   return (
