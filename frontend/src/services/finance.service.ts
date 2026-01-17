@@ -11,12 +11,13 @@ export const financeService = {
   },
 
   getStats: async () => {
-    // Mock stats
-    return {
-      totalPayable: 125000,
-      totalReceivable: 85000,
-      monthlyCashIn: 45000,
-      monthlyCashOut: 22000,
+    // 从后端获取统计数据
+    const response = await api.get('/finance/stats');
+    return (response as { data: any }).data || {
+      totalPayable: 0,
+      totalReceivable: 0,
+      monthlyCashIn: 0,
+      monthlyCashOut: 0,
     };
   }
 };

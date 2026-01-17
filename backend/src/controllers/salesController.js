@@ -12,16 +12,20 @@ const { createError } = require('../middleware/errorHandler');
 
 /**
  * 职责：获取出口合同列表
+ * 思路：支持关键字搜索合同编号
  */
 const list = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20, status, storeId } = req.query;
+    const { page = 1, pageSize = 20, status, storeId, keyword } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(pageSize);
     
     const where = {};
     if (status) where.status = status;
     if (storeId) {
       where.items = { some: { storeId } };
+    }
+    if (keyword) {
+      where.contractNo = { contains: keyword };
     }
     
     const [contracts, total] = await Promise.all([

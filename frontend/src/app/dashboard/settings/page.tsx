@@ -1,3 +1,11 @@
+/**
+ * Input: 后端 /system/configs API
+ * Output: 系统设置页面
+ * Pos: 系统模块，管理全局参数与数据字典
+ * 
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -18,9 +26,10 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { X, Plus, Save } from 'lucide-react';
+import { X, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE, UNITS as INITIAL_UNITS } from '@/lib/constants';
+import api from '@/lib/axios';
 
 const configSchema = z.object({
   exchangeRate: z.number().min(0.1, '汇率必须大于0'),
@@ -30,11 +39,21 @@ const configSchema = z.object({
 
 type ConfigFormValues = z.infer<typeof configSchema>;
 
+interface SystemConfigMap {
+  exchangeRate?: number;
+  profitRate?: number;
+  units?: string[];
+  brokers?: string[];
+  [key: string]: any;
+}
+
 export default function SettingsPage() {
   const [units, setUnits] = useState<string[]>(INITIAL_UNITS);
   const [newUnit, setNewUnit] = useState('');
   const [brokers, setBrokers] = useState<string[]>(['捷淞', '埋单', '其他厂家报关', '不报关']);
   const [newBroker, setNewBroker] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const form = useForm<ConfigFormValues>({
     resolver: zodResolver(configSchema),
@@ -45,35 +64,130 @@ export default function SettingsPage() {
     },
   });
 
-  const onSubmit = (data: ConfigFormValues) => {
-    // Simulate save
-    console.log(data);
-    toast.success('系统配置已保存');
+  // 加载系统配置
+  useEffect(() => {
+    const fetchConfigs = async () => {
+      try {
+        const response = await api.get('/system/configs');
+        const configs = (response as any).data as SystemConfigMap;
+        
+        // 配置是对象格式，直接设置
+        if (configs) {
+          if (typeof configs.exchangeRate === 'number') {
+            form.setValue('exchangeRate', configs.exchangeRate);
+          }
+          if (typeof configs.profitRate === 'number') {
+            form.setValue('profitRate', configs.profitRate);
+          }
+          if (Array.isArray(configs.units)) {
+            setUnits(configs.units);
+          }
+          if (Array.isArray(configs.brokers)) {
+            setBrokers(configs.brokers);
+          }
+        }
+      } catch (error) {
+        console.error('加载配置失败:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchConfigs();
+  }, [form]);
+
+  // 保存单个配置
+  const saveConfig = async (key: string, value: string) => {
+    try {
+      await api.put(`/system/configs/${key}`, { value });
+    } catch (error) {
+      throw error;
+    }
   };
 
-  const handleAddUnit = () => {
+  const onSubmit = async (data: ConfigFormValues) => {
+    setSaving(true);
+    try {
+      // 保存基础配置
+      await Promise.all([
+        saveConfig('exchangeRate', data.exchangeRate.toString()),
+        saveConfig('profitRate', data.profitRate.toString()),
+        saveConfig('units', JSON.stringify(units)),
+        saveConfig('brokers', JSON.stringify(brokers)),
+      ]);
+      
+      toast.success('系统配置已保存');
+    } catch (error) {
+      console.error('保存配置失败:', error);
+      toast.error('保存配置失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddUnit = async () => {
     if (newUnit && !units.includes(newUnit)) {
-      setUnits([...units, newUnit]);
+      const newUnits = [...units, newUnit];
+      setUnits(newUnits);
       setNewUnit('');
-      toast.success('单位添加成功');
+      
+      // 自动保存
+      try {
+        await saveConfig('units', JSON.stringify(newUnits));
+        toast.success('单位添加成功');
+      } catch {
+        toast.error('保存失败');
+      }
     }
   };
 
-  const handleDeleteUnit = (unit: string) => {
-    setUnits(units.filter(u => u !== unit));
+  const handleDeleteUnit = async (unit: string) => {
+    const newUnits = units.filter(u => u !== unit);
+    setUnits(newUnits);
+    
+    // 自动保存
+    try {
+      await saveConfig('units', JSON.stringify(newUnits));
+    } catch {
+      toast.error('保存失败');
+    }
   };
 
-  const handleAddBroker = () => {
+  const handleAddBroker = async () => {
     if (newBroker && !brokers.includes(newBroker)) {
-      setBrokers([...brokers, newBroker]);
+      const newBrokers = [...brokers, newBroker];
+      setBrokers(newBrokers);
       setNewBroker('');
-      toast.success('报关公司添加成功');
+      
+      // 自动保存
+      try {
+        await saveConfig('brokers', JSON.stringify(newBrokers));
+        toast.success('报关公司添加成功');
+      } catch {
+        toast.error('保存失败');
+      }
     }
   };
 
-  const handleDeleteBroker = (broker: string) => {
-    setBrokers(brokers.filter(b => b !== broker));
+  const handleDeleteBroker = async (broker: string) => {
+    const newBrokers = brokers.filter(b => b !== broker);
+    setBrokers(newBrokers);
+    
+    // 自动保存
+    try {
+      await saveConfig('brokers', JSON.stringify(newBrokers));
+    } catch {
+      toast.error('保存失败');
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <span className="ml-2">加载配置...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -105,7 +219,12 @@ export default function SettingsPage() {
                         <FormItem>
                           <FormLabel>默认汇率 (USD/CNY)</FormLabel>
                           <FormControl>
-                            <Input type="number" step="0.01" {...field} />
+                            <Input 
+                              type="number" 
+                              step="0.01" 
+                              {...field}
+                              onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
+                            />
                           </FormControl>
                           <FormDescription>用于销售合同的初始汇率填充。</FormDescription>
                           <FormMessage />
@@ -119,7 +238,12 @@ export default function SettingsPage() {
                         <FormItem>
                           <FormLabel>默认利润率</FormLabel>
                           <FormControl>
-                            <Input type="number" step="0.1" {...field} />
+                            <Input 
+                              type="number" 
+                              step="0.1" 
+                              {...field}
+                              onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
+                            />
                           </FormControl>
                           <FormDescription>例如 1.3 表示 30% 利润。</FormDescription>
                           <FormMessage />
@@ -133,28 +257,26 @@ export default function SettingsPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>AI 集成</CardTitle>
-                  <CardDescription>配置 Kimi API 密钥以启用智能助手功能。</CardDescription>
+                  <CardDescription>Kimi API 已在后端配置，无需在此设置。</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <FormField
-                    control={form.control}
-                    name="apiKey"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Kimi API Key</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="sk-..." {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <p className="text-sm text-muted-foreground">
+                    AI 助手功能已就绪。如需更改 API 密钥，请联系系统管理员在服务器端配置。
+                  </p>
                 </CardContent>
               </Card>
 
               <div className="flex justify-end">
-                <Button type="submit" size="lg">
-                  <Save className="mr-2 h-4 w-4" /> 保存配置
+                <Button type="submit" size="lg" disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 保存中...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" /> 保存配置
+                    </>
+                  )}
                 </Button>
               </div>
             </form>
@@ -174,6 +296,7 @@ export default function SettingsPage() {
                   value={newUnit} 
                   onChange={(e) => setNewUnit(e.target.value)}
                   className="max-w-xs"
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddUnit())}
                 />
                 <Button onClick={handleAddUnit} variant="secondary">添加</Button>
               </div>
@@ -207,6 +330,7 @@ export default function SettingsPage() {
                   value={newBroker} 
                   onChange={(e) => setNewBroker(e.target.value)}
                   className="max-w-xs"
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddBroker())}
                 />
                 <Button onClick={handleAddBroker} variant="secondary">添加</Button>
               </div>

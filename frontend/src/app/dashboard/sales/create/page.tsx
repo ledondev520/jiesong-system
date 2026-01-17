@@ -82,15 +82,17 @@ export default function CreateSalesPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      // Mock loading
-      setProducts([
-        { id: '1', customsName: '800x800瓷砖', unit: '平方米', isActive: true, createdAt: '', updatedAt: '' },
-        { id: '2', customsName: '洗手盆', unit: '个', isActive: true, createdAt: '', updatedAt: '' },
-      ]);
-      setStores([
-         { id: '1', name: 'Ceritos Store', portId: '1', isActive: true, createdAt: '', updatedAt: '' },
-         { id: '2', name: 'Anaheim Store', portId: '1', isActive: true, createdAt: '', updatedAt: '' },
-      ]);
+      try {
+        const [productsRes, storesRes] = await Promise.all([
+          productService.getAll({ pageSize: 100 }),
+          storeService.getAll({ pageSize: 100 }),
+        ]);
+        setProducts(productsRes.data?.items || []);
+        setStores(storesRes.data?.items || []);
+      } catch (error) {
+        console.error('加载数据失败:', error);
+        toast.error('加载商品和门店数据失败');
+      }
     };
     loadData();
   }, []);

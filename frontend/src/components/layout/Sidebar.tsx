@@ -15,22 +15,26 @@ import {
   Settings,
   LogOut,
   FileBarChart,
-  History
+  History,
+  FileSpreadsheet,
+  Store
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/button';
 
 const navItems = [
   { href: '/dashboard', label: '工作台', icon: LayoutDashboard },
+  { href: '/dashboard/import', label: '数据导入', icon: FileSpreadsheet },
   { href: '/dashboard/products', label: '商品管理', icon: Package },
   { href: '/dashboard/suppliers', label: '供应商', icon: Users },
+  { href: '/dashboard/stores', label: '门店管理', icon: Store },
   { href: '/dashboard/purchase', label: '采购管理', icon: ShoppingCart },
   { href: '/dashboard/sales', label: '销售管理', icon: TrendingUp },
   { href: '/dashboard/inventory', label: '库存管理', icon: Warehouse },
   { href: '/dashboard/containers', label: '货柜管理', icon: Container },
   { href: '/dashboard/finance', label: '财务管理', icon: DollarSign },
   { href: '/dashboard/reports', label: '报表统计', icon: FileBarChart },
-  { href: '/dashboard/users', label: '用户管理', icon: Users }, // Admin only usually
+  { href: '/dashboard/users', label: '用户管理', icon: Users },
   { href: '/dashboard/settings', label: '系统设置', icon: Settings },
   { href: '/dashboard/logs', label: '操作日志', icon: History },
 ];

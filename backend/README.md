@@ -36,7 +36,7 @@ npm run dev   # 开发模式（热重载）
 npm start     # 生产模式
 ```
 
-服务默认运行在 `http://localhost:3000`
+服务默认运行在 `http://localhost:3001`
 
 ### 5. 运行测试
 

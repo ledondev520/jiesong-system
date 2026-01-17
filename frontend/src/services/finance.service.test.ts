@@ -41,14 +41,29 @@ describe('financeService', () => {
     expect(api.post).toHaveBeenCalledWith('/finance/payments', payload);
   });
 
-  it('getStats: 返回模拟统计', async () => {
+  it('getStats: 调用API获取统计数据', async () => {
+    const mockData = {
+      payable: { total: 125000, paid: 50000, unpaid: 75000 },
+      receivable: { total: 85000, received: 30000, unreceived: 55000 },
+    };
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ data: mockData });
+
+    const stats = await financeService.getStats();
+
+    expect(api.get).toHaveBeenCalledWith('/finance/stats');
+    expect(stats).toEqual(mockData);
+  });
+
+  it('getStats: API错误时返回默认值', async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ data: null });
+
     const stats = await financeService.getStats();
 
     expect(stats).toEqual({
-      totalPayable: 125000,
-      totalReceivable: 85000,
-      monthlyCashIn: 45000,
-      monthlyCashOut: 22000,
+      totalPayable: 0,
+      totalReceivable: 0,
+      monthlyCashIn: 0,
+      monthlyCashOut: 0,
     });
   });
 });

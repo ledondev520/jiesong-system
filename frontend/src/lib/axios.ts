@@ -1,8 +1,9 @@
 import axios from 'axios';
 
 // Create Axios instance
+// 使用相对路径，通过Next.js rewrites代理到后端
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1', // Backend runs on port 3000
+  baseURL: process.env.NEXT_PUBLIC_API_URL || '/api/v1',
   timeout: 60000, // 增加到60秒，AI调用可能需要更长时间
   headers: {
     'Content-Type': 'application/json',

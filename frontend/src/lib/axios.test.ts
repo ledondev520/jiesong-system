@@ -34,8 +34,8 @@ describe('api axios config', () => {
 
     expect(axiosModule.default.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        baseURL: 'http://localhost:3000/api/v1',
-        timeout: 10000,
+        baseURL: '/api/v1', // 使用Next.js代理路径
+        timeout: 60000, // 更新后的超时时间
         headers: { 'Content-Type': 'application/json' },
       }),
     );

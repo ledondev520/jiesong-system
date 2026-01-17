@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Product } from '@/types';
 import { productService } from '@/services/product.service';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -12,24 +14,40 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Pencil, Trash } from 'lucide-react';
+import { Plus, Pencil, Trash, Search } from 'lucide-react';
 import { ProductDialog } from './components/ProductDialog';
 import { toast } from 'sonner';
 
 export default function ProductsPage() {
+  const searchParams = useSearchParams();
+  const initialKeyword = searchParams.get('keyword') || '';
+  
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [keyword, setKeyword] = useState(initialKeyword);
 
   useEffect(() => {
-    loadProducts();
-  }, []);
+    loadProducts(keyword);
+  }, [keyword]);
 
-  const loadProducts = async () => {
+  // 从URL参数初始化关键字
+  useEffect(() => {
+    const urlKeyword = searchParams.get('keyword');
+    if (urlKeyword && urlKeyword !== keyword) {
+      setKeyword(urlKeyword);
+    }
+  }, [searchParams, keyword]);
+
+  const loadProducts = async (searchKeyword?: string) => {
     setLoading(true);
     try {
-      const response = await productService.getAll({ page: 1, pageSize: 100 });
+      const response = await productService.getAll({ 
+        page: 1, 
+        pageSize: 100,
+        keyword: searchKeyword || undefined,
+      });
       setProducts(response.data?.items || []);
     } catch (error) {
       toast.error('加载商品失败');
@@ -83,9 +101,20 @@ export default function ProductsPage() {
           <h2 className="text-3xl font-bold tracking-tight">商品管理</h2>
           <p className="text-muted-foreground">管理商品档案与规格信息。</p>
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="mr-2 h-4 w-4" /> 新增商品
-        </Button>
+        <div className="flex gap-2">
+          <div className="relative w-64">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="搜索商品..."
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+          <Button onClick={handleCreate}>
+            <Plus className="mr-2 h-4 w-4" /> 新增商品
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-md border">

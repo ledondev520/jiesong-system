@@ -2,7 +2,7 @@ import api from '@/lib/axios';
 import { Product, PaginatedResponse, ApiResponse } from '@/types';
 
 export const productService = {
-  getAll: async (params?: { page?: number; pageSize?: number; query?: string }) => {
+  getAll: async (params?: { page?: number; pageSize?: number; keyword?: string }) => {
     return api.get<any, ApiResponse<PaginatedResponse<Product>>>('/products', { params });
   },
 

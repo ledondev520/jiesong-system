@@ -1,7 +1,15 @@
+/**
+ * Input: 后端 /finance/payables API
+ * Output: 应付账款管理页面
+ * Pos: 财务模块子页面，展示并管理供应商待付款项
+ * 
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
+
 'use client';
 
-import { useState } from 'react';
-import { PurchaseContract, PurchaseStatus, PaymentType } from '@/types';
+import { useState, useEffect } from 'react';
+import { PaymentType } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -12,47 +20,99 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { CreditCard } from 'lucide-react';
+import { CreditCard, Loader2 } from 'lucide-react';
 import { PaymentDialog } from '../components/PaymentDialog';
 import { toast } from 'sonner';
+import api from '@/lib/axios';
+
+interface PayableContract {
+  id: string;
+  contractNo: string;
+  totalAmount: number;
+  paidAmount: number;
+  unpaidAmount: number;
+  status: string;
+  supplier?: {
+    id: string;
+    name: string;
+  };
+}
 
 export default function PayablePage() {
-  const [contracts, setContracts] = useState<PurchaseContract[]>([
-    { 
-      id: '1', 
-      contractNo: 'CG250001', 
-      supplierId: '1', 
-      supplier: { id: '1', name: '佛山XX陶瓷', hasQualityIssue: false, isActive: true, createdAt: '', updatedAt: '' },
-      totalAmount: 45000, 
-      paidAmount: 13500, 
-      status: PurchaseStatus.PRODUCING,
-      createdAt: '', 
-      updatedAt: ''
-    }
-  ]);
-  const [selectedContract, setSelectedContract] = useState<PurchaseContract | null>(null);
+  const [contracts, setContracts] = useState<PayableContract[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedContract, setSelectedContract] = useState<PayableContract | null>(null);
 
-  const handlePay = (contract: PurchaseContract) => {
+  // 加载应付账款数据
+  const fetchPayables = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/finance/payables', { params: { pageSize: 100 } });
+      const data = (response as any).data;
+      setContracts(data?.items || []);
+    } catch (error) {
+      console.error('获取应付账款失败:', error);
+      toast.error('加载应付账款失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPayables();
+  }, []);
+
+  const handlePay = (contract: PayableContract) => {
     setSelectedContract(contract);
   };
 
   const handleSubmit = async (data: any) => {
-    // Simulate API update
-    if (selectedContract) {
-      const newPaid = selectedContract.paidAmount + Number(data.amount);
-      setContracts(contracts.map(c => c.id === selectedContract.id ? { ...c, paidAmount: newPaid } : c));
-      toast.success('付款记录成功');
+    if (!selectedContract) return;
+    
+    try {
+      // 调用后端API创建付款记录
+      await api.post('/finance/payments', {
+        type: 'PAYABLE',
+        purchaseContractId: selectedContract.id,
+        amount: Number(data.amount),
+        currency: 'CNY',
+        paymentMethod: data.paymentMethod,
+        paymentDate: new Date().toISOString(),
+        note: data.note,
+      });
+      
+      toast.success('付款记录已保存');
+      setSelectedContract(null);
+      // 重新加载数据
+      fetchPayables();
+    } catch (error) {
+      console.error('记录付款失败:', error);
+      toast.error('记录付款失败');
     }
-    setSelectedContract(null);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <span className="ml-2">加载中...</span>
+      </div>
+    );
+  }
+
+  // 过滤出有待付金额的合同
+  const unpaidContracts = contracts.filter(c => c.unpaidAmount > 0);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">应付账款</h2>
-          <p className="text-muted-foreground">供应商付款跟踪。</p>
+          <p className="text-muted-foreground">供应商付款跟踪。共 {unpaidContracts.length} 笔待付账款。</p>
         </div>
+        <Button variant="outline" onClick={fetchPayables}>
+          刷新
+        </Button>
       </div>
 
       <div className="rounded-md border">
@@ -61,6 +121,7 @@ export default function PayablePage() {
             <TableRow>
               <TableHead>合同编号</TableHead>
               <TableHead>供应商</TableHead>
+              <TableHead>状态</TableHead>
               <TableHead className="text-right">总金额</TableHead>
               <TableHead className="text-right">已付</TableHead>
               <TableHead className="text-right">待付</TableHead>
@@ -68,22 +129,33 @@ export default function PayablePage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {contracts.map((contract) => (
-              <TableRow key={contract.id}>
-                <TableCell className="font-medium">{contract.contractNo}</TableCell>
-                <TableCell>{contract.supplier?.name}</TableCell>
-                <TableCell className="text-right">¥{contract.totalAmount.toLocaleString()}</TableCell>
-                <TableCell className="text-right text-green-600">¥{contract.paidAmount.toLocaleString()}</TableCell>
-                <TableCell className="text-right text-red-600 font-bold">
-                  ¥{(contract.totalAmount - contract.paidAmount).toLocaleString()}
-                </TableCell>
-                <TableCell>
-                  <Button size="sm" onClick={() => handlePay(contract)}>
-                    <CreditCard className="mr-2 h-3 w-3" /> 记录付款
-                  </Button>
+            {unpaidContracts.length > 0 ? (
+              unpaidContracts.map((contract) => (
+                <TableRow key={contract.id}>
+                  <TableCell className="font-medium">{contract.contractNo}</TableCell>
+                  <TableCell>{contract.supplier?.name || '-'}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{contract.status}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">¥{contract.totalAmount.toLocaleString()}</TableCell>
+                  <TableCell className="text-right text-green-600">¥{contract.paidAmount.toLocaleString()}</TableCell>
+                  <TableCell className="text-right text-red-600 font-bold">
+                    ¥{contract.unpaidAmount.toLocaleString()}
+                  </TableCell>
+                  <TableCell>
+                    <Button size="sm" onClick={() => handlePay(contract)}>
+                      <CreditCard className="mr-2 h-3 w-3" /> 记录付款
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  暂无待付账款
                 </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
       </div>
@@ -95,7 +167,7 @@ export default function PayablePage() {
           type={PaymentType.PAYABLE}
           contractId={selectedContract.id}
           contractNo={selectedContract.contractNo}
-          remainingAmount={selectedContract.totalAmount - selectedContract.paidAmount}
+          remainingAmount={selectedContract.unpaidAmount}
           onSubmit={handleSubmit}
         />
       )}

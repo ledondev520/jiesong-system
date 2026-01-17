@@ -21,6 +21,8 @@ const financeRoutes = require('./finance');
 const systemRoutes = require('./system');
 const aiRoutes = require('./ai');
 const userRoutes = require('./users');
+const dataImportRoutes = require('./dataImport');
+const dashboardRoutes = require('./dashboard');
 
 const router = Router();
 
@@ -41,5 +43,7 @@ router.use('/finance', financeRoutes);
 router.use('/system', systemRoutes);
 router.use('/ai', aiRoutes);
 router.use('/users', userRoutes);
+router.use('/import', dataImportRoutes);
+router.use('/dashboard', dashboardRoutes);
 
 module.exports = router;

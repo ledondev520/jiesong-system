@@ -12,15 +12,19 @@ const { createError } = require('../middleware/errorHandler');
 
 /**
  * 职责：获取货柜列表
+ * 思路：支持关键字搜索货柜编号
  */
 const list = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20, status, portId } = req.query;
+    const { page = 1, pageSize = 20, status, portId, keyword } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(pageSize);
     
     const where = {};
     if (status) where.status = status;
     if (portId) where.portId = portId;
+    if (keyword) {
+      where.containerNo = { contains: keyword };
+    }
     
     const [containers, total] = await Promise.all([
       prisma.container.findMany({

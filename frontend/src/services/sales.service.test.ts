@@ -29,7 +29,7 @@ describe('salesService api', () => {
 
     await salesService.getAll({ page: 1, pageSize: 20, query: 'keyword' });
 
-    expect(api.get).toHaveBeenCalledWith('/sales/contracts', {
+    expect(api.get).toHaveBeenCalledWith('/sales', {
       params: { page: 1, pageSize: 20, query: 'keyword' },
     });
   });
@@ -39,7 +39,7 @@ describe('salesService api', () => {
 
     await salesService.getById('123');
 
-    expect(api.get).toHaveBeenCalledWith('/sales/contracts/123');
+    expect(api.get).toHaveBeenCalledWith('/sales/123');
   });
 
   it('create: 提交新增数据', async () => {
@@ -48,7 +48,7 @@ describe('salesService api', () => {
 
     await salesService.create(payload);
 
-    expect(api.post).toHaveBeenCalledWith('/sales/contracts', payload);
+    expect(api.post).toHaveBeenCalledWith('/sales', payload);
   });
 
   it('update: 使用id提交更新', async () => {
@@ -57,7 +57,7 @@ describe('salesService api', () => {
 
     await salesService.update('123', payload);
 
-    expect(api.put).toHaveBeenCalledWith('/sales/contracts/123', payload);
+    expect(api.put).toHaveBeenCalledWith('/sales/123', payload);
   });
 
   it('delete: 使用id删除数据', async () => {
@@ -65,7 +65,7 @@ describe('salesService api', () => {
 
     await salesService.delete('123');
 
-    expect(api.delete).toHaveBeenCalledWith('/sales/contracts/123');
+    expect(api.delete).toHaveBeenCalledWith('/sales/123');
   });
 });
 

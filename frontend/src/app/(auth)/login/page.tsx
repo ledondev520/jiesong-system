@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuthStore } from '@/store/auth.store';
+import api from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -57,6 +58,12 @@ export default function LoginPage() {
     }
   }, [form]);
 
+  /**
+   * 职责：提交登录表单并处理登录结果
+   * 思路：先处理记住密码，再调用后端登录接口并保存用户信息
+   * @param {LoginFormValues} data - 登录表单数据
+   * @returns {Promise<void>} 登录流程执行结果
+   */
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
     setError(null);
@@ -70,17 +77,11 @@ export default function LoginPage() {
         localStorage.removeItem('jiesong_credentials');
       }
 
-      // 调用后端登录API
-      const response = await fetch('http://localhost:3000/api/v1/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: data.username,
-          password: data.password
-        }),
+      // 调用后端登录API（使用统一axios实例）
+      const result = await api.post('/auth/login', {
+        username: data.username,
+        password: data.password,
       });
-      
-      const result = await response.json();
       
       if (result.code === 200 && result.data) {
         login(result.data.user, result.data.token);

@@ -12,15 +12,22 @@ const { createError } = require('../middleware/errorHandler');
 
 /**
  * 职责：获取采购合同列表
+ * 思路：支持关键字搜索合同编号和供应商名称
  */
 const list = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20, status, supplierId } = req.query;
+    const { page = 1, pageSize = 20, status, supplierId, keyword } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(pageSize);
     
     const where = {};
     if (status) where.status = status;
     if (supplierId) where.supplierId = supplierId;
+    if (keyword) {
+      where.OR = [
+        { contractNo: { contains: keyword } },
+        { supplier: { name: { contains: keyword } } },
+      ];
+    }
     
     const [contracts, total] = await Promise.all([
       prisma.purchaseContract.findMany({

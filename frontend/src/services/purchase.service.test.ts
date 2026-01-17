@@ -29,7 +29,7 @@ describe('purchaseService api', () => {
 
     await purchaseService.getAll({ page: 1, pageSize: 20, query: '采购' });
 
-    expect(api.get).toHaveBeenCalledWith('/purchase/contracts', {
+    expect(api.get).toHaveBeenCalledWith('/purchases', {
       params: { page: 1, pageSize: 20, query: '采购' },
     });
   });
@@ -39,7 +39,7 @@ describe('purchaseService api', () => {
 
     await purchaseService.getById('pc1');
 
-    expect(api.get).toHaveBeenCalledWith('/purchase/contracts/pc1');
+    expect(api.get).toHaveBeenCalledWith('/purchases/pc1');
   });
 
   it('create: 提交新增数据', async () => {
@@ -48,7 +48,7 @@ describe('purchaseService api', () => {
 
     await purchaseService.create(payload);
 
-    expect(api.post).toHaveBeenCalledWith('/purchase/contracts', payload);
+    expect(api.post).toHaveBeenCalledWith('/purchases', payload);
   });
 
   it('update: 提交更新数据', async () => {
@@ -57,7 +57,7 @@ describe('purchaseService api', () => {
 
     await purchaseService.update('pc1', payload);
 
-    expect(api.put).toHaveBeenCalledWith('/purchase/contracts/pc1', payload);
+    expect(api.put).toHaveBeenCalledWith('/purchases/pc1', payload);
   });
 
   it('delete: 通过id删除', async () => {
@@ -65,7 +65,7 @@ describe('purchaseService api', () => {
 
     await purchaseService.delete('pc1');
 
-    expect(api.delete).toHaveBeenCalledWith('/purchase/contracts/pc1');
+    expect(api.delete).toHaveBeenCalledWith('/purchases/pc1');
   });
 });
 

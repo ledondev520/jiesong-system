@@ -80,17 +80,19 @@ export default function CreatePurchasePage() {
   }, 0);
 
   useEffect(() => {
-    // Load Dependencies
+    // Load Dependencies from API
     const loadData = async () => {
-      // Mock loading
-      setSuppliers([
-        { id: '1', name: '佛山XX陶瓷有限公司', hasQualityIssue: false, isActive: true, createdAt: '', updatedAt: '' },
-        { id: '2', name: '广州XX卫浴厂', hasQualityIssue: true, isActive: true, createdAt: '', updatedAt: '' },
-      ]);
-      setProducts([
-        { id: '1', customsName: '800x800瓷砖', unit: '平方米', isActive: true, createdAt: '', updatedAt: '' },
-        { id: '2', customsName: '洗手盆', unit: '个', isActive: true, createdAt: '', updatedAt: '' },
-      ]);
+      try {
+        const [suppliersRes, productsRes] = await Promise.all([
+          supplierService.getAll({ pageSize: 100 }),
+          productService.getAll({ pageSize: 100 }),
+        ]);
+        setSuppliers(suppliersRes.data?.items || []);
+        setProducts(productsRes.data?.items || []);
+      } catch (error) {
+        console.error('加载数据失败:', error);
+        toast.error('加载供应商和商品数据失败');
+      }
     };
     loadData();
   }, []);

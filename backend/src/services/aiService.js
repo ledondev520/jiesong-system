@@ -49,9 +49,12 @@ const chat = async (userId, sessionId, message, imageUrl = null) => {
     take: 10,
   });
   
-  // 1. 构建消息列表
+  // 0.5 查询数据库获取相关上下文
+  const dbContext = await getDbContext(message);
+  
+  // 1. 构建消息列表（系统提示词 + 数据库上下文）
   const messages = [
-    { role: 'system', content: getSystemPrompt() },
+    { role: 'system', content: getSystemPrompt() + dbContext },
     ...history.map(h => buildMessageFromHistory(h)),
   ];
   
@@ -132,9 +135,12 @@ const chatStream = async (userId, sessionId, message, imageUrl = null, onChunk) 
     take: 10,
   });
   
-  // 1. 构建消息列表
+  // 0.5 查询数据库获取相关上下文
+  const dbContext = await getDbContext(message);
+  
+  // 1. 构建消息列表（系统提示词 + 数据库上下文）
   const messages = [
-    { role: 'system', content: getSystemPrompt() },
+    { role: 'system', content: getSystemPrompt() + dbContext },
     ...history.map(h => buildMessageFromHistory(h)),
   ];
   
@@ -291,7 +297,206 @@ const getSystemPrompt = () => {
 采购合同编号：CG + 年份 + 5位序号，如 CG2500001
 出口合同编号：EXP + 年份 + 5位序号，如 EXP2500001
 
-请用中文回答，语言简洁专业。当用户上传图片时，请仔细识别图片内容并提取有用信息。`;
+请用中文回答，语言简洁专业。回答时请引用系统数据库中的实际数据。当用户上传图片时，请仔细识别图片内容并提取有用信息。`;
+};
+
+/**
+ * 职责：查询数据库获取与用户问题相关的上下文
+ * 思路：
+ * 1. 分析用户问题中的关键词
+ * 2. 查询相关的商品、供应商、合同、货柜等数据
+ * 3. 格式化为上下文字符串返回给AI
+ * @param {string} message - 用户消息
+ * @returns {string} 数据库上下文
+ */
+const getDbContext = async (message) => {
+  const context = [];
+  const lowerMsg = message.toLowerCase();
+  
+  try {
+    // 1. 统计数据（总是包含）
+    const [productCount, supplierCount, purchaseCount, salesCount, containerCount] = await Promise.all([
+      prisma.product.count(),
+      prisma.supplier.count(),
+      prisma.purchaseContract.count(),
+      prisma.salesContract.count(),
+      prisma.container.count(),
+    ]);
+    
+    context.push(`【系统统计】商品${productCount}种, 供应商${supplierCount}家, 采购合同${purchaseCount}份, 销售合同${salesCount}份, 货柜${containerCount}个`);
+    
+    // 2. 查询相关商品
+    if (lowerMsg.includes('商品') || lowerMsg.includes('产品') || lowerMsg.includes('货')) {
+      const keywords = extractKeywords(message);
+      for (const keyword of keywords) {
+        const products = await prisma.product.findMany({
+          where: { customsName: { contains: keyword } },
+          take: 5,
+        });
+        if (products.length > 0) {
+          context.push(`【商品"${keyword}"】找到${products.length}条: ` + products.map(p => `${p.customsName}(${p.unit})`).join(', '));
+        }
+      }
+    }
+    
+    // 3. 查询供应商
+    if (lowerMsg.includes('供应商') || lowerMsg.includes('厂家') || lowerMsg.includes('谁')) {
+      const keywords = extractKeywords(message);
+      for (const keyword of keywords) {
+        const suppliers = await prisma.supplier.findMany({
+          where: { OR: [{ name: { contains: keyword } }, { shortName: { contains: keyword } }] },
+          take: 5,
+        });
+        if (suppliers.length > 0) {
+          context.push(`【供应商"${keyword}"】找到${suppliers.length}家: ` + suppliers.map(s => `${s.name}(${s.shortName || '无简称'})`).join(', '));
+        }
+      }
+    }
+    
+    // 4. 查询合同
+    if (lowerMsg.includes('合同') || lowerMsg.includes('cg') || lowerMsg.includes('exp') || lowerMsg.includes('采购') || lowerMsg.includes('销售')) {
+      // 查询采购合同
+      const purchaseKeyword = message.match(/CG\d+/i)?.[0];
+      if (purchaseKeyword) {
+        const purchases = await prisma.purchaseContract.findMany({
+          where: { contractNo: { contains: purchaseKeyword.toUpperCase() } },
+          include: { supplier: true },
+          take: 3,
+        });
+        if (purchases.length > 0) {
+          context.push(`【采购合同"${purchaseKeyword}"】` + purchases.map(p => `${p.contractNo}(供应商:${p.supplier?.name || '未知'}, 金额:¥${p.totalAmount})`).join('; '));
+        }
+      }
+      
+      // 查询销售合同
+      const salesKeyword = message.match(/EXP\d+/i)?.[0];
+      if (salesKeyword) {
+        const sales = await prisma.salesContract.findMany({
+          where: { contractNo: { contains: salesKeyword.toUpperCase() } },
+          take: 3,
+        });
+        if (sales.length > 0) {
+          context.push(`【销售合同"${salesKeyword}"】` + sales.map(s => `${s.contractNo}(金额:$${s.totalAmount}, 状态:${s.status})`).join('; '));
+        }
+      }
+      
+      // 最近合同汇总
+      if (!purchaseKeyword && !salesKeyword && (lowerMsg.includes('采购') || lowerMsg.includes('合同'))) {
+        const recentPurchases = await prisma.purchaseContract.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+          include: { supplier: true },
+        });
+        if (recentPurchases.length > 0) {
+          context.push(`【最近采购合同】` + recentPurchases.map(p => `${p.contractNo}(${p.supplier?.shortName || p.supplier?.name || '未知'}, ¥${p.totalAmount})`).join(', '));
+        }
+      }
+    }
+    
+    // 5. 查询货柜
+    if (lowerMsg.includes('货柜') || lowerMsg.includes('集装箱') || lowerMsg.includes('柜') || lowerMsg.match(/\d{2}-\d{3}/)) {
+      const containerNo = message.match(/\d{2}-\d{3}(-\w+)?/)?.[0];
+      if (containerNo) {
+        const containers = await prisma.container.findMany({
+          where: { containerNo: { contains: containerNo } },
+          include: { port: true },
+          take: 3,
+        });
+        if (containers.length > 0) {
+          context.push(`【货柜"${containerNo}"】` + containers.map(c => `${c.containerNo}(港口:${c.port?.name || '未知'}, 状态:${c.status})`).join('; '));
+        }
+      } else {
+        // 最近货柜
+        const recentContainers = await prisma.container.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+          include: { port: true },
+        });
+        if (recentContainers.length > 0) {
+          context.push(`【最近货柜】` + recentContainers.map(c => `${c.containerNo}(${c.port?.name || '未知'}, ${c.status})`).join(', '));
+        }
+      }
+    }
+    
+    // 6. 库存和位置查询
+    if (lowerMsg.includes('位置') || lowerMsg.includes('在哪') || lowerMsg.includes('库存') || lowerMsg.includes('多少')) {
+      const keywords = extractKeywords(message);
+      for (const keyword of keywords) {
+        const inventories = await prisma.inventory.findMany({
+          where: { product: { customsName: { contains: keyword } } },
+          include: { product: true, container: { include: { port: true } } },
+          take: 5,
+        });
+        if (inventories.length > 0) {
+          context.push(`【库存"${keyword}"】` + inventories.map(i => 
+            `${i.product.customsName}: ${i.quantity}${i.product.unit}, 货柜${i.container?.containerNo || '未装柜'}, 状态${i.status}`
+          ).join('; '));
+        }
+      }
+    }
+    
+    // 7. 价格查询
+    if (lowerMsg.includes('价格') || lowerMsg.includes('售价') || lowerMsg.includes('成本')) {
+      const exchangeConfig = await prisma.systemConfig.findUnique({ where: { key: 'exchangeRate' } });
+      if (exchangeConfig) {
+        try {
+          const rate = JSON.parse(exchangeConfig.value);
+          context.push(`【汇率配置】当前汇率${rate.rate || rate}, 缓冲值${rate.buffer || 0.2}`);
+        } catch {
+          context.push(`【汇率配置】当前汇率${exchangeConfig.value}`);
+        }
+      }
+    }
+    
+    // 8. 财务查询
+    if (lowerMsg.includes('付款') || lowerMsg.includes('欠款') || lowerMsg.includes('应付') || lowerMsg.includes('应收') || lowerMsg.includes('财务')) {
+      const [payableStats, receivableStats] = await Promise.all([
+        prisma.purchaseContract.aggregate({
+          where: { NOT: { status: 'CANCELLED' } },
+          _sum: { totalAmount: true, paidAmount: true },
+        }),
+        prisma.salesContract.aggregate({
+          where: { NOT: { status: 'CANCELLED' } },
+          _sum: { totalAmount: true, receivedAmount: true },
+        }),
+      ]);
+      
+      const payableTotal = payableStats._sum.totalAmount || 0;
+      const paidTotal = payableStats._sum.paidAmount || 0;
+      const receivableTotal = receivableStats._sum.totalAmount || 0;
+      const receivedTotal = receivableStats._sum.receivedAmount || 0;
+      
+      context.push(`【财务概况】应付总额¥${payableTotal}, 已付¥${paidTotal}, 待付¥${payableTotal - paidTotal}; 应收总额$${receivableTotal}, 已收$${receivedTotal}, 待收$${receivableTotal - receivedTotal}`);
+    }
+    
+  } catch (error) {
+    console.error('查询数据库上下文失败:', error.message);
+  }
+  
+  return context.length > 0 ? '\n\n【数据库参考信息】\n' + context.join('\n') : '';
+};
+
+/**
+ * 职责：从用户消息中提取关键词
+ * @param {string} message - 用户消息
+ * @returns {string[]} 关键词列表
+ */
+const extractKeywords = (message) => {
+  // 移除常见的问句词
+  const stopWords = ['是什么', '在哪', '多少', '有没有', '能不能', '怎么', '哪里', '哪个', '什么', '请', '帮我', '查询', '查一下', '找', '看看'];
+  let text = message;
+  stopWords.forEach(w => { text = text.replace(new RegExp(w, 'g'), ' '); });
+  
+  // 提取中文词（2-10个字）
+  const chineseWords = text.match(/[\u4e00-\u9fa5]{2,10}/g) || [];
+  
+  // 提取合同编号
+  const contractNos = text.match(/[A-Za-z]{2,3}\d+/g) || [];
+  
+  // 提取货柜编号
+  const containerNos = text.match(/\d{2}-\d{3}(-\w+)?/g) || [];
+  
+  return [...new Set([...chineseWords, ...contractNos, ...containerNos])].slice(0, 5);
 };
 
 /**
