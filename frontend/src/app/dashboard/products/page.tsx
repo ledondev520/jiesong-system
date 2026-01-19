@@ -1,3 +1,11 @@
+/**
+ * Input: 商品服务API
+ * Output: 商品管理页面
+ * Pos: 基础档案子页面
+ * 
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -16,6 +24,7 @@ import {
 } from '@/components/ui/table';
 import { Plus, Pencil, Trash, Search } from 'lucide-react';
 import { ProductDialog } from './components/ProductDialog';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { toast } from 'sonner';
 
 export default function ProductsPage() {
@@ -96,26 +105,28 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">商品管理</h2>
-          <p className="text-muted-foreground">管理商品档案与规格信息。</p>
-        </div>
-        <div className="flex gap-2">
-          <div className="relative w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="搜索商品..."
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              className="pl-8"
-            />
+      <PageHeader 
+        title="商品管理"
+        description="管理商品档案与规格信息"
+        backHref="/dashboard/settings?tab=master"
+        backLabel="返回"
+        actions={
+          <div className="flex gap-2">
+            <div className="relative w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="搜索商品..."
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            <Button onClick={handleCreate}>
+              <Plus className="mr-2 h-4 w-4" /> 新增商品
+            </Button>
           </div>
-          <Button onClick={handleCreate}>
-            <Plus className="mr-2 h-4 w-4" /> 新增商品
-          </Button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="rounded-md border">
         <Table>

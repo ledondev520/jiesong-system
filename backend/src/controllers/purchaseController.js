@@ -35,7 +35,7 @@ const list = async (req, res, next) => {
         skip,
         take: parseInt(pageSize),
         include: { supplier: true, _count: { select: { items: true } } },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { contractNo: 'desc' }, // 按合同编号倒序
       }),
       prisma.purchaseContract.count({ where }),
     ]);

@@ -69,7 +69,7 @@ const login = async (username, password) => {
 };
 
 /**
- * 职责：创建新用户
+ * 职责：创建新用户（管理员创建）
  * 思路：
  * 1. 检查用户名是否已存在
  * 2. 加密密码
@@ -108,6 +108,64 @@ const register = async (userData) => {
       name: true,
       role: true,
       email: true,
+      phone: true,
+      isActive: true,
+      createdAt: true,
+    },
+  });
+  
+  return user;
+};
+
+/**
+ * 职责：公开注册新用户（用户自助注册）
+ * 思路：
+ * 1. 检查用户名是否已存在
+ * 2. 检查手机号是否已被使用
+ * 3. 加密密码
+ * 4. 创建用户记录（默认角色SALES，默认未激活）
+ * @param {Object} userData - 用户数据
+ * @returns {Object} 创建的用户（不含密码）
+ */
+const publicRegister = async (userData) => {
+  const { username, password, name, phone } = userData;
+  
+  // 1. 检查用户名
+  const existingUsername = await prisma.user.findUnique({
+    where: { username },
+  });
+  
+  if (existingUsername) {
+    throw createError('用户名已被使用，请尝试其他用户名', 400);
+  }
+  
+  // 2. 检查手机号
+  const existingPhone = await prisma.user.findFirst({
+    where: { phone },
+  });
+  
+  if (existingPhone) {
+    throw createError('该手机号已被注册', 400);
+  }
+  
+  // 3. 加密密码
+  const hashedPassword = await bcrypt.hash(password, 12);
+  
+  // 4. 创建用户（默认未激活，需管理员审核）
+  const user = await prisma.user.create({
+    data: {
+      username,
+      password: hashedPassword,
+      name,
+      phone,
+      role: 'SALES',       // 默认角色
+      isActive: false,     // 默认未激活，需审核
+    },
+    select: {
+      id: true,
+      username: true,
+      name: true,
+      role: true,
       phone: true,
       isActive: true,
       createdAt: true,
@@ -241,6 +299,7 @@ const updateUser = async (id, userData) => {
 module.exports = {
   login,
   register,
+  publicRegister,
   getUserById,
   changePassword,
   getUsers,

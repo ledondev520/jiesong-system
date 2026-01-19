@@ -1,3 +1,11 @@
+/**
+ * Input: 供应商服务API
+ * Output: 供应商管理页面
+ * Pos: 基础档案子页面
+ * 
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -15,6 +23,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Plus, Pencil, Trash, AlertTriangle } from 'lucide-react';
 import { SupplierDialog } from './components/SupplierDialog';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { toast } from 'sonner';
 
 export default function SuppliersPage() {
@@ -79,15 +88,17 @@ export default function SuppliersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">供应商管理</h2>
-          <p className="text-muted-foreground">管理供应商档案与质量记录。</p>
-        </div>
-        <Button onClick={handleCreate}>
-          <Plus className="mr-2 h-4 w-4" /> 新增供应商
-        </Button>
-      </div>
+      <PageHeader 
+        title="供应商管理"
+        description="管理供应商档案与质量记录"
+        backHref="/dashboard/settings?tab=master"
+        backLabel="返回"
+        actions={
+          <Button onClick={handleCreate}>
+            <Plus className="mr-2 h-4 w-4" /> 新增供应商
+          </Button>
+        }
+      />
 
       <div className="rounded-md border">
         <Table>

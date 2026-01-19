@@ -317,6 +317,7 @@ const importRecords = async (records) => {
       stores: 0,
       containers: 0,
       salesContracts: 0,
+      salesItems: 0,
       purchaseContracts: 0,
       containerItems: 0,
       inventories: 0,
@@ -413,14 +414,15 @@ const importRecords = async (records) => {
         }
       }
       
-      // 6. 处理销售合同
+      // 6. 处理销售合同及明细
       const salesContractNo = (row['合同号'] || '').trim();
+      let salesContract = null;
       if (salesContractNo) {
-        let salesContract = await prisma.salesContract.findUnique({ 
+        salesContract = await prisma.salesContract.findUnique({ 
           where: { contractNo: salesContractNo } 
         });
         if (!salesContract) {
-          await prisma.salesContract.create({
+          salesContract = await prisma.salesContract.create({
             data: {
               contractNo: salesContractNo,
               totalAmount: 0,
@@ -431,6 +433,47 @@ const importRecords = async (records) => {
             },
           });
           results.created.salesContracts++;
+        }
+        
+        // 6.1 创建销售合同明细（SalesItem）
+        const quantity = parseQuantity(row['报关数量']) || 0;
+        const costPrice = parseAmount(row['采购金额']) || 0;
+        const sellingPrice = parseAmount(row['出口金额']) || parseAmount(row['售价']) || 0;
+        
+        if (product && store && quantity > 0) {
+          // 检查是否已存在相同的明细（避免重复导入）
+          const existingItem = await prisma.salesItem.findFirst({
+            where: {
+              salesContractId: salesContract.id,
+              productId: product.id,
+              storeId: store.id,
+            },
+          });
+          
+          if (!existingItem) {
+            await prisma.salesItem.create({
+              data: {
+                salesContractId: salesContract.id,
+                productId: product.id,
+                storeId: store.id,
+                quantity,
+                unit: standardizeUnit(row['单位']),
+                costPrice,
+                sellingPrice,
+                specification: (row['规格'] || row['商品规格'] || '').trim() || null,
+                note: `序号${row['序号']}: ${(row['备注'] || '').trim()}`,
+              },
+            });
+            results.created.salesItems = (results.created.salesItems || 0) + 1;
+            
+            // 更新销售合同总金额
+            await prisma.salesContract.update({
+              where: { id: salesContract.id },
+              data: {
+                totalAmount: { increment: sellingPrice * quantity },
+              },
+            });
+          }
         }
       }
       
@@ -549,6 +592,7 @@ const getDatabaseStats = async () => {
     containers,
     containerItems,
     salesContracts,
+    salesItems,
     purchaseContracts,
     inventories,
   ] = await Promise.all([
@@ -558,6 +602,7 @@ const getDatabaseStats = async () => {
     prisma.container.count(),
     prisma.containerItem.count(),
     prisma.salesContract.count(),
+    prisma.salesItem.count(),
     prisma.purchaseContract.count(),
     prisma.inventory.count(),
   ]);
@@ -569,6 +614,7 @@ const getDatabaseStats = async () => {
     containers,
     containerItems,
     salesContracts,
+    salesItems,
     purchaseContracts,
     inventories,
   };

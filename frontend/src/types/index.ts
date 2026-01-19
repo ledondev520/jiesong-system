@@ -194,6 +194,9 @@ export interface Inventory {
   createdAt: string;
   updatedAt: string;
   product?: Product;
+  purchaseItem?: PurchaseItem & {
+    purchaseContract?: PurchaseContract;
+  };
 }
 
 export enum ContainerStatus {

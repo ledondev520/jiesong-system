@@ -1,3 +1,11 @@
+/**
+ * Input: 用户服务API
+ * Output: 用户管理页面
+ * Pos: 系统设置子页面
+ * 
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -15,6 +23,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Plus, Pencil, Trash, UserCog } from 'lucide-react';
 import { UserDialog } from './components/UserDialog';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { toast } from 'sonner';
 
 export default function UsersPage() {
@@ -88,15 +97,17 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">用户管理</h2>
-          <p className="text-muted-foreground">管理系统用户及角色权限。</p>
-        </div>
-        <Button onClick={handleCreate}>
-          <Plus className="mr-2 h-4 w-4" /> 新增用户
-        </Button>
-      </div>
+      <PageHeader 
+        title="用户管理"
+        description="管理系统用户及角色权限"
+        backHref="/dashboard/settings?tab=users"
+        backLabel="返回"
+        actions={
+          <Button onClick={handleCreate}>
+            <Plus className="mr-2 h-4 w-4" /> 新增用户
+          </Button>
+        }
+      />
 
       <div className="rounded-md border">
         <Table>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,6 +20,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { UserPlus } from 'lucide-react';
 
 const loginSchema = z.object({
   username: z.string().min(1, '请输入用户名'),
@@ -166,8 +168,16 @@ export default function LoginPage() {
             </form>
           </Form>
         </CardContent>
-        <CardFooter className="flex justify-center text-sm text-muted-foreground">
-           默认账号: admin / 123456
+        <CardFooter className="flex flex-col gap-3">
+          <Link href="/register" className="w-full">
+            <Button variant="outline" className="w-full gap-2">
+              <UserPlus className="h-4 w-4" />
+              没有账号？立即注册
+            </Button>
+          </Link>
+          <p className="text-center text-sm text-muted-foreground">
+            默认管理员: admin / 123456
+          </p>
         </CardFooter>
       </Card>
     </div>

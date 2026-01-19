@@ -1,7 +1,7 @@
 /**
- * Input: 后端 /system/configs API
- * Output: 系统设置页面
- * Pos: 系统模块，管理全局参数与数据字典
+ * Input: 后端 /system/configs API、基础数据API
+ * Output: 综合设置页面（基础档案+系统配置+数据导入）
+ * Pos: 系统模块，整合所有设置功能
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -9,6 +9,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -26,10 +27,11 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { X, Save, Loader2 } from 'lucide-react';
+import { X, Save, Loader2, Package, Users, Store, Settings2, FileSpreadsheet, UserCog } from 'lucide-react';
 import { toast } from 'sonner';
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE, UNITS as INITIAL_UNITS } from '@/lib/constants';
 import api from '@/lib/axios';
+import Link from 'next/link';
 
 const configSchema = z.object({
   exchangeRate: z.number().min(0.1, '汇率必须大于0'),
@@ -47,7 +49,19 @@ interface SystemConfigMap {
   [key: string]: any;
 }
 
+/**
+ * 职责：渲染综合设置页面
+ * 思路：
+ *   1. Tab1 基础档案：商品/供应商/门店的快捷入口
+ *   2. Tab2 系统配置：汇率/利润率/数据字典
+ *   3. Tab3 数据导入：CSV导入入口
+ *   4. Tab4 用户管理：用户管理入口
+ */
 export default function SettingsPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const defaultTab = searchParams.get('tab') || 'master';
+  
   const [units, setUnits] = useState<string[]>(INITIAL_UNITS);
   const [newUnit, setNewUnit] = useState('');
   const [brokers, setBrokers] = useState<string[]>(['捷淞', '埋单', '其他厂家报关', '不报关']);
@@ -189,20 +203,64 @@ export default function SettingsPage() {
     );
   }
 
+  // 快捷入口配置
+  const masterDataLinks = [
+    { href: '/dashboard/products', label: '商品管理', icon: Package, desc: '管理商品档案' },
+    { href: '/dashboard/suppliers', label: '供应商管理', icon: Users, desc: '管理供应商信息' },
+    { href: '/dashboard/stores', label: '门店管理', icon: Store, desc: '管理客户门店' },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">系统设置</h2>
-        <p className="text-muted-foreground">管理系统全局参数与数据字典。</p>
+        <h2 className="text-2xl font-bold tracking-tight">设置</h2>
+        <p className="text-muted-foreground">管理基础档案、系统配置与数据导入</p>
       </div>
 
-      <Tabs defaultValue="basic" className="space-y-4">
+      <Tabs defaultValue={defaultTab} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="basic">基础设置</TabsTrigger>
-          <TabsTrigger value="enums">数据字典</TabsTrigger>
+          <TabsTrigger value="master" className="gap-2">
+            <Package className="h-4 w-4" />
+            基础档案
+          </TabsTrigger>
+          <TabsTrigger value="config" className="gap-2">
+            <Settings2 className="h-4 w-4" />
+            系统配置
+          </TabsTrigger>
+          <TabsTrigger value="import" className="gap-2">
+            <FileSpreadsheet className="h-4 w-4" />
+            数据导入
+          </TabsTrigger>
+          <TabsTrigger value="users" className="gap-2">
+            <UserCog className="h-4 w-4" />
+            用户管理
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="basic">
+        {/* 基础档案Tab */}
+        <TabsContent value="master" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            {masterDataLinks.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Card key={item.href} className="hover:border-primary/50 transition-colors cursor-pointer" onClick={() => router.push(item.href)}>
+                  <CardHeader className="flex flex-row items-center gap-4 pb-2">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Icon className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">{item.label}</CardTitle>
+                      <CardDescription>{item.desc}</CardDescription>
+                    </div>
+                  </CardHeader>
+                </Card>
+              );
+            })}
+          </div>
+        </TabsContent>
+
+        {/* 系统配置Tab */}
+        <TabsContent value="config">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <Card>
@@ -281,74 +339,113 @@ export default function SettingsPage() {
               </div>
             </form>
           </Form>
-        </TabsContent>
 
-        <TabsContent value="enums" className="space-y-4">
-          <Card>
+          {/* 数据字典部分 */}
+          <Card className="mt-4">
             <CardHeader>
-              <CardTitle>商品单位</CardTitle>
-              <CardDescription>系统中可用的计量单位。</CardDescription>
+              <CardTitle>数据字典</CardTitle>
+              <CardDescription>系统中可用的枚举值配置</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input 
-                  placeholder="输入新单位 (例如: 卷)" 
-                  value={newUnit} 
-                  onChange={(e) => setNewUnit(e.target.value)}
-                  className="max-w-xs"
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddUnit())}
-                />
-                <Button onClick={handleAddUnit} variant="secondary">添加</Button>
+            <CardContent className="space-y-6">
+              {/* 商品单位 */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">商品单位</label>
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder="输入新单位 (例如: 卷)" 
+                    value={newUnit} 
+                    onChange={(e) => setNewUnit(e.target.value)}
+                    className="max-w-xs"
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddUnit())}
+                  />
+                  <Button onClick={handleAddUnit} variant="secondary" size="sm">添加</Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {units.map((unit) => (
+                    <Badge key={unit} variant="outline" className="pl-2 pr-1 py-1 text-sm">
+                      {unit}
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-4 w-4 ml-1 hover:bg-destructive/20 hover:text-destructive rounded-full"
+                        onClick={() => handleDeleteUnit(unit)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </Badge>
+                  ))}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {units.map((unit) => (
-                  <Badge key={unit} variant="outline" className="pl-2 pr-1 py-1 text-sm">
-                    {unit}
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-4 w-4 ml-1 hover:bg-destructive/20 hover:text-destructive rounded-full"
-                      onClick={() => handleDeleteUnit(unit)}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </Badge>
-                ))}
+
+              {/* 报关公司 */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">报关公司</label>
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder="输入新报关公司" 
+                    value={newBroker} 
+                    onChange={(e) => setNewBroker(e.target.value)}
+                    className="max-w-xs"
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddBroker())}
+                  />
+                  <Button onClick={handleAddBroker} variant="secondary" size="sm">添加</Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {brokers.map((broker) => (
+                    <Badge key={broker} variant="outline" className="pl-2 pr-1 py-1 text-sm">
+                      {broker}
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-4 w-4 ml-1 hover:bg-destructive/20 hover:text-destructive rounded-full"
+                        onClick={() => handleDeleteBroker(broker)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </Badge>
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>报关公司</CardTitle>
-              <CardDescription>货柜报关时的可选公司。</CardDescription>
+        {/* 数据导入Tab */}
+        <TabsContent value="import" className="space-y-4">
+          <Card className="hover:border-primary/50 transition-colors cursor-pointer" onClick={() => router.push('/dashboard/import')}>
+            <CardHeader className="flex flex-row items-center gap-4">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <FileSpreadsheet className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">CSV数据导入</CardTitle>
+                <CardDescription>导入历史采购、销售数据</CardDescription>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input 
-                  placeholder="输入新报关公司" 
-                  value={newBroker} 
-                  onChange={(e) => setNewBroker(e.target.value)}
-                  className="max-w-xs"
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddBroker())}
-                />
-                <Button onClick={handleAddBroker} variant="secondary">添加</Button>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                支持导入CSV格式的历史数据，系统会自动解析并创建相应的合同、商品、供应商等记录。
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 用户管理Tab */}
+        <TabsContent value="users" className="space-y-4">
+          <Card className="hover:border-primary/50 transition-colors cursor-pointer" onClick={() => router.push('/dashboard/users')}>
+            <CardHeader className="flex flex-row items-center gap-4">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <UserCog className="h-6 w-6 text-primary" />
               </div>
-              <div className="flex flex-wrap gap-2">
-                {brokers.map((broker) => (
-                  <Badge key={broker} variant="outline" className="pl-2 pr-1 py-1 text-sm">
-                    {broker}
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-4 w-4 ml-1 hover:bg-destructive/20 hover:text-destructive rounded-full"
-                      onClick={() => handleDeleteBroker(broker)}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </Badge>
-                ))}
+              <div>
+                <CardTitle className="text-lg">用户管理</CardTitle>
+                <CardDescription>管理系统用户与权限</CardDescription>
               </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                创建和管理系统用户，分配角色权限（管理员、采购、销售）。
+              </p>
             </CardContent>
           </Card>
         </TabsContent>

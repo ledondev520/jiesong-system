@@ -20,12 +20,14 @@ import {
   Database,
   FileWarning,
   ArrowRight,
+  ArrowLeft,
   Package,
   Building2,
   Store,
   Container,
   FileText,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import {
   previewCSV,
   executeImport,
@@ -41,6 +43,8 @@ import {
 type ImportStep = 'upload' | 'preview' | 'importing' | 'result';
 
 export default function DataImportPage() {
+  const router = useRouter();
+  
   // 0. 状态管理
   const [step, setStep] = useState<ImportStep>('upload');
   const [file, setFile] = useState<File | null>(null);
@@ -166,6 +170,13 @@ export default function DataImportPage() {
       <div className="max-w-7xl mx-auto">
         {/* 页面标题 */}
         <div className="mb-8">
+          <button 
+            onClick={() => router.push('/dashboard/settings?tab=import')}
+            className="flex items-center gap-1 text-slate-400 hover:text-white mb-4 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            返回
+          </button>
           <h1 className="text-3xl font-bold text-white flex items-center gap-3">
             <FileSpreadsheet className="w-8 h-8 text-emerald-400" />
             数据导入中心

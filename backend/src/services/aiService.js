@@ -62,8 +62,12 @@ const chat = async (userId, sessionId, message, imageUrl = null) => {
   const userMessage = buildUserMessage(message, imageUrl);
   messages.push(userMessage);
   
-  // 3. 选择模型（有图片用视觉模型，否则用默认模型）
-  const model = imageUrl ? MODELS.vision : MODELS.default;
+  // 3. 选择模型（当前消息或历史消息有图片时，使用视觉模型）
+  const hasImageInHistory = history.some(h => h.imageUrl);
+  const needsVisionModel = imageUrl || hasImageInHistory;
+  const model = needsVisionModel ? MODELS.vision : MODELS.default;
+  
+  console.log(`[AI] 使用模型: ${model}, 当前图片: ${!!imageUrl}, 历史图片: ${hasImageInHistory}`);
   
   // 4. 保存用户消息
   await prisma.chatHistory.create({
@@ -148,8 +152,12 @@ const chatStream = async (userId, sessionId, message, imageUrl = null, onChunk) 
   const userMessage = buildUserMessage(message, imageUrl);
   messages.push(userMessage);
   
-  // 3. 选择模型
-  const model = imageUrl ? MODELS.vision : MODELS.default;
+  // 3. 选择模型（当前消息或历史消息有图片时，使用视觉模型）
+  const hasImageInHistory = history.some(h => h.imageUrl);
+  const needsVisionModel = imageUrl || hasImageInHistory;
+  const model = needsVisionModel ? MODELS.vision : MODELS.default;
+  
+  console.log(`[AI] 使用模型: ${model}, 当前图片: ${!!imageUrl}, 历史图片: ${hasImageInHistory}`);
   
   // 4. 保存用户消息
   await prisma.chatHistory.create({
@@ -190,8 +198,21 @@ const chatStream = async (userId, sessionId, message, imageUrl = null, onChunk) 
       tokenUsage.outputTokens = Math.ceil(fullContent.length / 2);
       
     } catch (error) {
-      console.error('流式调用失败:', error.message);
-      fullContent = '抱歉，AI服务暂时不可用，请稍后再试。';
+      console.error('流式调用失败:', error.message, error.stack);
+      // 构建更详细的错误信息
+      let errorMessage = '抱歉，AI服务出错了。';
+      if (error.status === 401 || error.message?.includes('Unauthorized')) {
+        errorMessage = '错误：API Key无效或已过期，请联系管理员检查配置。';
+      } else if (error.status === 429 || error.message?.includes('rate limit')) {
+        errorMessage = '错误：请求过于频繁，请稍后再试。';
+      } else if (error.status === 400 || error.message?.includes('Invalid')) {
+        errorMessage = '错误：请求参数无效 - ' + (error.message || '未知错误');
+      } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+        errorMessage = '错误：无法连接到AI服务，请检查网络连接。';
+      } else if (error.message) {
+        errorMessage = '错误：' + error.message;
+      }
+      fullContent = errorMessage;
       if (onChunk) onChunk(fullContent);
     }
   } else {
@@ -293,11 +314,21 @@ const getSystemPrompt = () => {
 
 定价公式：售价(USD) = 成本价(RMB) ÷ (汇率 - 0.2) × 1.3
 
-货柜编号格式：年份-序号-港口简码，如 25-001-LA
-采购合同编号：CG + 年份 + 5位序号，如 CG2500001
-出口合同编号：EXP + 年份 + 5位序号，如 EXP2500001
+编号格式：
+- 货柜：年份-序号-港口简码，如 25-001-LA
+- 采购合同：CG + 年份 + 5位序号，如 CG2500001
+- 出口合同：EXP + 年份 + 5位序号，如 EXP2500001
 
-请用中文回答，语言简洁专业。回答时请引用系统数据库中的实际数据。当用户上传图片时，请仔细识别图片内容并提取有用信息。`;
+重要：当用户查询合同或货柜信息时：
+1. 直接引用【数据库参考信息】中的实际数据来回答
+2. 如果找到相关数据，详细列出商品明细、数量、金额等
+3. 提供跳转链接让用户可以查看更多详情，格式示例：
+   - "点击查看销售合同详情: /dashboard/contracts?tab=sales"
+   - "点击查看货柜详情: /dashboard/inventory-container?tab=container"
+4. 如果用户输入的编号可能有误（如多了一个数字），主动查找相似的记录并提示
+5. 如果数据库中没有相关数据，明确告知用户"系统中未找到此记录"
+
+请用中文回答，语言简洁专业。当用户上传图片时，请仔细识别图片内容并提取有用信息。`;
 };
 
 /**
@@ -368,15 +399,53 @@ const getDbContext = async (message) => {
         }
       }
       
-      // 查询销售合同
+      // 查询销售合同（包含商品明细）
       const salesKeyword = message.match(/EXP\d+/i)?.[0];
       if (salesKeyword) {
         const sales = await prisma.salesContract.findMany({
           where: { contractNo: { contains: salesKeyword.toUpperCase() } },
+          include: { 
+            items: { 
+              include: { 
+                product: true, 
+                store: true 
+              } 
+            } 
+          },
           take: 3,
         });
         if (sales.length > 0) {
-          context.push(`【销售合同"${salesKeyword}"】` + sales.map(s => `${s.contractNo}(金额:$${s.totalAmount}, 状态:${s.status})`).join('; '));
+          for (const s of sales) {
+            const itemDetails = s.items?.map(item => 
+              `${item.product?.customsName || '未知商品'}(${item.quantity}${item.product?.unit || ''}, 售价$${item.sellingPrice}, 门店:${item.store?.name || '未知'})`
+            ).join(', ') || '无商品明细';
+            
+            context.push(`【销售合同${s.contractNo}】状态:${s.status}, 金额:$${s.totalAmount}, 已收:$${s.receivedAmount}\n  商品明细: ${itemDetails}\n  链接: /dashboard/contracts?tab=sales`);
+          }
+        } else {
+          // 模糊匹配（用户可能输入错误的编号）
+          const fuzzySearch = salesKeyword.toUpperCase().replace(/EXP/, '');
+          const fuzzySales = await prisma.salesContract.findMany({
+            where: { contractNo: { contains: fuzzySearch } },
+            include: { 
+              items: { 
+                include: { 
+                  product: true, 
+                  store: true 
+                } 
+              } 
+            },
+            take: 3,
+          });
+          if (fuzzySales.length > 0) {
+            context.push(`【提示】未找到精确匹配的"${salesKeyword}"，但找到以下相似合同:`);
+            for (const s of fuzzySales) {
+              const itemDetails = s.items?.map(item => 
+                `${item.product?.customsName || '未知商品'}(${item.quantity}${item.product?.unit || ''})`
+              ).join(', ') || '无商品明细';
+              context.push(`  - ${s.contractNo}: $${s.totalAmount}, 商品: ${itemDetails}`);
+            }
+          }
         }
       }
       
@@ -393,27 +462,47 @@ const getDbContext = async (message) => {
       }
     }
     
-    // 5. 查询货柜
+    // 5. 查询货柜（包含商品明细）
     if (lowerMsg.includes('货柜') || lowerMsg.includes('集装箱') || lowerMsg.includes('柜') || lowerMsg.match(/\d{2}-\d{3}/)) {
       const containerNo = message.match(/\d{2}-\d{3}(-\w+)?/)?.[0];
       if (containerNo) {
         const containers = await prisma.container.findMany({
           where: { containerNo: { contains: containerNo } },
-          include: { port: true },
+          include: { 
+            port: true,
+            items: {
+              include: {
+                product: true
+              }
+            }
+          },
           take: 3,
         });
         if (containers.length > 0) {
-          context.push(`【货柜"${containerNo}"】` + containers.map(c => `${c.containerNo}(港口:${c.port?.name || '未知'}, 状态:${c.status})`).join('; '));
+          for (const c of containers) {
+            const itemDetails = c.items?.map(item => 
+              `${item.product?.customsName || '未知商品'}(${item.quantity}${item.product?.unit || ''}, ${item.boxes || 0}箱)`
+            ).join(', ') || '暂无装箱记录';
+            
+            context.push(`【货柜${c.containerNo}】港口:${c.port?.name || '未知'}, 状态:${c.status}, 总箱数:${c.totalBoxes}, 体积:${c.volume}CBM\n  装箱明细: ${itemDetails}\n  链接: /dashboard/inventory-container?tab=container`);
+          }
         }
       } else {
         // 最近货柜
         const recentContainers = await prisma.container.findMany({
           orderBy: { createdAt: 'desc' },
           take: 5,
-          include: { port: true },
+          include: { 
+            port: true,
+            items: { include: { product: true } }
+          },
         });
         if (recentContainers.length > 0) {
-          context.push(`【最近货柜】` + recentContainers.map(c => `${c.containerNo}(${c.port?.name || '未知'}, ${c.status})`).join(', '));
+          context.push(`【最近货柜】`);
+          for (const c of recentContainers) {
+            const itemCount = c.items?.length || 0;
+            context.push(`  - ${c.containerNo}: ${c.port?.name || '未知'}, ${c.status}, ${itemCount}种商品, ${c.totalBoxes}箱`);
+          }
         }
       }
     }

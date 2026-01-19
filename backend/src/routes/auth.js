@@ -18,6 +18,9 @@ const router = Router();
 // POST /api/v1/auth/login - 用户登录
 router.post('/login', validateLogin, handleValidation, authController.login);
 
+// POST /api/v1/auth/public-register - 公开注册（新用户自助注册）
+router.post('/public-register', validateRegister, handleValidation, authController.publicRegister);
+
 // ==================== 需认证路由 ====================
 
 // POST /api/v1/auth/register - 注册新用户（仅管理员）

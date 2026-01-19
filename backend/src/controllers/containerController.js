@@ -32,7 +32,7 @@ const list = async (req, res, next) => {
         skip,
         take: parseInt(pageSize),
         include: { port: true, _count: { select: { items: true } } },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { containerNo: 'desc' }, // 按货柜编号倒序
       }),
       prisma.container.count({ where }),
     ]);

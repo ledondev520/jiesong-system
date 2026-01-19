@@ -26,7 +26,7 @@ const login = async (req, res, next) => {
 };
 
 /**
- * 职责：处理用户注册请求
+ * 职责：处理用户注册请求（管理员创建用户）
  * @param {Request} req - Express请求对象
  * @param {Response} res - Express响应对象
  * @param {NextFunction} next - 下一个中间件
@@ -36,6 +36,30 @@ const register = async (req, res, next) => {
     const userData = req.body;
     const user = await authService.register(userData);
     created(res, user, '用户创建成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：处理公开注册请求（新用户自助注册）
+ * 思路：
+ * 1. 新注册用户默认角色为SALES
+ * 2. 新注册用户默认状态为未激活（需管理员审核）
+ * @param {Request} req - Express请求对象
+ * @param {Response} res - Express响应对象
+ * @param {NextFunction} next - 下一个中间件
+ */
+const publicRegister = async (req, res, next) => {
+  try {
+    const { username, password, name, phone } = req.body;
+    const user = await authService.publicRegister({
+      username,
+      password,
+      name,
+      phone,
+    });
+    created(res, user, '注册成功，请等待管理员审核');
   } catch (error) {
     next(error);
   }
@@ -108,6 +132,7 @@ const updateUser = async (req, res, next) => {
 module.exports = {
   login,
   register,
+  publicRegister,
   getCurrentUser,
   changePassword,
   getUsers,
