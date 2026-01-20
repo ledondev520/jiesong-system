@@ -35,6 +35,12 @@ router.delete('/:id', validateId, handleValidation, containerController.remove);
 // POST /api/v1/containers/:id/items - 添加装箱明细
 router.post('/:id/items', validateId, handleValidation, containerController.addItem);
 
+// PUT /api/v1/containers/:id/items/:itemId - 更新装箱明细
+router.put('/:id/items/:itemId', validateId, handleValidation, containerController.updateItem);
+
+// DELETE /api/v1/containers/:id/items/:itemId - 删除装箱明细
+router.delete('/:id/items/:itemId', validateId, handleValidation, containerController.removeItem);
+
 // PUT /api/v1/containers/:id/status - 更新货柜状态
 router.put('/:id/status', validateId, handleValidation, containerController.updateStatus);
 

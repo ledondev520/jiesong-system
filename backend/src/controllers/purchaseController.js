@@ -90,6 +90,7 @@ const create = async (req, res, next) => {
       data: {
         contractNo,
         supplierId: data.supplierId,
+        taxRate: data.taxRate || 13, // 默认税率 13%
         signedAt: data.signedAt ? new Date(data.signedAt) : null,
         expectedDate: data.expectedDate ? new Date(data.expectedDate) : null,
         note: data.note,
@@ -114,6 +115,7 @@ const update = async (req, res, next) => {
     const contract = await prisma.purchaseContract.update({
       where: { id },
       data: {
+        taxRate: data.taxRate !== undefined ? data.taxRate : undefined,
         signedAt: data.signedAt ? new Date(data.signedAt) : undefined,
         expectedDate: data.expectedDate ? new Date(data.expectedDate) : undefined,
         invoiceNo: data.invoiceNo,

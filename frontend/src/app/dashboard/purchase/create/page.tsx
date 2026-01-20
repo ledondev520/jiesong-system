@@ -37,6 +37,7 @@ const purchaseSchema = z.object({
   supplierId: z.string().min(1, '请选择供应商'),
   contractNo: z.string().optional(), // Auto-generated if empty
   signedAt: z.date().optional(),
+  taxRate: z.number().min(0).max(100).default(13), // 税率（%），通常为 1 或 13
   note: z.string().optional(),
   items: z.array(z.object({
     productId: z.string().min(1, '请选择商品'),
@@ -62,6 +63,7 @@ export default function CreatePurchasePage() {
       supplierId: '',
       contractNo: 'CG25' + Math.floor(Math.random() * 10000), // Mock Auto-gen
       signedAt: new Date(),
+      taxRate: 13, // 默认税率 13%
       note: '',
       items: [{ productId: '', quantity: 0, unitPrice: 0, unit: '', note: '' }],
     },
@@ -222,6 +224,32 @@ export default function CreatePurchasePage() {
                     <FormItem className="flex flex-col">
                       <FormLabel className="mb-1.5">签订日期</FormLabel>
                       <DatePicker date={field.value} setDate={field.onChange} />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="taxRate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>税率 (%)</FormLabel>
+                      <Select 
+                        onValueChange={(val) => field.onChange(Number(val))} 
+                        defaultValue={String(field.value)}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="选择税率" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="1">1% (小规模纳税人)</SelectItem>
+                          <SelectItem value="13">13% (一般纳税人)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>用于生成购销合同</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

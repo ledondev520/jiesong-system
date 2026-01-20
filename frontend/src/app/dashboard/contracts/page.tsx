@@ -31,9 +31,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Eye, FileText, TrendingUp, ShoppingCart, Package, Loader2 } from 'lucide-react';
+import { Plus, Eye, FileText, TrendingUp, ShoppingCart, Package, Loader2, FileDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { contractDocService } from '@/services/contractDoc.service';
 
 // 扩展类型，包含商品明细
 interface SalesContractDetail extends SalesContract {
@@ -77,6 +80,17 @@ export default function ContractsPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [salesDetail, setSalesDetail] = useState<SalesContractDetail | null>(null);
   const [purchaseDetail, setPurchaseDetail] = useState<PurchaseContractDetail | null>(null);
+  
+  // 生成合同文档弹窗状态
+  const [generateOpen, setGenerateOpen] = useState(false);
+  const [generateLoading, setGenerateLoading] = useState(false);
+  const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
+  const [generateForm, setGenerateForm] = useState({
+    storeName: '',
+    deliveryAddress: '',
+    deliveryContact: '',
+    depositRate: '30', // 首付比例，默认30%
+  });
 
   // 0. 初始化加载
   useEffect(() => {
@@ -140,6 +154,39 @@ export default function ContractsPage() {
     }
   };
 
+  // 5. 打开生成合同文档弹窗
+  const openGenerateDialog = (purchaseId: string) => {
+    setSelectedPurchaseId(purchaseId);
+    setGenerateForm({ storeName: '', deliveryAddress: '', deliveryContact: '', depositRate: '30' });
+    setGenerateOpen(true);
+  };
+
+  // 6. 生成购销合同文档
+  const handleGenerateContract = async () => {
+    if (!selectedPurchaseId) return;
+    
+    setGenerateLoading(true);
+    try {
+      const blob = await contractDocService.generateFromPurchase(
+        selectedPurchaseId,
+        generateForm
+      );
+      
+      // 下载文件
+      const contract = purchaseContracts.find(c => c.id === selectedPurchaseId);
+      const filename = `购销合同${contract?.contractNo?.replace('PO', 'CG') || ''}.docx`;
+      contractDocService.downloadDocument(blob, filename);
+      
+      toast.success('合同文档已生成');
+      setGenerateOpen(false);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '生成合同文档失败';
+      toast.error(message);
+    } finally {
+      setGenerateLoading(false);
+    }
+  };
+
   // 关闭弹窗时清理状态
   const closeDetail = () => {
     setDetailOpen(false);
@@ -177,8 +224,9 @@ export default function ContractsPage() {
     const statusMap: Record<SalesStatus, { label: string; className: string }> = {
       [SalesStatus.DRAFT]: { label: '草稿', className: 'bg-gray-100 text-gray-800' },
       [SalesStatus.CONFIRMED]: { label: '已确认', className: 'bg-blue-100 text-blue-800' },
-      [SalesStatus.PAID]: { label: '已收款', className: 'bg-green-100 text-green-800' },
+      [SalesStatus.PACKING]: { label: '装箱中', className: 'bg-yellow-100 text-yellow-800' },
       [SalesStatus.SHIPPED]: { label: '已发货', className: 'bg-purple-100 text-purple-800' },
+      [SalesStatus.ARRIVED]: { label: '已到达', className: 'bg-green-100 text-green-800' },
       [SalesStatus.COMPLETED]: { label: '已完成', className: 'bg-gray-500 text-white' },
       [SalesStatus.CANCELLED]: { label: '已取消', className: 'bg-red-100 text-red-800' },
     };
@@ -222,35 +270,43 @@ export default function ContractsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>合同编号</TableHead>
+                  <TableHead>商品名称</TableHead>
                   <TableHead>供应商</TableHead>
                   <TableHead>签订日期</TableHead>
                   <TableHead>状态</TableHead>
                   <TableHead className="text-right">总金额 (¥)</TableHead>
                   <TableHead className="text-right">已付 (¥)</TableHead>
-                  <TableHead className="w-[80px]">操作</TableHead>
+                  <TableHead className="w-[100px]">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {purchaseLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
                       加载中...
                     </TableCell>
                   </TableRow>
                 ) : purchaseContracts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
                       暂无采购合同
                     </TableCell>
                   </TableRow>
                 ) : (
-                  purchaseContracts.map((contract) => (
+                  purchaseContracts.map((contract) => {
+                    // 获取第一个商品名称
+                    const firstProduct = contract.items?.[0]?.product;
+                    const productName = firstProduct?.customsName || '-';
+                    return (
                     <TableRow key={contract.id}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-muted-foreground" />
                           {contract.contractNo}
                         </div>
+                      </TableCell>
+                      <TableCell className="max-w-[150px] truncate" title={productName}>
+                        {productName}
                       </TableCell>
                       <TableCell>
                         {contract.supplier?.name}
@@ -271,17 +327,27 @@ export default function ContractsPage() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => viewPurchaseDetail(contract.id)}
-                          title="查看详情"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => viewPurchaseDetail(contract.id)}
+                            title="查看详情"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => openGenerateDialog(contract.id)}
+                            title="生成购销合同"
+                          >
+                            <FileDown className="h-4 w-4 text-blue-500" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ))
+                  );})
                 )}
               </TableBody>
             </Table>
@@ -564,6 +630,86 @@ export default function ContractsPage() {
               <DialogDescription>暂无数据</DialogDescription>
             </DialogHeader>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 生成购销合同弹窗 */}
+      <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileDown className="h-5 w-5 text-blue-500" />
+              生成购销合同
+            </DialogTitle>
+            <DialogDescription>
+              填写收货信息后，系统将自动生成标准购销合同文档
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="storeName">收货店铺名称</Label>
+              <Input 
+                id="storeName"
+                placeholder="例如：米尔皮塔"
+                value={generateForm.storeName}
+                onChange={(e) => setGenerateForm(prev => ({ ...prev, storeName: e.target.value }))}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="deliveryAddress">收货地址</Label>
+              <Input 
+                id="deliveryAddress"
+                placeholder="完整收货地址"
+                value={generateForm.deliveryAddress}
+                onChange={(e) => setGenerateForm(prev => ({ ...prev, deliveryAddress: e.target.value }))}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="deliveryContact">收货联系人</Label>
+              <Input 
+                id="deliveryContact"
+                placeholder="联系人及电话"
+                value={generateForm.deliveryContact}
+                onChange={(e) => setGenerateForm(prev => ({ ...prev, deliveryContact: e.target.value }))}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="depositRate">首付比例 (%)</Label>
+              <Input 
+                id="depositRate"
+                type="number"
+                min="0"
+                max="100"
+                placeholder="默认30%"
+                value={generateForm.depositRate}
+                onChange={(e) => setGenerateForm(prev => ({ ...prev, depositRate: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">合同中"第一笔款项"的比例，默认为30%</p>
+            </div>
+          </div>
+          
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setGenerateOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleGenerateContract} disabled={generateLoading}>
+              {generateLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  生成中...
+                </>
+              ) : (
+                <>
+                  <FileDown className="mr-2 h-4 w-4" />
+                  生成合同
+                </>
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

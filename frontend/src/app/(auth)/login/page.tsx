@@ -20,7 +20,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, KeyRound } from 'lucide-react';
 
 const loginSchema = z.object({
   username: z.string().min(1, '请输入用户名'),
@@ -169,12 +169,20 @@ export default function LoginPage() {
           </Form>
         </CardContent>
         <CardFooter className="flex flex-col gap-3">
-          <Link href="/register" className="w-full">
-            <Button variant="outline" className="w-full gap-2">
-              <UserPlus className="h-4 w-4" />
-              没有账号？立即注册
-            </Button>
-          </Link>
+          <div className="flex w-full gap-2">
+            <Link href="/register" className="flex-1">
+              <Button variant="outline" className="w-full gap-2">
+                <UserPlus className="h-4 w-4" />
+                立即注册
+              </Button>
+            </Link>
+            <Link href="/forgot-password" className="flex-1">
+              <Button variant="outline" className="w-full gap-2">
+                <KeyRound className="h-4 w-4" />
+                忘记密码
+              </Button>
+            </Link>
+          </div>
           <p className="text-center text-sm text-muted-foreground">
             默认管理员: admin / 123456
           </p>

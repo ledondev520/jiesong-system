@@ -1,6 +1,6 @@
 /**
  * Input: express-validator库
- * Output: 通用验证规则
+ * Output: 通用验证规则（登录、注册、找回密码等）
  * Pos: 参数验证工具，提供常用验证规则
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -34,7 +34,7 @@ const validateId = param('id')
 // 分页参数验证
 const validatePagination = [
   query('page').optional().isInt({ min: 1 }).withMessage('页码必须大于0'),
-  query('pageSize').optional().isInt({ min: 1, max: 100 }).withMessage('每页数量必须在1-100之间'),
+  query('pageSize').optional().isInt({ min: 1, max: 500 }).withMessage('每页数量必须在1-500之间'),
 ];
 
 // 用户登录验证
@@ -55,12 +55,25 @@ const validateRegister = [
   body('role').optional().isIn(['ADMIN', 'PURCHASE', 'SALES']).withMessage('角色无效'),
 ];
 
+// 找回密码验证
+const validateResetPassword = [
+  body('username')
+    .notEmpty().withMessage('用户名不能为空'),
+  body('phone')
+    .notEmpty().withMessage('手机号不能为空')
+    .matches(/^1[3-9]\d{9}$/).withMessage('手机号格式无效'),
+  body('newPassword')
+    .notEmpty().withMessage('新密码不能为空')
+    .isLength({ min: 6 }).withMessage('新密码至少6个字符'),
+];
+
 module.exports = {
   handleValidation,
   validateId,
   validatePagination,
   validateLogin,
   validateRegister,
+  validateResetPassword,
   body,
   param,
   query,

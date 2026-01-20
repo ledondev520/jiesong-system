@@ -13,7 +13,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash, Ship } from 'lucide-react';
+import { Plus, Pencil, Trash, Ship, Eye } from 'lucide-react';
+import Link from 'next/link';
 import { ContainerDialog } from './components/ContainerDialog';
 import { toast } from 'sonner';
 import { PORTS } from '@/lib/constants';
@@ -140,11 +141,16 @@ export default function ContainersPage() {
                     <div className="text-sm">{container.totalBoxes} 箱</div>
                     <div className="text-xs text-muted-foreground">{container.volume} CBM</div>
                   </TableCell>
-                  <TableCell className="flex gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => handleEdit(container)}>
+                  <TableCell className="flex gap-1">
+                    <Link href={`/dashboard/containers/${container.id}`}>
+                      <Button variant="ghost" size="icon" title="查看装箱详情">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                    <Button variant="ghost" size="icon" onClick={() => handleEdit(container)} title="编辑">
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(container.id)}>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(container.id)} title="删除">
                       <Trash className="h-4 w-4 text-destructive" />
                     </Button>
                   </TableCell>

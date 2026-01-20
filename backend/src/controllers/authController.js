@@ -1,7 +1,7 @@
 /**
  * Input: 认证服务
  * Output: 认证相关的HTTP响应
- * Pos: 认证控制器，处理登录/注册/用户管理请求
+ * Pos: 认证控制器，处理登录/注册/用户管理/找回密码请求
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -129,6 +129,22 @@ const updateUser = async (req, res, next) => {
   }
 };
 
+/**
+ * 职责：找回密码（通过用户名+手机号验证身份后重置密码）
+ * @param {Request} req - Express请求对象
+ * @param {Response} res - Express响应对象
+ * @param {NextFunction} next - 下一个中间件
+ */
+const resetPassword = async (req, res, next) => {
+  try {
+    const { username, phone, newPassword } = req.body;
+    const result = await authService.verifyAndResetPassword(username, phone, newPassword);
+    success(res, result, '密码重置成功，请使用新密码登录');
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   login,
   register,
@@ -137,4 +153,5 @@ module.exports = {
   changePassword,
   getUsers,
   updateUser,
+  resetPassword,
 };

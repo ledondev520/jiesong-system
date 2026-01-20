@@ -24,8 +24,8 @@ router.get('/stats', inventoryController.getStats);
 // GET /api/v1/inventory/product/:productId - 按商品查询库存
 router.get('/product/:productId', inventoryController.getByProduct);
 
-// GET /api/v1/inventory/container/:containerId - 按货柜查询库存
-router.get('/container/:containerId', inventoryController.getByContainer);
+// GET /api/v1/inventory/contract/:contractId - 按出口合同查询库存
+router.get('/contract/:contractId', inventoryController.getByContract);
 
 // GET /api/v1/inventory/:id - 获取库存详情（通配路由放最后）
 router.get('/:id', validateId, handleValidation, inventoryController.getById);

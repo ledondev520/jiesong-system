@@ -29,11 +29,17 @@ import { Plus, Trash } from 'lucide-react';
 const supplierSchema = z.object({
   name: z.string().min(1, '公司名称必填'),
   shortName: z.string().optional(),
+  // 联系人信息
   contactName: z.string().optional(),
   contactPhone: z.string().optional(),
   contactEmail: z.string().email('邮箱格式不正确').optional().or(z.literal('')),
+  // 公司信息（合同用）
   address: z.string().optional(),
-  bankAccount: z.string().optional(),
+  phone: z.string().optional(),        // 公司电话
+  taxId: z.string().optional(),        // 纳税人识别号/税号
+  bankName: z.string().optional(),     // 开户银行名称
+  bankAccount: z.string().optional(),  // 银行账号
+  // 状态
   hasQualityIssue: z.boolean(),
   qualityNote: z.string().optional(),
   aliases: z.array(z.object({
@@ -65,6 +71,9 @@ export function SupplierDialog({
       contactPhone: '',
       contactEmail: '',
       address: '',
+      phone: '',
+      taxId: '',
+      bankName: '',
       bankAccount: '',
       hasQualityIssue: false,
       qualityNote: '',
@@ -77,6 +86,9 @@ export function SupplierDialog({
       contactPhone: supplier.contactPhone || '',
       contactEmail: supplier.contactEmail || '',
       address: supplier.address || '',
+      phone: supplier.phone || '',
+      taxId: supplier.taxId || '',
+      bankName: supplier.bankName || '',
       bankAccount: supplier.bankAccount || '',
       hasQualityIssue: supplier.hasQualityIssue,
       qualityNote: supplier.qualityNote || '',
@@ -218,33 +230,83 @@ export function SupplierDialog({
                 )}
               />
 
-             <FormField
-                control={form.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>地址</FormLabel>
-                    <FormControl>
-                      <Input placeholder="公司地址" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="bankAccount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>银行账号</FormLabel>
-                    <FormControl>
-                      <Input placeholder="开户行及账号" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            {/* 公司信息（合同用） */}
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-medium mb-3">公司信息（用于生成合同）</h4>
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>公司地址</FormLabel>
+                      <FormControl>
+                        <Input placeholder="完整公司地址" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>公司电话</FormLabel>
+                        <FormControl>
+                          <Input placeholder="座机电话" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="taxId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>纳税人识别号</FormLabel>
+                        <FormControl>
+                          <Input placeholder="税号" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="bankName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>开户银行</FormLabel>
+                        <FormControl>
+                          <Input placeholder="银行名称" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="bankAccount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>银行账号</FormLabel>
+                        <FormControl>
+                          <Input placeholder="银行账号" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            </div>
 
             <div className="rounded-lg border p-4 bg-muted/20">
               <FormField

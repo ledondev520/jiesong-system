@@ -135,24 +135,32 @@ export default function ProductsPage() {
               <TableHead>报关名称</TableHead>
               <TableHead>规格</TableHead>
               <TableHead>单位</TableHead>
+              <TableHead>包装规格</TableHead>
+              <TableHead className="text-right">毛重(kg)</TableHead>
+              <TableHead className="text-right">净重(kg)</TableHead>
+              <TableHead className="text-right">体积(CBM)</TableHead>
               <TableHead className="w-[100px]">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
                <TableRow>
-                 <TableCell colSpan={4} className="text-center py-10">加载中...</TableCell>
+                 <TableCell colSpan={8} className="text-center py-10">加载中...</TableCell>
                </TableRow>
             ) : products.length === 0 ? (
                <TableRow>
-                 <TableCell colSpan={4} className="text-center py-10">暂无商品数据。</TableCell>
+                 <TableCell colSpan={8} className="text-center py-10">暂无商品数据。</TableCell>
                </TableRow>
             ) : (
               products.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell className="font-medium">{product.customsName}</TableCell>
-                  <TableCell>{product.specification}</TableCell>
-                  <TableCell>{product.unit}</TableCell>
+                  <TableCell>{product.specification || '-'}</TableCell>
+                  <TableCell>{product.unit || '-'}</TableCell>
+                  <TableCell>{product.packingSpec || '-'}</TableCell>
+                  <TableCell className="text-right">{product.grossWeight ?? '-'}</TableCell>
+                  <TableCell className="text-right">{product.netWeight ?? '-'}</TableCell>
+                  <TableCell className="text-right">{product.volume ?? '-'}</TableCell>
                   <TableCell className="flex gap-2">
                     <Button variant="ghost" size="icon" onClick={() => handleEdit(product)}>
                       <Pencil className="h-4 w-4" />

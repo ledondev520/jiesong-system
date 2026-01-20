@@ -13,7 +13,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Eye, FileText, TrendingUp } from 'lucide-react';
+import { Plus, Eye, TrendingUp } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -99,9 +100,11 @@ export default function SalesPage() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon">
-                      <Eye className="h-4 w-4" />
-                    </Button>
+                    <Link href={`/dashboard/sales/${contract.id}`}>
+                      <Button variant="ghost" size="icon" title="查看详情与装箱">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))

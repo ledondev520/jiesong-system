@@ -22,7 +22,7 @@
 
 | 文件 | 功能 |
 |------|------|
-| authController.js | 用户认证与授权 |
+| authController.js | 用户认证、授权与找回密码 |
 | supplierController.js | 供应商管理 CRUD |
 | storeController.js | 门店管理 CRUD + 港口 |
 | productController.js | 商品管理 + 历史价格 |
@@ -38,7 +38,7 @@
 
 | 文件 | 功能 |
 |------|------|
-| authService.js | 登录验证、Token生成、密码管理 |
+| authService.js | 登录验证、Token生成、密码管理、找回密码 |
 | aiService.js | Kimi API集成、智能问答、内容解析 |
 | importService.js | CSV数据解析与导入 |
 | exportService.js | 多格式数据导出 (CSV) |

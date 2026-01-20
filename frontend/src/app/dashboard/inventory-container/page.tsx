@@ -1,7 +1,9 @@
 /**
- * Input: 库存服务、货柜服务
- * Output: 库存与货柜管理页面（Tab切换）
- * Pos: 核心业务页面，管理库存状态和货柜装箱
+ * Input: 库存服务、销售服务
+ * Output: 库存与出口合同管理页面（Tab切换）
+ * Pos: 核心业务页面，管理库存状态和出口合同/装箱
+ * 
+ * 2026-01-20 重构：货柜功能已合并到出口合同，EXP号即货柜号
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -10,9 +12,10 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Inventory, Container, InventoryStatus, ContainerStatus } from '@/types';
+import Link from 'next/link';
+import { Inventory, SalesContract, InventoryStatus, SalesStatus } from '@/types';
 import { inventoryService } from '@/services/inventory.service';
-import { containerService } from '@/services/container.service';
+import { salesService } from '@/services/sales.service';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -30,18 +33,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, Pencil, Trash, Ship, Warehouse, MoreHorizontal } from 'lucide-react';
+import { Plus, Eye, Ship, Warehouse, MoreHorizontal, Box } from 'lucide-react';
 import { toast } from 'sonner';
-import { PORTS } from '@/lib/constants';
 import { format } from 'date-fns';
-import { ContainerDialog } from '../../dashboard/containers/components/ContainerDialog';
 
 /**
- * 职责：渲染库存与货柜管理页面
+ * 职责：渲染库存与出口合同管理页面
  * 思路：
- *   1. 使用Tab切换库存/货柜视图
+ *   1. 使用Tab切换库存/出口合同视图
  *   2. 库存页面支持状态快速更新
- *   3. 货柜页面支持CRUD操作
+ *   3. 出口合同页面显示装箱概览，点击进入详情页查看3D
  */
 export default function InventoryContainerPage() {
   const searchParams = useSearchParams();
@@ -59,16 +60,14 @@ export default function InventoryContainerPage() {
   const [inventory, setInventory] = useState<Inventory[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(true);
   
-  // 货柜状态
-  const [containers, setContainers] = useState<Container[]>([]);
-  const [containerLoading, setContainerLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingContainer, setEditingContainer] = useState<Container | null>(null);
+  // 出口合同状态（原货柜）
+  const [contracts, setContracts] = useState<SalesContract[]>([]);
+  const [contractLoading, setContractLoading] = useState(true);
 
   // 0. 初始化加载
   useEffect(() => {
     loadInventory();
-    loadContainers();
+    loadContracts();
   }, []);
 
   // 1. 加载库存
@@ -84,16 +83,16 @@ export default function InventoryContainerPage() {
     }
   };
 
-  // 2. 加载货柜
-  const loadContainers = async () => {
-    setContainerLoading(true);
+  // 2. 加载出口合同（替代原货柜）
+  const loadContracts = async () => {
+    setContractLoading(true);
     try {
-      const response = await containerService.getAll({ page: 1, pageSize: 100 });
-      setContainers(response.data?.items || []);
+      const response = await salesService.getAll({ page: 1, pageSize: 100 });
+      setContracts(response.data?.items || []);
     } catch {
-      toast.error('加载货柜失败');
+      toast.error('加载出口合同失败');
     } finally {
-      setContainerLoading(false);
+      setContractLoading(false);
     }
   };
 
@@ -113,14 +112,17 @@ export default function InventoryContainerPage() {
   };
 
   /**
-   * 获取货柜状态徽章
+   * 获取出口合同状态徽章
    */
-  const getContainerStatusBadge = (status: ContainerStatus) => {
-    const statusMap: Record<ContainerStatus, { label: string; className: string }> = {
-      [ContainerStatus.PENDING]: { label: '待装柜', className: 'bg-gray-100 text-gray-800' },
-      [ContainerStatus.LOADING]: { label: '装柜中', className: 'bg-yellow-100 text-yellow-800' },
-      [ContainerStatus.SHIPPED]: { label: '已发运', className: 'bg-blue-100 text-blue-800' },
-      [ContainerStatus.ARRIVED]: { label: '已到达', className: 'bg-green-100 text-green-800' },
+  const getContractStatusBadge = (status: SalesStatus) => {
+    const statusMap: Record<SalesStatus, { label: string; className: string }> = {
+      [SalesStatus.DRAFT]: { label: '草稿', className: 'bg-gray-100 text-gray-800' },
+      [SalesStatus.CONFIRMED]: { label: '已确认', className: 'bg-blue-100 text-blue-800' },
+      [SalesStatus.PACKING]: { label: '装箱中', className: 'bg-yellow-100 text-yellow-800' },
+      [SalesStatus.SHIPPED]: { label: '已发运', className: 'bg-purple-100 text-purple-800' },
+      [SalesStatus.ARRIVED]: { label: '已到达', className: 'bg-green-100 text-green-800' },
+      [SalesStatus.COMPLETED]: { label: '已完成', className: 'bg-gray-700 text-white' },
+      [SalesStatus.CANCELLED]: { label: '已取消', className: 'bg-red-100 text-red-800' },
     };
     const config = statusMap[status] || { label: status, className: '' };
     return <Badge className={config.className}>{config.label}</Badge>;
@@ -139,58 +141,12 @@ export default function InventoryContainerPage() {
     }
   };
 
-  /**
-   * 获取港口名称
-   */
-  const getPortName = (portId: string) => {
-    return PORTS.find(p => p.id === portId)?.name || '未知港口';
-  };
-
-  // 货柜操作
-  const handleCreateContainer = () => {
-    setEditingContainer(null);
-    setIsDialogOpen(true);
-  };
-
-  const handleEditContainer = (container: Container) => {
-    setEditingContainer(container);
-    setIsDialogOpen(true);
-  };
-
-  const handleDeleteContainer = async (id: string) => {
-    if (confirm('确定要删除此货柜吗？')) {
-      try {
-        await containerService.delete(id);
-        setContainers(containers.filter(c => c.id !== id));
-        toast.success('货柜已删除');
-      } catch {
-        toast.error('删除失败');
-      }
-    }
-  };
-
-  const handleContainerSubmit = async (data: Partial<Container>) => {
-    try {
-      if (editingContainer) {
-        await containerService.update(editingContainer.id, data);
-        toast.success('货柜更新成功');
-      } else {
-        await containerService.create(data);
-        toast.success('货柜创建成功');
-      }
-      setIsDialogOpen(false);
-      loadContainers();
-    } catch {
-      toast.error(editingContainer ? '更新失败' : '创建失败');
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* 页面标题 */}
       <div>
         <h2 className="text-2xl font-bold tracking-tight">库存与货柜</h2>
-        <p className="text-muted-foreground">管理商品库存状态和货柜装运</p>
+        <p className="text-muted-foreground">管理商品库存状态和出口合同装箱</p>
       </div>
 
       {/* Tab切换 */}
@@ -275,68 +231,75 @@ export default function InventoryContainerPage() {
           </div>
         </TabsContent>
 
-        {/* 货柜Tab */}
+        {/* 货柜Tab（现为出口合同列表） */}
         <TabsContent value="container" className="space-y-4">
-          <div className="flex justify-end">
-            <Button onClick={handleCreateContainer}>
-              <Plus className="mr-2 h-4 w-4" /> 创建货柜
-            </Button>
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-muted-foreground">
+              一个出口合同 (EXP) = 一个货柜，点击眼睛图标查看装箱详情和3D可视化
+            </p>
+            <Link href="/dashboard/sales/create">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" /> 创建出口合同
+              </Button>
+            </Link>
           </div>
           
           <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>货柜编号</TableHead>
+                  <TableHead>合同编号 (货柜号)</TableHead>
                   <TableHead>目的港口</TableHead>
                   <TableHead>状态</TableHead>
                   <TableHead>预计到达</TableHead>
-                  <TableHead>箱数/体积</TableHead>
-                  <TableHead className="w-[100px]">操作</TableHead>
+                  <TableHead>装箱情况</TableHead>
+                  <TableHead className="w-[80px]">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {containerLoading ? (
+                {contractLoading ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
                       加载中...
                     </TableCell>
                   </TableRow>
-                ) : containers.length === 0 ? (
+                ) : contracts.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                      暂无货柜数据
+                      暂无出口合同，点击"创建出口合同"开始
                     </TableCell>
                   </TableRow>
                 ) : (
-                  containers.map((container) => (
-                    <TableRow key={container.id}>
+                  contracts.map((contract) => (
+                    <TableRow key={contract.id}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          <Ship className="h-4 w-4 text-muted-foreground" />
-                          {container.containerNo}
+                          <Ship className="h-4 w-4 text-blue-500" />
+                          {contract.contractNo}
                         </div>
                       </TableCell>
-                      <TableCell>{getPortName(container.portId)}</TableCell>
-                      <TableCell>{getContainerStatusBadge(container.status)}</TableCell>
+                      <TableCell>{contract.port?.name || '-'}</TableCell>
+                      <TableCell>{getContractStatusBadge(contract.status)}</TableCell>
                       <TableCell>
-                        {container.estimatedArrival 
-                          ? format(new Date(container.estimatedArrival), 'yyyy-MM-dd') 
+                        {contract.estimatedArrival 
+                          ? format(new Date(contract.estimatedArrival), 'yyyy-MM-dd') 
                           : '-'}
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm">{container.totalBoxes} 箱</div>
-                        <div className="text-xs text-muted-foreground">{container.volume} CBM</div>
+                        <div className="flex items-center gap-2">
+                          <Box className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <div className="text-sm">{contract.totalBoxes || 0} 箱</div>
+                            <div className="text-xs text-muted-foreground">{contract.volume?.toFixed(2) || 0} CBM</div>
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleEditContainer(container)}>
-                            <Pencil className="h-4 w-4" />
+                        <Link href={`/dashboard/sales/${contract.id}`}>
+                          <Button variant="ghost" size="icon" title="查看装箱详情与3D可视化">
+                            <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteContainer(container.id)}>
-                            <Trash className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
+                        </Link>
                       </TableCell>
                     </TableRow>
                   ))
@@ -346,14 +309,6 @@ export default function InventoryContainerPage() {
           </div>
         </TabsContent>
       </Tabs>
-
-      {/* 货柜编辑弹窗 */}
-      <ContainerDialog 
-        open={isDialogOpen} 
-        onOpenChange={setIsDialogOpen}
-        container={editingContainer}
-        onSubmit={handleContainerSubmit}
-      />
     </div>
   );
 }

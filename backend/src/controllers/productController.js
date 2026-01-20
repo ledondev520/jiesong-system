@@ -73,6 +73,7 @@ const getById = async (req, res, next) => {
 
 /**
  * 职责：创建商品
+ * 思路：接收商品基本信息、体积/重量/尺寸信息，存入数据库
  */
 const create = async (req, res, next) => {
   try {
@@ -84,6 +85,13 @@ const create = async (req, res, next) => {
         specification: data.specification,
         unit: data.unit,
         categoryId: data.categoryId,
+        grossWeight: data.grossWeight,
+        netWeight: data.netWeight,
+        volume: data.volume,
+        packingSpec: data.packingSpec,
+        length: data.length,
+        width: data.width,
+        height: data.height,
       },
     });
     
@@ -95,6 +103,7 @@ const create = async (req, res, next) => {
 
 /**
  * 职责：更新商品
+ * 思路：更新商品基本信息、体积/重量/尺寸信息
  */
 const update = async (req, res, next) => {
   try {
@@ -109,6 +118,13 @@ const update = async (req, res, next) => {
         specification: data.specification,
         unit: data.unit,
         categoryId: data.categoryId,
+        grossWeight: data.grossWeight,
+        netWeight: data.netWeight,
+        volume: data.volume,
+        packingSpec: data.packingSpec,
+        length: data.length,
+        width: data.width,
+        height: data.height,
       },
     });
     

@@ -1,7 +1,9 @@
 /**
  * Input: Prisma客户端
  * Output: 出口合同相关的HTTP响应
- * Pos: 销售控制器，处理出口合同CRUD请求
+ * Pos: 销售控制器，处理出口合同CRUD请求（含装箱管理）
+ * 
+ * 2026-01-20 重构：合并货柜功能到出口合同，EXP号即货柜号
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -46,7 +48,7 @@ const list = async (req, res, next) => {
 };
 
 /**
- * 职责：获取出口合同详情
+ * 职责：获取出口合同详情（包含装箱明细）
  */
 const getById = async (req, res, next) => {
   try {
@@ -54,11 +56,19 @@ const getById = async (req, res, next) => {
     const contract = await prisma.salesContract.findUnique({
       where: { id },
       include: {
+        port: true,
         items: {
           include: {
             product: true,
             store: { include: { port: true } },
           },
+        },
+        packingItems: {
+          include: {
+            product: true,
+            store: true,
+          },
+          orderBy: { createdAt: 'asc' },
         },
         payments: true,
       },
@@ -247,6 +257,112 @@ const calculatePrice = async (req, res, next) => {
   }
 };
 
+// ==================== 装箱明细管理 ====================
+
+/**
+ * 职责：添加装箱明细
+ */
+const addPackingItem = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const data = req.body;
+    
+    const item = await prisma.packingItem.create({
+      data: {
+        salesContractId: id,
+        productId: data.productId,
+        storeId: data.storeId || null,
+        quantity: data.quantity,
+        unit: data.unit,
+        boxes: data.boxes,
+        grossWeight: data.grossWeight,
+        netWeight: data.netWeight,
+        volume: data.volume,
+        note: data.note,
+      },
+      include: { product: true, store: true },
+    });
+    
+    // 更新合同汇总数据
+    await recalculateContractStats(id);
+    
+    created(res, item, '装箱明细添加成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：更新装箱明细
+ */
+const updatePackingItem = async (req, res, next) => {
+  try {
+    const { id, itemId } = req.params;
+    const data = req.body;
+    
+    const item = await prisma.packingItem.update({
+      where: { id: itemId },
+      data: {
+        quantity: data.quantity,
+        unit: data.unit,
+        boxes: data.boxes,
+        grossWeight: data.grossWeight,
+        netWeight: data.netWeight,
+        volume: data.volume,
+        storeId: data.storeId || null,
+        note: data.note,
+      },
+      include: { product: true, store: true },
+    });
+    
+    // 更新合同汇总数据
+    await recalculateContractStats(id);
+    
+    success(res, item, '装箱明细更新成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：删除装箱明细
+ */
+const removePackingItem = async (req, res, next) => {
+  try {
+    const { id, itemId } = req.params;
+    
+    await prisma.packingItem.delete({ where: { id: itemId } });
+    
+    // 更新合同汇总数据
+    await recalculateContractStats(id);
+    
+    success(res, null, '装箱明细删除成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：重新计算合同装箱汇总数据
+ * @param {string} contractId - 合同ID
+ */
+const recalculateContractStats = async (contractId) => {
+  const stats = await prisma.packingItem.aggregate({
+    where: { salesContractId: contractId },
+    _sum: { boxes: true, grossWeight: true, netWeight: true, volume: true },
+  });
+  
+  await prisma.salesContract.update({
+    where: { id: contractId },
+    data: {
+      totalBoxes: stats._sum.boxes || 0,
+      grossWeight: stats._sum.grossWeight || 0,
+      netWeight: stats._sum.netWeight || 0,
+      volume: stats._sum.volume || 0,
+    },
+  });
+};
+
 module.exports = {
   list,
   getById,
@@ -257,4 +373,7 @@ module.exports = {
   updateStatus,
   getNextContractNo,
   calculatePrice,
+  addPackingItem,
+  updatePackingItem,
+  removePackingItem,
 };

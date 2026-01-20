@@ -45,6 +45,7 @@ const list = async (req, res, next) => {
 
 /**
  * 职责：获取货柜详情
+ * 思路：包含装箱明细、商品信息、门店信息
  */
 const getById = async (req, res, next) => {
   try {
@@ -53,7 +54,13 @@ const getById = async (req, res, next) => {
       where: { id },
       include: {
         port: true,
-        items: { include: { product: true } },
+        items: { 
+          include: { 
+            product: true,
+            // 关联门店信息（如果有）
+          },
+          orderBy: { createdAt: 'asc' },
+        },
       },
     });
     
@@ -61,7 +68,27 @@ const getById = async (req, res, next) => {
       throw createError('货柜不存在', 404);
     }
     
-    success(res, container);
+    // 如果有 storeId，查询门店信息
+    const storeIds = [...new Set(container.items.filter(i => i.storeId).map(i => i.storeId))];
+    let storeMap = new Map();
+    if (storeIds.length > 0) {
+      const stores = await prisma.store.findMany({
+        where: { id: { in: storeIds } },
+        select: { id: true, name: true },
+      });
+      storeMap = new Map(stores.map(s => [s.id, s]));
+    }
+    
+    // 组装结果
+    const result = {
+      ...container,
+      items: container.items.map(item => ({
+        ...item,
+        store: item.storeId ? storeMap.get(item.storeId) : null,
+      })),
+    };
+    
+    success(res, result);
   } catch (error) {
     next(error);
   }
@@ -266,6 +293,77 @@ const getProducts = async (req, res, next) => {
   }
 };
 
+/**
+ * 职责：更新装箱明细
+ */
+const updateItem = async (req, res, next) => {
+  try {
+    const { id, itemId } = req.params;
+    const data = req.body;
+    
+    const item = await prisma.containerItem.update({
+      where: { id: itemId },
+      data: {
+        quantity: data.quantity,
+        unit: data.unit,
+        boxes: data.boxes,
+        grossWeight: data.grossWeight,
+        netWeight: data.netWeight,
+        volume: data.volume,
+        storeId: data.storeId,
+        note: data.note,
+      },
+      include: { product: true },
+    });
+    
+    // 更新货柜汇总数据
+    await recalculateContainerStats(id);
+    
+    success(res, item, '装箱明细更新成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：删除装箱明细
+ */
+const removeItem = async (req, res, next) => {
+  try {
+    const { id, itemId } = req.params;
+    
+    await prisma.containerItem.delete({ where: { id: itemId } });
+    
+    // 更新货柜汇总数据
+    await recalculateContainerStats(id);
+    
+    success(res, null, '装箱明细删除成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：重新计算货柜汇总数据
+ * @param {string} containerId - 货柜ID
+ */
+const recalculateContainerStats = async (containerId) => {
+  const stats = await prisma.containerItem.aggregate({
+    where: { containerId },
+    _sum: { boxes: true, grossWeight: true, netWeight: true, volume: true },
+  });
+  
+  await prisma.container.update({
+    where: { id: containerId },
+    data: {
+      totalBoxes: stats._sum.boxes || 0,
+      grossWeight: stats._sum.grossWeight || 0,
+      netWeight: stats._sum.netWeight || 0,
+      volume: stats._sum.volume || 0,
+    },
+  });
+};
+
 module.exports = {
   list,
   getById,
@@ -273,6 +371,8 @@ module.exports = {
   update,
   remove,
   addItem,
+  updateItem,
+  removeItem,
   updateStatus,
   getNextContainerNo,
   getProducts,

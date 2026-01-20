@@ -17,16 +17,20 @@
   },
   "dependencies": {
     "@prisma/client": "^5.8.0",
+    "adm-zip": "^0.5.16",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
+    "docx-templates": "^4.15.0",
+    "docxtemplater": "^3.67.6",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-validator": "^7.0.1",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "openai": "^6.16.0",
-    "papaparse": "^5.5.3"
+    "papaparse": "^5.5.3",
+    "pizzip": "^3.2.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2",

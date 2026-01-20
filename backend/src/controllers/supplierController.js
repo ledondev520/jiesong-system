@@ -77,6 +77,9 @@ const create = async (req, res, next) => {
         contactPhone: data.contactPhone,
         contactEmail: data.contactEmail,
         address: data.address,
+        phone: data.phone,
+        taxId: data.taxId,
+        bankName: data.bankName,
         bankAccount: data.bankAccount,
       },
     });
@@ -104,6 +107,9 @@ const update = async (req, res, next) => {
         contactPhone: data.contactPhone,
         contactEmail: data.contactEmail,
         address: data.address,
+        phone: data.phone,
+        taxId: data.taxId,
+        bankName: data.bankName,
         bankAccount: data.bankAccount,
       },
     });

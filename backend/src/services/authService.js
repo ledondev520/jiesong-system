@@ -1,6 +1,6 @@
 /**
  * Input: Prisma客户端、JWT、bcrypt
- * Output: 认证相关业务逻辑
+ * Output: 认证相关业务逻辑（登录、注册、密码管理、找回密码）
  * Pos: 认证服务，处理用户认证和授权逻辑
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -296,6 +296,50 @@ const updateUser = async (id, userData) => {
   return user;
 };
 
+/**
+ * 职责：验证用户身份并重置密码（找回密码功能）
+ * 思路：
+ * 1. 通过用户名查找用户
+ * 2. 验证手机号是否匹配
+ * 3. 验证通过后更新密码
+ * @param {string} username - 用户名
+ * @param {string} phone - 注册时绑定的手机号
+ * @param {string} newPassword - 新密码
+ * @returns {Object} 操作结果
+ */
+const verifyAndResetPassword = async (username, phone, newPassword) => {
+  // 1. 查找用户
+  const user = await prisma.user.findUnique({
+    where: { username },
+  });
+  
+  if (!user) {
+    throw createError('用户名不存在', 404);
+  }
+  
+  // 2. 验证手机号
+  if (!user.phone || user.phone !== phone) {
+    throw createError('手机号与注册信息不匹配', 400);
+  }
+  
+  // 3. 检查账号状态
+  if (!user.isActive) {
+    throw createError('该账号已被禁用，请联系管理员', 403);
+  }
+  
+  // 4. 加密新密码并更新
+  const hashedPassword = await bcrypt.hash(newPassword, 12);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { password: hashedPassword },
+  });
+  
+  // 5. 记录操作日志
+  await auditLog.action(user.id, 'RESET_PASSWORD', 'User', user.id, null, null);
+  
+  return { username: user.username, name: user.name };
+};
+
 module.exports = {
   login,
   register,
@@ -304,4 +348,5 @@ module.exports = {
   changePassword,
   getUsers,
   updateUser,
+  verifyAndResetPassword,
 };

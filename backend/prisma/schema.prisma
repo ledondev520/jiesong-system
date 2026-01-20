@@ -2,6 +2,8 @@
 // Output: Prisma ORM 数据模型定义
 // Pos: 数据层核心Schema，定义所有实体及关系
 // Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+// 
+// 2026-01-20 重构：合并货柜与出口合同，用 EXP 号作为货柜标识
 
 generator client {
   provider = "prisma-client-js"
@@ -45,21 +47,27 @@ model Port {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  stores     Store[]
-  containers Container[]
+  stores         Store[]
+  salesContracts SalesContract[]
 
   @@map("ports")
 }
 
 model Supplier {
   id              String    @id @default(cuid())
-  name            String
-  shortName       String?
+  name            String    // 供应商全称（合同用）
+  shortName       String?   // 简称
+  // 联系人信息
   contactName     String?
   contactPhone    String?
   contactEmail    String?
-  address         String?
-  bankAccount     String?
+  // 公司信息（合同用）
+  address         String?   // 公司地址
+  phone           String?   // 公司电话
+  taxId           String?   // 纳税人识别号/税号
+  bankName        String?   // 开户银行名称
+  bankAccount     String?   // 银行账号
+  // 状态
   hasQualityIssue Boolean   @default(false)
   qualityNote     String?
   isActive        Boolean   @default(true)
@@ -96,8 +104,9 @@ model Store {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  port       Port        @relation(fields: [portId], references: [id])
-  salesItems SalesItem[]
+  port         Port          @relation(fields: [portId], references: [id])
+  salesItems   SalesItem[]
+  packingItems PackingItem[]
 
   @@map("stores")
 }
@@ -106,9 +115,18 @@ model Product {
   id            String   @id @default(cuid())
   customsName   String
   description   String?
-  specification String?
+  specification String?  // 原文本规格（兼容历史数据）
   unit          String?
   categoryId    String?
+  // 重量信息
+  grossWeight   Float?   // 毛重 (kg/件)
+  netWeight     Float?   // 净重 (kg/件)
+  volume        Float?   // 体积 (CBM/件)
+  packingSpec   String?  // 包装规格 (如: 4片/箱)
+  // 尺寸信息（用于3D可视化）
+  length        Float?   // 长度 (mm)
+  width         Float?   // 宽度 (mm)
+  height        Float?   // 高度 (mm)
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -118,7 +136,7 @@ model Product {
   purchaseItems  PurchaseItem[]
   salesItems     SalesItem[]
   inventories    Inventory[]
-  containerItems ContainerItem[]
+  packingItems   PackingItem[]
   priceHistories PriceHistory[]
 
   @@map("products")
@@ -172,6 +190,7 @@ model PurchaseContract {
   supplierId   String
   totalAmount  Float    @default(0)
   paidAmount   Float    @default(0)
+  taxRate      Int      @default(13)  // 税率（%），通常为 1 或 13
   status       String   @default("DRAFT")
   signedAt     DateTime?
   expectedDate DateTime?
@@ -208,22 +227,39 @@ model PurchaseItem {
   @@map("purchase_items")
 }
 
-// ==================== 销售管理 ====================
+// ==================== 销售管理（含货柜/装箱） ====================
+// 重构说明：一个出口合同 EXP = 一个货柜，合并管理
 
 model SalesContract {
   id             String   @id @default(cuid())
-  contractNo     String   @unique
+  contractNo     String   @unique  // EXP 编号，同时作为货柜标识
+  // 销售信息
   totalAmount    Float    @default(0)
   receivedAmount Float    @default(0)
   exchangeRate   Float
-  status         String   @default("DRAFT")
+  status         String   @default("DRAFT")  // DRAFT/CONFIRMED/PACKING/SHIPPED/ARRIVED/COMPLETED
   signedAt       DateTime?
   note           String?
+  // 货柜信息（合并自原 Container 表）
+  portId         String?  // 目的港口
+  totalBoxes     Int      @default(0)
+  grossWeight    Float    @default(0)
+  netWeight      Float    @default(0)
+  volume         Float    @default(0)
+  shippedAt      DateTime?
+  estimatedArrival DateTime?
+  customsBroker  String?
+  isFumigated    Boolean?
+  hasTaxRefund   Boolean?
+  // 时间戳
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  items    SalesItem[]
-  payments Payment[]
+  port         Port?         @relation(fields: [portId], references: [id])
+  items        SalesItem[]
+  packingItems PackingItem[] // 装箱明细
+  payments     Payment[]
+  inventories  Inventory[]
 
   @@map("sales_contracts")
 }
@@ -250,77 +286,56 @@ model SalesItem {
   @@map("sales_items")
 }
 
+// 装箱明细（原 ContainerItem，现关联 SalesContract）
+model PackingItem {
+  id              String   @id @default(cuid())
+  salesContractId String   // 关联出口合同（即货柜）
+  productId       String
+  storeId         String?
+  quantity        Float
+  unit            String?
+  boxes           Int?
+  grossWeight     Float?
+  netWeight       Float?
+  volume          Float?
+  // 3D 装箱位置（由装箱算法计算）
+  posX            Float?   // 在货柜中的 X 位置 (mm)
+  posY            Float?   // 在货柜中的 Y 位置 (mm)
+  posZ            Float?   // 在货柜中的 Z 位置 (mm)
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  salesContract SalesContract @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+  store         Store?        @relation(fields: [storeId], references: [id])
+
+  @@map("packing_items")
+}
+
 // ==================== 库存管理 ====================
 
 model Inventory {
-  id             String    @id @default(cuid())
-  productId      String
-  purchaseItemId String?
-  salesItemId    String?
-  containerId    String?
-  quantity       Float
-  unit           String?
-  status         String    @default("PRODUCING")
-  inboundAt      DateTime?
-  outboundAt     DateTime?
-  note           String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  productId       String
+  purchaseItemId  String?
+  salesItemId     String?
+  salesContractId String?   // 关联出口合同（代替原 containerId）
+  quantity        Float
+  unit            String?
+  status          String    @default("PRODUCING")
+  inboundAt       DateTime?
+  outboundAt      DateTime?
+  note            String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  product      Product       @relation(fields: [productId], references: [id])
-  purchaseItem PurchaseItem? @relation(fields: [purchaseItemId], references: [id])
-  salesItem    SalesItem?    @relation(fields: [salesItemId], references: [id])
-  container    Container?    @relation(fields: [containerId], references: [id])
+  product       Product        @relation(fields: [productId], references: [id])
+  purchaseItem  PurchaseItem?  @relation(fields: [purchaseItemId], references: [id])
+  salesItem     SalesItem?     @relation(fields: [salesItemId], references: [id])
+  salesContract SalesContract? @relation(fields: [salesContractId], references: [id])
 
   @@map("inventories")
-}
-
-// ==================== 货柜管理 ====================
-
-model Container {
-  id               String    @id @default(cuid())
-  containerNo      String    @unique
-  portId           String
-  status           String    @default("PENDING")
-  totalBoxes       Int       @default(0)
-  grossWeight      Float     @default(0)
-  netWeight        Float     @default(0)
-  volume           Float     @default(0)
-  shippedAt        DateTime?
-  estimatedArrival DateTime?
-  note             String?
-  customsBroker    String?
-  isFumigated      Boolean?
-  hasTaxRefund     Boolean?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  port        Port            @relation(fields: [portId], references: [id])
-  items       ContainerItem[]
-  inventories Inventory[]
-
-  @@map("containers")
-}
-
-model ContainerItem {
-  id          String   @id @default(cuid())
-  containerId String
-  productId   String
-  storeId     String?
-  quantity    Float
-  unit        String?
-  boxes       Int?
-  grossWeight Float?
-  netWeight   Float?
-  volume      Float?
-  note        String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  container Container @relation(fields: [containerId], references: [id], onDelete: Cascade)
-  product   Product   @relation(fields: [productId], references: [id])
-
-  @@map("container_items")
 }
 
 // ==================== 财务管理 ====================
@@ -368,11 +383,11 @@ model ChatHistory {
   sessionId    String
   role         String
   content      String
-  imageUrl     String?  // 图片URL（用于视觉模型）
+  imageUrl     String?
   metadata     String?
-  promptTokens Int?     // 输入token数
-  outputTokens Int?     // 输出token数
-  modelUsed    String?  // 使用的模型
+  promptTokens Int?
+  outputTokens Int?
+  modelUsed    String?
   createdAt    DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
@@ -385,11 +400,11 @@ model TokenUsage {
   id           String   @id @default(cuid())
   userId       String
   sessionId    String?
-  model        String   // 使用的模型
-  promptTokens Int      // 输入token数
-  outputTokens Int      // 输出token数
-  totalTokens  Int      // 总token数
-  requestType  String   // chat/parse/vision
+  model        String
+  promptTokens Int
+  outputTokens Int
+  totalTokens  Int
+  requestType  String
   createdAt    DateTime @default(now())
 
   @@index([userId])

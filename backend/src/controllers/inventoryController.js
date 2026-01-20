@@ -3,6 +3,8 @@
  * Output: 库存相关的HTTP响应
  * Pos: 库存控制器，处理库存查询和状态变更
  * 
+ * 2026-01-20 更新：Container已合并到SalesContract
+ * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
@@ -29,7 +31,8 @@ const list = async (req, res, next) => {
         take: parseInt(pageSize),
         include: {
           product: true,
-          container: { include: { port: true } },
+          purchaseItem: { include: { purchaseContract: true } },
+          salesContract: { include: { port: true } },  // 原 container
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -54,7 +57,7 @@ const getById = async (req, res, next) => {
         product: true,
         purchaseItem: { include: { purchaseContract: true } },
         salesItem: { include: { salesContract: true, store: true } },
-        container: { include: { port: true } },
+        salesContract: { include: { port: true } },  // 原 container
       },
     });
     
@@ -106,7 +109,7 @@ const getByProduct = async (req, res, next) => {
     const inventories = await prisma.inventory.findMany({
       where: { productId },
       include: {
-        container: { include: { port: true } },
+        salesContract: { include: { port: true } },  // 原 container
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -131,14 +134,14 @@ const getByProduct = async (req, res, next) => {
 };
 
 /**
- * 职责：按货柜查询库存
+ * 职责：按出口合同查询库存（原按货柜查询）
  */
-const getByContainer = async (req, res, next) => {
+const getByContract = async (req, res, next) => {
   try {
-    const { containerId } = req.params;
+    const { contractId } = req.params;
     
     const inventories = await prisma.inventory.findMany({
-      where: { containerId },
+      where: { salesContractId: contractId },
       include: { product: true },
     });
     
@@ -178,6 +181,6 @@ module.exports = {
   getById,
   updateStatus,
   getByProduct,
-  getByContainer,
+  getByContract,  // 原 getByContainer
   getStats,
 };

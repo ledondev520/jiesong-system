@@ -29,13 +29,19 @@ export interface Port {
 
 export interface Supplier {
   id: string;
-  name: string;
-  shortName?: string;
+  name: string;           // 供应商全称（合同用）
+  shortName?: string;     // 简称
+  // 联系人信息
   contactName?: string;
   contactPhone?: string;
   contactEmail?: string;
-  address?: string;
-  bankAccount?: string;
+  // 公司信息（合同用）
+  address?: string;       // 公司地址
+  phone?: string;         // 公司电话
+  taxId?: string;         // 纳税人识别号/税号
+  bankName?: string;      // 开户银行名称
+  bankAccount?: string;   // 银行账号
+  // 状态
   hasQualityIssue: boolean;
   qualityNote?: string;
   isActive: boolean;
@@ -72,6 +78,15 @@ export interface Product {
   specification?: string;
   unit?: string;
   categoryId?: string;
+  // 重量信息
+  grossWeight?: number;  // 毛重 (kg/件)
+  netWeight?: number;    // 净重 (kg/件)
+  volume?: number;       // 体积 (CBM/件)
+  packingSpec?: string;  // 包装规格 (如: 4片/箱)
+  // 尺寸信息（用于3D可视化，单位毫米）
+  length?: number;       // 长度 (mm)
+  width?: number;        // 宽度 (mm)
+  height?: number;       // 高度 (mm)
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -103,6 +118,7 @@ export interface PurchaseContract {
   supplierId: string;
   totalAmount: number;
   paidAmount: number;
+  taxRate: number;  // 税率（%），通常为 1 或 13
   status: PurchaseStatus;
   signedAt?: string;
   expectedDate?: string;
@@ -131,26 +147,43 @@ export interface PurchaseItem {
 }
 
 export enum SalesStatus {
-  DRAFT = 'DRAFT',
-  CONFIRMED = 'CONFIRMED',
-  PAID = 'PAID',
-  SHIPPED = 'SHIPPED',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
+  DRAFT = 'DRAFT',        // 草稿
+  CONFIRMED = 'CONFIRMED', // 已确认
+  PACKING = 'PACKING',    // 装箱中
+  SHIPPED = 'SHIPPED',    // 已发运
+  ARRIVED = 'ARRIVED',    // 已到达
+  COMPLETED = 'COMPLETED', // 已完成
+  CANCELLED = 'CANCELLED', // 已取消
 }
 
 export interface SalesContract {
   id: string;
-  contractNo: string;
+  contractNo: string;  // EXP 编号，同时作为货柜标识
+  // 销售信息
   totalAmount: number;
   receivedAmount: number;
   exchangeRate: number;
-  status: SalesStatus;
+  status: SalesStatus;  // DRAFT/CONFIRMED/PACKING/SHIPPED/ARRIVED/COMPLETED
   signedAt?: string;
   note?: string;
+  // 货柜信息（合并自原 Container 表）
+  portId?: string;
+  totalBoxes: number;
+  grossWeight: number;
+  netWeight: number;
+  volume: number;
+  shippedAt?: string;
+  estimatedArrival?: string;
+  customsBroker?: string;
+  isFumigated?: boolean;
+  hasTaxRefund?: boolean;
+  // 时间戳
   createdAt: string;
   updatedAt: string;
+  // 关联
+  port?: Port;
   items?: SalesItem[];
+  packingItems?: PackingItem[];  // 装箱明细
   payments?: Payment[];
 }
 
@@ -199,6 +232,8 @@ export interface Inventory {
   };
 }
 
+// 已废弃：货柜已合并到 SalesContract
+// 保留枚举用于兼容
 export enum ContainerStatus {
   PENDING = 'PENDING',
   LOADING = 'LOADING',
@@ -206,30 +241,14 @@ export enum ContainerStatus {
   ARRIVED = 'ARRIVED',
 }
 
-export interface Container {
-  id: string;
-  containerNo: string;
-  portId: string;
-  status: ContainerStatus;
-  totalBoxes: number;
-  grossWeight: number;
-  netWeight: number;
-  volume: number;
-  shippedAt?: string;
-  estimatedArrival?: string;
-  note?: string;
-  customsBroker?: string;
-  isFumigated?: boolean;
-  hasTaxRefund?: boolean;
-  createdAt: string;
-  updatedAt: string;
-  port?: Port;
-  items?: ContainerItem[];
-}
+// 已废弃：Container 功能已合并到 SalesContract
+// 一个 EXP 出口合同 = 一个货柜
+export type Container = SalesContract;
 
-export interface ContainerItem {
+// 装箱明细（原 ContainerItem，现关联 SalesContract）
+export interface PackingItem {
   id: string;
-  containerId: string;
+  salesContractId: string;  // 关联出口合同（即货柜）
   productId: string;
   storeId?: string;
   quantity: number;
@@ -238,11 +257,19 @@ export interface ContainerItem {
   grossWeight?: number;
   netWeight?: number;
   volume?: number;
+  // 3D 装箱位置（由装箱算法计算）
+  posX?: number;  // 在货柜中的 X 位置 (mm)
+  posY?: number;  // 在货柜中的 Y 位置 (mm)
+  posZ?: number;  // 在货柜中的 Z 位置 (mm)
   note?: string;
   createdAt: string;
   updatedAt: string;
   product?: Product;
+  store?: Store;
 }
+
+// 兼容旧代码的别名
+export type ContainerItem = PackingItem;
 
 export enum PaymentType {
   PAYABLE = 'PAYABLE',
