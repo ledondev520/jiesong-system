@@ -42,3 +42,7 @@ temp/
 # Uploads
 public/uploads/*
 !public/uploads/.gitkeep
+
+# Generated contracts (exclude sample files)
+docs/购销合同CG*.docx
+docs/购销合同CG*.pdf
