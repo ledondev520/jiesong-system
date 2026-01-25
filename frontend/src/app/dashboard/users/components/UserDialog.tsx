@@ -142,7 +142,9 @@ export function UserDialog({
               )}
             />
             <DialogFooter>
-              <Button type="submit">保存</Button>
+              <Button type="submit" disabled={!form.formState.isValid || form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? '保存中...' : '保存'}
+              </Button>
             </DialogFooter>
           </form>
         </Form>

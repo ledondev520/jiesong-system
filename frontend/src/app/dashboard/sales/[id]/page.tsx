@@ -8,12 +8,13 @@
 
 'use client';
 
-import { useState, useEffect, use, lazy, Suspense } from 'react';
+import { useState, useEffect, use, lazy, Suspense, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { SalesContract, PackingItem, Product, Store, SalesStatus } from '@/types';
+import { SalesContract, PackingItem, Product, Store, SalesStatus, Inventory } from '@/types';
 import { salesService } from '@/services/sales.service';
 import { productService } from '@/services/product.service';
 import { storeService } from '@/services/store.service';
+import { inventoryService } from '@/services/inventory.service';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -30,6 +31,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
@@ -47,7 +49,7 @@ import {
 } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Plus, Pencil, Trash, Ship, Package, Weight, Box, Boxes } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash, Ship, Package, Weight, Box, Boxes, Search, PackageCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { CONTAINER_40HQ } from '@/lib/binPacking';
@@ -66,7 +68,9 @@ export default function SalesDetailPage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
+  const [inventories, setInventories] = useState<Inventory[]>([]);
   const [activeTab, setActiveTab] = useState('packing');
+  const [productSearch, setProductSearch] = useState('');
   
   // 添加/编辑商品对话框
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
@@ -80,6 +84,10 @@ export default function SalesDetailPage({ params }: PageProps) {
     netWeight: 0,
     volume: 0,
     note: '',
+    // 商品尺寸（用于3D可视化）
+    length: 0,
+    width: 0,
+    height: 0,
   });
 
   useEffect(() => {
@@ -87,19 +95,21 @@ export default function SalesDetailPage({ params }: PageProps) {
   }, [id]);
 
   /**
-   * 职责：加载合同详情和基础数据
+   * 职责：加载合同详情和基础数据（含库存）
    */
   const loadData = async () => {
     setLoading(true);
     try {
-      const [contractRes, productsRes, storesRes] = await Promise.all([
+      const [contractRes, productsRes, storesRes, inventoryRes] = await Promise.all([
         salesService.getById(id),
         productService.getAll({ pageSize: 500 }),
         storeService.getAll({ pageSize: 100 }),
+        inventoryService.getAll({ pageSize: 500 }),
       ]);
       setContract(contractRes.data);
       setProducts(productsRes.data?.items || []);
       setStores(storesRes.data?.items || []);
+      setInventories(inventoryRes.data?.items || []);
     } catch (error) {
       toast.error('加载数据失败');
     } finally {
@@ -121,6 +131,9 @@ export default function SalesDetailPage({ params }: PageProps) {
       netWeight: 0,
       volume: 0,
       note: '',
+      length: 0,
+      width: 0,
+      height: 0,
     });
     setIsItemDialogOpen(true);
   };
@@ -130,6 +143,8 @@ export default function SalesDetailPage({ params }: PageProps) {
    */
   const handleEditItem = (item: PackingItem) => {
     setEditingItem(item);
+    // 获取商品的尺寸信息（优先使用 PackingItem 保存的尺寸）
+    const product = products.find(p => p.id === item.productId);
     setItemForm({
       productId: item.productId,
       storeId: item.storeId || '',
@@ -139,6 +154,10 @@ export default function SalesDetailPage({ params }: PageProps) {
       netWeight: item.netWeight || 0,
       volume: item.volume || 0,
       note: item.note || '',
+      // 优先使用 PackingItem 中保存的尺寸，否则使用 Product 的尺寸
+      length: item.length || product?.length || 0,
+      width: item.width || product?.width || 0,
+      height: item.height || product?.height || 0,
     });
     setIsItemDialogOpen(true);
   };
@@ -181,7 +200,44 @@ export default function SalesDetailPage({ params }: PageProps) {
   };
 
   /**
-   * 职责：选择商品时自动填充体积/重量
+   * 职责：计算商品优先级并排序
+   * 思路：有库存的商品优先，按目的港门店关联排序
+   */
+  const sortedProducts = useMemo(() => {
+    // 1. 获取有库存的商品ID集合
+    const productsWithInventory = new Set(
+      inventories
+        .filter(inv => inv.quantity > 0)
+        .map(inv => inv.productId)
+    );
+    
+    // 2. 过滤搜索关键词
+    let filtered = products;
+    if (productSearch.trim()) {
+      const keyword = productSearch.toLowerCase();
+      filtered = products.filter(p => 
+        p.customsName?.toLowerCase().includes(keyword) ||
+        p.specification?.toLowerCase().includes(keyword)
+      );
+    }
+    
+    // 3. 排序：有库存的优先
+    return [...filtered].sort((a, b) => {
+      const aHasInventory = productsWithInventory.has(a.id) ? 1 : 0;
+      const bHasInventory = productsWithInventory.has(b.id) ? 1 : 0;
+      return bHasInventory - aHasInventory;
+    });
+  }, [products, inventories, productSearch]);
+
+  /**
+   * 职责：检查商品是否有库存
+   */
+  const hasInventory = (productId: string) => {
+    return inventories.some(inv => inv.productId === productId && inv.quantity > 0);
+  };
+
+  /**
+   * 职责：选择商品时自动填充体积/重量/尺寸
    */
   const handleProductChange = (productId: string) => {
     const product = products.find(p => p.id === productId);
@@ -192,6 +248,10 @@ export default function SalesDetailPage({ params }: PageProps) {
         grossWeight: product.grossWeight || prev.grossWeight,
         netWeight: product.netWeight || prev.netWeight,
         volume: product.volume || prev.volume,
+        // 自动填充商品尺寸（用于3D可视化）
+        length: product.length || 0,
+        width: product.width || 0,
+        height: product.height || 0,
       }));
     } else {
       setItemForm(prev => ({ ...prev, productId }));
@@ -360,9 +420,11 @@ export default function SalesDetailPage({ params }: PageProps) {
                             )}
                           </TableCell>
                           <TableCell>
-                            {product?.length && product?.width && product?.height
-                              ? `${product.length}×${product.width}×${product.height}`
-                              : '-'}
+                            {(item.length && item.width && item.height)
+                              ? `${item.length}×${item.width}×${item.height}`
+                              : (product?.length && product?.width && product?.height)
+                                ? `${product.length}×${product.width}×${product.height}`
+                                : '-'}
                           </TableCell>
                           <TableCell className="text-right">{item.boxes || '-'}</TableCell>
                           <TableCell className="text-right">{item.grossWeight || '-'}</TableCell>
@@ -467,32 +529,106 @@ export default function SalesDetailPage({ params }: PageProps) {
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>{editingItem ? '编辑商品' : '添加商品到货柜'}</DialogTitle>
+            <DialogDescription>
+              填写商品信息和规格尺寸，尺寸将用于3D可视化
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">商品 *</label>
+              {/* 搜索框 */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="搜索商品名称..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  className="pl-9"
+                  disabled={!!editingItem}
+                />
+              </div>
               <Select 
                 value={itemForm.productId} 
                 onValueChange={handleProductChange}
                 disabled={!!editingItem}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="选择商品" />
+                  <SelectValue placeholder="选择商品（有库存的优先显示）" />
                 </SelectTrigger>
-                <SelectContent>
-                  {products.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.customsName} 
-                      {p.length && p.width && p.height && (
-                        <span className="text-muted-foreground ml-1">
-                          ({p.length}×{p.width}×{p.height}mm)
-                        </span>
-                      )}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="max-h-[300px]">
+                  {sortedProducts.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground text-center">
+                      {productSearch ? '未找到匹配商品' : '暂无商品'}
+                    </div>
+                  ) : (
+                    sortedProducts.map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        <div className="flex items-center gap-2">
+                          {hasInventory(p.id) && (
+                            <PackageCheck className="h-3 w-3 text-green-500 flex-shrink-0" />
+                          )}
+                          <span>{p.customsName}</span>
+                          {p.length && p.width && p.height && (
+                            <span className="text-muted-foreground text-xs">
+                              ({p.length}×{p.width}×{p.height}mm)
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                <PackageCheck className="h-3 w-3 inline text-green-500 mr-1" />
+                表示有库存
+              </p>
             </div>
+
+            {/* 商品规格尺寸（用于3D可视化） */}
+            {itemForm.productId && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                    商品规格尺寸（用于3D可视化）
+                  </span>
+                  {(itemForm.length === 0 || itemForm.width === 0 || itemForm.height === 0) && (
+                    <span className="text-xs text-orange-600 dark:text-orange-400">
+                      请填写尺寸以获得准确的3D效果
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">长度 (mm)</label>
+                    <Input 
+                      type="number" 
+                      value={itemForm.length || ''}
+                      placeholder="500"
+                      onChange={(e) => setItemForm(prev => ({ ...prev, length: parseFloat(e.target.value) || 0 }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">宽度 (mm)</label>
+                    <Input 
+                      type="number" 
+                      value={itemForm.width || ''}
+                      placeholder="500"
+                      onChange={(e) => setItemForm(prev => ({ ...prev, width: parseFloat(e.target.value) || 0 }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">高度 (mm)</label>
+                    <Input 
+                      type="number" 
+                      value={itemForm.height || ''}
+                      placeholder="500"
+                      onChange={(e) => setItemForm(prev => ({ ...prev, height: parseFloat(e.target.value) || 0 }))}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -540,6 +676,13 @@ export default function SalesDetailPage({ params }: PageProps) {
                   value={itemForm.volume}
                   onChange={(e) => setItemForm(prev => ({ ...prev, volume: parseFloat(e.target.value) || 0 }))}
                 />
+                {/* 体积预估提示 */}
+                {itemForm.length > 0 && itemForm.width > 0 && itemForm.height > 0 && itemForm.boxes > 0 && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400">
+                    预估: {((itemForm.length * itemForm.width * itemForm.height / 1e9) * itemForm.boxes).toFixed(4)} CBM
+                    （{itemForm.length}×{itemForm.width}×{itemForm.height}mm × {itemForm.boxes}箱）
+                  </p>
+                )}
               </div>
             </div>
 

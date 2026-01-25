@@ -190,15 +190,17 @@ export default function Container3DView({
   products 
 }: Container3DViewProps) {
   // 将 PackingItem 转换为 Box 格式
+  // 优先使用 PackingItem 中的尺寸，否则使用 Product 的尺寸，最后使用默认值
   const boxes: Box[] = useMemo(() => {
     return packingItems.map(item => {
       const product = products.find(p => p.id === item.productId);
       return {
         id: item.id,
         name: product?.customsName || '未知商品',
-        length: product?.length || 500,  // 默认尺寸
-        width: product?.width || 500,
-        height: product?.height || 500,
+        // 尺寸优先级：PackingItem > Product > 默认 500mm
+        length: item.length || product?.length || 500,
+        width: item.width || product?.width || 500,
+        height: item.height || product?.height || 500,
         weight: item.grossWeight,
         color: generateColor(item.productId),
         quantity: item.boxes || 1,
@@ -212,7 +214,7 @@ export default function Container3DView({
   }, [boxes]);
   
   const handleBoxClick = (box: PlacedBox) => {
-    console.log('Clicked box:', box);
+    // 点击箱子时的交互（可以扩展为显示详情弹窗等）
   };
   
   return (

@@ -69,6 +69,26 @@ describe('purchaseService api', () => {
   });
 });
 
+describe('purchaseService.getNextContractNo', () => {
+  it('获取下一个合同编号', async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { contractNo: 'CG2500001' } });
+
+    await purchaseService.getNextContractNo();
+
+    expect(api.get).toHaveBeenCalledWith('/purchases/options/next-no');
+  });
+});
+
+describe('purchaseService.getSuppliersByProducts', () => {
+  it('根据商品ID获取供应商', async () => {
+    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { supplierIds: ['s1', 's2'] } });
+
+    await purchaseService.getSuppliersByProducts(['p1', 'p2']);
+
+    expect(api.post).toHaveBeenCalledWith('/purchases/suppliers-by-products', { productIds: ['p1', 'p2'] });
+  });
+});
+
 describe('purchaseService.parseQuote', () => {
   it('返回模拟解析结果', async () => {
     vi.useFakeTimers();

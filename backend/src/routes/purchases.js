@@ -51,4 +51,7 @@ router.delete('/files/:fileId', purchaseController.deleteFile);
 // GET /api/v1/purchases/next-no - 获取下一个合同编号
 router.get('/options/next-no', purchaseController.getNextContractNo);
 
+// POST /api/v1/purchases/suppliers-by-products - 根据商品获取曾供应过的供应商
+router.post('/suppliers-by-products', purchaseController.getSuppliersByProducts);
+
 module.exports = router;

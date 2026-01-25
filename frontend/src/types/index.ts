@@ -257,6 +257,10 @@ export interface PackingItem {
   grossWeight?: number;
   netWeight?: number;
   volume?: number;
+  // 商品规格尺寸（用于3D可视化，单位 mm）
+  length?: number;  // 长度 (mm)
+  width?: number;   // 宽度 (mm)
+  height?: number;  // 高度 (mm)
   // 3D 装箱位置（由装箱算法计算）
   posX?: number;  // 在货柜中的 X 位置 (mm)
   posY?: number;  // 在货柜中的 Y 位置 (mm)

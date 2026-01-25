@@ -143,7 +143,9 @@ export function PaymentDialog({
               )}
             />
             <DialogFooter>
-              <Button type="submit">确认记录</Button>
+              <Button type="submit" disabled={!form.formState.isValid || form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? '提交中...' : '确认记录'}
+              </Button>
             </DialogFooter>
           </form>
         </Form>

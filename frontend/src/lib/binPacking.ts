@@ -1,16 +1,16 @@
 /**
  * Input: 箱子尺寸列表、货柜尺寸
  * Output: 每个箱子在货柜中的3D位置
- * Pos: 工具库，实现3D装箱算法（First Fit Decreasing Height）
+ * Pos: 工具库，实现3D装箱算法（底部优先堆叠）
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 // 40HQ 标准货柜内部尺寸（毫米）及厂家建议限制
 export const CONTAINER_40HQ = {
-  length: 12030,  // 长度 (mm)
-  width: 2350,    // 宽度 (mm)
-  height: 2690,   // 高度 (mm)
+  length: 12030,  // 长度 (mm) - 内径
+  width: 2350,    // 宽度 (mm) - 内径
+  height: 2690,   // 高度 (mm) - 内径
   maxVolume: 68,  // 厂家建议最大装载体积 (CBM)
   maxWeight: 22500, // 厂家建议最大毛重 (kg) = 22.5吨
 };
@@ -31,7 +31,7 @@ export interface Box {
 export interface PlacedBox extends Box {
   posX: number;  // mm
   posY: number;  // mm
-  posZ: number;  // mm
+  posZ: number;  // mm (高度方向，0 = 地面)
   rotated?: boolean; // 是否旋转（长宽互换）
 }
 
@@ -44,12 +44,22 @@ export interface PackingResult {
   utilizationRate: number; // 利用率 %
 }
 
+// 空间接口（用于跟踪可用空间）
+interface Space {
+  x: number;
+  y: number;
+  z: number;
+  length: number;
+  width: number;
+  height: number;
+}
+
 /**
- * 职责：简化版3D装箱算法（层级堆叠）
+ * 职责：3D装箱算法（底部优先堆叠）
  * 思路：
- * 1. 按高度降序排列箱子
- * 2. 在货柜底面逐层放置
- * 3. 每层尽可能填满后再开始下一层
+ * 1. 使用可用空间列表跟踪剩余空间
+ * 2. 每次放置箱子后，将剩余空间分割为新的可用空间
+ * 3. 优先使用Z值最小（最接近地面）的空间
  * 
  * @param boxes - 待装箱的箱子列表
  * @param container - 货柜尺寸，默认40HQ
@@ -61,6 +71,7 @@ export function packBoxes(
 ): PackingResult {
   const placedBoxes: PlacedBox[] = [];
   const unplacedBoxes: Box[] = [];
+  const GAP = 10; // 箱子间隙 (mm)
   
   // 0. 展开所有箱子（按数量展开）
   const expandedBoxes: Box[] = [];
@@ -81,100 +92,90 @@ export function packBoxes(
     return volB - volA;
   });
   
-  // 2. 使用简单的层级堆叠算法
-  let currentX = 0;
-  let currentY = 0;
-  let currentZ = 0;
-  let layerHeight = 0;
-  let rowWidth = 0;
+  // 2. 初始化可用空间列表（整个货柜是一个大空间）
+  const spaces: Space[] = [{
+    x: 0,
+    y: 0,
+    z: 0,
+    length: container.length,
+    width: container.width,
+    height: container.height,
+  }];
   
+  // 3. 逐个放置箱子
   for (const box of sortedBoxes) {
-    // 尝试放置（可能需要旋转）
     let placed = false;
+    
+    // 尝试两种旋转方向
     const orientations = [
       { l: box.length, w: box.width, h: box.height, rotated: false },
       { l: box.width, w: box.length, h: box.height, rotated: true },
     ];
     
-    for (const orient of orientations) {
-      // 检查当前位置是否能放下
-      if (currentX + orient.l <= container.length &&
-          currentY + orient.w <= container.width &&
-          currentZ + orient.h <= container.height) {
-        
-        placedBoxes.push({
-          ...box,
-          length: orient.l,
-          width: orient.w,
-          height: orient.h,
-          posX: currentX,
-          posY: currentY,
-          posZ: currentZ,
-          rotated: orient.rotated,
-        });
-        
-        // 更新位置
-        currentX += orient.l + 10; // 10mm 间隙
-        layerHeight = Math.max(layerHeight, orient.h);
-        rowWidth = Math.max(rowWidth, orient.w);
-        placed = true;
-        break;
-      }
+    // 按 Z 值排序空间（底部优先）
+    spaces.sort((a, b) => a.z - b.z || a.y - b.y || a.x - b.x);
+    
+    for (let i = 0; i < spaces.length && !placed; i++) {
+      const space = spaces[i];
       
-      // 尝试新行
-      if (currentX > 0 && currentY + rowWidth + orient.w <= container.width) {
-        currentX = 0;
-        currentY += rowWidth + 10;
-        rowWidth = 0;
-        
-        if (orient.l <= container.length &&
-            currentY + orient.w <= container.width &&
-            currentZ + orient.h <= container.height) {
+      for (const orient of orientations) {
+        // 检查箱子是否能放入这个空间
+        if (orient.l <= space.length && 
+            orient.w <= space.width && 
+            orient.h <= space.height) {
           
+          // 放置箱子
           placedBoxes.push({
             ...box,
             length: orient.l,
             width: orient.w,
             height: orient.h,
-            posX: currentX,
-            posY: currentY,
-            posZ: currentZ,
+            posX: space.x,
+            posY: space.y,
+            posZ: space.z,
             rotated: orient.rotated,
           });
           
-          currentX += orient.l + 10;
-          layerHeight = Math.max(layerHeight, orient.h);
-          rowWidth = Math.max(rowWidth, orient.w);
-          placed = true;
-          break;
-        }
-      }
-      
-      // 尝试新层
-      if (currentZ + layerHeight + orient.h <= container.height) {
-        currentX = 0;
-        currentY = 0;
-        currentZ += layerHeight + 10;
-        layerHeight = 0;
-        rowWidth = 0;
-        
-        if (orient.l <= container.length &&
-            orient.w <= container.width) {
+          // 移除使用的空间
+          spaces.splice(i, 1);
           
-          placedBoxes.push({
-            ...box,
-            length: orient.l,
-            width: orient.w,
-            height: orient.h,
-            posX: currentX,
-            posY: currentY,
-            posZ: currentZ,
-            rotated: orient.rotated,
-          });
+          // 分割剩余空间（创建三个新空间：右侧、前方、上方）
+          // 右侧空间（沿 X 轴）
+          if (space.length - orient.l - GAP > 100) {
+            spaces.push({
+              x: space.x + orient.l + GAP,
+              y: space.y,
+              z: space.z,
+              length: space.length - orient.l - GAP,
+              width: space.width,
+              height: space.height,
+            });
+          }
           
-          currentX += orient.l + 10;
-          layerHeight = orient.h;
-          rowWidth = orient.w;
+          // 前方空间（沿 Y 轴）
+          if (space.width - orient.w - GAP > 100) {
+            spaces.push({
+              x: space.x,
+              y: space.y + orient.w + GAP,
+              z: space.z,
+              length: orient.l,
+              width: space.width - orient.w - GAP,
+              height: space.height,
+            });
+          }
+          
+          // 上方空间（沿 Z 轴）- 仅当这个箱子下方有支撑时才能使用
+          if (space.height - orient.h - GAP > 100) {
+            spaces.push({
+              x: space.x,
+              y: space.y,
+              z: space.z + orient.h + GAP,
+              length: orient.l,
+              width: orient.w,
+              height: space.height - orient.h - GAP,
+            });
+          }
+          
           placed = true;
           break;
         }
@@ -186,7 +187,7 @@ export function packBoxes(
     }
   }
   
-  // 3. 计算利用率
+  // 4. 计算利用率
   const usedVolume = placedBoxes.reduce(
     (sum, box) => sum + box.length * box.width * box.height,
     0

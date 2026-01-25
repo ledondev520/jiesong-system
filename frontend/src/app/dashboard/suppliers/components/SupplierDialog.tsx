@@ -354,7 +354,9 @@ export function SupplierDialog({
             </div>
 
             <DialogFooter>
-              <Button type="submit">保存供应商</Button>
+              <Button type="submit" disabled={!form.formState.isValid || form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? '保存中...' : '保存供应商'}
+              </Button>
             </DialogFooter>
           </form>
         </Form>

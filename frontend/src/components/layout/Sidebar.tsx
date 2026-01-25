@@ -65,7 +65,7 @@ export function Sidebar() {
     <div className="flex h-full w-64 flex-col border-r bg-card text-card-foreground">
       {/* 0. Logo区域 */}
       <div className="flex h-14 items-center border-b px-4 font-semibold text-lg">
-        捷淞进销存
+        捷淞
       </div>
       
       {/* 1. 导航菜单 */}

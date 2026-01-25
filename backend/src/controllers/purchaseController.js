@@ -304,6 +304,47 @@ const getNextContractNo = async (req, res, next) => {
   }
 };
 
+/**
+ * 职责：根据商品ID列表获取曾供应过这些商品的供应商ID
+ * 思路：查询 PurchaseItem 中包含这些商品的记录，获取对应的 PurchaseContract，再获取 supplierId
+ * @param productIds 商品ID数组
+ * @returns 供应商ID列表（去重）
+ */
+const getSuppliersByProducts = async (req, res, next) => {
+  try {
+    const { productIds } = req.body;
+    
+    if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
+      return success(res, { supplierIds: [] });
+    }
+    
+    // 1. 查询包含这些商品的采购明细
+    const purchaseItems = await prisma.purchaseItem.findMany({
+      where: { productId: { in: productIds } },
+      select: { purchaseContractId: true },
+      distinct: ['purchaseContractId'],
+    });
+    
+    if (purchaseItems.length === 0) {
+      return success(res, { supplierIds: [] });
+    }
+    
+    // 2. 获取对应的采购合同的供应商ID
+    const contractIds = purchaseItems.map(item => item.purchaseContractId);
+    const contracts = await prisma.purchaseContract.findMany({
+      where: { id: { in: contractIds } },
+      select: { supplierId: true },
+      distinct: ['supplierId'],
+    });
+    
+    const supplierIds = [...new Set(contracts.map(c => c.supplierId))];
+    
+    success(res, { supplierIds });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   list,
   getById,
@@ -316,4 +357,5 @@ module.exports = {
   getFiles,
   deleteFile,
   getNextContractNo,
+  getSuppliersByProducts,
 };

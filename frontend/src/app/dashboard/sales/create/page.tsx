@@ -304,7 +304,13 @@ export default function CreateSalesPage() {
 
           <div className="flex justify-end gap-4">
             <Button type="button" variant="outline" onClick={() => router.back()}>取消</Button>
-            <Button type="submit" size="lg">创建合同</Button>
+            <Button 
+              type="submit" 
+              size="lg"
+              disabled={!form.formState.isValid || form.formState.isSubmitting}
+            >
+              {form.formState.isSubmitting ? '提交中...' : '创建合同'}
+            </Button>
           </div>
         </form>
       </Form>

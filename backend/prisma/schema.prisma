@@ -298,6 +298,10 @@ model PackingItem {
   grossWeight     Float?
   netWeight       Float?
   volume          Float?
+  // 商品规格尺寸（用于3D可视化，单位 mm）
+  length          Float?   // 长度 (mm)
+  width           Float?   // 宽度 (mm)
+  height          Float?   // 高度 (mm)
   // 3D 装箱位置（由装箱算法计算）
   posX            Float?   // 在货柜中的 X 位置 (mm)
   posY            Float?   // 在货柜中的 Y 位置 (mm)

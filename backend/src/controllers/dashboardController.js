@@ -111,6 +111,126 @@ const getStats = async (req, res, next) => {
   }
 };
 
+/**
+ * 职责：商品追踪 - 根据商品名称和门店查找对应的出口合同
+ * 思路：
+ *   1. 模糊匹配商品名称
+ *   2. 可选匹配门店名称
+ *   3. 通过 SalesItem 或 PackingItem 关联找到出口合同
+ */
+const trackProduct = async (req, res, next) => {
+  try {
+    const { product, store } = req.query;
+    
+    if (!product) {
+      return success(res, []);
+    }
+    
+    // 1. 构建查询条件
+    const whereCondition = {
+      product: {
+        customsName: { contains: product },
+      },
+    };
+    
+    // 如果提供了门店名称，添加门店过滤
+    if (store) {
+      whereCondition.store = {
+        name: { contains: store },
+      };
+    }
+    
+    // 2. 从 SalesItem 查询（销售明细）
+    const salesItems = await prisma.salesItem.findMany({
+      where: whereCondition,
+      include: {
+        salesContract: {
+          include: {
+            port: true,
+          },
+        },
+        product: true,
+        store: true,
+      },
+      take: 20,
+    });
+    
+    // 3. 从 PackingItem 查询（装箱明细）
+    const packingItems = await prisma.packingItem.findMany({
+      where: {
+        product: {
+          customsName: { contains: product },
+        },
+        ...(store ? {
+          store: {
+            name: { contains: store },
+          },
+        } : {}),
+      },
+      include: {
+        salesContract: {
+          include: {
+            port: true,
+          },
+        },
+        product: true,
+        store: true,
+      },
+      take: 20,
+    });
+    
+    // 4. 合并结果并去重
+    const resultMap = new Map();
+    
+    // 处理销售明细
+    salesItems.forEach(item => {
+      const key = `${item.salesContractId}-${item.productId}-${item.storeId}`;
+      if (!resultMap.has(key) && item.salesContract) {
+        resultMap.set(key, {
+          salesContractId: item.salesContractId,
+          contractNo: item.salesContract.contractNo,
+          portName: item.salesContract.port?.name || '未知',
+          status: item.salesContract.status,
+          eta: item.salesContract.eta 
+            ? new Date(item.salesContract.eta).toLocaleDateString('zh-CN')
+            : null,
+          storeName: item.store?.name || '未知门店',
+          productName: item.product?.customsName || '未知商品',
+          quantity: item.quantity,
+        });
+      }
+    });
+    
+    // 处理装箱明细
+    packingItems.forEach(item => {
+      const key = `${item.salesContractId}-${item.productId}-${item.storeId || 'no-store'}`;
+      if (!resultMap.has(key) && item.salesContract) {
+        resultMap.set(key, {
+          salesContractId: item.salesContractId,
+          contractNo: item.salesContract.contractNo,
+          portName: item.salesContract.port?.name || '未知',
+          status: item.salesContract.status,
+          eta: item.salesContract.eta 
+            ? new Date(item.salesContract.eta).toLocaleDateString('zh-CN')
+            : null,
+          storeName: item.store?.name || '未知门店',
+          productName: item.product?.customsName || '未知商品',
+          quantity: item.quantity,
+        });
+      }
+    });
+    
+    // 5. 按合同编号排序返回
+    const results = Array.from(resultMap.values())
+      .sort((a, b) => b.contractNo.localeCompare(a.contractNo));
+    
+    success(res, results);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getStats,
+  trackProduct,
 };

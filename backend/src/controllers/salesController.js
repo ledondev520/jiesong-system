@@ -278,6 +278,10 @@ const addPackingItem = async (req, res, next) => {
         grossWeight: data.grossWeight,
         netWeight: data.netWeight,
         volume: data.volume,
+        // 商品规格尺寸（用于3D可视化）
+        length: data.length || null,
+        width: data.width || null,
+        height: data.height || null,
         note: data.note,
       },
       include: { product: true, store: true },
@@ -310,6 +314,10 @@ const updatePackingItem = async (req, res, next) => {
         netWeight: data.netWeight,
         volume: data.volume,
         storeId: data.storeId || null,
+        // 商品规格尺寸（用于3D可视化）
+        length: data.length || null,
+        width: data.width || null,
+        height: data.height || null,
         note: data.note,
       },
       include: { product: true, store: true },

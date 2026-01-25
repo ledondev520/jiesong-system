@@ -27,7 +27,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { X, Save, Loader2, Package, Users, Store, Settings2, FileSpreadsheet, UserCog } from 'lucide-react';
+import { X, Save, Loader2, Package, Users, Store, Settings2, FileSpreadsheet, UserCog, Wrench } from 'lucide-react';
+import { ClaudeCostCalculator } from '@/components/tools/ClaudeCostCalculator';
 import { toast } from 'sonner';
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE, UNITS as INITIAL_UNITS } from '@/lib/constants';
 import api from '@/lib/axios';
@@ -217,28 +218,32 @@ export default function SettingsPage() {
         <p className="text-muted-foreground">管理基础档案、系统配置与数据导入</p>
       </div>
 
-      <Tabs defaultValue={defaultTab} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="master" className="gap-2">
+      <Tabs defaultValue={defaultTab} className="flex gap-6" orientation="vertical">
+        <TabsList className="flex flex-col h-fit w-48 shrink-0">
+          <TabsTrigger value="master" className="w-full justify-start gap-2">
             <Package className="h-4 w-4" />
             基础档案
           </TabsTrigger>
-          <TabsTrigger value="config" className="gap-2">
+          <TabsTrigger value="config" className="w-full justify-start gap-2">
             <Settings2 className="h-4 w-4" />
             系统配置
           </TabsTrigger>
-          <TabsTrigger value="import" className="gap-2">
+          <TabsTrigger value="import" className="w-full justify-start gap-2">
             <FileSpreadsheet className="h-4 w-4" />
             数据导入
           </TabsTrigger>
-          <TabsTrigger value="users" className="gap-2">
+          <TabsTrigger value="users" className="w-full justify-start gap-2">
             <UserCog className="h-4 w-4" />
             用户管理
+          </TabsTrigger>
+          <TabsTrigger value="tools" className="w-full justify-start gap-2">
+            <Wrench className="h-4 w-4" />
+            小工具
           </TabsTrigger>
         </TabsList>
 
         {/* 基础档案Tab */}
-        <TabsContent value="master" className="space-y-4">
+        <TabsContent value="master" className="flex-1 space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
             {masterDataLinks.map((item) => {
               const Icon = item.icon;
@@ -260,7 +265,7 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* 系统配置Tab */}
-        <TabsContent value="config">
+        <TabsContent value="config" className="flex-1">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <Card>
@@ -411,7 +416,7 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* 数据导入Tab */}
-        <TabsContent value="import" className="space-y-4">
+        <TabsContent value="import" className="flex-1 space-y-4">
           <Card className="hover:border-primary/50 transition-colors cursor-pointer" onClick={() => router.push('/dashboard/import')}>
             <CardHeader className="flex flex-row items-center gap-4">
               <div className="p-2 bg-primary/10 rounded-lg">
@@ -431,7 +436,7 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* 用户管理Tab */}
-        <TabsContent value="users" className="space-y-4">
+        <TabsContent value="users" className="flex-1 space-y-4">
           <Card className="hover:border-primary/50 transition-colors cursor-pointer" onClick={() => router.push('/dashboard/users')}>
             <CardHeader className="flex flex-row items-center gap-4">
               <div className="p-2 bg-primary/10 rounded-lg">
@@ -448,6 +453,11 @@ export default function SettingsPage() {
               </p>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* 小工具Tab */}
+        <TabsContent value="tools" className="flex-1 space-y-4">
+          <ClaudeCostCalculator />
         </TabsContent>
       </Tabs>
     </div>

@@ -30,8 +30,17 @@ export const purchaseService = {
     return api.get<any, ApiResponse<{ contractNo: string }>>('/purchases/options/next-no');
   },
 
+  /**
+   * 职责：根据商品ID列表获取曾供应过这些商品的供应商ID
+   * @param productIds 商品ID数组
+   * @returns 供应商ID列表
+   */
+  getSuppliersByProducts: async (productIds: string[]) => {
+    return api.post<any, ApiResponse<{ supplierIds: string[] }>>('/purchases/suppliers-by-products', { productIds });
+  },
+
   // Mock AI Parse
-  parseQuote: async (text: string) => {
+  parseQuote: async (text: string): Promise<{ success: boolean; data?: Array<{ productId: string; quantity: number; unitPrice: number; unit?: string; note?: string }> }> => {
     // In real app, this calls /api/ai/parse
     return new Promise((resolve) => {
       setTimeout(() => {

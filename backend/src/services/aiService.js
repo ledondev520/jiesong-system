@@ -11,10 +11,10 @@ const prisma = require('../utils/prisma');
 
 const OpenAI = require('openai');
 
-// Kimi K2模型配置
+// Kimi 模型配置
 const MODELS = {
   default: 'kimi-k2-turbo-preview', // 默认模型
-  vision: 'moonshot-v1-128k-vision-preview', // 视觉模型
+  vision: 'moonshot-v1-8k-vision-preview', // 视觉模型（8k 版本更稳定）
   fast: 'moonshot-v1-8k', // 快速响应模型
 };
 

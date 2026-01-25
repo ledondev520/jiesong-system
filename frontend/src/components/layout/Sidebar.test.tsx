@@ -19,7 +19,7 @@ vi.mock('@/store/auth.store', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/dashboard/products',
+  usePathname: () => '/dashboard/contracts',
 }));
 
 vi.mock('next/link', () => ({
@@ -34,8 +34,9 @@ describe('Sidebar', () => {
   it('渲染导航项并标记当前路由', () => {
     const { getByText } = render(<Sidebar />);
 
-    const current = getByText('商品管理');
-    expect(current.className.includes('bg-muted')).toBe(true);
+    // 当前路由是 /dashboard/contracts，对应 "合同管理"
+    const current = getByText('合同管理');
+    expect(current.className.includes('bg-primary')).toBe(true);
   });
 
   it('点击退出登录调用logout', () => {

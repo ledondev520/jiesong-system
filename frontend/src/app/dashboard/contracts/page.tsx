@@ -33,7 +33,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Eye, FileText, TrendingUp, ShoppingCart, Package, Loader2, FileDown } from 'lucide-react';
+import { Plus, Eye, FileText, TrendingUp, ShoppingCart, Package, Loader2, FileDown, Filter } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -58,14 +65,24 @@ export default function ContractsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get('tab') || 'purchase';
+  const statusFromUrl = searchParams.get('status') || '';
   
   // Tab状态（受控模式）
   const [activeTab, setActiveTab] = useState(tabFromUrl);
   
+  // 筛选状态
+  const [purchaseStatusFilter, setPurchaseStatusFilter] = useState(statusFromUrl);
+  const [salesStatusFilter, setSalesStatusFilter] = useState(statusFromUrl);
+  
   // 同步URL参数变化
   useEffect(() => {
     setActiveTab(tabFromUrl);
-  }, [tabFromUrl]);
+    if (tabFromUrl === 'purchase') {
+      setPurchaseStatusFilter(statusFromUrl);
+    } else {
+      setSalesStatusFilter(statusFromUrl);
+    }
+  }, [tabFromUrl, statusFromUrl]);
   
   // 采购合同状态
   const [purchaseContracts, setPurchaseContracts] = useState<PurchaseContract[]>([]);
@@ -240,7 +257,30 @@ export default function ContractsPage() {
 
         {/* 采购合同Tab */}
         <TabsContent value="purchase" className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex justify-between items-center gap-4">
+            {/* 状态筛选 */}
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={purchaseStatusFilter} onValueChange={setPurchaseStatusFilter}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="全部状态" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">全部状态</SelectItem>
+                  <SelectItem value="DRAFT">草稿</SelectItem>
+                  <SelectItem value="SIGNED">已签约</SelectItem>
+                  <SelectItem value="PRODUCING">生产中</SelectItem>
+                  <SelectItem value="SHIPPED">已发货</SelectItem>
+                  <SelectItem value="RECEIVED">已收货</SelectItem>
+                  <SelectItem value="COMPLETED">已完成</SelectItem>
+                </SelectContent>
+              </Select>
+              {purchaseStatusFilter && purchaseStatusFilter !== 'ALL' && (
+                <Badge variant="secondary">
+                  筛选中: {purchaseContracts.filter(c => c.status === purchaseStatusFilter).length} 条
+                </Badge>
+              )}
+            </div>
             <Button onClick={() => router.push('/dashboard/purchase/create')}>
               <Plus className="mr-2 h-4 w-4" /> 新增采购
             </Button>
@@ -267,14 +307,18 @@ export default function ContractsPage() {
                       加载中...
                     </TableCell>
                   </TableRow>
-                ) : purchaseContracts.length === 0 ? (
+                ) : (() => {
+                  const filtered = purchaseStatusFilter && purchaseStatusFilter !== 'ALL'
+                    ? purchaseContracts.filter(c => c.status === purchaseStatusFilter)
+                    : purchaseContracts;
+                  return filtered.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
-                      暂无采购合同
+                      {purchaseStatusFilter && purchaseStatusFilter !== 'ALL' ? '没有符合筛选条件的合同' : '暂无采购合同'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  purchaseContracts.map((contract) => {
+                  filtered.map((contract) => {
                     const firstProduct = contract.items?.[0]?.product;
                     const productName = firstProduct?.customsName || '-';
                     return (
@@ -328,7 +372,7 @@ export default function ContractsPage() {
                       </TableCell>
                     </TableRow>
                   );})
-                )}
+                )})()}
               </TableBody>
             </Table>
           </div>
@@ -336,7 +380,30 @@ export default function ContractsPage() {
 
         {/* 出口合同Tab */}
         <TabsContent value="sales" className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex justify-between items-center gap-4">
+            {/* 状态筛选 */}
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={salesStatusFilter} onValueChange={setSalesStatusFilter}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="全部状态" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">全部状态</SelectItem>
+                  <SelectItem value="DRAFT">草稿</SelectItem>
+                  <SelectItem value="CONFIRMED">已确认</SelectItem>
+                  <SelectItem value="PACKING">装箱中</SelectItem>
+                  <SelectItem value="SHIPPED">已发运</SelectItem>
+                  <SelectItem value="ARRIVED">已到达</SelectItem>
+                  <SelectItem value="COMPLETED">已完成</SelectItem>
+                </SelectContent>
+              </Select>
+              {salesStatusFilter && salesStatusFilter !== 'ALL' && (
+                <Badge variant="secondary">
+                  筛选中: {salesContracts.filter(c => c.status === salesStatusFilter).length} 条
+                </Badge>
+              )}
+            </div>
             <Button onClick={() => router.push('/dashboard/sales/create')}>
               <Plus className="mr-2 h-4 w-4" /> 新增出口
             </Button>
@@ -360,12 +427,18 @@ export default function ContractsPage() {
                    <TableRow>
                      <TableCell colSpan={7} className="text-center py-10">加载中...</TableCell>
                    </TableRow>
-                ) : salesContracts.length === 0 ? (
+                ) : (() => {
+                  const filtered = salesStatusFilter && salesStatusFilter !== 'ALL'
+                    ? salesContracts.filter(c => c.status === salesStatusFilter)
+                    : salesContracts;
+                  return filtered.length === 0 ? (
                    <TableRow>
-                     <TableCell colSpan={7} className="text-center py-10">暂无出口合同</TableCell>
+                     <TableCell colSpan={7} className="text-center py-10">
+                       {salesStatusFilter && salesStatusFilter !== 'ALL' ? '没有符合筛选条件的合同' : '暂无出口合同'}
+                     </TableCell>
                    </TableRow>
                 ) : (
-                  salesContracts.map((contract) => (
+                  filtered.map((contract) => (
                     <TableRow key={contract.id}>
                       <TableCell className="font-medium flex items-center gap-2">
                         <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -392,7 +465,7 @@ export default function ContractsPage() {
                       </TableCell>
                     </TableRow>
                   ))
-                )}
+                )})()}
               </TableBody>
             </Table>
           </div>

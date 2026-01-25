@@ -27,6 +27,7 @@ import {
   FileText,
 } from 'lucide-react';
 import api from '@/lib/axios';
+import { ProductTracker } from '@/components/tools/ProductTracker';
 
 interface DashboardStats {
   overview: {
@@ -135,24 +136,24 @@ export default function DashboardPage() {
     CANCELLED: '已取消',
   };
 
-  // 待办事项
+  // 待办事项（点击跳转到筛选后的列表）
   const todoItems = [
     { 
       label: '采购待付款', 
       count: stats?.alerts?.pendingPurchases || 0, 
-      href: '/dashboard/payments?tab=payable',
+      href: '/dashboard/contracts?tab=purchase&status=SIGNED',  // 已签约待付款的采购合同
       icon: DollarSign,
     },
     { 
       label: '待发货柜', 
       count: stats?.recent?.containers?.filter(c => c.status === 'PENDING').length || 0, 
-      href: '/dashboard/contracts?tab=sales',
+      href: '/dashboard/contracts?tab=sales&status=PACKING',  // 装箱中的货柜
       icon: Ship,
     },
     { 
       label: '库存待入库', 
       count: stats?.overview?.inventories || 0, 
-      href: '/dashboard/inventory-container',
+      href: '/dashboard/inventory-container?status=PENDING',  // 待入库的库存
       icon: Warehouse,
     },
   ];
@@ -230,6 +231,9 @@ export default function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* 商品追踪 */}
+      <ProductTracker />
 
       {/* 数据概览 */}
       <div className="grid gap-4 md:grid-cols-4">
