@@ -129,13 +129,22 @@ async function main() {
       contractMap.set(contractNo, { 
         supplier: r['供应商名称'], 
         signedAt: r['签订日期'] || '',
-        products: [] 
+        products: [],
+        totalAmount: 0,
       });
     }
+    const quantity = parseFloat(r['数量']) || 0;
+    const unitPrice = parseFloat(r['单价']) || 0;
+    const amount = parseFloat(r['金额']) || 0;
+    
     contractMap.get(contractNo).products.push({
       name: r['商品名称'],
       unit: r['单位'],
+      quantity,
+      unitPrice,
+      totalPrice: amount || (quantity * unitPrice),
     });
+    contractMap.get(contractNo).totalAmount += (amount || (quantity * unitPrice));
   }
   
   // 3. 导入/更新供应商
@@ -230,15 +239,15 @@ async function main() {
       signedAt = new Date(data.signedAt);
     }
     
-    // 创建采购合同
+    // 创建采购合同（使用计算的总金额）
     const contract = await prisma.purchaseContract.create({
       data: {
         contractNo,
         supplierId,
         status: 'COMPLETED',
         signedAt,
-        totalAmount: 0,
-        paidAmount: 0,
+        totalAmount: data.totalAmount || 0,
+        paidAmount: data.totalAmount || 0, // 假设已完成的合同已付款
         taxRate: 13,
       },
     });
@@ -253,16 +262,17 @@ async function main() {
         data: {
           purchaseContractId: contract.id,
           productId,
-          quantity: 1,
+          quantity: prod.quantity || 1,
           unit: prod.unit || '个',
-          unitPrice: 0,
-          totalPrice: 0,
+          unitPrice: prod.unitPrice || 0,
+          totalPrice: prod.totalPrice || 0,
         },
       });
       itemCount++;
     }
     
-    console.log(`   + ${contractNo}: ${data.products.length} 个商品`);
+    const amountStr = data.totalAmount > 0 ? `¥${data.totalAmount.toLocaleString()}` : '';
+    console.log(`   + ${contractNo}: ${data.products.length} 个商品 ${amountStr}`);
   }
   
   console.log(`\n=== 导入完成 ===`);

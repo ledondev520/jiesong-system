@@ -74,6 +74,19 @@ def extract_contract_info(doc_path):
                     if product_col == -1 and len(header_cells) > 1:
                         product_col = 1
                     
+                    # 找到数量、单价、金额列的索引
+                    qty_col = -1
+                    price_col = -1
+                    amount_col = -1
+                    
+                    for i, h in enumerate(header_cells):
+                        if '数量' in h:
+                            qty_col = i
+                        if '单价' in h:
+                            price_col = i
+                        if '金额' in h or '总金额' in h:
+                            amount_col = i
+                    
                     # 遍历数据行
                     for row_idx, row in enumerate(table.rows[1:], 1):
                         cells = [cell.text.strip() for cell in row.cells]
@@ -85,6 +98,9 @@ def extract_contract_info(doc_path):
                         # 提取产品名称
                         product_name = ""
                         unit = ""
+                        quantity = 0
+                        unit_price = 0
+                        total_price = 0
                         
                         if product_col >= 0 and product_col < len(cells):
                             product_name = cells[product_col]
@@ -92,13 +108,50 @@ def extract_contract_info(doc_path):
                         if unit_col >= 0 and unit_col < len(cells):
                             unit = cells[unit_col]
                         
+                        # 提取数量
+                        if qty_col >= 0 and qty_col < len(cells):
+                            qty_text = cells[qty_col].replace(',', '').replace('，', '')
+                            qty_match = re.search(r'[\d.]+', qty_text)
+                            if qty_match:
+                                try:
+                                    quantity = float(qty_match.group())
+                                except:
+                                    pass
+                        
+                        # 提取单价（移除货币符号）
+                        if price_col >= 0 and price_col < len(cells):
+                            price_text = cells[price_col].replace('￥', '').replace('¥', '').replace(',', '').replace('，', '')
+                            price_match = re.search(r'[\d.]+', price_text)
+                            if price_match:
+                                try:
+                                    unit_price = float(price_match.group())
+                                except:
+                                    pass
+                        
+                        # 提取金额
+                        if amount_col >= 0 and amount_col < len(cells):
+                            amount_text = cells[amount_col].replace('￥', '').replace('¥', '').replace(',', '').replace('，', '')
+                            amount_match = re.search(r'[\d.]+', amount_text)
+                            if amount_match:
+                                try:
+                                    total_price = float(amount_match.group())
+                                except:
+                                    pass
+                        
+                        # 如果没有金额但有数量和单价，计算金额
+                        if total_price == 0 and quantity > 0 and unit_price > 0:
+                            total_price = quantity * unit_price
+                        
                         # 清理产品名称
                         if product_name and product_name != supplier:
                             # 跳过序号（纯数字）
                             if not product_name.isdigit() and len(product_name) > 1:
                                 products.append({
                                     "product_name": product_name,
-                                    "unit": unit
+                                    "unit": unit,
+                                    "quantity": quantity,
+                                    "unit_price": unit_price,
+                                    "total_price": total_price,
                                 })
                     
                     # 找到产品清单后就退出
@@ -112,7 +165,7 @@ def extract_contract_info(doc_path):
             if name_match:
                 product_name = name_match.group(1).strip()
                 if product_name and len(product_name) > 1:
-                    products.append({"product_name": product_name, "unit": ""})
+                    products.append({"product_name": product_name, "unit": "", "quantity": 0, "unit_price": 0, "total_price": 0})
         
         return {
             "contract_no": contract_no,
@@ -158,17 +211,21 @@ def main():
                                 "供应商名称": supplier,
                                 "商品名称": product['product_name'],
                                 "单位": product['unit'],
+                                "数量": product.get('quantity', 0),
+                                "单价": product.get('unit_price', 0),
+                                "金额": product.get('total_price', 0),
                                 "合同编号": info['contract_no'],
                                 "签订日期": info.get('signed_date', ''),
                             })
-                            print(f"  + {product['product_name']} ({product['unit']}) [{info.get('signed_date', '')}]")
+                            total = product.get('total_price', 0)
+                            print(f"  + {product['product_name']} ({product['unit']}) ¥{total:.0f} [{info.get('signed_date', '')}]")
     
     # 按供应商名称排序
     all_records.sort(key=lambda x: x['供应商名称'])
     
     # 写入 CSV
     with open(OUTPUT_CSV, 'w', newline='', encoding='utf-8-sig') as f:
-        writer = csv.DictWriter(f, fieldnames=['供应商名称', '商品名称', '单位', '合同编号', '签订日期'])
+        writer = csv.DictWriter(f, fieldnames=['供应商名称', '商品名称', '单位', '数量', '单价', '金额', '合同编号', '签订日期'])
         writer.writeheader()
         writer.writerows(all_records)
     
