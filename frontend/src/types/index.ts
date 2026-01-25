@@ -78,6 +78,9 @@ export interface Product {
   specification?: string;
   unit?: string;
   categoryId?: string;
+  // 海关申报信息
+  hsCode?: string;      // HS编码（10位海关编码）
+  declaration?: string; // 申报要素（汇总）
   // 重量信息
   grossWeight?: number;  // 毛重 (kg/件)
   netWeight?: number;    // 净重 (kg/件)

@@ -77,6 +77,9 @@ export default function InventoryPage() {
           <TableHeader>
             <TableRow>
               <TableHead>商品名称</TableHead>
+              <TableHead>HS编码</TableHead>
+              <TableHead className="max-w-[200px]">申报信息</TableHead>
+              <TableHead>单位</TableHead>
               <TableHead>数量</TableHead>
               <TableHead>当前状态</TableHead>
               <TableHead className="w-[100px]">操作</TableHead>
@@ -85,17 +88,22 @@ export default function InventoryPage() {
           <TableBody>
             {loading ? (
                <TableRow>
-                 <TableCell colSpan={4} className="text-center py-10">加载中...</TableCell>
+                 <TableCell colSpan={7} className="text-center py-10">加载中...</TableCell>
                </TableRow>
             ) : inventory.length === 0 ? (
                <TableRow>
-                 <TableCell colSpan={4} className="text-center py-10">暂无库存记录。</TableCell>
+                 <TableCell colSpan={7} className="text-center py-10">暂无库存记录。</TableCell>
                </TableRow>
             ) : (
               inventory.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.product?.customsName}</TableCell>
-                  <TableCell>{item.quantity} {item.product?.unit}</TableCell>
+                  <TableCell className="font-mono text-sm">{item.product?.hsCode || '-'}</TableCell>
+                  <TableCell className="max-w-[200px] truncate" title={item.product?.declaration || ''}>
+                    {item.product?.declaration || '-'}
+                  </TableCell>
+                  <TableCell>{item.product?.unit || '-'}</TableCell>
+                  <TableCell>{item.quantity}</TableCell>
                   <TableCell>{getStatusBadge(item.status)}</TableCell>
                   <TableCell>
                     <DropdownMenu>
