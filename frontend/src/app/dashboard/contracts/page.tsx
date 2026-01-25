@@ -10,7 +10,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PurchaseContract, SalesContract, PurchaseStatus, SalesStatus, PurchaseItem } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
@@ -76,6 +76,11 @@ export default function ContractsPage() {
   const [productSearch, setProductSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
   
+  // 分页状态
+  const [purchasePage, setPurchasePage] = useState(1);
+  const [salesPage, setSalesPage] = useState(1);
+  const PAGE_SIZE = 30;
+  
   // 同步URL参数变化
   useEffect(() => {
     setActiveTab(tabFromUrl);
@@ -89,6 +94,36 @@ export default function ContractsPage() {
   // 采购合同状态
   const [purchaseContracts, setPurchaseContracts] = useState<PurchaseContract[]>([]);
   const [purchaseLoading, setPurchaseLoading] = useState(true);
+  
+  // 计算筛选后的采购合同（用于分页显示）
+  const filteredPurchaseContracts = useMemo(() => {
+    let filtered = purchaseContracts;
+    if (purchaseStatusFilter && purchaseStatusFilter !== 'ALL') {
+      filtered = filtered.filter(c => c.status === purchaseStatusFilter);
+    }
+    if (storeFilter && storeFilter !== 'ALL') {
+      filtered = filtered.filter(c => c.storeName?.includes(storeFilter));
+    }
+    if (productSearch.trim()) {
+      const search = productSearch.trim().toLowerCase();
+      filtered = filtered.filter(c => {
+        const productName = c.items?.[0]?.product?.customsName || '';
+        return productName.toLowerCase().includes(search);
+      });
+    }
+    return filtered;
+  }, [purchaseContracts, purchaseStatusFilter, storeFilter, productSearch]);
+  
+  const purchaseTotalPages = Math.ceil(filteredPurchaseContracts.length / PAGE_SIZE);
+  const pagedPurchaseContracts = filteredPurchaseContracts.slice(
+    (purchasePage - 1) * PAGE_SIZE,
+    purchasePage * PAGE_SIZE
+  );
+  
+  // 筛选变化时重置页码
+  useEffect(() => {
+    setPurchasePage(1);
+  }, [purchaseStatusFilter, storeFilter, productSearch]);
   
   // 货柜（出口合同）状态
   const [salesContracts, setSalesContracts] = useState<SalesContract[]>([]);
@@ -120,7 +155,7 @@ export default function ContractsPage() {
   const loadPurchaseContracts = async () => {
     setPurchaseLoading(true);
     try {
-      const response = await purchaseService.getAll({ page: 1, pageSize: 100 });
+      const response = await purchaseService.getAll({ page: 1, pageSize: 200 }); // 加载更多数据，前端分页
       setPurchaseContracts(response.data?.items || []);
     } catch {
       toast.error('加载采购合同失败');
@@ -338,33 +373,14 @@ export default function ContractsPage() {
                       加载中...
                     </TableCell>
                   </TableRow>
-                ) : (() => {
-                  // 多条件筛选
-                  let filtered = purchaseContracts;
-                  // 状态筛选
-                  if (purchaseStatusFilter && purchaseStatusFilter !== 'ALL') {
-                    filtered = filtered.filter(c => c.status === purchaseStatusFilter);
-                  }
-                  // 发货店铺筛选
-                  if (storeFilter && storeFilter !== 'ALL') {
-                    filtered = filtered.filter(c => c.storeName?.includes(storeFilter));
-                  }
-                  // 商品名称搜索
-                  if (productSearch.trim()) {
-                    const search = productSearch.trim().toLowerCase();
-                    filtered = filtered.filter(c => {
-                      const productName = c.items?.[0]?.product?.customsName || '';
-                      return productName.toLowerCase().includes(search);
-                    });
-                  }
-                  return filtered.length === 0 ? (
+                ) : pagedPurchaseContracts.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
                       {(purchaseStatusFilter !== 'ALL' || storeFilter || productSearch) ? '没有符合筛选条件的合同' : '暂无采购合同'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((contract) => {
+                  pagedPurchaseContracts.map((contract) => {
                     const firstProduct = contract.items?.[0]?.product;
                     const productName = firstProduct?.customsName || '-';
                     return (
@@ -420,11 +436,38 @@ export default function ContractsPage() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  );})
-                )})()}
+                  )})
+                )}
               </TableBody>
             </Table>
           </div>
+          
+          {/* 分页控件 */}
+          {purchaseTotalPages > 1 && (
+            <div className="flex items-center justify-between py-4">
+              <div className="text-sm text-muted-foreground">
+                共 {filteredPurchaseContracts.length} 条，第 {purchasePage}/{purchaseTotalPages} 页
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPurchasePage(p => Math.max(1, p - 1))}
+                  disabled={purchasePage === 1}
+                >
+                  上一页
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPurchasePage(p => Math.min(purchaseTotalPages, p + 1))}
+                  disabled={purchasePage === purchaseTotalPages}
+                >
+                  下一页
+                </Button>
+              </div>
+            </div>
+          )}
         </TabsContent>
 
         {/* 出口合同Tab */}
