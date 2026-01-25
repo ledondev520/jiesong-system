@@ -118,6 +118,9 @@ model Product {
   specification String?  // 原文本规格（兼容历史数据）
   unit          String?
   categoryId    String?
+  // 海关申报信息
+  hsCode        String?  // HS编码（10位海关编码）
+  declaration   String?  // 申报要素（汇总）
   // 重量信息
   grossWeight   Float?   // 毛重 (kg/件)
   netWeight     Float?   // 净重 (kg/件)
