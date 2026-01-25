@@ -42,6 +42,14 @@ def extract_contract_info(doc_path):
             year, month, day = date_match.groups()
             signed_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
         
+        # 提取发货店铺
+        store = ""
+        store_match = re.search(r'发货店铺[为：:]+\s*([^。\n]+)', text)
+        if store_match:
+            store = store_match.group(1).strip()
+            # 清理店铺名称
+            store = store.rstrip('。')
+        
         # 提取供应商名称 - 从"乙方（供方）"后面
         supplier = ""
         supplier_match = re.search(r'乙方[（\(]供方[）\)][：:]\s*([^\n]+)', text)
@@ -171,6 +179,7 @@ def extract_contract_info(doc_path):
             "contract_no": contract_no,
             "supplier": supplier,
             "signed_date": signed_date,
+            "store": store,
             "products": products,
             "file_path": doc_path
         }
@@ -216,16 +225,18 @@ def main():
                                 "金额": product.get('total_price', 0),
                                 "合同编号": info['contract_no'],
                                 "签订日期": info.get('signed_date', ''),
+                                "发货店铺": info.get('store', ''),
                             })
                             total = product.get('total_price', 0)
-                            print(f"  + {product['product_name']} ({product['unit']}) ¥{total:.0f} [{info.get('signed_date', '')}]")
+                            store = info.get('store', '')
+                            print(f"  + {product['product_name']} ({product['unit']}) ¥{total:.0f} [{info.get('signed_date', '')}] -> {store}")
     
     # 按供应商名称排序
     all_records.sort(key=lambda x: x['供应商名称'])
     
     # 写入 CSV
     with open(OUTPUT_CSV, 'w', newline='', encoding='utf-8-sig') as f:
-        writer = csv.DictWriter(f, fieldnames=['供应商名称', '商品名称', '单位', '数量', '单价', '金额', '合同编号', '签订日期'])
+        writer = csv.DictWriter(f, fieldnames=['供应商名称', '商品名称', '单位', '数量', '单价', '金额', '合同编号', '签订日期', '发货店铺'])
         writer.writeheader()
         writer.writerows(all_records)
     

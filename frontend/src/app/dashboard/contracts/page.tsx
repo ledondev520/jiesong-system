@@ -493,6 +493,9 @@ export default function ContractsPage() {
                   供应商：{purchaseDetail.supplier?.name || '未知'}
                   {' | '}
                   {purchaseDetail.signedAt ? `签订日期：${format(new Date(purchaseDetail.signedAt), 'yyyy-MM-dd')}` : '未设置签订日期'}
+                  {purchaseDetail.storeName && (
+                    <> | 发货店铺：{purchaseDetail.storeName}</>
+                  )}
                 </DialogDescription>
               </DialogHeader>
               

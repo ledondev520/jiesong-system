@@ -129,6 +129,7 @@ async function main() {
       contractMap.set(contractNo, { 
         supplier: r['供应商名称'], 
         signedAt: r['签订日期'] || '',
+        storeName: r['发货店铺'] || '',
         products: [],
         totalAmount: 0,
       });
@@ -248,6 +249,7 @@ async function main() {
         signedAt,
         totalAmount: data.totalAmount || 0,
         paidAmount: data.totalAmount || 0, // 假设已完成的合同已付款
+        storeName: data.storeName || null,
         taxRate: 13,
       },
     });

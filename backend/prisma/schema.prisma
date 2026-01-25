@@ -195,6 +195,7 @@ model PurchaseContract {
   signedAt     DateTime?
   expectedDate DateTime?
   invoiceNo    String?
+  storeName    String?  // 发货店铺名称
   note         String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

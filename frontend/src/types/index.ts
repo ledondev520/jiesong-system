@@ -123,6 +123,7 @@ export interface PurchaseContract {
   signedAt?: string;
   expectedDate?: string;
   invoiceNo?: string;
+  storeName?: string;  // 发货店铺名称
   note?: string;
   createdAt: string;
   updatedAt: string;
