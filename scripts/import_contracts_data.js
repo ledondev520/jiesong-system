@@ -126,7 +126,11 @@ async function main() {
     
     const contractNo = r['合同编号'];
     if (!contractMap.has(contractNo)) {
-      contractMap.set(contractNo, { supplier: r['供应商名称'], products: [] });
+      contractMap.set(contractNo, { 
+        supplier: r['供应商名称'], 
+        signedAt: r['签订日期'] || '',
+        products: [] 
+      });
     }
     contractMap.get(contractNo).products.push({
       name: r['商品名称'],
@@ -220,13 +224,19 @@ async function main() {
     const supplierId = supplierIdMap.get(data.supplier);
     if (!supplierId) continue;
     
+    // 解析签订日期
+    let signedAt = new Date();
+    if (data.signedAt && /^\d{4}-\d{2}-\d{2}$/.test(data.signedAt)) {
+      signedAt = new Date(data.signedAt);
+    }
+    
     // 创建采购合同
     const contract = await prisma.purchaseContract.create({
       data: {
         contractNo,
         supplierId,
         status: 'COMPLETED',
-        signedAt: new Date(),
+        signedAt,
         totalAmount: 0,
         paidAmount: 0,
         taxRate: 13,

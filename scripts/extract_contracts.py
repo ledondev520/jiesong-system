@@ -35,6 +35,13 @@ def extract_contract_info(doc_path):
             contract_no_match = re.search(r'合同编号[：:]\s*(CG\d+)', text)
         contract_no = contract_no_match.group(1) if contract_no_match else ""
         
+        # 提取签订日期
+        signed_date = ""
+        date_match = re.search(r'签订日期[：:]\s*(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日', text)
+        if date_match:
+            year, month, day = date_match.groups()
+            signed_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+        
         # 提取供应商名称 - 从"乙方（供方）"后面
         supplier = ""
         supplier_match = re.search(r'乙方[（\(]供方[）\)][：:]\s*([^\n]+)', text)
@@ -110,6 +117,7 @@ def extract_contract_info(doc_path):
         return {
             "contract_no": contract_no,
             "supplier": supplier,
+            "signed_date": signed_date,
             "products": products,
             "file_path": doc_path
         }
@@ -151,15 +159,16 @@ def main():
                                 "商品名称": product['product_name'],
                                 "单位": product['unit'],
                                 "合同编号": info['contract_no'],
+                                "签订日期": info.get('signed_date', ''),
                             })
-                            print(f"  + {product['product_name']} ({product['unit']})")
+                            print(f"  + {product['product_name']} ({product['unit']}) [{info.get('signed_date', '')}]")
     
     # 按供应商名称排序
     all_records.sort(key=lambda x: x['供应商名称'])
     
     # 写入 CSV
     with open(OUTPUT_CSV, 'w', newline='', encoding='utf-8-sig') as f:
-        writer = csv.DictWriter(f, fieldnames=['供应商名称', '商品名称', '单位', '合同编号'])
+        writer = csv.DictWriter(f, fieldnames=['供应商名称', '商品名称', '单位', '合同编号', '签订日期'])
         writer.writeheader()
         writer.writerows(all_records)
     
