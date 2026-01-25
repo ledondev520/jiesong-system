@@ -73,6 +73,8 @@ export default function ContractsPage() {
   // 筛选状态
   const [purchaseStatusFilter, setPurchaseStatusFilter] = useState(statusFromUrl);
   const [salesStatusFilter, setSalesStatusFilter] = useState(statusFromUrl);
+  const [productSearch, setProductSearch] = useState('');
+  const [storeFilter, setStoreFilter] = useState('');
   
   // 同步URL参数变化
   useEffect(() => {
@@ -257,12 +259,13 @@ export default function ContractsPage() {
 
         {/* 采购合同Tab */}
         <TabsContent value="purchase" className="space-y-4">
-          <div className="flex justify-between items-center gap-4">
-            {/* 状态筛选 */}
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap justify-between items-center gap-4">
+            {/* 筛选区域 */}
+            <div className="flex flex-wrap items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
+              {/* 状态筛选 */}
               <Select value={purchaseStatusFilter} onValueChange={setPurchaseStatusFilter}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-[130px]">
                   <SelectValue placeholder="全部状态" />
                 </SelectTrigger>
                 <SelectContent>
@@ -275,10 +278,37 @@ export default function ContractsPage() {
                   <SelectItem value="COMPLETED">已完成</SelectItem>
                 </SelectContent>
               </Select>
-              {purchaseStatusFilter && purchaseStatusFilter !== 'ALL' && (
-                <Badge variant="secondary">
-                  筛选中: {purchaseContracts.filter(c => c.status === purchaseStatusFilter).length} 条
-                </Badge>
+              {/* 发货店铺筛选 */}
+              <Select value={storeFilter} onValueChange={setStoreFilter}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="全部店铺" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">全部店铺</SelectItem>
+                  {Array.from(new Set(purchaseContracts.filter(c => c.storeName).map(c => c.storeName!))).sort().map(store => (
+                    <SelectItem key={store} value={store}>{store}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {/* 商品搜索 */}
+              <Input
+                placeholder="搜索商品名称..."
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                className="w-[160px]"
+              />
+              {(purchaseStatusFilter !== 'ALL' || storeFilter || productSearch) && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    setPurchaseStatusFilter('ALL');
+                    setStoreFilter('');
+                    setProductSearch('');
+                  }}
+                >
+                  清除筛选
+                </Button>
               )}
             </div>
             <Button onClick={() => router.push('/dashboard/purchase/create')}>
@@ -293,6 +323,7 @@ export default function ContractsPage() {
                   <TableHead>合同编号</TableHead>
                   <TableHead>商品名称</TableHead>
                   <TableHead>供应商</TableHead>
+                  <TableHead>发货店铺</TableHead>
                   <TableHead>签订日期</TableHead>
                   <TableHead>状态</TableHead>
                   <TableHead className="text-right">总金额 (¥)</TableHead>
@@ -303,18 +334,33 @@ export default function ContractsPage() {
               <TableBody>
                 {purchaseLoading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
                       加载中...
                     </TableCell>
                   </TableRow>
                 ) : (() => {
-                  const filtered = purchaseStatusFilter && purchaseStatusFilter !== 'ALL'
-                    ? purchaseContracts.filter(c => c.status === purchaseStatusFilter)
-                    : purchaseContracts;
+                  // 多条件筛选
+                  let filtered = purchaseContracts;
+                  // 状态筛选
+                  if (purchaseStatusFilter && purchaseStatusFilter !== 'ALL') {
+                    filtered = filtered.filter(c => c.status === purchaseStatusFilter);
+                  }
+                  // 发货店铺筛选
+                  if (storeFilter && storeFilter !== 'ALL') {
+                    filtered = filtered.filter(c => c.storeName?.includes(storeFilter));
+                  }
+                  // 商品名称搜索
+                  if (productSearch.trim()) {
+                    const search = productSearch.trim().toLowerCase();
+                    filtered = filtered.filter(c => {
+                      const productName = c.items?.[0]?.product?.customsName || '';
+                      return productName.toLowerCase().includes(search);
+                    });
+                  }
                   return filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
-                      {purchaseStatusFilter && purchaseStatusFilter !== 'ALL' ? '没有符合筛选条件的合同' : '暂无采购合同'}
+                    <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
+                      {(purchaseStatusFilter !== 'ALL' || storeFilter || productSearch) ? '没有符合筛选条件的合同' : '暂无采购合同'}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -337,6 +383,9 @@ export default function ContractsPage() {
                         {contract.supplier?.hasQualityIssue && (
                           <Badge variant="destructive" className="ml-2 text-xs">质量问题</Badge>
                         )}
+                      </TableCell>
+                      <TableCell className="max-w-[120px] truncate" title={contract.storeName || ''}>
+                        {contract.storeName || '-'}
                       </TableCell>
                       <TableCell>
                         {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}
