@@ -45,10 +45,10 @@ import { ArrowLeft, Plus, Pencil, Trash, Ship, Package, Weight, Box } from 'luci
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
-// 40HQ 标准货柜规格
+// 40HQ 标准货柜规格（厂家建议值）
 const CONTAINER_40HQ = {
-  maxVolume: 76,      // CBM
-  maxWeight: 26740,   // kg (载重)
+  maxVolume: 68,      // CBM（厂家建议最大装载体积）
+  maxWeight: 22500,   // kg (厂家建议最大毛重 22.5吨)
   length: 12.03,      // m
   width: 2.35,        // m
   height: 2.69,       // m
@@ -252,7 +252,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
               体积利用率
             </CardTitle>
             <CardDescription>
-              40HQ 标准柜最大容积: {CONTAINER_40HQ.maxVolume} CBM
+              40HQ 建议装载体积: {CONTAINER_40HQ.maxVolume} CBM（厂家建议）
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -279,7 +279,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
               载重利用率
             </CardTitle>
             <CardDescription>
-              40HQ 标准柜最大载重: {CONTAINER_40HQ.maxWeight.toLocaleString()} kg
+              40HQ 建议最大毛重: {CONTAINER_40HQ.maxWeight.toLocaleString()} kg（厂家建议）
             </CardDescription>
           </CardHeader>
           <CardContent>

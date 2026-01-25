@@ -89,7 +89,7 @@ export default function DashboardPage() {
     fetchStats();
   }, []);
 
-  // 快速录入入口配置
+  // 快速录入入口配置（采购 + 销售/货柜）
   const quickActions = [
     { 
       label: '新建采购', 
@@ -103,14 +103,7 @@ export default function DashboardPage() {
       icon: TrendingUp, 
       href: '/dashboard/sales/create',
       color: 'bg-green-500 hover:bg-green-600',
-      desc: '创建出口合同'
-    },
-    { 
-      label: '新建货柜', 
-      icon: Ship, 
-      href: '/dashboard/inventory-container?tab=container',
-      color: 'bg-orange-500 hover:bg-orange-600',
-      desc: '创建货柜装箱'
+      desc: '创建出口合同（即货柜）'
     },
   ];
 
@@ -153,13 +146,13 @@ export default function DashboardPage() {
     { 
       label: '待发货柜', 
       count: stats?.recent?.containers?.filter(c => c.status === 'PENDING').length || 0, 
-      href: '/dashboard/inventory-container?tab=container',
+      href: '/dashboard/contracts?tab=sales',
       icon: Ship,
     },
     { 
       label: '库存待入库', 
       count: stats?.overview?.inventories || 0, 
-      href: '/dashboard/inventory-container?tab=inventory',
+      href: '/dashboard/inventory-container',
       icon: Warehouse,
     },
   ];
@@ -182,7 +175,7 @@ export default function DashboardPage() {
           <CardDescription>一键开始录入新数据</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2">
             {quickActions.map((action) => {
               const Icon = action.icon;
               return (
@@ -292,7 +285,7 @@ export default function DashboardPage() {
                 <Container className="h-4 w-4 text-orange-500" />
                 最近货柜
               </CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard/inventory-container?tab=container')}>
+              <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard/contracts?tab=sales')}>
                 查看全部 <ArrowRight className="ml-1 h-3 w-3" />
               </Button>
             </div>

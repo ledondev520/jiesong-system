@@ -149,28 +149,29 @@ export function Header() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 处理结果点击 - 跳转到列表页并自动筛选
+  // 处理结果点击 - 所有合同类直接跳转详情页，商品/供应商跳转列表页筛选
   const handleResultClick = (result: SearchResult) => {
     setShowResults(false);
     setSearchQuery('');
     
-    // 所有类型都跳转到列表页并带上关键字筛选
-    const keyword = encodeURIComponent(result.title);
     switch (result.type) {
       case 'product':
-        router.push(`/dashboard/products?keyword=${keyword}`);
+        router.push(`/dashboard/products?keyword=${encodeURIComponent(result.title)}`);
         break;
       case 'supplier':
-        router.push(`/dashboard/suppliers?keyword=${keyword}`);
+        router.push(`/dashboard/suppliers?keyword=${encodeURIComponent(result.title)}`);
         break;
       case 'container':
-        router.push(`/dashboard/containers?keyword=${keyword}`);
+        // 货柜直接跳转到详情页
+        router.push(`/dashboard/containers/${result.id}`);
         break;
       case 'purchase':
-        router.push(`/dashboard/purchase?keyword=${keyword}`);
+        // 采购合同直接跳转到详情页
+        router.push(`/dashboard/purchase/${result.id}`);
         break;
       case 'sales':
-        router.push(`/dashboard/sales?keyword=${keyword}`);
+        // 销售合同直接跳转到详情页
+        router.push(`/dashboard/sales/${result.id}`);
         break;
     }
   };
@@ -290,8 +291,9 @@ export function Header() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>个人设置</DropdownMenuItem>
-            <DropdownMenuItem>系统帮助</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push('/dashboard/settings')}>
+              个人设置
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => {
               logout();

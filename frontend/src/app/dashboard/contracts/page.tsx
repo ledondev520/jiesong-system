@@ -1,7 +1,9 @@
 /**
  * Input: 采购合同服务、销售合同服务
- * Output: 合同管理页面（采购+销售 Tab切换）
- * Pos: 核心业务页面，管理所有合同
+ * Output: 合同管理页面（采购合同 + 出口合同 Tab切换）
+ * Pos: 核心业务页面，管理采购合同和出口合同
+ * 
+ * 架构说明：出口合同与货柜一对一关系，每个 EXP 编号的出口合同即为一个货柜
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -10,7 +12,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { PurchaseContract, SalesContract, PurchaseStatus, SalesStatus, SalesItem, PurchaseItem } from '@/types';
+import { PurchaseContract, SalesContract, PurchaseStatus, SalesStatus, PurchaseItem } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
 import { salesService } from '@/services/sales.service';
 import { Button } from '@/components/ui/button';
@@ -32,17 +34,15 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Eye, FileText, TrendingUp, ShoppingCart, Package, Loader2, FileDown } from 'lucide-react';
+import Link from 'next/link';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { contractDocService } from '@/services/contractDoc.service';
+import { PORTS } from '@/lib/constants';
 
-// 扩展类型，包含商品明细
-interface SalesContractDetail extends SalesContract {
-  items?: SalesItem[];
-}
-
+// 扩展类型
 interface PurchaseContractDetail extends PurchaseContract {
   items?: PurchaseItem[];
 }
@@ -50,8 +50,8 @@ interface PurchaseContractDetail extends PurchaseContract {
 /**
  * 职责：渲染合同管理页面
  * 思路：
- *   1. 使用Tab切换采购/销售合同
- *   2. 分别加载和展示两类合同
+ *   1. 使用Tab切换采购合同/出口合同
+ *   2. 出口合同与货柜一对一（EXP编号即货柜编号）
  *   3. 提供快速新建入口
  */
 export default function ContractsPage() {
@@ -71,14 +71,13 @@ export default function ContractsPage() {
   const [purchaseContracts, setPurchaseContracts] = useState<PurchaseContract[]>([]);
   const [purchaseLoading, setPurchaseLoading] = useState(true);
   
-  // 销售合同状态
+  // 货柜（出口合同）状态
   const [salesContracts, setSalesContracts] = useState<SalesContract[]>([]);
   const [salesLoading, setSalesLoading] = useState(true);
   
-  // 详情弹窗状态
+  // 采购详情弹窗状态
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [salesDetail, setSalesDetail] = useState<SalesContractDetail | null>(null);
   const [purchaseDetail, setPurchaseDetail] = useState<PurchaseContractDetail | null>(null);
   
   // 生成合同文档弹窗状态
@@ -89,7 +88,7 @@ export default function ContractsPage() {
     storeName: '',
     deliveryAddress: '',
     deliveryContact: '',
-    depositRate: '30', // 首付比例，默认30%
+    depositRate: '30',
   });
 
   // 0. 初始化加载
@@ -111,38 +110,22 @@ export default function ContractsPage() {
     }
   };
 
-  // 2. 加载销售合同
+  // 2. 加载货柜（出口合同）列表
   const loadSalesContracts = async () => {
     setSalesLoading(true);
     try {
       const response = await salesService.getAll({ page: 1, pageSize: 100 });
       setSalesContracts(response.data?.items || []);
     } catch {
-      toast.error('加载销售合同失败');
+      toast.error('加载货柜列表失败');
     } finally {
       setSalesLoading(false);
     }
   };
 
-  // 3. 查看销售合同详情
-  const viewSalesDetail = async (id: string) => {
-    setDetailLoading(true);
-    setPurchaseDetail(null);
-    setDetailOpen(true);
-    try {
-      const response = await salesService.getById(id);
-      setSalesDetail(response.data || null);
-    } catch {
-      toast.error('加载合同详情失败');
-    } finally {
-      setDetailLoading(false);
-    }
-  };
-
-  // 4. 查看采购合同详情
+  // 3. 查看采购合同详情
   const viewPurchaseDetail = async (id: string) => {
     setDetailLoading(true);
-    setSalesDetail(null);
     setDetailOpen(true);
     try {
       const response = await purchaseService.getById(id);
@@ -154,14 +137,14 @@ export default function ContractsPage() {
     }
   };
 
-  // 5. 打开生成合同文档弹窗
+  // 4. 打开生成合同文档弹窗
   const openGenerateDialog = (purchaseId: string) => {
     setSelectedPurchaseId(purchaseId);
     setGenerateForm({ storeName: '', deliveryAddress: '', deliveryContact: '', depositRate: '30' });
     setGenerateOpen(true);
   };
 
-  // 6. 生成购销合同文档
+  // 5. 生成购销合同文档
   const handleGenerateContract = async () => {
     if (!selectedPurchaseId) return;
     
@@ -172,7 +155,6 @@ export default function ContractsPage() {
         generateForm
       );
       
-      // 下载文件
       const contract = purchaseContracts.find(c => c.id === selectedPurchaseId);
       const filename = `购销合同${contract?.contractNo?.replace('PO', 'CG') || ''}.docx`;
       contractDocService.downloadDocument(blob, filename);
@@ -190,14 +172,13 @@ export default function ContractsPage() {
   // 关闭弹窗时清理状态
   const closeDetail = () => {
     setDetailOpen(false);
-    setSalesDetail(null);
     setPurchaseDetail(null);
   };
 
-  // 计算销售合同的成本价总额（人民币）
-  const calculateCostTotal = (items: SalesItem[] | undefined) => {
-    if (!items) return 0;
-    return items.reduce((sum, item) => sum + (item.costPrice * item.quantity), 0);
+  // 获取港口名称
+  const getPortName = (portId: string | undefined | null) => {
+    if (!portId) return '未指定';
+    return PORTS.find(p => p.id === portId)?.name || '未知港口';
   };
 
   /**
@@ -218,17 +199,17 @@ export default function ContractsPage() {
   };
 
   /**
-   * 获取销售状态徽章
+   * 获取货柜状态徽章
    */
   const getSalesStatusBadge = (status: SalesStatus) => {
     const statusMap: Record<SalesStatus, { label: string; className: string }> = {
-      [SalesStatus.DRAFT]: { label: '草稿', className: 'bg-gray-100 text-gray-800' },
-      [SalesStatus.CONFIRMED]: { label: '已确认', className: 'bg-blue-100 text-blue-800' },
-      [SalesStatus.PACKING]: { label: '装箱中', className: 'bg-yellow-100 text-yellow-800' },
-      [SalesStatus.SHIPPED]: { label: '已发货', className: 'bg-purple-100 text-purple-800' },
-      [SalesStatus.ARRIVED]: { label: '已到达', className: 'bg-green-100 text-green-800' },
-      [SalesStatus.COMPLETED]: { label: '已完成', className: 'bg-gray-500 text-white' },
-      [SalesStatus.CANCELLED]: { label: '已取消', className: 'bg-red-100 text-red-800' },
+      [SalesStatus.DRAFT]: { label: '草稿', className: '' },
+      [SalesStatus.CONFIRMED]: { label: '已确认', className: 'bg-blue-500' },
+      [SalesStatus.PACKING]: { label: '装柜中', className: 'bg-yellow-500' },
+      [SalesStatus.SHIPPED]: { label: '已发运', className: 'bg-purple-500' },
+      [SalesStatus.ARRIVED]: { label: '已到达', className: 'bg-green-500' },
+      [SalesStatus.COMPLETED]: { label: '已完成', className: 'bg-gray-500' },
+      [SalesStatus.CANCELLED]: { label: '已取消', className: 'bg-red-500' },
     };
     const config = statusMap[status] || { label: status, className: '' };
     return <Badge className={config.className}>{config.label}</Badge>;
@@ -294,7 +275,6 @@ export default function ContractsPage() {
                   </TableRow>
                 ) : (
                   purchaseContracts.map((contract) => {
-                    // 获取第一个商品名称
                     const firstProduct = contract.items?.[0]?.product;
                     const productName = firstProduct?.customsName || '-';
                     return (
@@ -331,7 +311,7 @@ export default function ContractsPage() {
                           <Button 
                             variant="ghost" 
                             size="icon"
-                            onClick={() => viewPurchaseDetail(contract.id)}
+                            onClick={() => router.push(`/dashboard/purchase/${contract.id}`)}
                             title="查看详情"
                           >
                             <Eye className="h-4 w-4" />
@@ -354,7 +334,7 @@ export default function ContractsPage() {
           </div>
         </TabsContent>
 
-        {/* 销售合同Tab */}
+        {/* 出口合同Tab */}
         <TabsContent value="sales" className="space-y-4">
           <div className="flex justify-end">
             <Button onClick={() => router.push('/dashboard/sales/create')}>
@@ -367,67 +347,51 @@ export default function ContractsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>合同编号</TableHead>
-                  <TableHead>签订日期</TableHead>
+                  <TableHead>目的港口</TableHead>
                   <TableHead>状态</TableHead>
-                  <TableHead className="text-right">成本价 (¥)</TableHead>
-                  <TableHead className="text-right">售价 ($)</TableHead>
-                  <TableHead className="text-right">已收 ($)</TableHead>
+                  <TableHead>签订日期</TableHead>
+                  <TableHead>箱数/体积</TableHead>
+                  <TableHead className="text-right">金额 ($)</TableHead>
                   <TableHead className="w-[80px]">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {salesLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                      加载中...
-                    </TableCell>
-                  </TableRow>
+                   <TableRow>
+                     <TableCell colSpan={7} className="text-center py-10">加载中...</TableCell>
+                   </TableRow>
                 ) : salesContracts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
-                      暂无出口合同
-                    </TableCell>
-                  </TableRow>
+                   <TableRow>
+                     <TableCell colSpan={7} className="text-center py-10">暂无出口合同</TableCell>
+                   </TableRow>
                 ) : (
-                  salesContracts.map((contract) => {
-                    // 计算成本价（如果有items）
-                    const costTotal = calculateCostTotal(contract.items);
-                    return (
-                      <TableRow key={contract.id}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                            {contract.contractNo}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}
-                        </TableCell>
-                        <TableCell>{getSalesStatusBadge(contract.status)}</TableCell>
-                        <TableCell className="text-right font-medium text-orange-600">
-                          ¥{costTotal.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right font-medium text-green-600">
-                          ${contract.totalAmount.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className={contract.receivedAmount < contract.totalAmount ? 'text-orange-600' : 'text-green-600'}>
-                            ${contract.receivedAmount.toLocaleString()}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => viewSalesDetail(contract.id)}
-                            title="查看详情"
-                          >
+                  salesContracts.map((contract) => (
+                    <TableRow key={contract.id}>
+                      <TableCell className="font-medium flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                        {contract.contractNo}
+                      </TableCell>
+                      <TableCell>{getPortName(contract.portId)}</TableCell>
+                      <TableCell>{getSalesStatusBadge(contract.status)}</TableCell>
+                      <TableCell>
+                        {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">{contract.totalBoxes || 0} 箱</div>
+                        <div className="text-xs text-muted-foreground">{(contract.volume || 0).toFixed(2)} CBM</div>
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-green-600">
+                        ${contract.totalAmount.toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <Link href={`/dashboard/sales/${contract.id}`}>
+                          <Button variant="ghost" size="icon" title="查看详情">
                             <Eye className="h-4 w-4" />
                           </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>
@@ -435,7 +399,7 @@ export default function ContractsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* 合同详情弹窗 */}
+      {/* 采购合同详情弹窗 */}
       <Dialog open={detailOpen} onOpenChange={closeDetail}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           {detailLoading ? (
@@ -445,96 +409,6 @@ export default function ContractsPage() {
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             </DialogHeader>
-          ) : salesDetail ? (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  出口合同详情：{salesDetail.contractNo}
-                </DialogTitle>
-                <DialogDescription>
-                  {salesDetail.signedAt ? `签订日期：${format(new Date(salesDetail.signedAt), 'yyyy-MM-dd')}` : '未设置签订日期'}
-                  {' | '}状态：{getSalesStatusBadge(salesDetail.status)}
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="space-y-4">
-                {/* 金额汇总 */}
-                <div className="grid grid-cols-3 gap-4 p-4 bg-muted rounded-lg">
-                  <div>
-                    <p className="text-sm text-muted-foreground">成本价（人民币）</p>
-                    <p className="text-xl font-bold text-orange-600">
-                      ¥{calculateCostTotal(salesDetail.items).toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">售价（美元）</p>
-                    <p className="text-xl font-bold text-green-600">
-                      ${salesDetail.totalAmount.toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">已收款</p>
-                    <p className="text-xl font-bold">
-                      ${salesDetail.receivedAmount.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-                
-                {/* 商品明细 */}
-                <div>
-                  <h4 className="font-medium mb-2 flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    商品明细
-                  </h4>
-                  {salesDetail.items && salesDetail.items.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>商品名称</TableHead>
-                          <TableHead>数量</TableHead>
-                          <TableHead className="text-right">成本价 (¥)</TableHead>
-                          <TableHead className="text-right">售价 ($)</TableHead>
-                          <TableHead>门店</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {salesDetail.items.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell className="font-medium">
-                              {item.product?.customsName || '未知商品'}
-                            </TableCell>
-                            <TableCell>
-                              {item.quantity} {item.unit || item.product?.unit}
-                            </TableCell>
-                            <TableCell className="text-right text-orange-600">
-                              ¥{item.costPrice.toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-right text-green-600">
-                              ${item.sellingPrice.toLocaleString()}
-                            </TableCell>
-                            <TableCell>
-                              {item.store?.name || '-'}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  ) : (
-                    <p className="text-center py-4 text-muted-foreground">
-                      暂无商品明细
-                    </p>
-                  )}
-                </div>
-                
-                {/* 备注 */}
-                {salesDetail.note && (
-                  <div className="p-3 bg-muted rounded">
-                    <p className="text-sm text-muted-foreground">备注：{salesDetail.note}</p>
-                  </div>
-                )}
-              </div>
-            </>
           ) : purchaseDetail ? (
             <>
               <DialogHeader>

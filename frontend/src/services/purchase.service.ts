@@ -22,6 +22,14 @@ export const purchaseService = {
     return api.delete<any, ApiResponse<void>>(`/purchases/${id}`);
   },
 
+  /**
+   * 职责：获取下一个采购合同编号
+   * @returns 格式为 CG + 年份(2位) + 序号(5位)，如 CG2500001
+   */
+  getNextContractNo: async () => {
+    return api.get<any, ApiResponse<{ contractNo: string }>>('/purchases/options/next-no');
+  },
+
   // Mock AI Parse
   parseQuote: async (text: string) => {
     // In real app, this calls /api/ai/parse

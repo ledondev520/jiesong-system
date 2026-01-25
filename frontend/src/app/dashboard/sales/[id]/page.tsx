@@ -229,8 +229,8 @@ export default function SalesDetailPage({ params }: PageProps) {
   const volumePercent = Math.min((volumeUsed / (CONTAINER_40HQ.length * CONTAINER_40HQ.width * CONTAINER_40HQ.height / 1e9)) * 100, 100);
   const weightPercent = Math.min((weightUsed / CONTAINER_40HQ.maxWeight) * 100, 100);
   
-  // 计算 CBM
-  const maxCBM = 76;
+  // 计算 CBM（使用厂家建议值）
+  const maxCBM = CONTAINER_40HQ.maxVolume;
   const usedCBM = volumeUsed;
   const cbmPercent = Math.min((usedCBM / maxCBM) * 100, 100);
 

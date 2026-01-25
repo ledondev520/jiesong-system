@@ -68,4 +68,21 @@ export const contractDocService = {
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
   },
+
+  /**
+   * 获取采购合同的PDF文档（用于预览）
+   * @param purchaseContractId - 采购合同ID
+   * @returns Blob | null - PDF Blob 或 null
+   */
+  getContractPdf: async (purchaseContractId: string): Promise<Blob | null> => {
+    try {
+      const response = await api.get(
+        `/contract-doc/pdf/${purchaseContractId}`,
+        { responseType: 'blob' }
+      );
+      return response as unknown as Blob;
+    } catch {
+      return null;
+    }
+  },
 };

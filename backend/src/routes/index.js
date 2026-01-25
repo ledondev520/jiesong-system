@@ -3,7 +3,7 @@
  * Output: 统一路由挂载点
  * Pos: 路由入口，注册所有API路由
  * 
- * 2026-01-20 重构：移除 containers 路由，功能已合并到 sales
+ * 架构说明：货柜功能已合并到 sales（出口合同），每个 EXP 编号即为货柜标识
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -17,7 +17,7 @@ const storeRoutes = require('./stores');
 const productRoutes = require('./products');
 const purchaseRoutes = require('./purchases');
 const salesRoutes = require('./sales');
-// const containerRoutes = require('./containers'); // 已废弃，功能合并到 sales
+// 注意：Container 已合并到 SalesContract，不再单独使用
 const inventoryRoutes = require('./inventory');
 const financeRoutes = require('./finance');
 const systemRoutes = require('./system');
@@ -39,8 +39,7 @@ router.use('/suppliers', supplierRoutes);
 router.use('/stores', storeRoutes);
 router.use('/products', productRoutes);
 router.use('/purchases', purchaseRoutes);
-router.use('/sales', salesRoutes);       // 出口合同管理（含装箱功能）
-// router.use('/containers', containerRoutes); // 已废弃
+router.use('/sales', salesRoutes);       // 出口合同管理（含货柜/装箱功能）
 router.use('/inventory', inventoryRoutes);
 router.use('/finance', financeRoutes);
 router.use('/system', systemRoutes);

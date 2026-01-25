@@ -6,12 +6,13 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-// 40HQ 标准货柜内部尺寸（毫米）
+// 40HQ 标准货柜内部尺寸（毫米）及厂家建议限制
 export const CONTAINER_40HQ = {
   length: 12030,  // 长度 (mm)
   width: 2350,    // 宽度 (mm)
   height: 2690,   // 高度 (mm)
-  maxWeight: 26740, // 最大载重 (kg)
+  maxVolume: 68,  // 厂家建议最大装载体积 (CBM)
+  maxWeight: 22500, // 厂家建议最大毛重 (kg) = 22.5吨
 };
 
 // 箱子接口
