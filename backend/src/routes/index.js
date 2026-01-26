@@ -26,6 +26,7 @@ const userRoutes = require('./users');
 const dataImportRoutes = require('./dataImport');
 const dashboardRoutes = require('./dashboard');
 const contractDocRoutes = require('./contractDoc');
+const storeRecommendRoutes = require('./storeRecommend');
 
 const router = Router();
 
@@ -48,5 +49,6 @@ router.use('/users', userRoutes);
 router.use('/import', dataImportRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/contract-doc', contractDocRoutes);  // 合同文档生成
+router.use('/store-recommend', storeRecommendRoutes);  // 门店采购建议
 
 module.exports = router;

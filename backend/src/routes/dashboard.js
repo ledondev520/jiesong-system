@@ -20,4 +20,7 @@ router.get('/stats', dashboardController.getStats);
 // GET /api/v1/dashboard/track-product - 商品追踪查询
 router.get('/track-product', dashboardController.trackProduct);
 
+// GET /api/v1/dashboard/analytics - 数据看板详细分析
+router.get('/analytics', dashboardController.getAnalytics);
+
 module.exports = router;

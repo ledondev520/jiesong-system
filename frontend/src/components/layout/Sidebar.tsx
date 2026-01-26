@@ -19,6 +19,7 @@ import {
   Settings,
   LogOut,
   Ship,
+  Store,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,7 @@ const navItems = [
   { href: '/dashboard/sales', label: '出口合同', icon: Ship },
   { href: '/dashboard/inventory-container', label: '库存状态', icon: Warehouse },
   { href: '/dashboard/payments', label: '收付款', icon: DollarSign },
+  { href: '/dashboard/store-recommend', label: '采购建议', icon: Store },
   { href: '/dashboard/settings', label: '设置', icon: Settings },
 ];
 

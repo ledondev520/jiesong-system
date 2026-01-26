@@ -230,7 +230,157 @@ const trackProduct = async (req, res, next) => {
   }
 };
 
+/**
+ * 职责：获取数据看板详细分析数据
+ * 思路：提供合同统计、应收账款、库存概览、出货趋势等
+ */
+const getAnalytics = async (req, res, next) => {
+  try {
+    // 1. 合同统计
+    const [purchaseStats, salesStats] = await Promise.all([
+      prisma.purchaseContract.aggregate({
+        _count: true,
+        _sum: { totalAmount: true, paidAmount: true },
+      }),
+      prisma.salesContract.aggregate({
+        _count: true,
+        _sum: { totalAmount: true, receivedAmount: true },
+      }),
+    ]);
+
+    // 2. 应收账款（待收美金）
+    const receivable = (salesStats._sum.totalAmount || 0) - (salesStats._sum.receivedAmount || 0);
+    
+    // 3. 库存概览
+    const [inventoryStats, productCount] = await Promise.all([
+      prisma.inventory.aggregate({
+        _count: true,
+        _sum: { quantity: true },
+      }),
+      prisma.product.count(),
+    ]);
+
+    // 4. 按月出货统计（最近6个月）
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    
+    const monthlyShipments = await prisma.salesContract.groupBy({
+      by: ['status'],
+      where: {
+        shippedAt: { gte: sixMonthsAgo },
+        status: { in: ['SHIPPED', 'ARRIVED', 'COMPLETED'] },
+      },
+      _count: true,
+      _sum: { totalAmount: true, totalBoxes: true },
+    });
+
+    // 获取按月统计的出口合同（使用签订日期signedAt作为出货月份）
+    const contracts = await prisma.salesContract.findMany({
+      where: {
+        signedAt: { not: null, gte: sixMonthsAgo },
+      },
+      select: { signedAt: true, totalAmount: true, totalBoxes: true },
+    });
+    
+    // 按月聚合
+    const monthMap = new Map();
+    contracts.forEach(c => {
+      if (c.signedAt) {
+        const month = c.signedAt.toISOString().substring(0, 7);
+        if (!monthMap.has(month)) {
+          monthMap.set(month, { month, count: 0, amount: 0, boxes: 0 });
+        }
+        const m = monthMap.get(month);
+        m.count++;
+        m.amount += c.totalAmount || 0;
+        m.boxes += c.totalBoxes || 0;
+      }
+    });
+    const salesByMonth = Array.from(monthMap.values()).sort((a, b) => b.month.localeCompare(a.month));
+
+    // 5. 热门采购商品（Top 10）
+    const topProducts = await prisma.packingItem.groupBy({
+      by: ['productId'],
+      _sum: { quantity: true, totalPrice: true },
+      _count: true,
+      orderBy: { _count: { productId: 'desc' } },
+      take: 10,
+    });
+
+    // 获取商品名称
+    const productIds = topProducts.map(p => p.productId);
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, customsName: true },
+    });
+    const productMap = new Map(products.map(p => [p.id, p.customsName]));
+
+    const topProductsWithNames = topProducts.map(p => ({
+      productName: productMap.get(p.productId) || '未知',
+      count: p._count,
+      quantity: p._sum.quantity,
+      totalAmount: p._sum.totalPrice,
+    }));
+
+    // 6. 门店统计
+    const storeStats = await prisma.packingItem.groupBy({
+      by: ['storeId'],
+      _sum: { totalPrice: true, quantity: true },
+      _count: true,
+      where: { storeId: { not: null } },
+    });
+
+    const storeIds = storeStats.map(s => s.storeId).filter(Boolean);
+    const stores = await prisma.store.findMany({
+      where: { id: { in: storeIds } },
+      select: { id: true, name: true },
+    });
+    const storeMap = new Map(stores.map(s => [s.id, s.name]));
+
+    const storeStatsWithNames = storeStats.map(s => ({
+      storeName: storeMap.get(s.storeId) || '未知',
+      orderCount: s._count,
+      quantity: s._sum.quantity,
+      totalAmount: s._sum.totalPrice,
+    })).sort((a, b) => (b.totalAmount || 0) - (a.totalAmount || 0));
+
+    // 组装返回数据
+    const data = {
+      contracts: {
+        purchase: {
+          count: purchaseStats._count,
+          totalAmount: purchaseStats._sum.totalAmount || 0,
+          paidAmount: purchaseStats._sum.paidAmount || 0,
+          unpaidAmount: (purchaseStats._sum.totalAmount || 0) - (purchaseStats._sum.paidAmount || 0),
+        },
+        sales: {
+          count: salesStats._count,
+          totalAmount: salesStats._sum.totalAmount || 0,
+          receivedAmount: salesStats._sum.receivedAmount || 0,
+          receivable,
+        },
+      },
+      inventory: {
+        productCount,
+        recordCount: inventoryStats._count,
+        totalQuantity: inventoryStats._sum.quantity || 0,
+      },
+      shipments: {
+        monthly: salesByMonth,
+        summary: monthlyShipments,
+      },
+      topProducts: topProductsWithNames,
+      storeStats: storeStatsWithNames.slice(0, 10),
+    };
+
+    success(res, data);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getStats,
   trackProduct,
+  getAnalytics,
 };
