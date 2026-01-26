@@ -285,7 +285,10 @@ export default function Container3DView({
       </div>
       
       {/* 3D Canvas */}
-      <Canvas shadows>
+      <Canvas 
+        shadows 
+        gl={{ preserveDrawingBuffer: true }} // 允许截图
+      >
         <Suspense fallback={null}>
           <Scene 
             placedBoxes={packingResult.placedBoxes}

@@ -157,12 +157,27 @@ export default function SalesDetailPage({ params }: PageProps) {
 
       // 2. 截取3D可视化
       setActiveTab('3d');
-      await new Promise(r => setTimeout(r, 1000)); // 等待3D渲染
+      await new Promise(r => setTimeout(r, 1500)); // 等待3D渲染
       
       let view3dCanvas: HTMLCanvasElement | null = null;
       if (view3dRef.current) {
         try {
-          view3dCanvas = await html2canvas(view3dRef.current, canvasOptions);
+          // 尝试直接获取 WebGL canvas
+          const webglCanvas = view3dRef.current.querySelector('canvas');
+          if (webglCanvas) {
+            // 创建一个新的 canvas 来复制 WebGL 内容
+            view3dCanvas = document.createElement('canvas');
+            view3dCanvas.width = webglCanvas.width;
+            view3dCanvas.height = webglCanvas.height;
+            const ctx = view3dCanvas.getContext('2d');
+            if (ctx) {
+              ctx.fillStyle = '#f0f0f0';
+              ctx.fillRect(0, 0, view3dCanvas.width, view3dCanvas.height);
+              ctx.drawImage(webglCanvas, 0, 0);
+            }
+          } else {
+            view3dCanvas = await html2canvas(view3dRef.current, canvasOptions);
+          }
         } catch (e) {
           console.warn('3D截图失败，将只保存装箱明细:', e);
         }
