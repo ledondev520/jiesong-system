@@ -105,9 +105,12 @@ export default function SalesDetailPage({ params }: PageProps) {
    * 职责：保存页面为图片（装箱明细+3D可视化合并为一张长图）
    */
   const handleSaveAsImage = async () => {
-    if (!packingRef.current || !view3dRef.current || !contract) return;
+    if (!contract) {
+      toast.error('合同数据未加载');
+      return;
+    }
     
-    toast.info('正在生成图片...');
+    toast.info('正在生成图片，请稍候...');
     const prevTab = activeTab;
     
     try {
@@ -116,17 +119,25 @@ export default function SalesDetailPage({ params }: PageProps) {
         scale: 2,
         useCORS: true,
         logging: false,
+        ignoreElements: (el: Element) => {
+          // 忽略canvas元素（3D渲染），因为需要特殊处理
+          return false;
+        },
         onclone: (clonedDoc: Document) => {
           const elements = clonedDoc.querySelectorAll('*');
           elements.forEach((el) => {
-            const computed = window.getComputedStyle(el as Element);
-            const color = computed.color;
-            const bgColor = computed.backgroundColor;
-            if (color.includes('lab') || color.includes('oklch')) {
-              (el as HTMLElement).style.color = '#000000';
-            }
-            if (bgColor.includes('lab') || bgColor.includes('oklch')) {
-              (el as HTMLElement).style.backgroundColor = 'transparent';
+            try {
+              const computed = window.getComputedStyle(el as Element);
+              const color = computed.color;
+              const bgColor = computed.backgroundColor;
+              if (color && (color.includes('lab') || color.includes('oklch'))) {
+                (el as HTMLElement).style.color = '#000000';
+              }
+              if (bgColor && (bgColor.includes('lab') || bgColor.includes('oklch'))) {
+                (el as HTMLElement).style.backgroundColor = 'transparent';
+              }
+            } catch {
+              // 忽略样式处理错误
             }
           });
         },
@@ -134,37 +145,60 @@ export default function SalesDetailPage({ params }: PageProps) {
 
       // 1. 截取装箱明细
       setActiveTab('packing');
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise(r => setTimeout(r, 300));
+      
+      if (!packingRef.current) {
+        toast.error('装箱明细未渲染');
+        return;
+      }
+      
       const packingCanvas = await html2canvas(packingRef.current, canvasOptions);
+      toast.info('装箱明细已截取，正在处理3D视图...');
 
       // 2. 截取3D可视化
       setActiveTab('3d');
-      await new Promise(r => setTimeout(r, 500)); // 等待3D渲染
-      const view3dCanvas = await html2canvas(view3dRef.current, canvasOptions);
+      await new Promise(r => setTimeout(r, 1000)); // 等待3D渲染
+      
+      let view3dCanvas: HTMLCanvasElement | null = null;
+      if (view3dRef.current) {
+        try {
+          view3dCanvas = await html2canvas(view3dRef.current, canvasOptions);
+        } catch (e) {
+          console.warn('3D截图失败，将只保存装箱明细:', e);
+        }
+      }
 
-      // 3. 合并为一张长图
-      const mergedCanvas = document.createElement('canvas');
-      mergedCanvas.width = Math.max(packingCanvas.width, view3dCanvas.width);
-      mergedCanvas.height = packingCanvas.height + view3dCanvas.height + 40; // 40px间距
+      // 3. 合并为一张长图（或只保存装箱明细）
+      let finalCanvas: HTMLCanvasElement;
+      
+      if (view3dCanvas) {
+        finalCanvas = document.createElement('canvas');
+        finalCanvas.width = Math.max(packingCanvas.width, view3dCanvas.width);
+        finalCanvas.height = packingCanvas.height + view3dCanvas.height + 80;
 
-      const ctx = mergedCanvas.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, mergedCanvas.width, mergedCanvas.height);
-        ctx.drawImage(packingCanvas, 0, 0);
-        ctx.drawImage(view3dCanvas, 0, packingCanvas.height + 40);
+        const ctx = finalCanvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+          ctx.drawImage(packingCanvas, 0, 0);
+          ctx.drawImage(view3dCanvas, 0, packingCanvas.height + 80);
+        }
+      } else {
+        finalCanvas = packingCanvas;
       }
 
       // 4. 下载
       const link = document.createElement('a');
       link.download = `${contract.contractNo}-装箱明细.png`;
-      link.href = mergedCanvas.toDataURL('image/png');
+      link.href = finalCanvas.toDataURL('image/png');
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
 
       toast.success('图片已保存');
     } catch (error) {
       console.error('保存图片失败:', error);
-      toast.error('保存图片失败，请稍后重试');
+      toast.error(`保存失败: ${error instanceof Error ? error.message : '未知错误'}`);
     } finally {
       setActiveTab(prevTab);
     }
