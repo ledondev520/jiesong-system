@@ -1,7 +1,7 @@
 /**
  * Input: 导航配置、用户认证状态
  * Output: 侧边栏导航组件
- * Pos: 全局布局组件，提供5个核心导航入口
+ * Pos: 全局布局组件，提供6个核心导航入口
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -18,21 +18,24 @@ import {
   DollarSign,
   Settings,
   LogOut,
+  Ship,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/button';
 
 /**
- * 简化后的导航菜单配置（5个核心入口）
+ * 导航菜单配置（6个核心入口）
  * - 工作台：快速录入 + 待办 + 概览
- * - 合同管理：采购合同 + 出口合同（Tab切换）
+ * - 采购合同：采购合同管理
+ * - 出口合同：出口合同管理（独立页面，方便返回）
  * - 库存状态：商品库存跟踪
  * - 收付款：应付 + 应收（Tab切换）
  * - 设置：基础档案 + 用户 + 系统配置 + 数据导入
  */
 const navItems = [
   { href: '/dashboard', label: '工作台', icon: LayoutDashboard, exact: true },
-  { href: '/dashboard/contracts', label: '合同管理', icon: FileText },
+  { href: '/dashboard/contracts', label: '采购合同', icon: FileText, exact: true },
+  { href: '/dashboard/sales', label: '出口合同', icon: Ship },
   { href: '/dashboard/inventory-container', label: '库存状态', icon: Warehouse },
   { href: '/dashboard/payments', label: '收付款', icon: DollarSign },
   { href: '/dashboard/settings', label: '设置', icon: Settings },

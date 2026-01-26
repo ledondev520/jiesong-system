@@ -298,7 +298,7 @@ export default function SalesDetailPage({ params }: PageProps) {
     <div className="space-y-6 pb-10">
       {/* 页头 */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
+        <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard/sales')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
