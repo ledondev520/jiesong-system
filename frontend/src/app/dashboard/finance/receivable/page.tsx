@@ -106,10 +106,15 @@ export default function ReceivablePage() {
   // 过滤出有待收金额的合同
   const unreceiveContracts = contracts.filter(c => c.unreceiveAmount > 0);
 
-  // 获取门店名称列表
+  /**
+   * 获取门店名称列表（去重）
+   * 思路：使用 Set 去除重复的门店名称，然后用逗号连接
+   */
   const getStoreNames = (contract: ReceivableContract) => {
-    const stores = contract.items?.map(item => item.store?.name).filter(Boolean);
-    return stores && stores.length > 0 ? stores.join(', ') : '-';
+    const stores = contract.items?.map(item => item.store?.name).filter(Boolean) as string[];
+    // 使用 Set 去重
+    const uniqueStores = [...new Set(stores)];
+    return uniqueStores.length > 0 ? uniqueStores.join(', ') : '-';
   };
 
   return (

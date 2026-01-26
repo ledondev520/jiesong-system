@@ -77,19 +77,28 @@ async function main() {
         storeName: r['发货店铺'] || '',
         items: [],
         totalAmount: 0,
+        // 货柜汇总信息
+        totalBoxes: 0,
+        grossWeight: 0,
+        netWeight: 0,
+        volume: 0,
       });
     }
     
     const purchaseAmount = parseFloat(r['采购金额RMB']) || 0;
+    const boxes = parseFloat(r['箱数']) || 0;
+    const grossWeight = parseFloat(r['毛重kg']) || 0;
+    const netWeight = parseFloat(r['净重kg']) || 0;
+    const volume = parseFloat(r['体积cbm']) || 0;
     
     contractMap.get(contractNo).items.push({
       productName,
       hsCode: r['HS编码'] || '',
       specification: r['规格'] || '',
-      boxes: parseFloat(r['箱数']) || 0,
-      grossWeight: parseFloat(r['毛重kg']) || 0,
-      netWeight: parseFloat(r['净重kg']) || 0,
-      volume: parseFloat(r['体积cbm']) || 0,
+      boxes,
+      grossWeight,
+      netWeight,
+      volume,
       quantity: parseFloat(r['数量']) || 0,
       unit: r['单位'] || '',
       purchaseAmount,
@@ -97,6 +106,11 @@ async function main() {
     
     // 累加采购金额作为合同总金额
     contractMap.get(contractNo).totalAmount += purchaseAmount;
+    // 累加货柜汇总信息
+    contractMap.get(contractNo).totalBoxes += boxes;
+    contractMap.get(contractNo).grossWeight += grossWeight;
+    contractMap.get(contractNo).netWeight += netWeight;
+    contractMap.get(contractNo).volume += volume;
   }
   
   console.log(`   找到 ${contractMap.size} 个出口合同`);
@@ -198,11 +212,15 @@ async function main() {
     });
     
     if (contract) {
-      // 更新合同总金额
+      // 更新合同金额和货柜信息
       await prisma.salesContract.update({
         where: { id: contract.id },
         data: {
           totalAmount: data.totalAmount || contract.totalAmount,
+          totalBoxes: data.totalBoxes || 0,
+          grossWeight: data.grossWeight || 0,
+          netWeight: data.netWeight || 0,
+          volume: data.volume || 0,
         },
       });
       contractUpdated++;
@@ -236,10 +254,45 @@ async function main() {
             },
           });
           itemsCreated++;
+          
+          // 同时创建/更新 PackingItem（装箱明细）
+          const existingPacking = await prisma.packingItem.findFirst({
+            where: {
+              salesContractId: contract.id,
+              productId,
+            },
+          });
+          
+          if (!existingPacking) {
+            await prisma.packingItem.create({
+              data: {
+                salesContractId: contract.id,
+                productId,
+                storeId,
+                quantity: item.quantity || 1,
+                unit: item.unit || '个',
+                boxes: item.boxes || 0,
+                grossWeight: item.grossWeight || 0,
+                netWeight: item.netWeight || 0,
+                volume: item.volume || 0,
+              },
+            });
+          } else {
+            // 更新装箱信息
+            await prisma.packingItem.update({
+              where: { id: existingPacking.id },
+              data: {
+                boxes: item.boxes || existingPacking.boxes,
+                grossWeight: item.grossWeight || existingPacking.grossWeight,
+                netWeight: item.netWeight || existingPacking.netWeight,
+                volume: item.volume || existingPacking.volume,
+              },
+            });
+          }
         }
       }
       
-      console.log(`   + ${contractNo}: ${data.items.length} 个商品, 总金额 ¥${data.totalAmount.toLocaleString()}`);
+      console.log(`   + ${contractNo}: ${data.items.length} 个商品, ${data.totalBoxes} 箱, ${data.volume.toFixed(2)} CBM, 毛重 ${data.grossWeight.toFixed(1)} kg`);
     } else {
       console.log(`   - ${contractNo}: 未找到对应的出口合同`);
     }
