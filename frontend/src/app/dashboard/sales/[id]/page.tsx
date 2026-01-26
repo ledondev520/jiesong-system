@@ -50,7 +50,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ArrowLeft, Plus, Pencil, Trash, Ship, Package, Weight, Box, Boxes, Search, PackageCheck, Camera } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import domtoimage from 'dom-to-image-more';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { CONTAINER_40HQ } from '@/lib/binPacking';
@@ -109,16 +109,17 @@ export default function SalesDetailPage({ params }: PageProps) {
     toast.info('正在生成图片...');
     
     try {
-      const canvas = await html2canvas(captureRef.current, {
-        backgroundColor: '#ffffff',
-        scale: 2,
-        useCORS: true,
-        logging: false,
+      const dataUrl = await domtoimage.toPng(captureRef.current, {
+        bgcolor: '#ffffff',
+        quality: 1,
+        style: {
+          transform: 'scale(1)',
+        },
       });
       
       const link = document.createElement('a');
       link.download = `${contract.contractNo}-装箱明细.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.href = dataUrl;
       link.click();
       
       toast.success('图片已保存');
