@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect, use, lazy, Suspense, useMemo } from 'react';
+import { useState, useEffect, use, lazy, Suspense, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { SalesContract, PackingItem, Product, Store, SalesStatus, Inventory } from '@/types';
 import { salesService } from '@/services/sales.service';
@@ -49,7 +49,8 @@ import {
 } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Plus, Pencil, Trash, Ship, Package, Weight, Box, Boxes, Search, PackageCheck } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash, Ship, Package, Weight, Box, Boxes, Search, PackageCheck, Camera } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { CONTAINER_40HQ } from '@/lib/binPacking';
@@ -92,9 +93,40 @@ export default function SalesDetailPage({ params }: PageProps) {
     height: 0,
   });
 
+  // 截图区域引用
+  const captureRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     loadData();
   }, [id]);
+
+  /**
+   * 职责：保存页面为图片
+   */
+  const handleSaveAsImage = async () => {
+    if (!captureRef.current || !contract) return;
+    
+    toast.info('正在生成图片...');
+    
+    try {
+      const canvas = await html2canvas(captureRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      
+      const link = document.createElement('a');
+      link.download = `${contract.contractNo}-装箱明细.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      
+      toast.success('图片已保存');
+    } catch (error) {
+      console.error('保存图片失败:', error);
+      toast.error('保存图片失败');
+    }
+  };
 
   /**
    * 职责：加载合同详情和基础数据（含库存）
@@ -313,9 +345,14 @@ export default function SalesDetailPage({ params }: PageProps) {
           </div>
           <p className="text-muted-foreground">
             目的港: {contract.port?.name || '未指定'} | 
+            签订: {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'} | 
             预计到达: {contract.estimatedArrival ? format(new Date(contract.estimatedArrival), 'yyyy-MM-dd') : '-'}
           </p>
         </div>
+        <Button variant="outline" onClick={handleSaveAsImage}>
+          <Camera className="mr-2 h-4 w-4" />
+          保存为图片
+        </Button>
       </div>
 
       {/* 容量概览 */}
@@ -369,12 +406,13 @@ export default function SalesDetailPage({ params }: PageProps) {
       </div>
 
       {/* 标签页 */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="packing">装箱明细</TabsTrigger>
-          <TabsTrigger value="3d">3D 可视化</TabsTrigger>
-          <TabsTrigger value="info">合同信息</TabsTrigger>
-        </TabsList>
+      <div ref={captureRef}>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="packing">装箱明细</TabsTrigger>
+            <TabsTrigger value="3d">3D 可视化</TabsTrigger>
+            <TabsTrigger value="info">合同信息</TabsTrigger>
+          </TabsList>
 
         {/* 装箱明细 */}
         <TabsContent value="packing">
@@ -496,7 +534,8 @@ export default function SalesDetailPage({ params }: PageProps) {
             }}
           />
         </TabsContent>
-      </Tabs>
+        </Tabs>
+      </div>
 
       {/* 添加/编辑商品对话框 */}
       <Dialog open={isItemDialogOpen} onOpenChange={setIsItemDialogOpen}>
