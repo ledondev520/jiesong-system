@@ -48,4 +48,10 @@ router.get('/token-stats', aiController.getTokenStats);
 // GET /api/v1/ai/models - 获取可用模型列表
 router.get('/models', aiController.getModels);
 
+// GET /api/v1/ai/greeting - 获取AI问候语（带五月天歌词）
+router.get('/greeting', aiController.getGreeting);
+
+// GET /api/v1/ai/greeting/stream - 流式获取AI问候语（支持 thinking）
+router.get('/greeting/stream', aiController.getGreetingStream);
+
 module.exports = router;

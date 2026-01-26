@@ -41,13 +41,13 @@ const chat = async (req, res, next) => {
 };
 
 /**
- * 职责：流式智能问答（SSE）
+ * 职责：流式智能问答（SSE，支持 thinking 展示）
  * 思路：
  * 1. 设置SSE响应头
  * 2. 调用aiService的流式聊天
- * 3. 逐个chunk发送给前端
+ * 3. 分别发送 thinking 和 content 给前端
  */
-const chatStream = async (req, res, next) => {
+const chatStream = async (req, res) => {
   try {
     const { message, sessionId, imageUrl } = req.body;
     const userId = req.user.id;
@@ -59,21 +59,28 @@ const chatStream = async (req, res, next) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // 禁用nginx缓冲
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
     
     // 发送sessionId
     res.write(`data: ${JSON.stringify({ type: 'session', sessionId: currentSessionId })}\n\n`);
     
-    // 流式调用AI服务
+    // 发送开始处理消息
+    res.write(`data: ${JSON.stringify({ type: 'start', message: '开始处理...' })}\n\n`);
+    
+    // 流式调用AI服务（支持 thinking）
     const result = await aiService.chatStream(
       userId, 
       currentSessionId, 
       message, 
       imageUrl,
+      // onChunk - 最终内容回调
       (chunk) => {
-        // 每个chunk都发送给前端
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`);
+      },
+      // onThinking - 思考过程回调
+      (thinking) => {
+        res.write(`data: ${JSON.stringify({ type: 'thinking', content: thinking })}\n\n`);
       }
     );
     
@@ -86,7 +93,6 @@ const chatStream = async (req, res, next) => {
     
     res.end();
   } catch (error) {
-    // 发送错误消息
     res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
     res.end();
   }
@@ -241,6 +247,67 @@ const getModels = async (req, res, next) => {
   }
 };
 
+/**
+ * 职责：获取AI问候语（带五月天歌词）
+ */
+const getGreeting = async (req, res, next) => {
+  try {
+    const result = await aiService.generateGreeting();
+    
+    success(res, {
+      greeting: result.greeting,
+      songName: result.songName,
+      lyrics: result.lyrics,
+      source: result.source,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：流式获取AI问候语（支持 thinking 展示）
+ * 思路：
+ * 1. 使用 SSE 流式返回
+ * 2. 先返回 thinking 内容
+ * 3. 再返回最终内容
+ */
+const getGreetingStream = async (req, res) => {
+  // 设置 SSE 响应头
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  try {
+    await aiService.generateGreetingStream(
+      // onThinking - 思考过程回调
+      (chunk) => {
+        res.write(`data: ${JSON.stringify({ type: 'thinking', content: chunk })}\n\n`);
+      },
+      // onContent - 最终内容回调
+      (chunk) => {
+        res.write(`data: ${JSON.stringify({ type: 'content', content: chunk })}\n\n`);
+      },
+      // onDone - 完成回调
+      (result) => {
+        res.write(`data: ${JSON.stringify({ 
+          type: 'done', 
+          greeting: result.greeting,
+          songName: result.songName,
+          lyrics: result.lyrics,
+          source: result.source,
+        })}\n\n`);
+        res.end();
+      }
+    );
+  } catch (error) {
+    res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+    res.end();
+  }
+};
+
 module.exports = {
   chat,
   chatStream,
@@ -251,4 +318,6 @@ module.exports = {
   updateConfig,
   getTokenStats,
   getModels,
+  getGreeting,
+  getGreetingStream,
 };

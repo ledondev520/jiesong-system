@@ -117,19 +117,20 @@ const chat = async (userId, sessionId, message, imageUrl = null) => {
 };
 
 /**
- * 职责：流式调用Kimi API进行对话
+ * 职责：流式调用Kimi API进行对话（支持 thinking 模型）
  * 思路：
  * 1. 构建消息列表
- * 2. 使用流式API调用
- * 3. 逐个chunk返回给调用者
+ * 2. 使用 kimi-k2-thinking 模型进行流式调用
+ * 3. 分别处理 reasoning_content（思考过程）和 content（最终内容）
  * @param {string} userId - 用户ID
  * @param {string} sessionId - 会话ID
  * @param {string} message - 用户消息
  * @param {string} imageUrl - 图片URL（可选）
- * @param {function} onChunk - 每个chunk的回调函数
+ * @param {function} onChunk - 最终内容的回调函数
+ * @param {function} onThinking - 思考过程的回调函数（可选）
  * @returns {Object} 最终结果
  */
-const chatStream = async (userId, sessionId, message, imageUrl = null, onChunk) => {
+const chatStream = async (userId, sessionId, message, imageUrl = null, onChunk, onThinking = null) => {
   const client = getOpenAIClient();
   
   // 0. 获取历史对话（最近10条）
@@ -152,10 +153,11 @@ const chatStream = async (userId, sessionId, message, imageUrl = null, onChunk) 
   const userMessage = buildUserMessage(message, imageUrl);
   messages.push(userMessage);
   
-  // 3. 选择模型（当前消息或历史消息有图片时，使用视觉模型）
+  // 3. 选择模型（有图片时用视觉模型，否则用 thinking-turbo 模型）
   const hasImageInHistory = history.some(h => h.imageUrl);
   const needsVisionModel = imageUrl || hasImageInHistory;
-  const model = needsVisionModel ? MODELS.vision : MODELS.default;
+  // 使用 thinking-turbo 模型（更快的推理速度，除非需要视觉能力）
+  const model = needsVisionModel ? MODELS.vision : 'kimi-k2-thinking-turbo';
   
   console.log(`[AI] 使用模型: ${model}, 当前图片: ${!!imageUrl}, 历史图片: ${hasImageInHistory}`);
   
@@ -166,6 +168,7 @@ const chatStream = async (userId, sessionId, message, imageUrl = null, onChunk) 
   
   // 5. 流式调用Kimi API
   let fullContent = '';
+  let thinkingContent = '';
   let tokenUsage = { promptTokens: 0, outputTokens: 0 };
   
   if (client) {
@@ -174,20 +177,34 @@ const chatStream = async (userId, sessionId, message, imageUrl = null, onChunk) 
       const tokenEstimate = await estimateTokens(messages, model);
       tokenUsage.promptTokens = tokenEstimate.data?.total_tokens || 0;
       
-      // 流式调用
+      // 流式调用（thinking 模型需要 temperature=1.0 和更大的 max_tokens）
+      const isThinkingModel = model.includes('thinking');
       const stream = await client.chat.completions.create({
         model,
         messages,
-        temperature: 0.6,
+        temperature: isThinkingModel ? 1.0 : 0.6,
+        max_tokens: isThinkingModel ? 16000 : undefined,
         stream: true,
       });
       
       // 逐个chunk处理
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta;
+        
+        // 处理 reasoning_content（思考过程）
+        if (delta && Object.prototype.hasOwnProperty.call(delta, 'reasoning_content')) {
+          const reasoning = delta.reasoning_content;
+          if (reasoning) {
+            thinkingContent += reasoning;
+            if (onThinking) {
+              onThinking(reasoning);
+            }
+          }
+        }
+        
+        // 处理 content（最终内容）
         if (delta?.content) {
           fullContent += delta.content;
-          // 调用回调函数发送chunk
           if (onChunk) {
             onChunk(delta.content);
           }
@@ -195,11 +212,10 @@ const chatStream = async (userId, sessionId, message, imageUrl = null, onChunk) 
       }
       
       // 估算输出Token
-      tokenUsage.outputTokens = Math.ceil(fullContent.length / 2);
+      tokenUsage.outputTokens = Math.ceil((fullContent.length + thinkingContent.length) / 2);
       
     } catch (error) {
       console.error('流式调用失败:', error.message, error.stack);
-      // 构建更详细的错误信息
       let errorMessage = '抱歉，AI服务出错了。';
       if (error.status === 401 || error.message?.includes('Unauthorized')) {
         errorMessage = '错误：API Key无效或已过期，请联系管理员检查配置。';
@@ -240,6 +256,7 @@ const chatStream = async (userId, sessionId, message, imageUrl = null, onChunk) 
   
   return {
     message: fullContent,
+    thinking: thinkingContent,
     sessionId,
     tokenUsage: {
       prompt: tokenUsage.promptTokens,
@@ -894,6 +911,109 @@ const getTokenStats = async (userId, days = 30) => {
   };
 };
 
+// 五月天50首经典歌曲名称列表
+const MAYDAY_SONGS = [
+  '倔强', '温柔', '知足', '突然好想你', '我不愿让你一个人',
+  '干杯', '恋爱ing', '天使', '志明与春娇', '疯狂世界',
+  '后来的我们', '盛夏光年', '憨人', '人生海海', '爱情万岁',
+  '入阵曲', '仓颉', '拥抱', '纯真', '生命有一种绝对',
+  '听不到', '咸鱼', '如烟', '洋葱', '星空',
+  '离开地球表面', '孙悟空', '最重要的小事', '伤心的人别听慢歌', '顽固',
+  '好好', '如果我们不曾相遇', '一颗苹果', '终结孤单', '圣诞结',
+  '而我知道', '倾听', '春天的呐喊', '雌雄同体', 'DNA',
+  '派对动物', '为爱而生', '你不是真正的快乐', '笑忘歌', '第二人生',
+  '将军令', '出头天', '我心中尚未崩坏的地方', '候鸟', '成名在望'
+];
+
+/**
+ * 职责：生成带五月天歌曲主题的AI问候语
+ * 思路：
+ * 1. 使用 kimi-k2-turbo-preview 模型（快速响应）
+ * 2. 从50首著名歌曲中随机选择一首
+ * 3. 让模型生成问候语
+ */
+const generateGreeting = async () => {
+  const client = getOpenAIClient();
+  if (!client) {
+    return getLocalGreeting();
+  }
+
+  // 随机选择一首歌
+  const randomSong = MAYDAY_SONGS[Math.floor(Math.random() * MAYDAY_SONGS.length)];
+
+  const systemPrompt = `你是精通歌词的大师。请根据五月天歌曲《${randomSong}》的歌词，生成一段温暖的问候语。
+
+要求：
+1. 生成一句简短的问候语（10字） 
+2. 获取这首歌连贯的4句歌词
+
+直接输出5行文字，不要其他内容。`;
+
+  try {
+    const stream = await client.chat.completions.create({
+      model: 'kimi-k2-turbo-preview',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: '生成问候语' },
+      ],
+      temperature: 0.8,
+      stream: true,
+    });
+
+    let fullContent = '';
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta;
+      if (delta?.content) {
+        fullContent += delta.content;
+      }
+    }
+
+    const lines = fullContent.trim().split('\n').filter(line => line.trim());
+    
+    if (lines.length >= 2) {
+      console.log(`[AI Greeting] 成功生成问候语，歌曲：${randomSong}`);
+      return {
+        greeting: lines[0].trim(),
+        songName: randomSong,
+        lyrics: lines.slice(1, 5).map(line => line.trim()),
+        source: 'ai',
+      };
+    }
+    
+    return getLocalGreeting();
+  } catch (error) {
+    console.error('生成问候语失败:', error.message);
+    return getLocalGreeting();
+  }
+};
+
+/**
+ * 职责：获取本地预设问候语（备用方案，不含歌词）
+ * 说明：当 AI 服务不可用时的降级方案
+ */
+const getLocalGreeting = () => {
+  const greetings = [
+    {
+      greeting: '每一天都是新的开始！',
+      songName: '',
+      lyrics: ['欢迎使用捷淞进销存系统', 'AI助手随时为您服务', '祝您工作顺利', '今天也要加油哦'],
+    },
+    {
+      greeting: '用热情开启元气满满的一天！',
+      songName: '',
+      lyrics: ['新的一天新的希望', '让我们一起努力', '相信自己的力量', '美好的事情即将发生'],
+    },
+    {
+      greeting: '愿今天的你充满力量！',
+      songName: '',
+      lyrics: ['保持微笑面对挑战', '每一步都是成长', '坚持就是胜利', '你是最棒的'],
+    },
+  ];
+
+  const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+  return { ...randomGreeting, source: 'local' };
+};
+
 module.exports = {
   chat,
   chatStream,
@@ -902,5 +1022,6 @@ module.exports = {
   estimateTokens,
   generateLocalResponse,
   getTokenStats,
+  generateGreeting,
   MODELS,
 };

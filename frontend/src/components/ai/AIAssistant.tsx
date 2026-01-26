@@ -13,13 +13,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bot, Send, X, Image, Loader2, XCircle } from 'lucide-react';
+import { Bot, Send, X, Image, Loader2, XCircle, Brain, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  thinking?: string; // AI思考过程
   imageUrl?: string; // 图片URL（base64或远程URL）
   createdAt: Date;
 }
@@ -57,6 +58,9 @@ export function AIAssistant() {
   const [isLoading, setIsLoading] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null); // 待发送的图片（base64）
   const [isDragging, setIsDragging] = useState(false);
+  const [currentThinking, setCurrentThinking] = useState(''); // 当前思考内容
+  const [isThinking, setIsThinking] = useState(false); // 是否正在思考
+  const [expandedThinking, setExpandedThinking] = useState<Record<string, boolean>>({}); // 展开的思考内容
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -202,6 +206,8 @@ export function AIAssistant() {
     setInput('');
     setPendingImage(null); // 清除待发送图片
     setIsLoading(true);
+    setCurrentThinking(''); // 清除之前的思考内容
+    setIsThinking(true); // 开始思考
 
     // 创建AI响应消息占位符
     const aiMsgId = (Date.now() + 1).toString();
@@ -245,6 +251,7 @@ export function AIAssistant() {
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let currentContent = '';
+      let thinkingContent = ''; // 本地变量收集思考内容
 
       if (reader) {
         while (true) {
@@ -261,20 +268,37 @@ export function AIAssistant() {
                 
                 if (data.type === 'session' && data.sessionId) {
                   setSessionId(data.sessionId);
+                } else if (data.type === 'start') {
+                  console.log('AI开始处理...');
+                } else if (data.type === 'thinking' && data.content) {
+                  // 收集思考内容
+                  thinkingContent += data.content;
+                  setCurrentThinking(thinkingContent);
                 } else if (data.type === 'chunk' && data.content) {
+                  // 开始输出最终内容时，结束思考状态
+                  setIsThinking(false);
                   currentContent += data.content;
-                  // 实时更新消息内容
+                  // 实时更新消息内容（包含思考内容）
                   setMessages((prev) => 
                     prev.map((msg) => 
                       msg.id === aiMsgId 
-                        ? { ...msg, content: currentContent }
+                        ? { ...msg, content: currentContent, thinking: thinkingContent }
                         : msg
                     )
                   );
                 } else if (data.type === 'done') {
-                  // 流式传输完成
+                  setIsThinking(false);
+                  // 确保最终消息包含思考内容
+                  setMessages((prev) => 
+                    prev.map((msg) => 
+                      msg.id === aiMsgId 
+                        ? { ...msg, thinking: thinkingContent }
+                        : msg
+                    )
+                  );
                   console.log('Token使用:', data.tokenUsage, '模型:', data.model);
                 } else if (data.type === 'error') {
+                  setIsThinking(false);
                   setMessages((prev) => 
                     prev.map((msg) => 
                       msg.id === aiMsgId 
@@ -283,8 +307,8 @@ export function AIAssistant() {
                     )
                   );
                 }
-              } catch (e) {
-                // 忽略JSON解析错误（可能是不完整的数据）
+              } catch {
+                // 忽略JSON解析错误
               }
             }
           }
@@ -323,6 +347,7 @@ export function AIAssistant() {
       );
     } finally {
       setIsLoading(false);
+      setIsThinking(false);
     }
   };
 
@@ -393,6 +418,33 @@ export function AIAssistant() {
                         className="max-w-full rounded-md max-h-40 object-contain"
                       />
                     )}
+                    {/* 显示思考过程（可折叠） */}
+                    {msg.role === 'assistant' && msg.thinking && (
+                      <div className="border-b border-gray-200 dark:border-gray-700 pb-2 mb-1">
+                        <button
+                          className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                          onClick={() => setExpandedThinking(prev => ({
+                            ...prev,
+                            [msg.id]: !prev[msg.id]
+                          }))}
+                        >
+                          <Brain className="h-3 w-3" />
+                          <span>查看思考过程</span>
+                          {expandedThinking[msg.id] ? (
+                            <ChevronUp className="h-3 w-3" />
+                          ) : (
+                            <ChevronDown className="h-3 w-3" />
+                          )}
+                        </button>
+                        {expandedThinking[msg.id] && (
+                          <div className="mt-2 pl-4 border-l border-dashed border-gray-300 dark:border-gray-600 max-h-40 overflow-y-auto">
+                            <p className="text-xs text-gray-400 italic leading-relaxed whitespace-pre-wrap">
+                              {msg.thinking}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {/* 显示文本（支持链接） */}
                     {msg.content && (
                       <span className="whitespace-pre-wrap">
@@ -401,10 +453,24 @@ export function AIAssistant() {
                     )}
                   </div>
                 ))}
-                {isLoading && messages[messages.length - 1]?.content === '' && (
+                {/* 思考过程展示 */}
+                {isLoading && isThinking && currentThinking && (
+                  <div className="bg-muted/50 w-max max-w-[85%] rounded-lg px-3 py-2 text-sm">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <Brain className="h-3 w-3 animate-pulse" />
+                      <span className="text-xs">思考中...</span>
+                    </div>
+                    <div className="pl-5 border-l border-dashed border-gray-300 dark:border-gray-600">
+                      <p className="text-xs text-gray-400 italic leading-relaxed line-clamp-4">
+                        {currentThinking.slice(-200)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {isLoading && !currentThinking && messages[messages.length - 1]?.content === '' && (
                   <div className="bg-muted w-max rounded-lg px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    思考中...
+                    <Brain className="h-3 w-3 animate-pulse" />
+                    AI正在思考，请稍候...
                   </div>
                 )}
               </div>

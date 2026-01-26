@@ -1,7 +1,7 @@
 /**
- * Input: 后端dashboard API
- * Output: 工作台页面（系统核心入口）
- * Pos: 系统首页，提供快速录入、待办事项、数据概览
+ * Input: 后端dashboard API、AI greeting API
+ * Output: 工作台页面（系统核心入口，含AI问候语）
+ * Pos: 系统首页，提供快速录入、待办事项、数据概览、AI问候语
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import api from '@/lib/axios';
 import { ProductTracker } from '@/components/tools/ProductTracker';
+import { AIGreeting } from '@/components/ai/AIGreeting';
 
 interface DashboardStats {
   overview: {
@@ -104,7 +105,7 @@ export default function DashboardPage() {
       icon: TrendingUp, 
       href: '/dashboard/sales/create',
       color: 'bg-green-500 hover:bg-green-600',
-      desc: '创建出口合同（即货柜）'
+      desc: '创建出口合同'
     },
   ];
 
@@ -160,6 +161,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* AI问候语悬浮卡片 */}
+      <AIGreeting />
+
       {/* 页面标题 */}
       <div>
         <h2 className="text-2xl font-bold tracking-tight">工作台</h2>
