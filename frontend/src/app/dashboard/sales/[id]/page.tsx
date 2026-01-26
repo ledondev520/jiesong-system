@@ -121,23 +121,24 @@ export default function SalesDetailPage({ params }: PageProps) {
         scale: 2,
         useCORS: true,
         logging: false,
+        removeContainer: true,
         onclone: (clonedDoc: Document) => {
-          const elements = clonedDoc.querySelectorAll('*');
-          elements.forEach((el) => {
-            try {
-              const computed = window.getComputedStyle(el as Element);
-              const color = computed.color;
-              const bgColor = computed.backgroundColor;
-              if (color && (color.includes('lab') || color.includes('oklch'))) {
-                (el as HTMLElement).style.color = '#000000';
-              }
-              if (bgColor && (bgColor.includes('lab') || bgColor.includes('oklch'))) {
-                (el as HTMLElement).style.backgroundColor = 'transparent';
-              }
-            } catch {
-              // 忽略
+          // 移除所有CSS变量中的lab/oklch颜色
+          const style = clonedDoc.createElement('style');
+          style.textContent = `
+            * {
+              --background: 0 0% 100% !important;
+              --foreground: 222.2 84% 4.9% !important;
+              --card: 0 0% 100% !important;
+              --card-foreground: 222.2 84% 4.9% !important;
+              --primary: 222.2 47.4% 11.2% !important;
+              --primary-foreground: 210 40% 98% !important;
+              --muted: 210 40% 96.1% !important;
+              --muted-foreground: 215.4 16.3% 46.9% !important;
+              --border: 214.3 31.8% 91.4% !important;
             }
-          });
+          `;
+          clonedDoc.head.appendChild(style);
         },
       };
 
