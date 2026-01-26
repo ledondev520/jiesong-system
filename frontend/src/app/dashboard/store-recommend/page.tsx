@@ -10,7 +10,6 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -20,15 +19,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Store, Loader2, TrendingUp, Package, DollarSign, BarChart3 } from 'lucide-react';
+import { Store, Loader2, Package, DollarSign, ShoppingCart, Utensils, Lightbulb, Sofa, Wrench, Box, CheckCircle2 } from 'lucide-react';
 import api from '@/lib/axios';
 
 interface StoreStats {
@@ -37,7 +29,6 @@ interface StoreStats {
   totalAmount: number;
   productCount: number;
   categories: Array<{ name: string; amount: number; count: number }>;
-  products: Array<{ productId: string; productName: string; quantity: number; totalPrice: number; category: string }>;
 }
 
 interface Recommendation {
@@ -46,8 +37,6 @@ interface Recommendation {
   category: string;
   subCategory: string;
   frequency: number;
-  storeCount: number;
-  avgQuantity: number;
   suggestedQuantity: number;
   avgUnitPrice: number;
   estimatedCost: number;
@@ -55,7 +44,6 @@ interface Recommendation {
 }
 
 interface RecommendResult {
-  targetStoreName: string;
   referenceStoreCount: number;
   totalProducts: number;
   totalEstimatedCost: number;
@@ -63,13 +51,32 @@ interface RecommendResult {
   byCategory: Record<string, Recommendation[]>;
 }
 
+// 分类图标映射
+const categoryIcons: Record<string, typeof Package> = {
+  '餐厅设备': Utensils,
+  '餐具用品': ShoppingCart,
+  '装修材料': Box,
+  '灯具照明': Lightbulb,
+  '家具家居': Sofa,
+  '后厨设备': Wrench,
+  '其他配件': Package,
+};
+
+// 分类颜色映射
+const categoryColors: Record<string, string> = {
+  '餐厅设备': 'border-red-200 bg-red-50',
+  '餐具用品': 'border-blue-200 bg-blue-50',
+  '装修材料': 'border-amber-200 bg-amber-50',
+  '灯具照明': 'border-yellow-200 bg-yellow-50',
+  '家具家居': 'border-purple-200 bg-purple-50',
+  '后厨设备': 'border-green-200 bg-green-50',
+  '其他配件': 'border-gray-200 bg-gray-50',
+};
+
 export default function StoreRecommendPage() {
   const [storeStats, setStoreStats] = useState<StoreStats[]>([]);
-  const [stores, setStores] = useState<Array<{ id: string; name: string }>>([]);
-  const [selectedStore, setSelectedStore] = useState<string>('all');
   const [recommendation, setRecommendation] = useState<RecommendResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -77,43 +84,19 @@ export default function StoreRecommendPage() {
 
   const loadData = async () => {
     try {
-      const [statsRes, storesRes] = await Promise.all([
+      const [statsRes, recommendRes] = await Promise.all([
         api.get('/store-recommend/stats'),
-        api.get('/store-recommend/stores'),
+        api.post('/store-recommend/recommend', {
+          referenceStoreIds: [],
+          targetStoreName: '新门店',
+        }),
       ]);
       setStoreStats((statsRes as { data: StoreStats[] }).data);
-      setStores((storesRes as { data: Array<{ id: string; name: string }> }).data);
+      setRecommendation((recommendRes as { data: RecommendResult }).data);
     } catch (e) {
       console.error('加载数据失败:', e);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const generateRecommendation = async () => {
-    setGenerating(true);
-    try {
-      const referenceStoreIds = selectedStore === 'all' ? [] : [selectedStore];
-      const res = await api.post('/store-recommend/recommend', {
-        referenceStoreIds,
-        targetStoreName: '新门店',
-      });
-      setRecommendation((res as { data: RecommendResult }).data);
-    } catch (e) {
-      console.error('生成建议失败:', e);
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const getPriorityBadge = (priority: string) => {
-    switch (priority) {
-      case '强烈建议':
-        return <Badge className="bg-green-500">强烈建议</Badge>;
-      case '建议采购':
-        return <Badge className="bg-blue-500">建议采购</Badge>;
-      default:
-        return <Badge variant="outline">可选</Badge>;
     }
   };
 
@@ -129,14 +112,196 @@ export default function StoreRecommendPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">门店采购建议</h2>
-        <p className="text-muted-foreground">基于历史采购数据，为新门店生成采购建议</p>
+        <p className="text-muted-foreground">基于 {recommendation?.referenceStoreCount || 0} 家门店的历史采购数据，为新门店生成采购建议</p>
       </div>
 
-      <Tabs defaultValue="stats">
+      <Tabs defaultValue="recommend">
         <TabsList>
-          <TabsTrigger value="stats">门店采购统计</TabsTrigger>
-          <TabsTrigger value="recommend">采购建议生成</TabsTrigger>
+          <TabsTrigger value="recommend">🛒 新店采购清单</TabsTrigger>
+          <TabsTrigger value="stats">📊 门店采购统计</TabsTrigger>
         </TabsList>
+
+        {/* 采购建议（主页面） */}
+        <TabsContent value="recommend" className="space-y-6">
+          {recommendation && (
+            <>
+              {/* 概览卡片 */}
+              <div className="grid gap-4 md:grid-cols-4">
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Store className="h-4 w-4" />
+                      参考门店
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold">{recommendation.referenceStoreCount}</div>
+                    <p className="text-xs text-muted-foreground">家门店数据</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      建议采购
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold">{recommendation.totalProducts}</div>
+                    <p className="text-xs text-muted-foreground">种商品</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-green-200 bg-green-50">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2 text-green-700">
+                      <DollarSign className="h-4 w-4" />
+                      预估总投入
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-green-600">
+                      ${recommendation.totalEstimatedCost.toLocaleString()}
+                    </div>
+                    <p className="text-xs text-green-600/70">美金</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-orange-200 bg-orange-50">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2 text-orange-700">
+                      <CheckCircle2 className="h-4 w-4" />
+                      必备商品
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-orange-600">
+                      {recommendation.recommendations.filter(r => r.priority === '强烈建议').length}
+                    </div>
+                    <p className="text-xs text-orange-600/70">种（50%+门店购买）</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* 分类采购清单 */}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {Object.entries(recommendation.byCategory).map(([category, items]) => {
+                  const Icon = categoryIcons[category] || Package;
+                  const colorClass = categoryColors[category] || 'border-gray-200 bg-gray-50';
+                  const categoryTotal = items.reduce((sum, i) => sum + i.estimatedCost, 0);
+                  const mustHave = items.filter(i => i.priority === '强烈建议');
+                  
+                  return (
+                    <Card key={category} className={`${colorClass} border-2`}>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center justify-between">
+                          <span className="flex items-center gap-2 text-base">
+                            <Icon className="h-5 w-5" />
+                            {category}
+                          </span>
+                          <Badge variant="secondary" className="text-xs">
+                            {items.length}种
+                          </Badge>
+                        </CardTitle>
+                        <CardDescription className="flex justify-between">
+                          <span>预估: ${categoryTotal.toLocaleString()}</span>
+                          {mustHave.length > 0 && (
+                            <span className="text-orange-600">必备{mustHave.length}种</span>
+                          )}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {items.slice(0, 8).map((item) => (
+                            <div 
+                              key={item.productId} 
+                              className={`flex items-center justify-between p-2 rounded text-sm ${
+                                item.priority === '强烈建议' ? 'bg-white/80 border border-orange-200' : 'bg-white/50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                {item.priority === '强烈建议' && (
+                                  <span className="text-orange-500">★</span>
+                                )}
+                                <span className="truncate max-w-[120px]">{item.productName}</span>
+                              </div>
+                              <div className="text-right text-xs">
+                                <div className="font-medium">{item.suggestedQuantity}件</div>
+                                <div className="text-muted-foreground">${item.estimatedCost}</div>
+                              </div>
+                            </div>
+                          ))}
+                          {items.length > 8 && (
+                            <p className="text-xs text-center text-muted-foreground pt-1">
+                              还有 {items.length - 8} 种商品...
+                            </p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {/* 必备商品清单（表格） */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-orange-500" />
+                    必备商品清单
+                  </CardTitle>
+                  <CardDescription>
+                    50%以上门店都购买的商品，强烈建议采购
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>商品名称</TableHead>
+                        <TableHead>分类</TableHead>
+                        <TableHead className="text-center">门店覆盖率</TableHead>
+                        <TableHead className="text-right">建议数量</TableHead>
+                        <TableHead className="text-right">单价</TableHead>
+                        <TableHead className="text-right">预估金额</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recommendation.recommendations
+                        .filter(r => r.priority === '强烈建议')
+                        .slice(0, 20)
+                        .map((item) => (
+                          <TableRow key={item.productId}>
+                            <TableCell className="font-medium">
+                              <span className="text-orange-500 mr-1">★</span>
+                              {item.productName}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">{item.category}</Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-orange-500 rounded-full"
+                                    style={{ width: `${item.frequency}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs">{item.frequency}%</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">{item.suggestedQuantity}</TableCell>
+                            <TableCell className="text-right">${item.avgUnitPrice}</TableCell>
+                            <TableCell className="text-right font-medium text-green-600">
+                              ${item.estimatedCost.toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
 
         {/* 门店采购统计 */}
         <TabsContent value="stats" className="space-y-4">
@@ -213,142 +378,6 @@ export default function StoreRecommendPage() {
               </Table>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* 采购建议生成 */}
-        <TabsContent value="recommend" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>生成采购建议</CardTitle>
-              <CardDescription>选择参考门店，系统将基于其采购数据生成建议</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-4 items-end">
-                <div className="flex-1">
-                  <label className="text-sm font-medium">参考门店</label>
-                  <Select value={selectedStore} onValueChange={setSelectedStore}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="选择参考门店" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">全部门店（综合分析）</SelectItem>
-                      {stores.map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button onClick={generateRecommendation} disabled={generating}>
-                  {generating ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      生成中...
-                    </>
-                  ) : (
-                    <>
-                      <TrendingUp className="mr-2 h-4 w-4" />
-                      生成建议
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {recommendation && (
-            <>
-              {/* 建议概览 */}
-              <div className="grid gap-4 md:grid-cols-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">参考门店数</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{recommendation.referenceStoreCount}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">建议商品数</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{recommendation.totalProducts}</div>
-                  </CardContent>
-                </Card>
-                <Card className="border-green-200 bg-green-50/50">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">预估总金额</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-green-600">
-                      ${recommendation.totalEstimatedCost.toLocaleString()}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">强烈建议</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-orange-500">
-                      {recommendation.recommendations.filter(r => r.priority === '强烈建议').length}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* 按分类展示 */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5" />
-                    采购建议清单（按分类）
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {Object.entries(recommendation.byCategory).map(([category, items]) => (
-                      <div key={category}>
-                        <h4 className="font-semibold mb-2 flex items-center gap-2">
-                          <Package className="h-4 w-4" />
-                          {category}
-                          <Badge variant="outline">{items.length}种</Badge>
-                        </h4>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>商品名称</TableHead>
-                              <TableHead>子分类</TableHead>
-                              <TableHead className="text-center">出现频率</TableHead>
-                              <TableHead className="text-right">建议数量</TableHead>
-                              <TableHead className="text-right">单价</TableHead>
-                              <TableHead className="text-right">预估金额</TableHead>
-                              <TableHead className="text-center">优先级</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {items.slice(0, 10).map((item) => (
-                              <TableRow key={item.productId}>
-                                <TableCell className="font-medium">{item.productName}</TableCell>
-                                <TableCell className="text-muted-foreground">{item.subCategory}</TableCell>
-                                <TableCell className="text-center">{item.frequency}%</TableCell>
-                                <TableCell className="text-right">{item.suggestedQuantity}</TableCell>
-                                <TableCell className="text-right">${item.avgUnitPrice}</TableCell>
-                                <TableCell className="text-right text-green-600">
-                                  ${item.estimatedCost.toLocaleString()}
-                                </TableCell>
-                                <TableCell className="text-center">{getPriorityBadge(item.priority)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          )}
         </TabsContent>
       </Tabs>
     </div>

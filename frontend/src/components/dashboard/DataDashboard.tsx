@@ -15,12 +15,21 @@ import {
   DollarSign,
   TrendingUp,
   Package,
-  Ship,
-  Store,
   Loader2,
-  BarChart3,
 } from 'lucide-react';
 import api from '@/lib/axios';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
 
 interface AnalyticsData {
   contracts: {
@@ -139,101 +148,122 @@ export function DataDashboard() {
         </Card>
       </div>
 
-      {/* 详细数据 */}
+      {/* 图表区域 */}
       <div className="grid gap-4 md:grid-cols-2">
-        {/* 出货统计 */}
+        {/* 月度出货趋势（折线图） */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Ship className="h-4 w-4 text-blue-500" />
-              月度出货统计
-            </CardTitle>
-            <CardDescription>最近6个月</CardDescription>
+            <CardTitle className="text-base">月度出货趋势</CardTitle>
+            <CardDescription>最近6个月出货金额</CardDescription>
           </CardHeader>
           <CardContent>
             {data.shipments.monthly.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">暂无出货数据</p>
+              <p className="text-sm text-muted-foreground text-center py-12">暂无出货数据</p>
             ) : (
-              <div className="space-y-3">
-                {data.shipments.monthly.map((m) => (
-                  <div key={m.month} className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{m.month}</span>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="text-muted-foreground">{m.count}单</span>
-                      <span className="text-muted-foreground">{m.boxes || 0}箱</span>
-                      <span className="font-medium text-green-600">
-                        ${(m.amount || 0).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={[...data.shipments.monthly].reverse()}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis 
+                    dataKey="month" 
+                    tick={{ fontSize: 12 }} 
+                    tickFormatter={(v) => v.substring(5)}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`}
+                  />
+                  <Tooltip 
+                    formatter={(value) => [`$${Number(value || 0).toLocaleString()}`, '金额']}
+                    labelFormatter={(label) => `${label}`}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="amount" 
+                    stroke="#10b981" 
+                    strokeWidth={2}
+                    dot={{ fill: '#10b981', r: 4 }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
 
-        {/* 门店统计 */}
+        {/* 门店采购排行（柱形图） */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Store className="h-4 w-4 text-purple-500" />
-              门店采购排行
-            </CardTitle>
-            <CardDescription>按采购金额排序</CardDescription>
+            <CardTitle className="text-base">门店采购排行</CardTitle>
+            <CardDescription>Top 5 门店采购金额</CardDescription>
           </CardHeader>
           <CardContent>
             {data.storeStats.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">暂无门店数据</p>
+              <p className="text-sm text-muted-foreground text-center py-12">暂无门店数据</p>
             ) : (
-              <div className="space-y-2">
-                {data.storeStats.slice(0, 5).map((s, i) => (
-                  <div key={s.storeName} className="flex items-center justify-between py-1">
-                    <div className="flex items-center gap-2">
-                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
-                        i === 0 ? 'bg-yellow-100 text-yellow-700' :
-                        i === 1 ? 'bg-gray-100 text-gray-700' :
-                        i === 2 ? 'bg-orange-100 text-orange-700' :
-                        'bg-muted text-muted-foreground'
-                      }`}>{i + 1}</span>
-                      <span className="text-sm truncate max-w-[120px]">{s.storeName}</span>
-                    </div>
-                    <span className="text-sm font-medium text-green-600">
-                      ${(s.totalAmount || 0).toLocaleString()}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={data.storeStats.slice(0, 5)} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis 
+                    type="number"
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`}
+                  />
+                  <YAxis 
+                    type="category" 
+                    dataKey="storeName" 
+                    width={80}
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(v) => v.length > 8 ? v.substring(0, 8) + '...' : v}
+                  />
+                  <Tooltip 
+                    formatter={(value) => [`$${Number(value || 0).toLocaleString()}`, '采购额']}
+                  />
+                  <Bar 
+                    dataKey="totalAmount" 
+                    fill="#8b5cf6" 
+                    radius={[0, 4, 4, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* 热门商品 */}
+      {/* 热门商品（柱形图） */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-green-500" />
-            热门采购商品 Top 10
-          </CardTitle>
+          <CardTitle className="text-base">热门采购商品 Top 10</CardTitle>
+          <CardDescription>按采购金额排序</CardDescription>
         </CardHeader>
         <CardContent>
           {data.topProducts.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">暂无商品数据</p>
+            <p className="text-sm text-muted-foreground text-center py-12">暂无商品数据</p>
           ) : (
-            <div className="grid gap-2 md:grid-cols-2">
-              {data.topProducts.map((p, i) => (
-                <div key={p.productName} className="flex items-center justify-between p-2 rounded border">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-4">{i + 1}.</span>
-                    <span className="text-sm truncate max-w-[140px]">{p.productName}</span>
-                  </div>
-                  <div className="text-right text-xs">
-                    <div className="text-muted-foreground">{p.count}次</div>
-                    <div className="text-green-600 font-medium">${(p.totalAmount || 0).toLocaleString()}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={data.topProducts.slice(0, 10)}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis 
+                  dataKey="productName" 
+                  tick={{ fontSize: 10 }}
+                  height={60}
+                  interval={0}
+                  tickFormatter={(v) => v.length > 6 ? v.substring(0, 6) + '..' : v}
+                />
+                <YAxis 
+                  tick={{ fontSize: 12 }}
+                  tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`}
+                />
+                <Tooltip 
+                  formatter={(value, name) => [
+                    name === 'totalAmount' ? `$${Number(value || 0).toLocaleString()}` : value,
+                    name === 'totalAmount' ? '金额' : '次数'
+                  ]}
+                />
+                <Legend formatter={(value) => value === 'totalAmount' ? '采购金额' : '采购次数'} />
+                <Bar dataKey="totalAmount" fill="#10b981" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           )}
         </CardContent>
       </Card>
