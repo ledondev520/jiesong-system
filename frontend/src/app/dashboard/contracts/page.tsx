@@ -1,9 +1,7 @@
 /**
- * Input: 采购合同服务、销售合同服务
- * Output: 合同管理页面（采购合同 + 出口合同 Tab切换）
- * Pos: 核心业务页面，管理采购合同和出口合同
- * 
- * 架构说明：出口合同与货柜一对一关系，每个 EXP 编号的出口合同即为一个货柜
+ * Input: 采购合同服务
+ * Output: 采购合同管理页面
+ * Pos: 核心业务页面，管理供应商采购合同
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -12,11 +10,9 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { PurchaseContract, SalesContract, PurchaseStatus, SalesStatus, PurchaseItem } from '@/types';
+import { PurchaseContract, PurchaseStatus, PurchaseItem } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
-import { salesService } from '@/services/sales.service';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -33,7 +29,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Eye, FileText, TrendingUp, ShoppingCart, Package, Loader2, FileDown, Filter } from 'lucide-react';
+import { Plus, Eye, FileText, ShoppingCart, Package, Loader2, FileDown, Filter } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -41,13 +37,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import Link from 'next/link';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { contractDocService } from '@/services/contractDoc.service';
-import { PORTS } from '@/lib/constants';
 
 // 扩展类型
 interface PurchaseContractDetail extends PurchaseContract {
@@ -55,41 +49,32 @@ interface PurchaseContractDetail extends PurchaseContract {
 }
 
 /**
- * 职责：渲染合同管理页面
+ * 职责：渲染采购合同管理页面
  * 思路：
- *   1. 使用Tab切换采购合同/出口合同
- *   2. 出口合同与货柜一对一（EXP编号即货柜编号）
- *   3. 提供快速新建入口
+ *   1. 显示采购合同列表
+ *   2. 提供筛选和分页
+ *   3. 支持查看详情和生成合同文档
  */
 export default function ContractsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tabFromUrl = searchParams.get('tab') || 'purchase';
   const statusFromUrl = searchParams.get('status') || '';
-  
-  // Tab状态（受控模式）
-  const [activeTab, setActiveTab] = useState(tabFromUrl);
   
   // 筛选状态
   const [purchaseStatusFilter, setPurchaseStatusFilter] = useState(statusFromUrl);
-  const [salesStatusFilter, setSalesStatusFilter] = useState(statusFromUrl);
   const [productSearch, setProductSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
   
   // 分页状态
   const [purchasePage, setPurchasePage] = useState(1);
-  const [salesPage, setSalesPage] = useState(1);
   const PAGE_SIZE = 30;
   
   // 同步URL参数变化
   useEffect(() => {
-    setActiveTab(tabFromUrl);
-    if (tabFromUrl === 'purchase') {
+    if (statusFromUrl) {
       setPurchaseStatusFilter(statusFromUrl);
-    } else {
-      setSalesStatusFilter(statusFromUrl);
     }
-  }, [tabFromUrl, statusFromUrl]);
+  }, [statusFromUrl]);
   
   // 采购合同状态
   const [purchaseContracts, setPurchaseContracts] = useState<PurchaseContract[]>([]);
@@ -125,10 +110,6 @@ export default function ContractsPage() {
     setPurchasePage(1);
   }, [purchaseStatusFilter, storeFilter, productSearch]);
   
-  // 货柜（出口合同）状态
-  const [salesContracts, setSalesContracts] = useState<SalesContract[]>([]);
-  const [salesLoading, setSalesLoading] = useState(true);
-  
   // 采购详情弹窗状态
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -148,32 +129,18 @@ export default function ContractsPage() {
   // 0. 初始化加载
   useEffect(() => {
     loadPurchaseContracts();
-    loadSalesContracts();
   }, []);
 
   // 1. 加载采购合同
   const loadPurchaseContracts = async () => {
     setPurchaseLoading(true);
     try {
-      const response = await purchaseService.getAll({ page: 1, pageSize: 200 }); // 加载更多数据，前端分页
+      const response = await purchaseService.getAll({ page: 1, pageSize: 200 });
       setPurchaseContracts(response.data?.items || []);
     } catch {
       toast.error('加载采购合同失败');
     } finally {
       setPurchaseLoading(false);
-    }
-  };
-
-  // 2. 加载货柜（出口合同）列表
-  const loadSalesContracts = async () => {
-    setSalesLoading(true);
-    try {
-      const response = await salesService.getAll({ page: 1, pageSize: 100 });
-      setSalesContracts(response.data?.items || []);
-    } catch {
-      toast.error('加载货柜列表失败');
-    } finally {
-      setSalesLoading(false);
     }
   };
 
@@ -229,12 +196,6 @@ export default function ContractsPage() {
     setPurchaseDetail(null);
   };
 
-  // 获取港口名称
-  const getPortName = (portId: string | undefined | null) => {
-    if (!portId) return '未指定';
-    return PORTS.find(p => p.id === portId)?.name || '未知港口';
-  };
-
   /**
    * 获取采购状态徽章
    */
@@ -252,48 +213,16 @@ export default function ContractsPage() {
     return <Badge className={config.className}>{config.label}</Badge>;
   };
 
-  /**
-   * 获取货柜状态徽章
-   */
-  const getSalesStatusBadge = (status: SalesStatus) => {
-    const statusMap: Record<SalesStatus, { label: string; className: string }> = {
-      [SalesStatus.DRAFT]: { label: '草稿', className: '' },
-      [SalesStatus.CONFIRMED]: { label: '已确认', className: 'bg-blue-500' },
-      [SalesStatus.PACKING]: { label: '装柜中', className: 'bg-yellow-500' },
-      [SalesStatus.SHIPPED]: { label: '已发运', className: 'bg-purple-500' },
-      [SalesStatus.ARRIVED]: { label: '已到达', className: 'bg-green-500' },
-      [SalesStatus.COMPLETED]: { label: '已完成', className: 'bg-gray-500' },
-      [SalesStatus.CANCELLED]: { label: '已取消', className: 'bg-red-500' },
-    };
-    const config = statusMap[status] || { label: status, className: '' };
-    return <Badge className={config.className}>{config.label}</Badge>;
-  };
-
   return (
     <div className="space-y-6">
       {/* 页面标题 */}
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">合同管理</h2>
-        <p className="text-muted-foreground">管理采购合同与出口合同</p>
+        <h2 className="text-2xl font-bold tracking-tight">采购合同</h2>
+        <p className="text-muted-foreground">管理供应商采购合同</p>
       </div>
 
-      {/* Tab切换 */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <div className="flex items-center justify-between">
-          <TabsList>
-            <TabsTrigger value="purchase" className="gap-2">
-              <ShoppingCart className="h-4 w-4" />
-              采购合同
-            </TabsTrigger>
-            <TabsTrigger value="sales" className="gap-2">
-              <TrendingUp className="h-4 w-4" />
-              出口合同
-            </TabsTrigger>
-          </TabsList>
-        </div>
-
-        {/* 采购合同Tab */}
-        <TabsContent value="purchase" className="space-y-4">
+      {/* 采购合同内容 */}
+      <div className="space-y-4">
           <div className="flex flex-wrap justify-between items-center gap-4">
             {/* 筛选区域 */}
             <div className="flex flex-wrap items-center gap-2">
@@ -468,101 +397,7 @@ export default function ContractsPage() {
               </div>
             </div>
           )}
-        </TabsContent>
-
-        {/* 出口合同Tab */}
-        <TabsContent value="sales" className="space-y-4">
-          <div className="flex justify-between items-center gap-4">
-            {/* 状态筛选 */}
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={salesStatusFilter} onValueChange={setSalesStatusFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="全部状态" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">全部状态</SelectItem>
-                  <SelectItem value="DRAFT">草稿</SelectItem>
-                  <SelectItem value="CONFIRMED">已确认</SelectItem>
-                  <SelectItem value="PACKING">装箱中</SelectItem>
-                  <SelectItem value="SHIPPED">已发运</SelectItem>
-                  <SelectItem value="ARRIVED">已到达</SelectItem>
-                  <SelectItem value="COMPLETED">已完成</SelectItem>
-                </SelectContent>
-              </Select>
-              {salesStatusFilter && salesStatusFilter !== 'ALL' && (
-                <Badge variant="secondary">
-                  筛选中: {salesContracts.filter(c => c.status === salesStatusFilter).length} 条
-                </Badge>
-              )}
-            </div>
-            <Button onClick={() => router.push('/dashboard/sales/create')}>
-              <Plus className="mr-2 h-4 w-4" /> 新增出口
-            </Button>
-          </div>
-          
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>合同编号</TableHead>
-                  <TableHead>目的港口</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead>签订日期</TableHead>
-                  <TableHead>箱数/体积</TableHead>
-                  <TableHead className="text-right">金额 ($)</TableHead>
-                  <TableHead className="w-[80px]">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {salesLoading ? (
-                   <TableRow>
-                     <TableCell colSpan={7} className="text-center py-10">加载中...</TableCell>
-                   </TableRow>
-                ) : (() => {
-                  const filtered = salesStatusFilter && salesStatusFilter !== 'ALL'
-                    ? salesContracts.filter(c => c.status === salesStatusFilter)
-                    : salesContracts;
-                  return filtered.length === 0 ? (
-                   <TableRow>
-                     <TableCell colSpan={7} className="text-center py-10">
-                       {salesStatusFilter && salesStatusFilter !== 'ALL' ? '没有符合筛选条件的合同' : '暂无出口合同'}
-                     </TableCell>
-                   </TableRow>
-                ) : (
-                  filtered.map((contract) => (
-                    <TableRow key={contract.id}>
-                      <TableCell className="font-medium flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                        {contract.contractNo}
-                      </TableCell>
-                      <TableCell>{getPortName(contract.portId)}</TableCell>
-                      <TableCell>{getSalesStatusBadge(contract.status)}</TableCell>
-                      <TableCell>
-                        {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">{contract.totalBoxes || 0} 箱</div>
-                        <div className="text-xs text-muted-foreground">{(contract.volume || 0).toFixed(2)} CBM</div>
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-green-600">
-                        ${contract.totalAmount.toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <Link href={`/dashboard/sales/${contract.id}`}>
-                          <Button variant="ghost" size="icon" title="查看详情">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )})()}
-              </TableBody>
-            </Table>
-          </div>
-        </TabsContent>
-      </Tabs>
+      </div>
 
       {/* 采购合同详情弹窗 */}
       <Dialog open={detailOpen} onOpenChange={closeDetail}>

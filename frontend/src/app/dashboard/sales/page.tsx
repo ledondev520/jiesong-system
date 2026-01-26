@@ -1,3 +1,11 @@
+/**
+ * Input: 出口合同服务
+ * Output: 出口合同列表页面
+ * Pos: 出口合同管理入口，展示合同列表与货柜信息
+ * 
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -13,11 +21,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Eye, TrendingUp } from 'lucide-react';
+import { Plus, Eye, Ship } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { PORTS } from '@/lib/constants';
 
 export default function SalesPage() {
   const [contracts, setContracts] = useState<SalesContract[]>([]);
@@ -33,30 +42,44 @@ export default function SalesPage() {
     try {
       const response = await salesService.getAll({ page: 1, pageSize: 100 });
       setContracts(response.data?.items || []);
-    } catch (error) {
-      toast.error('加载销售合同失败');
+    } catch {
+      toast.error('加载出口合同失败');
     } finally {
       setLoading(false);
     }
   };
 
+  /**
+   * 获取港口名称
+   */
+  const getPortName = (portId: string | undefined | null) => {
+    if (!portId) return '-';
+    return PORTS.find(p => p.id === portId)?.name || '-';
+  };
+
+  /**
+   * 获取状态徽章
+   */
   const getStatusBadge = (status: SalesStatus) => {
-    switch (status) {
-      case SalesStatus.DRAFT: return <Badge variant="outline">草稿</Badge>;
-      case SalesStatus.CONFIRMED: return <Badge className="bg-blue-500">已确认</Badge>;
-      case SalesStatus.PAID: return <Badge className="bg-green-500">已收款</Badge>;
-      case SalesStatus.SHIPPED: return <Badge className="bg-purple-500">已发货</Badge>;
-      case SalesStatus.COMPLETED: return <Badge className="bg-gray-500">已完成</Badge>;
-      default: return <Badge variant="secondary">{status}</Badge>;
-    }
+    const statusMap: Record<SalesStatus, { label: string; className: string }> = {
+      [SalesStatus.DRAFT]: { label: '草稿', className: 'bg-gray-100 text-gray-800' },
+      [SalesStatus.CONFIRMED]: { label: '已确认', className: 'bg-blue-500' },
+      [SalesStatus.PACKING]: { label: '装柜中', className: 'bg-yellow-500' },
+      [SalesStatus.SHIPPED]: { label: '已发运', className: 'bg-purple-500' },
+      [SalesStatus.ARRIVED]: { label: '已到达', className: 'bg-green-500' },
+      [SalesStatus.COMPLETED]: { label: '已完成', className: 'bg-gray-500' },
+      [SalesStatus.CANCELLED]: { label: '已取消', className: 'bg-red-500' },
+    };
+    const config = statusMap[status] || { label: status, className: '' };
+    return <Badge className={config.className}>{config.label}</Badge>;
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">销售管理</h2>
-          <p className="text-muted-foreground">管理出口合同与收款。</p>
+          <h2 className="text-3xl font-bold tracking-tight">出口合同</h2>
+          <p className="text-muted-foreground">管理出口合同与装箱信息。共 {contracts.length} 个合同。</p>
         </div>
         <Button onClick={() => router.push('/dashboard/sales/create')}>
           <Plus className="mr-2 h-4 w-4" /> 新增出口合同
@@ -68,36 +91,44 @@ export default function SalesPage() {
           <TableHeader>
             <TableRow>
               <TableHead>合同编号</TableHead>
-              <TableHead>日期</TableHead>
+              <TableHead>目的港口</TableHead>
               <TableHead>状态</TableHead>
-              <TableHead className="text-right">总金额 ($)</TableHead>
-              <TableHead className="text-right">已收 ($)</TableHead>
-              <TableHead className="w-[100px]">操作</TableHead>
+              <TableHead>签订日期</TableHead>
+              <TableHead className="text-right">箱数</TableHead>
+              <TableHead className="text-right">体积 (CBM)</TableHead>
+              <TableHead className="text-right">毛重 (kg)</TableHead>
+              <TableHead className="text-right">金额 ($)</TableHead>
+              <TableHead className="w-[80px]">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
                <TableRow>
-                 <TableCell colSpan={6} className="text-center py-10">加载中...</TableCell>
+                 <TableCell colSpan={9} className="text-center py-10">加载中...</TableCell>
                </TableRow>
             ) : contracts.length === 0 ? (
                <TableRow>
-                 <TableCell colSpan={6} className="text-center py-10">暂无合同。</TableCell>
+                 <TableCell colSpan={9} className="text-center py-10">暂无出口合同。</TableCell>
                </TableRow>
             ) : (
               contracts.map((contract) => (
                 <TableRow key={contract.id}>
-                  <TableCell className="font-medium flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                    {contract.contractNo}
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <Ship className="h-4 w-4 text-blue-500" />
+                      {contract.contractNo}
+                    </div>
                   </TableCell>
-                  <TableCell>{contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}</TableCell>
+                  <TableCell>{getPortName(contract.portId)}</TableCell>
                   <TableCell>{getStatusBadge(contract.status)}</TableCell>
-                  <TableCell className="text-right">${contract.totalAmount.toLocaleString()}</TableCell>
-                  <TableCell className="text-right">
-                    <span className={contract.receivedAmount < contract.totalAmount ? 'text-yellow-600' : 'text-green-600'}>
-                      ${contract.receivedAmount.toLocaleString()}
-                    </span>
+                  <TableCell>
+                    {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}
+                  </TableCell>
+                  <TableCell className="text-right">{contract.totalBoxes || 0}</TableCell>
+                  <TableCell className="text-right">{(contract.volume || 0).toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{(contract.grossWeight || 0).toLocaleString()}</TableCell>
+                  <TableCell className="text-right font-medium text-green-600">
+                    ${contract.totalAmount.toLocaleString()}
                   </TableCell>
                   <TableCell>
                     <Link href={`/dashboard/sales/${contract.id}`}>
