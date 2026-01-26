@@ -94,35 +94,34 @@ export default function SalesDetailPage({ params }: PageProps) {
   });
 
   // 截图区域引用
-  const captureRef = useRef<HTMLDivElement>(null);
+  const packingRef = useRef<HTMLDivElement>(null);
+  const view3dRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadData();
   }, [id]);
 
   /**
-   * 职责：保存页面为图片（装箱明细+3D可视化）
+   * 职责：保存页面为图片（装箱明细+3D可视化合并为一张长图）
    */
   const handleSaveAsImage = async () => {
-    if (!captureRef.current || !contract) return;
+    if (!packingRef.current || !view3dRef.current || !contract) return;
     
     toast.info('正在生成图片...');
+    const prevTab = activeTab;
     
     try {
-      const canvas = await html2canvas(captureRef.current, {
+      const canvasOptions = {
         backgroundColor: '#ffffff',
         scale: 2,
         useCORS: true,
         logging: false,
-        // 处理 lab() 颜色函数问题
-        onclone: (clonedDoc) => {
-          // 移除可能有问题的样式
+        onclone: (clonedDoc: Document) => {
           const elements = clonedDoc.querySelectorAll('*');
           elements.forEach((el) => {
             const computed = window.getComputedStyle(el as Element);
             const color = computed.color;
             const bgColor = computed.backgroundColor;
-            // 如果颜色包含 lab 函数，替换为默认颜色
             if (color.includes('lab') || color.includes('oklch')) {
               (el as HTMLElement).style.color = '#000000';
             }
@@ -131,17 +130,43 @@ export default function SalesDetailPage({ params }: PageProps) {
             }
           });
         },
-      });
-      
+      };
+
+      // 1. 截取装箱明细
+      setActiveTab('packing');
+      await new Promise(r => setTimeout(r, 100));
+      const packingCanvas = await html2canvas(packingRef.current, canvasOptions);
+
+      // 2. 截取3D可视化
+      setActiveTab('3d');
+      await new Promise(r => setTimeout(r, 500)); // 等待3D渲染
+      const view3dCanvas = await html2canvas(view3dRef.current, canvasOptions);
+
+      // 3. 合并为一张长图
+      const mergedCanvas = document.createElement('canvas');
+      mergedCanvas.width = Math.max(packingCanvas.width, view3dCanvas.width);
+      mergedCanvas.height = packingCanvas.height + view3dCanvas.height + 40; // 40px间距
+
+      const ctx = mergedCanvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, mergedCanvas.width, mergedCanvas.height);
+        ctx.drawImage(packingCanvas, 0, 0);
+        ctx.drawImage(view3dCanvas, 0, packingCanvas.height + 40);
+      }
+
+      // 4. 下载
       const link = document.createElement('a');
       link.download = `${contract.contractNo}-装箱明细.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.href = mergedCanvas.toDataURL('image/png');
       link.click();
-      
+
       toast.success('图片已保存');
     } catch (error) {
       console.error('保存图片失败:', error);
       toast.error('保存图片失败，请稍后重试');
+    } finally {
+      setActiveTab(prevTab);
     }
   };
 
@@ -423,17 +448,16 @@ export default function SalesDetailPage({ params }: PageProps) {
       </div>
 
       {/* 标签页 */}
-      <div ref={captureRef}>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="packing">装箱明细</TabsTrigger>
-            <TabsTrigger value="3d">3D 可视化</TabsTrigger>
-            <TabsTrigger value="info">合同信息</TabsTrigger>
-          </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="packing">装箱明细</TabsTrigger>
+          <TabsTrigger value="3d">3D 可视化</TabsTrigger>
+          <TabsTrigger value="info">合同信息</TabsTrigger>
+        </TabsList>
 
         {/* 装箱明细 */}
         <TabsContent value="packing">
-          <Card>
+          <Card ref={packingRef}>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
@@ -508,7 +532,7 @@ export default function SalesDetailPage({ params }: PageProps) {
 
         {/* 3D 可视化 */}
         <TabsContent value="3d">
-          <Card>
+          <Card ref={view3dRef}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Boxes className="h-5 w-5 text-blue-500" />
@@ -551,8 +575,7 @@ export default function SalesDetailPage({ params }: PageProps) {
             }}
           />
         </TabsContent>
-        </Tabs>
-      </div>
+      </Tabs>
 
       {/* 添加/编辑商品对话框 */}
       <Dialog open={isItemDialogOpen} onOpenChange={setIsItemDialogOpen}>
