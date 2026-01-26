@@ -50,7 +50,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ArrowLeft, Plus, Pencil, Trash, Ship, Package, Weight, Box, Boxes, Search, PackageCheck, Camera } from 'lucide-react';
-import domtoimage from 'dom-to-image-more';
+import html2canvas from 'html2canvas';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { CONTAINER_40HQ } from '@/lib/binPacking';
@@ -101,7 +101,7 @@ export default function SalesDetailPage({ params }: PageProps) {
   }, [id]);
 
   /**
-   * 职责：保存页面为图片
+   * 职责：保存页面为图片（装箱明细+3D可视化）
    */
   const handleSaveAsImage = async () => {
     if (!captureRef.current || !contract) return;
@@ -109,23 +109,39 @@ export default function SalesDetailPage({ params }: PageProps) {
     toast.info('正在生成图片...');
     
     try {
-      const dataUrl = await domtoimage.toPng(captureRef.current, {
-        bgcolor: '#ffffff',
-        quality: 1,
-        style: {
-          transform: 'scale(1)',
+      const canvas = await html2canvas(captureRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        // 处理 lab() 颜色函数问题
+        onclone: (clonedDoc) => {
+          // 移除可能有问题的样式
+          const elements = clonedDoc.querySelectorAll('*');
+          elements.forEach((el) => {
+            const computed = window.getComputedStyle(el as Element);
+            const color = computed.color;
+            const bgColor = computed.backgroundColor;
+            // 如果颜色包含 lab 函数，替换为默认颜色
+            if (color.includes('lab') || color.includes('oklch')) {
+              (el as HTMLElement).style.color = '#000000';
+            }
+            if (bgColor.includes('lab') || bgColor.includes('oklch')) {
+              (el as HTMLElement).style.backgroundColor = 'transparent';
+            }
+          });
         },
       });
       
       const link = document.createElement('a');
       link.download = `${contract.contractNo}-装箱明细.png`;
-      link.href = dataUrl;
+      link.href = canvas.toDataURL('image/png');
       link.click();
       
       toast.success('图片已保存');
     } catch (error) {
       console.error('保存图片失败:', error);
-      toast.error('保存图片失败');
+      toast.error('保存图片失败，请稍后重试');
     }
   };
 
