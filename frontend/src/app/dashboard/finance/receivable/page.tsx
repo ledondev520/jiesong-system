@@ -133,12 +133,12 @@ export default function ReceivablePage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>合同编号</TableHead>
-              <TableHead>门店</TableHead>
-              <TableHead>状态</TableHead>
-              <TableHead className="text-right">总金额 ($)</TableHead>
-              <TableHead className="text-right">已收 ($)</TableHead>
-              <TableHead className="text-right">待收 ($)</TableHead>
+              <TableHead className="w-[120px]">合同编号</TableHead>
+              <TableHead className="max-w-[200px]">门店</TableHead>
+              <TableHead className="w-[100px]">状态</TableHead>
+              <TableHead className="text-right w-[120px]">总金额 ($)</TableHead>
+              <TableHead className="text-right w-[100px]">已收 ($)</TableHead>
+              <TableHead className="text-right w-[100px]">待收 ($)</TableHead>
               <TableHead className="w-[100px]">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -147,7 +147,9 @@ export default function ReceivablePage() {
               unreceiveContracts.map((contract) => (
                 <TableRow key={contract.id}>
                   <TableCell className="font-medium">{contract.contractNo}</TableCell>
-                  <TableCell>{getStoreNames(contract)}</TableCell>
+                  <TableCell className="max-w-[200px] truncate" title={getStoreNames(contract)}>
+                    {getStoreNames(contract)}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline">{contract.status}</Badge>
                   </TableCell>
