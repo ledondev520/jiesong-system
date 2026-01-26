@@ -94,6 +94,8 @@ export default function SalesDetailPage({ params }: PageProps) {
   });
 
   // 截图区域引用
+  const headerRef = useRef<HTMLDivElement>(null);
+  const statsRef = useRef<HTMLDivElement>(null);
   const packingRef = useRef<HTMLDivElement>(null);
   const view3dRef = useRef<HTMLDivElement>(null);
 
@@ -102,7 +104,7 @@ export default function SalesDetailPage({ params }: PageProps) {
   }, [id]);
 
   /**
-   * 职责：保存页面为图片（装箱明细+3D可视化合并为一张长图）
+   * 职责：保存页面为图片（头部+统计+装箱明细+3D可视化合并为一张长图）
    */
   const handleSaveAsImage = async () => {
     if (!contract) {
@@ -119,10 +121,6 @@ export default function SalesDetailPage({ params }: PageProps) {
         scale: 2,
         useCORS: true,
         logging: false,
-        ignoreElements: (el: Element) => {
-          // 忽略canvas元素（3D渲染），因为需要特殊处理
-          return false;
-        },
         onclone: (clonedDoc: Document) => {
           const elements = clonedDoc.querySelectorAll('*');
           elements.forEach((el) => {
@@ -137,72 +135,84 @@ export default function SalesDetailPage({ params }: PageProps) {
                 (el as HTMLElement).style.backgroundColor = 'transparent';
               }
             } catch {
-              // 忽略样式处理错误
+              // 忽略
             }
           });
         },
       };
 
-      // 1. 截取装箱明细
+      const canvases: HTMLCanvasElement[] = [];
+      let totalHeight = 0;
+      let maxWidth = 0;
+
+      // 1. 截取头部
+      if (headerRef.current) {
+        const headerCanvas = await html2canvas(headerRef.current, canvasOptions);
+        canvases.push(headerCanvas);
+        totalHeight += headerCanvas.height;
+        maxWidth = Math.max(maxWidth, headerCanvas.width);
+      }
+
+      // 2. 截取统计卡片
+      if (statsRef.current) {
+        const statsCanvas = await html2canvas(statsRef.current, canvasOptions);
+        canvases.push(statsCanvas);
+        totalHeight += statsCanvas.height + 40;
+        maxWidth = Math.max(maxWidth, statsCanvas.width);
+      }
+
+      // 3. 截取装箱明细
       setActiveTab('packing');
       await new Promise(r => setTimeout(r, 300));
-      
-      if (!packingRef.current) {
-        toast.error('装箱明细未渲染');
-        return;
+      if (packingRef.current) {
+        const packingCanvas = await html2canvas(packingRef.current, canvasOptions);
+        canvases.push(packingCanvas);
+        totalHeight += packingCanvas.height + 40;
+        maxWidth = Math.max(maxWidth, packingCanvas.width);
       }
-      
-      const packingCanvas = await html2canvas(packingRef.current, canvasOptions);
-      toast.info('装箱明细已截取，正在处理3D视图...');
+      toast.info('正在处理3D视图...');
 
-      // 2. 截取3D可视化
+      // 4. 截取3D可视化
       setActiveTab('3d');
-      await new Promise(r => setTimeout(r, 1500)); // 等待3D渲染
-      
-      let view3dCanvas: HTMLCanvasElement | null = null;
+      await new Promise(r => setTimeout(r, 1500));
       if (view3dRef.current) {
-        try {
-          // 尝试直接获取 WebGL canvas
-          const webglCanvas = view3dRef.current.querySelector('canvas');
-          if (webglCanvas) {
-            // 创建一个新的 canvas 来复制 WebGL 内容
-            view3dCanvas = document.createElement('canvas');
-            view3dCanvas.width = webglCanvas.width;
-            view3dCanvas.height = webglCanvas.height;
-            const ctx = view3dCanvas.getContext('2d');
-            if (ctx) {
-              ctx.fillStyle = '#f0f0f0';
-              ctx.fillRect(0, 0, view3dCanvas.width, view3dCanvas.height);
-              ctx.drawImage(webglCanvas, 0, 0);
-            }
-          } else {
-            view3dCanvas = await html2canvas(view3dRef.current, canvasOptions);
+        const webglCanvas = view3dRef.current.querySelector('canvas');
+        if (webglCanvas) {
+          const view3dCanvas = document.createElement('canvas');
+          view3dCanvas.width = webglCanvas.width;
+          view3dCanvas.height = webglCanvas.height;
+          const ctx = view3dCanvas.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = '#f5f5f5';
+            ctx.fillRect(0, 0, view3dCanvas.width, view3dCanvas.height);
+            ctx.drawImage(webglCanvas, 0, 0);
           }
-        } catch (e) {
-          console.warn('3D截图失败，将只保存装箱明细:', e);
+          canvases.push(view3dCanvas);
+          totalHeight += view3dCanvas.height + 40;
+          maxWidth = Math.max(maxWidth, view3dCanvas.width);
         }
       }
 
-      // 3. 合并为一张长图（或只保存装箱明细）
-      let finalCanvas: HTMLCanvasElement;
-      
-      if (view3dCanvas) {
-        finalCanvas = document.createElement('canvas');
-        finalCanvas.width = Math.max(packingCanvas.width, view3dCanvas.width);
-        finalCanvas.height = packingCanvas.height + view3dCanvas.height + 80;
+      // 5. 合并所有canvas
+      const finalCanvas = document.createElement('canvas');
+      finalCanvas.width = maxWidth;
+      finalCanvas.height = totalHeight + 40;
 
-        const ctx = finalCanvas.getContext('2d');
-        if (ctx) {
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
-          ctx.drawImage(packingCanvas, 0, 0);
-          ctx.drawImage(view3dCanvas, 0, packingCanvas.height + 80);
+      const ctx = finalCanvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+        
+        let y = 20;
+        for (const canvas of canvases) {
+          // 居中绘制
+          const x = (maxWidth - canvas.width) / 2;
+          ctx.drawImage(canvas, x, y);
+          y += canvas.height + 40;
         }
-      } else {
-        finalCanvas = packingCanvas;
       }
 
-      // 4. 下载
+      // 6. 下载
       const link = document.createElement('a');
       link.download = `${contract.contractNo}-装箱明细.png`;
       link.href = finalCanvas.toDataURL('image/png');
@@ -428,7 +438,7 @@ export default function SalesDetailPage({ params }: PageProps) {
         <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard/sales')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="flex-1">
+        <div className="flex-1" ref={headerRef}>
           <div className="flex items-center gap-3">
             <Ship className="h-6 w-6 text-blue-500" />
             <h2 className="text-3xl font-bold tracking-tight">{contract.contractNo}</h2>
@@ -447,7 +457,7 @@ export default function SalesDetailPage({ params }: PageProps) {
       </div>
 
       {/* 容量概览 */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div ref={statsRef} className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
