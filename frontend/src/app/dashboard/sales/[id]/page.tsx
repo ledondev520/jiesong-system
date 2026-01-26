@@ -116,30 +116,29 @@ export default function SalesDetailPage({ params }: PageProps) {
     const prevTab = activeTab;
     
     try {
+      // 临时注入样式覆盖lab/oklch颜色
+      const tempStyle = document.createElement('style');
+      tempStyle.id = 'temp-screenshot-style';
+      tempStyle.textContent = `
+        :root {
+          --background: 0 0% 100% !important;
+          --foreground: 0 0% 0% !important;
+          --card: 0 0% 100% !important;
+          --card-foreground: 0 0% 0% !important;
+          --primary: 220 90% 50% !important;
+          --primary-foreground: 0 0% 100% !important;
+          --muted: 0 0% 96% !important;
+          --muted-foreground: 0 0% 45% !important;
+          --border: 0 0% 90% !important;
+        }
+      `;
+      document.head.appendChild(tempStyle);
+      
       const canvasOptions = {
         backgroundColor: '#ffffff',
         scale: 2,
         useCORS: true,
         logging: false,
-        removeContainer: true,
-        onclone: (clonedDoc: Document) => {
-          // 移除所有CSS变量中的lab/oklch颜色
-          const style = clonedDoc.createElement('style');
-          style.textContent = `
-            * {
-              --background: 0 0% 100% !important;
-              --foreground: 222.2 84% 4.9% !important;
-              --card: 0 0% 100% !important;
-              --card-foreground: 222.2 84% 4.9% !important;
-              --primary: 222.2 47.4% 11.2% !important;
-              --primary-foreground: 210 40% 98% !important;
-              --muted: 210 40% 96.1% !important;
-              --muted-foreground: 215.4 16.3% 46.9% !important;
-              --border: 214.3 31.8% 91.4% !important;
-            }
-          `;
-          clonedDoc.head.appendChild(style);
-        },
       };
 
       const canvases: HTMLCanvasElement[] = [];
@@ -226,6 +225,9 @@ export default function SalesDetailPage({ params }: PageProps) {
       console.error('保存图片失败:', error);
       toast.error(`保存失败: ${error instanceof Error ? error.message : '未知错误'}`);
     } finally {
+      // 移除临时样式
+      const tempStyleEl = document.getElementById('temp-screenshot-style');
+      if (tempStyleEl) tempStyleEl.remove();
       setActiveTab(prevTab);
     }
   };
