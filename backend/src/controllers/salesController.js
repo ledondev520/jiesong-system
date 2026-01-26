@@ -35,8 +35,11 @@ const list = async (req, res, next) => {
         where,
         skip,
         take: parseInt(pageSize),
-        include: { _count: { select: { items: true } } },
-        orderBy: { contractNo: 'desc' }, // 按合同编号倒序
+        include: { 
+          port: true, // 包含港口信息
+          _count: { select: { items: true } },
+        },
+        orderBy: { contractNo: 'desc' },
       }),
       prisma.salesContract.count({ where }),
     ]);

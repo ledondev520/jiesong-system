@@ -26,8 +26,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { PORTS } from '@/lib/constants';
-
 export default function SalesPage() {
   const [contracts, setContracts] = useState<SalesContract[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,14 +45,6 @@ export default function SalesPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  /**
-   * 获取港口名称
-   */
-  const getPortName = (portId: string | undefined | null) => {
-    if (!portId) return '-';
-    return PORTS.find(p => p.id === portId)?.name || '-';
   };
 
   /**
@@ -119,7 +109,7 @@ export default function SalesPage() {
                       {contract.contractNo}
                     </div>
                   </TableCell>
-                  <TableCell>{getPortName(contract.portId)}</TableCell>
+                  <TableCell>{contract.port?.name || '-'}</TableCell>
                   <TableCell>{getStatusBadge(contract.status)}</TableCell>
                   <TableCell>
                     {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}
