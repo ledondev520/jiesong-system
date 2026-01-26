@@ -56,6 +56,7 @@ import { CONTAINER_40HQ } from '@/lib/binPacking';
 
 // 动态导入 3D 组件（避免 SSR 问题）
 const Container3DView = lazy(() => import('@/components/container/Container3DView'));
+import { ContractInfoEditor } from '@/components/sales/ContractInfoEditor';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -80,6 +81,7 @@ export default function SalesDetailPage({ params }: PageProps) {
     storeId: '',
     quantity: 0,
     boxes: 0,
+    unitPrice: 0,  // 单价（USD）
     grossWeight: 0,
     netWeight: 0,
     volume: 0,
@@ -127,6 +129,7 @@ export default function SalesDetailPage({ params }: PageProps) {
       storeId: '',
       quantity: 0,
       boxes: 0,
+      unitPrice: 0,
       grossWeight: 0,
       netWeight: 0,
       volume: 0,
@@ -150,6 +153,7 @@ export default function SalesDetailPage({ params }: PageProps) {
       storeId: item.storeId || '',
       quantity: item.quantity,
       boxes: item.boxes || 0,
+      unitPrice: item.unitPrice || 0,
       grossWeight: item.grossWeight || 0,
       netWeight: item.netWeight || 0,
       volume: item.volume || 0,
@@ -392,17 +396,18 @@ export default function SalesDetailPage({ params }: PageProps) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>商品名称</TableHead>
-                    <TableHead>尺寸 (L×W×H mm)</TableHead>
+                    <TableHead className="text-right">数量</TableHead>
                     <TableHead className="text-right">箱数</TableHead>
+                    <TableHead className="text-right">单价($)</TableHead>
+                    <TableHead className="text-right">总价($)</TableHead>
                     <TableHead className="text-right">毛重(kg)</TableHead>
-                    <TableHead className="text-right">体积(CBM)</TableHead>
-                    <TableHead className="w-[100px]">操作</TableHead>
+                    <TableHead className="w-[80px]">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {!contract.packingItems?.length ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
                         暂无装箱商品，点击"添加商品"开始装柜
                       </TableCell>
                     </TableRow>
@@ -419,16 +424,15 @@ export default function SalesDetailPage({ params }: PageProps) {
                               </span>
                             )}
                           </TableCell>
-                          <TableCell>
-                            {(item.length && item.width && item.height)
-                              ? `${item.length}×${item.width}×${item.height}`
-                              : (product?.length && product?.width && product?.height)
-                                ? `${product.length}×${product.width}×${product.height}`
-                                : '-'}
+                          <TableCell className="text-right">{item.quantity || '-'}</TableCell>
+                          <TableCell className="text-right">{item.boxes ?? '-'}</TableCell>
+                          <TableCell className="text-right">
+                            {item.unitPrice ? `$${item.unitPrice.toLocaleString()}` : '-'}
                           </TableCell>
-                          <TableCell className="text-right">{item.boxes || '-'}</TableCell>
+                          <TableCell className="text-right font-medium text-green-600">
+                            {item.totalPrice ? `$${item.totalPrice.toLocaleString()}` : '-'}
+                          </TableCell>
                           <TableCell className="text-right">{item.grossWeight || '-'}</TableCell>
-                          <TableCell className="text-right">{item.volume?.toFixed(4) || '-'}</TableCell>
                           <TableCell className="flex gap-1">
                             <Button variant="ghost" size="icon" onClick={() => handleEditItem(item)}>
                               <Pencil className="h-4 w-4" />
@@ -476,51 +480,21 @@ export default function SalesDetailPage({ params }: PageProps) {
           </Card>
         </TabsContent>
 
-        {/* 合同信息 */}
+        {/* 合同信息（可编辑） */}
         <TabsContent value="info">
-          <Card>
-            <CardHeader>
-              <CardTitle>合同信息</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              <div>
-                <div className="text-sm text-muted-foreground">合同编号</div>
-                <div className="font-medium">{contract.contractNo}</div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">状态</div>
-                <div>{getStatusBadge(contract.status)}</div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">总金额</div>
-                <div className="font-medium">${contract.totalAmount.toLocaleString()}</div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">已收款</div>
-                <div className="font-medium">${contract.receivedAmount.toLocaleString()}</div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">汇率</div>
-                <div className="font-medium">{contract.exchangeRate}</div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">目的港</div>
-                <div className="font-medium">{contract.port?.name || '-'}</div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">签订日期</div>
-                <div className="font-medium">
-                  {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}
-                </div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">预计到达</div>
-                <div className="font-medium">
-                  {contract.estimatedArrival ? format(new Date(contract.estimatedArrival), 'yyyy-MM-dd') : '-'}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <ContractInfoEditor 
+            contract={contract}
+            stores={stores}
+            onSave={async (data) => {
+              try {
+                await salesService.update(id, data);
+                toast.success('合同信息更新成功');
+                loadData();
+              } catch {
+                toast.error('更新失败');
+              }
+            }}
+          />
         </TabsContent>
       </Tabs>
 
@@ -646,6 +620,27 @@ export default function SalesDetailPage({ params }: PageProps) {
                   value={itemForm.boxes}
                   onChange={(e) => setItemForm(prev => ({ ...prev, boxes: parseInt(e.target.value) || 0 }))}
                 />
+              </div>
+            </div>
+
+            {/* 价格信息 */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">单价 (USD)</label>
+                <Input 
+                  type="number" 
+                  step="0.01"
+                  value={itemForm.unitPrice || ''}
+                  placeholder="0.00"
+                  onChange={(e) => setItemForm(prev => ({ ...prev, unitPrice: parseFloat(e.target.value) || 0 }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">总价 (USD)</label>
+                <div className="h-10 px-3 py-2 rounded-md border bg-muted/50 text-sm font-medium text-green-600">
+                  ${(itemForm.unitPrice * itemForm.quantity).toLocaleString()}
+                </div>
+                <p className="text-xs text-muted-foreground">自动计算: 单价 × 数量</p>
               </div>
             </div>
 

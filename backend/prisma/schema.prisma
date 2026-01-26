@@ -302,6 +302,9 @@ model PackingItem {
   grossWeight     Float?
   netWeight       Float?
   volume          Float?
+  // 价格信息（USD）
+  unitPrice       Float?   // 单价（USD）
+  totalPrice      Float?   // 总价（USD）= 单价 * 数量
   // 商品规格尺寸（用于3D可视化，单位 mm）
   length          Float?   // 长度 (mm)
   width           Float?   // 宽度 (mm)

@@ -3,6 +3,11 @@
  * Output: 修复 SalesContract 的美元金额 + 创建 PackingItem 装箱明细
  * Pos: 数据修复脚本
  * 
+ * 2026-01-26 修正：
+ *   - 箱数(boxes)不再使用数量(quantity)作为默认值
+ *   - 如果CSV中没有箱数字段，boxes 置为 null 而非推导值
+ *   - 合同的 totalBoxes 也可能为 null（当无有效箱数数据时）
+ * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
@@ -110,12 +115,17 @@ async function main() {
       existingItem.volume += volume;
       existingItem.quantity += quantity;
     } else {
+      // 注意：箱数(boxes)需要单独获取，不能用数量代替
+      // 如果CSV中没有箱数字段，则置空而非使用默认值
+      const boxesRaw = r['箱数'];
+      const boxes = boxesRaw ? parseFloat(boxesRaw) : null;
+      
       contractMap.get(contractNo).items.push({
         productName,
         spec: r['规格'] || '',
         quantity,
         unit: '',
-        boxes: Math.ceil(quantity), // 数量约等于箱数
+        boxes, // 没有数据时为null，不使用数量作为默认值
         grossWeight,
         volume,
         sellingPriceUSD,
@@ -164,15 +174,18 @@ async function main() {
       continue;
     }
     
-    // 计算总箱数
-    const totalBoxes = data.items.reduce((sum, item) => sum + (item.boxes || 0), 0);
+    // 计算总箱数（只统计有箱数数据的项目）
+    const itemsWithBoxes = data.items.filter(item => item.boxes !== null && item.boxes !== undefined);
+    const totalBoxes = itemsWithBoxes.length > 0 
+      ? itemsWithBoxes.reduce((sum, item) => sum + item.boxes, 0) 
+      : null; // 如果没有任何箱数数据，总箱数也置空
     
     // 更新合同金额和货柜信息
     await prisma.salesContract.update({
       where: { id: contract.id },
       data: {
         totalAmount: data.totalAmountUSD,
-        totalBoxes,
+        totalBoxes: totalBoxes, // 可能为null
         grossWeight: data.grossWeight,
         volume: data.volume,
       },
@@ -200,7 +213,7 @@ async function main() {
           productId,
           storeId,
           quantity: item.quantity || 1,
-          boxes: item.boxes || 1,
+          boxes: item.boxes, // 如果没有箱数数据则为null，不使用默认值
           grossWeight: item.grossWeight || 0,
           netWeight: item.grossWeight * 0.9 || 0, // 估算净重
           volume: item.volume || 0,

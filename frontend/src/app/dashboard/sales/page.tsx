@@ -1,7 +1,9 @@
 /**
- * Input: 出口合同服务
- * Output: 出口合同列表页面
- * Pos: 出口合同管理入口，展示合同列表与货柜信息
+ * Input: 出口合同服务 (salesService)
+ * Output: 出口合同列表页面（含删除功能）
+ * Pos: 出口合同管理入口，展示合同列表、货柜信息，支持删除操作
+ * 
+ * 2026-01-26 新增：管理员可删除出口合同（带确认对话框）
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -21,7 +23,17 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Eye, Ship } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Eye, Ship, Trash2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -30,6 +42,11 @@ export default function SalesPage() {
   const [contracts, setContracts] = useState<SalesContract[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  
+  // 删除确认对话框状态
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [contractToDelete, setContractToDelete] = useState<SalesContract | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadContracts();
@@ -44,6 +61,35 @@ export default function SalesPage() {
       toast.error('加载出口合同失败');
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * 职责：打开删除确认对话框
+   */
+  const openDeleteDialog = (contract: SalesContract) => {
+    setContractToDelete(contract);
+    setDeleteDialogOpen(true);
+  };
+
+  /**
+   * 职责：执行删除合同操作
+   * 思路：调用API删除后刷新列表
+   */
+  const handleDeleteContract = async () => {
+    if (!contractToDelete) return;
+    
+    setDeleting(true);
+    try {
+      await salesService.delete(contractToDelete.id);
+      toast.success(`合同 ${contractToDelete.contractNo} 已删除`);
+      setDeleteDialogOpen(false);
+      setContractToDelete(null);
+      loadContracts(); // 刷新列表
+    } catch {
+      toast.error('删除合同失败');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -121,11 +167,21 @@ export default function SalesPage() {
                     ${contract.totalAmount.toLocaleString()}
                   </TableCell>
                   <TableCell>
-                    <Link href={`/dashboard/sales/${contract.id}`}>
-                      <Button variant="ghost" size="icon" title="查看详情与装箱">
-                        <Eye className="h-4 w-4" />
+                    <div className="flex gap-1">
+                      <Link href={`/dashboard/sales/${contract.id}`}>
+                        <Button variant="ghost" size="icon" title="查看详情与装箱">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        title="删除合同"
+                        onClick={() => openDeleteDialog(contract)}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
-                    </Link>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -133,6 +189,37 @@ export default function SalesPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* 删除确认对话框 */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除出口合同 <strong>{contractToDelete?.contractNo}</strong> 吗？
+              <br />
+              此操作将同时删除该合同下的所有装箱明细，且无法撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteContract}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  删除中...
+                </>
+              ) : (
+                '确认删除'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

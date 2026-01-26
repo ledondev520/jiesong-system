@@ -33,12 +33,7 @@ interface ReceivableContract {
   unreceiveAmount: number;
   exchangeRate: number;
   status: string;
-  items?: Array<{
-    store?: {
-      id: string;
-      name: string;
-    };
-  }>;
+  stores?: string[]; // 去重后的门店名称列表
 }
 
 export default function ReceivablePage() {
@@ -107,14 +102,10 @@ export default function ReceivablePage() {
   const unreceiveContracts = contracts.filter(c => c.unreceiveAmount > 0);
 
   /**
-   * 获取门店名称列表（去重）
-   * 思路：使用 Set 去除重复的门店名称，然后用逗号连接
+   * 获取门店名称列表（后端已去重）
    */
   const getStoreNames = (contract: ReceivableContract) => {
-    const stores = contract.items?.map(item => item.store?.name).filter(Boolean) as string[];
-    // 使用 Set 去重
-    const uniqueStores = [...new Set(stores)];
-    return uniqueStores.length > 0 ? uniqueStores.join(', ') : '-';
+    return contract.stores?.length ? contract.stores.join(', ') : '-';
   };
 
   return (

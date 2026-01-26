@@ -261,6 +261,9 @@ export interface PackingItem {
   grossWeight?: number;
   netWeight?: number;
   volume?: number;
+  // 价格信息（USD）
+  unitPrice?: number;   // 单价（USD）
+  totalPrice?: number;  // 总价（USD）= 单价 * 数量
   // 商品规格尺寸（用于3D可视化，单位 mm）
   length?: number;  // 长度 (mm)
   width?: number;   // 宽度 (mm)

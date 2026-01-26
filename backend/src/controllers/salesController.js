@@ -129,6 +129,8 @@ const update = async (req, res, next) => {
       data: {
         exchangeRate: data.exchangeRate,
         signedAt: data.signedAt ? new Date(data.signedAt) : undefined,
+        estimatedArrival: data.estimatedArrival ? new Date(data.estimatedArrival) : undefined,
+        portId: data.portId || undefined,
         note: data.note,
       },
     });
@@ -264,11 +266,16 @@ const calculatePrice = async (req, res, next) => {
 
 /**
  * 职责：添加装箱明细
+ * 思路：接收单价，自动计算总价，更新合同总金额
  */
 const addPackingItem = async (req, res, next) => {
   try {
     const { id } = req.params;
     const data = req.body;
+    
+    // 自动计算总价 = 单价 × 数量
+    const unitPrice = data.unitPrice || null;
+    const totalPrice = unitPrice && data.quantity ? unitPrice * data.quantity : null;
     
     const item = await prisma.packingItem.create({
       data: {
@@ -281,6 +288,8 @@ const addPackingItem = async (req, res, next) => {
         grossWeight: data.grossWeight,
         netWeight: data.netWeight,
         volume: data.volume,
+        unitPrice,
+        totalPrice,
         // 商品规格尺寸（用于3D可视化）
         length: data.length || null,
         width: data.width || null,
@@ -290,7 +299,7 @@ const addPackingItem = async (req, res, next) => {
       include: { product: true, store: true },
     });
     
-    // 更新合同汇总数据
+    // 更新合同汇总数据（含总金额）
     await recalculateContractStats(id);
     
     created(res, item, '装箱明细添加成功');
@@ -301,11 +310,16 @@ const addPackingItem = async (req, res, next) => {
 
 /**
  * 职责：更新装箱明细
+ * 思路：接收单价，自动计算总价，更新合同总金额
  */
 const updatePackingItem = async (req, res, next) => {
   try {
     const { id, itemId } = req.params;
     const data = req.body;
+    
+    // 自动计算总价 = 单价 × 数量
+    const unitPrice = data.unitPrice || null;
+    const totalPrice = unitPrice && data.quantity ? unitPrice * data.quantity : null;
     
     const item = await prisma.packingItem.update({
       where: { id: itemId },
@@ -316,6 +330,8 @@ const updatePackingItem = async (req, res, next) => {
         grossWeight: data.grossWeight,
         netWeight: data.netWeight,
         volume: data.volume,
+        unitPrice,
+        totalPrice,
         storeId: data.storeId || null,
         // 商品规格尺寸（用于3D可视化）
         length: data.length || null,
@@ -326,7 +342,7 @@ const updatePackingItem = async (req, res, next) => {
       include: { product: true, store: true },
     });
     
-    // 更新合同汇总数据
+    // 更新合同汇总数据（含总金额）
     await recalculateContractStats(id);
     
     success(res, item, '装箱明细更新成功');
@@ -354,13 +370,13 @@ const removePackingItem = async (req, res, next) => {
 };
 
 /**
- * 职责：重新计算合同装箱汇总数据
+ * 职责：重新计算合同装箱汇总数据（含总金额）
  * @param {string} contractId - 合同ID
  */
 const recalculateContractStats = async (contractId) => {
   const stats = await prisma.packingItem.aggregate({
     where: { salesContractId: contractId },
-    _sum: { boxes: true, grossWeight: true, netWeight: true, volume: true },
+    _sum: { boxes: true, grossWeight: true, netWeight: true, volume: true, totalPrice: true },
   });
   
   await prisma.salesContract.update({
@@ -370,6 +386,7 @@ const recalculateContractStats = async (contractId) => {
       grossWeight: stats._sum.grossWeight || 0,
       netWeight: stats._sum.netWeight || 0,
       volume: stats._sum.volume || 0,
+      totalAmount: stats._sum.totalPrice || 0, // 从装箱明细汇总总金额
     },
   });
 };

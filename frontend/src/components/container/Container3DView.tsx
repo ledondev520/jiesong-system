@@ -1,16 +1,18 @@
 /**
- * Input: 装箱明细（PackingItem[]）
- * Output: 3D货柜可视化组件
+ * Input: 装箱明细（PackingItem[]）、商品信息（Product[]）
+ * Output: 3D货柜可视化组件（含悬浮提示）
  * Pos: 货柜管理组件，展示3D装箱效果
+ * 
+ * 2026-01-26: 新增悬浮提示功能，鼠标移到箱子上显示商品名称和尺寸
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 'use client';
 
-import { useRef, useMemo, Suspense } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Text, PerspectiveCamera, Environment } from '@react-three/drei';
+import { useRef, useMemo, Suspense, useState } from 'react';
+import { Canvas, useFrame, ThreeEvent } from '@react-three/fiber';
+import { OrbitControls, Text, PerspectiveCamera, Environment, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { PackingItem, Product } from '@/types';
 import { 
@@ -28,14 +30,18 @@ interface Container3DViewProps {
 }
 
 /**
- * 职责：渲染单个箱子
+ * 职责：渲染单个箱子（含悬浮提示）
  */
 function BoxMesh({ 
   box, 
-  onClick 
+  onClick,
+  onHover,
+  isHovered,
 }: { 
   box: PlacedBox; 
   onClick?: () => void;
+  onHover?: (hovered: boolean) => void;
+  isHovered?: boolean;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   
@@ -53,23 +59,51 @@ function BoxMesh({
     z: mmToM(box.posY + box.width / 2),
   }), [box]);
   
+  // 悬浮时轻微高亮
+  const color = isHovered 
+    ? new THREE.Color(box.color || '#4ECDC4').lerp(new THREE.Color('#ffffff'), 0.15)
+    : box.color || '#4ECDC4';
+  
   return (
     <mesh
       ref={meshRef}
       position={[position.x, position.y, position.z]}
       onClick={onClick}
+      onPointerEnter={(e) => {
+        e.stopPropagation();
+        onHover?.(true);
+        document.body.style.cursor = 'pointer';
+      }}
+      onPointerLeave={(e) => {
+        e.stopPropagation();
+        onHover?.(false);
+        document.body.style.cursor = 'auto';
+      }}
     >
       <boxGeometry args={[size.x, size.y, size.z]} />
       <meshStandardMaterial 
-        color={box.color || '#4ECDC4'} 
+        color={color} 
         transparent 
-        opacity={0.85}
+        opacity={isHovered ? 0.9 : 0.85}
       />
       {/* 边框 */}
       <lineSegments>
         <edgesGeometry args={[new THREE.BoxGeometry(size.x, size.y, size.z)]} />
         <lineBasicMaterial color="#333" linewidth={1} />
       </lineSegments>
+      
+      {/* 悬浮提示 - 简洁显示商品名称 */}
+      {isHovered && (
+        <Html
+          position={[0, size.y / 2 + 0.05, 0]}
+          center
+          style={{ pointerEvents: 'none' }}
+        >
+          <div className="bg-black/75 text-white px-2 py-1 rounded text-xs whitespace-nowrap">
+            {box.name}
+          </div>
+        </Html>
+      )}
     </mesh>
   );
 }
@@ -139,14 +173,18 @@ function ContainerFrame() {
 }
 
 /**
- * 职责：3D场景主组件
+ * 职责：3D场景主组件（含悬浮状态管理）
  */
 function Scene({ 
   placedBoxes, 
-  onBoxClick 
+  onBoxClick,
+  hoveredBoxId,
+  onBoxHover,
 }: { 
   placedBoxes: PlacedBox[];
   onBoxClick?: (box: PlacedBox) => void;
+  hoveredBoxId: string | null;
+  onBoxHover: (boxId: string | null) => void;
 }) {
   return (
     <>
@@ -168,13 +206,18 @@ function Scene({
       <ContainerFrame />
       
       {/* 箱子 */}
-      {placedBoxes.map((box, index) => (
-        <BoxMesh 
-          key={`${box.id}-${index}`} 
-          box={box}
-          onClick={() => onBoxClick?.(box)}
-        />
-      ))}
+      {placedBoxes.map((box, index) => {
+        const boxKey = `${box.id}-${index}`;
+        return (
+          <BoxMesh 
+            key={boxKey} 
+            box={box}
+            onClick={() => onBoxClick?.(box)}
+            isHovered={hoveredBoxId === boxKey}
+            onHover={(hovered) => onBoxHover(hovered ? boxKey : null)}
+          />
+        );
+      })}
       
       {/* 地面网格 */}
       <gridHelper args={[20, 20, '#ccc', '#eee']} position={[6, 0, 1.2]} />
@@ -183,12 +226,15 @@ function Scene({
 }
 
 /**
- * 职责：主导出组件
+ * 职责：主导出组件（含悬浮提示功能）
  */
 export default function Container3DView({ 
   packingItems, 
   products 
 }: Container3DViewProps) {
+  // 悬浮状态
+  const [hoveredBoxId, setHoveredBoxId] = useState<string | null>(null);
+  
   // 将 PackingItem 转换为 Box 格式
   // 优先使用 PackingItem 中的尺寸，否则使用 Product 的尺寸，最后使用默认值
   const boxes: Box[] = useMemo(() => {
@@ -244,6 +290,8 @@ export default function Container3DView({
           <Scene 
             placedBoxes={packingResult.placedBoxes}
             onBoxClick={handleBoxClick}
+            hoveredBoxId={hoveredBoxId}
+            onBoxHover={setHoveredBoxId}
           />
         </Suspense>
       </Canvas>

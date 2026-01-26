@@ -126,6 +126,10 @@ const getPayables = async (req, res, next) => {
 
 /**
  * 职责：获取应收账款
+ * 思路：
+ *   1. 从 packingItems 获取门店信息（去重后）
+ *   2. 如果没有门店信息，尝试从目的港口获取
+ *   3. 按合同号倒序排列（EXP26 > EXP25 > EXP24）
  */
 const getReceivables = async (req, res, next) => {
   try {
@@ -143,18 +147,44 @@ const getReceivables = async (req, res, next) => {
         skip,
         take: parseInt(pageSize),
         include: {
-          items: { include: { store: true } },
+          // 包含装箱明细及门店
+          packingItems: { 
+            include: { store: true },
+          },
+          // 包含目的港口
+          port: true,
         },
-        orderBy: { createdAt: 'desc' },
+        // 按合同号倒序排列
+        orderBy: { contractNo: 'desc' },
       }),
       prisma.salesContract.count({ where }),
     ]);
     
-    // 计算未收金额
-    const receivables = contracts.map(c => ({
-      ...c,
-      unreceiveAmount: c.totalAmount - c.receivedAmount,
-    }));
+    // 计算未收金额 + 去重门店列表
+    const receivables = contracts.map(c => {
+      // 从 packingItems 获取唯一门店列表
+      const storeMap = new Map();
+      c.packingItems?.forEach(item => {
+        if (item.store && !storeMap.has(item.store.id)) {
+          storeMap.set(item.store.id, item.store.name);
+        }
+      });
+      let uniqueStores = Array.from(storeMap.values());
+      
+      // 如果没有门店信息，尝试使用目的港口名称
+      if (uniqueStores.length === 0 && c.port?.name) {
+        uniqueStores = [c.port.name];
+      }
+      
+      return {
+        ...c,
+        unreceiveAmount: c.totalAmount - c.receivedAmount,
+        // 简化的门店列表
+        stores: uniqueStores,
+        packingItems: undefined, // 不返回完整数据
+        port: undefined, // 不返回完整港口数据
+      };
+    });
     
     paginated(res, receivables, total, parseInt(page), parseInt(pageSize));
   } catch (error) {
