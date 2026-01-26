@@ -209,8 +209,8 @@ export default function StoreRecommendPage() {
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                          {items.slice(0, 8).map((item) => (
+                        <div className="space-y-2 max-h-72 overflow-y-auto pr-1 scrollbar-thin">
+                          {items.map((item) => (
                             <div 
                               key={item.productId} 
                               className={`flex items-center justify-between p-2 rounded text-sm ${
@@ -229,11 +229,6 @@ export default function StoreRecommendPage() {
                               </div>
                             </div>
                           ))}
-                          {items.length > 8 && (
-                            <p className="text-xs text-center text-muted-foreground pt-1">
-                              还有 {items.length - 8} 种商品...
-                            </p>
-                          )}
                         </div>
                       </CardContent>
                     </Card>
