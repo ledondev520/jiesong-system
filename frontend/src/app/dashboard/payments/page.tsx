@@ -27,6 +27,7 @@ import { CreditCard, ArrowUpRight, ArrowDownLeft, RefreshCw } from 'lucide-react
 import { PaymentDialog } from '../../dashboard/finance/components/PaymentDialog';
 import { toast } from 'sonner';
 import api from '@/lib/axios';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 interface PayableContract {
   id: string;
@@ -185,26 +186,25 @@ export default function PaymentsPage() {
 
   return (
     <div className="space-y-6">
-      {/* 页面标题 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">收付款</h2>
-          <p className="text-muted-foreground">管理应付账款与应收账款</p>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => { fetchStats(); fetchPayables(); fetchReceivables(); }}>
-          <RefreshCw className="mr-2 h-4 w-4" /> 刷新
-        </Button>
-      </div>
+      <PageHeader
+        title="收付款"
+        description="管理应付账款与应收账款"
+        actions={
+          <Button variant="outline" size="sm" className="h-10 rounded-xl border-border/70 bg-background/60" onClick={() => { fetchStats(); fetchPayables(); fetchReceivables(); }}>
+            <RefreshCw className="mr-2 h-4 w-4" /> 刷新
+          </Button>
+        }
+      />
 
       {/* 统计卡片 */}
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+        <Card className="kpi-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">待付账款</CardTitle>
-            <ArrowUpRight className="h-4 w-4 text-orange-600" />
+            <ArrowUpRight className="h-4 w-4 text-chart-5" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
+            <div className="text-2xl font-bold text-chart-5">
               ¥{(stats?.payable?.unpaid ?? 0).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -212,13 +212,13 @@ export default function PaymentsPage() {
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="kpi-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">待收账款</CardTitle>
-            <ArrowDownLeft className="h-4 w-4 text-blue-600" />
+            <ArrowDownLeft className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
+            <div className="text-2xl font-bold text-primary">
               ${(stats?.receivable?.unreceived ?? 0).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -230,7 +230,7 @@ export default function PaymentsPage() {
 
       {/* Tab切换 */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList>
+        <TabsList className="rounded-xl border border-border/70 bg-background/60">
           <TabsTrigger value="payable" className="gap-2">
             <ArrowUpRight className="h-4 w-4" />
             应付账款
@@ -243,7 +243,7 @@ export default function PaymentsPage() {
 
         {/* 应付账款Tab */}
         <TabsContent value="payable" className="space-y-4">
-          <div className="rounded-md border">
+          <div className="surface-panel overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -259,13 +259,13 @@ export default function PaymentsPage() {
               <TableBody>
                 {payableLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
                       加载中...
                     </TableCell>
                   </TableRow>
                 ) : unpaidContracts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
                       暂无待付账款
                     </TableCell>
                   </TableRow>
@@ -278,14 +278,14 @@ export default function PaymentsPage() {
                         <Badge variant="outline">{contract.status}</Badge>
                       </TableCell>
                       <TableCell className="text-right">{contract.totalAmount.toLocaleString()}</TableCell>
-                      <TableCell className="text-right text-green-600">
+                      <TableCell className="text-right text-chart-3">
                         {contract.paidAmount.toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-right text-orange-600 font-bold">
+                      <TableCell className="text-right text-chart-5 font-bold">
                         {contract.unpaidAmount.toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        <Button size="sm" variant="outline" onClick={() => setSelectedPayable(contract)}>
+                        <Button size="sm" variant="outline" className="rounded-xl border-border/70 bg-background/60" onClick={() => setSelectedPayable(contract)}>
                           <CreditCard className="mr-1 h-3 w-3" /> 付款
                         </Button>
                       </TableCell>
@@ -299,7 +299,7 @@ export default function PaymentsPage() {
 
         {/* 应收账款Tab */}
         <TabsContent value="receivable" className="space-y-4">
-          <div className="rounded-md border">
+          <div className="surface-panel overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -315,13 +315,13 @@ export default function PaymentsPage() {
               <TableBody>
                 {receivableLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
                       加载中...
                     </TableCell>
                   </TableRow>
                 ) : unreceiveContracts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
                       暂无待收账款
                     </TableCell>
                   </TableRow>
@@ -334,14 +334,14 @@ export default function PaymentsPage() {
                         <Badge variant="outline">{contract.status}</Badge>
                       </TableCell>
                       <TableCell className="text-right">{contract.totalAmount.toLocaleString()}</TableCell>
-                      <TableCell className="text-right text-green-600">
+                      <TableCell className="text-right text-chart-3">
                         {contract.receivedAmount.toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-right text-blue-600 font-bold">
+                      <TableCell className="text-right text-primary font-bold">
                         {contract.unreceiveAmount.toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        <Button size="sm" variant="outline" onClick={() => setSelectedReceivable(contract)}>
+                        <Button size="sm" variant="outline" className="rounded-xl border-border/70 bg-background/60" onClick={() => setSelectedReceivable(contract)}>
                           <CreditCard className="mr-1 h-3 w-3" /> 收款
                         </Button>
                       </TableCell>

@@ -1,3 +1,11 @@
+/**
+ * Input: 库存服务API
+ * Output: 库存管理页面
+ * Pos: 核心业务页面，负责库存记录和状态流转
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -12,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -21,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal } from 'lucide-react';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 export default function InventoryPage() {
   const [inventory, setInventory] = useState<Inventory[]>([]);
@@ -44,12 +53,12 @@ export default function InventoryPage() {
 
   const getStatusBadge = (status: InventoryStatus) => {
     switch (status) {
-      case InventoryStatus.PRODUCING: return <Badge variant="outline" className="border-yellow-500 text-yellow-600">生产中</Badge>;
-      case InventoryStatus.PACKING: return <Badge className="bg-orange-500">包装中</Badge>;
-      case InventoryStatus.SHIPPING: return <Badge className="bg-blue-500">运输中</Badge>;
-      case InventoryStatus.INBOUND: return <Badge className="bg-purple-500">已入库</Badge>;
-      case InventoryStatus.OUTBOUND: return <Badge className="bg-green-500">已出库</Badge>;
-      default: return <Badge>{status}</Badge>;
+      case InventoryStatus.PRODUCING: return <SemanticBadge tone="warning">生产中</SemanticBadge>;
+      case InventoryStatus.PACKING: return <SemanticBadge tone="danger">包装中</SemanticBadge>;
+      case InventoryStatus.SHIPPING: return <SemanticBadge tone="progress">运输中</SemanticBadge>;
+      case InventoryStatus.INBOUND: return <SemanticBadge tone="secondary">已入库</SemanticBadge>;
+      case InventoryStatus.OUTBOUND: return <SemanticBadge tone="success">已出库</SemanticBadge>;
+      default: return <SemanticBadge tone="neutral">{status}</SemanticBadge>;
     }
   };
 
@@ -65,14 +74,12 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">库存管理</h2>
-          <p className="text-muted-foreground">监控商品生产与流转状态。</p>
-        </div>
-      </div>
+      <PageHeader
+        title="库存管理"
+        description="监控商品生产与流转状态。"
+      />
 
-      <div className="rounded-md border">
+      <div className="surface-panel overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -88,11 +95,11 @@ export default function InventoryPage() {
           <TableBody>
             {loading ? (
                <TableRow>
-                 <TableCell colSpan={7} className="text-center py-10">加载中...</TableCell>
+                 <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
                </TableRow>
             ) : inventory.length === 0 ? (
                <TableRow>
-                 <TableCell colSpan={7} className="text-center py-10">暂无库存记录。</TableCell>
+                 <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">暂无库存记录。</TableCell>
                </TableRow>
             ) : (
               inventory.map((item) => (
@@ -108,7 +115,7 @@ export default function InventoryPage() {
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" className="rounded-xl border border-border/65 bg-background/55">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

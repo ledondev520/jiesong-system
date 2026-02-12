@@ -12,13 +12,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Plus, Pencil, Trash, Ship, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { ContainerDialog } from './components/ContainerDialog';
 import { toast } from 'sonner';
 import { PORTS } from '@/lib/constants';
 import { format } from 'date-fns';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 export default function ContainersPage() {
   const [containers, setContainers] = useState<Container[]>([]);
@@ -48,11 +49,11 @@ export default function ContainersPage() {
 
   const getStatusBadge = (status: ContainerStatus) => {
     switch (status) {
-      case ContainerStatus.PENDING: return <Badge variant="outline">待装柜</Badge>;
-      case ContainerStatus.LOADING: return <Badge className="bg-yellow-500">装柜中</Badge>;
-      case ContainerStatus.SHIPPED: return <Badge className="bg-blue-500">已发运</Badge>;
-      case ContainerStatus.ARRIVED: return <Badge className="bg-green-500">已到达</Badge>;
-      default: return <Badge>{status}</Badge>;
+      case ContainerStatus.PENDING: return <SemanticBadge tone="neutral">待装柜</SemanticBadge>;
+      case ContainerStatus.LOADING: return <SemanticBadge tone="warning">装柜中</SemanticBadge>;
+      case ContainerStatus.SHIPPED: return <SemanticBadge tone="progress">已发运</SemanticBadge>;
+      case ContainerStatus.ARRIVED: return <SemanticBadge tone="success">已到达</SemanticBadge>;
+      default: return <SemanticBadge tone="secondary">{status}</SemanticBadge>;
     }
   };
 
@@ -96,15 +97,15 @@ export default function ContainersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">货柜管理</h2>
-          <p className="text-muted-foreground">管理集装箱装运与物流状态。</p>
-        </div>
-        <Button onClick={handleCreate}>
-          <Plus className="mr-2 h-4 w-4" /> 创建货柜
-        </Button>
-      </div>
+      <PageHeader
+        title="货柜管理"
+        description="管理集装箱装运与物流状态。"
+        actions={
+          <Button onClick={handleCreate}>
+            <Plus className="mr-2 h-4 w-4" /> 创建货柜
+          </Button>
+        }
+      />
 
       <div className="rounded-md border">
         <Table>

@@ -15,6 +15,7 @@ import { ShoppingCart, TrendingUp, Plus } from 'lucide-react';
 import { ProductTracker } from '@/components/tools/ProductTracker';
 import { AIGreeting } from '@/components/ai/AIGreeting';
 import { DataDashboard } from '@/components/dashboard/DataDashboard';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 /**
  * 职责：渲染工作台首页
@@ -32,14 +33,14 @@ export default function DashboardPage() {
       label: '新建采购', 
       icon: ShoppingCart, 
       href: '/dashboard/purchase/create',
-      color: 'bg-blue-500 hover:bg-blue-600',
+      tone: 'primary',
       desc: '录入采购合同'
     },
     { 
       label: '新建销售', 
       icon: TrendingUp, 
       href: '/dashboard/sales/create',
-      color: 'bg-green-500 hover:bg-green-600',
+      tone: 'secondary',
       desc: '创建出口合同'
     },
   ];
@@ -49,16 +50,15 @@ export default function DashboardPage() {
       {/* AI问候语悬浮卡片 */}
       <AIGreeting />
 
-      {/* 页面标题 */}
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">工作台</h2>
-        <p className="text-muted-foreground">欢迎回来，开始今天的工作</p>
-      </div>
+      <PageHeader
+        title="工作台"
+        description="欢迎回来，开始今天的经营任务与核心指标追踪"
+      />
 
       {/* 快速录入区 */}
-      <Card className="border-primary/20 bg-primary/5">
+      <Card className="surface-panel surface-mesh border-primary/35">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
+          <CardTitle className="text-lg flex items-center gap-2 text-accent">
             <Plus className="h-5 w-5" />
             快速录入
           </CardTitle>
@@ -71,12 +71,13 @@ export default function DashboardPage() {
               return (
                 <Button
                   key={action.label}
-                  className={`h-auto py-4 flex-col gap-2 ${action.color} text-white`}
+                  variant={action.tone === 'primary' ? 'default' : 'secondary'}
+                  className="h-auto min-h-24 flex-col gap-2 rounded-2xl border border-border/50 py-4 shadow-[0_8px_20px_oklch(0.06_0.01_260_/_0.28)] transition-all duration-200 hover:-translate-y-0.5"
                   onClick={() => router.push(action.href)}
                 >
                   <Icon className="h-6 w-6" />
                   <span className="font-medium">{action.label}</span>
-                  <span className="text-xs opacity-80">{action.desc}</span>
+                  <span className="text-xs opacity-75">{action.desc}</span>
                 </Button>
               );
             })}

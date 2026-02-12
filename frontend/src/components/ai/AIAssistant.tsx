@@ -420,9 +420,9 @@ export function AIAssistant() {
                     )}
                     {/* 显示思考过程（可折叠） */}
                     {msg.role === 'assistant' && msg.thinking && (
-                      <div className="border-b border-gray-200 dark:border-gray-700 pb-2 mb-1">
+                      <div className="border-b border-border pb-2 mb-1">
                         <button
-                          className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                           onClick={() => setExpandedThinking(prev => ({
                             ...prev,
                             [msg.id]: !prev[msg.id]
@@ -437,8 +437,8 @@ export function AIAssistant() {
                           )}
                         </button>
                         {expandedThinking[msg.id] && (
-                          <div className="mt-2 pl-4 border-l border-dashed border-gray-300 dark:border-gray-600 max-h-40 overflow-y-auto">
-                            <p className="text-xs text-gray-400 italic leading-relaxed whitespace-pre-wrap">
+                          <div className="mt-2 pl-4 border-l border-dashed border-border/80 max-h-40 overflow-y-auto">
+                            <p className="text-xs text-muted-foreground italic leading-relaxed whitespace-pre-wrap">
                               {msg.thinking}
                             </p>
                           </div>
@@ -460,8 +460,8 @@ export function AIAssistant() {
                       <Brain className="h-3 w-3 animate-pulse" />
                       <span className="text-xs">思考中...</span>
                     </div>
-                    <div className="pl-5 border-l border-dashed border-gray-300 dark:border-gray-600">
-                      <p className="text-xs text-gray-400 italic leading-relaxed line-clamp-4">
+                    <div className="pl-5 border-l border-dashed border-border/80">
+                      <p className="text-xs text-muted-foreground italic leading-relaxed line-clamp-4">
                         {currentThinking.slice(-200)}
                       </p>
                     </div>

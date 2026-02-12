@@ -47,13 +47,14 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
+import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Plus, Pencil, Trash, Ship, Package, Weight, Box, Boxes, Search, PackageCheck, Camera } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera } from 'lucide-react';
+import { domToPng } from 'modern-screenshot';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { CONTAINER_40HQ } from '@/lib/binPacking';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 // 动态导入 3D 组件（避免 SSR 问题）
 const Container3DView = lazy(() => import('@/components/container/Container3DView'));
@@ -116,84 +117,70 @@ export default function SalesDetailPage({ params }: PageProps) {
     const prevTab = activeTab;
     
     try {
-      const canvasOptions = {
-        backgroundColor: '#ffffff',
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        foreignObjectRendering: false, // 禁用foreignObject渲染
-        allowTaint: true,
-        imageTimeout: 0,
-      };
-
-      const canvases: HTMLCanvasElement[] = [];
-      let totalHeight = 0;
-      let maxWidth = 0;
+      const images: string[] = [];
 
       // 1. 截取头部
       if (headerRef.current) {
-        const headerCanvas = await html2canvas(headerRef.current, canvasOptions);
-        canvases.push(headerCanvas);
-        totalHeight += headerCanvas.height;
-        maxWidth = Math.max(maxWidth, headerCanvas.width);
+        const headerImg = await domToPng(headerRef.current, { scale: 2, backgroundColor: '#ffffff' });
+        images.push(headerImg);
       }
 
       // 2. 截取统计卡片
       if (statsRef.current) {
-        const statsCanvas = await html2canvas(statsRef.current, canvasOptions);
-        canvases.push(statsCanvas);
-        totalHeight += statsCanvas.height + 40;
-        maxWidth = Math.max(maxWidth, statsCanvas.width);
+        const statsImg = await domToPng(statsRef.current, { scale: 2, backgroundColor: '#ffffff' });
+        images.push(statsImg);
       }
 
       // 3. 截取装箱明细
       setActiveTab('packing');
       await new Promise(r => setTimeout(r, 300));
       if (packingRef.current) {
-        const packingCanvas = await html2canvas(packingRef.current, canvasOptions);
-        canvases.push(packingCanvas);
-        totalHeight += packingCanvas.height + 40;
-        maxWidth = Math.max(maxWidth, packingCanvas.width);
+        const packingImg = await domToPng(packingRef.current, { scale: 2, backgroundColor: '#ffffff' });
+        images.push(packingImg);
       }
       toast.info('正在处理3D视图...');
 
-      // 4. 截取3D可视化
+      // 4. 截取3D可视化（直接获取WebGL canvas）
       setActiveTab('3d');
       await new Promise(r => setTimeout(r, 1500));
       if (view3dRef.current) {
         const webglCanvas = view3dRef.current.querySelector('canvas');
         if (webglCanvas) {
-          const view3dCanvas = document.createElement('canvas');
-          view3dCanvas.width = webglCanvas.width;
-          view3dCanvas.height = webglCanvas.height;
-          const ctx = view3dCanvas.getContext('2d');
-          if (ctx) {
-            ctx.fillStyle = '#f5f5f5';
-            ctx.fillRect(0, 0, view3dCanvas.width, view3dCanvas.height);
-            ctx.drawImage(webglCanvas, 0, 0);
-          }
-          canvases.push(view3dCanvas);
-          totalHeight += view3dCanvas.height + 40;
-          maxWidth = Math.max(maxWidth, view3dCanvas.width);
+          images.push(webglCanvas.toDataURL('image/png'));
         }
       }
 
-      // 5. 合并所有canvas
+      // 5. 加载所有图片并合并
+      const loadedImages = await Promise.all(
+        images.map(src => new Promise<HTMLImageElement>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => resolve(img);
+          img.src = src;
+        }))
+      );
+
+      // 计算总尺寸
+      const maxWidth = Math.max(...loadedImages.map(img => img.width));
+      const totalHeight = loadedImages.reduce((sum, img) => sum + img.height + 40, 40);
+
+      // 创建最终canvas
       const finalCanvas = document.createElement('canvas');
       finalCanvas.width = maxWidth;
-      finalCanvas.height = totalHeight + 40;
+      finalCanvas.height = totalHeight;
 
       const ctx = finalCanvas.getContext('2d');
       if (ctx) {
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+        ctx.fillRect(0, 0, maxWidth, totalHeight);
         
         let y = 20;
-        for (const canvas of canvases) {
-          // 居中绘制
-          const x = (maxWidth - canvas.width) / 2;
-          ctx.drawImage(canvas, x, y);
-          y += canvas.height + 40;
+        for (const img of loadedImages) {
+          if (img.width > 0) {
+            const x = (maxWidth - img.width) / 2;
+            ctx.drawImage(img, x, y);
+            y += img.height + 40;
+          }
         }
       }
 
@@ -384,17 +371,17 @@ export default function SalesDetailPage({ params }: PageProps) {
    * 职责：获取状态徽章
    */
   const getStatusBadge = (status: SalesStatus) => {
-    const statusMap: Record<SalesStatus, { label: string; className: string }> = {
-      [SalesStatus.DRAFT]: { label: '草稿', className: 'bg-gray-500' },
-      [SalesStatus.CONFIRMED]: { label: '已确认', className: 'bg-blue-500' },
-      [SalesStatus.PACKING]: { label: '装箱中', className: 'bg-yellow-500' },
-      [SalesStatus.SHIPPED]: { label: '已发运', className: 'bg-purple-500' },
-      [SalesStatus.ARRIVED]: { label: '已到达', className: 'bg-green-500' },
-      [SalesStatus.COMPLETED]: { label: '已完成', className: 'bg-gray-700' },
-      [SalesStatus.CANCELLED]: { label: '已取消', className: 'bg-red-500' },
+    const statusMap: Record<SalesStatus, { label: string; tone: React.ComponentProps<typeof SemanticBadge>["tone"] }> = {
+      [SalesStatus.DRAFT]: { label: '草稿', tone: 'neutral' },
+      [SalesStatus.CONFIRMED]: { label: '已确认', tone: 'info' },
+      [SalesStatus.PACKING]: { label: '装箱中', tone: 'warning' },
+      [SalesStatus.SHIPPED]: { label: '已发运', tone: 'progress' },
+      [SalesStatus.ARRIVED]: { label: '已到达', tone: 'success' },
+      [SalesStatus.COMPLETED]: { label: '已完成', tone: 'secondary' },
+      [SalesStatus.CANCELLED]: { label: '已取消', tone: 'danger' },
     };
-    const config = statusMap[status] || { label: status, className: '' };
-    return <Badge className={config.className}>{config.label}</Badge>;
+    const config = statusMap[status] || { label: status, tone: 'neutral' as const };
+    return <SemanticBadge tone={config.tone}>{config.label}</SemanticBadge>;
   };
 
   if (loading) {
@@ -419,26 +406,21 @@ export default function SalesDetailPage({ params }: PageProps) {
   return (
     <div className="space-y-6 pb-10">
       {/* 页头 */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard/sales')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex-1" ref={headerRef}>
-          <div className="flex items-center gap-3">
-            <Ship className="h-6 w-6 text-blue-500" />
-            <h2 className="text-3xl font-bold tracking-tight">{contract.contractNo}</h2>
-            {getStatusBadge(contract.status)}
-          </div>
-          <p className="text-muted-foreground">
-            目的港: {contract.port?.name || '未指定'} | 
-            签订: {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'} | 
-            预计到达: {contract.estimatedArrival ? format(new Date(contract.estimatedArrival), 'yyyy-MM-dd') : '-'}
-          </p>
-        </div>
-        <Button variant="outline" onClick={handleSaveAsImage}>
-          <Camera className="mr-2 h-4 w-4" />
-          保存为图片
-        </Button>
+      <div ref={headerRef}>
+        <PageHeader
+          title={contract.contractNo}
+          description={`目的港: ${contract.port?.name || '未指定'} | 签订: ${contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'} | 预计到达: ${contract.estimatedArrival ? format(new Date(contract.estimatedArrival), 'yyyy-MM-dd') : '-'}`}
+          backHref="/dashboard/sales"
+          actions={
+            <div className="flex items-center gap-2">
+              {getStatusBadge(contract.status)}
+              <Button variant="outline" onClick={handleSaveAsImage}>
+                <Camera className="mr-2 h-4 w-4" />
+                保存为图片
+              </Button>
+            </div>
+          }
+        />
       </div>
 
       {/* 容量概览 */}
@@ -446,7 +428,7 @@ export default function SalesDetailPage({ params }: PageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <Box className="h-5 w-5 text-purple-500" />
+              <Box className="h-5 w-5 text-chart-4" />
               <div>
                 <div className="text-2xl font-bold">{contract.totalBoxes || 0}</div>
                 <p className="text-xs text-muted-foreground">总箱数</p>
@@ -457,7 +439,7 @@ export default function SalesDetailPage({ params }: PageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <Boxes className="h-5 w-5 text-blue-500" />
+              <Boxes className="h-5 w-5 text-chart-1" />
               <div>
                 <div className="text-2xl font-bold">{usedCBM.toFixed(2)}</div>
                 <p className="text-xs text-muted-foreground">体积 (CBM) / {maxCBM}</p>
@@ -469,7 +451,7 @@ export default function SalesDetailPage({ params }: PageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <Weight className="h-5 w-5 text-orange-500" />
+              <Weight className="h-5 w-5 text-chart-5" />
               <div>
                 <div className="text-2xl font-bold">{weightUsed.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">毛重 (kg) / {CONTAINER_40HQ.maxWeight.toLocaleString()}</p>
@@ -481,7 +463,7 @@ export default function SalesDetailPage({ params }: PageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-green-500" />
+              <Package className="h-5 w-5 text-chart-3" />
               <div>
                 <div className="text-2xl font-bold">${contract.totalAmount.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">合同金额</p>
@@ -552,7 +534,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                           <TableCell className="text-right">
                             {item.unitPrice ? `$${item.unitPrice.toLocaleString()}` : '-'}
                           </TableCell>
-                          <TableCell className="text-right font-medium text-green-600">
+                          <TableCell className="text-right font-medium text-chart-3">
                             {item.totalPrice ? `$${item.totalPrice.toLocaleString()}` : '-'}
                           </TableCell>
                           <TableCell className="text-right">{item.grossWeight || '-'}</TableCell>
@@ -579,7 +561,7 @@ export default function SalesDetailPage({ params }: PageProps) {
           <Card ref={view3dRef}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Boxes className="h-5 w-5 text-blue-500" />
+                <Boxes className="h-5 w-5 text-primary" />
                 3D 装箱可视化
               </CardTitle>
               <CardDescription>
@@ -662,7 +644,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                       <SelectItem key={p.id} value={p.id}>
                         <div className="flex items-center gap-2">
                           {hasInventory(p.id) && (
-                            <PackageCheck className="h-3 w-3 text-green-500 flex-shrink-0" />
+                            <PackageCheck className="h-3 w-3 text-chart-3 flex-shrink-0" />
                           )}
                           <span>{p.customsName}</span>
                           {p.length && p.width && p.height && (
@@ -677,20 +659,20 @@ export default function SalesDetailPage({ params }: PageProps) {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                <PackageCheck className="h-3 w-3 inline text-green-500 mr-1" />
+                <PackageCheck className="h-3 w-3 inline text-chart-3 mr-1" />
                 表示有库存
               </p>
             </div>
 
             {/* 商品规格尺寸（用于3D可视化） */}
             {itemForm.productId && (
-              <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="p-3 bg-primary/7 rounded-lg border border-primary/22">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                  <span className="text-sm font-medium text-primary">
                     商品规格尺寸（用于3D可视化）
                   </span>
                   {(itemForm.length === 0 || itemForm.width === 0 || itemForm.height === 0) && (
-                    <span className="text-xs text-orange-600 dark:text-orange-400">
+                    <span className="text-xs text-chart-5">
                       请填写尺寸以获得准确的3D效果
                     </span>
                   )}
@@ -760,7 +742,7 @@ export default function SalesDetailPage({ params }: PageProps) {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">总价 (USD)</label>
-                <div className="h-10 px-3 py-2 rounded-md border bg-muted/50 text-sm font-medium text-green-600">
+                <div className="h-10 px-3 py-2 rounded-md border bg-muted/50 text-sm font-medium text-chart-3">
                   ${(itemForm.unitPrice * itemForm.quantity).toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground">自动计算: 单价 × 数量</p>
@@ -796,7 +778,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                 />
                 {/* 体积预估提示 */}
                 {itemForm.length > 0 && itemForm.width > 0 && itemForm.height > 0 && itemForm.boxes > 0 && (
-                  <p className="text-xs text-blue-600 dark:text-blue-400">
+                  <p className="text-xs text-primary">
                     预估: {((itemForm.length * itemForm.width * itemForm.height / 1e9) * itemForm.boxes).toFixed(4)} CBM
                     （{itemForm.length}×{itemForm.width}×{itemForm.height}mm × {itemForm.boxes}箱）
                   </p>

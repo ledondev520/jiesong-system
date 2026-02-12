@@ -11,7 +11,7 @@ import { SalesContract, PackingItem, ApiResponse, PaginatedResponse } from '@/ty
 
 export const salesService = {
   // 获取销售合同列表
-  getAll: async (params?: { page?: number; pageSize?: number; query?: string }) => {
+  getAll: async (params?: { page?: number; pageSize?: number; keyword?: string }) => {
     return api.get<any, ApiResponse<PaginatedResponse<SalesContract>>>('/sales', { params });
   },
 

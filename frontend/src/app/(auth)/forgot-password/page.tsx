@@ -99,13 +99,13 @@ export default function ForgotPasswordPage() {
   // 重置成功后的展示
   if (isSuccess) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/50">
-        <Card className="w-full max-w-md">
+      <div className="auth-shell">
+        <Card className="auth-card">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-              <CheckCircle className="h-10 w-10 text-green-600" />
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-chart-3/30 bg-chart-3/16">
+              <CheckCircle className="h-10 w-10 text-chart-3" />
             </div>
-            <CardTitle>密码重置成功！</CardTitle>
+            <CardTitle className="text-accent">密码重置成功！</CardTitle>
             <CardDescription>
               您的密码已成功重置，请使用新密码登录。
             </CardDescription>
@@ -118,7 +118,7 @@ export default function ForgotPasswordPage() {
             </div>
           </CardContent>
           <CardFooter>
-            <Button className="w-full" onClick={() => router.push('/login')}>
+            <Button className="h-10 w-full rounded-xl" onClick={() => router.push('/login')}>
               返回登录
             </Button>
           </CardFooter>
@@ -128,13 +128,13 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/50 py-8">
-      <Card className="w-full max-w-md">
+    <div className="auth-shell">
+      <Card className="auth-card">
         <CardHeader>
-          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full border border-primary/30 bg-primary/10">
             <KeyRound className="h-6 w-6 text-primary" />
           </div>
-          <CardTitle className="text-center">找回密码</CardTitle>
+          <CardTitle className="text-center text-accent">找回密码</CardTitle>
           <CardDescription className="text-center">
             请输入您的用户名和注册时绑定的手机号进行验证
           </CardDescription>
@@ -150,7 +150,7 @@ export default function ForgotPasswordPage() {
                   <FormItem>
                     <FormLabel>用户名</FormLabel>
                     <FormControl>
-                      <Input placeholder="请输入您的用户名" {...field} />
+                      <Input placeholder="请输入您的用户名" className="rounded-xl bg-background/70" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -165,7 +165,7 @@ export default function ForgotPasswordPage() {
                   <FormItem>
                     <FormLabel>绑定手机号</FormLabel>
                     <FormControl>
-                      <Input placeholder="请输入注册时绑定的手机号" type="tel" {...field} />
+                      <Input placeholder="请输入注册时绑定的手机号" type="tel" className="rounded-xl bg-background/70" {...field} />
                     </FormControl>
                     <FormDescription>
                       输入注册时填写的手机号以验证身份
@@ -183,7 +183,7 @@ export default function ForgotPasswordPage() {
                   <FormItem>
                     <FormLabel>新密码</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="请设置新密码（至少6位）" {...field} />
+                      <Input type="password" placeholder="请设置新密码（至少6位）" className="rounded-xl bg-background/70" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -198,14 +198,14 @@ export default function ForgotPasswordPage() {
                   <FormItem>
                     <FormLabel>确认新密码</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="请再次输入新密码" {...field} />
+                      <Input type="password" placeholder="请再次输入新密码" className="rounded-xl bg-background/70" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="h-10 w-full rounded-xl" disabled={isLoading}>
                 {isLoading ? '验证中...' : '重置密码'}
               </Button>
             </form>

@@ -1,17 +1,25 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { IBM_Plex_Mono, Noto_Sans_SC, Noto_Serif_SC } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { AIAssistant } from "@/components/ai/AIAssistant";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const bodySans = Noto_Sans_SC({
+  variable: "--font-body-sans",
+  weight: ["400", "500", "700"],
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const displaySerif = Noto_Serif_SC({
+  variable: "--font-display-serif",
+  weight: ["500", "700"],
   subsets: ["latin"],
+});
+
+const uiMono = IBM_Plex_Mono({
+  variable: "--font-ui-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
 });
 
 export const metadata: Metadata = {
@@ -25,9 +33,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="zh-CN" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${bodySans.variable} ${displaySerif.variable} ${uiMono.variable} antialiased`}
+        style={{
+          fontFamily: "var(--font-body-sans)",
+        }}
       >
         {children}
         <Toaster position="top-center" />

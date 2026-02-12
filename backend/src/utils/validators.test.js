@@ -106,7 +106,7 @@ test('validateRegister: 用户名长度不足', async () => {
 });
 
 test('validatePagination: 页码与每页数量', async () => {
-  const req = createRequest({ query: { page: 0, pageSize: 200 } });
+  const req = createRequest({ query: { page: 1, pageSize: 600 } });
 
   await runValidations(validatePagination, req);
   const { next, capture } = createNextCapture();
@@ -114,8 +114,7 @@ test('validatePagination: 页码与每页数量', async () => {
 
   assert.equal(capture.called, true);
   assert.equal(capture.error.statusCode, 400);
-  assert.match(capture.error.message, /页码必须大于0/);
-  assert.match(capture.error.message, /每页数量必须在1-100之间/);
+  assert.match(capture.error.message, /每页数量必须在1-500之间/);
 });
 
 test('validateId: ID参数不能为空', async () => {

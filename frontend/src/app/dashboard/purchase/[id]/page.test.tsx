@@ -1,0 +1,132 @@
+/**
+ * Input: 采购合同详情页、purchaseService、contractDocService、router、toast
+ * Output: 采购合同详情页交互逻辑测试结果
+ * Pos: 前端详情页交互测试
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
+
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Suspense } from 'react';
+import PurchaseDetailPage from './page';
+
+const mockGetById = vi.fn();
+const mockToastError = vi.fn();
+
+vi.mock('react', async () => {
+  const actual = await vi.importActual<typeof import('react')>('react');
+  return {
+    ...actual,
+    use: (value: unknown) => {
+      if (value && typeof (value as { then?: unknown }).then === 'function') {
+        return { id: 'p-1' };
+      }
+      return actual.use(value as never);
+    },
+  };
+});
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    back: vi.fn(),
+  }),
+}));
+
+vi.mock('@/services/purchase.service', () => ({
+  purchaseService: {
+    getById: (...args: unknown[]) => mockGetById(...args),
+  },
+}));
+
+vi.mock('@/services/contractDoc.service', () => ({
+  contractDocService: {
+    generateFromPurchase: vi.fn(),
+    downloadDocument: vi.fn(),
+    getContractPdf: vi.fn(),
+  },
+}));
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: (...args: unknown[]) => mockToastError(...args),
+    success: vi.fn(),
+    info: vi.fn(),
+  },
+}));
+
+describe('PurchaseDetailPage 交互逻辑', () => {
+  beforeEach(() => {
+    mockGetById.mockReset();
+    mockToastError.mockReset();
+  });
+
+  /**
+   * 职责：使用 Suspense 渲染依赖 use(params) 的详情页
+   * 思路：统一包裹 fallback，确保 Promise params 能被 React 解析
+   * @param id 合同ID
+   */
+  const renderPage = (id = 'p-1') => {
+    return render(
+      <Suspense fallback={<div>页面加载中...</div>}>
+        <PurchaseDetailPage params={Promise.resolve({ id })} />
+      </Suspense>,
+    );
+  };
+
+  it('加载成功后展示合同信息与商品空态', async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: 'p-1',
+        contractNo: 'PO2500001',
+        status: 'DRAFT',
+        totalAmount: 0,
+        paidAmount: 0,
+        supplier: { name: '供应商A' },
+        items: [],
+      },
+    });
+
+    renderPage('p-1');
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'PO2500001' })).toBeInTheDocument();
+      expect(screen.getByText('暂无商品明细')).toBeInTheDocument();
+    });
+  });
+
+  it('点击生成购销合同会打开弹窗', async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: 'p-1',
+        contractNo: 'PO2500001',
+        status: 'DRAFT',
+        totalAmount: 0,
+        paidAmount: 0,
+        supplier: { name: '供应商A' },
+        items: [],
+      },
+    });
+
+    const user = userEvent.setup();
+    renderPage('p-1');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /生成购销合同/ })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /生成购销合同/ }));
+    expect(screen.getByText('填写收货信息后，系统将自动生成标准购销合同文档')).toBeInTheDocument();
+  });
+
+  it('加载失败时提示错误', async () => {
+    mockGetById.mockRejectedValue(new Error('load failed'));
+    renderPage('p-1');
+
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith('加载合同详情失败');
+    });
+  });
+});
+

@@ -27,10 +27,10 @@ describe('purchaseService api', () => {
   it('getAll: 传递查询参数', async () => {
     (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
 
-    await purchaseService.getAll({ page: 1, pageSize: 20, query: '采购' });
+    await purchaseService.getAll({ page: 1, pageSize: 20, keyword: '采购' });
 
     expect(api.get).toHaveBeenCalledWith('/purchases', {
-      params: { page: 1, pageSize: 20, query: '采购' },
+      params: { page: 1, pageSize: 20, keyword: '采购' },
     });
   });
 

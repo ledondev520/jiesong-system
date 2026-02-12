@@ -29,6 +29,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { SemanticBadge } from '@/components/ui/semantic-badge';
+import { AmountText } from '@/components/ui/amount-text';
 import { Plus, Eye, FileText, ShoppingCart, Package, Loader2, FileDown, Filter } from 'lucide-react';
 import {
   Select,
@@ -42,6 +44,7 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { contractDocService } from '@/services/contractDoc.service';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 // 扩展类型
 interface PurchaseContractDetail extends PurchaseContract {
@@ -58,7 +61,7 @@ interface PurchaseContractDetail extends PurchaseContract {
 export default function ContractsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const statusFromUrl = searchParams.get('status') || '';
+  const statusFromUrl = searchParams.get('status') || 'ALL';
   
   // 筛选状态
   const [purchaseStatusFilter, setPurchaseStatusFilter] = useState(statusFromUrl);
@@ -71,9 +74,7 @@ export default function ContractsPage() {
   
   // 同步URL参数变化
   useEffect(() => {
-    if (statusFromUrl) {
-      setPurchaseStatusFilter(statusFromUrl);
-    }
+    setPurchaseStatusFilter(statusFromUrl || 'ALL');
   }, [statusFromUrl]);
   
   // 采购合同状态
@@ -200,36 +201,35 @@ export default function ContractsPage() {
    * 获取采购状态徽章
    */
   const getPurchaseStatusBadge = (status: PurchaseStatus) => {
-    const statusMap: Record<PurchaseStatus, { label: string; className: string }> = {
-      [PurchaseStatus.DRAFT]: { label: '草稿', className: 'bg-gray-100 text-gray-800' },
-      [PurchaseStatus.SIGNED]: { label: '已签订', className: 'bg-blue-100 text-blue-800' },
-      [PurchaseStatus.PRODUCING]: { label: '生产中', className: 'bg-yellow-100 text-yellow-800' },
-      [PurchaseStatus.SHIPPED]: { label: '已发货', className: 'bg-purple-100 text-purple-800' },
-      [PurchaseStatus.RECEIVED]: { label: '已收货', className: 'bg-cyan-100 text-cyan-800' },
-      [PurchaseStatus.COMPLETED]: { label: '已完成', className: 'bg-green-100 text-green-800' },
-      [PurchaseStatus.CANCELLED]: { label: '已取消', className: 'bg-red-100 text-red-800' },
+    const statusMap: Record<PurchaseStatus, { label: string; tone: React.ComponentProps<typeof SemanticBadge>["tone"] }> = {
+      [PurchaseStatus.DRAFT]: { label: '草稿', tone: 'neutral' },
+      [PurchaseStatus.SIGNED]: { label: '已签订', tone: 'info' },
+      [PurchaseStatus.PRODUCING]: { label: '生产中', tone: 'warning' },
+      [PurchaseStatus.SHIPPED]: { label: '已发货', tone: 'progress' },
+      [PurchaseStatus.RECEIVED]: { label: '已收货', tone: 'secondary' },
+      [PurchaseStatus.COMPLETED]: { label: '已完成', tone: 'success' },
+      [PurchaseStatus.CANCELLED]: { label: '已取消', tone: 'danger' },
     };
-    const config = statusMap[status] || { label: status, className: '' };
-    return <Badge className={config.className}>{config.label}</Badge>;
+    const config = statusMap[status] || { label: status, tone: 'neutral' as const };
+    return <SemanticBadge tone={config.tone}>{config.label}</SemanticBadge>;
   };
 
   return (
     <div className="space-y-6">
-      {/* 页面标题 */}
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">采购合同</h2>
-        <p className="text-muted-foreground">管理供应商采购合同</p>
-      </div>
+      <PageHeader
+        title="采购合同"
+        description="管理供应商采购合同"
+      />
 
       {/* 采购合同内容 */}
       <div className="space-y-4">
           <div className="flex flex-wrap justify-between items-center gap-4">
             {/* 筛选区域 */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="surface-panel flex flex-wrap items-center gap-2 px-3 py-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
               {/* 状态筛选 */}
               <Select value={purchaseStatusFilter} onValueChange={setPurchaseStatusFilter}>
-                <SelectTrigger className="w-[130px]">
+                <SelectTrigger className="h-10 w-[130px] rounded-xl border-border/70 bg-background/70">
                   <SelectValue placeholder="全部状态" />
                 </SelectTrigger>
                 <SelectContent>
@@ -244,7 +244,7 @@ export default function ContractsPage() {
               </Select>
               {/* 发货店铺筛选 */}
               <Select value={storeFilter} onValueChange={setStoreFilter}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="h-10 w-[150px] rounded-xl border-border/70 bg-background/70">
                   <SelectValue placeholder="全部店铺" />
                 </SelectTrigger>
                 <SelectContent>
@@ -259,12 +259,13 @@ export default function ContractsPage() {
                 placeholder="搜索商品名称..."
                 value={productSearch}
                 onChange={(e) => setProductSearch(e.target.value)}
-                className="w-[160px]"
+                className="h-10 w-[160px] rounded-xl border-border/70 bg-background/70"
               />
               {(purchaseStatusFilter !== 'ALL' || storeFilter || productSearch) && (
-                <Button 
+                <Button
                   variant="ghost" 
                   size="sm"
+                  className="rounded-xl"
                   onClick={() => {
                     setPurchaseStatusFilter('ALL');
                     setStoreFilter('');
@@ -275,12 +276,12 @@ export default function ContractsPage() {
                 </Button>
               )}
             </div>
-            <Button onClick={() => router.push('/dashboard/purchase/create')}>
+            <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/purchase/create')}>
               <Plus className="mr-2 h-4 w-4" /> 新增采购
             </Button>
           </div>
           
-          <div className="rounded-md border">
+          <div className="surface-panel overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -298,13 +299,13 @@ export default function ContractsPage() {
               <TableBody>
                 {purchaseLoading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">
                       加载中...
                     </TableCell>
                   </TableRow>
                 ) : pagedPurchaseContracts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">
                       {(purchaseStatusFilter !== 'ALL' || storeFilter || productSearch) ? '没有符合筛选条件的合同' : '暂无采购合同'}
                     </TableCell>
                   </TableRow>
@@ -340,15 +341,16 @@ export default function ContractsPage() {
                         {contract.totalAmount.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className={contract.paidAmount < contract.totalAmount ? 'text-orange-600' : 'text-green-600'}>
+                        <AmountText tone={contract.paidAmount < contract.totalAmount ? 'warning' : 'success'}>
                           {contract.paidAmount.toLocaleString()}
-                        </span>
+                        </AmountText>
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
                           <Button 
                             variant="ghost" 
                             size="icon"
+                            className="rounded-xl border border-border/65 bg-background/55"
                             onClick={() => router.push(`/dashboard/purchase/${contract.id}`)}
                             title="查看详情"
                           >
@@ -357,10 +359,11 @@ export default function ContractsPage() {
                           <Button 
                             variant="ghost" 
                             size="icon"
+                            className="rounded-xl border border-border/65 bg-background/55"
                             onClick={() => openGenerateDialog(contract.id)}
                             title="生成购销合同"
                           >
-                            <FileDown className="h-4 w-4 text-blue-500" />
+                            <FileDown className="h-4 w-4 text-primary" />
                           </Button>
                         </div>
                       </TableCell>
@@ -437,9 +440,9 @@ export default function ContractsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">已付款</p>
-                    <p className="text-xl font-bold text-green-600">
+                    <AmountText tone="success" size="lg">
                       ¥{purchaseDetail.paidAmount.toLocaleString()}
-                    </p>
+                    </AmountText>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">状态</p>
@@ -515,7 +518,7 @@ export default function ContractsPage() {
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileDown className="h-5 w-5 text-blue-500" />
+              <FileDown className="h-5 w-5 text-primary" />
               生成购销合同
             </DialogTitle>
             <DialogDescription>

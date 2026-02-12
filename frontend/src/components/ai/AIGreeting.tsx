@@ -71,7 +71,7 @@ export function AIGreeting() {
 
   return (
     <div className="fixed top-16 right-4 z-50 w-72 lg:w-80 animate-in slide-in-from-right-5 fade-in duration-300">
-      <div className="relative overflow-hidden rounded-lg border border-purple-200/50 bg-gradient-to-br from-purple-50/95 to-pink-50/95 dark:from-purple-950/90 dark:to-pink-950/90 backdrop-blur-sm shadow-lg">
+      <div className="relative overflow-hidden rounded-lg border border-border/80 bg-card/95 backdrop-blur-sm shadow-lg">
         {/* 关闭按钮 */}
         <Button
           variant="ghost"
@@ -100,13 +100,13 @@ export function AIGreeting() {
             <div className="space-y-2">
               {/* 问候语标题 */}
               <div className="flex items-center gap-1.5 pr-4">
-                <Sparkles className="h-3.5 w-3.5 text-purple-500 flex-shrink-0" />
+                <Sparkles className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                 <span className="font-medium text-sm text-foreground">{data.greeting}</span>
               </div>
 
               {/* 励志语句展示 */}
               {data.lyrics && data.lyrics.length > 0 && (
-                <div className="pl-5 space-y-0.5 border-l-2 border-purple-300/50 dark:border-purple-700/50">
+                <div className="pl-5 space-y-0.5 border-l-2 border-primary/35">
                   {data.lyrics.map((line, index) => (
                     <p
                       key={index}

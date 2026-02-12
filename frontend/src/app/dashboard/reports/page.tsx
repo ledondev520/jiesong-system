@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/table';
 import { Loader2 } from 'lucide-react';
 import api from '@/lib/axios';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 interface SupplierStats {
   id: string;
@@ -127,10 +128,10 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">报表统计</h2>
-        <p className="text-muted-foreground">业务数据汇总与分析。</p>
-      </div>
+      <PageHeader
+        title="报表统计"
+        description="业务数据汇总与分析。"
+      />
 
       {/* 概览卡片 */}
       <div className="grid gap-4 md:grid-cols-5">

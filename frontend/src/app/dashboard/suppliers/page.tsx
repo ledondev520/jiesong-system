@@ -94,13 +94,13 @@ export default function SuppliersPage() {
         backHref="/dashboard/settings?tab=master"
         backLabel="返回"
         actions={
-          <Button onClick={handleCreate}>
+          <Button onClick={handleCreate} className="h-10 rounded-xl">
             <Plus className="mr-2 h-4 w-4" /> 新增供应商
           </Button>
         }
       />
 
-      <div className="rounded-md border">
+      <div className="surface-panel overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -114,11 +114,11 @@ export default function SuppliersPage() {
           <TableBody>
             {loading ? (
                <TableRow>
-                 <TableCell colSpan={5} className="text-center py-10">加载中...</TableCell>
+                 <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
                </TableRow>
             ) : suppliers.length === 0 ? (
                <TableRow>
-                 <TableCell colSpan={5} className="text-center py-10">暂无供应商数据。</TableCell>
+                 <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">暂无供应商数据。</TableCell>
                </TableRow>
             ) : (
               suppliers.map((supplier) => (
@@ -145,14 +145,14 @@ export default function SuppliersPage() {
                         <span className="text-sm font-medium">质量问题</span>
                       </div>
                     ) : (
-                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">正常</Badge>
+                      <Badge variant="outline" className="bg-chart-3/10 text-chart-3 border-chart-3/35">正常</Badge>
                     )}
                   </TableCell>
                   <TableCell className="flex gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => handleEdit(supplier)}>
+                    <Button variant="ghost" size="icon" className="rounded-xl border border-border/65 bg-background/55" onClick={() => handleEdit(supplier)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(supplier.id)}>
+                    <Button variant="ghost" size="icon" className="rounded-xl border border-border/65 bg-background/55" onClick={() => handleDelete(supplier.id)}>
                       <Trash className="h-4 w-4 text-destructive" />
                     </Button>
                   </TableCell>

@@ -45,31 +45,31 @@ export function PageHeader({
   };
 
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-4">
+    <div className="surface-panel surface-mesh flex flex-wrap items-start justify-between gap-3 px-4 py-3">
+      <div className="flex min-w-0 items-start gap-3">
         {/* 返回按钮 */}
         <Button 
           variant="ghost" 
           size="sm" 
           onClick={handleBack}
-          className="gap-1 text-muted-foreground hover:text-foreground"
+          className="mt-0.5 gap-1 rounded-xl border border-border/65 bg-background/60 text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
           {backLabel}
         </Button>
         
         {/* 标题区域 */}
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
+        <div className="min-w-0">
+          <h2 className="truncate text-2xl font-bold tracking-tight text-accent">{title}</h2>
           {description && (
-            <p className="text-muted-foreground">{description}</p>
+            <p className="text-sm text-muted-foreground/90">{description}</p>
           )}
         </div>
       </div>
       
       {/* 右侧操作按钮 */}
       {actions && (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {actions}
         </div>
       )}

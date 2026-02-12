@@ -26,12 +26,13 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
-import { Plus, Trash, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Plus, Trash, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { salesService } from '@/services/sales.service';
 import { productService } from '@/services/product.service';
 import { storeService } from '@/services/store.service';
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE } from '@/lib/constants';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 const salesSchema = z.object({
   contractNo: z.string().optional(),
@@ -117,15 +118,10 @@ export default function CreateSalesPage() {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-10">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">创建出口合同</h2>
-          <p className="text-muted-foreground">创建新的销售合同并自动计算报价。</p>
-        </div>
-      </div>
+      <PageHeader
+        title="创建出口合同"
+        description="创建新的销售合同并自动计算报价。"
+      />
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="contents">

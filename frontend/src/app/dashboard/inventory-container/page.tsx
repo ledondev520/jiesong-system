@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -27,8 +27,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Warehouse } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 /**
  * 职责：渲染库存状态管理页面
@@ -63,15 +64,15 @@ export default function InventoryPage() {
    * 获取库存状态徽章
    */
   const getStatusBadge = (status: InventoryStatus) => {
-    const statusMap: Record<InventoryStatus, { label: string; className: string }> = {
-      [InventoryStatus.PRODUCING]: { label: '生产中', className: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-      [InventoryStatus.PACKING]: { label: '包装中', className: 'bg-orange-100 text-orange-800' },
-      [InventoryStatus.SHIPPING]: { label: '运输中', className: 'bg-blue-100 text-blue-800' },
-      [InventoryStatus.INBOUND]: { label: '已入库', className: 'bg-purple-100 text-purple-800' },
-      [InventoryStatus.OUTBOUND]: { label: '已出库', className: 'bg-green-100 text-green-800' },
+    const statusMap: Record<InventoryStatus, { label: string; tone: React.ComponentProps<typeof SemanticBadge>["tone"] }> = {
+      [InventoryStatus.PRODUCING]: { label: '生产中', tone: 'warning' },
+      [InventoryStatus.PACKING]: { label: '包装中', tone: 'danger' },
+      [InventoryStatus.SHIPPING]: { label: '运输中', tone: 'progress' },
+      [InventoryStatus.INBOUND]: { label: '已入库', tone: 'secondary' },
+      [InventoryStatus.OUTBOUND]: { label: '已出库', tone: 'success' },
     };
-    const config = statusMap[status] || { label: status, className: '' };
-    return <Badge variant="outline" className={config.className}>{config.label}</Badge>;
+    const config = statusMap[status] || { label: status, tone: 'neutral' as const };
+    return <SemanticBadge tone={config.tone}>{config.label}</SemanticBadge>;
   };
 
   /**
@@ -89,17 +90,13 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      {/* 页面标题 */}
-      <div className="flex items-center gap-3">
-        <Warehouse className="h-6 w-6 text-primary" />
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">库存状态</h2>
-          <p className="text-muted-foreground">管理商品库存状态，跟踪生产、包装、运输进度</p>
-        </div>
-      </div>
+      <PageHeader
+        title="库存状态"
+        description="管理商品库存状态，跟踪生产、包装、运输进度"
+      />
 
       {/* 库存列表 */}
-      <div className="rounded-md border">
+      <div className="surface-panel overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -113,13 +110,13 @@ export default function InventoryPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
+                <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">
                   加载中...
                 </TableCell>
               </TableRow>
             ) : inventory.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
+                <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">
                   暂无库存记录
                 </TableCell>
               </TableRow>
@@ -135,7 +132,7 @@ export default function InventoryPage() {
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" className="rounded-xl border border-border/65 bg-background/55">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

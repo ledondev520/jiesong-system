@@ -53,12 +53,13 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
-import { Wand2, Plus, Trash, Eye, ArrowLeft, FileText, Loader2, UserPlus, Check, ChevronsUpDown, Star } from 'lucide-react';
+import { Wand2, Plus, Trash, Eye, FileText, Loader2, UserPlus, Check, ChevronsUpDown, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { purchaseService } from '@/services/purchase.service';
 import { supplierService } from '@/services/supplier.service';
 import { productService } from '@/services/product.service';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 // ============== Schema ==============
 const purchaseSchema = z.object({
@@ -276,23 +277,17 @@ export default function CreatePurchasePage() {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-10">
-      {/* 页头 */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">新增采购合同</h2>
-          <p className="text-muted-foreground">先添加商品，系统会推荐曾供应过该商品的供应商</p>
-        </div>
-      </div>
+      <PageHeader
+        title="新增采购合同"
+        description="先添加商品，系统会推荐曾供应过该商品的供应商"
+      />
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* AI 智能录入 */}
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Wand2 className="h-5 w-5 text-purple-500" />
+              <Wand2 className="h-5 w-5 text-primary" />
               AI 智能录入
             </CardTitle>
           </CardHeader>
@@ -303,7 +298,7 @@ export default function CreatePurchasePage() {
               onChange={(e) => setParseText(e.target.value)}
               className="min-h-[100px]"
             />
-            <Button onClick={handleParse} disabled={isParsing || !parseText} className="bg-purple-600 hover:bg-purple-700 text-white">
+            <Button onClick={handleParse} disabled={isParsing || !parseText} variant="default" className="shadow-sm">
               {isParsing ? '解析中...' : '解析报价'}
             </Button>
           </CardContent>
@@ -499,7 +494,7 @@ export default function CreatePurchasePage() {
                                       }}
                                     >
                                       <Check className={cn('mr-2 h-4 w-4', field.value === s.id ? 'opacity-100' : 'opacity-0')} />
-                                      <Star className="h-3 w-3 mr-1 text-yellow-500" />
+                                      <Star className="h-3 w-3 mr-1 text-chart-4" />
                                       <span>{s.name}</span>
                                       {s.contactName && <span className="text-muted-foreground text-xs ml-2">({s.contactName})</span>}
                                       <Badge variant="secondary" className="ml-auto text-xs">曾供应</Badge>
@@ -575,7 +570,7 @@ export default function CreatePurchasePage() {
                   <FormLabel>合同预览</FormLabel>
                   <div className="mt-2 p-4 bg-muted/30 rounded-lg border">
                     <div className="flex items-center gap-3">
-                      <FileText className="h-8 w-8 text-blue-500" />
+                      <FileText className="h-8 w-8 text-primary" />
                       <div className="flex-1">
                         <p className="font-medium">购销合同</p>
                         <p className="text-sm text-muted-foreground">填写完成后，可在采购详情页生成并预览标准购销合同文档</p>

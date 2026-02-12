@@ -21,6 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Plus, Pencil, Trash, UserCog } from 'lucide-react';
 import { UserDialog } from './components/UserDialog';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -50,10 +51,10 @@ export default function UsersPage() {
 
   const getRoleBadge = (role: Role) => {
     switch (role) {
-      case Role.ADMIN: return <Badge className="bg-red-500">管理员</Badge>;
-      case Role.PURCHASE: return <Badge className="bg-blue-500">采购</Badge>;
-      case Role.SALES: return <Badge className="bg-green-500">销售</Badge>;
-      default: return <Badge>{role}</Badge>;
+      case Role.ADMIN: return <SemanticBadge tone="danger">管理员</SemanticBadge>;
+      case Role.PURCHASE: return <SemanticBadge tone="info">采购</SemanticBadge>;
+      case Role.SALES: return <SemanticBadge tone="success">销售</SemanticBadge>;
+      default: return <SemanticBadge tone="secondary">{role}</SemanticBadge>;
     }
   };
 
@@ -103,13 +104,13 @@ export default function UsersPage() {
         backHref="/dashboard/settings?tab=users"
         backLabel="返回"
         actions={
-          <Button onClick={handleCreate}>
+          <Button onClick={handleCreate} className="h-10 rounded-xl">
             <Plus className="mr-2 h-4 w-4" /> 新增用户
           </Button>
         }
       />
 
-      <div className="rounded-md border">
+      <div className="surface-panel overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -123,11 +124,11 @@ export default function UsersPage() {
           <TableBody>
             {loading ? (
                <TableRow>
-                 <TableCell colSpan={5} className="text-center py-10">加载中...</TableCell>
+                 <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
                </TableRow>
             ) : users.length === 0 ? (
                <TableRow>
-                 <TableCell colSpan={5} className="text-center py-10">暂无用户。</TableCell>
+                 <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">暂无用户。</TableCell>
                </TableRow>
             ) : (
               users.map((user) => (
@@ -139,15 +140,15 @@ export default function UsersPage() {
                   <TableCell>{user.username}</TableCell>
                   <TableCell>{getRoleBadge(user.role)}</TableCell>
                   <TableCell>
-                    <Badge variant={user.isActive ? 'outline' : 'secondary'} className={user.isActive ? 'text-green-600 border-green-200' : ''}>
+                    <Badge variant={user.isActive ? 'outline' : 'secondary'} className={user.isActive ? 'text-chart-3 border-chart-3/35' : ''}>
                       {user.isActive ? '正常' : '禁用'}
                     </Badge>
                   </TableCell>
                   <TableCell className="flex gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => handleEdit(user)}>
+                    <Button variant="ghost" size="icon" className="rounded-xl border border-border/65 bg-background/55" onClick={() => handleEdit(user)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(user.id)}>
+                    <Button variant="ghost" size="icon" className="rounded-xl border border-border/65 bg-background/55" onClick={() => handleDelete(user.id)}>
                       <Trash className="h-4 w-4 text-destructive" />
                     </Button>
                   </TableCell>

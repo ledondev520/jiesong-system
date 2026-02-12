@@ -39,11 +39,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Plus, Pencil, Trash, Ship, Package, Weight, Box } from 'lucide-react';
+import { Plus, Pencil, Trash, Package, Weight, Box } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 // 40HQ 标准货柜规格（厂家建议值）
 const CONTAINER_40HQ = {
@@ -201,11 +202,11 @@ export default function ContainerDetailPage({ params }: PageProps) {
    */
   const getStatusBadge = (status: ContainerStatus) => {
     switch (status) {
-      case ContainerStatus.PENDING: return <Badge variant="outline">待装柜</Badge>;
-      case ContainerStatus.LOADING: return <Badge className="bg-yellow-500">装柜中</Badge>;
-      case ContainerStatus.SHIPPED: return <Badge className="bg-blue-500">已发运</Badge>;
-      case ContainerStatus.ARRIVED: return <Badge className="bg-green-500">已到达</Badge>;
-      default: return <Badge>{status}</Badge>;
+      case ContainerStatus.PENDING: return <SemanticBadge tone="neutral">待装柜</SemanticBadge>;
+      case ContainerStatus.LOADING: return <SemanticBadge tone="warning">装柜中</SemanticBadge>;
+      case ContainerStatus.SHIPPED: return <SemanticBadge tone="progress">已发运</SemanticBadge>;
+      case ContainerStatus.ARRIVED: return <SemanticBadge tone="success">已到达</SemanticBadge>;
+      default: return <SemanticBadge tone="secondary">{status}</SemanticBadge>;
     }
   };
 
@@ -226,29 +227,18 @@ export default function ContainerDetailPage({ params }: PageProps) {
   return (
     <div className="space-y-6 pb-10">
       {/* 页头 */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <Ship className="h-6 w-6 text-blue-500" />
-            <h2 className="text-3xl font-bold tracking-tight">{container.containerNo}</h2>
-            {getStatusBadge(container.status)}
-          </div>
-          <p className="text-muted-foreground">
-            目的港: {container.port?.name} | 
-            预计到达: {container.estimatedArrival ? format(new Date(container.estimatedArrival), 'yyyy-MM-dd') : '-'}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title={container.containerNo}
+        description={`目的港: ${container.port?.name || '-'} | 预计到达: ${container.estimatedArrival ? format(new Date(container.estimatedArrival), 'yyyy-MM-dd') : '-'}`}
+        actions={getStatusBadge(container.status)}
+      />
 
       {/* 容量可视化卡片 */}
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Box className="h-5 w-5 text-purple-500" />
+              <Box className="h-5 w-5 text-chart-4" />
               体积利用率
             </CardTitle>
             <CardDescription>
@@ -263,7 +253,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
               </div>
               <Progress 
                 value={volumePercent} 
-                className={`h-4 ${volumePercent > 90 ? '[&>div]:bg-red-500' : volumePercent > 70 ? '[&>div]:bg-yellow-500' : '[&>div]:bg-green-500'}`}
+                className={`h-4 ${volumePercent > 90 ? '[&>div]:bg-destructive' : volumePercent > 70 ? '[&>div]:bg-chart-4' : '[&>div]:bg-chart-3'}`}
               />
               <div className="text-right text-sm font-medium">
                 {volumePercent.toFixed(1)}%
@@ -275,7 +265,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Weight className="h-5 w-5 text-orange-500" />
+              <Weight className="h-5 w-5 text-chart-5" />
               载重利用率
             </CardTitle>
             <CardDescription>
@@ -290,7 +280,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
               </div>
               <Progress 
                 value={weightPercent} 
-                className={`h-4 ${weightPercent > 90 ? '[&>div]:bg-red-500' : weightPercent > 70 ? '[&>div]:bg-yellow-500' : '[&>div]:bg-green-500'}`}
+                className={`h-4 ${weightPercent > 90 ? '[&>div]:bg-destructive' : weightPercent > 70 ? '[&>div]:bg-chart-4' : '[&>div]:bg-chart-3'}`}
               />
               <div className="text-right text-sm font-medium">
                 {weightPercent.toFixed(1)}%
@@ -427,13 +417,19 @@ export default function ContainerDetailPage({ params }: PageProps) {
               <label className="text-sm font-medium">所属门店</label>
               <Select 
                 value={itemForm.storeId} 
-                onValueChange={(v) => setItemForm(prev => ({ ...prev, storeId: v }))}
+                onValueChange={(v) =>
+                  setItemForm((prev) => ({
+                    ...prev,
+                    // Radix Select.Item 不允许空字符串，使用 NONE 作为未指定门店哨兵值
+                    storeId: v === '__NONE__' ? '' : v,
+                  }))
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="选择门店（可选）" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">不指定门店</SelectItem>
+                  <SelectItem value="__NONE__">不指定门店</SelectItem>
                   {stores.map(s => (
                     <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                   ))}

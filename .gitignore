@@ -33,6 +33,8 @@ npm-debug.log*
 # Test
 coverage/
 .nyc_output/
+frontend/playwright-report/
+frontend/test-results/
 
 # Temp
 tmp/

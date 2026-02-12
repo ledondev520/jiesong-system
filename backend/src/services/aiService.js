@@ -16,6 +16,12 @@ const MODELS = {
   default: 'kimi-k2-turbo-preview', // 默认模型
   vision: 'moonshot-v1-8k-vision-preview', // 视觉模型（8k 版本更稳定）
   fast: 'moonshot-v1-8k', // 快速响应模型
+  thinking: 'kimi-k2-thinking-turbo', // 带思考过程的模型
+};
+
+// 获取当前 provider
+const getActiveProvider = () => {
+  return config.kimi?.apiKey ? 'kimi' : null;
 };
 
 // 初始化OpenAI客户端（用于流式调用）
@@ -25,6 +31,14 @@ const getOpenAIClient = () => {
     apiKey: config.kimi.apiKey,
     baseURL: config.kimi.baseUrl,
   });
+};
+
+// 获取 Kimi 客户端（别名）
+const getKimiClient = getOpenAIClient;
+
+// 选择模型
+const selectModel = (type) => {
+  return MODELS[type] || MODELS.default;
 };
 
 /**

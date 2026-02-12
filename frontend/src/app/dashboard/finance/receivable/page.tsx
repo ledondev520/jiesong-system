@@ -24,6 +24,7 @@ import { CreditCard, Loader2 } from 'lucide-react';
 import { PaymentDialog } from '../components/PaymentDialog';
 import { toast } from 'sonner';
 import api from '@/lib/axios';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 interface ReceivableContract {
   id: string;
@@ -110,17 +111,17 @@ export default function ReceivablePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">应收账款</h2>
-          <p className="text-muted-foreground">门店收款跟踪。共 {unreceiveContracts.length} 笔待收账款。</p>
-        </div>
-        <Button variant="outline" onClick={fetchReceivables}>
-          刷新
-        </Button>
-      </div>
+      <PageHeader
+        title="应收账款"
+        description={`门店收款跟踪。共 ${unreceiveContracts.length} 笔待收账款。`}
+        actions={
+          <Button variant="outline" className="h-10 rounded-xl border-border/70 bg-background/60" onClick={fetchReceivables}>
+            刷新
+          </Button>
+        }
+      />
 
-      <div className="rounded-md border">
+      <div className="surface-panel overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -145,12 +146,12 @@ export default function ReceivablePage() {
                     <Badge variant="outline">{contract.status}</Badge>
                   </TableCell>
                   <TableCell className="text-right">${contract.totalAmount.toLocaleString()}</TableCell>
-                  <TableCell className="text-right text-green-600">${contract.receivedAmount.toLocaleString()}</TableCell>
-                  <TableCell className="text-right text-red-600 font-bold">
+                  <TableCell className="text-right text-chart-3">${contract.receivedAmount.toLocaleString()}</TableCell>
+                  <TableCell className="text-right text-destructive font-bold">
                     ${contract.unreceiveAmount.toLocaleString()}
                   </TableCell>
                   <TableCell>
-                    <Button size="sm" onClick={() => handleReceive(contract)}>
+                    <Button size="sm" className="rounded-xl" onClick={() => handleReceive(contract)}>
                       <CreditCard className="mr-2 h-3 w-3" /> 记录收款
                     </Button>
                   </TableCell>
@@ -158,7 +159,7 @@ export default function ReceivablePage() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
                   暂无待收账款
                 </TableCell>
               </TableRow>

@@ -13,7 +13,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Search, Package, MapPin, Ship, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/axios';
@@ -71,24 +71,24 @@ export function ProductTracker() {
   };
 
   const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { label: string; className: string }> = {
-      DRAFT: { label: '草稿', className: 'bg-gray-500' },
-      CONFIRMED: { label: '已确认', className: 'bg-blue-500' },
-      PACKING: { label: '装箱中', className: 'bg-yellow-500' },
-      SHIPPED: { label: '已发运', className: 'bg-purple-500' },
-      ARRIVED: { label: '已到达', className: 'bg-green-500' },
-      COMPLETED: { label: '已完成', className: 'bg-gray-700' },
-      CANCELLED: { label: '已取消', className: 'bg-red-500' },
+    const statusMap: Record<string, { label: string; tone: React.ComponentProps<typeof SemanticBadge>["tone"] }> = {
+      DRAFT: { label: '草稿', tone: 'neutral' },
+      CONFIRMED: { label: '已确认', tone: 'info' },
+      PACKING: { label: '装箱中', tone: 'warning' },
+      SHIPPED: { label: '已发运', tone: 'progress' },
+      ARRIVED: { label: '已到达', tone: 'success' },
+      COMPLETED: { label: '已完成', tone: 'secondary' },
+      CANCELLED: { label: '已取消', tone: 'danger' },
     };
-    const config = statusMap[status] || { label: status, className: 'bg-gray-400' };
-    return <Badge className={config.className}>{config.label}</Badge>;
+    const config = statusMap[status] || { label: status, tone: 'neutral' as const };
+    return <SemanticBadge tone={config.tone}>{config.label}</SemanticBadge>;
   };
 
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
-          <Search className="h-5 w-5 text-blue-500" />
+          <Search className="h-5 w-5 text-primary" />
           商品追踪
         </CardTitle>
         <CardDescription>
@@ -150,7 +150,7 @@ export function ProductTracker() {
                       onClick={() => router.push(`/dashboard/sales/${item.salesContractId}`)}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <Ship className="h-5 w-5 text-blue-500 shrink-0" />
+                        <Ship className="h-5 w-5 text-primary shrink-0" />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-mono font-medium">{item.contractNo}</span>

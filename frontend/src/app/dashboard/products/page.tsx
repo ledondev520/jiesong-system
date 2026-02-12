@@ -111,24 +111,24 @@ export default function ProductsPage() {
         backHref="/dashboard/settings?tab=master"
         backLabel="返回"
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <div className="relative w-64">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="搜索商品..."
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
-                className="pl-8"
+                className="h-10 rounded-xl border-border/70 bg-background/70 pl-9"
               />
             </div>
-            <Button onClick={handleCreate}>
+            <Button onClick={handleCreate} className="h-10 rounded-xl">
               <Plus className="mr-2 h-4 w-4" /> 新增商品
             </Button>
           </div>
         }
       />
 
-      <div className="rounded-md border">
+      <div className="surface-panel overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -145,11 +145,11 @@ export default function ProductsPage() {
           <TableBody>
             {loading ? (
                <TableRow>
-                 <TableCell colSpan={8} className="text-center py-10">加载中...</TableCell>
+                 <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
                </TableRow>
             ) : products.length === 0 ? (
                <TableRow>
-                 <TableCell colSpan={8} className="text-center py-10">暂无商品数据。</TableCell>
+                 <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">暂无商品数据。</TableCell>
                </TableRow>
             ) : (
               products.map((product) => (

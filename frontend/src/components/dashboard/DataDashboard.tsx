@@ -81,47 +81,47 @@ export function DataDashboard() {
       {/* 核心指标卡片 */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {/* 采购合同 */}
-        <Card>
+        <Card className="kpi-card surface-mesh">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">采购合同</CardTitle>
-            <FileText className="h-4 w-4 text-blue-500" />
+            <FileText className="h-4 w-4 text-chart-1" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data.contracts.purchase.count}</div>
             <p className="text-xs text-muted-foreground">
               总金额: ¥{data.contracts.purchase.totalAmount.toLocaleString()}
             </p>
-            <p className="text-xs text-orange-500">
+            <p className="text-xs text-chart-5">
               待付: ¥{data.contracts.purchase.unpaidAmount.toLocaleString()}
             </p>
           </CardContent>
         </Card>
 
         {/* 销售合同 */}
-        <Card>
+        <Card className="kpi-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">销售合同</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
+            <TrendingUp className="h-4 w-4 text-chart-3" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data.contracts.sales.count}</div>
             <p className="text-xs text-muted-foreground">
               总金额: ${data.contracts.sales.totalAmount.toLocaleString()}
             </p>
-            <p className="text-xs text-green-600">
+            <p className="text-xs text-chart-3">
               已收: ${data.contracts.sales.receivedAmount.toLocaleString()}
             </p>
           </CardContent>
         </Card>
 
         {/* 应收账款 */}
-        <Card className="border-orange-200 bg-orange-50/50">
+        <Card className="kpi-card border-chart-5/40 bg-chart-5/12">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">应收账款</CardTitle>
-            <DollarSign className="h-4 w-4 text-orange-500" />
+            <DollarSign className="h-4 w-4 text-chart-5" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
+            <div className="text-2xl font-bold text-chart-5">
               ${data.contracts.sales.receivable.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -131,17 +131,17 @@ export function DataDashboard() {
         </Card>
 
         {/* 库存概览 */}
-        <Card>
+        <Card className="kpi-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">库存概览</CardTitle>
-            <Package className="h-4 w-4 text-purple-500" />
+            <Package className="h-4 w-4 text-chart-4" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data.inventory.productCount}</div>
             <p className="text-xs text-muted-foreground">
               商品种类
             </p>
-            <p className="text-xs text-purple-600">
+            <p className="text-xs text-chart-4">
               库存记录: {data.inventory.recordCount}条
             </p>
           </CardContent>
@@ -151,7 +151,7 @@ export function DataDashboard() {
       {/* 图表区域 */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* 月度出货趋势（折线图） */}
-        <Card>
+        <Card className="surface-panel">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">月度出货趋势</CardTitle>
             <CardDescription>最近6个月出货金额</CardDescription>
@@ -162,7 +162,7 @@ export function DataDashboard() {
             ) : (
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={[...data.shipments.monthly].reverse()}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis 
                     dataKey="month" 
                     tick={{ fontSize: 12 }} 
@@ -179,9 +179,9 @@ export function DataDashboard() {
                   <Line 
                     type="monotone" 
                     dataKey="amount" 
-                    stroke="#10b981" 
+                    stroke="var(--chart-3)" 
                     strokeWidth={2}
-                    dot={{ fill: '#10b981', r: 4 }}
+                    dot={{ fill: 'var(--chart-3)', r: 4 }}
                     activeDot={{ r: 6 }}
                   />
                 </LineChart>
@@ -191,7 +191,7 @@ export function DataDashboard() {
         </Card>
 
         {/* 门店采购排行（柱形图） */}
-        <Card>
+        <Card className="surface-panel">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">门店采购排行</CardTitle>
             <CardDescription>Top 5 门店采购金额</CardDescription>
@@ -202,7 +202,7 @@ export function DataDashboard() {
             ) : (
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={data.storeStats.slice(0, 5)} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis 
                     type="number"
                     tick={{ fontSize: 12 }}
@@ -220,7 +220,7 @@ export function DataDashboard() {
                   />
                   <Bar 
                     dataKey="totalAmount" 
-                    fill="#8b5cf6" 
+                    fill="var(--chart-1)" 
                     radius={[0, 4, 4, 0]}
                   />
                 </BarChart>
@@ -231,7 +231,7 @@ export function DataDashboard() {
       </div>
 
       {/* 热门商品（柱形图） */}
-      <Card>
+      <Card className="surface-panel">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">热门采购商品 Top 10</CardTitle>
           <CardDescription>按采购金额排序</CardDescription>
@@ -242,7 +242,7 @@ export function DataDashboard() {
           ) : (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={data.topProducts.slice(0, 10)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis 
                   dataKey="productName" 
                   tick={{ fontSize: 10 }}
@@ -261,7 +261,7 @@ export function DataDashboard() {
                   ]}
                 />
                 <Legend formatter={(value) => value === 'totalAmount' ? '采购金额' : '采购次数'} />
-                <Bar dataKey="totalAmount" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="totalAmount" fill="var(--chart-3)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}

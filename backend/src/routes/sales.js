@@ -22,6 +22,9 @@ router.use(authenticate);
 // GET /api/v1/sales - 获取出口合同列表
 router.get('/', validatePagination, handleValidation, salesController.list);
 
+// GET /api/v1/sales/options/next-no - 获取下一个合同编号（必须位于 /:id 之前）
+router.get('/options/next-no', salesController.getNextContractNo);
+
 // GET /api/v1/sales/:id - 获取出口合同详情（包含装箱明细）
 router.get('/:id', validateId, handleValidation, salesController.getById);
 
@@ -56,9 +59,6 @@ router.delete('/:id/packing-items/:itemId', validateId, handleValidation, salesC
 
 // PUT /api/v1/sales/:id/status - 更新合同状态
 router.put('/:id/status', validateId, handleValidation, salesController.updateStatus);
-
-// GET /api/v1/sales/next-no - 获取下一个合同编号
-router.get('/options/next-no', salesController.getNextContractNo);
 
 // POST /api/v1/sales/calculate-price - 计算销售价格
 router.post('/calculate-price', salesController.calculatePrice);

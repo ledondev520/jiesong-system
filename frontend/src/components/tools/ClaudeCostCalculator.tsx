@@ -242,7 +242,7 @@ export function ClaudeCostCalculator() {
     <Card ref={containerRef}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Calculator className="h-5 w-5 text-purple-500" />
+          <Calculator className="h-5 w-5 text-primary" />
           Claude 4.5 Opus 费用计算器
         </CardTitle>
         <CardDescription>
@@ -254,7 +254,7 @@ export function ClaudeCostCalculator() {
         <div className="border-2 border-dashed rounded-lg p-6 text-center hover:bg-muted/50 transition-colors">
           {isProcessing ? (
             <div className="flex flex-col items-center gap-3 py-4">
-              <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="text-sm text-muted-foreground">正在识别图片中的数据...</p>
             </div>
           ) : imagePreview ? (
@@ -387,7 +387,7 @@ export function ClaudeCostCalculator() {
           </div>
           <div className="border-t pt-3 flex justify-between items-center">
             <span className="font-medium">总计</span>
-            <span className="text-2xl font-bold text-green-600">
+            <span className="text-2xl font-bold text-chart-3">
               ${costs.total.toFixed(2)}
             </span>
           </div>

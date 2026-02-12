@@ -32,11 +32,12 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
+import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Package, FileText, DollarSign, Building2, FileDown, Loader2, Eye } from 'lucide-react';
+import { Package, FileText, DollarSign, Building2, FileDown, Loader2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -86,17 +87,17 @@ export default function PurchaseDetailPage({ params }: PageProps) {
    * 职责：获取状态徽章
    */
   const getStatusBadge = (status: PurchaseStatus) => {
-    const statusMap: Record<PurchaseStatus, { label: string; className: string }> = {
-      [PurchaseStatus.DRAFT]: { label: '草稿', className: 'bg-gray-500' },
-      [PurchaseStatus.SIGNED]: { label: '已签订', className: 'bg-blue-500' },
-      [PurchaseStatus.PRODUCING]: { label: '生产中', className: 'bg-yellow-500' },
-      [PurchaseStatus.SHIPPED]: { label: '已发货', className: 'bg-purple-500' },
-      [PurchaseStatus.RECEIVED]: { label: '已收货', className: 'bg-cyan-500' },
-      [PurchaseStatus.COMPLETED]: { label: '已完成', className: 'bg-green-500' },
-      [PurchaseStatus.CANCELLED]: { label: '已取消', className: 'bg-red-500' },
+    const statusMap: Record<PurchaseStatus, { label: string; tone: React.ComponentProps<typeof SemanticBadge>["tone"] }> = {
+      [PurchaseStatus.DRAFT]: { label: '草稿', tone: 'neutral' },
+      [PurchaseStatus.SIGNED]: { label: '已签订', tone: 'info' },
+      [PurchaseStatus.PRODUCING]: { label: '生产中', tone: 'warning' },
+      [PurchaseStatus.SHIPPED]: { label: '已发货', tone: 'progress' },
+      [PurchaseStatus.RECEIVED]: { label: '已收货', tone: 'secondary' },
+      [PurchaseStatus.COMPLETED]: { label: '已完成', tone: 'success' },
+      [PurchaseStatus.CANCELLED]: { label: '已取消', tone: 'danger' },
     };
-    const config = statusMap[status] || { label: status, className: '' };
-    return <Badge className={config.className}>{config.label}</Badge>;
+    const config = statusMap[status] || { label: status, tone: 'neutral' as const };
+    return <SemanticBadge tone={config.tone}>{config.label}</SemanticBadge>;
   };
 
   /**
@@ -166,43 +167,34 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   return (
     <div className="space-y-6 pb-10">
       {/* 页头 */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <FileText className="h-6 w-6 text-blue-500" />
-            <h2 className="text-3xl font-bold tracking-tight">{contract.contractNo}</h2>
+      <PageHeader
+        title={contract.contractNo}
+        description={`供应商: ${contract.supplier?.name || '未知'} | 签订日期: ${contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}`}
+        actions={
+          <div className="flex items-center gap-2">
             {getStatusBadge(contract.status)}
+            <Button variant="outline" onClick={viewContractPdf} disabled={pdfLoading}>
+              {pdfLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Eye className="mr-2 h-4 w-4" />
+              )}
+              查看合同
+            </Button>
+            <Button onClick={() => setGenerateOpen(true)}>
+              <FileDown className="mr-2 h-4 w-4" />
+              生成购销合同
+            </Button>
           </div>
-          <p className="text-muted-foreground">
-            供应商: {contract.supplier?.name || '未知'} | 
-            签订日期: {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={viewContractPdf} disabled={pdfLoading}>
-            {pdfLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Eye className="mr-2 h-4 w-4" />
-            )}
-            查看合同
-          </Button>
-          <Button onClick={() => setGenerateOpen(true)}>
-            <FileDown className="mr-2 h-4 w-4" />
-            生成购销合同
-          </Button>
-        </div>
-      </div>
+        }
+      />
 
       {/* 汇总卡片 */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-green-500" />
+              <DollarSign className="h-5 w-5 text-chart-3" />
               <div>
                 <div className="text-2xl font-bold">¥{contract.totalAmount.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">合同金额</p>
@@ -213,7 +205,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-blue-500" />
+              <DollarSign className="h-5 w-5 text-primary" />
               <div>
                 <div className="text-2xl font-bold">¥{contract.paidAmount.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">已付金额</p>
@@ -225,7 +217,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-orange-500" />
+              <DollarSign className="h-5 w-5 text-chart-5" />
               <div>
                 <div className="text-2xl font-bold">
                   ¥{(contract.totalAmount - contract.paidAmount).toLocaleString()}
@@ -238,7 +230,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-purple-500" />
+              <Building2 className="h-5 w-5 text-chart-4" />
               <div>
                 <div className="text-lg font-medium truncate max-w-[150px]" title={contract.supplier?.name}>
                   {contract.supplier?.name || '-'}
@@ -320,7 +312,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileDown className="h-5 w-5 text-blue-500" />
+              <FileDown className="h-5 w-5 text-primary" />
               生成购销合同
             </DialogTitle>
             <DialogDescription>

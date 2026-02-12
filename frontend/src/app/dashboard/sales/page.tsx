@@ -22,7 +22,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { SemanticBadge } from '@/components/ui/semantic-badge';
+import { AmountText } from '@/components/ui/amount-text';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +39,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { PageHeader } from '@/components/layout/PageHeader';
 export default function SalesPage() {
   const [contracts, setContracts] = useState<SalesContract[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,32 +99,32 @@ export default function SalesPage() {
    * 获取状态徽章
    */
   const getStatusBadge = (status: SalesStatus) => {
-    const statusMap: Record<SalesStatus, { label: string; className: string }> = {
-      [SalesStatus.DRAFT]: { label: '草稿', className: 'bg-gray-100 text-gray-800' },
-      [SalesStatus.CONFIRMED]: { label: '已确认', className: 'bg-blue-500' },
-      [SalesStatus.PACKING]: { label: '装柜中', className: 'bg-yellow-500' },
-      [SalesStatus.SHIPPED]: { label: '已发运', className: 'bg-purple-500' },
-      [SalesStatus.ARRIVED]: { label: '已到达', className: 'bg-green-500' },
-      [SalesStatus.COMPLETED]: { label: '已完成', className: 'bg-gray-500' },
-      [SalesStatus.CANCELLED]: { label: '已取消', className: 'bg-red-500' },
+    const statusMap: Record<SalesStatus, { label: string; tone: React.ComponentProps<typeof SemanticBadge>["tone"] }> = {
+      [SalesStatus.DRAFT]: { label: '草稿', tone: 'neutral' },
+      [SalesStatus.CONFIRMED]: { label: '已确认', tone: 'info' },
+      [SalesStatus.PACKING]: { label: '装柜中', tone: 'warning' },
+      [SalesStatus.SHIPPED]: { label: '已发运', tone: 'progress' },
+      [SalesStatus.ARRIVED]: { label: '已到达', tone: 'success' },
+      [SalesStatus.COMPLETED]: { label: '已完成', tone: 'secondary' },
+      [SalesStatus.CANCELLED]: { label: '已取消', tone: 'danger' },
     };
-    const config = statusMap[status] || { label: status, className: '' };
-    return <Badge className={config.className}>{config.label}</Badge>;
+    const config = statusMap[status] || { label: status, tone: 'neutral' as const };
+    return <SemanticBadge tone={config.tone}>{config.label}</SemanticBadge>;
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">出口合同</h2>
-          <p className="text-muted-foreground">管理出口合同与装箱信息。共 {contracts.length} 个合同。</p>
-        </div>
-        <Button onClick={() => router.push('/dashboard/sales/create')}>
-          <Plus className="mr-2 h-4 w-4" /> 新增出口合同
-        </Button>
-      </div>
+      <PageHeader
+        title="出口合同"
+        description={`管理出口合同与装箱信息。共 ${contracts.length} 个合同。`}
+        actions={
+          <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/sales/create')}>
+            <Plus className="mr-2 h-4 w-4" /> 新增出口合同
+          </Button>
+        }
+      />
 
-      <div className="rounded-md border">
+      <div className="surface-panel overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -140,18 +142,18 @@ export default function SalesPage() {
           <TableBody>
             {loading ? (
                <TableRow>
-                 <TableCell colSpan={9} className="text-center py-10">加载中...</TableCell>
+                 <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
                </TableRow>
             ) : contracts.length === 0 ? (
                <TableRow>
-                 <TableCell colSpan={9} className="text-center py-10">暂无出口合同。</TableCell>
+                 <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">暂无出口合同。</TableCell>
                </TableRow>
             ) : (
               contracts.map((contract) => (
                 <TableRow key={contract.id}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
-                      <Ship className="h-4 w-4 text-blue-500" />
+                      <Ship className="h-4 w-4 text-primary" />
                       {contract.contractNo}
                     </div>
                   </TableCell>
@@ -163,23 +165,31 @@ export default function SalesPage() {
                   <TableCell className="text-right">{contract.totalBoxes || 0}</TableCell>
                   <TableCell className="text-right">{(contract.volume || 0).toFixed(2)}</TableCell>
                   <TableCell className="text-right">{(contract.grossWeight || 0).toLocaleString()}</TableCell>
-                  <TableCell className="text-right font-medium text-green-600">
-                    ${contract.totalAmount.toLocaleString()}
+                  <TableCell className="text-right">
+                    <AmountText tone="success">${contract.totalAmount.toLocaleString()}</AmountText>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Link href={`/dashboard/sales/${contract.id}`}>
-                        <Button variant="ghost" size="icon" title="查看详情与装箱">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="rounded-xl border border-border/65 bg-background/55"
+                          title="查看详情与装箱"
+                          aria-label={`查看合同 ${contract.contractNo}`}
+                        >
                           <Eye className="h-4 w-4" />
                         </Button>
                       </Link>
                       <Button 
-                        variant="ghost" 
+                        variant="ghost"
                         size="icon" 
+                        className="rounded-xl border border-border/65 bg-background/55"
                         title="删除合同"
+                        aria-label={`删除合同 ${contract.contractNo}`}
                         onClick={() => openDeleteDialog(contract)}
                       >
-                        <Trash2 className="h-4 w-4 text-red-500" />
+                        <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                   </TableCell>
@@ -206,7 +216,7 @@ export default function SalesPage() {
             <AlertDialogAction 
               onClick={handleDeleteContract}
               disabled={deleting}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
             >
               {deleting ? (
                 <>

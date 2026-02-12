@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Loader2, Save, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -70,17 +70,17 @@ export function ContractInfoEditor({ contract, stores, onSave }: ContractInfoEdi
   };
 
   const getStatusBadge = (status: SalesStatus) => {
-    const statusMap: Record<SalesStatus, { label: string; className: string }> = {
-      [SalesStatus.DRAFT]: { label: '草稿', className: 'bg-gray-500' },
-      [SalesStatus.CONFIRMED]: { label: '已确认', className: 'bg-blue-500' },
-      [SalesStatus.PACKING]: { label: '装箱中', className: 'bg-yellow-500' },
-      [SalesStatus.SHIPPED]: { label: '已发运', className: 'bg-purple-500' },
-      [SalesStatus.ARRIVED]: { label: '已到达', className: 'bg-green-500' },
-      [SalesStatus.COMPLETED]: { label: '已完成', className: 'bg-gray-700' },
-      [SalesStatus.CANCELLED]: { label: '已取消', className: 'bg-red-500' },
+    const statusMap: Record<SalesStatus, { label: string; tone: React.ComponentProps<typeof SemanticBadge>["tone"] }> = {
+      [SalesStatus.DRAFT]: { label: '草稿', tone: 'neutral' },
+      [SalesStatus.CONFIRMED]: { label: '已确认', tone: 'info' },
+      [SalesStatus.PACKING]: { label: '装箱中', tone: 'warning' },
+      [SalesStatus.SHIPPED]: { label: '已发运', tone: 'progress' },
+      [SalesStatus.ARRIVED]: { label: '已到达', tone: 'success' },
+      [SalesStatus.COMPLETED]: { label: '已完成', tone: 'secondary' },
+      [SalesStatus.CANCELLED]: { label: '已取消', tone: 'danger' },
     };
-    const config = statusMap[status] || { label: status, className: '' };
-    return <Badge className={config.className}>{config.label}</Badge>;
+    const config = statusMap[status] || { label: status, tone: 'neutral' as const };
+    return <SemanticBadge tone={config.tone}>{config.label}</SemanticBadge>;
   };
 
   // 从 stores 中获取唯一的港口列表
@@ -116,7 +116,7 @@ export function ContractInfoEditor({ contract, stores, onSave }: ContractInfoEdi
         </div>
         <div>
           <div className="text-sm text-muted-foreground">总金额（自动计算）</div>
-          <div className="font-medium text-green-600">${contract.totalAmount.toLocaleString()}</div>
+          <div className="font-medium text-chart-3">${contract.totalAmount.toLocaleString()}</div>
         </div>
         <div>
           <div className="text-sm text-muted-foreground">已收款</div>

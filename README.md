@@ -22,7 +22,7 @@
 
 系统采用前后端分离架构：
 
-- **Frontend**: Next.js 14 (App Router) + Tailwind CSS + shadcn/ui
+- **Frontend**: Next.js 16 (App Router) + Tailwind CSS + shadcn/ui
 - **Backend**: Express + Prisma + SQLite (详见 `backend/`)
 - **AI**: Kimi API
 
@@ -30,8 +30,14 @@
 
 ```
 jiesong_system/
+├── .cursor/agents/           # 项目级 Cursor 子代理（AI委派配置）
+├── .github/workflows/       # CI工作流（单元测试+自动化验收）
 ├── docs/                    # 项目文档
-├── frontend/                # 前端项目 (Next.js 14)
+├── PLAN.md                  # 前端美化路线图与里程碑
+├── TASKS.md                 # 前端美化任务清单与状态
+├── RISKS.md                 # 前端美化风险台账
+├── METRICS.md               # 前端美化质量与过程指标
+├── frontend/                # 前端项目 (Next.js 16)
 │   ├── src/
 │   │   ├── app/             # App Router Pages
 │   │   ├── components/      # UI Components
@@ -63,7 +69,7 @@ jiesong_system/
 cd frontend
 npm install
 npm run dev
-# 访问 http://localhost:3000
+# 访问 http://localhost:3001
 ```
 
 ### 后端 (Backend)
@@ -72,8 +78,14 @@ npm run dev
 cd backend
 npm install
 npm run dev
-# API 服务运行在 http://localhost:3001 (假设)
+# API 服务运行在 http://localhost:3000
 ```
+
+### 联调提示
+
+- 登录默认管理员账号：`admin / admin123`
+- 若登录接口报 `500`，先确认后端是否已启动并监听 `3000` 端口
+- 前端会通过 `/api/v1/*` 代理到 `http://localhost:3000/api/v1/*`
 
 ## 文档导航
 
@@ -83,6 +95,19 @@ npm run dev
 - [数据库设计](docs/数据库设计.md) - Schema 定义
 - [测试样例](docs/测试样例.md) - 测试先行样例与用例清单
 - [模拟数据汇总](docs/模拟数据汇总.md) - 模拟数据标记清单
+- [前端统一重构验收清单](docs/前端统一重构验收清单.md) - 前端样式统一改造验收台账
+- [系统架构落地执行方案](docs/系统架构落地执行方案.md) - 多 Agent 协同执行路线与 WU 落地清单
+- [可执行里程碑计划（V1）](docs/可执行里程碑计划.md) - 未来2周 6 个里程碑、角色、验证与回滚
+- [采购链路 API 契约](docs/api-contracts/采购链路契约.md) - 采购域接口契约与联调状态基线
+- [销售链路 API 契约](docs/api-contracts/销售链路契约.md) - 销售与装箱接口契约基线
+- [销售链路联调面板](docs/api-contracts/销售链路联调面板.md) - 销售链路 READY/BLOCKED/DONE 联调追踪
+- [发布结论（M5）](docs/quality/发布结论_M5_20260212.md) - 采购链路门禁执行证据与发布建议
+- [周节奏指标看板](docs/周节奏指标看板.md) - 周度质量/效率/回归风险跟踪
+- [项目子代理说明](.cursor/agents/README.md) - 项目级 Cursor 子代理与用途
+- [前端美化路线图](PLAN.md) - 分阶段里程碑与风险对策
+- [前端美化任务清单](TASKS.md) - 执行状态与优先级
+- [前端美化风险台账](RISKS.md) - 风险触发与回滚点
+- [前端美化指标](METRICS.md) - 每轮质量与过程指标
 - [前端文档](frontend/README.md) - 前端开发指南
 
 ## License

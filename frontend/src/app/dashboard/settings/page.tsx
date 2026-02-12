@@ -33,6 +33,7 @@ import { toast } from 'sonner';
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE, UNITS as INITIAL_UNITS } from '@/lib/constants';
 import api from '@/lib/axios';
 import Link from 'next/link';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 const configSchema = z.object({
   exchangeRate: z.number().min(0.1, '汇率必须大于0'),
@@ -213,10 +214,10 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">设置</h2>
-        <p className="text-muted-foreground">管理基础档案、系统配置与数据导入</p>
-      </div>
+      <PageHeader
+        title="设置"
+        description="管理基础档案、系统配置与数据导入"
+      />
 
       <Tabs defaultValue={defaultTab} className="flex gap-6" orientation="vertical">
         <TabsList className="flex flex-col h-fit w-48 shrink-0">

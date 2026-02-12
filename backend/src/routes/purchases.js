@@ -19,6 +19,9 @@ router.use(authenticate);
 // GET /api/v1/purchases - 获取采购合同列表
 router.get('/', validatePagination, handleValidation, purchaseController.list);
 
+// GET /api/v1/purchases/options/next-no - 获取下一个合同编号（必须位于 /:id 之前）
+router.get('/options/next-no', purchaseController.getNextContractNo);
+
 // GET /api/v1/purchases/:id - 获取采购合同详情
 router.get('/:id', validateId, handleValidation, purchaseController.getById);
 
@@ -47,9 +50,6 @@ router.get('/:id/files', validateId, handleValidation, purchaseController.getFil
 
 // DELETE /api/v1/purchases/files/:fileId - 删除合同文件
 router.delete('/files/:fileId', purchaseController.deleteFile);
-
-// GET /api/v1/purchases/next-no - 获取下一个合同编号
-router.get('/options/next-no', purchaseController.getNextContractNo);
 
 // POST /api/v1/purchases/suppliers-by-products - 根据商品获取曾供应过的供应商
 router.post('/suppliers-by-products', purchaseController.getSuppliersByProducts);

@@ -99,7 +99,7 @@ function BoxMesh({
           center
           style={{ pointerEvents: 'none' }}
         >
-          <div className="bg-black/75 text-white px-2 py-1 rounded text-xs whitespace-nowrap">
+          <div className="bg-popover/92 text-popover-foreground px-2 py-1 rounded text-xs whitespace-nowrap border border-border/60">
             {box.name}
           </div>
         </Html>
@@ -264,9 +264,9 @@ export default function Container3DView({
   };
   
   return (
-    <div className="w-full h-[500px] bg-gray-100 rounded-lg overflow-hidden relative">
+    <div className="w-full h-[500px] bg-muted rounded-lg overflow-hidden relative">
       {/* 利用率信息 */}
-      <div className="absolute top-4 left-4 z-10 bg-white/90 rounded-lg p-3 shadow">
+      <div className="absolute top-4 left-4 z-10 bg-card/92 rounded-lg p-3 shadow border border-border/60">
         <div className="text-sm font-medium">装箱统计</div>
         <div className="text-xs text-muted-foreground mt-1">
           已装: {packingResult.placedBoxes.length} 箱
@@ -280,7 +280,7 @@ export default function Container3DView({
       </div>
       
       {/* 操作提示 */}
-      <div className="absolute bottom-4 left-4 z-10 bg-white/90 rounded-lg p-2 text-xs text-muted-foreground">
+      <div className="absolute bottom-4 left-4 z-10 bg-card/92 rounded-lg p-2 text-xs text-muted-foreground border border-border/60">
         拖拽旋转 | 滚轮缩放 | 右键平移
       </div>
       

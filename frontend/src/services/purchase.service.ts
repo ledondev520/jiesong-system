@@ -2,7 +2,7 @@ import api from '@/lib/axios';
 import { PurchaseContract, ApiResponse, PaginatedResponse } from '@/types';
 
 export const purchaseService = {
-  getAll: async (params?: { page?: number; pageSize?: number; query?: string }) => {
+  getAll: async (params?: { page?: number; pageSize?: number; keyword?: string }) => {
     return api.get<any, ApiResponse<PaginatedResponse<PurchaseContract>>>('/purchases', { params });
   },
 

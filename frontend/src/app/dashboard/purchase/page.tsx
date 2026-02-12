@@ -1,3 +1,11 @@
+/**
+ * Input: 采购合同服务API
+ * Output: 采购合同列表页面
+ * Pos: 采购管理入口，负责合同概览与状态追踪
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -13,10 +21,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { SemanticBadge } from '@/components/ui/semantic-badge';
+import { AmountText } from '@/components/ui/amount-text';
 import { Plus, Eye, FileText } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 export default function PurchasePage() {
   const [contracts, setContracts] = useState<PurchaseContract[]>([]);
@@ -41,28 +52,36 @@ export default function PurchasePage() {
 
   const getStatusBadge = (status: PurchaseStatus) => {
     switch (status) {
-      case PurchaseStatus.DRAFT: return <Badge variant="outline">草稿</Badge>;
-      case PurchaseStatus.SIGNED: return <Badge className="bg-blue-500">已签订</Badge>;
-      case PurchaseStatus.PRODUCING: return <Badge className="bg-yellow-500">生产中</Badge>;
-      case PurchaseStatus.SHIPPED: return <Badge className="bg-purple-500">已发货</Badge>;
-      case PurchaseStatus.COMPLETED: return <Badge className="bg-green-500">已完成</Badge>;
-      default: return <Badge variant="secondary">{status}</Badge>;
+      case PurchaseStatus.DRAFT: return <SemanticBadge tone="neutral">草稿</SemanticBadge>;
+      case PurchaseStatus.SIGNED: return <SemanticBadge tone="info">已签订</SemanticBadge>;
+      case PurchaseStatus.PRODUCING: return <SemanticBadge tone="warning">生产中</SemanticBadge>;
+      case PurchaseStatus.SHIPPED: return <SemanticBadge tone="progress">已发货</SemanticBadge>;
+      case PurchaseStatus.COMPLETED: return <SemanticBadge tone="success">已完成</SemanticBadge>;
+      default: return <SemanticBadge tone="secondary">{status}</SemanticBadge>;
     }
+  };
+
+  /**
+   * 职责：跳转到采购合同详情页
+   * @param id 合同ID
+   */
+  const handleViewContract = (id: string) => {
+    router.push(`/dashboard/purchase/${id}`);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">采购管理</h2>
-          <p className="text-muted-foreground">管理采购合同与付款进度。</p>
-        </div>
-        <Button onClick={() => router.push('/dashboard/purchase/create')}>
-          <Plus className="mr-2 h-4 w-4" /> 新增采购合同
-        </Button>
-      </div>
+      <PageHeader
+        title="采购管理"
+        description="管理采购合同与付款进度。"
+        actions={
+          <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/purchase/create')}>
+            <Plus className="mr-2 h-4 w-4" /> 新增采购合同
+          </Button>
+        }
+      />
 
-      <div className="rounded-md border">
+      <div className="surface-panel overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -78,11 +97,11 @@ export default function PurchasePage() {
           <TableBody>
             {loading ? (
                <TableRow>
-                 <TableCell colSpan={7} className="text-center py-10">加载中...</TableCell>
+                 <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
                </TableRow>
             ) : contracts.length === 0 ? (
                <TableRow>
-                 <TableCell colSpan={7} className="text-center py-10">暂无合同。</TableCell>
+                 <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">暂无合同。</TableCell>
                </TableRow>
             ) : (
               contracts.map((contract) => (
@@ -101,12 +120,17 @@ export default function PurchasePage() {
                   <TableCell>{getStatusBadge(contract.status)}</TableCell>
                   <TableCell className="text-right">¥{contract.totalAmount.toLocaleString()}</TableCell>
                   <TableCell className="text-right">
-                    <span className={contract.paidAmount < contract.totalAmount ? 'text-yellow-600' : 'text-green-600'}>
+                    <AmountText tone={contract.paidAmount < contract.totalAmount ? 'warning' : 'success'}>
                       ¥{contract.paidAmount.toLocaleString()}
-                    </span>
+                    </AmountText>
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`查看合同 ${contract.contractNo}`}
+                      onClick={() => handleViewContract(contract.id)}
+                    >
                       <Eye className="h-4 w-4" />
                     </Button>
                   </TableCell>

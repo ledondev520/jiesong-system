@@ -67,15 +67,23 @@ export function Sidebar() {
   };
 
   return (
-    <div className="flex h-full w-64 flex-col border-r bg-card text-card-foreground">
+    <div className="flex h-full w-64 flex-col border-r border-sidebar-border/80 bg-sidebar/75 text-sidebar-foreground backdrop-blur-xl">
       {/* 0. Logo区域 */}
-      <div className="flex h-14 items-center border-b px-4 font-semibold text-lg">
-        捷淞
+      <div className="flex h-16 items-center border-b border-sidebar-border/80 px-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-accent/30 bg-accent/15 text-accent">
+            JS
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold tracking-[0.18em] text-accent">JIESONG</p>
+            <p className="truncate text-xs text-sidebar-foreground/65">Business Control Center</p>
+          </div>
+        </div>
       </div>
       
       {/* 1. 导航菜单 */}
       <div className="flex-1 overflow-auto py-4">
-        <nav className="grid gap-1 px-2">
+        <nav className="grid gap-1.5 px-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = isActiveItem(item);
@@ -84,13 +92,13 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all hover:text-primary',
+                  'flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200',
                   isActive
-                    ? 'bg-primary/10 text-primary font-medium'
-                    : 'text-muted-foreground hover:bg-muted'
+                    ? 'bg-sidebar-primary/18 text-sidebar-primary font-medium shadow-[inset_0_0_0_1px_oklch(0.76_0.07_248_/_0.32)]'
+                    : 'text-sidebar-foreground/72 hover:bg-sidebar-accent/75 hover:text-sidebar-accent-foreground'
                 )}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className="h-4 w-4" />
                 {item.label}
               </Link>
             );
@@ -99,10 +107,10 @@ export function Sidebar() {
       </div>
       
       {/* 2. 退出登录 */}
-      <div className="border-t p-4">
+      <div className="border-t border-sidebar-border/80 p-4">
         <Button
           variant="ghost"
-          className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive"
+          className="w-full justify-start gap-2 rounded-xl border border-sidebar-border/80 bg-sidebar-accent/40 text-sidebar-foreground/72 hover:text-destructive"
           onClick={() => {
             logout();
             window.location.href = '/login';

@@ -106,13 +106,13 @@ export default function RegisterPage() {
   // 注册成功后的展示
   if (isSuccess) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/50">
-        <Card className="w-full max-w-md">
+      <div className="auth-shell">
+        <Card className="auth-card">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-              <CheckCircle className="h-10 w-10 text-green-600" />
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-chart-3/30 bg-chart-3/16">
+              <CheckCircle className="h-10 w-10 text-chart-3" />
             </div>
-            <CardTitle>注册成功！</CardTitle>
+            <CardTitle className="text-accent">注册成功！</CardTitle>
             <CardDescription>
               您的账号已创建成功，请等待管理员审核后即可登录使用。
             </CardDescription>
@@ -132,7 +132,7 @@ export default function RegisterPage() {
             </p>
           </CardContent>
           <CardFooter>
-            <Button className="w-full" onClick={() => router.push('/login')}>
+            <Button className="h-10 w-full rounded-xl" onClick={() => router.push('/login')}>
               返回登录
             </Button>
           </CardFooter>
@@ -142,10 +142,10 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/50 py-8">
-      <Card className="w-full max-w-md">
+    <div className="auth-shell">
+      <Card className="auth-card">
         <CardHeader>
-          <CardTitle>账号注册</CardTitle>
+          <CardTitle className="text-accent">账号注册</CardTitle>
           <CardDescription>
             创建新账号以使用捷淞进销存系统
           </CardDescription>
@@ -161,7 +161,7 @@ export default function RegisterPage() {
                   <FormItem>
                     <FormLabel>用户名 (姓名拼音)</FormLabel>
                     <FormControl>
-                      <Input placeholder="zhangsan" {...field} />
+                      <Input placeholder="zhangsan" className="rounded-xl bg-background/70" {...field} />
                     </FormControl>
                     <FormDescription>
                       请使用您的姓名拼音作为用户名，如：zhangsan
@@ -179,7 +179,7 @@ export default function RegisterPage() {
                   <FormItem>
                     <FormLabel>真实姓名</FormLabel>
                     <FormControl>
-                      <Input placeholder="张三" {...field} />
+                      <Input placeholder="张三" className="rounded-xl bg-background/70" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -194,7 +194,7 @@ export default function RegisterPage() {
                   <FormItem>
                     <FormLabel>手机号码 (密保)</FormLabel>
                     <FormControl>
-                      <Input placeholder="13800138000" type="tel" {...field} />
+                      <Input placeholder="13800138000" type="tel" className="rounded-xl bg-background/70" {...field} />
                     </FormControl>
                     <FormDescription>
                       用于账号安全验证和找回密码
@@ -212,7 +212,7 @@ export default function RegisterPage() {
                   <FormItem>
                     <FormLabel>设置密码</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="至少6位字符" {...field} />
+                      <Input type="password" placeholder="至少6位字符" className="rounded-xl bg-background/70" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -227,14 +227,14 @@ export default function RegisterPage() {
                   <FormItem>
                     <FormLabel>确认密码</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="再次输入密码" {...field} />
+                      <Input type="password" placeholder="再次输入密码" className="rounded-xl bg-background/70" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="h-10 w-full rounded-xl" disabled={isLoading}>
                 {isLoading ? '注册中...' : '立即注册'}
               </Button>
             </form>

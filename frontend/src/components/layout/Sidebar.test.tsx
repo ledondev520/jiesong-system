@@ -8,12 +8,13 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 
 const mockLogout = vi.fn();
 
 vi.mock('@/store/auth.store', () => ({
-  useAuthStore: (selector: any) => selector({
+  useAuthStore: (selector: (state: { logout: () => void }) => unknown) => selector({
     logout: mockLogout,
   }),
 }));
@@ -23,7 +24,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('next/link', () => ({
-  default: ({ href, children, className }: any) => (
+  default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => (
     <a href={href} className={className}>
       {children}
     </a>
@@ -34,9 +35,9 @@ describe('Sidebar', () => {
   it('渲染导航项并标记当前路由', () => {
     const { getByText } = render(<Sidebar />);
 
-    // 当前路由是 /dashboard/contracts，对应 "合同管理"
-    const current = getByText('合同管理');
-    expect(current.className.includes('bg-primary')).toBe(true);
+    // 当前路由是 /dashboard/contracts，对应 "采购合同"
+    const current = getByText('采购合同').closest('a');
+    expect(current?.className.includes('bg-sidebar-primary/18')).toBe(true);
   });
 
   it('点击退出登录调用logout', () => {
