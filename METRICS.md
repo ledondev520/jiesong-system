@@ -93,3 +93,58 @@
 ### 结论
 - 自动化验收从“纯冒烟”升级为“冒烟 + 业务页可用性”。
 - 鉴权状态恢复边界稳定性增强，降低刷新/首屏误跳登录风险。
+
+## 2026-02-12 Round 8 (Theme Toggle & Style Unification)
+
+### 质量指标
+- 定向单测：`Header` + `store-recommend` 页面 4/4 通过
+- 改动文件 lint 诊断：0 新增问题（`ReadLints` 结果）
+
+### 过程指标
+- 新增主题基础组件：`ThemeProvider`、`ThemeToggle`
+- 页面风格修正：`store-recommend` 中 emoji 标签/标记全部替换为 Lucide 图标
+
+### 结论
+- 系统已支持白天/夜间切换，且采购建议页视觉语言与全局设计系统一致。
+
+## 2026-02-12 Round 9 (Light Mode Contrast Fix)
+
+### 质量指标
+- 定向单测：`Header` + `PageHeader` + `login` 共 8/8 通过
+- 改动文件 lint 诊断：0 新增问题（`ReadLints` 结果）
+
+### 过程指标
+- 新增语义色：`--brand-emphasis`、`--brand-emphasis-soft`
+- 替换范围：页面标题、认证标题、侧边栏品牌位、Header 日期图标
+
+### 结论
+- 白天模式下强调文字对比度显著提升，夜间模式风格保持不变。
+
+## 2026-02-12 Round 10 (Dashboard Hydration Mismatch Fix)
+
+### 质量指标
+- 定向 lint：`frontend/src/app/dashboard/layout.tsx` 通过（0 error）
+- 定向单测：`inventory/inventory-container/products/store-recommend` 共 14/14 通过
+
+### 过程指标
+- 稳定性修复点：1（移除 `dashboard/layout.tsx` 渲染期 `window/localStorage` 分支）
+- 重定向策略调整：1（未登录跳转改为 hydration 完成后执行 `router.replace('/login')`）
+
+### 结论
+- Dashboard 布局 SSR/CSR 首帧分支已统一，hydration mismatch 风险显著降低。
+
+## 2026-02-12 Round 11 (Build Gate Recovery)
+
+### 质量指标
+- 前端生产构建：`npm run build` 通过（Next.js 16.1.2）
+- 定向单测：`inventory/inventory-container/products/store-recommend` 共 14/14 通过
+- 前端全量单测：48 文件、155 用例，100% 通过
+- 后端全量测试：37/37 通过
+- 改动文件 lint：0 新增问题（`ReadLints`）
+
+### 过程指标
+- 类型兼容修复：3 类（认证 API 响应类型、货柜域字段兼容、状态映射）
+- 框架约束修复：4 个页面补齐 `useSearchParams` Suspense 边界（`payments/products/contracts/settings`）
+
+### 结论
+- 本轮从“局部 hydration 修复”扩展到“构建门禁打通”，当前前端已恢复可构建状态。

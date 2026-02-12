@@ -15,6 +15,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import api from '@/lib/axios';
+import type { ApiResponse } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -82,7 +83,7 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const result = await api.post('/auth/public-register', {
+      const result: ApiResponse<null> = await api.post('/auth/public-register', {
         username: data.username,
         name: data.name,
         phone: data.phone,
@@ -112,7 +113,7 @@ export default function RegisterPage() {
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-chart-3/30 bg-chart-3/16">
               <CheckCircle className="h-10 w-10 text-chart-3" />
             </div>
-            <CardTitle className="text-accent">注册成功！</CardTitle>
+            <CardTitle className="text-brand-emphasis">注册成功！</CardTitle>
             <CardDescription>
               您的账号已创建成功，请等待管理员审核后即可登录使用。
             </CardDescription>
@@ -145,7 +146,7 @@ export default function RegisterPage() {
     <div className="auth-shell">
       <Card className="auth-card">
         <CardHeader>
-          <CardTitle className="text-accent">账号注册</CardTitle>
+          <CardTitle className="text-brand-emphasis">账号注册</CardTitle>
           <CardDescription>
             创建新账号以使用捷淞进销存系统
           </CardDescription>

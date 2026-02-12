@@ -58,7 +58,7 @@ export default function DashboardPage() {
       {/* 快速录入区 */}
       <Card className="surface-panel surface-mesh border-primary/35">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2 text-accent">
+          <CardTitle className="text-brand-emphasis text-lg flex items-center gap-2">
             <Plus className="h-5 w-5" />
             快速录入
           </CardTitle>

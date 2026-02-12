@@ -27,6 +27,9 @@ router.get('/product/:productId', inventoryController.getByProduct);
 // GET /api/v1/inventory/contract/:contractId - 按出口合同查询库存
 router.get('/contract/:contractId', inventoryController.getByContract);
 
+// PUT /api/v1/inventory/batch-status - 批量更新库存状态（静态路由优先）
+router.put('/batch-status', inventoryController.batchUpdateStatus);
+
 // GET /api/v1/inventory/:id - 获取库存详情（通配路由放最后）
 router.get('/:id', validateId, handleValidation, inventoryController.getById);
 

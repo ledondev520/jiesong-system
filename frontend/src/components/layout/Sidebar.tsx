@@ -71,11 +71,11 @@ export function Sidebar() {
       {/* 0. Logo区域 */}
       <div className="flex h-16 items-center border-b border-sidebar-border/80 px-4">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-accent/30 bg-accent/15 text-accent">
+          <div className="text-brand-emphasis flex h-9 w-9 items-center justify-center rounded-xl border border-accent/30 bg-accent/15">
             JS
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold tracking-[0.18em] text-accent">JIESONG</p>
+            <p className="text-brand-emphasis truncate text-sm font-semibold tracking-[0.18em]">JIESONG</p>
             <p className="truncate text-xs text-sidebar-foreground/65">Business Control Center</p>
           </div>
         </div>

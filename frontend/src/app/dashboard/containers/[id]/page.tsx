@@ -200,13 +200,18 @@ export default function ContainerDetailPage({ params }: PageProps) {
   /**
    * 职责：获取状态徽章
    */
-  const getStatusBadge = (status: ContainerStatus) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case ContainerStatus.PENDING: return <SemanticBadge tone="neutral">待装柜</SemanticBadge>;
+      case 'DRAFT': return <SemanticBadge tone="neutral">草稿</SemanticBadge>;
+      case 'CONFIRMED': return <SemanticBadge tone="neutral">已确认</SemanticBadge>;
       case ContainerStatus.LOADING: return <SemanticBadge tone="warning">装柜中</SemanticBadge>;
+      case 'PACKING': return <SemanticBadge tone="warning">装箱中</SemanticBadge>;
       case ContainerStatus.SHIPPED: return <SemanticBadge tone="progress">已发运</SemanticBadge>;
       case ContainerStatus.ARRIVED: return <SemanticBadge tone="success">已到达</SemanticBadge>;
-      default: return <SemanticBadge tone="secondary">{status}</SemanticBadge>;
+      case 'COMPLETED': return <SemanticBadge tone="success">已完成</SemanticBadge>;
+      case 'CANCELLED': return <SemanticBadge tone="secondary">已取消</SemanticBadge>;
+      default: return <SemanticBadge tone="secondary">{String(status)}</SemanticBadge>;
     }
   };
 
@@ -223,12 +228,16 @@ export default function ContainerDetailPage({ params }: PageProps) {
   const weightUsed = container.grossWeight || 0;
   const volumePercent = Math.min((volumeUsed / CONTAINER_40HQ.maxVolume) * 100, 100);
   const weightPercent = Math.min((weightUsed / CONTAINER_40HQ.maxWeight) * 100, 100);
+  const containerTitle = (container as { containerNo?: string }).containerNo ?? container.contractNo;
+  const containerItems: ContainerItem[] =
+    (container as { packingItems?: ContainerItem[] }).packingItems ??
+    ((container.items as unknown as ContainerItem[] | undefined) ?? []);
 
   return (
     <div className="space-y-6 pb-10">
       {/* 页头 */}
       <PageHeader
-        title={container.containerNo}
+        title={containerTitle}
         description={`目的港: ${container.port?.name || '-'} | 预计到达: ${container.estimatedArrival ? format(new Date(container.estimatedArrival), 'yyyy-MM-dd') : '-'}`}
         actions={getStatusBadge(container.status)}
       />
@@ -347,14 +356,14 @@ export default function ContainerDetailPage({ params }: PageProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!container.items?.length ? (
+              {!containerItems.length ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
                     暂无装箱商品，点击"添加商品"开始装柜
                   </TableCell>
                 </TableRow>
               ) : (
-                container.items.map((item) => (
+                containerItems.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">
                       {item.product?.customsName}

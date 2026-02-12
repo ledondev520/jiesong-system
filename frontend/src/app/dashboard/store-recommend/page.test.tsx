@@ -117,9 +117,9 @@ describe('StoreRecommendPage 交互逻辑', () => {
     render(<StoreRecommendPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('tab', { name: '📊 门店采购统计' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: '门店采购统计' })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('tab', { name: '📊 门店采购统计' }));
+    await user.click(screen.getByRole('tab', { name: '门店采购统计' }));
 
     await waitFor(() => {
       expect(screen.getByText('门店采购明细')).toBeInTheDocument();

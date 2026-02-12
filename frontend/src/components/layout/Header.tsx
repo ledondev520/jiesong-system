@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { UserCircle, Bell, Search, Package, FileText, Container, Building2, Loader2, CalendarDays } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import api from '@/lib/axios';
 
 interface SearchResult {
@@ -209,7 +210,7 @@ export function Header() {
     <header className="surface-panel surface-mesh flex h-16 items-center gap-4 border-border/65 px-4 md:px-6">
       <div className="flex flex-1 items-center gap-4">
         <div className="hidden items-center gap-2 rounded-xl border border-border/70 bg-background/60 px-3 py-2 text-xs text-muted-foreground lg:flex">
-          <CalendarDays className="h-3.5 w-3.5 text-accent" />
+          <CalendarDays className="text-brand-emphasis-soft h-3.5 w-3.5" />
           <span>{todayLabel}</span>
         </div>
 
@@ -268,6 +269,8 @@ export function Header() {
       </div>
       
       <div className="flex items-center gap-4">
+        <ThemeToggle />
+
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -60,7 +60,7 @@ export function PageHeader({
         
         {/* 标题区域 */}
         <div className="min-w-0">
-          <h2 className="truncate text-2xl font-bold tracking-tight text-accent">{title}</h2>
+          <h2 className="text-brand-emphasis truncate text-2xl font-bold tracking-tight">{title}</h2>
           {description && (
             <p className="text-sm text-muted-foreground/90">{description}</p>
           )}

@@ -20,7 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Store, Loader2, Package, DollarSign, ShoppingCart, Utensils, Lightbulb, Sofa, Wrench, Box, CheckCircle2 } from 'lucide-react';
+import { Store, Loader2, Package, DollarSign, ShoppingCart, Utensils, Lightbulb, Sofa, Wrench, Box, CheckCircle2, Sparkles, BarChart3, Star } from 'lucide-react';
 import api from '@/lib/axios';
 import { PageHeader } from '@/components/layout/PageHeader';
 
@@ -117,9 +117,15 @@ export default function StoreRecommendPage() {
       />
 
       <Tabs defaultValue="recommend">
-        <TabsList>
-          <TabsTrigger value="recommend">🛒 新店采购清单</TabsTrigger>
-          <TabsTrigger value="stats">📊 门店采购统计</TabsTrigger>
+        <TabsList className="rounded-xl border border-border/70 bg-background/60">
+          <TabsTrigger value="recommend" className="gap-2">
+            <Sparkles className="h-4 w-4" />
+            新店采购清单
+          </TabsTrigger>
+          <TabsTrigger value="stats" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            门店采购统计
+          </TabsTrigger>
         </TabsList>
 
         {/* 采购建议（主页面） */}
@@ -220,7 +226,7 @@ export default function StoreRecommendPage() {
                             >
                               <div className="flex items-center gap-2">
                                 {item.priority === '强烈建议' && (
-                                  <span className="text-chart-5">★</span>
+                                  <Star className="h-3.5 w-3.5 fill-chart-5 text-chart-5" />
                                 )}
                                 <span className="truncate max-w-[120px]">{item.productName}</span>
                               </div>
@@ -267,7 +273,7 @@ export default function StoreRecommendPage() {
                         .map((item) => (
                           <TableRow key={item.productId}>
                             <TableCell className="font-medium">
-                              <span className="text-chart-5 mr-1">★</span>
+                              <Star className="mr-1 inline h-3.5 w-3.5 fill-chart-5 text-chart-5" />
                               {item.productName}
                             </TableCell>
                             <TableCell>

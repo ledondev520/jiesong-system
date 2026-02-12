@@ -64,7 +64,7 @@ describe('InventoryPage 交互逻辑', () => {
     });
   });
 
-  it('可更新库存状态为已出库', async () => {
+  it('可按状态机规则更新库存状态', async () => {
     mockGetAll.mockResolvedValue({
       data: {
         items: [
@@ -91,11 +91,45 @@ describe('InventoryPage 交互逻辑', () => {
     if (!trigger) return;
 
     await user.click(trigger);
+    await user.click(screen.getByText('设为: 包装中'));
+
+    await waitFor(() => {
+      expect(mockUpdateStatus).toHaveBeenCalledWith('inv-1', 'PACKING');
+      expect(mockToastSuccess).toHaveBeenCalledWith('状态已更新为: PACKING');
+    });
+  });
+
+  it('状态更新失败时展示后端错误信息', async () => {
+    mockGetAll.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: 'inv-1',
+            status: 'INBOUND',
+            quantity: 20,
+            product: { customsName: '测试瓷砖', hsCode: '69072190', declaration: '墙地砖', unit: '箱' },
+          },
+        ],
+      },
+    });
+    mockUpdateStatus.mockRejectedValue({ message: '入库记录未绑定出口合同，禁止出库' });
+
+    const user = userEvent.setup();
+    const { container } = render(<InventoryPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('测试瓷砖')).toBeInTheDocument();
+    });
+
+    const trigger = container.querySelector('[data-slot="dropdown-menu-trigger"]');
+    expect(trigger).toBeTruthy();
+    if (!trigger) return;
+
+    await user.click(trigger);
     await user.click(screen.getByText('设为: 已出库'));
 
     await waitFor(() => {
-      expect(mockUpdateStatus).toHaveBeenCalledWith('inv-1', 'OUTBOUND');
-      expect(mockToastSuccess).toHaveBeenCalledWith('状态已更新为: OUTBOUND');
+      expect(mockToastError).toHaveBeenCalledWith('入库记录未绑定出口合同，禁止出库');
     });
   });
 });

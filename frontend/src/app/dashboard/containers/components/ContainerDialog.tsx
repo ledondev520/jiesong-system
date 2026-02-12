@@ -70,8 +70,8 @@ export function ContainerDialog({
       note: '',
     },
     values: container ? {
-      containerNo: container.containerNo,
-      portId: container.portId,
+      containerNo: (container as { containerNo?: string }).containerNo ?? container.contractNo ?? '',
+      portId: container.portId ?? '',
       estimatedArrival: container.estimatedArrival ? new Date(container.estimatedArrival) : undefined,
       totalBoxes: container.totalBoxes,
       grossWeight: container.grossWeight,

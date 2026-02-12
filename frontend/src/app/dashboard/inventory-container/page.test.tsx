@@ -13,6 +13,7 @@ import InventoryPage from './page';
 
 const mockGetAll = vi.fn();
 const mockUpdateStatus = vi.fn();
+const mockBatchUpdateStatus = vi.fn();
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockRouterPush = vi.fn();
@@ -28,6 +29,7 @@ vi.mock('@/services/inventory.service', () => ({
   inventoryService: {
     getAll: (...args: unknown[]) => mockGetAll(...args),
     updateStatus: (...args: unknown[]) => mockUpdateStatus(...args),
+    batchUpdateStatus: (...args: unknown[]) => mockBatchUpdateStatus(...args),
   },
 }));
 
@@ -42,6 +44,7 @@ describe('InventoryPage 交互逻辑', () => {
   beforeEach(() => {
     mockGetAll.mockReset();
     mockUpdateStatus.mockReset();
+    mockBatchUpdateStatus.mockReset();
     mockToastError.mockReset();
     mockToastSuccess.mockReset();
   });
@@ -65,7 +68,7 @@ describe('InventoryPage 交互逻辑', () => {
     });
   });
 
-  it('可更新库存状态为已出库', async () => {
+  it('可按状态机规则更新库存状态', async () => {
     mockGetAll.mockResolvedValue({
       data: {
         items: [
@@ -94,13 +97,83 @@ describe('InventoryPage 交互逻辑', () => {
     if (!trigger) return;
     await user.click(trigger);
 
-    // 1. 执行状态更新
-    await user.click(screen.getByText('设为: 已出库'));
+    // 1. 执行状态更新（PRODUCING 仅允许到 PACKING）
+    await user.click(screen.getByText('设为: 包装中'));
 
     // 2. 验证服务调用与成功反馈
     await waitFor(() => {
-      expect(mockUpdateStatus).toHaveBeenCalledWith('inv-1', 'OUTBOUND');
+      expect(mockUpdateStatus).toHaveBeenCalledWith('inv-1', 'PACKING');
       expect(mockToastSuccess).toHaveBeenCalledWith('状态已更新');
+    });
+  });
+
+  it('输入关键词时会触发后端关键词查询', async () => {
+    mockGetAll.mockResolvedValue({ data: { items: [] } });
+    const user = userEvent.setup();
+    render(<InventoryPage />);
+
+    await waitFor(() => {
+      expect(mockGetAll).toHaveBeenCalledWith({
+        page: 1,
+        pageSize: 100,
+        keyword: undefined,
+      });
+    });
+
+    await user.type(screen.getByPlaceholderText('搜索商品/采购合同...'), '瓷砖');
+
+    await waitFor(() => {
+      expect(mockGetAll).toHaveBeenCalledWith({
+        page: 1,
+        pageSize: 100,
+        keyword: '瓷砖',
+      });
+    });
+  });
+
+  it('可批量更新库存状态', async () => {
+    mockGetAll.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: 'inv-1',
+            status: 'INBOUND',
+            quantity: 100,
+            product: { customsName: '测试商品A', unit: '箱' },
+            purchaseItem: { purchaseContract: { contractNo: 'CG2500001' } },
+          },
+          {
+            id: 'inv-2',
+            status: 'INBOUND',
+            quantity: 80,
+            product: { customsName: '测试商品B', unit: '箱' },
+            purchaseItem: { purchaseContract: { contractNo: 'CG2500002' } },
+          },
+        ],
+      },
+    });
+    mockBatchUpdateStatus.mockResolvedValue({
+      data: { success: 2, failed: 0, errors: [] },
+    });
+
+    const user = userEvent.setup();
+    render(<InventoryPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('测试商品A')).toBeInTheDocument();
+    });
+
+    // 0. 勾选两条库存记录
+    await user.click(screen.getByRole('checkbox', { name: '选择库存 测试商品A' }));
+    await user.click(screen.getByRole('checkbox', { name: '选择库存 测试商品B' }));
+
+    // 1. 执行批量状态更新
+    await user.click(screen.getByRole('button', { name: '批量设为已出库' }));
+
+    // 2. 验证调用参数与结果提示
+    await waitFor(() => {
+      expect(mockBatchUpdateStatus).toHaveBeenCalledWith(['inv-1', 'inv-2'], 'OUTBOUND');
+      expect(mockToastSuccess).toHaveBeenCalledWith('批量更新完成：成功 2 条');
     });
   });
 });

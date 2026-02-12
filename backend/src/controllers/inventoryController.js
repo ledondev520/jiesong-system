@@ -1,7 +1,7 @@
 /**
- * Input: Prisma客户端
- * Output: 库存相关的HTTP响应
- * Pos: 库存控制器，处理库存查询和状态变更
+ * Input: Prisma客户端、库存状态机工具
+ * Output: 库存相关的HTTP响应（含单条/批量状态更新）
+ * Pos: 库存控制器，处理库存查询、状态变更与批量操作
  * 
  * 2026-01-20 更新：Container已合并到SalesContract
  * 
@@ -11,18 +11,47 @@
 const prisma = require('../utils/prisma');
 const { success, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
+const { validateInventoryTransition } = require('../utils/inventoryStateMachine');
 
 /**
- * 职责：获取库存列表
+ * 职责：获取库存列表并支持条件筛选。
+ * 思路：
+ * 1. 解析分页与筛选参数；
+ * 2. 组装 Prisma where 条件；
+ * 3. 并行查询列表与总数并返回分页结果。
+ * @param {import('express').Request} req 请求对象
+ * @param {import('express').Response} res 响应对象
+ * @param {import('express').NextFunction} next 错误透传
+ * @returns {Promise<void>}
  */
 const list = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20, status, productId } = req.query;
+    const { page = 1, pageSize = 20, status, productId, keyword } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(pageSize);
     
     const where = {};
     if (status) where.status = status;
     if (productId) where.productId = productId;
+    if (keyword && keyword.trim()) {
+      where.OR = [
+        {
+          product: {
+            customsName: {
+              contains: keyword.trim(),
+            },
+          },
+        },
+        {
+          purchaseItem: {
+            purchaseContract: {
+              contractNo: {
+                contains: keyword.trim(),
+              },
+            },
+          },
+        },
+      ];
+    }
     
     const [inventories, total] = await Promise.all([
       prisma.inventory.findMany({
@@ -72,12 +101,43 @@ const getById = async (req, res, next) => {
 };
 
 /**
- * 职责：更新库存状态
+ * 职责：更新单条库存状态并执行状态机校验。
+ * 思路：
+ * 1. 读取库存当前状态；
+ * 2. 执行状态机规则校验；
+ * 3. 校验通过后更新状态及状态时间戳。
+ * @param {import('express').Request} req 请求对象
+ * @param {import('express').Response} res 响应对象
+ * @param {import('express').NextFunction} next 错误透传
+ * @returns {Promise<void>}
  */
 const updateStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
+
+    // 0. 获取当前库存状态与关键上下文
+    const existingInventory = await prisma.inventory.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        status: true,
+        salesContractId: true,
+      },
+    });
+    if (!existingInventory) {
+      throw createError('库存记录不存在', 404);
+    }
+
+    // 1. 执行状态机校验
+    const validationResult = validateInventoryTransition(
+      existingInventory.status,
+      status,
+      existingInventory
+    );
+    if (!validationResult.valid) {
+      throw createError(validationResult.message || '非法库存状态流转', 400);
+    }
     
     const updateData = { status };
     
@@ -94,6 +154,87 @@ const updateStatus = async (req, res, next) => {
     });
     
     success(res, inventory, '状态更新成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：批量更新库存状态并返回逐条执行结果。
+ * 思路：
+ * 1. 校验请求体 ids 与 status；
+ * 2. 查询目标库存集合；
+ * 3. 逐条执行状态机校验与更新，收集成功/失败明细。
+ * @param {import('express').Request} req 请求对象
+ * @param {import('express').Response} res 响应对象
+ * @param {import('express').NextFunction} next 错误透传
+ * @returns {Promise<void>}
+ */
+const batchUpdateStatus = async (req, res, next) => {
+  try {
+    const { ids, status } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw createError('ids 不能为空数组', 400);
+    }
+    if (!status) {
+      throw createError('status 不能为空', 400);
+    }
+
+    const existingInventories = await prisma.inventory.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        status: true,
+        salesContractId: true,
+      },
+    });
+
+    const inventoryMap = new Map(existingInventories.map((item) => [item.id, item]));
+    let successCount = 0;
+    const errors = [];
+
+    // 0. 逐条校验并更新，确保返回可追踪失败原因
+    for (const id of ids) {
+      const existingInventory = inventoryMap.get(id);
+      if (!existingInventory) {
+        errors.push({ id, message: '库存记录不存在' });
+        continue;
+      }
+
+      const validationResult = validateInventoryTransition(
+        existingInventory.status,
+        status,
+        existingInventory
+      );
+      if (!validationResult.valid) {
+        errors.push({ id, message: validationResult.message || '非法库存状态流转' });
+        continue;
+      }
+
+      const updateData = { status };
+      if (status === 'INBOUND') {
+        updateData.inboundAt = new Date();
+      } else if (status === 'OUTBOUND') {
+        updateData.outboundAt = new Date();
+      }
+
+      // 1. 执行更新
+      await prisma.inventory.update({
+        where: { id },
+        data: updateData,
+      });
+      successCount += 1;
+    }
+
+    success(
+      res,
+      {
+        success: successCount,
+        failed: errors.length,
+        errors,
+      },
+      '批量状态更新完成'
+    );
   } catch (error) {
     next(error);
   }
@@ -180,6 +321,7 @@ module.exports = {
   list,
   getById,
   updateStatus,
+  batchUpdateStatus,
   getByProduct,
   getByContract,  // 原 getByContainer
   getStats,

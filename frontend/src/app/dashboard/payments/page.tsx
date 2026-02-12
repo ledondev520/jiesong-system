@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { PaymentType } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -62,7 +62,7 @@ interface FinanceStats {
  *   2. 使用Tab切换应付/应收列表
  *   3. 支持快速记录付款/收款
  */
-export default function PaymentsPage() {
+function PaymentsPageContent() {
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get('tab') || 'payable';
   
@@ -380,5 +380,13 @@ export default function PaymentsPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function PaymentsPage() {
+  return (
+    <Suspense fallback={<div className="py-12 text-center text-muted-foreground">加载中...</div>}>
+      <PaymentsPageContent />
+    </Suspense>
   );
 }

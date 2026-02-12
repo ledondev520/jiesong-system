@@ -1,3 +1,11 @@
+/**
+ * Input: 货柜服务 API、港口常量、货柜弹窗组件
+ * Output: 货柜管理页面（列表展示、创建编辑入口）
+ * Pos: 核心业务页面，承接货柜运输管理
+ * 
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -43,16 +51,21 @@ export default function ContainersPage() {
     }
   };
 
-  const getPortName = (portId: string) => {
+  const getPortName = (portId?: string) => {
     return PORTS.find(p => p.id === portId)?.name || '未知港口';
   };
 
-  const getStatusBadge = (status: ContainerStatus) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case ContainerStatus.PENDING: return <SemanticBadge tone="neutral">待装柜</SemanticBadge>;
+      case 'DRAFT': return <SemanticBadge tone="neutral">草稿</SemanticBadge>;
+      case 'CONFIRMED': return <SemanticBadge tone="neutral">已确认</SemanticBadge>;
       case ContainerStatus.LOADING: return <SemanticBadge tone="warning">装柜中</SemanticBadge>;
+      case 'PACKING': return <SemanticBadge tone="warning">装箱中</SemanticBadge>;
       case ContainerStatus.SHIPPED: return <SemanticBadge tone="progress">已发运</SemanticBadge>;
       case ContainerStatus.ARRIVED: return <SemanticBadge tone="success">已到达</SemanticBadge>;
+      case 'COMPLETED': return <SemanticBadge tone="success">已完成</SemanticBadge>;
+      case 'CANCELLED': return <SemanticBadge tone="secondary">已取消</SemanticBadge>;
       default: return <SemanticBadge tone="secondary">{status}</SemanticBadge>;
     }
   };
@@ -107,7 +120,7 @@ export default function ContainersPage() {
         }
       />
 
-      <div className="rounded-md border">
+      <div className="surface-panel overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -133,7 +146,7 @@ export default function ContainersPage() {
                 <TableRow key={container.id}>
                   <TableCell className="font-medium flex items-center gap-2">
                     <Ship className="h-4 w-4 text-muted-foreground" />
-                    {container.containerNo}
+                    {container.containerNo ?? container.contractNo}
                   </TableCell>
                   <TableCell>{getPortName(container.portId)}</TableCell>
                   <TableCell>{getStatusBadge(container.status)}</TableCell>

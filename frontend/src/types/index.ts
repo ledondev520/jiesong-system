@@ -163,6 +163,7 @@ export enum SalesStatus {
 export interface SalesContract {
   id: string;
   contractNo: string;  // EXP 编号，同时作为货柜标识
+  containerNo?: string; // 兼容旧货柜页面字段（逐步迁移到 contractNo）
   // 销售信息
   totalAmount: number;
   receivedAmount: number;
@@ -221,6 +222,7 @@ export interface Inventory {
   productId: string;
   purchaseItemId?: string;
   salesItemId?: string;
+  salesContractId?: string;
   containerId?: string;
   quantity: number;
   unit?: string;

@@ -1,6 +1,6 @@
 /**
- * Input: 认证状态、Sidebar、Header
- * Output: Dashboard 全局布局容器
+ * Input: 认证状态仓库（zustand persist）、路由导航能力、Sidebar、Header
+ * Output: Dashboard 全局布局容器与未登录重定向行为
  * Pos: 仪表盘路由层，承载导航框架和内容区域
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,29 +8,52 @@
 
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/auth.store';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 
+/**
+ * 职责：在认证状态完成 hydration 后渲染仪表盘框架，并对未登录用户执行客户端重定向。
+ * 思路：
+ * 1) 通过本地 `hydrated` 状态保证首屏 SSR/CSR 输出一致，避免 hydration mismatch。
+ * 2) hydration 完成后仅根据持久化恢复的认证状态决定是否跳转登录页。
+ * 3) 仅在可渲染时输出稳定布局结构。
+ * @param children 页面内容插槽
+ * @returns 仪表盘布局节点或空节点
+ */
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  // persist 中间件在某些测试/SSR边界可能不可用，需做安全兜底
-  const hasHydrated = useAuthStore.persist?.hasHydrated?.() ?? false;
-  // 在少量边界场景下（如刷新瞬间/自动化测试），state 可能短暂未恢复，允许 token 作为临时兜底
-  const hasTokenFallback =
-    typeof window !== 'undefined' && Boolean(window.localStorage.getItem('token'));
+  const [hydrated, setHydrated] = useState(() => useAuthStore.persist?.hasHydrated?.() ?? true);
 
-  // Client-side only redirect check
-  if (hasHydrated && !isAuthenticated && !hasTokenFallback) {
-    redirect('/login');
-  }
+  useEffect(() => {
+    // 0. 初始化 hydration 状态，确保首屏结构稳定
+    const persistApi = useAuthStore.persist;
+    if (!persistApi || persistApi.hasHydrated()) {
+      return;
+    }
+    // 1. 若尚未完成，监听完成事件后更新
+    const unsubscribe = persistApi.onFinishHydration(() => {
+      setHydrated(true);
+    });
 
-  if (!hasHydrated) {
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    // 0. 仅在 hydration 完成后执行客户端跳转，避免 SSR/CSR 分支差异
+    if (hydrated && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [hydrated, isAuthenticated, router]);
+
+  if (!hydrated) {
     return null; // Prevent hydration mismatch
   }
 

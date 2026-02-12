@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -59,7 +59,7 @@ interface SystemConfigMap {
  *   3. Tab3 数据导入：CSV导入入口
  *   4. Tab4 用户管理：用户管理入口
  */
-export default function SettingsPage() {
+function SettingsPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const defaultTab = searchParams.get('tab') || 'master';
@@ -462,5 +462,13 @@ export default function SettingsPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="py-12 text-center text-muted-foreground">加载中...</div>}>
+      <SettingsPageContent />
+    </Suspense>
   );
 }

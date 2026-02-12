@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { Suspense, useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PurchaseContract, PurchaseStatus, PurchaseItem } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
@@ -58,7 +58,7 @@ interface PurchaseContractDetail extends PurchaseContract {
  *   2. 提供筛选和分页
  *   3. 支持查看详情和生成合同文档
  */
-export default function ContractsPage() {
+function ContractsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusFromUrl = searchParams.get('status') || 'ALL';
@@ -593,5 +593,13 @@ export default function ContractsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function ContractsPage() {
+  return (
+    <Suspense fallback={<div className="py-12 text-center text-muted-foreground">加载中...</div>}>
+      <ContractsPageContent />
+    </Suspense>
   );
 }

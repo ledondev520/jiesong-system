@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { IBM_Plex_Mono, Noto_Sans_SC, Noto_Serif_SC } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { AIAssistant } from "@/components/ai/AIAssistant";
+import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import "./globals.css";
 
 const bodySans = Noto_Sans_SC({
@@ -33,16 +34,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" className="dark">
+    <html lang="zh-CN" suppressHydrationWarning>
       <body
         className={`${bodySans.variable} ${displaySerif.variable} ${uiMono.variable} antialiased`}
         style={{
           fontFamily: "var(--font-body-sans)",
         }}
       >
-        {children}
-        <Toaster position="top-center" />
-        <AIAssistant />
+        <ThemeProvider>
+          {children}
+          <Toaster position="top-center" />
+          <AIAssistant />
+        </ThemeProvider>
       </body>
     </html>
   );

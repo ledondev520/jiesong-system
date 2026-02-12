@@ -88,6 +88,48 @@
 - 已完成 Phase F 第十二交付（M6 详情页 E2E 补齐）：
   - 在 `frontend/e2e/smoke.spec.ts` 新增“登录后访问销售详情页可展示合同与明细（Mock）”场景。
   - 前端 E2E 冒烟升级为 5/5，覆盖列表与详情关键路径。
+- 已启动 Phase G（产品体验增强）并完成首个交付：
+  - 在商品管理页新增关键词搜索防抖（350ms），避免输入过程高频请求导致卡顿。
+  - 定向交互测试通过：`frontend/src/app/dashboard/products/page.test.tsx`（3/3）。
+- 已完成 Phase G 第二交付（交互一致性）：
+  - 商品删除流程从原生 `confirm` 迁移为统一 `AlertDialog`，对齐系统交互规范。
+  - 补齐删除按钮可访问标签，提升可测性与无障碍表现。
+  - 定向交互测试持续通过：`frontend/src/app/dashboard/products/page.test.tsx`（3/3）。
+- 已完成 Phase G 第三交付（主数据字段补齐）：
+  - 在商品编辑弹窗补齐 `HS编码` 与 `申报要素` 字段，打通商品录入与库存展示链路。
+  - 完成 schema、默认值、编辑回填与提交路径同步，确保新增字段可创建/编辑。
+  - 定向交互测试持续通过：`frontend/src/app/dashboard/products/page.test.tsx`（3/3）。
+- 已完成 Phase G 第四交付（库存入口可用性）：
+  - 在库存状态页新增关键词检索（商品名/采购合同号），提升列表定位效率并弱化与库存管理页的入口混淆。
+  - 过滤逻辑采用 `useMemo` 派生，避免不必要重算。
+- 已完成 Phase G 第五交付（视觉一致性收口）：
+  - 货柜管理列表容器统一为 `surface-panel` 风格，与商品/库存页面一致。
+  - 相关页面回归测试通过：inventory-container + containers + products 共 9/9。
+- 已完成 Phase H 第一交付（库存状态机后端强约束）：
+  - 新增 `backend/src/utils/inventoryStateMachine.js`，定义合法流转与出库前置校验（需 `salesContractId`）。
+  - `PUT /api/v1/inventory/:id/status` 接入状态机，非法流转返回明确错误文案。
+  - 后端全量测试通过（37/37）。
+- 已完成 Phase H 第二交付（库存搜索后端化）：
+  - `GET /api/v1/inventory` 新增 `keyword` 参数，支持商品名/采购合同号检索。
+  - 库存状态页改为防抖后端查询，移除前端本地过滤实现。
+- 已完成 Phase H 第三交付（批量状态更新）：
+  - 新增 `PUT /api/v1/inventory/batch-status`，返回 `success/failed/errors` 结果集。
+  - 前端库存状态页新增勾选与“批量设为已入库/已出库”操作入口。
+- 已完成 Phase H 第四交付（契约与联调台账补齐）：
+  - 新增 `docs/api-contracts/库存链路契约.md` 与 `docs/api-contracts/库存链路联调面板.md`。
+  - 同步更新 `docs/api-contracts/README.md`、`docs/README.md` 与根 `README.md` 导航。
+- 已完成 Phase G 第六交付（主题与风格统一）：
+  - 接入 `next-themes`，支持白天/夜间模式切换，并在 Header 提供全局切换按钮。
+  - 门店采购建议页（store-recommend）移除 emoji，统一为 Lucide 图标风格。
+- 已完成 Phase G 第七交付（可读性修复）：
+  - 修复白天模式下“金色标题”对比度不足问题，新增 `brand-emphasis` 文本语义色并替换关键标题/品牌文本。
+- 已完成 Phase G 第八交付（hydration 稳定性修复）：
+  - 修复 `dashboard/layout.tsx` 中渲染期访问 `window.localStorage` 导致的 SSR/CSR 分支不一致问题。
+  - 认证跳转改为 hydration 完成后执行 `router.replace('/login')`，消除 Dashboard 布局 hydration mismatch。
+- 已完成 Phase G 第九交付（前端构建门禁打通）：
+  - 修复认证页 API 返回类型标注问题（`login/register/forgot-password`），消除 `result.code` 相关 TypeScript 报错。
+  - 修复货柜域类型兼容问题（`Container` 与 `SalesContract` 合并后的字段兼容与页面回退逻辑）。
+  - 为 `payments/products/contracts/settings` 页面补齐 `useSearchParams` 的 Suspense 边界，满足 Next 16 构建约束。
 
 ## 风险与对策
 - 风险：仓库已有大量历史 lint 问题影响全量校验。

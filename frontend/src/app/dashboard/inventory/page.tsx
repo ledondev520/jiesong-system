@@ -31,6 +31,14 @@ import {
 import { MoreHorizontal } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 
+const STATUS_LABEL_MAP: Record<InventoryStatus, string> = {
+  [InventoryStatus.PRODUCING]: '生产中',
+  [InventoryStatus.PACKING]: '包装中',
+  [InventoryStatus.SHIPPING]: '运输中',
+  [InventoryStatus.INBOUND]: '已入库',
+  [InventoryStatus.OUTBOUND]: '已出库',
+};
+
 export default function InventoryPage() {
   const [inventory, setInventory] = useState<Inventory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,13 +70,54 @@ export default function InventoryPage() {
     }
   };
 
-  const handleStatusChange = async (id: string, newStatus: InventoryStatus) => {
+  /**
+   * 职责：解析接口错误消息，优先展示后端业务约束提示。
+   * @param error 接口错误对象
+   * @returns 错误文案
+   */
+  const resolveErrorMessage = (error: unknown): string => {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'message' in error &&
+      typeof (error as { message?: unknown }).message === 'string'
+    ) {
+      return (error as { message: string }).message;
+    }
+    return '状态更新失败';
+  };
+
+  /**
+   * 职责：返回当前状态允许的下一状态集合，避免前端发起非法跳转请求。
+   * @param status 当前库存状态
+   * @returns 下一状态列表
+   */
+  const getAllowedNextStatuses = (status: InventoryStatus): InventoryStatus[] => {
+    const transitionMap: Record<InventoryStatus, InventoryStatus[]> = {
+      [InventoryStatus.PRODUCING]: [InventoryStatus.PACKING],
+      [InventoryStatus.PACKING]: [InventoryStatus.SHIPPING],
+      [InventoryStatus.SHIPPING]: [InventoryStatus.INBOUND],
+      [InventoryStatus.INBOUND]: [InventoryStatus.OUTBOUND],
+      [InventoryStatus.OUTBOUND]: [],
+    };
+    return transitionMap[status] || [];
+  };
+
+  /**
+   * 职责：更新库存状态并同步本地展示。
+   * @param id 库存ID
+   * @param newStatus 目标状态
+   * @returns Promise<void>
+   */
+  const handleStatusChange = async (id: string, newStatus: InventoryStatus): Promise<void> => {
     try {
       await inventoryService.updateStatus(id, newStatus);
-      setInventory(inventory.map(item => item.id === id ? { ...item, status: newStatus } : item));
+      setInventory((prevInventory) =>
+        prevInventory.map((item) => (item.id === id ? { ...item, status: newStatus } : item))
+      );
       toast.success(`状态已更新为: ${newStatus}`);
     } catch (error) {
-      toast.error('状态更新失败');
+      toast.error(resolveErrorMessage(error));
     }
   };
 
@@ -120,11 +169,18 @@ export default function InventoryPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleStatusChange(item.id, InventoryStatus.PRODUCING)}>设为: 生产中</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleStatusChange(item.id, InventoryStatus.PACKING)}>设为: 包装中</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleStatusChange(item.id, InventoryStatus.SHIPPING)}>设为: 运输中</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleStatusChange(item.id, InventoryStatus.INBOUND)}>设为: 已入库</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleStatusChange(item.id, InventoryStatus.OUTBOUND)}>设为: 已出库</DropdownMenuItem>
+                        {getAllowedNextStatuses(item.status).length === 0 ? (
+                          <DropdownMenuItem disabled>无可用下一状态</DropdownMenuItem>
+                        ) : (
+                          getAllowedNextStatuses(item.status).map((nextStatus) => (
+                            <DropdownMenuItem
+                              key={`${item.id}-${nextStatus}`}
+                              onClick={() => handleStatusChange(item.id, nextStatus)}
+                            >
+                              设为: {STATUS_LABEL_MAP[nextStatus]}
+                            </DropdownMenuItem>
+                          ))
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

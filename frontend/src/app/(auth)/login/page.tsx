@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuthStore } from '@/store/auth.store';
 import api from '@/lib/axios';
+import type { ApiResponse, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -37,6 +38,10 @@ const loginSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
+type LoginResponseData = {
+  user: User;
+  token: string;
+};
 
 export default function LoginPage() {
   const router = useRouter();
@@ -91,7 +96,7 @@ export default function LoginPage() {
       }
 
       // 调用后端登录API（使用统一axios实例）
-      const result = await api.post('/auth/login', {
+      const result: ApiResponse<LoginResponseData> = await api.post('/auth/login', {
         username: data.username,
         password: data.password,
       });
@@ -133,7 +138,7 @@ export default function LoginPage() {
     <div className="auth-shell">
       <Card className="auth-card">
         <CardHeader>
-          <CardTitle className="text-accent">系统登录</CardTitle>
+          <CardTitle className="text-brand-emphasis">系统登录</CardTitle>
           <CardDescription>
             请输入您的账号密码以访问系统。
           </CardDescription>
@@ -189,7 +194,14 @@ export default function LoginPage() {
               />
 
               {error && (
-                <div className="rounded-lg border border-destructive/35 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>
+                <div className="space-y-2 rounded-lg border border-destructive/35 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  <p>{error}</p>
+                  {error.includes('用户名或密码错误') && (
+                    <p className="text-xs text-muted-foreground">
+                      提示：默认管理员账号为 <span className="font-mono">admin / admin123</span>
+                    </p>
+                  )}
+                </div>
               )}
               <Button type="submit" className="h-10 w-full rounded-xl" disabled={isLoading}>
                 {isLoading ? '登录中...' : '登录'}

@@ -101,6 +101,8 @@ npm run dev
 - [采购链路 API 契约](docs/api-contracts/采购链路契约.md) - 采购域接口契约与联调状态基线
 - [销售链路 API 契约](docs/api-contracts/销售链路契约.md) - 销售与装箱接口契约基线
 - [销售链路联调面板](docs/api-contracts/销售链路联调面板.md) - 销售链路 READY/BLOCKED/DONE 联调追踪
+- [库存链路 API 契约](docs/api-contracts/库存链路契约.md) - 库存查询、状态机流转与批量状态更新契约
+- [库存链路联调面板](docs/api-contracts/库存链路联调面板.md) - 库存链路 READY/BLOCKED/DONE 联调追踪
 - [发布结论（M5）](docs/quality/发布结论_M5_20260212.md) - 采购链路门禁执行证据与发布建议
 - [周节奏指标看板](docs/周节奏指标看板.md) - 周度质量/效率/回归风险跟踪
 - [项目子代理说明](.cursor/agents/README.md) - 项目级 Cursor 子代理与用途

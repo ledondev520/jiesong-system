@@ -1,7 +1,7 @@
 /**
  * Input: 商品数据
  * Output: 商品编辑对话框
- * Pos: 商品管理组件，支持录入报关名、规格、体积、重量等信息
+ * Pos: 商品管理组件，支持录入报关名、HS编码、申报要素、规格、体积、重量等信息
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -33,6 +33,8 @@ import {
 
 const productSchema = z.object({
   customsName: z.string().min(1, '请输入报关名称'),
+  hsCode: z.string().optional(),
+  declaration: z.string().optional(),
   description: z.string().optional(),
   specification: z.string().optional(),
   unit: z.string().optional(),
@@ -65,6 +67,8 @@ export function ProductDialog({
     resolver: zodResolver(productSchema),
     defaultValues: {
       customsName: '',
+      hsCode: '',
+      declaration: '',
       description: '',
       specification: '',
       unit: '',
@@ -78,6 +82,8 @@ export function ProductDialog({
     },
     values: product ? {
       customsName: product.customsName,
+      hsCode: product.hsCode || '',
+      declaration: product.declaration || '',
       description: product.description || '',
       specification: product.specification || '',
       unit: product.unit || '',
@@ -91,7 +97,16 @@ export function ProductDialog({
     } : undefined,
   });
 
-  const handleSubmit = async (data: ProductFormValues) => {
+  /**
+   * 职责：提交商品表单并做空值标准化后交由外层保存。
+   * 思路：
+   * 1. 统一将数值空值转换为 null，避免后端收到空字符串；
+   * 2. 调用上层 onSubmit 持久化；
+   * 3. 提交成功后重置表单。
+   * @param data 表单原始值
+   * @returns Promise<void>
+   */
+  const handleSubmit = async (data: ProductFormValues): Promise<void> => {
     // 转换空值为 null
     const submitData = {
       ...data,
@@ -150,6 +165,32 @@ export function ProductDialog({
                     <FormLabel>单位</FormLabel>
                     <FormControl>
                       <Input placeholder="例如: 平方米, 个" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="hsCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>HS编码</FormLabel>
+                    <FormControl>
+                      <Input placeholder="例如: 69072190" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="declaration"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>申报要素</FormLabel>
+                    <FormControl>
+                      <Input placeholder="例如: 抛光瓷砖，釉面，600x600mm" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

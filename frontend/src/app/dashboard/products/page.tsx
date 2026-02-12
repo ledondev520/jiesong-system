@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Product } from '@/types';
 import { productService } from '@/services/product.service';
@@ -26,8 +26,44 @@ import { Plus, Pencil, Trash, Search } from 'lucide-react';
 import { ProductDialog } from './components/ProductDialog';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
-export default function ProductsPage() {
+/**
+ * 职责：将输入值延迟一段时间后再稳定输出，避免高频副作用触发。
+ * 思路：
+ * 1. 每次 value 变化时启动新的定时器；
+ * 2. 在 cleanup 中清理上一次定时器，确保只保留最后一次输入；
+ * 3. 定时到期后更新防抖值。
+ * @param value 需要进行防抖处理的输入值
+ * @param delay 防抖延迟时间（毫秒）
+ * @returns 延迟稳定后的值
+ */
+function useDebouncedValue<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    // 1. 启动延迟更新
+    const timer = window.setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    // 2. 清理上一次定时器
+    return () => window.clearTimeout(timer);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
+function ProductsPageContent() {
   const searchParams = useSearchParams();
   const initialKeyword = searchParams.get('keyword') || '';
   
@@ -36,10 +72,15 @@ export default function ProductsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [keyword, setKeyword] = useState(initialKeyword);
+  const debouncedKeyword = useDebouncedValue(keyword, 350);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
+  // 0. 输入停止一段时间后再触发查询，降低请求频率
   useEffect(() => {
-    loadProducts(keyword);
-  }, [keyword]);
+    loadProducts(debouncedKeyword);
+  }, [debouncedKeyword]);
 
   // 从URL参数初始化关键字
   useEffect(() => {
@@ -75,15 +116,43 @@ export default function ProductsPage() {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('确定要删除这个商品吗？')) {
-      try {
-        await productService.delete(id);
-        setProducts(products.filter(p => p.id !== id));
-        toast.success('商品已删除');
-      } catch (error) {
-        toast.error('删除失败');
-      }
+  /**
+   * 职责：打开删除确认弹窗并记录当前待删除商品。
+   * 思路：先缓存目标商品，再打开受控弹窗供用户确认。
+   * @param product 待删除的商品记录
+   */
+  const openDeleteDialog = (product: Product) => {
+    // 0. 初始化待删除上下文
+    setProductToDelete(product);
+    setDeleteDialogOpen(true);
+  };
+
+  /**
+   * 职责：执行商品删除并同步本地列表状态。
+   * 思路：
+   * 1. 校验待删除商品是否存在；
+   * 2. 调用删除接口并在成功后更新本地列表；
+   * 3. 收口弹窗与加载态。
+   * @returns Promise<void>
+   */
+  const handleDeleteProduct = async (): Promise<void> => {
+    if (!productToDelete) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await productService.delete(productToDelete.id);
+      setProducts((prevProducts) =>
+        prevProducts.filter((product) => product.id !== productToDelete.id)
+      );
+      toast.success('商品已删除');
+      setDeleteDialogOpen(false);
+      setProductToDelete(null);
+    } catch (error) {
+      toast.error('删除失败');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -165,7 +234,12 @@ export default function ProductsPage() {
                     <Button variant="ghost" size="icon" onClick={() => handleEdit(product)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(product.id)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`删除商品 ${product.customsName}`}
+                      onClick={() => openDeleteDialog(product)}
+                    >
                       <Trash className="h-4 w-4 text-destructive" />
                     </Button>
                   </TableCell>
@@ -182,6 +256,42 @@ export default function ProductsPage() {
         product={editingProduct}
         onSubmit={handleSubmit}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除商品 <strong>{productToDelete?.customsName}</strong> 吗？
+              <br />
+              此操作无法撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={deleting}
+              onClick={() => setProductToDelete(null)}
+            >
+              取消
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteProduct}
+              disabled={deleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleting ? '删除中...' : '确认删除'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+  );
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense fallback={<div className="py-12 text-center text-muted-foreground">加载中...</div>}>
+      <ProductsPageContent />
+    </Suspense>
   );
 }
