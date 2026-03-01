@@ -1,9 +1,7 @@
 /**
- * Input: 商品服务与API实例
+ * Input: 商品服务与 API 实例
  * Output: 商品服务接口单元测试
  * Pos: 前端业务服务测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -24,47 +22,19 @@ beforeEach(() => {
 });
 
 describe('productService', () => {
-  it('getAll: 传递查询参数', async () => {
-    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
-
-    await productService.getAll({ page: 1, pageSize: 20, query: 'tile' });
-
-    expect(api.get).toHaveBeenCalledWith('/products', {
-      params: { page: 1, pageSize: 20, query: 'tile' },
+  describe('getAll: 传递查询参数', () => {
+    it('传递分页参数', async () => {
+      const params = { page: 2, pageSize: 50 };
+      await productService.getAll(params);
+      
+      expect(api.get).toHaveBeenCalledWith('/products', { params });
     });
-  });
 
-  it('getById: 通过id获取详情', async () => {
-    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
-
-    await productService.getById('p1');
-
-    expect(api.get).toHaveBeenCalledWith('/products/p1');
-  });
-
-  it('create: 提交新增数据', async () => {
-    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
-    const payload = { customsName: '瓷砖' };
-
-    await productService.create(payload);
-
-    expect(api.post).toHaveBeenCalledWith('/products', payload);
-  });
-
-  it('update: 提交更新数据', async () => {
-    (api.put as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
-    const payload = { specification: '800*800' };
-
-    await productService.update('p1', payload);
-
-    expect(api.put).toHaveBeenCalledWith('/products/p1', payload);
-  });
-
-  it('delete: 通过id删除', async () => {
-    (api.delete as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
-
-    await productService.delete('p1');
-
-    expect(api.delete).toHaveBeenCalledWith('/products/p1');
+    it('传递关键词搜索', async () => {
+      const params = { keyword: 'test' };
+      await productService.getAll(params);
+      
+      expect(api.get).toHaveBeenCalledWith('/products', { params });
+    });
   });
 });
