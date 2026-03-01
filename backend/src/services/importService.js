@@ -8,6 +8,7 @@
 
 const fs = require('fs');
 const prisma = require('../utils/prisma');
+const { IMPORT_STATUS } = require('../config/constants');
 
 /**
  * 职责：解析CSV文件内容
@@ -63,6 +64,15 @@ const parseCSVLine = (line) => {
   
   return result;
 };
+
+/**
+ * 职责：根据导入失败条数推导导入状态
+ * @param {number} failedRows - 失败条数
+ * @returns {string} 导入状态
+ */
+const resolveImportStatus = (failedRows) => (
+  failedRows > 0 ? IMPORT_STATUS.FAILED : IMPORT_STATUS.COMPLETED
+);
 
 /**
  * 职责：导入CSV数据到数据库
@@ -135,7 +145,7 @@ const importCSVData = async (filePath, userId) => {
     data: {
       successRows: result.successRows,
       failedRows: result.failedRows,
-      status: result.failedRows > 0 ? 'COMPLETED' : 'COMPLETED',
+      status: resolveImportStatus(result.failedRows),
       errorLog: result.errors.length > 0 ? JSON.stringify(result.errors) : null,
     },
   });
@@ -273,18 +283,31 @@ const processRow = async (row, cache) => {
  * 职责：获取导入记录列表
  * @param {number} page - 页码
  * @param {number} pageSize - 每页数量
+ * @param {{status?: string, keyword?: string}} filters - 过滤条件
  * @returns {Object} 导入记录列表
  */
-const getImportRecords = async (page = 1, pageSize = 20) => {
+const getImportRecords = async (page = 1, pageSize = 20, filters = {}) => {
   const skip = (page - 1) * pageSize;
+  const where = {};
+
+  if (filters.status) {
+    where.status = filters.status;
+  }
+
+  if (filters.keyword) {
+    where.fileName = {
+      contains: filters.keyword,
+    };
+  }
   
   const [records, total] = await Promise.all([
     prisma.importRecord.findMany({
+      where,
       skip,
       take: pageSize,
       orderBy: { importedAt: 'desc' },
     }),
-    prisma.importRecord.count(),
+    prisma.importRecord.count({ where }),
   ]);
   
   return { records, total };
@@ -292,6 +315,7 @@ const getImportRecords = async (page = 1, pageSize = 20) => {
 
 module.exports = {
   parseCSV,
+  resolveImportStatus,
   importCSVData,
   getImportRecords,
 };

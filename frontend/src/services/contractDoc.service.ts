@@ -18,6 +18,23 @@ export const contractDocService = {
   },
 
   /**
+   * 获取模板列表（当前后端仅支持单模板）
+   */
+  getTemplates: async () => {
+    return api.get<ApiResponse<{ items: Array<{
+      exists: boolean;
+      filename?: string;
+      size?: number;
+      updatedAt?: string;
+    }> }>, ApiResponse<{ items: Array<{
+      exists: boolean;
+      filename?: string;
+      size?: number;
+      updatedAt?: string;
+    }> }>>('/contract-doc/templates');
+  },
+
+  /**
    * 上传合同模板
    * @param file - Word模板文件
    */
@@ -27,6 +44,13 @@ export const contractDocService = {
     return api.post<ApiResponse<void>, ApiResponse<void>, FormData>('/contract-doc/template', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+  },
+
+  /**
+   * 删除合同模板
+   */
+  deleteTemplate: async () => {
+    return api.delete<ApiResponse<void>, ApiResponse<void>>('/contract-doc/template');
   },
 
   /**

@@ -92,7 +92,7 @@ npm run db:seed
 # 启动后端，验证连接
 cd backend && npm run dev
 
-# 访问 http://localhost:3001/api/v1/system/configs
+# 访问 http://localhost:3000/api/v1/system/configs
 # 应返回系统配置列表（需 Token）
 ```
 

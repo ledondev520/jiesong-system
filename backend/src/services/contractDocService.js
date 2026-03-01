@@ -256,11 +256,38 @@ const saveTemplate = async (buffer) => {
   await fs.writeFile(TEMPLATE_PATH, buffer);
 };
 
+/**
+ * 职责：获取模板元信息
+ * @returns {Promise<{ exists: boolean; filename?: string; size?: number; updatedAt?: Date }>}
+ */
+const getTemplateInfo = async () => {
+  try {
+    const stat = await fs.stat(TEMPLATE_PATH);
+    return {
+      exists: true,
+      filename: path.basename(TEMPLATE_PATH),
+      size: stat.size,
+      updatedAt: stat.mtime,
+    };
+  } catch {
+    return { exists: false };
+  }
+};
+
+/**
+ * 职责：删除模板文件
+ */
+const removeTemplate = async () => {
+  await fs.unlink(TEMPLATE_PATH);
+};
+
 module.exports = {
   generatePurchaseContract,
   generateFilename,
   checkTemplateExists,
   saveTemplate,
+  getTemplateInfo,
+  removeTemplate,
   numberToChinese,
   generateContractNo,
 };

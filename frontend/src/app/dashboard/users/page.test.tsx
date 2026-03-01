@@ -66,6 +66,31 @@ describe('UsersPage 交互逻辑', () => {
     expect(screen.getByText('用户弹窗已打开')).toBeInTheDocument();
   });
 
+  it('展示头像占位与最后登录时间', async () => {
+    mockGetAll.mockResolvedValue({
+      data: {
+        items: [{
+          id: 'u-1',
+          username: 'admin',
+          name: '管理员',
+          role: 'ADMIN',
+          isActive: true,
+          lastLoginAt: '2026-03-01T10:00:00',
+          createdAt: '2026-03-01T09:00:00',
+          updatedAt: '2026-03-01T09:00:00',
+        }],
+      },
+    });
+
+    render(<UsersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('管理员')).toBeInTheDocument();
+      expect(screen.getByText('admin')).toBeInTheDocument();
+      expect(screen.getByText('2026-03-01 10:00')).toBeInTheDocument();
+    });
+  });
+
   it('加载失败时提示错误', async () => {
     mockGetAll.mockRejectedValue(new Error('load failed'));
     render(<UsersPage />);
@@ -75,4 +100,3 @@ describe('UsersPage 交互逻辑', () => {
     });
   });
 });
-

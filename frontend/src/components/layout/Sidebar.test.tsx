@@ -9,12 +9,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { Role } from '@/types';
 import { Sidebar } from './Sidebar';
 
 const mockLogout = vi.fn();
+const mockUser = {
+  role: Role.ADMIN,
+};
 
 vi.mock('@/store/auth.store', () => ({
-  useAuthStore: (selector: (state: { logout: () => void }) => unknown) => selector({
+  useAuthStore: (selector: (state: { user: typeof mockUser | null; logout: () => void }) => unknown) => selector({
+    user: mockUser,
     logout: mockLogout,
   }),
 }));
@@ -33,14 +38,19 @@ vi.mock('next/link', () => ({
 
 describe('Sidebar', () => {
   it('渲染导航项并标记当前路由', () => {
+    mockUser.role = Role.ADMIN;
     const { getByText } = render(<Sidebar />);
 
     // 当前路由是 /dashboard/contracts，对应 "采购合同"
     const current = getByText('采购合同').closest('a');
     expect(current?.className.includes('bg-sidebar-primary/18')).toBe(true);
+    expect(getByText('通知中心')).toBeInTheDocument();
+    expect(getByText('系统日志')).toBeInTheDocument();
+    expect(getByText('导入记录')).toBeInTheDocument();
   });
 
   it('点击退出登录调用logout', () => {
+    mockUser.role = Role.ADMIN;
     Object.defineProperty(window, 'location', {
       value: { href: '' },
       writable: true,
@@ -51,5 +61,13 @@ describe('Sidebar', () => {
 
     expect(mockLogout).toHaveBeenCalled();
     expect(window.location.href).toBe('/login');
+  });
+
+  it('非管理员角色不显示系统日志入口', () => {
+    mockUser.role = Role.SALES;
+    const { getByText, queryByText } = render(<Sidebar />);
+    expect(getByText('通知中心')).toBeInTheDocument();
+    expect(queryByText('系统日志')).toBeNull();
+    expect(queryByText('导入记录')).toBeNull();
   });
 });

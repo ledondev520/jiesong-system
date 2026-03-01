@@ -10,7 +10,7 @@ require('dotenv').config();
 
 const config = {
   // 服务器配置
-  port: parseInt(process.env.PORT, 10) || 3001,
+  port: parseInt(process.env.PORT, 10) || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
   
   // JWT配置

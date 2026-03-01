@@ -4,7 +4,7 @@
 
 ## 目录说明
 
-本目录包含进销存系统的后端 API 服务，基于 Node.js + Express + Prisma + SQLite 构建。
+本目录包含进销存系统的后端 API 服务，基于 Node.js + Express + Prisma + Supabase PostgreSQL 构建。
 
 ## 快速开始
 
@@ -18,14 +18,14 @@ npm install
 
 ```bash
 cp env.example .env
-# 编辑 .env 文件，配置必要参数
+# 编辑 .env 文件，配置 Supabase 连接字符串与业务参数
 ```
 
 ### 3. 初始化数据库
 
 ```bash
 npm run db:generate   # 生成 Prisma 客户端
-npm run db:push       # 同步数据库结构
+npm run db:push       # 同步数据库结构到 Supabase（开发环境）
 npm run db:seed       # 初始化种子数据
 ```
 
@@ -36,7 +36,7 @@ npm run dev   # 开发模式（热重载）
 npm start     # 生产模式
 ```
 
-服务默认运行在 `http://localhost:3001`
+服务默认运行在 `http://localhost:3000`
 
 ### 5. 运行测试
 
@@ -183,6 +183,6 @@ Authorization: Bearer <token>
 - **运行时**: Node.js >= 18
 - **框架**: Express.js 4.x
 - **ORM**: Prisma 5.x
-- **数据库**: SQLite
+- **数据库**: Supabase PostgreSQL
 - **认证**: JWT
 - **密码加密**: bcryptjs

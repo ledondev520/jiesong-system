@@ -88,6 +88,43 @@ npm run dev
 - 若登录接口报 `500`，先确认后端是否已启动并监听 `3000` 端口
 - 前端会通过 `/api/v1/*` 代理到 `http://localhost:3000/api/v1/*`
 
+## 启动与上线
+
+### 本地启动（Supabase）
+
+1. 配置后端环境变量（`backend/.env`）  
+  必填：`DATABASE_URL`（Pooler 6543）、`DIRECT_URL`（Direct 5432）、`JWT_SECRET`、`DEFAULT_ADMIN_PASSWORD`
+2. 初始化数据库结构与种子：
+```bash
+cd backend
+npm install
+npm run db:generate
+npm run db:push
+npm run db:seed
+```
+3. 启动后端：
+```bash
+cd backend
+npm run dev
+```
+4. 启动前端：
+```bash
+cd frontend
+npm install
+npm run dev -- -p 3001
+```
+5. 访问：`http://localhost:3001`
+
+### 推荐上线方式
+
+1. 数据库：Supabase PostgreSQL（已配置 Prisma `postgresql` provider）
+2. 后端：部署到 Render/Railway/Fly.io 任一 Node 平台
+3. 前端：部署到 Vercel（项目根已配置 `vercel.json`）
+4. Vercel 环境变量设置：
+  `NEXT_PUBLIC_API_BASE_URL=https://<your-backend-domain>`
+5. 后端环境变量设置：
+  `DATABASE_URL`、`DIRECT_URL`、`JWT_SECRET`、`DEFAULT_ADMIN_PASSWORD`、`KIMI_API_KEY`
+
 ## 文档导航
 
 - [需求总结](docs/需求总结_v2.0.md) - 完整需求规格

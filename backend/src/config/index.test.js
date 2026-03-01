@@ -45,7 +45,7 @@ test('config: 读取默认值', () => {
     CORS_ORIGIN: '',
   });
 
-  assert.equal(config.port, 3001);
+  assert.equal(config.port, 3000);
   assert.equal(config.nodeEnv, 'development');
   assert.equal(config.jwt.secret, 'default-secret-change-me');
   assert.equal(config.jwt.expiresIn, '7d');

@@ -20,6 +20,9 @@ router.use(authenticate);
 // GET /api/v1/contract-doc/template/check - 检查模板状态
 router.get('/template/check', contractDocController.checkTemplate);
 
+// GET /api/v1/contract-doc/templates - 获取模板列表（当前单模板）
+router.get('/templates', contractDocController.getTemplates);
+
 // POST /api/v1/contract-doc/template - 上传合同模板（仅管理员）
 router.post(
   '/template',
@@ -27,6 +30,9 @@ router.post(
   upload.single('template'),
   contractDocController.uploadTemplate
 );
+
+// DELETE /api/v1/contract-doc/template - 删除模板（仅管理员）
+router.delete('/template', adminOnly, contractDocController.deleteTemplate);
 
 // POST /api/v1/contract-doc/generate/:id - 根据采购合同生成购销合同
 router.post(

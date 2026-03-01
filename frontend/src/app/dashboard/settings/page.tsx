@@ -27,13 +27,14 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { X, Save, Loader2, Package, Users, Store, Settings2, FileSpreadsheet, UserCog, Wrench } from 'lucide-react';
+import { X, Save, Loader2, Package, Users, Store, Settings2, FileSpreadsheet, UserCog, Wrench, Download } from 'lucide-react';
 import { ClaudeCostCalculator } from '@/components/tools/ClaudeCostCalculator';
 import { toast } from 'sonner';
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE, UNITS as INITIAL_UNITS } from '@/lib/constants';
 import api from '@/lib/axios';
 import { PageHeader } from '@/components/layout/PageHeader';
 import type { ApiResponse } from '@/types';
+import { exportSystemData, SystemExportType } from '@/services/system.service';
 
 const configSchema = z.object({
   exchangeRate: z.number().min(0.1, '汇率必须大于0'),
@@ -50,6 +51,17 @@ interface SystemConfigMap {
   brokers?: string[];
   [key: string]: unknown;
 }
+
+const exportTargets: Array<{ type: SystemExportType; label: string; desc: string }> = [
+  { type: 'suppliers', label: '供应商', desc: '导出供应商主数据与别名信息' },
+  { type: 'stores', label: '门店', desc: '导出门店与港口基础数据' },
+  { type: 'products', label: '商品', desc: '导出商品主数据与分类信息' },
+  { type: 'purchases', label: '采购合同', desc: '导出采购合同与付款状态' },
+  { type: 'sales', label: '出口合同', desc: '导出出口合同与收款状态' },
+  { type: 'containers', label: '货柜', desc: '导出货柜与装箱摘要数据' },
+  { type: 'inventory', label: '库存', desc: '导出库存状态与关联合同' },
+  { type: 'payments', label: '收付款', desc: '导出财务收付款记录' },
+];
 
 /**
  * 职责：渲染综合设置页面
@@ -70,6 +82,8 @@ function SettingsPageContent() {
   const [newBroker, setNewBroker] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [selectedExportType, setSelectedExportType] = useState<SystemExportType>('suppliers');
+  const [exporting, setExporting] = useState(false);
 
   const form = useForm<ConfigFormValues>({
     resolver: zodResolver(configSchema),
@@ -196,6 +210,22 @@ function SettingsPageContent() {
     }
   };
 
+  const handleExport = async () => {
+    const target = exportTargets.find((item) => item.type === selectedExportType);
+    const label = target?.label || selectedExportType;
+
+    setExporting(true);
+    try {
+      await exportSystemData(selectedExportType, `${label}.csv`);
+      toast.success(`${label}数据导出成功`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '导出失败';
+      toast.error(message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -216,7 +246,7 @@ function SettingsPageContent() {
     <div className="space-y-6">
       <PageHeader
         title="设置"
-        description="管理基础档案、系统配置与数据导入"
+        description="管理基础档案、系统配置、数据导入与数据导出"
       />
 
       <Tabs defaultValue={defaultTab} className="flex gap-6" orientation="vertical">
@@ -232,6 +262,10 @@ function SettingsPageContent() {
           <TabsTrigger value="import" className="w-full justify-start gap-2">
             <FileSpreadsheet className="h-4 w-4" />
             数据导入
+          </TabsTrigger>
+          <TabsTrigger value="export" className="w-full justify-start gap-2">
+            <Download className="h-4 w-4" />
+            数据导出
           </TabsTrigger>
           <TabsTrigger value="users" className="w-full justify-start gap-2">
             <UserCog className="h-4 w-4" />
@@ -432,6 +466,61 @@ function SettingsPageContent() {
               <p className="text-sm text-muted-foreground">
                 支持导入CSV格式的历史数据，系统会自动解析并创建相应的合同、商品、供应商等记录。
               </p>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:border-primary/50 transition-colors cursor-pointer" onClick={() => router.push('/dashboard/system/import-records')}>
+            <CardHeader className="flex flex-row items-center gap-4">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <FileSpreadsheet className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">导入记录</CardTitle>
+                <CardDescription>查看历史导入任务执行状态与失败明细</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                用于复盘导入任务结果，快速定位失败数据行并重试。
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 数据导出Tab */}
+        <TabsContent value="export" className="flex-1 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>数据导出</CardTitle>
+              <CardDescription>选择导出类型后生成并下载对应 CSV 文件。</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="export-type" className="text-sm font-medium">
+                  导出类型
+                </label>
+                <select
+                  id="export-type"
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={selectedExportType}
+                  onChange={(event) => setSelectedExportType(event.target.value as SystemExportType)}
+                >
+                  {exportTargets.map((target) => (
+                    <option key={target.type} value={target.type}>
+                      {target.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <p className="text-sm text-muted-foreground">
+                {exportTargets.find((target) => target.type === selectedExportType)?.desc}
+              </p>
+
+              <Button className="w-full" onClick={handleExport} disabled={exporting}>
+                <Download className="mr-2 h-4 w-4" />
+                {exporting ? '导出中...' : '导出数据'}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

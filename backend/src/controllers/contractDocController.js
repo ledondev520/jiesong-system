@@ -96,6 +96,36 @@ const checkTemplate = async (req, res, next) => {
 };
 
 /**
+ * 职责：获取模板列表（当前仅支持单模板）
+ */
+const getTemplates = async (req, res, next) => {
+  try {
+    const info = await contractDocService.getTemplateInfo();
+    success(res, {
+      items: info.exists ? [info] : [],
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：删除合同模板（仅管理员）
+ */
+const deleteTemplate = async (req, res, next) => {
+  try {
+    const exists = await contractDocService.checkTemplateExists();
+    if (!exists) {
+      throw createError('模板不存在', 404);
+    }
+    await contractDocService.removeTemplate();
+    success(res, null, '模板删除成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * 职责：获取采购合同PDF文档（兼容前端预览）
  */
 const getContractPdf = async (req, res, next) => {
@@ -135,5 +165,7 @@ module.exports = {
   generateFromPurchase,
   uploadTemplate,
   checkTemplate,
+  getTemplates,
+  deleteTemplate,
   getContractPdf,
 };

@@ -8,9 +8,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SystemLogsPage from './page';
+import { Role } from '@/types';
 
 const mockGetSystemLogs = vi.fn();
 const mockToastError = vi.fn();
+const mockUser = {
+  role: Role.ADMIN,
+};
+
+vi.mock('@/store/auth.store', () => ({
+  useAuthStore: (selector: (state: { user: typeof mockUser | null }) => unknown) => selector({
+    user: mockUser,
+  }),
+}));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -60,6 +70,7 @@ const otherLog = {
 
 describe('SystemLogsPage', () => {
   beforeEach(() => {
+    mockUser.role = Role.ADMIN;
     mockGetSystemLogs.mockReset();
     mockToastError.mockReset();
   });
@@ -122,5 +133,15 @@ describe('SystemLogsPage', () => {
       expect(mockToastError).toHaveBeenCalledWith('加载日志失败');
     });
   });
-});
 
+  it('非管理员角色不请求日志并显示无权限提示', async () => {
+    mockUser.role = Role.SALES;
+    render(<SystemLogsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('无权限访问')).toBeInTheDocument();
+    });
+    expect(screen.getByText('当前账号角色无权查看系统日志。')).toBeInTheDocument();
+    expect(mockGetSystemLogs).not.toHaveBeenCalled();
+  });
+});

@@ -1,7 +1,7 @@
 /**
  * Input: 导航配置、用户认证状态
  * Output: 侧边栏导航组件
- * Pos: 全局布局组件，提供6个核心导航入口
+ * Pos: 全局布局组件，提供核心导航入口
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -21,9 +21,12 @@ import {
   Ship,
   Store,
   History,
+  Bell,
+  Database,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/button';
+import { Role } from '@/types';
 
 /**
  * 导航菜单配置（6个核心入口）
@@ -33,7 +36,9 @@ import { Button } from '@/components/ui/button';
  * - 库存状态：商品库存跟踪
  * - 收付款：应付 + 应收（Tab切换）
  * - 设置：基础档案 + 用户 + 系统配置 + 数据导入
+ * - 通知中心：查看个人系统通知
  * - 系统日志：操作日志列表
+ * - 导入记录：查看导入任务结果（管理员）
  */
 const navItems = [
   { href: '/dashboard', label: '工作台', icon: LayoutDashboard, exact: true },
@@ -42,7 +47,9 @@ const navItems = [
   { href: '/dashboard/inventory-container', label: '库存状态', icon: Warehouse },
   { href: '/dashboard/payments', label: '收付款', icon: DollarSign },
   { href: '/dashboard/store-recommend', label: '采购建议', icon: Store },
-  { href: '/dashboard/system/logs', label: '系统日志', icon: History },
+  { href: '/dashboard/system/notifications', label: '通知中心', icon: Bell },
+  { href: '/dashboard/system/logs', label: '系统日志', icon: History, adminOnly: true },
+  { href: '/dashboard/system/import-records', label: '导入记录', icon: Database, adminOnly: true },
   { href: '/dashboard/settings', label: '设置', icon: Settings },
 ];
 
@@ -56,6 +63,10 @@ const navItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const logout = useAuthStore((state) => state.logout);
+  const user = useAuthStore((state) => state.user);
+
+  const isAdmin = user?.role === Role.ADMIN;
+  const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
 
   /**
    * 判断菜单是否活跃
@@ -87,7 +98,7 @@ export function Sidebar() {
       {/* 1. 导航菜单 */}
       <div className="flex-1 overflow-auto py-4">
         <nav className="grid gap-1.5 px-2">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = isActiveItem(item);
             return (

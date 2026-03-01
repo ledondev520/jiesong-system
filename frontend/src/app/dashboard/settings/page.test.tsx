@@ -14,6 +14,7 @@ import SettingsPage from './page';
 const mockPush = vi.fn();
 const mockApiGet = vi.fn();
 const mockApiPut = vi.fn();
+const mockExportSystemData = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
 
@@ -34,6 +35,10 @@ vi.mock('@/lib/axios', () => ({
   },
 }));
 
+vi.mock('@/services/system.service', () => ({
+  exportSystemData: (...args: unknown[]) => mockExportSystemData(...args),
+}));
+
 vi.mock('sonner', () => ({
   toast: {
     success: (...args: unknown[]) => mockToastSuccess(...args),
@@ -50,6 +55,7 @@ describe('SettingsPage 交互逻辑', () => {
     mockPush.mockReset();
     mockApiGet.mockReset();
     mockApiPut.mockReset();
+    mockExportSystemData.mockReset();
     mockToastSuccess.mockReset();
     mockToastError.mockReset();
   });
@@ -102,5 +108,31 @@ describe('SettingsPage 交互逻辑', () => {
       expect(mockToastSuccess).toHaveBeenCalledWith('系统配置已保存');
     });
   });
-});
 
+  it('在数据导出标签可触发导出动作', async () => {
+    mockApiGet.mockResolvedValue({
+      data: {
+        exchangeRate: 7.2,
+        profitRate: 1.3,
+        units: ['件', '箱'],
+        brokers: ['捷淞'],
+      },
+    });
+    mockExportSystemData.mockResolvedValue(undefined);
+
+    const user = userEvent.setup();
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: '数据导出' })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('tab', { name: '数据导出' }));
+    await user.click(screen.getByRole('button', { name: '导出供应商' }));
+
+    await waitFor(() => {
+      expect(mockExportSystemData).toHaveBeenCalledWith('suppliers', '供应商.csv');
+      expect(mockToastSuccess).toHaveBeenCalledWith('供应商数据导出成功');
+    });
+  });
+});
