@@ -18,8 +18,8 @@ jobs:
       - name: Install backend dependencies
         run: npm ci
         working-directory: backend
-      - name: Run backend tests
-        run: npm run test
+      - name: Run backend all tests (unit + db integration)
+        run: npm run test:all
         working-directory: backend
 
   frontend-unit:
@@ -65,4 +65,3 @@ jobs:
           name: playwright-report
           path: frontend/playwright-report/
           retention-days: 14
-

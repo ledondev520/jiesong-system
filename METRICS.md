@@ -302,3 +302,20 @@
 
 ### 结论
 - 大页与控制器层“拆分与分层”目标完成，形成后续“统一数据加载/错误处理/加载态”模式统一化的前置条件。
+
+## 2026-03-02 Round 24 (DB Integration Gate Closure)
+
+### 质量指标
+- 后端数据库集成测试：`3/3` 通过（schema、事务回滚、seed 幂等）。
+- 后端全量门禁：`npm run test:all` 通过（`85/85` 单元 + `3/3` DB 集成）。
+- 前端全量单测回归：`70/70` 通过。
+- 前端 E2E 全量回归：`52/52` 通过。
+
+### 过程指标
+- 新增集成测试文件：1（`backend/src/integration/database.integration.js`）。
+- 后端脚本新增：2（`test:db`、`test:all`）。
+- CI 门禁变更：1（backend job 从 `test` 升级为 `test:all`）。
+- 文档同步：2（`backend/README.md`、`backend/src/README.md`）。
+
+### 结论
+- 测试链路从“前后端单测 + 前端 E2E”升级为“前后端单测 + 前端 E2E + 数据库集成测试”四线门禁，自动化完整性进一步闭环。

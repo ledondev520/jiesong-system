@@ -398,3 +398,25 @@
     - 后端 `app.test` 的 `/health` 用例仍受当前沙箱环境端口监听 EPERM 限制，不是逻辑回归失败。
 - 结论：
   - 本次重构保持功能行为不变，按“wrapper + service”落地完成；建议在非沙箱环境再补跑 `backend npm test` 获得最终全链路绿灯快照。
+
+## 2026-03-02 Round 24（数据库集成测试与 CI 门禁补齐）
+
+- 已完成本轮目标：补齐数据库自动化测试短板，并将其并入后端持续集成门禁。
+- 已完成项：
+  - 新增数据库集成测试：
+    - 新增 `backend/src/integration/database.integration.js`，覆盖三类场景：
+      - schema 可推送并包含核心表（`users/ports/products/purchase_contracts/sales_contracts/system_configs`）
+      - 事务异常回滚有效
+      - `seed` 重复执行幂等（记录数不重复）且管理员密码可更新
+  - 后端脚本增强：
+    - `backend/package.json` 新增 `test:db` 与 `test:all`（`test + test:db`）。
+  - CI 门禁增强：
+    - `.github/workflows/test-and-acceptance.yml` 的 backend job 切换为运行 `npm run test:all`，将数据库集成验证纳入 push/PR 自动化。
+  - 文档同步：
+    - `backend/README.md` 增加 `test:db`/`test:all` 使用说明。
+    - `backend/src/README.md` 增加 `integration/` 目录职责说明。
+- 验证结论：
+  - `backend` 数据库集成测试通过：`npm run test:db`（3/3）。
+  - `backend` 全量门禁通过：`npm run test:all`（单元 85/85 + DB 集成 3/3）。
+  - `frontend` 单测回归通过：`npm test`（70/70）。
+  - `frontend` E2E 回归通过：`npm run test:e2e`（52/52）。

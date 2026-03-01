@@ -13,6 +13,7 @@
 | app.js | 入口 | Express 应用初始化和启动 |
 | config/ | 配置层 | 环境变量和常量定义（含配置/常量单元测试） |
 | controllers/ | 控制层 | 处理 HTTP 请求，调用服务层 |
+| integration/ | 集成测试层 | 数据库集成测试（schema/事务/seed 幂等） |
 | middleware/ | 中间件层 | 认证、日志、错误处理（含单元测试） |
 | routes/ | 路由层 | 定义 API 路由和参数验证 |
 | services/ | 服务层 | 业务逻辑实现 |

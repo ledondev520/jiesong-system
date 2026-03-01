@@ -41,7 +41,9 @@ npm start     # 生产模式
 ### 5. 运行测试
 
 ```bash
-npm run test
+npm run test      # 单元/模块测试
+npm run test:db   # 数据库集成测试（临时 SQLite：schema + 事务 + seed 幂等）
+npm run test:all  # 全量（test + test:db）
 ```
 
 ## 目录结构

@@ -95,6 +95,7 @@
 | TST-05 | P0 | 45m | 1 | DONE | 补齐后端缺失测试 37 个并修复 app 可测性（`require.main` 启动守卫 + `/health` 测试） |
 | TST-06 | P0 | 25m | 1 | DONE | 执行回归验证（frontend 定向 Vitest + backend 全量 + frontend E2E 全量）并通过 |
 | TST-07 | P0 | 25m | 1 | DONE | 修复前端全量单测遗留失败（users/token-stats/sidebar）并完成前后端+E2E全量绿灯回归 |
+| TST-08 | P0 | 35m | 1 | DONE | 补齐数据库集成测试链路（schema/事务/seed 幂等）并接入 CI 后端门禁（`test:all`） |
 | OPT-01 | P0 | 60m | 1 | DONE | 关键页面结构重构：5 个大页面改为 `page.tsx + components/*` 组件化 |
 | OPT-02 | P0 | 40m | 1 | DONE | 统一公共 Hooks 抽离：`usePagination/useDataTable/useFormHandler/useApi` |
 | OPT-03 | P0 | 30m | 1 | DONE | `systemController` 按域拆分为子控制器并更新聚合层 |
