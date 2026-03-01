@@ -82,6 +82,7 @@
 | DB-01 | P0 | 20m | 1 | DONE | Prisma 数据源切回 Supabase PostgreSQL（恢复 `provider=postgresql` 与 `directUrl`） |
 | OPS-01 | P0 | 15m | 1 | DONE | 统一本地端口与环境模板（backend 默认端口 3000，`env.example` 同步） |
 | OPS-02 | P1 | 20m | 1 | DONE | 补齐启动/上线文档（根 README + backend README + Supabase 迁移文档）并移除 Vercel 占位 rewrite |
+| AUTH-01 | P1 | 20m | 1 | DONE | 登录页支持记住账号密码与“快捷登录”按钮（本地恢复后可一键登录） |
 | E2E-01 | P0 | 30m | 1 | DONE | 前端 E2E 全量稳定性收口（修复 dashboard 认证竞态 + system logs hooks 错序 + 完成 14/14 回归） |
 | E2E-02 | P0 | 45m | 1 | DONE | 按钮级 E2E 巡检扩展（新增 28 页按钮巡检 + 导入页 mock 补齐 + 全量 E2E 42/42） |
 | S3-01 | P0 | 60m | 1 | DOING | 阶段3：AI 管理页面（`/dashboard/ai/sessions`、`/dashboard/ai/token-stats`、`/dashboard/ai/models`）+ 测试 + 侧边栏导航 |
@@ -93,3 +94,4 @@
 | TST-04 | P0 | 45m | 3 | DONE | 扩展按钮级 E2E 覆盖到缺失页面（新增 10 条页面巡检 + mock 补齐 + 稳定性增强） |
 | TST-05 | P0 | 45m | 1 | DONE | 补齐后端缺失测试 37 个并修复 app 可测性（`require.main` 启动守卫 + `/health` 测试） |
 | TST-06 | P0 | 25m | 1 | DONE | 执行回归验证（frontend 定向 Vitest + backend 全量 + frontend E2E 全量）并通过 |
+| TST-07 | P0 | 25m | 1 | DONE | 修复前端全量单测遗留失败（users/token-stats/sidebar）并完成前后端+E2E全量绿灯回归 |

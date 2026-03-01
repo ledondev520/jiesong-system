@@ -208,6 +208,19 @@
 ### 结论
 - 数据层已回切到 Supabase PostgreSQL，且本地启动与上线路径已具备可执行说明。
 
+## 2026-03-01 Round 19 (Login UX: Remember Password + Quick Login)
+
+### 质量指标
+- 登录页定向单测：5/5 通过（含快捷登录路径）
+- 登录页定向 ESLint：0 error
+
+### 过程指标
+- 登录流程能力新增：2（记住账号密码、快捷登录按钮）
+- 本地存储兼容处理：1（兼容旧 `jiesong_saved_username`）
+
+### 结论
+- 登录体验从“仅记住用户名”升级为“可直接一键登录”，减少重复输入密码成本。
+
 ## 2026-03-01 Round 19 (Frontend E2E Stabilization Closure)
 
 ### 质量指标
@@ -254,3 +267,19 @@
 
 ### 结论
 - 当前仓库“文件级缺失测试”已清零，前后端基础自动化覆盖闭环建立完成。
+
+## 2026-03-01 Round 22 (Unit Test Closure & Full Green)
+
+### 质量指标
+- 前端定向 Vitest：`3 files / 11 tests` 全通过（`users/token-stats/sidebar`）。
+- 前端全量 Vitest：`70 files / 229 tests` 全通过（`cd frontend && npm test`）。
+- 前端 E2E 全量：`52/52` 通过（`cd frontend && npm run test:e2e`）。
+- 后端全量测试：`85/85` 通过（`cd backend && npm test`）。
+
+### 过程指标
+- 修复失败测试文件：3（`users/page.test.tsx`、`ai/token-stats/page.test.tsx`、`Sidebar.test.tsx`）。
+- 测试断言收敛策略：2 类（重复文本多命中 -> `getAllByText`；断言对齐当前导航实现）。
+- 无关目录清理：1（删除 `music_name_fetch/` 运行时残留目录）。
+
+### 结论
+- 当前仓库测试门禁达到“前端单测 + 前端 E2E + 后端全量”三线全绿状态，可作为测试先行流程的可执行基线。

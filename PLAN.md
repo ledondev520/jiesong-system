@@ -301,6 +301,22 @@
   - `backend` 全量测试通过：`npm run test`（44/44）。
   - Prisma 客户端生成通过：`npm run db:generate`。
 
+## 2026-03-01 Round 19（登录体验增强：记住密码与快捷登录）
+
+- 已完成本轮目标：将登录页“记住用户名”升级为“记住账号密码”，并新增一键快捷登录入口。
+- 已完成项：
+  - `frontend/src/app/(auth)/login/page.tsx`
+    - 本地存储从仅用户名扩展为账号密码（`jiesong_saved_credentials`）。
+    - 页面初始化自动恢复用户名与密码。
+    - 新增“快捷登录（用户名）”按钮，用户可直接点击登录，无需重复输入密码。
+    - 保留旧键 `jiesong_saved_username` 兼容逻辑，避免历史用户数据失效。
+  - `frontend/src/app/(auth)/login/page.test.tsx`
+    - 更新“恢复记住信息”断言为同时恢复密码。
+    - 增加“快捷登录”测试用例，覆盖一键登录请求与跳转行为。
+- 验证结论：
+  - `frontend` 定向测试通过：`npm run test -- src/app/(auth)/login/page.test.tsx`（5/5）。
+  - 定向 ESLint 通过：`npx eslint src/app/(auth)/login/page.tsx src/app/(auth)/login/page.test.tsx`。
+
 ## 2026-03-01 Round 19（前端 E2E 全量稳定性收口）
 
 - 已完成本轮目标：验证“前端关键页面点击交互是否可自动化验收”并修复阻塞项，达成全量 E2E 通过。
@@ -340,3 +356,19 @@
 - 验证结论：
   - 按钮巡检专项：`npm run test:e2e -- --reporter=line e2e/button-coverage.spec.ts`（28/28）。
   - 前端 E2E 全量：`npm run test:e2e -- --reporter=line`（42/42）。
+
+## 2026-03-01 Round 22（前端单测收口与全链路绿灯）
+
+- 已完成本轮目标：修复前端全量单测剩余失败并完成全链路回归验证。
+- 已完成项：
+  - 前端单测失败收口（3 文件 / 5 用例 -> 0）：
+    - `frontend/src/app/dashboard/users/page.test.tsx`：将重复文本断言改为 `getAllByText`，消除“管理员”多节点歧义。
+    - `frontend/src/app/dashboard/ai/token-stats/page.test.tsx`：将重复数值断言改为 `getAllByText`，消除“10”多节点歧义。
+    - `frontend/src/components/layout/Sidebar.test.tsx`：按当前侧边栏实现更新断言（激活样式、管理员子菜单展开条件、退出仅校验 `logout` 调用）。
+  - 清理无关目录残留：
+    - 删除 `music_name_fetch/` 运行时残留文件与空目录（非项目资产）。
+- 验证结论：
+  - 前端定向测试：`3 files / 11 tests` 通过。
+  - 前端全量单测：`70 files / 229 tests` 通过。
+  - 前端 E2E 全量：`52/52` 通过。
+  - 后端全量测试：`85/85` 通过。

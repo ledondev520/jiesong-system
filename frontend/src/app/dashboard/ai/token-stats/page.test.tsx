@@ -50,7 +50,7 @@ describe('AiTokenStatsPage', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Token 用量统计' })).toBeInTheDocument();
-      expect(screen.getByText('10')).toBeInTheDocument();
+      expect(screen.getAllByText('10')).toHaveLength(2);
       expect(screen.getByText('kimi-k2')).toBeInTheDocument();
     });
   });
