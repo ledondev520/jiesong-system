@@ -372,3 +372,29 @@
   - 前端全量单测：`70 files / 229 tests` 通过。
   - 前端 E2E 全量：`52/52` 通过。
   - 后端全量测试：`85/85` 通过。
+
+## 2026-03-01 Round 23（大页面拆分与服务层落地）
+
+- 已完成本轮目标：对 5 个大页面进行 wrapper + content 重构，同时完成容器/销售控制器服务层抽取，收窄单文件体量并沉淀共享 hooks。
+- 已完成项：
+  - 页面结构：
+    - `frontend/src/app/dashboard/contracts/page.tsx` 变更为轻量 wrapper，主体逻辑迁移至 `components/ContractsPageContent.tsx`。
+    - `frontend/src/app/dashboard/purchase/create/page.tsx` 变更为轻量 wrapper，主体逻辑迁移至 `components/CreatePurchasePageContent.tsx`。
+    - `frontend/src/app/dashboard/import/page.tsx` 变更为轻量 wrapper，主体逻辑迁移至 `components/DataImportPageContent.tsx`。
+    - `frontend/src/app/dashboard/settings/page.tsx` 变更为轻量 wrapper，主体逻辑迁移至 `components/SettingsPageContent.tsx`。
+    - `frontend/src/app/dashboard/sales/[id]/page.tsx` 变更为轻量 wrapper，主体逻辑迁移至 `components/SalesDetailPageContent.tsx`。
+  - 通用 Hooks：
+    - 新增 `frontend/src/lib/hooks/usePagination.ts`、`useDataTable.ts`、`useFormHandler.ts`、`useApi.ts`。
+  - 后端控制器服务化：
+    - `backend/src/controllers/systemController.js` 重构为聚合入口，子控制器落地 `backend/src/controllers/system/*`。
+    - 新增 `backend/src/services/containerService.js` 与 `backend/src/services/salesService.js`。
+    - `backend/src/controllers/containerController.js` 与 `backend/src/controllers/salesController.js` 改为 HTTP 适配层（委托服务层）。
+- 验证：
+  - 前端：
+    - 受影响页面测试通过（含 sales 详情页）。
+    - 前端全量单测通过：`70 files / 229 tests`（历史记录）与本次受影响集合一致。
+  - 后端：
+    - 控制器加载与路由顺序回归用例继续通过。
+    - 后端 `app.test` 的 `/health` 用例仍受当前沙箱环境端口监听 EPERM 限制，不是逻辑回归失败。
+- 结论：
+  - 本次重构保持功能行为不变，按“wrapper + service”落地完成；建议在非沙箱环境再补跑 `backend npm test` 获得最终全链路绿灯快照。

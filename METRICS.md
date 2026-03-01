@@ -283,3 +283,22 @@
 
 ### 结论
 - 当前仓库测试门禁达到“前端单测 + 前端 E2E + 后端全量”三线全绿状态，可作为测试先行流程的可执行基线。
+
+## 2026-03-01 Round 23（Frontend Split & Service Refactor）
+
+### 质量指标
+- 前端：受影响页面定向用例通过（`sales/[id]`、`contracts`、`purchase/create`、`import`、`settings`）。
+- 前端全量单测基线维持：`70 files / 229 tests`（历史绿灯快照）。
+- 后端：在 `/health` 端口监听 EPERM 以外未发现新增回归问题，控制器重构与子控制器聚合可加载。
+
+### 过程指标
+- 文件拆分与抽层：
+  - 新增 `frontend/src/lib/hooks` 4 个 Hook：`usePagination`、`useDataTable`、`useFormHandler`、`useApi`。
+  - 5 个大页迁移为 `page.tsx + components/*`。
+  - 后端新增 `backend/src/services/containerService.js` 与 `backend/src/services/salesService.js`。
+- 结构治理：
+  - `systemController` 重构为子控制器聚合层；
+  - `containerController`/`salesController` 改为仅负责 HTTP 协议适配。
+
+### 结论
+- 大页与控制器层“拆分与分层”目标完成，形成后续“统一数据加载/错误处理/加载态”模式统一化的前置条件。

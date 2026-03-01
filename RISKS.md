@@ -9,3 +9,6 @@
 | R-004 | 鉴权 hydration 窗口与条件渲染导致 hooks 顺序/误跳登录 | E2E 随机回登录、页面运行时崩溃 | 在布局中增加持久化认证兜底；禁止在条件 return 之后新增 hook；新增对应页面定向回归 + E2E 回归 | 回滚 `dashboard/layout.tsx` 与问题页面到修复前提交点 |
 | R-005 | 按钮巡检在浏览器环境触发非业务噪声（下载场景 sessionStorage、WebGL 初始化告警） | E2E 误报失败、阻塞回归 | 将已确认的环境噪声加入白名单过滤；保留业务异常（运行时 TypeError/ReferenceError）为阻断 | 回退 `button-coverage.spec.ts` 中噪声过滤策略到上一版本 |
 | R-006 | 前端全量 Vitest 在当前仓库存在历史慢测/不稳定用例 | 影响“全量一次性绿灯”稳定性 | 本轮采用“缺口文件定向回归 + 后端全量 + 前端 E2E 全量”门禁；后续单独治理历史慢测（容器/销售/推荐/用户等） | 回滚本轮新增测试文件与 E2E 稳定化策略（`smoke.spec.ts`/`button-coverage.spec.ts`/`playwright.config.ts`） |
+| R-007 | 大页面拆分期间遗漏共享逻辑导致状态初始化/副作用行为与历史行为偏差 | 列表/详情页显示异常、交互回退 | 分离动作后执行页面级定向测试；保留 wrapper 层仅负责入口，核心逻辑不改动 | 回滚到拆分前单文件版本（`contracts/page.tsx` 等） |
+| R-008 | `salesService`/`containerService` 引入服务层后，可能遗漏字段映射与异常边界 | 导出数据/金额字段偏差、更新接口行为变更 | 服务层增加集中映射与数值回写保障，并通过 `backend` 全量测试与受影响接口回归 | 回退到控制器直写版本并复用旧控制器逻辑 |
+| R-009 | 系统控制器按域拆分后，子控制器导出协定不一致导致路由 500 | 部分配置/通知/日志接口返回 500 | 启动期保持 `systemController` 聚合层完整映射旧对外 API；新增单测覆盖 `ports/categories/import/notifications` 关键入口 | 回退到单文件聚合控制器（`systemController.js`） |
