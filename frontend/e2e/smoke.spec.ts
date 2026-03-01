@@ -211,3 +211,89 @@ test.describe('系统登录与权限', () => {
     await expect(page.getByText('设置')).toBeVisible({ timeout: 10000 });
   });
 });
+
+test.describe('核心业务流程', () => {
+  test('采购列表页可访问', async ({ page }) => {
+    await page.route('**/api/v1/**', async (route) => {
+      if (route.request().url().includes('/purchases')) {
+        await fulfillJson(route, { items: [{ id: 'pc-001', contractNo: 'CG2500001' }] });
+        return;
+      }
+      await fulfillJson(route, { items: [] });
+    });
+
+    await setAuth(page);
+    await page.goto('/dashboard/purchase');
+    await expect(page.getByText('采购')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('库存列表页可访问', async ({ page }) => {
+    await page.route('**/api/v1/**', async (route) => {
+      if (route.request().url().includes('/inventory')) {
+        await fulfillJson(route, { items: [{ id: 'inv-001' }] });
+        return;
+      }
+      await fulfillJson(route, { items: [] });
+    });
+
+    await setAuth(page);
+    await page.goto('/dashboard/inventory');
+    await expect(page.getByText('库存')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('产品列表页可访问', async ({ page }) => {
+    await page.route('**/api/v1/**', async (route) => {
+      if (route.request().url().includes('/products')) {
+        await fulfillJson(route, { items: [] });
+        return;
+      }
+      await fulfillJson(route, { items: [] });
+    });
+
+    await setAuth(page);
+    await page.goto('/dashboard/products');
+    await expect(page.getByText('产品')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('供应商列表页可访问', async ({ page }) => {
+    await setAuth(page);
+    await page.goto('/dashboard/suppliers');
+    await expect(page.getByText('供应商')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('用户管理页可访问', async ({ page }) => {
+    await setAuth(page);
+    await page.goto('/dashboard/users');
+    await expect(page.getByText('用户')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('仓库列表页可访问', async ({ page }) => {
+    await setAuth(page);
+    await page.goto('/dashboard/stores');
+    await expect(page.getByText('仓库')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('财务管理页可访问', async ({ page }) => {
+    await setAuth(page);
+    await page.goto('/dashboard/finance');
+    await expect(page.getByText('财务')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('货柜管理页可访问', async ({ page }) => {
+    await setAuth(page);
+    await page.goto('/dashboard/containers');
+    await expect(page.getByText('货柜')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('报表页可访问', async ({ page }) => {
+    await setAuth(page);
+    await page.goto('/dashboard/reports');
+    await expect(page.getByText('报表')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('系统设置页可访问', async ({ page }) => {
+    await setAuth(page);
+    await page.goto('/dashboard/settings');
+    await expect(page.getByText('设置')).toBeVisible({ timeout: 10000 });
+  });
+});
