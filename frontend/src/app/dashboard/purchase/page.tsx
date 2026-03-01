@@ -104,38 +104,43 @@ export default function PurchasePage() {
                  <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">暂无合同。</TableCell>
                </TableRow>
             ) : (
-              contracts.map((contract) => (
-                <TableRow key={contract.id}>
-                  <TableCell className="font-medium flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    {contract.contractNo}
-                  </TableCell>
-                  <TableCell>
-                    {contract.supplier?.name}
-                    {contract.supplier?.hasQualityIssue && (
-                       <Badge variant="destructive" className="ml-2 text-[10px] h-5 px-1">质量问题</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>{contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}</TableCell>
-                  <TableCell>{getStatusBadge(contract.status)}</TableCell>
-                  <TableCell className="text-right">¥{contract.totalAmount.toLocaleString()}</TableCell>
-                  <TableCell className="text-right">
-                    <AmountText tone={contract.paidAmount < contract.totalAmount ? 'warning' : 'success'}>
-                      ¥{contract.paidAmount.toLocaleString()}
-                    </AmountText>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`查看合同 ${contract.contractNo}`}
-                      onClick={() => handleViewContract(contract.id)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
+              contracts.map((contract) => {
+                const totalAmount = Number(contract.totalAmount || 0);
+                const paidAmount = Number(contract.paidAmount || 0);
+
+                return (
+                  <TableRow key={contract.id}>
+                    <TableCell className="font-medium flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      {contract.contractNo}
+                    </TableCell>
+                    <TableCell>
+                      {contract.supplier?.name}
+                      {contract.supplier?.hasQualityIssue && (
+                         <Badge variant="destructive" className="ml-2 text-[10px] h-5 px-1">质量问题</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>{contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}</TableCell>
+                    <TableCell>{getStatusBadge(contract.status)}</TableCell>
+                    <TableCell className="text-right">¥{totalAmount.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                      <AmountText tone={paidAmount < totalAmount ? 'warning' : 'success'}>
+                        ¥{paidAmount.toLocaleString()}
+                      </AmountText>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`查看合同 ${contract.contractNo}`}
+                        onClick={() => handleViewContract(contract.id)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

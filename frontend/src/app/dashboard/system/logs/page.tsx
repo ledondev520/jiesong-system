@@ -21,6 +21,8 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { getSystemLogs, SystemLogItem } from '@/services/system.service';
 import { toast } from 'sonner';
+import { Role } from '@/types';
+import { useAuthStore } from '@/store/auth.store';
 
 type LogFilter = 'all' | 'import';
 
@@ -57,8 +59,20 @@ export default function SystemLogsPage() {
   const [logs, setLogs] = useState<SystemLogItem[]>([]);
   const [filter, setFilter] = useState<LogFilter>('all');
   const [total, setTotal] = useState(0);
+  const user = useAuthStore((state) => state.user);
+  const filteredLogs = useMemo(
+    () => (filter === 'import' ? logs.filter(isImportLog) : logs),
+    [filter, logs]
+  );
+
+  const canAccess = user?.role === Role.ADMIN;
 
   useEffect(() => {
+    if (!user || !canAccess) {
+      setLoading(false);
+      return;
+    }
+
     const loadLogs = async () => {
       try {
         const response = await getSystemLogs();
@@ -73,12 +87,55 @@ export default function SystemLogsPage() {
     };
 
     loadLogs();
-  }, []);
+  }, [user, canAccess]);
 
-  const filteredLogs = useMemo(
-    () => (filter === 'import' ? logs.filter(isImportLog) : logs),
-    [filter, logs]
-  );
+  if (!user) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="系统日志"
+          description="查看系统操作日志与导入相关日志"
+          backHref="/dashboard"
+          backLabel="返回工作台"
+        />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>权限校验中...</CardTitle>
+            <CardDescription>正在加载用户权限。</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">加载中...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!canAccess) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="系统日志"
+          description="查看系统操作日志与导入相关日志"
+          backHref="/dashboard"
+          backLabel="返回工作台"
+        />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>无权限访问</CardTitle>
+            <CardDescription>当前账号角色无权查看系统日志。</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              请联系管理员分配管理员角色后重试。
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const userLabel = (log: SystemLogItem) => {
     if (log.user?.name) {

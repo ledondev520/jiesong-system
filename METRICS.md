@@ -164,3 +164,77 @@
 ### 结论
 - 销售链路 E2E 测试桩逻辑已从模糊匹配切换为精确匹配，避免列表桩覆盖详情请求。
 - 当前环境无法完成 Playwright 真正跑测，需在可监听端口的环境执行最终 E2E 回归确认。
+
+## 2026-03-01 Round 16 (System Ops Pages Closure)
+
+### 质量指标
+- 定向单测：`Sidebar` + `Settings` + `SystemLogs` + `SystemNotifications` + `SystemImportRecords` 共 17/17 通过
+- 运维页面覆盖：新增 2 个页面（通知中心、导入记录），并完成设置页导出入口联调
+
+### 过程指标
+- 服务层新增能力：4 个（通知查询、通知已读、导入记录查询、系统数据导出下载）
+- 导航新增入口：2 个（通知中心、导入记录）
+- 权限隔离强化：1 处（导入记录页面前端管理员守卫）
+
+### 结论
+- 运维模块 Phase 2 任务 `SYS-02/03/04` 已全部闭环。
+- 当前可在前端直接完成“通知处理 + 导入追踪 + 多类型数据导出”三类运维操作。
+
+## 2026-03-01 Round 17 (System Backend Hardening)
+
+### 质量指标
+- 后端全量测试：44/44 通过（新增 6 条测试，覆盖通知权限与导入筛选/状态逻辑）
+- 关键安全缺陷修复：1 处（通知已读越权）
+- 关键状态一致性缺陷修复：1 处（导入失败状态误标记）
+
+### 过程指标
+- 新增后端测试文件：2（`systemController.test.js`、`importService.test.js`）
+- 修复后端核心文件：2（`systemController.js`、`importService.js`）
+
+### 结论
+- 运维后端“权限控制 + 状态语义 + 测试覆盖”达到可发布基线。
+
+## 2026-03-01 Round 18 (Supabase Cutback & Deploy Readiness)
+
+### 质量指标
+- 后端全量测试：44/44 通过（`npm run test`）
+- Prisma 客户端生成：通过（`npm run db:generate`）
+- 配置一致性修复：端口默认值与模板统一为 `3000`
+
+### 过程指标
+- 核心配置文件变更：3（`schema.prisma`、`config/index.js`、`env.example`）
+- 文档/部署配置变更：4（根 `README`、`backend/README`、`Supabase迁移指南`、`vercel.json`）
+
+### 结论
+- 数据层已回切到 Supabase PostgreSQL，且本地启动与上线路径已具备可执行说明。
+
+## 2026-03-01 Round 19 (Frontend E2E Stabilization Closure)
+
+### 质量指标
+- 前端 E2E 全量：14/14 通过（`npm run test:e2e -- --reporter=line`）
+- 定向单测：`src/app/dashboard/system/logs/page.test.tsx` 4/4 通过
+- 关键运行时缺陷修复：2 处（dashboard 误跳登录、system logs hooks 顺序错误）
+
+### 过程指标
+- E2E 稳定性修复文件：2（`frontend/e2e/helpers.ts`、`frontend/src/app/dashboard/layout.tsx`）
+- 页面运行时修复文件：1（`frontend/src/app/dashboard/system/logs/page.tsx`）
+
+### 结论
+- 当前前端关键页面“导航 + 核心按钮交互”已具备可重复自动化验收能力，并在本地全量回归通过。
+
+## 2026-03-01 Round 20 (Button Coverage Expansion)
+
+### 质量指标
+- 按钮巡检专项：`e2e/button-coverage.spec.ts`，28/28 通过
+- 前端 E2E 全量：42/42 通过（`smoke` + `button-coverage`）
+- 新发现并修复运行时问题：2 处
+  - 采购详情页金额字段空值崩溃
+  - 导入页 mock 结构不匹配导致 `history.map` 异常
+
+### 过程指标
+- 新增 E2E 页面覆盖：28 页
+- 新增/补齐 mock 端点：4 个（`/import/history`、`/import/stats`、`/import/preview`、`/import/execute`）
+- 巡检策略增强：页面按钮快照扫描、环境噪声异常过滤、展示页最小点击阈值配置
+
+### 结论
+- 当前前端自动化从“关键路径”升级到“关键路径 + 页面按钮巡检”，覆盖广度与回归稳定性显著提升。

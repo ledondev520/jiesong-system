@@ -210,3 +210,106 @@
   - 补齐定向单测：`frontend/src/app/dashboard/system/logs/page.test.tsx`。
 - 验证结论：
   - `frontend` 定向测试通过：`npm test src/app/dashboard/system/logs/page.test.tsx src/components/layout/Sidebar.test.tsx`。
+
+## 2026-03-01 Round 16（运维系统页面第二阶段收口）
+
+- 已完成本轮目标：按优先级完成 `SYS-02`、`SYS-03`、`SYS-04` 全量交付，并补齐前端权限隔离与导航入口。
+- 已完成项：
+  - 通知中心（`SYS-02`）：
+    - 新增页面 `/dashboard/system/notifications`，支持通知列表、全部/仅未读筛选、单条标记已读与刷新。
+    - 扩展系统服务层：`getSystemNotifications`、`markSystemNotificationRead`。
+  - 导入记录（`SYS-03`）：
+    - 新增页面 `/dashboard/system/import-records`，展示导入记录状态、成功/失败数、错误日志。
+    - 新增管理员前端守卫（非管理员不发起接口请求，直接显示无权限）。
+    - 扩展系统服务层：`getSystemImportRecords`。
+  - 导出入口（`SYS-04`）：
+    - 设置页新增“数据导出”Tab，接入 8 类导出目标（供应商/门店/商品/采购/销售/货柜/库存/收付款）。
+    - 扩展系统服务层：`exportSystemData`，支持下载 `GET /api/v1/system/export/:type` 返回文件。
+  - 侧边栏与入口联动：
+    - 新增“通知中心”导航；
+    - 新增“导入记录”导航（管理员可见）；
+    - 保持“系统日志”管理员可见策略。
+- 验证结论：
+  - `frontend` 定向测试通过：`npm run test -- src/components/layout/Sidebar.test.tsx src/app/dashboard/settings/page.test.tsx src/app/dashboard/system/logs/page.test.tsx src/app/dashboard/system/notifications/page.test.tsx src/app/dashboard/system/import-records/page.test.tsx`
+  - 结果：5 个测试文件、17 个测试用例全部通过。
+
+## 2026-03-01 Round 17（运维后端安全与一致性修复）
+
+- 已完成本轮目标：修复审阅发现的后端权限与状态一致性问题，并补齐后端测试覆盖。
+- 已完成项：
+  - 通知已读接口权限修复：
+    - `backend/src/controllers/systemController.js` 中 `markNotificationRead` 改为 `updateMany({ id, userId })`，只允许用户修改自己的通知。
+    - 当记录不存在或无权限时返回 `404`（`通知不存在或无权限访问`）。
+  - 导入状态修复：
+    - `backend/src/services/importService.js` 新增 `resolveImportStatus(failedRows)`。
+    - 导入完成状态改为 `FAILED/COMPLETED` 正确分支，修复原先固定 `COMPLETED` 的问题。
+  - 测试覆盖补齐：
+    - 新增 `backend/src/controllers/systemController.test.js`：
+      - 通知已读归属约束
+      - 无权限/不存在场景 404
+      - 导入记录 `status/keyword` 筛选参数透传
+    - 新增 `backend/src/services/importService.test.js`：
+      - 导入状态推导
+      - 导入记录筛选 where 组装
+- 验证结论：
+  - `backend` 全量测试通过：`npm run test`（44/44）。
+
+## 2026-03-01 Round 18（Supabase 回切与上线路径收口）
+
+- 已完成本轮目标：将 Prisma 数据源切回 Supabase PostgreSQL，并整理可执行的本地启动与上线路径。
+- 已完成项：
+  - 数据源回切：
+    - `backend/prisma/schema.prisma` 恢复 `provider = "postgresql"`，并恢复 `directUrl = env("DIRECT_URL")`。
+    - `backend/.env` 改为 Supabase 连接模板（`DATABASE_URL` + `DIRECT_URL`）。
+  - 运行配置统一：
+    - `backend/src/config/index.js` 默认端口改为 `3000`（与前端代理及启动脚本一致）。
+    - `backend/src/config/index.test.js` 同步默认端口断言。
+    - `backend/env.example` 端口统一为 `3000`。
+  - 文档与部署配置收口：
+    - 更新 `backend/README.md` 数据库说明（SQLite -> Supabase PostgreSQL）与启动说明。
+    - 更新 `README.md` 新增“本地启动（Supabase）/推荐上线方式”步骤。
+    - 更新 `docs/Supabase迁移指南.md` 的本地验证端口（3000）。
+    - 清理 `vercel.json` 中硬编码占位 rewrite，避免上线后 API 被错误重写到假域名。
+- 验证结论：
+  - `backend` 全量测试通过：`npm run test`（44/44）。
+  - Prisma 客户端生成通过：`npm run db:generate`。
+
+## 2026-03-01 Round 19（前端 E2E 全量稳定性收口）
+
+- 已完成本轮目标：验证“前端关键页面点击交互是否可自动化验收”并修复阻塞项，达成全量 E2E 通过。
+- 已完成项：
+  - E2E 认证注入稳定化：
+    - `frontend/e2e/helpers.ts` 的 `signInAsAdmin` 改为注入 `auth-storage` + `jiesong_access_token` 后直达目标页，减少登录流程竞态。
+  - 鉴权跳转竞态修复：
+    - `frontend/src/app/dashboard/layout.tsx` 增加持久化认证态读取兜底，避免 hydration 窗口误判未登录并跳回 `/login`。
+  - 系统日志页面运行时崩溃修复：
+    - `frontend/src/app/dashboard/system/logs/page.tsx` 将 `useMemo` 前置到条件返回之前，修复 Hooks 顺序错误。
+  - E2E Mock 与业务页兼容补丁：
+    - 持续保留 `frontend/e2e/helpers.ts` 的系统运维/业务接口 Mock 覆盖；
+    - `frontend/src/app/dashboard/purchase/page.tsx` 的金额字段增加空值兜底，避免 `toLocaleString` 在 mock 空值时崩溃。
+- 验证结论：
+  - `frontend` 定向单测通过：
+    - `npm run test -- src/app/dashboard/system/logs/page.test.tsx`（4/4）。
+  - `frontend` 全量 E2E 通过：
+    - `npm run test:e2e -- --reporter=line`（14/14）。
+
+## 2026-03-01 Round 20（按钮级 E2E 巡检扩展）
+
+- 已完成本轮目标：将前端 E2E 从“关键路径按钮”扩展到“页面按钮巡检”，覆盖系统主要页面按钮交互可点击性。
+- 已完成项：
+  - 新增按钮巡检用例：`frontend/e2e/button-coverage.spec.ts`
+    - 覆盖 28 个页面入口（含采购/销售/库存/财务/主数据/系统运维页面）。
+    - 每页执行按钮快照扫描 + 可点击验证（跳过非业务/环境按钮）。
+    - 针对展示型页面支持 `minClicks: 0` 配置，避免误报。
+  - Mock 能力补齐：
+    - `frontend/e2e/helpers.ts` 新增导入中心相关接口 mock：
+      - `GET /api/v1/import/history`
+      - `GET /api/v1/import/stats`
+      - `POST /api/v1/import/preview`
+      - `POST /api/v1/import/execute`
+  - 运行时健壮性补丁：
+    - `frontend/src/app/dashboard/purchase/[id]/page.tsx` 补齐 `unitPrice/totalPrice` 空值兜底，修复详情页潜在崩溃。
+    - `frontend/e2e/helpers.ts` 登录注入脚本增加 `sessionStorage` 异常保护，兼容下载/跨源文档场景。
+- 验证结论：
+  - 按钮巡检专项：`npm run test:e2e -- --reporter=line e2e/button-coverage.spec.ts`（28/28）。
+  - 前端 E2E 全量：`npm run test:e2e -- --reporter=line`（42/42）。

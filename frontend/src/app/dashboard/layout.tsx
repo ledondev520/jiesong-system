@@ -14,6 +14,29 @@ import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 
+type PersistedAuthState = {
+  state?: {
+    user?: unknown;
+    token?: unknown;
+    isAuthenticated?: unknown;
+  };
+};
+
+const readPersistedAuthState = (): PersistedAuthState | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  const raw = window.sessionStorage.getItem('auth-storage');
+  if (!raw) {
+    return null;
+  }
+  try {
+    return JSON.parse(raw) as PersistedAuthState;
+  } catch {
+    return null;
+  }
+};
+
 /**
  * 职责：在认证状态完成 hydration 后渲染仪表盘框架，并对未登录用户执行客户端重定向。
  * 思路：
@@ -49,6 +72,18 @@ export default function DashboardLayout({
   useEffect(() => {
     // 0. 仅在 hydration 完成后执行客户端跳转，避免 SSR/CSR 分支差异
     if (hydrated && !isAuthenticated) {
+      const persisted = readPersistedAuthState();
+      const hasPersistedAuth =
+        Boolean(persisted?.state?.isAuthenticated) &&
+        typeof persisted?.state?.token === 'string' &&
+        Boolean(persisted?.state?.token) &&
+        typeof persisted?.state?.user === 'object' &&
+        persisted?.state?.user !== null;
+
+      // 持久化状态已存在时，等待 zustand 同步，避免误跳转到登录页。
+      if (hasPersistedAuth) {
+        return;
+      }
       router.replace('/login');
     }
   }, [hydrated, isAuthenticated, router]);

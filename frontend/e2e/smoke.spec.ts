@@ -1,298 +1,181 @@
 /**
- * E2E 冒烟测试 - 完整覆盖
+ * E2E 覆盖策略：
+ * 1. 登录/权限路径验证
+ * 2. 侧边栏全导航点击可达
+ * 3. 各主界面关键按钮交互
  */
 
-import { test, expect, type Page, type Route } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
+import { mockApiRoutes, signInAsAdmin } from './helpers';
 
-const mockUser = { id: 'u-admin', username: 'admin', name: '管理员', role: 'ADMIN', isActive: true };
-const mockToken = 'mock-token-12345';
+test.beforeEach(async ({ page }) => {
+  await mockApiRoutes(page);
+});
 
-function getPathname(url: string) {
-  return new URL(url).pathname;
-}
+const safeClick = async (locator: Locator) => {
+  const retryTimes = 3;
 
-async function fulfillJson(route: Route, data: unknown, message = 'ok') {
-  await route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({ code: 200, message, data }),
-  });
-}
+  for (let attempt = 1; attempt <= retryTimes; attempt += 1) {
+    try {
+      await locator.first().click({ timeout: 10000 });
+      return;
+    } catch (error) {
+      if (attempt === retryTimes) {
+        throw error;
+      }
+      await locator.page().waitForTimeout(300);
+    }
+  }
+};
 
-async function setAuth(page: Page) {
-  await page.addInitScript(({ user, token }: { user: typeof mockUser; token: string }) => {
-    sessionStorage.setItem('jiesong_access_token', token);
-    sessionStorage.setItem(
-      'auth-storage',
-      JSON.stringify({
-        state: { user, token, isAuthenticated: true },
-        version: 0,
-      })
-    );
-  }, { user: mockUser, token: mockToken });
-  
-  await page.goto('/');
-}
-
-test.describe('系统登录与权限', () => {
-  test('登录页可访问并展示关键元素', async ({ page }) => {
+test.describe('登录与权限', () => {
+  test('登录页可访问', async ({ page }) => {
     await page.goto('/login');
     await expect(page.getByText('系统登录')).toBeVisible();
   });
 
-  test('未登录访问 dashboard 会跳转到登录', async ({ page }) => {
+  test('未登录访问 dashboard 会跳转登录', async ({ page }) => {
     await page.goto('/dashboard');
     await expect(page).toHaveURL(/\/login$/);
-  });
-
-  test('登录后访问销售页可展示列表数据（接口 Mock）', async ({ page }) => {
-    await page.route('**/api/v1/**', async (route) => {
-      const pathname = getPathname(route.request().url());
-
-      if (pathname === '/api/v1/sales') {
-        await fulfillJson(route, {
-          items: [
-            {
-              id: 'sc-001',
-              contractNo: 'EXP2500001',
-              status: 'DRAFT',
-              totalAmount: 250000,
-              totalBoxes: 12,
-              volume: 28.5,
-              grossWeight: 18600,
-              port: { id: 'p-1', name: '深圳盐田港' },
-            },
-          ],
-          pagination: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
-        }, '获取成功');
-        return;
-      }
-
-      await fulfillJson(route, { items: [] });
-    });
-
-    await setAuth(page);
-    await page.goto('/dashboard/sales');
-
-    await expect(page.getByRole('heading', { name: '出口合同' })).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('EXP2500001')).toBeVisible();
-    await expect(page.getByText('深圳盐田港')).toBeVisible();
-    await expect(page.getByText(/250,000/)).toBeVisible();
-  });
-
-  test('登录后访问销售详情页可展示合同与明细（接口 Mock）', async ({ page }) => {
-    await page.route('**/api/v1/**', async (route) => {
-      const pathname = getPathname(route.request().url());
-
-      if (pathname === '/api/v1/sales/sc-001') {
-        await fulfillJson(route, {
-          id: 'sc-001',
-          contractNo: 'EXP2500002',
-          status: 'DRAFT',
-          totalAmount: 300000,
-          receivedAmount: 90000,
-          exchangeRate: 7.2,
-          totalBoxes: 22,
-          grossWeight: 20500,
-          netWeight: 19600,
-          volume: 35.6,
-          packingItems: [],
-          port: { id: 'p-1', name: '宁波港' },
-          createdAt: '2026-01-01T00:00:00.000Z',
-          updatedAt: '2026-01-01T00:00:00.000Z',
-        }, '获取成功');
-        return;
-      }
-
-      if (pathname === '/api/v1/products' || pathname === '/api/v1/stores' || pathname === '/api/v1/inventory') {
-        await fulfillJson(route, { items: [], pagination: { total: 0, page: 1, pageSize: 100, totalPages: 0 } }, '获取成功');
-        return;
-      }
-
-      if (pathname === '/api/v1/sales') {
-        await fulfillJson(route, { items: [], pagination: { total: 0, page: 1, pageSize: 100, totalPages: 0 } }, '获取成功');
-        return;
-      }
-
-      await fulfillJson(route, { items: [] });
-    });
-
-    await setAuth(page);
-    await page.goto('/dashboard/sales/sc-001');
-
-    await expect(page.getByRole('heading', { name: 'EXP2500002' })).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('宁波港')).toBeVisible();
-    await expect(page.getByText(/装箱/)).toBeVisible();
-    await expect(page.getByText(/300,000/)).toBeVisible();
-  });
-
-  test('采购列表页', async ({ page }) => {
-    await page.route('**/api/v1/**', async (route) => {
-      if (route.request().url().includes('/purchases')) {
-        await fulfillJson(route, { items: [{ id: 'pc-001' }] });
-        return;
-      }
-      await fulfillJson(route, { items: [] });
-    });
-
-    await setAuth(page);
-    await page.goto('/dashboard/purchase');
-    await expect(page.getByRole('heading', { name: '采购管理' })).toBeVisible({ timeout: 10000 });
-  });
-
-  test('库存列表页', async ({ page }) => {
-    await page.route('**/api/v1/**', async (route) => {
-      if (route.request().url().includes('/inventory')) {
-        await fulfillJson(route, { items: [{ id: 'inv-001' }] });
-        return;
-      }
-      await fulfillJson(route, { items: [] });
-    });
-
-    await setAuth(page);
-    await page.goto('/dashboard/inventory');
-    await expect(page.getByRole('heading', { name: '库存管理' })).toBeVisible({ timeout: 10000 });
-  });
-
-  test('产品列表页', async ({ page }) => {
-    await page.route('**/api/v1/**', async (route) => {
-      if (route.request().url().includes('/products')) {
-        await fulfillJson(route, { items: [] });
-        return;
-      }
-      await fulfillJson(route, { items: [] });
-    });
-
-    await setAuth(page);
-    await page.goto('/dashboard/products');
-    await expect(page.getByRole('heading', { name: '产品管理' })).toBeVisible({ timeout: 10000 });
-  });
-
-  test('供应商列表页', async ({ page }) => {
-    await setAuth(page);
-    await page.goto('/dashboard/suppliers');
-    await expect(page.getByRole('heading', { name: '供应商管理' })).toBeVisible({ timeout: 10000 });
-  });
-
-  test('用户管理页', async ({ page }) => {
-    await setAuth(page);
-    await page.goto('/dashboard/users');
-    await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible({ timeout: 10000 });
-  });
-
-  test('仓库列表页', async ({ page }) => {
-    await setAuth(page);
-    await page.goto('/dashboard/stores');
-    await expect(page.getByRole('heading', { name: '仓库管理' })).toBeVisible({ timeout: 10000 });
-  });
-
-  test('财务管理页', async ({ page }) => {
-    await setAuth(page);
-    await page.goto('/dashboard/finance');
-    await expect(page.getByRole('heading', { name: '财务管理' })).toBeVisible({ timeout: 10000 });
-  });
-
-  test('货柜管理页', async ({ page }) => {
-    await setAuth(page);
-    await page.goto('/dashboard/containers');
-    await expect(page.getByRole('heading', { name: '货柜管理' })).toBeVisible({ timeout: 10000 });
-  });
-
-  test('报表页', async ({ page }) => {
-    await setAuth(page);
-    await page.goto('/dashboard/reports');
-    await expect(page.getByRole('heading', { name: '报表统计' })).toBeVisible({ timeout: 10000 });
-  });
-
-  test('系统设置页', async ({ page }) => {
-    await setAuth(page);
-    await page.goto('/dashboard/settings');
-    await expect(page.getByRole('heading', { name: '系统设置' })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('系统登录')).toBeVisible();
   });
 });
 
-test.describe('核心业务流程', () => {
-  test('采购列表页可访问', async ({ page }) => {
-    await page.route('**/api/v1/**', async (route) => {
-      if (route.request().url().includes('/purchases')) {
-        await fulfillJson(route, { items: [{ id: 'pc-001', contractNo: 'CG2500001' }] });
-        return;
-      }
-      await fulfillJson(route, { items: [] });
-    });
+test.describe('侧边栏导航全覆盖', () => {
+  test('所有导航入口可点击并进入对应页面', async ({ page }) => {
+    await signInAsAdmin(page, '/dashboard/contracts');
 
-    await setAuth(page);
-    await page.goto('/dashboard/purchase');
-    await expect(page.getByRole('heading', { name: '采购管理' })).toBeVisible({ timeout: 10000 });
+    const navCases = [
+      { label: '工作台', url: /\/dashboard$/, heading: '工作台' },
+      { label: '采购合同', url: /\/dashboard\/contracts$/, heading: '采购合同' },
+      { label: '出口合同', url: /\/dashboard\/sales$/, heading: '出口合同' },
+      { label: '库存状态', url: /\/dashboard\/inventory-container$/, heading: '库存状态' },
+      { label: '收付款', url: /\/dashboard\/payments$/, heading: '收付款' },
+      { label: '采购建议', url: /\/dashboard\/store-recommend$/, heading: '门店采购建议' },
+      { label: '通知中心', url: /\/dashboard\/system\/notifications$/, heading: '通知中心' },
+      { label: '系统日志', url: /\/dashboard\/system\/logs$/, heading: '系统日志' },
+      { label: '导入记录', url: /\/dashboard\/system\/import-records$/, heading: '导入记录' },
+      { label: '设置', url: /\/dashboard\/settings$/, heading: '设置' },
+    ] as const;
+
+    for (const item of navCases) {
+      await page.getByRole('link', { name: item.label }).click();
+      await expect(page).toHaveURL(item.url);
+      await expect(page.getByRole('heading', { name: item.heading })).toBeVisible({ timeout: 10000 });
+    }
   });
 
-  test('库存列表页可访问', async ({ page }) => {
-    await page.route('**/api/v1/**', async (route) => {
-      if (route.request().url().includes('/inventory')) {
-        await fulfillJson(route, { items: [{ id: 'inv-001' }] });
-        return;
-      }
-      await fulfillJson(route, { items: [] });
-    });
+  test('点击退出登录会回到登录页', async ({ page }) => {
+    await signInAsAdmin(page, '/dashboard/contracts');
+    await safeClick(page.getByRole('button', { name: '退出登录' }));
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByText('系统登录')).toBeVisible();
+  });
+});
 
-    await setAuth(page);
-    await page.goto('/dashboard/inventory');
-    await expect(page.getByRole('heading', { name: '库存管理' })).toBeVisible({ timeout: 10000 });
+test.describe('关键按钮交互', () => {
+  test('工作台快捷入口：新建采购 / 新建销售', async ({ page }) => {
+    await signInAsAdmin(page, '/dashboard');
+
+    await safeClick(page.getByRole('button', { name: '新建采购' }));
+    await expect(page).toHaveURL(/\/dashboard\/purchase\/create$/);
+    await expect(page.getByRole('heading', { name: '新增采购合同' })).toBeVisible();
+
+    await safeClick(page.getByRole('link', { name: '工作台' }));
+    await safeClick(page.getByRole('button', { name: '新建销售' }));
+    await expect(page).toHaveURL(/\/dashboard\/sales\/create$/);
+    await expect(page.getByRole('heading', { name: '创建出口合同' })).toBeVisible();
   });
 
-  test('产品列表页可访问', async ({ page }) => {
-    await page.route('**/api/v1/**', async (route) => {
-      if (route.request().url().includes('/products')) {
-        await fulfillJson(route, { items: [] });
-        return;
-      }
-      await fulfillJson(route, { items: [] });
-    });
+  test('采购合同页：新增采购按钮跳转', async ({ page }) => {
+    await signInAsAdmin(page, '/dashboard/contracts');
+    await expect(page.getByRole('heading', { name: '采购合同' })).toBeVisible();
 
-    await setAuth(page);
-    await page.goto('/dashboard/products');
-    await expect(page.getByRole('heading', { name: '产品管理' })).toBeVisible({ timeout: 10000 });
+    await safeClick(page.getByRole('button', { name: '新增采购' }));
+    await expect(page).toHaveURL(/\/dashboard\/purchase\/create$/);
+    await expect(page.getByRole('heading', { name: '新增采购合同' })).toBeVisible();
   });
 
-  test('供应商列表页可访问', async ({ page }) => {
-    await setAuth(page);
-    await page.goto('/dashboard/suppliers');
-    await expect(page.getByRole('heading', { name: '供应商管理' })).toBeVisible({ timeout: 10000 });
+  test('出口合同页：新增与查看详情按钮可用', async ({ page }) => {
+    await signInAsAdmin(page, '/dashboard/sales');
+    await expect(page.getByRole('heading', { name: '出口合同' })).toBeVisible();
+
+    await safeClick(page.getByRole('button', { name: '新增出口合同' }));
+    await expect(page).toHaveURL(/\/dashboard\/sales\/create$/);
+    await expect(page.getByRole('heading', { name: '创建出口合同' })).toBeVisible();
+
+    await signInAsAdmin(page, '/dashboard/sales');
+    await safeClick(page.getByRole('button', { name: '查看合同 EXP2600001' }));
+    await expect(page).toHaveURL(/\/dashboard\/sales\/sc-001$/);
+    await expect(page.getByRole('heading', { name: 'EXP2600001' })).toBeVisible();
   });
 
-  test('用户管理页可访问', async ({ page }) => {
-    await setAuth(page);
-    await page.goto('/dashboard/users');
-    await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible({ timeout: 10000 });
+  test('库存状态页：批量状态更新可触发', async ({ page }) => {
+    await signInAsAdmin(page, '/dashboard/inventory-container');
+    await expect(page.getByRole('heading', { name: '库存状态' })).toBeVisible();
+
+    await safeClick(page.getByRole('checkbox', { name: /选择库存/ }));
+
+    const batchOutboundButton = page.getByRole('button', { name: '批量设为已出库' });
+    await expect(batchOutboundButton).toBeEnabled();
+
+    await safeClick(batchOutboundButton);
+    await expect(page.getByText('批量更新完成：成功 1 条')).toBeVisible();
   });
 
-  test('仓库列表页可访问', async ({ page }) => {
-    await setAuth(page);
-    await page.goto('/dashboard/stores');
-    await expect(page.getByRole('heading', { name: '仓库管理' })).toBeVisible({ timeout: 10000 });
+  test('收付款页：切换应收并打开收款弹窗', async ({ page }) => {
+    await signInAsAdmin(page, '/dashboard/payments');
+    await expect(page.getByRole('heading', { name: '收付款' })).toBeVisible();
+
+    await safeClick(page.getByRole('tab', { name: '应收账款' }));
+    await safeClick(page.getByRole('button', { name: /收款/ }));
+    await expect(page.getByRole('heading', { name: '录入收款' })).toBeVisible();
   });
 
-  test('财务管理页可访问', async ({ page }) => {
-    await setAuth(page);
-    await page.goto('/dashboard/finance');
-    await expect(page.getByRole('heading', { name: '财务管理' })).toBeVisible({ timeout: 10000 });
+  test('门店采购建议页：Tab 切换可用', async ({ page }) => {
+    await signInAsAdmin(page, '/dashboard/store-recommend');
+    await expect(page.getByRole('heading', { name: '门店采购建议' })).toBeVisible();
+
+    await safeClick(page.getByRole('tab', { name: '门店采购统计' }));
+    await expect(page.getByText('门店采购明细')).toBeVisible();
   });
 
-  test('货柜管理页可访问', async ({ page }) => {
-    await setAuth(page);
-    await page.goto('/dashboard/containers');
-    await expect(page.getByRole('heading', { name: '货柜管理' })).toBeVisible({ timeout: 10000 });
+  test('通知中心：仅未读筛选与标记已读', async ({ page }) => {
+    await signInAsAdmin(page, '/dashboard/system/notifications');
+    await expect(page.getByRole('heading', { name: '通知中心' })).toBeVisible();
+
+    await safeClick(page.getByRole('button', { name: '仅未读' }));
+    await safeClick(page.getByRole('button', { name: '标记已读' }));
+    await expect(page.getByText('暂无通知。')).toBeVisible();
   });
 
-  test('报表页可访问', async ({ page }) => {
-    await setAuth(page);
-    await page.goto('/dashboard/reports');
-    await expect(page.getByRole('heading', { name: '报表统计' })).toBeVisible({ timeout: 10000 });
+  test('系统日志：切换导入日志筛选', async ({ page }) => {
+    await signInAsAdmin(page, '/dashboard/system/logs');
+    await expect(page.getByRole('heading', { name: '系统日志' })).toBeVisible();
+
+    await safeClick(page.getByRole('button', { name: '导入日志' }));
+    await expect(page.getByText('IMPORT_DATA')).toBeVisible();
   });
 
-  test('系统设置页可访问', async ({ page }) => {
-    await setAuth(page);
-    await page.goto('/dashboard/settings');
-    await expect(page.getByRole('heading', { name: '系统设置' })).toBeVisible({ timeout: 10000 });
+  test('导入记录：状态筛选和关键字段显示', async ({ page }) => {
+    await signInAsAdmin(page, '/dashboard/system/import-records');
+    await expect(page.getByRole('heading', { name: '导入记录' })).toBeVisible();
+
+    await safeClick(page.getByRole('button', { name: '失败' }));
+    await expect(page.getByText('import-failed.csv')).toBeVisible();
+  });
+
+  test('设置页：导入/导出相关按钮交互', async ({ page }) => {
+    await signInAsAdmin(page, '/dashboard/settings');
+    await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
+
+    await safeClick(page.getByRole('tab', { name: '数据导入' }));
+    await safeClick(page.getByText('查看历史导入任务执行状态与失败明细'));
+    await expect(page).toHaveURL(/\/dashboard\/system\/import-records$/);
+
+    await signInAsAdmin(page, '/dashboard/settings');
+    await safeClick(page.getByRole('tab', { name: '数据导出' }));
+    await safeClick(page.getByRole('button', { name: '导出数据' }));
+    await expect(page).toHaveURL(/\/dashboard\/settings$/);
   });
 });

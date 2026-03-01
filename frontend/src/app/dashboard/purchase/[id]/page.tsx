@@ -280,10 +280,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                       {item.quantity} {item.unit || item.product?.unit}
                     </TableCell>
                     <TableCell className="text-right">
-                      ¥{item.unitPrice.toLocaleString()}
+                      ¥{(Number(item.unitPrice) || 0).toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      ¥{item.totalPrice.toLocaleString()}
+                      ¥{(Number(item.totalPrice) || Number(item.quantity || 0) * Number(item.unitPrice || 0)).toLocaleString()}
                     </TableCell>
                   </TableRow>
                 ))
