@@ -36,4 +36,12 @@ router.post(
   contractDocController.generateFromPurchase
 );
 
+// GET /api/v1/contract-doc/pdf/:id - 获取采购合同PDF（用于预览）
+router.get(
+  '/pdf/:id',
+  validateId,
+  handleValidation,
+  contractDocController.getContractPdf
+);
+
 module.exports = router;

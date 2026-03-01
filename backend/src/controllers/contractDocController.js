@@ -95,8 +95,45 @@ const checkTemplate = async (req, res, next) => {
   }
 };
 
+/**
+ * 职责：获取采购合同PDF文档（兼容前端预览）
+ */
+const getContractPdf = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    // 1. 获取采购合同详情
+    const purchaseContract = await prisma.purchaseContract.findUnique({
+      where: { id },
+      include: {
+        supplier: true,
+        items: {
+          include: {
+            product: true,
+          },
+        },
+      },
+    });
+    
+    if (!purchaseContract) {
+      throw createError('采购合同不存在', 404);
+    }
+    
+    const buffer = await contractDocService.generatePurchaseContract(purchaseContract, {});
+    const filename = contractDocService.generateFilename(purchaseContract, purchaseContract.storeName);
+    const encodedFilename = encodeURIComponent(filename);
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `inline; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`);
+    res.send(buffer);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   generateFromPurchase,
   uploadTemplate,
   checkTemplate,
+  getContractPdf,
 };

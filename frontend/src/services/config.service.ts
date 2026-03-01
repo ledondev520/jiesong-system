@@ -11,29 +11,75 @@ interface SystemConfig {
   [key: string]: SystemConfigValue | undefined;
 }
 
+const fetchSystemConfig = async () => {
+  return api.get<ApiResponse<SystemConfig>, ApiResponse<SystemConfig>>('/system/configs');
+};
+
+const toStringArray = (value: unknown, fallback: string[] = []): string[] => {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : fallback;
+};
+
 export const configService = {
   getSystemConfig: async () => {
-    // Returns { exchangeRate: number, profitRate: number, ... }
-    return api.get<ApiResponse<SystemConfig>, ApiResponse<SystemConfig>>('/config/system');
+    return fetchSystemConfig();
   },
 
   updateSystemConfig: async (data: Partial<SystemConfig>) => {
-    return api.put<ApiResponse<SystemConfig>, ApiResponse<SystemConfig>, Partial<SystemConfig>>('/config/system', data);
+    const keys = Object.keys(data).filter((key) => key in data);
+    if (keys.length === 0) {
+      return fetchSystemConfig();
+    }
+
+    await Promise.all(
+      keys.map((key) => api.put<ApiResponse<SystemConfig>, ApiResponse<SystemConfig>, { value: SystemConfigValue }>(
+        `/system/configs/${key}`,
+        { value: data[key] }
+      ))
+    );
+
+    return fetchSystemConfig();
   },
 
   getUnits: async () => {
-    return api.get<ApiResponse<string[]>, ApiResponse<string[]>>('/config/units');
+    const response = await fetchSystemConfig();
+    return {
+      ...response,
+      data: response.code === 200 ? toStringArray(response.data?.units, []) : [],
+    } as ApiResponse<string[]>;
   },
 
   addUnit: async (unit: string) => {
-    return api.post<ApiResponse<void>, ApiResponse<void>, { unit: string }>('/config/units', { unit });
+    const current = await fetchSystemConfig();
+    const currentUnits = toStringArray(current.data?.units, []);
+    const nextUnits = Array.from(new Set([...currentUnits, unit]));
+    const response = await api.put<ApiResponse<SystemConfig>, ApiResponse<SystemConfig>, { value: string[] }>(
+      '/system/configs/units',
+      { value: nextUnits }
+    );
+    return {
+      ...response,
+      data: toStringArray(response.data?.units, nextUnits),
+    } as ApiResponse<string[]>;
   },
 
   deleteUnit: async (unit: string) => {
-    return api.delete<ApiResponse<void>, ApiResponse<void>>(`/config/units/${encodeURIComponent(unit)}`);
+    const current = await fetchSystemConfig();
+    const nextUnits = toStringArray(current.data?.units, []).filter((item) => item !== unit);
+    const response = await api.put<ApiResponse<SystemConfig>, ApiResponse<SystemConfig>, { value: string[] }>(
+      '/system/configs/units',
+      { value: nextUnits }
+    );
+    return {
+      ...response,
+      data: toStringArray(response.data?.units, nextUnits),
+    } as ApiResponse<string[]>;
   },
   
   getCustomsBrokers: async () => {
-    return api.get<ApiResponse<string[]>, ApiResponse<string[]>>('/config/brokers');
+    const response = await fetchSystemConfig();
+    return {
+      ...response,
+      data: response.code === 200 ? toStringArray(response.data?.brokers, []) : [],
+    } as ApiResponse<string[]>;
   }
 };
