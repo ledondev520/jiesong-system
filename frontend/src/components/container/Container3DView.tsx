@@ -11,8 +11,8 @@
 'use client';
 
 import { useRef, useMemo, Suspense, useState } from 'react';
-import { Canvas, useFrame, ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, Text, PerspectiveCamera, Environment, Html } from '@react-three/drei';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, Text, PerspectiveCamera, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { PackingItem, Product } from '@/types';
 import { 
@@ -259,10 +259,6 @@ export default function Container3DView({
     return packBoxes(boxes);
   }, [boxes]);
   
-  const handleBoxClick = (box: PlacedBox) => {
-    // 点击箱子时的交互（可以扩展为显示详情弹窗等）
-  };
-  
   return (
     <div className="w-full h-[500px] bg-muted rounded-lg overflow-hidden relative">
       {/* 利用率信息 */}
@@ -292,7 +288,6 @@ export default function Container3DView({
         <Suspense fallback={null}>
           <Scene 
             placedBoxes={packingResult.placedBoxes}
-            onBoxClick={handleBoxClick}
             hoveredBoxId={hoveredBoxId}
             onBoxHover={setHoveredBoxId}
           />

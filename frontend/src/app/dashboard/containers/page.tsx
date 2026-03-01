@@ -44,7 +44,7 @@ export default function ContainersPage() {
     try {
       const response = await containerService.getAll({ page: 1, pageSize: 100 });
       setContainers(response.data?.items || []);
-    } catch (error) {
+    } catch {
       toast.error('加载货柜失败');
     } finally {
       setLoading(false);
@@ -86,7 +86,7 @@ export default function ContainersPage() {
         await containerService.delete(id);
         setContainers(containers.filter(c => c.id !== id));
         toast.success('货柜已删除');
-      } catch (error) {
+      } catch {
         toast.error('删除失败');
       }
     }
@@ -103,7 +103,7 @@ export default function ContainersPage() {
       }
       setIsDialogOpen(false);
       loadContainers();
-    } catch (error) {
+    } catch {
       toast.error(editingContainer ? '更新失败' : '创建失败');
     }
   };

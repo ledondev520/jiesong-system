@@ -1,6 +1,6 @@
 'use client';
 
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Supplier } from '@/types';
@@ -99,6 +99,10 @@ export function SupplierDialog({
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "aliases",
+  });
+  const hasQualityIssue = useWatch({
+    control: form.control,
+    name: 'hasQualityIssue',
   });
 
   const handleSubmit = async (data: SupplierFormValues) => {
@@ -332,7 +336,7 @@ export function SupplierDialog({
                 )}
               />
               
-              {form.watch('hasQualityIssue') && (
+              {hasQualityIssue && (
                 <FormField
                   control={form.control}
                   name="qualityNote"

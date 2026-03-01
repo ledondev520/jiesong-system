@@ -52,7 +52,7 @@ export default function InventoryPage() {
     try {
       const response = await inventoryService.getAll({ page: 1, pageSize: 100 });
       setInventory(response.data?.items || []);
-    } catch (error) {
+    } catch {
       toast.error('加载库存失败');
     } finally {
       setLoading(false);

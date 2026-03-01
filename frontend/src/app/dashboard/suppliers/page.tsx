@@ -41,7 +41,7 @@ export default function SuppliersPage() {
     try {
       const response = await supplierService.getAll({ page: 1, pageSize: 100 });
       setSuppliers(response.data?.items || []);
-    } catch (error) {
+    } catch {
       toast.error('加载供应商失败');
     } finally {
       setLoading(false);
@@ -64,7 +64,7 @@ export default function SuppliersPage() {
         await supplierService.delete(id);
         setSuppliers(suppliers.filter(s => s.id !== id));
         toast.success('供应商已删除');
-      } catch (error) {
+      } catch {
         toast.error('删除失败');
       }
     }
@@ -81,7 +81,7 @@ export default function SuppliersPage() {
       }
       setIsDialogOpen(false);
       loadSuppliers();
-    } catch (error) {
+    } catch {
       toast.error(editingSupplier ? '更新失败' : '创建失败');
     }
   };

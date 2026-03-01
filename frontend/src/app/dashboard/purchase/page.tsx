@@ -43,7 +43,7 @@ export default function PurchasePage() {
     try {
       const response = await purchaseService.getAll({ page: 1, pageSize: 100 });
       setContracts(response.data?.items || []);
-    } catch (error) {
+    } catch {
       toast.error('加载采购合同失败');
     } finally {
       setLoading(false);

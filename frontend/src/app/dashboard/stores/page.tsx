@@ -42,7 +42,7 @@ export default function StoresPage() {
     try {
       const response = await storeService.getAll({ page: 1, pageSize: 100 });
       setStores(response.data?.items || []);
-    } catch (error) {
+    } catch {
       toast.error('加载门店失败');
     } finally {
       setLoading(false);
@@ -70,7 +70,7 @@ export default function StoresPage() {
         await storeService.delete(id);
         setStores(stores.filter(s => s.id !== id));
         toast.success('门店已删除');
-      } catch (error) {
+      } catch {
         toast.error('删除失败');
       }
     }
@@ -87,7 +87,7 @@ export default function StoresPage() {
       }
       setIsDialogOpen(false);
       loadStores();
-    } catch (error) {
+    } catch {
       toast.error(editingStore ? '更新失败' : '创建失败');
     }
   };

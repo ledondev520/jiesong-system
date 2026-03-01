@@ -42,7 +42,7 @@ export default function UsersPage() {
     try {
       const response = await userService.getAll({ page: 1, pageSize: 100 });
       setUsers(response.data?.items || []);
-    } catch (error) {
+    } catch {
       toast.error('加载用户失败');
     } finally {
       setLoading(false);
@@ -74,7 +74,7 @@ export default function UsersPage() {
         await userService.delete(id);
         setUsers(users.filter(u => u.id !== id));
         toast.success('用户已删除');
-      } catch (error) {
+      } catch {
         toast.error('删除失败');
       }
     }
@@ -91,7 +91,7 @@ export default function UsersPage() {
       }
       setIsDialogOpen(false);
       loadUsers();
-    } catch (error) {
+    } catch {
       toast.error(editingUser ? '更新失败' : '创建失败');
     }
   };

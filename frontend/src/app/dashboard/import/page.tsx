@@ -37,7 +37,6 @@ import {
   ImportResult,
   ImportHistory,
   DatabaseStats,
-  NewRecord,
 } from '@/services/dataImportService';
 
 type ImportStep = 'upload' | 'preview' | 'importing' | 'result';
@@ -47,7 +46,6 @@ export default function DataImportPage() {
   
   // 0. 状态管理
   const [step, setStep] = useState<ImportStep>('upload');
-  const [file, setFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<PreviewResult | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [history, setHistory] = useState<ImportHistory[]>([]);
@@ -82,7 +80,6 @@ export default function DataImportPage() {
       return;
     }
     
-    setFile(selectedFile);
     setError(null);
     setLoading(true);
     
@@ -154,7 +151,6 @@ export default function DataImportPage() {
   // 5. 重置
   const handleReset = () => {
     setStep('upload');
-    setFile(null);
     setPreviewData(null);
     setImportResult(null);
     setError(null);

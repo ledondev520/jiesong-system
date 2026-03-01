@@ -98,7 +98,7 @@ export default function InventoryPage() {
         const availableIds = new Set(nextInventory.map((item) => item.id));
         return prevSelectedIds.filter((id) => availableIds.has(id));
       });
-    } catch (error) {
+    } catch {
       toast.error('加载库存失败');
     } finally {
       setLoading(false);

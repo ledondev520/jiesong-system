@@ -70,7 +70,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     try {
       const response = await purchaseService.getById(id);
       setContract(response.data || null);
-    } catch (error) {
+    } catch {
       toast.error('加载合同详情失败');
     } finally {
       setLoading(false);
@@ -142,7 +142,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
       } else {
         toast.info('暂无合同文档，请先生成');
       }
-    } catch (error) {
+    } catch {
       toast.info('暂无合同文档，请点击"生成购销合同"创建');
     } finally {
       setPdfLoading(false);

@@ -93,7 +93,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
       setContainer(containerRes.data);
       setProducts(productsRes.data?.items || []);
       setStores(storesRes.data?.items || []);
-    } catch (error) {
+    } catch {
       toast.error('加载数据失败');
     } finally {
       setLoading(false);
@@ -149,7 +149,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
       await containerService.removeItem(id, itemId);
       toast.success('商品已删除');
       loadData();
-    } catch (error) {
+    } catch {
       toast.error('删除失败');
     }
   };
@@ -172,7 +172,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
       }
       setIsItemDialogOpen(false);
       loadData();
-    } catch (error) {
+    } catch {
       toast.error('保存失败');
     }
   };

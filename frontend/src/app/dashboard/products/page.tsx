@@ -99,7 +99,7 @@ function ProductsPageContent() {
         keyword: searchKeyword || undefined,
       });
       setProducts(response.data?.items || []);
-    } catch (error) {
+    } catch {
       toast.error('加载商品失败');
     } finally {
       setLoading(false);
@@ -149,7 +149,7 @@ function ProductsPageContent() {
       toast.success('商品已删除');
       setDeleteDialogOpen(false);
       setProductToDelete(null);
-    } catch (error) {
+    } catch {
       toast.error('删除失败');
     } finally {
       setDeleting(false);
@@ -167,7 +167,7 @@ function ProductsPageContent() {
       }
       setIsDialogOpen(false);
       loadProducts();
-    } catch (error) {
+    } catch {
       toast.error(editingProduct ? '更新失败' : '创建失败');
     }
   };

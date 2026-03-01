@@ -51,7 +51,7 @@ describe('InventoryPage 交互逻辑', () => {
 
   it('加载后展示空态', async () => {
     mockGetAll.mockResolvedValue({ data: { items: [] } });
-    const { container } = render(<InventoryPage />);
+    render(<InventoryPage />);
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '库存状态' })).toBeInTheDocument();
@@ -177,4 +177,3 @@ describe('InventoryPage 交互逻辑', () => {
     });
   });
 });
-

@@ -113,7 +113,7 @@ function ContractsPageContent() {
   
   // 采购详情弹窗状态
   const [detailOpen, setDetailOpen] = useState(false);
-  const [detailLoading, setDetailLoading] = useState(false);
+  const detailLoading = false;
   const [purchaseDetail, setPurchaseDetail] = useState<PurchaseContractDetail | null>(null);
   
   // 生成合同文档弹窗状态
@@ -142,20 +142,6 @@ function ContractsPageContent() {
       toast.error('加载采购合同失败');
     } finally {
       setPurchaseLoading(false);
-    }
-  };
-
-  // 3. 查看采购合同详情
-  const viewPurchaseDetail = async (id: string) => {
-    setDetailLoading(true);
-    setDetailOpen(true);
-    try {
-      const response = await purchaseService.getById(id);
-      setPurchaseDetail(response.data || null);
-    } catch {
-      toast.error('加载合同详情失败');
-    } finally {
-      setDetailLoading(false);
     }
   };
 
