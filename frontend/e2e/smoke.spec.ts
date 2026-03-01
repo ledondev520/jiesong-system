@@ -30,6 +30,9 @@ async function setAuth(page: Page) {
       })
     );
   }, { user: mockUser, token: mockToken });
+  
+  // 确保认证脚本注入完成
+  await page.goto('/');
 }
 
 test.describe('系统登录与权限', () => {
@@ -38,12 +41,12 @@ test.describe('系统登录与权限', () => {
     await expect(page.getByText('系统登录')).toBeVisible();
   });
 
-  test('未登录访问dashboard会跳转到登录', async ({ page }) => {
+  test('未登录访问 dashboard 会跳转到登录', async ({ page }) => {
     await page.goto('/dashboard');
     await expect(page).toHaveURL(/\/login$/);
   });
 
-  test('登录后访问销售页可展示列表数据（接口Mock）', async ({ page }) => {
+  test('登录后访问销售页可展示列表数据（接口 Mock）', async ({ page }) => {
     await page.route('**/api/v1/**', async (route) => {
       const pathname = getPathname(route.request().url());
 
@@ -78,7 +81,7 @@ test.describe('系统登录与权限', () => {
     await expect(page.getByText('$250,000')).toBeVisible();
   });
 
-  test('登录后访问销售详情页可展示合同与明细（接口Mock）', async ({ page }) => {
+  test('登录后访问销售详情页可展示合同与明细（接口 Mock）', async ({ page }) => {
     await page.route('**/api/v1/**', async (route) => {
       const pathname = getPathname(route.request().url());
 
