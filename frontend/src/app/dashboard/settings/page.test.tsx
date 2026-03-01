@@ -128,7 +128,7 @@ describe('SettingsPage 交互逻辑', () => {
     });
 
     await user.click(screen.getByRole('tab', { name: '数据导出' }));
-    await user.click(screen.getByRole('button', { name: '导出供应商' }));
+    await user.click(screen.getByRole('button', { name: '导出数据' }));
 
     await waitFor(() => {
       expect(mockExportSystemData).toHaveBeenCalledWith('suppliers', '供应商.csv');

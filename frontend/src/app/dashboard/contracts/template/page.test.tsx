@@ -59,10 +59,11 @@ describe('ContractTemplateUploadPage', () => {
 
     render(<ContractTemplateUploadPage />);
 
-    const fileInput = await screen.findByLabelText('', { selector: 'input[type="file"]' });
+    const fileInput = document.querySelector('input[type="file"]');
+    expect(fileInput).toBeTruthy();
     const file = new File(['demo'], 'contract.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 
-    await user.upload(fileInput, file);
+    await user.upload(fileInput as HTMLInputElement, file);
     await user.click(screen.getByRole('button', { name: '上传模板' }));
 
     expect(mockUploadTemplate).toHaveBeenCalled();

@@ -53,8 +53,9 @@ app.use(errorHandler);
 
 const PORT = config.port;
 
-app.listen(PORT, () => {
-  console.log(`
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`
 ╔════════════════════════════════════════════╗
 ║     捷淞进销存系统 Backend API Server      ║
 ╠════════════════════════════════════════════╣
@@ -63,6 +64,7 @@ app.listen(PORT, () => {
 ║  URL: http://localhost:${String(PORT).padEnd(20)}║
 ╚════════════════════════════════════════════╝
   `);
-});
+  });
+}
 
 module.exports = app;

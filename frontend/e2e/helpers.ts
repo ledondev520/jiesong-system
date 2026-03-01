@@ -527,6 +527,51 @@ export const mockApiRoutes = async (page: Page) => {
       return;
     }
 
+    if (pathname === '/api/v1/ai/sessions' && method === 'GET') {
+      await fulfillJson(route, [
+        {
+          sessionId: 'session-1',
+          _max: { createdAt: now },
+          _count: { _all: 4 },
+        },
+      ]);
+      return;
+    }
+
+    if (/^\/api\/v1\/ai\/sessions\/[^/]+$/.test(pathname) && method === 'DELETE') {
+      await fulfillJson(route, null);
+      return;
+    }
+
+    if (pathname === '/api/v1/ai/token-stats' && method === 'GET') {
+      await fulfillJson(route, {
+        period: '30d',
+        totalRequests: 12,
+        totalTokens: 34567,
+        promptTokens: 21000,
+        outputTokens: 13567,
+        byModel: [
+          { model: 'gpt-4.1-mini', requests: 8, tokens: 22000 },
+          { model: 'gpt-4.1', requests: 4, tokens: 12567 },
+        ],
+      });
+      return;
+    }
+
+    if (pathname === '/api/v1/ai/models' && method === 'GET') {
+      await fulfillJson(route, {
+        models: {
+          chat: 'gpt-4.1-mini',
+          analysis: 'gpt-4.1',
+        },
+        description: {
+          chat: '日常问答与操作建议',
+          analysis: '复杂数据分析与总结',
+        },
+      });
+      return;
+    }
+
     if (pathname === '/api/v1/import/history' && method === 'GET') {
       await fulfillJson(route, state.importRecords);
       return;
@@ -761,6 +806,30 @@ export const mockApiRoutes = async (page: Page) => {
 
     if (pathname === '/api/v1/contract-doc/template/check' && method === 'GET') {
       await fulfillJson(route, { exists: true });
+      return;
+    }
+
+    if (pathname === '/api/v1/contract-doc/templates' && method === 'GET') {
+      await fulfillJson(route, {
+        items: [
+          {
+            exists: true,
+            filename: '采购合同模板.docx',
+            size: 24576,
+            updatedAt: now,
+          },
+        ],
+      });
+      return;
+    }
+
+    if (pathname === '/api/v1/contract-doc/template' && method === 'POST') {
+      await fulfillJson(route, null);
+      return;
+    }
+
+    if (pathname === '/api/v1/contract-doc/template' && method === 'DELETE') {
+      await fulfillJson(route, null);
       return;
     }
 
