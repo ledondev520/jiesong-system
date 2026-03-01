@@ -10,7 +10,7 @@ const { Router } = require('express');
 const multer = require('multer');
 const contractDocController = require('../controllers/contractDocController');
 const { authenticate, adminOnly } = require('../middleware/auth');
-const { validateId, handleValidation } = require('../utils/validators');
+const { withIdValidation } = require('../utils/validators');
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -37,16 +37,14 @@ router.delete('/template', adminOnly, contractDocController.deleteTemplate);
 // POST /api/v1/contract-doc/generate/:id - 根据采购合同生成购销合同
 router.post(
   '/generate/:id',
-  validateId,
-  handleValidation,
+  withIdValidation,
   contractDocController.generateFromPurchase
 );
 
 // GET /api/v1/contract-doc/pdf/:id - 获取采购合同PDF（用于预览）
 router.get(
   '/pdf/:id',
-  validateId,
-  handleValidation,
+  withIdValidation,
   contractDocController.getContractPdf
 );
 

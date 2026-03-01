@@ -9,17 +9,17 @@
 const { Router } = require('express');
 const productController = require('../controllers/productController');
 const { authenticate } = require('../middleware/auth');
-const { validateId, validatePagination, handleValidation, body } = require('../utils/validators');
+const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 
 const router = Router();
 
 router.use(authenticate);
 
 // GET /api/v1/products - 获取商品列表
-router.get('/', validatePagination, handleValidation, productController.list);
+router.get('/', withPaginationValidation, productController.list);
 
 // GET /api/v1/products/:id - 获取商品详情
-router.get('/:id', validateId, handleValidation, productController.getById);
+router.get('/:id', withIdValidation, productController.getById);
 
 // POST /api/v1/products - 创建商品
 router.post('/', [
@@ -27,30 +27,30 @@ router.post('/', [
 ], handleValidation, productController.create);
 
 // PUT /api/v1/products/:id - 更新商品
-router.put('/:id', validateId, handleValidation, productController.update);
+router.put('/:id', withIdValidation, productController.update);
 
 // DELETE /api/v1/products/:id - 删除商品
-router.delete('/:id', validateId, handleValidation, productController.remove);
+router.delete('/:id', withIdValidation, productController.remove);
 
 // GET /api/v1/products/:id/suppliers - 获取商品供应商列表
-router.get('/:id/suppliers', validateId, handleValidation, productController.getSuppliers);
+router.get('/:id/suppliers', withIdValidation, productController.getSuppliers);
 
 // POST /api/v1/products/:id/suppliers - 关联供应商
-router.post('/:id/suppliers', validateId, handleValidation, productController.addSupplier);
+router.post('/:id/suppliers', withIdValidation, productController.addSupplier);
 
 // GET /api/v1/products/categories - 获取商品分类
 router.get('/options/categories', productController.getCategories);
 
 // GET /api/v1/products/:id/price-history - 获取商品历史价格
-router.get('/:id/price-history', validateId, handleValidation, productController.getPriceHistory);
+router.get('/:id/price-history', withIdValidation, productController.getPriceHistory);
 
 // POST /api/v1/products/:id/price-history - 记录商品价格
 router.post('/:id/price-history', [
-  validateId,
+  withIdValidation,
   body('price').isFloat({ min: 0 }).withMessage('价格必须为正数'),
 ], handleValidation, productController.recordPrice);
 
 // GET /api/v1/products/:id/price-trend - 获取价格趋势
-router.get('/:id/price-trend', validateId, handleValidation, productController.getPriceTrend);
+router.get('/:id/price-trend', withIdValidation, productController.getPriceTrend);
 
 module.exports = router;

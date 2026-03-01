@@ -9,17 +9,17 @@
 const { Router } = require('express');
 const storeController = require('../controllers/storeController');
 const { authenticate } = require('../middleware/auth');
-const { validateId, validatePagination, handleValidation, body } = require('../utils/validators');
+const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 
 const router = Router();
 
 router.use(authenticate);
 
 // GET /api/v1/stores - 获取门店列表
-router.get('/', validatePagination, handleValidation, storeController.list);
+router.get('/', withPaginationValidation, storeController.list);
 
 // GET /api/v1/stores/:id - 获取门店详情
-router.get('/:id', validateId, handleValidation, storeController.getById);
+router.get('/:id', withIdValidation, storeController.getById);
 
 // POST /api/v1/stores - 创建门店
 router.post('/', [
@@ -28,10 +28,10 @@ router.post('/', [
 ], handleValidation, storeController.create);
 
 // PUT /api/v1/stores/:id - 更新门店
-router.put('/:id', validateId, handleValidation, storeController.update);
+router.put('/:id', withIdValidation, storeController.update);
 
 // DELETE /api/v1/stores/:id - 删除门店
-router.delete('/:id', validateId, handleValidation, storeController.remove);
+router.delete('/:id', withIdValidation, storeController.remove);
 
 // GET /api/v1/stores/ports - 获取港口列表
 router.get('/options/ports', storeController.getPorts);

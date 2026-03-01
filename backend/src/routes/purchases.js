@@ -9,7 +9,7 @@
 const { Router } = require('express');
 const purchaseController = require('../controllers/purchaseController');
 const { authenticate } = require('../middleware/auth');
-const { validateId, validatePagination, handleValidation, body } = require('../utils/validators');
+const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 const { upload } = require('../utils/upload');
 
 const router = Router();
@@ -17,13 +17,13 @@ const router = Router();
 router.use(authenticate);
 
 // GET /api/v1/purchases - 获取采购合同列表
-router.get('/', validatePagination, handleValidation, purchaseController.list);
+router.get('/', withPaginationValidation, purchaseController.list);
 
 // GET /api/v1/purchases/options/next-no - 获取下一个合同编号（必须位于 /:id 之前）
 router.get('/options/next-no', purchaseController.getNextContractNo);
 
 // GET /api/v1/purchases/:id - 获取采购合同详情
-router.get('/:id', validateId, handleValidation, purchaseController.getById);
+router.get('/:id', withIdValidation, purchaseController.getById);
 
 // POST /api/v1/purchases - 创建采购合同
 router.post('/', [
@@ -31,22 +31,22 @@ router.post('/', [
 ], handleValidation, purchaseController.create);
 
 // PUT /api/v1/purchases/:id - 更新采购合同
-router.put('/:id', validateId, handleValidation, purchaseController.update);
+router.put('/:id', withIdValidation, purchaseController.update);
 
 // DELETE /api/v1/purchases/:id - 删除采购合同
-router.delete('/:id', validateId, handleValidation, purchaseController.remove);
+router.delete('/:id', withIdValidation, purchaseController.remove);
 
 // POST /api/v1/purchases/:id/items - 添加采购明细
-router.post('/:id/items', validateId, handleValidation, purchaseController.addItem);
+router.post('/:id/items', withIdValidation, purchaseController.addItem);
 
 // PUT /api/v1/purchases/:id/status - 更新合同状态
-router.put('/:id/status', validateId, handleValidation, purchaseController.updateStatus);
+router.put('/:id/status', withIdValidation, purchaseController.updateStatus);
 
 // POST /api/v1/purchases/:id/files - 上传合同文件
-router.post('/:id/files', validateId, handleValidation, upload.single('file'), purchaseController.uploadFile);
+router.post('/:id/files', withIdValidation, upload.single('file'), purchaseController.uploadFile);
 
 // GET /api/v1/purchases/:id/files - 获取合同文件列表
-router.get('/:id/files', validateId, handleValidation, purchaseController.getFiles);
+router.get('/:id/files', withIdValidation, purchaseController.getFiles);
 
 // DELETE /api/v1/purchases/files/:fileId - 删除合同文件
 router.delete('/files/:fileId', purchaseController.deleteFile);

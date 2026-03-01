@@ -9,6 +9,7 @@
 const prisma = require('../utils/prisma');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
+const { normalizePagination } = require('../utils/pagination');
 
 /**
  * 将前端旧状态映射到 salesContract 支持的状态。
@@ -73,8 +74,8 @@ const generateNextContainerNo = async (portId) => {
  */
 const list = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20, status, portId, keyword } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+    const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
+    const { status, portId, keyword } = req.query;
 
     const where = {};
     if (status) {
@@ -91,7 +92,7 @@ const list = async (req, res, next) => {
       prisma.salesContract.findMany({
         where,
         skip,
-        take: parseInt(pageSize),
+        take: pageSize,
         include: { port: true, _count: { select: { packingItems: true } } },
         orderBy: { contractNo: 'desc' },
       }),
@@ -99,7 +100,7 @@ const list = async (req, res, next) => {
     ]);
 
     const normalized = contracts.map(toContainerPayload);
-    paginated(res, normalized, total, parseInt(page), parseInt(pageSize));
+    paginated(res, normalized, total, page, pageSize);
   } catch (error) {
     next(error);
   }

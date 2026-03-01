@@ -67,6 +67,22 @@ const validateResetPassword = [
     .isLength({ min: 6 }).withMessage('新密码至少6个字符'),
 ];
 
+/**
+ * 复用分页参数校验链。
+ */
+const withPaginationValidation = [
+  validatePagination,
+  handleValidation,
+].flat();
+
+/**
+ * 复用 ID 参数校验链。
+ */
+const withIdValidation = [
+  validateId,
+  handleValidation,
+].flat();
+
 module.exports = {
   handleValidation,
   validateId,
@@ -74,6 +90,8 @@ module.exports = {
   validateLogin,
   validateRegister,
   validateResetPassword,
+  withPaginationValidation,
+  withIdValidation,
   body,
   param,
   query,

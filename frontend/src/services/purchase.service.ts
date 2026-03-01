@@ -1,38 +1,39 @@
 import api from '@/lib/axios';
-import { PurchaseContract, ApiResponse, PaginatedResponse } from '@/types';
+import type { ApiResponse, PaginatedResponse, PurchaseContract } from '@/types';
+import { createCrudService } from './crudService';
 
 type PurchaseContractQuery = { page?: number; pageSize?: number; keyword?: string };
 
-export interface PurchaseCreateItemPayload {
+export type PurchaseCreateItemPayload = {
   productId: string;
   quantity: number;
   unitPrice: number;
   unit?: string;
   note?: string;
-}
+};
 
-export interface PurchaseCreatePayload {
+export type PurchaseCreatePayload = {
   supplierId: string;
   contractNo?: string;
   signedAt?: string;
   taxRate: number;
   note?: string;
   items: PurchaseCreateItemPayload[];
-}
+};
 
-export interface ParsedQuoteItem {
+export type ParsedQuoteItem = {
   productId?: string;
   productName?: string;
   quantity: number;
   unitPrice: number;
   unit?: string;
   note?: string;
-}
+};
 
-interface AIParseResult {
+type AIParseResult = {
   data?: unknown;
   message?: string;
-}
+};
 
 const toNumber = (value: unknown): number => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -79,57 +80,39 @@ const normalizeParsedItems = (raw: unknown): ParsedQuoteItem[] => {
       } satisfies ParsedQuoteItem;
     })
     .filter((item): item is ParsedQuoteItem => item !== null)
-    .filter(
-      (item) =>
-        item.quantity > 0 ||
-        item.unitPrice > 0 ||
-        Boolean(item.productId) ||
-        Boolean(item.productName)
-    );
+    .filter((item) => item.quantity > 0 || item.unitPrice > 0 || Boolean(item.productId) || Boolean(item.productName));
 };
 
+const crud = createCrudService<PurchaseContract, PurchaseCreatePayload, Partial<PurchaseContract>, PurchaseContractQuery>(
+  '/purchases'
+);
+
+/**
+ * 采购服务（含报价解析与供应商查询）。
+ */
 export const purchaseService = {
-  getAll: async (params?: PurchaseContractQuery) => {
-    return api.get<ApiResponse<PaginatedResponse<PurchaseContract>>, ApiResponse<PaginatedResponse<PurchaseContract>>>('/purchases', { params });
-  },
-
-  getById: async (id: string) => {
-    return api.get<ApiResponse<PurchaseContract>, ApiResponse<PurchaseContract>>(`/purchases/${id}`);
-  },
-
-  create: async (data: PurchaseCreatePayload) => {
-    return api.post<ApiResponse<PurchaseContract>, ApiResponse<PurchaseContract>, PurchaseCreatePayload>('/purchases', data);
-  },
-
-  update: async (id: string, data: Partial<PurchaseContract>) => {
-    return api.put<ApiResponse<PurchaseContract>, ApiResponse<PurchaseContract>, Partial<PurchaseContract>>(`/purchases/${id}`, data);
-  },
-
-  delete: async (id: string) => {
-    return api.delete<ApiResponse<void>, ApiResponse<void>>(`/purchases/${id}`);
-  },
+  ...crud,
 
   /**
-   * 职责：获取下一个采购合同编号
-   * @returns 格式为 CG + 年份(2位) + 序号(5位)，如 CG2500001
+   * 获取下一个采购合同编号。
    */
   getNextContractNo: async () => {
     return api.get<ApiResponse<{ contractNo: string }>, ApiResponse<{ contractNo: string }>>('/purchases/options/next-no');
   },
 
   /**
-   * 职责：根据商品ID列表获取曾供应过这些商品的供应商ID
-   * @param productIds 商品ID数组
-   * @returns 供应商ID列表
+   * 根据商品ID列表返回供应商ID数组。
    */
   getSuppliersByProducts: async (productIds: string[]) => {
-    return api.post<
-      ApiResponse<{ supplierIds: string[] }>,
-      ApiResponse<{ supplierIds: string[] }>,
-      { productIds: string[] }
-    >('/purchases/suppliers-by-products', { productIds });
+    return api.post<ApiResponse<{ supplierIds: string[] }>, ApiResponse<{ supplierIds: string[] }>, { productIds: string[] }>(
+      '/purchases/suppliers-by-products',
+      { productIds },
+    );
   },
 
+  /**
+   * 解析报价文本为标准明细结构。
+   */
   parseQuote: async (text: string): Promise<{ success: boolean; data: ParsedQuoteItem[]; message?: string }> => {
     const content = text.trim();
     if (!content) {
@@ -138,7 +121,7 @@ export const purchaseService = {
 
     const response = await api.post<ApiResponse<AIParseResult>, ApiResponse<AIParseResult>, { type: string; content: string }>(
       '/ai/parse',
-      { type: 'quote', content }
+      { type: 'quote', content },
     );
 
     const parsedItems = normalizeParsedItems(response.data?.data);

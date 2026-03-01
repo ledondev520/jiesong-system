@@ -9,14 +9,15 @@
 const prisma = require('../utils/prisma');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
+const { normalizePagination, parsePositiveInt } = require('../utils/pagination');
 
 /**
  * 职责：获取商品列表
  */
 const list = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20, keyword, categoryId } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+    const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
+    const { keyword, categoryId } = req.query;
     
     const where = {};
     if (keyword) {
@@ -33,14 +34,14 @@ const list = async (req, res, next) => {
       prisma.product.findMany({
         where,
         skip,
-        take: parseInt(pageSize),
+        take: pageSize,
         include: { category: true },
         orderBy: { createdAt: 'desc' },
       }),
       prisma.product.count({ where }),
     ]);
     
-    paginated(res, products, total, parseInt(page), parseInt(pageSize));
+    paginated(res, products, total, page, pageSize);
   } catch (error) {
     next(error);
   }
@@ -211,12 +212,12 @@ const getCategories = async (req, res, next) => {
 const getPriceHistory = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { limit = 20 } = req.query;
+    const limit = parsePositiveInt(req.query.limit, 20, 1, 500);
     
     const history = await prisma.priceHistory.findMany({
       where: { productId: id },
       orderBy: { recordedAt: 'desc' },
-      take: parseInt(limit),
+      take: limit,
     });
     
     // 获取相关供应商信息
@@ -276,10 +277,10 @@ const recordPrice = async (req, res, next) => {
 const getPriceTrend = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { days = 90 } = req.query;
+    const days = parsePositiveInt(req.query.days, 90, 1, 3650);
     
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(days));
+    startDate.setDate(startDate.getDate() - days);
     
     const history = await prisma.priceHistory.findMany({
       where: {

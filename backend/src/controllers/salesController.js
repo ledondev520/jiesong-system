@@ -11,6 +11,7 @@
 const prisma = require('../utils/prisma');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
+const { normalizePagination } = require('../utils/pagination');
 
 /**
  * 职责：获取出口合同列表
@@ -18,8 +19,8 @@ const { createError } = require('../middleware/errorHandler');
  */
 const list = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20, status, storeId, keyword } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+    const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
+    const { status, storeId, keyword } = req.query;
     
     const where = {};
     if (status) where.status = status;
@@ -34,7 +35,7 @@ const list = async (req, res, next) => {
       prisma.salesContract.findMany({
         where,
         skip,
-        take: parseInt(pageSize),
+        take: pageSize,
         include: { 
           port: true, // 包含港口信息
           _count: { select: { items: true } },
@@ -44,7 +45,7 @@ const list = async (req, res, next) => {
       prisma.salesContract.count({ where }),
     ]);
     
-    paginated(res, contracts, total, parseInt(page), parseInt(pageSize));
+    paginated(res, contracts, total, page, pageSize);
   } catch (error) {
     next(error);
   }
@@ -245,7 +246,16 @@ const getNextContractNo = async (req, res, next) => {
  */
 const calculatePrice = async (req, res, next) => {
   try {
-    const { costPrice, exchangeRate, profitRate = 1.3 } = req.body;
+    const costPrice = Number(req.body?.costPrice);
+    const exchangeRate = Number(req.body?.exchangeRate);
+    const profitRate = Number(req.body?.profitRate ?? 1.3);
+
+    if (!Number.isFinite(costPrice) || !Number.isFinite(exchangeRate) || !Number.isFinite(profitRate)) {
+      throw createError('costPrice、exchangeRate 和 profitRate 必须为数字', 400);
+    }
+    if (exchangeRate <= 0) {
+      throw createError('exchangeRate 必须大于0', 400);
+    }
     
     const sellingPrice = costPrice / exchangeRate * profitRate;
     const roundedUp = Math.ceil(sellingPrice);

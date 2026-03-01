@@ -13,7 +13,7 @@ const { Router } = require('express');
 const salesController = require('../controllers/salesController');
 const { exportSalesContractExcel } = require('../services/exportService');
 const { authenticate } = require('../middleware/auth');
-const { validateId, validatePagination, handleValidation, body } = require('../utils/validators');
+const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 
 const router = Router();
 
@@ -22,13 +22,13 @@ router.use(authenticate);
 // ==================== 出口合同 CRUD ====================
 
 // GET /api/v1/sales - 获取出口合同列表
-router.get('/', validatePagination, handleValidation, salesController.list);
+router.get('/', withPaginationValidation, salesController.list);
 
 // GET /api/v1/sales/options/next-no - 获取下一个合同编号（必须位于 /:id 之前）
 router.get('/options/next-no', salesController.getNextContractNo);
 
 // GET /api/v1/sales/:id - 获取出口合同详情（包含装箱明细）
-router.get('/:id', validateId, handleValidation, salesController.getById);
+router.get('/:id', withIdValidation, salesController.getById);
 
 // POST /api/v1/sales - 创建出口合同
 router.post('/', [
@@ -36,37 +36,37 @@ router.post('/', [
 ], handleValidation, salesController.create);
 
 // PUT /api/v1/sales/:id - 更新出口合同
-router.put('/:id', validateId, handleValidation, salesController.update);
+router.put('/:id', withIdValidation, salesController.update);
 
 // DELETE /api/v1/sales/:id - 删除出口合同
-router.delete('/:id', validateId, handleValidation, salesController.remove);
+router.delete('/:id', withIdValidation, salesController.remove);
 
 // ==================== 销售明细 ====================
 
 // POST /api/v1/sales/:id/items - 添加销售明细
-router.post('/:id/items', validateId, handleValidation, salesController.addItem);
+router.post('/:id/items', withIdValidation, salesController.addItem);
 
 // ==================== 装箱明细 ====================
 
 // POST /api/v1/sales/:id/packing-items - 添加装箱明细
-router.post('/:id/packing-items', validateId, handleValidation, salesController.addPackingItem);
+router.post('/:id/packing-items', withIdValidation, salesController.addPackingItem);
 
 // PUT /api/v1/sales/:id/packing-items/:itemId - 更新装箱明细
-router.put('/:id/packing-items/:itemId', validateId, handleValidation, salesController.updatePackingItem);
+router.put('/:id/packing-items/:itemId', withIdValidation, salesController.updatePackingItem);
 
 // DELETE /api/v1/sales/:id/packing-items/:itemId - 删除装箱明细
-router.delete('/:id/packing-items/:itemId', validateId, handleValidation, salesController.removePackingItem);
+router.delete('/:id/packing-items/:itemId', withIdValidation, salesController.removePackingItem);
 
 // ==================== 其他功能 ====================
 
 // PUT /api/v1/sales/:id/status - 更新合同状态
-router.put('/:id/status', validateId, handleValidation, salesController.updateStatus);
+router.put('/:id/status', withIdValidation, salesController.updateStatus);
 
 // POST /api/v1/sales/calculate-price - 计算销售价格
 router.post('/calculate-price', salesController.calculatePrice);
 
 // GET /api/v1/sales/:id/export-excel - 导出单份合同标准出口 Excel（三 Sheet）
-router.get('/:id/export-excel', validateId, handleValidation, async (req, res) => {
+router.get('/:id/export-excel', withIdValidation, async (req, res) => {
   try {
     const { buffer, filename } = await exportSalesContractExcel(req.params.id);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

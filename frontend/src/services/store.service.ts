@@ -1,24 +1,22 @@
-import api from '@/lib/axios';
-import { Store, ApiResponse, PaginatedResponse } from '@/types';
+import type { Store } from '@/types';
+import { createCrudService } from './crudService';
 
-export const storeService = {
-  getAll: async (params?: { page?: number; pageSize?: number; query?: string }) => {
-    return api.get<ApiResponse<PaginatedResponse<Store>>, ApiResponse<PaginatedResponse<Store>>>('/stores', { params });
-  },
-
-  getById: async (id: string) => {
-    return api.get<ApiResponse<Store>, ApiResponse<Store>>(`/stores/${id}`);
-  },
-
-  create: async (data: Partial<Store>) => {
-    return api.post<ApiResponse<Store>, ApiResponse<Store>, Partial<Store>>('/stores', data);
-  },
-
-  update: async (id: string, data: Partial<Store>) => {
-    return api.put<ApiResponse<Store>, ApiResponse<Store>, Partial<Store>>(`/stores/${id}`, data);
-  },
-
-  delete: async (id: string) => {
-    return api.delete<ApiResponse<void>, ApiResponse<void>>(`/stores/${id}`);
-  },
+export type StoreListQuery = {
+  page?: number;
+  pageSize?: number;
+  query?: string;
 };
+
+const crud = createCrudService<Store, Partial<Store>, Partial<Store>, StoreListQuery>('/stores');
+
+/**
+ * 门店服务（列表查询、详情、增删改）。
+ */
+export const storeService = {
+  ...crud,
+};
+
+/**
+ * 保留显式返回类型，供服务测试与调用方类型推断使用。
+ */
+export type StoreService = typeof storeService;

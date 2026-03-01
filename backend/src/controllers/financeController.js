@@ -8,14 +8,15 @@
 
 const prisma = require('../utils/prisma');
 const { success, created, paginated } = require('../utils/response');
+const { normalizePagination } = require('../utils/pagination');
 
 /**
  * 职责：获取付款记录列表
  */
 const listPayments = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20, type } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+    const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
+    const { type } = req.query;
     
     const where = type ? { type } : {};
     
@@ -23,7 +24,7 @@ const listPayments = async (req, res, next) => {
       prisma.payment.findMany({
         where,
         skip,
-        take: parseInt(pageSize),
+        take: pageSize,
         include: {
           purchaseContract: { include: { supplier: true } },
           salesContract: true,
@@ -33,7 +34,7 @@ const listPayments = async (req, res, next) => {
       prisma.payment.count({ where }),
     ]);
     
-    paginated(res, payments, total, parseInt(page), parseInt(pageSize));
+    paginated(res, payments, total, page, pageSize);
   } catch (error) {
     next(error);
   }
@@ -93,8 +94,7 @@ const createPayment = async (req, res, next) => {
  */
 const getPayables = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20 } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+    const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
     
     const where = {
       totalAmount: { gt: 0 },
@@ -105,7 +105,7 @@ const getPayables = async (req, res, next) => {
       prisma.purchaseContract.findMany({
         where,
         skip,
-        take: parseInt(pageSize),
+        take: pageSize,
         include: { supplier: true },
         orderBy: { createdAt: 'desc' },
       }),
@@ -118,7 +118,7 @@ const getPayables = async (req, res, next) => {
       unpaidAmount: c.totalAmount - c.paidAmount,
     }));
     
-    paginated(res, payables, total, parseInt(page), parseInt(pageSize));
+    paginated(res, payables, total, page, pageSize);
   } catch (error) {
     next(error);
   }
@@ -133,8 +133,7 @@ const getPayables = async (req, res, next) => {
  */
 const getReceivables = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20 } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+    const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
     
     const where = {
       totalAmount: { gt: 0 },
@@ -145,7 +144,7 @@ const getReceivables = async (req, res, next) => {
       prisma.salesContract.findMany({
         where,
         skip,
-        take: parseInt(pageSize),
+        take: pageSize,
         include: {
           // 包含装箱明细及门店
           packingItems: { 
@@ -186,7 +185,7 @@ const getReceivables = async (req, res, next) => {
       };
     });
     
-    paginated(res, receivables, total, parseInt(page), parseInt(pageSize));
+    paginated(res, receivables, total, page, pageSize);
   } catch (error) {
     next(error);
   }

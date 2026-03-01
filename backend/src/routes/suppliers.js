@@ -9,7 +9,7 @@
 const { Router } = require('express');
 const supplierController = require('../controllers/supplierController');
 const { authenticate } = require('../middleware/auth');
-const { validateId, validatePagination, handleValidation, body } = require('../utils/validators');
+const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 
 const router = Router();
 
@@ -17,10 +17,10 @@ const router = Router();
 router.use(authenticate);
 
 // GET /api/v1/suppliers - 获取供应商列表
-router.get('/', validatePagination, handleValidation, supplierController.list);
+router.get('/', withPaginationValidation, supplierController.list);
 
 // GET /api/v1/suppliers/:id - 获取供应商详情
-router.get('/:id', validateId, handleValidation, supplierController.getById);
+router.get('/:id', withIdValidation, supplierController.getById);
 
 // POST /api/v1/suppliers - 创建供应商
 router.post('/', [
@@ -28,15 +28,15 @@ router.post('/', [
 ], handleValidation, supplierController.create);
 
 // PUT /api/v1/suppliers/:id - 更新供应商
-router.put('/:id', validateId, handleValidation, supplierController.update);
+router.put('/:id', withIdValidation, supplierController.update);
 
 // DELETE /api/v1/suppliers/:id - 删除供应商
-router.delete('/:id', validateId, handleValidation, supplierController.remove);
+router.delete('/:id', withIdValidation, supplierController.remove);
 
 // POST /api/v1/suppliers/:id/aliases - 添加供应商昵称
-router.post('/:id/aliases', validateId, handleValidation, supplierController.addAlias);
+router.post('/:id/aliases', withIdValidation, supplierController.addAlias);
 
 // POST /api/v1/suppliers/:id/quality-issue - 标记质量问题
-router.post('/:id/quality-issue', validateId, handleValidation, supplierController.markQualityIssue);
+router.post('/:id/quality-issue', withIdValidation, supplierController.markQualityIssue);
 
 module.exports = router;

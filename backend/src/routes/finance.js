@@ -9,14 +9,14 @@
 const { Router } = require('express');
 const financeController = require('../controllers/financeController');
 const { authenticate } = require('../middleware/auth');
-const { validateId, validatePagination, handleValidation, body } = require('../utils/validators');
+const { withPaginationValidation, body, handleValidation } = require('../utils/validators');
 
 const router = Router();
 
 router.use(authenticate);
 
 // GET /api/v1/finance/payments - 获取付款记录列表
-router.get('/payments', validatePagination, handleValidation, financeController.listPayments);
+router.get('/payments', withPaginationValidation, financeController.listPayments);
 
 // POST /api/v1/finance/payments - 创建付款记录
 router.post('/payments', [
@@ -26,10 +26,10 @@ router.post('/payments', [
 ], handleValidation, financeController.createPayment);
 
 // GET /api/v1/finance/payables - 获取应付账款
-router.get('/payables', validatePagination, handleValidation, financeController.getPayables);
+router.get('/payables', withPaginationValidation, financeController.getPayables);
 
 // GET /api/v1/finance/receivables - 获取应收账款
-router.get('/receivables', validatePagination, handleValidation, financeController.getReceivables);
+router.get('/receivables', withPaginationValidation, financeController.getReceivables);
 
 // GET /api/v1/finance/stats - 获取财务统计
 router.get('/stats', financeController.getStats);

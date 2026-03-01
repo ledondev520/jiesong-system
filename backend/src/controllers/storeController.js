@@ -9,29 +9,29 @@
 const prisma = require('../utils/prisma');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
+const { normalizePagination } = require('../utils/pagination');
 
 /**
  * 职责：获取门店列表
  */
 const list = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20, portId } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(pageSize);
-    
+    const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
+    const { portId } = req.query;
     const where = portId ? { portId } : {};
-    
+ 
     const [stores, total] = await Promise.all([
       prisma.store.findMany({
         where,
         skip,
-        take: parseInt(pageSize),
+        take: pageSize,
         include: { port: true },
         orderBy: { name: 'asc' },
       }),
       prisma.store.count({ where }),
     ]);
     
-    paginated(res, stores, total, parseInt(page), parseInt(pageSize));
+    paginated(res, stores, total, page, pageSize);
   } catch (error) {
     next(error);
   }

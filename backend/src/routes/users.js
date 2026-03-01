@@ -9,8 +9,7 @@
 const { Router } = require('express');
 const userController = require('../controllers/userController');
 const { authenticate, adminOnly } = require('../middleware/auth');
-const { validateId, validatePagination, handleValidation } = require('../utils/validators');
-const { body } = require('express-validator');
+const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 
 const router = Router();
 
@@ -19,10 +18,10 @@ router.use(authenticate);
 router.use(adminOnly);
 
 // GET /api/v1/users - 获取用户列表
-router.get('/', validatePagination, handleValidation, userController.list);
+router.get('/', withPaginationValidation, userController.list);
 
 // GET /api/v1/users/:id - 获取单个用户
-router.get('/:id', validateId, handleValidation, userController.getById);
+router.get('/:id', withIdValidation, userController.getById);
 
 // POST /api/v1/users - 创建用户
 router.post('/', [
@@ -32,9 +31,9 @@ router.post('/', [
 ], handleValidation, userController.create);
 
 // PUT /api/v1/users/:id - 更新用户
-router.put('/:id', validateId, handleValidation, userController.update);
+router.put('/:id', withIdValidation, userController.update);
 
 // DELETE /api/v1/users/:id - 删除用户
-router.delete('/:id', validateId, handleValidation, userController.remove);
+router.delete('/:id', withIdValidation, userController.remove);
 
 module.exports = router;

@@ -12,6 +12,7 @@ const prisma = require('../utils/prisma');
 const { success, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const { validateInventoryTransition } = require('../utils/inventoryStateMachine');
+const { normalizePagination } = require('../utils/pagination');
 
 /**
  * 职责：获取库存列表并支持条件筛选。
@@ -26,8 +27,8 @@ const { validateInventoryTransition } = require('../utils/inventoryStateMachine'
  */
 const list = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20, status, productId, keyword } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+    const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
+    const { status, productId, keyword } = req.query;
     
     const where = {};
     if (status) where.status = status;
@@ -57,7 +58,7 @@ const list = async (req, res, next) => {
       prisma.inventory.findMany({
         where,
         skip,
-        take: parseInt(pageSize),
+        take: pageSize,
         include: {
           product: true,
           purchaseItem: { include: { purchaseContract: true } },
@@ -68,7 +69,7 @@ const list = async (req, res, next) => {
       prisma.inventory.count({ where }),
     ]);
     
-    paginated(res, inventories, total, parseInt(page), parseInt(pageSize));
+    paginated(res, inventories, total, page, pageSize);
   } catch (error) {
     next(error);
   }

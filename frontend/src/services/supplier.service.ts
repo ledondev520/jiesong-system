@@ -1,24 +1,34 @@
-import api from '@/lib/axios';
-import { Supplier, ApiResponse, PaginatedResponse } from '@/types';
+import type { Supplier } from '@/types';
+import { createCrudService } from './crudService';
+
+type SupplierListQuery = {
+  page?: number;
+  pageSize?: number;
+  keyword?: string;
+  query?: string;
+};
+
+const normalizeSupplierListParams = (params?: SupplierListQuery) => {
+  if (!params) {
+    return {};
+  }
+  const { query, ...rest } = params;
+  return {
+    ...rest,
+    ...(query !== undefined ? { keyword: query } : {}),
+  };
+};
+
+/**
+ * 供应商服务。
+ * - 外部可继续传 query
+ * - 后端实际透传 keyword 查询
+ */
+const crud = createCrudService<Supplier, Partial<Supplier>, Partial<Supplier>, Omit<SupplierListQuery, 'query'>>('/suppliers');
 
 export const supplierService = {
-  getAll: async (params?: { page?: number; pageSize?: number; query?: string }) => {
-    return api.get<ApiResponse<PaginatedResponse<Supplier>>, ApiResponse<PaginatedResponse<Supplier>>>('/suppliers', { params });
-  },
-
-  getById: async (id: string) => {
-    return api.get<ApiResponse<Supplier>, ApiResponse<Supplier>>(`/suppliers/${id}`);
-  },
-
-  create: async (data: Partial<Supplier>) => {
-    return api.post<ApiResponse<Supplier>, ApiResponse<Supplier>, Partial<Supplier>>('/suppliers', data);
-  },
-
-  update: async (id: string, data: Partial<Supplier>) => {
-    return api.put<ApiResponse<Supplier>, ApiResponse<Supplier>, Partial<Supplier>>(`/suppliers/${id}`, data);
-  },
-
-  delete: async (id: string) => {
-    return api.delete<ApiResponse<void>, ApiResponse<void>>(`/suppliers/${id}`);
+  ...crud,
+  getAll: async (params?: SupplierListQuery) => {
+    return crud.getAll?.(normalizeSupplierListParams(params) as Omit<SupplierListQuery, 'query'>);
   },
 };

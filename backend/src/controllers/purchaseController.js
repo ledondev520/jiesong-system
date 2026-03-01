@@ -9,6 +9,7 @@
 const prisma = require('../utils/prisma');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
+const { normalizePagination } = require('../utils/pagination');
 
 /**
  * 职责：获取采购合同列表
@@ -16,8 +17,8 @@ const { createError } = require('../middleware/errorHandler');
  */
 const list = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20, status, supplierId, keyword } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+    const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
+    const { status, supplierId, keyword } = req.query;
     
     const where = {};
     if (status) where.status = status;
@@ -33,7 +34,7 @@ const list = async (req, res, next) => {
       prisma.purchaseContract.findMany({
         where,
         skip,
-        take: parseInt(pageSize),
+        take: pageSize,
         include: { 
           supplier: true, 
           items: {
@@ -47,7 +48,7 @@ const list = async (req, res, next) => {
       prisma.purchaseContract.count({ where }),
     ]);
     
-    paginated(res, contracts, total, parseInt(page), parseInt(pageSize));
+    paginated(res, contracts, total, page, pageSize);
   } catch (error) {
     next(error);
   }

@@ -9,6 +9,25 @@
 const prisma = require('../utils/prisma');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
+const { normalizePagination, buildPaginationMeta } = require('../utils/pagination');
+
+const parseOptionalText = (value) => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const buildPaginatedPayload = (items, total, page, pageSize, extras = {}) => ({
+  code: 200,
+  message: '获取成功',
+  data: {
+    items,
+    pagination: buildPaginationMeta(total, page, pageSize),
+    ...extras,
+  },
+});
 
 /**
  * 职责：获取系统配置
@@ -58,8 +77,8 @@ const updateConfig = async (req, res, next) => {
  */
 const getLogs = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 50, userId, entity, action } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+    const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 50, maxPageSize: 200 });
+    const { userId, entity, action } = req.query;
     
     const where = {};
     if (userId) where.userId = userId;
@@ -70,14 +89,14 @@ const getLogs = async (req, res, next) => {
       prisma.operationLog.findMany({
         where,
         skip,
-        take: parseInt(pageSize),
+        take: pageSize,
         include: { user: { select: { id: true, name: true, username: true } } },
         orderBy: { createdAt: 'desc' },
       }),
       prisma.operationLog.count({ where }),
     ]);
     
-    paginated(res, logs, total, parseInt(page), parseInt(pageSize));
+    paginated(res, logs, total, page, pageSize);
   } catch (error) {
     next(error);
   }
@@ -88,8 +107,8 @@ const getLogs = async (req, res, next) => {
  */
 const getNotifications = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20, unreadOnly } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+    const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
+    const { unreadOnly } = req.query;
     
     const where = { userId: req.user.id };
     if (unreadOnly === 'true') {
@@ -100,7 +119,7 @@ const getNotifications = async (req, res, next) => {
       prisma.notification.findMany({
         where,
         skip,
-        take: parseInt(pageSize),
+        take: pageSize,
         orderBy: { createdAt: 'desc' },
       }),
       prisma.notification.count({ where }),
@@ -110,21 +129,8 @@ const getNotifications = async (req, res, next) => {
     const unreadCount = await prisma.notification.count({
       where: { userId: req.user.id, isRead: false },
     });
-    
-    res.json({
-      code: 200,
-      message: '获取成功',
-      data: {
-        items: notifications,
-        pagination: {
-          total,
-          page: parseInt(page),
-          pageSize: parseInt(pageSize),
-          totalPages: Math.ceil(total / parseInt(pageSize)),
-        },
-        unreadCount,
-      },
-    });
+
+    res.json(buildPaginatedPayload(notifications, total, page, pageSize, { unreadCount }));
   } catch (error) {
     next(error);
   }
@@ -182,17 +188,18 @@ const getExchangeRate = async (req, res, next) => {
  */
 const getPorts = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 100, keyword, includeInactive = 'false' } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+    const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 100, maxPageSize: 200 });
+    const keyword = parseOptionalText(req.query.keyword);
+    const includeInactive = req.query.includeInactive === 'true';
 
     const where = {};
     if (includeInactive !== 'true') {
       where.isActive = true;
     }
-    if (typeof keyword === 'string' && keyword.trim()) {
+    if (keyword) {
       where.OR = [
-        { name: { contains: keyword.trim(), mode: 'insensitive' } },
-        { code: { contains: keyword.trim(), mode: 'insensitive' } },
+        { name: { contains: keyword, mode: 'insensitive' } },
+        { code: { contains: keyword, mode: 'insensitive' } },
       ];
     }
 
@@ -200,13 +207,13 @@ const getPorts = async (req, res, next) => {
       prisma.port.findMany({
         where,
         skip,
-        take: parseInt(pageSize),
+        take: pageSize,
         orderBy: { name: 'asc' },
       }),
       prisma.port.count({ where }),
     ]);
 
-    paginated(res, ports, total, parseInt(page), parseInt(pageSize));
+    paginated(res, ports, total, page, pageSize);
   } catch (error) {
     next(error);
   }
@@ -321,19 +328,19 @@ const removePort = async (req, res, next) => {
  */
 const getCategories = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 100, keyword } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+    const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 100, maxPageSize: 200 });
+    const keyword = parseOptionalText(req.query.keyword);
 
     const where = {};
-    if (typeof keyword === 'string' && keyword.trim()) {
-      where.name = { contains: keyword.trim(), mode: 'insensitive' };
+    if (keyword) {
+      where.name = { contains: keyword, mode: 'insensitive' };
     }
 
     const [categories, total] = await Promise.all([
       prisma.productCategory.findMany({
         where,
         skip,
-        take: parseInt(pageSize),
+        take: pageSize,
         include: {
           parent: { select: { id: true, name: true } },
           _count: {
@@ -348,7 +355,7 @@ const getCategories = async (req, res, next) => {
       prisma.productCategory.count({ where }),
     ]);
 
-    paginated(res, categories, total, parseInt(page), parseInt(pageSize));
+    paginated(res, categories, total, page, pageSize);
   } catch (error) {
     next(error);
   }
@@ -493,26 +500,16 @@ const importData = async (req, res, next) => {
 const getImportRecords = async (req, res, next) => {
   try {
     const importService = require('../services/importService');
-    const { page = 1, pageSize = 20, status, keyword } = req.query;
+    const { page, pageSize } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
+    const status = parseOptionalText(req.query.status);
+    const keyword = parseOptionalText(req.query.keyword);
     
-    const result = await importService.getImportRecords(parseInt(page), parseInt(pageSize), {
-      status: typeof status === 'string' && status.trim() ? status.trim() : undefined,
-      keyword: typeof keyword === 'string' && keyword.trim() ? keyword.trim() : undefined,
+    const result = await importService.getImportRecords(page, pageSize, {
+      status,
+      keyword,
     });
-    
-    res.json({
-      code: 200,
-      message: '获取成功',
-      data: {
-        items: result.records,
-        pagination: {
-          total: result.total,
-          page: parseInt(page),
-          pageSize: parseInt(pageSize),
-          totalPages: Math.ceil(result.total / parseInt(pageSize)),
-        },
-      },
-    });
+
+    res.json(buildPaginatedPayload(result.records, result.total, page, pageSize));
   } catch (error) {
     next(error);
   }
