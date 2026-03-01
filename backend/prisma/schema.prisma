@@ -11,9 +11,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")   // Supabase 连接池 URL（Transaction Mode, 端口 6543）
-  directUrl = env("DIRECT_URL")     // Supabase 直连 URL（端口 5432，供 prisma migrate 使用）
+  provider  = "sqlite"
+  url       = env("DATABASE_URL")   // 本地开发默认使用 SQLite（file:./dev.db）
 }
 
 // ==================== 用户与权限 ====================

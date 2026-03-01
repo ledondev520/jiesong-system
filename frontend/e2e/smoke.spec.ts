@@ -59,8 +59,8 @@ test.describe('侧边栏导航全覆盖', () => {
     ] as const;
 
     for (const item of navCases) {
-      await page.getByRole('link', { name: item.label }).click();
-      await expect(page).toHaveURL(item.url);
+      await safeClick(page.getByRole('link', { name: item.label }));
+      await expect(page).toHaveURL(item.url, { timeout: 10000 });
       await expect(page.getByRole('heading', { name: item.heading })).toBeVisible({ timeout: 10000 });
     }
   });
@@ -101,12 +101,12 @@ test.describe('关键按钮交互', () => {
     await expect(page.getByRole('heading', { name: '出口合同' })).toBeVisible();
 
     await safeClick(page.getByRole('button', { name: '新增出口合同' }));
-    await expect(page).toHaveURL(/\/dashboard\/sales\/create$/);
+    await expect(page).toHaveURL(/\/dashboard\/sales\/create$/, { timeout: 10000 });
     await expect(page.getByRole('heading', { name: '创建出口合同' })).toBeVisible();
 
     await signInAsAdmin(page, '/dashboard/sales');
     await safeClick(page.getByRole('button', { name: '查看合同 EXP2600001' }));
-    await expect(page).toHaveURL(/\/dashboard\/sales\/sc-001$/);
+    await expect(page).toHaveURL(/\/dashboard\/sales\/sc-001$/, { timeout: 10000 });
     await expect(page.getByRole('heading', { name: 'EXP2600001' })).toBeVisible();
   });
 

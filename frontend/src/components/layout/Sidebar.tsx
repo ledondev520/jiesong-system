@@ -5,18 +5,12 @@
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  * 
- * 导航结构：
- * - 工作台：系统首页
- * - 采购合同：采购合同管理
- * - 出口合同：销售合同管理
- * - 库存状态：商品库存跟踪
- * - 收付款：应付 + 应收（Tab 切换）
- * - 采购建议：AI 智能推荐
- * - AI 管理：AI 会话/用量/模型（阶段 3）
- * - 合同模板：模板上传/管理（阶段 4）
- * - 系统运维：通知/日志/导入记录
- * - 数据配置：港口/商品分类（阶段 5）
- * - 设置：基础档案 + 用户 + 系统配置
+ * 导航结构（优化后）：
+ * - 核心业务（6 个）：工作台、采购合同、出口合同、库存状态、收付款、采购建议
+ * - AI 功能（1 个）：AI 管理
+ * - 合同管理（1 个）：合同模板
+ * - 系统管理（1 个）：系统设置（通知/日志/导入/数据配置）
+ * - 基础设置（1 个）：设置（基础档案 + 用户）
  */
 
 'use client';
@@ -33,17 +27,19 @@ import {
   Store,
   Bot,
   FileBox,
+  Settings,
+  LogOut,
   Bell,
   History,
   Database,
-  Settings,
-  LogOut,
   Globe,
+  HardDrive,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/button';
 
 const navItems = [
+  // 核心业务模块
   { href: '/dashboard', label: '工作台', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/contracts', label: '采购合同', icon: FileText, exact: true },
   { href: '/dashboard/sales', label: '出口合同', icon: Ship },
@@ -51,22 +47,29 @@ const navItems = [
   { href: '/dashboard/payments', label: '收付款', icon: DollarSign },
   { href: '/dashboard/store-recommend', label: '采购建议', icon: Store },
   
-  // 阶段 3 - AI 管理
+  // AI 功能模块
   { href: '/dashboard/ai/sessions', label: 'AI 管理', icon: Bot },
   
-  // 阶段 4 - 合同模板
+  // 合同管理模块
   { href: '/dashboard/contracts/templates', label: '合同模板', icon: FileBox },
   
-  // 阶段 2 - 系统运维
-  { href: '/dashboard/system/notifications', label: '通知中心', icon: Bell },
-  { href: '/dashboard/system/logs', label: '系统日志', icon: History, adminOnly: true },
-  { href: '/dashboard/system/import-records', label: '导入记录', icon: Database, adminOnly: true },
+  // 系统管理模块（整合系统运维 + 数据配置）
+  { 
+    href: '/dashboard/system', 
+    label: '系统管理', 
+    icon: HardDrive,
+    adminOnly: true,
+    children: [
+      { href: '/dashboard/system/notifications', label: '通知中心', icon: Bell },
+      { href: '/dashboard/system/logs', label: '系统日志', icon: History },
+      { href: '/dashboard/system/import-records', label: '导入记录', icon: Database },
+      { href: '/dashboard/settings/ports', label: '港口管理', icon: Globe },
+      { href: '/dashboard/settings/categories', label: '商品分类', icon: Database },
+    ]
+  },
   
-  // 阶段 5 - 数据域配置
-  { href: '/dashboard/settings/ports', label: '港口管理', icon: Globe },
-  { href: '/dashboard/settings/categories', label: '商品分类', icon: Database },
-  
-  { href: '/dashboard/settings', label: '设置', icon: Settings },
+  // 基础设置
+  { href: '/dashboard/settings', label: '基础设置', icon: Settings },
 ];
 
 /**
@@ -103,19 +106,41 @@ export function Sidebar() {
       <div className="flex-1 overflow-auto py-4">
         <nav className="grid gap-1 px-2">
           {visibleNavItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200',
-                isActiveItem(item)
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground/72 hover:bg-sidebar-accent/75 hover:text-sidebar-accent-foreground'
+            <div key={item.href}>
+              <Link
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200',
+                  isActiveItem(item)
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                    : 'text-sidebar-foreground/72 hover:bg-sidebar-accent/75 hover:text-sidebar-accent-foreground'
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                <span>{item.label}</span>
+              </Link>
+              
+              {/* 子菜单（如果有） */}
+              {item.children && isActiveItem(item) && (
+                <div className="ml-6 mt-1 grid gap-1">
+                  {item.children.map((child) => (
+                    <Link
+                      key={child.href}
+                      href={child.href}
+                      className={cn(
+                        'flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-all duration-200',
+                        pathname === child.href
+                          ? 'bg-sidebar-accent/50 text-sidebar-accent-foreground font-medium'
+                          : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+                      )}
+                    >
+                      <child.icon className="h-3 w-3" />
+                      <span>{child.label}</span>
+                    </Link>
+                  ))}
+                </div>
               )}
-            >
-              <item.icon className="h-4 w-4" />
-              <span>{item.label}</span>
-            </Link>
+            </div>
           ))}
         </nav>
       </div>

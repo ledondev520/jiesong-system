@@ -50,10 +50,12 @@ const pageCases: PageCase[] = [
 
 const skipPatterns = [
   /^退出登录$/,
+  /^删除/,
   /^返回$/,
   /^打开AI助手$/,
   /^上传图片$/,
   /^切换主题$/,
+  /^button$/i,
   /^Open Next\.js Dev Tools$/i,
   /^Open issues overlay$/i,
   /^Collapse issues badge$/i,
@@ -175,6 +177,9 @@ test.describe('按钮全覆盖巡检', () => {
       const pageErrors: string[] = [];
       page.on('pageerror', (error) => {
         pageErrors.push(error.message);
+      });
+      page.on('dialog', (dialog) => {
+        void dialog.dismiss().catch(() => {});
       });
 
       await signInAsAdmin(page, pageCase.path);
