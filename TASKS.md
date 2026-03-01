@@ -87,3 +87,9 @@
 | S3-01 | P0 | 60m | 1 | DOING | 阶段3：AI 管理页面（`/dashboard/ai/sessions`、`/dashboard/ai/token-stats`、`/dashboard/ai/models`）+ 测试 + 侧边栏导航 |
 | S4-01 | P0 | 60m | 2 | DOING | 阶段4：合同模板管理（`/dashboard/contracts/template`、`/dashboard/contracts/templates`）并集成到合同生成流程 + 测试 |
 | S5-01 | P0 | 60m | 3 | DOING | 阶段5：数据域配置（`/dashboard/settings/ports`、`/dashboard/settings/categories` CRUD + 用户头像/最后登录展示）+ 测试 |
+| TST-01 | P0 | 30m | 1 | DONE | 清理无关仓库文件（删除 `music_name_fetch/README.md`、`music_name_fetch/fetch_music.py`） |
+| TST-02 | P0 | 40m | 1 | DONE | 补齐前端缺失页面测试 6 个并修复既有红灯（settings/template） |
+| TST-03 | P0 | 40m | 2 | DONE | 补齐前端缺失 service 测试 6 个（config/container/contractDoc/dataImport/inventory/user） |
+| TST-04 | P0 | 45m | 3 | DONE | 扩展按钮级 E2E 覆盖到缺失页面（新增 10 条页面巡检 + mock 补齐 + 稳定性增强） |
+| TST-05 | P0 | 45m | 1 | DONE | 补齐后端缺失测试 37 个并修复 app 可测性（`require.main` 启动守卫 + `/health` 测试） |
+| TST-06 | P0 | 25m | 1 | DONE | 执行回归验证（frontend 定向 Vitest + backend 全量 + frontend E2E 全量）并通过 |

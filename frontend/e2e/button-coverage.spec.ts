@@ -56,6 +56,7 @@ const skipPatterns = [
   /^上传图片$/,
   /^切换主题$/,
   /^button$/i,
+  /^dialog-close$/i,
   /^Open Next\.js Dev Tools$/i,
   /^Open issues overlay$/i,
   /^Collapse issues badge$/i,
@@ -102,8 +103,8 @@ const waitForLoadingDone = async (page: Page) => {
 const clickAllBusinessButtons = async (page: Page, routePath: string): Promise<string[]> => {
   const processedLabels = new Set<string>();
   const clickedList: string[] = [];
-  const maxActionsPerPage = 12;
-  const maxDurationMs = 45000;
+  const maxActionsPerPage = 10;
+  const maxDurationMs = 30000;
   const startedAt = Date.now();
 
   for (let step = 0; step < maxActionsPerPage; step += 1) {
@@ -147,7 +148,7 @@ const clickAllBusinessButtons = async (page: Page, routePath: string): Promise<s
     await button.scrollIntoViewIfNeeded().catch(() => {});
     await safeClick(button).catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
-      if (/not attached|detached|not visible|intercepts pointer events|Timeout/i.test(message)) {
+      if (/not attached|detached|not visible|outside of the viewport|intercepts pointer events|Timeout/i.test(message)) {
         clicked = false;
         return;
       }

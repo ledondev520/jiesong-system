@@ -8,3 +8,4 @@
 | R-003 | 深色主题下对比度不足 | 可读性下降 | 逐页检查重点文本对比度，统一前景色 token | 回退异常页面到基础 token |
 | R-004 | 鉴权 hydration 窗口与条件渲染导致 hooks 顺序/误跳登录 | E2E 随机回登录、页面运行时崩溃 | 在布局中增加持久化认证兜底；禁止在条件 return 之后新增 hook；新增对应页面定向回归 + E2E 回归 | 回滚 `dashboard/layout.tsx` 与问题页面到修复前提交点 |
 | R-005 | 按钮巡检在浏览器环境触发非业务噪声（下载场景 sessionStorage、WebGL 初始化告警） | E2E 误报失败、阻塞回归 | 将已确认的环境噪声加入白名单过滤；保留业务异常（运行时 TypeError/ReferenceError）为阻断 | 回退 `button-coverage.spec.ts` 中噪声过滤策略到上一版本 |
+| R-006 | 前端全量 Vitest 在当前仓库存在历史慢测/不稳定用例 | 影响“全量一次性绿灯”稳定性 | 本轮采用“缺口文件定向回归 + 后端全量 + 前端 E2E 全量”门禁；后续单独治理历史慢测（容器/销售/推荐/用户等） | 回滚本轮新增测试文件与 E2E 稳定化策略（`smoke.spec.ts`/`button-coverage.spec.ts`/`playwright.config.ts`） |

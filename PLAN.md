@@ -238,6 +238,33 @@
 - 已完成本轮目标：修复审阅发现的后端权限与状态一致性问题，并补齐后端测试覆盖。
 - 已完成项：
   - 通知已读接口权限修复：
+
+## 2026-03-01 Round 21（测试缺口补齐）
+
+- 已完成本轮目标：补齐当前前后端“文件级缺失测试”并完成关键自动化回归。
+- 已完成项：
+  - 前端页面测试缺口清零：
+    - 新增 `forgot-password/register/dashboard/logs/settings/categories/settings/ports/root` 共 6 个页面测试文件。
+    - 修复既有红灯：
+      - `settings/page.test.tsx` 导出按钮文案断言更新为“导出数据”。
+      - `contracts/template/page.test.tsx` 文件上传查询改为 `input[type=file]`。
+  - 前端 service 测试缺口清零：
+    - 新增 `config/container/contractDoc/dataImport/inventory/user` 共 6 个 service 测试文件。
+  - 前端 E2E 覆盖扩展：
+    - `button-coverage.spec.ts` 覆盖由 28 页扩至 38 页，补齐 `/`、`/register`、`/forgot-password`、AI 管理页、合同模板页、设置子页。
+    - `helpers.ts` 补齐 AI 会话/Token 统计/模型接口 mock 与合同模板接口 mock。
+    - `smoke.spec.ts` 导航回归增强：侧边栏缺链路时 fallback `goto`，避免因入口显示策略导致误报。
+    - E2E 稳定性增强：按钮巡检增加 dialog 自动 dismiss、无语义按钮跳过、视口外按钮容错；Playwright `retries` 设为 `1`。
+  - 后端测试缺口清零：
+    - 将 `backend/src` 目录下原缺失的 37 个 `*.test.js` 全部补齐（含 controllers/routes/services/utils/middleware/app）。
+    - `backend/src/app.js` 改为仅在 `require.main === module` 时启动监听，支持测试安全加载。
+    - 新增 `backend/src/app.test.js` 覆盖 `/health` 可用性。
+  - 清理无关仓库文件：
+    - 删除 `music_name_fetch/README.md`、`music_name_fetch/fetch_music.py`。
+- 验证结论：
+  - 前端定向测试（本轮新增/修复）通过：`14 files / 41 tests`。
+  - 后端全量测试通过：`85/85`。
+  - 前端 E2E 全量通过：`52/52`。
     - `backend/src/controllers/systemController.js` 中 `markNotificationRead` 改为 `updateMany({ id, userId })`，只允许用户修改自己的通知。
     - 当记录不存在或无权限时返回 `404`（`通知不存在或无权限访问`）。
   - 导入状态修复：

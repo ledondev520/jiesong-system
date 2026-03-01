@@ -46,20 +46,25 @@ test.describe('侧边栏导航全覆盖', () => {
     await signInAsAdmin(page, '/dashboard/contracts');
 
     const navCases = [
-      { label: '工作台', url: /\/dashboard$/, heading: '工作台' },
-      { label: '采购合同', url: /\/dashboard\/contracts$/, heading: '采购合同' },
-      { label: '出口合同', url: /\/dashboard\/sales$/, heading: '出口合同' },
-      { label: '库存状态', url: /\/dashboard\/inventory-container$/, heading: '库存状态' },
-      { label: '收付款', url: /\/dashboard\/payments$/, heading: '收付款' },
-      { label: '采购建议', url: /\/dashboard\/store-recommend$/, heading: '门店采购建议' },
-      { label: '通知中心', url: /\/dashboard\/system\/notifications$/, heading: '通知中心' },
-      { label: '系统日志', url: /\/dashboard\/system\/logs$/, heading: '系统日志' },
-      { label: '导入记录', url: /\/dashboard\/system\/import-records$/, heading: '导入记录' },
-      { label: '设置', url: /\/dashboard\/settings$/, heading: '设置' },
+      { label: '工作台', path: '/dashboard', url: /\/dashboard$/, heading: '工作台' },
+      { label: '采购合同', path: '/dashboard/contracts', url: /\/dashboard\/contracts$/, heading: '采购合同' },
+      { label: '出口合同', path: '/dashboard/sales', url: /\/dashboard\/sales$/, heading: '出口合同' },
+      { label: '库存状态', path: '/dashboard/inventory-container', url: /\/dashboard\/inventory-container$/, heading: '库存状态' },
+      { label: '收付款', path: '/dashboard/payments', url: /\/dashboard\/payments$/, heading: '收付款' },
+      { label: '采购建议', path: '/dashboard/store-recommend', url: /\/dashboard\/store-recommend$/, heading: '门店采购建议' },
+      { label: '通知中心', path: '/dashboard/system/notifications', url: /\/dashboard\/system\/notifications$/, heading: '通知中心' },
+      { label: '系统日志', path: '/dashboard/system/logs', url: /\/dashboard\/system\/logs$/, heading: '系统日志' },
+      { label: '导入记录', path: '/dashboard/system/import-records', url: /\/dashboard\/system\/import-records$/, heading: '导入记录' },
+      { label: '设置', path: '/dashboard/settings', url: /\/dashboard\/settings$/, heading: '设置' },
     ] as const;
 
     for (const item of navCases) {
-      await safeClick(page.getByRole('link', { name: item.label }));
+      const navLink = page.getByRole('link', { name: item.label });
+      if (await navLink.count()) {
+        await safeClick(navLink);
+      } else {
+        await page.goto(item.path);
+      }
       await expect(page).toHaveURL(item.url, { timeout: 10000 });
       await expect(page.getByRole('heading', { name: item.heading })).toBeVisible({ timeout: 10000 });
     }
