@@ -126,7 +126,7 @@ async function main() {
   console.log(`   总行数: ${parsed.data.length}`);
   
   // 2. 获取已导入的序号
-  const existingItems = await prisma.containerItem.findMany({
+  const existingItems = await prisma.packingItem.findMany({
     select: { note: true },
   });
   
@@ -246,13 +246,14 @@ async function main() {
         
         let container = null;
         if (containerNo && port) {
-          container = await prisma.container.findUnique({ where: { containerNo } });
+          container = await prisma.salesContract.findUnique({ where: { contractNo: containerNo } });
           if (!container) {
-            container = await prisma.container.create({
+            container = await prisma.salesContract.create({
               data: {
-                containerNo,
+                contractNo: containerNo,
                 portId: port.id,
-                status: shippedAt ? 'SHIPPED' : 'PENDING',
+                status: shippedAt ? 'SHIPPED' : 'DRAFT',
+                exchangeRate: 7.0,
                 shippedAt,
                 customsBroker: (row['报关公司'] || '').trim() || null,
                 isFumigated: row['是否熏蒸'] === '是',
@@ -307,9 +308,9 @@ async function main() {
         
         // 创建装箱明细
         if (container) {
-          await prisma.containerItem.create({
+          await prisma.packingItem.create({
             data: {
-              containerId: container.id,
+              salesContractId: container.id,
               productId: product.id,
               storeId: store?.id,
               quantity: parseQuantity(row['报关数量']) || 0,
@@ -329,7 +330,7 @@ async function main() {
           await prisma.inventory.create({
             data: {
               productId: product.id,
-              containerId: container?.id,
+              salesContractId: container?.id,
               quantity,
               unit: standardizeUnit(row['单位']),
               status: extractStatus(row['备注'], shippedAt),

@@ -43,6 +43,8 @@ type LoginResponseData = {
   token: string;
 };
 
+const REMEMBER_USERNAME_KEY = 'jiesong_saved_username';
+
 export default function LoginPage() {
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
@@ -58,18 +60,12 @@ export default function LoginPage() {
     },
   });
 
-  // Check for saved credentials on mount
+  // Check for saved username on mount
   useEffect(() => {
-    const saved = localStorage.getItem('jiesong_credentials');
+    const saved = localStorage.getItem(REMEMBER_USERNAME_KEY);
     if (saved) {
-      try {
-        const { username, password } = JSON.parse(atob(saved));
-        form.setValue('username', username);
-        form.setValue('password', password);
-        form.setValue('rememberMe', true);
-      } catch {
-        localStorage.removeItem('jiesong_credentials');
-      }
+      form.setValue('username', saved);
+      form.setValue('rememberMe', true);
     }
   }, [form]);
 
@@ -87,12 +83,11 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      // Handle Remember Me
+      // Handle Remember Username
       if (data.rememberMe) {
-        const credentials = btoa(JSON.stringify({ username: data.username, password: data.password }));
-        localStorage.setItem('jiesong_credentials', credentials);
+        localStorage.setItem(REMEMBER_USERNAME_KEY, data.username);
       } else {
-        localStorage.removeItem('jiesong_credentials');
+        localStorage.removeItem(REMEMBER_USERNAME_KEY);
       }
 
       // 调用后端登录API（使用统一axios实例）
@@ -186,7 +181,7 @@ export default function LoginPage() {
                     </FormControl>
                     <div className="space-y-1 leading-none">
                       <FormLabel>
-                        7天免登录 (记住账号密码)
+                        记住用户名
                       </FormLabel>
                     </div>
                   </FormItem>
@@ -196,11 +191,6 @@ export default function LoginPage() {
               {error && (
                 <div className="space-y-2 rounded-lg border border-destructive/35 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   <p>{error}</p>
-                  {error.includes('用户名或密码错误') && (
-                    <p className="text-xs text-muted-foreground">
-                      提示：默认管理员账号为 <span className="font-mono">admin / admin123</span>
-                    </p>
-                  )}
                 </div>
               )}
               <Button type="submit" className="h-10 w-full rounded-xl" disabled={isLoading}>
@@ -224,9 +214,7 @@ export default function LoginPage() {
               </Button>
             </Link>
           </div>
-          <p className="text-center text-sm text-muted-foreground">
-            默认管理员: admin / admin123
-          </p>
+          <p className="text-center text-sm text-muted-foreground">请使用管理员分配的账号登录。</p>
         </CardFooter>
       </Card>
     </div>

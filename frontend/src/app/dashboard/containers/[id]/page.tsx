@@ -8,8 +8,7 @@
 
 'use client';
 
-import { useState, useEffect, use } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, use, useCallback } from 'react';
 import { Container, ContainerItem, Product, Store, ContainerStatus } from '@/types';
 import { containerService } from '@/services/container.service';
 import { productService } from '@/services/product.service';
@@ -61,7 +60,6 @@ interface PageProps {
 
 export default function ContainerDetailPage({ params }: PageProps) {
   const { id } = use(params);
-  const router = useRouter();
   const [container, setContainer] = useState<Container | null>(null);
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
@@ -81,14 +79,10 @@ export default function ContainerDetailPage({ params }: PageProps) {
     note: '',
   });
 
-  useEffect(() => {
-    loadData();
-  }, [id]);
-
   /**
    * 职责：加载货柜详情和基础数据
    */
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [containerRes, productsRes, storesRes] = await Promise.all([
@@ -104,7 +98,11 @@ export default function ContainerDetailPage({ params }: PageProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   /**
    * 职责：打开添加商品对话框
@@ -359,7 +357,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
               {!containerItems.length ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
-                    暂无装箱商品，点击"添加商品"开始装柜
+                    暂无装箱商品，点击&quot;添加商品&quot;开始装柜
                   </TableCell>
                 </TableRow>
               ) : (

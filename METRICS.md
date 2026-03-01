@@ -148,3 +148,19 @@
 
 ### 结论
 - 本轮从“局部 hydration 修复”扩展到“构建门禁打通”，当前前端已恢复可构建状态。
+
+## 2026-03-01 Round 13 (E2E Sales Mock Route Fix)
+
+### 质量指标
+- 前端全量单测：48 文件、155 用例，100% 通过（`cd frontend && npm test`）
+- E2E 用例发现校验：14 条用例被正确识别（`npx playwright test e2e/smoke.spec.ts --list`）
+- E2E 执行状态：受沙箱端口监听限制，`npm run test:e2e` 阻塞于 `listen EPERM 0.0.0.0:3001`
+
+### 过程指标
+- 修复目标用例：2（销售列表/销售详情 Mock 场景）
+- Mock 路由修复点：1（`/api/v1/sales` 与 `/api/v1/sales/:id` 改为 `pathname` 精确匹配）
+- 鉴权注入修复点：1（`setAuth` 改为参数化 `addInitScript`，稳定写入 `auth-storage`）
+
+### 结论
+- 销售链路 E2E 测试桩逻辑已从模糊匹配切换为精确匹配，避免列表桩覆盖详情请求。
+- 当前环境无法完成 Playwright 真正跑测，需在可监听端口的环境执行最终 E2E 回归确认。

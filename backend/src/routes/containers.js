@@ -18,6 +18,9 @@ router.use(authenticate);
 // GET /api/v1/containers - 获取货柜列表
 router.get('/', validatePagination, handleValidation, containerController.list);
 
+// GET /api/v1/containers/next-no/:portId - 获取下一个货柜编号
+router.get('/next-no/:portId', containerController.getNextContainerNo);
+
 // GET /api/v1/containers/:id - 获取货柜详情
 router.get('/:id', validateId, handleValidation, containerController.getById);
 
@@ -43,9 +46,6 @@ router.delete('/:id/items/:itemId', validateId, handleValidation, containerContr
 
 // PUT /api/v1/containers/:id/status - 更新货柜状态
 router.put('/:id/status', validateId, handleValidation, containerController.updateStatus);
-
-// GET /api/v1/containers/next-no/:portId - 获取下一个货柜编号
-router.get('/next-no/:portId', containerController.getNextContainerNo);
 
 // GET /api/v1/containers/:id/products - 查询货柜中的商品
 router.get('/:id/products', validateId, handleValidation, containerController.getProducts);

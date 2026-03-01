@@ -23,7 +23,7 @@
 系统采用前后端分离架构：
 
 - **Frontend**: Next.js 16 (App Router) + Tailwind CSS + shadcn/ui
-- **Backend**: Express + Prisma + SQLite (详见 `backend/`)
+- **Backend**: Express + Prisma + Supabase (PostgreSQL)（详见 `backend/`）
 - **AI**: Kimi API
 
 ## 项目结构
@@ -31,6 +31,7 @@
 ```
 jiesong_system/
 ├── .cursor/agents/           # 项目级 Cursor 子代理（AI委派配置）
+├── .cursor/skills/           # 项目级 Cursor Skills（可复用工作流）
 ├── .github/workflows/       # CI工作流（单元测试+自动化验收）
 ├── docs/                    # 项目文档
 ├── PLAN.md                  # 前端美化路线图与里程碑
@@ -83,7 +84,7 @@ npm run dev
 
 ### 联调提示
 
-- 登录默认管理员账号：`admin / admin123`
+- 执行 `backend` 的 `db:seed` 前，请先在 `.env` 配置 `DEFAULT_ADMIN_PASSWORD`，管理员账号为 `admin / <DEFAULT_ADMIN_PASSWORD>`
 - 若登录接口报 `500`，先确认后端是否已启动并监听 `3000` 端口
 - 前端会通过 `/api/v1/*` 代理到 `http://localhost:3000/api/v1/*`
 
@@ -106,11 +107,13 @@ npm run dev
 - [发布结论（M5）](docs/quality/发布结论_M5_20260212.md) - 采购链路门禁执行证据与发布建议
 - [周节奏指标看板](docs/周节奏指标看板.md) - 周度质量/效率/回归风险跟踪
 - [项目子代理说明](.cursor/agents/README.md) - 项目级 Cursor 子代理与用途
+- [项目技能说明](.cursor/skills/README.md) - 项目级 Cursor Skills 索引与用途
 - [前端美化路线图](PLAN.md) - 分阶段里程碑与风险对策
 - [前端美化任务清单](TASKS.md) - 执行状态与优先级
 - [前端美化风险台账](RISKS.md) - 风险触发与回滚点
 - [前端美化指标](METRICS.md) - 每轮质量与过程指标
 - [前端文档](frontend/README.md) - 前端开发指南
+- [Supabase 迁移指南](docs/Supabase迁移指南.md) - SQLite → Supabase 迁移步骤与 MCP 配置
 
 ## License
 

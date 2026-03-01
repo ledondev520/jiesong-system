@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearAuthToken, getAuthToken } from '@/lib/auth-token';
 
 // Create Axios instance
 // 使用相对路径，通过Next.js rewrites代理到后端
@@ -15,7 +16,7 @@ api.interceptors.request.use(
   (config) => {
     // Client-side only
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token');
+      const token = getAuthToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -37,7 +38,7 @@ api.interceptors.response.use(
       // Handle 401 Unauthorized
       if (error.response.status === 401) {
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('token');
+          clearAuthToken();
           // Optional: Redirect to login or dispatch logout event
           window.location.href = '/login';
         }

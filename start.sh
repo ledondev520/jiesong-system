@@ -126,7 +126,7 @@ show_status() {
     echo ""
     echo -e "  打开浏览器访问: ${BLUE}http://localhost:$FRONTEND_PORT${NC}"
     echo ""
-    echo "  默认账号: admin / admin123"
+    echo "  管理员账号: admin / <DEFAULT_ADMIN_PASSWORD>"
     echo ""
     echo "=========================================="
     echo -e "  停止服务: ${YELLOW}./start.sh --stop${NC}"

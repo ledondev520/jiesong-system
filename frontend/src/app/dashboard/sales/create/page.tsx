@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
-import { Plus, Trash, RefreshCw } from 'lucide-react';
+import { Plus, Trash } from 'lucide-react';
 import { toast } from 'sonner';
 import { salesService } from '@/services/sales.service';
 import { productService } from '@/services/product.service';
@@ -56,11 +56,12 @@ export default function CreateSalesPage() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
+  const [contractNoLoading, setContractNoLoading] = useState(true);
 
   const form = useForm<SalesFormValues>({
     resolver: zodResolver(salesSchema),
     defaultValues: {
-      contractNo: 'EXP25' + Math.floor(Math.random() * 10000),
+      contractNo: '',
       signedAt: new Date(),
       exchangeRate: DEFAULT_EXCHANGE_RATE,
       note: '',
@@ -84,19 +85,25 @@ export default function CreateSalesPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [productsRes, storesRes] = await Promise.all([
+        const [productsRes, storesRes, contractNoRes] = await Promise.all([
           productService.getAll({ pageSize: 100 }),
           storeService.getAll({ pageSize: 100 }),
+          salesService.getNextContractNo(),
         ]);
         setProducts(productsRes.data?.items || []);
         setStores(storesRes.data?.items || []);
+        if (contractNoRes.data?.contractNo) {
+          form.setValue('contractNo', contractNoRes.data.contractNo);
+        }
       } catch (error) {
         console.error('加载数据失败:', error);
         toast.error('加载商品和门店数据失败');
+      } finally {
+        setContractNoLoading(false);
       }
     };
     loadData();
-  }, []);
+  }, [form]);
 
   // Auto-calculate selling price when cost price changes
   const handleCostChange = (index: number, cost: number) => {
@@ -108,10 +115,35 @@ export default function CreateSalesPage() {
 
   const onSubmit = async (data: SalesFormValues) => {
     try {
-      // await salesService.create(data);
+      const createResult = await salesService.create({
+        exchangeRate: data.exchangeRate,
+        signedAt: data.signedAt?.toISOString(),
+        note: data.note,
+      });
+
+      const contractId = createResult.data?.id;
+      if (!contractId) {
+        throw new Error('创建合同失败：未返回合同ID');
+      }
+
+      await Promise.all(
+        data.items.map((item) =>
+          salesService.addItem(contractId, {
+            productId: item.productId,
+            storeId: item.storeId,
+            quantity: item.quantity,
+            unit: item.unit,
+            costPrice: item.costPrice,
+            sellingPrice: item.sellingPrice,
+            note: item.note,
+          })
+        )
+      );
+
       toast.success('出口合同创建成功');
-      router.push('/dashboard/sales');
+      router.push(`/dashboard/sales/${contractId}`);
     } catch (error) {
+      console.error('创建出口合同失败:', error);
       toast.error('创建失败');
     }
   };
@@ -137,7 +169,7 @@ export default function CreateSalesPage() {
                   <FormItem>
                     <FormLabel>合同编号</FormLabel>
                     <FormControl>
-                      <Input {...field} disabled />
+                      <Input {...field} disabled={contractNoLoading} />
                     </FormControl>
                     <FormDescription>自动生成</FormDescription>
                   </FormItem>

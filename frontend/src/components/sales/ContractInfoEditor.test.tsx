@@ -10,25 +10,47 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ContractInfoEditor } from './ContractInfoEditor';
-import { SalesStatus } from '@/types';
+import { SalesStatus, type SalesContract, type Store } from '@/types';
 
-const baseContract = {
+const baseContract: SalesContract = {
   id: 's-1',
   contractNo: 'EXP260001',
   status: SalesStatus.DRAFT,
   totalAmount: 123456,
   receivedAmount: 23456,
   exchangeRate: 7.2,
+  totalBoxes: 0,
+  grossWeight: 0,
+  netWeight: 0,
+  volume: 0,
   signedAt: '2026-02-01T00:00:00.000Z',
   estimatedArrival: '2026-03-01T00:00:00.000Z',
   portId: 'port-1',
   port: { id: 'port-1', name: 'Los Angeles' },
-} as any;
+  createdAt: '2026-02-01T00:00:00.000Z',
+  updatedAt: '2026-02-01T00:00:00.000Z',
+};
 
-const stores = [
-  { id: 'store-1', name: '门店A', port: { id: 'port-1', name: 'Los Angeles' } },
-  { id: 'store-2', name: '门店B', port: { id: 'port-2', name: 'Long Beach' } },
-] as any;
+const stores: Store[] = [
+  {
+    id: 'store-1',
+    name: '门店A',
+    portId: 'port-1',
+    isActive: true,
+    createdAt: '2026-02-01T00:00:00.000Z',
+    updatedAt: '2026-02-01T00:00:00.000Z',
+    port: { id: 'port-1', name: 'Los Angeles', code: 'LAX', isActive: true, createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-02-01T00:00:00.000Z' },
+  },
+  {
+    id: 'store-2',
+    name: '门店B',
+    portId: 'port-2',
+    isActive: true,
+    createdAt: '2026-02-01T00:00:00.000Z',
+    updatedAt: '2026-02-01T00:00:00.000Z',
+    port: { id: 'port-2', name: 'Long Beach', code: 'LGB', isActive: true, createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-02-01T00:00:00.000Z' },
+  },
+];
 
 describe('ContractInfoEditor', () => {
   it('默认展示合同关键信息与编辑按钮', () => {
@@ -107,15 +129,14 @@ describe('ContractInfoEditor', () => {
       <ContractInfoEditor contract={baseContract} stores={stores} onSave={vi.fn()} />,
     );
 
-    const nextContract = {
+    const nextContract: SalesContract = {
       ...baseContract,
       exchangeRate: 8.1,
       signedAt: '2026-04-10T00:00:00.000Z',
-    } as any;
+    };
 
     rerender(<ContractInfoEditor contract={nextContract} stores={stores} onSave={vi.fn()} />);
     expect(screen.getByText('8.1')).toBeInTheDocument();
     expect(screen.getByText('2026-04-10')).toBeInTheDocument();
   });
 });
-

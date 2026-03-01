@@ -17,6 +17,7 @@ import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Search, Package, MapPin, Ship, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/axios';
+import type { ApiResponse } from '@/types';
 
 interface TrackResult {
   salesContractId: string;
@@ -54,13 +55,13 @@ export function ProductTracker() {
     setLoading(true);
     setSearched(true);
     try {
-      const response = await api.get('/dashboard/track-product', {
+      const response = await api.get<ApiResponse<TrackResult[]>, ApiResponse<TrackResult[]>>('/dashboard/track-product', {
         params: {
           product: productKeyword.trim(),
           store: storeKeyword.trim() || undefined,
         },
       });
-      setResults((response as any).data || []);
+      setResults(response.data || []);
     } catch (error) {
       console.error('查询失败:', error);
       toast.error('查询失败，请稍后重试');

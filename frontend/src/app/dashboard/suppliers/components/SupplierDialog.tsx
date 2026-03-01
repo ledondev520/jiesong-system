@@ -53,7 +53,7 @@ interface SupplierDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   supplier?: Supplier | null;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: SupplierFormValues) => Promise<void>;
 }
 
 export function SupplierDialog({

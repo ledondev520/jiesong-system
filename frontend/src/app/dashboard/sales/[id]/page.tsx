@@ -8,8 +8,7 @@
 
 'use client';
 
-import { useState, useEffect, use, lazy, Suspense, useMemo, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, use, lazy, Suspense, useMemo, useRef, useCallback } from 'react';
 import { SalesContract, PackingItem, Product, Store, SalesStatus, Inventory } from '@/types';
 import { salesService } from '@/services/sales.service';
 import { productService } from '@/services/product.service';
@@ -49,7 +48,7 @@ import {
 } from '@/components/ui/tabs';
 import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera } from 'lucide-react';
+import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { domToPng } from 'modern-screenshot';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -66,7 +65,6 @@ interface PageProps {
 
 export default function SalesDetailPage({ params }: PageProps) {
   const { id } = use(params);
-  const router = useRouter();
   const [contract, setContract] = useState<SalesContract | null>(null);
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
@@ -94,15 +92,31 @@ export default function SalesDetailPage({ params }: PageProps) {
     height: 0,
   });
 
+  // 导出 Excel 状态
+  const [exportingExcel, setExportingExcel] = useState(false);
+
   // 截图区域引用
   const headerRef = useRef<HTMLDivElement>(null);
   const statsRef = useRef<HTMLDivElement>(null);
   const packingRef = useRef<HTMLDivElement>(null);
   const view3dRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    loadData();
-  }, [id]);
+  /**
+   * 职责：导出当前合同为标准出口 Excel（三 Sheet）
+   * 思路：调用 salesService.exportExcel 触发浏览器文件下载
+   */
+  const handleExportExcel = async () => {
+    if (!contract) return;
+    setExportingExcel(true);
+    try {
+      await salesService.exportExcel(contract.id, contract.contractNo);
+      toast.success(`${contract.contractNo} Excel 已下载`);
+    } catch {
+      toast.error('导出 Excel 失败，请稍后重试');
+    } finally {
+      setExportingExcel(false);
+    }
+  };
 
   /**
    * 职责：保存页面为图片（头部+统计+装箱明细+3D可视化合并为一张长图）
@@ -204,7 +218,7 @@ export default function SalesDetailPage({ params }: PageProps) {
   /**
    * 职责：加载合同详情和基础数据（含库存）
    */
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [contractRes, productsRes, storesRes, inventoryRes] = await Promise.all([
@@ -222,7 +236,11 @@ export default function SalesDetailPage({ params }: PageProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   /**
    * 职责：打开添加商品对话框
@@ -395,7 +413,6 @@ export default function SalesDetailPage({ params }: PageProps) {
   // 计算容量利用率
   const volumeUsed = contract.volume || 0;
   const weightUsed = contract.grossWeight || 0;
-  const volumePercent = Math.min((volumeUsed / (CONTAINER_40HQ.length * CONTAINER_40HQ.width * CONTAINER_40HQ.height / 1e9)) * 100, 100);
   const weightPercent = Math.min((weightUsed / CONTAINER_40HQ.maxWeight) * 100, 100);
   
   // 计算 CBM（使用厂家建议值）
@@ -414,6 +431,18 @@ export default function SalesDetailPage({ params }: PageProps) {
           actions={
             <div className="flex items-center gap-2">
               {getStatusBadge(contract.status)}
+              <Button
+                variant="outline"
+                onClick={handleExportExcel}
+                disabled={exportingExcel}
+                aria-label="导出标准出口 Excel"
+              >
+                {exportingExcel
+                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  : <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
+                }
+                导出 Excel
+              </Button>
               <Button variant="outline" onClick={handleSaveAsImage}>
                 <Camera className="mr-2 h-4 w-4" />
                 保存为图片
@@ -513,7 +542,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                   {!contract.packingItems?.length ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
-                        暂无装箱商品，点击"添加商品"开始装柜
+                        暂无装箱商品，点击&quot;添加商品&quot;开始装柜
                       </TableCell>
                     </TableRow>
                   ) : (

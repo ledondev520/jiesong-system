@@ -14,7 +14,7 @@ function setInputValue(input, value) {
 }
 
 setInputValue(usernameInput, 'admin');
-setInputValue(passwordInput, 'admin123');
+setInputValue(passwordInput, '<YOUR_ADMIN_PASSWORD>');
 
 // 点击登录按钮
 setTimeout(() => {

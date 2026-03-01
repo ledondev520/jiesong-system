@@ -14,7 +14,7 @@ export const contractDocService = {
    * 检查模板状态
    */
   checkTemplate: async () => {
-    return api.get<any, ApiResponse<{ exists: boolean }>>('/contract-doc/template/check');
+    return api.get<ApiResponse<{ exists: boolean }>, ApiResponse<{ exists: boolean }>>('/contract-doc/template/check');
   },
 
   /**
@@ -24,7 +24,7 @@ export const contractDocService = {
   uploadTemplate: async (file: File) => {
     const formData = new FormData();
     formData.append('template', file);
-    return api.post<any, ApiResponse<void>>('/contract-doc/template', formData, {
+    return api.post<ApiResponse<void>, ApiResponse<void>, FormData>('/contract-doc/template', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },

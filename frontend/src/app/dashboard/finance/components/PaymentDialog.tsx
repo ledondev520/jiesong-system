@@ -32,6 +32,7 @@ const paymentSchema = z.object({
 });
 
 type PaymentFormValues = z.infer<typeof paymentSchema>;
+export type PaymentSubmitData = PaymentFormValues;
 
 interface PaymentDialogProps {
   open: boolean;
@@ -40,7 +41,7 @@ interface PaymentDialogProps {
   contractNo: string;
   contractId: string;
   remainingAmount: number;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: PaymentSubmitData) => Promise<void>;
 }
 
 export function PaymentDialog({

@@ -544,21 +544,23 @@ async function createContainers() {
   for (const [containerNo, container] of dataCollector.containers) {
     if (!containerNo) continue;
     
-    let record = await prisma.container.findUnique({ where: { containerNo } });
+    let record = await prisma.salesContract.findUnique({ where: { contractNo: containerNo } });
     
     if (!record) {
       const port = await prisma.port.findUnique({ where: { code: container.portCode } });
       if (port) {
-        record = await prisma.container.create({
+        record = await prisma.salesContract.create({
           data: {
-            containerNo: container.containerNo,
+            contractNo: container.containerNo,
             portId: port.id,
-            status: container.status,
+            status: container.status === 'SHIPPED' ? 'SHIPPED' : 'DRAFT',
             totalBoxes: Math.round(container.totalBoxes),
             grossWeight: container.grossWeight,
             netWeight: container.netWeight,
             volume: container.volume,
             shippedAt: container.shippedAt,
+            estimatedArrival: null,
+            exchangeRate: 7.0,
             customsBroker: container.customsBroker,
             isFumigated: container.isFumigated,
             hasTaxRefund: container.hasTaxRefund,
@@ -661,8 +663,7 @@ async function createPurchaseContracts(supplierIdMap) {
 async function createContainerItemsAndInventory(
   productIdMap,
   storeIdMap,
-  containerIdMap,
-  salesContractIdMap
+  containerIdMap
 ) {
   console.log('\n📥 创建装箱明细和库存...');
   let itemsCreated = 0;
@@ -670,17 +671,16 @@ async function createContainerItemsAndInventory(
   
   for (const item of dataCollector.containerItems) {
     const productId = productIdMap.get(item.customsName);
-    const containerId = item.containerNo ? containerIdMap.get(item.containerNo) : null;
+    const salesContractId = item.containerNo ? containerIdMap.get(item.containerNo) : null;
     const storeId = storeIdMap.get(item.storeName);
-    const salesContractId = item.salesContractNo ? salesContractIdMap.get(item.salesContractNo) : null;
     
     if (!productId) continue;
     
     // 创建装箱明细
-    if (containerId) {
-      await prisma.containerItem.create({
+    if (salesContractId) {
+      await prisma.packingItem.create({
         data: {
-          containerId,
+          salesContractId,
           productId,
           storeId: storeId || undefined,
           quantity: item.quantity || 0,
@@ -700,7 +700,7 @@ async function createContainerItemsAndInventory(
       await prisma.inventory.create({
         data: {
           productId,
-          containerId: containerId || undefined,
+          salesContractId: salesContractId || undefined,
           quantity: item.quantity,
           unit: item.unit,
           status: item.status,
@@ -799,13 +799,12 @@ async function main() {
     const productIdMap = await createProducts();
     const storeIdMap = await createStores();
     const containerIdMap = await createContainers();
-    const salesContractIdMap = await createSalesContracts();
-    const purchaseContractIdMap = await createPurchaseContracts(supplierIdMap);
+    await createSalesContracts();
+    await createPurchaseContracts(supplierIdMap);
     await createContainerItemsAndInventory(
       productIdMap,
       storeIdMap,
-      containerIdMap,
-      salesContractIdMap
+      containerIdMap
     );
     
     // 6. 记录导入日志

@@ -15,13 +15,15 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import NextImage from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calculator, Upload, Image, Loader2, DollarSign, Sparkles } from 'lucide-react';
+import { Calculator, Upload, Image as ImageIcon, Loader2, DollarSign, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/axios';
+import type { ApiResponse } from '@/types';
 
 // Claude 4.5 Opus 费率（美元/百万 token）
 const RATES = {
@@ -37,6 +39,10 @@ interface TokenUsage {
   input: number;
   output: number;
   total: number;
+}
+
+interface AIChatResponseData {
+  message?: string;
 }
 
 /**
@@ -74,7 +80,7 @@ export function ClaudeCostCalculator() {
   }, []);
 
   // 解析 AI 识别结果
-  const parseAIResponse = (text: string): Partial<TokenUsage> => {
+  const parseAIResponse = useCallback((text: string): Partial<TokenUsage> => {
     const result: Partial<TokenUsage> = {};
     
     // 尝试多种格式解析
@@ -97,14 +103,16 @@ export function ClaudeCostCalculator() {
     });
 
     return result;
-  };
+  }, []);
 
   // 调用 AI 识别图片
-  const recognizeImage = async (base64Image: string) => {
+  const recognizeImage = useCallback(async (base64Image: string) => {
     setIsProcessing(true);
     try {
       // 调用后端 AI 服务识别图片
-      const response = await api.post('/ai/chat', {
+      const response = await api.post<ApiResponse<AIChatResponseData>, ApiResponse<AIChatResponseData>, { message: string; imageUrl: string }>(
+        '/ai/chat',
+        {
         message: `请识别这张图片中的 token 使用统计数据。提取以下数值：
 1. Cache Read (缓存读取)
 2. Cache Write (缓存写入)
@@ -119,7 +127,7 @@ export function ClaudeCostCalculator() {
         imageUrl: base64Image,
       });
 
-      const data = (response as any).data;
+      const data = response.data;
       
       if (data && data.message) {
         const content = data.message;
@@ -169,17 +177,23 @@ export function ClaudeCostCalculator() {
       }
       
       toast.info('无法自动识别，请手动输入数值');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('图片识别失败:', error);
-      const errorMsg = error?.response?.data?.message || error?.message || '未知错误';
+      const errorMsg =
+        typeof error === 'object' &&
+        error !== null &&
+        'message' in error &&
+        typeof (error as { message?: unknown }).message === 'string'
+          ? (error as { message: string }).message
+          : '未知错误';
       toast.error(`图片识别失败: ${errorMsg}`);
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [parseAIResponse]);
 
   // 处理图片（上传或粘贴）
-  const handleImage = async (file: File | Blob) => {
+  const handleImage = useCallback(async (file: File | Blob) => {
     const reader = new FileReader();
     reader.onload = async (event) => {
       const base64 = event.target?.result as string;
@@ -187,7 +201,7 @@ export function ClaudeCostCalculator() {
       await recognizeImage(base64);
     };
     reader.readAsDataURL(file);
-  };
+  }, [recognizeImage]);
 
   // 处理文件上传
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -222,7 +236,7 @@ export function ClaudeCostCalculator() {
 
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
-  }, []);
+  }, [handleImage]);
 
   // 更新单个数值
   const updateValue = (field: keyof TokenUsage, value: string) => {
@@ -259,11 +273,15 @@ export function ClaudeCostCalculator() {
             </div>
           ) : imagePreview ? (
             <div className="space-y-3">
-              <img 
-                src={imagePreview} 
-                alt="Uploaded" 
-                className="max-h-48 mx-auto rounded border"
-              />
+              <div className="relative mx-auto h-48 w-full max-w-md overflow-hidden rounded border">
+                <NextImage
+                  src={imagePreview}
+                  alt="上传截图预览"
+                  fill
+                  unoptimized
+                  className="object-contain"
+                />
+              </div>
               <div className="flex justify-center gap-2">
                 <Button 
                   variant="outline" 
@@ -299,7 +317,7 @@ export function ClaudeCostCalculator() {
                   onChange={handleFileUpload}
                 />
                 <Button variant="secondary" size="sm" asChild>
-                  <span><Image className="h-4 w-4 mr-2" /> 选择图片</span>
+                  <span><ImageIcon className="h-4 w-4 mr-2" /> 选择图片</span>
                 </Button>
               </label>
             </>

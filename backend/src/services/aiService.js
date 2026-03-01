@@ -377,13 +377,13 @@ const getDbContext = async (message) => {
   
   try {
     // 1. 统计数据（总是包含）
-    const [productCount, supplierCount, purchaseCount, salesCount, containerCount] = await Promise.all([
+    const [productCount, supplierCount, purchaseCount, salesCount] = await Promise.all([
       prisma.product.count(),
       prisma.supplier.count(),
       prisma.purchaseContract.count(),
       prisma.salesContract.count(),
-      prisma.container.count(),
     ]);
+    const containerCount = salesCount;
     
     context.push(`【系统统计】商品${productCount}种, 供应商${supplierCount}家, 采购合同${purchaseCount}份, 销售合同${salesCount}份, 货柜${containerCount}个`);
     
@@ -497,11 +497,11 @@ const getDbContext = async (message) => {
     if (lowerMsg.includes('货柜') || lowerMsg.includes('集装箱') || lowerMsg.includes('柜') || lowerMsg.match(/\d{2}-\d{3}/)) {
       const containerNo = message.match(/\d{2}-\d{3}(-\w+)?/)?.[0];
       if (containerNo) {
-        const containers = await prisma.container.findMany({
-          where: { containerNo: { contains: containerNo } },
+        const containers = await prisma.salesContract.findMany({
+          where: { contractNo: { contains: containerNo } },
           include: { 
             port: true,
-            items: {
+            packingItems: {
               include: {
                 product: true
               }
@@ -511,28 +511,28 @@ const getDbContext = async (message) => {
         });
         if (containers.length > 0) {
           for (const c of containers) {
-            const itemDetails = c.items?.map(item => 
+            const itemDetails = c.packingItems?.map(item => 
               `${item.product?.customsName || '未知商品'}(${item.quantity}${item.product?.unit || ''}, ${item.boxes || 0}箱)`
             ).join(', ') || '暂无装箱记录';
             
-            context.push(`【货柜${c.containerNo}】港口:${c.port?.name || '未知'}, 状态:${c.status}, 总箱数:${c.totalBoxes}, 体积:${c.volume}CBM\n  装箱明细: ${itemDetails}\n  链接: /dashboard/inventory-container?tab=container`);
+            context.push(`【货柜${c.contractNo}】港口:${c.port?.name || '未知'}, 状态:${c.status}, 总箱数:${c.totalBoxes}, 体积:${c.volume}CBM\n  装箱明细: ${itemDetails}\n  链接: /dashboard/inventory-container?tab=container`);
           }
         }
       } else {
         // 最近货柜
-        const recentContainers = await prisma.container.findMany({
+        const recentContainers = await prisma.salesContract.findMany({
           orderBy: { createdAt: 'desc' },
           take: 5,
           include: { 
             port: true,
-            items: { include: { product: true } }
+            packingItems: { include: { product: true } }
           },
         });
         if (recentContainers.length > 0) {
           context.push(`【最近货柜】`);
           for (const c of recentContainers) {
-            const itemCount = c.items?.length || 0;
-            context.push(`  - ${c.containerNo}: ${c.port?.name || '未知'}, ${c.status}, ${itemCount}种商品, ${c.totalBoxes}箱`);
+            const itemCount = c.packingItems?.length || 0;
+            context.push(`  - ${c.contractNo}: ${c.port?.name || '未知'}, ${c.status}, ${itemCount}种商品, ${c.totalBoxes}箱`);
           }
         }
       }
@@ -544,12 +544,12 @@ const getDbContext = async (message) => {
       for (const keyword of keywords) {
         const inventories = await prisma.inventory.findMany({
           where: { product: { customsName: { contains: keyword } } },
-          include: { product: true, container: { include: { port: true } } },
+          include: { product: true, salesContract: { include: { port: true } } },
           take: 5,
         });
         if (inventories.length > 0) {
           context.push(`【库存"${keyword}"】` + inventories.map(i => 
-            `${i.product.customsName}: ${i.quantity}${i.product.unit}, 货柜${i.container?.containerNo || '未装柜'}, 状态${i.status}`
+            `${i.product.customsName}: ${i.quantity}${i.product.unit}, 货柜${i.salesContract?.contractNo || '未装柜'}, 状态${i.status}`
           ).join('; '));
         }
       }
@@ -728,10 +728,10 @@ const generateLocalResponse = async (message) => {
     if (products.length > 0) {
       const inventory = await prisma.inventory.findFirst({
         where: { productId: products[0].id },
-        include: { container: true },
+        include: { salesContract: true },
       });
-      if (inventory?.container) {
-        return `${products[0].customsName}目前在货柜${inventory.container.containerNo}中，状态为${inventory.status}。`;
+      if (inventory?.salesContract) {
+        return `${products[0].customsName}目前在货柜${inventory.salesContract.contractNo}中，状态为${inventory.status}。`;
       }
       return `${products[0].customsName}当前状态为${inventory?.status || '未知'}，暂未装柜。`;
     }

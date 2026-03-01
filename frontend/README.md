@@ -71,7 +71,7 @@ npm run test:e2e
 
 ## 登录与联调排查
 
-- 默认管理员账号：`admin / admin123`
+- 管理员账号：`admin`，密码来自 `backend/.env` 的 `DEFAULT_ADMIN_PASSWORD`
 - 前端 API 默认走 `/api/v1`，由 Next.js 代理到 `http://localhost:3000/api/v1`
 - 出现登录 `500` 时，优先确认后端 `backend` 服务是否已启动（`cd backend && npm run dev`）
 - 主题支持白天/夜间模式切换（Header 右上角主题按钮）

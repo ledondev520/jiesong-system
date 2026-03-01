@@ -12,9 +12,13 @@ import { Header } from './Header';
 
 const mockLogout = vi.fn();
 const mockPush = vi.fn();
+type AuthStoreMock = {
+  user: { name: string; username: string };
+  logout: () => void;
+};
 
 vi.mock('@/store/auth.store', () => ({
-  useAuthStore: (selector: any) => selector({
+  useAuthStore: <T,>(selector: (state: AuthStoreMock) => T): T => selector({
     user: { name: '管理员', username: 'admin' },
     logout: mockLogout,
   }),

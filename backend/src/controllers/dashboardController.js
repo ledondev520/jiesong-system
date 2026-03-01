@@ -191,8 +191,8 @@ const trackProduct = async (req, res, next) => {
           contractNo: item.salesContract.contractNo,
           portName: item.salesContract.port?.name || '未知',
           status: item.salesContract.status,
-          eta: item.salesContract.eta 
-            ? new Date(item.salesContract.eta).toLocaleDateString('zh-CN')
+          eta: item.salesContract.estimatedArrival 
+            ? new Date(item.salesContract.estimatedArrival).toLocaleDateString('zh-CN')
             : null,
           storeName: item.store?.name || '未知门店',
           productName: item.product?.customsName || '未知商品',
@@ -210,8 +210,8 @@ const trackProduct = async (req, res, next) => {
           contractNo: item.salesContract.contractNo,
           portName: item.salesContract.port?.name || '未知',
           status: item.salesContract.status,
-          eta: item.salesContract.eta 
-            ? new Date(item.salesContract.eta).toLocaleDateString('zh-CN')
+          eta: item.salesContract.estimatedArrival 
+            ? new Date(item.salesContract.estimatedArrival).toLocaleDateString('zh-CN')
             : null,
           storeName: item.store?.name || '未知门店',
           productName: item.product?.customsName || '未知商品',

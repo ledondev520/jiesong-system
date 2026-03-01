@@ -94,9 +94,9 @@
 - 最后一批页面收口：`users`、`suppliers`、`contracts` 完成筛选区、表格容器、操作按钮视觉统一，进一步消除跨页风格割裂。
 - 收口批验证：`npm run test -- "src/app/dashboard/users/page.test.tsx" "src/app/dashboard/suppliers/page.test.tsx" "src/app/dashboard/contracts/page.test.tsx"` 通过（9/9）；改动文件 `ReadLints` 无新增问题。
 - 终检完成：执行 `npm run test` 前端全量单测通过（37 文件 / 114 用例），本轮前端美化改动具备可回归验证依据。
-- 登录故障排查补充：确认 `3001 -> /api/v1/auth/login` 代理链路正常，后端默认管理员可用凭据为 `admin / admin123`（`admin / 123456` 返回401）。
+- 登录故障排查补充：确认 `3001 -> /api/v1/auth/login` 代理链路正常，后端管理员凭据为 `admin / <DEFAULT_ADMIN_PASSWORD>`（错误密码返回401）。
 - 登录体验修复：`(auth)/login` 在“用户名或密码错误”时追加明确提示（默认管理员凭据），并通过 `login/page.test.tsx` 回归（4/4）。
-- 即时恢复措施：已执行本地数据库管理员账号重置（激活并设为 `admin / admin123`），再次验证 `POST http://localhost:3001/api/v1/auth/login` 返回 `200 登录成功`。
+- 即时恢复措施：已执行本地数据库管理员账号重置（激活并设置为环境变量密码），再次验证 `POST http://localhost:3001/api/v1/auth/login` 返回 `200 登录成功`。
 - 视觉模式增强：接入 `next-themes`，移除 `layout` 强制 dark，新增 `ThemeProvider` + Header 全局主题切换按钮（白天/夜间可切换）。
 - 风格一致性修复：`store-recommend` 页面移除 emoji（标签和星标），统一替换为 Lucide 图标体系。
 - 定向验证：`npm run test -- "src/components/layout/Header.test.tsx" "src/app/dashboard/store-recommend/page.test.tsx"` 通过（4/4），改动文件 `ReadLints` 无新增问题。

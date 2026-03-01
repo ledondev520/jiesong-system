@@ -25,6 +25,15 @@ import { UserCircle, Bell, Search, Package, FileText, Container, Building2, Load
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import api from '@/lib/axios';
+import type {
+  ApiResponse,
+  Container,
+  PaginatedResponse,
+  Product,
+  PurchaseContract,
+  SalesContract,
+  Supplier,
+} from '@/types';
 
 interface SearchResult {
   type: 'product' | 'supplier' | 'container' | 'purchase' | 'sales';
@@ -60,18 +69,68 @@ export function Header() {
     try {
       // 并行搜索多个类型 - 使用正确的参数名
       const [productsRes, suppliersRes, containersRes, purchasesRes, salesRes] = await Promise.all([
-        api.get('/products', { params: { keyword: query, pageSize: 5 } }).catch(() => ({ data: { items: [] } })),
-        api.get('/suppliers', { params: { keyword: query, pageSize: 5 } }).catch(() => ({ data: { items: [] } })),
-        api.get('/containers', { params: { keyword: query, pageSize: 5 } }).catch(() => ({ data: { items: [] } })),
-        api.get('/purchases', { params: { keyword: query, pageSize: 5 } }).catch(() => ({ data: { items: [] } })),
-        api.get('/sales', { params: { keyword: query, pageSize: 5 } }).catch(() => ({ data: { items: [] } })),
+        api
+          .get<ApiResponse<PaginatedResponse<Product>>, ApiResponse<PaginatedResponse<Product>>>('/products', {
+            params: { keyword: query, pageSize: 5 },
+          })
+          .catch(
+            (): ApiResponse<PaginatedResponse<Product>> => ({
+              code: 200,
+              message: 'ok',
+              data: { items: [], pagination: { total: 0, page: 1, pageSize: 5, totalPages: 0 } },
+            })
+          ),
+        api
+          .get<ApiResponse<PaginatedResponse<Supplier>>, ApiResponse<PaginatedResponse<Supplier>>>('/suppliers', {
+            params: { keyword: query, pageSize: 5 },
+          })
+          .catch(
+            (): ApiResponse<PaginatedResponse<Supplier>> => ({
+              code: 200,
+              message: 'ok',
+              data: { items: [], pagination: { total: 0, page: 1, pageSize: 5, totalPages: 0 } },
+            })
+          ),
+        api
+          .get<ApiResponse<PaginatedResponse<Container>>, ApiResponse<PaginatedResponse<Container>>>('/containers', {
+            params: { keyword: query, pageSize: 5 },
+          })
+          .catch(
+            (): ApiResponse<PaginatedResponse<Container>> => ({
+              code: 200,
+              message: 'ok',
+              data: { items: [], pagination: { total: 0, page: 1, pageSize: 5, totalPages: 0 } },
+            })
+          ),
+        api
+          .get<ApiResponse<PaginatedResponse<PurchaseContract>>, ApiResponse<PaginatedResponse<PurchaseContract>>>('/purchases', {
+            params: { keyword: query, pageSize: 5 },
+          })
+          .catch(
+            (): ApiResponse<PaginatedResponse<PurchaseContract>> => ({
+              code: 200,
+              message: 'ok',
+              data: { items: [], pagination: { total: 0, page: 1, pageSize: 5, totalPages: 0 } },
+            })
+          ),
+        api
+          .get<ApiResponse<PaginatedResponse<SalesContract>>, ApiResponse<PaginatedResponse<SalesContract>>>('/sales', {
+            params: { keyword: query, pageSize: 5 },
+          })
+          .catch(
+            (): ApiResponse<PaginatedResponse<SalesContract>> => ({
+              code: 200,
+              message: 'ok',
+              data: { items: [], pagination: { total: 0, page: 1, pageSize: 5, totalPages: 0 } },
+            })
+          ),
       ]);
 
       const results: SearchResult[] = [];
 
       // 处理商品结果
-      const products = (productsRes as any).data?.items || [];
-      products.forEach((p: any) => {
+      const products = productsRes.data?.items || [];
+      products.forEach((p) => {
         results.push({
           type: 'product',
           id: p.id,
@@ -81,8 +140,8 @@ export function Header() {
       });
 
       // 处理供应商结果
-      const suppliers = (suppliersRes as any).data?.items || [];
-      suppliers.forEach((s: any) => {
+      const suppliers = suppliersRes.data?.items || [];
+      suppliers.forEach((s) => {
         results.push({
           type: 'supplier',
           id: s.id,
@@ -92,19 +151,19 @@ export function Header() {
       });
 
       // 处理货柜结果
-      const containers = (containersRes as any).data?.items || [];
-      containers.forEach((c: any) => {
+      const containers = containersRes.data?.items || [];
+      containers.forEach((c) => {
         results.push({
           type: 'container',
           id: c.id,
-          title: c.containerNo,
+          title: c.containerNo || c.contractNo,
           subtitle: c.status,
         });
       });
 
       // 处理采购合同结果
-      const purchases = (purchasesRes as any).data?.items || [];
-      purchases.forEach((p: any) => {
+      const purchases = purchasesRes.data?.items || [];
+      purchases.forEach((p) => {
         results.push({
           type: 'purchase',
           id: p.id,
@@ -114,8 +173,8 @@ export function Header() {
       });
 
       // 处理销售合同结果
-      const sales = (salesRes as any).data?.items || [];
-      sales.forEach((s: any) => {
+      const sales = salesRes.data?.items || [];
+      sales.forEach((s) => {
         results.push({
           type: 'sales',
           id: s.id,

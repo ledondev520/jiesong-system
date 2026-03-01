@@ -9,12 +9,14 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import NextImage from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bot, Send, X, Image, Loader2, XCircle, Brain, ChevronDown, ChevronUp } from 'lucide-react';
+import { Bot, Send, X, Image as ImageIcon, XCircle, Brain, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getAuthToken } from '@/lib/auth-token';
 
 interface Message {
   id: string;
@@ -25,16 +27,10 @@ interface Message {
   createdAt: Date;
 }
 
-interface ChatResponse {
-  sessionId: string;
-  message: string;
-  tokenUsage?: {
-    prompt: number;
-    completion: number;
-    total: number;
-  };
-  model?: string;
-}
+const resolveStreamEndpoint = (): string => {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+  return `${baseUrl.replace(/\/$/, '')}/ai/chat/stream`;
+};
 
 /**
  * 职责：渲染AI智能助手悬浮窗
@@ -220,7 +216,7 @@ export function AIAssistant() {
 
     try {
       // 获取token
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const token = getAuthToken();
       
       // 构建请求体
       const requestBody: { message: string; sessionId: string | null; imageUrl?: string } = {
@@ -234,7 +230,7 @@ export function AIAssistant() {
       }
       
       // 使用fetch调用流式接口
-      const response = await fetch('http://localhost:3000/api/v1/ai/chat/stream', {
+      const response = await fetch(resolveStreamEndpoint(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -412,11 +408,15 @@ export function AIAssistant() {
                   >
                     {/* 显示图片 */}
                     {msg.imageUrl && (
-                      <img 
-                        src={msg.imageUrl} 
-                        alt="上传的图片" 
-                        className="max-w-full rounded-md max-h-40 object-contain"
-                      />
+                      <div className="relative h-40 w-full max-w-[280px] overflow-hidden rounded-md">
+                        <NextImage
+                          src={msg.imageUrl}
+                          alt="上传的图片"
+                          fill
+                          unoptimized
+                          className="object-contain"
+                        />
+                      </div>
                     )}
                     {/* 显示思考过程（可折叠） */}
                     {msg.role === 'assistant' && msg.thinking && (
@@ -479,7 +479,7 @@ export function AIAssistant() {
               {isDragging && (
                 <div className="absolute inset-0 flex items-center justify-center bg-primary/10 pointer-events-none">
                   <div className="flex flex-col items-center gap-2 text-primary">
-                    <Image className="h-8 w-8" />
+                    <ImageIcon className="h-8 w-8" />
                     <span className="font-medium">松开以上传图片</span>
                   </div>
                 </div>
@@ -491,11 +491,15 @@ export function AIAssistant() {
             {/* 待发送图片预览 */}
             {pendingImage && (
               <div className="w-full flex items-center gap-2 p-2 bg-muted rounded-lg">
-                <img 
-                  src={pendingImage} 
-                  alt="待发送图片" 
-                  className="h-12 w-12 object-cover rounded"
-                />
+                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded">
+                  <NextImage
+                    src={pendingImage}
+                    alt="待发送图片"
+                    fill
+                    unoptimized
+                    className="object-cover"
+                  />
+                </div>
                 <span className="text-xs text-muted-foreground flex-1">图片已准备好</span>
                 <Button 
                   variant="ghost" 
@@ -533,7 +537,7 @@ export function AIAssistant() {
                 onClick={() => fileInputRef.current?.click()}
                 title="上传图片"
               >
-                <Image className="h-4 w-4" />
+                <ImageIcon className="h-4 w-4" />
               </Button>
               
               <Input

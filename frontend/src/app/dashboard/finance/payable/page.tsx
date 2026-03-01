@@ -9,7 +9,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { PaymentType } from '@/types';
+import { PaymentType, type ApiResponse, type PaginatedResponse } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { CreditCard, Loader2 } from 'lucide-react';
-import { PaymentDialog } from '../components/PaymentDialog';
+import { PaymentDialog, type PaymentSubmitData } from '../components/PaymentDialog';
 import { toast } from 'sonner';
 import api from '@/lib/axios';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -48,8 +48,11 @@ export default function PayablePage() {
   const fetchPayables = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/finance/payables', { params: { pageSize: 100 } });
-      const data = (response as any).data;
+      const response = await api.get<
+        ApiResponse<PaginatedResponse<PayableContract>>,
+        ApiResponse<PaginatedResponse<PayableContract>>
+      >('/finance/payables', { params: { pageSize: 100 } });
+      const data = response.data;
       setContracts(data?.items || []);
     } catch (error) {
       console.error('获取应付账款失败:', error);
@@ -67,7 +70,7 @@ export default function PayablePage() {
     setSelectedContract(contract);
   };
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: PaymentSubmitData) => {
     if (!selectedContract) return;
     
     try {

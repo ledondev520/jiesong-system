@@ -32,8 +32,8 @@ import { ClaudeCostCalculator } from '@/components/tools/ClaudeCostCalculator';
 import { toast } from 'sonner';
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE, UNITS as INITIAL_UNITS } from '@/lib/constants';
 import api from '@/lib/axios';
-import Link from 'next/link';
 import { PageHeader } from '@/components/layout/PageHeader';
+import type { ApiResponse } from '@/types';
 
 const configSchema = z.object({
   exchangeRate: z.number().min(0.1, '汇率必须大于0'),
@@ -48,7 +48,7 @@ interface SystemConfigMap {
   profitRate?: number;
   units?: string[];
   brokers?: string[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -84,8 +84,8 @@ function SettingsPageContent() {
   useEffect(() => {
     const fetchConfigs = async () => {
       try {
-        const response = await api.get('/system/configs');
-        const configs = (response as any).data as SystemConfigMap;
+        const response = await api.get<ApiResponse<SystemConfigMap>, ApiResponse<SystemConfigMap>>('/system/configs');
+        const configs = response.data;
         
         // 配置是对象格式，直接设置
         if (configs) {

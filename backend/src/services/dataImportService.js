@@ -212,18 +212,11 @@ const analyzeData = (rows) => {
  */
 const compareWithDatabase = async (rows) => {
   // 获取数据库中现有的装箱明细
-  const existingItems = await prisma.containerItem.findMany({
+  const existingItems = await prisma.packingItem.findMany({
     include: {
       product: true,
-      container: true,
+      salesContract: true,
     },
-  });
-  
-  // 生成现有数据的key集合
-  const existingKeys = new Set();
-  existingItems.forEach(item => {
-    const key = `${item.product?.customsName}|${item.container?.containerNo}`;
-    existingKeys.add(key);
   });
   
   // 分类记录
@@ -246,15 +239,12 @@ const compareWithDatabase = async (rows) => {
     }
     
     // 检查是否已存在
-    const key = `${customsName}|${containerNo}`;
-    const fullKey = generateRecordKey(row);
-    
     // 简单判断：如果商品名+货柜编号+数量组合已存在，认为是重复
     const isDuplicate = existingItems.some(item => {
       if (item.product?.customsName !== customsName) return false;
       if (!containerNo) return false;
       
-      const itemContainerNo = item.container?.containerNo;
+      const itemContainerNo = item.salesContract?.contractNo;
       const rowContainerNoStd = standardizeContainerNo(
         containerNo,
         row['出货日期'],
@@ -397,14 +387,15 @@ const importRecords = async (records) => {
       
       let container = null;
       if (containerNo && port) {
-        container = await prisma.container.findUnique({ where: { containerNo } });
+        container = await prisma.salesContract.findUnique({ where: { contractNo: containerNo } });
         if (!container) {
-          container = await prisma.container.create({
+          container = await prisma.salesContract.create({
             data: {
-              containerNo,
+              contractNo: containerNo,
               portId: port.id,
-              status: shippedAt ? 'SHIPPED' : 'PENDING',
+              status: shippedAt ? 'SHIPPED' : 'DRAFT',
               shippedAt,
+              exchangeRate: 7.0,
               customsBroker: (row['报关公司'] || '').trim() || null,
               isFumigated: row['是否熏蒸'] === '是',
               note: containerNoRaw !== containerNo ? `原编号: ${containerNoRaw}` : null,
@@ -503,9 +494,9 @@ const importRecords = async (records) => {
       
       // 8. 创建装箱明细
       if (container) {
-        await prisma.containerItem.create({
+        await prisma.packingItem.create({
           data: {
-            containerId: container.id,
+            salesContractId: container.id,
             productId: product.id,
             storeId: store?.id,
             quantity: parseQuantity(row['报关数量']) || 0,
@@ -526,7 +517,7 @@ const importRecords = async (records) => {
         await prisma.inventory.create({
           data: {
             productId: product.id,
-            containerId: container?.id,
+            salesContractId: container?.id,
             quantity,
             unit: standardizeUnit(row['单位']),
             status: extractStatus(row['备注'], shippedAt),
@@ -589,9 +580,8 @@ const getDatabaseStats = async () => {
     suppliers,
     products,
     stores,
-    containers,
-    containerItems,
     salesContracts,
+    packingItemsCount,
     salesItems,
     purchaseContracts,
     inventories,
@@ -599,9 +589,8 @@ const getDatabaseStats = async () => {
     prisma.supplier.count(),
     prisma.product.count(),
     prisma.store.count(),
-    prisma.container.count(),
-    prisma.containerItem.count(),
     prisma.salesContract.count(),
+    prisma.packingItem.count(),
     prisma.salesItem.count(),
     prisma.purchaseContract.count(),
     prisma.inventory.count(),
@@ -611,8 +600,8 @@ const getDatabaseStats = async () => {
     suppliers,
     products,
     stores,
-    containers,
-    containerItems,
+    containers: salesContracts,
+    containerItems: packingItemsCount,
     salesContracts,
     salesItems,
     purchaseContracts,

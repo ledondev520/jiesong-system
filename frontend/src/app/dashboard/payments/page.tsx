@@ -10,7 +10,7 @@
 
 import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { PaymentType } from '@/types';
+import { PaymentType, type ApiResponse, type PaginatedResponse } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { CreditCard, ArrowUpRight, ArrowDownLeft, RefreshCw } from 'lucide-react';
-import { PaymentDialog } from '../../dashboard/finance/components/PaymentDialog';
+import { PaymentDialog, type PaymentSubmitData } from '../../dashboard/finance/components/PaymentDialog';
 import { toast } from 'sonner';
 import api from '@/lib/axios';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -108,8 +108,11 @@ function PaymentsPageContent() {
   const fetchPayables = async () => {
     setPayableLoading(true);
     try {
-      const response = await api.get('/finance/payables', { params: { pageSize: 100 } });
-      setPayables((response as any).data?.items || []);
+      const response = await api.get<
+        ApiResponse<PaginatedResponse<PayableContract>>,
+        ApiResponse<PaginatedResponse<PayableContract>>
+      >('/finance/payables', { params: { pageSize: 100 } });
+      setPayables(response.data?.items || []);
     } catch {
       toast.error('加载应付账款失败');
     } finally {
@@ -121,8 +124,11 @@ function PaymentsPageContent() {
   const fetchReceivables = async () => {
     setReceivableLoading(true);
     try {
-      const response = await api.get('/finance/receivables', { params: { pageSize: 100 } });
-      setReceivables((response as any).data?.items || []);
+      const response = await api.get<
+        ApiResponse<PaginatedResponse<ReceivableContract>>,
+        ApiResponse<PaginatedResponse<ReceivableContract>>
+      >('/finance/receivables', { params: { pageSize: 100 } });
+      setReceivables(response.data?.items || []);
     } catch {
       toast.error('加载应收账款失败');
     } finally {
@@ -131,7 +137,7 @@ function PaymentsPageContent() {
   };
 
   // 处理付款提交
-  const handlePayableSubmit = async (data: any) => {
+  const handlePayableSubmit = async (data: PaymentSubmitData) => {
     if (!selectedPayable) return;
     try {
       await api.post('/finance/payments', {
@@ -153,7 +159,7 @@ function PaymentsPageContent() {
   };
 
   // 处理收款提交
-  const handleReceivableSubmit = async (data: any) => {
+  const handleReceivableSubmit = async (data: PaymentSubmitData) => {
     if (!selectedReceivable) return;
     try {
       await api.post('/finance/payments', {

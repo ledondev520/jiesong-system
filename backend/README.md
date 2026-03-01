@@ -173,9 +173,10 @@ Authorization: Bearer <token>
 
 ## 默认账户
 
-| 用户名 | 密码 | 角色 |
-|--------|------|------|
-| admin | admin123 | 管理员 |
+管理员用户名固定为 `admin`，密码来自环境变量 `DEFAULT_ADMIN_PASSWORD`。
+
+- 若未配置 `DEFAULT_ADMIN_PASSWORD`，`db:seed` 会生成一次性随机密码并打印在终端。
+- 生产环境请务必显式配置强密码并妥善保管。
 
 ## 技术栈
 

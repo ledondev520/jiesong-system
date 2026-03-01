@@ -219,8 +219,8 @@ const processRow = async (row, cache) => {
     container = cache.containers.get(containerNo);
     if (!container) {
       const port = cache.ports.get(portName) || cache.ports.get('洛杉矶');
-      container = await prisma.container.upsert({
-        where: { containerNo },
+      container = await prisma.salesContract.upsert({
+        where: { contractNo: containerNo },
         update: {
           shippedAt: row['出货日期'] ? new Date(row['出货日期']) : undefined,
           customsBroker: row['报关公司'] || undefined,
@@ -228,13 +228,14 @@ const processRow = async (row, cache) => {
           hasTaxRefund: row['是否报出口退税'] === '是' ? true : false,
         },
         create: {
-          containerNo,
+          contractNo: containerNo,
           portId: port?.id,
           shippedAt: row['出货日期'] ? new Date(row['出货日期']) : null,
           customsBroker: row['报关公司'] || null,
           isFumigated: row['是否熏蒸'] === '是',
           hasTaxRefund: row['是否报出口退税'] === '是',
           status: 'SHIPPED',
+          exchangeRate: 7.0,
         },
       }).catch(() => null);
       if (container) cache.containers.set(containerNo, container);
@@ -250,9 +251,9 @@ const processRow = async (row, cache) => {
     const volume = parseFloat(row['体积']) || 0;
     
     if (quantity > 0 || boxes > 0) {
-      await prisma.containerItem.create({
+      await prisma.packingItem.create({
         data: {
-          containerId: container.id,
+          salesContractId: container.id,
           productId: product.id,
           storeId: store?.id,
           quantity,

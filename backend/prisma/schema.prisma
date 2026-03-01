@@ -4,14 +4,16 @@
 // Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 // 
 // 2026-01-20 重构：合并货柜与出口合同，用 EXP 号作为货柜标识
+// 2026-02-21 迁移：SQLite → Supabase (PostgreSQL)
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")   // Supabase 连接池 URL（Transaction Mode, 端口 6543）
+  directUrl = env("DIRECT_URL")     // Supabase 直连 URL（端口 5432，供 prisma migrate 使用）
 }
 
 // ==================== 用户与权限 ====================

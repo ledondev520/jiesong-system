@@ -12,46 +12,46 @@ import { Container, ContainerItem, ApiResponse, PaginatedResponse } from '@/type
 export const containerService = {
   // 获取货柜列表
   getAll: async (params?: { page?: number; pageSize?: number; query?: string }) => {
-    return api.get<any, ApiResponse<PaginatedResponse<Container>>>('/containers', { params });
+    return api.get<ApiResponse<PaginatedResponse<Container>>, ApiResponse<PaginatedResponse<Container>>>('/containers', { params });
   },
 
   // 获取货柜详情（包含装箱明细）
   getById: async (id: string) => {
-    return api.get<any, ApiResponse<Container>>(`/containers/${id}`);
+    return api.get<ApiResponse<Container>, ApiResponse<Container>>(`/containers/${id}`);
   },
 
   // 创建货柜
   create: async (data: Partial<Container>) => {
-    return api.post<any, ApiResponse<Container>>('/containers', data);
+    return api.post<ApiResponse<Container>, ApiResponse<Container>, Partial<Container>>('/containers', data);
   },
 
   // 更新货柜
   update: async (id: string, data: Partial<Container>) => {
-    return api.put<any, ApiResponse<Container>>(`/containers/${id}`, data);
+    return api.put<ApiResponse<Container>, ApiResponse<Container>, Partial<Container>>(`/containers/${id}`, data);
   },
 
   // 删除货柜
   delete: async (id: string) => {
-    return api.delete<any, ApiResponse<void>>(`/containers/${id}`);
+    return api.delete<ApiResponse<void>, ApiResponse<void>>(`/containers/${id}`);
   },
 
   // 更新货柜状态
   updateStatus: async (id: string, status: string) => {
-    return api.put<any, ApiResponse<Container>>(`/containers/${id}/status`, { status });
+    return api.put<ApiResponse<Container>, ApiResponse<Container>, { status: string }>(`/containers/${id}/status`, { status });
   },
 
   // 添加装箱明细
   addItem: async (containerId: string, data: Partial<ContainerItem>) => {
-    return api.post<any, ApiResponse<ContainerItem>>(`/containers/${containerId}/items`, data);
+    return api.post<ApiResponse<ContainerItem>, ApiResponse<ContainerItem>, Partial<ContainerItem>>(`/containers/${containerId}/items`, data);
   },
 
   // 更新装箱明细
   updateItem: async (containerId: string, itemId: string, data: Partial<ContainerItem>) => {
-    return api.put<any, ApiResponse<ContainerItem>>(`/containers/${containerId}/items/${itemId}`, data);
+    return api.put<ApiResponse<ContainerItem>, ApiResponse<ContainerItem>, Partial<ContainerItem>>(`/containers/${containerId}/items/${itemId}`, data);
   },
 
   // 删除装箱明细
   removeItem: async (containerId: string, itemId: string) => {
-    return api.delete<any, ApiResponse<void>>(`/containers/${containerId}/items/${itemId}`);
+    return api.delete<ApiResponse<void>, ApiResponse<void>>(`/containers/${containerId}/items/${itemId}`);
   },
 };

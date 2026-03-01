@@ -135,8 +135,8 @@ export default function FinancePage() {
             <div className="text-sm text-muted-foreground space-y-2">
               <p>• <strong>应付账款</strong>：需要支付给供应商的采购金额</p>
               <p>• <strong>应收账款</strong>：待从美国门店收回的销售款项</p>
-              <p>• 采购金额来自导入的CSV数据中的"采购金额"列</p>
-              <p>• 点击"查看应付"或"查看应收"可查看详细明细</p>
+              <p>• 采购金额来自导入的CSV数据中的“采购金额”列</p>
+              <p>• 点击“查看应付”或“查看应收”可查看详细明细</p>
             </div>
           </CardContent>
         </Card>

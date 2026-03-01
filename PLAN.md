@@ -131,8 +131,71 @@
   - 修复货柜域类型兼容问题（`Container` 与 `SalesContract` 合并后的字段兼容与页面回退逻辑）。
   - 为 `payments/products/contracts/settings` 页面补齐 `useSearchParams` 的 Suspense 边界，满足 Next 16 构建约束。
 
+- 已完成 Phase I 第一交付（Excel 三 Sheet 标准出口模板）：
+  - 安装 `exceljs`，新增 `exportSalesContractExcel(contractId)` 函数，生成三 Sheet Excel（合同信息 + 商品明细 + 装箱清单）。
+  - 后端新增路由 `GET /api/v1/sales/:id/export-excel`，支持按合同 ID 导出并触发浏览器下载。
+  - 前端 `salesService.exportExcel` 封装 blob 下载；销售列表页每行新增绿色表格图标按钮，销售详情页顶部新增"导出 Excel"按钮。
+  - 后端全量测试通过：38/38。
+
 ## 风险与对策
 - 风险：仓库已有大量历史 lint 问题影响全量校验。
 - 对策：采用“改动文件零新增问题 + 定向测试 + 阶段回归”的方式推进。
 - 风险：子代理角色增多后，存在职责重叠与委派歧义。
 - 对策：统一由 `system-architect-orchestrator` 做任务编排，其他 agent 聚焦单一职责并按 DoD 交付。
+
+## 2026-02-15 Round 12 (Container/SalesContract Migration Recovery)
+
+- 已完成本轮目标：修复模型重构后后端服务层与脚本中的旧容器引用。
+- 已完成项：
+  - 货柜路由兼容层：`backend/src/routes/containers.js` 增加 `/next-no/:portId` 优先级与 `/containers` 挂载路由。
+  - 服务层兼容修复：
+    - `backend/src/services/exportService.js`
+    - `backend/src/services/importService.js`
+    - `backend/src/services/dataImportService.js`
+    - `backend/src/services/aiService.js`
+    - `backend/src/controllers/dashboardController.js`（`estimatedArrival` 修正）
+  - 脚本迁移修复：
+    - `backend/scripts/importData.js`
+    - `backend/scripts/importIncremental.js`
+- 验证计划：完成后续 `backend` 全量测试 + 与 `frontend` 相关路由冒烟回归，确认旧路由在合并模型下可用。
+- 验证结论：
+  - `backend` 全量测试通过：`npm test --silent`（38 通过）
+  - 新增 `backend/src/routes/containers.test.js`，覆盖 `/next-no/:portId` 与 `/:id` 路由顺序。
+  - `frontend` 全量单测通过：`npm test --silent`（48 通过）
+  - 关键冒烟回归：`frontend` 现有 Vitest 页面测试全部通过；Playwright 冒烟中存在 2 项既有环境性失败（认证页跳转与采购页数据桩不一致），待下一轮单独修复。
+- 追加修复（2）：`backend/src/controllers/containerController.js` 修复装箱明细编辑 `unitPrice/quantity` 更新时的 `totalPrice` 回写逻辑，避免仅更新部分字段时误清空金额；并对 `exchangeRate` 与数量/权重字段的空值兼容做增强。
+- 更新结论（2）：补丁通过 `backend` 全量测试复核（38 通过），为下一轮冒烟稳定性修复留出空间（仍建议继续关注 Playwright 的一次性环境抖动）。
+
+## 2026-03-01 Round 13 (E2E Sales Mock Repair + Login UI Audit)
+
+- 已完成本轮目标：修复 `frontend/e2e/smoke.spec.ts` 中销售列表/详情 Mock 拦截不稳定问题，并完成登录页样式审查。
+- 已完成项：
+  - 修复 E2E 认证注入逻辑：`setAuth` 改为 `page.addInitScript` 参数注入，稳定写入 `token` 与 `auth-storage`。
+  - 恢复并加固目标用例：
+    - `登录后访问销售页可展示列表数据（接口Mock）`
+    - `登录后访问销售详情页可展示合同与明细（接口Mock）`
+  - Mock 路由改为 `pathname` 精确匹配，区分 `/api/v1/sales`（列表）与 `/api/v1/sales/:id`（详情），避免 `/sales` 模糊匹配误伤详情请求。
+  - 登录页与全局样式完成代码审查，记录移动端可滚动性风险（见本轮评审结论）。
+- 验证结论：
+  - `frontend` 单测通过：`npm test`（48 files / 155 tests 通过）。
+  - E2E 语法/发现校验通过：`npx playwright test e2e/smoke.spec.ts --list`（14 tests 被正确发现，含目标 2 条）。
+  - `npm run test:e2e` 在当前沙箱环境受限（`listen EPERM 0.0.0.0:3001`），无法完成端到端实际执行；需在可监听端口环境复验。
+
+## 2026-03-01 Round 14 (Frontend Lint Error Burn-Down)
+
+- 已完成本轮目标：清零 `frontend` 的 ESLint errors，并修复指定规则焦点项（`no-explicit-any`、`set-state-in-effect`、`exhaustive-deps`、`alt-text`、`no-img-element`）。
+- 已完成项：
+  - 批量移除 `any`：
+    - 测试文件：`ContractInfoEditor.test.tsx`、`Container3DView.test.tsx`、`Header.test.tsx`
+    - 组件/页面：`PaymentDialog`、`ContainerDialog`、`StoreDialog`、`SupplierDialog`、`UserDialog`、`reports`、`settings`、`payable/receivable/payments` 等。
+  - 修复 Hooks 规则：
+    - `ThemeToggle` 移除 effect 内同步 setState（改为 `useSyncExternalStore` hydration 检测）
+    - `containers/[id]`、`purchase/[id]`、`sales/[id]`、`ClaudeCostCalculator` 修复 `exhaustive-deps`。
+  - 修复图片可访问性与 Next 规则：
+    - `AIAssistant`、`ClaudeCostCalculator` 的 `<img>` 改为 `next/image`（含 `alt` 与 `unoptimized`）。
+    - `lucide-react` 的 `Image` 图标重命名为 `ImageIcon`，消除 `alt-text` 误报。
+  - 修复 `react/no-unescaped-entities`：
+    - 相关文案改为 `&quot;...&quot;` 实体，兼容 lint 与既有测试断言。
+- 验证结论：
+  - `frontend` lint：`npm run lint` => `0 errors`（剩余 37 warnings 为历史 `unused-vars` 与 `react-hooks/incompatible-library`）。
+  - `frontend` tests：`npm test` => `48 files / 155 tests` 全部通过。

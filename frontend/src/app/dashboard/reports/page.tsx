@@ -22,6 +22,7 @@ import {
 import { Loader2 } from 'lucide-react';
 import api from '@/lib/axios';
 import { PageHeader } from '@/components/layout/PageHeader';
+import type { ApiResponse, PaginatedResponse } from '@/types';
 
 interface SupplierStats {
   id: string;
@@ -48,6 +49,33 @@ interface ReportData {
   };
 }
 
+interface SupplierLite {
+  id: string;
+  name: string;
+}
+
+interface StoreLite {
+  id: string;
+  name: string;
+}
+
+interface PurchaseSummary {
+  totalAmount?: number;
+}
+
+interface PurchaseSummaryResponse extends PaginatedResponse<PurchaseSummary> {
+  total?: number;
+}
+
+interface DashboardStatsData {
+  overview?: {
+    purchaseContracts?: number;
+    salesContracts?: number;
+    products?: number;
+    containers?: number;
+  };
+}
+
 export default function ReportsPage() {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,28 +85,36 @@ export default function ReportsPage() {
       try {
         // 获取多个统计数据
         const [suppliersRes, storesRes, dashboardRes] = await Promise.all([
-          api.get('/suppliers', { params: { pageSize: 100 } }),
-          api.get('/stores', { params: { pageSize: 100 } }),
-          api.get('/dashboard/stats'),
+          api.get<ApiResponse<PaginatedResponse<SupplierLite>>, ApiResponse<PaginatedResponse<SupplierLite>>>(
+            '/suppliers',
+            { params: { pageSize: 100 } },
+          ),
+          api.get<ApiResponse<PaginatedResponse<StoreLite>>, ApiResponse<PaginatedResponse<StoreLite>>>(
+            '/stores',
+            { params: { pageSize: 100 } },
+          ),
+          api.get<ApiResponse<DashboardStatsData>, ApiResponse<DashboardStatsData>>('/dashboard/stats'),
         ]);
 
-        const suppliers = (suppliersRes as any).data?.items || [];
-        const stores = (storesRes as any).data?.items || [];
-        const dashboard = (dashboardRes as any).data || {};
+        const suppliers = suppliersRes.data?.items || [];
+        const stores = storesRes.data?.items || [];
+        const dashboard = dashboardRes.data || {};
 
         // 获取每个供应商的采购统计
         const supplierStats: SupplierStats[] = [];
         for (const supplier of suppliers.slice(0, 20)) {
           try {
-            const purchasesRes = await api.get('/purchases', { 
-              params: { supplierId: supplier.id, pageSize: 1 } 
-            });
-            const purchaseData = (purchasesRes as any).data;
+            const purchasesRes = await api.get<
+              ApiResponse<PurchaseSummaryResponse>,
+              ApiResponse<PurchaseSummaryResponse>
+            >('/purchases', { params: { supplierId: supplier.id, pageSize: 1 } });
+            const purchaseData = purchasesRes.data;
             supplierStats.push({
               id: supplier.id,
               name: supplier.name,
-              totalAmount: purchaseData?.items?.reduce((sum: number, c: any) => sum + (c.totalAmount || 0), 0) || 0,
-              contractCount: purchaseData?.total || 0,
+              totalAmount:
+                purchaseData?.items?.reduce((sum, contract) => sum + (contract.totalAmount || 0), 0) || 0,
+              contractCount: purchaseData?.total ?? purchaseData?.pagination?.total ?? 0,
             });
           } catch {
             supplierStats.push({
@@ -91,7 +127,7 @@ export default function ReportsPage() {
         }
 
         // 门店统计
-        const storeStats: StoreStats[] = stores.map((store: any) => ({
+        const storeStats: StoreStats[] = stores.map((store) => ({
           id: store.id,
           name: store.name,
           itemCount: 0, // 需要额外查询

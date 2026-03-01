@@ -1,0 +1,19 @@
+{
+  "plugins": {
+    "supabase": {
+      "enabled": true
+    },
+    "vercel": {
+      "enabled": true
+    },
+    "sentry": {
+      "enabled": true
+    },
+    "continual-learning": {
+      "enabled": true
+    },
+    "notion-workspace": {
+      "enabled": true
+    }
+  }
+}

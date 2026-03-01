@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import Container3DView from './Container3DView';
+import type { PackingItem, Product } from '@/types';
 
 vi.mock('@react-three/fiber', () => ({
   Canvas: ({ children }: { children: ReactNode }) => <div data-testid="mock-canvas">{children}</div>,
@@ -49,10 +50,32 @@ describe('Container3DView', () => {
   });
 
   it('渲染装箱统计信息', () => {
+    const packingItems: PackingItem[] = [
+      {
+        id: 'i-1',
+        salesContractId: 's-1',
+        productId: 'p-1',
+        quantity: 1,
+        boxes: 1,
+        grossWeight: 10,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+    const products: Product[] = [
+      {
+        id: 'p-1',
+        customsName: '测试商品',
+        isActive: true,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+
     render(
       <Container3DView
-        packingItems={[{ id: 'i-1', productId: 'p-1', boxes: 1, grossWeight: 10 } as any]}
-        products={[{ id: 'p-1', customsName: '测试商品' } as any]}
+        packingItems={packingItems}
+        products={products}
       />,
     );
 
@@ -62,4 +85,3 @@ describe('Container3DView', () => {
     expect(screen.getByText('利用率: 52.5%')).toBeInTheDocument();
   });
 });
-

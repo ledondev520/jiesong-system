@@ -13,6 +13,7 @@ import CreateSalesPage from './page';
 const mockPush = vi.fn();
 const mockGetProducts = vi.fn();
 const mockGetStores = vi.fn();
+const mockGetNextContractNo = vi.fn();
 const mockToastError = vi.fn();
 
 vi.mock('next/navigation', () => ({
@@ -37,6 +38,9 @@ vi.mock('@/services/store.service', () => ({
 vi.mock('@/services/sales.service', () => ({
   salesService: {
     calculatePrice: vi.fn(() => 0),
+    getNextContractNo: (...args: unknown[]) => mockGetNextContractNo(...args),
+    create: vi.fn(),
+    addItem: vi.fn(),
   },
 }));
 
@@ -51,7 +55,9 @@ describe('CreateSalesPage 交互逻辑', () => {
   beforeEach(() => {
     mockGetProducts.mockReset();
     mockGetStores.mockReset();
+    mockGetNextContractNo.mockReset();
     mockToastError.mockReset();
+    mockGetNextContractNo.mockResolvedValue({ data: { contractNo: 'EXP2600001' } });
   });
 
   it('加载成功后展示创建页关键元素', async () => {
@@ -78,4 +84,3 @@ describe('CreateSalesPage 交互逻辑', () => {
     });
   });
 });
-

@@ -56,7 +56,11 @@ import { Badge } from '@/components/ui/badge';
 import { Wand2, Plus, Trash, Eye, FileText, Loader2, UserPlus, Check, ChevronsUpDown, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { purchaseService } from '@/services/purchase.service';
+import {
+  ParsedQuoteItem,
+  PurchaseCreatePayload,
+  purchaseService,
+} from '@/services/purchase.service';
 import { supplierService } from '@/services/supplier.service';
 import { productService } from '@/services/product.service';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -238,12 +242,38 @@ export default function CreatePurchasePage() {
     setIsParsing(true);
     try {
       const result = await purchaseService.parseQuote(parseText);
-      if (result.success && result.data) {
-        result.data.forEach((item: { productId: string; quantity: number; unitPrice: number; unit?: string; note?: string }) => {
-          append(item);
+      if (result.success && result.data.length > 0) {
+        const normalizedItems = result.data.map((item: ParsedQuoteItem) => {
+          const matchedProduct =
+            item.productId
+              ? products.find((product) => product.id === item.productId)
+              : products.find((product) => {
+                  if (!item.productName) return false;
+                  return product.customsName.toLowerCase().includes(item.productName.toLowerCase());
+                });
+
+          const fallbackNote = item.productName ? `AI识别商品：${item.productName}` : undefined;
+
+          return {
+            productId: matchedProduct?.id || item.productId || '',
+            quantity: item.quantity || 0,
+            unitPrice: item.unitPrice || 0,
+            unit: item.unit || matchedProduct?.unit || '',
+            note: item.note || fallbackNote || '',
+          };
         });
-        toast.success('报价解析成功！');
+
+        const unresolvedCount = normalizedItems.filter((item) => !item.productId).length;
+        normalizedItems.forEach((item) => append(item));
+
+        if (unresolvedCount > 0) {
+          toast.success(`解析完成，已添加 ${normalizedItems.length} 条，${unresolvedCount} 条需手动选择商品`);
+        } else {
+          toast.success(`解析完成，已添加 ${normalizedItems.length} 条报价`);
+        }
         setParseText('');
+      } else {
+        toast.error(result.message || '解析失败');
       }
     } catch {
       toast.error('解析失败');
@@ -256,15 +286,21 @@ export default function CreatePurchasePage() {
   const onSubmit = async (data: PurchaseFormValues) => {
     try {
       // 转换数据格式以匹配后端期望
-      const submitData = {
+      const submitData: PurchaseCreatePayload = {
         supplierId: data.supplierId,
         contractNo: data.contractNo,
         signedAt: data.signedAt?.toISOString(),
         taxRate: data.taxRate,
         note: data.note,
-        items: data.items,
+        items: data.items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          unit: item.unit,
+          note: item.note,
+        })),
       };
-      await purchaseService.create(submitData as any);
+      await purchaseService.create(submitData);
       toast.success('采购合同创建成功');
       router.push('/dashboard/contracts');
     } catch {
@@ -477,7 +513,7 @@ export default function CreatePurchasePage() {
                                       setSupplierOpen(false);
                                     }}
                                   >
-                                    + 新增 "{supplierSearch}"
+                                    {`+ 新增 "${supplierSearch}"`}
                                   </Button>
                                 </div>
                               </CommandEmpty>

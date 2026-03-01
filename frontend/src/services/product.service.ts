@@ -3,22 +3,22 @@ import { Product, PaginatedResponse, ApiResponse } from '@/types';
 
 export const productService = {
   getAll: async (params?: { page?: number; pageSize?: number; keyword?: string }) => {
-    return api.get<any, ApiResponse<PaginatedResponse<Product>>>('/products', { params });
+    return api.get<ApiResponse<PaginatedResponse<Product>>, ApiResponse<PaginatedResponse<Product>>>('/products', { params });
   },
 
   getById: async (id: string) => {
-    return api.get<any, ApiResponse<Product>>(`/products/${id}`);
+    return api.get<ApiResponse<Product>, ApiResponse<Product>>(`/products/${id}`);
   },
 
   create: async (data: Partial<Product>) => {
-    return api.post<any, ApiResponse<Product>>('/products', data);
+    return api.post<ApiResponse<Product>, ApiResponse<Product>, Partial<Product>>('/products', data);
   },
 
   update: async (id: string, data: Partial<Product>) => {
-    return api.put<any, ApiResponse<Product>>(`/products/${id}`, data);
+    return api.put<ApiResponse<Product>, ApiResponse<Product>, Partial<Product>>(`/products/${id}`, data);
   },
 
   delete: async (id: string) => {
-    return api.delete<any, ApiResponse<void>>(`/products/${id}`);
+    return api.delete<ApiResponse<void>, ApiResponse<void>>(`/products/${id}`);
   },
 };

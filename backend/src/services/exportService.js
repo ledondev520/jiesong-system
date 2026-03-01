@@ -1,11 +1,12 @@
 /**
  * Input: Prisma客户端、数据库数据
  * Output: CSV/Excel格式的导出数据
- * Pos: 数据导出服务，生成各种格式的导出文件
+ * Pos: 数据导出服务，生成各种格式的导出文件（含销售合同三 Sheet Excel 标准出口模板）
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
+const ExcelJS = require('exceljs');
 const prisma = require('../utils/prisma');
 
 /**
@@ -200,17 +201,17 @@ const exportSales = async (query) => {
  * 职责：导出货柜数据
  */
 const exportContainers = async (query) => {
-  const containers = await prisma.container.findMany({
+  const containers = await prisma.salesContract.findMany({
     include: {
       port: true,
-      items: { include: { product: true } },
+      packingItems: { include: { product: true } },
     },
     orderBy: { createdAt: 'desc' },
   });
   
   const headers = ['货柜编号', '港口', '状态', '总箱数', '毛重', '净重', '体积', '发运日期', '预计到达', '报关公司', '是否熏蒸', '是否退税'];
   const rows = containers.map(c => [
-    c.containerNo,
+    c.contractNo,
     c.port?.name || '',
     c.status,
     c.totalBoxes,
@@ -238,7 +239,7 @@ const exportInventory = async (query) => {
   const inventories = await prisma.inventory.findMany({
     include: {
       product: true,
-      container: true,
+      salesContract: true,
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -250,7 +251,7 @@ const exportInventory = async (query) => {
     inv.quantity,
     inv.unit || '',
     inv.status,
-    inv.container?.containerNo || '',
+    inv.salesContract?.contractNo || '',
     inv.inboundAt ? formatDate(inv.inboundAt) : '',
     inv.outboundAt ? formatDate(inv.outboundAt) : '',
   ]);
@@ -303,6 +304,188 @@ const formatDate = (date) => {
   return d.toISOString().slice(0, 10);
 };
 
+/**
+ * 职责：为工作表设置统一的标题行样式（加粗、填充背景色）
+ * @param {import('exceljs').Worksheet} worksheet - 工作表对象
+ */
+const applyHeaderStyle = (worksheet) => {
+  const headerRow = worksheet.getRow(1);
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: 'FF1F2D3D' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EEF7' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    cell.border = {
+      bottom: { style: 'thin', color: { argb: 'FFADC0D8' } },
+    };
+  });
+  headerRow.height = 22;
+};
+
+/**
+ * 职责：生成单份销售合同的标准出口 Excel（三 Sheet：合同信息 + 商品明细 + 装箱清单）
+ * 思路：
+ *   1. 查询销售合同及其关联的销售明细（items）与装箱明细（packingItems）
+ *   2. Sheet 1 输出合同基本信息（键值对形式）
+ *   3. Sheet 2 输出商品明细列表（每行一个明细条目）
+ *   4. Sheet 3 输出装箱清单（Packing List）
+ *   5. 写入 Buffer 返回，供路由层设置响应头并下载
+ * @param {string} contractId - 销售合同 ID
+ * @returns {{ buffer: Buffer, filename: string }}
+ */
+const exportSalesContractExcel = async (contractId) => {
+  // 1. 查询合同数据
+  const contract = await prisma.salesContract.findUnique({
+    where: { id: contractId },
+    include: {
+      port: true,
+      items: {
+        include: {
+          product: true,
+          store: true,
+        },
+      },
+      packingItems: {
+        include: {
+          product: true,
+          store: true,
+        },
+      },
+    },
+  });
+
+  if (!contract) {
+    throw new Error(`合同不存在: ${contractId}`);
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = '捷淞进销存系统';
+  workbook.created = new Date();
+
+  // ==================== Sheet 1: 合同基本信息 ====================
+  const sheet1 = workbook.addWorksheet('合同信息');
+  sheet1.columns = [
+    { header: '字段', key: 'field', width: 20 },
+    { header: '值', key: 'value', width: 40 },
+  ];
+  applyHeaderStyle(sheet1);
+
+  const statusLabels = {
+    DRAFT: '草稿',
+    CONFIRMED: '已确认',
+    PACKING: '装柜中',
+    SHIPPED: '已发运',
+    ARRIVED: '已到达',
+    COMPLETED: '已完成',
+    CANCELLED: '已取消',
+  };
+
+  const infoRows = [
+    ['合同编号', contract.contractNo],
+    ['签订日期', contract.signedAt ? formatDate(contract.signedAt) : '-'],
+    ['合同状态', statusLabels[contract.status] || contract.status],
+    ['目的港口', contract.port?.name || '-'],
+    ['总金额 (USD)', `$${contract.totalAmount.toFixed(2)}`],
+    ['已收金额 (USD)', `$${contract.receivedAmount.toFixed(2)}`],
+    ['未收金额 (USD)', `$${(contract.totalAmount - contract.receivedAmount).toFixed(2)}`],
+    ['汇率 (USD/CNY)', contract.exchangeRate],
+    ['总箱数', contract.totalBoxes || 0],
+    ['毛重 (kg)', contract.grossWeight || 0],
+    ['净重 (kg)', contract.netWeight || 0],
+    ['体积 (CBM)', contract.volume || 0],
+    ['发运日期', contract.shippedAt ? formatDate(contract.shippedAt) : '-'],
+    ['预计到达', contract.estimatedArrival ? formatDate(contract.estimatedArrival) : '-'],
+    ['报关公司', contract.customsBroker || '-'],
+    ['是否熏蒸', contract.isFumigated ? '是' : '否'],
+    ['是否退税', contract.hasTaxRefund ? '是' : '否'],
+    ['备注', contract.note || '-'],
+  ];
+
+  infoRows.forEach(([field, value]) => {
+    sheet1.addRow({ field, value });
+  });
+
+  // ==================== Sheet 2: 商品明细 ====================
+  const sheet2 = workbook.addWorksheet('商品明细');
+  sheet2.columns = [
+    { header: '序号', key: 'index', width: 8 },
+    { header: '商品名称', key: 'productName', width: 28 },
+    { header: '规格', key: 'specification', width: 20 },
+    { header: '数量', key: 'quantity', width: 10 },
+    { header: '单位', key: 'unit', width: 8 },
+    { header: '成本价 (CNY)', key: 'costPrice', width: 16 },
+    { header: '售价 (USD)', key: 'sellingPrice', width: 14 },
+    { header: '门店/客户', key: 'store', width: 20 },
+    { header: '备注', key: 'note', width: 24 },
+  ];
+  applyHeaderStyle(sheet2);
+
+  contract.items.forEach((item, idx) => {
+    sheet2.addRow({
+      index: idx + 1,
+      productName: item.product?.customsName || '-',
+      specification: item.specification || item.product?.specification || '-',
+      quantity: item.quantity,
+      unit: item.unit || item.product?.unit || '-',
+      costPrice: item.costPrice,
+      sellingPrice: item.sellingPrice,
+      store: item.store?.name || '-',
+      note: item.note || '',
+    });
+  });
+
+  // 若商品明细为空，补一行说明
+  if (contract.items.length === 0) {
+    sheet2.addRow({ index: '-', productName: '（暂无商品明细）' });
+  }
+
+  // ==================== Sheet 3: 装箱清单（Packing List） ====================
+  const sheet3 = workbook.addWorksheet('装箱清单');
+  sheet3.columns = [
+    { header: '序号', key: 'index', width: 8 },
+    { header: '货柜号 / 合同号', key: 'containerNo', width: 22 },
+    { header: '商品名称', key: 'productName', width: 28 },
+    { header: '箱数', key: 'boxes', width: 10 },
+    { header: '数量', key: 'quantity', width: 10 },
+    { header: '单位', key: 'unit', width: 8 },
+    { header: '单价 (USD)', key: 'unitPrice', width: 14 },
+    { header: '总价 (USD)', key: 'totalPrice', width: 14 },
+    { header: '毛重 (kg)', key: 'grossWeight', width: 12 },
+    { header: '净重 (kg)', key: 'netWeight', width: 12 },
+    { header: '体积 (CBM)', key: 'volume', width: 12 },
+    { header: '门店/客户', key: 'store', width: 20 },
+    { header: '备注', key: 'note', width: 20 },
+  ];
+  applyHeaderStyle(sheet3);
+
+  contract.packingItems.forEach((item, idx) => {
+    sheet3.addRow({
+      index: idx + 1,
+      containerNo: contract.contractNo,
+      productName: item.product?.customsName || '-',
+      boxes: item.boxes || 0,
+      quantity: item.quantity,
+      unit: item.unit || item.product?.unit || '-',
+      unitPrice: item.unitPrice ?? '-',
+      totalPrice: item.totalPrice ?? '-',
+      grossWeight: item.grossWeight ?? '-',
+      netWeight: item.netWeight ?? '-',
+      volume: item.volume ?? '-',
+      store: item.store?.name || '-',
+      note: item.note || '',
+    });
+  });
+
+  // 若装箱明细为空，补一行说明
+  if (contract.packingItems.length === 0) {
+    sheet3.addRow({ index: '-', containerNo: contract.contractNo, productName: '（暂无装箱明细）' });
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const filename = `${contract.contractNo}_出口模板_${formatDate()}.xlsx`;
+  return { buffer, filename };
+};
+
 module.exports = {
   exportData,
+  exportSalesContractExcel,
 };

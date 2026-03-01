@@ -62,7 +62,7 @@ POST /auth/login
 ```json
 {
   "username": "admin",
-  "password": "admin123"
+  "password": "<DEFAULT_ADMIN_PASSWORD>"
 }
 ```
 
@@ -625,9 +625,9 @@ PUT /system/notifications/:id/read
 
 | 用户名 | 密码 | 角色 |
 |--------|------|------|
-| admin | admin123 | ADMIN |
+| admin | <DEFAULT_ADMIN_PASSWORD> | ADMIN |
 
-> 注意：密码在 `backend/prisma/seed.js` 中定义，默认为 `admin123`
+> 注意：密码来自环境变量 `DEFAULT_ADMIN_PASSWORD`；未配置时 seed 会生成随机临时密码
 
 ---
 

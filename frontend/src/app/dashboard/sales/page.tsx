@@ -34,7 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Eye, Ship, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Eye, Ship, Trash2, Loader2, FileSpreadsheet } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -49,6 +49,7 @@ export default function SalesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [contractToDelete, setContractToDelete] = useState<SalesContract | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [exportingId, setExportingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadContracts();
@@ -72,6 +73,23 @@ export default function SalesPage() {
   const openDeleteDialog = (contract: SalesContract) => {
     setContractToDelete(contract);
     setDeleteDialogOpen(true);
+  };
+
+  /**
+   * 职责：导出单份合同为标准出口 Excel（三 Sheet）
+   * 思路：调用 salesService.exportExcel 触发浏览器下载
+   * @param contract - 要导出的出口合同对象
+   */
+  const handleExportExcel = async (contract: SalesContract) => {
+    setExportingId(contract.id);
+    try {
+      await salesService.exportExcel(contract.id, contract.contractNo);
+      toast.success(`合同 ${contract.contractNo} Excel 已下载`);
+    } catch {
+      toast.error('导出 Excel 失败，请稍后重试');
+    } finally {
+      setExportingId(null);
+    }
   };
 
   /**
@@ -136,7 +154,7 @@ export default function SalesPage() {
               <TableHead className="text-right">体积 (CBM)</TableHead>
               <TableHead className="text-right">毛重 (kg)</TableHead>
               <TableHead className="text-right">金额 ($)</TableHead>
-              <TableHead className="w-[80px]">操作</TableHead>
+              <TableHead className="w-[112px]">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -181,6 +199,20 @@ export default function SalesPage() {
                           <Eye className="h-4 w-4" />
                         </Button>
                       </Link>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-xl border border-border/65 bg-background/55"
+                        title="导出标准出口 Excel"
+                        aria-label={`导出合同 ${contract.contractNo} Excel`}
+                        disabled={exportingId === contract.id}
+                        onClick={() => handleExportExcel(contract)}
+                      >
+                        {exportingId === contract.id
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+                        }
+                      </Button>
                       <Button 
                         variant="ghost"
                         size="icon" 

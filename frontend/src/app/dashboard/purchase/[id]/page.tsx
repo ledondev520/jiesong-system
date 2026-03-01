@@ -8,8 +8,7 @@
 
 'use client';
 
-import { useState, useEffect, use } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, use, useCallback } from 'react';
 import { PurchaseContract, PurchaseItem, PurchaseStatus } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
 import { contractDocService } from '@/services/contractDoc.service';
@@ -34,7 +33,7 @@ import {
 } from '@/components/ui/dialog';
 import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Progress } from '@/components/ui/progress';
-import { Package, FileText, DollarSign, Building2, FileDown, Loader2, Eye } from 'lucide-react';
+import { Package, DollarSign, Building2, FileDown, Loader2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -45,7 +44,6 @@ interface PageProps {
 
 export default function PurchaseDetailPage({ params }: PageProps) {
   const { id } = use(params);
-  const router = useRouter();
   const [contract, setContract] = useState<PurchaseContract | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -64,14 +62,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, [id]);
-
   /**
    * 职责：加载采购合同详情
    */
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const response = await purchaseService.getById(id);
@@ -81,7 +75,11 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   /**
    * 职责：获取状态徽章
@@ -362,7 +360,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                 value={generateForm.depositRate}
                 onChange={(e) => setGenerateForm(prev => ({ ...prev, depositRate: e.target.value }))}
               />
-              <p className="text-xs text-muted-foreground">合同中"第一笔款项"的比例，默认为30%</p>
+              <p className="text-xs text-muted-foreground">合同中&quot;第一笔款项&quot;的比例，默认为30%</p>
             </div>
           </div>
           

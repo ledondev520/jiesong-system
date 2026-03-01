@@ -90,21 +90,21 @@ describe('purchaseService.getSuppliersByProducts', () => {
 });
 
 describe('purchaseService.parseQuote', () => {
-  it('返回模拟解析结果', async () => {
-    vi.useFakeTimers();
-    const promise = purchaseService.parseQuote('报价文本');
-
-    vi.runAllTimers();
-    const result = await promise;
-
-    expect(result).toEqual({
-      success: true,
-      data: [
-        { productId: '1', quantity: 100, unitPrice: 45, unit: 'sqm', note: 'AI Parsed' },
-        { productId: '2', quantity: 50, unitPrice: 120, unit: 'pcs', note: 'AI Parsed' },
-      ],
+  it('调用 AI 解析接口并标准化返回值', async () => {
+    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: {
+        data: {
+          items: [{ name: '瓷砖', quantity: '100', price: '45.5', unit: 'sqm' }],
+        },
+      },
     });
 
-    vi.useRealTimers();
+    const result = await purchaseService.parseQuote('报价文本');
+
+    expect(api.post).toHaveBeenCalledWith('/ai/parse', { type: 'quote', content: '报价文本' });
+    expect(result).toEqual({
+      success: true,
+      data: [{ productId: undefined, productName: '瓷砖', quantity: 100, unitPrice: 45.5, unit: 'sqm', note: undefined }],
+    });
   });
 });

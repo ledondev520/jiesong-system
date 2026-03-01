@@ -546,7 +546,7 @@ export default function DataImportPage() {
               <ul className="space-y-2 text-muted-foreground text-sm">
                 <li className="flex items-start gap-2">
                   <span className="text-chart-3">1.</span>
-                  上传与"出货汇总"格式一致的CSV文件
+                  上传与“出货汇总”格式一致的CSV文件
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-chart-3">2.</span>

@@ -42,7 +42,7 @@ interface UserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   user?: User | null;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: UserFormValues) => Promise<void>;
 }
 
 export function UserDialog({

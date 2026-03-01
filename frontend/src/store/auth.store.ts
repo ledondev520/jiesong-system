@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { User } from '@/types';
+import { clearAuthToken, setAuthToken } from '@/lib/auth-token';
 
 interface AuthState {
   user: User | null;
@@ -18,15 +19,16 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       login: (user, token) => {
         set({ user, token, isAuthenticated: true });
-        localStorage.setItem('token', token);
+        setAuthToken(token);
       },
       logout: () => {
         set({ user: null, token: null, isAuthenticated: false });
-        localStorage.removeItem('token');
+        clearAuthToken();
       },
     }),
     {
       name: 'auth-storage',
+      storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({ user: state.user, token: state.token, isAuthenticated: state.isAuthenticated }),
     }
   )

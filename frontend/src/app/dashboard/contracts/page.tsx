@@ -568,7 +568,7 @@ function ContractsPageContent() {
                 value={generateForm.depositRate}
                 onChange={(e) => setGenerateForm(prev => ({ ...prev, depositRate: e.target.value }))}
               />
-              <p className="text-xs text-muted-foreground">合同中"第一笔款项"的比例，默认为30%</p>
+              <p className="text-xs text-muted-foreground">合同中&quot;第一笔款项&quot;的比例，默认为30%</p>
             </div>
           </div>
           

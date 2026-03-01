@@ -45,7 +45,7 @@ interface StoreDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   store?: Store | null;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: StoreFormValues) => Promise<void>;
 }
 
 export function StoreDialog({

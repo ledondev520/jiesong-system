@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Container, ContainerStatus } from '@/types';
+import { Container } from '@/types';
 import { PORTS } from '@/lib/constants';
 import {
   Dialog,
@@ -48,7 +48,7 @@ interface ContainerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   container?: Container | null;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: ContainerFormValues) => Promise<void>;
 }
 
 export function ContainerDialog({

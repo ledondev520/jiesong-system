@@ -53,16 +53,13 @@ describe('LoginPage 交互逻辑', () => {
   });
 
   it('可从本地恢复记住的账号密码', async () => {
-    localStorage.setItem(
-      'jiesong_credentials',
-      btoa(JSON.stringify({ username: 'admin', password: '123456' })),
-    );
+    localStorage.setItem('jiesong_saved_username', 'admin');
 
     render(<LoginPage />);
 
     await waitFor(() => {
       expect(screen.getByLabelText('用户名')).toHaveValue('admin');
-      expect(screen.getByLabelText('密码')).toHaveValue('123456');
+      expect(screen.getByLabelText('密码')).toHaveValue('');
     });
   });
 
@@ -82,7 +79,7 @@ describe('LoginPage 交互逻辑', () => {
     await user.type(screen.getByLabelText('用户名'), 'admin');
     await user.type(screen.getByLabelText('密码'), '123456');
 
-    // 1. 开启记住密码并提交
+    // 1. 开启记住用户名并提交
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: '登录' }));
 
@@ -99,13 +96,8 @@ describe('LoginPage 交互逻辑', () => {
       expect(mockPush).toHaveBeenCalledWith('/');
     });
 
-    // 3. 校验记住密码写入
-    const saved = localStorage.getItem('jiesong_credentials');
-    expect(saved).toBeTruthy();
-    expect(saved && JSON.parse(atob(saved))).toEqual({
-      username: 'admin',
-      password: '123456',
-    });
+    // 3. 校验记住用户名写入
+    expect(localStorage.getItem('jiesong_saved_username')).toBe('admin');
   });
 
   it('登录失败时展示错误提示', async () => {
@@ -124,4 +116,3 @@ describe('LoginPage 交互逻辑', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 });
-
