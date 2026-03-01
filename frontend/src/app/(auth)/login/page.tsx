@@ -1,7 +1,7 @@
 /**
  * Input: 登录API、认证状态存储
  * Output: 登录页面
- * Pos: 认证模块入口，负责用户登录与凭证记忆
+ * Pos: 认证模块入口，负责用户登录、凭证记忆与快捷登录
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -44,12 +44,19 @@ type LoginResponseData = {
 };
 
 const REMEMBER_USERNAME_KEY = 'jiesong_saved_username';
+const REMEMBER_CREDENTIALS_KEY = 'jiesong_saved_credentials';
+
+type RememberedCredentials = {
+  username: string;
+  password: string;
+};
 
 export default function LoginPage() {
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedCredentials, setSavedCredentials] = useState<RememberedCredentials | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -60,14 +67,88 @@ export default function LoginPage() {
     },
   });
 
-  // Check for saved username on mount
+  // Check for saved credentials on mount
   useEffect(() => {
-    const saved = localStorage.getItem(REMEMBER_USERNAME_KEY);
-    if (saved) {
-      form.setValue('username', saved);
+    const savedRaw = localStorage.getItem(REMEMBER_CREDENTIALS_KEY);
+    if (savedRaw) {
+      try {
+        const parsed: RememberedCredentials = JSON.parse(savedRaw);
+        if (parsed.username && parsed.password) {
+          form.setValue('username', parsed.username);
+          form.setValue('password', parsed.password);
+          form.setValue('rememberMe', true);
+          setSavedCredentials(parsed);
+          return;
+        }
+      } catch {
+        localStorage.removeItem(REMEMBER_CREDENTIALS_KEY);
+      }
+    }
+
+    // Backward compatibility: older versions only saved username
+    const savedUsername = localStorage.getItem(REMEMBER_USERNAME_KEY);
+    if (savedUsername) {
+      form.setValue('username', savedUsername);
       form.setValue('rememberMe', true);
+      setSavedCredentials(null);
     }
   }, [form]);
+
+  /**
+   * 职责：执行登录请求并完成状态跳转
+   * @param {string} username - 用户名
+   * @param {string} password - 密码
+   * @param {boolean} rememberMe - 是否记住账号密码
+   * @returns {Promise<void>} 登录流程执行结果
+   */
+  const performLogin = async (username: string, password: string, rememberMe: boolean) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      if (rememberMe) {
+        const payload: RememberedCredentials = { username, password };
+        localStorage.setItem(REMEMBER_USERNAME_KEY, username);
+        localStorage.setItem(REMEMBER_CREDENTIALS_KEY, JSON.stringify(payload));
+        setSavedCredentials(payload);
+      } else {
+        localStorage.removeItem(REMEMBER_USERNAME_KEY);
+        localStorage.removeItem(REMEMBER_CREDENTIALS_KEY);
+        setSavedCredentials(null);
+      }
+
+      const result: ApiResponse<LoginResponseData> = await api.post('/auth/login', {
+        username,
+        password,
+      });
+      
+      if (result.code === 200 && result.data) {
+        login(result.data.user, result.data.token);
+        router.push('/');
+      } else {
+        throw new Error(result.message || '登录失败');
+      }
+    } catch (err: unknown) {
+      const rawMessage =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err !== null && 'message' in err
+            ? String((err as { message: unknown }).message)
+            : '';
+
+      if (
+        /ECONNREFUSED|Failed to proxy|Network Error|fetch failed|timeout/i.test(rawMessage)
+      ) {
+        setError('后端服务未连接，请先启动 backend 服务（默认端口 3000）');
+      } else if (rawMessage) {
+        setError(rawMessage);
+      } else {
+        setError('登录失败，请检查用户名和密码');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   /**
    * 职责：提交登录表单并处理登录结果
@@ -79,54 +160,7 @@ export default function LoginPage() {
    * @returns {Promise<void>} 登录流程执行结果
    */
   async function onSubmit(data: LoginFormValues) {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Handle Remember Username
-      if (data.rememberMe) {
-        localStorage.setItem(REMEMBER_USERNAME_KEY, data.username);
-      } else {
-        localStorage.removeItem(REMEMBER_USERNAME_KEY);
-      }
-
-      // 调用后端登录API（使用统一axios实例）
-      const result: ApiResponse<LoginResponseData> = await api.post('/auth/login', {
-        username: data.username,
-        password: data.password,
-      });
-      
-      if (result.code === 200 && result.data) {
-        login(result.data.user, result.data.token);
-        router.push('/');
-      } else {
-        throw new Error(result.message || '登录失败');
-      }
-      
-    } catch (err: unknown) {
-      // 0. 初始化错误消息提取，优先兼容axios返回的对象错误
-      const rawMessage =
-        err instanceof Error
-          ? err.message
-          : typeof err === 'object' && err !== null && 'message' in err
-            ? String((err as { message: unknown }).message)
-            : '';
-
-      // 1. 若后端不可达或代理失败，给出明确运维提示
-      if (
-        /ECONNREFUSED|Failed to proxy|Network Error|fetch failed|timeout/i.test(rawMessage)
-      ) {
-        setError('后端服务未连接，请先启动 backend 服务（默认端口 3000）');
-      } else if (rawMessage) {
-        // 2. 若有业务错误消息（如用户名密码错误），直接透传
-        setError(rawMessage);
-      } else {
-        // 3. 兜底提示
-        setError('登录失败，请检查用户名和密码');
-      }
-    } finally {
-      setIsLoading(false);
-    }
+    await performLogin(data.username, data.password, data.rememberMe);
   }
 
   return (
@@ -181,7 +215,7 @@ export default function LoginPage() {
                     </FormControl>
                     <div className="space-y-1 leading-none">
                       <FormLabel>
-                        记住用户名
+                        记住账号和密码
                       </FormLabel>
                     </div>
                   </FormItem>
@@ -193,6 +227,21 @@ export default function LoginPage() {
                   <p>{error}</p>
                 </div>
               )}
+
+              {savedCredentials && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 w-full rounded-xl border-accent/50 bg-accent/10 text-accent-foreground"
+                  onClick={() => {
+                    void performLogin(savedCredentials.username, savedCredentials.password, true);
+                  }}
+                  disabled={isLoading}
+                >
+                  {isLoading ? '登录中...' : `快捷登录（${savedCredentials.username}）`}
+                </Button>
+              )}
+
               <Button type="submit" className="h-10 w-full rounded-xl" disabled={isLoading}>
                 {isLoading ? '登录中...' : '登录'}
               </Button>
