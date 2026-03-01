@@ -199,3 +199,14 @@
 - 验证结论：
   - `frontend` lint：`npm run lint` => `0 errors`（剩余 37 warnings 为历史 `unused-vars` 与 `react-hooks/incompatible-library`）。
   - `frontend` tests：`npm test` => `48 files / 155 tests` 全部通过。
+
+## 2026-03-01 Round 15（运维系统页面第一阶段）
+
+- 已完成本轮目标：启动系统运维页面 Phase 2 第一项（系统日志）开发。
+- 已完成项：
+  - 新增系统日志服务接口封装：`frontend/src/services/system.service.ts`（`getSystemLogs`）。
+  - 新增系统日志页面：`/dashboard/system/logs`（`frontend/src/app/dashboard/system/logs/page.tsx`），支持“全部日志”和“导入日志”切换视图，复用 `Card` 与 `Table` 组件。
+  - 在侧边栏新增“系统日志”入口：`/dashboard/system/logs`。
+  - 补齐定向单测：`frontend/src/app/dashboard/system/logs/page.test.tsx`。
+- 验证结论：
+  - `frontend` 定向测试通过：`npm test src/app/dashboard/system/logs/page.test.tsx src/components/layout/Sidebar.test.tsx`。

@@ -72,3 +72,7 @@
 | SA-52 | P0 | 30m | 1 | DONE | Excel 三 Sheet 标准出口模板：安装 exceljs、新增后端导出函数与路由、前端列表页+详情页导出按钮 |
 | SA-53 | P0 | 30m | 1 | DONE | 修复 `frontend/e2e/smoke.spec.ts` 销售列表/详情 Mock 路由精确拦截（`/sales` vs `/sales/:id`），并完成登录页 UI 审查与测试复核 |
 | SA-54 | P0 | 40m | 1 | DONE | 前端 lint 错误清零专项：修复 `no-explicit-any`、`set-state-in-effect`、`exhaustive-deps`、`alt-text`、`no-img-element`，并完成 lint/test 回归 |
+| SYS-01 | P0 | 30m | 1 | DONE | 新增系统日志页（`/dashboard/system/logs`）列表与导入日志视图 |
+| SYS-02 | P1 | 30m | 1 | TODO | 新增通知中心页（`/dashboard/system/notifications`）列表与已读标记 |
+| SYS-03 | P1 | 30m | 1 | TODO | 新增导入记录页（`/dashboard/system/import-records`） |
+| SYS-04 | P1 | 20m | 1 | TODO | 系统设置页集成导出入口（`/system/export/:type`） |

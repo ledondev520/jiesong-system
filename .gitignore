@@ -27,6 +27,8 @@ prisma/migrations/
 
 # Logs
 logs/
+!frontend/src/app/dashboard/system/logs/
+!frontend/src/app/dashboard/system/logs/**
 *.log
 npm-debug.log*
 

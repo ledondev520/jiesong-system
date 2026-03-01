@@ -11,7 +11,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import {
+import { 
   LayoutDashboard,
   FileText,
   Warehouse,
@@ -20,6 +20,7 @@ import {
   LogOut,
   Ship,
   Store,
+  History,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ import { Button } from '@/components/ui/button';
  * - 库存状态：商品库存跟踪
  * - 收付款：应付 + 应收（Tab切换）
  * - 设置：基础档案 + 用户 + 系统配置 + 数据导入
+ * - 系统日志：操作日志列表
  */
 const navItems = [
   { href: '/dashboard', label: '工作台', icon: LayoutDashboard, exact: true },
@@ -40,6 +42,7 @@ const navItems = [
   { href: '/dashboard/inventory-container', label: '库存状态', icon: Warehouse },
   { href: '/dashboard/payments', label: '收付款', icon: DollarSign },
   { href: '/dashboard/store-recommend', label: '采购建议', icon: Store },
+  { href: '/dashboard/system/logs', label: '系统日志', icon: History },
   { href: '/dashboard/settings', label: '设置', icon: Settings },
 ];
 
