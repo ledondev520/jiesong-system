@@ -5,7 +5,7 @@
  * 3. 各主界面关键按钮交互
  */
 
-import { test, expect, type Locator, type Page } from '@playwright/test';
+import { test, expect, type Locator } from '@playwright/test';
 import { mockApiRoutes, signInAsAdmin } from './helpers';
 
 test.beforeEach(async ({ page }) => {

@@ -1,5 +1,5 @@
 import api from '@/lib/axios';
-import type { Container, ContainerItem, ApiResponse, PaginatedResponse } from '@/types';
+import type { Container, ContainerItem, ApiResponse } from '@/types';
 import { createCrudService } from './crudService';
 
 type ContainerListQuery = {

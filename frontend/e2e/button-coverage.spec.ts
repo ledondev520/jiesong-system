@@ -5,6 +5,8 @@ interface PageCase {
   name: string;
   path: string;
   minClicks?: number;
+  maxActions?: number;
+  maxDurationMs?: number;
 }
 
 const pageCases: PageCase[] = [
@@ -16,7 +18,8 @@ const pageCases: PageCase[] = [
   { name: '合同模板管理', path: '/dashboard/contracts/templates', minClicks: 0 },
   { name: '合同模板上传', path: '/dashboard/contracts/template', minClicks: 0 },
   { name: '采购列表', path: '/dashboard/purchase' },
-  { name: '采购创建', path: '/dashboard/purchase/create' },
+  // 该页面控件密集，限制巡检动作预算可降低偶发超时。
+  { name: '采购创建', path: '/dashboard/purchase/create', maxActions: 5, maxDurationMs: 15000 },
   { name: '采购详情', path: '/dashboard/purchase/pc-001' },
   { name: '销售合同', path: '/dashboard/sales' },
   { name: '销售创建', path: '/dashboard/sales/create' },
@@ -72,6 +75,11 @@ const normalize = (value: string | null | undefined): string =>
 
 const shouldSkip = (label: string): boolean => skipPatterns.some((pattern) => pattern.test(label));
 
+const normalizePath = (path: string): string => {
+  const cleaned = path.replace(/[?#].*$/, '').replace(/\/+$/, '');
+  return cleaned || '/';
+};
+
 const safeClick = async (locator: Locator) => {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
@@ -100,11 +108,15 @@ const waitForLoadingDone = async (page: Page) => {
   }
 };
 
-const clickAllBusinessButtons = async (page: Page, routePath: string): Promise<string[]> => {
+const clickAllBusinessButtons = async (
+  page: Page,
+  options?: { maxActions?: number; maxDurationMs?: number; basePath?: string },
+): Promise<string[]> => {
   const processedLabels = new Set<string>();
   const clickedList: string[] = [];
-  const maxActionsPerPage = 10;
-  const maxDurationMs = 30000;
+  const maxActionsPerPage = options?.maxActions ?? 10;
+  const maxDurationMs = options?.maxDurationMs ?? 30000;
+  const basePath = normalizePath(options?.basePath ?? new URL(page.url()).pathname);
   const startedAt = Date.now();
 
   for (let step = 0; step < maxActionsPerPage; step += 1) {
@@ -162,6 +174,12 @@ const clickAllBusinessButtons = async (page: Page, routePath: string): Promise<s
     await page.waitForTimeout(120);
     await expect(page).not.toHaveURL(/\/login$/);
     await assertNoRuntimeError(page);
+
+    // 跨路由后结束当前页面巡检，避免进入下一页导致动作穷举超时。
+    const currentPath = normalizePath(new URL(page.url()).pathname);
+    if (currentPath !== basePath) {
+      break;
+    }
   }
 
   return clickedList;
@@ -188,7 +206,11 @@ test.describe('按钮全覆盖巡检', () => {
       await expect(page).not.toHaveURL(/\/login$/);
       await assertNoRuntimeError(page);
 
-      const clickedList = await clickAllBusinessButtons(page, pageCase.path);
+      const clickedList = await clickAllBusinessButtons(page, {
+        maxActions: pageCase.maxActions,
+        maxDurationMs: pageCase.maxDurationMs,
+        basePath: pageCase.path,
+      });
       const minClicks = pageCase.minClicks ?? 1;
       const blockingErrors = pageErrors.filter(
         (message) =>

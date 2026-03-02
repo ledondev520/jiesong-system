@@ -1,5 +1,5 @@
 import api from '@/lib/axios';
-import type { ApiResponse, PaginatedResponse, PurchaseContract } from '@/types';
+import type { ApiResponse, PurchaseContract } from '@/types';
 import { createCrudService } from './crudService';
 
 type PurchaseContractQuery = { page?: number; pageSize?: number; keyword?: string };

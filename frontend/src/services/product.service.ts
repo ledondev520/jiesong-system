@@ -1,4 +1,4 @@
-import type { ApiResponse, PaginatedResponse, Product } from '@/types';
+import type { Product } from '@/types';
 import { createCrudService } from './crudService';
 
 type ProductListQuery = {

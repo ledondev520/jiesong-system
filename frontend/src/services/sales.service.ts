@@ -1,6 +1,6 @@
 import { getAuthToken } from '@/lib/auth-token';
 import api from '@/lib/axios';
-import type { ApiResponse, PaginatedResponse, PackingItem, SalesContract } from '@/types';
+import type { ApiResponse, PackingItem, SalesContract } from '@/types';
 import { createCrudService } from './crudService';
 import { downloadResponseBlob } from './fileDownload';
 
