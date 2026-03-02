@@ -103,3 +103,8 @@
 | OPT-05 | P0 | 20m | 1 | DONE | 受影响前端页面与后端控制器回归验证（全量前端用例） |
 | OPT-06 | P2 | 30m | 1 | DONE | 统一销售/库存页面状态徽章与日期工具（`StatusBadge`、`formatDate`） |
 | OPT-07 | P1 | 30m | 1 | DONE | 补齐 `dataImportService` 回归测试（`compareWithDatabase` / `importRecords`） |
+| TST-09 | P0 | 35m | 1 | DONE | 补齐 AI 编排缺口测试（`streamHelpers`/`chatOrchestrator`）并修正 `needsVision` 布尔语义，后端门禁回归通过（`test:all`） |
+| TST-10 | P0 | 40m | 1 | DONE | 补齐前端共享 hooks 测试（`usePagination/useDataTable/useFormHandler/useApi`）并完成前端单测+E2E全量回归 |
+| TST-11 | P0 | 35m | 1 | DONE | 补齐前端公共工具与服务工厂测试（`date-format/auth-token/binPacking/fileDownload/crudService`）并完成前端单测全量回归 |
+| TST-12 | P0 | 20m | 1 | DONE | 补齐认证状态仓库测试（`auth.store` 登录/登出）并完成前端单测全量回归（`80 files / 251 tests`） |
+| TST-13 | P0 | 25m | 1 | DONE | 补齐布局与主题缺口测试（`dashboard/layout`、`ThemeToggle`、`ThemeProvider`、`status-badge`）并完成前后端+E2E 全量门禁回归 |

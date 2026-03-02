@@ -22,7 +22,7 @@ const buildChatSession = async ({
   ]);
 
   const messages = buildChatMessages({ message, imageUrl, history, dbContext });
-  const needsVision = imageUrl || hasImageInHistory(history);
+  const needsVision = Boolean(imageUrl || hasImageInHistory(history));
 
   let model = needsVision ? visionModel : defaultModel;
   if (useThinkingModel) {

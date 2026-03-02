@@ -438,3 +438,91 @@
       - 覆盖 `importRecords` 的同次导入映射缓存命中行为
 - 结果验收：
   - 新增测试路径可执行但当前沙箱未进行一键回归执行（保持变更可追溯，待下次窗口集中跑验）。
+
+## 2026-03-02 Round 26（AI 编排测试缺口收口）
+
+- 已完成本轮目标：补齐 AI 会话编排与流式响应辅助模块的单测缺口，收口后端测试覆盖盲区。
+- 已完成项：
+  - 新增测试文件：
+    - `backend/src/services/ai/streamHelpers.test.js`
+      - 覆盖 `collectStreamedChat` 的 thinking/普通模型参数差异
+      - 覆盖内容流与思考流分片聚合、回调触发
+    - `backend/src/services/ai/chatOrchestrator.test.js`
+      - 覆盖历史查询参数、消息拼装、视觉模型优先、thinking 模型选择与兜底
+  - 同步修复实现一致性：
+    - `backend/src/services/ai/chatOrchestrator.js` 中 `needsVision` 改为显式布尔值，避免“有图时返回字符串”的语义歧义。
+- 验证结论：
+  - 新增 AI 定向测试通过：`6/6`。
+  - 后端全量门禁通过：`npm run test:all`（单元 `136/136` + DB 集成 `3/3`）。
+
+## 2026-03-02 Round 27（前端共享 Hooks 测试补齐）
+
+- 已完成本轮目标：补齐前端复用型 hooks 的自动化测试，降低页面重构与状态管理回归风险。
+- 已完成项：
+  - 新增测试文件：
+    - `frontend/src/lib/hooks/usePagination.test.ts`
+    - `frontend/src/lib/hooks/useDataTable.test.ts`
+    - `frontend/src/lib/hooks/useFormHandler.test.ts`
+    - `frontend/src/lib/hooks/useApi.test.ts`
+  - 覆盖能力：
+    - 分页边界收敛、页码切换、重置与页长变更
+    - 数据表过滤/排序/分页切片联动
+    - 表单提交成功/失败分支、错误映射与重置
+    - 通用异步请求 `loading/error/hasLoaded` 状态机与 `immediate` 自动请求
+- 验证结论：
+  - 前端 hooks 定向测试通过：`4 files / 10 tests`。
+  - 前端单测全量通过：`74 files / 232 tests`。
+  - 前端 E2E 全量通过：`52/52`（按钮巡检 + smoke）。
+
+## 2026-03-02 Round 28（前端公共工具与服务测试补齐）
+
+- 已完成本轮目标：补齐高复用前端工具与服务工厂的测试缺口，收口基础设施层回归风险。
+- 已完成项：
+  - 新增测试文件：
+    - `frontend/src/lib/date-format.test.ts`
+    - `frontend/src/lib/auth-token.test.ts`
+    - `frontend/src/lib/binPacking.test.ts`
+    - `frontend/src/services/fileDownload.test.ts`
+    - `frontend/src/services/crudService.test.ts`
+  - 覆盖能力：
+    - 日期格式化 fallback 与日期时间格式输出
+    - token 内存缓存与 sessionStorage 同步/清理
+    - 3D 装箱算法放置/超限分支、颜色稳定性与单位换算
+    - 下载响应文件名解析、错误提取与浏览器下载流程
+    - CRUD 工厂的路径归一、标准方法映射与按需禁用
+- 验证结论：
+  - 定向测试通过：`5 files / 17 tests`。
+  - 前端单测全量通过：`79 files / 249 tests`。
+
+## 2026-03-02 Round 29（认证状态仓库补测）
+
+- 已完成本轮目标：补齐认证状态管理仓库（Zustand）的关键状态流测试，确保登录态变更可回归。
+- 已完成项：
+  - 新增测试文件：
+    - `frontend/src/store/auth.store.test.ts`
+  - 覆盖能力：
+    - `login`：认证状态写入、用户与 token 更新、token 工具调用
+    - `logout`：认证状态清空、token 清理工具调用
+- 验证结论：
+  - 定向测试通过：`1 file / 2 tests`。
+  - 前端单测全量通过：`80 files / 251 tests`。
+
+## 2026-03-02 Round 30（布局与主题测试收口）
+
+- 已完成本轮目标：补齐 dashboard 布局层、主题切换与状态徽章的自动化覆盖，收口前端框架层测试盲区。
+- 已完成项：
+  - 新增测试文件：
+    - `frontend/src/app/dashboard/layout.test.tsx`
+    - `frontend/src/components/layout/ThemeToggle.test.tsx`
+    - `frontend/src/components/layout/ThemeProvider.test.tsx`
+    - `frontend/src/components/ui/status-badge.test.tsx`
+  - 覆盖能力：
+    - dashboard 布局：登录态渲染、未登录重定向、持久化认证保护、hydration 完成后的渲染行为
+    - 主题切换：light/dark 双向切换
+    - 主题提供器：`next-themes` 配置参数透传
+    - 状态徽章：内置状态映射、自定义覆盖、未知状态兜底
+- 验证结论：
+  - 新增定向测试通过：`4 files / 11 tests`。
+  - 前端单测全量通过：`84 files / 262 tests`。
+  - 前端 E2E 全量通过：`52/52`。
+  - 后端全量门禁通过：`npm run test:all`（单元 `136/136` + DB 集成 `3/3`）。

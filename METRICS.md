@@ -335,3 +335,95 @@
 ### 结论
 - 完成本轮收口后，前后端在不改 API 契约前提下完成“统一展示层组件化 + import 关键路径行为可验证化”；
 - 当前未在本次操作内执行自动化回归（按你本次要求保留变更并进入下一步验证环节）。
+
+## 2026-03-02 Round 26（AI 编排测试缺口收口）
+
+### 质量指标
+- 后端单测：`136/136` 通过（新增 `streamHelpers` 与 `chatOrchestrator` 用例后）。
+- 后端数据库集成：`3/3` 通过（`npm run test:db`，作为 `test:all` 一部分）。
+- 后端全量门禁：`npm run test:all` 全绿。
+
+### 过程指标
+- 新增测试文件：2
+  - `backend/src/services/ai/streamHelpers.test.js`
+  - `backend/src/services/ai/chatOrchestrator.test.js`
+- 新增测试用例：6（流式分片聚合 2 + 会话编排模型选择 4）。
+- 同步代码修正：1（`chatOrchestrator.js` 的 `needsVision` 强制布尔化）。
+
+### 结论
+- AI 服务层剩余关键缺口已补齐到可回归状态；
+- 当前后端测试链路（单测 + DB 集成）在本轮改动后保持稳定绿灯。
+
+## 2026-03-02 Round 27（前端共享 Hooks 测试补齐）
+
+### 质量指标
+- 前端 hooks 定向测试：`4 files / 10 tests` 全通过。
+- 前端单测全量：`74 files / 232 tests` 全通过。
+- 前端 E2E 全量：`52/52` 通过。
+
+### 过程指标
+- 新增测试文件：4
+  - `frontend/src/lib/hooks/usePagination.test.ts`
+  - `frontend/src/lib/hooks/useDataTable.test.ts`
+  - `frontend/src/lib/hooks/useFormHandler.test.ts`
+  - `frontend/src/lib/hooks/useApi.test.ts`
+- 新增测试用例：10（分页 3 + 数据表 2 + 表单 2 + API 3）。
+- 回归执行范围：前端单测全量 + 前端 E2E 全量。
+
+### 结论
+- 前端基础状态管理与异步请求层形成可回归保护；
+- 当前前端测试门禁（unit + e2e）在本轮补测后保持绿灯。
+
+## 2026-03-02 Round 28（前端公共工具与服务测试补齐）
+
+### 质量指标
+- 前端定向测试：`5 files / 17 tests` 全通过。
+- 前端单测全量：`79 files / 249 tests` 全通过。
+
+### 过程指标
+- 新增测试文件：5
+  - `frontend/src/lib/date-format.test.ts`
+  - `frontend/src/lib/auth-token.test.ts`
+  - `frontend/src/lib/binPacking.test.ts`
+  - `frontend/src/services/fileDownload.test.ts`
+  - `frontend/src/services/crudService.test.ts`
+- 新增测试用例：17（日期 3 + token 3 + 装箱 4 + 下载 4 + CRUD 3）。
+
+### 结论
+- 前端“工具层 + 通用服务层 + hooks 层”补测路径形成闭环；
+- 在不改业务功能的前提下，单测门禁容量从 `232` 提升到 `249`，且保持全绿。
+
+## 2026-03-02 Round 29（认证状态仓库补测）
+
+### 质量指标
+- 前端定向测试：`1 file / 2 tests` 全通过。
+- 前端单测全量：`80 files / 251 tests` 全通过。
+
+### 过程指标
+- 新增测试文件：1（`frontend/src/store/auth.store.test.ts`）。
+- 新增测试用例：2（登录状态写入 + 登出状态清理）。
+
+### 结论
+- 认证状态流（store + token 工具联动）已纳入自动化回归；
+- 前端单测门禁规模继续提升并保持稳定绿灯。
+
+## 2026-03-02 Round 30（布局与主题测试收口）
+
+### 质量指标
+- 前端定向测试：`4 files / 11 tests` 全通过。
+- 前端单测全量：`84 files / 262 tests` 全通过。
+- 前端 E2E 全量：`52/52` 通过。
+- 后端全量门禁：`npm run test:all` 通过（单元 `136/136` + DB 集成 `3/3`）。
+
+### 过程指标
+- 新增测试文件：4
+  - `frontend/src/app/dashboard/layout.test.tsx`
+  - `frontend/src/components/layout/ThemeToggle.test.tsx`
+  - `frontend/src/components/layout/ThemeProvider.test.tsx`
+  - `frontend/src/components/ui/status-badge.test.tsx`
+- 新增测试用例：11（layout 4 + theme toggle 2 + theme provider 1 + status badge 4）。
+- 全链路回归：backend 单测+DB、frontend unit、frontend e2e 均完成。
+
+### 结论
+- 前端框架层（布局/主题/状态呈现）自动化保护已补齐；
+- 当前仓库维持“后端 + 前端单测 + 前端 E2E + DB 集成”四线全绿。

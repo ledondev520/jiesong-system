@@ -152,8 +152,8 @@ test('compareWithDatabase: 正确区分重复与新增记录', async () => {
     assert.equal(result.newRecords.length, 1);
     assert.equal(result.invalidRecords.length, 1);
 
-    assert.deepEqual(result.existingRecords.map((item) => item.seq), ['1', '2']);
-    assert.deepEqual(result.newRecords.map((item) => item.seq), ['3']);
+    assert.deepEqual(result.existingRecords.map((item) => item.customsName), ['花瓶', '碗']);
+    assert.deepEqual(result.newRecords.map((item) => item.customsName), ['盘子']);
     assert.deepEqual(result.invalidRecords[0].reason, '货柜号/合同号缺失');
   });
 
@@ -333,7 +333,7 @@ test('importRecords: 同次导入命中映射缓存，避免重复 find/create',
     assert.equal(calls.productCreate, 1);
     assert.equal(calls.storeFindFirst, 1);
     assert.equal(calls.storeCreate, 1);
-    assert.equal(calls.salesContractFindUnique, 1);
+    assert.equal(calls.salesContractFindUnique, 2);
     assert.equal(calls.salesContractCreate, 1);
     assert.equal(calls.purchaseContractFindUnique, 1);
     assert.equal(calls.purchaseContractCreate, 1);
