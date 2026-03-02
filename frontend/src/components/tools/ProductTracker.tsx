@@ -13,7 +13,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { SemanticBadge } from '@/components/ui/semantic-badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Search, Package, MapPin, Ship, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/axios';
@@ -72,17 +72,14 @@ export function ProductTracker() {
   };
 
   const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { label: string; tone: React.ComponentProps<typeof SemanticBadge>["tone"] }> = {
-      DRAFT: { label: '草稿', tone: 'neutral' },
-      CONFIRMED: { label: '已确认', tone: 'info' },
-      PACKING: { label: '装箱中', tone: 'warning' },
-      SHIPPED: { label: '已发运', tone: 'progress' },
-      ARRIVED: { label: '已到达', tone: 'success' },
-      COMPLETED: { label: '已完成', tone: 'secondary' },
-      CANCELLED: { label: '已取消', tone: 'danger' },
-    };
-    const config = statusMap[status] || { label: status, tone: 'neutral' as const };
-    return <SemanticBadge tone={config.tone}>{config.label}</SemanticBadge>;
+    return (
+      <StatusBadge
+        status={status}
+        statusMap={{
+          CANCELLED: { label: '已取消', tone: 'danger' },
+        }}
+      />
+    );
   };
 
   return (

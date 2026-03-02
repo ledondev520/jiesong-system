@@ -1,21 +1,7 @@
 const { success } = require('../../utils/response');
 const { createError } = require('../../middleware/errorHandler');
 const { normalizePagination } = require('../../utils/pagination');
-
-const buildPaginatedPayload = (items, total, page, pageSize, extras = {}) => ({
-  code: 200,
-  message: '获取成功',
-  data: {
-    items,
-    pagination: {
-      page,
-      pageSize,
-      total,
-      totalPages: Math.max(1, Math.ceil(total / pageSize)),
-    },
-    ...extras,
-  },
-});
+const { paginated } = require('../../utils/response');
 
 const importData = async (req, res, next) => {
   try {
@@ -44,8 +30,7 @@ const getImportRecords = async (req, res, next) => {
       keyword: keyword.length ? keyword : undefined,
     });
 
-    const payload = buildPaginatedPayload(result.records, result.total, page, pageSize);
-    res.json(payload);
+      paginated(res, result.records, result.total, page, pageSize);
   } catch (error) {
     next(error);
   }

@@ -20,9 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SemanticBadge } from '@/components/ui/semantic-badge';
+import { StatusBadge, type StatusBadgeConfig } from '@/components/ui/status-badge';
 import { Loader2, Save, Pencil } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/date-format';
 
 interface ContractInfoEditorProps {
   contract: SalesContract;
@@ -39,8 +39,8 @@ export function ContractInfoEditor({ contract, stores, onSave }: ContractInfoEdi
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     exchangeRate: contract.exchangeRate,
-    signedAt: contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '',
-    estimatedArrival: contract.estimatedArrival ? format(new Date(contract.estimatedArrival), 'yyyy-MM-dd') : '',
+    signedAt: formatDate(contract.signedAt, ''),
+    estimatedArrival: formatDate(contract.estimatedArrival, ''),
     portId: contract.portId || '',
   });
 
@@ -48,8 +48,8 @@ export function ContractInfoEditor({ contract, stores, onSave }: ContractInfoEdi
   useEffect(() => {
     setForm({
       exchangeRate: contract.exchangeRate,
-      signedAt: contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '',
-      estimatedArrival: contract.estimatedArrival ? format(new Date(contract.estimatedArrival), 'yyyy-MM-dd') : '',
+      signedAt: formatDate(contract.signedAt, ''),
+      estimatedArrival: formatDate(contract.estimatedArrival, ''),
       portId: contract.portId || '',
     });
   }, [contract]);
@@ -70,7 +70,7 @@ export function ContractInfoEditor({ contract, stores, onSave }: ContractInfoEdi
   };
 
   const getStatusBadge = (status: SalesStatus) => {
-    const statusMap: Record<SalesStatus, { label: string; tone: React.ComponentProps<typeof SemanticBadge>["tone"] }> = {
+    const statusMap: Record<SalesStatus, StatusBadgeConfig> = {
       [SalesStatus.DRAFT]: { label: '草稿', tone: 'neutral' },
       [SalesStatus.CONFIRMED]: { label: '已确认', tone: 'info' },
       [SalesStatus.PACKING]: { label: '装箱中', tone: 'warning' },
@@ -79,8 +79,7 @@ export function ContractInfoEditor({ contract, stores, onSave }: ContractInfoEdi
       [SalesStatus.COMPLETED]: { label: '已完成', tone: 'secondary' },
       [SalesStatus.CANCELLED]: { label: '已取消', tone: 'danger' },
     };
-    const config = statusMap[status] || { label: status, tone: 'neutral' as const };
-    return <SemanticBadge tone={config.tone}>{config.label}</SemanticBadge>;
+    return <StatusBadge status={status} statusMap={statusMap} />;
   };
 
   // 从 stores 中获取唯一的港口列表
@@ -166,7 +165,7 @@ export function ContractInfoEditor({ contract, stores, onSave }: ContractInfoEdi
             />
           ) : (
             <div className="font-medium">
-              {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}
+              {formatDate(contract.signedAt)}
             </div>
           )}
         </div>
@@ -181,7 +180,7 @@ export function ContractInfoEditor({ contract, stores, onSave }: ContractInfoEdi
             />
           ) : (
             <div className="font-medium">
-              {contract.estimatedArrival ? format(new Date(contract.estimatedArrival), 'yyyy-MM-dd') : '-'}
+              {formatDate(contract.estimatedArrival)}
             </div>
           )}
         </div>

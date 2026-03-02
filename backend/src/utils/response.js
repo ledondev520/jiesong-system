@@ -6,6 +6,8 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
+const { buildPaginatedPayload } = require('./pagination');
+
 /**
  * 职责：构建成功响应
  * @param {Response} res - Express响应对象
@@ -39,24 +41,24 @@ const created = (res, data = null, message = '创建成功') => {
  * @param {number} page - 当前页
  * @param {number} pageSize - 每页数量
  */
-const paginated = (res, items, total, page, pageSize) => {
-  res.status(200).json({
-    code: 200,
-    message: '获取成功',
-    data: {
-      items,
-      pagination: {
-        total,
-        page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
-      },
-    },
-  });
+const paginated = (res, items, total, page, pageSize, extras = {}) => {
+  res.status(200).json(buildPaginatedPayload(items, total, page, pageSize, extras));
+};
+
+const buildErrorPayload = (message = '请求失败', statusCode = 500, data = null) => ({
+  code: statusCode,
+  message,
+  data,
+});
+
+const error = (res, message = '请求失败', statusCode = 500, data = null) => {
+  res.status(statusCode).json(buildErrorPayload(message, statusCode, data));
 };
 
 module.exports = {
   success,
   created,
   paginated,
+  error,
+  buildErrorPayload,
 };

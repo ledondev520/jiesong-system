@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { SemanticBadge } from '@/components/ui/semantic-badge';
+import { StatusBadge, type StatusBadgeConfig } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -109,15 +109,14 @@ export default function InventoryPage() {
    * 获取库存状态徽章
    */
   const getStatusBadge = (status: InventoryStatus) => {
-    const statusMap: Record<InventoryStatus, { label: string; tone: React.ComponentProps<typeof SemanticBadge>["tone"] }> = {
+    const statusMap: Record<InventoryStatus, StatusBadgeConfig> = {
       [InventoryStatus.PRODUCING]: { label: '生产中', tone: 'warning' },
       [InventoryStatus.PACKING]: { label: '包装中', tone: 'danger' },
       [InventoryStatus.SHIPPING]: { label: '运输中', tone: 'progress' },
       [InventoryStatus.INBOUND]: { label: '已入库', tone: 'secondary' },
       [InventoryStatus.OUTBOUND]: { label: '已出库', tone: 'success' },
     };
-    const config = statusMap[status] || { label: status, tone: 'neutral' as const };
-    return <SemanticBadge tone={config.tone}>{config.label}</SemanticBadge>;
+    return <StatusBadge status={status} statusMap={statusMap} />;
   };
 
   /**

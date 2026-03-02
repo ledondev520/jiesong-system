@@ -46,13 +46,13 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { SemanticBadge } from '@/components/ui/semantic-badge';
+import { StatusBadge, type StatusBadgeConfig } from '@/components/ui/status-badge';
 import { Progress } from '@/components/ui/progress';
 import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { domToPng } from 'modern-screenshot';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
 import { CONTAINER_40HQ } from '@/lib/binPacking';
+import { formatDate } from '@/lib/date-format';
 import { PageHeader } from '@/components/layout/PageHeader';
 
 // 动态导入 3D 组件（避免 SSR 问题）
@@ -389,7 +389,7 @@ export default function SalesDetailPage({ params }: PageProps) {
    * 职责：获取状态徽章
    */
   const getStatusBadge = (status: SalesStatus) => {
-    const statusMap: Record<SalesStatus, { label: string; tone: React.ComponentProps<typeof SemanticBadge>["tone"] }> = {
+    const statusMap: Record<SalesStatus, StatusBadgeConfig> = {
       [SalesStatus.DRAFT]: { label: '草稿', tone: 'neutral' },
       [SalesStatus.CONFIRMED]: { label: '已确认', tone: 'info' },
       [SalesStatus.PACKING]: { label: '装箱中', tone: 'warning' },
@@ -398,8 +398,7 @@ export default function SalesDetailPage({ params }: PageProps) {
       [SalesStatus.COMPLETED]: { label: '已完成', tone: 'secondary' },
       [SalesStatus.CANCELLED]: { label: '已取消', tone: 'danger' },
     };
-    const config = statusMap[status] || { label: status, tone: 'neutral' as const };
-    return <SemanticBadge tone={config.tone}>{config.label}</SemanticBadge>;
+    return <StatusBadge status={status} statusMap={statusMap} />;
   };
 
   if (loading) {
@@ -426,7 +425,7 @@ export default function SalesDetailPage({ params }: PageProps) {
       <div ref={headerRef}>
         <PageHeader
           title={contract.contractNo}
-          description={`目的港: ${contract.port?.name || '未指定'} | 签订: ${contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'} | 预计到达: ${contract.estimatedArrival ? format(new Date(contract.estimatedArrival), 'yyyy-MM-dd') : '-'}`}
+          description={`目的港: ${contract.port?.name || '未指定'} | 签订: ${formatDate(contract.signedAt)} | 预计到达: ${formatDate(contract.estimatedArrival)}`}
           backHref="/dashboard/sales"
           actions={
             <div className="flex items-center gap-2">

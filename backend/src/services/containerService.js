@@ -1,21 +1,10 @@
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
-
-const normalizeFilterStatus = (status) => {
-  switch (status) {
-    case 'PENDING':
-    case 'LOADING':
-      return 'DRAFT';
-    default:
-      return status;
-  }
-};
-
-const parseNullableNumber = (value, fallback = null) => {
-  if (value === undefined || value === null || value === '') return fallback;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
+const {
+  generateNextContractNo,
+  normalizeFilterStatus,
+  parseNullableNumber,
+} = require('./shared/contractUtils');
 
 const toContainerPayload = (contract) => ({
   ...contract,
@@ -24,27 +13,24 @@ const toContainerPayload = (contract) => ({
 
 const generateNextContainerNo = async (portId) => {
   const year = new Date().getFullYear().toString().slice(-2);
-  if (portId) {
-    const port = await prisma.port.findUnique({ where: { id: portId } });
-    if (port?.code) {
-      const count = await prisma.salesContract.count({
-        where: {
-          contractNo: {
-            startsWith: `${year}-`,
-            endsWith: `-${port.code}`,
-          },
-        },
-      });
-      if (count >= 0) {
-        return `${year}-${String(count + 1).padStart(3, '0')}-${port.code}`;
-      }
-    }
+  if (!portId) {
+    return generateNextContractNo({ prisma, year });
   }
 
-  const count = await prisma.salesContract.count({
-    where: { contractNo: { startsWith: `EXP${year}` } },
+  const port = await prisma.port.findUnique({
+    where: { id: portId },
+    select: { code: true },
   });
-  return `EXP${year}${String(count + 1).padStart(5, '0')}`;
+
+  if (portId) {
+    return generateNextContractNo({
+      prisma,
+      year,
+      portCode: port?.code,
+    });
+  }
+
+  return generateNextContractNo({ prisma, year });
 };
 
 const list = async ({ page, pageSize, status, portId, keyword }) => {

@@ -20,13 +20,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { SemanticBadge } from '@/components/ui/semantic-badge';
+import { StatusBadge, type StatusBadgeConfig } from '@/components/ui/status-badge';
 import { Plus, Pencil, Trash, Ship, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { ContainerDialog } from './components/ContainerDialog';
 import { toast } from 'sonner';
 import { PORTS } from '@/lib/constants';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/date-format';
 import { PageHeader } from '@/components/layout/PageHeader';
 
 export default function ContainersPage() {
@@ -56,18 +56,18 @@ export default function ContainersPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case ContainerStatus.PENDING: return <SemanticBadge tone="neutral">待装柜</SemanticBadge>;
-      case 'DRAFT': return <SemanticBadge tone="neutral">草稿</SemanticBadge>;
-      case 'CONFIRMED': return <SemanticBadge tone="neutral">已确认</SemanticBadge>;
-      case ContainerStatus.LOADING: return <SemanticBadge tone="warning">装柜中</SemanticBadge>;
-      case 'PACKING': return <SemanticBadge tone="warning">装箱中</SemanticBadge>;
-      case ContainerStatus.SHIPPED: return <SemanticBadge tone="progress">已发运</SemanticBadge>;
-      case ContainerStatus.ARRIVED: return <SemanticBadge tone="success">已到达</SemanticBadge>;
-      case 'COMPLETED': return <SemanticBadge tone="success">已完成</SemanticBadge>;
-      case 'CANCELLED': return <SemanticBadge tone="secondary">已取消</SemanticBadge>;
-      default: return <SemanticBadge tone="secondary">{status}</SemanticBadge>;
-    }
+    const statusMap: Record<string, StatusBadgeConfig> = {
+      [ContainerStatus.PENDING]: { label: '待装柜', tone: 'neutral' },
+      DRAFT: { label: '草稿', tone: 'neutral' },
+      CONFIRMED: { label: '已确认', tone: 'neutral' },
+      [ContainerStatus.LOADING]: { label: '装柜中', tone: 'warning' },
+      PACKING: { label: '装箱中', tone: 'warning' },
+      [ContainerStatus.SHIPPED]: { label: '已发运', tone: 'progress' },
+      [ContainerStatus.ARRIVED]: { label: '已到达', tone: 'success' },
+      COMPLETED: { label: '已完成', tone: 'success' },
+      CANCELLED: { label: '已取消', tone: 'secondary' },
+    };
+    return <StatusBadge status={status} statusMap={statusMap} />;
   };
 
   const handleCreate = () => {
@@ -148,9 +148,9 @@ export default function ContainersPage() {
                     <Ship className="h-4 w-4 text-muted-foreground" />
                     {container.containerNo ?? container.contractNo}
                   </TableCell>
-                  <TableCell>{getPortName(container.portId)}</TableCell>
-                  <TableCell>{getStatusBadge(container.status)}</TableCell>
-                  <TableCell>{container.estimatedArrival ? format(new Date(container.estimatedArrival), 'yyyy-MM-dd') : '-'}</TableCell>
+                    <TableCell>{getPortName(container.portId)}</TableCell>
+                    <TableCell>{getStatusBadge(container.status)}</TableCell>
+                    <TableCell>{formatDate(container.estimatedArrival)}</TableCell>
                   <TableCell>
                     <div className="text-sm">{container.totalBoxes} 箱</div>
                     <div className="text-xs text-muted-foreground">{container.volume} CBM</div>

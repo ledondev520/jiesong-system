@@ -27,22 +27,7 @@ const getNotifications = async (req, res, next) => {
       where: { userId: req.user.id, isRead: false },
     });
 
-    const payload = {
-      code: 200,
-      message: '获取成功',
-      data: {
-        items: notifications,
-        pagination: {
-          page,
-          pageSize,
-          total,
-          totalPages: Math.max(1, Math.ceil(total / pageSize)),
-        },
-        unreadCount,
-      },
-    };
-
-    res.json(payload);
+    paginated(res, notifications, total, page, pageSize, { unreadCount });
   } catch (error) {
     next(error);
   }

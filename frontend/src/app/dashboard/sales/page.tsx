@@ -22,8 +22,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { AmountText } from '@/components/ui/amount-text';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,7 +37,7 @@ import {
 import { Plus, Eye, Ship, Trash2, Loader2, FileSpreadsheet } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/date-format';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 export default function SalesPage() {
@@ -117,7 +117,7 @@ export default function SalesPage() {
    * 获取状态徽章
    */
   const getStatusBadge = (status: SalesStatus) => {
-    const statusMap: Record<SalesStatus, { label: string; tone: React.ComponentProps<typeof SemanticBadge>["tone"] }> = {
+    const statusMap: Record<SalesStatus, { label: string; tone: NonNullable<Parameters<typeof StatusBadge>[0]['statusMap']>[keyof NonNullable<Parameters<typeof StatusBadge>[0]['statusMap']>]['tone'] }> = {
       [SalesStatus.DRAFT]: { label: '草稿', tone: 'neutral' },
       [SalesStatus.CONFIRMED]: { label: '已确认', tone: 'info' },
       [SalesStatus.PACKING]: { label: '装柜中', tone: 'warning' },
@@ -127,7 +127,7 @@ export default function SalesPage() {
       [SalesStatus.CANCELLED]: { label: '已取消', tone: 'danger' },
     };
     const config = statusMap[status] || { label: status, tone: 'neutral' as const };
-    return <SemanticBadge tone={config.tone}>{config.label}</SemanticBadge>;
+    return <StatusBadge status={status} statusMap={{ [status]: config }} />;
   };
 
   return (
@@ -178,7 +178,7 @@ export default function SalesPage() {
                   <TableCell>{contract.port?.name || '-'}</TableCell>
                   <TableCell>{getStatusBadge(contract.status)}</TableCell>
                   <TableCell>
-                    {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}
+                    {formatDate(contract.signedAt)}
                   </TableCell>
                   <TableCell className="text-right">{contract.totalBoxes || 0}</TableCell>
                   <TableCell className="text-right">{(contract.volume || 0).toFixed(2)}</TableCell>

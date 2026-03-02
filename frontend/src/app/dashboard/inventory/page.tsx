@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { SemanticBadge } from '@/components/ui/semantic-badge';
+import { StatusBadge, type StatusBadgeConfig } from '@/components/ui/status-badge';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -60,14 +60,14 @@ export default function InventoryPage() {
   };
 
   const getStatusBadge = (status: InventoryStatus) => {
-    switch (status) {
-      case InventoryStatus.PRODUCING: return <SemanticBadge tone="warning">生产中</SemanticBadge>;
-      case InventoryStatus.PACKING: return <SemanticBadge tone="danger">包装中</SemanticBadge>;
-      case InventoryStatus.SHIPPING: return <SemanticBadge tone="progress">运输中</SemanticBadge>;
-      case InventoryStatus.INBOUND: return <SemanticBadge tone="secondary">已入库</SemanticBadge>;
-      case InventoryStatus.OUTBOUND: return <SemanticBadge tone="success">已出库</SemanticBadge>;
-      default: return <SemanticBadge tone="neutral">{status}</SemanticBadge>;
-    }
+    const statusMap: Record<InventoryStatus, StatusBadgeConfig> = {
+      [InventoryStatus.PRODUCING]: { label: '生产中', tone: 'warning' },
+      [InventoryStatus.PACKING]: { label: '包装中', tone: 'danger' },
+      [InventoryStatus.SHIPPING]: { label: '运输中', tone: 'progress' },
+      [InventoryStatus.INBOUND]: { label: '已入库', tone: 'secondary' },
+      [InventoryStatus.OUTBOUND]: { label: '已出库', tone: 'success' },
+    };
+    return <StatusBadge status={status} statusMap={statusMap} />;
   };
 
   /**

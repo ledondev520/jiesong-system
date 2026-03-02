@@ -2,15 +2,7 @@ const prisma = require('../../utils/prisma');
 const { success, paginated } = require('../../utils/response');
 const { createError } = require('../../middleware/errorHandler');
 const { normalizePagination } = require('../../utils/pagination');
-
-const parseOptionalText = (value) => {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
-};
+const { parseOptionalText } = require('../../utils/text');
 
 const normalizePortPayload = (value) => {
   if (!value) {

@@ -61,8 +61,28 @@ const buildPaginationMeta = (total, page, pageSize) => ({
   totalPages: Math.ceil(total / pageSize),
 });
 
+/**
+ * 生成统一分页响应 payload（含自定义扩展字段）。
+ * @param {Array} items - 列表项
+ * @param {number} total - 总数量
+ * @param {number} page - 页码
+ * @param {number} pageSize - 每页数量
+ * @param {Record<string, unknown>} [extras] - 额外字段（如 unreadCount）
+ * @returns {object}
+ */
+const buildPaginatedPayload = (items, total, page, pageSize, extras = {}) => ({
+  code: 200,
+  message: '获取成功',
+  data: {
+    items,
+    pagination: buildPaginationMeta(total, page, pageSize),
+    ...extras,
+  },
+});
+
 module.exports = {
   parsePositiveInt,
   normalizePagination,
   buildPaginationMeta,
+  buildPaginatedPayload,
 };

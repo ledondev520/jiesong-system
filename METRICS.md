@@ -319,3 +319,19 @@
 
 ### 结论
 - 测试链路从“前后端单测 + 前端 E2E”升级为“前后端单测 + 前端 E2E + 数据库集成测试”四线门禁，自动化完整性进一步闭环。
+
+## 2026-03-02 Round 25（OPTIMIZATION_PLAN 统一化收口）
+
+### 质量指标
+- `dataImportService` 回归测试新增：`2 tests`（`compareWithDatabase` + `importRecords`）。
+- 状态徽章统一影响文件：3（`inventory/page.tsx`、`inventory-container/page.tsx`、`sales/[id]/components/SalesDetailPageContent.tsx`）。
+- 日期工具统一覆盖：`ContractInfoEditor.tsx` + `SalesDetailPageContent.tsx`。
+
+### 过程指标
+- 后端测试文件：`backend/src/services/dataImportService.test.js` 从冒烟到关键行为回归（新增断言/行为约束）。
+- 前端页面文件：`StatusBadge` + `formatDate` 替换完成 3 页关键详情/列表链路。
+- 文档里程碑同步：`PLAN.md` 与 `TASKS.md` 新增本轮交付摘要；`RISKS.md` 补充 2 条回退条件。
+
+### 结论
+- 完成本轮收口后，前后端在不改 API 契约前提下完成“统一展示层组件化 + import 关键路径行为可验证化”；
+- 当前未在本次操作内执行自动化回归（按你本次要求保留变更并进入下一步验证环节）。

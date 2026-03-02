@@ -8,6 +8,8 @@
 
 const config = require('../config');
 const prisma = require('../utils/prisma');
+const { buildChatSession } = require('./ai/chatOrchestrator');
+const { collectStreamedChat } = require('./ai/streamHelpers');
 
 const OpenAI = require('openai');
 
@@ -24,6 +26,11 @@ const getActiveProvider = () => {
   return config.kimi?.apiKey ? 'kimi' : null;
 };
 
+const safeToNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 // 初始化OpenAI客户端（用于流式调用）
 const getOpenAIClient = () => {
   if (!config.kimi.apiKey) return null;
@@ -33,12 +40,215 @@ const getOpenAIClient = () => {
   });
 };
 
-// 获取 Kimi 客户端（别名）
-const getKimiClient = getOpenAIClient;
+const persistChatMessage = ({ userId, sessionId, role, content, imageUrl = null, promptTokens = 0, outputTokens = 0, modelUsed = null }) => {
+  const payload = {
+    userId,
+    sessionId,
+    role,
+    content,
+  };
 
-// 选择模型
-const selectModel = (type) => {
-  return MODELS[type] || MODELS.default;
+  if (imageUrl) {
+    payload.imageUrl = imageUrl;
+  }
+
+  if (role === 'assistant') {
+    payload.promptTokens = safeToNumber(promptTokens);
+    payload.outputTokens = safeToNumber(outputTokens);
+    if (modelUsed) {
+      payload.modelUsed = modelUsed;
+    }
+  }
+
+  return prisma.chatHistory.create({ data: payload });
+};
+
+const persistUserMessage = ({ userId, sessionId, message, imageUrl }) =>
+  prisma.chatHistory.create({
+    data: {
+      userId,
+      sessionId,
+      role: 'user',
+      content: message,
+      imageUrl,
+    },
+  });
+
+const buildChatErrorResponse = (error) => {
+  if (error.status === 401 || error.message?.includes('Unauthorized')) {
+    return '错误：API Key无效或已过期，请联系管理员检查配置。';
+  }
+  if (error.status === 429 || error.message?.includes('rate limit')) {
+    return '错误：请求过于频繁，请稍后再试。';
+  }
+  if (error.status === 400 || error.message?.includes('Invalid')) {
+    return `错误：请求参数无效 - ${error.message || '未知错误'}`;
+  }
+  if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+    return '错误：无法连接到AI服务，请检查网络连接。';
+  }
+  if (error.message) {
+    return `错误：${error.message}`;
+  }
+  return '抱歉，AI服务出错了。';
+};
+
+const buildZeroTokenUsage = () => ({
+  promptTokens: 0,
+  outputTokens: 0,
+});
+
+const runThinkingChat = async ({ message, model, messages, onChunk, onThinking }) => {
+  const tokenUsage = buildZeroTokenUsage();
+  const client = getOpenAIClient();
+  if (!client) {
+    return {
+      response: await generateLocalResponse(message),
+      tokenUsage,
+    };
+  }
+
+  try {
+    const tokenEstimate = await estimateTokens(messages, model);
+    tokenUsage.promptTokens = safeToNumber(tokenEstimate.data?.total_tokens);
+
+    const streamResult = await collectStreamedChat({
+      client,
+      model,
+      messages,
+      onChunk,
+      onThinking,
+      isThinkingModel: true,
+    });
+
+    tokenUsage.outputTokens = Math.ceil((streamResult.fullContent.length + streamResult.thinkingContent.length) / 2);
+
+    return {
+      response: streamResult.fullContent,
+      tokenUsage,
+    };
+  } catch (error) {
+    console.error('流式调用失败:', error.message, error.stack);
+    const fallbackResponse = buildChatErrorResponse(error);
+    if (onChunk) {
+      onChunk(fallbackResponse);
+    }
+
+    return {
+      response: fallbackResponse,
+      tokenUsage,
+    };
+  }
+};
+
+const runStandardChat = async ({ messages, model }) => {
+  const result = await callKimiAPI(messages, model);
+  return {
+    response: result.content,
+    tokenUsage: {
+      promptTokens: safeToNumber(result.tokenUsage.promptTokens),
+      outputTokens: safeToNumber(result.tokenUsage.outputTokens),
+    },
+  };
+};
+
+const runChatModel = async ({ message, model, useThinking, messages, onChunk, onThinking }) => {
+  if (!config.kimi.apiKey) {
+    return {
+      response: await generateLocalResponse(message),
+      tokenUsage: buildZeroTokenUsage(),
+    };
+  }
+
+  if (useThinking) {
+    return runThinkingChat({
+      message,
+      model,
+      messages,
+      onChunk,
+      onThinking,
+    });
+  }
+
+  return runStandardChat({ messages, model });
+};
+
+const buildTokenRecordArgs = (userId, sessionId, model, tokenUsage, useThinking) => {
+  if (tokenUsage.promptTokens <= 0) {
+    return null;
+  }
+
+  return {
+    userId,
+    sessionId,
+    model,
+    tokenUsage,
+    requestType: useThinking ? 'chat_stream' : 'chat',
+  };
+};
+
+const buildChatApiResult = ({ response, model, tokenUsage, sessionId }) => ({
+  message: response,
+  sessionId,
+  tokenUsage: {
+    prompt: tokenUsage.promptTokens,
+    completion: tokenUsage.outputTokens,
+    total: tokenUsage.promptTokens + tokenUsage.outputTokens,
+  },
+  model,
+});
+
+const runChatSession = async ({
+  userId,
+  sessionId,
+  message,
+  imageUrl,
+  useThinking,
+  onChunk,
+  onThinking,
+}) => {
+  const { messages, model } = await buildChatSession({
+    userId,
+    sessionId,
+    message,
+    imageUrl,
+    defaultModel: MODELS.default,
+    visionModel: MODELS.vision,
+    thinkingModel: MODELS.thinking,
+    useThinkingModel: Boolean(useThinking),
+  });
+
+  await persistUserMessage({ userId, sessionId, message, imageUrl });
+
+  const { response: aiResponse, tokenUsage } = await runChatModel({
+    message,
+    model,
+    useThinking,
+    messages,
+    onChunk,
+    onThinking,
+  });
+
+  const tokenRecord = buildTokenRecordArgs(userId, sessionId, model, tokenUsage, useThinking);
+  if (tokenRecord) {
+    await recordTokenUsage(tokenRecord.userId, tokenRecord.sessionId, tokenRecord.model, tokenRecord.tokenUsage, tokenRecord.requestType);
+  }
+
+  await persistChatMessage({
+    userId,
+    sessionId,
+    role: 'assistant',
+    content: aiResponse,
+    promptTokens: tokenUsage.promptTokens,
+    outputTokens: tokenUsage.outputTokens,
+    modelUsed: model,
+  });
+
+  return {
+    response: aiResponse,
+    model,
+    tokenUsage,
+  };
 };
 
 /**
@@ -56,78 +266,22 @@ const selectModel = (type) => {
  * @returns {Object} AI响应
  */
 const chat = async (userId, sessionId, message, imageUrl = null) => {
-  // 0. 获取历史对话（最近10条）
-  const history = await prisma.chatHistory.findMany({
-    where: { userId, sessionId },
-    orderBy: { createdAt: 'asc' },
-    take: 10,
-  });
-  
-  // 0.5 查询数据库获取相关上下文
-  const dbContext = await getDbContext(message);
-  
-  // 1. 构建消息列表（系统提示词 + 数据库上下文）
-  const messages = [
-    { role: 'system', content: getSystemPrompt() + dbContext },
-    ...history.map(h => buildMessageFromHistory(h)),
-  ];
-  
-  // 2. 构建当前用户消息
-  const userMessage = buildUserMessage(message, imageUrl);
-  messages.push(userMessage);
-  
-  // 3. 选择模型（当前消息或历史消息有图片时，使用视觉模型）
-  const hasImageInHistory = history.some(h => h.imageUrl);
-  const needsVisionModel = imageUrl || hasImageInHistory;
-  const model = needsVisionModel ? MODELS.vision : MODELS.default;
-  
-  console.log(`[AI] 使用模型: ${model}, 当前图片: ${!!imageUrl}, 历史图片: ${hasImageInHistory}`);
-  
-  // 4. 保存用户消息
-  await prisma.chatHistory.create({
-    data: { userId, sessionId, role: 'user', content: message, imageUrl },
-  });
-  
-  // 5. 调用Kimi API
-  let aiResponse = '';
-  let tokenUsage = { promptTokens: 0, outputTokens: 0 };
-  
-  if (config.kimi.apiKey) {
-    const result = await callKimiAPI(messages, model);
-    aiResponse = result.content;
-    tokenUsage = result.tokenUsage;
-  } else {
-    aiResponse = await generateLocalResponse(message);
-  }
-  
-  // 6. 记录Token消耗
-  if (tokenUsage.promptTokens > 0) {
-    await recordTokenUsage(userId, sessionId, model, tokenUsage, 'chat');
-  }
-  
-  // 7. 保存AI响应
-  await prisma.chatHistory.create({
-    data: {
-      userId,
-      sessionId,
-      role: 'assistant',
-      content: aiResponse,
-      promptTokens: tokenUsage.promptTokens,
-      outputTokens: tokenUsage.outputTokens,
-      modelUsed: model,
-    },
-  });
-  
-  return {
-    message: aiResponse,
+  const result = await runChatSession({
+    userId,
     sessionId,
-    tokenUsage: {
-      prompt: tokenUsage.promptTokens,
-      completion: tokenUsage.outputTokens,
-      total: tokenUsage.promptTokens + tokenUsage.outputTokens,
-    },
-    model,
-  };
+    message,
+    imageUrl,
+    useThinking: false,
+  });
+
+  console.log(`[AI] 使用模型: ${result.model}, 当前图片: ${!!imageUrl}`);
+
+  return buildChatApiResult({
+    response: result.response,
+    model: result.model,
+    tokenUsage: result.tokenUsage,
+    sessionId,
+  });
 };
 
 /**
@@ -145,172 +299,24 @@ const chat = async (userId, sessionId, message, imageUrl = null) => {
  * @returns {Object} 最终结果
  */
 const chatStream = async (userId, sessionId, message, imageUrl = null, onChunk, onThinking = null) => {
-  const client = getOpenAIClient();
-  
-  // 0. 获取历史对话（最近10条）
-  const history = await prisma.chatHistory.findMany({
-    where: { userId, sessionId },
-    orderBy: { createdAt: 'asc' },
-    take: 10,
-  });
-  
-  // 0.5 查询数据库获取相关上下文
-  const dbContext = await getDbContext(message);
-  
-  // 1. 构建消息列表（系统提示词 + 数据库上下文）
-  const messages = [
-    { role: 'system', content: getSystemPrompt() + dbContext },
-    ...history.map(h => buildMessageFromHistory(h)),
-  ];
-  
-  // 2. 构建当前用户消息
-  const userMessage = buildUserMessage(message, imageUrl);
-  messages.push(userMessage);
-  
-  // 3. 选择模型（有图片时用视觉模型，否则用 thinking-turbo 模型）
-  const hasImageInHistory = history.some(h => h.imageUrl);
-  const needsVisionModel = imageUrl || hasImageInHistory;
-  // 使用 thinking-turbo 模型（更快的推理速度，除非需要视觉能力）
-  const model = needsVisionModel ? MODELS.vision : 'kimi-k2-thinking-turbo';
-  
-  console.log(`[AI] 使用模型: ${model}, 当前图片: ${!!imageUrl}, 历史图片: ${hasImageInHistory}`);
-  
-  // 4. 保存用户消息
-  await prisma.chatHistory.create({
-    data: { userId, sessionId, role: 'user', content: message, imageUrl },
-  });
-  
-  // 5. 流式调用Kimi API
-  let fullContent = '';
-  let thinkingContent = '';
-  let tokenUsage = { promptTokens: 0, outputTokens: 0 };
-  
-  if (client) {
-    try {
-      // 估算输入Token
-      const tokenEstimate = await estimateTokens(messages, model);
-      tokenUsage.promptTokens = tokenEstimate.data?.total_tokens || 0;
-      
-      // 流式调用（thinking 模型需要 temperature=1.0 和更大的 max_tokens）
-      const isThinkingModel = model.includes('thinking');
-      const stream = await client.chat.completions.create({
-        model,
-        messages,
-        temperature: isThinkingModel ? 1.0 : 0.6,
-        max_tokens: isThinkingModel ? 16000 : undefined,
-        stream: true,
-      });
-      
-      // 逐个chunk处理
-      for await (const chunk of stream) {
-        const delta = chunk.choices[0]?.delta;
-        
-        // 处理 reasoning_content（思考过程）
-        if (delta && Object.prototype.hasOwnProperty.call(delta, 'reasoning_content')) {
-          const reasoning = delta.reasoning_content;
-          if (reasoning) {
-            thinkingContent += reasoning;
-            if (onThinking) {
-              onThinking(reasoning);
-            }
-          }
-        }
-        
-        // 处理 content（最终内容）
-        if (delta?.content) {
-          fullContent += delta.content;
-          if (onChunk) {
-            onChunk(delta.content);
-          }
-        }
-      }
-      
-      // 估算输出Token
-      tokenUsage.outputTokens = Math.ceil((fullContent.length + thinkingContent.length) / 2);
-      
-    } catch (error) {
-      console.error('流式调用失败:', error.message, error.stack);
-      let errorMessage = '抱歉，AI服务出错了。';
-      if (error.status === 401 || error.message?.includes('Unauthorized')) {
-        errorMessage = '错误：API Key无效或已过期，请联系管理员检查配置。';
-      } else if (error.status === 429 || error.message?.includes('rate limit')) {
-        errorMessage = '错误：请求过于频繁，请稍后再试。';
-      } else if (error.status === 400 || error.message?.includes('Invalid')) {
-        errorMessage = '错误：请求参数无效 - ' + (error.message || '未知错误');
-      } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
-        errorMessage = '错误：无法连接到AI服务，请检查网络连接。';
-      } else if (error.message) {
-        errorMessage = '错误：' + error.message;
-      }
-      fullContent = errorMessage;
-      if (onChunk) onChunk(fullContent);
-    }
-  } else {
-    fullContent = await generateLocalResponse(message);
-    if (onChunk) onChunk(fullContent);
-  }
-  
-  // 6. 记录Token消耗
-  if (tokenUsage.promptTokens > 0) {
-    await recordTokenUsage(userId, sessionId, model, tokenUsage, 'chat_stream');
-  }
-  
-  // 7. 保存AI响应
-  await prisma.chatHistory.create({
-    data: {
-      userId,
-      sessionId,
-      role: 'assistant',
-      content: fullContent,
-      promptTokens: tokenUsage.promptTokens,
-      outputTokens: tokenUsage.outputTokens,
-      modelUsed: model,
-    },
-  });
-  
-  return {
-    message: fullContent,
-    thinking: thinkingContent,
+  const result = await runChatSession({
+    userId,
     sessionId,
-    tokenUsage: {
-      prompt: tokenUsage.promptTokens,
-      completion: tokenUsage.outputTokens,
-      total: tokenUsage.promptTokens + tokenUsage.outputTokens,
-    },
+    message,
+    imageUrl,
+    useThinking: true,
+    onChunk,
+    onThinking,
+  });
+
+  const { response, model, tokenUsage } = result;
+
+  return buildChatApiResult({
+    response,
     model,
-  };
-};
-
-/**
- * 职责：从历史记录构建消息
- */
-const buildMessageFromHistory = (h) => {
-  if (h.imageUrl && h.role === 'user') {
-    return {
-      role: h.role,
-      content: [
-        { type: 'text', text: h.content },
-        { type: 'image_url', image_url: { url: h.imageUrl } },
-      ],
-    };
-  }
-  return { role: h.role, content: h.content };
-};
-
-/**
- * 职责：构建用户消息（支持图片）
- */
-const buildUserMessage = (message, imageUrl) => {
-  if (imageUrl) {
-    return {
-      role: 'user',
-      content: [
-        { type: 'text', text: message },
-        { type: 'image_url', image_url: { url: imageUrl } },
-      ],
-    };
-  }
-  return { role: 'user', content: message };
+    tokenUsage,
+    sessionId,
+  });
 };
 
 /**
@@ -333,292 +339,6 @@ const recordTokenUsage = async (userId, sessionId, model, tokenUsage, requestTyp
 /**
  * 职责：获取系统提示词
  */
-const getSystemPrompt = () => {
-  return `你是捷淞进销存系统的AI助手，帮助用户管理采购、销售、库存和货柜信息。
-
-你的主要功能：
-1. 智能问答：回答关于商品位置、库存状态、合同信息等业务问题
-2. 辅助录入：解析用户粘贴的报价单、合同信息，提取关键字段
-3. 价格计算：根据成本价、汇率、利润率计算推荐售价
-4. 图像识别：识别用户上传的报价单、发票、合同图片，提取信息
-5. 业务分析：提供采购、销售数据的分析建议
-
-定价公式：售价(USD) = 成本价(RMB) ÷ (汇率 - 0.2) × 1.3
-
-编号格式：
-- 货柜：年份-序号-港口简码，如 25-001-LA
-- 采购合同：CG + 年份 + 5位序号，如 CG2500001
-- 出口合同：EXP + 年份 + 5位序号，如 EXP2500001
-
-重要：当用户查询合同或货柜信息时：
-1. 直接引用【数据库参考信息】中的实际数据来回答
-2. 如果找到相关数据，详细列出商品明细、数量、金额等
-3. 提供跳转链接让用户可以查看更多详情，格式示例：
-   - "点击查看销售合同详情: /dashboard/contracts?tab=sales"
-   - "点击查看货柜详情: /dashboard/inventory-container?tab=container"
-4. 如果用户输入的编号可能有误（如多了一个数字），主动查找相似的记录并提示
-5. 如果数据库中没有相关数据，明确告知用户"系统中未找到此记录"
-
-请用中文回答，语言简洁专业。当用户上传图片时，请仔细识别图片内容并提取有用信息。`;
-};
-
-/**
- * 职责：查询数据库获取与用户问题相关的上下文
- * 思路：
- * 1. 分析用户问题中的关键词
- * 2. 查询相关的商品、供应商、合同、货柜等数据
- * 3. 格式化为上下文字符串返回给AI
- * @param {string} message - 用户消息
- * @returns {string} 数据库上下文
- */
-const getDbContext = async (message) => {
-  const context = [];
-  const lowerMsg = message.toLowerCase();
-  
-  try {
-    // 1. 统计数据（总是包含）
-    const [productCount, supplierCount, purchaseCount, salesCount] = await Promise.all([
-      prisma.product.count(),
-      prisma.supplier.count(),
-      prisma.purchaseContract.count(),
-      prisma.salesContract.count(),
-    ]);
-    const containerCount = salesCount;
-    
-    context.push(`【系统统计】商品${productCount}种, 供应商${supplierCount}家, 采购合同${purchaseCount}份, 销售合同${salesCount}份, 货柜${containerCount}个`);
-    
-    // 2. 查询相关商品
-    if (lowerMsg.includes('商品') || lowerMsg.includes('产品') || lowerMsg.includes('货')) {
-      const keywords = extractKeywords(message);
-      for (const keyword of keywords) {
-        const products = await prisma.product.findMany({
-          where: { customsName: { contains: keyword } },
-          take: 5,
-        });
-        if (products.length > 0) {
-          context.push(`【商品"${keyword}"】找到${products.length}条: ` + products.map(p => `${p.customsName}(${p.unit})`).join(', '));
-        }
-      }
-    }
-    
-    // 3. 查询供应商
-    if (lowerMsg.includes('供应商') || lowerMsg.includes('厂家') || lowerMsg.includes('谁')) {
-      const keywords = extractKeywords(message);
-      for (const keyword of keywords) {
-        const suppliers = await prisma.supplier.findMany({
-          where: { OR: [{ name: { contains: keyword } }, { shortName: { contains: keyword } }] },
-          take: 5,
-        });
-        if (suppliers.length > 0) {
-          context.push(`【供应商"${keyword}"】找到${suppliers.length}家: ` + suppliers.map(s => `${s.name}(${s.shortName || '无简称'})`).join(', '));
-        }
-      }
-    }
-    
-    // 4. 查询合同
-    if (lowerMsg.includes('合同') || lowerMsg.includes('cg') || lowerMsg.includes('exp') || lowerMsg.includes('采购') || lowerMsg.includes('销售')) {
-      // 查询采购合同
-      const purchaseKeyword = message.match(/CG\d+/i)?.[0];
-      if (purchaseKeyword) {
-        const purchases = await prisma.purchaseContract.findMany({
-          where: { contractNo: { contains: purchaseKeyword.toUpperCase() } },
-          include: { supplier: true },
-          take: 3,
-        });
-        if (purchases.length > 0) {
-          context.push(`【采购合同"${purchaseKeyword}"】` + purchases.map(p => `${p.contractNo}(供应商:${p.supplier?.name || '未知'}, 金额:¥${p.totalAmount})`).join('; '));
-        }
-      }
-      
-      // 查询销售合同（包含商品明细）
-      const salesKeyword = message.match(/EXP\d+/i)?.[0];
-      if (salesKeyword) {
-        const sales = await prisma.salesContract.findMany({
-          where: { contractNo: { contains: salesKeyword.toUpperCase() } },
-          include: { 
-            items: { 
-              include: { 
-                product: true, 
-                store: true 
-              } 
-            } 
-          },
-          take: 3,
-        });
-        if (sales.length > 0) {
-          for (const s of sales) {
-            const itemDetails = s.items?.map(item => 
-              `${item.product?.customsName || '未知商品'}(${item.quantity}${item.product?.unit || ''}, 售价$${item.sellingPrice}, 门店:${item.store?.name || '未知'})`
-            ).join(', ') || '无商品明细';
-            
-            context.push(`【销售合同${s.contractNo}】状态:${s.status}, 金额:$${s.totalAmount}, 已收:$${s.receivedAmount}\n  商品明细: ${itemDetails}\n  链接: /dashboard/contracts?tab=sales`);
-          }
-        } else {
-          // 模糊匹配（用户可能输入错误的编号）
-          const fuzzySearch = salesKeyword.toUpperCase().replace(/EXP/, '');
-          const fuzzySales = await prisma.salesContract.findMany({
-            where: { contractNo: { contains: fuzzySearch } },
-            include: { 
-              items: { 
-                include: { 
-                  product: true, 
-                  store: true 
-                } 
-              } 
-            },
-            take: 3,
-          });
-          if (fuzzySales.length > 0) {
-            context.push(`【提示】未找到精确匹配的"${salesKeyword}"，但找到以下相似合同:`);
-            for (const s of fuzzySales) {
-              const itemDetails = s.items?.map(item => 
-                `${item.product?.customsName || '未知商品'}(${item.quantity}${item.product?.unit || ''})`
-              ).join(', ') || '无商品明细';
-              context.push(`  - ${s.contractNo}: $${s.totalAmount}, 商品: ${itemDetails}`);
-            }
-          }
-        }
-      }
-      
-      // 最近合同汇总
-      if (!purchaseKeyword && !salesKeyword && (lowerMsg.includes('采购') || lowerMsg.includes('合同'))) {
-        const recentPurchases = await prisma.purchaseContract.findMany({
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-          include: { supplier: true },
-        });
-        if (recentPurchases.length > 0) {
-          context.push(`【最近采购合同】` + recentPurchases.map(p => `${p.contractNo}(${p.supplier?.shortName || p.supplier?.name || '未知'}, ¥${p.totalAmount})`).join(', '));
-        }
-      }
-    }
-    
-    // 5. 查询货柜（包含商品明细）
-    if (lowerMsg.includes('货柜') || lowerMsg.includes('集装箱') || lowerMsg.includes('柜') || lowerMsg.match(/\d{2}-\d{3}/)) {
-      const containerNo = message.match(/\d{2}-\d{3}(-\w+)?/)?.[0];
-      if (containerNo) {
-        const containers = await prisma.salesContract.findMany({
-          where: { contractNo: { contains: containerNo } },
-          include: { 
-            port: true,
-            packingItems: {
-              include: {
-                product: true
-              }
-            }
-          },
-          take: 3,
-        });
-        if (containers.length > 0) {
-          for (const c of containers) {
-            const itemDetails = c.packingItems?.map(item => 
-              `${item.product?.customsName || '未知商品'}(${item.quantity}${item.product?.unit || ''}, ${item.boxes || 0}箱)`
-            ).join(', ') || '暂无装箱记录';
-            
-            context.push(`【货柜${c.contractNo}】港口:${c.port?.name || '未知'}, 状态:${c.status}, 总箱数:${c.totalBoxes}, 体积:${c.volume}CBM\n  装箱明细: ${itemDetails}\n  链接: /dashboard/inventory-container?tab=container`);
-          }
-        }
-      } else {
-        // 最近货柜
-        const recentContainers = await prisma.salesContract.findMany({
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-          include: { 
-            port: true,
-            packingItems: { include: { product: true } }
-          },
-        });
-        if (recentContainers.length > 0) {
-          context.push(`【最近货柜】`);
-          for (const c of recentContainers) {
-            const itemCount = c.packingItems?.length || 0;
-            context.push(`  - ${c.contractNo}: ${c.port?.name || '未知'}, ${c.status}, ${itemCount}种商品, ${c.totalBoxes}箱`);
-          }
-        }
-      }
-    }
-    
-    // 6. 库存和位置查询
-    if (lowerMsg.includes('位置') || lowerMsg.includes('在哪') || lowerMsg.includes('库存') || lowerMsg.includes('多少')) {
-      const keywords = extractKeywords(message);
-      for (const keyword of keywords) {
-        const inventories = await prisma.inventory.findMany({
-          where: { product: { customsName: { contains: keyword } } },
-          include: { product: true, salesContract: { include: { port: true } } },
-          take: 5,
-        });
-        if (inventories.length > 0) {
-          context.push(`【库存"${keyword}"】` + inventories.map(i => 
-            `${i.product.customsName}: ${i.quantity}${i.product.unit}, 货柜${i.salesContract?.contractNo || '未装柜'}, 状态${i.status}`
-          ).join('; '));
-        }
-      }
-    }
-    
-    // 7. 价格查询
-    if (lowerMsg.includes('价格') || lowerMsg.includes('售价') || lowerMsg.includes('成本')) {
-      const exchangeConfig = await prisma.systemConfig.findUnique({ where: { key: 'exchangeRate' } });
-      if (exchangeConfig) {
-        try {
-          const rate = JSON.parse(exchangeConfig.value);
-          context.push(`【汇率配置】当前汇率${rate.rate || rate}, 缓冲值${rate.buffer || 0.2}`);
-        } catch {
-          context.push(`【汇率配置】当前汇率${exchangeConfig.value}`);
-        }
-      }
-    }
-    
-    // 8. 财务查询
-    if (lowerMsg.includes('付款') || lowerMsg.includes('欠款') || lowerMsg.includes('应付') || lowerMsg.includes('应收') || lowerMsg.includes('财务')) {
-      const [payableStats, receivableStats] = await Promise.all([
-        prisma.purchaseContract.aggregate({
-          where: { NOT: { status: 'CANCELLED' } },
-          _sum: { totalAmount: true, paidAmount: true },
-        }),
-        prisma.salesContract.aggregate({
-          where: { NOT: { status: 'CANCELLED' } },
-          _sum: { totalAmount: true, receivedAmount: true },
-        }),
-      ]);
-      
-      const payableTotal = payableStats._sum.totalAmount || 0;
-      const paidTotal = payableStats._sum.paidAmount || 0;
-      const receivableTotal = receivableStats._sum.totalAmount || 0;
-      const receivedTotal = receivableStats._sum.receivedAmount || 0;
-      
-      context.push(`【财务概况】应付总额¥${payableTotal}, 已付¥${paidTotal}, 待付¥${payableTotal - paidTotal}; 应收总额$${receivableTotal}, 已收$${receivedTotal}, 待收$${receivableTotal - receivedTotal}`);
-    }
-    
-  } catch (error) {
-    console.error('查询数据库上下文失败:', error.message);
-  }
-  
-  return context.length > 0 ? '\n\n【数据库参考信息】\n' + context.join('\n') : '';
-};
-
-/**
- * 职责：从用户消息中提取关键词
- * @param {string} message - 用户消息
- * @returns {string[]} 关键词列表
- */
-const extractKeywords = (message) => {
-  // 移除常见的问句词
-  const stopWords = ['是什么', '在哪', '多少', '有没有', '能不能', '怎么', '哪里', '哪个', '什么', '请', '帮我', '查询', '查一下', '找', '看看'];
-  let text = message;
-  stopWords.forEach(w => { text = text.replace(new RegExp(w, 'g'), ' '); });
-  
-  // 提取中文词（2-10个字）
-  const chineseWords = text.match(/[\u4e00-\u9fa5]{2,10}/g) || [];
-  
-  // 提取合同编号
-  const contractNos = text.match(/[A-Za-z]{2,3}\d+/g) || [];
-  
-  // 提取货柜编号
-  const containerNos = text.match(/\d{2}-\d{3}(-\w+)?/g) || [];
-  
-  return [...new Set([...chineseWords, ...contractNos, ...containerNos])].slice(0, 5);
-};
-
 /**
  * 职责：调用Kimi API（流式调用）
  * 思路：
@@ -1001,6 +721,33 @@ const generateGreeting = async () => {
   }
 };
 
+const generateGreetingStream = async (onThinking, onContent, onDone) => {
+  const resolvedOnThinking = typeof onThinking === 'function' ? onThinking : null;
+  const resolvedOnContent = typeof onContent === 'function' ? onContent : null;
+  const resolvedOnDone = typeof onDone === 'function' ? onDone : null;
+
+  if (resolvedOnThinking) {
+    resolvedOnThinking('生成问候语中...');
+  }
+
+  const result = await generateGreeting();
+
+  if (resolvedOnContent) {
+    if (result.greeting) {
+      resolvedOnContent(result.greeting);
+    }
+    if (Array.isArray(result.lyrics)) {
+      result.lyrics.forEach((line) => resolvedOnContent(line));
+    }
+  }
+
+  if (resolvedOnDone) {
+    resolvedOnDone(result);
+  }
+
+  return result;
+};
+
 /**
  * 职责：获取本地预设问候语（备用方案，不含歌词）
  * 说明：当 AI 服务不可用时的降级方案
@@ -1036,6 +783,7 @@ module.exports = {
   estimateTokens,
   generateLocalResponse,
   getTokenStats,
+  generateGreetingStream,
   generateGreeting,
   MODELS,
 };

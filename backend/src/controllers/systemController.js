@@ -8,7 +8,6 @@ const {
   getConfigs,
   updateConfig,
   getExchangeRate,
-  parseOptionalText,
 } = require('./system/configController');
 const {
   getNotifications,
@@ -49,5 +48,4 @@ module.exports = {
   importData,
   getImportRecords,
   exportData,
-  parseOptionalText,
 };

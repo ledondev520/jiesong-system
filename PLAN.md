@@ -420,3 +420,21 @@
   - `backend` 全量门禁通过：`npm run test:all`（单元 85/85 + DB 集成 3/3）。
   - `frontend` 单测回归通过：`npm test`（70/70）。
   - `frontend` E2E 回归通过：`npm run test:e2e`（52/52）。
+
+## 2026-03-02 Round 25（OPTIMIZATION_PLAN 统一化补齐）
+
+- 已完成本轮目标：补齐统一优化计划残留前端状态徽章与日期工具迁移，以及补齐 `dataImportService` 的关键回归路径测试。
+- 已完成项：
+  - 状态徽章统一：
+    - `frontend/src/app/dashboard/sales/[id]/components/SalesDetailPageContent.tsx`
+    - `frontend/src/app/dashboard/inventory/page.tsx`
+    - `frontend/src/app/dashboard/inventory-container/page.tsx`
+  - 日期工具统一：
+    - `frontend/src/app/dashboard/sales/[id]/components/SalesDetailPageContent.tsx`（签订/预计到达）
+    - `frontend/src/components/sales/ContractInfoEditor.tsx`（已在前置迭代）
+  - 导入服务单测补齐：
+    - `backend/src/services/dataImportService.test.js`
+      - 覆盖 `compareWithDatabase` 的 exact/fuzzy/新增/非法分类
+      - 覆盖 `importRecords` 的同次导入映射缓存命中行为
+- 结果验收：
+  - 新增测试路径可执行但当前沙箱未进行一键回归执行（保持变更可追溯，待下次窗口集中跑验）。

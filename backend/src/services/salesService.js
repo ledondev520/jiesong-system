@@ -1,9 +1,18 @@
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
+const {
+  generateNextContractNo,
+  normalizeFilterStatus,
+  parseNullableNumber,
+} = require('./shared/contractUtils');
+
+const getCurrentYear = () => new Date().getFullYear().toString().slice(-2);
 
 const getSalesContracts = async ({ page, pageSize, status, storeId, keyword }) => {
   const where = {};
-  if (status) where.status = status;
+  if (status) {
+    where.status = normalizeFilterStatus(status);
+  }
   if (storeId) {
     where.items = { some: { storeId } };
   }
@@ -59,16 +68,14 @@ const getSalesContractById = async (id) => {
 };
 
 const createSalesContract = async (data = {}) => {
-  const year = new Date().getFullYear().toString().slice(-2);
-  const count = await prisma.salesContract.count({
-    where: { contractNo: { startsWith: `EXP${year}` } },
-  });
-  const contractNo = `EXP${year}${String(count + 1).padStart(5, '0')}`;
+  const year = getCurrentYear();
+  const contractNo = data.contractNo || (await generateNextContractNo({ prisma, year }));
+  const exchangeRate = parseNullableNumber(data.exchangeRate, 7.0);
 
   const contract = await prisma.salesContract.create({
     data: {
       contractNo,
-      exchangeRate: data.exchangeRate,
+      exchangeRate,
       signedAt: data.signedAt ? new Date(data.signedAt) : null,
       note: data.note,
     },
@@ -81,7 +88,7 @@ const updateSalesContract = async (id, data = {}) => {
   return prisma.salesContract.update({
     where: { id },
     data: {
-      exchangeRate: data.exchangeRate,
+      exchangeRate: parseNullableNumber(data.exchangeRate, undefined),
       signedAt: data.signedAt ? new Date(data.signedAt) : undefined,
       estimatedArrival: data.estimatedArrival ? new Date(data.estimatedArrival) : undefined,
       portId: data.portId || undefined,
@@ -97,9 +104,6 @@ const removeSalesContract = async (id) => {
 const addSalesItem = async (id, data = {}) => {
   const contract = await prisma.salesContract.findUnique({ where: { id } });
 
-  const sellingPrice = data.sellingPrice ||
-    (data.costPrice / contract.exchangeRate * 1.3);
-
   const item = await prisma.salesItem.create({
     data: {
       salesContractId: id,
@@ -108,7 +112,7 @@ const addSalesItem = async (id, data = {}) => {
       quantity: data.quantity,
       unit: data.unit,
       costPrice: data.costPrice,
-      sellingPrice,
+      sellingPrice: data.sellingPrice || (data.costPrice / contract.exchangeRate * 1.3),
       specification: data.specification,
       note: data.note,
     },
@@ -131,16 +135,15 @@ const addSalesItem = async (id, data = {}) => {
 const updateSalesStatus = async (id, status) => {
   return prisma.salesContract.update({
     where: { id },
-    data: { status },
+    data: {
+      status: normalizeFilterStatus(status),
+    },
   });
 };
 
 const getNextContractNo = async () => {
-  const year = new Date().getFullYear().toString().slice(-2);
-  const count = await prisma.salesContract.count({
-    where: { contractNo: { startsWith: `EXP${year}` } },
-  });
-  return `EXP${year}${String(count + 1).padStart(5, '0')}`;
+  const year = getCurrentYear();
+  return generateNextContractNo({ prisma, year });
 };
 
 const calculateSellingPrice = ({ costPrice, exchangeRate, profitRate = 1.3 }) => {

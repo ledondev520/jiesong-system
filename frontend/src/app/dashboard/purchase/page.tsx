@@ -21,11 +21,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { SemanticBadge } from '@/components/ui/semantic-badge';
+import { StatusBadge, type StatusBadgeConfig } from '@/components/ui/status-badge';
 import { AmountText } from '@/components/ui/amount-text';
 import { Plus, Eye, FileText } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/date-format';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 
@@ -51,14 +51,14 @@ export default function PurchasePage() {
   };
 
   const getStatusBadge = (status: PurchaseStatus) => {
-    switch (status) {
-      case PurchaseStatus.DRAFT: return <SemanticBadge tone="neutral">草稿</SemanticBadge>;
-      case PurchaseStatus.SIGNED: return <SemanticBadge tone="info">已签订</SemanticBadge>;
-      case PurchaseStatus.PRODUCING: return <SemanticBadge tone="warning">生产中</SemanticBadge>;
-      case PurchaseStatus.SHIPPED: return <SemanticBadge tone="progress">已发货</SemanticBadge>;
-      case PurchaseStatus.COMPLETED: return <SemanticBadge tone="success">已完成</SemanticBadge>;
-      default: return <SemanticBadge tone="secondary">{status}</SemanticBadge>;
-    }
+    const statusMap: Record<PurchaseStatus, StatusBadgeConfig> = {
+      [PurchaseStatus.DRAFT]: { label: '草稿', tone: 'neutral' },
+      [PurchaseStatus.SIGNED]: { label: '已签订', tone: 'info' },
+      [PurchaseStatus.PRODUCING]: { label: '生产中', tone: 'warning' },
+      [PurchaseStatus.SHIPPED]: { label: '已发货', tone: 'progress' },
+      [PurchaseStatus.COMPLETED]: { label: '已完成', tone: 'success' },
+    };
+    return <StatusBadge status={status} statusMap={statusMap} />;
   };
 
   /**
@@ -120,7 +120,7 @@ export default function PurchasePage() {
                          <Badge variant="destructive" className="ml-2 text-[10px] h-5 px-1">质量问题</Badge>
                       )}
                     </TableCell>
-                    <TableCell>{contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}</TableCell>
+                    <TableCell>{formatDate(contract.signedAt)}</TableCell>
                     <TableCell>{getStatusBadge(contract.status)}</TableCell>
                     <TableCell className="text-right">¥{totalAmount.toLocaleString()}</TableCell>
                     <TableCell className="text-right">

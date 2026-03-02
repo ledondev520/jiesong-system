@@ -1,15 +1,6 @@
 const prisma = require('../../utils/prisma');
 const { success } = require('../../utils/response');
 
-const parseOptionalText = (value) => {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
-};
-
 const getConfigs = async (req, res, next) => {
   try {
     const configs = await prisma.systemConfig.findMany();
@@ -70,7 +61,6 @@ const getExchangeRate = async (req, res, next) => {
 };
 
 module.exports = {
-  parseOptionalText,
   getConfigs,
   updateConfig,
   getExchangeRate,

@@ -147,6 +147,501 @@ function isIrrelevant(row) {
   return note.includes('不相关') || broker === '不报关' || broker === '埋单';
 }
 
+const parseContainerDigits = (value) => String(value || '').replace(/\D/g, '');
+
+const getQuantityBucket = (value) => {
+  const quantity = Number(value || 0);
+  if (!Number.isFinite(quantity)) {
+    return 0;
+  }
+  return Math.floor(quantity * 1000);
+};
+
+const addQuantityBucket = (index, key, quantity) => {
+  if (!index.has(key)) {
+    index.set(key, new Set());
+  }
+  index.get(key).add(getQuantityBucket(quantity));
+};
+
+const hasNearbyQuantity = (bucketSet, targetBucket) => {
+  for (let offset = -9; offset <= 9; offset += 1) {
+    if (bucketSet.has(targetBucket + offset)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const buildDuplicateIndexes = (items) => {
+  const exactIndex = new Map();
+  const fuzzyIndex = new Map();
+
+  items.forEach((item) => {
+    const customsName = item.product?.customsName;
+    const contractNo = item.salesContract?.contractNo;
+    if (!customsName || !contractNo) {
+      return;
+    }
+
+    const normalizedCustomsName = customsName.trim();
+    const exactKey = `${normalizedCustomsName}|${contractNo}`;
+    addQuantityBucket(exactIndex, exactKey, item.quantity);
+
+    const digits = parseContainerDigits(contractNo);
+    if (digits) {
+      const fuzzyKey = `${normalizedCustomsName}|${digits}`;
+      addQuantityBucket(fuzzyIndex, fuzzyKey, item.quantity);
+    }
+  });
+
+  return { exactIndex, fuzzyIndex };
+};
+
+const createLookupMap = (items, key) => {
+  const map = new Map();
+  items.forEach((item) => {
+    const keyValue = key(item);
+    if (keyValue) {
+      map.set(keyValue, item);
+    }
+  });
+  return map;
+};
+
+const normalizeText = (value) => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  return value.trim();
+};
+
+const normalizeNumberText = (value) => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const parsed = parseFloat(value.replace(/,/g, '').trim());
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const normalizeRecordValue = (record, keyName) => normalizeText(record?.[keyName] || '');
+
+const normalizeContainerNoForImport = (row, portInfo) => {
+  const rawContainerNo = normalizeRecordValue(row, '柜子编号');
+  if (!rawContainerNo) {
+    return { rawContainerNo: '', standardizedNo: null };
+  }
+
+  return {
+    rawContainerNo,
+    standardizedNo: standardizeContainerNo(rawContainerNo, row['出货日期'], portInfo?.code),
+  };
+};
+
+const normalizeSupplierName = (supplierAlias) => {
+  const trimmedAlias = normalizeText(supplierAlias);
+  if (!trimmedAlias) {
+    return '';
+  }
+
+  return SUPPLIER_ALIASES[trimmedAlias] || trimmedAlias;
+};
+
+const normalizeImportRows = (records) => records.map((record) => {
+  const row = record.data || record;
+  const customsName = normalizeRecordValue(row, '报关名');
+  const storeName = normalizeRecordValue(row, '门店');
+  const supplierAlias = normalizeRecordValue(row, '厂家');
+  const supplierName = normalizeSupplierName(supplierAlias);
+  const portName = normalizeRecordValue(row, '港口');
+  const portInfo = getPortInfo(portName);
+  const { rawContainerNo, standardizedNo } = normalizeContainerNoForImport(row, portInfo);
+  const shippedAt = parseDate(row['出货日期']);
+  const salesContractNo = normalizeRecordValue(row, '合同号');
+  const purchaseContractNo = normalizeRecordValue(row, '购销合同号');
+
+  return {
+    record,
+    row,
+    seq: record.seq,
+    customsName,
+    storeName,
+    supplierAlias,
+    supplierName,
+    portName,
+    portInfo,
+    rawContainerNo,
+    containerNo: standardizedNo,
+    shippedAt,
+    salesContractNo,
+    purchaseContractNo,
+    quantity: parseQuantity(row['报关数量']),
+    quantityBucket: getQuantityBucket(parseQuantity(row['报关数量'])),
+    costPrice: parseAmount(row['采购金额']),
+    sellingPrice: parseAmount(row['出口金额']) || parseAmount(row['售价']),
+    isFumigated: row['是否熏蒸'] === '是',
+    customsBroker: normalizeRecordValue(row, '报关公司'),
+    note: normalizeRecordValue(row, '备注'),
+    noteContainsIrrelevant: isIrrelevant(row),
+    rawOutboundDate: row['出货日期'],
+    unit: normalizeText(row['单位']),
+    boxes: normalizeNumberText(row['箱数']) || 0,
+    grossWeight: parseAmount(row['毛重']),
+    netWeight: parseAmount(row['净重']),
+    volume: parseAmount(row['体积']),
+    specification: normalizeText(row['规格'] || row['商品规格']),
+  };
+});
+
+const buildImportCache = async (records) => {
+  const keys = {
+    ports: [...new Set(records.map((item) => item.portInfo?.code).filter(Boolean))],
+    suppliers: [...new Set(records.map((item) => item.supplierName).filter(Boolean))],
+    products: [...new Set(records.map((item) => item.customsName).filter(Boolean))],
+    stores: [...new Set(records.map((item) => item.storeName).filter(Boolean))],
+    salesContracts: [...new Set(records.map((item) => item.salesContractNo).filter(Boolean))],
+    purchaseContracts: [...new Set(records.map((item) => item.purchaseContractNo).filter(Boolean))],
+    containers: [...new Set(records.map((item) => item.containerNo).filter(Boolean))],
+  };
+
+  const [ports, suppliers, products, stores, salesContracts, purchaseContracts, containers] = await Promise.all([
+    prisma.port.findMany({
+      where: { code: { in: keys.ports } },
+      select: { id: true, code: true, name: true },
+    }),
+    prisma.supplier.findMany({
+      where: { name: { in: keys.suppliers } },
+      select: { id: true, name: true, shortName: true },
+    }),
+    prisma.product.findMany({
+      where: { customsName: { in: keys.products } },
+      select: { id: true, customsName: true, description: true, specification: true },
+    }),
+    prisma.store.findMany({
+      where: { name: { in: keys.stores } },
+      select: { id: true, name: true, portId: true },
+    }),
+    prisma.salesContract.findMany({
+      where: { contractNo: { in: [...keys.salesContracts, ...keys.containers] } },
+      select: { id: true, contractNo: true, exchangeRate: true, status: true, signedAt: true },
+    }),
+    prisma.purchaseContract.findMany({
+      where: { contractNo: { in: keys.purchaseContracts } },
+      select: { id: true, contractNo: true, supplierId: true },
+    }),
+    prisma.salesContract.findMany({
+      where: { contractNo: { in: keys.containers } },
+      select: { id: true, contractNo: true, portId: true, shippedAt: true, status: true },
+    }),
+  ]);
+
+  return {
+    portsByCode: createLookupMap(ports, (item) => item.code),
+    suppliersByName: createLookupMap(suppliers, (item) => item.name),
+    productsByName: createLookupMap(products, (item) => item.customsName),
+    storesByName: createLookupMap(stores, (item) => item.name),
+    salesContractsByNo: createLookupMap(salesContracts, (item) => item.contractNo),
+    purchaseContractsByNo: createLookupMap(purchaseContracts, (item) => item.contractNo),
+    containerContractsByNo: createLookupMap(containers, (item) => item.contractNo),
+  };
+};
+
+const createEntityCache = () => ({
+  portsByCode: new Map(),
+  suppliersByName: new Map(),
+  productsByName: new Map(),
+  storesByName: new Map(),
+  salesContractsByNo: new Map(),
+  purchaseContractsByNo: new Map(),
+  containerByNo: new Map(),
+  salesItemByKey: new Map(),
+  containerItemByKey: new Map(),
+});
+
+const buildSalesItemCacheKey = (salesContractId, productId, storeId) => [salesContractId, productId, storeId || ''].join('|');
+
+const buildContainerItemCacheKey = (contractId, productId, storeId) => [contractId, productId, storeId || ''].join('|');
+
+const getOrBuildItem = async (cache, key, finder) => {
+  if (cache.has(key)) {
+    return cache.get(key);
+  }
+
+  const result = await finder();
+  cache.set(key, result || null);
+  return result || null;
+};
+
+const getCachedSalesItem = (cache, salesContractId, productId, storeId) => getOrBuildItem(
+  cache.salesItemByKey,
+  buildSalesItemCacheKey(salesContractId, productId, storeId),
+  () => prisma.salesItem.findFirst({
+    where: {
+      salesContractId,
+      productId,
+      storeId,
+    },
+  })
+);
+
+const getCachedContainerItem = (cache, salesContractId, productId, storeId) => getOrBuildItem(
+  cache.containerItemByKey,
+  buildContainerItemCacheKey(salesContractId, productId, storeId),
+  () => prisma.packingItem.findFirst({
+    where: {
+      salesContractId,
+      productId,
+      ...(storeId ? { storeId } : { storeId: null }),
+    },
+  })
+);
+
+const toNumberOrNull = (value) => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  return Number.isFinite(Number(value)) ? Number(value) : null;
+};
+
+const shouldUseAsShortName = (supplierAlias, supplierName) => {
+  if (!supplierAlias) {
+    return supplierName || '';
+  }
+  return supplierAlias;
+};
+
+const getOrCreatePort = async (portInfo, cache, results) => {
+  if (!portInfo?.code) {
+    return null;
+  }
+
+  if (cache.portsByCode.has(portInfo.code)) {
+    return cache.portsByCode.get(portInfo.code);
+  }
+
+  let port = await prisma.port.findUnique({
+    where: { code: portInfo.code },
+  });
+
+  if (!port) {
+    port = await prisma.port.create({
+      data: {
+        name: portInfo.name,
+        code: portInfo.code,
+        isActive: true,
+      },
+    });
+  }
+
+  cache.portsByCode.set(port.code, port);
+  return port;
+};
+
+const getOrCreateSupplier = async (supplierName, supplierAlias, cache, results) => {
+  if (!supplierName) {
+    return null;
+  }
+
+  if (cache.suppliersByName.has(supplierName)) {
+    return cache.suppliersByName.get(supplierName);
+  }
+
+  let supplier = await prisma.supplier.findFirst({
+    where: { name: supplierName },
+  });
+
+  if (!supplier) {
+    supplier = await prisma.supplier.create({
+      data: {
+        name: supplierName,
+        shortName: shouldUseAsShortName(supplierAlias, supplierName),
+        isActive: true,
+      },
+    });
+    results.created.suppliers += 1;
+  }
+
+  cache.suppliersByName.set(supplierName, supplier);
+  return supplier;
+};
+
+const getOrCreateProduct = async (row, cache, results) => {
+  if (!row.customsName) {
+    return null;
+  }
+
+  if (cache.productsByName.has(row.customsName)) {
+    return cache.productsByName.get(row.customsName);
+  }
+
+  let product = await prisma.product.findFirst({
+    where: { customsName: row.customsName },
+  });
+
+  if (!product) {
+    const description = (row.record?.['商品补充信息']?.trim?.() || '').trim() || null;
+    product = await prisma.product.create({
+      data: {
+        customsName: row.customsName,
+        description,
+        specification: row.specification || null,
+        unit: row.unit,
+        isActive: true,
+      },
+    });
+    results.created.products += 1;
+  }
+
+  cache.productsByName.set(row.customsName, product);
+  return product;
+};
+
+const getOrCreateStore = async (storeName, port, cache, results) => {
+  if (!storeName || !port) {
+    return null;
+  }
+
+  if (cache.storesByName.has(storeName)) {
+    return cache.storesByName.get(storeName);
+  }
+
+  let store = await prisma.store.findFirst({
+    where: { name: storeName },
+  });
+
+  if (!store) {
+    store = await prisma.store.create({
+      data: {
+        name: storeName,
+        portId: port.id,
+        isActive: true,
+      },
+    });
+    results.created.stores += 1;
+  }
+
+  cache.storesByName.set(storeName, store);
+  return store;
+};
+
+const getOrCreateSalesContract = async (contractNo, cache, results, options = {}) => {
+  if (!contractNo) {
+    return null;
+  }
+
+  if (cache.salesContractsByNo.has(contractNo)) {
+    return cache.salesContractsByNo.get(contractNo);
+  }
+
+  let contract = await prisma.salesContract.findUnique({
+    where: { contractNo },
+  });
+
+  if (!contract) {
+    const status = options.status || 'DRAFT';
+    contract = await prisma.salesContract.create({
+      data: {
+        contractNo,
+        totalAmount: 0,
+        receivedAmount: 0,
+        exchangeRate: 7.0,
+        status,
+        signedAt: options.signedAt ?? null,
+        portId: options.portId || undefined,
+        shippedAt: options.shippedAt ?? null,
+        customsBroker: options.customsBroker || null,
+        isFumigated: options.isFumigated || false,
+        note: options.note || null,
+      },
+    });
+    results.created.salesContracts += 1;
+  }
+
+  cache.salesContractsByNo.set(contractNo, contract);
+  return contract;
+};
+
+const getOrCreateSalesContainerContract = async (contractNo, port, record, cache, results) => {
+  if (!contractNo || !port) {
+    return null;
+  }
+
+  if (cache.containerByNo.has(contractNo)) {
+    return cache.containerByNo.get(contractNo);
+  }
+
+  let contract = await prisma.salesContract.findUnique({
+    where: { contractNo },
+  });
+
+  if (!contract) {
+    const shippedAt = parseDate(record['出货日期']);
+    const rawContainerNo = normalizeRecordValue(record, '柜子编号');
+    contract = await getOrCreateSalesContract(contractNo, cache, results, {
+      status: shippedAt ? 'SHIPPED' : 'DRAFT',
+      signedAt: shippedAt,
+      shippedAt,
+      portId: port.id,
+      customsBroker: normalizeRecordValue(record, '报关公司') || null,
+      isFumigated: record['是否熏蒸'] === '是',
+      note: rawContainerNo !== contractNo ? `原编号: ${rawContainerNo}` : null,
+    });
+    results.created.containers += 1;
+  }
+
+  cache.containerByNo.set(contractNo, contract);
+  return contract;
+};
+
+const getOrCreatePurchaseContract = async (contractNo, supplier, cache, results, options = {}) => {
+  if (!contractNo) {
+    return null;
+  }
+
+  if (!supplier) {
+    return null;
+  }
+
+  if (cache.purchaseContractsByNo.has(contractNo)) {
+    return cache.purchaseContractsByNo.get(contractNo);
+  }
+
+  let purchaseContract = await prisma.purchaseContract.findUnique({
+    where: { contractNo },
+  });
+
+  if (!purchaseContract) {
+    const paidAmount = toNumberOrNull(options.paidAmount) ?? 0;
+    const totalAmount = toNumberOrNull(options.totalAmount) ?? 0;
+    purchaseContract = await prisma.purchaseContract.create({
+      data: {
+        contractNo,
+        supplierId: supplier.id,
+        totalAmount,
+        paidAmount,
+        status: 'COMPLETED',
+        invoiceNo: options.invoiceNo || null,
+        signedAt: options.signedAt || null,
+      },
+    });
+    results.created.purchaseContracts += 1;
+  }
+
+  cache.purchaseContractsByNo.set(contractNo, purchaseContract);
+  return purchaseContract;
+};
+
 /**
  * 职责：生成记录的唯一标识（用于去重）
  */
@@ -186,13 +681,24 @@ const parseCSV = (csvContent) => {
  * @returns {Object} 分析结果
  */
 const analyzeData = (rows) => {
-  const seqs = rows.map(r => parseInt(r['序号'])).filter(n => !isNaN(n)).sort((a, b) => a - b);
+  const sequenceSet = new Set();
+  const seqs = [];
+
+  rows.forEach((row) => {
+    const rawSeq = parseInt(row['序号']);
+    if (!isNaN(rawSeq)) {
+      seqs.push(rawSeq);
+      sequenceSet.add(rawSeq);
+    }
+  });
+
+  seqs.sort((a, b) => a - b);
   const minSeq = seqs[0] || 1;
   const maxSeq = seqs[seqs.length - 1] || 1;
   
   const missingSeqs = [];
   for (let i = minSeq; i <= maxSeq; i++) {
-    if (!seqs.includes(i)) {
+    if (!sequenceSet.has(i)) {
       missingSeqs.push(i);
     }
   }
@@ -212,53 +718,64 @@ const analyzeData = (rows) => {
  */
 const compareWithDatabase = async (rows) => {
   // 获取数据库中现有的装箱明细
+  const normalizedRows = normalizeImportRows(rows);
   const existingItems = await prisma.packingItem.findMany({
     include: {
       product: true,
       salesContract: true,
     },
   });
+  const { exactIndex, fuzzyIndex } = buildDuplicateIndexes(existingItems);
   
   // 分类记录
   const newRecords = [];
   const existingRecords = [];
   const invalidRecords = [];
   
-  for (const row of rows) {
-    const customsName = (row['报关名'] || '').trim();
-    const containerNo = (row['柜子编号'] || '').trim();
+  for (const row of normalizedRows) {
+    const customsName = row.customsName;
+
+    if (!row.containerNo && !row.salesContractNo) {
+      invalidRecords.push({
+        seq: row.seq,
+        reason: '货柜号/合同号缺失',
+        data: row.record || row,
+      });
+      continue;
+    }
     
     // 验证必填字段
     if (!customsName) {
       invalidRecords.push({
-        seq: row['序号'],
+        seq: row.seq,
         reason: '报关名为空',
-        data: row,
+        data: row.record || row,
       });
       continue;
     }
     
     // 检查是否已存在
-    // 简单判断：如果商品名+货柜编号+数量组合已存在，认为是重复
-    const isDuplicate = existingItems.some(item => {
-      if (item.product?.customsName !== customsName) return false;
-      if (!containerNo) return false;
-      
-      const itemContainerNo = item.salesContract?.contractNo;
-      const rowContainerNoStd = standardizeContainerNo(
-        containerNo,
-        row['出货日期'],
-        getPortInfo(row['港口'])?.code
-      );
-      
-      if (itemContainerNo !== rowContainerNoStd && 
-          !itemContainerNo?.includes(containerNo.replace(/[^\d]/g, ''))) {
+    const containerNo = row.containerNo;
+    const rowQuantityBucket = row.quantityBucket;
+
+    const isDuplicate = (() => {
+      if (!containerNo) {
         return false;
       }
-      
-      const rowQty = parseQuantity(row['报关数量']);
-      return Math.abs((item.quantity || 0) - (rowQty || 0)) < 0.01;
-    });
+
+      const exactBuckets = exactIndex.get(`${customsName}|${containerNo}`);
+      if (exactBuckets && hasNearbyQuantity(exactBuckets, rowQuantityBucket)) {
+        return true;
+      }
+
+      const fuzzyDigits = parseContainerDigits(containerNo);
+      if (!fuzzyDigits) {
+        return false;
+      }
+
+      const fuzzyBuckets = fuzzyIndex.get(`${customsName}|${fuzzyDigits}`);
+      return Boolean(fuzzyBuckets && hasNearbyQuantity(fuzzyBuckets, rowQuantityBucket));
+    })();
     
     if (isDuplicate) {
       existingRecords.push({
@@ -271,10 +788,10 @@ const compareWithDatabase = async (rows) => {
       newRecords.push({
         seq: row['序号'],
         customsName,
-        storeName: (row['门店'] || '').trim(),
+        storeName: row.storeName,
         containerNo,
-        quantity: parseQuantity(row['报关数量']),
-        data: row,
+        quantity: row.quantity,
+        data: row.record || row,
       });
     }
   }
@@ -314,212 +831,124 @@ const importRecords = async (records) => {
     },
   };
   
-  for (const record of records) {
+  const normalizedRecords = normalizeImportRows(records);
+  const cache = createEntityCache();
+
+  const seeded = await buildImportCache(normalizedRecords);
+  cache.portsByCode = seeded.portsByCode;
+  cache.suppliersByName = seeded.suppliersByName;
+  cache.productsByName = seeded.productsByName;
+  cache.storesByName = seeded.storesByName;
+  cache.salesContractsByNo = seeded.salesContractsByNo;
+  cache.purchaseContractsByNo = seeded.purchaseContractsByNo;
+  cache.containerByNo = seeded.containerContractsByNo;
+
+  
+
+  for (const record of normalizedRecords) {
     try {
-      const row = record.data;
-      const customsName = (row['报关名'] || '').trim();
-      const storeName = (row['门店'] || '').trim();
-      const portName = (row['港口'] || '').trim();
-      const supplierAlias = (row['厂家'] || '').trim();
-      
+      const row = record.record;
+      const customsName = record.customsName;
+      const storeName = record.storeName;
+      const supplierName = record.supplierName;
+      const portName = record.portName;
+      const shippedAt = record.shippedAt;
+      const containerNo = record.containerNo;
+      const salesContractNo = record.salesContractNo;
+      const purchaseContractNo = record.purchaseContractNo;
+      const quantity = record.quantity;
+      const costPrice = record.costPrice;
+      const sellingPrice = record.sellingPrice;
+
       if (!customsName) {
         results.failed.push({ seq: record.seq, reason: '报关名为空' });
         continue;
       }
       
       // 1. 获取或创建港口
-      const portInfo = getPortInfo(portName);
-      let port = null;
-      if (portInfo) {
-        port = await prisma.port.findUnique({ where: { code: portInfo.code } });
-        if (!port) {
-          port = await prisma.port.create({
-            data: { name: portInfo.name, code: portInfo.code, isActive: true },
-          });
-        }
-      }
+      const port = await getOrCreatePort(getPortInfo(portName), cache, results);
       
       // 2. 获取或创建供应商
-      let supplier = null;
-      if (supplierAlias) {
-        const supplierName = SUPPLIER_ALIASES[supplierAlias] || supplierAlias;
-        supplier = await prisma.supplier.findFirst({ where: { name: supplierName } });
-        if (!supplier) {
-          supplier = await prisma.supplier.create({
-            data: { name: supplierName, shortName: supplierAlias, isActive: true },
-          });
-          results.created.suppliers++;
-        }
-      }
+      const supplier = await getOrCreateSupplier(supplierName, record.supplierAlias, cache, results);
       
       // 3. 获取或创建商品
-      let product = await prisma.product.findFirst({ where: { customsName } });
-      if (!product) {
-        product = await prisma.product.create({
-          data: {
-            customsName,
-            description: (row['商品补充信息'] || '').trim() || null,
-            specification: (row['规格'] || '').trim() || null,
-            unit: standardizeUnit(row['单位']),
-            isActive: true,
-          },
-        });
-        results.created.products++;
-      }
+      const product = await getOrCreateProduct(record, cache, results);
       
       // 4. 获取或创建门店
-      let store = null;
-      if (storeName && port) {
-        store = await prisma.store.findFirst({ where: { name: storeName } });
-        if (!store) {
-          store = await prisma.store.create({
-            data: { name: storeName, portId: port.id, isActive: true },
-          });
-          results.created.stores++;
-        }
-      }
+      const store = await getOrCreateStore(storeName, port, cache, results);
       
       // 5. 处理货柜
-      const shippedAt = parseDate(row['出货日期']);
-      const containerNoRaw = (row['柜子编号'] || '').trim();
-      const containerNo = containerNoRaw ? 
-        standardizeContainerNo(containerNoRaw, row['出货日期'], portInfo?.code) : null;
-      
-      let container = null;
-      if (containerNo && port) {
-        container = await prisma.salesContract.findUnique({ where: { contractNo: containerNo } });
-        if (!container) {
-          container = await prisma.salesContract.create({
-            data: {
-              contractNo: containerNo,
-              portId: port.id,
-              status: shippedAt ? 'SHIPPED' : 'DRAFT',
-              shippedAt,
-              exchangeRate: 7.0,
-              customsBroker: (row['报关公司'] || '').trim() || null,
-              isFumigated: row['是否熏蒸'] === '是',
-              note: containerNoRaw !== containerNo ? `原编号: ${containerNoRaw}` : null,
-            },
-          });
-          results.created.containers++;
-        }
-      }
+      const container = containerNo ? await getOrCreateSalesContainerContract(containerNo, port, record.record, cache, results) : null;
       
       // 6. 处理销售合同及明细
-      const salesContractNo = (row['合同号'] || '').trim();
-      let salesContract = null;
-      if (salesContractNo) {
-        salesContract = await prisma.salesContract.findUnique({ 
-          where: { contractNo: salesContractNo } 
-        });
-        if (!salesContract) {
-          salesContract = await prisma.salesContract.create({
+      const salesContract = salesContractNo ? await getOrCreateSalesContract(salesContractNo, cache, results) : null;
+
+      // 6.1 创建销售合同明细（SalesItem）
+      if (salesContract && product && store && quantity > 0) {
+        const existingSalesItem = await getCachedSalesItem(cache, salesContract.id, product.id, store.id);
+
+        if (!existingSalesItem) {
+          await prisma.salesItem.create({
             data: {
-              contractNo: salesContractNo,
-              totalAmount: 0,
-              receivedAmount: 0,
-              exchangeRate: 7.0,
-              status: shippedAt ? 'COMPLETED' : 'DRAFT',
-              signedAt: shippedAt,
-            },
-          });
-          results.created.salesContracts++;
-        }
-        
-        // 6.1 创建销售合同明细（SalesItem）
-        const quantity = parseQuantity(row['报关数量']) || 0;
-        const costPrice = parseAmount(row['采购金额']) || 0;
-        const sellingPrice = parseAmount(row['出口金额']) || parseAmount(row['售价']) || 0;
-        
-        if (product && store && quantity > 0) {
-          // 检查是否已存在相同的明细（避免重复导入）
-          const existingItem = await prisma.salesItem.findFirst({
-            where: {
               salesContractId: salesContract.id,
               productId: product.id,
               storeId: store.id,
+              quantity,
+              unit: standardizeUnit(record.unit),
+              costPrice,
+              sellingPrice,
+              specification: record.specification,
+              note: `序号${record.seq}: ${(record.record && record.record['备注'])?.trim?.() || ''}`,
             },
           });
-          
-          if (!existingItem) {
-            await prisma.salesItem.create({
-              data: {
-                salesContractId: salesContract.id,
-                productId: product.id,
-                storeId: store.id,
-                quantity,
-                unit: standardizeUnit(row['单位']),
-                costPrice,
-                sellingPrice,
-                specification: (row['规格'] || row['商品规格'] || '').trim() || null,
-                note: `序号${row['序号']}: ${(row['备注'] || '').trim()}`,
-              },
-            });
-            results.created.salesItems = (results.created.salesItems || 0) + 1;
-            
-            // 更新销售合同总金额
-            await prisma.salesContract.update({
-              where: { id: salesContract.id },
-              data: {
-                totalAmount: { increment: sellingPrice * quantity },
-              },
-            });
-          }
+
+          results.created.salesItems += 1;
+
+          await prisma.salesContract.update({
+            where: { id: salesContract.id },
+            data: {
+              totalAmount: { increment: sellingPrice * quantity },
+            },
+          });
         }
       }
-      
+
       // 7. 处理采购合同
-      const purchaseContractNo = (row['购销合同号'] || '').trim();
-      const purchaseAmount = parseAmount(row['采购金额']);
       if (purchaseContractNo && supplier) {
-        let purchaseContract = await prisma.purchaseContract.findUnique({ 
-          where: { contractNo: purchaseContractNo } 
-        });
-        if (!purchaseContract) {
-          await prisma.purchaseContract.create({
-            data: {
-              contractNo: purchaseContractNo,
-              supplierId: supplier.id,
-              totalAmount: purchaseAmount || 0,
-              paidAmount: (row['是否付款'] === '1' || row['是否付款'] === '是') ? 
-                (purchaseAmount || 0) : 0,
-              invoiceNo: (row['发票号码'] || '').trim() || null,
-              signedAt: shippedAt,
-              status: 'COMPLETED',
-            },
-          });
-          results.created.purchaseContracts++;
-        }
+        await getOrCreatePurchaseContract(purchaseContractNo, supplier, cache, results);
       }
       
       // 8. 创建装箱明细
-      if (container) {
-        await prisma.packingItem.create({
-          data: {
-            salesContractId: container.id,
-            productId: product.id,
-            storeId: store?.id,
-            quantity: parseQuantity(row['报关数量']) || 0,
-            unit: standardizeUnit(row['单位']),
-            boxes: parseInt(row['箱数']) || null,
-            grossWeight: parseAmount(row['毛重']),
-            netWeight: parseAmount(row['净重']),
-            volume: parseAmount(row['体积']),
-            note: `序号${row['序号']}: ${(row['备注'] || '').trim()}`,
-          },
-        });
-        results.created.containerItems++;
+      if (container && product) {
+        const containerItem = await getCachedContainerItem(cache, container.id, product.id, store ? store.id : null);
+
+        if (!containerItem) {
+          await prisma.packingItem.create({
+            data: {
+              salesContractId: container.id,
+              productId: product.id,
+              storeId: store?.id,
+              quantity: quantity || 0,
+              unit: standardizeUnit(record.unit),
+              boxes: Number.isFinite(record.boxes) ? record.boxes : null,
+              grossWeight: Number.isFinite(record.grossWeight) ? record.grossWeight : 0,
+              netWeight: Number.isFinite(record.netWeight) ? record.netWeight : 0,
+              volume: Number.isFinite(record.volume) ? record.volume : 0,
+              note: `序号${record.seq}: ${(record.record && record.record['备注'])?.trim?.() || ''}`,
+            },
+          });
+          results.created.containerItems++;
+        }
       }
       
       // 9. 创建库存记录
-      const quantity = parseQuantity(row['报关数量']);
       if (quantity && quantity > 0) {
         await prisma.inventory.create({
           data: {
             productId: product.id,
             salesContractId: container?.id,
             quantity,
-            unit: standardizeUnit(row['单位']),
+            unit: standardizeUnit(record.unit),
             status: extractStatus(row['备注'], shippedAt),
             outboundAt: shippedAt,
             note: isIrrelevant(row) ? 
@@ -531,7 +960,7 @@ const importRecords = async (records) => {
       }
       
       results.success.push({
-        seq: row['序号'],
+        seq: record.seq,
         customsName,
         storeName,
       });

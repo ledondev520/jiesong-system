@@ -38,11 +38,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SemanticBadge } from '@/components/ui/semantic-badge';
+import { StatusBadge, type StatusBadgeConfig } from '@/components/ui/status-badge';
 import { Progress } from '@/components/ui/progress';
 import { Plus, Pencil, Trash, Package, Weight, Box } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/date-format';
 import { PageHeader } from '@/components/layout/PageHeader';
 
 // 40HQ 标准货柜规格（厂家建议值）
@@ -199,18 +199,18 @@ export default function ContainerDetailPage({ params }: PageProps) {
    * 职责：获取状态徽章
    */
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case ContainerStatus.PENDING: return <SemanticBadge tone="neutral">待装柜</SemanticBadge>;
-      case 'DRAFT': return <SemanticBadge tone="neutral">草稿</SemanticBadge>;
-      case 'CONFIRMED': return <SemanticBadge tone="neutral">已确认</SemanticBadge>;
-      case ContainerStatus.LOADING: return <SemanticBadge tone="warning">装柜中</SemanticBadge>;
-      case 'PACKING': return <SemanticBadge tone="warning">装箱中</SemanticBadge>;
-      case ContainerStatus.SHIPPED: return <SemanticBadge tone="progress">已发运</SemanticBadge>;
-      case ContainerStatus.ARRIVED: return <SemanticBadge tone="success">已到达</SemanticBadge>;
-      case 'COMPLETED': return <SemanticBadge tone="success">已完成</SemanticBadge>;
-      case 'CANCELLED': return <SemanticBadge tone="secondary">已取消</SemanticBadge>;
-      default: return <SemanticBadge tone="secondary">{String(status)}</SemanticBadge>;
-    }
+    const statusMap: Record<string, StatusBadgeConfig> = {
+      [ContainerStatus.PENDING]: { label: '待装柜', tone: 'neutral' },
+      DRAFT: { label: '草稿', tone: 'neutral' },
+      CONFIRMED: { label: '已确认', tone: 'neutral' },
+      [ContainerStatus.LOADING]: { label: '装柜中', tone: 'warning' },
+      PACKING: { label: '装箱中', tone: 'warning' },
+      [ContainerStatus.SHIPPED]: { label: '已发运', tone: 'progress' },
+      [ContainerStatus.ARRIVED]: { label: '已到达', tone: 'success' },
+      COMPLETED: { label: '已完成', tone: 'success' },
+      CANCELLED: { label: '已取消', tone: 'secondary' },
+    };
+    return <StatusBadge status={status} statusMap={statusMap} />;
   };
 
   if (loading) {
@@ -234,11 +234,11 @@ export default function ContainerDetailPage({ params }: PageProps) {
   return (
     <div className="space-y-6 pb-10">
       {/* 页头 */}
-      <PageHeader
-        title={containerTitle}
-        description={`目的港: ${container.port?.name || '-'} | 预计到达: ${container.estimatedArrival ? format(new Date(container.estimatedArrival), 'yyyy-MM-dd') : '-'}`}
-        actions={getStatusBadge(container.status)}
-      />
+        <PageHeader
+          title={containerTitle}
+          description={`目的港: ${container.port?.name || '-'} | 预计到达: ${formatDate(container.estimatedArrival)}`}
+          actions={getStatusBadge(container.status)}
+        />
 
       {/* 容量可视化卡片 */}
       <div className="grid gap-4 md:grid-cols-2">
