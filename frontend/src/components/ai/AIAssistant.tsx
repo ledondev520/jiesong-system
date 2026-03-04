@@ -27,6 +27,15 @@ interface Message {
   createdAt: Date;
 }
 
+type StreamPayload = {
+  type: 'session' | 'start' | 'thinking' | 'chunk' | 'done' | 'error';
+  sessionId?: string;
+  content?: string;
+  message?: string;
+  tokenUsage?: unknown;
+  model?: string;
+};
+
 const resolveStreamEndpoint = (): string => {
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
   return `${baseUrl.replace(/\/$/, '')}/ai/chat/stream`;
@@ -60,7 +69,6 @@ export function AIAssistant() {
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // 滚动到底部
   useEffect(() => {
@@ -184,163 +192,201 @@ export function AIAssistant() {
     });
   };
 
+  const createUserMessage = (text: string, imageUrl: string | null): Message => ({
+    id: `${Date.now()}-user`,
+    role: 'user',
+    content: text,
+    ...(imageUrl ? { imageUrl } : {}),
+    createdAt: new Date(),
+  });
+
+  const createAssistantPlaceholder = () => ({
+    id: `${Date.now()}-assistant`,
+    role: 'assistant',
+    content: '',
+    createdAt: new Date(),
+  } as Message);
+
+  const updateMessageById = (messageId: string, patch: Partial<Message>) => {
+    setMessages((prev) =>
+      prev.map((msg) => (msg.id === messageId ? { ...msg, ...patch } : msg))
+    );
+  };
+
+  const parseStreamPayload = (line: string): StreamPayload | null => {
+    const trimmedLine = line.trim();
+    if (!trimmedLine.startsWith('data:')) {
+      return null;
+    }
+    const payload = trimmedLine.slice(5).trim();
+    if (!payload) {
+      return null;
+    }
+    try {
+      return JSON.parse(payload);
+    } catch {
+      return null;
+    }
+  };
+
+  const extractStreamPayloads = (chunkText: string, carryOver: string) => {
+    const merged = `${carryOver}${chunkText}`;
+    const lines = merged.split('\n');
+    const doneLines = lines.slice(0, -1);
+    const nextCarryOver = lines[lines.length - 1] || '';
+
+    return {
+      payloads: doneLines
+        .map((line) => parseStreamPayload(line))
+        .filter((entry): entry is StreamPayload => Boolean(entry)),
+      carryOver: nextCarryOver,
+    };
+  };
+
+  const formatStreamErrorMessage = (error: unknown) => {
+    const fallback = '抱歉，AI服务暂时不可用。';
+    if (!(error instanceof Error)) {
+      return fallback;
+    }
+    if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+      return '请先登录系统后再使用AI助手。';
+    }
+    if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
+      return '无法连接到服务器，请检查网络连接。';
+    }
+    return error.message ? `请求失败：${error.message}` : fallback;
+  };
+
+  const buildChatRequestBody = (text: string, sessionIdValue: string | null, imageUrl: string | null) => ({
+    message: text,
+    sessionId: sessionIdValue,
+    ...(imageUrl ? { imageUrl } : {}),
+  });
+
+  const processStreamEvent = (
+    payload: StreamPayload,
+    assistantMessageId: string,
+    streamState: {
+      thinkingText: string;
+      answerText: string;
+      hasResult: boolean;
+    }
+  ) => {
+    if (payload.type === 'session' && payload.sessionId) {
+      setSessionId(payload.sessionId);
+      return;
+    }
+    if (payload.type === 'start') {
+      console.log('AI开始处理...');
+      return;
+    }
+    if (payload.type === 'thinking' && payload.content) {
+      streamState.thinkingText += payload.content;
+      setCurrentThinking(streamState.thinkingText);
+      updateMessageById(assistantMessageId, { thinking: streamState.thinkingText });
+      return;
+    }
+    if (payload.type === 'chunk' && payload.content) {
+      setIsThinking(false);
+      streamState.answerText += payload.content;
+      streamState.hasResult = true;
+      updateMessageById(assistantMessageId, {
+        content: streamState.answerText,
+        thinking: streamState.thinkingText,
+      });
+      return;
+    }
+    if (payload.type === 'done') {
+      setIsThinking(false);
+      updateMessageById(assistantMessageId, { thinking: streamState.thinkingText });
+      console.log('Token使用:', payload.tokenUsage, '模型:', payload.model);
+      return;
+    }
+    if (payload.type === 'error') {
+      setIsThinking(false);
+      streamState.hasResult = true;
+      updateMessageById(assistantMessageId, {
+        content: `抱歉，AI服务出错了: ${payload.message || '未知错误'}`,
+      });
+    }
+  };
+
+  const readAssistantStream = async (response: Response, assistantMessageId: string): Promise<boolean> => {
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('无法读取AI返回的流式内容。');
+    }
+
+    const streamState = {
+      thinkingText: '',
+      answerText: '',
+      hasResult: false,
+    };
+    const decoder = new TextDecoder();
+    let carryOver = '';
+
+    const handleChunk = (chunkText: string) => {
+      const parsed = extractStreamPayloads(chunkText, carryOver);
+      carryOver = parsed.carryOver;
+      parsed.payloads.forEach((payload) => {
+        processStreamEvent(payload, assistantMessageId, streamState);
+      });
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      handleChunk(decoder.decode(value, { stream: true }));
+    }
+    handleChunk(decoder.decode());
+
+    const remainingPayload = parseStreamPayload(carryOver);
+    if (remainingPayload) {
+      processStreamEvent(remainingPayload, assistantMessageId, streamState);
+    }
+
+    return streamState.hasResult;
+  };
+
   const handleSend = async () => {
     if ((!input.trim() && !pendingImage) || isLoading) return;
 
     const userMessage = input.trim() || (pendingImage ? '请分析这张图片' : '');
     const currentImage = pendingImage;
-    
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: userMessage,
-      imageUrl: currentImage || undefined,
-      createdAt: new Date(),
-    };
+    const userMsg = createUserMessage(userMessage, currentImage);
+    const assistantMessage = createAssistantPlaceholder();
 
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((prev) => [...prev, userMsg, assistantMessage]);
     setInput('');
-    setPendingImage(null); // 清除待发送图片
+    setPendingImage(null);
     setIsLoading(true);
-    setCurrentThinking(''); // 清除之前的思考内容
-    setIsThinking(true); // 开始思考
-
-    // 创建AI响应消息占位符
-    const aiMsgId = (Date.now() + 1).toString();
-    setMessages((prev) => [...prev, {
-      id: aiMsgId,
-      role: 'assistant',
-      content: '',
-      createdAt: new Date(),
-    }]);
+    setCurrentThinking('');
+    setIsThinking(true);
 
     try {
-      // 获取token
       const token = getAuthToken();
-      
-      // 构建请求体
-      const requestBody: { message: string; sessionId: string | null; imageUrl?: string } = {
-        message: userMessage,
-        sessionId: sessionId,
-      };
-      
-      // 如果有图片，添加到请求体
-      if (currentImage) {
-        requestBody.imageUrl = currentImage;
-      }
-      
-      // 使用fetch调用流式接口
       const response = await fetch(resolveStreamEndpoint(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': token ? `Bearer ${token}` : '',
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(buildChatRequestBody(userMessage, sessionId, currentImage)),
       });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // 读取SSE流
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let currentContent = '';
-      let thinkingContent = ''; // 本地变量收集思考内容
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const text = decoder.decode(value);
-          const lines = text.split('\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                
-                if (data.type === 'session' && data.sessionId) {
-                  setSessionId(data.sessionId);
-                } else if (data.type === 'start') {
-                  console.log('AI开始处理...');
-                } else if (data.type === 'thinking' && data.content) {
-                  // 收集思考内容
-                  thinkingContent += data.content;
-                  setCurrentThinking(thinkingContent);
-                } else if (data.type === 'chunk' && data.content) {
-                  // 开始输出最终内容时，结束思考状态
-                  setIsThinking(false);
-                  currentContent += data.content;
-                  // 实时更新消息内容（包含思考内容）
-                  setMessages((prev) => 
-                    prev.map((msg) => 
-                      msg.id === aiMsgId 
-                        ? { ...msg, content: currentContent, thinking: thinkingContent }
-                        : msg
-                    )
-                  );
-                } else if (data.type === 'done') {
-                  setIsThinking(false);
-                  // 确保最终消息包含思考内容
-                  setMessages((prev) => 
-                    prev.map((msg) => 
-                      msg.id === aiMsgId 
-                        ? { ...msg, thinking: thinkingContent }
-                        : msg
-                    )
-                  );
-                  console.log('Token使用:', data.tokenUsage, '模型:', data.model);
-                } else if (data.type === 'error') {
-                  setIsThinking(false);
-                  setMessages((prev) => 
-                    prev.map((msg) => 
-                      msg.id === aiMsgId 
-                        ? { ...msg, content: '抱歉，AI服务出错了: ' + data.message }
-                        : msg
-                    )
-                  );
-                }
-              } catch {
-                // 忽略JSON解析错误
-              }
-            }
-          }
-        }
-      }
-
-      // 如果没有收到任何内容，显示默认消息
-      if (!currentContent) {
-        setMessages((prev) => 
-          prev.map((msg) => 
-            msg.id === aiMsgId 
-              ? { ...msg, content: '抱歉，我暂时无法回答这个问题。' }
-              : msg
-          )
-        );
+      const hasResult = await readAssistantStream(response, assistantMessage.id);
+      if (!hasResult) {
+        updateMessageById(assistantMessage.id, { content: '抱歉，我暂时无法回答这个问题。' });
       }
     } catch (error: unknown) {
       console.error('AI请求失败:', error);
-      // 构建详细的错误消息
-      let errorMessage = '抱歉，AI服务暂时不可用。';
-      if (error instanceof Error) {
-        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-          errorMessage = '请先登录系统后再使用AI助手。';
-        } else if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
-          errorMessage = '无法连接到服务器，请检查网络连接。';
-        } else if (error.message) {
-          errorMessage = '请求失败：' + error.message;
-        }
-      }
-      setMessages((prev) => 
-        prev.map((msg) => 
-          msg.id === aiMsgId 
-            ? { ...msg, content: errorMessage }
-            : msg
-        )
-      );
+      updateMessageById(assistantMessage.id, {
+        content: formatStreamErrorMessage(error),
+      });
     } finally {
       setIsLoading(false);
       setIsThinking(false);
@@ -541,7 +587,6 @@ export function AIAssistant() {
               </Button>
               
               <Input
-                ref={inputRef}
                 placeholder={isLoading ? "AI思考中，可继续输入..." : "输入问题或粘贴图片..."}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}

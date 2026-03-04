@@ -108,3 +108,4 @@
 | TST-11 | P0 | 35m | 1 | DONE | 补齐前端公共工具与服务工厂测试（`date-format/auth-token/binPacking/fileDownload/crudService`）并完成前端单测全量回归 |
 | TST-12 | P0 | 20m | 1 | DONE | 补齐认证状态仓库测试（`auth.store` 登录/登出）并完成前端单测全量回归（`80 files / 251 tests`） |
 | TST-13 | P0 | 25m | 1 | DONE | 补齐布局与主题缺口测试（`dashboard/layout`、`ThemeToggle`、`ThemeProvider`、`status-badge`）并完成前后端+E2E 全量门禁回归 |
+| SIM-01 | P1 | 60m | 1 | DONE | 简化 AI 与数据导入服务核心流程：拆分长函数、去重重复逻辑、补齐流式解析错误处理与无效引用清理 |

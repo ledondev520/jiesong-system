@@ -11,6 +11,46 @@ const { success, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const aiService = require('../services/aiService');
 
+const SSE_HEADERS = {
+  'Content-Type': 'text/event-stream',
+  'Cache-Control': 'no-cache',
+  'Connection': 'keep-alive',
+  'X-Accel-Buffering': 'no',
+};
+
+const parsePositiveInt = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed)) {
+    return fallback;
+  }
+  return parsed > 0 ? parsed : fallback;
+};
+
+const parseMessage = (body) => {
+  const message = typeof body?.message === 'string' ? body.message.trim() : '';
+  if (!message) {
+    throw createError('message 不能为空', 400);
+  }
+  return message;
+};
+
+const parseContent = (body) => {
+  const content = typeof body?.content === 'string' ? body.content.trim() : '';
+  if (!content) {
+    throw createError('content 不能为空', 400);
+  }
+  return content;
+};
+
+const setSseHeaders = (res) => {
+  Object.entries(SSE_HEADERS).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
+  res.flushHeaders();
+};
+
+const sendSseMessage = (res, payload) => res.write(`data: ${JSON.stringify(payload)}\n\n`);
+
 /**
  * 职责：智能问答（支持图片）
  * 思路：
@@ -20,7 +60,8 @@ const aiService = require('../services/aiService');
  */
 const chat = async (req, res, next) => {
   try {
-    const { message, sessionId, imageUrl } = req.body;
+    const message = parseMessage(req.body);
+    const { sessionId, imageUrl } = req.body;
     const userId = req.user.id;
     
     // 生成会话ID
@@ -49,24 +90,20 @@ const chat = async (req, res, next) => {
  */
 const chatStream = async (req, res) => {
   try {
-    const { message, sessionId, imageUrl } = req.body;
+    const message = parseMessage(req.body);
+    const { sessionId, imageUrl } = req.body;
     const userId = req.user.id;
     
     // 生成会话ID
     const currentSessionId = sessionId || `session_${Date.now()}`;
     
-    // 设置SSE响应头
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
-    res.flushHeaders();
+    setSseHeaders(res);
     
     // 发送sessionId
-    res.write(`data: ${JSON.stringify({ type: 'session', sessionId: currentSessionId })}\n\n`);
+    sendSseMessage(res, { type: 'session', sessionId: currentSessionId });
     
     // 发送开始处理消息
-    res.write(`data: ${JSON.stringify({ type: 'start', message: '开始处理...' })}\n\n`);
+    sendSseMessage(res, { type: 'start', message: '开始处理...' });
     
     // 流式调用AI服务（支持 thinking）
     const result = await aiService.chatStream(
@@ -76,24 +113,20 @@ const chatStream = async (req, res) => {
       imageUrl,
       // onChunk - 最终内容回调
       (chunk) => {
-        res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`);
+        sendSseMessage(res, { type: 'chunk', content: chunk });
       },
       // onThinking - 思考过程回调
       (thinking) => {
-        res.write(`data: ${JSON.stringify({ type: 'thinking', content: thinking })}\n\n`);
+        sendSseMessage(res, { type: 'thinking', content: thinking });
       }
     );
     
     // 发送完成消息
-    res.write(`data: ${JSON.stringify({ 
-      type: 'done', 
-      tokenUsage: result.tokenUsage,
-      model: result.model 
-    })}\n\n`);
+    sendSseMessage(res, { type: 'done', tokenUsage: result.tokenUsage, model: result.model });
     
     res.end();
   } catch (error) {
-    res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+    sendSseMessage(res, { type: 'error', message: error.message });
     res.end();
   }
 };
@@ -107,7 +140,8 @@ const chatStream = async (req, res) => {
  */
 const parseInput = async (req, res, next) => {
   try {
-    const { content, type, imageUrl } = req.body;
+    const content = parseContent(req.body);
+    const { type, imageUrl } = req.body;
     const userId = req.user.id;
     
     const parsed = await aiService.parseInput(content, type, imageUrl, userId);
@@ -124,7 +158,9 @@ const parseInput = async (req, res, next) => {
 const getChatHistory = async (req, res, next) => {
   try {
     const { sessionId, page = 1, pageSize = 50 } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+    const parsedPage = parsePositiveInt(page, 1);
+    const parsedPageSize = parsePositiveInt(pageSize, 50);
+    const skip = (parsedPage - 1) * parsedPageSize;
     
     const where = { userId: req.user.id };
     if (sessionId) where.sessionId = sessionId;
@@ -133,7 +169,7 @@ const getChatHistory = async (req, res, next) => {
       prisma.chatHistory.findMany({
         where,
         skip,
-        take: parseInt(pageSize),
+        take: parsedPageSize,
         orderBy: { createdAt: 'asc' },
         select: {
           id: true,
@@ -150,7 +186,7 @@ const getChatHistory = async (req, res, next) => {
       prisma.chatHistory.count({ where }),
     ]);
     
-    paginated(res, messages, total, parseInt(page), parseInt(pageSize));
+    paginated(res, messages, total, parsedPage, parsedPageSize);
   } catch (error) {
     next(error);
   }
@@ -221,7 +257,8 @@ const getTokenStats = async (req, res, next) => {
     const { days = 30 } = req.query;
     const userId = req.user.id;
     
-    const stats = await aiService.getTokenStats(userId, parseInt(days));
+    const parsedDays = parsePositiveInt(days, 30);
+    const stats = await aiService.getTokenStats(userId, parsedDays);
     
     success(res, stats);
   } catch (error) {
@@ -274,36 +311,32 @@ const getGreeting = async (req, res, next) => {
  */
 const getGreetingStream = async (req, res) => {
   // 设置 SSE 响应头
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
-  res.flushHeaders();
+  setSseHeaders(res);
 
   try {
     await aiService.generateGreetingStream(
       // onThinking - 思考过程回调
       (chunk) => {
-        res.write(`data: ${JSON.stringify({ type: 'thinking', content: chunk })}\n\n`);
+        sendSseMessage(res, { type: 'thinking', content: chunk });
       },
       // onContent - 最终内容回调
       (chunk) => {
-        res.write(`data: ${JSON.stringify({ type: 'content', content: chunk })}\n\n`);
+        sendSseMessage(res, { type: 'content', content: chunk });
       },
       // onDone - 完成回调
       (result) => {
-        res.write(`data: ${JSON.stringify({ 
-          type: 'done', 
+        sendSseMessage(res, {
+          type: 'done',
           greeting: result.greeting,
           songName: result.songName,
           lyrics: result.lyrics,
           source: result.source,
-        })}\n\n`);
+        });
         res.end();
       }
     );
   } catch (error) {
-    res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+    sendSseMessage(res, { type: 'error', message: error.message });
     res.end();
   }
 };

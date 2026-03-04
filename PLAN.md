@@ -526,3 +526,17 @@
   - 前端单测全量通过：`84 files / 262 tests`。
   - 前端 E2E 全量通过：`52/52`。
   - 后端全量门禁通过：`npm run test:all`（单元 `136/136` + DB 集成 `3/3`）。
+
+## 2026-03-04 Round 31（AI 与导入链路简化）
+
+- 已完成本轮目标：降低关键对话与导入链路的复杂度，减少重复处理路径，补齐前端流式请求的异常处理一致性。
+- 已完成项：
+  - 重构 `frontend/src/components/ai/AIAssistant.tsx`：
+    - 拆分原有大于 50 行的 `handleSend`，引入流事件解析与消息更新辅助函数。
+    - 提炼 `parse`/`read`/`error` 处理闭环，强化流式 `payload` 的边界处理。
+    - 移除无效 `inputRef`，保留实际可执行的状态更新链路。
+  - 复用并清理 `backend/src/services/aiService.js` 与 `backend/src/services/dataImportService.js`：
+    - 去重重复回调/解析/构建逻辑，合并共通流程。
+    - 增强错误兜底行为，避免空响应导致静默失败。
+  - 更新协同台账：
+    - `TASKS.md` 新增 `SIM-01`。

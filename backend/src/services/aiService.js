@@ -21,14 +21,33 @@ const MODELS = {
   thinking: 'kimi-k2-thinking-turbo', // 带思考过程的模型
 };
 
-// 获取当前 provider
-const getActiveProvider = () => {
-  return config.kimi?.apiKey ? 'kimi' : null;
-};
-
 const safeToNumber = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const extractErrorMessage = (error) => {
+  if (!error) {
+    return '抱歉，AI服务出错了。';
+  }
+
+  if (error.status === 401 || error.message?.includes('Unauthorized')) {
+    return '错误：API Key无效或已过期，请联系管理员检查配置。';
+  }
+  if (error.status === 429 || error.message?.includes('rate limit')) {
+    return '错误：请求过于频繁，请稍后再试。';
+  }
+  if (error.status === 400 || error.message?.includes('Invalid')) {
+    return `错误：请求参数无效 - ${error.message || '未知错误'}`;
+  }
+  if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+    return '错误：无法连接到AI服务，请检查网络连接。';
+  }
+  if (error.message) {
+    return `错误：${error.message}`;
+  }
+
+  return '抱歉，AI服务出错了。';
 };
 
 // 初始化OpenAI客户端（用于流式调用）
@@ -74,24 +93,18 @@ const persistUserMessage = ({ userId, sessionId, message, imageUrl }) =>
     },
   });
 
-const buildChatErrorResponse = (error) => {
-  if (error.status === 401 || error.message?.includes('Unauthorized')) {
-    return '错误：API Key无效或已过期，请联系管理员检查配置。';
+const collectStreamText = async (stream) => {
+  let fullContent = '';
+  for await (const chunk of stream) {
+    const delta = chunk.choices?.[0]?.delta;
+    if (delta?.content) {
+      fullContent += delta.content;
+    }
   }
-  if (error.status === 429 || error.message?.includes('rate limit')) {
-    return '错误：请求过于频繁，请稍后再试。';
-  }
-  if (error.status === 400 || error.message?.includes('Invalid')) {
-    return `错误：请求参数无效 - ${error.message || '未知错误'}`;
-  }
-  if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
-    return '错误：无法连接到AI服务，请检查网络连接。';
-  }
-  if (error.message) {
-    return `错误：${error.message}`;
-  }
-  return '抱歉，AI服务出错了。';
+  return fullContent;
 };
+
+const toSafeCallback = (value) => (typeof value === 'function' ? value : null);
 
 const buildZeroTokenUsage = () => ({
   promptTokens: 0,
@@ -129,7 +142,7 @@ const runThinkingChat = async ({ message, model, messages, onChunk, onThinking }
     };
   } catch (error) {
     console.error('流式调用失败:', error.message, error.stack);
-    const fallbackResponse = buildChatErrorResponse(error);
+    const fallbackResponse = extractErrorMessage(error);
     if (onChunk) {
       onChunk(fallbackResponse);
     }
@@ -142,14 +155,22 @@ const runThinkingChat = async ({ message, model, messages, onChunk, onThinking }
 };
 
 const runStandardChat = async ({ messages, model }) => {
-  const result = await callKimiAPI(messages, model);
-  return {
-    response: result.content,
-    tokenUsage: {
-      promptTokens: safeToNumber(result.tokenUsage.promptTokens),
-      outputTokens: safeToNumber(result.tokenUsage.outputTokens),
-    },
-  };
+  try {
+    const result = await callKimiAPI(messages, model);
+    return {
+      response: result.content,
+      tokenUsage: {
+        promptTokens: safeToNumber(result.tokenUsage.promptTokens),
+        outputTokens: safeToNumber(result.tokenUsage.outputTokens),
+      },
+    };
+  } catch (error) {
+    const fallback = extractErrorMessage(error);
+    return {
+      response: fallback,
+      tokenUsage: buildZeroTokenUsage(),
+    };
+  }
 };
 
 const runChatModel = async ({ message, model, useThinking, messages, onChunk, onThinking }) => {
@@ -197,6 +218,25 @@ const buildChatApiResult = ({ response, model, tokenUsage, sessionId }) => ({
   },
   model,
 });
+
+const resolveChatResult = async ({ userId, sessionId, message, imageUrl, useThinking, onChunk, onThinking }) => {
+  const result = await runChatSession({
+    userId,
+    sessionId,
+    message,
+    imageUrl,
+    useThinking,
+    onChunk,
+    onThinking,
+  });
+
+  return buildChatApiResult({
+    response: result.response,
+    model: result.model,
+    tokenUsage: result.tokenUsage,
+    sessionId,
+  });
+};
 
 const runChatSession = async ({
   userId,
@@ -266,7 +306,7 @@ const runChatSession = async ({
  * @returns {Object} AI响应
  */
 const chat = async (userId, sessionId, message, imageUrl = null) => {
-  const result = await runChatSession({
+  const result = await resolveChatResult({
     userId,
     sessionId,
     message,
@@ -276,12 +316,7 @@ const chat = async (userId, sessionId, message, imageUrl = null) => {
 
   console.log(`[AI] 使用模型: ${result.model}, 当前图片: ${!!imageUrl}`);
 
-  return buildChatApiResult({
-    response: result.response,
-    model: result.model,
-    tokenUsage: result.tokenUsage,
-    sessionId,
-  });
+  return result;
 };
 
 /**
@@ -299,7 +334,7 @@ const chat = async (userId, sessionId, message, imageUrl = null) => {
  * @returns {Object} 最终结果
  */
 const chatStream = async (userId, sessionId, message, imageUrl = null, onChunk, onThinking = null) => {
-  const result = await runChatSession({
+  return resolveChatResult({
     userId,
     sessionId,
     message,
@@ -307,15 +342,6 @@ const chatStream = async (userId, sessionId, message, imageUrl = null, onChunk, 
     useThinking: true,
     onChunk,
     onThinking,
-  });
-
-  const { response, model, tokenUsage } = result;
-
-  return buildChatApiResult({
-    response,
-    model,
-    tokenUsage,
-    sessionId,
   });
 };
 
@@ -367,14 +393,7 @@ const callKimiAPI = async (messages, model = MODELS.default) => {
       stream: true,
     });
     
-    // 2. 收集所有chunk
-    let fullContent = '';
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta;
-      if (delta?.content) {
-        fullContent += delta.content;
-      }
-    }
+    const fullContent = await collectStreamText(stream);
     
     // 3. 调用token统计接口估算消耗
     const tokenEstimate = await estimateTokens(messages, model);
@@ -492,6 +511,62 @@ const generateLocalResponse = async (message) => {
 请问有什么可以帮您的？`;
 };
 
+const buildParsedInputResult = (text, type, rawText, tokenUsage) => {
+  const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+  if (!jsonMatch) {
+    return {
+      type,
+      confidence: 0.5,
+      message: text,
+      rawText,
+      needsConfirmation: true,
+      tokenUsage,
+    };
+  }
+
+  try {
+    return {
+      type,
+      confidence: 0.9,
+      data: JSON.parse(jsonMatch[0]),
+      rawText,
+      needsConfirmation: true,
+      tokenUsage,
+    };
+  } catch {
+    return {
+      type,
+      confidence: 0.5,
+      message: text,
+      rawText,
+      needsConfirmation: true,
+      tokenUsage,
+    };
+  }
+};
+
+const parseInputPromptMap = {
+  purchase: (content) => `请解析以下采购信息，提取：商品名称、数量、单价、供应商、规格。以JSON格式返回。
+内容：${content}`,
+  quote: (content) => `请解析以下报价单，提取每个商品的：名称、规格、数量、单价、总价。以JSON数组格式返回。
+内容：${content}`,
+  contract: (content) => `请解析以下合同信息，提取：合同号、供应商/客户名称、商品列表、总金额。以JSON格式返回。
+内容：${content}`,
+};
+
+const buildImagePrompt = () => `请识别这张图片的内容，如果是报价单/发票/合同，请提取：商品名称、规格、数量、单价、总价。以JSON格式返回。`;
+
+const buildInputContent = (content, type, imageUrl) => {
+  if (!imageUrl) {
+    return parseInputPromptMap[type]?.(content) || content;
+  }
+
+  return [
+    { type: 'text', text: buildImagePrompt() },
+    { type: 'image_url', image_url: { url: imageUrl } },
+  ];
+};
+
 /**
  * 职责：解析用户输入内容（辅助录入，支持图片）
  * @param {string} content - 用户粘贴的内容
@@ -506,22 +581,7 @@ const parseInput = async (content, type, imageUrl = null, userId = null) => {
   }
   
   const model = imageUrl ? MODELS.vision : MODELS.fast;
-  const prompts = {
-    purchase: `请解析以下采购信息，提取：商品名称、数量、单价、供应商、规格。以JSON格式返回。
-内容：${content}`,
-    quote: `请解析以下报价单，提取每个商品的：名称、规格、数量、单价、总价。以JSON数组格式返回。
-内容：${content}`,
-    contract: `请解析以下合同信息，提取：合同号、供应商/客户名称、商品列表、总金额。以JSON格式返回。
-内容：${content}`,
-    image: `请识别这张图片的内容，如果是报价单/发票/合同，请提取：商品名称、规格、数量、单价、总价。以JSON格式返回。`,
-  };
-  
-  const userContent = imageUrl
-    ? [
-        { type: 'text', text: prompts.image },
-        { type: 'image_url', image_url: { url: imageUrl } },
-      ]
-    : prompts[type] || content;
+  const userContent = buildInputContent(content, type, imageUrl);
   
   try {
     const result = await callKimiAPI([
@@ -534,29 +594,7 @@ const parseInput = async (content, type, imageUrl = null, userId = null) => {
       await recordTokenUsage(userId, null, model, result.tokenUsage, 'parse');
     }
     
-    // 尝试提取JSON
-    const text = result.content;
-    const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-    
-    if (jsonMatch) {
-      return {
-        type,
-        confidence: 0.9,
-        data: JSON.parse(jsonMatch[0]),
-        rawText: content,
-        needsConfirmation: true,
-        tokenUsage: result.tokenUsage,
-      };
-    }
-    
-    return {
-      type,
-      confidence: 0.5,
-      message: text,
-      rawText: content,
-      needsConfirmation: true,
-      tokenUsage: result.tokenUsage,
-    };
+    return buildParsedInputResult(result.content, type, content, result.tokenUsage);
   } catch (error) {
     console.error('Kimi解析失败:', error.message);
     return parseLocally(content, type);
@@ -694,13 +732,7 @@ const generateGreeting = async () => {
       stream: true,
     });
 
-    let fullContent = '';
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta;
-      if (delta?.content) {
-        fullContent += delta.content;
-      }
-    }
+    const fullContent = await collectStreamText(stream);
 
     const lines = fullContent.trim().split('\n').filter(line => line.trim());
     
@@ -722,9 +754,9 @@ const generateGreeting = async () => {
 };
 
 const generateGreetingStream = async (onThinking, onContent, onDone) => {
-  const resolvedOnThinking = typeof onThinking === 'function' ? onThinking : null;
-  const resolvedOnContent = typeof onContent === 'function' ? onContent : null;
-  const resolvedOnDone = typeof onDone === 'function' ? onDone : null;
+  const resolvedOnThinking = toSafeCallback(onThinking);
+  const resolvedOnContent = toSafeCallback(onContent);
+  const resolvedOnDone = toSafeCallback(onDone);
 
   if (resolvedOnThinking) {
     resolvedOnThinking('生成问候语中...');

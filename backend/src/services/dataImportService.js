@@ -642,17 +642,199 @@ const getOrCreatePurchaseContract = async (contractNo, supplier, cache, results,
   return purchaseContract;
 };
 
-/**
- * 职责：生成记录的唯一标识（用于去重）
- */
-function generateRecordKey(row) {
-  const customsName = (row['报关名'] || '').trim();
-  const storeName = (row['门店'] || '').trim();
-  const containerNo = (row['柜子编号'] || '').trim();
-  const contractNo = (row['合同号'] || '').trim();
-  const quantity = parseQuantity(row['报关数量']);
-  return `${customsName}|${storeName}|${containerNo}|${contractNo}|${quantity}`;
-}
+const IMPORT_ERRORS = {
+  missingContractReference: '货柜号/合同号缺失',
+  missingCustomsName: '报关名为空',
+};
+
+const getRecordSource = (record) => record.record || record;
+
+const getRecordSeq = (record) => record.seq ?? record['序号'];
+
+const buildImportMessage = (seq, note, isIrrelevant = false) => {
+  const normalizedNote = note ? note.trim() : '';
+  const prefix = isIrrelevant ? `不相关记录 - 序号${seq}` : `序号${seq}`;
+  return `${prefix}: ${normalizedNote}`;
+};
+
+const classifyImportRow = (row, exactIndex, fuzzyIndex) => {
+  if (!row.containerNo && !row.salesContractNo) {
+    return {
+      status: 'invalid',
+      reason: IMPORT_ERRORS.missingContractReference,
+    };
+  }
+
+  if (!row.customsName) {
+    return {
+      status: 'invalid',
+      reason: IMPORT_ERRORS.missingCustomsName,
+    };
+  }
+
+  if (isRecordDuplicate(row, exactIndex, fuzzyIndex)) {
+    return {
+      status: 'existing',
+      payload: {
+        seq: row.seq,
+        customsName: row.customsName,
+        containerNo: row.containerNo,
+        data: getRecordSource(row),
+      },
+    };
+  }
+
+  return {
+    status: 'new',
+    payload: {
+      seq: row.seq,
+      customsName: row.customsName,
+      storeName: row.storeName,
+      containerNo: row.containerNo,
+      quantity: row.quantity,
+      data: getRecordSource(row),
+    },
+  };
+};
+
+const buildImportError = (record, reason) => ({
+  seq: getRecordSeq(record),
+  reason,
+  data: getRecordSource(record),
+});
+
+const buildImportRecordContext = async (record, cache, results) => {
+  const port = await getOrCreatePort(getPortInfo(record.portName), cache, results);
+  const supplier = await getOrCreateSupplier(record.supplierName, record.supplierAlias, cache, results);
+  const product = await getOrCreateProduct(record, cache, results);
+  const store = await getOrCreateStore(record.storeName, port, cache, results);
+  const container = record.containerNo ? await getOrCreateSalesContainerContract(record.containerNo, port, record.record, cache, results) : null;
+  const salesContract = record.salesContractNo ? await getOrCreateSalesContract(record.salesContractNo, cache, results) : null;
+
+  return {
+    port,
+    supplier,
+    product,
+    store,
+    container,
+    salesContract,
+  };
+};
+
+const attachPurchaseContractIfNeeded = async (contractNo, supplier, cache, results) => {
+  if (!contractNo || !supplier) {
+    return;
+  }
+
+  await getOrCreatePurchaseContract(contractNo, supplier, cache, results);
+};
+
+const isRecordDuplicate = (row, exactIndex, fuzzyIndex) => {
+  if (!row.containerNo) {
+    return false;
+  }
+
+  const exactBuckets = exactIndex.get(`${row.customsName}|${row.containerNo}`);
+  if (exactBuckets && hasNearbyQuantity(exactBuckets, row.quantityBucket)) {
+    return true;
+  }
+
+  const fuzzyDigits = parseContainerDigits(row.containerNo);
+  if (!fuzzyDigits) {
+    return false;
+  }
+
+  const fuzzyBuckets = fuzzyIndex.get(`${row.customsName}|${fuzzyDigits}`);
+  return Boolean(fuzzyBuckets && hasNearbyQuantity(fuzzyBuckets, row.quantityBucket));
+};
+
+const addSalesItemIfNeeded = async (record, salesContract, product, store, cache, results) => {
+  if (!salesContract || !product || !store || !(record.quantity > 0)) {
+    return;
+  }
+
+  const existingSalesItem = await getCachedSalesItem(cache, salesContract.id, product.id, store.id);
+  if (existingSalesItem) {
+    return;
+  }
+
+  await prisma.salesItem.create({
+    data: {
+      salesContractId: salesContract.id,
+      productId: product.id,
+      storeId: store.id,
+      quantity: record.quantity,
+      unit: standardizeUnit(record.unit),
+      costPrice: record.costPrice,
+      sellingPrice: record.sellingPrice,
+      specification: record.specification,
+      note: buildImportMessage(record.seq, record.record?.['备注'] || '', false),
+    },
+  });
+
+  results.created.salesItems += 1;
+
+  await prisma.salesContract.update({
+    where: { id: salesContract.id },
+    data: { totalAmount: { increment: record.sellingPrice * record.quantity } },
+  });
+};
+
+const addContainerItemIfNeeded = async (record, container, product, store, cache, results) => {
+  if (!container || !product) {
+    return;
+  }
+
+  const containerItem = await getCachedContainerItem(cache, container.id, product.id, store ? store.id : null);
+  if (containerItem) {
+    return;
+  }
+
+  await prisma.packingItem.create({
+    data: {
+      salesContractId: container.id,
+      productId: product.id,
+      storeId: store?.id,
+      quantity: record.quantity || 0,
+      unit: standardizeUnit(record.unit),
+      boxes: Number.isFinite(record.boxes) ? record.boxes : null,
+      grossWeight: Number.isFinite(record.grossWeight) ? record.grossWeight : 0,
+      netWeight: Number.isFinite(record.netWeight) ? record.netWeight : 0,
+      volume: Number.isFinite(record.volume) ? record.volume : 0,
+      note: buildImportMessage(record.seq, record.record?.['备注'] || '', false),
+    },
+  });
+
+  results.created.containerItems++;
+};
+
+const addInventoryIfNeeded = async (row, product, contract, results) => {
+  if (!(row.quantity && row.quantity > 0)) {
+    return;
+  }
+
+  if (!product) {
+    return;
+  }
+
+  const sourceRow = row.record || row;
+  const rawNote = sourceRow['备注'] || '';
+
+  await prisma.inventory.create({
+    data: {
+      productId: product.id,
+      salesContractId: contract?.id,
+      quantity: row.quantity,
+      unit: standardizeUnit(row.unit),
+      status: extractStatus(rawNote, row.shippedAt),
+      outboundAt: row.shippedAt,
+      note: buildImportMessage(row.seq, rawNote, isIrrelevant(sourceRow)),
+    },
+  });
+  results.created.inventories++;
+};
+
+const getImportFailureMessage = (error) => (error instanceof Error ? error.message : '导入失败');
 
 // ==================== 核心服务函数 ====================
 
@@ -662,17 +844,33 @@ function generateRecordKey(row) {
  * @returns {Object} 解析结果
  */
 const parseCSV = (csvContent) => {
-  const parsed = Papa.parse(csvContent, {
-    header: true,
-    skipEmptyLines: true,
-    transformHeader: (header) => header.trim(),
-  });
-  
-  return {
-    data: parsed.data,
-    errors: parsed.errors,
-    meta: parsed.meta,
-  };
+  if (typeof csvContent !== 'string') {
+    return {
+      data: [],
+      errors: [{ message: 'CSV内容必须是字符串' }],
+      meta: null,
+    };
+  }
+
+  try {
+    const parsed = Papa.parse(csvContent, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (header) => header.trim(),
+    });
+
+    return {
+      data: parsed.data || [],
+      errors: parsed.errors || [],
+      meta: parsed.meta || null,
+    };
+  } catch (error) {
+    return {
+      data: [],
+      errors: [{ message: error?.message || 'CSV解析异常' }],
+      meta: null,
+    };
+  }
 };
 
 /**
@@ -733,67 +931,19 @@ const compareWithDatabase = async (rows) => {
   const invalidRecords = [];
   
   for (const row of normalizedRows) {
-    const customsName = row.customsName;
+    const classification = classifyImportRow(row, exactIndex, fuzzyIndex);
 
-    if (!row.containerNo && !row.salesContractNo) {
-      invalidRecords.push({
-        seq: row.seq,
-        reason: '货柜号/合同号缺失',
-        data: row.record || row,
-      });
+    if (classification.status === 'invalid') {
+      invalidRecords.push(buildImportError(row, classification.reason));
       continue;
     }
-    
-    // 验证必填字段
-    if (!customsName) {
-      invalidRecords.push({
-        seq: row.seq,
-        reason: '报关名为空',
-        data: row.record || row,
-      });
+
+    if (classification.status === 'existing') {
+      existingRecords.push(classification.payload);
       continue;
     }
-    
-    // 检查是否已存在
-    const containerNo = row.containerNo;
-    const rowQuantityBucket = row.quantityBucket;
 
-    const isDuplicate = (() => {
-      if (!containerNo) {
-        return false;
-      }
-
-      const exactBuckets = exactIndex.get(`${customsName}|${containerNo}`);
-      if (exactBuckets && hasNearbyQuantity(exactBuckets, rowQuantityBucket)) {
-        return true;
-      }
-
-      const fuzzyDigits = parseContainerDigits(containerNo);
-      if (!fuzzyDigits) {
-        return false;
-      }
-
-      const fuzzyBuckets = fuzzyIndex.get(`${customsName}|${fuzzyDigits}`);
-      return Boolean(fuzzyBuckets && hasNearbyQuantity(fuzzyBuckets, rowQuantityBucket));
-    })();
-    
-    if (isDuplicate) {
-      existingRecords.push({
-        seq: row['序号'],
-        customsName,
-        containerNo,
-        data: row,
-      });
-    } else {
-      newRecords.push({
-        seq: row['序号'],
-        customsName,
-        storeName: row.storeName,
-        containerNo,
-        quantity: row.quantity,
-        data: row.record || row,
-      });
-    }
+    newRecords.push(classification.payload);
   }
   
   return {
@@ -843,132 +993,37 @@ const importRecords = async (records) => {
   cache.purchaseContractsByNo = seeded.purchaseContractsByNo;
   cache.containerByNo = seeded.containerContractsByNo;
 
-  
-
   for (const record of normalizedRecords) {
     try {
-      const row = record.record;
-      const customsName = record.customsName;
-      const storeName = record.storeName;
-      const supplierName = record.supplierName;
-      const portName = record.portName;
-      const shippedAt = record.shippedAt;
-      const containerNo = record.containerNo;
-      const salesContractNo = record.salesContractNo;
-      const purchaseContractNo = record.purchaseContractNo;
-      const quantity = record.quantity;
-      const costPrice = record.costPrice;
-      const sellingPrice = record.sellingPrice;
-
-      if (!customsName) {
-        results.failed.push({ seq: record.seq, reason: '报关名为空' });
+      if (!record.customsName) {
+        results.failed.push(buildImportError(record, IMPORT_ERRORS.missingCustomsName));
         continue;
       }
-      
-      // 1. 获取或创建港口
-      const port = await getOrCreatePort(getPortInfo(portName), cache, results);
-      
-      // 2. 获取或创建供应商
-      const supplier = await getOrCreateSupplier(supplierName, record.supplierAlias, cache, results);
-      
-      // 3. 获取或创建商品
-      const product = await getOrCreateProduct(record, cache, results);
-      
-      // 4. 获取或创建门店
-      const store = await getOrCreateStore(storeName, port, cache, results);
-      
-      // 5. 处理货柜
-      const container = containerNo ? await getOrCreateSalesContainerContract(containerNo, port, record.record, cache, results) : null;
-      
-      // 6. 处理销售合同及明细
-      const salesContract = salesContractNo ? await getOrCreateSalesContract(salesContractNo, cache, results) : null;
+      const context = await buildImportRecordContext(record, cache, results);
+      const { supplier, product, store, container, salesContract } = context;
+      const { purchaseContractNo } = record;
+
+      await attachPurchaseContractIfNeeded(purchaseContractNo, supplier, cache, results);
 
       // 6.1 创建销售合同明细（SalesItem）
-      if (salesContract && product && store && quantity > 0) {
-        const existingSalesItem = await getCachedSalesItem(cache, salesContract.id, product.id, store.id);
+      await addSalesItemIfNeeded(record, salesContract, product, store, cache, results);
 
-        if (!existingSalesItem) {
-          await prisma.salesItem.create({
-            data: {
-              salesContractId: salesContract.id,
-              productId: product.id,
-              storeId: store.id,
-              quantity,
-              unit: standardizeUnit(record.unit),
-              costPrice,
-              sellingPrice,
-              specification: record.specification,
-              note: `序号${record.seq}: ${(record.record && record.record['备注'])?.trim?.() || ''}`,
-            },
-          });
-
-          results.created.salesItems += 1;
-
-          await prisma.salesContract.update({
-            where: { id: salesContract.id },
-            data: {
-              totalAmount: { increment: sellingPrice * quantity },
-            },
-          });
-        }
-      }
-
-      // 7. 处理采购合同
-      if (purchaseContractNo && supplier) {
-        await getOrCreatePurchaseContract(purchaseContractNo, supplier, cache, results);
-      }
-      
       // 8. 创建装箱明细
-      if (container && product) {
-        const containerItem = await getCachedContainerItem(cache, container.id, product.id, store ? store.id : null);
-
-        if (!containerItem) {
-          await prisma.packingItem.create({
-            data: {
-              salesContractId: container.id,
-              productId: product.id,
-              storeId: store?.id,
-              quantity: quantity || 0,
-              unit: standardizeUnit(record.unit),
-              boxes: Number.isFinite(record.boxes) ? record.boxes : null,
-              grossWeight: Number.isFinite(record.grossWeight) ? record.grossWeight : 0,
-              netWeight: Number.isFinite(record.netWeight) ? record.netWeight : 0,
-              volume: Number.isFinite(record.volume) ? record.volume : 0,
-              note: `序号${record.seq}: ${(record.record && record.record['备注'])?.trim?.() || ''}`,
-            },
-          });
-          results.created.containerItems++;
-        }
-      }
+      await addContainerItemIfNeeded(record, container, product, store, cache, results);
       
       // 9. 创建库存记录
-      if (quantity && quantity > 0) {
-        await prisma.inventory.create({
-          data: {
-            productId: product.id,
-            salesContractId: container?.id,
-            quantity,
-            unit: standardizeUnit(record.unit),
-            status: extractStatus(row['备注'], shippedAt),
-            outboundAt: shippedAt,
-            note: isIrrelevant(row) ? 
-              `不相关记录 - 序号${row['序号']}: ${(row['备注'] || '').trim()}` : 
-              `序号${row['序号']}: ${(row['备注'] || '').trim()}`,
-          },
-        });
-        results.created.inventories++;
-      }
+      await addInventoryIfNeeded(record, product, container, results);
       
       results.success.push({
         seq: record.seq,
-        customsName,
-        storeName,
+        customsName: record.customsName,
+        storeName: record.storeName,
       });
       
     } catch (error) {
       results.failed.push({
         seq: record.seq,
-        reason: error.message,
+        reason: getImportFailureMessage(error),
       });
     }
   }
