@@ -1,56 +1,42 @@
 import api from '@/lib/axios';
-import type { Container, ContainerItem, ApiResponse } from '@/types';
+import type { SalesContract, PackingItem, ApiResponse } from '@/types';
 import { createCrudService } from './crudService';
 
 type ContainerListQuery = {
   page?: number;
   pageSize?: number;
   keyword?: string;
-  query?: string;
 };
 
-type ContainerCreateInput = Partial<Container>;
-type ContainerUpdateInput = Partial<Container>;
+type ContainerCreateInput = Partial<SalesContract>;
+type ContainerUpdateInput = Partial<SalesContract>;
 
-const normalizeListParams = (params?: ContainerListQuery) => {
-  if (!params) {
-    return {};
-  }
-  const { query, ...rest } = params;
-  return {
-    ...rest,
-    ...(query !== undefined ? { keyword: query } : {}),
-  };
-};
-
-const crud = createCrudService<Container, ContainerCreateInput, ContainerUpdateInput, Omit<ContainerListQuery, 'query'>>(
-  '/containers'
-);
+const crud = createCrudService<SalesContract, ContainerCreateInput, ContainerUpdateInput, ContainerListQuery>('/containers');
 
 /**
- * 货柜服务（兼容旧容器接口）。
+ * 货柜服务。
  */
 export const containerService = {
   ...crud,
 
-  getAll: (params?: ContainerListQuery) =>
-    crud.getAll?.(normalizeListParams(params) as Omit<ContainerListQuery, 'query'>),
+  getAll: (params?: ContainerListQuery) => crud.getAll?.(params),
 
   updateStatus: async (id: string, status: string) => {
-    return api.put<ApiResponse<Container>, ApiResponse<Container>, { status: string }>(`/containers/${id}/status`, {
-      status,
-    });
+    return api.put<ApiResponse<SalesContract>, ApiResponse<SalesContract>, { status: string }>(
+      `/containers/${id}/status`,
+      { status },
+    );
   },
 
-  addItem: async (containerId: string, data: Partial<ContainerItem>) => {
-    return api.post<ApiResponse<ContainerItem>, ApiResponse<ContainerItem>, Partial<ContainerItem>>(
+  addItem: async (containerId: string, data: Partial<PackingItem>) => {
+    return api.post<ApiResponse<PackingItem>, ApiResponse<PackingItem>, Partial<PackingItem>>(
       `/containers/${containerId}/items`,
       data,
     );
   },
 
-  updateItem: async (containerId: string, itemId: string, data: Partial<ContainerItem>) => {
-    return api.put<ApiResponse<ContainerItem>, ApiResponse<ContainerItem>, Partial<ContainerItem>>(
+  updateItem: async (containerId: string, itemId: string, data: Partial<PackingItem>) => {
+    return api.put<ApiResponse<PackingItem>, ApiResponse<PackingItem>, Partial<PackingItem>>(
       `/containers/${containerId}/items/${itemId}`,
       data,
     );

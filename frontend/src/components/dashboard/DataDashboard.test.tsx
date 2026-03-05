@@ -11,11 +11,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { DataDashboard } from './DataDashboard';
 
-const mockApiGet = vi.fn();
+const mockGetDashboardAnalytics = vi.fn();
 
-vi.mock('@/lib/axios', () => ({
-  default: {
-    get: (...args: unknown[]) => mockApiGet(...args),
+vi.mock('@/services/ai.service', () => ({
+  aiService: {
+    getDashboardAnalytics: (...args: unknown[]) => mockGetDashboardAnalytics(...args),
   },
 }));
 
@@ -34,11 +34,11 @@ vi.mock('recharts', () => ({
 
 describe('DataDashboard', () => {
   beforeEach(() => {
-    mockApiGet.mockReset();
+    mockGetDashboardAnalytics.mockReset();
   });
 
   it('加载成功后展示核心指标', async () => {
-    mockApiGet.mockResolvedValue({
+    mockGetDashboardAnalytics.mockResolvedValue({
       data: {
         contracts: {
           purchase: { count: 3, totalAmount: 10000, paidAmount: 6000, unpaidAmount: 4000 },
@@ -62,7 +62,7 @@ describe('DataDashboard', () => {
   });
 
   it('无图表数据时展示空文案', async () => {
-    mockApiGet.mockResolvedValue({
+    mockGetDashboardAnalytics.mockResolvedValue({
       data: {
         contracts: {
           purchase: { count: 0, totalAmount: 0, paidAmount: 0, unpaidAmount: 0 },
@@ -84,4 +84,3 @@ describe('DataDashboard', () => {
     });
   });
 });
-

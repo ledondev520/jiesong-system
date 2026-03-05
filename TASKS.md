@@ -109,3 +109,20 @@
 | TST-12 | P0 | 20m | 1 | DONE | 补齐认证状态仓库测试（`auth.store` 登录/登出）并完成前端单测全量回归（`80 files / 251 tests`） |
 | TST-13 | P0 | 25m | 1 | DONE | 补齐布局与主题缺口测试（`dashboard/layout`、`ThemeToggle`、`ThemeProvider`、`status-badge`）并完成前后端+E2E 全量门禁回归 |
 | SIM-01 | P1 | 60m | 1 | DONE | 简化 AI 与数据导入服务核心流程：拆分长函数、去重重复逻辑、补齐流式解析错误处理与无效引用清理 |
+| OPS-03 | P2 | 15m | 1 | DONE | 统一导入导出路径到 `/api/v1/import/*` 与 `/api/v1/export/*`，移除 `/api/v1/system` 下别名路径，并同步前端调用与文档 |
+| RBAC-01 | P0 | 20m | 1 | DONE | 数据库模型新增 `Role` 枚举并更新 `User.role` 字段 |
+| RBAC-02 | P0 | 60m | 1 | DONE | 补齐 `roleAuth` 中间件并逐路由替换后端写操作角色鉴权 |
+| RBAC-03 | P0 | 30m | 1 | DONE | 注册改为管理员邀请制：`/auth/register` 仅管理员可达，前端注册页改为说明页 |
+| DEBT-01 | P0 | 20m | 1 | DONE | 清理 dashboard 测试中直接 `axios` mock 依赖，统一服务层 mock |
+| DEBT-02 | P0 | 20m | 1 | DONE | 去除前端兼容参数/兼容逻辑（如 `query` 兼容链路）并回归接口调用断言 |
+| DEBT-03 | P0 | 15m | 1 | DONE | 补齐 `finance.service` 幂等行为测试（重复请求只触发一次 `POST`） |
+| DEBT-04 | P0 | 10m | 1 | DONE | 清理已下线 mock 标记文档项并同步 `docs/模拟数据汇总.md` |
+| DEBT-05 | P0 | 10m | 1 | DONE | 更新计划与任务台账，记录本轮清理交付 |
+| DEBT-06 | P0 | 60m | 1 | DONE | 运行态去除 `containerNo` 兼容链路 + 财务控制器服务化重构 + 后端付款幂等（`X-Idempotency-Key`）+ 文档同步 |
+| INV-01 | P0 | 30m | 1 | DONE | 库存联动修复：创建 `inventorySnapshot.js`、销售 `out_stock` 自动扣减、财务金额按数量对齐并补齐后端定向测试 |
+| AUDIT-01 | P0 | 90m | 1 | DONE | 审计日志全链路增强：新增 `withAuditLog` 中间件、核心控制器写路由接入、before/after 对比、系统日志过滤增强与 CSV 导出、前端导出接入与定向回归 | 
+
+| RBAC-04 | P0 | 35m | 1 | DONE | 新增 FINANCE/WAREHOUSE 角色、抽离 roleAuth 中间件、补齐写路由鉴权并新增 RBAC 写路由覆盖测试 |
+| API-01 | P0 | 35m | 1 | DONE | 新增货柜可视化接口 `GET /api/v1/containers/:id/visualization`，返回布局/重量体积汇总/ASCII 视图并补齐服务与路由回归测试 |
+| INV-ALERT-01 | P0 | 40m | 1 | DONE | 库存预警系统：新增 `Product.lowStockThreshold`、每日库存巡检任务、低库存通知下发、接口 `GET /api/v1/inventory/alerts` 与定向回归测试 |
+| PDF-01 | P1 | 35m | 1 | DONE | 前端 PDF 导出增强：合同详情页（采购/销售）+ 财务应收/应付报表导出，统一 blob 下载并补齐 loading/error 处理与定向测试 |

@@ -57,9 +57,6 @@ const login = async (username, password) => {
     data: { lastLoginAt: new Date() },
   });
   
-  // 4.1 记录登录日志
-  await auditLog.login(user.id, null);
-  
   // 5. 返回结果（排除密码）
   const { password: _, ...userWithoutPassword } = user;
   return {

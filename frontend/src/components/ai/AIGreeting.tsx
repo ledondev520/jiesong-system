@@ -11,14 +11,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sparkles, RefreshCw, Music, Loader2, X } from 'lucide-react';
-import api from '@/lib/axios';
-
-interface GreetingData {
-  greeting: string;
-  songName: string;
-  lyrics: string[];
-  source: 'ai' | 'local';
-}
+import { aiService, type AiGreeting } from '@/services/ai.service';
 
 /**
  * 职责：渲染AI问候语悬浮卡片
@@ -28,7 +21,7 @@ interface GreetingData {
  *   3. 提供刷新和关闭功能
  */
 export function AIGreeting() {
-  const [data, setData] = useState<GreetingData | null>(null);
+  const [data, setData] = useState<AiGreeting | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [visible, setVisible] = useState(true);
@@ -44,8 +37,8 @@ export function AIGreeting() {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get('/ai/greeting');
-      setData((response as { data: GreetingData }).data);
+      const response = await aiService.getGreeting();
+      setData(response.data);
     } catch (err) {
       console.error('获取问候语失败:', err);
       setError('获取问候语失败');

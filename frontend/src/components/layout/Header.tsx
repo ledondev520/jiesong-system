@@ -27,7 +27,6 @@ import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import api from '@/lib/axios';
 import type {
   ApiResponse,
-  Container,
   PaginatedResponse,
   Product,
   PurchaseContract,
@@ -92,11 +91,11 @@ export function Header() {
             })
           ),
         api
-          .get<ApiResponse<PaginatedResponse<Container>>, ApiResponse<PaginatedResponse<Container>>>('/containers', {
+          .get<ApiResponse<PaginatedResponse<SalesContract>>, ApiResponse<PaginatedResponse<SalesContract>>>('/containers', {
             params: { keyword: query, pageSize: 5 },
           })
           .catch(
-            (): ApiResponse<PaginatedResponse<Container>> => ({
+            (): ApiResponse<PaginatedResponse<SalesContract>> => ({
               code: 200,
               message: 'ok',
               data: { items: [], pagination: { total: 0, page: 1, pageSize: 5, totalPages: 0 } },
@@ -156,7 +155,7 @@ export function Header() {
         results.push({
           type: 'container',
           id: c.id,
-          title: c.containerNo || c.contractNo,
+          title: c.contractNo,
           subtitle: c.status,
         });
       });

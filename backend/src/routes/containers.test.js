@@ -26,3 +26,8 @@ test('containers route order: /next-no/:portId must be before /:id for GET', () 
     `路由顺序错误：/next-no/:portId(index=${nextNoIndex}) 应在 /:id(index=${idIndex}) 之前`
   );
 });
+
+test('containers route includes visualization endpoint', () => {
+  const visualizationIndex = getRouteIndex(containersRouter, '/:id/visualization', 'get');
+  assert.notEqual(visualizationIndex, -1, '缺少 GET /:id/visualization 路由');
+});

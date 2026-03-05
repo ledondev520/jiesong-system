@@ -10,10 +10,13 @@ const express = require('express');
 const multer = require('multer');
 const router = express.Router();
 const dataImportController = require('../controllers/dataImportController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, roleAuth } = require('../middleware/auth');
+const systemController = require('../controllers/systemController');
+const { upload: systemUpload } = require('../utils/upload');
+const { withAuditLog } = require('../middleware/auditLog');
 
 // 配置multer内存存储
-const upload = multer({
+const memoryUpload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB限制
@@ -33,11 +36,38 @@ const upload = multer({
 // 所有路由需要认证
 router.use(authenticate);
 
+// POST /api/v1/import - 导入CSV数据（仅管理员）
+router.post('/', roleAuth('ADMIN'), systemUpload.single('file'), withAuditLog(
+  {
+    entity: 'DataImport',
+    action: 'IMPORT',
+    captureBefore: false,
+    captureAfter: false,
+    getNewValue: ({ req, responseData }) => ({
+      fileName: req.file?.originalname || null,
+      result: responseData || null,
+    }),
+  },
+  systemController.importData
+));
+
 // POST /api/v1/import/preview - 上传并预览CSV
-router.post('/preview', upload.single('file'), dataImportController.previewImport);
+router.post('/preview', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), memoryUpload.single('file'), dataImportController.previewImport);
 
 // POST /api/v1/import/execute - 执行导入
-router.post('/execute', dataImportController.executeImport);
+router.post('/execute', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+  {
+    entity: 'DataImport',
+    action: 'IMPORT',
+    captureBefore: false,
+    captureAfter: false,
+    getNewValue: ({ req, responseData }) => ({
+      recordsCount: Array.isArray(req.body?.records) ? req.body.records.length : 0,
+      result: responseData || null,
+    }),
+  },
+  dataImportController.executeImport
+));
 
 // GET /api/v1/import/history - 获取导入历史
 router.get('/history', dataImportController.getHistory);

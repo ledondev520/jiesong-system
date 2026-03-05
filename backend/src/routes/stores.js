@@ -8,8 +8,9 @@
 
 const { Router } = require('express');
 const storeController = require('../controllers/storeController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, roleAuth } = require('../middleware/auth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
+const { withAuditLog } = require('../middleware/auditLog');
 
 const router = Router();
 
@@ -25,13 +26,22 @@ router.get('/:id', withIdValidation, storeController.getById);
 router.post('/', [
   body('name').notEmpty().withMessage('门店名称不能为空'),
   body('portId').notEmpty().withMessage('港口ID不能为空'),
-], handleValidation, storeController.create);
+], roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), handleValidation, withAuditLog(
+  { entity: 'Store', action: 'CREATE', model: 'store' },
+  storeController.create
+));
 
 // PUT /api/v1/stores/:id - 更新门店
-router.put('/:id', withIdValidation, storeController.update);
+router.put('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+  { entity: 'Store', action: 'UPDATE', model: 'store' },
+  storeController.update
+));
 
 // DELETE /api/v1/stores/:id - 删除门店
-router.delete('/:id', withIdValidation, storeController.remove);
+router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+  { entity: 'Store', action: 'DELETE', model: 'store' },
+  storeController.remove
+));
 
 // GET /api/v1/stores/ports - 获取港口列表
 router.get('/options/ports', storeController.getPorts);

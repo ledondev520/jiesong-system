@@ -17,7 +17,7 @@ import {
   Package,
   Loader2,
 } from 'lucide-react';
-import api from '@/lib/axios';
+import { aiService, type DashboardAnalytics } from '@/services/ai.service';
 import {
   LineChart,
   Line,
@@ -31,32 +31,19 @@ import {
   Legend,
 } from 'recharts';
 
-interface AnalyticsData {
-  contracts: {
-    purchase: { count: number; totalAmount: number; paidAmount: number; unpaidAmount: number };
-    sales: { count: number; totalAmount: number; receivedAmount: number; receivable: number };
-  };
-  inventory: { productCount: number; recordCount: number; totalQuantity: number };
-  shipments: {
-    monthly: Array<{ month: string; count: number; amount: number; boxes: number }>;
-  };
-  topProducts: Array<{ productName: string; count: number; quantity: number; totalAmount: number }>;
-  storeStats: Array<{ storeName: string; orderCount: number; quantity: number; totalAmount: number }>;
-}
-
 /**
  * 职责：渲染数据看板
  * 思路：展示关键业务指标卡片和图表
  */
 export function DataDashboard() {
-  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [data, setData] = useState<DashboardAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await api.get('/dashboard/analytics');
-        setData((res as { data: AnalyticsData }).data);
+        const res = await aiService.getDashboardAnalytics();
+        setData(res.data);
       } catch (e) {
         console.error('获取分析数据失败:', e);
       } finally {

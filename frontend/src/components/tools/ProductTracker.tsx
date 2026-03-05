@@ -16,19 +16,7 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Search, Package, MapPin, Ship, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import api from '@/lib/axios';
-import type { ApiResponse } from '@/types';
-
-interface TrackResult {
-  salesContractId: string;
-  contractNo: string;       // EXP编号
-  portName: string;         // 目的港
-  status: string;           // 状态
-  eta?: string;             // 预计到达
-  storeName: string;        // 门店
-  productName: string;      // 商品
-  quantity: number;         // 数量
-}
+import { aiService, type TrackResult } from '@/services/ai.service';
 
 /**
  * 职责：商品追踪组件
@@ -55,11 +43,9 @@ export function ProductTracker() {
     setLoading(true);
     setSearched(true);
     try {
-      const response = await api.get<ApiResponse<TrackResult[]>, ApiResponse<TrackResult[]>>('/dashboard/track-product', {
-        params: {
-          product: productKeyword.trim(),
-          store: storeKeyword.trim() || undefined,
-        },
+      const response = await aiService.trackProduct({
+        product: productKeyword.trim(),
+        store: storeKeyword.trim() || undefined,
       });
       setResults(response.data || []);
     } catch (error) {

@@ -9,6 +9,8 @@
 const prisma = require('../utils/prisma');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
+const { validatePurchaseTransition, PURCHASE_STATUS } = require('../services/purchaseStateMachine');
+const { applyPurchaseInStock } = require('../services/inventorySnapshot');
 const { normalizePagination } = require('../utils/pagination');
 
 /**
@@ -198,11 +200,38 @@ const addItem = async (req, res, next) => {
 const updateStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
-    
-    const contract = await prisma.purchaseContract.update({
-      where: { id },
-      data: { status },
+    const targetStatus = typeof req.body?.status === 'string' ? req.body.status.trim() : req.body?.status;
+
+    if (!targetStatus) {
+      throw createError('status 不能为空', 400);
+    }
+
+    const contract = await prisma.$transaction(async (tx) => {
+      const existingContract = await tx.purchaseContract.findUnique({
+        where: { id },
+        select: { id: true, status: true },
+      });
+
+      if (!existingContract) {
+        throw createError('采购合同不存在', 404);
+      }
+
+      const validationResult = validatePurchaseTransition(existingContract.status, targetStatus);
+      if (!validationResult.valid) {
+        throw createError(validationResult.message || '非法采购合同状态流转', 400);
+      }
+
+      const isTransition = existingContract.status !== targetStatus;
+      const contract = await tx.purchaseContract.update({
+        where: { id },
+        data: { status: targetStatus },
+      });
+
+      if (isTransition && targetStatus === PURCHASE_STATUS.IN_STOCK) {
+        await applyPurchaseInStock(tx, id);
+      }
+
+      return contract;
     });
     
     success(res, contract, '状态更新成功');

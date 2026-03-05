@@ -9,8 +9,9 @@
 const { Router } = require('express');
 const multer = require('multer');
 const contractDocController = require('../controllers/contractDocController');
-const { authenticate, adminOnly } = require('../middleware/auth');
+const { authenticate, roleAuth } = require('../middleware/auth');
 const { withIdValidation } = require('../utils/validators');
+const { withAuditLog } = require('../middleware/auditLog');
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -26,19 +27,54 @@ router.get('/templates', contractDocController.getTemplates);
 // POST /api/v1/contract-doc/template - 上传合同模板（仅管理员）
 router.post(
   '/template',
-  adminOnly,
+  roleAuth('ADMIN'),
   upload.single('template'),
-  contractDocController.uploadTemplate
+  withAuditLog(
+    {
+      entity: 'ContractTemplate',
+      action: 'UPLOAD',
+      captureBefore: false,
+      captureAfter: false,
+      getNewValue: ({ req }) => ({
+        fileName: req.file?.originalname || null,
+        mimeType: req.file?.mimetype || null,
+        size: req.file?.size || null,
+      }),
+    },
+    contractDocController.uploadTemplate
+  )
 );
 
 // DELETE /api/v1/contract-doc/template - 删除模板（仅管理员）
-router.delete('/template', adminOnly, contractDocController.deleteTemplate);
+router.delete('/template', roleAuth('ADMIN'), withAuditLog(
+  {
+    entity: 'ContractTemplate',
+    action: 'DELETE',
+    captureBefore: false,
+    captureAfter: false,
+  },
+  contractDocController.deleteTemplate
+));
 
 // POST /api/v1/contract-doc/generate/:id - 根据采购合同生成购销合同
 router.post(
   '/generate/:id',
+  roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
   withIdValidation,
-  contractDocController.generateFromPurchase
+  withAuditLog(
+    {
+      entity: 'ContractFile',
+      action: 'GENERATE',
+      captureBefore: false,
+      captureAfter: false,
+      getEntityId: ({ req }) => req.params?.id || null,
+      getNewValue: ({ req }) => ({
+        purchaseContractId: req.params?.id || null,
+        storeName: req.body?.storeName || null,
+      }),
+    },
+    contractDocController.generateFromPurchase
+  )
 );
 
 // GET /api/v1/contract-doc/pdf/:id - 获取采购合同PDF（用于预览）

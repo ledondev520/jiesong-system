@@ -10,4 +10,5 @@ const assert = require('node:assert/strict');
 test('inventoryController: 模块可正常加载并导出', () => {
   const mod = require('./inventoryController');
   assert.ok(mod !== undefined);
+  assert.equal(typeof mod.getAlerts, 'function');
 });

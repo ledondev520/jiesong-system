@@ -51,8 +51,27 @@ const exportData = async (req, res, next) => {
   }
 };
 
+const exportDataPdf = async (req, res, next) => {
+  try {
+    const { type } = req.params;
+    const { exportSystemDataPdf } = require('../../services/pdfExportService');
+
+    const result = await exportSystemDataPdf(type, req.query);
+
+    res.setHeader('Content-Type', result.contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename*=UTF-8''${encodeURIComponent(result.filename)}`
+    );
+    res.send(result.buffer);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   importData,
   getImportRecords,
   exportData,
+  exportDataPdf,
 };

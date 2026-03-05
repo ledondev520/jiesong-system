@@ -10,7 +10,7 @@ import userEvent from '@testing-library/user-event';
 import ForgotPasswordPage from './page';
 
 const mockPush = vi.fn();
-const mockPost = vi.fn();
+const mockResetPassword = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
 
@@ -20,9 +20,9 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@/lib/axios', () => ({
-  default: {
-    post: (...args: unknown[]) => mockPost(...args),
+vi.mock('@/services/auth.service', () => ({
+  authService: {
+    resetPassword: (...args: unknown[]) => mockResetPassword(...args),
   },
 }));
 
@@ -36,7 +36,7 @@ vi.mock('sonner', () => ({
 describe('ForgotPasswordPage 交互逻辑', () => {
   beforeEach(() => {
     mockPush.mockReset();
-    mockPost.mockReset();
+    mockResetPassword.mockReset();
     mockToastSuccess.mockReset();
     mockToastError.mockReset();
   });
@@ -53,7 +53,7 @@ describe('ForgotPasswordPage 交互逻辑', () => {
   });
 
   it('重置成功后展示成功态并可返回登录', async () => {
-    mockPost.mockResolvedValue({ code: 200, data: null });
+    mockResetPassword.mockResolvedValue({ code: 200, data: null });
     const user = userEvent.setup();
 
     render(<ForgotPasswordPage />);
@@ -65,7 +65,7 @@ describe('ForgotPasswordPage 交互逻辑', () => {
     await user.click(screen.getByRole('button', { name: '重置密码' }));
 
     await waitFor(() => {
-      expect(mockPost).toHaveBeenCalledWith('/auth/reset-password', {
+      expect(mockResetPassword).toHaveBeenCalledWith({
         username: 'admin',
         phone: '13800138000',
         newPassword: 'new-password',
@@ -79,7 +79,7 @@ describe('ForgotPasswordPage 交互逻辑', () => {
   });
 
   it('重置失败时提示错误', async () => {
-    mockPost.mockRejectedValue(new Error('账号信息不匹配'));
+    mockResetPassword.mockRejectedValue(new Error('账号信息不匹配'));
     const user = userEvent.setup();
 
     render(<ForgotPasswordPage />);

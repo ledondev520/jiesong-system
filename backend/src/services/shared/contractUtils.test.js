@@ -12,9 +12,11 @@ const {
   generateNextContractNo,
 } = require('./contractUtils');
 
-test('normalizeFilterStatus: PENDING/LOADING 归一为 DRAFT', () => {
-  assert.equal(normalizeFilterStatus('PENDING'), 'DRAFT');
-  assert.equal(normalizeFilterStatus('LOADING'), 'DRAFT');
+test('normalizeFilterStatus: 大小写与连字符归一化', () => {
+  assert.equal(normalizeFilterStatus('PENDING'), 'PENDING');
+  assert.equal(normalizeFilterStatus('loading'), 'LOADING');
+  assert.equal(normalizeFilterStatus('out_stock'), 'OUT_STOCK');
+  assert.equal(normalizeFilterStatus('pending-shipment'), 'PENDING_SHIPMENT');
   assert.equal(normalizeFilterStatus('SHIPPED'), 'SHIPPED');
 });
 

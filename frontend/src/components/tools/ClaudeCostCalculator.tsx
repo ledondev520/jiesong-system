@@ -22,8 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Calculator, Upload, Image as ImageIcon, Loader2, DollarSign, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
-import api from '@/lib/axios';
-import type { ApiResponse } from '@/types';
+import { aiService } from '@/services/ai.service';
 
 // Claude 4.5 Opus 费率（美元/百万 token）
 const RATES = {
@@ -39,10 +38,6 @@ interface TokenUsage {
   input: number;
   output: number;
   total: number;
-}
-
-interface AIChatResponseData {
-  message?: string;
 }
 
 /**
@@ -110,10 +105,8 @@ export function ClaudeCostCalculator() {
     setIsProcessing(true);
     try {
       // 调用后端 AI 服务识别图片
-      const response = await api.post<ApiResponse<AIChatResponseData>, ApiResponse<AIChatResponseData>, { message: string; imageUrl: string }>(
-        '/ai/chat',
-        {
-        message: `请识别这张图片中的 token 使用统计数据。提取以下数值：
+      const response = await aiService.parseImageTokenUsage(
+        `请识别这张图片中的 token 使用统计数据。提取以下数值：
 1. Cache Read (缓存读取)
 2. Cache Write (缓存写入)
 3. Input (输入)
@@ -124,8 +117,8 @@ export function ClaudeCostCalculator() {
 {"cacheRead": 92258867, "cacheWrite": 3352546, "input": 1592822, "output": 699243, "total": 97903478}
 
 只返回 JSON，不要其他文字。`,
-        imageUrl: base64Image,
-      });
+        base64Image,
+      );
 
       const data = response.data;
       

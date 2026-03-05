@@ -126,7 +126,7 @@ const deleteTemplate = async (req, res, next) => {
 };
 
 /**
- * 职责：获取采购合同PDF文档（兼容前端预览）
+ * 职责：获取采购合同PDF文档（前端预览）
  */
 const getContractPdf = async (req, res, next) => {
   try {

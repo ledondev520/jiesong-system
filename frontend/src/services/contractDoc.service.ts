@@ -7,7 +7,9 @@
  */
 
 import api from '@/lib/axios';
+import { getAuthToken } from '@/lib/auth-token';
 import { ApiResponse } from '@/types';
+import { downloadResponseBlob } from './fileDownload';
 
 export const contractDocService = {
   /**
@@ -108,5 +110,18 @@ export const contractDocService = {
     } catch {
       return null;
     }
+  },
+
+  /**
+   * 导出采购合同 PDF（blob 下载）
+   */
+  exportPurchasePdf: async (purchaseContractId: string, contractNo?: string) => {
+    const token = getAuthToken();
+    const response = await fetch(`/api/v1/contract-doc/pdf/${purchaseContractId}`, {
+      headers: {
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+    });
+    await downloadResponseBlob(response, `${contractNo || purchaseContractId}_purchase_contract.pdf`);
   },
 };

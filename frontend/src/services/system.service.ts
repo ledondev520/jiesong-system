@@ -28,6 +28,11 @@ export interface GetSystemLogsParams {
   userId?: string;
   entity?: string;
   action?: string;
+  entityId?: string;
+  keyword?: string;
+  ipAddress?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export const getSystemLogs = async (params: GetSystemLogsParams = { page: 1, pageSize: 50 }) => {
@@ -35,6 +40,50 @@ export const getSystemLogs = async (params: GetSystemLogsParams = { page: 1, pag
     '/system/logs',
     { params }
   );
+};
+
+export const exportSystemLogsCsv = async (params: GetSystemLogsParams = {}, fallbackFilename = 'operation_logs.csv') => {
+  const token = getAuthToken();
+  const query = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value).length > 0) {
+      query.set(key, String(value));
+    }
+  });
+
+  const queryString = query.toString();
+  const response = await fetch(`/api/v1/system/logs/export/csv${queryString ? `?${queryString}` : ''}`, {
+    headers: {
+      Authorization: token ? `Bearer ${token}` : '',
+    },
+  });
+
+  if (!response.ok) {
+    let message = `导出失败（${response.status}）`;
+    try {
+      const errorData = await response.json();
+      if (errorData?.message) {
+        message = errorData.message;
+      }
+    } catch {
+      // Ignore JSON parse errors from non-JSON responses.
+    }
+    throw new Error(message);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const filenameMatch = disposition.match(/filename\*=UTF-8''(.+)/i) || disposition.match(/filename="?([^"]+)"?/i);
+
+  link.href = url;
+  link.download = filenameMatch ? decodeURIComponent(filenameMatch[1]) : fallbackFilename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 };
 
 export interface SystemNotificationItem {
@@ -94,7 +143,7 @@ export const getSystemImportRecords = async (
   params: GetSystemImportRecordsParams = { page: 1, pageSize: 50 }
 ) => {
   return api.get<ApiResponse<PaginatedResponse<SystemImportRecordItem>>, ApiResponse<PaginatedResponse<SystemImportRecordItem>>>(
-    '/system/import/records',
+    '/import/records',
     { params }
   );
 };
@@ -190,7 +239,7 @@ export type SystemExportType =
 
 export const exportSystemData = async (type: SystemExportType, fallbackFilename?: string) => {
   const token = getAuthToken();
-  const response = await fetch(`/api/v1/system/export/${type}`, {
+  const response = await fetch(`/api/v1/export/${type}`, {
     headers: {
       Authorization: token ? `Bearer ${token}` : '',
     },

@@ -10,7 +10,7 @@ import type { NextConfig } from "next";
 
 // 开发环境默认代理到本地后端，生产环境使用环境变量
 const apiBackendUrl =
-  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 
 const nextConfig: NextConfig = {
   /* API代理配置 - 将/api/v1/*请求代理到后端 */

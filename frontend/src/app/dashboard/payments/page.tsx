@@ -10,7 +10,7 @@
 
 import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { PaymentType, type ApiResponse, type PaginatedResponse } from '@/types';
+import { PaymentType } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,7 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { CreditCard, ArrowUpRight, ArrowDownLeft, RefreshCw } from 'lucide-react';
 import { PaymentDialog, type PaymentSubmitData } from '../../dashboard/finance/components/PaymentDialog';
 import { toast } from 'sonner';
-import api from '@/lib/axios';
+import { financeService } from '@/services/finance.service';
 import { PageHeader } from '@/components/layout/PageHeader';
 
 interface PayableContract {
@@ -97,8 +97,8 @@ function PaymentsPageContent() {
   // 1. 加载统计数据
   const fetchStats = async () => {
     try {
-      const response = await api.get('/finance/stats');
-      setStats((response as { data: FinanceStats }).data);
+      const data = await financeService.getStats();
+      setStats(data);
     } catch {
       console.error('获取财务统计失败');
     }
@@ -108,10 +108,7 @@ function PaymentsPageContent() {
   const fetchPayables = async () => {
     setPayableLoading(true);
     try {
-      const response = await api.get<
-        ApiResponse<PaginatedResponse<PayableContract>>,
-        ApiResponse<PaginatedResponse<PayableContract>>
-      >('/finance/payables', { params: { pageSize: 100 } });
+      const response = await financeService.getPayables({ pageSize: 100 });
       setPayables(response.data?.items || []);
     } catch {
       toast.error('加载应付账款失败');
@@ -124,10 +121,7 @@ function PaymentsPageContent() {
   const fetchReceivables = async () => {
     setReceivableLoading(true);
     try {
-      const response = await api.get<
-        ApiResponse<PaginatedResponse<ReceivableContract>>,
-        ApiResponse<PaginatedResponse<ReceivableContract>>
-      >('/finance/receivables', { params: { pageSize: 100 } });
+      const response = await financeService.getReceivables({ pageSize: 100 });
       setReceivables(response.data?.items || []);
     } catch {
       toast.error('加载应收账款失败');
@@ -140,7 +134,7 @@ function PaymentsPageContent() {
   const handlePayableSubmit = async (data: PaymentSubmitData) => {
     if (!selectedPayable) return;
     try {
-      await api.post('/finance/payments', {
+      await financeService.createPayment({
         type: 'PAYABLE',
         purchaseContractId: selectedPayable.id,
         amount: Number(data.amount),
@@ -162,7 +156,7 @@ function PaymentsPageContent() {
   const handleReceivableSubmit = async (data: PaymentSubmitData) => {
     if (!selectedReceivable) return;
     try {
-      await api.post('/finance/payments', {
+      await financeService.createPayment({
         type: 'RECEIVABLE',
         salesContractId: selectedReceivable.id,
         amount: Number(data.amount),

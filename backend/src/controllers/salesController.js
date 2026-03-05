@@ -67,7 +67,10 @@ const addItem = async (req, res, next) => {
 
 const updateStatus = async (req, res, next) => {
   try {
-    const contract = await salesService.updateSalesStatus(req.params.id, req.body?.status);
+    const contract = await salesService.updateSalesStatus(req.params.id, req.body?.status, {
+      userId: req.user?.id,
+      req,
+    });
     success(res, contract, '状态更新成功');
   } catch (error) {
     next(error);

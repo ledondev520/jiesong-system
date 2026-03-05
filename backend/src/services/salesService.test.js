@@ -8,6 +8,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const prisma = require('../utils/prisma');
 const salesService = require('./salesService');
+const inventorySnapshot = require('./inventorySnapshot');
 
 test('getSalesContracts: 组装筛选条件并分页查询', async () => {
   const originalFindMany = prisma.salesContract.findMany;
@@ -24,7 +25,7 @@ test('getSalesContracts: 组装筛选条件并分页查询', async () => {
     const result = await salesService.getSalesContracts({
       page: 3,
       pageSize: 5,
-      status: 'PENDING',
+      status: 'DRAFT',
       storeId: 'store-1',
       keyword: 'EXP',
     });
@@ -84,7 +85,7 @@ test('createSalesContract: 未传合同号时自动生成并写入', async () =>
 test('addSalesItem: 未传 sellingPrice 时按汇率与利润率计算并回写总额', async () => {
   const originalFindUnique = prisma.salesContract.findUnique;
   const originalCreate = prisma.salesItem.create;
-  const originalAggregate = prisma.salesItem.aggregate;
+  const originalFindMany = prisma.salesItem.findMany;
   const originalUpdate = prisma.salesContract.update;
   let createArgs = null;
   let updateArgs = null;
@@ -94,7 +95,11 @@ test('addSalesItem: 未传 sellingPrice 时按汇率与利润率计算并回写�
     createArgs = args;
     return { id: 'si-1', ...args.data };
   };
-  prisma.salesItem.aggregate = async () => ({ _sum: { sellingPrice: 123 } });
+  prisma.salesItem.findMany = async () => [{
+    quantity: 2,
+    sellingPrice: 13,
+    costPrice: 50,
+  }];
   prisma.salesContract.update = async (args) => {
     updateArgs = args;
     return { id: 'sc-1' };
@@ -112,13 +117,44 @@ test('addSalesItem: 未传 sellingPrice 时按汇率与利润率计算并回写�
     assert.equal(createArgs.data.sellingPrice, 13);
     assert.deepEqual(updateArgs, {
       where: { id: 'sc-1' },
-      data: { totalAmount: 123 },
+      data: { totalAmount: 26 },
     });
   } finally {
     prisma.salesContract.findUnique = originalFindUnique;
     prisma.salesItem.create = originalCreate;
-    prisma.salesItem.aggregate = originalAggregate;
+    prisma.salesItem.findMany = originalFindMany;
     prisma.salesContract.update = originalUpdate;
+  }
+});
+
+test('updateSalesStatus: 传入 out_stock 时触发自动出库扣减', async () => {
+  const originalTransaction = prisma.$transaction;
+  const originalApplySalesOutStock = inventorySnapshot.applySalesOutStock;
+  let updatedStatus = null;
+  let outStockCalled = false;
+
+  prisma.$transaction = async (fn) => fn({
+    salesContract: {
+      findUnique: async () => ({ id: 'sc-1', status: 'PENDING_SHIPMENT' }),
+      update: async (args) => {
+        updatedStatus = args.data.status;
+        return { id: 'sc-1', status: args.data.status };
+      },
+    },
+  });
+  inventorySnapshot.applySalesOutStock = async (_tx, salesContractId) => {
+    outStockCalled = salesContractId === 'sc-1';
+    return { results: [] };
+  };
+
+  try {
+    const contract = await salesService.updateSalesStatus('sc-1', 'out_stock');
+    assert.equal(updatedStatus, 'OUT_STOCK');
+    assert.equal(outStockCalled, true);
+    assert.equal(contract.status, 'OUT_STOCK');
+  } finally {
+    prisma.$transaction = originalTransaction;
+    inventorySnapshot.applySalesOutStock = originalApplySalesOutStock;
   }
 });
 

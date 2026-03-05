@@ -20,9 +20,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Loader2 } from 'lucide-react';
-import api from '@/lib/axios';
 import { PageHeader } from '@/components/layout/PageHeader';
-import type { ApiResponse, PaginatedResponse } from '@/types';
+import { reportsService } from '@/services/reports.service';
 
 interface SupplierStats {
   id: string;
@@ -59,22 +58,6 @@ interface StoreLite {
   name: string;
 }
 
-interface PurchaseSummary {
-  totalAmount?: number;
-}
-
-interface PurchaseSummaryResponse extends PaginatedResponse<PurchaseSummary> {
-  total?: number;
-}
-
-interface DashboardStatsData {
-  overview?: {
-    purchaseContracts?: number;
-    salesContracts?: number;
-    products?: number;
-    containers?: number;
-  };
-}
 
 export default function ReportsPage() {
   const [data, setData] = useState<ReportData | null>(null);
@@ -85,15 +68,9 @@ export default function ReportsPage() {
       try {
         // 获取多个统计数据
         const [suppliersRes, storesRes, dashboardRes] = await Promise.all([
-          api.get<ApiResponse<PaginatedResponse<SupplierLite>>, ApiResponse<PaginatedResponse<SupplierLite>>>(
-            '/suppliers',
-            { params: { pageSize: 100 } },
-          ),
-          api.get<ApiResponse<PaginatedResponse<StoreLite>>, ApiResponse<PaginatedResponse<StoreLite>>>(
-            '/stores',
-            { params: { pageSize: 100 } },
-          ),
-          api.get<ApiResponse<DashboardStatsData>, ApiResponse<DashboardStatsData>>('/dashboard/stats'),
+          reportsService.getSuppliers({ pageSize: 100 }),
+          reportsService.getStores({ pageSize: 100 }),
+          reportsService.getDashboardStats(),
         ]);
 
         const suppliers = suppliersRes.data?.items || [];
@@ -104,10 +81,7 @@ export default function ReportsPage() {
         const supplierStats: SupplierStats[] = [];
         for (const supplier of suppliers.slice(0, 20)) {
           try {
-            const purchasesRes = await api.get<
-              ApiResponse<PurchaseSummaryResponse>,
-              ApiResponse<PurchaseSummaryResponse>
-            >('/purchases', { params: { supplierId: supplier.id, pageSize: 1 } });
+            const purchasesRes = await reportsService.getPurchasesBySupplier(supplier.id);
             const purchaseData = purchasesRes.data;
             supplierStats.push({
               id: supplier.id,

@@ -8,14 +8,15 @@
 
 const { Router } = require('express');
 const userController = require('../controllers/userController');
-const { authenticate, adminOnly } = require('../middleware/auth');
+const { authenticate, roleAuth } = require('../middleware/auth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
+const { withAuditLog } = require('../middleware/auditLog');
 
 const router = Router();
 
 // 所有用户路由需要认证且仅管理员可访问
 router.use(authenticate);
-router.use(adminOnly);
+router.use(roleAuth('ADMIN'));
 
 // GET /api/v1/users - 获取用户列表
 router.get('/', withPaginationValidation, userController.list);
@@ -28,12 +29,21 @@ router.post('/', [
   body('username').notEmpty().withMessage('用户名不能为空'),
   body('password').isLength({ min: 6 }).withMessage('密码至少6位'),
   body('name').notEmpty().withMessage('姓名不能为空'),
-], handleValidation, userController.create);
+], handleValidation, withAuditLog(
+  { entity: 'User', action: 'CREATE', model: 'user' },
+  userController.create
+));
 
 // PUT /api/v1/users/:id - 更新用户
-router.put('/:id', withIdValidation, userController.update);
+router.put('/:id', withIdValidation, withAuditLog(
+  { entity: 'User', action: 'UPDATE', model: 'user' },
+  userController.update
+));
 
 // DELETE /api/v1/users/:id - 删除用户
-router.delete('/:id', withIdValidation, userController.remove);
+router.delete('/:id', withIdValidation, withAuditLog(
+  { entity: 'User', action: 'DELETE', model: 'user' },
+  userController.remove
+));
 
 module.exports = router;

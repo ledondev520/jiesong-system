@@ -120,6 +120,15 @@ const getProducts = async (req, res, next) => {
   }
 };
 
+const getVisualization = async (req, res, next) => {
+  try {
+    const visualization = await containerService.getVisualization(req.params.id);
+    success(res, visualization);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   list,
   getById,
@@ -132,4 +141,5 @@ module.exports = {
   updateStatus,
   getNextContainerNo,
   getProducts,
+  getVisualization,
 };

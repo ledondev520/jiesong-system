@@ -15,8 +15,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuthStore } from '@/store/auth.store';
-import api from '@/lib/axios';
-import type { ApiResponse, User } from '@/types';
+import type { ApiResponse } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -30,6 +29,7 @@ import {
 } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserPlus, KeyRound } from 'lucide-react';
+import { authService, type LoginResponse } from '@/services/auth.service';
 
 const loginSchema = z.object({
   username: z.string().min(1, '请输入用户名'),
@@ -38,10 +38,6 @@ const loginSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
-type LoginResponseData = {
-  user: User;
-  token: string;
-};
 
 const REMEMBER_USERNAME_KEY = 'jiesong_saved_username';
 const REMEMBER_CREDENTIALS_KEY = 'jiesong_saved_credentials';
@@ -85,13 +81,6 @@ export default function LoginPage() {
       }
     }
 
-    // Backward compatibility: older versions only saved username
-    const savedUsername = localStorage.getItem(REMEMBER_USERNAME_KEY);
-    if (savedUsername) {
-      form.setValue('username', savedUsername);
-      form.setValue('rememberMe', true);
-      setSavedCredentials(null);
-    }
   }, [form]);
 
   /**
@@ -117,7 +106,7 @@ export default function LoginPage() {
         setSavedCredentials(null);
       }
 
-      const result: ApiResponse<LoginResponseData> = await api.post('/auth/login', {
+      const result: ApiResponse<LoginResponse> = await authService.login({
         username,
         password,
       });

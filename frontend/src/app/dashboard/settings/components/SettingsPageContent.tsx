@@ -31,9 +31,8 @@ import { X, Save, Loader2, Package, Users, Store, Settings2, FileSpreadsheet, Us
 import { ClaudeCostCalculator } from '@/components/tools/ClaudeCostCalculator';
 import { toast } from 'sonner';
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE, UNITS as INITIAL_UNITS } from '@/lib/constants';
-import api from '@/lib/axios';
 import { PageHeader } from '@/components/layout/PageHeader';
-import type { ApiResponse } from '@/types';
+import { configService } from '@/services/config.service';
 import { exportSystemData, SystemExportType } from '@/services/system.service';
 
 const configSchema = z.object({
@@ -51,6 +50,7 @@ interface SystemConfigMap {
   brokers?: string[];
   [key: string]: unknown;
 }
+type ConfigUpdateValue = string | number | string[];
 
 const exportTargets: Array<{ type: SystemExportType; label: string; desc: string }> = [
   { type: 'suppliers', label: '供应商', desc: '导出供应商主数据与别名信息' },
@@ -98,7 +98,7 @@ export default function SettingsPageContent() {
   useEffect(() => {
     const fetchConfigs = async () => {
       try {
-        const response = await api.get<ApiResponse<SystemConfigMap>, ApiResponse<SystemConfigMap>>('/system/configs');
+        const response = await configService.getSystemConfig();
         const configs = response.data;
         
         // 配置是对象格式，直接设置
@@ -126,12 +126,10 @@ export default function SettingsPageContent() {
   }, [form]);
 
   // 保存单个配置
-  const saveConfig = async (key: string, value: string) => {
-    try {
-      await api.put(`/system/configs/${key}`, { value });
-    } catch (error) {
-      throw error;
-    }
+  const saveConfig = async (key: string, value: ConfigUpdateValue) => {
+    await configService.updateSystemConfig({
+      [key]: value,
+    } as Record<string, ConfigUpdateValue>);
   };
 
   const onSubmit = async (data: ConfigFormValues) => {
@@ -139,10 +137,10 @@ export default function SettingsPageContent() {
     try {
       // 保存基础配置
       await Promise.all([
-        saveConfig('exchangeRate', data.exchangeRate.toString()),
-        saveConfig('profitRate', data.profitRate.toString()),
-        saveConfig('units', JSON.stringify(units)),
-        saveConfig('brokers', JSON.stringify(brokers)),
+        saveConfig('exchangeRate', data.exchangeRate),
+        saveConfig('profitRate', data.profitRate),
+        saveConfig('units', units),
+        saveConfig('brokers', brokers),
       ]);
       
       toast.success('系统配置已保存');
@@ -162,7 +160,7 @@ export default function SettingsPageContent() {
       
       // 自动保存
       try {
-        await saveConfig('units', JSON.stringify(newUnits));
+        await saveConfig('units', newUnits);
         toast.success('单位添加成功');
       } catch {
         toast.error('保存失败');
@@ -176,7 +174,7 @@ export default function SettingsPageContent() {
     
     // 自动保存
     try {
-      await saveConfig('units', JSON.stringify(newUnits));
+      await saveConfig('units', newUnits);
     } catch {
       toast.error('保存失败');
     }
@@ -190,7 +188,7 @@ export default function SettingsPageContent() {
       
       // 自动保存
       try {
-        await saveConfig('brokers', JSON.stringify(newBrokers));
+        await saveConfig('brokers', newBrokers);
         toast.success('报关公司添加成功');
       } catch {
         toast.error('保存失败');
@@ -204,7 +202,7 @@ export default function SettingsPageContent() {
     
     // 自动保存
     try {
-      await saveConfig('brokers', JSON.stringify(newBrokers));
+      await saveConfig('brokers', newBrokers);
     } catch {
       toast.error('保存失败');
     }

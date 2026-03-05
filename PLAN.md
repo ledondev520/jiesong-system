@@ -257,30 +257,10 @@
     - E2E 稳定性增强：按钮巡检增加 dialog 自动 dismiss、无语义按钮跳过、视口外按钮容错；Playwright `retries` 设为 `1`。
   - 后端测试缺口清零：
     - 将 `backend/src` 目录下原缺失的 37 个 `*.test.js` 全部补齐（含 controllers/routes/services/utils/middleware/app）。
-    - `backend/src/app.js` 改为仅在 `require.main === module` 时启动监听，支持测试安全加载。
-    - 新增 `backend/src/app.test.js` 覆盖 `/health` 可用性。
+  - `backend/src/app.js` 改为仅在 `require.main === module` 时启动监听，支持测试安全加载。
+  - 新增 `backend/src/app.test.js` 覆盖 `/health` 可用性。
   - 清理无关仓库文件：
     - 删除 `music_name_fetch/README.md`、`music_name_fetch/fetch_music.py`。
-- 验证结论：
-  - 前端定向测试（本轮新增/修复）通过：`14 files / 41 tests`。
-  - 后端全量测试通过：`85/85`。
-  - 前端 E2E 全量通过：`52/52`。
-    - `backend/src/controllers/systemController.js` 中 `markNotificationRead` 改为 `updateMany({ id, userId })`，只允许用户修改自己的通知。
-    - 当记录不存在或无权限时返回 `404`（`通知不存在或无权限访问`）。
-  - 导入状态修复：
-    - `backend/src/services/importService.js` 新增 `resolveImportStatus(failedRows)`。
-    - 导入完成状态改为 `FAILED/COMPLETED` 正确分支，修复原先固定 `COMPLETED` 的问题。
-  - 测试覆盖补齐：
-    - 新增 `backend/src/controllers/systemController.test.js`：
-      - 通知已读归属约束
-      - 无权限/不存在场景 404
-      - 导入记录 `status/keyword` 筛选参数透传
-    - 新增 `backend/src/services/importService.test.js`：
-      - 导入状态推导
-      - 导入记录筛选 where 组装
-- 验证结论：
-  - `backend` 全量测试通过：`npm run test`（44/44）。
-
 ## 2026-03-01 Round 18（Supabase 回切与上线路径收口）
 
 - 已完成本轮目标：将 Prisma 数据源切回 Supabase PostgreSQL，并整理可执行的本地启动与上线路径。
@@ -538,5 +518,194 @@
   - 复用并清理 `backend/src/services/aiService.js` 与 `backend/src/services/dataImportService.js`：
     - 去重重复回调/解析/构建逻辑，合并共通流程。
     - 增强错误兜底行为，避免空响应导致静默失败。
-  - 更新协同台账：
-    - `TASKS.md` 新增 `SIM-01`。
+- 更新协同台账：
+  - `TASKS.md` 新增 `SIM-01`。
+
+## 2026-03-05 Round 32（RBAC 与邀请注册）
+
+- 已完成本轮目标：补齐后端写操作角色授权，并将注册流程调整为管理员邀请制。
+- 已完成项：
+  - `backend/prisma/schema.prisma` 增加 `Role` 枚举并将 `User.role` 改为 `Role` 类型，默认值设置为 `SALES`。
+  - `backend/src/middleware/auth.js` 新增/对外导出 `roleAuth`，并兼容现有 `authorize`、`adminOnly` 用法。
+  - 全量写接口（create/update/delete/批量导入/执行等）接入 `roleAuth` 鉴权，`dataImport` 写接口完成补齐。
+  - 注册入口切换为邀请制：移除公开注册提交逻辑，`backend/src/routes/auth.js` 的 `/register` 改为 `roleAuth('ADMIN')`，前端 `/register` 页面改为管理员邀请说明页。
+- 验证结论：
+  - 当前未执行新增自动化，建议在下个窗口按后续计划补跑：
+    - `backend` 全量后端鉴权回归。
+    - `backend` 路由权限相关定向测试。
+    - `frontend` `/register` 页面定向测试（已按本次修改内容补齐）。
+
+## 2026-03-05 Round 33（前端 Mock 与兼容技术债清理）
+
+- 已完成本轮目标：清理前端 mock 引用与兼容逻辑，强化服务层契约，补充幂等能力验证，并同步文档。
+- 已完成项：
+  - 清理 `frontend/src/app/dashboard` 财务/报表/设置/收付款系列页面测试中的直接 `axios` mock，改为服务层 mock。
+  - 清理 `frontend/src/app/(auth)` 登录/找回密码测试中的直接 `axios` mock，改为 `authService` mock。
+  - 清理 AI/工作台组件测试中的直接 `axios` mock：`AIGreeting`、`DataDashboard`、`ProductTracker`、`ClaudeCostCalculator` 改为 `aiService` mock。
+  - 为组件层新增 `aiService` 抽象方法并统一调用（`getGreeting`、`getDashboardAnalytics`、`trackProduct`、`parseImageTokenUsage`）。
+  - 移除测试中的遗留 `mockApiGet/mockApiPost` 未使用变量与 `Reports` 语法回归。
+  - 统一 `finance.service.test.ts` / `store.service.test.ts` / `user.service.test.ts` 请求断言，移除已下线兼容参数路径。
+  - 在 `finance.service` 级别完善重复提交幂等验证（服务层单次 post + idempotency key）。
+  - 更新 `docs/模拟数据汇总.md` 移除已清理的服务层 mock 标记。
+- 已补充文档：
+  - `PLAN.md`
+  - `TASKS.md`
+  - `docs/模拟数据汇总.md`
+- 验证结论：
+  - 本轮以清理与文档为主，未新增自动化回归；建议在下一窗口按范围补跑：
+    - `frontend` dashboard 相关定向测试。
+    - `frontend` 受影响 service 测试复核。
+
+## 2026-03-05 Round 34（库存联动与财务成本对齐修复）
+
+- 已完成本轮目标：修复库存快照服务命名不一致、销售出库自动扣减触发条件与销售财务金额对齐问题。
+- 已完成项：
+  - 新增 `backend/src/services/inventorySnapshot.js` 作为库存快照主服务，并保留 `inventorySnapshotService.js` 兼容别名。
+  - `salesService`、`purchaseController`、`inventoryController` 全部切换为 `inventorySnapshot` 新路径引用。
+  - 销售状态归一化增强：`out_stock`/`pending-shipment` 等格式可归一为 `OUT_STOCK`/`PENDING_SHIPMENT`，确保出库状态切换稳定触发自动扣减。
+  - `reconcileSalesFinancials` 改为按 `quantity * sellingPrice` 计算合同金额，并同步返回成本与毛利对齐结果（`quantity * costPrice`）。
+  - `addSalesItem` 改为复用 `reconcileSalesFinancials`，消除与库存联动财务计算口径不一致。
+  - 新增后端测试：
+    - `backend/src/services/inventorySnapshot.test.js`
+    - 扩展 `backend/src/services/salesService.test.js`
+    - 扩展 `backend/src/services/shared/contractUtils.test.js`
+- 验证结论：
+  - 定向后端测试通过：
+    - `npm test -- src/services/shared/contractUtils.test.js src/services/inventorySnapshot.test.js src/services/salesService.test.js`（11/11）
+  - 额外路由回归中 `sales.test.js` 受环境依赖阻塞：当前缺失 `pdfkit` 模块，非本次改动引入。
+
+## 2026-03-05 Round 35（占位清理 + 兼容链路下线 + 财务幂等落地）
+
+- 已完成本轮目标：清理运行态占位痕迹、移除货柜域兼容链路、重构财务控制器并落地后端付款幂等能力。
+- 已完成项：
+  - 运行态清理：
+    - `frontend/src` + `backend/src` + `docs`（非测试路径）已无占位关键字残留。
+    - `docs/模拟数据汇总.md` 重写为“运行态清理结论 + 测试态保留边界”。
+  - 兼容链路下线：
+    - 前端类型移除 `containerNo`/`ContainerStatus`/`ContainerItem` 兼容别名，容器页统一使用 `SalesContract.contractNo` 与 `PackingItem`。
+    - 后端 `containerService` 取消 `containerNo` 入参与返回映射，`getById` 不再回填 `items` 兼容字段，`getNextContainerNo` 仅返回 `contractNo`。
+    - `dashboardController` 最近货柜数据改为输出 `contractNo`。
+    - `normalizeFilterStatus` 移除 `PENDING/LOADING -> DRAFT` 兼容映射。
+  - 控制器重构 + 幂等：
+    - 新增 `backend/src/services/financeService.js`，承接付款创建、应收应付聚合与统计逻辑。
+    - `financeController` 仅保留请求参数解析与响应组装。
+    - `POST /finance/payments` 接入 `X-Idempotency-Key`：重复请求返回首次结果，避免重复入账。
+    - Prisma `Payment` 新增 `idempotencyKey` 唯一字段（待 `db:push` 同步数据库）。
+  - 文档同步：
+    - `docs/API文档.md`：货柜创建响应示例改为 `contractNo`，财务创建付款新增幂等请求头说明。
+    - `backend/README.md`、`backend/src/README.md`：补充财务幂等与 `financeService` 说明。
+- 验证结论：
+  - 后端定向测试通过（20/20）：
+    - `src/services/shared/contractUtils.test.js`
+    - `src/services/containerService.test.js`
+    - `src/services/salesService.test.js`
+    - `src/services/financeService.test.js`
+    - `src/controllers/financeController.test.js`
+  - 前端定向测试通过（6/6）：
+    - `src/app/dashboard/containers/page.test.tsx`
+    - `src/app/dashboard/containers/[id]/page.test.tsx`
+
+## 本轮（2026-03-05）审计日志增强交付
+- 新增统一审计中间件 `backend/src/middleware/auditLog.js`，支持：
+  - 控制器包装式接入（`withAuditLog`）
+  - 操作前/后快照采集（before/after）
+  - 自定义 userId/entityId 解析（覆盖登录等场景）
+  - 自定义 old/new 值与日志条件
+- 全量接入核心写操作控制器路由（auth/users/suppliers/stores/products/purchases/sales/containers/inventory/finance/system/dataImport/contractDoc/ai/storeRecommend）。
+- 审计值处理增强：`backend/src/utils/auditLog.js`
+  - 扩展敏感字段识别规则（password/token/secret/api key 等）
+  - 对敏感配置记录自动隐藏 `value`
+  - 增加通用 `log.action(...)` 入口
+- 系统日志查询增强：
+  - `getOperationLogs` 支持过滤：`userId/entity/action/entityId/ipAddress/keyword/startDate/endDate`
+  - 新增 CSV 导出：`GET /api/v1/system/logs/export/csv`
+- 前端联动：
+  - `frontend/src/services/system.service.ts` 增加日志导出能力与扩展筛选参数
+  - 系统日志页增加“导出CSV”操作入口
+
+### 验证结果
+- 后端定向测试：审计中间件 + 日志控制器 + 系统路由 + authService + auditLog 均通过。
+- 后端路由回归（不含依赖缺失的 sales/index 组合场景）通过。
+- 前端定向测试：`system logs page` + `system service` 通过。
+
+## 2026-03-06 Round 36（RBAC 修复：角色扩展 + 写路由鉴权补齐）
+
+- 已完成本轮目标：
+  - `Role` 体系扩展到 `ADMIN/PURCHASE/SALES/FINANCE/WAREHOUSE`。
+  - 新增独立中间件 `backend/src/middleware/roleAuth.js` 并由 `auth.js` 统一导出。
+  - 补齐销售域所有写路由的 `roleAuth` 校验；同时将既有业务写路由角色白名单扩展到新角色集合。
+  - 新增路由层回归 `backend/src/routes/rbac-write-routes.test.js`，确保写路由不会遗漏 RBAC。
+  - 前端用户管理角色枚举与角色选项同步新增 `FINANCE/WAREHOUSE`。
+- 验证结论：
+  - 后端定向测试通过：
+    - `cd backend && node --test src/middleware/auth.test.js src/config/constants.test.js src/utils/validators.test.js src/routes/rbac-write-routes.test.js`
+  - 前端定向测试通过：
+    - `cd frontend && npx vitest run src/app/dashboard/users/page.test.tsx`
+
+## 2026-03-06 Round 37（Container Visualization API）
+
+- 已完成本轮目标：
+  - 新增 `GET /api/v1/containers/:id/visualization`，返回货柜装箱可视化信息。
+  - 增加装箱项重量/体积聚合计算与体积利用率计算。
+  - 增加基础 ASCII 货柜俯视图输出（含图例与溢出标识）。
+- 已完成项：
+  - `backend/src/services/containerService.js`
+    - 新增 `getVisualization(id)`。
+    - 新增布局计算（基于长/宽/高 + 简单 shelf 排布）与溢出判定。
+    - 新增重量/体积汇总、货柜容量与利用率计算。
+    - 新增 ASCII 图生成（`asciiArt` + `ascii.legend`）。
+  - `backend/src/controllers/containerController.js`
+    - 新增 `getVisualization` 控制器。
+  - `backend/src/routes/containers.js`
+    - 新增路由 `GET /:id/visualization`。
+  - 测试补齐：
+    - `backend/src/services/containerService.test.js`
+    - `backend/src/routes/containers.test.js`
+- 验证结论：
+  - 后端定向测试通过（11/11）：
+    - `cd backend && npm test -- src/controllers/containerController.test.js src/services/containerService.test.js src/routes/containers.test.js`
+
+## 2026-03-05 Round 38（Inventory Alert System）
+
+- 已完成本轮目标：交付低库存预警全链路（模型字段 + 每日任务 + 通知 + API）。
+- 已完成项：
+  - 数据模型：`Product` 新增 `lowStockThreshold` 字段（默认 `0`，避免历史数据被误告警）。
+  - 预警服务：新增 `backend/src/services/inventoryAlertService.js`，提供低库存聚合查询与通知下发能力。
+  - 定时任务：新增 `backend/src/jobs/inventoryAlertJob.js`，在 `app.js` 主进程启动时注册每日巡检任务。
+  - API：新增 `GET /api/v1/inventory/alerts`（支持分页与 `keyword` 查询）。
+  - 通知类型：新增 `NOTIFICATION_TYPE.LOW_STOCK` 并接入去重逻辑（同日同用户同商品只发一次）。
+  - 测试：新增 `inventoryAlertService.test.js`，补充 `inventory` 路由顺序与控制器导出回归。
+- 验证结论：
+  - 定向测试通过：
+    - `cd backend && node --test src/config/constants.test.js src/controllers/inventoryController.test.js src/routes/inventory.test.js src/services/inventoryAlertService.test.js`
+  - 全量后端测试未通过（既有环境问题）：
+    - 缺失依赖：`pdfkit` 模块缺失导致 `app.test`/`routes/sales.test`/`pdfExportService.test` 失败。
+    - 安全配置：`.env` 权限为 `644` 在严格模式下触发 `config/index.test.js` 失败。
+
+## 2026-03-05 Round 39（Frontend PDF Export Buttons）
+
+- 已完成本轮目标：
+  - 合同详情页新增 PDF 导出按钮（采购详情页、销售详情页）。
+  - 财务报表页新增 PDF 导出按钮（应付账款页、应收账款页）。
+  - 统一采用 blob 下载链路，并补齐按钮级 loading / error 处理。
+- 已完成项：
+  - 服务层新增导出能力：
+    - `frontend/src/services/sales.service.ts`：`exportPdf(id, contractNo)`
+    - `frontend/src/services/contractDoc.service.ts`：`exportPurchasePdf(purchaseContractId, contractNo?)`
+    - `frontend/src/services/finance.service.ts`：`exportReportPdf(type, fallbackFilename?)`
+  - 页面接入：
+    - `frontend/src/app/dashboard/sales/[id]/components/SalesDetailPageContent.tsx`
+    - `frontend/src/app/dashboard/purchase/[id]/page.tsx`
+    - `frontend/src/app/dashboard/finance/payable/page.tsx`
+    - `frontend/src/app/dashboard/finance/receivable/page.tsx`
+  - 测试补齐：
+    - `frontend/src/app/dashboard/sales/[id]/page.test.tsx`
+    - `frontend/src/app/dashboard/purchase/[id]/page.test.tsx`
+    - `frontend/src/app/dashboard/finance/payable/page.test.tsx`
+    - `frontend/src/app/dashboard/finance/receivable/page.test.tsx`
+- 验证结论：
+  - 前端定向 lint 通过（改动文件集合）。
+  - 前端定向测试通过：`14/14`。
+  - `next build` 未通过，失败原因来自既有问题与环境限制：
+    - 既有语法错误：`frontend/src/components/tools/ClaudeCostCalculator.tsx`。
+    - 网络受限导致 Google Fonts 拉取失败。

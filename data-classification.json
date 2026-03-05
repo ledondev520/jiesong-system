@@ -1,0 +1,88 @@
+{
+  "version": "1.0",
+  "updatedAt": "2026-03-05",
+  "owner": "security-team",
+  "tiers": [
+    {
+      "name": "restricted",
+      "label": "Restricted",
+      "purpose": "Secrets and high-impact business data with strong legal or financial exposure.",
+      "examples": [
+        "API tokens",
+        "password hashes and auth signing keys",
+        "database credentials",
+        "backend environment overrides containing real secrets",
+        "signed legal/financial contract artifacts"
+      ],
+      "controls": {
+        "storage": [
+          "Only in .env or secret manager",
+          "Least privilege file mode (<=600 for backend .env)"
+        ],
+        "transfer": [
+          "Encrypt in transit (TLS)",
+          "Do not paste into tickets/chat unless redacted"
+        ],
+        "retention": "Rotate on role change; remove stale values within 24h of lifecycle end"
+      },
+      "paths": [
+        "backend/.env",
+        "backend/src/config/index.js"
+      ]
+    },
+    {
+      "name": "confidential",
+      "label": "Confidential",
+      "purpose": "Business-sensitive internal data that is not publicly shareable.",
+      "examples": [
+        "purchase contract and sales records",
+        "supplier pricing and margins",
+        "financial summary reports",
+        "inventory and shipment operational history"
+      ],
+      "controls": {
+        "storage": [
+          "Restrict DB/service read access",
+          "Use role-based filtering at API response layer"
+        ],
+        "transfer": [
+          "Use authenticated session only",
+          "Mask identifiers in non-prod shared environments"
+        ],
+        "retention": "Keep no longer than product/legal requirement; archive with access audit"
+      },
+      "paths": [
+        "backend/src",
+        "backend/prisma/schema.prisma",
+        "frontend/src/services"
+      ]
+    },
+    {
+      "name": "internal",
+      "label": "Internal",
+      "purpose": "General internal information for team coordination and operation.",
+      "examples": [
+        "planning docs",
+        "test fixtures",
+        "build scripts",
+        "readme and API contract docs"
+      ],
+      "controls": {
+        "storage": [
+          "Repository standard permissions",
+          "Code review for unintended leakage"
+        ],
+        "transfer": [
+          "Use normal authenticated collaboration channels"
+        ],
+        "retention": "Keep in repository history as needed and clean when obsolete"
+      },
+      "paths": [
+        "docs/",
+        "scripts/",
+        "README.md",
+        "PLAN.md"
+      ]
+    }
+  ]
+}

@@ -8,8 +8,9 @@
 
 const { Router } = require('express');
 const inventoryController = require('../controllers/inventoryController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, roleAuth } = require('../middleware/auth');
 const { withIdValidation, withPaginationValidation } = require('../utils/validators');
+const { withAuditLog } = require('../middleware/auditLog');
 
 const router = Router();
 
@@ -21,6 +22,12 @@ router.get('/', withPaginationValidation, inventoryController.list);
 // GET /api/v1/inventory/stats - 获取库存统计（放在/:id前面避免被匹配）
 router.get('/stats', inventoryController.getStats);
 
+// GET /api/v1/inventory/snapshot - 按商品聚合库存快照
+router.get('/snapshot', inventoryController.getSnapshot);
+
+// GET /api/v1/inventory/alerts - 低库存预警
+router.get('/alerts', withPaginationValidation, inventoryController.getAlerts);
+
 // GET /api/v1/inventory/product/:productId - 按商品查询库存
 router.get('/product/:productId', inventoryController.getByProduct);
 
@@ -28,12 +35,28 @@ router.get('/product/:productId', inventoryController.getByProduct);
 router.get('/contract/:contractId', inventoryController.getByContract);
 
 // PUT /api/v1/inventory/batch-status - 批量更新库存状态（静态路由优先）
-router.put('/batch-status', inventoryController.batchUpdateStatus);
+router.put('/batch-status', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+  {
+    entity: 'Inventory',
+    action: 'BATCH_UPDATE',
+    captureBefore: false,
+    captureAfter: false,
+    getNewValue: ({ req, responseData }) => ({
+      ids: req.body?.ids || [],
+      status: req.body?.status || null,
+      result: responseData || null,
+    }),
+  },
+  inventoryController.batchUpdateStatus
+));
 
 // GET /api/v1/inventory/:id - 获取库存详情（通配路由放最后）
 router.get('/:id', withIdValidation, inventoryController.getById);
 
 // PUT /api/v1/inventory/:id/status - 更新库存状态
-router.put('/:id/status', withIdValidation, inventoryController.updateStatus);
+router.put('/:id/status', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+  { entity: 'Inventory', action: 'UPDATE', model: 'inventory' },
+  inventoryController.updateStatus
+));
 
 module.exports = router;

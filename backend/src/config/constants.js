@@ -11,6 +11,8 @@ const ROLES = {
   ADMIN: 'ADMIN',       // 管理员/老板
   PURCHASE: 'PURCHASE', // 采购
   SALES: 'SALES',       // 销售
+  FINANCE: 'FINANCE',   // 财务
+  WAREHOUSE: 'WAREHOUSE', // 仓库
 };
 
 // 采购状态
@@ -62,6 +64,7 @@ const NOTIFICATION_TYPE = {
   PAYMENT_DUE: 'PAYMENT_DUE',           // 付款到期
   RECEIVABLE_DUE: 'RECEIVABLE_DUE',     // 应收到期
   CONTAINER_ARRIVAL: 'CONTAINER_ARRIVAL', // 货柜到达
+  LOW_STOCK: 'LOW_STOCK',               // 低库存预警
   SYSTEM: 'SYSTEM',                     // 系统通知
 };
 

@@ -8,6 +8,7 @@
 
 const { body, param, query, validationResult } = require('express-validator');
 const { createError } = require('../middleware/errorHandler');
+const { ROLES } = require('../config/constants');
 
 /**
  * 职责：处理验证结果，抛出验证错误
@@ -52,7 +53,7 @@ const validateRegister = [
     .notEmpty().withMessage('密码不能为空')
     .isLength({ min: 6 }).withMessage('密码至少6个字符'),
   body('name').notEmpty().withMessage('姓名不能为空'),
-  body('role').optional().isIn(['ADMIN', 'PURCHASE', 'SALES']).withMessage('角色无效'),
+  body('role').optional().isIn(Object.values(ROLES)).withMessage('角色无效'),
 ];
 
 // 找回密码验证

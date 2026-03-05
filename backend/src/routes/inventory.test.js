@@ -35,3 +35,15 @@ test('inventory route order: /batch-status must be before /:id for PUT', () => {
     `路由顺序错误：/batch-status(index=${batchIndex}) 应在 /:id/status(index=${idStatusIndex}) 之前`
   );
 });
+
+test('inventory route order: /alerts must be before /:id for GET', () => {
+  const alertsIndex = getRouteIndex(inventoryRouter, '/alerts', 'get');
+  const idIndex = getRouteIndex(inventoryRouter, '/:id', 'get');
+
+  assert.notEqual(alertsIndex, -1, '缺少 GET /alerts 路由');
+  assert.notEqual(idIndex, -1, '缺少 GET /:id 路由');
+  assert.ok(
+    alertsIndex < idIndex,
+    `路由顺序错误：/alerts(index=${alertsIndex}) 应在 /:id(index=${idIndex}) 之前`,
+  );
+});

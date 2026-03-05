@@ -15,6 +15,13 @@ datasource db {
   url       = env("DATABASE_URL")   // 本地开发默认使用 SQLite（file:./dev.db）
 }
 
+// Role 类型说明 (SQLite 不支持枚举，使用 String):
+// - ADMIN: 管理员
+// - PURCHASE: 采购
+// - SALES: 销售
+// - FINANCE: 财务
+// - WAREHOUSE: 仓库
+
 // ==================== 用户与权限 ====================
 
 model User {
@@ -22,7 +29,7 @@ model User {
   username      String    @unique
   password      String
   name          String
-  role          String    @default("SALES")
+  role          String    @default("SALES") // ADMIN, PURCHASE, SALES, FINANCE, WAREHOUSE
   email         String?
   phone         String?
   avatar        String?
@@ -118,6 +125,7 @@ model Product {
   description   String?
   specification String?  // 原文本规格（兼容历史数据）
   unit          String?
+  lowStockThreshold Float @default(0)
   categoryId    String?
   // 海关申报信息
   hsCode        String?  // HS编码（10位海关编码）
@@ -354,6 +362,7 @@ model Inventory {
 
 model Payment {
   id                 String   @id @default(cuid())
+  idempotencyKey     String?  @unique
   type               String
   purchaseContractId String?
   salesContractId    String?

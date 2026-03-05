@@ -12,8 +12,8 @@ import userEvent from '@testing-library/user-event';
 import SettingsPage from './page';
 
 const mockPush = vi.fn();
-const mockApiGet = vi.fn();
-const mockApiPut = vi.fn();
+const mockGetSystemConfig = vi.fn();
+const mockUpdateSystemConfig = vi.fn();
 const mockExportSystemData = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
@@ -28,10 +28,10 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@/lib/axios', () => ({
-  default: {
-    get: (...args: unknown[]) => mockApiGet(...args),
-    put: (...args: unknown[]) => mockApiPut(...args),
+vi.mock('@/services/config.service', () => ({
+  configService: {
+    getSystemConfig: (...args: unknown[]) => mockGetSystemConfig(...args),
+    updateSystemConfig: (...args: unknown[]) => mockUpdateSystemConfig(...args),
   },
 }));
 
@@ -53,15 +53,15 @@ vi.mock('@/components/tools/ClaudeCostCalculator', () => ({
 describe('SettingsPage 交互逻辑', () => {
   beforeEach(() => {
     mockPush.mockReset();
-    mockApiGet.mockReset();
-    mockApiPut.mockReset();
+    mockGetSystemConfig.mockReset();
+    mockUpdateSystemConfig.mockReset();
     mockExportSystemData.mockReset();
     mockToastSuccess.mockReset();
     mockToastError.mockReset();
   });
 
   it('加载后可点击基础档案快捷入口', async () => {
-    mockApiGet.mockResolvedValue({
+    mockGetSystemConfig.mockResolvedValue({
       data: {
         exchangeRate: 7.2,
         profitRate: 1.3,
@@ -83,7 +83,7 @@ describe('SettingsPage 交互逻辑', () => {
   });
 
   it('在系统配置标签保存配置成功', async () => {
-    mockApiGet.mockResolvedValue({
+    mockGetSystemConfig.mockResolvedValue({
       data: {
         exchangeRate: 7.2,
         profitRate: 1.3,
@@ -91,7 +91,7 @@ describe('SettingsPage 交互逻辑', () => {
         brokers: ['捷淞'],
       },
     });
-    mockApiPut.mockResolvedValue({});
+    mockUpdateSystemConfig.mockResolvedValue({});
 
     const user = userEvent.setup();
     render(<SettingsPage />);
@@ -104,13 +104,17 @@ describe('SettingsPage 交互逻辑', () => {
     await user.click(screen.getByRole('button', { name: /保存配置/ }));
 
     await waitFor(() => {
-      expect(mockApiPut).toHaveBeenCalled();
+      expect(mockUpdateSystemConfig).toHaveBeenCalled();
+      expect(mockUpdateSystemConfig).toHaveBeenCalledWith({ exchangeRate: 7.2 });
+      expect(mockUpdateSystemConfig).toHaveBeenCalledWith({ profitRate: 1.3 });
+      expect(mockUpdateSystemConfig).toHaveBeenCalledWith({ units: ['件', '箱'] });
+      expect(mockUpdateSystemConfig).toHaveBeenCalledWith({ brokers: ['捷淞'] });
       expect(mockToastSuccess).toHaveBeenCalledWith('系统配置已保存');
     });
   });
 
   it('在数据导出标签可触发导出动作', async () => {
-    mockApiGet.mockResolvedValue({
+    mockGetSystemConfig.mockResolvedValue({
       data: {
         exchangeRate: 7.2,
         profitRate: 1.3,

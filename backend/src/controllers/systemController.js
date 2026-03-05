@@ -1,7 +1,7 @@
 /**
  * Input: /system/* API 控制器聚合
  * Output: 系统配置、通知、日志、港口与商品分类、导入导出统一入口
- * Pos: 拆分后的系统控制器聚合层，兼容原有路由直接 require 模式
+ * Pos: 拆分后的系统控制器聚合层，统一对外导出入口
  */
 
 const {
@@ -13,6 +13,8 @@ const {
   getNotifications,
   markNotificationRead,
   getLogs,
+  getOperationLogs,
+  exportOperationLogsCsv,
 } = require('./system/notificationController');
 const {
   getPorts,
@@ -28,12 +30,15 @@ const {
   importData,
   getImportRecords,
   exportData,
+  exportDataPdf,
 } = require('./system/importExportController');
 
 module.exports = {
   getConfigs,
   updateConfig,
   getLogs,
+  getOperationLogs,
+  exportOperationLogsCsv,
   getNotifications,
   markNotificationRead,
   getExchangeRate,
@@ -48,4 +53,5 @@ module.exports = {
   importData,
   getImportRecords,
   exportData,
+  exportDataPdf,
 };

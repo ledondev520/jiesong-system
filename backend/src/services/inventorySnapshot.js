@@ -1,0 +1,388 @@
+/**
+ * Input: PrismaClient、库存/采购/销售模型
+ * Output: 库存快照与库存出入库服务能力
+ * Pos: 统一处理库存快照、采购入库建档和销售出库扣减，确保财务金额对齐
+ */
+
+const { createError } = require('../middleware/errorHandler');
+const prisma = require('../utils/prisma');
+const { INVENTORY_STATUS } = require('../config/constants');
+
+const clampNumber = (value, fallback = 0) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+};
+
+const toMoney = (value, precision = 2) => {
+  const num = clampNumber(value, 0);
+  return Number(num.toFixed(precision));
+};
+
+const getDefaultSnapshotInput = (tx = prisma) => tx;
+
+/**
+ * 获取库存快照（支持按商品筛选）。
+ * 说明：用于前端展示与内部库存成本评估，返回按商品聚合后的可用库存和平均成本
+ */
+const getInventorySnapshot = async (tx = prisma, filters = {}) => {
+  const where = {};
+  if (filters.productId) {
+    where.productId = filters.productId;
+  }
+
+  const inventories = await getDefaultSnapshotInput(tx).inventory.findMany({
+    where,
+    include: {
+      purchaseItem: { select: { unitPrice: true } },
+      product: { select: { id: true, customsName: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const byProductMap = new Map();
+
+  inventories.forEach((item) => {
+    const key = item.productId;
+    const current = byProductMap.get(key) || {
+      productId: item.productId,
+      productName: item.product?.customsName || '未知商品',
+      totalQuantity: 0,
+      inboundQuantity: 0,
+      outboundQuantity: 0,
+      availableQuantity: 0,
+      totalCost: 0,
+      averageCost: 0,
+      records: 0,
+    };
+
+    const quantity = clampNumber(item.quantity, 0);
+    current.totalQuantity += quantity;
+    current.records += 1;
+
+    if (item.status === INVENTORY_STATUS.INBOUND) {
+      current.inboundQuantity += quantity;
+      current.availableQuantity += quantity;
+      current.totalCost += quantity * clampNumber(item.purchaseItem?.unitPrice, 0);
+    } else {
+      current.outboundQuantity += quantity;
+    }
+
+    current.averageCost = current.inboundQuantity > 0
+      ? toMoney(current.totalCost / current.inboundQuantity)
+      : 0;
+
+    byProductMap.set(key, current);
+  });
+
+  return {
+    records: inventories,
+    byProduct: Array.from(byProductMap.values()),
+    totalQuantity: inventories.reduce((sum, item) => sum + clampNumber(item.quantity, 0), 0),
+  };
+};
+
+/**
+ * 重新计算采购合同财务金额（totalAmount）。
+ */
+const reconcilePurchaseFinancials = async (tx, purchaseContractId) => {
+  const total = await getDefaultSnapshotInput(tx).purchaseItem.aggregate({
+    where: { purchaseContractId },
+    _sum: { totalPrice: true },
+  });
+
+  const totalAmount = toMoney(total._sum.totalPrice || 0, 2);
+
+  await getDefaultSnapshotInput(tx).purchaseContract.update({
+    where: { id: purchaseContractId },
+    data: { totalAmount },
+  });
+
+  return totalAmount;
+};
+
+/**
+ * 重新计算销售合同财务金额（totalAmount）。
+ * 说明：销售明细 sellingPrice/costPrice 为单价，合同金额需按 quantity * 单价对齐。
+ */
+const reconcileSalesFinancials = async (tx, salesContractId) => {
+  const items = await getDefaultSnapshotInput(tx).salesItem.findMany({
+    where: { salesContractId },
+    select: {
+      quantity: true,
+      sellingPrice: true,
+      costPrice: true,
+    },
+  });
+
+  const totalAmountRaw = items.reduce(
+    (sum, item) => sum + clampNumber(item.quantity, 0) * clampNumber(item.sellingPrice, 0),
+    0,
+  );
+  const totalCostRaw = items.reduce(
+    (sum, item) => sum + clampNumber(item.quantity, 0) * clampNumber(item.costPrice, 0),
+    0,
+  );
+
+  const totalAmount = toMoney(totalAmountRaw, 2);
+  const totalCost = toMoney(totalCostRaw, 2);
+  const grossProfit = toMoney(totalAmountRaw - totalCostRaw, 2);
+
+  await getDefaultSnapshotInput(tx).salesContract.update({
+    where: { id: salesContractId },
+    data: { totalAmount },
+  });
+
+  return {
+    totalAmount,
+    totalCost,
+    grossProfit,
+  };
+};
+
+/**
+ * 自动创建入库库存。
+ * - 每个采购明细创建一条 INBOUND 记录
+ * - 若历史已存在对应 purchaseItemId 的库存记录，则自动跳过，保证幂等
+ */
+const applyPurchaseInStock = async (tx, purchaseContractId) => {
+  const contract = await getDefaultSnapshotInput(tx).purchaseContract.findUnique({
+    where: { id: purchaseContractId },
+    include: {
+      items: {
+        select: {
+          id: true,
+          productId: true,
+          quantity: true,
+          unit: true,
+        },
+      },
+    },
+  });
+
+  if (!contract) {
+    throw createError('采购合同不存在', 404);
+  }
+
+  const eligibleItems = (contract.items || []).filter((item) => clampNumber(item.quantity, 0) > 0);
+
+  if (eligibleItems.length === 0) {
+    await reconcilePurchaseFinancials(tx, purchaseContractId);
+    return { created: 0, skipped: 0 };
+  }
+
+  const purchaseItemIds = eligibleItems
+    .map((item) => item.id)
+    .filter((id) => !!id);
+
+  const existing = purchaseItemIds.length
+    ? await getDefaultSnapshotInput(tx).inventory.findMany({
+      where: { purchaseItemId: { in: purchaseItemIds } },
+      select: { purchaseItemId: true },
+    })
+    : [];
+
+  const existingSet = new Set(existing.map((item) => item.purchaseItemId));
+  const now = new Date();
+  const createdRows = eligibleItems
+    .map((item) => ({
+      productId: item.productId,
+      purchaseItemId: item.id,
+      quantity: clampNumber(item.quantity, 0),
+      unit: item.unit,
+      status: INVENTORY_STATUS.INBOUND,
+      inboundAt: now,
+      note: `采购入库（${contract.contractNo || 'N/A'}）`,
+    }))
+    .filter((item) => item.quantity > 0 && !existingSet.has(item.purchaseItemId));
+
+  if (createdRows.length > 0) {
+    await getDefaultSnapshotInput(tx).inventory.createMany({
+      data: createdRows,
+    });
+  }
+
+  const created = createdRows.length;
+  const skipped = eligibleItems.length - created;
+
+  await reconcilePurchaseFinancials(tx, purchaseContractId);
+
+  return {
+    created,
+    skipped,
+  };
+};
+
+const allocateInboundInventory = async ({
+  tx,
+  productId,
+  salesItemId,
+  salesContractId,
+  quantity,
+  unit,
+  at,
+}) => {
+  const target = clampNumber(quantity, 0);
+  if (target <= 0) {
+    return { allocatedQuantity: 0, averageCost: 0, allocations: [] };
+  }
+  const normalizedUnit = typeof unit === 'string' && unit.trim() ? unit.trim() : null;
+
+  const availableInventories = await getDefaultSnapshotInput(tx).inventory.findMany({
+    where: {
+      productId,
+      status: INVENTORY_STATUS.INBOUND,
+      salesItemId: null,
+    },
+    orderBy: [
+      { inboundAt: 'asc' },
+      { createdAt: 'asc' },
+    ],
+    include: {
+      purchaseItem: {
+        select: { unitPrice: true },
+      },
+    },
+  });
+
+  const totalAvailable = availableInventories.reduce(
+    (sum, item) => sum + clampNumber(item.quantity, 0),
+    0,
+  );
+
+  if (totalAvailable + 1e-9 < target) {
+    throw createError(`商品 ${productId} 库存不足，需出库 ${target}，可用 ${toMoney(totalAvailable, 3)}`, 400);
+  }
+
+  let remaining = target;
+  let totalCost = 0;
+  const allocations = [];
+
+  for (const item of availableInventories) {
+    if (remaining <= 0) {
+      break;
+    }
+
+    const available = clampNumber(item.quantity, 0);
+    if (available <= 0) {
+      continue;
+    }
+
+    const outQty = Math.min(available, remaining);
+    const unitCost = clampNumber(item.purchaseItem?.unitPrice, 0);
+    const outboundUnit = item.unit || normalizedUnit || null;
+
+    if (outQty >= available - 1e-9) {
+      await getDefaultSnapshotInput(tx).inventory.update({
+        where: { id: item.id },
+        data: {
+          salesItemId,
+          salesContractId,
+          status: INVENTORY_STATUS.OUTBOUND,
+          outboundAt: at,
+          unit: outboundUnit || undefined,
+          note: '销售出库',
+        },
+      });
+    } else {
+      await getDefaultSnapshotInput(tx).inventory.update({
+        where: { id: item.id },
+        data: {
+          quantity: available - outQty,
+        },
+      });
+
+      await getDefaultSnapshotInput(tx).inventory.create({
+        data: {
+          productId,
+          purchaseItemId: item.purchaseItemId,
+          salesItemId,
+          salesContractId,
+          quantity: outQty,
+          unit: outboundUnit,
+          status: INVENTORY_STATUS.OUTBOUND,
+          outboundAt: at,
+          note: '销售出库',
+        },
+      });
+    }
+
+    remaining -= outQty;
+    totalCost += outQty * unitCost;
+    allocations.push({
+      inventoryId: item.id,
+      quantity: outQty,
+      unitCost,
+    });
+  }
+
+  const averageCost = target > 0 ? toMoney(totalCost / target, 2) : 0;
+
+  return {
+    allocatedQuantity: target,
+    averageCost,
+    allocations,
+  };
+};
+
+/**
+ * 自动出库并根据 FIFO 成本对齐销售明细 costPrice。
+ */
+const applySalesOutStock = async (tx, salesContractId) => {
+  const contract = await getDefaultSnapshotInput(tx).salesContract.findUnique({
+    where: { id: salesContractId },
+    include: { items: true },
+  });
+
+  if (!contract) {
+    throw createError('销售合同不存在', 404);
+  }
+
+  const now = new Date();
+  const results = [];
+
+  for (const item of contract.items || []) {
+    const needed = clampNumber(item.quantity, 0);
+    if (needed <= 0) {
+      continue;
+    }
+
+    const allocation = await allocateInboundInventory({
+      tx,
+      productId: item.productId,
+      salesItemId: item.id,
+      salesContractId,
+      quantity: needed,
+      unit: item.unit,
+      at: now,
+    });
+
+    if (allocation.allocatedQuantity <= 0) {
+      continue;
+    }
+
+    await getDefaultSnapshotInput(tx).salesItem.update({
+      where: { id: item.id },
+      data: { costPrice: allocation.averageCost },
+    });
+
+    results.push({
+      salesItemId: item.id,
+      productId: item.productId,
+      ...allocation,
+    });
+  }
+
+  await reconcileSalesFinancials(tx, salesContractId);
+
+  return {
+    results,
+  };
+};
+
+module.exports = {
+  getInventorySnapshot,
+  applyPurchaseInStock,
+  applySalesOutStock,
+  reconcilePurchaseFinancials,
+  reconcileSalesFinancials,
+};

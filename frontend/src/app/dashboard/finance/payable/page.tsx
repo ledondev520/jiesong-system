@@ -9,7 +9,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { PaymentType, type ApiResponse, type PaginatedResponse } from '@/types';
+import { PaymentType } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -20,10 +20,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { CreditCard, Loader2 } from 'lucide-react';
+import { CreditCard, Loader2, FileDown } from 'lucide-react';
 import { PaymentDialog, type PaymentSubmitData } from '../components/PaymentDialog';
 import { toast } from 'sonner';
-import api from '@/lib/axios';
+import { financeService } from '@/services/finance.service';
 import { PageHeader } from '@/components/layout/PageHeader';
 
 interface PayableContract {
@@ -43,15 +43,13 @@ export default function PayablePage() {
   const [contracts, setContracts] = useState<PayableContract[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedContract, setSelectedContract] = useState<PayableContract | null>(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   // 加载应付账款数据
   const fetchPayables = async () => {
     try {
       setLoading(true);
-      const response = await api.get<
-        ApiResponse<PaginatedResponse<PayableContract>>,
-        ApiResponse<PaginatedResponse<PayableContract>>
-      >('/finance/payables', { params: { pageSize: 100 } });
+      const response = await financeService.getPayables({ pageSize: 100 });
       const data = response.data;
       setContracts(data?.items || []);
     } catch (error) {
@@ -75,7 +73,7 @@ export default function PayablePage() {
     
     try {
       // 调用后端API创建付款记录
-      await api.post('/finance/payments', {
+      await financeService.createPayment({
         type: 'PAYABLE',
         purchaseContractId: selectedContract.id,
         amount: Number(data.amount),
@@ -92,6 +90,19 @@ export default function PayablePage() {
     } catch (error) {
       console.error('记录付款失败:', error);
       toast.error('记录付款失败');
+    }
+  };
+
+  const handleExportPdf = async () => {
+    setExportingPdf(true);
+    try {
+      await financeService.exportReportPdf('purchases', '应付账款报表.pdf');
+      toast.success('应付账款 PDF 已下载');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '导出应付账款 PDF 失败';
+      toast.error(message);
+    } finally {
+      setExportingPdf(false);
     }
   };
 
@@ -113,9 +124,20 @@ export default function PayablePage() {
         title="应付账款"
         description={`供应商付款跟踪。共 ${unpaidContracts.length} 笔待付账款。`}
         actions={
-          <Button variant="outline" className="h-10 rounded-xl border-border/70 bg-background/60" onClick={fetchPayables}>
-            刷新
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl border-border/70 bg-background/60"
+              onClick={handleExportPdf}
+              disabled={exportingPdf}
+            >
+              {exportingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+              导出 PDF
+            </Button>
+            <Button variant="outline" className="h-10 rounded-xl border-border/70 bg-background/60" onClick={fetchPayables}>
+              刷新
+            </Button>
+          </div>
         }
       />
 

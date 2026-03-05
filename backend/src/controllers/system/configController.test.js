@@ -30,7 +30,7 @@ test('getConfigs: JSON 配置解析为对象，非 JSON 保留原字符串', asy
   ]);
 
   try {
-    const req = {};
+  const req = {};
     const res = createMockRes();
     let capturedError = null;
 

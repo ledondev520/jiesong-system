@@ -1,0 +1,38 @@
+# Security Playbook
+
+## 5-Layer Defense Architecture
+
+### 1) 访问控制与身份层（Identity & Access）
+- Enforce explicit身份校验 (JWT + role checks) for all sensitive routes.
+- Keep authentication middleware as single entry for route groups and validate user context before业务处理.
+- Use least-privilege账号 and role-to-resource mapping for every service boundary.
+- Disable默认凭证 and rotate all secrets periodically.
+
+### 2) 运行时与执行环境层（Host & Runtime）
+- Keep `.env` permissions tight; warn in非生产 and block in生产 for misconfigured permissions.
+- Run Node进程 with最小权限 (non-root, locked-down directories) and mount config with read-only policy where possible.
+- Keep upload/storage directories explicitly created and scoped to应用用户.
+- Add startup checks for config file accessibility and permission drift.
+
+### 3) 网络与应用边界层（Application & Network）
+- Apply CORS whitelist (`CORS_ORIGIN`) and avoid `*` in生产 environments.
+- Enforce request size limits, rate limiting at API网关 (or reverse proxy), and strict MIME/type checks on uploads.
+- Keep internal errors server-side; expose only最小化错误码 to clients.
+- Require HTTPS in external endpoints and internal服务间连接。
+
+### 4) 数据与隐私层（Data Protection）
+- Classify data by tier per `data-classification.json` and apply处理规则 in code and documents.
+- Store secrets in `.env` only, never in repository tracked text.
+- Redact PII/敏感字段 in logs and exports; avoid writing raw identifiers to audit channels unless authorized.
+- Use prepared statements/ORM boundaries and strict参数校验 before persistence.
+
+### 5) 监控与响应层（Detection & Response）
+- Maintain security-related日志 for permission checks, auth failures, privilege changes, and config load incidents.
+- Define owner for every security alert and keep rollback checkpoints in `PLAN.md` / `TASKS.md` where相关.
+- Perform periodic review for依赖更新、权限变更、以及配置基线漂移.
+- For incident response: isolate影响面 -> rollback可行方案 ->修复 -> 验证 -> 事后复盘.
+
+## Operational controls
+- Security-related changes should be documented in this file and reflected in `AGENTS.md` and `data-classification.json`.
+- Any runtime permission tightening should include a clear validation path and migration plan for existing environments.
+- Security failures on启动应优先阻断（尤其生产）而不是继续运行.

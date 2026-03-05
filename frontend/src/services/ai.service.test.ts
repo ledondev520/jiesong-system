@@ -53,5 +53,41 @@ describe('aiService', () => {
 
     expect(api.get).toHaveBeenCalledWith('/ai/models');
   });
-});
 
+  it('getGreeting: 拉取 AI 问候语', async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+
+    await aiService.getGreeting();
+
+    expect(api.get).toHaveBeenCalledWith('/ai/greeting');
+  });
+
+  it('getDashboardAnalytics: 拉取数据看板指标', async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+
+    await aiService.getDashboardAnalytics();
+
+    expect(api.get).toHaveBeenCalledWith('/dashboard/analytics');
+  });
+
+  it('trackProduct: 拉取商品追踪结果', async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+
+    await aiService.trackProduct({ product: '钢材', store: '仓库1' });
+
+    expect(api.get).toHaveBeenCalledWith('/dashboard/track-product', {
+      params: { product: '钢材', store: '仓库1' },
+    });
+  });
+
+  it('parseImageTokenUsage: 调用 AI 图片识别接口', async () => {
+    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+
+    await aiService.parseImageTokenUsage('解析图片', 'data:image/png;base64,xxx');
+
+    expect(api.post).toHaveBeenCalledWith('/ai/chat', {
+      message: '解析图片',
+      imageUrl: 'data:image/png;base64,xxx',
+    });
+  });
+});

@@ -11,8 +11,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import StoreRecommendPage from './page';
 
-const mockApiGet = vi.fn();
-const mockApiPost = vi.fn();
+const mockGetStoreStats = vi.fn();
+const mockGenerateRecommendations = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -21,21 +21,21 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@/lib/axios', () => ({
-  default: {
-    get: (...args: unknown[]) => mockApiGet(...args),
-    post: (...args: unknown[]) => mockApiPost(...args),
+vi.mock('@/services/storeRecommend.service', () => ({
+  storeRecommendService: {
+    getStoreStats: (...args: unknown[]) => mockGetStoreStats(...args),
+    generateRecommendations: (...args: unknown[]) => mockGenerateRecommendations(...args),
   },
 }));
 
 describe('StoreRecommendPage 交互逻辑', () => {
   beforeEach(() => {
-    mockApiGet.mockReset();
-    mockApiPost.mockReset();
+    mockGetStoreStats.mockReset();
+    mockGenerateRecommendations.mockReset();
   });
 
   it('加载后展示建议清单概要数据', async () => {
-    mockApiGet.mockResolvedValue({
+    mockGetStoreStats.mockResolvedValue({
       data: [
         {
           storeId: 'st-1',
@@ -46,7 +46,7 @@ describe('StoreRecommendPage 交互逻辑', () => {
         },
       ],
     });
-    mockApiPost.mockResolvedValue({
+    mockGenerateRecommendations.mockResolvedValue({
       data: {
         referenceStoreCount: 1,
         totalProducts: 3,
@@ -92,7 +92,7 @@ describe('StoreRecommendPage 交互逻辑', () => {
   });
 
   it('切换到门店采购统计标签后展示门店明细', async () => {
-    mockApiGet.mockResolvedValue({
+    mockGetStoreStats.mockResolvedValue({
       data: [
         {
           storeId: 'st-1',
@@ -103,7 +103,7 @@ describe('StoreRecommendPage 交互逻辑', () => {
         },
       ],
     });
-    mockApiPost.mockResolvedValue({
+    mockGenerateRecommendations.mockResolvedValue({
       data: {
         referenceStoreCount: 1,
         totalProducts: 3,
@@ -127,4 +127,3 @@ describe('StoreRecommendPage 交互逻辑', () => {
     });
   });
 });
-

@@ -12,8 +12,8 @@ import userEvent from '@testing-library/user-event';
 import LoginPage from './page';
 
 const mockPush = vi.fn();
-const mockLogin = vi.fn();
-const mockPost = vi.fn();
+const mockAuthStoreLogin = vi.fn();
+const mockAuthServiceLogin = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -26,21 +26,21 @@ vi.mock('@/store/auth.store', () => ({
     selector: (state: { login: (user: unknown, token: string) => void }) => unknown,
   ) =>
     selector({
-      login: mockLogin,
+      login: mockAuthStoreLogin,
     }),
 }));
 
-vi.mock('@/lib/axios', () => ({
-  default: {
-    post: (...args: unknown[]) => mockPost(...args),
+vi.mock('@/services/auth.service', () => ({
+  authService: {
+    login: (...args: unknown[]) => mockAuthServiceLogin(...args),
   },
 }));
 
 describe('LoginPage 交互逻辑', () => {
   beforeEach(() => {
     mockPush.mockReset();
-    mockLogin.mockReset();
-    mockPost.mockReset();
+    mockAuthStoreLogin.mockReset();
+    mockAuthServiceLogin.mockReset();
     localStorage.clear();
   });
 
@@ -68,7 +68,7 @@ describe('LoginPage 交互逻辑', () => {
   });
 
   it('登录成功后调用store并跳转首页', async () => {
-    mockPost.mockResolvedValue({
+    mockAuthServiceLogin.mockResolvedValue({
       code: 200,
       data: {
         user: { id: 'u1', username: 'admin', name: '管理员', role: 'ADMIN' },
@@ -89,11 +89,11 @@ describe('LoginPage 交互逻辑', () => {
 
     // 2. 校验请求与后续动作
     await waitFor(() => {
-      expect(mockPost).toHaveBeenCalledWith('/auth/login', {
+      expect(mockAuthServiceLogin).toHaveBeenCalledWith({
         username: 'admin',
         password: '123456',
       });
-      expect(mockLogin).toHaveBeenCalledWith(
+      expect(mockAuthStoreLogin).toHaveBeenCalledWith(
         { id: 'u1', username: 'admin', name: '管理员', role: 'ADMIN' },
         'token-123',
       );
@@ -113,7 +113,7 @@ describe('LoginPage 交互逻辑', () => {
       password: '123456',
     }));
 
-    mockPost.mockResolvedValue({
+    mockAuthServiceLogin.mockResolvedValue({
       code: 200,
       data: {
         user: { id: 'u2', username: 'xuminjie', name: 'xuminjie', role: 'SALES' },
@@ -131,11 +131,11 @@ describe('LoginPage 交互逻辑', () => {
     await user.click(screen.getByRole('button', { name: '快捷登录（xuminjie）' }));
 
     await waitFor(() => {
-      expect(mockPost).toHaveBeenCalledWith('/auth/login', {
+      expect(mockAuthServiceLogin).toHaveBeenCalledWith({
         username: 'xuminjie',
         password: '123456',
       });
-      expect(mockLogin).toHaveBeenCalledWith(
+      expect(mockAuthStoreLogin).toHaveBeenCalledWith(
         { id: 'u2', username: 'xuminjie', name: 'xuminjie', role: 'SALES' },
         'token-quick',
       );
@@ -144,7 +144,7 @@ describe('LoginPage 交互逻辑', () => {
   });
 
   it('登录失败时展示错误提示', async () => {
-    mockPost.mockRejectedValue(new Error('账号或密码错误'));
+    mockAuthServiceLogin.mockRejectedValue(new Error('账号或密码错误'));
 
     const user = userEvent.setup();
     render(<LoginPage />);

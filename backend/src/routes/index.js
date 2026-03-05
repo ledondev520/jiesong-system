@@ -25,6 +25,7 @@ const systemRoutes = require('./system');
 const aiRoutes = require('./ai');
 const userRoutes = require('./users');
 const dataImportRoutes = require('./dataImport');
+const dataExportRoutes = require('./dataExport');
 const dashboardRoutes = require('./dashboard');
 const contractDocRoutes = require('./contractDoc');
 const storeRecommendRoutes = require('./storeRecommend');
@@ -41,14 +42,15 @@ router.use('/suppliers', supplierRoutes);
 router.use('/stores', storeRoutes);
 router.use('/products', productRoutes);
 router.use('/purchases', purchaseRoutes);
-router.use('/sales', salesRoutes);       // 出口合同管理（含货柜/装箱功能）
-router.use('/containers', containerRoutes); // 兼容旧货柜路由（映射至 SalesContract）
+router.use('/sales', salesRoutes); // 出口合同管理（含货柜/装箱功能）
+router.use('/containers', containerRoutes);
 router.use('/inventory', inventoryRoutes);
 router.use('/finance', financeRoutes);
 router.use('/system', systemRoutes);
 router.use('/ai', aiRoutes);
 router.use('/users', userRoutes);
 router.use('/import', dataImportRoutes);
+router.use('/export', dataExportRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/contract-doc', contractDocRoutes);  // 合同文档生成
 router.use('/store-recommend', storeRecommendRoutes);  // 门店采购建议

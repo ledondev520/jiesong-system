@@ -2,6 +2,8 @@ export enum Role {
   ADMIN = 'ADMIN',
   PURCHASE = 'PURCHASE',
   SALES = 'SALES',
+  FINANCE = 'FINANCE',
+  WAREHOUSE = 'WAREHOUSE',
 }
 
 export interface User {
@@ -163,7 +165,6 @@ export enum SalesStatus {
 export interface SalesContract {
   id: string;
   contractNo: string;  // EXP 编号，同时作为货柜标识
-  containerNo?: string; // 兼容旧货柜页面字段（逐步迁移到 contractNo）
   // 销售信息
   totalAmount: number;
   receivedAmount: number;
@@ -171,7 +172,7 @@ export interface SalesContract {
   status: SalesStatus;  // DRAFT/CONFIRMED/PACKING/SHIPPED/ARRIVED/COMPLETED
   signedAt?: string;
   note?: string;
-  // 货柜信息（合并自原 Container 表）
+  // 货柜信息（由出口合同承载）
   portId?: string;
   totalBoxes: number;
   grossWeight: number;
@@ -238,20 +239,7 @@ export interface Inventory {
   };
 }
 
-// 已废弃：货柜已合并到 SalesContract
-// 保留枚举用于兼容
-export enum ContainerStatus {
-  PENDING = 'PENDING',
-  LOADING = 'LOADING',
-  SHIPPED = 'SHIPPED',
-  ARRIVED = 'ARRIVED',
-}
-
-// 已废弃：Container 功能已合并到 SalesContract
-// 一个 EXP 出口合同 = 一个货柜
-export type Container = SalesContract;
-
-// 装箱明细（原 ContainerItem，现关联 SalesContract）
+// 装箱明细（关联 SalesContract）
 export interface PackingItem {
   id: string;
   salesContractId: string;  // 关联出口合同（即货柜）
@@ -280,9 +268,6 @@ export interface PackingItem {
   product?: Product;
   store?: Store;
 }
-
-// 兼容旧代码的别名
-export type ContainerItem = PackingItem;
 
 export enum PaymentType {
   PAYABLE = 'PAYABLE',

@@ -1,0 +1,129 @@
+/**
+ * Input: crypto, 配置
+ * Output: API Key 加解密与脱敏工具
+ * Pos: 系统配置中敏感字段的加密存储与安全响应
+ */
+
+const crypto = require('crypto');
+const config = require('../config');
+
+const CIPHER_ALGORITHM = 'aes-256-gcm';
+const IV_LENGTH_BYTES = 12;
+
+const trimToString = (value) => {
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+  return '';
+};
+
+const getEncryptionKey = () => {
+  const secret = trimToString(config.jwt?.secret);
+  return crypto.createHash('sha256').update(secret).digest();
+};
+
+const safeJsonParse = (value) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+};
+
+const isApiKeyConfigKey = (key) => trimToString(key).toLowerCase() === 'kimiapikey';
+
+const isEncryptedPayload = (value) => {
+  return (
+    value &&
+    typeof value === 'object' &&
+    value.encrypted === true &&
+    typeof value.iv === 'string' &&
+    typeof value.tag === 'string' &&
+    typeof value.value === 'string'
+  );
+};
+
+const encryptApiKeyForStorage = (rawApiKey) => {
+  const apiKey = trimToString(rawApiKey);
+  const key = getEncryptionKey();
+
+  const iv = crypto.randomBytes(IV_LENGTH_BYTES);
+  const cipher = crypto.createCipheriv(CIPHER_ALGORITHM, key, iv);
+  const encrypted = Buffer.concat([cipher.update(apiKey, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+
+  return JSON.stringify({
+    encrypted: true,
+    algorithm: CIPHER_ALGORITHM,
+    iv: iv.toString('base64'),
+    tag: tag.toString('base64'),
+    value: encrypted.toString('base64'),
+  });
+};
+
+const decryptApiKeyFromStorage = (storedValue) => {
+  const payload = safeJsonParse(storedValue) ?? storedValue;
+  if (!isEncryptedPayload(payload)) {
+    if (typeof payload === 'string') {
+      return payload;
+    }
+    return '';
+  }
+
+  try {
+    const key = getEncryptionKey();
+    const iv = Buffer.from(payload.iv, 'base64');
+    const tag = Buffer.from(payload.tag, 'base64');
+    const encrypted = Buffer.from(payload.value, 'base64');
+
+    const decipher = crypto.createDecipheriv(CIPHER_ALGORITHM, key, iv);
+    decipher.setAuthTag(tag);
+
+    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+    return decrypted.toString('utf8');
+  } catch {
+    return '';
+  }
+};
+
+// 若解密失败，返回原始空串，调用方会统一脱敏处理
+const maskApiKeyForApiResponse = (apiKey) => {
+  if (typeof apiKey !== 'string' || !apiKey) {
+    return '';
+  }
+
+  return 'sk-****';
+};
+
+const normalizeConfigValueForStorage = (key, value) => {
+  if (!isApiKeyConfigKey(key)) {
+    return JSON.stringify(value);
+  }
+
+  if (typeof value !== 'string') {
+    return JSON.stringify(value);
+  }
+
+  return encryptApiKeyForStorage(value);
+};
+
+const normalizeConfigValueForResponse = (key, rawValue) => {
+  if (!isApiKeyConfigKey(key)) {
+    const parsed = safeJsonParse(rawValue);
+    return parsed === null ? rawValue : parsed;
+  }
+
+  const parsed = safeJsonParse(rawValue);
+  const plaintext = decryptApiKeyFromStorage(parsed === null ? rawValue : parsed);
+  return maskApiKeyForApiResponse(plaintext);
+};
+
+module.exports = {
+  isApiKeyConfigKey,
+  normalizeConfigValueForStorage,
+  normalizeConfigValueForResponse,
+};

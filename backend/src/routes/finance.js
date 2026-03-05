@@ -8,8 +8,9 @@
 
 const { Router } = require('express');
 const financeController = require('../controllers/financeController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, roleAuth } = require('../middleware/auth');
 const { withPaginationValidation, body, handleValidation } = require('../utils/validators');
+const { withAuditLog } = require('../middleware/auditLog');
 
 const router = Router();
 
@@ -23,7 +24,10 @@ router.post('/payments', [
   body('type').notEmpty().withMessage('付款类型不能为空'),
   body('amount').notEmpty().withMessage('金额不能为空'),
   body('paymentDate').notEmpty().withMessage('付款日期不能为空'),
-], handleValidation, financeController.createPayment);
+], roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), handleValidation, withAuditLog(
+  { entity: 'Payment', action: 'CREATE', model: 'payment' },
+  financeController.createPayment
+));
 
 // GET /api/v1/finance/payables - 获取应付账款
 router.get('/payables', withPaginationValidation, financeController.getPayables);

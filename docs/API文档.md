@@ -477,7 +477,7 @@ POST /containers
 ```json
 {
   "data": {
-    "containerNo": "26-001-LA",
+    "contractNo": "26-001-LA",
     "..."
   }
 }
@@ -527,6 +527,13 @@ GET /finance/payments?type=PAYABLE&page=1
 ```
 POST /finance/payments
 ```
+
+**请求头（可选）**:
+```
+X-Idempotency-Key: <唯一键>
+```
+
+> 相同幂等键重复提交将返回首次写入结果，不会重复创建付款记录。
 
 **请求体**:
 ```json
@@ -589,13 +596,13 @@ GET /system/logs?page=1&pageSize=50&entity=User&action=LOGIN
 
 ### 11.5 导入CSV数据 (管理员)
 ```
-POST /system/import
+POST /import
 Content-Type: multipart/form-data
 ```
 
 ### 11.6 导出数据
 ```
-GET /system/export/:type
+GET /export/:type
 ```
 type: suppliers | stores | products | purchases | sales | containers | inventory | payments
 

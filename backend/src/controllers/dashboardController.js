@@ -49,7 +49,7 @@ const getStats = async (req, res, next) => {
       prisma.inventory.count({
         where: { quantity: { lt: 10 } },
       }),
-      // 最近的出口合同（原货柜，现为SalesContract）
+      // 最近的出口合同
       prisma.salesContract.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
@@ -61,7 +61,7 @@ const getStats = async (req, res, next) => {
           createdAt: true,
         },
       }),
-      // 最近的销售合同（与上面相同，为兼容前端）
+      // 最近的销售合同
       prisma.salesContract.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
@@ -76,7 +76,7 @@ const getStats = async (req, res, next) => {
     ]);
 
     // 2. 组装返回数据
-    // 为兼容前端，将出口合同数量同时赋给 containers
+    // 为页面展示，将出口合同数量同时赋给 containers
     const data = {
       overview: {
         products: productCount,
@@ -93,10 +93,10 @@ const getStats = async (req, res, next) => {
         lowInventory,
       },
       recent: {
-        // 将出口合同映射为货柜格式（兼容前端）
+        // 最近的出口合同（货柜管理使用 contractNo 作为唯一编号）
         containers: recentContainers.map(c => ({
           id: c.id,
-          containerNo: c.contractNo,  // EXP号作为货柜号
+          contractNo: c.contractNo,
           status: c.status,
           shippedAt: c.shippedAt,
           createdAt: c.createdAt,

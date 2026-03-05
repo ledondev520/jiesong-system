@@ -95,16 +95,17 @@ Authorization: Bearer <token>
 | 货柜 | `/api/v1/containers` | 货柜管理 |
 | 库存 | `/api/v1/inventory` | 库存查询和状态变更 |
 | 财务 | `/api/v1/finance` | 付款记录和账款查询 |
-| 系统 | `/api/v1/system` | 系统配置/日志/通知/数据导入导出 |
+| 系统 | `/api/v1/system` | 系统配置/日志/通知 |
+| 数据导入导出 | `/api/v1/import` `/api/v1/export` | 导入/导出任务与历史 |
 | AI | `/api/v1/ai` | 智能问答/辅助录入/对话历史 |
 
 ### 核心功能说明
 
 #### 1. 数据导入导出
 
-- **CSV导入**: `POST /api/v1/system/import` - 导入历史CSV数据
-- **导入记录**: `GET /api/v1/system/import/records` - 查看导入历史
-- **数据导出**: `GET /api/v1/system/export/:type` - 导出各类数据为CSV
+- **CSV导入**: `POST /api/v1/import` - 导入历史CSV数据
+- **导入历史**: `GET /api/v1/import/records` - 查看导入历史
+- **数据导出**: `GET /api/v1/export/:type` - 导出各类数据为CSV
 
 #### 2. AI辅助录入
 
@@ -128,6 +129,12 @@ Authorization: Bearer <token>
 
 - **操作日志**: `GET /api/v1/system/logs` - 查看用户操作记录（管理员）
 - 自动记录：登录、创建、更新、删除等关键操作
+
+#### 6. 财务写入幂等
+
+- **创建付款**: `POST /api/v1/finance/payments`
+- 可选请求头：`X-Idempotency-Key`
+- 相同幂等键重复提交时复用首次结果，避免重复入账
 
 ### 响应格式
 

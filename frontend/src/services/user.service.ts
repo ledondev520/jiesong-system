@@ -4,7 +4,6 @@ import { createCrudService } from './crudService';
 type UserListQuery = {
   page?: number;
   pageSize?: number;
-  query?: string;
 };
 
 /**

@@ -10,11 +10,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import FinancePage from './page';
 
-const mockApiGet = vi.fn();
+const mockGetStats = vi.fn();
 
-vi.mock('@/lib/axios', () => ({
-  default: {
-    get: (...args: unknown[]) => mockApiGet(...args),
+vi.mock('@/services/finance.service', () => ({
+  financeService: {
+    getStats: (...args: unknown[]) => mockGetStats(...args),
   },
 }));
 
@@ -27,11 +27,11 @@ vi.mock('next/navigation', () => ({
 
 describe('FinancePage 交互逻辑', () => {
   beforeEach(() => {
-    mockApiGet.mockReset();
+    mockGetStats.mockReset();
   });
 
   it('加载完成后展示统计信息', async () => {
-    mockApiGet.mockResolvedValue({
+    mockGetStats.mockResolvedValue({
       data: {
         payable: { total: 1200, paid: 400, unpaid: 800 },
         receivable: { total: 3200, received: 1000, unreceived: 2200 },
@@ -48,9 +48,8 @@ describe('FinancePage 交互逻辑', () => {
   });
 
   it('初始加载中会显示加载文案', () => {
-    mockApiGet.mockReturnValue(new Promise(() => {}));
+    mockGetStats.mockReturnValue(new Promise(() => {}));
     render(<FinancePage />);
     expect(screen.getByText('加载中...')).toBeInTheDocument();
   });
 });
-

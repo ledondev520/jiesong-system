@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/dialog';
 import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Progress } from '@/components/ui/progress';
-import { Package, DollarSign, Building2, FileDown, Loader2, Eye } from 'lucide-react';
+import { Package, DollarSign, Building2, FileDown, Loader2, Eye, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -61,6 +61,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   /**
    * 职责：加载采购合同详情
@@ -149,6 +150,24 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     }
   };
 
+  /**
+   * 职责：导出合同 PDF
+   */
+  const handleExportPdf = async () => {
+    if (!contract) return;
+
+    setExportingPdf(true);
+    try {
+      await contractDocService.exportPurchasePdf(contract.id, contract.contractNo);
+      toast.success('合同 PDF 已下载');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '导出 PDF 失败';
+      toast.error(message);
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-64">加载中...</div>;
   }
@@ -171,6 +190,14 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         actions={
           <div className="flex items-center gap-2">
             {getStatusBadge(contract.status)}
+            <Button variant="outline" onClick={handleExportPdf} disabled={exportingPdf}>
+              {exportingPdf ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              导出 PDF
+            </Button>
             <Button variant="outline" onClick={viewContractPdf} disabled={pdfLoading}>
               {pdfLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

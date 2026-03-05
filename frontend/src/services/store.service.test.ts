@@ -27,10 +27,10 @@ describe('storeService', () => {
   it('getAll: 传递查询参数', async () => {
     (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
 
-    await storeService.getAll({ page: 2, pageSize: 10, query: 'LA' });
+    await storeService.getAll({ page: 2, pageSize: 10 });
 
     expect(api.get).toHaveBeenCalledWith('/stores', {
-      params: { page: 2, pageSize: 10, query: 'LA' },
+      params: { page: 2, pageSize: 10 },
     });
   });
 

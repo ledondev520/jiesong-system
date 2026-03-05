@@ -13,6 +13,8 @@ const { success, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const { validateInventoryTransition } = require('../utils/inventoryStateMachine');
 const { normalizePagination } = require('../utils/pagination');
+const { getInventorySnapshot } = require('../services/inventorySnapshot');
+const { listLowStockAlerts } = require('../services/inventoryAlertService');
 
 /**
  * 职责：获取库存列表并支持条件筛选。
@@ -70,6 +72,22 @@ const list = async (req, res, next) => {
     ]);
     
     paginated(res, inventories, total, page, pageSize);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：按商品汇总库存快照。
+ */
+const getSnapshot = async (req, res, next) => {
+  try {
+    const { productId } = req.query;
+    const snapshot = await getInventorySnapshot(prisma, {
+      productId: productId || null,
+    });
+
+    success(res, snapshot);
   } catch (error) {
     next(error);
   }
@@ -318,6 +336,25 @@ const getStats = async (req, res, next) => {
   }
 };
 
+/**
+ * 职责：获取低库存预警列表（按商品维度）。
+ */
+const getAlerts = async (req, res, next) => {
+  try {
+    const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
+    const keyword = String(req.query.keyword || '').trim();
+
+    const { alerts, checkedAt } = await listLowStockAlerts(prisma, {
+      keyword,
+    });
+
+    const items = alerts.slice(skip, skip + pageSize);
+    paginated(res, items, alerts.length, page, pageSize, { checkedAt });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   list,
   getById,
@@ -325,5 +362,7 @@ module.exports = {
   batchUpdateStatus,
   getByProduct,
   getByContract,  // 原 getByContainer
+  getSnapshot,
   getStats,
+  getAlerts,
 };

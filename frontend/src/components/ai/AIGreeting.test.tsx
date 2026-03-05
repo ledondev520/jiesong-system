@@ -11,21 +11,21 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AIGreeting } from './AIGreeting';
 
-const mockApiGet = vi.fn();
+const mockGetGreeting = vi.fn();
 
-vi.mock('@/lib/axios', () => ({
-  default: {
-    get: (...args: unknown[]) => mockApiGet(...args),
+vi.mock('@/services/ai.service', () => ({
+  aiService: {
+    getGreeting: (...args: unknown[]) => mockGetGreeting(...args),
   },
 }));
 
 describe('AIGreeting', () => {
   beforeEach(() => {
-    mockApiGet.mockReset();
+    mockGetGreeting.mockReset();
   });
 
   it('加载后展示问候语和歌曲信息', async () => {
-    mockApiGet.mockResolvedValue({
+    mockGetGreeting.mockResolvedValue({
       data: {
         greeting: '今天也要加油呀',
         songName: '倔强',
@@ -44,7 +44,7 @@ describe('AIGreeting', () => {
   });
 
   it('点击关闭后隐藏卡片', async () => {
-    mockApiGet.mockResolvedValue({
+    mockGetGreeting.mockResolvedValue({
       data: {
         greeting: '你好',
         songName: '温柔',
@@ -66,4 +66,3 @@ describe('AIGreeting', () => {
     expect(screen.queryByText('你好')).not.toBeInTheDocument();
   });
 });
-

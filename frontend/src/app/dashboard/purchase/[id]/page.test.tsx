@@ -14,6 +14,7 @@ import PurchaseDetailPage from './page';
 
 const mockGetById = vi.fn();
 const mockToastError = vi.fn();
+const mockExportPurchasePdf = vi.fn();
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react');
@@ -46,6 +47,7 @@ vi.mock('@/services/contractDoc.service', () => ({
     generateFromPurchase: vi.fn(),
     downloadDocument: vi.fn(),
     getContractPdf: vi.fn(),
+    exportPurchasePdf: (...args: unknown[]) => mockExportPurchasePdf(...args),
   },
 }));
 
@@ -61,6 +63,7 @@ describe('PurchaseDetailPage 交互逻辑', () => {
   beforeEach(() => {
     mockGetById.mockReset();
     mockToastError.mockReset();
+    mockExportPurchasePdf.mockReset();
   });
 
   /**
@@ -128,5 +131,29 @@ describe('PurchaseDetailPage 交互逻辑', () => {
       expect(mockToastError).toHaveBeenCalledWith('加载合同详情失败');
     });
   });
-});
 
+  it('点击导出 PDF 会调用服务', async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: 'p-1',
+        contractNo: 'PO2500001',
+        status: 'DRAFT',
+        totalAmount: 0,
+        paidAmount: 0,
+        supplier: { name: '供应商A' },
+        items: [],
+      },
+    });
+    mockExportPurchasePdf.mockResolvedValue(undefined);
+
+    const user = userEvent.setup();
+    renderPage('p-1');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /导出 PDF/ })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /导出 PDF/ }));
+
+    expect(mockExportPurchasePdf).toHaveBeenCalledWith('p-1', 'PO2500001');
+  });
+});

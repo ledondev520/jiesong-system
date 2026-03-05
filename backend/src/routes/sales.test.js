@@ -35,3 +35,8 @@ test('sales route order: /options/next-no must be before /:id for GET', () => {
     `路由顺序错误：/options/next-no(index=${optionsIndex}) 应在 /:id(index=${idIndex}) 之前`
   );
 });
+
+test('sales route includes PDF export endpoint', () => {
+  const pdfExportIndex = getRouteIndex(salesRouter, '/:id/export-pdf', 'get');
+  assert.notEqual(pdfExportIndex, -1, '缺少 GET /:id/export-pdf 路由');
+});

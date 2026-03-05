@@ -9,7 +9,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Container, ContainerStatus } from '@/types';
+import { SalesContract, SalesStatus } from '@/types';
 import { containerService } from '@/services/container.service';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,10 +30,10 @@ import { formatDate } from '@/lib/date-format';
 import { PageHeader } from '@/components/layout/PageHeader';
 
 export default function ContainersPage() {
-  const [containers, setContainers] = useState<Container[]>([]);
+  const [containers, setContainers] = useState<SalesContract[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingContainer, setEditingContainer] = useState<Container | null>(null);
+  const [editingContainer, setEditingContainer] = useState<SalesContract | null>(null);
 
   useEffect(() => {
     loadContainers();
@@ -57,15 +57,13 @@ export default function ContainersPage() {
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, StatusBadgeConfig> = {
-      [ContainerStatus.PENDING]: { label: '待装柜', tone: 'neutral' },
-      DRAFT: { label: '草稿', tone: 'neutral' },
-      CONFIRMED: { label: '已确认', tone: 'neutral' },
-      [ContainerStatus.LOADING]: { label: '装柜中', tone: 'warning' },
-      PACKING: { label: '装箱中', tone: 'warning' },
-      [ContainerStatus.SHIPPED]: { label: '已发运', tone: 'progress' },
-      [ContainerStatus.ARRIVED]: { label: '已到达', tone: 'success' },
-      COMPLETED: { label: '已完成', tone: 'success' },
-      CANCELLED: { label: '已取消', tone: 'secondary' },
+      [SalesStatus.DRAFT]: { label: '草稿', tone: 'neutral' },
+      [SalesStatus.CONFIRMED]: { label: '已确认', tone: 'neutral' },
+      [SalesStatus.PACKING]: { label: '装箱中', tone: 'warning' },
+      [SalesStatus.SHIPPED]: { label: '已发运', tone: 'progress' },
+      [SalesStatus.ARRIVED]: { label: '已到达', tone: 'success' },
+      [SalesStatus.COMPLETED]: { label: '已完成', tone: 'success' },
+      [SalesStatus.CANCELLED]: { label: '已取消', tone: 'secondary' },
     };
     return <StatusBadge status={status} statusMap={statusMap} />;
   };
@@ -75,7 +73,7 @@ export default function ContainersPage() {
     setIsDialogOpen(true);
   };
 
-  const handleEdit = (container: Container) => {
+  const handleEdit = (container: SalesContract) => {
     setEditingContainer(container);
     setIsDialogOpen(true);
   };
@@ -92,7 +90,7 @@ export default function ContainersPage() {
     }
   };
 
-  const handleSubmit = async (data: Partial<Container>) => {
+  const handleSubmit = async (data: Partial<SalesContract>) => {
     try {
       if (editingContainer) {
         await containerService.update(editingContainer.id, data);
@@ -146,7 +144,7 @@ export default function ContainersPage() {
                 <TableRow key={container.id}>
                   <TableCell className="font-medium flex items-center gap-2">
                     <Ship className="h-4 w-4 text-muted-foreground" />
-                    {container.containerNo ?? container.contractNo}
+                    {container.contractNo}
                   </TableCell>
                     <TableCell>{getPortName(container.portId)}</TableCell>
                     <TableCell>{getStatusBadge(container.status)}</TableCell>

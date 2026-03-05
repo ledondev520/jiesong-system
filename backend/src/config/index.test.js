@@ -36,7 +36,7 @@ test('config: 读取默认值', () => {
   const config = loadConfigWithEnv({
     PORT: '',
     NODE_ENV: '',
-    JWT_SECRET: '',
+    JWT_SECRET: 'default-test-secret-change-me-please',
     JWT_EXPIRES_IN: '',
     KIMI_API_KEY: '',
     KIMI_BASE_URL: '',
@@ -47,13 +47,13 @@ test('config: 读取默认值', () => {
 
   assert.equal(config.port, 3000);
   assert.equal(config.nodeEnv, 'development');
-  assert.equal(config.jwt.secret, 'default-secret-change-me');
+  assert.equal(config.jwt.secret, 'default-test-secret-change-me-please');
   assert.equal(config.jwt.expiresIn, '7d');
   assert.equal(config.kimi.apiKey, '');
   assert.equal(config.kimi.baseUrl, 'https://api.moonshot.cn/v1');
   assert.equal(config.upload.dir, './uploads');
-  assert.equal(config.upload.maxSize, 10 * 1024 * 1024);
-  assert.equal(config.cors.origin, '*');
+  assert.equal(config.upload.maxSize, 50 * 1024 * 1024);
+  assert.deepEqual(config.cors.origin, []);
   assert.equal(config.cors.credentials, true);
 });
 
@@ -61,23 +61,23 @@ test('config: 读取环境变量覆盖', () => {
   const config = loadConfigWithEnv({
     PORT: '4001',
     NODE_ENV: 'production',
-    JWT_SECRET: 'test-secret',
+    JWT_SECRET: 'test-secret-with-32-chars--xxxxxxxx',
     JWT_EXPIRES_IN: '1h',
     KIMI_API_KEY: 'kimi-key',
     KIMI_BASE_URL: 'https://example.com',
     UPLOAD_DIR: './files',
     MAX_FILE_SIZE: '2048',
-    CORS_ORIGIN: 'http://localhost:3000',
+    CORS_ORIGIN: 'http://localhost:3000,https://test.example.com',
   });
 
   assert.equal(config.port, 4001);
   assert.equal(config.nodeEnv, 'production');
-  assert.equal(config.jwt.secret, 'test-secret');
+  assert.equal(config.jwt.secret, 'test-secret-with-32-chars--xxxxxxxx');
   assert.equal(config.jwt.expiresIn, '1h');
   assert.equal(config.kimi.apiKey, 'kimi-key');
   assert.equal(config.kimi.baseUrl, 'https://example.com');
   assert.equal(config.upload.dir, './files');
   assert.equal(config.upload.maxSize, 2048);
-  assert.equal(config.cors.origin, 'http://localhost:3000');
+  assert.deepEqual(config.cors.origin, ['http://localhost:3000', 'https://test.example.com']);
   assert.equal(config.cors.credentials, true);
 });

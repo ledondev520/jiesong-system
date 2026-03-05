@@ -12,7 +12,7 @@ import userEvent from '@testing-library/user-event';
 import { ProductTracker } from './ProductTracker';
 
 const mockPush = vi.fn();
-const mockApiGet = vi.fn();
+const mockTrackProduct = vi.fn();
 const mockToastError = vi.fn();
 
 vi.mock('next/navigation', () => ({
@@ -22,9 +22,9 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@/lib/axios', () => ({
-  default: {
-    get: (...args: unknown[]) => mockApiGet(...args),
+vi.mock('@/services/ai.service', () => ({
+  aiService: {
+    trackProduct: (...args: unknown[]) => mockTrackProduct(...args),
   },
 }));
 
@@ -37,7 +37,7 @@ vi.mock('sonner', () => ({
 describe('ProductTracker', () => {
   beforeEach(() => {
     mockPush.mockReset();
-    mockApiGet.mockReset();
+    mockTrackProduct.mockReset();
     mockToastError.mockReset();
   });
 
@@ -50,7 +50,7 @@ describe('ProductTracker', () => {
   });
 
   it('查询成功后点击结果会跳转详情', async () => {
-    mockApiGet.mockResolvedValue({
+    mockTrackProduct.mockResolvedValue({
       data: [
         {
           salesContractId: 'sales-1',
@@ -80,7 +80,7 @@ describe('ProductTracker', () => {
   });
 
   it('在商品输入框按回车可触发查询', async () => {
-    mockApiGet.mockResolvedValue({ data: [] });
+    mockTrackProduct.mockResolvedValue({ data: [] });
 
     const user = userEvent.setup();
     render(<ProductTracker />);
@@ -89,14 +89,15 @@ describe('ProductTracker', () => {
     await user.type(productInput, '不锈钢门{Enter}');
 
     await waitFor(() => {
-      expect(mockApiGet).toHaveBeenCalledWith('/dashboard/track-product', {
-        params: { product: '不锈钢门', store: undefined },
+      expect(mockTrackProduct).toHaveBeenCalledWith({
+        product: '不锈钢门',
+        store: undefined,
       });
     });
   });
 
   it('查询失败时提示错误并显示空结果态', async () => {
-    mockApiGet.mockRejectedValue(new Error('query failed'));
+    mockTrackProduct.mockRejectedValue(new Error('query failed'));
 
     const user = userEvent.setup();
     render(<ProductTracker />);
@@ -110,4 +111,3 @@ describe('ProductTracker', () => {
     expect(screen.getByText('未找到匹配的货柜记录')).toBeInTheDocument();
   });
 });
-

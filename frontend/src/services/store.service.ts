@@ -4,7 +4,6 @@ import { createCrudService } from './crudService';
 export type StoreListQuery = {
   page?: number;
   pageSize?: number;
-  query?: string;
 };
 
 const crud = createCrudService<Store, Partial<Store>, Partial<Store>, StoreListQuery>('/stores');

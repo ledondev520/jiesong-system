@@ -1,16 +1,35 @@
 const prisma = require('../../utils/prisma');
 const { success } = require('../../utils/response');
+const {
+  normalizeConfigValueForResponse,
+  normalizeConfigValueForStorage,
+} = require('../../utils/secretCrypto');
+
+const buildConfigValue = (key, value) => {
+  if (value === undefined || value === null) {
+    return value;
+  }
+
+  return normalizeConfigValueForResponse(key, value);
+};
+
+const formatConfigResponse = (configRecord) => {
+  if (!configRecord) {
+    return configRecord;
+  }
+
+  return {
+    ...configRecord,
+    value: buildConfigValue(configRecord.key, configRecord.value),
+  };
+};
 
 const getConfigs = async (req, res, next) => {
   try {
     const configs = await prisma.systemConfig.findMany();
 
     const formatted = configs.reduce((acc, config) => {
-      try {
-        acc[config.key] = JSON.parse(config.value);
-      } catch {
-        acc[config.key] = config.value;
-      }
+      acc[config.key] = buildConfigValue(config.key, config.value);
       return acc;
     }, {});
 
@@ -25,13 +44,15 @@ const updateConfig = async (req, res, next) => {
     const { key } = req.params;
     const { value, note } = req.body;
 
+    const storedValue = normalizeConfigValueForStorage(key, value);
+
     const config = await prisma.systemConfig.upsert({
       where: { key },
-      update: { value: JSON.stringify(value), note },
-      create: { key, value: JSON.stringify(value), note },
+      update: { value: storedValue, note },
+      create: { key, value: storedValue, note },
     });
 
-    success(res, config, '配置更新成功');
+    success(res, formatConfigResponse(config), '配置更新成功');
   } catch (error) {
     next(error);
   }

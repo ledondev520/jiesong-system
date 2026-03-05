@@ -11,8 +11,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ReceivablePage from './page';
 
-const mockApiGet = vi.fn();
 const mockToastError = vi.fn();
+const mockGetReceivables = vi.fn();
+const mockExportReportPdf = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -21,10 +22,10 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@/lib/axios', () => ({
-  default: {
-    get: (...args: unknown[]) => mockApiGet(...args),
-    post: vi.fn(),
+vi.mock('@/services/finance.service', () => ({
+  financeService: {
+    getReceivables: (...args: unknown[]) => mockGetReceivables(...args),
+    exportReportPdf: (...args: unknown[]) => mockExportReportPdf(...args),
   },
 }));
 
@@ -41,12 +42,13 @@ vi.mock('../components/PaymentDialog', () => ({
 
 describe('ReceivablePage 交互逻辑', () => {
   beforeEach(() => {
-    mockApiGet.mockReset();
+    mockGetReceivables.mockReset();
     mockToastError.mockReset();
+    mockExportReportPdf.mockReset();
   });
 
   it('无数据时展示空态', async () => {
-    mockApiGet.mockResolvedValue({ data: { items: [] } });
+    mockGetReceivables.mockResolvedValue({ data: { items: [] } });
     render(<ReceivablePage />);
 
     await waitFor(() => {
@@ -56,7 +58,7 @@ describe('ReceivablePage 交互逻辑', () => {
   });
 
   it('点击刷新会再次请求数据', async () => {
-    mockApiGet.mockResolvedValue({ data: { items: [] } });
+    mockGetReceivables.mockResolvedValue({ data: { items: [] } });
     const user = userEvent.setup();
     render(<ReceivablePage />);
 
@@ -65,8 +67,21 @@ describe('ReceivablePage 交互逻辑', () => {
     });
     await user.click(screen.getByRole('button', { name: '刷新' }));
     await waitFor(() => {
-      expect(mockApiGet.mock.calls.length).toBeGreaterThan(1);
+      expect(mockGetReceivables).toHaveBeenCalledTimes(2);
     });
   });
-});
 
+  it('点击导出 PDF 会调用报表导出', async () => {
+    mockGetReceivables.mockResolvedValue({ data: { items: [] } });
+    mockExportReportPdf.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(<ReceivablePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /导出 PDF/ })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /导出 PDF/ }));
+
+    expect(mockExportReportPdf).toHaveBeenCalledWith('sales', '应收账款报表.pdf');
+  });
+});

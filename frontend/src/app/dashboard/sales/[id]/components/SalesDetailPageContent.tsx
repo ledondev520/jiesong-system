@@ -48,7 +48,7 @@ import {
 } from '@/components/ui/tabs';
 import { StatusBadge, type StatusBadgeConfig } from '@/components/ui/status-badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, FileDown, Loader2 } from 'lucide-react';
 import { domToPng } from 'modern-screenshot';
 import { toast } from 'sonner';
 import { CONTAINER_40HQ } from '@/lib/binPacking';
@@ -94,6 +94,8 @@ export default function SalesDetailPage({ params }: PageProps) {
 
   // 导出 Excel 状态
   const [exportingExcel, setExportingExcel] = useState(false);
+  // 导出 PDF 状态
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   // 截图区域引用
   const headerRef = useRef<HTMLDivElement>(null);
@@ -115,6 +117,23 @@ export default function SalesDetailPage({ params }: PageProps) {
       toast.error('导出 Excel 失败，请稍后重试');
     } finally {
       setExportingExcel(false);
+    }
+  };
+
+  /**
+   * 职责：导出当前合同 PDF
+   */
+  const handleExportPdf = async () => {
+    if (!contract) return;
+    setExportingPdf(true);
+    try {
+      await salesService.exportPdf(contract.id, contract.contractNo);
+      toast.success(`${contract.contractNo} PDF 已下载`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '导出 PDF 失败，请稍后重试';
+      toast.error(message);
+    } finally {
+      setExportingPdf(false);
     }
   };
 
@@ -430,6 +449,18 @@ export default function SalesDetailPage({ params }: PageProps) {
           actions={
             <div className="flex items-center gap-2">
               {getStatusBadge(contract.status)}
+              <Button
+                variant="outline"
+                onClick={handleExportPdf}
+                disabled={exportingPdf}
+                aria-label="导出合同 PDF"
+              >
+                {exportingPdf
+                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  : <FileDown className="mr-2 h-4 w-4 text-primary" />
+                }
+                导出 PDF
+              </Button>
               <Button
                 variant="outline"
                 onClick={handleExportExcel}

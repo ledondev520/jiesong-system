@@ -9,7 +9,7 @@
 'use client';
 
 import { useState, useEffect, use, useCallback } from 'react';
-import { Container, ContainerItem, Product, Store, ContainerStatus } from '@/types';
+import { SalesContract, PackingItem, Product, Store, SalesStatus } from '@/types';
 import { containerService } from '@/services/container.service';
 import { productService } from '@/services/product.service';
 import { storeService } from '@/services/store.service';
@@ -60,14 +60,14 @@ interface PageProps {
 
 export default function ContainerDetailPage({ params }: PageProps) {
   const { id } = use(params);
-  const [container, setContainer] = useState<Container | null>(null);
+  const [container, setContainer] = useState<SalesContract | null>(null);
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   
   // 添加/编辑商品对话框
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<ContainerItem | null>(null);
+  const [editingItem, setEditingItem] = useState<PackingItem | null>(null);
   const [itemForm, setItemForm] = useState({
     productId: '',
     storeId: '',
@@ -125,7 +125,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
   /**
    * 职责：打开编辑商品对话框
    */
-  const handleEditItem = (item: ContainerItem) => {
+  const handleEditItem = (item: PackingItem) => {
     setEditingItem(item);
     setItemForm({
       productId: item.productId,
@@ -200,15 +200,13 @@ export default function ContainerDetailPage({ params }: PageProps) {
    */
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, StatusBadgeConfig> = {
-      [ContainerStatus.PENDING]: { label: '待装柜', tone: 'neutral' },
-      DRAFT: { label: '草稿', tone: 'neutral' },
-      CONFIRMED: { label: '已确认', tone: 'neutral' },
-      [ContainerStatus.LOADING]: { label: '装柜中', tone: 'warning' },
-      PACKING: { label: '装箱中', tone: 'warning' },
-      [ContainerStatus.SHIPPED]: { label: '已发运', tone: 'progress' },
-      [ContainerStatus.ARRIVED]: { label: '已到达', tone: 'success' },
-      COMPLETED: { label: '已完成', tone: 'success' },
-      CANCELLED: { label: '已取消', tone: 'secondary' },
+      [SalesStatus.DRAFT]: { label: '草稿', tone: 'neutral' },
+      [SalesStatus.CONFIRMED]: { label: '已确认', tone: 'neutral' },
+      [SalesStatus.PACKING]: { label: '装箱中', tone: 'warning' },
+      [SalesStatus.SHIPPED]: { label: '已发运', tone: 'progress' },
+      [SalesStatus.ARRIVED]: { label: '已到达', tone: 'success' },
+      [SalesStatus.COMPLETED]: { label: '已完成', tone: 'success' },
+      [SalesStatus.CANCELLED]: { label: '已取消', tone: 'secondary' },
     };
     return <StatusBadge status={status} statusMap={statusMap} />;
   };
@@ -226,16 +224,13 @@ export default function ContainerDetailPage({ params }: PageProps) {
   const weightUsed = container.grossWeight || 0;
   const volumePercent = Math.min((volumeUsed / CONTAINER_40HQ.maxVolume) * 100, 100);
   const weightPercent = Math.min((weightUsed / CONTAINER_40HQ.maxWeight) * 100, 100);
-  const containerTitle = (container as { containerNo?: string }).containerNo ?? container.contractNo;
-  const containerItems: ContainerItem[] =
-    (container as { packingItems?: ContainerItem[] }).packingItems ??
-    ((container.items as unknown as ContainerItem[] | undefined) ?? []);
+  const containerItems: PackingItem[] = container.packingItems || [];
 
   return (
     <div className="space-y-6 pb-10">
       {/* 页头 */}
         <PageHeader
-          title={containerTitle}
+          title={container.contractNo}
           description={`目的港: ${container.port?.name || '-'} | 预计到达: ${formatDate(container.estimatedArrival)}`}
           actions={getStatusBadge(container.status)}
         />

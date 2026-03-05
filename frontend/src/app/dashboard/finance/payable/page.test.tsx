@@ -11,8 +11,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import PayablePage from './page';
 
-const mockApiGet = vi.fn();
 const mockToastError = vi.fn();
+const mockGetPayables = vi.fn();
+const mockExportReportPdf = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -21,10 +22,10 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@/lib/axios', () => ({
-  default: {
-    get: (...args: unknown[]) => mockApiGet(...args),
-    post: vi.fn(),
+vi.mock('@/services/finance.service', () => ({
+  financeService: {
+    getPayables: (...args: unknown[]) => mockGetPayables(...args),
+    exportReportPdf: (...args: unknown[]) => mockExportReportPdf(...args),
   },
 }));
 
@@ -41,12 +42,13 @@ vi.mock('../components/PaymentDialog', () => ({
 
 describe('PayablePage 交互逻辑', () => {
   beforeEach(() => {
-    mockApiGet.mockReset();
+    mockGetPayables.mockReset();
     mockToastError.mockReset();
+    mockExportReportPdf.mockReset();
   });
 
   it('无数据时展示空态', async () => {
-    mockApiGet.mockResolvedValue({ data: { items: [] } });
+    mockGetPayables.mockResolvedValue({ data: { items: [] } });
     render(<PayablePage />);
 
     await waitFor(() => {
@@ -56,7 +58,7 @@ describe('PayablePage 交互逻辑', () => {
   });
 
   it('点击刷新会再次请求数据', async () => {
-    mockApiGet.mockResolvedValue({ data: { items: [] } });
+    mockGetPayables.mockResolvedValue({ data: { items: [] } });
     const user = userEvent.setup();
     render(<PayablePage />);
 
@@ -65,8 +67,21 @@ describe('PayablePage 交互逻辑', () => {
     });
     await user.click(screen.getByRole('button', { name: '刷新' }));
     await waitFor(() => {
-      expect(mockApiGet.mock.calls.length).toBeGreaterThan(1);
+      expect(mockGetPayables).toHaveBeenCalledTimes(2);
     });
   });
-});
 
+  it('点击导出 PDF 会调用报表导出', async () => {
+    mockGetPayables.mockResolvedValue({ data: { items: [] } });
+    mockExportReportPdf.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(<PayablePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /导出 PDF/ })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /导出 PDF/ }));
+
+    expect(mockExportReportPdf).toHaveBeenCalledWith('purchases', '应付账款报表.pdf');
+  });
+});

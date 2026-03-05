@@ -14,3 +14,9 @@
 | R-009 | 系统控制器按域拆分后，子控制器导出协定不一致导致路由 500 | 部分配置/通知/日志接口返回 500 | 启动期保持 `systemController` 聚合层完整映射旧对外 API；新增单测覆盖 `ports/categories/import/notifications` 关键入口 | 回退到单文件聚合控制器（`systemController.js`） |
 | R-010 | `dataImportService` 测试采用深度 mock，可能掩盖 `prisma` 并发边界或查询链路异常 | 导入路径回归通过但真实数据库场景存在未覆盖缺陷 | 在每次发布前补充一条真实数据库集成回放测试（最小导入样例 + 重复容器映射） | 回退到仅 compare/import 单测，保守放宽缓存重构力度 |
 | R-011 | 前端状态徽章替换导致文本映射与历史约定不一致 | 运营端状态语义展示与业务口径冲突 | 与后端枚举对齐并保留 override map；关键路径定向页面测试回归 | 回退到 `SemanticBadge` 原始本地映射（保留 `semantic-badge.tsx`） |
+| R-012 | 角色授权中间件替换未同步到部分写接口 | 越权写入或部分功能误阻塞 | 在发布前逐文件核对 `post/put/delete` 路由与 `roleAuth`；保留现有 `authorize` 兼容入口 | 回退到逐路由 `authorize` + `adminOnly` 组合并补充灰度窗口 |
+| R-013 | 财务幂等字段 `Payment.idempotencyKey` 未完成数据库同步（`db:push`） | 生产环境创建付款可能因字段缺失报错 | 发布前执行 `npm run db:generate && npm run db:push`，并验证 `POST /finance/payments` 重复请求仅写入一次 | 回退 `financeService` 幂等写入分支与 Prisma 字段变更 |
+| R-014 | 审计中间件在高频写入路由全量启用后，可能引入额外 DB 查询开销（before/after 快照） | 写接口 RT 上升、高峰期资源压力增大 | 对高频但非关键路由可使用 `captureBefore/captureAfter: false` 精简快照；必要时对日志写入做异步队列化 | 回退各路由 `withAuditLog` 配置至仅关键实体（合同/库存/财务/系统配置） |
+| R-015 | 使用 SQLite 数据源执行 Prisma 校验（provider=sqlite）且 schema 含 enum Role | prisma validate 失败，阻塞数据库层全量校验 | 统一到 PostgreSQL 或改为 SQLite 兼容字段类型后再执行 prisma validate/db push；当前先以应用层定向测试兜底 | 回退到旧角色字段定义或恢复上一次可验证的数据源配置 |
+| R-016 | 多实例同时执行每日库存任务（无分布式锁） | 可能产生重复低库存通知 | 当前采用“同日+用户+商品”去重降低重复；若进入多实例部署，需引入任务锁（DB/Redis）或集中调度器 | 回退到仅保留 `GET /inventory/alerts` 查询，不自动下发通知 |
+| R-017 | 前端构建依赖外网字体与既有页面语法健康；在网络受限或存量语法错误存在时执行 `next build` | 阻塞本轮功能的“全量 build 绿灯”验收 | 先执行定向 lint+test 验证功能正确性；并行跟进修复 `ClaudeCostCalculator.tsx` 语法错误与字体离线化策略 | 回退到不依赖构建产物的定向验证门禁（保留本轮 PDF 导出功能改动） |

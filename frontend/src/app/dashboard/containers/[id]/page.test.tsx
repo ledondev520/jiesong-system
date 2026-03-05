@@ -90,13 +90,13 @@ describe('ContainerDetailPage 交互逻辑', () => {
     mockGetById.mockResolvedValue({
       data: {
         id: 'c-1',
-        containerNo: '25-001-LA',
-        status: 'PENDING',
+        contractNo: '25-001-LA',
+        status: 'DRAFT',
         volume: 0,
         grossWeight: 0,
         netWeight: 0,
         totalBoxes: 0,
-        items: [],
+        packingItems: [],
         port: { name: 'LA' },
       },
     });
@@ -115,9 +115,9 @@ describe('ContainerDetailPage 交互逻辑', () => {
     mockGetById.mockResolvedValue({
       data: {
         id: 'c-1',
-        containerNo: '25-001-LA',
-        status: 'PENDING',
-        items: [],
+        contractNo: '25-001-LA',
+        status: 'DRAFT',
+        packingItems: [],
         port: { name: 'LA' },
       },
     });
@@ -146,4 +146,3 @@ describe('ContainerDetailPage 交互逻辑', () => {
     });
   });
 });
-

@@ -5,6 +5,8 @@ const {
   normalizeFilterStatus,
   parseNullableNumber,
 } = require('./shared/contractUtils');
+const { SALES_STATUS, validateSalesTransition } = require('./salesStateMachine');
+const inventorySnapshot = require('./inventorySnapshot');
 
 const getCurrentYear = () => new Date().getFullYear().toString().slice(-2);
 
@@ -119,26 +121,46 @@ const addSalesItem = async (id, data = {}) => {
     include: { product: true, store: true },
   });
 
-  const total = await prisma.salesItem.aggregate({
-    where: { salesContractId: id },
-    _sum: { sellingPrice: true },
-  });
-
-  await prisma.salesContract.update({
-    where: { id },
-    data: { totalAmount: total._sum.sellingPrice || 0 },
-  });
+  await inventorySnapshot.reconcileSalesFinancials(prisma, id);
 
   return item;
 };
 
-const updateSalesStatus = async (id, status) => {
-  return prisma.salesContract.update({
-    where: { id },
-    data: {
-      status: normalizeFilterStatus(status),
-    },
+const updateSalesStatus = async (id, status, context = {}) => {
+  const targetStatus = normalizeFilterStatus(typeof status === 'string' ? status.trim() : status);
+
+  if (!targetStatus) {
+    throw createError('status 不能为空', 400);
+  }
+  const contract = await prisma.$transaction(async (tx) => {
+    const existingContract = await tx.salesContract.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    });
+
+    if (!existingContract) {
+      throw createError('出口合同不存在', 404);
+    }
+
+    const validationResult = validateSalesTransition(existingContract.status, targetStatus);
+    if (!validationResult.valid) {
+      throw createError(validationResult.message || '非法销售合同状态流转', 400);
+    }
+
+    const isTransition = existingContract.status !== targetStatus;
+    const contract = await tx.salesContract.update({
+      where: { id },
+      data: { status: targetStatus },
+    });
+
+    if (isTransition && targetStatus === SALES_STATUS.OUT_STOCK) {
+      await inventorySnapshot.applySalesOutStock(tx, id);
+    }
+
+    return contract;
   });
+
+  return contract;
 };
 
 const getNextContractNo = async () => {

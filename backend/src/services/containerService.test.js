@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const prisma = require('../utils/prisma');
 const containerService = require('./containerService');
 
-test('list: 组装筛选条件并返回 containerNo 映射', async () => {
+test('list: 组装筛选条件并返回合同号字段', async () => {
   const originalFindMany = prisma.salesContract.findMany;
   const originalCount = prisma.salesContract.count;
   let findManyArgs = null;
@@ -24,7 +24,7 @@ test('list: 组装筛选条件并返回 containerNo 映射', async () => {
     const result = await containerService.list({
       page: 2,
       pageSize: 10,
-      status: 'PENDING',
+      status: 'DRAFT',
       portId: 'port-1',
       keyword: '25-001',
     });
@@ -37,7 +37,7 @@ test('list: 组装筛选条件并返回 containerNo 映射', async () => {
     assert.equal(findManyArgs.skip, 10);
     assert.equal(findManyArgs.take, 10);
     assert.equal(result.total, 1);
-    assert.equal(result.items[0].containerNo, '25-001-LA');
+    assert.equal(result.items[0].contractNo, '25-001-LA');
   } finally {
     prisma.salesContract.findMany = originalFindMany;
     prisma.salesContract.count = originalCount;
@@ -170,8 +170,116 @@ test('updateStatus: SHIPPED 状态会写入 shippedAt', async () => {
 
     assert.equal(updateArgs.data.status, 'SHIPPED');
     assert.ok(updateArgs.data.shippedAt instanceof Date);
-    assert.equal(result.containerNo, '25-001-LA');
+    assert.equal(result.contractNo, '25-001-LA');
   } finally {
     prisma.salesContract.update = originalUpdate;
+  }
+});
+
+test('getVisualization: 货柜不存在时抛出404', async () => {
+  const originalFindUnique = prisma.salesContract.findUnique;
+  prisma.salesContract.findUnique = async () => null;
+
+  try {
+    await assert.rejects(
+      () => containerService.getVisualization('missing-id'),
+      (error) => error.statusCode === 404 && error.message === '货柜不存在',
+    );
+  } finally {
+    prisma.salesContract.findUnique = originalFindUnique;
+  }
+});
+
+test('getVisualization: 返回布局、重量体积汇总和ASCII图', async () => {
+  const originalFindUnique = prisma.salesContract.findUnique;
+
+  prisma.salesContract.findUnique = async () => ({
+    id: 'sc-1',
+    contractNo: '26-001-LA',
+    status: 'PACKING',
+    totalBoxes: 11,
+    grossWeight: 560,
+    netWeight: 485,
+    volume: 7.5,
+    port: { id: 'port-1', name: 'Los Angeles', code: 'LA' },
+    packingItems: [
+      {
+        id: 'pi-1',
+        quantity: 2,
+        boxes: 5,
+        grossWeight: 400,
+        netWeight: 350,
+        volume: 4,
+        length: 7000,
+        width: 1200,
+        height: 1200,
+        note: 'front',
+        product: { id: 'p-1', name: 'Apple', hsCode: '0808', unit: 'box' },
+        store: { id: 's-1', name: 'Store 1' },
+      },
+      {
+        id: 'pi-2',
+        quantity: 3,
+        boxes: 4,
+        grossWeight: null,
+        netWeight: null,
+        volume: null,
+        length: null,
+        width: null,
+        height: null,
+        product: {
+          id: 'p-2',
+          name: 'Banana',
+          hsCode: '0803',
+          unit: 'box',
+          length: 6000,
+          width: 1200,
+          height: 800,
+          grossWeight: 20,
+          netWeight: 15,
+          volume: 0.5,
+        },
+        store: { id: 's-2', name: 'Store 2' },
+      },
+      {
+        id: 'pi-3',
+        quantity: 1,
+        boxes: 2,
+        grossWeight: 100,
+        netWeight: 90,
+        volume: 2,
+        length: 7000,
+        width: 1000,
+        height: 2000,
+        product: { id: 'p-3', name: 'Cherry', hsCode: '0809', unit: 'box' },
+        store: null,
+      },
+    ],
+  });
+
+  try {
+    const result = await containerService.getVisualization('sc-1');
+
+    assert.equal(result.container.contractNo, '26-001-LA');
+    assert.equal(result.layout.length, 3);
+    assert.equal(result.layout[0].positionMm.x, 0);
+    assert.equal(result.layout[1].positionMm.z, 1200);
+    assert.equal(result.layout[2].overflow, true);
+    assert.equal(result.layout[2].positionMm.x, null);
+
+    assert.equal(result.summary.itemCount, 3);
+    assert.equal(result.summary.overflowItemCount, 1);
+    assert.equal(result.summary.totalBoxes, 11);
+    assert.equal(result.summary.totalGrossWeight, 560);
+    assert.equal(result.summary.totalNetWeight, 485);
+    assert.equal(result.summary.totalVolume, 7.5);
+    assert.ok(result.summary.volumeUtilizationRate > 9);
+    assert.ok(result.summary.volumeUtilizationRate < 10);
+
+    assert.ok(result.asciiArt.includes('Legend (3):'));
+    assert.ok(result.asciiArt.includes('A=Apple'));
+    assert.ok(result.asciiArt.includes('C=Cherry qty:1 boxes:2 [OVERFLOW]'));
+  } finally {
+    prisma.salesContract.findUnique = originalFindUnique;
   }
 });

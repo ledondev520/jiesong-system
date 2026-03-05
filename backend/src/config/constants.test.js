@@ -28,10 +28,10 @@ const getSortedValues = (enumObject) => {
   return Object.values(enumObject).slice().sort();
 };
 
-test('ROLES: 包含管理员/采购/销售角色', () => {
+test('ROLES: 包含管理员/采购/销售/财务/仓库角色', () => {
   const values = getSortedValues(ROLES);
 
-  assert.deepStrictEqual(values, ['ADMIN', 'PURCHASE', 'SALES'].sort());
+  assert.deepStrictEqual(values, ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'].sort());
 });
 
 test('INVENTORY_STATUS: 与PRD状态机一致', () => {
@@ -81,7 +81,7 @@ test('NOTIFICATION_TYPE: 覆盖主要通知类型', () => {
 
   assert.deepStrictEqual(
     values,
-    ['PAYMENT_DUE', 'RECEIVABLE_DUE', 'CONTAINER_ARRIVAL', 'SYSTEM'].sort(),
+    ['PAYMENT_DUE', 'RECEIVABLE_DUE', 'CONTAINER_ARRIVAL', 'LOW_STOCK', 'SYSTEM'].sort(),
   );
 });
 

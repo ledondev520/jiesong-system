@@ -12,13 +12,31 @@ const config = require('./config');
 const routes = require('./routes');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./middleware/logger');
+const { startInventoryAlertJob } = require('./jobs/inventoryAlertJob');
 
 const app = express();
+
+const allowedOrigins = Array.isArray(config.cors.origin) ? config.cors.origin : [];
 
 // ==================== 中间件配置 ====================
 
 // 0. CORS配置
-app.use(cors(config.cors));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS origin not allowed: ${origin}`));
+    },
+    credentials: config.cors.credentials,
+  })
+);
 
 // 1. 请求体解析
 app.use(express.json({ limit: '10mb' }));
@@ -54,6 +72,7 @@ app.use(errorHandler);
 const PORT = config.port;
 
 if (require.main === module) {
+  startInventoryAlertJob();
   app.listen(PORT, () => {
     console.log(`
 ╔════════════════════════════════════════════╗

@@ -10,6 +10,7 @@ const prisma = require('../utils/prisma');
 const { success, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const aiService = require('../services/aiService');
+const { normalizeConfigValueForStorage } = require('../utils/secretCrypto');
 
 const SSE_HEADERS = {
   'Content-Type': 'text/event-stream',
@@ -238,8 +239,12 @@ const updateConfig = async (req, res, next) => {
     if (apiKey) {
       await prisma.systemConfig.upsert({
         where: { key: 'kimiApiKey' },
-        update: { value: JSON.stringify({ encrypted: true }) },
-        create: { key: 'kimiApiKey', value: JSON.stringify({ encrypted: true }), note: 'Kimi API Key (加密存储)' },
+        update: { value: normalizeConfigValueForStorage('kimiApiKey', apiKey), note: 'Kimi API Key (加密存储)' },
+        create: {
+          key: 'kimiApiKey',
+          value: normalizeConfigValueForStorage('kimiApiKey', apiKey),
+          note: 'Kimi API Key (加密存储)',
+        },
       });
     }
     

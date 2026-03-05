@@ -68,6 +68,19 @@ export const salesService = {
   },
 
   /**
+   * 导出单份出口合同 PDF。
+   */
+  exportPdf: async (id: string, contractNo: string) => {
+    const token = getAuthToken();
+    const response = await fetch(`/api/v1/sales/${id}/export-pdf`, {
+      headers: {
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+    });
+    await downloadResponseBlob(response, `${contractNo}_sales_contract.pdf`);
+  },
+
+  /**
    * 计算推荐售价。
    */
   calculatePrice: (costPrice: number, exchangeRate: number, profitRate: number) => {

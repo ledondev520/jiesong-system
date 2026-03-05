@@ -427,3 +427,163 @@
 ### 结论
 - 前端框架层（布局/主题/状态呈现）自动化保护已补齐；
 - 当前仓库维持“后端 + 前端单测 + 前端 E2E + DB 集成”四线全绿。
+
+## 2026-03-05 Round 32（RBAC 与邀请注册）
+
+### 质量指标
+- 本次新增改动覆盖文件：`backend/src/middleware/auth.js`、`backend/src/routes/dataImport.js`、`backend/src/routes/auth.js`、`frontend/src/app/(auth)/register/page.tsx`、`frontend/src/app/(auth)/register/page.test.tsx`、`PLAN.md`、`TASKS.md`、`RISKS.md`、`METRICS.md`。
+- 该轮未新增自动化回归执行（按该任务边界先完成实现与文档闭环，需在后续窗口补跑权限回归与前端定向测试）。
+
+### 过程指标
+- 接口改造点：1 个枚举、1 个权限中间件导出、约 20+ 条写路由权限接入、注册流程收口。
+- 安全域行为变更：用户注册入口由公开注册切换为管理员邀请制。
+
+### 结论
+- 完成 RBAC 基础能力补齐与注册策略调整，建议尽快补齐 `roleAuth` 与注册路由的回归执行快照。
+
+## 2026-03-05 Round 33（前端 Mock 与兼容技术债清理）
+
+### 质量指标
+- 本轮未执行新增自动化，作为交付收口轮仅完成 mock 清理与文档同步，建议下一轮补跑受影响前端定向测试与服务测试。
+
+### 过程指标
+- 覆盖清理文件：`frontend/src/app/dashboard/reports/page.test.tsx`、`frontend/src/app/dashboard/payments/page.test.tsx`、`frontend/src/app/dashboard/finance/page.test.tsx`、`frontend/src/app/dashboard/finance/payable/page.test.tsx`、`frontend/src/app/dashboard/finance/receivable/page.test.tsx`、`frontend/src/app/dashboard/settings/page.test.tsx`、`frontend/src/app/dashboard/store-recommend/page.test.tsx`、`frontend/src/app/(auth)/login/page.test.tsx`、`frontend/src/app/(auth)/forgot-password/page.test.tsx`、`docs/模拟数据汇总.md`。
+- 技术债清理点：服务层 mock 统一、兼容参数断言清理、认证页 mock 迁移、AI/工作台组件 mock 迁移、财务幂等验证补齐与文档同步。
+
+### 服务层补充
+- 扩展 `frontend/src/services/ai.service.ts` 接口与测试：
+  - 新增 `getGreeting` / `getDashboardAnalytics` / `trackProduct` / `parseImageTokenUsage` 方法。
+  - `frontend/src/services/ai.service.test.ts` 补充对应 4 个方法调用断言。
+
+### 结论
+- 已将 mock 兼容链路清理范围扩展到认证页入口，形成更一致的前端测试组织方式。
+
+## 2026-03-05 Round 35（占位清理 + 兼容链路下线 + 财务幂等）
+
+### 质量指标
+- 后端定向测试：`20/20` 通过
+  - `src/services/shared/contractUtils.test.js`
+  - `src/services/containerService.test.js`
+  - `src/services/salesService.test.js`
+  - `src/services/financeService.test.js`
+  - `src/controllers/financeController.test.js`
+- 前端定向测试：`2 files / 6 tests` 通过
+  - `src/app/dashboard/containers/page.test.tsx`
+  - `src/app/dashboard/containers/[id]/page.test.tsx`
+
+### 过程指标
+- 新增后端服务文件：`backend/src/services/financeService.js`
+- 新增后端测试文件：`backend/src/services/financeService.test.js`
+- 运行态兼容清理：货柜域 `containerNo` 回退链路与 `PENDING/LOADING -> DRAFT` 状态兼容已下线。
+- 幂等能力落地：`POST /finance/payments` 支持 `X-Idempotency-Key`，并发冲突通过唯一键重放返回。
+
+### 结论
+- 运行态占位与兼容技术债已完成一轮收口，财务写路径具备后端幂等防重能力。
+- 发布前仍需执行 `db:generate + db:push`，确保 `Payment.idempotencyKey` 字段完成数据库同步。
+
+## 2026-03-05 Round 14 (Comprehensive Audit Logging)
+
+### 质量指标
+- 后端定向测试通过：
+  - `src/middleware/auditLog.test.js`
+  - `src/controllers/system/notificationController.test.js`
+  - `src/routes/system.test.js`
+  - `src/services/authService.test.js`
+  - `src/utils/auditLog.test.js`
+- 后端路由回归（14 个关键路由测试）通过。
+- 前端定向测试通过：
+  - `src/app/dashboard/system/logs/page.test.tsx`
+  - `src/services/system.service.test.ts`
+
+### 过程指标
+- 新增后端中间件文件：1（`auditLog.js`）
+- 新增后端测试文件：1（`auditLog.test.js`）
+- 核心写路由审计接入：14+ 路由模块
+- 新增日志导出接口：`GET /api/v1/system/logs/export/csv`
+
+### 结论
+- 审计日志从“零散调用”升级为“路由层统一中间件治理 + 可筛选查询 + 可导出审计凭据”。
+- 已满足控制器接入、before/after 对比、日志过滤与 CSV 导出的交付目标。
+
+## 2026-03-06 Round 36（RBAC 修复）
+
+### 质量指标
+- 后端定向测试通过：`20/20`
+  - `src/middleware/auth.test.js`
+  - `src/config/constants.test.js`
+  - `src/utils/validators.test.js`
+  - `src/routes/rbac-write-routes.test.js`
+- 前端定向测试通过：`1 file / 4 tests`
+  - `src/app/dashboard/users/page.test.tsx`
+
+### 过程指标
+- 新增后端中间件文件：1（`backend/src/middleware/roleAuth.js`）
+- 新增后端 RBAC 回归测试：1（`backend/src/routes/rbac-write-routes.test.js`）
+- 角色枚举扩展：后端与前端均新增 `FINANCE`、`WAREHOUSE`
+
+### 风险说明
+- `prisma validate` 在当前 `provider=sqlite` + `enum Role` 组合下失败（见 `RISKS.md` R-015）；本轮以应用层测试作为交付校验。
+
+## 2026-03-06 Round 37（Container Visualization API）
+
+### 质量指标
+- 后端定向测试通过：`11/11`
+  - `src/controllers/containerController.test.js`
+  - `src/services/containerService.test.js`
+  - `src/routes/containers.test.js`
+
+### 过程指标
+- 新增接口：`GET /api/v1/containers/:id/visualization`
+- 新增能力：
+  - 货柜装箱布局计算（shelf 排布 + 溢出判定）
+  - 重量/体积聚合与体积利用率计算
+  - ASCII 俯视图与图例输出
+- 新增测试用例：`containerService.test.js` 2 条，`containers.test.js` 1 条
+
+### 结论
+- 本轮交付满足“接口 + 可视化数据 + 汇总计算 + ASCII 输出”目标，并完成定向回归验证。
+
+## 2026-03-05 Round 38（Inventory Alert System）
+
+### 质量指标
+- 新增后端定向测试：`src/services/inventoryAlertService.test.js`（3/3 通过）。
+- 相关回归测试通过：
+  - `src/config/constants.test.js`
+  - `src/controllers/inventoryController.test.js`
+  - `src/routes/inventory.test.js`
+- 定向总计：`14/14` 通过。
+
+### 过程指标
+- 新增后端服务文件：1（`inventoryAlertService.js`）
+- 新增后端任务文件：1（`inventoryAlertJob.js`）
+- 变更后端核心文件：6（`schema.prisma`、`app.js`、`constants.js`、`productController.js`、`inventoryController.js`、`inventory.js`）
+- 新增 API：`GET /api/v1/inventory/alerts`
+
+### 结论
+- 低库存预警能力已具备“每日巡检 + 去重通知 + 查询接口”闭环。
+- 全量后端测试仍受既有环境问题影响（`pdfkit` 缺失、`.env` 权限 644），不属于本轮改动引入。
+
+## 2026-03-05 Round 39（Frontend PDF Export Buttons）
+
+### 质量指标
+- 前端定向 lint 通过（11 个改动文件）。
+- 前端定向测试通过：`4 files / 14 tests`。
+  - `src/app/dashboard/sales/[id]/page.test.tsx`
+  - `src/app/dashboard/purchase/[id]/page.test.tsx`
+  - `src/app/dashboard/finance/payable/page.test.tsx`
+  - `src/app/dashboard/finance/receivable/page.test.tsx`
+- 服务层回归通过：`src/services/finance.service.test.ts`（`5/5`）。
+
+### 过程指标
+- 新增前端导出方法：3
+  - `salesService.exportPdf`
+  - `contractDocService.exportPurchasePdf`
+  - `financeService.exportReportPdf`
+- 新增页面导出按钮：4（采购详情、销售详情、应付、应收）。
+- 新增按钮级 loading state：4。
+- 新增导出交互测试：4。
+
+### 验证限制
+- `next build` 在当前环境未通过，存在两个非本次改动引入问题：
+  - `ClaudeCostCalculator.tsx` 既有语法错误。
+  - 网络受限导致 Google Fonts 拉取失败。

@@ -11,6 +11,7 @@ import SystemLogsPage from './page';
 import { Role } from '@/types';
 
 const mockGetSystemLogs = vi.fn();
+const mockExportSystemLogsCsv = vi.fn();
 const mockToastError = vi.fn();
 const mockUser = {
   role: Role.ADMIN,
@@ -32,6 +33,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/services/system.service', () => ({
   getSystemLogs: (...args: unknown[]) => mockGetSystemLogs(...args),
+  exportSystemLogsCsv: (...args: unknown[]) => mockExportSystemLogsCsv(...args),
 }));
 
 vi.mock('sonner', () => ({
@@ -72,6 +74,7 @@ describe('SystemLogsPage', () => {
   beforeEach(() => {
     mockUser.role = Role.ADMIN;
     mockGetSystemLogs.mockReset();
+    mockExportSystemLogsCsv.mockReset();
     mockToastError.mockReset();
   });
 

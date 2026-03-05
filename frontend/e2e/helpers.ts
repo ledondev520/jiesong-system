@@ -792,7 +792,7 @@ export const mockApiRoutes = async (page: Page) => {
       return;
     }
 
-    if (pathname === '/api/v1/system/import/records' && method === 'GET') {
+    if (pathname === '/api/v1/import/records' && method === 'GET') {
       const status = searchParams.get('status');
       const keyword = searchParams.get('keyword')?.trim();
       const filtered = state.importRecords.filter((item) => {

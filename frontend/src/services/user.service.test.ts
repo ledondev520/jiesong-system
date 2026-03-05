@@ -25,11 +25,11 @@ describe('userService', () => {
   it('getAll/getById: 调用正确查询接口', async () => {
     (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
 
-    await userService.getAll({ page: 1, pageSize: 20, query: 'admin' });
+    await userService.getAll({ page: 1, pageSize: 20 });
     await userService.getById('u-1');
 
     expect(api.get).toHaveBeenCalledWith('/users', {
-      params: { page: 1, pageSize: 20, query: 'admin' },
+      params: { page: 1, pageSize: 20 },
     });
     expect(api.get).toHaveBeenCalledWith('/users/u-1');
   });

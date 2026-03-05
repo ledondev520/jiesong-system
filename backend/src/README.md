@@ -40,9 +40,11 @@
 | 文件 | 功能 |
 |------|------|
 | authService.js | 登录验证、Token生成、密码管理、找回密码 |
+| financeService.js | 付款记录幂等写入、应收应付聚合 |
 | aiService.js | Kimi API集成、智能问答、内容解析 |
 | importService.js | CSV数据解析与导入 |
 | exportService.js | 多格式数据导出 (CSV) |
+| pdfExportService.js | 销售合同 / 系统数据 PDF 导出 |
 
 ## 工具清单
 

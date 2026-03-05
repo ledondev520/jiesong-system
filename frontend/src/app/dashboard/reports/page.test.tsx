@@ -11,7 +11,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ReportsPage from './page';
 
-const mockApiGet = vi.fn();
+const mockGetSuppliers = vi.fn();
+const mockGetStores = vi.fn();
+const mockGetDashboardStats = vi.fn();
+const mockGetPurchasesBySupplier = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -20,35 +23,30 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@/lib/axios', () => ({
-  default: {
-    get: (...args: unknown[]) => mockApiGet(...args),
+vi.mock('@/services/reports.service', () => ({
+  reportsService: {
+    getSuppliers: (...args: unknown[]) => mockGetSuppliers(...args),
+    getStores: (...args: unknown[]) => mockGetStores(...args),
+    getDashboardStats: (...args: unknown[]) => mockGetDashboardStats(...args),
+    getPurchasesBySupplier: (...args: unknown[]) => mockGetPurchasesBySupplier(...args),
   },
 }));
 
 describe('ReportsPage 交互逻辑', () => {
   beforeEach(() => {
-    mockApiGet.mockReset();
+    mockGetSuppliers.mockReset();
+    mockGetStores.mockReset();
+    mockGetDashboardStats.mockReset();
+    mockGetPurchasesBySupplier.mockReset();
   });
 
   it('加载后展示汇总和供应商统计', async () => {
-    mockApiGet.mockImplementation((url: string) => {
-      if (url === '/suppliers') {
-        return Promise.resolve({ data: { items: [{ id: 'sp-1', name: '供应商A' }] } });
-      }
-      if (url === '/stores') {
-        return Promise.resolve({ data: { items: [{ id: 'st-1', name: '洛杉矶店' }] } });
-      }
-      if (url === '/dashboard/stats') {
-        return Promise.resolve({
-          data: { overview: { purchaseContracts: 3, salesContracts: 2, products: 10, containers: 1 } },
-        });
-      }
-      if (url === '/purchases') {
-        return Promise.resolve({ data: { items: [{ totalAmount: 5000 }], total: 1 } });
-      }
-      return Promise.resolve({ data: {} });
+    mockGetSuppliers.mockResolvedValue({ data: { items: [{ id: 'sp-1', name: '供应商A' }] } });
+    mockGetStores.mockResolvedValue({ data: { items: [{ id: 'st-1', name: '洛杉矶店' }] } });
+    mockGetDashboardStats.mockResolvedValue({
+      data: { overview: { purchaseContracts: 3, salesContracts: 2, products: 10, containers: 1 } },
     });
+    mockGetPurchasesBySupplier.mockResolvedValue({ data: { items: [{ totalAmount: 5000 }], total: 1 } });
 
     render(<ReportsPage />);
 
@@ -60,20 +58,12 @@ describe('ReportsPage 交互逻辑', () => {
   });
 
   it('切换到门店列表标签后展示门店名称', async () => {
-    mockApiGet.mockImplementation((url: string) => {
-      if (url === '/suppliers') {
-        return Promise.resolve({ data: { items: [] } });
-      }
-      if (url === '/stores') {
-        return Promise.resolve({ data: { items: [{ id: 'st-1', name: '洛杉矶店' }] } });
-      }
-      if (url === '/dashboard/stats') {
-        return Promise.resolve({
-          data: { overview: { purchaseContracts: 0, salesContracts: 0, products: 0, containers: 0 } },
-        });
-      }
-      return Promise.resolve({ data: { items: [], total: 0 } });
+    mockGetSuppliers.mockResolvedValue({ data: { items: [] } });
+    mockGetStores.mockResolvedValue({ data: { items: [{ id: 'st-1', name: '洛杉矶店' }] } });
+    mockGetDashboardStats.mockResolvedValue({
+      data: { overview: { purchaseContracts: 0, salesContracts: 0, products: 0, containers: 0 } },
     });
+    mockGetPurchasesBySupplier.mockResolvedValue({ data: { items: [], total: 0 } });
 
     const user = userEvent.setup();
     render(<ReportsPage />);
@@ -89,4 +79,3 @@ describe('ReportsPage 交互逻辑', () => {
     });
   });
 });
-

@@ -11,15 +11,16 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ClaudeCostCalculator } from './ClaudeCostCalculator';
 
-const mockApiPost = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastInfo = vi.fn();
 const mockToastError = vi.fn();
 const OriginalFileReader = globalThis.FileReader;
 
-vi.mock('@/lib/axios', () => ({
-  default: {
-    post: (...args: unknown[]) => mockApiPost(...args),
+const mockParseImageTokenUsage = vi.fn();
+
+vi.mock('@/services/ai.service', () => ({
+  aiService: {
+    parseImageTokenUsage: (...args: unknown[]) => mockParseImageTokenUsage(...args),
   },
 }));
 
@@ -47,7 +48,7 @@ function createMockFileReader() {
 
 describe('ClaudeCostCalculator', () => {
   beforeEach(() => {
-    mockApiPost.mockReset();
+    mockParseImageTokenUsage.mockReset();
     mockToastSuccess.mockReset();
     mockToastInfo.mockReset();
     mockToastError.mockReset();
@@ -72,7 +73,7 @@ describe('ClaudeCostCalculator', () => {
   });
 
   it('上传图片后识别 JSON 并回填数据', async () => {
-    mockApiPost.mockResolvedValue({
+    mockParseImageTokenUsage.mockResolvedValue({
       data: {
         message: '{"cacheRead":1000000,"cacheWrite":2000000,"input":3000000,"output":4000000,"total":10000000}',
       },
@@ -96,7 +97,7 @@ describe('ClaudeCostCalculator', () => {
   });
 
   it('AI 返回文本格式时走兜底解析并回填', async () => {
-    mockApiPost.mockResolvedValue({
+    mockParseImageTokenUsage.mockResolvedValue({
       data: {
         message: 'Cache Read: 1,111\nCache Write: 2,222\nInput: 3,333\nOutput: 4,444\nTotal: 11,110',
       },
@@ -119,7 +120,7 @@ describe('ClaudeCostCalculator', () => {
   });
 
   it('全局粘贴图片时触发识别流程', async () => {
-    mockApiPost.mockResolvedValue({
+    mockParseImageTokenUsage.mockResolvedValue({
       data: {
         message: '{"cacheRead":9,"cacheWrite":8,"input":7,"output":6,"total":30}',
       },
@@ -139,12 +140,12 @@ describe('ClaudeCostCalculator', () => {
     });
 
     await waitFor(() => {
-      expect(mockApiPost).toHaveBeenCalled();
+      expect(mockParseImageTokenUsage).toHaveBeenCalled();
     });
   });
 
   it('识别失败时提示错误消息', async () => {
-    mockApiPost.mockRejectedValue(new Error('boom'));
+    mockParseImageTokenUsage.mockRejectedValue(new Error('boom'));
 
     const user = userEvent.setup();
     render(<ClaudeCostCalculator />);
@@ -158,4 +159,3 @@ describe('ClaudeCostCalculator', () => {
     });
   });
 });
-

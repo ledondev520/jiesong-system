@@ -8,7 +8,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { authorize, adminOnly } = require('./auth');
+const { roleAuth, adminOnly } = require('./auth');
 
 /**
  * 职责：创建捕获next错误的函数
@@ -25,7 +25,7 @@ const createNextCapture = () => {
 
 test('authorize: 未登录时拒绝', () => {
   const req = {};
-  const middleware = authorize('ADMIN');
+  const middleware = roleAuth('ADMIN');
   const { next, capture } = createNextCapture();
 
   middleware(req, {}, next);
@@ -37,7 +37,7 @@ test('authorize: 未登录时拒绝', () => {
 
 test('authorize: 角色不匹配时拒绝', () => {
   const req = { user: { role: 'SALES' } };
-  const middleware = authorize('ADMIN', 'PURCHASE');
+  const middleware = roleAuth('ADMIN', 'PURCHASE');
   const { next, capture } = createNextCapture();
 
   middleware(req, {}, next);
@@ -49,7 +49,7 @@ test('authorize: 角色不匹配时拒绝', () => {
 
 test('authorize: 角色匹配时放行', () => {
   const req = { user: { role: 'PURCHASE' } };
-  const middleware = authorize('ADMIN', 'PURCHASE');
+  const middleware = roleAuth('ADMIN', 'PURCHASE');
   const { next, capture } = createNextCapture();
 
   middleware(req, {}, next);

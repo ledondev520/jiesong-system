@@ -63,7 +63,7 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: config.upload.maxSize, // 默认10MB
+    fileSize: config.upload.maxSize, // 默认50MB
   },
 });
 

@@ -1,0 +1,2758 @@
+diff --git a/backend/src/controllers/purchaseController.js b/backend/src/controllers/purchaseController.js
+index e9fa796..ae63b6a 100644
+--- a/backend/src/controllers/purchaseController.js
++++ b/backend/src/controllers/purchaseController.js
+@@ -9,6 +9,8 @@
+ const prisma = require('../utils/prisma');
+ const { success, created, paginated } = require('../utils/response');
+ const { createError } = require('../middleware/errorHandler');
++const { validatePurchaseTransition, PURCHASE_STATUS } = require('../services/purchaseStateMachine');
++const { applyPurchaseInStock } = require('../services/inventorySnapshot');
+ const { normalizePagination } = require('../utils/pagination');
+ 
+ /**
+@@ -198,11 +200,38 @@ const addItem = async (req, res, next) => {
+ const updateStatus = async (req, res, next) => {
+   try {
+     const { id } = req.params;
+-    const { status } = req.body;
+-    
+-    const contract = await prisma.purchaseContract.update({
+-      where: { id },
+-      data: { status },
++    const targetStatus = typeof req.body?.status === 'string' ? req.body.status.trim() : req.body?.status;
++
++    if (!targetStatus) {
++      throw createError('status 不能为空', 400);
++    }
++
++    const contract = await prisma.$transaction(async (tx) => {
++      const existingContract = await tx.purchaseContract.findUnique({
++        where: { id },
++        select: { id: true, status: true },
++      });
++
++      if (!existingContract) {
++        throw createError('采购合同不存在', 404);
++      }
++
++      const validationResult = validatePurchaseTransition(existingContract.status, targetStatus);
++      if (!validationResult.valid) {
++        throw createError(validationResult.message || '非法采购合同状态流转', 400);
++      }
++
++      const isTransition = existingContract.status !== targetStatus;
++      const contract = await tx.purchaseContract.update({
++        where: { id },
++        data: { status: targetStatus },
++      });
++
++      if (isTransition && targetStatus === PURCHASE_STATUS.IN_STOCK) {
++        await applyPurchaseInStock(tx, id);
++      }
++
++      return contract;
+     });
+     
+     success(res, contract, '状态更新成功');
+diff --git a/backend/src/controllers/system/notificationController.js b/backend/src/controllers/system/notificationController.js
+index ecad6a4..4e29c96 100644
+--- a/backend/src/controllers/system/notificationController.js
++++ b/backend/src/controllers/system/notificationController.js
+@@ -3,6 +3,125 @@ const { success, paginated } = require('../../utils/response');
+ const { createError } = require('../../middleware/errorHandler');
+ const { normalizePagination } = require('../../utils/pagination');
+ 
++const parseOptionalText = (value) => {
++  if (value === undefined || value === null) {
++    return '';
++  }
++  return String(value).trim();
++};
++
++const parseDate = (value, options = {}) => {
++  const text = parseOptionalText(value);
++  if (!text) {
++    return null;
++  }
++
++  const parsed = new Date(text);
++  if (Number.isNaN(parsed.getTime())) {
++    return null;
++  }
++
++  if (options.endOfDay && /^\d{4}-\d{2}-\d{2}$/.test(text)) {
++    parsed.setHours(23, 59, 59, 999);
++  }
++
++  return parsed;
++};
++
++const buildOperationLogWhere = (query = {}) => {
++  const userId = parseOptionalText(query.userId);
++  const entity = parseOptionalText(query.entity);
++  const action = parseOptionalText(query.action);
++  const entityId = parseOptionalText(query.entityId);
++  const ipAddress = parseOptionalText(query.ipAddress);
++  const keyword = parseOptionalText(query.keyword);
++  const startDate = parseDate(query.startDate);
++  const endDate = parseDate(query.endDate, { endOfDay: true });
++
++  if (query.startDate && !startDate) {
++    throw createError('startDate 格式错误，需为 ISO 日期或 YYYY-MM-DD', 400);
++  }
++  if (query.endDate && !endDate) {
++    throw createError('endDate 格式错误，需为 ISO 日期或 YYYY-MM-DD', 400);
++  }
++  if (startDate && endDate && startDate > endDate) {
++    throw createError('startDate 不能晚于 endDate', 400);
++  }
++
++  const where = {};
++  if (userId) where.userId = userId;
++  if (entity) where.entity = entity;
++  if (action) where.action = action;
++  if (entityId) where.entityId = entityId;
++  if (ipAddress) where.ipAddress = { contains: ipAddress, mode: 'insensitive' };
++
++  if (startDate || endDate) {
++    where.createdAt = {};
++    if (startDate) {
++      where.createdAt.gte = startDate;
++    }
++    if (endDate) {
++      where.createdAt.lte = endDate;
++    }
++  }
++
++  if (keyword) {
++    where.OR = [
++      { action: { contains: keyword, mode: 'insensitive' } },
++      { entity: { contains: keyword, mode: 'insensitive' } },
++      { entityId: { contains: keyword, mode: 'insensitive' } },
++      { oldValue: { contains: keyword, mode: 'insensitive' } },
++      { newValue: { contains: keyword, mode: 'insensitive' } },
++      { ipAddress: { contains: keyword, mode: 'insensitive' } },
++      { user: { is: { name: { contains: keyword, mode: 'insensitive' } } } },
++      { user: { is: { username: { contains: keyword, mode: 'insensitive' } } } },
++    ];
++  }
++
++  return where;
++};
++
++const csvEscape = (value) => {
++  const text = value === undefined || value === null ? '' : String(value);
++  return `"${text.replace(/"/g, '""')}"`;
++};
++
++const buildOperationLogCsv = (logs = []) => {
++  const headers = [
++    'ID',
++    '时间',
++    '用户ID',
++    '用户名',
++    '姓名',
++    '动作',
++    '实体',
++    '实体ID',
++    'IP地址',
++    'UserAgent',
++    '修改前',
++    '修改后',
++  ];
++
++  const rows = logs.map((item) => ([
++    item.id,
++    item.createdAt ? new Date(item.createdAt).toISOString() : '',
++    item.userId,
++    item.user?.username || '',
++    item.user?.name || '',
++    item.action,
++    item.entity,
++    item.entityId || '',
++    item.ipAddress || '',
++    item.userAgent || '',
++    item.oldValue || '',
++    item.newValue || '',
++  ]));
++
++  const headerLine = headers.map(csvEscape).join(',');
++  const dataLines = rows.map((row) => row.map(csvEscape).join(','));
++  return [headerLine, ...dataLines].join('\n');
++};
++
+ const getNotifications = async (req, res, next) => {
+   try {
+     const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
+@@ -51,15 +170,10 @@ const markNotificationRead = async (req, res, next) => {
+   }
+ };
+ 
+-const getLogs = async (req, res, next) => {
++const getOperationLogs = async (req, res, next) => {
+   try {
+     const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 50, maxPageSize: 200 });
+-    const { userId, entity, action } = req.query;
+-
+-    const where = {};
+-    if (userId) where.userId = userId;
+-    if (entity) where.entity = entity;
+-    if (action) where.action = action;
++    const where = buildOperationLogWhere(req.query);
+ 
+     const [logs, total] = await Promise.all([
+       prisma.operationLog.findMany({
+@@ -78,8 +192,38 @@ const getLogs = async (req, res, next) => {
+   }
+ };
+ 
++const exportOperationLogsCsv = async (req, res, next) => {
++  try {
++    const where = buildOperationLogWhere(req.query);
++    const maxRows = 20000;
++    const requestedLimit = Number.parseInt(req.query.limit, 10);
++    const limit = Number.isFinite(requestedLimit) && requestedLimit > 0
++      ? Math.min(requestedLimit, maxRows)
++      : 5000;
++
++    const logs = await prisma.operationLog.findMany({
++      where,
++      include: { user: { select: { id: true, name: true, username: true } } },
++      orderBy: { createdAt: 'desc' },
++      take: limit,
++    });
++
++    const csv = `\uFEFF${buildOperationLogCsv(logs)}`;
++    const now = new Date().toISOString().replace(/[:]/g, '-');
++    const filename = `operation_logs_${now}.csv`;
++
++    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
++    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
++    res.send(csv);
++  } catch (error) {
++    next(error);
++  }
++};
++
+ module.exports = {
+   getNotifications,
+   markNotificationRead,
+-  getLogs,
++  getLogs: getOperationLogs,
++  getOperationLogs,
++  exportOperationLogsCsv,
+ };
+diff --git a/backend/src/controllers/system/notificationController.test.js b/backend/src/controllers/system/notificationController.test.js
+index fc90d39..32c36d4 100644
+--- a/backend/src/controllers/system/notificationController.test.js
++++ b/backend/src/controllers/system/notificationController.test.js
+@@ -10,15 +10,23 @@ const prisma = require('../../utils/prisma');
+ const notificationController = require('./notificationController');
+ 
+ const createMockRes = () => {
+-  const res = { statusCode: null, payload: null };
++  const res = { statusCode: null, payload: null, headers: {} };
+   res.status = (code) => {
+     res.statusCode = code;
+     return res;
+   };
++  res.setHeader = (key, value) => {
++    res.headers[key] = value;
++    return res;
++  };
+   res.json = (payload) => {
+     res.payload = payload;
+     return res;
+   };
++  res.send = (payload) => {
++    res.payload = payload;
++    return res;
++  };
+   return res;
+ };
+ 
+@@ -130,3 +138,83 @@ test('getLogs: 透传 userId/entity/action 过滤条件', async () => {
+     prisma.operationLog.count = originalCount;
+   }
+ });
++
++test('getOperationLogs: 支持 keyword 与日期区间过滤', async () => {
++  const originalFindMany = prisma.operationLog.findMany;
++  const originalCount = prisma.operationLog.count;
++  let findManyArgs = null;
++
++  prisma.operationLog.findMany = async (args) => {
++    findManyArgs = args;
++    return [];
++  };
++  prisma.operationLog.count = async () => 0;
++
++  try {
++    const req = {
++      query: {
++        keyword: 'admin',
++        startDate: '2026-03-01',
++        endDate: '2026-03-05',
++      },
++    };
++    const res = createMockRes();
++    let capturedError = null;
++
++    await notificationController.getOperationLogs(req, res, (error) => {
++      capturedError = error;
++    });
++
++    assert.equal(capturedError, null);
++    assert.ok(findManyArgs.where.createdAt.gte instanceof Date);
++    assert.ok(findManyArgs.where.createdAt.lte instanceof Date);
++    assert.ok(Array.isArray(findManyArgs.where.OR));
++    assert.ok(findManyArgs.where.OR.length > 0);
++  } finally {
++    prisma.operationLog.findMany = originalFindMany;
++    prisma.operationLog.count = originalCount;
++  }
++});
++
++test('exportOperationLogsCsv: 返回 CSV 文件', async () => {
++  const originalFindMany = prisma.operationLog.findMany;
++  prisma.operationLog.findMany = async () => ([
++    {
++      id: 'log-1',
++      createdAt: new Date('2026-03-05T00:00:00.000Z'),
++      userId: 'u-1',
++      action: 'UPDATE',
++      entity: 'Store',
++      entityId: 's-1',
++      ipAddress: '127.0.0.1',
++      userAgent: 'jest',
++      oldValue: '{"name":"旧"}',
++      newValue: '{"name":"新"}',
++      user: {
++        id: 'u-1',
++        username: 'admin',
++        name: '管理员',
++      },
++    },
++  ]);
++
++  try {
++    const req = {
++      query: {},
++    };
++    const res = createMockRes();
++    let capturedError = null;
++
++    await notificationController.exportOperationLogsCsv(req, res, (error) => {
++      capturedError = error;
++    });
++
++    assert.equal(capturedError, null);
++    assert.equal(res.headers['Content-Type'], 'text/csv; charset=utf-8');
++    assert.match(res.headers['Content-Disposition'], /operation_logs_/);
++    assert.match(String(res.payload), /"UPDATE"/);
++    assert.match(String(res.payload), /"Store"/);
++  } finally {
++    prisma.operationLog.findMany = originalFindMany;
++  }
++});
+diff --git a/backend/src/controllers/systemController.js b/backend/src/controllers/systemController.js
+index 857a1dc..4b2302c 100644
+--- a/backend/src/controllers/systemController.js
++++ b/backend/src/controllers/systemController.js
+@@ -1,7 +1,7 @@
+ /**
+  * Input: /system/* API 控制器聚合
+  * Output: 系统配置、通知、日志、港口与商品分类、导入导出统一入口
+- * Pos: 拆分后的系统控制器聚合层，兼容原有路由直接 require 模式
++ * Pos: 拆分后的系统控制器聚合层，统一对外导出入口
+  */
+ 
+ const {
+@@ -13,6 +13,8 @@ const {
+   getNotifications,
+   markNotificationRead,
+   getLogs,
++  getOperationLogs,
++  exportOperationLogsCsv,
+ } = require('./system/notificationController');
+ const {
+   getPorts,
+@@ -28,12 +30,15 @@ const {
+   importData,
+   getImportRecords,
+   exportData,
++  exportDataPdf,
+ } = require('./system/importExportController');
+ 
+ module.exports = {
+   getConfigs,
+   updateConfig,
+   getLogs,
++  getOperationLogs,
++  exportOperationLogsCsv,
+   getNotifications,
+   markNotificationRead,
+   getExchangeRate,
+@@ -48,4 +53,5 @@ module.exports = {
+   importData,
+   getImportRecords,
+   exportData,
++  exportDataPdf,
+ };
+diff --git a/backend/src/routes/ai.js b/backend/src/routes/ai.js
+index ab159c2..3ebeeb1 100644
+--- a/backend/src/routes/ai.js
++++ b/backend/src/routes/ai.js
+@@ -8,25 +8,26 @@
+ 
+ const { Router } = require('express');
+ const aiController = require('../controllers/aiController');
+-const { authenticate, adminOnly } = require('../middleware/auth');
++const { authenticate, roleAuth } = require('../middleware/auth');
+ const { body, handleValidation } = require('../utils/validators');
++const { withAuditLog } = require('../middleware/auditLog');
+ 
+ const router = Router();
+ 
+ router.use(authenticate);
+ 
+ // POST /api/v1/ai/chat - 智能问答（支持图片）
+-router.post('/chat', [
++router.post('/chat', roleAuth('ADMIN', 'PURCHASE', 'SALES'), [
+   body('message').notEmpty().withMessage('消息不能为空'),
+ ], handleValidation, aiController.chat);
+ 
+ // POST /api/v1/ai/chat/stream - 流式智能问答（SSE）
+-router.post('/chat/stream', [
++router.post('/chat/stream', roleAuth('ADMIN', 'PURCHASE', 'SALES'), [
+   body('message').notEmpty().withMessage('消息不能为空'),
+ ], handleValidation, aiController.chatStream);
+ 
+ // POST /api/v1/ai/parse - 解析输入内容（辅助录入，支持图片）
+-router.post('/parse', [
++router.post('/parse', roleAuth('ADMIN', 'PURCHASE', 'SALES'), [
+   body('type').notEmpty().withMessage('解析类型不能为空'),
+ ], handleValidation, aiController.parseInput);
+ 
+@@ -37,10 +38,36 @@ router.get('/history', aiController.getChatHistory);
+ router.get('/sessions', aiController.getSessions);
+ 
+ // DELETE /api/v1/ai/sessions/:sessionId - 删除会话
+-router.delete('/sessions/:sessionId', aiController.deleteSession);
++router.delete('/sessions/:sessionId', roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  {
++    entity: 'ChatSession',
++    action: 'DELETE',
++    idParam: 'sessionId',
++    captureBefore: false,
++    captureAfter: false,
++    getEntityId: ({ req }) => req.params?.sessionId || null,
++    getOldValue: ({ req }) => ({
++      sessionId: req.params?.sessionId || null,
++      userId: req.user?.id || null,
++    }),
++  },
++  aiController.deleteSession
++));
+ 
+ // PUT /api/v1/ai/config - 配置AI设置（仅管理员）
+-router.put('/config', adminOnly, aiController.updateConfig);
++router.put('/config', roleAuth('ADMIN'), withAuditLog(
++  {
++    entity: 'SystemConfig',
++    action: 'UPDATE',
++    model: 'systemConfig',
++    captureBefore: true,
++    captureAfter: true,
++    getEntityId: () => 'kimiApiKey',
++    beforeWhere: () => ({ key: 'kimiApiKey' }),
++    afterWhere: () => ({ key: 'kimiApiKey' }),
++  },
++  aiController.updateConfig
++));
+ 
+ // GET /api/v1/ai/token-stats - 获取Token使用统计
+ router.get('/token-stats', aiController.getTokenStats);
+diff --git a/backend/src/routes/auth.js b/backend/src/routes/auth.js
+index 47fd109..b3a9c87 100644
+--- a/backend/src/routes/auth.js
++++ b/backend/src/routes/auth.js
+@@ -9,17 +9,31 @@
+ const { Router } = require('express');
+ const authController = require('../controllers/authController');
+ const { validateLogin, validateRegister, validateResetPassword, handleValidation } = require('../utils/validators');
+-const { authenticate, adminOnly } = require('../middleware/auth');
++const { authenticate, roleAuth } = require('../middleware/auth');
++const { withAuditLog } = require('../middleware/auditLog');
+ 
+ const router = Router();
+ 
+ // ==================== 公开路由 ====================
+ 
+ // POST /api/v1/auth/login - 用户登录
+-router.post('/login', validateLogin, handleValidation, authController.login);
+-
+-// POST /api/v1/auth/public-register - 公开注册（新用户自助注册）
+-router.post('/public-register', validateRegister, handleValidation, authController.publicRegister);
++router.post(
++  '/login',
++  validateLogin,
++  handleValidation,
++  withAuditLog(
++    {
++      entity: 'User',
++      action: 'LOGIN',
++      getUserId: ({ responseData }) => responseData?.user?.id,
++      getEntityId: ({ responseData }) => responseData?.user?.id,
++      getNewValue: ({ responseData }) => ({
++        user: responseData?.user || null,
++      }),
++    },
++    authController.login
++  )
++);
+ 
+ // POST /api/v1/auth/reset-password - 找回密码（用户名+手机号验证）
+ router.post('/reset-password', validateResetPassword, handleValidation, authController.resetPassword);
+@@ -27,18 +41,52 @@ router.post('/reset-password', validateResetPassword, handleValidation, authCont
+ // ==================== 需认证路由 ====================
+ 
+ // POST /api/v1/auth/register - 注册新用户（仅管理员）
+-router.post('/register', authenticate, adminOnly, validateRegister, handleValidation, authController.register);
++router.post(
++  '/register',
++  authenticate,
++  roleAuth('ADMIN'),
++  validateRegister,
++  handleValidation,
++  withAuditLog(
++    { entity: 'User', action: 'CREATE', model: 'user' },
++    authController.register
++  )
++);
+ 
+ // GET /api/v1/auth/me - 获取当前用户信息
+ router.get('/me', authenticate, authController.getCurrentUser);
+ 
+ // POST /api/v1/auth/change-password - 修改密码
+-router.post('/change-password', authenticate, authController.changePassword);
++router.post(
++  '/change-password',
++  authenticate,
++  roleAuth('ADMIN', 'PURCHASE', 'SALES'),
++  withAuditLog(
++    {
++      entity: 'User',
++      action: 'UPDATE',
++      model: 'user',
++      getEntityId: ({ req }) => req.user?.id || null,
++      beforeWhere: ({ req }) => (req.user?.id ? { id: req.user.id } : null),
++      afterWhere: ({ req }) => (req.user?.id ? { id: req.user.id } : null),
++      getNewValue: ({ defaultValue }) => defaultValue,
++    },
++    authController.changePassword
++  )
++);
+ 
+ // GET /api/v1/auth/users - 获取用户列表（仅管理员）
+-router.get('/users', authenticate, adminOnly, authController.getUsers);
++router.get('/users', authenticate, roleAuth('ADMIN'), authController.getUsers);
+ 
+ // PUT /api/v1/auth/users/:id - 更新用户（仅管理员）
+-router.put('/users/:id', authenticate, adminOnly, authController.updateUser);
++router.put(
++  '/users/:id',
++  authenticate,
++  roleAuth('ADMIN'),
++  withAuditLog(
++    { entity: 'User', action: 'UPDATE', model: 'user' },
++    authController.updateUser
++  )
++);
+ 
+ module.exports = router;
+diff --git a/backend/src/routes/containers.js b/backend/src/routes/containers.js
+index 2341f0a..48dcfa2 100644
+--- a/backend/src/routes/containers.js
++++ b/backend/src/routes/containers.js
+@@ -8,8 +8,9 @@
+ 
+ const { Router } = require('express');
+ const containerController = require('../controllers/containerController');
+-const { authenticate } = require('../middleware/auth');
++const { authenticate, roleAuth } = require('../middleware/auth');
+ const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
++const { withAuditLog } = require('../middleware/auditLog');
+ 
+ const router = Router();
+ 
+@@ -27,25 +28,46 @@ router.get('/:id', withIdValidation, containerController.getById);
+ // POST /api/v1/containers - 创建货柜
+ router.post('/', [
+   body('portId').notEmpty().withMessage('港口ID不能为空'),
+-], handleValidation, containerController.create);
++], roleAuth('ADMIN', 'PURCHASE', 'SALES'), handleValidation, withAuditLog(
++  { entity: 'Container', action: 'CREATE', model: 'salesContract' },
++  containerController.create
++));
+ 
+ // PUT /api/v1/containers/:id - 更新货柜
+-router.put('/:id', withIdValidation, containerController.update);
++router.put('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'Container', action: 'UPDATE', model: 'salesContract' },
++  containerController.update
++));
+ 
+ // DELETE /api/v1/containers/:id - 删除货柜
+-router.delete('/:id', withIdValidation, containerController.remove);
++router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'Container', action: 'DELETE', model: 'salesContract' },
++  containerController.remove
++));
+ 
+ // POST /api/v1/containers/:id/items - 添加装箱明细
+-router.post('/:id/items', withIdValidation, containerController.addItem);
++router.post('/:id/items', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'ContainerItem', action: 'CREATE', model: 'packingItem' },
++  containerController.addItem
++));
+ 
+ // PUT /api/v1/containers/:id/items/:itemId - 更新装箱明细
+-router.put('/:id/items/:itemId', withIdValidation, containerController.updateItem);
++router.put('/:id/items/:itemId', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'ContainerItem', action: 'UPDATE', model: 'packingItem', idParam: 'itemId' },
++  containerController.updateItem
++));
+ 
+ // DELETE /api/v1/containers/:id/items/:itemId - 删除装箱明细
+-router.delete('/:id/items/:itemId', withIdValidation, containerController.removeItem);
++router.delete('/:id/items/:itemId', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'ContainerItem', action: 'DELETE', model: 'packingItem', idParam: 'itemId' },
++  containerController.removeItem
++));
+ 
+ // PUT /api/v1/containers/:id/status - 更新货柜状态
+-router.put('/:id/status', withIdValidation, containerController.updateStatus);
++router.put('/:id/status', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'Container', action: 'UPDATE', model: 'salesContract' },
++  containerController.updateStatus
++));
+ 
+ // GET /api/v1/containers/:id/products - 查询货柜中的商品
+ router.get('/:id/products', withIdValidation, containerController.getProducts);
+diff --git a/backend/src/routes/contractDoc.js b/backend/src/routes/contractDoc.js
+index e20df77..5d27af0 100644
+--- a/backend/src/routes/contractDoc.js
++++ b/backend/src/routes/contractDoc.js
+@@ -9,8 +9,9 @@
+ const { Router } = require('express');
+ const multer = require('multer');
+ const contractDocController = require('../controllers/contractDocController');
+-const { authenticate, adminOnly } = require('../middleware/auth');
++const { authenticate, roleAuth } = require('../middleware/auth');
+ const { withIdValidation } = require('../utils/validators');
++const { withAuditLog } = require('../middleware/auditLog');
+ 
+ const router = Router();
+ const upload = multer({ storage: multer.memoryStorage() });
+@@ -26,19 +27,54 @@ router.get('/templates', contractDocController.getTemplates);
+ // POST /api/v1/contract-doc/template - 上传合同模板（仅管理员）
+ router.post(
+   '/template',
+-  adminOnly,
++  roleAuth('ADMIN'),
+   upload.single('template'),
+-  contractDocController.uploadTemplate
++  withAuditLog(
++    {
++      entity: 'ContractTemplate',
++      action: 'UPLOAD',
++      captureBefore: false,
++      captureAfter: false,
++      getNewValue: ({ req }) => ({
++        fileName: req.file?.originalname || null,
++        mimeType: req.file?.mimetype || null,
++        size: req.file?.size || null,
++      }),
++    },
++    contractDocController.uploadTemplate
++  )
+ );
+ 
+ // DELETE /api/v1/contract-doc/template - 删除模板（仅管理员）
+-router.delete('/template', adminOnly, contractDocController.deleteTemplate);
++router.delete('/template', roleAuth('ADMIN'), withAuditLog(
++  {
++    entity: 'ContractTemplate',
++    action: 'DELETE',
++    captureBefore: false,
++    captureAfter: false,
++  },
++  contractDocController.deleteTemplate
++));
+ 
+ // POST /api/v1/contract-doc/generate/:id - 根据采购合同生成购销合同
+ router.post(
+   '/generate/:id',
++  roleAuth('ADMIN', 'PURCHASE', 'SALES'),
+   withIdValidation,
+-  contractDocController.generateFromPurchase
++  withAuditLog(
++    {
++      entity: 'ContractFile',
++      action: 'GENERATE',
++      captureBefore: false,
++      captureAfter: false,
++      getEntityId: ({ req }) => req.params?.id || null,
++      getNewValue: ({ req }) => ({
++        purchaseContractId: req.params?.id || null,
++        storeName: req.body?.storeName || null,
++      }),
++    },
++    contractDocController.generateFromPurchase
++  )
+ );
+ 
+ // GET /api/v1/contract-doc/pdf/:id - 获取采购合同PDF（用于预览）
+diff --git a/backend/src/routes/dataImport.js b/backend/src/routes/dataImport.js
+index dd583f2..e262942 100644
+--- a/backend/src/routes/dataImport.js
++++ b/backend/src/routes/dataImport.js
+@@ -10,10 +10,13 @@ const express = require('express');
+ const multer = require('multer');
+ const router = express.Router();
+ const dataImportController = require('../controllers/dataImportController');
+-const { authenticate } = require('../middleware/auth');
++const { authenticate, roleAuth } = require('../middleware/auth');
++const systemController = require('../controllers/systemController');
++const { upload: systemUpload } = require('../utils/upload');
++const { withAuditLog } = require('../middleware/auditLog');
+ 
+ // 配置multer内存存储
+-const upload = multer({
++const memoryUpload = multer({
+   storage: multer.memoryStorage(),
+   limits: {
+     fileSize: 10 * 1024 * 1024, // 10MB限制
+@@ -33,11 +36,38 @@ const upload = multer({
+ // 所有路由需要认证
+ router.use(authenticate);
+ 
++// POST /api/v1/import - 导入CSV数据（仅管理员）
++router.post('/', roleAuth('ADMIN'), systemUpload.single('file'), withAuditLog(
++  {
++    entity: 'DataImport',
++    action: 'IMPORT',
++    captureBefore: false,
++    captureAfter: false,
++    getNewValue: ({ req, responseData }) => ({
++      fileName: req.file?.originalname || null,
++      result: responseData || null,
++    }),
++  },
++  systemController.importData
++));
++
+ // POST /api/v1/import/preview - 上传并预览CSV
+-router.post('/preview', upload.single('file'), dataImportController.previewImport);
++router.post('/preview', roleAuth('ADMIN', 'PURCHASE', 'SALES'), memoryUpload.single('file'), dataImportController.previewImport);
+ 
+ // POST /api/v1/import/execute - 执行导入
+-router.post('/execute', dataImportController.executeImport);
++router.post('/execute', roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  {
++    entity: 'DataImport',
++    action: 'IMPORT',
++    captureBefore: false,
++    captureAfter: false,
++    getNewValue: ({ req, responseData }) => ({
++      recordsCount: Array.isArray(req.body?.records) ? req.body.records.length : 0,
++      result: responseData || null,
++    }),
++  },
++  dataImportController.executeImport
++));
+ 
+ // GET /api/v1/import/history - 获取导入历史
+ router.get('/history', dataImportController.getHistory);
+diff --git a/backend/src/routes/finance.js b/backend/src/routes/finance.js
+index 634b206..3118d8a 100644
+--- a/backend/src/routes/finance.js
++++ b/backend/src/routes/finance.js
+@@ -8,8 +8,9 @@
+ 
+ const { Router } = require('express');
+ const financeController = require('../controllers/financeController');
+-const { authenticate } = require('../middleware/auth');
++const { authenticate, roleAuth } = require('../middleware/auth');
+ const { withPaginationValidation, body, handleValidation } = require('../utils/validators');
++const { withAuditLog } = require('../middleware/auditLog');
+ 
+ const router = Router();
+ 
+@@ -23,7 +24,10 @@ router.post('/payments', [
+   body('type').notEmpty().withMessage('付款类型不能为空'),
+   body('amount').notEmpty().withMessage('金额不能为空'),
+   body('paymentDate').notEmpty().withMessage('付款日期不能为空'),
+-], handleValidation, financeController.createPayment);
++], roleAuth('ADMIN', 'PURCHASE', 'SALES'), handleValidation, withAuditLog(
++  { entity: 'Payment', action: 'CREATE', model: 'payment' },
++  financeController.createPayment
++));
+ 
+ // GET /api/v1/finance/payables - 获取应付账款
+ router.get('/payables', withPaginationValidation, financeController.getPayables);
+diff --git a/backend/src/routes/inventory.js b/backend/src/routes/inventory.js
+index dbd83d1..efd634a 100644
+--- a/backend/src/routes/inventory.js
++++ b/backend/src/routes/inventory.js
+@@ -8,8 +8,9 @@
+ 
+ const { Router } = require('express');
+ const inventoryController = require('../controllers/inventoryController');
+-const { authenticate } = require('../middleware/auth');
++const { authenticate, roleAuth } = require('../middleware/auth');
+ const { withIdValidation, withPaginationValidation } = require('../utils/validators');
++const { withAuditLog } = require('../middleware/auditLog');
+ 
+ const router = Router();
+ 
+@@ -21,6 +22,9 @@ router.get('/', withPaginationValidation, inventoryController.list);
+ // GET /api/v1/inventory/stats - 获取库存统计（放在/:id前面避免被匹配）
+ router.get('/stats', inventoryController.getStats);
+ 
++// GET /api/v1/inventory/snapshot - 按商品聚合库存快照
++router.get('/snapshot', inventoryController.getSnapshot);
++
+ // GET /api/v1/inventory/product/:productId - 按商品查询库存
+ router.get('/product/:productId', inventoryController.getByProduct);
+ 
+@@ -28,12 +32,28 @@ router.get('/product/:productId', inventoryController.getByProduct);
+ router.get('/contract/:contractId', inventoryController.getByContract);
+ 
+ // PUT /api/v1/inventory/batch-status - 批量更新库存状态（静态路由优先）
+-router.put('/batch-status', inventoryController.batchUpdateStatus);
++router.put('/batch-status', roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  {
++    entity: 'Inventory',
++    action: 'BATCH_UPDATE',
++    captureBefore: false,
++    captureAfter: false,
++    getNewValue: ({ req, responseData }) => ({
++      ids: req.body?.ids || [],
++      status: req.body?.status || null,
++      result: responseData || null,
++    }),
++  },
++  inventoryController.batchUpdateStatus
++));
+ 
+ // GET /api/v1/inventory/:id - 获取库存详情（通配路由放最后）
+ router.get('/:id', withIdValidation, inventoryController.getById);
+ 
+ // PUT /api/v1/inventory/:id/status - 更新库存状态
+-router.put('/:id/status', withIdValidation, inventoryController.updateStatus);
++router.put('/:id/status', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'Inventory', action: 'UPDATE', model: 'inventory' },
++  inventoryController.updateStatus
++));
+ 
+ module.exports = router;
+diff --git a/backend/src/routes/products.js b/backend/src/routes/products.js
+index a60dd7f..dc9ce08 100644
+--- a/backend/src/routes/products.js
++++ b/backend/src/routes/products.js
+@@ -8,8 +8,9 @@
+ 
+ const { Router } = require('express');
+ const productController = require('../controllers/productController');
+-const { authenticate } = require('../middleware/auth');
++const { authenticate, roleAuth } = require('../middleware/auth');
+ const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
++const { withAuditLog } = require('../middleware/auditLog');
+ 
+ const router = Router();
+ 
+@@ -24,19 +25,31 @@ router.get('/:id', withIdValidation, productController.getById);
+ // POST /api/v1/products - 创建商品
+ router.post('/', [
+   body('customsName').notEmpty().withMessage('报关名不能为空'),
+-], handleValidation, productController.create);
++], roleAuth('ADMIN', 'PURCHASE', 'SALES'), handleValidation, withAuditLog(
++  { entity: 'Product', action: 'CREATE', model: 'product' },
++  productController.create
++));
+ 
+ // PUT /api/v1/products/:id - 更新商品
+-router.put('/:id', withIdValidation, productController.update);
++router.put('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'Product', action: 'UPDATE', model: 'product' },
++  productController.update
++));
+ 
+ // DELETE /api/v1/products/:id - 删除商品
+-router.delete('/:id', withIdValidation, productController.remove);
++router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'Product', action: 'DELETE', model: 'product' },
++  productController.remove
++));
+ 
+ // GET /api/v1/products/:id/suppliers - 获取商品供应商列表
+ router.get('/:id/suppliers', withIdValidation, productController.getSuppliers);
+ 
+ // POST /api/v1/products/:id/suppliers - 关联供应商
+-router.post('/:id/suppliers', withIdValidation, productController.addSupplier);
++router.post('/:id/suppliers', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'ProductSupplier', action: 'CREATE', model: 'productSupplier' },
++  productController.addSupplier
++));
+ 
+ // GET /api/v1/products/categories - 获取商品分类
+ router.get('/options/categories', productController.getCategories);
+@@ -48,7 +61,10 @@ router.get('/:id/price-history', withIdValidation, productController.getPriceHis
+ router.post('/:id/price-history', [
+   withIdValidation,
+   body('price').isFloat({ min: 0 }).withMessage('价格必须为正数'),
+-], handleValidation, productController.recordPrice);
++], roleAuth('ADMIN', 'PURCHASE', 'SALES'), handleValidation, withAuditLog(
++  { entity: 'PriceHistory', action: 'CREATE', model: 'priceHistory' },
++  productController.recordPrice
++));
+ 
+ // GET /api/v1/products/:id/price-trend - 获取价格趋势
+ router.get('/:id/price-trend', withIdValidation, productController.getPriceTrend);
+diff --git a/backend/src/routes/purchases.js b/backend/src/routes/purchases.js
+index dbcd215..f2bba02 100644
+--- a/backend/src/routes/purchases.js
++++ b/backend/src/routes/purchases.js
+@@ -8,9 +8,10 @@
+ 
+ const { Router } = require('express');
+ const purchaseController = require('../controllers/purchaseController');
+-const { authenticate } = require('../middleware/auth');
++const { authenticate, roleAuth } = require('../middleware/auth');
+ const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
+ const { upload } = require('../utils/upload');
++const { withAuditLog } = require('../middleware/auditLog');
+ 
+ const router = Router();
+ 
+@@ -28,30 +29,51 @@ router.get('/:id', withIdValidation, purchaseController.getById);
+ // POST /api/v1/purchases - 创建采购合同
+ router.post('/', [
+   body('supplierId').notEmpty().withMessage('供应商ID不能为空'),
+-], handleValidation, purchaseController.create);
++], roleAuth('ADMIN', 'PURCHASE', 'SALES'), handleValidation, withAuditLog(
++  { entity: 'PurchaseContract', action: 'CREATE', model: 'purchaseContract' },
++  purchaseController.create
++));
+ 
+ // PUT /api/v1/purchases/:id - 更新采购合同
+-router.put('/:id', withIdValidation, purchaseController.update);
++router.put('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'PurchaseContract', action: 'UPDATE', model: 'purchaseContract' },
++  purchaseController.update
++));
+ 
+ // DELETE /api/v1/purchases/:id - 删除采购合同
+-router.delete('/:id', withIdValidation, purchaseController.remove);
++router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'PurchaseContract', action: 'DELETE', model: 'purchaseContract' },
++  purchaseController.remove
++));
+ 
+ // POST /api/v1/purchases/:id/items - 添加采购明细
+-router.post('/:id/items', withIdValidation, purchaseController.addItem);
++router.post('/:id/items', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'PurchaseItem', action: 'CREATE', model: 'purchaseItem' },
++  purchaseController.addItem
++));
+ 
+ // PUT /api/v1/purchases/:id/status - 更新合同状态
+-router.put('/:id/status', withIdValidation, purchaseController.updateStatus);
++router.put('/:id/status', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'PurchaseContract', action: 'UPDATE', model: 'purchaseContract' },
++  purchaseController.updateStatus
++));
+ 
+ // POST /api/v1/purchases/:id/files - 上传合同文件
+-router.post('/:id/files', withIdValidation, upload.single('file'), purchaseController.uploadFile);
++router.post('/:id/files', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), upload.single('file'), withAuditLog(
++  { entity: 'ContractFile', action: 'CREATE', model: 'contractFile' },
++  purchaseController.uploadFile
++));
+ 
+ // GET /api/v1/purchases/:id/files - 获取合同文件列表
+ router.get('/:id/files', withIdValidation, purchaseController.getFiles);
+ 
+ // DELETE /api/v1/purchases/files/:fileId - 删除合同文件
+-router.delete('/files/:fileId', purchaseController.deleteFile);
++router.delete('/files/:fileId', roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'ContractFile', action: 'DELETE', model: 'contractFile', idParam: 'fileId' },
++  purchaseController.deleteFile
++));
+ 
+ // POST /api/v1/purchases/suppliers-by-products - 根据商品获取曾供应过的供应商
+-router.post('/suppliers-by-products', purchaseController.getSuppliersByProducts);
++router.post('/suppliers-by-products', roleAuth('ADMIN', 'PURCHASE', 'SALES'), purchaseController.getSuppliersByProducts);
+ 
+ module.exports = router;
+diff --git a/backend/src/routes/sales.js b/backend/src/routes/sales.js
+index 8d1c791..beeae0f 100644
+--- a/backend/src/routes/sales.js
++++ b/backend/src/routes/sales.js
+@@ -12,8 +12,10 @@
+ const { Router } = require('express');
+ const salesController = require('../controllers/salesController');
+ const { exportSalesContractExcel } = require('../services/exportService');
++const { exportSalesContractPdf } = require('../services/pdfExportService');
+ const { authenticate } = require('../middleware/auth');
+ const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
++const { withAuditLog } = require('../middleware/auditLog');
+ 
+ const router = Router();
+ 
+@@ -33,34 +35,58 @@ router.get('/:id', withIdValidation, salesController.getById);
+ // POST /api/v1/sales - 创建出口合同
+ router.post('/', [
+   body('exchangeRate').notEmpty().withMessage('汇率不能为空'),
+-], handleValidation, salesController.create);
++], handleValidation, withAuditLog(
++  { entity: 'SalesContract', action: 'CREATE', model: 'salesContract' },
++  salesController.create
++));
+ 
+ // PUT /api/v1/sales/:id - 更新出口合同
+-router.put('/:id', withIdValidation, salesController.update);
++router.put('/:id', withIdValidation, withAuditLog(
++  { entity: 'SalesContract', action: 'UPDATE', model: 'salesContract' },
++  salesController.update
++));
+ 
+ // DELETE /api/v1/sales/:id - 删除出口合同
+-router.delete('/:id', withIdValidation, salesController.remove);
++router.delete('/:id', withIdValidation, withAuditLog(
++  { entity: 'SalesContract', action: 'DELETE', model: 'salesContract' },
++  salesController.remove
++));
+ 
+ // ==================== 销售明细 ====================
+ 
+ // POST /api/v1/sales/:id/items - 添加销售明细
+-router.post('/:id/items', withIdValidation, salesController.addItem);
++router.post('/:id/items', withIdValidation, withAuditLog(
++  { entity: 'SalesItem', action: 'CREATE', model: 'salesItem' },
++  salesController.addItem
++));
+ 
+ // ==================== 装箱明细 ====================
+ 
+ // POST /api/v1/sales/:id/packing-items - 添加装箱明细
+-router.post('/:id/packing-items', withIdValidation, salesController.addPackingItem);
++router.post('/:id/packing-items', withIdValidation, withAuditLog(
++  { entity: 'PackingItem', action: 'CREATE', model: 'packingItem' },
++  salesController.addPackingItem
++));
+ 
+ // PUT /api/v1/sales/:id/packing-items/:itemId - 更新装箱明细
+-router.put('/:id/packing-items/:itemId', withIdValidation, salesController.updatePackingItem);
++router.put('/:id/packing-items/:itemId', withIdValidation, withAuditLog(
++  { entity: 'PackingItem', action: 'UPDATE', model: 'packingItem', idParam: 'itemId' },
++  salesController.updatePackingItem
++));
+ 
+ // DELETE /api/v1/sales/:id/packing-items/:itemId - 删除装箱明细
+-router.delete('/:id/packing-items/:itemId', withIdValidation, salesController.removePackingItem);
++router.delete('/:id/packing-items/:itemId', withIdValidation, withAuditLog(
++  { entity: 'PackingItem', action: 'DELETE', model: 'packingItem', idParam: 'itemId' },
++  salesController.removePackingItem
++));
+ 
+ // ==================== 其他功能 ====================
+ 
+ // PUT /api/v1/sales/:id/status - 更新合同状态
+-router.put('/:id/status', withIdValidation, salesController.updateStatus);
++router.put('/:id/status', withIdValidation, withAuditLog(
++  { entity: 'SalesContract', action: 'UPDATE', model: 'salesContract' },
++  salesController.updateStatus
++));
+ 
+ // POST /api/v1/sales/calculate-price - 计算销售价格
+ router.post('/calculate-price', salesController.calculatePrice);
+@@ -80,4 +106,19 @@ router.get('/:id/export-excel', withIdValidation, async (req, res) => {
+   }
+ });
+ 
++// GET /api/v1/sales/:id/export-pdf - 导出单份合同 PDF
++router.get('/:id/export-pdf', withIdValidation, async (req, res) => {
++  try {
++    const { buffer, filename } = await exportSalesContractPdf(req.params.id);
++    res.setHeader('Content-Type', 'application/pdf');
++    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
++    res.send(buffer);
++  } catch (err) {
++    if (err.message && err.message.includes('合同不存在')) {
++      return res.status(404).json({ success: false, message: err.message });
++    }
++    res.status(500).json({ success: false, message: '导出 PDF 失败', error: err.message });
++  }
++});
++
+ module.exports = router;
+diff --git a/backend/src/routes/storeRecommend.js b/backend/src/routes/storeRecommend.js
+index b26ab31..a4a80f5 100644
+--- a/backend/src/routes/storeRecommend.js
++++ b/backend/src/routes/storeRecommend.js
+@@ -9,7 +9,8 @@
+ const express = require('express');
+ const router = express.Router();
+ const controller = require('../controllers/storeRecommendController');
+-const { authenticate } = require('../middleware/auth');
++const { authenticate, roleAuth } = require('../middleware/auth');
++const { withAuditLog } = require('../middleware/auditLog');
+ 
+ router.use(authenticate);
+ 
+@@ -20,6 +21,19 @@ router.get('/stats', controller.getStoreStats);
+ router.get('/stores', controller.getStoreList);
+ 
+ // POST /api/v1/store-recommend/recommend - 生成采购建议
+-router.post('/recommend', controller.getRecommendation);
++router.post('/recommend', roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  {
++    entity: 'StoreRecommend',
++    action: 'GENERATE',
++    captureBefore: false,
++    captureAfter: false,
++    getNewValue: ({ req, responseData }) => ({
++      storeId: req.body?.storeId || null,
++      requestedItems: Array.isArray(req.body?.items) ? req.body.items.length : null,
++      resultCount: Array.isArray(responseData) ? responseData.length : null,
++    }),
++  },
++  controller.getRecommendation
++));
+ 
+ module.exports = router;
+diff --git a/backend/src/routes/stores.js b/backend/src/routes/stores.js
+index 3276fe1..4fe80e5 100644
+--- a/backend/src/routes/stores.js
++++ b/backend/src/routes/stores.js
+@@ -8,8 +8,9 @@
+ 
+ const { Router } = require('express');
+ const storeController = require('../controllers/storeController');
+-const { authenticate } = require('../middleware/auth');
++const { authenticate, roleAuth } = require('../middleware/auth');
+ const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
++const { withAuditLog } = require('../middleware/auditLog');
+ 
+ const router = Router();
+ 
+@@ -25,13 +26,22 @@ router.get('/:id', withIdValidation, storeController.getById);
+ router.post('/', [
+   body('name').notEmpty().withMessage('门店名称不能为空'),
+   body('portId').notEmpty().withMessage('港口ID不能为空'),
+-], handleValidation, storeController.create);
++], roleAuth('ADMIN', 'PURCHASE', 'SALES'), handleValidation, withAuditLog(
++  { entity: 'Store', action: 'CREATE', model: 'store' },
++  storeController.create
++));
+ 
+ // PUT /api/v1/stores/:id - 更新门店
+-router.put('/:id', withIdValidation, storeController.update);
++router.put('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'Store', action: 'UPDATE', model: 'store' },
++  storeController.update
++));
+ 
+ // DELETE /api/v1/stores/:id - 删除门店
+-router.delete('/:id', withIdValidation, storeController.remove);
++router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'Store', action: 'DELETE', model: 'store' },
++  storeController.remove
++));
+ 
+ // GET /api/v1/stores/ports - 获取港口列表
+ router.get('/options/ports', storeController.getPorts);
+diff --git a/backend/src/routes/suppliers.js b/backend/src/routes/suppliers.js
+index 882c948..fd3ae5f 100644
+--- a/backend/src/routes/suppliers.js
++++ b/backend/src/routes/suppliers.js
+@@ -8,8 +8,9 @@
+ 
+ const { Router } = require('express');
+ const supplierController = require('../controllers/supplierController');
+-const { authenticate } = require('../middleware/auth');
++const { authenticate, roleAuth } = require('../middleware/auth');
+ const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
++const { withAuditLog } = require('../middleware/auditLog');
+ 
+ const router = Router();
+ 
+@@ -25,18 +26,33 @@ router.get('/:id', withIdValidation, supplierController.getById);
+ // POST /api/v1/suppliers - 创建供应商
+ router.post('/', [
+   body('name').notEmpty().withMessage('供应商名称不能为空'),
+-], handleValidation, supplierController.create);
++], roleAuth('ADMIN', 'PURCHASE', 'SALES'), handleValidation, withAuditLog(
++  { entity: 'Supplier', action: 'CREATE', model: 'supplier' },
++  supplierController.create
++));
+ 
+ // PUT /api/v1/suppliers/:id - 更新供应商
+-router.put('/:id', withIdValidation, supplierController.update);
++router.put('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'Supplier', action: 'UPDATE', model: 'supplier' },
++  supplierController.update
++));
+ 
+ // DELETE /api/v1/suppliers/:id - 删除供应商
+-router.delete('/:id', withIdValidation, supplierController.remove);
++router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'Supplier', action: 'DELETE', model: 'supplier' },
++  supplierController.remove
++));
+ 
+ // POST /api/v1/suppliers/:id/aliases - 添加供应商昵称
+-router.post('/:id/aliases', withIdValidation, supplierController.addAlias);
++router.post('/:id/aliases', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'SupplierAlias', action: 'CREATE', model: 'supplierAlias' },
++  supplierController.addAlias
++));
+ 
+ // POST /api/v1/suppliers/:id/quality-issue - 标记质量问题
+-router.post('/:id/quality-issue', withIdValidation, supplierController.markQualityIssue);
++router.post('/:id/quality-issue', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'Supplier', action: 'UPDATE', model: 'supplier' },
++  supplierController.markQualityIssue
++));
+ 
+ module.exports = router;
+diff --git a/backend/src/routes/system.js b/backend/src/routes/system.js
+index 9bc6692..72517a4 100644
+--- a/backend/src/routes/system.js
++++ b/backend/src/routes/system.js
+@@ -8,9 +8,10 @@
+ 
+ const { Router } = require('express');
+ const systemController = require('../controllers/systemController');
+-const { authenticate, adminOnly } = require('../middleware/auth');
++const { authenticate, roleAuth } = require('../middleware/auth');
+ const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
+ const { upload } = require('../utils/upload');
++const { withAuditLog } = require('../middleware/auditLog');
+ 
+ const router = Router();
+ 
+@@ -20,16 +21,31 @@ router.use(authenticate);
+ router.get('/configs', systemController.getConfigs);
+ 
+ // PUT /api/v1/system/configs/:key - 更新系统配置（仅管理员）
+-router.put('/configs/:key', adminOnly, systemController.updateConfig);
++router.put('/configs/:key', roleAuth('ADMIN'), withAuditLog(
++  {
++    entity: 'SystemConfig',
++    action: 'UPDATE',
++    model: 'systemConfig',
++    idParam: 'key',
++    idField: 'key',
++  },
++  systemController.updateConfig
++));
+ 
+ // GET /api/v1/system/logs - 获取操作日志（仅管理员）
+-router.get('/logs', adminOnly, withPaginationValidation, systemController.getLogs);
++router.get('/logs', roleAuth('ADMIN'), withPaginationValidation, systemController.getLogs);
++
++// GET /api/v1/system/logs/export/csv - 导出操作日志（CSV）
++router.get('/logs/export/csv', roleAuth('ADMIN'), systemController.exportOperationLogsCsv);
+ 
+ // GET /api/v1/system/notifications - 获取通知列表
+ router.get('/notifications', withPaginationValidation, systemController.getNotifications);
+ 
+ // PUT /api/v1/system/notifications/:id/read - 标记通知已读
+-router.put('/notifications/:id/read', systemController.markNotificationRead);
++router.put('/notifications/:id/read', roleAuth('ADMIN', 'PURCHASE', 'SALES'), withAuditLog(
++  { entity: 'Notification', action: 'UPDATE', model: 'notification' },
++  systemController.markNotificationRead
++));
+ 
+ // GET /api/v1/system/exchange-rate - 获取当前汇率
+ router.get('/exchange-rate', systemController.getExchangeRate);
+@@ -38,38 +54,71 @@ router.get('/exchange-rate', systemController.getExchangeRate);
+ router.get('/ports', withPaginationValidation, systemController.getPorts);
+ 
+ // POST /api/v1/system/ports - 创建港口（仅管理员）
+-router.post('/ports', adminOnly, [
++router.post('/ports', roleAuth('ADMIN'), [
+   body('name').notEmpty().withMessage('港口名称不能为空'),
+   body('code').notEmpty().withMessage('港口代码不能为空'),
+-], handleValidation, systemController.createPort);
++], handleValidation, withAuditLog(
++  { entity: 'Port', action: 'CREATE', model: 'port' },
++  systemController.createPort
++));
+ 
+ // PUT /api/v1/system/ports/:id - 更新港口（仅管理员）
+-router.put('/ports/:id', adminOnly, withIdValidation, systemController.updatePort);
++router.put('/ports/:id', roleAuth('ADMIN'), withIdValidation, withAuditLog(
++  { entity: 'Port', action: 'UPDATE', model: 'port' },
++  systemController.updatePort
++));
+ 
+ // DELETE /api/v1/system/ports/:id - 停用港口（仅管理员）
+-router.delete('/ports/:id', adminOnly, withIdValidation, systemController.removePort);
++router.delete('/ports/:id', roleAuth('ADMIN'), withIdValidation, withAuditLog(
++  { entity: 'Port', action: 'DELETE', model: 'port' },
++  systemController.removePort
++));
+ 
+ // GET /api/v1/system/categories - 获取商品分类列表
+ router.get('/categories', withPaginationValidation, systemController.getCategories);
+ 
+ // POST /api/v1/system/categories - 创建商品分类（仅管理员）
+-router.post('/categories', adminOnly, [
++router.post('/categories', roleAuth('ADMIN'), [
+   body('name').notEmpty().withMessage('分类名称不能为空'),
+-], handleValidation, systemController.createCategory);
++], handleValidation, withAuditLog(
++  { entity: 'ProductCategory', action: 'CREATE', model: 'productCategory' },
++  systemController.createCategory
++));
+ 
+ // PUT /api/v1/system/categories/:id - 更新商品分类（仅管理员）
+-router.put('/categories/:id', adminOnly, withIdValidation, systemController.updateCategory);
++router.put('/categories/:id', roleAuth('ADMIN'), withIdValidation, withAuditLog(
++  { entity: 'ProductCategory', action: 'UPDATE', model: 'productCategory' },
++  systemController.updateCategory
++));
+ 
+ // DELETE /api/v1/system/categories/:id - 删除商品分类（仅管理员）
+-router.delete('/categories/:id', adminOnly, withIdValidation, systemController.removeCategory);
++router.delete('/categories/:id', roleAuth('ADMIN'), withIdValidation, withAuditLog(
++  { entity: 'ProductCategory', action: 'DELETE', model: 'productCategory' },
++  systemController.removeCategory
++));
+ 
+ // POST /api/v1/system/import - 导入CSV数据（仅管理员）
+-router.post('/import', adminOnly, upload.single('file'), systemController.importData);
++router.post('/import', roleAuth('ADMIN'), upload.single('file'), withAuditLog(
++  {
++    entity: 'DataImport',
++    action: 'IMPORT',
++    captureBefore: false,
++    captureAfter: false,
++    getNewValue: ({ responseData, req }) => ({
++      fileName: req.file?.originalname || null,
++      result: responseData || null,
++    }),
++  },
++  systemController.importData
++));
+ 
+ // GET /api/v1/system/import/records - 获取导入记录（仅管理员）
+-router.get('/import/records', adminOnly, withPaginationValidation, systemController.getImportRecords);
++router.get('/import/records', roleAuth('ADMIN'), withPaginationValidation, systemController.getImportRecords);
+ 
+ // GET /api/v1/system/export/:type - 导出数据
+ router.get('/export/:type', systemController.exportData);
+ 
++// GET /api/v1/system/export/:type/pdf - 导出PDF报表
++router.get('/export/:type/pdf', systemController.exportDataPdf);
++
+ module.exports = router;
+diff --git a/backend/src/routes/system.test.js b/backend/src/routes/system.test.js
+index 2ec53a0..50f6c29 100644
+--- a/backend/src/routes/system.test.js
++++ b/backend/src/routes/system.test.js
+@@ -6,8 +6,31 @@
+ 
+ const test = require('node:test');
+ const assert = require('node:assert/strict');
++const systemRouter = require('./system');
+ 
+ test('system: 模块可正常加载并导出', () => {
+   const mod = require('./system');
+   assert.ok(mod !== undefined);
+ });
++
++const getRouteIndex = (router, path, method) => {
++  return router.stack.findIndex((layer) => {
++    if (!layer.route) return false;
++    return layer.route.path === path && Boolean(layer.route.methods?.[method]);
++  });
++};
++
++test('system route includes CSV export endpoint', () => {
++  const index = getRouteIndex(systemRouter, '/export/:type', 'get');
++  assert.notEqual(index, -1, '缺少 GET /export/:type 路由');
++});
++
++test('system route includes PDF export endpoint', () => {
++  const index = getRouteIndex(systemRouter, '/export/:type/pdf', 'get');
++  assert.notEqual(index, -1, '缺少 GET /export/:type/pdf 路由');
++});
++
++test('system route includes operation logs CSV export endpoint', () => {
++  const index = getRouteIndex(systemRouter, '/logs/export/csv', 'get');
++  assert.notEqual(index, -1, '缺少 GET /logs/export/csv 路由');
++});
+diff --git a/backend/src/routes/users.js b/backend/src/routes/users.js
+index ac00235..570a861 100644
+--- a/backend/src/routes/users.js
++++ b/backend/src/routes/users.js
+@@ -8,14 +8,15 @@
+ 
+ const { Router } = require('express');
+ const userController = require('../controllers/userController');
+-const { authenticate, adminOnly } = require('../middleware/auth');
++const { authenticate, roleAuth } = require('../middleware/auth');
+ const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
++const { withAuditLog } = require('../middleware/auditLog');
+ 
+ const router = Router();
+ 
+ // 所有用户路由需要认证且仅管理员可访问
+ router.use(authenticate);
+-router.use(adminOnly);
++router.use(roleAuth('ADMIN'));
+ 
+ // GET /api/v1/users - 获取用户列表
+ router.get('/', withPaginationValidation, userController.list);
+@@ -28,12 +29,21 @@ router.post('/', [
+   body('username').notEmpty().withMessage('用户名不能为空'),
+   body('password').isLength({ min: 6 }).withMessage('密码至少6位'),
+   body('name').notEmpty().withMessage('姓名不能为空'),
+-], handleValidation, userController.create);
++], handleValidation, withAuditLog(
++  { entity: 'User', action: 'CREATE', model: 'user' },
++  userController.create
++));
+ 
+ // PUT /api/v1/users/:id - 更新用户
+-router.put('/:id', withIdValidation, userController.update);
++router.put('/:id', withIdValidation, withAuditLog(
++  { entity: 'User', action: 'UPDATE', model: 'user' },
++  userController.update
++));
+ 
+ // DELETE /api/v1/users/:id - 删除用户
+-router.delete('/:id', withIdValidation, userController.remove);
++router.delete('/:id', withIdValidation, withAuditLog(
++  { entity: 'User', action: 'DELETE', model: 'user' },
++  userController.remove
++));
+ 
+ module.exports = router;
+diff --git a/backend/src/services/authService.js b/backend/src/services/authService.js
+index 707eec7..17591e9 100644
+--- a/backend/src/services/authService.js
++++ b/backend/src/services/authService.js
+@@ -57,9 +57,6 @@ const login = async (username, password) => {
+     data: { lastLoginAt: new Date() },
+   });
+   
+-  // 4.1 记录登录日志
+-  await auditLog.login(user.id, null);
+-  
+   // 5. 返回结果（排除密码）
+   const { password: _, ...userWithoutPassword } = user;
+   return {
+diff --git a/backend/src/services/salesService.js b/backend/src/services/salesService.js
+index e63b845..091c842 100644
+--- a/backend/src/services/salesService.js
++++ b/backend/src/services/salesService.js
+@@ -5,6 +5,8 @@ const {
+   normalizeFilterStatus,
+   parseNullableNumber,
+ } = require('./shared/contractUtils');
++const { SALES_STATUS, validateSalesTransition } = require('./salesStateMachine');
++const inventorySnapshot = require('./inventorySnapshot');
+ 
+ const getCurrentYear = () => new Date().getFullYear().toString().slice(-2);
+ 
+@@ -119,26 +121,46 @@ const addSalesItem = async (id, data = {}) => {
+     include: { product: true, store: true },
+   });
+ 
+-  const total = await prisma.salesItem.aggregate({
+-    where: { salesContractId: id },
+-    _sum: { sellingPrice: true },
+-  });
+-
+-  await prisma.salesContract.update({
+-    where: { id },
+-    data: { totalAmount: total._sum.sellingPrice || 0 },
+-  });
++  await inventorySnapshot.reconcileSalesFinancials(prisma, id);
+ 
+   return item;
+ };
+ 
+-const updateSalesStatus = async (id, status) => {
+-  return prisma.salesContract.update({
+-    where: { id },
+-    data: {
+-      status: normalizeFilterStatus(status),
+-    },
++const updateSalesStatus = async (id, status, context = {}) => {
++  const targetStatus = normalizeFilterStatus(typeof status === 'string' ? status.trim() : status);
++
++  if (!targetStatus) {
++    throw createError('status 不能为空', 400);
++  }
++  const contract = await prisma.$transaction(async (tx) => {
++    const existingContract = await tx.salesContract.findUnique({
++      where: { id },
++      select: { id: true, status: true },
++    });
++
++    if (!existingContract) {
++      throw createError('出口合同不存在', 404);
++    }
++
++    const validationResult = validateSalesTransition(existingContract.status, targetStatus);
++    if (!validationResult.valid) {
++      throw createError(validationResult.message || '非法销售合同状态流转', 400);
++    }
++
++    const isTransition = existingContract.status !== targetStatus;
++    const contract = await tx.salesContract.update({
++      where: { id },
++      data: { status: targetStatus },
++    });
++
++    if (isTransition && targetStatus === SALES_STATUS.OUT_STOCK) {
++      await inventorySnapshot.applySalesOutStock(tx, id);
++    }
++
++    return contract;
+   });
++
++  return contract;
+ };
+ 
+ const getNextContractNo = async () => {
+diff --git a/backend/src/utils/auditLog.js b/backend/src/utils/auditLog.js
+index 82c011e..61e3ede 100644
+--- a/backend/src/utils/auditLog.js
++++ b/backend/src/utils/auditLog.js
+@@ -8,6 +8,190 @@
+ 
+ const prisma = require('./prisma');
+ 
++const SENSITIVE_FIELDS = new Set(['password', 'token', 'secret', 'apikey']);
++const SENSITIVE_KEY_PATTERNS = [
++  /password/i,
++  /token/i,
++  /secret/i,
++  /api[-_]?key/i,
++  /credential/i,
++];
++
++const CRITICAL_FIELDS_BY_ENTITY = {
++  User: ['username', 'name', 'role', 'email', 'phone', 'isActive', 'avatar'],
++  Store: ['name', 'portId', 'contactName', 'contactPhone', 'contactEmail', 'address', 'isActive'],
++  Supplier: ['name', 'shortName', 'contactName', 'contactPhone', 'contactEmail', 'address', 'phone', 'taxId', 'bankName', 'bankAccount', 'isActive', 'hasQualityIssue', 'qualityNote'],
++  Product: ['customsName', 'description', 'specification', 'unit', 'categoryId', 'grossWeight', 'netWeight', 'volume', 'packingSpec', 'length', 'width', 'height', 'isActive'],
++  ProductCategory: ['name', 'parentId'],
++  Port: ['name', 'code', 'isActive'],
++  SalesContract: ['status', 'exchangeRate', 'signedAt', 'estimatedArrival', 'portId', 'note', 'totalAmount', 'totalBoxes', 'grossWeight', 'netWeight', 'volume', 'customsBroker', 'isFumigated', 'hasTaxRefund', 'shippedAt'],
++  PurchaseContract: ['status', 'supplierId', 'taxRate', 'signedAt', 'expectedDate', 'invoiceNo', 'note', 'totalAmount', 'paidAmount'],
++  PurchaseItem: ['productId', 'quantity', 'unit', 'unitPrice', 'totalPrice', 'specification', 'note'],
++  ContractFile: ['fileName', 'filePath', 'fileType', 'fileSize'],
++  PriceHistory: ['productId', 'price', 'supplierId', 'unitPrice'],
++  Payment: ['type', 'amount', 'currency', 'paymentMethod', 'paymentDate', 'note', 'purchaseContractId', 'salesContractId'],
++  SupplierAlias: ['alias', 'supplierId'],
++  Inventory: ['status', 'quantity', 'salesContractId', 'inboundAt', 'outboundAt'],
++  PackingItem: ['salesContractId', 'productId', 'storeId', 'quantity', 'unit', 'boxes', 'grossWeight', 'netWeight', 'volume', 'unitPrice', 'totalPrice', 'note'],
++  SalesItem: ['salesContractId', 'productId', 'storeId', 'quantity', 'unit', 'costPrice', 'sellingPrice', 'specification', 'note'],
++  ChatSession: ['sessionId', 'userId'],
++  SystemConfig: ['key', 'value', 'note'],
++  ContractTemplate: ['exists'],
++  DataImport: ['created', 'failed', 'success'],
++  ImportRecord: ['fileName', 'totalRows', 'successRows', 'failedRows', 'status'],
++};
++
++const normalizeEntity = (entity = '') => {
++  const trimmed = String(entity).trim();
++  const map = {
++    Container: 'SalesContract',
++    ContainerItem: 'PackingItem',
++    Import: 'DataImport',
++  };
++
++  return map[trimmed] || trimmed;
++};
++
++const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
++
++const isSensitiveField = (key) => {
++  const normalized = String(key || '').trim().toLowerCase();
++  if (!normalized) {
++    return false;
++  }
++
++  if (SENSITIVE_FIELDS.has(normalized)) {
++    return true;
++  }
++
++  return SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(normalized));
++};
++
++const isSensitiveConfigRecord = (value) => {
++  if (!isObject(value) || typeof value.key !== 'string') {
++    return false;
++  }
++
++  return isSensitiveField(value.key);
++};
++
++const sanitizeValue = (value) => {
++  if (value === null || value === undefined) {
++    return value;
++  }
++
++  if (value instanceof Date) {
++    return value.toISOString();
++  }
++
++  if (typeof value === 'bigint') {
++    return value.toString();
++  }
++
++  if (Array.isArray(value)) {
++    return value.map((item) => sanitizeValue(item));
++  }
++
++  if (!isObject(value)) {
++    return value;
++  }
++
++  const sanitized = {};
++  const sensitiveConfigRecord = isSensitiveConfigRecord(value);
++
++  Object.entries(value).forEach(([key, itemValue]) => {
++    if (isSensitiveField(key)) {
++      return;
++    }
++
++    if (sensitiveConfigRecord && key === 'value') {
++      return;
++    }
++    sanitized[key] = sanitizeValue(itemValue);
++  });
++
++  return sanitized;
++};
++
++const toComparable = (value) => {
++  if (value instanceof Date) {
++    return value.toISOString();
++  }
++
++  if (typeof value === 'bigint') {
++    return value.toString();
++  }
++
++  return value;
++};
++
++const buildCriticalComparison = (entity, oldValue = null, newValue = null) => {
++  const normalizedEntity = normalizeEntity(entity);
++  const criticalKeys = CRITICAL_FIELDS_BY_ENTITY[normalizedEntity] || [];
++  const oldRecord = sanitizeValue(oldValue);
++  const newRecord = sanitizeValue(newValue);
++
++  if (!criticalKeys.length || !isObject(oldRecord) || !isObject(newRecord)) {
++    return {
++      hasChange: false,
++      before: null,
++      after: null,
++      keys: criticalKeys,
++    };
++  }
++
++  const before = {};
++  const after = {};
++  let hasChange = false;
++
++  criticalKeys.forEach((key) => {
++    const oldKeyValue = oldRecord[key];
++    const newKeyValue = newRecord[key];
++
++    if (JSON.stringify(toComparable(oldKeyValue)) === JSON.stringify(toComparable(newKeyValue))) {
++      return;
++    }
++
++    before[key] = sanitizeValue(oldKeyValue);
++    after[key] = sanitizeValue(newKeyValue);
++    hasChange = true;
++  });
++
++  return {
++    hasChange,
++    before: hasChange ? before : null,
++    after: hasChange ? after : null,
++    keys: criticalKeys,
++  };
++};
++
++const resolveValues = (action, entity, oldValue, newValue) => {
++  const oldSanitized = sanitizeValue(oldValue);
++  const newSanitized = sanitizeValue(newValue);
++
++  if (action === 'UPDATE') {
++    const comparison = buildCriticalComparison(entity, oldSanitized, newSanitized);
++    if (comparison.hasChange) {
++      return { oldValue: comparison.before, newValue: comparison.after };
++    }
++
++    // 若实体存在关键字段清单但本次未变更关键字段，补齐完整快照，便于排查
++    if (comparison.keys.length > 0) {
++      return { oldValue: oldSanitized, newValue: newSanitized };
++    }
++  }
++
++  return { oldValue: oldSanitized, newValue: newSanitized };
++};
++
++const stringifyLogValue = (value) => {
++  try {
++    return value ? JSON.stringify(value) : null;
++  } catch {
++    return null;
++  }
++};
++
+ /**
+  * 职责：记录操作日志
+  * @param {Object} params - 日志参数
+@@ -29,14 +213,16 @@ const logOperation = async ({
+   req = null,
+ }) => {
+   try {
++    const resolvedValues = resolveValues(action, entity, oldValue, newValue);
++
+     await prisma.operationLog.create({
+       data: {
+         userId,
+         action,
+         entity,
+         entityId,
+-        oldValue: oldValue ? JSON.stringify(oldValue) : null,
+-        newValue: newValue ? JSON.stringify(newValue) : null,
++        oldValue: stringifyLogValue(resolvedValues.oldValue),
++        newValue: stringifyLogValue(resolvedValues.newValue),
+         ipAddress: req?.ip || req?.connection?.remoteAddress || null,
+         userAgent: req?.headers?.['user-agent'] || null,
+       },
+@@ -100,6 +286,9 @@ const log = {
+   
+   logout: (userId, req) =>
+     logOperation({ userId, action: 'LOGOUT', entity: 'User', entityId: userId, req }),
++
++  action: (userId, action, entity, entityId = null, oldValue = null, newValue = null, req = null) =>
++    logOperation({ userId, action, entity, entityId, oldValue, newValue, req }),
+ };
+ 
+ module.exports = {
+diff --git a/frontend/src/app/dashboard/system/logs/page.test.tsx b/frontend/src/app/dashboard/system/logs/page.test.tsx
+index 72e300f..d3c74bc 100644
+--- a/frontend/src/app/dashboard/system/logs/page.test.tsx
++++ b/frontend/src/app/dashboard/system/logs/page.test.tsx
+@@ -11,6 +11,7 @@ import SystemLogsPage from './page';
+ import { Role } from '@/types';
+ 
+ const mockGetSystemLogs = vi.fn();
++const mockExportSystemLogsCsv = vi.fn();
+ const mockToastError = vi.fn();
+ const mockUser = {
+   role: Role.ADMIN,
+@@ -32,6 +33,7 @@ vi.mock('next/navigation', () => ({
+ 
+ vi.mock('@/services/system.service', () => ({
+   getSystemLogs: (...args: unknown[]) => mockGetSystemLogs(...args),
++  exportSystemLogsCsv: (...args: unknown[]) => mockExportSystemLogsCsv(...args),
+ }));
+ 
+ vi.mock('sonner', () => ({
+@@ -72,6 +74,7 @@ describe('SystemLogsPage', () => {
+   beforeEach(() => {
+     mockUser.role = Role.ADMIN;
+     mockGetSystemLogs.mockReset();
++    mockExportSystemLogsCsv.mockReset();
+     mockToastError.mockReset();
+   });
+ 
+diff --git a/frontend/src/app/dashboard/system/logs/page.tsx b/frontend/src/app/dashboard/system/logs/page.tsx
+index 671ff2a..b71a275 100644
+--- a/frontend/src/app/dashboard/system/logs/page.tsx
++++ b/frontend/src/app/dashboard/system/logs/page.tsx
+@@ -19,7 +19,7 @@ import {
+ } from '@/components/ui/table';
+ import { PageHeader } from '@/components/layout/PageHeader';
+ import { Badge } from '@/components/ui/badge';
+-import { getSystemLogs, SystemLogItem } from '@/services/system.service';
++import { exportSystemLogsCsv, getSystemLogs, SystemLogItem } from '@/services/system.service';
+ import { toast } from 'sonner';
+ import { Role } from '@/types';
+ import { useAuthStore } from '@/store/auth.store';
+@@ -58,6 +58,7 @@ export default function SystemLogsPage() {
+   const [loading, setLoading] = useState(true);
+   const [logs, setLogs] = useState<SystemLogItem[]>([]);
+   const [filter, setFilter] = useState<LogFilter>('all');
++  const [exporting, setExporting] = useState(false);
+   const [total, setTotal] = useState(0);
+   const user = useAuthStore((state) => state.user);
+   const filteredLogs = useMemo(
+@@ -147,6 +148,18 @@ export default function SystemLogsPage() {
+     return log.userId || '系统';
+   };
+ 
++  const handleExportCsv = async () => {
++    try {
++      setExporting(true);
++      await exportSystemLogsCsv();
++      toast.success('CSV导出成功');
++    } catch {
++      toast.error('CSV导出失败');
++    } finally {
++      setExporting(false);
++    }
++  };
++
+   return (
+     <div className="space-y-6">
+       <PageHeader
+@@ -170,6 +183,9 @@ export default function SystemLogsPage() {
+             >
+               导入日志
+             </Button>
++            <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={exporting}>
++              {exporting ? '导出中...' : '导出CSV'}
++            </Button>
+           </div>
+         }
+       />
+diff --git a/frontend/src/services/system.service.ts b/frontend/src/services/system.service.ts
+index 3c4234a..5849e0c 100644
+--- a/frontend/src/services/system.service.ts
++++ b/frontend/src/services/system.service.ts
+@@ -28,6 +28,11 @@ export interface GetSystemLogsParams {
+   userId?: string;
+   entity?: string;
+   action?: string;
++  entityId?: string;
++  keyword?: string;
++  ipAddress?: string;
++  startDate?: string;
++  endDate?: string;
+ }
+ 
+ export const getSystemLogs = async (params: GetSystemLogsParams = { page: 1, pageSize: 50 }) => {
+@@ -37,6 +42,50 @@ export const getSystemLogs = async (params: GetSystemLogsParams = { page: 1, pag
+   );
+ };
+ 
++export const exportSystemLogsCsv = async (params: GetSystemLogsParams = {}, fallbackFilename = 'operation_logs.csv') => {
++  const token = getAuthToken();
++  const query = new URLSearchParams();
++
++  Object.entries(params).forEach(([key, value]) => {
++    if (value !== undefined && value !== null && String(value).length > 0) {
++      query.set(key, String(value));
++    }
++  });
++
++  const queryString = query.toString();
++  const response = await fetch(`/api/v1/system/logs/export/csv${queryString ? `?${queryString}` : ''}`, {
++    headers: {
++      Authorization: token ? `Bearer ${token}` : '',
++    },
++  });
++
++  if (!response.ok) {
++    let message = `导出失败（${response.status}）`;
++    try {
++      const errorData = await response.json();
++      if (errorData?.message) {
++        message = errorData.message;
++      }
++    } catch {
++      // Ignore JSON parse errors from non-JSON responses.
++    }
++    throw new Error(message);
++  }
++
++  const blob = await response.blob();
++  const url = URL.createObjectURL(blob);
++  const link = document.createElement('a');
++  const disposition = response.headers.get('Content-Disposition') || '';
++  const filenameMatch = disposition.match(/filename\*=UTF-8''(.+)/i) || disposition.match(/filename="?([^"]+)"?/i);
++
++  link.href = url;
++  link.download = filenameMatch ? decodeURIComponent(filenameMatch[1]) : fallbackFilename;
++  document.body.appendChild(link);
++  link.click();
++  link.remove();
++  URL.revokeObjectURL(url);
++};
++
+ export interface SystemNotificationItem {
+   id: string;
+   userId: string;
+@@ -94,7 +143,7 @@ export const getSystemImportRecords = async (
+   params: GetSystemImportRecordsParams = { page: 1, pageSize: 50 }
+ ) => {
+   return api.get<ApiResponse<PaginatedResponse<SystemImportRecordItem>>, ApiResponse<PaginatedResponse<SystemImportRecordItem>>>(
+-    '/system/import/records',
++    '/import/records',
+     { params }
+   );
+ };
+@@ -190,7 +239,7 @@ export type SystemExportType =
+ 
+ export const exportSystemData = async (type: SystemExportType, fallbackFilename?: string) => {
+   const token = getAuthToken();
+-  const response = await fetch(`/api/v1/system/export/${type}`, {
++  const response = await fetch(`/api/v1/export/${type}`, {
+     headers: {
+       Authorization: token ? `Bearer ${token}` : '',
+     },
+diff --git a/backend/src/middleware/auditLog.js b/backend/src/middleware/auditLog.js
+new file mode 100644
+index 0000000..fc13c76
+--- /dev/null
++++ b/backend/src/middleware/auditLog.js
+@@ -0,0 +1,322 @@
++/**
++ * Input: 路由处理器、Prisma、审计日志工具
++ * Output: 带审计能力的控制器包装函数
++ * Pos: 审计日志中间件，统一记录操作轨迹
++ */
++
++const prisma = require('../utils/prisma');
++const auditLogUtils = require('../utils/auditLog');
++
++const ACTION_BY_METHOD = {
++  POST: 'CREATE',
++  PUT: 'UPDATE',
++  PATCH: 'UPDATE',
++  DELETE: 'DELETE',
++};
++
++const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
++
++const resolveMaybe = async (valueOrResolver, context) => {
++  if (typeof valueOrResolver === 'function') {
++    return valueOrResolver(context);
++  }
++  return valueOrResolver;
++};
++
++const extractPayloadData = (payload) => {
++  if (isObject(payload) && Object.prototype.hasOwnProperty.call(payload, 'data')) {
++    return payload.data;
++  }
++  return payload;
++};
++
++const resolveRequestEntityId = (req, idParam = 'id') => {
++  if (!req?.params) {
++    return null;
++  }
++  if (req.params[idParam]) {
++    return req.params[idParam];
++  }
++  if (idParam !== 'id' && req.params.id) {
++    return req.params.id;
++  }
++  return null;
++};
++
++const resolveResponseEntityId = (responseData) => {
++  if (!isObject(responseData)) {
++    return null;
++  }
++  if (responseData.id) {
++    return responseData.id;
++  }
++  return null;
++};
++
++const getPrismaDelegate = (model) => {
++  if (!model) {
++    return null;
++  }
++  const delegate = prisma[model];
++  if (!delegate || typeof delegate.findUnique !== 'function') {
++    return null;
++  }
++  return delegate;
++};
++
++const loadSnapshot = async ({
++  model,
++  whereResolver,
++  entityId,
++  idField,
++  context,
++}) => {
++  const delegate = getPrismaDelegate(model);
++  if (!delegate) {
++    return null;
++  }
++
++  const resolvedWhere = await resolveMaybe(whereResolver, context);
++  const where = resolvedWhere || (entityId ? { [idField]: entityId } : null);
++  if (!where) {
++    return null;
++  }
++
++  return delegate.findUnique({ where });
++};
++
++const shouldCaptureBefore = (action, options) => {
++  if (options.captureBefore !== undefined) {
++    return Boolean(options.captureBefore);
++  }
++  return action === 'UPDATE' || action === 'DELETE';
++};
++
++const shouldCaptureAfter = (action, options) => {
++  if (options.captureAfter !== undefined) {
++    return Boolean(options.captureAfter);
++  }
++  return action === 'CREATE' || action === 'UPDATE';
++};
++
++const buildDefaultValues = ({
++  action,
++  req,
++  responseData,
++  beforeSnapshot,
++  afterSnapshot,
++}) => {
++  if (action === 'CREATE') {
++    return {
++      oldValue: null,
++      newValue: afterSnapshot || responseData || req.body || null,
++    };
++  }
++
++  if (action === 'UPDATE') {
++    return {
++      oldValue: beforeSnapshot || null,
++      newValue: afterSnapshot || responseData || req.body || null,
++    };
++  }
++
++  if (action === 'DELETE') {
++    return {
++      oldValue: beforeSnapshot || responseData || null,
++      newValue: null,
++    };
++  }
++
++  return {
++    oldValue: beforeSnapshot || null,
++    newValue: afterSnapshot || responseData || req.body || null,
++  };
++};
++
++/**
++ * 职责：包装控制器并在成功响应后记录审计日志
++ * @param {Object} options - 审计配置
++ * @param {Function} handler - 原始控制器
++ */
++const withAuditLog = (options = {}, handler) => {
++  if (typeof handler !== 'function') {
++    throw new TypeError('withAuditLog 需要传入有效的 handler 函数');
++  }
++
++  return async (req, res, next) => {
++    const action = String(options.action || ACTION_BY_METHOD[req.method] || 'ACTION').toUpperCase();
++    const entity = options.entity || 'Unknown';
++    const idField = options.idField || options.idParam || 'id';
++    const requestEntityId = resolveRequestEntityId(req, options.idParam || 'id');
++    const captured = {
++      payload: undefined,
++    };
++    let finalized = false;
++    let beforeSnapshot = null;
++
++    const originalJson = res.json.bind(res);
++    const originalSend = res.send.bind(res);
++
++    res.json = (payload) => {
++      captured.payload = payload;
++      return originalJson(payload);
++    };
++
++    res.send = (payload) => {
++      if (captured.payload === undefined && !Buffer.isBuffer(payload)) {
++        captured.payload = payload;
++      }
++      return originalSend(payload);
++    };
++
++    if (shouldCaptureBefore(action, options)) {
++      try {
++        beforeSnapshot = await loadSnapshot({
++          model: options.model,
++          whereResolver: options.beforeWhere || options.where,
++          entityId: requestEntityId,
++          idField,
++          context: {
++            req,
++            payload: null,
++            responseData: null,
++            entityId: requestEntityId,
++          },
++        });
++      } catch (error) {
++        console.error('审计日志读取操作前快照失败:', error.message);
++      }
++    }
++
++    const finalize = async () => {
++      if (finalized) {
++        return;
++      }
++      finalized = true;
++
++      try {
++        if (res.statusCode < 200 || res.statusCode >= 300) {
++          return;
++        }
++
++        const payload = captured.payload;
++        const responseData = extractPayloadData(payload);
++        const customShouldLog = await resolveMaybe(options.shouldLog, {
++          req,
++          res,
++          payload,
++          responseData,
++        });
++        if (customShouldLog === false) {
++          return;
++        }
++
++        const resolvedEntityId = await resolveMaybe(options.getEntityId, {
++          req,
++          res,
++          payload,
++          responseData,
++          entityId: requestEntityId,
++        }) || resolveResponseEntityId(responseData) || requestEntityId || null;
++
++        let userId = await resolveMaybe(options.getUserId, {
++          req,
++          res,
++          payload,
++          responseData,
++          entityId: resolvedEntityId,
++        });
++        if (!userId) {
++          userId = req.user?.id || null;
++        }
++        if (!userId) {
++          return;
++        }
++
++        let afterSnapshot = null;
++        if (shouldCaptureAfter(action, options)) {
++          try {
++            afterSnapshot = await loadSnapshot({
++              model: options.model,
++              whereResolver: options.afterWhere || options.where,
++              entityId: resolvedEntityId,
++              idField,
++              context: {
++                req,
++                payload,
++                responseData,
++                entityId: resolvedEntityId,
++              },
++            });
++          } catch (error) {
++            console.error('审计日志读取操作后快照失败:', error.message);
++          }
++        }
++
++        const defaultValues = buildDefaultValues({
++          action,
++          req,
++          responseData,
++          beforeSnapshot,
++          afterSnapshot,
++        });
++
++        const oldValue = await resolveMaybe(options.getOldValue, {
++          req,
++          res,
++          payload,
++          responseData,
++          entityId: resolvedEntityId,
++          beforeSnapshot,
++          afterSnapshot,
++          defaultValue: defaultValues.oldValue,
++        });
++        const newValue = await resolveMaybe(options.getNewValue, {
++          req,
++          res,
++          payload,
++          responseData,
++          entityId: resolvedEntityId,
++          beforeSnapshot,
++          afterSnapshot,
++          defaultValue: defaultValues.newValue,
++        });
++
++        await auditLogUtils.logOperation({
++          userId,
++          action,
++          entity,
++          entityId: resolvedEntityId,
++          oldValue: oldValue === undefined ? defaultValues.oldValue : oldValue,
++          newValue: newValue === undefined ? defaultValues.newValue : newValue,
++          req,
++        });
++      } catch (error) {
++        console.error('审计日志中间件执行失败:', error.message);
++      }
++    };
++
++    res.once('finish', () => {
++      void finalize();
++    });
++
++    res.once('close', () => {
++      if (!res.writableEnded) {
++        void finalize();
++      }
++    });
++
++    try {
++      const result = handler(req, res, next);
++      if (result && typeof result.then === 'function') {
++        await result;
++      }
++    } catch (error) {
++      next(error);
++    }
++  };
++};
++
++module.exports = {
++  withAuditLog,
++};
+diff --git a/backend/src/middleware/auditLog.test.js b/backend/src/middleware/auditLog.test.js
+new file mode 100644
+index 0000000..30e1fd6
+--- /dev/null
++++ b/backend/src/middleware/auditLog.test.js
+@@ -0,0 +1,171 @@
++/**
++ * Input: auditLog middleware
++ * Output: 审计日志中间件单元测试
++ * Pos: 审计能力回归测试
++ */
++
++const test = require('node:test');
++const assert = require('node:assert/strict');
++const { EventEmitter } = require('node:events');
++const prisma = require('../utils/prisma');
++const auditLogUtils = require('../utils/auditLog');
++const { withAuditLog } = require('./auditLog');
++
++const waitForAsyncTasks = () => new Promise((resolve) => setTimeout(resolve, 0));
++
++const createMockRes = () => {
++  const res = new EventEmitter();
++  res.statusCode = 200;
++  res.payload = null;
++  res.writableEnded = true;
++  res.status = (code) => {
++    res.statusCode = code;
++    return res;
++  };
++  res.json = (payload) => {
++    res.payload = payload;
++    res.emit('finish');
++    return res;
++  };
++  res.send = (payload) => {
++    res.payload = payload;
++    res.emit('finish');
++    return res;
++  };
++  return res;
++};
++
++test('withAuditLog: UPDATE 时记录 before/after 快照', async () => {
++  const originalFindUnique = prisma.store.findUnique;
++  const originalLogOperation = auditLogUtils.logOperation;
++  let findUniqueCalls = 0;
++  let captured = null;
++
++  prisma.store.findUnique = async () => {
++    findUniqueCalls += 1;
++    if (findUniqueCalls === 1) {
++      return { id: 'store-1', name: '旧门店' };
++    }
++    return { id: 'store-1', name: '新门店' };
++  };
++  auditLogUtils.logOperation = async (payload) => {
++    captured = payload;
++  };
++
++  try {
++    const handler = async (req, res) => {
++      res.status(200).json({
++        code: 200,
++        data: { id: 'store-1', name: '新门店' },
++      });
++    };
++    const middleware = withAuditLog(
++      { entity: 'Store', action: 'UPDATE', model: 'store' },
++      handler
++    );
++    const req = {
++      method: 'PUT',
++      params: { id: 'store-1' },
++      user: { id: 'user-1' },
++      body: { name: '新门店' },
++      headers: {},
++    };
++    const res = createMockRes();
++
++    await middleware(req, res, () => {});
++    await waitForAsyncTasks();
++
++    assert.ok(captured, '应调用 logOperation');
++    assert.equal(captured.userId, 'user-1');
++    assert.equal(captured.action, 'UPDATE');
++    assert.equal(captured.entity, 'Store');
++    assert.equal(captured.entityId, 'store-1');
++    assert.deepEqual(captured.oldValue, { id: 'store-1', name: '旧门店' });
++    assert.deepEqual(captured.newValue, { id: 'store-1', name: '新门店' });
++  } finally {
++    prisma.store.findUnique = originalFindUnique;
++    auditLogUtils.logOperation = originalLogOperation;
++  }
++});
++
++test('withAuditLog: 非2xx响应不记录日志', async () => {
++  const originalLogOperation = auditLogUtils.logOperation;
++  let called = false;
++  auditLogUtils.logOperation = async () => {
++    called = true;
++  };
++
++  try {
++    const handler = async (req, res) => {
++      res.status(400).json({ code: 400, message: 'bad request' });
++    };
++    const middleware = withAuditLog(
++      { entity: 'Store', action: 'UPDATE', model: 'store', captureBefore: false },
++      handler
++    );
++    const req = {
++      method: 'PUT',
++      params: { id: 'store-1' },
++      user: { id: 'user-1' },
++      body: { name: 'x' },
++      headers: {},
++    };
++    const res = createMockRes();
++
++    await middleware(req, res, () => {});
++    await waitForAsyncTasks();
++
++    assert.equal(called, false);
++  } finally {
++    auditLogUtils.logOperation = originalLogOperation;
++  }
++});
++
++test('withAuditLog: 支持从响应中解析 userId/entityId（登录场景）', async () => {
++  const originalLogOperation = auditLogUtils.logOperation;
++  let captured = null;
++  auditLogUtils.logOperation = async (payload) => {
++    captured = payload;
++  };
++
++  try {
++    const handler = async (req, res) => {
++      res.status(200).json({
++        code: 200,
++        data: {
++          token: 'jwt-token',
++          user: {
++            id: 'user-login-1',
++            username: 'admin',
++          },
++        },
++      });
++    };
++    const middleware = withAuditLog(
++      {
++        entity: 'User',
++        action: 'LOGIN',
++        getUserId: ({ responseData }) => responseData?.user?.id,
++        getEntityId: ({ responseData }) => responseData?.user?.id,
++      },
++      handler
++    );
++    const req = {
++      method: 'POST',
++      params: {},
++      body: { username: 'admin', password: 'secret' },
++      headers: {},
++    };
++    const res = createMockRes();
++
++    await middleware(req, res, () => {});
++    await waitForAsyncTasks();
++
++    assert.ok(captured, '应调用 logOperation');
++    assert.equal(captured.userId, 'user-login-1');
++    assert.equal(captured.entityId, 'user-login-1');
++    assert.equal(captured.action, 'LOGIN');
++  } finally {
++    auditLogUtils.logOperation = originalLogOperation;
++  }
++});
+diff --git a/METRICS.md b/METRICS.md
+index 03781ff..f3d7618 100644
+--- a/METRICS.md
++++ b/METRICS.md
+@@ -427,3 +427,80 @@
+ ### 结论
+ - 前端框架层（布局/主题/状态呈现）自动化保护已补齐；
+ - 当前仓库维持“后端 + 前端单测 + 前端 E2E + DB 集成”四线全绿。
++
++## 2026-03-05 Round 32（RBAC 与邀请注册）
++
++### 质量指标
++- 本次新增改动覆盖文件：`backend/src/middleware/auth.js`、`backend/src/routes/dataImport.js`、`backend/src/routes/auth.js`、`frontend/src/app/(auth)/register/page.tsx`、`frontend/src/app/(auth)/register/page.test.tsx`、`PLAN.md`、`TASKS.md`、`RISKS.md`、`METRICS.md`。
++- 该轮未新增自动化回归执行（按该任务边界先完成实现与文档闭环，需在后续窗口补跑权限回归与前端定向测试）。
++
++### 过程指标
++- 接口改造点：1 个枚举、1 个权限中间件导出、约 20+ 条写路由权限接入、注册流程收口。
++- 安全域行为变更：用户注册入口由公开注册切换为管理员邀请制。
++
++### 结论
++- 完成 RBAC 基础能力补齐与注册策略调整，建议尽快补齐 `roleAuth` 与注册路由的回归执行快照。
++
++## 2026-03-05 Round 33（前端 Mock 与兼容技术债清理）
++
++### 质量指标
++- 本轮未执行新增自动化，作为交付收口轮仅完成 mock 清理与文档同步，建议下一轮补跑受影响前端定向测试与服务测试。
++
++### 过程指标
++- 覆盖清理文件：`frontend/src/app/dashboard/reports/page.test.tsx`、`frontend/src/app/dashboard/payments/page.test.tsx`、`frontend/src/app/dashboard/finance/page.test.tsx`、`frontend/src/app/dashboard/finance/payable/page.test.tsx`、`frontend/src/app/dashboard/finance/receivable/page.test.tsx`、`frontend/src/app/dashboard/settings/page.test.tsx`、`frontend/src/app/dashboard/store-recommend/page.test.tsx`、`frontend/src/app/(auth)/login/page.test.tsx`、`frontend/src/app/(auth)/forgot-password/page.test.tsx`、`docs/模拟数据汇总.md`。
++- 技术债清理点：服务层 mock 统一、兼容参数断言清理、认证页 mock 迁移、AI/工作台组件 mock 迁移、财务幂等验证补齐与文档同步。
++
++### 服务层补充
++- 扩展 `frontend/src/services/ai.service.ts` 接口与测试：
++  - 新增 `getGreeting` / `getDashboardAnalytics` / `trackProduct` / `parseImageTokenUsage` 方法。
++  - `frontend/src/services/ai.service.test.ts` 补充对应 4 个方法调用断言。
++
++### 结论
++- 已将 mock 兼容链路清理范围扩展到认证页入口，形成更一致的前端测试组织方式。
++
++## 2026-03-05 Round 35（占位清理 + 兼容链路下线 + 财务幂等）
++
++### 质量指标
++- 后端定向测试：`20/20` 通过
++  - `src/services/shared/contractUtils.test.js`
++  - `src/services/containerService.test.js`
++  - `src/services/salesService.test.js`
++  - `src/services/financeService.test.js`
++  - `src/controllers/financeController.test.js`
++- 前端定向测试：`2 files / 6 tests` 通过
++  - `src/app/dashboard/containers/page.test.tsx`
++  - `src/app/dashboard/containers/[id]/page.test.tsx`
++
++### 过程指标
++- 新增后端服务文件：`backend/src/services/financeService.js`
++- 新增后端测试文件：`backend/src/services/financeService.test.js`
++- 运行态兼容清理：货柜域 `containerNo` 回退链路与 `PENDING/LOADING -> DRAFT` 状态兼容已下线。
++- 幂等能力落地：`POST /finance/payments` 支持 `X-Idempotency-Key`，并发冲突通过唯一键重放返回。
++
++### 结论
++- 运行态占位与兼容技术债已完成一轮收口，财务写路径具备后端幂等防重能力。
++- 发布前仍需执行 `db:generate + db:push`，确保 `Payment.idempotencyKey` 字段完成数据库同步。
++
++## 2026-03-05 Round 14 (Comprehensive Audit Logging)
++
++### 质量指标
++- 后端定向测试通过：
++  - `src/middleware/auditLog.test.js`
++  - `src/controllers/system/notificationController.test.js`
++  - `src/routes/system.test.js`
++  - `src/services/authService.test.js`
++  - `src/utils/auditLog.test.js`
++- 后端路由回归（14 个关键路由测试）通过。
++- 前端定向测试通过：
++  - `src/app/dashboard/system/logs/page.test.tsx`
++  - `src/services/system.service.test.ts`
++
++### 过程指标
++- 新增后端中间件文件：1（`auditLog.js`）
++- 新增后端测试文件：1（`auditLog.test.js`）
++- 核心写路由审计接入：14+ 路由模块
++- 新增日志导出接口：`GET /api/v1/system/logs/export/csv`
++
++### 结论
++- 审计日志从“零散调用”升级为“路由层统一中间件治理 + 可筛选查询 + 可导出审计凭据”。
++- 已满足控制器接入、before/after 对比、日志过滤与 CSV 导出的交付目标。
+diff --git a/PLAN.md b/PLAN.md
+index aa21a78..2e83741 100644
+--- a/PLAN.md
++++ b/PLAN.md
+@@ -257,30 +257,10 @@
+     - E2E 稳定性增强：按钮巡检增加 dialog 自动 dismiss、无语义按钮跳过、视口外按钮容错；Playwright `retries` 设为 `1`。
+   - 后端测试缺口清零：
+     - 将 `backend/src` 目录下原缺失的 37 个 `*.test.js` 全部补齐（含 controllers/routes/services/utils/middleware/app）。
+-    - `backend/src/app.js` 改为仅在 `require.main === module` 时启动监听，支持测试安全加载。
+-    - 新增 `backend/src/app.test.js` 覆盖 `/health` 可用性。
++  - `backend/src/app.js` 改为仅在 `require.main === module` 时启动监听，支持测试安全加载。
++  - 新增 `backend/src/app.test.js` 覆盖 `/health` 可用性。
+   - 清理无关仓库文件：
+     - 删除 `music_name_fetch/README.md`、`music_name_fetch/fetch_music.py`。
+-- 验证结论：
+-  - 前端定向测试（本轮新增/修复）通过：`14 files / 41 tests`。
+-  - 后端全量测试通过：`85/85`。
+-  - 前端 E2E 全量通过：`52/52`。
+-    - `backend/src/controllers/systemController.js` 中 `markNotificationRead` 改为 `updateMany({ id, userId })`，只允许用户修改自己的通知。
+-    - 当记录不存在或无权限时返回 `404`（`通知不存在或无权限访问`）。
+-  - 导入状态修复：
+-    - `backend/src/services/importService.js` 新增 `resolveImportStatus(failedRows)`。
+-    - 导入完成状态改为 `FAILED/COMPLETED` 正确分支，修复原先固定 `COMPLETED` 的问题。
+-  - 测试覆盖补齐：
+-    - 新增 `backend/src/controllers/systemController.test.js`：
+-      - 通知已读归属约束
+-      - 无权限/不存在场景 404
+-      - 导入记录 `status/keyword` 筛选参数透传
+-    - 新增 `backend/src/services/importService.test.js`：
+-      - 导入状态推导
+-      - 导入记录筛选 where 组装
+-- 验证结论：
+-  - `backend` 全量测试通过：`npm run test`（44/44）。
+-
+ ## 2026-03-01 Round 18（Supabase 回切与上线路径收口）
+ 
+ - 已完成本轮目标：将 Prisma 数据源切回 Supabase PostgreSQL，并整理可执行的本地启动与上线路径。
+@@ -538,5 +518,112 @@
+   - 复用并清理 `backend/src/services/aiService.js` 与 `backend/src/services/dataImportService.js`：
+     - 去重重复回调/解析/构建逻辑，合并共通流程。
+     - 增强错误兜底行为，避免空响应导致静默失败。
+-  - 更新协同台账：
+-    - `TASKS.md` 新增 `SIM-01`。
++- 更新协同台账：
++  - `TASKS.md` 新增 `SIM-01`。
++
++## 2026-03-05 Round 32（RBAC 与邀请注册）
++
++- 已完成本轮目标：补齐后端写操作角色授权，并将注册流程调整为管理员邀请制。
++- 已完成项：
++  - `backend/prisma/schema.prisma` 增加 `Role` 枚举并将 `User.role` 改为 `Role` 类型，默认值设置为 `SALES`。
++  - `backend/src/middleware/auth.js` 新增/对外导出 `roleAuth`，并兼容现有 `authorize`、`adminOnly` 用法。
++  - 全量写接口（create/update/delete/批量导入/执行等）接入 `roleAuth` 鉴权，`dataImport` 写接口完成补齐。
++  - 注册入口切换为邀请制：移除公开注册提交逻辑，`backend/src/routes/auth.js` 的 `/register` 改为 `roleAuth('ADMIN')`，前端 `/register` 页面改为管理员邀请说明页。
++- 验证结论：
++  - 当前未执行新增自动化，建议在下个窗口按后续计划补跑：
++    - `backend` 全量后端鉴权回归。
++    - `backend` 路由权限相关定向测试。
++    - `frontend` `/register` 页面定向测试（已按本次修改内容补齐）。
++
++## 2026-03-05 Round 33（前端 Mock 与兼容技术债清理）
++
++- 已完成本轮目标：清理前端 mock 引用与兼容逻辑，强化服务层契约，补充幂等能力验证，并同步文档。
++- 已完成项：
++  - 清理 `frontend/src/app/dashboard` 财务/报表/设置/收付款系列页面测试中的直接 `axios` mock，改为服务层 mock。
++  - 清理 `frontend/src/app/(auth)` 登录/找回密码测试中的直接 `axios` mock，改为 `authService` mock。
++  - 清理 AI/工作台组件测试中的直接 `axios` mock：`AIGreeting`、`DataDashboard`、`ProductTracker`、`ClaudeCostCalculator` 改为 `aiService` mock。
++  - 为组件层新增 `aiService` 抽象方法并统一调用（`getGreeting`、`getDashboardAnalytics`、`trackProduct`、`parseImageTokenUsage`）。
++  - 移除测试中的遗留 `mockApiGet/mockApiPost` 未使用变量与 `Reports` 语法回归。
++  - 统一 `finance.service.test.ts` / `store.service.test.ts` / `user.service.test.ts` 请求断言，移除已下线兼容参数路径。
++  - 在 `finance.service` 级别完善重复提交幂等验证（服务层单次 post + idempotency key）。
++  - 更新 `docs/模拟数据汇总.md` 移除已清理的服务层 mock 标记。
++- 已补充文档：
++  - `PLAN.md`
++  - `TASKS.md`
++  - `docs/模拟数据汇总.md`
++- 验证结论：
++  - 本轮以清理与文档为主，未新增自动化回归；建议在下一窗口按范围补跑：
++    - `frontend` dashboard 相关定向测试。
++    - `frontend` 受影响 service 测试复核。
++
++## 2026-03-05 Round 34（库存联动与财务成本对齐修复）
++
++- 已完成本轮目标：修复库存快照服务命名不一致、销售出库自动扣减触发条件与销售财务金额对齐问题。
++- 已完成项：
++  - 新增 `backend/src/services/inventorySnapshot.js` 作为库存快照主服务，并保留 `inventorySnapshotService.js` 兼容别名。
++  - `salesService`、`purchaseController`、`inventoryController` 全部切换为 `inventorySnapshot` 新路径引用。
++  - 销售状态归一化增强：`out_stock`/`pending-shipment` 等格式可归一为 `OUT_STOCK`/`PENDING_SHIPMENT`，确保出库状态切换稳定触发自动扣减。
++  - `reconcileSalesFinancials` 改为按 `quantity * sellingPrice` 计算合同金额，并同步返回成本与毛利对齐结果（`quantity * costPrice`）。
++  - `addSalesItem` 改为复用 `reconcileSalesFinancials`，消除与库存联动财务计算口径不一致。
++  - 新增后端测试：
++    - `backend/src/services/inventorySnapshot.test.js`
++    - 扩展 `backend/src/services/salesService.test.js`
++    - 扩展 `backend/src/services/shared/contractUtils.test.js`
++- 验证结论：
++  - 定向后端测试通过：
++    - `npm test -- src/services/shared/contractUtils.test.js src/services/inventorySnapshot.test.js src/services/salesService.test.js`（11/11）
++  - 额外路由回归中 `sales.test.js` 受环境依赖阻塞：当前缺失 `pdfkit` 模块，非本次改动引入。
++
++## 2026-03-05 Round 35（占位清理 + 兼容链路下线 + 财务幂等落地）
++
++- 已完成本轮目标：清理运行态占位痕迹、移除货柜域兼容链路、重构财务控制器并落地后端付款幂等能力。
++- 已完成项：
++  - 运行态清理：
++    - `frontend/src` + `backend/src` + `docs`（非测试路径）已无占位关键字残留。
++    - `docs/模拟数据汇总.md` 重写为“运行态清理结论 + 测试态保留边界”。
++  - 兼容链路下线：
++    - 前端类型移除 `containerNo`/`ContainerStatus`/`ContainerItem` 兼容别名，容器页统一使用 `SalesContract.contractNo` 与 `PackingItem`。
++    - 后端 `containerService` 取消 `containerNo` 入参与返回映射，`getById` 不再回填 `items` 兼容字段，`getNextContainerNo` 仅返回 `contractNo`。
++    - `dashboardController` 最近货柜数据改为输出 `contractNo`。
++    - `normalizeFilterStatus` 移除 `PENDING/LOADING -> DRAFT` 兼容映射。
++  - 控制器重构 + 幂等：
++    - 新增 `backend/src/services/financeService.js`，承接付款创建、应收应付聚合与统计逻辑。
++    - `financeController` 仅保留请求参数解析与响应组装。
++    - `POST /finance/payments` 接入 `X-Idempotency-Key`：重复请求返回首次结果，避免重复入账。
++    - Prisma `Payment` 新增 `idempotencyKey` 唯一字段（待 `db:push` 同步数据库）。
++  - 文档同步：
++    - `docs/API文档.md`：货柜创建响应示例改为 `contractNo`，财务创建付款新增幂等请求头说明。
++    - `backend/README.md`、`backend/src/README.md`：补充财务幂等与 `financeService` 说明。
++- 验证结论：
++  - 后端定向测试通过（20/20）：
++    - `src/services/shared/contractUtils.test.js`
++    - `src/services/containerService.test.js`
++    - `src/services/salesService.test.js`
++    - `src/services/financeService.test.js`
++    - `src/controllers/financeController.test.js`
++  - 前端定向测试通过（6/6）：
++    - `src/app/dashboard/containers/page.test.tsx`
++    - `src/app/dashboard/containers/[id]/page.test.tsx`
++
++## 本轮（2026-03-05）审计日志增强交付
++- 新增统一审计中间件 `backend/src/middleware/auditLog.js`，支持：
++  - 控制器包装式接入（`withAuditLog`）
++  - 操作前/后快照采集（before/after）
++  - 自定义 userId/entityId 解析（覆盖登录等场景）
++  - 自定义 old/new 值与日志条件
++- 全量接入核心写操作控制器路由（auth/users/suppliers/stores/products/purchases/sales/containers/inventory/finance/system/dataImport/contractDoc/ai/storeRecommend）。
++- 审计值处理增强：`backend/src/utils/auditLog.js`
++  - 扩展敏感字段识别规则（password/token/secret/api key 等）
++  - 对敏感配置记录自动隐藏 `value`
++  - 增加通用 `log.action(...)` 入口
++- 系统日志查询增强：
++  - `getOperationLogs` 支持过滤：`userId/entity/action/entityId/ipAddress/keyword/startDate/endDate`
++  - 新增 CSV 导出：`GET /api/v1/system/logs/export/csv`
++- 前端联动：
++  - `frontend/src/services/system.service.ts` 增加日志导出能力与扩展筛选参数
++  - 系统日志页增加“导出CSV”操作入口
++
++### 验证结果
++- 后端定向测试：审计中间件 + 日志控制器 + 系统路由 + authService + auditLog 均通过。
++- 后端路由回归（不含依赖缺失的 sales/index 组合场景）通过。
++- 前端定向测试：`system logs page` + `system service` 通过。
+diff --git a/RISKS.md b/RISKS.md
+index 803be83..9a83461 100644
+--- a/RISKS.md
++++ b/RISKS.md
+@@ -14,3 +14,6 @@
+ | R-009 | 系统控制器按域拆分后，子控制器导出协定不一致导致路由 500 | 部分配置/通知/日志接口返回 500 | 启动期保持 `systemController` 聚合层完整映射旧对外 API；新增单测覆盖 `ports/categories/import/notifications` 关键入口 | 回退到单文件聚合控制器（`systemController.js`） |
+ | R-010 | `dataImportService` 测试采用深度 mock，可能掩盖 `prisma` 并发边界或查询链路异常 | 导入路径回归通过但真实数据库场景存在未覆盖缺陷 | 在每次发布前补充一条真实数据库集成回放测试（最小导入样例 + 重复容器映射） | 回退到仅 compare/import 单测，保守放宽缓存重构力度 |
+ | R-011 | 前端状态徽章替换导致文本映射与历史约定不一致 | 运营端状态语义展示与业务口径冲突 | 与后端枚举对齐并保留 override map；关键路径定向页面测试回归 | 回退到 `SemanticBadge` 原始本地映射（保留 `semantic-badge.tsx`） |
++| R-012 | 角色授权中间件替换未同步到部分写接口 | 越权写入或部分功能误阻塞 | 在发布前逐文件核对 `post/put/delete` 路由与 `roleAuth`；保留现有 `authorize` 兼容入口 | 回退到逐路由 `authorize` + `adminOnly` 组合并补充灰度窗口 |
++| R-013 | 财务幂等字段 `Payment.idempotencyKey` 未完成数据库同步（`db:push`） | 生产环境创建付款可能因字段缺失报错 | 发布前执行 `npm run db:generate && npm run db:push`，并验证 `POST /finance/payments` 重复请求仅写入一次 | 回退 `financeService` 幂等写入分支与 Prisma 字段变更 |
++| R-014 | 审计中间件在高频写入路由全量启用后，可能引入额外 DB 查询开销（before/after 快照） | 写接口 RT 上升、高峰期资源压力增大 | 对高频但非关键路由可使用 `captureBefore/captureAfter: false` 精简快照；必要时对日志写入做异步队列化 | 回退各路由 `withAuditLog` 配置至仅关键实体（合同/库存/财务/系统配置） |
+diff --git a/TASKS.md b/TASKS.md
+index 8f34569..7880d95 100644
+--- a/TASKS.md
++++ b/TASKS.md
+@@ -109,3 +109,15 @@
+ | TST-12 | P0 | 20m | 1 | DONE | 补齐认证状态仓库测试（`auth.store` 登录/登出）并完成前端单测全量回归（`80 files / 251 tests`） |
+ | TST-13 | P0 | 25m | 1 | DONE | 补齐布局与主题缺口测试（`dashboard/layout`、`ThemeToggle`、`ThemeProvider`、`status-badge`）并完成前后端+E2E 全量门禁回归 |
+ | SIM-01 | P1 | 60m | 1 | DONE | 简化 AI 与数据导入服务核心流程：拆分长函数、去重重复逻辑、补齐流式解析错误处理与无效引用清理 |
++| OPS-03 | P2 | 15m | 1 | DONE | 统一导入导出路径到 `/api/v1/import/*` 与 `/api/v1/export/*`，移除 `/api/v1/system` 下别名路径，并同步前端调用与文档 |
++| RBAC-01 | P0 | 20m | 1 | DONE | 数据库模型新增 `Role` 枚举并更新 `User.role` 字段 |
++| RBAC-02 | P0 | 60m | 1 | DONE | 补齐 `roleAuth` 中间件并逐路由替换后端写操作角色鉴权 |
++| RBAC-03 | P0 | 30m | 1 | DONE | 注册改为管理员邀请制：`/auth/register` 仅管理员可达，前端注册页改为说明页 |
++| DEBT-01 | P0 | 20m | 1 | DONE | 清理 dashboard 测试中直接 `axios` mock 依赖，统一服务层 mock |
++| DEBT-02 | P0 | 20m | 1 | DONE | 去除前端兼容参数/兼容逻辑（如 `query` 兼容链路）并回归接口调用断言 |
++| DEBT-03 | P0 | 15m | 1 | DONE | 补齐 `finance.service` 幂等行为测试（重复请求只触发一次 `POST`） |
++| DEBT-04 | P0 | 10m | 1 | DONE | 清理已下线 mock 标记文档项并同步 `docs/模拟数据汇总.md` |
++| DEBT-05 | P0 | 10m | 1 | DONE | 更新计划与任务台账，记录本轮清理交付 |
++| DEBT-06 | P0 | 60m | 1 | DONE | 运行态去除 `containerNo` 兼容链路 + 财务控制器服务化重构 + 后端付款幂等（`X-Idempotency-Key`）+ 文档同步 |
++| INV-01 | P0 | 30m | 1 | DONE | 库存联动修复：创建 `inventorySnapshot.js`、销售 `out_stock` 自动扣减、财务金额按数量对齐并补齐后端定向测试 |
++| AUDIT-01 | P0 | 90m | 1 | DONE | 审计日志全链路增强：新增 `withAuditLog` 中间件、核心控制器写路由接入、before/after 对比、系统日志过滤增强与 CSV 导出、前端导出接入与定向回归 | 
+diff --git a/logs/task-AUDIT-01.md b/logs/task-AUDIT-01.md
+new file mode 100644
+index 0000000..883d73f
+--- /dev/null
++++ b/logs/task-AUDIT-01.md
+@@ -0,0 +1,22 @@
++# TASK AUDIT-01 日志
++
++- 时间：2026-03-05
++- 目标：实现综合审计日志能力（中间件、全控制器接入、before/after、过滤查询、CSV 导出）。
++
++## 执行记录
++1. 盘点现有审计工具与日志查询实现，确认已有 `utils/auditLog.js` 可复用。
++2. 新增 `backend/src/middleware/auditLog.js`，实现 `withAuditLog(options, handler)` 包装能力。
++3. 扩展 `utils/auditLog.js` 脱敏逻辑并补充 `log.action` 通用入口。
++4. 将核心写路由统一接入 `withAuditLog`（auth/users/suppliers/stores/products/purchases/sales/containers/inventory/finance/system/dataImport/contractDoc/ai/storeRecommend）。
++5. 清理重复日志：移除 `authService.login`、`purchaseController.updateStatus`、`salesService.updateSalesStatus` 的重复审计写入。
++6. 增强系统日志查询：新增 `getOperationLogs` 过滤器构建与 CSV 导出接口。
++7. 前端补充日志导出调用：`exportSystemLogsCsv`，并在系统日志页增加导出按钮。
++8. 补充与更新测试并执行回归。
++
++## 验证命令
++- `cd backend && npm test -- src/middleware/auditLog.test.js src/controllers/system/notificationController.test.js src/routes/system.test.js src/services/authService.test.js src/utils/auditLog.test.js`
++- `cd backend && npm test -- src/routes/auth.test.js src/routes/users.test.js src/routes/suppliers.test.js src/routes/stores.test.js src/routes/products.test.js src/routes/purchases.test.js src/routes/containers.test.js src/routes/inventory.test.js src/routes/finance.test.js src/routes/system.test.js src/routes/dataImport.test.js src/routes/contractDoc.test.js src/routes/ai.test.js src/routes/storeRecommend.test.js`
++- `cd frontend && npm test -- src/app/dashboard/system/logs/page.test.tsx src/services/system.service.test.ts`
++
++## 结果
++- 任务完成：DONE
+diff --git a/RESULTS/AUDIT-01.md b/RESULTS/AUDIT-01.md
+new file mode 100644
+index 0000000..a3eb9be
+--- /dev/null
++++ b/RESULTS/AUDIT-01.md
+@@ -0,0 +1,27 @@
++# AUDIT-01 Results
++
++## 交付物
++- 审计中间件：`backend/src/middleware/auditLog.js`
++- 审计中间件测试：`backend/src/middleware/auditLog.test.js`
++- 审计工具增强：`backend/src/utils/auditLog.js`
++- 系统日志增强：
++  - `backend/src/controllers/system/notificationController.js`
++  - `backend/src/routes/system.js`
++  - `backend/src/controllers/systemController.js`
++- 路由接入审计：
++  - `backend/src/routes/{auth,users,suppliers,stores,products,purchases,sales,containers,inventory,finance,dataImport,contractDoc,ai,storeRecommend,system}.js`
++- 前端日志导出接入：
++  - `frontend/src/services/system.service.ts`
++  - `frontend/src/app/dashboard/system/logs/page.tsx`
++
++## 关键能力
++1. 控制器写操作统一接入审计中间件。
++2. UPDATE/DELETE 支持操作前快照，CREATE/UPDATE 支持操作后快照。
++3. 审计内容支持敏感字段脱敏（含 password/token/secret/api key 等）。
++4. 系统日志支持多维过滤与日期区间检索。
++5. 系统日志支持 CSV 导出。
++
++## 验证结论
++- 后端定向 + 路由回归测试通过。
++- 前端系统日志页与服务层测试通过。
++- 已满足用户提出的 5 项需求。

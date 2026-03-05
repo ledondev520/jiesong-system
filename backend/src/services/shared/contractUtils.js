@@ -5,13 +5,16 @@
  */
 
 const normalizeFilterStatus = (status) => {
-  switch (status) {
-    case 'PENDING':
-    case 'LOADING':
-      return 'DRAFT';
-    default:
-      return status;
+  if (typeof status !== 'string') {
+    return status;
   }
+
+  const normalized = status.trim();
+  if (!normalized) {
+    return normalized;
+  }
+
+  return normalized.toUpperCase().replace(/[\s-]+/g, '_');
 };
 
 const parseNullableNumber = (value, fallback = null) => {

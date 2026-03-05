@@ -21,36 +21,8 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Store, Loader2, Package, DollarSign, ShoppingCart, Utensils, Lightbulb, Sofa, Wrench, Box, CheckCircle2, Sparkles, BarChart3, Star } from 'lucide-react';
-import api from '@/lib/axios';
+import { storeRecommendService, type RecommendResult, type StoreStats } from '@/services/storeRecommend.service';
 import { PageHeader } from '@/components/layout/PageHeader';
-
-interface StoreStats {
-  storeId: string;
-  storeName: string;
-  totalAmount: number;
-  productCount: number;
-  categories: Array<{ name: string; amount: number; count: number }>;
-}
-
-interface Recommendation {
-  productId: string;
-  productName: string;
-  category: string;
-  subCategory: string;
-  frequency: number;
-  suggestedQuantity: number;
-  avgUnitPrice: number;
-  estimatedCost: number;
-  priority: string;
-}
-
-interface RecommendResult {
-  referenceStoreCount: number;
-  totalProducts: number;
-  totalEstimatedCost: number;
-  recommendations: Recommendation[];
-  byCategory: Record<string, Recommendation[]>;
-}
 
 // 分类图标映射
 const categoryIcons: Record<string, typeof Package> = {
@@ -86,14 +58,14 @@ export default function StoreRecommendPage() {
   const loadData = async () => {
     try {
       const [statsRes, recommendRes] = await Promise.all([
-        api.get('/store-recommend/stats'),
-        api.post('/store-recommend/recommend', {
+        storeRecommendService.getStoreStats(),
+        storeRecommendService.generateRecommendations({
           referenceStoreIds: [],
           targetStoreName: '新门店',
         }),
       ]);
-      setStoreStats((statsRes as { data: StoreStats[] }).data);
-      setRecommendation((recommendRes as { data: RecommendResult }).data);
+      setStoreStats(statsRes.data || []);
+      setRecommendation(recommendRes.data || null);
     } catch (e) {
       console.error('加载数据失败:', e);
     } finally {

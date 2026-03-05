@@ -56,6 +56,8 @@ export default function UsersPage() {
       case Role.ADMIN: return <SemanticBadge tone="danger">管理员</SemanticBadge>;
       case Role.PURCHASE: return <SemanticBadge tone="info">采购</SemanticBadge>;
       case Role.SALES: return <SemanticBadge tone="success">销售</SemanticBadge>;
+      case Role.FINANCE: return <SemanticBadge tone="warning">财务</SemanticBadge>;
+      case Role.WAREHOUSE: return <SemanticBadge tone="secondary">仓库</SemanticBadge>;
       default: return <SemanticBadge tone="secondary">{role}</SemanticBadge>;
     }
   };

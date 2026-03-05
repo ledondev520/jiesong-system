@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/table';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
-import { getSystemLogs, SystemLogItem } from '@/services/system.service';
+import { exportSystemLogsCsv, getSystemLogs, SystemLogItem } from '@/services/system.service';
 import { toast } from 'sonner';
 import { Role } from '@/types';
 import { useAuthStore } from '@/store/auth.store';
@@ -58,6 +58,7 @@ export default function SystemLogsPage() {
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState<SystemLogItem[]>([]);
   const [filter, setFilter] = useState<LogFilter>('all');
+  const [exporting, setExporting] = useState(false);
   const [total, setTotal] = useState(0);
   const user = useAuthStore((state) => state.user);
   const filteredLogs = useMemo(
@@ -147,6 +148,18 @@ export default function SystemLogsPage() {
     return log.userId || '系统';
   };
 
+  const handleExportCsv = async () => {
+    try {
+      setExporting(true);
+      await exportSystemLogsCsv();
+      toast.success('CSV导出成功');
+    } catch {
+      toast.error('CSV导出失败');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -169,6 +182,9 @@ export default function SystemLogsPage() {
               onClick={() => setFilter('import')}
             >
               导入日志
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={exporting}>
+              {exporting ? '导出中...' : '导出CSV'}
             </Button>
           </div>
         }

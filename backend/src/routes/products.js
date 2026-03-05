@@ -8,8 +8,9 @@
 
 const { Router } = require('express');
 const productController = require('../controllers/productController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, roleAuth } = require('../middleware/auth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
+const { withAuditLog } = require('../middleware/auditLog');
 
 const router = Router();
 
@@ -24,19 +25,31 @@ router.get('/:id', withIdValidation, productController.getById);
 // POST /api/v1/products - 创建商品
 router.post('/', [
   body('customsName').notEmpty().withMessage('报关名不能为空'),
-], handleValidation, productController.create);
+], roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), handleValidation, withAuditLog(
+  { entity: 'Product', action: 'CREATE', model: 'product' },
+  productController.create
+));
 
 // PUT /api/v1/products/:id - 更新商品
-router.put('/:id', withIdValidation, productController.update);
+router.put('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+  { entity: 'Product', action: 'UPDATE', model: 'product' },
+  productController.update
+));
 
 // DELETE /api/v1/products/:id - 删除商品
-router.delete('/:id', withIdValidation, productController.remove);
+router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+  { entity: 'Product', action: 'DELETE', model: 'product' },
+  productController.remove
+));
 
 // GET /api/v1/products/:id/suppliers - 获取商品供应商列表
 router.get('/:id/suppliers', withIdValidation, productController.getSuppliers);
 
 // POST /api/v1/products/:id/suppliers - 关联供应商
-router.post('/:id/suppliers', withIdValidation, productController.addSupplier);
+router.post('/:id/suppliers', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+  { entity: 'ProductSupplier', action: 'CREATE', model: 'productSupplier' },
+  productController.addSupplier
+));
 
 // GET /api/v1/products/categories - 获取商品分类
 router.get('/options/categories', productController.getCategories);
@@ -48,7 +61,10 @@ router.get('/:id/price-history', withIdValidation, productController.getPriceHis
 router.post('/:id/price-history', [
   withIdValidation,
   body('price').isFloat({ min: 0 }).withMessage('价格必须为正数'),
-], handleValidation, productController.recordPrice);
+], roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), handleValidation, withAuditLog(
+  { entity: 'PriceHistory', action: 'CREATE', model: 'priceHistory' },
+  productController.recordPrice
+));
 
 // GET /api/v1/products/:id/price-trend - 获取价格趋势
 router.get('/:id/price-trend', withIdValidation, productController.getPriceTrend);

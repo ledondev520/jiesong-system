@@ -11,6 +11,23 @@ const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const { normalizePagination, parsePositiveInt } = require('../utils/pagination');
 
+const parseLowStockThreshold = (value, options = {}) => {
+  if (value === undefined) {
+    return options.allowUndefined ? undefined : 0;
+  }
+
+  if (value === null || value === '') {
+    return 0;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw createError('lowStockThreshold 必须是大于等于 0 的数字', 400);
+  }
+
+  return parsed;
+};
+
 /**
  * 职责：获取商品列表
  */
@@ -85,6 +102,7 @@ const create = async (req, res, next) => {
         description: data.description,
         specification: data.specification,
         unit: data.unit,
+        lowStockThreshold: parseLowStockThreshold(data.lowStockThreshold),
         categoryId: data.categoryId,
         grossWeight: data.grossWeight,
         netWeight: data.netWeight,
@@ -118,6 +136,7 @@ const update = async (req, res, next) => {
         description: data.description,
         specification: data.specification,
         unit: data.unit,
+        lowStockThreshold: parseLowStockThreshold(data.lowStockThreshold, { allowUndefined: true }),
         categoryId: data.categoryId,
         grossWeight: data.grossWeight,
         netWeight: data.netWeight,

@@ -1,0 +1,983 @@
+diff --git a/METRICS.md b/METRICS.md
+index 03781ff..0e2e0a5 100644
+--- a/METRICS.md
++++ b/METRICS.md
+@@ -427,3 +427,118 @@
+ ### 结论
+ - 前端框架层（布局/主题/状态呈现）自动化保护已补齐；
+ - 当前仓库维持“后端 + 前端单测 + 前端 E2E + DB 集成”四线全绿。
++
++## 2026-03-05 Round 32（RBAC 与邀请注册）
++
++### 质量指标
++- 本次新增改动覆盖文件：`backend/src/middleware/auth.js`、`backend/src/routes/dataImport.js`、`backend/src/routes/auth.js`、`frontend/src/app/(auth)/register/page.tsx`、`frontend/src/app/(auth)/register/page.test.tsx`、`PLAN.md`、`TASKS.md`、`RISKS.md`、`METRICS.md`。
++- 该轮未新增自动化回归执行（按该任务边界先完成实现与文档闭环，需在后续窗口补跑权限回归与前端定向测试）。
++
++### 过程指标
++- 接口改造点：1 个枚举、1 个权限中间件导出、约 20+ 条写路由权限接入、注册流程收口。
++- 安全域行为变更：用户注册入口由公开注册切换为管理员邀请制。
++
++### 结论
++- 完成 RBAC 基础能力补齐与注册策略调整，建议尽快补齐 `roleAuth` 与注册路由的回归执行快照。
++
++## 2026-03-05 Round 33（前端 Mock 与兼容技术债清理）
++
++### 质量指标
++- 本轮未执行新增自动化，作为交付收口轮仅完成 mock 清理与文档同步，建议下一轮补跑受影响前端定向测试与服务测试。
++
++### 过程指标
++- 覆盖清理文件：`frontend/src/app/dashboard/reports/page.test.tsx`、`frontend/src/app/dashboard/payments/page.test.tsx`、`frontend/src/app/dashboard/finance/page.test.tsx`、`frontend/src/app/dashboard/finance/payable/page.test.tsx`、`frontend/src/app/dashboard/finance/receivable/page.test.tsx`、`frontend/src/app/dashboard/settings/page.test.tsx`、`frontend/src/app/dashboard/store-recommend/page.test.tsx`、`frontend/src/app/(auth)/login/page.test.tsx`、`frontend/src/app/(auth)/forgot-password/page.test.tsx`、`docs/模拟数据汇总.md`。
++- 技术债清理点：服务层 mock 统一、兼容参数断言清理、认证页 mock 迁移、AI/工作台组件 mock 迁移、财务幂等验证补齐与文档同步。
++
++### 服务层补充
++- 扩展 `frontend/src/services/ai.service.ts` 接口与测试：
++  - 新增 `getGreeting` / `getDashboardAnalytics` / `trackProduct` / `parseImageTokenUsage` 方法。
++  - `frontend/src/services/ai.service.test.ts` 补充对应 4 个方法调用断言。
++
++### 结论
++- 已将 mock 兼容链路清理范围扩展到认证页入口，形成更一致的前端测试组织方式。
++
++## 2026-03-05 Round 35（占位清理 + 兼容链路下线 + 财务幂等）
++
++### 质量指标
++- 后端定向测试：`20/20` 通过
++  - `src/services/shared/contractUtils.test.js`
++  - `src/services/containerService.test.js`
++  - `src/services/salesService.test.js`
++  - `src/services/financeService.test.js`
++  - `src/controllers/financeController.test.js`
++- 前端定向测试：`2 files / 6 tests` 通过
++  - `src/app/dashboard/containers/page.test.tsx`
++  - `src/app/dashboard/containers/[id]/page.test.tsx`
++
++### 过程指标
++- 新增后端服务文件：`backend/src/services/financeService.js`
++- 新增后端测试文件：`backend/src/services/financeService.test.js`
++- 运行态兼容清理：货柜域 `containerNo` 回退链路与 `PENDING/LOADING -> DRAFT` 状态兼容已下线。
++- 幂等能力落地：`POST /finance/payments` 支持 `X-Idempotency-Key`，并发冲突通过唯一键重放返回。
++
++### 结论
++- 运行态占位与兼容技术债已完成一轮收口，财务写路径具备后端幂等防重能力。
++- 发布前仍需执行 `db:generate + db:push`，确保 `Payment.idempotencyKey` 字段完成数据库同步。
++
++## 2026-03-05 Round 14 (Comprehensive Audit Logging)
++
++### 质量指标
++- 后端定向测试通过：
++  - `src/middleware/auditLog.test.js`
++  - `src/controllers/system/notificationController.test.js`
++  - `src/routes/system.test.js`
++  - `src/services/authService.test.js`
++  - `src/utils/auditLog.test.js`
++- 后端路由回归（14 个关键路由测试）通过。
++- 前端定向测试通过：
++  - `src/app/dashboard/system/logs/page.test.tsx`
++  - `src/services/system.service.test.ts`
++
++### 过程指标
++- 新增后端中间件文件：1（`auditLog.js`）
++- 新增后端测试文件：1（`auditLog.test.js`）
++- 核心写路由审计接入：14+ 路由模块
++- 新增日志导出接口：`GET /api/v1/system/logs/export/csv`
++
++### 结论
++- 审计日志从“零散调用”升级为“路由层统一中间件治理 + 可筛选查询 + 可导出审计凭据”。
++- 已满足控制器接入、before/after 对比、日志过滤与 CSV 导出的交付目标。
++
++## 2026-03-06 Round 36（RBAC 修复）
++
++### 质量指标
++- 后端定向测试通过：`20/20`
++  - `src/middleware/auth.test.js`
++  - `src/config/constants.test.js`
++  - `src/utils/validators.test.js`
++  - `src/routes/rbac-write-routes.test.js`
++- 前端定向测试通过：`1 file / 4 tests`
++  - `src/app/dashboard/users/page.test.tsx`
++
++### 过程指标
++- 新增后端中间件文件：1（`backend/src/middleware/roleAuth.js`）
++- 新增后端 RBAC 回归测试：1（`backend/src/routes/rbac-write-routes.test.js`）
++- 角色枚举扩展：后端与前端均新增 `FINANCE`、`WAREHOUSE`
++
++### 风险说明
++- `prisma validate` 在当前 `provider=sqlite` + `enum Role` 组合下失败（见 `RISKS.md` R-015）；本轮以应用层测试作为交付校验。
++
++## 2026-03-06 Round 37（Container Visualization API）
++
++### 质量指标
++- 后端定向测试通过：`11/11`
++  - `src/controllers/containerController.test.js`
++  - `src/services/containerService.test.js`
++  - `src/routes/containers.test.js`
++
++### 过程指标
++- 新增接口：`GET /api/v1/containers/:id/visualization`
++- 新增能力：
++  - 货柜装箱布局计算（shelf 排布 + 溢出判定）
++  - 重量/体积聚合与体积利用率计算
++  - ASCII 俯视图与图例输出
++- 新增测试用例：`containerService.test.js` 2 条，`containers.test.js` 1 条
++
++### 结论
++- 本轮交付满足“接口 + 可视化数据 + 汇总计算 + ASCII 输出”目标，并完成定向回归验证。
+diff --git a/PLAN.md b/PLAN.md
+index aa21a78..bd5d2e1 100644
+--- a/PLAN.md
++++ b/PLAN.md
+@@ -257,30 +257,10 @@
+     - E2E 稳定性增强：按钮巡检增加 dialog 自动 dismiss、无语义按钮跳过、视口外按钮容错；Playwright `retries` 设为 `1`。
+   - 后端测试缺口清零：
+     - 将 `backend/src` 目录下原缺失的 37 个 `*.test.js` 全部补齐（含 controllers/routes/services/utils/middleware/app）。
+-    - `backend/src/app.js` 改为仅在 `require.main === module` 时启动监听，支持测试安全加载。
+-    - 新增 `backend/src/app.test.js` 覆盖 `/health` 可用性。
++  - `backend/src/app.js` 改为仅在 `require.main === module` 时启动监听，支持测试安全加载。
++  - 新增 `backend/src/app.test.js` 覆盖 `/health` 可用性。
+   - 清理无关仓库文件：
+     - 删除 `music_name_fetch/README.md`、`music_name_fetch/fetch_music.py`。
+-- 验证结论：
+-  - 前端定向测试（本轮新增/修复）通过：`14 files / 41 tests`。
+-  - 后端全量测试通过：`85/85`。
+-  - 前端 E2E 全量通过：`52/52`。
+-    - `backend/src/controllers/systemController.js` 中 `markNotificationRead` 改为 `updateMany({ id, userId })`，只允许用户修改自己的通知。
+-    - 当记录不存在或无权限时返回 `404`（`通知不存在或无权限访问`）。
+-  - 导入状态修复：
+-    - `backend/src/services/importService.js` 新增 `resolveImportStatus(failedRows)`。
+-    - 导入完成状态改为 `FAILED/COMPLETED` 正确分支，修复原先固定 `COMPLETED` 的问题。
+-  - 测试覆盖补齐：
+-    - 新增 `backend/src/controllers/systemController.test.js`：
+-      - 通知已读归属约束
+-      - 无权限/不存在场景 404
+-      - 导入记录 `status/keyword` 筛选参数透传
+-    - 新增 `backend/src/services/importService.test.js`：
+-      - 导入状态推导
+-      - 导入记录筛选 where 组装
+-- 验证结论：
+-  - `backend` 全量测试通过：`npm run test`（44/44）。
+-
+ ## 2026-03-01 Round 18（Supabase 回切与上线路径收口）
+ 
+ - 已完成本轮目标：将 Prisma 数据源切回 Supabase PostgreSQL，并整理可执行的本地启动与上线路径。
+@@ -538,5 +518,166 @@
+   - 复用并清理 `backend/src/services/aiService.js` 与 `backend/src/services/dataImportService.js`：
+     - 去重重复回调/解析/构建逻辑，合并共通流程。
+     - 增强错误兜底行为，避免空响应导致静默失败。
+-  - 更新协同台账：
+-    - `TASKS.md` 新增 `SIM-01`。
++- 更新协同台账：
++  - `TASKS.md` 新增 `SIM-01`。
++
++## 2026-03-05 Round 32（RBAC 与邀请注册）
++
++- 已完成本轮目标：补齐后端写操作角色授权，并将注册流程调整为管理员邀请制。
++- 已完成项：
++  - `backend/prisma/schema.prisma` 增加 `Role` 枚举并将 `User.role` 改为 `Role` 类型，默认值设置为 `SALES`。
++  - `backend/src/middleware/auth.js` 新增/对外导出 `roleAuth`，并兼容现有 `authorize`、`adminOnly` 用法。
++  - 全量写接口（create/update/delete/批量导入/执行等）接入 `roleAuth` 鉴权，`dataImport` 写接口完成补齐。
++  - 注册入口切换为邀请制：移除公开注册提交逻辑，`backend/src/routes/auth.js` 的 `/register` 改为 `roleAuth('ADMIN')`，前端 `/register` 页面改为管理员邀请说明页。
++- 验证结论：
++  - 当前未执行新增自动化，建议在下个窗口按后续计划补跑：
++    - `backend` 全量后端鉴权回归。
++    - `backend` 路由权限相关定向测试。
++    - `frontend` `/register` 页面定向测试（已按本次修改内容补齐）。
++
++## 2026-03-05 Round 33（前端 Mock 与兼容技术债清理）
++
++- 已完成本轮目标：清理前端 mock 引用与兼容逻辑，强化服务层契约，补充幂等能力验证，并同步文档。
++- 已完成项：
++  - 清理 `frontend/src/app/dashboard` 财务/报表/设置/收付款系列页面测试中的直接 `axios` mock，改为服务层 mock。
++  - 清理 `frontend/src/app/(auth)` 登录/找回密码测试中的直接 `axios` mock，改为 `authService` mock。
++  - 清理 AI/工作台组件测试中的直接 `axios` mock：`AIGreeting`、`DataDashboard`、`ProductTracker`、`ClaudeCostCalculator` 改为 `aiService` mock。
++  - 为组件层新增 `aiService` 抽象方法并统一调用（`getGreeting`、`getDashboardAnalytics`、`trackProduct`、`parseImageTokenUsage`）。
++  - 移除测试中的遗留 `mockApiGet/mockApiPost` 未使用变量与 `Reports` 语法回归。
++  - 统一 `finance.service.test.ts` / `store.service.test.ts` / `user.service.test.ts` 请求断言，移除已下线兼容参数路径。
++  - 在 `finance.service` 级别完善重复提交幂等验证（服务层单次 post + idempotency key）。
++  - 更新 `docs/模拟数据汇总.md` 移除已清理的服务层 mock 标记。
++- 已补充文档：
++  - `PLAN.md`
++  - `TASKS.md`
++  - `docs/模拟数据汇总.md`
++- 验证结论：
++  - 本轮以清理与文档为主，未新增自动化回归；建议在下一窗口按范围补跑：
++    - `frontend` dashboard 相关定向测试。
++    - `frontend` 受影响 service 测试复核。
++
++## 2026-03-05 Round 34（库存联动与财务成本对齐修复）
++
++- 已完成本轮目标：修复库存快照服务命名不一致、销售出库自动扣减触发条件与销售财务金额对齐问题。
++- 已完成项：
++  - 新增 `backend/src/services/inventorySnapshot.js` 作为库存快照主服务，并保留 `inventorySnapshotService.js` 兼容别名。
++  - `salesService`、`purchaseController`、`inventoryController` 全部切换为 `inventorySnapshot` 新路径引用。
++  - 销售状态归一化增强：`out_stock`/`pending-shipment` 等格式可归一为 `OUT_STOCK`/`PENDING_SHIPMENT`，确保出库状态切换稳定触发自动扣减。
++  - `reconcileSalesFinancials` 改为按 `quantity * sellingPrice` 计算合同金额，并同步返回成本与毛利对齐结果（`quantity * costPrice`）。
++  - `addSalesItem` 改为复用 `reconcileSalesFinancials`，消除与库存联动财务计算口径不一致。
++  - 新增后端测试：
++    - `backend/src/services/inventorySnapshot.test.js`
++    - 扩展 `backend/src/services/salesService.test.js`
++    - 扩展 `backend/src/services/shared/contractUtils.test.js`
++- 验证结论：
++  - 定向后端测试通过：
++    - `npm test -- src/services/shared/contractUtils.test.js src/services/inventorySnapshot.test.js src/services/salesService.test.js`（11/11）
++  - 额外路由回归中 `sales.test.js` 受环境依赖阻塞：当前缺失 `pdfkit` 模块，非本次改动引入。
++
++## 2026-03-05 Round 35（占位清理 + 兼容链路下线 + 财务幂等落地）
++
++- 已完成本轮目标：清理运行态占位痕迹、移除货柜域兼容链路、重构财务控制器并落地后端付款幂等能力。
++- 已完成项：
++  - 运行态清理：
++    - `frontend/src` + `backend/src` + `docs`（非测试路径）已无占位关键字残留。
++    - `docs/模拟数据汇总.md` 重写为“运行态清理结论 + 测试态保留边界”。
++  - 兼容链路下线：
++    - 前端类型移除 `containerNo`/`ContainerStatus`/`ContainerItem` 兼容别名，容器页统一使用 `SalesContract.contractNo` 与 `PackingItem`。
++    - 后端 `containerService` 取消 `containerNo` 入参与返回映射，`getById` 不再回填 `items` 兼容字段，`getNextContainerNo` 仅返回 `contractNo`。
++    - `dashboardController` 最近货柜数据改为输出 `contractNo`。
++    - `normalizeFilterStatus` 移除 `PENDING/LOADING -> DRAFT` 兼容映射。
++  - 控制器重构 + 幂等：
++    - 新增 `backend/src/services/financeService.js`，承接付款创建、应收应付聚合与统计逻辑。
++    - `financeController` 仅保留请求参数解析与响应组装。
++    - `POST /finance/payments` 接入 `X-Idempotency-Key`：重复请求返回首次结果，避免重复入账。
++    - Prisma `Payment` 新增 `idempotencyKey` 唯一字段（待 `db:push` 同步数据库）。
++  - 文档同步：
++    - `docs/API文档.md`：货柜创建响应示例改为 `contractNo`，财务创建付款新增幂等请求头说明。
++    - `backend/README.md`、`backend/src/README.md`：补充财务幂等与 `financeService` 说明。
++- 验证结论：
++  - 后端定向测试通过（20/20）：
++    - `src/services/shared/contractUtils.test.js`
++    - `src/services/containerService.test.js`
++    - `src/services/salesService.test.js`
++    - `src/services/financeService.test.js`
++    - `src/controllers/financeController.test.js`
++  - 前端定向测试通过（6/6）：
++    - `src/app/dashboard/containers/page.test.tsx`
++    - `src/app/dashboard/containers/[id]/page.test.tsx`
++
++## 本轮（2026-03-05）审计日志增强交付
++- 新增统一审计中间件 `backend/src/middleware/auditLog.js`，支持：
++  - 控制器包装式接入（`withAuditLog`）
++  - 操作前/后快照采集（before/after）
++  - 自定义 userId/entityId 解析（覆盖登录等场景）
++  - 自定义 old/new 值与日志条件
++- 全量接入核心写操作控制器路由（auth/users/suppliers/stores/products/purchases/sales/containers/inventory/finance/system/dataImport/contractDoc/ai/storeRecommend）。
++- 审计值处理增强：`backend/src/utils/auditLog.js`
++  - 扩展敏感字段识别规则（password/token/secret/api key 等）
++  - 对敏感配置记录自动隐藏 `value`
++  - 增加通用 `log.action(...)` 入口
++- 系统日志查询增强：
++  - `getOperationLogs` 支持过滤：`userId/entity/action/entityId/ipAddress/keyword/startDate/endDate`
++  - 新增 CSV 导出：`GET /api/v1/system/logs/export/csv`
++- 前端联动：
++  - `frontend/src/services/system.service.ts` 增加日志导出能力与扩展筛选参数
++  - 系统日志页增加“导出CSV”操作入口
++
++### 验证结果
++- 后端定向测试：审计中间件 + 日志控制器 + 系统路由 + authService + auditLog 均通过。
++- 后端路由回归（不含依赖缺失的 sales/index 组合场景）通过。
++- 前端定向测试：`system logs page` + `system service` 通过。
++
++## 2026-03-06 Round 36（RBAC 修复：角色扩展 + 写路由鉴权补齐）
++
++- 已完成本轮目标：
++  - `Role` 体系扩展到 `ADMIN/PURCHASE/SALES/FINANCE/WAREHOUSE`。
++  - 新增独立中间件 `backend/src/middleware/roleAuth.js` 并由 `auth.js` 统一导出。
++  - 补齐销售域所有写路由的 `roleAuth` 校验；同时将既有业务写路由角色白名单扩展到新角色集合。
++  - 新增路由层回归 `backend/src/routes/rbac-write-routes.test.js`，确保写路由不会遗漏 RBAC。
++  - 前端用户管理角色枚举与角色选项同步新增 `FINANCE/WAREHOUSE`。
++- 验证结论：
++  - 后端定向测试通过：
++    - `cd backend && node --test src/middleware/auth.test.js src/config/constants.test.js src/utils/validators.test.js src/routes/rbac-write-routes.test.js`
++  - 前端定向测试通过：
++    - `cd frontend && npx vitest run src/app/dashboard/users/page.test.tsx`
++
++## 2026-03-06 Round 37（Container Visualization API）
++
++- 已完成本轮目标：
++  - 新增 `GET /api/v1/containers/:id/visualization`，返回货柜装箱可视化信息。
++  - 增加装箱项重量/体积聚合计算与体积利用率计算。
++  - 增加基础 ASCII 货柜俯视图输出（含图例与溢出标识）。
++- 已完成项：
++  - `backend/src/services/containerService.js`
++    - 新增 `getVisualization(id)`。
++    - 新增布局计算（基于长/宽/高 + 简单 shelf 排布）与溢出判定。
++    - 新增重量/体积汇总、货柜容量与利用率计算。
++    - 新增 ASCII 图生成（`asciiArt` + `ascii.legend`）。
++  - `backend/src/controllers/containerController.js`
++    - 新增 `getVisualization` 控制器。
++  - `backend/src/routes/containers.js`
++    - 新增路由 `GET /:id/visualization`。
++  - 测试补齐：
++    - `backend/src/services/containerService.test.js`
++    - `backend/src/routes/containers.test.js`
++- 验证结论：
++  - 后端定向测试通过（11/11）：
++    - `cd backend && npm test -- src/controllers/containerController.test.js src/services/containerService.test.js src/routes/containers.test.js`
++
++## 2026-03-05 Round 38（Inventory Alert System）
++
++- 已完成本轮目标：交付低库存预警全链路（模型字段 + 每日任务 + 通知 + API）。
++- 已完成项：
++  - 数据模型：`Product` 新增 `lowStockThreshold` 字段（默认 `0`，避免历史数据被误告警）。
++  - 预警服务：新增 `backend/src/services/inventoryAlertService.js`，提供低库存聚合查询与通知下发能力。
++  - 定时任务：新增 `backend/src/jobs/inventoryAlertJob.js`，在 `app.js` 主进程启动时注册每日巡检任务。
++  - API：新增 `GET /api/v1/inventory/alerts`（支持分页与 `keyword` 查询）。
++  - 通知类型：新增 `NOTIFICATION_TYPE.LOW_STOCK` 并接入去重逻辑（同日同用户同商品只发一次）。
++  - 测试：新增 `inventoryAlertService.test.js`，补充 `inventory` 路由顺序与控制器导出回归。
++- 验证结论：
++  - 定向测试通过：
++    - `cd backend && node --test src/config/constants.test.js src/controllers/inventoryController.test.js src/routes/inventory.test.js src/services/inventoryAlertService.test.js`
++  - 全量后端测试未通过（既有环境问题）：
++    - 缺失依赖：`pdfkit` 模块缺失导致 `app.test`/`routes/sales.test`/`pdfExportService.test` 失败。
++    - 安全配置：`.env` 权限为 `644` 在严格模式下触发 `config/index.test.js` 失败。
+diff --git a/TASKS.md b/TASKS.md
+index 8f34569..ee28961 100644
+--- a/TASKS.md
++++ b/TASKS.md
+@@ -109,3 +109,19 @@
+ | TST-12 | P0 | 20m | 1 | DONE | 补齐认证状态仓库测试（`auth.store` 登录/登出）并完成前端单测全量回归（`80 files / 251 tests`） |
+ | TST-13 | P0 | 25m | 1 | DONE | 补齐布局与主题缺口测试（`dashboard/layout`、`ThemeToggle`、`ThemeProvider`、`status-badge`）并完成前后端+E2E 全量门禁回归 |
+ | SIM-01 | P1 | 60m | 1 | DONE | 简化 AI 与数据导入服务核心流程：拆分长函数、去重重复逻辑、补齐流式解析错误处理与无效引用清理 |
++| OPS-03 | P2 | 15m | 1 | DONE | 统一导入导出路径到 `/api/v1/import/*` 与 `/api/v1/export/*`，移除 `/api/v1/system` 下别名路径，并同步前端调用与文档 |
++| RBAC-01 | P0 | 20m | 1 | DONE | 数据库模型新增 `Role` 枚举并更新 `User.role` 字段 |
++| RBAC-02 | P0 | 60m | 1 | DONE | 补齐 `roleAuth` 中间件并逐路由替换后端写操作角色鉴权 |
++| RBAC-03 | P0 | 30m | 1 | DONE | 注册改为管理员邀请制：`/auth/register` 仅管理员可达，前端注册页改为说明页 |
++| DEBT-01 | P0 | 20m | 1 | DONE | 清理 dashboard 测试中直接 `axios` mock 依赖，统一服务层 mock |
++| DEBT-02 | P0 | 20m | 1 | DONE | 去除前端兼容参数/兼容逻辑（如 `query` 兼容链路）并回归接口调用断言 |
++| DEBT-03 | P0 | 15m | 1 | DONE | 补齐 `finance.service` 幂等行为测试（重复请求只触发一次 `POST`） |
++| DEBT-04 | P0 | 10m | 1 | DONE | 清理已下线 mock 标记文档项并同步 `docs/模拟数据汇总.md` |
++| DEBT-05 | P0 | 10m | 1 | DONE | 更新计划与任务台账，记录本轮清理交付 |
++| DEBT-06 | P0 | 60m | 1 | DONE | 运行态去除 `containerNo` 兼容链路 + 财务控制器服务化重构 + 后端付款幂等（`X-Idempotency-Key`）+ 文档同步 |
++| INV-01 | P0 | 30m | 1 | DONE | 库存联动修复：创建 `inventorySnapshot.js`、销售 `out_stock` 自动扣减、财务金额按数量对齐并补齐后端定向测试 |
++| AUDIT-01 | P0 | 90m | 1 | DONE | 审计日志全链路增强：新增 `withAuditLog` 中间件、核心控制器写路由接入、before/after 对比、系统日志过滤增强与 CSV 导出、前端导出接入与定向回归 | 
++
++| RBAC-04 | P0 | 35m | 1 | DONE | 新增 FINANCE/WAREHOUSE 角色、抽离 roleAuth 中间件、补齐写路由鉴权并新增 RBAC 写路由覆盖测试 |
++| API-01 | P0 | 35m | 1 | DONE | 新增货柜可视化接口 `GET /api/v1/containers/:id/visualization`，返回布局/重量体积汇总/ASCII 视图并补齐服务与路由回归测试 |
++| INV-ALERT-01 | P0 | 40m | 1 | DONE | 库存预警系统：新增 `Product.lowStockThreshold`、每日库存巡检任务、低库存通知下发、接口 `GET /api/v1/inventory/alerts` 与定向回归测试 |
+diff --git a/backend/src/controllers/containerController.js b/backend/src/controllers/containerController.js
+index ca25b15..09fc110 100644
+--- a/backend/src/controllers/containerController.js
++++ b/backend/src/controllers/containerController.js
+@@ -120,6 +120,15 @@ const getProducts = async (req, res, next) => {
+   }
+ };
+ 
++const getVisualization = async (req, res, next) => {
++  try {
++    const visualization = await containerService.getVisualization(req.params.id);
++    success(res, visualization);
++  } catch (error) {
++    next(error);
++  }
++};
++
+ module.exports = {
+   list,
+   getById,
+@@ -132,4 +141,5 @@ module.exports = {
+   updateStatus,
+   getNextContainerNo,
+   getProducts,
++  getVisualization,
+ };
+diff --git a/backend/src/routes/containers.js b/backend/src/routes/containers.js
+index 2341f0a..1e8f40a 100644
+--- a/backend/src/routes/containers.js
++++ b/backend/src/routes/containers.js
+@@ -8,8 +8,9 @@
+ 
+ const { Router } = require('express');
+ const containerController = require('../controllers/containerController');
+-const { authenticate } = require('../middleware/auth');
++const { authenticate, roleAuth } = require('../middleware/auth');
+ const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
++const { withAuditLog } = require('../middleware/auditLog');
+ 
+ const router = Router();
+ 
+@@ -27,27 +28,51 @@ router.get('/:id', withIdValidation, containerController.getById);
+ // POST /api/v1/containers - 创建货柜
+ router.post('/', [
+   body('portId').notEmpty().withMessage('港口ID不能为空'),
+-], handleValidation, containerController.create);
++], roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), handleValidation, withAuditLog(
++  { entity: 'Container', action: 'CREATE', model: 'salesContract' },
++  containerController.create
++));
+ 
+ // PUT /api/v1/containers/:id - 更新货柜
+-router.put('/:id', withIdValidation, containerController.update);
++router.put('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
++  { entity: 'Container', action: 'UPDATE', model: 'salesContract' },
++  containerController.update
++));
+ 
+ // DELETE /api/v1/containers/:id - 删除货柜
+-router.delete('/:id', withIdValidation, containerController.remove);
++router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
++  { entity: 'Container', action: 'DELETE', model: 'salesContract' },
++  containerController.remove
++));
+ 
+ // POST /api/v1/containers/:id/items - 添加装箱明细
+-router.post('/:id/items', withIdValidation, containerController.addItem);
++router.post('/:id/items', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
++  { entity: 'ContainerItem', action: 'CREATE', model: 'packingItem' },
++  containerController.addItem
++));
+ 
+ // PUT /api/v1/containers/:id/items/:itemId - 更新装箱明细
+-router.put('/:id/items/:itemId', withIdValidation, containerController.updateItem);
++router.put('/:id/items/:itemId', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
++  { entity: 'ContainerItem', action: 'UPDATE', model: 'packingItem', idParam: 'itemId' },
++  containerController.updateItem
++));
+ 
+ // DELETE /api/v1/containers/:id/items/:itemId - 删除装箱明细
+-router.delete('/:id/items/:itemId', withIdValidation, containerController.removeItem);
++router.delete('/:id/items/:itemId', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
++  { entity: 'ContainerItem', action: 'DELETE', model: 'packingItem', idParam: 'itemId' },
++  containerController.removeItem
++));
+ 
+ // PUT /api/v1/containers/:id/status - 更新货柜状态
+-router.put('/:id/status', withIdValidation, containerController.updateStatus);
++router.put('/:id/status', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
++  { entity: 'Container', action: 'UPDATE', model: 'salesContract' },
++  containerController.updateStatus
++));
+ 
+ // GET /api/v1/containers/:id/products - 查询货柜中的商品
+ router.get('/:id/products', withIdValidation, containerController.getProducts);
+ 
++// GET /api/v1/containers/:id/visualization - 查询货柜装箱可视化
++router.get('/:id/visualization', withIdValidation, containerController.getVisualization);
++
+ module.exports = router;
+diff --git a/backend/src/routes/containers.test.js b/backend/src/routes/containers.test.js
+index 1683113..7a8e79f 100644
+--- a/backend/src/routes/containers.test.js
++++ b/backend/src/routes/containers.test.js
+@@ -26,3 +26,8 @@ test('containers route order: /next-no/:portId must be before /:id for GET', ()
+     `路由顺序错误：/next-no/:portId(index=${nextNoIndex}) 应在 /:id(index=${idIndex}) 之前`
+   );
+ });
++
++test('containers route includes visualization endpoint', () => {
++  const visualizationIndex = getRouteIndex(containersRouter, '/:id/visualization', 'get');
++  assert.notEqual(visualizationIndex, -1, '缺少 GET /:id/visualization 路由');
++});
+diff --git a/backend/src/services/containerService.js b/backend/src/services/containerService.js
+index 0954c3b..ea20429 100644
+--- a/backend/src/services/containerService.js
++++ b/backend/src/services/containerService.js
+@@ -6,11 +6,204 @@ const {
+   parseNullableNumber,
+ } = require('./shared/contractUtils');
+ 
+-const toContainerPayload = (contract) => ({
+-  ...contract,
+-  containerNo: contract.contractNo,
++const DEFAULT_CONTAINER_DIMENSIONS_MM = Object.freeze({
++  length: 12032,
++  width: 2352,
++  height: 2698,
+ });
+ 
++const DEFAULT_ITEM_DIMENSION_MM = 500;
++const ASCII_GRID_WIDTH = 48;
++const ASCII_GRID_HEIGHT = 12;
++const ASCII_SYMBOLS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
++
++const roundNumber = (value, precision = 3) => {
++  if (!Number.isFinite(value)) {
++    return 0;
++  }
++  return Number(value.toFixed(precision));
++};
++
++const toNonNegativeNumber = (value, fallback = 0) => {
++  const parsed = parseNullableNumber(value, fallback);
++  if (!Number.isFinite(parsed)) {
++    return fallback;
++  }
++  return parsed >= 0 ? parsed : fallback;
++};
++
++const resolveItemDimension = (item, key) => {
++  const direct = parseNullableNumber(item?.[key], null);
++  if (direct !== null && direct > 0) {
++    return direct;
++  }
++
++  const fallback = parseNullableNumber(item?.product?.[key], null);
++  if (fallback !== null && fallback > 0) {
++    return fallback;
++  }
++
++  return DEFAULT_ITEM_DIMENSION_MM;
++};
++
++const resolveItemMetric = (item, key, quantity = 1) => {
++  const direct = parseNullableNumber(item?.[key], null);
++  if (direct !== null && direct >= 0) {
++    return direct;
++  }
++
++  const perUnit = parseNullableNumber(item?.product?.[key], null);
++  if (perUnit !== null && perUnit >= 0) {
++    return perUnit * quantity;
++  }
++
++  return 0;
++};
++
++const buildLayoutItems = (packingItems = [], containerDimensions) => {
++  let cursorX = 0;
++  let cursorY = 0;
++  let cursorZ = 0;
++  let rowMaxWidth = 0;
++  let layerMaxHeight = 0;
++  let maxUsedHeight = 0;
++
++  const items = packingItems.map((item, index) => {
++    const quantity = toNonNegativeNumber(item.quantity, 0);
++    const boxes = toNonNegativeNumber(item.boxes, 0);
++    const length = toNonNegativeNumber(resolveItemDimension(item, 'length'), DEFAULT_ITEM_DIMENSION_MM);
++    const width = toNonNegativeNumber(resolveItemDimension(item, 'width'), DEFAULT_ITEM_DIMENSION_MM);
++    const height = toNonNegativeNumber(resolveItemDimension(item, 'height'), DEFAULT_ITEM_DIMENSION_MM);
++
++    if (cursorX > 0 && cursorX + length > containerDimensions.length) {
++      cursorX = 0;
++      cursorY += rowMaxWidth;
++      rowMaxWidth = 0;
++    }
++
++    if (cursorY > 0 && cursorY + width > containerDimensions.width) {
++      cursorX = 0;
++      cursorY = 0;
++      cursorZ += layerMaxHeight;
++      rowMaxWidth = 0;
++      layerMaxHeight = 0;
++    }
++
++    const overflow = (
++      length > containerDimensions.length ||
++      width > containerDimensions.width ||
++      height > containerDimensions.height ||
++      cursorX + length > containerDimensions.length ||
++      cursorY + width > containerDimensions.width ||
++      cursorZ + height > containerDimensions.height
++    );
++    const posX = overflow ? null : cursorX;
++    const posY = overflow ? null : cursorY;
++    const posZ = overflow ? null : cursorZ;
++    const symbol = ASCII_SYMBOLS[index % ASCII_SYMBOLS.length];
++
++    const grossWeight = resolveItemMetric(item, 'grossWeight', quantity);
++    const netWeight = resolveItemMetric(item, 'netWeight', quantity);
++    const volume = resolveItemMetric(item, 'volume', quantity);
++
++    if (!overflow) {
++      cursorX += length;
++      rowMaxWidth = Math.max(rowMaxWidth, width);
++      layerMaxHeight = Math.max(layerMaxHeight, height);
++      maxUsedHeight = Math.max(maxUsedHeight, cursorZ + height);
++    }
++
++    return {
++      id: item.id,
++      symbol,
++      overflow,
++      product: item.product
++        ? {
++            id: item.product.id,
++            name: item.product.name,
++            hsCode: item.product.hsCode || null,
++            unit: item.product.unit || null,
++          }
++        : null,
++      store: item.store ? { id: item.store.id, name: item.store.name } : null,
++      quantity: roundNumber(quantity),
++      boxes: Math.trunc(boxes),
++      grossWeight: roundNumber(grossWeight),
++      netWeight: roundNumber(netWeight),
++      volume: roundNumber(volume),
++      dimensionsMm: {
++        length: roundNumber(length, 2),
++        width: roundNumber(width, 2),
++        height: roundNumber(height, 2),
++      },
++      positionMm: {
++        x: posX === null ? null : roundNumber(posX, 2),
++        y: posY === null ? null : roundNumber(posY, 2),
++        z: posZ === null ? null : roundNumber(posZ, 2),
++      },
++      note: item.note || null,
++    };
++  });
++
++  return {
++    items,
++    maxUsedHeight: roundNumber(maxUsedHeight, 2),
++  };
++};
++
++const buildAsciiArt = (layoutItems = [], containerDimensions) => {
++  const grid = Array.from({ length: ASCII_GRID_HEIGHT }, () => Array(ASCII_GRID_WIDTH).fill('.'));
++
++  const toGridX = (value) => Math.floor((value / containerDimensions.length) * ASCII_GRID_WIDTH);
++  const toGridY = (value) => Math.floor((value / containerDimensions.width) * ASCII_GRID_HEIGHT);
++
++  layoutItems.forEach((item) => {
++    if (item.overflow || !item.positionMm || item.positionMm.x === null || item.positionMm.y === null) {
++      return;
++    }
++
++    const xStart = Math.max(0, Math.min(ASCII_GRID_WIDTH - 1, toGridX(item.positionMm.x)));
++    const xEnd = Math.max(
++      xStart + 1,
++      Math.min(
++        ASCII_GRID_WIDTH,
++        Math.ceil(((item.positionMm.x + item.dimensionsMm.length) / containerDimensions.length) * ASCII_GRID_WIDTH)
++      )
++    );
++
++    const yStart = Math.max(0, Math.min(ASCII_GRID_HEIGHT - 1, toGridY(item.positionMm.y)));
++    const yEnd = Math.max(
++      yStart + 1,
++      Math.min(
++        ASCII_GRID_HEIGHT,
++        Math.ceil(((item.positionMm.y + item.dimensionsMm.width) / containerDimensions.width) * ASCII_GRID_HEIGHT)
++      )
++    );
++
++    for (let y = yStart; y < yEnd; y += 1) {
++      for (let x = xStart; x < xEnd; x += 1) {
++        grid[y][x] = item.symbol;
++      }
++    }
++  });
++
++  const border = `+${'-'.repeat(ASCII_GRID_WIDTH)}+`;
++  const body = grid.map((row) => `|${row.join('')}|`);
++  const legend = layoutItems.map((item) => {
++    const productName = item.product?.name || 'Unknown Product';
++    const overflowTag = item.overflow ? ' [OVERFLOW]' : '';
++    return `${item.symbol}=${productName} qty:${item.quantity} boxes:${item.boxes}${overflowTag}`;
++  });
++
++  const text = [border, ...body, border, `Legend (${layoutItems.length}):`, ...legend].join('\n');
++  return {
++    width: ASCII_GRID_WIDTH,
++    height: ASCII_GRID_HEIGHT,
++    text,
++    legend,
++  };
++};
++
+ const generateNextContainerNo = async (portId) => {
+   const year = new Date().getFullYear().toString().slice(-2);
+   if (!portId) {
+@@ -58,7 +251,7 @@ const list = async ({ page, pageSize, status, portId, keyword }) => {
+   ]);
+ 
+   return {
+-    items: contracts.map(toContainerPayload),
++    items: contracts,
+     total,
+   };
+ };
+@@ -83,12 +276,12 @@ const getById = async (id) => {
+     throw createError('货柜不存在', 404);
+   }
+ 
+-  return toContainerPayload({ ...contract, items: contract.packingItems });
++  return contract;
+ };
+ 
+ const create = async (data = {}) => {
+   const status = normalizeFilterStatus(data.status || 'DRAFT');
+-  const contractNo = data.contractNo || data.containerNo || (await generateNextContainerNo(data.portId));
++  const contractNo = data.contractNo || (await generateNextContainerNo(data.portId));
+   const exchangeRate = parseNullableNumber(data.exchangeRate, 7.0);
+ 
+   const contract = await prisma.salesContract.create({
+@@ -111,7 +304,7 @@ const create = async (data = {}) => {
+     },
+   });
+ 
+-  return toContainerPayload(contract);
++  return contract;
+ };
+ 
+ const update = async (id, data = {}) => {
+@@ -141,7 +334,7 @@ const update = async (id, data = {}) => {
+     data: updateData,
+   });
+ 
+-  return toContainerPayload(contract);
++  return contract;
+ };
+ 
+ const remove = async (id) => {
+@@ -187,12 +380,12 @@ const updateStatus = async (id, status) => {
+     },
+   });
+ 
+-  return toContainerPayload(contract);
++  return contract;
+ };
+ 
+ const getNextContainerNo = async (portId) => {
+-  const containerNo = await generateNextContainerNo(portId);
+-  return { containerNo, contractNo: containerNo };
++  const contractNo = await generateNextContainerNo(portId);
++  return { contractNo };
+ };
+ 
+ const getProducts = async (id) => {
+@@ -202,6 +395,91 @@ const getProducts = async (id) => {
+   });
+ };
+ 
++const getVisualization = async (id) => {
++  const contract = await prisma.salesContract.findUnique({
++    where: { id },
++    include: {
++      port: true,
++      packingItems: {
++        include: {
++          product: true,
++          store: true,
++        },
++        orderBy: { createdAt: 'asc' },
++      },
++    },
++  });
++
++  if (!contract) {
++    throw createError('货柜不存在', 404);
++  }
++
++  const dimensionsMm = { ...DEFAULT_CONTAINER_DIMENSIONS_MM };
++  const capacityCbm = roundNumber(
++    (dimensionsMm.length * dimensionsMm.width * dimensionsMm.height) / 1_000_000_000,
++    3
++  );
++
++  const { items: layoutItems, maxUsedHeight } = buildLayoutItems(contract.packingItems, dimensionsMm);
++  const summary = layoutItems.reduce(
++    (acc, item) => {
++      acc.totalQuantity += item.quantity;
++      acc.totalBoxes += item.boxes;
++      acc.totalGrossWeight += item.grossWeight;
++      acc.totalNetWeight += item.netWeight;
++      acc.totalVolume += item.volume;
++      if (item.overflow) {
++        acc.overflowItemCount += 1;
++      }
++      return acc;
++    },
++    {
++      totalQuantity: 0,
++      totalBoxes: 0,
++      totalGrossWeight: 0,
++      totalNetWeight: 0,
++      totalVolume: 0,
++      overflowItemCount: 0,
++    }
++  );
++
++  const ascii = buildAsciiArt(layoutItems, dimensionsMm);
++  const volumeUtilizationRate = capacityCbm > 0
++    ? roundNumber((summary.totalVolume / capacityCbm) * 100, 2)
++    : 0;
++
++  return {
++    container: {
++      id: contract.id,
++      contractNo: contract.contractNo,
++      status: contract.status,
++      port: contract.port ? { id: contract.port.id, name: contract.port.name, code: contract.port.code } : null,
++      dimensionsMm,
++      capacityCbm,
++    },
++    summary: {
++      itemCount: layoutItems.length,
++      overflowItemCount: summary.overflowItemCount,
++      totalQuantity: roundNumber(summary.totalQuantity),
++      totalBoxes: Math.trunc(summary.totalBoxes),
++      totalGrossWeight: roundNumber(summary.totalGrossWeight),
++      totalNetWeight: roundNumber(summary.totalNetWeight),
++      totalVolume: roundNumber(summary.totalVolume),
++      volumeUtilizationRate,
++      stackedHeightMm: maxUsedHeight,
++      declared: {
++        totalBoxes: contract.totalBoxes,
++        grossWeight: contract.grossWeight,
++        netWeight: contract.netWeight,
++        volume: contract.volume,
++      },
++    },
++    layout: layoutItems,
++    asciiArt: ascii.text,
++    ascii,
++  };
++};
++
+ const updateItem = async (id, itemId, data = {}) => {
+   const item = await prisma.packingItem.findUnique({
+     where: { id: itemId },
+@@ -300,4 +578,5 @@ module.exports = {
+   updateStatus,
+   getNextContainerNo,
+   getProducts,
++  getVisualization,
+ };
+diff --git a/backend/src/services/containerService.test.js b/backend/src/services/containerService.test.js
+index dce72ba..de256c5 100644
+--- a/backend/src/services/containerService.test.js
++++ b/backend/src/services/containerService.test.js
+@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
+ const prisma = require('../utils/prisma');
+ const containerService = require('./containerService');
+ 
+-test('list: 组装筛选条件并返回 containerNo 映射', async () => {
++test('list: 组装筛选条件并返回合同号字段', async () => {
+   const originalFindMany = prisma.salesContract.findMany;
+   const originalCount = prisma.salesContract.count;
+   let findManyArgs = null;
+@@ -24,7 +24,7 @@ test('list: 组装筛选条件并返回 containerNo 映射', async () => {
+     const result = await containerService.list({
+       page: 2,
+       pageSize: 10,
+-      status: 'PENDING',
++      status: 'DRAFT',
+       portId: 'port-1',
+       keyword: '25-001',
+     });
+@@ -37,7 +37,7 @@ test('list: 组装筛选条件并返回 containerNo 映射', async () => {
+     assert.equal(findManyArgs.skip, 10);
+     assert.equal(findManyArgs.take, 10);
+     assert.equal(result.total, 1);
+-    assert.equal(result.items[0].containerNo, '25-001-LA');
++    assert.equal(result.items[0].contractNo, '25-001-LA');
+   } finally {
+     prisma.salesContract.findMany = originalFindMany;
+     prisma.salesContract.count = originalCount;
+@@ -170,8 +170,116 @@ test('updateStatus: SHIPPED 状态会写入 shippedAt', async () => {
+ 
+     assert.equal(updateArgs.data.status, 'SHIPPED');
+     assert.ok(updateArgs.data.shippedAt instanceof Date);
+-    assert.equal(result.containerNo, '25-001-LA');
++    assert.equal(result.contractNo, '25-001-LA');
+   } finally {
+     prisma.salesContract.update = originalUpdate;
+   }
+ });
++
++test('getVisualization: 货柜不存在时抛出404', async () => {
++  const originalFindUnique = prisma.salesContract.findUnique;
++  prisma.salesContract.findUnique = async () => null;
++
++  try {
++    await assert.rejects(
++      () => containerService.getVisualization('missing-id'),
++      (error) => error.statusCode === 404 && error.message === '货柜不存在',
++    );
++  } finally {
++    prisma.salesContract.findUnique = originalFindUnique;
++  }
++});
++
++test('getVisualization: 返回布局、重量体积汇总和ASCII图', async () => {
++  const originalFindUnique = prisma.salesContract.findUnique;
++
++  prisma.salesContract.findUnique = async () => ({
++    id: 'sc-1',
++    contractNo: '26-001-LA',
++    status: 'PACKING',
++    totalBoxes: 11,
++    grossWeight: 560,
++    netWeight: 485,
++    volume: 7.5,
++    port: { id: 'port-1', name: 'Los Angeles', code: 'LA' },
++    packingItems: [
++      {
++        id: 'pi-1',
++        quantity: 2,
++        boxes: 5,
++        grossWeight: 400,
++        netWeight: 350,
++        volume: 4,
++        length: 7000,
++        width: 1200,
++        height: 1200,
++        note: 'front',
++        product: { id: 'p-1', name: 'Apple', hsCode: '0808', unit: 'box' },
++        store: { id: 's-1', name: 'Store 1' },
++      },
++      {
++        id: 'pi-2',
++        quantity: 3,
++        boxes: 4,
++        grossWeight: null,
++        netWeight: null,
++        volume: null,
++        length: null,
++        width: null,
++        height: null,
++        product: {
++          id: 'p-2',
++          name: 'Banana',
++          hsCode: '0803',
++          unit: 'box',
++          length: 6000,
++          width: 1200,
++          height: 800,
++          grossWeight: 20,
++          netWeight: 15,
++          volume: 0.5,
++        },
++        store: { id: 's-2', name: 'Store 2' },
++      },
++      {
++        id: 'pi-3',
++        quantity: 1,
++        boxes: 2,
++        grossWeight: 100,
++        netWeight: 90,
++        volume: 2,
++        length: 7000,
++        width: 1000,
++        height: 2000,
++        product: { id: 'p-3', name: 'Cherry', hsCode: '0809', unit: 'box' },
++        store: null,
++      },
++    ],
++  });
++
++  try {
++    const result = await containerService.getVisualization('sc-1');
++
++    assert.equal(result.container.contractNo, '26-001-LA');
++    assert.equal(result.layout.length, 3);
++    assert.equal(result.layout[0].positionMm.x, 0);
++    assert.equal(result.layout[1].positionMm.z, 1200);
++    assert.equal(result.layout[2].overflow, true);
++    assert.equal(result.layout[2].positionMm.x, null);
++
++    assert.equal(result.summary.itemCount, 3);
++    assert.equal(result.summary.overflowItemCount, 1);
++    assert.equal(result.summary.totalBoxes, 11);
++    assert.equal(result.summary.totalGrossWeight, 560);
++    assert.equal(result.summary.totalNetWeight, 485);
++    assert.equal(result.summary.totalVolume, 7.5);
++    assert.ok(result.summary.volumeUtilizationRate > 9);
++    assert.ok(result.summary.volumeUtilizationRate < 10);
++
++    assert.ok(result.asciiArt.includes('Legend (3):'));
++    assert.ok(result.asciiArt.includes('A=Apple'));
++    assert.ok(result.asciiArt.includes('C=Cherry qty:1 boxes:2 [OVERFLOW]'));
++  } finally {
++    prisma.salesContract.findUnique = originalFindUnique;
++  }
++});

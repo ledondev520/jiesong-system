@@ -8,6 +8,190 @@
 
 const prisma = require('./prisma');
 
+const SENSITIVE_FIELDS = new Set(['password', 'token', 'secret', 'apikey']);
+const SENSITIVE_KEY_PATTERNS = [
+  /password/i,
+  /token/i,
+  /secret/i,
+  /api[-_]?key/i,
+  /credential/i,
+];
+
+const CRITICAL_FIELDS_BY_ENTITY = {
+  User: ['username', 'name', 'role', 'email', 'phone', 'isActive', 'avatar'],
+  Store: ['name', 'portId', 'contactName', 'contactPhone', 'contactEmail', 'address', 'isActive'],
+  Supplier: ['name', 'shortName', 'contactName', 'contactPhone', 'contactEmail', 'address', 'phone', 'taxId', 'bankName', 'bankAccount', 'isActive', 'hasQualityIssue', 'qualityNote'],
+  Product: ['customsName', 'description', 'specification', 'unit', 'categoryId', 'grossWeight', 'netWeight', 'volume', 'packingSpec', 'length', 'width', 'height', 'isActive'],
+  ProductCategory: ['name', 'parentId'],
+  Port: ['name', 'code', 'isActive'],
+  SalesContract: ['status', 'exchangeRate', 'signedAt', 'estimatedArrival', 'portId', 'note', 'totalAmount', 'totalBoxes', 'grossWeight', 'netWeight', 'volume', 'customsBroker', 'isFumigated', 'hasTaxRefund', 'shippedAt'],
+  PurchaseContract: ['status', 'supplierId', 'taxRate', 'signedAt', 'expectedDate', 'invoiceNo', 'note', 'totalAmount', 'paidAmount'],
+  PurchaseItem: ['productId', 'quantity', 'unit', 'unitPrice', 'totalPrice', 'specification', 'note'],
+  ContractFile: ['fileName', 'filePath', 'fileType', 'fileSize'],
+  PriceHistory: ['productId', 'price', 'supplierId', 'unitPrice'],
+  Payment: ['type', 'amount', 'currency', 'paymentMethod', 'paymentDate', 'note', 'purchaseContractId', 'salesContractId'],
+  SupplierAlias: ['alias', 'supplierId'],
+  Inventory: ['status', 'quantity', 'salesContractId', 'inboundAt', 'outboundAt'],
+  PackingItem: ['salesContractId', 'productId', 'storeId', 'quantity', 'unit', 'boxes', 'grossWeight', 'netWeight', 'volume', 'unitPrice', 'totalPrice', 'note'],
+  SalesItem: ['salesContractId', 'productId', 'storeId', 'quantity', 'unit', 'costPrice', 'sellingPrice', 'specification', 'note'],
+  ChatSession: ['sessionId', 'userId'],
+  SystemConfig: ['key', 'value', 'note'],
+  ContractTemplate: ['exists'],
+  DataImport: ['created', 'failed', 'success'],
+  ImportRecord: ['fileName', 'totalRows', 'successRows', 'failedRows', 'status'],
+};
+
+const normalizeEntity = (entity = '') => {
+  const trimmed = String(entity).trim();
+  const map = {
+    Container: 'SalesContract',
+    ContainerItem: 'PackingItem',
+    Import: 'DataImport',
+  };
+
+  return map[trimmed] || trimmed;
+};
+
+const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const isSensitiveField = (key) => {
+  const normalized = String(key || '').trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  if (SENSITIVE_FIELDS.has(normalized)) {
+    return true;
+  }
+
+  return SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(normalized));
+};
+
+const isSensitiveConfigRecord = (value) => {
+  if (!isObject(value) || typeof value.key !== 'string') {
+    return false;
+  }
+
+  return isSensitiveField(value.key);
+};
+
+const sanitizeValue = (value) => {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeValue(item));
+  }
+
+  if (!isObject(value)) {
+    return value;
+  }
+
+  const sanitized = {};
+  const sensitiveConfigRecord = isSensitiveConfigRecord(value);
+
+  Object.entries(value).forEach(([key, itemValue]) => {
+    if (isSensitiveField(key)) {
+      return;
+    }
+
+    if (sensitiveConfigRecord && key === 'value') {
+      return;
+    }
+    sanitized[key] = sanitizeValue(itemValue);
+  });
+
+  return sanitized;
+};
+
+const toComparable = (value) => {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+
+  return value;
+};
+
+const buildCriticalComparison = (entity, oldValue = null, newValue = null) => {
+  const normalizedEntity = normalizeEntity(entity);
+  const criticalKeys = CRITICAL_FIELDS_BY_ENTITY[normalizedEntity] || [];
+  const oldRecord = sanitizeValue(oldValue);
+  const newRecord = sanitizeValue(newValue);
+
+  if (!criticalKeys.length || !isObject(oldRecord) || !isObject(newRecord)) {
+    return {
+      hasChange: false,
+      before: null,
+      after: null,
+      keys: criticalKeys,
+    };
+  }
+
+  const before = {};
+  const after = {};
+  let hasChange = false;
+
+  criticalKeys.forEach((key) => {
+    const oldKeyValue = oldRecord[key];
+    const newKeyValue = newRecord[key];
+
+    if (JSON.stringify(toComparable(oldKeyValue)) === JSON.stringify(toComparable(newKeyValue))) {
+      return;
+    }
+
+    before[key] = sanitizeValue(oldKeyValue);
+    after[key] = sanitizeValue(newKeyValue);
+    hasChange = true;
+  });
+
+  return {
+    hasChange,
+    before: hasChange ? before : null,
+    after: hasChange ? after : null,
+    keys: criticalKeys,
+  };
+};
+
+const resolveValues = (action, entity, oldValue, newValue) => {
+  const oldSanitized = sanitizeValue(oldValue);
+  const newSanitized = sanitizeValue(newValue);
+
+  if (action === 'UPDATE') {
+    const comparison = buildCriticalComparison(entity, oldSanitized, newSanitized);
+    if (comparison.hasChange) {
+      return { oldValue: comparison.before, newValue: comparison.after };
+    }
+
+    // 若实体存在关键字段清单但本次未变更关键字段，补齐完整快照，便于排查
+    if (comparison.keys.length > 0) {
+      return { oldValue: oldSanitized, newValue: newSanitized };
+    }
+  }
+
+  return { oldValue: oldSanitized, newValue: newSanitized };
+};
+
+const stringifyLogValue = (value) => {
+  try {
+    return value ? JSON.stringify(value) : null;
+  } catch {
+    return null;
+  }
+};
+
 /**
  * 职责：记录操作日志
  * @param {Object} params - 日志参数
@@ -29,14 +213,16 @@ const logOperation = async ({
   req = null,
 }) => {
   try {
+    const resolvedValues = resolveValues(action, entity, oldValue, newValue);
+
     await prisma.operationLog.create({
       data: {
         userId,
         action,
         entity,
         entityId,
-        oldValue: oldValue ? JSON.stringify(oldValue) : null,
-        newValue: newValue ? JSON.stringify(newValue) : null,
+        oldValue: stringifyLogValue(resolvedValues.oldValue),
+        newValue: stringifyLogValue(resolvedValues.newValue),
         ipAddress: req?.ip || req?.connection?.remoteAddress || null,
         userAgent: req?.headers?.['user-agent'] || null,
       },
@@ -100,6 +286,9 @@ const log = {
   
   logout: (userId, req) =>
     logOperation({ userId, action: 'LOGOUT', entity: 'User', entityId: userId, req }),
+
+  action: (userId, action, entity, entityId = null, oldValue = null, newValue = null, req = null) =>
+    logOperation({ userId, action, entity, entityId, oldValue, newValue, req }),
 };
 
 module.exports = {

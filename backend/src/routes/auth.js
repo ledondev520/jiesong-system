@@ -9,17 +9,31 @@
 const { Router } = require('express');
 const authController = require('../controllers/authController');
 const { validateLogin, validateRegister, validateResetPassword, handleValidation } = require('../utils/validators');
-const { authenticate, adminOnly } = require('../middleware/auth');
+const { authenticate, roleAuth } = require('../middleware/auth');
+const { withAuditLog } = require('../middleware/auditLog');
 
 const router = Router();
 
 // ==================== 公开路由 ====================
 
 // POST /api/v1/auth/login - 用户登录
-router.post('/login', validateLogin, handleValidation, authController.login);
-
-// POST /api/v1/auth/public-register - 公开注册（新用户自助注册）
-router.post('/public-register', validateRegister, handleValidation, authController.publicRegister);
+router.post(
+  '/login',
+  validateLogin,
+  handleValidation,
+  withAuditLog(
+    {
+      entity: 'User',
+      action: 'LOGIN',
+      getUserId: ({ responseData }) => responseData?.user?.id,
+      getEntityId: ({ responseData }) => responseData?.user?.id,
+      getNewValue: ({ responseData }) => ({
+        user: responseData?.user || null,
+      }),
+    },
+    authController.login
+  )
+);
 
 // POST /api/v1/auth/reset-password - 找回密码（用户名+手机号验证）
 router.post('/reset-password', validateResetPassword, handleValidation, authController.resetPassword);
@@ -27,18 +41,52 @@ router.post('/reset-password', validateResetPassword, handleValidation, authCont
 // ==================== 需认证路由 ====================
 
 // POST /api/v1/auth/register - 注册新用户（仅管理员）
-router.post('/register', authenticate, adminOnly, validateRegister, handleValidation, authController.register);
+router.post(
+  '/register',
+  authenticate,
+  roleAuth('ADMIN'),
+  validateRegister,
+  handleValidation,
+  withAuditLog(
+    { entity: 'User', action: 'CREATE', model: 'user' },
+    authController.register
+  )
+);
 
 // GET /api/v1/auth/me - 获取当前用户信息
 router.get('/me', authenticate, authController.getCurrentUser);
 
 // POST /api/v1/auth/change-password - 修改密码
-router.post('/change-password', authenticate, authController.changePassword);
+router.post(
+  '/change-password',
+  authenticate,
+  roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  withAuditLog(
+    {
+      entity: 'User',
+      action: 'UPDATE',
+      model: 'user',
+      getEntityId: ({ req }) => req.user?.id || null,
+      beforeWhere: ({ req }) => (req.user?.id ? { id: req.user.id } : null),
+      afterWhere: ({ req }) => (req.user?.id ? { id: req.user.id } : null),
+      getNewValue: ({ defaultValue }) => defaultValue,
+    },
+    authController.changePassword
+  )
+);
 
 // GET /api/v1/auth/users - 获取用户列表（仅管理员）
-router.get('/users', authenticate, adminOnly, authController.getUsers);
+router.get('/users', authenticate, roleAuth('ADMIN'), authController.getUsers);
 
 // PUT /api/v1/auth/users/:id - 更新用户（仅管理员）
-router.put('/users/:id', authenticate, adminOnly, authController.updateUser);
+router.put(
+  '/users/:id',
+  authenticate,
+  roleAuth('ADMIN'),
+  withAuditLog(
+    { entity: 'User', action: 'UPDATE', model: 'user' },
+    authController.updateUser
+  )
+);
 
 module.exports = router;

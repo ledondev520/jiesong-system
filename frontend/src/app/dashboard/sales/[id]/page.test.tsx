@@ -17,6 +17,7 @@ const mockProductGetAll = vi.fn();
 const mockStoreGetAll = vi.fn();
 const mockInventoryGetAll = vi.fn();
 const mockToastError = vi.fn();
+const mockExportPdf = vi.fn();
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react');
@@ -45,6 +46,7 @@ vi.mock('@/services/sales.service', () => ({
     addPackingItem: vi.fn(),
     updatePackingItem: vi.fn(),
     removePackingItem: vi.fn(),
+    exportPdf: (...args: unknown[]) => mockExportPdf(...args),
   },
 }));
 
@@ -89,6 +91,7 @@ describe('SalesDetailPage 交互逻辑', () => {
     mockStoreGetAll.mockReset();
     mockInventoryGetAll.mockReset();
     mockToastError.mockReset();
+    mockExportPdf.mockReset();
   });
 
   /**
@@ -170,5 +173,34 @@ describe('SalesDetailPage 交互逻辑', () => {
       expect(mockToastError).toHaveBeenCalledWith('加载数据失败');
     });
   });
-});
 
+  it('点击导出 PDF 会调用服务', async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: 's-1',
+        contractNo: 'EXP2500001',
+        status: 'DRAFT',
+        totalBoxes: 0,
+        volume: 0,
+        grossWeight: 0,
+        totalAmount: 0,
+        packingItems: [],
+        port: { name: 'LA' },
+      },
+    });
+    mockProductGetAll.mockResolvedValue({ data: { items: [] } });
+    mockStoreGetAll.mockResolvedValue({ data: { items: [] } });
+    mockInventoryGetAll.mockResolvedValue({ data: { items: [] } });
+    mockExportPdf.mockResolvedValue(undefined);
+
+    const user = userEvent.setup();
+    renderPage('s-1');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /导出合同 PDF/ })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /导出合同 PDF/ }));
+
+    expect(mockExportPdf).toHaveBeenCalledWith('s-1', 'EXP2500001');
+  });
+});

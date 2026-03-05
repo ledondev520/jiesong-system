@@ -14,7 +14,6 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import api from '@/lib/axios';
 import type { ApiResponse } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +29,7 @@ import {
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { CheckCircle, ArrowLeft, KeyRound } from 'lucide-react';
+import { authService } from '@/services/auth.service';
 
 // 找回密码表单验证Schema
 const forgotPasswordSchema = z.object({
@@ -76,7 +76,7 @@ export default function ForgotPasswordPage() {
     setIsLoading(true);
 
     try {
-      const result: ApiResponse<null> = await api.post('/auth/reset-password', {
+      const result: ApiResponse<null> = await authService.resetPassword({
         username: data.username,
         phone: data.phone,
         newPassword: data.newPassword,

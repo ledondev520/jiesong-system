@@ -9,7 +9,8 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/storeRecommendController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, roleAuth } = require('../middleware/auth');
+const { withAuditLog } = require('../middleware/auditLog');
 
 router.use(authenticate);
 
@@ -20,6 +21,19 @@ router.get('/stats', controller.getStoreStats);
 router.get('/stores', controller.getStoreList);
 
 // POST /api/v1/store-recommend/recommend - 生成采购建议
-router.post('/recommend', controller.getRecommendation);
+router.post('/recommend', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+  {
+    entity: 'StoreRecommend',
+    action: 'GENERATE',
+    captureBefore: false,
+    captureAfter: false,
+    getNewValue: ({ req, responseData }) => ({
+      storeId: req.body?.storeId || null,
+      requestedItems: Array.isArray(req.body?.items) ? req.body.items.length : null,
+      resultCount: Array.isArray(responseData) ? responseData.length : null,
+    }),
+  },
+  controller.getRecommendation
+));
 
 module.exports = router;

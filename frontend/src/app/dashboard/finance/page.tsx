@@ -13,8 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, ArrowDownLeft, ArrowUpRight, Wallet, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import api from '@/lib/axios';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { financeService } from '@/services/finance.service';
 
 interface FinanceStats {
   payable: {
@@ -36,8 +36,8 @@ export default function FinancePage() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await api.get('/finance/stats');
-        setStats((response as { data: FinanceStats }).data);
+        const response = await financeService.getStats();
+        setStats(response);
       } catch (error) {
         console.error('获取财务统计失败:', error);
       } finally {

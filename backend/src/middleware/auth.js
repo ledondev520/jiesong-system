@@ -9,6 +9,7 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 const { createError } = require('./errorHandler');
+const { roleAuth, adminOnly } = require('./roleAuth');
 const prisma = require('../utils/prisma');
 
 /**
@@ -71,33 +72,8 @@ const authenticate = async (req, res, next) => {
   }
 };
 
-/**
- * 职责：检查用户是否具有指定角色
- * 思路：返回中间件函数，检查req.user.role是否在允许列表中
- * @param {...string} roles - 允许的角色列表
- * @returns {Function} Express中间件
- */
-const authorize = (...roles) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return next(createError('请先登录', 401));
-    }
-    
-    if (!roles.includes(req.user.role)) {
-      return next(createError('无权限执行此操作', 403));
-    }
-    
-    next();
-  };
-};
-
-/**
- * 职责：仅允许管理员访问
- */
-const adminOnly = authorize('ADMIN');
-
 module.exports = {
   authenticate,
-  authorize,
+  roleAuth,
   adminOnly,
 };

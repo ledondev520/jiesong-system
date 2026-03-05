@@ -9,7 +9,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { PaymentType, type ApiResponse, type PaginatedResponse } from '@/types';
+import { PaymentType } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -20,10 +20,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { CreditCard, Loader2 } from 'lucide-react';
+import { CreditCard, Loader2, FileDown } from 'lucide-react';
 import { PaymentDialog, type PaymentSubmitData } from '../components/PaymentDialog';
 import { toast } from 'sonner';
-import api from '@/lib/axios';
+import { financeService } from '@/services/finance.service';
 import { PageHeader } from '@/components/layout/PageHeader';
 
 interface ReceivableContract {
@@ -41,15 +41,13 @@ export default function ReceivablePage() {
   const [contracts, setContracts] = useState<ReceivableContract[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedContract, setSelectedContract] = useState<ReceivableContract | null>(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   // 加载应收账款数据
   const fetchReceivables = async () => {
     try {
       setLoading(true);
-      const response = await api.get<
-        ApiResponse<PaginatedResponse<ReceivableContract>>,
-        ApiResponse<PaginatedResponse<ReceivableContract>>
-      >('/finance/receivables', { params: { pageSize: 100 } });
+      const response = await financeService.getReceivables({ pageSize: 100 });
       const data = response.data;
       setContracts(data?.items || []);
     } catch (error) {
@@ -73,7 +71,7 @@ export default function ReceivablePage() {
     
     try {
       // 调用后端API创建收款记录
-      await api.post('/finance/payments', {
+      await financeService.createPayment({
         type: 'RECEIVABLE',
         salesContractId: selectedContract.id,
         amount: Number(data.amount),
@@ -90,6 +88,19 @@ export default function ReceivablePage() {
     } catch (error) {
       console.error('记录收款失败:', error);
       toast.error('记录收款失败');
+    }
+  };
+
+  const handleExportPdf = async () => {
+    setExportingPdf(true);
+    try {
+      await financeService.exportReportPdf('sales', '应收账款报表.pdf');
+      toast.success('应收账款 PDF 已下载');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '导出应收账款 PDF 失败';
+      toast.error(message);
+    } finally {
+      setExportingPdf(false);
     }
   };
 
@@ -118,9 +129,20 @@ export default function ReceivablePage() {
         title="应收账款"
         description={`门店收款跟踪。共 ${unreceiveContracts.length} 笔待收账款。`}
         actions={
-          <Button variant="outline" className="h-10 rounded-xl border-border/70 bg-background/60" onClick={fetchReceivables}>
-            刷新
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl border-border/70 bg-background/60"
+              onClick={handleExportPdf}
+              disabled={exportingPdf}
+            >
+              {exportingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+              导出 PDF
+            </Button>
+            <Button variant="outline" className="h-10 rounded-xl border-border/70 bg-background/60" onClick={fetchReceivables}>
+              刷新
+            </Button>
+          </div>
         }
       />
 
