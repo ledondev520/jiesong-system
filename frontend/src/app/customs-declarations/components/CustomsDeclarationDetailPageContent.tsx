@@ -1,0 +1,204 @@
+/**
+ * Input: 报关单 ID、报关单服务、router
+ * Output: 报关单详情页
+ * Pos: 报关单管理详情展示页
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
+
+'use client';
+
+import { use, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import type { CustomsDeclaration } from '@/types';
+import { customsDeclarationService } from '@/services/customsDeclaration.service';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { FilePenLine } from 'lucide-react';
+import { toast } from 'sonner';
+import { CustomsDeclarationStatusBadge } from './CustomsDeclarationStatusBadge';
+
+interface CustomsDeclarationDetailPageContentProps {
+  params: Promise<{ id: string }>;
+}
+
+const detailFields = (declaration: CustomsDeclaration) => [
+  { label: '发货人', value: declaration.exporter },
+  { label: '收货人', value: declaration.consignee },
+  { label: '目的国', value: declaration.destinationCountry },
+  { label: '起运港', value: declaration.portOfLoading || '-' },
+  { label: '目的港', value: declaration.portOfDestination || '-' },
+  { label: '运输方式', value: declaration.transportMode || '-' },
+  { label: '申报日期', value: declaration.declarationDate },
+  { label: '放行日期', value: declaration.releaseDate || '-' },
+  { label: '成交币种', value: declaration.currency },
+];
+
+export function CustomsDeclarationDetailPageContent({
+  params,
+}: CustomsDeclarationDetailPageContentProps) {
+  const { id } = use(params);
+  const router = useRouter();
+
+  const [declaration, setDeclaration] = useState<CustomsDeclaration | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadDeclaration = async () => {
+      setLoading(true);
+      try {
+        const response = await customsDeclarationService.getById(id);
+        setDeclaration(response?.data || null);
+      } catch {
+        toast.error('加载报关单详情失败');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadDeclaration();
+  }, [id]);
+
+  if (loading) {
+    return <div className="py-14 text-center text-muted-foreground">加载中...</div>;
+  }
+
+  if (!declaration) {
+    return <div className="py-14 text-center text-muted-foreground">报关单不存在</div>;
+  }
+
+  return (
+    <div className="space-y-6 pb-10">
+      <PageHeader
+        title={declaration.declarationNo}
+        description={`${declaration.exporter} -> ${declaration.destinationCountry}`}
+        backHref="/customs-declarations"
+        actions={
+          <>
+            <CustomsDeclarationStatusBadge status={declaration.status} />
+            <Button
+              className="rounded-xl"
+              onClick={() => router.push(`/customs-declarations/${declaration.id}/edit`)}
+            >
+              <FilePenLine className="mr-2 h-4 w-4" />
+              编辑报关单
+            </Button>
+          </>
+        }
+      />
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card className="surface-panel">
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">货值总额</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">
+            {declaration.currency} {declaration.totalAmount.toLocaleString()}
+          </CardContent>
+        </Card>
+        <Card className="surface-panel">
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">总件数</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">
+            {declaration.totalPackages.toLocaleString()}
+          </CardContent>
+        </Card>
+        <Card className="surface-panel">
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">毛重</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">
+            {declaration.grossWeight.toLocaleString()} kg
+          </CardContent>
+        </Card>
+        <Card className="surface-panel">
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">净重</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">
+            {declaration.netWeight.toLocaleString()} kg
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="surface-panel">
+        <CardHeader>
+          <CardTitle>单证摘要</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {detailFields(declaration).map((field) => (
+            <div key={field.label} className="space-y-1">
+              <div className="text-sm text-muted-foreground">{field.label}</div>
+              <div className="font-medium">{field.value}</div>
+            </div>
+          ))}
+          <div className="space-y-1 md:col-span-2 xl:col-span-3">
+            <div className="text-sm text-muted-foreground">备注</div>
+            <div className="font-medium">{declaration.remarks || '-'}</div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="surface-panel overflow-hidden">
+        <CardHeader>
+          <CardTitle>商品明细</CardTitle>
+        </CardHeader>
+        <CardContent className="px-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>商品名称</TableHead>
+                <TableHead>HS 编码</TableHead>
+                <TableHead className="text-right">数量</TableHead>
+                <TableHead>单位</TableHead>
+                <TableHead className="text-right">单价</TableHead>
+                <TableHead className="text-right">总价</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {declaration.items?.length ? (
+                declaration.items.map((item, index) => (
+                  <TableRow key={item.id || `${item.productName}-${index}`}>
+                    <TableCell className="font-medium">{item.productName}</TableCell>
+                    <TableCell>{item.hsCode}</TableCell>
+                    <TableCell className="text-right">
+                      {item.quantity.toLocaleString()}
+                    </TableCell>
+                    <TableCell>{item.unit || '-'}</TableCell>
+                    <TableCell className="text-right">
+                      {item.unitPrice ?? '-'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {item.totalPrice ?? '-'}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
+                    暂无商品明细。
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

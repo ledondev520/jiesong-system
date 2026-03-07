@@ -1,0 +1,988 @@
+diff --git a/backend/prisma/schema.prisma b/backend/prisma/schema.prisma
+index 95513b0..7855cb4 100644
+--- a/backend/prisma/schema.prisma
++++ b/backend/prisma/schema.prisma
+@@ -149,7 +149,9 @@ model Product {
+   salesItems     SalesItem[]
+   inventories    Inventory[]
+   packingItems   PackingItem[]
++  customsDeclarationItems CustomsDeclarationItem[]
+   priceHistories PriceHistory[]
++  taxRates       TaxRate[]
+ 
+   @@map("products")
+ }
+@@ -269,10 +271,13 @@ model SalesContract {
+   updatedAt      DateTime @updatedAt
+ 
+   port         Port?         @relation(fields: [portId], references: [id])
++  customsDeclarations CustomsDeclaration[]
++  forexVerifications ForexVerification[]
+   items        SalesItem[]
+   packingItems PackingItem[] // 装箱明细
+   payments     Payment[]
+   inventories  Inventory[]
++  taxRefunds   TaxRefund[]
+ 
+   @@map("sales_contracts")
+ }
+@@ -327,6 +332,7 @@ model PackingItem {
+   updatedAt       DateTime @updatedAt
+ 
+   salesContract SalesContract @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
++  customsDeclarationItems CustomsDeclarationItem[]
+   product       Product       @relation(fields: [productId], references: [id])
+   store         Store?        @relation(fields: [storeId], references: [id])
+ 
+@@ -380,6 +386,136 @@ model Payment {
+   @@map("payments")
+ }
+ 
++// ==================== 出口退税 ====================
++
++model CustomsDeclaration {
++  id             String   @id @default(cuid())
++  declarationNo  String   @unique
++  salesContractId String
++  declaredAt     DateTime?
++  exportDate     DateTime?
++  customsBroker  String?
++  currency       String   @default("USD")
++  exchangeRate   Float?
++  totalAmount    Float    @default(0)
++  totalQuantity  Float    @default(0)
++  totalNetWeight Float    @default(0)
++  totalGrossWeight Float  @default(0)
++  status         String   @default("DRAFT") // DRAFT/DECLARED/RELEASED/VOID
++  note           String?
++  createdAt      DateTime @default(now())
++  updatedAt      DateTime @updatedAt
++
++  salesContract      SalesContract            @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
++  items              CustomsDeclarationItem[]
++  forexVerifications ForexVerification[]
++  taxRefunds         TaxRefund[]
++
++  @@index([salesContractId])
++  @@map("customs_declarations")
++}
++
++model CustomsDeclarationItem {
++  id                 String   @id @default(cuid())
++  customsDeclarationId String
++  productId          String
++  packingItemId      String?
++  taxRateId          String?
++  itemNo             Int?
++  customsName        String
++  hsCode             String?
++  declarationElements String?
++  quantity           Float
++  unit               String?
++  unitPrice          Float?
++  totalPrice         Float?
++  createdAt          DateTime @default(now())
++  updatedAt          DateTime @updatedAt
++
++  customsDeclaration CustomsDeclaration @relation(fields: [customsDeclarationId], references: [id], onDelete: Cascade)
++  product            Product            @relation(fields: [productId], references: [id])
++  packingItem        PackingItem?       @relation(fields: [packingItemId], references: [id])
++  taxRate            TaxRate?           @relation(fields: [taxRateId], references: [id])
++
++  @@index([customsDeclarationId])
++  @@index([productId])
++  @@index([packingItemId])
++  @@index([taxRateId])
++  @@map("customs_declaration_items")
++}
++
++model ForexVerification {
++  id                  String   @id @default(cuid())
++  verificationNo      String   @unique
++  salesContractId     String
++  customsDeclarationId String?
++  bankName            String?
++  currency            String   @default("USD")
++  receivedAmount      Float
++  settledAmount       Float?
++  exchangeRate        Float?
++  verifiedAt          DateTime?
++  status              String   @default("PENDING") // PENDING/VERIFIED/FAILED
++  note                String?
++  createdAt           DateTime @default(now())
++  updatedAt           DateTime @updatedAt
++
++  salesContract      SalesContract       @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
++  customsDeclaration CustomsDeclaration? @relation(fields: [customsDeclarationId], references: [id])
++  taxRefunds         TaxRefund[]
++
++  @@index([salesContractId])
++  @@index([customsDeclarationId])
++  @@map("forex_verifications")
++}
++
++model TaxRefund {
++  id                  String   @id @default(cuid())
++  refundNo            String   @unique
++  salesContractId     String
++  customsDeclarationId String
++  forexVerificationId String?
++  status              String   @default("DRAFT") // DRAFT/APPLIED/APPROVED/REFUNDED/REJECTED
++  declaredAmount      Float    @default(0)
++  refundableAmount    Float    @default(0)
++  refundedAmount      Float    @default(0)
++  appliedAt           DateTime?
++  refundedAt          DateTime?
++  note                String?
++  createdAt           DateTime @default(now())
++  updatedAt           DateTime @updatedAt
++
++  salesContract      SalesContract      @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
++  customsDeclaration CustomsDeclaration @relation(fields: [customsDeclarationId], references: [id])
++  forexVerification  ForexVerification? @relation(fields: [forexVerificationId], references: [id])
++
++  @@index([salesContractId])
++  @@index([customsDeclarationId])
++  @@index([forexVerificationId])
++  @@map("tax_refunds")
++}
++
++model TaxRate {
++  id              String   @id @default(cuid())
++  productId       String
++  hsCode          String?
++  purchaseTaxRate Float    @default(13)
++  refundRate      Float
++  effectiveFrom   DateTime
++  effectiveTo     DateTime?
++  isActive        Boolean  @default(true)
++  note            String?
++  createdAt       DateTime @default(now())
++  updatedAt       DateTime @updatedAt
++
++  product                 Product                  @relation(fields: [productId], references: [id], onDelete: Cascade)
++  customsDeclarationItems CustomsDeclarationItem[]
++
++  @@index([productId, isActive])
++  @@unique([productId, effectiveFrom])
++  @@map("tax_rates")
++}
++
+ // ==================== 文件管理 ====================
+ 
+ model ContractFile {
+diff --git a/PLAN.md b/PLAN.md
+new file mode 100644
+index 0000000..0317c5f
+--- /dev/null
++++ b/PLAN.md
+@@ -0,0 +1,34 @@
++# Tax Refund Migration Plan
++
++## Goal
++完成退税模块数据库演进：在 Prisma schema 中新增 `CustomsDeclaration`、`CustomsDeclarationItem`、`ForexVerification`、`TaxRefund`、`TaxRate` 五张表，并生成可执行迁移与 Prisma Client。
++
++## Scope
++- 修改 `prisma/schema.prisma`
++- 生成 Prisma migration
++- 执行 `prisma generate`
++- 记录本轮风险、指标与交付物
++
++## Milestones
++1. 读取现有 schema 与领域文档，确认新增表与现有 `SalesContract` / `Product` / `PackingItem` 的关联。
++2. 以最小兼容改动扩展 Prisma models，保留现有 `customsBroker` / `hasTaxRefund` 字段不回收。
++3. 执行 `prisma validate`、`prisma migrate dev`、`prisma generate`，若失败则就地修复。
++4. 更新任务台账、风险台账、指标台账，并输出结果与 patch。
++
++## Design Basis
++- 当前仓库中未找到名为 “export tax refund analysis / 出口退税分析” 的独立文档。
++- 本轮以 `../docs/数据库设计.md` 中现有出口合同/报关记录结构为基础，向独立退税子模块做最小一致化拆分。
++
++## Risks
++- 若隐藏设计稿未纳入仓库，本轮字段命名需以现有领域模型推断，后续可能需要二次对齐。
++- 当前数据源为 SQLite，本轮表结构避免引入 Prisma enum / Decimal 等高迁移成本类型。
++
++## Verification
++- `npx prisma validate`
++- `npx prisma migrate dev --name add_tax_refund_module`
++- `npx prisma generate`
++
++## Execution Outcome
++- 已新增 5 个 Prisma models，并在既有 `SalesContract` / `Product` / `PackingItem` 上补齐关系。
++- 因本地 `prisma/dev.db` 早已有表但无 migration 历史，先建立 baseline migration，再生成本轮增量 migration，避免重置开发库。
++- 验证已完成：`prisma validate`、`prisma migrate dev --name add_tax_refund_module`、`prisma generate`、以及退税模块定向服务测试。
+diff --git a/TASKS.md b/TASKS.md
+new file mode 100644
+index 0000000..0869992
+--- /dev/null
++++ b/TASKS.md
+@@ -0,0 +1,9 @@
++# Tax Refund Migration Tasks
++
++## MaxParallel
++- `1`
++
++## Task Board
++| ID | Priority | ETA | Slot | Status | Input | Output | Validation | DoD |
++|---|---|---:|---:|---|---|---|---|---|
++| DB-TRM-01 | P0 | 20m | 1 | DONE | `prisma/schema.prisma` + `../docs/数据库设计.md` | 新增 5 张表 + 迁移 + client | `npx prisma validate && npx prisma migrate dev --name add_tax_refund_module && npx prisma generate` | Schema 可解析、迁移生成成功、client 生成成功、文档台账更新 |
+diff --git a/RISKS.md b/RISKS.md
+new file mode 100644
+index 0000000..13d2fc1
+--- /dev/null
++++ b/RISKS.md
+@@ -0,0 +1,7 @@
++# Tax Refund Migration Risks
++
++| Risk ID | Trigger | Impact | Mitigation | Rollback |
++|---|---|---|---|---|
++| TRM-R1 | 仓库缺少“export tax refund analysis”独立设计稿 | 字段设计可能与预期存在偏差 | 以 `../docs/数据库设计.md` + 现有 `SalesContract/Product/PackingItem` 结构做最小兼容设计，并在结果中显式说明依据 | 回退本轮 migration 与 schema 变更 |
++| TRM-R2 | SQLite 迁移对字段类型/关系约束敏感 | `prisma migrate dev` 失败，阻塞交付 | 统一沿用现有 `String/Float/Boolean/DateTime` 风格，避免 enum 与 Decimal | 回退新增模型，保留现有 schema |
++| TRM-R3 | 现有开发库缺少 migration 历史 | `migrate dev` 要求 reset 本地库 | 建立 baseline migration 并用 `migrate resolve` 标记已应用，再创建本轮增量迁移 | 回退 baseline 目录与本轮增量 migration |
+diff --git a/METRICS.md b/METRICS.md
+new file mode 100644
+index 0000000..2f80775
+--- /dev/null
++++ b/METRICS.md
+@@ -0,0 +1,22 @@
++# Tax Refund Migration Metrics
++
++## 2026-03-07 Round 1
++
++### Baseline
++- 预检：`prisma/schema.prisma` 中不存在 `CustomsDeclaration` / `CustomsDeclarationItem` / `ForexVerification` / `TaxRefund` / `TaxRate`
++- 设计来源：仅定位到 `../docs/数据库设计.md` 中的嵌入式报关/退税字段，未定位到独立退税分析稿
++
++### Pending Verification
++- `npx prisma validate`
++- `npx prisma migrate dev --name add_tax_refund_module`
++- `npx prisma generate`
++
++### Verification Result
++- `npx prisma validate`: 通过
++- `npx prisma migrate resolve --applied 20260307090000_baseline`: 通过
++- `npx prisma migrate dev --name add_tax_refund_module`: 通过，生成 `prisma/migrations/20260307090001_add_tax_refund_module/migration.sql`
++- `npx prisma generate`: 通过
++- `node --test src/services/customsDeclarationService.test.js src/services/forexVerificationService.test.js src/services/taxRateService.test.js src/services/taxRefundService.test.js`: 20/20 通过
++
++### Notes
++- 由于当前开发库先于 migration 历史存在，未直接接受 Prisma 的 reset 提示；改为 baseline + 增量迁移的方式保留现有开发数据。
+diff --git a/docs/plans/2026-03-07-tax-refund-migration.md b/docs/plans/2026-03-07-tax-refund-migration.md
+new file mode 100644
+index 0000000..a153c00
+--- /dev/null
++++ b/docs/plans/2026-03-07-tax-refund-migration.md
+@@ -0,0 +1,65 @@
++# Tax Refund Migration Implementation Plan
++
++> **For Codex:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
++
++**Goal:** Add the tax refund module tables to Prisma, generate a migration, and regenerate the Prisma client.
++
++**Architecture:** Keep the current SQLite-compatible Prisma style. Model the tax refund workflow around `SalesContract` as the export container aggregate, `PackingItem` as declaration-line source data, and `Product` as the tax-rate owner.
++
++**Tech Stack:** Prisma 5, SQLite, Node.js
++
++---
++
++### Task 1: Capture the failing precondition
++
++**Files:**
++- Modify: `prisma/schema.prisma`
++- Test: command-only precheck
++
++**Step 1: Verify new models do not already exist**
++
++Run: `rg -n "model (CustomsDeclaration|CustomsDeclarationItem|ForexVerification|TaxRefund|TaxRate)" prisma/schema.prisma`
++Expected: no matches
++
++**Step 2: Add the minimal schema**
++
++Create five new models and the required relation fields on existing models.
++
++**Step 3: Run validation**
++
++Run: `npx prisma validate`
++Expected: schema valid
++
++### Task 2: Generate migration artifacts
++
++**Files:**
++- Create: `prisma/migrations/*`
++
++**Step 1: Run migration**
++
++Run: `npx prisma migrate dev --name add_tax_refund_module`
++Expected: migration directory created and database updated
++
++**Step 2: Regenerate client**
++
++Run: `npx prisma generate`
++Expected: Prisma Client generated successfully
++
++### Task 3: Record delivery
++
++**Files:**
++- Create: `logs/task-DB-TRM-01.md`
++- Create: `RESULTS/DB-TRM-01.md`
++- Create: `PATCHES/DB-TRM-01.diff`
++- Modify: `PLAN.md`
++- Modify: `TASKS.md`
++- Modify: `RISKS.md`
++- Modify: `METRICS.md`
++
++**Step 1: Record verification output**
++
++Write the commands executed and their results.
++
++**Step 2: Mark task complete**
++
++Update `TASKS.md` from `DOING` to `DONE` after verification succeeds.
+diff --git a/logs/task-DB-TRM-01.md b/logs/task-DB-TRM-01.md
+new file mode 100644
+index 0000000..6229d0b
+--- /dev/null
++++ b/logs/task-DB-TRM-01.md
+@@ -0,0 +1,20 @@
++# Task DB-TRM-01 Log
++
++- Status: DONE
++- Objective: 为退税模块新增 5 张 Prisma 表并生成迁移。
++- Design source used: `../docs/数据库设计.md`
++- Missing source note: 未在仓库内定位到名为 “export tax refund analysis / 出口退税分析” 的独立文档。
++- Precheck: `prisma/schema.prisma` 原始版本不存在目标 5 个 model。
++- Schema update:
++  - 新增 `CustomsDeclaration`
++  - 新增 `CustomsDeclarationItem`
++  - 新增 `ForexVerification`
++  - 新增 `TaxRefund`
++  - 新增 `TaxRate`
++  - 在 `SalesContract` / `Product` / `PackingItem` 上补 relation
++- Verification:
++  - `npx prisma validate` => pass
++  - `npx prisma migrate resolve --applied 20260307090000_baseline` => pass
++  - `npx prisma migrate dev --name add_tax_refund_module` => pass
++  - `npx prisma generate` => pass
++  - `node --test src/services/customsDeclarationService.test.js src/services/forexVerificationService.test.js src/services/taxRateService.test.js src/services/taxRefundService.test.js` => 20/20 pass
+diff --git a/RESULTS/DB-TRM-01.md b/RESULTS/DB-TRM-01.md
+new file mode 100644
+index 0000000..64ca5b2
+--- /dev/null
++++ b/RESULTS/DB-TRM-01.md
+@@ -0,0 +1,32 @@
++# DB-TRM-01 Result
++
++## Delivery
++- 在 `prisma/schema.prisma` 中新增 5 张退税模块表：
++  - `CustomsDeclaration`
++  - `CustomsDeclarationItem`
++  - `ForexVerification`
++  - `TaxRefund`
++  - `TaxRate`
++- 为既有模型补齐关系：
++  - `SalesContract` -> `customsDeclarations` / `forexVerifications` / `taxRefunds`
++  - `Product` -> `customsDeclarationItems` / `taxRates`
++  - `PackingItem` -> `customsDeclarationItems`
++- 生成 migration：
++  - baseline: `prisma/migrations/20260307090000_baseline/migration.sql`
++  - increment: `prisma/migrations/20260307090001_add_tax_refund_module/migration.sql`
++
++## Why baseline was needed
++- 本地 `prisma/dev.db` 已存在完整业务表，但仓库此前没有 Prisma migration 历史。
++- 直接执行 `prisma migrate dev` 会要求 reset SQLite 开发库。
++- 本轮改为先生成 baseline migration 并通过 `migrate resolve` 标记已应用，再生成新增 5 表的增量 migration，从而保留现有开发数据。
++
++## Verification
++- `npx prisma validate`
++- `npx prisma migrate resolve --applied 20260307090000_baseline`
++- `npx prisma migrate dev --name add_tax_refund_module`
++- `npx prisma generate`
++- `node --test src/services/customsDeclarationService.test.js src/services/forexVerificationService.test.js src/services/taxRateService.test.js src/services/taxRefundService.test.js`
++
++## Design basis
++- 使用依据：`../docs/数据库设计.md`
++- 未找到用户提到的独立 “export tax refund analysis / 出口退税分析” 文档；因此本轮采用与现有销售合同、装箱明细、商品税率配置一致的最小兼容设计。
+diff --git a/prisma/migrations/migration_lock.toml b/prisma/migrations/migration_lock.toml
+new file mode 100644
+index 0000000..e5e5c47
+--- /dev/null
++++ b/prisma/migrations/migration_lock.toml
+@@ -0,0 +1,3 @@
++# Please do not edit this file manually
++# It should be added in your version-control system (i.e. Git)
++provider = "sqlite"
+\ No newline at end of file
+diff --git a/prisma/migrations/20260307090000_baseline/migration.sql b/prisma/migrations/20260307090000_baseline/migration.sql
+new file mode 100644
+index 0000000..d266670
+--- /dev/null
++++ b/prisma/migrations/20260307090000_baseline/migration.sql
+@@ -0,0 +1,417 @@
++-- CreateTable
++CREATE TABLE "users" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "username" TEXT NOT NULL,
++    "password" TEXT NOT NULL,
++    "name" TEXT NOT NULL,
++    "role" TEXT NOT NULL DEFAULT 'SALES',
++    "email" TEXT,
++    "phone" TEXT,
++    "avatar" TEXT,
++    "isActive" BOOLEAN NOT NULL DEFAULT true,
++    "lastLoginAt" DATETIME,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL
++);
++
++-- CreateTable
++CREATE TABLE "ports" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "name" TEXT NOT NULL,
++    "code" TEXT NOT NULL,
++    "isActive" BOOLEAN NOT NULL DEFAULT true,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL
++);
++
++-- CreateTable
++CREATE TABLE "suppliers" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "name" TEXT NOT NULL,
++    "shortName" TEXT,
++    "contactName" TEXT,
++    "contactPhone" TEXT,
++    "contactEmail" TEXT,
++    "address" TEXT,
++    "phone" TEXT,
++    "taxId" TEXT,
++    "bankName" TEXT,
++    "bankAccount" TEXT,
++    "hasQualityIssue" BOOLEAN NOT NULL DEFAULT false,
++    "qualityNote" TEXT,
++    "isActive" BOOLEAN NOT NULL DEFAULT true,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL
++);
++
++-- CreateTable
++CREATE TABLE "supplier_aliases" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "alias" TEXT NOT NULL,
++    "supplierId" TEXT NOT NULL,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    CONSTRAINT "supplier_aliases_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "suppliers" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "stores" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "name" TEXT NOT NULL,
++    "portId" TEXT NOT NULL,
++    "contactName" TEXT,
++    "contactPhone" TEXT,
++    "contactEmail" TEXT,
++    "address" TEXT,
++    "isActive" BOOLEAN NOT NULL DEFAULT true,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL,
++    CONSTRAINT "stores_portId_fkey" FOREIGN KEY ("portId") REFERENCES "ports" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "products" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "customsName" TEXT NOT NULL,
++    "description" TEXT,
++    "specification" TEXT,
++    "unit" TEXT,
++    "lowStockThreshold" REAL NOT NULL DEFAULT 0,
++    "categoryId" TEXT,
++    "hsCode" TEXT,
++    "declaration" TEXT,
++    "grossWeight" REAL,
++    "netWeight" REAL,
++    "volume" REAL,
++    "packingSpec" TEXT,
++    "length" REAL,
++    "width" REAL,
++    "height" REAL,
++    "isActive" BOOLEAN NOT NULL DEFAULT true,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL,
++    CONSTRAINT "products_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "product_categories" ("id") ON DELETE SET NULL ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "product_categories" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "name" TEXT NOT NULL,
++    "parentId" TEXT,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL,
++    CONSTRAINT "product_categories_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "product_categories" ("id") ON DELETE SET NULL ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "product_suppliers" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "productId" TEXT NOT NULL,
++    "supplierId" TEXT NOT NULL,
++    "price" REAL,
++    "updatedAt" DATETIME NOT NULL,
++    CONSTRAINT "product_suppliers_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
++    CONSTRAINT "product_suppliers_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "suppliers" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "price_histories" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "productId" TEXT NOT NULL,
++    "supplierId" TEXT,
++    "price" REAL NOT NULL,
++    "recordedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    CONSTRAINT "price_histories_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "purchase_contracts" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "contractNo" TEXT NOT NULL,
++    "supplierId" TEXT NOT NULL,
++    "totalAmount" REAL NOT NULL DEFAULT 0,
++    "paidAmount" REAL NOT NULL DEFAULT 0,
++    "taxRate" INTEGER NOT NULL DEFAULT 13,
++    "status" TEXT NOT NULL DEFAULT 'DRAFT',
++    "signedAt" DATETIME,
++    "expectedDate" DATETIME,
++    "invoiceNo" TEXT,
++    "storeName" TEXT,
++    "note" TEXT,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL,
++    CONSTRAINT "purchase_contracts_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "suppliers" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "purchase_items" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "purchaseContractId" TEXT NOT NULL,
++    "productId" TEXT NOT NULL,
++    "quantity" REAL NOT NULL,
++    "unit" TEXT,
++    "unitPrice" REAL NOT NULL,
++    "totalPrice" REAL NOT NULL,
++    "specification" TEXT,
++    "note" TEXT,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL,
++    CONSTRAINT "purchase_items_purchaseContractId_fkey" FOREIGN KEY ("purchaseContractId") REFERENCES "purchase_contracts" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
++    CONSTRAINT "purchase_items_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "sales_contracts" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "contractNo" TEXT NOT NULL,
++    "totalAmount" REAL NOT NULL DEFAULT 0,
++    "receivedAmount" REAL NOT NULL DEFAULT 0,
++    "exchangeRate" REAL NOT NULL,
++    "status" TEXT NOT NULL DEFAULT 'DRAFT',
++    "signedAt" DATETIME,
++    "note" TEXT,
++    "portId" TEXT,
++    "totalBoxes" INTEGER NOT NULL DEFAULT 0,
++    "grossWeight" REAL NOT NULL DEFAULT 0,
++    "netWeight" REAL NOT NULL DEFAULT 0,
++    "volume" REAL NOT NULL DEFAULT 0,
++    "shippedAt" DATETIME,
++    "estimatedArrival" DATETIME,
++    "customsBroker" TEXT,
++    "isFumigated" BOOLEAN,
++    "hasTaxRefund" BOOLEAN,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL,
++    CONSTRAINT "sales_contracts_portId_fkey" FOREIGN KEY ("portId") REFERENCES "ports" ("id") ON DELETE SET NULL ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "sales_items" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "salesContractId" TEXT NOT NULL,
++    "productId" TEXT NOT NULL,
++    "storeId" TEXT NOT NULL,
++    "quantity" REAL NOT NULL,
++    "unit" TEXT,
++    "costPrice" REAL NOT NULL,
++    "sellingPrice" REAL NOT NULL,
++    "specification" TEXT,
++    "note" TEXT,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL,
++    CONSTRAINT "sales_items_salesContractId_fkey" FOREIGN KEY ("salesContractId") REFERENCES "sales_contracts" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
++    CONSTRAINT "sales_items_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
++    CONSTRAINT "sales_items_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "stores" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "packing_items" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "salesContractId" TEXT NOT NULL,
++    "productId" TEXT NOT NULL,
++    "storeId" TEXT,
++    "quantity" REAL NOT NULL,
++    "unit" TEXT,
++    "boxes" INTEGER,
++    "grossWeight" REAL,
++    "netWeight" REAL,
++    "volume" REAL,
++    "unitPrice" REAL,
++    "totalPrice" REAL,
++    "length" REAL,
++    "width" REAL,
++    "height" REAL,
++    "posX" REAL,
++    "posY" REAL,
++    "posZ" REAL,
++    "note" TEXT,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL,
++    CONSTRAINT "packing_items_salesContractId_fkey" FOREIGN KEY ("salesContractId") REFERENCES "sales_contracts" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
++    CONSTRAINT "packing_items_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
++    CONSTRAINT "packing_items_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "stores" ("id") ON DELETE SET NULL ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "inventories" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "productId" TEXT NOT NULL,
++    "purchaseItemId" TEXT,
++    "salesItemId" TEXT,
++    "salesContractId" TEXT,
++    "quantity" REAL NOT NULL,
++    "unit" TEXT,
++    "status" TEXT NOT NULL DEFAULT 'PRODUCING',
++    "inboundAt" DATETIME,
++    "outboundAt" DATETIME,
++    "note" TEXT,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL,
++    CONSTRAINT "inventories_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
++    CONSTRAINT "inventories_purchaseItemId_fkey" FOREIGN KEY ("purchaseItemId") REFERENCES "purchase_items" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
++    CONSTRAINT "inventories_salesItemId_fkey" FOREIGN KEY ("salesItemId") REFERENCES "sales_items" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
++    CONSTRAINT "inventories_salesContractId_fkey" FOREIGN KEY ("salesContractId") REFERENCES "sales_contracts" ("id") ON DELETE SET NULL ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "payments" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "idempotencyKey" TEXT,
++    "type" TEXT NOT NULL,
++    "purchaseContractId" TEXT,
++    "salesContractId" TEXT,
++    "amount" REAL NOT NULL,
++    "currency" TEXT NOT NULL DEFAULT 'CNY',
++    "paymentMethod" TEXT,
++    "paymentDate" DATETIME NOT NULL,
++    "note" TEXT,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL,
++    CONSTRAINT "payments_purchaseContractId_fkey" FOREIGN KEY ("purchaseContractId") REFERENCES "purchase_contracts" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
++    CONSTRAINT "payments_salesContractId_fkey" FOREIGN KEY ("salesContractId") REFERENCES "sales_contracts" ("id") ON DELETE SET NULL ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "contract_files" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "purchaseContractId" TEXT NOT NULL,
++    "fileName" TEXT NOT NULL,
++    "filePath" TEXT NOT NULL,
++    "fileType" TEXT NOT NULL,
++    "fileSize" INTEGER NOT NULL,
++    "uploadedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    CONSTRAINT "contract_files_purchaseContractId_fkey" FOREIGN KEY ("purchaseContractId") REFERENCES "purchase_contracts" ("id") ON DELETE CASCADE ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "chat_histories" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "userId" TEXT NOT NULL,
++    "sessionId" TEXT NOT NULL,
++    "role" TEXT NOT NULL,
++    "content" TEXT NOT NULL,
++    "imageUrl" TEXT,
++    "metadata" TEXT,
++    "promptTokens" INTEGER,
++    "outputTokens" INTEGER,
++    "modelUsed" TEXT,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    CONSTRAINT "chat_histories_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "token_usages" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "userId" TEXT NOT NULL,
++    "sessionId" TEXT,
++    "model" TEXT NOT NULL,
++    "promptTokens" INTEGER NOT NULL,
++    "outputTokens" INTEGER NOT NULL,
++    "totalTokens" INTEGER NOT NULL,
++    "requestType" TEXT NOT NULL,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
++);
++
++-- CreateTable
++CREATE TABLE "operation_logs" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "userId" TEXT NOT NULL,
++    "action" TEXT NOT NULL,
++    "entity" TEXT NOT NULL,
++    "entityId" TEXT,
++    "oldValue" TEXT,
++    "newValue" TEXT,
++    "ipAddress" TEXT,
++    "userAgent" TEXT,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    CONSTRAINT "operation_logs_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "system_configs" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "key" TEXT NOT NULL,
++    "value" TEXT NOT NULL,
++    "note" TEXT,
++    "updatedAt" DATETIME NOT NULL
++);
++
++-- CreateTable
++CREATE TABLE "notifications" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "userId" TEXT NOT NULL,
++    "type" TEXT NOT NULL,
++    "title" TEXT NOT NULL,
++    "content" TEXT NOT NULL,
++    "isRead" BOOLEAN NOT NULL DEFAULT false,
++    "metadata" TEXT,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    CONSTRAINT "notifications_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "import_records" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "fileName" TEXT NOT NULL,
++    "totalRows" INTEGER NOT NULL,
++    "successRows" INTEGER NOT NULL,
++    "failedRows" INTEGER NOT NULL,
++    "status" TEXT NOT NULL,
++    "errorLog" TEXT,
++    "importedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "importedBy" TEXT NOT NULL
++);
++
++-- CreateIndex
++CREATE UNIQUE INDEX "users_username_key" ON "users"("username");
++
++-- CreateIndex
++CREATE UNIQUE INDEX "ports_name_key" ON "ports"("name");
++
++-- CreateIndex
++CREATE UNIQUE INDEX "ports_code_key" ON "ports"("code");
++
++-- CreateIndex
++CREATE UNIQUE INDEX "supplier_aliases_alias_key" ON "supplier_aliases"("alias");
++
++-- CreateIndex
++CREATE UNIQUE INDEX "stores_name_key" ON "stores"("name");
++
++-- CreateIndex
++CREATE UNIQUE INDEX "product_categories_name_key" ON "product_categories"("name");
++
++-- CreateIndex
++CREATE UNIQUE INDEX "product_suppliers_productId_supplierId_key" ON "product_suppliers"("productId", "supplierId");
++
++-- CreateIndex
++CREATE UNIQUE INDEX "purchase_contracts_contractNo_key" ON "purchase_contracts"("contractNo");
++
++-- CreateIndex
++CREATE UNIQUE INDEX "sales_contracts_contractNo_key" ON "sales_contracts"("contractNo");
++
++-- CreateIndex
++CREATE UNIQUE INDEX "payments_idempotencyKey_key" ON "payments"("idempotencyKey");
++
++-- CreateIndex
++CREATE INDEX "chat_histories_userId_sessionId_idx" ON "chat_histories"("userId", "sessionId");
++
++-- CreateIndex
++CREATE INDEX "token_usages_userId_idx" ON "token_usages"("userId");
++
++-- CreateIndex
++CREATE INDEX "token_usages_createdAt_idx" ON "token_usages"("createdAt");
++
++-- CreateIndex
++CREATE INDEX "operation_logs_userId_idx" ON "operation_logs"("userId");
++
++-- CreateIndex
++CREATE INDEX "operation_logs_entity_entityId_idx" ON "operation_logs"("entity", "entityId");
++
++-- CreateIndex
++CREATE INDEX "operation_logs_createdAt_idx" ON "operation_logs"("createdAt");
++
++-- CreateIndex
++CREATE UNIQUE INDEX "system_configs_key_key" ON "system_configs"("key");
++
++-- CreateIndex
++CREATE INDEX "notifications_userId_isRead_idx" ON "notifications"("userId", "isRead");
++
+diff --git a/prisma/migrations/20260307090001_add_tax_refund_module/migration.sql b/prisma/migrations/20260307090001_add_tax_refund_module/migration.sql
+new file mode 100644
+index 0000000..f14fc72
+--- /dev/null
++++ b/prisma/migrations/20260307090001_add_tax_refund_module/migration.sql
+@@ -0,0 +1,145 @@
++-- CreateTable
++CREATE TABLE "customs_declarations" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "declarationNo" TEXT NOT NULL,
++    "salesContractId" TEXT NOT NULL,
++    "declaredAt" DATETIME,
++    "exportDate" DATETIME,
++    "customsBroker" TEXT,
++    "currency" TEXT NOT NULL DEFAULT 'USD',
++    "exchangeRate" REAL,
++    "totalAmount" REAL NOT NULL DEFAULT 0,
++    "totalQuantity" REAL NOT NULL DEFAULT 0,
++    "totalNetWeight" REAL NOT NULL DEFAULT 0,
++    "totalGrossWeight" REAL NOT NULL DEFAULT 0,
++    "status" TEXT NOT NULL DEFAULT 'DRAFT',
++    "note" TEXT,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL,
++    CONSTRAINT "customs_declarations_salesContractId_fkey" FOREIGN KEY ("salesContractId") REFERENCES "sales_contracts" ("id") ON DELETE CASCADE ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "customs_declaration_items" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "customsDeclarationId" TEXT NOT NULL,
++    "productId" TEXT NOT NULL,
++    "packingItemId" TEXT,
++    "taxRateId" TEXT,
++    "itemNo" INTEGER,
++    "customsName" TEXT NOT NULL,
++    "hsCode" TEXT,
++    "declarationElements" TEXT,
++    "quantity" REAL NOT NULL,
++    "unit" TEXT,
++    "unitPrice" REAL,
++    "totalPrice" REAL,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL,
++    CONSTRAINT "customs_declaration_items_customsDeclarationId_fkey" FOREIGN KEY ("customsDeclarationId") REFERENCES "customs_declarations" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
++    CONSTRAINT "customs_declaration_items_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
++    CONSTRAINT "customs_declaration_items_packingItemId_fkey" FOREIGN KEY ("packingItemId") REFERENCES "packing_items" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
++    CONSTRAINT "customs_declaration_items_taxRateId_fkey" FOREIGN KEY ("taxRateId") REFERENCES "tax_rates" ("id") ON DELETE SET NULL ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "forex_verifications" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "verificationNo" TEXT NOT NULL,
++    "salesContractId" TEXT NOT NULL,
++    "customsDeclarationId" TEXT,
++    "bankName" TEXT,
++    "currency" TEXT NOT NULL DEFAULT 'USD',
++    "receivedAmount" REAL NOT NULL,
++    "settledAmount" REAL,
++    "exchangeRate" REAL,
++    "verifiedAt" DATETIME,
++    "status" TEXT NOT NULL DEFAULT 'PENDING',
++    "note" TEXT,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL,
++    CONSTRAINT "forex_verifications_salesContractId_fkey" FOREIGN KEY ("salesContractId") REFERENCES "sales_contracts" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
++    CONSTRAINT "forex_verifications_customsDeclarationId_fkey" FOREIGN KEY ("customsDeclarationId") REFERENCES "customs_declarations" ("id") ON DELETE SET NULL ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "tax_refunds" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "refundNo" TEXT NOT NULL,
++    "salesContractId" TEXT NOT NULL,
++    "customsDeclarationId" TEXT NOT NULL,
++    "forexVerificationId" TEXT,
++    "status" TEXT NOT NULL DEFAULT 'DRAFT',
++    "declaredAmount" REAL NOT NULL DEFAULT 0,
++    "refundableAmount" REAL NOT NULL DEFAULT 0,
++    "refundedAmount" REAL NOT NULL DEFAULT 0,
++    "appliedAt" DATETIME,
++    "refundedAt" DATETIME,
++    "note" TEXT,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL,
++    CONSTRAINT "tax_refunds_salesContractId_fkey" FOREIGN KEY ("salesContractId") REFERENCES "sales_contracts" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
++    CONSTRAINT "tax_refunds_customsDeclarationId_fkey" FOREIGN KEY ("customsDeclarationId") REFERENCES "customs_declarations" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
++    CONSTRAINT "tax_refunds_forexVerificationId_fkey" FOREIGN KEY ("forexVerificationId") REFERENCES "forex_verifications" ("id") ON DELETE SET NULL ON UPDATE CASCADE
++);
++
++-- CreateTable
++CREATE TABLE "tax_rates" (
++    "id" TEXT NOT NULL PRIMARY KEY,
++    "productId" TEXT NOT NULL,
++    "hsCode" TEXT,
++    "purchaseTaxRate" REAL NOT NULL DEFAULT 13,
++    "refundRate" REAL NOT NULL,
++    "effectiveFrom" DATETIME NOT NULL,
++    "effectiveTo" DATETIME,
++    "isActive" BOOLEAN NOT NULL DEFAULT true,
++    "note" TEXT,
++    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" DATETIME NOT NULL,
++    CONSTRAINT "tax_rates_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE
++);
++
++-- CreateIndex
++CREATE UNIQUE INDEX "customs_declarations_declarationNo_key" ON "customs_declarations"("declarationNo");
++
++-- CreateIndex
++CREATE INDEX "customs_declarations_salesContractId_idx" ON "customs_declarations"("salesContractId");
++
++-- CreateIndex
++CREATE INDEX "customs_declaration_items_customsDeclarationId_idx" ON "customs_declaration_items"("customsDeclarationId");
++
++-- CreateIndex
++CREATE INDEX "customs_declaration_items_productId_idx" ON "customs_declaration_items"("productId");
++
++-- CreateIndex
++CREATE INDEX "customs_declaration_items_packingItemId_idx" ON "customs_declaration_items"("packingItemId");
++
++-- CreateIndex
++CREATE INDEX "customs_declaration_items_taxRateId_idx" ON "customs_declaration_items"("taxRateId");
++
++-- CreateIndex
++CREATE UNIQUE INDEX "forex_verifications_verificationNo_key" ON "forex_verifications"("verificationNo");
++
++-- CreateIndex
++CREATE INDEX "forex_verifications_salesContractId_idx" ON "forex_verifications"("salesContractId");
++
++-- CreateIndex
++CREATE INDEX "forex_verifications_customsDeclarationId_idx" ON "forex_verifications"("customsDeclarationId");
++
++-- CreateIndex
++CREATE UNIQUE INDEX "tax_refunds_refundNo_key" ON "tax_refunds"("refundNo");
++
++-- CreateIndex
++CREATE INDEX "tax_refunds_salesContractId_idx" ON "tax_refunds"("salesContractId");
++
++-- CreateIndex
++CREATE INDEX "tax_refunds_customsDeclarationId_idx" ON "tax_refunds"("customsDeclarationId");
++
++-- CreateIndex
++CREATE INDEX "tax_refunds_forexVerificationId_idx" ON "tax_refunds"("forexVerificationId");
++
++-- CreateIndex
++CREATE INDEX "tax_rates_productId_isActive_idx" ON "tax_rates"("productId", "isActive");
++
++-- CreateIndex
++CREATE UNIQUE INDEX "tax_rates_productId_effectiveFrom_key" ON "tax_rates"("productId", "effectiveFrom");

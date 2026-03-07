@@ -1,0 +1,141 @@
+/**
+ * Input: taxRefundController、taxRefundService
+ * Output: 退税控制器关键行为测试
+ * Pos: 后端控制器测试
+ */
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const taxRefundController = require('./taxRefundController');
+const taxRefundService = require('../services/taxRefundService');
+
+const createMockRes = () => {
+  const res = {
+    statusCode: null,
+    payload: null,
+  };
+
+  res.status = (code) => {
+    res.statusCode = code;
+    return res;
+  };
+
+  res.json = (payload) => {
+    res.payload = payload;
+    return res;
+  };
+
+  return res;
+};
+
+test('listTaxRefunds: 透传分页和筛选参数', async () => {
+  const original = taxRefundService.listTaxRefunds;
+  let capturedArgs = null;
+
+  taxRefundService.listTaxRefunds = async (args) => {
+    capturedArgs = args;
+    return {
+      items: [{ id: 'tr-1', refundNo: 'TR-001' }],
+      total: 1,
+      page: args.page,
+      pageSize: args.pageSize,
+    };
+  };
+
+  try {
+    const req = {
+      query: {
+        page: '2',
+        pageSize: '15',
+        salesContractId: 'sc-1',
+        status: 'APPLIED',
+        keyword: '2026',
+      },
+    };
+    const res = createMockRes();
+    let capturedError = null;
+    const next = (error) => {
+      capturedError = error;
+    };
+
+    await taxRefundController.listTaxRefunds(req, res, next);
+
+    assert.equal(capturedError, null);
+    assert.deepEqual(capturedArgs, {
+      page: 2,
+      pageSize: 15,
+      salesContractId: 'sc-1',
+      status: 'APPLIED',
+      keyword: '2026',
+    });
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.payload.data.items, [{ id: 'tr-1', refundNo: 'TR-001' }]);
+    assert.equal(res.payload.data.pagination.total, 1);
+  } finally {
+    taxRefundService.listTaxRefunds = original;
+  }
+});
+
+test('createTaxRefund: 创建成功返回 201 与成功消息', async () => {
+  const original = taxRefundService.createTaxRefund;
+
+  taxRefundService.createTaxRefund = async (payload) => ({
+    id: 'tr-2',
+    refundNo: payload.refundNo,
+  });
+
+  try {
+    const req = {
+      body: {
+        refundNo: 'TR-20260307-01',
+        salesContractId: 'sc-2',
+        customsDeclarationId: 'cd-2',
+      },
+    };
+    const res = createMockRes();
+    let capturedError = null;
+    const next = (error) => {
+      capturedError = error;
+    };
+
+    await taxRefundController.createTaxRefund(req, res, next);
+
+    assert.equal(capturedError, null);
+    assert.equal(res.statusCode, 201);
+    assert.equal(res.payload.message, '退税记录创建成功');
+    assert.deepEqual(res.payload.data, {
+      id: 'tr-2',
+      refundNo: 'TR-20260307-01',
+    });
+  } finally {
+    taxRefundService.createTaxRefund = original;
+  }
+});
+
+test('removeTaxRefund: 删除成功返回统一成功响应', async () => {
+  const original = taxRefundService.removeTaxRefund;
+  let capturedId = null;
+
+  taxRefundService.removeTaxRefund = async (id) => {
+    capturedId = id;
+  };
+
+  try {
+    const req = { params: { id: 'tr-3' } };
+    const res = createMockRes();
+    let capturedError = null;
+    const next = (error) => {
+      capturedError = error;
+    };
+
+    await taxRefundController.removeTaxRefund(req, res, next);
+
+    assert.equal(capturedError, null);
+    assert.equal(capturedId, 'tr-3');
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.payload.message, '退税记录删除成功');
+    assert.equal(res.payload.data, null);
+  } finally {
+    taxRefundService.removeTaxRefund = original;
+  }
+});

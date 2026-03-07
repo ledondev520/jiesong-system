@@ -149,7 +149,9 @@ model Product {
   salesItems     SalesItem[]
   inventories    Inventory[]
   packingItems   PackingItem[]
+  customsDeclarationItems CustomsDeclarationItem[]
   priceHistories PriceHistory[]
+  taxRates       TaxRate[]
 
   @@map("products")
 }
@@ -269,10 +271,13 @@ model SalesContract {
   updatedAt      DateTime @updatedAt
 
   port         Port?         @relation(fields: [portId], references: [id])
+  customsDeclarations CustomsDeclaration[]
+  forexVerifications ForexVerification[]
   items        SalesItem[]
   packingItems PackingItem[] // 装箱明细
   payments     Payment[]
   inventories  Inventory[]
+  taxRefunds   TaxRefund[]
 
   @@map("sales_contracts")
 }
@@ -327,6 +332,7 @@ model PackingItem {
   updatedAt       DateTime @updatedAt
 
   salesContract SalesContract @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
+  customsDeclarationItems CustomsDeclarationItem[]
   product       Product       @relation(fields: [productId], references: [id])
   store         Store?        @relation(fields: [storeId], references: [id])
 
@@ -378,6 +384,136 @@ model Payment {
   salesContract    SalesContract?    @relation(fields: [salesContractId], references: [id])
 
   @@map("payments")
+}
+
+// ==================== 出口退税 ====================
+
+model CustomsDeclaration {
+  id             String   @id @default(cuid())
+  declarationNo  String   @unique
+  salesContractId String
+  declaredAt     DateTime?
+  exportDate     DateTime?
+  customsBroker  String?
+  currency       String   @default("USD")
+  exchangeRate   Float?
+  totalAmount    Float    @default(0)
+  totalQuantity  Float    @default(0)
+  totalNetWeight Float    @default(0)
+  totalGrossWeight Float  @default(0)
+  status         String   @default("DRAFT") // DRAFT/DECLARED/RELEASED/VOID
+  note           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  salesContract      SalesContract            @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
+  items              CustomsDeclarationItem[]
+  forexVerifications ForexVerification[]
+  taxRefunds         TaxRefund[]
+
+  @@index([salesContractId])
+  @@map("customs_declarations")
+}
+
+model CustomsDeclarationItem {
+  id                 String   @id @default(cuid())
+  customsDeclarationId String
+  productId          String
+  packingItemId      String?
+  taxRateId          String?
+  itemNo             Int?
+  customsName        String
+  hsCode             String?
+  declarationElements String?
+  quantity           Float
+  unit               String?
+  unitPrice          Float?
+  totalPrice         Float?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  customsDeclaration CustomsDeclaration @relation(fields: [customsDeclarationId], references: [id], onDelete: Cascade)
+  product            Product            @relation(fields: [productId], references: [id])
+  packingItem        PackingItem?       @relation(fields: [packingItemId], references: [id])
+  taxRate            TaxRate?           @relation(fields: [taxRateId], references: [id])
+
+  @@index([customsDeclarationId])
+  @@index([productId])
+  @@index([packingItemId])
+  @@index([taxRateId])
+  @@map("customs_declaration_items")
+}
+
+model ForexVerification {
+  id                  String   @id @default(cuid())
+  verificationNo      String   @unique
+  salesContractId     String
+  customsDeclarationId String?
+  bankName            String?
+  currency            String   @default("USD")
+  receivedAmount      Float
+  settledAmount       Float?
+  exchangeRate        Float?
+  verifiedAt          DateTime?
+  status              String   @default("PENDING") // PENDING/VERIFIED/FAILED
+  note                String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  salesContract      SalesContract       @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
+  customsDeclaration CustomsDeclaration? @relation(fields: [customsDeclarationId], references: [id])
+  taxRefunds         TaxRefund[]
+
+  @@index([salesContractId])
+  @@index([customsDeclarationId])
+  @@map("forex_verifications")
+}
+
+model TaxRefund {
+  id                  String   @id @default(cuid())
+  refundNo            String   @unique
+  salesContractId     String
+  customsDeclarationId String
+  forexVerificationId String?
+  status              String   @default("DRAFT") // DRAFT/APPLIED/APPROVED/REFUNDED/REJECTED
+  declaredAmount      Float    @default(0)
+  refundableAmount    Float    @default(0)
+  refundedAmount      Float    @default(0)
+  appliedAt           DateTime?
+  refundedAt          DateTime?
+  note                String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  salesContract      SalesContract      @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
+  customsDeclaration CustomsDeclaration @relation(fields: [customsDeclarationId], references: [id])
+  forexVerification  ForexVerification? @relation(fields: [forexVerificationId], references: [id])
+
+  @@index([salesContractId])
+  @@index([customsDeclarationId])
+  @@index([forexVerificationId])
+  @@map("tax_refunds")
+}
+
+model TaxRate {
+  id              String   @id @default(cuid())
+  productId       String
+  hsCode          String?
+  purchaseTaxRate Float    @default(13)
+  refundRate      Float
+  effectiveFrom   DateTime
+  effectiveTo     DateTime?
+  isActive        Boolean  @default(true)
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  product                 Product                  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customsDeclarationItems CustomsDeclarationItem[]
+
+  @@index([productId, isActive])
+  @@unique([productId, effectiveFrom])
+  @@map("tax_rates")
 }
 
 // ==================== 文件管理 ====================

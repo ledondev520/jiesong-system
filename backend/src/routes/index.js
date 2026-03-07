@@ -29,6 +29,10 @@ const dataExportRoutes = require('./dataExport');
 const dashboardRoutes = require('./dashboard');
 const contractDocRoutes = require('./contractDoc');
 const storeRecommendRoutes = require('./storeRecommend');
+const customsDeclarationRoutes = require('./customsDeclarations');
+const forexVerificationRoutes = require('./forexVerifications');
+const taxRefundRoutes = require('./taxRefunds');
+const taxRateRoutes = require('./taxRates');
 
 const router = Router();
 
@@ -54,5 +58,9 @@ router.use('/export', dataExportRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/contract-doc', contractDocRoutes);  // 合同文档生成
 router.use('/store-recommend', storeRecommendRoutes);  // 门店采购建议
+router.use('/customs-declarations', customsDeclarationRoutes);
+router.use('/forex-verifications', forexVerificationRoutes);
+router.use('/tax-refunds', taxRefundRoutes);
+router.use('/tax-rates', taxRateRoutes);
 
 module.exports = router;

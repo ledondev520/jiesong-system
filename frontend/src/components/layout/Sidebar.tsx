@@ -34,6 +34,7 @@ import {
   Database,
   Globe,
   HardDrive,
+  ReceiptText,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,8 @@ const navItems = [
   { href: '/dashboard', label: '工作台', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/contracts', label: '采购合同', icon: FileText, exact: true },
   { href: '/dashboard/sales', label: '出口合同', icon: Ship },
+  { href: '/dashboard/tax-refunds', label: '出口退税', icon: ReceiptText },
+  { href: '/customs-declarations', label: '报关单', icon: FileText },
   { href: '/dashboard/inventory-container', label: '库存状态', icon: Warehouse },
   { href: '/dashboard/payments', label: '收付款', icon: DollarSign },
   { href: '/dashboard/store-recommend', label: '采购建议', icon: Store },

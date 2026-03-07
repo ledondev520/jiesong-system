@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const PDFDocument = require('pdfkit');
 const prisma = require('../utils/prisma');
+const { calculateTaxSummary } = require('./taxCalculationEngine');
 
 const DEFAULT_LOGO_PATH = path.join(__dirname, '../../assets/pdf-logo.png');
 const DEFAULT_STAMP_PATH = path.join(__dirname, '../../assets/pdf-stamp.png');
@@ -296,6 +297,21 @@ const exportSalesContractPdf = async (contractId) => {
     const storeName = item.store?.name || '-';
     const productName = item.product?.customsName || '-';
     return `${productName} | Boxes:${safeText(item.boxes)} | Qty:${formatMoney(item.quantity)} ${safeText(item.unit)} | Weight:${formatMoney(item.grossWeight)}kg / ${formatMoney(item.netWeight)}kg | Volume:${formatMoney(item.volume)} | Store:${storeName}`;
+  });
+
+  const taxResult = calculateTaxSummary(contract);
+  doc.moveDown(0.6);
+  addSectionTitle(doc, 'Tax Summary');
+  addKVSection(doc, [
+    ['Estimated Refund (CNY)', formatMoney(taxResult.summary.totalRefundAmountCny)],
+    ['Refund Base (CNY)', formatMoney(taxResult.summary.totalRefundBaseCny)],
+    ['Non-refundable Tax (CNY)', formatMoney(taxResult.summary.totalNonRefundableTaxCny)],
+    ['Matched Lines', `${taxResult.summary.matchedLineCount}/${taxResult.summary.lineCount}`],
+    ['Pending Review Lines', taxResult.summary.fallbackLineCount],
+  ]);
+
+  addParagraphList(doc, 'Tax Lines', taxResult.lines || [], (line) => {
+    return `${line.productName} | HS:${safeText(line.hsCode)} | Refund:${formatMoney(line.estimatedRefundCny)} CNY | Non-refundable:${formatMoney(line.nonRefundableTaxCny)} CNY | ${line.hsDescription}`;
   });
 
   doc.moveDown(1);

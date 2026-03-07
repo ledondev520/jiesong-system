@@ -8,6 +8,7 @@
 
 const ExcelJS = require('exceljs');
 const prisma = require('../utils/prisma');
+const { calculateTaxSummary } = require('./taxCalculationEngine');
 
 /**
  * 职责：导出数据
@@ -322,13 +323,14 @@ const applyHeaderStyle = (worksheet) => {
 };
 
 /**
- * 职责：生成单份销售合同的标准出口 Excel（三 Sheet：合同信息 + 商品明细 + 装箱清单）
+ * 职责：生成单份销售合同的标准出口 Excel（合同信息 + 商品明细 + 装箱清单 + 税务测算）
  * 思路：
  *   1. 查询销售合同及其关联的销售明细（items）与装箱明细（packingItems）
  *   2. Sheet 1 输出合同基本信息（键值对形式）
  *   3. Sheet 2 输出商品明细列表（每行一个明细条目）
  *   4. Sheet 3 输出装箱清单（Packing List）
- *   5. 写入 Buffer 返回，供路由层设置响应头并下载
+ *   5. Sheet 4 输出税务测算摘要与逐行退税结果
+ *   6. 写入 Buffer 返回，供路由层设置响应头并下载
  * @param {string} contractId - 销售合同 ID
  * @returns {{ buffer: Buffer, filename: string }}
  */
@@ -478,6 +480,50 @@ const exportSalesContractExcel = async (contractId) => {
   // 若装箱明细为空，补一行说明
   if (contract.packingItems.length === 0) {
     sheet3.addRow({ index: '-', containerNo: contract.contractNo, productName: '（暂无装箱明细）' });
+  }
+
+  // ==================== Sheet 4: 税务测算 ====================
+  const taxResult = calculateTaxSummary(contract);
+  const sheet4 = workbook.addWorksheet('税务测算');
+  sheet4.columns = [
+    { header: '字段/商品', key: 'field', width: 22 },
+    { header: '值/HS编码', key: 'value', width: 18 },
+    { header: '退税额(CNY)', key: 'refund', width: 14 },
+    { header: '不可退税额(CNY)', key: 'nonRefund', width: 16 },
+    { header: '说明', key: 'description', width: 30 },
+  ];
+  applyHeaderStyle(sheet4);
+
+  [
+    ['合同编号', contract.contractNo, '', '', '税务测算基于当前销售明细/装箱明细'],
+    ['汇率', taxResult.summary.exchangeRate, '', '', 'USD -> CNY'],
+    ['销售金额(USD)', taxResult.summary.totalSalesUsd, '', '', '按明细汇总'],
+    ['销售金额(CNY)', taxResult.summary.totalSalesCny, '', '', '按汇率折算'],
+    ['预计退税额(CNY)', taxResult.summary.totalRefundAmountCny, '', '', '按 HS 规则估算'],
+    ['不可退税额(CNY)', taxResult.summary.totalNonRefundableTaxCny, '', '', '税负差额'],
+    ['待确认行数', taxResult.summary.fallbackLineCount, '', '', '未匹配税则需人工复核'],
+  ].forEach(([field, value, refund, nonRefund, description]) => {
+    sheet4.addRow({ field, value, refund, nonRefund, description });
+  });
+
+  if (!taxResult.lines.length) {
+    sheet4.addRow({
+      field: '（暂无可测算明细）',
+      value: '-',
+      refund: 0,
+      nonRefund: 0,
+      description: '请先补充销售明细或装箱明细',
+    });
+  } else {
+    taxResult.lines.forEach((line) => {
+      sheet4.addRow({
+        field: line.productName,
+        value: line.hsCode || '-',
+        refund: line.estimatedRefundCny,
+        nonRefund: line.nonRefundableTaxCny,
+        description: `${line.hsDescription} / 退税率${line.refundRate}% / ${line.matchType}`,
+      });
+    });
   }
 
   const buffer = await workbook.xlsx.writeBuffer();

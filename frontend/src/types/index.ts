@@ -107,6 +107,73 @@ export interface ProductSupplier {
   supplier?: Supplier;
 }
 
+export enum CustomsDeclarationStatus {
+  DRAFT = 'DRAFT',
+  SUBMITTED = 'SUBMITTED',
+  INSPECTING = 'INSPECTING',
+  RELEASED = 'RELEASED',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+}
+
+export interface CustomsDeclarationItem {
+  id: string;
+  productName: string;
+  hsCode: string;
+  quantity: number;
+  unit?: string;
+  unitPrice?: number | null;
+  totalPrice?: number | null;
+}
+
+export interface CustomsDeclaration {
+  id: string;
+  declarationNo: string;
+  status: CustomsDeclarationStatus;
+  exporter: string;
+  consignee: string;
+  destinationCountry: string;
+  portOfLoading?: string;
+  portOfDestination?: string;
+  transportMode?: string;
+  declarationDate: string;
+  releaseDate?: string | null;
+  currency: string;
+  totalAmount: number;
+  totalPackages: number;
+  grossWeight: number;
+  netWeight: number;
+  remarks?: string;
+  items?: CustomsDeclarationItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type TaxRefundStatus =
+  | 'ALL'
+  | 'DRAFT'
+  | 'APPLIED'
+  | 'APPROVED'
+  | 'REFUNDED'
+  | 'REJECTED';
+
+export interface TaxRefund {
+  id: string;
+  refundNo: string;
+  status: Exclude<TaxRefundStatus, 'ALL'>;
+  salesContractId: string;
+  customsDeclarationId: string;
+  forexVerificationId?: string | null;
+  declaredAmount: number;
+  refundableAmount: number;
+  refundedAmount: number;
+  appliedAt: string;
+  refundedAt?: string | null;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export enum PurchaseStatus {
   DRAFT = 'DRAFT',
   SIGNED = 'SIGNED',
