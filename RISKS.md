@@ -20,3 +20,6 @@
 | R-015 | 使用 SQLite 数据源执行 Prisma 校验（provider=sqlite）且 schema 含 enum Role | prisma validate 失败，阻塞数据库层全量校验 | 统一到 PostgreSQL 或改为 SQLite 兼容字段类型后再执行 prisma validate/db push；当前先以应用层定向测试兜底 | 回退到旧角色字段定义或恢复上一次可验证的数据源配置 |
 | R-016 | 多实例同时执行每日库存任务（无分布式锁） | 可能产生重复低库存通知 | 当前采用“同日+用户+商品”去重降低重复；若进入多实例部署，需引入任务锁（DB/Redis）或集中调度器 | 回退到仅保留 `GET /inventory/alerts` 查询，不自动下发通知 |
 | R-017 | 前端构建依赖外网字体与既有页面语法健康；在网络受限或存量语法错误存在时执行 `next build` | 阻塞本轮功能的“全量 build 绿灯”验收 | 先执行定向 lint+test 验证功能正确性；并行跟进修复 `ClaudeCostCalculator.tsx` 语法错误与字体离线化策略 | 回退到不依赖构建产物的定向验证门禁（保留本轮 PDF 导出功能改动） |
+| R-018 | CI 环境启用远程 LLM 时上游延迟抖动/限流 | `Performance Smoke (LLM Route)` 随机超时红灯 | 默认在 CI/test 走本地 AI 降级与超时保护（可通过 `AI_ALLOW_REMOTE=true` 显式开启远程） | 回退 `aiService.js` 的本地降级与超时参数逻辑 |
+| R-019 | Dashboard 在 `md` 以下隐藏侧边栏，但 Header 无移动端导航补位 | 移动端用户进入工作台后无法切换主模块，阻断完整使用 | 增加移动端菜单入口（Sheet/Drawer/Hamburger）并补移动端 Playwright 验收 | 回退移动端导航新增入口，恢复桌面侧边栏模式 |
+| R-020 | 登录页 rememberMe 复选框与可读标签未形成稳定可访问名称关联 | 屏幕阅读器和键盘用户无法确认控件语义，影响认证入口无障碍 | 为复选框补 `aria-label`/`id + htmlFor`/`aria-labelledby` 之一，并新增无障碍断言 | 回退登录表单的 rememberMe 控件改动 |

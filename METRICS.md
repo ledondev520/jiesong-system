@@ -587,3 +587,46 @@
 - `next build` 在当前环境未通过，存在两个非本次改动引入问题：
   - `ClaudeCostCalculator.tsx` 既有语法错误。
   - 网络受限导致 Google Fonts 拉取失败。
+
+## 2026-03-06 Round 40（CI: Performance Smoke + Frontend E2E）
+
+### 质量指标
+- 前端 E2E 用例发现校验：`52/52`（`npx playwright test --list`）。
+- 后端 AI 相关回归：`5/5`（`src/services/aiService.test.js` + `src/controllers/aiController.test.js`）。
+- 认证页定向单测：`10/10`（`login/register/forgot-password`）。
+- 前端单测全量现状：`84 files / 270 tests` 中 `2` 条既有失败，位于 `src/app/dashboard/containers/[id]/page.test.tsx`，不属于本轮 CI 修复范围。
+
+### 过程指标
+- 影响文件：4
+- 影响文件：5
+  - `backend/src/services/aiService.js`
+  - `backend/src/services/aiService.test.js`
+  - `frontend/e2e/smoke.spec.ts`
+  - `frontend/e2e/button-coverage.spec.ts`
+  - `frontend/playwright.config.ts`
+- 新增任务产物：
+  - `logs/task-ci-01.md`
+  - `RESULTS/ci-01.md`
+  - `PATCHES/ci-01.diff`
+
+### 结论
+- LLM 路由性能风险从“外部依赖强耦合”降为“可配置远程模式 + 默认本地稳定模式（CI/test）”，并补齐了 Node `--test` 运行识别。
+- Frontend E2E 稳定性策略已补齐，避免认证页被误判为 dashboard shell，并降低选择器歧义和并发资源争用导致的随机失败概率。
+
+## 2026-03-06 Round 41（Frontend Interaction QA Audit）
+
+### 质量指标
+- Playwright 冒烟：`14/14` 通过（`cd frontend && npx playwright test e2e/smoke.spec.ts --reporter=list`）。
+- Playwright 按钮巡检：`38/38` 通过（`cd frontend && npx playwright test e2e/button-coverage.spec.ts --reporter=list`）。
+- 补充交互验收脚本：执行完成，产出 `summary.json` 与 4 张截图（`cd frontend && node scripts/interactive-qa-audit.mjs`）。
+- 发现阻断性可用性/无障碍问题：`2` 个（移动端导航缺失 `1`、登录页无名复选框 `1`）。
+
+### 过程指标
+- 新增验收脚本：1（`frontend/scripts/interactive-qa-audit.mjs`）。
+- 新增验收文档：1（`docs/quality/前端交互验收_20260306.md`）。
+- 新增截图证据：4（登录页、桌面工作台、通知中心、移动端工作台）。
+- 额外观察到运行时噪声：1 类（Header 下拉触发器 hydration mismatch warning）。
+
+### 结论
+- 桌面端主流程可以继续签收为“可用”。
+- 系统整体暂不能签收为“用户可无障碍完整使用”，需先完成移动端导航补位与登录页复选框语义修复。

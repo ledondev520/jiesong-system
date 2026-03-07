@@ -1,0 +1,144 @@
+{
+  "runAt": "2026-03-06T15:07:25.271Z",
+  "baseUrl": "http://127.0.0.1:3001",
+  "outputDir": "/Users/helena/Cursor/jiesong_system/frontend/qa-artifacts/interactive-qa-20260306",
+  "claims": [
+    "登录页可通过键盘进入主要输入与提交控件。",
+    "桌面端工作台首屏可见，并可进入通知/日志/导入记录关键交互。",
+    "移动端至少应暴露一个可见的全局导航入口，保证用户不依赖桌面断点也能继续操作。"
+  ],
+  "exploratoryScenarios": [
+    "通知中心切换到“仅未读”后，继续执行“标记已读”并观察空态。",
+    "移动端首屏检查在 390x844 下是否还能找到系统主导航入口。"
+  ],
+  "checks": {
+    "login": {
+      "heading": "系统登录",
+      "tabSequence": [
+        {
+          "tag": "input",
+          "role": null,
+          "name": "admin"
+        },
+        {
+          "tag": "input",
+          "role": null,
+          "name": "••••••"
+        },
+        {
+          "tag": "button",
+          "role": "checkbox",
+          "name": ""
+        },
+        {
+          "tag": "button",
+          "role": null,
+          "name": "登录"
+        },
+        {
+          "tag": "a",
+          "role": null,
+          "name": "立即注册"
+        }
+      ],
+      "screenshot": "/Users/helena/Cursor/jiesong_system/frontend/qa-artifacts/interactive-qa-20260306/desktop-login.png",
+      "pageErrors": [],
+      "consoleErrors": []
+    },
+    "desktop": {
+      "visibleNavLabels": [
+        "工作台",
+        "采购合同",
+        "出口合同",
+        "库存状态",
+        "收付款",
+        "采购建议",
+        "AI 管理",
+        "合同模板",
+        "系统管理",
+        "基础设置"
+      ],
+      "viewportMetrics": {
+        "innerWidth": 1600,
+        "innerHeight": 900,
+        "clientWidth": 1600,
+        "clientHeight": 900,
+        "scrollWidth": 1600,
+        "scrollHeight": 1682,
+        "canScrollX": false,
+        "canScrollY": true
+      },
+      "tabSequence": [
+        {
+          "tag": "a",
+          "role": null,
+          "name": "捷淞系统"
+        },
+        {
+          "tag": "a",
+          "role": null,
+          "name": "工作台"
+        },
+        {
+          "tag": "a",
+          "role": null,
+          "name": "采购合同"
+        },
+        {
+          "tag": "a",
+          "role": null,
+          "name": "出口合同"
+        },
+        {
+          "tag": "a",
+          "role": null,
+          "name": "库存状态"
+        },
+        {
+          "tag": "a",
+          "role": null,
+          "name": "收付款"
+        }
+      ],
+      "screenshots": [
+        "/Users/helena/Cursor/jiesong_system/frontend/qa-artifacts/interactive-qa-20260306/desktop-dashboard.png",
+        "/Users/helena/Cursor/jiesong_system/frontend/qa-artifacts/interactive-qa-20260306/desktop-notifications.png"
+      ],
+      "pageErrors": [],
+      "consoleErrors": [
+        "A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.\n- Date formatting in a user's locale which doesn't match the server.\n- External changing data without sending a snapshot of it along with the HTML.\n- Invalid HTML tag nesting.\n\nIt can also happen if the client has a browser extension installed which messes with the HTML before React loaded.\n\n%s%s https://react.dev/link/hydration-mismatch \n\n  ...\n    <div className=\"flex items...\">\n      <ThemeToggle>\n      ...\n        <MenuProvider scope={{Menu:[...], ...}} onClose={function Menu.useCallback} isUsingKeyboardRef={{current:false}} ...>\n          <DropdownMenuTrigger asChild={true}>\n            <DropdownMenuTrigger data-slot=\"dropdown-m...\" asChild={true}>\n              <MenuAnchor asChild={true} __scopeMenu={{Menu:[...], ...}}>\n                <PopperAnchor __scopePopper={{Menu:[...], ...}} asChild={true} ref={null}>\n                  <Primitive.div asChild={true} ref={function}>\n                    <Primitive.div.Slot ref={function}>\n                      <Primitive.div.SlotClone ref={function}>\n                        <Primitive.button type=\"button\" id=\"radix-_R_5...\" aria-haspopup=\"menu\" aria-expanded={false} ...>\n                          <Primitive.button.Slot type=\"button\" id=\"radix-_R_5...\" aria-haspopup=\"menu\" ...>\n                            <Primitive.button.SlotClone type=\"button\" id=\"radix-_R_5...\" aria-haspopup=\"menu\" ...>\n                              <Button variant=\"ghost\" size=\"icon\" className=\"relative r...\" type=\"button\" ...>\n                                <button\n                                  data-slot=\"dropdown-menu-trigger\"\n                                  data-variant=\"ghost\"\n                                  data-size=\"icon\"\n                                  className={\"inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm...\"}\n                                  type=\"button\"\n+                                 id=\"radix-_R_57itmlb_\"\n-                                 id=\"radix-_R_kuitmlb_\"\n                                  aria-haspopup=\"menu\"\n                                  aria-expanded={false}\n                                  aria-controls={undefined}\n                                  data-state=\"closed\"\n                                  data-disabled={undefined}\n                                  disabled={false}\n                                  onPointerDown={function handleEvent}\n                                  onKeyDown={function handleEvent}\n                                  ref={function}\n                                >\n          ...\n      ...\n        <MenuProvider scope={{Menu:[...], ...}} onClose={function Menu.useCallback} isUsingKeyboardRef={{current:false}} ...>\n          <DropdownMenuTrigger asChild={true}>\n            <DropdownMenuTrigger data-slot=\"dropdown-m...\" asChild={true}>\n              <MenuAnchor asChild={true} __scopeMenu={{Menu:[...], ...}}>\n                <PopperAnchor __scopePopper={{Menu:[...], ...}} asChild={true} ref={null}>\n                  <Primitive.div asChild={true} ref={function}>\n                    <Primitive.div.Slot ref={function}>\n                      <Primitive.div.SlotClone ref={function}>\n                        <Primitive.button type=\"button\" id=\"radix-_R_7...\" aria-haspopup=\"menu\" aria-expanded={false} ...>\n                          <Primitive.button.Slot type=\"button\" id=\"radix-_R_7...\" aria-haspopup=\"menu\" ...>\n                            <Primitive.button.SlotClone type=\"button\" id=\"radix-_R_7...\" aria-haspopup=\"menu\" ...>\n                              <Button variant=\"ghost\" size=\"icon\" className=\"rounded-fu...\" type=\"button\" ...>\n                                <button\n                                  data-slot=\"dropdown-menu-trigger\"\n                                  data-variant=\"ghost\"\n                                  data-size=\"icon\"\n                                  className={\"inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm...\"}\n                                  type=\"button\"\n+                                 id=\"radix-_R_77itmlb_\"\n-                                 id=\"radix-_R_suitmlb_\"\n                                  aria-haspopup=\"menu\"\n                                  aria-expanded={false}\n                                  aria-controls={undefined}\n                                  data-state=\"closed\"\n                                  data-disabled={undefined}\n                                  disabled={false}\n                                  onPointerDown={function handleEvent}\n                                  onKeyDown={function handleEvent}\n                                  ref={function}\n                                >\n          ...\n",
+        "A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.\n- Date formatting in a user's locale which doesn't match the server.\n- External changing data without sending a snapshot of it along with the HTML.\n- Invalid HTML tag nesting.\n\nIt can also happen if the client has a browser extension installed which messes with the HTML before React loaded.\n\n%s%s https://react.dev/link/hydration-mismatch \n\n  ...\n    <div className=\"flex items...\">\n      <ThemeToggle>\n      ...\n        <MenuProvider scope={{Menu:[...], ...}} onClose={function Menu.useCallback} isUsingKeyboardRef={{current:false}} ...>\n          <DropdownMenuTrigger asChild={true}>\n            <DropdownMenuTrigger data-slot=\"dropdown-m...\" asChild={true}>\n              <MenuAnchor asChild={true} __scopeMenu={{Menu:[...], ...}}>\n                <PopperAnchor __scopePopper={{Menu:[...], ...}} asChild={true} ref={null}>\n                  <Primitive.div asChild={true} ref={function}>\n                    <Primitive.div.Slot ref={function}>\n                      <Primitive.div.SlotClone ref={function}>\n                        <Primitive.button type=\"button\" id=\"radix-_R_5...\" aria-haspopup=\"menu\" aria-expanded={false} ...>\n                          <Primitive.button.Slot type=\"button\" id=\"radix-_R_5...\" aria-haspopup=\"menu\" ...>\n                            <Primitive.button.SlotClone type=\"button\" id=\"radix-_R_5...\" aria-haspopup=\"menu\" ...>\n                              <Button variant=\"ghost\" size=\"icon\" className=\"relative r...\" type=\"button\" ...>\n                                <button\n                                  data-slot=\"dropdown-menu-trigger\"\n                                  data-variant=\"ghost\"\n                                  data-size=\"icon\"\n                                  className={\"inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm...\"}\n                                  type=\"button\"\n+                                 id=\"radix-_R_57itmlb_\"\n-                                 id=\"radix-_R_kuitmlb_\"\n                                  aria-haspopup=\"menu\"\n                                  aria-expanded={false}\n                                  aria-controls={undefined}\n                                  data-state=\"closed\"\n                                  data-disabled={undefined}\n                                  disabled={false}\n                                  onPointerDown={function handleEvent}\n                                  onKeyDown={function handleEvent}\n                                  ref={function}\n                                >\n          ...\n      ...\n        <MenuProvider scope={{Menu:[...], ...}} onClose={function Menu.useCallback} isUsingKeyboardRef={{current:false}} ...>\n          <DropdownMenuTrigger asChild={true}>\n            <DropdownMenuTrigger data-slot=\"dropdown-m...\" asChild={true}>\n              <MenuAnchor asChild={true} __scopeMenu={{Menu:[...], ...}}>\n                <PopperAnchor __scopePopper={{Menu:[...], ...}} asChild={true} ref={null}>\n                  <Primitive.div asChild={true} ref={function}>\n                    <Primitive.div.Slot ref={function}>\n                      <Primitive.div.SlotClone ref={function}>\n                        <Primitive.button type=\"button\" id=\"radix-_R_7...\" aria-haspopup=\"menu\" aria-expanded={false} ...>\n                          <Primitive.button.Slot type=\"button\" id=\"radix-_R_7...\" aria-haspopup=\"menu\" ...>\n                            <Primitive.button.SlotClone type=\"button\" id=\"radix-_R_7...\" aria-haspopup=\"menu\" ...>\n                              <Button variant=\"ghost\" size=\"icon\" className=\"rounded-fu...\" type=\"button\" ...>\n                                <button\n                                  data-slot=\"dropdown-menu-trigger\"\n                                  data-variant=\"ghost\"\n                                  data-size=\"icon\"\n                                  className={\"inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm...\"}\n                                  type=\"button\"\n+                                 id=\"radix-_R_77itmlb_\"\n-                                 id=\"radix-_R_suitmlb_\"\n                                  aria-haspopup=\"menu\"\n                                  aria-expanded={false}\n                                  aria-controls={undefined}\n                                  data-state=\"closed\"\n                                  data-disabled={undefined}\n                                  disabled={false}\n                                  onPointerDown={function handleEvent}\n                                  onKeyDown={function handleEvent}\n                                  ref={function}\n                                >\n          ...\n"
+      ]
+    },
+    "mobile": {
+      "visibleNavLabels": [],
+      "viewportMetrics": {
+        "innerWidth": 390,
+        "innerHeight": 844,
+        "clientWidth": 390,
+        "clientHeight": 844,
+        "scrollWidth": 390,
+        "scrollHeight": 2764,
+        "canScrollX": false,
+        "canScrollY": true
+      },
+      "screenshot": "/Users/helena/Cursor/jiesong_system/frontend/qa-artifacts/interactive-qa-20260306/mobile-dashboard.png",
+      "pageErrors": [],
+      "consoleErrors": []
+    }
+  },
+  "findings": [
+    {
+      "id": "F-LOGIN-CHECKBOX-NAME",
+      "severity": "medium",
+      "message": "登录页存在可聚焦但无可读名称的表单控件。当前键盘巡检命中了一个 `role=\"checkbox\"` 控件，但没有读到 `aria-label`、可关联标签或其它可访问名称。",
+      "evidence": "/Users/helena/Cursor/jiesong_system/frontend/qa-artifacts/interactive-qa-20260306/desktop-login.png"
+    },
+    {
+      "id": "F-MOBILE-NAV",
+      "severity": "high",
+      "message": "移动端 390x844 首屏没有可见的全局导航入口。侧边栏在 `md` 以下被隐藏，而顶部 Header 也没有替代的菜单按钮，用户进入工作台后无法通过界面继续切换主要模块。",
+      "evidence": "/Users/helena/Cursor/jiesong_system/frontend/qa-artifacts/interactive-qa-20260306/mobile-dashboard.png"
+    }
+  ]
+}

@@ -8,6 +8,19 @@
 import { test, expect, type Locator } from '@playwright/test';
 import { mockApiRoutes, signInAsAdmin } from './helpers';
 
+const escapeForRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const firstVisible = async (locator: Locator): Promise<Locator> => {
+  const count = await locator.count();
+  for (let index = 0; index < count; index += 1) {
+    const candidate = locator.nth(index);
+    if (await candidate.isVisible().catch(() => false)) {
+      return candidate;
+    }
+  }
+  return locator.first();
+};
+
 test.beforeEach(async ({ page }) => {
   await mockApiRoutes(page);
 });
@@ -17,7 +30,9 @@ const safeClick = async (locator: Locator) => {
 
   for (let attempt = 1; attempt <= retryTimes; attempt += 1) {
     try {
-      await locator.first().click({ timeout: 10000 });
+      const target = await firstVisible(locator);
+      await target.scrollIntoViewIfNeeded().catch(() => {});
+      await target.click({ timeout: 10000 });
       return;
     } catch (error) {
       if (attempt === retryTimes) {
@@ -44,6 +59,7 @@ test.describe('登录与权限', () => {
 test.describe('侧边栏导航全覆盖', () => {
   test('所有导航入口可点击并进入对应页面', async ({ page }) => {
     await signInAsAdmin(page, '/dashboard/contracts');
+    const sidebarNav = page.locator('nav').first();
 
     const navCases = [
       { label: '工作台', path: '/dashboard', url: /\/dashboard$/, heading: '工作台' },
@@ -59,12 +75,15 @@ test.describe('侧边栏导航全覆盖', () => {
     ] as const;
 
     for (const item of navCases) {
-      const navLink = page.getByRole('link', { name: item.label });
+      const navLink = sidebarNav.getByRole('link', {
+        name: new RegExp(`^\\s*${escapeForRegex(item.label)}\\s*$`),
+      });
       if (await navLink.count()) {
         await safeClick(navLink);
       } else {
         await page.goto(item.path);
       }
+      await page.waitForLoadState('domcontentloaded');
       await expect(page).toHaveURL(item.url, { timeout: 10000 });
       await expect(page.getByRole('heading', { name: item.heading })).toBeVisible({ timeout: 10000 });
     }
@@ -82,12 +101,12 @@ test.describe('关键按钮交互', () => {
   test('工作台快捷入口：新建采购 / 新建销售', async ({ page }) => {
     await signInAsAdmin(page, '/dashboard');
 
-    await safeClick(page.getByRole('button', { name: '新建采购' }));
+    await safeClick(page.getByRole('button', { name: /^新建采购/ }));
     await expect(page).toHaveURL(/\/dashboard\/purchase\/create$/);
     await expect(page.getByRole('heading', { name: '新增采购合同' })).toBeVisible();
 
     await safeClick(page.getByRole('link', { name: '工作台' }));
-    await safeClick(page.getByRole('button', { name: '新建销售' }));
+    await safeClick(page.getByRole('button', { name: /^新建销售/ }));
     await expect(page).toHaveURL(/\/dashboard\/sales\/create$/);
     await expect(page.getByRole('heading', { name: '创建出口合同' })).toBeVisible();
   });
@@ -96,7 +115,7 @@ test.describe('关键按钮交互', () => {
     await signInAsAdmin(page, '/dashboard/contracts');
     await expect(page.getByRole('heading', { name: '采购合同' })).toBeVisible();
 
-    await safeClick(page.getByRole('button', { name: '新增采购' }));
+    await safeClick(page.getByRole('button', { name: /^新增采购/ }));
     await expect(page).toHaveURL(/\/dashboard\/purchase\/create$/);
     await expect(page.getByRole('heading', { name: '新增采购合同' })).toBeVisible();
   });
@@ -105,12 +124,12 @@ test.describe('关键按钮交互', () => {
     await signInAsAdmin(page, '/dashboard/sales');
     await expect(page.getByRole('heading', { name: '出口合同' })).toBeVisible();
 
-    await safeClick(page.getByRole('button', { name: '新增出口合同' }));
+    await safeClick(page.getByRole('button', { name: /^新增出口合同/ }));
     await expect(page).toHaveURL(/\/dashboard\/sales\/create$/, { timeout: 10000 });
     await expect(page.getByRole('heading', { name: '创建出口合同' })).toBeVisible();
 
     await signInAsAdmin(page, '/dashboard/sales');
-    await safeClick(page.getByRole('button', { name: '查看合同 EXP2600001' }));
+    await safeClick(page.getByRole('button', { name: /查看合同\s*EXP2600001/ }));
     await expect(page).toHaveURL(/\/dashboard\/sales\/sc-001$/, { timeout: 10000 });
     await expect(page.getByRole('heading', { name: 'EXP2600001' })).toBeVisible();
   });
@@ -175,12 +194,12 @@ test.describe('关键按钮交互', () => {
     await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
 
     await safeClick(page.getByRole('tab', { name: '数据导入' }));
-    await safeClick(page.getByText('查看历史导入任务执行状态与失败明细'));
+    await safeClick(page.getByText(/查看历史导入任务执行状态与失败明细/));
     await expect(page).toHaveURL(/\/dashboard\/system\/import-records$/);
 
     await signInAsAdmin(page, '/dashboard/settings');
     await safeClick(page.getByRole('tab', { name: '数据导出' }));
-    await safeClick(page.getByRole('button', { name: '导出数据' }));
+    await safeClick(page.getByRole('button', { name: /导出数据/ }));
     await expect(page).toHaveURL(/\/dashboard\/settings$/);
   });
 });

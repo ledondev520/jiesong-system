@@ -10,7 +10,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const config = require('../config');
-const { MODELS, estimateTokens, parseInput } = require('./aiService');
+const { MODELS, estimateTokens, parseInput, generateGreeting } = require('./aiService');
 
 /**
  * 职责：临时关闭Kimi配置执行测试
@@ -52,3 +52,14 @@ test('parseInput 在无API Key时走本地解析', async () => {
   });
 });
 
+test('generateGreeting 在测试环境默认走本地降级且输出稳定', async () => {
+  const result = await generateGreeting();
+  assert.equal(result.source, 'local');
+  assert.equal(result.greeting, '每一天都是新的开始！');
+  assert.deepEqual(result.lyrics, [
+    '欢迎使用捷淞进销存系统',
+    'AI助手随时为您服务',
+    '祝您工作顺利',
+    '今天也要加油哦',
+  ]);
+});

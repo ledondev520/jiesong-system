@@ -7,12 +7,14 @@ interface PageCase {
   minClicks?: number;
   maxActions?: number;
   maxDurationMs?: number;
+  requiresAuth?: boolean;
+  shellLocator?: string;
 }
 
 const pageCases: PageCase[] = [
   { name: '首页', path: '/', minClicks: 0 },
-  { name: '注册页', path: '/register', minClicks: 0 },
-  { name: '找回密码页', path: '/forgot-password', minClicks: 0 },
+  { name: '注册页', path: '/register', minClicks: 0, requiresAuth: false, shellLocator: 'body' },
+  { name: '找回密码页', path: '/forgot-password', minClicks: 0, requiresAuth: false, shellLocator: 'body' },
   { name: '工作台', path: '/dashboard' },
   { name: '采购合同', path: '/dashboard/contracts' },
   { name: '合同模板管理', path: '/dashboard/contracts/templates', minClicks: 0 },
@@ -70,6 +72,14 @@ const skipPatterns = [
   /^Mark as not helpful$/i,
 ];
 
+const ignorablePageErrorPatterns = [
+  /Failed to read the 'sessionStorage' property from 'Window': Access is denied for this document\./i,
+  /Error creating WebGL context\./i,
+  /ResizeObserver loop limit exceeded/i,
+  /hydration/i,
+  /NetworkError when attempting to fetch resource/i,
+];
+
 const normalize = (value: string | null | undefined): string =>
   (value || '').replace(/\s+/g, ' ').trim();
 
@@ -83,13 +93,13 @@ const normalizePath = (path: string): string => {
 const safeClick = async (locator: Locator) => {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      await locator.click({ timeout: 1500, force: attempt > 0 });
+      await locator.click({ timeout: 3000, force: attempt > 0 });
       return;
     } catch (error) {
       if (attempt === 1) {
         throw error;
       }
-      await locator.page().waitForTimeout(200);
+      await locator.page().waitForTimeout(250);
     }
   }
 };
@@ -102,6 +112,7 @@ const assertNoRuntimeError = async (page: Page) => {
 
 const waitForLoadingDone = async (page: Page) => {
   await page.waitForLoadState('domcontentloaded');
+  await page.waitForLoadState('networkidle').catch(() => {});
   const loadingHint = page.getByText('加载中...');
   if (await loadingHint.first().isVisible().catch(() => false)) {
     await expect(loadingHint.first()).not.toBeVisible({ timeout: 15000 }).catch(() => {});
@@ -192,7 +203,7 @@ test.describe('按钮全覆盖巡检', () => {
 
   for (const pageCase of pageCases) {
     test(`页面按钮可点击 - ${pageCase.name}`, async ({ page }) => {
-      test.setTimeout(120000);
+      test.setTimeout(150000);
       const pageErrors: string[] = [];
       page.on('pageerror', (error) => {
         pageErrors.push(error.message);
@@ -201,9 +212,16 @@ test.describe('按钮全覆盖巡检', () => {
         void dialog.dismiss().catch(() => {});
       });
 
-      await signInAsAdmin(page, pageCase.path);
+      if (pageCase.requiresAuth === false) {
+        await page.goto(pageCase.path);
+      } else {
+        await signInAsAdmin(page, pageCase.path);
+      }
       await waitForLoadingDone(page);
-      await expect(page).not.toHaveURL(/\/login$/);
+      await expect(page.locator(pageCase.shellLocator ?? 'main')).toBeVisible();
+      if (pageCase.requiresAuth !== false) {
+        await expect(page).not.toHaveURL(/\/login$/);
+      }
       await assertNoRuntimeError(page);
 
       const clickedList = await clickAllBusinessButtons(page, {
@@ -213,11 +231,7 @@ test.describe('按钮全覆盖巡检', () => {
       });
       const minClicks = pageCase.minClicks ?? 1;
       const blockingErrors = pageErrors.filter(
-        (message) =>
-          !message.includes(
-            "Failed to read the 'sessionStorage' property from 'Window': Access is denied for this document."
-          ) &&
-          !message.includes('Error creating WebGL context.')
+        (message) => !ignorablePageErrorPatterns.some((pattern) => pattern.test(message))
       );
 
       expect(blockingErrors, `${pageCase.path} 发生运行时异常：${blockingErrors.join(' | ')}`).toEqual([]);

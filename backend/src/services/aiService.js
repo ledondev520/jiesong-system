@@ -13,6 +13,26 @@ const { collectStreamedChat } = require('./ai/streamHelpers');
 
 const OpenAI = require('openai');
 
+const parsePositiveIntEnv = (value, fallback, min, max) => {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+    return fallback;
+  }
+  return parsed;
+};
+
+const isCiRuntime = process.env.CI === 'true';
+const isNodeTestRuntime =
+  (Array.isArray(process.execArgv) && process.execArgv.includes('--test')) ||
+  process.argv.some((arg) => /\.test\.[cm]?[jt]sx?$/.test(arg));
+const isTestRuntime = process.env.NODE_ENV === 'test' || isNodeTestRuntime;
+const shouldForceLocalAI =
+  process.env.AI_FORCE_LOCAL === 'true' ||
+  ((isCiRuntime || isTestRuntime) && process.env.AI_ALLOW_REMOTE !== 'true');
+
+const kimiRequestTimeoutMs = parsePositiveIntEnv(process.env.KIMI_REQUEST_TIMEOUT_MS, 3500, 500, 30000);
+const kimiGreetingTimeoutMs = parsePositiveIntEnv(process.env.KIMI_GREETING_TIMEOUT_MS, 1200, 200, 10000);
+
 // Kimi 模型配置
 const MODELS = {
   default: 'kimi-k2-turbo-preview', // 默认模型
@@ -50,12 +70,30 @@ const extractErrorMessage = (error) => {
   return '抱歉，AI服务出错了。';
 };
 
+const pickStableOrRandom = (items) => {
+  if (!Array.isArray(items) || items.length === 0) {
+    return null;
+  }
+  if (isCiRuntime || isTestRuntime) {
+    return items[0];
+  }
+  return items[Math.floor(Math.random() * items.length)];
+};
+
+const createTimeoutSignal = (timeoutMs) => {
+  if (typeof AbortSignal === 'undefined' || typeof AbortSignal.timeout !== 'function') {
+    return undefined;
+  }
+  return AbortSignal.timeout(timeoutMs);
+};
+
 // 初始化OpenAI客户端（用于流式调用）
 const getOpenAIClient = () => {
-  if (!config.kimi.apiKey) return null;
+  if (!config.kimi.apiKey || shouldForceLocalAI) return null;
   return new OpenAI({
     apiKey: config.kimi.apiKey,
     baseURL: config.kimi.baseUrl,
+    timeout: kimiRequestTimeoutMs,
   });
 };
 
@@ -430,14 +468,21 @@ const estimateTokens = async (messages, model = MODELS.default) => {
   }
   
   try {
-    const response = await fetch(`${config.kimi.baseUrl}/tokenizers/estimate-token-count`, {
+    const requestOptions = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${config.kimi.apiKey}`,
       },
       body: JSON.stringify({ model, messages }),
-    });
+    };
+
+    const timeoutSignal = createTimeoutSignal(kimiRequestTimeoutMs);
+    if (timeoutSignal) {
+      requestOptions.signal = timeoutSignal;
+    }
+
+    const response = await fetch(`${config.kimi.baseUrl}/tokenizers/estimate-token-count`, requestOptions);
     
     if (!response.ok) {
       console.error('Token估算请求失败:', response.status);
@@ -710,10 +755,9 @@ const generateGreeting = async () => {
     return getLocalGreeting();
   }
 
-  // 随机选择一首歌
-  const randomSong = MAYDAY_SONGS[Math.floor(Math.random() * MAYDAY_SONGS.length)];
+  const selectedSong = pickStableOrRandom(MAYDAY_SONGS) || MAYDAY_SONGS[0];
 
-  const systemPrompt = `你是精通歌词的大师。请根据五月天歌曲《${randomSong}》的歌词，生成一段温暖的问候语。
+  const systemPrompt = `你是精通歌词的大师。请根据五月天歌曲《${selectedSong}》的歌词，生成一段温暖的问候语。
 
 要求：
 1. 生成一句简短的问候语（10字） 
@@ -722,7 +766,7 @@ const generateGreeting = async () => {
 直接输出5行文字，不要其他内容。`;
 
   try {
-    const stream = await client.chat.completions.create({
+    const requestOptions = {
       model: 'kimi-k2-turbo-preview',
       messages: [
         { role: 'system', content: systemPrompt },
@@ -730,17 +774,24 @@ const generateGreeting = async () => {
       ],
       temperature: 0.8,
       stream: true,
-    });
+    };
+
+    const timeoutSignal = createTimeoutSignal(kimiGreetingTimeoutMs);
+    if (timeoutSignal) {
+      requestOptions.signal = timeoutSignal;
+    }
+
+    const stream = await client.chat.completions.create(requestOptions);
 
     const fullContent = await collectStreamText(stream);
 
     const lines = fullContent.trim().split('\n').filter(line => line.trim());
     
     if (lines.length >= 2) {
-      console.log(`[AI Greeting] 成功生成问候语，歌曲：${randomSong}`);
+      console.log(`[AI Greeting] 成功生成问候语，歌曲：${selectedSong}`);
       return {
         greeting: lines[0].trim(),
-        songName: randomSong,
+        songName: selectedSong,
         lyrics: lines.slice(1, 5).map(line => line.trim()),
         source: 'ai',
       };
@@ -803,7 +854,7 @@ const getLocalGreeting = () => {
     },
   ];
 
-  const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+  const randomGreeting = pickStableOrRandom(greetings) || greetings[0];
   return { ...randomGreeting, source: 'local' };
 };
 

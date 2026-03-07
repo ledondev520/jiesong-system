@@ -709,3 +709,56 @@
   - `next build` 未通过，失败原因来自既有问题与环境限制：
     - 既有语法错误：`frontend/src/components/tools/ClaudeCostCalculator.tsx`。
     - 网络受限导致 Google Fonts 拉取失败。
+
+## 2026-03-06 Round 40（CI: Performance Smoke + Frontend E2E）
+
+- 已完成本轮目标：
+  - 修复 `Performance Smoke (LLM Route)` 潜在超时根因：AI 问候链路对外部模型依赖引入不可控延迟。
+  - 修复 `Frontend E2E` 潜在不稳定根因：认证页被按钮巡检误判为 dashboard shell，且部分定位/点击策略过于脆弱。
+- 已完成项：
+  - `backend/src/services/aiService.js`
+    - 新增 CI/test 本地降级策略（默认启用，可由 `AI_ALLOW_REMOTE=true` 覆盖）。
+    - 补齐 Node `--test` 运行识别，避免仅靠 `NODE_ENV=test` 导致测试环境仍发起远程 LLM 请求。
+    - 新增请求超时参数：`KIMI_REQUEST_TIMEOUT_MS`、`KIMI_GREETING_TIMEOUT_MS`。
+    - `generateGreeting` 与 `estimateTokens` 接入超时信号，超时自动回落本地问候。
+  - `backend/src/services/aiService.test.js`
+    - 新增回归测试，锁定测试环境默认本地问候降级与稳定输出。
+  - `frontend/e2e/smoke.spec.ts`
+    - 侧边栏导航定位收敛到 `nav`，避免同名元素误点击。
+    - `safeClick` 优先点击可见元素并保留滚动/重试容错。
+    - 关键按钮选择器改为更稳健正则匹配。
+  - `frontend/e2e/button-coverage.spec.ts`
+    - 区分公开认证页与需登录业务页；认证页不再注入登录态，也不再强依赖 `main` 容器。
+    - 点击超时和页面加载等待策略放宽（`networkidle` + 更长 click timeout）。
+    - 增补 pageerror 非业务噪声过滤（hydration/ResizeObserver 等）。
+    - 单测级超时调高到 `150000ms`。
+  - `frontend/playwright.config.ts`
+    - CI 强制 `workers=1`，降低并发导致的不稳定。
+    - `baseURL/webServer` 统一 `127.0.0.1`。
+- 验证结论：
+  - `cd frontend && npx playwright test --list`：通过（52 条）。
+  - `cd backend && node --test src/services/aiService.test.js src/controllers/aiController.test.js`：通过（5/5）。
+  - `cd frontend && npm run test -- 'src/app/(auth)/login/page.test.tsx' 'src/app/(auth)/register/page.test.tsx' 'src/app/(auth)/forgot-password/page.test.tsx'`：通过（10/10）。
+  - `cd frontend && npm run test`：未全绿；存在与本次 CI 修复无关的既有失败 `src/app/dashboard/containers/[id]/page.test.tsx` 2 条超时。
+
+## 2026-03-06 Round 41（Frontend Interaction QA Audit）
+
+- 已完成本轮目标：
+  - 使用仓库现有 Playwright 用例 + 补充交互验收脚本，对前端桌面端/移动端/键盘可达性做一轮可复跑验收。
+  - 给出“是否已能让用户无障碍完整使用系统”的当前结论。
+- 已完成项：
+  - 现有 E2E 广覆盖复验：
+    - `frontend/e2e/smoke.spec.ts`：14/14 通过。
+    - `frontend/e2e/button-coverage.spec.ts`：38/38 通过。
+  - 新增补充验收脚本：
+    - `frontend/scripts/interactive-qa-audit.mjs`
+    - 覆盖登录页键盘焦点链、桌面工作台首屏、通知中心状态切换、系统日志筛选、导入记录筛选、移动端首屏导航可达性。
+  - 新增验收产物：
+    - `docs/quality/前端交互验收_20260306.md`
+    - `frontend/qa-artifacts/interactive-qa-20260306/*`
+- 验证结论：
+  - 桌面端关键交互链路当前可用，且运行时未发现阻断性 pageerror。
+  - 当前不能签收“用户可无障碍完整使用系统”，存在 2 个明确缺口：
+    - 高优先级：移动端 Dashboard 首屏无可见全局导航入口。
+    - 中优先级：登录页 rememberMe 复选框缺少可访问名称。
+  - 另观察到 1 类残余噪声：Header 下拉触发器存在 hydration mismatch 警告，未在本轮修复。
