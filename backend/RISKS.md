@@ -14,3 +14,4 @@
 | HSCODE-R2 | SQLite 无法提供真正全文索引 | `productName` “全文搜索”实现与 PostgreSQL 预期不同 | 本轮按 SQLite 能力保留普通索引，并在结果中注明服务层使用 `contains` 搜索 | 后续若切 PostgreSQL，再追加 FTS/index migration |
 | HSCODE-R3 | 本地库已存在 `hs_codes` 表或迁移状态不一致 | `migrate dev` 失败或要求 reset | 先执行 `prisma validate` / `migrate status`，以现有 migration 为准应用；拒绝破坏性 reset | 保留现有 DB，仅记录未完成项与阻塞原因 |
 | HSCODE-R4 | 本轮 `hsCodes` 路由未接入鉴权 | 若后续要求该数据仅内部可见，需要补统一访问控制 | 当前按任务要求交付公开查询能力；后续进入联调时再与前端/权限策略统一收口 | 回退 `src/routes/index.js` 中 `/hs-codes` 挂载或在路由前补 `authenticate` |
+| HSCODE-R5 | live JSON 中部分编码条目可能缺少可解析退税率或申报段落 | 自动生成退税草稿时可退金额不完整、部分报关单被跳过 | 导入阶段保留完整 `rawPayloadJson`，生成草稿时对缺失税率明细做 skip/warning，不写入伪造金额 | 回退自动草稿生成逻辑，仅保留 live HSCode 入库 |

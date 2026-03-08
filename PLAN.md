@@ -837,19 +837,24 @@
 - 已完成项：
   - 新增 `backend/scripts/test_scrape_hscode_raw.py`，覆盖搜索页去重与详情页结构化解析。
   - 新增 `backend/scripts/scrape_hscode_raw.py`，支持章节抓取、详情解析、分文件落盘、章节快照和断点续跑。
-  - 已完成真实抓取首批数据，当前 `backend/data/hscode-live/records` 已落盘 764 条记录：
-    - `01` 章：147 条
-    - `02` 章：143 条
-    - `03` 章：400 条（本轮中断点）
-    - `04` 章：16 条（已开始）
-    - `69` 章：58 条（烟测批次）
+  - 新增 `backend/scripts/test_export_hscode_csv.py` 与 `backend/scripts/export_hscode_csv.py`，将原始 JSON 快照整理为单一大 CSV。
+  - 已完成 `01`-`99` 全量章节扫取，当前 `backend/data/hscode-live/records` 共 908 条原始记录。
+  - 已生成总表：
+    - `backend/data/hscode-live/hscode-live.csv`
+- 最终快照分布：
+  - `01` 章：147 条
+  - `02` 章：143 条
+  - `03` 章：400 条
+  - `04` 章：70 条
+  - `05` 章：90 条
+  - `69` 章：58 条
 - 验证结论：
-  - `python3 -m unittest backend/scripts/test_scrape_hscode_raw.py`：通过（2/2）。
-  - `python3 backend/scripts/scrape_hscode_raw.py --chapters 69 --request-delay 0.05`：通过，落盘 58 条。
-  - `python3 backend/scripts/scrape_hscode_raw.py --chapters 03,04,05 --request-delay 0.03 --workers 4`：已验证真实落盘生效，当前按文件可续跑。
-- 后续动作：
-  - 继续执行全量章节抓取，直至 `01`-`99` 全部完成。
-  - 第二阶段再基于 `records/*.json` 做字段标准化与入库映射。
+  - `python3 -m unittest backend/scripts/test_scrape_hscode_raw.py backend/scripts/test_export_hscode_csv.py`：通过（3/3）。
+  - `python3 backend/scripts/scrape_hscode_raw.py --request-delay 0.02 --workers 6`：完成，最终快照 908 条。
+  - `python3 backend/scripts/export_hscode_csv.py`：完成，导出 CSV 908 行数据。
+- 观察结论：
+  - 站点章节搜索并非 99 章都返回结果；当前可抓取数据主要集中在 `01`、`02`、`03`、`04`、`05`、`69` 章节前缀。
+  - CSV 已可作为下一阶段清洗、筛选与入库的统一输入。
 
 ## 2026-03-08 Round 44（Customs Declarations Closeout + Frontend Build Recovery）
 
@@ -867,3 +872,21 @@
   - `cd frontend && npm run lint -- <touched-files>`：通过。
   - `cd frontend && npm run build`：通过。
   - `cd frontend && npm run test -- --coverage src/services/customsDeclaration.service.test.ts src/app/customs-declarations/layout.test.tsx src/app/customs-declarations/page.test.tsx src/app/customs-declarations/create/page.test.tsx 'src/app/customs-declarations/[id]/page.test.tsx' 'src/app/customs-declarations/[id]/edit/page.test.tsx'`：通过；coverage 报告仍按仓库全量口径输出。
+
+## 2026-03-08 Round 45（Live HSCode Import + Tax Refund Draft Automation）
+
+- 已完成本轮目标：
+  - 将真实 HSCode JSON 清洗入 `hs_codes` 正式表，并保留完整原始 payload。
+  - 基于报关单明细自动生成退税草稿，并在退税列表页接入触发入口。
+- 已完成项：
+  - `backend/prisma/schema.prisma` 已扩展 `HsCode` 字段，新增退税率/申报要素/监管条件/检验检疫/多组 JSON 留存字段与 `rawPayloadJson`。
+  - `backend/scripts/import-hscode-live.js` 与 `backend/scripts/import-hscode-live.test.js` 已落地，导入逻辑默认以 live JSON 重建 `hs_codes` 表。
+  - 已执行 migration `20260308124928_extend_hs_codes_for_live_import`。
+  - 已真实执行 `node scripts/import-hscode-live.js`，当前数据库 `hs_codes` 记录数为 `905`，样例 seed 不再作为系统主查询源。
+  - `backend/src/services/taxRefundDraftService.js` 已实现按报关单自动生成退税草稿。
+  - `backend/src/routes/taxRefunds.js` 已新增 `POST /tax-refunds/auto-drafts`，前端退税列表页已新增“自动生成草稿”按钮。
+- 验证结论：
+  - `cd backend && node --test scripts/import-hscode-live.test.js src/services/taxRefundDraftService.test.js src/controllers/taxRefundController.test.js src/routes/taxModules.test.js src/services/hsCodeService.test.js src/routes/hsCodes.test.js`：通过（19/19）。
+  - `cd frontend && npm test -- src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.test.tsx`：通过（9/9）。
+  - `cd frontend && npm run lint -- src/services/taxRefund.service.ts src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.tsx src/app/dashboard/tax-refunds/page.test.tsx src/app/dashboard/tax-refunds/components/TaxRefundListPageContent.tsx src/types/index.ts`：通过。
+  - `cd frontend && npm run build`：通过。

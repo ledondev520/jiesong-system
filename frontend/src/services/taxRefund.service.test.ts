@@ -75,4 +75,15 @@ describe('taxRefundService', () => {
 
     expect(api.put).toHaveBeenCalledWith('/tax-refunds/tr-1', payload);
   });
+
+  it('generateDrafts 调用自动草稿接口', async () => {
+    const payload = {
+      customsDeclarationId: 'cd-1',
+      replaceExisting: true,
+    };
+
+    await taxRefundService.generateDrafts(payload);
+
+    expect(api.post).toHaveBeenCalledWith('/tax-refunds/auto-drafts', payload);
+  });
 });

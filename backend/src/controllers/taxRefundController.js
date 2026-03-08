@@ -5,7 +5,9 @@
  */
 
 const taxRefundService = require('../services/taxRefundService');
+const taxRefundDraftService = require('../services/taxRefundDraftService');
 const { createCrudController } = require('./shared/createCrudController');
+const { success } = require('../utils/response');
 
 const controller = createCrudController({
   listMethod: (...args) => taxRefundService.listTaxRefunds(...args),
@@ -26,4 +28,12 @@ module.exports = {
   createTaxRefund: controller.create,
   updateTaxRefund: controller.update,
   removeTaxRefund: controller.remove,
+  generateTaxRefundDrafts: async (req, res, next) => {
+    try {
+      const result = await taxRefundDraftService.generateTaxRefundDrafts(req.body || {});
+      success(res, result, '退税草稿生成完成');
+    } catch (error) {
+      next(error);
+    }
+  },
 };

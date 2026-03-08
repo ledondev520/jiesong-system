@@ -84,3 +84,30 @@
 - 已新增 `src/routes/hsCodes.js`，支持 `GET /search?q=keyword&limit=10` 与 `GET /:code`。
 - 已在 `src/routes/index.js` 挂载 `/hs-codes`。
 - 定向验证结果：`node --test src/services/hsCodeService.test.js src/routes/hsCodes.test.js` 通过。
+
+## 2026-03-08 Round 4: Live HSCode Import + Tax Refund Draft Automation
+
+### Goal
+- 将 `backend/data/hscode-live/records/*.json` 清洗并导入 `hs_codes` 正式表，保留真实查询字段与完整原始 payload。
+- 基于报关单明细、live HSCode 退税率和核销记录，自动生成退税草稿。
+
+### Execution Outcome
+- `prisma/schema.prisma` 已扩展 `HsCode` 模型，可保留：
+  - `refundRate/exportTaxRate/vatRate`
+  - `declarationElements/supervisionConditions/inspectionQuarantine`
+  - 各章节/CIQ/协定税率/税率信息的 JSON 字段
+  - `rawPayloadJson`
+- 已生成并执行 migration：`20260308124928_extend_hs_codes_for_live_import`。
+- 已新增 `scripts/import-hscode-live.js` 与 `scripts/import-hscode-live.test.js`，导入逻辑默认先清空旧 `hs_codes` 数据，再从 live JSON 全量重建。
+- 已真实执行导入，当前 `hs_codes` 表记录数为 `905`，样例 seed 已被 live 数据接管。
+- 已新增 `src/services/taxRefundDraftService.js`，实现按报关单自动生成退税草稿。
+- 已在 `src/controllers/taxRefundController.js` 和 `src/routes/taxRefunds.js` 接入 `POST /tax-refunds/auto-drafts`。
+
+### Verification
+- `node --test scripts/import-hscode-live.test.js src/services/taxRefundDraftService.test.js src/controllers/taxRefundController.test.js src/routes/taxModules.test.js src/services/hsCodeService.test.js src/routes/hsCodes.test.js`
+- `npx prisma migrate dev --name extend_hs_codes_for_live_import`
+- `node scripts/import-hscode-live.js`
+
+### Current Capability
+- HSCode 主查询源现在已切换为真实 JSON 清洗后的正式库数据。
+- 退税草稿现在可按报关单明细自动生成，但依赖明细上的 `hsCode + totalPrice` 完整度；缺失时会跳过而不是盲目生成错误金额。

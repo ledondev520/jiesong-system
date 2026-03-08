@@ -118,6 +118,24 @@
 - 替换范围：页面标题、认证标题、侧边栏品牌位、Header 日期图标
 
 ### 结论
+
+## 2026-03-08 Round 44 (HSCode Live Raw Capture)
+
+### 质量指标
+- 抓取解析 + CSV 导出单测：`python3 -m unittest backend/scripts/test_scrape_hscode_raw.py backend/scripts/test_export_hscode_csv.py` => 3/3 通过
+- 真实站点全量章节扫取：`python3 backend/scripts/scrape_hscode_raw.py --request-delay 0.02 --workers 6` => 完成，0 抓取异常退出
+- CSV 导出：`python3 backend/scripts/export_hscode_csv.py` => 908 行数据导出成功
+
+### 过程指标
+- 新增脚本：2（`backend/scripts/scrape_hscode_raw.py`、`backend/scripts/export_hscode_csv.py`）
+- 新增测试：2（`backend/scripts/test_scrape_hscode_raw.py`、`backend/scripts/test_export_hscode_csv.py`）
+- 当前原始记录落盘数：908
+- 当前 CSV 文件大小：约 1.77 MB
+- 当前已触达章节前缀：`01`、`02`、`03`、`04`、`05`、`69`
+
+### 结论
+- 原始抓取链路与 CSV 汇总链路都已跑通。
+- 当前已交付一份可直接打开使用的大 CSV，总量 908 行。
 - 白天模式下强调文字对比度显著提升，夜间模式风格保持不变。
 
 ## 2026-02-12 Round 10 (Dashboard Hydration Mismatch Fix)
@@ -682,3 +700,22 @@
 ### 结论
 - `/customs-declarations` 前端 CRUD 已完成收口并具备可验证证据。
 - `frontend` 当前可重新完成生产构建，验证过程中发现的主要存量类型阻塞已清理。
+
+## 2026-03-08 Round 45（Live HSCode Import + Tax Refund Draft Automation）
+
+### 质量指标
+- 后端定向 Node tests：`19/19` 通过。
+- 前端定向 Vitest：`9/9` 通过。
+- 前端定向 lint：通过。
+- 前端 `next build`：通过。
+- `hs_codes` 当前 live 记录数：`905`。
+
+### 过程指标
+- 新增后端脚本/服务：`2`（`import-hscode-live.js`、`taxRefundDraftService.js`）。
+- 新增后端测试：`2`（`import-hscode-live.test.js`、`taxRefundDraftService.test.js`）。
+- 扩展 HSCode 持久字段：`15+` 个。
+- 新增退税自动化入口：`1`（`POST /tax-refunds/auto-drafts` + 前端按钮）。
+
+### 结论
+- 当前系统已具备“真实 HSCode 入库并作为查询主源”的能力。
+- 当前系统已具备“按报关单自动生成退税草稿”的能力，但不是完整自动申报系统。

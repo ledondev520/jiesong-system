@@ -11,8 +11,10 @@ import TaxRefundsDashboardPage from './page';
 
 const mockPush = vi.fn();
 const mockGetAll = vi.fn();
+const mockGenerateDrafts = vi.fn();
 const mockSearchParamGet = vi.fn();
 const mockToastError = vi.fn();
+const mockToastSuccess = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -26,13 +28,14 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/services/taxRefund.service', () => ({
   taxRefundService: {
     getAll: (...args: unknown[]) => mockGetAll(...args),
+    generateDrafts: (...args: unknown[]) => mockGenerateDrafts(...args),
   },
 }));
 
 vi.mock('sonner', () => ({
   toast: {
     error: (...args: unknown[]) => mockToastError(...args),
-    success: vi.fn(),
+    success: (...args: unknown[]) => mockToastSuccess(...args),
   },
 }));
 
@@ -40,7 +43,9 @@ describe('TaxRefundsDashboardPage 交互逻辑', () => {
   beforeEach(() => {
     mockPush.mockReset();
     mockGetAll.mockReset();
+    mockGenerateDrafts.mockReset();
     mockToastError.mockReset();
+    mockToastSuccess.mockReset();
     mockSearchParamGet.mockReset();
     mockSearchParamGet.mockImplementation((key: string) => {
       if (key === 'keyword') return '';
@@ -126,6 +131,32 @@ describe('TaxRefundsDashboardPage 交互逻辑', () => {
 
     await user.click(await screen.findByRole('button', { name: /查看详情 TR-2026-002/ }));
     expect(mockPush).toHaveBeenCalledWith('/dashboard/tax-refunds/tr-2');
+  });
+
+  it('点击自动生成草稿后提示结果并刷新列表', async () => {
+    mockGetAll.mockResolvedValue({
+      data: {
+        items: [],
+      },
+    });
+    mockGenerateDrafts.mockResolvedValue({
+      data: {
+        created: 2,
+        skipped: 1,
+      },
+    });
+    const user = userEvent.setup();
+
+    render(<TaxRefundsDashboardPage />);
+
+    await user.click(screen.getByRole('button', { name: '自动生成草稿' }));
+
+    await waitFor(() => {
+      expect(mockGenerateDrafts).toHaveBeenCalledWith({});
+    });
+
+    expect(mockToastSuccess).toHaveBeenCalledWith('自动生成完成：新增 2 条，跳过 1 条');
+    expect(mockGetAll).toHaveBeenCalledTimes(2);
   });
 
   it('加载失败时提示错误', async () => {

@@ -1,3 +1,4 @@
+import api from '@/lib/axios';
 import type { TaxRefund } from '@/types';
 import { createCrudService } from './crudService';
 
@@ -7,6 +8,12 @@ export type TaxRefundListQuery = {
   keyword?: string;
   status?: string;
   salesContractId?: string;
+};
+
+export type TaxRefundDraftGenerateInput = {
+  customsDeclarationId?: string;
+  salesContractId?: string;
+  replaceExisting?: boolean;
 };
 
 export type TaxRefundUpsertInput = Omit<
@@ -28,4 +35,5 @@ export const taxRefundService = {
   create: async (data: TaxRefundUpsertInput) => crud.create!(data),
   update: async (id: string, data: TaxRefundUpsertInput) => crud.update!(id, data),
   delete: async (id: string) => crud.delete!(id),
+  generateDrafts: async (data: TaxRefundDraftGenerateInput) => api.post('/tax-refunds/auto-drafts', data),
 };

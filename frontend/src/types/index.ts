@@ -103,8 +103,24 @@ export interface HsCodeRecord {
   hsCode: string;
   productName: string;
   taxRate: number;
+  refundRate?: number | null;
+  exportTaxRate?: number | null;
+  vatRate?: number | null;
   unit?: string | null;
   note?: string | null;
+  title?: string | null;
+  sourceUrl?: string | null;
+  declarationElements?: string | null;
+  supervisionConditions?: string | null;
+  inspectionQuarantine?: string | null;
+  chapterHierarchyJson?: string | null;
+  ciqCodesJson?: string | null;
+  agreementRatesJson?: string | null;
+  rcepRatesJson?: string | null;
+  basicInfoJson?: string | null;
+  taxInfoJson?: string | null;
+  rawPayloadJson?: string | null;
+  fetchedAt?: string | null;
   effectiveDate: string;
 }
 

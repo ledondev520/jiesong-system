@@ -6,7 +6,7 @@
 
 'use client';
 
-import { startTransition, useDeferredValue, useEffect, useState } from 'react';
+import { startTransition, useCallback, useDeferredValue, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, Plus, ReceiptText } from 'lucide-react';
 import { toast } from 'sonner';
@@ -32,28 +32,29 @@ export function TaxRefundListPageContent() {
   const [status, setStatus] = useState(initialStatus);
   const [taxRefunds, setTaxRefunds] = useState<TaxRefund[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generatingDrafts, setGeneratingDrafts] = useState(false);
   const deferredKeyword = useDeferredValue(keyword);
 
-  useEffect(() => {
-    const loadTaxRefunds = async () => {
-      setLoading(true);
-      try {
-        const response = await taxRefundService.getAll({
-          page: 1,
-          pageSize: PAGE_SIZE,
-          keyword: deferredKeyword || undefined,
-          status: status === 'ALL' ? undefined : status,
-        });
-        setTaxRefunds(response?.data?.items || []);
-      } catch {
-        toast.error('加载退税记录失败');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadTaxRefunds();
+  const loadTaxRefunds = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await taxRefundService.getAll({
+        page: 1,
+        pageSize: PAGE_SIZE,
+        keyword: deferredKeyword || undefined,
+        status: status === 'ALL' ? undefined : status,
+      });
+      setTaxRefunds(response?.data?.items || []);
+    } catch {
+      toast.error('加载退税记录失败');
+    } finally {
+      setLoading(false);
+    }
   }, [deferredKeyword, status]);
+
+  useEffect(() => {
+    void loadTaxRefunds();
+  }, [loadTaxRefunds]);
 
   const totalRefundable = taxRefunds.reduce((sum, item) => sum + item.refundableAmount, 0);
   const totalRefunded = taxRefunds.reduce((sum, item) => sum + item.refundedAmount, 0);
@@ -63,6 +64,21 @@ export function TaxRefundListPageContent() {
     startTransition(() => {
       router.push(`/dashboard/tax-refunds/${id}`);
     });
+  };
+
+  const handleGenerateDrafts = async () => {
+    setGeneratingDrafts(true);
+    try {
+      const response = await taxRefundService.generateDrafts({});
+      const created = response?.data?.created ?? 0;
+      const skipped = response?.data?.skipped ?? 0;
+      toast.success(`自动生成完成：新增 ${created} 条，跳过 ${skipped} 条`);
+      await loadTaxRefunds();
+    } catch {
+      toast.error('自动生成退税草稿失败');
+    } finally {
+      setGeneratingDrafts(false);
+    }
   };
 
   return (
@@ -95,6 +111,15 @@ export function TaxRefundListPageContent() {
                 ))}
               </SelectContent>
             </Select>
+
+            <Button
+              variant="outline"
+              className="h-11 rounded-xl"
+              onClick={handleGenerateDrafts}
+              disabled={generatingDrafts}
+            >
+              自动生成草稿
+            </Button>
 
             <Button className="h-11 rounded-xl" onClick={() => router.push('/dashboard/tax-refunds/create')}>
               <Plus className="mr-2 h-4 w-4" />

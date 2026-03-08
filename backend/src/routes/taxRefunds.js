@@ -15,6 +15,11 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', withPaginationValidation, taxRefundController.list);
+router.post(
+  '/auto-drafts',
+  roleAuth('ADMIN', 'SALES', 'FINANCE'),
+  taxRefundController.generateTaxRefundDrafts,
+);
 router.get('/:id', withIdValidation, taxRefundController.getById);
 router.post(
   '/',

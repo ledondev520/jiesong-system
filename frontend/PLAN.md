@@ -67,3 +67,19 @@
 - `npm run lint -- src/sentry.config.test.ts sentry.client.config.ts sentry.server.config.ts sentry.edge.config.ts src/services/customsDeclaration.service.ts src/services/customsDeclaration.service.test.ts src/app/customs-declarations/layout.tsx src/app/customs-declarations/layout.test.tsx src/app/customs-declarations/page.tsx src/app/customs-declarations/page.test.tsx src/app/customs-declarations/create/page.tsx src/app/customs-declarations/create/page.test.tsx 'src/app/customs-declarations/[id]/page.tsx' 'src/app/customs-declarations/[id]/page.test.tsx' 'src/app/customs-declarations/[id]/edit/page.tsx' 'src/app/customs-declarations/[id]/edit/page.test.tsx' src/app/customs-declarations/components/CustomsDeclarationForm.tsx src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx src/app/customs-declarations/components/CustomsDeclarationDetailPageContent.tsx src/app/customs-declarations/components/CustomsDeclarationStatusBadge.tsx src/app/dashboard/tax-refunds/page.tsx src/app/dashboard/tax-refunds/page.test.tsx src/services/container.service.ts src/services/container.service.test.ts src/services/crudService.ts src/services/crudService.test.ts src/services/purchase.service.ts src/services/purchase.service.test.ts src/lib/hooks/useApi.ts src/lib/hooks/useApi.test.ts src/services/config.service.ts src/app/dashboard/containers/page.tsx src/app/dashboard/containers/components/ContainerDialog.tsx src/app/dashboard/finance/payable/page.tsx src/app/dashboard/finance/receivable/page.tsx src/app/dashboard/payments/page.tsx src/app/dashboard/purchase/page.tsx src/app/dashboard/suppliers/page.tsx src/app/dashboard/suppliers/components/SupplierDialog.tsx src/services/supplier.service.ts`
 - `npm run build`
 - `npm run test -- --coverage src/services/customsDeclaration.service.test.ts src/app/customs-declarations/layout.test.tsx src/app/customs-declarations/page.test.tsx src/app/customs-declarations/create/page.test.tsx 'src/app/customs-declarations/[id]/page.test.tsx' 'src/app/customs-declarations/[id]/edit/page.test.tsx'`
+
+## 2026-03-08 Round 5: Tax Refund Auto Draft Trigger
+
+### Goal
+- Expose the backend auto-draft generation capability on `/dashboard/tax-refunds`.
+- Keep the UI minimal: one action button, one success/error toast, one reload pass.
+
+### Execution Outcome
+- `src/services/taxRefund.service.ts` 新增 `generateDrafts` 调用，绑定 `POST /tax-refunds/auto-drafts`。
+- `src/app/dashboard/tax-refunds/components/TaxRefundListPageContent.tsx` 新增“自动生成草稿”按钮与生成中的状态。
+- `src/types/index.ts` 中 `HsCodeRecord` 已扩展为兼容 live HSCode 查询返回字段。
+
+### Verification
+- `npm test -- src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.test.tsx`
+- `npm run lint -- src/services/taxRefund.service.ts src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.tsx src/app/dashboard/tax-refunds/page.test.tsx src/app/dashboard/tax-refunds/components/TaxRefundListPageContent.tsx src/types/index.ts`
+- `npm run build`

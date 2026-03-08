@@ -65,3 +65,15 @@
 
 ### Notes
 - API 采用“薄路由 + service”结构，未额外引入 controller，控制改动面。
+
+## 2026-03-08 Round 4
+
+### Verification Result
+- `node --test scripts/import-hscode-live.test.js src/services/taxRefundDraftService.test.js src/controllers/taxRefundController.test.js src/routes/taxModules.test.js src/services/hsCodeService.test.js src/routes/hsCodes.test.js`: `19/19` 通过
+- `npx prisma migrate dev --name extend_hs_codes_for_live_import`: 通过
+- `node scripts/import-hscode-live.js`: 通过，`processed=908`、`upserted=905`
+- `node -e ... prisma.hsCode.count()`: `905`
+
+### Notes
+- `hs_codes` 现已由 live JSON 全量重建，不再混用示例 seed 作为系统主查询源。
+- 自动退税草稿当前按报关单粒度生成，金额来源为“明细 totalPrice × live refundRate”。

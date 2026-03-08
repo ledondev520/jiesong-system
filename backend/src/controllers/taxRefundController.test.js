@@ -8,6 +8,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const taxRefundController = require('./taxRefundController');
 const taxRefundService = require('../services/taxRefundService');
+const taxRefundDraftService = require('../services/taxRefundDraftService');
 
 const createMockRes = () => {
   const res = {
@@ -137,5 +138,50 @@ test('removeTaxRefund: 删除成功返回统一成功响应', async () => {
     assert.equal(res.payload.data, null);
   } finally {
     taxRefundService.removeTaxRefund = original;
+  }
+});
+
+test('generateTaxRefundDrafts: 返回自动生成结果汇总', async () => {
+  const original = taxRefundDraftService.generateTaxRefundDrafts;
+  let capturedPayload = null;
+
+  taxRefundDraftService.generateTaxRefundDrafts = async (payload) => {
+    capturedPayload = payload;
+    return {
+      created: 2,
+      skipped: 1,
+      items: [
+        { customsDeclarationId: 'cd-1', refundId: 'tr-1', reason: null },
+        { customsDeclarationId: 'cd-2', refundId: null, reason: 'existing_refund' },
+      ],
+    };
+  };
+
+  try {
+    const req = {
+      body: {
+        customsDeclarationId: 'cd-1',
+        replaceExisting: true,
+      },
+    };
+    const res = createMockRes();
+    let capturedError = null;
+    const next = (error) => {
+      capturedError = error;
+    };
+
+    await taxRefundController.generateTaxRefundDrafts(req, res, next);
+
+    assert.equal(capturedError, null);
+    assert.deepEqual(capturedPayload, {
+      customsDeclarationId: 'cd-1',
+      replaceExisting: true,
+    });
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.payload.message, '退税草稿生成完成');
+    assert.equal(res.payload.data.created, 2);
+    assert.equal(res.payload.data.skipped, 1);
+  } finally {
+    taxRefundDraftService.generateTaxRefundDrafts = original;
   }
 });

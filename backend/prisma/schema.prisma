@@ -517,13 +517,29 @@ model TaxRate {
 }
 
 model HsCode {
-  id            String   @id @default(cuid())
-  hsCode        String   @unique
-  productName   String
-  taxRate       Float
-  unit          String?
-  note          String?
-  effectiveDate DateTime
+  id                    String   @id @default(cuid())
+  hsCode                String   @unique
+  productName           String
+  taxRate               Float
+  refundRate            Float?
+  exportTaxRate         Float?
+  vatRate               Float?
+  unit                  String?
+  note                  String?
+  title                 String?
+  sourceUrl             String?
+  declarationElements   String?
+  supervisionConditions String?
+  inspectionQuarantine  String?
+  chapterHierarchyJson  String?
+  ciqCodesJson          String?
+  agreementRatesJson    String?
+  rcepRatesJson         String?
+  basicInfoJson         String?
+  taxInfoJson           String?
+  rawPayloadJson        String?
+  fetchedAt             DateTime?
+  effectiveDate         DateTime
 
   @@index([productName])
   @@map("hs_codes")
