@@ -83,3 +83,17 @@
 - `npm test -- src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.test.tsx`
 - `npm run lint -- src/services/taxRefund.service.ts src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.tsx src/app/dashboard/tax-refunds/page.test.tsx src/app/dashboard/tax-refunds/components/TaxRefundListPageContent.tsx src/types/index.ts`
 - `npm run build`
+
+## 2026-03-08 Round 6: Customs Declaration Auto Draft Trigger
+
+### Goal
+- Expose the backend customs auto-draft generation capability on `/customs-declarations`.
+
+### Execution Outcome
+- `src/services/customsDeclaration.service.ts` 新增 `generateDrafts` 调用，绑定 `POST /customs-declarations/auto-drafts`。
+- `src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx` 新增“自动生成草稿”按钮与生成中的状态。
+
+### Verification
+- `npm test -- src/services/customsDeclaration.service.test.ts src/app/customs-declarations/page.test.tsx`
+- `npm run lint -- src/services/customsDeclaration.service.ts src/services/customsDeclaration.service.test.ts src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx src/app/customs-declarations/page.test.tsx`
+- `npm run build`

@@ -15,6 +15,11 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', withPaginationValidation, customsDeclarationController.list);
+router.post(
+  '/auto-drafts',
+  roleAuth('ADMIN', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  customsDeclarationController.generateCustomsDeclarationDrafts,
+);
 router.get('/:id', withIdValidation, customsDeclarationController.getById);
 router.post(
   '/',

@@ -77,3 +77,14 @@
 ### Notes
 - `hs_codes` 现已由 live JSON 全量重建，不再混用示例 seed 作为系统主查询源。
 - 自动退税草稿当前按报关单粒度生成，金额来源为“明细 totalPrice × live refundRate”。
+
+## 2026-03-08 Round 5
+
+### Verification Result
+- `node --test src/services/customsDeclarationDraftService.test.js src/controllers/customsDeclarationController.test.js src/routes/taxModules.test.js`: `8/8` 通过
+- 真实自动生成报关单草稿：`created=35`、`skipped=1`
+- 随后真实自动生成退税草稿：`created=9`、`skipped=9`
+
+### Notes
+- 当前跳过退税草稿的主因是 `no_rate_data`，对应 HSCode 章节尚未全部抓齐或部分商品未命中 live 税率。
+- 现有数据库已经从“只有 live HSCode”推进到“已有自动生成的报关单草稿与部分退税草稿”。

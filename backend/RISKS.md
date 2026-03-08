@@ -15,3 +15,4 @@
 | HSCODE-R3 | 本地库已存在 `hs_codes` 表或迁移状态不一致 | `migrate dev` 失败或要求 reset | 先执行 `prisma validate` / `migrate status`，以现有 migration 为准应用；拒绝破坏性 reset | 保留现有 DB，仅记录未完成项与阻塞原因 |
 | HSCODE-R4 | 本轮 `hsCodes` 路由未接入鉴权 | 若后续要求该数据仅内部可见，需要补统一访问控制 | 当前按任务要求交付公开查询能力；后续进入联调时再与前端/权限策略统一收口 | 回退 `src/routes/index.js` 中 `/hs-codes` 挂载或在路由前补 `authenticate` |
 | HSCODE-R5 | live JSON 中部分编码条目可能缺少可解析退税率或申报段落 | 自动生成退税草稿时可退金额不完整、部分报关单被跳过 | 导入阶段保留完整 `rawPayloadJson`，生成草稿时对缺失税率明细做 skip/warning，不写入伪造金额 | 回退自动草稿生成逻辑，仅保留 live HSCode 入库 |
+| CUSTOMS-R1 | 部分销售合同没有 `packing_items` 或装箱金额不完整 | 报关单自动生成只能部分成功，个别合同会被跳过 | 自动草稿服务在结果中返回 `no_packing_items`，前端按钮提示 created/skipped 统计 | 回退 `/customs-declarations/auto-drafts`，恢复手工建单 |

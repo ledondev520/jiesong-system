@@ -1,0 +1,543 @@
+diff --git a/METRICS.md b/METRICS.md
+index 71ed4ff..1b94d90 100644
+--- a/METRICS.md
++++ b/METRICS.md
+@@ -1,5 +1,24 @@
+ # Frontend Polish Metrics
+ 
++## 2026-03-08 Round 46 (Tax Refund Module CRUD Closure)
++
++### 质量指标
++- 后端税退模块定向回归：`28/28` 通过
++- 前端退税模块定向单测：`18/18` 通过
++- 前端改动文件定向 lint：通过（0 error）
++- 前端生产构建：`npm run build` 通过（Next.js 16.1.2）
++
++### 过程指标
++- 后端新增共享控制器工厂：`1`
++- 后端新增税退模块控制器/路由：`4 + 4`
++- 前端新增退税工作台页面：`4`（列表、详情、创建、编辑）
++- 前端新增共享组件：`3`（状态徽章、表单、详情内容）
++- 基础设施修复：`1`（根布局移除 Google Fonts 外网依赖，改为本地字体栈）
++
++### 结论
++- 退税模块已从“仅有 schema/service”推进到“API + 登录后工作台 + 构建可交付”状态。
++- 后续自动草稿生成与 HSCode live import 继续按独立任务推进，不纳入本轮完成口径。
++
+ ## 2026-02-12 Round 1
+ 
+ ### 质量指标
+@@ -719,3 +738,23 @@
+ ### 结论
+ - 当前系统已具备“真实 HSCode 入库并作为查询主源”的能力。
+ - 当前系统已具备“按报关单自动生成退税草稿”的能力，但不是完整自动申报系统。
++
++## 2026-03-08 Round 46（Customs Declaration Draft Automation）
++
++### 质量指标
++- 后端定向 Node tests：`8/8` 通过。
++- 前端定向 Vitest：`9/9` 通过。
++- 前端定向 lint：通过。
++- 前端 `next build`：通过。
++- 真实自动补齐结果：报关单草稿 `35`、退税草稿 `9`。
++
++### 过程指标
++- 新增后端服务：`1`（`customsDeclarationDraftService.js`）。
++- 新增后端控制器测试：`1`。
++- 新增前端自动化入口：`1`（报关单列表页按钮）。
++- 跳过报关单原因：`1` 类（`no_packing_items`）。
++- 跳过退税草稿原因：`1` 类（`no_rate_data`）。
++
++### 结论
++- 当前系统已经从“功能可用”推进到“真实数据库已补齐一轮上游报关单草稿并生成部分退税草稿”。
++- 剩余提升空间集中在继续抓取更多 HSCode 章节并减少 `no_rate_data`。
+diff --git a/PLAN.md b/PLAN.md
+index 8f22e04..fca592c 100644
+--- a/PLAN.md
++++ b/PLAN.md
+@@ -1,5 +1,32 @@
+ # Frontend Polish Plan
+ 
++## 2026-03-08 Round 46 (Tax Refund Module CRUD Closure)
++
++### Goal
++- 在已有退税数据模型基础上，补齐可用的后端 CRUD API 与前端登录后工作台，形成可测试、可构建、可继续扩展的退税模块主干。
++
++### Delivered
++- 后端：
++  - 新增共享 CRUD 控制器工厂 `backend/src/controllers/shared/createCrudController.js`
++  - 新增并挂载 4 组税退模块路由与控制器：`/customs-declarations`、`/forex-verifications`、`/tax-refunds`、`/tax-rates`
++  - 新增定向回归：`backend/src/routes/taxModules.test.js`、`backend/src/controllers/taxRefundController.test.js`
++- 前端：
++  - 新增登录后退税工作台 `/dashboard/tax-refunds`
++  - 补齐列表、详情、创建、编辑、状态徽章、共享表单、服务层与类型定义
++  - 侧边栏新增“出口退税”入口
++  - `frontend/src/app/layout.tsx` 改为本地字体栈，移除构建阶段对 Google Fonts 的外网依赖
++
++### Verification
++- Backend:
++  - `cd backend && node --test src/services/customsDeclarationService.test.js src/services/forexVerificationService.test.js src/services/taxRateService.test.js src/services/taxRefundService.test.js src/routes/taxModules.test.js src/controllers/taxRefundController.test.js`
++- Frontend:
++  - `cd frontend && npm test -- src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.test.tsx src/app/dashboard/tax-refunds/create/page.test.tsx 'src/app/dashboard/tax-refunds/[id]/page.test.tsx' 'src/app/dashboard/tax-refunds/[id]/edit/page.test.tsx' src/components/layout/Sidebar.test.tsx`
++  - `cd frontend && npm run lint -- src/services/taxRefund.service.ts src/services/taxRefund.service.test.ts src/components/layout/Sidebar.tsx src/components/layout/Sidebar.test.tsx src/types/index.ts src/app/layout.tsx src/app/dashboard/tax-refunds/page.tsx src/app/dashboard/tax-refunds/page.test.tsx src/app/dashboard/tax-refunds/create/page.tsx src/app/dashboard/tax-refunds/create/page.test.tsx 'src/app/dashboard/tax-refunds/[id]/page.tsx' 'src/app/dashboard/tax-refunds/[id]/page.test.tsx' 'src/app/dashboard/tax-refunds/[id]/edit/page.tsx' 'src/app/dashboard/tax-refunds/[id]/edit/page.test.tsx' src/app/dashboard/tax-refunds/components/TaxRefundStatusBadge.tsx src/app/dashboard/tax-refunds/components/TaxRefundForm.tsx src/app/dashboard/tax-refunds/components/TaxRefundListPageContent.tsx src/app/dashboard/tax-refunds/components/TaxRefundDetailPageContent.tsx`
++  - `cd frontend && npm run build`
++
++### Scope Note
++- 当前工作区存在并行中的“退税草稿自动生成 / HSCode live import”相关改动。本轮完成并验证的范围仅包含：税退模块 CRUD API、登录后退税工作台，以及构建所需的本地字体栈修复。
++
+ ## 长程目标
+ 完成“全系统前端高端美化”：
+ - 全局设计语言统一（token/字体/层级/动效）
+@@ -890,3 +917,21 @@
+   - `cd frontend && npm test -- src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.test.tsx`：通过（9/9）。
+   - `cd frontend && npm run lint -- src/services/taxRefund.service.ts src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.tsx src/app/dashboard/tax-refunds/page.test.tsx src/app/dashboard/tax-refunds/components/TaxRefundListPageContent.tsx src/types/index.ts`：通过。
+   - `cd frontend && npm run build`：通过。
++
++## 2026-03-08 Round 46（Customs Declaration Draft Automation）
++
++- 已完成本轮目标：
++  - 使用现有销售合同、装箱明细和商品申报数据自动补齐报关单草稿。
++  - 在报关单列表页提供触发入口，让这一步不再只靠脚本或手工接口调用。
++- 已完成项：
++  - `backend/src/services/customsDeclarationDraftService.js` 已实现按 `sales_contracts + packing_items + product` 自动生成报关单草稿。
++  - 申报要素优先用 `product.declaration`，缺失时回退到 live `hs_codes.declarationElements`。
++  - `backend/src/routes/customsDeclarations.js` 已新增 `POST /customs-declarations/auto-drafts`。
++  - `frontend/src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx` 已新增“自动生成草稿”按钮。
++  - 已对真实数据库执行一次自动补齐：生成 `35` 个报关单草稿，跳过 `1` 个无装箱明细合同。
++  - 已再执行一次退税草稿自动生成：生成 `9` 个，跳过 `9` 个 `no_rate_data` 案例。
++- 验证结论：
++  - `cd backend && node --test src/services/customsDeclarationDraftService.test.js src/controllers/customsDeclarationController.test.js src/routes/taxModules.test.js`：通过（8/8）。
++  - `cd frontend && npm test -- src/services/customsDeclaration.service.test.ts src/app/customs-declarations/page.test.tsx`：通过（9/9）。
++  - `cd frontend && npm run lint -- src/services/customsDeclaration.service.ts src/services/customsDeclaration.service.test.ts src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx src/app/customs-declarations/page.test.tsx`：通过。
++  - `cd frontend && npm run build`：通过。
+diff --git a/RISKS.md b/RISKS.md
+index d813013..3c6bad2 100644
+--- a/RISKS.md
++++ b/RISKS.md
+@@ -28,6 +28,7 @@
+ | R-023 | 商品页当前无 `taxRate` 持久字段，若直接扩展 `Product` 模型会放大改动面 | 牵连商品 CRUD、列表、类型与库存链路，增加回归面 | 本轮将 `taxRate` 作为 HSCode 匹配辅助展示值，不持久化到 `Product`；后续若业务确认需要持久化，再单独立项 | 回退商品弹窗中的税率展示逻辑，保留仅 HSCode 回填 |
+ | R-024 | HSCode 全量原始抓取耗时较长，当前交互会话或前台进程被打断 | 原始快照不完整，影响后续统一清洗与入库 | 使用“每编码单独 JSON + manifest + chapter page 快照”的断点续跑结构；随时可通过同一命令继续抓取未完成部分 | 回退到仅保留已抓取 `records/*.json` 的阶段性快照，不删除已有原始数据 |
+ | R-025 | 站点章节搜索结果存在源站侧限制/覆盖范围差异，并非 `01`-`99` 每章都返回可抓数据 | CSV 总量可能低于“理论全量 HS 编码”，影响对完整性的预期 | 以“源站当前可返回结果”为准保存快照，并在结果文档中明确当前仅抓到 `01/02/03/04/05/69` 前缀；若后续需要更高覆盖率，再补其他来源交叉抓取 | 保留本轮 CSV 作为可复用基线，后续增量合并而非重做 |
++| R-026 | 退税模块当前存在并行中的“auto-drafts / HSCode live import”开发，与本轮 CRUD 收口交叉触达相同文件 | 若直接混合验收，容易把未完成的自动草稿链路误判为本轮回归范围 | 本轮只以 CRUD API、`/dashboard/tax-refunds` 工作台与生产构建为验收边界；自动草稿链路单独跟踪 | 回退本轮税退 CRUD 页面与路由挂载，保留并行草稿链路继续开发 |
+ 
+ ## 2026-03-08 Round 43 状态更新
+ 
+@@ -45,3 +46,12 @@
+ 
+ - 新增残余风险：自动退税草稿仍依赖报关单明细上的 `hsCode + totalPrice` 完整度；缺失时系统会跳过而不是自动猜测金额。
+ - live HSCode 主查询源已切换完成，示例 seed 不再混入当前正式 `hs_codes` 数据。
++
++## 2026-03-08 Round 46 状态更新
++
++- 上游报关单草稿已从现有销售/装箱数据补齐一轮，当前自动化链路的主要剩余阻塞转为 live HSCode 覆盖不足导致的 `no_rate_data`。
++
++## 2026-03-08 Round 46 状态更新
++
++- `R-026`：已激活并纳入边界说明；本轮验收不包含自动草稿生成链路。
++- `R-017`：已进一步收敛；`frontend/src/app/layout.tsx` 改为本地字体栈后，`cd frontend && npm run build` 在当前环境通过。
+diff --git a/TASKS.md b/TASKS.md
+index 1926249..e1bba30 100644
+--- a/TASKS.md
++++ b/TASKS.md
+@@ -138,3 +138,6 @@
+ | CD-FE-01 | P0 | 45m | 1 | DONE | 收口 `/customs-declarations` 前端 CRUD 台账，并修复其触发的 Next16 构建阻塞（Sentry、CRUD typing、finance/container/supplier/config hook 类型与 Suspense 边界） |
+ | HSCODE-LIVE-01 | P0 | 45m | 1 | DONE | 将 `backend/data/hscode-live/records/*.json` 清洗入 `hs_codes` 正式表，并保留关键字段与完整原始 payload |
+ | TAX-DRAFT-01 | P0 | 45m | 1 | DONE | 基于报关单明细 `hsCode + totalPrice` 自动生成退税草稿，并在退税列表页提供触发入口 |
++| CUSTOMS-DRAFT-01 | P0 | 45m | 1 | DONE | 基于现有 `sales_contracts + packing_items + product` 自动生成报关单草稿，并在报关单列表页提供触发入口 |
++| TRM-CRUD-API-01 | P0 | 35m | 1 | DONE | 既有 `customsDeclaration/forexVerification/taxRefund/taxRate` 服务层与路由模式 | 4 组税退模块 CRUD 控制器 + 路由挂载 + 定向回归测试 | `cd backend && node --test src/services/customsDeclarationService.test.js src/services/forexVerificationService.test.js src/services/taxRateService.test.js src/services/taxRefundService.test.js src/routes/taxModules.test.js src/controllers/taxRefundController.test.js` | `/api/v1/customs-declarations`、`/api/v1/forex-verifications`、`/api/v1/tax-refunds`、`/api/v1/tax-rates` 已挂载且回归通过 |
++| TRM-CRUD-FE-01 | P0 | 45m | 1 | DONE | 退税 API 契约 + 现有 dashboard 页面模式 | `/dashboard/tax-refunds` 列表/详情/创建/编辑 + 服务层/类型/导航入口 + 构建修复 | `cd frontend && npm test -- src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.test.tsx src/app/dashboard/tax-refunds/create/page.test.tsx 'src/app/dashboard/tax-refunds/[id]/page.test.tsx' 'src/app/dashboard/tax-refunds/[id]/edit/page.test.tsx' src/components/layout/Sidebar.test.tsx && cd frontend && npm run lint -- src/services/taxRefund.service.ts src/services/taxRefund.service.test.ts src/components/layout/Sidebar.tsx src/components/layout/Sidebar.test.tsx src/types/index.ts src/app/layout.tsx src/app/dashboard/tax-refunds/page.tsx src/app/dashboard/tax-refunds/page.test.tsx src/app/dashboard/tax-refunds/create/page.tsx src/app/dashboard/tax-refunds/create/page.test.tsx 'src/app/dashboard/tax-refunds/[id]/page.tsx' 'src/app/dashboard/tax-refunds/[id]/page.test.tsx' 'src/app/dashboard/tax-refunds/[id]/edit/page.tsx' 'src/app/dashboard/tax-refunds/[id]/edit/page.test.tsx' src/app/dashboard/tax-refunds/components/TaxRefundStatusBadge.tsx src/app/dashboard/tax-refunds/components/TaxRefundForm.tsx src/app/dashboard/tax-refunds/components/TaxRefundListPageContent.tsx src/app/dashboard/tax-refunds/components/TaxRefundDetailPageContent.tsx && cd frontend && npm run build` | 登录后退税模块可进入、可增改查、静态校验与生产构建通过 |
+diff --git a/backend/METRICS.md b/backend/METRICS.md
+index dea722f..31aa2a1 100644
+--- a/backend/METRICS.md
++++ b/backend/METRICS.md
+@@ -77,3 +77,14 @@
+ ### Notes
+ - `hs_codes` 现已由 live JSON 全量重建，不再混用示例 seed 作为系统主查询源。
+ - 自动退税草稿当前按报关单粒度生成，金额来源为“明细 totalPrice × live refundRate”。
++
++## 2026-03-08 Round 5
++
++### Verification Result
++- `node --test src/services/customsDeclarationDraftService.test.js src/controllers/customsDeclarationController.test.js src/routes/taxModules.test.js`: `8/8` 通过
++- 真实自动生成报关单草稿：`created=35`、`skipped=1`
++- 随后真实自动生成退税草稿：`created=9`、`skipped=9`
++
++### Notes
++- 当前跳过退税草稿的主因是 `no_rate_data`，对应 HSCode 章节尚未全部抓齐或部分商品未命中 live 税率。
++- 现有数据库已经从“只有 live HSCode”推进到“已有自动生成的报关单草稿与部分退税草稿”。
+diff --git a/backend/PLAN.md b/backend/PLAN.md
+index a57cc36..3b007b8 100644
+--- a/backend/PLAN.md
++++ b/backend/PLAN.md
+@@ -111,3 +111,25 @@
+ ### Current Capability
+ - HSCode 主查询源现在已切换为真实 JSON 清洗后的正式库数据。
+ - 退税草稿现在可按报关单明细自动生成，但依赖明细上的 `hsCode + totalPrice` 完整度；缺失时会跳过而不是盲目生成错误金额。
++
++## 2026-03-08 Round 5: Customs Declaration Draft Automation
++
++### Goal
++- 使用现有 `sales_contracts + packing_items + product` 数据自动补齐报关单草稿，为退税草稿生成提供上游单据。
++
++### Execution Outcome
++- 已新增 `src/services/customsDeclarationDraftService.js`，按销售合同生成报关单草稿。
++- 数据来源优先级：
++  - 明细金额/数量/重量：`packing_items`
++  - HSCode：`product.hsCode`
++  - 申报要素：`product.declaration`，缺失时回落到 live `hs_codes.declarationElements`
++- 已在 `src/controllers/customsDeclarationController.js` 与 `src/routes/customsDeclarations.js` 接入 `POST /customs-declarations/auto-drafts`。
++- 已用真实数据库运行一次自动补齐，实际生成 `35` 个报关单草稿，跳过 `1` 个无装箱明细合同。
++
++### Verification
++- `node --test src/services/customsDeclarationDraftService.test.js src/controllers/customsDeclarationController.test.js src/routes/taxModules.test.js`
++- 真实执行：`node - <<'NODE' ... customsDeclarationDraftService.generateCustomsDeclarationDrafts({}) ... NODE`
++
++### Current Capability
++- 现有销售/装箱数据已可一键补成报关单草稿。
++- 退税自动化链路现在具备“销售/装箱 -> 报关单草稿 -> 退税草稿”的最小闭环。
+diff --git a/backend/RISKS.md b/backend/RISKS.md
+index 8e0c2bd..5d3a8f5 100644
+--- a/backend/RISKS.md
++++ b/backend/RISKS.md
+@@ -15,3 +15,4 @@
+ | HSCODE-R3 | 本地库已存在 `hs_codes` 表或迁移状态不一致 | `migrate dev` 失败或要求 reset | 先执行 `prisma validate` / `migrate status`，以现有 migration 为准应用；拒绝破坏性 reset | 保留现有 DB，仅记录未完成项与阻塞原因 |
+ | HSCODE-R4 | 本轮 `hsCodes` 路由未接入鉴权 | 若后续要求该数据仅内部可见，需要补统一访问控制 | 当前按任务要求交付公开查询能力；后续进入联调时再与前端/权限策略统一收口 | 回退 `src/routes/index.js` 中 `/hs-codes` 挂载或在路由前补 `authenticate` |
+ | HSCODE-R5 | live JSON 中部分编码条目可能缺少可解析退税率或申报段落 | 自动生成退税草稿时可退金额不完整、部分报关单被跳过 | 导入阶段保留完整 `rawPayloadJson`，生成草稿时对缺失税率明细做 skip/warning，不写入伪造金额 | 回退自动草稿生成逻辑，仅保留 live HSCode 入库 |
++| CUSTOMS-R1 | 部分销售合同没有 `packing_items` 或装箱金额不完整 | 报关单自动生成只能部分成功，个别合同会被跳过 | 自动草稿服务在结果中返回 `no_packing_items`，前端按钮提示 created/skipped 统计 | 回退 `/customs-declarations/auto-drafts`，恢复手工建单 |
+diff --git a/backend/TASKS.md b/backend/TASKS.md
+index 9f6e2a3..fc4f4c4 100644
+--- a/backend/TASKS.md
++++ b/backend/TASKS.md
+@@ -10,5 +10,7 @@
+ | HSCODE-S1-01 | P0 | 20m | 1 | DONE | `prisma/schema.prisma` + 现有 `prisma/migrations/*add_hs_codes_table*` | `HsCode` 模型对齐 + migration 执行 | `npx prisma validate && npx prisma migrate dev --name add_hs_codes_table && npx prisma generate` | Schema 与迁移一致、命令执行成功、client 可生成 |
+ | HSCODE-S1-02 | P0 | 20m | 1 | DONE | `backend/scripts` + HSCode 样例数据约束 | `seed-hscodes.js` + 100 条示例数据 | `node --test scripts/seed-hscodes.test.js && node scripts/seed-hscodes.js` | 脚本可执行、数据 100 条、`hsCode` 唯一、可重复导入 |
+ | HSCODE-API-01 | P0 | 30m | 1 | DONE | `src/services/hsCodeService.test.js` + `src/routes/hsCodes.test.js` | `src/services/hsCodeService.js` + `src/routes/hsCodes.js` + `/hs-codes` 挂载 | `node --test src/services/hsCodeService.test.js src/routes/hsCodes.test.js` | 服务搜索/查码/税率查询行为可用，路由已注册，定向测试通过 |
++| TRM-API-02 | P0 | 35m | 1 | DONE | `src/services/*tax*.js` + 既有 Express 路由模式 | 4 组税退模块 CRUD 控制器/路由与 `/api/v1` 挂载 | `node --test src/services/customsDeclarationService.test.js src/services/forexVerificationService.test.js src/services/taxRateService.test.js src/services/taxRefundService.test.js src/routes/taxModules.test.js src/controllers/taxRefundController.test.js` | 报关单/核销/退税/退税率 4 组资源均可通过 HTTP CRUD 访问，定向后端回归通过 |
+ | HSCODE-LIVE-DB-01 | P0 | 30m | 1 | DONE | `backend/data/hscode-live/records/*.json` + `prisma/schema.prisma` | 扩展 `HsCode` 模型、迁移、`import-hscode-live.js` 与导入测试 | `node --test scripts/import-hscode-live.test.js && npx prisma migrate dev --name extend_hs_codes_for_live_import && node scripts/import-hscode-live.js` | 正式表可保留关键规范字段和完整原始 payload，导入可重复执行 |
+ | TAX-DRAFT-BE-01 | P0 | 35m | 1 | DONE | `TaxRefund/CustomsDeclaration/ForexVerification` 关系模型 + 新服务测试 | `taxRefundDraftService.js` + `/tax-refunds/auto-drafts` 路由与控制器接入 | `node --test src/services/taxRefundDraftService.test.js src/controllers/taxRefundController.test.js` | 可按报关单自动生成 draft、跳过已有记录并返回 created/skipped 统计 |
++| CUSTOMS-DRAFT-BE-01 | P0 | 35m | 1 | DONE | `SalesContract/PackingItem/Product` 现有数据 + 新服务测试 | `customsDeclarationDraftService.js` + `/customs-declarations/auto-drafts` 路由与控制器接入 | `node --test src/services/customsDeclarationDraftService.test.js src/controllers/customsDeclarationController.test.js src/routes/taxModules.test.js` | 可按销售合同自动生成报关单草稿、回填明细申报要素，并返回 created/skipped 统计 |
+diff --git a/backend/src/controllers/customsDeclarationController.js b/backend/src/controllers/customsDeclarationController.js
+index 5fa953f..e0d4e66 100644
+--- a/backend/src/controllers/customsDeclarationController.js
++++ b/backend/src/controllers/customsDeclarationController.js
+@@ -5,7 +5,9 @@
+  */
+ 
+ const customsDeclarationService = require('../services/customsDeclarationService');
++const customsDeclarationDraftService = require('../services/customsDeclarationDraftService');
+ const { createCrudController } = require('./shared/createCrudController');
++const { success } = require('../utils/response');
+ 
+ const controller = createCrudController({
+   listMethod: (...args) => customsDeclarationService.listCustomsDeclarations(...args),
+@@ -26,4 +28,12 @@ module.exports = {
+   createCustomsDeclaration: controller.create,
+   updateCustomsDeclaration: controller.update,
+   removeCustomsDeclaration: controller.remove,
++  generateCustomsDeclarationDrafts: async (req, res, next) => {
++    try {
++      const result = await customsDeclarationDraftService.generateCustomsDeclarationDrafts(req.body || {});
++      success(res, result, '报关单草稿生成完成');
++    } catch (error) {
++      next(error);
++    }
++  },
+ };
+diff --git a/backend/src/routes/customsDeclarations.js b/backend/src/routes/customsDeclarations.js
+index 2c32774..7c572c0 100644
+--- a/backend/src/routes/customsDeclarations.js
++++ b/backend/src/routes/customsDeclarations.js
+@@ -15,6 +15,11 @@ const router = Router();
+ router.use(authenticate);
+ 
+ router.get('/', withPaginationValidation, customsDeclarationController.list);
++router.post(
++  '/auto-drafts',
++  roleAuth('ADMIN', 'SALES', 'FINANCE', 'WAREHOUSE'),
++  customsDeclarationController.generateCustomsDeclarationDrafts,
++);
+ router.get('/:id', withIdValidation, customsDeclarationController.getById);
+ router.post(
+   '/',
+diff --git a/backend/src/routes/taxModules.test.js b/backend/src/routes/taxModules.test.js
+index 49c4de9..3d8c8f2 100644
+--- a/backend/src/routes/taxModules.test.js
++++ b/backend/src/routes/taxModules.test.js
+@@ -30,6 +30,11 @@ const assertCrudRoutes = (router, label) => {
+ 
+ test('tax modules: customs declarations router exposes CRUD routes', () => {
+   assertCrudRoutes(customsDeclarationsRouter, 'customsDeclarations');
++  const autoDraftIndex = getRouteIndex(customsDeclarationsRouter, '/auto-drafts', 'post');
++  const detailIndex = getRouteIndex(customsDeclarationsRouter, '/:id', 'get');
++
++  assert.notEqual(autoDraftIndex, -1, 'customsDeclarations 缺少 POST /auto-drafts');
++  assert.ok(autoDraftIndex < detailIndex, 'customsDeclarations /auto-drafts 必须位于 /:id 之前');
+ });
+ 
+ test('tax modules: forex verifications router exposes CRUD routes', () => {
+diff --git a/frontend/METRICS.md b/frontend/METRICS.md
+index 55e0e8f..552102b 100644
+--- a/frontend/METRICS.md
++++ b/frontend/METRICS.md
+@@ -7,3 +7,4 @@
+ | 2 | HSCode frontend integration (`hsCode.service`, `ProductDialog`, `products` page) | Pass (`6` tests) | Pass | Not run | Not run | Targeted verification: `npm run test -- src/services/hsCode.service.test.ts src/app/dashboard/products/components/ProductDialog.test.tsx src/app/dashboard/products/page.test.tsx` and `npm run lint -- src/services/hsCode.service.ts src/services/hsCode.service.test.ts src/app/dashboard/products/components/ProductDialog.tsx src/app/dashboard/products/components/ProductDialog.test.tsx src/app/dashboard/products/page.tsx src/app/dashboard/products/page.test.tsx` |
+ | 3 | Customs declarations closeout + frontend build debt cleanup | Pass (`36` tests) | Pass | Pass | Targeted coverage command passed; Vitest v8 report remained repo-wide (`11.51%` statements / `45%` branches / `43.75%` functions / `11.51%` lines) | Verification bundle included customs declarations routes, dashboard tax-refunds wrapper, Sentry config import smoke test, service factory/type cleanup tests, and final `next build` |
+ | 4 | Tax-refunds auto-draft trigger + live HSCode type compatibility | Pass (`9` tests) | Pass | Pass | Not run | Verification covered `taxRefund.service`, tax-refunds dashboard page interaction, and final `next build` |
++| 5 | Customs auto-draft trigger | Pass (`9` tests) | Pass | Pass | Not run | Verification covered `customsDeclaration.service`, customs-declarations list page interaction, and final `next build` |
+diff --git a/frontend/PLAN.md b/frontend/PLAN.md
+index 22e5536..077b3c2 100644
+--- a/frontend/PLAN.md
++++ b/frontend/PLAN.md
+@@ -83,3 +83,17 @@
+ - `npm test -- src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.test.tsx`
+ - `npm run lint -- src/services/taxRefund.service.ts src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.tsx src/app/dashboard/tax-refunds/page.test.tsx src/app/dashboard/tax-refunds/components/TaxRefundListPageContent.tsx src/types/index.ts`
+ - `npm run build`
++
++## 2026-03-08 Round 6: Customs Declaration Auto Draft Trigger
++
++### Goal
++- Expose the backend customs auto-draft generation capability on `/customs-declarations`.
++
++### Execution Outcome
++- `src/services/customsDeclaration.service.ts` 新增 `generateDrafts` 调用，绑定 `POST /customs-declarations/auto-drafts`。
++- `src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx` 新增“自动生成草稿”按钮与生成中的状态。
++
++### Verification
++- `npm test -- src/services/customsDeclaration.service.test.ts src/app/customs-declarations/page.test.tsx`
++- `npm run lint -- src/services/customsDeclaration.service.ts src/services/customsDeclaration.service.test.ts src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx src/app/customs-declarations/page.test.tsx`
++- `npm run build`
+diff --git a/frontend/RISKS.md b/frontend/RISKS.md
+index 2c39c05..b701499 100644
+--- a/frontend/RISKS.md
++++ b/frontend/RISKS.md
+@@ -11,3 +11,4 @@
+ | R7 | Product backend currently ignores `taxRate` persistence | Auto-filled tax rate could disappear after save/reload | Present tax rate in the form immediately and pass it through submit payload while keeping frontend logic isolated from backend schema changes | Remove `taxRate` field from the dialog if backend scope is intentionally deferred | Open |
+ | R8 | Next 16 build now enforces stronger prerender/type checks than the older task plan assumed | Feature closeout can be blocked by unrelated frontend debt and delay delivery | Clear blocking build debt in the same round, but keep fixes minimal and verification-backed | Revert the build-debt fixes if a later dedicated cleanup supersedes them | Closed |
+ | R9 | 自动退税草稿依赖后端可用的 `hsCode + totalPrice + refundRate` 组合 | 用户点击“自动生成草稿”后可能只生成部分记录，或出现 skipped 提示 | 在 UI 中明确显示 created/skipped 数量；后端 note 中记录自动生成来源并对缺少税率的数据跳过 | 回退前端自动生成按钮，仅保留手工新建退税单入口 |
++| R10 | 自动报关单草稿依赖现有装箱明细金额与商品申报信息质量 | 用户点击“自动生成草稿”后可能只生成部分报关单，或部分申报要素来自 HSCode 回退值 | 在 UI 中显示 created/skipped 数量；服务层对缺申报要素时先回退 live HSCode，再保留草稿 note 说明来源 | 回退前端自动生成按钮，仅保留手工新建报关单入口 |
+diff --git a/frontend/TASKS.md b/frontend/TASKS.md
+index fcc8e5b..0b1da76 100644
+--- a/frontend/TASKS.md
++++ b/frontend/TASKS.md
+@@ -13,3 +13,5 @@
+ | HS-03 | P0 | 15m | 1 | DONE | Implemented HSCode feature | Metrics, task/result logs, and patch artifact | `npm run test -- ...` and `npm run lint -- ...` | Checks green and artifacts written |
+ | TR-AUTO-01 | P0 | 15m | 1 | DONE | New backend auto-draft endpoint contract | `taxRefund.service.ts` auto-draft client + failing page/service tests | `npm test -- src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.test.tsx` | Frontend captures the new endpoint contract before UI implementation |
+ | TR-AUTO-02 | P0 | 15m | 1 | DONE | Failing auto-draft tests | Tax-refunds list action button + success/error reload behavior | Same targeted `vitest` command | User can trigger draft generation from the list page and see created/skipped feedback |
++| CD-AUTO-01 | P0 | 15m | 1 | DONE | New backend customs auto-draft endpoint contract | `customsDeclaration.service.ts` auto-draft client + failing page/service tests | `npm test -- src/services/customsDeclaration.service.test.ts src/app/customs-declarations/page.test.tsx` | Frontend captures the customs auto-draft endpoint contract before UI implementation |
++| CD-AUTO-02 | P0 | 15m | 1 | DONE | Failing customs auto-draft tests | Customs-declarations list action button + success/error reload behavior | Same targeted `vitest` command | User can trigger customs draft generation from the list page and see created/skipped feedback |
+diff --git a/frontend/src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx b/frontend/src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx
+index 71a4a96..916565c 100644
+--- a/frontend/src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx
++++ b/frontend/src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx
+@@ -8,7 +8,7 @@
+ 
+ 'use client';
+ 
+-import { startTransition, useDeferredValue, useEffect, useState } from 'react';
++import { startTransition, useCallback, useDeferredValue, useEffect, useState } from 'react';
+ import { useRouter, useSearchParams } from 'next/navigation';
+ import type { CustomsDeclaration } from '@/types';
+ import { customsDeclarationService } from '@/services/customsDeclaration.service';
+@@ -60,27 +60,28 @@ export function CustomsDeclarationListPageContent() {
+ 
+   const [declarations, setDeclarations] = useState<CustomsDeclaration[]>([]);
+   const [loading, setLoading] = useState(true);
++  const [generatingDrafts, setGeneratingDrafts] = useState(false);
+ 
+-  useEffect(() => {
+-    const loadDeclarations = async () => {
+-      setLoading(true);
+-      try {
+-        const response = await customsDeclarationService.getAll({
+-          page: 1,
+-          pageSize: PAGE_SIZE,
+-          keyword: deferredKeyword || undefined,
+-          status: status === 'ALL' ? undefined : status,
+-        });
+-        setDeclarations(response?.data?.items || []);
+-      } catch {
+-        toast.error('加载报关单失败');
+-      } finally {
+-        setLoading(false);
+-      }
+-    };
++  const loadDeclarations = useCallback(async () => {
++    setLoading(true);
++    try {
++      const response = await customsDeclarationService.getAll({
++        page: 1,
++        pageSize: PAGE_SIZE,
++        keyword: deferredKeyword || undefined,
++        status: status === 'ALL' ? undefined : status,
++      });
++      setDeclarations(response?.data?.items || []);
++    } catch {
++      toast.error('加载报关单失败');
++    } finally {
++      setLoading(false);
++    }
++  }, [deferredKeyword, status]);
+ 
++  useEffect(() => {
+     void loadDeclarations();
+-  }, [deferredKeyword, status]);
++  }, [loadDeclarations]);
+ 
+   const draftCount = declarations.filter((item) => item.status === 'DRAFT').length;
+   const releasedCount = declarations.filter((item) => item.status === 'RELEASED').length;
+@@ -92,6 +93,21 @@ export function CustomsDeclarationListPageContent() {
+     });
+   };
+ 
++  const handleGenerateDrafts = async () => {
++    setGeneratingDrafts(true);
++    try {
++      const response = await customsDeclarationService.generateDrafts({});
++      const created = response?.data?.created ?? 0;
++      const skipped = response?.data?.skipped ?? 0;
++      toast.success(`自动生成完成：新增 ${created} 条，跳过 ${skipped} 条`);
++      await loadDeclarations();
++    } catch {
++      toast.error('自动生成报关单草稿失败');
++    } finally {
++      setGeneratingDrafts(false);
++    }
++  };
++
+   return (
+     <div className="space-y-6 pb-10">
+       <PageHeader
+@@ -123,6 +139,15 @@ export function CustomsDeclarationListPageContent() {
+               </SelectContent>
+             </Select>
+ 
++            <Button
++              variant="outline"
++              className="h-11 rounded-xl"
++              onClick={handleGenerateDrafts}
++              disabled={generatingDrafts}
++            >
++              自动生成草稿
++            </Button>
++
+             <Button
+               className="h-11 rounded-xl"
+               onClick={() => router.push('/customs-declarations/create')}
+diff --git a/frontend/src/app/customs-declarations/page.test.tsx b/frontend/src/app/customs-declarations/page.test.tsx
+index eabd96a..46de400 100644
+--- a/frontend/src/app/customs-declarations/page.test.tsx
++++ b/frontend/src/app/customs-declarations/page.test.tsx
+@@ -12,7 +12,9 @@ import userEvent from '@testing-library/user-event';
+ import CustomsDeclarationsPage from './page';
+ 
+ const mockGetAll = vi.fn();
++const mockGenerateDrafts = vi.fn();
+ const mockToastError = vi.fn();
++const mockToastSuccess = vi.fn();
+ const mockSearchParamGet = vi.fn();
+ const mockRouterPush = vi.fn();
+ 
+@@ -29,20 +31,23 @@ vi.mock('next/navigation', () => ({
+ vi.mock('@/services/customsDeclaration.service', () => ({
+   customsDeclarationService: {
+     getAll: (...args: unknown[]) => mockGetAll(...args),
++    generateDrafts: (...args: unknown[]) => mockGenerateDrafts(...args),
+   },
+ }));
+ 
+ vi.mock('sonner', () => ({
+   toast: {
+     error: (...args: unknown[]) => mockToastError(...args),
+-    success: vi.fn(),
++    success: (...args: unknown[]) => mockToastSuccess(...args),
+   },
+ }));
+ 
+ describe('CustomsDeclarationsPage 交互逻辑', () => {
+   beforeEach(() => {
+     mockGetAll.mockReset();
++    mockGenerateDrafts.mockReset();
+     mockToastError.mockReset();
++    mockToastSuccess.mockReset();
+     mockRouterPush.mockReset();
+     mockSearchParamGet.mockReset();
+     mockSearchParamGet.mockImplementation((key: string) => {
+@@ -150,4 +155,30 @@ describe('CustomsDeclarationsPage 交互逻辑', () => {
+       expect(mockToastError).toHaveBeenCalledWith('加载报关单失败');
+     });
+   });
++
++  it('点击自动生成草稿后提示结果并刷新列表', async () => {
++    mockGetAll.mockResolvedValue({
++      data: {
++        items: [],
++      },
++    });
++    mockGenerateDrafts.mockResolvedValue({
++      data: {
++        created: 3,
++        skipped: 1,
++      },
++    });
++
++    const user = userEvent.setup();
++    render(<CustomsDeclarationsPage />);
++
++    await user.click(screen.getByRole('button', { name: '自动生成草稿' }));
++
++    await waitFor(() => {
++      expect(mockGenerateDrafts).toHaveBeenCalledWith({});
++    });
++
++    expect(mockToastSuccess).toHaveBeenCalledWith('自动生成完成：新增 3 条，跳过 1 条');
++    expect(mockGetAll).toHaveBeenCalledTimes(2);
++  });
+ });
+diff --git a/frontend/src/services/customsDeclaration.service.test.ts b/frontend/src/services/customsDeclaration.service.test.ts
+index ee33c47..2e66ce1 100644
+--- a/frontend/src/services/customsDeclaration.service.test.ts
++++ b/frontend/src/services/customsDeclaration.service.test.ts
+@@ -89,4 +89,15 @@ describe('customsDeclarationService', () => {
+ 
+     expect(api.put).toHaveBeenCalledWith('/customs-declarations/cd-1', payload);
+   });
++
++  it('generateDrafts 调用自动草稿接口', async () => {
++    const payload = {
++      salesContractId: 'sc-1',
++      replaceExisting: true,
++    };
++
++    await customsDeclarationService.generateDrafts(payload);
++
++    expect(api.post).toHaveBeenCalledWith('/customs-declarations/auto-drafts', payload);
++  });
+ });
+diff --git a/frontend/src/services/customsDeclaration.service.ts b/frontend/src/services/customsDeclaration.service.ts
+index 930d866..0b4bc7c 100644
+--- a/frontend/src/services/customsDeclaration.service.ts
++++ b/frontend/src/services/customsDeclaration.service.ts
+@@ -1,3 +1,4 @@
++import api from '@/lib/axios';
+ import type {
+   CustomsDeclaration,
+   CustomsDeclarationItem,
+@@ -13,6 +14,11 @@ export type CustomsDeclarationListQuery = {
+ 
+ export type CustomsDeclarationItemInput = Omit<CustomsDeclarationItem, 'id'>;
+ 
++export type CustomsDeclarationDraftGenerateInput = {
++  salesContractId?: string;
++  replaceExisting?: boolean;
++};
++
+ export type CustomsDeclarationUpsertInput = Omit<
+   CustomsDeclaration,
+   'id' | 'createdAt' | 'updatedAt' | 'items'
+@@ -36,4 +42,6 @@ export const customsDeclarationService = {
+   update: async (id: string, data: CustomsDeclarationUpsertInput) =>
+     crud.update!(id, data),
+   delete: async (id: string) => crud.delete!(id),
++  generateDrafts: async (data: CustomsDeclarationDraftGenerateInput) =>
++    api.post('/customs-declarations/auto-drafts', data),
+ };

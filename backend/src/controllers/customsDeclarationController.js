@@ -5,7 +5,9 @@
  */
 
 const customsDeclarationService = require('../services/customsDeclarationService');
+const customsDeclarationDraftService = require('../services/customsDeclarationDraftService');
 const { createCrudController } = require('./shared/createCrudController');
+const { success } = require('../utils/response');
 
 const controller = createCrudController({
   listMethod: (...args) => customsDeclarationService.listCustomsDeclarations(...args),
@@ -26,4 +28,12 @@ module.exports = {
   createCustomsDeclaration: controller.create,
   updateCustomsDeclaration: controller.update,
   removeCustomsDeclaration: controller.remove,
+  generateCustomsDeclarationDrafts: async (req, res, next) => {
+    try {
+      const result = await customsDeclarationDraftService.generateCustomsDeclarationDrafts(req.body || {});
+      success(res, result, '报关单草稿生成完成');
+    } catch (error) {
+      next(error);
+    }
+  },
 };

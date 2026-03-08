@@ -1,5 +1,32 @@
 # Frontend Polish Plan
 
+## 2026-03-08 Round 46 (Tax Refund Module CRUD Closure)
+
+### Goal
+- 在已有退税数据模型基础上，补齐可用的后端 CRUD API 与前端登录后工作台，形成可测试、可构建、可继续扩展的退税模块主干。
+
+### Delivered
+- 后端：
+  - 新增共享 CRUD 控制器工厂 `backend/src/controllers/shared/createCrudController.js`
+  - 新增并挂载 4 组税退模块路由与控制器：`/customs-declarations`、`/forex-verifications`、`/tax-refunds`、`/tax-rates`
+  - 新增定向回归：`backend/src/routes/taxModules.test.js`、`backend/src/controllers/taxRefundController.test.js`
+- 前端：
+  - 新增登录后退税工作台 `/dashboard/tax-refunds`
+  - 补齐列表、详情、创建、编辑、状态徽章、共享表单、服务层与类型定义
+  - 侧边栏新增“出口退税”入口
+  - `frontend/src/app/layout.tsx` 改为本地字体栈，移除构建阶段对 Google Fonts 的外网依赖
+
+### Verification
+- Backend:
+  - `cd backend && node --test src/services/customsDeclarationService.test.js src/services/forexVerificationService.test.js src/services/taxRateService.test.js src/services/taxRefundService.test.js src/routes/taxModules.test.js src/controllers/taxRefundController.test.js`
+- Frontend:
+  - `cd frontend && npm test -- src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.test.tsx src/app/dashboard/tax-refunds/create/page.test.tsx 'src/app/dashboard/tax-refunds/[id]/page.test.tsx' 'src/app/dashboard/tax-refunds/[id]/edit/page.test.tsx' src/components/layout/Sidebar.test.tsx`
+  - `cd frontend && npm run lint -- src/services/taxRefund.service.ts src/services/taxRefund.service.test.ts src/components/layout/Sidebar.tsx src/components/layout/Sidebar.test.tsx src/types/index.ts src/app/layout.tsx src/app/dashboard/tax-refunds/page.tsx src/app/dashboard/tax-refunds/page.test.tsx src/app/dashboard/tax-refunds/create/page.tsx src/app/dashboard/tax-refunds/create/page.test.tsx 'src/app/dashboard/tax-refunds/[id]/page.tsx' 'src/app/dashboard/tax-refunds/[id]/page.test.tsx' 'src/app/dashboard/tax-refunds/[id]/edit/page.tsx' 'src/app/dashboard/tax-refunds/[id]/edit/page.test.tsx' src/app/dashboard/tax-refunds/components/TaxRefundStatusBadge.tsx src/app/dashboard/tax-refunds/components/TaxRefundForm.tsx src/app/dashboard/tax-refunds/components/TaxRefundListPageContent.tsx src/app/dashboard/tax-refunds/components/TaxRefundDetailPageContent.tsx`
+  - `cd frontend && npm run build`
+
+### Scope Note
+- 当前工作区存在并行中的“退税草稿自动生成 / HSCode live import”相关改动。本轮完成并验证的范围仅包含：税退模块 CRUD API、登录后退税工作台，以及构建所需的本地字体栈修复。
+
 ## 长程目标
 完成“全系统前端高端美化”：
 - 全局设计语言统一（token/字体/层级/动效）
@@ -889,4 +916,22 @@
   - `cd backend && node --test scripts/import-hscode-live.test.js src/services/taxRefundDraftService.test.js src/controllers/taxRefundController.test.js src/routes/taxModules.test.js src/services/hsCodeService.test.js src/routes/hsCodes.test.js`：通过（19/19）。
   - `cd frontend && npm test -- src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.test.tsx`：通过（9/9）。
   - `cd frontend && npm run lint -- src/services/taxRefund.service.ts src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.tsx src/app/dashboard/tax-refunds/page.test.tsx src/app/dashboard/tax-refunds/components/TaxRefundListPageContent.tsx src/types/index.ts`：通过。
+  - `cd frontend && npm run build`：通过。
+
+## 2026-03-08 Round 46（Customs Declaration Draft Automation）
+
+- 已完成本轮目标：
+  - 使用现有销售合同、装箱明细和商品申报数据自动补齐报关单草稿。
+  - 在报关单列表页提供触发入口，让这一步不再只靠脚本或手工接口调用。
+- 已完成项：
+  - `backend/src/services/customsDeclarationDraftService.js` 已实现按 `sales_contracts + packing_items + product` 自动生成报关单草稿。
+  - 申报要素优先用 `product.declaration`，缺失时回退到 live `hs_codes.declarationElements`。
+  - `backend/src/routes/customsDeclarations.js` 已新增 `POST /customs-declarations/auto-drafts`。
+  - `frontend/src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx` 已新增“自动生成草稿”按钮。
+  - 已对真实数据库执行一次自动补齐：生成 `35` 个报关单草稿，跳过 `1` 个无装箱明细合同。
+  - 已再执行一次退税草稿自动生成：生成 `9` 个，跳过 `9` 个 `no_rate_data` 案例。
+- 验证结论：
+  - `cd backend && node --test src/services/customsDeclarationDraftService.test.js src/controllers/customsDeclarationController.test.js src/routes/taxModules.test.js`：通过（8/8）。
+  - `cd frontend && npm test -- src/services/customsDeclaration.service.test.ts src/app/customs-declarations/page.test.tsx`：通过（9/9）。
+  - `cd frontend && npm run lint -- src/services/customsDeclaration.service.ts src/services/customsDeclaration.service.test.ts src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx src/app/customs-declarations/page.test.tsx`：通过。
   - `cd frontend && npm run build`：通过。

@@ -12,7 +12,9 @@ import userEvent from '@testing-library/user-event';
 import CustomsDeclarationsPage from './page';
 
 const mockGetAll = vi.fn();
+const mockGenerateDrafts = vi.fn();
 const mockToastError = vi.fn();
+const mockToastSuccess = vi.fn();
 const mockSearchParamGet = vi.fn();
 const mockRouterPush = vi.fn();
 
@@ -29,20 +31,23 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/services/customsDeclaration.service', () => ({
   customsDeclarationService: {
     getAll: (...args: unknown[]) => mockGetAll(...args),
+    generateDrafts: (...args: unknown[]) => mockGenerateDrafts(...args),
   },
 }));
 
 vi.mock('sonner', () => ({
   toast: {
     error: (...args: unknown[]) => mockToastError(...args),
-    success: vi.fn(),
+    success: (...args: unknown[]) => mockToastSuccess(...args),
   },
 }));
 
 describe('CustomsDeclarationsPage 交互逻辑', () => {
   beforeEach(() => {
     mockGetAll.mockReset();
+    mockGenerateDrafts.mockReset();
     mockToastError.mockReset();
+    mockToastSuccess.mockReset();
     mockRouterPush.mockReset();
     mockSearchParamGet.mockReset();
     mockSearchParamGet.mockImplementation((key: string) => {
@@ -149,5 +154,31 @@ describe('CustomsDeclarationsPage 交互逻辑', () => {
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('加载报关单失败');
     });
+  });
+
+  it('点击自动生成草稿后提示结果并刷新列表', async () => {
+    mockGetAll.mockResolvedValue({
+      data: {
+        items: [],
+      },
+    });
+    mockGenerateDrafts.mockResolvedValue({
+      data: {
+        created: 3,
+        skipped: 1,
+      },
+    });
+
+    const user = userEvent.setup();
+    render(<CustomsDeclarationsPage />);
+
+    await user.click(screen.getByRole('button', { name: '自动生成草稿' }));
+
+    await waitFor(() => {
+      expect(mockGenerateDrafts).toHaveBeenCalledWith({});
+    });
+
+    expect(mockToastSuccess).toHaveBeenCalledWith('自动生成完成：新增 3 条，跳过 1 条');
+    expect(mockGetAll).toHaveBeenCalledTimes(2);
   });
 });

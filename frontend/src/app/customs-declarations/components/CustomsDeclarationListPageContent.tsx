@@ -8,7 +8,7 @@
 
 'use client';
 
-import { startTransition, useDeferredValue, useEffect, useState } from 'react';
+import { startTransition, useCallback, useDeferredValue, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { CustomsDeclaration } from '@/types';
 import { customsDeclarationService } from '@/services/customsDeclaration.service';
@@ -60,27 +60,28 @@ export function CustomsDeclarationListPageContent() {
 
   const [declarations, setDeclarations] = useState<CustomsDeclaration[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generatingDrafts, setGeneratingDrafts] = useState(false);
+
+  const loadDeclarations = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await customsDeclarationService.getAll({
+        page: 1,
+        pageSize: PAGE_SIZE,
+        keyword: deferredKeyword || undefined,
+        status: status === 'ALL' ? undefined : status,
+      });
+      setDeclarations(response?.data?.items || []);
+    } catch {
+      toast.error('加载报关单失败');
+    } finally {
+      setLoading(false);
+    }
+  }, [deferredKeyword, status]);
 
   useEffect(() => {
-    const loadDeclarations = async () => {
-      setLoading(true);
-      try {
-        const response = await customsDeclarationService.getAll({
-          page: 1,
-          pageSize: PAGE_SIZE,
-          keyword: deferredKeyword || undefined,
-          status: status === 'ALL' ? undefined : status,
-        });
-        setDeclarations(response?.data?.items || []);
-      } catch {
-        toast.error('加载报关单失败');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     void loadDeclarations();
-  }, [deferredKeyword, status]);
+  }, [loadDeclarations]);
 
   const draftCount = declarations.filter((item) => item.status === 'DRAFT').length;
   const releasedCount = declarations.filter((item) => item.status === 'RELEASED').length;
@@ -90,6 +91,21 @@ export function CustomsDeclarationListPageContent() {
     startTransition(() => {
       router.push(`/customs-declarations/${id}`);
     });
+  };
+
+  const handleGenerateDrafts = async () => {
+    setGeneratingDrafts(true);
+    try {
+      const response = await customsDeclarationService.generateDrafts({});
+      const created = response?.data?.created ?? 0;
+      const skipped = response?.data?.skipped ?? 0;
+      toast.success(`自动生成完成：新增 ${created} 条，跳过 ${skipped} 条`);
+      await loadDeclarations();
+    } catch {
+      toast.error('自动生成报关单草稿失败');
+    } finally {
+      setGeneratingDrafts(false);
+    }
   };
 
   return (
@@ -122,6 +138,15 @@ export function CustomsDeclarationListPageContent() {
                 ))}
               </SelectContent>
             </Select>
+
+            <Button
+              variant="outline"
+              className="h-11 rounded-xl"
+              onClick={handleGenerateDrafts}
+              disabled={generatingDrafts}
+            >
+              自动生成草稿
+            </Button>
 
             <Button
               className="h-11 rounded-xl"

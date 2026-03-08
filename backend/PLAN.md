@@ -111,3 +111,25 @@
 ### Current Capability
 - HSCode 主查询源现在已切换为真实 JSON 清洗后的正式库数据。
 - 退税草稿现在可按报关单明细自动生成，但依赖明细上的 `hsCode + totalPrice` 完整度；缺失时会跳过而不是盲目生成错误金额。
+
+## 2026-03-08 Round 5: Customs Declaration Draft Automation
+
+### Goal
+- 使用现有 `sales_contracts + packing_items + product` 数据自动补齐报关单草稿，为退税草稿生成提供上游单据。
+
+### Execution Outcome
+- 已新增 `src/services/customsDeclarationDraftService.js`，按销售合同生成报关单草稿。
+- 数据来源优先级：
+  - 明细金额/数量/重量：`packing_items`
+  - HSCode：`product.hsCode`
+  - 申报要素：`product.declaration`，缺失时回落到 live `hs_codes.declarationElements`
+- 已在 `src/controllers/customsDeclarationController.js` 与 `src/routes/customsDeclarations.js` 接入 `POST /customs-declarations/auto-drafts`。
+- 已用真实数据库运行一次自动补齐，实际生成 `35` 个报关单草稿，跳过 `1` 个无装箱明细合同。
+
+### Verification
+- `node --test src/services/customsDeclarationDraftService.test.js src/controllers/customsDeclarationController.test.js src/routes/taxModules.test.js`
+- 真实执行：`node - <<'NODE' ... customsDeclarationDraftService.generateCustomsDeclarationDrafts({}) ... NODE`
+
+### Current Capability
+- 现有销售/装箱数据已可一键补成报关单草稿。
+- 退税自动化链路现在具备“销售/装箱 -> 报关单草稿 -> 退税草稿”的最小闭环。

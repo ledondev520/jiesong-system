@@ -89,4 +89,15 @@ describe('customsDeclarationService', () => {
 
     expect(api.put).toHaveBeenCalledWith('/customs-declarations/cd-1', payload);
   });
+
+  it('generateDrafts 调用自动草稿接口', async () => {
+    const payload = {
+      salesContractId: 'sc-1',
+      replaceExisting: true,
+    };
+
+    await customsDeclarationService.generateDrafts(payload);
+
+    expect(api.post).toHaveBeenCalledWith('/customs-declarations/auto-drafts', payload);
+  });
 });

@@ -1,3 +1,4 @@
+import api from '@/lib/axios';
 import type {
   CustomsDeclaration,
   CustomsDeclarationItem,
@@ -12,6 +13,11 @@ export type CustomsDeclarationListQuery = {
 };
 
 export type CustomsDeclarationItemInput = Omit<CustomsDeclarationItem, 'id'>;
+
+export type CustomsDeclarationDraftGenerateInput = {
+  salesContractId?: string;
+  replaceExisting?: boolean;
+};
 
 export type CustomsDeclarationUpsertInput = Omit<
   CustomsDeclaration,
@@ -36,4 +42,6 @@ export const customsDeclarationService = {
   update: async (id: string, data: CustomsDeclarationUpsertInput) =>
     crud.update!(id, data),
   delete: async (id: string) => crud.delete!(id),
+  generateDrafts: async (data: CustomsDeclarationDraftGenerateInput) =>
+    api.post('/customs-declarations/auto-drafts', data),
 };

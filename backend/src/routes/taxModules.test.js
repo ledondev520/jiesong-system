@@ -30,6 +30,11 @@ const assertCrudRoutes = (router, label) => {
 
 test('tax modules: customs declarations router exposes CRUD routes', () => {
   assertCrudRoutes(customsDeclarationsRouter, 'customsDeclarations');
+  const autoDraftIndex = getRouteIndex(customsDeclarationsRouter, '/auto-drafts', 'post');
+  const detailIndex = getRouteIndex(customsDeclarationsRouter, '/:id', 'get');
+
+  assert.notEqual(autoDraftIndex, -1, 'customsDeclarations 缺少 POST /auto-drafts');
+  assert.ok(autoDraftIndex < detailIndex, 'customsDeclarations /auto-drafts 必须位于 /:id 之前');
 });
 
 test('tax modules: forex verifications router exposes CRUD routes', () => {
