@@ -23,6 +23,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Plus, Pencil, Trash, AlertTriangle } from 'lucide-react';
 import { SupplierDialog } from './components/SupplierDialog';
+import type { SupplierFormValues } from './components/SupplierDialog';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { toast } from 'sonner';
 
@@ -70,13 +71,18 @@ export default function SuppliersPage() {
     }
   };
 
-  const handleSubmit = async (data: Partial<Supplier>) => {
+  const handleSubmit = async (data: SupplierFormValues) => {
+    const payload = {
+      ...data,
+      aliases: data.aliases?.map((alias) => ({ alias: alias.alias })),
+    };
+
     try {
       if (editingSupplier) {
-        await supplierService.update(editingSupplier.id, data);
+        await supplierService.update(editingSupplier.id, payload);
         toast.success('供应商更新成功');
       } else {
-        await supplierService.create(data);
+        await supplierService.create(payload);
         toast.success('供应商创建成功');
       }
       setIsDialogOpen(false);

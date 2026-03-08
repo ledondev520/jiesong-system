@@ -7,10 +7,14 @@ type SupplierListQuery = {
   keyword?: string;
 };
 
+type SupplierUpsertInput = Omit<Partial<Supplier>, 'aliases'> & {
+  aliases?: Array<{ alias: string }>;
+};
+
 /**
  * 供应商服务。
  */
-const crud = createCrudService<Supplier, Partial<Supplier>, Partial<Supplier>, SupplierListQuery>('/suppliers');
+const crud = createCrudService<Supplier, SupplierUpsertInput, SupplierUpsertInput, SupplierListQuery>('/suppliers');
 
 export const supplierService = {
   ...crud,

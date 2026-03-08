@@ -11,12 +11,12 @@ export interface UseApiOptions<TResult> {
   onError?: (error: unknown) => void;
 }
 
-export interface UseApiState<TResult> {
+export interface UseApiState<TResult, TArgs extends readonly unknown[]> {
   data: TResult | undefined;
   loading: boolean;
   error: string | null;
   hasLoaded: boolean;
-  execute: (...args: Parameters<AsyncFunction<unknown[], TResult>>) => Promise<TResult | null>;
+  execute: (...args: TArgs) => Promise<TResult | null>;
 }
 
 function normalizeErrorMessage(error: unknown): string {
@@ -30,7 +30,7 @@ function normalizeErrorMessage(error: unknown): string {
 export function useApi<TResult, TArgs extends readonly unknown[] = []>(
   request: AsyncFunction<TArgs, TResult>,
   options: UseApiOptions<TResult> = {},
-): UseApiState<TResult> {
+): UseApiState<TResult, TArgs> {
   const { immediate = false, initialData, onSuccess, onError } = options;
 
   const [data, setData] = useState<TResult | undefined>(initialData);
@@ -64,7 +64,7 @@ export function useApi<TResult, TArgs extends readonly unknown[] = []>(
 
   useEffect(() => {
     if (immediate) {
-      void execute();
+      void execute(...([] as unknown as TArgs));
     }
   }, [immediate, execute]);
 

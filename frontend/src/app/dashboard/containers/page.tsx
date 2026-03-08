@@ -24,6 +24,7 @@ import { StatusBadge, type StatusBadgeConfig } from '@/components/ui/status-badg
 import { Plus, Pencil, Trash, Ship, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { ContainerDialog } from './components/ContainerDialog';
+import type { ContainerFormValues } from './components/ContainerDialog';
 import { toast } from 'sonner';
 import { PORTS } from '@/lib/constants';
 import { formatDate } from '@/lib/date-format';
@@ -90,13 +91,18 @@ export default function ContainersPage() {
     }
   };
 
-  const handleSubmit = async (data: Partial<SalesContract>) => {
+  const handleSubmit = async (data: ContainerFormValues) => {
+    const payload: Partial<SalesContract> = {
+      ...data,
+      estimatedArrival: data.estimatedArrival?.toISOString(),
+    };
+
     try {
       if (editingContainer) {
-        await containerService.update(editingContainer.id, data);
+        await containerService.update(editingContainer.id, payload);
         toast.success('货柜更新成功');
       } else {
-        await containerService.create(data);
+        await containerService.create(payload);
         toast.success('货柜创建成功');
       }
       setIsDialogOpen(false);

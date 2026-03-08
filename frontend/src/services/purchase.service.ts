@@ -57,9 +57,9 @@ const normalizeParsedItems = (raw: unknown): ParsedQuoteItem[] => {
           : [];
 
   return source
-    .map((entry) => {
+    .flatMap<ParsedQuoteItem>((entry) => {
       if (typeof entry !== 'object' || entry === null) {
-        return null;
+        return [];
       }
 
       const record = entry as Record<string, unknown>;
@@ -70,16 +70,15 @@ const normalizeParsedItems = (raw: unknown): ParsedQuoteItem[] => {
             ? record.name
             : undefined;
 
-      return {
+      return [{
         productId: typeof record.productId === 'string' ? record.productId : undefined,
         productName,
         quantity: toNumber(record.quantity),
         unitPrice: toNumber(record.unitPrice ?? record.price),
         unit: typeof record.unit === 'string' ? record.unit : undefined,
         note: typeof record.note === 'string' ? record.note : undefined,
-      } satisfies ParsedQuoteItem;
+      } satisfies ParsedQuoteItem];
     })
-    .filter((item): item is ParsedQuoteItem => item !== null)
     .filter((item) => item.quantity > 0 || item.unitPrice > 0 || Boolean(item.productId) || Boolean(item.productName));
 };
 

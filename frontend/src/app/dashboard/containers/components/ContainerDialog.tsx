@@ -42,6 +42,7 @@ const containerSchema = z.object({
 });
 
 type ContainerFormValues = z.infer<typeof containerSchema>;
+export type { ContainerFormValues };
 
 interface ContainerDialogProps {
   open: boolean;

@@ -109,7 +109,17 @@ function PaymentsPageContent() {
     setPayableLoading(true);
     try {
       const response = await financeService.getPayables({ pageSize: 100 });
-      setPayables(response.data?.items || []);
+      setPayables(
+        (response.data?.items || []).map((item) => ({
+          id: item.id,
+          contractNo: item.contractNo,
+          totalAmount: item.totalAmount,
+          paidAmount: item.paidAmount ?? 0,
+          unpaidAmount: item.unpaidAmount ?? Math.max(0, item.totalAmount - (item.paidAmount ?? 0)),
+          status: item.status,
+          supplier: item.supplier,
+        })),
+      );
     } catch {
       toast.error('加载应付账款失败');
     } finally {
@@ -122,7 +132,18 @@ function PaymentsPageContent() {
     setReceivableLoading(true);
     try {
       const response = await financeService.getReceivables({ pageSize: 100 });
-      setReceivables(response.data?.items || []);
+      setReceivables(
+        (response.data?.items || []).map((item) => ({
+          id: item.id,
+          contractNo: item.contractNo,
+          totalAmount: item.totalAmount,
+          receivedAmount: item.receivedAmount ?? 0,
+          unreceiveAmount: item.unreceiveAmount ?? Math.max(0, item.totalAmount - (item.receivedAmount ?? 0)),
+          exchangeRate: 0,
+          status: item.status,
+          items: item.items,
+        })),
+      );
     } catch {
       toast.error('加载应收账款失败');
     } finally {
@@ -135,7 +156,7 @@ function PaymentsPageContent() {
     if (!selectedPayable) return;
     try {
       await financeService.createPayment({
-        type: 'PAYABLE',
+        type: PaymentType.PAYABLE,
         purchaseContractId: selectedPayable.id,
         amount: Number(data.amount),
         currency: 'CNY',
@@ -157,7 +178,7 @@ function PaymentsPageContent() {
     if (!selectedReceivable) return;
     try {
       await financeService.createPayment({
-        type: 'RECEIVABLE',
+        type: PaymentType.RECEIVABLE,
         salesContractId: selectedReceivable.id,
         amount: Number(data.amount),
         currency: 'USD',

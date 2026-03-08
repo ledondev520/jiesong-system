@@ -665,3 +665,20 @@
 ### 结论
 - HSCode 本地数据库、API 与商品页智能匹配已形成可验证闭环。
 - `taxRate` 当前仅作商品弹窗辅助值展示，不持久化到 `Product` 表。
+
+## 2026-03-08 Round 44（Customs Declarations Closeout + Frontend Build Recovery）
+
+### 质量指标
+- 前端定向 Vitest：`36/36` 通过。
+- 前端定向 lint：通过。
+- 前端 `next build`：通过。
+- customs declarations 定向 coverage 命令：通过；Vitest v8 输出仍按仓库全量口径汇总。
+
+### 过程指标
+- 新增/更新前端构建保障测试：`1`（`frontend/src/sentry.config.test.ts`）。
+- 收口前端任务：`4`（`CD-01`、`CD-02`、`CD-03`、`CD-FE-01`）。
+- 修复前端构建阻塞类别：`6+`（Sentry 依赖、SearchParams Suspense、CRUD typing、表单 payload 边界、财务/配置类型、通用 hook 类型）。
+
+### 结论
+- `/customs-declarations` 前端 CRUD 已完成收口并具备可验证证据。
+- `frontend` 当前可重新完成生产构建，验证过程中发现的主要存量类型阻塞已清理。

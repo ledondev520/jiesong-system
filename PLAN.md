@@ -821,3 +821,49 @@
   - `cd backend && node --test src/services/hsCodeService.test.js src/routes/hsCodes.test.js src/controllers/productController.test.js`：通过（7/7）。
   - `cd frontend && npm run test -- src/services/hsCode.service.test.ts src/app/dashboard/products/components/ProductDialog.test.tsx src/app/dashboard/products/page.test.tsx`：通过（6/6）。
   - `cd backend && node scripts/seed-hscodes.js` 后，本地 `hs_codes` 记录数为 100。
+
+## 2026-03-08 Round 44（HSCode Live Raw Capture）
+
+- 已设定本轮目标：
+  - 先抓取 `hsbianma.com` 当前可访问的 HSCode 原始详情信息。
+  - 暂缓清洗与入库，优先完成“原始快照可落盘、可续跑、可回放”。
+- 执行策略：
+  - 使用 Python 抓取器 `backend/scripts/scrape_hscode_raw.py`。
+  - 章节枚举：`Search/<page>?keywords=<chapter>`，默认覆盖 `01`-`99`。
+  - 详情落盘：每个 10 位编码写入 `backend/data/hscode-live/records/<code>.json`。
+  - 断点续跑：已存在记录自动跳过，并输出 `manifest.json` 与 `chapters/<chapter>/page-*.json`。
+- 当前计划文档：
+  - `docs/plans/2026-03-08-hscode-live-capture.md`
+- 已完成项：
+  - 新增 `backend/scripts/test_scrape_hscode_raw.py`，覆盖搜索页去重与详情页结构化解析。
+  - 新增 `backend/scripts/scrape_hscode_raw.py`，支持章节抓取、详情解析、分文件落盘、章节快照和断点续跑。
+  - 已完成真实抓取首批数据，当前 `backend/data/hscode-live/records` 已落盘 764 条记录：
+    - `01` 章：147 条
+    - `02` 章：143 条
+    - `03` 章：400 条（本轮中断点）
+    - `04` 章：16 条（已开始）
+    - `69` 章：58 条（烟测批次）
+- 验证结论：
+  - `python3 -m unittest backend/scripts/test_scrape_hscode_raw.py`：通过（2/2）。
+  - `python3 backend/scripts/scrape_hscode_raw.py --chapters 69 --request-delay 0.05`：通过，落盘 58 条。
+  - `python3 backend/scripts/scrape_hscode_raw.py --chapters 03,04,05 --request-delay 0.03 --workers 4`：已验证真实落盘生效，当前按文件可续跑。
+- 后续动作：
+  - 继续执行全量章节抓取，直至 `01`-`99` 全部完成。
+  - 第二阶段再基于 `records/*.json` 做字段标准化与入库映射。
+
+## 2026-03-08 Round 44（Customs Declarations Closeout + Frontend Build Recovery）
+
+- 已完成本轮目标：
+  - 收口 `/customs-declarations` 前端 CRUD 任务台账与验证证据。
+  - 修复本轮验证过程中暴露的前端构建阻塞，恢复 `frontend` 的 `next build`。
+- 已完成项：
+  - `frontend/src/app/customs-declarations/page.tsx` 新增顶层 `Suspense`，修复 Next 16 对 `useSearchParams()` 的 prerender 要求。
+  - `frontend/src/app/dashboard/tax-refunds/page.tsx` 同步补齐 `Suspense` 包装，避免同类静态生成失败。
+  - `frontend/package.json` / lockfile 引入 `@sentry/nextjs`，并在 `frontend/sentry.client.config.ts` 删除当前 SDK 不支持的 replay 初始化项。
+  - `frontend/src/services/crudService.ts` 新增重载，默认全 CRUD 情况返回强类型必有方法；同步消除 container/product/store 等调用点的可选方法泄漏。
+  - 货柜、供应商、财务、配置、采购解析、通用 `useApi` hook 的类型边界已收紧，匹配当前页面/服务真实输入输出。
+- 验证结论：
+  - `cd frontend && npm test -- src/sentry.config.test.ts src/services/customsDeclaration.service.test.ts src/app/customs-declarations/page.test.tsx src/app/customs-declarations/create/page.test.tsx 'src/app/customs-declarations/[id]/page.test.tsx' 'src/app/customs-declarations/[id]/edit/page.test.tsx' src/app/dashboard/tax-refunds/page.test.tsx src/services/container.service.test.ts src/services/crudService.test.ts src/services/purchase.service.test.ts src/lib/hooks/useApi.test.ts`：通过（36/36）。
+  - `cd frontend && npm run lint -- <touched-files>`：通过。
+  - `cd frontend && npm run build`：通过。
+  - `cd frontend && npm run test -- --coverage src/services/customsDeclaration.service.test.ts src/app/customs-declarations/layout.test.tsx src/app/customs-declarations/page.test.tsx src/app/customs-declarations/create/page.test.tsx 'src/app/customs-declarations/[id]/page.test.tsx' 'src/app/customs-declarations/[id]/edit/page.test.tsx'`：通过；coverage 报告仍按仓库全量口径输出。

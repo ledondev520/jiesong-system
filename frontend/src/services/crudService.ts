@@ -30,6 +30,19 @@ export interface CrudServiceDefinition<
   delete?: (id: string) => CrudServiceResponse<void>;
 }
 
+export interface EnabledCrudServiceDefinition<
+  TItem,
+  TCreateInput,
+  TUpdateInput,
+  TListQuery extends QueryDictionary,
+> {
+  getAll: (params?: TListQuery) => CrudServiceResponse<PaginatedResponse<TItem>>;
+  getById: (id: string) => CrudServiceResponse<TItem>;
+  create: (data: TCreateInput) => CrudServiceResponse<TItem>;
+  update: (id: string, data: TUpdateInput) => CrudServiceResponse<TItem>;
+  delete: (id: string) => CrudServiceResponse<void>;
+}
+
 /**
  * 生成统一 CRUD 调用模板，减少服务层重复样板代码。
  * @param basePath - 接口前缀，示例：'/users'
@@ -42,7 +55,26 @@ export interface CrudServiceDefinition<
  * @param options 需要开启的接口方法（默认全部开启）
  * @returns 带有标准 CRUD 方法的服务实例
  */
-export const createCrudService = <
+export function createCrudService<
+  TItem,
+  TCreateInput = Partial<TItem>,
+  TUpdateInput = Partial<TCreateInput>,
+  TListQuery extends QueryDictionary = QueryDictionary
+>(
+  basePath: string,
+): EnabledCrudServiceDefinition<TItem, TCreateInput, TUpdateInput, TListQuery>;
+
+export function createCrudService<
+  TItem,
+  TCreateInput = Partial<TItem>,
+  TUpdateInput = Partial<TCreateInput>,
+  TListQuery extends QueryDictionary = QueryDictionary
+>(
+  basePath: string,
+  options: CrudServiceOptions,
+): CrudServiceDefinition<TItem, TCreateInput, TUpdateInput, TListQuery>;
+
+export function createCrudService<
   TItem,
   TCreateInput = Partial<TItem>,
   TUpdateInput = Partial<TCreateInput>,
@@ -50,7 +82,7 @@ export const createCrudService = <
 >(
   basePath: string,
   options: CrudServiceOptions = {},
-): CrudServiceDefinition<TItem, TCreateInput, TUpdateInput, TListQuery> => {
+): CrudServiceDefinition<TItem, TCreateInput, TUpdateInput, TListQuery> {
   const normalizedBasePath = basePath.startsWith('/') ? basePath : `/${basePath}`;
   const methods = {
     getAll: true,
@@ -103,4 +135,4 @@ export const createCrudService = <
   }
 
   return service;
-};
+}

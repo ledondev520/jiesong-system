@@ -17,12 +17,4 @@ Sentry.init({
 
   // 采样率：1.0 = 100% 错误全量上报
   tracesSampleRate: 1.0,
-
-  // Session Replay：录制用户行为（仅在出错时上传）
-  replaysOnErrorSampleRate: 1.0,
-  replaysSessionSampleRate: 0.1,
-
-  integrations: [
-    Sentry.replayIntegration(),
-  ],
 });

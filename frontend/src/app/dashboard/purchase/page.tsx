@@ -56,7 +56,9 @@ export default function PurchasePage() {
       [PurchaseStatus.SIGNED]: { label: '已签订', tone: 'info' },
       [PurchaseStatus.PRODUCING]: { label: '生产中', tone: 'warning' },
       [PurchaseStatus.SHIPPED]: { label: '已发货', tone: 'progress' },
+      [PurchaseStatus.RECEIVED]: { label: '已收货', tone: 'success' },
       [PurchaseStatus.COMPLETED]: { label: '已完成', tone: 'success' },
+      [PurchaseStatus.CANCELLED]: { label: '已取消', tone: 'secondary' },
     };
     return <StatusBadge status={status} statusMap={statusMap} />;
   };

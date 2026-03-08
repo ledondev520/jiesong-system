@@ -20,6 +20,10 @@ export const containerService = {
   ...crud,
 
   getAll: (params?: ContainerListQuery) => crud.getAll?.(params),
+  getById: (id: string) => crud.getById!(id),
+  create: (data: ContainerCreateInput) => crud.create!(data),
+  update: (id: string, data: ContainerUpdateInput) => crud.update!(id, data),
+  delete: (id: string) => crud.delete!(id),
 
   updateStatus: async (id: string, status: string) => {
     return api.put<ApiResponse<SalesContract>, ApiResponse<SalesContract>, { status: string }>(

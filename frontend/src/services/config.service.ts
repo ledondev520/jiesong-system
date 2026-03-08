@@ -25,15 +25,18 @@ export const configService = {
   },
 
   updateSystemConfig: async (data: Partial<SystemConfig>) => {
-    const keys = Object.keys(data).filter((key) => key in data);
-    if (keys.length === 0) {
+    const entries = Object.entries(data).filter(
+      (entry): entry is [string, SystemConfigValue] => entry[1] !== undefined,
+    );
+
+    if (entries.length === 0) {
       return fetchSystemConfig();
     }
 
     await Promise.all(
-      keys.map((key) => api.put<ApiResponse<SystemConfig>, ApiResponse<SystemConfig>, { value: SystemConfigValue }>(
+      entries.map(([key, value]) => api.put<ApiResponse<SystemConfig>, ApiResponse<SystemConfig>, { value: SystemConfigValue }>(
         `/system/configs/${key}`,
-        { value: data[key] }
+        { value }
       ))
     );
 

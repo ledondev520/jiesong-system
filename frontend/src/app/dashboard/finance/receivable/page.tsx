@@ -49,7 +49,20 @@ export default function ReceivablePage() {
       setLoading(true);
       const response = await financeService.getReceivables({ pageSize: 100 });
       const data = response.data;
-      setContracts(data?.items || []);
+      setContracts(
+        (data?.items || []).map((item) => ({
+          id: item.id,
+          contractNo: item.contractNo,
+          totalAmount: item.totalAmount,
+          receivedAmount: item.receivedAmount ?? 0,
+          unreceiveAmount: item.unreceiveAmount ?? Math.max(0, item.totalAmount - (item.receivedAmount ?? 0)),
+          exchangeRate: 0,
+          status: item.status,
+          stores: Array.from(
+            new Set(item.items?.map((entry) => entry.store?.name).filter(Boolean) as string[]),
+          ),
+        })),
+      );
     } catch (error) {
       console.error('获取应收账款失败:', error);
       toast.error('加载应收账款失败');
@@ -72,7 +85,7 @@ export default function ReceivablePage() {
     try {
       // 调用后端API创建收款记录
       await financeService.createPayment({
-        type: 'RECEIVABLE',
+        type: PaymentType.RECEIVABLE,
         salesContractId: selectedContract.id,
         amount: Number(data.amount),
         currency: 'USD',

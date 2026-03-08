@@ -51,7 +51,17 @@ export default function PayablePage() {
       setLoading(true);
       const response = await financeService.getPayables({ pageSize: 100 });
       const data = response.data;
-      setContracts(data?.items || []);
+      setContracts(
+        (data?.items || []).map((item) => ({
+          id: item.id,
+          contractNo: item.contractNo,
+          totalAmount: item.totalAmount,
+          paidAmount: item.paidAmount ?? 0,
+          unpaidAmount: item.unpaidAmount ?? Math.max(0, item.totalAmount - (item.paidAmount ?? 0)),
+          status: item.status,
+          supplier: item.supplier,
+        })),
+      );
     } catch (error) {
       console.error('获取应付账款失败:', error);
       toast.error('加载应付账款失败');
@@ -74,7 +84,7 @@ export default function PayablePage() {
     try {
       // 调用后端API创建付款记录
       await financeService.createPayment({
-        type: 'PAYABLE',
+        type: PaymentType.PAYABLE,
         purchaseContractId: selectedContract.id,
         amount: Number(data.amount),
         currency: 'CNY',

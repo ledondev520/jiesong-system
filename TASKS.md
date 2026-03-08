@@ -134,3 +134,5 @@
 | HSCODE-02 | P0 | 30m | 1 | DONE | 新增 HSCode 种子脚本、服务层与 API 路由，并完成后端定向回归 |
 | HSCODE-03 | P0 | 35m | 1 | DONE | 商品管理页接入“HSCode 智能匹配”，支持候选选择后回填 `hsCode` 并展示推荐 `taxRate` |
 | HSCODE-04 | P1 | 15m | 1 | DONE | 更新风险/指标/任务产物（`logs`、`RESULTS`、`PATCHES`）并完成本轮验证收口 |
+| HSCODE-RAW-01 | P0 | 90m | 1 | DOING | 新增可续跑的 HSCode 原始抓取脚本，先将 `hsbianma.com` 可见详情信息落盘到 `backend/data/hscode-live`，后续再清洗入库 |
+| CD-FE-01 | P0 | 45m | 1 | DONE | 收口 `/customs-declarations` 前端 CRUD 台账，并修复其触发的 Next16 构建阻塞（Sentry、CRUD typing、finance/container/supplier/config hook 类型与 Suspense 边界） |

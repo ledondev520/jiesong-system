@@ -44,3 +44,26 @@
 - Mitigations:
   - Bind the service to the tested backend contract `GET /hs-codes/search` and `GET /hs-codes/:code`.
   - Surface tax rate clearly in the form and pass it through submit payload without coupling the UI to backend schema changes.
+
+## 2026-03-08 Round 4: Customs Declarations Closeout + Frontend Build Debt Cleanup
+
+### Goal
+- Close out the existing `/customs-declarations` frontend CRUD slice with fresh verification evidence.
+- Restore `next build` by fixing the unrelated but blocking frontend type/config regressions uncovered during closeout.
+
+### Execution Outcome
+- Confirmed the customs declarations list/detail/create/edit flows and service layer were already implemented, then closed the gap between implementation and repo checkpoints.
+- Added top-level `Suspense` wrappers for `/customs-declarations` and `/dashboard/tax-refunds` so `useSearchParams()` no longer breaks Next 16 prerendering.
+- Restored the frontend build by:
+  - installing `@sentry/nextjs` and trimming unsupported replay config from `sentry.client.config.ts`,
+  - tightening `createCrudService` typings for the default all-methods-enabled case,
+  - normalizing container/supplier form payload boundaries,
+  - normalizing finance/config service payloads,
+  - fixing purchase parser typing and purchase status badge completeness,
+  - tightening `useApi` generic execution typing.
+
+### Verification
+- `npm test -- src/sentry.config.test.ts src/services/customsDeclaration.service.test.ts src/app/customs-declarations/page.test.tsx src/app/customs-declarations/create/page.test.tsx 'src/app/customs-declarations/[id]/page.test.tsx' 'src/app/customs-declarations/[id]/edit/page.test.tsx' src/app/dashboard/tax-refunds/page.test.tsx src/services/container.service.test.ts src/services/crudService.test.ts src/services/purchase.service.test.ts src/lib/hooks/useApi.test.ts`
+- `npm run lint -- src/sentry.config.test.ts sentry.client.config.ts sentry.server.config.ts sentry.edge.config.ts src/services/customsDeclaration.service.ts src/services/customsDeclaration.service.test.ts src/app/customs-declarations/layout.tsx src/app/customs-declarations/layout.test.tsx src/app/customs-declarations/page.tsx src/app/customs-declarations/page.test.tsx src/app/customs-declarations/create/page.tsx src/app/customs-declarations/create/page.test.tsx 'src/app/customs-declarations/[id]/page.tsx' 'src/app/customs-declarations/[id]/page.test.tsx' 'src/app/customs-declarations/[id]/edit/page.tsx' 'src/app/customs-declarations/[id]/edit/page.test.tsx' src/app/customs-declarations/components/CustomsDeclarationForm.tsx src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx src/app/customs-declarations/components/CustomsDeclarationDetailPageContent.tsx src/app/customs-declarations/components/CustomsDeclarationStatusBadge.tsx src/app/dashboard/tax-refunds/page.tsx src/app/dashboard/tax-refunds/page.test.tsx src/services/container.service.ts src/services/container.service.test.ts src/services/crudService.ts src/services/crudService.test.ts src/services/purchase.service.ts src/services/purchase.service.test.ts src/lib/hooks/useApi.ts src/lib/hooks/useApi.test.ts src/services/config.service.ts src/app/dashboard/containers/page.tsx src/app/dashboard/containers/components/ContainerDialog.tsx src/app/dashboard/finance/payable/page.tsx src/app/dashboard/finance/receivable/page.tsx src/app/dashboard/payments/page.tsx src/app/dashboard/purchase/page.tsx src/app/dashboard/suppliers/page.tsx src/app/dashboard/suppliers/components/SupplierDialog.tsx src/services/supplier.service.ts`
+- `npm run build`
+- `npm run test -- --coverage src/services/customsDeclaration.service.test.ts src/app/customs-declarations/layout.test.tsx src/app/customs-declarations/page.test.tsx src/app/customs-declarations/create/page.test.tsx 'src/app/customs-declarations/[id]/page.test.tsx' 'src/app/customs-declarations/[id]/edit/page.test.tsx'`

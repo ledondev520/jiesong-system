@@ -48,6 +48,7 @@ const supplierSchema = z.object({
 });
 
 type SupplierFormValues = z.infer<typeof supplierSchema>;
+export type { SupplierFormValues };
 
 interface SupplierDialogProps {
   open: boolean;
