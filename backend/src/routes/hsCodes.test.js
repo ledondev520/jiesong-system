@@ -1,0 +1,34 @@
+/**
+ * Input: hsCodes route + route index
+ * Output: HSCode 路由注册测试
+ * Pos: 后端路由层测试
+ */
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+
+const hsCodesRouter = require('./hsCodes');
+const indexRouter = require('./index');
+
+const getRouteIndex = (router, path, method) => {
+  return router.stack.findIndex((layer) => {
+    if (!layer.route) return false;
+    return layer.route.path === path && Boolean(layer.route.methods?.[method]);
+  });
+};
+
+test('hsCodes: router exposes GET /search and GET /:code', () => {
+  assert.notEqual(getRouteIndex(hsCodesRouter, '/search', 'get'), -1, '缺少 GET /search');
+  assert.notEqual(getRouteIndex(hsCodesRouter, '/:code', 'get'), -1, '缺少 GET /:code');
+});
+
+test('hsCodes: route index mounts /hs-codes router', () => {
+  const mountedPaths = indexRouter.stack
+    .filter((layer) => layer.name === 'router' && layer.regexp)
+    .map((layer) => String(layer.regexp));
+
+  assert.ok(
+    mountedPaths.some((entry) => entry.includes('hs-codes')),
+    '缺少 /hs-codes 路由挂载',
+  );
+});

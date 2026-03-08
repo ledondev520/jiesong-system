@@ -8,6 +8,7 @@
 
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,6 +16,7 @@ import { Product } from '@/types';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -30,10 +32,12 @@ import {
   FormMessage,
   FormDescription,
 } from '@/components/ui/form';
+import { hsCodeService, type HsCodeMatch } from '@/services/hsCode.service';
 
 const productSchema = z.object({
   customsName: z.string().min(1, '请输入报关名称'),
   hsCode: z.string().optional(),
+  taxRate: z.number().min(0).max(100).optional().nullable(),
   declaration: z.string().optional(),
   description: z.string().optional(),
   specification: z.string().optional(),
@@ -50,6 +54,20 @@ const productSchema = z.object({
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
+function useDebouncedValue<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => window.clearTimeout(timer);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
 interface ProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -63,11 +81,17 @@ export function ProductDialog({
   product,
   onSubmit,
 }: ProductDialogProps) {
+  const [hsSuggestions, setHsSuggestions] = useState<HsCodeMatch[]>([]);
+  const [hsLoading, setHsLoading] = useState(false);
+  const [hsLookupMessage, setHsLookupMessage] = useState<string | null>(null);
+  const [fillingCode, setFillingCode] = useState<string | null>(null);
+
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
       customsName: '',
       hsCode: '',
+      taxRate: null,
       declaration: '',
       description: '',
       specification: '',
@@ -83,6 +107,7 @@ export function ProductDialog({
     values: product ? {
       customsName: product.customsName,
       hsCode: product.hsCode || '',
+      taxRate: null,
       declaration: product.declaration || '',
       description: product.description || '',
       specification: product.specification || '',
@@ -97,6 +122,125 @@ export function ProductDialog({
     } : undefined,
   });
 
+  const customsName = form.watch('customsName');
+  const debouncedCustomsName = useDebouncedValue(customsName, 350);
+
+  const loadHsSuggestions = async (rawKeyword: string): Promise<void> => {
+    const keyword = rawKeyword.trim();
+
+    if (!open || keyword.length < 2) {
+      setHsSuggestions([]);
+      setHsLookupMessage(keyword.length === 0 ? null : '至少输入 2 个字符开始匹配');
+      setHsLoading(false);
+      return;
+    }
+
+    setHsLoading(true);
+    setHsLookupMessage(null);
+
+    try {
+      const searchMethod = hsCodeService.searchByProductName ?? hsCodeService.search;
+      const response = await searchMethod(keyword);
+      const matches = response.data || [];
+      setHsSuggestions(matches);
+      setHsLookupMessage(matches.length === 0 ? '未找到匹配的 HSCode 建议' : null);
+    } catch {
+      setHsSuggestions([]);
+      setHsLookupMessage('HSCode 建议加载失败，请稍后重试');
+    } finally {
+      setHsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!open) {
+      setHsSuggestions([]);
+      setHsLookupMessage(null);
+      setFillingCode(null);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchSuggestions = async () => {
+      if (!active) {
+        return;
+      }
+
+      const keyword = debouncedCustomsName.trim();
+
+      if (!open || keyword.length < 2) {
+        setHsSuggestions([]);
+        setHsLookupMessage(keyword.length === 0 ? null : '至少输入 2 个字符开始匹配');
+        setHsLoading(false);
+        return;
+      }
+
+      setHsLoading(true);
+      setHsLookupMessage(null);
+
+      try {
+        const searchMethod = hsCodeService.searchByProductName ?? hsCodeService.search;
+        const response = await searchMethod(keyword);
+
+        if (!active) {
+          return;
+        }
+
+        const matches = response.data || [];
+        setHsSuggestions(matches);
+        setHsLookupMessage(matches.length === 0 ? '未找到匹配的 HSCode 建议' : null);
+      } catch {
+        if (!active) {
+          return;
+        }
+
+        setHsSuggestions([]);
+        setHsLookupMessage('HSCode 建议加载失败，请稍后重试');
+      } finally {
+        if (active) {
+          setHsLoading(false);
+        }
+      }
+    };
+
+    void fetchSuggestions();
+
+    return () => {
+      active = false;
+    };
+  }, [debouncedCustomsName, open]);
+
+  const handleSelectHsCode = async (suggestion: HsCodeMatch): Promise<void> => {
+    setFillingCode(suggestion.hsCode);
+
+    try {
+      const getByCodeMethod = hsCodeService.searchByHsCode ?? hsCodeService.getByCode;
+      const response = getByCodeMethod ? await getByCodeMethod(suggestion.hsCode) : null;
+      const detail = response?.data ?? suggestion;
+
+      form.setValue('hsCode', detail.hsCode, { shouldDirty: true, shouldValidate: true });
+      form.setValue('taxRate', detail.taxRate ?? suggestion.taxRate ?? null, { shouldDirty: true });
+
+      if (!form.getValues('customsName')) {
+        form.setValue('customsName', detail.productName || suggestion.productName, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      }
+      if (!form.getValues('unit') && detail.unit) {
+        form.setValue('unit', detail.unit, { shouldDirty: true });
+      }
+
+      setHsLookupMessage(`已匹配 HSCode ${detail.hsCode}`);
+    } catch {
+      setHsLookupMessage('HSCode 详情加载失败，请稍后重试');
+    } finally {
+      setFillingCode(null);
+    }
+  };
+
   /**
    * 职责：提交商品表单并做空值标准化后交由外层保存。
    * 思路：
@@ -110,6 +254,7 @@ export function ProductDialog({
     // 转换空值为 null
     const submitData = {
       ...data,
+      taxRate: data.taxRate || null,
       grossWeight: data.grossWeight || null,
       netWeight: data.netWeight || null,
       volume: data.volume || null,
@@ -126,6 +271,9 @@ export function ProductDialog({
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>{product ? '编辑商品' : '新增商品'}</DialogTitle>
+          <DialogDescription>
+            维护商品基础资料，并可通过商品名称自动匹配 HSCode 与税率。
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -144,6 +292,57 @@ export function ProductDialog({
                   </FormItem>
                 )}
               />
+              <div className="col-span-2 rounded-xl border border-border/70 bg-muted/30 p-4">
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm font-medium">HSCode 智能匹配</p>
+                    <p className="text-xs text-muted-foreground">
+                      基于报关名称自动推荐编码，也可点击按钮立即发起匹配。
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void loadHsSuggestions(form.getValues('customsName') || '')}
+                    disabled={hsLoading}
+                  >
+                    HSCode 智能匹配
+                  </Button>
+                  {hsLoading ? (
+                    <p className="text-xs text-muted-foreground">正在匹配 HSCode...</p>
+                  ) : null}
+                  {!hsLoading && hsSuggestions.length > 0 ? (
+                    <div className="space-y-2">
+                      {hsSuggestions.map((suggestion) => (
+                        <button
+                          key={`${suggestion.hsCode}-${suggestion.productName}`}
+                          type="button"
+                          className="flex w-full items-center justify-between rounded-lg border border-border/70 bg-background px-3 py-2 text-left transition hover:border-primary/40 hover:bg-muted/50"
+                          onClick={() => void handleSelectHsCode(suggestion)}
+                          disabled={fillingCode === suggestion.hsCode}
+                        >
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium">
+                              {suggestion.productName}
+                            </span>
+                            <span className="block text-xs text-muted-foreground">
+                              {suggestion.hsCode}
+                            </span>
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {fillingCode === suggestion.hsCode
+                              ? '填充中...'
+                              : `税率 ${suggestion.taxRate}%`}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  {hsLookupMessage ? (
+                    <p className="text-xs text-muted-foreground">{hsLookupMessage}</p>
+                  ) : null}
+                </div>
+              </div>
               <FormField
                 control={form.control}
                 name="specification"
@@ -185,9 +384,34 @@ export function ProductDialog({
               />
               <FormField
                 control={form.control}
-                name="declaration"
+                name="taxRate"
                 render={({ field }) => (
                   <FormItem>
+                    <FormLabel>税率(%)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="text"
+                        placeholder="例如: 13"
+                        {...field}
+                        value={field.value == null ? '' : `${field.value}%`}
+                        readOnly
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value ? parseFloat(e.target.value.replace('%', '')) : null,
+                          )
+                        }
+                      />
+                    </FormControl>
+                    <FormDescription>由 HSCode 智能匹配结果自动带出</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="declaration"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
                     <FormLabel>申报要素</FormLabel>
                     <FormControl>
                       <Input placeholder="例如: 抛光瓷砖，釉面，600x600mm" {...field} />

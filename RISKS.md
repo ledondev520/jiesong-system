@@ -22,4 +22,13 @@
 | R-017 | 前端构建依赖外网字体与既有页面语法健康；在网络受限或存量语法错误存在时执行 `next build` | 阻塞本轮功能的“全量 build 绿灯”验收 | 先执行定向 lint+test 验证功能正确性；并行跟进修复 `ClaudeCostCalculator.tsx` 语法错误与字体离线化策略 | 回退到不依赖构建产物的定向验证门禁（保留本轮 PDF 导出功能改动） |
 | R-018 | CI 环境启用远程 LLM 时上游延迟抖动/限流 | `Performance Smoke (LLM Route)` 随机超时红灯 | 默认在 CI/test 走本地 AI 降级与超时保护（可通过 `AI_ALLOW_REMOTE=true` 显式开启远程） | 回退 `aiService.js` 的本地降级与超时参数逻辑 |
 | R-019 | Dashboard 在 `md` 以下隐藏侧边栏，但 Header 无移动端导航补位 | 移动端用户进入工作台后无法切换主模块，阻断完整使用 | 增加移动端菜单入口（Sheet/Drawer/Hamburger）并补移动端 Playwright 验收 | 回退移动端导航新增入口，恢复桌面侧边栏模式 |
-| R-020 | 登录页 rememberMe 复选框与可读标签未形成稳定可访问名称关联 | 屏幕阅读器和键盘用户无法确认控件语义，影响认证入口无障碍 | 为复选框补 `aria-label`/`id + htmlFor`/`aria-labelledby` 之一，并新增无障碍断言 | 回退登录表单的 rememberMe 控件改动 |
+| R-020 | 登录页 rememberMe 复选框与可读标签未形成稳定可访问名称关联 | 屏幕阅读器和键盘用户无法确认控件语义，影响认证入口无障碍 | 2026-03-08 已通过 `frontend/src/app/(auth)/login/page.test.tsx` 的 `getByRole('checkbox', { name: '记住账号和密码' })` 断言复核，风险关闭 | 回退登录表单的 rememberMe 控件改动 |
+| R-021 | Prisma 新增 `HsCode` 表后，本地 SQLite 迁移与既有 `dev.db` 状态不一致 | `prisma migrate dev` 失败，阻塞后续服务与前端开发 | 先用定向服务测试锁定模型行为，再执行 `npx prisma migrate dev --name add_hs_codes_table`；若本地数据库漂移，优先修复迁移状态而不回退业务代码 | 回退新增 migration 与 `schema.prisma` 中 `HsCode` 模型 |
+| R-022 | HSCode 种子数据若直接 `createMany` 且重复执行无幂等策略 | 本地重复运行脚本报唯一键冲突，影响开发恢复 | 采用 `upsert` 或“先查后写”策略保证 100 条种子可重复执行 | 回退种子脚本到只在空表执行的保守版本 |
+| R-023 | 商品页当前无 `taxRate` 持久字段，若直接扩展 `Product` 模型会放大改动面 | 牵连商品 CRUD、列表、类型与库存链路，增加回归面 | 本轮将 `taxRate` 作为 HSCode 匹配辅助展示值，不持久化到 `Product`；后续若业务确认需要持久化，再单独立项 | 回退商品弹窗中的税率展示逻辑，保留仅 HSCode 回填 |
+
+## 2026-03-08 Round 43 状态更新
+
+- `R-021`：已完成验证，迁移执行成功。
+- `R-022`：已降低风险，种子脚本改为“先清空后写入固定 100 条”。
+- `R-023`：继续保留监控，本轮未扩展 `Product` 持久字段。

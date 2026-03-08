@@ -98,6 +98,16 @@ export interface Product {
   suppliers?: ProductSupplier[];
 }
 
+export interface HsCodeRecord {
+  id: string;
+  hsCode: string;
+  productName: string;
+  taxRate: number;
+  unit?: string | null;
+  note?: string | null;
+  effectiveDate: string;
+}
+
 export interface ProductSupplier {
   id: string;
   productId: string;

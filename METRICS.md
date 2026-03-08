@@ -630,3 +630,38 @@
 ### 结论
 - 桌面端主流程可以继续签收为“可用”。
 - 系统整体暂不能签收为“用户可无障碍完整使用”，需先完成移动端导航补位与登录页复选框语义修复。
+
+## 2026-03-08 Round 42（Auth RememberMe Accessibility Closure）
+
+### 质量指标
+- Auth 登录页定向 Vitest：`6/6` 通过（`cd frontend && npm run test -- 'src/app/(auth)/login/page.test.tsx'`）。
+- rememberMe 可访问名称断言：新增 `1` 条（基于 `getByRole('checkbox', { name: '记住账号和密码' })`）。
+- Auth 无障碍遗留问题：`1` 个（移动端 Dashboard 导航入口），较上一轮减少 `1` 个。
+
+### 过程指标
+- 新增回归测试文件改动：`1`（`frontend/src/app/(auth)/login/page.test.tsx`）。
+- 新关闭任务：`1`（`A11Y-02`）。
+- 新关闭风险：`1`（`R-020`）。
+
+### 结论
+- 登录页 rememberMe 控件已具备稳定可访问名称，且已纳入自动化回归。
+- 当前无障碍阻断项收敛为移动端 Dashboard 导航缺口，auth 入口不再是独立阻断点。
+
+## 2026-03-08 Round 43（HSCode Local Database Integration）
+
+### 质量指标
+- Prisma migration：`1/1` 成功。
+- 后端定向回归：`7/7` 通过。
+- 前端定向回归：`6/6` 通过。
+- 本地 HSCode 数据量：`100`。
+
+### 过程指标
+- 新增 Prisma 模型：`1`
+- 新增 migration：`1`
+- 新增后端文件：`3`
+- 新增前端文件：`2`
+- 修复既有商品写入缺口：`1`
+
+### 结论
+- HSCode 本地数据库、API 与商品页智能匹配已形成可验证闭环。
+- `taxRate` 当前仅作商品弹窗辅助值展示，不持久化到 `Product` 表。

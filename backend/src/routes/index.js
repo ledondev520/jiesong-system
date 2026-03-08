@@ -33,6 +33,7 @@ const customsDeclarationRoutes = require('./customsDeclarations');
 const forexVerificationRoutes = require('./forexVerifications');
 const taxRefundRoutes = require('./taxRefunds');
 const taxRateRoutes = require('./taxRates');
+const hsCodeRoutes = require('./hsCodes');
 
 const router = Router();
 
@@ -62,5 +63,6 @@ router.use('/customs-declarations', customsDeclarationRoutes);
 router.use('/forex-verifications', forexVerificationRoutes);
 router.use('/tax-refunds', taxRefundRoutes);
 router.use('/tax-rates', taxRateRoutes);
+router.use('/hs-codes', hsCodeRoutes);
 
 module.exports = router;

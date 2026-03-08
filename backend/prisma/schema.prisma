@@ -516,6 +516,19 @@ model TaxRate {
   @@map("tax_rates")
 }
 
+model HsCode {
+  id            String   @id @default(cuid())
+  hsCode        String   @unique
+  productName   String
+  taxRate       Float
+  unit          String?
+  note          String?
+  effectiveDate DateTime
+
+  @@index([productName])
+  @@map("hs_codes")
+}
+
 // ==================== 文件管理 ====================
 
 model ContractFile {

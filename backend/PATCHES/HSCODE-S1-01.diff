@@ -1,0 +1,165 @@
+diff --git a/backend/METRICS.md b/backend/METRICS.md
+index 2f80775..3bcd495 100644
+--- a/backend/METRICS.md
++++ b/backend/METRICS.md
+@@ -20,3 +20,48 @@
+ 
+ ### Notes
+ - 由于当前开发库先于 migration 历史存在，未直接接受 Prisma 的 reset 提示；改为 baseline + 增量迁移的方式保留现有开发数据。
++
++## 2026-03-08 Round 2
++
++### Baseline
++- `prisma/schema.prisma` 中已存在 `model HsCode`，待确认与迁移 SQL 一致。
++- 工作区已有未提交 `prisma/migrations/20260308035256_add_hs_codes_table/`、`src/services/hsCodeService.test.js`、`src/routes/hsCodes.test.js`。
++- `backend/scripts` 下尚无 `seed-hscodes.js`。
++
++### Pending Verification
++- `node --test scripts/seed-hscodes.test.js`
++- `npx prisma validate`
++- `npx prisma migrate dev --name add_hs_codes_table`
++- `npx prisma generate`
++- `node scripts/seed-hscodes.js`
++
++### Verification Result
++- `node --test scripts/seed-hscodes.test.js`: 通过（1/1）
++- `npx prisma validate`: 通过
++- `npx prisma migrate status`: 通过，状态为 `Database schema is up to date!`
++- `npx prisma migrate dev --name add_hs_codes_table`: 通过，输出 `Already in sync, no schema change or pending migration was found.`
++- `npx prisma generate`: 通过
++- `node scripts/seed-hscodes.js`: 通过，脚本处理 100 条示例数据
++- `node -e ... prisma.hsCode.count({ where: { hsCode: { in: sampleHsCodes.map(...) } } })`: 100，确认示例编码全部已存在
++
++### Notes
++- 当前数据库总 `hs_codes` 记录数为 200，说明本地库在本轮前已存在其他 HSCode 数据；本轮脚本以 `upsert` 导入并确认 100 条目标示例编码均已落库。
++
++## 2026-03-08 Round 3
++
++### Baseline
++- `src/services/hsCodeService.js` 与 `src/routes/hsCodes.js` 初始不存在。
++- `src/services/hsCodeService.test.js` 与 `src/routes/hsCodes.test.js` 已存在，可直接作为红灯用例。
++
++### Verification Result
++- 红灯：`node --test src/services/hsCodeService.test.js src/routes/hsCodes.test.js`
++  - 结果：失败，报错 `Cannot find module './hsCodeService'` 与 `Cannot find module './hsCodes'`。
++- 绿灯：`node --test src/services/hsCodeService.test.js`
++  - 结果：`3/3` 通过。
++- 绿灯：`node --test src/routes/hsCodes.test.js`
++  - 结果：`2/2` 通过。
++- 最终合并验证：`node --test src/services/hsCodeService.test.js src/routes/hsCodes.test.js`
++  - 结果：`5/5` 通过。
++
++### Notes
++- API 采用“薄路由 + service”结构，未额外引入 controller，控制改动面。
+diff --git a/backend/PLAN.md b/backend/PLAN.md
+index 0317c5f..6cc0559 100644
+--- a/backend/PLAN.md
++++ b/backend/PLAN.md
+@@ -32,3 +32,55 @@
+ - 已新增 5 个 Prisma models，并在既有 `SalesContract` / `Product` / `PackingItem` 上补齐关系。
+ - 因本地 `prisma/dev.db` 早已有表但无 migration 历史，先建立 baseline migration，再生成本轮增量 migration，避免重置开发库。
+ - 验证已完成：`prisma validate`、`prisma migrate dev --name add_tax_refund_module`、`prisma generate`、以及退税模块定向服务测试。
++
++## 2026-03-08 Round 2: HSCode Migration + Seed
++
++### Goal
++完成 HSCode 数据库演进：确认 `HsCode` Prisma 模型、生成并执行 `add_hs_codes_table` migration，新增 `backend/scripts/seed-hscodes.js` 并导入 100 条示例数据。
++
++### Scope
++- 校正 `prisma/schema.prisma` 中 `HsCode` 模型定义
++- 执行/落地 `prisma migrate dev --name add_hs_codes_table`
++- 新增 HSCode 种子脚本与 100 条示例数据
++- 更新本轮风险、指标、结果与 patch 台账
++
++### Milestones
++1. 复核现有 `HsCode` schema、迁移目录与工作区差异，避免覆盖未确认改动。
++2. 以最小约束补齐种子脚本测试，先验证数据条数/唯一性/字段完整性。
++3. 完成种子脚本实现，并执行 Prisma 迁移与 client 生成。
++4. 运行脚本写入 100 条示例数据，记录结果与验证证据。
++
++### Risks
++- 工作区已存在未提交的 `HsCode` 相关测试与 migration 目录，本轮只做对齐与补完，不回退未知来源改动。
++- SQLite 不支持真正的全文索引；`productName` 本轮以普通索引落地，对应服务层仍使用 `contains` 搜索。
++- 若本地数据库已提前存在 `hs_codes` 表，`prisma migrate dev` 可能转为仅标记/应用已有迁移，需要以命令输出为准记录状态。
++
++### Verification
++- `node --test scripts/seed-hscodes.test.js`
++- `npx prisma validate`
++- `npx prisma migrate dev --name add_hs_codes_table`
++- `npx prisma generate`
++- `node scripts/seed-hscodes.js`
++
++### Execution Outcome
++- 已确认 `prisma/schema.prisma` 中 `HsCode` 模型与 `prisma/migrations/20260308035256_add_hs_codes_table/migration.sql` 一致。
++- 已新增 `scripts/seed-hscodes.js`，内含 100 条示例 HSCode 数据，并使用 `upsert` 保证重复执行幂等。
++- 已新增 `scripts/seed-hscodes.test.js`，对数据条数、编码唯一性与字段完整性做最小约束。
++- 验证已完成：`node --test scripts/seed-hscodes.test.js`、`prisma validate`、`prisma migrate dev --name add_hs_codes_table`、`prisma generate`、`node scripts/seed-hscodes.js`。
++
++## 2026-03-08 Session 2 Goal
++
++完成 HSCode 后端能力的第二阶段交付：
++- 新增 `src/services/hsCodeService.js`
++- 新增 `src/routes/hsCodes.js`
++- 在 `src/routes/index.js` 挂载 `/hs-codes`
++- 完成 `src/services/hsCodeService.test.js` 与 `src/routes/hsCodes.test.js` 定向验证
++
++## Verification
++- `node --test src/services/hsCodeService.test.js src/routes/hsCodes.test.js`
++
++## Execution Outcome
++- 已新增 `src/services/hsCodeService.js`，基于 `prisma.hsCode` 实现商品名模糊搜索、编码精确查询与税率提取。
++- 已新增 `src/routes/hsCodes.js`，支持 `GET /search?q=keyword&limit=10` 与 `GET /:code`。
++- 已在 `src/routes/index.js` 挂载 `/hs-codes`。
++- 定向验证结果：`node --test src/services/hsCodeService.test.js src/routes/hsCodes.test.js` 通过。
+diff --git a/backend/RISKS.md b/backend/RISKS.md
+index 13d2fc1..389c661 100644
+--- a/backend/RISKS.md
++++ b/backend/RISKS.md
+@@ -5,3 +5,12 @@
+ | TRM-R1 | 仓库缺少“export tax refund analysis”独立设计稿 | 字段设计可能与预期存在偏差 | 以 `../docs/数据库设计.md` + 现有 `SalesContract/Product/PackingItem` 结构做最小兼容设计，并在结果中显式说明依据 | 回退本轮 migration 与 schema 变更 |
+ | TRM-R2 | SQLite 迁移对字段类型/关系约束敏感 | `prisma migrate dev` 失败，阻塞交付 | 统一沿用现有 `String/Float/Boolean/DateTime` 风格，避免 enum 与 Decimal | 回退新增模型，保留现有 schema |
+ | TRM-R3 | 现有开发库缺少 migration 历史 | `migrate dev` 要求 reset 本地库 | 建立 baseline migration 并用 `migrate resolve` 标记已应用，再创建本轮增量迁移 | 回退 baseline 目录与本轮增量 migration |
++
++## 2026-03-08 Round 2: HSCode Migration + Seed
++
++| Risk ID | Trigger | Impact | Mitigation | Rollback |
++|---|---|---|---|---|
++| HSCODE-R1 | 工作区已有未提交的 `HsCode` 相关 schema/migration/test 改动 | 误覆盖用户或前序任务内容 | 仅在现有定义基础上补齐缺口，逐文件核对后再修改 | 回退本轮新增脚本与台账，不触碰用户改动 |
++| HSCODE-R2 | SQLite 无法提供真正全文索引 | `productName` “全文搜索”实现与 PostgreSQL 预期不同 | 本轮按 SQLite 能力保留普通索引，并在结果中注明服务层使用 `contains` 搜索 | 后续若切 PostgreSQL，再追加 FTS/index migration |
++| HSCODE-R3 | 本地库已存在 `hs_codes` 表或迁移状态不一致 | `migrate dev` 失败或要求 reset | 先执行 `prisma validate` / `migrate status`，以现有 migration 为准应用；拒绝破坏性 reset | 保留现有 DB，仅记录未完成项与阻塞原因 |
++| HSCODE-R4 | 本轮 `hsCodes` 路由未接入鉴权 | 若后续要求该数据仅内部可见，需要补统一访问控制 | 当前按任务要求交付公开查询能力；后续进入联调时再与前端/权限策略统一收口 | 回退 `src/routes/index.js` 中 `/hs-codes` 挂载或在路由前补 `authenticate` |
+diff --git a/backend/TASKS.md b/backend/TASKS.md
+index 0869992..9a27414 100644
+--- a/backend/TASKS.md
++++ b/backend/TASKS.md
+@@ -7,3 +7,6 @@
+ | ID | Priority | ETA | Slot | Status | Input | Output | Validation | DoD |
+ |---|---|---:|---:|---|---|---|---|---|
+ | DB-TRM-01 | P0 | 20m | 1 | DONE | `prisma/schema.prisma` + `../docs/数据库设计.md` | 新增 5 张表 + 迁移 + client | `npx prisma validate && npx prisma migrate dev --name add_tax_refund_module && npx prisma generate` | Schema 可解析、迁移生成成功、client 生成成功、文档台账更新 |
++| HSCODE-S1-01 | P0 | 20m | 1 | DONE | `prisma/schema.prisma` + 现有 `prisma/migrations/*add_hs_codes_table*` | `HsCode` 模型对齐 + migration 执行 | `npx prisma validate && npx prisma migrate dev --name add_hs_codes_table && npx prisma generate` | Schema 与迁移一致、命令执行成功、client 可生成 |
++| HSCODE-S1-02 | P0 | 20m | 1 | DONE | `backend/scripts` + HSCode 样例数据约束 | `seed-hscodes.js` + 100 条示例数据 | `node --test scripts/seed-hscodes.test.js && node scripts/seed-hscodes.js` | 脚本可执行、数据 100 条、`hsCode` 唯一、可重复导入 |
++| HSCODE-API-01 | P0 | 30m | 1 | DONE | `src/services/hsCodeService.test.js` + `src/routes/hsCodes.test.js` | `src/services/hsCodeService.js` + `src/routes/hsCodes.js` + `/hs-codes` 挂载 | `node --test src/services/hsCodeService.test.js src/routes/hsCodes.test.js` | 服务搜索/查码/税率查询行为可用，路由已注册，定向测试通过 |
+diff --git a/backend/prisma/schema.prisma b/backend/prisma/schema.prisma
+index 7855cb4..89187f6 100644
+--- a/backend/prisma/schema.prisma
++++ b/backend/prisma/schema.prisma
+@@ -516,6 +516,19 @@ model TaxRate {
+   @@map("tax_rates")
+ }
+ 
++model HsCode {
++  id            String   @id @default(cuid())
++  hsCode        String   @unique
++  productName   String
++  taxRate       Float
++  unit          String?
++  note          String?
++  effectiveDate DateTime
++
++  @@index([productName])
++  @@map("hs_codes")
++}
++
+ // ==================== 文件管理 ====================
+ 
+ model ContractFile {

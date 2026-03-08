@@ -52,6 +52,11 @@ describe('LoginPage 交互逻辑', () => {
     expect(screen.getByRole('button', { name: '登录' })).toBeInTheDocument();
   });
 
+  it('rememberMe 复选框具备可访问名称', () => {
+    render(<LoginPage />);
+    expect(screen.getByRole('checkbox', { name: '记住账号和密码' })).toBeInTheDocument();
+  });
+
   it('可从本地恢复记住的账号密码', async () => {
     localStorage.setItem('jiesong_saved_credentials', JSON.stringify({
       username: 'admin',

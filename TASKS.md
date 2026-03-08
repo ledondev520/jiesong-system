@@ -129,4 +129,8 @@
 | CI-01 | P0 | 45m | 1 | DONE | 修复 CI 红灯：LLM 路由性能烟测稳定化（AI 本地降级+超时保护+Node `--test` 识别）与 Frontend E2E 稳定性加固（公开页/业务页分流、定位收敛、点击容错、CI 单 worker） |
 | QA-01 | P0 | 35m | 1 | DONE | 执行前端交互验收（Playwright 冒烟 + 按钮巡检 + 补充桌面/移动端/键盘脚本）并产出 `前端交互验收_20260306.md` |
 | A11Y-01 | P0 | 45m | 1 | TODO | 修复移动端 Dashboard 缺少全局导航入口（`layout.tsx`/`Header.tsx`）并补移动端验收 |
-| A11Y-02 | P1 | 20m | 1 | TODO | 为登录页 rememberMe 复选框补齐可访问名称并补无障碍回归验证 |
+| A11Y-02 | P1 | 20m | 1 | DONE | 为登录页 rememberMe 复选框补齐可访问名称并补无障碍回归验证 |
+| HSCODE-01 | P0 | 25m | 1 | DONE | 新增 Prisma `HsCode` 模型、生成 `add_hs_codes_table` migration，并以服务测试作为迁移前置约束 |
+| HSCODE-02 | P0 | 30m | 1 | DONE | 新增 HSCode 种子脚本、服务层与 API 路由，并完成后端定向回归 |
+| HSCODE-03 | P0 | 35m | 1 | DONE | 商品管理页接入“HSCode 智能匹配”，支持候选选择后回填 `hsCode` 并展示推荐 `taxRate` |
+| HSCODE-04 | P1 | 15m | 1 | DONE | 更新风险/指标/任务产物（`logs`、`RESULTS`、`PATCHES`）并完成本轮验证收口 |

@@ -20,3 +20,48 @@
 
 ### Notes
 - 由于当前开发库先于 migration 历史存在，未直接接受 Prisma 的 reset 提示；改为 baseline + 增量迁移的方式保留现有开发数据。
+
+## 2026-03-08 Round 2
+
+### Baseline
+- `prisma/schema.prisma` 中已存在 `model HsCode`，待确认与迁移 SQL 一致。
+- 工作区已有未提交 `prisma/migrations/20260308035256_add_hs_codes_table/`、`src/services/hsCodeService.test.js`、`src/routes/hsCodes.test.js`。
+- `backend/scripts` 下尚无 `seed-hscodes.js`。
+
+### Pending Verification
+- `node --test scripts/seed-hscodes.test.js`
+- `npx prisma validate`
+- `npx prisma migrate dev --name add_hs_codes_table`
+- `npx prisma generate`
+- `node scripts/seed-hscodes.js`
+
+### Verification Result
+- `node --test scripts/seed-hscodes.test.js`: 通过（1/1）
+- `npx prisma validate`: 通过
+- `npx prisma migrate status`: 通过，状态为 `Database schema is up to date!`
+- `npx prisma migrate dev --name add_hs_codes_table`: 通过，输出 `Already in sync, no schema change or pending migration was found.`
+- `npx prisma generate`: 通过
+- `node scripts/seed-hscodes.js`: 通过，脚本处理 100 条示例数据
+- `node -e ... prisma.hsCode.count({ where: { hsCode: { in: sampleHsCodes.map(...) } } })`: 100，确认示例编码全部已存在
+
+### Notes
+- 当前数据库总 `hs_codes` 记录数为 200，说明本地库在本轮前已存在其他 HSCode 数据；本轮脚本以 `upsert` 导入并确认 100 条目标示例编码均已落库。
+
+## 2026-03-08 Round 3
+
+### Baseline
+- `src/services/hsCodeService.js` 与 `src/routes/hsCodes.js` 初始不存在。
+- `src/services/hsCodeService.test.js` 与 `src/routes/hsCodes.test.js` 已存在，可直接作为红灯用例。
+
+### Verification Result
+- 红灯：`node --test src/services/hsCodeService.test.js src/routes/hsCodes.test.js`
+  - 结果：失败，报错 `Cannot find module './hsCodeService'` 与 `Cannot find module './hsCodes'`。
+- 绿灯：`node --test src/services/hsCodeService.test.js`
+  - 结果：`3/3` 通过。
+- 绿灯：`node --test src/routes/hsCodes.test.js`
+  - 结果：`2/2` 通过。
+- 最终合并验证：`node --test src/services/hsCodeService.test.js src/routes/hsCodes.test.js`
+  - 结果：`5/5` 通过。
+
+### Notes
+- API 采用“薄路由 + service”结构，未额外引入 controller，控制改动面。

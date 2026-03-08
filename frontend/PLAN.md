@@ -31,3 +31,16 @@
 - Mitigations:
   - Reuse current CSS variables and shadcn/ui primitives instead of creating a separate landing-page system.
   - Record the exact targeted coverage command and results in `METRICS.md`.
+
+## HSCode Frontend Integration
+- Goal: deliver HSCode search APIs in the frontend and add smart matching to the product management flow at `/dashboard/products`.
+- Milestones:
+  - HS-01: add failing service/component tests for HSCode lookup and smart-fill behavior.
+  - HS-02: implement `hsCode.service.ts` plus product-dialog smart matching and auto-fill for `hsCode` and `taxRate`.
+  - HS-03: run focused tests/lint and checkpoint plan, tasks, metrics, risks, results, and patch artifacts.
+- Risks:
+  - Backend route implementation is not present in this checkout, so the frontend must target the route contract inferred from backend tests.
+  - Product persistence currently does not include `taxRate`, so the frontend can only guarantee form auto-fill, not durable backend storage.
+- Mitigations:
+  - Bind the service to the tested backend contract `GET /hs-codes/search` and `GET /hs-codes/:code`.
+  - Surface tax rate clearly in the form and pass it through submit payload without coupling the UI to backend schema changes.

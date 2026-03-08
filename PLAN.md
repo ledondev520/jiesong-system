@@ -239,6 +239,19 @@
 - 已完成项：
   - 通知已读接口权限修复：
 
+## 2026-03-08 Round 43（HSCode Backend Service + API）
+
+- 已启动本轮目标：完成 `HSCODE-02`，交付后端 HSCode service、API 路由与单元测试。
+- 执行策略：
+  - 以现有未纳管测试草稿为红灯起点，先锁定服务查询行为与路由挂载行为。
+  - 采用最小改动方案，不新增 controller，直接由 `routes/hsCodes.js` 调用 `services/hsCodeService.js`。
+  - 交付后同步更新根/后端计划台账与 `backend/logs`、`backend/RESULTS`、`backend/PATCHES` 产物。
+- 已完成项：
+  - 新增 `backend/src/services/hsCodeService.js`，封装商品名搜索、编码查询与税率读取。
+  - 新增 `backend/src/routes/hsCodes.js`，提供 `GET /search` 与 `GET /:code`。
+  - 在 `backend/src/routes/index.js` 挂载 `/hs-codes`。
+  - 完成定向回归：`cd backend && node --test src/services/hsCodeService.test.js src/routes/hsCodes.test.js`。
+
 ## 2026-03-01 Round 21（测试缺口补齐）
 
 - 已完成本轮目标：补齐当前前后端“文件级缺失测试”并完成关键自动化回归。
@@ -762,3 +775,49 @@
     - 高优先级：移动端 Dashboard 首屏无可见全局导航入口。
     - 中优先级：登录页 rememberMe 复选框缺少可访问名称。
   - 另观察到 1 类残余噪声：Header 下拉触发器存在 hydration mismatch 警告，未在本轮修复。
+
+## 2026-03-08 Round 42（Auth RememberMe Accessibility Closure）
+
+- 已完成本轮目标：
+  - 复核登录页 rememberMe 复选框的可访问名称状态，并补齐稳定回归测试与台账收口。
+- 已完成项：
+  - 新增登录页无障碍回归断言：
+    - `frontend/src/app/(auth)/login/page.test.tsx`
+    - 覆盖 `getByRole('checkbox', { name: '记住账号和密码' })`，确保复选框名称可被辅助技术识别。
+  - 复核结果：
+    - 当前实现已能为 rememberMe 复选框提供稳定可访问名称，本轮无需额外改动生产代码。
+  - 台账收口：
+    - `TASKS.md` 中 `A11Y-02` 更新为 `DONE`。
+    - `RISKS.md` 中 rememberMe 无障碍风险标记为 `Closed`。
+- 验证结论：
+  - `cd frontend && npm run test -- 'src/app/(auth)/login/page.test.tsx'`：通过（6/6）。
+  - 认证入口当前剩余的明确无障碍缺口为移动端 Dashboard 导航入口（`A11Y-01`）。
+
+## 2026-03-08 Round 43（HSCode Local Database Integration）
+
+- 已设定本轮目标：
+  - 为商品管理页接入本地 HSCode 数据库、种子数据、后端查询 API 与前端智能匹配交互。
+  - 严格按顺序推进：数据库迁移 -> 种子数据 -> Service -> API -> 前端集成。
+- 执行策略：
+  - 采用 TDD：先补失败测试，再写最小实现。
+  - 税率作为 HSCode 匹配辅助信息在商品弹窗展示，不扩展现有 `Product` 持久字段，避免扩大改动面。
+  - 每个重大阶段后更新 `PLAN.md`、`TASKS.md`、`RISKS.md`、`METRICS.md`。
+- 当前计划文档：
+  - `docs/plans/2026-03-08-hscode-integration.md`
+- 预期交付：
+  - Prisma `HsCode` 模型与 `add_hs_codes_table` migration
+  - `backend/scripts/seed-hscodes.js`
+  - `backend/src/services/hsCodeService.js`
+  - `backend/src/routes/hsCodes.js`
+  - `frontend/src/services/hsCode.service.ts`
+  - 商品弹窗“HSCode 智能匹配”交互与回填流程
+- 已完成项：
+  - `backend/prisma/schema.prisma` 新增 `HsCode` 模型，并生成 `20260308035256_add_hs_codes_table` migration。
+  - `backend/scripts/seed-hscodes.js` 已实现固定 100 条 HSCode 的确定性本地种子。
+  - `backend/src/services/hsCodeService.js` 与 `backend/src/routes/hsCodes.js` 已落地，并在 `backend/src/routes/index.js` 完成挂载。
+  - 商品写入链路已修复 `hsCode` / `declaration` 未落库问题。
+  - `frontend/src/services/hsCode.service.ts` 与商品弹窗 HSCode 智能匹配交互已落地。
+- 验证结论：
+  - `cd backend && node --test src/services/hsCodeService.test.js src/routes/hsCodes.test.js src/controllers/productController.test.js`：通过（7/7）。
+  - `cd frontend && npm run test -- src/services/hsCode.service.test.ts src/app/dashboard/products/components/ProductDialog.test.tsx src/app/dashboard/products/page.test.tsx`：通过（6/6）。
+  - `cd backend && node scripts/seed-hscodes.js` 后，本地 `hs_codes` 记录数为 100。
