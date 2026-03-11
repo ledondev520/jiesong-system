@@ -297,12 +297,16 @@ const withAuditLog = (options = {}, handler) => {
     };
 
     res.once('finish', () => {
-      void finalize();
+      finalize().catch((error) => {
+        console.error('审计日志 finalize (finish) 失败:', error.message);
+      });
     });
 
     res.once('close', () => {
       if (!res.writableEnded) {
-        void finalize();
+        finalize().catch((error) => {
+          console.error('审计日志 finalize (close) 失败:', error.message);
+        });
       }
     });
 

@@ -748,7 +748,7 @@ const isRecordDuplicate = (row, exactIndex, fuzzyIndex) => {
   return Boolean(fuzzyBuckets && hasNearbyQuantity(fuzzyBuckets, row.quantityBucket));
 };
 
-const addSalesItemIfNeeded = async (record, salesContract, product, store, cache, results) => {
+const addSalesItemIfNeeded = async (record, salesContract, product, store, cache, results, tx = prisma) => {
   if (!salesContract || !product || !store || !(record.quantity > 0)) {
     return;
   }
@@ -758,7 +758,7 @@ const addSalesItemIfNeeded = async (record, salesContract, product, store, cache
     return;
   }
 
-  await prisma.salesItem.create({
+  await tx.salesItem.create({
     data: {
       salesContractId: salesContract.id,
       productId: product.id,
@@ -774,13 +774,13 @@ const addSalesItemIfNeeded = async (record, salesContract, product, store, cache
 
   results.created.salesItems += 1;
 
-  await prisma.salesContract.update({
+  await tx.salesContract.update({
     where: { id: salesContract.id },
     data: { totalAmount: { increment: record.sellingPrice * record.quantity } },
   });
 };
 
-const addContainerItemIfNeeded = async (record, container, product, store, cache, results) => {
+const addContainerItemIfNeeded = async (record, container, product, store, cache, results, tx = prisma) => {
   if (!container || !product) {
     return;
   }
@@ -790,7 +790,7 @@ const addContainerItemIfNeeded = async (record, container, product, store, cache
     return;
   }
 
-  await prisma.packingItem.create({
+  await tx.packingItem.create({
     data: {
       salesContractId: container.id,
       productId: product.id,
@@ -808,7 +808,7 @@ const addContainerItemIfNeeded = async (record, container, product, store, cache
   results.created.containerItems++;
 };
 
-const addInventoryIfNeeded = async (row, product, contract, results) => {
+const addInventoryIfNeeded = async (row, product, contract, results, tx = prisma) => {
   if (!(row.quantity && row.quantity > 0)) {
     return;
   }
@@ -820,7 +820,7 @@ const addInventoryIfNeeded = async (row, product, contract, results) => {
   const sourceRow = row.record || row;
   const rawNote = sourceRow['备注'] || '';
 
-  await prisma.inventory.create({
+  await tx.inventory.create({
     data: {
       productId: product.id,
       salesContractId: contract?.id,
@@ -915,9 +915,11 @@ const analyzeData = (rows) => {
  * @returns {Object} 对比结果
  */
 const compareWithDatabase = async (rows) => {
-  // 获取数据库中现有的装箱明细
+  // 获取数据库中现有的装箱明细（限制最近10000条以避免性能问题）
   const normalizedRows = normalizeImportRows(rows);
   const existingItems = await prisma.packingItem.findMany({
+    take: 10000,
+    orderBy: { createdAt: 'desc' },
     include: {
       product: true,
       salesContract: true,
@@ -1005,15 +1007,18 @@ const importRecords = async (records) => {
 
       await attachPurchaseContractIfNeeded(purchaseContractNo, supplier, cache, results);
 
-      // 6.1 创建销售合同明细（SalesItem）
-      await addSalesItemIfNeeded(record, salesContract, product, store, cache, results);
+      // 使用事务包裹关键业务数据创建
+      await prisma.$transaction(async (tx) => {
+        // 6.1 创建销售合同明细（SalesItem）
+        await addSalesItemIfNeeded(record, salesContract, product, store, cache, results, tx);
 
-      // 8. 创建装箱明细
-      await addContainerItemIfNeeded(record, container, product, store, cache, results);
-      
-      // 9. 创建库存记录
-      await addInventoryIfNeeded(record, product, container, results);
-      
+        // 8. 创建装箱明细
+        await addContainerItemIfNeeded(record, container, product, store, cache, results, tx);
+
+        // 9. 创建库存记录
+        await addInventoryIfNeeded(record, product, container, results, tx);
+      });
+
       results.success.push({
         seq: record.seq,
         customsName: record.customsName,

@@ -105,8 +105,19 @@ const changePassword = async (req, res, next) => {
 const getUsers = async (req, res, next) => {
   try {
     const { page = 1, pageSize = 20 } = req.query;
-    const result = await authService.getUsers(parseInt(page), parseInt(pageSize));
-    paginated(res, result.users, result.total, parseInt(page), parseInt(pageSize));
+    const parsedPage = parseInt(page, 10);
+    const parsedPageSize = parseInt(pageSize, 10);
+
+    // 验证分页参数
+    if (Number.isNaN(parsedPage) || parsedPage < 1) {
+      return res.status(400).json({ success: false, message: '页码必须是大于0的数字' });
+    }
+    if (Number.isNaN(parsedPageSize) || parsedPageSize < 1 || parsedPageSize > 100) {
+      return res.status(400).json({ success: false, message: '每页数量必须是1-100之间的数字' });
+    }
+
+    const result = await authService.getUsers(parsedPage, parsedPageSize);
+    paginated(res, result.users, result.total, parsedPage, parsedPageSize);
   } catch (error) {
     next(error);
   }

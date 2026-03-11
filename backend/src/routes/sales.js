@@ -93,32 +93,26 @@ router.put('/:id/status', withIdValidation, roleAuth(...WRITE_ROLES), withAuditL
 router.post('/calculate-price', roleAuth(...WRITE_ROLES), salesController.calculatePrice);
 
 // GET /api/v1/sales/:id/export-excel - 导出单份合同标准出口 Excel（三 Sheet）
-router.get('/:id/export-excel', withIdValidation, async (req, res) => {
+router.get('/:id/export-excel', withIdValidation, async (req, res, next) => {
   try {
     const { buffer, filename } = await exportSalesContractExcel(req.params.id);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
     res.send(buffer);
   } catch (err) {
-    if (err.message && err.message.includes('合同不存在')) {
-      return res.status(404).json({ success: false, message: err.message });
-    }
-    res.status(500).json({ success: false, message: '导出 Excel 失败', error: err.message });
+    next(err);
   }
 });
 
 // GET /api/v1/sales/:id/export-pdf - 导出单份合同 PDF
-router.get('/:id/export-pdf', withIdValidation, async (req, res) => {
+router.get('/:id/export-pdf', withIdValidation, async (req, res, next) => {
   try {
     const { buffer, filename } = await exportSalesContractPdf(req.params.id);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
     res.send(buffer);
   } catch (err) {
-    if (err.message && err.message.includes('合同不存在')) {
-      return res.status(404).json({ success: false, message: err.message });
-    }
-    res.status(500).json({ success: false, message: '导出 PDF 失败', error: err.message });
+    next(err);
   }
 });
 
