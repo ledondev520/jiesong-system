@@ -10,8 +10,9 @@ const prisma = require('../utils/prisma');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const { validatePurchaseTransition, PURCHASE_STATUS } = require('../services/purchaseStateMachine');
-const { applyPurchaseInStock } = require('../services/inventorySnapshot');
+const { applyPurchaseInStock, revertPurchaseInStock } = require('../services/inventorySnapshot');
 const { normalizePagination } = require('../utils/pagination');
+const auditLog = require('../utils/auditLog');
 
 /**
  * 职责：获取采购合同列表
@@ -206,6 +207,9 @@ const updateStatus = async (req, res, next) => {
       throw createError('status 不能为空', 400);
     }
 
+    let revertResult = null;
+    let applyResult = null;
+
     const contract = await prisma.$transaction(async (tx) => {
       const existingContract = await tx.purchaseContract.findUnique({
         where: { id },
@@ -227,13 +231,49 @@ const updateStatus = async (req, res, next) => {
         data: { status: targetStatus },
       });
 
+      // 正向流转：入库时创建库存记录
       if (isTransition && targetStatus === PURCHASE_STATUS.IN_STOCK) {
-        await applyPurchaseInStock(tx, id);
+        applyResult = await applyPurchaseInStock(tx, id);
+      }
+
+      // 反向流转：从入库状态回退时，回滚库存记录
+      if (isTransition && existingContract.status === PURCHASE_STATUS.IN_STOCK) {
+        revertResult = await revertPurchaseInStock(tx, id);
       }
 
       return contract;
     });
-    
+
+    // 记录回滚操作的审计日志
+    if (revertResult && revertResult.reverted > 0) {
+      await auditLog.logOperation({
+        userId: req.user?.id,
+        action: 'REVERT_IN_STOCK',
+        entity: 'PurchaseContract',
+        entityId: id,
+        oldValue: { status: PURCHASE_STATUS.IN_STOCK, revertedInventoryCount: revertResult.reverted },
+        newValue: { status: targetStatus },
+        req,
+        note: `采购入库回滚：恢复 ${revertResult.reverted} 条库存记录`,
+      });
+      console.log(`[库存回滚] 采购合同 ${id}: 恢复 ${revertResult.reverted} 条入库记录`);
+    }
+
+    // 记录入库操作的审计日志
+    if (applyResult && (applyResult.created > 0 || applyResult.skipped > 0)) {
+      await auditLog.logOperation({
+        userId: req.user?.id,
+        action: 'APPLY_IN_STOCK',
+        entity: 'PurchaseContract',
+        entityId: id,
+        oldValue: { status: contract.status },
+        newValue: { status: PURCHASE_STATUS.IN_STOCK, createdCount: applyResult.created, skippedCount: applyResult.skipped },
+        req,
+        note: `采购入库：创建 ${applyResult.created} 条库存记录，跳过 ${applyResult.skipped} 条`,
+      });
+      console.log(`[库存入库] 采购合同 ${id}: 创建 ${applyResult.created} 条记录，跳过 ${applyResult.skipped} 条`);
+    }
+
     success(res, contract, '状态更新成功');
   } catch (error) {
     next(error);

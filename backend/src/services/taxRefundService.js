@@ -26,7 +26,7 @@ const buildWhere = ({ salesContractId, status, keyword } = {}) => {
 };
 
 const mapData = (data = {}) => normalizePayload(data, {
-  numberFields: ['declaredAmount', 'refundableAmount', 'refundedAmount'],
+  numberFields: ['declaredAmount', 'refundableAmount', 'refundedAmount', 'vat_rate_type'],
   dateFields: ['appliedAt', 'refundedAt'],
 });
 

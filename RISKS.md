@@ -29,6 +29,7 @@
 | R-024 | HSCode 全量原始抓取耗时较长，当前交互会话或前台进程被打断 | 原始快照不完整，影响后续统一清洗与入库 | 使用“每编码单独 JSON + manifest + chapter page 快照”的断点续跑结构；随时可通过同一命令继续抓取未完成部分 | 回退到仅保留已抓取 `records/*.json` 的阶段性快照，不删除已有原始数据 |
 | R-025 | 站点章节搜索结果存在源站侧限制/覆盖范围差异，并非 `01`-`99` 每章都返回可抓数据 | CSV 总量可能低于“理论全量 HS 编码”，影响对完整性的预期 | 以“源站当前可返回结果”为准保存快照，并在结果文档中明确当前仅抓到 `01/02/03/04/05/69` 前缀；若后续需要更高覆盖率，再补其他来源交叉抓取 | 保留本轮 CSV 作为可复用基线，后续增量合并而非重做 |
 | R-026 | 退税模块当前存在并行中的“auto-drafts / HSCode live import”开发，与本轮 CRUD 收口交叉触达相同文件 | 若直接混合验收，容易把未完成的自动草稿链路误判为本轮回归范围 | 本轮只以 CRUD API、`/dashboard/tax-refunds` 工作台与生产构建为验收边界；自动草稿链路单独跟踪 | 回退本轮税退 CRUD 页面与路由挂载，保留并行草稿链路继续开发 |
+| R-027 | 前端全量 Vitest/coverage 在 CI 下运行高交互页面测试时，默认 `5s` 超时不足 | 产生假红灯，阻塞前端单测与覆盖率门禁 | 提升 `frontend/vitest.config.ts` 中 `testTimeout` 到 `20000`，保留业务代码不变并用全量 `test + coverage` 复核 | 回退 `frontend/vitest.config.ts` 的 `testTimeout` 配置 |
 
 ## 2026-03-08 Round 43 状态更新
 
@@ -55,3 +56,12 @@
 
 - `R-026`：已激活并纳入边界说明；本轮验收不包含自动草稿生成链路。
 - `R-017`：已进一步收敛；`frontend/src/app/layout.tsx` 改为本地字体栈后，`cd frontend && npm run build` 在当前环境通过。
+
+## 2026-03-08 Round 47 状态更新
+
+- `R-027`：已收敛；`cd frontend && npm run test` 与 `cd frontend && npm run test:coverage` 均在新超时上限下通过。
+
+## 2026-03-08 Round 48 状态更新
+
+- 新增残余风险：`TaxRefund` Prisma 模型已扩字段，但当前沙箱未执行 `prisma generate/db push`；若本地运行真实写链路，需要先同步 Prisma Client 与数据库结构。
+- V1 导出校验当前通过 `relation_no -> purchaseContract.contractNo` 做规范化比对；若后续业务确认“关联号”语义不同，需要单独调整映射规则。

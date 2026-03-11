@@ -6,6 +6,16 @@
 - Created Plan (`task_plan.md`).
 - Next step: Initialize Next.js project.
 
+## 2026-03-08 HSCode Raw Capture
+- Verified the live HSCode source site is still reachable.
+- Confirmed search pages work and detail pages are keyed by 10-digit codes.
+- Adjusted scope based on user direction: raw capture first, database handling later.
+- Added parser tests and a resumable scraper under `backend/scripts`.
+- Completed live smoke capture for chapter `69` (58 records).
+- Completed full `01`-`99` chapter sweep against the current source response pattern.
+- Exported `backend/data/hscode-live/hscode-live.csv` from 908 raw JSON records.
+- Next step: if needed, supplement coverage from additional sources or map this CSV into the database.
+
 ## 2026-01-16
 - 增加测试先行文档 `docs/测试样例.md`，覆盖PRD/技术方案核心规则。
 - 新增后端单元测试（响应工具与常量枚举），加入 `npm run test` 脚本。

@@ -34,7 +34,34 @@ const safeJsonParse = (value) => {
   }
 };
 
-const isApiKeyConfigKey = (key) => trimToString(key).toLowerCase() === 'kimiapikey';
+const SENSITIVE_CONFIG_KEYS = [
+  'kimiapikey',
+  'api_key',
+  'apikey',
+  'secret',
+  'password',
+  'passwd',
+  'credential',
+  'token',
+  'auth_token',
+  'access_token',
+  'refresh_token',
+  'private_key',
+  'encryption_key',
+  'smtp_password',
+  'database_password',
+  'aws_secret',
+  'azure_key',
+  'gcp_key',
+];
+
+const isApiKeyConfigKey = (key) => {
+  const normalizedKey = trimToString(key).toLowerCase();
+  return SENSITIVE_CONFIG_KEYS.some(sensitiveKey =>
+    normalizedKey === sensitiveKey ||
+    normalizedKey.includes(sensitiveKey)
+  );
+};
 
 const isEncryptedPayload = (value) => {
   return (

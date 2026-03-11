@@ -132,6 +132,10 @@ const updateSalesStatus = async (id, status, context = {}) => {
   if (!targetStatus) {
     throw createError('status 不能为空', 400);
   }
+
+  let revertResult = null;
+  let applyResult = null;
+
   const contract = await prisma.$transaction(async (tx) => {
     const existingContract = await tx.salesContract.findUnique({
       where: { id },
@@ -153,12 +157,40 @@ const updateSalesStatus = async (id, status, context = {}) => {
       data: { status: targetStatus },
     });
 
+    // 正向流转：出库时扣减库存
     if (isTransition && targetStatus === SALES_STATUS.OUT_STOCK) {
-      await inventorySnapshot.applySalesOutStock(tx, id);
+      applyResult = await inventorySnapshot.applySalesOutStock(tx, id);
+    }
+
+    // 反向流转：从出库状态回退时，恢复库存
+    if (isTransition && existingContract.status === SALES_STATUS.OUT_STOCK) {
+      revertResult = await inventorySnapshot.revertSalesOutStock(tx, id);
     }
 
     return contract;
   });
+
+  // 记录回滚操作的日志
+  if (revertResult && revertResult.reverted > 0) {
+    console.log(`[库存回滚] 销售合同 ${id}: 恢复 ${revertResult.reverted} 条出库记录`);
+    // 将回滚信息附加到返回结果中，供控制器层记录审计日志
+    contract._revertInfo = {
+      action: 'REVERT_OUT_STOCK',
+      revertedCount: revertResult.reverted,
+      note: `销售出库回滚：恢复 ${revertResult.reverted} 条库存记录`,
+    };
+  }
+
+  // 记录出库操作的日志
+  if (applyResult && applyResult.results) {
+    const totalAllocated = applyResult.results.reduce((sum, r) => sum + (r.allocatedQuantity || 0), 0);
+    console.log(`[库存出库] 销售合同 ${id}: 出库 ${totalAllocated} 件商品`);
+    contract._applyInfo = {
+      action: 'APPLY_OUT_STOCK',
+      allocatedQuantity: totalAllocated,
+      note: `销售出库：出库 ${totalAllocated} 件商品`,
+    };
+  }
 
   return contract;
 };

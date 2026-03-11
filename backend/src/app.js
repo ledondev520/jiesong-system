@@ -1,8 +1,8 @@
 /**
  * Input: 所有路由模块、中间件
- * Output: Express应用实例
- * Pos: 应用入口，初始化Express服务器
- * 
+ * Output: Express 应用实例
+ * Pos: 应用入口，初始化 Express 服务器
+ *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
@@ -12,20 +12,38 @@ const config = require('./config');
 const routes = require('./routes');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./middleware/logger');
+const { gentleRateLimit } = require('./middleware/rateLimit');
 const { startInventoryAlertJob } = require('./jobs/inventoryAlertJob');
 
 const app = express();
 
 const allowedOrigins = Array.isArray(config.cors.origin) ? config.cors.origin : [];
+const isProduction = config.nodeEnv === 'production';
 
 // ==================== 中间件配置 ====================
 
-// 0. CORS配置
+// 0. CORS 配置（生产环境强制白名单）
 app.use(
   cors({
     origin: (origin, callback) => {
+      // 生产环境下，不允许空 origin（防止非浏览器直接访问）
+      if (isProduction && !origin) {
+        return callback(new Error('CORS origin required in production'));
+      }
+
+      // 无 origin 时（如 Postman/服务器间调用）允许
       if (!origin) {
         return callback(null, true);
+      }
+
+      // 白名单校验
+      if (allowedOrigins.length === 0) {
+        // 生产环境不允许空 CORS 白名单
+        if (isProduction) {
+          return callback(new Error('CORS origin allowlist is empty'));
+        }
+        // 开发环境允许所有
+        return callback(null, origin);
       }
 
       if (allowedOrigins.includes(origin)) {
@@ -38,6 +56,13 @@ app.use(
   })
 );
 
+// 0.5. 速率限制（全局宽松限制）
+app.use(gentleRateLimit({
+  windowMs: 60 * 1000, // 1 分钟
+  max: 100, // 100 次/分钟
+  message: '请求过于频繁，请稍后再试',
+}));
+
 // 1. 请求体解析
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -49,19 +74,19 @@ app.use(requestLogger);
 
 // 3. 健康检查
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
   });
 });
 
-// 4. API路由（所有业务路由挂载在/api/v1下）
+// 4. API 路由（所有业务路由挂载在/api/v1 下）
 app.use('/api/v1', routes);
 
 // ==================== 错误处理 ====================
 
-// 5. 404处理
+// 5. 404 处理
 app.use(notFoundHandler);
 
 // 6. 统一错误处理

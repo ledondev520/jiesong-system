@@ -44,10 +44,13 @@ test('tax modules: forex verifications router exposes CRUD routes', () => {
 test('tax modules: tax refunds router exposes CRUD routes', () => {
   assertCrudRoutes(taxRefundsRouter, 'taxRefunds');
   const autoDraftIndex = getRouteIndex(taxRefundsRouter, '/auto-drafts', 'post');
+  const exportIndex = getRouteIndex(taxRefundsRouter, '/export', 'post');
   const detailIndex = getRouteIndex(taxRefundsRouter, '/:id', 'get');
 
   assert.notEqual(autoDraftIndex, -1, 'taxRefunds 缺少 POST /auto-drafts');
+  assert.notEqual(exportIndex, -1, 'taxRefunds 缺少 POST /export');
   assert.ok(autoDraftIndex < detailIndex, 'taxRefunds /auto-drafts 必须位于 /:id 之前');
+  assert.ok(exportIndex < detailIndex, 'taxRefunds /export 必须位于 /:id 之前');
 });
 
 test('tax modules: tax rates router exposes CRUD routes', () => {

@@ -19,6 +19,9 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     setupFiles: ['src/test/setup.ts'],
+    // Page-level interaction tests exceed Vitest's 5s default under full-suite load in CI,
+    // especially with coverage instrumentation enabled.
+    testTimeout: 20000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

@@ -1,5 +1,19 @@
 # Customs Declaration Management
 
+## 2026-03-08 Round 6: Frontend Vitest Timeout Stabilization
+
+### Goal
+- Recover the frontend CI-equivalent Vitest gates without touching production code.
+
+### Execution Outcome
+- Reproduced the full-suite timeout failures in `customs-declarations/create`, `customs-declarations/[id]/edit`, and `dashboard/settings/ports`.
+- Verified those tests pass in isolation, confirming the regression is timeout pressure under full-suite and coverage execution rather than broken UI behavior.
+- Applied the minimal fix in `frontend/vitest.config.ts` by setting `testTimeout: 20000` and documenting the reason inline.
+
+### Verification
+- `npm run test`
+- `npm run test:coverage`
+
 ## Goal
 - Deliver protected Next.js App Router pages for customs declaration list, detail, create, and edit flows at `/customs-declarations`.
 - Reuse existing dashboard shell, shadcn/ui primitives, and `products`-style data/service patterns.

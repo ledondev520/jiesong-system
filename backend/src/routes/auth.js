@@ -1,8 +1,8 @@
 /**
  * Input: 认证控制器
  * Output: 认证相关路由
- * Pos: 认证路由，处理登录/注册/找回密码/Token刷新
- * 
+ * Pos: 认证路由，处理登录/注册/找回密码/Token 刷新
+ *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
@@ -11,14 +11,20 @@ const authController = require('../controllers/authController');
 const { validateLogin, validateRegister, validateResetPassword, handleValidation } = require('../utils/validators');
 const { authenticate, roleAuth } = require('../middleware/auth');
 const { withAuditLog } = require('../middleware/auditLog');
+const { strictRateLimit } = require('../middleware/rateLimit');
 
 const router = Router();
 
 // ==================== 公开路由 ====================
 
-// POST /api/v1/auth/login - 用户登录
+// POST /api/v1/auth/login - 用户登录（严格限流：10 次/15 分钟）
 router.post(
   '/login',
+  strictRateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: '登录尝试过于频繁，请 15 分钟后再试',
+  }),
   validateLogin,
   handleValidation,
   withAuditLog(
@@ -35,8 +41,18 @@ router.post(
   )
 );
 
-// POST /api/v1/auth/reset-password - 找回密码（用户名+手机号验证）
-router.post('/reset-password', validateResetPassword, handleValidation, authController.resetPassword);
+// POST /api/v1/auth/reset-password - 找回密码（严格限流：5 次/15 分钟）
+router.post(
+  '/reset-password',
+  strictRateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: '操作过于频繁，请 15 分钟后再试',
+  }),
+  validateResetPassword,
+  handleValidation,
+  authController.resetPassword
+);
 
 // ==================== 需认证路由 ====================
 

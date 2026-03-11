@@ -20,6 +20,11 @@ router.post(
   roleAuth('ADMIN', 'SALES', 'FINANCE'),
   taxRefundController.generateTaxRefundDrafts,
 );
+router.post(
+  '/export',
+  roleAuth('ADMIN', 'SALES', 'FINANCE'),
+  taxRefundController.exportTaxRefunds,
+);
 router.get('/:id', withIdValidation, taxRefundController.getById);
 router.post(
   '/',

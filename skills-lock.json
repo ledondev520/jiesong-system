@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "claude-to-im": {
+      "source": "op7418/Claude-to-IM-skill",
+      "sourceType": "github",
+      "computedHash": "d51f9e6451b16093a114e0f050d5420cb2ad31b03488ef4aa125f4187cd9f7d1"
+    }
+  }
+}

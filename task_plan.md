@@ -1,42 +1,31 @@
-# Frontend Development Plan - Jiesong System
+# HSCode Live Capture Plan
 
 ## Status
-- [x] Phase 1: Initialization
-- [x] Phase 2: Core Architecture
-- [x] Phase 3: Layout & Auth
-- [x] Phase 4: Feature Implementation (P0)
-- [x] Phase 4-Ext: Feature Implementation (P1/P2/P3 - Full Scope)
-- [ ] Phase 5: Alignment & Integration
+- [x] Phase 1: Verify live source availability
+- [x] Phase 2: Add parser/scraper tests
+- [x] Phase 3: Implement resumable raw-data scraper
+- [x] Phase 4: Execute live capture and record artifacts
 
-## Goals
-- Complete ALL frontend features defined in PRD (P0-P3).
-- Strict Localization (All Chinese).
-- **Blue Theme Applied**.
-- **AI Assistant Integrated**.
+## Goal
+- First capture all currently reachable HSCode detail information from `hsbianma.com` into local raw files.
+- Defer cleaning, schema mapping, and database import until after the raw snapshot is complete.
 
-## Feature Inventory
+## Scope
+- Source discovery: chapter keyword search pages (`01`-`99`)
+- Detail capture: per-code pages under `/Code/<10-digit>.html`
+- Output: structured JSON records plus run manifest for resume/retry
 
-### 1. 核心业务 (Core Business)
-- **商品管理**: List, Create/Edit.
-- **供应商管理**: List, Create/Edit, Quality Flag, Aliases.
-- **门店管理**: List, Create/Edit, Port Selection.
-- **采购管理**: Contract List, Create (AI Parse, File Upload), Payment Tracking.
-- **销售管理**: Contract List, Create (Smart Pricing), Multi-store Support.
-- **库存管理**: List, Status Flow (Producing -> Outbound).
-- **货柜管理**: List, Create (Logistics Info), Tracking.
+## Deliverables
+- `backend/scripts/scrape_hscode_raw.py`
+- `backend/scripts/test_scrape_hscode_raw.py`
+- `backend/scripts/export_hscode_csv.py`
+- `backend/scripts/test_export_hscode_csv.py`
+- `backend/data/hscode-live/records/*.json`
+- `backend/data/hscode-live/manifest.json`
+- `backend/data/hscode-live/hscode-live.csv`
 
-### 2. 财务与统计 (Finance & Reports)
-- **财务概览**: Cash Flow Stats.
-- **应收应付**: Payable/Receivable Tracking & Recording.
-- **报表中心**: Purchase/Sales Summary Tables.
-
-### 3. 系统与运维 (System & Admin)
-- **用户管理**: RBAC (Admin/Purchase/Sales).
-- **系统设置**: Exchange Rate, Profit Rate, Enum Management.
-- **日志审计**: Operation Log View.
-- **通知中心**: Alert System.
-- **AI助手**: Global Floating Chat.
-
-## Next Steps
-- Backend API Integration.
-- End-to-end Testing.
+## Current Notes
+- Live site verified on 2026-03-08: search pages return 200, detail pages use 10-digit codes.
+- Existing repo HSCode seed data is sample-only and not sufficient for direct business use.
+- Current raw snapshot count: 908 records under `backend/data/hscode-live/records`.
+- Current CSV output: `backend/data/hscode-live/hscode-live.csv`.

@@ -1,5 +1,40 @@
 # Frontend Polish Metrics
 
+## 2026-03-08 Round 48（Tax Refund Export Precheck V1）
+
+### 质量指标
+- 后端退税导出定向回归：`18/18` 通过
+- 新增后端服务：`1`（`taxRefundExportService`）
+- 新增后端测试文件：`1`
+- 扩展既有测试文件：`3`
+
+### 过程指标
+- `TaxRefund` 新增导出字段：`4`
+- P0 阻断规则：`4`（缺关联号、缺发票号、`vat_rate_type` 非法、税率不一致）
+- P1 告警规则：`2`（同关联号多发票冲突、金额异常）
+- P2 规范化字段：`2`（`relation_no`、`invoice_no`）
+
+### 结论
+- 退税模块已具备“申报前校验 -> 告警/修复提示 -> passed-only 导出”的后端 V1 能力。
+- 当前未在沙箱内执行 Prisma 客户端/数据库同步，真实环境启用前仍需补 `prisma generate/db push`。
+
+## 2026-03-08 Round 47（Frontend Vitest Timeout Stabilization）
+
+### 质量指标
+- 前端全量单测：`101 files / 313 tests` 通过
+- 前端全量覆盖率：`101 files / 313 tests` 通过
+- 覆盖率汇总：`73.28%` statements / `80.2%` branches / `67.45%` functions / `73.28%` lines
+- 代码改动：`1` 个配置文件（`frontend/vitest.config.ts`）
+
+### 过程指标
+- 首次复现红灯：`3` 条页面交互测试在全量套件下超时
+- 单测单独复核：上述 `3` 条用例单独运行全部通过
+- 配置修复：Vitest 默认超时从 `5s` 提升到 `20s`
+
+### 结论
+- 本轮 CI 红灯根因已确认是测试门禁配置过紧，而不是前端业务逻辑回归。
+- 通过最小配置变更恢复了全量 `test` 与 `test:coverage` 门禁稳定性。
+
 ## 2026-03-08 Round 46 (Tax Refund Module CRUD Closure)
 
 ### 质量指标

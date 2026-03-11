@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>捷淞进销存系统 - 架构图</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .card h2 {
+            color: #333;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 3px solid #667eea;
+        }
+        .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+        .tech-stack {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .tech-item {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .tech-item h4 {
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .feature-item {
+            background: #f8f9fa;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        .badge-frontend { background: #61dafb; color: #000; }
+        .badge-backend { background: #68a063; color: #fff; }
+        .badge-db { background: #336791; color: #fff; }
+        .badge-ai { background: #ff6b6b; color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚢 捷淞进销存系统架构图</h1>
+
+        <div class="card">
+            <h2>📋 项目概述</h2>
+            <p><strong>捷淞进销存系统</strong>是一个面向外贸企业的综合性 ERP 系统，涵盖采购、销售、库存、财务、海关报关、退税等全流程管理。</p>
+        </div>
+
+        <div class="card">
+            <h2>🏗️ 技术架构 <span class="badge badge-frontend">前端</span><span class="badge badge-backend">后端</span></h2>
+            <div class="tech-stack">
+                <div class="tech-item">
+                    <h4>🎨 前端</h4>
+                    <p>Next.js 16 + React 19</p>
+                    <p>TypeScript + Tailwind CSS</p>
+                    <p>Zustand 状态管理</p>
+                </div>
+                <div class="tech-item">
+                    <h4>⚙️ 后端</h4>
+                    <p>Node.js + Express</p>
+                    <p>Prisma ORM</p>
+                    <p>JWT 认证</p>
+                </div>
+                <div class="tech-item">
+                    <h4>🗄️ 数据库</h4>
+                    <p>SQLite (开发)</p>
+                    <p>PostgreSQL (生产)</p>
+                </div>
+                <div class="tech-item">
+                    <h4>🤖 AI</h4>
+                    <p>Kimi API 集成</p>
+                    <p>智能助手</p>
+                    <p>合同生成</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📊 系统架构图</h2>
+            <div class="mermaid">
+graph TB
+    subgraph "前端层"
+        A1[登录/注册] --> A2[Dashboard]
+        A2 --> A3[采购管理]
+        A2 --> A4[销售管理]
+        A2 --> A5[库存管理]
+        A2 --> A6[财务管理]
+        A2 --> A7[海关报关]
+        A2 --> A8[AI助手]
+    end
+
+    subgraph "后端层"
+        B1[认证服务] --> B2[业务服务]
+        B2 --> B3[采购服务]
+        B2 --> B4[销售服务]
+        B2 --> B5[库存服务]
+        B2 --> B6[财务服务]
+        B2 --> B7[海关服务]
+        B2 --> B8[AI服务]
+    end
+
+    subgraph "数据层"
+        C1[(SQLite)]
+        C2[(PostgreSQL)]
+    end
+
+    subgraph "外部服务"
+        D1[Kimi AI]
+        D2[文件存储]
+    end
+
+    A3 --> B3
+    A4 --> B4
+    A5 --> B5
+    A6 --> B6
+    A7 --> B7
+    A8 --> B8
+
+    B3 --> C1
+    B4 --> C1
+    B5 --> C1
+    B6 --> C1
+    B7 --> C1
+    B8 --> D1
+    B7 --> D2
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🔄 业务流程</h2>
+            <div class="mermaid">
+sequenceDiagram
+    participant 采购
+    participant 库存
+    participant 销售
+    participant 财务
+    participant 海关
+
+    采购->>库存: 1. 采购入库
+    库存->>销售: 2. 库存分配
+    销售->>库存: 3. 销售出库
+    销售->>海关: 4. 报关出口
+    海关->>财务: 5. 外汇核销
+    海关->>财务: 6. 出口退税
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📦 核心功能模块</h2>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <strong>👥 用户管理</strong><br>
+                    多角色权限控制
+                </div>
+                <div class="feature-item">
+                    <strong>🛒 采购管理</strong><br>
+                    供应商、采购合同
+                </div>
+                <div class="feature-item">
+                    <strong>💰 销售管理</strong><br>
+                    客户、销售合同
+                </div>
+                <div class="feature-item">
+                    <strong>📦 库存管理</strong><br>
+                    实时库存、预警
+                </div>
+                <div class="feature-item">
+                    <strong>💵 财务管理</strong><br>
+                    收付款、退税
+                </div>
+                <div class="feature-item">
+                    <strong>🚢 货柜管理</strong><br>
+                    出口、物流跟踪
+                </div>
+                <div class="feature-item">
+                    <strong>📋 海关报关</strong><br>
+                    报关单、HS编码
+                </div>
+                <div class="feature-item">
+                    <strong>🤖 AI助手</strong><br>
+                    智能对话、生成
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>👤 角色权限</h2>
+            <div class="mermaid">
+graph LR
+    A[管理员] --> A1[全部功能]
+    B[采购] --> B1[采购管理]
+    B --> B2[库存查看]
+    C[销售] --> C1[销售管理]
+    C --> C2[货柜管理]
+    D[财务] --> D1[收付款]
+    D --> D2[退税管理]
+    E[仓库] --> E1[库存操作]
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🛡️ 安全措施</h2>
+            <div class="feature-grid">
+                <div class="feature-item">✅ JWT 认证</div>
+                <div class="feature-item">✅ 密码加密存储</div>
+                <div class="feature-item">✅ CORS 白名单</div>
+                <div class="feature-item">✅ 操作日志审计</div>
+                <div class="feature-item">✅ 角色权限控制</div>
+                <div class="feature-item">✅ 文件权限检查</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+</body>
+</html>

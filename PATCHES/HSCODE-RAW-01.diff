@@ -1,0 +1,987 @@
+diff --git a/task_plan.md b/task_plan.md
+index 61d102c..840eb0e 100644
+--- a/task_plan.md
++++ b/task_plan.md
+@@ -1,42 +1,31 @@
+-# Frontend Development Plan - Jiesong System
++# HSCode Live Capture Plan
+ 
+ ## Status
+-- [x] Phase 1: Initialization
+-- [x] Phase 2: Core Architecture
+-- [x] Phase 3: Layout & Auth
+-- [x] Phase 4: Feature Implementation (P0)
+-- [x] Phase 4-Ext: Feature Implementation (P1/P2/P3 - Full Scope)
+-- [ ] Phase 5: Alignment & Integration
++- [x] Phase 1: Verify live source availability
++- [x] Phase 2: Add parser/scraper tests
++- [x] Phase 3: Implement resumable raw-data scraper
++- [x] Phase 4: Execute live capture and record artifacts
+ 
+-## Goals
+-- Complete ALL frontend features defined in PRD (P0-P3).
+-- Strict Localization (All Chinese).
+-- **Blue Theme Applied**.
+-- **AI Assistant Integrated**.
++## Goal
++- First capture all currently reachable HSCode detail information from `hsbianma.com` into local raw files.
++- Defer cleaning, schema mapping, and database import until after the raw snapshot is complete.
+ 
+-## Feature Inventory
++## Scope
++- Source discovery: chapter keyword search pages (`01`-`99`)
++- Detail capture: per-code pages under `/Code/<10-digit>.html`
++- Output: structured JSON records plus run manifest for resume/retry
+ 
+-### 1. 核心业务 (Core Business)
+-- **商品管理**: List, Create/Edit.
+-- **供应商管理**: List, Create/Edit, Quality Flag, Aliases.
+-- **门店管理**: List, Create/Edit, Port Selection.
+-- **采购管理**: Contract List, Create (AI Parse, File Upload), Payment Tracking.
+-- **销售管理**: Contract List, Create (Smart Pricing), Multi-store Support.
+-- **库存管理**: List, Status Flow (Producing -> Outbound).
+-- **货柜管理**: List, Create (Logistics Info), Tracking.
++## Deliverables
++- `backend/scripts/scrape_hscode_raw.py`
++- `backend/scripts/test_scrape_hscode_raw.py`
++- `backend/scripts/export_hscode_csv.py`
++- `backend/scripts/test_export_hscode_csv.py`
++- `backend/data/hscode-live/records/*.json`
++- `backend/data/hscode-live/manifest.json`
++- `backend/data/hscode-live/hscode-live.csv`
+ 
+-### 2. 财务与统计 (Finance & Reports)
+-- **财务概览**: Cash Flow Stats.
+-- **应收应付**: Payable/Receivable Tracking & Recording.
+-- **报表中心**: Purchase/Sales Summary Tables.
+-
+-### 3. 系统与运维 (System & Admin)
+-- **用户管理**: RBAC (Admin/Purchase/Sales).
+-- **系统设置**: Exchange Rate, Profit Rate, Enum Management.
+-- **日志审计**: Operation Log View.
+-- **通知中心**: Alert System.
+-- **AI助手**: Global Floating Chat.
+-
+-## Next Steps
+-- Backend API Integration.
+-- End-to-end Testing.
++## Current Notes
++- Live site verified on 2026-03-08: search pages return 200, detail pages use 10-digit codes.
++- Existing repo HSCode seed data is sample-only and not sufficient for direct business use.
++- Current raw snapshot count: 908 records under `backend/data/hscode-live/records`.
++- Current CSV output: `backend/data/hscode-live/hscode-live.csv`.
+diff --git a/findings.md b/findings.md
+index 3f9f72b..b91f82a 100644
+--- a/findings.md
++++ b/findings.md
+@@ -9,3 +9,21 @@
+ - Backend is using Express + Prisma.
+ - Database is SQLite.
+ - API alignment will be crucial. I will assume standard RESTful patterns based on Prisma Schema.
++
++## 2026-03-08 HSCode Live Source
++- `https://www.hsbianma.com/Search/<page>?keywords=<chapter>` is reachable and returns HTML search results.
++- Detail pages currently use 10-digit codes, for example `/Code/6904100000.html`.
++- Detail pages expose these sections in HTML:
++  - `基本信息`
++  - `税率信息`
++  - `申报要素`
++  - `监管条件`
++  - `检验检疫类别`
++  - `协定税率`
++  - `RCEP税率`
++  - `所属章节`
++  - `CIQ代码(13位海关编码)`
++- User clarified scope: capture raw information first, postpone cleaning/import.
++- Current raw snapshot path: `backend/data/hscode-live`.
++- Current captured chapter prefixes: `01`、`02`、`03`、`04`、`05`、`69`.
++- Exported consolidated CSV: `backend/data/hscode-live/hscode-live.csv`.
+diff --git a/progress.md b/progress.md
+index 3a8354b..0294bcd 100644
+--- a/progress.md
++++ b/progress.md
+@@ -6,6 +6,16 @@
+ - Created Plan (`task_plan.md`).
+ - Next step: Initialize Next.js project.
+ 
++## 2026-03-08 HSCode Raw Capture
++- Verified the live HSCode source site is still reachable.
++- Confirmed search pages work and detail pages are keyed by 10-digit codes.
++- Adjusted scope based on user direction: raw capture first, database handling later.
++- Added parser tests and a resumable scraper under `backend/scripts`.
++- Completed live smoke capture for chapter `69` (58 records).
++- Completed full `01`-`99` chapter sweep against the current source response pattern.
++- Exported `backend/data/hscode-live/hscode-live.csv` from 908 raw JSON records.
++- Next step: if needed, supplement coverage from additional sources or map this CSV into the database.
++
+ ## 2026-01-16
+ - 增加测试先行文档 `docs/测试样例.md`，覆盖PRD/技术方案核心规则。
+ - 新增后端单元测试（响应工具与常量枚举），加入 `npm run test` 脚本。
+diff --git a/PLAN.md b/PLAN.md
+index 6e5cf49..a176585 100644
+--- a/PLAN.md
++++ b/PLAN.md
+@@ -837,19 +837,24 @@
+ - 已完成项：
+   - 新增 `backend/scripts/test_scrape_hscode_raw.py`，覆盖搜索页去重与详情页结构化解析。
+   - 新增 `backend/scripts/scrape_hscode_raw.py`，支持章节抓取、详情解析、分文件落盘、章节快照和断点续跑。
+-  - 已完成真实抓取首批数据，当前 `backend/data/hscode-live/records` 已落盘 764 条记录：
+-    - `01` 章：147 条
+-    - `02` 章：143 条
+-    - `03` 章：400 条（本轮中断点）
+-    - `04` 章：16 条（已开始）
+-    - `69` 章：58 条（烟测批次）
++  - 新增 `backend/scripts/test_export_hscode_csv.py` 与 `backend/scripts/export_hscode_csv.py`，将原始 JSON 快照整理为单一大 CSV。
++  - 已完成 `01`-`99` 全量章节扫取，当前 `backend/data/hscode-live/records` 共 908 条原始记录。
++  - 已生成总表：
++    - `backend/data/hscode-live/hscode-live.csv`
++- 最终快照分布：
++  - `01` 章：147 条
++  - `02` 章：143 条
++  - `03` 章：400 条
++  - `04` 章：70 条
++  - `05` 章：90 条
++  - `69` 章：58 条
+ - 验证结论：
+-  - `python3 -m unittest backend/scripts/test_scrape_hscode_raw.py`：通过（2/2）。
+-  - `python3 backend/scripts/scrape_hscode_raw.py --chapters 69 --request-delay 0.05`：通过，落盘 58 条。
+-  - `python3 backend/scripts/scrape_hscode_raw.py --chapters 03,04,05 --request-delay 0.03 --workers 4`：已验证真实落盘生效，当前按文件可续跑。
+-- 后续动作：
+-  - 继续执行全量章节抓取，直至 `01`-`99` 全部完成。
+-  - 第二阶段再基于 `records/*.json` 做字段标准化与入库映射。
++  - `python3 -m unittest backend/scripts/test_scrape_hscode_raw.py backend/scripts/test_export_hscode_csv.py`：通过（3/3）。
++  - `python3 backend/scripts/scrape_hscode_raw.py --request-delay 0.02 --workers 6`：完成，最终快照 908 条。
++  - `python3 backend/scripts/export_hscode_csv.py`：完成，导出 CSV 908 行数据。
++- 观察结论：
++  - 站点章节搜索并非 99 章都返回结果；当前可抓取数据主要集中在 `01`、`02`、`03`、`04`、`05`、`69` 章节前缀。
++  - CSV 已可作为下一阶段清洗、筛选与入库的统一输入。
+ 
+ ## 2026-03-08 Round 44（Customs Declarations Closeout + Frontend Build Recovery）
+ 
+diff --git a/TASKS.md b/TASKS.md
+index d4ff13f..2c16eee 100644
+--- a/TASKS.md
++++ b/TASKS.md
+@@ -134,5 +134,7 @@
+ | HSCODE-02 | P0 | 30m | 1 | DONE | 新增 HSCode 种子脚本、服务层与 API 路由，并完成后端定向回归 |
+ | HSCODE-03 | P0 | 35m | 1 | DONE | 商品管理页接入“HSCode 智能匹配”，支持候选选择后回填 `hsCode` 并展示推荐 `taxRate` |
+ | HSCODE-04 | P1 | 15m | 1 | DONE | 更新风险/指标/任务产物（`logs`、`RESULTS`、`PATCHES`）并完成本轮验证收口 |
+-| HSCODE-RAW-01 | P0 | 90m | 1 | DOING | 新增可续跑的 HSCode 原始抓取脚本，先将 `hsbianma.com` 可见详情信息落盘到 `backend/data/hscode-live`，后续再清洗入库 |
++| HSCODE-RAW-01 | P0 | 90m | 1 | DONE | 新增可续跑的 HSCode 原始抓取脚本，完成 `hsbianma.com` 全量章节扫取、原始 JSON 快照与总 CSV 导出 |
+ | CD-FE-01 | P0 | 45m | 1 | DONE | 收口 `/customs-declarations` 前端 CRUD 台账，并修复其触发的 Next16 构建阻塞（Sentry、CRUD typing、finance/container/supplier/config hook 类型与 Suspense 边界） |
++| HSCODE-LIVE-01 | P0 | 45m | 1 | DOING | 将 `backend/data/hscode-live/records/*.json` 清洗入 `hs_codes` 正式表，并保留关键字段与完整原始 payload |
++| TAX-DRAFT-01 | P0 | 45m | 1 | TODO | 基于报关单明细 `hsCode + totalPrice` 自动生成退税草稿，并在退税列表页提供触发入口 |
+diff --git a/RISKS.md b/RISKS.md
+index e99cb86..bcbde7e 100644
+--- a/RISKS.md
++++ b/RISKS.md
+@@ -27,13 +27,15 @@
+ | R-022 | HSCode 种子数据若直接 `createMany` 且重复执行无幂等策略 | 本地重复运行脚本报唯一键冲突，影响开发恢复 | 采用 `upsert` 或“先查后写”策略保证 100 条种子可重复执行 | 回退种子脚本到只在空表执行的保守版本 |
+ | R-023 | 商品页当前无 `taxRate` 持久字段，若直接扩展 `Product` 模型会放大改动面 | 牵连商品 CRUD、列表、类型与库存链路，增加回归面 | 本轮将 `taxRate` 作为 HSCode 匹配辅助展示值，不持久化到 `Product`；后续若业务确认需要持久化，再单独立项 | 回退商品弹窗中的税率展示逻辑，保留仅 HSCode 回填 |
+ | R-024 | HSCode 全量原始抓取耗时较长，当前交互会话或前台进程被打断 | 原始快照不完整，影响后续统一清洗与入库 | 使用“每编码单独 JSON + manifest + chapter page 快照”的断点续跑结构；随时可通过同一命令继续抓取未完成部分 | 回退到仅保留已抓取 `records/*.json` 的阶段性快照，不删除已有原始数据 |
++| R-025 | 站点章节搜索结果存在源站侧限制/覆盖范围差异，并非 `01`-`99` 每章都返回可抓数据 | CSV 总量可能低于“理论全量 HS 编码”，影响对完整性的预期 | 以“源站当前可返回结果”为准保存快照，并在结果文档中明确当前仅抓到 `01/02/03/04/05/69` 前缀；若后续需要更高覆盖率，再补其他来源交叉抓取 | 保留本轮 CSV 作为可复用基线，后续增量合并而非重做 |
+ 
+ ## 2026-03-08 Round 43 状态更新
+ 
+ - `R-021`：已完成验证，迁移执行成功。
+ - `R-022`：已降低风险，种子脚本改为“先清空后写入固定 100 条”。
+ - `R-023`：继续保留监控，本轮未扩展 `Product` 持久字段。
+-- `R-024`：风险已激活；当前通过断点续跑方案已降低影响，继续执行剩余章节抓取。
++- `R-024`：已收敛；断点续跑方案已支撑完成本轮全量章节扫取。
++- `R-025`：已激活并记录；当前 CSV 反映的是源站当前可返回的章节覆盖范围。
+ 
+ ## 2026-03-08 Round 44 状态更新
+ 
+diff --git a/METRICS.md b/METRICS.md
+index 14c0163..e907a11 100644
+--- a/METRICS.md
++++ b/METRICS.md
+@@ -118,6 +118,24 @@
+ - 替换范围：页面标题、认证标题、侧边栏品牌位、Header 日期图标
+ 
+ ### 结论
++
++## 2026-03-08 Round 44 (HSCode Live Raw Capture)
++
++### 质量指标
++- 抓取解析 + CSV 导出单测：`python3 -m unittest backend/scripts/test_scrape_hscode_raw.py backend/scripts/test_export_hscode_csv.py` => 3/3 通过
++- 真实站点全量章节扫取：`python3 backend/scripts/scrape_hscode_raw.py --request-delay 0.02 --workers 6` => 完成，0 抓取异常退出
++- CSV 导出：`python3 backend/scripts/export_hscode_csv.py` => 908 行数据导出成功
++
++### 过程指标
++- 新增脚本：2（`backend/scripts/scrape_hscode_raw.py`、`backend/scripts/export_hscode_csv.py`）
++- 新增测试：2（`backend/scripts/test_scrape_hscode_raw.py`、`backend/scripts/test_export_hscode_csv.py`）
++- 当前原始记录落盘数：908
++- 当前 CSV 文件大小：约 1.77 MB
++- 当前已触达章节前缀：`01`、`02`、`03`、`04`、`05`、`69`
++
++### 结论
++- 原始抓取链路与 CSV 汇总链路都已跑通。
++- 当前已交付一份可直接打开使用的大 CSV，总量 908 行。
+ - 白天模式下强调文字对比度显著提升，夜间模式风格保持不变。
+ 
+ ## 2026-02-12 Round 10 (Dashboard Hydration Mismatch Fix)
+diff --git a/Users/helena/Cursor/jiesong_system/backend/scripts/scrape_hscode_raw.py b/Users/helena/Cursor/jiesong_system/backend/scripts/scrape_hscode_raw.py
+new file mode 100644
+index 0000000..e74ffef
+--- /dev/null
++++ b/Users/helena/Cursor/jiesong_system/backend/scripts/scrape_hscode_raw.py
+@@ -0,0 +1,359 @@
++#!/usr/bin/env python3
++"""
++Input: hsbianma.com 搜索页与详情页
++Output: 本地原始 HSCode 结构化快照（逐条 JSON + manifest）
++Pos: 后端离线数据抓取脚本
++
++Environment prerequisite:
++- Requires `requests`, `bs4`, and `lxml` in the current Python environment.
++- Writes only inside the repository under `backend/data/hscode-live`.
++"""
++
++from __future__ import annotations
++
++import argparse
++from concurrent.futures import ThreadPoolExecutor, as_completed
++import json
++import re
++import sys
++import time
++from datetime import datetime, timezone
++from pathlib import Path
++from typing import Iterable
++
++import requests
++from bs4 import BeautifulSoup
++from requests.adapters import HTTPAdapter
++from urllib3.util.retry import Retry
++
++BASE_URL = "https://www.hsbianma.com"
++SEARCH_URL = BASE_URL + "/Search/{page}?keywords={keyword}"
++DETAIL_URL = BASE_URL + "/Code/{code}.html"
++DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "data" / "hscode-live"
++USER_AGENT = "Mozilla/5.0 (Codex HSCode Raw Capture; +https://github.com/openai)"
++CODE_LINK_PATTERN = re.compile(r"/Code/(\d{10})\.html")
++
++
++def utc_now_iso() -> str:
++    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
++
++
++def normalize_text(value: str | None) -> str:
++    if value is None:
++        return ""
++    return re.sub(r"\s+", " ", value).strip()
++
++
++def make_session() -> requests.Session:
++    session = requests.Session()
++    session.headers.update(
++        {
++            "User-Agent": USER_AGENT,
++            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
++            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.5",
++        }
++    )
++    retry = Retry(
++        total=3,
++        backoff_factor=0.5,
++        status_forcelist=(429, 500, 502, 503, 504),
++        allowed_methods=("GET",),
++    )
++    adapter = HTTPAdapter(max_retries=retry, pool_connections=4, pool_maxsize=4)
++    session.mount("http://", adapter)
++    session.mount("https://", adapter)
++    return session
++
++
++def fetch_html(session: requests.Session, url: str, request_delay: float) -> str:
++    response = session.get(url, timeout=20)
++    response.raise_for_status()
++    response.encoding = "utf-8"
++    if request_delay > 0:
++        time.sleep(request_delay)
++    return response.text
++
++
++def extract_code_links(html: str) -> list[str]:
++    soup = BeautifulSoup(html, "lxml")
++    codes: list[str] = []
++    seen: set[str] = set()
++    for link in soup.find_all("a", href=True):
++        match = CODE_LINK_PATTERN.search(link["href"])
++        if not match:
++            continue
++        code = match.group(1)
++        if code in seen:
++            continue
++        seen.add(code)
++        codes.append(code)
++    return codes
++
++
++def table_rows(table) -> list[list[str]]:
++    if table is None:
++        return []
++
++    rows: list[list[str]] = []
++    for tr in table.find_all("tr"):
++        cells = [normalize_text(cell.get_text(" ", strip=True)) for cell in tr.find_all(["th", "td"])]
++        cells = [cell for cell in cells if cell]
++        if cells:
++            rows.append(cells)
++    return rows
++
++
++def find_section_table(soup: BeautifulSoup, heading_prefix: str):
++    for heading in soup.find_all("h3"):
++        text = normalize_text(heading.get_text(" ", strip=True))
++        if not text.startswith(heading_prefix):
++            continue
++        return heading.find_next("table")
++    return None
++
++
++def parse_key_value_rows(rows: Iterable[list[str]]) -> dict[str, str]:
++    result: dict[str, str] = {}
++    for row in rows:
++        if len(row) < 2:
++            continue
++        result[row[0]] = row[1]
++    return result
++
++
++def parse_labeled_rows(rows: Iterable[list[str]]) -> list[dict[str, str | int | None]]:
++    result: list[dict[str, str | int | None]] = []
++    for row in rows:
++        if len(row) == 1:
++            result.append({"index": None, "code": None, "value": row[0]})
++            continue
++
++        left = row[0]
++        if left.isdigit():
++            result.append({"index": int(left), "code": None, "value": row[1]})
++            continue
++
++        result.append({"index": None, "code": left, "value": row[1]})
++    return result
++
++
++def parse_rate_rows(rows: Iterable[list[str]]) -> dict[str, str]:
++    rates: dict[str, str] = {}
++    for row in rows:
++        if len(row) >= 2:
++            rates[row[0]] = row[1]
++    return rates
++
++
++def parse_code_value_rows(rows: Iterable[list[str]]) -> list[dict[str, str]]:
++    result: list[dict[str, str]] = []
++    for row in rows:
++        if len(row) >= 2:
++            result.append({"code": row[0], "value": row[1]})
++    return result
++
++
++def parse_detail_page(html: str, source_url: str) -> dict:
++    soup = BeautifulSoup(html, "lxml")
++    title = normalize_text(soup.title.get_text(" ", strip=True) if soup.title else "")
++
++    basic_info = parse_key_value_rows(table_rows(find_section_table(soup, "基本信息")))
++    tax_info = parse_key_value_rows(table_rows(find_section_table(soup, "税率信息")))
++    declaration_elements = parse_labeled_rows(table_rows(find_section_table(soup, "申报要素")))
++    supervision_conditions = parse_labeled_rows(table_rows(find_section_table(soup, "监管条件")))
++    inspection_quarantine = parse_labeled_rows(table_rows(find_section_table(soup, "检验检疫类别")))
++    agreement_rates = parse_rate_rows(table_rows(find_section_table(soup, "协定税率")))
++    rcep_rates = parse_rate_rows(table_rows(find_section_table(soup, "RCEP税率")))
++    chapter_hierarchy = parse_code_value_rows(table_rows(find_section_table(soup, "所属章节")))
++    ciq_codes = parse_code_value_rows(table_rows(find_section_table(soup, "CIQ代码")))
++
++    hs_code = basic_info.get("商品编码", "")
++    if not hs_code:
++        match = CODE_LINK_PATTERN.search(source_url)
++        hs_code = match.group(1) if match else ""
++
++    return {
++        "hs_code": hs_code,
++        "title": title,
++        "source_url": source_url,
++        "fetched_at": utc_now_iso(),
++        "basic_info": basic_info,
++        "tax_info": tax_info,
++        "declaration_elements": declaration_elements,
++        "supervision_conditions": supervision_conditions,
++        "inspection_quarantine": inspection_quarantine,
++        "agreement_rates": agreement_rates,
++        "rcep_rates": rcep_rates,
++        "chapter_hierarchy": chapter_hierarchy,
++        "ciq_codes": ciq_codes,
++    }
++
++
++def parse_chapter_list(raw_value: str | None) -> list[str]:
++    if not raw_value:
++        return [f"{chapter:02d}" for chapter in range(1, 100)]
++
++    chapters: list[str] = []
++    for part in raw_value.split(","):
++        piece = part.strip()
++        if not piece:
++            continue
++        if piece.isdigit():
++            chapters.append(f"{int(piece):02d}")
++            continue
++        raise ValueError(f"invalid chapter value: {piece}")
++    return chapters
++
++
++def write_json(path: Path, payload: dict) -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++
++
++def scrape_keyword(
++    session: requests.Session,
++    keyword: str,
++    output_dir: Path,
++    request_delay: float,
++    max_pages: int,
++    workers: int,
++) -> dict:
++    records_dir = output_dir / "records"
++    chapter_dir = output_dir / "chapters"
++    discovered_codes: list[str] = []
++    saved = 0
++    skipped = 0
++    failures: list[dict[str, str]] = []
++
++    for page in range(1, max_pages + 1):
++        search_url = SEARCH_URL.format(page=page, keyword=keyword)
++        try:
++            html = fetch_html(session, search_url, request_delay)
++        except Exception as error:  # pragma: no cover - network behavior
++            failures.append({"stage": "search", "page": str(page), "error": str(error)})
++            break
++
++        codes = extract_code_links(html)
++        if not codes:
++            break
++
++        discovered_codes.extend(codes)
++        page_summary = {
++            "keyword": keyword,
++            "page": page,
++            "search_url": search_url,
++            "codes": codes,
++            "captured_at": utc_now_iso(),
++        }
++        write_json(chapter_dir / keyword / f"page-{page}.json", page_summary)
++
++        pending_codes = []
++        for code in codes:
++            record_path = records_dir / f"{code}.json"
++            if record_path.exists():
++                skipped += 1
++                continue
++            pending_codes.append((code, page))
++
++        with ThreadPoolExecutor(max_workers=max(1, workers)) as executor:
++            future_map = {
++                executor.submit(fetch_and_build_record, code, keyword, page_no, request_delay): code
++                for code, page_no in pending_codes
++            }
++            for future in as_completed(future_map):
++                code = future_map[future]
++                record_path = records_dir / f"{code}.json"
++                try:
++                    record = future.result()
++                    write_json(record_path, record)
++                    saved += 1
++                except Exception as error:  # pragma: no cover - network behavior
++                    failures.append({"stage": "detail", "code": code, "error": str(error)})
++
++    chapter_summary = {
++        "keyword": keyword,
++        "pages_captured": len(list((chapter_dir / keyword).glob("page-*.json"))) if (chapter_dir / keyword).exists() else 0,
++        "codes_discovered": len(discovered_codes),
++        "unique_codes_discovered": len(set(discovered_codes)),
++        "records_saved": saved,
++        "records_skipped": skipped,
++        "failures": failures,
++        "updated_at": utc_now_iso(),
++    }
++    write_json(output_dir / "chapters" / f"{keyword}.json", chapter_summary)
++    return chapter_summary
++
++
++def build_manifest(output_dir: Path, chapter_summaries: list[dict], chapters: list[str]) -> dict:
++    records_dir = output_dir / "records"
++    record_count = len(list(records_dir.glob("*.json"))) if records_dir.exists() else 0
++    total_failures = sum(len(summary.get("failures", [])) for summary in chapter_summaries)
++    return {
++        "source": BASE_URL,
++        "chapters": chapters,
++        "record_count": record_count,
++        "chapter_count": len(chapter_summaries),
++        "total_failures": total_failures,
++        "updated_at": utc_now_iso(),
++        "chapter_summaries": chapter_summaries,
++    }
++
++
++def fetch_and_build_record(code: str, keyword: str, page: int, request_delay: float) -> dict:
++    detail_url = DETAIL_URL.format(code=code)
++    session = make_session()
++    detail_html = fetch_html(session, detail_url, request_delay)
++    record = parse_detail_page(detail_html, detail_url)
++    record["discovered_from"] = {"keyword": keyword, "page": page}
++    return record
++
++
++def main(argv: list[str] | None = None) -> int:
++    parser = argparse.ArgumentParser(description="Capture raw HSCode detail data into local JSON files.")
++    parser.add_argument("--chapters", help="Comma-separated chapter list, for example 68,69,70. Defaults to 01-99.")
++    parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR), help="Output directory for scraped data.")
++    parser.add_argument("--request-delay", type=float, default=0.15, help="Delay between requests in seconds.")
++    parser.add_argument("--max-pages", type=int, default=500, help="Upper bound for pages scanned per chapter.")
++    parser.add_argument("--workers", type=int, default=4, help="Concurrent detail-page workers per search page.")
++    args = parser.parse_args(argv)
++
++    output_dir = Path(args.output_dir).resolve()
++    output_dir.mkdir(parents=True, exist_ok=True)
++
++    try:
++        chapters = parse_chapter_list(args.chapters)
++    except ValueError as error:
++        print(f"Invalid --chapters value: {error}", file=sys.stderr)
++        return 2
++
++    session = make_session()
++    chapter_summaries: list[dict] = []
++    started_at = utc_now_iso()
++
++    for keyword in chapters:
++        print(f"[HSCode] Capturing chapter {keyword} ...", flush=True)
++        summary = scrape_keyword(session, keyword, output_dir, args.request_delay, args.max_pages, args.workers)
++        chapter_summaries.append(summary)
++        manifest = build_manifest(output_dir, chapter_summaries, chapters)
++        manifest["started_at"] = started_at
++        write_json(output_dir / "manifest.json", manifest)
++        print(
++            f"[HSCode] Chapter {keyword}: discovered={summary['unique_codes_discovered']} "
++            f"saved={summary['records_saved']} skipped={summary['records_skipped']} "
++            f"failures={len(summary['failures'])}",
++            flush=True,
++        )
++
++    final_manifest = build_manifest(output_dir, chapter_summaries, chapters)
++    final_manifest["started_at"] = started_at
++    write_json(output_dir / "manifest.json", final_manifest)
++    print(
++        f"[HSCode] Finished. records={final_manifest['record_count']} "
++        f"chapters={final_manifest['chapter_count']} failures={final_manifest['total_failures']}",
++        flush=True,
++    )
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/Users/helena/Cursor/jiesong_system/backend/scripts/test_scrape_hscode_raw.py b/Users/helena/Cursor/jiesong_system/backend/scripts/test_scrape_hscode_raw.py
+new file mode 100644
+index 0000000..42f48ad
+--- /dev/null
++++ b/Users/helena/Cursor/jiesong_system/backend/scripts/test_scrape_hscode_raw.py
+@@ -0,0 +1,118 @@
++from pathlib import Path
++import sys
++import unittest
++
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++
++from scrape_hscode_raw import extract_code_links, parse_detail_page
++
++
++SEARCH_HTML = """
++<html>
++  <body>
++    <a href="/Code/6904100000.html">6904100000</a>
++    <a href="/Code/6904100000.html">详情</a>
++    <a href="/Code/6907100010.html">6907100010</a>
++    <a href="/Code/invalid.html">无效</a>
++  </body>
++</html>
++"""
++
++
++DETAIL_HTML = """
++<html>
++  <head>
++    <title>6904100000的HS编码_陶瓷制建筑用砖_HS编码查询</title>
++  </head>
++  <body>
++    <h3>基本信息</h3>
++    <table>
++      <tr><td>商品编码</td><td>6904100000</td></tr>
++      <tr><td>商品名称</td><td>陶瓷制建筑用砖</td></tr>
++      <tr><td>商品描述</td><td>用于建筑铺设</td></tr>
++      <tr><td>编码状态</td><td>正常</td></tr>
++      <tr><td>更新时间</td><td>2026/1/1</td></tr>
++    </table>
++
++    <h3>税率信息</h3>
++    <table>
++      <tr><td>计量单位</td><td>千克/千块</td></tr>
++      <tr><td>出口税率</td><td>0%</td></tr>
++      <tr><td>出口退税税率</td><td>9%</td></tr>
++      <tr><td>出口暂定税率</td><td>无</td></tr>
++      <tr><td>增值税率</td><td>13%</td></tr>
++      <tr><td>最惠国税率</td><td>15%</td></tr>
++      <tr><td>进口暂定税率</td><td></td></tr>
++      <tr><td>进口普通税率</td><td>90%</td></tr>
++      <tr><td>消费税率</td><td>无</td></tr>
++    </table>
++
++    <h3>申报要素</h3>
++    <table>
++      <tr><td>0</td><td>品牌类型</td></tr>
++      <tr><td>1</td><td>出口享惠情况</td></tr>
++      <tr><td>2</td><td>种类(建筑用砖)</td></tr>
++    </table>
++
++    <h3>监管条件 [ ? ]</h3>
++    <table>
++      <tr><td>无</td></tr>
++    </table>
++
++    <h3>检验检疫类别 [ ? ]</h3>
++    <table>
++      <tr><td>L</td><td>民用商品入境验证</td></tr>
++    </table>
++
++    <h3>协定税率</h3>
++    <table>
++      <tr><td>东盟</td><td>0%</td></tr>
++      <tr><td>智利</td><td>0%</td></tr>
++    </table>
++
++    <h3>RCEP税率</h3>
++    <table>
++      <tr><td>澳大利亚</td><td>0%</td></tr>
++    </table>
++
++    <h3>所属章节</h3>
++    <table>
++      <tr><td>第13类</td><td>石料、石膏等制品</td></tr>
++      <tr><td>69</td><td>陶瓷产品</td></tr>
++      <tr><td>6904</td><td>陶瓷制建筑用砖</td></tr>
++    </table>
++
++    <h3>CIQ代码(13位海关编码)</h3>
++    <table>
++      <tr><td>6904100000999</td><td>陶瓷制建筑用砖</td></tr>
++    </table>
++  </body>
++</html>
++"""
++
++
++class ScrapeHsCodeRawTests(unittest.TestCase):
++    def test_extract_code_links_returns_unique_10_digit_codes(self):
++        self.assertEqual(
++            extract_code_links(SEARCH_HTML),
++            ["6904100000", "6907100010"],
++        )
++
++    def test_parse_detail_page_extracts_all_visible_sections(self):
++        record = parse_detail_page(DETAIL_HTML, source_url="https://www.hsbianma.com/Code/6904100000.html")
++
++        self.assertEqual(record["hs_code"], "6904100000")
++        self.assertEqual(record["title"], "6904100000的HS编码_陶瓷制建筑用砖_HS编码查询")
++        self.assertEqual(record["basic_info"]["商品名称"], "陶瓷制建筑用砖")
++        self.assertEqual(record["tax_info"]["出口退税税率"], "9%")
++        self.assertEqual(record["declaration_elements"][2]["value"], "种类(建筑用砖)")
++        self.assertEqual(record["supervision_conditions"][0]["value"], "无")
++        self.assertEqual(record["inspection_quarantine"][0]["code"], "L")
++        self.assertEqual(record["agreement_rates"]["东盟"], "0%")
++        self.assertEqual(record["rcep_rates"]["澳大利亚"], "0%")
++        self.assertEqual(record["chapter_hierarchy"][1]["code"], "69")
++        self.assertEqual(record["ciq_codes"][0]["code"], "6904100000999")
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/Users/helena/Cursor/jiesong_system/backend/scripts/export_hscode_csv.py b/Users/helena/Cursor/jiesong_system/backend/scripts/export_hscode_csv.py
+new file mode 100644
+index 0000000..792f40d
+--- /dev/null
++++ b/Users/helena/Cursor/jiesong_system/backend/scripts/export_hscode_csv.py
+@@ -0,0 +1,132 @@
++#!/usr/bin/env python3
++"""
++Input: backend/data/hscode-live/records/*.json
++Output: backend/data/hscode-live/hscode-live.csv
++Pos: HSCode 原始快照转 CSV 导出脚本
++"""
++
++from __future__ import annotations
++
++import argparse
++import csv
++import json
++from pathlib import Path
++
++DEFAULT_INPUT_DIR = Path(__file__).resolve().parents[1] / "data" / "hscode-live" / "records"
++DEFAULT_OUTPUT = Path(__file__).resolve().parents[1] / "data" / "hscode-live" / "hscode-live.csv"
++
++FIELDNAMES = [
++    "hs_code",
++    "title",
++    "source_url",
++    "fetched_at",
++    "product_code",
++    "product_name",
++    "product_description",
++    "status",
++    "updated_date",
++    "unit",
++    "export_rate",
++    "export_refund_rate",
++    "export_temp_rate",
++    "vat_rate",
++    "mf_rate",
++    "import_temp_rate",
++    "general_import_rate",
++    "consumption_tax_rate",
++    "declaration_elements",
++    "supervision_conditions",
++    "inspection_quarantine",
++    "agreement_rates_json",
++    "rcep_rates_json",
++    "chapter_hierarchy",
++    "ciq_codes",
++]
++
++
++def join_labeled_values(items: list[dict]) -> str:
++    parts: list[str] = []
++    for item in items:
++        index = item.get("index")
++        code = item.get("code")
++        value = item.get("value", "")
++        if index is not None:
++            parts.append(f"{index}:{value}")
++        elif code:
++            parts.append(f"{code}:{value}")
++        else:
++            parts.append(str(value))
++    return " | ".join(part for part in parts if part)
++
++
++def join_code_values(items: list[dict]) -> str:
++    return " | ".join(
++        f"{item.get('code', '')}:{item.get('value', '')}".rstrip(":")
++        for item in items
++        if item.get("code") or item.get("value")
++    )
++
++
++def record_to_row(record: dict) -> dict[str, str]:
++    basic_info = record.get("basic_info", {})
++    tax_info = record.get("tax_info", {})
++    return {
++        "hs_code": record.get("hs_code", ""),
++        "title": record.get("title", ""),
++        "source_url": record.get("source_url", ""),
++        "fetched_at": record.get("fetched_at", ""),
++        "product_code": basic_info.get("商品编码", ""),
++        "product_name": basic_info.get("商品名称", ""),
++        "product_description": basic_info.get("商品描述", ""),
++        "status": basic_info.get("编码状态", ""),
++        "updated_date": basic_info.get("更新时间", ""),
++        "unit": tax_info.get("计量单位", ""),
++        "export_rate": tax_info.get("出口税率", ""),
++        "export_refund_rate": tax_info.get("出口退税税率", ""),
++        "export_temp_rate": tax_info.get("出口暂定税率", ""),
++        "vat_rate": tax_info.get("增值税率", ""),
++        "mf_rate": tax_info.get("最惠国税率", ""),
++        "import_temp_rate": tax_info.get("进口暂定税率", ""),
++        "general_import_rate": tax_info.get("进口普通税率", ""),
++        "consumption_tax_rate": tax_info.get("消费税率", ""),
++        "declaration_elements": join_labeled_values(record.get("declaration_elements", [])),
++        "supervision_conditions": join_labeled_values(record.get("supervision_conditions", [])),
++        "inspection_quarantine": join_labeled_values(record.get("inspection_quarantine", [])),
++        "agreement_rates_json": json.dumps(record.get("agreement_rates", {}), ensure_ascii=False, sort_keys=True),
++        "rcep_rates_json": json.dumps(record.get("rcep_rates", {}), ensure_ascii=False, sort_keys=True),
++        "chapter_hierarchy": join_code_values(record.get("chapter_hierarchy", [])),
++        "ciq_codes": join_code_values(record.get("ciq_codes", [])),
++    }
++
++
++def load_records(input_dir: Path) -> list[dict]:
++    records = []
++    for path in sorted(input_dir.glob("*.json")):
++        records.append(json.loads(path.read_text(encoding="utf-8")))
++    return records
++
++
++def export_csv(input_dir: Path, output_path: Path) -> int:
++    records = load_records(input_dir)
++    output_path.parent.mkdir(parents=True, exist_ok=True)
++    with output_path.open("w", encoding="utf-8-sig", newline="") as handle:
++        writer = csv.DictWriter(handle, fieldnames=FIELDNAMES)
++        writer.writeheader()
++        for record in records:
++            writer.writerow(record_to_row(record))
++    return len(records)
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser(description="Export raw HSCode JSON records to a single CSV file.")
++    parser.add_argument("--input-dir", default=str(DEFAULT_INPUT_DIR))
++    parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
++    args = parser.parse_args()
++
++    record_count = export_csv(Path(args.input_dir).resolve(), Path(args.output).resolve())
++    print(f"Exported {record_count} records to {Path(args.output).resolve()}")
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/Users/helena/Cursor/jiesong_system/backend/scripts/test_export_hscode_csv.py b/Users/helena/Cursor/jiesong_system/backend/scripts/test_export_hscode_csv.py
+new file mode 100644
+index 0000000..dd632a8
+--- /dev/null
++++ b/Users/helena/Cursor/jiesong_system/backend/scripts/test_export_hscode_csv.py
+@@ -0,0 +1,55 @@
++from pathlib import Path
++import sys
++import unittest
++
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++
++from export_hscode_csv import record_to_row
++
++
++class ExportHsCodeCsvTests(unittest.TestCase):
++    def test_record_to_row_flattens_json_record(self):
++        row = record_to_row(
++            {
++                "hs_code": "6904100000",
++                "title": "6904100000的HS编码_陶瓷制建筑用砖_HS编码查询",
++                "source_url": "https://www.hsbianma.com/Code/6904100000.html",
++                "fetched_at": "2026-03-08T11:00:00+00:00",
++                "basic_info": {
++                    "商品编码": "6904100000",
++                    "商品名称": "陶瓷制建筑用砖",
++                    "商品描述": "用于建筑铺设",
++                    "编码状态": "正常",
++                    "更新时间": "2026/1/1",
++                },
++                "tax_info": {
++                    "计量单位": "千克/千块",
++                    "出口税率": "0%",
++                    "出口退税税率": "9%",
++                    "增值税率": "13%",
++                },
++                "declaration_elements": [
++                    {"index": 0, "value": "品牌类型"},
++                    {"index": 1, "value": "出口享惠情况"},
++                ],
++                "supervision_conditions": [{"value": "无"}],
++                "inspection_quarantine": [{"code": "L", "value": "民用商品入境验证"}],
++                "agreement_rates": {"东盟": "0%"},
++                "rcep_rates": {"澳大利亚": "0%"},
++                "chapter_hierarchy": [{"code": "69", "value": "陶瓷产品"}],
++                "ciq_codes": [{"code": "6904100000999", "value": "陶瓷制建筑用砖"}],
++            }
++        )
++
++        self.assertEqual(row["hs_code"], "6904100000")
++        self.assertEqual(row["product_name"], "陶瓷制建筑用砖")
++        self.assertEqual(row["export_refund_rate"], "9%")
++        self.assertEqual(row["declaration_elements"], "0:品牌类型 | 1:出口享惠情况")
++        self.assertEqual(row["inspection_quarantine"], "L:民用商品入境验证")
++        self.assertEqual(row["agreement_rates_json"], '{"东盟": "0%"}')
++        self.assertEqual(row["chapter_hierarchy"], "69:陶瓷产品")
++        self.assertEqual(row["ciq_codes"], "6904100000999:陶瓷制建筑用砖")
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/Users/helena/Cursor/jiesong_system/docs/plans/2026-03-08-hscode-live-capture.md b/Users/helena/Cursor/jiesong_system/docs/plans/2026-03-08-hscode-live-capture.md
+new file mode 100644
+index 0000000..d45a5a1
+--- /dev/null
++++ b/Users/helena/Cursor/jiesong_system/docs/plans/2026-03-08-hscode-live-capture.md
+@@ -0,0 +1,70 @@
++# HSCode Live Raw Capture Plan
++
++> **For Codex:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
++
++**Goal:** 从 `hsbianma.com` 抓取当前可访问的 HSCode 原始详情信息，先完成本地原始数据快照，不先做清洗入库。
++
++**Architecture:** 通过章节关键字搜索页（`01`-`99`）枚举 10 位编码，再逐条抓取详情页并解析成结构化 JSON。输出以“每编码一个 JSON + 全局 manifest + 章节分页快照”的方式落盘，天然支持断点续跑与后续清洗。
++
++**Tech Stack:** Python 3、requests、BeautifulSoup4、lxml
++
++---
++
++### Task 1: 站点结构验证与测试先行
++
++**Files:**
++- Create: `backend/scripts/test_scrape_hscode_raw.py`
++- Test: `python3 -m unittest backend/scripts/test_scrape_hscode_raw.py`
++
++**Step 1: 写失败测试**
++
++- 覆盖搜索页提取 10 位编码去重。
++- 覆盖详情页解析基本信息、税率、申报要素、监管条件、检验检疫、协定税率、RCEP、所属章节、CIQ。
++
++**Step 2: 运行红灯**
++
++Run: `python3 -m unittest backend/scripts/test_scrape_hscode_raw.py`
++
++Expected: 先因抓取模块缺失失败。
++
++### Task 2: 实现可续跑抓取器
++
++**Files:**
++- Create: `backend/scripts/scrape_hscode_raw.py`
++- Output: `backend/data/hscode-live/**/*`
++
++**Step 1: 实现搜索页枚举**
++
++- 输入章节号，循环抓 `Search/<page>?keywords=<chapter>`。
++- 提取并去重 10 位详情页编码。
++
++**Step 2: 实现详情页解析**
++
++- 将可见段落完整解析为结构化 JSON。
++- 每个编码单独写到 `records/<code>.json`。
++
++**Step 3: 实现断点续跑**
++
++- 已存在的 `records/<code>.json` 自动跳过。
++- 每章产出 `chapters/<chapter>.json`，全局产出 `manifest.json`。
++
++### Task 3: 执行真实抓取并留痕
++
++**Files:**
++- Modify: `PLAN.md`
++- Modify: `TASKS.md`
++- Modify: `RISKS.md`
++- Modify: `METRICS.md`
++- Create: `logs/task-HSCODE-RAW-01.md`
++- Create: `RESULTS/HSCODE-RAW-01.md`
++- Create: `PATCHES/HSCODE-RAW-01.diff`
++
++**Step 1: 真实运行**
++
++Run: `python3 backend/scripts/scrape_hscode_raw.py --request-delay 0.03 --workers 4`
++
++**Step 2: 记录阶段结果**
++
++- 已抓取记录数
++- 已完成章节
++- 失败数与可恢复方式

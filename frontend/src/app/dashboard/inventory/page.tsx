@@ -1,17 +1,11 @@
-/**
- * Input: 库存服务API
- * Output: 库存管理页面
- * Pos: 核心业务页面，负责库存记录和状态流转
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
- */
-
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Inventory, InventoryStatus } from '@/types';
+import { Inventory, InventoryStatus, Product } from '@/types';
 import { inventoryService } from '@/services/inventory.service';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -20,23 +14,35 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { StatusBadge, type StatusBadgeConfig } from '@/components/ui/status-badge';
-import { toast } from 'sonner';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { MoreHorizontal, Package } from 'lucide-react';
+import { toast } from 'sonner';
 
 const STATUS_LABEL_MAP: Record<InventoryStatus, string> = {
-  [InventoryStatus.PRODUCING]: '生产中',
-  [InventoryStatus.PACKING]: '包装中',
-  [InventoryStatus.SHIPPING]: '运输中',
-  [InventoryStatus.INBOUND]: '已入库',
-  [InventoryStatus.OUTBOUND]: '已出库',
+  [InventoryStatus.INBOUND]: '入库',
+  [InventoryStatus.OUTBOUND]: '出库',
+};
+
+const getStatusBadgeTone = (status: InventoryStatus): 'default' | 'secondary' | 'destructive' | 'outline' => {
+  switch (status) {
+    case InventoryStatus.INBOUND:
+      return 'default';
+    case InventoryStatus.OUTBOUND:
+      return 'secondary';
+    default:
+      return 'outline';
+  }
+};
+
+const resolveErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  return '操作失败，请稍后重试';
 };
 
 export default function InventoryPage() {
@@ -48,55 +54,25 @@ export default function InventoryPage() {
   }, []);
 
   const loadInventory = async () => {
-    setLoading(true);
     try {
-      const response = await inventoryService.getAll({ page: 1, pageSize: 100 });
-      setInventory(response.data?.items || []);
-    } catch {
-      toast.error('加载库存失败');
+      const data = await inventoryService.list();
+      setInventory(data);
+    } catch (error) {
+      toast.error(resolveErrorMessage(error));
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusBadge = (status: InventoryStatus) => {
-    const statusMap: Record<InventoryStatus, StatusBadgeConfig> = {
-      [InventoryStatus.PRODUCING]: { label: '生产中', tone: 'warning' },
-      [InventoryStatus.PACKING]: { label: '包装中', tone: 'danger' },
-      [InventoryStatus.SHIPPING]: { label: '运输中', tone: 'progress' },
-      [InventoryStatus.INBOUND]: { label: '已入库', tone: 'secondary' },
-      [InventoryStatus.OUTBOUND]: { label: '已出库', tone: 'success' },
-    };
-    return <StatusBadge status={status} statusMap={statusMap} />;
-  };
+  const getStatusBadge = (status: InventoryStatus) => (
+    <Badge variant={getStatusBadgeTone(status)}>{STATUS_LABEL_MAP[status]}</Badge>
+  );
 
   /**
-   * 职责：解析接口错误消息，优先展示后端业务约束提示。
-   * @param error 接口错误对象
-   * @returns 错误文案
-   */
-  const resolveErrorMessage = (error: unknown): string => {
-    if (
-      typeof error === 'object' &&
-      error !== null &&
-      'message' in error &&
-      typeof (error as { message?: unknown }).message === 'string'
-    ) {
-      return (error as { message: string }).message;
-    }
-    return '状态更新失败';
-  };
-
-  /**
-   * 职责：返回当前状态允许的下一状态集合，避免前端发起非法跳转请求。
-   * @param status 当前库存状态
-   * @returns 下一状态列表
+   * 获取允许的状态流转
    */
   const getAllowedNextStatuses = (status: InventoryStatus): InventoryStatus[] => {
     const transitionMap: Record<InventoryStatus, InventoryStatus[]> = {
-      [InventoryStatus.PRODUCING]: [InventoryStatus.PACKING],
-      [InventoryStatus.PACKING]: [InventoryStatus.SHIPPING],
-      [InventoryStatus.SHIPPING]: [InventoryStatus.INBOUND],
       [InventoryStatus.INBOUND]: [InventoryStatus.OUTBOUND],
       [InventoryStatus.OUTBOUND]: [],
     };
@@ -105,17 +81,27 @@ export default function InventoryPage() {
 
   /**
    * 职责：更新库存状态并同步本地展示。
-   * @param id 库存ID
+   * @param id 库存 ID
    * @param newStatus 目标状态
    * @returns Promise<void>
    */
   const handleStatusChange = async (id: string, newStatus: InventoryStatus): Promise<void> => {
+    // 二次确认：回滚操作需要特别提示
+    const isRevertAction = newStatus === InventoryStatus.INBOUND;
+    const confirmed = window.confirm(
+      isRevertAction
+        ? '此操作将恢复库存记录为入库状态，可能会影响当前的出库记录。确定要继续吗？'
+        : `确定将库存状态更新为 "${STATUS_LABEL_MAP[newStatus]}" 吗？`
+    );
+
+    if (!confirmed) return;
+
     try {
       await inventoryService.updateStatus(id, newStatus);
       setInventory((prevInventory) =>
         prevInventory.map((item) => (item.id === id ? { ...item, status: newStatus } : item))
       );
-      toast.success(`状态已更新为: ${newStatus}`);
+      toast.success(`状态已更新为：${STATUS_LABEL_MAP[newStatus]}`);
     } catch (error) {
       toast.error(resolveErrorMessage(error));
     }
@@ -133,7 +119,7 @@ export default function InventoryPage() {
           <TableHeader>
             <TableRow>
               <TableHead>商品名称</TableHead>
-              <TableHead>HS编码</TableHead>
+              <TableHead>HS 编码</TableHead>
               <TableHead className="max-w-[200px]">申报信息</TableHead>
               <TableHead>单位</TableHead>
               <TableHead>数量</TableHead>
@@ -177,7 +163,7 @@ export default function InventoryPage() {
                               key={`${item.id}-${nextStatus}`}
                               onClick={() => handleStatusChange(item.id, nextStatus)}
                             >
-                              设为: {STATUS_LABEL_MAP[nextStatus]}
+                              设为：{STATUS_LABEL_MAP[nextStatus]}
                             </DropdownMenuItem>
                           ))
                         )}

@@ -7,6 +7,7 @@
 const { success, created, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
 const salesService = require('../services/salesService');
+const auditLog = require('../utils/auditLog');
 
 const list = async (req, res, next) => {
   try {
@@ -71,6 +72,39 @@ const updateStatus = async (req, res, next) => {
       userId: req.user?.id,
       req,
     });
+
+    // 记录回滚操作的审计日志
+    if (contract._revertInfo) {
+      await auditLog.logOperation({
+        userId: req.user?.id,
+        action: contract._revertInfo.action,
+        entity: 'SalesContract',
+        entityId: req.params.id,
+        oldValue: { status: 'OUT_STOCK', revertedCount: contract._revertInfo.revertedCount },
+        newValue: { status: req.body?.status },
+        req,
+        note: contract._revertInfo.note,
+      });
+    }
+
+    // 记录出库操作的审计日志
+    if (contract._applyInfo) {
+      await auditLog.logOperation({
+        userId: req.user?.id,
+        action: contract._applyInfo.action,
+        entity: 'SalesContract',
+        entityId: req.params.id,
+        oldValue: { status: contract.status },
+        newValue: { status: 'OUT_STOCK', allocatedQuantity: contract._applyInfo.allocatedQuantity },
+        req,
+        note: contract._applyInfo.note,
+      });
+    }
+
+    // 清理内部字段，不返回给客户端
+    delete contract._revertInfo;
+    delete contract._applyInfo;
+
     success(res, contract, '状态更新成功');
   } catch (error) {
     next(error);

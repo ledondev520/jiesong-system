@@ -379,10 +379,104 @@ const applySalesOutStock = async (tx, salesContractId) => {
   };
 };
 
+/**
+ * 回滚采购入库操作（当采购状态从 IN_STOCK 回退时）。
+ * - 删除或恢复相关库存记录
+ * - 保证幂等性
+ */
+const revertPurchaseInStock = async (tx, purchaseContractId) => {
+  const contract = await getDefaultSnapshotInput(tx).purchaseContract.findUnique({
+    where: { id: purchaseContractId },
+    include: { items: true },
+  });
+
+  if (!contract) {
+    throw createError('采购合同不存在', 404);
+  }
+
+  const purchaseItemIds = (contract.items || [])
+    .map(item => item.id)
+    .filter(id => !!id);
+
+  if (purchaseItemIds.length === 0) {
+    return { reverted: 0 };
+  }
+
+  // 查找并删除相关的库存记录
+  const result = await getDefaultSnapshotInput(tx).inventory.deleteMany({
+    where: {
+      purchaseItemId: { in: purchaseItemIds },
+      status: INVENTORY_STATUS.INBOUND,
+    },
+  });
+
+  await reconcilePurchaseFinancials(tx, purchaseContractId);
+
+  return { reverted: result.count };
+};
+
+/**
+ * 回滚销售出库操作（当销售状态从 OUT_STOCK 回退时）。
+ * - 恢复被占用的库存记录为可用状态
+ * - 保证幂等性
+ */
+const revertSalesOutStock = async (tx, salesContractId) => {
+  const contract = await getDefaultSnapshotInput(tx).salesContract.findUnique({
+    where: { id: salesContractId },
+    include: { items: true },
+  });
+
+  if (!contract) {
+    throw createError('销售合同不存在', 404);
+  }
+
+  const salesItemIds = (contract.items || [])
+    .map(item => item.id)
+    .filter(id => !!id);
+
+  if (salesItemIds.length === 0) {
+    return { reverted: 0 };
+  }
+
+  // 查找相关的出库库存记录
+  const outboundInventories = await getDefaultSnapshotInput(tx).inventory.findMany({
+    where: {
+      salesItemId: { in: salesItemIds },
+      status: INVENTORY_STATUS.OUTBOUND,
+    },
+    orderBy: { outboundAt: 'desc' },
+  });
+
+  if (outboundInventories.length === 0) {
+    return { reverted: 0 };
+  }
+
+  // 恢复库存记录：将状态改回 INBOUND，清空销售关联
+  const restorePromises = outboundInventories.map(inventory =>
+    getDefaultSnapshotInput(tx).inventory.update({
+      where: { id: inventory.id },
+      data: {
+        status: INVENTORY_STATUS.INBOUND,
+        salesItemId: null,
+        salesContractId: null,
+        outboundAt: null,
+        note: `库存回滚（原销售合同：${salesContractId}）`,
+      },
+    })
+  );
+
+  await Promise.all(restorePromises);
+  await reconcileSalesFinancials(tx, salesContractId);
+
+  return { reverted: outboundInventories.length };
+};
+
 module.exports = {
   getInventorySnapshot,
   applyPurchaseInStock,
   applySalesOutStock,
+  revertPurchaseInStock,
+  revertSalesOutStock,
   reconcilePurchaseFinancials,
   reconcileSalesFinancials,
 };

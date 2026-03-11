@@ -1,9 +1,10 @@
 /**
  * Input: 登录API、认证状态存储
  * Output: 登录页面
- * Pos: 认证模块入口，负责用户登录、凭证记忆与快捷登录
+ * Pos: 认证模块入口，负责用户登录、用户名记忆
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ * Security: 密码从不存储在本地，仅用户名可记住
  */
 
 'use client';
@@ -28,7 +29,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserPlus, KeyRound } from 'lucide-react';
+import { UserPlus, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { authService, type LoginResponse } from '@/services/auth.service';
 
 const loginSchema = z.object({
@@ -40,19 +41,14 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 const REMEMBER_USERNAME_KEY = 'jiesong_saved_username';
-const REMEMBER_CREDENTIALS_KEY = 'jiesong_saved_credentials';
-
-type RememberedCredentials = {
-  username: string;
-  password: string;
-};
 
 export default function LoginPage() {
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [savedCredentials, setSavedCredentials] = useState<RememberedCredentials | null>(null);
+  const [savedUsername, setSavedUsername] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -63,31 +59,29 @@ export default function LoginPage() {
     },
   });
 
-  // Check for saved credentials on mount
+  // Check for saved username on mount (security: never store password)
   useEffect(() => {
-    const savedRaw = localStorage.getItem(REMEMBER_CREDENTIALS_KEY);
+    const savedRaw = localStorage.getItem(REMEMBER_USERNAME_KEY);
     if (savedRaw) {
       try {
-        const parsed: RememberedCredentials = JSON.parse(savedRaw);
-        if (parsed.username && parsed.password) {
+        const parsed: RememberedUsername = JSON.parse(savedRaw);
+        if (parsed.username) {
           form.setValue('username', parsed.username);
-          form.setValue('password', parsed.password);
           form.setValue('rememberMe', true);
-          setSavedCredentials(parsed);
-          return;
+          setSavedUsername(parsed.username);
         }
       } catch {
-        localStorage.removeItem(REMEMBER_CREDENTIALS_KEY);
+        localStorage.removeItem(REMEMBER_USERNAME_KEY);
       }
     }
-
   }, [form]);
 
   /**
    * 职责：执行登录请求并完成状态跳转
+   * 安全说明：密码仅用于本次登录，不存储在本地
    * @param {string} username - 用户名
    * @param {string} password - 密码
-   * @param {boolean} rememberMe - 是否记住账号密码
+   * @param {boolean} rememberMe - 是否记住用户名
    * @returns {Promise<void>} 登录流程执行结果
    */
   const performLogin = async (username: string, password: string, rememberMe: boolean) => {
@@ -96,14 +90,12 @@ export default function LoginPage() {
 
     try {
       if (rememberMe) {
-        const payload: RememberedCredentials = { username, password };
-        localStorage.setItem(REMEMBER_USERNAME_KEY, username);
-        localStorage.setItem(REMEMBER_CREDENTIALS_KEY, JSON.stringify(payload));
-        setSavedCredentials(payload);
+        // 安全：只存储用户名，不存储密码
+        localStorage.setItem(REMEMBER_USERNAME_KEY, JSON.stringify({ username }));
+        setSavedUsername(username);
       } else {
         localStorage.removeItem(REMEMBER_USERNAME_KEY);
-        localStorage.removeItem(REMEMBER_CREDENTIALS_KEY);
-        setSavedCredentials(null);
+        setSavedUsername(null);
       }
 
       const result: ApiResponse<LoginResponse> = await authService.login({
@@ -142,7 +134,7 @@ export default function LoginPage() {
   /**
    * 职责：提交登录表单并处理登录结果
    * 思路：
-   * 1. 先处理记住密码
+   * 1. 先处理记住用户名
    * 2. 调用后端登录接口并保存用户信息
    * 3. 根据错误类型返回可操作的提示信息
    * @param {LoginFormValues} data - 登录表单数据
@@ -184,7 +176,22 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>密码</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="••••••" className="rounded-xl bg-background/70" {...field} />
+                      <div className="relative">
+                        <Input
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="••••••"
+                          className="rounded-xl bg-background/70 pr-10"
+                          {...field}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          tabIndex={-1}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -204,7 +211,7 @@ export default function LoginPage() {
                     </FormControl>
                     <div className="space-y-1 leading-none">
                       <FormLabel>
-                        记住账号和密码
+                        记住用户名
                       </FormLabel>
                     </div>
                   </FormItem>
@@ -217,17 +224,17 @@ export default function LoginPage() {
                 </div>
               )}
 
-              {savedCredentials && (
+              {savedUsername && (
                 <Button
                   type="button"
                   variant="outline"
                   className="h-10 w-full rounded-xl border-accent/50 bg-accent/10 text-accent-foreground"
                   onClick={() => {
-                    void performLogin(savedCredentials.username, savedCredentials.password, true);
+                    form.setValue('username', savedUsername);
                   }}
                   disabled={isLoading}
                 >
-                  {isLoading ? '登录中...' : `快捷登录（${savedCredentials.username}）`}
+                  使用记住的用户名（{savedUsername}）
                 </Button>
               )}
 

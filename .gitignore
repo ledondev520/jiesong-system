@@ -32,6 +32,9 @@ logs/
 *.log
 npm-debug.log*
 
+# HSCode raw capture artifacts
+backend/data/hscode-live/
+
 # Test
 coverage/
 .nyc_output/

@@ -475,6 +475,10 @@ model TaxRefund {
   salesContractId     String
   customsDeclarationId String
   forexVerificationId String?
+  relation_no         String?
+  invoice_no          String?
+  vat_rate_type       Int?
+  match_status        String   @default("pending") // pending/passed/blocked
   status              String   @default("DRAFT") // DRAFT/APPLIED/APPROVED/REFUNDED/REJECTED
   declaredAmount      Float    @default(0)
   refundableAmount    Float    @default(0)

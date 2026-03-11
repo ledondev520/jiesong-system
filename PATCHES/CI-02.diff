@@ -1,0 +1,224 @@
+diff --git a/METRICS.md b/METRICS.md
+index 1b94d90..4b4d06f 100644
+--- a/METRICS.md
++++ b/METRICS.md
+@@ -1,5 +1,22 @@
+ # Frontend Polish Metrics
+ 
++## 2026-03-08 Round 47（Frontend Vitest Timeout Stabilization）
++
++### 质量指标
++- 前端全量单测：`101 files / 313 tests` 通过
++- 前端全量覆盖率：`101 files / 313 tests` 通过
++- 覆盖率汇总：`73.28%` statements / `80.2%` branches / `67.45%` functions / `73.28%` lines
++- 代码改动：`1` 个配置文件（`frontend/vitest.config.ts`）
++
++### 过程指标
++- 首次复现红灯：`3` 条页面交互测试在全量套件下超时
++- 单测单独复核：上述 `3` 条用例单独运行全部通过
++- 配置修复：Vitest 默认超时从 `5s` 提升到 `20s`
++
++### 结论
++- 本轮 CI 红灯根因已确认是测试门禁配置过紧，而不是前端业务逻辑回归。
++- 通过最小配置变更恢复了全量 `test` 与 `test:coverage` 门禁稳定性。
++
+ ## 2026-03-08 Round 46 (Tax Refund Module CRUD Closure)
+ 
+ ### 质量指标
+diff --git a/PLAN.md b/PLAN.md
+index fca592c..ad601ca 100644
+--- a/PLAN.md
++++ b/PLAN.md
+@@ -1,5 +1,23 @@
+ # Frontend Polish Plan
+ 
++## 2026-03-08 Round 47 (Frontend Vitest Timeout Stabilization)
++
++### Goal
++- 修复当前 CI 等价前端门禁中的假红灯，恢复 `vitest` 全量与覆盖率回归稳定性。
++
++### Delivered
++- 复现到 `frontend` 全量 Vitest 在默认 `5s` 超时下失败，首批红灯集中在高交互页面测试：
++  - `src/app/customs-declarations/create/page.test.tsx`
++  - `src/app/customs-declarations/[id]/edit/page.test.tsx`
++  - `src/app/dashboard/settings/ports/page.test.tsx`
++- 进一步确认这些用例单独运行均通过，根因是全量套件和 coverage 插桩下的 `jsdom + user-event` 执行时长超过默认超时，而非生产代码行为错误。
++- 对 `frontend/vitest.config.ts` 做最小修复：新增 `testTimeout: 20000`，仅放宽测试运行时上限，不修改业务逻辑或页面实现。
++
++### Verification
++- `cd frontend && npm run test`
++- `cd frontend && npm run test:coverage`
++- 说明：`cd backend && npm run test:all` 在当前沙箱仍会因 `src/app.test.js` 监听端口触发 `listen EPERM 0.0.0.0`，属于环境限制，不作为本轮 CI 根因。
++
+ ## 2026-03-08 Round 46 (Tax Refund Module CRUD Closure)
+ 
+ ### Goal
+diff --git a/RISKS.md b/RISKS.md
+index 3c6bad2..87d3b39 100644
+--- a/RISKS.md
++++ b/RISKS.md
+@@ -29,6 +29,7 @@
+ | R-024 | HSCode 全量原始抓取耗时较长，当前交互会话或前台进程被打断 | 原始快照不完整，影响后续统一清洗与入库 | 使用“每编码单独 JSON + manifest + chapter page 快照”的断点续跑结构；随时可通过同一命令继续抓取未完成部分 | 回退到仅保留已抓取 `records/*.json` 的阶段性快照，不删除已有原始数据 |
+ | R-025 | 站点章节搜索结果存在源站侧限制/覆盖范围差异，并非 `01`-`99` 每章都返回可抓数据 | CSV 总量可能低于“理论全量 HS 编码”，影响对完整性的预期 | 以“源站当前可返回结果”为准保存快照，并在结果文档中明确当前仅抓到 `01/02/03/04/05/69` 前缀；若后续需要更高覆盖率，再补其他来源交叉抓取 | 保留本轮 CSV 作为可复用基线，后续增量合并而非重做 |
+ | R-026 | 退税模块当前存在并行中的“auto-drafts / HSCode live import”开发，与本轮 CRUD 收口交叉触达相同文件 | 若直接混合验收，容易把未完成的自动草稿链路误判为本轮回归范围 | 本轮只以 CRUD API、`/dashboard/tax-refunds` 工作台与生产构建为验收边界；自动草稿链路单独跟踪 | 回退本轮税退 CRUD 页面与路由挂载，保留并行草稿链路继续开发 |
++| R-027 | 前端全量 Vitest/coverage 在 CI 下运行高交互页面测试时，默认 `5s` 超时不足 | 产生假红灯，阻塞前端单测与覆盖率门禁 | 提升 `frontend/vitest.config.ts` 中 `testTimeout` 到 `20000`，保留业务代码不变并用全量 `test + coverage` 复核 | 回退 `frontend/vitest.config.ts` 的 `testTimeout` 配置 |
+ 
+ ## 2026-03-08 Round 43 状态更新
+ 
+@@ -55,3 +56,7 @@
+ 
+ - `R-026`：已激活并纳入边界说明；本轮验收不包含自动草稿生成链路。
+ - `R-017`：已进一步收敛；`frontend/src/app/layout.tsx` 改为本地字体栈后，`cd frontend && npm run build` 在当前环境通过。
++
++## 2026-03-08 Round 47 状态更新
++
++- `R-027`：已收敛；`cd frontend && npm run test` 与 `cd frontend && npm run test:coverage` 均在新超时上限下通过。
+diff --git a/TASKS.md b/TASKS.md
+index e1bba30..8c8e8a3 100644
+--- a/TASKS.md
++++ b/TASKS.md
+@@ -127,6 +127,7 @@
+ | INV-ALERT-01 | P0 | 40m | 1 | DONE | 库存预警系统：新增 `Product.lowStockThreshold`、每日库存巡检任务、低库存通知下发、接口 `GET /api/v1/inventory/alerts` 与定向回归测试 |
+ | PDF-01 | P1 | 35m | 1 | DONE | 前端 PDF 导出增强：合同详情页（采购/销售）+ 财务应收/应付报表导出，统一 blob 下载并补齐 loading/error 处理与定向测试 |
+ | CI-01 | P0 | 45m | 1 | DONE | 修复 CI 红灯：LLM 路由性能烟测稳定化（AI 本地降级+超时保护+Node `--test` 识别）与 Frontend E2E 稳定性加固（公开页/业务页分流、定位收敛、点击容错、CI 单 worker） |
++| CI-02 | P0 | 25m | 1 | DONE | 修复前端 Vitest CI 假红灯：定位全量/coverage 下页面交互慢测超时，并将 `frontend/vitest.config.ts` 默认 `testTimeout` 提升到 `20000` 后完成全量 `test + coverage` 复核 |
+ | QA-01 | P0 | 35m | 1 | DONE | 执行前端交互验收（Playwright 冒烟 + 按钮巡检 + 补充桌面/移动端/键盘脚本）并产出 `前端交互验收_20260306.md` |
+ | A11Y-01 | P0 | 45m | 1 | TODO | 修复移动端 Dashboard 缺少全局导航入口（`layout.tsx`/`Header.tsx`）并补移动端验收 |
+ | A11Y-02 | P1 | 20m | 1 | DONE | 为登录页 rememberMe 复选框补齐可访问名称并补无障碍回归验证 |
+diff --git a/frontend/METRICS.md b/frontend/METRICS.md
+index 552102b..205fcc8 100644
+--- a/frontend/METRICS.md
++++ b/frontend/METRICS.md
+@@ -8,3 +8,4 @@
+ | 3 | Customs declarations closeout + frontend build debt cleanup | Pass (`36` tests) | Pass | Pass | Targeted coverage command passed; Vitest v8 report remained repo-wide (`11.51%` statements / `45%` branches / `43.75%` functions / `11.51%` lines) | Verification bundle included customs declarations routes, dashboard tax-refunds wrapper, Sentry config import smoke test, service factory/type cleanup tests, and final `next build` |
+ | 4 | Tax-refunds auto-draft trigger + live HSCode type compatibility | Pass (`9` tests) | Pass | Pass | Not run | Verification covered `taxRefund.service`, tax-refunds dashboard page interaction, and final `next build` |
+ | 5 | Customs auto-draft trigger | Pass (`9` tests) | Pass | Pass | Not run | Verification covered `customsDeclaration.service`, customs-declarations list page interaction, and final `next build` |
++| 6 | Frontend Vitest timeout stabilization | Pass (`101 files / 313 tests`) | Not run | Not run | Pass (`73.28%` statements / `80.2%` branches / `67.45%` functions / `73.28%` lines) | Minimal fix was `testTimeout: 20000` in `vitest.config.ts`; verified with full `npm run test` and `npm run test:coverage` |
+diff --git a/frontend/PLAN.md b/frontend/PLAN.md
+index 077b3c2..d5f4c3f 100644
+--- a/frontend/PLAN.md
++++ b/frontend/PLAN.md
+@@ -1,5 +1,19 @@
+ # Customs Declaration Management
+ 
++## 2026-03-08 Round 6: Frontend Vitest Timeout Stabilization
++
++### Goal
++- Recover the frontend CI-equivalent Vitest gates without touching production code.
++
++### Execution Outcome
++- Reproduced the full-suite timeout failures in `customs-declarations/create`, `customs-declarations/[id]/edit`, and `dashboard/settings/ports`.
++- Verified those tests pass in isolation, confirming the regression is timeout pressure under full-suite and coverage execution rather than broken UI behavior.
++- Applied the minimal fix in `frontend/vitest.config.ts` by setting `testTimeout: 20000` and documenting the reason inline.
++
++### Verification
++- `npm run test`
++- `npm run test:coverage`
++
+ ## Goal
+ - Deliver protected Next.js App Router pages for customs declaration list, detail, create, and edit flows at `/customs-declarations`.
+ - Reuse existing dashboard shell, shadcn/ui primitives, and `products`-style data/service patterns.
+diff --git a/frontend/RISKS.md b/frontend/RISKS.md
+index b701499..b2b602f 100644
+--- a/frontend/RISKS.md
++++ b/frontend/RISKS.md
+@@ -12,3 +12,4 @@
+ | R8 | Next 16 build now enforces stronger prerender/type checks than the older task plan assumed | Feature closeout can be blocked by unrelated frontend debt and delay delivery | Clear blocking build debt in the same round, but keep fixes minimal and verification-backed | Revert the build-debt fixes if a later dedicated cleanup supersedes them | Closed |
+ | R9 | 自动退税草稿依赖后端可用的 `hsCode + totalPrice + refundRate` 组合 | 用户点击“自动生成草稿”后可能只生成部分记录，或出现 skipped 提示 | 在 UI 中明确显示 created/skipped 数量；后端 note 中记录自动生成来源并对缺少税率的数据跳过 | 回退前端自动生成按钮，仅保留手工新建退税单入口 |
+ | R10 | 自动报关单草稿依赖现有装箱明细金额与商品申报信息质量 | 用户点击“自动生成草稿”后可能只生成部分报关单，或部分申报要素来自 HSCode 回退值 | 在 UI 中显示 created/skipped 数量；服务层对缺申报要素时先回退 live HSCode，再保留草稿 note 说明来源 | 回退前端自动生成按钮，仅保留手工新建报关单入口 |
++| R11 | Full-suite Vitest and coverage runs can push high-interaction page tests beyond the default `5s` timeout | CI unit/coverage jobs fail with false negatives although isolated tests pass | Set `testTimeout: 20000` in `vitest.config.ts` and keep production code unchanged; verify with fresh full-suite `test` and `test:coverage` runs | Revert the `vitest.config.ts` timeout change only | Closed |
+diff --git a/frontend/TASKS.md b/frontend/TASKS.md
+index 0b1da76..bd990c4 100644
+--- a/frontend/TASKS.md
++++ b/frontend/TASKS.md
+@@ -15,3 +15,4 @@
+ | TR-AUTO-02 | P0 | 15m | 1 | DONE | Failing auto-draft tests | Tax-refunds list action button + success/error reload behavior | Same targeted `vitest` command | User can trigger draft generation from the list page and see created/skipped feedback |
+ | CD-AUTO-01 | P0 | 15m | 1 | DONE | New backend customs auto-draft endpoint contract | `customsDeclaration.service.ts` auto-draft client + failing page/service tests | `npm test -- src/services/customsDeclaration.service.test.ts src/app/customs-declarations/page.test.tsx` | Frontend captures the customs auto-draft endpoint contract before UI implementation |
+ | CD-AUTO-02 | P0 | 15m | 1 | DONE | Failing customs auto-draft tests | Customs-declarations list action button + success/error reload behavior | Same targeted `vitest` command | User can trigger customs draft generation from the list page and see created/skipped feedback |
++| CI-FE-01 | P0 | 20m | 1 | DONE | Full-suite `vitest` timeout failures in slow page-interaction tests | `vitest.config.ts` timeout recovery + refreshed checkpoint artifacts | `npm run test` and `npm run test:coverage` | Full frontend unit and coverage gates pass without touching production code |
+diff --git a/frontend/vitest.config.ts b/frontend/vitest.config.ts
+index eee81fc..7fc194f 100644
+--- a/frontend/vitest.config.ts
++++ b/frontend/vitest.config.ts
+@@ -19,6 +19,9 @@ export default defineConfig({
+     environment: 'jsdom',
+     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+     setupFiles: ['src/test/setup.ts'],
++    // Page-level interaction tests exceed Vitest's 5s default under full-suite load in CI,
++    // especially with coverage instrumentation enabled.
++    testTimeout: 20000,
+     coverage: {
+       provider: 'v8',
+       reporter: ['text', 'html'],
+diff --git a/logs/task-CI-02.md b/logs/task-CI-02.md
+new file mode 100644
+index 0000000..e7dca59
+--- /dev/null
++++ b/logs/task-CI-02.md
+@@ -0,0 +1,30 @@
++# CI-02 Task Log
++
++- Date: 2026-03-08
++- Scope: frontend CI-equivalent Vitest timeout recovery
++
++## Reproduction
++- Ran `cd backend && npm run test:all`
++  - Result: sandbox-only failure `listen EPERM 0.0.0.0` in `backend/src/app.test.js`
++- Ran `cd frontend && npm run test`
++  - Result: 3 failing timeout tests in full suite
++    - `src/app/customs-declarations/create/page.test.tsx`
++    - `src/app/customs-declarations/[id]/edit/page.test.tsx`
++    - `src/app/dashboard/settings/ports/page.test.tsx`
++
++## Root Cause Investigation
++- Ran the 3 failing frontend files individually; all passed.
++- Ran the same suite with a larger timeout to confirm the failures were time-budget related, not behavior regressions.
++- Confirmed coverage instrumentation further increases runtime for the same high-interaction page tests.
++
++## Fix
++- Updated `frontend/vitest.config.ts` to set `testTimeout: 20000`.
++- Kept production code unchanged.
++
++## Verification
++- `cd frontend && npm run test` -> pass (`101 files / 313 tests`)
++- `cd frontend && npm run test:coverage` -> pass (`101 files / 313 tests`)
++
++## Notes
++- An intermediate attempt ran `test` and `test:coverage` in parallel and produced artificial slowdowns; those results were discarded.
++- Backend `EPERM` reproduction is environment-specific to this sandbox and was not treated as the CI root cause for this task.
+diff --git a/RESULTS/CI-02.md b/RESULTS/CI-02.md
+new file mode 100644
+index 0000000..4564872
+--- /dev/null
++++ b/RESULTS/CI-02.md
+@@ -0,0 +1,30 @@
++# CI-02 Result
++
++## Outcome
++- Fixed the reproducible frontend CI-equivalent failure by relaxing Vitest's default timeout budget for full-suite and coverage runs.
++
++## Root Cause
++- The failing tests were not functionally broken.
++- `jsdom + user-event` page-interaction tests exceeded Vitest's default `5s` timeout when run as part of the full suite, and became even slower with coverage instrumentation.
++
++## Files Changed
++- `frontend/vitest.config.ts`
++- checkpoint artifacts:
++  - `PLAN.md`
++  - `TASKS.md`
++  - `METRICS.md`
++  - `RISKS.md`
++  - `frontend/PLAN.md`
++  - `frontend/TASKS.md`
++  - `frontend/METRICS.md`
++  - `frontend/RISKS.md`
++
++## Verification Evidence
++- `cd frontend && npm run test`
++  - Pass: `101 files / 313 tests`
++- `cd frontend && npm run test:coverage`
++  - Pass: `101 files / 313 tests`
++  - Coverage: `73.28%` statements / `80.2%` branches / `67.45%` functions / `73.28%` lines
++
++## Residual Notes
++- `cd backend && npm run test:all` still hits `listen EPERM 0.0.0.0` in this sandbox because the test opens a socket; this was not the failing frontend CI gate addressed here.

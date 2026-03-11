@@ -190,6 +190,10 @@ export interface TaxRefund {
   salesContractId: string;
   customsDeclarationId: string;
   forexVerificationId?: string | null;
+  relation_no?: string | null;
+  invoice_no?: string | null;
+  vat_rate_type?: 1 | 13 | null;
+  match_status?: 'pending' | 'passed' | 'blocked';
   declaredAmount: number;
   refundableAmount: number;
   refundedAmount: number;

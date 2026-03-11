@@ -7,7 +7,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const prisma = require('../utils/prisma');
-const { reconcileSalesFinancials } = require('./inventorySnapshot');
+const {
+  reconcileSalesFinancials,
+  revertPurchaseInStock,
+  revertSalesOutStock,
+} = require('./inventorySnapshot');
 
 test('reconcileSalesFinancials: 按 quantity * 单价 对齐合同金额与成本', async () => {
   const originalFindMany = prisma.salesItem.findMany;
@@ -39,4 +43,50 @@ test('reconcileSalesFinancials: 按 quantity * 单价 对齐合同金额与成�
     prisma.salesItem.findMany = originalFindMany;
     prisma.salesContract.update = originalUpdate;
   }
+});
+
+test('revertPurchaseInStock: 回滚采购入库操作', async () => {
+  const mockTx = {
+    purchaseContract: {
+      findUnique: async () => ({
+        id: 'pc-1',
+        items: [{ id: 'item-1' }, { id: 'item-2' }],
+      }),
+      update: async () => ({}),
+    },
+    inventory: {
+      deleteMany: async () => ({ count: 2 }),
+    },
+    purchaseItem: {
+      aggregate: async () => ({ _sum: { totalPrice: 1000 } }),
+    },
+  };
+
+  const result = await revertPurchaseInStock(mockTx, 'pc-1');
+  assert.equal(result.reverted, 2);
+});
+
+test('revertSalesOutStock: 回滚销售出库操作', async () => {
+  const mockTx = {
+    salesContract: {
+      findUnique: async () => ({
+        id: 'sc-1',
+        items: [{ id: 'item-1' }, { id: 'item-2' }],
+      }),
+      update: async () => ({}),
+    },
+    inventory: {
+      findMany: async () => [
+        { id: 'inv-1', salesItemId: 'item-1', status: 'OUTBOUND' },
+        { id: 'inv-2', salesItemId: 'item-2', status: 'OUTBOUND' },
+      ],
+      update: async () => ({}),
+    },
+    salesItem: {
+      findMany: async () => [],
+    },
+  };
+
+  const result = await revertSalesOutStock(mockTx, 'sc-1');
+  assert.equal(result.reverted, 2);
 });

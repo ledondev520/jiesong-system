@@ -85,6 +85,10 @@ test('createTaxRefund: 转换金额与申请时间字段', async () => {
       declaredAmount: '12000',
       refundableAmount: '8888.66',
       refundedAmount: '0',
+      relation_no: 'REL-001',
+      invoice_no: 'INV-001',
+      vat_rate_type: '13',
+      match_status: 'pending',
       appliedAt: '2026-03-07',
       refundedAt: '2026-03-10',
       note: 'apply submitted',
@@ -93,6 +97,10 @@ test('createTaxRefund: 转换金额与申请时间字段', async () => {
     assert.equal(createArgs.data.declaredAmount, 12000);
     assert.equal(createArgs.data.refundableAmount, 8888.66);
     assert.equal(createArgs.data.refundedAmount, 0);
+    assert.equal(createArgs.data.relation_no, 'REL-001');
+    assert.equal(createArgs.data.invoice_no, 'INV-001');
+    assert.equal(createArgs.data.vat_rate_type, 13);
+    assert.equal(createArgs.data.match_status, 'pending');
     assert.ok(createArgs.data.appliedAt instanceof Date);
     assert.ok(createArgs.data.refundedAt instanceof Date);
     assert.equal(result.refundNo, 'TR-20260307-01');

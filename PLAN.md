@@ -1,5 +1,75 @@
 # Frontend Polish Plan
 
+## 2026-03-10 Round 49 (Claude-to-IM Feishu Bridge Setup)
+
+### Goal
+- 为当前仓库工作区安装并配置 `claude-to-im` skill，接通飞书机器人桥接，确保守护进程可启动、可诊断、可续跑。
+
+### Delivered
+- 通过 `npx skills add op7418/Claude-to-IM-skill` 将 skill 安装到当前项目，并收缩为当前实际使用的入口：
+  - `.agents/skills/claude-to-im`
+  - `.claude/skills/claude-to-im`
+  - `skills/claude-to-im`
+- 补齐 skill 运行依赖并完成构建。
+- 修复第三方脚本缺陷：`scripts/doctor.sh` 在 `config.env` 缺失时不再直接崩溃，而会正常报告缺配置状态。
+- 新增回归测试 `src/__tests__/doctor.test.ts` 覆盖上述场景。
+- 在用户目录写入飞书桥接配置 `~/.claude-to-im/config.env`，权限设为 `600`。
+- 启动桥接守护进程并确认 macOS `launchd` 注册成功，当前启用渠道为 `feishu`。
+
+### Verification
+- `cd .agents/skills/claude-to-im && npm install`
+- `cd .agents/skills/claude-to-im && npm run build`
+- `cd .agents/skills/claude-to-im && npm test`
+- `cd .agents/skills/claude-to-im && bash scripts/doctor.sh`
+- `cd .agents/skills/claude-to-im && bash scripts/daemon.sh start`
+- `cd .agents/skills/claude-to-im && bash scripts/daemon.sh status`
+
+### Remaining Risk
+- 飞书侧若未完成“机器人能力开启 + 长连接事件订阅 + 版本发布”，守护进程虽然已启动，但机器人仍可能无法在飞书中收到消息。
+
+## 2026-03-08 Round 48 (Tax Refund Export Precheck V1)
+
+### Goal
+- 为出口退税模块新增申报前校验 V1：补齐退税导出字段、阻断缺失/税率不一致导出、输出冲突告警与可修复提示，并仅导出 `match_status=passed` 记录。
+
+### Delivered
+- 后端数据结构：`TaxRefund` 新增 `relation_no`、`invoice_no`、`vat_rate_type`、`match_status`
+- 后端服务：新增 `backend/src/services/taxRefundExportService.js`，负责：
+  - 关联号 / 发票号空格与前导 0 规范化
+  - P0 阻断校验：缺失关联号、缺失发票号、`vat_rate_type` 非法或与采购合同税率不一致
+  - P1 告警：同关联号多发票冲突、金额异常
+  - 导出数据构建：仅输出 `match_status=passed` 记录，并返回 CSV 文本
+- 控制器与路由：
+  - 新增 `POST /api/v1/tax-refunds/export`
+  - 校验失败返回 `409`
+  - 校验通过返回导出结果与 CSV
+- 测试：
+  - 新增 `backend/src/services/taxRefundExportService.test.js`
+  - 补充 `taxRefundController.test.js` 与 `taxModules.test.js`
+  - 扩展 `taxRefundService.test.js` 覆盖新增字段写入
+
+### Verification
+- `cd backend && node --test src/services/taxRefundExportService.test.js src/services/taxRefundService.test.js src/controllers/taxRefundController.test.js src/routes/taxModules.test.js`
+- 结果：`18/18` 通过
+
+## 2026-03-08 Round 47 (Frontend Vitest Timeout Stabilization)
+
+### Goal
+- 修复当前 CI 等价前端门禁中的假红灯，恢复 `vitest` 全量与覆盖率回归稳定性。
+
+### Delivered
+- 复现到 `frontend` 全量 Vitest 在默认 `5s` 超时下失败，首批红灯集中在高交互页面测试：
+  - `src/app/customs-declarations/create/page.test.tsx`
+  - `src/app/customs-declarations/[id]/edit/page.test.tsx`
+  - `src/app/dashboard/settings/ports/page.test.tsx`
+- 进一步确认这些用例单独运行均通过，根因是全量套件和 coverage 插桩下的 `jsdom + user-event` 执行时长超过默认超时，而非生产代码行为错误。
+- 对 `frontend/vitest.config.ts` 做最小修复：新增 `testTimeout: 20000`，仅放宽测试运行时上限，不修改业务逻辑或页面实现。
+
+### Verification
+- `cd frontend && npm run test`
+- `cd frontend && npm run test:coverage`
+- 说明：`cd backend && npm run test:all` 在当前沙箱仍会因 `src/app.test.js` 监听端口触发 `listen EPERM 0.0.0.0`，属于环境限制，不作为本轮 CI 根因。
+
 ## 2026-03-08 Round 46 (Tax Refund Module CRUD Closure)
 
 ### Goal
