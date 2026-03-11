@@ -11,6 +11,7 @@ const dataImportService = require('./dataImportService');
 
 const withPrismaMocks = async (mocks, fn) => {
   const original = {
+    transaction: prisma.$transaction,
     findMany: prisma.packingItem.findMany,
     portFindMany: prisma.port.findMany,
     supplierFindMany: prisma.supplier.findMany,
@@ -39,6 +40,7 @@ const withPrismaMocks = async (mocks, fn) => {
     importRecordCreate: prisma.importRecord.create,
   };
 
+  prisma.$transaction = mocks.transaction ?? original.transaction;
   prisma.packingItem.findMany = mocks.findMany;
   prisma.port.findMany = mocks.portFindMany;
   prisma.supplier.findMany = mocks.supplierFindMany;
@@ -69,6 +71,7 @@ const withPrismaMocks = async (mocks, fn) => {
   try {
     await fn();
   } finally {
+    prisma.$transaction = original.transaction;
     prisma.packingItem.findMany = original.findMany;
     prisma.port.findMany = original.portFindMany;
     prisma.supplier.findMany = original.supplierFindMany;
@@ -108,6 +111,7 @@ test('compareWithDatabase: 正确区分重复与新增记录', async () => {
   ];
 
   await withPrismaMocks({
+    transaction: async () => null,
     findMany: async () => {
       calls.findMany += 1;
       return [
@@ -160,14 +164,16 @@ test('compareWithDatabase: 正确区分重复与新增记录', async () => {
   assert.equal(calls.findMany, 1);
 });
 
-test('importRecords: 同次导入命中映射缓存，避免重复 find/create', async () => {
-  const calls = {
+test('importRecords: 同次导入命中映射缓存，且事务内写操作统一走 tx client', async () => {
+  const preloadCalls = {
     portFindMany: 0,
     supplierFindMany: 0,
     productFindMany: 0,
     storeFindMany: 0,
     salesContractFindMany: 0,
     purchaseContractFindMany: 0,
+  };
+  const txCalls = {
     portFindUnique: 0,
     portCreate: 0,
     supplierFindFirst: 0,
@@ -178,9 +184,14 @@ test('importRecords: 同次导入命中映射缓存，避免重复 find/create',
     storeCreate: 0,
     salesContractFindUnique: 0,
     salesContractCreate: 0,
-    salesContractFindManyCalledByContainer: 0,
     purchaseContractFindUnique: 0,
     purchaseContractCreate: 0,
+    salesItemFindFirst: 0,
+    salesItemCreate: 0,
+    packingItemFindFirst: 0,
+    packingItemCreate: 0,
+    salesContractUpdate: 0,
+    inventoryCreate: 0,
   };
 
   const rows = [
@@ -222,90 +233,180 @@ test('importRecords: 同次导入命中映射缓存，避免重复 find/create',
     },
   ];
 
+  const txClient = {
+    port: {
+      findUnique: async () => {
+        txCalls.portFindUnique += 1;
+        return null;
+      },
+      create: async (input) => {
+        txCalls.portCreate += 1;
+        return { id: 'port-1', ...input.data };
+      },
+    },
+    supplier: {
+      findFirst: async () => {
+        txCalls.supplierFindFirst += 1;
+        return null;
+      },
+      create: async (input) => {
+        txCalls.supplierCreate += 1;
+        return { id: 'supplier-1', name: input.data.name, shortName: input.data.shortName };
+      },
+    },
+    product: {
+      findFirst: async () => {
+        txCalls.productFindFirst += 1;
+        return null;
+      },
+      create: async (input) => {
+        txCalls.productCreate += 1;
+        return { id: 'product-1', customsName: input.data.customsName };
+      },
+    },
+    store: {
+      findFirst: async () => {
+        txCalls.storeFindFirst += 1;
+        return null;
+      },
+      create: async (input) => {
+        txCalls.storeCreate += 1;
+        return { id: 'store-1', name: input.data.name, portId: input.data.portId };
+      },
+    },
+    salesContract: {
+      findUnique: async () => {
+        txCalls.salesContractFindUnique += 1;
+        return null;
+      },
+      create: async (input) => {
+        txCalls.salesContractCreate += 1;
+        return { id: `contract-${txCalls.salesContractCreate}`, contractNo: input.data.contractNo };
+      },
+      update: async () => {
+        txCalls.salesContractUpdate += 1;
+        return { id: 'contract-1' };
+      },
+    },
+    purchaseContract: {
+      findUnique: async () => {
+        txCalls.purchaseContractFindUnique += 1;
+        return null;
+      },
+      create: async (input) => {
+        txCalls.purchaseContractCreate += 1;
+        return { id: `pc-${txCalls.purchaseContractCreate}`, contractNo: input.data.contractNo };
+      },
+    },
+    salesItem: {
+      findFirst: async () => {
+        txCalls.salesItemFindFirst += 1;
+        return null;
+      },
+      create: async () => {
+        txCalls.salesItemCreate += 1;
+        return { id: `sales-item-${txCalls.salesItemCreate}` };
+      },
+    },
+    packingItem: {
+      findFirst: async () => {
+        txCalls.packingItemFindFirst += 1;
+        return null;
+      },
+      create: async () => {
+        txCalls.packingItemCreate += 1;
+        return { id: `packing-item-${txCalls.packingItemCreate}` };
+      },
+    },
+    inventory: {
+      create: async () => {
+        txCalls.inventoryCreate += 1;
+        return { id: `inventory-${txCalls.inventoryCreate}` };
+      },
+    },
+  };
+
   await withPrismaMocks({
+    transaction: async (callback) => callback(txClient),
     findMany: async () => [],
     portFindMany: async () => {
-      calls.portFindMany += 1;
+      preloadCalls.portFindMany += 1;
       return [];
     },
     supplierFindMany: async () => {
-      calls.supplierFindMany += 1;
+      preloadCalls.supplierFindMany += 1;
       return [];
     },
     productFindMany: async () => {
-      calls.productFindMany += 1;
+      preloadCalls.productFindMany += 1;
       return [];
     },
     storeFindMany: async () => {
-      calls.storeFindMany += 1;
+      preloadCalls.storeFindMany += 1;
       return [];
     },
     salesContractFindMany: async () => {
-      calls.salesContractFindMany += 1;
-      if (calls.salesContractFindManyCalledByContainer > 0) {
-        return [];
-      }
-      calls.salesContractFindManyCalledByContainer += 1;
+      preloadCalls.salesContractFindMany += 1;
       return [];
     },
     purchaseContractFindMany: async () => {
-      calls.purchaseContractFindMany += 1;
+      preloadCalls.purchaseContractFindMany += 1;
       return [];
     },
     portFindUnique: async () => {
-      calls.portFindUnique += 1;
-      return null;
+      throw new Error('root port.findUnique should not be used inside import transaction');
     },
     supplierFindFirst: async () => {
-      calls.supplierFindFirst += 1;
-      return null;
+      throw new Error('root supplier.findFirst should not be used inside import transaction');
     },
     productFindFirst: async () => {
-      calls.productFindFirst += 1;
-      return null;
+      throw new Error('root product.findFirst should not be used inside import transaction');
     },
     storeFindFirst: async () => {
-      calls.storeFindFirst += 1;
-      return null;
+      throw new Error('root store.findFirst should not be used inside import transaction');
     },
     salesContractFindUnique: async () => {
-      calls.salesContractFindUnique += 1;
-      return null;
+      throw new Error('root salesContract.findUnique should not be used inside import transaction');
     },
     purchaseContractFindUnique: async () => {
-      calls.purchaseContractFindUnique += 1;
-      return null;
+      throw new Error('root purchaseContract.findUnique should not be used inside import transaction');
     },
-    salesItemFindFirst: async () => null,
-    packingItemFindFirst: async () => null,
-    portCreate: async (input) => {
-      calls.portCreate += 1;
-      return { id: 'port-1', ...input.data };
+    salesItemFindFirst: async () => {
+      throw new Error('root salesItem.findFirst should not be used inside import transaction');
     },
-    supplierCreate: async (input) => {
-      calls.supplierCreate += 1;
-      return { id: 'supplier-1', name: input.data.name, shortName: input.data.shortName };
+    packingItemFindFirst: async () => {
+      throw new Error('root packingItem.findFirst should not be used inside import transaction');
     },
-    productCreate: async (input) => {
-      calls.productCreate += 1;
-      return { id: 'product-1', customsName: input.data.customsName };
+    portCreate: async () => {
+      throw new Error('root port.create should not be used inside import transaction');
     },
-    storeCreate: async (input) => {
-      calls.storeCreate += 1;
-      return { id: 'store-1', name: input.data.name, portId: input.data.portId };
+    supplierCreate: async () => {
+      throw new Error('root supplier.create should not be used inside import transaction');
     },
-    salesContractCreate: async (input) => {
-      calls.salesContractCreate += 1;
-      return { id: `contract-${calls.salesContractCreate}`, contractNo: input.data.contractNo };
+    productCreate: async () => {
+      throw new Error('root product.create should not be used inside import transaction');
     },
-    purchaseContractCreate: async (input) => {
-      calls.purchaseContractCreate += 1;
-      return { id: `pc-${calls.purchaseContractCreate}`, contractNo: input.data.contractNo };
+    storeCreate: async () => {
+      throw new Error('root store.create should not be used inside import transaction');
     },
-    salesItemCreate: async () => ({ id: 'sales-item' }),
-    packingItemCreate: async () => ({ id: 'packing-item' }),
-    salesContractUpdate: async () => null,
-    inventoryCreate: async () => ({ id: 'inventory-item' }),
+    salesContractCreate: async () => {
+      throw new Error('root salesContract.create should not be used inside import transaction');
+    },
+    purchaseContractCreate: async () => {
+      throw new Error('root purchaseContract.create should not be used inside import transaction');
+    },
+    salesItemCreate: async () => {
+      throw new Error('root salesItem.create should not be used inside import transaction');
+    },
+    packingItemCreate: async () => {
+      throw new Error('root packingItem.create should not be used inside import transaction');
+    },
+    salesContractUpdate: async () => {
+      throw new Error('root salesContract.update should not be used inside import transaction');
+    },
+    inventoryCreate: async () => {
+      throw new Error('root inventory.create should not be used inside import transaction');
+    },
     importRecordCreate: async (input) => ({ id: 'import-record', data: input.data }),
   }, async () => {
     const result = await dataImportService.importRecords(rows);
@@ -319,23 +420,241 @@ test('importRecords: 同次导入命中映射缓存，避免重复 find/create',
     assert.equal(result.failed.length, 0);
     assert.equal(result.success.length, 2);
 
-    assert.equal(calls.portFindMany, 1);
-    assert.equal(calls.supplierFindMany, 1);
-    assert.equal(calls.productFindMany, 1);
-    assert.equal(calls.storeFindMany, 1);
-    assert.equal(calls.salesContractFindMany, 2);
-    assert.equal(calls.purchaseContractFindMany, 1);
-    assert.equal(calls.portFindUnique, 1);
-    assert.equal(calls.portCreate, 1);
-    assert.equal(calls.supplierFindFirst, 1);
-    assert.equal(calls.supplierCreate, 1);
-    assert.equal(calls.productFindFirst, 1);
-    assert.equal(calls.productCreate, 1);
-    assert.equal(calls.storeFindFirst, 1);
-    assert.equal(calls.storeCreate, 1);
-    assert.equal(calls.salesContractFindUnique, 2);
-    assert.equal(calls.salesContractCreate, 1);
-    assert.equal(calls.purchaseContractFindUnique, 1);
-    assert.equal(calls.purchaseContractCreate, 1);
+    assert.equal(preloadCalls.portFindMany, 1);
+    assert.equal(preloadCalls.supplierFindMany, 1);
+    assert.equal(preloadCalls.productFindMany, 1);
+    assert.equal(preloadCalls.storeFindMany, 1);
+    assert.equal(preloadCalls.salesContractFindMany, 2);
+    assert.equal(preloadCalls.purchaseContractFindMany, 1);
+
+    assert.equal(txCalls.portFindUnique, 1);
+    assert.equal(txCalls.portCreate, 1);
+    assert.equal(txCalls.supplierFindFirst, 1);
+    assert.equal(txCalls.supplierCreate, 1);
+    assert.equal(txCalls.productFindFirst, 1);
+    assert.equal(txCalls.productCreate, 1);
+    assert.equal(txCalls.storeFindFirst, 1);
+    assert.equal(txCalls.storeCreate, 1);
+    assert.equal(txCalls.salesContractFindUnique, 2);
+    assert.equal(txCalls.salesContractCreate, 1);
+    assert.equal(txCalls.purchaseContractFindUnique, 1);
+    assert.equal(txCalls.purchaseContractCreate, 1);
+    assert.equal(txCalls.salesItemCreate, 2);
+    assert.equal(txCalls.packingItemCreate, 2);
+    assert.equal(txCalls.salesContractUpdate, 2);
+    assert.equal(txCalls.inventoryCreate, 2);
+  });
+});
+
+test('importRecords: 单条事务失败后不会污染后续记录的缓存和创建计数', async () => {
+  const rows = [
+    {
+      '序号': '1',
+      '报关名': '花杯',
+      '门店': '华强店',
+      '厂家': '黎总',
+      '港口': '洛杉矶',
+      '柜子编号': '25-001-LA',
+      '合同号': '25-001-LA',
+      '购销合同号': 'PO-2026-001',
+      '报关数量': '2',
+      '箱数': '3',
+      '毛重': '10',
+      '净重': '9',
+      '体积': '1.2',
+      '采购金额': '200',
+      '出口金额': '300',
+      '规格': '标准'
+    },
+    {
+      '序号': '2',
+      '报关名': '花杯',
+      '门店': '华强店',
+      '厂家': '黎总',
+      '港口': '洛杉矶',
+      '柜子编号': '25-001-LA',
+      '合同号': '25-001-LA',
+      '购销合同号': 'PO-2026-001',
+      '报关数量': '2',
+      '箱数': '3',
+      '毛重': '10',
+      '净重': '9',
+      '体积': '1.2',
+      '采购金额': '200',
+      '出口金额': '300',
+      '规格': '标准'
+    },
+  ];
+
+  let transactionAttempt = 0;
+  const txCalls = {
+    portCreate: 0,
+    supplierCreate: 0,
+    productCreate: 0,
+    storeCreate: 0,
+    salesContractCreate: 0,
+    purchaseContractCreate: 0,
+    salesItemCreate: 0,
+    packingItemCreate: 0,
+    inventoryCreate: 0,
+  };
+
+  const createTxClient = () => ({
+    port: {
+      findUnique: async () => null,
+      create: async (input) => {
+        txCalls.portCreate += 1;
+        return { id: `port-${txCalls.portCreate}`, ...input.data };
+      },
+    },
+    supplier: {
+      findFirst: async () => null,
+      create: async (input) => {
+        txCalls.supplierCreate += 1;
+        return { id: `supplier-${txCalls.supplierCreate}`, name: input.data.name, shortName: input.data.shortName };
+      },
+    },
+    product: {
+      findFirst: async () => null,
+      create: async (input) => {
+        txCalls.productCreate += 1;
+        return { id: `product-${txCalls.productCreate}`, customsName: input.data.customsName };
+      },
+    },
+    store: {
+      findFirst: async () => null,
+      create: async (input) => {
+        txCalls.storeCreate += 1;
+        return { id: `store-${txCalls.storeCreate}`, name: input.data.name, portId: input.data.portId };
+      },
+    },
+    salesContract: {
+      findUnique: async () => null,
+      create: async (input) => {
+        txCalls.salesContractCreate += 1;
+        return { id: `contract-${txCalls.salesContractCreate}`, contractNo: input.data.contractNo };
+      },
+      update: async () => ({ id: 'contract-final' }),
+    },
+    purchaseContract: {
+      findUnique: async () => null,
+      create: async (input) => {
+        txCalls.purchaseContractCreate += 1;
+        return { id: `purchase-${txCalls.purchaseContractCreate}`, contractNo: input.data.contractNo };
+      },
+    },
+    salesItem: {
+      findFirst: async () => null,
+      create: async () => {
+        txCalls.salesItemCreate += 1;
+        if (transactionAttempt === 1) {
+          throw new Error('forced tx failure');
+        }
+        return { id: `sales-item-${txCalls.salesItemCreate}` };
+      },
+    },
+    packingItem: {
+      findFirst: async () => null,
+      create: async () => {
+        txCalls.packingItemCreate += 1;
+        return { id: `packing-item-${txCalls.packingItemCreate}` };
+      },
+    },
+    inventory: {
+      create: async () => {
+        txCalls.inventoryCreate += 1;
+        return { id: `inventory-${txCalls.inventoryCreate}` };
+      },
+    },
+  });
+
+  await withPrismaMocks({
+    transaction: async (callback) => {
+      transactionAttempt += 1;
+      return callback(createTxClient());
+    },
+    findMany: async () => [],
+    portFindMany: async () => [],
+    supplierFindMany: async () => [],
+    productFindMany: async () => [],
+    storeFindMany: async () => [],
+    salesContractFindMany: async () => [],
+    purchaseContractFindMany: async () => [],
+    portFindUnique: async () => {
+      throw new Error('root port.findUnique should not be used inside import transaction');
+    },
+    supplierFindFirst: async () => {
+      throw new Error('root supplier.findFirst should not be used inside import transaction');
+    },
+    productFindFirst: async () => {
+      throw new Error('root product.findFirst should not be used inside import transaction');
+    },
+    storeFindFirst: async () => {
+      throw new Error('root store.findFirst should not be used inside import transaction');
+    },
+    salesContractFindUnique: async () => {
+      throw new Error('root salesContract.findUnique should not be used inside import transaction');
+    },
+    purchaseContractFindUnique: async () => {
+      throw new Error('root purchaseContract.findUnique should not be used inside import transaction');
+    },
+    salesItemFindFirst: async () => {
+      throw new Error('root salesItem.findFirst should not be used inside import transaction');
+    },
+    packingItemFindFirst: async () => {
+      throw new Error('root packingItem.findFirst should not be used inside import transaction');
+    },
+    portCreate: async () => {
+      throw new Error('root port.create should not be used inside import transaction');
+    },
+    supplierCreate: async () => {
+      throw new Error('root supplier.create should not be used inside import transaction');
+    },
+    productCreate: async () => {
+      throw new Error('root product.create should not be used inside import transaction');
+    },
+    storeCreate: async () => {
+      throw new Error('root store.create should not be used inside import transaction');
+    },
+    salesContractCreate: async () => {
+      throw new Error('root salesContract.create should not be used inside import transaction');
+    },
+    purchaseContractCreate: async () => {
+      throw new Error('root purchaseContract.create should not be used inside import transaction');
+    },
+    salesItemCreate: async () => {
+      throw new Error('root salesItem.create should not be used inside import transaction');
+    },
+    packingItemCreate: async () => {
+      throw new Error('root packingItem.create should not be used inside import transaction');
+    },
+    salesContractUpdate: async () => {
+      throw new Error('root salesContract.update should not be used inside import transaction');
+    },
+    inventoryCreate: async () => {
+      throw new Error('root inventory.create should not be used inside import transaction');
+    },
+    importRecordCreate: async () => ({ id: 'import-record' }),
+  }, async () => {
+    const result = await dataImportService.importRecords(rows);
+
+    assert.equal(result.failed.length, 1);
+    assert.equal(result.success.length, 1);
+    assert.equal(result.created.suppliers, 1);
+    assert.equal(result.created.products, 1);
+    assert.equal(result.created.stores, 1);
+    assert.equal(result.created.salesContracts, 1);
+    assert.equal(result.created.containers, 1);
+    assert.equal(result.created.purchaseContracts, 1);
+
+    assert.equal(txCalls.portCreate, 2);
+    assert.equal(txCalls.supplierCreate, 2);
+    assert.equal(txCalls.productCreate, 2);
+    assert.equal(txCalls.storeCreate, 2);
+    assert.equal(txCalls.salesContractCreate, 2);
+    assert.equal(txCalls.purchaseContractCreate, 2);
+    assert.equal(txCalls.salesItemCreate, 2);
+    assert.equal(txCalls.packingItemCreate, 1);
+    assert.equal(txCalls.inventoryCreate, 1);
   });
 });

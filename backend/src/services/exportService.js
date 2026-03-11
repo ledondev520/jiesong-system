@@ -8,6 +8,7 @@
 
 const ExcelJS = require('exceljs');
 const prisma = require('../utils/prisma');
+const { createError } = require('../middleware/errorHandler');
 const { calculateTaxSummary } = require('./taxCalculationEngine');
 
 /**
@@ -356,7 +357,7 @@ const exportSalesContractExcel = async (contractId) => {
   });
 
   if (!contract) {
-    throw new Error(`合同不存在: ${contractId}`);
+    throw createError(`合同不存在: ${contractId}`, 404);
   }
 
   const workbook = new ExcelJS.Workbook();

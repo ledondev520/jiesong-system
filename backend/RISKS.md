@@ -16,3 +16,12 @@
 | HSCODE-R4 | 本轮 `hsCodes` 路由未接入鉴权 | 若后续要求该数据仅内部可见，需要补统一访问控制 | 当前按任务要求交付公开查询能力；后续进入联调时再与前端/权限策略统一收口 | 回退 `src/routes/index.js` 中 `/hs-codes` 挂载或在路由前补 `authenticate` |
 | HSCODE-R5 | live JSON 中部分编码条目可能缺少可解析退税率或申报段落 | 自动生成退税草稿时可退金额不完整、部分报关单被跳过 | 导入阶段保留完整 `rawPayloadJson`，生成草稿时对缺失税率明细做 skip/warning，不写入伪造金额 | 回退自动草稿生成逻辑，仅保留 live HSCode 入库 |
 | CUSTOMS-R1 | 部分销售合同没有 `packing_items` 或装箱金额不完整 | 报关单自动生成只能部分成功，个别合同会被跳过 | 自动草稿服务在结果中返回 `no_packing_items`，前端按钮提示 created/skipped 统计 | 回退 `/customs-declarations/auto-drafts`，恢复手工建单 |
+
+
+## 2026-03-11 Round 6
+
+| Risk ID | Trigger | Impact | Mitigation | Rollback |
+|---|---|---|---|---|
+| SALES-EXP-R1 | 其他导出链路仍可能直接抛普通 `Error` | 某些下载接口仍可能返回 500 而不是业务状态码 | 本轮仅修复销售 Excel/PDF 导出；后续如扩展其他导出接口，复用 `createError(..., 404)` 模式统一收口 | 回退本轮导出 service 改动 |
+| IMPORT-TX-R1 | 真实数据库导入时出现 Prisma/SQLite 与 mock 不一致行为 | 单元测试绿灯但真实导入链路仍可能暴露未覆盖问题 | 本轮已增加事务成功/失败两类单测；后续补一条针对 `importRecords` 的集成回归 | 回退 `dataImportService` 事务内上下文改动，恢复原先非事务上下文创建模式 |
+| IMPORT-TX-R2 | 导入失败日志仍未稳定保留原始“序号”字段 | 人工排查失败项时需要依赖 `data` payload 而不是简洁序号 | 本轮不扩展失败日志模型，只保证事务与状态码修复；后续如继续优化导入体验，可单独修 `normalizeImportRows/getRecordSeq` | 保持当前失败日志结构不变 |

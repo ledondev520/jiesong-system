@@ -88,3 +88,20 @@
 ### Notes
 - 当前跳过退税草稿的主因是 `no_rate_data`，对应 HSCode 章节尚未全部抓齐或部分商品未命中 live 税率。
 - 现有数据库已经从“只有 live HSCode”推进到“已有自动生成的报关单草稿与部分退税草稿”。
+
+## 2026-03-11 Round 6
+
+### Baseline
+- 销售导出缺失合同时在 service 层抛普通 `Error`，经统一错误处理中间件后会表现为 500。
+- `dataImportService.test` 在事务路径使用真实 `tx.salesItem.create()`，导致测试命中 SQLite 外键错误。
+- 沙箱环境禁止本地监听端口，因此未采用真实 socket HTTP 集成测试。
+
+### Verification Result
+- 红灯：`cd backend && node --test src/routes/sales.test.js src/services/exportService.test.js src/services/pdfExportService.test.js src/services/dataImportService.test.js`
+  - 结果：导出 404 用例失败，证明现状不满足要求。
+- 绿灯：`cd backend && node --test src/routes/sales.test.js src/services/exportService.test.js src/services/pdfExportService.test.js src/services/dataImportService.test.js`
+  - 结果：`12/12` 通过。
+
+### Notes
+- 销售导出路由验证改为直接调用 route handler，并断言其向 `next` 传递 404 错误；这在当前沙箱下是可执行且稳定的证据。
+- 导入事务新增了失败隔离逻辑，但仍未做真实 Prisma/SQLite 集成级导入演练，本轮证据以 node:test 单元/模块测试为准。

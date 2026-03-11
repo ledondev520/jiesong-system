@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const PDFDocument = require('pdfkit');
 const prisma = require('../utils/prisma');
+const { createError } = require('../middleware/errorHandler');
 const { calculateTaxSummary } = require('./taxCalculationEngine');
 
 const DEFAULT_LOGO_PATH = path.join(__dirname, '../../assets/pdf-logo.png');
@@ -244,7 +245,7 @@ const exportSalesContractPdf = async (contractId) => {
   });
 
   if (!contract) {
-    throw new Error(`合同不存在: ${contractId}`);
+    throw createError(`合同不存在: ${contractId}`, 404);
   }
 
   const statusLabelMap = {

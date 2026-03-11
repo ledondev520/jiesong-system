@@ -9,14 +9,14 @@ const assert = require('node:assert/strict');
 const prisma = require('../utils/prisma');
 const { exportSalesContractPdf, exportSystemDataPdf } = require('./pdfExportService');
 
-test('exportSalesContractPdf: 合同不存在时抛错', async () => {
+test('exportSalesContractPdf: 合同不存在时抛出404业务错误', async () => {
   const originalFindUnique = prisma.salesContract.findUnique;
 
   prisma.salesContract.findUnique = async () => null;
   try {
     await assert.rejects(
       () => exportSalesContractPdf('not-found-id'),
-      /合同不存在: not-found-id/
+      (error) => error.statusCode === 404 && /合同不存在/.test(error.message),
     );
   } finally {
     prisma.salesContract.findUnique = originalFindUnique;
@@ -118,4 +118,3 @@ test('exportSystemDataPdf: 生成系统导出 PDF', async () => {
     prisma.supplier.findMany = originalFindMany;
   }
 });
-

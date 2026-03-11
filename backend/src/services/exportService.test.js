@@ -8,14 +8,29 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const ExcelJS = require('exceljs');
 const prisma = require('../utils/prisma');
+const { exportSalesContractExcel } = require('./exportService');
 
 test('exportService: 模块可正常加载并导出', () => {
   const mod = require('./exportService');
   assert.ok(mod !== undefined);
 });
 
+test('exportSalesContractExcel: 合同不存在时抛出404业务错误', async () => {
+  const originalFindUnique = prisma.salesContract.findUnique;
+
+  prisma.salesContract.findUnique = async () => null;
+
+  try {
+    await assert.rejects(
+      () => exportSalesContractExcel('not-found-id'),
+      (error) => error.statusCode === 404 && /合同不存在/.test(error.message),
+    );
+  } finally {
+    prisma.salesContract.findUnique = originalFindUnique;
+  }
+});
+
 test('exportSalesContractExcel: 附带税务测算 sheet', async () => {
-  const { exportSalesContractExcel } = require('./exportService');
   const originalFindUnique = prisma.salesContract.findUnique;
 
   prisma.salesContract.findUnique = async () => ({

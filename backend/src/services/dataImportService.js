@@ -368,6 +368,30 @@ const createEntityCache = () => ({
   containerItemByKey: new Map(),
 });
 
+const cloneEntityCache = (cache) => ({
+  portsByCode: new Map(cache.portsByCode),
+  suppliersByName: new Map(cache.suppliersByName),
+  productsByName: new Map(cache.productsByName),
+  storesByName: new Map(cache.storesByName),
+  salesContractsByNo: new Map(cache.salesContractsByNo),
+  purchaseContractsByNo: new Map(cache.purchaseContractsByNo),
+  containerByNo: new Map(cache.containerByNo),
+  salesItemByKey: new Map(cache.salesItemByKey),
+  containerItemByKey: new Map(cache.containerItemByKey),
+});
+
+const commitEntityCache = (target, source) => {
+  target.portsByCode = source.portsByCode;
+  target.suppliersByName = source.suppliersByName;
+  target.productsByName = source.productsByName;
+  target.storesByName = source.storesByName;
+  target.salesContractsByNo = source.salesContractsByNo;
+  target.purchaseContractsByNo = source.purchaseContractsByNo;
+  target.containerByNo = source.containerByNo;
+  target.salesItemByKey = source.salesItemByKey;
+  target.containerItemByKey = source.containerItemByKey;
+};
+
 const buildSalesItemCacheKey = (salesContractId, productId, storeId) => [salesContractId, productId, storeId || ''].join('|');
 
 const buildContainerItemCacheKey = (contractId, productId, storeId) => [contractId, productId, storeId || ''].join('|');
@@ -382,10 +406,10 @@ const getOrBuildItem = async (cache, key, finder) => {
   return result || null;
 };
 
-const getCachedSalesItem = (cache, salesContractId, productId, storeId) => getOrBuildItem(
+const getCachedSalesItem = (cache, salesContractId, productId, storeId, db = prisma) => getOrBuildItem(
   cache.salesItemByKey,
   buildSalesItemCacheKey(salesContractId, productId, storeId),
-  () => prisma.salesItem.findFirst({
+  () => db.salesItem.findFirst({
     where: {
       salesContractId,
       productId,
@@ -394,10 +418,10 @@ const getCachedSalesItem = (cache, salesContractId, productId, storeId) => getOr
   })
 );
 
-const getCachedContainerItem = (cache, salesContractId, productId, storeId) => getOrBuildItem(
+const getCachedContainerItem = (cache, salesContractId, productId, storeId, db = prisma) => getOrBuildItem(
   cache.containerItemByKey,
   buildContainerItemCacheKey(salesContractId, productId, storeId),
-  () => prisma.packingItem.findFirst({
+  () => db.packingItem.findFirst({
     where: {
       salesContractId,
       productId,
@@ -421,7 +445,7 @@ const shouldUseAsShortName = (supplierAlias, supplierName) => {
   return supplierAlias;
 };
 
-const getOrCreatePort = async (portInfo, cache, results) => {
+const getOrCreatePort = async (portInfo, cache, results, db = prisma) => {
   if (!portInfo?.code) {
     return null;
   }
@@ -430,12 +454,12 @@ const getOrCreatePort = async (portInfo, cache, results) => {
     return cache.portsByCode.get(portInfo.code);
   }
 
-  let port = await prisma.port.findUnique({
+  let port = await db.port.findUnique({
     where: { code: portInfo.code },
   });
 
   if (!port) {
-    port = await prisma.port.create({
+    port = await db.port.create({
       data: {
         name: portInfo.name,
         code: portInfo.code,
@@ -448,7 +472,7 @@ const getOrCreatePort = async (portInfo, cache, results) => {
   return port;
 };
 
-const getOrCreateSupplier = async (supplierName, supplierAlias, cache, results) => {
+const getOrCreateSupplier = async (supplierName, supplierAlias, cache, results, db = prisma) => {
   if (!supplierName) {
     return null;
   }
@@ -457,12 +481,12 @@ const getOrCreateSupplier = async (supplierName, supplierAlias, cache, results) 
     return cache.suppliersByName.get(supplierName);
   }
 
-  let supplier = await prisma.supplier.findFirst({
+  let supplier = await db.supplier.findFirst({
     where: { name: supplierName },
   });
 
   if (!supplier) {
-    supplier = await prisma.supplier.create({
+    supplier = await db.supplier.create({
       data: {
         name: supplierName,
         shortName: shouldUseAsShortName(supplierAlias, supplierName),
@@ -476,7 +500,7 @@ const getOrCreateSupplier = async (supplierName, supplierAlias, cache, results) 
   return supplier;
 };
 
-const getOrCreateProduct = async (row, cache, results) => {
+const getOrCreateProduct = async (row, cache, results, db = prisma) => {
   if (!row.customsName) {
     return null;
   }
@@ -485,13 +509,13 @@ const getOrCreateProduct = async (row, cache, results) => {
     return cache.productsByName.get(row.customsName);
   }
 
-  let product = await prisma.product.findFirst({
+  let product = await db.product.findFirst({
     where: { customsName: row.customsName },
   });
 
   if (!product) {
     const description = (row.record?.['商品补充信息']?.trim?.() || '').trim() || null;
-    product = await prisma.product.create({
+    product = await db.product.create({
       data: {
         customsName: row.customsName,
         description,
@@ -507,7 +531,7 @@ const getOrCreateProduct = async (row, cache, results) => {
   return product;
 };
 
-const getOrCreateStore = async (storeName, port, cache, results) => {
+const getOrCreateStore = async (storeName, port, cache, results, db = prisma) => {
   if (!storeName || !port) {
     return null;
   }
@@ -516,12 +540,12 @@ const getOrCreateStore = async (storeName, port, cache, results) => {
     return cache.storesByName.get(storeName);
   }
 
-  let store = await prisma.store.findFirst({
+  let store = await db.store.findFirst({
     where: { name: storeName },
   });
 
   if (!store) {
-    store = await prisma.store.create({
+    store = await db.store.create({
       data: {
         name: storeName,
         portId: port.id,
@@ -535,7 +559,7 @@ const getOrCreateStore = async (storeName, port, cache, results) => {
   return store;
 };
 
-const getOrCreateSalesContract = async (contractNo, cache, results, options = {}) => {
+const getOrCreateSalesContract = async (contractNo, cache, results, options = {}, db = prisma) => {
   if (!contractNo) {
     return null;
   }
@@ -544,13 +568,13 @@ const getOrCreateSalesContract = async (contractNo, cache, results, options = {}
     return cache.salesContractsByNo.get(contractNo);
   }
 
-  let contract = await prisma.salesContract.findUnique({
+  let contract = await db.salesContract.findUnique({
     where: { contractNo },
   });
 
   if (!contract) {
     const status = options.status || 'DRAFT';
-    contract = await prisma.salesContract.create({
+    contract = await db.salesContract.create({
       data: {
         contractNo,
         totalAmount: 0,
@@ -572,7 +596,7 @@ const getOrCreateSalesContract = async (contractNo, cache, results, options = {}
   return contract;
 };
 
-const getOrCreateSalesContainerContract = async (contractNo, port, record, cache, results) => {
+const getOrCreateSalesContainerContract = async (contractNo, port, record, cache, results, db = prisma) => {
   if (!contractNo || !port) {
     return null;
   }
@@ -581,7 +605,7 @@ const getOrCreateSalesContainerContract = async (contractNo, port, record, cache
     return cache.containerByNo.get(contractNo);
   }
 
-  let contract = await prisma.salesContract.findUnique({
+  let contract = await db.salesContract.findUnique({
     where: { contractNo },
   });
 
@@ -596,7 +620,7 @@ const getOrCreateSalesContainerContract = async (contractNo, port, record, cache
       customsBroker: normalizeRecordValue(record, '报关公司') || null,
       isFumigated: record['是否熏蒸'] === '是',
       note: rawContainerNo !== contractNo ? `原编号: ${rawContainerNo}` : null,
-    });
+    }, db);
     results.created.containers += 1;
   }
 
@@ -604,7 +628,7 @@ const getOrCreateSalesContainerContract = async (contractNo, port, record, cache
   return contract;
 };
 
-const getOrCreatePurchaseContract = async (contractNo, supplier, cache, results, options = {}) => {
+const getOrCreatePurchaseContract = async (contractNo, supplier, cache, results, options = {}, db = prisma) => {
   if (!contractNo) {
     return null;
   }
@@ -617,14 +641,14 @@ const getOrCreatePurchaseContract = async (contractNo, supplier, cache, results,
     return cache.purchaseContractsByNo.get(contractNo);
   }
 
-  let purchaseContract = await prisma.purchaseContract.findUnique({
+  let purchaseContract = await db.purchaseContract.findUnique({
     where: { contractNo },
   });
 
   if (!purchaseContract) {
     const paidAmount = toNumberOrNull(options.paidAmount) ?? 0;
     const totalAmount = toNumberOrNull(options.totalAmount) ?? 0;
-    purchaseContract = await prisma.purchaseContract.create({
+    purchaseContract = await db.purchaseContract.create({
       data: {
         contractNo,
         supplierId: supplier.id,
@@ -703,13 +727,13 @@ const buildImportError = (record, reason) => ({
   data: getRecordSource(record),
 });
 
-const buildImportRecordContext = async (record, cache, results) => {
-  const port = await getOrCreatePort(getPortInfo(record.portName), cache, results);
-  const supplier = await getOrCreateSupplier(record.supplierName, record.supplierAlias, cache, results);
-  const product = await getOrCreateProduct(record, cache, results);
-  const store = await getOrCreateStore(record.storeName, port, cache, results);
-  const container = record.containerNo ? await getOrCreateSalesContainerContract(record.containerNo, port, record.record, cache, results) : null;
-  const salesContract = record.salesContractNo ? await getOrCreateSalesContract(record.salesContractNo, cache, results) : null;
+const buildImportRecordContext = async (record, cache, results, db = prisma) => {
+  const port = await getOrCreatePort(getPortInfo(record.portName), cache, results, db);
+  const supplier = await getOrCreateSupplier(record.supplierName, record.supplierAlias, cache, results, db);
+  const product = await getOrCreateProduct(record, cache, results, db);
+  const store = await getOrCreateStore(record.storeName, port, cache, results, db);
+  const container = record.containerNo ? await getOrCreateSalesContainerContract(record.containerNo, port, record.record, cache, results, db) : null;
+  const salesContract = record.salesContractNo ? await getOrCreateSalesContract(record.salesContractNo, cache, results, {}, db) : null;
 
   return {
     port,
@@ -721,12 +745,12 @@ const buildImportRecordContext = async (record, cache, results) => {
   };
 };
 
-const attachPurchaseContractIfNeeded = async (contractNo, supplier, cache, results) => {
+const attachPurchaseContractIfNeeded = async (contractNo, supplier, cache, results, db = prisma) => {
   if (!contractNo || !supplier) {
     return;
   }
 
-  await getOrCreatePurchaseContract(contractNo, supplier, cache, results);
+  await getOrCreatePurchaseContract(contractNo, supplier, cache, results, {}, db);
 };
 
 const isRecordDuplicate = (row, exactIndex, fuzzyIndex) => {
@@ -753,7 +777,7 @@ const addSalesItemIfNeeded = async (record, salesContract, product, store, cache
     return;
   }
 
-  const existingSalesItem = await getCachedSalesItem(cache, salesContract.id, product.id, store.id);
+  const existingSalesItem = await getCachedSalesItem(cache, salesContract.id, product.id, store.id, tx);
   if (existingSalesItem) {
     return;
   }
@@ -785,7 +809,7 @@ const addContainerItemIfNeeded = async (record, container, product, store, cache
     return;
   }
 
-  const containerItem = await getCachedContainerItem(cache, container.id, product.id, store ? store.id : null);
+  const containerItem = await getCachedContainerItem(cache, container.id, product.id, store ? store.id : null, tx);
   if (containerItem) {
     return;
   }
@@ -996,29 +1020,34 @@ const importRecords = async (records) => {
   cache.containerByNo = seeded.containerContractsByNo;
 
   for (const record of normalizedRecords) {
+    let createdSnapshot = null;
+
     try {
       if (!record.customsName) {
         results.failed.push(buildImportError(record, IMPORT_ERRORS.missingCustomsName));
         continue;
       }
-      const context = await buildImportRecordContext(record, cache, results);
-      const { supplier, product, store, container, salesContract } = context;
-      const { purchaseContractNo } = record;
+      const recordCache = cloneEntityCache(cache);
+      createdSnapshot = { ...results.created };
 
-      await attachPurchaseContractIfNeeded(purchaseContractNo, supplier, cache, results);
-
-      // 使用事务包裹关键业务数据创建
       await prisma.$transaction(async (tx) => {
+        const context = await buildImportRecordContext(record, recordCache, results, tx);
+        const { supplier, product, store, container, salesContract } = context;
+        const { purchaseContractNo } = record;
+
+        await attachPurchaseContractIfNeeded(purchaseContractNo, supplier, recordCache, results, tx);
+
         // 6.1 创建销售合同明细（SalesItem）
-        await addSalesItemIfNeeded(record, salesContract, product, store, cache, results, tx);
+        await addSalesItemIfNeeded(record, salesContract, product, store, recordCache, results, tx);
 
         // 8. 创建装箱明细
-        await addContainerItemIfNeeded(record, container, product, store, cache, results, tx);
+        await addContainerItemIfNeeded(record, container, product, store, recordCache, results, tx);
 
         // 9. 创建库存记录
         await addInventoryIfNeeded(record, product, container, results, tx);
       });
 
+      commitEntityCache(cache, recordCache);
       results.success.push({
         seq: record.seq,
         customsName: record.customsName,
@@ -1026,6 +1055,9 @@ const importRecords = async (records) => {
       });
       
     } catch (error) {
+      if (createdSnapshot) {
+        results.created = createdSnapshot;
+      }
       results.failed.push({
         seq: record.seq,
         reason: getImportFailureMessage(error),

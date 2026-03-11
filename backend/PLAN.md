@@ -133,3 +133,38 @@
 ### Current Capability
 - 现有销售/装箱数据已可一键补成报关单草稿。
 - 退税自动化链路现在具备“销售/装箱 -> 报关单草稿 -> 退税草稿”的最小闭环。
+
+## 2026-03-11 Round 6: Sales Export 404 + Import Transaction Fix
+
+### Goal
+- 修复销售导出接口在合同不存在时返回 500 的问题，统一为 404。
+- 修复 `dataImportService` 事务路径中 `salesItem` / `packingItem` 查重与创建跨 Prisma client 的问题，消除事务测试红灯。
+
+### Scope
+- `src/services/exportService.js`
+- `src/services/pdfExportService.js`
+- `src/routes/sales.test.js`
+- `src/services/exportService.test.js`
+- `src/services/pdfExportService.test.js`
+- `src/services/dataImportService.js`
+- `src/services/dataImportService.test.js`
+- 本轮台账与结果文件
+
+### Milestones
+1. 先以测试复现导出 404 缺失和导入事务 client 混用问题。
+2. 将导出服务缺失合同错误映射为 404，并补 HTTP 级回归。
+3. 将导入事务内的查重查询绑定到传入 `tx`，与创建/更新共用事务 client。
+4. 运行定向测试并更新 `TASKS.md` / `RISKS.md` / `METRICS.md` / `RESULTS` / `PATCHES`。
+
+### Risks
+- 销售导出路由受认证中间件保护，HTTP 测试需要稳定 mock 用户认证路径，避免把鉴权失败误判为导出异常。
+- 导入服务缓存逻辑与事务 client 耦合，若改动过大可能影响非事务路径的重复判断；本轮仅做最小参数透传。
+
+### Verification
+- `cd backend && node --test src/routes/sales.test.js src/services/exportService.test.js src/services/pdfExportService.test.js src/services/dataImportService.test.js`
+
+### Execution Outcome
+- 销售导出服务与 PDF 导出服务在缺失合同时已统一抛出 404 业务错误，路由层透传到 `next(err)`。
+- `dataImportService.importRecords` 现改为按记录在同一事务内完成上下文实体查找/创建、明细写入与库存写入。
+- 为避免单条事务失败污染后续导入，本轮新增“事务级缓存克隆 + 成功后提交 + 失败后恢复 created 计数”的保护。
+- 定向验证已完成：`node --test src/routes/sales.test.js src/services/exportService.test.js src/services/pdfExportService.test.js src/services/dataImportService.test.js`，结果 12/12 通过。

@@ -1,0 +1,164 @@
+diff --git a/backend/src/routes/sales.test.js b/backend/src/routes/sales.test.js
+index b33b7dc..0b48507 100644
+--- a/backend/src/routes/sales.test.js
++++ b/backend/src/routes/sales.test.js
+@@ -8,6 +8,7 @@
+ 
+ const test = require('node:test');
+ const assert = require('node:assert/strict');
++const prisma = require('../utils/prisma');
+ const salesRouter = require('./sales');
+ 
+ /**
+@@ -24,6 +25,27 @@ const getRouteIndex = (router, path, method) => {
+   });
+ };
+ 
++const getRouteHandlers = (router, path, method) => {
++  const layer = router.stack.find((item) => item.route?.path === path && item.route.methods?.[method]);
++  return layer?.route?.stack || [];
++};
++
++const invokeExportHandler = async (path) => {
++  const handlers = getRouteHandlers(salesRouter, path, 'get');
++  const nextCapture = { error: null };
++  const req = { params: { id: 'not-found' } };
++  const res = {
++    setHeader() {},
++    send() {},
++  };
++
++  await handlers.at(-1).handle(req, res, (error) => {
++    nextCapture.error = error;
++  });
++
++  return nextCapture.error;
++};
++
+ test('sales route order: /options/next-no must be before /:id for GET', () => {
+   const optionsIndex = getRouteIndex(salesRouter, '/options/next-no', 'get');
+   const idIndex = getRouteIndex(salesRouter, '/:id', 'get');
+@@ -40,3 +62,20 @@ test('sales route includes PDF export endpoint', () => {
+   const pdfExportIndex = getRouteIndex(salesRouter, '/:id/export-pdf', 'get');
+   assert.notEqual(pdfExportIndex, -1, '缺少 GET /:id/export-pdf 路由');
+ });
++
++test('sales export routes: 缺失合同时将404错误传给 next', async () => {
++  const originalSalesContractFindUnique = prisma.salesContract.findUnique;
++  prisma.salesContract.findUnique = async () => null;
++
++  try {
++    const excelError = await invokeExportHandler('/:id/export-excel');
++    const pdfError = await invokeExportHandler('/:id/export-pdf');
++
++    assert.equal(excelError?.statusCode, 404);
++    assert.equal(pdfError?.statusCode, 404);
++    assert.match(excelError?.message || '', /合同不存在/);
++    assert.match(pdfError?.message || '', /合同不存在/);
++  } finally {
++    prisma.salesContract.findUnique = originalSalesContractFindUnique;
++  }
++});
+diff --git a/backend/src/services/exportService.js b/backend/src/services/exportService.js
+index 425c744..76bdf47 100644
+--- a/backend/src/services/exportService.js
++++ b/backend/src/services/exportService.js
+@@ -8,6 +8,7 @@
+ 
+ const ExcelJS = require('exceljs');
+ const prisma = require('../utils/prisma');
++const { createError } = require('../middleware/errorHandler');
+ const { calculateTaxSummary } = require('./taxCalculationEngine');
+ 
+ /**
+@@ -356,7 +357,7 @@ const exportSalesContractExcel = async (contractId) => {
+   });
+ 
+   if (!contract) {
+-    throw new Error(`合同不存在: ${contractId}`);
++    throw createError(`合同不存在: ${contractId}`, 404);
+   }
+ 
+   const workbook = new ExcelJS.Workbook();
+diff --git a/backend/src/services/exportService.test.js b/backend/src/services/exportService.test.js
+index b42dc91..d61632c 100644
+--- a/backend/src/services/exportService.test.js
++++ b/backend/src/services/exportService.test.js
+@@ -8,14 +8,29 @@ const test = require('node:test');
+ const assert = require('node:assert/strict');
+ const ExcelJS = require('exceljs');
+ const prisma = require('../utils/prisma');
++const { exportSalesContractExcel } = require('./exportService');
+ 
+ test('exportService: 模块可正常加载并导出', () => {
+   const mod = require('./exportService');
+   assert.ok(mod !== undefined);
+ });
+ 
++test('exportSalesContractExcel: 合同不存在时抛出404业务错误', async () => {
++  const originalFindUnique = prisma.salesContract.findUnique;
++
++  prisma.salesContract.findUnique = async () => null;
++
++  try {
++    await assert.rejects(
++      () => exportSalesContractExcel('not-found-id'),
++      (error) => error.statusCode === 404 && /合同不存在/.test(error.message),
++    );
++  } finally {
++    prisma.salesContract.findUnique = originalFindUnique;
++  }
++});
++
+ test('exportSalesContractExcel: 附带税务测算 sheet', async () => {
+-  const { exportSalesContractExcel } = require('./exportService');
+   const originalFindUnique = prisma.salesContract.findUnique;
+ 
+   prisma.salesContract.findUnique = async () => ({
+diff --git a/backend/src/services/pdfExportService.js b/backend/src/services/pdfExportService.js
+index 2948c5c..621534d 100644
+--- a/backend/src/services/pdfExportService.js
++++ b/backend/src/services/pdfExportService.js
+@@ -11,6 +11,7 @@ const fs = require('fs');
+ const path = require('path');
+ const PDFDocument = require('pdfkit');
+ const prisma = require('../utils/prisma');
++const { createError } = require('../middleware/errorHandler');
+ const { calculateTaxSummary } = require('./taxCalculationEngine');
+ 
+ const DEFAULT_LOGO_PATH = path.join(__dirname, '../../assets/pdf-logo.png');
+@@ -244,7 +245,7 @@ const exportSalesContractPdf = async (contractId) => {
+   });
+ 
+   if (!contract) {
+-    throw new Error(`合同不存在: ${contractId}`);
++    throw createError(`合同不存在: ${contractId}`, 404);
+   }
+ 
+   const statusLabelMap = {
+diff --git a/backend/src/services/pdfExportService.test.js b/backend/src/services/pdfExportService.test.js
+index 9b54df9..d882695 100644
+--- a/backend/src/services/pdfExportService.test.js
++++ b/backend/src/services/pdfExportService.test.js
+@@ -9,14 +9,14 @@ const assert = require('node:assert/strict');
+ const prisma = require('../utils/prisma');
+ const { exportSalesContractPdf, exportSystemDataPdf } = require('./pdfExportService');
+ 
+-test('exportSalesContractPdf: 合同不存在时抛错', async () => {
++test('exportSalesContractPdf: 合同不存在时抛出404业务错误', async () => {
+   const originalFindUnique = prisma.salesContract.findUnique;
+ 
+   prisma.salesContract.findUnique = async () => null;
+   try {
+     await assert.rejects(
+       () => exportSalesContractPdf('not-found-id'),
+-      /合同不存在: not-found-id/
++      (error) => error.statusCode === 404 && /合同不存在/.test(error.message),
+     );
+   } finally {
+     prisma.salesContract.findUnique = originalFindUnique;
+@@ -118,4 +118,3 @@ test('exportSystemDataPdf: 生成系统导出 PDF', async () => {
+     prisma.supplier.findMany = originalFindMany;
+   }
+ });
+-
