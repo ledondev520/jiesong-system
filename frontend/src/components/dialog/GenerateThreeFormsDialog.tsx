@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { hsCodeService, type BatchHsCodeMatchResult } from '@/services/hsCode.service';
-import { customsDeclarationService } from '@/services/customsDeclaration.service';
+import { threeFormsService, type ThreeFormsGenerateInput } from '@/services/threeForms.service';
 import { toast } from 'sonner';
 import { FileText, DollarSign, ReceiptText, CheckCircle2, AlertCircle, XCircle, Loader2 } from 'lucide-react';
 import type { SalesContract, PackingItem } from '@/types';
@@ -129,57 +129,52 @@ export function GenerateThreeFormsDialog({
   const handleGenerateForms = async () => {
     setStep('generating');
     try {
-      const results: {
-        customsDeclarationId?: string;
-        forexId?: string;
-        taxRefundId?: string;
-      } = {};
+      // 准备商品数据
+      const items = products
+        .filter((p) => p.hsCodeMatch?.match)
+        .map((p) => ({
+          productName: p.productName,
+          hsCode: p.hsCodeMatch!.match!.hsCode,
+          quantity: p.quantity,
+          unit: p.unit || p.product?.unit || '',
+          unitPrice: p.unitPrice || 0,
+          totalPrice: p.totalPrice || 0,
+          refundRate: p.hsCodeMatch!.match!.refundRate || undefined,
+          packingItemId: p.id,
+        }));
 
-      // 生成报关单
-      if (selectedForms.includes('customs')) {
-        const customsItems = products
-          .filter((p) => p.hsCodeMatch?.match)
-          .map((p) => ({
-            productName: p.productName,
-            hsCode: p.hsCodeMatch!.match!.hsCode,
-            quantity: p.quantity,
-            unit: p.unit || p.product?.unit || '',
-            unitPrice: p.unitPrice || 0,
-            totalPrice: p.totalPrice || 0,
-          }));
+      if (items.length === 0) {
+        toast.error('没有匹配到 HSCode 的商品，无法生成单据');
+        setStep('review');
+        return;
+      }
 
-        if (customsItems.length > 0) {
-          const customsPayload = {
-            declarationNo: `BG${salesContract.contractNo.slice(2)}`,
-            status: 'DRAFT' as const,
+      // 调用后端一键生成三张表 API
+      const payload: ThreeFormsGenerateInput = {
+        salesContractId: salesContract.id,
+        items,
+        extraData: {
+          customs: {
             exporter: '',
             consignee: '',
             destinationCountry: '',
             portOfLoading: '',
             portOfDestination: '',
             transportMode: '',
-            declarationDate: new Date().toISOString().split('T')[0],
-            releaseDate: '',
-            currency: 'USD',
-            totalAmount: customsItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0),
-            totalQuantity: customsItems.reduce((sum, item) => sum + item.quantity, 0),
-            totalNetWeight: 0,
-            totalGrossWeight: 0,
-            salesContractId: salesContract.id,
-            items: customsItems,
-          };
+          },
+          forex: {
+            bankName: '',
+          },
+        },
+        generateCustoms: selectedForms.includes('customs'),
+        generateForex: selectedForms.includes('forex'),
+        generateTaxRefund: selectedForms.includes('tax-refund'),
+      };
 
-          const customsResponse = await customsDeclarationService.create(customsPayload);
-          results.customsDeclarationId = customsResponse.data?.id;
-        }
-      }
-
-      // TODO: 生成外汇核销单和出口退税单（需要后端 API 支持）
-      // if (selectedForms.includes('forex')) { ... }
-      // if (selectedForms.includes('tax-refund')) { ... }
+      const response = await threeFormsService.generateThreeForms(payload);
+      const results = response.data || {};
 
       toast.success(`生成成功：${Object.keys(results).length} 张单据`);
-      setStep('preview');
       onGenerated?.(results);
       handleOpenChange(false);
     } catch {

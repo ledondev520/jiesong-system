@@ -34,6 +34,7 @@ const forexVerificationRoutes = require('./forexVerifications');
 const taxRefundRoutes = require('./taxRefunds');
 const taxRateRoutes = require('./taxRates');
 const hsCodeRoutes = require('./hsCodes');
+const threeFormsRoutes = require('./threeForms');
 
 const router = Router();
 
@@ -64,5 +65,6 @@ router.use('/forex-verifications', forexVerificationRoutes);
 router.use('/tax-refunds', taxRefundRoutes);
 router.use('/tax-rates', taxRateRoutes);
 router.use('/hs-codes', hsCodeRoutes);
+router.use('/three-forms', threeFormsRoutes);
 
 module.exports = router;
