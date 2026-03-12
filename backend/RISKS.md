@@ -25,3 +25,11 @@
 | SALES-EXP-R1 | 其他导出链路仍可能直接抛普通 `Error` | 某些下载接口仍可能返回 500 而不是业务状态码 | 本轮仅修复销售 Excel/PDF 导出；后续如扩展其他导出接口，复用 `createError(..., 404)` 模式统一收口 | 回退本轮导出 service 改动 |
 | IMPORT-TX-R1 | 真实数据库导入时出现 Prisma/SQLite 与 mock 不一致行为 | 单元测试绿灯但真实导入链路仍可能暴露未覆盖问题 | 本轮已增加事务成功/失败两类单测；后续补一条针对 `importRecords` 的集成回归 | 回退 `dataImportService` 事务内上下文改动，恢复原先非事务上下文创建模式 |
 | IMPORT-TX-R2 | 导入失败日志仍未稳定保留原始“序号”字段 | 人工排查失败项时需要依赖 `data` payload 而不是简洁序号 | 本轮不扩展失败日志模型，只保证事务与状态码修复；后续如继续优化导入体验，可单独修 `normalizeImportRows/getRecordSeq` | 保持当前失败日志结构不变 |
+
+## 2026-03-12 Round 7: Backend Coverage 98 Phase 1
+
+| Risk ID | Trigger | Impact | Mitigation | Rollback |
+|---|---|---|---|---|
+| BE-COV-R1 | 为追求 98% 直接从高耦合模块（如 `aiService` / `importService`）硬补测试 | 周期长、收益低，容易把 coverage 冲刺变成重构任务 | 先按 ROI 补 controller 薄层与中等复杂 service，再处理高耦合模块 | 回退新增测试与最小可测性重构，保留第一阶段基线文档 |
+| BE-COV-R2 | 继续依赖 Node 内建 coverage 而不做额外统计转换 | 当前只有 line/branch/function，没有单独 statements 汇总 | 第一阶段先冻结 Node 原生命令为唯一基线；若后续确需 statements，再补统一脚本，不在冲刺中途切换口径 | 回退新增 coverage 脚本，继续使用 `node --test --experimental-test-coverage` |
+| BE-COV-R3 | app 装配测试再次直接 require 整棵业务路由树 | Prisma/路由副作用重新把 test runner 拖慢或拖挂 | 保持 `app.test.js` 使用依赖替身，仅验证装配契约和 `/health` 路由 | 回退到当前稳定的替身加载方案，不恢复真实 socket / 全路由加载测试 |

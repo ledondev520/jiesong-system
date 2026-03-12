@@ -16,3 +16,10 @@
 | CUSTOMS-DRAFT-BE-01 | P0 | 35m | 1 | DONE | `SalesContract/PackingItem/Product` 现有数据 + 新服务测试 | `customsDeclarationDraftService.js` + `/customs-declarations/auto-drafts` 路由与控制器接入 | `node --test src/services/customsDeclarationDraftService.test.js src/controllers/customsDeclarationController.test.js src/routes/taxModules.test.js` | 可按销售合同自动生成报关单草稿、回填明细申报要素，并返回 created/skipped 统计 |
 | SALES-EXP-404 | P0 | 20m | 1 | DONE | `src/routes/sales.js` + `src/services/exportService.js` + `src/services/pdfExportService.js` | 销售导出接口缺失合同时返回 404 + 回归测试 | `cd backend && node --test src/routes/sales.test.js src/services/exportService.test.js src/services/pdfExportService.test.js` | `/:id/export-excel` 与 `/:id/export-pdf` 缺失合同均返回 404，服务/路由测试通过 |
 | IMPORT-TX-01 | P0 | 20m | 1 | DONE | `src/services/dataImportService.js` + `src/services/dataImportService.test.js` | 导入事务内 item 查重/创建统一使用 `tx` client | `cd backend && node --test src/services/dataImportService.test.js` | 导入测试不再因事务内外 client 混用触发外键失败，新增事务行为测试通过 |
+
+## 2026-03-12 Backend Coverage 98
+
+| ID | Priority | ETA | Slot | Status | Input | Output | Validation | DoD |
+|---|---|---:|---:|---|---|---|---|---|
+| BE-COV-98-P1 | P0 | 45m | 1 | DONE | 现有 backend 全量 node:test 套件 | 稳定 coverage 基线 + 第一阶段专项报告 | `cd backend && npm test && node --test --experimental-test-coverage` | 全量测试可稳定退出，且已产出 `docs/coverage-98-backend-report.md` 记录真实基线 |
+| BE-COV-98-P2 | P0 | 90m | 1 | TODO | 第一阶段 coverage 报告 + 文件级缺口清单 | Controller/Service 分批补测并把 backend coverage 推进到 `>=98%` | `cd backend && npm test && node --test --experimental-test-coverage` | lines/branches/functions 全部 `>=98%` |

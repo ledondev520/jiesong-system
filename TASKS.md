@@ -144,3 +144,17 @@
 | TRM-CRUD-API-01 | P0 | 35m | 1 | DONE | 既有 `customsDeclaration/forexVerification/taxRefund/taxRate` 服务层与路由模式 | 4 组税退模块 CRUD 控制器 + 路由挂载 + 定向回归测试 | `cd backend && node --test src/services/customsDeclarationService.test.js src/services/forexVerificationService.test.js src/services/taxRateService.test.js src/services/taxRefundService.test.js src/routes/taxModules.test.js src/controllers/taxRefundController.test.js` | `/api/v1/customs-declarations`、`/api/v1/forex-verifications`、`/api/v1/tax-refunds`、`/api/v1/tax-rates` 已挂载且回归通过 |
 | TRM-CRUD-FE-01 | P0 | 45m | 1 | DONE | 退税 API 契约 + 现有 dashboard 页面模式 | `/dashboard/tax-refunds` 列表/详情/创建/编辑 + 服务层/类型/导航入口 + 构建修复 | `cd frontend && npm test -- src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.test.tsx src/app/dashboard/tax-refunds/create/page.test.tsx 'src/app/dashboard/tax-refunds/[id]/page.test.tsx' 'src/app/dashboard/tax-refunds/[id]/edit/page.test.tsx' src/components/layout/Sidebar.test.tsx && cd frontend && npm run lint -- src/services/taxRefund.service.ts src/services/taxRefund.service.test.ts src/components/layout/Sidebar.tsx src/components/layout/Sidebar.test.tsx src/types/index.ts src/app/layout.tsx src/app/dashboard/tax-refunds/page.tsx src/app/dashboard/tax-refunds/page.test.tsx src/app/dashboard/tax-refunds/create/page.tsx src/app/dashboard/tax-refunds/create/page.test.tsx 'src/app/dashboard/tax-refunds/[id]/page.tsx' 'src/app/dashboard/tax-refunds/[id]/page.test.tsx' 'src/app/dashboard/tax-refunds/[id]/edit/page.tsx' 'src/app/dashboard/tax-refunds/[id]/edit/page.test.tsx' src/app/dashboard/tax-refunds/components/TaxRefundStatusBadge.tsx src/app/dashboard/tax-refunds/components/TaxRefundForm.tsx src/app/dashboard/tax-refunds/components/TaxRefundListPageContent.tsx src/app/dashboard/tax-refunds/components/TaxRefundDetailPageContent.tsx && cd frontend && npm run build` | 登录后退税模块可进入、可增改查、静态校验与生产构建通过 |
 | OPS-CTI-01 | P0 | 30m | 1 | DONE | 安装并配置 `claude-to-im` 飞书桥接：收缩项目 skill 入口、修复 `doctor.sh` 缺配置崩溃、写入本地 `config.env`、完成凭据校验并启动守护进程 |
+| FE-COV-98 | P0 | 90m | 1 | DOING | 前端全量 Vitest + 当前 coverage 配置 | 修复既有红灯、扩 `coverage.include` 到 `src/app`/`src/services` 并把四项指标拉到 `>=98%`，产出专项报告 | `cd frontend && npm run test && npm run test:coverage` | 全量前端单测通过，Statements/Branches/Functions/Lines 全部 `>=98%` |
+| FE-COV-98-A | P0 | 20m | 1 | DONE | 提炼既有执行计划与当前 coverage 配置现状，产出 `docs/coverage-98-master-plan.md` 分阶段总纲 |
+| FE-COV-98-B | P0 | 25m | 1 | TODO | 锁定最新 `frontend` 全量 test / coverage 基线，输出低覆盖热点清单与阶段优先级 |
+| FE-COV-98-C | P0 | 45m | 1 | TODO | 修复当前前端失败测试与 coverage 下慢测不稳定项，恢复全量单测稳定绿灯 |
+| FE-COV-98-D | P0 | 35m | 1 | TODO | 扩大 `frontend/vitest.config.ts` 的 `coverage.include` 到 `src/app`/`src/services`/`src/lib`/`src/components` 并收紧 threshold |
+| FE-COV-98-E | P0 | 60m | 1 | TODO | 按热点顺序补 `services/lib/app/components` 测试并清理 branches/functions 长尾缺口 |
+| FE-COV-98-F | P0 | 20m | 1 | TODO | 完成最终 `test + coverage` 验证，输出专项报告并更新结果台账 |
+| FE-COV-98-CI | P0 | 20m | 1 | DONE | 现有 `test-and-acceptance.yml`、`frontend/vitest.config.ts`、2026-03-12 coverage 基线实测结果 | `docs/coverage-98-ci-plan.md` + 文档导航 + checkpoint 产物 | `cd frontend && npm run test:coverage`；`git diff --check -- docs/coverage-98-ci-plan.md docs/README.md PLAN.md TASKS.md logs/task-FE-COV-98-DOC.md RESULTS/FE-COV-98-DOC.md` | CI 门禁方案已落盘，后续可按该方案推进稳定性治理和 98% 硬门禁切换 |
+
+## 2026-03-12 Backend Coverage 98
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| BE-COV-98 | P0 | 120m | 1 | DOING | 后端覆盖率推进到 98%，第一阶段先完成测试门禁稳定化、全量基线盘点与专项报告，第二阶段进入 controller/service 分批补测 |

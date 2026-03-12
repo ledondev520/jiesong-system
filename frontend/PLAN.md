@@ -1,5 +1,29 @@
 # Customs Declaration Management
 
+## 2026-03-12 Round 7: Frontend Coverage 98 Phase 1 Baseline
+
+### Goal
+- Build a trustworthy phase-1 baseline for the frontend `>=98%` coverage push before changing thresholds or widening coverage scope.
+
+### Execution Outcome
+- Confirmed the current Vitest coverage gate is still scoped to `src/components/**/*.ts(x)` plus `src/lib/**/*.ts`, with thresholds left at `10/10/20/20`.
+- Counted the current covered scope versus the target scope:
+  - Current configured scope: `79` files.
+  - Target phase scope (`src/app`, `src/components`, `src/lib`, `src/services`): `243` files.
+  - Immediate scope expansion delta: `+164` files.
+- Replayed fresh full-suite commands and captured new blockers before coverage expansion:
+  - `src/app/(auth)/login/page.test.tsx` is stale against the current security behavior and accessible-name structure.
+  - High-interaction page tests are timing out under full-suite pressure in `customs-declarations`, `inventory-container`, and `sales/[id]`.
+
+### Verification
+- `npm run test`
+- `npm run test:coverage`
+- `npm run test -- src/app/'(auth)'/login/page.test.tsx`
+
+### Phase Boundary
+- Phase 1 is documentation and baseline only.
+- No production code or test code was changed in this round.
+
 ## 2026-03-08 Round 6: Frontend Vitest Timeout Stabilization
 
 ### Goal

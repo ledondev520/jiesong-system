@@ -9,8 +9,8 @@ const store = new Map();
 
 const cleanupInterval = 60000; // 每分钟清理一次过期记录
 
-// 定期清理过期记录
-setInterval(() => {
+// 定期清理过期记录。unref() 避免模块初始化后阻塞进程退出。
+const cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, value] of store.entries()) {
     if (value.resetTime < now) {
@@ -18,6 +18,10 @@ setInterval(() => {
     }
   }
 }, cleanupInterval);
+
+if (typeof cleanupTimer.unref === 'function') {
+  cleanupTimer.unref();
+}
 
 /**
  * 创建速率限制中间件

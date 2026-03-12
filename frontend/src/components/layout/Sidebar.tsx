@@ -73,6 +73,7 @@ const navItems = [
   
   // 基础设置
   { href: '/dashboard/settings', label: '基础设置', icon: Settings },
+  { href: '/dashboard/hs-codes', label: 'HSCode 查询', icon: Globe },
 ];
 
 /**

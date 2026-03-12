@@ -179,6 +179,7 @@ export default function LoginPage() {
                       <div className="relative">
                         <Input
                           type={showPassword ? 'text' : 'password'}
+                          aria-label="密码"
                           placeholder="••••••"
                           className="rounded-xl bg-background/70 pr-10"
                           {...field}
@@ -186,6 +187,7 @@ export default function LoginPage() {
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
+                          aria-label={showPassword ? '隐藏密码' : '显示密码'}
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                           tabIndex={-1}
                         >

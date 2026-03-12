@@ -1,0 +1,121 @@
+diff --git a/PLAN.md b/PLAN.md
+index 5da38b7..6d52125 100644
+--- a/PLAN.md
++++ b/PLAN.md
+@@ -1,5 +1,26 @@
+ # Frontend Polish Plan
+ 
++## 2026-03-12 Round 50 (Frontend Coverage 98 Master Plan)
++
++### Goal
++- 产出前端覆盖率 `>=98%` 的分阶段总计划，明确基线、阶段目标、里程碑、风险与交付口径，供 `FE-COV-98` 后续执行与断点续跑。
++
++### Delivered
++- 新增 `docs/coverage-98-master-plan.md`，明确：
++  - 当前 coverage 基线与统计口径缺口
++  - `Phase 0` 到 `Phase 5` 的分阶段推进路径
++  - `M1` 到 `M6` 的里程碑定义
++  - 覆盖率冲刺中的关键风险与应对策略
++- 将现有执行型计划 `docs/plans/2026-03-12-frontend-coverage-98.md` 与新的 master plan 形成“执行步骤 + 调度总纲”双文档结构。
++- 同步更新根级 `TASKS.md`、`METRICS.md`、`RISKS.md` 与 `docs/README.md`，让 FE-COV-98 可继续串行推进。
++
++### Verification
++- 文档一致性检查：`docs/coverage-98-master-plan.md` 已落盘，且 `docs/README.md`、根级台账已同步引用。
++- 说明：本轮为计划与台账产出，不涉及业务代码改动，未执行 `frontend` 构建或测试门禁。
++
++### Remaining Risk
++- FE-COV-98 进入执行阶段后，`coverage.include` 扩到 `src/app` / `src/services` 可能导致覆盖率短期显著回落；需按 master plan 先清红灯、再扩口径、再补长尾分支。
++
+ ## 2026-03-10 Round 49 (Claude-to-IM Feishu Bridge Setup)
+ 
+ ### Goal
+@@ -1005,3 +1026,45 @@
+   - `cd frontend && npm test -- src/services/customsDeclaration.service.test.ts src/app/customs-declarations/page.test.tsx`：通过（9/9）。
+   - `cd frontend && npm run lint -- src/services/customsDeclaration.service.ts src/services/customsDeclaration.service.test.ts src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx src/app/customs-declarations/page.test.tsx`：通过。
+   - `cd frontend && npm run build`：通过。
++
++## 2026-03-12 Round 49（Frontend Coverage >=98 专项）
++
++- 本轮目标：
++  - 修复 `frontend` 现有失败测试，恢复全量 `vitest` 绿灯。
++  - 将前端 coverage 统计口径扩到 `src/app`、`src/services` 等关键目录。
++  - 补齐测试直到 Statements/Branches/Functions/Lines 全部达到 `>=98%`。
++  - 在每次 coverage 运行后把结果写入 `METRICS.md`，并产出 `docs/coverage-98-frontend-report.md`。
++- 执行策略：
++  - 先跑当前 `npm run test` 与 `npm run test:coverage` 建立基线，不在未知状态下直接改代码。
++  - 按 root cause 修复失败测试；仅在确认生产代码真实缺陷时修改实现。
++  - 再扩 `frontend/vitest.config.ts` 的 `coverage.include/thresholds`，用真实门禁识别低覆盖文件。
++  - 对低覆盖页面 wrapper、服务错误分支和关键工具函数补定向测试；必要时做最小可测性重构。
++- 本轮交付物：
++  - `docs/plans/2026-03-12-frontend-coverage-98.md`
++  - `docs/coverage-98-frontend-report.md`
++  - `logs/task-FE-COV-98.md`
++  - `RESULTS/FE-COV-98.md`
++  - `PATCHES/FE-COV-98.diff`
++
++## 2026-03-12 Round 51（Coverage 98 CI Gate Plan）
++
++### Goal
++- 交付 `docs/coverage-98-ci-plan.md`，把“前端 coverage 提升到 98%”沉淀为可执行的 CI 门禁切换方案。
++
++### Delivered
++- 新增 `docs/coverage-98-ci-plan.md`，补齐：
++  - 当前 GitHub Actions 前端门禁顺序
++  - `frontend/vitest.config.ts` 的现状缺口
++  - 为什么当前不能直接切到 `98%` 硬阈值
++  - “先稳定 coverage 执行 -> 扩统计口径 -> 补缺口 -> 切硬门禁”的顺序
++- 更新 `docs/README.md`，把该 CI 方案纳入文档导航。
++- 更新 `TASKS.md` 与任务产物，保证后续断点续跑能直接接上当前门禁方案。
++
++### Verification
++- `cd frontend && npm run test:coverage`
++  - 当前实测先暴露慢测/超时：`src/app/customs-declarations/page.test.tsx` 在 coverage 模式下触发 `20000ms` 超时，说明切 98% 阈值前必须先处理稳定性。
++- `git diff --check -- docs/coverage-98-ci-plan.md docs/README.md PLAN.md TASKS.md logs/task-FE-COV-98-DOC.md RESULTS/FE-COV-98-DOC.md`
++  - 用于校验本轮文档与 checkpoint 改动无格式错误。
++
++### Remaining Risk
++- 当前 coverage 基线仍未稳定收口；若直接把 threshold 改到 `98`，CI 会先死在慢测超时，而不是死在真实覆盖率缺口。
+diff --git a/TASKS.md b/TASKS.md
+index 73e5440..6cd685e 100644
+--- a/TASKS.md
++++ b/TASKS.md
+@@ -144,3 +144,11 @@
+ | TRM-CRUD-API-01 | P0 | 35m | 1 | DONE | 既有 `customsDeclaration/forexVerification/taxRefund/taxRate` 服务层与路由模式 | 4 组税退模块 CRUD 控制器 + 路由挂载 + 定向回归测试 | `cd backend && node --test src/services/customsDeclarationService.test.js src/services/forexVerificationService.test.js src/services/taxRateService.test.js src/services/taxRefundService.test.js src/routes/taxModules.test.js src/controllers/taxRefundController.test.js` | `/api/v1/customs-declarations`、`/api/v1/forex-verifications`、`/api/v1/tax-refunds`、`/api/v1/tax-rates` 已挂载且回归通过 |
+ | TRM-CRUD-FE-01 | P0 | 45m | 1 | DONE | 退税 API 契约 + 现有 dashboard 页面模式 | `/dashboard/tax-refunds` 列表/详情/创建/编辑 + 服务层/类型/导航入口 + 构建修复 | `cd frontend && npm test -- src/services/taxRefund.service.test.ts src/app/dashboard/tax-refunds/page.test.tsx src/app/dashboard/tax-refunds/create/page.test.tsx 'src/app/dashboard/tax-refunds/[id]/page.test.tsx' 'src/app/dashboard/tax-refunds/[id]/edit/page.test.tsx' src/components/layout/Sidebar.test.tsx && cd frontend && npm run lint -- src/services/taxRefund.service.ts src/services/taxRefund.service.test.ts src/components/layout/Sidebar.tsx src/components/layout/Sidebar.test.tsx src/types/index.ts src/app/layout.tsx src/app/dashboard/tax-refunds/page.tsx src/app/dashboard/tax-refunds/page.test.tsx src/app/dashboard/tax-refunds/create/page.tsx src/app/dashboard/tax-refunds/create/page.test.tsx 'src/app/dashboard/tax-refunds/[id]/page.tsx' 'src/app/dashboard/tax-refunds/[id]/page.test.tsx' 'src/app/dashboard/tax-refunds/[id]/edit/page.tsx' 'src/app/dashboard/tax-refunds/[id]/edit/page.test.tsx' src/app/dashboard/tax-refunds/components/TaxRefundStatusBadge.tsx src/app/dashboard/tax-refunds/components/TaxRefundForm.tsx src/app/dashboard/tax-refunds/components/TaxRefundListPageContent.tsx src/app/dashboard/tax-refunds/components/TaxRefundDetailPageContent.tsx && cd frontend && npm run build` | 登录后退税模块可进入、可增改查、静态校验与生产构建通过 |
+ | OPS-CTI-01 | P0 | 30m | 1 | DONE | 安装并配置 `claude-to-im` 飞书桥接：收缩项目 skill 入口、修复 `doctor.sh` 缺配置崩溃、写入本地 `config.env`、完成凭据校验并启动守护进程 |
++| FE-COV-98 | P0 | 90m | 1 | DOING | 前端全量 Vitest + 当前 coverage 配置 | 修复既有红灯、扩 `coverage.include` 到 `src/app`/`src/services` 并把四项指标拉到 `>=98%`，产出专项报告 | `cd frontend && npm run test && npm run test:coverage` | 全量前端单测通过，Statements/Branches/Functions/Lines 全部 `>=98%` |
++| FE-COV-98-A | P0 | 20m | 1 | DONE | 提炼既有执行计划与当前 coverage 配置现状，产出 `docs/coverage-98-master-plan.md` 分阶段总纲 |
++| FE-COV-98-B | P0 | 25m | 1 | TODO | 锁定最新 `frontend` 全量 test / coverage 基线，输出低覆盖热点清单与阶段优先级 |
++| FE-COV-98-C | P0 | 45m | 1 | TODO | 修复当前前端失败测试与 coverage 下慢测不稳定项，恢复全量单测稳定绿灯 |
++| FE-COV-98-D | P0 | 35m | 1 | TODO | 扩大 `frontend/vitest.config.ts` 的 `coverage.include` 到 `src/app`/`src/services`/`src/lib`/`src/components` 并收紧 threshold |
++| FE-COV-98-E | P0 | 60m | 1 | TODO | 按热点顺序补 `services/lib/app/components` 测试并清理 branches/functions 长尾缺口 |
++| FE-COV-98-F | P0 | 20m | 1 | TODO | 完成最终 `test + coverage` 验证，输出专项报告并更新结果台账 |
++| FE-COV-98-CI | P0 | 20m | 1 | DONE | 现有 `test-and-acceptance.yml`、`frontend/vitest.config.ts`、2026-03-12 coverage 基线实测结果 | `docs/coverage-98-ci-plan.md` + 文档导航 + checkpoint 产物 | `cd frontend && npm run test:coverage`；`git diff --check -- docs/coverage-98-ci-plan.md docs/README.md PLAN.md TASKS.md logs/task-FE-COV-98-DOC.md RESULTS/FE-COV-98-DOC.md` | CI 门禁方案已落盘，后续可按该方案推进稳定性治理和 98% 硬门禁切换 |
+diff --git a/docs/README.md b/docs/README.md
+index e9bc931..6131e69 100644
+--- a/docs/README.md
++++ b/docs/README.md
+@@ -19,6 +19,8 @@
+ | 测试样例.md | 开发基线 | 测试先行样例与用例清单 |
+ | 模拟数据汇总.md | 追踪清单 | 标记并汇总模拟数据位置 |
+ | 前端统一重构验收清单.md | 验收台账 | 记录前端 shadcn/ui 统一重构的验收项与复核命令 |
++| coverage-98-master-plan.md | 专项总纲 | 定义前端覆盖率提升到 98% 的分阶段路径、门禁与里程碑 |
++| coverage-98-ci-plan.md | CI 方案 | 定义 Coverage `>=98%` 的 CI 门禁切换顺序、前置条件、风险与回退 |
+ | 系统架构落地执行方案.md | 执行总纲 | 定义多 Agent 协同的系统架构落地路径、WU清单与门禁 |
+ | 可执行里程碑计划.md | 调度清单 | 未来2周按批次可执行的6个里程碑、角色、验证与回滚 |
+ | api-contracts/README.md | 子目录索引 | 维护 API 契约子目录导航与职责说明 |
+@@ -41,6 +43,8 @@
+ - ✅ 测试样例 - 已完成（待审核）
+ - ✅ 模拟数据汇总 - 已完成（待审核）
+ - ✅ 前端统一重构验收清单 - 已完成
++- ✅ Frontend Coverage 98 Master Plan - 已完成
++- ✅ Frontend Coverage 98 CI Gate Plan - 已完成
+ - ✅ 系统架构落地执行方案 - 已完成
+ - ✅ 可执行里程碑计划（V1） - 已完成
+ - ✅ 采购链路 API 契约与联调面板 - 已完成（M2）
+@@ -50,4 +54,4 @@
+ 
+ ## 下一步
+ - 用户审核确认文档
+-- 按《可执行里程碑计划（V1）》继续执行 M6（采购模板复制到销售链路）
++- 先按 `coverage-98-ci-plan.md` 处理 coverage 稳定性与门禁切换，再按 `coverage-98-master-plan.md` 执行 FE-COV-98 的 M1-M6

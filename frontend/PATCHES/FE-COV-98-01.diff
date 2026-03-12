@@ -1,0 +1,66 @@
+diff --git a/frontend/METRICS.md b/frontend/METRICS.md
+index 205fcc8..89ecb6f 100644
+--- a/frontend/METRICS.md
++++ b/frontend/METRICS.md
+@@ -9,3 +9,4 @@
+ | 4 | Tax-refunds auto-draft trigger + live HSCode type compatibility | Pass (`9` tests) | Pass | Pass | Not run | Verification covered `taxRefund.service`, tax-refunds dashboard page interaction, and final `next build` |
+ | 5 | Customs auto-draft trigger | Pass (`9` tests) | Pass | Pass | Not run | Verification covered `customsDeclaration.service`, customs-declarations list page interaction, and final `next build` |
+ | 6 | Frontend Vitest timeout stabilization | Pass (`101 files / 313 tests`) | Not run | Not run | Pass (`73.28%` statements / `80.2%` branches / `67.45%` functions / `73.28%` lines) | Minimal fix was `testTimeout: 20000` in `vitest.config.ts`; verified with full `npm run test` and `npm run test:coverage` |
++| 7 | Coverage 98 phase-1 baseline | Fail (fresh full-suite run observed red files in `login`, `customs-declarations`, `inventory-container`, `sales/[id]`) | Not run | Not run | Baseline only: configured coverage scope remains `79` files vs target `243` files; no fresh final summary captured in this phase | Evidence captured from fresh `npm run test`, fresh `npm run test:coverage` start, config inspection, and focused login rerun kickoff; phase-1 goal was to lock blockers and scope delta before raising thresholds |
+diff --git a/frontend/PLAN.md b/frontend/PLAN.md
+index d5f4c3f..a433b4d 100644
+--- a/frontend/PLAN.md
++++ b/frontend/PLAN.md
+@@ -1,5 +1,29 @@
+ # Customs Declaration Management
+ 
++## 2026-03-12 Round 7: Frontend Coverage 98 Phase 1 Baseline
++
++### Goal
++- Build a trustworthy phase-1 baseline for the frontend `>=98%` coverage push before changing thresholds or widening coverage scope.
++
++### Execution Outcome
++- Confirmed the current Vitest coverage gate is still scoped to `src/components/**/*.ts(x)` plus `src/lib/**/*.ts`, with thresholds left at `10/10/20/20`.
++- Counted the current covered scope versus the target scope:
++  - Current configured scope: `79` files.
++  - Target phase scope (`src/app`, `src/components`, `src/lib`, `src/services`): `243` files.
++  - Immediate scope expansion delta: `+164` files.
++- Replayed fresh full-suite commands and captured new blockers before coverage expansion:
++  - `src/app/(auth)/login/page.test.tsx` is stale against the current security behavior and accessible-name structure.
++  - High-interaction page tests are timing out under full-suite pressure in `customs-declarations`, `inventory-container`, and `sales/[id]`.
++
++### Verification
++- `npm run test`
++- `npm run test:coverage`
++- `npm run test -- src/app/'(auth)'/login/page.test.tsx`
++
++### Phase Boundary
++- Phase 1 is documentation and baseline only.
++- No production code or test code was changed in this round.
++
+ ## 2026-03-08 Round 6: Frontend Vitest Timeout Stabilization
+ 
+ ### Goal
+diff --git a/frontend/RISKS.md b/frontend/RISKS.md
+index b2b602f..04e0634 100644
+--- a/frontend/RISKS.md
++++ b/frontend/RISKS.md
+@@ -13,3 +13,6 @@
+ | R9 | 自动退税草稿依赖后端可用的 `hsCode + totalPrice + refundRate` 组合 | 用户点击“自动生成草稿”后可能只生成部分记录，或出现 skipped 提示 | 在 UI 中明确显示 created/skipped 数量；后端 note 中记录自动生成来源并对缺少税率的数据跳过 | 回退前端自动生成按钮，仅保留手工新建退税单入口 |
+ | R10 | 自动报关单草稿依赖现有装箱明细金额与商品申报信息质量 | 用户点击“自动生成草稿”后可能只生成部分报关单，或部分申报要素来自 HSCode 回退值 | 在 UI 中显示 created/skipped 数量；服务层对缺申报要素时先回退 live HSCode，再保留草稿 note 说明来源 | 回退前端自动生成按钮，仅保留手工新建报关单入口 |
+ | R11 | Full-suite Vitest and coverage runs can push high-interaction page tests beyond the default `5s` timeout | CI unit/coverage jobs fail with false negatives although isolated tests pass | Set `testTimeout: 20000` in `vitest.config.ts` and keep production code unchanged; verify with fresh full-suite `test` and `test:coverage` runs | Revert the `vitest.config.ts` timeout change only | Closed |
++| R12 | Login/auth tests still assert the pre-security behavior (remembered password, old checkbox copy, direct password field label) while the page now stores username only and wraps the password input inside a visibility-toggle container | Coverage 98 work is blocked by stale red tests before threshold tightening can begin | Update the login tests to match the current security contract and accessible queries, then re-run the focused auth suite before touching coverage gates | Revert only the auth test updates if product/security requirements change again | Open |
++| R13 | Several page-level interaction suites still exceed `20000ms` when run inside the full suite, so widening `coverage.include` to `src/app` will amplify timeout pressure immediately | Coverage expansion can look like a coverage problem while the real blocker is suite runtime instability | Isolate timeout-heavy files, reduce redundant waits/mocks, and prove they pass under focused and full-suite runs before expanding the coverage scope | Revert only the affected test refinements if they introduce behavior drift | Open |
++
+diff --git a/frontend/TASKS.md b/frontend/TASKS.md
+index bd990c4..df38ffb 100644
+--- a/frontend/TASKS.md
++++ b/frontend/TASKS.md
+@@ -16,3 +16,7 @@
+ | CD-AUTO-01 | P0 | 15m | 1 | DONE | New backend customs auto-draft endpoint contract | `customsDeclaration.service.ts` auto-draft client + failing page/service tests | `npm test -- src/services/customsDeclaration.service.test.ts src/app/customs-declarations/page.test.tsx` | Frontend captures the customs auto-draft endpoint contract before UI implementation |
+ | CD-AUTO-02 | P0 | 15m | 1 | DONE | Failing customs auto-draft tests | Customs-declarations list action button + success/error reload behavior | Same targeted `vitest` command | User can trigger customs draft generation from the list page and see created/skipped feedback |
+ | CI-FE-01 | P0 | 20m | 1 | DONE | Full-suite `vitest` timeout failures in slow page-interaction tests | `vitest.config.ts` timeout recovery + refreshed checkpoint artifacts | `npm run test` and `npm run test:coverage` | Full frontend unit and coverage gates pass without touching production code |
++| FE-COV-98-01 | P0 | 15m | 1 | DONE | `docs/plans/2026-03-12-frontend-coverage-98.md`, `vitest.config.ts`, current suite status | Phase-1 baseline report, refreshed checkpoints, task log/result | `npm run test`; `npm run test:coverage`; `npm run test -- src/app/'(auth)'/login/page.test.tsx` | Report captures real blockers, current coverage scope, and next execution order before threshold changes |
++| FE-COV-98-02 | P0 | 20m | 1 | TODO | FE-COV-98-01 baseline blockers | Stabilized login/auth tests and timeout-heavy page tests | Focused `vitest` runs for each red file, then `npm run test` | Full unit suite returns to green under existing coverage scope |
++| FE-COV-98-03 | P0 | 20m | 1 | TODO | Green suite under current scope | Expanded `coverage.include` + raised thresholds + low-coverage补测 | `npm run test:coverage` | Statements/Branches/Functions/Lines all reach `>=98%` in the target frontend scope |
++

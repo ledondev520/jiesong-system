@@ -8,7 +8,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { roleAuth, adminOnly } = require('./auth');
+const { roleAuth, adminOnly } = require('./roleAuth');
 
 /**
  * 职责：创建捕获next错误的函数

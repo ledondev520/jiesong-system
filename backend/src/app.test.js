@@ -6,28 +6,87 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const http = require('node:http');
-const app = require('./app');
+const Module = require('node:module');
+const express = require('express');
+
+const loadApp = () => {
+  const originalLoad = Module._load;
+  const appPath = require.resolve('./app');
+
+  const noopMiddleware = (req, res, next) => next();
+  const notFoundHandler = (req, res, next) => next();
+  const errorHandler = (err, req, res, next) => next(err);
+
+  Module._load = function patchedLoad(request, parent, isMain) {
+    if (parent?.filename === appPath) {
+      if (request === './config') {
+        return {
+          port: 3000,
+          nodeEnv: 'test',
+          cors: {
+            origin: [],
+            credentials: true,
+          },
+        };
+      }
+      if (request === './routes') {
+        return express.Router();
+      }
+      if (request === './middleware/errorHandler') {
+        return { errorHandler, notFoundHandler };
+      }
+      if (request === './middleware/logger') {
+        return { requestLogger: noopMiddleware };
+      }
+      if (request === './middleware/rateLimit') {
+        return {
+          gentleRateLimit: () => noopMiddleware,
+        };
+      }
+      if (request === './jobs/inventoryAlertJob') {
+        return {
+          startInventoryAlertJob: () => {},
+        };
+      }
+    }
+
+    return originalLoad(request, parent, isMain);
+  };
+
+  delete require.cache[appPath];
+  try {
+    return require('./app');
+  } finally {
+    Module._load = originalLoad;
+    delete require.cache[appPath];
+  }
+};
 
 test('app: 以模块方式加载时不直接监听端口', () => {
+  const app = loadApp();
   assert.equal(typeof app, 'function');
 });
 
-test('app: /health 返回基础健康信息', async () => {
-  const server = http.createServer(app);
+test('app: /health 返回基础健康信息', () => {
+  const app = loadApp();
+  const healthRouteLayer = app._router.stack.find(
+    (layer) => layer.route?.path === '/health' && layer.route.methods?.get
+  );
 
-  await new Promise((resolve) => server.listen(0, resolve));
-  const address = server.address();
-  const port = typeof address === 'object' && address ? address.port : 0;
+  assert.ok(healthRouteLayer, '应注册 GET /health 路由');
 
-  try {
-    const response = await fetch(`http://127.0.0.1:${port}/health`);
-    const data = await response.json();
+  let payload = null;
+  const res = {
+    json(data) {
+      payload = data;
+      return data;
+    },
+  };
 
-    assert.equal(response.status, 200);
-    assert.equal(data.status, 'ok');
-    assert.equal(data.version, '1.0.0');
-  } finally {
-    await new Promise((resolve) => server.close(resolve));
-  }
+  healthRouteLayer.route.stack[0].handle({}, res);
+
+  assert.ok(payload, '/health 应返回 JSON 响应');
+  assert.equal(payload.status, 'ok');
+  assert.equal(payload.version, '1.0.0');
+  assert.match(payload.timestamp, /^\d{4}-\d{2}-\d{2}T/);
 });

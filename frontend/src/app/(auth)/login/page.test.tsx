@@ -54,21 +54,19 @@ describe('LoginPage 交互逻辑', () => {
 
   it('rememberMe 复选框具备可访问名称', () => {
     render(<LoginPage />);
-    expect(screen.getByRole('checkbox', { name: '记住账号和密码' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: '记住用户名' })).toBeInTheDocument();
   });
 
-  it('可从本地恢复记住的账号密码', async () => {
-    localStorage.setItem('jiesong_saved_credentials', JSON.stringify({
+  it('可从本地恢复记住的用户名', async () => {
+    localStorage.setItem('jiesong_saved_username', JSON.stringify({
       username: 'admin',
-      password: '123456',
     }));
 
     render(<LoginPage />);
 
     await waitFor(() => {
       expect(screen.getByLabelText('用户名')).toHaveValue('admin');
-      expect(screen.getByLabelText('密码')).toHaveValue('123456');
-      expect(screen.getByRole('button', { name: '快捷登录（admin）' })).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: '记住用户名' })).toHaveAttribute('aria-checked', 'true');
     });
   });
 
@@ -89,7 +87,7 @@ describe('LoginPage 交互逻辑', () => {
     await user.type(screen.getByLabelText('密码'), '123456');
 
     // 1. 开启记住账号密码并提交
-    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('checkbox', { name: '记住用户名' }));
     await user.click(screen.getByRole('button', { name: '登录' }));
 
     // 2. 校验请求与后续动作
@@ -105,47 +103,24 @@ describe('LoginPage 交互逻辑', () => {
       expect(mockPush).toHaveBeenCalledWith('/');
     });
 
-    // 3. 校验记住账号密码写入
-    expect(localStorage.getItem('jiesong_saved_username')).toBe('admin');
-    expect(localStorage.getItem('jiesong_saved_credentials')).toBe(
-      JSON.stringify({ username: 'admin', password: '123456' }),
+    // 3. 校验仅记住用户名
+    expect(localStorage.getItem('jiesong_saved_username')).toBe(
+      JSON.stringify({ username: 'admin' }),
     );
   });
 
-  it('可使用快捷登录按钮直接登录', async () => {
-    localStorage.setItem('jiesong_saved_credentials', JSON.stringify({
+  it('仅记住用户名时不会渲染快捷登录入口', async () => {
+    localStorage.setItem('jiesong_saved_username', JSON.stringify({
       username: 'xuminjie',
-      password: '123456',
     }));
 
-    mockAuthServiceLogin.mockResolvedValue({
-      code: 200,
-      data: {
-        user: { id: 'u2', username: 'xuminjie', name: 'xuminjie', role: 'SALES' },
-        token: 'token-quick',
-      },
-    });
-
-    const user = userEvent.setup();
     render(<LoginPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '快捷登录（xuminjie）' })).toBeInTheDocument();
+      expect(screen.getByLabelText('用户名')).toHaveValue('xuminjie');
     });
 
-    await user.click(screen.getByRole('button', { name: '快捷登录（xuminjie）' }));
-
-    await waitFor(() => {
-      expect(mockAuthServiceLogin).toHaveBeenCalledWith({
-        username: 'xuminjie',
-        password: '123456',
-      });
-      expect(mockAuthStoreLogin).toHaveBeenCalledWith(
-        { id: 'u2', username: 'xuminjie', name: 'xuminjie', role: 'SALES' },
-        'token-quick',
-      );
-      expect(mockPush).toHaveBeenCalledWith('/');
-    });
+    expect(screen.queryByRole('button', { name: /快捷登录/ })).not.toBeInTheDocument();
   });
 
   it('登录失败时展示错误提示', async () => {

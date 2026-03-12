@@ -168,3 +168,25 @@
 - `dataImportService.importRecords` 现改为按记录在同一事务内完成上下文实体查找/创建、明细写入与库存写入。
 - 为避免单条事务失败污染后续导入，本轮新增“事务级缓存克隆 + 成功后提交 + 失败后恢复 created 计数”的保护。
 - 定向验证已完成：`node --test src/routes/sales.test.js src/services/exportService.test.js src/services/pdfExportService.test.js src/services/dataImportService.test.js`，结果 12/12 通过。
+
+## 2026-03-12 Round 7: Backend Coverage 98 Phase 1
+
+### Goal
+- 为 backend coverage 98 冲刺建立可信基线，先清理测试门禁阻塞，再拿到全量覆盖率真实盘点。
+
+### Delivered
+- 重写 `src/app.test.js`，移除对真实 socket 与整棵业务路由树的依赖。
+- 为 `src/middleware/rateLimit.js` 顶层清理定时器补 `unref()`，避免 `node --test` 退出阻塞。
+- 新增回归测试 `src/middleware/rateLimit.init.test.js`。
+- 产出专项报告：`../docs/coverage-98-backend-report.md`。
+- 产出实施计划：`../docs/plans/2026-03-12-backend-coverage-98.md`。
+
+### Verification
+- `cd backend && node --test src/app.test.js src/middleware/rateLimit.init.test.js src/middleware/rateLimit.test.js`
+- `cd backend && npm test`
+- `cd backend && node --test --experimental-test-coverage`
+
+### Current Status
+- 后端全量测试：`227/227` 通过
+- 后端 coverage 基线：`lines 63.88% / branches 61.74% / functions 55.40%`
+- 下一阶段重点：controller 薄层行为测试与高 ROI service 分支补测

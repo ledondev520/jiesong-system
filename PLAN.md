@@ -1,5 +1,26 @@
 # Frontend Polish Plan
 
+## 2026-03-12 Round 50 (Frontend Coverage 98 Master Plan)
+
+### Goal
+- 产出前端覆盖率 `>=98%` 的分阶段总计划，明确基线、阶段目标、里程碑、风险与交付口径，供 `FE-COV-98` 后续执行与断点续跑。
+
+### Delivered
+- 新增 `docs/coverage-98-master-plan.md`，明确：
+  - 当前 coverage 基线与统计口径缺口
+  - `Phase 0` 到 `Phase 5` 的分阶段推进路径
+  - `M1` 到 `M6` 的里程碑定义
+  - 覆盖率冲刺中的关键风险与应对策略
+- 将现有执行型计划 `docs/plans/2026-03-12-frontend-coverage-98.md` 与新的 master plan 形成“执行步骤 + 调度总纲”双文档结构。
+- 同步更新根级 `TASKS.md`、`METRICS.md`、`RISKS.md` 与 `docs/README.md`，让 FE-COV-98 可继续串行推进。
+
+### Verification
+- 文档一致性检查：`docs/coverage-98-master-plan.md` 已落盘，且 `docs/README.md`、根级台账已同步引用。
+- 说明：本轮为计划与台账产出，不涉及业务代码改动，未执行 `frontend` 构建或测试门禁。
+
+### Remaining Risk
+- FE-COV-98 进入执行阶段后，`coverage.include` 扩到 `src/app` / `src/services` 可能导致覆盖率短期显著回落；需按 master plan 先清红灯、再扩口径、再补长尾分支。
+
 ## 2026-03-10 Round 49 (Claude-to-IM Feishu Bridge Setup)
 
 ### Goal
@@ -1005,3 +1026,66 @@
   - `cd frontend && npm test -- src/services/customsDeclaration.service.test.ts src/app/customs-declarations/page.test.tsx`：通过（9/9）。
   - `cd frontend && npm run lint -- src/services/customsDeclaration.service.ts src/services/customsDeclaration.service.test.ts src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx src/app/customs-declarations/page.test.tsx`：通过。
   - `cd frontend && npm run build`：通过。
+
+## 2026-03-12 Round 49（Frontend Coverage >=98 专项）
+
+- 本轮目标：
+  - 修复 `frontend` 现有失败测试，恢复全量 `vitest` 绿灯。
+  - 将前端 coverage 统计口径扩到 `src/app`、`src/services` 等关键目录。
+  - 补齐测试直到 Statements/Branches/Functions/Lines 全部达到 `>=98%`。
+  - 在每次 coverage 运行后把结果写入 `METRICS.md`，并产出 `docs/coverage-98-frontend-report.md`。
+- 执行策略：
+  - 先跑当前 `npm run test` 与 `npm run test:coverage` 建立基线，不在未知状态下直接改代码。
+  - 按 root cause 修复失败测试；仅在确认生产代码真实缺陷时修改实现。
+  - 再扩 `frontend/vitest.config.ts` 的 `coverage.include/thresholds`，用真实门禁识别低覆盖文件。
+  - 对低覆盖页面 wrapper、服务错误分支和关键工具函数补定向测试；必要时做最小可测性重构。
+- 本轮交付物：
+  - `docs/plans/2026-03-12-frontend-coverage-98.md`
+  - `docs/coverage-98-frontend-report.md`
+  - `logs/task-FE-COV-98.md`
+  - `RESULTS/FE-COV-98.md`
+  - `PATCHES/FE-COV-98.diff`
+
+## 2026-03-12 Round 51（Coverage 98 CI Gate Plan）
+
+### Goal
+- 交付 `docs/coverage-98-ci-plan.md`，把“前端 coverage 提升到 98%”沉淀为可执行的 CI 门禁切换方案。
+
+### Delivered
+- 新增 `docs/coverage-98-ci-plan.md`，补齐：
+  - 当前 GitHub Actions 前端门禁顺序
+  - `frontend/vitest.config.ts` 的现状缺口
+  - 为什么当前不能直接切到 `98%` 硬阈值
+  - “先稳定 coverage 执行 -> 扩统计口径 -> 补缺口 -> 切硬门禁”的顺序
+- 更新 `docs/README.md`，把该 CI 方案纳入文档导航。
+- 更新 `TASKS.md` 与任务产物，保证后续断点续跑能直接接上当前门禁方案。
+
+### Verification
+- `cd frontend && npm run test:coverage`
+  - 当前实测先暴露慢测/超时：`src/app/customs-declarations/page.test.tsx` 在 coverage 模式下触发 `20000ms` 超时，说明切 98% 阈值前必须先处理稳定性。
+- `git diff --check -- docs/coverage-98-ci-plan.md docs/README.md PLAN.md TASKS.md logs/task-FE-COV-98-DOC.md RESULTS/FE-COV-98-DOC.md`
+  - 用于校验本轮文档与 checkpoint 改动无格式错误。
+
+### Remaining Risk
+- 当前 coverage 基线仍未稳定收口；若直接把 threshold 改到 `98`，CI 会先死在慢测超时，而不是死在真实覆盖率缺口。
+
+## 2026-03-12 Round 51 (Backend Coverage 98 Phase 1)
+
+### Goal
+- 为 backend coverage 冲刺建立可信基线，并先提交第一阶段报告。
+
+### Delivered
+- 修复后端测试门禁阻塞：
+  - `backend/src/app.test.js` 改为依赖替身加载，不再依赖真实 socket
+  - `backend/src/middleware/rateLimit.js` 的清理定时器改为 `unref()`
+  - 新增 `backend/src/middleware/rateLimit.init.test.js`
+- 产出：
+  - `docs/coverage-98-backend-report.md`
+  - `docs/plans/2026-03-12-backend-coverage-98.md`
+
+### Verification
+- `cd backend && npm test` => `227/227`
+- `cd backend && node --test --experimental-test-coverage` => `lines 63.88% / branches 61.74% / functions 55.40%`
+
+### Next
+- 进入第二阶段：优先批量补 controller 与高 ROI service 测试，逐轮复跑 coverage。

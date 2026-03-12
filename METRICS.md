@@ -1,5 +1,21 @@
 # Frontend Polish Metrics
 
+## 2026-03-12 Round 50（Frontend Coverage 98 Master Plan）
+
+### 质量指标
+- 新增 master plan：`1`（`docs/coverage-98-master-plan.md`）
+- 同步更新台账文件：`5`（`PLAN.md`、`TASKS.md`、`METRICS.md`、`RISKS.md`、`docs/README.md`）
+- 新增结果归档目标：`2`（`RESULTS/FE-COV-98.md`、`PATCHES/FE-COV-98.diff`）
+
+### 过程指标
+- 分阶段数量：`6`（`Phase 0` 到 `Phase 5`）
+- 里程碑数量：`6`（`M1` 到 `M6`）
+- 新纳入目标统计目录：`4` 类（`app`、`services`、`components`、`lib`）
+
+### 结论
+- FE-COV-98 已从“单条任务描述”升级为可执行的阶段化总纲，后续可以按里程碑推进而不是按感觉补测。
+- 本轮未执行 `frontend` 测试/coverage；当前最新已知基线仍以 2026-03-08 Round 47 记录为准，待 FE-COV-98-B 复测刷新。
+
 ## 2026-03-08 Round 48（Tax Refund Export Precheck V1）
 
 ### 质量指标
@@ -793,3 +809,20 @@
 ### 结论
 - 当前系统已经从“功能可用”推进到“真实数据库已补齐一轮上游报关单草稿并生成部分退税草稿”。
 - 剩余提升空间集中在继续抓取更多 HSCode 章节并减少 `no_rate_data`。
+
+## 2026-03-12 Round 51（Backend Coverage 98 Phase 1）
+
+### 质量指标
+- 后端全量测试：`227/227` 通过
+- 后端全量 coverage：`lines 63.88%` / `branches 61.74%` / `functions 55.40%`
+- 新增回归测试：`1`（`backend/src/middleware/rateLimit.init.test.js`）
+- 改造稳定性测试：`1`（`backend/src/app.test.js`）
+
+### 过程指标
+- 已清理 coverage 基线阻塞点：`2`
+- 新增专项文档：`2`（报告 + 计划）
+- 第二阶段优先目录：`2` 类（`controllers`、`services`）
+
+### 结论
+- backend 当前已具备继续推进 98% 覆盖率的稳定前提，但真实基线仍远低于目标。
+- 下一阶段必须以“高 ROI 补测”为主，而不是继续修测试门禁。

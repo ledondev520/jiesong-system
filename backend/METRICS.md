@@ -105,3 +105,24 @@
 ### Notes
 - 销售导出路由验证改为直接调用 route handler，并断言其向 `next` 传递 404 错误；这在当前沙箱下是可执行且稳定的证据。
 - 导入事务新增了失败隔离逻辑，但仍未做真实 Prisma/SQLite 集成级导入演练，本轮证据以 node:test 单元/模块测试为准。
+
+## 2026-03-12 Round 7
+
+### Baseline
+- 原 `src/app.test.js` 通过真实 `listen(0)` 验证 `/health`，在当前沙箱触发 `listen EPERM 0.0.0.0`
+- 原 `src/middleware/rateLimit.js` 在模块顶层启动清理定时器，导致 `node --test` 存在退出拖尾
+- 本轮开始前，backend 尚未有可信的全量 coverage 盘点文档
+
+### Verification Result
+- `node --test src/middleware/rateLimit.init.test.js` 红灯：子进程 `require('./src/middleware/rateLimit')` 超时，证明退出阻塞存在
+- `node --test src/app.test.js` 绿灯：`2/2` 通过
+- `node --test src/middleware/rateLimit.init.test.js src/middleware/rateLimit.test.js` 绿灯：`6/6` 通过
+- `npm test`：`227/227` 通过
+- `node --test --experimental-test-coverage`：`227/227` 通过，coverage 为：
+  - lines: `63.88%`
+  - branches: `61.74%`
+  - functions: `55.40%`
+
+### Notes
+- 当前 coverage 低位并非门禁失败，而是大量 controller/service 文件只有装载级测试。
+- 第二阶段应优先补 controller 薄层行为测试，以最低成本提升函数覆盖率。
