@@ -411,11 +411,11 @@ export function AIAssistant() {
       {/* Chat Window */}
       <div
         className={cn(
-          "fixed bottom-6 right-6 z-50 w-[380px] transition-all duration-300 origin-bottom-right",
+          "fixed bottom-6 right-6 z-50 w-96 transition-all duration-300 origin-bottom-right",
           isOpen ? "scale-100 opacity-100" : "scale-0 opacity-0 pointer-events-none"
         )}
       >
-        <Card className="h-[500px] flex flex-col shadow-2xl border-primary/20">
+        <Card className="h-[32rem] flex flex-col shadow-2xl border-primary/20">
           <CardHeader className="p-4 bg-primary text-primary-foreground rounded-t-lg flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base">
               <Bot className="h-5 w-5" />
@@ -454,7 +454,7 @@ export function AIAssistant() {
                   >
                     {/* 显示图片 */}
                     {msg.imageUrl && (
-                      <div className="relative h-40 w-full max-w-[280px] overflow-hidden rounded-md">
+                      <div className="relative h-40 w-full max-w-xs overflow-hidden rounded-md">
                         <NextImage
                           src={msg.imageUrl}
                           alt="上传的图片"

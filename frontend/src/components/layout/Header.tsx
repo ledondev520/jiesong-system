@@ -244,10 +244,10 @@ export function Header() {
   // 获取图标
   const getIcon = (type: string) => {
     switch (type) {
-      case 'product': return <Package className="h-4 w-4 text-chart-1" />;
-      case 'supplier': return <Building2 className="h-4 w-4 text-chart-3" />;
-      case 'container': return <Container className="h-4 w-4 text-chart-5" />;
-      case 'purchase': return <FileText className="h-4 w-4 text-chart-4" />;
+      case 'product': return <Package className="h-4 w-4 text-primary" />;
+      case 'supplier': return <Building2 className="h-4 w-4 text-primary" />;
+      case 'container': return <Container className="h-4 w-4 text-primary" />;
+      case 'purchase': return <FileText className="h-4 w-4 text-primary" />;
       case 'sales': return <FileText className="h-4 w-4 text-primary" />;
       default: return <Search className="h-4 w-4" />;
     }
@@ -342,7 +342,7 @@ export function Header() {
               <span className="sr-only">通知</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[300px]">
+          <DropdownMenuContent align="end" className="w-80">
             <DropdownMenuLabel>消息通知</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <div className="py-6 text-center text-muted-foreground text-sm">

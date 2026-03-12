@@ -215,7 +215,7 @@ export default function ContractsPageContent() {
               <Filter className="h-4 w-4 text-muted-foreground" />
               {/* 状态筛选 */}
               <Select value={purchaseStatusFilter} onValueChange={setPurchaseStatusFilter}>
-                <SelectTrigger className="h-10 w-[130px] rounded-xl border-border/70 bg-background/70">
+                <SelectTrigger className="h-10 w-32 rounded-xl border-border/70 bg-background/70">
                   <SelectValue placeholder="全部状态" />
                 </SelectTrigger>
                 <SelectContent>
@@ -230,7 +230,7 @@ export default function ContractsPageContent() {
               </Select>
               {/* 发货店铺筛选 */}
               <Select value={storeFilter} onValueChange={setStoreFilter}>
-                <SelectTrigger className="h-10 w-[150px] rounded-xl border-border/70 bg-background/70">
+                <SelectTrigger className="h-10 w-36 rounded-xl border-border/70 bg-background/70">
                   <SelectValue placeholder="全部店铺" />
                 </SelectTrigger>
                 <SelectContent>
@@ -245,7 +245,7 @@ export default function ContractsPageContent() {
                 placeholder="搜索商品名称..."
                 value={productSearch}
                 onChange={(e) => setProductSearch(e.target.value)}
-                className="h-10 w-[160px] rounded-xl border-border/70 bg-background/70"
+                className="h-10 w-40 rounded-xl border-border/70 bg-background/70"
               />
               {(purchaseStatusFilter !== 'ALL' || storeFilter || productSearch) && (
                 <Button

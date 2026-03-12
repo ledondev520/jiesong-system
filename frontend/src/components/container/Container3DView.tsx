@@ -260,7 +260,7 @@ export default function Container3DView({
   }, [boxes]);
   
   return (
-    <div className="w-full h-[500px] bg-muted rounded-lg overflow-hidden relative">
+    <div className="w-full h-80 md:h-96 bg-muted rounded-lg overflow-hidden relative">
       {/* 利用率信息 */}
       <div className="absolute top-4 left-4 z-10 bg-card/92 rounded-lg p-3 shadow border border-border/60">
         <div className="text-sm font-medium">装箱统计</div>

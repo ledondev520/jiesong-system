@@ -18,11 +18,10 @@ describe('SemanticBadge', () => {
     expect(badge.className).toContain('text-muted-foreground');
   });
 
-  it('warning语义会使用chart-4色系', () => {
+  it('warning语义会使用amber语义色系', () => {
     const { getByText } = render(<SemanticBadge tone="warning">生产中</SemanticBadge>);
     const badge = getByText('生产中');
-    expect(badge.className).toContain('text-chart-4');
-    expect(badge.className).toContain('border-chart-4/35');
+    expect(badge.className).toContain('text-amber-800');
+    expect(badge.className).toContain('border-amber-300');
   });
 });
-

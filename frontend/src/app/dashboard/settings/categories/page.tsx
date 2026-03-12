@@ -180,7 +180,7 @@ export default function CategoriesSettingsPage() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[460px]">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editingCategory ? '编辑分类' : '新增分类'}</DialogTitle>
             <DialogDescription>可选择父分类构建层级结构。</DialogDescription>

@@ -148,7 +148,7 @@ export function BatchImportDialog({
       onOpenChange(newOpen);
       if (!newOpen) resetForm();
     }}>
-      <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>批量导入商品 - HSCode 智能匹配</DialogTitle>
           <DialogDescription>

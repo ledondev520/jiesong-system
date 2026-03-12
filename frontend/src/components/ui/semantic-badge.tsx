@@ -15,10 +15,10 @@ const semanticBadgeVariants = cva("", {
     tone: {
       neutral: "border-border bg-muted text-muted-foreground",
       info: "border-primary/20 bg-primary/10 text-primary",
-      warning: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200",
+      warning: "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400",
       progress: "border-primary/20 bg-primary/10 text-primary",
-      success: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200",
-      danger: "border-destructive/20 bg-destructive/10 text-destructive",
+      success: "border-green-300 bg-green-50 text-green-800 dark:border-green-700 dark:bg-green-950 dark:text-green-400",
+      danger: "border-destructive/30 bg-destructive/10 text-destructive-foreground",
       secondary: "border-border bg-secondary text-secondary-foreground",
     },
   },
