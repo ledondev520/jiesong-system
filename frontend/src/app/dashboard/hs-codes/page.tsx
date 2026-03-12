@@ -10,6 +10,7 @@ import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { HsCodeRecord } from '@/types';
 import { hsCodeService } from '@/services/hsCode.service';
+import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -247,8 +248,6 @@ function HsCodesPageContent() {
     </div>
   );
 }
-
-import { toast } from 'sonner';
 
 export default function HsCodesPage() {
   return (
