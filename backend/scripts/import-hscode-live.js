@@ -73,7 +73,23 @@ const normalizeLiveRecord = (record) => {
   const taxInfo = record?.tax_info || {};
 
   const hsCode = String(record?.hs_code || basicInfo['商品编码'] || '').trim();
-  const productName = String(basicInfo['商品名称'] || '').trim();
+
+  // Try to get product name from basic_info first, then fall back to chapter_hierarchy
+  let productName = String(basicInfo['商品名称'] || '').trim();
+  if (!productName && Array.isArray(record?.chapter_hierarchy)) {
+    // Use the most specific level from chapter hierarchy (last entry with meaningful value)
+    const hierarchy = record.chapter_hierarchy;
+    for (let i = hierarchy.length - 1; i >= 0; i--) {
+      const entry = hierarchy[i];
+      const value = typeof entry?.value === 'string' ? entry.value.trim() : '';
+      // Skip generic category names, look for specific product names
+      if (value && !value.includes('类') && !value.match(/^第?\d+/)) {
+        productName = value;
+        break;
+      }
+    }
+  }
+
   const declarationElements = flattenDeclarationElements(record?.declaration_elements);
   const supervisionConditions = flattenLabeledValues(record?.supervision_conditions);
   const inspectionQuarantine = flattenLabeledValues(record?.inspection_quarantine);
