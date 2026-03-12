@@ -103,10 +103,10 @@ export default function ForgotPasswordPage() {
       <div className="auth-shell">
         <Card className="auth-card">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-chart-3/30 bg-chart-3/16">
-              <CheckCircle className="h-10 w-10 text-chart-3" />
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-primary/20 bg-primary/10">
+              <CheckCircle className="h-10 w-10 text-primary" />
             </div>
-            <CardTitle className="text-brand-emphasis">密码重置成功！</CardTitle>
+            <CardTitle>密码重置成功！</CardTitle>
             <CardDescription>
               您的密码已成功重置，请使用新密码登录。
             </CardDescription>
@@ -135,7 +135,7 @@ export default function ForgotPasswordPage() {
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full border border-primary/30 bg-primary/10">
             <KeyRound className="h-6 w-6 text-primary" />
           </div>
-          <CardTitle className="text-brand-emphasis text-center">找回密码</CardTitle>
+          <CardTitle className="text-center">找回密码</CardTitle>
           <CardDescription className="text-center">
             请输入您的用户名和注册时绑定的手机号进行验证
           </CardDescription>

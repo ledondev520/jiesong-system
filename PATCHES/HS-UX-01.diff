@@ -1,0 +1,477 @@
+diff --git a/PLAN.md b/PLAN.md
+index e327ea0..fce059d 100644
+--- a/PLAN.md
++++ b/PLAN.md
+@@ -1,5 +1,37 @@
+ # Frontend Polish Plan
+ 
++## 2026-03-12 Round 51 (Backend/Frontend Local Login + HSCode List Fix)
++
++### Goal
++- Explain why the local app looked "empty" and why login was failing.
++- Fix HSCode UX so the page shows a full list first, then supports search/filtering.
++- Bring local backend and frontend up together with a verified admin login path.
++
++### Delivered
++- Confirmed the real runtime database is `backend/prisma/dev.db`, not `backend/dev.db`.
++- Verified current table counts: `hs_codes=11879`, `users=1`, but business tables such as `products`, `suppliers`, `stores`, `sales_contracts`, `purchase_contracts`, and `inventories` are currently `0`, which is why the app looks empty outside HSCode/base config data.
++- Reset the local admin credential by re-running seed with a fixed password.
++- Added backend HSCode list capability:
++  - `backend/src/services/hsCodeService.js`
++  - `backend/src/routes/hsCodes.js`
++- Added frontend HSCode list capability and page behavior:
++  - `frontend/src/services/hsCode.service.ts`
++  - `frontend/src/app/dashboard/hs-codes/page.tsx`
++- Added/updated tests:
++  - `backend/src/services/hsCodeService.test.js`
++  - `frontend/src/services/hsCode.service.test.ts`
++  - `frontend/src/app/dashboard/hs-codes/page.test.tsx`
++- Started backend (`3001`) and frontend (`3002`) together and verified both ports respond.
++
++### Verification
++- `node --test src/services/hsCodeService.test.js`
++- `npm test -- src/services/hsCode.service.test.ts src/app/dashboard/hs-codes/page.test.tsx`
++- `curl -I http://127.0.0.1:3002/login`
++- login API verified with seeded admin credential against `http://127.0.0.1:3001/api/v1/auth/login`
++
++### Remaining Risk
++- The app still looks data-sparse outside HSCode/base config because the business tables in `backend/prisma/dev.db` are empty; that is a data-state problem, not a missing database connection.
++
+ ## 2026-03-12 Round 50 (Frontend Coverage 98 Master Plan)
+ 
+ ### Goal
+diff --git a/TASKS.md b/TASKS.md
+index 7d6b491..8b5636d 100644
+--- a/TASKS.md
++++ b/TASKS.md
+@@ -3,6 +3,7 @@
+ ## 任务清单
+ | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+ |---|---|---:|---:|---|---|
++| HS-UX-01 | P0 | 20m | 1 | DONE | 查明本地登录/空库根因，补 HSCode 默认全量列表，再联通本地 backend+frontend 登录链路 |
+ | FP-01 | P0 | 20m | 1 | DONE | 全局视觉 token 与背景层次升级（`globals.css`） |
+ | FP-02 | P0 | 20m | 1 | DONE | dashboard 框架美化（`dashboard/layout` + `Header` + `Sidebar` + `PageHeader`） |
+ | FP-03 | P0 | 20m | 1 | DONE | 工作台核心模块美化（`dashboard/page` + `DataDashboard`） |
+diff --git a/backend/src/routes/hsCodes.js b/backend/src/routes/hsCodes.js
+index 9d0fec3..da19e35 100644
+--- a/backend/src/routes/hsCodes.js
++++ b/backend/src/routes/hsCodes.js
+@@ -15,6 +15,19 @@ const router = Router();
+ 
+ router.use(authenticate);
+ 
++router.get('/', async (req, res, next) => {
++  try {
++    const results = await hsCodeService.listHsCodes({
++      keyword: req.query.keyword,
++      page: req.query.page,
++      pageSize: req.query.pageSize,
++    });
++    success(res, results);
++  } catch (error) {
++    next(error);
++  }
++});
++
+ router.get('/search', async (req, res, next) => {
+   try {
+     const results = await hsCodeService.searchByProductName(req.query.keyword);
+diff --git a/backend/src/services/hsCodeService.js b/backend/src/services/hsCodeService.js
+index 0df60a7..44eb519 100644
+--- a/backend/src/services/hsCodeService.js
++++ b/backend/src/services/hsCodeService.js
+@@ -8,6 +8,43 @@ const prisma = require('../utils/prisma');
+ 
+ const normalizeKeyword = (value) => String(value || '').trim();
+ 
++const listHsCodes = async ({ keyword = '', page = 1, pageSize = 50 } = {}) => {
++  const normalizedKeyword = normalizeKeyword(keyword);
++  const safePage = Math.max(parseInt(page, 10) || 1, 1);
++  const safePageSize = Math.min(Math.max(parseInt(pageSize, 10) || 50, 1), 200);
++
++  const where = normalizedKeyword
++    ? {
++        productName: {
++          contains: normalizedKeyword,
++        },
++      }
++    : {};
++
++  const [items, total] = await Promise.all([
++    prisma.hsCode.findMany({
++      where,
++      orderBy: [
++        { effectiveDate: 'desc' },
++        { hsCode: 'asc' },
++      ],
++      skip: (safePage - 1) * safePageSize,
++      take: safePageSize,
++    }),
++    prisma.hsCode.count({ where }),
++  ]);
++
++  return {
++    items,
++    pagination: {
++      page: safePage,
++      pageSize: safePageSize,
++      total,
++      totalPages: Math.max(Math.ceil(total / safePageSize), 1),
++    },
++  };
++};
++
+ const searchByProductName = async (keyword) => {
+   const normalizedKeyword = normalizeKeyword(keyword);
+ 
+@@ -126,6 +163,7 @@ const batchMatchHsCodes = async (productNames) => {
+ };
+ 
+ module.exports = {
++  listHsCodes,
+   searchByProductName,
+   searchByHsCode,
+   getTaxRate,
+diff --git a/backend/src/services/hsCodeService.test.js b/backend/src/services/hsCodeService.test.js
+index 140c8cb..8e79096 100644
+--- a/backend/src/services/hsCodeService.test.js
++++ b/backend/src/services/hsCodeService.test.js
+@@ -87,3 +87,42 @@ test('getTaxRate: 未命中时返回 null，命中时返回税率', async () =>
+     assert.equal(result, null);
+   });
+ });
++
++test('listHsCodes: 空关键字时返回分页全量列表', async () => {
++  let findManyArgs = null;
++  let countArgs = null;
++
++  await withMockDelegate('hsCode', {
++    findMany: async (args) => {
++      findManyArgs = args;
++      return [
++        { id: '1', hsCode: '01010101', productName: '商品A' },
++        { id: '2', hsCode: '01010102', productName: '商品B' },
++      ];
++    },
++    count: async (args) => {
++      countArgs = args;
++      return 2;
++    },
++  }, async () => {
++    const result = await hsCodeService.listHsCodes({ keyword: '', page: 1, pageSize: 20 });
++
++    assert.deepEqual(findManyArgs, {
++      where: {},
++      orderBy: [
++        { effectiveDate: 'desc' },
++        { hsCode: 'asc' },
++      ],
++      skip: 0,
++      take: 20,
++    });
++    assert.deepEqual(countArgs, { where: {} });
++    assert.deepEqual(result.pagination, {
++      page: 1,
++      pageSize: 20,
++      total: 2,
++      totalPages: 1,
++    });
++    assert.equal(result.items.length, 2);
++  });
++});
+diff --git a/frontend/src/app/dashboard/hs-codes/page.tsx b/frontend/src/app/dashboard/hs-codes/page.tsx
+index 870e272..a4b3a62 100644
+--- a/frontend/src/app/dashboard/hs-codes/page.tsx
++++ b/frontend/src/app/dashboard/hs-codes/page.tsx
+@@ -23,6 +23,7 @@ import {
+ import { Search, ChevronRight } from 'lucide-react';
+ import { PageHeader } from '@/components/layout/PageHeader';
+ import { Badge } from '@/components/ui/badge';
++import { Button } from '@/components/ui/button';
+ import { Card, CardContent } from '@/components/ui/card';
+ 
+ /**
+@@ -50,15 +51,19 @@ function HsCodesPageContent() {
+   const [loading, setLoading] = useState(false);
+   const [keyword, setKeyword] = useState(initialKeyword);
+   const [selectedRecord, setSelectedRecord] = useState<HsCodeRecord | null>(null);
++  const [page, setPage] = useState(1);
++  const [total, setTotal] = useState(0);
++  const [totalPages, setTotalPages] = useState(1);
+   const debouncedKeyword = useDebouncedValue(keyword, 350);
++  const pageSize = 50;
+ 
+-  // 搜索触发
++  // 列表/搜索触发
+   useEffect(() => {
+-    if (debouncedKeyword.trim()) {
+-      loadResults(debouncedKeyword);
+-    } else {
+-      setResults([]);
+-    }
++    loadResults({ searchKeyword: debouncedKeyword, nextPage: page });
++  }, [debouncedKeyword, page]);
++
++  useEffect(() => {
++    setPage(1);
+   }, [debouncedKeyword]);
+ 
+   // 从 URL 同步关键字
+@@ -69,11 +74,23 @@ function HsCodesPageContent() {
+     }
+   }, [searchParams, keyword]);
+ 
+-  const loadResults = async (searchKeyword: string) => {
++  const loadResults = async ({
++    searchKeyword,
++    nextPage,
++  }: {
++    searchKeyword: string;
++    nextPage: number;
++  }) => {
+     setLoading(true);
+     try {
+-      const response = await hsCodeService.search(searchKeyword);
+-      setResults(response.data || []);
++      const response = await hsCodeService.list({
++        keyword: searchKeyword.trim(),
++        page: nextPage,
++        pageSize,
++      });
++      setResults(response.data.items || []);
++      setTotal(response.data.pagination.total || 0);
++      setTotalPages(response.data.pagination.totalPages || 1);
+     } catch (error) {
+       console.error('HSCode 搜索失败:', error);
+       toast.error('搜索失败，请稍后重试');
+@@ -91,7 +108,7 @@ function HsCodesPageContent() {
+     <div className="flex flex-col h-full">
+       <PageHeader
+         title="HSCode 查询"
+-        description="海关商品编码检索 - 支持商品名称或编码搜索"
++        description="默认先展示 HSCode 列表，再按商品名称或编码过滤。"
+       />
+ 
+       {/* 搜索栏 */}
+@@ -192,49 +209,75 @@ function HsCodesPageContent() {
+               ) : (
+                 <div className="text-center py-8 text-muted-foreground">
+                   <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+-                  输入商品名称或 HSCode 开始搜索
++                  当前暂无 HSCode 数据
+                 </div>
+               )
+             ) : (
+-              <Table>
+-                <TableHeader>
+-                  <TableRow>
+-                    <TableHead>HSCode</TableHead>
+-                    <TableHead>商品名称</TableHead>
+-                    <TableHead>单位</TableHead>
+-                    <TableHead>退税率</TableHead>
+-                    <TableHead>监管条件</TableHead>
+-                    <TableHead className="w-[80px]">操作</TableHead>
+-                  </TableRow>
+-                </TableHeader>
+-                <TableBody>
+-                  {results.map((record) => (
+-                    <TableRow
+-                      key={record.id}
+-                      className="cursor-pointer hover:bg-muted/50"
+-                      onClick={() => setSelectedRecord(record)}
+-                    >
+-                      <TableCell className="font-mono">{record.hsCode}</TableCell>
+-                      <TableCell>{record.productName}</TableCell>
+-                      <TableCell>{record.unit || '-'}</TableCell>
+-                      <TableCell>{formatPercent(record.refundRate)}</TableCell>
+-                      <TableCell>
+-                        {record.supervisionConditions ? (
+-                          <Badge variant="outline" className="text-xs">
+-                            {record.supervisionConditions.slice(0, 20)}
+-                            {record.supervisionConditions.length > 20 ? '...' : ''}
+-                          </Badge>
+-                        ) : (
+-                          '-'
+-                        )}
+-                      </TableCell>
+-                      <TableCell>
+-                        <ChevronRight className="h-4 w-4" />
+-                      </TableCell>
++              <div className="space-y-4">
++                <Table>
++                  <TableHeader>
++                    <TableRow>
++                      <TableHead>HSCode</TableHead>
++                      <TableHead>商品名称</TableHead>
++                      <TableHead>单位</TableHead>
++                      <TableHead>退税率</TableHead>
++                      <TableHead>监管条件</TableHead>
++                      <TableHead className="w-[80px]">操作</TableHead>
+                     </TableRow>
+-                  ))}
+-                </TableBody>
+-              </Table>
++                  </TableHeader>
++                  <TableBody>
++                    {results.map((record) => (
++                      <TableRow
++                        key={record.id}
++                        className="cursor-pointer hover:bg-muted/50"
++                        onClick={() => setSelectedRecord(record)}
++                      >
++                        <TableCell className="font-mono">{record.hsCode}</TableCell>
++                        <TableCell>{record.productName}</TableCell>
++                        <TableCell>{record.unit || '-'}</TableCell>
++                        <TableCell>{formatPercent(record.refundRate)}</TableCell>
++                        <TableCell>
++                          {record.supervisionConditions ? (
++                            <Badge variant="outline" className="text-xs">
++                              {record.supervisionConditions.slice(0, 20)}
++                              {record.supervisionConditions.length > 20 ? '...' : ''}
++                            </Badge>
++                          ) : (
++                            '-'
++                          )}
++                        </TableCell>
++                        <TableCell>
++                          <ChevronRight className="h-4 w-4" />
++                        </TableCell>
++                      </TableRow>
++                    ))}
++                  </TableBody>
++                </Table>
++
++                <div className="flex items-center justify-between">
++                  <p className="text-sm text-muted-foreground">
++                    共 {total} 条记录，第 {page} / {totalPages} 页
++                  </p>
++                  <div className="flex gap-2">
++                    <Button
++                      variant="outline"
++                      size="sm"
++                      disabled={page <= 1 || loading}
++                      onClick={() => setPage((current) => Math.max(current - 1, 1))}
++                    >
++                      上一页
++                    </Button>
++                    <Button
++                      variant="outline"
++                      size="sm"
++                      disabled={page >= totalPages || loading}
++                      onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
++                    >
++                      下一页
++                    </Button>
++                  </div>
++                </div>
++              </div>
+             )}
+           </CardContent>
+         </Card>
+@@ -242,8 +285,8 @@ function HsCodesPageContent() {
+ 
+       {/* 数据说明 */}
+       <div className="mt-4 text-xs text-muted-foreground">
+-        数据来源：海关总署 - 共 {results.length} 条记录
+-        {keyword.trim() && `（搜索：${keyword}）`}
++        数据来源：海关总署 - 当前列表 {results.length} 条 / 总计 {total} 条
++        {keyword.trim() ? `（搜索：${keyword}）` : '（默认全量列表）'}
+       </div>
+     </div>
+   );
+diff --git a/frontend/src/services/hsCode.service.test.ts b/frontend/src/services/hsCode.service.test.ts
+index 5de8ef9..a11f1f3 100644
+--- a/frontend/src/services/hsCode.service.test.ts
++++ b/frontend/src/services/hsCode.service.test.ts
+@@ -32,4 +32,12 @@ describe('hsCodeService', () => {
+ 
+     expect(api.get).toHaveBeenCalledWith('/hs-codes/69072190');
+   });
++
++  it('list: 空关键字时请求分页列表', async () => {
++    await hsCodeService.list({ page: 2, pageSize: 50 });
++
++    expect(api.get).toHaveBeenCalledWith('/hs-codes', {
++      params: { keyword: '', page: 2, pageSize: 50 },
++    });
++  });
+ });
+diff --git a/frontend/src/services/hsCode.service.ts b/frontend/src/services/hsCode.service.ts
+index a03b22b..c2309ce 100644
+--- a/frontend/src/services/hsCode.service.ts
++++ b/frontend/src/services/hsCode.service.ts
+@@ -5,7 +5,7 @@
+  */
+ 
+ import api from '@/lib/axios';
+-import type { ApiResponse, HsCodeRecord } from '@/types';
++import type { ApiResponse, HsCodeRecord, PaginatedResponse } from '@/types';
+ 
+ export type HsCodeMatch = HsCodeRecord;
+ 
+@@ -17,6 +17,20 @@ export interface BatchHsCodeMatchResult {
+ }
+ 
+ export const hsCodeService = {
++  list: async ({
++    keyword = '',
++    page = 1,
++    pageSize = 50,
++  }: {
++    keyword?: string;
++    page?: number;
++    pageSize?: number;
++  } = {}) => {
++    return api.get<ApiResponse<PaginatedResponse<HsCodeRecord>>, ApiResponse<PaginatedResponse<HsCodeRecord>>>('/hs-codes', {
++      params: { keyword, page, pageSize },
++    });
++  },
++
+   search: async (keyword: string) => {
+     return api.get<ApiResponse<HsCodeRecord[]>, ApiResponse<HsCodeRecord[]>>('/hs-codes/search', {
+       params: { keyword },
+diff --git a/RESULTS/HS-UX-01.md b/RESULTS/HS-UX-01.md
+new file mode 100644
+index 0000000..ea392c3
+--- /dev/null
++++ b/RESULTS/HS-UX-01.md
+@@ -0,0 +1,22 @@
++# HS-UX-01 Result
++
++## Delivered
++
++- Confirmed the real runtime DB is `backend/prisma/dev.db`.
++- Confirmed why the app looked empty: business tables are currently empty, while `hs_codes` and base setup tables are populated.
++- Reset the local admin login to a known credential via seed.
++- Added a backend HSCode list endpoint and wired the frontend HSCode page to show a default list first, then filter by keyword.
++- Brought backend and frontend up together locally and verified both ports respond.
++
++## Validation
++
++- `node --test src/services/hsCodeService.test.js`
++- `npm test -- src/services/hsCode.service.test.ts src/app/dashboard/hs-codes/page.test.tsx`
++- `curl -I http://127.0.0.1:3002/login`
++- verified login API success on `http://127.0.0.1:3001/api/v1/auth/login`
++
++## Outcome
++
++- Local login now has a known working admin credential.
++- HSCode page now behaves as requested: show list first, then search.
++- The "empty app" symptom is explained by data state, not by a missing DB connection.
+diff --git a/logs/task-HS-UX-01.md b/logs/task-HS-UX-01.md
+new file mode 100644
+index 0000000..3522cff
+--- /dev/null
++++ b/logs/task-HS-UX-01.md
+@@ -0,0 +1,11 @@
++# Task HS-UX-01
++
++- Root cause 1: frontend and backend were not running together consistently.
++- Root cause 2: local admin password was not fixed because `DEFAULT_ADMIN_PASSWORD` was unset.
++- Root cause 3: HSCode page used only the search endpoint and had no default list mode.
++- Root cause 4: the actual DB file is `backend/prisma/dev.db`; the top-level `backend/dev.db` is not the runtime DB.
++- Verification:
++  - backend HSCode service test passed
++  - frontend HSCode service/page tests passed
++  - frontend `/login` returned 200
++  - backend login API returned 200 with seeded admin user

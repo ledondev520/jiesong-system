@@ -652,6 +652,104 @@ model Notification {
   @@map("notifications")
 }
 
+// ==================== 财务报表 ====================
+
+model FinancialPeriod {
+  id          String   @id @default(cuid())
+  year        Int      // 会计年度，如 2025
+  month       Int      // 账期月份 1-12
+  periodLabel String   // 显示标签，如 "2025年1账期"
+  reportDate  DateTime // 期末日期，如 2025-01-31
+  importedAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  balanceSheet     BalanceSheetEntry?
+  incomeStatement  IncomeStatementEntry?
+
+  @@unique([year, month])
+  @@map("financial_periods")
+}
+
+model BalanceSheetEntry {
+  id       String @id @default(cuid())
+  periodId String @unique
+
+  // 流动资产
+  cashAndEquivalents   Float? // 货币资金 行次1
+  shortTermInvestments Float? // 短期投资 行次2
+  accountsReceivable   Float? // 应收账款 行次4
+  prepaidExpenses      Float? // 预付账款 行次5
+  otherReceivables     Float? // 其他应收款 行次8
+  inventory            Float? // 存货 行次9
+  totalCurrentAssets   Float? // 流动资产合计 行次15
+
+  // 非流动资产
+  totalNonCurrentAssets Float? // 非流动资产合计 行次29
+  totalAssets           Float? // 资产合计 行次30
+
+  // 流动负债
+  accountsPayable            Float? // 应付账款 行次33
+  advancedReceipts           Float? // 预收账款 行次34
+  staffWagesPayable          Float? // 应付职工薪酬 行次35
+  taxesPayable               Float? // 应交税费 行次36
+  otherPayables              Float? // 其他应付款 行次39
+  totalCurrentLiabilities    Float? // 流动负债合计 行次41
+
+  // 非流动负债
+  totalNonCurrentLiabilities Float? // 非流动负债合计 行次46
+  totalLiabilities            Float? // 负债合计 行次47
+
+  // 所有者权益
+  paidInCapital    Float? // 实收资本 行次48
+  capitalReserve   Float? // 资本公积 行次49
+  surplusReserve   Float? // 盈余公积 行次50
+  retainedEarnings Float? // 未分配利润 行次51
+  totalEquity      Float? // 所有者权益合计 行次52
+
+  period FinancialPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@map("balance_sheet_entries")
+}
+
+model IncomeStatementEntry {
+  id       String @id @default(cuid())
+  periodId String @unique
+
+  // 本月金额
+  revenueMonth             Float? // 营业收入 行次1
+  costOfSalesMonth         Float? // 营业成本 行次2
+  taxesMonth               Float? // 税金及附加 行次3
+  sellingExpensesMonth     Float? // 销售费用 行次11
+  adminExpensesMonth       Float? // 管理费用 行次14
+  financialExpensesMonth   Float? // 财务费用 行次18
+  investmentIncomeMonth    Float? // 投资收益 行次20
+  operatingProfitMonth     Float? // 营业利润 行次21
+  nonOperatingIncomeMonth  Float? // 营业外收入 行次22
+  nonOperatingExpensesMonth Float? // 营业外支出 行次24
+  totalProfitMonth         Float? // 利润总额 行次30
+  incomeTaxMonth           Float? // 所得税费用 行次31
+  netProfitMonth           Float? // 净利润 行次32
+
+  // 本年累计金额
+  revenueYTD             Float? // 营业收入
+  costOfSalesYTD         Float? // 营业成本
+  taxesYTD               Float? // 税金及附加
+  sellingExpensesYTD     Float? // 销售费用
+  adminExpensesYTD       Float? // 管理费用
+  financialExpensesYTD   Float? // 财务费用
+  investmentIncomeYTD    Float? // 投资收益
+  operatingProfitYTD     Float? // 营业利润
+  nonOperatingIncomeYTD  Float? // 营业外收入
+  nonOperatingExpensesYTD Float? // 营业外支出
+  totalProfitYTD         Float? // 利润总额
+  incomeTaxYTD           Float? // 所得税费用
+  netProfitYTD           Float? // 净利润
+
+  period FinancialPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@map("income_statement_entries")
+}
+
 // ==================== 数据导入 ====================
 
 model ImportRecord {

@@ -151,7 +151,7 @@ export default function SuppliersPage() {
                         <span className="text-sm font-medium">质量问题</span>
                       </div>
                     ) : (
-                      <Badge variant="outline" className="bg-chart-3/10 text-chart-3 border-chart-3/35">正常</Badge>
+                      <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary">正常</Badge>
                     )}
                   </TableCell>
                   <TableCell className="flex gap-2">

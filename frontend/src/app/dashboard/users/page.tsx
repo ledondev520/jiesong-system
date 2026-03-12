@@ -153,7 +153,7 @@ export default function UsersPage() {
                   <TableCell>{user.username}</TableCell>
                   <TableCell>{getRoleBadge(user.role)}</TableCell>
                   <TableCell>
-                    <Badge variant={user.isActive ? 'outline' : 'secondary'} className={user.isActive ? 'text-chart-3 border-chart-3/35' : ''}>
+                    <Badge variant={user.isActive ? 'outline' : 'secondary'} className={user.isActive ? 'border-primary/20 bg-primary/5 text-primary' : ''}>
                       {user.isActive ? '正常' : '禁用'}
                     </Badge>
                   </TableCell>

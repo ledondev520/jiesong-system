@@ -174,7 +174,7 @@ export default function PayablePage() {
                     <Badge variant="outline">{contract.status}</Badge>
                   </TableCell>
                   <TableCell className="text-right">¥{contract.totalAmount.toLocaleString()}</TableCell>
-                  <TableCell className="text-right text-chart-3">¥{contract.paidAmount.toLocaleString()}</TableCell>
+                  <TableCell className="text-right text-primary/80">¥{contract.paidAmount.toLocaleString()}</TableCell>
                   <TableCell className="text-right text-destructive font-bold">
                     ¥{contract.unpaidAmount.toLocaleString()}
                   </TableCell>

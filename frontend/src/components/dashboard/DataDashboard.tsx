@@ -71,14 +71,14 @@ export function DataDashboard() {
         <Card className="kpi-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">采购合同</CardTitle>
-            <FileText className="h-4 w-4 text-chart-1" />
+            <FileText className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data.contracts.purchase.count}</div>
             <p className="text-xs text-muted-foreground">
               总金额: ¥{data.contracts.purchase.totalAmount.toLocaleString()}
             </p>
-            <p className="text-xs text-chart-5">
+            <p className="text-xs text-primary/80">
               待付: ¥{data.contracts.purchase.unpaidAmount.toLocaleString()}
             </p>
           </CardContent>
@@ -88,14 +88,14 @@ export function DataDashboard() {
         <Card className="kpi-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">销售合同</CardTitle>
-            <TrendingUp className="h-4 w-4 text-chart-3" />
+            <TrendingUp className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data.contracts.sales.count}</div>
             <p className="text-xs text-muted-foreground">
               总金额: ${data.contracts.sales.totalAmount.toLocaleString()}
             </p>
-            <p className="text-xs text-chart-3">
+            <p className="text-xs text-primary/80">
               已收: ${data.contracts.sales.receivedAmount.toLocaleString()}
             </p>
           </CardContent>
@@ -105,7 +105,7 @@ export function DataDashboard() {
         <Card className="kpi-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">应收账款</CardTitle>
-            <DollarSign className="h-4 w-4 text-chart-5" />
+            <DollarSign className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -121,14 +121,14 @@ export function DataDashboard() {
         <Card className="kpi-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">库存概览</CardTitle>
-            <Package className="h-4 w-4 text-chart-4" />
+            <Package className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data.inventory.productCount}</div>
             <p className="text-xs text-muted-foreground">
               商品种类
             </p>
-            <p className="text-xs text-chart-4">
+            <p className="text-xs text-primary/80">
               库存记录: {data.inventory.recordCount}条
             </p>
           </CardContent>

@@ -11,8 +11,6 @@ const forexVerificationConfig: ServicePageConfig = {
   title: '外汇核销加速通道',
   description:
     '围绕收汇匹配、报关单据核验和异常节点跟催，先把核销材料按窗口顺序整理清楚，再进入正式办理，减少银行与单证往返次数。',
-  themeClassName:
-    'before:absolute before:inset-y-0 before:right-0 before:w-1/3 before:bg-[linear-gradient(180deg,oklch(0.8_0.09_74_/_0.06),transparent)]',
   metrics: [
     { label: '平均预审响应', value: '24h', detail: '工作日内反馈缺口' },
     { label: '收汇匹配节点', value: '4步', detail: '从水单到核销闭环' },

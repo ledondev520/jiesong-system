@@ -15,6 +15,19 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get('/', async (req, res, next) => {
+  try {
+    const results = await hsCodeService.listHsCodes({
+      keyword: req.query.keyword,
+      page: req.query.page,
+      pageSize: req.query.pageSize,
+    });
+    success(res, results);
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/search', async (req, res, next) => {
   try {
     const results = await hsCodeService.searchByProductName(req.query.keyword);

@@ -159,7 +159,7 @@ export default function PortsSettingsPage() {
                   <TableCell className="font-medium">{item.name}</TableCell>
                   <TableCell>{item.code}</TableCell>
                   <TableCell>
-                    <Badge variant={item.isActive ? 'outline' : 'secondary'} className={item.isActive ? 'text-chart-3 border-chart-3/35' : ''}>
+                    <Badge variant={item.isActive ? 'outline' : 'secondary'} className={item.isActive ? 'border-primary/20 bg-primary/5 text-primary' : ''}>
                       {item.isActive ? '启用' : '停用'}
                     </Badge>
                   </TableCell>

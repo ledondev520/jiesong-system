@@ -1,15 +1,15 @@
 /**
  * Input: 登录API、认证状态存储
  * Output: 登录页面
- * Pos: 认证模块入口，负责用户登录、用户名记忆
+ * Pos: 认证模块入口，负责用户登录与快捷登录入口
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
- * Security: 密码从不存储在本地，仅用户名可记住
+ * Security: 快捷登录会在当前浏览器保存最近一次成功登录账号信息，仅用于已登录账号的下次一键登录
  */
 
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -19,7 +19,6 @@ import { useAuthStore } from '@/store/auth.store';
 import type { ApiResponse } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Form,
   FormControl,
@@ -35,15 +34,12 @@ import { authService, type LoginResponse } from '@/services/auth.service';
 const loginSchema = z.object({
   username: z.string().min(1, '请输入用户名'),
   password: z.string().min(1, '请输入密码'),
-  rememberMe: z.boolean(),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
-type RememberedUsername = { username: string };
+type QuickLoginProfile = { username: string; password: string };
 
-const REMEMBER_USERNAME_KEY = 'jiesong_saved_username';
-const QUICK_LOGIN_USERNAME = 'admin';
-const AUTO_LOGIN_MIN_PASSWORD_LENGTH = 6;
+const QUICK_LOGIN_PROFILE_KEY = 'jiesong_quick_login_profile';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -51,62 +47,59 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [isQuickLoginEnabled, setIsQuickLoginEnabled] = useState(false);
-  const passwordInputRef = useRef<HTMLInputElement | null>(null);
-  const autoLoginTimerRef = useRef<number | null>(null);
-  const lastAutoSubmitKeyRef = useRef('');
+  const [quickLoginProfile, setQuickLoginProfile] = useState<QuickLoginProfile | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       username: '',
       password: '',
-      rememberMe: false,
     },
   });
 
-  // Check for saved username on mount (security: never store password)
+  // 恢复快捷登录入口（当前浏览器维度）
   useEffect(() => {
-    const savedRaw = localStorage.getItem(REMEMBER_USERNAME_KEY);
-    if (savedRaw) {
-      try {
-        const parsed: RememberedUsername = JSON.parse(savedRaw);
-        if (parsed.username) {
-          form.setValue('username', parsed.username);
-          form.setValue('rememberMe', true);
-        }
-      } catch {
-        localStorage.removeItem(REMEMBER_USERNAME_KEY);
-      }
+    const savedRaw = localStorage.getItem(QUICK_LOGIN_PROFILE_KEY);
+    if (!savedRaw) {
+      return;
     }
-  }, [form]);
+
+    try {
+      const parsed: QuickLoginProfile = JSON.parse(savedRaw);
+      if (parsed.username && parsed.password) {
+        setQuickLoginProfile(parsed);
+      } else {
+        localStorage.removeItem(QUICK_LOGIN_PROFILE_KEY);
+      }
+    } catch {
+      localStorage.removeItem(QUICK_LOGIN_PROFILE_KEY);
+    }
+  }, []);
+
+  const persistQuickLoginProfile = useCallback((username: string, password: string) => {
+    const profile: QuickLoginProfile = { username, password };
+    localStorage.setItem(QUICK_LOGIN_PROFILE_KEY, JSON.stringify(profile));
+    setQuickLoginProfile(profile);
+  }, []);
 
   /**
    * 职责：执行登录请求并完成状态跳转
-   * 安全说明：密码仅用于本次登录，不存储在本地
    * @param {string} username - 用户名
    * @param {string} password - 密码
-   * @param {boolean} rememberMe - 是否记住用户名
    * @returns {Promise<void>} 登录流程执行结果
    */
-  const performLogin = useCallback(async (username: string, password: string, rememberMe: boolean) => {
+  const performLogin = useCallback(async (username: string, password: string) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      if (rememberMe) {
-        // 安全：只存储用户名，不存储密码
-        localStorage.setItem(REMEMBER_USERNAME_KEY, JSON.stringify({ username }));
-      } else {
-        localStorage.removeItem(REMEMBER_USERNAME_KEY);
-      }
-
       const result: ApiResponse<LoginResponse> = await authService.login({
         username,
         password,
       });
-      
+
       if (result.code === 200 && result.data) {
+        persistQuickLoginProfile(username, password);
         login(result.data.user, result.data.token);
         router.push('/');
       } else {
@@ -132,92 +125,35 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [login, router]);
-
-  const watchedPassword = form.watch('password');
-
-  useEffect(() => {
-    if (!isQuickLoginEnabled || isLoading) {
-      return;
-    }
-
-    const username = form.getValues('username').trim();
-    const rememberMe = form.getValues('rememberMe');
-    const password = watchedPassword ?? '';
-
-    if (username !== QUICK_LOGIN_USERNAME || password.length < AUTO_LOGIN_MIN_PASSWORD_LENGTH) {
-      lastAutoSubmitKeyRef.current = '';
-      if (autoLoginTimerRef.current !== null) {
-        window.clearTimeout(autoLoginTimerRef.current);
-        autoLoginTimerRef.current = null;
-      }
-      return;
-    }
-
-    const currentKey = `${username}:${password}`;
-    if (currentKey === lastAutoSubmitKeyRef.current) {
-      return;
-    }
-
-    if (autoLoginTimerRef.current !== null) {
-      window.clearTimeout(autoLoginTimerRef.current);
-    }
-
-    autoLoginTimerRef.current = window.setTimeout(() => {
-      lastAutoSubmitKeyRef.current = currentKey;
-      void performLogin(username, password, rememberMe);
-    }, 280);
-
-    return () => {
-      if (autoLoginTimerRef.current !== null) {
-        window.clearTimeout(autoLoginTimerRef.current);
-        autoLoginTimerRef.current = null;
-      }
-    };
-  }, [form, isLoading, isQuickLoginEnabled, performLogin, watchedPassword]);
-
-  useEffect(() => () => {
-    if (autoLoginTimerRef.current !== null) {
-      window.clearTimeout(autoLoginTimerRef.current);
-      autoLoginTimerRef.current = null;
-    }
-  }, []);
+  }, [login, persistQuickLoginProfile, router]);
 
   /**
    * 职责：提交登录表单并处理登录结果
-   * 思路：
-   * 1. 先处理记住用户名
-   * 2. 调用后端登录接口并保存用户信息
-   * 3. 根据错误类型返回可操作的提示信息
    * @param {LoginFormValues} data - 登录表单数据
    * @returns {Promise<void>} 登录流程执行结果
    */
   async function onSubmit(data: LoginFormValues) {
-    if (autoLoginTimerRef.current !== null) {
-      window.clearTimeout(autoLoginTimerRef.current);
-      autoLoginTimerRef.current = null;
-    }
-    await performLogin(data.username, data.password, data.rememberMe);
+    await performLogin(data.username.trim(), data.password);
   }
 
-  function handleQuickLogin() {
-    form.setValue('username', QUICK_LOGIN_USERNAME, { shouldDirty: true, shouldValidate: true });
-    form.setValue('rememberMe', true, { shouldDirty: true });
-    setIsQuickLoginEnabled(true);
+  const handleQuickLogin = useCallback(() => {
+    if (!quickLoginProfile || isLoading) {
+      return;
+    }
+
+    form.setValue('username', quickLoginProfile.username, { shouldDirty: true, shouldValidate: true });
+    form.setValue('password', quickLoginProfile.password, { shouldDirty: true, shouldValidate: true });
     setError(null);
-    lastAutoSubmitKeyRef.current = '';
-    requestAnimationFrame(() => {
-      passwordInputRef.current?.focus();
-    });
-  }
+    void performLogin(quickLoginProfile.username, quickLoginProfile.password);
+  }, [form, isLoading, performLogin, quickLoginProfile]);
 
   return (
     <div className="auth-shell">
       <Card className="auth-card">
         <CardHeader>
-          <CardTitle>快捷登录</CardTitle>
+          <CardTitle>系统登录</CardTitle>
           <CardDescription>
-            点击一键登录后，直接输入密码即可自动登录。
+            {quickLoginProfile ? '你已开启快捷登录，可一键进入系统。' : '首次登录成功后，下次可使用快捷登录。'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -231,7 +167,7 @@ export default function LoginPage() {
                     <FormLabel>用户名</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="admin"
+                        placeholder="请输入用户名"
                         className="rounded-xl bg-background/70"
                         {...field}
                       />
@@ -243,57 +179,30 @@ export default function LoginPage() {
               <FormField
                 control={form.control}
                 name="password"
-                render={({ field }) => {
-                  const { ref, ...restField } = field;
-                  return (
-                    <FormItem>
-                      <FormLabel>密码</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Input
-                            type={showPassword ? 'text' : 'password'}
-                            aria-label="密码"
-                            placeholder="••••••"
-                            className="rounded-xl bg-background/70 pr-10"
-                            {...restField}
-                            ref={(node) => {
-                              ref(node);
-                              passwordInputRef.current = node;
-                            }}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            aria-label={showPassword ? '隐藏密码' : '显示密码'}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                            tabIndex={-1}
-                          >
-                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </button>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
-              
-              <FormField
-                control={form.control}
-                name="rememberMe"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormItem>
+                    <FormLabel>密码</FormLabel>
                     <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
+                      <div className="relative">
+                        <Input
+                          type={showPassword ? 'text' : 'password'}
+                          aria-label="密码"
+                          placeholder="••••••"
+                          className="rounded-xl bg-background/70 pr-10"
+                          {...field}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={showPassword ? '隐藏密码' : '显示密码'}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          tabIndex={-1}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>
-                        记住用户名
-                      </FormLabel>
-                    </div>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -304,21 +213,20 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <div className="space-y-2 rounded-xl border border-accent/40 bg-accent/10 p-3">
-                <p className="text-sm font-medium text-foreground">快捷登录</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-10 w-full rounded-xl border-accent/50 bg-accent/10 text-accent-foreground"
-                  onClick={handleQuickLogin}
-                  disabled={isLoading}
-                >
-                  一键登录（{QUICK_LOGIN_USERNAME}）
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                  一键后直接输入密码，密码达到 {AUTO_LOGIN_MIN_PASSWORD_LENGTH} 位将自动提交。
-                </p>
-              </div>
+              {quickLoginProfile && (
+                <div className="space-y-2 rounded-xl border border-accent/40 bg-accent/10 p-3">
+                  <p className="text-sm font-medium text-foreground">快捷登录</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 w-full rounded-xl border-accent/50 bg-accent/10 text-accent-foreground"
+                    onClick={handleQuickLogin}
+                    disabled={isLoading}
+                  >
+                    一键登录（{quickLoginProfile.username}）
+                  </Button>
+                </div>
+              )}
 
               <Button type="submit" className="h-10 w-full rounded-xl" disabled={isLoading}>
                 {isLoading ? '登录中...' : '登录'}
@@ -341,7 +249,6 @@ export default function LoginPage() {
               </Button>
             </Link>
           </div>
-          <p className="text-center text-sm text-muted-foreground">测试阶段账号：admin，默认密码：123456。</p>
         </CardFooter>
       </Card>
     </div>

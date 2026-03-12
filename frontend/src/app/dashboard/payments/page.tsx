@@ -211,7 +211,7 @@ function PaymentsPageContent() {
         title="收付款"
         description="管理应付账款与应收账款"
         actions={
-          <Button variant="outline" size="sm" className="h-10 rounded-xl border-border/70 bg-background/60" onClick={() => { fetchStats(); fetchPayables(); fetchReceivables(); }}>
+          <Button variant="outline" size="sm" className="h-10" onClick={() => { fetchStats(); fetchPayables(); fetchReceivables(); }}>
             <RefreshCw className="mr-2 h-4 w-4" /> 刷新
           </Button>
         }
@@ -222,10 +222,10 @@ function PaymentsPageContent() {
         <Card className="kpi-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">待付账款</CardTitle>
-            <ArrowUpRight className="h-4 w-4 text-chart-5" />
+            <ArrowUpRight className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-chart-5">
+            <div className="text-2xl font-bold text-primary">
               ¥{(stats?.payable?.unpaid ?? 0).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -251,7 +251,7 @@ function PaymentsPageContent() {
 
       {/* Tab切换 */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="rounded-xl border border-border/70 bg-background/60">
+        <TabsList className="border bg-background">
           <TabsTrigger value="payable" className="gap-2">
             <ArrowUpRight className="h-4 w-4" />
             应付账款
@@ -264,7 +264,7 @@ function PaymentsPageContent() {
 
         {/* 应付账款Tab */}
         <TabsContent value="payable" className="space-y-4">
-          <div className="surface-panel overflow-hidden">
+          <Card className="overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -299,14 +299,14 @@ function PaymentsPageContent() {
                         <Badge variant="outline">{contract.status}</Badge>
                       </TableCell>
                       <TableCell className="text-right">{contract.totalAmount.toLocaleString()}</TableCell>
-                      <TableCell className="text-right text-chart-3">
+                      <TableCell className="text-right text-primary/80">
                         {contract.paidAmount.toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-right text-chart-5 font-bold">
+                      <TableCell className="text-right font-bold text-primary">
                         {contract.unpaidAmount.toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        <Button size="sm" variant="outline" className="rounded-xl border-border/70 bg-background/60" onClick={() => setSelectedPayable(contract)}>
+                        <Button size="sm" variant="outline" onClick={() => setSelectedPayable(contract)}>
                           <CreditCard className="mr-1 h-3 w-3" /> 付款
                         </Button>
                       </TableCell>
@@ -315,12 +315,12 @@ function PaymentsPageContent() {
                 )}
               </TableBody>
             </Table>
-          </div>
+          </Card>
         </TabsContent>
 
         {/* 应收账款Tab */}
         <TabsContent value="receivable" className="space-y-4">
-          <div className="surface-panel overflow-hidden">
+          <Card className="overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -355,14 +355,14 @@ function PaymentsPageContent() {
                         <Badge variant="outline">{contract.status}</Badge>
                       </TableCell>
                       <TableCell className="text-right">{contract.totalAmount.toLocaleString()}</TableCell>
-                      <TableCell className="text-right text-chart-3">
+                      <TableCell className="text-right text-primary/80">
                         {contract.receivedAmount.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right text-primary font-bold">
                         {contract.unreceiveAmount.toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        <Button size="sm" variant="outline" className="rounded-xl border-border/70 bg-background/60" onClick={() => setSelectedReceivable(contract)}>
+                        <Button size="sm" variant="outline" onClick={() => setSelectedReceivable(contract)}>
                           <CreditCard className="mr-1 h-3 w-3" /> 收款
                         </Button>
                       </TableCell>
@@ -371,7 +371,7 @@ function PaymentsPageContent() {
                 )}
               </TableBody>
             </Table>
-          </div>
+          </Card>
         </TabsContent>
       </Tabs>
 

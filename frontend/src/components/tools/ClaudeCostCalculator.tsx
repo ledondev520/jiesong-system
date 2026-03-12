@@ -373,7 +373,7 @@ export function ClaudeCostCalculator() {
         </div>
 
         {/* 计算结果 */}
-        <div className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 p-4 rounded-lg space-y-3">
+        <div className="rounded-lg border bg-primary/5 p-4 space-y-3">
           <h4 className="font-medium flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
             费用明细
@@ -398,7 +398,7 @@ export function ClaudeCostCalculator() {
           </div>
           <div className="border-t pt-3 flex justify-between items-center">
             <span className="font-medium">总计</span>
-            <span className="text-2xl font-bold text-chart-3">
+            <span className="text-2xl font-bold text-primary">
               ${costs.total.toFixed(2)}
             </span>
           </div>

@@ -68,10 +68,7 @@ test.describe('侧边栏导航全覆盖', () => {
       { label: '库存状态', path: '/dashboard/inventory-container', url: /\/dashboard\/inventory-container$/, heading: '库存状态' },
       { label: '收付款', path: '/dashboard/payments', url: /\/dashboard\/payments$/, heading: '收付款' },
       { label: '采购建议', path: '/dashboard/store-recommend', url: /\/dashboard\/store-recommend$/, heading: '门店采购建议' },
-      { label: '通知中心', path: '/dashboard/system/notifications', url: /\/dashboard\/system\/notifications$/, heading: '通知中心' },
-      { label: '系统日志', path: '/dashboard/system/logs', url: /\/dashboard\/system\/logs$/, heading: '系统日志' },
-      { label: '导入记录', path: '/dashboard/system/import-records', url: /\/dashboard\/system\/import-records$/, heading: '导入记录' },
-      { label: '设置', path: '/dashboard/settings', url: /\/dashboard\/settings$/, heading: '设置' },
+      { label: '基础设置', path: '/dashboard/settings', url: /\/dashboard\/settings$/, heading: '设置' },
     ] as const;
 
     for (const item of navCases) {

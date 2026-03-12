@@ -115,7 +115,7 @@ export function ContractInfoEditor({ contract, stores, onSave }: ContractInfoEdi
         </div>
         <div>
           <div className="text-sm text-muted-foreground">总金额（自动计算）</div>
-          <div className="font-medium text-chart-3">${contract.totalAmount.toLocaleString()}</div>
+          <div className="font-medium text-primary">${contract.totalAmount.toLocaleString()}</div>
         </div>
         <div>
           <div className="text-sm text-muted-foreground">已收款</div>

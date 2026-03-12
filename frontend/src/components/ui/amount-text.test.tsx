@@ -14,7 +14,7 @@ describe('AmountText', () => {
   it('支持warning语义', () => {
     const { getByText } = render(<AmountText tone="warning">¥100</AmountText>);
     const amount = getByText('¥100');
-    expect(amount.className).toContain('text-chart-5');
+    expect(amount.className).toContain('text-amber-600');
   });
 
   it('支持xl尺寸', () => {
@@ -23,4 +23,3 @@ describe('AmountText', () => {
     expect(amount.className).toContain('text-2xl');
   });
 });
-

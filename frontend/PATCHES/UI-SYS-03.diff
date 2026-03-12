@@ -1,0 +1,844 @@
+diff --git a/frontend/METRICS.md b/frontend/METRICS.md
+index 7b06351..1909e9c 100644
+--- a/frontend/METRICS.md
++++ b/frontend/METRICS.md
+@@ -11,3 +11,5 @@
+ | 6 | Frontend Vitest timeout stabilization | Pass (`101 files / 313 tests`) | Not run | Not run | Pass (`73.28%` statements / `80.2%` branches / `67.45%` functions / `73.28%` lines) | Minimal fix was `testTimeout: 20000` in `vitest.config.ts`; verified with full `npm run test` and `npm run test:coverage` |
+ | 7 | Coverage 98 phase-1 baseline | Fail (fresh full-suite run observed red files in `login`, `customs-declarations`, `inventory-container`, `sales/[id]`) | Not run | Not run | Baseline only: configured coverage scope remains `79` files vs target `243` files; no fresh final summary captured in this phase | Evidence captured from fresh `npm run test`, fresh `npm run test:coverage` start, config inspection, and focused login rerun kickoff; phase-1 goal was to lock blockers and scope delta before raising thresholds |
+ | 8 | Global shadcn/ui visual baseline unification | Pass (`10` files / `29` tests) | Pass (targeted touched-file lint; `globals.css` is outside the active ESLint config and reported only an ignore warning) | Pass | Not run | Shared shell, primitives, dashboard home surfaces, auth shell, and the repaired inventory page all verified cleanly; production build blockers in login/customs/inventory/three-forms files were cleared in the same round |
++| 9 | Blue shadcn/ui enforcement on remaining outlier pages | Pass (`5` files / `7` tests) | Pass | Pass | Not run | Blue theme tokens now drive the app baseline; public service pages and the more bespoke import/store-recommend surfaces were pulled toward standard shadcn cards, buttons, badges, and page headers |
++| 10 | Final blue-token convergence for auth and finance surfaces | Pass (`7` files / `19` tests) | Pass | Pass | Not run | Auth, dashboard stats, finance, payments, import, and semantic helper surfaces were converged onto blue-token or standard semantic styling; build remained green after the cleanup |
+diff --git a/frontend/PLAN.md b/frontend/PLAN.md
+index d067337..76e1eb6 100644
+--- a/frontend/PLAN.md
++++ b/frontend/PLAN.md
+@@ -26,6 +26,67 @@
+ - This round establishes the global shadcn-style baseline and fixes the production build blockers uncovered by verification.
+ - Follow-up work should focus on page-by-page cleanup where older feature slices still layer custom one-off styling on top of the shared shell.
+ 
++## 2026-03-12 Round 9: Blue shadcn/ui enforcement on remaining outlier pages
++
++### Goal
++- Finish the next cleanup pass for pages still visually drifting from the shadcn/ui baseline.
++- Lock the frontend onto a blue shadcn-style theme instead of the temporary neutral baseline.
++
++### Execution Outcome
++- Switched the shadcn registry metadata to blue in `components.json` and updated `src/app/globals.css` token values to a blue-led palette for light and dark themes.
++- Reworked shared semantic helpers in `src/components/ui/semantic-badge.tsx` and `src/components/ui/amount-text.tsx` to rely on standard shadcn-style semantic surfaces.
++- Simplified the public service layout in `src/components/public/service-page.tsx` and removed route-level decorative overrides from:
++  - `src/app/forex-verifications/page.tsx`
++  - `src/app/tax-refunds/page.tsx`
++- Pulled the most divergent operational pages closer to shadcn primitives:
++  - `src/app/dashboard/store-recommend/page.tsx`
++  - `src/app/dashboard/import/components/DataImportPageContent.tsx`
++
++### Verification
++- `npm run lint -- src/components/ui/semantic-badge.tsx src/components/ui/amount-text.tsx src/components/public/service-page.tsx src/app/forex-verifications/page.tsx src/app/tax-refunds/page.tsx src/app/dashboard/store-recommend/page.tsx src/app/dashboard/import/components/DataImportPageContent.tsx`
++- `npm test -- src/components/public/service-page.test.tsx src/app/forex-verifications/page.test.tsx src/app/tax-refunds/page.test.tsx src/app/dashboard/store-recommend/page.test.tsx src/app/dashboard/import/page.test.tsx`
++- `npm run build`
++
++### Visual Evidence
++- `frontend/qa-artifacts-ui-blue-login.png`
++- `frontend/qa-artifacts-ui-blue-forex.png`
++
++### Phase Boundary
++- This round locks the app onto blue shadcn tokens and cleans the most visible remaining outliers.
++- Remaining work should target deeper feature-detail pages that still use older chart-heavy page-local styling.
++
++## 2026-03-12 Round 10: Final blue-token convergence for auth and finance surfaces
++
++### Goal
++- Finish another cleanup slice on pages that still exposed older accent classes or non-semantic color usage after the blue migration.
++- Reduce reliance on legacy `text-chart-*` usages by converging them onto blue token families or standard shadcn semantic classes.
++
++### Execution Outcome
++- Tightened the remaining shared color drift in:
++  - `src/components/layout/Header.tsx`
++  - `src/components/dashboard/DataDashboard.tsx`
++  - `src/app/globals.css`
++- Simplified auth page headings and success states in:
++  - `src/app/(auth)/login/page.tsx`
++  - `src/app/(auth)/register/page.tsx`
++  - `src/app/(auth)/forgot-password/page.tsx`
++- Cleaned finance-oriented pages so their emphasis uses the blue baseline instead of mixed legacy chart colors:
++  - `src/app/dashboard/finance/page.tsx`
++  - `src/app/dashboard/payments/page.tsx`
++- Finished the remaining visible import-page cleanup in `src/app/dashboard/import/components/DataImportPageContent.tsx`.
++- Updated affected tests for the new semantic helper output:
++  - `src/components/ui/amount-text.test.tsx`
++  - `src/components/ui/semantic-badge.test.tsx`
++
++### Verification
++- `npm run lint -- src/app/(auth)/login/page.tsx src/app/(auth)/register/page.tsx src/app/(auth)/forgot-password/page.tsx src/components/layout/Header.tsx src/components/dashboard/DataDashboard.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/payments/page.tsx src/app/dashboard/import/components/DataImportPageContent.tsx src/components/ui/amount-text.tsx src/components/ui/amount-text.test.tsx src/components/ui/semantic-badge.tsx src/components/ui/semantic-badge.test.tsx`
++- `npm test -- src/components/ui/amount-text.test.tsx src/components/ui/semantic-badge.test.tsx src/app/(auth)/login/page.test.tsx src/app/(auth)/register/page.test.tsx src/app/(auth)/forgot-password/page.test.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/payments/page.test.tsx`
++- `npm run build`
++
++### Phase Boundary
++- This round completes the current cleanup pass for the most user-visible shells and finance/auth surfaces.
++- The remaining backlog, if any, is limited to low-level feature detail polish rather than the global theme baseline.
++
+ # Customs Declaration Management
+ 
+ ## 2026-03-12 Round 7: Frontend Coverage 98 Phase 1 Baseline
+diff --git a/frontend/RISKS.md b/frontend/RISKS.md
+index 9aca48d..7538cec 100644
+--- a/frontend/RISKS.md
++++ b/frontend/RISKS.md
+@@ -16,3 +16,5 @@
+ | R12 | Login/auth tests still assert the pre-security behavior (remembered password, old checkbox copy, direct password field label) while the page now stores username only and wraps the password input inside a visibility-toggle container | Coverage 98 work is blocked by stale red tests before threshold tightening can begin | Update the login tests to match the current security contract and accessible queries, then re-run the focused auth suite before touching coverage gates | Revert only the auth test updates if product/security requirements change again | Open |
+ | R13 | Several page-level interaction suites still exceed `20000ms` when run inside the full suite, so widening `coverage.include` to `src/app` will amplify timeout pressure immediately | Coverage expansion can look like a coverage problem while the real blocker is suite runtime instability | Isolate timeout-heavy files, reduce redundant waits/mocks, and prove they pass under focused and full-suite runs before expanding the coverage scope | Revert only the affected test refinements if they introduce behavior drift | Open |
+ | R14 | Older feature slices may still carry one-off visual overrides that partially fight the new shared shadcn baseline | Some pages can remain visually inconsistent even though the global shell and primitives are unified | Keep new styling centralized in `globals.css`, `ui/*`, and layout components first; audit outlier pages incrementally instead of reintroducing page-local style systems | Revert only the page-level overrides while preserving the shared primitive layer | Open |
++| R15 | Some deep feature-detail pages still rely on legacy `chart-*` accents and bespoke decorative blocks even after the blue token migration | The app can look mostly shadcn-compliant at the shell level while a few detail screens still reveal the older visual language | Continue auditing pages surfaced by `rg "text-chart-|bg-chart-|bg-gradient|backdrop-blur"` and convert them to semantic helpers or shadcn primitives in slices | Revert only the page-local cleanup for the affected feature if business stakeholders prefer the older visualization density | Open |
++| R16 | A few low-priority detail views may still use historical blue-toned `chart-*` classes even though those tokens now sit inside the global blue family | Visual variance becomes mostly density/layout related instead of theme related | Treat remaining work as detail-page polish, not a theme-system rewrite; keep using the shared blue token set as the source of truth | Revert only the specific detail-page polish if it conflicts with product expectations | Open |
+diff --git a/frontend/TASKS.md b/frontend/TASKS.md
+index db9c3e6..826fe17 100644
+--- a/frontend/TASKS.md
++++ b/frontend/TASKS.md
+@@ -3,6 +3,8 @@
+ | ID | Priority | ETA | Slot | Status | Input | Output | Validation | DoD |
+ | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+ | UI-SYS-01 | P0 | 30m | 1 | DONE | Existing frontend shared shell, shadcn requirement, current dashboard/auth/list/form surfaces | Unified global shadcn-style tokens, layout chrome, shared primitives, refreshed checkpoints, and build-fix follow-ups | `npm test -- src/components/layout/Header.test.tsx src/components/layout/Sidebar.test.tsx src/components/layout/ThemeToggle.test.tsx src/app/dashboard/layout.test.tsx src/app/page.test.tsx src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.test.tsx src/components/tools/ProductTracker.test.tsx src/components/ai/AIGreeting.test.tsx` + `npm run lint -- ...` + `npm run build` | Shared visual baseline is shadcn-aligned, high-traffic pages inherit it, and production build stays green |
++| UI-SYS-02 | P0 | 25m | 1 | DONE | User requirement to fully enforce shadcn/ui with blue theme, plus remaining outlier pages | Blue token set, shadcn-aligned semantic helpers, simplified public service shell, and cleaned `store-recommend` / `import` pages | `npm run lint -- src/components/ui/semantic-badge.tsx src/components/ui/amount-text.tsx src/components/public/service-page.tsx src/app/forex-verifications/page.tsx src/app/tax-refunds/page.tsx src/app/dashboard/store-recommend/page.tsx src/app/dashboard/import/components/DataImportPageContent.tsx` + `npm test -- src/components/public/service-page.test.tsx src/app/forex-verifications/page.test.tsx src/app/tax-refunds/page.test.tsx src/app/dashboard/store-recommend/page.test.tsx src/app/dashboard/import/page.test.tsx` + `npm run build` | Blue shadcn theme is active globally and the most obvious non-shadcn pages are pulled back to shared primitives |
++| UI-SYS-03 | P0 | 20m | 1 | DONE | Remaining auth/finance/dashboard surfaces still exposing legacy chart accents after blue migration | Final blue-token convergence across auth pages, finance/payments pages, dashboard stats, import cleanup, and semantic-helper test updates | `npm run lint -- src/app/(auth)/login/page.tsx src/app/(auth)/register/page.tsx src/app/(auth)/forgot-password/page.tsx src/components/layout/Header.tsx src/components/dashboard/DataDashboard.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/payments/page.tsx src/app/dashboard/import/components/DataImportPageContent.tsx src/components/ui/amount-text.tsx src/components/ui/amount-text.test.tsx src/components/ui/semantic-badge.tsx src/components/ui/semantic-badge.test.tsx` + `npm test -- src/components/ui/amount-text.test.tsx src/components/ui/semantic-badge.test.tsx src/app/(auth)/login/page.test.tsx src/app/(auth)/register/page.test.tsx src/app/(auth)/forgot-password/page.test.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/payments/page.test.tsx` + `npm run build` | Blue shadcn baseline now covers the core app shell, auth, public, import, finance, payments, and dashboard stat surfaces without build or regression failures |
+ | CD-01 | P0 | 20m | 1 | DONE | Existing dashboard/product CRUD patterns | Checkpoint files, closeout plan, and verified failing/build blockers list | `npm test -- src/services/customsDeclaration.service.test.ts src/app/customs-declarations/page.test.tsx src/app/customs-declarations/create/page.test.tsx 'src/app/customs-declarations/[id]/page.test.tsx' 'src/app/customs-declarations/[id]/edit/page.test.tsx'` | Customs declarations route set and closeout plan are anchored in repo artifacts |
+ | CD-02 | P0 | 20m | 1 | DONE | Failing route/form tests plus Next16 build failures | `customs-declarations` routes/components/service/types + related frontend build blockers | Same targeted `vitest` command plus `npm run build` | List/detail/create/edit routes work, top-level Suspense is in place, and related build blockers are cleared |
+ | CD-03 | P0 | 15m | 1 | DONE | Implemented feature | Verification artifacts, metrics updates, and patch/result logs | `npm test -- src/sentry.config.test.ts src/services/customsDeclaration.service.test.ts src/app/customs-declarations/page.test.tsx src/app/customs-declarations/create/page.test.tsx 'src/app/customs-declarations/[id]/page.test.tsx' 'src/app/customs-declarations/[id]/edit/page.test.tsx' src/app/dashboard/tax-refunds/page.test.tsx src/services/container.service.test.ts src/services/crudService.test.ts src/services/purchase.service.test.ts src/lib/hooks/useApi.test.ts` + `npm run lint -- ...` + `npm run build` + `npm run test -- --coverage src/services/customsDeclaration.service.test.ts src/app/customs-declarations/layout.test.tsx src/app/customs-declarations/page.test.tsx src/app/customs-declarations/create/page.test.tsx 'src/app/customs-declarations/[id]/page.test.tsx' 'src/app/customs-declarations/[id]/edit/page.test.tsx'` | Checks green, metrics recorded, and patch/result artifacts written |
+diff --git a/frontend/src/app/(auth)/forgot-password/page.tsx b/frontend/src/app/(auth)/forgot-password/page.tsx
+index 00b99b4..bf10ebb 100644
+--- a/frontend/src/app/(auth)/forgot-password/page.tsx
++++ b/frontend/src/app/(auth)/forgot-password/page.tsx
+@@ -103,10 +103,10 @@ export default function ForgotPasswordPage() {
+       <div className="auth-shell">
+         <Card className="auth-card">
+           <CardHeader className="text-center">
+-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-chart-3/30 bg-chart-3/16">
+-              <CheckCircle className="h-10 w-10 text-chart-3" />
++            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-primary/20 bg-primary/10">
++              <CheckCircle className="h-10 w-10 text-primary" />
+             </div>
+-            <CardTitle className="text-brand-emphasis">密码重置成功！</CardTitle>
++            <CardTitle>密码重置成功！</CardTitle>
+             <CardDescription>
+               您的密码已成功重置，请使用新密码登录。
+             </CardDescription>
+@@ -135,7 +135,7 @@ export default function ForgotPasswordPage() {
+           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full border border-primary/30 bg-primary/10">
+             <KeyRound className="h-6 w-6 text-primary" />
+           </div>
+-          <CardTitle className="text-brand-emphasis text-center">找回密码</CardTitle>
++          <CardTitle className="text-center">找回密码</CardTitle>
+           <CardDescription className="text-center">
+             请输入您的用户名和注册时绑定的手机号进行验证
+           </CardDescription>
+diff --git a/frontend/src/app/(auth)/login/page.tsx b/frontend/src/app/(auth)/login/page.tsx
+index 8d4f7d5..b2f4942 100644
+--- a/frontend/src/app/(auth)/login/page.tsx
++++ b/frontend/src/app/(auth)/login/page.tsx
+@@ -149,7 +149,7 @@ export default function LoginPage() {
+     <div className="auth-shell">
+       <Card className="auth-card">
+         <CardHeader>
+-          <CardTitle className="text-brand-emphasis">系统登录</CardTitle>
++          <CardTitle>系统登录</CardTitle>
+           <CardDescription>
+             请输入您的账号密码以访问系统。
+           </CardDescription>
+diff --git a/frontend/src/app/(auth)/register/page.tsx b/frontend/src/app/(auth)/register/page.tsx
+index 1821390..00dfed6 100644
+--- a/frontend/src/app/(auth)/register/page.tsx
++++ b/frontend/src/app/(auth)/register/page.tsx
+@@ -17,7 +17,7 @@ export default function RegisterPage() {
+     <div className="auth-shell">
+       <Card className="auth-card">
+         <CardHeader>
+-          <CardTitle className="text-brand-emphasis">账号注册已关闭</CardTitle>
++          <CardTitle>账号注册已关闭</CardTitle>
+           <CardDescription>
+             系统当前采用“管理员邀请注册”模式
+           </CardDescription>
+diff --git a/frontend/src/app/dashboard/finance/page.tsx b/frontend/src/app/dashboard/finance/page.tsx
+index d753c46..ac710a0 100644
+--- a/frontend/src/app/dashboard/finance/page.tsx
++++ b/frontend/src/app/dashboard/finance/page.tsx
+@@ -62,7 +62,7 @@ export default function FinancePage() {
+       value: `¥${(stats?.payable?.total ?? 0).toLocaleString()}`,
+       icon: ArrowUpRight,
+       description: `已付: ¥${(stats?.payable?.paid ?? 0).toLocaleString()}`,
+-      variant: 'text-chart-5',
++      variant: 'text-primary',
+     },
+     {
+       title: '待付账款',
+@@ -83,7 +83,7 @@ export default function FinancePage() {
+       value: `$${(stats?.receivable?.unreceived ?? 0).toLocaleString()}`,
+       icon: DollarSign,
+       description: '待从门店收回',
+-      variant: 'text-chart-3',
++      variant: 'text-primary',
+     },
+   ];
+ 
+@@ -94,10 +94,10 @@ export default function FinancePage() {
+         description="资金流水与应收应付概览。"
+         actions={
+           <div className="flex gap-2">
+-            <Button asChild variant="outline" className="h-10 rounded-xl border-border/70 bg-background/60">
++            <Button asChild variant="outline" className="h-10">
+               <Link href="/dashboard/finance/payable">查看应付</Link>
+             </Button>
+-            <Button asChild className="h-10 rounded-xl">
++            <Button asChild className="h-10">
+               <Link href="/dashboard/finance/receivable">查看应收</Link>
+             </Button>
+           </div>
+@@ -127,7 +127,7 @@ export default function FinancePage() {
+       </div>
+ 
+       <div className="grid gap-4 md:grid-cols-2">
+-        <Card className="surface-panel col-span-2">
++        <Card className="col-span-2">
+           <CardHeader>
+             <CardTitle>财务说明</CardTitle>
+           </CardHeader>
+diff --git a/frontend/src/app/dashboard/import/components/DataImportPageContent.tsx b/frontend/src/app/dashboard/import/components/DataImportPageContent.tsx
+index 1881e87..91a17d5 100644
+--- a/frontend/src/app/dashboard/import/components/DataImportPageContent.tsx
++++ b/frontend/src/app/dashboard/import/components/DataImportPageContent.tsx
+@@ -20,17 +20,14 @@ import {
+   Database,
+   FileWarning,
+   ArrowRight,
+-  ArrowLeft,
+   Package,
+   Building2,
+   Store,
+   Container,
+   FileText,
+ } from 'lucide-react';
+-import { useRouter } from 'next/navigation';
+ import { Button } from '@/components/ui/button';
+-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+-import { Badge } from '@/components/ui/badge';
++import { Card, CardContent } from '@/components/ui/card';
+ import { PageHeader } from '@/components/layout/PageHeader';
+ import {
+   previewCSV,
+@@ -46,8 +43,6 @@ import {
+ type ImportStep = 'upload' | 'preview' | 'importing' | 'result';
+ 
+ export default function DataImportPage() {
+-  const router = useRouter();
+-  
+   // 0. 状态管理
+   const [step, setStep] = useState<ImportStep>('upload');
+   const [previewData, setPreviewData] = useState<PreviewResult | null>(null);
+@@ -268,18 +263,20 @@ export default function DataImportPage() {
+             {step === 'preview' && previewData && (
+               <div className="space-y-6">
+                 {/* 文件信息 */}
+-                <div className="bg-card/70 backdrop-blur border border-border/70 rounded-xl p-6">
++                <Card>
++                  <CardContent className="p-6">
+                   <div className="flex items-center justify-between mb-4">
+                     <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+-                      <FileSpreadsheet className="w-5 h-5 text-chart-3" />
++                      <FileSpreadsheet className="w-5 h-5 text-primary" />
+                       {previewData.fileName}
+                     </h3>
+-                    <button
++                    <Button
+                       onClick={handleReset}
+-                      className="text-muted-foreground hover:text-foreground text-sm"
++                      variant="ghost"
++                      size="sm"
+                     >
+                       重新上传
+-                    </button>
++                    </Button>
+                   </div>
+                   
+                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+@@ -287,25 +284,27 @@ export default function DataImportPage() {
+                       <div className="text-2xl font-bold text-foreground">{previewData.analysis.totalRows}</div>
+                       <div className="text-muted-foreground text-sm">总记录数</div>
+                     </div>
+-                    <div className="bg-chart-3/10 rounded-lg p-3 border border-chart-3/30">
+-                      <div className="text-2xl font-bold text-chart-3">{previewData.comparison.summary.new}</div>
++                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
++                      <div className="text-2xl font-bold text-primary">{previewData.comparison.summary.new}</div>
+                       <div className="text-muted-foreground text-sm">新增记录</div>
+                     </div>
+                     <div className="bg-muted/55 rounded-lg p-3">
+                       <div className="text-2xl font-bold text-foreground/85">{previewData.comparison.summary.existing}</div>
+                       <div className="text-muted-foreground text-sm">已存在</div>
+                     </div>
+-                    <div className="bg-chart-5/10 rounded-lg p-3 border border-chart-5/30">
+-                      <div className="text-2xl font-bold text-chart-5">{previewData.comparison.summary.invalid}</div>
++                    <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
++                      <div className="text-2xl font-bold text-destructive">{previewData.comparison.summary.invalid}</div>
+                       <div className="text-muted-foreground text-sm">无效记录</div>
+                     </div>
+                   </div>
+-                </div>
++                  </CardContent>
++                </Card>
+ 
+                 {/* 缺失序号提示 */}
+                 {previewData.analysis.missingSeqs.length > 0 && (
+-                  <div className="bg-chart-5/10 border border-chart-5/30 rounded-xl p-6">
+-                    <h3 className="text-lg font-semibold text-chart-5 flex items-center gap-2 mb-3">
++                  <Card className="border-destructive/20 bg-destructive/5">
++                    <CardContent className="p-6">
++                    <h3 className="text-lg font-semibold text-destructive flex items-center gap-2 mb-3">
+                       <FileWarning className="w-5 h-5" />
+                       缺失序号提醒（共 {previewData.analysis.missingSeqs.length} 个）
+                     </h3>
+@@ -314,20 +313,21 @@ export default function DataImportPage() {
+                     </p>
+                     <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                       {previewData.analysis.missingSeqs.map(seq => (
+-                        <span key={seq} className="px-2 py-1 bg-chart-5/20 text-chart-5/85 text-sm rounded">
++                        <span key={seq} className="rounded bg-destructive/10 px-2 py-1 text-sm text-destructive">
+                           {seq}
+                         </span>
+                       ))}
+                     </div>
+-                  </div>
++                    </CardContent>
++                  </Card>
+                 )}
+ 
+                 {/* 新增记录预览 */}
+                 {previewData.comparison.newRecords.length > 0 && (
+-                  <div className="bg-card/70 backdrop-blur border border-border/70 rounded-xl overflow-hidden">
++                  <Card className="overflow-hidden">
+                     <div className="p-4 border-b border-border/70">
+                       <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+-                        <CheckCircle className="w-5 h-5 text-chart-3" />
++                        <CheckCircle className="w-5 h-5 text-primary" />
+                         将导入的新记录（显示前 {Math.min(previewData.comparison.newRecords.length, 50)} 条）
+                       </h3>
+                     </div>
+@@ -345,7 +345,7 @@ export default function DataImportPage() {
+                         <tbody className="divide-y divide-border/60">
+                           {previewData.comparison.newRecords.slice(0, 50).map((record, i) => (
+                             <tr key={i} className="hover:bg-muted/40">
+-                              <td className="px-4 py-2 text-chart-3">{record.seq}</td>
++                              <td className="px-4 py-2 text-primary">{record.seq}</td>
+                               <td className="px-4 py-2 text-foreground">{record.customsName}</td>
+                               <td className="px-4 py-2 text-foreground/85">{record.storeName || '-'}</td>
+                               <td className="px-4 py-2 text-foreground/85">{record.containerNo || '-'}</td>
+@@ -355,7 +355,7 @@ export default function DataImportPage() {
+                         </tbody>
+                       </table>
+                     </div>
+-                  </div>
++                  </Card>
+                 )}
+ 
+                 {/* 无效记录 */}
+@@ -377,46 +377,51 @@ export default function DataImportPage() {
+ 
+                 {/* 操作按钮 */}
+                 <div className="flex gap-4">
+-                  <button
++                  <Button
+                     onClick={handleReset}
+-                    className="px-6 py-3 bg-muted hover:bg-muted/75 text-foreground rounded-lg font-medium transition-colors"
++                    variant="outline"
+                   >
+                     取消
+-                  </button>
+-                  <button
++                  </Button>
++                  <Button
+                     onClick={handleImport}
+                     disabled={previewData.comparison.summary.new === 0}
+-                    className="flex-1 px-6 py-3 bg-chart-3 hover:bg-chart-3/90 text-foreground rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
++                    className="flex-1"
+                   >
+                     <Upload className="w-5 h-5" />
+                     确认导入 {previewData.comparison.summary.new} 条新记录
+-                  </button>
++                  </Button>
+                 </div>
+               </div>
+             )}
+ 
+             {/* 导入中 */}
+             {step === 'importing' && (
+-              <div className="bg-card/70 backdrop-blur border border-border/70 rounded-xl p-12 text-center">
+-                <RefreshCw className="w-16 h-16 mx-auto mb-4 text-chart-3 animate-spin" />
++              <Card>
++                <CardContent className="p-12 text-center">
++                <RefreshCw className="w-16 h-16 mx-auto mb-4 text-primary animate-spin" />
+                 <h3 className="text-xl font-semibold text-foreground mb-2">正在导入数据...</h3>
+                 <p className="text-muted-foreground">请稍候，这可能需要一些时间</p>
+-              </div>
++                </CardContent>
++              </Card>
+             )}
+ 
+             {/* 导入结果 */}
+             {step === 'result' && importResult && (
+               <div className="space-y-6">
+-                <div className="bg-chart-3/10 border border-chart-3/30 rounded-xl p-6">
++                <Card className="border-primary/20 bg-primary/5">
++                  <CardContent className="p-6">
+                   <div className="flex items-center gap-3 mb-4">
+-                    <CheckCircle className="w-8 h-8 text-chart-3" />
+-                    <h3 className="text-xl font-semibold text-chart-3">导入完成</h3>
++                    <CheckCircle className="w-8 h-8 text-primary" />
++                    <h3 className="text-xl font-semibold text-primary">导入完成</h3>
+                   </div>
+                   <p className="text-foreground text-lg">{importResult.message}</p>
+-                </div>
++                  </CardContent>
++                </Card>
+ 
+                 {/* 创建统计 */}
+-                <div className="bg-card/70 backdrop-blur border border-border/70 rounded-xl p-6">
++                <Card>
++                  <CardContent className="p-6">
+                   <h3 className="text-lg font-semibold text-foreground mb-4">新增数据统计</h3>
+                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                     {[
+@@ -431,14 +436,15 @@ export default function DataImportPage() {
+                     ].map(item => (
+                       <div key={item.label} className="bg-muted/55 rounded-lg p-3">
+                         <div className="flex items-center gap-2 mb-1">
+-                          <item.icon className="w-4 h-4 text-chart-3" />
++                          <item.icon className="w-4 h-4 text-primary" />
+                           <span className="text-muted-foreground text-sm">{item.label}</span>
+                         </div>
+                         <div className="text-xl font-bold text-foreground">+{item.value}</div>
+                       </div>
+                     ))}
+                   </div>
+-                </div>
++                  </CardContent>
++                </Card>
+ 
+                 {/* 失败记录 */}
+                 {importResult.result.failed.length > 0 && (
+@@ -457,12 +463,12 @@ export default function DataImportPage() {
+                   </div>
+                 )}
+ 
+-                <button
++                <Button
+                   onClick={handleReset}
+-                  className="w-full px-6 py-3 bg-chart-3 hover:bg-chart-3/90 text-foreground rounded-lg font-medium transition-colors"
++                  className="w-full"
+                 >
+                   继续导入其他数据
+-                </button>
++                </Button>
+               </div>
+             )}
+           </div>
+@@ -471,9 +477,10 @@ export default function DataImportPage() {
+           <div className="space-y-6">
+             {/* 数据库统计 */}
+             {stats && (
+-              <div className="bg-card/70 backdrop-blur border border-border/70 rounded-xl p-6">
++              <Card>
++                <CardContent className="p-6">
+                 <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+-                  <Database className="w-5 h-5 text-chart-3" />
++                  <Database className="w-5 h-5 text-primary" />
+                   数据库统计
+                 </h3>
+                 <div className="space-y-3">
+@@ -493,13 +500,15 @@ export default function DataImportPage() {
+                     </div>
+                   ))}
+                 </div>
+-              </div>
++                </CardContent>
++              </Card>
+             )}
+ 
+             {/* 导入历史 */}
+-            <div className="bg-card/70 backdrop-blur border border-border/70 rounded-xl p-6">
++            <Card>
++              <CardContent className="p-6">
+               <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+-                <History className="w-5 h-5 text-chart-3" />
++                <History className="w-5 h-5 text-primary" />
+                 导入历史
+               </h3>
+               {history.length === 0 ? (
+@@ -514,7 +523,7 @@ export default function DataImportPage() {
+                         </span>
+                         <span className={`text-xs px-2 py-0.5 rounded ${
+                           record.status === 'COMPLETED' 
+-                            ? 'bg-chart-3/20 text-chart-3' 
++                            ? 'bg-primary/10 text-primary' 
+                             : 'bg-destructive/15 text-destructive'
+                         }`}>
+                           {record.status === 'COMPLETED' ? '成功' : '失败'}
+@@ -530,33 +539,35 @@ export default function DataImportPage() {
+                   ))}
+                 </div>
+               )}
+-            </div>
++              </CardContent>
++            </Card>
+ 
+             {/* 使用说明 */}
+-            <div className="bg-card/70 backdrop-blur border border-border/70 rounded-xl p-6">
++            <Card>
++              <CardContent className="p-6">
+               <h3 className="text-lg font-semibold text-foreground mb-4">使用说明</h3>
+               <ul className="space-y-2 text-muted-foreground text-sm">
+                 <li className="flex items-start gap-2">
+-                  <span className="text-chart-3">1.</span>
++                  <span className="text-primary">1.</span>
+                   上传与“出货汇总”格式一致的CSV文件
+                 </li>
+                 <li className="flex items-start gap-2">
+-                  <span className="text-chart-3">2.</span>
++                  <span className="text-primary">2.</span>
+                   系统自动对比数据库，识别新增记录
+                 </li>
+                 <li className="flex items-start gap-2">
+-                  <span className="text-chart-3">3.</span>
++                  <span className="text-primary">3.</span>
+                   检查缺失序号，确认无误后导入
+                 </li>
+                 <li className="flex items-start gap-2">
+-                  <span className="text-chart-3">4.</span>
++                  <span className="text-primary">4.</span>
+                   已存在的记录会自动跳过，不会重复导入
+                 </li>
+               </ul>
+-            </div>
++              </CardContent>
++            </Card>
+           </div>
+         </div>
+-      </div>
+     </div>
+   );
+ }
+diff --git a/frontend/src/app/dashboard/payments/page.tsx b/frontend/src/app/dashboard/payments/page.tsx
+index b7b5f6d..532b2eb 100644
+--- a/frontend/src/app/dashboard/payments/page.tsx
++++ b/frontend/src/app/dashboard/payments/page.tsx
+@@ -211,7 +211,7 @@ function PaymentsPageContent() {
+         title="收付款"
+         description="管理应付账款与应收账款"
+         actions={
+-          <Button variant="outline" size="sm" className="h-10 rounded-xl border-border/70 bg-background/60" onClick={() => { fetchStats(); fetchPayables(); fetchReceivables(); }}>
++          <Button variant="outline" size="sm" className="h-10" onClick={() => { fetchStats(); fetchPayables(); fetchReceivables(); }}>
+             <RefreshCw className="mr-2 h-4 w-4" /> 刷新
+           </Button>
+         }
+@@ -222,10 +222,10 @@ function PaymentsPageContent() {
+         <Card className="kpi-card">
+           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+             <CardTitle className="text-sm font-medium">待付账款</CardTitle>
+-            <ArrowUpRight className="h-4 w-4 text-chart-5" />
++            <ArrowUpRight className="h-4 w-4 text-primary" />
+           </CardHeader>
+           <CardContent>
+-            <div className="text-2xl font-bold text-chart-5">
++            <div className="text-2xl font-bold text-primary">
+               ¥{(stats?.payable?.unpaid ?? 0).toLocaleString()}
+             </div>
+             <p className="text-xs text-muted-foreground">
+@@ -251,7 +251,7 @@ function PaymentsPageContent() {
+ 
+       {/* Tab切换 */}
+       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+-        <TabsList className="rounded-xl border border-border/70 bg-background/60">
++        <TabsList className="border bg-background">
+           <TabsTrigger value="payable" className="gap-2">
+             <ArrowUpRight className="h-4 w-4" />
+             应付账款
+@@ -264,7 +264,7 @@ function PaymentsPageContent() {
+ 
+         {/* 应付账款Tab */}
+         <TabsContent value="payable" className="space-y-4">
+-          <div className="surface-panel overflow-hidden">
++          <Card className="overflow-hidden">
+             <Table>
+               <TableHeader>
+                 <TableRow>
+@@ -299,14 +299,14 @@ function PaymentsPageContent() {
+                         <Badge variant="outline">{contract.status}</Badge>
+                       </TableCell>
+                       <TableCell className="text-right">{contract.totalAmount.toLocaleString()}</TableCell>
+-                      <TableCell className="text-right text-chart-3">
++                      <TableCell className="text-right text-primary/80">
+                         {contract.paidAmount.toLocaleString()}
+                       </TableCell>
+-                      <TableCell className="text-right text-chart-5 font-bold">
++                      <TableCell className="text-right font-bold text-primary">
+                         {contract.unpaidAmount.toLocaleString()}
+                       </TableCell>
+                       <TableCell>
+-                        <Button size="sm" variant="outline" className="rounded-xl border-border/70 bg-background/60" onClick={() => setSelectedPayable(contract)}>
++                        <Button size="sm" variant="outline" onClick={() => setSelectedPayable(contract)}>
+                           <CreditCard className="mr-1 h-3 w-3" /> 付款
+                         </Button>
+                       </TableCell>
+@@ -315,12 +315,12 @@ function PaymentsPageContent() {
+                 )}
+               </TableBody>
+             </Table>
+-          </div>
++          </Card>
+         </TabsContent>
+ 
+         {/* 应收账款Tab */}
+         <TabsContent value="receivable" className="space-y-4">
+-          <div className="surface-panel overflow-hidden">
++          <Card className="overflow-hidden">
+             <Table>
+               <TableHeader>
+                 <TableRow>
+@@ -355,14 +355,14 @@ function PaymentsPageContent() {
+                         <Badge variant="outline">{contract.status}</Badge>
+                       </TableCell>
+                       <TableCell className="text-right">{contract.totalAmount.toLocaleString()}</TableCell>
+-                      <TableCell className="text-right text-chart-3">
++                      <TableCell className="text-right text-primary/80">
+                         {contract.receivedAmount.toLocaleString()}
+                       </TableCell>
+                       <TableCell className="text-right text-primary font-bold">
+                         {contract.unreceiveAmount.toLocaleString()}
+                       </TableCell>
+                       <TableCell>
+-                        <Button size="sm" variant="outline" className="rounded-xl border-border/70 bg-background/60" onClick={() => setSelectedReceivable(contract)}>
++                        <Button size="sm" variant="outline" onClick={() => setSelectedReceivable(contract)}>
+                           <CreditCard className="mr-1 h-3 w-3" /> 收款
+                         </Button>
+                       </TableCell>
+@@ -371,7 +371,7 @@ function PaymentsPageContent() {
+                 )}
+               </TableBody>
+             </Table>
+-          </div>
++          </Card>
+         </TabsContent>
+       </Tabs>
+ 
+diff --git a/frontend/src/app/globals.css b/frontend/src/app/globals.css
+index 9331c91..33c06b8 100644
+--- a/frontend/src/app/globals.css
++++ b/frontend/src/app/globals.css
+@@ -67,10 +67,10 @@
+     --input: oklch(0.928 0.006 264.531);
+     --ring: oklch(0.623 0.214 259.815);
+     --chart-1: oklch(0.546 0.245 262.881);
+-    --chart-2: oklch(0.623 0.188 259.814);
+-    --chart-3: oklch(0.696 0.17 162.48);
+-    --chart-4: oklch(0.769 0.188 70.08);
+-    --chart-5: oklch(0.645 0.246 16.439);
++    --chart-2: oklch(0.623 0.214 259.815);
++    --chart-3: oklch(0.707 0.165 254.624);
++    --chart-4: oklch(0.612 0.188 259.814);
++    --chart-5: oklch(0.488 0.243 264.376);
+     --sidebar: oklch(0.995 0.001 247.858);
+     --sidebar-foreground: oklch(0.238 0.014 253.1);
+     --sidebar-primary: oklch(0.546 0.245 262.881);
+@@ -103,11 +103,11 @@
+     --border: oklch(1 0 0 / 0.1);
+     --input: oklch(1 0 0 / 0.14);
+     --ring: oklch(0.623 0.214 259.815);
+-    --chart-1: oklch(0.623 0.214 259.815);
+-    --chart-2: oklch(0.707 0.165 254.624);
+-    --chart-3: oklch(0.7 0.13 145);
+-    --chart-4: oklch(0.76 0.15 80);
+-    --chart-5: oklch(0.7 0.19 25);
++    --chart-1: oklch(0.707 0.165 254.624);
++    --chart-2: oklch(0.77 0.135 251.813);
++    --chart-3: oklch(0.665 0.179 258.338);
++    --chart-4: oklch(0.612 0.188 259.814);
++    --chart-5: oklch(0.546 0.245 262.881);
+     --sidebar: oklch(0.252 0.021 258.334);
+     --sidebar-foreground: oklch(0.929 0.013 255.508);
+     --sidebar-primary: oklch(0.623 0.214 259.815);
+diff --git a/frontend/src/components/dashboard/DataDashboard.tsx b/frontend/src/components/dashboard/DataDashboard.tsx
+index 4598e86..a4fef60 100644
+--- a/frontend/src/components/dashboard/DataDashboard.tsx
++++ b/frontend/src/components/dashboard/DataDashboard.tsx
+@@ -71,14 +71,14 @@ export function DataDashboard() {
+         <Card className="kpi-card">
+           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+             <CardTitle className="text-sm font-medium">采购合同</CardTitle>
+-            <FileText className="h-4 w-4 text-chart-1" />
++            <FileText className="h-4 w-4 text-primary" />
+           </CardHeader>
+           <CardContent>
+             <div className="text-2xl font-bold">{data.contracts.purchase.count}</div>
+             <p className="text-xs text-muted-foreground">
+               总金额: ¥{data.contracts.purchase.totalAmount.toLocaleString()}
+             </p>
+-            <p className="text-xs text-chart-5">
++            <p className="text-xs text-primary/80">
+               待付: ¥{data.contracts.purchase.unpaidAmount.toLocaleString()}
+             </p>
+           </CardContent>
+@@ -88,14 +88,14 @@ export function DataDashboard() {
+         <Card className="kpi-card">
+           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+             <CardTitle className="text-sm font-medium">销售合同</CardTitle>
+-            <TrendingUp className="h-4 w-4 text-chart-3" />
++            <TrendingUp className="h-4 w-4 text-primary" />
+           </CardHeader>
+           <CardContent>
+             <div className="text-2xl font-bold">{data.contracts.sales.count}</div>
+             <p className="text-xs text-muted-foreground">
+               总金额: ${data.contracts.sales.totalAmount.toLocaleString()}
+             </p>
+-            <p className="text-xs text-chart-3">
++            <p className="text-xs text-primary/80">
+               已收: ${data.contracts.sales.receivedAmount.toLocaleString()}
+             </p>
+           </CardContent>
+@@ -105,7 +105,7 @@ export function DataDashboard() {
+         <Card className="kpi-card">
+           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+             <CardTitle className="text-sm font-medium">应收账款</CardTitle>
+-            <DollarSign className="h-4 w-4 text-chart-5" />
++            <DollarSign className="h-4 w-4 text-primary" />
+           </CardHeader>
+           <CardContent>
+             <div className="text-2xl font-bold">
+@@ -121,14 +121,14 @@ export function DataDashboard() {
+         <Card className="kpi-card">
+           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+             <CardTitle className="text-sm font-medium">库存概览</CardTitle>
+-            <Package className="h-4 w-4 text-chart-4" />
++            <Package className="h-4 w-4 text-primary" />
+           </CardHeader>
+           <CardContent>
+             <div className="text-2xl font-bold">{data.inventory.productCount}</div>
+             <p className="text-xs text-muted-foreground">
+               商品种类
+             </p>
+-            <p className="text-xs text-chart-4">
++            <p className="text-xs text-primary/80">
+               库存记录: {data.inventory.recordCount}条
+             </p>
+           </CardContent>
+diff --git a/frontend/src/components/layout/Header.tsx b/frontend/src/components/layout/Header.tsx
+index fac5b2a..d82348d 100644
+--- a/frontend/src/components/layout/Header.tsx
++++ b/frontend/src/components/layout/Header.tsx
+@@ -244,10 +244,10 @@ export function Header() {
+   // 获取图标
+   const getIcon = (type: string) => {
+     switch (type) {
+-      case 'product': return <Package className="h-4 w-4 text-chart-1" />;
+-      case 'supplier': return <Building2 className="h-4 w-4 text-chart-3" />;
+-      case 'container': return <Container className="h-4 w-4 text-chart-5" />;
+-      case 'purchase': return <FileText className="h-4 w-4 text-chart-4" />;
++      case 'product': return <Package className="h-4 w-4 text-primary" />;
++      case 'supplier': return <Building2 className="h-4 w-4 text-primary" />;
++      case 'container': return <Container className="h-4 w-4 text-primary" />;
++      case 'purchase': return <FileText className="h-4 w-4 text-primary" />;
+       case 'sales': return <FileText className="h-4 w-4 text-primary" />;
+       default: return <Search className="h-4 w-4" />;
+     }
+diff --git a/frontend/src/components/ui/amount-text.test.tsx b/frontend/src/components/ui/amount-text.test.tsx
+index b288625..e7c521e 100644
+--- a/frontend/src/components/ui/amount-text.test.tsx
++++ b/frontend/src/components/ui/amount-text.test.tsx
+@@ -14,7 +14,7 @@ describe('AmountText', () => {
+   it('支持warning语义', () => {
+     const { getByText } = render(<AmountText tone="warning">¥100</AmountText>);
+     const amount = getByText('¥100');
+-    expect(amount.className).toContain('text-chart-5');
++    expect(amount.className).toContain('text-amber-600');
+   });
+ 
+   it('支持xl尺寸', () => {
+@@ -23,4 +23,3 @@ describe('AmountText', () => {
+     expect(amount.className).toContain('text-2xl');
+   });
+ });
+-
+diff --git a/frontend/src/components/ui/semantic-badge.test.tsx b/frontend/src/components/ui/semantic-badge.test.tsx
+index 42021b9..32638fd 100644
+--- a/frontend/src/components/ui/semantic-badge.test.tsx
++++ b/frontend/src/components/ui/semantic-badge.test.tsx
+@@ -18,11 +18,10 @@ describe('SemanticBadge', () => {
+     expect(badge.className).toContain('text-muted-foreground');
+   });
+ 
+-  it('warning语义会使用chart-4色系', () => {
++  it('warning语义会使用amber语义色系', () => {
+     const { getByText } = render(<SemanticBadge tone="warning">生产中</SemanticBadge>);
+     const badge = getByText('生产中');
+-    expect(badge.className).toContain('text-chart-4');
+-    expect(badge.className).toContain('border-chart-4/35');
++    expect(badge.className).toContain('text-amber-700');
++    expect(badge.className).toContain('border-amber-200');
+   });
+ });
+-
+diff --git a/frontend/RESULTS/UI-SYS-03.md b/frontend/RESULTS/UI-SYS-03.md
+new file mode 100644
+index 0000000..a78167d
+--- /dev/null
++++ b/frontend/RESULTS/UI-SYS-03.md
+@@ -0,0 +1,30 @@
++# UI-SYS-03 Result
++
++## Delivered
++
++- Tightened the remaining blue-token convergence in:
++  - `src/app/globals.css`
++  - `src/components/layout/Header.tsx`
++  - `src/components/dashboard/DataDashboard.tsx`
++- Simplified auth-page emphasis in:
++  - `src/app/(auth)/login/page.tsx`
++  - `src/app/(auth)/register/page.tsx`
++  - `src/app/(auth)/forgot-password/page.tsx`
++- Cleaned finance-oriented pages so they rely on the blue baseline instead of mixed legacy chart accents:
++  - `src/app/dashboard/finance/page.tsx`
++  - `src/app/dashboard/payments/page.tsx`
++- Finished another cleanup pass on `src/app/dashboard/import/components/DataImportPageContent.tsx`.
++- Updated semantic-helper tests to reflect the new semantic classes:
++  - `src/components/ui/amount-text.test.tsx`
++  - `src/components/ui/semantic-badge.test.tsx`
++
++## Validation
++
++- `npm run lint -- src/app/(auth)/login/page.tsx src/app/(auth)/register/page.tsx src/app/(auth)/forgot-password/page.tsx src/components/layout/Header.tsx src/components/dashboard/DataDashboard.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/payments/page.tsx src/app/dashboard/import/components/DataImportPageContent.tsx src/components/ui/amount-text.tsx src/components/ui/amount-text.test.tsx src/components/ui/semantic-badge.tsx src/components/ui/semantic-badge.test.tsx`
++- `npm test -- src/components/ui/amount-text.test.tsx src/components/ui/semantic-badge.test.tsx src/app/(auth)/login/page.test.tsx src/app/(auth)/register/page.test.tsx src/app/(auth)/forgot-password/page.test.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/payments/page.test.tsx`
++- `npm run build`
++
++## Outcome
++
++- The current app baseline is now consistently blue and shadcn-led across the core shell, auth flows, public service pages, dashboard summary widgets, finance/payments, and import flows.
++- Remaining work is down to fine-grained detail-page polish rather than a missing global theme system.
+diff --git a/logs/task-UI-SYS-03.md b/logs/task-UI-SYS-03.md
+new file mode 100644
+index 0000000..2c9125d
+--- /dev/null
++++ b/logs/task-UI-SYS-03.md
+@@ -0,0 +1,19 @@
++# Task UI-SYS-03
++
++- Goal: finish the current blue shadcn/ui cleanup pass for auth, finance, payments, dashboard stats, and remaining shared semantic drift.
++- Core files cleaned:
++  - `frontend/src/app/globals.css`
++  - `frontend/src/components/layout/Header.tsx`
++  - `frontend/src/components/dashboard/DataDashboard.tsx`
++  - `frontend/src/app/(auth)/login/page.tsx`
++  - `frontend/src/app/(auth)/register/page.tsx`
++  - `frontend/src/app/(auth)/forgot-password/page.tsx`
++  - `frontend/src/app/dashboard/finance/page.tsx`
++  - `frontend/src/app/dashboard/payments/page.tsx`
++  - `frontend/src/app/dashboard/import/components/DataImportPageContent.tsx`
++  - `frontend/src/components/ui/amount-text.test.tsx`
++  - `frontend/src/components/ui/semantic-badge.test.tsx`
++- Verification:
++  - targeted lint passed
++  - targeted auth/finance/helper tests passed (`19` tests)
++  - `npm run build` passed

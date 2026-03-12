@@ -32,4 +32,12 @@ describe('hsCodeService', () => {
 
     expect(api.get).toHaveBeenCalledWith('/hs-codes/69072190');
   });
+
+  it('list: 空关键字时请求分页列表', async () => {
+    await hsCodeService.list({ page: 2, pageSize: 50 });
+
+    expect(api.get).toHaveBeenCalledWith('/hs-codes', {
+      params: { keyword: '', page: 2, pageSize: 50 },
+    });
+  });
 });

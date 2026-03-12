@@ -11,8 +11,6 @@ const taxRefundConfig: ServicePageConfig = {
   title: '出口退税申报工作台',
   description:
     '按批次梳理退税资料、申报口径与凭证缺口，把单证归集和窗口排期同步推进，帮助财务团队更稳地压缩申报周期。',
-  themeClassName:
-    'before:absolute before:inset-x-0 before:bottom-0 before:h-24 before:bg-[linear-gradient(180deg,transparent,oklch(0.72_0.08_145_/_0.08))]',
   metrics: [
     { label: '批次排期反馈', value: '48h', detail: '申报前给出节奏建议' },
     { label: '资料归集模块', value: '6组', detail: '按税务口径分层检查' },

@@ -219,7 +219,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-chart-3" />
+              <DollarSign className="h-5 w-5 text-primary" />
               <div>
                 <div className="text-2xl font-bold">¥{contract.totalAmount.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">合同金额</p>
@@ -242,7 +242,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-chart-5" />
+              <DollarSign className="h-5 w-5 text-primary" />
               <div>
                 <div className="text-2xl font-bold">
                   ¥{(contract.totalAmount - contract.paidAmount).toLocaleString()}
@@ -255,7 +255,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-chart-4" />
+              <Building2 className="h-5 w-5 text-primary" />
               <div>
                 <div className="text-lg font-medium truncate max-w-[150px]" title={contract.supplier?.name}>
                   {contract.supplier?.name || '-'}

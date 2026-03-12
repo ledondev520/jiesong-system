@@ -20,17 +20,14 @@ import {
   Database,
   FileWarning,
   ArrowRight,
-  ArrowLeft,
   Package,
   Building2,
   Store,
   Container,
   FileText,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { PageHeader } from '@/components/layout/PageHeader';
 import {
   previewCSV,
@@ -46,8 +43,6 @@ import {
 type ImportStep = 'upload' | 'preview' | 'importing' | 'result';
 
 export default function DataImportPage() {
-  const router = useRouter();
-  
   // 0. 状态管理
   const [step, setStep] = useState<ImportStep>('upload');
   const [previewData, setPreviewData] = useState<PreviewResult | null>(null);
@@ -268,18 +263,20 @@ export default function DataImportPage() {
             {step === 'preview' && previewData && (
               <div className="space-y-6">
                 {/* 文件信息 */}
-                <div className="bg-card/70 backdrop-blur border border-border/70 rounded-xl p-6">
+                <Card>
+                  <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                      <FileSpreadsheet className="w-5 h-5 text-chart-3" />
+                      <FileSpreadsheet className="w-5 h-5 text-primary" />
                       {previewData.fileName}
                     </h3>
-                    <button
+                    <Button
                       onClick={handleReset}
-                      className="text-muted-foreground hover:text-foreground text-sm"
+                      variant="ghost"
+                      size="sm"
                     >
                       重新上传
-                    </button>
+                    </Button>
                   </div>
                   
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -287,25 +284,27 @@ export default function DataImportPage() {
                       <div className="text-2xl font-bold text-foreground">{previewData.analysis.totalRows}</div>
                       <div className="text-muted-foreground text-sm">总记录数</div>
                     </div>
-                    <div className="bg-chart-3/10 rounded-lg p-3 border border-chart-3/30">
-                      <div className="text-2xl font-bold text-chart-3">{previewData.comparison.summary.new}</div>
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                      <div className="text-2xl font-bold text-primary">{previewData.comparison.summary.new}</div>
                       <div className="text-muted-foreground text-sm">新增记录</div>
                     </div>
                     <div className="bg-muted/55 rounded-lg p-3">
                       <div className="text-2xl font-bold text-foreground/85">{previewData.comparison.summary.existing}</div>
                       <div className="text-muted-foreground text-sm">已存在</div>
                     </div>
-                    <div className="bg-chart-5/10 rounded-lg p-3 border border-chart-5/30">
-                      <div className="text-2xl font-bold text-chart-5">{previewData.comparison.summary.invalid}</div>
+                    <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+                      <div className="text-2xl font-bold text-destructive">{previewData.comparison.summary.invalid}</div>
                       <div className="text-muted-foreground text-sm">无效记录</div>
                     </div>
                   </div>
-                </div>
+                  </CardContent>
+                </Card>
 
                 {/* 缺失序号提示 */}
                 {previewData.analysis.missingSeqs.length > 0 && (
-                  <div className="bg-chart-5/10 border border-chart-5/30 rounded-xl p-6">
-                    <h3 className="text-lg font-semibold text-chart-5 flex items-center gap-2 mb-3">
+                  <Card className="border-destructive/20 bg-destructive/5">
+                    <CardContent className="p-6">
+                    <h3 className="text-lg font-semibold text-destructive flex items-center gap-2 mb-3">
                       <FileWarning className="w-5 h-5" />
                       缺失序号提醒（共 {previewData.analysis.missingSeqs.length} 个）
                     </h3>
@@ -314,20 +313,21 @@ export default function DataImportPage() {
                     </p>
                     <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                       {previewData.analysis.missingSeqs.map(seq => (
-                        <span key={seq} className="px-2 py-1 bg-chart-5/20 text-chart-5/85 text-sm rounded">
+                        <span key={seq} className="rounded bg-destructive/10 px-2 py-1 text-sm text-destructive">
                           {seq}
                         </span>
                       ))}
                     </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                 )}
 
                 {/* 新增记录预览 */}
                 {previewData.comparison.newRecords.length > 0 && (
-                  <div className="bg-card/70 backdrop-blur border border-border/70 rounded-xl overflow-hidden">
+                  <Card className="overflow-hidden">
                     <div className="p-4 border-b border-border/70">
                       <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                        <CheckCircle className="w-5 h-5 text-chart-3" />
+                        <CheckCircle className="w-5 h-5 text-primary" />
                         将导入的新记录（显示前 {Math.min(previewData.comparison.newRecords.length, 50)} 条）
                       </h3>
                     </div>
@@ -345,7 +345,7 @@ export default function DataImportPage() {
                         <tbody className="divide-y divide-border/60">
                           {previewData.comparison.newRecords.slice(0, 50).map((record, i) => (
                             <tr key={i} className="hover:bg-muted/40">
-                              <td className="px-4 py-2 text-chart-3">{record.seq}</td>
+                              <td className="px-4 py-2 text-primary">{record.seq}</td>
                               <td className="px-4 py-2 text-foreground">{record.customsName}</td>
                               <td className="px-4 py-2 text-foreground/85">{record.storeName || '-'}</td>
                               <td className="px-4 py-2 text-foreground/85">{record.containerNo || '-'}</td>
@@ -355,7 +355,7 @@ export default function DataImportPage() {
                         </tbody>
                       </table>
                     </div>
-                  </div>
+                  </Card>
                 )}
 
                 {/* 无效记录 */}
@@ -377,46 +377,51 @@ export default function DataImportPage() {
 
                 {/* 操作按钮 */}
                 <div className="flex gap-4">
-                  <button
+                  <Button
                     onClick={handleReset}
-                    className="px-6 py-3 bg-muted hover:bg-muted/75 text-foreground rounded-lg font-medium transition-colors"
+                    variant="outline"
                   >
                     取消
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={handleImport}
                     disabled={previewData.comparison.summary.new === 0}
-                    className="flex-1 px-6 py-3 bg-chart-3 hover:bg-chart-3/90 text-foreground rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="flex-1"
                   >
                     <Upload className="w-5 h-5" />
                     确认导入 {previewData.comparison.summary.new} 条新记录
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
 
             {/* 导入中 */}
             {step === 'importing' && (
-              <div className="bg-card/70 backdrop-blur border border-border/70 rounded-xl p-12 text-center">
-                <RefreshCw className="w-16 h-16 mx-auto mb-4 text-chart-3 animate-spin" />
+              <Card>
+                <CardContent className="p-12 text-center">
+                <RefreshCw className="w-16 h-16 mx-auto mb-4 text-primary animate-spin" />
                 <h3 className="text-xl font-semibold text-foreground mb-2">正在导入数据...</h3>
                 <p className="text-muted-foreground">请稍候，这可能需要一些时间</p>
-              </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* 导入结果 */}
             {step === 'result' && importResult && (
               <div className="space-y-6">
-                <div className="bg-chart-3/10 border border-chart-3/30 rounded-xl p-6">
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardContent className="p-6">
                   <div className="flex items-center gap-3 mb-4">
-                    <CheckCircle className="w-8 h-8 text-chart-3" />
-                    <h3 className="text-xl font-semibold text-chart-3">导入完成</h3>
+                    <CheckCircle className="w-8 h-8 text-primary" />
+                    <h3 className="text-xl font-semibold text-primary">导入完成</h3>
                   </div>
                   <p className="text-foreground text-lg">{importResult.message}</p>
-                </div>
+                  </CardContent>
+                </Card>
 
                 {/* 创建统计 */}
-                <div className="bg-card/70 backdrop-blur border border-border/70 rounded-xl p-6">
+                <Card>
+                  <CardContent className="p-6">
                   <h3 className="text-lg font-semibold text-foreground mb-4">新增数据统计</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {[
@@ -431,14 +436,15 @@ export default function DataImportPage() {
                     ].map(item => (
                       <div key={item.label} className="bg-muted/55 rounded-lg p-3">
                         <div className="flex items-center gap-2 mb-1">
-                          <item.icon className="w-4 h-4 text-chart-3" />
+                          <item.icon className="w-4 h-4 text-primary" />
                           <span className="text-muted-foreground text-sm">{item.label}</span>
                         </div>
                         <div className="text-xl font-bold text-foreground">+{item.value}</div>
                       </div>
                     ))}
                   </div>
-                </div>
+                  </CardContent>
+                </Card>
 
                 {/* 失败记录 */}
                 {importResult.result.failed.length > 0 && (
@@ -457,12 +463,12 @@ export default function DataImportPage() {
                   </div>
                 )}
 
-                <button
+                <Button
                   onClick={handleReset}
-                  className="w-full px-6 py-3 bg-chart-3 hover:bg-chart-3/90 text-foreground rounded-lg font-medium transition-colors"
+                  className="w-full"
                 >
                   继续导入其他数据
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -471,9 +477,10 @@ export default function DataImportPage() {
           <div className="space-y-6">
             {/* 数据库统计 */}
             {stats && (
-              <div className="bg-card/70 backdrop-blur border border-border/70 rounded-xl p-6">
+              <Card>
+                <CardContent className="p-6">
                 <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
-                  <Database className="w-5 h-5 text-chart-3" />
+                  <Database className="w-5 h-5 text-primary" />
                   数据库统计
                 </h3>
                 <div className="space-y-3">
@@ -493,13 +500,15 @@ export default function DataImportPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* 导入历史 */}
-            <div className="bg-card/70 backdrop-blur border border-border/70 rounded-xl p-6">
+            <Card>
+              <CardContent className="p-6">
               <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
-                <History className="w-5 h-5 text-chart-3" />
+                <History className="w-5 h-5 text-primary" />
                 导入历史
               </h3>
               {history.length === 0 ? (
@@ -514,7 +523,7 @@ export default function DataImportPage() {
                         </span>
                         <span className={`text-xs px-2 py-0.5 rounded ${
                           record.status === 'COMPLETED' 
-                            ? 'bg-chart-3/20 text-chart-3' 
+                            ? 'bg-primary/10 text-primary' 
                             : 'bg-destructive/15 text-destructive'
                         }`}>
                           {record.status === 'COMPLETED' ? '成功' : '失败'}
@@ -530,33 +539,35 @@ export default function DataImportPage() {
                   ))}
                 </div>
               )}
-            </div>
+              </CardContent>
+            </Card>
 
             {/* 使用说明 */}
-            <div className="bg-card/70 backdrop-blur border border-border/70 rounded-xl p-6">
+            <Card>
+              <CardContent className="p-6">
               <h3 className="text-lg font-semibold text-foreground mb-4">使用说明</h3>
               <ul className="space-y-2 text-muted-foreground text-sm">
                 <li className="flex items-start gap-2">
-                  <span className="text-chart-3">1.</span>
+                  <span className="text-primary">1.</span>
                   上传与“出货汇总”格式一致的CSV文件
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-chart-3">2.</span>
+                  <span className="text-primary">2.</span>
                   系统自动对比数据库，识别新增记录
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-chart-3">3.</span>
+                  <span className="text-primary">3.</span>
                   检查缺失序号，确认无误后导入
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-chart-3">4.</span>
+                  <span className="text-primary">4.</span>
                   已存在的记录会自动跳过，不会重复导入
                 </li>
               </ul>
-            </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
-      </div>
     </div>
   );
 }

@@ -287,7 +287,7 @@ export default function SystemImportRecordsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">{record.totalRows}</TableCell>
-                      <TableCell className="text-right text-chart-3">{record.successRows}</TableCell>
+                      <TableCell className="text-right text-primary">{record.successRows}</TableCell>
                       <TableCell className="text-right text-destructive">{record.failedRows}</TableCell>
                       <TableCell>{record.importedBy || '-'}</TableCell>
                       <TableCell className="max-w-[180px] truncate text-xs text-muted-foreground" title={record.errorLog || ''}>

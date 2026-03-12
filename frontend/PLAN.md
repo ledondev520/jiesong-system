@@ -26,6 +26,102 @@
 - This round establishes the global shadcn-style baseline and fixes the production build blockers uncovered by verification.
 - Follow-up work should focus on page-by-page cleanup where older feature slices still layer custom one-off styling on top of the shared shell.
 
+## 2026-03-12 Round 9: Blue shadcn/ui enforcement on remaining outlier pages
+
+### Goal
+- Finish the next cleanup pass for pages still visually drifting from the shadcn/ui baseline.
+- Lock the frontend onto a blue shadcn-style theme instead of the temporary neutral baseline.
+
+### Execution Outcome
+- Switched the shadcn registry metadata to blue in `components.json` and updated `src/app/globals.css` token values to a blue-led palette for light and dark themes.
+- Reworked shared semantic helpers in `src/components/ui/semantic-badge.tsx` and `src/components/ui/amount-text.tsx` to rely on standard shadcn-style semantic surfaces.
+- Simplified the public service layout in `src/components/public/service-page.tsx` and removed route-level decorative overrides from:
+  - `src/app/forex-verifications/page.tsx`
+  - `src/app/tax-refunds/page.tsx`
+- Pulled the most divergent operational pages closer to shadcn primitives:
+  - `src/app/dashboard/store-recommend/page.tsx`
+  - `src/app/dashboard/import/components/DataImportPageContent.tsx`
+
+### Verification
+- `npm run lint -- src/components/ui/semantic-badge.tsx src/components/ui/amount-text.tsx src/components/public/service-page.tsx src/app/forex-verifications/page.tsx src/app/tax-refunds/page.tsx src/app/dashboard/store-recommend/page.tsx src/app/dashboard/import/components/DataImportPageContent.tsx`
+- `npm test -- src/components/public/service-page.test.tsx src/app/forex-verifications/page.test.tsx src/app/tax-refunds/page.test.tsx src/app/dashboard/store-recommend/page.test.tsx src/app/dashboard/import/page.test.tsx`
+- `npm run build`
+
+### Visual Evidence
+- `frontend/qa-artifacts-ui-blue-login.png`
+- `frontend/qa-artifacts-ui-blue-forex.png`
+
+### Phase Boundary
+- This round locks the app onto blue shadcn tokens and cleans the most visible remaining outliers.
+- Remaining work should target deeper feature-detail pages that still use older chart-heavy page-local styling.
+
+## 2026-03-12 Round 10: Final blue-token convergence for auth and finance surfaces
+
+### Goal
+- Finish another cleanup slice on pages that still exposed older accent classes or non-semantic color usage after the blue migration.
+- Reduce reliance on legacy `text-chart-*` usages by converging them onto blue token families or standard shadcn semantic classes.
+
+### Execution Outcome
+- Tightened the remaining shared color drift in:
+  - `src/components/layout/Header.tsx`
+  - `src/components/dashboard/DataDashboard.tsx`
+  - `src/app/globals.css`
+- Simplified auth page headings and success states in:
+  - `src/app/(auth)/login/page.tsx`
+  - `src/app/(auth)/register/page.tsx`
+  - `src/app/(auth)/forgot-password/page.tsx`
+- Cleaned finance-oriented pages so their emphasis uses the blue baseline instead of mixed legacy chart colors:
+  - `src/app/dashboard/finance/page.tsx`
+  - `src/app/dashboard/payments/page.tsx`
+- Finished the remaining visible import-page cleanup in `src/app/dashboard/import/components/DataImportPageContent.tsx`.
+- Updated affected tests for the new semantic helper output:
+  - `src/components/ui/amount-text.test.tsx`
+  - `src/components/ui/semantic-badge.test.tsx`
+
+### Verification
+- `npm run lint -- src/app/(auth)/login/page.tsx src/app/(auth)/register/page.tsx src/app/(auth)/forgot-password/page.tsx src/components/layout/Header.tsx src/components/dashboard/DataDashboard.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/payments/page.tsx src/app/dashboard/import/components/DataImportPageContent.tsx src/components/ui/amount-text.tsx src/components/ui/amount-text.test.tsx src/components/ui/semantic-badge.tsx src/components/ui/semantic-badge.test.tsx`
+- `npm test -- src/components/ui/amount-text.test.tsx src/components/ui/semantic-badge.test.tsx src/app/(auth)/login/page.test.tsx src/app/(auth)/register/page.test.tsx src/app/(auth)/forgot-password/page.test.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/payments/page.test.tsx`
+- `npm run build`
+
+### Phase Boundary
+- This round completes the current cleanup pass for the most user-visible shells and finance/auth surfaces.
+- The remaining backlog, if any, is limited to low-level feature detail polish rather than the global theme baseline.
+
+## 2026-03-12 Round 11: Residual detail cleanup + local persistent frontend startup
+
+### Goal
+- Remove the last visible legacy color/gradient leftovers in detail and admin surfaces.
+- Start the frontend locally in a persistent background process for immediate review.
+
+### Execution Outcome
+- Cleaned remaining legacy accent usage in:
+  - `src/components/tools/ClaudeCostCalculator.tsx`
+  - `src/app/dashboard/purchase/create/components/CreatePurchasePageContent.tsx`
+  - `src/app/dashboard/settings/ports/page.tsx`
+  - `src/app/dashboard/users/page.tsx`
+  - `src/app/dashboard/suppliers/page.tsx`
+  - `src/app/dashboard/finance/payable/page.tsx`
+  - `src/app/dashboard/finance/receivable/page.tsx`
+  - `src/app/dashboard/system/import-records/page.tsx`
+  - `src/components/sales/ContractInfoEditor.tsx`
+  - `src/app/dashboard/purchase/[id]/page.tsx`
+  - `src/app/dashboard/containers/[id]/page.tsx`
+  - `src/app/dashboard/sales/[id]/components/SalesDetailPageContent.tsx`
+- Confirmed the remaining `text-brand-emphasis*` references are unused compatibility helpers in `globals.css`, not active page usage.
+- Started the frontend with a persistent background process on port `3002`.
+  - PID file: `frontend/.next-dev.pid`
+  - Log file: `frontend/.next-dev.log`
+  - URL: `http://localhost:3002`
+
+### Verification
+- `npm run lint -- src/components/tools/ClaudeCostCalculator.tsx src/app/dashboard/purchase/create/components/CreatePurchasePageContent.tsx src/app/dashboard/settings/ports/page.tsx src/app/dashboard/users/page.tsx src/app/dashboard/suppliers/page.tsx src/app/dashboard/finance/payable/page.tsx src/app/dashboard/finance/receivable/page.tsx src/app/dashboard/system/import-records/page.tsx src/components/sales/ContractInfoEditor.tsx src/app/dashboard/purchase/[id]/page.tsx src/app/dashboard/containers/[id]/page.tsx src/app/dashboard/sales/[id]/components/SalesDetailPageContent.tsx`
+- `npm run build`
+- `lsof -nP -iTCP:3002 -sTCP:LISTEN`
+
+### Phase Boundary
+- The app is now effectively on a blue shadcn/ui visual baseline end-to-end for normal user flows.
+- Any follow-up would be optional polish, not required to complete the current UI unification goal.
+
 # Customs Declaration Management
 
 ## 2026-03-12 Round 7: Frontend Coverage 98 Phase 1 Baseline

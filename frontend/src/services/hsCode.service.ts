@@ -5,7 +5,7 @@
  */
 
 import api from '@/lib/axios';
-import type { ApiResponse, HsCodeRecord } from '@/types';
+import type { ApiResponse, HsCodeRecord, PaginatedResponse } from '@/types';
 
 export type HsCodeMatch = HsCodeRecord;
 
@@ -17,6 +17,20 @@ export interface BatchHsCodeMatchResult {
 }
 
 export const hsCodeService = {
+  list: async ({
+    keyword = '',
+    page = 1,
+    pageSize = 50,
+  }: {
+    keyword?: string;
+    page?: number;
+    pageSize?: number;
+  } = {}) => {
+    return api.get<ApiResponse<PaginatedResponse<HsCodeRecord>>, ApiResponse<PaginatedResponse<HsCodeRecord>>>('/hs-codes', {
+      params: { keyword, page, pageSize },
+    });
+  },
+
   search: async (keyword: string) => {
     return api.get<ApiResponse<HsCodeRecord[]>, ApiResponse<HsCodeRecord[]>>('/hs-codes/search', {
       params: { keyword },

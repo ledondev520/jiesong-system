@@ -1,0 +1,466 @@
+diff --git a/PLAN.md b/PLAN.md
+index e327ea0..191fb43 100644
+--- a/PLAN.md
++++ b/PLAN.md
+@@ -1,5 +1,144 @@
+ # Frontend Polish Plan
+ 
++## 2026-03-12 Round 55 (Merge Settings Into System Management)
++
++### Goal
++- 融合“基础设置”和“系统管理”两个模块，减少一级菜单数量，同时保持现有功能路由不变。
++
++### Delivered
++- 侧边栏导航重构：
++  - `frontend/src/components/layout/Sidebar.tsx`
++  - 将“基础设置”和“HSCode 查询”并入“系统管理”子菜单。
++  - 子菜单引入子项级权限控制：非管理员仅显示基础设置相关入口，管理员显示完整系统运维入口。
++  - 父菜单激活逻辑升级：访问 `/dashboard/settings*` 时“系统管理”保持高亮并展开。
++- 系统管理总览页同步融合：
++  - `frontend/src/app/dashboard/system/page.tsx`
++  - 新增“基础设置”“HSCode 查询”快捷入口；非管理员访问总览页时显示可访问入口而非整页拒绝。
++- 回归测试更新：
++  - `frontend/src/components/layout/Sidebar.test.tsx`：新增融合后权限与展开行为断言。
++  - `frontend/src/app/dashboard/system/page.test.tsx`：新增融合入口渲染与跳转断言。
++  - `frontend/e2e/smoke.spec.ts`：将导航文案校验由“设置”调整为“基础设置”。
++
++### Verification
++- `cd frontend && npm run test -- src/components/layout/Sidebar.test.tsx src/app/dashboard/system/page.test.tsx src/app/dashboard/system/notifications/page.test.tsx src/app/dashboard/system/logs/page.test.tsx src/app/dashboard/system/import-records/page.test.tsx`（21/21 通过）
++- `cd frontend && npm run lint -- src/components/layout/Sidebar.tsx src/components/layout/Sidebar.test.tsx src/app/dashboard/system/page.tsx src/app/dashboard/system/page.test.tsx e2e/smoke.spec.ts e2e/button-coverage.spec.ts`（通过）
++- `cd frontend && npm run build -- --webpack`（通过）
++
++### Remaining Risk
++- 由于当前会话存在常驻 `next dev`，本轮未执行 Playwright e2e 实跑；导航脚本已完成断言更新，待空闲窗口可补跑。
++
++## 2026-03-12 Round 54 (快捷登录 + admin 测试密码)
++
++### Goal
++- 将登录页“记住用户名”辅助入口切换为“快捷登录”，支持点击“一键登录（admin）”后直接输入密码并自动提交。
++- 将测试阶段 `admin` 默认密码改为 `123456`，并立即同步到本地数据库。
++
++### Delivered
++- 前端登录页改造：
++  - `frontend/src/app/(auth)/login/page.tsx`
++  - 新增快捷登录模块与“一键登录（admin）”按钮。
++  - 点击后自动填充账号并聚焦密码框；密码输入达到 6 位后自动登录。
++  - 页脚改为测试阶段账号提示（`admin / 123456`）。
++- 前端测试更新：
++  - `frontend/src/app/(auth)/login/page.test.tsx`
++  - 覆盖快捷登录入口渲染、一键登录后 6 位密码自动提交场景。
++- 后端默认管理员密码调整：
++  - `backend/prisma/seed.js`：默认回退密码由随机改为固定 `123456`（`DEFAULT_ADMIN_PASSWORD` 仍可覆盖）。
++  - `backend/README.md`、`backend/env.example` 同步说明。
++- 安全台账联动更新：
++  - `SECURITY.md`、`AGENTS.md`、`data-classification.json`。
++- 已执行本地 seed，将现有 `admin` 密码重置为 `123456`。
++
++### Verification
++- `cd frontend && npm run test -- 'src/app/(auth)/login/page.test.tsx'`（6/6 通过）
++- `cd frontend && npm run lint -- 'src/app/(auth)/login/page.tsx' 'src/app/(auth)/login/page.test.tsx'`（通过）
++- `cd backend && npm run test:db`（3/3 通过）
++- `cd backend && DEFAULT_ADMIN_PASSWORD=123456 npm run db:seed`（执行成功）
++
++### Remaining Risk
++- `admin/123456` 仅适用于测试阶段，发布前必须通过环境变量覆盖并完成密码轮换。
++
++## 2026-03-12 Round 53 (System Management 404 Closure)
++
++### Goal
++- 修复侧边栏“系统管理”主入口点击后出现 `404 not found` 的问题，并补齐可回归验证路径，避免再次回归。
++
++### Delivered
++- 新增系统管理总览页：
++  - `frontend/src/app/dashboard/system/page.tsx`
++  - 现在 `/dashboard/system` 可正常访问，展示通知中心/系统日志/导入记录/港口管理/商品分类快捷入口。
++- 新增单元测试：
++  - `frontend/src/app/dashboard/system/page.test.tsx`
++  - 覆盖总览渲染、入口跳转、非管理员无权限提示。
++- 扩展 E2E 用例覆盖入口路由：
++  - `frontend/e2e/smoke.spec.ts` 新增“系统管理”导航断言（`/dashboard/system`）。
++  - `frontend/e2e/button-coverage.spec.ts` 新增页面巡检项（`/dashboard/system`）。
++
++### Verification
++- `cd frontend && npm run test -- src/app/dashboard/system/page.test.tsx src/components/layout/Sidebar.test.tsx src/app/dashboard/system/notifications/page.test.tsx src/app/dashboard/system/logs/page.test.tsx src/app/dashboard/system/import-records/page.test.tsx`（20/20 通过）
++- `cd frontend && npm run lint -- src/app/dashboard/system/page.tsx src/app/dashboard/system/page.test.tsx e2e/smoke.spec.ts e2e/button-coverage.spec.ts`（通过）
++- `cd frontend && npm run build -- --webpack`（通过，产物中已包含 `/dashboard/system`）
++
++### Remaining Risk
++- 当前工作区已有常驻 `next dev` 进程时，`playwright` 的 `webServer` 会因 `.next/dev/lock` 冲突无法自启动；本轮未完成自动化 E2E 重跑，仅完成单测/lint/build 验证。
++
++## 2026-03-12 Round 52 (页面切换与数据加载性能优化)
++
++### Goal
++- 定位并修复“页面来回切换慢、数据重复加载慢”的核心瓶颈，确保在不改业务流程的前提下提升感知速度。
++
++### Delivered
++- 在 `frontend/src/lib/axios.ts` 增加全局 GET 请求性能层：
++  - 相同 GET 请求短 TTL 缓存（默认 `20s`）
++  - 并发去重（同 key 请求只打一次网络）
++  - 写操作（`POST/PUT/PATCH/DELETE`）成功后自动失效 GET 缓存，避免脏读
++- 在 `frontend/src/components/layout/Sidebar.tsx` 增加空闲时路由预取：
++  - 优先在 `requestIdleCallback` 执行
++  - 不支持时降级为 `setTimeout` 延迟预取
++- 补齐测试：
++  - `frontend/src/lib/axios.test.ts` 新增缓存命中/并发去重/写后失效用例
++  - `frontend/src/components/layout/Sidebar.test.tsx` 新增路由预取用例
++
++### Verification
++- `cd frontend && npm run lint -- src/lib/axios.ts src/lib/axios.test.ts src/components/layout/Sidebar.tsx src/components/layout/Sidebar.test.tsx`
++- `cd frontend && npm run test -- src/lib/axios.test.ts src/components/layout/Sidebar.test.tsx`
++- `cd frontend && npm run build`
++
++### Remaining Risk
++- 当前缓存是内存级短 TTL 策略，已能显著降低“来回切页”重复请求；若后续需要更强一致性或跨标签页共享，可再升级为可配置策略（例如按接口白名单 TTL / 精细化失效）。
++
++## 2026-03-12 Round 51 (Backend/Frontend Local Login + HSCode List Fix)
++
++### Goal
++- Explain why the local app looked "empty" and why login was failing.
++- Fix HSCode UX so the page shows a full list first, then supports search/filtering.
++- Bring local backend and frontend up together with a verified admin login path.
++
++### Delivered
++- Confirmed the real runtime database is `backend/prisma/dev.db`, not `backend/dev.db`.
++- Verified current table counts: `hs_codes=11879`, `users=1`, but business tables such as `products`, `suppliers`, `stores`, `sales_contracts`, `purchase_contracts`, and `inventories` are currently `0`, which is why the app looks empty outside HSCode/base config data.
++- Reset the local admin credential by re-running seed with a fixed password.
++- Added backend HSCode list capability:
++  - `backend/src/services/hsCodeService.js`
++  - `backend/src/routes/hsCodes.js`
++- Added frontend HSCode list capability and page behavior:
++  - `frontend/src/services/hsCode.service.ts`
++  - `frontend/src/app/dashboard/hs-codes/page.tsx`
++- Added/updated tests:
++  - `backend/src/services/hsCodeService.test.js`
++  - `frontend/src/services/hsCode.service.test.ts`
++  - `frontend/src/app/dashboard/hs-codes/page.test.tsx`
++- Started backend (`3001`) and frontend (`3002`) together and verified both ports respond.
++
++### Verification
++- `node --test src/services/hsCodeService.test.js`
++- `npm test -- src/services/hsCode.service.test.ts src/app/dashboard/hs-codes/page.test.tsx`
++- `curl -I http://127.0.0.1:3002/login`
++- login API verified with seeded admin credential against `http://127.0.0.1:3001/api/v1/auth/login`
++
++### Remaining Risk
++- The app still looks data-sparse outside HSCode/base config because the business tables in `backend/prisma/dev.db` are empty; that is a data-state problem, not a missing database connection.
++
+ ## 2026-03-12 Round 50 (Frontend Coverage 98 Master Plan)
+ 
+ ### Goal
+diff --git a/TASKS.md b/TASKS.md
+index 7d6b491..b038207 100644
+--- a/TASKS.md
++++ b/TASKS.md
+@@ -3,6 +3,8 @@
+ ## 任务清单
+ | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+ |---|---|---:|---:|---|---|
++| HS-UX-01 | P0 | 20m | 1 | DONE | 查明本地登录/空库根因，补 HSCode 默认全量列表，再联通本地 backend+frontend 登录链路 |
++| PERF-01 | P0 | 40m | 1 | DONE | 页面切换性能优化：实现全局 GET 缓存+并发去重+写后失效，并在侧边栏空闲预取常用路由，完成 lint/test/build 验证 |
+ | FP-01 | P0 | 20m | 1 | DONE | 全局视觉 token 与背景层次升级（`globals.css`） |
+ | FP-02 | P0 | 20m | 1 | DONE | dashboard 框架美化（`dashboard/layout` + `Header` + `Sidebar` + `PageHeader`） |
+ | FP-03 | P0 | 20m | 1 | DONE | 工作台核心模块美化（`dashboard/page` + `DataDashboard`） |
+@@ -79,10 +81,13 @@
+ | SYS-05 | P0 | 20m | 1 | DONE | 修复通知已读越权风险（`markNotificationRead` 强制 userId 归属校验） |
+ | SYS-06 | P1 | 20m | 1 | DONE | 修复导入状态错误（失败记录标记为 `FAILED`）并补服务层状态推导函数 |
+ | SYS-07 | P1 | 20m | 1 | DONE | 补齐后端测试覆盖（`systemController` + `importService`）验证筛选参数与权限行为 |
++| SYS-08 | P0 | 25m | 1 | DONE | 修复“系统管理”主入口 `/dashboard/system` 404：新增总览页、补单测并扩展导航 E2E 用例 |
++| SYS-09 | P0 | 30m | 1 | DONE | 融合“基础设置”和“系统管理”：侧边栏整合为单一系统管理模块并保留原路由可访问性（含权限与回归测试） |
+ | DB-01 | P0 | 20m | 1 | DONE | Prisma 数据源切回 Supabase PostgreSQL（恢复 `provider=postgresql` 与 `directUrl`） |
+ | OPS-01 | P0 | 15m | 1 | DONE | 统一本地端口与环境模板（backend 默认端口 3000，`env.example` 同步） |
+ | OPS-02 | P1 | 20m | 1 | DONE | 补齐启动/上线文档（根 README + backend README + Supabase 迁移文档）并移除 Vercel 占位 rewrite |
+ | AUTH-01 | P1 | 20m | 1 | DONE | 登录页支持记住账号密码与“快捷登录”按钮（本地恢复后可一键登录） |
++| AUTH-02 | P0 | 25m | 1 | DONE | 登录页改为“快捷登录 + 一键登录（admin）后输入密码自动提交”，并将 admin 测试密码切换为 123456（含 seed 同步） |
+ | E2E-01 | P0 | 30m | 1 | DONE | 前端 E2E 全量稳定性收口（修复 dashboard 认证竞态 + system logs hooks 错序 + 完成 14/14 回归） |
+ | E2E-02 | P0 | 45m | 1 | DONE | 按钮级 E2E 巡检扩展（新增 28 页按钮巡检 + 导入页 mock 补齐 + 全量 E2E 42/42） |
+ | S3-01 | P0 | 60m | 1 | DOING | 阶段3：AI 管理页面（`/dashboard/ai/sessions`、`/dashboard/ai/token-stats`、`/dashboard/ai/models`）+ 测试 + 侧边栏导航 |
+diff --git a/frontend/e2e/smoke.spec.ts b/frontend/e2e/smoke.spec.ts
+index 8176b2f..fc90f3a 100644
+--- a/frontend/e2e/smoke.spec.ts
++++ b/frontend/e2e/smoke.spec.ts
+@@ -68,10 +68,11 @@ test.describe('侧边栏导航全覆盖', () => {
+       { label: '库存状态', path: '/dashboard/inventory-container', url: /\/dashboard\/inventory-container$/, heading: '库存状态' },
+       { label: '收付款', path: '/dashboard/payments', url: /\/dashboard\/payments$/, heading: '收付款' },
+       { label: '采购建议', path: '/dashboard/store-recommend', url: /\/dashboard\/store-recommend$/, heading: '门店采购建议' },
++      { label: '系统管理', path: '/dashboard/system', url: /\/dashboard\/system$/, heading: '系统管理' },
+       { label: '通知中心', path: '/dashboard/system/notifications', url: /\/dashboard\/system\/notifications$/, heading: '通知中心' },
+       { label: '系统日志', path: '/dashboard/system/logs', url: /\/dashboard\/system\/logs$/, heading: '系统日志' },
+       { label: '导入记录', path: '/dashboard/system/import-records', url: /\/dashboard\/system\/import-records$/, heading: '导入记录' },
+-      { label: '设置', path: '/dashboard/settings', url: /\/dashboard\/settings$/, heading: '设置' },
++      { label: '基础设置', path: '/dashboard/settings', url: /\/dashboard\/settings$/, heading: '设置' },
+     ] as const;
+ 
+     for (const item of navCases) {
+diff --git a/frontend/src/components/layout/Sidebar.test.tsx b/frontend/src/components/layout/Sidebar.test.tsx
+index 71aac8c..ac5adbc 100644
+--- a/frontend/src/components/layout/Sidebar.test.tsx
++++ b/frontend/src/components/layout/Sidebar.test.tsx
+@@ -13,6 +13,7 @@ import { Role } from '@/types';
+ import { Sidebar } from './Sidebar';
+ 
+ const mockLogout = vi.fn();
++const mockPrefetch = vi.fn();
+ let mockPathname = '/dashboard/contracts';
+ 
+ const mockUser = {
+@@ -28,6 +29,9 @@ vi.mock('@/store/auth.store', () => ({
+ 
+ vi.mock('next/navigation', () => ({
+   usePathname: () => mockPathname,
++  useRouter: () => ({
++    prefetch: mockPrefetch,
++  }),
+ }));
+ 
+ vi.mock('next/link', () => ({
+@@ -41,6 +45,7 @@ vi.mock('next/link', () => ({
+ describe('Sidebar', () => {
+   beforeEach(() => {
+     mockLogout.mockReset();
++    mockPrefetch.mockReset();
+     mockUser.role = Role.ADMIN;
+     mockPathname = '/dashboard/contracts';
+   });
+@@ -68,17 +73,44 @@ describe('Sidebar', () => {
+     mockPathname = '/dashboard/system';
+     const { getByText } = render(<Sidebar />);
+ 
++    expect(getByText('基础设置')).toBeInTheDocument();
++    expect(getByText('HSCode 查询')).toBeInTheDocument();
+     expect(getByText('通知中心')).toBeInTheDocument();
+     expect(getByText('系统日志')).toBeInTheDocument();
+     expect(getByText('导入记录')).toBeInTheDocument();
+   });
+ 
+-  it('非管理员角色不显示系统日志入口', () => {
++  it('非管理员角色仅显示基础设置子项', () => {
+     mockUser.role = Role.SALES;
+     mockPathname = '/dashboard/system';
+-    const { queryByText } = render(<Sidebar />);
+-    expect(queryByText('系统管理')).toBeNull();
++    const { getByText, queryByText } = render(<Sidebar />);
++    expect(getByText('系统管理')).toBeInTheDocument();
++    expect(getByText('基础设置')).toBeInTheDocument();
++    expect(getByText('HSCode 查询')).toBeInTheDocument();
+     expect(queryByText('系统日志')).toBeNull();
+     expect(queryByText('导入记录')).toBeNull();
++    expect(queryByText('通知中心')).toBeNull();
++  });
++
++  it('基础设置子路由下系统管理保持激活并展开', () => {
++    mockPathname = '/dashboard/settings';
++    const { getByText } = render(<Sidebar />);
++    const systemLink = getByText('系统管理').closest('a');
++    expect(systemLink?.className.includes('bg-background')).toBe(true);
++    expect(getByText('基础设置')).toBeInTheDocument();
++  });
++
++  it('空闲时预取可见导航路由', () => {
++    vi.useFakeTimers();
++    render(<Sidebar />);
++    vi.runOnlyPendingTimers();
++
++    expect(mockPrefetch).toHaveBeenCalledWith('/dashboard');
++    expect(mockPrefetch).toHaveBeenCalledWith('/dashboard/contracts');
++    expect(mockPrefetch).toHaveBeenCalledWith('/dashboard/system');
++    expect(mockPrefetch).toHaveBeenCalledWith('/dashboard/settings');
++    expect(mockPrefetch).toHaveBeenCalledWith('/dashboard/hs-codes');
++
++    vi.useRealTimers();
+   });
+ });
+diff --git a/frontend/src/components/layout/Sidebar.tsx b/frontend/src/components/layout/Sidebar.tsx
+index 89d7538..df1328d 100644
+--- a/frontend/src/components/layout/Sidebar.tsx
++++ b/frontend/src/components/layout/Sidebar.tsx
+@@ -2,23 +2,24 @@
+  * Input: 用户认证状态、路由信息
+  * Output: 侧边导航栏组件
+  * Pos: 全局布局组件，提供系统导航功能
+- * 
++ *
+  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+- * 
++ *
+  * 导航结构（优化后）：
+  * - 核心业务（6 个）：工作台、采购合同、出口合同、库存状态、收付款、采购建议
++ * - 财务分析（1 个）：财务报表（三表看板）
+  * - AI 功能（1 个）：AI 管理
+  * - 合同管理（1 个）：合同模板
+- * - 系统管理（1 个）：系统设置（通知/日志/导入/数据配置）
+- * - 基础设置（1 个）：设置（基础档案 + 用户）
++ * - 系统管理（1 个）：系统设置 + 基础设置（通知/日志/导入/数据配置/HSCode）
+  */
+ 
+ 'use client';
+ 
+-import { usePathname } from 'next/navigation';
++import { useEffect, type ComponentType } from 'react';
++import { usePathname, useRouter } from 'next/navigation';
+ import Link from 'next/link';
+ import { cn } from '@/lib/utils';
+-import { 
++import {
+   LayoutDashboard,
+   FileText,
+   Ship,
+@@ -35,13 +36,30 @@ import {
+   Globe,
+   HardDrive,
+   ReceiptText,
++  BarChart3,
+ } from 'lucide-react';
+ import { useAuthStore } from '@/store/auth.store';
+ import { Button } from '@/components/ui/button';
+ import { ScrollArea } from '@/components/ui/scroll-area';
+ import { Badge } from '@/components/ui/badge';
+ 
+-const navItems = [
++type NavChildItem = {
++  href: string;
++  label: string;
++  icon: ComponentType<{ className?: string }>;
++  adminOnly?: boolean;
++};
++
++type NavItem = {
++  href: string;
++  label: string;
++  icon: ComponentType<{ className?: string }>;
++  exact?: boolean;
++  adminOnly?: boolean;
++  children?: NavChildItem[];
++};
++
++const navItems: NavItem[] = [
+   // 核心业务模块
+   { href: '/dashboard', label: '工作台', icon: LayoutDashboard, exact: true },
+   { href: '/dashboard/contracts', label: '采购合同', icon: FileText, exact: true },
+@@ -50,6 +68,7 @@ const navItems = [
+   { href: '/customs-declarations', label: '报关单', icon: FileText },
+   { href: '/dashboard/inventory-container', label: '库存状态', icon: Warehouse },
+   { href: '/dashboard/payments', label: '收付款', icon: DollarSign },
++  { href: '/dashboard/finance/statements', label: '财务报表', icon: BarChart3 },
+   { href: '/dashboard/store-recommend', label: '采购建议', icon: Store },
+   
+   // AI 功能模块
+@@ -58,24 +77,21 @@ const navItems = [
+   // 合同管理模块
+   { href: '/dashboard/contracts/templates', label: '合同模板', icon: FileBox },
+   
+-  // 系统管理模块（整合系统运维 + 数据配置）
++  // 系统管理模块（整合系统运维 + 基础设置）
+   { 
+     href: '/dashboard/system', 
+     label: '系统管理', 
+     icon: HardDrive,
+-    adminOnly: true,
+     children: [
+-      { href: '/dashboard/system/notifications', label: '通知中心', icon: Bell },
+-      { href: '/dashboard/system/logs', label: '系统日志', icon: History },
+-      { href: '/dashboard/system/import-records', label: '导入记录', icon: Database },
+-      { href: '/dashboard/settings/ports', label: '港口管理', icon: Globe },
+-      { href: '/dashboard/settings/categories', label: '商品分类', icon: Database },
++      { href: '/dashboard/settings', label: '基础设置', icon: Settings },
++      { href: '/dashboard/hs-codes', label: 'HSCode 查询', icon: Globe },
++      { href: '/dashboard/system/notifications', label: '通知中心', icon: Bell, adminOnly: true },
++      { href: '/dashboard/system/logs', label: '系统日志', icon: History, adminOnly: true },
++      { href: '/dashboard/system/import-records', label: '导入记录', icon: Database, adminOnly: true },
++      { href: '/dashboard/settings/ports', label: '港口管理', icon: Globe, adminOnly: true },
++      { href: '/dashboard/settings/categories', label: '商品分类', icon: Database, adminOnly: true },
+     ]
+   },
+-  
+-  // 基础设置
+-  { href: '/dashboard/settings', label: '基础设置', icon: Settings },
+-  { href: '/dashboard/hs-codes', label: 'HSCode 查询', icon: Globe },
+ ];
+ 
+ /**
+@@ -87,26 +103,71 @@ const navItems = [
+  */
+ export function Sidebar() {
+   const pathname = usePathname();
++  const router = useRouter();
+   const logout = useAuthStore((state) => state.logout);
+   const user = useAuthStore((state) => state.user);
+   const isAdmin = user?.role === 'ADMIN';
+ 
+-  const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
++  const visibleNavItems = navItems
++    .map((item) => ({
++      ...item,
++      children: item.children?.filter((child) => !child.adminOnly || isAdmin),
++    }))
++    .filter((item) => {
++      if (item.adminOnly && !isAdmin) {
++        return false;
++      }
++      if (item.children) {
++        return item.children.length > 0;
++      }
++      return true;
++    });
+   const primaryItems = visibleNavItems.filter(
+-    (item) => !item.adminOnly && item.href !== '/dashboard/settings' && item.href !== '/dashboard/hs-codes',
++    (item) => item.href !== '/dashboard/system',
+   );
+   const managementItems = visibleNavItems.filter(
+-    (item) => item.adminOnly || item.href === '/dashboard/settings' || item.href === '/dashboard/hs-codes',
++    (item) => item.href === '/dashboard/system',
+   );
++  const prefetchRoutes = visibleNavItems.flatMap((item) => [
++    item.href,
++    ...(item.children?.map((child) => child.href) ?? []),
++  ]);
++
++  useEffect(() => {
++    // 空闲时预取常用路由，降低跨页面切换首次等待。
++    const prefetch = () => {
++      prefetchRoutes.forEach((href) => {
++        router.prefetch(href);
++      });
++    };
++
++    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
++      const idleId = window.requestIdleCallback(prefetch);
++      return () => window.cancelIdleCallback(idleId);
++    }
+ 
+-  const isActiveItem = (item: typeof navItems[0]) => {
++    const timer = setTimeout(prefetch, 300);
++    return () => clearTimeout(timer);
++  }, [prefetchRoutes, router]);
++
++  const isActivePath = (href: string, exact?: boolean) => {
++    if (exact) {
++      return pathname === href;
++    }
++    return pathname === href || pathname.startsWith(`${href}/`);
++  };
++
++  const isActiveItem = (item: NavItem) => {
++    if (item.children?.some((child) => isActivePath(child.href))) {
++      return true;
++    }
+     if (item.exact) {
+       return pathname === item.href;
+     }
+-    return pathname.startsWith(item.href);
++    return isActivePath(item.href);
+   };
+ 
+-  const renderNavItem = (item: typeof navItems[0]) => (
++  const renderNavItem = (item: NavItem) => (
+     <div key={item.href}>
+       <Link
+         href={item.href}
+@@ -130,7 +191,7 @@ export function Sidebar() {
+               href={child.href}
+               className={cn(
+                 'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+-                pathname === child.href
++                isActivePath(child.href)
+                   ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+                   : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+               )}

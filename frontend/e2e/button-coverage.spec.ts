@@ -48,6 +48,7 @@ const pageCases: PageCase[] = [
   { name: '导入页', path: '/dashboard/import' },
   { name: '报表页', path: '/dashboard/reports', minClicks: 0 },
   { name: '日志页', path: '/dashboard/logs', minClicks: 0 },
+  { name: '系统管理', path: '/dashboard/system', minClicks: 0 },
   { name: '通知中心', path: '/dashboard/system/notifications' },
   { name: '系统日志', path: '/dashboard/system/logs' },
   { name: '导入记录', path: '/dashboard/system/import-records' },

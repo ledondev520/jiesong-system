@@ -87,3 +87,42 @@ test('getTaxRate: 未命中时返回 null，命中时返回税率', async () => 
     assert.equal(result, null);
   });
 });
+
+test('listHsCodes: 空关键字时返回分页全量列表', async () => {
+  let findManyArgs = null;
+  let countArgs = null;
+
+  await withMockDelegate('hsCode', {
+    findMany: async (args) => {
+      findManyArgs = args;
+      return [
+        { id: '1', hsCode: '01010101', productName: '商品A' },
+        { id: '2', hsCode: '01010102', productName: '商品B' },
+      ];
+    },
+    count: async (args) => {
+      countArgs = args;
+      return 2;
+    },
+  }, async () => {
+    const result = await hsCodeService.listHsCodes({ keyword: '', page: 1, pageSize: 20 });
+
+    assert.deepEqual(findManyArgs, {
+      where: {},
+      orderBy: [
+        { effectiveDate: 'desc' },
+        { hsCode: 'asc' },
+      ],
+      skip: 0,
+      take: 20,
+    });
+    assert.deepEqual(countArgs, { where: {} });
+    assert.deepEqual(result.pagination, {
+      page: 1,
+      pageSize: 20,
+      total: 2,
+      totalPages: 1,
+    });
+    assert.equal(result.items.length, 2);
+  });
+});

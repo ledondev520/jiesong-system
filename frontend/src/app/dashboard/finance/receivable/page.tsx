@@ -184,7 +184,7 @@ export default function ReceivablePage() {
                     <Badge variant="outline">{contract.status}</Badge>
                   </TableCell>
                   <TableCell className="text-right">${contract.totalAmount.toLocaleString()}</TableCell>
-                  <TableCell className="text-right text-chart-3">${contract.receivedAmount.toLocaleString()}</TableCell>
+                  <TableCell className="text-right text-primary/80">${contract.receivedAmount.toLocaleString()}</TableCell>
                   <TableCell className="text-right text-destructive font-bold">
                     ${contract.unreceiveAmount.toLocaleString()}
                   </TableCell>

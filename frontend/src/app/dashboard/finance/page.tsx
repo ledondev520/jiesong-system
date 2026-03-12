@@ -62,7 +62,7 @@ export default function FinancePage() {
       value: `¥${(stats?.payable?.total ?? 0).toLocaleString()}`,
       icon: ArrowUpRight,
       description: `已付: ¥${(stats?.payable?.paid ?? 0).toLocaleString()}`,
-      variant: 'text-chart-5',
+      variant: 'text-primary',
     },
     {
       title: '待付账款',
@@ -83,7 +83,7 @@ export default function FinancePage() {
       value: `$${(stats?.receivable?.unreceived ?? 0).toLocaleString()}`,
       icon: DollarSign,
       description: '待从门店收回',
-      variant: 'text-chart-3',
+      variant: 'text-primary',
     },
   ];
 
@@ -94,10 +94,10 @@ export default function FinancePage() {
         description="资金流水与应收应付概览。"
         actions={
           <div className="flex gap-2">
-            <Button asChild variant="outline" className="h-10 rounded-xl border-border/70 bg-background/60">
+            <Button asChild variant="outline" className="h-10">
               <Link href="/dashboard/finance/payable">查看应付</Link>
             </Button>
-            <Button asChild className="h-10 rounded-xl">
+            <Button asChild className="h-10">
               <Link href="/dashboard/finance/receivable">查看应收</Link>
             </Button>
           </div>
@@ -127,7 +127,7 @@ export default function FinancePage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card className="surface-panel col-span-2">
+        <Card className="col-span-2">
           <CardHeader>
             <CardTitle>财务说明</CardTitle>
           </CardHeader>

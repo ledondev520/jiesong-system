@@ -17,7 +17,7 @@ export default function RegisterPage() {
     <div className="auth-shell">
       <Card className="auth-card">
         <CardHeader>
-          <CardTitle className="text-brand-emphasis">账号注册已关闭</CardTitle>
+          <CardTitle>账号注册已关闭</CardTitle>
           <CardDescription>
             系统当前采用“管理员邀请注册”模式
           </CardDescription>

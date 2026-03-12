@@ -44,34 +44,32 @@ describe('LoginPage 交互逻辑', () => {
     localStorage.clear();
   });
 
-  it('默认渲染登录表单关键元素', () => {
+  it('默认渲染登录表单，且未登录过时不展示快捷登录按钮', () => {
     render(<LoginPage />);
-    expect(screen.getByText('点击一键登录后，直接输入密码即可自动登录。')).toBeInTheDocument();
+
+    expect(screen.getByText('首次登录成功后，下次可使用快捷登录。')).toBeInTheDocument();
     expect(screen.getByLabelText('用户名')).toBeInTheDocument();
     expect(screen.getByLabelText('密码')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '一键登录（admin）' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '登录' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /一键登录/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/测试阶段账号/)).not.toBeInTheDocument();
   });
 
-  it('rememberMe 复选框具备可访问名称', () => {
-    render(<LoginPage />);
-    expect(screen.getByRole('checkbox', { name: '记住用户名' })).toBeInTheDocument();
-  });
-
-  it('可从本地恢复记住的用户名', async () => {
-    localStorage.setItem('jiesong_saved_username', JSON.stringify({
+  it('本地存在快捷登录资料时展示一键登录入口', async () => {
+    localStorage.setItem('jiesong_quick_login_profile', JSON.stringify({
       username: 'admin',
+      password: '123456',
     }));
 
     render(<LoginPage />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText('用户名')).toHaveValue('admin');
-      expect(screen.getByRole('checkbox', { name: '记住用户名' })).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByText('你已开启快捷登录，可一键进入系统。')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '一键登录（admin）' })).toBeInTheDocument();
     });
   });
 
-  it('登录成功后调用store并跳转首页', async () => {
+  it('手动登录成功后写入快捷登录资料并跳转首页', async () => {
     mockAuthServiceLogin.mockResolvedValue({
       code: 200,
       data: {
@@ -83,15 +81,10 @@ describe('LoginPage 交互逻辑', () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    // 0. 输入账号密码
     await user.type(screen.getByLabelText('用户名'), 'admin');
     await user.type(screen.getByLabelText('密码'), '123456');
-
-    // 1. 开启记住账号密码并提交
-    await user.click(screen.getByRole('checkbox', { name: '记住用户名' }));
     await user.click(screen.getByRole('button', { name: '登录' }));
 
-    // 2. 校验请求与后续动作
     await waitFor(() => {
       expect(mockAuthServiceLogin).toHaveBeenCalledWith({
         username: 'admin',
@@ -104,13 +97,16 @@ describe('LoginPage 交互逻辑', () => {
       expect(mockPush).toHaveBeenCalledWith('/');
     });
 
-    // 3. 校验仅记住用户名
-    expect(localStorage.getItem('jiesong_saved_username')).toBe(
-      JSON.stringify({ username: 'admin' }),
+    expect(localStorage.getItem('jiesong_quick_login_profile')).toBe(
+      JSON.stringify({ username: 'admin', password: '123456' }),
     );
   });
 
-  it('点击一键登录后输入 6 位密码自动提交', async () => {
+  it('点击一键登录后直接自动登录', async () => {
+    localStorage.setItem('jiesong_quick_login_profile', JSON.stringify({
+      username: 'admin',
+      password: '123456',
+    }));
     mockAuthServiceLogin.mockResolvedValue({
       code: 200,
       data: {
@@ -123,8 +119,9 @@ describe('LoginPage 交互逻辑', () => {
     render(<LoginPage />);
 
     await user.click(screen.getByRole('button', { name: '一键登录（admin）' }));
+
     expect(screen.getByLabelText('用户名')).toHaveValue('admin');
-    await user.type(screen.getByLabelText('密码'), '123456');
+    expect(screen.getByLabelText('密码')).toHaveValue('123456');
 
     await waitFor(() => {
       expect(mockAuthServiceLogin).toHaveBeenCalledWith({

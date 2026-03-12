@@ -27,7 +27,23 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { X, Save, Loader2, Package, Users, Store, Settings2, FileSpreadsheet, UserCog, Wrench, Download } from 'lucide-react';
+import {
+  X,
+  Save,
+  Loader2,
+  Package,
+  Users,
+  Store,
+  Settings2,
+  FileSpreadsheet,
+  UserCog,
+  Wrench,
+  Download,
+  SearchCheck,
+  Bell,
+  History,
+  Database,
+} from 'lucide-react';
 import { ClaudeCostCalculator } from '@/components/tools/ClaudeCostCalculator';
 import { toast } from 'sonner';
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE, UNITS as INITIAL_UNITS } from '@/lib/constants';
@@ -43,13 +59,6 @@ const configSchema = z.object({
 
 type ConfigFormValues = z.infer<typeof configSchema>;
 
-interface SystemConfigMap {
-  exchangeRate?: number;
-  profitRate?: number;
-  units?: string[];
-  brokers?: string[];
-  [key: string]: unknown;
-}
 type ConfigUpdateValue = string | number | string[];
 
 const exportTargets: Array<{ type: SystemExportType; label: string; desc: string }> = [
@@ -238,6 +247,13 @@ export default function SettingsPageContent() {
     { href: '/dashboard/products', label: '商品管理', icon: Package, desc: '管理商品档案' },
     { href: '/dashboard/suppliers', label: '供应商管理', icon: Users, desc: '管理供应商信息' },
     { href: '/dashboard/stores', label: '门店管理', icon: Store, desc: '管理客户门店' },
+    { href: '/dashboard/hs-codes', label: 'HSCode 查询', icon: SearchCheck, desc: '查询海关编码与退税率' },
+  ];
+
+  const opsLinks = [
+    { href: '/dashboard/system/notifications', label: '通知中心', icon: Bell, desc: '查看系统通知和未读提醒' },
+    { href: '/dashboard/system/logs', label: '系统日志', icon: History, desc: '审计关键操作日志与变更记录' },
+    { href: '/dashboard/system/import-records', label: '导入记录', icon: Database, desc: '复盘导入任务与失败明细' },
   ];
 
   return (
@@ -261,6 +277,10 @@ export default function SettingsPageContent() {
             <FileSpreadsheet className="h-4 w-4" />
             数据导入
           </TabsTrigger>
+          <TabsTrigger value="ops" className="w-full justify-start gap-2">
+            <History className="h-4 w-4" />
+            运维中心
+          </TabsTrigger>
           <TabsTrigger value="export" className="w-full justify-start gap-2">
             <Download className="h-4 w-4" />
             数据导出
@@ -277,7 +297,7 @@ export default function SettingsPageContent() {
 
         {/* 基础档案Tab */}
         <TabsContent value="master" className="flex-1 space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {masterDataLinks.map((item) => {
               const Icon = item.icon;
               return (
@@ -467,22 +487,28 @@ export default function SettingsPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="hover:border-primary/50 transition-colors cursor-pointer" onClick={() => router.push('/dashboard/system/import-records')}>
-            <CardHeader className="flex flex-row items-center gap-4">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <FileSpreadsheet className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <CardTitle className="text-lg">导入记录</CardTitle>
-                <CardDescription>查看历史导入任务执行状态与失败明细</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                用于复盘导入任务结果，快速定位失败数据行并重试。
-              </p>
-            </CardContent>
-          </Card>
+        </TabsContent>
+
+        {/* 运维中心Tab */}
+        <TabsContent value="ops" className="flex-1 space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            {opsLinks.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Card key={item.href} className="hover:border-primary/50 transition-colors cursor-pointer" onClick={() => router.push(item.href)}>
+                  <CardHeader className="flex flex-row items-center gap-4 pb-2">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Icon className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">{item.label}</CardTitle>
+                      <CardDescription>{item.desc}</CardDescription>
+                    </div>
+                  </CardHeader>
+                </Card>
+              );
+            })}
+          </div>
         </TabsContent>
 
         {/* 数据导出Tab */}

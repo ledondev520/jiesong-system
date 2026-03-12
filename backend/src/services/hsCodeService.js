@@ -8,6 +8,43 @@ const prisma = require('../utils/prisma');
 
 const normalizeKeyword = (value) => String(value || '').trim();
 
+const listHsCodes = async ({ keyword = '', page = 1, pageSize = 50 } = {}) => {
+  const normalizedKeyword = normalizeKeyword(keyword);
+  const safePage = Math.max(parseInt(page, 10) || 1, 1);
+  const safePageSize = Math.min(Math.max(parseInt(pageSize, 10) || 50, 1), 200);
+
+  const where = normalizedKeyword
+    ? {
+        productName: {
+          contains: normalizedKeyword,
+        },
+      }
+    : {};
+
+  const [items, total] = await Promise.all([
+    prisma.hsCode.findMany({
+      where,
+      orderBy: [
+        { effectiveDate: 'desc' },
+        { hsCode: 'asc' },
+      ],
+      skip: (safePage - 1) * safePageSize,
+      take: safePageSize,
+    }),
+    prisma.hsCode.count({ where }),
+  ]);
+
+  return {
+    items,
+    pagination: {
+      page: safePage,
+      pageSize: safePageSize,
+      total,
+      totalPages: Math.max(Math.ceil(total / safePageSize), 1),
+    },
+  };
+};
+
 const searchByProductName = async (keyword) => {
   const normalizedKeyword = normalizeKeyword(keyword);
 
@@ -126,6 +163,7 @@ const batchMatchHsCodes = async (productNames) => {
 };
 
 module.exports = {
+  listHsCodes,
   searchByProductName,
   searchByHsCode,
   getTaxRate,
