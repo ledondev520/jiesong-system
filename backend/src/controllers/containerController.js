@@ -12,6 +12,7 @@ const list = async (req, res, next) => {
   try {
     const { page, pageSize } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
     const { status, portId, keyword } = req.query;
+    const lite = req.query.lite === 'true' || req.query.lite === true;
 
     const { items, total } = await containerService.list({
       page,
@@ -19,6 +20,7 @@ const list = async (req, res, next) => {
       status,
       portId,
       keyword,
+      lite,
     });
 
     paginated(res, items, total, page, pageSize);

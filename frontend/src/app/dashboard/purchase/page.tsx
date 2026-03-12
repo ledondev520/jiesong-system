@@ -41,7 +41,7 @@ export default function PurchasePage() {
   const loadContracts = async () => {
     setLoading(true);
     try {
-      const response = await purchaseService.getAll({ page: 1, pageSize: 100 });
+      const response = await purchaseService.getAll({ page: 1, pageSize: 100, lite: true });
       setContracts(response.data?.items || []);
     } catch {
       toast.error('加载采购合同失败');

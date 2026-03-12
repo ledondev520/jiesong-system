@@ -147,8 +147,8 @@ export default function CreatePurchasePage() {
     const loadData = async () => {
       try {
         const [suppliersRes, productsRes, contractNoRes] = await Promise.all([
-          supplierService.getAll({ pageSize: 100 }),
-          productService.getAll({ pageSize: 100 }),
+          supplierService.getAll({ pageSize: 100, lite: true }),
+          productService.getAll({ pageSize: 100, lite: true }),
           purchaseService.getNextContractNo(),
         ]);
         setSuppliers(suppliersRes.data?.items || []);
@@ -530,7 +530,7 @@ export default function CreatePurchasePage() {
                                       }}
                                     >
                                       <Check className={cn('mr-2 h-4 w-4', field.value === s.id ? 'opacity-100' : 'opacity-0')} />
-                                      <Star className="h-3 w-3 mr-1 text-chart-4" />
+                                      <Star className="mr-1 h-3 w-3 text-primary" />
                                       <span>{s.name}</span>
                                       {s.contactName && <span className="text-muted-foreground text-xs ml-2">({s.contactName})</span>}
                                       <Badge variant="secondary" className="ml-auto text-xs">曾供应</Badge>

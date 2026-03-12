@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Toaster } from "@/components/ui/sonner";
-import { AIAssistant } from "@/components/ai/AIAssistant";
+import { LazyAIAssistantMount } from "@/components/ai/LazyAIAssistantMount";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import "./globals.css";
 
@@ -32,7 +32,7 @@ export default function RootLayout({
         <ThemeProvider>
           {children}
           <Toaster position="top-center" />
-          <AIAssistant />
+          <LazyAIAssistantMount />
         </ThemeProvider>
       </body>
     </html>

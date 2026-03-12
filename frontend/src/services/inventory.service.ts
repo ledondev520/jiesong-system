@@ -2,7 +2,7 @@ import api from '@/lib/axios';
 import { Inventory, ApiResponse, PaginatedResponse } from '@/types';
 
 export const inventoryService = {
-  getAll: async (params?: { page?: number; pageSize?: number; keyword?: string }) => {
+  getAll: async (params?: { page?: number; pageSize?: number; keyword?: string; lite?: boolean }) => {
     return api.get<ApiResponse<PaginatedResponse<Inventory>>, ApiResponse<PaginatedResponse<Inventory>>>('/inventory', { params });
   },
 

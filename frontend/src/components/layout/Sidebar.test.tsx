@@ -13,6 +13,7 @@ import { Role } from '@/types';
 import { Sidebar } from './Sidebar';
 
 const mockLogout = vi.fn();
+const mockPrefetch = vi.fn();
 let mockPathname = '/dashboard/contracts';
 
 const mockUser = {
@@ -28,6 +29,9 @@ vi.mock('@/store/auth.store', () => ({
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockPathname,
+  useRouter: () => ({
+    prefetch: mockPrefetch,
+  }),
 }));
 
 vi.mock('next/link', () => ({
@@ -41,6 +45,7 @@ vi.mock('next/link', () => ({
 describe('Sidebar', () => {
   beforeEach(() => {
     mockLogout.mockReset();
+    mockPrefetch.mockReset();
     mockUser.role = Role.ADMIN;
     mockPathname = '/dashboard/contracts';
   });
@@ -52,9 +57,8 @@ describe('Sidebar', () => {
     const current = getByText('采购合同').closest('a');
     expect(current?.className.includes('bg-background')).toBe(true);
     expect(getByText('出口退税')).toBeInTheDocument();
-    expect(getByText('系统管理')).toBeInTheDocument();
-    expect(queryByText('通知中心')).toBeNull();
-    expect(queryByText('系统日志')).toBeNull();
+    expect(getByText('基础设置')).toBeInTheDocument();
+    expect(queryByText('系统管理')).toBeNull();
   });
 
   it('点击退出登录调用logout', () => {
@@ -64,21 +68,31 @@ describe('Sidebar', () => {
     expect(mockLogout).toHaveBeenCalled();
   });
 
-  it('系统管理路由下展示管理员子菜单', () => {
-    mockPathname = '/dashboard/system';
+  it('基础设置路由下基础设置菜单激活', () => {
+    mockPathname = '/dashboard/settings';
     const { getByText } = render(<Sidebar />);
 
-    expect(getByText('通知中心')).toBeInTheDocument();
-    expect(getByText('系统日志')).toBeInTheDocument();
-    expect(getByText('导入记录')).toBeInTheDocument();
+    const settingLink = getByText('基础设置').closest('a');
+    expect(settingLink?.className.includes('bg-background')).toBe(true);
   });
 
-  it('非管理员角色不显示系统日志入口', () => {
+  it('非管理员角色仍可见基础设置入口', () => {
     mockUser.role = Role.SALES;
-    mockPathname = '/dashboard/system';
-    const { queryByText } = render(<Sidebar />);
+    mockPathname = '/dashboard/settings';
+    const { getByText, queryByText } = render(<Sidebar />);
+    expect(getByText('基础设置')).toBeInTheDocument();
     expect(queryByText('系统管理')).toBeNull();
-    expect(queryByText('系统日志')).toBeNull();
-    expect(queryByText('导入记录')).toBeNull();
+  });
+
+  it('空闲时预取可见导航路由', () => {
+    vi.useFakeTimers();
+    render(<Sidebar />);
+    vi.runOnlyPendingTimers();
+
+    expect(mockPrefetch).toHaveBeenCalledWith('/dashboard');
+    expect(mockPrefetch).toHaveBeenCalledWith('/dashboard/contracts');
+    expect(mockPrefetch).toHaveBeenCalledWith('/dashboard/settings');
+
+    vi.useRealTimers();
   });
 });

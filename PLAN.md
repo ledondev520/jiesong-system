@@ -1,5 +1,271 @@
 # Frontend Polish Plan
 
+## 2026-03-12 Round 59 (登录页快捷登录逻辑收口)
+
+### Goal
+- 将登录页行为调整为“首次登录成功后，下次可一键直接登录”，并移除与快捷登录重复或对外不必要的信息展示。
+
+### Delivered
+- 登录页逻辑重构：
+  - `frontend/src/app/(auth)/login/page.tsx`
+  - 移除“记住用户名”复选框。
+  - 移除“点击一键后输入密码并满 6 位自动提交”的文案与交互。
+  - 一键登录改为直接使用上次成功登录资料自动完成登录。
+  - 移除底部“测试阶段账号：admin，默认密码：123456”展示。
+- 登录页测试更新：
+  - `frontend/src/app/(auth)/login/page.test.tsx`
+  - 覆盖“未登录过不展示快捷登录入口 / 登录成功后写入快捷登录资料 / 一键即登录”关键路径。
+
+### Verification
+- `cd frontend && npm run test -- 'src/app/(auth)/login/page.test.tsx'`（5/5 通过）
+- `cd frontend && npm run lint -- 'src/app/(auth)/login/page.tsx' 'src/app/(auth)/login/page.test.tsx'`（通过）
+- 由于主工作区存在常驻 `next dev` 锁，构建在隔离临时目录执行：
+  - `cd <tmp-frontend-copy> && npm run build -- --webpack`（通过）
+
+### Remaining Risk
+- 当前快捷登录资料保存在浏览器本地存储（用于实现“一键直接登录”）；若后续进入更高安全等级环境，需升级为服务端受控免密机制。
+
+## 2026-03-12 Round 58 (System Features Re-homed Into Settings)
+
+### Goal
+- 按“功能归位”拆分原系统管理：不是做导航嵌套，而是把能力归入已有模块，并减少一级菜单数量。
+
+### Delivered
+- 侧边栏模块收敛：
+  - `frontend/src/components/layout/Sidebar.tsx`
+  - 移除“系统管理”一级菜单，仅保留“基础设置”作为系统配置入口。
+- 设置页承接系统能力：
+  - `frontend/src/app/dashboard/settings/components/SettingsPageContent.tsx`
+  - 在“基础档案”补充 `HSCode 查询` 入口。
+  - 新增“运维中心”Tab，承接 `通知中心` / `系统日志` / `导入记录` 三项入口。
+  - “数据导入”Tab 保留导入动作入口，不再混放导入记录卡片。
+- 旧路由兼容：
+  - `frontend/src/app/dashboard/system/page.tsx`
+  - `/dashboard/system` 改为自动跳转 `/dashboard/settings?tab=ops`，避免历史书签失效。
+- 回归测试同步：
+  - `frontend/src/components/layout/Sidebar.test.tsx`
+  - `frontend/src/app/dashboard/system/page.test.tsx`
+  - `frontend/e2e/smoke.spec.ts`
+
+### Verification
+- `cd frontend && npm run test -- src/components/layout/Sidebar.test.tsx src/app/dashboard/system/page.test.tsx src/app/dashboard/settings/page.test.tsx src/app/dashboard/system/notifications/page.test.tsx src/app/dashboard/system/logs/page.test.tsx src/app/dashboard/system/import-records/page.test.tsx`（21/21 通过）
+- `cd frontend && npm run lint -- src/components/layout/Sidebar.tsx src/components/layout/Sidebar.test.tsx src/app/dashboard/settings/components/SettingsPageContent.tsx src/app/dashboard/system/page.tsx src/app/dashboard/system/page.test.tsx e2e/smoke.spec.ts`（通过）
+- `cd frontend && npm run build -- --webpack`（通过）
+
+### Remaining Risk
+- 当前仅做信息架构重分配，未删除既有 `/dashboard/system/*` 子页面；后续若确认不再独立使用，可继续做路径收敛和重定向策略统一。
+
+## 2026-03-12 Round 57 (持续性能优化：预取治理 + AI 懒加载 + API 压缩)
+
+### Goal
+- 在列表载荷瘦身后继续优化切页卡顿：降低前端主线程与网络抢占，进一步缩短 API 传输时间。
+
+### Delivered
+- 侧边栏预取治理（避免“预取过量”反噬性能）：
+  - `frontend/src/components/layout/Sidebar.tsx`
+  - 引入“高优先级 + 数量上限 + 已预取去重”策略，替代一次性预取全部可见路由。
+- 全局 AI 助手改为按需懒加载，减少公共页面首屏负担：
+  - `frontend/src/components/ai/LazyAIAssistantMount.tsx`（新增）
+  - `frontend/src/app/layout.tsx`（用 Lazy mount 替代同步挂载）
+  - 仅在业务路径挂载 AI 助手：`/dashboard*`、`/customs-declarations*`、`/tax-refunds*`。
+- 后端启用响应压缩（排除 SSE）：
+  - `backend/src/app.js`
+  - `backend/package.json`
+  - `backend/package-lock.json`
+  - 新增 `compression` 中间件，`threshold=1024`，并对 `text/event-stream` 与 `/ai/chat/stream` 路径禁用压缩。
+
+### Verification
+- Backend:
+  - `cd backend && npm run test -- src/app.test.js src/controllers/purchaseController.test.js src/controllers/salesController.test.js src/controllers/inventoryController.test.js src/controllers/supplierController.test.js src/controllers/productController.test.js src/controllers/storeController.test.js src/services/salesService.test.js src/services/containerService.test.js`
+- Frontend:
+  - `cd frontend && npm run test -- src/components/layout/Sidebar.test.tsx src/app/dashboard/products/page.test.tsx src/lib/axios.test.ts src/components/ai/AIAssistant.test.tsx`
+  - `cd frontend && npm run lint -- <touched files>`
+  - `cd frontend && npm run build`
+
+### Remaining Risk
+- 当前已覆盖“请求载荷/缓存/预取/压缩/重组件挂载”五个高影响点；若仍有卡顿，下一轮建议引入表格虚拟滚动与图表延迟渲染做渲染层压测优化。
+
+## 2026-03-12 Round 56 (持续性能优化：Lite 查询 + 列表载荷瘦身)
+
+### Goal
+- 持续降低页面切换卡顿与数据加载耗时，重点优化高频列表页的首屏请求负载。
+
+### Delivered
+- 后端为高频列表接口接入 `lite=true` 轻量模式，并移除不必要关联字段：
+  - `backend/src/controllers/productController.js`
+  - `backend/src/controllers/storeController.js`
+  - `backend/src/controllers/inventoryController.js`
+  - `backend/src/controllers/purchaseController.js`
+  - `backend/src/controllers/supplierController.js`
+  - `backend/src/controllers/salesController.js`
+  - `backend/src/controllers/containerController.js`
+  - `backend/src/services/salesService.js`
+  - `backend/src/services/containerService.js`
+- 前端高频页面改为请求轻量数据（`lite: true`），减少跨页首屏等待：
+  - `frontend/src/app/dashboard/purchase/page.tsx`
+  - `frontend/src/app/dashboard/sales/page.tsx`
+  - `frontend/src/app/dashboard/containers/page.tsx`
+  - `frontend/src/app/dashboard/products/page.tsx`
+  - `frontend/src/app/dashboard/stores/page.tsx`
+  - `frontend/src/app/dashboard/sales/create/page.tsx`
+  - `frontend/src/app/dashboard/purchase/create/components/CreatePurchasePageContent.tsx`
+  - `frontend/src/app/dashboard/sales/[id]/components/SalesDetailPageContent.tsx`
+  - `frontend/src/app/dashboard/containers/[id]/page.tsx`
+- 前端 service 查询类型补齐 `lite?: boolean`：
+  - `product.service.ts`, `store.service.ts`, `inventory.service.ts`
+  - `purchase.service.ts`, `sales.service.ts`, `container.service.ts`, `supplier.service.ts`
+- 继续强化前端请求缓存：`frontend/src/lib/axios.ts` 默认 GET TTL 从 `20s` 提升到 `180s`（写后失效策略保持不变）。
+
+### Verification
+- Backend:
+  - `cd backend && node --test src/controllers/purchaseController.test.js src/controllers/salesController.test.js src/controllers/inventoryController.test.js src/controllers/supplierController.test.js src/controllers/productController.test.js src/controllers/storeController.test.js src/services/salesService.test.js src/services/containerService.test.js`
+- Frontend:
+  - `cd frontend && npm run test -- src/app/dashboard/purchase/page.test.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/products/page.test.tsx src/app/dashboard/stores/page.test.tsx src/app/dashboard/sales/create/page.test.tsx 'src/app/dashboard/sales/[id]/page.test.tsx' src/app/dashboard/purchase/create/page.test.tsx 'src/app/dashboard/containers/[id]/page.test.tsx' src/lib/axios.test.ts src/components/layout/Sidebar.test.tsx`
+  - `cd frontend && npm run lint -- <touched files>`
+  - `cd frontend && npm run build`
+
+### Remaining Risk
+- 当前优化主要针对请求负载与缓存命中；若仍有卡顿，下一轮将继续处理渲染层（大表格渲染量、全局重组件延迟加载）。
+
+## 2026-03-12 Round 55 (Merge Settings Into System Management)
+
+### Goal
+- 融合“基础设置”和“系统管理”两个模块，减少一级菜单数量，同时保持现有功能路由不变。
+
+### Delivered
+- 侧边栏导航重构：
+  - `frontend/src/components/layout/Sidebar.tsx`
+  - 将“基础设置”和“HSCode 查询”并入“系统管理”子菜单。
+  - 子菜单引入子项级权限控制：非管理员仅显示基础设置相关入口，管理员显示完整系统运维入口。
+  - 父菜单激活逻辑升级：访问 `/dashboard/settings*` 时“系统管理”保持高亮并展开。
+- 系统管理总览页同步融合：
+  - `frontend/src/app/dashboard/system/page.tsx`
+  - 新增“基础设置”“HSCode 查询”快捷入口；非管理员访问总览页时显示可访问入口而非整页拒绝。
+- 回归测试更新：
+  - `frontend/src/components/layout/Sidebar.test.tsx`：新增融合后权限与展开行为断言。
+  - `frontend/src/app/dashboard/system/page.test.tsx`：新增融合入口渲染与跳转断言。
+  - `frontend/e2e/smoke.spec.ts`：将导航文案校验由“设置”调整为“基础设置”。
+
+### Verification
+- `cd frontend && npm run test -- src/components/layout/Sidebar.test.tsx src/app/dashboard/system/page.test.tsx src/app/dashboard/system/notifications/page.test.tsx src/app/dashboard/system/logs/page.test.tsx src/app/dashboard/system/import-records/page.test.tsx`（21/21 通过）
+- `cd frontend && npm run lint -- src/components/layout/Sidebar.tsx src/components/layout/Sidebar.test.tsx src/app/dashboard/system/page.tsx src/app/dashboard/system/page.test.tsx e2e/smoke.spec.ts e2e/button-coverage.spec.ts`（通过）
+- `cd frontend && npm run build -- --webpack`（通过）
+
+### Remaining Risk
+- 由于当前会话存在常驻 `next dev`，本轮未执行 Playwright e2e 实跑；导航脚本已完成断言更新，待空闲窗口可补跑。
+
+## 2026-03-12 Round 54 (快捷登录 + admin 测试密码)
+
+### Goal
+- 将登录页“记住用户名”辅助入口切换为“快捷登录”，支持点击“一键登录（admin）”后直接输入密码并自动提交。
+- 将测试阶段 `admin` 默认密码改为 `123456`，并立即同步到本地数据库。
+
+### Delivered
+- 前端登录页改造：
+  - `frontend/src/app/(auth)/login/page.tsx`
+  - 新增快捷登录模块与“一键登录（admin）”按钮。
+  - 点击后自动填充账号并聚焦密码框；密码输入达到 6 位后自动登录。
+  - 页脚改为测试阶段账号提示（`admin / 123456`）。
+- 前端测试更新：
+  - `frontend/src/app/(auth)/login/page.test.tsx`
+  - 覆盖快捷登录入口渲染、一键登录后 6 位密码自动提交场景。
+- 后端默认管理员密码调整：
+  - `backend/prisma/seed.js`：默认回退密码由随机改为固定 `123456`（`DEFAULT_ADMIN_PASSWORD` 仍可覆盖）。
+  - `backend/README.md`、`backend/env.example` 同步说明。
+- 安全台账联动更新：
+  - `SECURITY.md`、`AGENTS.md`、`data-classification.json`。
+- 已执行本地 seed，将现有 `admin` 密码重置为 `123456`。
+
+### Verification
+- `cd frontend && npm run test -- 'src/app/(auth)/login/page.test.tsx'`（6/6 通过）
+- `cd frontend && npm run lint -- 'src/app/(auth)/login/page.tsx' 'src/app/(auth)/login/page.test.tsx'`（通过）
+- `cd backend && npm run test:db`（3/3 通过）
+- `cd backend && DEFAULT_ADMIN_PASSWORD=123456 npm run db:seed`（执行成功）
+
+### Remaining Risk
+- `admin/123456` 仅适用于测试阶段，发布前必须通过环境变量覆盖并完成密码轮换。
+
+## 2026-03-12 Round 53 (System Management 404 Closure)
+
+### Goal
+- 修复侧边栏“系统管理”主入口点击后出现 `404 not found` 的问题，并补齐可回归验证路径，避免再次回归。
+
+### Delivered
+- 新增系统管理总览页：
+  - `frontend/src/app/dashboard/system/page.tsx`
+  - 现在 `/dashboard/system` 可正常访问，展示通知中心/系统日志/导入记录/港口管理/商品分类快捷入口。
+- 新增单元测试：
+  - `frontend/src/app/dashboard/system/page.test.tsx`
+  - 覆盖总览渲染、入口跳转、非管理员无权限提示。
+- 扩展 E2E 用例覆盖入口路由：
+  - `frontend/e2e/smoke.spec.ts` 新增“系统管理”导航断言（`/dashboard/system`）。
+  - `frontend/e2e/button-coverage.spec.ts` 新增页面巡检项（`/dashboard/system`）。
+
+### Verification
+- `cd frontend && npm run test -- src/app/dashboard/system/page.test.tsx src/components/layout/Sidebar.test.tsx src/app/dashboard/system/notifications/page.test.tsx src/app/dashboard/system/logs/page.test.tsx src/app/dashboard/system/import-records/page.test.tsx`（20/20 通过）
+- `cd frontend && npm run lint -- src/app/dashboard/system/page.tsx src/app/dashboard/system/page.test.tsx e2e/smoke.spec.ts e2e/button-coverage.spec.ts`（通过）
+- `cd frontend && npm run build -- --webpack`（通过，产物中已包含 `/dashboard/system`）
+
+### Remaining Risk
+- 当前工作区已有常驻 `next dev` 进程时，`playwright` 的 `webServer` 会因 `.next/dev/lock` 冲突无法自启动；本轮未完成自动化 E2E 重跑，仅完成单测/lint/build 验证。
+
+## 2026-03-12 Round 52 (页面切换与数据加载性能优化)
+
+### Goal
+- 定位并修复“页面来回切换慢、数据重复加载慢”的核心瓶颈，确保在不改业务流程的前提下提升感知速度。
+
+### Delivered
+- 在 `frontend/src/lib/axios.ts` 增加全局 GET 请求性能层：
+  - 相同 GET 请求短 TTL 缓存（默认 `20s`）
+  - 并发去重（同 key 请求只打一次网络）
+  - 写操作（`POST/PUT/PATCH/DELETE`）成功后自动失效 GET 缓存，避免脏读
+- 在 `frontend/src/components/layout/Sidebar.tsx` 增加空闲时路由预取：
+  - 优先在 `requestIdleCallback` 执行
+  - 不支持时降级为 `setTimeout` 延迟预取
+- 补齐测试：
+  - `frontend/src/lib/axios.test.ts` 新增缓存命中/并发去重/写后失效用例
+  - `frontend/src/components/layout/Sidebar.test.tsx` 新增路由预取用例
+
+### Verification
+- `cd frontend && npm run lint -- src/lib/axios.ts src/lib/axios.test.ts src/components/layout/Sidebar.tsx src/components/layout/Sidebar.test.tsx`
+- `cd frontend && npm run test -- src/lib/axios.test.ts src/components/layout/Sidebar.test.tsx`
+- `cd frontend && npm run build`
+
+### Remaining Risk
+- 当前缓存是内存级短 TTL 策略，已能显著降低“来回切页”重复请求；若后续需要更强一致性或跨标签页共享，可再升级为可配置策略（例如按接口白名单 TTL / 精细化失效）。
+
+## 2026-03-12 Round 51 (Backend/Frontend Local Login + HSCode List Fix)
+
+### Goal
+- Explain why the local app looked "empty" and why login was failing.
+- Fix HSCode UX so the page shows a full list first, then supports search/filtering.
+- Bring local backend and frontend up together with a verified admin login path.
+
+### Delivered
+- Confirmed the real runtime database is `backend/prisma/dev.db`, not `backend/dev.db`.
+- Verified current table counts: `hs_codes=11879`, `users=1`, but business tables such as `products`, `suppliers`, `stores`, `sales_contracts`, `purchase_contracts`, and `inventories` are currently `0`, which is why the app looks empty outside HSCode/base config data.
+- Reset the local admin credential by re-running seed with a fixed password.
+- Added backend HSCode list capability:
+  - `backend/src/services/hsCodeService.js`
+  - `backend/src/routes/hsCodes.js`
+- Added frontend HSCode list capability and page behavior:
+  - `frontend/src/services/hsCode.service.ts`
+  - `frontend/src/app/dashboard/hs-codes/page.tsx`
+- Added/updated tests:
+  - `backend/src/services/hsCodeService.test.js`
+  - `frontend/src/services/hsCode.service.test.ts`
+  - `frontend/src/app/dashboard/hs-codes/page.test.tsx`
+- Started backend (`3001`) and frontend (`3002`) together and verified both ports respond.
+
+### Verification
+- `node --test src/services/hsCodeService.test.js`
+- `npm test -- src/services/hsCode.service.test.ts src/app/dashboard/hs-codes/page.test.tsx`
+- `curl -I http://127.0.0.1:3002/login`
+- login API verified with seeded admin credential against `http://127.0.0.1:3001/api/v1/auth/login`
+
+### Remaining Risk
+- The app still looks data-sparse outside HSCode/base config because the business tables in `backend/prisma/dev.db` are empty; that is a data-state problem, not a missing database connection.
+
 ## 2026-03-12 Round 50 (Frontend Coverage 98 Master Plan)
 
 ### Goal

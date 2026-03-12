@@ -6,6 +6,7 @@ type ContainerListQuery = {
   page?: number;
   pageSize?: number;
   keyword?: string;
+  lite?: boolean;
 };
 
 type ContainerCreateInput = Partial<SalesContract>;

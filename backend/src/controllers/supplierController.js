@@ -18,6 +18,7 @@ const list = async (req, res, next) => {
   try {
     const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
     const { keyword } = req.query;
+    const lite = req.query.lite === 'true' || req.query.lite === true;
     
     const where = keyword ? {
       OR: [
@@ -31,7 +32,19 @@ const list = async (req, res, next) => {
         where,
         skip,
         take: pageSize,
-        include: { aliases: true },
+        ...(lite
+          ? {
+              select: {
+                id: true,
+                name: true,
+                shortName: true,
+                hasQualityIssue: true,
+                isActive: true,
+              },
+            }
+          : {
+              include: { aliases: true },
+            }),
         orderBy: { createdAt: 'desc' },
       }),
       prisma.supplier.count({ where }),

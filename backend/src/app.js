@@ -8,6 +8,7 @@
 
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const config = require('./config');
 const routes = require('./routes');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
@@ -66,6 +67,20 @@ app.use(gentleRateLimit({
 // 1. 请求体解析
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// 1.5. 响应压缩（排除 SSE，减少页面切换时数据传输时间）
+app.use(
+  compression({
+    threshold: 1024,
+    filter: (req, res) => {
+      const accept = String(req.headers.accept || '');
+      if (accept.includes('text/event-stream') || req.path.includes('/ai/chat/stream')) {
+        return false;
+      }
+      return compression.filter(req, res);
+    },
+  }),
+);
 
 // 2. 请求日志
 app.use(requestLogger);

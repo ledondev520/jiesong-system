@@ -86,8 +86,8 @@ export default function CreateSalesPage() {
     const loadData = async () => {
       try {
         const [productsRes, storesRes, contractNoRes] = await Promise.all([
-          productService.getAll({ pageSize: 100 }),
-          storeService.getAll({ pageSize: 100 }),
+          productService.getAll({ pageSize: 100, lite: true }),
+          storeService.getAll({ pageSize: 100, lite: true }),
           salesService.getNextContractNo(),
         ]);
         setProducts(productsRes.data?.items || []);

@@ -2,23 +2,24 @@
  * Input: 用户认证状态、路由信息
  * Output: 侧边导航栏组件
  * Pos: 全局布局组件，提供系统导航功能
- * 
+ *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
- * 
+ *
  * 导航结构（优化后）：
  * - 核心业务（6 个）：工作台、采购合同、出口合同、库存状态、收付款、采购建议
+ * - 财务分析（1 个）：财务报表（三表看板）
  * - AI 功能（1 个）：AI 管理
  * - 合同管理（1 个）：合同模板
- * - 系统管理（1 个）：系统设置（通知/日志/导入/数据配置）
- * - 基础设置（1 个）：设置（基础档案 + 用户）
+ * - 基础设置（1 个）：系统配置/数据导入导出/用户/运维入口
  */
 
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { useEffect, useRef, type ComponentType } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { 
+import {
   LayoutDashboard,
   FileText,
   Ship,
@@ -29,19 +30,31 @@ import {
   FileBox,
   Settings,
   LogOut,
-  Bell,
-  History,
-  Database,
-  Globe,
-  HardDrive,
   ReceiptText,
+  BarChart3,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 
-const navItems = [
+type NavChildItem = {
+  href: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  adminOnly?: boolean;
+};
+
+type NavItem = {
+  href: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  exact?: boolean;
+  adminOnly?: boolean;
+  children?: NavChildItem[];
+};
+
+const navItems: NavItem[] = [
   // 核心业务模块
   { href: '/dashboard', label: '工作台', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/contracts', label: '采购合同', icon: FileText, exact: true },
@@ -50,6 +63,7 @@ const navItems = [
   { href: '/customs-declarations', label: '报关单', icon: FileText },
   { href: '/dashboard/inventory-container', label: '库存状态', icon: Warehouse },
   { href: '/dashboard/payments', label: '收付款', icon: DollarSign },
+  { href: '/dashboard/finance/statements', label: '财务报表', icon: BarChart3 },
   { href: '/dashboard/store-recommend', label: '采购建议', icon: Store },
   
   // AI 功能模块
@@ -58,25 +72,19 @@ const navItems = [
   // 合同管理模块
   { href: '/dashboard/contracts/templates', label: '合同模板', icon: FileBox },
   
-  // 系统管理模块（整合系统运维 + 数据配置）
-  { 
-    href: '/dashboard/system', 
-    label: '系统管理', 
-    icon: HardDrive,
-    adminOnly: true,
-    children: [
-      { href: '/dashboard/system/notifications', label: '通知中心', icon: Bell },
-      { href: '/dashboard/system/logs', label: '系统日志', icon: History },
-      { href: '/dashboard/system/import-records', label: '导入记录', icon: Database },
-      { href: '/dashboard/settings/ports', label: '港口管理', icon: Globe },
-      { href: '/dashboard/settings/categories', label: '商品分类', icon: Database },
-    ]
-  },
-  
-  // 基础设置
+  // 基础设置模块
   { href: '/dashboard/settings', label: '基础设置', icon: Settings },
-  { href: '/dashboard/hs-codes', label: 'HSCode 查询', icon: Globe },
 ];
+
+const PREFETCH_PRIORITY_ROUTES = [
+  '/dashboard',
+  '/dashboard/contracts',
+  '/dashboard/sales',
+  '/dashboard/payments',
+  '/dashboard/settings',
+] as const;
+
+const MAX_PREFETCH_ROUTES = 6;
 
 /**
  * 职责：渲染侧边导航栏
@@ -87,26 +95,85 @@ const navItems = [
  */
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
   const isAdmin = user?.role === 'ADMIN';
+  const prefetchedRoutesRef = useRef<Set<string>>(new Set());
 
-  const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
+  const visibleNavItems = navItems
+    .map((item) => ({
+      ...item,
+      children: item.children?.filter((child) => !child.adminOnly || isAdmin),
+    }))
+    .filter((item) => {
+      if (item.adminOnly && !isAdmin) {
+        return false;
+      }
+      if (item.children) {
+        return item.children.length > 0;
+      }
+      return true;
+    });
   const primaryItems = visibleNavItems.filter(
-    (item) => !item.adminOnly && item.href !== '/dashboard/settings' && item.href !== '/dashboard/hs-codes',
+    (item) => item.href !== '/dashboard/settings',
   );
   const managementItems = visibleNavItems.filter(
-    (item) => item.adminOnly || item.href === '/dashboard/settings' || item.href === '/dashboard/hs-codes',
+    (item) => item.href === '/dashboard/settings',
   );
+  const prefetchRoutes = visibleNavItems.flatMap((item) => [
+    item.href,
+    ...(item.children?.map((child) => child.href) ?? []),
+  ]);
 
-  const isActiveItem = (item: typeof navItems[0]) => {
+  useEffect(() => {
+    // 空闲时仅预取高优先级路由，避免一次性预取过多页面造成主线程和网络压力。
+    const visibleRouteSet = new Set(prefetchRoutes);
+    const orderedCandidates = [
+      ...PREFETCH_PRIORITY_ROUTES.filter((href) => visibleRouteSet.has(href)),
+      ...prefetchRoutes,
+    ];
+    const uniqueRoutes = Array.from(new Set(orderedCandidates)).slice(0, MAX_PREFETCH_ROUTES);
+    const routesToPrefetch = uniqueRoutes.filter((href) => !prefetchedRoutesRef.current.has(href));
+
+    if (routesToPrefetch.length === 0) {
+      return;
+    }
+
+    const prefetch = () => {
+      routesToPrefetch.forEach((href) => {
+        router.prefetch(href);
+        prefetchedRoutesRef.current.add(href);
+      });
+    };
+
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      const idleId = window.requestIdleCallback(prefetch);
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timer = setTimeout(prefetch, 300);
+    return () => clearTimeout(timer);
+  }, [prefetchRoutes, router, pathname]);
+
+  const isActivePath = (href: string, exact?: boolean) => {
+    if (exact) {
+      return pathname === href;
+    }
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
+
+  const isActiveItem = (item: NavItem) => {
+    if (item.children?.some((child) => isActivePath(child.href))) {
+      return true;
+    }
     if (item.exact) {
       return pathname === item.href;
     }
-    return pathname.startsWith(item.href);
+    return isActivePath(item.href);
   };
 
-  const renderNavItem = (item: typeof navItems[0]) => (
+  const renderNavItem = (item: NavItem) => (
     <div key={item.href}>
       <Link
         href={item.href}
@@ -130,7 +197,7 @@ export function Sidebar() {
               href={child.href}
               className={cn(
                 'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
-                pathname === child.href
+                isActivePath(child.href)
                   ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
                   : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
               )}

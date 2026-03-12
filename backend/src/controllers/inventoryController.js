@@ -31,6 +31,7 @@ const list = async (req, res, next) => {
   try {
     const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
     const { status, productId, keyword } = req.query;
+    const lite = req.query.lite === 'true' || req.query.lite === true;
     
     const where = {};
     if (status) where.status = status;
@@ -61,11 +62,38 @@ const list = async (req, res, next) => {
         where,
         skip,
         take: pageSize,
-        include: {
-          product: true,
-          purchaseItem: { include: { purchaseContract: true } },
-          salesContract: { include: { port: true } },  // 原 container
-        },
+        include: lite
+          ? {
+              product: {
+                select: {
+                  id: true,
+                  customsName: true,
+                  unit: true,
+                },
+              },
+            }
+          : {
+              product: {
+                select: {
+                  id: true,
+                  customsName: true,
+                  hsCode: true,
+                  declaration: true,
+                  unit: true,
+                },
+              },
+              purchaseItem: {
+                select: {
+                  id: true,
+                  purchaseContract: {
+                    select: {
+                      id: true,
+                      contractNo: true,
+                    },
+                  },
+                },
+              },
+            },
         orderBy: { createdAt: 'desc' },
       }),
       prisma.inventory.count({ where }),

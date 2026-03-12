@@ -18,6 +18,7 @@ const list = async (req, res, next) => {
   try {
     const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
     const { portId } = req.query;
+    const lite = req.query.lite === 'true' || req.query.lite === true;
     const where = portId ? { portId } : {};
  
     const [stores, total] = await Promise.all([
@@ -25,7 +26,11 @@ const list = async (req, res, next) => {
         where,
         skip,
         take: pageSize,
-        include: { port: true },
+        ...(lite
+          ? {}
+          : {
+              include: { port: true },
+            }),
         orderBy: { name: 'asc' },
       }),
       prisma.store.count({ where }),

@@ -5,6 +5,7 @@ type ProductListQuery = {
   page?: number;
   pageSize?: number;
   keyword?: string;
+  lite?: boolean;
 };
 
 const crud = createCrudService<Product, Partial<Product>, Partial<Product>, ProductListQuery>('/products');

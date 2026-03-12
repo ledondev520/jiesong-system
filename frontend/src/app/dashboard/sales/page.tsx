@@ -58,7 +58,7 @@ export default function SalesPage() {
   const loadContracts = async () => {
     setLoading(true);
     try {
-      const response = await salesService.getAll({ page: 1, pageSize: 100 });
+      const response = await salesService.getAll({ page: 1, pageSize: 100, lite: true });
       setContracts(response.data?.items || []);
     } catch {
       toast.error('加载出口合同失败');

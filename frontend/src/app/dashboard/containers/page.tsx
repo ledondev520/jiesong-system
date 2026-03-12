@@ -43,7 +43,7 @@ export default function ContainersPage() {
   const loadContainers = async () => {
     setLoading(true);
     try {
-      const response = await containerService.getAll({ page: 1, pageSize: 100 });
+      const response = await containerService.getAll({ page: 1, pageSize: 100, lite: true });
       setContainers(response.data?.items || []);
     } catch {
       toast.error('加载货柜失败');

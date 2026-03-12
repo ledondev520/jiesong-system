@@ -226,7 +226,7 @@ const generateNextContainerNo = async (portId) => {
   return generateNextContractNo({ prisma, year });
 };
 
-const list = async ({ page, pageSize, status, portId, keyword }) => {
+const list = async ({ page, pageSize, status, portId, keyword, lite = false }) => {
   const where = {};
   if (status) {
     where.status = normalizeFilterStatus(status);
@@ -244,7 +244,18 @@ const list = async ({ page, pageSize, status, portId, keyword }) => {
       where,
       skip,
       take: pageSize,
-      include: { port: true, _count: { select: { packingItems: true } } },
+      ...(lite
+        ? {}
+        : {
+            include: {
+              port: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          }),
       orderBy: { contractNo: 'desc' },
     }),
     prisma.salesContract.count({ where }),

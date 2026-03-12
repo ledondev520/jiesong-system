@@ -4,7 +4,7 @@ import type { ApiResponse, PackingItem, SalesContract } from '@/types';
 import { createCrudService } from './crudService';
 import { downloadResponseBlob } from './fileDownload';
 
-type SalesListQuery = { page?: number; pageSize?: number; keyword?: string };
+type SalesListQuery = { page?: number; pageSize?: number; keyword?: string; lite?: boolean };
 type SalesCreatePayload = Partial<SalesContract>;
 type SalesUpdatePayload = Partial<SalesContract>;
 

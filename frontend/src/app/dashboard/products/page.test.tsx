@@ -69,6 +69,7 @@ describe('ProductsPage 交互逻辑', () => {
         page: 1,
         pageSize: 100,
         keyword: '苹果',
+        lite: true,
       });
       expect(screen.getByDisplayValue('苹果')).toBeInTheDocument();
     });
@@ -84,10 +85,11 @@ describe('ProductsPage 交互逻辑', () => {
     await user.type(input, '香蕉');
 
     await waitFor(() => {
-      expect(mockGetAll).toHaveBeenCalledWith({
+      expect(mockGetAll).toHaveBeenLastCalledWith({
         page: 1,
         pageSize: 100,
         keyword: '香蕉',
+        lite: true,
       });
     });
   });
@@ -101,4 +103,3 @@ describe('ProductsPage 交互逻辑', () => {
     expect(screen.getByText('商品弹窗已打开')).toBeInTheDocument();
   });
 });
-

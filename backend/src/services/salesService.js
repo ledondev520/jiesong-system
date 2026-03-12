@@ -10,7 +10,7 @@ const inventorySnapshot = require('./inventorySnapshot');
 
 const getCurrentYear = () => new Date().getFullYear().toString().slice(-2);
 
-const getSalesContracts = async ({ page, pageSize, status, storeId, keyword }) => {
+const getSalesContracts = async ({ page, pageSize, status, storeId, keyword, lite = false }) => {
   const where = {};
   if (status) {
     where.status = normalizeFilterStatus(status);
@@ -28,10 +28,18 @@ const getSalesContracts = async ({ page, pageSize, status, storeId, keyword }) =
       where,
       skip,
       take: pageSize,
-      include: {
-        port: true,
-        _count: { select: { items: true } },
-      },
+      include: lite
+        ? {
+            port: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          }
+        : {
+            port: true,
+          },
       orderBy: { contractNo: 'desc' },
     }),
     prisma.salesContract.count({ where }),

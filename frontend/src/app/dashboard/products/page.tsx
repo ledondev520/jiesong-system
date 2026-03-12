@@ -97,6 +97,7 @@ function ProductsPageContent() {
         page: 1, 
         pageSize: 100,
         keyword: searchKeyword || undefined,
+        lite: true,
       });
       setProducts(response.data?.items || []);
     } catch {

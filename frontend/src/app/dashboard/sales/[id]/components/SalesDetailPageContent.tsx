@@ -255,9 +255,9 @@ export default function SalesDetailPage({ params }: PageProps) {
     try {
       const [contractRes, productsRes, storesRes, inventoryRes] = await Promise.all([
         salesService.getById(id),
-        productService.getAll({ pageSize: 500 }),
-        storeService.getAll({ pageSize: 100 }),
-        inventoryService.getAll({ pageSize: 500 }),
+        productService.getAll({ pageSize: 500, lite: true }),
+        storeService.getAll({ pageSize: 100, lite: true }),
+        inventoryService.getAll({ pageSize: 500, lite: true }),
       ]);
       setContract(contractRes.data);
       setProducts(productsRes.data?.items || []);
@@ -492,7 +492,6 @@ export default function SalesDetailPage({ params }: PageProps) {
               </Button>
               <Button
                 variant="default"
-                className="bg-gradient-to-r from-blue-500 to-orange-500"
                 onClick={() => setThreeFormsDialogOpen(true)}
               >
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
@@ -508,7 +507,7 @@ export default function SalesDetailPage({ params }: PageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <Box className="h-5 w-5 text-chart-4" />
+              <Box className="h-5 w-5 text-primary" />
               <div>
                 <div className="text-2xl font-bold">{contract.totalBoxes || 0}</div>
                 <p className="text-xs text-muted-foreground">总箱数</p>
@@ -519,7 +518,7 @@ export default function SalesDetailPage({ params }: PageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <Boxes className="h-5 w-5 text-chart-1" />
+              <Boxes className="h-5 w-5 text-primary" />
               <div>
                 <div className="text-2xl font-bold">{usedCBM.toFixed(2)}</div>
                 <p className="text-xs text-muted-foreground">体积 (CBM) / {maxCBM}</p>
@@ -531,7 +530,7 @@ export default function SalesDetailPage({ params }: PageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <Weight className="h-5 w-5 text-chart-5" />
+              <Weight className="h-5 w-5 text-primary" />
               <div>
                 <div className="text-2xl font-bold">{weightUsed.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">毛重 (kg) / {CONTAINER_40HQ.maxWeight.toLocaleString()}</p>
@@ -543,7 +542,7 @@ export default function SalesDetailPage({ params }: PageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-chart-3" />
+              <Package className="h-5 w-5 text-primary" />
               <div>
                 <div className="text-2xl font-bold">${contract.totalAmount.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">合同金额</p>
@@ -614,7 +613,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                           <TableCell className="text-right">
                             {item.unitPrice ? `$${item.unitPrice.toLocaleString()}` : '-'}
                           </TableCell>
-                          <TableCell className="text-right font-medium text-chart-3">
+                          <TableCell className="text-right font-medium text-primary">
                             {item.totalPrice ? `$${item.totalPrice.toLocaleString()}` : '-'}
                           </TableCell>
                           <TableCell className="text-right">{item.grossWeight || '-'}</TableCell>
@@ -724,7 +723,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                       <SelectItem key={p.id} value={p.id}>
                         <div className="flex items-center gap-2">
                           {hasInventory(p.id) && (
-                            <PackageCheck className="h-3 w-3 text-chart-3 flex-shrink-0" />
+                            <PackageCheck className="h-3 w-3 text-primary flex-shrink-0" />
                           )}
                           <span>{p.customsName}</span>
                           {p.length && p.width && p.height && (
@@ -739,7 +738,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                <PackageCheck className="h-3 w-3 inline text-chart-3 mr-1" />
+                <PackageCheck className="mr-1 inline h-3 w-3 text-primary" />
                 表示有库存
               </p>
             </div>
@@ -752,7 +751,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                     商品规格尺寸（用于3D可视化）
                   </span>
                   {(itemForm.length === 0 || itemForm.width === 0 || itemForm.height === 0) && (
-                    <span className="text-xs text-chart-5">
+                    <span className="text-xs text-primary/80">
                       请填写尺寸以获得准确的3D效果
                     </span>
                   )}
@@ -822,7 +821,7 @@ export default function SalesDetailPage({ params }: PageProps) {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">总价 (USD)</label>
-                <div className="h-10 px-3 py-2 rounded-md border bg-muted/50 text-sm font-medium text-chart-3">
+                <div className="h-10 rounded-md border bg-muted/50 px-3 py-2 text-sm font-medium text-primary">
                   ${(itemForm.unitPrice * itemForm.quantity).toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground">自动计算: 单价 × 数量</p>

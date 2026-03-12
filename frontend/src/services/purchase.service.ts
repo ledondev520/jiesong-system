@@ -2,7 +2,7 @@ import api from '@/lib/axios';
 import type { ApiResponse, PurchaseContract } from '@/types';
 import { createCrudService } from './crudService';
 
-type PurchaseContractQuery = { page?: number; pageSize?: number; keyword?: string };
+type PurchaseContractQuery = { page?: number; pageSize?: number; keyword?: string; lite?: boolean };
 
 export type PurchaseCreateItemPayload = {
   productId: string;

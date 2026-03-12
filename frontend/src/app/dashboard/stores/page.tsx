@@ -40,7 +40,7 @@ export default function StoresPage() {
   const loadStores = async () => {
     setLoading(true);
     try {
-      const response = await storeService.getAll({ page: 1, pageSize: 100 });
+      const response = await storeService.getAll({ page: 1, pageSize: 100, lite: true });
       setStores(response.data?.items || []);
     } catch {
       toast.error('加载门店失败');

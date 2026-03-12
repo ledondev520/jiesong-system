@@ -13,8 +13,9 @@ const list = async (req, res, next) => {
   try {
     const { page, pageSize } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
     const { status, storeId, keyword } = req.query;
+    const lite = req.query.lite === 'true' || req.query.lite === true;
 
-    const result = await salesService.getSalesContracts({ page, pageSize, status, storeId, keyword });
+    const result = await salesService.getSalesContracts({ page, pageSize, status, storeId, keyword, lite });
     paginated(res, result.contracts, result.total, page, pageSize);
   } catch (error) {
     next(error);

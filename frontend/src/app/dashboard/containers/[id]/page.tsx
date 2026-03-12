@@ -87,8 +87,8 @@ export default function ContainerDetailPage({ params }: PageProps) {
     try {
       const [containerRes, productsRes, storesRes] = await Promise.all([
         containerService.getById(id),
-        productService.getAll({ pageSize: 500 }),
-        storeService.getAll({ pageSize: 100 }),
+        productService.getAll({ pageSize: 500, lite: true }),
+        storeService.getAll({ pageSize: 100, lite: true }),
       ]);
       setContainer(containerRes.data);
       setProducts(productsRes.data?.items || []);
@@ -240,7 +240,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Box className="h-5 w-5 text-chart-4" />
+              <Box className="h-5 w-5 text-primary" />
               体积利用率
             </CardTitle>
             <CardDescription>
@@ -255,7 +255,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
               </div>
               <Progress 
                 value={volumePercent} 
-                className={`h-4 ${volumePercent > 90 ? '[&>div]:bg-destructive' : volumePercent > 70 ? '[&>div]:bg-chart-4' : '[&>div]:bg-chart-3'}`}
+                className={`h-4 ${volumePercent > 90 ? '[&>div]:bg-destructive' : '[&>div]:bg-primary'}`}
               />
               <div className="text-right text-sm font-medium">
                 {volumePercent.toFixed(1)}%
@@ -267,7 +267,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Weight className="h-5 w-5 text-chart-5" />
+              <Weight className="h-5 w-5 text-primary" />
               载重利用率
             </CardTitle>
             <CardDescription>
@@ -282,7 +282,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
               </div>
               <Progress 
                 value={weightPercent} 
-                className={`h-4 ${weightPercent > 90 ? '[&>div]:bg-destructive' : weightPercent > 70 ? '[&>div]:bg-chart-4' : '[&>div]:bg-chart-3'}`}
+                className={`h-4 ${weightPercent > 90 ? '[&>div]:bg-destructive' : '[&>div]:bg-primary'}`}
               />
               <div className="text-right text-sm font-medium">
                 {weightPercent.toFixed(1)}%
