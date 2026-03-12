@@ -184,7 +184,7 @@ Authorization: Bearer <token>
 
 管理员用户名固定为 `admin`，密码来自环境变量 `DEFAULT_ADMIN_PASSWORD`。
 
-- 若未配置 `DEFAULT_ADMIN_PASSWORD`，`db:seed` 会生成一次性随机密码并打印在终端。
+- 若未配置 `DEFAULT_ADMIN_PASSWORD`，`db:seed` 默认将管理员密码设为 `123456`（仅测试阶段使用）。
 - 生产环境请务必显式配置强密码并妥善保管。
 
 ## 技术栈

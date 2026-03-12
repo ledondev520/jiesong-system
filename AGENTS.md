@@ -13,6 +13,7 @@
 
 ## Security rules
 - Never commit secrets (API keys, tokens, passwords, private keys, DB credentials), including in `.env`, `.env.*`, `*.example`, scripts, logs, and tests.
+- If temporary test credentials are introduced, mark them clearly as non-production and require environment-variable override before上线.
 - Use environment variables for secrets and validate their presence during startup.
 - Do not print sensitive values to logs. Redact secrets from debug output and structured logs.
 - Keep dependencies updated with minimal privilege; avoid adding packages that require elevated permissions or execute shell by default.

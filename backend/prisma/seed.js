@@ -8,7 +8,6 @@
 
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
 
 const prisma = new PrismaClient();
 
@@ -17,8 +16,7 @@ async function main() {
   
   // 1. 创建管理员用户
   const configuredAdminPassword = process.env.DEFAULT_ADMIN_PASSWORD;
-  const generatedAdminPassword = crypto.randomBytes(12).toString('base64url');
-  const adminPlainPassword = configuredAdminPassword || generatedAdminPassword;
+  const adminPlainPassword = configuredAdminPassword || '123456';
   const adminPassword = await bcrypt.hash(adminPlainPassword, 12);
 
   await prisma.user.upsert({
@@ -34,9 +32,8 @@ async function main() {
   if (configuredAdminPassword) {
     console.log('✓ 管理员用户创建成功 (admin / 来自 DEFAULT_ADMIN_PASSWORD)');
   } else {
-    console.log('✓ 管理员用户创建成功 (admin / 临时随机密码，见下方提示)');
-    console.log(`⚠️  未设置 DEFAULT_ADMIN_PASSWORD，本次随机管理员密码: ${generatedAdminPassword}`);
-    console.log('⚠️  建议立即在 .env 中配置 DEFAULT_ADMIN_PASSWORD 并重新执行 db:seed');
+    console.log('✓ 管理员用户创建成功 (admin / 默认测试密码 123456)');
+    console.log('⚠️  当前为测试模式默认密码，请在生产环境配置 DEFAULT_ADMIN_PASSWORD');
   }
   
   // 2. 创建港口数据

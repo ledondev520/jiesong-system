@@ -34,5 +34,6 @@
 
 ## Operational controls
 - Security-related changes should be documented in this file and reflected in `AGENTS.md` and `data-classification.json`.
+- Temporary test credentials (for example default admin passwords) must be explicitly labeled as non-production and replaced via environment variables before deployment.
 - Any runtime permission tightening should include a clear validation path and migration plan for existing environments.
 - Security failures on启动应优先阻断（尤其生产）而不是继续运行.

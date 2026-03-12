@@ -9,7 +9,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -42,14 +42,19 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 type RememberedUsername = { username: string };
 
 const REMEMBER_USERNAME_KEY = 'jiesong_saved_username';
+const QUICK_LOGIN_USERNAME = 'admin';
+const AUTO_LOGIN_MIN_PASSWORD_LENGTH = 6;
 
 export default function LoginPage() {
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [savedUsername, setSavedUsername] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [isQuickLoginEnabled, setIsQuickLoginEnabled] = useState(false);
+  const passwordInputRef = useRef<HTMLInputElement | null>(null);
+  const autoLoginTimerRef = useRef<number | null>(null);
+  const lastAutoSubmitKeyRef = useRef('');
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -69,7 +74,6 @@ export default function LoginPage() {
         if (parsed.username) {
           form.setValue('username', parsed.username);
           form.setValue('rememberMe', true);
-          setSavedUsername(parsed.username);
         }
       } catch {
         localStorage.removeItem(REMEMBER_USERNAME_KEY);
@@ -85,7 +89,7 @@ export default function LoginPage() {
    * @param {boolean} rememberMe - 是否记住用户名
    * @returns {Promise<void>} 登录流程执行结果
    */
-  const performLogin = async (username: string, password: string, rememberMe: boolean) => {
+  const performLogin = useCallback(async (username: string, password: string, rememberMe: boolean) => {
     setIsLoading(true);
     setError(null);
 
@@ -93,10 +97,8 @@ export default function LoginPage() {
       if (rememberMe) {
         // 安全：只存储用户名，不存储密码
         localStorage.setItem(REMEMBER_USERNAME_KEY, JSON.stringify({ username }));
-        setSavedUsername(username);
       } else {
         localStorage.removeItem(REMEMBER_USERNAME_KEY);
-        setSavedUsername(null);
       }
 
       const result: ApiResponse<LoginResponse> = await authService.login({
@@ -130,7 +132,56 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [login, router]);
+
+  const watchedPassword = form.watch('password');
+
+  useEffect(() => {
+    if (!isQuickLoginEnabled || isLoading) {
+      return;
+    }
+
+    const username = form.getValues('username').trim();
+    const rememberMe = form.getValues('rememberMe');
+    const password = watchedPassword ?? '';
+
+    if (username !== QUICK_LOGIN_USERNAME || password.length < AUTO_LOGIN_MIN_PASSWORD_LENGTH) {
+      lastAutoSubmitKeyRef.current = '';
+      if (autoLoginTimerRef.current !== null) {
+        window.clearTimeout(autoLoginTimerRef.current);
+        autoLoginTimerRef.current = null;
+      }
+      return;
+    }
+
+    const currentKey = `${username}:${password}`;
+    if (currentKey === lastAutoSubmitKeyRef.current) {
+      return;
+    }
+
+    if (autoLoginTimerRef.current !== null) {
+      window.clearTimeout(autoLoginTimerRef.current);
+    }
+
+    autoLoginTimerRef.current = window.setTimeout(() => {
+      lastAutoSubmitKeyRef.current = currentKey;
+      void performLogin(username, password, rememberMe);
+    }, 280);
+
+    return () => {
+      if (autoLoginTimerRef.current !== null) {
+        window.clearTimeout(autoLoginTimerRef.current);
+        autoLoginTimerRef.current = null;
+      }
+    };
+  }, [form, isLoading, isQuickLoginEnabled, performLogin, watchedPassword]);
+
+  useEffect(() => () => {
+    if (autoLoginTimerRef.current !== null) {
+      window.clearTimeout(autoLoginTimerRef.current);
+      autoLoginTimerRef.current = null;
+    }
+  }, []);
 
   /**
    * 职责：提交登录表单并处理登录结果
@@ -142,16 +193,31 @@ export default function LoginPage() {
    * @returns {Promise<void>} 登录流程执行结果
    */
   async function onSubmit(data: LoginFormValues) {
+    if (autoLoginTimerRef.current !== null) {
+      window.clearTimeout(autoLoginTimerRef.current);
+      autoLoginTimerRef.current = null;
+    }
     await performLogin(data.username, data.password, data.rememberMe);
+  }
+
+  function handleQuickLogin() {
+    form.setValue('username', QUICK_LOGIN_USERNAME, { shouldDirty: true, shouldValidate: true });
+    form.setValue('rememberMe', true, { shouldDirty: true });
+    setIsQuickLoginEnabled(true);
+    setError(null);
+    lastAutoSubmitKeyRef.current = '';
+    requestAnimationFrame(() => {
+      passwordInputRef.current?.focus();
+    });
   }
 
   return (
     <div className="auth-shell">
       <Card className="auth-card">
         <CardHeader>
-          <CardTitle className="text-brand-emphasis">系统登录</CardTitle>
+          <CardTitle>快捷登录</CardTitle>
           <CardDescription>
-            请输入您的账号密码以访问系统。
+            点击一键登录后，直接输入密码即可自动登录。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -164,7 +230,11 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>用户名</FormLabel>
                     <FormControl>
-                      <Input placeholder="admin" className="rounded-xl bg-background/70" {...field} />
+                      <Input
+                        placeholder="admin"
+                        className="rounded-xl bg-background/70"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -173,32 +243,39 @@ export default function LoginPage() {
               <FormField
                 control={form.control}
                 name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>密码</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Input
-                          type={showPassword ? 'text' : 'password'}
-                          aria-label="密码"
-                          placeholder="••••••"
-                          className="rounded-xl bg-background/70 pr-10"
-                          {...field}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          aria-label={showPassword ? '隐藏密码' : '显示密码'}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                          tabIndex={-1}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const { ref, ...restField } = field;
+                  return (
+                    <FormItem>
+                      <FormLabel>密码</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Input
+                            type={showPassword ? 'text' : 'password'}
+                            aria-label="密码"
+                            placeholder="••••••"
+                            className="rounded-xl bg-background/70 pr-10"
+                            {...restField}
+                            ref={(node) => {
+                              ref(node);
+                              passwordInputRef.current = node;
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            aria-label={showPassword ? '隐藏密码' : '显示密码'}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            tabIndex={-1}
+                          >
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
               
               <FormField
@@ -227,19 +304,21 @@ export default function LoginPage() {
                 </div>
               )}
 
-              {savedUsername && (
+              <div className="space-y-2 rounded-xl border border-accent/40 bg-accent/10 p-3">
+                <p className="text-sm font-medium text-foreground">快捷登录</p>
                 <Button
                   type="button"
                   variant="outline"
                   className="h-10 w-full rounded-xl border-accent/50 bg-accent/10 text-accent-foreground"
-                  onClick={() => {
-                    form.setValue('username', savedUsername);
-                  }}
+                  onClick={handleQuickLogin}
                   disabled={isLoading}
                 >
-                  使用记住的用户名（{savedUsername}）
+                  一键登录（{QUICK_LOGIN_USERNAME}）
                 </Button>
-              )}
+                <p className="text-xs text-muted-foreground">
+                  一键后直接输入密码，密码达到 {AUTO_LOGIN_MIN_PASSWORD_LENGTH} 位将自动提交。
+                </p>
+              </div>
 
               <Button type="submit" className="h-10 w-full rounded-xl" disabled={isLoading}>
                 {isLoading ? '登录中...' : '登录'}
@@ -262,7 +341,7 @@ export default function LoginPage() {
               </Button>
             </Link>
           </div>
-          <p className="text-center text-sm text-muted-foreground">请使用管理员分配的账号登录。</p>
+          <p className="text-center text-sm text-muted-foreground">测试阶段账号：admin，默认密码：123456。</p>
         </CardFooter>
       </Card>
     </div>

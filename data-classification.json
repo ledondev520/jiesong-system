@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updatedAt": "2026-03-05",
+  "updatedAt": "2026-03-12",
   "owner": "security-team",
   "tiers": [
     {
@@ -10,6 +10,7 @@
       "examples": [
         "API tokens",
         "password hashes and auth signing keys",
+        "temporary default test credentials (for example admin/123456)",
         "database credentials",
         "backend environment overrides containing real secrets",
         "signed legal/financial contract artifacts"

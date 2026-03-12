@@ -46,9 +46,10 @@ describe('LoginPage 交互逻辑', () => {
 
   it('默认渲染登录表单关键元素', () => {
     render(<LoginPage />);
-    expect(screen.getByText('系统登录')).toBeInTheDocument();
+    expect(screen.getByText('点击一键登录后，直接输入密码即可自动登录。')).toBeInTheDocument();
     expect(screen.getByLabelText('用户名')).toBeInTheDocument();
     expect(screen.getByLabelText('密码')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '一键登录（admin）' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '登录' })).toBeInTheDocument();
   });
 
@@ -109,18 +110,29 @@ describe('LoginPage 交互逻辑', () => {
     );
   });
 
-  it('仅记住用户名时不会渲染快捷登录入口', async () => {
-    localStorage.setItem('jiesong_saved_username', JSON.stringify({
-      username: 'xuminjie',
-    }));
-
-    render(<LoginPage />);
-
-    await waitFor(() => {
-      expect(screen.getByLabelText('用户名')).toHaveValue('xuminjie');
+  it('点击一键登录后输入 6 位密码自动提交', async () => {
+    mockAuthServiceLogin.mockResolvedValue({
+      code: 200,
+      data: {
+        user: { id: 'u1', username: 'admin', name: '管理员', role: 'ADMIN' },
+        token: 'token-123',
+      },
     });
 
-    expect(screen.queryByRole('button', { name: /快捷登录/ })).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    render(<LoginPage />);
+
+    await user.click(screen.getByRole('button', { name: '一键登录（admin）' }));
+    expect(screen.getByLabelText('用户名')).toHaveValue('admin');
+    await user.type(screen.getByLabelText('密码'), '123456');
+
+    await waitFor(() => {
+      expect(mockAuthServiceLogin).toHaveBeenCalledWith({
+        username: 'admin',
+        password: '123456',
+      });
+      expect(mockPush).toHaveBeenCalledWith('/');
+    });
   });
 
   it('登录失败时展示错误提示', async () => {
