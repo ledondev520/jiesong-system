@@ -42,6 +42,12 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* 背景渐变颜色 - 基于主题色动态生成 */
+  --gradient-from: color-mix(in oklch, var(--background), transparent 0%);
+  --gradient-to: color-mix(in oklch, var(--background), var(--primary) 3%);
+  --grid-primary: color-mix(in oklch, var(--primary) 3.5%, transparent);
+  --grid-secondary: color-mix(in oklch, var(--primary) 3%, transparent);
 }
 
 @layer base {
@@ -134,18 +140,18 @@
   body {
     @apply bg-background text-foreground antialiased;
     background-image:
-      linear-gradient(to bottom, oklch(0.992 0.002 147.858), oklch(0.985 0.002 147.839) 14rem),
-      linear-gradient(to right, oklch(0.546 0.245 152.881 / 0.035) 1px, transparent 1px),
-      linear-gradient(oklch(0.546 0.245 152.881 / 0.03) 1px, transparent 1px);
+      linear-gradient(to bottom, var(--gradient-from), var(--gradient-to) 14rem),
+      linear-gradient(to right, var(--grid-primary) 1px, transparent 1px),
+      linear-gradient(var(--grid-secondary) 1px, transparent 1px);
     background-size: auto, 24px 24px, 24px 24px;
     background-position: 0 0, 0 0, 0 0;
   }
 
   .dark body {
     background-image:
-      linear-gradient(to bottom, oklch(0.252 0.021 148.334), oklch(0.208 0.021 148.334) 14rem),
-      linear-gradient(to right, oklch(0.523 0.214 139.815 / 0.06) 1px, transparent 1px),
-      linear-gradient(oklch(0.523 0.214 139.815 / 0.05) 1px, transparent 1px);
+      linear-gradient(to bottom, var(--gradient-to), var(--gradient-from) 14rem),
+      linear-gradient(to right, color-mix(in oklch, var(--primary) 6%, transparent) 1px, transparent 1px),
+      linear-gradient(color-mix(in oklch, var(--primary) 5%, transparent) 1px, transparent 1px);
   }
 
   h1,
@@ -186,14 +192,14 @@
 
   .surface-mesh {
     background-image:
-      linear-gradient(180deg, oklch(0 0 0 / 0.018), transparent 5rem),
-      radial-gradient(circle at top left, oklch(0 0 0 / 0.025), transparent 40%);
+      linear-gradient(180deg, var(--foreground) / 0.018, transparent 5rem),
+      radial-gradient(circle at top left, var(--foreground) / 0.025, transparent 40%);
   }
 
   .dark .surface-mesh {
     background-image:
-      linear-gradient(180deg, oklch(1 0 0 / 0.03), transparent 5rem),
-      radial-gradient(circle at top left, oklch(1 0 0 / 0.04), transparent 40%);
+      linear-gradient(180deg, var(--foreground) / 0.03, transparent 5rem),
+      radial-gradient(circle at top left, var(--foreground) / 0.04, transparent 40%);
   }
 
   .kpi-card {
@@ -208,15 +214,15 @@
     content: "";
     @apply pointer-events-none absolute inset-0;
     background-image:
-      linear-gradient(to right, oklch(0 0 0 / 0.03) 1px, transparent 1px),
-      linear-gradient(oklch(0 0 0 / 0.03) 1px, transparent 1px);
+      linear-gradient(to right, var(--foreground) / 0.03 1px, transparent 1px),
+      linear-gradient(var(--foreground) / 0.03 1px, transparent 1px);
     background-size: 28px 28px;
   }
 
   .dark .auth-shell::before {
     background-image:
-      linear-gradient(to right, oklch(1 0 0 / 0.04) 1px, transparent 1px),
-      linear-gradient(oklch(1 0 0 / 0.04) 1px, transparent 1px);
+      linear-gradient(to right, var(--foreground) / 0.04 1px, transparent 1px),
+      linear-gradient(var(--foreground) / 0.04 1px, transparent 1px);
   }
 
   .auth-card {
