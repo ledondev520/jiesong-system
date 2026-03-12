@@ -13,13 +13,13 @@ import { cn } from "@/lib/utils";
 const semanticBadgeVariants = cva("", {
   variants: {
     tone: {
-      neutral: "bg-muted text-muted-foreground border border-border/70",
-      info: "bg-primary/16 text-primary border border-primary/35",
-      warning: "bg-chart-4/16 text-chart-4 border border-chart-4/35",
-      progress: "bg-chart-1/16 text-chart-1 border border-chart-1/35",
-      success: "bg-chart-3/16 text-chart-3 border border-chart-3/35",
-      danger: "bg-destructive/14 text-destructive border border-destructive/30",
-      secondary: "bg-secondary text-secondary-foreground border border-border/70",
+      neutral: "border-border bg-muted text-muted-foreground",
+      info: "border-primary/20 bg-primary/10 text-primary",
+      warning: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200",
+      progress: "border-primary/20 bg-primary/10 text-primary",
+      success: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200",
+      danger: "border-destructive/20 bg-destructive/10 text-destructive",
+      secondary: "border-border bg-secondary text-secondary-foreground",
     },
   },
   defaultVariants: {
@@ -42,4 +42,3 @@ export function SemanticBadge({
 }: SemanticBadgeProps) {
   return <Badge className={cn(semanticBadgeVariants({ tone }), className)} {...props} />;
 }
-

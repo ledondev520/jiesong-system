@@ -1,9 +1,15 @@
-# Security Operating Notes
+# Security & Development Operating Notes
 
 ## Scope
 - Applies to the whole repository rooted at `/Users/helena/Cursor/jiesong_system`.
 - Security requirements are mandatory for code, scripts, docs, and operational procedures.
 - All automation and scripts in this repo should follow the controls below unless explicitly overridden by an approved incident procedure.
+
+## UI Design System (强制)
+- **所有前端页面开发必须遵循 SHADCN/UI 设计风格**.
+- 优先使用 shadcn/ui 组件库 (https://ui.shadcn.com)，禁止自行造轮子.
+- 设计 Token（颜色、间距、字体、圆角、阴影）必须与 shadcn/ui theme 保持一致.
+- 自定义组件必须基于 shadcn/ui 的设计规范扩展.
 
 ## Security rules
 - Never commit secrets (API keys, tokens, passwords, private keys, DB credentials), including in `.env`, `.env.*`, `*.example`, scripts, logs, and tests.

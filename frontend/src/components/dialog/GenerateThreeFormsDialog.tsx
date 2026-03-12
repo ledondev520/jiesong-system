@@ -39,6 +39,7 @@ interface GenerateThreeFormsDialogProps {
 }
 
 interface ProductWithHSCode extends PackingItem {
+  productName: string;
   hsCodeMatch?: BatchHsCodeMatchResult;
 }
 
@@ -97,7 +98,6 @@ export function GenerateThreeFormsDialog({
       setStep('preview');
       setProducts([]);
       setSelectedForms(['customs', 'forex', 'tax-refund']);
-      setGeneratedIds({});
     } else {
       initializeProducts();
     }
@@ -173,9 +173,14 @@ export function GenerateThreeFormsDialog({
 
       const response = await threeFormsService.generateThreeForms(payload);
       const results = response.data || {};
+      const generatedFormIds = {
+        customsDeclarationId: results.customsDeclarationId ?? undefined,
+        forexId: results.forexId ?? undefined,
+        taxRefundId: results.taxRefundId ?? undefined,
+      };
 
       toast.success(`生成成功：${Object.keys(results).length} 张单据`);
-      onGenerated?.(results);
+      onGenerated?.(generatedFormIds);
       handleOpenChange(false);
     } catch {
       toast.error('生成单据失败');

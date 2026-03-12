@@ -1,3 +1,31 @@
+# 2026-03-12 Round 8: Global shadcn/ui visual baseline unification
+
+## Goal
+- Re-align the frontend's shared visual system with the shadcn/ui baseline across the whole app, not just `/dashboard`.
+- Reduce design drift by moving global tokens, layout chrome, and shared primitives back to a neutral shadcn-style shell.
+- Keep future theme/palette work cheap by concentrating appearance in semantic CSS variables and shared UI primitives.
+
+## Execution Outcome
+- Reworked the shared theme surface in `src/app/globals.css` so cards, borders, muted backgrounds, sidebar, auth pages, and body background all use a simpler shadcn-style neutral palette.
+- Refined the shared primitive layer in `src/components/ui/*` (`button`, `card`, `input`, `table`) to remove the heavier custom gloss and match the flatter shadcn interaction model.
+- Updated the global shell in `src/app/dashboard/layout.tsx`, `src/components/layout/Header.tsx`, `src/components/layout/Sidebar.tsx`, `src/components/layout/PageHeader.tsx`, and `src/components/layout/ThemeToggle.tsx`.
+- Pulled the highest-traffic surfaces back into the same system: `src/app/dashboard/page.tsx`, `src/components/dashboard/DataDashboard.tsx`, `src/components/tools/ProductTracker.tsx`, and `src/components/ai/AIGreeting.tsx`.
+- Cleared unrelated build blockers discovered during verification in:
+  - `src/app/(auth)/login/page.tsx`
+  - `src/app/customs-declarations/components/CustomsDeclarationForm.tsx`
+  - `src/app/dashboard/inventory/page.tsx`
+  - `src/components/dialog/GenerateThreeFormsDialog.tsx`
+
+## Verification
+- `npm test -- src/components/layout/Header.test.tsx src/components/layout/Sidebar.test.tsx src/components/layout/ThemeToggle.test.tsx src/app/dashboard/layout.test.tsx src/app/page.test.tsx src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.test.tsx src/components/tools/ProductTracker.test.tsx src/components/ai/AIGreeting.test.tsx`
+- `npm test -- src/app/dashboard/inventory/page.test.tsx`
+- `npm run lint -- src/components/ui/button.tsx src/components/ui/card.tsx src/components/ui/input.tsx src/components/ui/table.tsx src/components/layout/Sidebar.tsx src/components/layout/Header.tsx src/components/layout/ThemeToggle.tsx src/components/layout/PageHeader.tsx src/app/dashboard/layout.tsx src/app/dashboard/page.tsx src/components/dashboard/DataDashboard.tsx src/components/tools/ProductTracker.tsx src/components/ai/AIGreeting.tsx src/components/layout/Sidebar.test.tsx src/app/(auth)/login/page.tsx`
+- `npm run build`
+
+## Phase Boundary
+- This round establishes the global shadcn-style baseline and fixes the production build blockers uncovered by verification.
+- Follow-up work should focus on page-by-page cleanup where older feature slices still layer custom one-off styling on top of the shared shell.
+
 # Customs Declaration Management
 
 ## 2026-03-12 Round 7: Frontend Coverage 98 Phase 1 Baseline

@@ -28,6 +28,10 @@ import {
   FileText,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/layout/PageHeader';
 import {
   previewCSV,
   executeImport,
@@ -162,31 +166,19 @@ export default function DataImportPage() {
   // ==================== 渲染部分 ====================
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* 页面标题 */}
-        <div className="mb-8">
-          <button 
-            onClick={() => router.push('/dashboard/settings?tab=import')}
-            className="flex items-center gap-1 text-muted-foreground hover:text-foreground mb-4 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            返回
-          </button>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-            <FileSpreadsheet className="w-8 h-8 text-chart-3" />
-            数据导入中心
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            上传CSV文件，系统将自动对比并导入新增数据
-          </p>
-        </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="数据导入中心"
+        description="上传 CSV，预览新增差异，再用统一流程导入业务数据。"
+        backHref="/dashboard/settings?tab=import"
+      />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 主区域 */}
           <div className="lg:col-span-2 space-y-6">
             {/* 步骤指示器 */}
-            <div className="bg-card/70 backdrop-blur border border-border/70 rounded-xl p-4">
+            <Card>
+              <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 {[
                   { key: 'upload', label: '上传文件', icon: Upload },
@@ -195,9 +187,9 @@ export default function DataImportPage() {
                   { key: 'result', label: '完成', icon: CheckCircle },
                 ].map((s, i) => (
                   <div key={s.key} className="flex items-center">
-                    <div className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                    <div className={`flex items-center gap-2 rounded-lg px-4 py-2 transition-colors ${
                       step === s.key 
-                        ? 'bg-chart-3/20 text-chart-3 border border-chart-3/30' 
+                        ? 'border border-primary/20 bg-primary/10 text-primary' 
                         : 'text-muted-foreground'
                     }`}>
                       <s.icon className={`w-5 h-5 ${step === s.key && s.key === 'importing' ? 'animate-spin' : ''}`} />
@@ -207,23 +199,26 @@ export default function DataImportPage() {
                   </div>
                 ))}
               </div>
-            </div>
+              </CardContent>
+            </Card>
 
             {/* 错误提示 */}
             {error && (
-              <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 flex items-center gap-3">
+              <Card className="border-destructive/30 bg-destructive/10">
+                <CardContent className="flex items-center gap-3 p-4">
                 <XCircle className="w-5 h-5 text-destructive flex-shrink-0" />
                 <span className="text-destructive">{error}</span>
-              </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* 上传区域 */}
             {step === 'upload' && (
-              <div 
-                className={`bg-card/70 backdrop-blur border-2 border-dashed rounded-xl p-12 text-center transition-all ${
+              <Card 
+                className={`border-2 border-dashed text-center transition-colors ${
                   dragActive 
-                    ? 'border-chart-3 bg-chart-3/10' 
-                    : 'border-border/65 hover:border-border/70'
+                    ? 'border-primary bg-primary/5' 
+                    : 'border-border hover:border-primary/40'
                 }`}
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}
@@ -238,7 +233,8 @@ export default function DataImportPage() {
                   onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
                 />
                 
-                <Upload className={`w-16 h-16 mx-auto mb-4 ${dragActive ? 'text-chart-3' : 'text-muted-foreground'}`} />
+                <CardContent className="p-12">
+                <Upload className={`w-16 h-16 mx-auto mb-4 ${dragActive ? 'text-primary' : 'text-muted-foreground'}`} />
                 
                 <h3 className="text-xl font-semibold text-foreground mb-2">
                   {loading ? '正在解析...' : '拖拽CSV文件到这里'}
@@ -247,10 +243,9 @@ export default function DataImportPage() {
                   或者点击按钮选择文件
                 </p>
                 
-                <button
+                <Button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={loading}
-                  className="px-6 py-3 bg-chart-3 hover:bg-chart-3/90 text-foreground rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <span className="flex items-center gap-2">
@@ -260,12 +255,13 @@ export default function DataImportPage() {
                   ) : (
                     '选择文件'
                   )}
-                </button>
+                </Button>
                 
                 <p className="text-muted-foreground text-sm mt-4">
                   支持格式：CSV（与出货汇总表格式一致）
                 </p>
-              </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* 预览区域 */}

@@ -37,13 +37,13 @@ const categoryIcons: Record<string, typeof Package> = {
 
 // 分类颜色映射
 const categoryColors: Record<string, string> = {
-  '餐厅设备': 'border-destructive/35 bg-destructive/8',
-  '餐具用品': 'border-primary/35 bg-primary/7',
-  '装修材料': 'border-chart-5/35 bg-chart-5/10',
-  '灯具照明': 'border-chart-4/35 bg-chart-4/10',
-  '家具家居': 'border-chart-1/35 bg-chart-1/10',
-  '后厨设备': 'border-chart-3/35 bg-chart-3/10',
-  '其他配件': 'border-border/80 bg-muted/30',
+  '餐厅设备': 'border-primary/20 bg-primary/5',
+  '餐具用品': 'border-primary/20 bg-primary/5',
+  '装修材料': 'border-primary/20 bg-primary/5',
+  '灯具照明': 'border-primary/20 bg-primary/5',
+  '家具家居': 'border-primary/20 bg-primary/5',
+  '后厨设备': 'border-primary/20 bg-primary/5',
+  '其他配件': 'border-border bg-muted/30',
 };
 
 export default function StoreRecommendPage() {
@@ -88,8 +88,8 @@ export default function StoreRecommendPage() {
         description={`基于 ${recommendation?.referenceStoreCount || 0} 家门店的历史采购数据，为新门店生成采购建议`}
       />
 
-      <Tabs defaultValue="recommend">
-        <TabsList className="rounded-xl border border-border/70 bg-background/60">
+      <Tabs defaultValue="recommend" className="space-y-6">
+        <TabsList className="border bg-background">
           <TabsTrigger value="recommend" className="gap-2">
             <Sparkles className="h-4 w-4" />
             新店采购清单
@@ -106,7 +106,7 @@ export default function StoreRecommendPage() {
             <>
               {/* 概览卡片 */}
               <div className="grid gap-4 md:grid-cols-4">
-                <Card className="border-primary/20 bg-primary/5">
+                <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                       <Store className="h-4 w-4" />
@@ -130,32 +130,32 @@ export default function StoreRecommendPage() {
                     <p className="text-xs text-muted-foreground">种商品</p>
                   </CardContent>
                 </Card>
-                <Card className="border-chart-3/35 bg-chart-3/10">
+                <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2 text-chart-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
                       <DollarSign className="h-4 w-4" />
                       预估总投入
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-chart-3">
+                    <div className="text-3xl font-bold text-primary">
                       ${recommendation.totalEstimatedCost.toLocaleString()}
                     </div>
-                    <p className="text-xs text-chart-3/70">美金</p>
+                    <p className="text-xs text-muted-foreground">美金</p>
                   </CardContent>
                 </Card>
-                <Card className="border-chart-5/35 bg-chart-5/10">
+                <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2 text-chart-5">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4" />
                       必备商品
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-chart-5">
+                    <div className="text-3xl font-bold text-primary">
                       {recommendation.recommendations.filter(r => r.priority === '强烈建议').length}
                     </div>
-                    <p className="text-xs text-chart-5/70">种（50%+门店购买）</p>
+                    <p className="text-xs text-muted-foreground">种（50%+门店购买）</p>
                   </CardContent>
                 </Card>
               </div>
@@ -183,7 +183,7 @@ export default function StoreRecommendPage() {
                         <CardDescription className="flex justify-between">
                           <span>预估: ${categoryTotal.toLocaleString()}</span>
                           {mustHave.length > 0 && (
-                            <span className="text-chart-5">必备{mustHave.length}种</span>
+                            <span className="text-primary">必备{mustHave.length}种</span>
                           )}
                         </CardDescription>
                       </CardHeader>
@@ -193,12 +193,12 @@ export default function StoreRecommendPage() {
                             <div 
                               key={item.productId} 
                               className={`flex items-center justify-between p-2 rounded text-sm ${
-                                item.priority === '强烈建议' ? 'bg-card/92 border border-chart-5/35' : 'bg-card/75'
+                                item.priority === '强烈建议' ? 'bg-card border border-primary/20' : 'bg-card/70'
                               }`}
                             >
                               <div className="flex items-center gap-2">
                                 {item.priority === '强烈建议' && (
-                                  <Star className="h-3.5 w-3.5 fill-chart-5 text-chart-5" />
+                                  <Star className="h-3.5 w-3.5 fill-primary text-primary" />
                                 )}
                                 <span className="truncate max-w-[120px]">{item.productName}</span>
                               </div>
@@ -219,7 +219,7 @@ export default function StoreRecommendPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-chart-5" />
+                    <CheckCircle2 className="h-5 w-5 text-primary" />
                     必备商品清单
                   </CardTitle>
                   <CardDescription>
@@ -245,7 +245,7 @@ export default function StoreRecommendPage() {
                         .map((item) => (
                           <TableRow key={item.productId}>
                             <TableCell className="font-medium">
-                              <Star className="mr-1 inline h-3.5 w-3.5 fill-chart-5 text-chart-5" />
+                              <Star className="mr-1 inline h-3.5 w-3.5 fill-primary text-primary" />
                               {item.productName}
                             </TableCell>
                             <TableCell>
@@ -255,7 +255,7 @@ export default function StoreRecommendPage() {
                               <div className="flex items-center justify-center gap-1">
                                 <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
                                   <div 
-                                    className="h-full bg-chart-5 rounded-full"
+                                    className="h-full bg-primary rounded-full"
                                     style={{ width: `${item.frequency}%` }}
                                   />
                                 </div>
@@ -264,7 +264,7 @@ export default function StoreRecommendPage() {
                             </TableCell>
                             <TableCell className="text-right">{item.suggestedQuantity}</TableCell>
                             <TableCell className="text-right">${item.avgUnitPrice}</TableCell>
-                            <TableCell className="text-right font-medium text-chart-3">
+                            <TableCell className="text-right font-medium text-primary">
                               ${item.estimatedCost.toLocaleString()}
                             </TableCell>
                           </TableRow>
@@ -293,7 +293,7 @@ export default function StoreRecommendPage() {
                 <CardTitle className="text-sm font-medium">总采购金额</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-chart-3">
+                <div className="text-2xl font-bold text-primary">
                   ${storeStats.reduce((sum, s) => sum + s.totalAmount, 0).toLocaleString()}
                 </div>
               </CardContent>
@@ -334,7 +334,7 @@ export default function StoreRecommendPage() {
                     <TableRow key={store.storeId}>
                       <TableCell className="font-medium">{store.storeName}</TableCell>
                       <TableCell className="text-right">{store.productCount}</TableCell>
-                      <TableCell className="text-right text-chart-3">
+                      <TableCell className="text-right text-primary">
                         ${store.totalAmount.toLocaleString()}
                       </TableCell>
                       <TableCell>

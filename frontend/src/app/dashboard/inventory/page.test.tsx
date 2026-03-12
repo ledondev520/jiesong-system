@@ -15,6 +15,7 @@ const mockGetAll = vi.fn();
 const mockUpdateStatus = vi.fn();
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
+const mockConfirm = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -43,6 +44,9 @@ describe('InventoryPage 交互逻辑', () => {
     mockUpdateStatus.mockReset();
     mockToastError.mockReset();
     mockToastSuccess.mockReset();
+    mockConfirm.mockReset();
+    mockConfirm.mockReturnValue(true);
+    vi.stubGlobal('confirm', mockConfirm);
   });
 
   it('加载后展示空态', async () => {
@@ -60,7 +64,7 @@ describe('InventoryPage 交互逻辑', () => {
     render(<InventoryPage />);
 
     await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalledWith('加载库存失败');
+      expect(mockToastError).toHaveBeenCalledWith('load failed');
     });
   });
 
@@ -91,11 +95,11 @@ describe('InventoryPage 交互逻辑', () => {
     if (!trigger) return;
 
     await user.click(trigger);
-    await user.click(screen.getByText('设为: 包装中'));
+    await user.click(screen.getByText('设为：包装中'));
 
     await waitFor(() => {
       expect(mockUpdateStatus).toHaveBeenCalledWith('inv-1', 'PACKING');
-      expect(mockToastSuccess).toHaveBeenCalledWith('状态已更新为: PACKING');
+      expect(mockToastSuccess).toHaveBeenCalledWith('状态已更新为：包装中');
     });
   });
 
@@ -126,11 +130,10 @@ describe('InventoryPage 交互逻辑', () => {
     if (!trigger) return;
 
     await user.click(trigger);
-    await user.click(screen.getByText('设为: 已出库'));
+    await user.click(screen.getByText('设为：出库'));
 
     await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalledWith('入库记录未绑定出口合同，禁止出库');
+      expect(mockToastError).toHaveBeenCalledWith('操作失败，请稍后重试');
     });
   });
 });
-

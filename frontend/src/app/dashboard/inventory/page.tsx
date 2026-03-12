@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Inventory, InventoryStatus, Product } from '@/types';
+import { Inventory, InventoryStatus } from '@/types';
 import { inventoryService } from '@/services/inventory.service';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +25,9 @@ import { MoreHorizontal, Package } from 'lucide-react';
 import { toast } from 'sonner';
 
 const STATUS_LABEL_MAP: Record<InventoryStatus, string> = {
+  [InventoryStatus.PRODUCING]: '生产中',
+  [InventoryStatus.PACKING]: '包装中',
+  [InventoryStatus.SHIPPING]: '运输中',
   [InventoryStatus.INBOUND]: '入库',
   [InventoryStatus.OUTBOUND]: '出库',
 };
@@ -35,6 +38,9 @@ const getStatusBadgeTone = (status: InventoryStatus): 'default' | 'secondary' | 
       return 'default';
     case InventoryStatus.OUTBOUND:
       return 'secondary';
+    case InventoryStatus.PRODUCING:
+    case InventoryStatus.PACKING:
+    case InventoryStatus.SHIPPING:
     default:
       return 'outline';
   }
@@ -55,8 +61,8 @@ export default function InventoryPage() {
 
   const loadInventory = async () => {
     try {
-      const data = await inventoryService.list();
-      setInventory(data);
+      const response = await inventoryService.getAll();
+      setInventory(response.data.items);
     } catch (error) {
       toast.error(resolveErrorMessage(error));
     } finally {
@@ -73,6 +79,9 @@ export default function InventoryPage() {
    */
   const getAllowedNextStatuses = (status: InventoryStatus): InventoryStatus[] => {
     const transitionMap: Record<InventoryStatus, InventoryStatus[]> = {
+      [InventoryStatus.PRODUCING]: [InventoryStatus.PACKING],
+      [InventoryStatus.PACKING]: [InventoryStatus.SHIPPING],
+      [InventoryStatus.SHIPPING]: [InventoryStatus.INBOUND],
       [InventoryStatus.INBOUND]: [InventoryStatus.OUTBOUND],
       [InventoryStatus.OUTBOUND]: [],
     };

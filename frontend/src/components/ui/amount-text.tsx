@@ -14,8 +14,8 @@ const amountTextVariants = cva("font-medium", {
     tone: {
       neutral: "text-foreground",
       info: "text-primary",
-      warning: "text-chart-5",
-      success: "text-chart-3",
+      warning: "text-amber-600 dark:text-amber-300",
+      success: "text-emerald-600 dark:text-emerald-300",
       danger: "text-destructive",
     },
     size: {
@@ -47,4 +47,3 @@ export function AmountText({
 }: AmountTextProps) {
   return <span className={cn(amountTextVariants({ tone, size }), className)} {...props} />;
 }
-
