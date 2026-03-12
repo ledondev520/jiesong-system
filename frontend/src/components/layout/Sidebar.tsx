@@ -38,6 +38,8 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 
 const navItems = [
   // 核心业务模块
@@ -90,6 +92,12 @@ export function Sidebar() {
   const isAdmin = user?.role === 'ADMIN';
 
   const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
+  const primaryItems = visibleNavItems.filter(
+    (item) => !item.adminOnly && item.href !== '/dashboard/settings' && item.href !== '/dashboard/hs-codes',
+  );
+  const managementItems = visibleNavItems.filter(
+    (item) => item.adminOnly || item.href === '/dashboard/settings' || item.href === '/dashboard/hs-codes',
+  );
 
   const isActiveItem = (item: typeof navItems[0]) => {
     if (item.exact) {
@@ -98,61 +106,88 @@ export function Sidebar() {
     return pathname.startsWith(item.href);
   };
 
+  const renderNavItem = (item: typeof navItems[0]) => (
+    <div key={item.href}>
+      <Link
+        href={item.href}
+        className={cn(
+          'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors',
+          isActiveItem(item)
+            ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+            : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+        )}
+      >
+        <item.icon className="h-4 w-4" />
+        <span className="flex-1">{item.label}</span>
+        {item.children ? <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">管理</Badge> : null}
+      </Link>
+
+      {item.children && isActiveItem(item) && (
+        <div className="ml-4 mt-1 grid gap-1 border-l pl-4">
+          {item.children.map((child) => (
+            <Link
+              key={child.href}
+              href={child.href}
+              className={cn(
+                'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                pathname === child.href
+                  ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+              )}
+            >
+              <child.icon className="h-3.5 w-3.5" />
+              <span>{child.label}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex h-14 items-center border-b border-sidebar-border px-4">
-        <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-          <Ship className="h-6 w-6" />
-          <span>捷淞系统</span>
+      <div className="flex h-16 items-center border-b border-sidebar-border px-5">
+        <Link href="/dashboard" className="flex items-center gap-3 font-semibold tracking-tight">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+            <Ship className="h-4 w-4" />
+          </span>
+          <div className="grid gap-0.5">
+            <span>捷淞系统</span>
+            <span className="text-xs font-normal text-muted-foreground">Import & Export</span>
+          </div>
         </Link>
       </div>
 
-      <div className="flex-1 overflow-auto py-4">
-        <nav className="grid gap-1 px-2">
-          {visibleNavItems.map((item) => (
-            <div key={item.href}>
-              <Link
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200',
-                  isActiveItem(item)
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                    : 'text-sidebar-foreground/72 hover:bg-sidebar-accent/75 hover:text-sidebar-accent-foreground'
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                <span>{item.label}</span>
-              </Link>
-              
-              {/* 子菜单（如果有） */}
-              {item.children && isActiveItem(item) && (
-                <div className="ml-6 mt-1 grid gap-1">
-                  {item.children.map((child) => (
-                    <Link
-                      key={child.href}
-                      href={child.href}
-                      className={cn(
-                        'flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-all duration-200',
-                        pathname === child.href
-                          ? 'bg-sidebar-accent/50 text-sidebar-accent-foreground font-medium'
-                          : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
-                      )}
-                    >
-                      <child.icon className="h-3 w-3" />
-                      <span>{child.label}</span>
-                    </Link>
-                  ))}
-                </div>
-              )}
+      <ScrollArea className="flex-1">
+        <div className="space-y-6 px-3 py-4">
+          <div className="space-y-2">
+            <div className="px-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              核心业务
             </div>
-          ))}
-        </nav>
-      </div>
+            <nav className="grid gap-1">
+              {primaryItems.map(renderNavItem)}
+            </nav>
+          </div>
 
-      <div className="border-t border-sidebar-border p-4">
+          <div className="space-y-2">
+            <div className="px-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              系统与配置
+            </div>
+            <nav className="grid gap-1">
+              {managementItems.map(renderNavItem)}
+            </nav>
+          </div>
+        </div>
+      </ScrollArea>
+
+      <div className="space-y-3 border-t border-sidebar-border p-4">
+        <div className="rounded-lg border bg-background px-3 py-2">
+          <div className="text-sm font-medium">{user?.name || '当前用户'}</div>
+          <div className="text-xs text-muted-foreground">{isAdmin ? '管理员权限' : '标准权限'}</div>
+        </div>
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 text-sidebar-foreground/72 hover:bg-sidebar-accent/75 hover:text-sidebar-accent-foreground"
+          className="w-full justify-start gap-3 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           onClick={() => logout()}
         >
           <LogOut className="h-4 w-4" />

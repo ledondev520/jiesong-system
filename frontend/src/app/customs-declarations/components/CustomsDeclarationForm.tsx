@@ -193,10 +193,10 @@ export function CustomsDeclarationForm({
         append({
           productName: result.match.productName,
           hsCode: result.match.hsCode,
-          quantity: 1,
+          quantity: '1',
           unit: result.match.unit || '',
-          unitPrice: 0,
-          totalPrice: 0,
+          unitPrice: '0',
+          totalPrice: '0',
         });
       }
     });

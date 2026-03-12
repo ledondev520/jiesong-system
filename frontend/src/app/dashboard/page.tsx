@@ -11,7 +11,7 @@
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, TrendingUp, Plus } from 'lucide-react';
+import { ShoppingCart, TrendingUp, Plus, ArrowRight } from 'lucide-react';
 import { ProductTracker } from '@/components/tools/ProductTracker';
 import { AIGreeting } from '@/components/ai/AIGreeting';
 import { DataDashboard } from '@/components/dashboard/DataDashboard';
@@ -52,17 +52,17 @@ export default function DashboardPage() {
 
       <PageHeader
         title="工作台"
-        description="欢迎回来，开始今天的经营任务与核心指标追踪"
+        description="查看关键经营指标，并从这里进入高频业务流程。"
       />
 
       {/* 快速录入区 */}
-      <Card className="surface-panel surface-mesh border-primary/35">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-brand-emphasis text-lg flex items-center gap-2">
+      <Card>
+        <CardHeader className="border-b pb-4">
+          <CardTitle className="flex items-center gap-2 text-base">
             <Plus className="h-5 w-5" />
             快速录入
           </CardTitle>
-          <CardDescription>一键开始录入新数据</CardDescription>
+          <CardDescription>用统一入口创建采购和销售业务。</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 md:grid-cols-2">
@@ -72,12 +72,19 @@ export default function DashboardPage() {
                 <Button
                   key={action.label}
                   variant={action.tone === 'primary' ? 'default' : 'secondary'}
-                  className="h-auto min-h-24 flex-col gap-2 rounded-2xl border border-border/50 py-4 shadow-[0_8px_20px_oklch(0.06_0.01_260_/_0.28)] transition-all duration-200 hover:-translate-y-0.5"
+                  className="h-auto min-h-28 items-start justify-start rounded-xl border border-border bg-background px-4 py-4 text-left shadow-none"
                   onClick={() => router.push(action.href)}
                 >
-                  <Icon className="h-6 w-6" />
-                  <span className="font-medium">{action.label}</span>
-                  <span className="text-xs opacity-75">{action.desc}</span>
+                  <div className="flex w-full items-center justify-between">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-background text-foreground ring-1 ring-border">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="block font-medium">{action.label}</span>
+                    <span className="block text-xs text-muted-foreground">{action.desc}</span>
+                  </div>
                 </Button>
               );
             })}

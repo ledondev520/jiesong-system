@@ -66,9 +66,9 @@ export function DataDashboard() {
   return (
     <div className="space-y-6">
       {/* 核心指标卡片 */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {/* 采购合同 */}
-        <Card className="kpi-card surface-mesh">
+        <Card className="kpi-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">采购合同</CardTitle>
             <FileText className="h-4 w-4 text-chart-1" />
@@ -102,13 +102,13 @@ export function DataDashboard() {
         </Card>
 
         {/* 应收账款 */}
-        <Card className="kpi-card border-chart-5/40 bg-chart-5/12">
+        <Card className="kpi-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">应收账款</CardTitle>
             <DollarSign className="h-4 w-4 text-chart-5" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-chart-5">
+            <div className="text-2xl font-bold">
               ${data.contracts.sales.receivable.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -138,7 +138,7 @@ export function DataDashboard() {
       {/* 图表区域 */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* 月度出货趋势（折线图） */}
-        <Card className="surface-panel">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">月度出货趋势</CardTitle>
             <CardDescription>最近6个月出货金额</CardDescription>
@@ -149,7 +149,7 @@ export function DataDashboard() {
             ) : (
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={[...data.shipments.monthly].reverse()}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis 
                     dataKey="month" 
                     tick={{ fontSize: 12 }} 
@@ -178,7 +178,7 @@ export function DataDashboard() {
         </Card>
 
         {/* 门店采购排行（柱形图） */}
-        <Card className="surface-panel">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">门店采购排行</CardTitle>
             <CardDescription>Top 5 门店采购金额</CardDescription>
@@ -189,7 +189,7 @@ export function DataDashboard() {
             ) : (
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={data.storeStats.slice(0, 5)} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis 
                     type="number"
                     tick={{ fontSize: 12 }}
@@ -218,7 +218,7 @@ export function DataDashboard() {
       </div>
 
       {/* 热门商品（柱形图） */}
-      <Card className="surface-panel">
+      <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">热门采购商品 Top 10</CardTitle>
           <CardDescription>按采购金额排序</CardDescription>
@@ -229,7 +229,7 @@ export function DataDashboard() {
           ) : (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={data.topProducts.slice(0, 10)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis 
                   dataKey="productName" 
                   tick={{ fontSize: 10 }}

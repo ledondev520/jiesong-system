@@ -39,6 +39,7 @@ const loginSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
+type RememberedUsername = { username: string };
 
 const REMEMBER_USERNAME_KEY = 'jiesong_saved_username';
 

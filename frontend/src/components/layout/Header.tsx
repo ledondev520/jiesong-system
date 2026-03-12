@@ -25,6 +25,7 @@ import { UserCircle, Bell, Search, Package, FileText, Container, Building2, Load
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import api from '@/lib/axios';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import type {
   ApiResponse,
   PaginatedResponse,
@@ -264,21 +265,25 @@ export function Header() {
     }
   };
 
+  const initials = (user?.name || user?.username || '用')
+    .slice(0, 2)
+    .toUpperCase();
+
   return (
-    <header className="surface-panel surface-mesh flex h-16 items-center gap-4 border-border/65 px-4 md:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-6">
       <div className="flex flex-1 items-center gap-4">
-        <div className="hidden items-center gap-2 rounded-xl border border-border/70 bg-background/60 px-3 py-2 text-xs text-muted-foreground lg:flex">
-          <CalendarDays className="text-brand-emphasis-soft h-3.5 w-3.5" />
+        <div className="hidden items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-xs text-muted-foreground lg:flex">
+          <CalendarDays className="h-3.5 w-3.5" />
           <span>{todayLabel}</span>
         </div>
 
         {/* Global Search */}
-        <div ref={searchRef} className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+        <div ref={searchRef} className="relative w-full max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
             placeholder="搜索商品、供应商、货柜..."
-            className="h-10 rounded-xl border-border/70 bg-background/70 pl-9"
+            className="h-10 bg-background pl-9"
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -289,7 +294,7 @@ export function Header() {
           
           {/* 搜索结果下拉 */}
           {showResults && (searchQuery.length >= 2 || isSearching) && (
-            <div className="surface-panel absolute left-0 right-0 top-full z-50 mt-2 max-h-80 overflow-y-auto rounded-xl">
+            <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-80 overflow-y-auto rounded-xl border bg-popover shadow-md">
               {isSearching ? (
                 <div className="flex items-center justify-center py-4 text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -300,7 +305,7 @@ export function Header() {
                   {searchResults.map((result, index) => (
                     <button
                       key={`${result.type}-${result.id}-${index}`}
-                      className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-accent/15"
+                      className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-accent"
                       onClick={() => handleResultClick(result)}
                     >
                       {getIcon(result.type)}
@@ -326,13 +331,13 @@ export function Header() {
         </div>
       </div>
       
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2">
         <ThemeToggle />
 
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative rounded-full border border-border/60 bg-background/50">
+            <Button variant="outline" size="icon" className="relative h-9 w-9 rounded-md">
               <Bell className="h-5 w-5" />
               <span className="sr-only">通知</span>
             </Button>
@@ -349,8 +354,15 @@ export function Header() {
         {/* User Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full border border-border/60 bg-background/50">
-              <UserCircle className="h-5 w-5" />
+            <Button variant="ghost" className="h-9 gap-2 rounded-md px-2">
+              <Avatar className="h-7 w-7 border">
+                <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
+              </Avatar>
+              <div className="hidden text-left sm:block">
+                <div className="text-sm font-medium leading-none">{user?.name || '管理员'}</div>
+                <div className="text-xs text-muted-foreground">{user?.username}</div>
+              </div>
+              <UserCircle className="hidden h-4 w-4 text-muted-foreground sm:block" />
               <span className="sr-only">用户菜单</span>
             </Button>
           </DropdownMenuTrigger>

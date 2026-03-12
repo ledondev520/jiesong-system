@@ -8,6 +8,13 @@ alwaysApply: true
 ## 核心原则
 "规范化开发，拒绝文档腐烂。"
 
+## 0. UI 设计规范 (SHADCN/UI Design System)
+- **所有前端页面开发必须遵循 SHADCN/UI 设计风格**。
+- 使用 shadcn/ui 提供的组件库 (https://ui.shadcn.com)。
+- 保持设计一致性：颜色、间距、字体、圆角等统一使用 shadcn/ui 的设计 Token。
+- 新增组件优先从 shadcn/ui 获取，避免自行造轮子。
+- 自定义样式必须基于 shadcn/ui 的 theme 扩展，不得覆盖基础样式变量。
+
 ## 1. 文档同步规则 (Document Synchronization)
 - **根目录 README**：功能/架构/目录结构发生变化时 -> **立即同步**更新导航或变更点。
 - **目录级 README/INDEX**：

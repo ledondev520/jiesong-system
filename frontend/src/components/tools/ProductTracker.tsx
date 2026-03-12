@@ -70,8 +70,8 @@ export function ProductTracker() {
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
+      <CardHeader className="border-b pb-4">
+        <CardTitle className="flex items-center gap-2 text-base">
           <Search className="h-5 w-5 text-primary" />
           商品追踪
         </CardTitle>
@@ -81,7 +81,7 @@ export function ProductTracker() {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* 搜索区域 */}
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col gap-2 lg:flex-row">
           <div className="relative flex-1">
             <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -118,7 +118,7 @@ export function ProductTracker() {
         {searched && (
           <div className="space-y-2">
             {results.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">
+              <div className="rounded-lg border border-dashed px-4 py-8 text-center text-muted-foreground">
                 未找到匹配的货柜记录
               </div>
             ) : (
@@ -130,7 +130,7 @@ export function ProductTracker() {
                   {results.map((item, index) => (
                     <div
                       key={`${item.salesContractId}-${index}`}
-                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+                      className="flex cursor-pointer items-center justify-between rounded-lg border bg-background p-3 transition-colors hover:bg-muted/50"
                       onClick={() => router.push(`/dashboard/sales/${item.salesContractId}`)}
                     >
                       <div className="flex items-center gap-3 min-w-0">

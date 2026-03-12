@@ -45,14 +45,14 @@ export function PageHeader({
   };
 
   return (
-    <div className="surface-panel surface-mesh flex flex-wrap items-start justify-between gap-3 px-4 py-3">
+    <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
       <div className="flex min-w-0 items-start gap-3">
         {/* 返回按钮 */}
         <Button 
-          variant="ghost" 
+          variant="outline" 
           size="sm" 
           onClick={handleBack}
-          className="mt-0.5 gap-1 rounded-xl border border-border/65 bg-background/60 text-muted-foreground hover:text-foreground"
+          className="mt-0.5 gap-1"
         >
           <ArrowLeft className="h-4 w-4" />
           {backLabel}
@@ -60,9 +60,9 @@ export function PageHeader({
         
         {/* 标题区域 */}
         <div className="min-w-0">
-          <h2 className="text-brand-emphasis truncate text-2xl font-bold tracking-tight">{title}</h2>
+          <h2 className="truncate text-2xl font-semibold tracking-tight">{title}</h2>
           {description && (
-            <p className="text-sm text-muted-foreground/90">{description}</p>
+            <p className="text-sm text-muted-foreground">{description}</p>
           )}
         </div>
       </div>

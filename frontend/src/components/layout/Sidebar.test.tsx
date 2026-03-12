@@ -50,7 +50,7 @@ describe('Sidebar', () => {
 
     // 当前路由是 /dashboard/contracts，对应 "采购合同"
     const current = getByText('采购合同').closest('a');
-    expect(current?.className.includes('bg-sidebar-accent')).toBe(true);
+    expect(current?.className.includes('bg-background')).toBe(true);
     expect(getByText('出口退税')).toBeInTheDocument();
     expect(getByText('系统管理')).toBeInTheDocument();
     expect(queryByText('通知中心')).toBeNull();

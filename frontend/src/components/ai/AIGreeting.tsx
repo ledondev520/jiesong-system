@@ -64,18 +64,18 @@ export function AIGreeting() {
 
   return (
     <div className="fixed top-16 right-4 z-50 w-72 lg:w-80 animate-in slide-in-from-right-5 fade-in duration-300">
-      <div className="relative overflow-hidden rounded-lg border border-border/80 bg-card/95 backdrop-blur-sm shadow-lg">
+      <div className="relative overflow-hidden rounded-xl border bg-card shadow-lg">
         {/* 关闭按钮 */}
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-1 right-1 h-5 w-5 text-muted-foreground hover:text-foreground hover:bg-transparent"
+          className="absolute right-2 top-2 h-7 w-7 text-muted-foreground"
           onClick={() => setVisible(false)}
         >
-          <X className="h-3 w-3" />
+          <X className="h-3.5 w-3.5" />
         </Button>
 
-        <div className="p-3">
+        <div className="space-y-3 p-4">
           {loading ? (
             <div className="flex items-center gap-2 text-muted-foreground py-1">
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -99,7 +99,7 @@ export function AIGreeting() {
 
               {/* 励志语句展示 */}
               {data.lyrics && data.lyrics.length > 0 && (
-                <div className="pl-5 space-y-0.5 border-l-2 border-primary/35">
+                <div className="space-y-1 rounded-lg border bg-muted/40 p-3">
                   {data.lyrics.map((line, index) => (
                     <p
                       key={index}
@@ -114,7 +114,7 @@ export function AIGreeting() {
               {/* 歌曲信息和刷新按钮 */}
               <div className="flex items-center justify-between pt-0.5">
                 {data.songName && (
-                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70">
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                     <Music className="h-2.5 w-2.5" />
                     <span>《{data.songName}》</span>
                   </div>

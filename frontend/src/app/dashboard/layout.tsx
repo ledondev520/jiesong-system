@@ -93,14 +93,13 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="relative grid min-h-screen w-full overflow-hidden bg-background md:grid-cols-[238px_1fr] lg:grid-cols-[298px_1fr]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_20%,oklch(0.72_0.08_252_/_0.12),transparent_32%),radial-gradient(circle_at_88%_16%,oklch(0.79_0.1_74_/_0.1),transparent_28%)]" />
-      <div className="relative hidden border-r border-sidebar-border/80 bg-sidebar/80 backdrop-blur-xl md:block">
+    <div className="grid min-h-screen w-full bg-muted/40 md:grid-cols-[260px_1fr]">
+      <div className="hidden border-r bg-sidebar md:block">
         <Sidebar />
       </div>
-      <div className="relative flex flex-col">
+      <div className="flex flex-col">
         <Header />
-        <main className="flex flex-1 flex-col gap-4 p-4 md:p-5 lg:gap-6 lg:p-7">
+        <main className="flex flex-1 flex-col gap-6 px-4 py-5 md:px-6 lg:px-8">
           {children}
         </main>
       </div>

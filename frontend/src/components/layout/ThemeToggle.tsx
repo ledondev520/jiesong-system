@@ -36,9 +36,9 @@ export function ThemeToggle() {
 
   return (
     <Button
-      variant="ghost"
+      variant="outline"
       size="icon"
-      className="rounded-full border border-border/60 bg-background/50"
+      className="h-9 w-9 rounded-md"
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
       title={isDark ? '切换到白天模式' : '切换到夜间模式'}
       aria-label={isDark ? '切换到白天模式' : '切换到夜间模式'}
