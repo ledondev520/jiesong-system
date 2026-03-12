@@ -6,6 +6,7 @@
 
 const { Router } = require('express');
 const { authenticate } = require('../middleware/auth');
+const { roleAuth } = require('../middleware/roleAuth');
 const { createError, wrapAsync } = require('../middleware/errorHandler');
 const { success } = require('../utils/response');
 const threeFormsService = require('../services/threeFormsService');
@@ -18,7 +19,7 @@ router.use(authenticate);
  * POST /api/three-forms/generate
  * 一键生成三张表（报关单、外汇核销单、出口退税单）
  */
-router.post('/generate', wrapAsync(async (req, res) => {
+router.post('/generate', roleAuth('ADMIN'), wrapAsync(async (req, res) => {
   const {
     salesContractId,
     items,
@@ -52,7 +53,7 @@ router.post('/generate', wrapAsync(async (req, res) => {
  * POST /api/three-forms/customs-declaration
  * 单独生成报关单
  */
-router.post('/customs-declaration', wrapAsync(async (req, res) => {
+router.post('/customs-declaration', roleAuth('ADMIN'), wrapAsync(async (req, res) => {
   const { salesContractId, items, extraData } = req.body;
 
   if (!salesContractId) {
@@ -72,7 +73,7 @@ router.post('/customs-declaration', wrapAsync(async (req, res) => {
  * POST /api/three-forms/forex-verification
  * 单独生成外汇核销单
  */
-router.post('/forex-verification', wrapAsync(async (req, res) => {
+router.post('/forex-verification', roleAuth('ADMIN'), wrapAsync(async (req, res) => {
   const { salesContractId, customsDeclarationId, extraData } = req.body;
 
   if (!salesContractId) {
@@ -96,7 +97,7 @@ router.post('/forex-verification', wrapAsync(async (req, res) => {
  * POST /api/three-forms/tax-refund
  * 单独生成出口退税单
  */
-router.post('/tax-refund', wrapAsync(async (req, res) => {
+router.post('/tax-refund', roleAuth('ADMIN'), wrapAsync(async (req, res) => {
   const { salesContractId, customsDeclarationId, forexVerificationId, items } = req.body;
 
   if (!salesContractId) {

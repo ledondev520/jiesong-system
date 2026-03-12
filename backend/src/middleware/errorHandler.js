@@ -67,8 +67,18 @@ const createError = (message, statusCode = 400) => {
   return error;
 };
 
+/**
+ * 职责：包装异步路由处理器，自动捕获错误
+ * @param {Function} fn - 异步路由处理函数
+ * @returns {Function} Express 中间件函数
+ */
+const wrapAsync = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
 module.exports = {
   notFoundHandler,
   errorHandler,
   createError,
+  wrapAsync,
 };

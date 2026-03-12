@@ -6,6 +6,7 @@
 
 const { Router } = require('express');
 const { authenticate } = require('../middleware/auth');
+const { roleAuth } = require('../middleware/roleAuth');
 const hsCodeService = require('../services/hsCodeService');
 const { success } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
@@ -42,7 +43,7 @@ router.get('/:code', async (req, res, next) => {
  * POST /api/hs-codes/batch-match
  * Body: { productNames: string[] }
  */
-router.post('/batch-match', async (req, res, next) => {
+router.post('/batch-match', authenticate, roleAuth('ADMIN'), async (req, res, next) => {
   try {
     const { productNames } = req.body;
 
