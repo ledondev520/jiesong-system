@@ -37,4 +37,28 @@ router.get('/:code', async (req, res, next) => {
   }
 });
 
+/**
+ * 批量 HSCode 匹配接口
+ * POST /api/hs-codes/batch-match
+ * Body: { productNames: string[] }
+ */
+router.post('/batch-match', async (req, res, next) => {
+  try {
+    const { productNames } = req.body;
+
+    if (!Array.isArray(productNames)) {
+      throw createError('productNames 必须是数组', 400);
+    }
+
+    if (productNames.length > 100) {
+      throw createError('单次最多匹配 100 个商品', 400);
+    }
+
+    const results = await hsCodeService.batchMatchHsCodes(productNames);
+    success(res, results);
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;

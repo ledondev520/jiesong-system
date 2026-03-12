@@ -54,6 +54,7 @@ import { toast } from 'sonner';
 import { CONTAINER_40HQ } from '@/lib/binPacking';
 import { formatDate } from '@/lib/date-format';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { GenerateThreeFormsDialog } from '@/components/dialog/GenerateThreeFormsDialog';
 
 // 动态导入 3D 组件（避免 SSR 问题）
 const Container3DView = lazy(() => import('@/components/container/Container3DView'));
@@ -96,6 +97,8 @@ export default function SalesDetailPage({ params }: PageProps) {
   const [exportingExcel, setExportingExcel] = useState(false);
   // 导出 PDF 状态
   const [exportingPdf, setExportingPdf] = useState(false);
+  // 一键生成三张表对话框状态
+  const [threeFormsDialogOpen, setThreeFormsDialogOpen] = useState(false);
 
   // 截图区域引用
   const headerRef = useRef<HTMLDivElement>(null);
@@ -135,6 +138,16 @@ export default function SalesDetailPage({ params }: PageProps) {
     } finally {
       setExportingPdf(false);
     }
+  };
+
+  const handleThreeFormsGenerated = (results: {
+    customsDeclarationId?: string;
+    forexId?: string;
+    taxRefundId?: string;
+  }) => {
+    if (results.customsDeclarationId) toast.success(`报关单已生成`);
+    if (results.forexId) toast.success(`外汇核销单已生成`);
+    if (results.taxRefundId) toast.success(`出口退税单已生成`);
   };
 
   /**
@@ -476,6 +489,14 @@ export default function SalesDetailPage({ params }: PageProps) {
               <Button variant="outline" onClick={handleSaveAsImage}>
                 <Camera className="mr-2 h-4 w-4" />
                 保存为图片
+              </Button>
+              <Button
+                variant="default"
+                className="bg-gradient-to-r from-blue-500 to-orange-500"
+                onClick={() => setThreeFormsDialogOpen(true)}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                一键生成三张表
               </Button>
             </div>
           }
@@ -860,6 +881,13 @@ export default function SalesDetailPage({ params }: PageProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <GenerateThreeFormsDialog
+        open={threeFormsDialogOpen}
+        onOpenChange={setThreeFormsDialogOpen}
+        salesContract={contract}
+        onGenerated={handleThreeFormsGenerated}
+      />
     </div>
   );
 }

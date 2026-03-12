@@ -47,8 +47,87 @@ const getTaxRate = async (code) => {
   return record ? record.taxRate : null;
 };
 
+/**
+ * 批量 HSCode 匹配
+ * @param {string[]} productNames - 商品名称列表
+ * @returns {Promise<Array>} - 每个商品名称对应的最佳匹配结果
+ */
+const batchMatchHsCodes = async (productNames) => {
+  if (!Array.isArray(productNames) || productNames.length === 0) {
+    return [];
+  }
+
+  const results = [];
+
+  for (const productName of productNames) {
+    const normalizedKeyword = normalizeKeyword(productName);
+
+    if (!normalizedKeyword) {
+      results.push({
+        productName,
+        hsCode: null,
+        match: null,
+        confidence: 'none',
+      });
+      continue;
+    }
+
+    // 查找最佳匹配
+    const matches = await prisma.hsCode.findMany({
+      where: {
+        productName: {
+          contains: normalizedKeyword,
+        },
+      },
+      orderBy: [
+        { effectiveDate: 'desc' },
+        { hsCode: 'asc' },
+      ],
+      take: 1,
+    });
+
+    if (matches.length > 0) {
+      const match = matches[0];
+      // 计算匹配置信度
+      let confidence = 'low';
+      if (match.productName === normalizedKeyword) {
+        confidence = 'exact';
+      } else if (match.productName.includes(normalizedKeyword) && normalizedKeyword.length >= 4) {
+        confidence = 'high';
+      }
+
+      results.push({
+        productName,
+        hsCode: match.hsCode,
+        match: {
+          hsCode: match.hsCode,
+          productName: match.productName,
+          taxRate: match.taxRate,
+          refundRate: match.refundRate,
+          exportTaxRate: match.exportTaxRate,
+          vatRate: match.vatRate,
+          unit: match.unit,
+          declarationElements: match.declarationElements,
+          supervisionConditions: match.supervisionConditions,
+        },
+        confidence,
+      });
+    } else {
+      results.push({
+        productName,
+        hsCode: null,
+        match: null,
+        confidence: 'none',
+      });
+    }
+  }
+
+  return results;
+};
+
 module.exports = {
   searchByProductName,
   searchByHsCode,
   getTaxRate,
+  batchMatchHsCodes,
 };

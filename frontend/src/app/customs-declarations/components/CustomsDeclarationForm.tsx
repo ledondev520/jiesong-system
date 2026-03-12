@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -36,12 +36,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, FileUp } from 'lucide-react';
 import { customsDeclarationStatusOptions } from './CustomsDeclarationStatusBadge';
 import type {
   CustomsDeclarationItemInput,
   CustomsDeclarationUpsertInput,
 } from '@/services/customsDeclaration.service';
+import { BatchImportDialog } from '@/components/dialog/BatchImportDialog';
+import type { BatchHsCodeMatchResult } from '@/services/hsCode.service';
+import { toast } from 'sonner';
 
 const declarationItemSchema = z.object({
   productName: z.string().trim().min(1, '请输入商品名称'),
@@ -169,6 +172,7 @@ export function CustomsDeclarationForm({
   submitLabel,
   onSubmit,
 }: CustomsDeclarationFormProps) {
+  const [batchImportOpen, setBatchImportOpen] = useState(false);
   const form = useForm<CustomsDeclarationFormValues>({
     resolver: zodResolver(declarationFormSchema),
     defaultValues: buildDefaultValues(declaration),
@@ -182,6 +186,22 @@ export function CustomsDeclarationForm({
   useEffect(() => {
     form.reset(buildDefaultValues(declaration));
   }, [declaration, form]);
+
+  const handleBatchImportComplete = (results: BatchHsCodeMatchResult[]) => {
+    results.forEach((result) => {
+      if (result.match) {
+        append({
+          productName: result.match.productName,
+          hsCode: result.match.hsCode,
+          quantity: 1,
+          unit: result.match.unit || '',
+          unitPrice: 0,
+          totalPrice: 0,
+        });
+      }
+    });
+    toast.success(`已导入 ${results.length} 个商品`);
+  };
 
   const handleSubmit = async (values: CustomsDeclarationFormValues) => {
     await onSubmit(normalizePayload(values));
@@ -450,17 +470,33 @@ export function CustomsDeclarationForm({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>商品明细</CardTitle>
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-xl"
-              onClick={() => append({ ...defaultItem })}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              新增商品行
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => setBatchImportOpen(true)}
+              >
+                <FileUp className="mr-2 h-4 w-4" />
+                批量导入
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => append({ ...defaultItem })}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                新增商品行
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            {fields.length > 0 && (
+              <div className="rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground">
+                已添加 {fields.length} 个商品，继续添加或提交报关单
+              </div>
+            )}
             {fields.map((field, index) => (
               <div
                 key={field.id}
@@ -586,6 +622,12 @@ export function CustomsDeclarationForm({
           </Button>
         </div>
       </form>
+
+      <BatchImportDialog
+        open={batchImportOpen}
+        onOpenChange={setBatchImportOpen}
+        onImportComplete={handleBatchImportComplete}
+      />
     </Form>
   );
 }
