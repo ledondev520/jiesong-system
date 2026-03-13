@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect, use, useCallback } from 'react';
+import { useState, useEffect, use, useCallback, useRef } from 'react';
 import { SalesContract, PackingItem, Product, Store, SalesStatus } from '@/types';
 import { containerService } from '@/services/container.service';
 import { productService } from '@/services/product.service';
@@ -64,6 +64,8 @@ export default function ContainerDetailPage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
+  const [referenceDataLoading, setReferenceDataLoading] = useState(false);
+  const referenceDataLoadedRef = useRef(false);
   
   // 添加/编辑商品对话框
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
@@ -80,19 +82,13 @@ export default function ContainerDetailPage({ params }: PageProps) {
   });
 
   /**
-   * 职责：加载货柜详情和基础数据
+   * 职责：首屏仅加载货柜详情，避免切页时被大列表请求阻塞。
    */
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [containerRes, productsRes, storesRes] = await Promise.all([
-        containerService.getById(id),
-        productService.getAll({ pageSize: 500, lite: true }),
-        storeService.getAll({ pageSize: 100, lite: true }),
-      ]);
+      const containerRes = await containerService.getById(id);
       setContainer(containerRes.data);
-      setProducts(productsRes.data?.items || []);
-      setStores(storesRes.data?.items || []);
     } catch {
       toast.error('加载数据失败');
     } finally {
@@ -100,9 +96,39 @@ export default function ContainerDetailPage({ params }: PageProps) {
     }
   }, [id]);
 
+  /**
+   * 职责：按需加载弹窗依赖的商品/门店列表，避免阻塞详情页首屏。
+   */
+  const loadReferenceData = useCallback(async () => {
+    if (referenceDataLoadedRef.current || referenceDataLoading) {
+      return;
+    }
+
+    setReferenceDataLoading(true);
+    try {
+      const [productsRes, storesRes] = await Promise.all([
+        productService.getAll({ pageSize: 500, lite: true }),
+        storeService.getAll({ pageSize: 100, lite: true }),
+      ]);
+      setProducts(productsRes.data?.items || []);
+      setStores(storesRes.data?.items || []);
+      referenceDataLoadedRef.current = true;
+    } catch {
+      toast.error('加载商品和门店数据失败');
+    } finally {
+      setReferenceDataLoading(false);
+    }
+  }, [referenceDataLoading]);
+
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (isItemDialogOpen) {
+      void loadReferenceData();
+    }
+  }, [isItemDialogOpen, loadReferenceData]);
 
   /**
    * 职责：打开添加商品对话框
@@ -148,7 +174,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
     try {
       await containerService.removeItem(id, itemId);
       toast.success('商品已删除');
-      loadData();
+      void loadData();
     } catch {
       toast.error('删除失败');
     }
@@ -171,7 +197,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
         toast.success('商品添加成功');
       }
       setIsItemDialogOpen(false);
-      loadData();
+      void loadData();
     } catch {
       toast.error('保存失败');
     }
@@ -400,17 +426,27 @@ export default function ContainerDetailPage({ params }: PageProps) {
               <Select 
                 value={itemForm.productId} 
                 onValueChange={handleProductChange}
-                disabled={!!editingItem}
+                disabled={!!editingItem || referenceDataLoading}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="选择商品" />
                 </SelectTrigger>
                 <SelectContent>
-                  {products.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.customsName} {p.specification ? `(${p.specification})` : ''}
+                  {referenceDataLoading ? (
+                    <SelectItem value="__loading__" disabled>
+                      加载商品中...
                     </SelectItem>
-                  ))}
+                  ) : products.length === 0 ? (
+                    <SelectItem value="__empty__" disabled>
+                      暂无商品
+                    </SelectItem>
+                  ) : (
+                    products.map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.customsName} {p.specification ? `(${p.specification})` : ''}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -432,9 +468,15 @@ export default function ContainerDetailPage({ params }: PageProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__NONE__">不指定门店</SelectItem>
-                  {stores.map(s => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                  ))}
+                  {referenceDataLoading ? (
+                    <SelectItem value="__loading_store__" disabled>
+                      加载门店中...
+                    </SelectItem>
+                  ) : (
+                    stores.map(s => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -499,7 +541,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsItemDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSaveItem}>保存</Button>
+            <Button onClick={handleSaveItem} disabled={referenceDataLoading}>保存</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

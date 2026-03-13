@@ -121,16 +121,15 @@ describe('SalesDetailPage 交互逻辑', () => {
         port: { name: 'LA' },
       },
     });
-    mockProductGetAll.mockResolvedValue({ data: { items: [] } });
-    mockStoreGetAll.mockResolvedValue({ data: { items: [] } });
-    mockInventoryGetAll.mockResolvedValue({ data: { items: [] } });
-
     renderPage('s-1');
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'EXP2500001' })).toBeInTheDocument();
       expect(screen.getByText('暂无装箱商品，点击"添加商品"开始装柜')).toBeInTheDocument();
     });
+    expect(mockProductGetAll).not.toHaveBeenCalled();
+    expect(mockStoreGetAll).not.toHaveBeenCalled();
+    expect(mockInventoryGetAll).not.toHaveBeenCalled();
   });
 
   it('点击添加商品会打开明细弹窗', async () => {
@@ -159,6 +158,11 @@ describe('SalesDetailPage 交互逻辑', () => {
     });
     await user.click(screen.getByRole('button', { name: /添加商品/ }));
     expect(screen.getByText('添加商品到货柜')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(mockProductGetAll).toHaveBeenCalled();
+      expect(mockStoreGetAll).toHaveBeenCalled();
+      expect(mockInventoryGetAll).toHaveBeenCalled();
+    });
   });
 
   it('加载失败时提示错误', async () => {

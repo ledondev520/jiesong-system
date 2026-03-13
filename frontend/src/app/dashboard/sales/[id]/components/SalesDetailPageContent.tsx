@@ -71,6 +71,8 @@ export default function SalesDetailPage({ params }: PageProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [inventories, setInventories] = useState<Inventory[]>([]);
+  const [referenceDataLoading, setReferenceDataLoading] = useState(false);
+  const referenceDataLoadedRef = useRef(false);
   const [activeTab, setActiveTab] = useState('packing');
   const [productSearch, setProductSearch] = useState('');
   
@@ -163,6 +165,7 @@ export default function SalesDetailPage({ params }: PageProps) {
     const prevTab = activeTab;
     
     try {
+      await loadReferenceData();
       const images: string[] = [];
 
       // 1. 截取头部
@@ -248,21 +251,13 @@ export default function SalesDetailPage({ params }: PageProps) {
   };
 
   /**
-   * 职责：加载合同详情和基础数据（含库存）
+   * 职责：首屏仅加载合同详情，缩短详情页切换等待时间。
    */
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [contractRes, productsRes, storesRes, inventoryRes] = await Promise.all([
-        salesService.getById(id),
-        productService.getAll({ pageSize: 500, lite: true }),
-        storeService.getAll({ pageSize: 100, lite: true }),
-        inventoryService.getAll({ pageSize: 500, lite: true }),
-      ]);
+      const contractRes = await salesService.getById(id);
       setContract(contractRes.data);
-      setProducts(productsRes.data?.items || []);
-      setStores(storesRes.data?.items || []);
-      setInventories(inventoryRes.data?.items || []);
     } catch {
       toast.error('加载数据失败');
     } finally {
@@ -270,9 +265,41 @@ export default function SalesDetailPage({ params }: PageProps) {
     }
   }, [id]);
 
+  /**
+   * 职责：按需加载商品、门店、库存列表，避免阻塞首屏。
+   */
+  const loadReferenceData = useCallback(async () => {
+    if (referenceDataLoadedRef.current || referenceDataLoading) {
+      return;
+    }
+
+    setReferenceDataLoading(true);
+    try {
+      const [productsRes, storesRes, inventoryRes] = await Promise.all([
+        productService.getAll({ pageSize: 500, lite: true }),
+        storeService.getAll({ pageSize: 100, lite: true }),
+        inventoryService.getAll({ pageSize: 500, lite: true }),
+      ]);
+      setProducts(productsRes.data?.items || []);
+      setStores(storesRes.data?.items || []);
+      setInventories(inventoryRes.data?.items || []);
+      referenceDataLoadedRef.current = true;
+    } catch {
+      toast.error('加载商品、门店和库存数据失败');
+    } finally {
+      setReferenceDataLoading(false);
+    }
+  }, [referenceDataLoading]);
+
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (isItemDialogOpen || activeTab === '3d' || activeTab === 'info') {
+      void loadReferenceData();
+    }
+  }, [activeTab, isItemDialogOpen, loadReferenceData]);
 
   /**
    * 职责：打开添加商品对话框
@@ -302,7 +329,7 @@ export default function SalesDetailPage({ params }: PageProps) {
   const handleEditItem = (item: PackingItem) => {
     setEditingItem(item);
     // 获取商品的尺寸信息（优先使用 PackingItem 保存的尺寸）
-    const product = products.find(p => p.id === item.productId);
+    const product = item.product || products.find(p => p.id === item.productId);
     setItemForm({
       productId: item.productId,
       storeId: item.storeId || '',
@@ -329,7 +356,7 @@ export default function SalesDetailPage({ params }: PageProps) {
     try {
       await salesService.removePackingItem(id, itemId);
       toast.success('商品已删除');
-      loadData();
+      void loadData();
     } catch {
       toast.error('删除失败');
     }
@@ -352,7 +379,7 @@ export default function SalesDetailPage({ params }: PageProps) {
         toast.success('商品添加成功');
       }
       setIsItemDialogOpen(false);
-      loadData();
+      void loadData();
     } catch {
       toast.error('保存失败');
     }
@@ -597,14 +624,13 @@ export default function SalesDetailPage({ params }: PageProps) {
                     </TableRow>
                   ) : (
                     contract.packingItems.map((item) => {
-                      const product = products.find(p => p.id === item.productId);
                       return (
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">
-                            {product?.customsName || '未知商品'}
-                            {product?.specification && (
+                            {item.product?.customsName || '未知商品'}
+                            {item.product?.specification && (
                               <span className="text-xs text-muted-foreground ml-1">
-                                ({product.specification})
+                                ({item.product.specification})
                               </span>
                             )}
                           </TableCell>
@@ -673,7 +699,7 @@ export default function SalesDetailPage({ params }: PageProps) {
               try {
                 await salesService.update(id, data);
                 toast.success('合同信息更新成功');
-                loadData();
+                void loadData();
               } catch {
                 toast.error('更新失败');
               }
@@ -702,19 +728,23 @@ export default function SalesDetailPage({ params }: PageProps) {
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
                   className="pl-9"
-                  disabled={!!editingItem}
+                  disabled={!!editingItem || referenceDataLoading}
                 />
               </div>
               <Select 
                 value={itemForm.productId} 
                 onValueChange={handleProductChange}
-                disabled={!!editingItem}
+                disabled={!!editingItem || referenceDataLoading}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="选择商品（有库存的优先显示）" />
                 </SelectTrigger>
                 <SelectContent className="max-h-[300px]">
-                  {sortedProducts.length === 0 ? (
+                  {referenceDataLoading ? (
+                    <div className="p-2 text-sm text-muted-foreground text-center">
+                      加载商品和库存中...
+                    </div>
+                  ) : sortedProducts.length === 0 ? (
                     <div className="p-2 text-sm text-muted-foreground text-center">
                       {productSearch ? '未找到匹配商品' : '暂无商品'}
                     </div>
@@ -876,7 +906,7 @@ export default function SalesDetailPage({ params }: PageProps) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsItemDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSaveItem}>保存</Button>
+            <Button onClick={handleSaveItem} disabled={referenceDataLoading}>保存</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

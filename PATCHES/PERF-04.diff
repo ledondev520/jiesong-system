@@ -1,0 +1,457 @@
+diff --git a/PLAN.md b/PLAN.md
+index 8365905..8ffe936 100644
+--- a/PLAN.md
++++ b/PLAN.md
+@@ -1,5 +1,33 @@
+ # Frontend Polish Plan
+ 
++## 2026-03-13 Round 60 (详情页按需加载重数据)
++
++### Goal
++- 继续降低详情页切换卡顿，把商品、门店、库存这类大列表从首屏请求链路中拆出去。
++
++### Delivered
++- 货柜详情页改为“主数据先渲染，弹窗依赖按需加载”：
++  - `frontend/src/app/dashboard/containers/[id]/page.tsx`
++  - 首屏仅请求货柜详情。
++  - 商品/门店列表仅在添加/编辑弹窗打开时加载。
++- 销售详情页改为“合同先渲染，重数据按需加载”：
++  - `frontend/src/app/dashboard/sales/[id]/components/SalesDetailPageContent.tsx`
++  - 首屏仅请求合同详情。
++  - 商品/门店/库存仅在装箱弹窗、3D 标签页、合同信息标签页需要时加载。
++  - 装箱表格直接使用 `packingItems[].product`，不再依赖额外商品列表才能首屏展示。
++- 回归测试更新：
++  - `frontend/src/app/dashboard/containers/[id]/page.test.tsx`
++  - `frontend/src/app/dashboard/sales/[id]/page.test.tsx`
++  - 新增断言：首屏不触发引用数据请求，打开弹窗后才触发。
++
++### Verification
++- `cd frontend && npm run test -- 'src/app/dashboard/containers/[id]/page.test.tsx' 'src/app/dashboard/sales/[id]/page.test.tsx'`
++- `cd frontend && npm run lint -- 'src/app/dashboard/containers/[id]/page.tsx' 'src/app/dashboard/containers/[id]/page.test.tsx' 'src/app/dashboard/sales/[id]/components/SalesDetailPageContent.tsx' 'src/app/dashboard/sales/[id]/page.test.tsx'`
++- `cd frontend && npm run build`
++
++### Remaining Risk
++- 详情页的主要阻塞链路已经拆开；若仍感到卡顿，下一轮应转向大表格和图表的渲染成本，而不是请求成本。
++
+ ## 2026-03-12 Round 59 (登录页快捷登录逻辑收口)
+ 
+ ### Goal
+diff --git a/TASKS.md b/TASKS.md
+index 75acb81..355622a 100644
+--- a/TASKS.md
++++ b/TASKS.md
+@@ -7,6 +7,7 @@
+ | PERF-01 | P0 | 40m | 1 | DONE | 页面切换性能优化：实现全局 GET 缓存+并发去重+写后失效，并在侧边栏空闲预取常用路由，完成 lint/test/build 验证 |
+ | PERF-02 | P0 | 60m | 1 | DONE | 持续性能优化：后端列表接口新增 lite 轻量响应并移除冗余关联，前端高频页切换为 lite 请求，叠加 GET 缓存 TTL 提升至 180s，完成前后端回归与构建验证 |
+ | PERF-03 | P0 | 45m | 1 | DONE | 持续性能优化：侧边栏预取限流（优先级+上限+去重）、AI 助手业务页懒加载、后端开启 gzip 压缩并排除 SSE，完成前后端回归与构建验证 |
++| PERF-04 | P0 | 45m | 1 | DONE | 持续性能优化：销售/货柜详情页首屏只加载主数据，商品/门店/库存改为弹窗或标签页按需加载，并补首屏不拉重数据的回归测试 |
+ | FP-01 | P0 | 20m | 1 | DONE | 全局视觉 token 与背景层次升级（`globals.css`） |
+ | FP-02 | P0 | 20m | 1 | DONE | dashboard 框架美化（`dashboard/layout` + `Header` + `Sidebar` + `PageHeader`） |
+ | FP-03 | P0 | 20m | 1 | DONE | 工作台核心模块美化（`dashboard/page` + `DataDashboard`） |
+diff --git a/frontend/src/app/dashboard/containers/[id]/page.test.tsx b/frontend/src/app/dashboard/containers/[id]/page.test.tsx
+index 4a2c8d6..f47774c 100644
+--- a/frontend/src/app/dashboard/containers/[id]/page.test.tsx
++++ b/frontend/src/app/dashboard/containers/[id]/page.test.tsx
+@@ -100,15 +100,14 @@ describe('ContainerDetailPage 交互逻辑', () => {
+         port: { name: 'LA' },
+       },
+     });
+-    mockProductGetAll.mockResolvedValue({ data: { items: [] } });
+-    mockStoreGetAll.mockResolvedValue({ data: { items: [] } });
+-
+     renderPage('c-1');
+ 
+     await waitFor(() => {
+       expect(screen.getByRole('heading', { name: '25-001-LA' })).toBeInTheDocument();
+       expect(screen.getByText('暂无装箱商品，点击"添加商品"开始装柜')).toBeInTheDocument();
+     });
++    expect(mockProductGetAll).not.toHaveBeenCalled();
++    expect(mockStoreGetAll).not.toHaveBeenCalled();
+   });
+ 
+   it('点击添加商品会打开弹窗', async () => {
+@@ -132,6 +131,10 @@ describe('ContainerDetailPage 交互逻辑', () => {
+     });
+     await user.click(screen.getByRole('button', { name: /添加商品/ }));
+     expect(screen.getByText('添加商品到货柜')).toBeInTheDocument();
++    await waitFor(() => {
++      expect(mockProductGetAll).toHaveBeenCalled();
++      expect(mockStoreGetAll).toHaveBeenCalled();
++    });
+   });
+ 
+   it('加载失败时提示错误', async () => {
+diff --git a/frontend/src/app/dashboard/containers/[id]/page.tsx b/frontend/src/app/dashboard/containers/[id]/page.tsx
+index 52a5732..77ca334 100644
+--- a/frontend/src/app/dashboard/containers/[id]/page.tsx
++++ b/frontend/src/app/dashboard/containers/[id]/page.tsx
+@@ -8,7 +8,7 @@
+ 
+ 'use client';
+ 
+-import { useState, useEffect, use, useCallback } from 'react';
++import { useState, useEffect, use, useCallback, useRef } from 'react';
+ import { SalesContract, PackingItem, Product, Store, SalesStatus } from '@/types';
+ import { containerService } from '@/services/container.service';
+ import { productService } from '@/services/product.service';
+@@ -64,6 +64,8 @@ export default function ContainerDetailPage({ params }: PageProps) {
+   const [loading, setLoading] = useState(true);
+   const [products, setProducts] = useState<Product[]>([]);
+   const [stores, setStores] = useState<Store[]>([]);
++  const [referenceDataLoading, setReferenceDataLoading] = useState(false);
++  const referenceDataLoadedRef = useRef(false);
+   
+   // 添加/编辑商品对话框
+   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
+@@ -80,30 +82,54 @@ export default function ContainerDetailPage({ params }: PageProps) {
+   });
+ 
+   /**
+-   * 职责：加载货柜详情和基础数据
++   * 职责：首屏仅加载货柜详情，避免切页时被大列表请求阻塞。
+    */
+   const loadData = useCallback(async () => {
+     setLoading(true);
+     try {
+-      const [containerRes, productsRes, storesRes] = await Promise.all([
+-        containerService.getById(id),
++      const containerRes = await containerService.getById(id);
++      setContainer(containerRes.data);
++    } catch {
++      toast.error('加载数据失败');
++    } finally {
++      setLoading(false);
++    }
++  }, [id]);
++
++  /**
++   * 职责：按需加载弹窗依赖的商品/门店列表，避免阻塞详情页首屏。
++   */
++  const loadReferenceData = useCallback(async () => {
++    if (referenceDataLoadedRef.current || referenceDataLoading) {
++      return;
++    }
++
++    setReferenceDataLoading(true);
++    try {
++      const [productsRes, storesRes] = await Promise.all([
+         productService.getAll({ pageSize: 500, lite: true }),
+         storeService.getAll({ pageSize: 100, lite: true }),
+       ]);
+-      setContainer(containerRes.data);
+       setProducts(productsRes.data?.items || []);
+       setStores(storesRes.data?.items || []);
++      referenceDataLoadedRef.current = true;
+     } catch {
+-      toast.error('加载数据失败');
++      toast.error('加载商品和门店数据失败');
+     } finally {
+-      setLoading(false);
++      setReferenceDataLoading(false);
+     }
+-  }, [id]);
++  }, [referenceDataLoading]);
+ 
+   useEffect(() => {
+     void loadData();
+   }, [loadData]);
+ 
++  useEffect(() => {
++    if (isItemDialogOpen) {
++      void loadReferenceData();
++    }
++  }, [isItemDialogOpen, loadReferenceData]);
++
+   /**
+    * 职责：打开添加商品对话框
+    */
+@@ -148,7 +174,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
+     try {
+       await containerService.removeItem(id, itemId);
+       toast.success('商品已删除');
+-      loadData();
++      void loadData();
+     } catch {
+       toast.error('删除失败');
+     }
+@@ -171,7 +197,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
+         toast.success('商品添加成功');
+       }
+       setIsItemDialogOpen(false);
+-      loadData();
++      void loadData();
+     } catch {
+       toast.error('保存失败');
+     }
+@@ -400,17 +426,27 @@ export default function ContainerDetailPage({ params }: PageProps) {
+               <Select 
+                 value={itemForm.productId} 
+                 onValueChange={handleProductChange}
+-                disabled={!!editingItem}
++                disabled={!!editingItem || referenceDataLoading}
+               >
+                 <SelectTrigger>
+                   <SelectValue placeholder="选择商品" />
+                 </SelectTrigger>
+                 <SelectContent>
+-                  {products.map(p => (
+-                    <SelectItem key={p.id} value={p.id}>
+-                      {p.customsName} {p.specification ? `(${p.specification})` : ''}
++                  {referenceDataLoading ? (
++                    <SelectItem value="__loading__" disabled>
++                      加载商品中...
+                     </SelectItem>
+-                  ))}
++                  ) : products.length === 0 ? (
++                    <SelectItem value="__empty__" disabled>
++                      暂无商品
++                    </SelectItem>
++                  ) : (
++                    products.map(p => (
++                      <SelectItem key={p.id} value={p.id}>
++                        {p.customsName} {p.specification ? `(${p.specification})` : ''}
++                      </SelectItem>
++                    ))
++                  )}
+                 </SelectContent>
+               </Select>
+             </div>
+@@ -432,9 +468,15 @@ export default function ContainerDetailPage({ params }: PageProps) {
+                 </SelectTrigger>
+                 <SelectContent>
+                   <SelectItem value="__NONE__">不指定门店</SelectItem>
+-                  {stores.map(s => (
+-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+-                  ))}
++                  {referenceDataLoading ? (
++                    <SelectItem value="__loading_store__" disabled>
++                      加载门店中...
++                    </SelectItem>
++                  ) : (
++                    stores.map(s => (
++                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
++                    ))
++                  )}
+                 </SelectContent>
+               </Select>
+             </div>
+@@ -499,7 +541,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
+           </div>
+           <DialogFooter>
+             <Button variant="outline" onClick={() => setIsItemDialogOpen(false)}>取消</Button>
+-            <Button onClick={handleSaveItem}>保存</Button>
++            <Button onClick={handleSaveItem} disabled={referenceDataLoading}>保存</Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
+diff --git a/frontend/src/app/dashboard/sales/[id]/components/SalesDetailPageContent.tsx b/frontend/src/app/dashboard/sales/[id]/components/SalesDetailPageContent.tsx
+index 36d506a..e98709c 100644
+--- a/frontend/src/app/dashboard/sales/[id]/components/SalesDetailPageContent.tsx
++++ b/frontend/src/app/dashboard/sales/[id]/components/SalesDetailPageContent.tsx
+@@ -71,6 +71,8 @@ export default function SalesDetailPage({ params }: PageProps) {
+   const [products, setProducts] = useState<Product[]>([]);
+   const [stores, setStores] = useState<Store[]>([]);
+   const [inventories, setInventories] = useState<Inventory[]>([]);
++  const [referenceDataLoading, setReferenceDataLoading] = useState(false);
++  const referenceDataLoadedRef = useRef(false);
+   const [activeTab, setActiveTab] = useState('packing');
+   const [productSearch, setProductSearch] = useState('');
+   
+@@ -163,6 +165,7 @@ export default function SalesDetailPage({ params }: PageProps) {
+     const prevTab = activeTab;
+     
+     try {
++      await loadReferenceData();
+       const images: string[] = [];
+ 
+       // 1. 截取头部
+@@ -248,32 +251,56 @@ export default function SalesDetailPage({ params }: PageProps) {
+   };
+ 
+   /**
+-   * 职责：加载合同详情和基础数据（含库存）
++   * 职责：首屏仅加载合同详情，缩短详情页切换等待时间。
+    */
+   const loadData = useCallback(async () => {
+     setLoading(true);
+     try {
+-      const [contractRes, productsRes, storesRes, inventoryRes] = await Promise.all([
+-        salesService.getById(id),
++      const contractRes = await salesService.getById(id);
++      setContract(contractRes.data);
++    } catch {
++      toast.error('加载数据失败');
++    } finally {
++      setLoading(false);
++    }
++  }, [id]);
++
++  /**
++   * 职责：按需加载商品、门店、库存列表，避免阻塞首屏。
++   */
++  const loadReferenceData = useCallback(async () => {
++    if (referenceDataLoadedRef.current || referenceDataLoading) {
++      return;
++    }
++
++    setReferenceDataLoading(true);
++    try {
++      const [productsRes, storesRes, inventoryRes] = await Promise.all([
+         productService.getAll({ pageSize: 500, lite: true }),
+         storeService.getAll({ pageSize: 100, lite: true }),
+         inventoryService.getAll({ pageSize: 500, lite: true }),
+       ]);
+-      setContract(contractRes.data);
+       setProducts(productsRes.data?.items || []);
+       setStores(storesRes.data?.items || []);
+       setInventories(inventoryRes.data?.items || []);
++      referenceDataLoadedRef.current = true;
+     } catch {
+-      toast.error('加载数据失败');
++      toast.error('加载商品、门店和库存数据失败');
+     } finally {
+-      setLoading(false);
++      setReferenceDataLoading(false);
+     }
+-  }, [id]);
++  }, [referenceDataLoading]);
+ 
+   useEffect(() => {
+     void loadData();
+   }, [loadData]);
+ 
++  useEffect(() => {
++    if (isItemDialogOpen || activeTab === '3d' || activeTab === 'info') {
++      void loadReferenceData();
++    }
++  }, [activeTab, isItemDialogOpen, loadReferenceData]);
++
+   /**
+    * 职责：打开添加商品对话框
+    */
+@@ -302,7 +329,7 @@ export default function SalesDetailPage({ params }: PageProps) {
+   const handleEditItem = (item: PackingItem) => {
+     setEditingItem(item);
+     // 获取商品的尺寸信息（优先使用 PackingItem 保存的尺寸）
+-    const product = products.find(p => p.id === item.productId);
++    const product = item.product || products.find(p => p.id === item.productId);
+     setItemForm({
+       productId: item.productId,
+       storeId: item.storeId || '',
+@@ -329,7 +356,7 @@ export default function SalesDetailPage({ params }: PageProps) {
+     try {
+       await salesService.removePackingItem(id, itemId);
+       toast.success('商品已删除');
+-      loadData();
++      void loadData();
+     } catch {
+       toast.error('删除失败');
+     }
+@@ -352,7 +379,7 @@ export default function SalesDetailPage({ params }: PageProps) {
+         toast.success('商品添加成功');
+       }
+       setIsItemDialogOpen(false);
+-      loadData();
++      void loadData();
+     } catch {
+       toast.error('保存失败');
+     }
+@@ -597,14 +624,13 @@ export default function SalesDetailPage({ params }: PageProps) {
+                     </TableRow>
+                   ) : (
+                     contract.packingItems.map((item) => {
+-                      const product = products.find(p => p.id === item.productId);
+                       return (
+                         <TableRow key={item.id}>
+                           <TableCell className="font-medium">
+-                            {product?.customsName || '未知商品'}
+-                            {product?.specification && (
++                            {item.product?.customsName || '未知商品'}
++                            {item.product?.specification && (
+                               <span className="text-xs text-muted-foreground ml-1">
+-                                ({product.specification})
++                                ({item.product.specification})
+                               </span>
+                             )}
+                           </TableCell>
+@@ -673,7 +699,7 @@ export default function SalesDetailPage({ params }: PageProps) {
+               try {
+                 await salesService.update(id, data);
+                 toast.success('合同信息更新成功');
+-                loadData();
++                void loadData();
+               } catch {
+                 toast.error('更新失败');
+               }
+@@ -702,19 +728,23 @@ export default function SalesDetailPage({ params }: PageProps) {
+                   value={productSearch}
+                   onChange={(e) => setProductSearch(e.target.value)}
+                   className="pl-9"
+-                  disabled={!!editingItem}
++                  disabled={!!editingItem || referenceDataLoading}
+                 />
+               </div>
+               <Select 
+                 value={itemForm.productId} 
+                 onValueChange={handleProductChange}
+-                disabled={!!editingItem}
++                disabled={!!editingItem || referenceDataLoading}
+               >
+                 <SelectTrigger>
+                   <SelectValue placeholder="选择商品（有库存的优先显示）" />
+                 </SelectTrigger>
+                 <SelectContent className="max-h-[300px]">
+-                  {sortedProducts.length === 0 ? (
++                  {referenceDataLoading ? (
++                    <div className="p-2 text-sm text-muted-foreground text-center">
++                      加载商品和库存中...
++                    </div>
++                  ) : sortedProducts.length === 0 ? (
+                     <div className="p-2 text-sm text-muted-foreground text-center">
+                       {productSearch ? '未找到匹配商品' : '暂无商品'}
+                     </div>
+@@ -876,7 +906,7 @@ export default function SalesDetailPage({ params }: PageProps) {
+           </div>
+           <DialogFooter>
+             <Button variant="outline" onClick={() => setIsItemDialogOpen(false)}>取消</Button>
+-            <Button onClick={handleSaveItem}>保存</Button>
++            <Button onClick={handleSaveItem} disabled={referenceDataLoading}>保存</Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
+diff --git a/frontend/src/app/dashboard/sales/[id]/page.test.tsx b/frontend/src/app/dashboard/sales/[id]/page.test.tsx
+index 5187ffe..7bde850 100644
+--- a/frontend/src/app/dashboard/sales/[id]/page.test.tsx
++++ b/frontend/src/app/dashboard/sales/[id]/page.test.tsx
+@@ -121,16 +121,15 @@ describe('SalesDetailPage 交互逻辑', () => {
+         port: { name: 'LA' },
+       },
+     });
+-    mockProductGetAll.mockResolvedValue({ data: { items: [] } });
+-    mockStoreGetAll.mockResolvedValue({ data: { items: [] } });
+-    mockInventoryGetAll.mockResolvedValue({ data: { items: [] } });
+-
+     renderPage('s-1');
+ 
+     await waitFor(() => {
+       expect(screen.getByRole('heading', { name: 'EXP2500001' })).toBeInTheDocument();
+       expect(screen.getByText('暂无装箱商品，点击"添加商品"开始装柜')).toBeInTheDocument();
+     });
++    expect(mockProductGetAll).not.toHaveBeenCalled();
++    expect(mockStoreGetAll).not.toHaveBeenCalled();
++    expect(mockInventoryGetAll).not.toHaveBeenCalled();
+   });
+ 
+   it('点击添加商品会打开明细弹窗', async () => {
+@@ -159,6 +158,11 @@ describe('SalesDetailPage 交互逻辑', () => {
+     });
+     await user.click(screen.getByRole('button', { name: /添加商品/ }));
+     expect(screen.getByText('添加商品到货柜')).toBeInTheDocument();
++    await waitFor(() => {
++      expect(mockProductGetAll).toHaveBeenCalled();
++      expect(mockStoreGetAll).toHaveBeenCalled();
++      expect(mockInventoryGetAll).toHaveBeenCalled();
++    });
+   });
+ 
+   it('加载失败时提示错误', async () => {

@@ -1,5 +1,33 @@
 # Frontend Polish Plan
 
+## 2026-03-13 Round 60 (详情页按需加载重数据)
+
+### Goal
+- 继续降低详情页切换卡顿，把商品、门店、库存这类大列表从首屏请求链路中拆出去。
+
+### Delivered
+- 货柜详情页改为“主数据先渲染，弹窗依赖按需加载”：
+  - `frontend/src/app/dashboard/containers/[id]/page.tsx`
+  - 首屏仅请求货柜详情。
+  - 商品/门店列表仅在添加/编辑弹窗打开时加载。
+- 销售详情页改为“合同先渲染，重数据按需加载”：
+  - `frontend/src/app/dashboard/sales/[id]/components/SalesDetailPageContent.tsx`
+  - 首屏仅请求合同详情。
+  - 商品/门店/库存仅在装箱弹窗、3D 标签页、合同信息标签页需要时加载。
+  - 装箱表格直接使用 `packingItems[].product`，不再依赖额外商品列表才能首屏展示。
+- 回归测试更新：
+  - `frontend/src/app/dashboard/containers/[id]/page.test.tsx`
+  - `frontend/src/app/dashboard/sales/[id]/page.test.tsx`
+  - 新增断言：首屏不触发引用数据请求，打开弹窗后才触发。
+
+### Verification
+- `cd frontend && npm run test -- 'src/app/dashboard/containers/[id]/page.test.tsx' 'src/app/dashboard/sales/[id]/page.test.tsx'`
+- `cd frontend && npm run lint -- 'src/app/dashboard/containers/[id]/page.tsx' 'src/app/dashboard/containers/[id]/page.test.tsx' 'src/app/dashboard/sales/[id]/components/SalesDetailPageContent.tsx' 'src/app/dashboard/sales/[id]/page.test.tsx'`
+- `cd frontend && npm run build`
+
+### Remaining Risk
+- 详情页的主要阻塞链路已经拆开；若仍感到卡顿，下一轮应转向大表格和图表的渲染成本，而不是请求成本。
+
 ## 2026-03-12 Round 59 (登录页快捷登录逻辑收口)
 
 ### Goal

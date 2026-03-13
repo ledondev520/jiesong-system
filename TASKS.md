@@ -7,6 +7,7 @@
 | PERF-01 | P0 | 40m | 1 | DONE | 页面切换性能优化：实现全局 GET 缓存+并发去重+写后失效，并在侧边栏空闲预取常用路由，完成 lint/test/build 验证 |
 | PERF-02 | P0 | 60m | 1 | DONE | 持续性能优化：后端列表接口新增 lite 轻量响应并移除冗余关联，前端高频页切换为 lite 请求，叠加 GET 缓存 TTL 提升至 180s，完成前后端回归与构建验证 |
 | PERF-03 | P0 | 45m | 1 | DONE | 持续性能优化：侧边栏预取限流（优先级+上限+去重）、AI 助手业务页懒加载、后端开启 gzip 压缩并排除 SSE，完成前后端回归与构建验证 |
+| PERF-04 | P0 | 45m | 1 | DONE | 持续性能优化：销售/货柜详情页首屏只加载主数据，商品/门店/库存改为弹窗或标签页按需加载，并补首屏不拉重数据的回归测试 |
 | FP-01 | P0 | 20m | 1 | DONE | 全局视觉 token 与背景层次升级（`globals.css`） |
 | FP-02 | P0 | 20m | 1 | DONE | dashboard 框架美化（`dashboard/layout` + `Header` + `Sidebar` + `PageHeader`） |
 | FP-03 | P0 | 20m | 1 | DONE | 工作台核心模块美化（`dashboard/page` + `DataDashboard`） |
