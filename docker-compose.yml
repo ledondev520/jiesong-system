@@ -1,0 +1,82 @@
+version: '3.8'
+
+# =============================================================================
+# 捷淞进销存系统 - Docker Compose 部署配置
+# 使用方法：docker compose up -d
+# =============================================================================
+
+services:
+  # =============================================================================
+  # 后端服务
+  # =============================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: jiesong-backend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - JWT_SECRET=${JWT_SECRET:-change-this-secret-key-in-production}
+      - JWT_EXPIRES_IN=7d
+      - DATABASE_URL=file:/app/data/dev.db
+    volumes:
+      - backend-data:/app/data
+      - backend-logs:/app/logs
+    networks:
+      - jiesong-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # 前端服务
+  # =============================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_BASE_URL=/api/v1
+    container_name: jiesong-frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - jiesong-network
+
+  # =============================================================================
+  # Nginx 反向代理
+  # =============================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: jiesong-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - jiesong-network
+
+networks:
+  jiesong-network:
+    driver: bridge
+
+volumes:
+  backend-data:
+  backend-logs:
+  nginx-logs:

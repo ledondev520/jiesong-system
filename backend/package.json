@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "nodemon src/app.js",
     "start": "node src/app.js",
-    "test": "node --test",
-    "test:db": "node --test src/integration/database.integration.js",
+    "test": "NODE_ENV=test JWT_SECRET=test-only-jwt-secret-for-ci-123456 node --test",
+    "test:db": "NODE_ENV=test JWT_SECRET=test-only-jwt-secret-for-ci-123456 node --test src/integration/database.integration.js",
     "test:all": "npm run test && npm run test:db",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
