@@ -60,6 +60,7 @@ import {
   type TemplateItem,
 } from '@/services/procurementTemplate.service';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
 
 // ==================== 图标/颜色映射 ====================
 
@@ -290,6 +291,7 @@ export default function StoreRecommendPage() {
 
   return (
     <div className="space-y-6">
+      <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
       <PageHeader
         title="门店采购指南"
         description={`基于 ${universalTemplate?.totalStores || 0} 家门店历史出货数据，生成开业采购优先级清单`}

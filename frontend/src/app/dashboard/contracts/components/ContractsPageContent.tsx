@@ -9,6 +9,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PurchaseContract, PurchaseStatus, PurchaseItem } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
@@ -202,6 +203,7 @@ export default function ContractsPageContent() {
 
   return (
     <div className="space-y-6">
+      <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
       <PageHeader
         title="采购合同"
         description="管理供应商采购合同"

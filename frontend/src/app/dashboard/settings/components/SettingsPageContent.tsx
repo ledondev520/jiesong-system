@@ -48,6 +48,7 @@ import { ClaudeCostCalculator } from '@/components/tools/ClaudeCostCalculator';
 import { toast } from 'sonner';
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE, UNITS as INITIAL_UNITS } from '@/lib/constants';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader';
 import { configService } from '@/services/config.service';
 import { exportSystemData, SystemExportType } from '@/services/system.service';
 
@@ -258,6 +259,7 @@ export default function SettingsPageContent() {
 
   return (
     <div className="space-y-6">
+      <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
       <PageHeader
         title="设置"
         description="管理基础档案、系统配置、数据导入与数据导出"

@@ -9,6 +9,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { ModuleTabHeader, OPERATIONS_TABS } from '@/components/layout/ModuleTabHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart, TrendingUp, Plus, ArrowRight } from 'lucide-react';
@@ -47,6 +48,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
       {/* AI问候语悬浮卡片 */}
       <AIGreeting />
 

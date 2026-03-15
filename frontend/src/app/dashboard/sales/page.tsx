@@ -40,6 +40,7 @@ import { useRouter } from 'next/navigation';
 import { formatDate } from '@/lib/date-format';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
 export default function SalesPage() {
   const [contracts, setContracts] = useState<SalesContract[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,6 +133,7 @@ export default function SalesPage() {
 
   return (
     <div className="space-y-6">
+      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
         title="出口合同"
         description={`管理出口合同与装箱信息。共 ${contracts.length} 个合同。`}

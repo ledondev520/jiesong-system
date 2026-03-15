@@ -39,6 +39,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
 import {
   TrendingUp,
   TrendingDown,
@@ -503,6 +504,7 @@ export default function FinancialStatementsPage() {
 
   return (
     <div className="space-y-6">
+      <ModuleTabHeader tabs={FINANCE_TABS} moduleName="财务" />
       {/* 页面标题 + 操作栏 */}
       <PageHeader
         title="财务报表分析"

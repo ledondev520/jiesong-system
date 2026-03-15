@@ -28,6 +28,7 @@ import { PaymentDialog, type PaymentSubmitData } from '../../dashboard/finance/c
 import { toast } from 'sonner';
 import { financeService } from '@/services/finance.service';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
 
 interface PayableContract {
   id: string;
@@ -207,6 +208,7 @@ function PaymentsPageContent() {
 
   return (
     <div className="space-y-6">
+      <ModuleTabHeader tabs={FINANCE_TABS} moduleName="财务" />
       <PageHeader
         title="收付款"
         description="管理应付账款与应收账款"

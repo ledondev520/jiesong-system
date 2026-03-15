@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import type { TaxRefund } from '@/types';
 import { taxRefundService } from '@/services/taxRefund.service';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -83,6 +84,7 @@ export function TaxRefundListPageContent() {
 
   return (
     <div className="space-y-6 pb-10">
+      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
         title="出口退税"
         description="管理退税批次、申报进度与到账状态。"

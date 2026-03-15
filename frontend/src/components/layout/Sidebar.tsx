@@ -1,16 +1,16 @@
 /**
  * Input: 用户认证状态、路由信息
- * Output: 侧边导航栏组件
+ * Output: 侧边导航栏组件（5 大模块分区）
  * Pos: 全局布局组件，提供系统导航功能
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  *
- * 导航结构（优化后）：
- * - 核心业务（6 个）：工作台、采购合同、出口合同、库存状态、收付款、采购建议
- * - 财务分析（1 个）：财务报表（三表看板）
- * - AI 功能（1 个）：AI 管理
- * - 合同管理（1 个）：合同模板
- * - 基础设置（1 个）：系统配置/数据导入导出/用户/运维入口
+ * 导航分区结构：
+ * - 经营中台：工作台、库存状态
+ * - 采购模块：采购合同、采购建议
+ * - 出口模块：出口合同、出口退税、报关单
+ * - 财务模块：经营执行、收付款、财务报表
+ * - 系统管理：AI 管理、合同模板、基础设置
  */
 
 'use client';
@@ -21,79 +21,77 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
-  FileText,
   Ship,
-  Warehouse,
-  DollarSign,
-  Store,
-  Bot,
-  FileBox,
-  Settings,
   LogOut,
-  ReceiptText,
-  BarChart3,
-  BriefcaseBusiness,
+  ShoppingCart,
+  PackageOpen,
+  Landmark,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 
-type NavChildItem = {
-  href: string;
+// ==================== 导航数据（5个顶级模块入口） ====================
+//
+// 每个模块入口指向该模块的「第一个子页面」。
+// 子页面之间的切换通过页面顶部的 ModuleTabHeader 组件（水平 Tab 栏）完成。
+// 路由激活判断：只要当前路径属于该模块任一子路由，对应模块条目就高亮。
+
+type ModuleNavItem = {
+  href: string;         // 入口路由（模块第一个子页面）
   label: string;
   icon: ComponentType<{ className?: string }>;
+  /** 属于此模块的所有子路由前缀（用于激活判断） */
+  childPrefixes: string[];
   adminOnly?: boolean;
 };
 
-type NavItem = {
-  href: string;
-  label: string;
-  icon: ComponentType<{ className?: string }>;
-  exact?: boolean;
-  adminOnly?: boolean;
-  children?: NavChildItem[];
-};
-
-const navItems: NavItem[] = [
-  // 核心业务模块
-  { href: '/dashboard', label: '工作台', icon: LayoutDashboard, exact: true },
-  { href: '/dashboard/contracts', label: '采购合同', icon: FileText, exact: true },
-  { href: '/dashboard/sales', label: '出口合同', icon: Ship },
-  { href: '/dashboard/tax-refunds', label: '出口退税', icon: ReceiptText },
-  { href: '/customs-declarations', label: '报关单', icon: FileText },
-  { href: '/dashboard/inventory-container', label: '库存状态', icon: Warehouse },
-  { href: '/dashboard/payments', label: '收付款', icon: DollarSign },
-  { href: '/dashboard/finance/statements', label: '财务报表', icon: BarChart3 },
-  { href: '/dashboard/store-recommend', label: '采购建议', icon: Store },
-  { href: '/dashboard/ops-execution', label: '经营执行', icon: BriefcaseBusiness },
-  
-  // AI 功能模块
-  { href: '/dashboard/ai/sessions', label: 'AI 管理', icon: Bot },
-  
-  // 合同管理模块
-  { href: '/dashboard/contracts/templates', label: '合同模板', icon: FileBox },
-  
-  // 基础设置模块
-  { href: '/dashboard/settings', label: '基础设置', icon: Settings },
+const moduleNavItems: ModuleNavItem[] = [
+  {
+    href: '/dashboard',
+    label: '经营中台',
+    icon: LayoutDashboard,
+    childPrefixes: ['/dashboard/inventory-container'],
+  },
+  {
+    href: '/dashboard/contracts',
+    label: '采购',
+    icon: ShoppingCart,
+    childPrefixes: ['/dashboard/contracts', '/dashboard/store-recommend'],
+  },
+  {
+    href: '/dashboard/sales',
+    label: '出口',
+    icon: PackageOpen,
+    childPrefixes: ['/dashboard/sales', '/dashboard/tax-refunds', '/customs-declarations'],
+  },
+  {
+    href: '/dashboard/ops-execution',
+    label: '财务',
+    icon: Landmark,
+    childPrefixes: ['/dashboard/ops-execution', '/dashboard/payments', '/dashboard/finance'],
+  },
+  {
+    href: '/dashboard/ai/sessions',
+    label: '系统管理',
+    icon: SlidersHorizontal,
+    childPrefixes: ['/dashboard/ai', '/dashboard/contracts/templates', '/dashboard/settings'],
+    adminOnly: false,
+  },
 ];
 
-const PREFETCH_PRIORITY_ROUTES = [
-  '/dashboard',
-  '/dashboard/contracts',
-  '/dashboard/sales',
-  '/dashboard/payments',
-  '/dashboard/settings',
-] as const;
+const MAX_PREFETCH_ROUTES = 5;
 
-const MAX_PREFETCH_ROUTES = 6;
+// ==================== 组件 ====================
 
 /**
- * 职责：渲染侧边导航栏
+ * 职责：渲染侧边导航栏（5 个顶级模块入口）
  * 思路：
- * 1. 过滤管理员专属导航项
- * 2. 根据当前路由高亮激活项
- * 3. 渲染导航链接和退出按钮
+ *   1. 侧边栏只显示 5 个模块入口，不列子页面
+ *   2. 模块激活判断：当前路径属于该模块任一子路由前缀即高亮
+ *   3. 子页面切换由各页面顶部的 ModuleTabHeader 水平 Tab 栏负责
+ *   4. 空闲时预取各模块入口路由
  */
 export function Sidebar() {
   const pathname = usePathname();
@@ -103,44 +101,16 @@ export function Sidebar() {
   const isAdmin = user?.role === 'ADMIN';
   const prefetchedRoutesRef = useRef<Set<string>>(new Set());
 
-  const visibleNavItems = navItems
-    .map((item) => ({
-      ...item,
-      children: item.children?.filter((child) => !child.adminOnly || isAdmin),
-    }))
-    .filter((item) => {
-      if (item.adminOnly && !isAdmin) {
-        return false;
-      }
-      if (item.children) {
-        return item.children.length > 0;
-      }
-      return true;
-    });
-  const primaryItems = visibleNavItems.filter(
-    (item) => item.href !== '/dashboard/settings',
-  );
-  const managementItems = visibleNavItems.filter(
-    (item) => item.href === '/dashboard/settings',
-  );
-  const prefetchRoutes = visibleNavItems.flatMap((item) => [
-    item.href,
-    ...(item.children?.map((child) => child.href) ?? []),
-  ]);
+  const visibleItems = moduleNavItems.filter((item) => !item.adminOnly || isAdmin);
 
+  // 空闲时预取各模块入口路由
   useEffect(() => {
-    // 空闲时仅预取高优先级路由，避免一次性预取过多页面造成主线程和网络压力。
-    const visibleRouteSet = new Set(prefetchRoutes);
-    const orderedCandidates = [
-      ...PREFETCH_PRIORITY_ROUTES.filter((href) => visibleRouteSet.has(href)),
-      ...prefetchRoutes,
-    ];
-    const uniqueRoutes = Array.from(new Set(orderedCandidates)).slice(0, MAX_PREFETCH_ROUTES);
-    const routesToPrefetch = uniqueRoutes.filter((href) => !prefetchedRoutesRef.current.has(href));
+    const routesToPrefetch = visibleItems
+      .map((i) => i.href)
+      .slice(0, MAX_PREFETCH_ROUTES)
+      .filter((href) => !prefetchedRoutesRef.current.has(href));
 
-    if (routesToPrefetch.length === 0) {
-      return;
-    }
+    if (routesToPrefetch.length === 0) return;
 
     const prefetch = () => {
       routesToPrefetch.forEach((href) => {
@@ -156,65 +126,22 @@ export function Sidebar() {
 
     const timer = setTimeout(prefetch, 300);
     return () => clearTimeout(timer);
-  }, [prefetchRoutes, router, pathname]);
+  }, [visibleItems, router, pathname]);
 
-  const isActivePath = (href: string, exact?: boolean) => {
-    if (exact) {
-      return pathname === href;
-    }
-    return pathname === href || pathname.startsWith(`${href}/`);
+  /**
+   * 职责：判断某个模块入口是否处于激活状态
+   * 思路：当前路径等于模块首页（精确），或以任意子路由前缀开头
+   */
+  const isModuleActive = (item: ModuleNavItem) => {
+    if (pathname === '/dashboard') return item.href === '/dashboard';
+    return [item.href, ...item.childPrefixes].some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    );
   };
-
-  const isActiveItem = (item: NavItem) => {
-    if (item.children?.some((child) => isActivePath(child.href))) {
-      return true;
-    }
-    if (item.exact) {
-      return pathname === item.href;
-    }
-    return isActivePath(item.href);
-  };
-
-  const renderNavItem = (item: NavItem) => (
-    <div key={item.href}>
-      <Link
-        href={item.href}
-        className={cn(
-          'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors',
-          isActiveItem(item)
-            ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
-            : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-        )}
-      >
-        <item.icon className="h-4 w-4" />
-        <span className="flex-1">{item.label}</span>
-        {item.children ? <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">管理</Badge> : null}
-      </Link>
-
-      {item.children && isActiveItem(item) && (
-        <div className="ml-4 mt-1 grid gap-1 border-l pl-4">
-          {item.children.map((child) => (
-            <Link
-              key={child.href}
-              href={child.href}
-              className={cn(
-                'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
-                isActivePath(child.href)
-                  ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
-                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-              )}
-            >
-              <child.icon className="h-3.5 w-3.5" />
-              <span>{child.label}</span>
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
+      {/* Logo / 品牌区 */}
       <div className="flex h-16 items-center border-b border-sidebar-border px-5">
         <Link href="/dashboard" className="flex items-center gap-3 font-semibold tracking-tight">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
@@ -227,28 +154,28 @@ export function Sidebar() {
         </Link>
       </div>
 
+      {/* 导航区：5 个模块入口 */}
       <ScrollArea className="flex-1">
-        <div className="space-y-6 px-3 py-4">
-          <div className="space-y-2">
-            <div className="px-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-              核心业务
-            </div>
-            <nav className="grid gap-1">
-              {primaryItems.map(renderNavItem)}
-            </nav>
-          </div>
-
-          <div className="space-y-2">
-            <div className="px-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-              系统与配置
-            </div>
-            <nav className="grid gap-1">
-              {managementItems.map(renderNavItem)}
-            </nav>
-          </div>
-        </div>
+        <nav className="grid gap-1 px-3 py-4">
+          {visibleItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors',
+                isModuleActive(item)
+                  ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+              )}
+            >
+              <item.icon className="h-4 w-4 shrink-0" />
+              <span>{item.label}</span>
+            </Link>
+          ))}
+        </nav>
       </ScrollArea>
 
+      {/* 底部：用户信息 + 退出 */}
       <div className="space-y-3 border-t border-sidebar-border p-4">
         <div className="rounded-lg border bg-background px-3 py-2">
           <div className="text-sm font-medium">{user?.name || '当前用户'}</div>
