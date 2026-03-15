@@ -35,6 +35,8 @@ const taxRefundRoutes = require('./taxRefunds');
 const taxRateRoutes = require('./taxRates');
 const hsCodeRoutes = require('./hsCodes');
 const threeFormsRoutes = require('./threeForms');
+const opsExecutionRoutes = require('./opsExecution');
+const procurementTemplateRoutes = require('./procurementTemplate');
 
 const router = Router();
 
@@ -66,5 +68,7 @@ router.use('/tax-refunds', taxRefundRoutes);
 router.use('/tax-rates', taxRateRoutes);
 router.use('/hs-codes', hsCodeRoutes);
 router.use('/three-forms', threeFormsRoutes);
+router.use('/ops-execution', opsExecutionRoutes);
+router.use('/procurement-template', procurementTemplateRoutes);  // 开业采购模板（CSV分析）
 
 module.exports = router;

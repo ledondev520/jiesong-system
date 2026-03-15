@@ -32,6 +32,7 @@ import {
   LogOut,
   ReceiptText,
   BarChart3,
+  BriefcaseBusiness,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/button';
@@ -65,6 +66,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard/payments', label: '收付款', icon: DollarSign },
   { href: '/dashboard/finance/statements', label: '财务报表', icon: BarChart3 },
   { href: '/dashboard/store-recommend', label: '采购建议', icon: Store },
+  { href: '/dashboard/ops-execution', label: '经营执行', icon: BriefcaseBusiness },
   
   // AI 功能模块
   { href: '/dashboard/ai/sessions', label: 'AI 管理', icon: Bot },
