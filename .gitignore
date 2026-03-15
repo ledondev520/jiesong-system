@@ -53,3 +53,16 @@ public/uploads/*
 # Generated contracts (exclude sample files)
 docs/购销合同CG*.docx
 docs/购销合同CG*.pdf
+
+# Agent session artifacts (PATCHES/RESULTS are operational; optionally exclude)
+# PATCHES/
+# RESULTS/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS metadata
+.DS_Store
+**/.DS_Store

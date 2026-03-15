@@ -1,3 +1,46 @@
+# Ops Execution Center Plan
+
+## 2026-03-15 Round 61 (Ops Execution Center Kickoff)
+
+### Goal
+- 新增“经营执行中台”一级能力入口，并优先交付 `未发货清单 v1`，让分发负责人流程先跑起来。
+
+### Delivered
+- 已完成范围确认与专项实施计划：
+  - `docs/plans/2026-03-15-ops-execution-center.md`
+  - 交付顺序确定为：
+    - `OPS-EXEC-01` 中台入口 + 未发货清单 v1
+    - `OPS-EXEC-02` 门店采购清单模板化基础
+    - `OPS-EXEC-03` 任务提醒引擎基础模型与 API
+- 已同步 checkpoint 文件：
+  - `task_plan.md`
+  - `findings.md`
+  - `progress.md`
+- 已完成 `OPS-EXEC-01` 首批实现：
+  - 新增前端入口页：`frontend/src/app/dashboard/ops-execution/page.tsx`
+  - 新增前端服务：`frontend/src/services/opsExecution.service.ts`
+  - 新增后端接口：`GET /api/v1/ops-execution/unshipped`、`PUT /api/v1/ops-execution/unshipped/assign`
+  - 新增侧边栏入口：`/dashboard/ops-execution`
+  - 负责人映射首版落在 `SystemConfig(key=ops_execution_unshipped_assignments)`
+- 已完成 `OPS-EXEC-02` 初版实现：
+  - 按店型/开店阶段生成采购清单
+  - 支持模板保存
+  - 支持 CSV 一键导出
+- 已完成 `OPS-EXEC-03` 初版实现：
+  - 支持自然语言建任务
+  - 支持责任人、优先级、提醒时间、二次提醒时间
+  - 后端新增提醒处理器与轮询任务，能把到期提醒写入通知
+
+### Verification
+- `cd backend && npm run test -- src/controllers/opsExecutionController.test.js src/routes/opsExecution.test.js`
+- `cd backend && npm run test -- src/services/opsTaskReminderService.test.js src/config/constants.test.js src/app.test.js`
+- `cd frontend && npm run test -- src/app/dashboard/ops-execution/page.test.tsx`
+- `cd frontend && npm run lint -- src/app/dashboard/ops-execution/page.tsx src/app/dashboard/ops-execution/page.test.tsx src/services/opsExecution.service.ts src/components/layout/Sidebar.tsx`
+
+### Remaining Risk
+- 首批交付若直接引入 Prisma 新模型，会扩大数据库变更面并拖慢反馈；因此 `未发货清单 v1` 先使用 `SystemConfig` 存储负责人映射，待后续稳定后再升级为专用模型。
+- 当前采购清单模板和任务数据仍保存在 `SystemConfig`，后续若量级增大应迁移为专用数据表。
+
 # Frontend Polish Plan
 
 ## 2026-03-13 Round 60 (详情页按需加载重数据)

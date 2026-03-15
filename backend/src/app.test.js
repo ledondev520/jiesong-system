@@ -48,6 +48,11 @@ const loadApp = () => {
           startInventoryAlertJob: () => {},
         };
       }
+      if (request === './jobs/opsTaskReminderJob') {
+        return {
+          startOpsTaskReminderJob: () => {},
+        };
+      }
     }
 
     return originalLoad(request, parent, isMain);

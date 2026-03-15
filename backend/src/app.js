@@ -15,6 +15,7 @@ const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./middleware/logger');
 const { gentleRateLimit } = require('./middleware/rateLimit');
 const { startInventoryAlertJob } = require('./jobs/inventoryAlertJob');
+const { startOpsTaskReminderJob } = require('./jobs/opsTaskReminderJob');
 
 const app = express();
 
@@ -113,6 +114,7 @@ const PORT = config.port;
 
 if (require.main === module) {
   startInventoryAlertJob();
+  startOpsTaskReminderJob();
   app.listen(PORT, () => {
     console.log(`
 ╔════════════════════════════════════════════╗

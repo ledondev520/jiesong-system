@@ -1,5 +1,26 @@
 # Progress Log
 
+## 2026-03-15 Ops Execution Center
+- Confirmed the three requested capabilities are not fully present in the current repo.
+- Chose phased delivery:
+  - first ship `经营执行中台` entry + `未发货清单 v1`
+  - then extend into purchase checklist templates
+  - then add task reminder engine
+- Recorded the implementation plan in `docs/plans/2026-03-15-ops-execution-center.md`.
+- Updated root checkpoint files to support resume-on-restart for this feature stream.
+- Added backend controller + route for unshipped aggregation and assignee distribution.
+- Added frontend ops center page, service, and sidebar navigation entry.
+- Validation completed:
+  - `backend` targeted tests passed (`4/4`)
+  - `frontend` targeted tests passed (`3/3`)
+  - `frontend` targeted lint passed
+- Added purchase checklist generation/save/export flow to the ops center.
+- Added natural-language task creation and reminder-processing backend job.
+- Expanded validation:
+  - `backend` targeted tests passed (`17/17`)
+  - `frontend` targeted tests passed (`5/5`)
+  - `frontend` targeted lint passed
+
 ## Session Start
 - Analyzed existing docs and file structure.
 - Identified architecture mismatch (Docs says Fullstack, actual is Separated).

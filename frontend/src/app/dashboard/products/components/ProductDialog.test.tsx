@@ -70,9 +70,12 @@ describe('ProductDialog', () => {
       expect(mockSearch).toHaveBeenCalledWith('瓷砖');
     });
 
-    await user.click(screen.getByRole('button', { name: /釉面砖/ }));
+    await user.click(await screen.findByRole('button', { name: /釉面砖/ }, { timeout: 5000 }));
 
-    expect(screen.getByDisplayValue('69072190')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('13%')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(mockGetByCode).toHaveBeenCalledWith('69072190');
+      expect(screen.getByLabelText('HS编码')).toHaveValue('69072190');
+      expect(screen.getByLabelText('税率(%)')).toHaveValue('13%');
+    }, { timeout: 5000 });
   });
 });
