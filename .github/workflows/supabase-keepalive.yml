@@ -1,0 +1,67 @@
+name: Supabase Keep-Alive Ping
+
+# 职责：每 3 天自动 ping Supabase 项目一次，防止免费套餐因 7 天无活动而被自动暂停。
+# 原理：向 Supabase REST 健康检查端点发送 HTTP 请求，即可刷新项目活跃计时器。
+# 费用：完全免费（GitHub Actions 公共仓库无限额度，私有仓库每月 2000 分钟免费额度）。
+
+on:
+  # 每 3 天 UTC 08:00（北京时间 16:00）触发，远小于 7 天暂停阈值
+  schedule:
+    - cron: '0 8 */3 * *'
+  # 允许手动触发（测试用）
+  workflow_dispatch:
+
+jobs:
+  ping-supabase:
+    name: Ping Supabase Project JIESONG
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Ping Supabase REST health endpoint
+        env:
+          # 可选：在 GitHub Repo → Settings → Secrets 中添加 SUPABASE_ANON_KEY
+          # 不设置也可以正常保活（401 响应同样刷新活跃计时器）
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          PROJECT_ID="thysagculhohynfrapgk"
+          BASE_URL="https://${PROJECT_ID}.supabase.co"
+
+          echo "⏰ $(date -u '+%Y-%m-%d %H:%M:%S UTC') — 开始 ping Supabase 项目 ${PROJECT_ID}"
+
+          # 0. 构建请求头（有 key 时附带，没有也不报错）
+          HEADERS=()
+          if [ -n "${SUPABASE_ANON_KEY}" ]; then
+            HEADERS+=(-H "apikey: ${SUPABASE_ANON_KEY}")
+            HEADERS+=(-H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+            echo "ℹ️  使用 SUPABASE_ANON_KEY 认证"
+          else
+            echo "ℹ️  未配置 SUPABASE_ANON_KEY，使用匿名请求（401 响应同样有效）"
+          fi
+
+          # 1. 先 ping 项目根域名（不需要任何认证，确认项目在线）
+          ROOT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 30 "${BASE_URL}")
+          echo "  根域名响应码：${ROOT_STATUS}"
+
+          # 2. 再 ping REST API 端点（刷新 Supabase 活跃计时器的关键请求）
+          REST_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 30 \
+            "${HEADERS[@]}" \
+            "${BASE_URL}/rest/v1/")
+          echo "  REST API 响应码：${REST_STATUS}"
+
+          # 3. 判断项目是否在线（000 = 超时/无法连接，说明项目已暂停）
+          if [ "${ROOT_STATUS}" = "000" ] && [ "${REST_STATUS}" = "000" ]; then
+            echo "❌ 所有请求均超时，Supabase 项目可能已被暂停！请前往 Dashboard 手动恢复。"
+            echo "   Dashboard: https://supabase.com/dashboard/project/${PROJECT_ID}"
+            exit 1
+          fi
+
+          echo "✅ 项目 JIESONG 保活成功，活跃计时器已刷新。"
+
+      - name: Log result
+        if: always()
+        run: |
+          echo "下次自动 ping 时间：约 3 天后"
+          echo "Supabase Dashboard: https://supabase.com/dashboard/project/thysagculhohynfrapgk"
