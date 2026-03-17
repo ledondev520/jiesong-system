@@ -15,8 +15,9 @@ import { ArrowLeft } from 'lucide-react';
 interface PageHeaderProps {
   title: string;
   description?: string;
-  backHref?: string;  // 指定返回链接，不指定则使用router.back()
-  backLabel?: string; // 返回按钮文字，默认"返回"
+  backHref?: string;   // 指定返回链接，不指定则使用router.back()
+  backLabel?: string;  // 返回按钮文字，默认"返回"
+  showBack?: boolean;  // 是否显示返回按钮，顶层页面传 false
   actions?: React.ReactNode; // 右侧操作按钮
 }
 
@@ -32,6 +33,7 @@ export function PageHeader({
   description, 
   backHref, 
   backLabel = '返回',
+  showBack = true,
   actions 
 }: PageHeaderProps) {
   const router = useRouter();
@@ -47,16 +49,18 @@ export function PageHeader({
   return (
     <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
       <div className="flex min-w-0 items-start gap-3">
-        {/* 返回按钮 */}
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={handleBack}
-          className="mt-0.5 gap-1"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          {backLabel}
-        </Button>
+        {/* 返回按钮：顶层页面通过 showBack={false} 隐藏 */}
+        {showBack && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleBack}
+            className="mt-0.5 gap-1"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            {backLabel}
+          </Button>
+        )}
         
         {/* 标题区域 */}
         <div className="min-w-0">

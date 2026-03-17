@@ -337,7 +337,7 @@ export function Header() {
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" className="relative h-9 w-9 rounded-md">
+            <Button variant="outline" size="icon" className="relative h-11 w-11 rounded-md">
               <Bell className="h-5 w-5" />
               <span className="sr-only">通知</span>
             </Button>
@@ -354,7 +354,7 @@ export function Header() {
         {/* User Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-9 gap-2 rounded-md px-2">
+            <Button variant="ghost" className="h-11 gap-2 rounded-md px-2">
               <Avatar className="h-7 w-7 border">
                 <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
               </Avatar>

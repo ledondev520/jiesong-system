@@ -92,7 +92,7 @@ export function ModuleTabHeader({ tabs, moduleName }: ModuleTabHeaderProps) {
             key={tab.href}
             href={tab.href}
             className={cn(
-              'relative flex items-center px-4 py-2.5 text-sm font-medium transition-colors',
+              'relative flex min-h-[44px] items-center px-4 py-2.5 text-sm font-medium transition-colors',
               'hover:text-foreground',
               isActive(tab.href)
                 ? 'text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-primary'

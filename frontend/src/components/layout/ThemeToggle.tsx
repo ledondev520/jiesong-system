@@ -29,7 +29,18 @@ export function ThemeToggle() {
   );
 
   if (!mounted) {
-    return null;
+    // 渲染占位按钮保持 SSR/Client 组件树结构一致，避免 Radix 生成 ID 不匹配导致水合报错
+    return (
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-11 w-11 rounded-md"
+        disabled
+        aria-hidden="true"
+      >
+        <span className="h-5 w-5 block" />
+      </Button>
+    );
   }
 
   const isDark = resolvedTheme === 'dark';
@@ -38,7 +49,7 @@ export function ThemeToggle() {
     <Button
       variant="outline"
       size="icon"
-      className="h-9 w-9 rounded-md"
+      className="h-11 w-11 rounded-md"
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
       title={isDark ? '切换到白天模式' : '切换到夜间模式'}
       aria-label={isDark ? '切换到白天模式' : '切换到夜间模式'}

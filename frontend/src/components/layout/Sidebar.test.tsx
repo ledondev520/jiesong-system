@@ -51,14 +51,13 @@ describe('Sidebar', () => {
   });
 
   it('渲染导航项并标记当前路由', () => {
-    const { getByText, queryByText } = render(<Sidebar />);
+    const { getByText } = render(<Sidebar />);
 
-    // 当前路由是 /dashboard/contracts，对应 "采购合同"
-    const current = getByText('采购合同').closest('a');
+    // 当前路由是 /dashboard/contracts，对应 "采购" 模块
+    const current = getByText('采购').closest('a');
     expect(current?.className.includes('bg-background')).toBe(true);
-    expect(getByText('出口退税')).toBeInTheDocument();
-    expect(getByText('基础设置')).toBeInTheDocument();
-    expect(queryByText('系统管理')).toBeNull();
+    expect(getByText('出口')).toBeInTheDocument();
+    expect(getByText('系统管理')).toBeInTheDocument();
   });
 
   it('点击退出登录调用logout', () => {
@@ -68,20 +67,19 @@ describe('Sidebar', () => {
     expect(mockLogout).toHaveBeenCalled();
   });
 
-  it('基础设置路由下基础设置菜单激活', () => {
+  it('系统管理路由下系统管理菜单激活', () => {
     mockPathname = '/dashboard/settings';
     const { getByText } = render(<Sidebar />);
 
-    const settingLink = getByText('基础设置').closest('a');
+    const settingLink = getByText('系统管理').closest('a');
     expect(settingLink?.className.includes('bg-background')).toBe(true);
   });
 
-  it('非管理员角色仍可见基础设置入口', () => {
+  it('非管理员角色仍可见系统管理入口', () => {
     mockUser.role = Role.SALES;
     mockPathname = '/dashboard/settings';
-    const { getByText, queryByText } = render(<Sidebar />);
-    expect(getByText('基础设置')).toBeInTheDocument();
-    expect(queryByText('系统管理')).toBeNull();
+    const { getByText } = render(<Sidebar />);
+    expect(getByText('系统管理')).toBeInTheDocument();
   });
 
   it('空闲时预取可见导航路由', () => {

@@ -183,7 +183,7 @@ export function Sidebar() {
         </div>
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          className="h-11 w-full justify-start gap-3 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           onClick={() => logout()}
         >
           <LogOut className="h-4 w-4" />
