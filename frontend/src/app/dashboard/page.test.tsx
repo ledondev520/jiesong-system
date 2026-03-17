@@ -18,10 +18,7 @@ vi.mock('next/navigation', () => ({
     push: mockPush,
     back: vi.fn(),
   }),
-}));
-
-vi.mock('@/components/ai/AIGreeting', () => ({
-  AIGreeting: () => <div>AI问候模块</div>,
+  usePathname: () => '/dashboard',
 }));
 
 vi.mock('@/components/tools/ProductTracker', () => ({

@@ -35,13 +35,6 @@ export interface AiModelsResponse {
   description: Record<string, string>;
 }
 
-export interface AiGreeting {
-  greeting: string;
-  songName: string;
-  lyrics: string[];
-  source: 'ai' | 'local';
-}
-
 export interface DashboardAnalytics {
   contracts: {
     purchase: { count: number; totalAmount: number; paidAmount: number; unpaidAmount: number };
@@ -87,10 +80,6 @@ export const aiService = {
 
   getModels: async () => {
     return api.get<ApiResponse<AiModelsResponse>, ApiResponse<AiModelsResponse>>('/ai/models');
-  },
-
-  getGreeting: async () => {
-    return api.get<ApiResponse<AiGreeting>, ApiResponse<AiGreeting>>('/ai/greeting');
   },
 
   getDashboardAnalytics: async () => {
