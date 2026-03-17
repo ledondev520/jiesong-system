@@ -345,11 +345,11 @@ export default function DataImportPage() {
                         <tbody className="divide-y divide-border/60">
                           {previewData.comparison.newRecords.slice(0, 50).map((record, i) => (
                             <tr key={i} className="hover:bg-muted/40">
-                              <td className="px-4 py-2 text-primary">{record.seq}</td>
-                              <td className="px-4 py-2 text-foreground">{record.customsName}</td>
-                              <td className="px-4 py-2 text-foreground/85">{record.storeName || '-'}</td>
-                              <td className="px-4 py-2 text-foreground/85">{record.containerNo || '-'}</td>
-                              <td className="px-4 py-2 text-right text-foreground/85">{record.quantity || '-'}</td>
+                              <td className="px-4 py-3 text-primary">{record.seq}</td>
+                              <td className="px-4 py-3 text-foreground">{record.customsName}</td>
+                              <td className="px-4 py-3 text-foreground/85">{record.storeName || '-'}</td>
+                              <td className="px-4 py-3 text-foreground/85">{record.containerNo || '-'}</td>
+                              <td className="px-4 py-3 text-right text-foreground/85">{record.quantity || '-'}</td>
                             </tr>
                           ))}
                         </tbody>

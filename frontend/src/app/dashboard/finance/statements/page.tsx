@@ -239,8 +239,8 @@ function BalanceSheetTable({ bs }: { bs: NonNullable<FinancialPeriod['balanceShe
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b">
-            <th className="text-left py-2 font-medium text-muted-foreground">科目</th>
-            <th className="text-right py-2 font-medium text-muted-foreground">金额（元）</th>
+            <th className="text-left py-3 font-medium text-muted-foreground">科目</th>
+            <th className="text-right py-3 font-medium text-muted-foreground">金额（元）</th>
           </tr>
         </thead>
         <tbody>
@@ -299,9 +299,9 @@ function IncomeStatementTable({ is: stmt }: { is: NonNullable<FinancialPeriod['i
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b">
-            <th className="text-left py-2 font-medium text-muted-foreground">项目</th>
-            <th className="text-right py-2 font-medium text-muted-foreground">本月金额（元）</th>
-            <th className="text-right py-2 font-medium text-muted-foreground">本年累计（元）</th>
+            <th className="text-left py-3 font-medium text-muted-foreground">项目</th>
+            <th className="text-right py-3 font-medium text-muted-foreground">本月金额（元）</th>
+            <th className="text-right py-3 font-medium text-muted-foreground">本年累计（元）</th>
           </tr>
         </thead>
         <tbody>
