@@ -1,6 +1,6 @@
 /**
- * Input: 后端dashboard API、AI greeting API
- * Output: 工作台页面（系统核心入口，含AI问候语、快速录入、商品追踪、数据看板）
+ * Input: 后端dashboard API
+ * Output: 工作台页面（系统核心入口，含快速录入、商品追踪、数据看板）
  * Pos: 系统首页，提供快速录入、商品追踪、数据看板
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -12,9 +12,9 @@ import { useRouter } from 'next/navigation';
 import { ModuleTabHeader, OPERATIONS_TABS } from '@/components/layout/ModuleTabHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { ShoppingCart, TrendingUp, Plus, ArrowRight } from 'lucide-react';
 import { ProductTracker } from '@/components/tools/ProductTracker';
-import { AIGreeting } from '@/components/ai/AIGreeting';
 import { DataDashboard } from '@/components/dashboard/DataDashboard';
 import { PageHeader } from '@/components/layout/PageHeader';
 
@@ -49,12 +49,11 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
-      {/* AI问候语悬浮卡片 */}
-      <AIGreeting />
 
       <PageHeader
         title="工作台"
         description="查看关键经营指标，并从这里进入高频业务流程。"
+        showBack={false}
       />
 
       {/* 快速录入区 */}
@@ -73,18 +72,25 @@ export default function DashboardPage() {
               return (
                 <Button
                   key={action.label}
-                  variant={action.tone === 'primary' ? 'default' : 'secondary'}
-                  className="h-auto min-h-28 items-start justify-start rounded-xl border border-border bg-background px-4 py-4 text-left shadow-none"
+                  variant="outline"
+                  className="h-auto min-h-20 items-start justify-start rounded-xl border border-border bg-background px-4 py-3 text-left shadow-none hover:bg-muted"
                   onClick={() => router.push(action.href)}
                 >
                   <div className="flex w-full items-center justify-between">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-background text-foreground ring-1 ring-border">
+                    <span
+                      className={cn(
+                        'flex h-10 w-10 items-center justify-center rounded-lg ring-1',
+                        action.tone === 'primary'
+                          ? 'bg-primary/10 text-primary ring-primary/20'
+                          : 'bg-muted text-muted-foreground ring-border',
+                      )}
+                    >
                       <Icon className="h-5 w-5" />
                     </span>
                     <ArrowRight className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div className="space-y-1">
-                    <span className="block font-medium">{action.label}</span>
+                    <span className="block font-medium text-foreground">{action.label}</span>
                     <span className="block text-xs text-muted-foreground">{action.desc}</span>
                   </div>
                 </Button>
