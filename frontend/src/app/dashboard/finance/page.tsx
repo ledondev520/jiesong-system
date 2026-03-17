@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, ArrowDownLeft, ArrowUpRight, Wallet, Loader2 } from 'lucide-react';
+import { DollarSign, ArrowDownLeft, ArrowUpRight, Wallet, Loader2, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -116,7 +116,7 @@ export default function FinancePage() {
                 <Icon className={`h-4 w-4 ${stat.variant || 'text-muted-foreground'}`} />
               </CardHeader>
               <CardContent>
-                <div className={`text-2xl font-bold ${stat.variant || ''}`}>{stat.value}</div>
+                <div className={`text-3xl font-bold tabular-nums ${stat.variant || ''}`}>{stat.value}</div>
                 <p className="text-xs text-muted-foreground">
                   {stat.description}
                 </p>
@@ -126,21 +126,35 @@ export default function FinancePage() {
         })}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="col-span-2">
-          <CardHeader>
-            <CardTitle>财务说明</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm text-muted-foreground space-y-2">
-              <p>• <strong>应付账款</strong>：需要支付给供应商的采购金额</p>
-              <p>• <strong>应收账款</strong>：待从美国门店收回的销售款项</p>
-              <p>• 采购金额来自导入的CSV数据中的“采购金额”列</p>
-              <p>• 点击“查看应付”或“查看应收”可查看详细明细</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* 空状态：所有数据均为 0 时显示引导操作，否则显示账期说明 */}
+      {stats &&
+      stats.payable.total === 0 &&
+      stats.receivable.total === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-14 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+            <BookOpen className="h-6 w-6 text-muted-foreground" />
+          </span>
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-foreground">暂无财务记录</p>
+            <p className="text-xs text-muted-foreground">
+              导入采购或销售合同数据后，应付 / 应收账款将自动汇总显示在此。
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href="/dashboard/finance/payable">查看应付明细</Link>
+            </Button>
+            <Button asChild size="sm">
+              <Link href="/dashboard/finance/receivable">查看应收明细</Link>
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">账款说明：</span>
+          应付账款为人民币（¥），应收账款为美元（$）。点击上方按钮可查看逐笔明细。
+        </div>
+      )}
     </div>
   );
 }
