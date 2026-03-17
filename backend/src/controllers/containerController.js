@@ -1,7 +1,9 @@
 /**
- * Input: 容器/货柜控制器
- * Output: 货柜相关 HTTP 控制器
- * Pos: 委托 service 完成容器业务，仅保留响应层组装
+ * Input: containerService（货柜服务层）
+ * Output: 货柜及装箱明细 HTTP 控制器（list/getById/create/update/remove/addItem/updateItem/removeItem/listItems/getItemsSummary）
+ * Pos: 货柜控制器层，委托 service 完成业务，仅负责请求解析与响应组装
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { success, created, paginated } = require('../utils/response');
@@ -131,6 +133,34 @@ const getVisualization = async (req, res, next) => {
   }
 };
 
+/**
+ * 职责：返回货柜所有装箱明细行（含商品和门店信息）
+ * 参数：req.params.id - 货柜(salesContract)ID
+ * 返回：{ success: true, data: PackingItem[] }
+ */
+const listItems = async (req, res, next) => {
+  try {
+    const items = await containerService.listItems(req.params.id);
+    success(res, items);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：返回货柜装箱明细汇总数据
+ * 参数：req.params.id - 货柜(salesContract)ID
+ * 返回：{ success: true, data: { itemCount, totalBoxes, totalGrossWeight, totalNetWeight, totalVolume, totalAmount } }
+ */
+const getItemsSummary = async (req, res, next) => {
+  try {
+    const summary = await containerService.getItemsSummary(req.params.id);
+    success(res, summary);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   list,
   getById,
@@ -144,4 +174,6 @@ module.exports = {
   getNextContainerNo,
   getProducts,
   getVisualization,
+  listItems,
+  getItemsSummary,
 };

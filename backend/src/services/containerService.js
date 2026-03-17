@@ -559,6 +559,83 @@ const removeItem = async (id, itemId) => {
   await recalculateContainerStats(id);
 };
 
+/**
+ * 职责：获取货柜所有装箱明细行，含商品和门店信息
+ * 参数：id - salesContractId（货柜ID）
+ * 返回：PackingItem 数组，按创建时间升序
+ */
+const listItems = async (id) => {
+  const contract = await prisma.salesContract.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!contract) {
+    throw createError('货柜不存在', 404);
+  }
+
+  const items = await prisma.packingItem.findMany({
+    where: { salesContractId: id },
+    include: {
+      product: {
+        select: {
+          id: true,
+          customsName: true,
+          description: true,
+          specification: true,
+          unit: true,
+          hsCode: true,
+        },
+      },
+      store: {
+        select: { id: true, name: true },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  return items;
+};
+
+/**
+ * 职责：汇总货柜装箱明细数据，返回体积/重量/箱数统计
+ * 参数：id - salesContractId（货柜ID）
+ * 返回：{ itemCount, totalBoxes, totalGrossWeight, totalNetWeight, totalVolume, totalAmount }
+ */
+const getItemsSummary = async (id) => {
+  const contract = await prisma.salesContract.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!contract) {
+    throw createError('货柜不存在', 404);
+  }
+
+  const [count, agg] = await Promise.all([
+    prisma.packingItem.count({ where: { salesContractId: id } }),
+    prisma.packingItem.aggregate({
+      where: { salesContractId: id },
+      _sum: {
+        boxes: true,
+        grossWeight: true,
+        netWeight: true,
+        volume: true,
+        totalPrice: true,
+        quantity: true,
+      },
+    }),
+  ]);
+
+  return {
+    itemCount: count,
+    totalBoxes: agg._sum.boxes || 0,
+    totalGrossWeight: roundNumber(agg._sum.grossWeight || 0),
+    totalNetWeight: roundNumber(agg._sum.netWeight || 0),
+    totalVolume: roundNumber(agg._sum.volume || 0),
+    totalQuantity: roundNumber(agg._sum.quantity || 0),
+    totalAmount: roundNumber(agg._sum.totalPrice || 0, 2),
+  };
+};
+
 const recalculateContainerStats = async (salesContractId) => {
   const stats = await prisma.packingItem.aggregate({
     where: { salesContractId },
@@ -590,4 +667,6 @@ module.exports = {
   getNextContainerNo,
   getProducts,
   getVisualization,
+  listItems,
+  getItemsSummary,
 };

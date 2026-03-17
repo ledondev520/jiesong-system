@@ -1,8 +1,8 @@
 /**
- * Input: 货柜控制器
- * Output: 货柜管理路由
- * Pos: 货柜路由，处理货柜CRUD操作
- * 
+ * Input: containerController（货柜控制器）、auth/auditLog 中间件
+ * Output: /api/v1/containers 路由，含货柜 CRUD 和装箱明细（PackingItem）增删改查汇总
+ * Pos: 货柜路由层，将 HTTP 请求分发到 containerController
+ *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
@@ -44,6 +44,12 @@ router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', '
   { entity: 'Container', action: 'DELETE', model: 'salesContract' },
   containerController.remove
 ));
+
+// GET /api/v1/containers/:id/items - 获取装箱明细列表（含商品和门店信息）
+router.get('/:id/items', withIdValidation, containerController.listItems);
+
+// GET /api/v1/containers/:id/items/summary - 获取装箱明细汇总（totalBoxes/totalGrossWeight/totalVolume/itemCount）
+router.get('/:id/items/summary', withIdValidation, containerController.getItemsSummary);
 
 // POST /api/v1/containers/:id/items - 添加装箱明细
 router.post('/:id/items', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
