@@ -21,7 +21,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { aiService, type AiSessionItem, type AiStandaloneTokenRow } from '@/services/ai.service';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, RefreshCw, Trash2, MessageSquare, FileText } from 'lucide-react';
+import { Loader2, RefreshCw, Trash2, MessageSquare, FileText, BarChart2 } from 'lucide-react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { formatDateTime, formatTime } from '@/lib/date-format';
@@ -322,8 +323,17 @@ export default function AiSessionsPage() {
               <button className="text-xs text-primary underline" onClick={() => void loadTokenStats(statsDays)}>重试</button>
             </div>
           ) : chartData.length === 0 ? (
-            <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
-              暂无 Token 使用数据
+            <div className="flex flex-col items-center justify-center h-40 gap-3 text-center">
+              <BarChart2 className="h-8 w-8 text-muted-foreground/40" />
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">暂无 Token 使用数据</p>
+                <p className="text-xs text-muted-foreground/70 mt-1">
+                  与 AI 助手对话后，这里会显示用量趋势图
+                </p>
+              </div>
+              <Link href="/dashboard/ai" className="text-xs text-primary hover:underline">
+                前往 AI 助手对话 →
+              </Link>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={220}>

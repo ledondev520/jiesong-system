@@ -27,6 +27,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
 import { Cpu, X, Save, Loader2, Eye, EyeOff, Key, ExternalLink, ChevronDown } from 'lucide-react';
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE, UNITS as INITIAL_UNITS } from '@/lib/constants';
 import { configService } from '@/services/config.service';
@@ -455,15 +456,14 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                     {temperature.toFixed(1)} — {getTemperatureStyleLabel(temperature)}
                   </span>
                 </div>
-                <input
+                <Slider
                   id="ai-temperature"
-                  type="range"
                   min={0}
                   max={1}
                   step={0.1}
-                  value={temperature}
-                  onChange={(e) => setTemperature(Number(e.target.value))}
-                  className="h-2 w-full cursor-pointer accent-primary"
+                  value={[temperature]}
+                  onValueChange={([v]) => setTemperature(v)}
+                  className="max-w-md"
                 />
                 <p className="text-xs text-muted-foreground">
                   0–0.3 偏保守，0.4–0.7 均衡，0.8–1 更富创意；影响非推理对话的随机性。

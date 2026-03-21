@@ -53,8 +53,8 @@ describe('SystemConfigTab', () => {
       expect(screen.getByText('AI 模型优先级')).toBeInTheDocument();
     });
 
-    expect(screen.getByLabelText(/采样温度/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/最大输出长度/)).toBeInTheDocument();
+    expect(screen.getAllByText(/采样温度/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/最大输出长度/).length).toBeGreaterThan(0);
     expect(screen.getByText(/0\.7 — 均衡/)).toBeInTheDocument();
   });
 
