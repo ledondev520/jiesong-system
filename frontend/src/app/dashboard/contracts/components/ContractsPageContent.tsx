@@ -33,7 +33,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { AmountText } from '@/components/ui/amount-text';
-import { Plus, Eye, FileText, ShoppingCart, Package, Loader2, FileDown, Filter } from 'lucide-react';
+import { Plus, Eye, FileText, ShoppingCart, Package, Loader2, FileDown, Filter, X } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -47,6 +47,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { contractDocService } from '@/services/contractDoc.service';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { PageSizeSelect } from '@/components/ui/page-size-select';
 
 // 扩展类型
 interface PurchaseContractDetail extends PurchaseContract {
@@ -72,7 +73,7 @@ export default function ContractsPageContent() {
   
   // 分页状态
   const [purchasePage, setPurchasePage] = useState(1);
-  const PAGE_SIZE = 30;
+  const [pageSize, setPageSize] = useState(20);
   
   // 同步URL参数变化
   useEffect(() => {
@@ -102,16 +103,16 @@ export default function ContractsPageContent() {
     return filtered;
   }, [purchaseContracts, purchaseStatusFilter, storeFilter, productSearch]);
   
-  const purchaseTotalPages = Math.ceil(filteredPurchaseContracts.length / PAGE_SIZE);
+  const purchaseTotalPages = Math.ceil(filteredPurchaseContracts.length / pageSize);
   const pagedPurchaseContracts = filteredPurchaseContracts.slice(
-    (purchasePage - 1) * PAGE_SIZE,
-    purchasePage * PAGE_SIZE
+    (purchasePage - 1) * pageSize,
+    purchasePage * pageSize
   );
   
-  // 筛选变化时重置页码
+  // 筛选或每页条数变化时重置页码
   useEffect(() => {
     setPurchasePage(1);
-  }, [purchaseStatusFilter, storeFilter, productSearch]);
+  }, [purchaseStatusFilter, storeFilter, productSearch, pageSize]);
   
   // 采购详情弹窗状态
   const [detailOpen, setDetailOpen] = useState(false);
@@ -262,9 +263,11 @@ export default function ContractsPageContent() {
                     setPurchaseStatusFilter('ALL');
                     setStoreFilter('');
                     setProductSearch('');
+                    setPurchasePage(1);
                   }}
                 >
-                  清除筛选
+                  <X className="h-4 w-4 mr-1" />
+                  重置
                 </Button>
               )}
             </div>
@@ -373,31 +376,34 @@ export default function ContractsPageContent() {
           </div>
           
           {/* 分页控件 */}
-          {purchaseTotalPages > 1 && (
-            <div className="flex items-center justify-between py-4">
-              <div className="text-sm text-muted-foreground">
-                共 {filteredPurchaseContracts.length} 条，第 {purchasePage}/{purchaseTotalPages} 页
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPurchasePage(p => Math.max(1, p - 1))}
-                  disabled={purchasePage === 1}
-                >
-                  上一页
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPurchasePage(p => Math.min(purchaseTotalPages, p + 1))}
-                  disabled={purchasePage === purchaseTotalPages}
-                >
-                  下一页
-                </Button>
-              </div>
+          <div className="flex items-center justify-between py-4">
+            <div className="text-sm text-muted-foreground">
+              共 {filteredPurchaseContracts.length} 条
+              {purchaseTotalPages > 1 && `，第 ${purchasePage}/${purchaseTotalPages} 页`}
             </div>
-          )}
+            <div className="flex items-center gap-2">
+              <PageSizeSelect
+                value={pageSize}
+                onChange={(size) => { setPageSize(size); setPurchasePage(1); }}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPurchasePage(p => Math.max(1, p - 1))}
+                disabled={purchasePage === 1}
+              >
+                上一页
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPurchasePage(p => Math.min(purchaseTotalPages, p + 1))}
+                disabled={purchasePage === purchaseTotalPages || purchaseTotalPages <= 1}
+              >
+                下一页
+              </Button>
+            </div>
+          </div>
       </div>
 
       {/* 采购合同详情弹窗 */}

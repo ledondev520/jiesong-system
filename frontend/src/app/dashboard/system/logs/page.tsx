@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -24,6 +24,7 @@ import { exportSystemLogsCsv, getSystemLogs, SystemLogItem } from '@/services/sy
 import { toast } from 'sonner';
 import { Role } from '@/types';
 import { useAuthStore } from '@/store/auth.store';
+import { PageSizeSelect } from '@/components/ui/page-size-select';
 
 type LogFilter = 'all' | 'import';
 
@@ -61,11 +62,22 @@ export default function SystemLogsPage() {
   const [filter, setFilter] = useState<LogFilter>('all');
   const [exporting, setExporting] = useState(false);
   const [total, setTotal] = useState(0);
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const user = useAuthStore((state) => state.user);
   const filteredLogs = useMemo(
     () => (filter === 'import' ? logs.filter(isImportLog) : logs),
     [filter, logs]
   );
+  const totalFilteredPages = Math.ceil(filteredLogs.length / pageSize);
+  const pagedLogs = filteredLogs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  // 筛选变化时重置页码
+  const handleFilterChange = useCallback((newFilter: LogFilter) => {
+    setFilter(newFilter);
+    setCurrentPage(1);
+  }, []);
 
   const canAccess = user?.role === Role.ADMIN;
 
@@ -170,14 +182,14 @@ export default function SystemLogsPage() {
             <Button
               variant={filter === 'all' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setFilter('all')}
+              onClick={() => handleFilterChange('all')}
             >
               全部日志
             </Button>
             <Button
               variant={filter === 'import' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setFilter('import')}
+              onClick={() => handleFilterChange('import')}
             >
               导入日志
             </Button>
@@ -192,7 +204,7 @@ export default function SystemLogsPage() {
         <CardHeader>
           <CardTitle>日志列表</CardTitle>
           <CardDescription>
-            共 {total} 条记录，当前筛选：{filter === 'all' ? '全部' : '导入相关'}
+            共 {total} 条记录（筛选后 {filteredLogs.length} 条），当前：{filter === 'all' ? '全部' : '导入相关'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -219,7 +231,7 @@ export default function SystemLogsPage() {
                     <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">暂无日志。</TableCell>
                   </TableRow>
                 ) : (
-                  filteredLogs.map((log) => (
+                  pagedLogs.map((log) => (
                     <TableRow key={log.id}>
                       <TableCell>{formatDateTime(log.createdAt)}</TableCell>
                       <TableCell>{userLabel(log)}</TableCell>
@@ -243,6 +255,32 @@ export default function SystemLogsPage() {
                 )}
               </TableBody>
             </Table>
+          </div>
+          {/* 分页控制 */}
+          <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+            <span>第 {currentPage}/{Math.max(1, totalFilteredPages)} 页</span>
+            <div className="flex items-center gap-2">
+              <PageSizeSelect
+                value={pageSize}
+                onChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                上一页
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.min(totalFilteredPages, p + 1))}
+                disabled={currentPage === totalFilteredPages || totalFilteredPages <= 1}
+              >
+                下一页
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

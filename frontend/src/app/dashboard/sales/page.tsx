@@ -42,6 +42,7 @@ import { formatDate } from '@/lib/date-format';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
+import { PageSizeSelect } from '@/components/ui/page-size-select';
 export default function SalesPage() {
   const [contracts, setContracts] = useState<SalesContract[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +53,9 @@ export default function SalesPage() {
   const [contractToDelete, setContractToDelete] = useState<SalesContract | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [exportingId, setExportingId] = useState<string | null>(null);
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   useEffect(() => {
     loadContracts();
@@ -136,6 +140,9 @@ export default function SalesPage() {
     return <StatusBadge status={status} statusMap={{ [status]: config }} />;
   };
 
+  const totalPages = Math.ceil(contracts.length / pageSize);
+  const pagedContracts = contracts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
     <div className="space-y-6">
       <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
@@ -174,7 +181,7 @@ export default function SalesPage() {
                  <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">暂无出口合同。</TableCell>
                </TableRow>
             ) : (
-              contracts.map((contract) => (
+              pagedContracts.map((contract) => (
                 <TableRow key={contract.id}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
@@ -237,6 +244,33 @@ export default function SalesPage() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* 分页控制 */}
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>共 {contracts.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
+        <div className="flex items-center gap-2">
+          <PageSizeSelect
+            value={pageSize}
+            onChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+          >
+            上一页
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages || totalPages <= 1}
+          >
+            下一页
+          </Button>
+        </div>
       </div>
 
       {/* 删除确认对话框 */}

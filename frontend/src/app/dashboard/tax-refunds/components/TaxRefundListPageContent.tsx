@@ -21,8 +21,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TaxRefundStatusBadge, taxRefundStatusOptions } from './TaxRefundStatusBadge';
+import { PageSizeSelect } from '@/components/ui/page-size-select';
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
 
 export function TaxRefundListPageContent() {
   const router = useRouter();
@@ -35,17 +36,18 @@ export function TaxRefundListPageContent() {
   const [taxRefunds, setTaxRefunds] = useState<TaxRefund[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingDrafts, setGeneratingDrafts] = useState(false);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const deferredKeyword = useDeferredValue(keyword);
 
   const loadTaxRefunds = useCallback(async () => {
     setLoading(true);
     try {
-      const cacheKey = `tax-refunds-${deferredKeyword}-${status}`;
+      const cacheKey = `tax-refunds-${deferredKeyword}-${status}-${pageSize}`;
       const response = await cachedFetch(
         cacheKey,
         () => taxRefundService.getAll({
           page: 1,
-          pageSize: PAGE_SIZE,
+          pageSize,
           keyword: deferredKeyword || undefined,
           status: status === 'ALL' ? undefined : status,
         }),
@@ -56,7 +58,7 @@ export function TaxRefundListPageContent() {
     } finally {
       setLoading(false);
     }
-  }, [deferredKeyword, status]);
+  }, [deferredKeyword, status, pageSize]);
 
   useEffect(() => {
     void loadTaxRefunds();
@@ -230,7 +232,13 @@ export function TaxRefundListPageContent() {
         </CardContent>
       </Card>
 
-      <div className="text-sm text-muted-foreground">已退金额合计：{totalRefunded.toLocaleString()}</div>
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>已退金额合计：{totalRefunded.toLocaleString()}</span>
+        <PageSizeSelect
+          value={pageSize}
+          onChange={(size) => setPageSize(size)}
+        />
+      </div>
     </div>
   );
 }

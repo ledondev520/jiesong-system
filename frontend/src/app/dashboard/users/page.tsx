@@ -23,6 +23,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Plus, Pencil, Trash, UserCog } from 'lucide-react';
+import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserDialog } from './components/UserDialog';
@@ -35,6 +36,9 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   useEffect(() => {
     loadUsers();
@@ -101,6 +105,9 @@ export default function UsersPage() {
     }
   };
 
+  const totalPages = Math.ceil(users.length / pageSize);
+  const pagedUsers = users.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
     <div className="space-y-6">
       <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
@@ -131,12 +138,12 @@ export default function UsersPage() {
                <TableRow>
                  <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
                </TableRow>
-            ) : users.length === 0 ? (
+            ) : pagedUsers.length === 0 ? (
                <TableRow>
                  <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">暂无用户。</TableCell>
                </TableRow>
             ) : (
-              users.map((user) => (
+              pagedUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
@@ -173,6 +180,33 @@ export default function UsersPage() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* 分页控制 */}
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>共 {users.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
+        <div className="flex items-center gap-2">
+          <PageSizeSelect
+            value={pageSize}
+            onChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+          >
+            上一页
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages || totalPages <= 1}
+          >
+            下一页
+          </Button>
+        </div>
       </div>
 
       <UserDialog 

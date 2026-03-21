@@ -21,19 +21,25 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash, AlertTriangle } from 'lucide-react';
+import { Plus, Pencil, Trash, AlertTriangle, Search, X } from 'lucide-react';
 import { SupplierDialog } from './components/SupplierDialog';
 import type { SupplierFormValues } from './components/SupplierDialog';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { PageSizeSelect } from '@/components/ui/page-size-select';
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  // 搜索与分页状态
+  const [keyword, setKeyword] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   useEffect(() => {
     loadSuppliers();
@@ -95,6 +101,26 @@ export default function SuppliersPage() {
     }
   };
 
+  // 根据关键词过滤与分页
+  const filteredSuppliers = keyword.trim()
+    ? suppliers.filter((s) => {
+        const kw = keyword.trim().toLowerCase();
+        return (
+          s.name.toLowerCase().includes(kw) ||
+          (s.shortName || '').toLowerCase().includes(kw) ||
+          (s.contactName || '').toLowerCase().includes(kw) ||
+          (s.aliases || []).some((a) => a.alias.toLowerCase().includes(kw))
+        );
+      })
+    : suppliers;
+  const totalPages = Math.ceil(filteredSuppliers.length / pageSize);
+  const pagedSuppliers = filteredSuppliers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const handleReset = () => {
+    setKeyword('');
+    setCurrentPage(1);
+  };
+
   return (
     <div className="space-y-6">
       <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
@@ -102,9 +128,26 @@ export default function SuppliersPage() {
         title="商家管理"
         description="管理供应商档案与质量记录"
         actions={
-          <Button onClick={handleCreate} className="h-10 rounded-xl">
-            <Plus className="mr-2 h-4 w-4" /> 新增供应商
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-56">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="搜索供应商名称..."
+                value={keyword}
+                onChange={(e) => { setKeyword(e.target.value); setCurrentPage(1); }}
+                className="h-10 rounded-xl border-border/70 bg-background/70 pl-9"
+              />
+            </div>
+            {keyword && (
+              <Button variant="ghost" size="sm" className="h-10 rounded-xl" onClick={handleReset}>
+                <X className="h-4 w-4 mr-1" />
+                重置
+              </Button>
+            )}
+            <Button onClick={handleCreate} className="h-10 rounded-xl">
+              <Plus className="mr-2 h-4 w-4" /> 新增供应商
+            </Button>
+          </div>
         }
       />
 
@@ -124,12 +167,12 @@ export default function SuppliersPage() {
                <TableRow>
                  <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
                </TableRow>
-            ) : suppliers.length === 0 ? (
+            ) : pagedSuppliers.length === 0 ? (
                <TableRow>
-                 <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">暂无供应商数据。</TableCell>
+                 <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">{keyword ? '没有符合条件的供应商' : '暂无供应商数据。'}</TableCell>
                </TableRow>
             ) : (
-              suppliers.map((supplier) => (
+              pagedSuppliers.map((supplier) => (
                 <TableRow key={supplier.id}>
                   <TableCell>
                     <div className="font-medium">{supplier.name}</div>
@@ -169,6 +212,33 @@ export default function SuppliersPage() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* 分页控制 */}
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>共 {filteredSuppliers.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
+        <div className="flex items-center gap-2">
+          <PageSizeSelect
+            value={pageSize}
+            onChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+          >
+            上一页
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages || totalPages <= 1}
+          >
+            下一页
+          </Button>
+        </div>
       </div>
 
       <SupplierDialog 

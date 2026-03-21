@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
+import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -60,6 +61,9 @@ export default function SystemNotificationsPage() {
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const loadNotifications = useCallback(async () => {
     setLoading(true);
@@ -88,6 +92,8 @@ export default function SystemNotificationsPage() {
     () => (filter === 'unread' ? notifications.filter((item) => !item.isRead) : notifications),
     [filter, notifications]
   );
+  const totalPages = Math.ceil(filteredNotifications.length / pageSize);
+  const pagedNotifications = filteredNotifications.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleMarkRead = async (id: string) => {
     setMarkingId(id);
@@ -114,14 +120,14 @@ export default function SystemNotificationsPage() {
             <Button
               variant={filter === 'all' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setFilter('all')}
+              onClick={() => { setFilter('all'); setCurrentPage(1); }}
             >
               全部通知
             </Button>
             <Button
               variant={filter === 'unread' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setFilter('unread')}
+              onClick={() => { setFilter('unread'); setCurrentPage(1); }}
             >
               仅未读
             </Button>
@@ -162,7 +168,7 @@ export default function SystemNotificationsPage() {
                     <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">暂无通知。</TableCell>
                   </TableRow>
                 ) : (
-                  filteredNotifications.map((item) => (
+                  pagedNotifications.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>{formatDateTime(item.createdAt)}</TableCell>
                       <TableCell>
@@ -197,6 +203,32 @@ export default function SystemNotificationsPage() {
                 )}
               </TableBody>
             </Table>
+          </div>
+          {/* 分页控制 */}
+          <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+            <span>共 {filteredNotifications.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
+            <div className="flex items-center gap-2">
+              <PageSizeSelect
+                value={pageSize}
+                onChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                上一页
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages || totalPages <= 1}
+              >
+                下一页
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

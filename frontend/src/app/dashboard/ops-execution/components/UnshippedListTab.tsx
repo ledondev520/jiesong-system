@@ -9,7 +9,7 @@
 'use client';
 
 import { useEffect, useEffectEvent, useMemo, useState } from 'react';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, X } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -204,7 +204,7 @@ export function UnshippedListTab() {
           <CardDescription>按订单、SKU、仓库状态聚合，并支持直接指定负责人。</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_200px_minmax(0,240px)_auto]">
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_200px_minmax(0,240px)_auto_auto]">
             <Input
               placeholder="搜索订单号、商品名称或 SKU"
               value={keyword}
@@ -239,6 +239,20 @@ export function UnshippedListTab() {
             >
               刷新清单
             </Button>
+            {(keyword || status !== 'ALL' || assigneeName) && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setKeyword('');
+                  setStatus('ALL');
+                  setAssigneeName('');
+                  void fetchUnshippedList({});
+                }}
+              >
+                <X className="h-4 w-4 mr-1" />
+                重置
+              </Button>
+            )}
           </div>
 
           {loading ? (

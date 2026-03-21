@@ -22,10 +22,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Pencil, Trash, Search, Package } from 'lucide-react';
+import { Plus, Pencil, Trash, Search, Package, X } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ProductDialog } from './components/ProductDialog';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -64,7 +65,8 @@ function useDebouncedValue<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-const PAGE_SIZE = 20;
+// 默认每页条数（由 PageSizeSelect 组件控制）
+const DEFAULT_PAGE_SIZE = 20;
 
 function ProductsPageContent() {
   const searchParams = useSearchParams();
@@ -80,6 +82,7 @@ function ProductsPageContent() {
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   // 0. 输入停止一段时间后再触发查询，降低请求频率
   useEffect(() => {
@@ -178,8 +181,8 @@ function ProductsPageContent() {
     }
   };
 
-  const totalPages = Math.ceil(products.length / PAGE_SIZE);
-  const pagedProducts = products.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const totalPages = Math.ceil(products.length / pageSize);
+  const pagedProducts = products.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="space-y-6">
@@ -199,6 +202,17 @@ function ProductsPageContent() {
                 className="h-10 rounded-xl border-border/70 bg-background/70 pl-9"
               />
             </div>
+            {keyword && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-10 rounded-xl"
+                onClick={() => { setKeyword(''); setCurrentPage(1); }}
+              >
+                <X className="h-4 w-4 mr-1" />
+                重置
+              </Button>
+            )}
             <Button onClick={handleCreate} className="h-10 rounded-xl">
               <Plus className="mr-2 h-4 w-4" /> 新增商品
             </Button>
@@ -266,30 +280,31 @@ function ProductsPageContent() {
       </div>
 
       {/* 分页控制 */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>共 {products.length} 条，每页 {PAGE_SIZE} 条</span>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              上一页
-            </Button>
-            <span className="px-3">{currentPage} / {totalPages}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              下一页
-            </Button>
-          </div>
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>共 {products.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
+        <div className="flex items-center gap-2">
+          <PageSizeSelect
+            value={pageSize}
+            onChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+          >
+            上一页
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages || totalPages <= 1}
+          >
+            下一页
+          </Button>
         </div>
-      )}
+      </div>
 
       <ProductDialog 
         open={isDialogOpen} 

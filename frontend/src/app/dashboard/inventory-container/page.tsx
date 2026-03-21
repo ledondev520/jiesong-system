@@ -27,13 +27,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Search } from 'lucide-react';
+import { MoreHorizontal, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, OPERATIONS_TABS } from '@/components/layout/ModuleTabHeader';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { PageSizeSelect } from '@/components/ui/page-size-select';
 
 const STATUS_LABEL_MAP: Record<InventoryStatus, string> = {
   [InventoryStatus.PRODUCING]: '生产中',
@@ -57,6 +58,9 @@ export default function InventoryPage() {
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [batchUpdating, setBatchUpdating] = useState(false);
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   /**
    * 职责：将关键词输入做轻量防抖，避免请求风暴。
@@ -230,6 +234,10 @@ export default function InventoryPage() {
     }
   };
 
+  // 客户端分页计算
+  const totalPages = Math.ceil(inventory.length / pageSize);
+  const pagedInventory = inventory.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
     <div className="space-y-6">
       <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
@@ -243,10 +251,21 @@ export default function InventoryPage() {
               <Input
                 placeholder="搜索商品/采购合同..."
                 value={keyword}
-                onChange={(event) => setKeyword(event.target.value)}
+                onChange={(event) => { setKeyword(event.target.value); setCurrentPage(1); }}
                 className="h-10 rounded-xl border-border/70 bg-background/70 pl-9"
               />
             </div>
+            {keyword && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-10 rounded-xl"
+                onClick={() => { setKeyword(''); setDebouncedKeyword(''); setCurrentPage(1); }}
+              >
+                <X className="h-4 w-4 mr-1" />
+                重置
+              </Button>
+            )}
             <Button
               variant="outline"
               disabled={batchUpdating || selectedIds.length === 0}
@@ -272,7 +291,7 @@ export default function InventoryPage() {
             <TableRow>
               <TableHead className="w-[48px]">
                 <Checkbox
-                  checked={inventory.length > 0 && selectedIds.length === inventory.length}
+                  checked={pagedInventory.length > 0 && pagedInventory.every((item) => selectedIds.includes(item.id))}
                   onCheckedChange={(checked) => toggleSelectAll(Boolean(checked))}
                   aria-label="全选库存记录"
                 />
@@ -298,7 +317,7 @@ export default function InventoryPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              inventory.map((item) => (
+              pagedInventory.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell>
                     <Checkbox
@@ -341,6 +360,33 @@ export default function InventoryPage() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* 分页控制 */}
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>共 {inventory.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
+        <div className="flex items-center gap-2">
+          <PageSizeSelect
+            value={pageSize}
+            onChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+          >
+            上一页
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages || totalPages <= 1}
+          >
+            下一页
+          </Button>
+        </div>
       </div>
     </div>
   );

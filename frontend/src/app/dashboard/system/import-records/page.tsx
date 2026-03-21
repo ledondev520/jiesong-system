@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader';
 import { Upload } from 'lucide-react';
+import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { getSystemImportRecords, SystemImportRecordItem } from '@/services/system.service';
 import { useAuthStore } from '@/store/auth.store';
 import { Role } from '@/types';
@@ -30,7 +31,7 @@ import { toast } from 'sonner';
 
 type StatusFilter = 'ALL' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
 
 const statusOptions: { value: StatusFilter; label: string }[] = [
   { value: 'ALL', label: '全部' },
@@ -93,6 +94,7 @@ export default function SystemImportRecordsPage() {
   const [keywordInput, setKeywordInput] = useState('');
   const [keyword, setKeyword] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -109,7 +111,7 @@ export default function SystemImportRecordsPage() {
     try {
       const response = await getSystemImportRecords({
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
         status: statusFilter === 'ALL' ? undefined : statusFilter,
         keyword: keyword || undefined,
       });
@@ -125,7 +127,7 @@ export default function SystemImportRecordsPage() {
     } finally {
       setLoading(false);
     }
-  }, [canAccess, keyword, page, statusFilter, user]);
+  }, [canAccess, keyword, page, pageSize, statusFilter, user]);
 
   useEffect(() => {
     loadRecords();
@@ -309,9 +311,13 @@ export default function SystemImportRecordsPage() {
 
           <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
             <span>
-              第 {page}/{totalPages} 页
+              共 {total} 条，第 {page}/{totalPages} 页
             </span>
             <div className="flex items-center gap-2">
+              <PageSizeSelect
+                value={pageSize}
+                onChange={(size) => { setPageSize(size); setPage(1); }}
+              />
               <Button variant="outline" size="sm" disabled={!canPrev} onClick={() => setPage((prev) => prev - 1)}>
                 上一页
               </Button>
