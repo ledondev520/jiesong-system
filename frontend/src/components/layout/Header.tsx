@@ -32,7 +32,7 @@ import {
 import {
   UserCircle, Bell, Search, Package, FileText, Container, Building2,
   Loader2, CalendarDays, Menu, Ship, LayoutDashboard, ShoppingCart,
-  PackageOpen, Landmark, SlidersHorizontal, LogOut,
+  PackageOpen, Landmark, SlidersHorizontal, LogOut, Bot,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
@@ -55,19 +55,19 @@ const mobileNavItems = [
     href: '/dashboard',
     label: '经营中台',
     icon: LayoutDashboard,
-    childPrefixes: ['/dashboard/inventory-container'],
+    childPrefixes: ['/dashboard/ops-execution', '/dashboard/inventory-container'],
   },
   {
     href: '/dashboard/contracts',
     label: '采购',
     icon: ShoppingCart,
-    childPrefixes: ['/dashboard/contracts', '/dashboard/store-recommend'],
+    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers'],
   },
   {
     href: '/dashboard/sales',
     label: '出口',
     icon: PackageOpen,
-    childPrefixes: ['/dashboard/sales', '/dashboard/tax-refunds', '/customs-declarations'],
+    childPrefixes: ['/dashboard/sales', '/dashboard/tax-refunds', '/customs-declarations', '/dashboard/hs-codes'],
   },
   {
     href: '/dashboard/finance/statements',
@@ -77,9 +77,15 @@ const mobileNavItems = [
   },
   {
     href: '/dashboard/ai/sessions',
+    label: 'AI 助手',
+    icon: Bot,
+    childPrefixes: ['/dashboard/ai'],
+  },
+  {
+    href: '/dashboard/settings',
     label: '系统管理',
     icon: SlidersHorizontal,
-    childPrefixes: ['/dashboard/ai', '/dashboard/contracts/templates', '/dashboard/settings'],
+    childPrefixes: ['/dashboard/contracts/templates', '/dashboard/settings', '/dashboard/import', '/dashboard/users', '/dashboard/system'],
   },
 ];
 

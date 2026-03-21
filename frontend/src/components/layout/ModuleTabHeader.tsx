@@ -104,7 +104,7 @@ export function ModuleTabHeader({ tabs, moduleName }: ModuleTabHeaderProps) {
 
   return (
     <div className="mb-6 border-b">
-      <nav className="flex items-end gap-0" aria-label={moduleName}>
+      <nav className="flex items-end gap-0 overflow-x-auto scrollbar-none" aria-label={moduleName}>
         {tabs.map((tab) => (
           <Link
             key={tab.href}
