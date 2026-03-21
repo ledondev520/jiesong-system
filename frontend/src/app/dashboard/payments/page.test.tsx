@@ -24,6 +24,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => ({
     get: (...args: unknown[]) => mockSearchParamGet(...args),
   }),
+  usePathname: () => '/dashboard/payments',
 }));
 
 vi.mock('@/services/finance.service', () => ({
@@ -36,6 +37,12 @@ vi.mock('@/services/finance.service', () => ({
 
 vi.mock('../../dashboard/finance/components/PaymentDialog', () => ({
   PaymentDialog: () => null,
+}));
+
+vi.mock('@/lib/api-cache', () => ({
+  cachedFetch: async (_key: string, fetcher: () => unknown) => fetcher(),
+  invalidateCache: vi.fn(),
+  clearAllCache: vi.fn(),
 }));
 
 describe('PaymentsPage 交互逻辑', () => {

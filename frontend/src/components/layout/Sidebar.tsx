@@ -6,11 +6,12 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  *
  * 导航分区结构：
- * - 经营中台：工作台、库存状态
- * - 采购模块：采购合同、采购建议
- * - 出口模块：出口合同、出口退税、报关单
- * - 财务模块：经营执行、收付款、财务报表
- * - 系统管理：AI 管理、合同模板、基础设置
+ * - 经营中台：工作台、经营执行、库存状态
+ * - 采购模块：采购合同、商家管理、采购建议
+ * - 出口模块：出口合同、出口退税、报关单、HS 编码
+ * - 财务模块：收付款、财务报表
+ * - AI 助手：AI 会话管理
+ * - 系统管理：合同模板、系统设置
  */
 
 'use client';
@@ -18,6 +19,7 @@
 import { useEffect, useRef, type ComponentType } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { getModuleTab } from '@/lib/tab-memory';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -27,6 +29,7 @@ import {
   PackageOpen,
   Landmark,
   SlidersHorizontal,
+  Bot,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/button';
@@ -52,31 +55,37 @@ const moduleNavItems: ModuleNavItem[] = [
     href: '/dashboard',
     label: '经营中台',
     icon: LayoutDashboard,
-    childPrefixes: ['/dashboard/inventory-container'],
+    childPrefixes: ['/dashboard/ops-execution', '/dashboard/inventory-container'],
   },
   {
     href: '/dashboard/contracts',
     label: '采购',
     icon: ShoppingCart,
-    childPrefixes: ['/dashboard/contracts', '/dashboard/store-recommend'],
+    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers'],
   },
   {
     href: '/dashboard/sales',
     label: '出口',
     icon: PackageOpen,
-    childPrefixes: ['/dashboard/sales', '/dashboard/tax-refunds', '/customs-declarations'],
+    childPrefixes: ['/dashboard/sales', '/dashboard/tax-refunds', '/customs-declarations', '/dashboard/hs-codes'],
   },
   {
-    href: '/dashboard/ops-execution',
+    href: '/dashboard/finance/statements',
     label: '财务',
     icon: Landmark,
-    childPrefixes: ['/dashboard/ops-execution', '/dashboard/payments', '/dashboard/finance'],
+    childPrefixes: ['/dashboard/payments', '/dashboard/finance'],
   },
   {
     href: '/dashboard/ai/sessions',
+    label: 'AI 助手',
+    icon: Bot,
+    childPrefixes: ['/dashboard/ai'],
+  },
+  {
+    href: '/dashboard/settings',
     label: '系统管理',
     icon: SlidersHorizontal,
-    childPrefixes: ['/dashboard/ai', '/dashboard/contracts/templates', '/dashboard/settings'],
+    childPrefixes: ['/dashboard/contracts/templates', '/dashboard/settings', '/dashboard/import', '/dashboard/users', '/dashboard/system'],
     adminOnly: false,
   },
 ];
@@ -103,11 +112,26 @@ export function Sidebar() {
 
   const visibleItems = moduleNavItems.filter((item) => !item.adminOnly || isAdmin);
 
-  // 空闲时预取各模块入口路由
+  // 高频操作页（新建/详情）预热列表
+  const ACTION_ROUTES = [
+    '/dashboard/purchase/create',
+    '/dashboard/sales/create',
+    '/dashboard/tax-refunds/create',
+    '/customs-declarations/create',
+    '/dashboard/contracts',
+    '/dashboard/payments',
+    '/dashboard/finance/statements',
+    '/dashboard/users',
+    '/dashboard/system',
+  ];
+
+  // 空闲时预取各模块入口路由 + 高频操作页
   useEffect(() => {
-    const routesToPrefetch = visibleItems
-      .map((i) => i.href)
-      .slice(0, MAX_PREFETCH_ROUTES)
+    const routesToPrefetch = [
+      ...visibleItems.map((i) => i.href),
+      ...ACTION_ROUTES,
+    ]
+      .slice(0, MAX_PREFETCH_ROUTES + ACTION_ROUTES.length)
       .filter((href) => !prefetchedRoutesRef.current.has(href));
 
     if (routesToPrefetch.length === 0) return;
@@ -157,21 +181,31 @@ export function Sidebar() {
       {/* 导航区：5 个模块入口 */}
       <ScrollArea className="flex-1">
         <nav className="grid gap-1 px-3 py-4">
-          {visibleItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors',
-                isModuleActive(item)
-                  ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
-                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-              )}
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              <span>{item.label}</span>
-            </Link>
-          ))}
+          {visibleItems.map((item) => {
+            // 点击模块时，优先跳转到上次记忆的子页面
+            const handleModuleClick = (e: React.MouseEvent) => {
+              e.preventDefault();
+              const target = getModuleTab(item.href);
+              router.push(target);
+            };
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={handleModuleClick}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors',
+                  isModuleActive(item)
+                    ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+                    : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                )}
+              >
+                <item.icon className="h-4 w-4 shrink-0" />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
         </nav>
       </ScrollArea>
 

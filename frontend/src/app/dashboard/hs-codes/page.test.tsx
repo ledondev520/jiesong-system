@@ -6,10 +6,12 @@ const mockList = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/dashboard/hs-codes',
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),
     back: vi.fn(),
+    prefetch: vi.fn(),
   }),
 }));
 
@@ -56,7 +58,7 @@ describe('HsCodesPage', () => {
     render(<HsCodesPage />);
 
     await waitFor(() => {
-      expect(mockList).toHaveBeenCalledWith({ keyword: '', page: 1, pageSize: 50 });
+      expect(mockList).toHaveBeenCalledWith({ keyword: '', page: 1, pageSize: 20, fuzzy: false });
     });
     expect(await screen.findByText('抛光瓷砖')).toBeInTheDocument();
   });
@@ -64,11 +66,11 @@ describe('HsCodesPage', () => {
   it('输入关键字后按关键字重新加载列表', async () => {
     render(<HsCodesPage />);
 
-    const input = await screen.findByPlaceholderText('输入商品名称或 HSCode 编码...');
+    const input = await screen.findByPlaceholderText('输入商品名称（支持相似度匹配）或 HSCode 编码...');
     fireEvent.change(input, { target: { value: '瓷砖' } });
 
     await waitFor(() => {
-      expect(mockList).toHaveBeenLastCalledWith({ keyword: '瓷砖', page: 1, pageSize: 50 });
+      expect(mockList).toHaveBeenLastCalledWith({ keyword: '瓷砖', page: 1, pageSize: 20, fuzzy: true });
     });
   });
 

@@ -1,10 +1,11 @@
 import axios, { type AxiosRequestConfig } from 'axios';
 import { clearAuthToken, getAuthToken } from '@/lib/auth-token';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 
 // Create Axios instance
 // 使用相对路径，通过Next.js rewrites代理到后端
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || '/api/v1',
+  baseURL: getApiBaseUrl(),
   timeout: 60000, // 增加到60秒，AI调用可能需要更长时间
   headers: {
     'Content-Type': 'application/json',

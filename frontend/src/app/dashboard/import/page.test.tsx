@@ -17,6 +17,7 @@ const mockGetDatabaseStats = vi.fn();
 const mockPreviewCSV = vi.fn();
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/dashboard',
   useRouter: () => ({
     push: mockPush,
     back: vi.fn(),
@@ -28,6 +29,12 @@ vi.mock('@/services/dataImportService', () => ({
   executeImport: vi.fn(),
   getImportHistory: (...args: unknown[]) => mockGetImportHistory(...args),
   getDatabaseStats: (...args: unknown[]) => mockGetDatabaseStats(...args),
+}));
+
+vi.mock('@/lib/api-cache', () => ({
+  cachedFetch: async (_key: string, fetcher: () => unknown) => fetcher(),
+  invalidateCache: vi.fn(),
+  clearAllCache: vi.fn(),
 }));
 
 describe('DataImportPage 交互逻辑', () => {

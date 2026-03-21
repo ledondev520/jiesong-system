@@ -29,8 +29,10 @@ vi.mock('next/navigation', () => ({
     push: mockPush,
     replace: vi.fn(),
     back: vi.fn(),
+    prefetch: vi.fn(),
   }),
   useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/dashboard',
 }));
 
 vi.mock('@/lib/axios', () => ({

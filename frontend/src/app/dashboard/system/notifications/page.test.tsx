@@ -15,6 +15,7 @@ const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/dashboard',
   useRouter: () => ({
     push: vi.fn(),
     back: vi.fn(),
@@ -53,6 +54,12 @@ const readNotification = {
   isRead: true,
   createdAt: '2026-03-01T08:00:00.000Z',
 };
+
+vi.mock('@/lib/api-cache', () => ({
+  cachedFetch: async (_key: string, fetcher: () => unknown) => fetcher(),
+  invalidateCache: vi.fn(),
+  clearAllCache: vi.fn(),
+}));
 
 describe('SystemNotificationsPage', () => {
   beforeEach(() => {

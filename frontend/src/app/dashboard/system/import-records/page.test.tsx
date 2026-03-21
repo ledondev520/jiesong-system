@@ -28,6 +28,7 @@ vi.mock('next/navigation', () => ({
     back: vi.fn(),
     replace: vi.fn(),
   }),
+  usePathname: () => '/dashboard/system/import-records',
 }));
 
 vi.mock('@/services/system.service', () => ({

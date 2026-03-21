@@ -21,6 +21,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
   }),
+  usePathname: () => '/dashboard/sales',
 }));
 
 vi.mock('@/services/sales.service', () => ({
@@ -35,6 +36,12 @@ vi.mock('sonner', () => ({
     error: (...args: unknown[]) => mockToastError(...args),
     success: (...args: unknown[]) => mockToastSuccess(...args),
   },
+}));
+
+vi.mock('@/lib/api-cache', () => ({
+  cachedFetch: async (_key: string, fetcher: () => unknown) => fetcher(),
+  invalidateCache: vi.fn(),
+  clearAllCache: vi.fn(),
 }));
 
 describe('SalesPage 交互逻辑', () => {

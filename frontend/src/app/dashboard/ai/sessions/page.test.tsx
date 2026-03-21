@@ -15,6 +15,7 @@ const mockToastError = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
+  usePathname: () => '/dashboard/ai/sessions',
 }));
 
 vi.mock('@/services/ai.service', () => ({
@@ -29,6 +30,12 @@ vi.mock('sonner', () => ({
     error: (...args: unknown[]) => mockToastError(...args),
     success: vi.fn(),
   },
+}));
+
+vi.mock('@/lib/api-cache', () => ({
+  cachedFetch: async (_key: string, fetcher: () => unknown) => fetcher(),
+  invalidateCache: vi.fn(),
+  clearAllCache: vi.fn(),
 }));
 
 describe('AiSessionsPage', () => {

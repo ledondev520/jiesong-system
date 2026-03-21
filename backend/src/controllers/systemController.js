@@ -6,8 +6,10 @@
 
 const {
   getConfigs,
+  getConfigsByDomain,
   updateConfig,
   getExchangeRate,
+  syncExchangeRate,
 } = require('./system/configController');
 const {
   getNotifications,
@@ -35,6 +37,7 @@ const {
 
 module.exports = {
   getConfigs,
+  getConfigsByDomain,
   updateConfig,
   getLogs,
   getOperationLogs,
@@ -42,6 +45,7 @@ module.exports = {
   getNotifications,
   markNotificationRead,
   getExchangeRate,
+  syncExchangeRate,
   getPorts,
   createPort,
   updatePort,

@@ -17,8 +17,11 @@ const router = Router();
 
 router.use(authenticate);
 
-// GET /api/v1/system/configs - 获取系统配置
+// GET /api/v1/system/configs - 获取系统配置（平铺格式，向后兼容）
 router.get('/configs', systemController.getConfigs);
+
+// GET /api/v1/system/configs/domains - 获取按域分组的系统配置（新端点，供设置页使用）
+router.get('/configs/domains', roleAuth('ADMIN'), systemController.getConfigsByDomain);
 
 // PUT /api/v1/system/configs/:key - 更新系统配置（仅管理员）
 router.put('/configs/:key', roleAuth('ADMIN'), withAuditLog(
@@ -49,6 +52,9 @@ router.put('/notifications/:id/read', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FI
 
 // GET /api/v1/system/exchange-rate - 获取当前汇率
 router.get('/exchange-rate', systemController.getExchangeRate);
+
+// POST /api/v1/system/exchange-rate/sync - 从公开 API 自动同步汇率（仅管理员）
+router.post('/exchange-rate/sync', roleAuth('ADMIN'), systemController.syncExchangeRate);
 
 // GET /api/v1/system/ports - 获取港口列表
 router.get('/ports', withPaginationValidation, systemController.getPorts);
@@ -115,10 +121,36 @@ router.post('/import', roleAuth('ADMIN'), upload.single('file'), withAuditLog(
 // GET /api/v1/system/import/records - 获取导入记录（仅管理员）
 router.get('/import/records', roleAuth('ADMIN'), withPaginationValidation, systemController.getImportRecords);
 
-// GET /api/v1/system/export/:type - 导出数据
-router.get('/export/:type', systemController.exportData);
+// GET /api/v1/system/export/:type - 导出数据（需要管理员或业务主管权限，操作记入审计日志）
+router.get('/export/:type', roleAuth('ADMIN', 'FINANCE', 'PURCHASE', 'SALES', 'WAREHOUSE'), withAuditLog(
+  {
+    entity: 'DataExport',
+    action: 'EXPORT',
+    captureBefore: false,
+    captureAfter: false,
+    getNewValue: ({ req }) => ({
+      type: req.params.type,
+      format: 'csv',
+      query: req.query,
+    }),
+  },
+  systemController.exportData
+));
 
-// GET /api/v1/system/export/:type/pdf - 导出PDF报表
-router.get('/export/:type/pdf', systemController.exportDataPdf);
+// GET /api/v1/system/export/:type/pdf - 导出PDF报表（需要管理员或业务主管权限，操作记入审计日志）
+router.get('/export/:type/pdf', roleAuth('ADMIN', 'FINANCE', 'PURCHASE', 'SALES', 'WAREHOUSE'), withAuditLog(
+  {
+    entity: 'DataExport',
+    action: 'EXPORT',
+    captureBefore: false,
+    captureAfter: false,
+    getNewValue: ({ req }) => ({
+      type: req.params.type,
+      format: 'pdf',
+      query: req.query,
+    }),
+  },
+  systemController.exportDataPdf
+));
 
 module.exports = router;

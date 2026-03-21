@@ -12,6 +12,7 @@ import { startTransition, useCallback, useDeferredValue, useEffect, useState } f
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { CustomsDeclaration } from '@/types';
 import { customsDeclarationService } from '@/services/customsDeclaration.service';
+import { cachedFetch } from '@/lib/api-cache';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -66,12 +67,16 @@ export function CustomsDeclarationListPageContent() {
   const loadDeclarations = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await customsDeclarationService.getAll({
-        page: 1,
-        pageSize: PAGE_SIZE,
-        keyword: deferredKeyword || undefined,
-        status: status === 'ALL' ? undefined : status,
-      });
+      const cacheKey = `customs-declarations-${deferredKeyword}-${status}`;
+      const response = await cachedFetch(
+        cacheKey,
+        () => customsDeclarationService.getAll({
+          page: 1,
+          pageSize: PAGE_SIZE,
+          keyword: deferredKeyword || undefined,
+          status: status === 'ALL' ? undefined : status,
+        }),
+      );
       setDeclarations(response?.data?.items || []);
     } catch {
       toast.error('加载报关单失败');
@@ -115,10 +120,9 @@ export function CustomsDeclarationListPageContent() {
       <PageHeader
         title="报关单管理"
         description="跟踪出口报关草稿、申报进度、查验与放行状态。"
-        backHref="/dashboard"
         actions={
           <>
-            <div className="relative w-72">
+            <div className="relative w-64">
               <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
               <Input
                 value={keyword}
@@ -140,6 +144,16 @@ export function CustomsDeclarationListPageContent() {
                 ))}
               </SelectContent>
             </Select>
+
+            {(keyword || status !== 'ALL') && (
+              <Button
+                variant="ghost"
+                className="h-11 rounded-xl"
+                onClick={() => { setKeyword(''); setStatus('ALL'); }}
+              >
+                重置
+              </Button>
+            )}
 
             <Button
               variant="outline"

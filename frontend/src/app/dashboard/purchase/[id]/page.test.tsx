@@ -30,6 +30,7 @@ vi.mock('react', async () => {
 });
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/dashboard',
   useRouter: () => ({
     push: vi.fn(),
     back: vi.fn(),
@@ -58,6 +59,24 @@ vi.mock('sonner', () => ({
     info: vi.fn(),
   },
 }));
+
+vi.mock('@/lib/api-cache', () => ({
+  cachedFetch: async (_key: string, fetcher: () => unknown) => fetcher(),
+  invalidateCache: vi.fn(),
+  clearAllCache: vi.fn(),
+}));
+
+vi.mock('@/lib/axios', () => ({
+  default: {
+    get: vi.fn().mockResolvedValue({ data: [] }),
+    post: vi.fn().mockResolvedValue({ data: {} }),
+    put: vi.fn().mockResolvedValue({ data: {} }),
+    delete: vi.fn().mockResolvedValue({ data: {} }),
+    create: vi.fn().mockReturnThis(),
+    interceptors: { request: { use: vi.fn() }, response: { use: vi.fn() } },
+  },
+}));
+
 
 describe('PurchaseDetailPage 交互逻辑', () => {
   beforeEach(() => {

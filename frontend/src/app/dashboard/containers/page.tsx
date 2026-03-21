@@ -30,11 +30,14 @@ import { PORTS } from '@/lib/constants';
 import { formatDate } from '@/lib/date-format';
 import { PageHeader } from '@/components/layout/PageHeader';
 
+const PAGE_SIZE = 20;
+
 export default function ContainersPage() {
   const [containers, setContainers] = useState<SalesContract[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingContainer, setEditingContainer] = useState<SalesContract | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     loadContainers();
@@ -112,6 +115,9 @@ export default function ContainersPage() {
     }
   };
 
+  const totalPages = Math.ceil(containers.length / PAGE_SIZE);
+  const pagedContainers = containers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -146,7 +152,7 @@ export default function ContainersPage() {
                  <TableCell colSpan={6} className="text-center py-10">暂无货柜数据。</TableCell>
                </TableRow>
             ) : (
-              containers.map((container) => (
+              pagedContainers.map((container) => (
                 <TableRow key={container.id}>
                   <TableCell className="font-medium flex items-center gap-2">
                     <Ship className="h-4 w-4 text-muted-foreground" />
@@ -178,6 +184,32 @@ export default function ContainersPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* 分页控制 */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>共 {containers.length} 条，每页 {PAGE_SIZE} 条</span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              上一页
+            </Button>
+            <span className="px-3">{currentPage} / {totalPages}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              下一页
+            </Button>
+          </div>
+        </div>
+      )}
 
       <ContainerDialog 
         open={isDialogOpen} 

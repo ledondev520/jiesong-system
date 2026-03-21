@@ -51,20 +51,4 @@ router.put('/purchase-checklist/templates', withAuditLog(
   controller.savePurchaseChecklistTemplate
 ));
 
-router.get('/tasks', controller.getTasks);
-router.post('/tasks', withAuditLog(
-  {
-    entity: 'OpsExecutionTask',
-    action: 'CREATE',
-    captureBefore: false,
-    captureAfter: false,
-    getNewValue: ({ req }) => ({
-      title: req.body?.title || null,
-      assigneeName: req.body?.assigneeName || null,
-      naturalLanguageInput: req.body?.naturalLanguageInput || null,
-    }),
-  },
-  controller.createTask
-));
-
 module.exports = router;

@@ -1,10 +1,9 @@
 /**
  * Input: Inventory, SalesContract, Product, SystemConfig
  * Output: 经营执行中台 API
- * Pos: 控制器层，提供未发货聚合与负责人分发能力
+ * Pos: 控制器层，提供未发货聚合、负责人分发与采购清单模板能力
  */
 
-const { randomUUID } = require('node:crypto');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { paginated, success } = require('../utils/response');
@@ -12,7 +11,6 @@ const { normalizePagination } = require('../utils/pagination');
 
 const ASSIGNMENT_CONFIG_KEY = 'ops_execution_unshipped_assignments';
 const PURCHASE_TEMPLATE_CONFIG_KEY = 'ops_execution_purchase_templates';
-const TASK_CONFIG_KEY = 'ops_execution_tasks';
 
 const DEFAULT_PURCHASE_TEMPLATES = [
   {
@@ -51,12 +49,6 @@ const DEFAULT_PURCHASE_TEMPLATES = [
     ],
   },
 ];
-
-const PRIORITY_ORDER = {
-  HIGH: 3,
-  MEDIUM: 2,
-  LOW: 1,
-};
 
 const parseOptionalText = (value) => {
   if (value === undefined || value === null) {
@@ -153,131 +145,6 @@ const summarizeChecklist = (items = []) => ({
   requiredCount: items.filter((item) => item.required).length,
   optionalCount: items.filter((item) => !item.required).length,
 });
-
-const parseNaturalLanguageDateTime = (input, now = new Date()) => {
-  const text = parseOptionalText(input);
-  const absoluteMatch = text.match(/(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})[日\s]+(\d{1,2})(?:[:点时](\d{1,2}))?/);
-  if (absoluteMatch) {
-    const [, year, month, day, hour, minute] = absoluteMatch;
-    return new Date(
-      Number(year),
-      Number(month) - 1,
-      Number(day),
-      Number(hour),
-      Number(minute || 0),
-      0,
-      0,
-    );
-  }
-
-  const dayOffset = text.includes('后天') ? 2 : text.includes('明天') ? 1 : 0;
-  const relativeMentioned = /(今天|明天|后天)/.test(text);
-  const timeMatch = text.match(/(上午|下午|晚上|中午)?\s*(\d{1,2})(?:[:点时](\d{1,2})|点半)?/);
-
-  if (!relativeMentioned && !timeMatch) {
-    return null;
-  }
-
-  const dueAt = new Date(now);
-  dueAt.setHours(10, 0, 0, 0);
-  dueAt.setDate(dueAt.getDate() + dayOffset);
-
-  if (timeMatch) {
-    const meridiem = timeMatch[1] || '';
-    let hour = Number(timeMatch[2]);
-    let minute = Number(timeMatch[3] || 0);
-    if (timeMatch[0].includes('点半')) {
-      minute = 30;
-    }
-    if ((meridiem === '下午' || meridiem === '晚上') && hour < 12) {
-      hour += 12;
-    }
-    if (meridiem === '中午' && hour < 11) {
-      hour += 12;
-    }
-    dueAt.setHours(hour, minute, 0, 0);
-  }
-
-  return dueAt;
-};
-
-const inferPriority = (input) => {
-  const text = parseOptionalText(input);
-  if (/紧急|高优先级|优先|P0|P1/.test(text)) {
-    return 'HIGH';
-  }
-  if (/低优先级|稍后|不急/.test(text)) {
-    return 'LOW';
-  }
-  return 'MEDIUM';
-};
-
-const inferAssignee = (input) => {
-  const text = parseOptionalText(input);
-  const match = text.match(/(?:提醒|给|由|负责人)([\u4e00-\u9fa5A-Za-z0-9_-]{2,12}?)(?=今天|明天|后天|\d{1,2}[点:时]|$)/);
-  return match?.[1] || '';
-};
-
-const inferTaskTitle = (input) => {
-  const text = parseOptionalText(input);
-  return (
-    text
-      .replace(/^(提醒|给)/, '')
-      .replace(/(今天|明天|后天).*/, '')
-      .replace(/(高优先级|低优先级|紧急)/g, '')
-      .replace(/^[\u4e00-\u9fa5A-Za-z0-9_-]{2,12}/, '')
-      .replace(/^[，,\s]+/, '')
-      .trim()
-    || text
-  );
-};
-
-const buildTaskPayload = (input = {}, now = new Date()) => {
-  const naturalLanguageInput = parseOptionalText(input.naturalLanguageInput);
-  const dueAt = naturalLanguageInput
-    ? (parseNaturalLanguageDateTime(naturalLanguageInput, now) || new Date(now.getTime() + 4 * 60 * 60 * 1000))
-    : new Date(parseOptionalText(input.dueAt) || now.getTime() + 4 * 60 * 60 * 1000);
-
-  const remindAtInput = parseOptionalText(input.remindAt);
-  const secondRemindAtInput = parseOptionalText(input.secondRemindAt);
-  const remindAt = remindAtInput
-    ? new Date(remindAtInput)
-    : new Date(Math.max(now.getTime() + 5 * 60 * 1000, dueAt.getTime() - 2 * 60 * 60 * 1000));
-  const secondRemindAt = secondRemindAtInput
-    ? new Date(secondRemindAtInput)
-    : new Date(dueAt.getTime() + 60 * 60 * 1000);
-
-  const title = naturalLanguageInput ? inferTaskTitle(naturalLanguageInput) : parseOptionalText(input.title);
-  const assigneeName = naturalLanguageInput ? inferAssignee(naturalLanguageInput) : parseOptionalText(input.assigneeName);
-  const priority = naturalLanguageInput ? inferPriority(naturalLanguageInput) : parseOptionalText(input.priority).toUpperCase() || 'MEDIUM';
-
-  if (!title) {
-    throw createError('任务标题不能为空', 400);
-  }
-  if (!assigneeName) {
-    throw createError('责任人不能为空', 400);
-  }
-  if (Number.isNaN(dueAt.getTime()) || Number.isNaN(remindAt.getTime()) || Number.isNaN(secondRemindAt.getTime())) {
-    throw createError('提醒时间格式错误', 400);
-  }
-
-  return {
-    id: randomUUID(),
-    title,
-    description: parseOptionalText(input.description),
-    assigneeName,
-    priority: PRIORITY_ORDER[priority] ? priority : 'MEDIUM',
-    status: 'TODO',
-    dueAt: dueAt.toISOString(),
-    remindAt: remindAt.toISOString(),
-    secondRemindAt: secondRemindAt.toISOString(),
-    firstReminderSentAt: null,
-    secondReminderSentAt: null,
-    sourceText: naturalLanguageInput || null,
-    createdAt: now.toISOString(),
-    updatedAt: now.toISOString(),
-  };
-};
 
 const getUnshippedList = async (req, res, next) => {
   try {
@@ -531,51 +398,6 @@ const exportPurchaseChecklist = async (req, res, next) => {
   }
 };
 
-const loadTasks = async () => {
-  const tasks = await loadJsonConfig(TASK_CONFIG_KEY, []);
-  return Array.isArray(tasks) ? tasks : [];
-};
-
-const getTasks = async (req, res, next) => {
-  try {
-    const tasks = await loadTasks();
-    const sorted = tasks.slice().sort((a, b) => {
-      if (a.status !== b.status) {
-        return a.status === 'DONE' ? 1 : -1;
-      }
-      if (PRIORITY_ORDER[b.priority] !== PRIORITY_ORDER[a.priority]) {
-        return PRIORITY_ORDER[b.priority] - PRIORITY_ORDER[a.priority];
-      }
-      return String(a.dueAt).localeCompare(String(b.dueAt));
-    });
-
-    const now = new Date();
-    success(res, {
-      items: sorted,
-      summary: {
-        totalItems: sorted.length,
-        overdueItems: sorted.filter((item) => item.status !== 'DONE' && new Date(item.dueAt) < now).length,
-        dueTodayItems: sorted.filter((item) => item.status !== 'DONE' && String(item.dueAt).slice(0, 10) === now.toISOString().slice(0, 10)).length,
-        highPriorityItems: sorted.filter((item) => item.priority === 'HIGH' && item.status !== 'DONE').length,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-const createTask = async (req, res, next) => {
-  try {
-    const tasks = await loadTasks();
-    const task = buildTaskPayload(req.body, new Date());
-    const nextTasks = [task, ...tasks];
-    await saveJsonConfig(TASK_CONFIG_KEY, nextTasks, '经营执行中台任务提醒引擎任务数据');
-    success(res, task, '任务创建成功');
-  } catch (error) {
-    next(error);
-  }
-};
-
 module.exports = {
   getUnshippedList,
   assignUnshippedAssignee,
@@ -583,6 +405,4 @@ module.exports = {
   savePurchaseChecklistTemplate,
   generatePurchaseChecklist,
   exportPurchaseChecklist,
-  getTasks,
-  createTask,
 };

@@ -15,6 +15,7 @@ const mockGetAll = vi.fn();
 const mockToastError = vi.fn();
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/dashboard',
   useRouter: () => ({
     push: vi.fn(),
     back: vi.fn(),
@@ -39,6 +40,12 @@ vi.mock('sonner', () => ({
 
 vi.mock('./components/UserDialog', () => ({
   UserDialog: ({ open }: { open: boolean }) => (open ? <div>用户弹窗已打开</div> : null),
+}));
+
+vi.mock('@/lib/api-cache', () => ({
+  cachedFetch: async (_key: string, fetcher: () => unknown) => fetcher(),
+  invalidateCache: vi.fn(),
+  clearAllCache: vi.fn(),
 }));
 
 describe('UsersPage 交互逻辑', () => {

@@ -1,0 +1,1029 @@
+OpenAI Codex v0.115.0 (research preview)
+--------
+workdir: /Users/helena/Cursor/jiesong_system
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, /Users/helena/.codex/memories]
+reasoning effort: high
+reasoning summaries: none
+session id: 019d0fac-174f-7121-ae44-c418bcf8e24e
+--------
+user
+请使用 plan-design-review 技能（/Users/helena/.claude/skills/gstack/plan-design-review/SKILL.md）对当前项目做一次新一轮review。要求输出：1）执行摘要；2）Top10产品/交互修改建议（问题/影响/改法/优先级/工作量/验证标准）；3）与上一轮相比的新发现。仅基于仓库静态证据。
+mcp: playwright starting
+mcp: playwright ready
+mcp startup: ready: playwright
+codex
+这次会按 `plan-design-review` 的报告式流程做静态设计审查，并专门比对仓库里上一轮 review 痕迹。先读技能说明，再盘点页面/组件/设计文档和历史审查产物。
+exec
+/bin/zsh -lc "sed -n '1,220p' /Users/helena/.claude/skills/gstack/plan-design-review/SKILL.md" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+---
+name: plan-design-review
+version: 1.0.0
+description: |
+  Designer's eye review of a live site. Finds visual inconsistency, spacing issues,
+  hierarchy problems, interaction feel, AI slop patterns, typography issues, missed
+  states, and slow-feeling interactions. Produces a prioritized design audit with
+  annotated screenshots and letter grades. Infers your design system and offers to
+  export as DESIGN.md. Report-only — never modifies code. For the fix loop, use
+  /qa-design-review instead.
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - AskUserQuestion
+---
+<!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
+<!-- Regenerate: bun run gen:skill-docs -->
+
+## Preamble (run first)
+exec
+/bin/zsh -lc "pwd && ls -la && rg --files -g 'SKILL.md' -g 'PLAN.md' -g 'TASKS.md' -g 'DESIGN.md' -g 'README*' -g 'package.json' -g 'src/**' -g 'app/**' -g 'components/**' -g 'pages/**' -g 'RESULTS/**' -g 'logs/**' -g '*review*' -g '*design*'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+/Users/helena/Cursor/jiesong_system
+total 1080
+drwxr-xr-x  43 helena  staff   1376 Mar 17 21:53 .
+drwxr-xr-x@ 12 helena  staff    384 Mar 19 20:27 ..
+-rw-r--r--@  1 helena  staff   8196 Mar 15 14:48 .DS_Store
+drwxr-xr-x@  3 helena  staff     96 Mar 10 23:27 .agents
+drwxr-xr-x@  4 helena  staff    128 Mar 10 23:27 .claude
+drwxr-xr-x@  4 helena  staff    128 Mar 10 23:07 .codepilot-images
+drwxr-xr-x@  3 helena  staff     96 Mar 10 22:48 .codepilot-uploads
+drwxr-xr-x@  8 helena  staff    256 Mar 18 10:45 .cursor
+-rw-r--r--@  1 helena  staff   2361 Mar 12 20:33 .cursorrules
+drwxr-xr-x@ 17 helena  staff    544 Mar 18 10:38 .git
+drwxr-xr-x@  3 helena  staff     96 Feb 12 08:14 .github
+-rw-r--r--@  1 helena  staff    845 Mar 17 21:53 .gitignore
+drwxr-xr-x@  3 helena  staff     96 Mar 20 23:20 .gstack
+-rw-r--r--@  1 helena  staff   2774 Mar 12 23:01 AGENTS.md
+-rw-r--r--@  1 helena  staff   4235 Mar 13 08:52 DEPLOY.md
+-rw-r--r--@  1 helena  staff  40960 Mar 19 06:13 METRICS.md
+drwxr-xr-x@ 40 helena  staff   1280 Mar 19 06:13 PATCHES
+-rw-r--r--@  1 helena  staff  97510 Mar 19 06:13 PLAN.md
+codex
+技能要求默认面向“已运行站点”，但你限定了“仅基于仓库静态证据”，所以这轮我会改成源码审查模式：以前端路由、页面实现、shadcn/ui 组件使用、文档和上一轮审查记录作为证据，不做运行态结论。
+Plan update
+Static design review scoped to repository evidence, plus comparison against prior review artifacts.
+  → Read prior design review artifacts and identify the previous-round baseline
+  • Inspect frontend routes, shared UI primitives, and design-related docs for current static evidence
+  • Synthesize executive summary, Top 10 recommendations, and new findings vs previous round
+exec
+/bin/zsh -lc "sed -n '1,240p' docs/reviews/2026-03-20-ceo-eng-design-review-summary.md" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "sed -n '1,220p' docs/reviews/raw/2026-03-21-review2-design.txt" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "sed -n '1,260p' docs/reviews/2026-03-21-gstack-comprehensive-review.md" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+# 捷淞系统三维评审汇总报告（CEO / Eng / Design）- 2026-03-20
+
+## 审查范围与方法
+- 仓库：`/Users/helena/Cursor/jiesong_system`
+- 方法：基于仓库静态代码 + 文档 + 最近提交记录
+- 审查技能：
+  - `plan-ceo-review`
+  - `plan-eng-review`
+  - `plan-design-review`
+
+---
+
+## 一句话结论
+当前系统已具备可用业务骨架，但存在 **配置中心泛化、权限边界偏宽、模块复杂度过高、体验一致性不足** 四类结构性问题。建议按 **P0（先保命）→ P1（提效率）→ P2（提体验）** 三阶段推进。
+
+---
+
+## Top 10 修改建议（汇总优先级）
+
+| # | 建议 | 来源 | 优先级 | 预估工作量 | 改造目标 |
+ succeeded in 0ms:
+OpenAI Codex v0.115.0 (research preview)
+--------
+workdir: /Users/helena/Cursor/jiesong_system
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, /Users/helena/.codex/memories]
+reasoning effort: high
+reasoning summaries: none
+session id: 019d0fac-174f-7121-ae44-c418bcf8e24e
+--------
+user
+请使用 plan-design-review 技能（/Users/helena/.claude/skills/gstack/plan-design-review/SKILL.md）对当前项目做一次新一轮review。要求输出：1）执行摘要；2）Top10产品/交互修改建议（问题/影响/改法/优先级/工作量/验证标准）；3）与上一轮相比的新发现。仅基于仓库静态证据。
+mcp: playwright starting
+mcp: playwright ready
+mcp startup: ready: playwright
+codex
+这次会按 `plan-design-review` 的报告式流程做静态设计审查，并专门比对仓库里上一轮 review 痕迹。先读技能说明，再盘点页面/组件/设计文档和历史审查产物。
+exec
+/bin/zsh -lc "sed -n '1,220p' /Users/helena/.claude/skills/gstack/plan-design-review/SKILL.md" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+ succeeded in 0ms:
+# 捷淞系统综合评审报告 2026-03-21
+
+> 技术总监视角 · 基于仓库代码 + 历史 PLAN/RISKS/TASKS 文档 + 近期迭代记录
+
+---
+
+## 评审背景
+
+- **时间节点**：2026-03-21，距上一轮三维评审（2026-03-20）约 1 天
+- **评审方法**：静态代码阅读 + 文档链路分析 + 测试配置审查
+- **覆盖范围**：后端路由/中间件/控制器、前端关键页面、测试体系、安全配置、近 60+ 轮迭代回顾
+- **评审员角色**：技术总监（兼顾产品、工程、安全三维度）
+
+---
+
+## 一、CEO/产品视角
+
+### 1.1 当前系统状态评估
+
+| 维度 | 评分 | 说明 |
+codex
+上一轮基线已经找到：`2026-03-20` 的三维汇总和 `2026-03-21` 的综合复盘都保留了设计向结论。现在转到当前前端代码面，确认这些问题哪些已落地、哪些出现了新的静态信号。
+exec
+/bin/zsh -lc "cd frontend && sed -n '1,220p' package.json" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+{
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
+    "@radix-ui/react-alert-dialog": "^1.1.15",
+    "@radix-ui/react-avatar": "^1.1.11",
+    "@radix-ui/react-checkbox": "^1.3.3",
+    "@radix-ui/react-dialog": "^1.1.15",
+exec
+/bin/zsh -lc "cd frontend && find src/app -maxdepth 4 -name 'page.tsx' | sort" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+src/app/(auth)/forgot-password/page.tsx
+src/app/(auth)/login/page.tsx
+src/app/(auth)/register/page.tsx
+src/app/customs-declarations/[id]/edit/page.tsx
+src/app/customs-declarations/[id]/page.tsx
+src/app/customs-declarations/create/page.tsx
+src/app/customs-declarations/page.tsx
+src/app/dashboard/ai/models/page.tsx
+src/app/dashboard/ai/sessions/page.tsx
+src/app/dashboard/ai/token-stats/page.tsx
+src/app/dashboard/containers/[id]/page.tsx
+src/app/dashboard/containers/page.tsx
+src/app/dashboard/contracts/page.tsx
+src/app/dashboard/contracts/template/page.tsx
+src/app/dashboard/contracts/templates/page.tsx
+src/app/dashboard/finance/page.tsx
+src/app/dashboard/finance/payable/page.tsx
+src/app/dashboard/finance/receivable/page.tsx
+src/app/dashboard/finance/statements/page.tsx
+src/app/dashboard/hs-codes/page.tsx
+exec
+/bin/zsh -lc "cd frontend && rg --files src/app src/components src/lib src/services | sed -n '1,240p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+src/app/globals.css
+src/app/page.tsx
+src/components/ai/AIAssistant.test.tsx
+src/components/ai/AIAssistant.tsx
+src/components/ai/LazyAIAssistantMount.tsx
+src/lib/date-format.ts
+src/lib/axios.test.ts
+src/lib/constants.test.ts
+src/lib/auth-token.ts
+src/lib/date-format.test.ts
+src/app/(auth)/login/page.tsx
+src/app/(auth)/login/page.test.tsx
+src/lib/hooks/useFormHandler.ts
+src/lib/hooks/useFormHandler.test.ts
+src/lib/hooks/useDataTable.test.ts
+src/lib/hooks/usePagination.ts
+src/lib/hooks/useApi.ts
+src/lib/hooks/useApi.test.ts
+src/lib/hooks/usePagination.test.ts
+src/lib/hooks/useDataTable.ts
+exec
+/bin/zsh -lc "cd frontend && rg -n \"shadcn|@/components/ui|cn\\(|Sidebar|ModuleTabHeader|AIAssistant|SettingsPageContent|ops-execution|finance/page|dashboard\" src README.md docs -S" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+README.md:17:  - `(dashboard)`: 主应用页面 (Dashboard, Products, etc.)
+README.md:19:  - `ui`: shadcn/ui 基础组件
+README.md:20:  - `layout`: 布局组件 (Sidebar, Header)
+README.md:34:- **Components**: shadcn/ui (Radix UI)
+README.md:43:2. **组件风格**: 使用 shadcn/ui 组件，遵循原子化 CSS 设计。
+docs/plans/2026-03-07-public-finance-service-pages-design.md:9:**Tech Stack:** Next.js 16 App Router, React 19, TypeScript, shadcn/ui, Tailwind CSS 4, Vitest, Testing Library
+docs/plans/2026-03-07-public-finance-service-pages-design.md:33:- Create `src/components/public/service-page.tsx` with shadcn/ui cards, badges, buttons, and config-driven sections.
+docs/plans/2026-03-07-customs-declarations.md:5:**Goal:** Build protected list, detail, create, and edit pages for customs declarations at `/customs-declarations` using the existing dashboard shell and shadcn/ui components.
+docs/plans/2026-03-07-customs-declarations.md:7:**Architecture:** Add a top-level protected route layout that reuses the dashboard frame, define a typed CRUD service for customs declarations, and share one form component between create/edit pages. Keep the list/detail pages read-oriented and align page structure, headers, tables, and toasts with the current `products`, `sales`, and `purchase` routes.
+docs/plans/2026-03-07-customs-declarations.md:9:**Tech Stack:** Next.js 16 App Router, React 19, TypeScript, shadcn/ui, react-hook-form, zod, Vitest, Testing Library.
+docs/plans/2026-03-07-customs-declarations.md:54:- Modify: `src/components/layout/Sidebar.tsx`
+docs/plans/2026-03-08-hscode-frontend-integration.md:42:- Create: `frontend/src/app/dashboard/products/components/ProductDialog.test.tsx`
+docs/plans/2026-03-08-hscode-frontend-integration.md:43:- Modify: `frontend/src/app/dashboard/products/components/ProductDialog.tsx`
+docs/plans/2026-03-08-hscode-frontend-integration.md:55:Run: `npm run test -- src/app/dashboard/products/components/ProductDialog.test.tsx`
+docs/plans/2026-03-08-hscode-frontend-integration.md:64:Run: `npm run test -- src/app/dashboard/products/components/ProductDialog.test.tsx`
+docs/plans/2026-03-08-hscode-frontend-integration.md:80:Run: `npm run test -- src/services/hsCode.service.test.ts src/app/dashboard/products/components/ProductDialog.test.tsx src/app/dashboard/products/page.test.tsx`
+docs/plans/2026-03-08-hscode-frontend-integration.md:84:Run: `npm run lint -- src/services/hsCode.service.ts src/services/hsCode.service.test.ts src/app/dashboard/products/components/ProductDialog.tsx src/app/dashboard/products/components/ProductDialog.test.tsx`
+src/services/reports.service.ts:47:    return api.get<ApiResponse<DashboardStats>, ApiResponse<DashboardStats>>('/dashboard/stats');
+src/services/ai.service.ts:86:    return api.get<ApiResponse<DashboardAnalytics>, ApiResponse<DashboardAnalytics>>('/dashboard/analytics');
+src/services/ai.service.ts:90:    return api.get<ApiResponse<TrackResult[]>, ApiResponse<TrackResult[]>>('/dashboard/track-product', {
+codex
+我在收敛到最能解释“产品/交互感受”的几类证据：全局 design tokens、导航骨架、财务/经营执行/设置三块高权重页面，以及 AI 助手与登录等高频入口。这样能把建议落到具体文件，而不是泛泛谈视觉。
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/app/globals.css | sed -n '1,260p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	@import "tailwindcss";
+     2	
+     3	@plugin "tailwindcss-animate";
+     4	
+     5	@custom-variant dark (&:is(.dark *));
+     6	
+     7	@theme {
+     8	  --color-background: var(--background);
+     9	  --color-foreground: var(--foreground);
+    10	  --color-card: var(--card);
+    11	  --color-card-foreground: var(--card-foreground);
+    12	  --color-popover: var(--popover);
+    13	  --color-popover-foreground: var(--popover-foreground);
+    14	  --color-primary: var(--primary);
+    15	  --color-primary-foreground: var(--primary-foreground);
+    16	  --color-secondary: var(--secondary);
+    17	  --color-secondary-foreground: var(--secondary-foreground);
+    18	  --color-muted: var(--muted);
+    19	  --color-muted-foreground: var(--muted-foreground);
+    20	  --color-accent: var(--accent);
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/app/layout.tsx | sed -n '1,220p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	import type { Metadata } from "next";
+     2	import { Toaster } from "@/components/ui/sonner";
+     3	import { LazyAIAssistantMount } from "@/components/ai/LazyAIAssistantMount";
+     4	import { ThemeProvider } from "@/components/layout/ThemeProvider";
+     5	import "./globals.css";
+     6	
+     7	export const metadata: Metadata = {
+     8	  title: "Jiesong System",
+     9	  description: "Import/Export Management System",
+    10	};
+    11	
+    12	const fontVariables = {
+    13	  "--font-body-sans": '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Source Han Sans SC", sans-serif',
+    14	  "--font-display-serif": '"Songti SC", "STSong", "Noto Serif CJK SC", serif',
+    15	  "--font-ui-mono": '"IBM Plex Mono", "SFMono-Regular", "Menlo", "Monaco", "Consolas", monospace',
+    16	} as React.CSSProperties;
+    17	
+    18	export default function RootLayout({
+    19	  children,
+    20	}: Readonly<{
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/components/layout/Sidebar.tsx | sed -n '1,260p'" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "cd frontend && nl -ba src/app/dashboard/layout.tsx | sed -n '1,240p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: 认证状态仓库（zustand persist）、路由导航能力、Sidebar、Header
+     3	 * Output: Dashboard 全局布局容器与未登录重定向行为
+     4	 * Pos: 仪表盘路由层，承载导航框架和内容区域
+     5	 *
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	'use client';
+    10	
+    11	import { useEffect, useState } from 'react';
+    12	import { useAuthStore } from '@/store/auth.store';
+    13	import { useRouter } from 'next/navigation';
+    14	import { Sidebar } from '@/components/layout/Sidebar';
+    15	import { Header } from '@/components/layout/Header';
+    16	
+    17	type PersistedAuthState = {
+    18	  state?: {
+    19	    user?: unknown;
+    20	    token?: unknown;
+ succeeded in 0ms:
+     1	/**
+     2	 * Input: 用户认证状态、路由信息
+     3	 * Output: 侧边导航栏组件（5 大模块分区）
+     4	 * Pos: 全局布局组件，提供系统导航功能
+     5	 *
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 *
+     8	 * 导航分区结构：
+     9	 * - 经营中台：工作台、库存状态
+    10	 * - 采购模块：采购合同、采购建议
+    11	 * - 出口模块：出口合同、出口退税、报关单
+    12	 * - 财务模块：经营执行、收付款、财务报表
+    13	 * - 系统管理：AI 管理、合同模板、基础设置
+    14	 */
+    15	
+    16	'use client';
+    17	
+    18	import { useEffect, useRef, type ComponentType } from 'react';
+    19	import { usePathname, useRouter } from 'next/navigation';
+    20	import Link from 'next/link';
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/components/layout/ModuleTabHeader.tsx | sed -n '1,220p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: 模块Tab配置数组、当前路由
+     3	 * Output: 模块内水平Tab导航栏（点击切换子页面）
+     4	 * Pos: 通用布局组件，给各业务模块提供统一的Tab切换导航
+     5	 *
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 *
+     8	 * 使用方式：
+     9	 *   import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
+    10	 *   // 在页面顶部渲染：
+    11	 *   <ModuleTabHeader tabs={PROCUREMENT_TABS} />
+    12	 */
+    13	
+    14	'use client';
+    15	
+    16	import Link from 'next/link';
+    17	import { usePathname } from 'next/navigation';
+    18	import { cn } from '@/lib/utils';
+    19	
+    20	// ==================== Tab 配置常量 ====================
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/components/ai/LazyAIAssistantMount.tsx | sed -n '1,200p'" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "cd frontend && nl -ba src/components/layout/Header.tsx | sed -n '1,260p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	'use client';
+     2	
+     3	import dynamic from 'next/dynamic';
+     4	import { usePathname } from 'next/navigation';
+     5	
+     6	const LazyAIAssistant = dynamic(
+     7	  () => import('@/components/ai/AIAssistant').then((module) => module.AIAssistant),
+     8	  {
+     9	    ssr: false,
+    10	    loading: () => null,
+    11	  },
+    12	);
+    13	
+    14	/**
+    15	 * 仅在业务页面挂载 AI 助手，降低登录等公共页面的首屏负担。
+    16	 */
+    17	export function LazyAIAssistantMount() {
+    18	  const pathname = usePathname();
+    19	  const shouldMount =
+    20	    pathname.startsWith('/dashboard') ||
+ succeeded in 0ms:
+     1	/**
+     2	 * Input: 用户状态、后端搜索API
+     3	 * Output: 顶部导航栏组件
+     4	 * Pos: 全局Header，包含搜索、通知、用户菜单
+     5	 * 
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	'use client';
+    10	
+    11	import { useState, useEffect, useRef, useCallback } from 'react';
+    12	import { useRouter } from 'next/navigation';
+    13	import { useAuthStore } from '@/store/auth.store';
+    14	import { Button } from '@/components/ui/button';
+    15	import { Input } from '@/components/ui/input';
+    16	import {
+    17	  DropdownMenu,
+    18	  DropdownMenuContent,
+    19	  DropdownMenuItem,
+    20	  DropdownMenuLabel,
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/components/ai/AIAssistant.tsx | sed -n '1,260p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: Kimi AI API
+     3	 * Output: AI智能助手悬浮组件
+     4	 * Pos: 全局组件，提供AI问答和图片识别功能
+     5	 * 
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	'use client';
+    10	
+    11	import { useState, useRef, useEffect, useCallback } from 'react';
+    12	import NextImage from 'next/image';
+    13	import { Button } from '@/components/ui/button';
+    14	import { Input } from '@/components/ui/input';
+    15	import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+    16	import { ScrollArea } from '@/components/ui/scroll-area';
+    17	import { Bot, Send, X, Image as ImageIcon, XCircle, Brain, ChevronDown, ChevronUp } from 'lucide-react';
+    18	import { cn } from '@/lib/utils';
+    19	import { getAuthToken } from '@/lib/auth-token';
+    20	import { getApiBaseUrl } from '@/lib/api-base-url';
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/components/ai/AIAssistant.tsx | sed -n '260,520p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+   260	
+   261	  const buildChatRequestBody = (text: string, sessionIdValue: string | null, imageUrl: string | null) => ({
+   262	    message: text,
+   263	    sessionId: sessionIdValue,
+   264	    ...(imageUrl ? { imageUrl } : {}),
+   265	  });
+   266	
+   267	  const processStreamEvent = (
+   268	    payload: StreamPayload,
+   269	    assistantMessageId: string,
+   270	    streamState: {
+   271	      thinkingText: string;
+   272	      answerText: string;
+   273	      hasResult: boolean;
+   274	    }
+   275	  ) => {
+   276	    if (payload.type === 'session' && payload.sessionId) {
+   277	      setSessionId(payload.sessionId);
+   278	      return;
+   279	    }
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/components/ai/AIAssistant.tsx | sed -n '520,760p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+   520	                    AI正在思考，请稍候...
+   521	                  </div>
+   522	                )}
+   523	              </div>
+   524	              
+   525	              {/* 拖拽提示 */}
+   526	              {isDragging && (
+   527	                <div className="absolute inset-0 flex items-center justify-center bg-primary/10 pointer-events-none">
+   528	                  <div className="flex flex-col items-center gap-2 text-primary">
+   529	                    <ImageIcon className="h-8 w-8" />
+   530	                    <span className="font-medium">松开以上传图片</span>
+   531	                  </div>
+   532	                </div>
+   533	              )}
+   534	            </ScrollArea>
+   535	          </CardContent>
+   536	
+   537	          <CardFooter className="p-3 bg-muted/20 flex-col gap-2">
+   538	            {/* 待发送图片预览 */}
+   539	            {pendingImage && (
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/app/dashboard/finance/page.tsx | sed -n '1,320p'" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "cd frontend && nl -ba src/app/dashboard/ops-execution/page.tsx | sed -n '1,260p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: UnshippedListTab、PurchaseChecklistTab 子组件
+     3	 * Output: 经营执行中台页面（两个子Tab的统一入口）
+     4	 * Pos: 经营执行模块顶层路由页面，负责布局与Tab切换
+     5	 *
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	'use client';
+    10	
+    11	import { ClipboardList, PackageSearch } from 'lucide-react';
+    12	import { PageHeader } from '@/components/layout/PageHeader';
+    13	import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
+    14	import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+    15	import { UnshippedListTab } from './components/UnshippedListTab';
+    16	import { PurchaseChecklistTab } from './components/PurchaseChecklistTab';
+    17	
+    18	/**
+    19	 * 职责：渲染经营执行中台布局，将未发货清单与门店采购清单分Tab展示
+    20	 */
+ succeeded in 0ms:
+     1	/**
+     2	 * Input: 后端 finance/stats API、system/exchange-rate API
+     3	 * Output: 财务经营驾驶舱页面（KPI + 完成率 + 汇率 + 紧迫信号 + 快捷导航）
+     4	 * Pos: 财务模块首页，提供管理层决策快速视图
+     5	 *
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	'use client';
+    10	
+    11	import { useEffect, useState } from 'react';
+    12	import {
+    13	  Card,
+    14	  CardContent,
+    15	  CardHeader,
+    16	  CardTitle,
+    17	  CardDescription,
+    18	} from '@/components/ui/card';
+    19	import { Button } from '@/components/ui/button';
+    20	import { Badge } from '@/components/ui/badge';
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/app/dashboard/settings/components/SettingsPageContent.tsx | sed -n '1,360p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: 后端 /system/configs API、基础数据API
+     3	 * Output: 综合设置页面（基础档案+系统配置+数据导入）
+     4	 * Pos: 系统模块，整合所有设置功能
+     5	 * 
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	'use client';
+    10	
+    11	import { useState, useEffect } from 'react';
+    12	import { useSearchParams, useRouter } from 'next/navigation';
+    13	import { useForm } from 'react-hook-form';
+    14	import { zodResolver } from '@hookform/resolvers/zod';
+    15	import { z } from 'zod';
+    16	import { Button } from '@/components/ui/button';
+    17	import { Input } from '@/components/ui/input';
+    18	import {
+    19	  Form,
+    20	  FormControl,
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/app/dashboard/page.tsx | sed -n '1,280p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: 后端dashboard API
+     3	 * Output: 工作台页面（系统核心入口，含快速录入、商品追踪、数据看板）
+     4	 * Pos: 系统首页，提供快速录入、商品追踪、数据看板
+     5	 * 
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	'use client';
+    10	
+    11	import { useRouter } from 'next/navigation';
+    12	import { ModuleTabHeader, OPERATIONS_TABS } from '@/components/layout/ModuleTabHeader';
+    13	import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+    14	import { Button } from '@/components/ui/button';
+    15	import { cn } from '@/lib/utils';
+    16	import { ShoppingCart, TrendingUp, Plus, ArrowRight } from 'lucide-react';
+    17	import { ProductTracker } from '@/components/tools/ProductTracker';
+    18	import { DataDashboard } from '@/components/dashboard/DataDashboard';
+    19	import { PageHeader } from '@/components/layout/PageHeader';
+    20	
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/components/layout/Header.tsx | sed -n '260,520p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+   260	      case 'supplier': return '供应商';
+   261	      case 'container': return '货柜';
+   262	      case 'purchase': return '采购';
+   263	      case 'sales': return '销售';
+   264	      default: return '';
+   265	    }
+   266	  };
+   267	
+   268	  const initials = (user?.name || user?.username || '用')
+   269	    .slice(0, 2)
+   270	    .toUpperCase();
+   271	
+   272	  return (
+   273	    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-6">
+   274	      <div className="flex flex-1 items-center gap-4">
+   275	        <div className="hidden items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-xs text-muted-foreground lg:flex">
+   276	          <CalendarDays className="h-3.5 w-3.5" />
+   277	          <span>{todayLabel}</span>
+   278	        </div>
+   279	
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/app/(auth)/login/page.tsx | sed -n '1,280p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+zsh:1: no matches found: src/app/(auth)/login/page.tsx
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/app/(auth)/register/page.tsx | sed -n '1,220p'" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "cd frontend && nl -ba src/app/(auth)/forgot-password/page.tsx | sed -n '1,220p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+zsh:1: no matches found: src/app/(auth)/register/page.tsx
+ succeeded in 0ms:
+zsh:1: no matches found: src/app/(auth)/forgot-password/page.tsx
+codex
+已经确认顶部栏没有任何移动端主导航替代物：`dashboard/layout` 在 `md` 以下直接隐藏侧边栏，而 `Header` 只有搜索、通知、用户菜单。这会把“可访问”问题升级成“无法导航”的结构问题。接着补登录/公共入口页的静态证据，判断是否还有新的首屏与任务流问题。
+exec
+/bin/zsh -lc "cd frontend && nl -ba 'src/app/(auth)/login/page.tsx' | sed -n '1,280p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: 登录API、认证状态存储
+     3	 * Output: 登录页面
+     4	 * Pos: 认证模块入口，负责用户登录与快捷登录入口
+     5	 *
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 * Security: 快捷登录会在当前浏览器保存最近一次成功登录账号信息，仅用于已登录账号的下次一键登录
+     8	 */
+     9	
+    10	'use client';
+    11	
+    12	import { useCallback, useEffect, useState } from 'react';
+    13	import { useRouter } from 'next/navigation';
+    14	import Link from 'next/link';
+    15	import { useForm } from 'react-hook-form';
+    16	import { z } from 'zod';
+    17	import { zodResolver } from '@hookform/resolvers/zod';
+    18	import { useAuthStore } from '@/store/auth.store';
+    19	import type { ApiResponse } from '@/types';
+    20	import { Button } from '@/components/ui/button';
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/components/public/service-page.tsx | sed -n '1,260p'" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "cd frontend && nl -ba 'src/app/(auth)/forgot-password/page.tsx' | sed -n '1,240p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	import Link from 'next/link';
+     2	import type { ReactNode } from 'react';
+     3	import {
+     4	  ArrowUpRight,
+     5	  BadgeCheck,
+     6	  CircleCheckBig,
+     7	  Clock3,
+     8	  FileCheck2,
+     9	  ShieldCheck,
+    10	} from 'lucide-react';
+    11	import { Badge } from '@/components/ui/badge';
+    12	import { Button } from '@/components/ui/button';
+    13	import {
+    14	  Card,
+    15	  CardContent,
+    16	  CardDescription,
+    17	  CardHeader,
+    18	} from '@/components/ui/card';
+    19	import { cn } from '@/lib/utils';
+    20	
+ succeeded in 0ms:
+     1	/**
+     2	 * Input: 找回密码API
+     3	 * Output: 找回密码页面
+     4	 * Pos: 认证模块，处理用户忘记密码后的密码重置
+     5	 * 
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	'use client';
+    10	
+    11	import { useState } from 'react';
+    12	import { useRouter } from 'next/navigation';
+    13	import Link from 'next/link';
+    14	import { useForm } from 'react-hook-form';
+    15	import { z } from 'zod';
+    16	import { zodResolver } from '@hookform/resolvers/zod';
+    17	import type { ApiResponse } from '@/types';
+    18	import { Button } from '@/components/ui/button';
+    19	import { Input } from '@/components/ui/input';
+    20	import {
+exec
+/bin/zsh -lc "cd frontend && nl -ba 'src/app/(auth)/register/page.tsx' | sed -n '1,240p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: 注册API
+     3	 * Output: 邀请制注册说明页
+     4	 * Pos: 认证模块，处理新用户注册
+     5	 * 
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	'use client';
+    10	
+    11	import Link from 'next/link';
+    12	import { Button } from '@/components/ui/button';
+    13	import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+    14	
+    15	export default function RegisterPage() {
+    16	  return (
+    17	    <div className="auth-shell">
+    18	      <Card className="auth-card">
+    19	        <CardHeader>
+    20	          <CardTitle>账号注册已关闭</CardTitle>
+exec
+/bin/zsh -lc "cd frontend && rg -n \"'/dashboard/finance'|\\\"/dashboard/finance\\\"|/dashboard/finance\\b\" src -S" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+src/components/layout/Sidebar.tsx:73:    childPrefixes: ['/dashboard/ops-execution', '/dashboard/payments', '/dashboard/finance'],
+src/components/layout/ModuleTabHeader.tsx:50:  { href: '/dashboard/finance/statements', label: '财务报表' },
+src/app/dashboard/finance/page.tsx:308:        <Link href="/dashboard/finance/payable" className="group">
+src/app/dashboard/finance/page.tsx:322:        <Link href="/dashboard/finance/receivable" className="group">
+src/app/dashboard/finance/page.tsx:350:        <Link href="/dashboard/finance/statements" className="group">
+src/app/dashboard/finance/page.tsx:379:              <Link href="/dashboard/finance/payable">查看应付明细</Link>
+src/app/dashboard/finance/page.tsx:382:              <Link href="/dashboard/finance/receivable">查看应收明细</Link>
+src/app/dashboard/payments/page.tsx:27:import { PaymentDialog, type PaymentSubmitData } from '../../dashboard/finance/components/PaymentDialog';
+src/app/dashboard/payments/page.test.tsx:38:vi.mock('../../dashboard/finance/components/PaymentDialog', () => ({
+exec
+/bin/zsh -lc 'cd frontend && rg -n "<Card[''^'"\\n]*onClick=|onClick=\\{\\(\\) => router\\.push\\(|className=\\\"hover:border-primary/50 transition-colors cursor-pointer\\\"\" src/app src/components -S" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+src/app/(auth)/forgot-password/page.tsx:122:            <Button className="h-10 w-full rounded-xl" onClick={() => router.push('/login')}>
+src/components/layout/Header.tsx:377:            <DropdownMenuItem onClick={() => router.push('/dashboard/settings')}>
+src/app/dashboard/page.tsx:77:                  onClick={() => router.push(action.href)}
+src/components/tools/ProductTracker.tsx:134:                      onClick={() => router.push(`/dashboard/sales/${item.salesContractId}`)}
+src/app/dashboard/purchase/page.tsx:80:          <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/purchase/create')}>
+src/app/dashboard/contracts/templates/page.tsx:77:          <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/contracts/template')}>
+src/app/dashboard/contracts/components/ContractsPageContent.tsx:267:            <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/purchase/create')}>
+src/app/dashboard/contracts/components/ContractsPageContent.tsx:342:                            onClick={() => router.push(`/dashboard/purchase/${contract.id}`)}
+src/app/dashboard/tax-refunds/components/TaxRefundListPageContent.tsx:126:            <Button className="h-11 rounded-xl" onClick={() => router.push('/dashboard/tax-refunds/create')}>
+src/app/dashboard/tax-refunds/components/TaxRefundDetailPageContent.tsx:71:            <Button className="rounded-xl" onClick={() => router.push(`/dashboard/tax-refunds/${taxRefund.id}/edit`)}>
+src/app/dashboard/sales/page.tsx:141:          <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/sales/create')}>
+src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx:155:              onClick={() => router.push('/customs-declarations/create')}
+src/app/customs-declarations/components/CustomsDeclarationDetailPageContent.tsx:95:              onClick={() => router.push(`/customs-declarations/${declaration.id}/edit`)}
+src/app/dashboard/settings/components/SettingsPageContent.tsx:323:                <Card key={item.href} className="hover:border-primary/50 transition-colors cursor-pointer" onClick={() => router.push(item.href)}>
+src/app/dashboard/settings/components/SettingsPageContent.tsx:492:          <Card className="hover:border-primary/50 transition-colors cursor-pointer" onClick={() => router.push('/dashboard/import')}>
+src/app/dashboard/settings/components/SettingsPageContent.tsx:517:                <Card key={item.href} className="hover:border-primary/50 transition-colors cursor-pointer" onClick={() => router.push(item.href)}>
+src/app/dashboard/settings/components/SettingsPageContent.tsx:583:          <Card className="hover:border-primary/50 transition-colors cursor-pointer" onClick={() => router.push('/dashboard/users')}>
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/components/layout/PageHeader.tsx | sed -n '1,220p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: 页面标题、描述、返回链接
+     3	 * Output: 页面头部组件（含返回按钮）
+     4	 * Pos: 通用布局组件，提供统一的页面头部样式
+     5	 * 
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	'use client';
+    10	
+    11	import { useRouter } from 'next/navigation';
+    12	import { Button } from '@/components/ui/button';
+    13	import { ArrowLeft } from 'lucide-react';
+    14	
+    15	interface PageHeaderProps {
+    16	  title: string;
+    17	  description?: string;
+    18	  backHref?: string;   // 指定返回链接，不指定则使用router.back()
+    19	  backLabel?: string;  // 返回按钮文字，默认"返回"
+    20	  showBack?: boolean;  // 是否显示返回按钮，顶层页面传 false
+exec
+/bin/zsh -lc 'rg -n "设计|Design|AI 助手|设置页|财务首页|经营执行|移动端|导航" docs/reviews docs -S' in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+docs/reviews/raw/2026-03-21-review2-ceo.txt:93:f814d2b refactor(ui): 统一 SHADCN/UI 设计规范，移除硬编码样式
+docs/reviews/raw/2026-03-21-review2-ceo.txt:97:8122a84 docs: AGENTS.md 添加 SHADCN/UI 设计规范
+docs/reviews/raw/2026-03-21-review2-ceo.txt:153:# 捷淞系统三维评审汇总报告（CEO / Eng / Design）- 2026-03-20
+docs/reviews/raw/2026-03-21-review2-ceo.txt:241:## 2026-03-21 CEO/Eng/Design 三维评审迭代（基于 2026-03-20 review）
+docs/reviews/raw/2026-03-21-review2-ceo.txt:246:| REV-02 | P1 | 90m | 2 | DONE | 财务首页升级为经营驾驶舱：汇率显示、收付款完成率进度条、紧迫性预警 badge、快捷导航区 |
+docs/reviews/raw/2026-03-21-review2-ceo.txt:247:| REV-03 | P1 | 20m | 2 | DONE | AI 助手 z-index 提升至 z-[199]/z-[200]，防止被弹框/sticky header 覆盖 |
+docs/reviews/raw/2026-03-21-review2-ceo.txt:248:| REV-04 | P1 | 60m | 3 | DONE | 经营执行中台拆分：page.tsx(55行) 委托 UnshippedListTab + PurchaseChecklistTab 子组件 |
+docs/reviews/raw/2026-03-21-review2-ceo.txt:249:| REV-05 | P1 | 45m | 3 | DONE | 设置页 IA 优化：基础档案加港口/品类入口、数据导出改 shadcn Select、系统配置分域说明 |
+docs/reviews/raw/2026-03-21-review2-ceo.txt:260:上一轮汇总里不少建议已经被执行了，所以这轮重点不是重复旧问题，而是验证这些“已完成项”有没有留下新的结构性尾巴。下面转向当前代码证据：鉴权、配置中心、系统路由、登录、财务页、经营执行页、测试门禁。
+docs/reviews/raw/2026-03-21-review2-ceo.txt:300:| 技术方案.md | 核心文档 | 技术架构设计、目录结构、API设计、AI集成方案 |
+docs/reviews/raw/2026-03-21-review2-ceo.txt:301:| 数据库设计.md | 核心文档 | 数据库Schema设计、Prisma模型、实体关系图 |
+docs/reviews/raw/2026-03-21-review2-ceo.txt:444:     3	 * Output: 经营执行中台页面（两个子Tab的统一入口）
+docs/reviews/raw/2026-03-21-review2-ceo.txt:445:     4	 * Pos: 经营执行模块顶层路由页面，负责布局与Tab切换
+docs/reviews/raw/2026-03-21-review2-ceo.txt:460:    19	 * 职责：渲染经营执行中台布局，将未发货清单与门店采购清单分Tab展示
+docs/reviews/raw/2026-03-21-review2-ceo.txt:465:     3	 * Output: 财务经营驾驶舱页面（KPI + 完成率 + 汇率 + 紧迫信号 + 快捷导航）
+docs/reviews/raw/2026-03-21-review2-ceo.txt:487:     3	 * Output: 综合设置页面（基础档案+系统配置+数据导入）
+docs/reviews/raw/2026-03-21-review2-ceo.txt:780:     3	 * Output: 经营执行中台 API
+docs/reviews/raw/2026-03-21-review2-ceo.txt:809:     3	 * Output: 经营执行中台 API 路由
+docs/reviews/raw/2026-03-21-review2-ceo.txt:836:  * Output: 经营执行中台 API
+docs/reviews/raw/2026-03-21-review2-ceo.txt:876:TASKS.md:194:| FE-COV-98-CI | P0 | 20m | 1 | DONE | 现有 `test-and-acceptance.yml`、`frontend/vitest.config.ts`、2026-03-12 coverage 基线实测结果 | `docs/coverage-98-ci-plan.md` + 文档导航 + checkpoint 产物 | `cd frontend && npm run test:coverage`；`git diff --check -- docs/coverage-98-ci-plan.md docs/README.md PLAN.md TASKS.md logs/task-FE-COV-98-DOC.md RESULTS/FE-COV-98-DOC.md` | CI 门禁方案已落盘，后续可按该方案推进稳定性治理和 98% 硬门禁切换 |
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/app/dashboard/settings/components/SettingsPageContent.tsx | sed -n '360,680p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+   360	                              {...field}
+   361	                              onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
+   362	                            />
+   363	                          </FormControl>
+   364	                          <FormDescription>用于销售合同的初始汇率填充。</FormDescription>
+   365	                          <FormMessage />
+   366	                        </FormItem>
+   367	                      )}
+   368	                    />
+   369	                    <FormField
+   370	                      control={form.control}
+   371	                      name="profitRate"
+   372	                      render={({ field }) => (
+   373	                        <FormItem>
+   374	                          <FormLabel>默认利润率</FormLabel>
+   375	                          <FormControl>
+   376	                            <Input 
+   377	                              type="number" 
+   378	                              step="0.1" 
+   379	                              {...field}
+exec
+/bin/zsh -lc "cd frontend && rg -n \"ServicePage\\(|service-page|themeClassName|eyebrow:\" src/app src/components -S" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+src/components/public/service-page.tsx:54:  eyebrow: string;
+src/components/public/service-page.tsx:57:  themeClassName?: string;
+src/components/public/service-page.tsx:70:export function ServicePage({ config }: { config: ServicePageConfig }) {
+src/components/public/service-page.tsx:77:            config.themeClassName
+src/components/public/service-page.test.tsx:3:import { ServicePage } from './service-page';
+src/components/public/service-page.test.tsx:10:          eyebrow: '跨境服务 / Test',
+src/components/public/service-page.test.tsx:13:          themeClassName: 'from-sky-500/10 via-background to-amber-500/10',
+src/app/forex-verifications/page.tsx:2:import { ServicePage, type ServicePageConfig } from '@/components/public/service-page';
+src/app/forex-verifications/page.tsx:10:  eyebrow: 'Public Service / Forex Verification',
+src/app/tax-refunds/page.tsx:2:import { ServicePage, type ServicePageConfig } from '@/components/public/service-page';
+src/app/tax-refunds/page.tsx:10:  eyebrow: 'Public Service / Tax Refund',
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/app/forex-verifications/page.tsx | sed -n '1,220p'" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "cd frontend && nl -ba src/app/tax-refunds/page.tsx | sed -n '1,220p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	import type { Metadata } from 'next';
+     2	import { ServicePage, type ServicePageConfig } from '@/components/public/service-page';
+     3	
+     4	export const metadata: Metadata = {
+     5	  title: '外汇核销服务 | Jiesong System',
+     6	  description: '面向出口业务的外汇核销预审、资料整理与节奏跟进页面。',
+     7	};
+     8	
+     9	const forexVerificationConfig: ServicePageConfig = {
+    10	  eyebrow: 'Public Service / Forex Verification',
+    11	  title: '外汇核销加速通道',
+    12	  description:
+    13	    '围绕收汇匹配、报关单据核验和异常节点跟催，先把核销材料按窗口顺序整理清楚，再进入正式办理，减少银行与单证往返次数。',
+    14	  metrics: [
+    15	    { label: '平均预审响应', value: '24h', detail: '工作日内反馈缺口' },
+    16	    { label: '收汇匹配节点', value: '4步', detail: '从水单到核销闭环' },
+    17	    { label: '重点单据校验', value: '9类', detail: '覆盖核销常见材料' },
+    18	    { label: '异常回退率', value: '<5%', detail: '资料齐全项目目标值' },
+    19	  ],
+    20	  highlights: [
+ succeeded in 0ms:
+     1	import type { Metadata } from 'next';
+     2	import { ServicePage, type ServicePageConfig } from '@/components/public/service-page';
+     3	
+     4	export const metadata: Metadata = {
+     5	  title: '出口退税服务 | Jiesong System',
+     6	  description: '面向出口退税批次管理、单证归集和申报排期的公开页面。',
+     7	};
+     8	
+     9	const taxRefundConfig: ServicePageConfig = {
+    10	  eyebrow: 'Public Service / Tax Refund',
+    11	  title: '出口退税申报工作台',
+    12	  description:
+    13	    '按批次梳理退税资料、申报口径与凭证缺口，把单证归集和窗口排期同步推进，帮助财务团队更稳地压缩申报周期。',
+    14	  metrics: [
+    15	    { label: '批次排期反馈', value: '48h', detail: '申报前给出节奏建议' },
+    16	    { label: '资料归集模块', value: '6组', detail: '按税务口径分层检查' },
+    17	    { label: '常见缺口识别', value: '15项', detail: '覆盖退税申报关键凭证' },
+    18	    { label: '补件优先级', value: 'A/B/C', detail: '先处理影响申报的核心问题' },
+    19	  ],
+    20	  highlights: [
+exec
+/bin/zsh -lc "nl -ba docs/系统简化方案.md | sed -n '60,120p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+    60	
+    61	## 二、简化方案
+    62	
+    63	### 2.1 新导航结构（5个入口）
+    64	
+    65	```
+    66	├── 📋 工作台        ← 核心入口，快速录入+待办+概览
+    67	├── 📄 合同管理      ← 采购+销售（Tab切换）
+    68	├── 📦 库存与货柜    ← 库存+货柜（Tab切换）
+    69	├── 💰 收付款        ← 应收+应付（Tab切换）
+    70	└── ⚙️ 设置          ← 基础档案+用户+系统配置+数据导入
+    71	```
+    72	
+    73	### 2.2 各模块详细设计
+    74	
+    75	#### 工作台（Dashboard）
+    76	
+    77	**定位**：系统的中心枢纽，打开就能开始工作
+    78	
+    79	```
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/components/tools/ProductTracker.tsx | sed -n '1,260p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: 商品名称、门店名称
+     3	 * Output: 匹配的出口合同列表
+     4	 * Pos: 工作台小工具，快速查询商品位置
+     5	 * 
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	'use client';
+    10	
+    11	import { useState } from 'react';
+    12	import { useRouter } from 'next/navigation';
+    13	import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+    14	import { Input } from '@/components/ui/input';
+    15	import { Button } from '@/components/ui/button';
+    16	import { StatusBadge } from '@/components/ui/status-badge';
+    17	import { Search, Package, MapPin, Ship, ArrowRight, Loader2 } from 'lucide-react';
+    18	import { toast } from 'sonner';
+    19	import { aiService, type TrackResult } from '@/services/ai.service';
+    20	
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/components/dashboard/DataDashboard.tsx | sed -n '1,260p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: 后端 dashboard/analytics API
+     3	 * Output: 数据看板组件（合同统计、应收账款、库存、出货趋势、热门商品）
+     4	 * Pos: 工作台子组件，展示关键业务指标
+     5	 * 
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	'use client';
+    10	
+    11	import { useEffect, useState } from 'react';
+    12	import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+    13	import { Button } from '@/components/ui/button';
+    14	import {
+    15	  FileText,
+    16	  DollarSign,
+    17	  TrendingUp,
+    18	  Package,
+    19	  Loader2,
+    20	  AlertCircle,
+exec
+/bin/zsh -lc "cd frontend && nl -ba src/components/dashboard/DataDashboard.tsx | sed -n '260,420p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+   260	          <CardDescription>按采购次数排序（含数量）</CardDescription>
+   261	        </CardHeader>
+   262	        <CardContent>
+   263	          {data.topProducts.length === 0 ? (
+   264	            <p className="text-sm text-muted-foreground text-center py-12">暂无商品数据</p>
+   265	          ) : (
+   266	            <ResponsiveContainer width="100%" height={300}>
+   267	              <BarChart data={data.topProducts.slice(0, 10)}>
+   268	                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
+   269	                <XAxis 
+   270	                  dataKey="productName" 
+   271	                  tick={{ fontSize: 10 }}
+   272	                  height={60}
+   273	                  interval={0}
+   274	                  tickFormatter={(v) => v.length > 6 ? v.substring(0, 6) + '..' : v}
+   275	                />
+   276	                <YAxis 
+   277	                  yAxisId="left"
+   278	                  tick={{ fontSize: 12 }}
+   279	                />
+codex
+我补跑一下 `plan-design-review` 的 preamble，确认当前分支与 gstack 状态，再完成最终归纳。由于这轮明确限制为静态证据，我不会进入 browse/live-site 步骤。
+exec
+/bin/zsh -lc 'cd frontend && wc -l src/app/dashboard/settings/components/SettingsPageContent.tsx src/components/ai/AIAssistant.tsx src/components/layout/Header.tsx src/components/layout/Sidebar.tsx src/components/dashboard/DataDashboard.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/page.tsx' in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     608 src/app/dashboard/settings/components/SettingsPageContent.tsx
+     615 src/components/ai/AIAssistant.tsx
+     392 src/components/layout/Header.tsx
+     195 src/components/layout/Sidebar.tsx
+     302 src/components/dashboard/DataDashboard.tsx
+     396 src/app/dashboard/finance/page.tsx
+     110 src/app/dashboard/page.tsx
+    2618 total
+exec
+/bin/zsh -lc "cd frontend && find src/app -name 'page.tsx' | wc -l && find src/app/dashboard -name 'page.tsx' | wc -l" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+      53
+      43
+exec
+/bin/zsh -lc "cd frontend && rg -n \"ModuleTabHeader|PageHeader|Card className=\\\"hover:border-primary/50|router\\.push\\('/dashboard/finance'|/dashboard/finance\\)|localStorage\\.getItem\\(QUICK_LOGIN_PROFILE_KEY\\)|localStorage\\.setItem\\(QUICK_LOGIN_PROFILE_KEY\\)|pathname\\.startsWith\\('/dashboard'\\)|hidden border-r bg-sidebar md:block|Tabs defaultValue=\\{defaultTab\\} className=\\\"flex gap-6\\\" orientation=\\\"vertical\\\"|FINANCE_TABS|moduleName=\\\"财务\\\"|查看思考过程|window\\.location\\.href = part\" src -S" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+src/app/(auth)/login/page.tsx:62:    const savedRaw = localStorage.getItem(QUICK_LOGIN_PROFILE_KEY);
+src/components/ai/AIAssistant.test.tsx:115:    expect(screen.getByText('查看思考过程')).toBeInTheDocument();
+src/components/ai/AIAssistant.tsx:184:              window.location.href = part;
+src/components/ai/AIAssistant.tsx:479:                          <span>查看思考过程</span>
+src/components/ai/LazyAIAssistantMount.tsx:20:    pathname.startsWith('/dashboard') ||
+src/app/dashboard/reports/page.tsx:23:import { PageHeader } from '@/components/layout/PageHeader';
+src/app/dashboard/reports/page.tsx:147:      <PageHeader
+src/components/layout/Sidebar.tsx:38:// 子页面之间的切换通过页面顶部的 ModuleTabHeader 组件（水平 Tab 栏）完成。
+src/components/layout/Sidebar.tsx:93: *   3. 子页面切换由各页面顶部的 ModuleTabHeader 水平 Tab 栏负责
+src/app/dashboard/hs-codes/page.tsx:24:import { PageHeader } from '@/components/layout/PageHeader';
+src/app/dashboard/hs-codes/page.tsx:176:      <PageHeader
+src/components/layout/ModuleTabHeader.tsx:9: *   import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
+src/components/layout/ModuleTabHeader.tsx:11: *   <ModuleTabHeader tabs={PROCUREMENT_TABS} />
+src/components/layout/ModuleTabHeader.tsx:47:export const FINANCE_TABS: TabConfig[] = [
+src/components/layout/ModuleTabHeader.tsx:62:interface ModuleTabHeaderProps {
+src/components/layout/ModuleTabHeader.tsx:75:export function ModuleTabHeader({ tabs, moduleName }: ModuleTabHeaderProps) {
+src/app/dashboard/page.tsx:12:import { ModuleTabHeader, OPERATIONS_TABS } from '@/components/layout/ModuleTabHeader';
+src/app/dashboard/page.tsx:19:import { PageHeader } from '@/components/layout/PageHeader';
+src/app/dashboard/page.tsx:51:      <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
+src/app/dashboard/page.tsx:53:      <PageHeader
+exec
+/bin/zsh -lc '_UPD=$(~/.claude/skills/gstack/bin/gstack-update-check 2>/dev/null || .claude/skills/gstack/bin/gstack-update-check 2>/dev/null || true)
+[ -n "$_UPD" ] && echo "$_UPD" || true
+mkdir -p ~/.gstack/sessions
+touch ~/.gstack/sessions/"$PPID"
+_SESSIONS=$(find ~/.gstack/sessions -mmin -120 -type f 2>/dev/null | wc -l | tr -d '"' ')
+find ~/.gstack/sessions -mmin +120 -type f -delete 2>/dev/null || true
+_CONTRIB="'$(~/.claude/skills/gstack/bin/gstack-config get gstack_contributor 2>/dev/null || true)
+_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
+echo "BRANCH: $_BRANCH"
+echo "CONTRIB: ${_CONTRIB:-false}"
+echo "ACTIVE_SESSIONS: ${_SESSIONS:-0}"' in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+mkdir: /Users/helena/.gstack/sessions: Operation not permitted
+touch: /Users/helena/.gstack/sessions/58195: No such file or directory
+BRANCH: main
+CONTRIB: false
+ACTIVE_SESSIONS: 0
+codex
+证据已经够了。当前可以下结论：这轮不是“风格散掉”，而是“信息架构开始二次漂移”。上一轮做对的三件事是财务驾驶舱、设置页瘦身、经营执行拆分；这轮的新问题主要出在这些改动没有被导航、入口和任务流一起收口。
+Plan update
+  ✓ Read prior design review artifacts and identify the previous-round baseline
+  ✓ Inspect frontend routes, shared UI primitives, and design-related docs for current static evidence
+  → Synthesize executive summary, Top 10 recommendations, and new findings vs previous round
+codex
+**执行摘要**
+本轮仅基于仓库静态证据审查。结论是：前端视觉 token 和 shadcn/ui 基座已经比上一轮更统一，主要矛盾不再是“样式散”，而是“信息架构和任务流开始二次漂移”。上一轮推动的财务驾驶舱、设置页瘦身、经营执行拆分都已落地，但没有被导航、入口和任务编排一起收口，导致产品语义开始分叉。[globals.css](/Users/helena/Cursor/jiesong_system/frontend/src/app/globals.css#L53) [2026-03-20-ceo-eng-design-review-summary.md](/Users/helena/Cursor/jiesong_system/docs/reviews/2026-03-20-ceo-eng-design-review-summary.md#L25) [2026-03-21-gstack-comprehensive-review.md](/Users/helena/Cursor/jiesong_system/docs/reviews/2026-03-21-gstack-comprehensive-review.md#L238)
+
+**Top 10 产品/交互修改建议**
+1. 顶级导航回到简化基线。问题：当前侧栏 5 个入口是“经营中台/采购/出口/财务/系统管理”，已经偏离仓库里原先定义的“工作台/合同管理/库存与货柜/收付款/设置”。影响：用户心智从“按任务找入口”变成“按组织切模块”，跨链路操作成本上升。改法：按简化方案重排顶层 IA，把采购/出口并回合同，把经营执行收回工作台或财务子层。优先级：P0。工作量：2-4 天。验证标准：所有高频页面 2 次点击内可达，且顶级导航与文档基线一致。[系统简化方案.md](/Users/helena/Cursor/jiesong_system/docs/系统简化方案.md#L63) [Sidebar.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/Sidebar.tsx#L50)
+
+2. 补上移动端全局导航。问题：`md` 以下直接隐藏侧栏，而顶部栏没有任何主导航触发器。影响：移动端进入 dashboard 后几乎无法切模块。改法：在 Header 增加 `Sheet/Drawer` 汉堡菜单，复用 5 个顶级入口与当前模块高亮。优先级：P0。工作量：1.5-2 天。验证标准：390px 宽度下可在 2 次点击内到达任一主模块。[layout.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/layout.tsx#L97) [Header.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/Header.tsx#L273)
+
+3. 修正财务与经营执行的模块语义。问题：`FINANCE_TABS` 不包含 `/dashboard/finance`，但 `ops-execution` 页面又直接使用 `FINANCE_TABS` 且 `moduleName="财务"`。影响：财务驾驶舱变成孤岛页，经营执行被误标成财务子页。改法：把财务模块重构为“驾驶舱/经营执行/收付款/报表”，或把经营执行移回经营中台。优先级：P0。工作量：0.5-1 天。验证标准：财务相关所有页面都有一致的 active tab 和返回路径。[ModuleTabHeader.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/ModuleTabHeader.tsx#L46) [ops-execution/page.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/ops-execution/page.tsx#L24) [finance/page.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/finance/page.tsx#L60)
+
+4. 让工作台回到“待办中枢”，不要只是工具架。问题：当前工作台只渲染快速录入、商品追踪、数据看板，没有明确待办队列。影响：管理层和执行层都看不到“下一步该做什么”。改法：首屏加入待付款、待发货、待催收、待补件等 action list，把工具卡降到第二屏。优先级：P1。工作量：2-3 天。验证标准：首屏至少出现 3 组可直接处理的待办卡片，并带跳转入口。[系统简化方案.md](/Users/helena/Cursor/jiesong_system/docs/系统简化方案.md#L77) [dashboard/page.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/page.tsx#L59)
+
+5. 继续把设置页从“大面板”改成“任务流”。问题：单个页面承载 7 个纵向 Tab，还把导入、导出、运维、用户管理都塞在一起。影响：设置页从配置中心又回退成“什么都在这里”的总集散地。改法：保留“基础档案/系统配置”，把导入、导出、用户、运维拆成独立任务页或次级入口。优先级：P1。工作量：2-3 天。验证标准：设置页主选项不超过 4 个，常见任务不需要先理解整页结构。[SettingsPageContent.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/settings/components/SettingsPageContent.tsx#L285)
+
+6. 停止用可点击 Card/`div` 充当导航。问题：多个入口卡片和结果行靠 `onClick` 跳转，不是 `Link`/`Button`。影响：可发现性、键盘可达性和焦点反馈都偏弱。改法：所有导航型卡片改为 `Link` 包裹，列表行改为语义化按钮或链接，并补可见 hover/focus 态。优先级：P1。工作量：1-2 天。验证标准：键盘 Tab 可访问所有跳转入口，代码里不再出现主要导航靠容器 `onClick`。[SettingsPageContent.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/settings/components/SettingsPageContent.tsx#L323) [ProductTracker.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/tools/ProductTracker.tsx#L131)
+
+7. 把全局搜索升级为分组式 command palette。问题：Header 里把商品、供应商、货柜、采购、销售直接扁平混排。影响：同名结果难扫读，用户只能靠小 badge 猜自己会跳去哪。改法：按实体分组、加分节标题、支持键盘上下选择和默认动作说明。优先级：P1。工作量：1-2 天。验证标准：同一关键词搜索结果可按实体分组浏览，Enter 的默认跳转稳定可预期。[Header.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/Header.tsx#L71) [Header.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/Header.tsx#L295)
+
+8. 收紧 AI 助手的产品边界。问题：助手挂在几乎所有业务路由上，还在 UI 中直接暴露“查看思考过程”，内部链接用 `window.location.href`。影响：它从“辅助工具”变成“持续打断物”，还带来信任和路由体验问题。改法：改成显式唤起后再加载，移除思考过程展示，内部跳转统一走 Next 路由。优先级：P1。工作量：1-2 天。验证标准：默认不预挂完整助手，不再向终端用户展示 reasoning，内部跳转无整页刷新。[LazyAIAssistantMount.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/ai/LazyAIAssistantMount.tsx#L19) [AIAssistant.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/ai/AIAssistant.tsx#L469) [AIAssistant.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/ai/AIAssistant.tsx#L184)
+
+9. 修正登录页的一键登录信任模型。问题：快捷登录直接把用户名和密码写入 `localStorage`。影响：共享设备场景下，这不是“便捷”，而是“降低信任”。改法：最多记住用户名，或改成受控设备令牌，不保存原始密码。优先级：P0。工作量：0.5-1 天。验证标准：浏览器本地存储中不再出现明文密码，同时仍保留便捷登录能力。[login/page.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/(auth)/login/page.tsx#L62) [login/page.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/(auth)/login/page.tsx#L79)
+
+10. 统一公开页与后台页的语言/品牌语气。问题：后台主导航是中文业务语义，公开页与 metadata 仍混用英文产品名和英文 eyebrow。影响：产品看起来像两套系统拼接。改法：统一命名策略，英文只做辅助说明，不做一级信息。优先级：P2。工作量：0.5-1 天。验证标准：公开页、登录页、后台页在标题、副标题、breadcrumb 上遵循同一语言策略。[layout.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/layout.tsx#L7) [tax-refunds/page.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/tax-refunds/page.tsx#L10) [Sidebar.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/Sidebar.tsx#L53)
+
+**与上一轮相比的新发现**
+上一轮已指出且本轮仍未闭环的，不算“新发现”：移动端导航缺失、`ops-execution` 误挂 `FINANCE_TABS`。以下是这轮新增或升级判断。
+
+- 新发现 1：当前顶级 IA 已经偏离仓库自己记录的简化方案，不只是“小错”，而是产品地图重新长歪了。[系统简化方案.md](/Users/helena/Cursor/jiesong_system/docs/系统简化方案.md#L63) [Sidebar.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/Sidebar.tsx#L50)
+- 新发现 2：财务驾驶舱虽然做出来了，但没有进入统一 tab 体系，成为存在感很低的孤岛入口。[ModuleTabHeader.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/ModuleTabHeader.tsx#L46) [finance/page.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/finance/page.tsx#L145)
+- 新发现 3：工作台并未兑现“打开就能开始工作”的产品承诺，仍更像工具集合页，而不是任务中枢。[系统简化方案.md](/Users/helena/Cursor/jiesong_system/docs/系统简化方案.md#L77) [dashboard/page.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/page.tsx#L49)
+- 新发现 4：仓库里出现了比较系统性的“伪链接”模式，说明交互语义债已经从个别页面扩散成实现习惯。[SettingsPageContent.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/settings/components/SettingsPageContent.tsx#L323) [ProductTracker.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/tools/ProductTracker.tsx#L133)
+- 新发现 5：AI 助手的问题已从上一轮的遮挡冲突，升级成产品边界问题：默认挂载、暴露 reasoning、内部路由粗暴跳转。[2026-03-20-ceo-eng-design-review-summary.md](/Users/helena/Cursor/jiesong_system/docs/reviews/2026-03-20-ceo-eng-design-review-summary.md#L29) [AIAssistant.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/ai/AIAssistant.tsx#L479)
+
+如果你要，我下一步可以把这份 review 压缩成一个可直接贴进 `docs/reviews/` 的 Markdown 版本。
+tokens used
+143,610
+**执行摘要**
+本轮仅基于仓库静态证据审查。结论是：前端视觉 token 和 shadcn/ui 基座已经比上一轮更统一，主要矛盾不再是“样式散”，而是“信息架构和任务流开始二次漂移”。上一轮推动的财务驾驶舱、设置页瘦身、经营执行拆分都已落地，但没有被导航、入口和任务编排一起收口，导致产品语义开始分叉。[globals.css](/Users/helena/Cursor/jiesong_system/frontend/src/app/globals.css#L53) [2026-03-20-ceo-eng-design-review-summary.md](/Users/helena/Cursor/jiesong_system/docs/reviews/2026-03-20-ceo-eng-design-review-summary.md#L25) [2026-03-21-gstack-comprehensive-review.md](/Users/helena/Cursor/jiesong_system/docs/reviews/2026-03-21-gstack-comprehensive-review.md#L238)
+
+**Top 10 产品/交互修改建议**
+1. 顶级导航回到简化基线。问题：当前侧栏 5 个入口是“经营中台/采购/出口/财务/系统管理”，已经偏离仓库里原先定义的“工作台/合同管理/库存与货柜/收付款/设置”。影响：用户心智从“按任务找入口”变成“按组织切模块”，跨链路操作成本上升。改法：按简化方案重排顶层 IA，把采购/出口并回合同，把经营执行收回工作台或财务子层。优先级：P0。工作量：2-4 天。验证标准：所有高频页面 2 次点击内可达，且顶级导航与文档基线一致。[系统简化方案.md](/Users/helena/Cursor/jiesong_system/docs/系统简化方案.md#L63) [Sidebar.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/Sidebar.tsx#L50)
+
+2. 补上移动端全局导航。问题：`md` 以下直接隐藏侧栏，而顶部栏没有任何主导航触发器。影响：移动端进入 dashboard 后几乎无法切模块。改法：在 Header 增加 `Sheet/Drawer` 汉堡菜单，复用 5 个顶级入口与当前模块高亮。优先级：P0。工作量：1.5-2 天。验证标准：390px 宽度下可在 2 次点击内到达任一主模块。[layout.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/layout.tsx#L97) [Header.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/Header.tsx#L273)
+
+3. 修正财务与经营执行的模块语义。问题：`FINANCE_TABS` 不包含 `/dashboard/finance`，但 `ops-execution` 页面又直接使用 `FINANCE_TABS` 且 `moduleName="财务"`。影响：财务驾驶舱变成孤岛页，经营执行被误标成财务子页。改法：把财务模块重构为“驾驶舱/经营执行/收付款/报表”，或把经营执行移回经营中台。优先级：P0。工作量：0.5-1 天。验证标准：财务相关所有页面都有一致的 active tab 和返回路径。[ModuleTabHeader.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/ModuleTabHeader.tsx#L46) [ops-execution/page.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/ops-execution/page.tsx#L24) [finance/page.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/finance/page.tsx#L60)
+
+4. 让工作台回到“待办中枢”，不要只是工具架。问题：当前工作台只渲染快速录入、商品追踪、数据看板，没有明确待办队列。影响：管理层和执行层都看不到“下一步该做什么”。改法：首屏加入待付款、待发货、待催收、待补件等 action list，把工具卡降到第二屏。优先级：P1。工作量：2-3 天。验证标准：首屏至少出现 3 组可直接处理的待办卡片，并带跳转入口。[系统简化方案.md](/Users/helena/Cursor/jiesong_system/docs/系统简化方案.md#L77) [dashboard/page.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/page.tsx#L59)
+
+5. 继续把设置页从“大面板”改成“任务流”。问题：单个页面承载 7 个纵向 Tab，还把导入、导出、运维、用户管理都塞在一起。影响：设置页从配置中心又回退成“什么都在这里”的总集散地。改法：保留“基础档案/系统配置”，把导入、导出、用户、运维拆成独立任务页或次级入口。优先级：P1。工作量：2-3 天。验证标准：设置页主选项不超过 4 个，常见任务不需要先理解整页结构。[SettingsPageContent.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/settings/components/SettingsPageContent.tsx#L285)
+
+6. 停止用可点击 Card/`div` 充当导航。问题：多个入口卡片和结果行靠 `onClick` 跳转，不是 `Link`/`Button`。影响：可发现性、键盘可达性和焦点反馈都偏弱。改法：所有导航型卡片改为 `Link` 包裹，列表行改为语义化按钮或链接，并补可见 hover/focus 态。优先级：P1。工作量：1-2 天。验证标准：键盘 Tab 可访问所有跳转入口，代码里不再出现主要导航靠容器 `onClick`。[SettingsPageContent.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/settings/components/SettingsPageContent.tsx#L323) [ProductTracker.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/tools/ProductTracker.tsx#L131)
+
+7. 把全局搜索升级为分组式 command palette。问题：Header 里把商品、供应商、货柜、采购、销售直接扁平混排。影响：同名结果难扫读，用户只能靠小 badge 猜自己会跳去哪。改法：按实体分组、加分节标题、支持键盘上下选择和默认动作说明。优先级：P1。工作量：1-2 天。验证标准：同一关键词搜索结果可按实体分组浏览，Enter 的默认跳转稳定可预期。[Header.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/Header.tsx#L71) [Header.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/Header.tsx#L295)
+
+8. 收紧 AI 助手的产品边界。问题：助手挂在几乎所有业务路由上，还在 UI 中直接暴露“查看思考过程”，内部链接用 `window.location.href`。影响：它从“辅助工具”变成“持续打断物”，还带来信任和路由体验问题。改法：改成显式唤起后再加载，移除思考过程展示，内部跳转统一走 Next 路由。优先级：P1。工作量：1-2 天。验证标准：默认不预挂完整助手，不再向终端用户展示 reasoning，内部跳转无整页刷新。[LazyAIAssistantMount.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/ai/LazyAIAssistantMount.tsx#L19) [AIAssistant.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/ai/AIAssistant.tsx#L469) [AIAssistant.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/ai/AIAssistant.tsx#L184)
+
+9. 修正登录页的一键登录信任模型。问题：快捷登录直接把用户名和密码写入 `localStorage`。影响：共享设备场景下，这不是“便捷”，而是“降低信任”。改法：最多记住用户名，或改成受控设备令牌，不保存原始密码。优先级：P0。工作量：0.5-1 天。验证标准：浏览器本地存储中不再出现明文密码，同时仍保留便捷登录能力。[login/page.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/(auth)/login/page.tsx#L62) [login/page.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/(auth)/login/page.tsx#L79)
+
+10. 统一公开页与后台页的语言/品牌语气。问题：后台主导航是中文业务语义，公开页与 metadata 仍混用英文产品名和英文 eyebrow。影响：产品看起来像两套系统拼接。改法：统一命名策略，英文只做辅助说明，不做一级信息。优先级：P2。工作量：0.5-1 天。验证标准：公开页、登录页、后台页在标题、副标题、breadcrumb 上遵循同一语言策略。[layout.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/layout.tsx#L7) [tax-refunds/page.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/tax-refunds/page.tsx#L10) [Sidebar.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/Sidebar.tsx#L53)
+
+**与上一轮相比的新发现**
+上一轮已指出且本轮仍未闭环的，不算“新发现”：移动端导航缺失、`ops-execution` 误挂 `FINANCE_TABS`。以下是这轮新增或升级判断。
+
+- 新发现 1：当前顶级 IA 已经偏离仓库自己记录的简化方案，不只是“小错”，而是产品地图重新长歪了。[系统简化方案.md](/Users/helena/Cursor/jiesong_system/docs/系统简化方案.md#L63) [Sidebar.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/Sidebar.tsx#L50)
+- 新发现 2：财务驾驶舱虽然做出来了，但没有进入统一 tab 体系，成为存在感很低的孤岛入口。[ModuleTabHeader.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/ModuleTabHeader.tsx#L46) [finance/page.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/finance/page.tsx#L145)
+- 新发现 3：工作台并未兑现“打开就能开始工作”的产品承诺，仍更像工具集合页，而不是任务中枢。[系统简化方案.md](/Users/helena/Cursor/jiesong_system/docs/系统简化方案.md#L77) [dashboard/page.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/page.tsx#L49)
+- 新发现 4：仓库里出现了比较系统性的“伪链接”模式，说明交互语义债已经从个别页面扩散成实现习惯。[SettingsPageContent.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/settings/components/SettingsPageContent.tsx#L323) [ProductTracker.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/tools/ProductTracker.tsx#L133)
+- 新发现 5：AI 助手的问题已从上一轮的遮挡冲突，升级成产品边界问题：默认挂载、暴露 reasoning、内部路由粗暴跳转。[2026-03-20-ceo-eng-design-review-summary.md](/Users/helena/Cursor/jiesong_system/docs/reviews/2026-03-20-ceo-eng-design-review-summary.md#L29) [AIAssistant.tsx](/Users/helena/Cursor/jiesong_system/frontend/src/components/ai/AIAssistant.tsx#L479)
+
+如果你要，我下一步可以把这份 review 压缩成一个可直接贴进 `docs/reviews/` 的 Markdown 版本。

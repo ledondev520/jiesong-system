@@ -9,6 +9,7 @@
 const { success, created, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
 const financeService = require('../services/financeService');
+const { createError } = require('../middleware/errorHandler');
 
 /**
  * 职责：获取付款记录列表
@@ -104,10 +105,43 @@ const getStats = async (req, res, next) => {
   }
 };
 
+/**
+ * 职责：获取近 N 天收付款趋势（按周聚合）
+ * @param {Request} req - query.days: 30 | 90，默认 90
+ */
+const getPaymentTrends = async (req, res, next) => {
+  try {
+    const days = Number(req.query.days) || 90;
+    if (![30, 90, 180].includes(days)) {
+      return next(createError('days 参数只允许 30/90/180', 400));
+    }
+    const trends = await financeService.getPaymentTrends(days);
+    success(res, trends);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：获取应收逾期预警列表
+ * @param {Request} req - query.days: 逾期判断天数，默认 30
+ */
+const getOverdueReceivables = async (req, res, next) => {
+  try {
+    const overdueDays = Number(req.query.days) || 30;
+    const list = await financeService.getOverdueReceivables(overdueDays);
+    success(res, list);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listPayments,
   createPayment,
   getPayables,
   getReceivables,
   getStats,
+  getPaymentTrends,
+  getOverdueReceivables,
 };

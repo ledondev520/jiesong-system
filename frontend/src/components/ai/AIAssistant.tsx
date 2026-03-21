@@ -17,6 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Bot, Send, X, Image as ImageIcon, XCircle, Brain, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getAuthToken } from '@/lib/auth-token';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 
 interface Message {
   id: string;
@@ -24,6 +25,7 @@ interface Message {
   content: string;
   thinking?: string; // AI思考过程
   imageUrl?: string; // 图片URL（base64或远程URL）
+  model?: string; // 响应所用模型
   createdAt: Date;
 }
 
@@ -37,7 +39,7 @@ type StreamPayload = {
 };
 
 const resolveStreamEndpoint = (): string => {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+  const baseUrl = getApiBaseUrl();
   return `${baseUrl.replace(/\/$/, '')}/ai/chat/stream`;
 };
 
@@ -298,8 +300,10 @@ export function AIAssistant() {
     }
     if (payload.type === 'done') {
       setIsThinking(false);
-      updateMessageById(assistantMessageId, { thinking: streamState.thinkingText });
-      console.log('Token使用:', payload.tokenUsage, '模型:', payload.model);
+      updateMessageById(assistantMessageId, {
+        thinking: streamState.thinkingText,
+        model: payload.model || undefined,
+      });
       return;
     }
     if (payload.type === 'error') {
@@ -398,7 +402,7 @@ export function AIAssistant() {
       {/* Floating Button (Bottom Right) */}
       <Button
         className={cn(
-          "fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg transition-all duration-300 z-50",
+          "fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg transition-all duration-300 z-[199]",
           isOpen ? "scale-0 opacity-0" : "scale-100 opacity-100"
         )}
         size="icon"
@@ -411,7 +415,7 @@ export function AIAssistant() {
       {/* Chat Window */}
       <div
         className={cn(
-          "fixed bottom-6 right-6 z-50 w-96 transition-all duration-300 origin-bottom-right",
+          "fixed bottom-6 right-6 z-[200] w-96 transition-all duration-300 origin-bottom-right",
           isOpen ? "scale-100 opacity-100" : "scale-0 opacity-0 pointer-events-none"
         )}
       >
@@ -496,6 +500,14 @@ export function AIAssistant() {
                       <span className="whitespace-pre-wrap">
                         {renderContentWithLinks(msg.content)}
                       </span>
+                    )}
+                    {/* 显示模型标签 */}
+                    {msg.role === 'assistant' && msg.model && (
+                      <div className="mt-1.5 flex items-center gap-1">
+                        <span className="inline-flex items-center rounded border border-border/50 bg-muted/60 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground/70">
+                          {msg.model}
+                        </span>
+                      </div>
                     )}
                   </div>
                 ))}

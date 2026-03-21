@@ -10,12 +10,14 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import {
   FileText,
   DollarSign,
   TrendingUp,
   Package,
   Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { aiService, type DashboardAnalytics } from '@/services/ai.service';
 import {
@@ -38,18 +40,23 @@ import {
 export function DataDashboard() {
   const [data, setData] = useState<DashboardAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const res = await aiService.getDashboardAnalytics();
+      setData(res.data);
+    } catch (e) {
+      console.error('获取分析数据失败:', e);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await aiService.getDashboardAnalytics();
-        setData(res.data);
-      } catch (e) {
-        console.error('获取分析数据失败:', e);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
   }, []);
 
@@ -61,7 +68,17 @@ export function DataDashboard() {
     );
   }
 
-  if (!data) return null;
+  if (error || !data) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+          <AlertCircle className="h-8 w-8 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">数据加载失败，请重试</p>
+          <Button variant="outline" size="sm" onClick={fetchData}>重新加载</Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -74,13 +91,19 @@ export function DataDashboard() {
             <FileText className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.contracts.purchase.count}</div>
-            <p className="text-xs text-muted-foreground">
-              总金额: ¥{data.contracts.purchase.totalAmount.toLocaleString()}
-            </p>
-            <p className="text-xs text-primary/80">
-              待付: ¥{data.contracts.purchase.unpaidAmount.toLocaleString()}
-            </p>
+            <div className="text-3xl font-bold tabular-nums">{data.contracts.purchase.count}</div>
+            {data.contracts.purchase.totalAmount > 0 ? (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  总金额: ¥{data.contracts.purchase.totalAmount.toLocaleString()}
+                </p>
+                <p className="text-xs text-primary/80">
+                  待付: ¥{data.contracts.purchase.unpaidAmount.toLocaleString()}
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">共 {data.contracts.purchase.count} 份合同</p>
+            )}
           </CardContent>
         </Card>
 
@@ -91,13 +114,19 @@ export function DataDashboard() {
             <TrendingUp className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.contracts.sales.count}</div>
-            <p className="text-xs text-muted-foreground">
-              总金额: ${data.contracts.sales.totalAmount.toLocaleString()}
-            </p>
-            <p className="text-xs text-primary/80">
-              已收: ${data.contracts.sales.receivedAmount.toLocaleString()}
-            </p>
+            <div className="text-3xl font-bold tabular-nums">{data.contracts.sales.count}</div>
+            {data.contracts.sales.totalAmount > 0 ? (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  总金额: ${data.contracts.sales.totalAmount.toLocaleString()}
+                </p>
+                <p className="text-xs text-primary/80">
+                  已收: ${data.contracts.sales.receivedAmount.toLocaleString()}
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">共 {data.contracts.sales.count} 份合同</p>
+            )}
           </CardContent>
         </Card>
 
@@ -108,12 +137,19 @@ export function DataDashboard() {
             <DollarSign className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              ${data.contracts.sales.receivable.toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              待收回美金
-            </p>
+            {data.contracts.sales.receivable > 0 ? (
+              <>
+                <div className="text-3xl font-bold tabular-nums">
+                  ${data.contracts.sales.receivable.toLocaleString()}
+                </div>
+                <p className="text-xs text-muted-foreground">待收回美金</p>
+              </>
+            ) : (
+              <>
+                <div className="text-3xl font-bold text-muted-foreground">—</div>
+                <p className="text-xs text-muted-foreground">暂无待收款项</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -124,7 +160,7 @@ export function DataDashboard() {
             <Package className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.inventory.productCount}</div>
+            <div className="text-3xl font-bold tabular-nums">{data.inventory.productCount}</div>
             <p className="text-xs text-muted-foreground">
               商品种类
             </p>
@@ -141,7 +177,7 @@ export function DataDashboard() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">月度出货趋势</CardTitle>
-            <CardDescription>最近6个月出货金额</CardDescription>
+            <CardDescription>最近6个月合同数量</CardDescription>
           </CardHeader>
           <CardContent>
             {data.shipments.monthly.length === 0 ? (
@@ -157,15 +193,15 @@ export function DataDashboard() {
                   />
                   <YAxis 
                     tick={{ fontSize: 12 }}
-                    tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`}
+                    allowDecimals={false}
                   />
                   <Tooltip 
-                    formatter={(value) => [`$${Number(value || 0).toLocaleString()}`, '金额']}
+                    formatter={(value) => [`${value} 份`, '合同数量']}
                     labelFormatter={(label) => `${label}`}
                   />
                   <Line 
                     type="monotone" 
-                    dataKey="amount" 
+                    dataKey="count" 
                     stroke="var(--chart-3)" 
                     strokeWidth={2}
                     dot={{ fill: 'var(--chart-3)', r: 4 }}
@@ -181,7 +217,7 @@ export function DataDashboard() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">门店采购排行</CardTitle>
-            <CardDescription>Top 5 门店采购金额</CardDescription>
+            <CardDescription>Top 5 门店采购数量</CardDescription>
           </CardHeader>
           <CardContent>
             {data.storeStats.length === 0 ? (
@@ -193,7 +229,7 @@ export function DataDashboard() {
                   <XAxis 
                     type="number"
                     tick={{ fontSize: 12 }}
-                    tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`}
+                    tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)}
                   />
                   <YAxis 
                     type="category" 
@@ -203,10 +239,10 @@ export function DataDashboard() {
                     tickFormatter={(v) => v.length > 8 ? v.substring(0, 8) + '...' : v}
                   />
                   <Tooltip 
-                    formatter={(value) => [`$${Number(value || 0).toLocaleString()}`, '采购额']}
+                    formatter={(value) => [Number(value || 0).toLocaleString(), '采购数量']}
                   />
                   <Bar 
-                    dataKey="totalAmount" 
+                    dataKey="quantity" 
                     fill="var(--chart-1)" 
                     radius={[0, 4, 4, 0]}
                   />
@@ -217,11 +253,11 @@ export function DataDashboard() {
         </Card>
       </div>
 
-      {/* 热门商品（柱形图） */}
+        {/* 热门商品（柱形图） */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">热门采购商品 Top 10</CardTitle>
-          <CardDescription>按采购金额排序</CardDescription>
+          <CardDescription>按采购次数排序（含数量）</CardDescription>
         </CardHeader>
         <CardContent>
           {data.topProducts.length === 0 ? (
@@ -238,17 +274,24 @@ export function DataDashboard() {
                   tickFormatter={(v) => v.length > 6 ? v.substring(0, 6) + '..' : v}
                 />
                 <YAxis 
+                  yAxisId="left"
                   tick={{ fontSize: 12 }}
-                  tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`}
+                />
+                <YAxis 
+                  yAxisId="right"
+                  orientation="right"
+                  tick={{ fontSize: 12 }}
+                  tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)}
                 />
                 <Tooltip 
                   formatter={(value, name) => [
-                    name === 'totalAmount' ? `$${Number(value || 0).toLocaleString()}` : value,
-                    name === 'totalAmount' ? '金额' : '次数'
+                    name === 'count' ? `${value} 次` : Number(value || 0).toLocaleString(),
+                    name === 'count' ? '采购次数' : '采购数量',
                   ]}
                 />
-                <Legend formatter={(value) => value === 'totalAmount' ? '采购金额' : '采购次数'} />
-                <Bar dataKey="totalAmount" fill="var(--chart-3)" radius={[4, 4, 0, 0]} />
+                <Legend formatter={(value) => value === 'count' ? '采购次数' : '采购数量'} />
+                <Bar yAxisId="left" dataKey="count" fill="var(--chart-3)" radius={[4, 4, 0, 0]} name="count" />
+                <Bar yAxisId="right" dataKey="quantity" fill="var(--chart-1)" radius={[4, 4, 0, 0]} name="quantity" opacity={0.7} />
               </BarChart>
             </ResponsiveContainer>
           )}

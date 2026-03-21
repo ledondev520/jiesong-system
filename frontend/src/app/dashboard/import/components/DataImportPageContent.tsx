@@ -29,6 +29,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader';
 import {
   previewCSV,
   executeImport,
@@ -162,10 +163,10 @@ export default function DataImportPage() {
 
   return (
     <div className="space-y-6">
+      <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
       <PageHeader
         title="数据导入中心"
         description="上传 CSV，预览新增差异，再用统一流程导入业务数据。"
-        backHref="/dashboard/settings?tab=import"
       />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

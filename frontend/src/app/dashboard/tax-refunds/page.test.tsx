@@ -23,6 +23,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => ({
     get: (...args: unknown[]) => mockSearchParamGet(...args),
   }),
+  usePathname: () => '/dashboard/tax-refunds',
 }));
 
 vi.mock('@/services/taxRefund.service', () => ({
@@ -37,6 +38,12 @@ vi.mock('sonner', () => ({
     error: (...args: unknown[]) => mockToastError(...args),
     success: (...args: unknown[]) => mockToastSuccess(...args),
   },
+}));
+
+vi.mock('@/lib/api-cache', () => ({
+  cachedFetch: async (_key: string, fetcher: () => unknown) => fetcher(),
+  invalidateCache: vi.fn(),
+  clearAllCache: vi.fn(),
 }));
 
 describe('TaxRefundsDashboardPage 交互逻辑', () => {

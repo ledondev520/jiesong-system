@@ -64,6 +64,7 @@ import {
 import { supplierService } from '@/services/supplier.service';
 import { productService } from '@/services/product.service';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { PriceGuard } from '@/components/purchase/PriceGuard';
 
 // ============== Schema ==============
 const purchaseSchema = z.object({
@@ -358,24 +359,27 @@ export default function CreatePurchasePage() {
                       <FormField
                         control={form.control}
                         name={`items.${index}.productId`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className={index !== 0 ? 'sr-only' : ''}>商品</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="选择商品" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {products.map(p => (
-                                  <SelectItem key={p.id} value={p.id}>{p.customsName}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+                        render={({ field }) => {
+                          const selectedProduct = products.find(p => p.id === field.value);
+                          return (
+                            <FormItem>
+                              <FormLabel className={index !== 0 ? 'sr-only' : ''}>商品</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="选择商品" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {products.map(p => (
+                                    <SelectItem key={p.id} value={p.id}>{p.customsName}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
                       />
                     </div>
                     <div className="md:col-span-2">
@@ -419,6 +423,14 @@ export default function CreatePurchasePage() {
                               <Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
                             </FormControl>
                             <FormMessage />
+                            {/* 智能比价红绿灯：与历史成交价对比 */}
+                            {watchItems[index]?.productId && (
+                              <PriceGuard
+                                productId={watchItems[index].productId}
+                                currentPrice={watchItems[index]?.unitPrice || 0}
+                                supplierId={form.watch('supplierId')}
+                              />
+                            )}
                           </FormItem>
                         )}
                       />

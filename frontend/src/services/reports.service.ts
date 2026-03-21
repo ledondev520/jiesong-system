@@ -52,4 +52,10 @@ export const reportsService = {
       params: { supplierId, pageSize: 1 },
     });
   },
+
+  getSalesByStore: async (storeId: string) => {
+    return api.get<ApiResponse<PurchaseSummaryResponse>, ApiResponse<PurchaseSummaryResponse>>('/sales', {
+      params: { storeId, pageSize: 1 },
+    });
+  },
 };

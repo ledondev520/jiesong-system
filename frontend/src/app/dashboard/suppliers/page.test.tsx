@@ -15,6 +15,7 @@ const mockGetAll = vi.fn();
 const mockToastError = vi.fn();
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/dashboard',
   useRouter: () => ({
     push: vi.fn(),
     back: vi.fn(),
@@ -41,6 +42,12 @@ vi.mock('./components/SupplierDialog', () => ({
   SupplierDialog: ({ open }: { open: boolean }) => (open ? <div>供应商弹窗已打开</div> : null),
 }));
 
+vi.mock('@/lib/api-cache', () => ({
+  cachedFetch: async (_key: string, fetcher: () => unknown) => fetcher(),
+  invalidateCache: vi.fn(),
+  clearAllCache: vi.fn(),
+}));
+
 describe('SuppliersPage 交互逻辑', () => {
   beforeEach(() => {
     mockGetAll.mockReset();
@@ -52,7 +59,7 @@ describe('SuppliersPage 交互逻辑', () => {
     render(<SuppliersPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '供应商管理' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '商家管理' })).toBeInTheDocument();
       expect(screen.getByText('暂无供应商数据。')).toBeInTheDocument();
     });
   });

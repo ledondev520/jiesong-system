@@ -52,6 +52,12 @@ router.get('/receivables', withPaginationValidation, financeController.getReceiv
 // GET /api/v1/finance/stats - 获取财务统计
 router.get('/stats', financeController.getStats);
 
+// GET /api/v1/finance/payment-trends - 获取近N天收付款趋势（按周聚合，用于折线图）
+router.get('/payment-trends', financeController.getPaymentTrends);
+
+// GET /api/v1/finance/overdue-receivables - 获取应收逾期预警（发货后超N天未收款）
+router.get('/overdue-receivables', financeController.getOverdueReceivables);
+
 // ==================== 财务报表路由 ====================
 
 // GET /api/v1/finance/statements/analytics - 获取趋势分析数据和预警列表（必须在 /:year/:month 之前注册）

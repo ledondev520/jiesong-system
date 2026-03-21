@@ -390,6 +390,30 @@ const deleteFile = async (req, res, next) => {
 };
 
 /**
+ * 职责：下载合同附件
+ * 思路：查找文件记录，构造绝对路径，通过 res.download 返回文件流
+ */
+const downloadFile = async (req, res, next) => {
+  try {
+    const { fileId } = req.params;
+    const path = require('path');
+
+    const file = await prisma.contractFile.findUnique({ where: { id: fileId } });
+    if (!file) throw createError('文件不存在', 404);
+
+    const absolutePath = path.isAbsolute(file.filePath)
+      ? file.filePath
+      : path.join(process.cwd(), file.filePath);
+
+    res.download(absolutePath, file.fileName, (err) => {
+      if (err && !res.headersSent) next(err);
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * 职责：获取下一个合同编号
  */
 const getNextContractNo = async (req, res, next) => {
@@ -458,6 +482,7 @@ module.exports = {
   uploadFile,
   getFiles,
   deleteFile,
+  downloadFile,
   getNextContractNo,
   getSuppliersByProducts,
 };

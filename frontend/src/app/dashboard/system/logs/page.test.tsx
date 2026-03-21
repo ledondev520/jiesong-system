@@ -24,6 +24,7 @@ vi.mock('@/store/auth.store', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/dashboard',
   useRouter: () => ({
     push: vi.fn(),
     back: vi.fn(),
@@ -69,6 +70,12 @@ const otherLog = {
   oldValue: '',
   newValue: '',
 };
+
+vi.mock('@/lib/api-cache', () => ({
+  cachedFetch: async (_key: string, fetcher: () => unknown) => fetcher(),
+  invalidateCache: vi.fn(),
+  clearAllCache: vi.fn(),
+}));
 
 describe('SystemLogsPage', () => {
   beforeEach(() => {

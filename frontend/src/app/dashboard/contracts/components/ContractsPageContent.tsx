@@ -13,6 +13,7 @@ import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTab
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PurchaseContract, PurchaseStatus, PurchaseItem } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
+import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -133,11 +134,14 @@ export default function ContractsPageContent() {
     loadPurchaseContracts();
   }, []);
 
-  // 1. 加载采购合同
+  // 1. 加载采购合同（带缓存，pageSize 降至 100 减少负载）
   const loadPurchaseContracts = async () => {
     setPurchaseLoading(true);
     try {
-      const response = await purchaseService.getAll({ page: 1, pageSize: 200 });
+      const response = await cachedFetch(
+        'purchase-contracts-list',
+        () => purchaseService.getAll({ page: 1, pageSize: 100 }),
+      );
       setPurchaseContracts(response.data?.items || []);
     } catch {
       toast.error('加载采购合同失败');
@@ -310,12 +314,18 @@ export default function ContractsPageContent() {
                         </div>
                       </TableCell>
                       <TableCell className="max-w-[150px] truncate" title={productName}>
-                        {productName}
+                        {productName || <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell>
-                        {contract.supplier?.name}
-                        {contract.supplier?.hasQualityIssue && (
-                          <Badge variant="destructive" className="ml-2 text-xs">质量问题</Badge>
+                        {contract.supplier?.name ? (
+                          <>
+                            {contract.supplier.name}
+                            {contract.supplier.hasQualityIssue && (
+                              <Badge variant="destructive" className="ml-2 text-xs">质量问题</Badge>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
                       <TableCell className="max-w-[120px] truncate" title={contract.storeName || ''}>

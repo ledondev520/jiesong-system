@@ -23,6 +23,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Plus, Pencil, Trash, UserCog } from 'lucide-react';
+import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserDialog } from './components/UserDialog';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -102,11 +103,10 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
+      <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
       <PageHeader 
         title="用户管理"
         description="管理系统用户及角色权限"
-        backHref="/dashboard/settings?tab=users"
-        backLabel="返回"
         actions={
           <Button onClick={handleCreate} className="h-10 rounded-xl">
             <Plus className="mr-2 h-4 w-4" /> 新增用户

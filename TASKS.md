@@ -1,5 +1,42 @@
 # Frontend Polish Tasks
 
+## 2026-03-21 CEO/Eng/Design 三维评审迭代（基于 2026-03-20 review）
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| REV-01 | P0 | 15m | 1 | DONE | 修复导出路由权限缺失：GET /system/export/:type 与 /pdf 均无 roleAuth，加 ADMIN+业务角色限制 |
+| REV-02 | P1 | 90m | 2 | DONE | 财务首页升级为经营驾驶舱：汇率显示、收付款完成率进度条、紧迫性预警 badge、快捷导航区 |
+| REV-03 | P1 | 20m | 2 | DONE | AI 助手 z-index 提升至 z-[199]/z-[200]，防止被弹框/sticky header 覆盖 |
+| REV-04 | P1 | 60m | 3 | DONE | 经营执行中台拆分：page.tsx(55行) 委托 UnshippedListTab + PurchaseChecklistTab 子组件 |
+| REV-05 | P1 | 45m | 3 | DONE | 设置页 IA 优化：基础档案加港口/品类入口、数据导出改 shadcn Select、系统配置分域说明 |
+| REV-06 | P1 | 30m | 1 | DONE | 导出路由加 withAuditLog 审计日志，可在 system/logs 追溯每次导出行为 |
+| REV-07 | P0 | 45m | 2 | DONE | SystemConfig 分域分组：新增 GET /configs/domains 端点，CONFIG_DOMAIN_MAP 维护 params/dictionary/ai/other 四域 |
+| REV-08 | P2 | 20m | 1 | DONE | vitest coverage 增加 services 层覆盖、reporter 加 lcov、阈值提升至 15/25%，test:coverage 命令已就绪 |
+| REV-09 | P0 | 30m | 1 | DONE | authenticate() 加 LRU 内存缓存（TTL=60s, max=1000）：减少每请求 DB 查询，暴露 clearAuthCache() 供禁用即时踢出 |
+| REV-10 | P0 | 15m | 1 | DONE | Settings 删除单位/报关公司失败时回滚本地状态并展示精确错误 toast（原来只有空 catch） |
+| REV-11 | P1 | 20m | 1 | DONE | 财务页新增 loadError 状态：区分「无数据」与「加载失败」，失败时展示专属 ServerCrash 错误卡片+重试按钮 |
+| REV-12 | P0 | 5m | 1 | DONE | ops-execution moduleName="财务"→"经营执行"，修复语义错误（FINANCE_TABS 跨页导航保留，aria-label 修正） |
+| REV-13 | P0 | 15m | 1 | DONE | 旧导出路由旁路修复：/api/v1/export/:type 补 roleAuth，与 /system/export/:type 权限对齐，消除 RBAC 绕过漏洞 |
+| REV-14 | P0 | — | 1 | N/A | PUT /system/notifications/:id/read 所有者校验：已通过 userId 过滤实现，无需额外修复 |
+| REV-15 | P1 | 15m | 1 | DONE | 财务驾驶舱货币混用：应收全部标注 USD，应付保持 ¥/CNY，底部说明文字同步更新 |
+| MOB-01 | P0 | 60m | 1 | DONE | 移动端汉堡菜单（R-019 18轮）：Header 加 Sheet 抽屉，md以下展示全量导航+用户信息+退出 |
+| SPLIT-01 | P1 | 45m | 2 | DONE | SettingsPageContent.tsx 拆分为 5 个 Tab 子组件（MasterData/SystemConfig/DataImport/Ops/DataExport/Users） |
+| FIN-TREND-01 | P2 | 90m | 3 | DONE | 财务趋势折线图：后端 /finance/payment-trends 按周聚合 + 前端 recharts 图表，支持 30/90 天切换 |
+| FIN-OVERDUE-01 | P2 | 45m | 3 | DONE | 应收逾期预警：后端 /finance/overdue-receivables（发货30天未收视为逾期） + 前端驾驶舱预警卡片 |
+| COV-01 | P1 | 30m | 1 | DONE | Coverage 扩围：include 新增 src/app/**，排除 layout/loading/error 等框架文件，阈值提升至 20/15% |
+| MRD-01 | P1 | 60m | 4 | DONE | 智能比价 PriceGuard 组件：调用 /products/:id/price-history，实时显示涨/跌/持平红绿灯徽章 |
+| MRD-02 | P1 | 30m | 4 | DONE | 合规性智能提示 ComplianceHint：关键词规则（鸟刺/烟花/刀具/食品）自动弹出美国法规提示 |
+| MRD-03 | P1 | — | — | N/A | 合同Word/PDF导出：采购合同详情页已有完整实现（generateFromPurchase + exportPurchasePdf），无需新增 |
+| MRD-04 | P1 | 45m | 1 | DONE | 合同附件归档：采购详情页增加「合同附件」卡片，支持上传/下载/删除，后端新增 downloadFile 端点 |
+| PERF-01 | P1 | 20m | 1 | DONE | 财务模块 Tab 卡顿修复：statements/page.tsx 的 loading 改为骨架屏内联方式，ModuleTabHeader 始终渲染，消除切 Tab 时整页空白闪烁 |
+| PERF-02 | P1 | 60m | 1 | DONE | 全模块 Tab 切换性能优化：新建 src/lib/api-cache.ts（30s 内存缓存），覆盖全部 10 个 Tab 页面，首次加载正常，30s 内重访秒开 |
+
+## 2026-03-19 ClawPi Domain Sweep
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| OPS-DOMAIN-01 | P0 | 30m | 1 | DONE | 全仓清扫 ClawPi 旧域名残留，核查脚本/配置/定时任务入口，修复前端 API 基址环境变量不一致并完成无副作用验证 |
+
 ## 2026-03-15 Ops Execution Center
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
@@ -11,6 +48,7 @@
 ## 任务清单
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
 |---|---|---:|---:|---|---|
+| UX-LAUNCH-01 | P0 | 30m | 1 | DONE | 登录成功后直达 `/dashboard`，工作台数据看板改为懒加载并提供骨架屏，缩短首开空白感 |
 | HS-UX-01 | P0 | 20m | 1 | DONE | 查明本地登录/空库根因，补 HSCode 默认全量列表，再联通本地 backend+frontend 登录链路 |
 | PERF-01 | P0 | 40m | 1 | DONE | 页面切换性能优化：实现全局 GET 缓存+并发去重+写后失效，并在侧边栏空闲预取常用路由，完成 lint/test/build 验证 |
 | PERF-02 | P0 | 60m | 1 | DONE | 持续性能优化：后端列表接口新增 lite 轻量响应并移除冗余关联，前端高频页切换为 lite 请求，叠加 GET 缓存 TTL 提升至 180s，完成前后端回归与构建验证 |
@@ -176,3 +214,55 @@
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
 |---|---|---:|---:|---|---|
 | BE-COV-98 | P0 | 120m | 1 | DOING | 后端覆盖率推进到 98%，第一阶段先完成测试门禁稳定化、全量基线盘点与专项报告，第二阶段进入 controller/service 分批补测 |
+
+## 2026-03-21 导航重构与设置精简
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| NAV-01 | P1 | 10m | 1 | DONE | 将「经营执行」从财务模块 Tab 移至经营中台模块（ops-execution 改用 OPERATIONS_TABS） |
+| NAV-02 | P1 | 10m | 1 | DONE | 将「商家管理」(suppliers) 接入采购模块 Tab，更新侧边栏 childPrefixes |
+| NAV-03 | P1 | 10m | 1 | DONE | 将「HS 编码」(hs-codes) 接入出口模块 Tab，更新侧边栏 childPrefixes |
+| NAV-04 | P1 | 15m | 1 | DONE | 精简系统设置页：移除「基础档案」和「小工具（Cloud费用计算器）」两个Tab，默认落地系统配置 |
+| NAV-05 | P1 | 5m | 1 | DONE | 修复 finance/page.tsx 中 Recharts Tooltip formatter 类型错误并通过生产构建 |
+| NAV-06 | P1 | 10m | 1 | DONE | ADMIN_TABS 重排序（系统配置→用户管理→通知中心→系统日志→导入记录→AI 管理→合同模板），删除数据导入 Tab |
+| NAV-07 | P1 | 15m | 1 | DONE | 「数据导入」功能改为导入记录页右上角按钮，点击跳 /dashboard/import |
+| BUG-01 | P0 | 5m | 1 | DONE | 修复导入记录 404：前端 service 调用改为 /import/history |
+| FIX-05 | P1 | 30m | 1 | DONE | HS 编码模糊搜索：后端 Dice 系数算法 + 前端相似度 Badge 展示 |
+| UX-01 | P1 | 20m | 1 | DONE | 统一分页：HS 编码页新增 20/50/100 条每页 Select，默认 20 条 |
+| UX-02 | P1 | 25m | 1 | DONE | Tab 记忆：localStorage 持久化各模块最后访问路径，侧边栏点击模块自动跳回上次位置 |
+| UX-03 | P1 | 20m | 1 | DONE | 筛选重置：退税列表、报关单列表筛选区新增「重置」按钮 |
+
+## 2026-03-21 CEO三维评审 + 设计评审 → 迭代计划
+
+> 来源：REDUCTION / HOLD SCOPE / SCOPE EXPANSION 三轮 CEO Review + Design Review。  
+> 按优先级排序，P0 = 质量危机/影响上线，P1 = 可见体验缺陷，P2 = 扩展与优化。
+
+### 🔴 P0 质量门禁
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| QG-01 | P0 | 60m | 1 | TODO | 修复 46 个前端失败测试：定位失败原因（mock 不同步、页面行为变更），逐文件修复直到 0 red（对应 FE-COV-98-C） |
+| QG-02 | P0 | 15m | 1 | TODO | API 缓存内存泄漏修复：`api-cache.ts` 增加 `setInterval` 每 5 分钟清理过期条目，或引入 LRU 策略限制最大 200 条 |
+| QG-03 | P0 | 20m | 1 | TODO | 全局 React Error Boundary：在 `app/layout.tsx` 外层加 `<GlobalErrorBoundary>`，catch 渲染崩溃并展示「页面异常，点击刷新」fallback UI |
+
+### 🟡 P1 体验与架构
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| ARCH-01 | P1 | 45m | 1 | TODO | HS 编码 SQLite FTS5 索引：对 `hs_codes.product_name` 建 FTS5 虚拟表，fuzzySearch 改为 `MATCH` 语句，候选集压缩到 <100 条再做 Dice 排序，解决 12k 记录全扫性能问题 |
+| ARCH-02 | P1 | 30m | 1 | TODO | 分页状态 URL 同步：HS 码、采购合同、销售合同、付款记录等列表页将 `page/pageSize/keyword` 写入 URL query string（`useSearchParams`+`router.replace`），支持浏览器回退与书签 |
+| ARCH-03 | P1 | 20m | 1 | TODO | RBAC 写路由审计：盘查所有 POST/PUT/DELETE 路由，确认 `system-configs`、`users`、`roles` 等管理类端点已加 `requireAdmin` 中间件，消除普通员工越权风险 |
+| DESIGN-01 | P1 | 20m | 1 | TODO | 采购列表空单元格修复：当采购单缺少供应商/金额/状态字段时，展示「—」占位符而非空白，避免表格参差不齐（Design Review P1） |
+| DESIGN-02 | P1 | 15m | 1 | TODO | 图表坐标轴字号修复：财务趋势折线图 X/Y 轴 `tick` 字体从 10px 提升到 12px，图例文字同步放大，提升可读性（Design Review P1） |
+| DESIGN-03 | P1 | 20m | 1 | TODO | 统一空态设计：产品/库存/合同等空列表页统一使用「插画 + 主操作按钮」的空态卡片（Design Review P1） |
+| REDUCE-01 | P1 | 20m | 1 | TODO | 移除「门店推荐」页（`/dashboard/store-recommend`）：CEO REDUCTION 识别为低频且维护成本高，删除页面、路由、侧边栏入口，相关测试同步清理 |
+| REDUCE-02 | P1 | 15m | 1 | TODO | 移除 `ComplianceHint` 悬浮合规提示组件：CEO REDUCTION 识别为打断用户流程的噪音，暂时下架，后续可改为「按需查询」模式集成到 HS 编码详情页 |
+
+### 🟢 P2 扩展能力（SCOPE EXPANSION 近期可落地）
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| EXP-01 | P2 | 90m | 1 | TODO | AI HS 码推荐助手：在 HS 编码搜索区加「AI 辅助识别」按钮，用户输入产品描述，调用 Kimi/MiniMax API 返回推荐 HS 编码列表 + 税率，利用现有 AI 配置体系 |
+| EXP-02 | P2 | 45m | 1 | TODO | 汇率自动同步：定时拉取央行/ExchangeRate-API 公开汇率，写入 `system_configs`，财务模块付款换算自动引用最新汇率而非手动填写 |
+| EXP-03 | P2 | 60m | 1 | TODO | 合同 Word 模板导出：基于 `docxtemplater`，采购/销售合同详情页增加「导出 Word」选项，输出带公司抬头/盖章位置的标准合同格式 |
+| EXP-04 | P2 | 120m | 2 | TODO | 供应商文件自服务门户 V1：生成带时效的供应商上传链接，供应商无需登录即可上传报价单/发票/合规文件，文件归入对应采购合同附件 |

@@ -143,7 +143,7 @@ export const getSystemImportRecords = async (
   params: GetSystemImportRecordsParams = { page: 1, pageSize: 50 }
 ) => {
   return api.get<ApiResponse<PaginatedResponse<SystemImportRecordItem>>, ApiResponse<PaginatedResponse<SystemImportRecordItem>>>(
-    '/import/records',
+    '/import/history',
     { params }
   );
 };

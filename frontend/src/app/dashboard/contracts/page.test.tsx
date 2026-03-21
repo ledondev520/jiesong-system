@@ -24,6 +24,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => ({
     get: (...args: unknown[]) => mockSearchParamGet(...args),
   }),
+  usePathname: () => '/dashboard/contracts',
 }));
 
 vi.mock('@/services/purchase.service', () => ({
@@ -45,6 +46,12 @@ vi.mock('sonner', () => ({
     error: (...args: unknown[]) => mockToastError(...args),
     success: vi.fn(),
   },
+}));
+
+vi.mock('@/lib/api-cache', () => ({
+  cachedFetch: async (_key: string, fetcher: () => unknown) => fetcher(),
+  invalidateCache: vi.fn(),
+  clearAllCache: vi.fn(),
 }));
 
 describe('ContractsPage 交互逻辑', () => {

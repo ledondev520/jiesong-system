@@ -18,6 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader';
 import { Badge } from '@/components/ui/badge';
 import { exportSystemLogsCsv, getSystemLogs, SystemLogItem } from '@/services/system.service';
 import { toast } from 'sonner';
@@ -93,11 +94,10 @@ export default function SystemLogsPage() {
   if (!user) {
     return (
       <div className="space-y-6">
+        <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
         <PageHeader
           title="系统日志"
           description="查看系统操作日志与导入相关日志"
-          backHref="/dashboard"
-          backLabel="返回工作台"
         />
 
         <Card>
@@ -116,11 +116,10 @@ export default function SystemLogsPage() {
   if (!canAccess) {
     return (
       <div className="space-y-6">
+        <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
         <PageHeader
           title="系统日志"
           description="查看系统操作日志与导入相关日志"
-          backHref="/dashboard"
-          backLabel="返回工作台"
         />
 
         <Card>
@@ -162,11 +161,10 @@ export default function SystemLogsPage() {
 
   return (
     <div className="space-y-6">
+      <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
       <PageHeader
         title="系统日志"
         description="查看系统操作日志与导入相关日志"
-        backHref="/dashboard"
-        backLabel="返回工作台"
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button

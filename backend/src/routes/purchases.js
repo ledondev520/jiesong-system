@@ -73,6 +73,9 @@ router.delete('/files/:fileId', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE'
   purchaseController.deleteFile
 ));
 
+// GET /api/v1/purchases/files/:fileId/download - 下载合同文件
+router.get('/files/:fileId/download', purchaseController.downloadFile);
+
 // POST /api/v1/purchases/suppliers-by-products - 根据商品获取曾供应过的供应商
 router.post('/suppliers-by-products', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), purchaseController.getSuppliersByProducts);
 

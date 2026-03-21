@@ -276,6 +276,29 @@ const resolveChatResult = async ({ userId, sessionId, message, imageUrl, useThin
   });
 };
 
+/**
+ * 职责：从 systemConfig 读取 AI 模型优先级配置，带 30 秒内存缓存
+ */
+let _modelConfigCache = null;
+let _modelConfigCacheAt = 0;
+const getConfiguredModels = async () => {
+  const now = Date.now();
+  if (_modelConfigCache && now - _modelConfigCacheAt < 30_000) return _modelConfigCache;
+
+  const rows = await prisma.systemConfig.findMany({
+    where: { key: { in: ['aiPrimaryModel', 'aiFallbackModel'] } },
+    select: { key: true, value: true },
+  });
+
+  const map = Object.fromEntries(rows.map(r => [r.key, r.value]));
+  _modelConfigCache = {
+    defaultModel: map.aiPrimaryModel || MODELS.default,
+    thinkingModel: map.aiFallbackModel || MODELS.thinking,
+  };
+  _modelConfigCacheAt = now;
+  return _modelConfigCache;
+};
+
 const runChatSession = async ({
   userId,
   sessionId,
@@ -285,14 +308,17 @@ const runChatSession = async ({
   onChunk,
   onThinking,
 }) => {
+  // 0. 读取管理员配置的模型优先级（primary/fallback）
+  const { defaultModel, thinkingModel } = await getConfiguredModels();
+
   const { messages, model } = await buildChatSession({
     userId,
     sessionId,
     message,
     imageUrl,
-    defaultModel: MODELS.default,
+    defaultModel,
     visionModel: MODELS.vision,
-    thinkingModel: MODELS.thinking,
+    thinkingModel,
     useThinkingModel: Boolean(useThinking),
   });
 
@@ -690,7 +716,8 @@ const parseLocally = (content, type) => {
 const getTokenStats = async (userId, days = 30) => {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
-  
+
+  // 1. 汇总统计
   const stats = await prisma.tokenUsage.aggregate({
     where: {
       userId,
@@ -703,7 +730,8 @@ const getTokenStats = async (userId, days = 30) => {
     },
     _count: true,
   });
-  
+
+  // 2. 按模型分组
   const byModel = await prisma.tokenUsage.groupBy({
     by: ['model'],
     where: {
@@ -713,7 +741,22 @@ const getTokenStats = async (userId, days = 30) => {
     _sum: { totalTokens: true },
     _count: true,
   });
-  
+
+  // 3. 获取每日明细（SQLite 用 date() 函数截取日期）
+  const dailyRaw = await prisma.$queryRaw`
+    SELECT
+      date(createdAt) AS day,
+      model,
+      SUM(totalTokens) AS tokens,
+      COUNT(*) AS requests,
+      SUM(CASE WHEN totalTokens > 0 THEN 1 ELSE 0 END) * 100.0 / COUNT(*) AS successRate
+    FROM token_usages
+    WHERE userId = ${userId}
+      AND createdAt >= ${startDate.toISOString()}
+    GROUP BY day, model
+    ORDER BY day ASC
+  `;
+
   return {
     period: `${days}天`,
     totalRequests: stats._count,
@@ -724,6 +767,14 @@ const getTokenStats = async (userId, days = 30) => {
       model: m.model,
       requests: m._count,
       tokens: m._sum.totalTokens,
+    })),
+    // 每日折线图数据：[{ day, model, tokens, requests, successRate }]
+    daily: (dailyRaw || []).map(r => ({
+      day: r.day,
+      model: r.model,
+      tokens: Number(r.tokens) || 0,
+      requests: Number(r.requests) || 0,
+      successRate: Math.round(Number(r.successRate) || 100),
     })),
   };
 };
@@ -858,11 +909,22 @@ const getLocalGreeting = () => {
   return { ...randomGreeting, source: 'local' };
 };
 
+/**
+ * 职责：简单非流式 AI 调用（供内部其他模块使用）
+ * @param {Array} messages - OpenAI 格式的消息列表
+ * @param {string} [model] - 使用的模型（默认 MODELS.fast）
+ * @returns {{ content: string, tokenUsage: object }}
+ */
+const callAI = async (messages, model = MODELS.fast) => {
+  return callKimiAPI(messages, model);
+};
+
 module.exports = {
   chat,
   chatStream,
   parseInput,
   callKimiAPI,
+  callAI,
   estimateTokens,
   generateLocalResponse,
   getTokenStats,

@@ -12,6 +12,7 @@ import { Search, Plus, ReceiptText } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TaxRefund } from '@/types';
 import { taxRefundService } from '@/services/taxRefund.service';
+import { cachedFetch } from '@/lib/api-cache';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
 import { Button } from '@/components/ui/button';
@@ -39,12 +40,16 @@ export function TaxRefundListPageContent() {
   const loadTaxRefunds = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await taxRefundService.getAll({
-        page: 1,
-        pageSize: PAGE_SIZE,
-        keyword: deferredKeyword || undefined,
-        status: status === 'ALL' ? undefined : status,
-      });
+      const cacheKey = `tax-refunds-${deferredKeyword}-${status}`;
+      const response = await cachedFetch(
+        cacheKey,
+        () => taxRefundService.getAll({
+          page: 1,
+          pageSize: PAGE_SIZE,
+          keyword: deferredKeyword || undefined,
+          status: status === 'ALL' ? undefined : status,
+        }),
+      );
       setTaxRefunds(response?.data?.items || []);
     } catch {
       toast.error('加载退税记录失败');
@@ -88,10 +93,9 @@ export function TaxRefundListPageContent() {
       <PageHeader
         title="出口退税"
         description="管理退税批次、申报进度与到账状态。"
-        backHref="/dashboard"
         actions={
           <>
-            <div className="relative w-72">
+            <div className="relative w-64">
               <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
               <Input
                 value={keyword}
@@ -113,6 +117,16 @@ export function TaxRefundListPageContent() {
                 ))}
               </SelectContent>
             </Select>
+
+            {(keyword || status !== 'ALL') && (
+              <Button
+                variant="ghost"
+                className="h-11 rounded-xl"
+                onClick={() => { setKeyword(''); setStatus('ALL'); }}
+              >
+                重置
+              </Button>
+            )}
 
             <Button
               variant="outline"

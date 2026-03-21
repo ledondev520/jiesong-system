@@ -13,6 +13,7 @@ import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { contractDocService } from '@/services/contractDoc.service';
+import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Trash2, Upload } from 'lucide-react';
@@ -33,7 +34,7 @@ export default function ContractTemplatesPage() {
   const loadTemplates = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await contractDocService.getTemplates();
+      const response = await cachedFetch('contract-templates', () => contractDocService.getTemplates());
       setItems(response.data?.items || []);
     } catch {
       toast.error('加载模板列表失败');
@@ -56,6 +57,7 @@ export default function ContractTemplatesPage() {
     setDeleting(true);
     try {
       await contractDocService.deleteTemplate();
+      invalidateCache('contract-templates');
       toast.success('模板已删除');
       await loadTemplates();
     } catch {
@@ -71,7 +73,7 @@ export default function ContractTemplatesPage() {
       <PageHeader
         title="模板管理"
         description="查看当前生效模板并支持替换/删除"
-        backHref="/dashboard/contracts"
+        
         backLabel="返回合同列表"
         actions={
           <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/contracts/template')}>

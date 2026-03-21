@@ -27,6 +27,7 @@ import { CreditCard, ArrowUpRight, ArrowDownLeft, RefreshCw } from 'lucide-react
 import { PaymentDialog, type PaymentSubmitData } from '../../dashboard/finance/components/PaymentDialog';
 import { toast } from 'sonner';
 import { financeService } from '@/services/finance.service';
+import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
 
@@ -98,18 +99,18 @@ function PaymentsPageContent() {
   // 1. 加载统计数据
   const fetchStats = async () => {
     try {
-      const data = await financeService.getStats();
+      const data = await cachedFetch('fin-stats', () => financeService.getStats());
       setStats(data);
     } catch {
       console.error('获取财务统计失败');
     }
   };
 
-  // 2. 加载应付账款
+  // 2. 加载应付账款（带缓存）
   const fetchPayables = async () => {
     setPayableLoading(true);
     try {
-      const response = await financeService.getPayables({ pageSize: 100 });
+      const response = await cachedFetch('fin-payables-p1', () => financeService.getPayables({ pageSize: 100 }));
       setPayables(
         (response.data?.items || []).map((item) => ({
           id: item.id,
@@ -128,11 +129,11 @@ function PaymentsPageContent() {
     }
   };
 
-  // 3. 加载应收账款
+  // 3. 加载应收账款（带缓存）
   const fetchReceivables = async () => {
     setReceivableLoading(true);
     try {
-      const response = await financeService.getReceivables({ pageSize: 100 });
+      const response = await cachedFetch('fin-receivables-p1', () => financeService.getReceivables({ pageSize: 100 }));
       setReceivables(
         (response.data?.items || []).map((item) => ({
           id: item.id,
@@ -167,6 +168,8 @@ function PaymentsPageContent() {
       });
       toast.success('付款记录已保存');
       setSelectedPayable(null);
+      invalidateCache('fin-payables');
+      invalidateCache('fin-stats');
       fetchPayables();
       fetchStats();
     } catch {
@@ -189,6 +192,8 @@ function PaymentsPageContent() {
       });
       toast.success('收款记录已保存');
       setSelectedReceivable(null);
+      invalidateCache('fin-receivables');
+      invalidateCache('fin-stats');
       fetchReceivables();
       fetchStats();
     } catch {

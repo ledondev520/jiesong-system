@@ -33,9 +33,11 @@ export function PageHeader({
   description, 
   backHref, 
   backLabel = '返回',
-  showBack = true,
+  showBack,
   actions 
 }: PageHeaderProps) {
+  // 0. 若未显式传入 showBack，则有 backHref 时才显示返回按钮
+  const shouldShowBack = showBack !== undefined ? showBack : Boolean(backHref);
   const router = useRouter();
 
   const handleBack = () => {
@@ -49,8 +51,8 @@ export function PageHeader({
   return (
     <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
       <div className="flex min-w-0 items-start gap-3">
-        {/* 返回按钮：顶层页面通过 showBack={false} 隐藏 */}
-        {showBack && (
+        {/* 返回按钮：有 backHref 时自动显示；可通过 showBack 强制控制 */}
+        {shouldShowBack && (
           <Button 
             variant="outline" 
             size="sm" 

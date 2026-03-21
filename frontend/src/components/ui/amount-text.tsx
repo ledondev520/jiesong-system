@@ -9,7 +9,7 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const amountTextVariants = cva("font-medium", {
+const amountTextVariants = cva("font-medium tabular-nums", {
   variants: {
     tone: {
       neutral: "text-foreground",

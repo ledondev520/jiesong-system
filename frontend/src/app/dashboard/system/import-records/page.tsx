@@ -7,6 +7,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,6 +21,8 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader';
+import { Upload } from 'lucide-react';
 import { getSystemImportRecords, SystemImportRecordItem } from '@/services/system.service';
 import { useAuthStore } from '@/store/auth.store';
 import { Role } from '@/types';
@@ -83,6 +86,7 @@ const getErrorSummary = (errorLog?: string | null) => {
 const getStatusLabel = (status: string) => statusLabelMap[status] || status || '-';
 
 export default function SystemImportRecordsPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<SystemImportRecordItem[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
@@ -142,11 +146,10 @@ export default function SystemImportRecordsPage() {
   if (!user) {
     return (
       <div className="space-y-6">
+        <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
         <PageHeader
           title="导入记录"
           description="查看历史导入任务执行结果"
-          backHref="/dashboard"
-          backLabel="返回工作台"
         />
 
         <Card>
@@ -165,11 +168,10 @@ export default function SystemImportRecordsPage() {
   if (!canAccess) {
     return (
       <div className="space-y-6">
+        <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
         <PageHeader
           title="导入记录"
           description="查看历史导入任务执行结果"
-          backHref="/dashboard"
-          backLabel="返回工作台"
         />
 
         <Card>
@@ -187,11 +189,16 @@ export default function SystemImportRecordsPage() {
 
   return (
     <div className="space-y-6">
+      <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
       <PageHeader
         title="导入记录"
         description="查看历史导入任务执行结果"
-        backHref="/dashboard"
-        backLabel="返回工作台"
+        actions={
+          <Button size="sm" onClick={() => router.push('/dashboard/import')}>
+            <Upload className="mr-2 h-4 w-4" />
+            数据导入
+          </Button>
+        }
       />
 
       <Card>

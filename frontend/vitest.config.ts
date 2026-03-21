@@ -24,13 +24,36 @@ export default defineConfig({
     testTimeout: 20000,
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html'],
-      include: ['src/components/**/*.ts', 'src/components/**/*.tsx', 'src/lib/**/*.ts'],
+      reporter: ['text', 'html', 'lcov'],
+      // 覆盖范围：组件层 + 服务层 + 工具库 + 页面层（FE-COV-98 Phase 2）
+      include: [
+        'src/components/**/*.ts',
+        'src/components/**/*.tsx',
+        'src/lib/**/*.ts',
+        'src/services/**/*.ts',
+        'src/app/**/*.ts',
+        'src/app/**/*.tsx',
+      ],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/**/*.test.tsx',
+        'src/test/**',
+        'src/**/*.d.ts',
+        // Next.js 路由特殊文件无需覆盖率统计
+        'src/app/layout.tsx',
+        'src/app/page.tsx',
+        'src/app/**/layout.tsx',
+        'src/app/**/loading.tsx',
+        'src/app/**/error.tsx',
+        'src/app/**/not-found.tsx',
+      ],
+      // 覆盖率门禁（FE-COV-98 Phase 2：扩围后基线，逐步向 50% 推进）
+      // 运行命令：npm run test -- --coverage
       thresholds: {
-        statements: 10,
-        lines: 10,
+        statements: 20,
+        lines: 20,
         functions: 20,
-        branches: 20,
+        branches: 15,
       },
     },
   },

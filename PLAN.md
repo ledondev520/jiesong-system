@@ -1,5 +1,77 @@
 # Ops Execution Center Plan
 
+## 2026-03-21 Round 64 — CEO 三维评审 + Design Review → 迭代计划
+
+### Goal
+基于 CEO REDUCTION / HOLD SCOPE / SCOPE EXPANSION 三轮审查 + Design Review 所有发现，整理为可执行迭代任务并写入 TASKS.md。
+
+### Delivered
+- **CEO REDUCTION 关键结论**：移除 `store-recommend`（低频高维护）、下架 `ComplianceHint` 悬浮组件（打断用户流程），收敛 HS 码搜索为单一入口。
+- **CEO HOLD SCOPE 关键发现**：
+  - 46 个前端测试失败（质量危机，`20 failed / 103 files`）
+  - `api-cache.ts` 无过期条目清理 → 潜在内存泄漏
+  - HS 码模糊搜索候选集全扫 → 12k 条记录下性能隐患
+  - 分页状态不写 URL → 浏览器回退丢失页码
+  - 缺全局 React Error Boundary → 任意组件 throw 都白屏
+  - 部分写路由未加 `requireAdmin` → RBAC 绕过风险
+- **CEO SCOPE EXPANSION 近期可落地**：AI HS 码推荐助手、汇率自动同步、Word 合同导出、供应商文件门户 V1。
+- **Design Review 高优**：采购表格空单元格占位、图表坐标轴字号、空态统一设计。
+- 所有发现已拆为 TASKS.md `QG-*/ARCH-*/DESIGN-*/REDUCE-*/EXP-*` 系列任务（13 条）。
+
+### Next Priorities
+1. **QG-01**：修复 46 个失败前端测试 → 恢复质量门禁
+2. **QG-02/03**：API 缓存内存泄漏 + Error Boundary
+3. **ARCH-01**：HS 码 FTS5 索引（性能）
+4. **DESIGN-01~03**：视觉质量补全
+5. **EXP-01**：AI HS 码推荐（利用现有 AI 配置，投入产出比最高）
+
+---
+
+## 2026-03-21 Round 63 (Login Transition / First-Paint Fix)
+
+### Goal
+- 缩短“登录后进入工作台”的感知空白，并降低工作台首屏的重图表加载阻塞。
+
+### Delivered
+- 登录成功后改为直达 `/dashboard`，不再先跳空壳根路由 `/`。
+- 工作台页将 `DataDashboard` 改为客户端懒加载，并增加 shadcn 风格骨架屏，先展示上半屏业务壳和占位内容。
+- 同步更新登录页与工作台页定向测试断言。
+
+### Verification
+- `cd frontend && npm run test -- 'src/app/(auth)/login/page.test.tsx' 'src/app/dashboard/page.test.tsx' 'src/components/dashboard/DataDashboard.test.tsx'`
+- `cd frontend && npm run lint -- 'src/app/(auth)/login/page.tsx' 'src/app/(auth)/login/page.test.tsx' 'src/app/dashboard/page.tsx' 'src/app/dashboard/page.test.tsx'`
+- 浏览器回归：注入本地 JWT 后访问 `/dashboard`，工作台壳与 KPI 区可在首屏阶段出现，最终完整指标卡与图表正常渲染。
+
+### Remaining Risk
+- 开发环境下 `next dev` 仍会受首次编译与大体量 chunk 下载影响，真实体感速度在生产构建下会更稳定；若后续仍需继续压缩首开，可再拆分 `ProductTracker` 或将图表区进一步延后到可见区后加载。
+
+## 2026-03-19 Round 62 (ClawPi Domain Sweep)
+
+### Goal
+- 全面清扫仓库内 ClawPi 旧域名残留，并确认关键 API 相关脚本/配置不会因环境变量错位继续打旧地址或错误地址。
+
+### Delivered
+- 完成全仓盘点：
+  - 扫描范围覆盖源码、脚本、配置、部署文档，以及 `cron` / `launchd` / 定时任务相关文件。
+  - 未发现 `clawpi-v2.vercel.app` 在工作树中的明文字面量引用。
+  - 未发现仓库内 `cron`、`launchd`、`backup.sh`、`health-check.sh`、`inventoryAlertJob` 等入口存在 ClawPi 旧域名硬编码。
+- 修复前端 API 基址解析不一致：
+  - 新增 `frontend/src/lib/api-base-url.ts`
+  - `frontend/src/lib/axios.ts` 与 `frontend/src/components/ai/AIAssistant.tsx` 统一改为共享解析逻辑。
+  - 规范优先使用 `NEXT_PUBLIC_API_BASE_URL`，兼容历史 `NEXT_PUBLIC_API_URL`，未设置时继续回退 `/api/v1`。
+- 补充定向回归：
+  - `frontend/src/lib/axios.test.ts` 新增 `NEXT_PUBLIC_API_BASE_URL` 优先级覆盖用例。
+- 新增专项实施计划：
+  - `docs/plans/2026-03-19-clawpi-domain-sweep.md`
+
+### Verification
+- `cd frontend && npm run test -- src/lib/axios.test.ts`
+- `grep -RIn --binary-files=without-match --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build --exclude-dir=.next --exclude-dir=coverage --exclude-dir=PATCHES --exclude-dir=RESULTS --exclude-dir=logs --exclude='*.tsbuildinfo' 'clawpi-v2\.vercel\.app' .`
+- `grep -RIn --binary-files=without-match --exclude-dir=node_modules --exclude-dir=.next --exclude='*.tsbuildinfo' 'NEXT_PUBLIC_API_URL\|NEXT_PUBLIC_API_BASE_URL' frontend/src frontend/next.config.ts frontend/Dockerfile README.md DEPLOY.md deploy.sh`
+
+### Remaining Risk
+- 本次仅覆盖仓库内文件。若旧域名仍存在于部署平台环境变量、系统级 `crontab`、用户目录 `LaunchAgents`、CI/CD Secret 或反向代理配置中，仓库内扫描无法直接发现，需要在外部运行环境继续复核。
+
 ## 2026-03-15 Round 61 (Ops Execution Center Kickoff)
 
 ### Goal

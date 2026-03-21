@@ -56,7 +56,9 @@ describe('api axios config', () => {
 
   it('使用默认baseURL并注册拦截器', async () => {
     const originalEnv = process.env.NEXT_PUBLIC_API_URL;
+    const originalBaseEnv = process.env.NEXT_PUBLIC_API_BASE_URL;
     delete process.env.NEXT_PUBLIC_API_URL;
+    delete process.env.NEXT_PUBLIC_API_BASE_URL;
 
     vi.resetModules();
     const axiosModule = await import('axios');
@@ -73,11 +75,16 @@ describe('api axios config', () => {
     expect(responseUse).toHaveBeenCalled();
 
     if (originalEnv) process.env.NEXT_PUBLIC_API_URL = originalEnv;
+    if (originalBaseEnv) {
+      process.env.NEXT_PUBLIC_API_BASE_URL = originalBaseEnv;
+    }
   });
 
   it('使用环境变量覆盖baseURL', async () => {
     const originalEnv = process.env.NEXT_PUBLIC_API_URL;
+    const originalBaseEnv = process.env.NEXT_PUBLIC_API_BASE_URL;
     process.env.NEXT_PUBLIC_API_URL = 'http://example.com/api';
+    delete process.env.NEXT_PUBLIC_API_BASE_URL;
 
     vi.resetModules();
     const axiosModule = await import('axios');
@@ -93,6 +100,39 @@ describe('api axios config', () => {
       process.env.NEXT_PUBLIC_API_URL = originalEnv;
     } else {
       delete process.env.NEXT_PUBLIC_API_URL;
+    }
+
+    if (originalBaseEnv) {
+      process.env.NEXT_PUBLIC_API_BASE_URL = originalBaseEnv;
+    }
+  });
+
+  it('优先使用 NEXT_PUBLIC_API_BASE_URL', async () => {
+    const originalEnv = process.env.NEXT_PUBLIC_API_URL;
+    const originalBaseEnv = process.env.NEXT_PUBLIC_API_BASE_URL;
+    process.env.NEXT_PUBLIC_API_URL = 'http://legacy.example.com/api';
+    process.env.NEXT_PUBLIC_API_BASE_URL = 'https://current.example.com/api';
+
+    vi.resetModules();
+    const axiosModule = await import('axios');
+    await import('./axios');
+
+    expect(axiosModule.default.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseURL: 'https://current.example.com/api',
+      }),
+    );
+
+    if (originalEnv) {
+      process.env.NEXT_PUBLIC_API_URL = originalEnv;
+    } else {
+      delete process.env.NEXT_PUBLIC_API_URL;
+    }
+
+    if (originalBaseEnv) {
+      process.env.NEXT_PUBLIC_API_BASE_URL = originalBaseEnv;
+    } else {
+      delete process.env.NEXT_PUBLIC_API_BASE_URL;
     }
   });
 

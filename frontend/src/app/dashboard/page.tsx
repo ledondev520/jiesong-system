@@ -8,6 +8,7 @@
 
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { ModuleTabHeader, OPERATIONS_TABS } from '@/components/layout/ModuleTabHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -15,8 +16,61 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ShoppingCart, TrendingUp, Plus, ArrowRight } from 'lucide-react';
 import { ProductTracker } from '@/components/tools/ProductTracker';
-import { DataDashboard } from '@/components/dashboard/DataDashboard';
 import { PageHeader } from '@/components/layout/PageHeader';
+
+const DataDashboard = dynamic(
+  () => import('@/components/dashboard/DataDashboard').then((module) => module.DataDashboard),
+  {
+    ssr: false,
+    loading: () => <DashboardAnalyticsSkeleton />,
+  },
+);
+
+function DashboardAnalyticsSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Card key={`kpi-skeleton-${index}`} className="kpi-card">
+            <CardHeader className="space-y-3 pb-2">
+              <div className="h-4 w-24 rounded-full bg-muted animate-pulse" />
+              <div className="h-4 w-4 rounded-full bg-muted animate-pulse" />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="h-10 w-16 rounded-xl bg-muted animate-pulse" />
+              <div className="h-3 w-28 rounded-full bg-muted animate-pulse" />
+              <div className="h-3 w-20 rounded-full bg-muted animate-pulse" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, index) => (
+          <Card key={`chart-skeleton-${index}`}>
+            <CardHeader className="space-y-3 pb-3">
+              <div className="h-5 w-28 rounded-full bg-muted animate-pulse" />
+              <div className="h-4 w-40 rounded-full bg-muted animate-pulse" />
+            </CardHeader>
+            <CardContent>
+              <div className="h-[200px] rounded-2xl border border-dashed border-border/70 bg-muted/40 animate-pulse" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card>
+        <CardHeader className="space-y-3 pb-3">
+          <div className="h-5 w-32 rounded-full bg-muted animate-pulse" />
+          <div className="h-4 w-52 rounded-full bg-muted animate-pulse" />
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] rounded-2xl border border-dashed border-border/70 bg-muted/40 animate-pulse" />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 /**
  * 职责：渲染工作台首页

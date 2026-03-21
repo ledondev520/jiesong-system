@@ -54,14 +54,6 @@ describe('aiService', () => {
     expect(api.get).toHaveBeenCalledWith('/ai/models');
   });
 
-  it('getGreeting: 拉取 AI 问候语', async () => {
-    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
-
-    await aiService.getGreeting();
-
-    expect(api.get).toHaveBeenCalledWith('/ai/greeting');
-  });
-
   it('getDashboardAnalytics: 拉取数据看板指标', async () => {
     (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
 

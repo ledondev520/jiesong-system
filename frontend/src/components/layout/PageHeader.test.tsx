@@ -35,8 +35,13 @@ describe('PageHeader', () => {
     expect(mockBack).not.toHaveBeenCalled();
   });
 
-  it('未传backHref时调用router.back', () => {
-    const { getByRole } = render(<PageHeader title="测试页面" />);
+  it('未传backHref时不显示返回按钮', () => {
+    const { queryByRole } = render(<PageHeader title="测试页面" />);
+    expect(queryByRole('button', { name: '返回' })).toBeNull();
+  });
+
+  it('showBack=true 时展示返回按钮并调用router.back', () => {
+    const { getByRole } = render(<PageHeader title="测试页面" showBack />);
     fireEvent.click(getByRole('button', { name: '返回' }));
     expect(mockBack).toHaveBeenCalledTimes(1);
   });

@@ -20,14 +20,20 @@ export const hsCodeService = {
   list: async ({
     keyword = '',
     page = 1,
-    pageSize = 50,
+    pageSize = 20,
+    fuzzy = false,
   }: {
     keyword?: string;
     page?: number;
     pageSize?: number;
+    /** 启用相似度模糊搜索（有 keyword 时才生效） */
+    fuzzy?: boolean;
   } = {}) => {
-    return api.get<ApiResponse<PaginatedResponse<HsCodeRecord>>, ApiResponse<PaginatedResponse<HsCodeRecord>>>('/hs-codes', {
-      params: { keyword, page, pageSize },
+    return api.get<
+      ApiResponse<PaginatedResponse<HsCodeRecord & { similarity?: number; fuzzy?: boolean }>>,
+      ApiResponse<PaginatedResponse<HsCodeRecord & { similarity?: number; fuzzy?: boolean }>>
+    >('/hs-codes', {
+      params: { keyword, page, pageSize, fuzzy: fuzzy ? 'true' : undefined },
     });
   },
 

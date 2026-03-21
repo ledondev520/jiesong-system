@@ -210,10 +210,111 @@ const getStats = async () => {
   };
 };
 
+/**
+ * 职责：按周聚合近 N 天的收付款流水，用于财务趋势折线图
+ * 思路：
+ *   1. 查询最近 days 天的 payment 记录
+ *   2. 按 ISO 周分组，累加应收回款（RECEIVABLE_COLLECTION）与应付付款（PAYABLE_PAYMENT）
+ *   3. 填充无流水的周为 0，保证折线图连续
+ * @param {number} days - 统计天数（30 或 90）
+ * @returns {{ label: string, receivables: number, payables: number }[]}
+ */
+const getPaymentTrends = async (days = 90) => {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  const payments = await prisma.payment.findMany({
+    where: { paymentDate: { gte: since } },
+    select: { paymentDate: true, amount: true, type: true },
+    orderBy: { paymentDate: 'asc' },
+  });
+
+  // 1. 按 ISO 周（YYYY-Www）归组
+  const weekMap = new Map();
+
+  const toWeekKey = (date) => {
+    const d = new Date(date);
+    // 周起点为周一
+    const day = d.getDay() === 0 ? 7 : d.getDay();
+    const monday = new Date(d);
+    monday.setDate(d.getDate() - (day - 1));
+    const y = monday.getFullYear();
+    const m = String(monday.getMonth() + 1).padStart(2, '0');
+    const md = String(monday.getDate()).padStart(2, '0');
+    return `${y}-${m}-${md}`;
+  };
+
+  const toLabel = (weekKey) => {
+    const d = new Date(weekKey);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  };
+
+  payments.forEach((p) => {
+    const key = toWeekKey(p.paymentDate);
+    if (!weekMap.has(key)) {
+      weekMap.set(key, { label: toLabel(key), receivables: 0, payables: 0 });
+    }
+    const entry = weekMap.get(key);
+    if (p.type === 'RECEIVABLE_COLLECTION') {
+      entry.receivables += Number(p.amount);
+    } else if (p.type === 'PAYABLE_PAYMENT') {
+      entry.payables += Number(p.amount);
+    }
+  });
+
+  // 2. 排序并返回
+  return Array.from(weekMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, v]) => v);
+};
+
+/**
+ * 职责：获取应收逾期预警列表
+ * 思路：
+ *   已发货（shippedAt 非空）且距发货超过 overdueDays 天、仍有未收款余额的销售合同
+ *   视为逾期，返回合同列表用于前端预警展示。
+ * @param {number} overdueDays - 发货后多少天仍未收视为逾期（默认 30）
+ */
+const getOverdueReceivables = async (overdueDays = 30) => {
+  const cutoff = new Date(Date.now() - overdueDays * 24 * 60 * 60 * 1000);
+
+  const overdue = await prisma.salesContract.findMany({
+    where: {
+      shippedAt: { not: null, lte: cutoff },
+      // 仍有未收余额：receivedAmount < totalAmount
+      NOT: { status: 'CANCELLED' },
+    },
+    select: {
+      id: true,
+      contractNo: true,
+      totalAmount: true,
+      receivedAmount: true,
+      shippedAt: true,
+      status: true,
+    },
+    orderBy: { shippedAt: 'asc' },
+  });
+
+  // 过滤出真正有未收余额的合同
+  return overdue
+    .filter((c) => c.receivedAmount < c.totalAmount)
+    .map((c) => ({
+      id: c.id,
+      contractNo: c.contractNo,
+      totalAmount: c.totalAmount,
+      receivedAmount: c.receivedAmount,
+      unreceived: c.totalAmount - c.receivedAmount,
+      shippedAt: c.shippedAt,
+      overdueDays: Math.floor((Date.now() - new Date(c.shippedAt).getTime()) / (24 * 60 * 60 * 1000)) - overdueDays,
+      status: c.status,
+    }));
+};
+
 module.exports = {
   listPayments,
   createPayment,
   getPayables,
   getReceivables,
   getStats,
+  getPaymentTrends,
+  getOverdueReceivables,
 };

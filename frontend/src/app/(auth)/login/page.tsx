@@ -28,7 +28,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserPlus, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, KeyRound, Eye, EyeOff, Ship } from 'lucide-react';
 import { authService, type LoginResponse } from '@/services/auth.service';
 
 const loginSchema = z.object({
@@ -101,7 +101,7 @@ export default function LoginPage() {
       if (result.code === 200 && result.data) {
         persistQuickLoginProfile(username, password);
         login(result.data.user, result.data.token);
-        router.push('/');
+        router.push('/dashboard');
       } else {
         throw new Error(result.message || '登录失败');
       }
@@ -149,7 +149,18 @@ export default function LoginPage() {
 
   return (
     <div className="auth-shell">
-      <Card className="auth-card">
+      <div className="flex w-full max-w-md flex-col items-center">
+        {/* 品牌标识 */}
+        <div className="mb-6 flex flex-col items-center gap-2">
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md">
+            <Ship className="h-6 w-6" />
+          </span>
+          <div className="text-center">
+            <h1 className="text-xl font-semibold tracking-tight">捷淞系统</h1>
+            <p className="text-xs text-muted-foreground">Import & Export Management</p>
+          </div>
+        </div>
+        <Card className="auth-card w-full">
         <CardHeader>
           <CardTitle>系统登录</CardTitle>
           <CardDescription>
@@ -250,7 +261,8 @@ export default function LoginPage() {
             </Link>
           </div>
         </CardFooter>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }

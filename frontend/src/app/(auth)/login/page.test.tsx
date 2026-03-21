@@ -69,7 +69,7 @@ describe('LoginPage 交互逻辑', () => {
     });
   });
 
-  it('手动登录成功后写入快捷登录资料并跳转首页', async () => {
+  it('手动登录成功后写入快捷登录资料并跳转工作台', async () => {
     mockAuthServiceLogin.mockResolvedValue({
       code: 200,
       data: {
@@ -94,7 +94,7 @@ describe('LoginPage 交互逻辑', () => {
         { id: 'u1', username: 'admin', name: '管理员', role: 'ADMIN' },
         'token-123',
       );
-      expect(mockPush).toHaveBeenCalledWith('/');
+      expect(mockPush).toHaveBeenCalledWith('/dashboard');
     });
 
     expect(localStorage.getItem('jiesong_quick_login_profile')).toBe(
@@ -128,7 +128,7 @@ describe('LoginPage 交互逻辑', () => {
         username: 'admin',
         password: '123456',
       });
-      expect(mockPush).toHaveBeenCalledWith('/');
+      expect(mockPush).toHaveBeenCalledWith('/dashboard');
     });
   });
 

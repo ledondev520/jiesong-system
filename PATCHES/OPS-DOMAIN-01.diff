@@ -1,0 +1,210 @@
+diff --git a/METRICS.md b/METRICS.md
+index 71cf761..b01a717 100644
+--- a/METRICS.md
++++ b/METRICS.md
+@@ -1,5 +1,23 @@
+ # Frontend Polish Metrics
+ 
++## 2026-03-19 Round 62（ClawPi Domain Sweep）
++
++### 质量指标
++- ClawPi 旧域名字面量命中：`0`
++- 关键前端 API 基址入口修复：`2`（`axios`、`AI Assistant stream`）
++- 新增共享解析文件：`1`（`frontend/src/lib/api-base-url.ts`）
++- 前端定向单测：`5/5` 通过
++
++### 过程指标
++- 重点核查入口：`8+`（源码、脚本、配置、README/DEPLOY、`cron`/`launchd` 相关文件）
++- 保守保留的本地代理路径：`3`（`frontend/Dockerfile`、`deploy.sh`、`next.config.ts`）
++- 新增兼容策略：`1`（规范优先 `NEXT_PUBLIC_API_BASE_URL`，兼容历史 `NEXT_PUBLIC_API_URL`）
++
++### 结论
++- 当前工作树内未发现 `clawpi-v2.vercel.app` 或等价旧域名硬编码。
++- 本轮真正修复的是“API 基址变量名不一致”这一运行时风险，避免未来迁移 API 域名时只改了文档/构建变量却漏掉实际请求入口。
++- 仍需在仓库外继续复核部署平台环境变量、系统级定时任务和网关配置。
++
+ ## 2026-03-15 Round 61（Ops Execution Center Kickoff）
+ 
+ ### 质量指标
+diff --git a/PLAN.md b/PLAN.md
+index 00cfc10..71ce01b 100644
+--- a/PLAN.md
++++ b/PLAN.md
+@@ -1,5 +1,32 @@
+ # Ops Execution Center Plan
+ 
++## 2026-03-19 Round 62 (ClawPi Domain Sweep)
++
++### Goal
++- 全面清扫仓库内 ClawPi 旧域名残留，并确认关键 API 相关脚本/配置不会因环境变量错位继续打旧地址或错误地址。
++
++### Delivered
++- 完成全仓盘点：
++  - 扫描范围覆盖源码、脚本、配置、部署文档，以及 `cron` / `launchd` / 定时任务相关文件。
++  - 未发现 `clawpi-v2.vercel.app` 在工作树中的明文字面量引用。
++  - 未发现仓库内 `cron`、`launchd`、`backup.sh`、`health-check.sh`、`inventoryAlertJob` 等入口存在 ClawPi 旧域名硬编码。
++- 修复前端 API 基址解析不一致：
++  - 新增 `frontend/src/lib/api-base-url.ts`
++  - `frontend/src/lib/axios.ts` 与 `frontend/src/components/ai/AIAssistant.tsx` 统一改为共享解析逻辑。
++  - 规范优先使用 `NEXT_PUBLIC_API_BASE_URL`，兼容历史 `NEXT_PUBLIC_API_URL`，未设置时继续回退 `/api/v1`。
++- 补充定向回归：
++  - `frontend/src/lib/axios.test.ts` 新增 `NEXT_PUBLIC_API_BASE_URL` 优先级覆盖用例。
++- 新增专项实施计划：
++  - `docs/plans/2026-03-19-clawpi-domain-sweep.md`
++
++### Verification
++- `cd frontend && npm run test -- src/lib/axios.test.ts`
++- `grep -RIn --binary-files=without-match --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build --exclude-dir=.next --exclude-dir=coverage --exclude-dir=PATCHES --exclude-dir=RESULTS --exclude-dir=logs --exclude='*.tsbuildinfo' 'clawpi-v2\.vercel\.app' .`
++- `grep -RIn --binary-files=without-match --exclude-dir=node_modules --exclude-dir=.next --exclude='*.tsbuildinfo' 'NEXT_PUBLIC_API_URL\|NEXT_PUBLIC_API_BASE_URL' frontend/src frontend/next.config.ts frontend/Dockerfile README.md DEPLOY.md deploy.sh`
++
++### Remaining Risk
++- 本次仅覆盖仓库内文件。若旧域名仍存在于部署平台环境变量、系统级 `crontab`、用户目录 `LaunchAgents`、CI/CD Secret 或反向代理配置中，仓库内扫描无法直接发现，需要在外部运行环境继续复核。
++
+ ## 2026-03-15 Round 61 (Ops Execution Center Kickoff)
+ 
+ ### Goal
+diff --git a/RISKS.md b/RISKS.md
+index e93cc2d..d5cedd9 100644
+--- a/RISKS.md
++++ b/RISKS.md
+@@ -1,5 +1,15 @@
+ # Frontend Polish Risks
+ 
++## 2026-03-19 Round 62（ClawPi Domain Sweep）
++
++| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
++|---|---|---|---|---|
++| R-033 | 旧 ClawPi 域名实际保存在部署平台环境变量、系统 `crontab` / `launchd`、CI Secret 或网关层，不在仓库工作树内 | 仓库已清理但运行时仍可能继续访问旧地址 | 仓库内先统一前端 API 基址解析逻辑，并在结果文档中明确要求复核外部环境变量与系统级定时任务 | 回退 `frontend/src/lib/api-base-url.ts`、`frontend/src/lib/axios.ts`、`frontend/src/components/ai/AIAssistant.tsx` 与对应测试改动 |
++
++### 2026-03-19 Round 62 状态更新
++
++- `R-033`：已激活。本轮已确认仓库内无 `clawpi-v2.vercel.app` 明文字面量，但外部部署环境仍需人工复核。
++
+ ## 2026-03-15 Round 61（Ops Execution Center Kickoff）
+ 
+ | 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
+diff --git a/TASKS.md b/TASKS.md
+index a16db04..dfa69d0 100644
+--- a/TASKS.md
++++ b/TASKS.md
+@@ -1,5 +1,11 @@
+ # Frontend Polish Tasks
+ 
++## 2026-03-19 ClawPi Domain Sweep
++
++| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
++|---|---|---:|---:|---|---|
++| OPS-DOMAIN-01 | P0 | 30m | 1 | DONE | 全仓清扫 ClawPi 旧域名残留，核查脚本/配置/定时任务入口，修复前端 API 基址环境变量不一致并完成无副作用验证 |
++
+ ## 2026-03-15 Ops Execution Center
+ 
+ | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+diff --git a/frontend/src/components/ai/AIAssistant.tsx b/frontend/src/components/ai/AIAssistant.tsx
+index 736017d..a333834 100644
+--- a/frontend/src/components/ai/AIAssistant.tsx
++++ b/frontend/src/components/ai/AIAssistant.tsx
+@@ -17,6 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
+ import { Bot, Send, X, Image as ImageIcon, XCircle, Brain, ChevronDown, ChevronUp } from 'lucide-react';
+ import { cn } from '@/lib/utils';
+ import { getAuthToken } from '@/lib/auth-token';
++import { getApiBaseUrl } from '@/lib/api-base-url';
+ 
+ interface Message {
+   id: string;
+@@ -37,7 +38,7 @@ type StreamPayload = {
+ };
+ 
+ const resolveStreamEndpoint = (): string => {
+-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
++  const baseUrl = getApiBaseUrl();
+   return `${baseUrl.replace(/\/$/, '')}/ai/chat/stream`;
+ };
+ 
+diff --git a/frontend/src/lib/axios.test.ts b/frontend/src/lib/axios.test.ts
+index e74ab26..7a4c53c 100644
+--- a/frontend/src/lib/axios.test.ts
++++ b/frontend/src/lib/axios.test.ts
+@@ -56,7 +56,9 @@ describe('api axios config', () => {
+ 
+   it('使用默认baseURL并注册拦截器', async () => {
+     const originalEnv = process.env.NEXT_PUBLIC_API_URL;
++    const originalBaseEnv = process.env.NEXT_PUBLIC_API_BASE_URL;
+     delete process.env.NEXT_PUBLIC_API_URL;
++    delete process.env.NEXT_PUBLIC_API_BASE_URL;
+ 
+     vi.resetModules();
+     const axiosModule = await import('axios');
+@@ -73,11 +75,16 @@ describe('api axios config', () => {
+     expect(responseUse).toHaveBeenCalled();
+ 
+     if (originalEnv) process.env.NEXT_PUBLIC_API_URL = originalEnv;
++    if (originalBaseEnv) {
++      process.env.NEXT_PUBLIC_API_BASE_URL = originalBaseEnv;
++    }
+   });
+ 
+   it('使用环境变量覆盖baseURL', async () => {
+     const originalEnv = process.env.NEXT_PUBLIC_API_URL;
++    const originalBaseEnv = process.env.NEXT_PUBLIC_API_BASE_URL;
+     process.env.NEXT_PUBLIC_API_URL = 'http://example.com/api';
++    delete process.env.NEXT_PUBLIC_API_BASE_URL;
+ 
+     vi.resetModules();
+     const axiosModule = await import('axios');
+@@ -94,6 +101,39 @@ describe('api axios config', () => {
+     } else {
+       delete process.env.NEXT_PUBLIC_API_URL;
+     }
++
++    if (originalBaseEnv) {
++      process.env.NEXT_PUBLIC_API_BASE_URL = originalBaseEnv;
++    }
++  });
++
++  it('优先使用 NEXT_PUBLIC_API_BASE_URL', async () => {
++    const originalEnv = process.env.NEXT_PUBLIC_API_URL;
++    const originalBaseEnv = process.env.NEXT_PUBLIC_API_BASE_URL;
++    process.env.NEXT_PUBLIC_API_URL = 'http://legacy.example.com/api';
++    process.env.NEXT_PUBLIC_API_BASE_URL = 'https://current.example.com/api';
++
++    vi.resetModules();
++    const axiosModule = await import('axios');
++    await import('./axios');
++
++    expect(axiosModule.default.create).toHaveBeenCalledWith(
++      expect.objectContaining({
++        baseURL: 'https://current.example.com/api',
++      }),
++    );
++
++    if (originalEnv) {
++      process.env.NEXT_PUBLIC_API_URL = originalEnv;
++    } else {
++      delete process.env.NEXT_PUBLIC_API_URL;
++    }
++
++    if (originalBaseEnv) {
++      process.env.NEXT_PUBLIC_API_BASE_URL = originalBaseEnv;
++    } else {
++      delete process.env.NEXT_PUBLIC_API_BASE_URL;
++    }
+   });
+ 
+   it('相同 GET 请求会命中缓存并复用并发请求', async () => {
+diff --git a/frontend/src/lib/axios.ts b/frontend/src/lib/axios.ts
+index 5dff360..b5d8b93 100644
+--- a/frontend/src/lib/axios.ts
++++ b/frontend/src/lib/axios.ts
+@@ -1,10 +1,11 @@
+ import axios, { type AxiosRequestConfig } from 'axios';
+ import { clearAuthToken, getAuthToken } from '@/lib/auth-token';
++import { getApiBaseUrl } from '@/lib/api-base-url';
+ 
+ // Create Axios instance
+ // 使用相对路径，通过Next.js rewrites代理到后端
+ const api = axios.create({
+-  baseURL: process.env.NEXT_PUBLIC_API_URL || '/api/v1',
++  baseURL: getApiBaseUrl(),
+   timeout: 60000, // 增加到60秒，AI调用可能需要更长时间
+   headers: {
+     'Content-Type': 'application/json',

@@ -194,10 +194,15 @@ const getChatHistory = async (req, res, next) => {
 };
 
 /**
- * 职责：获取会话列表
+ * 职责：获取会话列表（含每个会话的 token 总量）
+ * 思路：
+ * 1. 从 ChatHistory 获取分组后的会话元数据
+ * 2. 从 TokenUsage 聚合每个 sessionId 的 token 总数
+ * 3. 合并后返回
  */
 const getSessions = async (req, res, next) => {
   try {
+    // 1. 获取会话基础信息（消息数、最近时间）
     const sessions = await prisma.chatHistory.groupBy({
       by: ['sessionId'],
       where: { userId: req.user.id },
@@ -205,8 +210,44 @@ const getSessions = async (req, res, next) => {
       _count: true,
       orderBy: { _max: { createdAt: 'desc' } },
     });
-    
-    success(res, sessions);
+
+    // 2. 获取每个会话的 token 汇总 + 最常用模型
+    const tokensBySession = await prisma.tokenUsage.groupBy({
+      by: ['sessionId'],
+      where: {
+        userId: req.user.id,
+        sessionId: { in: sessions.map(s => s.sessionId) },
+      },
+      _sum: { totalTokens: true },
+    });
+
+    // 2.1. 获取每个会话最后使用的模型（按 createdAt 倒序取最新一条）
+    const lastModels = await prisma.tokenUsage.findMany({
+      where: {
+        userId: req.user.id,
+        sessionId: { in: sessions.map(s => s.sessionId) },
+      },
+      select: { sessionId: true, model: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+      distinct: ['sessionId'],
+    });
+
+    // 3. 建立映射
+    const tokenMap = Object.fromEntries(
+      tokensBySession.map(t => [t.sessionId, t._sum.totalTokens || 0])
+    );
+    const modelMap = Object.fromEntries(
+      lastModels.map(t => [t.sessionId, t.model])
+    );
+
+    // 4. 合并后返回（totalTokens 单位为 token 数，前端转 M）
+    const enrichedSessions = sessions.map(s => ({
+      ...s,
+      totalTokens: tokenMap[s.sessionId] || 0,
+      lastModel: modelMap[s.sessionId] || null,
+    }));
+
+    success(res, enrichedSessions);
   } catch (error) {
     next(error);
   }
@@ -231,23 +272,28 @@ const deleteSession = async (req, res, next) => {
 
 /**
  * 职责：配置AI设置（仅管理员）
+ * 思路：
+ * 1. 更新 Kimi / MiniMax API Key
+ * 2. 更新模型优先级（primaryModel、fallbackModel）
  */
 const updateConfig = async (req, res, next) => {
   try {
-    const { apiKey, baseUrl } = req.body;
-    
-    if (apiKey) {
+    const { apiKey, baseUrl, minimaxApiKey, primaryModel, fallbackModel } = req.body;
+
+    const upsertConfig = async (key, value, note) => {
+      const stored = normalizeConfigValueForStorage(key, value);
       await prisma.systemConfig.upsert({
-        where: { key: 'kimiApiKey' },
-        update: { value: normalizeConfigValueForStorage('kimiApiKey', apiKey), note: 'Kimi API Key (加密存储)' },
-        create: {
-          key: 'kimiApiKey',
-          value: normalizeConfigValueForStorage('kimiApiKey', apiKey),
-          note: 'Kimi API Key (加密存储)',
-        },
+        where: { key },
+        update: { value: stored, note },
+        create: { key, value: stored, note },
       });
-    }
-    
+    };
+
+    if (apiKey) await upsertConfig('kimiApiKey', apiKey, 'Kimi API Key (加密存储)');
+    if (minimaxApiKey) await upsertConfig('minimaxApiKey', minimaxApiKey, 'MiniMax API Key (加密存储)');
+    if (primaryModel) await upsertConfig('aiPrimaryModel', primaryModel, 'AI 首选模型');
+    if (fallbackModel !== undefined) await upsertConfig('aiFallbackModel', fallbackModel, 'AI 备用模型');
+
     success(res, null, 'AI配置更新成功');
   } catch (error) {
     next(error);

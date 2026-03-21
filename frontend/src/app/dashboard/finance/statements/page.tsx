@@ -80,6 +80,7 @@ import {
   type FinancialPeriod,
   type FinancialAlert,
 } from '@/services/financialStatements.service';
+import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { toast } from 'sonner';
 
 // ==================== 工具函数 ====================
@@ -359,13 +360,13 @@ export default function FinancialStatementsPage() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 0. 初始加载：拉取 analytics + periods 列表
+  // 0. 初始加载：拉取 analytics + periods 列表（带内存缓存，30s TTL）
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [analyticsData, periodsData] = await Promise.all([
-        financialStatementsService.getAnalytics(),
-        financialStatementsService.listStatements(),
+        cachedFetch('fin-statements-analytics', () => financialStatementsService.getAnalytics()),
+        cachedFetch('fin-statements-list', () => financialStatementsService.listStatements()),
       ]);
       const safePeriods = Array.isArray(periodsData) ? periodsData : [];
       setAnalytics(analyticsData);
@@ -382,13 +383,16 @@ export default function FinancialStatementsPage() {
     }
   }, [selectedPeriod]);
 
-  // 0b. 拉取某一账期完整详情
+  // 0b. 拉取某一账期完整详情（带缓存）
   const loadDetail = useCallback(async (periodKey: string) => {
     const [year, month] = periodKey.split('-').map(Number);
     if (!year || !month) return;
     setDetailLoading(true);
     try {
-      const detail = await financialStatementsService.getStatementDetail(year, month);
+      const detail = await cachedFetch(
+        `fin-statements-detail-${year}-${month}`,
+        () => financialStatementsService.getStatementDetail(year, month),
+      );
       setCurrentDetail(detail);
     } catch {
       setCurrentDetail(null);
@@ -418,7 +422,8 @@ export default function FinancialStatementsPage() {
       if (result.errors.length > 0) {
         toast.warning(`${result.errors.length} 个账期导入失败：${result.errors[0]}`);
       }
-      // 重新加载数据
+      // 失效缓存并重新加载数据
+      invalidateCache('fin-statements');
       setSelectedPeriod('');
       await loadData();
     } catch (err: unknown) {
@@ -491,20 +496,38 @@ export default function FinancialStatementsPage() {
     cash: '#f59e0b',
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <span className="ml-3 text-muted-foreground">加载财务数据...</span>
-      </div>
-    );
-  }
-
   const hasData = analytics && analytics.totalPeriods > 0;
 
   return (
     <div className="space-y-6">
       <ModuleTabHeader tabs={FINANCE_TABS} moduleName="财务" />
+      {loading && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <Card key={i}>
+                <CardHeader className="pb-2">
+                  <div className="h-4 w-24 rounded bg-muted animate-pulse" />
+                </CardHeader>
+                <CardContent>
+                  <div className="h-8 w-32 rounded bg-muted animate-pulse" />
+                  <div className="mt-2 h-3 w-20 rounded bg-muted animate-pulse" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <Card>
+            <CardHeader>
+              <div className="h-5 w-32 rounded bg-muted animate-pulse" />
+            </CardHeader>
+            <CardContent>
+              <div className="h-48 rounded bg-muted animate-pulse" />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      {!loading && (
+      <>
       {/* 页面标题 + 操作栏 */}
       <PageHeader
         title="财务报表分析"
@@ -707,7 +730,7 @@ export default function FinancialStatementsPage() {
                       <XAxis dataKey="label" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
                       <YAxis
                         tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`}
-                        tick={{ fontSize: 11 }}
+                        tick={{ fontSize: 12 }}
                         className="fill-muted-foreground"
                       />
                       <Tooltip content={<ChartTooltipContent />} />
@@ -761,7 +784,7 @@ export default function FinancialStatementsPage() {
                       <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                       <YAxis
                         tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`}
-                        tick={{ fontSize: 11 }}
+                        tick={{ fontSize: 12 }}
                       />
                       <Tooltip content={<ChartTooltipContent />} />
                       <Legend />
@@ -805,7 +828,7 @@ export default function FinancialStatementsPage() {
                       <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                       <YAxis
                         tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`}
-                        tick={{ fontSize: 11 }}
+                        tick={{ fontSize: 12 }}
                       />
                       <Tooltip content={<ChartTooltipContent />} />
                       <Legend />
@@ -836,7 +859,7 @@ export default function FinancialStatementsPage() {
                       <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                       <YAxis
                         tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`}
-                        tick={{ fontSize: 11 }}
+                        tick={{ fontSize: 12 }}
                       />
                       <Tooltip content={<ChartTooltipContent />} />
                       <Legend />
@@ -862,8 +885,8 @@ export default function FinancialStatementsPage() {
                     <ResponsiveContainer width="100%" height={220}>
                       <AreaChart data={analytics.trends} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                        <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`} tick={{ fontSize: 11 }} />
+                        <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                        <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`} tick={{ fontSize: 12 }} />
                         <Tooltip content={<ChartTooltipContent />} />
                         <Area type="monotone" dataKey="cash" name="货币资金" stroke={COLORS.cash} fill={COLORS.cash} fillOpacity={0.15} strokeWidth={2} />
                       </AreaChart>
@@ -883,10 +906,10 @@ export default function FinancialStatementsPage() {
                     <ResponsiveContainer width="100%" height={220}>
                       <LineChart data={analytics.trends} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                        <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                         <YAxis
                           tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
-                          tick={{ fontSize: 11 }}
+                          tick={{ fontSize: 12 }}
                           domain={[0, 1.2]}
                         />
                         <Tooltip
@@ -1098,6 +1121,8 @@ export default function FinancialStatementsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </>
+      )}
     </div>
   );
 }

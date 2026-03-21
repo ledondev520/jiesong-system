@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Toaster } from "@/components/ui/sonner";
 import { LazyAIAssistantMount } from "@/components/ai/LazyAIAssistantMount";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
+import { GlobalErrorBoundary } from "@/components/layout/GlobalErrorBoundary";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -30,9 +31,11 @@ export default function RootLayout({
         }}
       >
         <ThemeProvider>
-          {children}
-          <Toaster position="top-center" />
-          <LazyAIAssistantMount />
+          <GlobalErrorBoundary>
+            {children}
+            <Toaster position="top-center" />
+            <LazyAIAssistantMount />
+          </GlobalErrorBoundary>
         </ThemeProvider>
       </body>
     </html>

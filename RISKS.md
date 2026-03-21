@@ -1,5 +1,15 @@
 # Frontend Polish Risks
 
+## 2026-03-19 Round 62（ClawPi Domain Sweep）
+
+| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
+|---|---|---|---|---|
+| R-033 | 旧 ClawPi 域名实际保存在部署平台环境变量、系统 `crontab` / `launchd`、CI Secret 或网关层，不在仓库工作树内 | 仓库已清理但运行时仍可能继续访问旧地址 | 仓库内先统一前端 API 基址解析逻辑，并在结果文档中明确要求复核外部环境变量与系统级定时任务 | 回退 `frontend/src/lib/api-base-url.ts`、`frontend/src/lib/axios.ts`、`frontend/src/components/ai/AIAssistant.tsx` 与对应测试改动 |
+
+### 2026-03-19 Round 62 状态更新
+
+- `R-033`：已激活。本轮已确认仓库内无 `clawpi-v2.vercel.app` 明文字面量，但外部部署环境仍需人工复核。
+
 ## 2026-03-15 Round 61（Ops Execution Center Kickoff）
 
 | 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |

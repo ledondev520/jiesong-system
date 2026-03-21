@@ -26,6 +26,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => ({
     get: (...args: unknown[]) => mockSearchParamGet(...args),
   }),
+  usePathname: () => '/customs-declarations',
 }));
 
 vi.mock('@/services/customsDeclaration.service', () => ({
@@ -40,6 +41,12 @@ vi.mock('sonner', () => ({
     error: (...args: unknown[]) => mockToastError(...args),
     success: (...args: unknown[]) => mockToastSuccess(...args),
   },
+}));
+
+vi.mock('@/lib/api-cache', () => ({
+  cachedFetch: async (_key: string, fetcher: () => unknown) => fetcher(),
+  invalidateCache: vi.fn(),
+  clearAllCache: vi.fn(),
 }));
 
 describe('CustomsDeclarationsPage 交互逻辑', () => {

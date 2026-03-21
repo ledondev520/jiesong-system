@@ -1,5 +1,41 @@
 # Frontend Polish Metrics
 
+## 2026-03-21 Round 63（Login Transition / First-Paint Fix）
+
+### 质量指标
+- 登录成功后跳转目标修正：`1`（`/` -> `/dashboard`）
+- 工作台首屏重组件延后加载：`1`（`DataDashboard` 动态导入 + 骨架屏）
+- 定向单测：`9/9` 通过
+- 定向 lint：通过
+
+### 过程指标
+- 需要首屏加载的重图表 chunk：减少 `1` 组直接同步挂载入口
+- 新增骨架屏区块：`3` 个（KPI / 图表 / 商品排行）
+- 浏览器回归：`1` 次注入 JWT 后工作台可见性验证
+
+### 结论
+- 登录成功后的跳转链路现在少了一层空白壳路由，体验上更直接。
+- 数据看板不再阻塞工作台上半屏内容，首开时至少能先看到页面骨架与核心入口。
+- 开发环境里 `next dev` 仍会受首次编译和 chunk 下载影响，但页面壳已经不再“空着等看板”。
+
+## 2026-03-19 Round 62（ClawPi Domain Sweep）
+
+### 质量指标
+- ClawPi 旧域名字面量命中：`0`
+- 关键前端 API 基址入口修复：`2`（`axios`、`AI Assistant stream`）
+- 新增共享解析文件：`1`（`frontend/src/lib/api-base-url.ts`）
+- 前端定向单测：`5/5` 通过
+
+### 过程指标
+- 重点核查入口：`8+`（源码、脚本、配置、README/DEPLOY、`cron`/`launchd` 相关文件）
+- 保守保留的本地代理路径：`3`（`frontend/Dockerfile`、`deploy.sh`、`next.config.ts`）
+- 新增兼容策略：`1`（规范优先 `NEXT_PUBLIC_API_BASE_URL`，兼容历史 `NEXT_PUBLIC_API_URL`）
+
+### 结论
+- 当前工作树内未发现 `clawpi-v2.vercel.app` 或等价旧域名硬编码。
+- 本轮真正修复的是“API 基址变量名不一致”这一运行时风险，避免未来迁移 API 域名时只改了文档/构建变量却漏掉实际请求入口。
+- 仍需在仓库外继续复核部署平台环境变量、系统级定时任务和网关配置。
+
 ## 2026-03-15 Round 61（Ops Execution Center Kickoff）
 
 ### 质量指标

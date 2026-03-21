@@ -9,6 +9,8 @@ import type { ApiResponse } from '@/types';
 
 export interface AiSessionItem {
   sessionId: string;
+  totalTokens?: number;
+  lastModel?: string;
   _max?: {
     createdAt?: string | null;
   } | null;

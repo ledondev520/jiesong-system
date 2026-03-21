@@ -13,6 +13,7 @@
 import { useState, useEffect } from 'react';
 import { SalesContract, SalesStatus } from '@/types';
 import { salesService } from '@/services/sales.service';
+import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -59,7 +60,10 @@ export default function SalesPage() {
   const loadContracts = async () => {
     setLoading(true);
     try {
-      const response = await salesService.getAll({ page: 1, pageSize: 100, lite: true });
+      const response = await cachedFetch(
+        'sales-contracts-list',
+        () => salesService.getAll({ page: 1, pageSize: 100, lite: true }),
+      );
       setContracts(response.data?.items || []);
     } catch {
       toast.error('加载出口合同失败');
@@ -106,6 +110,7 @@ export default function SalesPage() {
       toast.success(`合同 ${contractToDelete.contractNo} 已删除`);
       setDeleteDialogOpen(false);
       setContractToDelete(null);
+      invalidateCache('sales-contracts-list');
       loadContracts(); // 刷新列表
     } catch {
       toast.error('删除合同失败');

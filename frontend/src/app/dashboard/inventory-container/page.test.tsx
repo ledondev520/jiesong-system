@@ -23,6 +23,7 @@ vi.mock('next/navigation', () => ({
     push: mockRouterPush,
     back: vi.fn(),
   }),
+  usePathname: () => '/dashboard/inventory-container',
 }));
 
 vi.mock('@/services/inventory.service', () => ({
@@ -38,6 +39,12 @@ vi.mock('sonner', () => ({
     error: (...args: unknown[]) => mockToastError(...args),
     success: (...args: unknown[]) => mockToastSuccess(...args),
   },
+}));
+
+vi.mock('@/lib/api-cache', () => ({
+  cachedFetch: async (_key: string, fetcher: () => unknown) => fetcher(),
+  invalidateCache: vi.fn(),
+  clearAllCache: vi.fn(),
 }));
 
 describe('InventoryPage 交互逻辑', () => {

@@ -81,42 +81,6 @@ export interface SavePurchaseChecklistTemplatePayload extends GeneratePurchaseCh
   items: PurchaseChecklistItem[];
 }
 
-export interface OpsTaskItem {
-  id: string;
-  title: string;
-  description: string;
-  assigneeName: string;
-  priority: 'HIGH' | 'MEDIUM' | 'LOW';
-  status: 'TODO' | 'DONE';
-  dueAt: string;
-  remindAt: string;
-  secondRemindAt: string;
-  sourceText?: string | null;
-}
-
-export interface OpsTaskSummary {
-  totalItems: number;
-  overdueItems: number;
-  dueTodayItems: number;
-  highPriorityItems: number;
-}
-
-export interface OpsTaskListResponse {
-  items: OpsTaskItem[];
-  summary: OpsTaskSummary;
-}
-
-export interface CreateOpsTaskPayload {
-  naturalLanguageInput?: string;
-  title?: string;
-  description?: string;
-  assigneeName?: string;
-  priority?: 'HIGH' | 'MEDIUM' | 'LOW';
-  dueAt?: string;
-  remindAt?: string;
-  secondRemindAt?: string;
-}
-
 export const opsExecutionService = {
   getUnshippedList: async (params: GetOpsUnshippedParams = { page: 1, pageSize: 50 }) => {
     return api.get<ApiResponse<OpsUnshippedResponse>, ApiResponse<OpsUnshippedResponse>>(
@@ -167,14 +131,4 @@ export const opsExecutionService = {
     await downloadResponseBlob(response, fallbackFilename);
   },
 
-  getTasks: async () => {
-    return api.get<ApiResponse<OpsTaskListResponse>, ApiResponse<OpsTaskListResponse>>('/ops-execution/tasks');
-  },
-
-  createTask: async (payload: CreateOpsTaskPayload) => {
-    return api.post<ApiResponse<OpsTaskItem>, ApiResponse<OpsTaskItem>, CreateOpsTaskPayload>(
-      '/ops-execution/tasks',
-      payload,
-    );
-  },
 };

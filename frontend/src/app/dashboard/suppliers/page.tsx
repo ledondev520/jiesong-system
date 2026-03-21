@@ -25,6 +25,8 @@ import { Plus, Pencil, Trash, AlertTriangle } from 'lucide-react';
 import { SupplierDialog } from './components/SupplierDialog';
 import type { SupplierFormValues } from './components/SupplierDialog';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
+import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { toast } from 'sonner';
 
 export default function SuppliersPage() {
@@ -40,7 +42,7 @@ export default function SuppliersPage() {
   const loadSuppliers = async () => {
     setLoading(true);
     try {
-      const response = await supplierService.getAll({ page: 1, pageSize: 100 });
+      const response = await cachedFetch('suppliers-list', () => supplierService.getAll({ page: 1, pageSize: 100 }));
       setSuppliers(response.data?.items || []);
     } catch {
       toast.error('加载供应商失败');
@@ -86,6 +88,7 @@ export default function SuppliersPage() {
         toast.success('供应商创建成功');
       }
       setIsDialogOpen(false);
+      invalidateCache('suppliers-list');
       loadSuppliers();
     } catch {
       toast.error(editingSupplier ? '更新失败' : '创建失败');
@@ -94,11 +97,10 @@ export default function SuppliersPage() {
 
   return (
     <div className="space-y-6">
+      <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
       <PageHeader 
-        title="供应商管理"
+        title="商家管理"
         description="管理供应商档案与质量记录"
-        backHref="/dashboard/settings?tab=master"
-        backLabel="返回"
         actions={
           <Button onClick={handleCreate} className="h-10 rounded-xl">
             <Plus className="mr-2 h-4 w-4" /> 新增供应商

@@ -1,0 +1,1262 @@
+OpenAI Codex v0.115.0 (research preview)
+--------
+workdir: /Users/helena/Cursor/jiesong_system
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, /Users/helena/.codex/memories]
+reasoning effort: high
+reasoning summaries: none
+session id: 019d0fac-1764-77c2-bcbf-2c31b02e5ea8
+--------
+user
+请使用 plan-ceo-review 技能（/Users/helena/.claude/skills/gstack/plan-ceo-review/SKILL.md）对当前项目做一次新一轮review。要求输出：1）执行摘要；2）Top10修改建议（问题/影响/改法/优先级/工作量/验证标准）；3）与上一轮相比的新发现。仅基于仓库静态证据。
+mcp: playwright starting
+mcp: playwright ready
+mcp startup: ready: playwright
+codex
+使用 `plan-ceo-review` 技能做一次基于仓库静态证据的复盘审查，先读取技能说明和仓库内上一轮 review/规划文档，再抽取当前代码与配置里的高信号问题。
+exec
+/bin/zsh -lc "pwd && rg --files -g 'PLAN.md' -g 'TASKS.md' -g 'RISKS.md' -g 'METRICS.md' -g '*review*' -g '*REVIEW*' -g 'AGENTS.md' -g 'SECURITY.md' -g 'README*'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+/Users/helena/Cursor/jiesong_system
+SECURITY.md
+AGENTS.md
+METRICS.md
+PLAN.md
+scripts/README.md
+TASKS.md
+README.md
+docs/reviews/raw/2026-03-21-review2-ceo.txt
+docs/reviews/raw/2026-03-21-review2-eng.txt
+docs/reviews/raw/2026-03-21-review2-design.txt
+docs/reviews/2026-03-20-ceo-eng-design-review-summary.md
+docs/reviews/2026-03-21-gstack-comprehensive-review.md
+docs/api-contracts/README.md
+docs/README.md
+docs/quality/README.md
+docs/archive/SESSION-REVIEW-REPORT.md
+docs/archive/CODE-REVIEW-AUDIT.md
+backend/src/README.md
+backend/METRICS.md
+exec
+/bin/zsh -lc "sed -n '1,220p' /Users/helena/.claude/skills/gstack/plan-ceo-review/SKILL.md" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+---
+name: plan-ceo-review
+version: 1.0.0
+description: |
+  CEO/founder-mode plan review. Rethink the problem, find the 10-star product,
+  challenge premises, expand scope when it creates a better product. Three modes:
+  SCOPE EXPANSION (dream big), HOLD SCOPE (maximum rigor), SCOPE REDUCTION
+  (strip to essentials).
+allowed-tools:
+  - Read
+  - Grep
+  - Glob
+  - Bash
+  - AskUserQuestion
+---
+<!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
+<!-- Regenerate: bun run gen:skill-docs -->
+
+## Preamble (run first)
+
+codex
+已定位到上一轮 review 文档和当前治理文件。接下来按 `plan-ceo-review` 的预审流程做系统审计，再对照上一轮结论筛出“新增发现”和优先级最高的修改建议。
+Plan update
+Running a static CEO-style repo review using the requested skill, with comparison against the previous review cycle.
+  ✓ Read skill instructions and locate prior review artifacts plus project governance docs
+  → Run system audit on git state, TODO/FIXME markers, and repo status
+  • Inspect high-signal source/config areas and compare against previous review findings
+  • Synthesize execution summary, top 10 recommendations, and net-new findings
+exec
+/bin/zsh -lc 'find . -name "*.rb" -newer Gemfile.lock | head -20' in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+find: Gemfile.lock: No such file or directory
+exec
+/bin/zsh -lc 'git stash list' in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+
+exec
+/bin/zsh -lc 'git log --oneline -30' in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+cfae0af fix(design): 改善表格行间距——td/th 从 py-2 升级为 py-3
+85b33b1 feat(backend): 新增货柜装箱明细 ContainerItem API
+735fe9b fix(design): 改善财务页空状态——替换静态说明卡为条件式引导
+869ca2c fix(design): 移除工作台首页多余的返回按钮
+8f2bbce fix(a11y): 修复触摸目标偏小——确保 icon-only 按钮 44px 点击区域
+33b4a53 fix(design): 删除工作台歌词弹窗
+f11b73f chore: 提取报关单数据并补充出货汇总字段
+945b0a8 refactor(nav): 侧边栏重构为5大模块入口 + 页面内Tab切换
+8ca2682 feat: 门店开业采购指南 — 密歇根模板基准 + 数据清洗 + CSV下载
+032bd37 chore: 添加 Supabase 免费套餐自动保活 GitHub Actions
+ef3520f feat: 添加完整的 VPS/Docker 部署方案
+35b5f56 perf: defer heavy detail page reference loads
+5222169 refactor(ui): 移除背景渐变硬编码，使用 CSS 变量
+fe7425c feat(theme): 将系统主色调从蓝色改为浅绿色
+f814d2b refactor(ui): 统一 SHADCN/UI 设计规范，移除硬编码样式
+ab27492 perf: optimize page switching and data loading
+3ab37ff feat(auth): 快捷登录自动提交并切换 admin 测试密码
+e3fb136 fix: 移除误加的 submodule
+8122a84 docs: AGENTS.md 添加 SHADCN/UI 设计规范
+8a61ad3 fix: 移除误加的 submodule
+exec
+/bin/zsh -lc 'git branch --show-current && (gh pr view --json baseRefName -q .baseRefName 2>/dev/null || gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || echo main)' in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc 'git diff main --stat' in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+ .gitignore                                         |   1 +
+ METRICS.md                                         |  18 +
+ PLAN.md                                            |  27 +
+ RISKS.md                                           |  10 +
+ TASKS.md                                           |  22 +
+ backend/src/app.js                                 |   2 -
+ backend/src/config/constants.js                    |   1 -
+ backend/src/config/constants.test.js               |   2 +-
+ backend/src/controllers/opsExecutionController.js  | 182 +----
+ .../src/controllers/opsExecutionController.test.js |  40 --
+ backend/src/controllers/system/configController.js |  96 ++-
+ backend/src/controllers/systemController.js        |   2 +
+ backend/src/jobs/opsTaskReminderJob.js             |  66 --
+ backend/src/middleware/auth.js                     |  83 ++-
+ backend/src/routes/opsExecution.js                 |  16 -
+ backend/src/routes/system.js                       |  39 +-
+ backend/src/services/opsTaskReminderService.js     | 138 ----
+ .../src/services/opsTaskReminderService.test.js    |  71 --
+ frontend/src/app/(auth)/login/page.tsx             |  18 +-
+ .../src/app/customs-declarations/page.test.tsx     |   1 +
+exec
+/bin/zsh -lc "grep -r \"TODO\\|FIXME\\|HACK\\|XXX\" --include=\"*.rb\" --include=\"*.js\" -l . || true" in /Users/helena/Cursor/jiesong_system succeeded in 138ms:
+main
+codex
+系统审计已完成大半：当前分支就是 `main`，且主干上刚经历一轮较大的后端权限/运维流程裁剪与前端工作台重构。我现在补读治理与历史 review 文档，重点确认哪些问题是“旧问题未解”，哪些才是这轮新增暴露出来的。
+exec
+/bin/zsh -lc "sed -n '1,220p' METRICS.md" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+# Frontend Polish Metrics
+
+## 2026-03-19 Round 62（ClawPi Domain Sweep）
+
+### 质量指标
+- ClawPi 旧域名字面量命中：`0`
+- 关键前端 API 基址入口修复：`2`（`axios`、`AI Assistant stream`）
+- 新增共享解析文件：`1`（`frontend/src/lib/api-base-url.ts`）
+- 前端定向单测：`5/5` 通过
+
+### 过程指标
+- 重点核查入口：`8+`（源码、脚本、配置、README/DEPLOY、`cron`/`launchd` 相关文件）
+- 保守保留的本地代理路径：`3`（`frontend/Dockerfile`、`deploy.sh`、`next.config.ts`）
+- 新增兼容策略：`1`（规范优先 `NEXT_PUBLIC_API_BASE_URL`，兼容历史 `NEXT_PUBLIC_API_URL`）
+
+### 结论
+- 当前工作树内未发现 `clawpi-v2.vercel.app` 或等价旧域名硬编码。
+- 本轮真正修复的是“API 基址变量名不一致”这一运行时风险，避免未来迁移 API 域名时只改了文档/构建变量却漏掉实际请求入口。
+- 仍需在仓库外继续复核部署平台环境变量、系统级定时任务和网关配置。
+
+exec
+/bin/zsh -lc "sed -n '1,260p' docs/reviews/2026-03-20-ceo-eng-design-review-summary.md" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "sed -n '1,220p' PLAN.md" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "sed -n '1,220p' RISKS.md" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+# 捷淞系统三维评审汇总报告（CEO / Eng / Design）- 2026-03-20
+
+## 审查范围与方法
+- 仓库：`/Users/helena/Cursor/jiesong_system`
+- 方法：基于仓库静态代码 + 文档 + 最近提交记录
+- 审查技能：
+  - `plan-ceo-review`
+  - `plan-eng-review`
+  - `plan-design-review`
+
+---
+
+## 一句话结论
+当前系统已具备可用业务骨架，但存在 **配置中心泛化、权限边界偏宽、模块复杂度过高、体验一致性不足** 四类结构性问题。建议按 **P0（先保命）→ P1（提效率）→ P2（提体验）** 三阶段推进。
+
+---
+
+## Top 10 修改建议（汇总优先级）
+
+| # | 建议 | 来源 | 优先级 | 预估工作量 | 改造目标 |
+ succeeded in 0ms:
+# Ops Execution Center Plan
+
+## 2026-03-19 Round 62 (ClawPi Domain Sweep)
+
+### Goal
+- 全面清扫仓库内 ClawPi 旧域名残留，并确认关键 API 相关脚本/配置不会因环境变量错位继续打旧地址或错误地址。
+
+### Delivered
+- 完成全仓盘点：
+  - 扫描范围覆盖源码、脚本、配置、部署文档，以及 `cron` / `launchd` / 定时任务相关文件。
+  - 未发现 `clawpi-v2.vercel.app` 在工作树中的明文字面量引用。
+  - 未发现仓库内 `cron`、`launchd`、`backup.sh`、`health-check.sh`、`inventoryAlertJob` 等入口存在 ClawPi 旧域名硬编码。
+- 修复前端 API 基址解析不一致：
+  - 新增 `frontend/src/lib/api-base-url.ts`
+  - `frontend/src/lib/axios.ts` 与 `frontend/src/components/ai/AIAssistant.tsx` 统一改为共享解析逻辑。
+  - 规范优先使用 `NEXT_PUBLIC_API_BASE_URL`，兼容历史 `NEXT_PUBLIC_API_URL`，未设置时继续回退 `/api/v1`。
+- 补充定向回归：
+  - `frontend/src/lib/axios.test.ts` 新增 `NEXT_PUBLIC_API_BASE_URL` 优先级覆盖用例。
+- 新增专项实施计划：
+  - `docs/plans/2026-03-19-clawpi-domain-sweep.md`
+ succeeded in 0ms:
+# Frontend Polish Risks
+
+## 2026-03-19 Round 62（ClawPi Domain Sweep）
+
+| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
+|---|---|---|---|---|
+| R-033 | 旧 ClawPi 域名实际保存在部署平台环境变量、系统 `crontab` / `launchd`、CI Secret 或网关层，不在仓库工作树内 | 仓库已清理但运行时仍可能继续访问旧地址 | 仓库内先统一前端 API 基址解析逻辑，并在结果文档中明确要求复核外部环境变量与系统级定时任务 | 回退 `frontend/src/lib/api-base-url.ts`、`frontend/src/lib/axios.ts`、`frontend/src/components/ai/AIAssistant.tsx` 与对应测试改动 |
+
+### 2026-03-19 Round 62 状态更新
+
+- `R-033`：已激活。本轮已确认仓库内无 `clawpi-v2.vercel.app` 明文字面量，但外部部署环境仍需人工复核。
+
+## 2026-03-15 Round 61（Ops Execution Center Kickoff）
+
+| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
+|---|---|---|---|---|
+| R-030 | 未发货清单首版若直接新增 Prisma 模型与数据库迁移 | 拉长首批反馈周期，阻塞前端入口和聚合逻辑上线 | 首版用 `SystemConfig` JSON 保存负责人映射，先完成真实列表与分发闭环；数据库专模放到 `OPS-EXEC-03` 之后 | 回退 `opsExecution` 新增路由与前端页面，保留计划台账 |
+| R-031 | 未发货聚合直接依赖 `/users` 列表来选择负责人 | 非管理员角色无法获取候选人，导致中台页对多数业务角色不可用 | 首版支持自由文本负责人分发（如“小周”），不依赖 admin-only 用户接口 | 回退负责人筛选与分发 UI 为只读展示 |
+| R-032 | 采购清单模板和任务提醒引擎同时落地，跨前后端与数据库改动面过大 | 单轮回归面过大，难以快速验证 | 按 `OPS-EXEC-01 -> OPS-EXEC-02 -> OPS-EXEC-03` 顺序推进，每轮只放行一个真实可验证切片 | 回滚到仅保留中台入口页与 roadmap 状态 |
+
+exec
+/bin/zsh -lc "sed -n '1,260p' docs/reviews/2026-03-21-gstack-comprehensive-review.md" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "sed -n '1,260p' TASKS.md" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+# 捷淞系统综合评审报告 2026-03-21
+
+> 技术总监视角 · 基于仓库代码 + 历史 PLAN/RISKS/TASKS 文档 + 近期迭代记录
+
+---
+
+## 评审背景
+
+- **时间节点**：2026-03-21，距上一轮三维评审（2026-03-20）约 1 天
+- **评审方法**：静态代码阅读 + 文档链路分析 + 测试配置审查
+- **覆盖范围**：后端路由/中间件/控制器、前端关键页面、测试体系、安全配置、近 60+ 轮迭代回顾
+- **评审员角色**：技术总监（兼顾产品、工程、安全三维度）
+
+---
+
+## 一、CEO/产品视角
+
+### 1.1 当前系统状态评估
+
+| 维度 | 评分 | 说明 |
+ succeeded in 0ms:
+# Frontend Polish Tasks
+
+## 2026-03-21 CEO/Eng/Design 三维评审迭代（基于 2026-03-20 review）
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| REV-01 | P0 | 15m | 1 | DONE | 修复导出路由权限缺失：GET /system/export/:type 与 /pdf 均无 roleAuth，加 ADMIN+业务角色限制 |
+| REV-02 | P1 | 90m | 2 | DONE | 财务首页升级为经营驾驶舱：汇率显示、收付款完成率进度条、紧迫性预警 badge、快捷导航区 |
+| REV-03 | P1 | 20m | 2 | DONE | AI 助手 z-index 提升至 z-[199]/z-[200]，防止被弹框/sticky header 覆盖 |
+| REV-04 | P1 | 60m | 3 | DONE | 经营执行中台拆分：page.tsx(55行) 委托 UnshippedListTab + PurchaseChecklistTab 子组件 |
+| REV-05 | P1 | 45m | 3 | DONE | 设置页 IA 优化：基础档案加港口/品类入口、数据导出改 shadcn Select、系统配置分域说明 |
+| REV-06 | P1 | 30m | 1 | DONE | 导出路由加 withAuditLog 审计日志，可在 system/logs 追溯每次导出行为 |
+| REV-07 | P0 | 45m | 2 | DONE | SystemConfig 分域分组：新增 GET /configs/domains 端点，CONFIG_DOMAIN_MAP 维护 params/dictionary/ai/other 四域 |
+| REV-08 | P2 | 20m | 1 | DONE | vitest coverage 增加 services 层覆盖、reporter 加 lcov、阈值提升至 15/25%，test:coverage 命令已就绪 |
+| REV-09 | P0 | 30m | 1 | DONE | authenticate() 加 LRU 内存缓存（TTL=60s, max=1000）：减少每请求 DB 查询，暴露 clearAuthCache() 供禁用即时踢出 |
+| REV-10 | P0 | 15m | 1 | DONE | Settings 删除单位/报关公司失败时回滚本地状态并展示精确错误 toast（原来只有空 catch） |
+| REV-11 | P1 | 20m | 1 | DONE | 财务页新增 loadError 状态：区分「无数据」与「加载失败」，失败时展示专属 ServerCrash 错误卡片+重试按钮 |
+
+## 2026-03-19 ClawPi Domain Sweep
+
+codex
+上一轮汇总里不少建议已经被执行了，所以这轮重点不是重复旧问题，而是验证这些“已完成项”有没有留下新的结构性尾巴。下面转向当前代码证据：鉴权、配置中心、系统路由、登录、财务页、经营执行页、测试门禁。
+exec
+/bin/zsh -lc "sed -n '1,220p' SECURITY.md" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "sed -n '1,220p' docs/README.md" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+# Security Playbook
+
+## 5-Layer Defense Architecture
+
+### 1) 访问控制与身份层（Identity & Access）
+- Enforce explicit身份校验 (JWT + role checks) for all sensitive routes.
+- Keep authentication middleware as single entry for route groups and validate user context before业务处理.
+- Use least-privilege账号 and role-to-resource mapping for every service boundary.
+- Disable默认凭证 and rotate all secrets periodically.
+
+### 2) 运行时与执行环境层（Host & Runtime）
+- Keep `.env` permissions tight; warn in非生产 and block in生产 for misconfigured permissions.
+- Run Node进程 with最小权限 (non-root, locked-down directories) and mount config with read-only policy where possible.
+- Keep upload/storage directories explicitly created and scoped to应用用户.
+- Add startup checks for config file accessibility and permission drift.
+
+### 3) 网络与应用边界层（Application & Network）
+- Apply CORS whitelist (`CORS_ORIGIN`) and avoid `*` in生产 environments.
+- Enforce request size limits, rate limiting at API网关 (or reverse proxy), and strict MIME/type checks on uploads.
+- Keep internal errors server-side; expose only最小化错误码 to clients.
+ succeeded in 0ms:
+# 项目文档目录
+
+> 若本文件夹结构或内容变化，请更新本文件。
+
+## 目的/边界/职责
+- 目的：集中维护进销存系统需求、方案、验收与执行类文档。
+- 边界：仅存放项目文档与索引，不承载业务实现代码。
+- 职责：提供可追溯文档入口，并在文件增删时同步更新清单。
+
+## 文件清单
+
+| 文件名 | 地位 | 功能 |
+|--------|------|------|
+| 需求总结_v2.0.md | 核心文档 | 完整的需求规格说明，作为PRD和技术方案的输入 |
+| PRD.md | 核心文档 | 产品需求文档，包含功能清单、用户故事、业务流程 |
+| 技术方案.md | 核心文档 | 技术架构设计、目录结构、API设计、AI集成方案 |
+| 数据库设计.md | 核心文档 | 数据库Schema设计、Prisma模型、实体关系图 |
+| 数据导入与清洗方案.md | 核心文档 | CSV历史数据导入方案、清洗规则、异常处理 |
+| 测试样例.md | 开发基线 | 测试先行样例与用例清单 |
+| 模拟数据汇总.md | 追踪清单 | 标记并汇总模拟数据位置 |
+exec
+/bin/zsh -lc "sed -n '1,220p' README.md" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+# 捷淞进销存管理系统
+
+> 若本文件夹结构或内容变化，请更新本文件。
+
+## 项目简介
+
+面向外贸出口企业的一站式进销存管理系统，集成AI智能助手，实现采购、销售、库存、财务的数字化管理。
+
+## 核心功能
+
+- 📦 **商品管理** - 商品档案、多供应商支持
+- 🏭 **供应商管理** - 供应商档案、昵称关联、质量标记
+- 🏪 **客户门店** - 门店档案、港口绑定
+- 📝 **采购管理** - 采购合同、AI辅助录入、付款跟踪
+- 💰 **销售管理** - 出口合同、智能定价
+- 📊 **库存管理** - 入库出库、状态流转
+- 🚢 **货柜管理** - 自动编号、装箱管理、位置查询
+- 🤖 **AI助手** - 智能问答、辅助录入
+- 📈 **报表统计** - 多维度数据分析
+
+exec
+/bin/zsh -lc "rg -n --glob '"'!**/node_modules/**'"' --glob '"'!**/.next/**'"' --glob '"'!**/dist/**'"' --glob '"'!**/build/**'"' 'TODO|FIXME|HACK|XXX' backend frontend docs *.md" in /Users/helena/Cursor/jiesong_system succeeded in 263ms:
+
+ succeeded in 26.07s:
+./frontend/node_modules/callsites/index.js
+./frontend/node_modules/victory-vendor/lib-vendor/d3-shape/src/arc.js
+./frontend/node_modules/victory-vendor/lib-vendor/d3-scale/src/log.js
+./frontend/node_modules/victory-vendor/lib-vendor/d3-voronoi/src/Edge.js
+./frontend/node_modules/test-exclude/node_modules/minimatch/dist/esm/index.js
+./frontend/node_modules/test-exclude/node_modules/minimatch/dist/esm/ast.js
+./frontend/node_modules/test-exclude/node_modules/minimatch/dist/commonjs/index.js
+./frontend/node_modules/test-exclude/node_modules/minimatch/dist/commonjs/ast.js
+./frontend/node_modules/zod/v4/classic/from-json-schema.js
+./frontend/node_modules/styled-jsx/dist/babel/index.js
+./frontend/node_modules/styled-jsx/dist/index/index.js
+./frontend/node_modules/d3-shape/dist/d3-shape.js
+./frontend/node_modules/d3-shape/src/arc.js
+./frontend/node_modules/next/dist/trace/trace.js
+./frontend/node_modules/next/dist/esm/server/create-deduped-by-callsite-server-error-logger.js
+./frontend/node_modules/next/dist/esm/server/load-manifest.external.js
+./frontend/node_modules/next/dist/esm/server/normalizers/built/app/app-page-normalizer.js
+./frontend/node_modules/next/dist/esm/server/stream-utils/node-web-streams-helper.js
+./frontend/node_modules/next/dist/esm/server/send-response.js
+./frontend/node_modules/next/dist/esm/server/node-polyfill-crypto.js
+exec
+/bin/zsh -lc "nl -ba backend/src/middleware/auth.js | sed -n '1,260p'" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "nl -ba backend/prisma/seed.js | sed -n '1,240p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: JWT Token, 用户角色
+     3	 * Output: 认证/授权结果
+     4	 * Pos: 认证授权中间件，保护API路由
+     5	 * 
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	const jwt = require('jsonwebtoken');
+    10	const config = require('../config');
+    11	const { createError } = require('./errorHandler');
+    12	const { roleAuth, adminOnly } = require('./roleAuth');
+    13	const prisma = require('../utils/prisma');
+    14	
+    15	/**
+    16	 * 认证用户信息内存缓存（LRU 简化实现）
+    17	 * - Key: userId（string）
+    18	 * - Value: { user, expiresAt }
+    19	 * - TTL: 60s（与 JWT 有效期相比极短，仅用于降低 DB 频率）
+    20	 * - 容量: 1000 条（超出按 FIFO 淘汰）
+ succeeded in 0ms:
+     1	/**
+     2	 * Input: Prisma客户端、bcryptjs
+     3	 * Output: 初始化数据库种子数据
+     4	 * Pos: 数据库初始化脚本
+     5	 * 
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	const { PrismaClient } = require('@prisma/client');
+    10	const bcrypt = require('bcryptjs');
+    11	
+    12	const prisma = new PrismaClient();
+    13	
+    14	async function main() {
+    15	  console.log('开始初始化数据库...');
+    16	  
+    17	  // 1. 创建管理员用户
+    18	  const configuredAdminPassword = process.env.DEFAULT_ADMIN_PASSWORD;
+    19	  const adminPlainPassword = configuredAdminPassword || '123456';
+    20	  const adminPassword = await bcrypt.hash(adminPlainPassword, 12);
+exec
+/bin/zsh -lc "nl -ba backend/src/routes/system.js | sed -n '1,280p'" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "nl -ba backend/src/controllers/system/configController.js | sed -n '1,320p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: prisma.systemConfig KV 存储
+     3	 * Output: 系统配置读写接口（平铺格式 + 分域格式）
+     4	 * Pos: 系统配置控制层，支持向后兼容的平铺 getConfigs 与新增的分域 getConfigsByDomain
+     5	 *
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	const prisma = require('../../utils/prisma');
+    10	const { success } = require('../../utils/response');
+    11	const {
+    12	  normalizeConfigValueForResponse,
+    13	  normalizeConfigValueForStorage,
+    14	} = require('../../utils/secretCrypto');
+    15	
+    16	/**
+    17	 * 配置键到域的映射表（不改 schema，仅在应用层做域划分）
+    18	 * - 新增配置 key 时，须在此表补充对应域，否则归入 "其他" 域。
+    19	 */
+    20	const CONFIG_DOMAIN_MAP = {
+ succeeded in 0ms:
+     1	/**
+     2	 * Input: 系统控制器
+     3	 * Output: 系统配置管理路由
+     4	 * Pos: 系统路由，处理系统配置和日志查询
+     5	 * 
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	const { Router } = require('express');
+    10	const systemController = require('../controllers/systemController');
+    11	const { authenticate, roleAuth } = require('../middleware/auth');
+    12	const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
+    13	const { upload } = require('../utils/upload');
+    14	const { withAuditLog } = require('../middleware/auditLog');
+    15	
+    16	const router = Router();
+    17	
+    18	router.use(authenticate);
+    19	
+    20	// GET /api/v1/system/configs - 获取系统配置（平铺格式，向后兼容）
+exec
+/bin/zsh -lc "nl -ba frontend/src/app/dashboard/ops-execution/page.tsx | sed -n '1,260p'" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "nl -ba frontend/src/app/dashboard/finance/page.tsx | sed -n '1,340p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: UnshippedListTab、PurchaseChecklistTab 子组件
+     3	 * Output: 经营执行中台页面（两个子Tab的统一入口）
+     4	 * Pos: 经营执行模块顶层路由页面，负责布局与Tab切换
+     5	 *
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	'use client';
+    10	
+    11	import { ClipboardList, PackageSearch } from 'lucide-react';
+    12	import { PageHeader } from '@/components/layout/PageHeader';
+    13	import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
+    14	import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+    15	import { UnshippedListTab } from './components/UnshippedListTab';
+    16	import { PurchaseChecklistTab } from './components/PurchaseChecklistTab';
+    17	
+    18	/**
+    19	 * 职责：渲染经营执行中台布局，将未发货清单与门店采购清单分Tab展示
+    20	 */
+ succeeded in 0ms:
+     1	/**
+     2	 * Input: 后端 finance/stats API、system/exchange-rate API
+     3	 * Output: 财务经营驾驶舱页面（KPI + 完成率 + 汇率 + 紧迫信号 + 快捷导航）
+     4	 * Pos: 财务模块首页，提供管理层决策快速视图
+     5	 *
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	'use client';
+    10	
+    11	import { useEffect, useState } from 'react';
+    12	import {
+    13	  Card,
+    14	  CardContent,
+    15	  CardHeader,
+    16	  CardTitle,
+    17	  CardDescription,
+    18	} from '@/components/ui/card';
+    19	import { Button } from '@/components/ui/button';
+    20	import { Badge } from '@/components/ui/badge';
+exec
+/bin/zsh -lc "nl -ba frontend/src/app/dashboard/settings/components/SettingsPageContent.tsx | sed -n '1,360p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: 后端 /system/configs API、基础数据API
+     3	 * Output: 综合设置页面（基础档案+系统配置+数据导入）
+     4	 * Pos: 系统模块，整合所有设置功能
+     5	 * 
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	'use client';
+    10	
+    11	import { useState, useEffect } from 'react';
+    12	import { useSearchParams, useRouter } from 'next/navigation';
+    13	import { useForm } from 'react-hook-form';
+    14	import { zodResolver } from '@hookform/resolvers/zod';
+    15	import { z } from 'zod';
+    16	import { Button } from '@/components/ui/button';
+    17	import { Input } from '@/components/ui/input';
+    18	import {
+    19	  Form,
+    20	  FormControl,
+exec
+/bin/zsh -lc "nl -ba frontend/vitest.config.ts | sed -n '1,240p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: Vitest配置需求
+     3	 * Output: 前端单元测试配置
+     4	 * Pos: 前端测试配置入口
+     5	 *
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	import path from 'node:path';
+    10	import { defineConfig } from 'vitest/config';
+    11	
+    12	export default defineConfig({
+    13	  resolve: {
+    14	    alias: {
+    15	      '@': path.resolve(__dirname, './src'),
+    16	    },
+    17	  },
+    18	  test: {
+    19	    environment: 'jsdom',
+    20	    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+exec
+/bin/zsh -lc "nl -ba frontend/src/app/(auth)/login/page.tsx | sed -n '1,280p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+zsh:1: no matches found: frontend/src/app/(auth)/login/page.tsx
+exec
+/bin/zsh -lc "nl -ba frontend/src/services/config.service.ts | sed -n '1,240p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	import api from '@/lib/axios';
+     2	import { ApiResponse } from '@/types';
+     3	
+     4	type SystemConfigValue = string | number | boolean | string[] | null;
+     5	
+     6	interface SystemConfig {
+     7	  exchangeRate?: number;
+     8	  profitRate?: number;
+     9	  units?: string[];
+    10	  brokers?: string[];
+    11	  [key: string]: SystemConfigValue | undefined;
+    12	}
+    13	
+    14	const fetchSystemConfig = async () => {
+    15	  return api.get<ApiResponse<SystemConfig>, ApiResponse<SystemConfig>>('/system/configs');
+    16	};
+    17	
+    18	const toStringArray = (value: unknown, fallback: string[] = []): string[] => {
+    19	  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : fallback;
+    20	};
+exec
+/bin/zsh -lc "nl -ba frontend/src/services/system.service.ts | sed -n '1,240p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: axios实例
+     3	 * Output: 系统运维相关 API 调用（日志、通知、导入记录、数据导出）
+     4	 * Pos: 前端系统运维服务层
+     5	 */
+     6	
+     7	import api from '@/lib/axios';
+     8	import { ApiResponse, PaginatedResponse, User } from '@/types';
+     9	import { getAuthToken } from '@/lib/auth-token';
+    10	
+    11	export interface SystemLogItem {
+    12	  id: string;
+    13	  userId: string;
+    14	  action: string;
+    15	  entity: string;
+    16	  entityId?: string | null;
+    17	  oldValue?: string | null;
+    18	  newValue?: string | null;
+    19	  ipAddress?: string | null;
+    20	  userAgent?: string | null;
+exec
+/bin/zsh -lc "nl -ba backend/src/config/index.js | sed -n '1,260p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: 环境变量 (.env)
+     3	 * Output: 统一配置对象
+     4	 * Pos: 配置中心，集中管理所有环境变量
+     5	 * 
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	const fs = require('fs');
+    10	const path = require('path');
+    11	const dotenv = require('dotenv');
+    12	
+    13	const PROJECT_ROOT = path.resolve(__dirname, '../..');
+    14	const ENV_PATH = path.join(PROJECT_ROOT, '.env');
+    15	
+    16	const isStrictPermissionMode =
+    17	  process.env.NODE_ENV === 'production' ||
+    18	  process.env.SECURITY_STRICT_CONFIG_PERMS === 'true';
+    19	
+    20	const validateJwtSecret = () => {
+exec
+/bin/zsh -lc "rg -n \"markNotificationRead|getNotifications|notification\" backend/src/controllers/systemController.js backend/src/controllers/system -g '"'!**/node_modules/**'"'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+backend/src/controllers/systemController.js:14:  getNotifications,
+backend/src/controllers/systemController.js:15:  markNotificationRead,
+backend/src/controllers/systemController.js:19:} = require('./system/notificationController');
+backend/src/controllers/systemController.js:44:  getNotifications,
+backend/src/controllers/systemController.js:45:  markNotificationRead,
+backend/src/controllers/system/notificationController.test.js:2: * Input: notificationController、prisma
+backend/src/controllers/system/notificationController.test.js:10:const notificationController = require('./notificationController');
+backend/src/controllers/system/notificationController.test.js:33:test('getNotifications: unreadOnly=true 时按未读筛选并返回 unreadCount', async () => {
+backend/src/controllers/system/notificationController.test.js:34:  const originalFindMany = prisma.notification.findMany;
+backend/src/controllers/system/notificationController.test.js:35:  const originalCount = prisma.notification.count;
+backend/src/controllers/system/notificationController.test.js:39:  prisma.notification.findMany = async (args) => {
+backend/src/controllers/system/notificationController.test.js:43:  prisma.notification.count = async (args) => {
+backend/src/controllers/system/notificationController.test.js:59:    await notificationController.getNotifications(req, res, (error) => {
+backend/src/controllers/system/notificationController.test.js:69:    prisma.notification.findMany = originalFindMany;
+backend/src/controllers/system/notificationController.test.js:70:    prisma.notification.count = originalCount;
+backend/src/controllers/system/notificationController.test.js:74:test('markNotificationRead: 无权限或不存在时返回404', async () => {
+backend/src/controllers/system/notificationController.test.js:75:  const originalUpdateMany = prisma.notification.updateMany;
+backend/src/controllers/system/notificationController.test.js:76:  prisma.notification.updateMany = async () => ({ count: 0 });
+backend/src/controllers/system/notificationController.test.js:83:    await notificationController.markNotificationRead(req, res, (error) => {
+backend/src/controllers/system/notificationController.test.js:91:    prisma.notification.updateMany = originalUpdateMany;
+exec
+/bin/zsh -lc "nl -ba backend/src/controllers/systemController.js | sed -n '1,260p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: /system/* API 控制器聚合
+     3	 * Output: 系统配置、通知、日志、港口与商品分类、导入导出统一入口
+     4	 * Pos: 拆分后的系统控制器聚合层，统一对外导出入口
+     5	 */
+     6	
+     7	const {
+     8	  getConfigs,
+     9	  getConfigsByDomain,
+    10	  updateConfig,
+    11	  getExchangeRate,
+    12	} = require('./system/configController');
+    13	const {
+    14	  getNotifications,
+    15	  markNotificationRead,
+    16	  getLogs,
+    17	  getOperationLogs,
+    18	  exportOperationLogsCsv,
+    19	} = require('./system/notificationController');
+    20	const {
+exec
+/bin/zsh -lc "rg -n \"DEFAULT_ADMIN_PASSWORD|123456|localStorage|quick login|快捷登录|rememberMe\" backend frontend -g '"'!**/node_modules/**'"'" in /Users/helena/Cursor/jiesong_system succeeded in 155ms:
+
+exec
+/bin/zsh -lc "nl -ba backend/src/controllers/system/notificationController.js | sed -n '120,220p'" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "nl -ba 'frontend/src/app/(auth)/login/page.tsx' | sed -n '1,280p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+   120	  const headerLine = headers.map(csvEscape).join(',');
+   121	  const dataLines = rows.map((row) => row.map(csvEscape).join(','));
+   122	  return [headerLine, ...dataLines].join('\n');
+   123	};
+   124	
+   125	const getNotifications = async (req, res, next) => {
+   126	  try {
+   127	    const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
+   128	    const { unreadOnly } = req.query;
+   129	
+   130	    const where = { userId: req.user.id };
+   131	    if (unreadOnly === 'true') {
+   132	      where.isRead = false;
+   133	    }
+   134	
+   135	    const [notifications, total] = await Promise.all([
+   136	      prisma.notification.findMany({
+   137	        where,
+   138	        skip,
+   139	        take: pageSize,
+ succeeded in 0ms:
+     1	/**
+     2	 * Input: 登录API、认证状态存储
+     3	 * Output: 登录页面
+     4	 * Pos: 认证模块入口，负责用户登录与快捷登录入口
+     5	 *
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 * Security: 快捷登录会在当前浏览器保存最近一次成功登录账号信息，仅用于已登录账号的下次一键登录
+     8	 */
+     9	
+    10	'use client';
+    11	
+    12	import { useCallback, useEffect, useState } from 'react';
+    13	import { useRouter } from 'next/navigation';
+    14	import Link from 'next/link';
+    15	import { useForm } from 'react-hook-form';
+    16	import { z } from 'zod';
+    17	import { zodResolver } from '@hookform/resolvers/zod';
+    18	import { useAuthStore } from '@/store/auth.store';
+    19	import type { ApiResponse } from '@/types';
+    20	import { Button } from '@/components/ui/button';
+exec
+/bin/zsh -lc "nl -ba backend/src/controllers/system/importExportController.js | sed -n '1,360p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	const { success } = require('../../utils/response');
+     2	const { createError } = require('../../middleware/errorHandler');
+     3	const { normalizePagination } = require('../../utils/pagination');
+     4	const { paginated } = require('../../utils/response');
+     5	
+     6	const importData = async (req, res, next) => {
+     7	  try {
+     8	    const importService = require('../../services/importService');
+     9	
+    10	    if (!req.file) {
+    11	      throw createError('请选择要导入的CSV文件', 400);
+    12	    }
+    13	
+    14	    const result = await importService.importCSVData(req.file.path, req.user.id);
+    15	    success(res, result, `导入完成：成功${result.successRows}条，失败${result.failedRows}条`);
+    16	  } catch (error) {
+    17	    next(error);
+    18	  }
+    19	};
+    20	
+exec
+/bin/zsh -lc "nl -ba frontend/src/lib/axios.ts | sed -n '1,280p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	import axios, { type AxiosRequestConfig } from 'axios';
+     2	import { clearAuthToken, getAuthToken } from '@/lib/auth-token';
+     3	import { getApiBaseUrl } from '@/lib/api-base-url';
+     4	
+     5	// Create Axios instance
+     6	// 使用相对路径，通过Next.js rewrites代理到后端
+     7	const api = axios.create({
+     8	  baseURL: getApiBaseUrl(),
+     9	  timeout: 60000, // 增加到60秒，AI调用可能需要更长时间
+    10	  headers: {
+    11	    'Content-Type': 'application/json',
+    12	  },
+    13	});
+    14	
+    15	type ApiRequestConfig<D = unknown> = AxiosRequestConfig<D> & {
+    16	  cache?: {
+    17	    enabled?: boolean;
+    18	    ttlMs?: number;
+    19	  };
+    20	};
+exec
+/bin/zsh -lc "nl -ba frontend/src/services/opsExecution.service.ts | sed -n '1,260p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	import api from '@/lib/axios';
+     2	import { getAuthToken } from '@/lib/auth-token';
+     3	import type { ApiResponse, PaginatedResponse } from '@/types';
+     4	import { downloadResponseBlob } from './fileDownload';
+     5	
+     6	export interface OpsUnshippedItem {
+     7	  key: string;
+     8	  salesContractId: string;
+     9	  orderNo: string;
+    10	  productId: string;
+    11	  skuName: string;
+    12	  skuCode: string;
+    13	  status: string;
+    14	  quantity: number;
+    15	  unit: string;
+    16	  recordCount: number;
+    17	  assigneeName: string;
+    18	  assigneeUpdatedAt: string;
+    19	  latestUpdatedAt: string;
+    20	}
+exec
+/bin/zsh -lc 'git status --short' in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+ M .gitignore
+ M METRICS.md
+ M PLAN.md
+ M RISKS.md
+ M TASKS.md
+ M backend/src/app.js
+ M backend/src/config/constants.js
+ M backend/src/config/constants.test.js
+ M backend/src/controllers/opsExecutionController.js
+ M backend/src/controllers/opsExecutionController.test.js
+ M backend/src/controllers/system/configController.js
+ M backend/src/controllers/systemController.js
+ D backend/src/jobs/opsTaskReminderJob.js
+ M backend/src/middleware/auth.js
+ M backend/src/routes/opsExecution.js
+ M backend/src/routes/system.js
+ D backend/src/services/opsTaskReminderService.js
+ D backend/src/services/opsTaskReminderService.test.js
+ M frontend/src/app/(auth)/login/page.tsx
+ M frontend/src/app/customs-declarations/page.test.tsx
+exec
+/bin/zsh -lc "nl -ba backend/src/controllers/opsExecutionController.js | sed -n '1,320p'" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "nl -ba backend/src/jobs/opsTaskReminderJob.js | sed -n '1,220p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: Inventory, SalesContract, Product, SystemConfig
+     3	 * Output: 经营执行中台 API
+     4	 * Pos: 控制器层，提供未发货聚合、负责人分发与采购清单模板能力
+     5	 */
+     6	
+     7	const prisma = require('../utils/prisma');
+     8	const { createError } = require('../middleware/errorHandler');
+     9	const { paginated, success } = require('../utils/response');
+    10	const { normalizePagination } = require('../utils/pagination');
+    11	
+    12	const ASSIGNMENT_CONFIG_KEY = 'ops_execution_unshipped_assignments';
+    13	const PURCHASE_TEMPLATE_CONFIG_KEY = 'ops_execution_purchase_templates';
+    14	
+    15	const DEFAULT_PURCHASE_TEMPLATES = [
+    16	  {
+    17	    templateId: '标准店:筹备期',
+    18	    templateName: '标准店-筹备期',
+    19	    storeType: '标准店',
+    20	    openingStage: '筹备期',
+ succeeded in 0ms:
+nl: backend/src/jobs/opsTaskReminderJob.js: No such file or directory
+exec
+/bin/zsh -lc "rg -n \"opsTaskReminder|task reminder|任务提醒|reminder\" backend frontend docs PLAN.md TASKS.md RISKS.md METRICS.md -g '"'!**/node_modules/**'"'" in /Users/helena/Cursor/jiesong_system succeeded in 152ms:
+
+codex
+当前证据里出现了一个比上一轮更严重的新信号：治理文档仍宣称 `OPS-EXEC-03` 已完成，但工作树里对应 reminder job/service 已被删除，`ops-execution` 控制器也只剩未发货与采购清单。我要把这条和其它“文档-代码失真”问题单独核实，因为它直接影响你们对系统能力的判断。
+exec
+/bin/zsh -lc "nl -ba backend/src/routes/opsExecution.js | sed -n '1,260p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: opsExecutionController
+     3	 * Output: 经营执行中台 API 路由
+     4	 * Pos: 路由层定义
+     5	 */
+     6	
+     7	const express = require('express');
+     8	const controller = require('../controllers/opsExecutionController');
+     9	const { authenticate, roleAuth } = require('../middleware/auth');
+    10	const { withPaginationValidation } = require('../utils/validators');
+    11	const { withAuditLog } = require('../middleware/auditLog');
+    12	
+    13	const router = express.Router();
+    14	
+    15	router.use(authenticate);
+    16	router.use(roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'));
+    17	
+    18	router.get('/unshipped', withPaginationValidation, controller.getUnshippedList);
+    19	
+    20	router.put('/unshipped/assign', withAuditLog(
+exec
+/bin/zsh -lc "git diff -- backend/src/routes/opsExecution.js backend/src/controllers/opsExecutionController.js backend/src/jobs/opsTaskReminderJob.js backend/src/services/opsTaskReminderService.js | sed -n '1,260p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+diff --git a/backend/src/controllers/opsExecutionController.js b/backend/src/controllers/opsExecutionController.js
+index 66bbff7..753a699 100644
+--- a/backend/src/controllers/opsExecutionController.js
++++ b/backend/src/controllers/opsExecutionController.js
+@@ -1,10 +1,9 @@
+ /**
+  * Input: Inventory, SalesContract, Product, SystemConfig
+  * Output: 经营执行中台 API
+- * Pos: 控制器层，提供未发货聚合与负责人分发能力
++ * Pos: 控制器层，提供未发货聚合、负责人分发与采购清单模板能力
+  */
+ 
+-const { randomUUID } = require('node:crypto');
+ const prisma = require('../utils/prisma');
+ const { createError } = require('../middleware/errorHandler');
+ const { paginated, success } = require('../utils/response');
+@@ -12,7 +11,6 @@ const { normalizePagination } = require('../utils/pagination');
+ 
+ const ASSIGNMENT_CONFIG_KEY = 'ops_execution_unshipped_assignments';
+ const PURCHASE_TEMPLATE_CONFIG_KEY = 'ops_execution_purchase_templates';
+exec
+/bin/zsh -lc "rg -n \"ops_execution_.*task|purchase_templates|unshipped_assignments|ops_execution\" backend/src frontend/src docs -g '"'!**/node_modules/**'"'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+docs/reviews/raw/2026-03-21-review2-ceo.txt:789:    12	const ASSIGNMENT_CONFIG_KEY = 'ops_execution_unshipped_assignments';
+docs/reviews/raw/2026-03-21-review2-ceo.txt:790:    13	const PURCHASE_TEMPLATE_CONFIG_KEY = 'ops_execution_purchase_templates';
+docs/reviews/raw/2026-03-21-review2-eng.txt:578:/bin/zsh -lc "rg -n \"ops_execution|purchaseChecklist|reminder|SystemConfig\" backend/src frontend/src docs -g '"'!**/node_modules/**'"' -g '"'!frontend/.next/**'"' | head -240" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+docs/reviews/raw/2026-03-21-review2-eng.txt:704:    12	const ASSIGNMENT_CONFIG_KEY = 'ops_execution_unshipped_assignments';
+docs/reviews/raw/2026-03-21-review2-eng.txt:705:    13	const PURCHASE_TEMPLATE_CONFIG_KEY = 'ops_execution_purchase_templates';
+docs/plans/2026-03-15-ops-execution-center.md:74:- Use `systemConfig` key `ops_execution_unshipped_assignments`
+backend/src/controllers/opsExecutionController.test.js:69:    key: 'ops_execution_unshipped_assignments',
+backend/src/controllers/opsExecutionController.test.js:121:    key: 'ops_execution_unshipped_assignments',
+backend/src/controllers/opsExecutionController.js:12:const ASSIGNMENT_CONFIG_KEY = 'ops_execution_unshipped_assignments';
+backend/src/controllers/opsExecutionController.js:13:const PURCHASE_TEMPLATE_CONFIG_KEY = 'ops_execution_purchase_templates';
+exec
+/bin/zsh -lc "rg -n \"coverage.include|thresholds|>=98%|98%|FE-COV-98\" frontend docs TASKS.md METRICS.md RISKS.md -g '"'!**/node_modules/**'"'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+RISKS.md:57:| R-028 | FE-COV-98 扩大 coverage 统计口径到 `src/app` / `src/services` 后，四项指标可能较当前基线明显下跌 | 团队误以为“本轮变差”，导致为保数字而缩小统计范围或临时豁免文件 | 先冻结 master plan，明确“先接受真实缺口，再分阶段补齐”；默认不通过排除文件凑指标 | 回退 FE-COV-98 的 coverage 扩围配置，恢复到当前 `components/lib` 统计口径 |
+RISKS.md:95:- `R-028`：已激活；FE-COV-98 后续执行阶段必须接受扩口径后的短期指标回落，禁止通过临时排除 `app/services` 文件来制造“达标”假象。
+METRICS.md:55:- 新增结果归档目标：`2`（`RESULTS/FE-COV-98.md`、`PATCHES/FE-COV-98.diff`）
+METRICS.md:63:- FE-COV-98 已从“单条任务描述”升级为可执行的阶段化总纲，后续可以按里程碑推进而不是按感觉补测。
+METRICS.md:64:- 本轮未执行 `frontend` 测试/coverage；当前最新已知基线仍以 2026-03-08 Round 47 记录为准，待 FE-COV-98-B 复测刷新。
+METRICS.md:874:- backend 当前已具备继续推进 98% 覆盖率的稳定前提，但真实基线仍远低于目标。
+TASKS.md:187:| FE-COV-98 | P0 | 90m | 1 | DOING | 前端全量 Vitest + 当前 coverage 配置 | 修复既有红灯、扩 `coverage.include` 到 `src/app`/`src/services` 并把四项指标拉到 `>=98%`，产出专项报告 | `cd frontend && npm run test && npm run test:coverage` | 全量前端单测通过，Statements/Branches/Functions/Lines 全部 `>=98%` |
+TASKS.md:188:| FE-COV-98-A | P0 | 20m | 1 | DONE | 提炼既有执行计划与当前 coverage 配置现状，产出 `docs/coverage-98-master-plan.md` 分阶段总纲 |
+TASKS.md:189:| FE-COV-98-B | P0 | 25m | 1 | TODO | 锁定最新 `frontend` 全量 test / coverage 基线，输出低覆盖热点清单与阶段优先级 |
+TASKS.md:190:| FE-COV-98-C | P0 | 45m | 1 | TODO | 修复当前前端失败测试与 coverage 下慢测不稳定项，恢复全量单测稳定绿灯 |
+TASKS.md:191:| FE-COV-98-D | P0 | 35m | 1 | TODO | 扩大 `frontend/vitest.config.ts` 的 `coverage.include` 到 `src/app`/`src/services`/`src/lib`/`src/components` 并收紧 threshold |
+TASKS.md:192:| FE-COV-98-E | P0 | 60m | 1 | TODO | 按热点顺序补 `services/lib/app/components` 测试并清理 branches/functions 长尾缺口 |
+TASKS.md:193:| FE-COV-98-F | P0 | 20m | 1 | TODO | 完成最终 `test + coverage` 验证，输出专项报告并更新结果台账 |
+TASKS.md:194:| FE-COV-98-CI | P0 | 20m | 1 | DONE | 现有 `test-and-acceptance.yml`、`frontend/vitest.config.ts`、2026-03-12 coverage 基线实测结果 | `docs/coverage-98-ci-plan.md` + 文档导航 + checkpoint 产物 | `cd frontend && npm run test:coverage`；`git diff --check -- docs/coverage-98-ci-plan.md docs/README.md PLAN.md TASKS.md logs/task-FE-COV-98-DOC.md RESULTS/FE-COV-98-DOC.md` | CI 门禁方案已落盘，后续可按该方案推进稳定性治理和 98% 硬门禁切换 |
+TASKS.md:200:| BE-COV-98 | P0 | 120m | 1 | DOING | 后端覆盖率推进到 98%，第一阶段先完成测试门禁稳定化、全量基线盘点与专项报告，第二阶段进入 controller/service 分批补测 |
+docs/reviews/2026-03-21-gstack-comprehensive-review.md:170:vitest.config.ts coverage.include:
+docs/reviews/2026-03-21-gstack-comprehensive-review.md:176:coverage.thresholds:
+docs/reviews/2026-03-21-gstack-comprehensive-review.md:183:**这意味着**：当前 CI coverage 门禁形同虚设——所有页面级业务代码（`/dashboard/*`）都不在统计范围内，而 `FE-COV-98` 计划目标已确认后续需扩围，但执行停留在 plan 阶段。
+docs/reviews/2026-03-21-gstack-comprehensive-review.md:282:| Vitest coverage 扩围至 `src/app`，thresholds 提升到 50% | 3 人天 | 按 FE-COV-98 master plan 第二阶段执行 |
+docs/reviews/2026-03-21-gstack-comprehensive-review.md:306:| 前端 coverage 门禁形同虚设（thresholds 15%，排除 src/app） | 10+ 轮 | High | 3 人天 |
+exec
+/bin/zsh -lc "nl -ba backend/src/app.js | sed -n '1,220p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: 所有路由模块、中间件
+     3	 * Output: Express 应用实例
+     4	 * Pos: 应用入口，初始化 Express 服务器
+     5	 *
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	const express = require('express');
+    10	const cors = require('cors');
+    11	const compression = require('compression');
+    12	const config = require('./config');
+    13	const routes = require('./routes');
+    14	const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
+    15	const { requestLogger } = require('./middleware/logger');
+    16	const { gentleRateLimit } = require('./middleware/rateLimit');
+    17	const { startInventoryAlertJob } = require('./jobs/inventoryAlertJob');
+    18	
+    19	const app = express();
+    20	
+exec
+/bin/zsh -lc "nl -ba backend/src/app.test.js | sed -n '1,180p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: Express app
+     3	 * Output: 应用入口基础可用性测试
+     4	 * Pos: 后端入口测试
+     5	 */
+     6	
+     7	const test = require('node:test');
+     8	const assert = require('node:assert/strict');
+     9	const Module = require('node:module');
+    10	const express = require('express');
+    11	
+    12	const loadApp = () => {
+    13	  const originalLoad = Module._load;
+    14	  const appPath = require.resolve('./app');
+    15	
+    16	  const noopMiddleware = (req, res, next) => next();
+    17	  const notFoundHandler = (req, res, next) => next();
+    18	  const errorHandler = (err, req, res, next) => next(err);
+    19	
+    20	  Module._load = function patchedLoad(request, parent, isMain) {
+exec
+/bin/zsh -lc "rg -n \"opsTaskReminderJob|processDueTaskReminders|task reminder|ops_execution_tasks\" backend/src -g '"'!**/node_modules/**'"'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+backend/src/app.test.js:51:      if (request === './jobs/opsTaskReminderJob') {
+exec
+/bin/zsh -lc "nl -ba backend/src/routes/system.js | sed -n '118,150p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+   118	// GET /api/v1/system/import/records - 获取导入记录（仅管理员）
+   119	router.get('/import/records', roleAuth('ADMIN'), withPaginationValidation, systemController.getImportRecords);
+   120	
+   121	// GET /api/v1/system/export/:type - 导出数据（需要管理员或业务主管权限，操作记入审计日志）
+   122	router.get('/export/:type', roleAuth('ADMIN', 'FINANCE', 'PURCHASE', 'SALES', 'WAREHOUSE'), withAuditLog(
+   123	  {
+   124	    entity: 'DataExport',
+   125	    action: 'EXPORT',
+   126	    captureBefore: false,
+   127	    captureAfter: false,
+   128	    getNewValue: ({ req }) => ({
+   129	      type: req.params.type,
+   130	      format: 'csv',
+   131	      query: req.query,
+   132	    }),
+   133	  },
+   134	  systemController.exportData
+   135	));
+   136	
+   137	// GET /api/v1/system/export/:type/pdf - 导出PDF报表（需要管理员或业务主管权限，操作记入审计日志）
+exec
+/bin/zsh -lc "rg -n \"moduleName=\\\"财务\\\"|FINANCE_TABS|quickLoginProfile|DEFAULT_ADMIN_PASSWORD|thresholds:|coverage: \\{|testTimeout: 20000|R-019|移动端 Dashboard\" frontend backend docs TASKS.md RISKS.md METRICS.md -g '"'!**/node_modules/**'"'" in /Users/helena/Cursor/jiesong_system succeeded in 137ms:
+
+exec
+/bin/zsh -lc "nl -ba backend/src/services/exportService.js | sed -n '1,320p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: Prisma客户端、数据库数据
+     3	 * Output: CSV/Excel格式的导出数据
+     4	 * Pos: 数据导出服务，生成各种格式的导出文件（含销售合同三 Sheet Excel 标准出口模板）
+     5	 * 
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 */
+     8	
+     9	const ExcelJS = require('exceljs');
+    10	const prisma = require('../utils/prisma');
+    11	const { createError } = require('../middleware/errorHandler');
+    12	const { calculateTaxSummary } = require('./taxCalculationEngine');
+    13	
+    14	/**
+    15	 * 职责：导出数据
+    16	 * 思路：根据类型查询数据，转换为CSV格式
+    17	 * @param {string} type - 导出类型
+    18	 * @param {Object} query - 查询参数
+    19	 * @returns {Object} { data, filename, contentType }
+    20	 */
+exec
+/bin/zsh -lc "nl -ba backend/src/services/pdfExportService.js | sed -n '1,320p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: Sales contracts / 系统导出数据
+     3	 * Output: PDF 报表 Buffer 与文件名
+     4	 *
+     5	 * Notes:
+     6	 * - Keep dependencies small and deterministic.
+     7	 * - Logo / stamp are optional; fallback vector graphics are rendered when files missing.
+     8	 */
+     9	
+    10	const fs = require('fs');
+    11	const path = require('path');
+    12	const PDFDocument = require('pdfkit');
+    13	const prisma = require('../utils/prisma');
+    14	const { createError } = require('../middleware/errorHandler');
+    15	const { calculateTaxSummary } = require('./taxCalculationEngine');
+    16	
+    17	const DEFAULT_LOGO_PATH = path.join(__dirname, '../../assets/pdf-logo.png');
+    18	const DEFAULT_STAMP_PATH = path.join(__dirname, '../../assets/pdf-stamp.png');
+    19	const DEFAULT_PDF_MIME = 'application/pdf';
+    20	
+exec
+/bin/zsh -lc "rg -n \"exportData\\(|case 'payments'|case 'sales'|case 'purchases'|case 'inventory'|switch \\(type\\)\" backend/src/services -g '"'!**/node_modules/**'"'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+backend/src/services/exportService.js:22:  switch (type) {
+backend/src/services/exportService.js:29:    case 'purchases':
+backend/src/services/exportService.js:31:    case 'sales':
+backend/src/services/exportService.js:35:    case 'inventory':
+backend/src/services/exportService.js:37:    case 'payments':
+backend/src/services/pdfExportService.js:332:  switch (type) {
+backend/src/services/pdfExportService.js:395:    case 'purchases': {
+backend/src/services/pdfExportService.js:420:    case 'sales': {
+backend/src/services/pdfExportService.js:470:    case 'inventory': {
+backend/src/services/pdfExportService.js:494:    case 'payments': {
+exec
+/bin/zsh -lc "nl -ba backend/src/utils/secretCrypto.js | sed -n '1,260p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: crypto, 配置
+     3	 * Output: API Key 加解密与脱敏工具
+     4	 * Pos: 系统配置中敏感字段的加密存储与安全响应
+     5	 */
+     6	
+     7	const crypto = require('crypto');
+     8	const config = require('../config');
+     9	
+    10	const CIPHER_ALGORITHM = 'aes-256-gcm';
+    11	const IV_LENGTH_BYTES = 12;
+    12	
+    13	const trimToString = (value) => {
+    14	  if (typeof value === 'string') {
+    15	    return value.trim();
+    16	  }
+    17	  return '';
+    18	};
+    19	
+    20	const getEncryptionKey = () => {
+exec
+/bin/zsh -lc "rg -n \"getConfigsByDomain|getConfigs\\(|/system/configs|apiKey|kimiModel\" frontend/src backend/src -g '"'!**/node_modules/**'"'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+frontend/src/services/config.service.ts:15:  return api.get<ApiResponse<SystemConfig>, ApiResponse<SystemConfig>>('/system/configs');
+frontend/src/services/config.service.ts:38:        `/system/configs/${key}`,
+frontend/src/services/config.service.ts:59:      '/system/configs/units',
+frontend/src/services/config.service.ts:72:      '/system/configs/units',
+backend/src/services/aiService.test.js:22:  const originalKey = config.kimi.apiKey;
+backend/src/services/aiService.test.js:23:  config.kimi.apiKey = '';
+backend/src/services/aiService.test.js:27:    config.kimi.apiKey = originalKey;
+frontend/src/services/config.service.test.ts:28:    expect(api.get).toHaveBeenCalledWith('/system/configs');
+frontend/src/services/config.service.test.ts:37:    expect(api.get).toHaveBeenCalledWith('/system/configs');
+frontend/src/services/config.service.test.ts:46:    expect(api.put).toHaveBeenCalledWith('/system/configs/exchangeRate', { value: 7.2 });
+frontend/src/services/config.service.test.ts:47:    expect(api.put).toHaveBeenCalledWith('/system/configs/profitRate', { value: 1.3 });
+frontend/src/services/config.service.test.ts:48:    expect(api.get).toHaveBeenCalledWith('/system/configs');
+frontend/src/services/config.service.test.ts:75:    expect(api.put).toHaveBeenNthCalledWith(1, '/system/configs/units', { value: ['件', '箱', '卷'] });
+frontend/src/services/config.service.test.ts:76:    expect(api.put).toHaveBeenNthCalledWith(2, '/system/configs/units', { value: ['件'] });
+backend/src/services/aiService.js:92:  if (!config.kimi.apiKey || shouldForceLocalAI) return null;
+backend/src/services/aiService.js:94:    apiKey: config.kimi.apiKey,
+backend/src/services/aiService.js:215:  if (!config.kimi.apiKey) {
+backend/src/services/aiService.js:466:  if (!config.kimi.apiKey) {
+backend/src/services/aiService.js:475:        'Authorization': `Bearer ${config.kimi.apiKey}`,
+backend/src/services/aiService.js:624:  if (!config.kimi.apiKey) {
+exec
+/bin/zsh -lc "nl -ba backend/env.example | sed -n '14,24p'" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "nl -ba backend/README.md | sed -n '180,200p'" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "nl -ba docs/API文档.md | sed -n '628,642p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+    14	JWT_SECRET="your-jwt-secret-key-change-in-production"
+    15	JWT_EXPIRES_IN="7d"
+    16	
+    17	# 默认管理员密码（用于 prisma seed）
+    18	# 强烈建议设置一个高强度密码；若未设置，seed 将使用测试默认密码 123456
+    19	DEFAULT_ADMIN_PASSWORD="ChangeThis-Strong-Password"
+    20	
+    21	# 服务器配置
+    22	PORT=3000
+    23	NODE_ENV=development
+    24	
+ succeeded in 0ms:
+   180	- 函数必须有职责注释
+   181	- 单元测试使用 Node 内置 test runner（`node --test`）
+   182	
+   183	## 默认账户
+   184	
+   185	管理员用户名固定为 `admin`，密码来自环境变量 `DEFAULT_ADMIN_PASSWORD`。
+   186	
+   187	- 若未配置 `DEFAULT_ADMIN_PASSWORD`，`db:seed` 默认将管理员密码设为 `123456`（仅测试阶段使用）。
+   188	- 生产环境请务必显式配置强密码并妥善保管。
+   189	
+   190	## 技术栈
+   191	
+   192	- **运行时**: Node.js >= 18
+   193	- **框架**: Express.js 4.x
+   194	- **ORM**: Prisma 5.x
+   195	- **数据库**: Supabase PostgreSQL
+   196	- **认证**: JWT
+   197	- **密码加密**: bcryptjs
+ succeeded in 0ms:
+   628	
+   629	---
+   630	
+   631	## 默认账号
+   632	
+   633	| 用户名 | 密码 | 角色 |
+   634	|--------|------|------|
+   635	| admin | <DEFAULT_ADMIN_PASSWORD> | ADMIN |
+   636	
+   637	> 注意：密码来自环境变量 `DEFAULT_ADMIN_PASSWORD`；未配置时 seed 会生成随机临时密码
+   638	
+   639	---
+   640	
+   641	## 状态码说明
+   642	
+exec
+/bin/zsh -lc "nl -ba frontend/src/components/layout/ModuleTabHeader.tsx | sed -n '1,140p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     1	/**
+     2	 * Input: 模块Tab配置数组、当前路由
+     3	 * Output: 模块内水平Tab导航栏（点击切换子页面）
+     4	 * Pos: 通用布局组件，给各业务模块提供统一的Tab切换导航
+     5	 *
+     6	 * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+     7	 *
+     8	 * 使用方式：
+     9	 *   import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
+    10	 *   // 在页面顶部渲染：
+    11	 *   <ModuleTabHeader tabs={PROCUREMENT_TABS} />
+    12	 */
+    13	
+    14	'use client';
+    15	
+    16	import Link from 'next/link';
+    17	import { usePathname } from 'next/navigation';
+    18	import { cn } from '@/lib/utils';
+    19	
+    20	// ==================== Tab 配置常量 ====================
+exec
+/bin/zsh -lc "rg -n \"operation_logs|OperationLog|retention|保留|cleanup|purge|archive\" backend/src docs TASKS.md RISKS.md METRICS.md -g '"'!**/node_modules/**'"'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+RISKS.md:17:| R-030 | 未发货清单首版若直接新增 Prisma 模型与数据库迁移 | 拉长首批反馈周期，阻塞前端入口和聚合逻辑上线 | 首版用 `SystemConfig` JSON 保存负责人映射，先完成真实列表与分发闭环；数据库专模放到 `OPS-EXEC-03` 之后 | 回退 `opsExecution` 新增路由与前端页面，保留计划台账 |
+RISKS.md:19:| R-032 | 采购清单模板和任务提醒引擎同时落地，跨前后端与数据库改动面过大 | 单轮回归面过大，难以快速验证 | 按 `OPS-EXEC-01 -> OPS-EXEC-02 -> OPS-EXEC-03` 顺序推进，每轮只放行一个真实可验证切片 | 回滚到仅保留中台入口页与 roadmap 状态 |
+RISKS.md:34:| R-005 | 按钮巡检在浏览器环境触发非业务噪声（下载场景 sessionStorage、WebGL 初始化告警） | E2E 误报失败、阻塞回归 | 将已确认的环境噪声加入白名单过滤；保留业务异常（运行时 TypeError/ReferenceError）为阻断 | 回退 `button-coverage.spec.ts` 中噪声过滤策略到上一版本 |
+RISKS.md:36:| R-007 | 大页面拆分期间遗漏共享逻辑导致状态初始化/副作用行为与历史行为偏差 | 列表/详情页显示异常、交互回退 | 分离动作后执行页面级定向测试；保留 wrapper 层仅负责入口，核心逻辑不改动 | 回滚到拆分前单文件版本（`contracts/page.tsx` 等） |
+RISKS.md:40:| R-011 | 前端状态徽章替换导致文本映射与历史约定不一致 | 运营端状态语义展示与业务口径冲突 | 与后端枚举对齐并保留 override map；关键路径定向页面测试回归 | 回退到 `SemanticBadge` 原始本地映射（保留 `semantic-badge.tsx`） |
+RISKS.md:41:| R-012 | 角色授权中间件替换未同步到部分写接口 | 越权写入或部分功能误阻塞 | 在发布前逐文件核对 `post/put/delete` 路由与 `roleAuth`；保留现有 `authorize` 兼容入口 | 回退到逐路由 `authorize` + `adminOnly` 组合并补充灰度窗口 |
+RISKS.md:45:| R-016 | 多实例同时执行每日库存任务（无分布式锁） | 可能产生重复低库存通知 | 当前采用“同日+用户+商品”去重降低重复；若进入多实例部署，需引入任务锁（DB/Redis）或集中调度器 | 回退到仅保留 `GET /inventory/alerts` 查询，不自动下发通知 |
+RISKS.md:46:| R-017 | 前端构建依赖外网字体与既有页面语法健康；在网络受限或存量语法错误存在时执行 `next build` | 阻塞本轮功能的“全量 build 绿灯”验收 | 先执行定向 lint+test 验证功能正确性；并行跟进修复 `ClaudeCostCalculator.tsx` 语法错误与字体离线化策略 | 回退到不依赖构建产物的定向验证门禁（保留本轮 PDF 导出功能改动） |
+RISKS.md:52:| R-023 | 商品页当前无 `taxRate` 持久字段，若直接扩展 `Product` 模型会放大改动面 | 牵连商品 CRUD、列表、类型与库存链路，增加回归面 | 本轮将 `taxRate` 作为 HSCode 匹配辅助展示值，不持久化到 `Product`；后续若业务确认需要持久化，再单独立项 | 回退商品弹窗中的税率展示逻辑，保留仅 HSCode 回填 |
+RISKS.md:53:| R-024 | HSCode 全量原始抓取耗时较长，当前交互会话或前台进程被打断 | 原始快照不完整，影响后续统一清洗与入库 | 使用“每编码单独 JSON + manifest + chapter page 快照”的断点续跑结构；随时可通过同一命令继续抓取未完成部分 | 回退到仅保留已抓取 `records/*.json` 的阶段性快照，不删除已有原始数据 |
+RISKS.md:54:| R-025 | 站点章节搜索结果存在源站侧限制/覆盖范围差异，并非 `01`-`99` 每章都返回可抓数据 | CSV 总量可能低于“理论全量 HS 编码”，影响对完整性的预期 | 以“源站当前可返回结果”为准保存快照，并在结果文档中明确当前仅抓到 `01/02/03/04/05/69` 前缀；若后续需要更高覆盖率，再补其他来源交叉抓取 | 保留本轮 CSV 作为可复用基线，后续增量合并而非重做 |
+RISKS.md:55:| R-026 | 退税模块当前存在并行中的“auto-drafts / HSCode live import”开发，与本轮 CRUD 收口交叉触达相同文件 | 若直接混合验收，容易把未完成的自动草稿链路误判为本轮回归范围 | 本轮只以 CRUD API、`/dashboard/tax-refunds` 工作台与生产构建为验收边界；自动草稿链路单独跟踪 | 回退本轮税退 CRUD 页面与路由挂载，保留并行草稿链路继续开发 |
+RISKS.md:56:| R-027 | 前端全量 Vitest/coverage 在 CI 下运行高交互页面测试时，默认 `5s` 超时不足 | 产生假红灯，阻塞前端单测与覆盖率门禁 | 提升 `frontend/vitest.config.ts` 中 `testTimeout` 到 `20000`，保留业务代码不变并用全量 `test + coverage` 复核 | 回退 `frontend/vitest.config.ts` 的 `testTimeout` 配置 |
+RISKS.md:63:- `R-023`：继续保留监控，本轮未扩展 `Product` 持久字段。
+RISKS.md:96:- `R-027`：继续保留监控；Coverage 冲刺阶段仍需防止高交互页面在插桩下重新出现超时假红。
+RISKS.md:102:| R-029 | backend coverage 冲刺直接从高耦合模块开始（AI/导入/文档） | 工时高、提分慢，可能把专项推进拖成重构工程 | 先冻结第一阶段真实基线，第二阶段优先补 controller 薄层与高 ROI service 测试 | 回退新增补测与最小可测性重构，保留第一阶段报告与基线 |
+METRICS.md:13:- 保守保留的本地代理路径：`3`（`frontend/Dockerfile`、`deploy.sh`、`next.config.ts`）
+METRICS.md:472:- 当前未在本次操作内执行自动化回归（按你本次要求保留变更并进入下一步验证环节）。
+TASKS.md:118:| SYS-09 | P0 | 30m | 1 | DONE | 融合“基础设置”和“系统管理”：侧边栏整合为单一系统管理模块并保留原路由可访问性（含权限与回归测试） |
+TASKS.md:119:| SYS-10 | P0 | 35m | 1 | DONE | 按“功能归位”拆分系统管理：移除独立系统管理一级菜单，运维入口并入设置页并保留旧路由兼容跳转 |
+exec
+/bin/zsh -lc "rg -n \"Drawer|Sheet|hamburger|Menu|mobile nav|移动端导航|Sidebar\" frontend/src/components/layout frontend/src/app/dashboard -g '"'!**/node_modules/**'"'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+frontend/src/components/layout/Sidebar.tsx:96:export function Sidebar() {
+frontend/src/components/layout/Header.tsx:17:  DropdownMenu,
+frontend/src/components/layout/Header.tsx:18:  DropdownMenuContent,
+frontend/src/components/layout/Header.tsx:19:  DropdownMenuItem,
+frontend/src/components/layout/Header.tsx:20:  DropdownMenuLabel,
+frontend/src/components/layout/Header.tsx:21:  DropdownMenuSeparator,
+frontend/src/components/layout/Header.tsx:22:  DropdownMenuTrigger,
+frontend/src/components/layout/Header.tsx:338:        <DropdownMenu>
+frontend/src/components/layout/Header.tsx:339:          <DropdownMenuTrigger asChild>
+frontend/src/components/layout/Header.tsx:344:          </DropdownMenuTrigger>
+frontend/src/components/layout/Header.tsx:345:          <DropdownMenuContent align="end" className="w-80">
+frontend/src/components/layout/Header.tsx:346:            <DropdownMenuLabel>消息通知</DropdownMenuLabel>
+frontend/src/components/layout/Header.tsx:347:            <DropdownMenuSeparator />
+frontend/src/components/layout/Header.tsx:351:          </DropdownMenuContent>
+frontend/src/components/layout/Header.tsx:352:        </DropdownMenu>
+frontend/src/components/layout/Header.tsx:354:        {/* User Menu */}
+frontend/src/components/layout/Header.tsx:355:        <DropdownMenu>
+frontend/src/components/layout/Header.tsx:356:          <DropdownMenuTrigger asChild>
+frontend/src/components/layout/Header.tsx:368:          </DropdownMenuTrigger>
+frontend/src/components/layout/Header.tsx:369:          <DropdownMenuContent align="end">
+exec
+/bin/zsh -lc "nl -ba frontend/src/components/layout/Header.tsx | sed -n '320,390p'" in /Users/helena/Cursor/jiesong_systemexec
+/bin/zsh -lc "nl -ba frontend/src/app/dashboard/layout.tsx | sed -n '88,130p'" in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+    88	    }
+    89	  }, [hydrated, isAuthenticated, router]);
+    90	
+    91	  if (!hydrated) {
+    92	    return null; // Prevent hydration mismatch
+    93	  }
+    94	
+    95	  return (
+    96	    <div className="grid min-h-screen w-full bg-muted/40 md:grid-cols-[260px_1fr]">
+    97	      <div className="hidden border-r bg-sidebar md:block">
+    98	        <Sidebar />
+    99	      </div>
+   100	      <div className="flex flex-col">
+   101	        <Header />
+   102	        <main className="flex flex-1 flex-col gap-6 px-4 py-5 md:px-6 lg:px-8">
+   103	          {children}
+   104	        </main>
+   105	      </div>
+   106	    </div>
+   107	  );
+ succeeded in 0ms:
+   320	                      </Badge>
+   321	                    </button>
+   322	                  ))}
+   323	                </div>
+   324	              ) : (
+   325	                <div className="py-4 text-center text-muted-foreground text-sm">
+   326	                  未找到相关结果
+   327	                </div>
+   328	              )}
+   329	            </div>
+   330	          )}
+   331	        </div>
+   332	      </div>
+   333	      
+   334	      <div className="flex items-center gap-2">
+   335	        <ThemeToggle />
+   336	
+   337	        {/* Notifications */}
+   338	        <DropdownMenu>
+   339	          <DropdownMenuTrigger asChild>
+exec
+/bin/zsh -lc 'wc -l frontend/src/app/dashboard/settings/components/SettingsPageContent.tsx frontend/src/app/dashboard/finance/page.tsx' in /Users/helena/Cursor/jiesong_system succeeded in 0ms:
+     608 frontend/src/app/dashboard/settings/components/SettingsPageContent.tsx
+     396 frontend/src/app/dashboard/finance/page.tsx
+    1004 total
+codex
+**执行摘要**
+按 `plan-ceo-review` 的 `HOLD SCOPE` 模式做了静态复审，比较基线以 [docs/reviews/2026-03-21-gstack-comprehensive-review.md](/Users/helena/Cursor/jiesong_system/docs/reviews/2026-03-21-gstack-comprehensive-review.md) 为主，辅以前一轮汇总 [docs/reviews/2026-03-20-ceo-eng-design-review-summary.md](/Users/helena/Cursor/jiesong_system/docs/reviews/2026-03-20-ceo-eng-design-review-summary.md)。结论：上一轮提到的几项问题已收敛，例如认证缓存、通知已读 owner 校验、财务页失败态已落地；但本轮暴露出更严重的“代码真相”和“治理台账”脱节，尤其是 `OPS-EXEC-03`。这会直接削弱你们对项目完成度、发布边界和风险判断的可信度。以下仅基于仓库静态证据，未运行测试。
+
+**Top 10 修改建议**
+1. `OPS-EXEC-03` 台账与代码失真。证据：[TASKS.md:31](/Users/helena/Cursor/jiesong_system/TASKS.md#L31)、[PLAN.md:41](/Users/helena/Cursor/jiesong_system/PLAN.md#L41)、[METRICS.md:47](/Users/helena/Cursor/jiesong_system/METRICS.md#L47) 仍宣称任务提醒引擎已完成，但当前 [backend/src/routes/opsExecution.js:18](/Users/helena/Cursor/jiesong_system/backend/src/routes/opsExecution.js#L18) 和 [backend/src/controllers/opsExecutionController.js:12](/Users/helena/Cursor/jiesong_system/backend/src/controllers/opsExecutionController.js#L12) 只剩未发货/采购清单能力，且 reminder job/service 已从工作树删除。影响：路线图、验收口径、对外承诺全部失真。改法：本周内二选一，恢复 reminder API/job/test，或正式回退并把 `OPS-EXEC-03` 改回 `TODO/DOING`。优先级：`P0`。工作量：`0.5-1d`。验证：代码、`PLAN/TASKS/RISKS/METRICS`、review 文档四处表述一致。
+2. 默认管理员弱口令仍可落地。证据：[backend/prisma/seed.js:18](/Users/helena/Cursor/jiesong_system/backend/prisma/seed.js#L18)、[backend/README.md:185](/Users/helena/Cursor/jiesong_system/backend/README.md#L185)、[backend/env.example:17](/Users/helena/Cursor/jiesong_system/backend/env.example#L17)。影响：一旦漏配环境变量，系统会以 `123456` 初始化管理员。改法：`seed` 默认 fail-closed；只允许显式 `ALLOW_INSECURE_DEV_SEED=true` 的非生产测试模式。优先级：`P0`。工作量：`0.5d`。验证：未配置 `DEFAULT_ADMIN_PASSWORD` 时生产/常规开发 seed 直接失败，测试模式需显式开关。
+3. 快捷登录把明文密码写入 `localStorage`。证据：[frontend/src/app/(auth)/login/page.tsx:40](/Users/helena/Cursor/jiesong_system/frontend/src/app/(auth)/login/page.tsx#L40)、[frontend/src/app/(auth)/login/page.tsx:61](/Users/helena/Cursor/jiesong_system/frontend/src/app/(auth)/login/page.tsx#L61)、[frontend/src/app/(auth)/login/page.tsx:101](/Users/helena/Cursor/jiesong_system/frontend/src/app/(auth)/login/page.tsx#L101)。影响：XSS、共享设备、浏览器扩展都可直接拿到凭证。改法：取消密码本地存储，只保留用户名提示，或改为服务端受控 remember-device token。优先级：`P0`。工作量：`1-2d`。验证：代码库中不再出现登录密码落地到 `localStorage/sessionStorage` 的路径，登录回归测试更新。
+4. 导出权限仍是“全角色通吃”，没有按导出类型收口。证据：[backend/src/routes/system.js:121](/Users/helena/Cursor/jiesong_system/backend/src/routes/system.js#L121)、[backend/src/services/exportService.js:21](/Users/helena/Cursor/jiesong_system/backend/src/services/exportService.js#L21)、[backend/src/services/exportService.js:271](/Users/helena/Cursor/jiesong_system/backend/src/services/exportService.js#L271)。影响：`SALES/WAREHOUSE` 等角色可触达 `payments`、`purchases` 等高敏导出。改法：建立 `export type -> allowed roles -> field scope` 权限矩阵。优先级：`P0`。工作量：`1-1.5d`。验证：RBAC 测试覆盖“允许/拒绝”两侧，导出审计日志保留类型与发起角色。
+5. 移动端 Dashboard 仍无全局导航入口。证据：[frontend/src/app/dashboard/layout.tsx:96](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/layout.tsx#L96)、[frontend/src/components/layout/Header.tsx:334](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/Header.tsx#L334)、[TASKS.md:172](/Users/helena/Cursor/jiesong_system/TASKS.md#L172)、[RISKS.md:48](/Users/helena/Cursor/jiesong_system/RISKS.md#L48)。影响：`md` 以下侧边栏隐藏后，用户无法切主模块。改法：在 Header 增加 `Sheet/Drawer` 级导航并补移动端 E2E。优先级：`P0`。工作量：`1-1.5d`。验证：移动视口下能进入任一主模块，Playwright 移动冒烟通过。
+6. 配置中心重构只做了后端半套，前端仍走扁平 `/system/configs`。证据：[backend/src/routes/system.js:20](/Users/helena/Cursor/jiesong_system/backend/src/routes/system.js#L20)、[frontend/src/services/config.service.ts:14](/Users/helena/Cursor/jiesong_system/frontend/src/services/config.service.ts#L14)、[backend/src/utils/secretCrypto.js:121](/Users/helena/Cursor/jiesong_system/backend/src/utils/secretCrypto.js#L121)。影响：分域设计没有真正进入产品面，且所有已登录用户都还能读取扁平配置集合。改法：设置页改接 `/configs/domains`，同时评估是否下线或限权旧 `/configs`。优先级：`P1`。工作量：`1-2d`。验证：前端不再依赖扁平配置接口；管理员与普通角色读取面清晰分离。
+7. `SystemConfig` 仍被当作经营执行数据表。证据：[backend/src/controllers/opsExecutionController.js:12](/Users/helena/Cursor/jiesong_system/backend/src/controllers/opsExecutionController.js#L12)、[backend/src/controllers/opsExecutionController.js:73](/Users/helena/Cursor/jiesong_system/backend/src/controllers/opsExecutionController.js#L73)、[backend/src/controllers/opsExecutionController.js:271](/Users/helena/Cursor/jiesong_system/backend/src/controllers/opsExecutionController.js#L271)。影响：负责人映射、采购模板继续堆在 JSON KV 中，缺结构约束、版本、并发语义和查询能力。改法：为 assignment/template 建专表，保留一次迁移脚本。优先级：`P1`。工作量：`2-3d`。验证：Prisma migration、读写 API、回归测试和旧数据迁移脚本齐备。
+8. 财务驾驶舱仍是“快照页”，不是“决策页”。证据：[frontend/src/app/dashboard/finance/page.tsx:42](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/finance/page.tsx#L42)、[frontend/src/app/dashboard/finance/page.tsx:67](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/finance/page.tsx#L67)、[frontend/src/app/dashboard/finance/page.tsx:201](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/finance/page.tsx#L201)。影响：只有总额/完成率，没有趋势、账龄、逾期、统一币种视角，管理层仍要回表格里看。改法：补 30/90 天趋势、逾期账龄、统一基准币种和异常归因。优先级：`P1`。工作量：`1.5-2d`。验证：财务首页可直接回答“最近趋势怎样、哪块最危险、先催谁/先付谁”。
+9. 前端 coverage 门禁依然是纸面目标。证据：[frontend/vitest.config.ts:20](/Users/helena/Cursor/jiesong_system/frontend/vitest.config.ts#L20)、[frontend/vitest.config.ts:43](/Users/helena/Cursor/jiesong_system/frontend/vitest.config.ts#L43)、[TASKS.md:187](/Users/helena/Cursor/jiesong_system/TASKS.md#L187)。影响：`src/app` 仍未纳入统计，阈值仍是 `15/15/25/20`，CI 不能真实约束页面逻辑质量。改法：执行 `FE-COV-98-B` 到 `F`，先扩口径再提阈值。优先级：`P1`。工作量：`2-4d`。验证：coverage 覆盖 `app/services/components/lib`，且阈值低于目标时 CI 真正红灯。
+10. 文档可信度需要单独治理。证据：[docs/API文档.md:633](/Users/helena/Cursor/jiesong_system/docs/API文档.md#L633)、[backend/README.md:185](/Users/helena/Cursor/jiesong_system/backend/README.md#L185)、[backend/prisma/seed.js:18](/Users/helena/Cursor/jiesong_system/backend/prisma/seed.js#L18)。影响：同一个“默认管理员密码”话题，文档里同时存在“来自 env”“随机临时密码”“固定 123456”三种说法；再叠加 `OPS-EXEC-03` 漂移，说明治理台账已不可靠。改法：加一个“发布前静态一致性检查”，至少校验能力清单、安全默认值、任务状态三类文档。优先级：`P1`。工作量：`0.5-1d`。验证：`README/API/PLAN/TASKS/METRICS/RISKS` 对关键能力与默认值只有一个真相。
+
+**与上一轮相比的新发现**
+- 最大的新发现不是新 bug，而是“能力回退但台账未回退”。上一轮还默认 `OPS-EXEC-03` 已完成；这轮静态证据显示该能力在当前工作树里已经不成立。
+- 新增了“治理文本互相矛盾”的问题。上一轮主要是安全实现有缺口；这轮连安全文档本身都开始互相打架，说明流程控制也出了问题。
+- `SystemConfig` 分域这件事从“未做”变成了“做了一半”。后端有了 `/configs/domains`，但前端主路径还没接，属于半落地状态。
+- 当前 `main` 工作树处于大面积未提交修改状态，且包含删除文件与台账更新并存。这意味着本轮之后，应该把“review on dirty main”视为一个流程风险，而不只是工程现象。
+tokens used
+190,338
+**执行摘要**
+按 `plan-ceo-review` 的 `HOLD SCOPE` 模式做了静态复审，比较基线以 [docs/reviews/2026-03-21-gstack-comprehensive-review.md](/Users/helena/Cursor/jiesong_system/docs/reviews/2026-03-21-gstack-comprehensive-review.md) 为主，辅以前一轮汇总 [docs/reviews/2026-03-20-ceo-eng-design-review-summary.md](/Users/helena/Cursor/jiesong_system/docs/reviews/2026-03-20-ceo-eng-design-review-summary.md)。结论：上一轮提到的几项问题已收敛，例如认证缓存、通知已读 owner 校验、财务页失败态已落地；但本轮暴露出更严重的“代码真相”和“治理台账”脱节，尤其是 `OPS-EXEC-03`。这会直接削弱你们对项目完成度、发布边界和风险判断的可信度。以下仅基于仓库静态证据，未运行测试。
+
+**Top 10 修改建议**
+1. `OPS-EXEC-03` 台账与代码失真。证据：[TASKS.md:31](/Users/helena/Cursor/jiesong_system/TASKS.md#L31)、[PLAN.md:41](/Users/helena/Cursor/jiesong_system/PLAN.md#L41)、[METRICS.md:47](/Users/helena/Cursor/jiesong_system/METRICS.md#L47) 仍宣称任务提醒引擎已完成，但当前 [backend/src/routes/opsExecution.js:18](/Users/helena/Cursor/jiesong_system/backend/src/routes/opsExecution.js#L18) 和 [backend/src/controllers/opsExecutionController.js:12](/Users/helena/Cursor/jiesong_system/backend/src/controllers/opsExecutionController.js#L12) 只剩未发货/采购清单能力，且 reminder job/service 已从工作树删除。影响：路线图、验收口径、对外承诺全部失真。改法：本周内二选一，恢复 reminder API/job/test，或正式回退并把 `OPS-EXEC-03` 改回 `TODO/DOING`。优先级：`P0`。工作量：`0.5-1d`。验证：代码、`PLAN/TASKS/RISKS/METRICS`、review 文档四处表述一致。
+2. 默认管理员弱口令仍可落地。证据：[backend/prisma/seed.js:18](/Users/helena/Cursor/jiesong_system/backend/prisma/seed.js#L18)、[backend/README.md:185](/Users/helena/Cursor/jiesong_system/backend/README.md#L185)、[backend/env.example:17](/Users/helena/Cursor/jiesong_system/backend/env.example#L17)。影响：一旦漏配环境变量，系统会以 `123456` 初始化管理员。改法：`seed` 默认 fail-closed；只允许显式 `ALLOW_INSECURE_DEV_SEED=true` 的非生产测试模式。优先级：`P0`。工作量：`0.5d`。验证：未配置 `DEFAULT_ADMIN_PASSWORD` 时生产/常规开发 seed 直接失败，测试模式需显式开关。
+3. 快捷登录把明文密码写入 `localStorage`。证据：[frontend/src/app/(auth)/login/page.tsx:40](/Users/helena/Cursor/jiesong_system/frontend/src/app/(auth)/login/page.tsx#L40)、[frontend/src/app/(auth)/login/page.tsx:61](/Users/helena/Cursor/jiesong_system/frontend/src/app/(auth)/login/page.tsx#L61)、[frontend/src/app/(auth)/login/page.tsx:101](/Users/helena/Cursor/jiesong_system/frontend/src/app/(auth)/login/page.tsx#L101)。影响：XSS、共享设备、浏览器扩展都可直接拿到凭证。改法：取消密码本地存储，只保留用户名提示，或改为服务端受控 remember-device token。优先级：`P0`。工作量：`1-2d`。验证：代码库中不再出现登录密码落地到 `localStorage/sessionStorage` 的路径，登录回归测试更新。
+4. 导出权限仍是“全角色通吃”，没有按导出类型收口。证据：[backend/src/routes/system.js:121](/Users/helena/Cursor/jiesong_system/backend/src/routes/system.js#L121)、[backend/src/services/exportService.js:21](/Users/helena/Cursor/jiesong_system/backend/src/services/exportService.js#L21)、[backend/src/services/exportService.js:271](/Users/helena/Cursor/jiesong_system/backend/src/services/exportService.js#L271)。影响：`SALES/WAREHOUSE` 等角色可触达 `payments`、`purchases` 等高敏导出。改法：建立 `export type -> allowed roles -> field scope` 权限矩阵。优先级：`P0`。工作量：`1-1.5d`。验证：RBAC 测试覆盖“允许/拒绝”两侧，导出审计日志保留类型与发起角色。
+5. 移动端 Dashboard 仍无全局导航入口。证据：[frontend/src/app/dashboard/layout.tsx:96](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/layout.tsx#L96)、[frontend/src/components/layout/Header.tsx:334](/Users/helena/Cursor/jiesong_system/frontend/src/components/layout/Header.tsx#L334)、[TASKS.md:172](/Users/helena/Cursor/jiesong_system/TASKS.md#L172)、[RISKS.md:48](/Users/helena/Cursor/jiesong_system/RISKS.md#L48)。影响：`md` 以下侧边栏隐藏后，用户无法切主模块。改法：在 Header 增加 `Sheet/Drawer` 级导航并补移动端 E2E。优先级：`P0`。工作量：`1-1.5d`。验证：移动视口下能进入任一主模块，Playwright 移动冒烟通过。
+6. 配置中心重构只做了后端半套，前端仍走扁平 `/system/configs`。证据：[backend/src/routes/system.js:20](/Users/helena/Cursor/jiesong_system/backend/src/routes/system.js#L20)、[frontend/src/services/config.service.ts:14](/Users/helena/Cursor/jiesong_system/frontend/src/services/config.service.ts#L14)、[backend/src/utils/secretCrypto.js:121](/Users/helena/Cursor/jiesong_system/backend/src/utils/secretCrypto.js#L121)。影响：分域设计没有真正进入产品面，且所有已登录用户都还能读取扁平配置集合。改法：设置页改接 `/configs/domains`，同时评估是否下线或限权旧 `/configs`。优先级：`P1`。工作量：`1-2d`。验证：前端不再依赖扁平配置接口；管理员与普通角色读取面清晰分离。
+7. `SystemConfig` 仍被当作经营执行数据表。证据：[backend/src/controllers/opsExecutionController.js:12](/Users/helena/Cursor/jiesong_system/backend/src/controllers/opsExecutionController.js#L12)、[backend/src/controllers/opsExecutionController.js:73](/Users/helena/Cursor/jiesong_system/backend/src/controllers/opsExecutionController.js#L73)、[backend/src/controllers/opsExecutionController.js:271](/Users/helena/Cursor/jiesong_system/backend/src/controllers/opsExecutionController.js#L271)。影响：负责人映射、采购模板继续堆在 JSON KV 中，缺结构约束、版本、并发语义和查询能力。改法：为 assignment/template 建专表，保留一次迁移脚本。优先级：`P1`。工作量：`2-3d`。验证：Prisma migration、读写 API、回归测试和旧数据迁移脚本齐备。
+8. 财务驾驶舱仍是“快照页”，不是“决策页”。证据：[frontend/src/app/dashboard/finance/page.tsx:42](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/finance/page.tsx#L42)、[frontend/src/app/dashboard/finance/page.tsx:67](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/finance/page.tsx#L67)、[frontend/src/app/dashboard/finance/page.tsx:201](/Users/helena/Cursor/jiesong_system/frontend/src/app/dashboard/finance/page.tsx#L201)。影响：只有总额/完成率，没有趋势、账龄、逾期、统一币种视角，管理层仍要回表格里看。改法：补 30/90 天趋势、逾期账龄、统一基准币种和异常归因。优先级：`P1`。工作量：`1.5-2d`。验证：财务首页可直接回答“最近趋势怎样、哪块最危险、先催谁/先付谁”。
+9. 前端 coverage 门禁依然是纸面目标。证据：[frontend/vitest.config.ts:20](/Users/helena/Cursor/jiesong_system/frontend/vitest.config.ts#L20)、[frontend/vitest.config.ts:43](/Users/helena/Cursor/jiesong_system/frontend/vitest.config.ts#L43)、[TASKS.md:187](/Users/helena/Cursor/jiesong_system/TASKS.md#L187)。影响：`src/app` 仍未纳入统计，阈值仍是 `15/15/25/20`，CI 不能真实约束页面逻辑质量。改法：执行 `FE-COV-98-B` 到 `F`，先扩口径再提阈值。优先级：`P1`。工作量：`2-4d`。验证：coverage 覆盖 `app/services/components/lib`，且阈值低于目标时 CI 真正红灯。
+10. 文档可信度需要单独治理。证据：[docs/API文档.md:633](/Users/helena/Cursor/jiesong_system/docs/API文档.md#L633)、[backend/README.md:185](/Users/helena/Cursor/jiesong_system/backend/README.md#L185)、[backend/prisma/seed.js:18](/Users/helena/Cursor/jiesong_system/backend/prisma/seed.js#L18)。影响：同一个“默认管理员密码”话题，文档里同时存在“来自 env”“随机临时密码”“固定 123456”三种说法；再叠加 `OPS-EXEC-03` 漂移，说明治理台账已不可靠。改法：加一个“发布前静态一致性检查”，至少校验能力清单、安全默认值、任务状态三类文档。优先级：`P1`。工作量：`0.5-1d`。验证：`README/API/PLAN/TASKS/METRICS/RISKS` 对关键能力与默认值只有一个真相。
+
+**与上一轮相比的新发现**
+- 最大的新发现不是新 bug，而是“能力回退但台账未回退”。上一轮还默认 `OPS-EXEC-03` 已完成；这轮静态证据显示该能力在当前工作树里已经不成立。
+- 新增了“治理文本互相矛盾”的问题。上一轮主要是安全实现有缺口；这轮连安全文档本身都开始互相打架，说明流程控制也出了问题。
+- `SystemConfig` 分域这件事从“未做”变成了“做了一半”。后端有了 `/configs/domains`，但前端主路径还没接，属于半落地状态。
+- 当前 `main` 工作树处于大面积未提交修改状态，且包含删除文件与台账更新并存。这意味着本轮之后，应该把“review on dirty main”视为一个流程风险，而不只是工程现象。

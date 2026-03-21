@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, OPERATIONS_TABS } from '@/components/layout/ModuleTabHeader';
 import { Input } from '@/components/ui/input';
@@ -88,11 +89,12 @@ export default function InventoryPage() {
   const loadInventory = async (searchKeyword = ''): Promise<void> => {
     setLoading(true);
     try {
-      const response = await inventoryService.getAll({
-        page: 1,
-        pageSize: 100,
-        keyword: searchKeyword || undefined,
-      });
+      const cacheKey = `inventory-list-${searchKeyword}`;
+      const response = await cachedFetch(
+        cacheKey,
+        () => inventoryService.getAll({ page: 1, pageSize: 100, keyword: searchKeyword || undefined }),
+        15_000, // 库存状态变更频繁，TTL 降至 15s
+      );
       const nextInventory = response.data?.items || [];
       setInventory(nextInventory);
       setSelectedIds((prevSelectedIds) => {
@@ -162,6 +164,7 @@ export default function InventoryPage() {
   const handleStatusChange = async (id: string, newStatus: InventoryStatus): Promise<void> => {
     try {
       await inventoryService.updateStatus(id, newStatus);
+      invalidateCache('inventory-list');
       setInventory((prevInventory) =>
         prevInventory.map((item) => (item.id === id ? { ...item, status: newStatus } : item))
       );

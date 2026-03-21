@@ -1,7 +1,7 @@
 /**
  * Input: 用户状态、后端搜索API
- * Output: 顶部导航栏组件
- * Pos: 全局Header，包含搜索、通知、用户菜单
+ * Output: 顶部导航栏组件（含移动端汉堡菜单）
+ * Pos: 全局Header，包含搜索、通知、用户菜单、移动端导航入口
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -9,7 +9,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,9 +22,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { UserCircle, Bell, Search, Package, FileText, Container, Building2, Loader2, CalendarDays } from 'lucide-react';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import {
+  UserCircle, Bell, Search, Package, FileText, Container, Building2,
+  Loader2, CalendarDays, Menu, Ship, LayoutDashboard, ShoppingCart,
+  PackageOpen, Landmark, SlidersHorizontal, LogOut,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
+import { cn } from '@/lib/utils';
 import api from '@/lib/axios';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import type {
@@ -34,6 +47,41 @@ import type {
   SalesContract,
   Supplier,
 } from '@/types';
+
+// ==================== 移动端导航数据（与 Sidebar 对齐） ====================
+
+const mobileNavItems = [
+  {
+    href: '/dashboard',
+    label: '经营中台',
+    icon: LayoutDashboard,
+    childPrefixes: ['/dashboard/inventory-container'],
+  },
+  {
+    href: '/dashboard/contracts',
+    label: '采购',
+    icon: ShoppingCart,
+    childPrefixes: ['/dashboard/contracts', '/dashboard/store-recommend'],
+  },
+  {
+    href: '/dashboard/sales',
+    label: '出口',
+    icon: PackageOpen,
+    childPrefixes: ['/dashboard/sales', '/dashboard/tax-refunds', '/customs-declarations'],
+  },
+  {
+    href: '/dashboard/finance/statements',
+    label: '财务',
+    icon: Landmark,
+    childPrefixes: ['/dashboard/payments', '/dashboard/finance'],
+  },
+  {
+    href: '/dashboard/ai/sessions',
+    label: '系统管理',
+    icon: SlidersHorizontal,
+    childPrefixes: ['/dashboard/ai', '/dashboard/contracts/templates', '/dashboard/settings'],
+  },
+];
 
 interface SearchResult {
   type: 'product' | 'supplier' | 'container' | 'purchase' | 'sales';
@@ -46,11 +94,24 @@ export function Header() {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const router = useRouter();
+  const pathname = usePathname();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  /**
+   * 职责：判断移动端导航项是否激活
+   * @param item 导航项
+   */
+  const isMobileNavActive = (item: typeof mobileNavItems[number]) => {
+    if (pathname === '/dashboard') return item.href === '/dashboard';
+    return [item.href, ...item.childPrefixes].some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    );
+  };
   const searchRef = useRef<HTMLDivElement>(null);
   const todayLabel = new Intl.DateTimeFormat('zh-CN', {
     month: '2-digit',
@@ -271,6 +332,72 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-6">
+      {/* 移动端汉堡菜单：仅在 md 以下显示 */}
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden h-9 w-9 shrink-0"
+            aria-label="打开导航菜单"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="w-72 p-0">
+          <SheetHeader className="flex h-16 items-center border-b px-5 py-0">
+            <SheetTitle asChild>
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-3 font-semibold tracking-tight"
+                onClick={() => setMobileOpen(false)}
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+                  <Ship className="h-4 w-4" />
+                </span>
+                <div className="grid gap-0.5 text-left">
+                  <span>捷淞系统</span>
+                  <span className="text-xs font-normal text-muted-foreground">Import &amp; Export</span>
+                </div>
+              </Link>
+            </SheetTitle>
+          </SheetHeader>
+          <nav className="grid gap-1 px-3 py-4">
+            {mobileNavItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors',
+                  isMobileNavActive(item)
+                    ? 'bg-muted text-foreground shadow-sm ring-1 ring-border'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                )}
+              >
+                <item.icon className="h-4 w-4 shrink-0" />
+                <span>{item.label}</span>
+              </Link>
+            ))}
+          </nav>
+          {/* 底部：用户信息 + 退出 */}
+          <div className="absolute bottom-0 left-0 right-0 space-y-3 border-t p-4">
+            <div className="rounded-lg border bg-muted/50 px-3 py-2">
+              <div className="text-sm font-medium">{user?.name || '当前用户'}</div>
+              <div className="text-xs text-muted-foreground">{user?.username}</div>
+            </div>
+            <Button
+              variant="ghost"
+              className="h-11 w-full justify-start gap-3 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              onClick={() => { logout(); window.location.href = '/login'; }}
+            >
+              <LogOut className="h-4 w-4" />
+              <span>退出登录</span>
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
       <div className="flex flex-1 items-center gap-4">
         <div className="hidden items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-xs text-muted-foreground lg:flex">
           <CalendarDays className="h-3.5 w-3.5" />

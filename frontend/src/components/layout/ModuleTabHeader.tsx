@@ -13,9 +13,11 @@
 
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { saveModuleTab } from '@/lib/tab-memory';
 
 // ==================== Tab 配置常量 ====================
 
@@ -24,37 +26,46 @@ export interface TabConfig {
   label: string;
 }
 
-/** 经营中台：工作台 | 库存状态 */
+/** 经营中台：工作台 | 经营执行 | 库存状态 */
 export const OPERATIONS_TABS: TabConfig[] = [
   { href: '/dashboard', label: '工作台' },
+  { href: '/dashboard/ops-execution', label: '经营执行' },
   { href: '/dashboard/inventory-container', label: '库存状态' },
 ];
 
-/** 采购模块：采购合同 | 采购建议 */
+/** 采购模块：采购合同 | 商家管理 */
 export const PROCUREMENT_TABS: TabConfig[] = [
   { href: '/dashboard/contracts', label: '采购合同' },
-  { href: '/dashboard/store-recommend', label: '采购建议' },
+  { href: '/dashboard/suppliers', label: '商家管理' },
 ];
 
-/** 出口模块：出口合同 | 出口退税 | 报关单 */
+/** 出口模块：出口合同 | 出口退税 | 报关单 | HS 编码 */
 export const EXPORT_TABS: TabConfig[] = [
   { href: '/dashboard/sales', label: '出口合同' },
   { href: '/dashboard/tax-refunds', label: '出口退税' },
   { href: '/customs-declarations', label: '报关单' },
+  { href: '/dashboard/hs-codes', label: 'HS 编码' },
 ];
 
-/** 财务模块：经营执行 | 收付款 | 财务报表 */
+/** 财务模块：财务报表 | 收付管理 */
 export const FINANCE_TABS: TabConfig[] = [
-  { href: '/dashboard/ops-execution', label: '经营执行' },
-  { href: '/dashboard/payments', label: '收付款' },
   { href: '/dashboard/finance/statements', label: '财务报表' },
+  { href: '/dashboard/payments', label: '收付管理' },
 ];
 
-/** 系统管理：AI 管理 | 合同模板 | 基础设置 */
+/** AI 模块：AI 会话 */
+export const AI_TABS: TabConfig[] = [
+  { href: '/dashboard/ai/sessions', label: 'AI 会话' },
+];
+
+/** 系统管理：系统配置 | 用户管理 | 通知中心 | 系统日志 | 导入记录 | 合同模板 */
 export const ADMIN_TABS: TabConfig[] = [
-  { href: '/dashboard/ai/sessions', label: 'AI 管理' },
+  { href: '/dashboard/settings', label: '系统配置' },
+  { href: '/dashboard/users', label: '用户管理' },
+  { href: '/dashboard/system/notifications', label: '通知中心' },
+  { href: '/dashboard/system/logs', label: '系统日志' },
+  { href: '/dashboard/system/import-records', label: '导入记录' },
   { href: '/dashboard/contracts/templates', label: '合同模板' },
-  { href: '/dashboard/settings', label: '基础设置' },
 ];
 
 // ==================== 组件 ====================
@@ -74,6 +85,13 @@ interface ModuleTabHeaderProps {
  */
 export function ModuleTabHeader({ tabs, moduleName }: ModuleTabHeaderProps) {
   const pathname = usePathname();
+
+  // 0. 每次路径变化时，将当前 URL 存入模块记忆（以第一个 tab 的 href 为模块 key）
+  useEffect(() => {
+    if (tabs.length > 0) {
+      saveModuleTab(tabs[0].href, pathname);
+    }
+  }, [pathname, tabs]);
 
   /**
    * 职责：判断某个Tab是否激活

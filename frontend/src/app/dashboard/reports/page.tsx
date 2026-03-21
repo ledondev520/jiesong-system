@@ -100,12 +100,18 @@ export default function ReportsPage() {
           }
         }
 
-        // 门店统计
-        const storeStats: StoreStats[] = stores.map((store) => ({
-          id: store.id,
-          name: store.name,
-          itemCount: 0, // 需要额外查询
-        }));
+        // 门店统计：查询每个门店的销售合同数量
+        const storeStatsRaw: StoreStats[] = [];
+        for (const store of stores.slice(0, 20)) {
+          try {
+            const salesRes = await reportsService.getSalesByStore(store.id);
+            const total = salesRes.data?.total ?? salesRes.data?.pagination?.total ?? 0;
+            storeStatsRaw.push({ id: store.id, name: store.name, itemCount: total });
+          } catch {
+            storeStatsRaw.push({ id: store.id, name: store.name, itemCount: 0 });
+          }
+        }
+        const storeStats = storeStatsRaw.sort((a, b) => b.itemCount - a.itemCount);
 
         setData({
           supplierStats: supplierStats.filter(s => s.contractCount > 0).sort((a, b) => b.totalAmount - a.totalAmount),
@@ -236,12 +242,14 @@ export default function ReportsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>门店名称</TableHead>
+                      <TableHead className="text-right">销售合同数</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {data.storeStats.map((s) => (
                       <TableRow key={s.id}>
                         <TableCell>{s.name}</TableCell>
+                        <TableCell className="text-right">{s.itemCount}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

@@ -12,8 +12,6 @@ import OpsExecutionPage from './page';
 const mockGetUnshippedList = vi.fn();
 const mockAssignUnshippedAssignee = vi.fn();
 const mockGeneratePurchaseChecklist = vi.fn();
-const mockCreateTask = vi.fn();
-const mockGetTasks = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
 
@@ -22,8 +20,6 @@ vi.mock('@/services/opsExecution.service', () => ({
     getUnshippedList: (...args: unknown[]) => mockGetUnshippedList(...args),
     assignUnshippedAssignee: (...args: unknown[]) => mockAssignUnshippedAssignee(...args),
     generatePurchaseChecklist: (...args: unknown[]) => mockGeneratePurchaseChecklist(...args),
-    createTask: (...args: unknown[]) => mockCreateTask(...args),
-    getTasks: (...args: unknown[]) => mockGetTasks(...args),
   },
 }));
 
@@ -33,6 +29,7 @@ vi.mock('next/navigation', () => ({
     back: vi.fn(),
     replace: vi.fn(),
   }),
+  usePathname: () => '/dashboard/ops-execution',
 }));
 
 vi.mock('sonner', () => ({
@@ -109,43 +106,15 @@ const checklistResponse = {
   },
 };
 
-const tasksResponse = {
-  data: {
-    items: [
-      {
-        id: 'task-1',
-        title: '跟进 EXP001 未发货',
-        description: '',
-        assigneeName: '小周',
-        priority: 'HIGH',
-        status: 'TODO',
-        dueAt: '2026-03-16T10:00:00.000Z',
-        remindAt: '2026-03-16T08:00:00.000Z',
-        secondRemindAt: '2026-03-16T11:00:00.000Z',
-        sourceText: '提醒小周明天10点跟进EXP001未发货，高优先级',
-      },
-    ],
-    summary: {
-      totalItems: 1,
-      overdueItems: 0,
-      dueTodayItems: 0,
-      highPriorityItems: 1,
-    },
-  },
-};
-
 describe('OpsExecutionPage', () => {
   beforeEach(() => {
     mockGetUnshippedList.mockReset();
     mockAssignUnshippedAssignee.mockReset();
     mockGeneratePurchaseChecklist.mockReset();
-    mockCreateTask.mockReset();
-    mockGetTasks.mockReset();
     mockToastSuccess.mockReset();
     mockToastError.mockReset();
     mockGetUnshippedList.mockResolvedValue(baseResponse);
     mockGeneratePurchaseChecklist.mockResolvedValue(checklistResponse);
-    mockGetTasks.mockResolvedValue(tasksResponse);
   });
 
   it('渲染未发货清单', async () => {
@@ -228,23 +197,4 @@ describe('OpsExecutionPage', () => {
     });
   });
 
-  it('可以自然语言创建任务', async () => {
-    const user = userEvent.setup();
-    mockCreateTask.mockResolvedValue({
-      data: tasksResponse.data.items[0],
-    });
-
-    render(<OpsExecutionPage />);
-
-    await user.click(screen.getByRole('tab', { name: '任务提醒引擎' }));
-    await user.type(screen.getByLabelText('自然语言建任务输入框'), '提醒小周明天10点跟进EXP001未发货，高优先级');
-    await user.click(screen.getByRole('button', { name: '创建任务' }));
-
-    await waitFor(() => {
-      expect(mockCreateTask).toHaveBeenCalledWith({
-        naturalLanguageInput: '提醒小周明天10点跟进EXP001未发货，高优先级',
-      });
-      expect(screen.getByText('跟进 EXP001 未发货')).toBeInTheDocument();
-    });
-  });
 });

@@ -11,6 +11,7 @@ import SystemManagementPage from './page';
 const mockReplace = vi.fn();
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/dashboard',
   useRouter: () => ({
     replace: mockReplace,
     back: vi.fn(),
@@ -18,14 +19,21 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
+vi.mock('@/lib/api-cache', () => ({
+  cachedFetch: async (_key: string, fetcher: () => unknown) => fetcher(),
+  invalidateCache: vi.fn(),
+  clearAllCache: vi.fn(),
+}));
+
 describe('SystemManagementPage', () => {
   beforeEach(() => {
     mockReplace.mockReset();
   });
 
-  it('加载后自动跳转到设置页运维中心', () => {
+  it('渲染运维中心总览页，包含三大功能入口', () => {
     render(<SystemManagementPage />);
-    expect(screen.getByText('正在跳转到运维中心...')).toBeInTheDocument();
-    expect(mockReplace).toHaveBeenCalledWith('/dashboard/settings?tab=ops');
+    expect(screen.getAllByText('通知中心').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('系统日志').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('导入记录').length).toBeGreaterThan(0);
   });
 });
