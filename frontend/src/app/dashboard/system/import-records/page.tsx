@@ -28,6 +28,7 @@ import { getSystemImportRecords, SystemImportRecordItem } from '@/services/syste
 import { useAuthStore } from '@/store/auth.store';
 import { Role } from '@/types';
 import { toast } from 'sonner';
+import { formatDateTime } from '@/lib/date-format';
 
 type StatusFilter = 'ALL' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 
@@ -50,21 +51,6 @@ const statusBadgeVariantMap: Record<string, 'default' | 'secondary' | 'destructi
   PROCESSING: 'outline',
   COMPLETED: 'secondary',
   FAILED: 'destructive',
-};
-
-const formatDateTime = (value: string) => {
-  const time = Date.parse(value);
-  if (Number.isNaN(time)) {
-    return '-';
-  }
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(new Date(time));
 };
 
 const getErrorSummary = (errorLog?: string | null) => {

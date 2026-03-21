@@ -126,3 +126,24 @@ test('listHsCodes: 空关键字时返回分页全量列表', async () => {
     assert.equal(result.items.length, 2);
   });
 });
+
+test('listHsCodes: 纯数字关键词同时查商品名包含与 hsCode 前缀', async () => {
+  let findManyArgs = null;
+
+  await withMockDelegate('hsCode', {
+    findMany: async (args) => {
+      findManyArgs = args;
+      return [{ id: '1', hsCode: '0802909020', productName: '某水果' }];
+    },
+    count: async () => 1,
+  }, async () => {
+    await hsCodeService.listHsCodes({ keyword: '0802909020', page: 1, pageSize: 20 });
+
+    assert.deepEqual(findManyArgs.where, {
+      OR: [
+        { productName: { contains: '0802909020' } },
+        { hsCode: { startsWith: '0802909020' } },
+      ],
+    });
+  });
+});

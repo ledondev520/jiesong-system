@@ -55,13 +55,13 @@ const mobileNavItems = [
     href: '/dashboard',
     label: '经营中台',
     icon: LayoutDashboard,
-    childPrefixes: ['/dashboard/ops-execution', '/dashboard/inventory-container'],
+    childPrefixes: ['/dashboard/ops-execution'],
   },
   {
     href: '/dashboard/contracts',
     label: '采购',
     icon: ShoppingCart,
-    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers'],
+    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers', '/dashboard/inventory-container', '/dashboard/store-recommend'],
   },
   {
     href: '/dashboard/sales',
@@ -122,6 +122,7 @@ export function Header() {
   };
   const searchRef = useRef<HTMLDivElement>(null);
   const todayLabel = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
     month: '2-digit',
     day: '2-digit',
     weekday: 'short',

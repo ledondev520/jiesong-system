@@ -587,15 +587,17 @@ model ChatHistory {
 }
 
 model TokenUsage {
-  id           String   @id @default(cuid())
-  userId       String
-  sessionId    String?
-  model        String
-  promptTokens Int
-  outputTokens Int
-  totalTokens  Int
-  requestType  String
-  createdAt    DateTime @default(now())
+  id             String   @id @default(cuid())
+  userId         String
+  sessionId      String?
+  model          String
+  promptTokens   Int
+  outputTokens   Int
+  totalTokens    Int
+  requestType    String
+  /// 无会话类调用的可选输出快照（如 HS 推荐原文），便于用量页「详情」展示
+  detailSnapshot String?
+  createdAt      DateTime @default(now())
 
   @@index([userId])
   @@index([createdAt])

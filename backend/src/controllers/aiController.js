@@ -221,23 +221,28 @@ const getSessions = async (req, res, next) => {
       _sum: { totalTokens: true },
     });
 
-    // 2.1. 获取每个会话最后使用的模型（按 createdAt 倒序取最新一条）
-    const lastModels = await prisma.tokenUsage.findMany({
-      where: {
-        userId: req.user.id,
-        sessionId: { in: sessions.map(s => s.sessionId) },
-      },
-      select: { sessionId: true, model: true, createdAt: true },
-      orderBy: { createdAt: 'desc' },
-      distinct: ['sessionId'],
-    });
+    // 2.1. 每个会话「最近一次」使用的模型（按 createdAt 倒序扫描，避免 distinct 语义不确定）
+    const sessionIds = sessions.map(s => s.sessionId);
+    const modelMap = {};
+    if (sessionIds.length > 0) {
+      const tokenRows = await prisma.tokenUsage.findMany({
+        where: {
+          userId: req.user.id,
+          sessionId: { in: sessionIds },
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { sessionId: true, model: true },
+      });
+      for (const row of tokenRows) {
+        if (modelMap[row.sessionId] === undefined) {
+          modelMap[row.sessionId] = row.model;
+        }
+      }
+    }
 
     // 3. 建立映射
     const tokenMap = Object.fromEntries(
       tokensBySession.map(t => [t.sessionId, t._sum.totalTokens || 0])
-    );
-    const modelMap = Object.fromEntries(
-      lastModels.map(t => [t.sessionId, t.model])
     );
 
     // 4. 合并后返回（totalTokens 单位为 token 数，前端转 M）
@@ -248,6 +253,67 @@ const getSessions = async (req, res, next) => {
     }));
 
     success(res, enrichedSessions);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：列出未绑定聊天会话的 Token 记录（如 HS 编码推荐、辅助解析等）
+ * 思路：
+ * 1. sessionId 为 null 的 tokenUsage 不会出现在 getSessions（基于 ChatHistory）中
+ * 2. 按时间倒序返回，供「AI 用量」页展示完整消耗来源
+ * @param {import('express').Request} req - query.limit 可选，默认 50，最大 200
+ */
+const getStandaloneTokenUsage = async (req, res, next) => {
+  try {
+    const limit = Math.min(parsePositiveInt(req.query.limit, 50), 200);
+    const where = {
+      userId: req.user.id,
+      sessionId: null,
+    };
+    const selectWithSnapshot = {
+      id: true,
+      model: true,
+      promptTokens: true,
+      outputTokens: true,
+      totalTokens: true,
+      requestType: true,
+      detailSnapshot: true,
+      createdAt: true,
+    };
+    const selectBase = {
+      id: true,
+      model: true,
+      promptTokens: true,
+      outputTokens: true,
+      totalTokens: true,
+      requestType: true,
+      createdAt: true,
+    };
+    let rows;
+    try {
+      rows = await prisma.tokenUsage.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        select: selectWithSnapshot,
+      });
+    } catch (err) {
+      // 1.1. 未执行 prisma migrate/db push 时无 detailSnapshot 列，降级查询避免 500
+      if (aiService.isMissingDetailSnapshotColumnError(err)) {
+        rows = await prisma.tokenUsage.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+          select: selectBase,
+        });
+        rows = rows.map((r) => ({ ...r, detailSnapshot: null }));
+      } else {
+        throw err;
+      }
+    }
+    success(res, rows);
   } catch (error) {
     next(error);
   }
@@ -398,6 +464,7 @@ module.exports = {
   parseInput,
   getChatHistory,
   getSessions,
+  getStandaloneTokenUsage,
   deleteSession,
   updateConfig,
   getTokenStats,

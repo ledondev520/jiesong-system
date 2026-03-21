@@ -29,22 +29,9 @@ import {
   SystemNotificationItem,
 } from '@/services/system.service';
 import { toast } from 'sonner';
+import { formatDateTime } from '@/lib/date-format';
 
 type NotificationFilter = 'all' | 'unread';
-
-const formatDateTime = (value: string) => {
-  const time = Date.parse(value);
-  if (Number.isNaN(time)) {
-    return '-';
-  }
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(time));
-};
 
 const typeLabelMap: Record<string, string> = {
   SYSTEM: '系统',

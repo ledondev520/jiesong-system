@@ -53,15 +53,18 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const [hydrated, setHydrated] = useState(() => useAuthStore.persist?.hasHydrated?.() ?? true);
+  // 0. 始终从 false 开始，确保服务端不渲染 Radix UI 组件（避免 SSR/CSR ID 不一致）
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    // 0. 初始化 hydration 状态，确保首屏结构稳定
+    // 1. 客户端挂载后检查 Zustand persist 状态
     const persistApi = useAuthStore.persist;
     if (!persistApi || persistApi.hasHydrated()) {
+      // 1.1 已完成或无 persist API，直接设置 hydrated
+      setHydrated(true);
       return;
     }
-    // 1. 若尚未完成，监听完成事件后更新
+    // 1.2 等待 Zustand persist hydration 完成
     const unsubscribe = persistApi.onFinishHydration(() => {
       setHydrated(true);
     });

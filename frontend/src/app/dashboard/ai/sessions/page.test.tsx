@@ -10,6 +10,7 @@ import userEvent from '@testing-library/user-event';
 import AiSessionsPage from './page';
 
 const mockGetSessions = vi.fn();
+const mockGetStandaloneTokenUsage = vi.fn();
 const mockDeleteSession = vi.fn();
 const mockToastError = vi.fn();
 
@@ -21,6 +22,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/services/ai.service', () => ({
   aiService: {
     getSessions: (...args: unknown[]) => mockGetSessions(...args),
+    getStandaloneTokenUsage: (...args: unknown[]) => mockGetStandaloneTokenUsage(...args),
     deleteSession: (...args: unknown[]) => mockDeleteSession(...args),
   },
 }));
@@ -41,6 +43,8 @@ vi.mock('@/lib/api-cache', () => ({
 describe('AiSessionsPage', () => {
   beforeEach(() => {
     mockGetSessions.mockReset();
+    mockGetStandaloneTokenUsage.mockReset();
+    mockGetStandaloneTokenUsage.mockResolvedValue({ data: [] });
     mockDeleteSession.mockReset();
     mockToastError.mockReset();
     vi.spyOn(window, 'confirm').mockReturnValue(true);

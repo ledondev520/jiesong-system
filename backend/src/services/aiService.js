@@ -46,6 +46,35 @@ const safeToNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+/** 职责：解析 systemConfig.value（JSON 字符串或原始值）为 JS 值 */
+const parseStoredConfigValue = (raw) => {
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+};
+
+const clampNumber = (n, min, max) => Math.min(max, Math.max(min, n));
+
+/** 职责：从配置读取 AI 温度，默认 0.6，限制在 0–1 */
+const parseAiTemperature = (raw) => {
+  const v = parseStoredConfigValue(raw);
+  const n = typeof v === 'number' ? v : Number(v);
+  if (!Number.isFinite(n)) return 0.6;
+  return clampNumber(n, 0, 1);
+};
+
+/** 职责：从配置读取 max_tokens，默认 4096，按 256 对齐并限制 256–8192 */
+const parseAiMaxTokens = (raw) => {
+  const v = parseStoredConfigValue(raw);
+  const n = typeof v === 'number' ? v : Number.parseInt(String(v ?? ''), 10);
+  if (!Number.isFinite(n)) return 4096;
+  const stepped = Math.round(n / 256) * 256;
+  return clampNumber(stepped, 256, 8192);
+};
+
 const extractErrorMessage = (error) => {
   if (!error) {
     return '抱歉，AI服务出错了。';
@@ -163,6 +192,8 @@ const runThinkingChat = async ({ message, model, messages, onChunk, onThinking }
     const tokenEstimate = await estimateTokens(messages, model);
     tokenUsage.promptTokens = safeToNumber(tokenEstimate.data?.total_tokens);
 
+    const { maxTokens: configuredMaxTokens } = await getConfiguredModels();
+
     const streamResult = await collectStreamedChat({
       client,
       model,
@@ -170,6 +201,7 @@ const runThinkingChat = async ({ message, model, messages, onChunk, onThinking }
       onChunk,
       onThinking,
       isThinkingModel: true,
+      maxTokens: configuredMaxTokens,
     });
 
     tokenUsage.outputTokens = Math.ceil((streamResult.fullContent.length + streamResult.thinkingContent.length) / 2);
@@ -277,7 +309,7 @@ const resolveChatResult = async ({ userId, sessionId, message, imageUrl, useThin
 };
 
 /**
- * 职责：从 systemConfig 读取 AI 模型优先级配置，带 30 秒内存缓存
+ * 职责：从 systemConfig 读取 AI 模型优先级与采样参数配置，带 30 秒内存缓存
  */
 let _modelConfigCache = null;
 let _modelConfigCacheAt = 0;
@@ -286,14 +318,18 @@ const getConfiguredModels = async () => {
   if (_modelConfigCache && now - _modelConfigCacheAt < 30_000) return _modelConfigCache;
 
   const rows = await prisma.systemConfig.findMany({
-    where: { key: { in: ['aiPrimaryModel', 'aiFallbackModel'] } },
+    where: { key: { in: ['aiPrimaryModel', 'aiFallbackModel', 'aiTemperature', 'aiMaxTokens'] } },
     select: { key: true, value: true },
   });
 
   const map = Object.fromEntries(rows.map(r => [r.key, r.value]));
+  const primaryParsed = parseStoredConfigValue(map.aiPrimaryModel);
+  const fallbackParsed = parseStoredConfigValue(map.aiFallbackModel);
   _modelConfigCache = {
-    defaultModel: map.aiPrimaryModel || MODELS.default,
-    thinkingModel: map.aiFallbackModel || MODELS.thinking,
+    defaultModel: (typeof primaryParsed === 'string' && primaryParsed) ? primaryParsed : MODELS.default,
+    thinkingModel: (typeof fallbackParsed === 'string' && fallbackParsed) ? fallbackParsed : MODELS.thinking,
+    temperature: parseAiTemperature(map.aiTemperature),
+    maxTokens: parseAiMaxTokens(map.aiMaxTokens),
   };
   _modelConfigCacheAt = now;
   return _modelConfigCache;
@@ -411,19 +447,47 @@ const chatStream = async (userId, sessionId, message, imageUrl = null, onChunk, 
 
 /**
  * 职责：记录Token消耗
+ * @param {string|null|undefined} [detailSnapshot] - 可选输出快照（如 HS 推荐 AI 原文），供用量详情展示
  */
-const recordTokenUsage = async (userId, sessionId, model, tokenUsage, requestType) => {
-  await prisma.tokenUsage.create({
-    data: {
-      userId,
-      sessionId,
-      model,
-      promptTokens: tokenUsage.promptTokens,
-      outputTokens: tokenUsage.outputTokens,
-      totalTokens: tokenUsage.promptTokens + tokenUsage.outputTokens,
-      requestType,
-    },
-  });
+const isMissingDetailSnapshotColumnError = (err) => {
+  const m = String(err?.message || '');
+  return (
+    err?.code === 'P2022' ||
+    m.includes('detailSnapshot') ||
+    m.includes('detail_snapshot') ||
+    (m.includes('no such column') && m.includes('detail'))
+  );
+};
+
+const recordTokenUsage = async (userId, sessionId, model, tokenUsage, requestType, detailSnapshot) => {
+  const snap =
+    typeof detailSnapshot === 'string' && detailSnapshot.length > 0
+      ? detailSnapshot.slice(0, 48000)
+      : undefined;
+  const baseData = {
+    userId,
+    sessionId,
+    model,
+    promptTokens: tokenUsage.promptTokens,
+    outputTokens: tokenUsage.outputTokens,
+    totalTokens: tokenUsage.promptTokens + tokenUsage.outputTokens,
+    requestType,
+  };
+  try {
+    await prisma.tokenUsage.create({
+      data: {
+        ...baseData,
+        ...(snap ? { detailSnapshot: snap } : {}),
+      },
+    });
+  } catch (err) {
+    // 1.1. 库未迁移出 detailSnapshot 列时降级写入，避免整条记录失败
+    if (snap && isMissingDetailSnapshotColumnError(err)) {
+      await prisma.tokenUsage.create({ data: baseData });
+      return;
+    }
+    throw err;
+  }
 };
 
 /**
@@ -437,23 +501,29 @@ const recordTokenUsage = async (userId, sessionId, model, tokenUsage, requestTyp
  * 3. 调用token统计接口获取消耗量
  * @param {Array} messages - 消息列表
  * @param {string} model - 模型名称
- * @returns {Object} { content, tokenUsage }
+ * @returns {Object} { content, model, tokenUsage }
  */
 const callKimiAPI = async (messages, model = MODELS.default) => {
   const client = getOpenAIClient();
   if (!client) {
     return {
       content: '抱歉，AI服务未配置API Key。',
+      model,
       tokenUsage: { promptTokens: 0, outputTokens: 0 },
     };
   }
-  
+
+  const { temperature: configuredTemperature } = await getConfiguredModels();
+  const temperature = typeof configuredTemperature === 'number' && Number.isFinite(configuredTemperature)
+    ? configuredTemperature
+    : 0.6;
+
   try {
     // 1. 使用流式调用
     const stream = await client.chat.completions.create({
       model,
       messages,
-      temperature: 0.6,
+      temperature,
       stream: true,
     });
     
@@ -468,6 +538,7 @@ const callKimiAPI = async (messages, model = MODELS.default) => {
     
     return {
       content: fullContent || '抱歉，我暂时无法回答这个问题。',
+      model,
       tokenUsage: {
         promptTokens,
         outputTokens,
@@ -477,6 +548,7 @@ const callKimiAPI = async (messages, model = MODELS.default) => {
     console.error('Kimi API调用失败:', error.message);
     return {
       content: '抱歉，AI服务暂时不可用，请稍后再试。',
+      model,
       tokenUsage: { promptTokens: 0, outputTokens: 0 },
     };
   }
@@ -660,9 +732,9 @@ const parseInput = async (content, type, imageUrl = null, userId = null) => {
       { role: 'user', content: userContent },
     ], model);
     
-    // 记录Token消耗
+    // 记录Token消耗（附输出快照，便于「其他 AI 调用」详情查看）
     if (userId && result.tokenUsage.promptTokens > 0) {
-      await recordTokenUsage(userId, null, model, result.tokenUsage, 'parse');
+      await recordTokenUsage(userId, null, model, result.tokenUsage, 'parse', result.content);
     }
     
     return buildParsedInputResult(result.content, type, content, result.tokenUsage);
@@ -742,23 +814,41 @@ const getTokenStats = async (userId, days = 30) => {
     _count: true,
   });
 
-  // 3. 获取每日明细（SQLite 用 date() 函数截取日期）
-  const dailyRaw = await prisma.$queryRaw`
+  // 3. 获取时间序列明细（按日或按小时）
+  // SQLite 将 DateTime 存储为毫秒级 Unix 时间戳；区间过滤用 startDateMs
+  // days===1（近 24 小时）：按北京时间（UTC+8）整点分桶，与前端「北京时间」展示一致；否则按 UTC 自然日聚合
+  const startDateMs = startDate.getTime();
+  const dailyRaw =
+    days === 1
+      ? await prisma.$queryRaw`
     SELECT
-      date(createdAt) AS day,
+      strftime('%Y-%m-%d %H:00', datetime(CAST(createdAt AS INTEGER) / 1000, 'unixepoch', '+8 hours')) AS day,
       model,
-      SUM(totalTokens) AS tokens,
-      COUNT(*) AS requests,
-      SUM(CASE WHEN totalTokens > 0 THEN 1 ELSE 0 END) * 100.0 / COUNT(*) AS successRate
+      CAST(SUM(totalTokens) AS INTEGER) AS tokens,
+      CAST(COUNT(*) AS INTEGER) AS requests,
+      CAST(SUM(CASE WHEN totalTokens > 0 THEN 1 ELSE 0 END) * 100 / COUNT(*) AS INTEGER) AS successRate
     FROM token_usages
     WHERE userId = ${userId}
-      AND createdAt >= ${startDate.toISOString()}
+      AND CAST(createdAt AS INTEGER) >= ${startDateMs}
+    GROUP BY day, model
+    ORDER BY day ASC
+  `
+      : await prisma.$queryRaw`
+    SELECT
+      date(datetime(CAST(createdAt AS INTEGER) / 1000, 'unixepoch', '+8 hours')) AS day,
+      model,
+      CAST(SUM(totalTokens) AS INTEGER) AS tokens,
+      CAST(COUNT(*) AS INTEGER) AS requests,
+      CAST(SUM(CASE WHEN totalTokens > 0 THEN 1 ELSE 0 END) * 100 / COUNT(*) AS INTEGER) AS successRate
+    FROM token_usages
+    WHERE userId = ${userId}
+      AND CAST(createdAt AS INTEGER) >= ${startDateMs}
     GROUP BY day, model
     ORDER BY day ASC
   `;
 
   return {
-    period: `${days}天`,
+    period: days === 1 ? '近24小时' : `${days}天`,
     totalRequests: stats._count,
     totalTokens: stats._sum.totalTokens || 0,
     promptTokens: stats._sum.promptTokens || 0,
@@ -913,7 +1003,7 @@ const getLocalGreeting = () => {
  * 职责：简单非流式 AI 调用（供内部其他模块使用）
  * @param {Array} messages - OpenAI 格式的消息列表
  * @param {string} [model] - 使用的模型（默认 MODELS.fast）
- * @returns {{ content: string, tokenUsage: object }}
+ * @returns {{ content: string, model: string, tokenUsage: { promptTokens: number, outputTokens: number } }}
  */
 const callAI = async (messages, model = MODELS.fast) => {
   return callKimiAPI(messages, model);
@@ -931,4 +1021,6 @@ module.exports = {
   generateGreetingStream,
   generateGreeting,
   MODELS,
+  recordTokenUsage,
+  isMissingDetailSnapshotColumnError,
 };

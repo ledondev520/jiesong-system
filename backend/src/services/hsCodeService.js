@@ -10,6 +10,9 @@ const prisma = require('../utils/prisma');
 
 const normalizeKeyword = (value) => String(value || '').trim();
 
+/** 职责：判断是否像 HS 编码检索（仅数字、4–12 位，已 trim） */
+const isHsCodeLikeQuery = (s) => /^\d{4,12}$/.test(s);
+
 /**
  * 职责：计算两个字符串的 Dice 相似度（双字符 bigram 集合重叠）
  * 思路：
@@ -55,12 +58,20 @@ const listHsCodes = async ({ keyword = '', page = 1, pageSize = 50 } = {}) => {
   const safePage = Math.max(parseInt(page, 10) || 1, 1);
   const safePageSize = Math.min(Math.max(parseInt(pageSize, 10) || 50, 1), 200);
 
+  // 1. 关键词：商品名包含 **或**（纯数字串时）HS 编码前缀/精确命中
   const where = normalizedKeyword
-    ? {
-        productName: {
-          contains: normalizedKeyword,
-        },
-      }
+    ? isHsCodeLikeQuery(normalizedKeyword)
+      ? {
+          OR: [
+            { productName: { contains: normalizedKeyword } },
+            { hsCode: { startsWith: normalizedKeyword } },
+          ],
+        }
+      : {
+          productName: {
+            contains: normalizedKeyword,
+          },
+        }
     : {};
 
   const [items, total] = await Promise.all([
@@ -207,9 +218,10 @@ const batchMatchHsCodes = async (productNames) => {
 /**
  * 职责：对商品名称做模糊相似度搜索，返回结果含 similarity 分数（0~1）
  * 思路：
- *   1. 先做 LIKE contains 精确匹配（最快路径）
+ *   0. 若关键词为纯数字（4–12 位），先按 hsCode 前缀 + 商品名 contains 召回（避免仅商品名相似度无法命中编码）
+ *   1. 再做商品名 contains 精确包含匹配（限量 300）
  *   2. 用关键词各 bigram 追加候选（OR LIKE 查询）
- *   3. 对所有候选用 Dice 计算相似度，过滤 < 0.2 的噪声
+ *   3. 对未预置 similarity 的候选用 Dice 计算相似度，过滤 < 0.2 的噪声
  *   4. 降序排列后分页返回
  * @param {{ keyword: string, page: number, pageSize: number }} params
  */
@@ -220,13 +232,38 @@ const fuzzySearchHsCodes = async ({ keyword = '', page = 1, pageSize = 20 } = {}
   const safePage = Math.max(parseInt(page, 10) || 1, 1);
   const safePageSize = Math.min(Math.max(parseInt(pageSize, 10) || 20, 1), 200);
 
+  const seenIds = new Set();
+  const candidates = [];
+
+  // 0. 纯数字关键词：必须按 hsCode 召回，否则仅商品名相似度无法命中编码（如 0802909020）
+  if (isHsCodeLikeQuery(q)) {
+    const byHsCode = await prisma.hsCode.findMany({
+      where: {
+        OR: [
+          { hsCode: { startsWith: q } },
+          { productName: { contains: q } },
+        ],
+      },
+      take: 400,
+    });
+    for (const row of byHsCode) {
+      if (seenIds.has(row.id)) continue;
+      seenIds.add(row.id);
+      const sim = row.hsCode === q ? 1 : row.hsCode?.startsWith(q) ? 0.95 : diceSimilarity(q, row.productName);
+      candidates.push({ ...row, similarity: sim });
+    }
+  }
+
   // 1. 精确包含匹配（限量 300 条，用于快速召回）
   const exactItems = await prisma.hsCode.findMany({
     where: { productName: { contains: q } },
     take: 300,
   });
-  const seenIds = new Set(exactItems.map((r) => r.id));
-  const candidates = [...exactItems];
+  for (const row of exactItems) {
+    if (seenIds.has(row.id)) continue;
+    seenIds.add(row.id);
+    candidates.push(row);
+  }
 
   // 2. Bigram 候选召回：合并为单次 OR 查询，减少 DB 往返次数
   if (q.length >= 2) {
@@ -250,10 +287,13 @@ const fuzzySearchHsCodes = async ({ keyword = '', page = 1, pageSize = 20 } = {}
     }
   }
 
-  // 3. 相似度评分并过滤
+  // 3. 相似度评分并过滤（步骤 0 已写入 similarity 的编码命中行保持不变）
   const THRESHOLD = 0.2;
   const scored = candidates
-    .map((item) => ({ ...item, similarity: diceSimilarity(q, item.productName) }))
+    .map((item) => {
+      if (typeof item.similarity === 'number') return item;
+      return { ...item, similarity: diceSimilarity(q, item.productName) };
+    })
     .filter((item) => item.similarity >= THRESHOLD)
     .sort((a, b) => b.similarity - a.similarity);
 

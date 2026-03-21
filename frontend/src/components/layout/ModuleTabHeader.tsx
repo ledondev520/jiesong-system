@@ -26,17 +26,18 @@ export interface TabConfig {
   label: string;
 }
 
-/** 经营中台：工作台 | 经营执行 | 库存状态 */
+/** 经营中台：工作台 | 经营执行 */
 export const OPERATIONS_TABS: TabConfig[] = [
   { href: '/dashboard', label: '工作台' },
   { href: '/dashboard/ops-execution', label: '经营执行' },
-  { href: '/dashboard/inventory-container', label: '库存状态' },
 ];
 
-/** 采购模块：采购合同 | 商家管理 */
+/** 采购模块：采购合同 | 商家管理 | 库存状态 | 采购建议 */
 export const PROCUREMENT_TABS: TabConfig[] = [
   { href: '/dashboard/contracts', label: '采购合同' },
   { href: '/dashboard/suppliers', label: '商家管理' },
+  { href: '/dashboard/inventory-container', label: '库存状态' },
+  { href: '/dashboard/store-recommend', label: '采购建议' },
 ];
 
 /** 出口模块：出口合同 | 出口退税 | 报关单 | HS 编码 */

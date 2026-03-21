@@ -93,7 +93,10 @@ router.post('/batch-match', authenticate, roleAuth('ADMIN'), async (req, res, ne
  * 2. 将候选列表 + 产品描述发送给 AI，让它推荐最合适的 HS 码
  * 3. 返回 AI 推荐结果 + 候选列表
  */
-router.post('/ai-recommend', authenticate, async (req, res, next) => {
+router.post(
+  '/ai-recommend',
+  roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  async (req, res, next) => {
   try {
     const { productDescription } = req.body;
     if (!productDescription || typeof productDescription !== 'string' || !productDescription.trim()) {
@@ -140,7 +143,24 @@ router.post('/ai-recommend', authenticate, async (req, res, next) => {
 
     const result = await aiService.callAI(messages);
 
-    // 3. 解析 AI 返回的 JSON
+    // 3. 记录 Token 消耗（与 Kimi 实际使用的 model 一致，供全局统计与用量展示）
+    const userId = req.user?.id;
+    if (userId && result.tokenUsage) {
+      try {
+        await aiService.recordTokenUsage(
+          userId,
+          null,
+          result.model || aiService.MODELS.fast,
+          result.tokenUsage,
+          'hs_code_recommend',
+          typeof result.content === 'string' ? result.content : undefined
+        );
+      } catch (err) {
+        console.error('[hsCodes] 记录Token消耗失败:', err);
+      }
+    }
+
+    // 4. 解析 AI 返回的 JSON
     let recommendation = null;
     try {
       const jsonMatch = result.content.match(/\{[\s\S]*\}/);
@@ -159,6 +179,7 @@ router.post('/ai-recommend', authenticate, async (req, res, next) => {
   } catch (error) {
     next(error);
   }
-});
+  }
+);
 
 module.exports = router;

@@ -65,9 +65,29 @@ export interface AiTokenUsageResponse {
   message?: string;
 }
 
+/** 无 sessionId 的 Token 行（如 HS 编码推荐），供用量页展示 */
+export interface AiStandaloneTokenRow {
+  id: string;
+  model: string;
+  promptTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  requestType: string;
+  /** 可选：服务端保存的 AI 输出快照 */
+  detailSnapshot?: string | null;
+  createdAt: string;
+}
+
 export const aiService = {
   getSessions: async () => {
     return api.get<ApiResponse<AiSessionItem[]>, ApiResponse<AiSessionItem[]>>('/ai/sessions');
+  },
+
+  getStandaloneTokenUsage: async (limit = 50) => {
+    return api.get<ApiResponse<AiStandaloneTokenRow[]>, ApiResponse<AiStandaloneTokenRow[]>>(
+      '/ai/standalone-token-usage',
+      { params: { limit } },
+    );
   },
 
   deleteSession: async (sessionId: string) => {

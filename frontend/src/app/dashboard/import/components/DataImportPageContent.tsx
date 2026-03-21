@@ -40,6 +40,7 @@ import {
   ImportHistory,
   DatabaseStats,
 } from '@/services/dataImportService';
+import { formatDateTime } from '@/lib/date-format';
 
 type ImportStep = 'upload' | 'preview' | 'importing' | 'result';
 
@@ -531,7 +532,7 @@ export default function DataImportPage() {
                         </span>
                       </div>
                       <div className="text-muted-foreground text-xs">
-                        {new Date(record.importedAt).toLocaleString('zh-CN')}
+                        {formatDateTime(record.importedAt)}
                       </div>
                       <div className="text-muted-foreground text-xs">
                         成功 {record.successRows} / 失败 {record.failedRows}

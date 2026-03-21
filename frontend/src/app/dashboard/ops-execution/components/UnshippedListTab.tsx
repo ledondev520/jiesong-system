@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { toast } from 'sonner';
+import { formatDateTime } from '@/lib/date-format';
 import {
   opsExecutionService,
   type OpsUnshippedItem,
@@ -57,17 +58,6 @@ const emptyUnshippedSummary: OpsUnshippedSummary = {
   totalOrders: 0,
   totalQuantity: 0,
   unassignedItems: 0,
-};
-
-const formatDateTime = (value: string) => {
-  const time = Date.parse(value);
-  if (Number.isNaN(time)) return '-';
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(time));
 };
 
 /**

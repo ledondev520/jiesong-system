@@ -31,7 +31,7 @@ import { MoreHorizontal, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { ModuleTabHeader, OPERATIONS_TABS } from '@/components/layout/ModuleTabHeader';
+import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
@@ -240,7 +240,7 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
+      <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
       <PageHeader
         title="库存状态"
         description="管理商品库存状态，跟踪生产、包装、运输进度"

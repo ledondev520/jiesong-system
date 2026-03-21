@@ -19,7 +19,7 @@
 import { useEffect, useRef, type ComponentType } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getModuleTab } from '@/lib/tab-memory';
+import { getModuleTabOrRoot } from '@/lib/tab-memory';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -55,13 +55,13 @@ const moduleNavItems: ModuleNavItem[] = [
     href: '/dashboard',
     label: '经营中台',
     icon: LayoutDashboard,
-    childPrefixes: ['/dashboard/ops-execution', '/dashboard/inventory-container'],
+    childPrefixes: ['/dashboard/ops-execution'],
   },
   {
     href: '/dashboard/contracts',
     label: '采购',
     icon: ShoppingCart,
-    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers'],
+    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers', '/dashboard/inventory-container', '/dashboard/store-recommend'],
   },
   {
     href: '/dashboard/sales',
@@ -190,7 +190,8 @@ export function Sidebar() {
             // 点击模块时，优先跳转到上次记忆的子页面
             const handleModuleClick = (e: React.MouseEvent) => {
               e.preventDefault();
-              const target = getModuleTab(item.href);
+              // 0. 记忆路径必须仍属于该模块，否则回退到入口（避免 /dashboard 键被写入采购等脏路径导致误跳）
+              const target = getModuleTabOrRoot(item.href, item.childPrefixes);
               router.push(target);
             };
 

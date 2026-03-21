@@ -33,6 +33,10 @@ const CONFIG_DOMAIN_MAP = {
   kimiModel:      { domain: 'ai', label: 'AI集成', note: 'Kimi 模型名称' },
   minimaxApiKey:  { domain: 'ai', label: 'AI集成', note: 'MiniMax API 密钥（脱敏存储）' },
   minimaxModel:   { domain: 'ai', label: 'AI集成', note: 'MiniMax 模型名称（默认 minimax-m2.7）' },
+  aiPrimaryModel: { domain: 'ai', label: 'AI集成', note: 'AI 首选模型' },
+  aiFallbackModel: { domain: 'ai', label: 'AI集成', note: 'AI 备用模型' },
+  aiTemperature:  { domain: 'ai', label: 'AI集成', note: '采样温度 0–1' },
+  aiMaxTokens:    { domain: 'ai', label: 'AI集成', note: '最大输出 token 数' },
 };
 
 const getDomainMeta = (key) => CONFIG_DOMAIN_MAP[key] || { domain: 'other', label: '其他', note: '' };

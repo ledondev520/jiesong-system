@@ -37,6 +37,9 @@ router.get('/history', aiController.getChatHistory);
 // GET /api/v1/ai/sessions - 获取会话列表
 router.get('/sessions', aiController.getSessions);
 
+// GET /api/v1/ai/standalone-token-usage - 无聊天会话绑定的 Token 记录（HS 推荐等）
+router.get('/standalone-token-usage', aiController.getStandaloneTokenUsage);
+
 // DELETE /api/v1/ai/sessions/:sessionId - 删除会话
 router.delete('/sessions/:sessionId', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
   {

@@ -1,6 +1,6 @@
 /**
  * Input: 后端 /system/configs API（通过 configService）
- * Output: 系统参数表单（汇率/利润率）+ 数据字典（单位/报关公司）
+ * Output: 系统参数表单（汇率/利润率）+ AI 模型/采样参数 + 数据字典（单位/报关公司）
  * Pos: 设置页 > 系统配置 Tab，管理员调整全局运营参数
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -27,7 +27,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Cpu, X, Save, Loader2, Eye, EyeOff, Key, ExternalLink } from 'lucide-react';
+import { Cpu, X, Save, Loader2, Eye, EyeOff, Key, ExternalLink, ChevronDown } from 'lucide-react';
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE, UNITS as INITIAL_UNITS } from '@/lib/constants';
 import { configService } from '@/services/config.service';
 import api from '@/lib/axios';
@@ -40,6 +40,16 @@ const configSchema = z.object({
 
 type ConfigFormValues = z.infer<typeof configSchema>;
 type ConfigUpdateValue = string | number | string[];
+
+/**
+ * 职责：将采样温度映射为区间文案（0–0.3 保守，0.4–0.7 均衡，0.8–1 创意）
+ * @param t 0–1
+ */
+function getTemperatureStyleLabel(t: number): string {
+  if (t < 0.4) return '保守';
+  if (t < 0.8) return '均衡';
+  return '创意';
+}
 
 /**
  * 职责：渲染系统配置表单及数据字典管理区域
@@ -67,6 +77,8 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
   // 模型优先级配置
   const [primaryModel, setPrimaryModel] = useState('kimi-k2-turbo-preview');
   const [fallbackModel, setFallbackModel] = useState('kimi-k2-thinking-turbo');
+  const [temperature, setTemperature] = useState<number>(0.7);
+  const [maxTokens, setMaxTokens] = useState<number>(4096);
   // 汇率同步
   const [syncing, setSyncing] = useState(false);
 
@@ -104,6 +116,8 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
           if (typeof configs.aiFallbackModel === 'string' && configs.aiFallbackModel) {
             setFallbackModel(configs.aiFallbackModel);
           }
+          if (typeof configs.aiTemperature === 'number') setTemperature(configs.aiTemperature);
+          if (typeof configs.aiMaxTokens === 'number') setMaxTokens(configs.aiMaxTokens);
         }
       } catch (error) {
         console.error('加载配置失败:', error);
@@ -137,9 +151,11 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
       if (newMinimaxKey.trim()) {
         tasks.push(saveConfig('minimaxApiKey', newMinimaxKey.trim()));
       }
-      // 1.3. 模型优先级
+      // 1.3. 模型优先级与采样参数
       tasks.push(saveConfig('aiPrimaryModel', primaryModel));
       tasks.push(saveConfig('aiFallbackModel', fallbackModel));
+      tasks.push(saveConfig('aiTemperature', temperature));
+      tasks.push(saveConfig('aiMaxTokens', maxTokens));
       await Promise.all(tasks);
       if (newApiKey.trim()) {
         setApiKeyPlaceholder('sk-****');
@@ -387,105 +403,7 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
             </CardContent>
           </Card>
 
-          {/* AI 集成 */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Key className="h-4 w-4 text-muted-foreground" />
-                  AI 集成（Kimi API）
-                </CardTitle>
-                <a
-                  href="https://platform.moonshot.cn/console/account"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-primary hover:underline"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  Kimi 控制台 → API Keys
-                </a>
-              </div>
-              <CardDescription>
-                {apiKeyPlaceholder
-                  ? `当前已配置 API Key（${apiKeyPlaceholder}）。若需更新，在下方输入新密钥后点击保存。`
-                  : '尚未配置 Kimi API Key，请前往 Kimi 控制台获取密钥后填写。'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2 max-w-md">
-                <div className="relative flex-1">
-                  <Input
-                    type={showApiKey ? 'text' : 'password'}
-                    placeholder={apiKeyPlaceholder ? '输入新 API Key 以覆盖当前配置' : '输入 Kimi API Key (sk-...)'}
-                    value={newApiKey}
-                    onChange={(e) => setNewApiKey(e.target.value)}
-                    className="pr-10"
-                    autoComplete="off"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
-                    onClick={() => setShowApiKey((v) => !v)}
-                  >
-                    {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* MiniMax AI 集成 */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Key className="h-4 w-4 text-muted-foreground" />
-                  AI 集成（MiniMax）
-                </CardTitle>
-                <a
-                  href="https://platform.minimax.io/user-center/basic-information"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-primary hover:underline"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  MiniMax 控制台 → API Keys
-                </a>
-              </div>
-              <CardDescription>
-                {minimaxKeyPlaceholder
-                  ? `当前已配置 MiniMax API Key（${minimaxKeyPlaceholder}）。若需更新，在下方输入新密钥后点击保存。`
-                  : '配置 MiniMax API Key，AI 助手将使用 minimax-m2.7 模型。'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2 max-w-md">
-                <div className="relative flex-1">
-                  <Input
-                    type={showMinimaxKey ? 'text' : 'password'}
-                    placeholder={minimaxKeyPlaceholder ? '输入新 API Key 以覆盖当前配置' : '输入 MiniMax API Key (sk-api-...)'}
-                    value={newMinimaxKey}
-                    onChange={(e) => setNewMinimaxKey(e.target.value)}
-                    className="pr-10"
-                    autoComplete="off"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
-                    onClick={() => setShowMinimaxKey((v) => !v)}
-                  >
-                    {showMinimaxKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 模型优先级配置 */}
+          {/* 模型优先级与采样参数（置于 API Key 卡片之前） */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -496,7 +414,7 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                 配置 AI 助手的首选模型与备用模型。首选模型响应失败时自动切换至备用模型。
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">首选模型（Primary）</label>
@@ -527,13 +445,175 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                   </Select>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+
+              <div className="space-y-3 max-w-xl">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="text-sm font-medium" htmlFor="ai-temperature">
+                    采样温度（Temperature）
+                  </label>
+                  <span className="text-sm tabular-nums text-muted-foreground">
+                    {temperature.toFixed(1)} — {getTemperatureStyleLabel(temperature)}
+                  </span>
+                </div>
+                <input
+                  id="ai-temperature"
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={temperature}
+                  onChange={(e) => setTemperature(Number(e.target.value))}
+                  className="h-2 w-full cursor-pointer accent-primary"
+                />
+                <p className="text-xs text-muted-foreground">
+                  0–0.3 偏保守，0.4–0.7 均衡，0.8–1 更富创意；影响非推理对话的随机性。
+                </p>
+              </div>
+
+              <div className="space-y-2 max-w-md">
+                <label className="text-sm font-medium" htmlFor="ai-max-tokens">
+                  最大输出长度（Max tokens）
+                </label>
+                <Input
+                  id="ai-max-tokens"
+                  type="number"
+                  min={256}
+                  max={8192}
+                  step={256}
+                  value={maxTokens}
+                  onChange={(e) => {
+                    const v = e.target.valueAsNumber;
+                    if (!Number.isFinite(v)) return;
+                    const stepped = Math.round(v / 256) * 256;
+                    setMaxTokens(Math.min(8192, Math.max(256, stepped)));
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  最大输出长度（token 数），影响 AI 回复的最大长度。
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground border-t pt-4">
                 <span>当前首选：</span>
                 <Badge variant="outline" className="font-mono text-[10px]">{primaryModel}</Badge>
                 <span className="ml-2">备用：</span>
                 <Badge variant="outline" className="font-mono text-[10px]">{fallbackModel}</Badge>
               </div>
             </CardContent>
+          </Card>
+
+          {/* AI 集成（Kimi）— 可折叠以减轻视觉重量 */}
+          <Card className="overflow-hidden p-0">
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
+                <span className="flex items-center gap-2 min-w-0">
+                  <Key className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate">AI 集成（Kimi API）</span>
+                  {apiKeyPlaceholder ? (
+                    <Badge variant="secondary" className="text-[10px] font-normal shrink-0">已配置</Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] font-normal shrink-0">未配置</Badge>
+                  )}
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+              </summary>
+              <CardContent className="border-t px-4 pb-4 pt-3 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground max-w-prose">
+                    {apiKeyPlaceholder
+                      ? `当前已配置 API Key（${apiKeyPlaceholder}）。若需更新，在下方输入新密钥后点击保存。`
+                      : '尚未配置 Kimi API Key，请前往 Kimi 控制台获取密钥后填写。'}
+                  </p>
+                  <a
+                    href="https://platform.moonshot.cn/console/account"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Kimi 控制台
+                  </a>
+                </div>
+                <div className="flex gap-2 max-w-md">
+                  <div className="relative flex-1">
+                    <Input
+                      type={showApiKey ? 'text' : 'password'}
+                      placeholder={apiKeyPlaceholder ? '输入新 API Key 以覆盖当前配置' : '输入 Kimi API Key (sk-...)'}
+                      value={newApiKey}
+                      onChange={(e) => setNewApiKey(e.target.value)}
+                      className="pr-10"
+                      autoComplete="off"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
+                      onClick={() => setShowApiKey((v) => !v)}
+                    >
+                      {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </details>
+          </Card>
+
+          {/* MiniMax AI 集成 */}
+          <Card className="overflow-hidden p-0">
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
+                <span className="flex items-center gap-2 min-w-0">
+                  <Key className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate">AI 集成（MiniMax）</span>
+                  {minimaxKeyPlaceholder ? (
+                    <Badge variant="secondary" className="text-[10px] font-normal shrink-0">已配置</Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] font-normal shrink-0">未配置</Badge>
+                  )}
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+              </summary>
+              <CardContent className="border-t px-4 pb-4 pt-3 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground max-w-prose">
+                    {minimaxKeyPlaceholder
+                      ? `当前已配置 MiniMax API Key（${minimaxKeyPlaceholder}）。若需更新，在下方输入新密钥后点击保存。`
+                      : '配置 MiniMax API Key，AI 助手将使用 minimax-m2.7 模型。'}
+                  </p>
+                  <a
+                    href="https://platform.minimax.io/user-center/basic-information"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    MiniMax 控制台
+                  </a>
+                </div>
+                <div className="flex gap-2 max-w-md">
+                  <div className="relative flex-1">
+                    <Input
+                      type={showMinimaxKey ? 'text' : 'password'}
+                      placeholder={minimaxKeyPlaceholder ? '输入新 API Key 以覆盖当前配置' : '输入 MiniMax API Key (sk-api-...)'}
+                      value={newMinimaxKey}
+                      onChange={(e) => setNewMinimaxKey(e.target.value)}
+                      className="pr-10"
+                      autoComplete="off"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
+                      onClick={() => setShowMinimaxKey((v) => !v)}
+                    >
+                      {showMinimaxKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </details>
           </Card>
 
           <div className="flex justify-end">

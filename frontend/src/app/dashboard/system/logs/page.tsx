@@ -1,7 +1,9 @@
 /**
- * Input: 系统运维日志 API
+ * Input: 系统运维日志 API、logDisplay（动作/实体中文与摘要）
  * Output: 系统日志页面（查看操作日志/导入相关日志）
  * Pos: 运维中心
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 'use client';
@@ -27,23 +29,10 @@ import { useAuthStore } from '@/store/auth.store';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { Input } from '@/components/ui/input';
 import { Search, X } from 'lucide-react';
+import { describeLogValues, labelForAction, labelForEntity } from './logDisplay';
+import { formatDateTime } from '@/lib/date-format';
 
 type LogFilter = 'all' | 'import';
-
-const formatDateTime = (value: string) => {
-  const time = Date.parse(value);
-  if (Number.isNaN(time)) {
-    return '-';
-  }
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(new Date(time));
-};
 
 const normalize = (value: string) => value.toLowerCase();
 
@@ -133,7 +122,7 @@ export default function SystemLogsPage() {
         <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
         <PageHeader
           title="系统日志"
-          description="查看系统操作日志与导入相关日志"
+          description="查看系统操作日志。动作/对象为内部代码时可对照中文说明；「内容变更」中 JSON 为审计快照，部分类型会附一句话摘要。"
         />
 
         <Card>
@@ -155,7 +144,7 @@ export default function SystemLogsPage() {
         <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
         <PageHeader
           title="系统日志"
-          description="查看系统操作日志与导入相关日志"
+          description="查看系统操作日志。动作/对象为内部代码时可对照中文说明；「内容变更」中 JSON 为审计快照，部分类型会附一句话摘要。"
         />
 
         <Card>
@@ -190,7 +179,7 @@ export default function SystemLogsPage() {
       <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
       <PageHeader
         title="系统日志"
-        description="查看系统操作日志与导入相关日志"
+        description="查看系统操作日志。动作/对象为内部代码时可对照中文说明；「内容变更」中 JSON 为审计快照，部分类型会附一句话摘要。"
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -256,7 +245,7 @@ export default function SystemLogsPage() {
                   <TableHead>时间</TableHead>
                   <TableHead>用户</TableHead>
                   <TableHead>动作</TableHead>
-                  <TableHead>对象</TableHead>
+                  <TableHead>对象（业务）</TableHead>
                   <TableHead>对象ID</TableHead>
                   <TableHead>IP</TableHead>
                   <TableHead className="w-[320px]">内容变更</TableHead>
@@ -272,27 +261,55 @@ export default function SystemLogsPage() {
                     <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">暂无日志。</TableCell>
                   </TableRow>
                 ) : (
-                  pagedLogs.map((log) => (
+                  pagedLogs.map((log) => {
+                    const { hints } = describeLogValues(log);
+                    return (
                     <TableRow key={log.id}>
                       <TableCell>{formatDateTime(log.createdAt)}</TableCell>
                       <TableCell>{userLabel(log)}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {log.action || '-'}
-                        </Badge>
+                        <div className="flex flex-col gap-0.5">
+                          <Badge variant="outline" className="w-fit text-xs">
+                            {labelForAction(log.action)}
+                          </Badge>
+                          {log.action && labelForAction(log.action) !== log.action && (
+                            <span className="text-[10px] text-muted-foreground font-mono">{log.action}</span>
+                          )}
+                        </div>
                       </TableCell>
-                      <TableCell>{log.entity || '-'}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-0.5">
+                          <span>{labelForEntity(log.entity)}</span>
+                          {log.entity && labelForEntity(log.entity) !== log.entity && (
+                            <span className="text-[10px] text-muted-foreground font-mono">{log.entity}</span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>{log.entityId || '-'}</TableCell>
                       <TableCell>{log.ipAddress || '-'}</TableCell>
-                      <TableCell className="max-w-[320px] text-xs text-muted-foreground">
-                        <div className="space-y-1">
-                          {log.oldValue && <p className="whitespace-pre-wrap break-all">旧值：{log.oldValue}</p>}
-                          {log.newValue && <p className="whitespace-pre-wrap break-all">新值：{log.newValue}</p>}
-                          {!log.oldValue && !log.newValue && <p>-</p>}
+                      <TableCell className="max-w-[340px] text-xs text-muted-foreground">
+                        <div className="space-y-1.5">
+                          {hints.map((line, i) => (
+                            <p key={i} className="text-foreground/90 leading-snug">
+                              {line}
+                            </p>
+                          ))}
+                          {log.oldValue && (
+                            <p className="whitespace-pre-wrap break-all border-t border-border/60 pt-1 text-[11px]">
+                              旧值（原始）：{log.oldValue}
+                            </p>
+                          )}
+                          {log.newValue && (
+                            <p className="whitespace-pre-wrap break-all text-[11px]">
+                              新值（原始）：{log.newValue}
+                            </p>
+                          )}
+                          {!log.oldValue && !log.newValue && hints.length === 0 && <p>-</p>}
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

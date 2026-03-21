@@ -30,6 +30,7 @@ import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeade
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 /**
  * 防抖 Hook - 延迟输入触发
@@ -176,8 +177,9 @@ function HsCodesPageContent() {
 
   // 列表/搜索触发（关键词/页码/每页条数变化时重新加载）
   useEffect(() => {
-    loadResults({ searchKeyword: debouncedKeyword, nextPage: page, currentPageSize: pageSize });
-    syncToUrl(debouncedKeyword, page, pageSize);
+    const kw = debouncedKeyword.trim();
+    loadResults({ searchKeyword: kw, nextPage: page, currentPageSize: pageSize });
+    syncToUrl(kw, page, pageSize);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedKeyword, page, pageSize]);
 
@@ -220,12 +222,18 @@ function HsCodesPageContent() {
     return `${value}%`;
   };
 
+  // 0. 过期判断：effectiveDate 早于 2025-01-01 视为可能过期
+  const isExpiredHsCode = (record: HsCodeRecord) => {
+    if (!record.effectiveDate) return false;
+    return new Date(record.effectiveDate) < new Date('2025-01-01');
+  };
+
   return (
     <div className="flex flex-col h-full">
       <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
         title="HS 编码查询"
-        description="默认先展示 HSCode 列表，再按商品名称或编码过滤。"
+        description="默认展示全量列表。输入商品名称（可模糊）或 4–12 位纯数字 HS 编码（支持首尾空格，自动 trim）即可检索；编码按库内 hsCode 前缀精确匹配。"
         actions={
           <Button
             variant="outline"
@@ -243,7 +251,11 @@ function HsCodesPageContent() {
         <CardContent className="pt-4">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              {loading ? (
+                <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
+              ) : (
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              )}
               <Input
                 placeholder="输入商品名称（支持相似度匹配）或 HSCode 编码..."
                 value={keyword}
@@ -396,7 +408,7 @@ function HsCodesPageContent() {
                         {isFuzzy && keyword.trim() && <TableHead className="w-[70px]">相似度</TableHead>}
                         <TableHead className="w-[60px]">单位</TableHead>
                         <TableHead className="w-[80px]">退税率</TableHead>
-                        <TableHead>监管条件</TableHead>
+                        <TableHead>申报要素</TableHead>
                         <TableHead className="w-[40px]" />
                       </TableRow>
                     </TableHeader>
@@ -404,7 +416,10 @@ function HsCodesPageContent() {
                       {results.map((record) => (
                         <TableRow
                           key={record.id}
-                          className="cursor-pointer hover:bg-muted/50"
+                          className={cn(
+                            'cursor-pointer hover:bg-muted/50',
+                            isExpiredHsCode(record) && 'bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/40',
+                          )}
                           onClick={() => setSelectedRecord(record)}
                         >
                           <TableCell className="font-mono text-xs">{record.hsCode}</TableCell>
@@ -428,10 +443,10 @@ function HsCodesPageContent() {
                           <TableCell className="text-xs">{record.unit || '-'}</TableCell>
                           <TableCell className="text-xs">{formatPercent(record.refundRate)}</TableCell>
                           <TableCell className="max-w-[160px]">
-                            {record.supervisionConditions ? (
+                            {record.declarationElements ? (
                               <Badge variant="outline" className="text-xs truncate max-w-[140px] block">
-                                {record.supervisionConditions.slice(0, 20)}
-                                {record.supervisionConditions.length > 20 ? '…' : ''}
+                                {record.declarationElements.slice(0, 20)}
+                                {record.declarationElements.length > 20 ? '…' : ''}
                               </Badge>
                             ) : (
                               <span className="text-muted-foreground text-xs">-</span>
