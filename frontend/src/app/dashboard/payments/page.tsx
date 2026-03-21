@@ -8,7 +8,7 @@
 
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { PaymentType } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { CreditCard, ArrowUpRight, ArrowDownLeft, RefreshCw } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { CreditCard, ArrowUpRight, ArrowDownLeft, RefreshCw, Search, X } from 'lucide-react';
 import { PaymentDialog, type PaymentSubmitData } from '../../dashboard/finance/components/PaymentDialog';
 import { toast } from 'sonner';
 import { financeService } from '@/services/finance.service';
@@ -88,6 +89,8 @@ function PaymentsPageContent() {
   const [receivables, setReceivables] = useState<ReceivableContract[]>([]);
   const [receivableLoading, setReceivableLoading] = useState(true);
   const [selectedReceivable, setSelectedReceivable] = useState<ReceivableContract | null>(null);
+  // 列表关键词（客户端过滤：合同号 / 供应商或门店）
+  const [keyword, setKeyword] = useState('');
 
   // 0. 初始化加载
   useEffect(() => {
@@ -201,15 +204,45 @@ function PaymentsPageContent() {
     }
   };
 
-  // 获取门店名称
+  // 获取门店名称（应收列表展示与关键词筛选）
   const getStoreNames = (contract: ReceivableContract) => {
-    const stores = contract.items?.map(item => item.store?.name).filter(Boolean);
+    const stores = contract.items?.map((item) => item.store?.name).filter(Boolean);
     return stores && stores.length > 0 ? stores.join(', ') : '-';
   };
 
-  // 过滤出待付/待收的合同
-  const unpaidContracts = payables.filter(c => c.unpaidAmount > 0);
-  const unreceiveContracts = receivables.filter(c => c.unreceiveAmount > 0);
+  // 待付/待收基础列表（统计卡片用全量；表格再套关键词）
+  const unpaidBase = useMemo(
+    () => payables.filter((c) => c.unpaidAmount > 0),
+    [payables]
+  );
+  const unreceiveBase = useMemo(
+    () => receivables.filter((c) => c.unreceiveAmount > 0),
+    [receivables]
+  );
+
+  const unpaidContracts = useMemo(() => {
+    if (!keyword.trim()) {
+      return unpaidBase;
+    }
+    const q = keyword.toLowerCase().trim();
+    return unpaidBase.filter(
+      (c) =>
+        (c.contractNo || '').toLowerCase().includes(q) ||
+        (c.supplier?.name || '').toLowerCase().includes(q)
+    );
+  }, [unpaidBase, keyword]);
+
+  const unreceiveContracts = useMemo(() => {
+    if (!keyword.trim()) {
+      return unreceiveBase;
+    }
+    const q = keyword.toLowerCase().trim();
+    return unreceiveBase.filter(
+      (c) =>
+        (c.contractNo || '').toLowerCase().includes(q) ||
+        getStoreNames(c).toLowerCase().includes(q)
+    );
+  }, [unreceiveBase, keyword]);
 
   return (
     <div className="space-y-6">
@@ -236,7 +269,7 @@ function PaymentsPageContent() {
               ¥{(stats?.payable?.unpaid ?? 0).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
-              共 {unpaidContracts.length} 笔待付
+              共 {unpaidBase.length} 笔待付
             </p>
           </CardContent>
         </Card>
@@ -250,10 +283,29 @@ function PaymentsPageContent() {
               ${(stats?.receivable?.unreceived ?? 0).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
-              共 {unreceiveContracts.length} 笔待收
+              共 {unreceiveBase.length} 笔待收
             </p>
           </CardContent>
         </Card>
+      </div>
+
+      {/* 统一搜索：对当前 Tab 下列表做客户端过滤 */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[200px] flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="h-9 pl-9"
+            placeholder="搜索合同号、供应商/门店..."
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+          />
+        </div>
+        {keyword && (
+          <Button variant="ghost" size="sm" onClick={() => setKeyword('')}>
+            <X className="mr-1 h-4 w-4" />
+            重置
+          </Button>
+        )}
       </div>
 
       {/* Tab切换 */}

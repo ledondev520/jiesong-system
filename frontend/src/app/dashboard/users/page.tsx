@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { User, Role } from '@/types';
 import { userService } from '@/services/user.service';
 import { Button } from '@/components/ui/button';
@@ -22,12 +22,13 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { SemanticBadge } from '@/components/ui/semantic-badge';
-import { Plus, Pencil, Trash, UserCog } from 'lucide-react';
+import { Plus, Pencil, Trash, UserCog, Search, X } from 'lucide-react';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserDialog } from './components/UserDialog';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -39,6 +40,7 @@ export default function UsersPage() {
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [keyword, setKeyword] = useState('');
 
   useEffect(() => {
     loadUsers();
@@ -105,8 +107,25 @@ export default function UsersPage() {
     }
   };
 
-  const totalPages = Math.ceil(users.length / pageSize);
-  const pagedUsers = users.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  // 客户端关键词筛选（姓名、账号、邮箱、角色）
+  const filteredUsers = useMemo(() => {
+    if (!keyword.trim()) {
+      return users;
+    }
+    const q = keyword.toLowerCase().trim();
+    return users.filter((u) => {
+      const roleStr = String(u.role ?? '');
+      return (
+        (u.name || '').toLowerCase().includes(q) ||
+        (u.username || '').toLowerCase().includes(q) ||
+        (u.email || '').toLowerCase().includes(q) ||
+        roleStr.toLowerCase().includes(q)
+      );
+    });
+  }, [users, keyword]);
+
+  const totalPages = Math.ceil(filteredUsers.length / pageSize);
+  const pagedUsers = filteredUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="space-y-6">
@@ -120,6 +139,34 @@ export default function UsersPage() {
           </Button>
         }
       />
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            className="pl-9 h-9"
+            placeholder="搜索姓名、账号、邮箱、角色..."
+            value={keyword}
+            onChange={(e) => {
+              setKeyword(e.target.value);
+              setCurrentPage(1);
+            }}
+          />
+        </div>
+        {keyword && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setKeyword('');
+              setCurrentPage(1);
+            }}
+          >
+            <X className="h-4 w-4 mr-1" />
+            重置
+          </Button>
+        )}
+      </div>
 
       <div className="surface-panel overflow-hidden">
         <Table>
@@ -184,7 +231,7 @@ export default function UsersPage() {
 
       {/* 分页控制 */}
       <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>共 {users.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
+        <span>共 {filteredUsers.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
         <div className="flex items-center gap-2">
           <PageSizeSelect
             value={pageSize}

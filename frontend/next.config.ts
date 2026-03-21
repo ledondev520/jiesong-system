@@ -22,6 +22,10 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  turbopack: {
+    /* 指定 turbopack 工作区根目录，消除多 lockfile 警告 */
+    root: __dirname,
+  },
 };
 
 export default nextConfig;

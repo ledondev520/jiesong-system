@@ -25,6 +25,8 @@ import { toast } from 'sonner';
 import { Role } from '@/types';
 import { useAuthStore } from '@/store/auth.store';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
+import { Input } from '@/components/ui/input';
+import { Search, X } from 'lucide-react';
 
 type LogFilter = 'all' | 'import';
 
@@ -56,6 +58,17 @@ const isImportLog = (log: SystemLogItem) => {
   return candidates.some((item) => normalize(item).includes('import'));
 };
 
+/** 展示用用户标签（供列表与关键词筛选复用） */
+const userLabel = (log: SystemLogItem) => {
+  if (log.user?.name) {
+    return log.user.name;
+  }
+  if (log.user?.username) {
+    return log.user.username;
+  }
+  return log.userId || '系统';
+};
+
 export default function SystemLogsPage() {
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState<SystemLogItem[]>([]);
@@ -65,11 +78,22 @@ export default function SystemLogsPage() {
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [keyword, setKeyword] = useState('');
   const user = useAuthStore((state) => state.user);
-  const filteredLogs = useMemo(
-    () => (filter === 'import' ? logs.filter(isImportLog) : logs),
-    [filter, logs]
-  );
+  const filteredLogs = useMemo(() => {
+    let result = filter === 'import' ? logs.filter(isImportLog) : logs;
+    if (keyword.trim()) {
+      const q = keyword.toLowerCase().trim();
+      result = result.filter(
+        (log) =>
+          userLabel(log).toLowerCase().includes(q) ||
+          (log.action || '').toLowerCase().includes(q) ||
+          (log.entity || '').toLowerCase().includes(q) ||
+          (log.entityId || '').toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [filter, logs, keyword]);
   const totalFilteredPages = Math.ceil(filteredLogs.length / pageSize);
   const pagedLogs = filteredLogs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
@@ -149,16 +173,6 @@ export default function SystemLogsPage() {
     );
   }
 
-  const userLabel = (log: SystemLogItem) => {
-    if (log.user?.name) {
-      return log.user.name;
-    }
-    if (log.user?.username) {
-      return log.user.username;
-    }
-    return log.userId || '系统';
-  };
-
   const handleExportCsv = async () => {
     try {
       setExporting(true);
@@ -206,6 +220,33 @@ export default function SystemLogsPage() {
           <CardDescription>
             共 {total} 条记录（筛选后 {filteredLogs.length} 条），当前：{filter === 'all' ? '全部' : '导入相关'}
           </CardDescription>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-9 h-9"
+                placeholder="搜索用户、动作、对象..."
+                value={keyword}
+                onChange={(e) => {
+                  setKeyword(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
+            {keyword && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setKeyword('');
+                  setCurrentPage(1);
+                }}
+              >
+                <X className="h-4 w-4 mr-1" />
+                重置
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="surface-panel overflow-hidden">

@@ -7,7 +7,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Search, X } from 'lucide-react';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +22,7 @@ import {
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   getSystemNotifications,
   markSystemNotificationRead,
@@ -64,6 +65,7 @@ export default function SystemNotificationsPage() {
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [keyword, setKeyword] = useState('');
 
   const loadNotifications = useCallback(async () => {
     setLoading(true);
@@ -88,10 +90,18 @@ export default function SystemNotificationsPage() {
     loadNotifications();
   }, [loadNotifications]);
 
-  const filteredNotifications = useMemo(
-    () => (filter === 'unread' ? notifications.filter((item) => !item.isRead) : notifications),
-    [filter, notifications]
-  );
+  const filteredNotifications = useMemo(() => {
+    let result = filter === 'unread' ? notifications.filter((item) => !item.isRead) : notifications;
+    if (keyword.trim()) {
+      const q = keyword.toLowerCase().trim();
+      result = result.filter(
+        (item) =>
+          (item.content || '').toLowerCase().includes(q) ||
+          (item.type || '').toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [filter, notifications, keyword]);
   const totalPages = Math.ceil(filteredNotifications.length / pageSize);
   const pagedNotifications = filteredNotifications.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
@@ -144,6 +154,33 @@ export default function SystemNotificationsPage() {
           <CardDescription>
             共 {total} 条通知，未读 {unreadCount} 条
           </CardDescription>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-9 h-9"
+                placeholder="搜索内容、类型..."
+                value={keyword}
+                onChange={(e) => {
+                  setKeyword(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
+            {keyword && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setKeyword('');
+                  setCurrentPage(1);
+                }}
+              >
+                <X className="h-4 w-4 mr-1" />
+                重置
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="surface-panel overflow-hidden">

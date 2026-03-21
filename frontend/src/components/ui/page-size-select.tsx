@@ -40,7 +40,7 @@ export function PageSizeSelect({
       value={String(value)}
       onValueChange={(v) => onChange(Number(v))}
     >
-      <SelectTrigger className="h-8 w-[100px] text-xs">
+      <SelectTrigger className="h-8 w-[130px] text-xs">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
