@@ -47,8 +47,9 @@ export const EXPORT_TABS: TabConfig[] = [
   { href: '/dashboard/hs-codes', label: 'HS 编码' },
 ];
 
-/** 财务模块：财务报表 | 收付管理 */
+/** 财务模块：财务概览 | 财务报表 | 收付管理 */
 export const FINANCE_TABS: TabConfig[] = [
+  { href: '/dashboard/finance', label: '财务概览' },
   { href: '/dashboard/finance/statements', label: '财务报表' },
   { href: '/dashboard/payments', label: '收付管理' },
 ];
@@ -95,10 +96,14 @@ export function ModuleTabHeader({ tabs, moduleName }: ModuleTabHeaderProps) {
 
   /**
    * 职责：判断某个Tab是否激活
-   * 思路：工作台（/dashboard）使用精确匹配，其他使用前缀匹配
+   * 思路：
+   *   1. /dashboard 精确匹配，避免误匹配所有 /dashboard/* 路由
+   *   2. /dashboard/finance 精确匹配，避免 /dashboard/finance/statements 同时高亮概览Tab
+   *   3. 其他路径使用前缀匹配
    */
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard';
+    if (href === '/dashboard/finance') return pathname === '/dashboard/finance';
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 

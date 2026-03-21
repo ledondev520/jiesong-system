@@ -70,7 +70,7 @@ const moduleNavItems: ModuleNavItem[] = [
     childPrefixes: ['/dashboard/sales', '/dashboard/tax-refunds', '/customs-declarations', '/dashboard/hs-codes'],
   },
   {
-    href: '/dashboard/finance/statements',
+    href: '/dashboard/finance',
     label: '财务',
     icon: Landmark,
     childPrefixes: ['/dashboard/payments', '/dashboard/finance'],
@@ -154,13 +154,18 @@ export function Sidebar() {
 
   /**
    * 职责：判断某个模块入口是否处于激活状态
-   * 思路：当前路径等于模块首页（精确），或以任意子路由前缀开头
+   * 思路：
+   *   1. 路径精确为 /dashboard 时，仅高亮经营中台
+   *   2. 其他情况：对 href 使用精确匹配，对 childPrefixes 使用前缀匹配
+   *   3. '/dashboard' 作为前缀会匹配所有子路由，必须单独精确匹配以避免误高亮
    */
   const isModuleActive = (item: ModuleNavItem) => {
     if (pathname === '/dashboard') return item.href === '/dashboard';
-    return [item.href, ...item.childPrefixes].some(
-      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-    );
+    return [item.href, ...item.childPrefixes].some((prefix) => {
+      // /dashboard 只做精确匹配，避免误匹配所有 /dashboard/* 路由
+      if (prefix === '/dashboard') return pathname === '/dashboard';
+      return pathname === prefix || pathname.startsWith(`${prefix}/`);
+    });
   };
 
   return (

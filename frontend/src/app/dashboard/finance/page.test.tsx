@@ -30,6 +30,12 @@ vi.mock('next/navigation', () => ({
     push: vi.fn(),
     back: vi.fn(),
   }),
+  usePathname: () => '/dashboard/finance',
+}));
+
+vi.mock('@/lib/tab-memory', () => ({
+  saveModuleTab: vi.fn(),
+  getModuleTab: vi.fn((href: string) => href),
 }));
 
 describe('FinancePage 交互逻辑', () => {

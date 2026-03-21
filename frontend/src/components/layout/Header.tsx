@@ -70,7 +70,7 @@ const mobileNavItems = [
     childPrefixes: ['/dashboard/sales', '/dashboard/tax-refunds', '/customs-declarations', '/dashboard/hs-codes'],
   },
   {
-    href: '/dashboard/finance/statements',
+    href: '/dashboard/finance',
     label: '财务',
     icon: Landmark,
     childPrefixes: ['/dashboard/payments', '/dashboard/finance'],
@@ -110,13 +110,15 @@ export function Header() {
 
   /**
    * 职责：判断移动端导航项是否激活
+   * 思路：'/dashboard' 作为前缀会匹配所有子路由，需单独精确匹配，避免经营中台在其他模块页面误高亮
    * @param item 导航项
    */
   const isMobileNavActive = (item: typeof mobileNavItems[number]) => {
     if (pathname === '/dashboard') return item.href === '/dashboard';
-    return [item.href, ...item.childPrefixes].some(
-      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-    );
+    return [item.href, ...item.childPrefixes].some((prefix) => {
+      if (prefix === '/dashboard') return pathname === '/dashboard';
+      return pathname === prefix || pathname.startsWith(`${prefix}/`);
+    });
   };
   const searchRef = useRef<HTMLDivElement>(null);
   const todayLabel = new Intl.DateTimeFormat('zh-CN', {

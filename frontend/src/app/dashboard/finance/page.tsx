@@ -45,6 +45,7 @@ import {
 } from 'recharts';
 import Link from 'next/link';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
 import { financeService } from '@/services/finance.service';
 import api from '@/lib/axios';
 import { type ApiResponse } from '@/types';
@@ -185,6 +186,7 @@ export default function FinancePage() {
 
   return (
     <div className="space-y-6">
+      <ModuleTabHeader tabs={FINANCE_TABS} moduleName="财务" />
       <PageHeader
         title="财务驾驶舱"
         description="资金流水与应收应付全局概览，实时监控经营健康度。"
