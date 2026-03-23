@@ -597,6 +597,8 @@ model TokenUsage {
   requestType    String
   /// 无会话类调用的可选输出快照（如 HS 推荐原文），便于用量页「详情」展示
   detailSnapshot String?
+  /// 用户输入摘要（如 HS 推荐的产品描述），便于用量列表首列展示
+  promptBrief    String?
   createdAt      DateTime @default(now())
 
   @@index([userId])

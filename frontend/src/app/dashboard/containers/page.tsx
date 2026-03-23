@@ -206,7 +206,7 @@ export default function ContainersPage() {
 
       {/* 分页控制 */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <span>共 {containers.length} 条，每页 {PAGE_SIZE} 条</span>
           <div className="flex items-center gap-1">
             <Button

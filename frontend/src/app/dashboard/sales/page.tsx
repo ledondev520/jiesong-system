@@ -304,7 +304,7 @@ export default function SalesPage() {
       </div>
 
       {/* 分页控制 */}
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
+      <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>共 {contracts.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
         <div className="flex items-center gap-2">
           <PageSizeSelect

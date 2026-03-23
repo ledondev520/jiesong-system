@@ -184,11 +184,16 @@ api.interceptors.response.use(
   (error) => {
     if (error.response) {
       // Handle 401 Unauthorized
+      // 若已在 auth 页面（登录/注册/忘记密码），不再重复重定向，
+      // 避免 401 触发整页刷新导致表单被清空。
       if (error.response.status === 401) {
         if (typeof window !== 'undefined') {
-          clearAuthToken();
-          // Optional: Redirect to login or dispatch logout event
-          window.location.href = '/login';
+          const authPaths = ['/login', '/register', '/forgot-password'];
+          const isAuthPage = authPaths.some((p) => window.location.pathname.startsWith(p));
+          if (!isAuthPage) {
+            clearAuthToken();
+            window.location.href = '/login';
+          }
         }
       }
       return Promise.reject(error.response.data);

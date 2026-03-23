@@ -272,7 +272,18 @@ const getStandaloneTokenUsage = async (req, res, next) => {
       userId: req.user.id,
       sessionId: null,
     };
-    const selectWithSnapshot = {
+    const selectFull = {
+      id: true,
+      model: true,
+      promptTokens: true,
+      outputTokens: true,
+      totalTokens: true,
+      requestType: true,
+      detailSnapshot: true,
+      promptBrief: true,
+      createdAt: true,
+    };
+    const selectWithoutBrief = {
       id: true,
       model: true,
       promptTokens: true,
@@ -297,18 +308,39 @@ const getStandaloneTokenUsage = async (req, res, next) => {
         where,
         orderBy: { createdAt: 'desc' },
         take: limit,
-        select: selectWithSnapshot,
+        select: selectFull,
       });
     } catch (err) {
-      // 1.1. 未执行 prisma migrate/db push 时无 detailSnapshot 列，降级查询避免 500
-      if (aiService.isMissingDetailSnapshotColumnError(err)) {
+      if (aiService.isMissingPromptBriefColumnError(err)) {
+        try {
+          rows = await prisma.tokenUsage.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            take: limit,
+            select: selectWithoutBrief,
+          });
+          rows = rows.map((r) => ({ ...r, promptBrief: null }));
+        } catch (err2) {
+          if (aiService.isMissingDetailSnapshotColumnError(err2)) {
+            rows = await prisma.tokenUsage.findMany({
+              where,
+              orderBy: { createdAt: 'desc' },
+              take: limit,
+              select: selectBase,
+            });
+            rows = rows.map((r) => ({ ...r, detailSnapshot: null, promptBrief: null }));
+          } else {
+            throw err2;
+          }
+        }
+      } else if (aiService.isMissingDetailSnapshotColumnError(err)) {
         rows = await prisma.tokenUsage.findMany({
           where,
           orderBy: { createdAt: 'desc' },
           take: limit,
           select: selectBase,
         });
-        rows = rows.map((r) => ({ ...r, detailSnapshot: null }));
+        rows = rows.map((r) => ({ ...r, detailSnapshot: null, promptBrief: null }));
       } else {
         throw err;
       }

@@ -38,8 +38,15 @@ type StreamPayload = {
   model?: string;
 };
 
+/**
+ * 流式接口必须直接请求后端，绕过 Next.js rewrite 代理。
+ * Next.js Turbopack dev 代理可能缓冲 SSE 响应导致流式失效。
+ * 生产环境使用 NEXT_PUBLIC_API_BASE_URL，开发环境回退到 localhost:3001。
+ */
 const resolveStreamEndpoint = (): string => {
-  const baseUrl = getApiBaseUrl();
+  const baseUrl =
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:3001/api/v1` : '/api/v1');
   return `${baseUrl.replace(/\/$/, '')}/ai/chat/stream`;
 };
 
@@ -402,7 +409,9 @@ export function AIAssistant() {
       <Button
         variant="outline"
         className={cn(
-          'fixed bottom-5 right-5 z-[140] h-10 rounded-full border bg-background/95 px-3 text-foreground shadow-lg backdrop-blur transition-all duration-300 supports-[backdrop-filter]:bg-background/80',
+          'fixed bottom-5 right-5 z-[140] h-11 rounded-full border bg-background/95 px-4 text-foreground shadow-lg backdrop-blur transition-all duration-300 supports-[backdrop-filter]:bg-background/80',
+          // 手机底部留出更多空间，避免被系统手势区遮挡
+          'mb-safe-area-inset-bottom',
           isOpen ? 'translate-y-2 opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
         )}
         onClick={() => setIsOpen(true)}
@@ -416,11 +425,13 @@ export function AIAssistant() {
         role="complementary"
         aria-label="AI 助手侧边面板"
         className={cn(
-          'fixed inset-y-4 right-4 z-[150] w-[24rem] max-w-[calc(100vw-2rem)] transition-all duration-300',
+          // 手机端：全屏铺满（inset-0）；桌面端：右侧悬浮面板
+          'fixed z-[150] transition-all duration-300',
+          'inset-0 md:inset-y-4 md:left-auto md:right-4 md:w-[24rem]',
           isOpen ? 'translate-x-0 opacity-100' : 'translate-x-6 opacity-0 pointer-events-none'
         )}
       >
-        <Card className="flex h-full flex-col border-border/70 bg-background/95 shadow-2xl backdrop-blur supports-[backdrop-filter]:bg-background/85">
+        <Card className="flex h-full flex-col border-border/70 bg-background/95 shadow-2xl backdrop-blur supports-[backdrop-filter]:bg-background/85 rounded-none md:rounded-xl">
           <CardHeader className="flex flex-row items-center justify-between border-b bg-muted/30 p-4">
             <CardTitle className="flex items-center gap-2 text-base">
               <Bot className="h-5 w-5 text-primary" />
@@ -448,91 +459,93 @@ export function AIAssistant() {
           >
             <ScrollArea className="h-full p-4" ref={scrollRef}>
               <div className="flex flex-col gap-4">
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={cn(
-                      "flex w-max max-w-[85%] flex-col gap-2 rounded-lg px-3 py-2 text-sm",
-                      msg.role === 'user'
-                        ? "ml-auto bg-primary text-primary-foreground"
-                        : "bg-muted text-foreground"
-                    )}
-                  >
-                    {/* 显示图片 */}
-                    {msg.imageUrl && (
-                      <div className="relative h-40 w-full max-w-xs overflow-hidden rounded-md">
-                        <NextImage
-                          src={msg.imageUrl}
-                          alt="上传的图片"
-                          fill
-                          unoptimized
-                          className="object-contain"
-                        />
-                      </div>
-                    )}
-                    {/* 显示思考过程（可折叠） */}
-                    {msg.role === 'assistant' && msg.thinking && (
-                      <div className="border-b border-border pb-2 mb-1">
-                        <button
-                          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                          onClick={() => setExpandedThinking(prev => ({
-                            ...prev,
-                            [msg.id]: !prev[msg.id]
-                          }))}
-                        >
-                          <Brain className="h-3 w-3" />
-                          <span>查看思考过程</span>
-                          {expandedThinking[msg.id] ? (
-                            <ChevronUp className="h-3 w-3" />
-                          ) : (
-                            <ChevronDown className="h-3 w-3" />
+                {messages.map((msg) => {
+                  // 判断此消息是否是当前流式输出中的最后一条 assistant 消息
+                  const isStreamingThis =
+                    isLoading &&
+                    msg.role === 'assistant' &&
+                    msg.id === messages[messages.length - 1]?.id;
+
+                  return (
+                    <div
+                      key={msg.id}
+                      className={cn(
+                        "flex w-max max-w-[85%] flex-col gap-2 rounded-lg px-3 py-2 text-sm",
+                        msg.role === 'user'
+                          ? "ml-auto bg-primary text-primary-foreground"
+                          : "bg-muted text-foreground"
+                      )}
+                    >
+                      {/* 显示图片 */}
+                      {msg.imageUrl && (
+                        <div className="relative h-40 w-full max-w-xs overflow-hidden rounded-md">
+                          <NextImage
+                            src={msg.imageUrl}
+                            alt="上传的图片"
+                            fill
+                            unoptimized
+                            className="object-contain"
+                          />
+                        </div>
+                      )}
+                      {/* 正在思考时在气泡内显示思考状态（流式阶段）*/}
+                      {isStreamingThis && !msg.content && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Brain className="h-3 w-3 animate-pulse shrink-0" />
+                          <span className="text-xs">
+                            {isThinking && currentThinking
+                              ? <span className="italic line-clamp-2">{currentThinking.slice(-120)}</span>
+                              : 'AI 正在思考，请稍候…'}
+                          </span>
+                        </div>
+                      )}
+                      {/* 显示思考过程（可折叠，生成完成后展示） */}
+                      {msg.role === 'assistant' && msg.thinking && msg.content && (
+                        <div className="border-b border-border pb-2 mb-1">
+                          <button
+                            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                            onClick={() => setExpandedThinking(prev => ({
+                              ...prev,
+                              [msg.id]: !prev[msg.id]
+                            }))}
+                          >
+                            <Brain className="h-3 w-3" />
+                            <span>查看思考过程</span>
+                            {expandedThinking[msg.id] ? (
+                              <ChevronUp className="h-3 w-3" />
+                            ) : (
+                              <ChevronDown className="h-3 w-3" />
+                            )}
+                          </button>
+                          {expandedThinking[msg.id] && (
+                            <div className="mt-2 pl-4 border-l border-dashed border-border/80 max-h-40 overflow-y-auto">
+                              <p className="text-xs text-muted-foreground italic leading-relaxed whitespace-pre-wrap">
+                                {msg.thinking}
+                              </p>
+                            </div>
                           )}
-                        </button>
-                        {expandedThinking[msg.id] && (
-                          <div className="mt-2 pl-4 border-l border-dashed border-border/80 max-h-40 overflow-y-auto">
-                            <p className="text-xs text-muted-foreground italic leading-relaxed whitespace-pre-wrap">
-                              {msg.thinking}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {/* 显示文本（支持链接） */}
-                    {msg.content && (
-                      <span className="whitespace-pre-wrap">
-                        {renderContentWithLinks(msg.content)}
-                      </span>
-                    )}
-                    {/* 显示模型标签 */}
-                    {msg.role === 'assistant' && msg.model && (
-                      <div className="mt-1.5 flex items-center gap-1">
-                        <span className="inline-flex items-center rounded border border-border/50 bg-muted/60 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground/70">
-                          {msg.model}
+                        </div>
+                      )}
+                      {/* 显示文本（支持链接），流式时末尾加光标 */}
+                      {(msg.content || isStreamingThis) && (
+                        <span className="whitespace-pre-wrap">
+                          {renderContentWithLinks(msg.content)}
+                          {isStreamingThis && (
+                            <span className="inline-block w-0.5 h-[1em] bg-current align-text-bottom ml-0.5 animate-pulse" />
+                          )}
                         </span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {/* 思考过程展示 */}
-                {isLoading && isThinking && currentThinking && (
-                  <div className="bg-muted/50 w-max max-w-[85%] rounded-lg px-3 py-2 text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <Brain className="h-3 w-3 animate-pulse" />
-                      <span className="text-xs">思考中...</span>
+                      )}
+                      {/* 显示模型标签 */}
+                      {msg.role === 'assistant' && msg.model && (
+                        <div className="mt-1.5 flex items-center gap-1">
+                          <span className="inline-flex items-center rounded border border-border/50 bg-muted/60 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground/70">
+                            {msg.model}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    <div className="pl-5 border-l border-dashed border-border/80">
-                      <p className="text-xs text-muted-foreground italic leading-relaxed line-clamp-4">
-                        {currentThinking.slice(-200)}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {isLoading && !currentThinking && messages[messages.length - 1]?.content === '' && (
-                  <div className="bg-muted w-max rounded-lg px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
-                    <Brain className="h-3 w-3 animate-pulse" />
-                    AI正在思考，请稍候...
-                  </div>
-                )}
+                  );
+                })}
               </div>
               
               {/* 拖拽提示 */}

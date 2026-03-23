@@ -459,10 +459,32 @@ const isMissingDetailSnapshotColumnError = (err) => {
   );
 };
 
-const recordTokenUsage = async (userId, sessionId, model, tokenUsage, requestType, detailSnapshot) => {
+const isMissingPromptBriefColumnError = (err) => {
+  const m = String(err?.message || '');
+  return (
+    err?.code === 'P2022' ||
+    m.includes('promptBrief') ||
+    m.includes('prompt_brief') ||
+    (m.includes('no such column') && m.includes('prompt'))
+  );
+};
+
+const recordTokenUsage = async (
+  userId,
+  sessionId,
+  model,
+  tokenUsage,
+  requestType,
+  detailSnapshot,
+  promptBrief,
+) => {
   const snap =
     typeof detailSnapshot === 'string' && detailSnapshot.length > 0
       ? detailSnapshot.slice(0, 48000)
+      : undefined;
+  const brief =
+    typeof promptBrief === 'string' && promptBrief.trim().length > 0
+      ? promptBrief.trim().slice(0, 500)
       : undefined;
   const baseData = {
     userId,
@@ -473,21 +495,29 @@ const recordTokenUsage = async (userId, sessionId, model, tokenUsage, requestTyp
     totalTokens: tokenUsage.promptTokens + tokenUsage.outputTokens,
     requestType,
   };
-  try {
-    await prisma.tokenUsage.create({
-      data: {
-        ...baseData,
-        ...(snap ? { detailSnapshot: snap } : {}),
-      },
-    });
-  } catch (err) {
-    // 1.1. 库未迁移出 detailSnapshot 列时降级写入，避免整条记录失败
-    if (snap && isMissingDetailSnapshotColumnError(err)) {
-      await prisma.tokenUsage.create({ data: baseData });
+  const extraAttempts = [];
+  if (snap && brief) extraAttempts.push({ detailSnapshot: snap, promptBrief: brief });
+  if (snap) extraAttempts.push({ detailSnapshot: snap });
+  if (brief) extraAttempts.push({ promptBrief: brief });
+  extraAttempts.push({});
+  const seen = new Set();
+  let lastErr = null;
+  for (const extra of extraAttempts) {
+    const key = JSON.stringify(extra);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    try {
+      await prisma.tokenUsage.create({ data: { ...baseData, ...extra } });
       return;
+    } catch (err) {
+      lastErr = err;
+      if (isMissingPromptBriefColumnError(err) || isMissingDetailSnapshotColumnError(err)) {
+        continue;
+      }
+      throw err;
     }
-    throw err;
   }
+  throw lastErr || new Error('tokenUsage.create failed');
 };
 
 /**
@@ -734,7 +764,15 @@ const parseInput = async (content, type, imageUrl = null, userId = null) => {
     
     // 记录Token消耗（附输出快照，便于「其他 AI 调用」详情查看）
     if (userId && result.tokenUsage.promptTokens > 0) {
-      await recordTokenUsage(userId, null, model, result.tokenUsage, 'parse', result.content);
+      await recordTokenUsage(
+        userId,
+        null,
+        model,
+        result.tokenUsage,
+        'parse',
+        result.content,
+        typeof content === 'string' ? content.slice(0, 400) : undefined,
+      );
     }
     
     return buildParsedInputResult(result.content, type, content, result.tokenUsage);
@@ -1023,4 +1061,5 @@ module.exports = {
   MODELS,
   recordTokenUsage,
   isMissingDetailSnapshotColumnError,
+  isMissingPromptBriefColumnError,
 };

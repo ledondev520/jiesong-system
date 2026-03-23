@@ -75,6 +75,8 @@ export interface AiStandaloneTokenRow {
   requestType: string;
   /** 可选：服务端保存的 AI 输出快照 */
   detailSnapshot?: string | null;
+  /** 用户输入摘要（如 HS 推荐的产品描述） */
+  promptBrief?: string | null;
   createdAt: string;
 }
 

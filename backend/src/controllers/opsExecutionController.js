@@ -146,6 +146,10 @@ const summarizeChecklist = (items = []) => ({
   optionalCount: items.filter((item) => !item.required).length,
 });
 
+/**
+ * 职责：分页返回未出库（或非 OUTBOUND）且已关联出口合同的库存聚合行
+ * 思路：Prisma 拉全量后按合同+SKU+状态分组；关键词/负责人筛选使用 String 再 toLowerCase，避免脏数据致 500
+ */
 const getUnshippedList = async (req, res, next) => {
   try {
     const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 50, maxPageSize: 200 });
@@ -157,8 +161,9 @@ const getUnshippedList = async (req, res, next) => {
       prisma.inventory.findMany({
         where: {
           salesContractId: { not: null },
-          status: statusFilter || { not: 'OUTBOUND' },
-          ...(statusFilter ? {} : { NOT: { status: 'OUTBOUND' } }),
+          ...(statusFilter
+            ? { status: statusFilter }
+            : { status: { not: 'OUTBOUND' } }),
         },
         include: {
           product: {
@@ -199,16 +204,18 @@ const getUnshippedList = async (req, res, next) => {
         grouped.set(key, {
           key,
           salesContractId: item.salesContractId,
-          orderNo: item.salesContract?.contractNo || '-',
+          orderNo: item.salesContract?.contractNo != null ? String(item.salesContract.contractNo) : '-',
           productId: item.productId,
-          skuName: item.product?.customsName || '-',
-          skuCode: item.product?.hsCode || '-',
+          skuName: item.product?.customsName != null ? String(item.product.customsName) : '-',
+          skuCode: item.product?.hsCode != null && item.product.hsCode !== ''
+            ? String(item.product.hsCode)
+            : '-',
           status: item.status,
           quantity: item.quantity || 0,
-          unit: item.product?.unit || item.unit || '',
+          unit: item.product?.unit != null ? String(item.product.unit) : (item.unit != null ? String(item.unit) : ''),
           recordCount: 1,
-          assigneeName: assignments[key]?.assigneeName || '',
-          assigneeUpdatedAt: assignments[key]?.updatedAt || '',
+          assigneeName: assignments[key]?.assigneeName != null ? String(assignments[key].assigneeName) : '',
+          assigneeUpdatedAt: assignments[key]?.updatedAt != null ? String(assignments[key].updatedAt) : '',
           latestUpdatedAt,
         });
         return;
@@ -223,11 +230,11 @@ const getUnshippedList = async (req, res, next) => {
 
     const filtered = Array.from(grouped.values()).filter((item) => {
       const matchesKeyword = !keyword
-        || item.orderNo.toLowerCase().includes(keyword)
-        || item.skuName.toLowerCase().includes(keyword)
-        || item.skuCode.toLowerCase().includes(keyword);
+        || String(item.orderNo || '').toLowerCase().includes(keyword)
+        || String(item.skuName || '').toLowerCase().includes(keyword)
+        || String(item.skuCode || '').toLowerCase().includes(keyword);
       const matchesAssignee = !assigneeNameFilter
-        || item.assigneeName.toLowerCase().includes(assigneeNameFilter);
+        || String(item.assigneeName || '').toLowerCase().includes(assigneeNameFilter);
       return matchesKeyword && matchesAssignee;
     }).sort((a, b) => {
       if (a.assigneeName && !b.assigneeName) {

@@ -315,7 +315,7 @@ export function BatchImportDialog({
                 </Table>
               </div>
 
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
                 <span>
                   匹配成功：{results.filter((r) => r.match).length} / {results.length}
                 </span>

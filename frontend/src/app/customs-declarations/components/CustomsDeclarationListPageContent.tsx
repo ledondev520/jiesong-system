@@ -122,7 +122,7 @@ export function CustomsDeclarationListPageContent() {
         description="跟踪出口报关草稿、申报进度、查验与放行状态。"
         actions={
           <>
-            <div className="relative w-64">
+            <div className="relative w-full sm:w-64">
               <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
               <Input
                 value={keyword}

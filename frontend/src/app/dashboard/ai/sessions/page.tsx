@@ -1,6 +1,6 @@
 /**
- * Input: AI 会话 API、Token 统计 API、独立 Token 记录 API
- * Output: AI 会话管理页面（用量折线图；聊天会话 / 其他 AI 调用 Tabs）
+ * Input: AI 会话 API、Token 统计 API、独立 Token 记录 API（含 promptBrief）
+ * Output: AI 会话管理页面（用量折线图、24h/30d 摘要卡片；聊天会话 / 其他 AI 调用 Tabs 与费用展示）
  * Pos: Dashboard AI 管理模块
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -64,10 +64,10 @@ const getSessionCount = (item: AiSessionItem) => {
 
 const getSessionLastAt = (item: AiSessionItem) => item._max?.createdAt || null;
 
-/** 将 token 数格式化为 M（百万）显示 */
+/** 将 token 数格式化为易读单位（≥1K 用 K，≥1M 用 M） */
 const formatTokensM = (tokens: number) => {
   if (!tokens) return '—';
-  if (tokens < 1000) return `${tokens} T`;
+  if (tokens < 1000) return String(tokens);
   if (tokens < 1_000_000) return `${(tokens / 1000).toFixed(1)} K`;
   return `${(tokens / 1_000_000).toFixed(3)} M`;
 };
@@ -146,19 +146,41 @@ const MODEL_PRICING_PER_K: Record<string, number> = {
   'moonshot-v1-8k': 0.012,
   'moonshot-v1-32k': 0.024,
   'moonshot-v1-128k': 0.120,
+  'kimi-k2-turbo-preview': 0.012,
+  'kimi-k2-thinking-turbo': 0.024,
+  'kimi-k2': 0.012,
   'minimax-m2.7': 0.003,
+};
+
+const DEFAULT_PRICE_PER_K = 0.012;
+
+/** 匹配模型每千 token 单价（元），无规则时用默认 */
+const pricePerKForModel = (model: string): number => {
+  const matchedKey = Object.keys(MODEL_PRICING_PER_K)
+    .filter((k) => model?.includes(k))
+    .sort((a, b) => b.length - a.length)[0];
+  return matchedKey ? MODEL_PRICING_PER_K[matchedKey] : DEFAULT_PRICE_PER_K;
 };
 
 /** 估算 token 消耗费用（人民币元），不含税 */
 const estimateCost = (model: string, tokens: number): string | null => {
-  // 按前缀匹配，找到最具体的定价规则
-  const matchedKey = Object.keys(MODEL_PRICING_PER_K)
-    .filter((k) => model?.includes(k))
-    .sort((a, b) => b.length - a.length)[0];
-  if (!matchedKey || !tokens) return null;
-  const cost = (tokens / 1000) * MODEL_PRICING_PER_K[matchedKey];
+  if (!tokens) return null;
+  const cost = (tokens / 1000) * pricePerKForModel(model || '');
   if (cost < 0.001) return '<¥0.001';
   return `≈¥${cost.toFixed(3)}`;
+};
+
+/** 按模型分组汇总估算费用（元） */
+const estimateSumYuan = (byModel: { model: string; tokens: number }[]): number => {
+  return byModel.reduce((sum, m) => {
+    if (!m.tokens) return sum;
+    return sum + (m.tokens / 1000) * pricePerKForModel(m.model || '');
+  }, 0);
+};
+
+const formatYuanSum = (yuan: number) => {
+  if (!yuan || yuan < 0.0001) return '≈ ¥0.00';
+  return `≈ ¥${yuan.toFixed(2)}`;
 };
 
 /** 无 sessionId 的 token 记录类型展示名（与后端 requestType 对齐） */
@@ -168,6 +190,13 @@ const REQUEST_TYPE_LABELS: Record<string, string> = {
 };
 
 const labelStandaloneRequestType = (t: string) => REQUEST_TYPE_LABELS[t] ?? t;
+
+/** 无会话调用列表首列：用户输入摘要（过长截断，完整内容用 title） */
+const standaloneInputLabel = (row: AiStandaloneTokenRow) => {
+  const t = row.promptBrief?.trim();
+  if (!t) return '—';
+  return t.length > 56 ? `${t.slice(0, 56)}…` : t;
+};
 
 export default function AiSessionsPage() {
   const [sessions, setSessions] = useState<AiSessionItem[]>([]);
@@ -187,6 +216,10 @@ export default function AiSessionsPage() {
   const [statsDays, setStatsDays] = useState<string>('7');
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState(false);
+  /** 折线图下方摘要卡片：近 24h / 近 30 天（与图表区间选择独立） */
+  const [stats24h, setStats24h] = useState<TokenStats | null>(null);
+  const [stats30d, setStats30d] = useState<TokenStats | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -239,6 +272,33 @@ export default function AiSessionsPage() {
     void loadTokenStats(statsDays);
   }, [loadTokenStats, statsDays]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setSummaryLoading(true);
+    void (async () => {
+      try {
+        const [r1, r30] = await Promise.all([
+          api.get<ApiResponse<TokenStats>>(`/ai/token-stats?days=1`),
+          api.get<ApiResponse<TokenStats>>(`/ai/token-stats?days=30`),
+        ]);
+        if (!cancelled) {
+          setStats24h(r1.data ?? null);
+          setStats30d(r30.data ?? null);
+        }
+      } catch {
+        if (!cancelled) {
+          setStats24h(null);
+          setStats30d(null);
+        }
+      } finally {
+        if (!cancelled) setSummaryLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleViewDetail = async (sessionId: string) => {
     setDetailSessionId(sessionId);
     setDetailLoading(true);
@@ -273,6 +333,10 @@ export default function AiSessionsPage() {
   const { data: chartData, models: chartModels } = tokenStats?.daily?.length
     ? buildChartData(tokenStats.daily)
     : { data: [], models: [] };
+
+  const detailSessionRow = detailSessionId
+    ? sessions.find((s) => s.sessionId === detailSessionId)
+    : undefined;
 
   return (
     <div className="space-y-6">
@@ -371,6 +435,54 @@ export default function AiSessionsPage() {
               </LineChart>
             </ResponsiveContainer>
           )}
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <Card className="border-border/70 shadow-none">
+              <CardHeader className="pb-1 pt-3">
+                <CardTitle className="text-xs font-medium text-muted-foreground">今日 Token（近 24 小时）</CardTitle>
+              </CardHeader>
+              <CardContent className="pb-3 pt-0">
+                {summaryLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden />
+                ) : (
+                  <p className="text-lg font-semibold tabular-nums tracking-tight">
+                    {formatTokensM(stats24h?.totalTokens ?? 0)}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="border-border/70 shadow-none">
+              <CardHeader className="pb-1 pt-3">
+                <CardTitle className="text-xs font-medium text-muted-foreground">今日预计花费（近 24 小时）</CardTitle>
+              </CardHeader>
+              <CardContent className="pb-3 pt-0">
+                {summaryLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden />
+                ) : (
+                  <p className="text-lg font-semibold tabular-nums tracking-tight">
+                    {formatYuanSum(estimateSumYuan(stats24h?.byModel ?? []))}
+                  </p>
+                )}
+                <p className="mt-1 text-[10px] text-muted-foreground">按公开价估算，以账单为准</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/70 shadow-none">
+              <CardHeader className="pb-1 pt-3">
+                <CardTitle className="text-xs font-medium text-muted-foreground">近 30 天预计花费</CardTitle>
+              </CardHeader>
+              <CardContent className="pb-3 pt-0">
+                {summaryLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden />
+                ) : (
+                  <p className="text-lg font-semibold tabular-nums tracking-tight">
+                    {formatYuanSum(estimateSumYuan(stats30d?.byModel ?? []))}
+                  </p>
+                )}
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  {stats30d ? `共 ${stats30d.totalRequests} 次请求` : '—'}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
           {tokenStats && (
             <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
               <span>总请求：<b className="text-foreground">{tokenStats.totalRequests}</b></span>
@@ -413,6 +525,7 @@ export default function AiSessionsPage() {
                     <TableHead>消息数</TableHead>
                     <TableHead>模型</TableHead>
                     <TableHead>Token 消耗</TableHead>
+                    <TableHead>预估费用</TableHead>
                     <TableHead>最近消息时间</TableHead>
                     <TableHead className="w-[120px]">操作</TableHead>
                   </TableRow>
@@ -420,11 +533,11 @@ export default function AiSessionsPage() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
+                      <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
                     </TableRow>
                   ) : sessions.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">暂无 AI 会话记录。</TableCell>
+                      <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">暂无 AI 会话记录。</TableCell>
                     </TableRow>
                   ) : (
                     sessions.map((item) => {
@@ -452,12 +565,9 @@ export default function AiSessionsPage() {
                           </TableCell>
                           <TableCell>
                             <div className="font-mono text-xs text-muted-foreground">{formatTokensM(tokens)}</div>
-                            {(() => {
-                              const cost = estimateCost(item.lastModel ?? '', tokens);
-                              return cost ? (
-                                <div className="text-[10px] text-muted-foreground/60 mt-0.5">{cost}</div>
-                              ) : null;
-                            })()}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {estimateCost(item.lastModel ?? '', tokens) ?? '—'}
                           </TableCell>
                           <TableCell>{lastAt ? formatDateTime(lastAt) : '-'}</TableCell>
                           <TableCell>
@@ -506,10 +616,11 @@ export default function AiSessionsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>时间</TableHead>
+                      <TableHead className="min-w-[140px] max-w-[240px]">用户输入摘要</TableHead>
                       <TableHead>类型</TableHead>
                       <TableHead>模型</TableHead>
-                      <TableHead>Token</TableHead>
+                      <TableHead className="min-w-[100px]">Token / 预估费用</TableHead>
+                      <TableHead>时间</TableHead>
                       <TableHead className="w-[100px] text-right">操作</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -518,19 +629,27 @@ export default function AiSessionsPage() {
                       const cost = estimateCost(row.model, row.totalTokens);
                       return (
                         <TableRow key={row.id}>
-                          <TableCell className="text-xs whitespace-nowrap">{formatDateTime(row.createdAt)}</TableCell>
+                          <TableCell className="max-w-[240px]">
+                            <span
+                              className="line-clamp-2 text-xs leading-snug text-foreground/90"
+                              title={row.promptBrief?.trim() || undefined}
+                            >
+                              {standaloneInputLabel(row)}
+                            </span>
+                          </TableCell>
                           <TableCell>
                             <Badge variant="secondary" className="font-normal">
                               {labelStandaloneRequestType(row.requestType)}
                             </Badge>
                           </TableCell>
-                          <TableCell className="font-mono text-xs max-w-[220px] truncate" title={row.model}>
+                          <TableCell className="max-w-[200px] truncate font-mono text-xs" title={row.model}>
                             {row.model}
                           </TableCell>
                           <TableCell>
                             <div className="font-mono text-xs text-muted-foreground">{formatTokensM(row.totalTokens)}</div>
-                            {cost ? <div className="text-[10px] text-muted-foreground/60 mt-0.5">{cost}</div> : null}
+                            {cost ? <div className="mt-0.5 text-[10px] text-muted-foreground/80">{cost}</div> : null}
                           </TableCell>
+                          <TableCell className="whitespace-nowrap text-xs">{formatDateTime(row.createdAt)}</TableCell>
                           <TableCell className="text-right">
                             <Button
                               type="button"
@@ -556,7 +675,7 @@ export default function AiSessionsPage() {
 
       {/* 无会话 Token 行详情（含 AI 输出快照） */}
       <Dialog open={!!standaloneDetailRow} onOpenChange={(open) => !open && setStandaloneDetailRow(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col gap-0">
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col gap-0" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="text-base">其他 AI 调用详情</DialogTitle>
             <DialogDescription className="sr-only">
@@ -570,6 +689,12 @@ export default function AiSessionsPage() {
                   <span className="text-muted-foreground/80">时间：</span>
                   {formatDateTime(standaloneDetailRow.createdAt)}
                 </div>
+                {standaloneDetailRow.promptBrief?.trim() ? (
+                  <div>
+                    <span className="text-muted-foreground/80">用户输入：</span>
+                    <span className="text-foreground/90">{standaloneDetailRow.promptBrief.trim()}</span>
+                  </div>
+                ) : null}
                 <div>
                   <span className="text-muted-foreground/80">类型：</span>
                   {labelStandaloneRequestType(standaloneDetailRow.requestType)}
@@ -581,6 +706,10 @@ export default function AiSessionsPage() {
                   <span className="text-muted-foreground/80">Token：</span>
                   输入 {standaloneDetailRow.promptTokens} / 输出 {standaloneDetailRow.outputTokens} / 合计{' '}
                   {standaloneDetailRow.totalTokens}
+                  {(() => {
+                    const c = estimateCost(standaloneDetailRow.model, standaloneDetailRow.totalTokens);
+                    return c ? <span className="ml-2 text-foreground/80">（{c}）</span> : null;
+                  })()}
                 </div>
               </div>
               <ScrollArea className="mt-3 max-h-[min(56vh,520px)] rounded-xl border border-border/60 bg-muted/20">
@@ -597,11 +726,19 @@ export default function AiSessionsPage() {
 
       {/* 会话详情弹窗 */}
       <Dialog open={!!detailSessionId} onOpenChange={(open) => !open && setDetailSessionId(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="font-mono text-sm truncate">
               会话详情：{detailSessionId}
             </DialogTitle>
+            {detailSessionRow ? (
+              <p className="text-xs text-muted-foreground">
+                合计 Token {formatTokensM(detailSessionRow.totalTokens ?? 0)}
+                {estimateCost(detailSessionRow.lastModel ?? '', detailSessionRow.totalTokens ?? 0)
+                  ? ` · ${estimateCost(detailSessionRow.lastModel ?? '', detailSessionRow.totalTokens ?? 0)}`
+                  : ''}
+              </p>
+            ) : null}
             <DialogDescription className="sr-only">
               该会话内的历史消息列表，时间均为北京时间。
             </DialogDescription>

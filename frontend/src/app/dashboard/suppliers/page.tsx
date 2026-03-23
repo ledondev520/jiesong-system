@@ -125,11 +125,11 @@ export default function SuppliersPage() {
     <div className="space-y-6">
       <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
       <PageHeader 
-        title="商家管理"
+        title="供应商管理"
         description="管理供应商档案与质量记录"
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative w-56">
+            <div className="relative w-full sm:w-56">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="搜索供应商名称..."
@@ -215,7 +215,7 @@ export default function SuppliersPage() {
       </div>
 
       {/* 分页控制 */}
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
+      <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>共 {filteredSuppliers.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
         <div className="flex items-center gap-2">
           <PageSizeSelect

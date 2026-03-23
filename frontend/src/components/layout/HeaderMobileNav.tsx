@@ -55,8 +55,8 @@ export function HeaderMobileNav({
           <Menu className="h-5 w-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-72 p-0">
-        <SheetHeader className="flex h-16 items-center border-b px-5 py-0">
+      <SheetContent side="left" className="flex w-72 flex-col p-0">
+        <SheetHeader className="flex h-16 shrink-0 items-center border-b px-5 py-0">
           <SheetTitle asChild>
             <Link
               href="/dashboard"
@@ -73,7 +73,8 @@ export function HeaderMobileNav({
             </Link>
           </SheetTitle>
         </SheetHeader>
-        <nav className="grid gap-1 px-3 py-4">
+        {/* 导航列表可滚动，不被底部用户区覆盖 */}
+        <nav className="flex-1 overflow-y-auto grid gap-1 px-3 py-4 content-start">
           {items.map((item) => (
             <Link
               key={item.href}
@@ -91,7 +92,8 @@ export function HeaderMobileNav({
             </Link>
           ))}
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 space-y-3 border-t p-4">
+        {/* 底部用户区：随文档流排布，不再 absolute 覆盖导航列表 */}
+        <div className="shrink-0 space-y-3 border-t p-4">
           <div className="rounded-lg border bg-muted/50 px-3 py-2">
             <div className="text-sm font-medium">{userName || '当前用户'}</div>
             <div className="text-xs text-muted-foreground">{username}</div>

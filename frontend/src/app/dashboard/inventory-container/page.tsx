@@ -250,7 +250,7 @@ export default function InventoryPage() {
         description="管理商品库存状态，跟踪生产、包装、运输进度"
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative w-64">
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="搜索商品/采购合同..."
@@ -378,7 +378,7 @@ export default function InventoryPage() {
       </div>
 
       {/* 分页控制 */}
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
+      <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>共 {inventory.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
         <div className="flex items-center gap-2">
           <PageSizeSelect

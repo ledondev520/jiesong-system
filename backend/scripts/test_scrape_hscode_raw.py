@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from scrape_hscode_raw import (
     collect_search_codes,
+    collect_keyword_codes_tree,
     extract_code_links,
     parse_detail_page,
     rebuild_manifest_snapshot,
@@ -141,6 +142,44 @@ class ScrapeHsCodeRawTests(unittest.TestCase):
         )
 
         self.assertEqual(codes, ["6904100000", "6907100010"])
+
+    def test_collect_keyword_codes_tree_refines_truncated_prefix_queries(self):
+        search_pages = {
+            ("84", 1): "".join(
+                f'<a href="/Code/84010000{i:02d}.html">code{i:02d}</a>'
+                for i in range(20)
+            ),
+            ("84", 2): "".join(
+                f'<a href="/Code/84010001{i:02d}.html">code{i:02d}</a>'
+                for i in range(20)
+            ),
+            ("8401", 1): """
+                <a href="/Code/8401100000.html">8401100000</a>
+                <a href="/Code/8401200000.html">8401200000</a>
+            """,
+            ("8417", 1): """
+                <a href="/Code/8417100000.html">8417100000</a>
+            """,
+        }
+
+        def fake_fetcher(_session, url, _delay):
+            keyword = url.split("keywords=")[-1]
+            page = int(url.split("/Search/")[1].split("?")[0])
+            return f"<html><body>{search_pages.get((keyword, page), '')}</body></html>"
+
+        summary = collect_keyword_codes_tree(
+            session=None,
+            keyword="84",
+            request_delay=0,
+            max_pages=2,
+            fetcher=fake_fetcher,
+        )
+
+        self.assertTrue(summary["refined"])
+        self.assertIn("8401", summary["expanded_keywords"])
+        self.assertIn("8417", summary["expanded_keywords"])
+        self.assertIn("8401100000", summary["codes"])
+        self.assertIn("8417100000", summary["codes"])
 
     def test_rebuild_manifest_snapshot_counts_existing_records(self):
         with tempfile.TemporaryDirectory() as temp_dir:

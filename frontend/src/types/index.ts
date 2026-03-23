@@ -122,6 +122,10 @@ export interface HsCodeRecord {
   rawPayloadJson?: string | null;
   fetchedAt?: string | null;
   effectiveDate: string;
+  /** 模糊检索相似度 0–1（仅部分列表接口返回） */
+  similarity?: number;
+  /** 置信分 0–100（如 AI 推荐对照列表等扩展字段） */
+  confidenceScore?: number;
 }
 
 export interface ProductSupplier {

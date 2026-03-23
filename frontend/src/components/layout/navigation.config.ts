@@ -33,7 +33,7 @@ export const OPERATIONS_TABS: TabConfig[] = [
 
 export const PROCUREMENT_TABS: TabConfig[] = [
   { href: '/dashboard/contracts', label: '采购合同' },
-  { href: '/dashboard/suppliers', label: '商家管理' },
+  { href: '/dashboard/suppliers', label: '供应商管理' },
   { href: '/dashboard/inventory-container', label: '库存状态' },
   { href: '/dashboard/store-recommend', label: '采购建议' },
 ];

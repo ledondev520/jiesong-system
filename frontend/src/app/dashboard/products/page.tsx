@@ -193,7 +193,7 @@ function ProductsPageContent() {
         backLabel="返回"
         actions={
           <div className="flex flex-wrap gap-2">
-            <div className="relative w-64">
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="搜索商品..."
@@ -225,13 +225,13 @@ function ProductsPageContent() {
           <TableHeader>
             <TableRow>
               <TableHead>报关名称</TableHead>
-              <TableHead>规格</TableHead>
-              <TableHead>单位</TableHead>
-              <TableHead>包装规格</TableHead>
-              <TableHead className="text-right">毛重(kg)</TableHead>
-              <TableHead className="text-right">净重(kg)</TableHead>
-              <TableHead className="text-right">体积(CBM)</TableHead>
-              <TableHead className="w-[100px]">操作</TableHead>
+              <TableHead className="hidden sm:table-cell">规格</TableHead>
+              <TableHead className="hidden sm:table-cell">单位</TableHead>
+              <TableHead className="hidden md:table-cell">包装规格</TableHead>
+              <TableHead className="hidden md:table-cell text-right">毛重(kg)</TableHead>
+              <TableHead className="hidden md:table-cell text-right">净重(kg)</TableHead>
+              <TableHead className="hidden md:table-cell text-right">体积(CBM)</TableHead>
+              <TableHead className="w-[80px] sm:w-[100px]">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -252,14 +252,20 @@ function ProductsPageContent() {
             ) : (
               pagedProducts.map((product) => (
                 <TableRow key={product.id}>
-                  <TableCell className="font-medium">{product.customsName}</TableCell>
-                  <TableCell>{product.specification || '-'}</TableCell>
-                  <TableCell>{product.unit || '-'}</TableCell>
-                  <TableCell>{product.packingSpec || '-'}</TableCell>
-                  <TableCell className="text-right">{product.grossWeight ?? '-'}</TableCell>
-                  <TableCell className="text-right">{product.netWeight ?? '-'}</TableCell>
-                  <TableCell className="text-right">{product.volume ?? '-'}</TableCell>
-                  <TableCell className="flex gap-2">
+                  <TableCell className="font-medium">
+                    <div>{product.customsName}</div>
+                    {/* 手机端在名称下内嵌规格和单位 */}
+                    <div className="mt-0.5 text-xs text-muted-foreground sm:hidden">
+                      {[product.specification, product.unit].filter(Boolean).join(' · ') || '-'}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell">{product.specification || '-'}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{product.unit || '-'}</TableCell>
+                  <TableCell className="hidden md:table-cell">{product.packingSpec || '-'}</TableCell>
+                  <TableCell className="hidden md:table-cell text-right">{product.grossWeight ?? '-'}</TableCell>
+                  <TableCell className="hidden md:table-cell text-right">{product.netWeight ?? '-'}</TableCell>
+                  <TableCell className="hidden md:table-cell text-right">{product.volume ?? '-'}</TableCell>
+                  <TableCell className="flex gap-1 sm:gap-2">
                     <Button variant="ghost" size="icon" onClick={() => handleEdit(product)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -279,8 +285,8 @@ function ProductsPageContent() {
         </Table>
       </div>
 
-      {/* 分页控制 */}
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
+      {/* 分页控制：手机端竖排，桌面端横排 */}
+      <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>共 {products.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
         <div className="flex items-center gap-2">
           <PageSizeSelect

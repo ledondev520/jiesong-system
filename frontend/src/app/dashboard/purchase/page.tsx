@@ -88,12 +88,12 @@ export default function PurchasePage() {
           <TableHeader>
             <TableRow>
               <TableHead>合同编号</TableHead>
-              <TableHead>供应商</TableHead>
-              <TableHead>签订日期</TableHead>
+              <TableHead className="hidden sm:table-cell">供应商</TableHead>
+              <TableHead className="hidden md:table-cell">签订日期</TableHead>
               <TableHead>状态</TableHead>
-              <TableHead className="text-right">总金额</TableHead>
-              <TableHead className="text-right">已付</TableHead>
-              <TableHead className="w-[100px]">操作</TableHead>
+              <TableHead className="hidden sm:table-cell text-right">总金额</TableHead>
+              <TableHead className="hidden sm:table-cell text-right">已付</TableHead>
+              <TableHead className="w-[60px] sm:w-[100px]">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -112,20 +112,31 @@ export default function PurchasePage() {
 
                 return (
                   <TableRow key={contract.id}>
-                    <TableCell className="font-medium flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      {contract.contractNo}
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span>{contract.contractNo}</span>
+                      </div>
+                      {/* 手机端在合同号下内嵌供应商和金额 */}
+                      <div className="mt-0.5 text-xs text-muted-foreground sm:hidden">
+                        {contract.supplier?.name}
+                        {contract.supplier?.hasQualityIssue && (
+                          <Badge variant="destructive" className="ml-1 text-[10px] h-4 px-1">质量问题</Badge>
+                        )}
+                        <span className="mx-1">·</span>
+                        ¥{totalAmount.toLocaleString()}
+                      </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       {contract.supplier?.name}
                       {contract.supplier?.hasQualityIssue && (
                          <Badge variant="destructive" className="ml-2 text-[10px] h-5 px-1">质量问题</Badge>
                       )}
                     </TableCell>
-                    <TableCell>{formatDate(contract.signedAt)}</TableCell>
+                    <TableCell className="hidden md:table-cell">{formatDate(contract.signedAt)}</TableCell>
                     <TableCell>{getStatusBadge(contract.status)}</TableCell>
-                    <TableCell className="text-right">¥{totalAmount.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="hidden sm:table-cell text-right">¥{totalAmount.toLocaleString()}</TableCell>
+                    <TableCell className="hidden sm:table-cell text-right">
                       <AmountText tone={paidAmount < totalAmount ? 'warning' : 'success'}>
                         ¥{paidAmount.toLocaleString()}
                       </AmountText>

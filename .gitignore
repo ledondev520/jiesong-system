@@ -9,6 +9,8 @@ node_modules/
 
 # Build output
 .next/
+.next.stale*/
+.next-dev.pid
 out/
 dist/
 build/

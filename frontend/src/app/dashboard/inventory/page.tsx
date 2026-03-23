@@ -127,12 +127,13 @@ export default function InventoryPage() {
           <TableHeader>
             <TableRow>
               <TableHead>商品名称</TableHead>
-              <TableHead>HS 编码</TableHead>
-              <TableHead className="max-w-[200px]">申报信息</TableHead>
-              <TableHead>单位</TableHead>
-              <TableHead>数量</TableHead>
+              {/* 手机端隐藏次要列，保持主信息可见 */}
+              <TableHead className="hidden sm:table-cell">HS 编码</TableHead>
+              <TableHead className="hidden md:table-cell max-w-[200px]">申报信息</TableHead>
+              <TableHead className="hidden sm:table-cell">单位</TableHead>
+              <TableHead className="hidden xs:table-cell">数量</TableHead>
               <TableHead>当前状态</TableHead>
-              <TableHead className="w-[100px]">操作</TableHead>
+              <TableHead className="w-[60px] sm:w-[100px]">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -147,13 +148,20 @@ export default function InventoryPage() {
             ) : (
               inventory.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.product?.customsName}</TableCell>
-                  <TableCell className="font-mono text-sm">{item.product?.hsCode || '-'}</TableCell>
-                  <TableCell className="max-w-[200px] truncate" title={item.product?.declaration || ''}>
+                  <TableCell className="font-medium">
+                    <div>{item.product?.customsName}</div>
+                    {/* 手机端在名称下方内嵌数量，避免横滑 */}
+                    <div className="mt-0.5 text-xs text-muted-foreground sm:hidden">
+                      {item.product?.unit && <span>{item.product.unit} · </span>}
+                      <span>×{item.quantity}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell font-mono text-sm">{item.product?.hsCode || '-'}</TableCell>
+                  <TableCell className="hidden md:table-cell max-w-[200px] truncate" title={item.product?.declaration || ''}>
                     {item.product?.declaration || '-'}
                   </TableCell>
-                  <TableCell>{item.product?.unit || '-'}</TableCell>
-                  <TableCell>{item.quantity}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{item.product?.unit || '-'}</TableCell>
+                  <TableCell className="hidden xs:table-cell">{item.quantity}</TableCell>
                   <TableCell>{getStatusBadge(item.status)}</TableCell>
                   <TableCell>
                     <DropdownMenu>

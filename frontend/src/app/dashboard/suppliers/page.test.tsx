@@ -59,7 +59,7 @@ describe('SuppliersPage 交互逻辑', () => {
     render(<SuppliersPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '商家管理' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '供应商管理' })).toBeInTheDocument();
       expect(screen.getByText('暂无供应商数据。')).toBeInTheDocument();
     });
   });

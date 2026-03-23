@@ -97,7 +97,7 @@ export function TaxRefundListPageContent() {
         description="管理退税批次、申报进度与到账状态。"
         actions={
           <>
-            <div className="relative w-64">
+            <div className="relative w-full sm:w-64">
               <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
               <Input
                 value={keyword}
@@ -232,7 +232,7 @@ export function TaxRefundListPageContent() {
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
+      <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>已退金额合计：{totalRefunded.toLocaleString()}</span>
         <PageSizeSelect
           value={pageSize}

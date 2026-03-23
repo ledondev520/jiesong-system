@@ -103,8 +103,10 @@ export default function DashboardLayout({
     }
   }, [hydrated, isAuthenticated, pathname, router, user?.role]);
 
-  if (!hydrated) {
-    return null; // Prevent hydration mismatch
+  // 冷启动（页面刷新/直接访问）需要等待 hydration，避免 SSR/CSR 不一致；
+  // 登录后客户端跳转时 isAuthenticated 在内存中已为 true，无需等待 hydration。
+  if (!hydrated && !isAuthenticated) {
+    return null;
   }
 
   return (

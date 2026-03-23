@@ -229,7 +229,7 @@ export default function SystemNotificationsPage() {
             </Table>
           </div>
           {/* 分页控制 */}
-          <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+          <div className="mt-4 flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <span>共 {filteredNotifications.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
             <div className="flex items-center gap-2">
               <PageSizeSelect

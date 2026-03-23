@@ -32,6 +32,7 @@ DETAIL_URL = BASE_URL + "/Code/{code}.html"
 DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "data" / "hscode-live"
 USER_AGENT = "Mozilla/5.0 (Codex HSCode Raw Capture; +https://github.com/openai)"
 CODE_LINK_PATTERN = re.compile(r"/Code/(\d{10})\.html")
+SEARCH_PAGE_SIZE_HINT = 20
 
 
 def utc_now_iso() -> str:
@@ -113,6 +114,139 @@ def collect_search_codes(
             return codes
         time.sleep(min(1.5, 0.4 * (attempt + 1)))
     return []
+
+
+def expand_keyword_children(keyword: str) -> list[str]:
+    normalized = normalize_text(keyword)
+    if not normalized.isdigit() or len(normalized) >= 10:
+        return []
+    return [f"{normalized}{suffix:02d}" for suffix in range(100)]
+
+
+def merge_unique_codes(*code_groups: Iterable[str]) -> list[str]:
+    merged: list[str] = []
+    seen: set[str] = set()
+    for codes in code_groups:
+        for code in codes:
+            if code in seen:
+                continue
+            seen.add(code)
+            merged.append(code)
+    return merged
+
+
+def merge_unique_keywords(*keyword_groups: Iterable[str]) -> list[str]:
+    merged: list[str] = []
+    seen: set[str] = set()
+    for keywords in keyword_groups:
+        for keyword in keywords:
+            if keyword in seen:
+                continue
+            seen.add(keyword)
+            merged.append(keyword)
+    return merged
+
+
+def collect_keyword_codes_tree(
+    session: requests.Session,
+    keyword: str,
+    request_delay: float,
+    max_pages: int,
+    fetcher=fetch_html,
+    seen_keywords: set[str] | None = None,
+) -> dict:
+    normalized_keyword = normalize_text(keyword)
+    visited = seen_keywords if seen_keywords is not None else set()
+    if normalized_keyword in visited:
+        return {
+            "keyword": normalized_keyword,
+            "codes": [],
+            "pages": [],
+            "code_sources": {},
+            "refined": False,
+            "truncated": False,
+            "expanded_keywords": [],
+        }
+    visited.add(normalized_keyword)
+
+    discovered_codes: list[str] = []
+    page_summaries: list[dict] = []
+    code_sources: dict[str, dict[str, int | str]] = {}
+    exhausted_after_full_page = False
+
+    for page in range(1, max_pages + 1):
+        search_url = SEARCH_URL.format(page=page, keyword=normalized_keyword)
+        codes = collect_search_codes(
+            session=session,
+            keyword=normalized_keyword,
+            page=page,
+            request_delay=request_delay,
+            fetcher=fetcher,
+        )
+        if not codes:
+            exhausted_after_full_page = bool(page_summaries) and len(page_summaries[-1]["codes"]) >= SEARCH_PAGE_SIZE_HINT
+            break
+
+        discovered_codes.extend(codes)
+        page_summaries.append(
+            {
+                "keyword": normalized_keyword,
+                "page": page,
+                "search_url": search_url,
+                "codes": codes,
+                "captured_at": utc_now_iso(),
+            }
+        )
+        for code in codes:
+            if code not in code_sources:
+                code_sources[code] = {"keyword": normalized_keyword, "page": page}
+
+    unique_codes = merge_unique_codes(discovered_codes)
+    truncated = bool(page_summaries) and (
+        exhausted_after_full_page
+        or (
+            len(page_summaries) == max_pages
+            and len(page_summaries[-1]["codes"]) >= SEARCH_PAGE_SIZE_HINT
+        )
+    )
+    refined = False
+    expanded_keywords: list[str] = []
+
+    if truncated:
+        child_keywords = expand_keyword_children(normalized_keyword)
+        if child_keywords:
+            refined = True
+        for child_keyword in child_keywords:
+            child_summary = collect_keyword_codes_tree(
+                session=session,
+                keyword=child_keyword,
+                request_delay=request_delay,
+                max_pages=max_pages,
+                fetcher=fetcher,
+                seen_keywords=visited,
+            )
+            if not child_summary["codes"]:
+                continue
+
+            expanded_keywords = merge_unique_keywords(
+                expanded_keywords,
+                [child_keyword],
+                child_summary["expanded_keywords"],
+            )
+            unique_codes = merge_unique_codes(unique_codes, child_summary["codes"])
+            page_summaries.extend(child_summary["pages"])
+            for code, source in child_summary["code_sources"].items():
+                code_sources.setdefault(code, source)
+
+    return {
+        "keyword": normalized_keyword,
+        "codes": unique_codes,
+        "pages": page_summaries,
+        "code_sources": code_sources,
+        "refined": refined,
+        "truncated": truncated,
+        "expanded_keywords": expanded_keywords,
+    }
 
 
 def table_rows(table) -> list[list[str]]:
@@ -268,62 +402,62 @@ def scrape_keyword(
     session = make_session()
     records_dir = output_dir / "records"
     chapter_dir = output_dir / "chapters"
-    discovered_codes: list[str] = []
     saved = 0
     skipped = 0
     failures: list[dict[str, str]] = []
 
-    for page in range(1, max_pages + 1):
-        search_url = SEARCH_URL.format(page=page, keyword=keyword)
-        try:
-            codes = collect_search_codes(session, keyword, page, request_delay)
-        except Exception as error:  # pragma: no cover - network behavior
-            failures.append({"stage": "search", "page": str(page), "error": str(error)})
-            break
-
-        if not codes:
-            break
-
-        discovered_codes.extend(codes)
-        page_summary = {
-            "keyword": keyword,
-            "page": page,
-            "search_url": search_url,
-            "codes": codes,
-            "captured_at": utc_now_iso(),
+    try:
+        discovery = collect_keyword_codes_tree(session, keyword, request_delay, max_pages)
+    except Exception as error:  # pragma: no cover - network behavior
+        failures.append({"stage": "search", "keyword": keyword, "error": str(error)})
+        discovery = {
+            "codes": [],
+            "pages": [],
+            "code_sources": {},
+            "refined": False,
+            "truncated": False,
+            "expanded_keywords": [],
         }
-        write_json(chapter_dir / keyword / f"page-{page}.json", page_summary)
 
-        pending_codes = []
-        for code in codes:
+    for page_summary in discovery["pages"]:
+        query_keyword = page_summary["keyword"]
+        filename = f"page-{page_summary['page']}.json" if query_keyword == keyword else f"{query_keyword}-page-{page_summary['page']}.json"
+        write_json(chapter_dir / keyword / filename, page_summary)
+
+    pending_codes: list[tuple[str, str, int]] = []
+    for code in discovery["codes"]:
+        record_path = records_dir / f"{code}.json"
+        if record_path.exists():
+            skipped += 1
+            continue
+        source = discovery["code_sources"].get(code, {"keyword": keyword, "page": 1})
+        pending_codes.append((code, str(source["keyword"]), int(source["page"])))
+
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as executor:
+        future_map = {
+            executor.submit(fetch_and_build_record, code, source_keyword, page_no, request_delay): code
+            for code, source_keyword, page_no in pending_codes
+        }
+        for future in as_completed(future_map):
+            code = future_map[future]
             record_path = records_dir / f"{code}.json"
-            if record_path.exists():
-                skipped += 1
-                continue
-            pending_codes.append((code, page))
-
-        with ThreadPoolExecutor(max_workers=max(1, workers)) as executor:
-            future_map = {
-                executor.submit(fetch_and_build_record, code, keyword, page_no, request_delay): code
-                for code, page_no in pending_codes
-            }
-            for future in as_completed(future_map):
-                code = future_map[future]
-                record_path = records_dir / f"{code}.json"
-                try:
-                    record = future.result()
-                    write_json(record_path, record)
-                    saved += 1
-                except Exception as error:  # pragma: no cover - network behavior
-                    failures.append({"stage": "detail", "code": code, "error": str(error)})
+            try:
+                record = future.result()
+                write_json(record_path, record)
+                saved += 1
+            except Exception as error:  # pragma: no cover - network behavior
+                failures.append({"stage": "detail", "code": code, "error": str(error)})
 
     chapter_summary = {
         "keyword": keyword,
-        "pages_captured": len(list((chapter_dir / keyword).glob("page-*.json"))) if (chapter_dir / keyword).exists() else 0,
-        "codes_discovered": len(discovered_codes),
-        "unique_codes_discovered": len(set(discovered_codes)),
+        "pages_captured": len(list((chapter_dir / keyword).glob("*.json"))) if (chapter_dir / keyword).exists() else 0,
+        "codes_discovered": sum(len(page_summary["codes"]) for page_summary in discovery["pages"]),
+        "unique_codes_discovered": len(discovery["codes"]),
         "records_saved": saved,
         "records_skipped": skipped,
+        "refined": discovery["refined"],
+        "truncated": discovery["truncated"],
+        "expanded_keywords": discovery["expanded_keywords"],
         "failures": failures,
         "updated_at": utc_now_iso(),
     }

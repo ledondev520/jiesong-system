@@ -1,12 +1,14 @@
 /**
- * Input: HSCode 搜索服务
- * Output: HSCode 查询页面
+ * Input: HSCode 搜索服务、AI 推荐接口
+ * Output: HSCode 查询页面（含 AI 推荐 HS 编码 + AI 填写申报要素 + 一键复制标准格式）
  * Pos: 基础档案子页面 - HSCode 检索
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 'use client';
 
-import { Suspense, useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import type { HsCodeRecord } from '@/types';
 import { hsCodeService } from '@/services/hsCode.service';
@@ -20,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, ChevronRight, X, Sparkles, Loader2 } from 'lucide-react';
+import { Search, ChevronRight, X, Sparkles, Loader2, Copy, Check } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import api from '@/lib/axios';
 import type { ApiResponse } from '@/types';
@@ -57,6 +59,16 @@ function parseDeclarationElements(value: string | null | undefined) {
     .map((item) => item.trim())
     .filter(Boolean);
 }
+
+/** AI 推荐接口返回的 data 载荷（与后端 success 的 data 字段一致） */
+type AiRecommendPayload = {
+  recommendation: { hsCode: string; productName: string; reason: string; confidence?: number } | null;
+  candidates: HsCodeRecord[];
+  rawResponse?: string;
+  reason?: string;
+  /** AI 根据产品描述填写的申报要素具体值 */
+  filledDeclarationElements?: Array<{ element: string; value: string; uncertain?: boolean }> | null;
+};
 
 function parseStructuredItems(value: string | null | undefined) {
   if (!value) return [];
@@ -121,7 +133,7 @@ function HsCodesPageContent() {
   const initialPage = parseInt(searchParams.get('page') || '1', 10);
   const initialPageSize = parseInt(searchParams.get('pageSize') || '20', 10);
 
-  const [results, setResults] = useState<(HsCodeRecord & { similarity?: number })[]>([]);
+  const [results, setResults] = useState<HsCodeRecord[]>([]);
   const [isFuzzy, setIsFuzzy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [keyword, setKeyword] = useState(initialKeyword);
@@ -130,7 +142,7 @@ function HsCodesPageContent() {
   const [page, setPage] = useState(initialPage);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const debouncedKeyword = useDebouncedValue(keyword, 350);
+  const debouncedKeyword = useDebouncedValue(keyword, 500);
   const declarationElements = parseDeclarationElements(selectedRecord?.declarationElements);
   const supervisionItems = parseStructuredItems(selectedRecord?.supervisionConditions);
   const inspectionItems = parseStructuredItems(selectedRecord?.inspectionQuarantine);
@@ -139,31 +151,93 @@ function HsCodesPageContent() {
   const [aiRecommendOpen, setAiRecommendOpen] = useState(false);
   const [aiRecommendInput, setAiRecommendInput] = useState('');
   const [aiRecommendLoading, setAiRecommendLoading] = useState(false);
-  const [aiRecommendResult, setAiRecommendResult] = useState<{
-    recommendation: { hsCode: string; productName: string; reason: string } | null;
-    candidates: HsCodeRecord[];
-    rawResponse?: string;
-  } | null>(null);
+  const [aiRecommendResult, setAiRecommendResult] = useState<AiRecommendPayload | null>(null);
+  const debouncedAiRecommendInput = useDebouncedValue(aiRecommendInput, 500);
+  const aiRecommendReqIdRef = useRef(0);
+  const runAiRecommendRef = useRef<(text: string) => Promise<void>>(async () => {});
+  // 一键复制标准格式状态（短暂显示 ✓）
+  const [copied, setCopied] = useState(false);
 
-  const handleAiRecommend = async () => {
-    if (!aiRecommendInput.trim()) {
-      toast.error('请输入产品描述');
-      return;
-    }
+  // 详情页 AI 辅助填写申报要素状态
+  const [fillProductName, setFillProductName] = useState('');
+  const [fillProductDescription, setFillProductDescription] = useState('');
+  const [fillLoading, setFillLoading] = useState(false);
+  const [fillResult, setFillResult] = useState<Array<{ element: string; value: string; uncertain?: boolean }> | null>(null);
+  const [fillCopied, setFillCopied] = useState(false);
+
+  // 切换到新记录时重置 AI 填写区状态
+  useEffect(() => {
+    setFillProductName('');
+    setFillProductDescription('');
+    setFillResult(null);
+    setFillCopied(false);
+  }, [selectedRecord?.id]);
+
+  /**
+   * 职责：调用后端 AI 推荐接口
+   * 思路：用递增请求 id 丢弃过期响应，避免防抖/连点乱序覆盖结果
+   * @param text 产品描述（已 trim 由调用方保证非空时发起）
+   */
+  const runAiRecommend = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const id = ++aiRecommendReqIdRef.current;
     setAiRecommendLoading(true);
     setAiRecommendResult(null);
     try {
-      const res = await api.post<ApiResponse<typeof aiRecommendResult>, ApiResponse<typeof aiRecommendResult>>(
+      const res = await api.post<ApiResponse<AiRecommendPayload>>(
         '/hs-codes/ai-recommend',
-        { productDescription: aiRecommendInput.trim() }
+        { productDescription: trimmed },
       );
-      setAiRecommendResult(res.data || null);
+      if (id !== aiRecommendReqIdRef.current) return;
+      setAiRecommendResult(res.data ?? null);
     } catch {
+      if (id !== aiRecommendReqIdRef.current) return;
       toast.error('AI 推荐失败，请稍后重试');
     } finally {
+      if (id === aiRecommendReqIdRef.current) {
+        setAiRecommendLoading(false);
+      }
+    }
+  }, []);
+
+  runAiRecommendRef.current = runAiRecommend;
+
+  /**
+   * 职责：手动点击「推荐」时校验非空再请求
+   */
+  const handleAiRecommendClick = () => {
+    const text = aiRecommendInput.trim();
+    if (!text) {
+      toast.error('请输入产品描述');
+      return;
+    }
+    void runAiRecommend(text);
+  };
+
+  /**
+   * 职责：弹窗打开且输入停顿后自动发起推荐（无需再点按钮）
+   * 思路：至少 2 个字符才自动请求（与列表模糊检索一致）；过短仅支持手动点按钮
+   */
+  useEffect(() => {
+    if (!aiRecommendOpen) return;
+    const text = debouncedAiRecommendInput.trim();
+    if (text.length < 2) return;
+    // 防抖未追上当前输入时不自动请求，避免弹窗重开时误用上一次描述
+    if (debouncedAiRecommendInput !== aiRecommendInput) return;
+    void runAiRecommendRef.current(text);
+  }, [debouncedAiRecommendInput, aiRecommendInput, aiRecommendOpen]);
+
+  /**
+   * 职责：关闭弹窗时作废进行中的推荐请求，避免关闭后仍改状态
+   */
+  const handleAiRecommendDialogChange = useCallback((open: boolean) => {
+    if (!open) {
+      aiRecommendReqIdRef.current += 1;
       setAiRecommendLoading(false);
     }
-  };
+    setAiRecommendOpen(open);
+  }, []);
 
   // 将分页/关键词状态同步写入 URL，支持书签与浏览器回退
   const syncToUrl = useCallback((kw: string, p: number, ps: number) => {
@@ -222,8 +296,12 @@ function HsCodesPageContent() {
     return `${value}%`;
   };
 
-  // 0. 过期判断：effectiveDate 早于 2025-01-01 视为可能过期
+  /**
+   * 职责：判断 HS 编码记录是否过期
+   * 思路：备注中含"过期"关键字，或 effectiveDate 早于 2025-01-01
+   */
   const isExpiredHsCode = (record: HsCodeRecord) => {
+    if (record.note && /过期/i.test(record.note)) return true;
     if (!record.effectiveDate) return false;
     return new Date(record.effectiveDate) < new Date('2025-01-01');
   };
@@ -249,8 +327,8 @@ function HsCodesPageContent() {
       {/* 搜索栏 */}
       <Card className="mb-4">
         <CardContent className="pt-4">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative min-w-0 flex-1">
               {loading ? (
                 <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
               ) : (
@@ -280,7 +358,7 @@ function HsCodesPageContent() {
                 loadResults({ searchKeyword: debouncedKeyword, nextPage: 1, currentPageSize: ps });
               }}
             >
-              <SelectTrigger className="w-[90px] h-10">
+              <SelectTrigger className="h-10 w-full sm:w-[90px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -305,6 +383,9 @@ function HsCodesPageContent() {
                 <ChevronRight className="h-4 w-4 rotate-180" />
                 返回列表
               </button>
+              {isExpiredHsCode(selectedRecord) && (
+                <Badge variant="destructive" className="text-xs">已过期</Badge>
+              )}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -362,6 +443,96 @@ function HsCodesPageContent() {
               </div>
             )}
 
+            {/* AI 辅助填写申报要素 —— 基于该 HS 码的真实要素模板 */}
+            <div className="mt-6 rounded-lg border border-dashed border-primary/40 bg-primary/5 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-medium">AI 辅助填写申报要素</h3>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                输入商品名称（必填），AI 将根据此 HS 编码的申报要素格式自动生成填写建议，并提供可复制的标准格式。
+              </p>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  placeholder="商品名称（必填，如：天然石英石橱柜台面）"
+                  value={fillProductName}
+                  onChange={(e) => setFillProductName(e.target.value)}
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground/60"
+                />
+                <textarea
+                  placeholder="产品描述（选填，如：天然石英石含量≥93%，表面抛光，规格3200×1600mm，厚度20mm）"
+                  value={fillProductDescription}
+                  onChange={(e) => setFillProductDescription(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground/60 resize-none"
+                />
+                <Button
+                  size="sm"
+                  disabled={fillLoading || !fillProductName.trim()}
+                  onClick={async () => {
+                    setFillLoading(true);
+                    setFillResult(null);
+                    try {
+                      const desc = fillProductDescription.trim() || fillProductName.trim();
+                      const res = await api.post<ApiResponse<{ filledDeclarationElements: Array<{ element: string; value: string; uncertain?: boolean }> }>>(
+                        `/hs-codes/${selectedRecord.hsCode}/fill-declaration`,
+                        { productDescription: desc, productName: fillProductName.trim() },
+                      );
+                      setFillResult(res.data?.filledDeclarationElements ?? null);
+                    } catch {
+                      toast.error('AI 填写申报要素失败，请稍后重试');
+                    } finally {
+                      setFillLoading(false);
+                    }
+                  }}
+                  className="w-full sm:w-auto"
+                >
+                  {fillLoading ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />AI 生成中...</> : <><Sparkles className="mr-1.5 h-3.5 w-3.5" />生成申报要素填写建议</>}
+                </Button>
+              </div>
+
+              {fillResult && fillResult.length > 0 && (
+                <div className="space-y-2 pt-1 border-t">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium">AI 填写建议</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const lines = [
+                          `HS 编码：${selectedRecord.hsCode}`,
+                          `商品名称：${fillProductName || selectedRecord.productName}`,
+                          `申报要素：`,
+                          ...fillResult.map((item, i) => `${i + 1}. ${item.element}：${item.value}${item.uncertain ? '（待确认）' : ''}`),
+                        ];
+                        void navigator.clipboard.writeText(lines.join('\n')).then(() => {
+                          setFillCopied(true);
+                          setTimeout(() => setFillCopied(false), 2000);
+                        });
+                      }}
+                      className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                    >
+                      {fillCopied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                      {fillCopied ? '已复制' : '复制标准格式'}
+                    </button>
+                  </div>
+                  <div className="space-y-1.5">
+                    {fillResult.map((item, i) => (
+                      <div key={i} className="flex items-start gap-2 rounded-md bg-background px-3 py-2 text-xs border">
+                        <span className="shrink-0 w-5 text-center font-medium text-muted-foreground">{i + 1}.</span>
+                        <span className="text-muted-foreground shrink-0">{item.element}：</span>
+                        <span className={cn('flex-1 font-medium', item.uncertain && 'text-amber-600 dark:text-amber-400')}>
+                          {item.value}
+                          {item.uncertain && <span className="ml-1 text-[10px] font-normal opacity-70">（待确认）</span>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">以上内容由 AI 根据产品描述和申报要素格式生成，仅供参考，请以实际货物和海关要求为准。</p>
+                </div>
+              )}
+            </div>
+
             <DetailTokenSection title="检验检疫" items={inspectionItems} />
 
             {selectedRecord.note && (
@@ -405,7 +576,7 @@ function HsCodesPageContent() {
                       <TableRow>
                         <TableHead className="w-[120px]">HSCode</TableHead>
                         <TableHead className="max-w-[260px]">商品名称</TableHead>
-                        {isFuzzy && keyword.trim() && <TableHead className="w-[70px]">相似度</TableHead>}
+                        {isFuzzy && keyword.trim() && <TableHead className="w-[76px]">置信分</TableHead>}
                         <TableHead className="w-[60px]">单位</TableHead>
                         <TableHead className="w-[80px]">退税率</TableHead>
                         <TableHead>申报要素</TableHead>
@@ -435,9 +606,11 @@ function HsCodesPageContent() {
                                   variant={record.similarity >= 0.8 ? 'default' : record.similarity >= 0.5 ? 'secondary' : 'outline'}
                                   className="text-xs tabular-nums"
                                 >
-                                  {Math.round(record.similarity * 100)}%
+                                  {Math.round(record.similarity * 100)} 分
                                 </Badge>
-                              ) : '-'}
+                              ) : (
+                                '-'
+                              )}
                             </TableCell>
                           )}
                           <TableCell className="text-xs">{record.unit || '-'}</TableCell>
@@ -533,7 +706,7 @@ function HsCodesPageContent() {
       </div>
 
       {/* AI 智能推荐弹窗 */}
-      <Dialog open={aiRecommendOpen} onOpenChange={setAiRecommendOpen}>
+      <Dialog open={aiRecommendOpen} onOpenChange={handleAiRecommendDialogChange}>
         <DialogContent className="w-[calc(100vw-2rem)] max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -542,67 +715,144 @@ function HsCodesPageContent() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">产品描述</label>
-              <div className="flex gap-2">
+            <form
+              className="space-y-1.5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleAiRecommendClick();
+              }}
+            >
+              <label className="text-sm font-medium" htmlFor="hs-ai-recommend-input">
+                产品描述
+              </label>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
                 <Input
+                  id="hs-ai-recommend-input"
                   placeholder="例如：天然石英石板材，用于橱柜台面"
                   value={aiRecommendInput}
                   onChange={(e) => setAiRecommendInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && void handleAiRecommend()}
+                  className="min-w-0 flex-1"
+                  enterKeyHint="search"
                 />
-                <Button onClick={() => void handleAiRecommend()} disabled={aiRecommendLoading}>
+                <Button type="submit" className="shrink-0 sm:w-10" disabled={aiRecommendLoading} aria-label="发起 AI 推荐">
                   {aiRecommendLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">输入产品的详细描述，AI 将从 HS 码库中推荐最合适的编码。</p>
-            </div>
+              <p className="text-xs text-muted-foreground">
+                停半秒自动推荐，亦可点按钮或键盘「搜索」。模型结果仅供参考；下方对照本地税则，分数 0–100 表示匹配度。
+              </p>
+            </form>
 
             {aiRecommendLoading && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                AI 正在分析商品描述...
+                AI 正在分析商品描述并生成申报要素建议...
               </div>
             )}
 
             {aiRecommendResult && !aiRecommendLoading && (
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
                 {aiRecommendResult.recommendation ? (
-                  <div className="rounded-lg border border-accent/60 bg-accent/20 p-4 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Badge className="font-mono text-sm">{aiRecommendResult.recommendation.hsCode}</Badge>
-                      <span className="text-sm font-medium">{aiRecommendResult.recommendation.productName}</span>
+                  <>
+                    {/* HS 编码推荐卡片 */}
+                    <div className="rounded-lg border border-accent/60 bg-accent/20 p-4 space-y-2">
+                      <div className="flex flex-wrap items-start gap-2">
+                        <Badge className="h-auto max-w-full whitespace-normal break-all py-1 text-left font-mono text-sm leading-snug">
+                          {aiRecommendResult.recommendation.hsCode}
+                        </Badge>
+                        <span className="text-sm font-medium">{aiRecommendResult.recommendation.productName}</span>
+                        {typeof aiRecommendResult.recommendation.confidence === 'number' ? (
+                          <Badge variant="secondary" className="tabular-nums">
+                            置信分 {Math.min(100, Math.max(0, Math.round(aiRecommendResult.recommendation.confidence)))} 分
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{aiRecommendResult.recommendation.reason}</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setKeyword(aiRecommendResult.recommendation!.hsCode);
+                          setAiRecommendOpen(false);
+                        }}
+                      >
+                        使用此编码搜索
+                      </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{aiRecommendResult.recommendation.reason}</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setKeyword(aiRecommendResult.recommendation!.hsCode);
-                        setAiRecommendOpen(false);
-                      }}
-                    >
-                      使用此编码搜索
-                    </Button>
-                  </div>
+
+                    {/* AI 填写的申报要素（推断值，建议在详情页使用精确版） */}
+                    {aiRecommendResult.filledDeclarationElements && aiRecommendResult.filledDeclarationElements.length > 0 && (
+                      <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">AI 申报要素参考</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const rec = aiRecommendResult.recommendation!;
+                              const lines = [
+                                `HS 编码：${rec.hsCode}`,
+                                `商品名称：${rec.productName}`,
+                                `申报要素：`,
+                                ...(aiRecommendResult.filledDeclarationElements || []).map(
+                                  (item, i) => `${i + 1}. ${item.element}：${item.value}${item.uncertain ? '（待确认）' : ''}`,
+                                ),
+                              ];
+                              void navigator.clipboard.writeText(lines.join('\n')).then(() => {
+                                setCopied(true);
+                                setTimeout(() => setCopied(false), 2000);
+                              });
+                            }}
+                            className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                          >
+                            {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                            {copied ? '已复制' : '复制标准格式'}
+                          </button>
+                        </div>
+                        <div className="space-y-1.5">
+                          {aiRecommendResult.filledDeclarationElements.map((item, i) => (
+                            <div key={i} className="flex items-start gap-2 text-xs">
+                              <span className="shrink-0 w-5 text-center font-medium text-muted-foreground">{i + 1}.</span>
+                              <span className="text-muted-foreground shrink-0">{item.element}：</span>
+                              <span className={cn('flex-1', item.uncertain && 'text-amber-600 dark:text-amber-400')}>
+                                {item.value}
+                                {item.uncertain && <span className="ml-1 text-[10px] opacity-70">（待确认）</span>}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed border-t pt-2">
+                          以上为 AI 参考推断，不保证精确。确认 HS 编码后，建议进入<strong>详情页</strong>使用「AI 辅助填写申报要素」获得基于真实要素模板的准确填写建议。
+                        </p>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
-                    {aiRecommendResult.rawResponse || '未找到合适的 HS 码推荐，请换用更详细的产品描述。'}
+                    {aiRecommendResult.reason ||
+                      aiRecommendResult.rawResponse ||
+                      '未找到合适的 HS 码推荐，请换用更详细的产品描述。'}
                   </div>
                 )}
 
                 {aiRecommendResult.candidates.length > 0 && (
                   <div className="space-y-1">
                     <p className="text-xs font-medium text-muted-foreground">参考候选（{aiRecommendResult.candidates.length} 条）</p>
-                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                    <p className="text-[11px] text-muted-foreground">
+                      分数＝相似度换算后按名次递减，仅供排序。
+                    </p>
+                    <div className="space-y-1 max-h-36 overflow-y-auto">
                       {aiRecommendResult.candidates.map((c) => (
                         <button
                           key={c.id}
-                          className="w-full text-left flex items-center gap-2 rounded px-2 py-1 hover:bg-muted text-xs"
+                          type="button"
+                          className="flex w-full items-start gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-muted"
                           onClick={() => { setKeyword(c.hsCode); setAiRecommendOpen(false); }}
                         >
-                          <span className="font-mono text-primary">{c.hsCode}</span>
-                          <span className="text-muted-foreground truncate">{c.productName}</span>
+                          <span className="font-mono break-all text-primary">{c.hsCode}</span>
+                          <span className="min-w-0 flex-1 truncate text-muted-foreground">{c.productName}</span>
+                          <Badge variant="outline" className="shrink-0 tabular-nums">
+                            {typeof c.confidenceScore === 'number' ? `${c.confidenceScore} 分` : '—'}
+                          </Badge>
                         </button>
                       ))}
                     </div>

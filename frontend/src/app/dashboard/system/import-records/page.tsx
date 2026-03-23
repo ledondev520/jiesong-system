@@ -295,7 +295,7 @@ export default function SystemImportRecordsPage() {
             </Table>
           </div>
 
-          <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+          <div className="mt-4 flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <span>
               共 {total} 条，第 {page}/{totalPages} 页
             </span>
