@@ -123,7 +123,7 @@ export default function CreatePurchasePage() {
     defaultValues: {
       supplierId: '',
       contractNo: '',
-      signedAt: new Date(),
+      signedAt: undefined,
       taxRate: 13,
       note: '',
       items: [{ productId: '', quantity: 0, unitPrice: 0, unit: '', note: '' }],
@@ -137,6 +137,12 @@ export default function CreatePurchasePage() {
 
   const watchItems = useWatch({ control: form.control, name: 'items' });
   const watchSupplierId = useWatch({ control: form.control, name: 'supplierId' });
+
+  useEffect(() => {
+    if (!form.getValues('signedAt')) {
+      form.setValue('signedAt', new Date(), { shouldDirty: false });
+    }
+  }, [form]);
 
   // 计算总价
   const totalAmount = watchItems.reduce((sum, item) => {
@@ -360,7 +366,6 @@ export default function CreatePurchasePage() {
                         control={form.control}
                         name={`items.${index}.productId`}
                         render={({ field }) => {
-                          const selectedProduct = products.find(p => p.id === field.value);
                           return (
                             <FormItem>
                               <FormLabel className={index !== 0 ? 'sr-only' : ''}>商品</FormLabel>

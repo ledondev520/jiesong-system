@@ -1,0 +1,69 @@
+diff --git a/frontend/e2e/helpers.ts b/frontend/e2e/helpers.ts
+index d18ca54..f7f81f1 100644
+--- a/frontend/e2e/helpers.ts
++++ b/frontend/e2e/helpers.ts
+@@ -663,6 +663,41 @@ export const mockApiRoutes = async (page: Page) => {
+       return;
+     }
+ 
++    if (pathname === '/api/v1/system/exchange-rate' && method === 'GET') {
++      await fulfillJson(route, {
++        rate: 7.2,
++        buffer: 0.2,
++        effectiveRate: 7.0,
++      });
++      return;
++    }
++
++    if (pathname === '/api/v1/finance/payment-trends' && method === 'GET') {
++      await fulfillJson(route, [
++        { label: '第1周', receivables: 32000, payables: 18000 },
++        { label: '第2周', receivables: 28000, payables: 22000 },
++        { label: '第3周', receivables: 36000, payables: 16000 },
++        { label: '第4周', receivables: 42000, payables: 24000 },
++      ]);
++      return;
++    }
++
++    if (pathname === '/api/v1/finance/overdue-receivables' && method === 'GET') {
++      await fulfillJson(route, [
++        {
++          id: 'ov-1',
++          contractNo: 'EXP2600001',
++          totalAmount: 220000,
++          receivedAmount: 50000,
++          unreceived: 170000,
++          shippedAt: now,
++          overdueDays: 12,
++          status: 'SHIPPED',
++        },
++      ]);
++      return;
++    }
++
+     if (pathname === '/api/v1/finance/payables' && method === 'GET') {
+       await fulfillJson(route, asPaginated(payables));
+       return;
+diff --git a/frontend/playwright.config.ts b/frontend/playwright.config.ts
+index da85750..e1baa31 100644
+--- a/frontend/playwright.config.ts
++++ b/frontend/playwright.config.ts
+@@ -15,14 +15,14 @@ export default defineConfig({
+   retries: 1,
+   reporter: [['list'], ['html', { open: 'never' }]],
+   use: {
+-    baseURL: 'http://127.0.0.1:3001',
++    baseURL: 'http://127.0.0.1:3004',
+     trace: 'on-first-retry',
+   },
+   webServer: {
+-    command: 'npm run dev -- --hostname 127.0.0.1 -p 3001',
+-    url: 'http://127.0.0.1:3001',
++    command: 'npm run build && npm run start -- --hostname 127.0.0.1 -p 3004',
++    url: 'http://127.0.0.1:3004',
+     reuseExistingServer: true,
+-    timeout: 120000,
++    timeout: 180000,
+   },
+   projects: [
+     {

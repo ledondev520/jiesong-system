@@ -21,7 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { StatusBadge, type StatusBadgeConfig } from '@/components/ui/status-badge';
-import { Plus, Pencil, Trash, Ship, Eye } from 'lucide-react';
+import { Plus, Pencil, Trash, Ship, Eye, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { ContainerDialog } from './components/ContainerDialog';
 import type { ContainerFormValues } from './components/ContainerDialog';
@@ -29,12 +29,14 @@ import { toast } from 'sonner';
 import { PORTS } from '@/lib/constants';
 import { formatDate } from '@/lib/date-format';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { TableStateRow } from '@/components/ui/data-state';
 
 const PAGE_SIZE = 20;
 
 export default function ContainersPage() {
   const [containers, setContainers] = useState<SalesContract[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingContainer, setEditingContainer] = useState<SalesContract | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -45,10 +47,12 @@ export default function ContainersPage() {
 
   const loadContainers = async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const response = await containerService.getAll({ page: 1, pageSize: 100, lite: true });
       setContainers(response.data?.items || []);
     } catch {
+      setLoadError(true);
       toast.error('加载货柜失败');
     } finally {
       setLoading(false);
@@ -144,13 +148,28 @@ export default function ContainersPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-               <TableRow>
-                 <TableCell colSpan={6} className="text-center py-10">加载中...</TableCell>
-               </TableRow>
+              <TableStateRow colSpan={6} variant="loading" title="加载中..." />
+            ) : loadError ? (
+              <TableStateRow
+                colSpan={6}
+                variant="error"
+                title="数据加载失败"
+                description="货柜列表暂时不可用，请稍后重试。"
+                action={
+                  <Button variant="outline" size="sm" onClick={() => void loadContainers()}>
+                    <RefreshCw className="mr-1 h-4 w-4" />
+                    重试
+                  </Button>
+                }
+              />
             ) : containers.length === 0 ? (
-               <TableRow>
-                 <TableCell colSpan={6} className="text-center py-10">暂无货柜数据。</TableCell>
-               </TableRow>
+              <TableStateRow
+                colSpan={6}
+                variant="empty"
+                icon={Ship}
+                title="暂无货柜数据。"
+                description="创建首个货柜后，这里会展示装运进度与预计到港时间。"
+              />
             ) : (
               pagedContainers.map((container) => (
                 <TableRow key={container.id}>

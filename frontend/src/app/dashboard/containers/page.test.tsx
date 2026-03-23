@@ -83,7 +83,8 @@ describe('ContainersPage 交互逻辑', () => {
 
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('加载货柜失败');
+      expect(screen.getByText('数据加载失败')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
     });
   });
 });
-

@@ -62,11 +62,12 @@ describe('AIAssistant', () => {
     globalThis.FileReader = OriginalFileReader;
   });
 
-  it('点击浮动按钮后打开助手窗口', async () => {
+  it('点击低存在感触发器后打开侧边面板', async () => {
     const user = userEvent.setup();
     render(<AIAssistant />);
 
-    await user.click(screen.getByRole('button', { name: '打开AI助手' }));
+    await user.click(screen.getByRole('button', { name: 'AI 助手' }));
+    expect(screen.getByRole('complementary', { name: 'AI 助手侧边面板' })).toBeInTheDocument();
     expect(screen.getByText('捷淞智能助手')).toBeInTheDocument();
   });
 
@@ -76,7 +77,7 @@ describe('AIAssistant', () => {
     const user = userEvent.setup();
     render(<AIAssistant />);
 
-    await user.click(screen.getByRole('button', { name: '打开AI助手' }));
+    await user.click(screen.getByRole('button', { name: 'AI 助手' }));
     const input = screen.getByPlaceholderText('输入问题或粘贴图片...');
     await user.type(input, '你好');
     await user.keyboard('{Enter}');
@@ -104,7 +105,7 @@ describe('AIAssistant', () => {
     const user = userEvent.setup();
     render(<AIAssistant />);
 
-    await user.click(screen.getByRole('button', { name: '打开AI助手' }));
+    await user.click(screen.getByRole('button', { name: 'AI 助手' }));
     const input = screen.getByPlaceholderText('输入问题或粘贴图片...');
     await user.type(input, '请给出建议');
     await user.keyboard('{Enter}');
@@ -119,7 +120,7 @@ describe('AIAssistant', () => {
     const user = userEvent.setup();
     render(<AIAssistant />);
 
-    await user.click(screen.getByRole('button', { name: '打开AI助手' }));
+    await user.click(screen.getByRole('button', { name: 'AI 助手' }));
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     const image = new File(['img'], 'test.png', { type: 'image/png' });
     await user.upload(fileInput, image);
@@ -140,7 +141,7 @@ describe('AIAssistant', () => {
     const user = userEvent.setup();
     render(<AIAssistant />);
 
-    await user.click(screen.getByRole('button', { name: '打开AI助手' }));
+    await user.click(screen.getByRole('button', { name: 'AI 助手' }));
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     const oversizedImage = new File([new Uint8Array(6 * 1024 * 1024)], 'big.png', { type: 'image/png' });
     await user.upload(fileInput, oversizedImage);
@@ -153,7 +154,7 @@ describe('AIAssistant', () => {
     const user = userEvent.setup({ applyAccept: false });
     render(<AIAssistant />);
 
-    await user.click(screen.getByRole('button', { name: '打开AI助手' }));
+    await user.click(screen.getByRole('button', { name: 'AI 助手' }));
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     const textFile = new File(['plain text'], 'note.txt', { type: 'text/plain' });
     await user.upload(fileInput, textFile);
@@ -165,7 +166,7 @@ describe('AIAssistant', () => {
     const user = userEvent.setup();
     render(<AIAssistant />);
 
-    await user.click(screen.getByRole('button', { name: '打开AI助手' }));
+    await user.click(screen.getByRole('button', { name: 'AI 助手' }));
     const input = screen.getByPlaceholderText('输入问题或粘贴图片...');
     const image = new File(['img'], 'paste.png', { type: 'image/png' });
 
@@ -189,7 +190,7 @@ describe('AIAssistant', () => {
     const user = userEvent.setup();
     render(<AIAssistant />);
 
-    await user.click(screen.getByRole('button', { name: '打开AI助手' }));
+    await user.click(screen.getByRole('button', { name: 'AI 助手' }));
     const dropArea = document.querySelector('[data-slot="card-content"]') as HTMLElement;
     const image = new File(['img'], 'drop.png', { type: 'image/png' });
 
@@ -204,4 +205,3 @@ describe('AIAssistant', () => {
     });
   });
 });
-

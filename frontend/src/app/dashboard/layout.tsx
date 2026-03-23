@@ -8,11 +8,12 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { useAuthStore } from '@/store/auth.store';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { getDefaultDashboardHref, getModuleByPath, getVisibleModuleNavItems } from '@/components/layout/navigation.config';
 
 type PersistedAuthState = {
   state?: {
@@ -52,25 +53,20 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  // 0. 始终从 false 开始，确保服务端不渲染 Radix UI 组件（避免 SSR/CSR ID 不一致）
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    // 1. 客户端挂载后检查 Zustand persist 状态
-    const persistApi = useAuthStore.persist;
-    if (!persistApi || persistApi.hasHydrated()) {
-      // 1.1 已完成或无 persist API，直接设置 hydrated
-      setHydrated(true);
-      return;
-    }
-    // 1.2 等待 Zustand persist hydration 完成
-    const unsubscribe = persistApi.onFinishHydration(() => {
-      setHydrated(true);
-    });
-
-    return unsubscribe;
-  }, []);
+  const user = useAuthStore((state) => state.user);
+  const hydrated = useSyncExternalStore(
+    (callback) => {
+      const persistApi = useAuthStore.persist;
+      if (!persistApi) {
+        return () => {};
+      }
+      return persistApi.onFinishHydration(callback);
+    },
+    () => useAuthStore.persist?.hasHydrated?.() ?? true,
+    () => false,
+  );
 
   useEffect(() => {
     // 0. 仅在 hydration 完成后执行客户端跳转，避免 SSR/CSR 分支差异
@@ -90,6 +86,22 @@ export default function DashboardLayout({
       router.replace('/login');
     }
   }, [hydrated, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (!hydrated || !isAuthenticated) {
+      return;
+    }
+
+    const currentModule = getModuleByPath(pathname);
+    if (!currentModule) {
+      return;
+    }
+
+    const visibleKeys = new Set(getVisibleModuleNavItems(user?.role).map((item) => item.key));
+    if (!visibleKeys.has(currentModule.key)) {
+      router.replace(getDefaultDashboardHref(user?.role));
+    }
+  }, [hydrated, isAuthenticated, pathname, router, user?.role]);
 
   if (!hydrated) {
     return null; // Prevent hydration mismatch

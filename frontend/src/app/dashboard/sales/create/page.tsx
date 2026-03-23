@@ -62,7 +62,7 @@ export default function CreateSalesPage() {
     resolver: zodResolver(salesSchema),
     defaultValues: {
       contractNo: '',
-      signedAt: new Date(),
+      signedAt: undefined,
       exchangeRate: DEFAULT_EXCHANGE_RATE,
       note: '',
       items: [{ productId: '', storeId: '', quantity: 0, unit: '', costPrice: 0, sellingPrice: 0, note: '' }],
@@ -76,6 +76,12 @@ export default function CreateSalesPage() {
 
   const watchItems = useWatch({ control: form.control, name: 'items' });
   const exchangeRate = useWatch({ control: form.control, name: 'exchangeRate' });
+
+  useEffect(() => {
+    if (!form.getValues('signedAt')) {
+      form.setValue('signedAt', new Date(), { shouldDirty: false });
+    }
+  }, [form]);
 
   // Calculate Total
   const totalAmount = watchItems.reduce((sum, item) => {

@@ -1,3 +1,330 @@
+# 2026-03-23 Round 19: Frontend E2E stabilization before commit
+
+## Goal
+- Clear the last pre-commit Playwright failures and turn the frontend into a truly commit-ready state.
+- Re-verify backend/frontend gates on fresh production output instead of relying on earlier partial green runs.
+
+## Planned Execution
+- Remove the production hydration mismatch in the dashboard shell.
+- Update stale E2E mocks and assertions for current IA, import contracts, AI stats/history, and purchase file endpoints.
+- Rebuild the frontend, run against a fresh preview on `127.0.0.1:3004`, and rerun the full E2E suite.
+- Re-run the backend/frontend verification stack before commit.
+
+## Verification Plan
+- `npm run test`
+- `npm run lint`
+- `npm run build`
+- `npm run test:e2e`
+
+## Execution Outcome
+- `src/app/dashboard/layout.tsx` now uses `useSyncExternalStore` for persisted-auth hydration, fixing the production shell mismatch that surfaced as `React error #418`.
+- `src/components/layout/Header.tsx` now renders its date string through an SSR-safe subscription pattern rather than render-time clock reads.
+- `src/app/dashboard/purchase/create/components/CreatePurchasePageContent.tsx` and `src/app/dashboard/sales/create/page.tsx` now initialize `signedAt` client-side after mount.
+- `e2e/helpers.ts` now includes the missing mocks for procurement-template store routes, AI token/history endpoints, paginated import history, and purchase file APIs.
+- `e2e/smoke.spec.ts` now matches the current dashboard/settings IA and no longer depends on removed tabs or labels.
+- `e2e/button-coverage.spec.ts` no longer scans the removed `/dashboard/logs` route.
+- `src/services/dataImportService.ts` now accepts both array and paginated import-history payloads, with regression coverage in `src/services/dataImportService.test.ts`.
+
+## Verification
+- `npm run test` => `110` files / `356` tests passed.
+- `npm run lint` => passed.
+- `npm run build` => passed.
+- `npm run test:e2e` => `57/57` passed.
+
+## Phase Boundary
+- This round is successful only if the prior “feature-complete but not commit-ready” state is eliminated, the full Playwright suite passes on a fresh production preview, and the frontend can be committed without known gate failures.
+
+# 2026-03-23 Round 18: Frontend next iterations round 7
+
+## Goal
+- Finish the remaining `docs/frontend-next-iterations-2026-03.md` scope with `FE-MODULE-01` and `FE-QA-01`.
+- Differentiate procurement/export module homes and add screenshot-regression coverage for the highest-signal pages.
+
+## Planned Execution
+- Add a procurement overview band to `src/app/dashboard/contracts/components/ContractsPageContent.tsx`.
+- Add an export-shipping overview band to `src/app/dashboard/sales/page.tsx`.
+- Add Playwright visual coverage in `e2e/visual.spec.ts` for:
+  - login
+  - dashboard
+  - procurement
+  - finance
+  - mobile dashboard first screen
+- Stabilize the visual gate by running against a dedicated production preview port and by filling the missing finance mocks in `e2e/helpers.ts`.
+
+## Verification Plan
+- `npm run test -- src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.test.tsx`
+- `npm run lint -- src/app/dashboard/contracts/components/ContractsPageContent.tsx src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx`
+- `npm run test:e2e -- e2e/visual.spec.ts`
+- `npm run build`
+
+## Execution Outcome
+- Procurement now has a dedicated top-of-page overview section summarizing:
+  - active follow-up contracts
+  - producing contracts
+  - shipped-but-not-received contracts
+  - active stores
+- Export now has a dedicated shipment overview section summarizing:
+  - contracts preparing for loading
+  - in-transit containers
+  - arrived-but-not-closed contracts
+  - total box count
+- Added `e2e/visual.spec.ts` and generated snapshot baselines for:
+  - login
+  - dashboard
+  - procurement
+  - finance
+  - mobile dashboard first screen
+- `playwright.config.ts` now uses a dedicated production preview on `127.0.0.1:3004`.
+- `e2e/helpers.ts` now includes the missing finance mocks for exchange rate, payment trends, and overdue receivables.
+
+## Verification
+- `npm run test -- src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.test.tsx`
+- `npm run lint -- src/app/dashboard/contracts/components/ContractsPageContent.tsx src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx`
+- `npm run test:e2e -- e2e/visual.spec.ts --grep visual-finance --update-snapshots`
+- `npm run test:e2e -- e2e/visual.spec.ts`
+- `npm run build`
+
+## Phase Boundary
+- This round is successful only if procurement/export home surfaces are no longer generic clones, the five screenshot baselines are stable under Playwright, and the full March frontend-iteration plan is complete.
+
+# 2026-03-23 Round 17: Frontend next iterations round 6
+
+## Goal
+- Continue `docs/frontend-next-iterations-2026-03.md` with `FE-AI-01`.
+- Reduce the AI assistant from a high-attention floating surface into a quieter assistive entry.
+
+## Planned Execution
+- Keep the chat/image/SSE logic intact while changing presentation and mount rules.
+- Update `LazyAIAssistantMount.tsx` so the dedicated AI workspace no longer also gets the global assistant.
+- Update `AIAssistant.tsx` so the default entry is quieter and the conversation opens as a right-side panel.
+- Add failing tests first for both mount boundary and panel semantics.
+
+## Verification Plan
+- `npm run test -- src/components/ai/AIAssistant.test.tsx src/components/ai/LazyAIAssistantMount.test.tsx`
+- `npm run lint -- src/components/ai/AIAssistant.tsx src/components/ai/AIAssistant.test.tsx src/components/ai/LazyAIAssistantMount.tsx src/components/ai/LazyAIAssistantMount.test.tsx`
+- `npm run build`
+
+## Execution Outcome
+- `LazyAIAssistantMount.tsx` now skips `/dashboard/ai/*`, preventing duplicate assistant presence in the dedicated AI workspace.
+- `AIAssistant.tsx` now uses a lower-noise trigger instead of the large floating circular button.
+- The assistant opens as a right-side panel with explicit `complementary` semantics.
+- Existing chat, upload, paste, drag-drop, and SSE-response behavior stays covered by the refreshed tests.
+
+## Verification
+- `npm run test -- src/components/ai/AIAssistant.test.tsx src/components/ai/LazyAIAssistantMount.test.tsx`
+- `npm run lint -- src/components/ai/AIAssistant.tsx src/components/ai/AIAssistant.test.tsx src/components/ai/LazyAIAssistantMount.tsx src/components/ai/LazyAIAssistantMount.test.tsx`
+- `npm run build`
+
+## Phase Boundary
+- This round is successful only if the assistant is visibly less intrusive by default, AI workspace duplication is removed, and the existing assistant capabilities remain intact under focused verification.
+
+# 2026-03-23 Round 16: Frontend next iterations round 5
+
+## Goal
+- Continue `docs/frontend-next-iterations-2026-03.md` with `FE-SHELL-01` and `FE-SEARCH-01`.
+- Decompose the overloaded `Header` shell and move global search behind a thinner aggregation service.
+
+## Planned Execution
+- Reduce `src/components/layout/Header.tsx` to shell orchestration only.
+- Extract focused child components:
+  - `HeaderMobileNav`
+  - `HeaderSearch`
+  - `HeaderNotifications`
+  - `HeaderUserMenu`
+- Add `src/services/dashboardSearch.service.ts` so search no longer fans out across five endpoints directly inside `Header`.
+- Add red tests first for staged search and Header search delegation before wiring the refactor.
+
+## Verification Plan
+- `npm run test -- src/components/layout/Header.test.tsx src/services/dashboardSearch.service.test.ts`
+- `npm run lint -- src/components/layout/Header.tsx src/components/layout/Header*.tsx src/services/dashboardSearch.service.ts src/services/dashboardSearch.service.test.ts`
+- `npm run build`
+
+## Execution Outcome
+- `src/components/layout/Header.tsx` is now a shell orchestrator rather than the place where mobile navigation, search fanout, notifications, and user menu all coexist.
+- Added focused child components:
+  - `HeaderMobileNav`
+  - `HeaderSearch`
+  - `HeaderNotifications`
+  - `HeaderUserMenu`
+- Added `src/services/dashboardSearch.service.ts` with staged search:
+  - `products + suppliers` first
+  - `containers + purchases + sales` only when the first batch is insufficient
+- Added focused regressions in:
+  - `src/components/layout/Header.test.tsx`
+  - `src/services/dashboardSearch.service.test.ts`
+
+## Verification
+- `npm run test -- src/components/layout/Header.test.tsx src/services/dashboardSearch.service.test.ts`
+- `npm run lint -- src/components/layout/Header.tsx src/components/layout/Header*.tsx src/services/dashboardSearch.service.ts src/services/dashboardSearch.service.test.ts`
+- `npm run build`
+
+## Phase Boundary
+- This round is successful only if Header responsibilities are materially clearer, search no longer lives as five direct requests in the component, and focused verification proves the user-facing search flow still works.
+
+# 2026-03-23 Round 15: Frontend next iterations round 4
+
+## Goal
+- Continue `docs/frontend-next-iterations-2026-03.md` with `FE-SPLIT-02`.
+- Decompose the oversized store recommendation route without changing its behavior.
+
+## Planned Execution
+- Keep `src/app/dashboard/store-recommend/page.tsx` as a thin route wrapper.
+- Extract a single stateful content component to own AI/template/store selection state.
+- Split the page into:
+  - `StoreRecommendTemplateTab`
+  - `StoreRecommendAITab`
+  - `StoreRecommendStatsTab`
+  - shared helpers for category mapping, priority badges, and CSV export
+- Add or tighten page-level regression around store switching before the split.
+
+## Verification Plan
+- `npm run test -- src/app/dashboard/store-recommend/page.test.tsx`
+- `npm run lint -- src/app/dashboard/store-recommend/page.tsx src/app/dashboard/store-recommend/page.test.tsx src/app/dashboard/store-recommend/components/*.tsx src/test/setup.ts`
+- `npm run build`
+
+## Execution Outcome
+- `src/app/dashboard/store-recommend/page.tsx` is now a thin wrapper.
+- The page logic is now split into:
+  - `StoreRecommendPageContent`
+  - `StoreRecommendTemplateTab`
+  - `StoreRecommendAITab`
+  - `StoreRecommendStatsTab`
+  - `storeRecommendShared`
+- Added a store-switching regression test and stabilized Radix Select interactions in `src/test/setup.ts`.
+
+## Verification
+- `npm run test -- src/app/dashboard/store-recommend/page.test.tsx`
+- `npm run lint -- src/app/dashboard/store-recommend/page.tsx src/app/dashboard/store-recommend/page.test.tsx src/app/dashboard/store-recommend/components/*.tsx src/test/setup.ts`
+- `npm run build`
+
+## Phase Boundary
+- This round is successful only if the route becomes materially easier to evolve while the store-switching/template/AI/stats behavior remains stable under tests and production build.
+
+# 2026-03-23 Round 14: Frontend next iterations round 3
+
+## Goal
+- Continue `docs/frontend-next-iterations-2026-03.md` with `FE-STATE-01`.
+- Unify loading / empty / error states across the highest-traffic dashboard pages without changing backend contracts.
+
+## Planned Execution
+- Add a shared state presentation layer in `src/components/ui/data-state.tsx`.
+- Adopt it first in:
+  - `src/app/dashboard/finance/page.tsx`
+  - `src/app/dashboard/reports/page.tsx`
+  - `src/app/dashboard/payments/page.tsx`
+  - `src/app/dashboard/containers/page.tsx`
+  - `src/app/dashboard/inventory-container/page.tsx`
+- Add regression tests for shared state rendering and page-level state adoption before wiring the new components in.
+
+## Verification Plan
+- `npm run test -- src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.test.tsx`
+- `npm run lint -- src/components/ui/data-state.tsx src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.tsx src/app/dashboard/payments/page.test.tsx`
+- `npm run build`
+
+## Execution Outcome
+- Added `src/components/ui/data-state.tsx` with:
+  - `LoadingState`
+  - `ErrorState`
+  - `TableStateRow`
+- Added `src/components/ui/data-state.test.tsx` to lock the shared state primitives.
+- Replaced bespoke state blocks in the five highest-traffic target pages with shared state components.
+- Preserved the existing core titles (`加载中...`, `数据加载失败`, `暂无*`) while standardizing layout and retry affordances.
+
+## Verification
+- `npm run test -- src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.test.tsx`
+- `npm run lint -- src/components/ui/data-state.tsx src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.tsx src/app/dashboard/payments/page.test.tsx`
+- `npm run build`
+
+## Phase Boundary
+- This round is successful only if shared state rendering exists, the five target pages use it, and verification proves the state-system cleanup did not break page behavior.
+
+# 2026-03-23 Round 13: Frontend next iterations round 2
+
+## Goal
+- Continue `docs/frontend-next-iterations-2026-03.md` with `FE-SPLIT-01`.
+- Decompose the oversized finance statements route into clearer page/container/section/dialog boundaries without changing behavior.
+
+## Planned Execution
+- Keep `src/app/dashboard/finance/statements/page.tsx` as a thin route entry.
+- Extract a single stateful container for data loading, import flows, and derived view-model state.
+- Extract presentational sections for:
+  - loading shell
+  - empty state
+  - overview/KPI area
+  - trends/balance/detail tabs
+  - historical alerts
+  - upload dialog
+- Add page-level regression tests before moving render blocks.
+
+## Verification Plan
+- `npm run test -- src/app/dashboard/finance/statements/page.test.tsx`
+- `npm run lint -- src/app/dashboard/finance/statements/page.tsx src/app/dashboard/finance/statements/page.test.tsx src/app/dashboard/finance/statements/components/*.tsx`
+- `npm run build`
+
+## Execution Outcome
+- `src/app/dashboard/finance/statements/page.tsx` is now a thin route wrapper.
+- The statements page is now split around the existing component boundaries:
+  - `FinancialStatementsPageContent`: page state, effects, import flows, and derived view-model
+  - `FinancialStatementsOverview`: header actions, empty state, alerts, KPI cards, working-capital overview
+  - `FinancialStatementsTabsSection`: chart tabs, detail tab, and historical alerts
+  - `FinancialStatementsUploadDialog`: file upload and period input dialog
+- Added `src/app/dashboard/finance/statements/page.test.tsx` to lock the page-level behavior before and after the refactor.
+
+## Verification
+- `npm run test -- src/app/dashboard/finance/statements/page.test.tsx`
+- `npm run lint -- src/app/dashboard/finance/statements/page.tsx src/app/dashboard/finance/statements/page.test.tsx src/app/dashboard/finance/statements/components/FinancialStatementsPageContent.tsx src/app/dashboard/finance/statements/components/FinancialStatementsOverview.tsx src/app/dashboard/finance/statements/components/FinancialStatementsTabsSection.tsx src/app/dashboard/finance/statements/components/FinancialStatementsUploadDialog.tsx src/app/dashboard/finance/statements/components/FinancialStatementsShared.tsx src/app/dashboard/finance/statements/components/financialStatementsFormatting.ts`
+- `npm run build`
+
+## Phase Boundary
+- This round is successful only if the finance statements page becomes materially easier to evolve while preserving its current import, tab, and detail behavior.
+
+# 2026-03-22 Round 12: Frontend next iterations round 1
+
+## Goal
+- Start executing `docs/frontend-next-iterations-2026-03.md` instead of leaving it as backlog only.
+- Complete the first slice:
+  - `FE-DASH-01` dashboard home redesign
+  - `FE-NAV-02` deeper navigation registry behavior
+
+## Planned Execution
+- Reframe `src/app/dashboard/page.tsx` into a true workspace homepage.
+- Rework `src/components/dashboard/DataDashboard.tsx` around:
+  - 当前焦点
+  - 高频动作
+  - 风险提醒
+  - 关键趋势
+- Extend `src/components/layout/navigation.config.ts` with visibility/default-landing/redirect metadata.
+- Keep the scope inside dashboard home + shell metadata. Large-page decomposition stays out of scope.
+
+## Execution Outcome
+- `FE-DASH-01`
+  - Removed the old `快速录入 + ProductTracker + legacy chart stack` composition from `/dashboard`.
+  - Promoted the homepage into a workspace with four visible zones:
+    - 当前焦点
+    - 高频动作
+    - 风险提醒
+    - 关键趋势
+  - Demoted `ProductTracker` into a secondary `经营工具` section.
+  - Reworked `DataDashboard.tsx` to derive focus/risk summaries from the existing analytics contract instead of widening backend scope.
+- `FE-NAV-02`
+  - Extended `navigation.config.ts` with `defaultHref`, `visibleRoles`, and helper functions for target resolution and active-route matching.
+  - Hid the admin module for non-admin roles in shared registry consumers.
+  - Unified sidebar/mobile navigation target resolution through the same registry helper.
+  - Added layout-level fallback redirect from hidden dashboard modules back to the default visible dashboard landing.
+
+## Verification Plan
+- `npm run test -- src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.test.tsx src/app/dashboard/layout.test.tsx src/components/layout/Sidebar.test.tsx src/components/layout/Header.test.tsx`
+- `npm run lint -- src/app/dashboard/page.tsx src/components/dashboard/DataDashboard.tsx src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.test.tsx src/components/layout/navigation.config.ts src/app/dashboard/layout.tsx src/app/dashboard/layout.test.tsx src/components/layout/Sidebar.test.tsx`
+- `npm run build`
+
+## Verification
+- `npm run test -- src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.test.tsx src/components/layout/navigation.config.test.ts src/app/dashboard/layout.test.tsx src/components/layout/Sidebar.test.tsx`
+- `npm run lint -- src/app/dashboard/page.tsx src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.tsx src/components/dashboard/DataDashboard.test.tsx src/components/layout/navigation.config.ts src/components/layout/navigation.config.test.ts src/components/layout/Sidebar.tsx src/components/layout/Sidebar.test.tsx src/components/layout/Header.tsx src/components/layout/ModuleTabHeader.tsx src/app/dashboard/layout.tsx src/app/dashboard/layout.test.tsx`
+- `npm run build`
+
+## Phase Boundary
+- This round is successful only if the dashboard homepage meaningfully changes hierarchy and the shell derives more behavior from the registry without breaking existing navigation flows.
+
 # 2026-03-12 Round 8: Global shadcn/ui visual baseline unification
 
 ## Goal

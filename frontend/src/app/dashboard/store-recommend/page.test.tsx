@@ -13,6 +13,9 @@ import StoreRecommendPage from './page';
 
 const mockGetStoreStats = vi.fn();
 const mockGenerateRecommendations = vi.fn();
+const mockGetStoreList = vi.fn();
+const mockGetUniversalTemplate = vi.fn();
+const mockGetStoreTemplate = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -36,13 +39,9 @@ vi.mock('@/services/storeRecommend.service', () => ({
 
 vi.mock('@/services/procurementTemplate.service', () => ({
   procurementTemplateService: {
-    getStoreList: vi.fn().mockResolvedValue({ data: [] }),
-    getUniversalTemplate: vi.fn().mockResolvedValue({
-      data: { items: [], totalCount: 0, byCategory: {}, categoryCount: 0, storeCount: 0 },
-    }),
-    getStoreTemplate: vi.fn().mockResolvedValue({
-      data: { storeId: '', storeName: '', items: [], byCategory: {}, totalItems: 0 },
-    }),
+    getStoreList: (...args: unknown[]) => mockGetStoreList(...args),
+    getUniversalTemplate: (...args: unknown[]) => mockGetUniversalTemplate(...args),
+    getStoreTemplate: (...args: unknown[]) => mockGetStoreTemplate(...args),
   },
 }));
 
@@ -50,6 +49,24 @@ describe('StoreRecommendPage 交互逻辑', () => {
   beforeEach(() => {
     mockGetStoreStats.mockReset();
     mockGenerateRecommendations.mockReset();
+    mockGetStoreList.mockReset();
+    mockGetUniversalTemplate.mockReset();
+    mockGetStoreTemplate.mockReset();
+
+    mockGetStoreList.mockResolvedValue({ data: [] });
+    mockGetUniversalTemplate.mockResolvedValue({
+      data: {
+        items: [],
+        totalStores: 0,
+        totalProducts: 0,
+        mustHaveCount: 0,
+        templateStore: '基准门店',
+        byCategory: {},
+      },
+    });
+    mockGetStoreTemplate.mockResolvedValue({
+      data: { storeId: '', storeName: '', items: [], byCategory: {}, totalProducts: 0, totalAmount: 0 },
+    });
   });
 
   it('加载后展示建议清单概要数据', async () => {
@@ -140,6 +157,68 @@ describe('StoreRecommendPage 交互逻辑', () => {
     await waitFor(() => {
       expect(screen.getByText('门店采购明细')).toBeInTheDocument();
       expect(screen.getByText('洛杉矶店')).toBeInTheDocument();
+    });
+  });
+
+  it('切换到指定门店后展示该店历史采购明细', async () => {
+    mockGetStoreStats.mockResolvedValue({ data: [] });
+    mockGenerateRecommendations.mockResolvedValue({
+      data: {
+        referenceStoreCount: 0,
+        totalProducts: 0,
+        totalEstimatedCost: 0,
+        recommendations: [],
+        byCategory: {},
+      },
+    });
+    mockGetStoreList.mockResolvedValue({ data: ['洛杉矶店'] });
+    mockGetUniversalTemplate.mockResolvedValue({
+      data: {
+        items: [],
+        totalStores: 3,
+        totalProducts: 0,
+        mustHaveCount: 0,
+        templateStore: '洛杉矶店',
+        byCategory: {},
+      },
+    });
+    mockGetStoreTemplate.mockResolvedValue({
+      data: {
+        storeId: 'st-1',
+        storeName: '洛杉矶店',
+        totalProducts: 1,
+        totalAmount: 1200,
+        byCategory: {
+          餐具用品: [
+            {
+              name: '陶瓷盘',
+              supplement: '10寸',
+              totalQty: 20,
+              unit: '个',
+              spec: '白瓷',
+              manufacturer: 'A工厂',
+              totalAmount: 1200,
+            },
+          ],
+        },
+      },
+    });
+
+    const user = userEvent.setup();
+    render(<StoreRecommendPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('查看模式：')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('combobox'));
+    await user.click(screen.getByText('洛杉矶店'));
+
+    await waitFor(() => {
+      expect(mockGetStoreTemplate).toHaveBeenCalledWith('洛杉矶店');
+      expect(screen.getByText('历史采购总额')).toBeInTheDocument();
+      expect(screen.getByText('陶瓷盘')).toBeInTheDocument();
+      expect(screen.getByText('A工厂')).toBeInTheDocument();
     });
   });
 });

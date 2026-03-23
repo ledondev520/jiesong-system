@@ -1,0 +1,968 @@
+diff --git a/frontend/src/app/dashboard/page.test.tsx b/frontend/src/app/dashboard/page.test.tsx
+index 419ffad..93cad72 100644
+--- a/frontend/src/app/dashboard/page.test.tsx
++++ b/frontend/src/app/dashboard/page.test.tsx
+@@ -6,12 +6,14 @@
+  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+  */
+ 
+-import { describe, expect, it, vi } from 'vitest';
+-import { render, screen } from '@testing-library/react';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import { render, screen, waitFor } from '@testing-library/react';
+ import userEvent from '@testing-library/user-event';
+ import DashboardPage from './page';
++import type { ReactNode } from 'react';
+ 
+ const mockPush = vi.fn();
++const mockGetDashboardAnalytics = vi.fn();
+ 
+ vi.mock('next/navigation', () => ({
+   useRouter: () => ({
+@@ -25,25 +27,75 @@ vi.mock('@/components/tools/ProductTracker', () => ({
+   ProductTracker: () => <div>商品追踪模块</div>,
+ }));
+ 
+-vi.mock('@/components/dashboard/DataDashboard', () => ({
+-  DataDashboard: () => <div>数据看板模块</div>,
++vi.mock('@/services/ai.service', () => ({
++  aiService: {
++    getDashboardAnalytics: (...args: unknown[]) => mockGetDashboardAnalytics(...args),
++  },
++}));
++
++vi.mock('recharts', () => ({
++  ResponsiveContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
++  LineChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
++  Line: () => <div>Line</div>,
++  BarChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
++  Bar: () => <div>Bar</div>,
++  XAxis: () => <div>XAxis</div>,
++  YAxis: () => <div>YAxis</div>,
++  CartesianGrid: () => <div>Grid</div>,
++  Tooltip: () => <div>Tooltip</div>,
++  Legend: () => <div>Legend</div>,
+ }));
+ 
+ describe('DashboardPage 交互逻辑', () => {
+-  it('点击新建采购跳转采购创建页', async () => {
+-    const user = userEvent.setup();
++  beforeEach(() => {
++    mockPush.mockReset();
++    mockGetDashboardAnalytics.mockReset();
++    mockGetDashboardAnalytics.mockResolvedValue({
++      data: {
++        contracts: {
++          purchase: { count: 3, totalAmount: 10000, paidAmount: 6000, unpaidAmount: 4000 },
++          sales: { count: 2, totalAmount: 5000, receivedAmount: 2000, receivable: 3000 },
++        },
++        inventory: { productCount: 9, recordCount: 20, totalQuantity: 500 },
++        shipments: { monthly: [] },
++        topProducts: [],
++        storeStats: [],
++      },
++    });
++  });
++
++  it('渲染四块工作区首屏结构', async () => {
+     render(<DashboardPage />);
+ 
+-    await user.click(screen.getByRole('button', { name: '新建采购录入采购合同' }));
+-    expect(mockPush).toHaveBeenCalledWith('/dashboard/purchase/create');
++    await waitFor(() => {
++      expect(screen.getByText('当前焦点')).toBeInTheDocument();
++      expect(screen.getByText('高频动作')).toBeInTheDocument();
++      expect(screen.getByText('风险提醒')).toBeInTheDocument();
++      expect(screen.getByText('关键趋势')).toBeInTheDocument();
++    });
++
++    expect(screen.queryByText('快速录入')).not.toBeInTheDocument();
++    expect(screen.getByText('商品追踪模块')).toBeInTheDocument();
+   });
+ 
+-  it('点击新建销售跳转销售创建页', async () => {
++  it('点击四个高频动作跳转对应页面', async () => {
+     const user = userEvent.setup();
+     render(<DashboardPage />);
+ 
++    await waitFor(() => {
++      expect(screen.getByText('高频动作')).toBeInTheDocument();
++    });
++
++    await user.click(screen.getByRole('button', { name: '新建采购录入采购合同' }));
++    expect(mockPush).toHaveBeenCalledWith('/dashboard/purchase/create');
++
+     await user.click(screen.getByRole('button', { name: '新建销售创建出口合同' }));
+     expect(mockPush).toHaveBeenCalledWith('/dashboard/sales/create');
++
++    await user.click(screen.getByRole('button', { name: '采购合同查看采购履约' }));
++    expect(mockPush).toHaveBeenCalledWith('/dashboard/contracts');
++
++    await user.click(screen.getByRole('button', { name: '收付管理跟进回款与付款' }));
++    expect(mockPush).toHaveBeenCalledWith('/dashboard/payments');
+   });
+ });
+-
+diff --git a/frontend/src/app/dashboard/page.tsx b/frontend/src/app/dashboard/page.tsx
+index 8294164..7fa89b4 100644
+--- a/frontend/src/app/dashboard/page.tsx
++++ b/frontend/src/app/dashboard/page.tsx
+@@ -8,81 +8,25 @@
+ 
+ 'use client';
+ 
+-import dynamic from 'next/dynamic';
+ import { useRouter } from 'next/navigation';
+ import { ModuleTabHeader, OPERATIONS_TABS } from '@/components/layout/ModuleTabHeader';
+ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+ import { Button } from '@/components/ui/button';
+ import { cn } from '@/lib/utils';
+-import { ShoppingCart, TrendingUp, Plus, ArrowRight } from 'lucide-react';
++import { ShoppingCart, TrendingUp, ClipboardList, Wallet, ArrowRight, Wrench } from 'lucide-react';
+ import { ProductTracker } from '@/components/tools/ProductTracker';
+ import { PageHeader } from '@/components/layout/PageHeader';
+-
+-const DataDashboard = dynamic(
+-  () => import('@/components/dashboard/DataDashboard').then((module) => module.DataDashboard),
+-  {
+-    ssr: false,
+-    loading: () => <DashboardAnalyticsSkeleton />,
+-  },
+-);
+-
+-function DashboardAnalyticsSkeleton() {
+-  return (
+-    <div className="space-y-6">
+-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+-        {Array.from({ length: 4 }).map((_, index) => (
+-          <Card key={`kpi-skeleton-${index}`} className="kpi-card">
+-            <CardHeader className="space-y-3 pb-2">
+-              <div className="h-4 w-24 rounded-full bg-muted animate-pulse" />
+-              <div className="h-4 w-4 rounded-full bg-muted animate-pulse" />
+-            </CardHeader>
+-            <CardContent className="space-y-3">
+-              <div className="h-10 w-16 rounded-xl bg-muted animate-pulse" />
+-              <div className="h-3 w-28 rounded-full bg-muted animate-pulse" />
+-              <div className="h-3 w-20 rounded-full bg-muted animate-pulse" />
+-            </CardContent>
+-          </Card>
+-        ))}
+-      </div>
+-
+-      <div className="grid gap-4 md:grid-cols-2">
+-        {Array.from({ length: 2 }).map((_, index) => (
+-          <Card key={`chart-skeleton-${index}`}>
+-            <CardHeader className="space-y-3 pb-3">
+-              <div className="h-5 w-28 rounded-full bg-muted animate-pulse" />
+-              <div className="h-4 w-40 rounded-full bg-muted animate-pulse" />
+-            </CardHeader>
+-            <CardContent>
+-              <div className="h-[200px] rounded-2xl border border-dashed border-border/70 bg-muted/40 animate-pulse" />
+-            </CardContent>
+-          </Card>
+-        ))}
+-      </div>
+-
+-      <Card>
+-        <CardHeader className="space-y-3 pb-3">
+-          <div className="h-5 w-32 rounded-full bg-muted animate-pulse" />
+-          <div className="h-4 w-52 rounded-full bg-muted animate-pulse" />
+-        </CardHeader>
+-        <CardContent>
+-          <div className="h-[300px] rounded-2xl border border-dashed border-border/70 bg-muted/40 animate-pulse" />
+-        </CardContent>
+-      </Card>
+-    </div>
+-  );
+-}
++import { DataDashboard } from '@/components/dashboard/DataDashboard';
+ 
+ /**
+  * 职责：渲染工作台首页
+  * 思路：
+- *   1. 顶部快速录入区（一键开始工作）
+- *   2. 商品追踪（查询商品出货状态）
+- *   3. 数据看板（关键业务指标）
++ *   1. 首屏先展示当前焦点 / 高频动作 / 风险提醒 / 关键趋势
++ *   2. 工具型模块（如商品追踪）下沉为次级区域
+  */
+ export default function DashboardPage() {
+   const router = useRouter();
+ 
+-  // 快速录入入口配置
+   const quickActions = [
+     { 
+       label: '新建采购', 
+@@ -98,67 +42,88 @@ export default function DashboardPage() {
+       tone: 'secondary',
+       desc: '创建出口合同'
+     },
++    {
++      label: '采购合同',
++      icon: ClipboardList,
++      href: '/dashboard/contracts',
++      tone: 'secondary',
++      desc: '查看采购履约',
++    },
++    {
++      label: '收付管理',
++      icon: Wallet,
++      href: '/dashboard/payments',
++      tone: 'primary',
++      desc: '跟进回款与付款',
++    },
+   ];
+ 
+   return (
+-    <div className="space-y-6">
++    <div className="space-y-8">
+       <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
+ 
+       <PageHeader
+         title="工作台"
+-        description="查看关键经营指标，并从这里进入高频业务流程。"
++        description="先看经营焦点与风险，再从高频动作进入当天执行。"
+         showBack={false}
+       />
+ 
+-      {/* 快速录入区 */}
+-      <Card>
+-        <CardHeader className="border-b pb-4">
+-          <CardTitle className="flex items-center gap-2 text-base">
+-            <Plus className="h-5 w-5" />
+-            快速录入
+-          </CardTitle>
+-          <CardDescription>用统一入口创建采购和销售业务。</CardDescription>
+-        </CardHeader>
+-        <CardContent>
+-          <div className="grid gap-3 md:grid-cols-2">
+-            {quickActions.map((action) => {
+-              const Icon = action.icon;
+-              return (
+-                <Button
+-                  key={action.label}
+-                  variant="outline"
+-                  className="h-auto min-h-20 items-start justify-start rounded-xl border border-border bg-background px-4 py-3 text-left shadow-none hover:bg-muted"
+-                  onClick={() => router.push(action.href)}
+-                >
+-                  <div className="flex w-full items-center justify-between">
+-                    <span
+-                      className={cn(
+-                        'flex h-10 w-10 items-center justify-center rounded-lg ring-1',
+-                        action.tone === 'primary'
+-                          ? 'bg-primary/10 text-primary ring-primary/20'
+-                          : 'bg-muted text-muted-foreground ring-border',
+-                      )}
+-                    >
+-                      <Icon className="h-5 w-5" />
+-                    </span>
+-                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+-                  </div>
+-                  <div className="space-y-1">
+-                    <span className="block font-medium text-foreground">{action.label}</span>
+-                    <span className="block text-xs text-muted-foreground">{action.desc}</span>
+-                  </div>
+-                </Button>
+-              );
+-            })}
+-          </div>
+-        </CardContent>
+-      </Card>
++      <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
++        <DataDashboard />
+ 
+-      {/* 商品追踪 */}
+-      <ProductTracker />
++        <Card className="h-fit">
++          <CardHeader className="space-y-2 border-b pb-4">
++            <CardTitle className="text-base">高频动作</CardTitle>
++            <CardDescription>保留最常用的业务入口，减少在侧边栏内来回切换。</CardDescription>
++          </CardHeader>
++          <CardContent className="pt-6">
++            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
++              {quickActions.map((action) => {
++                const Icon = action.icon;
++                return (
++                  <Button
++                    key={action.label}
++                    variant="outline"
++                    className="h-auto min-h-20 items-start justify-start rounded-xl border border-border bg-background px-4 py-3 text-left shadow-none hover:bg-muted"
++                    onClick={() => router.push(action.href)}
++                  >
++                    <div className="flex w-full items-center justify-between">
++                      <span
++                        className={cn(
++                          'flex h-10 w-10 items-center justify-center rounded-lg ring-1',
++                          action.tone === 'primary'
++                            ? 'bg-primary/10 text-primary ring-primary/20'
++                            : 'bg-muted text-muted-foreground ring-border',
++                        )}
++                      >
++                        <Icon className="h-5 w-5" />
++                      </span>
++                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
++                    </div>
++                    <div className="space-y-1">
++                      <span className="block font-medium text-foreground">{action.label}</span>
++                      <span className="block text-xs text-muted-foreground">{action.desc}</span>
++                    </div>
++                  </Button>
++                );
++              })}
++            </div>
++          </CardContent>
++        </Card>
++      </div>
+ 
+-      {/* 数据看板 */}
+-      <DataDashboard />
++      <section className="space-y-3" aria-labelledby="dashboard-tools-heading">
++        <div className="flex items-center gap-2">
++          <Wrench className="h-4 w-4 text-muted-foreground" />
++          <h2 id="dashboard-tools-heading" className="text-base font-semibold text-foreground">
++            经营工具
++          </h2>
++        </div>
++        <CardDescription>将查询型工具下沉为次级区域，避免与首屏经营信号抢焦点。</CardDescription>
++        <div>
++          <ProductTracker />
++        </div>
++      </section>
+     </div>
+   );
+ }
+diff --git a/frontend/src/components/dashboard/DataDashboard.test.tsx b/frontend/src/components/dashboard/DataDashboard.test.tsx
+index 7b56a96..7c352f4 100644
+--- a/frontend/src/components/dashboard/DataDashboard.test.tsx
++++ b/frontend/src/components/dashboard/DataDashboard.test.tsx
+@@ -54,14 +54,35 @@ describe('DataDashboard', () => {
+     render(<DataDashboard />);
+ 
+     await waitFor(() => {
+-      expect(screen.getByText('采购合同')).toBeInTheDocument();
+-      expect(screen.getByText('销售合同')).toBeInTheDocument();
+-      expect(screen.getByText('应收账款')).toBeInTheDocument();
+-      expect(screen.getByText('库存概览')).toBeInTheDocument();
++      expect(screen.getByText('优先处理回款')).toBeInTheDocument();
++      expect(screen.getByText(/待收回款/)).toBeInTheDocument();
++      expect(screen.getByText('关键趋势')).toBeInTheDocument();
+     });
+   });
+ 
+-  it('无图表数据时展示空文案', async () => {
++  it('无应收但有待付时聚焦采购付款', async () => {
++    mockGetDashboardAnalytics.mockResolvedValue({
++      data: {
++        contracts: {
++          purchase: { count: 2, totalAmount: 6000, paidAmount: 1000, unpaidAmount: 5000 },
++          sales: { count: 1, totalAmount: 3000, receivedAmount: 3000, receivable: 0 },
++        },
++        inventory: { productCount: 4, recordCount: 8, totalQuantity: 40 },
++        shipments: { monthly: [] },
++        topProducts: [],
++        storeStats: [],
++      },
++    });
++
++    render(<DataDashboard />);
++
++    await waitFor(() => {
++      expect(screen.getByText('优先处理待付款采购')).toBeInTheDocument();
++      expect(screen.getByText(/采购待付/)).toBeInTheDocument();
++    });
++  });
++
++  it('数据为空时展示低噪音风险与趋势空态', async () => {
+     mockGetDashboardAnalytics.mockResolvedValue({
+       data: {
+         contracts: {
+@@ -78,9 +99,35 @@ describe('DataDashboard', () => {
+     render(<DataDashboard />);
+ 
+     await waitFor(() => {
+-      expect(screen.getByText('暂无出货数据')).toBeInTheDocument();
+-      expect(screen.getByText('暂无门店数据')).toBeInTheDocument();
++      expect(screen.getByText('当前没有需要立即处理的经营风险')).toBeInTheDocument();
++      expect(screen.getByText('暂无出货趋势数据')).toBeInTheDocument();
+       expect(screen.getByText('暂无商品数据')).toBeInTheDocument();
+     });
+   });
++
++  it('加载成功后不再展示门店采购排行图表', async () => {
++    mockGetDashboardAnalytics.mockResolvedValue({
++      data: {
++        contracts: {
++          purchase: { count: 3, totalAmount: 10000, paidAmount: 6000, unpaidAmount: 4000 },
++          sales: { count: 2, totalAmount: 5000, receivedAmount: 2000, receivable: 3000 },
++        },
++        inventory: { productCount: 9, recordCount: 20, totalQuantity: 500 },
++        shipments: {
++          monthly: [{ month: '2026-02', count: 2, amount: 3000, boxes: 12 }],
++        },
++        topProducts: [{ productName: '蓝牙耳机', count: 3, quantity: 120, totalAmount: 2000 }],
++        storeStats: [{ storeName: '杭州一店', orderCount: 2, quantity: 100, totalAmount: 1200 }],
++      },
++    });
++
++    render(<DataDashboard />);
++
++    await waitFor(() => {
++      expect(screen.getByText('月度出货趋势')).toBeInTheDocument();
++      expect(screen.getByText('热门采购商品')).toBeInTheDocument();
++    });
++
++    expect(screen.queryByText('门店采购排行')).not.toBeInTheDocument();
++  });
+ });
+diff --git a/frontend/src/components/dashboard/DataDashboard.tsx b/frontend/src/components/dashboard/DataDashboard.tsx
+index c3ee3aa..2d51d64 100644
+--- a/frontend/src/components/dashboard/DataDashboard.tsx
++++ b/frontend/src/components/dashboard/DataDashboard.tsx
+@@ -13,11 +13,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
+ import { Button } from '@/components/ui/button';
+ import {
+   FileText,
+-  DollarSign,
+   TrendingUp,
+   Package,
+   Loader2,
+   AlertCircle,
++  AlertTriangle,
++  ArrowUpRight,
++  ShieldCheck,
+ } from 'lucide-react';
+ import { aiService, type DashboardAnalytics } from '@/services/ai.service';
+ import {
+@@ -33,9 +35,97 @@ import {
+   Legend,
+ } from 'recharts';
+ 
++type FocusSummary = {
++  title: string;
++  description: string;
++  metrics: Array<{ label: string; value: string }>;
++};
++
++type RiskItem = {
++  title: string;
++  value: string;
++  tone: 'high' | 'medium' | 'low';
++};
++
++const formatAmount = (amount: number, currency: 'CNY' | 'USD') =>
++  `${currency === 'CNY' ? '¥' : '$'}${amount.toLocaleString()}`;
++
++const deriveFocusSummary = (data: DashboardAnalytics): FocusSummary => {
++  if (data.contracts.sales.receivable > 0) {
++    return {
++      title: '优先处理回款',
++      description: '销售侧仍有未回款项，优先跟进收款进度，避免现金流继续占压。',
++      metrics: [
++        { label: '待收金额', value: formatAmount(data.contracts.sales.receivable, 'USD') },
++        { label: '销售合同', value: `${data.contracts.sales.count} 份` },
++        { label: '商品在库', value: `${data.inventory.productCount} 种` },
++      ],
++    };
++  }
++
++  if (data.contracts.purchase.unpaidAmount > 0) {
++    return {
++      title: '优先处理待付款采购',
++      description: '采购侧仍有待付款项，优先确认付款节奏与到货安排，避免履约阻塞。',
++      metrics: [
++        { label: '待付金额', value: formatAmount(data.contracts.purchase.unpaidAmount, 'CNY') },
++        { label: '采购合同', value: `${data.contracts.purchase.count} 份` },
++        { label: '库存记录', value: `${data.inventory.recordCount} 条` },
++      ],
++    };
++  }
++
++  return {
++    title: '今日经营平稳，进入执行动作',
++    description: '当前没有突出的收付压力，优先处理合同推进、库存协同与日常履约。',
++    metrics: [
++      { label: '采购合同', value: `${data.contracts.purchase.count} 份` },
++      { label: '销售合同', value: `${data.contracts.sales.count} 份` },
++      { label: '库存记录', value: `${data.inventory.recordCount} 条` },
++    ],
++  };
++};
++
++const deriveRiskItems = (data: DashboardAnalytics): RiskItem[] => {
++  const risks: RiskItem[] = [];
++
++  if (data.contracts.sales.receivable > 0) {
++    risks.push({
++      title: '待收回款',
++      value: formatAmount(data.contracts.sales.receivable, 'USD'),
++      tone: 'high',
++    });
++  }
++
++  if (data.contracts.purchase.unpaidAmount > 0) {
++    risks.push({
++      title: '采购待付',
++      value: formatAmount(data.contracts.purchase.unpaidAmount, 'CNY'),
++      tone: 'medium',
++    });
++  }
++
++  const hasOperationalActivity =
++    data.contracts.purchase.count > 0 ||
++    data.contracts.sales.count > 0 ||
++    data.inventory.recordCount > 0 ||
++    data.topProducts.length > 0 ||
++    data.storeStats.length > 0;
++
++  if (hasOperationalActivity && data.shipments.monthly.length === 0) {
++    risks.push({
++      title: '出货趋势',
++      value: '暂无近 6 个月出货数据',
++      tone: 'low',
++    });
++  }
++
++  return risks;
++};
++
+ /**
+  * 职责：渲染数据看板
+- * 思路：展示关键业务指标卡片和图表
++ * 思路：把 dashboard analytics 收口成焦点、风险与趋势三个区域
+  */
+ export function DataDashboard() {
+   const [data, setData] = useState<DashboardAnalytics | null>(null);
+@@ -62,241 +152,216 @@ export function DataDashboard() {
+ 
+   if (loading) {
+     return (
+-      <div className="flex items-center justify-center h-32">
+-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
++      <div className="grid gap-6">
++        <section className="space-y-3" aria-labelledby="dashboard-focus-heading">
++          <h2 id="dashboard-focus-heading" className="text-base font-semibold text-foreground">当前焦点</h2>
++          <Card>
++            <CardContent className="flex h-40 items-center justify-center">
++              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
++            </CardContent>
++          </Card>
++        </section>
++        <section className="space-y-3" aria-labelledby="dashboard-risk-heading">
++          <h2 id="dashboard-risk-heading" className="text-base font-semibold text-foreground">风险提醒</h2>
++          <Card>
++            <CardContent className="h-24 animate-pulse rounded-xl bg-muted/40" />
++          </Card>
++        </section>
++        <section className="space-y-3" aria-labelledby="dashboard-trend-heading">
++          <h2 id="dashboard-trend-heading" className="text-base font-semibold text-foreground">关键趋势</h2>
++          <div className="grid gap-4 lg:grid-cols-2">
++            <Card><CardContent className="h-56 animate-pulse rounded-xl bg-muted/40" /></Card>
++            <Card><CardContent className="h-56 animate-pulse rounded-xl bg-muted/40" /></Card>
++          </div>
++        </section>
+       </div>
+     );
+   }
+ 
+   if (error || !data) {
+     return (
+-      <Card>
+-        <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+-          <AlertCircle className="h-8 w-8 text-muted-foreground" />
+-          <p className="text-sm text-muted-foreground">数据加载失败，请重试</p>
+-          <Button variant="outline" size="sm" onClick={fetchData}>重新加载</Button>
+-        </CardContent>
+-      </Card>
++      <section className="space-y-3" aria-labelledby="dashboard-focus-heading">
++        <h2 id="dashboard-focus-heading" className="text-base font-semibold text-foreground">当前焦点</h2>
++        <Card>
++          <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
++            <AlertCircle className="h-8 w-8 text-muted-foreground" />
++            <p className="text-sm text-muted-foreground">数据加载失败，请重试</p>
++            <Button variant="outline" size="sm" onClick={fetchData}>重新加载</Button>
++          </CardContent>
++        </Card>
++      </section>
+     );
+   }
+ 
++  const focus = deriveFocusSummary(data);
++  const risks = deriveRiskItems(data);
++
+   return (
+     <div className="space-y-6">
+-      {/* 核心指标卡片 */}
+-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+-        {/* 采购合同 */}
+-        <Card className="kpi-card">
+-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+-            <CardTitle className="text-sm font-medium">采购合同</CardTitle>
+-            <FileText className="h-4 w-4 text-primary" />
+-          </CardHeader>
+-          <CardContent>
+-            <div className="text-3xl font-bold tabular-nums">{data.contracts.purchase.count}</div>
+-            {data.contracts.purchase.totalAmount > 0 ? (
+-              <>
+-                <p className="text-xs text-muted-foreground">
+-                  总金额: ¥{data.contracts.purchase.totalAmount.toLocaleString()}
+-                </p>
+-                <p className="text-xs text-primary/80">
+-                  待付: ¥{data.contracts.purchase.unpaidAmount.toLocaleString()}
+-                </p>
+-              </>
+-            ) : (
+-              <p className="text-xs text-muted-foreground">共 {data.contracts.purchase.count} 份合同</p>
+-            )}
+-          </CardContent>
+-        </Card>
+-
+-        {/* 销售合同 */}
+-        <Card className="kpi-card">
+-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+-            <CardTitle className="text-sm font-medium">销售合同</CardTitle>
+-            <TrendingUp className="h-4 w-4 text-primary" />
+-          </CardHeader>
+-          <CardContent>
+-            <div className="text-3xl font-bold tabular-nums">{data.contracts.sales.count}</div>
+-            {data.contracts.sales.totalAmount > 0 ? (
+-              <>
+-                <p className="text-xs text-muted-foreground">
+-                  总金额: ${data.contracts.sales.totalAmount.toLocaleString()}
+-                </p>
+-                <p className="text-xs text-primary/80">
+-                  已收: ${data.contracts.sales.receivedAmount.toLocaleString()}
+-                </p>
+-              </>
+-            ) : (
+-              <p className="text-xs text-muted-foreground">共 {data.contracts.sales.count} 份合同</p>
+-            )}
+-          </CardContent>
+-        </Card>
++      <section className="space-y-3" aria-labelledby="dashboard-focus-heading">
++        <h2 id="dashboard-focus-heading" className="text-base font-semibold text-foreground">当前焦点</h2>
++        <Card className="border-primary/20 bg-primary/5">
++          <CardContent className="grid gap-6 pt-6 lg:grid-cols-[1.2fr_0.8fr]">
++            <div className="space-y-3">
++              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background px-3 py-1 text-xs font-medium text-primary">
++                <ArrowUpRight className="h-3.5 w-3.5" />
++                今日优先事项
++              </div>
++              <div>
++                <h3 className="text-2xl font-semibold tracking-tight text-foreground">{focus.title}</h3>
++                <p className="mt-2 text-sm leading-6 text-muted-foreground">{focus.description}</p>
++              </div>
++            </div>
+ 
+-        {/* 应收账款 */}
+-        <Card className="kpi-card">
+-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+-            <CardTitle className="text-sm font-medium">应收账款</CardTitle>
+-            <DollarSign className="h-4 w-4 text-primary" />
+-          </CardHeader>
+-          <CardContent>
+-            {data.contracts.sales.receivable > 0 ? (
+-              <>
+-                <div className="text-3xl font-bold tabular-nums">
+-                  ${data.contracts.sales.receivable.toLocaleString()}
++            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
++              {focus.metrics.map((metric) => (
++                <div key={metric.label} className="rounded-xl border bg-background/80 p-4">
++                  <p className="text-xs text-muted-foreground">{metric.label}</p>
++                  <p className="mt-2 text-xl font-semibold text-foreground">{metric.value}</p>
+                 </div>
+-                <p className="text-xs text-muted-foreground">待收回美金</p>
+-              </>
+-            ) : (
+-              <>
+-                <div className="text-3xl font-bold text-muted-foreground">—</div>
+-                <p className="text-xs text-muted-foreground">暂无待收款项</p>
+-              </>
+-            )}
++              ))}
++            </div>
+           </CardContent>
+         </Card>
+-
+-        {/* 库存概览 */}
+-        <Card className="kpi-card">
+-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+-            <CardTitle className="text-sm font-medium">库存概览</CardTitle>
+-            <Package className="h-4 w-4 text-primary" />
+-          </CardHeader>
+-          <CardContent>
+-            <div className="text-3xl font-bold tabular-nums">{data.inventory.productCount}</div>
+-            <p className="text-xs text-muted-foreground">
+-              商品种类
+-            </p>
+-            <p className="text-xs text-primary/80">
+-              库存记录: {data.inventory.recordCount}条
+-            </p>
+-          </CardContent>
+-        </Card>
+-      </div>
++      </section>
+ 
+-      {/* 图表区域 */}
+-      <div className="grid gap-4 md:grid-cols-2">
+-        {/* 月度出货趋势（折线图） */}
+-        <Card>
+-          <CardHeader className="pb-3">
+-            <CardTitle className="text-base">月度出货趋势</CardTitle>
+-            <CardDescription>最近6个月合同数量</CardDescription>
+-          </CardHeader>
+-          <CardContent>
+-            {data.shipments.monthly.length === 0 ? (
+-              <p className="text-sm text-muted-foreground text-center py-12">暂无出货数据</p>
+-            ) : (
+-              <ResponsiveContainer width="100%" height={200}>
+-                <LineChart data={[...data.shipments.monthly].reverse()}>
+-                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
+-                  <XAxis 
+-                    dataKey="month" 
+-                    tick={{ fontSize: 12 }} 
+-                    tickFormatter={(v) => v.substring(5)}
+-                  />
+-                  <YAxis 
+-                    tick={{ fontSize: 12 }}
+-                    allowDecimals={false}
+-                  />
+-                  <Tooltip 
+-                    formatter={(value) => [`${value} 份`, '合同数量']}
+-                    labelFormatter={(label) => `${label}`}
+-                  />
+-                  <Line 
+-                    type="monotone" 
+-                    dataKey="count" 
+-                    stroke="var(--chart-3)" 
+-                    strokeWidth={2}
+-                    dot={{ fill: 'var(--chart-3)', r: 4 }}
+-                    activeDot={{ r: 6 }}
+-                  />
+-                </LineChart>
+-              </ResponsiveContainer>
+-            )}
+-          </CardContent>
+-        </Card>
++      <section className="space-y-3" aria-labelledby="dashboard-risk-heading">
++        <h2 id="dashboard-risk-heading" className="text-base font-semibold text-foreground">风险提醒</h2>
++        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
++          {risks.length > 0 ? (
++            risks.map((risk) => (
++              <Card key={`${risk.title}-${risk.value}`}>
++                <CardContent className="flex items-start gap-3 pt-6">
++                  <span className={risk.tone === 'high' ? 'mt-0.5 text-destructive' : 'mt-0.5 text-amber-600'}>
++                    <AlertTriangle className="h-4 w-4" />
++                  </span>
++                  <div className="space-y-1">
++                    <p className="text-sm font-medium text-foreground">{risk.title}</p>
++                    <p className="text-sm text-muted-foreground">{risk.value}</p>
++                  </div>
++                </CardContent>
++              </Card>
++            ))
++          ) : (
++            <Card className="md:col-span-2 xl:col-span-3">
++              <CardContent className="flex items-center gap-3 pt-6 text-sm text-muted-foreground">
++                <ShieldCheck className="h-4 w-4 text-primary" />
++                <span>当前没有需要立即处理的经营风险</span>
++              </CardContent>
++            </Card>
++          )}
++        </div>
++      </section>
+ 
+-        {/* 门店采购排行（柱形图） */}
+-        <Card>
+-          <CardHeader className="pb-3">
+-            <CardTitle className="text-base">门店采购排行</CardTitle>
+-            <CardDescription>Top 5 门店采购数量</CardDescription>
+-          </CardHeader>
+-          <CardContent>
+-            {data.storeStats.length === 0 ? (
+-              <p className="text-sm text-muted-foreground text-center py-12">暂无门店数据</p>
+-            ) : (
+-              <ResponsiveContainer width="100%" height={200}>
+-                <BarChart data={data.storeStats.slice(0, 5)} layout="vertical">
+-                  <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="var(--border)" />
+-                  <XAxis 
+-                    type="number"
+-                    tick={{ fontSize: 12 }}
+-                    tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)}
+-                  />
+-                  <YAxis 
+-                    type="category" 
+-                    dataKey="storeName" 
+-                    width={80}
+-                    tick={{ fontSize: 11 }}
+-                    tickFormatter={(v) => v.length > 8 ? v.substring(0, 8) + '...' : v}
+-                  />
+-                  <Tooltip 
+-                    formatter={(value) => [Number(value || 0).toLocaleString(), '采购数量']}
+-                  />
+-                  <Bar 
+-                    dataKey="quantity" 
+-                    fill="var(--chart-1)" 
+-                    radius={[0, 4, 4, 0]}
+-                  />
+-                </BarChart>
+-              </ResponsiveContainer>
+-            )}
+-          </CardContent>
+-        </Card>
+-      </div>
++      <section className="space-y-3" aria-labelledby="dashboard-trend-heading">
++        <h2 id="dashboard-trend-heading" className="text-base font-semibold text-foreground">关键趋势</h2>
++        <div className="grid gap-4 lg:grid-cols-2">
++          <Card>
++            <CardHeader className="pb-3">
++              <CardTitle className="text-base">月度出货趋势</CardTitle>
++              <CardDescription>最近 6 个月合同数量变化</CardDescription>
++            </CardHeader>
++            <CardContent>
++              {data.shipments.monthly.length === 0 ? (
++                <p className="py-12 text-center text-sm text-muted-foreground">暂无出货趋势数据</p>
++              ) : (
++                <ResponsiveContainer width="100%" height={220}>
++                  <LineChart data={[...data.shipments.monthly].reverse()}>
++                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
++                    <XAxis dataKey="month" tick={{ fontSize: 12 }} tickFormatter={(v) => v.substring(5)} />
++                    <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
++                    <Tooltip formatter={(value) => [`${value} 份`, '合同数量']} labelFormatter={(label) => `${label}`} />
++                    <Line
++                      type="monotone"
++                      dataKey="count"
++                      stroke="var(--chart-3)"
++                      strokeWidth={2}
++                      dot={{ fill: 'var(--chart-3)', r: 4 }}
++                      activeDot={{ r: 6 }}
++                    />
++                  </LineChart>
++                </ResponsiveContainer>
++              )}
++            </CardContent>
++          </Card>
+ 
+-        {/* 热门商品（柱形图） */}
+-      <Card>
+-        <CardHeader className="pb-3">
+-          <CardTitle className="text-base">热门采购商品 Top 10</CardTitle>
+-          <CardDescription>按采购次数排序（含数量）</CardDescription>
+-        </CardHeader>
+-        <CardContent>
+-          {data.topProducts.length === 0 ? (
+-            <p className="text-sm text-muted-foreground text-center py-12">暂无商品数据</p>
+-          ) : (
+-            <ResponsiveContainer width="100%" height={300}>
+-              <BarChart data={data.topProducts.slice(0, 10)}>
+-                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
+-                <XAxis 
+-                  dataKey="productName" 
+-                  tick={{ fontSize: 10 }}
+-                  height={60}
+-                  interval={0}
+-                  tickFormatter={(v) => v.length > 6 ? v.substring(0, 6) + '..' : v}
+-                />
+-                <YAxis 
+-                  yAxisId="left"
+-                  tick={{ fontSize: 12 }}
+-                />
+-                <YAxis 
+-                  yAxisId="right"
+-                  orientation="right"
+-                  tick={{ fontSize: 12 }}
+-                  tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)}
+-                />
+-                <Tooltip 
+-                  formatter={(value, name) => [
+-                    name === 'count' ? `${value} 次` : Number(value || 0).toLocaleString(),
+-                    name === 'count' ? '采购次数' : '采购数量',
+-                  ]}
+-                />
+-                <Legend formatter={(value) => value === 'count' ? '采购次数' : '采购数量'} />
+-                <Bar yAxisId="left" dataKey="count" fill="var(--chart-3)" radius={[4, 4, 0, 0]} name="count" />
+-                <Bar yAxisId="right" dataKey="quantity" fill="var(--chart-1)" radius={[4, 4, 0, 0]} name="quantity" opacity={0.7} />
+-              </BarChart>
+-            </ResponsiveContainer>
+-          )}
+-        </CardContent>
+-      </Card>
++          <Card>
++            <CardHeader className="pb-3">
++              <CardTitle className="text-base">热门采购商品</CardTitle>
++              <CardDescription>按采购次数排序，保留最核心的商品趋势。</CardDescription>
++            </CardHeader>
++            <CardContent>
++              {data.topProducts.length === 0 ? (
++                <p className="py-12 text-center text-sm text-muted-foreground">暂无商品数据</p>
++              ) : (
++                <ResponsiveContainer width="100%" height={220}>
++                  <BarChart data={data.topProducts.slice(0, 6)}>
++                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
++                    <XAxis
++                      dataKey="productName"
++                      tick={{ fontSize: 10 }}
++                      height={60}
++                      interval={0}
++                      tickFormatter={(v) => v.length > 6 ? `${v.substring(0, 6)}..` : v}
++                    />
++                    <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
++                    <YAxis
++                      yAxisId="right"
++                      orientation="right"
++                      tick={{ fontSize: 12 }}
++                      tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v))}
++                    />
++                    <Tooltip
++                      formatter={(value, name) => [
++                        name === 'count' ? `${value} 次` : Number(value || 0).toLocaleString(),
++                        name === 'count' ? '采购次数' : '采购数量',
++                      ]}
++                    />
++                    <Legend formatter={(value) => (value === 'count' ? '采购次数' : '采购数量')} />
++                    <Bar yAxisId="left" dataKey="count" fill="var(--chart-3)" radius={[4, 4, 0, 0]} name="count" />
++                    <Bar yAxisId="right" dataKey="quantity" fill="var(--chart-1)" radius={[4, 4, 0, 0]} name="quantity" opacity={0.7} />
++                  </BarChart>
++                </ResponsiveContainer>
++              )}
++            </CardContent>
++          </Card>
++        </div>
++
++        <div className="grid gap-4 md:grid-cols-3">
++          <Card className="kpi-card">
++            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
++              <CardTitle className="text-sm font-medium">采购合同</CardTitle>
++              <FileText className="h-4 w-4 text-primary" />
++            </CardHeader>
++            <CardContent>
++              <div className="text-3xl font-bold tabular-nums">{data.contracts.purchase.count}</div>
++              <p className="text-xs text-muted-foreground">总金额: {formatAmount(data.contracts.purchase.totalAmount, 'CNY')}</p>
++            </CardContent>
++          </Card>
++
++          <Card className="kpi-card">
++            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
++              <CardTitle className="text-sm font-medium">销售合同</CardTitle>
++              <TrendingUp className="h-4 w-4 text-primary" />
++            </CardHeader>
++            <CardContent>
++              <div className="text-3xl font-bold tabular-nums">{data.contracts.sales.count}</div>
++              <p className="text-xs text-muted-foreground">总金额: {formatAmount(data.contracts.sales.totalAmount, 'USD')}</p>
++            </CardContent>
++          </Card>
++
++          <Card className="kpi-card">
++            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
++              <CardTitle className="text-sm font-medium">库存概览</CardTitle>
++              <Package className="h-4 w-4 text-primary" />
++            </CardHeader>
++            <CardContent>
++              <div className="text-3xl font-bold tabular-nums">{data.inventory.productCount}</div>
++              <p className="text-xs text-muted-foreground">库存记录: {data.inventory.recordCount} 条</p>
++            </CardContent>
++          </Card>
++        </div>
++      </section>
+     </div>
+   );
+ }

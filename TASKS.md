@@ -1,5 +1,30 @@
 # Frontend Polish Tasks
 
+## 2026-03-23 提交前 E2E 稳定化
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| E2E-03 | P0 | 60m | 1 | DONE | 修复前端全量 Playwright 红灯（hydration mismatch、mock 契约漂移、过期 IA 断言），完成 fresh 全门禁验证并收口提交前台账 |
+
+## 2026-03-22 Frontend Audit To Iteration
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| FE-AUDIT-01 | P0 | 20m | 1 | DONE | 产出 `docs/frontend-audit-2026-03.md`，固化审查结论、结构问题、frontend-skill 方向与分阶段改进计划 |
+| FE-BASE-01 | P0 | 45m | 1 | DONE | 修复 `frontend` 当前 lint/build 红灯，清理明显 warning，恢复前端可演进基线 |
+| FE-NAV-01 | P0 | 45m | 1 | DONE | 建立单一导航注册表，统一驱动 Sidebar/Header/ModuleTabHeader，消除多份导航配置漂移 |
+| FE-CLEAN-01 | P1 | 20m | 1 | DONE | 清理陈旧或脱轨页面入口（如旧 `dashboard/logs`），统一壳层规范 |
+| FE-DASH-01 | P0 | 90m | 1 | DONE | 重做工作台首屏结构：从卡片拼盘收敛为“当前焦点 + 高频动作 + 关键趋势 + 风险提醒”工作空间 |
+| FE-NAV-02 | P0 | 45m | 2 | DONE | 将权限、默认落点、重定向规则进一步并入导航注册表，减少壳层条件分支 |
+| FE-SPLIT-01 | P1 | 90m | 1 | DONE | 拆分 `finance/statements/page.tsx`，收口 route/data/view/dialog 结构 |
+| FE-SPLIT-02 | P1 | 75m | 1 | DONE | 拆分 `store-recommend/page.tsx`，降低超长页面与重复卡片堆叠 |
+| FE-SHELL-01 | P1 | 60m | 2 | DONE | 继续重构 `Header`，拆开移动导航、搜索、通知、用户菜单 |
+| FE-SEARCH-01 | P1 | 60m | 2 | DONE | 将 Header 全局搜索改为聚合入口，避免输入时并发打 5 个接口 |
+| FE-AI-01 | P2 | 60m | 3 | DONE | 降低 AI 助手对业务页面主交互的抢占，改成更克制的辅助入口 |
+| FE-STATE-01 | P2 | 45m | 1 | DONE | 统一列表页和模块页 loading / empty / error 状态体系 |
+| FE-MODULE-01 | P2 | 90m | 1 | DONE | 让采购/出口/财务模块首页形成差异化工作空间结构 |
+| FE-QA-01 | P2 | 45m | 1 | DONE | 为登录页、工作台、采购合同、财务页、移动端首屏补截图回归门禁 |
+
 ## 2026-03-21 CEO/Eng/Design 三维评审迭代（基于 2026-03-20 review）
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |

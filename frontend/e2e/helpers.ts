@@ -554,7 +554,48 @@ export const mockApiRoutes = async (page: Page) => {
           { model: 'gpt-4.1-mini', requests: 8, tokens: 22000 },
           { model: 'gpt-4.1', requests: 4, tokens: 12567 },
         ],
+        daily: [
+          { day: '2026-03-20', model: 'gpt-4.1-mini', tokens: 8200, requests: 3, successRate: 1 },
+          { day: '2026-03-21', model: 'gpt-4.1-mini', tokens: 7400, requests: 2, successRate: 1 },
+          { day: '2026-03-22', model: 'gpt-4.1', tokens: 9100, requests: 4, successRate: 1 },
+          { day: '2026-03-23', model: 'gpt-4.1-mini', tokens: 9867, requests: 3, successRate: 1 },
+        ],
       });
+      return;
+    }
+
+    if (pathname === '/api/v1/ai/standalone-token-usage' && method === 'GET') {
+      await fulfillJson(route, [
+        {
+          id: 'standalone-1',
+          model: 'gpt-4.1-mini',
+          promptTokens: 800,
+          outputTokens: 200,
+          totalTokens: 1000,
+          requestType: 'hs_code_recommend',
+          detailSnapshot: 'HS 编码推荐结果',
+          createdAt: now,
+        },
+      ]);
+      return;
+    }
+
+    if (pathname === '/api/v1/ai/history' && method === 'GET') {
+      await fulfillJson(route, asPaginated([
+        {
+          id: 'msg-1',
+          role: 'user',
+          content: '帮我总结最近的 AI 调用情况',
+          createdAt: now,
+        },
+        {
+          id: 'msg-2',
+          role: 'assistant',
+          content: '最近 7 天主要使用 gpt-4.1-mini 处理日常问题。',
+          modelUsed: 'gpt-4.1-mini',
+          createdAt: now,
+        },
+      ]));
       return;
     }
 
@@ -573,7 +614,16 @@ export const mockApiRoutes = async (page: Page) => {
     }
 
     if (pathname === '/api/v1/import/history' && method === 'GET') {
-      await fulfillJson(route, state.importRecords);
+      const status = searchParams.get('status');
+      const keyword = searchParams.get('keyword')?.trim();
+      const page = Number(searchParams.get('page') || '1');
+      const pageSize = Number(searchParams.get('pageSize') || '20');
+      const filtered = state.importRecords.filter((item) => {
+        const statusMatch = !status || item.status === status;
+        const keywordMatch = !keyword || item.fileName.includes(keyword);
+        return statusMatch && keywordMatch;
+      });
+      await fulfillJson(route, asPaginated(filtered, page, pageSize));
       return;
     }
 
@@ -663,6 +713,41 @@ export const mockApiRoutes = async (page: Page) => {
       return;
     }
 
+    if (pathname === '/api/v1/system/exchange-rate' && method === 'GET') {
+      await fulfillJson(route, {
+        rate: 7.2,
+        buffer: 0.2,
+        effectiveRate: 7.0,
+      });
+      return;
+    }
+
+    if (pathname === '/api/v1/finance/payment-trends' && method === 'GET') {
+      await fulfillJson(route, [
+        { label: '第1周', receivables: 32000, payables: 18000 },
+        { label: '第2周', receivables: 28000, payables: 22000 },
+        { label: '第3周', receivables: 36000, payables: 16000 },
+        { label: '第4周', receivables: 42000, payables: 24000 },
+      ]);
+      return;
+    }
+
+    if (pathname === '/api/v1/finance/overdue-receivables' && method === 'GET') {
+      await fulfillJson(route, [
+        {
+          id: 'ov-1',
+          contractNo: 'EXP2600001',
+          totalAmount: 220000,
+          receivedAmount: 50000,
+          unreceived: 170000,
+          shippedAt: now,
+          overdueDays: 12,
+          status: 'SHIPPED',
+        },
+      ]);
+      return;
+    }
+
     if (pathname === '/api/v1/finance/payables' && method === 'GET') {
       await fulfillJson(route, asPaginated(payables));
       return;
@@ -748,6 +833,155 @@ export const mockApiRoutes = async (page: Page) => {
               avgUnitPrice: 500,
               estimatedCost: 10000,
               priority: '建议',
+            },
+          ],
+        },
+      });
+      return;
+    }
+
+    if (pathname === '/api/v1/procurement-template/stores' && method === 'GET') {
+      await fulfillJson(route, [stores[0].name, '纽约店']);
+      return;
+    }
+
+    if (pathname === '/api/v1/procurement-template/universal' && method === 'GET') {
+      await fulfillJson(route, {
+        totalStores: 2,
+        totalProducts: 3,
+        mustHaveCount: 1,
+        templateStore: stores[0].name,
+        items: [
+          {
+            name: '不锈钢门',
+            supplement: '主入口',
+            category: '餐厅设备',
+            storeCount: 2,
+            frequency: 100,
+            priority: '强烈建议',
+            isTemplateStore: true,
+            avgQtyPerStore: 2,
+            unit: '扇',
+            manufacturers: ['A厂'],
+            totalAmount: 16000,
+            rowCount: 2,
+          },
+          {
+            name: '餐具套装',
+            supplement: '基础配置',
+            category: '餐具用品',
+            storeCount: 2,
+            frequency: 80,
+            priority: '建议',
+            isTemplateStore: true,
+            avgQtyPerStore: 20,
+            unit: '套',
+            manufacturers: ['B厂'],
+            totalAmount: 10000,
+            rowCount: 2,
+          },
+        ],
+        byCategory: {
+          餐厅设备: [
+            {
+              name: '不锈钢门',
+              supplement: '主入口',
+              category: '餐厅设备',
+              storeCount: 2,
+              frequency: 100,
+              priority: '强烈建议',
+              isTemplateStore: true,
+              avgQtyPerStore: 2,
+              unit: '扇',
+              manufacturers: ['A厂'],
+              totalAmount: 16000,
+              rowCount: 2,
+            },
+          ],
+          餐具用品: [
+            {
+              name: '餐具套装',
+              supplement: '基础配置',
+              category: '餐具用品',
+              storeCount: 2,
+              frequency: 80,
+              priority: '建议',
+              isTemplateStore: true,
+              avgQtyPerStore: 20,
+              unit: '套',
+              manufacturers: ['B厂'],
+              totalAmount: 10000,
+              rowCount: 2,
+            },
+          ],
+        },
+      });
+      return;
+    }
+
+    if (/^\/api\/v1\/procurement-template\/stores\/[^/]+$/.test(pathname) && method === 'GET') {
+      const storeName = decodeURIComponent(pathname.split('/').pop() || stores[0].name);
+      await fulfillJson(route, {
+        storeName,
+        totalProducts: 2,
+        totalAmount: 18000,
+        items: [
+          {
+            name: '不锈钢门',
+            supplement: '主入口',
+            category: '餐厅设备',
+            totalQty: 2,
+            unit: '扇',
+            manufacturer: 'A厂',
+            spec: '900x2100',
+            totalAmount: 16000,
+            shipments: [
+              { date: '2026-02-01', qty: 2, amount: 16000, spec: '900x2100' },
+            ],
+          },
+          {
+            name: '餐具套装',
+            supplement: '基础配置',
+            category: '餐具用品',
+            totalQty: 20,
+            unit: '套',
+            manufacturer: 'B厂',
+            spec: '标准款',
+            totalAmount: 2000,
+            shipments: [
+              { date: '2026-02-03', qty: 20, amount: 2000, spec: '标准款' },
+            ],
+          },
+        ],
+        byCategory: {
+          餐厅设备: [
+            {
+              name: '不锈钢门',
+              supplement: '主入口',
+              category: '餐厅设备',
+              totalQty: 2,
+              unit: '扇',
+              manufacturer: 'A厂',
+              spec: '900x2100',
+              totalAmount: 16000,
+              shipments: [
+                { date: '2026-02-01', qty: 2, amount: 16000, spec: '900x2100' },
+              ],
+            },
+          ],
+          餐具用品: [
+            {
+              name: '餐具套装',
+              supplement: '基础配置',
+              category: '餐具用品',
+              totalQty: 20,
+              unit: '套',
+              manufacturer: 'B厂',
+              spec: '标准款',
+              totalAmount: 2000,
+              shipments: [
+                { date: '2026-02-03', qty: 20, amount: 2000, spec: '标准款' },
+              ],
             },
           ],
         },
@@ -853,6 +1087,28 @@ export const mockApiRoutes = async (page: Page) => {
 
     if (/^\/api\/v1\/purchases\/[^/]+$/.test(pathname) && method === 'PUT') {
       await fulfillJson(route, purchaseContract);
+      return;
+    }
+
+    if (/^\/api\/v1\/purchases\/[^/]+\/files$/.test(pathname) && method === 'GET') {
+      await fulfillJson(route, []);
+      return;
+    }
+
+    if (/^\/api\/v1\/purchases\/[^/]+\/files$/.test(pathname) && method === 'POST') {
+      await fulfillJson(route, {
+        id: 'file-1',
+        fileName: '采购合同附件.pdf',
+        fileType: 'application/pdf',
+        fileSize: 2048,
+        filePath: '/mock/purchase/file-1.pdf',
+        uploadedAt: now,
+      });
+      return;
+    }
+
+    if (/^\/api\/v1\/purchases\/files\/[^/]+$/.test(pathname) && method === 'DELETE') {
+      await fulfillJson(route, null);
       return;
     }
 

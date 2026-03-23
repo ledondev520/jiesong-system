@@ -1,0 +1,250 @@
+diff --git a/frontend/src/app/dashboard/contracts/components/ContractsPageContent.tsx b/frontend/src/app/dashboard/contracts/components/ContractsPageContent.tsx
+index cc7d454..ec18024 100644
+--- a/frontend/src/app/dashboard/contracts/components/ContractsPageContent.tsx
++++ b/frontend/src/app/dashboard/contracts/components/ContractsPageContent.tsx
+@@ -13,7 +13,7 @@ import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTab
+ import { useRouter, useSearchParams } from 'next/navigation';
+ import { PurchaseContract, PurchaseStatus, PurchaseItem } from '@/types';
+ import { purchaseService } from '@/services/purchase.service';
+-import { cachedFetch, invalidateCache } from '@/lib/api-cache';
++import { cachedFetch } from '@/lib/api-cache';
+ import { Button } from '@/components/ui/button';
+ import {
+   Table,
+@@ -33,7 +33,7 @@ import {
+ import { Badge } from '@/components/ui/badge';
+ import { SemanticBadge } from '@/components/ui/semantic-badge';
+ import { AmountText } from '@/components/ui/amount-text';
+-import { Plus, Eye, FileText, ShoppingCart, Package, Loader2, FileDown, Filter, X } from 'lucide-react';
++import { Plus, Eye, FileText, ShoppingCart, Package, Loader2, FileDown, Filter, X, Store, Truck } from 'lucide-react';
+ import {
+   Select,
+   SelectContent,
+@@ -48,6 +48,7 @@ import { Label } from '@/components/ui/label';
+ import { contractDocService } from '@/services/contractDoc.service';
+ import { PageHeader } from '@/components/layout/PageHeader';
+ import { PageSizeSelect } from '@/components/ui/page-size-select';
++import { Card, CardContent } from '@/components/ui/card';
+ 
+ // 扩展类型
+ interface PurchaseContractDetail extends PurchaseContract {
+@@ -108,6 +109,21 @@ export default function ContractsPageContent() {
+     (purchasePage - 1) * pageSize,
+     purchasePage * pageSize
+   );
++  const procurementOverview = useMemo(() => {
++    const activeContracts = purchaseContracts.filter((contract) =>
++      [PurchaseStatus.DRAFT, PurchaseStatus.SIGNED, PurchaseStatus.PRODUCING].includes(contract.status)
++    ).length;
++    const producingContracts = purchaseContracts.filter((contract) => contract.status === PurchaseStatus.PRODUCING).length;
++    const shippedPendingReceipt = purchaseContracts.filter((contract) => contract.status === PurchaseStatus.SHIPPED).length;
++    const activeStores = new Set(purchaseContracts.map((contract) => contract.storeName).filter(Boolean)).size;
++
++    return {
++      activeContracts,
++      producingContracts,
++      shippedPendingReceipt,
++      activeStores,
++    };
++  }, [purchaseContracts]);
+   
+   // 筛选或每页条数变化时重置页码
+   useEffect(() => {
+@@ -214,6 +230,56 @@ export default function ContractsPageContent() {
+         description="管理供应商采购合同"
+       />
+ 
++      <section className="space-y-4">
++        <div className="flex flex-wrap items-end justify-between gap-3">
++          <div>
++            <p className="text-sm font-medium text-muted-foreground">采购执行概览</p>
++            <h3 className="text-lg font-semibold tracking-tight">围绕下单、生产与收货节奏安排跟进动作</h3>
++          </div>
++          <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">
++            当前活跃合同 {procurementOverview.activeContracts}
++          </Badge>
++        </div>
++        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
++          <Card className="border-border/70">
++            <CardContent className="flex items-center justify-between pt-6">
++              <div>
++                <p className="text-sm text-muted-foreground">待推进合同</p>
++                <p className="mt-1 text-2xl font-semibold tabular-nums">{procurementOverview.activeContracts}</p>
++              </div>
++              <ShoppingCart className="h-5 w-5 text-primary" />
++            </CardContent>
++          </Card>
++          <Card className="border-border/70">
++            <CardContent className="flex items-center justify-between pt-6">
++              <div>
++                <p className="text-sm text-muted-foreground">生产中</p>
++                <p className="mt-1 text-2xl font-semibold tabular-nums">{procurementOverview.producingContracts}</p>
++              </div>
++              <Package className="h-5 w-5 text-amber-600" />
++            </CardContent>
++          </Card>
++          <Card className="border-border/70">
++            <CardContent className="flex items-center justify-between pt-6">
++              <div>
++                <p className="text-sm text-muted-foreground">已发货待收货</p>
++                <p className="mt-1 text-2xl font-semibold tabular-nums">{procurementOverview.shippedPendingReceipt}</p>
++              </div>
++              <Truck className="h-5 w-5 text-emerald-600" />
++            </CardContent>
++          </Card>
++          <Card className="border-border/70">
++            <CardContent className="flex items-center justify-between pt-6">
++              <div>
++                <p className="text-sm text-muted-foreground">合作店铺</p>
++                <p className="mt-1 text-2xl font-semibold tabular-nums">{procurementOverview.activeStores}</p>
++              </div>
++              <Store className="h-5 w-5 text-sky-600" />
++            </CardContent>
++          </Card>
++        </div>
++      </section>
++
+       {/* 采购合同内容 */}
+       <div className="space-y-4">
+           <div className="flex flex-wrap justify-between items-center gap-4">
+diff --git a/frontend/src/app/dashboard/contracts/page.test.tsx b/frontend/src/app/dashboard/contracts/page.test.tsx
+index e80deae..e6c43ac 100644
+--- a/frontend/src/app/dashboard/contracts/page.test.tsx
++++ b/frontend/src/app/dashboard/contracts/page.test.tsx
+@@ -63,12 +63,14 @@ describe('ContractsPage 交互逻辑', () => {
+     mockSearchParamGet.mockReturnValue('');
+   });
+ 
+-  it('加载后展示空态文案', async () => {
++  it('加载后展示采购模块概览与空态文案', async () => {
+     mockGetAll.mockResolvedValue({ data: { items: [] } });
+     render(<ContractsPage />);
+ 
+     await waitFor(() => {
+       expect(screen.getByRole('heading', { name: '采购合同' })).toBeInTheDocument();
++      expect(screen.getByText('采购执行概览')).toBeInTheDocument();
++      expect(screen.getByText('合作店铺')).toBeInTheDocument();
+       expect(screen.getByText('暂无采购合同')).toBeInTheDocument();
+     });
+   });
+@@ -91,4 +93,3 @@ describe('ContractsPage 交互逻辑', () => {
+     });
+   });
+ });
+-
+diff --git a/frontend/src/app/dashboard/sales/page.test.tsx b/frontend/src/app/dashboard/sales/page.test.tsx
+index 2d90647..bf35892 100644
+--- a/frontend/src/app/dashboard/sales/page.test.tsx
++++ b/frontend/src/app/dashboard/sales/page.test.tsx
+@@ -53,12 +53,14 @@ describe('SalesPage 交互逻辑', () => {
+     mockToastSuccess.mockReset();
+   });
+ 
+-  it('加载后展示空态文案', async () => {
++  it('加载后展示出口模块概览与空态文案', async () => {
+     mockGetAll.mockResolvedValue({ data: { items: [] } });
+     render(<SalesPage />);
+ 
+     await waitFor(() => {
+       expect(screen.getByRole('heading', { name: '出口合同' })).toBeInTheDocument();
++      expect(screen.getByText('出口出运概览')).toBeInTheDocument();
++      expect(screen.getByText('在途货柜')).toBeInTheDocument();
+       expect(screen.getByText('暂无出口合同。')).toBeInTheDocument();
+     });
+   });
+@@ -134,4 +136,3 @@ describe('SalesPage 交互逻辑', () => {
+     });
+   });
+ });
+-
+diff --git a/frontend/src/app/dashboard/sales/page.tsx b/frontend/src/app/dashboard/sales/page.tsx
+index 294fe32..8798f24 100644
+--- a/frontend/src/app/dashboard/sales/page.tsx
++++ b/frontend/src/app/dashboard/sales/page.tsx
+@@ -15,6 +15,7 @@ import { SalesContract, SalesStatus } from '@/types';
+ import { salesService } from '@/services/sales.service';
+ import { cachedFetch, invalidateCache } from '@/lib/api-cache';
+ import { Button } from '@/components/ui/button';
++import { Card, CardContent } from '@/components/ui/card';
+ import {
+   Table,
+   TableBody,
+@@ -35,7 +36,7 @@ import {
+   AlertDialogHeader,
+   AlertDialogTitle,
+ } from '@/components/ui/alert-dialog';
+-import { Plus, Eye, Ship, Trash2, Loader2, FileSpreadsheet } from 'lucide-react';
++import { Plus, Eye, Ship, Trash2, Loader2, FileSpreadsheet, Container, Anchor, Boxes, Clock3 } from 'lucide-react';
+ import Link from 'next/link';
+ import { useRouter } from 'next/navigation';
+ import { formatDate } from '@/lib/date-format';
+@@ -142,6 +143,12 @@ export default function SalesPage() {
+ 
+   const totalPages = Math.ceil(contracts.length / pageSize);
+   const pagedContracts = contracts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
++  const exportOverview = {
++    preparing: contracts.filter((contract) => [SalesStatus.CONFIRMED, SalesStatus.PACKING].includes(contract.status)).length,
++    inTransit: contracts.filter((contract) => contract.status === SalesStatus.SHIPPED).length,
++    arrivedPendingClose: contracts.filter((contract) => contract.status === SalesStatus.ARRIVED).length,
++    totalBoxes: contracts.reduce((sum, contract) => sum + (contract.totalBoxes || 0), 0),
++  };
+ 
+   return (
+     <div className="space-y-6">
+@@ -156,6 +163,56 @@ export default function SalesPage() {
+         }
+       />
+ 
++      <section className="space-y-4">
++        <div className="flex flex-wrap items-end justify-between gap-3">
++          <div>
++            <p className="text-sm font-medium text-muted-foreground">出口出运概览</p>
++            <h3 className="text-lg font-semibold tracking-tight">围绕装柜、在途与到港节点安排出口履约节奏</h3>
++          </div>
++          <Button variant="outline" size="sm" onClick={() => router.push('/dashboard/tax-refunds')}>
++            前往退税跟进
++          </Button>
++        </div>
++        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
++          <Card className="border-border/70">
++            <CardContent className="flex items-center justify-between pt-6">
++              <div>
++                <p className="text-sm text-muted-foreground">待装柜合同</p>
++                <p className="mt-1 text-2xl font-semibold tabular-nums">{exportOverview.preparing}</p>
++              </div>
++              <Boxes className="h-5 w-5 text-primary" />
++            </CardContent>
++          </Card>
++          <Card className="border-border/70">
++            <CardContent className="flex items-center justify-between pt-6">
++              <div>
++                <p className="text-sm text-muted-foreground">在途货柜</p>
++                <p className="mt-1 text-2xl font-semibold tabular-nums">{exportOverview.inTransit}</p>
++              </div>
++              <Container className="h-5 w-5 text-sky-600" />
++            </CardContent>
++          </Card>
++          <Card className="border-border/70">
++            <CardContent className="flex items-center justify-between pt-6">
++              <div>
++                <p className="text-sm text-muted-foreground">已到港待结清</p>
++                <p className="mt-1 text-2xl font-semibold tabular-nums">{exportOverview.arrivedPendingClose}</p>
++              </div>
++              <Anchor className="h-5 w-5 text-emerald-600" />
++            </CardContent>
++          </Card>
++          <Card className="border-border/70">
++            <CardContent className="flex items-center justify-between pt-6">
++              <div>
++                <p className="text-sm text-muted-foreground">总箱数</p>
++                <p className="mt-1 text-2xl font-semibold tabular-nums">{exportOverview.totalBoxes}</p>
++              </div>
++              <Clock3 className="h-5 w-5 text-amber-600" />
++            </CardContent>
++          </Card>
++        </div>
++      </section>
++
+       <div className="surface-panel overflow-hidden">
+         <Table>
+           <TableHeader>

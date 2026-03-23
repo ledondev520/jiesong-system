@@ -13,7 +13,7 @@ import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTab
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PurchaseContract, PurchaseStatus, PurchaseItem } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
-import { cachedFetch, invalidateCache } from '@/lib/api-cache';
+import { cachedFetch } from '@/lib/api-cache';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -33,7 +33,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { AmountText } from '@/components/ui/amount-text';
-import { Plus, Eye, FileText, ShoppingCart, Package, Loader2, FileDown, Filter, X } from 'lucide-react';
+import { Plus, Eye, FileText, ShoppingCart, Package, Loader2, FileDown, Filter, X, Store, Truck } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -48,6 +48,7 @@ import { Label } from '@/components/ui/label';
 import { contractDocService } from '@/services/contractDoc.service';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
+import { Card, CardContent } from '@/components/ui/card';
 
 // 扩展类型
 interface PurchaseContractDetail extends PurchaseContract {
@@ -108,6 +109,21 @@ export default function ContractsPageContent() {
     (purchasePage - 1) * pageSize,
     purchasePage * pageSize
   );
+  const procurementOverview = useMemo(() => {
+    const activeContracts = purchaseContracts.filter((contract) =>
+      [PurchaseStatus.DRAFT, PurchaseStatus.SIGNED, PurchaseStatus.PRODUCING].includes(contract.status)
+    ).length;
+    const producingContracts = purchaseContracts.filter((contract) => contract.status === PurchaseStatus.PRODUCING).length;
+    const shippedPendingReceipt = purchaseContracts.filter((contract) => contract.status === PurchaseStatus.SHIPPED).length;
+    const activeStores = new Set(purchaseContracts.map((contract) => contract.storeName).filter(Boolean)).size;
+
+    return {
+      activeContracts,
+      producingContracts,
+      shippedPendingReceipt,
+      activeStores,
+    };
+  }, [purchaseContracts]);
   
   // 筛选或每页条数变化时重置页码
   useEffect(() => {
@@ -213,6 +229,56 @@ export default function ContractsPageContent() {
         title="采购合同"
         description="管理供应商采购合同"
       />
+
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">采购执行概览</p>
+            <h3 className="text-lg font-semibold tracking-tight">围绕下单、生产与收货节奏安排跟进动作</h3>
+          </div>
+          <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">
+            当前活跃合同 {procurementOverview.activeContracts}
+          </Badge>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Card className="border-border/70">
+            <CardContent className="flex items-center justify-between pt-6">
+              <div>
+                <p className="text-sm text-muted-foreground">待推进合同</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums">{procurementOverview.activeContracts}</p>
+              </div>
+              <ShoppingCart className="h-5 w-5 text-primary" />
+            </CardContent>
+          </Card>
+          <Card className="border-border/70">
+            <CardContent className="flex items-center justify-between pt-6">
+              <div>
+                <p className="text-sm text-muted-foreground">生产中</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums">{procurementOverview.producingContracts}</p>
+              </div>
+              <Package className="h-5 w-5 text-amber-600" />
+            </CardContent>
+          </Card>
+          <Card className="border-border/70">
+            <CardContent className="flex items-center justify-between pt-6">
+              <div>
+                <p className="text-sm text-muted-foreground">已发货待收货</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums">{procurementOverview.shippedPendingReceipt}</p>
+              </div>
+              <Truck className="h-5 w-5 text-emerald-600" />
+            </CardContent>
+          </Card>
+          <Card className="border-border/70">
+            <CardContent className="flex items-center justify-between pt-6">
+              <div>
+                <p className="text-sm text-muted-foreground">合作店铺</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums">{procurementOverview.activeStores}</p>
+              </div>
+              <Store className="h-5 w-5 text-sky-600" />
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
       {/* 采购合同内容 */}
       <div className="space-y-4">

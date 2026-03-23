@@ -15,14 +15,14 @@ export default defineConfig({
   retries: 1,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://127.0.0.1:3001',
+    baseURL: 'http://127.0.0.1:3004',
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'npm run dev -- --hostname 127.0.0.1 -p 3001',
-    url: 'http://127.0.0.1:3001',
+    command: 'npm run build && npm run start -- --hostname 127.0.0.1 -p 3004',
+    url: 'http://127.0.0.1:3004',
     reuseExistingServer: true,
-    timeout: 120000,
+    timeout: 180000,
   },
   projects: [
     {

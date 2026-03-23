@@ -63,12 +63,14 @@ describe('ContractsPage 交互逻辑', () => {
     mockSearchParamGet.mockReturnValue('');
   });
 
-  it('加载后展示空态文案', async () => {
+  it('加载后展示采购模块概览与空态文案', async () => {
     mockGetAll.mockResolvedValue({ data: { items: [] } });
     render(<ContractsPage />);
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '采购合同' })).toBeInTheDocument();
+      expect(screen.getByText('采购执行概览')).toBeInTheDocument();
+      expect(screen.getByText('合作店铺')).toBeInTheDocument();
       expect(screen.getByText('暂无采购合同')).toBeInTheDocument();
     });
   });
@@ -91,4 +93,3 @@ describe('ContractsPage 交互逻辑', () => {
     });
   });
 });
-

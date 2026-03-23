@@ -54,14 +54,35 @@ describe('DataDashboard', () => {
     render(<DataDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByText('采购合同')).toBeInTheDocument();
-      expect(screen.getByText('销售合同')).toBeInTheDocument();
-      expect(screen.getByText('应收账款')).toBeInTheDocument();
-      expect(screen.getByText('库存概览')).toBeInTheDocument();
+      expect(screen.getByText('优先处理回款')).toBeInTheDocument();
+      expect(screen.getByText(/待收回款/)).toBeInTheDocument();
+      expect(screen.getByText('关键趋势')).toBeInTheDocument();
     });
   });
 
-  it('无图表数据时展示空文案', async () => {
+  it('无应收但有待付时聚焦采购付款', async () => {
+    mockGetDashboardAnalytics.mockResolvedValue({
+      data: {
+        contracts: {
+          purchase: { count: 2, totalAmount: 6000, paidAmount: 1000, unpaidAmount: 5000 },
+          sales: { count: 1, totalAmount: 3000, receivedAmount: 3000, receivable: 0 },
+        },
+        inventory: { productCount: 4, recordCount: 8, totalQuantity: 40 },
+        shipments: { monthly: [] },
+        topProducts: [],
+        storeStats: [],
+      },
+    });
+
+    render(<DataDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('优先处理待付款采购')).toBeInTheDocument();
+      expect(screen.getByText(/采购待付/)).toBeInTheDocument();
+    });
+  });
+
+  it('数据为空时展示低噪音风险与趋势空态', async () => {
     mockGetDashboardAnalytics.mockResolvedValue({
       data: {
         contracts: {
@@ -78,9 +99,35 @@ describe('DataDashboard', () => {
     render(<DataDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByText('暂无出货数据')).toBeInTheDocument();
-      expect(screen.getByText('暂无门店数据')).toBeInTheDocument();
+      expect(screen.getByText('当前没有需要立即处理的经营风险')).toBeInTheDocument();
+      expect(screen.getByText('暂无出货趋势数据')).toBeInTheDocument();
       expect(screen.getByText('暂无商品数据')).toBeInTheDocument();
     });
+  });
+
+  it('加载成功后不再展示门店采购排行图表', async () => {
+    mockGetDashboardAnalytics.mockResolvedValue({
+      data: {
+        contracts: {
+          purchase: { count: 3, totalAmount: 10000, paidAmount: 6000, unpaidAmount: 4000 },
+          sales: { count: 2, totalAmount: 5000, receivedAmount: 2000, receivable: 3000 },
+        },
+        inventory: { productCount: 9, recordCount: 20, totalQuantity: 500 },
+        shipments: {
+          monthly: [{ month: '2026-02', count: 2, amount: 3000, boxes: 12 }],
+        },
+        topProducts: [{ productName: '蓝牙耳机', count: 3, quantity: 120, totalAmount: 2000 }],
+        storeStats: [{ storeName: '杭州一店', orderCount: 2, quantity: 100, totalAmount: 1200 }],
+      },
+    });
+
+    render(<DataDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('月度出货趋势')).toBeInTheDocument();
+      expect(screen.getByText('热门采购商品')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('门店采购排行')).not.toBeInTheDocument();
   });
 });

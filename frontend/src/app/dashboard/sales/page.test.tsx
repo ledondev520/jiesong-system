@@ -53,12 +53,14 @@ describe('SalesPage 交互逻辑', () => {
     mockToastSuccess.mockReset();
   });
 
-  it('加载后展示空态文案', async () => {
+  it('加载后展示出口模块概览与空态文案', async () => {
     mockGetAll.mockResolvedValue({ data: { items: [] } });
     render(<SalesPage />);
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '出口合同' })).toBeInTheDocument();
+      expect(screen.getByText('出口出运概览')).toBeInTheDocument();
+      expect(screen.getByText('在途货柜')).toBeInTheDocument();
       expect(screen.getByText('暂无出口合同。')).toBeInTheDocument();
     });
   });
@@ -134,4 +136,3 @@ describe('SalesPage 交互逻辑', () => {
     });
   });
 });
-

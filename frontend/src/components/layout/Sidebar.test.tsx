@@ -14,6 +14,7 @@ import { Sidebar } from './Sidebar';
 
 const mockLogout = vi.fn();
 const mockPrefetch = vi.fn();
+const mockPush = vi.fn();
 let mockPathname = '/dashboard/contracts';
 
 const mockUser = {
@@ -31,6 +32,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => mockPathname,
   useRouter: () => ({
     prefetch: mockPrefetch,
+    push: mockPush,
   }),
 }));
 
@@ -46,8 +48,15 @@ describe('Sidebar', () => {
   beforeEach(() => {
     mockLogout.mockReset();
     mockPrefetch.mockReset();
+    mockPush.mockReset();
     mockUser.role = Role.ADMIN;
     mockPathname = '/dashboard/contracts';
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    });
   });
 
   it('渲染导航项并标记当前路由', () => {
@@ -75,11 +84,11 @@ describe('Sidebar', () => {
     expect(settingLink?.className.includes('bg-background')).toBe(true);
   });
 
-  it('非管理员角色仍可见系统管理入口', () => {
+  it('非管理员角色不再显示系统管理入口', () => {
     mockUser.role = Role.SALES;
     mockPathname = '/dashboard/settings';
-    const { getByText } = render(<Sidebar />);
-    expect(getByText('系统管理')).toBeInTheDocument();
+    const { queryByText } = render(<Sidebar />);
+    expect(queryByText('系统管理')).not.toBeInTheDocument();
   });
 
   it('空闲时预取可见导航路由', () => {

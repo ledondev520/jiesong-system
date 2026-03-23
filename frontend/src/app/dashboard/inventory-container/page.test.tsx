@@ -72,6 +72,8 @@ describe('InventoryPage 交互逻辑', () => {
 
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('加载库存失败');
+      expect(screen.getByText('数据加载失败')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
     });
   });
 

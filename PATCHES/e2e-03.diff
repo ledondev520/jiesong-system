@@ -1,0 +1,2527 @@
+diff --git a/METRICS.md b/METRICS.md
+index 76aba71..5f56413 100644
+--- a/METRICS.md
++++ b/METRICS.md
+@@ -1,5 +1,174 @@
+ # Frontend Polish Metrics
+ 
++## 2026-03-23 Round 73（Frontend E2E Stabilization Before Commit）
++
++### 质量指标
++- backend 全量测试：`236/236` 通过（单测 `233` + DB 集成 `3`）
++- frontend 全量单测：`110` 文件 / `356` 用例通过
++- frontend 全量 Playwright：`57/57` 通过
++- frontend lint：通过
++- frontend production build：通过
++
++### 过程指标
++- hydration 稳定化改动点：`4` 个（dashboard layout、Header 日期、采购创建、销售创建）
++- E2E mock/断言收口文件：`4` 个（`helpers.ts`、`smoke.spec.ts`、`button-coverage.spec.ts`、`dataImportService.ts`）
++- 新增/补强兼容回归：`3` 组（layout、Header、import history service）
++- 重新构建并用 fresh preview 复跑全量 E2E：`1` 次
++
++### 结论
++- 提交前最后一批前端假红灯/真红灯已经清掉，当前仓库回到“可提交”状态。
++- 这轮价值不在于新增功能，而在于把此前“功能完成但门禁不可信”的状态收口成真实绿灯。
++
++## 2026-03-23 Round 72（Frontend Next Iterations Round 7）
++
++### 质量指标
++- `FE-MODULE-01`：完成
++- `FE-QA-01`：完成
++- 页面级定向前端单测：`10/10` 通过
++- Playwright 截图回归：`5/5` 通过
++- 定向 lint：通过
++- 前端 production build：通过
++
++### 过程指标
++- 新增模块首页概览区：`2` 个（采购、出口）
++- 新增视觉回归基线截图：`5` 张
++- 为财务页截图补齐 mock 端点：`3` 个
++- 截图门禁运行方式调整：`1` 次（dev server -> production preview）
++
++### 结论
++- `frontend-next-iterations-2026-03` 的 `10/10` 项已经全部完成并完成验证。
++- 当前前端已从“继续结构迭代”进入“可以另开下一轮专项”的状态。
++
++## 2026-03-23 Round 71（Frontend Next Iterations Round 6）
++
++### 质量指标
++- `FE-AI-01`：完成
++- 新增定向前端单测：`2` 文件 / `10` 用例
++- 定向 lint：通过
++- 前端 production build：通过
++
++### 过程指标
++- AI 挂载边界新增：`1` 条（`/dashboard/ai/*` 不再重复挂载全局助手）
++- AI 主入口形态改造：`1` 组（大悬浮按钮 -> 低存在感触发器 + 右侧侧边面板）
++
++### 结论
++- AI 助手已经从“全局抢焦点的悬浮物”进入“业务页可用、但默认更克制”的状态。
++- 当前整体进度提升到 `8/10`，剩余 `FE-MODULE-01`、`FE-QA-01`。
++
++## 2026-03-23 Round 70（Frontend Next Iterations Round 5）
++
++### 质量指标
++- `FE-SHELL-01`：完成
++- `FE-SEARCH-01`：完成
++- 新增定向前端单测：`2` 文件 / `5` 用例
++- 定向 lint：通过
++- 前端 production build：通过
++
++### 过程指标
++- `Header.tsx` 主文件体量：从 `528` 行降为 `76` 行
++- 新增 Header 子组件：`4`
++- 新增统一搜索服务：`1`
++- 搜索查询阶段：`2`（高频主数据优先，合同类补充）
++
++### 结论
++- `Header` 已从“超重基础组件”进入“壳层编排 + 子组件职责清晰”的状态。
++- 当前整体进度提升到 `7/10`，剩余 `FE-AI-01`、`FE-MODULE-01`、`FE-QA-01`。
++
++## 2026-03-23 Round 69（Frontend Next Iterations Round 4）
++
++### 质量指标
++- `FE-SPLIT-02`：完成
++- 新增页面级回归测试：`1` 条（门店切换到历史采购明细）
++- 定向前端单测：`3/3` 通过
++- 定向 lint：通过
++- 前端 production build：通过
++
++### 过程指标
++- 主路由文件体量：从 `902` 行降为 `15` 行
++- 新增拆分文件：`5`
++- 为测试基建新增通用 polyfill：`1` 组（Radix Select）
++
++### 结论
++- `store-recommend` 已从“超长单文件”进入“可以继续做体验和结构收敛”的状态。
++- 当前整体进度提升到 `5/10`。
++
++## 2026-03-23 Round 68（Frontend Next Iterations Round 3）
++
++### 质量指标
++- `FE-STATE-01`：完成
++- 新增共享状态组件：`1` 组（`data-state.tsx`）
++- 新增组件级回归测试：`1` 文件 / `3` 用例
++- 页面级定向前端单测：`19/19` 通过
++- 定向 lint：通过
++- 前端 production build：通过
++
++### 过程指标
++- 本轮接入统一状态体系的高频页：`5`
++- 新增状态呈现抽象：`3` 个（loading / error / table-row state）
++- 因 `not_found` 恢复为待执行的并行任务：`4`
++
++### 结论
++- dashboard 高频页的状态反馈开始进入共享、可复用、可测的阶段。
++- 下一轮可以继续推进 `FE-SPLIT-02` / `FE-SHELL-01` / `FE-SEARCH-01` / `FE-AI-01`，而不是继续容忍状态展示分散生长。
++
++## 2026-03-23 Round 67（Frontend Next Iterations Round 2）
++
++### 质量指标
++- `FE-SPLIT-01`：完成
++- 新增页面级回归测试：`1` 文件 / `4` 用例
++- 定向前端单测：`4/4` 通过
++- 定向 lint：通过
++- 前端 production build：通过
++
++### 过程指标
++- 本轮拆分页级别：`1` 个超大页面（`finance/statements`）
++- 路由主文件体量：从 `1128` 行降为轻入口
++- 主要结构层：`4` 层（route / container / section / dialog）
++
++### 结论
++- 财务报表页已经从“超大单文件”进入“可继续演进的分层结构”状态。
++- 下一轮可以直接推进 `FE-SPLIT-02`，而不用继续把结构债务和行为验证绑在同一个文件里。
++
++## 2026-03-22 Round 66（Frontend Next Iterations Round 1）
++
++### 质量指标
++- `FE-DASH-01`：完成
++- `FE-NAV-02`：完成
++- 计划文档新增：`1`
++- checkpoint 文件更新：`8`
++- 定向前端单测：`20/20` 通过
++- 定向 lint：通过
++- 前端 production build：通过
++
++### 过程指标
++- 本轮锁定范围：`2` 个 P0 前端任务
++- 并行高推理探索子任务：`2` 个（`gpt-5.4 high`）
++- 暂不扩围任务：`4+`（`FE-SPLIT-01`、`FE-SPLIT-02`、`FE-SHELL-01`、`FE-SEARCH-01`）
++
++### 结论
++- 当前已从“审查结论可执行”进入“首个结构化实现批次已交付”。
++- dashboard 首页层级和壳层导航策略都已经进入共享、可测、可继续扩展的状态。
++
++## 2026-03-22 Round 65（Frontend Audit To Iteration）
++
++### 质量指标
++- 新增专项审查文档：`1`
++- 前端 lint：通过
++- 前端 production build：通过
++- 导航配置单一化：`1` 组（`navigation.config.ts`）
++- 定向前端单测：`14/14` 通过
++
++### 过程指标
++- 修复 lint/build 阻塞点：`2`
++- 清理额外 lint warning：`6+`
++- 壳层接入共享导航配置的组件：`3`
++- 清理陈旧壳层页面：`1`
++
++### 结论
++- 前端已经从“审查发现问题”进入“可继续系统迭代”的状态，当前 baseline 恢复为绿灯。
++- 第一轮价值不在于大改视觉，而在于把后续所有视觉和结构重构的底座先稳定下来。
++- 下一轮可以直接进入工作台首屏重做，而不用继续被导航漂移和构建红灯牵制。
++
+ ## 2026-03-21 Round 63（Login Transition / First-Paint Fix）
+ 
+ ### 质量指标
+diff --git a/PLAN.md b/PLAN.md
+index 509cca8..9f8cec7 100644
+--- a/PLAN.md
++++ b/PLAN.md
+@@ -1,5 +1,403 @@
+ # Ops Execution Center Plan
+ 
++## 2026-03-23 Round 73 — Frontend E2E Stabilization Before Commit
++
++### Goal
++- 清掉提交前最后一批前端 E2E 红灯，完成一次 fresh 的全门禁验证。
++- 把此前“功能已完成但 Playwright 仍失败”的状态收口为真正可提交状态。
++
++### Planned Scope
++- 查明并修复 dashboard 壳层在 production preview 下的 hydration mismatch（`React error #418`）。
++- 收口 `store-recommend`、`import`、`AI`、`purchase files` 等 E2E mock 契约缺口。
++- 将 smoke / button-coverage 断言同步到当前 IA 与文案。
++- 用 fresh production build + preview 重新跑完 backend/frontend 全量验证。
++
++### Verification Plan
++- `cd backend && npm run test:all`
++- `cd frontend && npm run test`
++- `cd frontend && npm run lint`
++- `cd frontend && npm run build`
++- `cd frontend && npm run test:e2e`
++
++### Delivered
++- `frontend/src/app/dashboard/layout.tsx`
++  - 改为 `useSyncExternalStore` 驱动 hydration 状态，消除 server/client 首帧结构不一致。
++- `frontend/src/components/layout/Header.tsx`
++  - 头部日期展示改为 SSR-safe 渲染，避免 render-time 日期差异导致 hydration 偏移。
++- `frontend/src/app/dashboard/purchase/create/components/CreatePurchasePageContent.tsx`
++  - `signedAt` 改为客户端挂载后初始化，避免 SSR/CSR 时间不一致。
++- `frontend/src/app/dashboard/sales/create/page.tsx`
++  - 同步修复 `signedAt` 初始化时机。
++- `frontend/e2e/helpers.ts`
++  - 补齐采购建议、AI token/history、导入记录、采购附件等缺失 mock，并统一导入记录分页响应。
++- `frontend/e2e/smoke.spec.ts`
++  - 将断言同步到当前文案与 IA，修复工作台快捷入口和设置页交互路径。
++- `frontend/e2e/button-coverage.spec.ts`
++  - 移除已废弃的旧日志页巡检，并保留当前页面集按钮覆盖。
++- `frontend/src/services/dataImportService.ts`
++  - `getImportHistory()` 同时兼容数组响应与分页响应，避免 `history.map` 类错误。
++- `frontend/src/services/dataImportService.test.ts`
++  - 补充分页响应兼容性回归。
++
++### Verification
++- `cd backend && npm run test:all`
++  - 通过：`233` 个单测 + `3` 个数据库集成测试。
++- `cd frontend && npm run test`
++  - 通过：`110` 个测试文件 / `356` 个用例。
++- `cd frontend && npm run lint`
++  - 通过。
++- `cd frontend && npm run build`
++  - 通过。
++- `cd frontend && npm run test:e2e`
++  - 通过：`57/57`。
++
++### Remaining Risk
++- 当前 Playwright 仍依赖本机 `127.0.0.1:3004` production preview 流程；若后续 CI 切换为不同浏览器版本或资源限流更严环境，仍需要在 CI 中再验证一次稳定性。
++- 这轮已经把“提交前红灯”清掉；后续若继续改 dashboard 壳层、导入页或 AI 模块，应该优先保住这批 E2E 契约而不是再去迁就旧断言。
++
++## 2026-03-23 Round 72 — Frontend Next Iterations Round 7
++
++### Goal
++- 完成 `docs/frontend-next-iterations-2026-03.md` 剩余的 `FE-MODULE-01` 与 `FE-QA-01`。
++- 让采购 / 出口首页拥有真正差异化首屏，并给关键页面补上视觉回归门禁。
++
++### Planned Scope
++- `FE-MODULE-01`
++  - 为采购合同页增加“采购执行概览”首屏概览卡。
++  - 为出口合同页增加“出口出运概览”首屏概览卡与跨模块跟进入口。
++- `FE-QA-01`
++  - 新增 `Playwright` 截图回归套件，覆盖：
++    - 登录页
++    - 工作台
++    - 采购合同页
++    - 财务页
++    - 移动端工作台首屏
++  - 稳定截图门禁运行环境：使用 production preview，而不是被本地已有 dev server/后端端口污染的配置。
++  - 为财务页截图补齐缺失 mock：汇率、付款趋势、逾期应收。
++
++### Verification Plan
++- `cd frontend && npm run test -- src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.test.tsx`
++- `cd frontend && npm run lint -- src/app/dashboard/contracts/components/ContractsPageContent.tsx src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx`
++- `cd frontend && npm run test:e2e -- e2e/visual.spec.ts`
++- `cd frontend && npm run build`
++
++### Delivered
++- `FE-MODULE-01`
++  - 采购首页新增“采购执行概览”，展示：
++    - 待推进合同
++    - 生产中
++    - 已发货待收货
++    - 合作店铺
++  - 出口首页新增“出口出运概览”，展示：
++    - 待装柜合同
++    - 在途货柜
++    - 已到港待结清
++    - 总箱数
++- `FE-QA-01`
++  - 新增 `frontend/e2e/visual.spec.ts`，截图回归覆盖 `5` 个关键页面/视口。
++  - `frontend/playwright.config.ts` 已改为使用 `127.0.0.1:3004` production preview，并提高启动超时。
++  - `frontend/e2e/helpers.ts` 已补齐财务页截图所需的 `3` 个关键 mock 端点。
++  - 当前快照基线已生成在 `frontend/e2e/visual.spec.ts-snapshots/`。
++
++### Verification
++- `cd frontend && npm run test -- src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.test.tsx`
++- `cd frontend && npm run lint -- src/app/dashboard/contracts/components/ContractsPageContent.tsx src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx`
++- `cd frontend && npm run test:e2e -- e2e/visual.spec.ts --grep visual-finance --update-snapshots`
++- `cd frontend && npm run test:e2e -- e2e/visual.spec.ts`
++- `cd frontend && npm run build`
++
++### Remaining Risk
++- 截图门禁当前基于本机 `chromium-darwin` 快照基线；若后续 CI/执行环境切换浏览器版本或操作系统，需要同步建立快照更新规范。
++- 这份 `frontend-next-iterations-2026-03` 报告项已全部完成，后续新迭代不应继续混入本轮 checkpoint，而应新开专项。
++
++## 2026-03-23 Round 71 — Frontend Next Iterations Round 6
++
++### Goal
++- 继续执行 `docs/frontend-next-iterations-2026-03.md`，完成 `FE-AI-01`。
++- 让 AI 助手从全局高抢占悬浮物收敛为更克制的辅助入口。
++
++### Planned Scope
++- 调整 `LazyAIAssistantMount.tsx`，避免在 AI 模块页重复挂载全局助手。
++- 调整 `AIAssistant.tsx`：
++  - 低存在感触发器
++  - 右侧可收纳侧边面板
++  - 保留现有文本/图片/SSE 对话能力
++- 先补挂载边界和侧边面板 red tests，再做 UI 收敛。
++
++### Verification Plan
++- `cd frontend && npm run test -- src/components/ai/AIAssistant.test.tsx src/components/ai/LazyAIAssistantMount.test.tsx`
++- `cd frontend && npm run lint -- src/components/ai/AIAssistant.tsx src/components/ai/AIAssistant.test.tsx src/components/ai/LazyAIAssistantMount.tsx src/components/ai/LazyAIAssistantMount.test.tsx`
++- `cd frontend && npm run build`
++
++### Delivered
++- `LazyAIAssistantMount.tsx` 现在在 `/dashboard/ai/*` 路径下不再重复挂载全局助手。
++- `AIAssistant.tsx` 已从大圆形悬浮按钮改为低存在感触发器。
++- 对话容器已改成右侧可收纳侧边面板，并补了 `complementary` 可访问语义。
++- 原有聊天、图片上传、粘贴、拖拽、SSE 流式响应逻辑保持不变。
++
++### Verification
++- `cd frontend && npm run test -- src/components/ai/AIAssistant.test.tsx src/components/ai/LazyAIAssistantMount.test.tsx`
++- `cd frontend && npm run lint -- src/components/ai/AIAssistant.tsx src/components/ai/AIAssistant.test.tsx src/components/ai/LazyAIAssistantMount.tsx src/components/ai/LazyAIAssistantMount.test.tsx`
++- `cd frontend && npm run build`
++
++### Remaining Risk
++- 当前 AI 助手仍是全局页面级入口，虽然噪音更低，但还没有做到“模块内上下文入口”；若后续继续精细化，需要把触发入口逐步下沉到具体模块页。
++
++## 2026-03-23 Round 70 — Frontend Next Iterations Round 5
++
++### Goal
++- 继续执行 `docs/frontend-next-iterations-2026-03.md`，完成 `FE-SHELL-01` 与 `FE-SEARCH-01`。
++- 把 `Header` 从超重壳层拆成清晰子组件，并将全局搜索收口为统一聚合服务。
++
++### Planned Scope
++- 将 `Header.tsx` 收敛为壳层装配组件。
++- 新增 Header 子组件：
++  - `HeaderMobileNav`
++  - `HeaderSearch`
++  - `HeaderNotifications`
++  - `HeaderUserMenu`
++- 新增 `frontend/src/services/dashboardSearch.service.ts`，避免 `Header` 每次输入直接并发打 `5` 个接口。
++- 先补 red tests，再做服务接线和壳层拆分。
++
++### Verification Plan
++- `cd frontend && npm run test -- src/components/layout/Header.test.tsx src/services/dashboardSearch.service.test.ts`
++- `cd frontend && npm run lint -- src/components/layout/Header.tsx src/components/layout/Header*.tsx src/services/dashboardSearch.service.ts src/services/dashboardSearch.service.test.ts`
++- `cd frontend && npm run build`
++
++### Delivered
++- `Header.tsx` 已从 `528` 行收敛为 `76` 行壳层编排组件。
++- 新增 Header 子组件：
++  - `HeaderMobileNav`
++  - `HeaderSearch`
++  - `HeaderNotifications`
++  - `HeaderUserMenu`
++- 新增 `dashboardSearch.service.ts`：
++  - 第一阶段先查 `products + suppliers`
++  - 首批结果足够时不再继续查询合同类接口
++  - 首批不足时再补查 `containers + purchases + sales`
++- `Header.test.tsx` 现已锁住：
++  - 搜索服务调用
++  - 搜索结果展示
++  - 结果点击跳转与清空输入
++- `dashboardSearch.service.test.ts` 已锁住分阶段搜索策略。
++
++### Verification
++- `cd frontend && npm run test -- src/components/layout/Header.test.tsx src/services/dashboardSearch.service.test.ts`
++- `cd frontend && npm run lint -- src/components/layout/Header.tsx src/components/layout/Header*.tsx src/services/dashboardSearch.service.ts src/services/dashboardSearch.service.test.ts`
++- `cd frontend && npm run build`
++
++### Remaining Risk
++- `HeaderSearch` 当前仍是前端聚合方案，不是后端单一聚合接口；如果后续需要跨更多实体或更严格的排序/权限控制，仍值得补一层后端统一搜索端点。
++
++## 2026-03-23 Round 69 — Frontend Next Iterations Round 4
++
++### Goal
++- 继续执行 `docs/frontend-next-iterations-2026-03.md`，完成 `FE-SPLIT-02`。
++- 把 `store-recommend/page.tsx` 从超长页面拆成分层结构，保持行为不变。
++
++### Planned Scope
++- `page.tsx` 收敛为薄入口。
++- 新增 `StoreRecommendPageContent` 作为单一 stateful container。
++- 新增三个视图分区：
++  - 模板 tab
++  - AI 建议 tab
++  - 统计 tab
++- 抽共享 helper，收口优先级样式、品类图标与 CSV 导出。
++
++### Verification Plan
++- `cd frontend && npm run test -- src/app/dashboard/store-recommend/page.test.tsx`
++- `cd frontend && npm run lint -- src/app/dashboard/store-recommend/page.tsx src/app/dashboard/store-recommend/page.test.tsx src/app/dashboard/store-recommend/components/*.tsx src/test/setup.ts`
++- `cd frontend && npm run build`
++
++### Delivered
++- 原 `902` 行 `store-recommend/page.tsx` 已拆开。
++- `page.tsx` 当前只保留薄入口，主逻辑下沉到：
++  - `StoreRecommendPageContent`
++  - `StoreRecommendTemplateTab`
++  - `StoreRecommendAITab`
++  - `StoreRecommendStatsTab`
++  - `storeRecommendShared`
++- 补强门店切换回归测试，并在全局 test setup 中补齐 Radix Select 所需的运行时 polyfill。
++
++### Verification
++- `cd frontend && npm run test -- src/app/dashboard/store-recommend/page.test.tsx`
++- `cd frontend && npm run lint -- src/app/dashboard/store-recommend/page.tsx src/app/dashboard/store-recommend/page.test.tsx src/app/dashboard/store-recommend/components/*.tsx src/test/setup.ts`
++- `cd frontend && npm run build`
++
++### Remaining Risk
++- `store-recommend` 结构已经可维护，但页面本身仍然信息量较大；后续若继续做功能收缩或视觉减负，需要在新结构上再做一轮体验级整理。
++
++## 2026-03-23 Round 68 — Frontend Next Iterations Round 3
++
++### Goal
++- 继续执行 `docs/frontend-next-iterations-2026-03.md`，完成 `FE-STATE-01`。
++- 统一 dashboard 高频页面的 loading / empty / error 状态体系，不改后端合同。
++
++### Planned Scope
++- 新增共享状态组件层：`frontend/src/components/ui/data-state.tsx`
++- 先接入五个高频页：
++  - `frontend/src/app/dashboard/finance/page.tsx`
++  - `frontend/src/app/dashboard/reports/page.tsx`
++  - `frontend/src/app/dashboard/payments/page.tsx`
++  - `frontend/src/app/dashboard/containers/page.tsx`
++  - `frontend/src/app/dashboard/inventory-container/page.tsx`
++- 先补页面级 red tests，再替换手写状态块。
++
++### Verification Plan
++- `cd frontend && npm run test -- src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.test.tsx`
++- `cd frontend && npm run lint -- src/components/ui/data-state.tsx src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.tsx src/app/dashboard/payments/page.test.tsx`
++- `cd frontend && npm run build`
++
++### Delivered
++- 新增共享状态组件：
++  - `LoadingState`
++  - `ErrorState`
++  - `TableStateRow`
++- 五个高频页面已开始使用统一状态层，替换原本分散的 loading / empty / error block。
++- 补齐了状态层与页面级回归测试，覆盖统一错误态、空态与加载态接线。
++
++### Verification
++- `cd frontend && npm run test -- src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.test.tsx`
++- `cd frontend && npm run lint -- src/components/ui/data-state.tsx src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.tsx src/app/dashboard/payments/page.test.tsx`
++- `cd frontend && npm run build`
++
++### Remaining Risk
++- 这轮只先统一了 5 个高频页，其他列表页仍存在旧式状态块，后续如果继续扩面，需要防止文案和行为再次漂移。
++
++## 2026-03-23 Round 67 — Frontend Next Iterations Round 2
++
++### Goal
++- 继续执行 `docs/frontend-next-iterations-2026-03.md`，推进 `FE-SPLIT-01`。
++- 在不改接口合同和页面行为的前提下，拆开超大的财务报表页。
++
++### Planned Scope
++- 将 `frontend/src/app/dashboard/finance/statements/page.tsx` 收敛为轻路由入口。
++- 抽出单一数据容器，承接 analytics/list/detail 加载、批量导入、文件上传与派生视图状态。
++- 抽出展示分区：
++  - 加载骨架
++  - 空态
++  - KPI/营运资金概览
++  - Tabs 图表与账期详情
++  - 历史预警
++  - 上传对话框
++- 先补页面级回归测试，再搬代码，保持现有行为不变。
++
++### Verification Plan
++- `cd frontend && npm run test -- src/app/dashboard/finance/statements/page.test.tsx`
++- `cd frontend && npm run lint -- src/app/dashboard/finance/statements/page.tsx src/app/dashboard/finance/statements/page.test.tsx src/app/dashboard/finance/statements/components/*.tsx`
++- `cd frontend && npm run build`
++
++### Delivered
++- `frontend/src/app/dashboard/finance/statements/page.tsx` 已收敛为轻路由入口，不再承载 1000+ 行状态与展示逻辑。
++- 财务报表页当前已形成清晰层次：
++  - `FinancialStatementsPageContent`：单一 stateful container
++  - `FinancialStatementsOverview`：头部/空态/KPI/营运资金概览
++  - `FinancialStatementsTabsSection`：趋势图表 + 历史预警 + 账期详情
++  - `FinancialStatementsUploadDialog`：Excel 上传导入
++- 新增页面级回归测试 `frontend/src/app/dashboard/finance/statements/page.test.tsx`，锁住：
++  - 首屏基础结构
++  - 账期切换后详情拉取
++  - 扫描导入全部
++  - 上传 Excel 导入
++
++### Verification
++- `cd frontend && npm run test -- src/app/dashboard/finance/statements/page.test.tsx`
++- `cd frontend && npm run lint -- src/app/dashboard/finance/statements/page.tsx src/app/dashboard/finance/statements/page.test.tsx src/app/dashboard/finance/statements/components/FinancialStatementsPageContent.tsx src/app/dashboard/finance/statements/components/FinancialStatementsOverview.tsx src/app/dashboard/finance/statements/components/FinancialStatementsTabsSection.tsx src/app/dashboard/finance/statements/components/FinancialStatementsUploadDialog.tsx src/app/dashboard/finance/statements/components/FinancialStatementsShared.tsx src/app/dashboard/finance/statements/components/financialStatementsFormatting.ts`
++- `cd frontend && npm run build`
++
++### Remaining Risk
++- 财务报表页当前状态较多，若拆分时 props 边界处理不干净，容易在账期切换、上传后选中期恢复、或 detail loading 提示上引入回归。
++
++## 2026-03-22 Round 66 — Frontend Next Iterations Round 1
++
++### Goal
++- 按 `docs/frontend-next-iterations-2026-03.md` 正式启动第一轮实现。
++- 本轮只做两个高杠杆任务：
++  - `FE-DASH-01`：工作台首屏重做
++  - `FE-NAV-02`：导航注册表继续深化
++
++### Planned Scope
++- 把 `/dashboard` 从“快速录入 + tracker + charts”堆叠页改为四块工作空间：
++  - 当前焦点
++  - 高频动作
++  - 风险提醒
++  - 关键趋势
++- 把模块可见性、默认落点、重定向策略继续并入 `frontend/src/components/layout/navigation.config.ts`。
++- 用共享 registry helper 驱动 `dashboard/layout`，减少壳层里的路径条件判断。
++
++### Delivered
++- `FE-DASH-01`
++  - `/dashboard` 已改成四块工作空间，不再是旧版卡片拼盘。
++  - `ProductTracker` 已从首屏主层级下沉到 `经营工具` 次级区域。
++  - `DataDashboard.tsx` 现在从现有 analytics 合同推导当前焦点、风险提醒与关键趋势。
++- `FE-NAV-02`
++  - 导航注册表新增默认落点、可见角色与统一 target-resolution helper。
++  - 非管理员不再显示系统管理模块。
++  - `Sidebar` 与移动端 `Header` 统一走共享导航目标解析。
++  - `dashboard/layout` 新增“进入不可见模块时回到默认 dashboard 落点”的壳层兜底。
++
++### Verification Plan
++- `cd frontend && npm run test -- src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.test.tsx src/app/dashboard/layout.test.tsx src/components/layout/Sidebar.test.tsx src/components/layout/Header.test.tsx`
++- `cd frontend && npm run lint -- src/app/dashboard/page.tsx src/components/dashboard/DataDashboard.tsx src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.test.tsx src/components/layout/navigation.config.ts src/app/dashboard/layout.tsx src/app/dashboard/layout.test.tsx src/components/layout/Sidebar.test.tsx`
++- `cd frontend && npm run build`
++
++### Verification
++- `cd frontend && npm run test -- src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.test.tsx src/components/layout/navigation.config.test.ts src/app/dashboard/layout.test.tsx src/components/layout/Sidebar.test.tsx`
++- `cd frontend && npm run lint -- src/app/dashboard/page.tsx src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.tsx src/components/dashboard/DataDashboard.test.tsx src/components/layout/navigation.config.ts src/components/layout/navigation.config.test.ts src/components/layout/Sidebar.tsx src/components/layout/Sidebar.test.tsx src/components/layout/Header.tsx src/components/layout/ModuleTabHeader.tsx src/app/dashboard/layout.tsx src/app/dashboard/layout.test.tsx`
++- `cd frontend && npm run build`
++
++### Remaining Risk
++- 当前 dashboard analytics 接口不一定天然覆盖“焦点/风险”语义，本轮先做前端推导，不扩大后端合同。
++- 导航注册表若接入默认落点后与历史 tab-memory 发生冲突，可能出现首跳路径偏差，需要定向测试兜底。
++
++## 2026-03-22 Round 65 — Frontend Audit To Iteration Kickoff
++
++### Goal
++- 将 2026-03 前端审查正式转为执行中的结构化迭代。
++- 第一轮先完成三件事：
++  - 把审查结论与设计方向落盘
++  - 修复前端当前 lint/build 红灯
++  - 收口导航配置，为后续工作台与模块首页重做铺路
++
++### Frontend Skill Direction
++- visual thesis：企业级冷静秩序感，减少表面层，强化排版与模块识别，让页面更像工作空间而不是卡片集合。
++- content plan：首屏先给“当前任务/关键状态/高频动作”，再给列表、图表、明细，不再让所有区块同权竞争。
++- interaction thesis：
++  - 壳层进入时有轻量层次显现
++  - 模块切换与页内切换共享同一导航语义
++  - AI 助手与高频动作不再抢同一视觉焦点
++
++### Delivered
++- 新增专项审查文档：
++  - `docs/frontend-audit-2026-03.md`
++- 明确第一轮执行顺序：
++  1. `FE-AUDIT-01` 审查文档与 checkpoint 落盘
++  2. `FE-BASE-01` 修复 frontend lint/build 红灯
++  3. `FE-NAV-01` 导航单一配置源重构
++  4. `FE-CLEAN-01` 清理陈旧壳层页面
++  5. `FE-DASH-01` 工作台首屏结构重做
++- 已完成第一轮基础收口：
++  - 修复 `frontend/src/app/dashboard/layout.tsx` 的 hydration effect lint 阻塞
++  - 修复 `frontend/src/app/dashboard/ai/sessions/page.tsx` 的 Recharts formatter build 阻塞
++  - 清理多处前端 lint warning（contracts / finance / inventory / reports / store-recommend / purchase create）
++  - 新增 `frontend/src/components/layout/navigation.config.ts`，集中管理模块入口、模块 tabs 与壳层预取路径
++  - `Sidebar` / `Header` / `ModuleTabHeader` 已切换到共享导航配置
++  - 删除陈旧壳层页：`frontend/src/app/dashboard/logs/page.tsx`
++
++### Verification
++- `cd frontend && npm run lint`
++- `cd frontend && npm run build`
++- `cd frontend && npm run test -- src/app/dashboard/layout.test.tsx src/components/layout/Header.test.tsx src/components/layout/Sidebar.test.tsx src/app/dashboard/ai/sessions/page.test.tsx`
++
++### Next Priorities
++1. `FE-DASH-01`：开始工作台首屏结构重做
++2. 将导航注册表进一步接入权限/重定向规则，减少壳层条件分支
++3. 继续拆分超大页面，优先 `finance/statements` 与 `store-recommend`
++4. 详细待办已落盘：`docs/frontend-next-iterations-2026-03.md`
++
++### Remaining Risk
++- 当前 front-end 仍存在大文件与 client-heavy 页面结构，第一轮不会一次性拆完；本轮只先修基线并搭骨架，避免把视觉升级变成无界重构。
++
+ ## 2026-03-21 Round 64 — CEO 三维评审 + Design Review → 迭代计划
+ 
+ ### Goal
+diff --git a/RISKS.md b/RISKS.md
+index d5cedd9..6201c41 100644
+--- a/RISKS.md
++++ b/RISKS.md
+@@ -1,5 +1,105 @@
+ # Frontend Polish Risks
+ 
++## 2026-03-23 Round 73（Frontend E2E Stabilization Before Commit）
++
++| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
++|---|---|---|---|---|
++| R-046 | dashboard 壳层在 server 首帧与 client 首帧渲染结构不同，production preview 下触发 hydration mismatch | Playwright 多页巡检在进入 dashboard 相关页面时直接抛 `React error #418`，导致提交前门禁失真 | 把 hydration 状态改成 `useSyncExternalStore` 驱动，确保 server snapshot 与 client 首帧快照一致，再用 fresh preview 重跑全量 E2E | 回退 `frontend/src/app/dashboard/layout.tsx`、`frontend/src/app/dashboard/layout.test.tsx`、`frontend/src/components/layout/Header.tsx` |
++| R-047 | E2E mock 返回结构与真实前端服务契约漂移，或者 smoke/button 断言仍指向旧 IA/旧文案 | 导入页、采购建议页、设置页等页面出现假红灯，团队会误以为功能回归而不是测试资产过期 | 先补 mock 契约与服务兼容，再把断言同步到当前 IA，并用 full-suite `test:e2e` 验证不是局部侥幸通过 | 回退 `frontend/e2e/helpers.ts`、`frontend/e2e/smoke.spec.ts`、`frontend/e2e/button-coverage.spec.ts`、`frontend/src/services/dataImportService.ts` |
++
++### 2026-03-23 Round 73 状态更新
++
++- `R-046`：本轮已收敛。dashboard 壳层和 Header 时间展示都已切到 hydration-safe 方案，`React error #418` 不再复现。
++- `R-047`：本轮已收敛。导入页/采购建议页/设置页相关 mock 与断言均已同步，前端全量 E2E `57/57` 通过。
++
++## 2026-03-23 Round 72（Frontend Next Iterations Round 7）
++
++| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
++|---|---|---|---|---|
++| R-044 | 模块首页差异化这轮直接在采购/出口首页插入概览卡，若统计口径只顾 UI 不顾业务状态，会让“模块首页差异化”变成新的误导信息 | 首页看起来更像模块工作台，但卡片数字不可信，会削弱运营对首页的依赖 | 只使用现有合同状态和箱数等可验证字段做派生，并用页面级回归测试锁住采购/出口首页首屏结构 | 回退 `frontend/src/app/dashboard/contracts/components/ContractsPageContent.tsx`、`frontend/src/app/dashboard/contracts/page.test.tsx`、`frontend/src/app/dashboard/sales/page.tsx`、`frontend/src/app/dashboard/sales/page.test.tsx` |
++| R-045 | Playwright 截图门禁若继续复用已有 dev server 端口，或 mock 不完整，截图回归会被环境噪声而不是真实 UI 漂移阻断 | QA 门禁不稳定，后续团队会选择绕过截图回归，而不是依赖它发现结构漂移 | 改用 production preview 端口独立运行，补齐财务页依赖的 mock，并先单页跑通再复跑全量 `5` 张截图 | 回退 `frontend/playwright.config.ts`、`frontend/e2e/helpers.ts`、`frontend/e2e/visual.spec.ts` |
++
++### 2026-03-23 Round 72 状态更新
++
++- `R-044`：本轮已收敛。采购/出口首页概览都只基于既有合同状态与箱数字段派生，页面级回归测试已覆盖首屏概览结构。
++- `R-045`：本轮已收敛。截图门禁已改为 production preview 运行，财务页 mock 缺口已补齐，`5` 张截图回归全部通过。
++
++## 2026-03-23 Round 71（Frontend Next Iterations Round 6）
++
++| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
++|---|---|---|---|---|
++| R-043 | AI 助手入口位置和挂载策略同时调整，若只改样式不改边界，AI 模块页仍会出现重复入口；若只改边界不改形态，业务页噪音仍旧过高 | 用户仍会觉得 AI 助手“总在抢焦点”，或者在 AI 模块里看到重复助手入口 | 同时给 `LazyAIAssistantMount` 和 `AIAssistant` 加回归测试：一个锁挂载边界，一个锁“低存在感触发器 + 侧边面板” | 回退 `frontend/src/components/ai/LazyAIAssistantMount.*` 与 `frontend/src/components/ai/AIAssistant.*` |
++
++### 2026-03-23 Round 71 状态更新
++
++- `R-043`：本轮已收敛。AI 模块页不再重复挂全局助手，默认入口与展开形态也已切成更克制的侧边面板。
++
++## 2026-03-23 Round 70（Frontend Next Iterations Round 5）
++
++| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
++|---|---|---|---|---|
++| R-042 | `Header` 壳层拆分与全局搜索收口在同一轮同时发生，搜索交互、移动导航、用户菜单都改到同一批文件 | 若测试边界不够清晰，容易把“结构更干净”换成“搜索/跳转/退出回归” | 先写 `Header` 与搜索服务的 red tests，`Header` 只做壳层编排，搜索策略下沉到单独服务并由定向测试锁住 | 回退 `frontend/src/components/layout/Header*.tsx` 和 `frontend/src/services/dashboardSearch.service.*` |
++
++### 2026-03-23 Round 70 状态更新
++
++- `R-042`：本轮已收敛。`Header` 已拆成子组件，搜索 fanout 已收口到服务层，且 `Header` / `dashboardSearch.service` 定向测试和 `build` 均通过。
++
++## 2026-03-23 Round 68（Frontend Next Iterations Round 3）
++
++| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
++|---|---|---|---|---|
++| R-039 | 统一状态体系时同时改动多个高频页，若页面仍保留各自手写文案和分支，容易出现 loading / empty / error 再次漂移 | 不同模块会继续给用户不同反馈，后续扩面成本更高 | 先抽共享 `data-state` 组件，再只接入 5 个高频页，并用页面级回归测试锁住错误态和空态接线 | 回退 `frontend/src/components/ui/data-state.tsx` 与这 5 个页面的状态层接线 |
++| R-040 | 并行子任务长时间运行后再次返回 `not_found` | checkpoint 会误把失联任务记成 `DOING`，导致下次续跑判断失真 | 只按可验证证据更新状态；失联任务恢复为 `TODO`，重新分发而不口头沿用旧进度 | 回退 `TASKS.md` 中错误的状态标记，重新按证据分配队列 |
++
++### 2026-03-23 Round 68 状态更新
++
++- `R-039`：本轮已按“共享组件 + 页面级回归”执行，当前 5 个高频页已进入统一状态层。
++- `R-040`：本轮已激活。并行 worker 再次返回 `not_found`，因此相关任务已恢复为真实待执行状态。
++
++## 2026-03-23 Round 69（Frontend Next Iterations Round 4）
++
++| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
++|---|---|---|---|---|
++| R-041 | `store-recommend` 页面在拆分时同时包含模板视图、AI 建议、统计视图和 CSV 导出逻辑 | 若 state / props 边界处理不清，容易在门店切换、模板导出或 tab 渲染上引入回归 | 保持单一 `StoreRecommendPageContent` 持有状态，只抽展示分区；补门店切换页面级回归测试后再搬代码 | 回退 `frontend/src/app/dashboard/store-recommend/components/*` 和 `page.tsx` 的拆分改动 |
++
++### 2026-03-23 Round 69 状态更新
++
++- `R-041`：本轮已收敛。`store-recommend` 现在由薄入口 + 单一 container + 三个展示分区组成，门店切换测试已覆盖核心路径。
++
++## 2026-03-22 Round 66（Frontend Next Iterations Round 1）
++
++| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
++|---|---|---|---|---|
++| R-036 | 工作台首屏使用现有 analytics 数据硬做“当前焦点/风险提醒”分区时，字段语义不够直接 | 首页层级会更好，但个别提醒可能只是推导值，业务感不够强 | 第一轮先接受“前端推导 + 文案收口”，不引入新 API；若验证后仍弱，再单开 dashboard contract 升级任务 | 回退 `frontend/src/app/dashboard/page.tsx` 与 `frontend/src/components/dashboard/DataDashboard.tsx` 到旧布局 |
++| R-037 | 导航注册表继续承载默认落点和重定向规则后，与现有 tab-memory/历史深链接产生冲突 | 模块入口、默认跳转或壳层首跳出现偏差，影响熟悉路径的用户 | registry helper 保持兼容旧记忆逻辑，并以 `layout/sidebar` 定向测试锁住关键路由；若发现冲突，先收窄到只管理默认落点 | 回退 `frontend/src/components/layout/navigation.config.ts` 与 `frontend/src/app/dashboard/layout.tsx` 的新增落点逻辑 |
++
++### 2026-03-22 Round 66 状态更新
++
++- `R-036`：本轮已按“前端推导 + 不扩后端合同”落地，焦点/风险首版已经可用。
++- `R-037`：本轮已通过 `navigation.config` / `layout` / `sidebar` 定向测试收敛，但未来新增更深路由时仍需继续扩覆盖。
++
++## 2026-03-23 Round 67（Frontend Next Iterations Round 2）
++
++| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
++|---|---|---|---|---|
++| R-038 | 财务报表页同时拆出 container、图表分区和上传对话框时，原本集中在单文件里的状态依赖被拆散 | 账期切换、导入后刷新、新账期选中、detail loading 提示等细节可能回归 | 本轮只保留一个 stateful container，route 和子组件尽量无状态；先用页面级回归测试锁住导入/空态/详情行为，再搬代码 | 回退 `frontend/src/app/dashboard/finance/statements/components/*` 与 `page.tsx` 的拆分改动 |
++
++### 2026-03-23 Round 67 状态更新
++
++- `R-038`：本轮已按“单一 container + 页面级回归测试”落地，测试覆盖了账期切换、扫描导入和上传导入。后续剩余风险主要在继续细拆子区块时的 props 漂移，而不是当前结构切换本身。
++
++## 2026-03-22 Round 65（Frontend Audit To Iteration）
++
++| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
++|---|---|---|---|---|
++| R-034 | 导航配置从三处收口到单一注册表后，若个别页面依赖历史硬编码顺序/路径，可能出现高亮、预取或模块记忆偏差 | 页面仍可访问，但模块激活态、移动端菜单或记忆跳转可能不准确 | 先以 `Header` / `Sidebar` / `dashboard/layout` / `ai/sessions` 的定向测试兜底；后续继续补采购、出口、系统管理三个模块的导航回归 | 回退 `frontend/src/components/layout/navigation.config.ts` 与壳层 3 个组件的接线改动 |
++| R-035 | 删除旧 `dashboard/logs` 页面后，若存在仓库外旧书签或未扫描到的内部跳转引用 | 用户命中旧路径时看到 404 或错误跳转 | 当前系统管理实际日志页已是 `/dashboard/system/logs`；后续若发现真实入口仍引用旧路径，再追加 redirect，而不是恢复旧页 | 回退删除 `frontend/src/app/dashboard/logs/page.tsx` 的改动 |
++
++### 2026-03-22 Round 65 状态更新
++
++- `R-034`：已激活。第一轮已通过壳层与 AI 会话页定向测试，后续仍需补更多模块级导航回归。
++- `R-035`：低风险激活。当前仓库内未找到 `/dashboard/logs` 引用，先保留观察。
++
+ ## 2026-03-19 Round 62（ClawPi Domain Sweep）
+ 
+ | 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
+diff --git a/TASKS.md b/TASKS.md
+index c402427..05deca0 100644
+--- a/TASKS.md
++++ b/TASKS.md
+@@ -1,5 +1,30 @@
+ # Frontend Polish Tasks
+ 
++## 2026-03-23 提交前 E2E 稳定化
++
++| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
++|---|---|---:|---:|---|---|
++| E2E-03 | P0 | 60m | 1 | DONE | 修复前端全量 Playwright 红灯（hydration mismatch、mock 契约漂移、过期 IA 断言），完成 fresh 全门禁验证并收口提交前台账 |
++
++## 2026-03-22 Frontend Audit To Iteration
++
++| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
++|---|---|---:|---:|---|---|
++| FE-AUDIT-01 | P0 | 20m | 1 | DONE | 产出 `docs/frontend-audit-2026-03.md`，固化审查结论、结构问题、frontend-skill 方向与分阶段改进计划 |
++| FE-BASE-01 | P0 | 45m | 1 | DONE | 修复 `frontend` 当前 lint/build 红灯，清理明显 warning，恢复前端可演进基线 |
++| FE-NAV-01 | P0 | 45m | 1 | DONE | 建立单一导航注册表，统一驱动 Sidebar/Header/ModuleTabHeader，消除多份导航配置漂移 |
++| FE-CLEAN-01 | P1 | 20m | 1 | DONE | 清理陈旧或脱轨页面入口（如旧 `dashboard/logs`），统一壳层规范 |
++| FE-DASH-01 | P0 | 90m | 1 | DONE | 重做工作台首屏结构：从卡片拼盘收敛为“当前焦点 + 高频动作 + 关键趋势 + 风险提醒”工作空间 |
++| FE-NAV-02 | P0 | 45m | 2 | DONE | 将权限、默认落点、重定向规则进一步并入导航注册表，减少壳层条件分支 |
++| FE-SPLIT-01 | P1 | 90m | 1 | DONE | 拆分 `finance/statements/page.tsx`，收口 route/data/view/dialog 结构 |
++| FE-SPLIT-02 | P1 | 75m | 1 | DONE | 拆分 `store-recommend/page.tsx`，降低超长页面与重复卡片堆叠 |
++| FE-SHELL-01 | P1 | 60m | 2 | DONE | 继续重构 `Header`，拆开移动导航、搜索、通知、用户菜单 |
++| FE-SEARCH-01 | P1 | 60m | 2 | DONE | 将 Header 全局搜索改为聚合入口，避免输入时并发打 5 个接口 |
++| FE-AI-01 | P2 | 60m | 3 | DONE | 降低 AI 助手对业务页面主交互的抢占，改成更克制的辅助入口 |
++| FE-STATE-01 | P2 | 45m | 1 | DONE | 统一列表页和模块页 loading / empty / error 状态体系 |
++| FE-MODULE-01 | P2 | 90m | 1 | DONE | 让采购/出口/财务模块首页形成差异化工作空间结构 |
++| FE-QA-01 | P2 | 45m | 1 | DONE | 为登录页、工作台、采购合同、财务页、移动端首屏补截图回归门禁 |
++
+ ## 2026-03-21 CEO/Eng/Design 三维评审迭代（基于 2026-03-20 review）
+ 
+ | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+diff --git a/frontend/METRICS.md b/frontend/METRICS.md
+index 2fe4e44..ffdb681 100644
+--- a/frontend/METRICS.md
++++ b/frontend/METRICS.md
+@@ -2,6 +2,12 @@
+ 
+ | Round | Scope | Tests | Lint | Build | Coverage | Notes |
+ | --- | --- | --- | --- | --- | --- | --- |
++| 19 | Frontend E2E stabilization before commit | Pass (`110` files / `356` unit tests + `57/57` Playwright) | Pass | Pass | Not run | The dashboard hydration mismatch and stale E2E contracts were fixed, a fresh production preview was rebuilt, and the repo moved from “feature-complete but gate-red” to genuinely commit-ready |
++| 18 | Frontend next iterations round 7 (`FE-MODULE-01` + `FE-QA-01`) | Pass (`10` page tests + `5` Playwright visuals) | Pass | Pass | Not run | Procurement/export now expose differentiated first-screen summaries, Playwright visual gating covers five critical pages, and the March frontend iteration plan is fully complete |
++| 17 | Frontend next iterations round 6 (`FE-AI-01`) | Pass (`2` files / `10` tests) | Pass | Pass | Not run | The AI assistant now mounts more selectively, opens from a quieter trigger, and uses a right-side panel instead of the louder floating bubble |
++| 16 | Frontend next iterations round 5 (`FE-SHELL-01` + `FE-SEARCH-01`) | Pass (`2` files / `5` tests) | Pass | Pass | Not run | `Header.tsx` dropped from `528` lines to `76`, four Header child components were added, and global search now uses staged aggregation instead of direct five-endpoint fanout inside the component |
++| 15 | Frontend next iterations round 4 (`FE-SPLIT-02`) | Pass (`1` file / `3` tests) | Pass | Pass | Not run | `store-recommend/page.tsx` is now a thin route wrapper; the page was split into content/section/shared-helper files and test setup gained shared Radix Select polyfills |
++| 14 | Frontend next iterations round 3 (`FE-STATE-01`) | Pass (`6` files / `19` tests) | Pass | Pass | Not run | Added shared `data-state` primitives and adopted them across finance, reports, payments, containers, and inventory-container; prior parallel tasks were reset to TODO because the worker sessions returned `not_found` |
+ | 0 | Baseline before customs declarations implementation | Pending | Pending | Pending | Pending | Checkpoint initialized before code changes |
+ | 1 | Public finance service pages (`/forex-verifications`, `/tax-refunds`) | Pass (`3` tests) | Pass | Not run | 100% statements / 100% branches / 100% functions / 100% lines | Targeted coverage command limited to `src/components/public/service-page.tsx`, `src/app/forex-verifications/page.tsx`, and `src/app/tax-refunds/page.tsx` |
+ | 2 | HSCode frontend integration (`hsCode.service`, `ProductDialog`, `products` page) | Pass (`6` tests) | Pass | Not run | Not run | Targeted verification: `npm run test -- src/services/hsCode.service.test.ts src/app/dashboard/products/components/ProductDialog.test.tsx src/app/dashboard/products/page.test.tsx` and `npm run lint -- src/services/hsCode.service.ts src/services/hsCode.service.test.ts src/app/dashboard/products/components/ProductDialog.tsx src/app/dashboard/products/components/ProductDialog.test.tsx src/app/dashboard/products/page.tsx src/app/dashboard/products/page.test.tsx` |
+@@ -14,3 +20,5 @@
+ | 9 | Blue shadcn/ui enforcement on remaining outlier pages | Pass (`5` files / `7` tests) | Pass | Pass | Not run | Blue theme tokens now drive the app baseline; public service pages and the more bespoke import/store-recommend surfaces were pulled toward standard shadcn cards, buttons, badges, and page headers |
+ | 10 | Final blue-token convergence for auth and finance surfaces | Pass (`7` files / `19` tests) | Pass | Pass | Not run | Auth, dashboard stats, finance, payments, import, and semantic helper surfaces were converged onto blue-token or standard semantic styling; build remained green after the cleanup |
+ | 11 | Residual detail cleanup + local persistent frontend startup | Pass (lint-backed cleanup on the touched detail/admin files; no focused tests were available/needed for each file) | Pass | Pass | Not run | Remaining visible gradient/chart leftovers in tools, purchase, sales, containers, finance detail, and admin badges were normalized; frontend process is now listening on `localhost:3002` with PID/log persisted locally |
++| 12 | Frontend next iterations round 1 kickoff (`FE-DASH-01` + `FE-NAV-02`) | Pass (`5` files / `20` tests) | Pass | Pass | Not run | Dashboard home now ships as a four-zone workspace and the shell derives visibility/default landing/redirect behavior from shared registry helpers |
++| 13 | Frontend next iterations round 2 (`FE-SPLIT-01`) | Pass (`1` file / `4` tests) | Pass | Pass | Not run | Finance statements now use a thin route entry plus split content sections, with page-level regression coverage for period switching and both import flows |
+diff --git a/frontend/PLAN.md b/frontend/PLAN.md
+index 80a3cea..690f4fe 100644
+--- a/frontend/PLAN.md
++++ b/frontend/PLAN.md
+@@ -1,3 +1,330 @@
++# 2026-03-23 Round 19: Frontend E2E stabilization before commit
++
++## Goal
++- Clear the last pre-commit Playwright failures and turn the frontend into a truly commit-ready state.
++- Re-verify backend/frontend gates on fresh production output instead of relying on earlier partial green runs.
++
++## Planned Execution
++- Remove the production hydration mismatch in the dashboard shell.
++- Update stale E2E mocks and assertions for current IA, import contracts, AI stats/history, and purchase file endpoints.
++- Rebuild the frontend, run against a fresh preview on `127.0.0.1:3004`, and rerun the full E2E suite.
++- Re-run the backend/frontend verification stack before commit.
++
++## Verification Plan
++- `npm run test`
++- `npm run lint`
++- `npm run build`
++- `npm run test:e2e`
++
++## Execution Outcome
++- `src/app/dashboard/layout.tsx` now uses `useSyncExternalStore` for persisted-auth hydration, fixing the production shell mismatch that surfaced as `React error #418`.
++- `src/components/layout/Header.tsx` now renders its date string through an SSR-safe subscription pattern rather than render-time clock reads.
++- `src/app/dashboard/purchase/create/components/CreatePurchasePageContent.tsx` and `src/app/dashboard/sales/create/page.tsx` now initialize `signedAt` client-side after mount.
++- `e2e/helpers.ts` now includes the missing mocks for procurement-template store routes, AI token/history endpoints, paginated import history, and purchase file APIs.
++- `e2e/smoke.spec.ts` now matches the current dashboard/settings IA and no longer depends on removed tabs or labels.
++- `e2e/button-coverage.spec.ts` no longer scans the removed `/dashboard/logs` route.
++- `src/services/dataImportService.ts` now accepts both array and paginated import-history payloads, with regression coverage in `src/services/dataImportService.test.ts`.
++
++## Verification
++- `npm run test` => `110` files / `356` tests passed.
++- `npm run lint` => passed.
++- `npm run build` => passed.
++- `npm run test:e2e` => `57/57` passed.
++
++## Phase Boundary
++- This round is successful only if the prior “feature-complete but not commit-ready” state is eliminated, the full Playwright suite passes on a fresh production preview, and the frontend can be committed without known gate failures.
++
++# 2026-03-23 Round 18: Frontend next iterations round 7
++
++## Goal
++- Finish the remaining `docs/frontend-next-iterations-2026-03.md` scope with `FE-MODULE-01` and `FE-QA-01`.
++- Differentiate procurement/export module homes and add screenshot-regression coverage for the highest-signal pages.
++
++## Planned Execution
++- Add a procurement overview band to `src/app/dashboard/contracts/components/ContractsPageContent.tsx`.
++- Add an export-shipping overview band to `src/app/dashboard/sales/page.tsx`.
++- Add Playwright visual coverage in `e2e/visual.spec.ts` for:
++  - login
++  - dashboard
++  - procurement
++  - finance
++  - mobile dashboard first screen
++- Stabilize the visual gate by running against a dedicated production preview port and by filling the missing finance mocks in `e2e/helpers.ts`.
++
++## Verification Plan
++- `npm run test -- src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.test.tsx`
++- `npm run lint -- src/app/dashboard/contracts/components/ContractsPageContent.tsx src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx`
++- `npm run test:e2e -- e2e/visual.spec.ts`
++- `npm run build`
++
++## Execution Outcome
++- Procurement now has a dedicated top-of-page overview section summarizing:
++  - active follow-up contracts
++  - producing contracts
++  - shipped-but-not-received contracts
++  - active stores
++- Export now has a dedicated shipment overview section summarizing:
++  - contracts preparing for loading
++  - in-transit containers
++  - arrived-but-not-closed contracts
++  - total box count
++- Added `e2e/visual.spec.ts` and generated snapshot baselines for:
++  - login
++  - dashboard
++  - procurement
++  - finance
++  - mobile dashboard first screen
++- `playwright.config.ts` now uses a dedicated production preview on `127.0.0.1:3004`.
++- `e2e/helpers.ts` now includes the missing finance mocks for exchange rate, payment trends, and overdue receivables.
++
++## Verification
++- `npm run test -- src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.test.tsx`
++- `npm run lint -- src/app/dashboard/contracts/components/ContractsPageContent.tsx src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx`
++- `npm run test:e2e -- e2e/visual.spec.ts --grep visual-finance --update-snapshots`
++- `npm run test:e2e -- e2e/visual.spec.ts`
++- `npm run build`
++
++## Phase Boundary
++- This round is successful only if procurement/export home surfaces are no longer generic clones, the five screenshot baselines are stable under Playwright, and the full March frontend-iteration plan is complete.
++
++# 2026-03-23 Round 17: Frontend next iterations round 6
++
++## Goal
++- Continue `docs/frontend-next-iterations-2026-03.md` with `FE-AI-01`.
++- Reduce the AI assistant from a high-attention floating surface into a quieter assistive entry.
++
++## Planned Execution
++- Keep the chat/image/SSE logic intact while changing presentation and mount rules.
++- Update `LazyAIAssistantMount.tsx` so the dedicated AI workspace no longer also gets the global assistant.
++- Update `AIAssistant.tsx` so the default entry is quieter and the conversation opens as a right-side panel.
++- Add failing tests first for both mount boundary and panel semantics.
++
++## Verification Plan
++- `npm run test -- src/components/ai/AIAssistant.test.tsx src/components/ai/LazyAIAssistantMount.test.tsx`
++- `npm run lint -- src/components/ai/AIAssistant.tsx src/components/ai/AIAssistant.test.tsx src/components/ai/LazyAIAssistantMount.tsx src/components/ai/LazyAIAssistantMount.test.tsx`
++- `npm run build`
++
++## Execution Outcome
++- `LazyAIAssistantMount.tsx` now skips `/dashboard/ai/*`, preventing duplicate assistant presence in the dedicated AI workspace.
++- `AIAssistant.tsx` now uses a lower-noise trigger instead of the large floating circular button.
++- The assistant opens as a right-side panel with explicit `complementary` semantics.
++- Existing chat, upload, paste, drag-drop, and SSE-response behavior stays covered by the refreshed tests.
++
++## Verification
++- `npm run test -- src/components/ai/AIAssistant.test.tsx src/components/ai/LazyAIAssistantMount.test.tsx`
++- `npm run lint -- src/components/ai/AIAssistant.tsx src/components/ai/AIAssistant.test.tsx src/components/ai/LazyAIAssistantMount.tsx src/components/ai/LazyAIAssistantMount.test.tsx`
++- `npm run build`
++
++## Phase Boundary
++- This round is successful only if the assistant is visibly less intrusive by default, AI workspace duplication is removed, and the existing assistant capabilities remain intact under focused verification.
++
++# 2026-03-23 Round 16: Frontend next iterations round 5
++
++## Goal
++- Continue `docs/frontend-next-iterations-2026-03.md` with `FE-SHELL-01` and `FE-SEARCH-01`.
++- Decompose the overloaded `Header` shell and move global search behind a thinner aggregation service.
++
++## Planned Execution
++- Reduce `src/components/layout/Header.tsx` to shell orchestration only.
++- Extract focused child components:
++  - `HeaderMobileNav`
++  - `HeaderSearch`
++  - `HeaderNotifications`
++  - `HeaderUserMenu`
++- Add `src/services/dashboardSearch.service.ts` so search no longer fans out across five endpoints directly inside `Header`.
++- Add red tests first for staged search and Header search delegation before wiring the refactor.
++
++## Verification Plan
++- `npm run test -- src/components/layout/Header.test.tsx src/services/dashboardSearch.service.test.ts`
++- `npm run lint -- src/components/layout/Header.tsx src/components/layout/Header*.tsx src/services/dashboardSearch.service.ts src/services/dashboardSearch.service.test.ts`
++- `npm run build`
++
++## Execution Outcome
++- `src/components/layout/Header.tsx` is now a shell orchestrator rather than the place where mobile navigation, search fanout, notifications, and user menu all coexist.
++- Added focused child components:
++  - `HeaderMobileNav`
++  - `HeaderSearch`
++  - `HeaderNotifications`
++  - `HeaderUserMenu`
++- Added `src/services/dashboardSearch.service.ts` with staged search:
++  - `products + suppliers` first
++  - `containers + purchases + sales` only when the first batch is insufficient
++- Added focused regressions in:
++  - `src/components/layout/Header.test.tsx`
++  - `src/services/dashboardSearch.service.test.ts`
++
++## Verification
++- `npm run test -- src/components/layout/Header.test.tsx src/services/dashboardSearch.service.test.ts`
++- `npm run lint -- src/components/layout/Header.tsx src/components/layout/Header*.tsx src/services/dashboardSearch.service.ts src/services/dashboardSearch.service.test.ts`
++- `npm run build`
++
++## Phase Boundary
++- This round is successful only if Header responsibilities are materially clearer, search no longer lives as five direct requests in the component, and focused verification proves the user-facing search flow still works.
++
++# 2026-03-23 Round 15: Frontend next iterations round 4
++
++## Goal
++- Continue `docs/frontend-next-iterations-2026-03.md` with `FE-SPLIT-02`.
++- Decompose the oversized store recommendation route without changing its behavior.
++
++## Planned Execution
++- Keep `src/app/dashboard/store-recommend/page.tsx` as a thin route wrapper.
++- Extract a single stateful content component to own AI/template/store selection state.
++- Split the page into:
++  - `StoreRecommendTemplateTab`
++  - `StoreRecommendAITab`
++  - `StoreRecommendStatsTab`
++  - shared helpers for category mapping, priority badges, and CSV export
++- Add or tighten page-level regression around store switching before the split.
++
++## Verification Plan
++- `npm run test -- src/app/dashboard/store-recommend/page.test.tsx`
++- `npm run lint -- src/app/dashboard/store-recommend/page.tsx src/app/dashboard/store-recommend/page.test.tsx src/app/dashboard/store-recommend/components/*.tsx src/test/setup.ts`
++- `npm run build`
++
++## Execution Outcome
++- `src/app/dashboard/store-recommend/page.tsx` is now a thin wrapper.
++- The page logic is now split into:
++  - `StoreRecommendPageContent`
++  - `StoreRecommendTemplateTab`
++  - `StoreRecommendAITab`
++  - `StoreRecommendStatsTab`
++  - `storeRecommendShared`
++- Added a store-switching regression test and stabilized Radix Select interactions in `src/test/setup.ts`.
++
++## Verification
++- `npm run test -- src/app/dashboard/store-recommend/page.test.tsx`
++- `npm run lint -- src/app/dashboard/store-recommend/page.tsx src/app/dashboard/store-recommend/page.test.tsx src/app/dashboard/store-recommend/components/*.tsx src/test/setup.ts`
++- `npm run build`
++
++## Phase Boundary
++- This round is successful only if the route becomes materially easier to evolve while the store-switching/template/AI/stats behavior remains stable under tests and production build.
++
++# 2026-03-23 Round 14: Frontend next iterations round 3
++
++## Goal
++- Continue `docs/frontend-next-iterations-2026-03.md` with `FE-STATE-01`.
++- Unify loading / empty / error states across the highest-traffic dashboard pages without changing backend contracts.
++
++## Planned Execution
++- Add a shared state presentation layer in `src/components/ui/data-state.tsx`.
++- Adopt it first in:
++  - `src/app/dashboard/finance/page.tsx`
++  - `src/app/dashboard/reports/page.tsx`
++  - `src/app/dashboard/payments/page.tsx`
++  - `src/app/dashboard/containers/page.tsx`
++  - `src/app/dashboard/inventory-container/page.tsx`
++- Add regression tests for shared state rendering and page-level state adoption before wiring the new components in.
++
++## Verification Plan
++- `npm run test -- src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.test.tsx`
++- `npm run lint -- src/components/ui/data-state.tsx src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.tsx src/app/dashboard/payments/page.test.tsx`
++- `npm run build`
++
++## Execution Outcome
++- Added `src/components/ui/data-state.tsx` with:
++  - `LoadingState`
++  - `ErrorState`
++  - `TableStateRow`
++- Added `src/components/ui/data-state.test.tsx` to lock the shared state primitives.
++- Replaced bespoke state blocks in the five highest-traffic target pages with shared state components.
++- Preserved the existing core titles (`加载中...`, `数据加载失败`, `暂无*`) while standardizing layout and retry affordances.
++
++## Verification
++- `npm run test -- src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.test.tsx`
++- `npm run lint -- src/components/ui/data-state.tsx src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.tsx src/app/dashboard/payments/page.test.tsx`
++- `npm run build`
++
++## Phase Boundary
++- This round is successful only if shared state rendering exists, the five target pages use it, and verification proves the state-system cleanup did not break page behavior.
++
++# 2026-03-23 Round 13: Frontend next iterations round 2
++
++## Goal
++- Continue `docs/frontend-next-iterations-2026-03.md` with `FE-SPLIT-01`.
++- Decompose the oversized finance statements route into clearer page/container/section/dialog boundaries without changing behavior.
++
++## Planned Execution
++- Keep `src/app/dashboard/finance/statements/page.tsx` as a thin route entry.
++- Extract a single stateful container for data loading, import flows, and derived view-model state.
++- Extract presentational sections for:
++  - loading shell
++  - empty state
++  - overview/KPI area
++  - trends/balance/detail tabs
++  - historical alerts
++  - upload dialog
++- Add page-level regression tests before moving render blocks.
++
++## Verification Plan
++- `npm run test -- src/app/dashboard/finance/statements/page.test.tsx`
++- `npm run lint -- src/app/dashboard/finance/statements/page.tsx src/app/dashboard/finance/statements/page.test.tsx src/app/dashboard/finance/statements/components/*.tsx`
++- `npm run build`
++
++## Execution Outcome
++- `src/app/dashboard/finance/statements/page.tsx` is now a thin route wrapper.
++- The statements page is now split around the existing component boundaries:
++  - `FinancialStatementsPageContent`: page state, effects, import flows, and derived view-model
++  - `FinancialStatementsOverview`: header actions, empty state, alerts, KPI cards, working-capital overview
++  - `FinancialStatementsTabsSection`: chart tabs, detail tab, and historical alerts
++  - `FinancialStatementsUploadDialog`: file upload and period input dialog
++- Added `src/app/dashboard/finance/statements/page.test.tsx` to lock the page-level behavior before and after the refactor.
++
++## Verification
++- `npm run test -- src/app/dashboard/finance/statements/page.test.tsx`
++- `npm run lint -- src/app/dashboard/finance/statements/page.tsx src/app/dashboard/finance/statements/page.test.tsx src/app/dashboard/finance/statements/components/FinancialStatementsPageContent.tsx src/app/dashboard/finance/statements/components/FinancialStatementsOverview.tsx src/app/dashboard/finance/statements/components/FinancialStatementsTabsSection.tsx src/app/dashboard/finance/statements/components/FinancialStatementsUploadDialog.tsx src/app/dashboard/finance/statements/components/FinancialStatementsShared.tsx src/app/dashboard/finance/statements/components/financialStatementsFormatting.ts`
++- `npm run build`
++
++## Phase Boundary
++- This round is successful only if the finance statements page becomes materially easier to evolve while preserving its current import, tab, and detail behavior.
++
++# 2026-03-22 Round 12: Frontend next iterations round 1
++
++## Goal
++- Start executing `docs/frontend-next-iterations-2026-03.md` instead of leaving it as backlog only.
++- Complete the first slice:
++  - `FE-DASH-01` dashboard home redesign
++  - `FE-NAV-02` deeper navigation registry behavior
++
++## Planned Execution
++- Reframe `src/app/dashboard/page.tsx` into a true workspace homepage.
++- Rework `src/components/dashboard/DataDashboard.tsx` around:
++  - 当前焦点
++  - 高频动作
++  - 风险提醒
++  - 关键趋势
++- Extend `src/components/layout/navigation.config.ts` with visibility/default-landing/redirect metadata.
++- Keep the scope inside dashboard home + shell metadata. Large-page decomposition stays out of scope.
++
++## Execution Outcome
++- `FE-DASH-01`
++  - Removed the old `快速录入 + ProductTracker + legacy chart stack` composition from `/dashboard`.
++  - Promoted the homepage into a workspace with four visible zones:
++    - 当前焦点
++    - 高频动作
++    - 风险提醒
++    - 关键趋势
++  - Demoted `ProductTracker` into a secondary `经营工具` section.
++  - Reworked `DataDashboard.tsx` to derive focus/risk summaries from the existing analytics contract instead of widening backend scope.
++- `FE-NAV-02`
++  - Extended `navigation.config.ts` with `defaultHref`, `visibleRoles`, and helper functions for target resolution and active-route matching.
++  - Hid the admin module for non-admin roles in shared registry consumers.
++  - Unified sidebar/mobile navigation target resolution through the same registry helper.
++  - Added layout-level fallback redirect from hidden dashboard modules back to the default visible dashboard landing.
++
++## Verification Plan
++- `npm run test -- src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.test.tsx src/app/dashboard/layout.test.tsx src/components/layout/Sidebar.test.tsx src/components/layout/Header.test.tsx`
++- `npm run lint -- src/app/dashboard/page.tsx src/components/dashboard/DataDashboard.tsx src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.test.tsx src/components/layout/navigation.config.ts src/app/dashboard/layout.tsx src/app/dashboard/layout.test.tsx src/components/layout/Sidebar.test.tsx`
++- `npm run build`
++
++## Verification
++- `npm run test -- src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.test.tsx src/components/layout/navigation.config.test.ts src/app/dashboard/layout.test.tsx src/components/layout/Sidebar.test.tsx`
++- `npm run lint -- src/app/dashboard/page.tsx src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.tsx src/components/dashboard/DataDashboard.test.tsx src/components/layout/navigation.config.ts src/components/layout/navigation.config.test.ts src/components/layout/Sidebar.tsx src/components/layout/Sidebar.test.tsx src/components/layout/Header.tsx src/components/layout/ModuleTabHeader.tsx src/app/dashboard/layout.tsx src/app/dashboard/layout.test.tsx`
++- `npm run build`
++
++## Phase Boundary
++- This round is successful only if the dashboard homepage meaningfully changes hierarchy and the shell derives more behavior from the registry without breaking existing navigation flows.
++
+ # 2026-03-12 Round 8: Global shadcn/ui visual baseline unification
+ 
+ ## Goal
+diff --git a/frontend/RISKS.md b/frontend/RISKS.md
+index 2573fb3..2109e7c 100644
+--- a/frontend/RISKS.md
++++ b/frontend/RISKS.md
+@@ -2,6 +2,49 @@
+ 
+ | ID | Trigger | Impact | Mitigation | Rollback Point | Status |
+ | --- | --- | --- | --- | --- | --- |
++
++| R28 | The dashboard shell can render a different first frame on the server and client under production preview hydration | Playwright fails across multiple dashboard pages with production `React error #418`, blocking commit even when feature work is functionally done | Move persisted-auth hydration and time-based shell rendering to SSR-safe patterns, then rerun the full suite on a fresh preview | Revert `src/app/dashboard/layout.tsx`, `src/app/dashboard/layout.test.tsx`, `src/components/layout/Header.tsx`, `src/app/dashboard/purchase/create/components/CreatePurchasePageContent.tsx`, and `src/app/dashboard/sales/create/page.tsx` | Open |
++| R29 | E2E mocks and smoke/button assertions can drift away from the current IA and service contracts after the March frontend refactors | Import/settings/store-recommend flows show false failures, masking real regressions and preventing a trustworthy pre-commit gate | Update mocks and assertions together, add service compatibility where contracts legitimately widened, and rerun the entire Playwright suite instead of trusting focused subsets | Revert `e2e/helpers.ts`, `e2e/smoke.spec.ts`, `e2e/button-coverage.spec.ts`, and `src/services/dataImportService.ts` | Open |
++
++## Round 19 Status Update
++
++- `R28`: Reduced. The dashboard shell and header time rendering are now hydration-safe, and the production `React error #418` no longer reproduces in the full suite.
++- `R29`: Reduced. E2E mocks/assertions now match the current IA and service contracts, and the fresh full Playwright suite passed `57/57`.
++
++| R26 | Module-home differentiation can turn into misleading KPI cards if the new procurement/export summaries are not derived from reliable existing fields | The pages look more intentional, but operators lose trust in the first-screen numbers | Derive the new cards only from already-loaded contract statuses and box counts, then lock the visible overview sections with page tests | Revert `src/app/dashboard/contracts/components/ContractsPageContent.tsx`, `src/app/dashboard/contracts/page.test.tsx`, `src/app/dashboard/sales/page.tsx`, and `src/app/dashboard/sales/page.test.tsx` | Open |
++| R27 | Visual-regression gating can stay flaky if it reuses conflicting local ports or if finance-page mocks are incomplete | The team will treat screenshot tests as noise and stop trusting them as a structure-drift gate | Run Playwright against a dedicated production preview port, backfill the missing finance mocks, and prove finance first before rerunning the whole suite | Revert `playwright.config.ts`, `e2e/helpers.ts`, and `e2e/visual.spec.ts` | Open |
++
++## Round 18 Status Update
++
++- `R26`: Reduced. Procurement/export overviews now derive from existing contract state and box-count data, and page-level regressions lock the new first-screen sections.
++- `R27`: Reduced. The visual gate now runs against a dedicated production preview, finance mocks are complete, and all five screenshots passed.
++
++| R25 | AI assistant noise reduction changes both mount conditions and surface shape in one pass | The app can end up with duplicate AI entry points on AI pages or regress the assistant interactions while chasing a calmer UI | Add tests for mount exclusion on `/dashboard/ai/*` and for the quieter trigger plus right-side panel semantics before touching the implementation | Revert `src/components/ai/LazyAIAssistantMount.*` and `src/components/ai/AIAssistant.*` | Open |
++
++## Round 17 Status Update
++
++- `R25`: Reduced. AI workspace duplication is gone, the assistant now opens from a quieter trigger into a right-side panel, and focused tests plus build are green.
++
++| R24 | `Header` decomposition and search-service refactor land in the same batch | Search interaction, mobile nav, and account-menu regressions can be introduced while the structure looks cleaner | Put red tests around `Header` search delegation and staged search first; keep `Header` as shell orchestration only and move query logic to one service file | Revert `src/components/layout/Header*.tsx` and `src/services/dashboardSearch.service.*` | Open |
++
++## Round 16 Status Update
++
++- `R24`: Reduced. `Header` is now split into focused child components, staged search lives in `dashboardSearch.service.ts`, and fresh `Header`/service tests plus `build` are green.
++
++| R21 | State-system cleanup touches several high-traffic pages at once, while each page previously owned its own bespoke loading / empty / error blocks | Without a shared primitive layer, state copy and retry affordances will drift again and future page work will keep reintroducing inconsistency | Add one shared `data-state` UI layer first, then adopt it in only five high-value pages with page-level regression coverage | Revert `src/components/ui/data-state.tsx` and the page-level wiring in `finance`, `reports`, `payments`, `containers`, and `inventory-container` | Open |
++| R22 | Long-running parallel worker sessions can disappear and return `not_found` before results are integrated | Task boards can falsely claim work is still `DOING`, causing the next resume pass to branch from a fake checkpoint | Only promote task status from evidence; if worker status is missing, reset the task to `TODO` and re-dispatch rather than carrying over stale execution state | Revert task status changes only and rebuild the queue from verified artifacts | Open |
++
++## Round 14 Status Update
++
++- `R21`: Reduced. Shared `data-state` primitives now back five high-traffic pages, and focused regression tests cover their state wiring.
++- `R22`: Active. Parallel worker sessions returned `not_found` again during this round, so the affected tasks were reset from `DOING` to `TODO` in the checkpoint files.
++
++| R23 | The `store-recommend` route still combines template data, AI recommendations, store-specific history, and CSV export in one UX surface | A careless split could break store switching, template export, or tab rendering while making the structure look cleaner on paper | Keep a single `StoreRecommendPageContent` state owner, split only presentational sections, and add a store-switching page test before moving code | Revert `src/app/dashboard/store-recommend/components/*`, `src/app/dashboard/store-recommend/page.tsx`, and the supporting test/setup changes | Open |
++
++## Round 15 Status Update
++
++- `R23`: Reduced. The route now uses a thin wrapper plus one stateful content component and three presentational tab sections, with store-switching regression coverage in place.
++
+ | R1 | Backend expects different customs declaration fields | Create/update pages may submit incompatible payloads | Keep payload explicit, typed, and close to common trade/customs fields; isolate in one shared form component | Revert new service + form files only | Open |
+ | R2 | Reusing dashboard layout at top-level route causes navigation/auth regressions | `/customs-declarations` could render without shell or mis-handle redirects | Implement a dedicated route layout wrapper that composes the existing dashboard layout | Remove new route layout and move route under dashboard if required | Closed |
+ | R3 | Coverage below target after adding new files | Feature is incomplete by repo standard | Add page and component tests before implementation and measure targeted coverage | Trim untested helpers and add focused tests | Open |
+@@ -19,3 +62,15 @@
+ | R15 | Some deep feature-detail pages still rely on legacy `chart-*` accents and bespoke decorative blocks even after the blue token migration | The app can look mostly shadcn-compliant at the shell level while a few detail screens still reveal the older visual language | Continue auditing pages surfaced by `rg "text-chart-|bg-chart-|bg-gradient|backdrop-blur"` and convert them to semantic helpers or shadcn primitives in slices | Revert only the page-local cleanup for the affected feature if business stakeholders prefer the older visualization density | Open |
+ | R16 | A few low-priority detail views may still use historical blue-toned `chart-*` classes even though those tokens now sit inside the global blue family | Visual variance becomes mostly density/layout related instead of theme related | Treat remaining work as detail-page polish, not a theme-system rewrite; keep using the shared blue token set as the source of truth | Revert only the specific detail-page polish if it conflicts with product expectations | Open |
+ | R17 | The persistent local dev server can become stale if the port is later reused or the process dies after a machine restart | User may assume the preview URL is alive when the process is no longer running | Persist PID/log files (`.next-dev.pid`, `.next-dev.log`) and verify with `lsof -nP -iTCP:3002 -sTCP:LISTEN` before relying on the URL | Kill the stored PID and restart the local dev server on the same port if needed | Open |
++| R18 | Dashboard 首页需要用现有 analytics 数据推导“当前焦点/风险提醒”，但接口没有直接提供这两个语义字段 | 首屏层级会改善，但提醒质量可能先停留在前端启发式规则 | 第一轮先封装前端推导，不扩后端 API；若验证后仍弱，再单开 richer dashboard contract 任务 | Revert the new workspace derivation in `src/app/dashboard/page.tsx` and `src/components/dashboard/DataDashboard.tsx` |
++| R19 | 导航注册表继续承载默认落点与重定向规则后，可能与现有 tab-memory 历史记忆冲突 | 模块首跳或布局初始跳转可能导向非预期子页 | 让 registry helper 兼容现有 `getModuleTabOrRoot` 逻辑，并用 `layout/sidebar` 定向测试锁定关键路径 | Revert only the new default-landing helpers in `src/components/layout/navigation.config.ts` and `src/app/dashboard/layout.tsx` |
++| R20 | 财务报表页把加载、导入、图表、详情和上传弹窗同时拆开时，状态依赖可能散落到多个组件 | 账期切换、导入后重载或 detail loading 提示可能回归，拆分后反而更难维护 | 先保持单一 container 持有状态与副作用，只抽纯展示组件，并用页面级回归测试锁住导入/空态/详情流程 | Revert the extracted `src/app/dashboard/finance/statements/components/*` files and fold logic back into the route |
++
++## Round 12 Status Update
++
++- `R18`：本轮已按预案执行，使用现有 analytics 合同在前端推导焦点与风险；结果可用，但后续仍可升级为 richer dashboard contract。
++- `R19`：本轮已通过 `navigation.config`、`layout`、`sidebar` 定向测试收敛；后续若模块新增更多深层路径，仍需继续扩前缀覆盖。
++
++## Round 13 Status Update
++
++- `R20`：本轮已收敛。财务报表页现在由轻路由入口 + 单一 `FinancialStatementsPageContent` 容器 + 展示分区组成，且页面级回归测试已覆盖账期切换、批量导入和上传导入链路。
+diff --git a/frontend/TASKS.md b/frontend/TASKS.md
+index f644008..9f3c139 100644
+--- a/frontend/TASKS.md
++++ b/frontend/TASKS.md
+@@ -1,5 +1,9 @@
+ # Task Board
+ 
++| ID | Priority | ETA | Slot | Status | Input | Output | Validation | DoD |
++| --- | --- | --- | --- | --- | --- | --- | --- | --- |
++| E2E-03 | P0 | 60m | 1 | DONE | Existing full-suite Playwright failures in production preview: hydration mismatch, stale mocks, and outdated IA assertions | Hydration-safe dashboard shell/date rendering, updated E2E mocks/assertions, import-history contract compatibility, and green pre-commit gates | `npm run test` + `npm run lint` + `npm run build` + `npm run test:e2e` | Full frontend gates are green on fresh production output and no known E2E red lights remain before commit |
++
+ | ID | Priority | ETA | Slot | Status | Input | Output | Validation | DoD |
+ | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+ | UI-SYS-01 | P0 | 30m | 1 | DONE | Existing frontend shared shell, shadcn requirement, current dashboard/auth/list/form surfaces | Unified global shadcn-style tokens, layout chrome, shared primitives, refreshed checkpoints, and build-fix follow-ups | `npm test -- src/components/layout/Header.test.tsx src/components/layout/Sidebar.test.tsx src/components/layout/ThemeToggle.test.tsx src/app/dashboard/layout.test.tsx src/app/page.test.tsx src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.test.tsx src/components/tools/ProductTracker.test.tsx src/components/ai/AIGreeting.test.tsx` + `npm run lint -- ...` + `npm run build` | Shared visual baseline is shadcn-aligned, high-traffic pages inherit it, and production build stays green |
+@@ -21,5 +25,15 @@
+ | CD-AUTO-02 | P0 | 15m | 1 | DONE | Failing customs auto-draft tests | Customs-declarations list action button + success/error reload behavior | Same targeted `vitest` command | User can trigger customs draft generation from the list page and see created/skipped feedback |
+ | CI-FE-01 | P0 | 20m | 1 | DONE | Full-suite `vitest` timeout failures in slow page-interaction tests | `vitest.config.ts` timeout recovery + refreshed checkpoint artifacts | `npm run test` and `npm run test:coverage` | Full frontend unit and coverage gates pass without touching production code |
+ | FE-COV-98-01 | P0 | 15m | 1 | DONE | `docs/plans/2026-03-12-frontend-coverage-98.md`, `vitest.config.ts`, current suite status | Phase-1 baseline report, refreshed checkpoints, task log/result | `npm run test`; `npm run test:coverage`; `npm run test -- src/app/'(auth)'/login/page.test.tsx` | Report captures real blockers, current coverage scope, and next execution order before threshold changes |
++| FE-DASH-01 | P0 | 90m | 1 | DONE | `docs/frontend-next-iterations-2026-03.md`, existing dashboard analytics contract, current workspace page/tests | Reworked dashboard home as four-zone workspace, updated tests, round artifacts | `npm run test -- src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.test.tsx` + `npm run lint -- src/app/dashboard/page.tsx src/components/dashboard/DataDashboard.tsx src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.test.tsx` + `npm run build` | 首页首屏不再是卡片拼盘，并且四块工作区层级在测试与构建下成立 |
++| FE-NAV-02 | P0 | 45m | 2 | DONE | `docs/frontend-next-iterations-2026-03.md`, current navigation registry/layout/sidebar tests | Registry now also drives visibility/default landing/redirect behavior, with updated shell tests | `npm run test -- src/app/dashboard/layout.test.tsx src/components/layout/Sidebar.test.tsx src/components/layout/Header.test.tsx` + `npm run lint -- src/components/layout/navigation.config.ts src/app/dashboard/layout.tsx src/app/dashboard/layout.test.tsx src/components/layout/Sidebar.test.tsx` + `npm run build` | 壳层默认落点与模块可见性由注册表统一驱动，layout 条件分支继续收缩 |
++| FE-SPLIT-01 | P1 | 90m | 1 | DONE | `docs/frontend-next-iterations-2026-03.md`, current `finance/statements` route, no existing page tests | Finance statements route decomposed into route/container/section/dialog files with new regression tests and round artifacts | `npm run test -- src/app/dashboard/finance/statements/page.test.tsx` + `npm run lint -- src/app/dashboard/finance/statements/page.tsx src/app/dashboard/finance/statements/page.test.tsx src/app/dashboard/finance/statements/components/*.tsx` + `npm run build` | 财务报表页结构被拆开且现有导入/空态/详情行为保持不变 |
++| FE-SPLIT-02 | P1 | 75m | 1 | DONE | `docs/frontend-next-iterations-2026-03.md`, current `store-recommend` route, existing page surface | Store recommendation page decomposed into route/content/section components with focused tests and round artifacts | `npm run test -- src/app/dashboard/store-recommend/page.test.tsx` + `npm run lint -- src/app/dashboard/store-recommend/page.tsx src/app/dashboard/store-recommend/**/*.tsx src/test/setup.ts` + `npm run build` | 采购建议页结构被拆开且主要模板/门店/AI 区块行为保持稳定 |
++| FE-SHELL-01 | P1 | 60m | 2 | DONE | `docs/frontend-next-iterations-2026-03.md`, current `Header.tsx`, mobile sheet/search/notification/user-menu coupling | Header decomposed into clearer subcomponents with focused shell tests and round artifacts | `npm run test -- src/components/layout/Header.test.tsx` + `npm run lint -- src/components/layout/Header.tsx src/components/layout/**/*.tsx` + `npm run build` | Header 不再是超重基础组件，移动导航/搜索/通知/用户菜单职责更清晰 |
++| FE-SEARCH-01 | P1 | 60m | 2 | DONE | `docs/frontend-next-iterations-2026-03.md`, current Header fanout search behavior | Header search routed through a thinner aggregation layer with focused tests and round artifacts | `npm run test -- src/components/layout/Header.test.tsx src/services/**/*.test.ts` + `npm run lint -- src/components/layout/Header.tsx src/services/**/*.ts` + `npm run build` | 输入搜索时不再直接扇出 5 个接口，Header 搜索链路更可控 |
++| FE-AI-01 | P2 | 60m | 3 | DONE | `docs/frontend-next-iterations-2026-03.md`, current floating AI assistant entry | AI assistant becomes lower-noise assistive UI with focused tests and round artifacts | `npm run test -- src/components/ai/**/*.test.tsx` + `npm run lint -- src/components/ai/**/*.tsx` + `npm run build` | AI 助手从高抢占悬浮物变成更克制的辅助工具 |
++| FE-STATE-01 | P2 | 45m | 1 | DONE | `docs/frontend-next-iterations-2026-03.md`, high-traffic dashboard pages with bespoke state rendering | Shared state primitives plus page-level adoption for loading / empty / error | `npm run test -- src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.test.tsx` + `npm run lint -- src/components/ui/data-state.tsx src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.tsx src/app/dashboard/payments/page.test.tsx` + `npm run build` | 高频页的 loading / empty / error 呈现不再分散手写，并且页面级回归已锁住关键接线 |
++| FE-MODULE-01 | P2 | 90m | 1 | DONE | `docs/frontend-next-iterations-2026-03.md`, current finance/procurement/export landing pages | Differentiated module-home structures for finance, procurement, and export with focused page tests and round artifacts | `npm run test -- src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.test.tsx` + `npm run lint -- src/app/dashboard/contracts/components/ContractsPageContent.tsx src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx` + `npm run build` | 财务/采购/出口首页不再只是同模板不同标题，而是各自有首屏概览结构 |
++| FE-QA-01 | P2 | 45m | 1 | DONE | `docs/frontend-next-iterations-2026-03.md`, current page-level tests and Playwright baseline | Screenshot regression coverage for login, dashboard, procurement, finance, and mobile first screen with artifacts and gate wiring | `npm run test:e2e -- e2e/visual.spec.ts` + `npm run build` | 核心页面具备截图回归门禁，后续结构漂移可以被自动发现 |
+ | FE-COV-98-02 | P0 | 20m | 1 | TODO | FE-COV-98-01 baseline blockers | Stabilized login/auth tests and timeout-heavy page tests | Focused `vitest` runs for each red file, then `npm run test` | Full unit suite returns to green under existing coverage scope |
+ | FE-COV-98-03 | P0 | 20m | 1 | TODO | Green suite under current scope | Expanded `coverage.include` + raised thresholds + low-coverage补测 | `npm run test:coverage` | Statements/Branches/Functions/Lines all reach `>=98%` in the target frontend scope |
+diff --git a/frontend/e2e/button-coverage.spec.ts b/frontend/e2e/button-coverage.spec.ts
+index cd0d306..d518cc6 100644
+--- a/frontend/e2e/button-coverage.spec.ts
++++ b/frontend/e2e/button-coverage.spec.ts
+@@ -47,7 +47,6 @@ const pageCases: PageCase[] = [
+   { name: '应收账款', path: '/dashboard/finance/receivable' },
+   { name: '导入页', path: '/dashboard/import' },
+   { name: '报表页', path: '/dashboard/reports', minClicks: 0 },
+-  { name: '日志页', path: '/dashboard/logs', minClicks: 0 },
+   { name: '系统管理', path: '/dashboard/system', minClicks: 0 },
+   { name: '通知中心', path: '/dashboard/system/notifications' },
+   { name: '系统日志', path: '/dashboard/system/logs' },
+diff --git a/frontend/e2e/helpers.ts b/frontend/e2e/helpers.ts
+index d18ca54..2cdd86b 100644
+--- a/frontend/e2e/helpers.ts
++++ b/frontend/e2e/helpers.ts
+@@ -554,10 +554,51 @@ export const mockApiRoutes = async (page: Page) => {
+           { model: 'gpt-4.1-mini', requests: 8, tokens: 22000 },
+           { model: 'gpt-4.1', requests: 4, tokens: 12567 },
+         ],
++        daily: [
++          { day: '2026-03-20', model: 'gpt-4.1-mini', tokens: 8200, requests: 3, successRate: 1 },
++          { day: '2026-03-21', model: 'gpt-4.1-mini', tokens: 7400, requests: 2, successRate: 1 },
++          { day: '2026-03-22', model: 'gpt-4.1', tokens: 9100, requests: 4, successRate: 1 },
++          { day: '2026-03-23', model: 'gpt-4.1-mini', tokens: 9867, requests: 3, successRate: 1 },
++        ],
+       });
+       return;
+     }
+ 
++    if (pathname === '/api/v1/ai/standalone-token-usage' && method === 'GET') {
++      await fulfillJson(route, [
++        {
++          id: 'standalone-1',
++          model: 'gpt-4.1-mini',
++          promptTokens: 800,
++          outputTokens: 200,
++          totalTokens: 1000,
++          requestType: 'hs_code_recommend',
++          detailSnapshot: 'HS 编码推荐结果',
++          createdAt: now,
++        },
++      ]);
++      return;
++    }
++
++    if (pathname === '/api/v1/ai/history' && method === 'GET') {
++      await fulfillJson(route, asPaginated([
++        {
++          id: 'msg-1',
++          role: 'user',
++          content: '帮我总结最近的 AI 调用情况',
++          createdAt: now,
++        },
++        {
++          id: 'msg-2',
++          role: 'assistant',
++          content: '最近 7 天主要使用 gpt-4.1-mini 处理日常问题。',
++          modelUsed: 'gpt-4.1-mini',
++          createdAt: now,
++        },
++      ]));
++      return;
++    }
++
+     if (pathname === '/api/v1/ai/models' && method === 'GET') {
+       await fulfillJson(route, {
+         models: {
+@@ -573,7 +614,16 @@ export const mockApiRoutes = async (page: Page) => {
+     }
+ 
+     if (pathname === '/api/v1/import/history' && method === 'GET') {
+-      await fulfillJson(route, state.importRecords);
++      const status = searchParams.get('status');
++      const keyword = searchParams.get('keyword')?.trim();
++      const page = Number(searchParams.get('page') || '1');
++      const pageSize = Number(searchParams.get('pageSize') || '20');
++      const filtered = state.importRecords.filter((item) => {
++        const statusMatch = !status || item.status === status;
++        const keywordMatch = !keyword || item.fileName.includes(keyword);
++        return statusMatch && keywordMatch;
++      });
++      await fulfillJson(route, asPaginated(filtered, page, pageSize));
+       return;
+     }
+ 
+@@ -663,6 +713,41 @@ export const mockApiRoutes = async (page: Page) => {
+       return;
+     }
+ 
++    if (pathname === '/api/v1/system/exchange-rate' && method === 'GET') {
++      await fulfillJson(route, {
++        rate: 7.2,
++        buffer: 0.2,
++        effectiveRate: 7.0,
++      });
++      return;
++    }
++
++    if (pathname === '/api/v1/finance/payment-trends' && method === 'GET') {
++      await fulfillJson(route, [
++        { label: '第1周', receivables: 32000, payables: 18000 },
++        { label: '第2周', receivables: 28000, payables: 22000 },
++        { label: '第3周', receivables: 36000, payables: 16000 },
++        { label: '第4周', receivables: 42000, payables: 24000 },
++      ]);
++      return;
++    }
++
++    if (pathname === '/api/v1/finance/overdue-receivables' && method === 'GET') {
++      await fulfillJson(route, [
++        {
++          id: 'ov-1',
++          contractNo: 'EXP2600001',
++          totalAmount: 220000,
++          receivedAmount: 50000,
++          unreceived: 170000,
++          shippedAt: now,
++          overdueDays: 12,
++          status: 'SHIPPED',
++        },
++      ]);
++      return;
++    }
++
+     if (pathname === '/api/v1/finance/payables' && method === 'GET') {
+       await fulfillJson(route, asPaginated(payables));
+       return;
+@@ -755,6 +840,155 @@ export const mockApiRoutes = async (page: Page) => {
+       return;
+     }
+ 
++    if (pathname === '/api/v1/procurement-template/stores' && method === 'GET') {
++      await fulfillJson(route, [stores[0].name, '纽约店']);
++      return;
++    }
++
++    if (pathname === '/api/v1/procurement-template/universal' && method === 'GET') {
++      await fulfillJson(route, {
++        totalStores: 2,
++        totalProducts: 3,
++        mustHaveCount: 1,
++        templateStore: stores[0].name,
++        items: [
++          {
++            name: '不锈钢门',
++            supplement: '主入口',
++            category: '餐厅设备',
++            storeCount: 2,
++            frequency: 100,
++            priority: '强烈建议',
++            isTemplateStore: true,
++            avgQtyPerStore: 2,
++            unit: '扇',
++            manufacturers: ['A厂'],
++            totalAmount: 16000,
++            rowCount: 2,
++          },
++          {
++            name: '餐具套装',
++            supplement: '基础配置',
++            category: '餐具用品',
++            storeCount: 2,
++            frequency: 80,
++            priority: '建议',
++            isTemplateStore: true,
++            avgQtyPerStore: 20,
++            unit: '套',
++            manufacturers: ['B厂'],
++            totalAmount: 10000,
++            rowCount: 2,
++          },
++        ],
++        byCategory: {
++          餐厅设备: [
++            {
++              name: '不锈钢门',
++              supplement: '主入口',
++              category: '餐厅设备',
++              storeCount: 2,
++              frequency: 100,
++              priority: '强烈建议',
++              isTemplateStore: true,
++              avgQtyPerStore: 2,
++              unit: '扇',
++              manufacturers: ['A厂'],
++              totalAmount: 16000,
++              rowCount: 2,
++            },
++          ],
++          餐具用品: [
++            {
++              name: '餐具套装',
++              supplement: '基础配置',
++              category: '餐具用品',
++              storeCount: 2,
++              frequency: 80,
++              priority: '建议',
++              isTemplateStore: true,
++              avgQtyPerStore: 20,
++              unit: '套',
++              manufacturers: ['B厂'],
++              totalAmount: 10000,
++              rowCount: 2,
++            },
++          ],
++        },
++      });
++      return;
++    }
++
++    if (/^\/api\/v1\/procurement-template\/stores\/[^/]+$/.test(pathname) && method === 'GET') {
++      const storeName = decodeURIComponent(pathname.split('/').pop() || stores[0].name);
++      await fulfillJson(route, {
++        storeName,
++        totalProducts: 2,
++        totalAmount: 18000,
++        items: [
++          {
++            name: '不锈钢门',
++            supplement: '主入口',
++            category: '餐厅设备',
++            totalQty: 2,
++            unit: '扇',
++            manufacturer: 'A厂',
++            spec: '900x2100',
++            totalAmount: 16000,
++            shipments: [
++              { date: '2026-02-01', qty: 2, amount: 16000, spec: '900x2100' },
++            ],
++          },
++          {
++            name: '餐具套装',
++            supplement: '基础配置',
++            category: '餐具用品',
++            totalQty: 20,
++            unit: '套',
++            manufacturer: 'B厂',
++            spec: '标准款',
++            totalAmount: 2000,
++            shipments: [
++              { date: '2026-02-03', qty: 20, amount: 2000, spec: '标准款' },
++            ],
++          },
++        ],
++        byCategory: {
++          餐厅设备: [
++            {
++              name: '不锈钢门',
++              supplement: '主入口',
++              category: '餐厅设备',
++              totalQty: 2,
++              unit: '扇',
++              manufacturer: 'A厂',
++              spec: '900x2100',
++              totalAmount: 16000,
++              shipments: [
++                { date: '2026-02-01', qty: 2, amount: 16000, spec: '900x2100' },
++              ],
++            },
++          ],
++          餐具用品: [
++            {
++              name: '餐具套装',
++              supplement: '基础配置',
++              category: '餐具用品',
++              totalQty: 20,
++              unit: '套',
++              manufacturer: 'B厂',
++              spec: '标准款',
++              totalAmount: 2000,
++              shipments: [
++                { date: '2026-02-03', qty: 20, amount: 2000, spec: '标准款' },
++              ],
++            },
++          ],
++        },
++      });
++      return;
++    }
++
+     if (pathname === '/api/v1/system/configs' && method === 'GET') {
+       await fulfillJson(route, state.systemConfigs);
+       return;
+@@ -856,6 +1090,28 @@ export const mockApiRoutes = async (page: Page) => {
+       return;
+     }
+ 
++    if (/^\/api\/v1\/purchases\/[^/]+\/files$/.test(pathname) && method === 'GET') {
++      await fulfillJson(route, []);
++      return;
++    }
++
++    if (/^\/api\/v1\/purchases\/[^/]+\/files$/.test(pathname) && method === 'POST') {
++      await fulfillJson(route, {
++        id: 'file-1',
++        fileName: '采购合同附件.pdf',
++        fileType: 'application/pdf',
++        fileSize: 2048,
++        filePath: '/mock/purchase/file-1.pdf',
++        uploadedAt: now,
++      });
++      return;
++    }
++
++    if (/^\/api\/v1\/purchases\/files\/[^/]+$/.test(pathname) && method === 'DELETE') {
++      await fulfillJson(route, null);
++      return;
++    }
++
+     if (/^\/api\/v1\/sales\/[^/]+$/.test(pathname) && method === 'PUT') {
+       await fulfillJson(route, salesContract);
+       return;
+diff --git a/frontend/e2e/smoke.spec.ts b/frontend/e2e/smoke.spec.ts
+index 11fde1e..22f542a 100644
+--- a/frontend/e2e/smoke.spec.ts
++++ b/frontend/e2e/smoke.spec.ts
+@@ -67,8 +67,8 @@ test.describe('侧边栏导航全覆盖', () => {
+       { label: '出口合同', path: '/dashboard/sales', url: /\/dashboard\/sales$/, heading: '出口合同' },
+       { label: '库存状态', path: '/dashboard/inventory-container', url: /\/dashboard\/inventory-container$/, heading: '库存状态' },
+       { label: '收付款', path: '/dashboard/payments', url: /\/dashboard\/payments$/, heading: '收付款' },
+-      { label: '采购建议', path: '/dashboard/store-recommend', url: /\/dashboard\/store-recommend$/, heading: '门店采购建议' },
+-      { label: '基础设置', path: '/dashboard/settings', url: /\/dashboard\/settings$/, heading: '设置' },
++      { label: '采购建议', path: '/dashboard/store-recommend', url: /\/dashboard\/store-recommend$/, heading: '门店采购指南' },
++      { label: '基础设置', path: '/dashboard/settings', url: /\/dashboard\/settings$/, heading: '系统配置' },
+     ] as const;
+ 
+     for (const item of navCases) {
+@@ -102,7 +102,8 @@ test.describe('关键按钮交互', () => {
+     await expect(page).toHaveURL(/\/dashboard\/purchase\/create$/);
+     await expect(page.getByRole('heading', { name: '新增采购合同' })).toBeVisible();
+ 
+-    await safeClick(page.getByRole('link', { name: '工作台' }));
++    await page.goto('/dashboard');
++    await page.waitForLoadState('domcontentloaded');
+     await safeClick(page.getByRole('button', { name: /^新建销售/ }));
+     await expect(page).toHaveURL(/\/dashboard\/sales\/create$/);
+     await expect(page.getByRole('heading', { name: '创建出口合同' })).toBeVisible();
+@@ -155,7 +156,7 @@ test.describe('关键按钮交互', () => {
+ 
+   test('门店采购建议页：Tab 切换可用', async ({ page }) => {
+     await signInAsAdmin(page, '/dashboard/store-recommend');
+-    await expect(page.getByRole('heading', { name: '门店采购建议' })).toBeVisible();
++    await expect(page.getByRole('heading', { name: '门店采购指南' })).toBeVisible();
+ 
+     await safeClick(page.getByRole('tab', { name: '门店采购统计' }));
+     await expect(page.getByText('门店采购明细')).toBeVisible();
+@@ -175,7 +176,7 @@ test.describe('关键按钮交互', () => {
+     await expect(page.getByRole('heading', { name: '系统日志' })).toBeVisible();
+ 
+     await safeClick(page.getByRole('button', { name: '导入日志' }));
+-    await expect(page.getByText('IMPORT_DATA')).toBeVisible();
++    await expect(page.getByText('IMPORT_DATA', { exact: true }).first()).toBeVisible();
+   });
+ 
+   test('导入记录：状态筛选和关键字段显示', async ({ page }) => {
+@@ -188,15 +189,13 @@ test.describe('关键按钮交互', () => {
+ 
+   test('设置页：导入/导出相关按钮交互', async ({ page }) => {
+     await signInAsAdmin(page, '/dashboard/settings');
+-    await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
++    await expect(page.getByRole('heading', { name: '系统配置' })).toBeVisible();
+ 
+-    await safeClick(page.getByRole('tab', { name: '数据导入' }));
+-    await safeClick(page.getByText(/查看历史导入任务执行状态与失败明细/));
++    await safeClick(page.getByRole('link', { name: '导入记录' }));
+     await expect(page).toHaveURL(/\/dashboard\/system\/import-records$/);
+ 
+     await signInAsAdmin(page, '/dashboard/settings');
+-    await safeClick(page.getByRole('tab', { name: '数据导出' }));
+-    await safeClick(page.getByRole('button', { name: /导出数据/ }));
+-    await expect(page).toHaveURL(/\/dashboard\/settings$/);
++    await safeClick(page.getByRole('link', { name: '合同模板' }));
++    await expect(page).toHaveURL(/\/dashboard\/contracts\/templates$/);
+   });
+ });
+diff --git a/frontend/src/app/dashboard/layout.test.tsx b/frontend/src/app/dashboard/layout.test.tsx
+index c8e7182..8125bff 100644
+--- a/frontend/src/app/dashboard/layout.test.tsx
++++ b/frontend/src/app/dashboard/layout.test.tsx
+@@ -9,12 +9,12 @@
+ import { act, render, screen, waitFor } from '@testing-library/react';
+ import { beforeEach, describe, expect, it, vi } from 'vitest';
+ import DashboardLayout from './layout';
+-
+ const mocks = vi.hoisted(() => {
+   const replace = vi.fn();
+-  const authState = { isAuthenticated: true };
++  const authState = { isAuthenticated: true, user: { role: 'ADMIN' } };
+   let hasHydrated = true;
+   let hydrationCallback: (() => void) | null = null;
++  let pathname = '/dashboard';
+ 
+   const useAuthStore = ((selector: (state: typeof authState) => unknown) => selector(authState)) as {
+     (selector: (state: typeof authState) => unknown): unknown;
+@@ -38,6 +38,10 @@ const mocks = vi.hoisted(() => {
+     replace,
+     authState,
+     useAuthStore,
++    setPathname: (value: string) => {
++      pathname = value;
++    },
++    getPathname: () => pathname,
+     setHasHydrated: (value: boolean) => {
+       hasHydrated = value;
+     },
+@@ -58,6 +62,7 @@ vi.mock('next/navigation', () => ({
+     push: vi.fn(),
+     back: vi.fn(),
+   }),
++  usePathname: () => mocks.getPathname(),
+ }));
+ 
+ vi.mock('@/components/layout/Sidebar', () => ({
+@@ -72,6 +77,8 @@ describe('DashboardLayout', () => {
+   beforeEach(() => {
+     mocks.replace.mockReset();
+     mocks.authState.isAuthenticated = true;
++    mocks.authState.user.role = 'ADMIN';
++    mocks.setPathname('/dashboard');
+     mocks.setHasHydrated(true);
+     mocks.resetHydrationCallback();
+     sessionStorage.clear();
+@@ -140,6 +147,7 @@ describe('DashboardLayout', () => {
+     expect(typeof mocks.getHydrationCallback()).toBe('function');
+ 
+     act(() => {
++      mocks.setHasHydrated(true);
+       mocks.getHydrationCallback()?.();
+     });
+ 
+@@ -148,4 +156,19 @@ describe('DashboardLayout', () => {
+     });
+     expect(mocks.replace).not.toHaveBeenCalled();
+   });
++
++  it('非管理员进入系统管理路径时跳回默认 dashboard 落点', async () => {
++    mocks.authState.user.role = 'SALES';
++    mocks.setPathname('/dashboard/settings');
++
++    render(
++      <DashboardLayout>
++        <div>页面内容</div>
++      </DashboardLayout>,
++    );
++
++    await waitFor(() => {
++      expect(mocks.replace).toHaveBeenCalledWith('/dashboard');
++    });
++  });
+ });
+diff --git a/frontend/src/app/dashboard/layout.tsx b/frontend/src/app/dashboard/layout.tsx
+index f906315..3b99fce 100644
+--- a/frontend/src/app/dashboard/layout.tsx
++++ b/frontend/src/app/dashboard/layout.tsx
+@@ -8,11 +8,12 @@
+ 
+ 'use client';
+ 
+-import { useEffect, useState } from 'react';
++import { useEffect, useSyncExternalStore } from 'react';
+ import { useAuthStore } from '@/store/auth.store';
+-import { useRouter } from 'next/navigation';
++import { usePathname, useRouter } from 'next/navigation';
+ import { Sidebar } from '@/components/layout/Sidebar';
+ import { Header } from '@/components/layout/Header';
++import { getDefaultDashboardHref, getModuleByPath, getVisibleModuleNavItems } from '@/components/layout/navigation.config';
+ 
+ type PersistedAuthState = {
+   state?: {
+@@ -52,25 +53,20 @@ export default function DashboardLayout({
+   children: React.ReactNode;
+ }) {
+   const router = useRouter();
++  const pathname = usePathname();
+   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+-  // 0. 始终从 false 开始，确保服务端不渲染 Radix UI 组件（避免 SSR/CSR ID 不一致）
+-  const [hydrated, setHydrated] = useState(false);
+-
+-  useEffect(() => {
+-    // 1. 客户端挂载后检查 Zustand persist 状态
+-    const persistApi = useAuthStore.persist;
+-    if (!persistApi || persistApi.hasHydrated()) {
+-      // 1.1 已完成或无 persist API，直接设置 hydrated
+-      setHydrated(true);
+-      return;
+-    }
+-    // 1.2 等待 Zustand persist hydration 完成
+-    const unsubscribe = persistApi.onFinishHydration(() => {
+-      setHydrated(true);
+-    });
+-
+-    return unsubscribe;
+-  }, []);
++  const user = useAuthStore((state) => state.user);
++  const hydrated = useSyncExternalStore(
++    (callback) => {
++      const persistApi = useAuthStore.persist;
++      if (!persistApi) {
++        return () => {};
++      }
++      return persistApi.onFinishHydration(callback);
++    },
++    () => useAuthStore.persist?.hasHydrated?.() ?? true,
++    () => false,
++  );
+ 
+   useEffect(() => {
+     // 0. 仅在 hydration 完成后执行客户端跳转，避免 SSR/CSR 分支差异
+@@ -91,6 +87,22 @@ export default function DashboardLayout({
+     }
+   }, [hydrated, isAuthenticated, router]);
+ 
++  useEffect(() => {
++    if (!hydrated || !isAuthenticated) {
++      return;
++    }
++
++    const currentModule = getModuleByPath(pathname);
++    if (!currentModule) {
++      return;
++    }
++
++    const visibleKeys = new Set(getVisibleModuleNavItems(user?.role).map((item) => item.key));
++    if (!visibleKeys.has(currentModule.key)) {
++      router.replace(getDefaultDashboardHref(user?.role));
++    }
++  }, [hydrated, isAuthenticated, pathname, router, user?.role]);
++
+   if (!hydrated) {
+     return null; // Prevent hydration mismatch
+   }
+diff --git a/frontend/src/app/dashboard/purchase/create/components/CreatePurchasePageContent.tsx b/frontend/src/app/dashboard/purchase/create/components/CreatePurchasePageContent.tsx
+index 1794568..b9bbf64 100644
+--- a/frontend/src/app/dashboard/purchase/create/components/CreatePurchasePageContent.tsx
++++ b/frontend/src/app/dashboard/purchase/create/components/CreatePurchasePageContent.tsx
+@@ -123,7 +123,7 @@ export default function CreatePurchasePage() {
+     defaultValues: {
+       supplierId: '',
+       contractNo: '',
+-      signedAt: new Date(),
++      signedAt: undefined,
+       taxRate: 13,
+       note: '',
+       items: [{ productId: '', quantity: 0, unitPrice: 0, unit: '', note: '' }],
+@@ -138,6 +138,12 @@ export default function CreatePurchasePage() {
+   const watchItems = useWatch({ control: form.control, name: 'items' });
+   const watchSupplierId = useWatch({ control: form.control, name: 'supplierId' });
+ 
++  useEffect(() => {
++    if (!form.getValues('signedAt')) {
++      form.setValue('signedAt', new Date(), { shouldDirty: false });
++    }
++  }, [form]);
++
+   // 计算总价
+   const totalAmount = watchItems.reduce((sum, item) => {
+     return sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
+@@ -360,7 +366,6 @@ export default function CreatePurchasePage() {
+                         control={form.control}
+                         name={`items.${index}.productId`}
+                         render={({ field }) => {
+-                          const selectedProduct = products.find(p => p.id === field.value);
+                           return (
+                             <FormItem>
+                               <FormLabel className={index !== 0 ? 'sr-only' : ''}>商品</FormLabel>
+diff --git a/frontend/src/app/dashboard/sales/create/page.tsx b/frontend/src/app/dashboard/sales/create/page.tsx
+index cc9f8cb..a1c1a0f 100644
+--- a/frontend/src/app/dashboard/sales/create/page.tsx
++++ b/frontend/src/app/dashboard/sales/create/page.tsx
+@@ -62,7 +62,7 @@ export default function CreateSalesPage() {
+     resolver: zodResolver(salesSchema),
+     defaultValues: {
+       contractNo: '',
+-      signedAt: new Date(),
++      signedAt: undefined,
+       exchangeRate: DEFAULT_EXCHANGE_RATE,
+       note: '',
+       items: [{ productId: '', storeId: '', quantity: 0, unit: '', costPrice: 0, sellingPrice: 0, note: '' }],
+@@ -77,6 +77,12 @@ export default function CreateSalesPage() {
+   const watchItems = useWatch({ control: form.control, name: 'items' });
+   const exchangeRate = useWatch({ control: form.control, name: 'exchangeRate' });
+ 
++  useEffect(() => {
++    if (!form.getValues('signedAt')) {
++      form.setValue('signedAt', new Date(), { shouldDirty: false });
++    }
++  }, [form]);
++
+   // Calculate Total
+   const totalAmount = watchItems.reduce((sum, item) => {
+     return sum + (Number(item.quantity) || 0) * (Number(item.sellingPrice) || 0);
+diff --git a/frontend/src/components/layout/Header.test.tsx b/frontend/src/components/layout/Header.test.tsx
+index e9584c6..8ab7fff 100644
+--- a/frontend/src/components/layout/Header.test.tsx
++++ b/frontend/src/components/layout/Header.test.tsx
+@@ -1,25 +1,29 @@
+ /**
+- * Input: Header组件
+- * Output: Header组件单元测试
++ * Input: Header组件、统一搜索服务、router
++ * Output: Header搜索与壳层交互测试
+  * Pos: 前端布局组件测试
+  *
+  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+  */
+ 
+-import { describe, expect, it, vi } from 'vitest';
+-import { render } from '@testing-library/react';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import { render, screen, waitFor } from '@testing-library/react';
++import userEvent from '@testing-library/user-event';
++import { Role } from '@/types';
+ import { Header } from './Header';
+ 
+ const mockLogout = vi.fn();
+ const mockPush = vi.fn();
+-type AuthStoreMock = {
+-  user: { name: string; username: string };
+-  logout: () => void;
++const mockSearchDashboard = vi.fn();
++const mockUser = {
++  name: '管理员',
++  username: 'admin',
++  role: Role.ADMIN,
+ };
+ 
+ vi.mock('@/store/auth.store', () => ({
+-  useAuthStore: <T,>(selector: (state: AuthStoreMock) => T): T => selector({
+-    user: { name: '管理员', username: 'admin' },
++  useAuthStore: <T,>(selector: (state: { user: typeof mockUser; logout: () => void }) => T): T => selector({
++    user: mockUser,
+     logout: mockLogout,
+   }),
+ }));
+@@ -35,24 +39,63 @@ vi.mock('next/navigation', () => ({
+   usePathname: () => '/dashboard',
+ }));
+ 
+-vi.mock('@/lib/axios', () => ({
+-  default: {
+-    get: vi.fn().mockResolvedValue({ data: { items: [] } }),
++vi.mock('@/services/dashboardSearch.service', () => ({
++  searchDashboard: (...args: unknown[]) => mockSearchDashboard(...args),
++  getDashboardSearchHref: (result: { type: string; id: string; title: string }) => {
++    if (result.type === 'product') {
++      return `/dashboard/products?keyword=${encodeURIComponent(result.title)}`;
++    }
++
++    return `/dashboard/containers/${result.id}`;
+   },
+ }));
+ 
+ describe('Header', () => {
++  beforeEach(() => {
++    mockLogout.mockReset();
++    mockPush.mockReset();
++    mockSearchDashboard.mockReset();
++  });
++
+   it('渲染搜索框与用户菜单', () => {
+-    const { getByPlaceholderText } = render(<Header />);
++    render(<Header />);
++
++    expect(screen.getByPlaceholderText('搜索商品、供应商、货柜...')).toBeInTheDocument();
++    expect(screen.getByRole('button', { name: '用户菜单' })).toBeInTheDocument();
++  });
++
++  it('输入关键字后调用统一搜索服务并展示结果', async () => {
++    mockSearchDashboard.mockResolvedValue([
++      { type: 'product', id: 'p-1', title: '瓷砖 A', subtitle: '600x600' },
++    ]);
+ 
+-    // 搜索框placeholder已更新
+-    expect(getByPlaceholderText('搜索商品、供应商、货柜...')).toBeTruthy();
++    const user = userEvent.setup();
++    render(<Header />);
++
++    await user.type(screen.getByPlaceholderText('搜索商品、供应商、货柜...'), '瓷砖');
++
++    await waitFor(() => {
++      expect(mockSearchDashboard).toHaveBeenCalledWith('瓷砖');
++    }, { timeout: 1000 });
++
++    expect(await screen.findByText('瓷砖 A')).toBeInTheDocument();
++    expect(screen.getByText('600x600')).toBeInTheDocument();
+   });
+ 
+-  it('渲染用户菜单按钮', () => {
+-    const { getAllByRole } = render(<Header />);
++  it('点击搜索结果后按结果映射跳转并清空输入', async () => {
++    mockSearchDashboard.mockResolvedValue([
++      { type: 'product', id: 'p-1', title: '瓷砖 A', subtitle: '600x600' },
++    ]);
++
++    const user = userEvent.setup();
++    render(<Header />);
++
++    const input = screen.getByPlaceholderText('搜索商品、供应商、货柜...') as HTMLInputElement;
++    await user.type(input, '瓷砖');
++
++    await user.click(await screen.findByRole('button', { name: /瓷砖 A/i }));
+ 
+-    const buttons = getAllByRole('button');
+-    expect(buttons.length).toBeGreaterThan(0);
++    expect(mockPush).toHaveBeenCalledWith('/dashboard/products?keyword=%E7%93%B7%E7%A0%96%20A');
++    expect(input.value).toBe('');
+   });
+ });
+diff --git a/frontend/src/components/layout/Header.tsx b/frontend/src/components/layout/Header.tsx
+index b428837..5e4257e 100644
+--- a/frontend/src/components/layout/Header.tsx
++++ b/frontend/src/components/layout/Header.tsx
+@@ -1,527 +1,82 @@
+ /**
+- * Input: 用户状态、后端搜索API
+- * Output: 顶部导航栏组件（含移动端汉堡菜单）
+- * Pos: 全局Header，包含搜索、通知、用户菜单、移动端导航入口
+- * 
++ * Input: 用户状态、导航配置
++ * Output: 顶部导航栏组件
++ * Pos: 全局 Header，负责装配移动导航、搜索、通知、用户菜单
++ *
+  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+  */
+ 
+ 'use client';
+ 
+-import { useState, useEffect, useRef, useCallback } from 'react';
+-import { useRouter, usePathname } from 'next/navigation';
+-import Link from 'next/link';
++import { useSyncExternalStore } from 'react';
++import { usePathname, useRouter } from 'next/navigation';
++import { CalendarDays } from 'lucide-react';
+ import { useAuthStore } from '@/store/auth.store';
+-import { Button } from '@/components/ui/button';
+-import { Input } from '@/components/ui/input';
+-import {
+-  DropdownMenu,
+-  DropdownMenuContent,
+-  DropdownMenuItem,
+-  DropdownMenuLabel,
+-  DropdownMenuSeparator,
+-  DropdownMenuTrigger,
+-} from '@/components/ui/dropdown-menu';
+-import {
+-  Sheet,
+-  SheetContent,
+-  SheetHeader,
+-  SheetTitle,
+-  SheetTrigger,
+-} from '@/components/ui/sheet';
+-import {
+-  UserCircle, Bell, Search, Package, FileText, Container, Building2,
+-  Loader2, CalendarDays, Menu, Ship, LayoutDashboard, ShoppingCart,
+-  PackageOpen, Landmark, SlidersHorizontal, LogOut, Bot,
+-} from 'lucide-react';
+-import { Badge } from '@/components/ui/badge';
+ import { ThemeToggle } from '@/components/layout/ThemeToggle';
+-import { cn } from '@/lib/utils';
+-import api from '@/lib/axios';
+-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+-import type {
+-  ApiResponse,
+-  PaginatedResponse,
+-  Product,
+-  PurchaseContract,
+-  SalesContract,
+-  Supplier,
+-} from '@/types';
+-
+-// ==================== 移动端导航数据（与 Sidebar 对齐） ====================
+-
+-const mobileNavItems = [
+-  {
+-    href: '/dashboard',
+-    label: '经营中台',
+-    icon: LayoutDashboard,
+-    childPrefixes: ['/dashboard/ops-execution'],
+-  },
+-  {
+-    href: '/dashboard/contracts',
+-    label: '采购',
+-    icon: ShoppingCart,
+-    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers', '/dashboard/inventory-container', '/dashboard/store-recommend'],
+-  },
+-  {
+-    href: '/dashboard/sales',
+-    label: '出口',
+-    icon: PackageOpen,
+-    childPrefixes: ['/dashboard/sales', '/dashboard/tax-refunds', '/customs-declarations', '/dashboard/hs-codes'],
+-  },
+-  {
+-    href: '/dashboard/finance',
+-    label: '财务',
+-    icon: Landmark,
+-    childPrefixes: ['/dashboard/payments', '/dashboard/finance'],
+-  },
+-  {
+-    href: '/dashboard/ai/sessions',
+-    label: 'AI 助手',
+-    icon: Bot,
+-    childPrefixes: ['/dashboard/ai'],
+-  },
+-  {
+-    href: '/dashboard/settings',
+-    label: '系统管理',
+-    icon: SlidersHorizontal,
+-    childPrefixes: ['/dashboard/contracts/templates', '/dashboard/settings', '/dashboard/import', '/dashboard/users', '/dashboard/system'],
+-  },
+-];
+-
+-interface SearchResult {
+-  type: 'product' | 'supplier' | 'container' | 'purchase' | 'sales';
+-  id: string;
+-  title: string;
+-  subtitle?: string;
+-}
++import { getVisibleModuleNavItems } from './navigation.config';
++import { HeaderMobileNav } from './HeaderMobileNav';
++import { HeaderNotifications } from './HeaderNotifications';
++import { HeaderSearch } from './HeaderSearch';
++import { HeaderUserMenu } from './HeaderUserMenu';
++
++const subscribeNoop = () => () => {};
++const headerDateFormatter = new Intl.DateTimeFormat('zh-CN', {
++  timeZone: 'Asia/Shanghai',
++  month: '2-digit',
++  day: '2-digit',
++  weekday: 'short',
++});
+ 
+ export function Header() {
+   const user = useAuthStore((state) => state.user);
+   const logout = useAuthStore((state) => state.logout);
+   const router = useRouter();
+   const pathname = usePathname();
+-  
+-  const [searchQuery, setSearchQuery] = useState('');
+-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+-  const [isSearching, setIsSearching] = useState(false);
+-  const [showResults, setShowResults] = useState(false);
+-  const [mobileOpen, setMobileOpen] = useState(false);
+-
+-  /**
+-   * 职责：判断移动端导航项是否激活
+-   * 思路：'/dashboard' 作为前缀会匹配所有子路由，需单独精确匹配，避免经营中台在其他模块页面误高亮
+-   * @param item 导航项
+-   */
+-  const isMobileNavActive = (item: typeof mobileNavItems[number]) => {
+-    if (pathname === '/dashboard') return item.href === '/dashboard';
+-    return [item.href, ...item.childPrefixes].some((prefix) => {
+-      if (prefix === '/dashboard') return pathname === '/dashboard';
+-      return pathname === prefix || pathname.startsWith(`${prefix}/`);
+-    });
+-  };
+-  const searchRef = useRef<HTMLDivElement>(null);
+-  const todayLabel = new Intl.DateTimeFormat('zh-CN', {
+-    timeZone: 'Asia/Shanghai',
+-    month: '2-digit',
+-    day: '2-digit',
+-    weekday: 'short',
+-  }).format(new Date());
+-
+-  // 搜索函数
+-  const performSearch = useCallback(async (query: string) => {
+-    if (!query || query.length < 2) {
+-      setSearchResults([]);
+-      return;
+-    }
+-
+-    setIsSearching(true);
+-    try {
+-      // 并行搜索多个类型 - 使用正确的参数名
+-      const [productsRes, suppliersRes, containersRes, purchasesRes, salesRes] = await Promise.all([
+-        api
+-          .get<ApiResponse<PaginatedResponse<Product>>, ApiResponse<PaginatedResponse<Product>>>('/products', {
+-            params: { keyword: query, pageSize: 5 },
+-          })
+-          .catch(
+-            (): ApiResponse<PaginatedResponse<Product>> => ({
+-              code: 200,
+-              message: 'ok',
+-              data: { items: [], pagination: { total: 0, page: 1, pageSize: 5, totalPages: 0 } },
+-            })
+-          ),
+-        api
+-          .get<ApiResponse<PaginatedResponse<Supplier>>, ApiResponse<PaginatedResponse<Supplier>>>('/suppliers', {
+-            params: { keyword: query, pageSize: 5 },
+-          })
+-          .catch(
+-            (): ApiResponse<PaginatedResponse<Supplier>> => ({
+-              code: 200,
+-              message: 'ok',
+-              data: { items: [], pagination: { total: 0, page: 1, pageSize: 5, totalPages: 0 } },
+-            })
+-          ),
+-        api
+-          .get<ApiResponse<PaginatedResponse<SalesContract>>, ApiResponse<PaginatedResponse<SalesContract>>>('/containers', {
+-            params: { keyword: query, pageSize: 5 },
+-          })
+-          .catch(
+-            (): ApiResponse<PaginatedResponse<SalesContract>> => ({
+-              code: 200,
+-              message: 'ok',
+-              data: { items: [], pagination: { total: 0, page: 1, pageSize: 5, totalPages: 0 } },
+-            })
+-          ),
+-        api
+-          .get<ApiResponse<PaginatedResponse<PurchaseContract>>, ApiResponse<PaginatedResponse<PurchaseContract>>>('/purchases', {
+-            params: { keyword: query, pageSize: 5 },
+-          })
+-          .catch(
+-            (): ApiResponse<PaginatedResponse<PurchaseContract>> => ({
+-              code: 200,
+-              message: 'ok',
+-              data: { items: [], pagination: { total: 0, page: 1, pageSize: 5, totalPages: 0 } },
+-            })
+-          ),
+-        api
+-          .get<ApiResponse<PaginatedResponse<SalesContract>>, ApiResponse<PaginatedResponse<SalesContract>>>('/sales', {
+-            params: { keyword: query, pageSize: 5 },
+-          })
+-          .catch(
+-            (): ApiResponse<PaginatedResponse<SalesContract>> => ({
+-              code: 200,
+-              message: 'ok',
+-              data: { items: [], pagination: { total: 0, page: 1, pageSize: 5, totalPages: 0 } },
+-            })
+-          ),
+-      ]);
+-
+-      const results: SearchResult[] = [];
+-
+-      // 处理商品结果
+-      const products = productsRes.data?.items || [];
+-      products.forEach((p) => {
+-        results.push({
+-          type: 'product',
+-          id: p.id,
+-          title: p.customsName,
+-          subtitle: p.specification || p.unit,
+-        });
+-      });
+-
+-      // 处理供应商结果
+-      const suppliers = suppliersRes.data?.items || [];
+-      suppliers.forEach((s) => {
+-        results.push({
+-          type: 'supplier',
+-          id: s.id,
+-          title: s.name,
+-          subtitle: s.shortName,
+-        });
+-      });
+-
+-      // 处理货柜结果
+-      const containers = containersRes.data?.items || [];
+-      containers.forEach((c) => {
+-        results.push({
+-          type: 'container',
+-          id: c.id,
+-          title: c.contractNo,
+-          subtitle: c.status,
+-        });
+-      });
+-
+-      // 处理采购合同结果
+-      const purchases = purchasesRes.data?.items || [];
+-      purchases.forEach((p) => {
+-        results.push({
+-          type: 'purchase',
+-          id: p.id,
+-          title: p.contractNo,
+-          subtitle: p.supplier?.name || '采购合同',
+-        });
+-      });
+-
+-      // 处理销售合同结果
+-      const sales = salesRes.data?.items || [];
+-      sales.forEach((s) => {
+-        results.push({
+-          type: 'sales',
+-          id: s.id,
+-          title: s.contractNo,
+-          subtitle: `$${(s.totalAmount || 0).toLocaleString()}`,
+-        });
+-      });
+-
+-      setSearchResults(results);
+-    } catch (error) {
+-      console.error('搜索失败:', error);
+-      setSearchResults([]);
+-    } finally {
+-      setIsSearching(false);
+-    }
+-  }, []);
+-
+-  // 防抖搜索
+-  useEffect(() => {
+-    const timer = setTimeout(() => {
+-      if (searchQuery) {
+-        performSearch(searchQuery);
+-      }
+-    }, 300);
+-
+-    return () => clearTimeout(timer);
+-  }, [searchQuery, performSearch]);
+-
+-  // 点击外部关闭搜索结果
+-  useEffect(() => {
+-    const handleClickOutside = (e: MouseEvent) => {
+-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+-        setShowResults(false);
+-      }
+-    };
+-    document.addEventListener('mousedown', handleClickOutside);
+-    return () => document.removeEventListener('mousedown', handleClickOutside);
+-  }, []);
+-
+-  // 处理结果点击 - 所有合同类直接跳转详情页，商品/供应商跳转列表页筛选
+-  const handleResultClick = (result: SearchResult) => {
+-    setShowResults(false);
+-    setSearchQuery('');
+-    
+-    switch (result.type) {
+-      case 'product':
+-        router.push(`/dashboard/products?keyword=${encodeURIComponent(result.title)}`);
+-        break;
+-      case 'supplier':
+-        router.push(`/dashboard/suppliers?keyword=${encodeURIComponent(result.title)}`);
+-        break;
+-      case 'container':
+-        // 货柜直接跳转到详情页
+-        router.push(`/dashboard/containers/${result.id}`);
+-        break;
+-      case 'purchase':
+-        // 采购合同直接跳转到详情页
+-        router.push(`/dashboard/purchase/${result.id}`);
+-        break;
+-      case 'sales':
+-        // 销售合同直接跳转到详情页
+-        router.push(`/dashboard/sales/${result.id}`);
+-        break;
+-    }
+-  };
+-
+-  // 获取图标
+-  const getIcon = (type: string) => {
+-    switch (type) {
+-      case 'product': return <Package className="h-4 w-4 text-primary" />;
+-      case 'supplier': return <Building2 className="h-4 w-4 text-primary" />;
+-      case 'container': return <Container className="h-4 w-4 text-primary" />;
+-      case 'purchase': return <FileText className="h-4 w-4 text-primary" />;
+-      case 'sales': return <FileText className="h-4 w-4 text-primary" />;
+-      default: return <Search className="h-4 w-4" />;
+-    }
+-  };
+-
+-  // 获取类型标签
+-  const getTypeLabel = (type: string) => {
+-    switch (type) {
+-      case 'product': return '商品';
+-      case 'supplier': return '供应商';
+-      case 'container': return '货柜';
+-      case 'purchase': return '采购';
+-      case 'sales': return '销售';
+-      default: return '';
+-    }
+-  };
++  const mobileNavItems = getVisibleModuleNavItems(user?.role);
++  const todayLabel = useSyncExternalStore(
++    subscribeNoop,
++    () => headerDateFormatter.format(new Date()),
++    () => '',
++  );
+ 
+   const initials = (user?.name || user?.username || '用')
+     .slice(0, 2)
+     .toUpperCase();
+ 
++  const handleLogout = () => {
++    logout();
++    window.location.href = '/login';
++  };
++
+   return (
+     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-6">
+-      {/* 移动端汉堡菜单：仅在 md 以下显示 */}
+-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+-        <SheetTrigger asChild>
+-          <Button
+-            variant="ghost"
+-            size="icon"
+-            className="md:hidden h-9 w-9 shrink-0"
+-            aria-label="打开导航菜单"
+-          >
+-            <Menu className="h-5 w-5" />
+-          </Button>
+-        </SheetTrigger>
+-        <SheetContent side="left" className="w-72 p-0">
+-          <SheetHeader className="flex h-16 items-center border-b px-5 py-0">
+-            <SheetTitle asChild>
+-              <Link
+-                href="/dashboard"
+-                className="flex items-center gap-3 font-semibold tracking-tight"
+-                onClick={() => setMobileOpen(false)}
+-              >
+-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+-                  <Ship className="h-4 w-4" />
+-                </span>
+-                <div className="grid gap-0.5 text-left">
+-                  <span>捷淞系统</span>
+-                  <span className="text-xs font-normal text-muted-foreground">Import &amp; Export</span>
+-                </div>
+-              </Link>
+-            </SheetTitle>
+-          </SheetHeader>
+-          <nav className="grid gap-1 px-3 py-4">
+-            {mobileNavItems.map((item) => (
+-              <Link
+-                key={item.href}
+-                href={item.href}
+-                onClick={() => setMobileOpen(false)}
+-                className={cn(
+-                  'flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors',
+-                  isMobileNavActive(item)
+-                    ? 'bg-muted text-foreground shadow-sm ring-1 ring-border'
+-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+-                )}
+-              >
+-                <item.icon className="h-4 w-4 shrink-0" />
+-                <span>{item.label}</span>
+-              </Link>
+-            ))}
+-          </nav>
+-          {/* 底部：用户信息 + 退出 */}
+-          <div className="absolute bottom-0 left-0 right-0 space-y-3 border-t p-4">
+-            <div className="rounded-lg border bg-muted/50 px-3 py-2">
+-              <div className="text-sm font-medium">{user?.name || '当前用户'}</div>
+-              <div className="text-xs text-muted-foreground">{user?.username}</div>
+-            </div>
+-            <Button
+-              variant="ghost"
+-              className="h-11 w-full justify-start gap-3 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+-              onClick={() => { logout(); window.location.href = '/login'; }}
+-            >
+-              <LogOut className="h-4 w-4" />
+-              <span>退出登录</span>
+-            </Button>
+-          </div>
+-        </SheetContent>
+-      </Sheet>
++      <HeaderMobileNav
++        items={mobileNavItems}
++        pathname={pathname}
++        userName={user?.name}
++        username={user?.username}
++        onLogout={handleLogout}
++      />
+ 
+       <div className="flex flex-1 items-center gap-4">
+         <div className="hidden items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-xs text-muted-foreground lg:flex">
+           <CalendarDays className="h-3.5 w-3.5" />
+-          <span>{todayLabel}</span>
++          <span suppressHydrationWarning>{todayLabel || '今天'}</span>
+         </div>
+ 
+-        {/* Global Search */}
+-        <div ref={searchRef} className="relative w-full max-w-md">
+-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+-          <Input
+-            type="search"
+-            placeholder="搜索商品、供应商、货柜..."
+-            className="h-10 bg-background pl-9"
+-            value={searchQuery}
+-            onChange={(e) => {
+-              setSearchQuery(e.target.value);
+-              setShowResults(true);
+-            }}
+-            onFocus={() => setShowResults(true)}
+-          />
+-          
+-          {/* 搜索结果下拉 */}
+-          {showResults && (searchQuery.length >= 2 || isSearching) && (
+-            <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-80 overflow-y-auto rounded-xl border bg-popover shadow-md">
+-              {isSearching ? (
+-                <div className="flex items-center justify-center py-4 text-muted-foreground">
+-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+-                  搜索中...
+-                </div>
+-              ) : searchResults.length > 0 ? (
+-                <div className="py-1">
+-                  {searchResults.map((result, index) => (
+-                    <button
+-                      key={`${result.type}-${result.id}-${index}`}
+-                      className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-accent"
+-                      onClick={() => handleResultClick(result)}
+-                    >
+-                      {getIcon(result.type)}
+-                      <div className="flex-1 min-w-0">
+-                        <div className="font-medium truncate">{result.title}</div>
+-                        {result.subtitle && (
+-                          <div className="text-xs text-muted-foreground truncate">{result.subtitle}</div>
+-                        )}
+-                      </div>
+-                      <Badge variant="outline" className="text-xs">
+-                        {getTypeLabel(result.type)}
+-                      </Badge>
+-                    </button>
+-                  ))}
+-                </div>
+-              ) : (
+-                <div className="py-4 text-center text-muted-foreground text-sm">
+-                  未找到相关结果
+-                </div>
+-              )}
+-            </div>
+-          )}
+-        </div>
++        <HeaderSearch />
+       </div>
+-      
++
+       <div className="flex items-center gap-2">
+         <ThemeToggle />
+-
+-        {/* Notifications */}
+-        <DropdownMenu>
+-          <DropdownMenuTrigger asChild>
+-            <Button variant="outline" size="icon" className="relative h-11 w-11 rounded-md">
+-              <Bell className="h-5 w-5" />
+-              <span className="sr-only">通知</span>
+-            </Button>
+-          </DropdownMenuTrigger>
+-          <DropdownMenuContent align="end" className="w-80">
+-            <DropdownMenuLabel>消息通知</DropdownMenuLabel>
+-            <DropdownMenuSeparator />
+-            <div className="py-6 text-center text-muted-foreground text-sm">
+-              暂无新通知
+-            </div>
+-          </DropdownMenuContent>
+-        </DropdownMenu>
+-
+-        {/* User Menu */}
+-        <DropdownMenu>
+-          <DropdownMenuTrigger asChild>
+-            <Button variant="ghost" className="h-11 gap-2 rounded-md px-2">
+-              <Avatar className="h-7 w-7 border">
+-                <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
+-              </Avatar>
+-              <div className="hidden text-left sm:block">
+-                <div className="text-sm font-medium leading-none">{user?.name || '管理员'}</div>
+-                <div className="text-xs text-muted-foreground">{user?.username}</div>
+-              </div>
+-              <UserCircle className="hidden h-4 w-4 text-muted-foreground sm:block" />
+-              <span className="sr-only">用户菜单</span>
+-            </Button>
+-          </DropdownMenuTrigger>
+-          <DropdownMenuContent align="end">
+-            <DropdownMenuLabel>
+-              <div className="flex flex-col">
+-                <span>{user?.name || '管理员'}</span>
+-                <span className="text-xs text-muted-foreground font-normal">{user?.username}</span>
+-              </div>
+-            </DropdownMenuLabel>
+-            <DropdownMenuSeparator />
+-            <DropdownMenuItem onClick={() => router.push('/dashboard/settings')}>
+-              个人设置
+-            </DropdownMenuItem>
+-            <DropdownMenuSeparator />
+-            <DropdownMenuItem onClick={() => {
+-              logout();
+-              window.location.href = '/login';
+-            }}>
+-              退出登录
+-            </DropdownMenuItem>
+-          </DropdownMenuContent>
+-        </DropdownMenu>
++        <HeaderNotifications />
++        <HeaderUserMenu
++          displayName={user?.name}
++          username={user?.username}
++          initials={initials}
++          onOpenSettings={() => router.push('/dashboard/settings')}
++          onLogout={handleLogout}
++        />
+       </div>
+     </header>
+   );
+diff --git a/frontend/src/services/dataImportService.test.ts b/frontend/src/services/dataImportService.test.ts
+index e5b3e6d..dde0723 100644
+--- a/frontend/src/services/dataImportService.test.ts
++++ b/frontend/src/services/dataImportService.test.ts
+@@ -83,4 +83,17 @@ describe('dataImportService', () => {
+     expect(history).toEqual([{ id: 'imp-1' }]);
+     expect(stats).toEqual({ suppliers: 1 });
+   });
++
++  it('getImportHistory: 兼容分页响应结构', async () => {
++    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
++      data: {
++        items: [{ id: 'imp-2' }],
++        pagination: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
++      },
++    });
++
++    const history = await getImportHistory();
++
++    expect(history).toEqual([{ id: 'imp-2' }]);
++  });
+ });
+diff --git a/frontend/src/services/dataImportService.ts b/frontend/src/services/dataImportService.ts
+index be8cd9b..f95b020 100644
+--- a/frontend/src/services/dataImportService.ts
++++ b/frontend/src/services/dataImportService.ts
+@@ -7,6 +7,7 @@
+  */
+ 
+ import api from '@/lib/axios';
++import type { PaginatedResponse } from '@/types';
+ 
+ export interface ImportAnalysis {
+   totalRows: number;
+@@ -122,7 +123,11 @@ export const executeImport = async (records: NewRecord[]): Promise<ImportResult>
+  */
+ export const getImportHistory = async (): Promise<ImportHistory[]> => {
+   const response = await api.get('/import/history');
+-  return (response as { data: ImportHistory[] }).data;
++  const data = (response as { data: ImportHistory[] | PaginatedResponse<ImportHistory> }).data;
++  if (Array.isArray(data)) {
++    return data;
++  }
++  return Array.isArray(data?.items) ? data.items : [];
+ };
+ 
+ /**

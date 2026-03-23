@@ -1,5 +1,174 @@
 # Frontend Polish Metrics
 
+## 2026-03-23 Round 73（Frontend E2E Stabilization Before Commit）
+
+### 质量指标
+- backend 全量测试：`236/236` 通过（单测 `233` + DB 集成 `3`）
+- frontend 全量单测：`110` 文件 / `356` 用例通过
+- frontend 全量 Playwright：`57/57` 通过
+- frontend lint：通过
+- frontend production build：通过
+
+### 过程指标
+- hydration 稳定化改动点：`4` 个（dashboard layout、Header 日期、采购创建、销售创建）
+- E2E mock/断言收口文件：`4` 个（`helpers.ts`、`smoke.spec.ts`、`button-coverage.spec.ts`、`dataImportService.ts`）
+- 新增/补强兼容回归：`3` 组（layout、Header、import history service）
+- 重新构建并用 fresh preview 复跑全量 E2E：`1` 次
+
+### 结论
+- 提交前最后一批前端假红灯/真红灯已经清掉，当前仓库回到“可提交”状态。
+- 这轮价值不在于新增功能，而在于把此前“功能完成但门禁不可信”的状态收口成真实绿灯。
+
+## 2026-03-23 Round 72（Frontend Next Iterations Round 7）
+
+### 质量指标
+- `FE-MODULE-01`：完成
+- `FE-QA-01`：完成
+- 页面级定向前端单测：`10/10` 通过
+- Playwright 截图回归：`5/5` 通过
+- 定向 lint：通过
+- 前端 production build：通过
+
+### 过程指标
+- 新增模块首页概览区：`2` 个（采购、出口）
+- 新增视觉回归基线截图：`5` 张
+- 为财务页截图补齐 mock 端点：`3` 个
+- 截图门禁运行方式调整：`1` 次（dev server -> production preview）
+
+### 结论
+- `frontend-next-iterations-2026-03` 的 `10/10` 项已经全部完成并完成验证。
+- 当前前端已从“继续结构迭代”进入“可以另开下一轮专项”的状态。
+
+## 2026-03-23 Round 71（Frontend Next Iterations Round 6）
+
+### 质量指标
+- `FE-AI-01`：完成
+- 新增定向前端单测：`2` 文件 / `10` 用例
+- 定向 lint：通过
+- 前端 production build：通过
+
+### 过程指标
+- AI 挂载边界新增：`1` 条（`/dashboard/ai/*` 不再重复挂载全局助手）
+- AI 主入口形态改造：`1` 组（大悬浮按钮 -> 低存在感触发器 + 右侧侧边面板）
+
+### 结论
+- AI 助手已经从“全局抢焦点的悬浮物”进入“业务页可用、但默认更克制”的状态。
+- 当前整体进度提升到 `8/10`，剩余 `FE-MODULE-01`、`FE-QA-01`。
+
+## 2026-03-23 Round 70（Frontend Next Iterations Round 5）
+
+### 质量指标
+- `FE-SHELL-01`：完成
+- `FE-SEARCH-01`：完成
+- 新增定向前端单测：`2` 文件 / `5` 用例
+- 定向 lint：通过
+- 前端 production build：通过
+
+### 过程指标
+- `Header.tsx` 主文件体量：从 `528` 行降为 `76` 行
+- 新增 Header 子组件：`4`
+- 新增统一搜索服务：`1`
+- 搜索查询阶段：`2`（高频主数据优先，合同类补充）
+
+### 结论
+- `Header` 已从“超重基础组件”进入“壳层编排 + 子组件职责清晰”的状态。
+- 当前整体进度提升到 `7/10`，剩余 `FE-AI-01`、`FE-MODULE-01`、`FE-QA-01`。
+
+## 2026-03-23 Round 69（Frontend Next Iterations Round 4）
+
+### 质量指标
+- `FE-SPLIT-02`：完成
+- 新增页面级回归测试：`1` 条（门店切换到历史采购明细）
+- 定向前端单测：`3/3` 通过
+- 定向 lint：通过
+- 前端 production build：通过
+
+### 过程指标
+- 主路由文件体量：从 `902` 行降为 `15` 行
+- 新增拆分文件：`5`
+- 为测试基建新增通用 polyfill：`1` 组（Radix Select）
+
+### 结论
+- `store-recommend` 已从“超长单文件”进入“可以继续做体验和结构收敛”的状态。
+- 当前整体进度提升到 `5/10`。
+
+## 2026-03-23 Round 68（Frontend Next Iterations Round 3）
+
+### 质量指标
+- `FE-STATE-01`：完成
+- 新增共享状态组件：`1` 组（`data-state.tsx`）
+- 新增组件级回归测试：`1` 文件 / `3` 用例
+- 页面级定向前端单测：`19/19` 通过
+- 定向 lint：通过
+- 前端 production build：通过
+
+### 过程指标
+- 本轮接入统一状态体系的高频页：`5`
+- 新增状态呈现抽象：`3` 个（loading / error / table-row state）
+- 因 `not_found` 恢复为待执行的并行任务：`4`
+
+### 结论
+- dashboard 高频页的状态反馈开始进入共享、可复用、可测的阶段。
+- 下一轮可以继续推进 `FE-SPLIT-02` / `FE-SHELL-01` / `FE-SEARCH-01` / `FE-AI-01`，而不是继续容忍状态展示分散生长。
+
+## 2026-03-23 Round 67（Frontend Next Iterations Round 2）
+
+### 质量指标
+- `FE-SPLIT-01`：完成
+- 新增页面级回归测试：`1` 文件 / `4` 用例
+- 定向前端单测：`4/4` 通过
+- 定向 lint：通过
+- 前端 production build：通过
+
+### 过程指标
+- 本轮拆分页级别：`1` 个超大页面（`finance/statements`）
+- 路由主文件体量：从 `1128` 行降为轻入口
+- 主要结构层：`4` 层（route / container / section / dialog）
+
+### 结论
+- 财务报表页已经从“超大单文件”进入“可继续演进的分层结构”状态。
+- 下一轮可以直接推进 `FE-SPLIT-02`，而不用继续把结构债务和行为验证绑在同一个文件里。
+
+## 2026-03-22 Round 66（Frontend Next Iterations Round 1）
+
+### 质量指标
+- `FE-DASH-01`：完成
+- `FE-NAV-02`：完成
+- 计划文档新增：`1`
+- checkpoint 文件更新：`8`
+- 定向前端单测：`20/20` 通过
+- 定向 lint：通过
+- 前端 production build：通过
+
+### 过程指标
+- 本轮锁定范围：`2` 个 P0 前端任务
+- 并行高推理探索子任务：`2` 个（`gpt-5.4 high`）
+- 暂不扩围任务：`4+`（`FE-SPLIT-01`、`FE-SPLIT-02`、`FE-SHELL-01`、`FE-SEARCH-01`）
+
+### 结论
+- 当前已从“审查结论可执行”进入“首个结构化实现批次已交付”。
+- dashboard 首页层级和壳层导航策略都已经进入共享、可测、可继续扩展的状态。
+
+## 2026-03-22 Round 65（Frontend Audit To Iteration）
+
+### 质量指标
+- 新增专项审查文档：`1`
+- 前端 lint：通过
+- 前端 production build：通过
+- 导航配置单一化：`1` 组（`navigation.config.ts`）
+- 定向前端单测：`14/14` 通过
+
+### 过程指标
+- 修复 lint/build 阻塞点：`2`
+- 清理额外 lint warning：`6+`
+- 壳层接入共享导航配置的组件：`3`
+- 清理陈旧壳层页面：`1`
+
+### 结论
+- 前端已经从“审查发现问题”进入“可继续系统迭代”的状态，当前 baseline 恢复为绿灯。
+- 第一轮价值不在于大改视觉，而在于把后续所有视觉和结构重构的底座先稳定下来。
+- 下一轮可以直接进入工作台首屏重做，而不用继续被导航漂移和构建红灯牵制。
+
 ## 2026-03-21 Round 63（Login Transition / First-Paint Fix）
 
 ### 质量指标

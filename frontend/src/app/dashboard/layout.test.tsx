@@ -9,12 +9,12 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import DashboardLayout from './layout';
-
 const mocks = vi.hoisted(() => {
   const replace = vi.fn();
-  const authState = { isAuthenticated: true };
+  const authState = { isAuthenticated: true, user: { role: 'ADMIN' } };
   let hasHydrated = true;
   let hydrationCallback: (() => void) | null = null;
+  let pathname = '/dashboard';
 
   const useAuthStore = ((selector: (state: typeof authState) => unknown) => selector(authState)) as {
     (selector: (state: typeof authState) => unknown): unknown;
@@ -38,6 +38,10 @@ const mocks = vi.hoisted(() => {
     replace,
     authState,
     useAuthStore,
+    setPathname: (value: string) => {
+      pathname = value;
+    },
+    getPathname: () => pathname,
     setHasHydrated: (value: boolean) => {
       hasHydrated = value;
     },
@@ -58,6 +62,7 @@ vi.mock('next/navigation', () => ({
     push: vi.fn(),
     back: vi.fn(),
   }),
+  usePathname: () => mocks.getPathname(),
 }));
 
 vi.mock('@/components/layout/Sidebar', () => ({
@@ -72,6 +77,8 @@ describe('DashboardLayout', () => {
   beforeEach(() => {
     mocks.replace.mockReset();
     mocks.authState.isAuthenticated = true;
+    mocks.authState.user.role = 'ADMIN';
+    mocks.setPathname('/dashboard');
     mocks.setHasHydrated(true);
     mocks.resetHydrationCallback();
     sessionStorage.clear();
@@ -140,6 +147,7 @@ describe('DashboardLayout', () => {
     expect(typeof mocks.getHydrationCallback()).toBe('function');
 
     act(() => {
+      mocks.setHasHydrated(true);
       mocks.getHydrationCallback()?.();
     });
 
@@ -147,5 +155,20 @@ describe('DashboardLayout', () => {
       expect(screen.getByText('页面内容')).toBeInTheDocument();
     });
     expect(mocks.replace).not.toHaveBeenCalled();
+  });
+
+  it('非管理员进入系统管理路径时跳回默认 dashboard 落点', async () => {
+    mocks.authState.user.role = 'SALES';
+    mocks.setPathname('/dashboard/settings');
+
+    render(
+      <DashboardLayout>
+        <div>页面内容</div>
+      </DashboardLayout>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.replace).toHaveBeenCalledWith('/dashboard');
+    });
   });
 });

@@ -16,10 +16,13 @@ const LazyAIAssistant = dynamic(
  */
 export function LazyAIAssistantMount() {
   const pathname = usePathname();
+  const isAiWorkspace = pathname.startsWith('/dashboard/ai');
   const shouldMount =
-    pathname.startsWith('/dashboard') ||
-    pathname.startsWith('/customs-declarations') ||
-    pathname.startsWith('/tax-refunds');
+    !isAiWorkspace && (
+      pathname.startsWith('/dashboard') ||
+      pathname.startsWith('/customs-declarations') ||
+      pathname.startsWith('/tax-refunds')
+    );
 
   if (!shouldMount) {
     return null;

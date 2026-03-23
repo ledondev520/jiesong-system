@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -24,14 +24,12 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Wallet,
-  Loader2,
   TrendingUp,
   AlertTriangle,
   CheckCircle2,
   ChevronRight,
   BarChart3,
   RefreshCw,
-  ServerCrash,
 } from 'lucide-react';
 import {
   LineChart,
@@ -50,6 +48,8 @@ import { financeService } from '@/services/finance.service';
 import api from '@/lib/axios';
 import { type ApiResponse } from '@/types';
 import { cachedFetch } from '@/lib/api-cache';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState, LoadingState } from '@/components/ui/data-state';
 
 interface PaymentTrendPoint {
   label: string;
@@ -96,7 +96,9 @@ export default function FinancePage() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
-  const loadData = async (isRefresh = false) => {
+  const hasLoadedRef = useRef(false);
+
+  const loadData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     setLoadError(false);
@@ -121,24 +123,19 @@ export default function FinancePage() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
-
-  // 切换趋势周期时重新拉取
-  useEffect(() => {
-    if (!loading) void loadData(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trendDays]);
 
   useEffect(() => {
-    void loadData();
-  }, []);
+    void loadData(hasLoadedRef.current);
+    hasLoadedRef.current = true;
+  }, [loadData]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <span className="ml-2 text-muted-foreground">加载中...</span>
-      </div>
+      <LoadingState
+        title="加载中..."
+        description="正在同步财务总览、汇率和账款趋势数据。"
+      />
     );
   }
 
@@ -155,17 +152,16 @@ export default function FinancePage() {
             </Button>
           }
         />
-        <Card className="border-destructive/30 bg-destructive/5">
-          <CardHeader className="text-center pb-2">
-            <div className="mx-auto h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center mb-2">
-              <ServerCrash className="h-6 w-6 text-destructive" />
-            </div>
-            <CardTitle className="text-base">数据加载失败</CardTitle>
-            <CardDescription>
-              无法连接到服务器，请检查网络连接或稍后重试。
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <ErrorState
+          title="数据加载失败"
+          description="无法连接到服务器，请检查网络连接或稍后重试。"
+          action={
+            <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={refreshing}>
+              <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+              重试
+            </Button>
+          }
+        />
       </div>
     );
   }
@@ -378,9 +374,12 @@ export default function FinancePage() {
         </CardHeader>
         <CardContent>
           {trends.length === 0 ? (
-            <div className="flex items-center justify-center h-36 text-sm text-muted-foreground">
-              暂无收付款数据，请先录入收付款记录
-            </div>
+            <EmptyState
+              icon={BarChart3}
+              title="暂无收付款数据"
+              description="请先录入收付款记录，趋势图会在此自动生成。"
+              className="py-10"
+            />
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={trends} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
@@ -528,22 +527,22 @@ export default function FinancePage() {
       {/* 无数据引导态 */}
       {!hasData && (
         <Card className="border-dashed">
-          <CardHeader className="text-center pb-2">
-            <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-2">
-              <DollarSign className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <CardTitle className="text-base">暂无财务记录</CardTitle>
-            <CardDescription>
-              导入采购或销售合同数据后，应付 / 应收账款将自动汇总显示在此。
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-center gap-3 pb-6">
-            <Button asChild variant="outline" size="sm">
-              <Link href="/dashboard/finance/payable">查看应付明细</Link>
-            </Button>
-            <Button asChild size="sm">
-              <Link href="/dashboard/finance/receivable">查看应收明细</Link>
-            </Button>
+          <CardContent className="pt-6">
+            <EmptyState
+              icon={DollarSign}
+              title="暂无财务记录"
+              description="导入采购或销售合同数据后，应付 / 应收账款将自动汇总显示在此。"
+              action={
+                <div className="flex flex-wrap justify-center gap-3">
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/dashboard/finance/payable">查看应付明细</Link>
+                  </Button>
+                  <Button asChild size="sm">
+                    <Link href="/dashboard/finance/receivable">查看应收明细</Link>
+                  </Button>
+                </div>
+              }
+            />
           </CardContent>
         </Card>
       )}

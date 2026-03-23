@@ -44,10 +44,10 @@ const resolveStreamEndpoint = (): string => {
 };
 
 /**
- * 职责：渲染AI智能助手悬浮窗
+ * 职责：渲染AI智能助手侧边面板
  * 思路：
- *   1. 支持文本对话
- *   2. 支持图片上传（点击/粘贴/拖拽）
+ *   1. 默认以低存在感触发器驻留在业务页
+ *   2. 展开后以右侧面板承载对话与图片分析
  *   3. 使用SSE流式输出
  */
 export function AIAssistant() {
@@ -399,37 +399,39 @@ export function AIAssistant() {
 
   return (
     <>
-      {/* Floating Button (Bottom Right) */}
       <Button
+        variant="outline"
         className={cn(
-          "fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg transition-all duration-300 z-[199]",
-          isOpen ? "scale-0 opacity-0" : "scale-100 opacity-100"
+          'fixed bottom-5 right-5 z-[140] h-10 rounded-full border bg-background/95 px-3 text-foreground shadow-lg backdrop-blur transition-all duration-300 supports-[backdrop-filter]:bg-background/80',
+          isOpen ? 'translate-y-2 opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
         )}
-        size="icon"
         onClick={() => setIsOpen(true)}
+        aria-label="AI 助手"
       >
-        <Bot className="h-8 w-8" />
-        <span className="sr-only">打开AI助手</span>
+        <Bot className="h-4 w-4 text-primary" />
+        <span className="text-sm font-medium">AI 助手</span>
       </Button>
 
-      {/* Chat Window */}
-      <div
+      <aside
+        role="complementary"
+        aria-label="AI 助手侧边面板"
         className={cn(
-          "fixed bottom-6 right-6 z-[200] w-96 transition-all duration-300 origin-bottom-right",
-          isOpen ? "scale-100 opacity-100" : "scale-0 opacity-0 pointer-events-none"
+          'fixed inset-y-4 right-4 z-[150] w-[24rem] max-w-[calc(100vw-2rem)] transition-all duration-300',
+          isOpen ? 'translate-x-0 opacity-100' : 'translate-x-6 opacity-0 pointer-events-none'
         )}
       >
-        <Card className="h-[32rem] flex flex-col shadow-2xl border-primary/20">
-          <CardHeader className="p-4 bg-primary text-primary-foreground rounded-t-lg flex flex-row items-center justify-between">
+        <Card className="flex h-full flex-col border-border/70 bg-background/95 shadow-2xl backdrop-blur supports-[backdrop-filter]:bg-background/85">
+          <CardHeader className="flex flex-row items-center justify-between border-b bg-muted/30 p-4">
             <CardTitle className="flex items-center gap-2 text-base">
-              <Bot className="h-5 w-5" />
+              <Bot className="h-5 w-5 text-primary" />
               捷淞智能助手
             </CardTitle>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20"
+              className="h-8 w-8"
               onClick={() => setIsOpen(false)}
+              aria-label="收起AI助手"
             >
               <X className="h-5 w-5" />
             </Button>
@@ -620,7 +622,7 @@ export function AIAssistant() {
             </p>
           </CardFooter>
         </Card>
-      </div>
+      </aside>
     </>
   );
 }

@@ -91,4 +91,36 @@ describe('PaymentsPage 交互逻辑', () => {
       expect(mockGetStats.mock.calls.length).toBeGreaterThan(1);
     });
   });
+
+  it('应付列表为空时展示统一空态', async () => {
+    mockGetStats.mockResolvedValue({
+      data: {
+        payable: { total: 1000, paid: 1000, unpaid: 0 },
+        receivable: { total: 2000, received: 500, unreceived: 1500 },
+      },
+    });
+    mockGetPayables.mockResolvedValue({ data: { items: [] } });
+    mockGetReceivables.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: 'rcv-1',
+            contractNo: 'XS-1',
+            totalAmount: 100,
+            receivedAmount: 0,
+            unreceiveAmount: 100,
+            status: 'OPEN',
+            items: [],
+          },
+        ],
+      },
+    });
+
+    render(<PaymentsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('暂无待付账款')).toBeInTheDocument();
+      expect(screen.getByText('当前没有需要处理的供应商付款记录。')).toBeInTheDocument();
+    });
+  });
 });

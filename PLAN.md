@@ -1,5 +1,403 @@
 # Ops Execution Center Plan
 
+## 2026-03-23 Round 73 — Frontend E2E Stabilization Before Commit
+
+### Goal
+- 清掉提交前最后一批前端 E2E 红灯，完成一次 fresh 的全门禁验证。
+- 把此前“功能已完成但 Playwright 仍失败”的状态收口为真正可提交状态。
+
+### Planned Scope
+- 查明并修复 dashboard 壳层在 production preview 下的 hydration mismatch（`React error #418`）。
+- 收口 `store-recommend`、`import`、`AI`、`purchase files` 等 E2E mock 契约缺口。
+- 将 smoke / button-coverage 断言同步到当前 IA 与文案。
+- 用 fresh production build + preview 重新跑完 backend/frontend 全量验证。
+
+### Verification Plan
+- `cd backend && npm run test:all`
+- `cd frontend && npm run test`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `cd frontend && npm run test:e2e`
+
+### Delivered
+- `frontend/src/app/dashboard/layout.tsx`
+  - 改为 `useSyncExternalStore` 驱动 hydration 状态，消除 server/client 首帧结构不一致。
+- `frontend/src/components/layout/Header.tsx`
+  - 头部日期展示改为 SSR-safe 渲染，避免 render-time 日期差异导致 hydration 偏移。
+- `frontend/src/app/dashboard/purchase/create/components/CreatePurchasePageContent.tsx`
+  - `signedAt` 改为客户端挂载后初始化，避免 SSR/CSR 时间不一致。
+- `frontend/src/app/dashboard/sales/create/page.tsx`
+  - 同步修复 `signedAt` 初始化时机。
+- `frontend/e2e/helpers.ts`
+  - 补齐采购建议、AI token/history、导入记录、采购附件等缺失 mock，并统一导入记录分页响应。
+- `frontend/e2e/smoke.spec.ts`
+  - 将断言同步到当前文案与 IA，修复工作台快捷入口和设置页交互路径。
+- `frontend/e2e/button-coverage.spec.ts`
+  - 移除已废弃的旧日志页巡检，并保留当前页面集按钮覆盖。
+- `frontend/src/services/dataImportService.ts`
+  - `getImportHistory()` 同时兼容数组响应与分页响应，避免 `history.map` 类错误。
+- `frontend/src/services/dataImportService.test.ts`
+  - 补充分页响应兼容性回归。
+
+### Verification
+- `cd backend && npm run test:all`
+  - 通过：`233` 个单测 + `3` 个数据库集成测试。
+- `cd frontend && npm run test`
+  - 通过：`110` 个测试文件 / `356` 个用例。
+- `cd frontend && npm run lint`
+  - 通过。
+- `cd frontend && npm run build`
+  - 通过。
+- `cd frontend && npm run test:e2e`
+  - 通过：`57/57`。
+
+### Remaining Risk
+- 当前 Playwright 仍依赖本机 `127.0.0.1:3004` production preview 流程；若后续 CI 切换为不同浏览器版本或资源限流更严环境，仍需要在 CI 中再验证一次稳定性。
+- 这轮已经把“提交前红灯”清掉；后续若继续改 dashboard 壳层、导入页或 AI 模块，应该优先保住这批 E2E 契约而不是再去迁就旧断言。
+
+## 2026-03-23 Round 72 — Frontend Next Iterations Round 7
+
+### Goal
+- 完成 `docs/frontend-next-iterations-2026-03.md` 剩余的 `FE-MODULE-01` 与 `FE-QA-01`。
+- 让采购 / 出口首页拥有真正差异化首屏，并给关键页面补上视觉回归门禁。
+
+### Planned Scope
+- `FE-MODULE-01`
+  - 为采购合同页增加“采购执行概览”首屏概览卡。
+  - 为出口合同页增加“出口出运概览”首屏概览卡与跨模块跟进入口。
+- `FE-QA-01`
+  - 新增 `Playwright` 截图回归套件，覆盖：
+    - 登录页
+    - 工作台
+    - 采购合同页
+    - 财务页
+    - 移动端工作台首屏
+  - 稳定截图门禁运行环境：使用 production preview，而不是被本地已有 dev server/后端端口污染的配置。
+  - 为财务页截图补齐缺失 mock：汇率、付款趋势、逾期应收。
+
+### Verification Plan
+- `cd frontend && npm run test -- src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.test.tsx`
+- `cd frontend && npm run lint -- src/app/dashboard/contracts/components/ContractsPageContent.tsx src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx`
+- `cd frontend && npm run test:e2e -- e2e/visual.spec.ts`
+- `cd frontend && npm run build`
+
+### Delivered
+- `FE-MODULE-01`
+  - 采购首页新增“采购执行概览”，展示：
+    - 待推进合同
+    - 生产中
+    - 已发货待收货
+    - 合作店铺
+  - 出口首页新增“出口出运概览”，展示：
+    - 待装柜合同
+    - 在途货柜
+    - 已到港待结清
+    - 总箱数
+- `FE-QA-01`
+  - 新增 `frontend/e2e/visual.spec.ts`，截图回归覆盖 `5` 个关键页面/视口。
+  - `frontend/playwright.config.ts` 已改为使用 `127.0.0.1:3004` production preview，并提高启动超时。
+  - `frontend/e2e/helpers.ts` 已补齐财务页截图所需的 `3` 个关键 mock 端点。
+  - 当前快照基线已生成在 `frontend/e2e/visual.spec.ts-snapshots/`。
+
+### Verification
+- `cd frontend && npm run test -- src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.test.tsx`
+- `cd frontend && npm run lint -- src/app/dashboard/contracts/components/ContractsPageContent.tsx src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx`
+- `cd frontend && npm run test:e2e -- e2e/visual.spec.ts --grep visual-finance --update-snapshots`
+- `cd frontend && npm run test:e2e -- e2e/visual.spec.ts`
+- `cd frontend && npm run build`
+
+### Remaining Risk
+- 截图门禁当前基于本机 `chromium-darwin` 快照基线；若后续 CI/执行环境切换浏览器版本或操作系统，需要同步建立快照更新规范。
+- 这份 `frontend-next-iterations-2026-03` 报告项已全部完成，后续新迭代不应继续混入本轮 checkpoint，而应新开专项。
+
+## 2026-03-23 Round 71 — Frontend Next Iterations Round 6
+
+### Goal
+- 继续执行 `docs/frontend-next-iterations-2026-03.md`，完成 `FE-AI-01`。
+- 让 AI 助手从全局高抢占悬浮物收敛为更克制的辅助入口。
+
+### Planned Scope
+- 调整 `LazyAIAssistantMount.tsx`，避免在 AI 模块页重复挂载全局助手。
+- 调整 `AIAssistant.tsx`：
+  - 低存在感触发器
+  - 右侧可收纳侧边面板
+  - 保留现有文本/图片/SSE 对话能力
+- 先补挂载边界和侧边面板 red tests，再做 UI 收敛。
+
+### Verification Plan
+- `cd frontend && npm run test -- src/components/ai/AIAssistant.test.tsx src/components/ai/LazyAIAssistantMount.test.tsx`
+- `cd frontend && npm run lint -- src/components/ai/AIAssistant.tsx src/components/ai/AIAssistant.test.tsx src/components/ai/LazyAIAssistantMount.tsx src/components/ai/LazyAIAssistantMount.test.tsx`
+- `cd frontend && npm run build`
+
+### Delivered
+- `LazyAIAssistantMount.tsx` 现在在 `/dashboard/ai/*` 路径下不再重复挂载全局助手。
+- `AIAssistant.tsx` 已从大圆形悬浮按钮改为低存在感触发器。
+- 对话容器已改成右侧可收纳侧边面板，并补了 `complementary` 可访问语义。
+- 原有聊天、图片上传、粘贴、拖拽、SSE 流式响应逻辑保持不变。
+
+### Verification
+- `cd frontend && npm run test -- src/components/ai/AIAssistant.test.tsx src/components/ai/LazyAIAssistantMount.test.tsx`
+- `cd frontend && npm run lint -- src/components/ai/AIAssistant.tsx src/components/ai/AIAssistant.test.tsx src/components/ai/LazyAIAssistantMount.tsx src/components/ai/LazyAIAssistantMount.test.tsx`
+- `cd frontend && npm run build`
+
+### Remaining Risk
+- 当前 AI 助手仍是全局页面级入口，虽然噪音更低，但还没有做到“模块内上下文入口”；若后续继续精细化，需要把触发入口逐步下沉到具体模块页。
+
+## 2026-03-23 Round 70 — Frontend Next Iterations Round 5
+
+### Goal
+- 继续执行 `docs/frontend-next-iterations-2026-03.md`，完成 `FE-SHELL-01` 与 `FE-SEARCH-01`。
+- 把 `Header` 从超重壳层拆成清晰子组件，并将全局搜索收口为统一聚合服务。
+
+### Planned Scope
+- 将 `Header.tsx` 收敛为壳层装配组件。
+- 新增 Header 子组件：
+  - `HeaderMobileNav`
+  - `HeaderSearch`
+  - `HeaderNotifications`
+  - `HeaderUserMenu`
+- 新增 `frontend/src/services/dashboardSearch.service.ts`，避免 `Header` 每次输入直接并发打 `5` 个接口。
+- 先补 red tests，再做服务接线和壳层拆分。
+
+### Verification Plan
+- `cd frontend && npm run test -- src/components/layout/Header.test.tsx src/services/dashboardSearch.service.test.ts`
+- `cd frontend && npm run lint -- src/components/layout/Header.tsx src/components/layout/Header*.tsx src/services/dashboardSearch.service.ts src/services/dashboardSearch.service.test.ts`
+- `cd frontend && npm run build`
+
+### Delivered
+- `Header.tsx` 已从 `528` 行收敛为 `76` 行壳层编排组件。
+- 新增 Header 子组件：
+  - `HeaderMobileNav`
+  - `HeaderSearch`
+  - `HeaderNotifications`
+  - `HeaderUserMenu`
+- 新增 `dashboardSearch.service.ts`：
+  - 第一阶段先查 `products + suppliers`
+  - 首批结果足够时不再继续查询合同类接口
+  - 首批不足时再补查 `containers + purchases + sales`
+- `Header.test.tsx` 现已锁住：
+  - 搜索服务调用
+  - 搜索结果展示
+  - 结果点击跳转与清空输入
+- `dashboardSearch.service.test.ts` 已锁住分阶段搜索策略。
+
+### Verification
+- `cd frontend && npm run test -- src/components/layout/Header.test.tsx src/services/dashboardSearch.service.test.ts`
+- `cd frontend && npm run lint -- src/components/layout/Header.tsx src/components/layout/Header*.tsx src/services/dashboardSearch.service.ts src/services/dashboardSearch.service.test.ts`
+- `cd frontend && npm run build`
+
+### Remaining Risk
+- `HeaderSearch` 当前仍是前端聚合方案，不是后端单一聚合接口；如果后续需要跨更多实体或更严格的排序/权限控制，仍值得补一层后端统一搜索端点。
+
+## 2026-03-23 Round 69 — Frontend Next Iterations Round 4
+
+### Goal
+- 继续执行 `docs/frontend-next-iterations-2026-03.md`，完成 `FE-SPLIT-02`。
+- 把 `store-recommend/page.tsx` 从超长页面拆成分层结构，保持行为不变。
+
+### Planned Scope
+- `page.tsx` 收敛为薄入口。
+- 新增 `StoreRecommendPageContent` 作为单一 stateful container。
+- 新增三个视图分区：
+  - 模板 tab
+  - AI 建议 tab
+  - 统计 tab
+- 抽共享 helper，收口优先级样式、品类图标与 CSV 导出。
+
+### Verification Plan
+- `cd frontend && npm run test -- src/app/dashboard/store-recommend/page.test.tsx`
+- `cd frontend && npm run lint -- src/app/dashboard/store-recommend/page.tsx src/app/dashboard/store-recommend/page.test.tsx src/app/dashboard/store-recommend/components/*.tsx src/test/setup.ts`
+- `cd frontend && npm run build`
+
+### Delivered
+- 原 `902` 行 `store-recommend/page.tsx` 已拆开。
+- `page.tsx` 当前只保留薄入口，主逻辑下沉到：
+  - `StoreRecommendPageContent`
+  - `StoreRecommendTemplateTab`
+  - `StoreRecommendAITab`
+  - `StoreRecommendStatsTab`
+  - `storeRecommendShared`
+- 补强门店切换回归测试，并在全局 test setup 中补齐 Radix Select 所需的运行时 polyfill。
+
+### Verification
+- `cd frontend && npm run test -- src/app/dashboard/store-recommend/page.test.tsx`
+- `cd frontend && npm run lint -- src/app/dashboard/store-recommend/page.tsx src/app/dashboard/store-recommend/page.test.tsx src/app/dashboard/store-recommend/components/*.tsx src/test/setup.ts`
+- `cd frontend && npm run build`
+
+### Remaining Risk
+- `store-recommend` 结构已经可维护，但页面本身仍然信息量较大；后续若继续做功能收缩或视觉减负，需要在新结构上再做一轮体验级整理。
+
+## 2026-03-23 Round 68 — Frontend Next Iterations Round 3
+
+### Goal
+- 继续执行 `docs/frontend-next-iterations-2026-03.md`，完成 `FE-STATE-01`。
+- 统一 dashboard 高频页面的 loading / empty / error 状态体系，不改后端合同。
+
+### Planned Scope
+- 新增共享状态组件层：`frontend/src/components/ui/data-state.tsx`
+- 先接入五个高频页：
+  - `frontend/src/app/dashboard/finance/page.tsx`
+  - `frontend/src/app/dashboard/reports/page.tsx`
+  - `frontend/src/app/dashboard/payments/page.tsx`
+  - `frontend/src/app/dashboard/containers/page.tsx`
+  - `frontend/src/app/dashboard/inventory-container/page.tsx`
+- 先补页面级 red tests，再替换手写状态块。
+
+### Verification Plan
+- `cd frontend && npm run test -- src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.test.tsx`
+- `cd frontend && npm run lint -- src/components/ui/data-state.tsx src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.tsx src/app/dashboard/payments/page.test.tsx`
+- `cd frontend && npm run build`
+
+### Delivered
+- 新增共享状态组件：
+  - `LoadingState`
+  - `ErrorState`
+  - `TableStateRow`
+- 五个高频页面已开始使用统一状态层，替换原本分散的 loading / empty / error block。
+- 补齐了状态层与页面级回归测试，覆盖统一错误态、空态与加载态接线。
+
+### Verification
+- `cd frontend && npm run test -- src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.test.tsx`
+- `cd frontend && npm run lint -- src/components/ui/data-state.tsx src/components/ui/data-state.test.tsx src/app/dashboard/finance/page.tsx src/app/dashboard/finance/page.test.tsx src/app/dashboard/reports/page.tsx src/app/dashboard/reports/page.test.tsx src/app/dashboard/containers/page.tsx src/app/dashboard/containers/page.test.tsx src/app/dashboard/inventory-container/page.tsx src/app/dashboard/inventory-container/page.test.tsx src/app/dashboard/payments/page.tsx src/app/dashboard/payments/page.test.tsx`
+- `cd frontend && npm run build`
+
+### Remaining Risk
+- 这轮只先统一了 5 个高频页，其他列表页仍存在旧式状态块，后续如果继续扩面，需要防止文案和行为再次漂移。
+
+## 2026-03-23 Round 67 — Frontend Next Iterations Round 2
+
+### Goal
+- 继续执行 `docs/frontend-next-iterations-2026-03.md`，推进 `FE-SPLIT-01`。
+- 在不改接口合同和页面行为的前提下，拆开超大的财务报表页。
+
+### Planned Scope
+- 将 `frontend/src/app/dashboard/finance/statements/page.tsx` 收敛为轻路由入口。
+- 抽出单一数据容器，承接 analytics/list/detail 加载、批量导入、文件上传与派生视图状态。
+- 抽出展示分区：
+  - 加载骨架
+  - 空态
+  - KPI/营运资金概览
+  - Tabs 图表与账期详情
+  - 历史预警
+  - 上传对话框
+- 先补页面级回归测试，再搬代码，保持现有行为不变。
+
+### Verification Plan
+- `cd frontend && npm run test -- src/app/dashboard/finance/statements/page.test.tsx`
+- `cd frontend && npm run lint -- src/app/dashboard/finance/statements/page.tsx src/app/dashboard/finance/statements/page.test.tsx src/app/dashboard/finance/statements/components/*.tsx`
+- `cd frontend && npm run build`
+
+### Delivered
+- `frontend/src/app/dashboard/finance/statements/page.tsx` 已收敛为轻路由入口，不再承载 1000+ 行状态与展示逻辑。
+- 财务报表页当前已形成清晰层次：
+  - `FinancialStatementsPageContent`：单一 stateful container
+  - `FinancialStatementsOverview`：头部/空态/KPI/营运资金概览
+  - `FinancialStatementsTabsSection`：趋势图表 + 历史预警 + 账期详情
+  - `FinancialStatementsUploadDialog`：Excel 上传导入
+- 新增页面级回归测试 `frontend/src/app/dashboard/finance/statements/page.test.tsx`，锁住：
+  - 首屏基础结构
+  - 账期切换后详情拉取
+  - 扫描导入全部
+  - 上传 Excel 导入
+
+### Verification
+- `cd frontend && npm run test -- src/app/dashboard/finance/statements/page.test.tsx`
+- `cd frontend && npm run lint -- src/app/dashboard/finance/statements/page.tsx src/app/dashboard/finance/statements/page.test.tsx src/app/dashboard/finance/statements/components/FinancialStatementsPageContent.tsx src/app/dashboard/finance/statements/components/FinancialStatementsOverview.tsx src/app/dashboard/finance/statements/components/FinancialStatementsTabsSection.tsx src/app/dashboard/finance/statements/components/FinancialStatementsUploadDialog.tsx src/app/dashboard/finance/statements/components/FinancialStatementsShared.tsx src/app/dashboard/finance/statements/components/financialStatementsFormatting.ts`
+- `cd frontend && npm run build`
+
+### Remaining Risk
+- 财务报表页当前状态较多，若拆分时 props 边界处理不干净，容易在账期切换、上传后选中期恢复、或 detail loading 提示上引入回归。
+
+## 2026-03-22 Round 66 — Frontend Next Iterations Round 1
+
+### Goal
+- 按 `docs/frontend-next-iterations-2026-03.md` 正式启动第一轮实现。
+- 本轮只做两个高杠杆任务：
+  - `FE-DASH-01`：工作台首屏重做
+  - `FE-NAV-02`：导航注册表继续深化
+
+### Planned Scope
+- 把 `/dashboard` 从“快速录入 + tracker + charts”堆叠页改为四块工作空间：
+  - 当前焦点
+  - 高频动作
+  - 风险提醒
+  - 关键趋势
+- 把模块可见性、默认落点、重定向策略继续并入 `frontend/src/components/layout/navigation.config.ts`。
+- 用共享 registry helper 驱动 `dashboard/layout`，减少壳层里的路径条件判断。
+
+### Delivered
+- `FE-DASH-01`
+  - `/dashboard` 已改成四块工作空间，不再是旧版卡片拼盘。
+  - `ProductTracker` 已从首屏主层级下沉到 `经营工具` 次级区域。
+  - `DataDashboard.tsx` 现在从现有 analytics 合同推导当前焦点、风险提醒与关键趋势。
+- `FE-NAV-02`
+  - 导航注册表新增默认落点、可见角色与统一 target-resolution helper。
+  - 非管理员不再显示系统管理模块。
+  - `Sidebar` 与移动端 `Header` 统一走共享导航目标解析。
+  - `dashboard/layout` 新增“进入不可见模块时回到默认 dashboard 落点”的壳层兜底。
+
+### Verification Plan
+- `cd frontend && npm run test -- src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.test.tsx src/app/dashboard/layout.test.tsx src/components/layout/Sidebar.test.tsx src/components/layout/Header.test.tsx`
+- `cd frontend && npm run lint -- src/app/dashboard/page.tsx src/components/dashboard/DataDashboard.tsx src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.test.tsx src/components/layout/navigation.config.ts src/app/dashboard/layout.tsx src/app/dashboard/layout.test.tsx src/components/layout/Sidebar.test.tsx`
+- `cd frontend && npm run build`
+
+### Verification
+- `cd frontend && npm run test -- src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.test.tsx src/components/layout/navigation.config.test.ts src/app/dashboard/layout.test.tsx src/components/layout/Sidebar.test.tsx`
+- `cd frontend && npm run lint -- src/app/dashboard/page.tsx src/app/dashboard/page.test.tsx src/components/dashboard/DataDashboard.tsx src/components/dashboard/DataDashboard.test.tsx src/components/layout/navigation.config.ts src/components/layout/navigation.config.test.ts src/components/layout/Sidebar.tsx src/components/layout/Sidebar.test.tsx src/components/layout/Header.tsx src/components/layout/ModuleTabHeader.tsx src/app/dashboard/layout.tsx src/app/dashboard/layout.test.tsx`
+- `cd frontend && npm run build`
+
+### Remaining Risk
+- 当前 dashboard analytics 接口不一定天然覆盖“焦点/风险”语义，本轮先做前端推导，不扩大后端合同。
+- 导航注册表若接入默认落点后与历史 tab-memory 发生冲突，可能出现首跳路径偏差，需要定向测试兜底。
+
+## 2026-03-22 Round 65 — Frontend Audit To Iteration Kickoff
+
+### Goal
+- 将 2026-03 前端审查正式转为执行中的结构化迭代。
+- 第一轮先完成三件事：
+  - 把审查结论与设计方向落盘
+  - 修复前端当前 lint/build 红灯
+  - 收口导航配置，为后续工作台与模块首页重做铺路
+
+### Frontend Skill Direction
+- visual thesis：企业级冷静秩序感，减少表面层，强化排版与模块识别，让页面更像工作空间而不是卡片集合。
+- content plan：首屏先给“当前任务/关键状态/高频动作”，再给列表、图表、明细，不再让所有区块同权竞争。
+- interaction thesis：
+  - 壳层进入时有轻量层次显现
+  - 模块切换与页内切换共享同一导航语义
+  - AI 助手与高频动作不再抢同一视觉焦点
+
+### Delivered
+- 新增专项审查文档：
+  - `docs/frontend-audit-2026-03.md`
+- 明确第一轮执行顺序：
+  1. `FE-AUDIT-01` 审查文档与 checkpoint 落盘
+  2. `FE-BASE-01` 修复 frontend lint/build 红灯
+  3. `FE-NAV-01` 导航单一配置源重构
+  4. `FE-CLEAN-01` 清理陈旧壳层页面
+  5. `FE-DASH-01` 工作台首屏结构重做
+- 已完成第一轮基础收口：
+  - 修复 `frontend/src/app/dashboard/layout.tsx` 的 hydration effect lint 阻塞
+  - 修复 `frontend/src/app/dashboard/ai/sessions/page.tsx` 的 Recharts formatter build 阻塞
+  - 清理多处前端 lint warning（contracts / finance / inventory / reports / store-recommend / purchase create）
+  - 新增 `frontend/src/components/layout/navigation.config.ts`，集中管理模块入口、模块 tabs 与壳层预取路径
+  - `Sidebar` / `Header` / `ModuleTabHeader` 已切换到共享导航配置
+  - 删除陈旧壳层页：`frontend/src/app/dashboard/logs/page.tsx`
+
+### Verification
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `cd frontend && npm run test -- src/app/dashboard/layout.test.tsx src/components/layout/Header.test.tsx src/components/layout/Sidebar.test.tsx src/app/dashboard/ai/sessions/page.test.tsx`
+
+### Next Priorities
+1. `FE-DASH-01`：开始工作台首屏结构重做
+2. 将导航注册表进一步接入权限/重定向规则，减少壳层条件分支
+3. 继续拆分超大页面，优先 `finance/statements` 与 `store-recommend`
+4. 详细待办已落盘：`docs/frontend-next-iterations-2026-03.md`
+
+### Remaining Risk
+- 当前 front-end 仍存在大文件与 client-heavy 页面结构，第一轮不会一次性拆完；本轮只先修基线并搭骨架，避免把视觉升级变成无界重构。
+
 ## 2026-03-21 Round 64 — CEO 三维评审 + Design Review → 迭代计划
 
 ### Goal

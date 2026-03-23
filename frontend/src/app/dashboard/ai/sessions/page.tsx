@@ -351,7 +351,10 @@ export default function AiSessionsPage() {
                 />
                 <Tooltip
                   labelFormatter={(label) => formatChartTooltipLabel(String(label), statsDays)}
-                  formatter={(value: number, name: string) => [formatTokensM(value), name]}
+                  formatter={(value, name) => [
+                    formatTokensM(typeof value === 'number' ? value : Number(value ?? 0)),
+                    String(name),
+                  ]}
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 {chartModels.map((model, i) => (

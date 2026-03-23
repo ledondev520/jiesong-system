@@ -31,6 +31,7 @@ import { financeService } from '@/services/finance.service';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
+import { LoadingState, TableStateRow } from '@/components/ui/data-state';
 
 interface PayableContract {
   id: string;
@@ -83,11 +84,13 @@ function PaymentsPageContent() {
   // 应付账款
   const [payables, setPayables] = useState<PayableContract[]>([]);
   const [payableLoading, setPayableLoading] = useState(true);
+  const [payableError, setPayableError] = useState(false);
   const [selectedPayable, setSelectedPayable] = useState<PayableContract | null>(null);
   
   // 应收账款
   const [receivables, setReceivables] = useState<ReceivableContract[]>([]);
   const [receivableLoading, setReceivableLoading] = useState(true);
+  const [receivableError, setReceivableError] = useState(false);
   const [selectedReceivable, setSelectedReceivable] = useState<ReceivableContract | null>(null);
   // 列表关键词（客户端过滤：合同号 / 供应商或门店）
   const [keyword, setKeyword] = useState('');
@@ -112,6 +115,7 @@ function PaymentsPageContent() {
   // 2. 加载应付账款（带缓存）
   const fetchPayables = async () => {
     setPayableLoading(true);
+    setPayableError(false);
     try {
       const response = await cachedFetch('fin-payables-p1', () => financeService.getPayables({ pageSize: 100 }));
       setPayables(
@@ -126,6 +130,7 @@ function PaymentsPageContent() {
         })),
       );
     } catch {
+      setPayableError(true);
       toast.error('加载应付账款失败');
     } finally {
       setPayableLoading(false);
@@ -135,6 +140,7 @@ function PaymentsPageContent() {
   // 3. 加载应收账款（带缓存）
   const fetchReceivables = async () => {
     setReceivableLoading(true);
+    setReceivableError(false);
     try {
       const response = await cachedFetch('fin-receivables-p1', () => financeService.getReceivables({ pageSize: 100 }));
       setReceivables(
@@ -150,6 +156,7 @@ function PaymentsPageContent() {
         })),
       );
     } catch {
+      setReceivableError(true);
       toast.error('加载应收账款失败');
     } finally {
       setReceivableLoading(false);
@@ -338,17 +345,28 @@ function PaymentsPageContent() {
               </TableHeader>
               <TableBody>
                 {payableLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
-                      加载中...
-                    </TableCell>
-                  </TableRow>
+                  <TableStateRow colSpan={7} variant="loading" title="加载中..." />
+                ) : payableError ? (
+                  <TableStateRow
+                    colSpan={7}
+                    variant="error"
+                    title="数据加载失败"
+                    description="应付账款列表暂时不可用，请稍后重试。"
+                    action={
+                      <Button variant="outline" size="sm" onClick={() => void fetchPayables()}>
+                        <RefreshCw className="mr-1 h-4 w-4" />
+                        重试
+                      </Button>
+                    }
+                  />
                 ) : unpaidContracts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
-                      暂无待付账款
-                    </TableCell>
-                  </TableRow>
+                  <TableStateRow
+                    colSpan={7}
+                    variant="empty"
+                    icon={Search}
+                    title="暂无待付账款"
+                    description={keyword ? '没有匹配当前关键词的供应商付款记录。' : '当前没有需要处理的供应商付款记录。'}
+                  />
                 ) : (
                   unpaidContracts.map((contract) => (
                     <TableRow key={contract.id}>
@@ -394,17 +412,28 @@ function PaymentsPageContent() {
               </TableHeader>
               <TableBody>
                 {receivableLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
-                      加载中...
-                    </TableCell>
-                  </TableRow>
+                  <TableStateRow colSpan={7} variant="loading" title="加载中..." />
+                ) : receivableError ? (
+                  <TableStateRow
+                    colSpan={7}
+                    variant="error"
+                    title="数据加载失败"
+                    description="应收账款列表暂时不可用，请稍后重试。"
+                    action={
+                      <Button variant="outline" size="sm" onClick={() => void fetchReceivables()}>
+                        <RefreshCw className="mr-1 h-4 w-4" />
+                        重试
+                      </Button>
+                    }
+                  />
                 ) : unreceiveContracts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
-                      暂无待收账款
-                    </TableCell>
-                  </TableRow>
+                  <TableStateRow
+                    colSpan={7}
+                    variant="empty"
+                    icon={Search}
+                    title="暂无待收账款"
+                    description={keyword ? '没有匹配当前关键词的门店回款记录。' : '当前没有需要跟进的门店回款记录。'}
+                  />
                 ) : (
                   unreceiveContracts.map((contract) => (
                     <TableRow key={contract.id}>
@@ -465,7 +494,15 @@ function PaymentsPageContent() {
 
 export default function PaymentsPage() {
   return (
-    <Suspense fallback={<div className="py-12 text-center text-muted-foreground">加载中...</div>}>
+    <Suspense
+      fallback={
+        <LoadingState
+          title="加载中..."
+          description="正在同步收付款视图和筛选状态。"
+          className="min-h-[10rem] border-0 bg-transparent"
+        />
+      }
+    >
       <PaymentsPageContent />
     </Suspense>
   );

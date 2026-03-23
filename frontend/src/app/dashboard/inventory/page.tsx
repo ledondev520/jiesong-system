@@ -5,7 +5,6 @@ import { Inventory, InventoryStatus } from '@/types';
 import { inventoryService } from '@/services/inventory.service';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -21,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { MoreHorizontal, Package } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 
 const STATUS_LABEL_MAP: Record<InventoryStatus, string> = {

@@ -27,7 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Search, X } from 'lucide-react';
+import { MoreHorizontal, RefreshCw, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -35,6 +35,7 @@ import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTab
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
+import { TableStateRow } from '@/components/ui/data-state';
 
 const STATUS_LABEL_MAP: Record<InventoryStatus, string> = {
   [InventoryStatus.PRODUCING]: '生产中',
@@ -54,6 +55,7 @@ export default function InventoryPage() {
   // 库存状态
   const [inventory, setInventory] = useState<Inventory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [keyword, setKeyword] = useState('');
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -92,6 +94,7 @@ export default function InventoryPage() {
    */
   const loadInventory = async (searchKeyword = ''): Promise<void> => {
     setLoading(true);
+    setLoadError(false);
     try {
       const cacheKey = `inventory-list-${searchKeyword}`;
       const response = await cachedFetch(
@@ -106,6 +109,7 @@ export default function InventoryPage() {
         return prevSelectedIds.filter((id) => availableIds.has(id));
       });
     } catch {
+      setLoadError(true);
       toast.error('加载库存失败');
     } finally {
       setLoading(false);
@@ -305,17 +309,28 @@ export default function InventoryPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
-                  加载中...
-                </TableCell>
-              </TableRow>
+              <TableStateRow colSpan={6} variant="loading" title="加载中..." />
+            ) : loadError ? (
+              <TableStateRow
+                colSpan={6}
+                variant="error"
+                title="数据加载失败"
+                description="库存列表暂时不可用，请稍后重试。"
+                action={
+                  <Button variant="outline" size="sm" onClick={() => void loadInventory(debouncedKeyword)}>
+                    <RefreshCw className="mr-1 h-4 w-4" />
+                    重试
+                  </Button>
+                }
+              />
             ) : inventory.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
-                  暂无库存记录
-                </TableCell>
-              </TableRow>
+              <TableStateRow
+                colSpan={6}
+                variant="empty"
+                icon={Search}
+                title="暂无库存记录"
+                description="当前关键词下没有匹配的库存条目。"
+              />
             ) : (
               pagedInventory.map((item) => (
                 <TableRow key={item.id}>

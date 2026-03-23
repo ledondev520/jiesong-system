@@ -83,4 +83,17 @@ describe('dataImportService', () => {
     expect(history).toEqual([{ id: 'imp-1' }]);
     expect(stats).toEqual({ suppliers: 1 });
   });
+
+  it('getImportHistory: 兼容分页响应结构', async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      data: {
+        items: [{ id: 'imp-2' }],
+        pagination: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+      },
+    });
+
+    const history = await getImportHistory();
+
+    expect(history).toEqual([{ id: 'imp-2' }]);
+  });
 });

@@ -7,6 +7,7 @@
  */
 
 import api from '@/lib/axios';
+import type { PaginatedResponse } from '@/types';
 
 export interface ImportAnalysis {
   totalRows: number;
@@ -122,7 +123,11 @@ export const executeImport = async (records: NewRecord[]): Promise<ImportResult>
  */
 export const getImportHistory = async (): Promise<ImportHistory[]> => {
   const response = await api.get('/import/history');
-  return (response as { data: ImportHistory[] }).data;
+  const data = (response as { data: ImportHistory[] | PaginatedResponse<ImportHistory> }).data;
+  if (Array.isArray(data)) {
+    return data;
+  }
+  return Array.isArray(data?.items) ? data.items : [];
 };
 
 /**

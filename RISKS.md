@@ -1,5 +1,105 @@
 # Frontend Polish Risks
 
+## 2026-03-23 Round 73（Frontend E2E Stabilization Before Commit）
+
+| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
+|---|---|---|---|---|
+| R-046 | dashboard 壳层在 server 首帧与 client 首帧渲染结构不同，production preview 下触发 hydration mismatch | Playwright 多页巡检在进入 dashboard 相关页面时直接抛 `React error #418`，导致提交前门禁失真 | 把 hydration 状态改成 `useSyncExternalStore` 驱动，确保 server snapshot 与 client 首帧快照一致，再用 fresh preview 重跑全量 E2E | 回退 `frontend/src/app/dashboard/layout.tsx`、`frontend/src/app/dashboard/layout.test.tsx`、`frontend/src/components/layout/Header.tsx` |
+| R-047 | E2E mock 返回结构与真实前端服务契约漂移，或者 smoke/button 断言仍指向旧 IA/旧文案 | 导入页、采购建议页、设置页等页面出现假红灯，团队会误以为功能回归而不是测试资产过期 | 先补 mock 契约与服务兼容，再把断言同步到当前 IA，并用 full-suite `test:e2e` 验证不是局部侥幸通过 | 回退 `frontend/e2e/helpers.ts`、`frontend/e2e/smoke.spec.ts`、`frontend/e2e/button-coverage.spec.ts`、`frontend/src/services/dataImportService.ts` |
+
+### 2026-03-23 Round 73 状态更新
+
+- `R-046`：本轮已收敛。dashboard 壳层和 Header 时间展示都已切到 hydration-safe 方案，`React error #418` 不再复现。
+- `R-047`：本轮已收敛。导入页/采购建议页/设置页相关 mock 与断言均已同步，前端全量 E2E `57/57` 通过。
+
+## 2026-03-23 Round 72（Frontend Next Iterations Round 7）
+
+| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
+|---|---|---|---|---|
+| R-044 | 模块首页差异化这轮直接在采购/出口首页插入概览卡，若统计口径只顾 UI 不顾业务状态，会让“模块首页差异化”变成新的误导信息 | 首页看起来更像模块工作台，但卡片数字不可信，会削弱运营对首页的依赖 | 只使用现有合同状态和箱数等可验证字段做派生，并用页面级回归测试锁住采购/出口首页首屏结构 | 回退 `frontend/src/app/dashboard/contracts/components/ContractsPageContent.tsx`、`frontend/src/app/dashboard/contracts/page.test.tsx`、`frontend/src/app/dashboard/sales/page.tsx`、`frontend/src/app/dashboard/sales/page.test.tsx` |
+| R-045 | Playwright 截图门禁若继续复用已有 dev server 端口，或 mock 不完整，截图回归会被环境噪声而不是真实 UI 漂移阻断 | QA 门禁不稳定，后续团队会选择绕过截图回归，而不是依赖它发现结构漂移 | 改用 production preview 端口独立运行，补齐财务页依赖的 mock，并先单页跑通再复跑全量 `5` 张截图 | 回退 `frontend/playwright.config.ts`、`frontend/e2e/helpers.ts`、`frontend/e2e/visual.spec.ts` |
+
+### 2026-03-23 Round 72 状态更新
+
+- `R-044`：本轮已收敛。采购/出口首页概览都只基于既有合同状态与箱数字段派生，页面级回归测试已覆盖首屏概览结构。
+- `R-045`：本轮已收敛。截图门禁已改为 production preview 运行，财务页 mock 缺口已补齐，`5` 张截图回归全部通过。
+
+## 2026-03-23 Round 71（Frontend Next Iterations Round 6）
+
+| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
+|---|---|---|---|---|
+| R-043 | AI 助手入口位置和挂载策略同时调整，若只改样式不改边界，AI 模块页仍会出现重复入口；若只改边界不改形态，业务页噪音仍旧过高 | 用户仍会觉得 AI 助手“总在抢焦点”，或者在 AI 模块里看到重复助手入口 | 同时给 `LazyAIAssistantMount` 和 `AIAssistant` 加回归测试：一个锁挂载边界，一个锁“低存在感触发器 + 侧边面板” | 回退 `frontend/src/components/ai/LazyAIAssistantMount.*` 与 `frontend/src/components/ai/AIAssistant.*` |
+
+### 2026-03-23 Round 71 状态更新
+
+- `R-043`：本轮已收敛。AI 模块页不再重复挂全局助手，默认入口与展开形态也已切成更克制的侧边面板。
+
+## 2026-03-23 Round 70（Frontend Next Iterations Round 5）
+
+| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
+|---|---|---|---|---|
+| R-042 | `Header` 壳层拆分与全局搜索收口在同一轮同时发生，搜索交互、移动导航、用户菜单都改到同一批文件 | 若测试边界不够清晰，容易把“结构更干净”换成“搜索/跳转/退出回归” | 先写 `Header` 与搜索服务的 red tests，`Header` 只做壳层编排，搜索策略下沉到单独服务并由定向测试锁住 | 回退 `frontend/src/components/layout/Header*.tsx` 和 `frontend/src/services/dashboardSearch.service.*` |
+
+### 2026-03-23 Round 70 状态更新
+
+- `R-042`：本轮已收敛。`Header` 已拆成子组件，搜索 fanout 已收口到服务层，且 `Header` / `dashboardSearch.service` 定向测试和 `build` 均通过。
+
+## 2026-03-23 Round 68（Frontend Next Iterations Round 3）
+
+| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
+|---|---|---|---|---|
+| R-039 | 统一状态体系时同时改动多个高频页，若页面仍保留各自手写文案和分支，容易出现 loading / empty / error 再次漂移 | 不同模块会继续给用户不同反馈，后续扩面成本更高 | 先抽共享 `data-state` 组件，再只接入 5 个高频页，并用页面级回归测试锁住错误态和空态接线 | 回退 `frontend/src/components/ui/data-state.tsx` 与这 5 个页面的状态层接线 |
+| R-040 | 并行子任务长时间运行后再次返回 `not_found` | checkpoint 会误把失联任务记成 `DOING`，导致下次续跑判断失真 | 只按可验证证据更新状态；失联任务恢复为 `TODO`，重新分发而不口头沿用旧进度 | 回退 `TASKS.md` 中错误的状态标记，重新按证据分配队列 |
+
+### 2026-03-23 Round 68 状态更新
+
+- `R-039`：本轮已按“共享组件 + 页面级回归”执行，当前 5 个高频页已进入统一状态层。
+- `R-040`：本轮已激活。并行 worker 再次返回 `not_found`，因此相关任务已恢复为真实待执行状态。
+
+## 2026-03-23 Round 69（Frontend Next Iterations Round 4）
+
+| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
+|---|---|---|---|---|
+| R-041 | `store-recommend` 页面在拆分时同时包含模板视图、AI 建议、统计视图和 CSV 导出逻辑 | 若 state / props 边界处理不清，容易在门店切换、模板导出或 tab 渲染上引入回归 | 保持单一 `StoreRecommendPageContent` 持有状态，只抽展示分区；补门店切换页面级回归测试后再搬代码 | 回退 `frontend/src/app/dashboard/store-recommend/components/*` 和 `page.tsx` 的拆分改动 |
+
+### 2026-03-23 Round 69 状态更新
+
+- `R-041`：本轮已收敛。`store-recommend` 现在由薄入口 + 单一 container + 三个展示分区组成，门店切换测试已覆盖核心路径。
+
+## 2026-03-22 Round 66（Frontend Next Iterations Round 1）
+
+| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
+|---|---|---|---|---|
+| R-036 | 工作台首屏使用现有 analytics 数据硬做“当前焦点/风险提醒”分区时，字段语义不够直接 | 首页层级会更好，但个别提醒可能只是推导值，业务感不够强 | 第一轮先接受“前端推导 + 文案收口”，不引入新 API；若验证后仍弱，再单开 dashboard contract 升级任务 | 回退 `frontend/src/app/dashboard/page.tsx` 与 `frontend/src/components/dashboard/DataDashboard.tsx` 到旧布局 |
+| R-037 | 导航注册表继续承载默认落点和重定向规则后，与现有 tab-memory/历史深链接产生冲突 | 模块入口、默认跳转或壳层首跳出现偏差，影响熟悉路径的用户 | registry helper 保持兼容旧记忆逻辑，并以 `layout/sidebar` 定向测试锁住关键路由；若发现冲突，先收窄到只管理默认落点 | 回退 `frontend/src/components/layout/navigation.config.ts` 与 `frontend/src/app/dashboard/layout.tsx` 的新增落点逻辑 |
+
+### 2026-03-22 Round 66 状态更新
+
+- `R-036`：本轮已按“前端推导 + 不扩后端合同”落地，焦点/风险首版已经可用。
+- `R-037`：本轮已通过 `navigation.config` / `layout` / `sidebar` 定向测试收敛，但未来新增更深路由时仍需继续扩覆盖。
+
+## 2026-03-23 Round 67（Frontend Next Iterations Round 2）
+
+| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
+|---|---|---|---|---|
+| R-038 | 财务报表页同时拆出 container、图表分区和上传对话框时，原本集中在单文件里的状态依赖被拆散 | 账期切换、导入后刷新、新账期选中、detail loading 提示等细节可能回归 | 本轮只保留一个 stateful container，route 和子组件尽量无状态；先用页面级回归测试锁住导入/空态/详情行为，再搬代码 | 回退 `frontend/src/app/dashboard/finance/statements/components/*` 与 `page.tsx` 的拆分改动 |
+
+### 2026-03-23 Round 67 状态更新
+
+- `R-038`：本轮已按“单一 container + 页面级回归测试”落地，测试覆盖了账期切换、扫描导入和上传导入。后续剩余风险主要在继续细拆子区块时的 props 漂移，而不是当前结构切换本身。
+
+## 2026-03-22 Round 65（Frontend Audit To Iteration）
+
+| 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |
+|---|---|---|---|---|
+| R-034 | 导航配置从三处收口到单一注册表后，若个别页面依赖历史硬编码顺序/路径，可能出现高亮、预取或模块记忆偏差 | 页面仍可访问，但模块激活态、移动端菜单或记忆跳转可能不准确 | 先以 `Header` / `Sidebar` / `dashboard/layout` / `ai/sessions` 的定向测试兜底；后续继续补采购、出口、系统管理三个模块的导航回归 | 回退 `frontend/src/components/layout/navigation.config.ts` 与壳层 3 个组件的接线改动 |
+| R-035 | 删除旧 `dashboard/logs` 页面后，若存在仓库外旧书签或未扫描到的内部跳转引用 | 用户命中旧路径时看到 404 或错误跳转 | 当前系统管理实际日志页已是 `/dashboard/system/logs`；后续若发现真实入口仍引用旧路径，再追加 redirect，而不是恢复旧页 | 回退删除 `frontend/src/app/dashboard/logs/page.tsx` 的改动 |
+
+### 2026-03-22 Round 65 状态更新
+
+- `R-034`：已激活。第一轮已通过壳层与 AI 会话页定向测试，后续仍需补更多模块级导航回归。
+- `R-035`：低风险激活。当前仓库内未找到 `/dashboard/logs` 引用，先保留观察。
+
 ## 2026-03-19 Round 62（ClawPi Domain Sweep）
 
 | 风险ID | 触发条件 | 影响 | 预案 | 回滚点 |

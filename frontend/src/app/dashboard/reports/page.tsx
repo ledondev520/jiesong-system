@@ -8,7 +8,8 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -19,9 +20,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Loader2 } from 'lucide-react';
+import { BarChart3, RefreshCw, Store } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { reportsService } from '@/services/reports.service';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState, LoadingState } from '@/components/ui/data-state';
 
 interface SupplierStats {
   id: string;
@@ -48,96 +51,101 @@ interface ReportData {
   };
 }
 
-interface SupplierLite {
-  id: string;
-  name: string;
-}
-
-interface StoreLite {
-  id: string;
-  name: string;
-}
-
-
 export default function ReportsPage() {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // 获取多个统计数据
-        const [suppliersRes, storesRes, dashboardRes] = await Promise.all([
-          reportsService.getSuppliers({ pageSize: 100 }),
-          reportsService.getStores({ pageSize: 100 }),
-          reportsService.getDashboardStats(),
-        ]);
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
 
-        const suppliers = suppliersRes.data?.items || [];
-        const stores = storesRes.data?.items || [];
-        const dashboard = dashboardRes.data || {};
+    try {
+      const [suppliersRes, storesRes, dashboardRes] = await Promise.all([
+        reportsService.getSuppliers({ pageSize: 100 }),
+        reportsService.getStores({ pageSize: 100 }),
+        reportsService.getDashboardStats(),
+      ]);
 
-        // 获取每个供应商的采购统计
-        const supplierStats: SupplierStats[] = [];
-        for (const supplier of suppliers.slice(0, 20)) {
-          try {
-            const purchasesRes = await reportsService.getPurchasesBySupplier(supplier.id);
-            const purchaseData = purchasesRes.data;
-            supplierStats.push({
-              id: supplier.id,
-              name: supplier.name,
-              totalAmount:
-                purchaseData?.items?.reduce((sum, contract) => sum + (contract.totalAmount || 0), 0) || 0,
-              contractCount: purchaseData?.total ?? purchaseData?.pagination?.total ?? 0,
-            });
-          } catch {
-            supplierStats.push({
-              id: supplier.id,
-              name: supplier.name,
-              totalAmount: 0,
-              contractCount: 0,
-            });
-          }
+      const suppliers = suppliersRes.data?.items || [];
+      const stores = storesRes.data?.items || [];
+      const dashboard = dashboardRes.data || {};
+
+      const supplierStats: SupplierStats[] = [];
+      for (const supplier of suppliers.slice(0, 20)) {
+        try {
+          const purchasesRes = await reportsService.getPurchasesBySupplier(supplier.id);
+          const purchaseData = purchasesRes.data;
+          supplierStats.push({
+            id: supplier.id,
+            name: supplier.name,
+            totalAmount:
+              purchaseData?.items?.reduce((sum, contract) => sum + (contract.totalAmount || 0), 0) || 0,
+            contractCount: purchaseData?.total ?? purchaseData?.pagination?.total ?? 0,
+          });
+        } catch {
+          supplierStats.push({
+            id: supplier.id,
+            name: supplier.name,
+            totalAmount: 0,
+            contractCount: 0,
+          });
         }
-
-        // 门店统计：查询每个门店的销售合同数量
-        const storeStatsRaw: StoreStats[] = [];
-        for (const store of stores.slice(0, 20)) {
-          try {
-            const salesRes = await reportsService.getSalesByStore(store.id);
-            const total = salesRes.data?.total ?? salesRes.data?.pagination?.total ?? 0;
-            storeStatsRaw.push({ id: store.id, name: store.name, itemCount: total });
-          } catch {
-            storeStatsRaw.push({ id: store.id, name: store.name, itemCount: 0 });
-          }
-        }
-        const storeStats = storeStatsRaw.sort((a, b) => b.itemCount - a.itemCount);
-
-        setData({
-          supplierStats: supplierStats.filter(s => s.contractCount > 0).sort((a, b) => b.totalAmount - a.totalAmount),
-          storeStats,
-          summary: {
-            totalPurchaseAmount: dashboard.overview?.purchaseContracts || 0,
-            totalPurchaseContracts: dashboard.overview?.purchaseContracts || 0,
-            totalSalesContracts: dashboard.overview?.salesContracts || 0,
-            totalProducts: dashboard.overview?.products || 0,
-            totalContainers: dashboard.overview?.containers || 0,
-          },
-        });
-      } catch (error) {
-        console.error('获取报表数据失败:', error);
-      } finally {
-        setLoading(false);
       }
-    };
-    fetchData();
+
+      const storeStatsRaw: StoreStats[] = [];
+      for (const store of stores.slice(0, 20)) {
+        try {
+          const salesRes = await reportsService.getSalesByStore(store.id);
+          const total = salesRes.data?.total ?? salesRes.data?.pagination?.total ?? 0;
+          storeStatsRaw.push({ id: store.id, name: store.name, itemCount: total });
+        } catch {
+          storeStatsRaw.push({ id: store.id, name: store.name, itemCount: 0 });
+        }
+      }
+      const storeStats = storeStatsRaw.sort((a, b) => b.itemCount - a.itemCount);
+
+      setData({
+        supplierStats: supplierStats.filter(s => s.contractCount > 0).sort((a, b) => b.totalAmount - a.totalAmount),
+        storeStats,
+        summary: {
+          totalPurchaseAmount: dashboard.overview?.purchaseContracts || 0,
+          totalPurchaseContracts: dashboard.overview?.purchaseContracts || 0,
+          totalSalesContracts: dashboard.overview?.salesContracts || 0,
+          totalProducts: dashboard.overview?.products || 0,
+          totalContainers: dashboard.overview?.containers || 0,
+        },
+      });
+    } catch (error) {
+      console.error('获取报表数据失败:', error);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
+
   if (loading) {
+    return <LoadingState title="加载中..." description="正在汇总供应商、门店和经营概览数据。" />;
+  }
+
+  if (loadError) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <span className="ml-2">加载中...</span>
+      <div className="space-y-6">
+        <PageHeader title="报表统计" description="业务数据汇总与分析。" />
+        <ErrorState
+          title="数据加载失败"
+          description="报表统计暂时不可用，请稍后重试。"
+          action={
+            <Button variant="outline" onClick={() => void fetchData()}>
+              <RefreshCw className="mr-1 h-4 w-4" />
+              重试
+            </Button>
+          }
+        />
       </div>
     );
   }
@@ -225,7 +233,12 @@ export default function ReportsPage() {
                   </TableBody>
                 </Table>
               ) : (
-                <p className="text-muted-foreground text-center py-8">暂无采购数据</p>
+                <EmptyState
+                  icon={BarChart3}
+                  title="暂无采购数据"
+                  description="至少需要一份采购合同，才能生成供应商维度的汇总分析。"
+                  className="py-10"
+                />
               )}
             </CardContent>
           </Card>
@@ -255,7 +268,12 @@ export default function ReportsPage() {
                   </TableBody>
                 </Table>
               ) : (
-                <p className="text-muted-foreground text-center py-8">暂无门店数据</p>
+                <EmptyState
+                  icon={Store}
+                  title="暂无门店数据"
+                  description="门店建立销售合同后，这里会自动生成门店维度的销售统计。"
+                  className="py-10"
+                />
               )}
             </CardContent>
           </Card>

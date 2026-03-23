@@ -15,6 +15,7 @@ import { SalesContract, SalesStatus } from '@/types';
 import { salesService } from '@/services/sales.service';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -35,7 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Eye, Ship, Trash2, Loader2, FileSpreadsheet } from 'lucide-react';
+import { Plus, Eye, Ship, Trash2, Loader2, FileSpreadsheet, Container, Anchor, Boxes, Clock3 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatDate } from '@/lib/date-format';
@@ -142,6 +143,12 @@ export default function SalesPage() {
 
   const totalPages = Math.ceil(contracts.length / pageSize);
   const pagedContracts = contracts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const exportOverview = {
+    preparing: contracts.filter((contract) => [SalesStatus.CONFIRMED, SalesStatus.PACKING].includes(contract.status)).length,
+    inTransit: contracts.filter((contract) => contract.status === SalesStatus.SHIPPED).length,
+    arrivedPendingClose: contracts.filter((contract) => contract.status === SalesStatus.ARRIVED).length,
+    totalBoxes: contracts.reduce((sum, contract) => sum + (contract.totalBoxes || 0), 0),
+  };
 
   return (
     <div className="space-y-6">
@@ -155,6 +162,56 @@ export default function SalesPage() {
           </Button>
         }
       />
+
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">出口出运概览</p>
+            <h3 className="text-lg font-semibold tracking-tight">围绕装柜、在途与到港节点安排出口履约节奏</h3>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => router.push('/dashboard/tax-refunds')}>
+            前往退税跟进
+          </Button>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Card className="border-border/70">
+            <CardContent className="flex items-center justify-between pt-6">
+              <div>
+                <p className="text-sm text-muted-foreground">待装柜合同</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums">{exportOverview.preparing}</p>
+              </div>
+              <Boxes className="h-5 w-5 text-primary" />
+            </CardContent>
+          </Card>
+          <Card className="border-border/70">
+            <CardContent className="flex items-center justify-between pt-6">
+              <div>
+                <p className="text-sm text-muted-foreground">在途货柜</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums">{exportOverview.inTransit}</p>
+              </div>
+              <Container className="h-5 w-5 text-sky-600" />
+            </CardContent>
+          </Card>
+          <Card className="border-border/70">
+            <CardContent className="flex items-center justify-between pt-6">
+              <div>
+                <p className="text-sm text-muted-foreground">已到港待结清</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums">{exportOverview.arrivedPendingClose}</p>
+              </div>
+              <Anchor className="h-5 w-5 text-emerald-600" />
+            </CardContent>
+          </Card>
+          <Card className="border-border/70">
+            <CardContent className="flex items-center justify-between pt-6">
+              <div>
+                <p className="text-sm text-muted-foreground">总箱数</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums">{exportOverview.totalBoxes}</p>
+              </div>
+              <Clock3 className="h-5 w-5 text-amber-600" />
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
       <div className="surface-panel overflow-hidden">
         <Table>

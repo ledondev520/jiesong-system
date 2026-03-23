@@ -1,527 +1,82 @@
 /**
- * Input: 用户状态、后端搜索API
- * Output: 顶部导航栏组件（含移动端汉堡菜单）
- * Pos: 全局Header，包含搜索、通知、用户菜单、移动端导航入口
- * 
+ * Input: 用户状态、导航配置
+ * Output: 顶部导航栏组件
+ * Pos: 全局 Header，负责装配移动导航、搜索、通知、用户菜单
+ *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import Link from 'next/link';
+import { useSyncExternalStore } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { CalendarDays } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
-import {
-  UserCircle, Bell, Search, Package, FileText, Container, Building2,
-  Loader2, CalendarDays, Menu, Ship, LayoutDashboard, ShoppingCart,
-  PackageOpen, Landmark, SlidersHorizontal, LogOut, Bot,
-} from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
-import { cn } from '@/lib/utils';
-import api from '@/lib/axios';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import type {
-  ApiResponse,
-  PaginatedResponse,
-  Product,
-  PurchaseContract,
-  SalesContract,
-  Supplier,
-} from '@/types';
+import { getVisibleModuleNavItems } from './navigation.config';
+import { HeaderMobileNav } from './HeaderMobileNav';
+import { HeaderNotifications } from './HeaderNotifications';
+import { HeaderSearch } from './HeaderSearch';
+import { HeaderUserMenu } from './HeaderUserMenu';
 
-// ==================== 移动端导航数据（与 Sidebar 对齐） ====================
-
-const mobileNavItems = [
-  {
-    href: '/dashboard',
-    label: '经营中台',
-    icon: LayoutDashboard,
-    childPrefixes: ['/dashboard/ops-execution'],
-  },
-  {
-    href: '/dashboard/contracts',
-    label: '采购',
-    icon: ShoppingCart,
-    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers', '/dashboard/inventory-container', '/dashboard/store-recommend'],
-  },
-  {
-    href: '/dashboard/sales',
-    label: '出口',
-    icon: PackageOpen,
-    childPrefixes: ['/dashboard/sales', '/dashboard/tax-refunds', '/customs-declarations', '/dashboard/hs-codes'],
-  },
-  {
-    href: '/dashboard/finance',
-    label: '财务',
-    icon: Landmark,
-    childPrefixes: ['/dashboard/payments', '/dashboard/finance'],
-  },
-  {
-    href: '/dashboard/ai/sessions',
-    label: 'AI 助手',
-    icon: Bot,
-    childPrefixes: ['/dashboard/ai'],
-  },
-  {
-    href: '/dashboard/settings',
-    label: '系统管理',
-    icon: SlidersHorizontal,
-    childPrefixes: ['/dashboard/contracts/templates', '/dashboard/settings', '/dashboard/import', '/dashboard/users', '/dashboard/system'],
-  },
-];
-
-interface SearchResult {
-  type: 'product' | 'supplier' | 'container' | 'purchase' | 'sales';
-  id: string;
-  title: string;
-  subtitle?: string;
-}
+const subscribeNoop = () => () => {};
+const headerDateFormatter = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  month: '2-digit',
+  day: '2-digit',
+  weekday: 'short',
+});
 
 export function Header() {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const router = useRouter();
   const pathname = usePathname();
-  
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  /**
-   * 职责：判断移动端导航项是否激活
-   * 思路：'/dashboard' 作为前缀会匹配所有子路由，需单独精确匹配，避免经营中台在其他模块页面误高亮
-   * @param item 导航项
-   */
-  const isMobileNavActive = (item: typeof mobileNavItems[number]) => {
-    if (pathname === '/dashboard') return item.href === '/dashboard';
-    return [item.href, ...item.childPrefixes].some((prefix) => {
-      if (prefix === '/dashboard') return pathname === '/dashboard';
-      return pathname === prefix || pathname.startsWith(`${prefix}/`);
-    });
-  };
-  const searchRef = useRef<HTMLDivElement>(null);
-  const todayLabel = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    month: '2-digit',
-    day: '2-digit',
-    weekday: 'short',
-  }).format(new Date());
-
-  // 搜索函数
-  const performSearch = useCallback(async (query: string) => {
-    if (!query || query.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-
-    setIsSearching(true);
-    try {
-      // 并行搜索多个类型 - 使用正确的参数名
-      const [productsRes, suppliersRes, containersRes, purchasesRes, salesRes] = await Promise.all([
-        api
-          .get<ApiResponse<PaginatedResponse<Product>>, ApiResponse<PaginatedResponse<Product>>>('/products', {
-            params: { keyword: query, pageSize: 5 },
-          })
-          .catch(
-            (): ApiResponse<PaginatedResponse<Product>> => ({
-              code: 200,
-              message: 'ok',
-              data: { items: [], pagination: { total: 0, page: 1, pageSize: 5, totalPages: 0 } },
-            })
-          ),
-        api
-          .get<ApiResponse<PaginatedResponse<Supplier>>, ApiResponse<PaginatedResponse<Supplier>>>('/suppliers', {
-            params: { keyword: query, pageSize: 5 },
-          })
-          .catch(
-            (): ApiResponse<PaginatedResponse<Supplier>> => ({
-              code: 200,
-              message: 'ok',
-              data: { items: [], pagination: { total: 0, page: 1, pageSize: 5, totalPages: 0 } },
-            })
-          ),
-        api
-          .get<ApiResponse<PaginatedResponse<SalesContract>>, ApiResponse<PaginatedResponse<SalesContract>>>('/containers', {
-            params: { keyword: query, pageSize: 5 },
-          })
-          .catch(
-            (): ApiResponse<PaginatedResponse<SalesContract>> => ({
-              code: 200,
-              message: 'ok',
-              data: { items: [], pagination: { total: 0, page: 1, pageSize: 5, totalPages: 0 } },
-            })
-          ),
-        api
-          .get<ApiResponse<PaginatedResponse<PurchaseContract>>, ApiResponse<PaginatedResponse<PurchaseContract>>>('/purchases', {
-            params: { keyword: query, pageSize: 5 },
-          })
-          .catch(
-            (): ApiResponse<PaginatedResponse<PurchaseContract>> => ({
-              code: 200,
-              message: 'ok',
-              data: { items: [], pagination: { total: 0, page: 1, pageSize: 5, totalPages: 0 } },
-            })
-          ),
-        api
-          .get<ApiResponse<PaginatedResponse<SalesContract>>, ApiResponse<PaginatedResponse<SalesContract>>>('/sales', {
-            params: { keyword: query, pageSize: 5 },
-          })
-          .catch(
-            (): ApiResponse<PaginatedResponse<SalesContract>> => ({
-              code: 200,
-              message: 'ok',
-              data: { items: [], pagination: { total: 0, page: 1, pageSize: 5, totalPages: 0 } },
-            })
-          ),
-      ]);
-
-      const results: SearchResult[] = [];
-
-      // 处理商品结果
-      const products = productsRes.data?.items || [];
-      products.forEach((p) => {
-        results.push({
-          type: 'product',
-          id: p.id,
-          title: p.customsName,
-          subtitle: p.specification || p.unit,
-        });
-      });
-
-      // 处理供应商结果
-      const suppliers = suppliersRes.data?.items || [];
-      suppliers.forEach((s) => {
-        results.push({
-          type: 'supplier',
-          id: s.id,
-          title: s.name,
-          subtitle: s.shortName,
-        });
-      });
-
-      // 处理货柜结果
-      const containers = containersRes.data?.items || [];
-      containers.forEach((c) => {
-        results.push({
-          type: 'container',
-          id: c.id,
-          title: c.contractNo,
-          subtitle: c.status,
-        });
-      });
-
-      // 处理采购合同结果
-      const purchases = purchasesRes.data?.items || [];
-      purchases.forEach((p) => {
-        results.push({
-          type: 'purchase',
-          id: p.id,
-          title: p.contractNo,
-          subtitle: p.supplier?.name || '采购合同',
-        });
-      });
-
-      // 处理销售合同结果
-      const sales = salesRes.data?.items || [];
-      sales.forEach((s) => {
-        results.push({
-          type: 'sales',
-          id: s.id,
-          title: s.contractNo,
-          subtitle: `$${(s.totalAmount || 0).toLocaleString()}`,
-        });
-      });
-
-      setSearchResults(results);
-    } catch (error) {
-      console.error('搜索失败:', error);
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  }, []);
-
-  // 防抖搜索
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery) {
-        performSearch(searchQuery);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery, performSearch]);
-
-  // 点击外部关闭搜索结果
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setShowResults(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // 处理结果点击 - 所有合同类直接跳转详情页，商品/供应商跳转列表页筛选
-  const handleResultClick = (result: SearchResult) => {
-    setShowResults(false);
-    setSearchQuery('');
-    
-    switch (result.type) {
-      case 'product':
-        router.push(`/dashboard/products?keyword=${encodeURIComponent(result.title)}`);
-        break;
-      case 'supplier':
-        router.push(`/dashboard/suppliers?keyword=${encodeURIComponent(result.title)}`);
-        break;
-      case 'container':
-        // 货柜直接跳转到详情页
-        router.push(`/dashboard/containers/${result.id}`);
-        break;
-      case 'purchase':
-        // 采购合同直接跳转到详情页
-        router.push(`/dashboard/purchase/${result.id}`);
-        break;
-      case 'sales':
-        // 销售合同直接跳转到详情页
-        router.push(`/dashboard/sales/${result.id}`);
-        break;
-    }
-  };
-
-  // 获取图标
-  const getIcon = (type: string) => {
-    switch (type) {
-      case 'product': return <Package className="h-4 w-4 text-primary" />;
-      case 'supplier': return <Building2 className="h-4 w-4 text-primary" />;
-      case 'container': return <Container className="h-4 w-4 text-primary" />;
-      case 'purchase': return <FileText className="h-4 w-4 text-primary" />;
-      case 'sales': return <FileText className="h-4 w-4 text-primary" />;
-      default: return <Search className="h-4 w-4" />;
-    }
-  };
-
-  // 获取类型标签
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case 'product': return '商品';
-      case 'supplier': return '供应商';
-      case 'container': return '货柜';
-      case 'purchase': return '采购';
-      case 'sales': return '销售';
-      default: return '';
-    }
-  };
+  const mobileNavItems = getVisibleModuleNavItems(user?.role);
+  const todayLabel = useSyncExternalStore(
+    subscribeNoop,
+    () => headerDateFormatter.format(new Date()),
+    () => '',
+  );
 
   const initials = (user?.name || user?.username || '用')
     .slice(0, 2)
     .toUpperCase();
 
+  const handleLogout = () => {
+    logout();
+    window.location.href = '/login';
+  };
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-6">
-      {/* 移动端汉堡菜单：仅在 md 以下显示 */}
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden h-9 w-9 shrink-0"
-            aria-label="打开导航菜单"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="w-72 p-0">
-          <SheetHeader className="flex h-16 items-center border-b px-5 py-0">
-            <SheetTitle asChild>
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-3 font-semibold tracking-tight"
-                onClick={() => setMobileOpen(false)}
-              >
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-                  <Ship className="h-4 w-4" />
-                </span>
-                <div className="grid gap-0.5 text-left">
-                  <span>捷淞系统</span>
-                  <span className="text-xs font-normal text-muted-foreground">Import &amp; Export</span>
-                </div>
-              </Link>
-            </SheetTitle>
-          </SheetHeader>
-          <nav className="grid gap-1 px-3 py-4">
-            {mobileNavItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors',
-                  isMobileNavActive(item)
-                    ? 'bg-muted text-foreground shadow-sm ring-1 ring-border'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                )}
-              >
-                <item.icon className="h-4 w-4 shrink-0" />
-                <span>{item.label}</span>
-              </Link>
-            ))}
-          </nav>
-          {/* 底部：用户信息 + 退出 */}
-          <div className="absolute bottom-0 left-0 right-0 space-y-3 border-t p-4">
-            <div className="rounded-lg border bg-muted/50 px-3 py-2">
-              <div className="text-sm font-medium">{user?.name || '当前用户'}</div>
-              <div className="text-xs text-muted-foreground">{user?.username}</div>
-            </div>
-            <Button
-              variant="ghost"
-              className="h-11 w-full justify-start gap-3 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              onClick={() => { logout(); window.location.href = '/login'; }}
-            >
-              <LogOut className="h-4 w-4" />
-              <span>退出登录</span>
-            </Button>
-          </div>
-        </SheetContent>
-      </Sheet>
+      <HeaderMobileNav
+        items={mobileNavItems}
+        pathname={pathname}
+        userName={user?.name}
+        username={user?.username}
+        onLogout={handleLogout}
+      />
 
       <div className="flex flex-1 items-center gap-4">
         <div className="hidden items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-xs text-muted-foreground lg:flex">
           <CalendarDays className="h-3.5 w-3.5" />
-          <span>{todayLabel}</span>
+          <span suppressHydrationWarning>{todayLabel || '今天'}</span>
         </div>
 
-        {/* Global Search */}
-        <div ref={searchRef} className="relative w-full max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="搜索商品、供应商、货柜..."
-            className="h-10 bg-background pl-9"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setShowResults(true);
-            }}
-            onFocus={() => setShowResults(true)}
-          />
-          
-          {/* 搜索结果下拉 */}
-          {showResults && (searchQuery.length >= 2 || isSearching) && (
-            <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-80 overflow-y-auto rounded-xl border bg-popover shadow-md">
-              {isSearching ? (
-                <div className="flex items-center justify-center py-4 text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  搜索中...
-                </div>
-              ) : searchResults.length > 0 ? (
-                <div className="py-1">
-                  {searchResults.map((result, index) => (
-                    <button
-                      key={`${result.type}-${result.id}-${index}`}
-                      className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-accent"
-                      onClick={() => handleResultClick(result)}
-                    >
-                      {getIcon(result.type)}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{result.title}</div>
-                        {result.subtitle && (
-                          <div className="text-xs text-muted-foreground truncate">{result.subtitle}</div>
-                        )}
-                      </div>
-                      <Badge variant="outline" className="text-xs">
-                        {getTypeLabel(result.type)}
-                      </Badge>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-4 text-center text-muted-foreground text-sm">
-                  未找到相关结果
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <HeaderSearch />
       </div>
-      
+
       <div className="flex items-center gap-2">
         <ThemeToggle />
-
-        {/* Notifications */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" className="relative h-11 w-11 rounded-md">
-              <Bell className="h-5 w-5" />
-              <span className="sr-only">通知</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>消息通知</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <div className="py-6 text-center text-muted-foreground text-sm">
-              暂无新通知
-            </div>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* User Menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-11 gap-2 rounded-md px-2">
-              <Avatar className="h-7 w-7 border">
-                <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
-              </Avatar>
-              <div className="hidden text-left sm:block">
-                <div className="text-sm font-medium leading-none">{user?.name || '管理员'}</div>
-                <div className="text-xs text-muted-foreground">{user?.username}</div>
-              </div>
-              <UserCircle className="hidden h-4 w-4 text-muted-foreground sm:block" />
-              <span className="sr-only">用户菜单</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>
-              <div className="flex flex-col">
-                <span>{user?.name || '管理员'}</span>
-                <span className="text-xs text-muted-foreground font-normal">{user?.username}</span>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push('/dashboard/settings')}>
-              个人设置
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => {
-              logout();
-              window.location.href = '/login';
-            }}>
-              退出登录
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <HeaderNotifications />
+        <HeaderUserMenu
+          displayName={user?.name}
+          username={user?.username}
+          initials={initials}
+          onOpenSettings={() => router.push('/dashboard/settings')}
+          onLogout={handleLogout}
+        />
       </div>
     </header>
   );
