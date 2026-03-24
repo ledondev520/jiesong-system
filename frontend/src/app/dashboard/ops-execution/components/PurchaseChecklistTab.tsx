@@ -115,7 +115,7 @@ export function PurchaseChecklistTab() {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* 操作栏 */}
-        <div className="grid gap-3 md:grid-cols-[180px_180px_minmax(0,1fr)_auto_auto_auto]">
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-[180px_180px_minmax(0,1fr)_auto_auto_auto]">
           <Select
             value={storeType}
             onValueChange={(value) => setStoreType(value as (typeof STORE_TYPE_OPTIONS)[number])}
@@ -149,9 +149,10 @@ export function PurchaseChecklistTab() {
             value={templateName}
             onChange={(event) => setTemplateName(event.target.value)}
             placeholder="模板名称"
+            className="col-span-2 md:col-span-1"
           />
 
-          <Button onClick={() => void handleGenerate()} disabled={loading}>
+          <Button onClick={() => void handleGenerate()} disabled={loading} className="col-span-2 md:col-span-1">
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             生成采购清单
           </Button>
@@ -176,7 +177,7 @@ export function PurchaseChecklistTab() {
         ) : (
           <div className="space-y-4">
             {/* 汇总KPI */}
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-3 gap-3 md:gap-4">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">采购项总数</CardTitle>

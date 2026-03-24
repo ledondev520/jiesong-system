@@ -44,6 +44,7 @@ import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
+import { MobileListCard } from '@/components/mobile';
 export default function SalesPage() {
   const [contracts, setContracts] = useState<SalesContract[]>([]);
   const [loading, setLoading] = useState(true);
@@ -213,7 +214,65 @@ export default function SalesPage() {
         </div>
       </section>
 
-      <div className="surface-panel overflow-hidden">
+      {/* 移动端卡片视图 */}
+      <div className="space-y-3 md:hidden">
+        {loading ? (
+          <div className="surface-panel py-12 text-center text-sm text-muted-foreground">加载中...</div>
+        ) : contracts.length === 0 ? (
+          <div className="surface-panel py-12 text-center text-sm text-muted-foreground">暂无出口合同</div>
+        ) : (
+          pagedContracts.map((contract) => (
+            <MobileListCard
+              key={contract.id}
+              title={contract.contractNo}
+              subtitle={contract.port?.name || '未知目的港'}
+              badge={getStatusBadge(contract.status)}
+              fields={[
+                { label: '签订日期', value: formatDate(contract.signedAt) || '—' },
+                { label: '箱数', value: `${contract.totalBoxes || 0} 箱` },
+                { label: '体积', value: `${(contract.volume || 0).toFixed(2)} CBM` },
+                { label: '毛重', value: `${(contract.grossWeight || 0).toLocaleString()} kg` },
+              ]}
+              amount={{
+                label: '合同金额',
+                value: `$${contract.totalAmount.toLocaleString()}`,
+                emphasis: 'success',
+              }}
+              onClick={() => router.push(`/dashboard/sales/${contract.id}`)}
+              action={
+                <div className="grid grid-cols-3 gap-2">
+                  <Link href={`/dashboard/sales/${contract.id}`}>
+                    <Button variant="outline" className="h-10 w-full rounded-xl text-xs">
+                      <Eye className="mr-1 h-3.5 w-3.5" /> 详情
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="outline"
+                    className="h-10 rounded-xl text-xs"
+                    disabled={exportingId === contract.id}
+                    onClick={() => handleExportExcel(contract)}
+                  >
+                    {exportingId === contract.id
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <FileSpreadsheet className="mr-1 h-3.5 w-3.5 text-emerald-600" />}
+                    Excel
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-10 rounded-xl text-xs text-destructive hover:bg-destructive/10"
+                    onClick={() => openDeleteDialog(contract)}
+                  >
+                    <Trash2 className="mr-1 h-3.5 w-3.5" /> 删除
+                  </Button>
+                </div>
+              }
+            />
+          ))
+        )}
+      </div>
+
+      {/* 桌面端表格视图 */}
+      <div className="hidden surface-panel overflow-hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>

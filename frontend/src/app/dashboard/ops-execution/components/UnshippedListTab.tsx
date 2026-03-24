@@ -152,7 +152,7 @@ export function UnshippedListTab() {
   return (
     <div className="space-y-6">
       {/* KPI 汇总卡片 */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">待跟进条目</CardTitle>
@@ -194,7 +194,7 @@ export function UnshippedListTab() {
           <CardDescription>按订单、SKU、仓库状态聚合，并支持直接指定负责人。</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_200px_minmax(0,240px)_auto_auto]">
+          <div className="grid gap-3 grid-cols-1 md:grid-cols-[minmax(0,1fr)_200px_minmax(0,240px)_auto_auto]">
             <Input
               placeholder="搜索订单号、商品名称或 SKU"
               value={keyword}
@@ -256,66 +256,113 @@ export function UnshippedListTab() {
               <p>当前没有待跟进的未发货条目。</p>
             </div>
           ) : (
-            <div className="surface-panel overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>订单号</TableHead>
-                    <TableHead>SKU / 商品</TableHead>
-                    <TableHead>仓库状态</TableHead>
-                    <TableHead className="text-right">待处理数量</TableHead>
-                    <TableHead className="text-right">记录数</TableHead>
-                    <TableHead>负责人</TableHead>
-                    <TableHead className="w-[180px]">操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {items.map((item) => (
-                    <TableRow key={item.key}>
-                      <TableCell className="font-medium">{item.orderNo}</TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-medium">{item.skuName}</div>
-                          <div className="text-xs text-muted-foreground">{item.skuCode}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={item.status} statusMap={inventoryStatusMap} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {item.quantity} {item.unit}
-                      </TableCell>
-                      <TableCell className="text-right">{item.recordCount}</TableCell>
-                      <TableCell>{item.assigneeName || '未分发'}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            aria-label={`负责人-${item.orderNo}-${item.skuName}`}
-                            value={draftAssignees[item.key] || ''}
-                            onChange={(event) =>
-                              setDraftAssignees((current) => ({
-                                ...current,
-                                [item.key]: event.target.value,
-                              }))
-                            }
-                            placeholder="如：小周"
-                            className="h-9"
-                          />
-                          <Button
-                            size="sm"
-                            disabled={savingKey === item.key}
-                            aria-label={`保存负责人-${item.orderNo}-${item.skuName}`}
-                            onClick={() => void handleSaveAssignee(item)}
-                          >
-                            {savingKey === item.key ? '保存中' : '保存'}
-                          </Button>
-                        </div>
-                      </TableCell>
+            <>
+              {/* 移动端卡片视图 */}
+              <div className="space-y-3 md:hidden">
+                {items.map((item) => (
+                  <div key={item.key} className="surface-panel space-y-3 p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="font-medium text-sm">{item.orderNo}</div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">{item.skuName}</div>
+                        {item.skuCode && <div className="text-xs text-muted-foreground">{item.skuCode}</div>}
+                      </div>
+                      <StatusBadge status={item.status} statusMap={inventoryStatusMap} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <div className="text-muted-foreground">待处理数量</div>
+                      <div className="text-right font-medium">{item.quantity} {item.unit}</div>
+                      <div className="text-muted-foreground">负责人</div>
+                      <div className="text-right">{item.assigneeName || <span className="text-muted-foreground">未分发</span>}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        aria-label={`负责人-${item.orderNo}-${item.skuName}`}
+                        value={draftAssignees[item.key] || ''}
+                        onChange={(event) =>
+                          setDraftAssignees((current) => ({
+                            ...current,
+                            [item.key]: event.target.value,
+                          }))
+                        }
+                        placeholder="指定负责人，如：小周"
+                        className="h-10 flex-1 rounded-xl text-sm"
+                      />
+                      <Button
+                        size="sm"
+                        className="h-10 rounded-xl"
+                        disabled={savingKey === item.key}
+                        onClick={() => void handleSaveAssignee(item)}
+                      >
+                        {savingKey === item.key ? '保存中' : '保存'}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 桌面端表格 */}
+              <div className="surface-panel hidden overflow-hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>订单号</TableHead>
+                      <TableHead>SKU / 商品</TableHead>
+                      <TableHead>仓库状态</TableHead>
+                      <TableHead className="text-right">待处理数量</TableHead>
+                      <TableHead className="text-right">记录数</TableHead>
+                      <TableHead>负责人</TableHead>
+                      <TableHead className="w-[180px]">操作</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((item) => (
+                      <TableRow key={item.key}>
+                        <TableCell className="font-medium">{item.orderNo}</TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="font-medium">{item.skuName}</div>
+                            <div className="text-xs text-muted-foreground">{item.skuCode}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={item.status} statusMap={inventoryStatusMap} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {item.quantity} {item.unit}
+                        </TableCell>
+                        <TableCell className="text-right">{item.recordCount}</TableCell>
+                        <TableCell>{item.assigneeName || '未分发'}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              aria-label={`负责人-${item.orderNo}-${item.skuName}`}
+                              value={draftAssignees[item.key] || ''}
+                              onChange={(event) =>
+                                setDraftAssignees((current) => ({
+                                  ...current,
+                                  [item.key]: event.target.value,
+                                }))
+                              }
+                              placeholder="如：小周"
+                              className="h-9"
+                            />
+                            <Button
+                              size="sm"
+                              disabled={savingKey === item.key}
+                              aria-label={`保存负责人-${item.orderNo}-${item.skuName}`}
+                              onClick={() => void handleSaveAssignee(item)}
+                            >
+                              {savingKey === item.key ? '保存中' : '保存'}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

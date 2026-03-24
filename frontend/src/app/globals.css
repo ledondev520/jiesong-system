@@ -130,11 +130,15 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    /* 消除移动端双击缩放 300ms 延迟，不影响滚动 */
+    touch-action: manipulation;
   }
 
   html,
   body {
     min-height: 100%;
+    /* iOS Safari 橡皮筋效果 */
+    overscroll-behavior: none;
   }
 
   body {
@@ -182,6 +186,50 @@
   pre,
   .font-mono {
     font-family: var(--font-ui-mono), monospace;
+  }
+
+  /* iOS Safari：防止输入框自动缩放（font-size < 16px 时 Safari 会缩放页面） */
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+
+  /* 移动端表格/数据文字可读性：确保不低于 13px */
+  @media (max-width: 767px) {
+    td,
+    th {
+      font-size: max(13px, 0.8125rem);
+    }
+
+    /* 移动端辅助文字不低于 11px */
+    .text-xs {
+      font-size: max(11px, 0.6875rem);
+    }
+  }
+}
+
+/* ==================== 移动端通用工具类 ==================== */
+@layer components {
+  /* 移动端列表卡片容器 */
+  .mobile-card-list {
+    @apply space-y-3;
+  }
+
+  /* 移动端卡片基础样式 */
+  .mobile-card {
+    @apply rounded-xl border border-border bg-card text-card-foreground shadow-sm p-4 active:scale-[0.99] transition-transform cursor-pointer;
+  }
+
+  /* 底部 TabBar 安全区域占位（在需要额外底部内边距的地方使用） */
+  .pb-tab-safe {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+
+  /* 吸底操作栏容器 */
+  .mobile-action-bar {
+    @apply fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-background/95 backdrop-blur px-4 py-3 md:hidden;
+    padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
   }
 }
 

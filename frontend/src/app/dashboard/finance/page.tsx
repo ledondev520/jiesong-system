@@ -201,7 +201,7 @@ export default function FinancePage() {
 
       {/* 汇率与健康度横幅 */}
       {hasData && (
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-3 grid-cols-1 md:grid-cols-3">
           {/* 汇率卡 */}
           <Card className="border-primary/20 bg-primary/5">
             <CardContent className="pt-4 pb-4">
@@ -268,7 +268,7 @@ export default function FinancePage() {
       )}
 
       {/* 四象KPI区域 */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         {/* 应付总额 */}
         <Card className="kpi-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -466,7 +466,7 @@ export default function FinancePage() {
       )}
 
       {/* 快捷导航区 */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         <Link href="/dashboard/finance/payable" className="group">
           <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm">
             <CardContent className="pt-4 pb-4">

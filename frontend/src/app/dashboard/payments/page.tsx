@@ -25,6 +25,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { CreditCard, ArrowUpRight, ArrowDownLeft, RefreshCw, Search, X } from 'lucide-react';
+import { MobileListCard } from '@/components/mobile';
 import { PaymentDialog, type PaymentSubmitData } from '../../dashboard/finance/components/PaymentDialog';
 import { toast } from 'sonner';
 import { financeService } from '@/services/finance.service';
@@ -330,7 +331,42 @@ function PaymentsPageContent() {
 
         {/* 应付账款Tab */}
         <TabsContent value="payable" className="space-y-4">
-          <Card className="overflow-hidden">
+          {/* 移动端卡片视图 */}
+          <div className="space-y-3 md:hidden">
+            {payableLoading ? (
+              <div className="surface-panel py-10 text-center text-sm text-muted-foreground">加载中...</div>
+            ) : payableError ? (
+              <div className="surface-panel py-10 text-center text-sm text-destructive">
+                加载失败 —&nbsp;
+                <button className="underline" onClick={() => void fetchPayables()}>重试</button>
+              </div>
+            ) : unpaidContracts.length === 0 ? (
+              <div className="surface-panel py-10 text-center text-sm text-muted-foreground">
+                {keyword ? '没有匹配当前关键词的记录' : '暂无待付账款'}
+              </div>
+            ) : (
+              unpaidContracts.map((contract) => (
+                <MobileListCard
+                  key={contract.id}
+                  title={contract.contractNo}
+                  subtitle={contract.supplier?.name || '未知供应商'}
+                  badge={<Badge variant="outline" className="text-xs">{contract.status}</Badge>}
+                  fields={[
+                    { label: '总金额', value: `¥${contract.totalAmount.toLocaleString()}` },
+                    { label: '已付', value: `¥${contract.paidAmount.toLocaleString()}`, emphasis: 'primary' },
+                  ]}
+                  amount={{ label: '待付', value: `¥${contract.unpaidAmount.toLocaleString()}`, emphasis: 'danger' }}
+                  action={
+                    <Button size="sm" className="h-10 w-full rounded-xl" onClick={() => setSelectedPayable(contract)}>
+                      <CreditCard className="mr-2 h-4 w-4" /> 记录付款
+                    </Button>
+                  }
+                />
+              ))
+            )}
+          </div>
+          {/* 桌面端表格 */}
+          <Card className="hidden overflow-hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -397,7 +433,42 @@ function PaymentsPageContent() {
 
         {/* 应收账款Tab */}
         <TabsContent value="receivable" className="space-y-4">
-          <Card className="overflow-hidden">
+          {/* 移动端卡片视图 */}
+          <div className="space-y-3 md:hidden">
+            {receivableLoading ? (
+              <div className="surface-panel py-10 text-center text-sm text-muted-foreground">加载中...</div>
+            ) : receivableError ? (
+              <div className="surface-panel py-10 text-center text-sm text-destructive">
+                加载失败 —&nbsp;
+                <button className="underline" onClick={() => void fetchReceivables()}>重试</button>
+              </div>
+            ) : unreceiveContracts.length === 0 ? (
+              <div className="surface-panel py-10 text-center text-sm text-muted-foreground">
+                {keyword ? '没有匹配当前关键词的记录' : '暂无待收账款'}
+              </div>
+            ) : (
+              unreceiveContracts.map((contract) => (
+                <MobileListCard
+                  key={contract.id}
+                  title={contract.contractNo}
+                  subtitle={getStoreNames(contract)}
+                  badge={<Badge variant="outline" className="text-xs">{contract.status}</Badge>}
+                  fields={[
+                    { label: '总金额', value: `$${contract.totalAmount.toLocaleString()}` },
+                    { label: '已收', value: `$${contract.receivedAmount.toLocaleString()}`, emphasis: 'primary' },
+                  ]}
+                  amount={{ label: '待收', value: `$${contract.unreceiveAmount.toLocaleString()}`, emphasis: 'danger' }}
+                  action={
+                    <Button size="sm" className="h-10 w-full rounded-xl" onClick={() => setSelectedReceivable(contract)}>
+                      <CreditCard className="mr-2 h-4 w-4" /> 记录收款
+                    </Button>
+                  }
+                />
+              ))
+            )}
+          </div>
+          {/* 桌面端表格 */}
+          <Card className="hidden overflow-hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>

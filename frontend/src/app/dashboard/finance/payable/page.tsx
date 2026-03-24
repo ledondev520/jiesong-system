@@ -1,6 +1,6 @@
 /**
  * Input: 后端 /finance/payables API
- * Output: 应付账款管理页面
+ * Output: 应付账款管理页面（移动端卡片视图 + 桌面端表格视图）
  * Pos: 财务模块子页面，展示并管理供应商待付款项
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { CreditCard, Loader2, FileDown } from 'lucide-react';
+import { MobileListCard } from '@/components/mobile';
 import { PaymentDialog, type PaymentSubmitData } from '../components/PaymentDialog';
 import { toast } from 'sonner';
 import { financeService } from '@/services/finance.service';
@@ -154,7 +155,45 @@ export default function PayablePage() {
         }
       />
 
-      <div className="surface-panel overflow-hidden">
+      {/* 移动端卡片视图 */}
+      <div className="space-y-3 md:hidden">
+        {unpaidContracts.length === 0 ? (
+          <div className="surface-panel py-12 text-center text-sm text-muted-foreground">
+            暂无待付账款
+          </div>
+        ) : (
+          unpaidContracts.map((contract) => (
+            <MobileListCard
+              key={contract.id}
+              title={contract.contractNo}
+              subtitle={contract.supplier?.name || '未知供应商'}
+              badge={<Badge variant="outline" className="text-xs">{contract.status}</Badge>}
+              fields={[
+                { label: '合同总额', value: `¥${contract.totalAmount.toLocaleString()}` },
+                { label: '已付', value: `¥${contract.paidAmount.toLocaleString()}`, emphasis: 'primary' },
+              ]}
+              amount={{
+                label: '待付金额',
+                value: `¥${contract.unpaidAmount.toLocaleString()}`,
+                emphasis: 'danger',
+              }}
+              action={
+                <Button
+                  size="sm"
+                  className="h-10 w-full rounded-xl text-sm"
+                  onClick={() => handlePay(contract)}
+                >
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  记录付款
+                </Button>
+              }
+            />
+          ))
+        )}
+      </div>
+
+      {/* 桌面端表格视图 */}
+      <div className="hidden surface-panel overflow-hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>

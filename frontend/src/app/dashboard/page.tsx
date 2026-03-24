@@ -1,7 +1,7 @@
 /**
  * Input: 后端dashboard API
  * Output: 工作台页面（系统核心入口，含快速录入、商品追踪、数据看板）
- * Pos: 系统首页，提供快速录入、商品追踪、数据看板
+ * Pos: 系统首页，提供快速录入、商品追踪、数据看板；移动端采用大图标快捷入口布局
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -17,6 +17,7 @@ import { ShoppingCart, TrendingUp, ClipboardList, Wallet, ArrowRight, Wrench } f
 import { ProductTracker } from '@/components/tools/ProductTracker';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataDashboard } from '@/components/dashboard/DataDashboard';
+import { useMobile } from '@/lib/hooks/useMobile';
 
 /**
  * 职责：渲染工作台首页
@@ -26,21 +27,22 @@ import { DataDashboard } from '@/components/dashboard/DataDashboard';
  */
 export default function DashboardPage() {
   const router = useRouter();
+  const isMobile = useMobile();
 
   const quickActions = [
-    { 
-      label: '新建采购', 
-      icon: ShoppingCart, 
+    {
+      label: '新建采购',
+      icon: ShoppingCart,
       href: '/dashboard/purchase/create',
       tone: 'primary',
-      desc: '录入采购合同'
+      desc: '录入采购合同',
     },
-    { 
-      label: '新建销售', 
-      icon: TrendingUp, 
+    {
+      label: '新建销售',
+      icon: TrendingUp,
       href: '/dashboard/sales/create',
       tone: 'secondary',
-      desc: '创建出口合同'
+      desc: '创建出口合同',
     },
     {
       label: '采购合同',
@@ -59,7 +61,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
 
       <PageHeader
@@ -68,10 +70,50 @@ export default function DashboardPage() {
         showBack={false}
       />
 
+      {/* 移动端：高频动作前置（拇指区域优先，减少滚动） */}
+      {isMobile && (
+        <section aria-label="高频动作">
+          <div className="grid grid-cols-2 gap-3">
+            {quickActions.map((action) => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={action.label}
+                  onClick={() => router.push(action.href)}
+                  className={cn(
+                    'flex flex-col items-start gap-3 rounded-2xl border border-border p-4',
+                    'bg-card text-card-foreground shadow-sm',
+                    'active:scale-[0.97] transition-transform touch-manipulation',
+                    'min-h-[88px]',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'flex h-10 w-10 items-center justify-center rounded-xl',
+                      action.tone === 'primary'
+                        ? 'bg-primary/12 text-primary'
+                        : 'bg-muted text-muted-foreground',
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <span className="block text-sm font-semibold text-foreground">{action.label}</span>
+                    <span className="block text-xs text-muted-foreground">{action.desc}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* 数据看板区域 */}
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
         <DataDashboard />
 
-        <Card className="h-fit">
+        {/* 桌面端高频动作 */}
+        <Card className="hidden h-fit xl:block">
           <CardHeader className="space-y-2 border-b pb-4">
             <CardTitle className="text-base">高频动作</CardTitle>
             <CardDescription>保留最常用的业务入口，减少在侧边栏内来回切换。</CardDescription>
@@ -112,6 +154,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {/* 经营工具（次级区域） */}
       <section className="space-y-3" aria-labelledby="dashboard-tools-heading">
         <div className="flex items-center gap-2">
           <Wrench className="h-4 w-4 text-muted-foreground" />
@@ -119,7 +162,7 @@ export default function DashboardPage() {
             经营工具
           </h2>
         </div>
-        <CardDescription>将查询型工具下沉为次级区域，避免与首屏经营信号抢焦点。</CardDescription>
+        <CardDescription className="hidden md:block">将查询型工具下沉为次级区域，避免与首屏经营信号抢焦点。</CardDescription>
         <div>
           <ProductTracker />
         </div>

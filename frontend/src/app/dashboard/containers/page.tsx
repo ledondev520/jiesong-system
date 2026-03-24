@@ -32,6 +32,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader } from '@/components/layout/ModuleTabHeader';
 import { EXPORT_TABS } from '@/components/layout/navigation.config';
 import { TableStateRow } from '@/components/ui/data-state';
+import { MobileListCard } from '@/components/mobile';
 
 const PAGE_SIZE = 20;
 
@@ -137,7 +138,51 @@ export default function ContainersPage() {
         }
       />
 
-      <div className="surface-panel overflow-hidden">
+      {/* 移动端卡片列表 */}
+      <div className="space-y-3 md:hidden">
+        {loading ? (
+          <div className="surface-panel py-10 text-center text-sm text-muted-foreground">加载中...</div>
+        ) : loadError ? (
+          <div className="surface-panel py-10 text-center text-sm text-destructive">
+            加载失败 —&nbsp;
+            <button className="underline" onClick={() => void loadContainers()}>重试</button>
+          </div>
+        ) : containers.length === 0 ? (
+          <div className="surface-panel py-10 text-center text-sm text-muted-foreground">暂无货柜数据</div>
+        ) : (
+          pagedContainers.map((container) => (
+            <MobileListCard
+              key={container.id}
+              title={container.contractNo}
+              subtitle={getPortName(container.portId)}
+              badge={getStatusBadge(container.status)}
+              fields={[
+                { label: 'ETA', value: formatDate(container.estimatedArrival) || '待定' },
+                { label: '箱数', value: `${container.totalBoxes ?? '-'} 箱` },
+                { label: '体积', value: container.volume ? `${container.volume} CBM` : '-' },
+              ]}
+              action={
+                <div className="flex gap-2">
+                  <Link href={`/dashboard/containers/${container.id}`} className="flex-1">
+                    <Button variant="outline" size="sm" className="h-10 w-full rounded-xl">
+                      <Eye className="mr-1 h-4 w-4" /> 查看详情
+                    </Button>
+                  </Link>
+                  <Button variant="outline" size="sm" className="h-10 rounded-xl px-3" onClick={() => handleEdit(container)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-10 rounded-xl px-3" onClick={() => handleDelete(container.id)}>
+                    <Trash className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              }
+            />
+          ))
+        )}
+      </div>
+
+      {/* 桌面端表格 */}
+      <div className="surface-panel hidden overflow-hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>

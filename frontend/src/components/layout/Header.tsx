@@ -9,8 +9,9 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, Ship } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { getVisibleModuleNavItems } from './navigation.config';
@@ -49,16 +50,34 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-6">
-      <HeaderMobileNav
-        items={mobileNavItems}
-        pathname={pathname}
-        userName={user?.name}
-        username={user?.username}
-        onLogout={handleLogout}
-      />
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-6"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
+      {/* 汉堡菜单：移动端已有底部 TabBar，此处完全隐藏；仅保留 SSR 结构避免 hydration mismatch */}
+      <div className="hidden" aria-hidden="true">
+        <HeaderMobileNav
+          items={mobileNavItems}
+          pathname={pathname}
+          userName={user?.name}
+          username={user?.username}
+          onLogout={handleLogout}
+        />
+      </div>
+
+      {/* 移动端品牌标识（仅移动端展示，桌面端侧边栏已有） */}
+      <Link
+        href="/dashboard"
+        className="flex items-center gap-2 md:hidden"
+        aria-label="捷淞系统首页"
+      >
+        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <Ship className="h-3.5 w-3.5" />
+        </span>
+        <span className="text-sm font-semibold">捷淞系统</span>
+      </Link>
 
       <div className="flex flex-1 items-center gap-4">
+        {/* 日期显示：仅大屏展示 */}
         <div className="hidden items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-xs text-muted-foreground lg:flex">
           <CalendarDays className="h-3.5 w-3.5" />
           <span suppressHydrationWarning>{todayLabel || '今天'}</span>
@@ -70,6 +89,7 @@ export function Header() {
       <div className="flex items-center gap-2">
         <ThemeToggle />
         <HeaderNotifications />
+        {/* 用户菜单：桌面端保留，移动端通过底部TabBar"更多"入口访问 */}
         <HeaderUserMenu
           displayName={user?.name}
           username={user?.username}

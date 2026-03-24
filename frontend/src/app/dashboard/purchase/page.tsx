@@ -28,6 +28,7 @@ import { useRouter } from 'next/navigation';
 import { formatDate } from '@/lib/date-format';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { MobileListCard } from '@/components/mobile';
 
 export default function PurchasePage() {
   const [contracts, setContracts] = useState<PurchaseContract[]>([]);
@@ -83,17 +84,59 @@ export default function PurchasePage() {
         }
       />
 
-      <div className="surface-panel overflow-hidden">
+      {/* 移动端卡片列表 */}
+      <div className="space-y-3 md:hidden">
+        {loading ? (
+          <div className="surface-panel py-10 text-center text-sm text-muted-foreground">加载中...</div>
+        ) : contracts.length === 0 ? (
+          <div className="surface-panel py-10 text-center text-sm text-muted-foreground">暂无采购合同</div>
+        ) : (
+          contracts.map((contract) => {
+            const totalAmount = Number(contract.totalAmount || 0);
+            const paidAmount = Number(contract.paidAmount || 0);
+            const unpaid = totalAmount - paidAmount;
+            return (
+              <MobileListCard
+                key={contract.id}
+                title={contract.contractNo}
+                subtitle={
+                  <span className="flex items-center gap-1">
+                    {contract.supplier?.name || '未知供应商'}
+                    {contract.supplier?.hasQualityIssue && (
+                      <Badge variant="destructive" className="h-4 px-1 text-[10px]">质量问题</Badge>
+                    )}
+                  </span>
+                }
+                badge={getStatusBadge(contract.status)}
+                fields={[
+                  { label: '签订日期', value: formatDate(contract.signedAt) || '-' },
+                  { label: '合同总额', value: `¥${totalAmount.toLocaleString()}` },
+                  { label: '已付', value: `¥${paidAmount.toLocaleString()}`, emphasis: 'primary' },
+                ]}
+                amount={unpaid > 0 ? { label: '待付', value: `¥${unpaid.toLocaleString()}`, emphasis: 'danger' } : undefined}
+                action={
+                  <Button size="sm" variant="outline" className="h-10 w-full rounded-xl" onClick={() => handleViewContract(contract.id)}>
+                    <Eye className="mr-2 h-4 w-4" /> 查看详情
+                  </Button>
+                }
+              />
+            );
+          })
+        )}
+      </div>
+
+      {/* 桌面端表格 */}
+      <div className="surface-panel hidden overflow-hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>合同编号</TableHead>
-              <TableHead className="hidden sm:table-cell">供应商</TableHead>
+              <TableHead>供应商</TableHead>
               <TableHead className="hidden md:table-cell">签订日期</TableHead>
               <TableHead>状态</TableHead>
-              <TableHead className="hidden sm:table-cell text-right">总金额</TableHead>
-              <TableHead className="hidden sm:table-cell text-right">已付</TableHead>
-              <TableHead className="w-[60px] sm:w-[100px]">操作</TableHead>
+              <TableHead className="text-right">总金额</TableHead>
+              <TableHead className="text-right">已付</TableHead>
+              <TableHead className="w-[60px]">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -109,7 +152,6 @@ export default function PurchasePage() {
               contracts.map((contract) => {
                 const totalAmount = Number(contract.totalAmount || 0);
                 const paidAmount = Number(contract.paidAmount || 0);
-
                 return (
                   <TableRow key={contract.id}>
                     <TableCell className="font-medium">
@@ -117,17 +159,8 @@ export default function PurchasePage() {
                         <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                         <span>{contract.contractNo}</span>
                       </div>
-                      {/* 手机端在合同号下内嵌供应商和金额 */}
-                      <div className="mt-0.5 text-xs text-muted-foreground sm:hidden">
-                        {contract.supplier?.name}
-                        {contract.supplier?.hasQualityIssue && (
-                          <Badge variant="destructive" className="ml-1 text-[10px] h-4 px-1">质量问题</Badge>
-                        )}
-                        <span className="mx-1">·</span>
-                        ¥{totalAmount.toLocaleString()}
-                      </div>
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell">
+                    <TableCell>
                       {contract.supplier?.name}
                       {contract.supplier?.hasQualityIssue && (
                          <Badge variant="destructive" className="ml-2 text-[10px] h-5 px-1">质量问题</Badge>
@@ -135,8 +168,8 @@ export default function PurchasePage() {
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{formatDate(contract.signedAt)}</TableCell>
                     <TableCell>{getStatusBadge(contract.status)}</TableCell>
-                    <TableCell className="hidden sm:table-cell text-right">¥{totalAmount.toLocaleString()}</TableCell>
-                    <TableCell className="hidden sm:table-cell text-right">
+                    <TableCell className="text-right">¥{totalAmount.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
                       <AmountText tone={paidAmount < totalAmount ? 'warning' : 'success'}>
                         ¥{paidAmount.toLocaleString()}
                       </AmountText>

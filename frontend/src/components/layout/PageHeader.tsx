@@ -49,33 +49,34 @@ export function PageHeader({
   };
 
   return (
-    <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
-      <div className="flex min-w-0 items-start gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3 md:items-start md:gap-4 md:pb-4">
+      <div className="flex min-w-0 items-center gap-2 md:items-start md:gap-3">
         {/* 返回按钮：有 backHref 时自动显示；可通过 showBack 强制控制 */}
         {shouldShowBack && (
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleBack}
-            className="mt-0.5 gap-1"
+            className="h-9 shrink-0 gap-1 md:mt-0.5"
           >
             <ArrowLeft className="h-4 w-4" />
-            {backLabel}
+            <span className="hidden sm:inline">{backLabel}</span>
           </Button>
         )}
-        
-        {/* 标题区域 */}
+
+        {/* 标题区域：移动端字号缩小以节省空间 */}
         <div className="min-w-0">
-          <h2 className="break-words text-2xl font-semibold tracking-tight">{title}</h2>
+          <h2 className="break-words text-xl font-semibold tracking-tight md:text-2xl">{title}</h2>
+          {/* 描述文字：移动端隐藏，节省屏幕高度 */}
           {description && (
-            <p className="break-words text-sm text-muted-foreground">{description}</p>
+            <p className="hidden break-words text-sm text-muted-foreground md:block">{description}</p>
           )}
         </div>
       </div>
-      
+
       {/* 右侧操作按钮 */}
       {actions && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           {actions}
         </div>
       )}

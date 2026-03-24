@@ -1,7 +1,7 @@
 /**
- * Input: 认证状态仓库（zustand persist）、路由导航能力、Sidebar、Header
+ * Input: 认证状态仓库（zustand persist）、路由导航能力、Sidebar、Header、MobileTabBar
  * Output: Dashboard 全局布局容器与未登录重定向行为
- * Pos: 仪表盘路由层，承载导航框架和内容区域
+ * Pos: 仪表盘路由层，承载导航框架和内容区域；移动端使用底部 TabBar 替代侧边栏
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -13,6 +13,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { MobileTabBar } from '@/components/layout/MobileTabBar';
 import { getDefaultDashboardHref, getModuleByPath, getVisibleModuleNavItems } from '@/components/layout/navigation.config';
 
 type PersistedAuthState = {
@@ -109,17 +110,26 @@ export default function DashboardLayout({
     return null;
   }
 
+  const visibleItems = getVisibleModuleNavItems(user?.role);
+
   return (
     <div className="grid min-h-screen w-full bg-muted/40 md:grid-cols-[260px_1fr]">
+      {/* 桌面端侧边栏：移动端隐藏 */}
       <div className="hidden border-r bg-sidebar md:block">
         <Sidebar />
       </div>
       <div className="flex flex-col">
         <Header />
-        <main className="flex flex-1 flex-col gap-6 px-4 py-5 md:px-6 lg:px-8">
+        {/* 移动端底部 TabBar 高度补偿：56px + safe-area-inset-bottom */}
+        <main
+          className="flex flex-1 flex-col gap-6 px-4 py-5 md:px-6 lg:px-8"
+          style={{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom) + 1.25rem)' }}
+        >
           {children}
         </main>
       </div>
+      {/* 移动端底部 TabBar：桌面端由 CSS md:hidden 控制不渲染 */}
+      <MobileTabBar visibleItems={visibleItems} />
     </div>
   );
 }

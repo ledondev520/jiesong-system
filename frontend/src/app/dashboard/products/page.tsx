@@ -26,6 +26,7 @@ import { Plus, Pencil, Trash, Search, Package, X } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ProductDialog } from './components/ProductDialog';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { MobileListCard } from '@/components/mobile';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { toast } from 'sonner';
 import {
@@ -220,18 +221,54 @@ function ProductsPageContent() {
         }
       />
 
-      <div className="surface-panel overflow-hidden">
+      {/* 移动端卡片列表 */}
+      <div className="space-y-3 md:hidden">
+        {loading ? (
+          <div className="surface-panel py-10 text-center text-sm text-muted-foreground">加载中...</div>
+        ) : products.length === 0 ? (
+          <div className="surface-panel py-10 text-center text-sm text-muted-foreground">
+            {keyword ? '没有匹配的商品' : '暂无商品，点击右上角新增'}
+          </div>
+        ) : (
+          pagedProducts.map((product) => (
+            <MobileListCard
+              key={product.id}
+              title={product.customsName}
+              subtitle={[product.specification, product.unit].filter(Boolean).join(' · ') || '-'}
+              fields={[
+                { label: '包装规格', value: product.packingSpec || '-' },
+                { label: '毛重', value: product.grossWeight != null ? `${product.grossWeight} kg` : '-' },
+                { label: '净重', value: product.netWeight != null ? `${product.netWeight} kg` : '-' },
+                { label: '体积', value: product.volume != null ? `${product.volume} CBM` : '-' },
+              ]}
+              action={
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="h-10 flex-1 rounded-xl" onClick={() => handleEdit(product)}>
+                    <Pencil className="mr-1 h-4 w-4" /> 编辑
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-10 rounded-xl px-3" onClick={() => openDeleteDialog(product)}>
+                    <Trash className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              }
+            />
+          ))
+        )}
+      </div>
+
+      {/* 桌面端表格 */}
+      <div className="surface-panel hidden overflow-hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>报关名称</TableHead>
-              <TableHead className="hidden sm:table-cell">规格</TableHead>
-              <TableHead className="hidden sm:table-cell">单位</TableHead>
+              <TableHead>规格</TableHead>
+              <TableHead>单位</TableHead>
               <TableHead className="hidden md:table-cell">包装规格</TableHead>
               <TableHead className="hidden md:table-cell text-right">毛重(kg)</TableHead>
               <TableHead className="hidden md:table-cell text-right">净重(kg)</TableHead>
               <TableHead className="hidden md:table-cell text-right">体积(CBM)</TableHead>
-              <TableHead className="w-[80px] sm:w-[100px]">操作</TableHead>
+              <TableHead className="w-[100px]">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -252,15 +289,9 @@ function ProductsPageContent() {
             ) : (
               pagedProducts.map((product) => (
                 <TableRow key={product.id}>
-                  <TableCell className="font-medium">
-                    <div>{product.customsName}</div>
-                    {/* 手机端在名称下内嵌规格和单位 */}
-                    <div className="mt-0.5 text-xs text-muted-foreground sm:hidden">
-                      {[product.specification, product.unit].filter(Boolean).join(' · ') || '-'}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">{product.specification || '-'}</TableCell>
-                  <TableCell className="hidden sm:table-cell">{product.unit || '-'}</TableCell>
+                  <TableCell className="font-medium">{product.customsName}</TableCell>
+                  <TableCell>{product.specification || '-'}</TableCell>
+                  <TableCell>{product.unit || '-'}</TableCell>
                   <TableCell className="hidden md:table-cell">{product.packingSpec || '-'}</TableCell>
                   <TableCell className="hidden md:table-cell text-right">{product.grossWeight ?? '-'}</TableCell>
                   <TableCell className="hidden md:table-cell text-right">{product.netWeight ?? '-'}</TableCell>

@@ -56,22 +56,33 @@ export function ModuleTabHeader({ tabs, moduleName }: ModuleTabHeaderProps) {
 
   return (
     <div className="mb-6 border-b">
-      <nav className="flex items-end gap-0 overflow-x-auto scrollbar-none" aria-label={moduleName}>
-        {tabs.map((tab) => (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            className={cn(
-              'relative flex min-h-[44px] items-center px-4 py-2.5 text-sm font-medium transition-colors',
-              'hover:text-foreground',
-              isTabRouteActive(pathname, tab.href)
-                ? 'text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-primary'
-                : 'text-muted-foreground',
-            )}
-          >
-            {tab.label}
-          </Link>
-        ))}
+      <nav
+        className="flex items-end gap-0 overflow-x-auto scrollbar-none"
+        aria-label={moduleName}
+        /* 移动端横向滚动时不触发页面纵向滚动 */
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+        {tabs.map((tab) => {
+          const active = isTabRouteActive(pathname, tab.href);
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              className={cn(
+                // 移动端更大触控区域 (min-h-[48px])，文字稍大
+                'relative flex min-h-[48px] items-center whitespace-nowrap px-3 py-2.5',
+                'text-sm font-medium transition-colors md:px-4',
+                'hover:text-foreground',
+                active
+                  ? 'text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:rounded-t-full after:bg-primary'
+                  : 'text-muted-foreground',
+              )}
+            >
+              {/* 激活状态加粗，提高移动端识别度 */}
+              <span className={cn(active && 'font-semibold')}>{tab.label}</span>
+            </Link>
+          );
+        })}
       </nav>
     </div>
   );

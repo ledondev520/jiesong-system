@@ -22,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TaxRefundStatusBadge, taxRefundStatusOptions } from './TaxRefundStatusBadge';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
+import { MobileListCard } from '@/components/mobile';
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -147,7 +148,7 @@ export function TaxRefundListPageContent() {
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-3 gap-3 md:gap-4">
         <Card className="surface-panel">
           <CardHeader>
             <CardTitle className="text-sm text-muted-foreground">当前记录数</CardTitle>
@@ -168,7 +169,37 @@ export function TaxRefundListPageContent() {
         </Card>
       </div>
 
-      <Card className="surface-panel overflow-hidden">
+      {/* 移动端卡片列表 */}
+      <div className="space-y-3 md:hidden">
+        {loading ? (
+          <div className="surface-panel py-10 text-center text-sm text-muted-foreground">加载中...</div>
+        ) : taxRefunds.length === 0 ? (
+          <div className="surface-panel py-10 text-center text-sm text-muted-foreground">暂无退税记录</div>
+        ) : (
+          taxRefunds.map((taxRefund) => (
+            <MobileListCard
+              key={taxRefund.id}
+              title={taxRefund.refundNo}
+              subtitle={taxRefund.appliedAt || '-'}
+              badge={<TaxRefundStatusBadge status={taxRefund.status} />}
+              fields={[
+                { label: '申报金额', value: `¥${taxRefund.declaredAmount.toLocaleString()}` },
+                { label: '可退金额', value: `¥${taxRefund.refundableAmount.toLocaleString()}`, emphasis: 'primary' },
+                { label: '备注', value: taxRefund.note || '-' },
+              ]}
+              amount={{ label: '已退', value: `¥${taxRefund.refundedAmount.toLocaleString()}`, emphasis: 'primary' }}
+              action={
+                <Button size="sm" variant="outline" className="h-10 w-full rounded-xl" onClick={() => openDetail(taxRefund.id)}>
+                  <ReceiptText className="mr-2 h-4 w-4" /> 查看详情
+                </Button>
+              }
+            />
+          ))
+        )}
+      </div>
+
+      {/* 桌面端表格 */}
+      <Card className="surface-panel hidden overflow-hidden md:block">
         <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2">
             <ReceiptText className="h-4 w-4" />
