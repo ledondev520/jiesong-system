@@ -42,6 +42,7 @@ export const EXPORT_TABS: TabConfig[] = [
   { href: '/dashboard/sales', label: '出口合同' },
   { href: '/dashboard/tax-refunds', label: '出口退税' },
   { href: '/customs-declarations', label: '报关单' },
+  { href: '/dashboard/containers', label: '货柜管理' },
   { href: '/dashboard/hs-codes', label: 'HS 编码' },
 ];
 
@@ -49,6 +50,8 @@ export const FINANCE_TABS: TabConfig[] = [
   { href: '/dashboard/finance', label: '财务概览' },
   { href: '/dashboard/finance/statements', label: '财务报表' },
   { href: '/dashboard/payments', label: '收付管理' },
+  { href: '/dashboard/finance/receivable', label: '应收账款' },
+  { href: '/dashboard/finance/payable', label: '应付账款' },
 ];
 
 export const AI_TABS: TabConfig[] = [
@@ -89,7 +92,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     defaultHref: '/dashboard/sales',
     label: '出口',
     icon: PackageOpen,
-    childPrefixes: ['/dashboard/sales', '/dashboard/tax-refunds', '/customs-declarations', '/dashboard/hs-codes'],
+    childPrefixes: ['/dashboard/sales', '/dashboard/tax-refunds', '/customs-declarations', '/dashboard/containers', '/dashboard/hs-codes'],
     tabs: EXPORT_TABS,
   },
   {
@@ -99,6 +102,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     label: '财务',
     icon: Landmark,
     childPrefixes: ['/dashboard/payments', '/dashboard/finance'],
+    // finance/payable 和 finance/receivable 路径前缀 /dashboard/finance 已覆盖
     tabs: FINANCE_TABS,
   },
   {

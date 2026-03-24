@@ -20,6 +20,7 @@ vi.mock('next/navigation', () => ({
     push: vi.fn(),
     back: vi.fn(),
   }),
+  usePathname: () => '/dashboard/finance/payable',
 }));
 
 vi.mock('@/services/finance.service', () => ({

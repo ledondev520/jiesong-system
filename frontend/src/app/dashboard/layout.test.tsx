@@ -133,8 +133,26 @@ describe('DashboardLayout', () => {
     expect(mocks.replace).not.toHaveBeenCalled();
   });
 
-  it('未完成 hydration 时先不渲染，完成后再展示内容', async () => {
+  it('未完成 hydration 但已登录时仍渲染内容（避免闪烁）', async () => {
+    // 已登录时，即使 hydration 未完成也直接渲染，避免白屏闪烁
     mocks.authState.isAuthenticated = true;
+    mocks.setHasHydrated(false);
+
+    render(
+      <DashboardLayout>
+        <div>页面内容</div>
+      </DashboardLayout>,
+    );
+
+    // 已认证时不应阻塞渲染
+    await waitFor(() => {
+      expect(screen.getByText('页面内容')).toBeInTheDocument();
+    });
+    expect(mocks.replace).not.toHaveBeenCalled();
+  });
+
+  it('未完成 hydration 且未登录时不渲染内容', async () => {
+    mocks.authState.isAuthenticated = false;
     mocks.setHasHydrated(false);
 
     const { queryByText } = render(
@@ -143,18 +161,8 @@ describe('DashboardLayout', () => {
       </DashboardLayout>,
     );
 
+    // 未认证且未 hydrated 时，返回 null
     expect(queryByText('页面内容')).toBeNull();
-    expect(typeof mocks.getHydrationCallback()).toBe('function');
-
-    act(() => {
-      mocks.setHasHydrated(true);
-      mocks.getHydrationCallback()?.();
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('页面内容')).toBeInTheDocument();
-    });
-    expect(mocks.replace).not.toHaveBeenCalled();
   });
 
   it('非管理员进入系统管理路径时跳回默认 dashboard 落点', async () => {

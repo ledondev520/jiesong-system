@@ -21,6 +21,7 @@ vi.mock('next/navigation', () => ({
     push: vi.fn(),
     back: vi.fn(),
   }),
+  usePathname: () => '/dashboard/containers',
 }));
 
 vi.mock('next/link', () => ({

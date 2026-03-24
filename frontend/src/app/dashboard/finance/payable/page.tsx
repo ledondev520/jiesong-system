@@ -25,6 +25,8 @@ import { PaymentDialog, type PaymentSubmitData } from '../components/PaymentDial
 import { toast } from 'sonner';
 import { financeService } from '@/services/finance.service';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader } from '@/components/layout/ModuleTabHeader';
+import { FINANCE_TABS } from '@/components/layout/navigation.config';
 
 interface PayableContract {
   id: string;
@@ -130,6 +132,7 @@ export default function PayablePage() {
 
   return (
     <div className="space-y-6">
+      <ModuleTabHeader tabs={FINANCE_TABS} moduleName="财务" />
       <PageHeader
         title="应付账款"
         description={`供应商付款跟踪。共 ${unpaidContracts.length} 笔待付账款。`}

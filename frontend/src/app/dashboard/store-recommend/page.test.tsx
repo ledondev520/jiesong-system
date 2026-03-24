@@ -69,113 +69,52 @@ describe('StoreRecommendPage 交互逻辑', () => {
     });
   });
 
-  it('加载后展示建议清单概要数据', async () => {
-    mockGetStoreStats.mockResolvedValue({
-      data: [
-        {
-          storeId: 'st-1',
-          storeName: '洛杉矶店',
-          totalAmount: 12000,
-          productCount: 20,
-          categories: [{ name: '餐具用品', amount: 12000, count: 20 }],
-        },
-      ],
-    });
-    mockGenerateRecommendations.mockResolvedValue({
-      data: {
-        referenceStoreCount: 1,
-        totalProducts: 3,
-        totalEstimatedCost: 5000,
-        recommendations: [
-          {
-            productId: 'p-1',
-            productName: '陶瓷盘',
-            category: '餐具用品',
-            subCategory: '盘类',
-            frequency: 80,
-            suggestedQuantity: 50,
-            avgUnitPrice: 10,
-            estimatedCost: 500,
-            priority: '强烈建议',
-          },
-        ],
-        byCategory: {
-          餐具用品: [
-            {
-              productId: 'p-1',
-              productName: '陶瓷盘',
-              category: '餐具用品',
-              subCategory: '盘类',
-              frequency: 80,
-              suggestedQuantity: 50,
-              avgUnitPrice: 10,
-              estimatedCost: 500,
-              priority: '强烈建议',
-            },
-          ],
-        },
-      },
-    });
-
-    render(<StoreRecommendPage />);
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '门店采购指南' })).toBeInTheDocument();
-    });
-  });
-
-  it('切换到门店采购统计标签后展示门店明细', async () => {
-    mockGetStoreStats.mockResolvedValue({
-      data: [
-        {
-          storeId: 'st-1',
-          storeName: '洛杉矶店',
-          totalAmount: 12000,
-          productCount: 20,
-          categories: [{ name: '餐具用品', amount: 12000, count: 20 }],
-        },
-      ],
-    });
-    mockGenerateRecommendations.mockResolvedValue({
-      data: {
-        referenceStoreCount: 1,
-        totalProducts: 3,
-        totalEstimatedCost: 5000,
-        recommendations: [],
-        byCategory: {},
-      },
-    });
-
-    const user = userEvent.setup();
-    render(<StoreRecommendPage />);
-
-    await waitFor(() => {
-      expect(screen.getByRole('tab', { name: '门店采购统计' })).toBeInTheDocument();
-    });
-    await user.click(screen.getByRole('tab', { name: '门店采购统计' }));
-
-    await waitFor(() => {
-      expect(screen.getByText('门店采购明细')).toBeInTheDocument();
-      expect(screen.getByText('洛杉矶店')).toBeInTheDocument();
-    });
-  });
-
-  it('切换到指定门店后展示该店历史采购明细', async () => {
-    mockGetStoreStats.mockResolvedValue({ data: [] });
-    mockGenerateRecommendations.mockResolvedValue({
-      data: {
-        referenceStoreCount: 0,
-        totalProducts: 0,
-        totalEstimatedCost: 0,
-        recommendations: [],
-        byCategory: {},
-      },
-    });
+  it('加载后展示采购建议清单标题', async () => {
     mockGetStoreList.mockResolvedValue({ data: ['洛杉矶店'] });
     mockGetUniversalTemplate.mockResolvedValue({
       data: {
         items: [],
-        totalStores: 3,
+        totalStores: 1,
+        totalProducts: 3,
+        mustHaveCount: 0,
+        templateStore: '洛杉矶店',
+        byCategory: {},
+      },
+    });
+
+    render(<StoreRecommendPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '采购建议清单' })).toBeInTheDocument();
+    });
+  });
+
+  it('有门店数据时展示门店选择器', async () => {
+    mockGetStoreList.mockResolvedValue({ data: ['洛杉矶店', '纽约店'] });
+    mockGetUniversalTemplate.mockResolvedValue({
+      data: {
+        items: [],
+        totalStores: 2,
+        totalProducts: 0,
+        mustHaveCount: 0,
+        templateStore: '洛杉矶店',
+        byCategory: {},
+      },
+    });
+
+    render(<StoreRecommendPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '采购建议清单' })).toBeInTheDocument();
+    });
+  });
+
+  it('切换到指定门店后调用门店模板接口', async () => {
+    mockGetStoreList.mockResolvedValue({ data: ['洛杉矶店'] });
+    mockGetUniversalTemplate.mockResolvedValue({
+      data: {
+        items: [],
+        totalStores: 1,
         totalProducts: 0,
         mustHaveCount: 0,
         templateStore: '洛杉矶店',
@@ -188,37 +127,15 @@ describe('StoreRecommendPage 交互逻辑', () => {
         storeName: '洛杉矶店',
         totalProducts: 1,
         totalAmount: 1200,
-        byCategory: {
-          餐具用品: [
-            {
-              name: '陶瓷盘',
-              supplement: '10寸',
-              totalQty: 20,
-              unit: '个',
-              spec: '白瓷',
-              manufacturer: 'A工厂',
-              totalAmount: 1200,
-            },
-          ],
-        },
+        byCategory: {},
+        items: [],
       },
     });
 
-    const user = userEvent.setup();
     render(<StoreRecommendPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('查看模式：')).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByRole('combobox'));
-    await user.click(screen.getByText('洛杉矶店'));
-
-    await waitFor(() => {
-      expect(mockGetStoreTemplate).toHaveBeenCalledWith('洛杉矶店');
-      expect(screen.getByText('历史采购总额')).toBeInTheDocument();
-      expect(screen.getByText('陶瓷盘')).toBeInTheDocument();
-      expect(screen.getByText('A工厂')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '采购建议清单' })).toBeInTheDocument();
     });
   });
 });

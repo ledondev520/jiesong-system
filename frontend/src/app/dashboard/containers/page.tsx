@@ -29,6 +29,8 @@ import { toast } from 'sonner';
 import { PORTS } from '@/lib/constants';
 import { formatDate } from '@/lib/date-format';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader } from '@/components/layout/ModuleTabHeader';
+import { EXPORT_TABS } from '@/components/layout/navigation.config';
 import { TableStateRow } from '@/components/ui/data-state';
 
 const PAGE_SIZE = 20;
@@ -124,6 +126,7 @@ export default function ContainersPage() {
 
   return (
     <div className="space-y-6">
+      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
         title="货柜管理"
         description="管理集装箱装运与物流状态。"

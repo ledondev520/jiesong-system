@@ -25,6 +25,8 @@ import { PaymentDialog, type PaymentSubmitData } from '../components/PaymentDial
 import { toast } from 'sonner';
 import { financeService } from '@/services/finance.service';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader } from '@/components/layout/ModuleTabHeader';
+import { FINANCE_TABS } from '@/components/layout/navigation.config';
 
 interface ReceivableContract {
   id: string;
@@ -138,6 +140,7 @@ export default function ReceivablePage() {
 
   return (
     <div className="space-y-6">
+      <ModuleTabHeader tabs={FINANCE_TABS} moduleName="财务" />
       <PageHeader
         title="应收账款"
         description={`门店收款跟踪。共 ${unreceiveContracts.length} 笔待收账款。`}
