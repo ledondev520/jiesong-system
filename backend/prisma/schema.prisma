@@ -266,6 +266,7 @@ model SalesContract {
   customsBroker  String?
   isFumigated    Boolean?
   hasTaxRefund   Boolean?
+  containerLabel String?  // 物理货柜编号（如 "02-振宗"），与 EXP 合同号区分
   // 时间戳
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -319,6 +320,15 @@ model PackingItem {
   // 价格信息（USD）
   unitPrice       Float?   // 单价（USD）
   totalPrice      Float?   // 总价（USD）= 单价 * 数量
+  // 商品详情（来自出货清单）
+  supplement      String?  // 商品补充信息（如型号、颜色、用途等）
+  specification   String?  // 规格/尺寸（如 "510*510*810"）
+  manufacturer    String?  // 厂家名称
+  invoiceNo       String?  // 发票号码（增值税发票，退税核销用）
+  purchaseContractNo String? // 购销合同号（对应采购合同）
+  purchaseCost    Float?   // 采购金额（人民币）
+  hsMatchConfidence Float? // HS编码匹配置信度（0-100）
+  hsMatchMethod   String?  // HS编码匹配方式（精确/别名/模糊等）
   // 商品规格尺寸（用于3D可视化，单位 mm）
   length          Float?   // 长度 (mm)
   width           Float?   // 宽度 (mm)
