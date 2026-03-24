@@ -31,6 +31,7 @@ import type { ApiResponse, PaginatedResponse } from '@/types';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
+import { MobileListCard } from '@/components/mobile';
 
 interface ChatMessage {
   id: string;
@@ -435,7 +436,7 @@ export default function AiSessionsPage() {
               </LineChart>
             </ResponsiveContainer>
           )}
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
             <Card className="border-border/70 shadow-none">
               <CardHeader className="pb-1 pt-3">
                 <CardTitle className="text-xs font-medium text-muted-foreground">今日 Token（近 24 小时）</CardTitle>
@@ -518,87 +519,147 @@ export default function AiSessionsPage() {
               </TabsList>
             </div>
             <TabsContent value="chat" className="mt-0 outline-none">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>会话ID</TableHead>
-                    <TableHead>消息数</TableHead>
-                    <TableHead>模型</TableHead>
-                    <TableHead>Token 消耗</TableHead>
-                    <TableHead>预估费用</TableHead>
-                    <TableHead>最近消息时间</TableHead>
-                    <TableHead className="w-[120px]">操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
-                    </TableRow>
-                  ) : sessions.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">暂无 AI 会话记录。</TableCell>
-                    </TableRow>
-                  ) : (
-                    sessions.map((item) => {
-                      const lastAt = getSessionLastAt(item);
-                      const isDeleting = deletingSessionId === item.sessionId;
-                      const tokens = item.totalTokens ?? 0;
-                      return (
-                        <TableRow
-                          key={item.sessionId}
-                          className="cursor-pointer hover:bg-muted/40"
-                          onClick={() => void handleViewDetail(item.sessionId)}
-                        >
-                          <TableCell className="font-mono text-xs">{item.sessionId}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{getSessionCount(item)}</Badge>
-                          </TableCell>
-                          <TableCell className="max-w-[200px]">
-                            {item.lastModel ? (
-                              <span className="font-mono text-xs text-foreground/90" title={item.lastModel}>
-                                {item.lastModel}
+              <div className="md:hidden space-y-3 p-4 pt-3">
+                {loading ? (
+                  <div className="surface-panel py-12 text-center text-sm text-muted-foreground">加载中...</div>
+                ) : sessions.length === 0 ? (
+                  <div className="surface-panel py-12 text-center text-sm text-muted-foreground">暂无 AI 会话记录。</div>
+                ) : (
+                  sessions.map((item) => {
+                    const lastAt = getSessionLastAt(item);
+                    const isDeleting = deletingSessionId === item.sessionId;
+                    const tokens = item.totalTokens ?? 0;
+                    const costText = estimateCost(item.lastModel ?? '', tokens) ?? '—';
+                    return (
+                      <MobileListCard
+                        key={item.sessionId}
+                        title={item.sessionId}
+                        subtitle={lastAt ? formatDateTime(lastAt) : '—'}
+                        badge={<Badge variant="outline">消息 {getSessionCount(item)}</Badge>}
+                        fields={[
+                          {
+                            label: '模型',
+                            value: item.lastModel ? (
+                              <span className="font-mono" title={item.lastModel}>
+                                {item.lastModel.length > 24 ? `${item.lastModel.slice(0, 24)}…` : item.lastModel}
                               </span>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-mono text-xs text-muted-foreground">{formatTokensM(tokens)}</div>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {estimateCost(item.lastModel ?? '', tokens) ?? '—'}
-                          </TableCell>
-                          <TableCell>{lastAt ? formatDateTime(lastAt) : '-'}</TableCell>
-                          <TableCell>
-                            <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="rounded-xl border border-border/65 bg-background/55"
-                                onClick={() => void handleViewDetail(item.sessionId)}
-                                aria-label={`查看会话-${item.sessionId}`}
-                              >
-                                <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="rounded-xl border border-border/65 bg-background/55"
-                                onClick={() => void handleDelete(item.sessionId)}
-                                disabled={isDeleting}
-                                aria-label={`删除会话-${item.sessionId}`}
-                              >
-                                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
+                            ) : '—',
+                          },
+                          { label: 'Token', value: formatTokensM(tokens), emphasis: 'primary' },
+                          { label: '预估', value: costText },
+                        ]}
+                        onClick={() => void handleViewDetail(item.sessionId)}
+                        action={
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => void handleViewDetail(item.sessionId)}
+                            >
+                              <MessageSquare className="mr-1 h-4 w-4" />
+                              查看
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 text-destructive hover:text-destructive"
+                              onClick={() => void handleDelete(item.sessionId)}
+                              disabled={isDeleting}
+                            >
+                              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="mr-1 h-4 w-4" />}
+                              删除
+                            </Button>
+                          </div>
+                        }
+                      />
+                    );
+                  })
+                )}
+              </div>
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>会话ID</TableHead>
+                      <TableHead>消息数</TableHead>
+                      <TableHead>模型</TableHead>
+                      <TableHead>Token 消耗</TableHead>
+                      <TableHead>预估费用</TableHead>
+                      <TableHead>最近消息时间</TableHead>
+                      <TableHead className="w-[120px]">操作</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
+                      </TableRow>
+                    ) : sessions.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">暂无 AI 会话记录。</TableCell>
+                      </TableRow>
+                    ) : (
+                      sessions.map((item) => {
+                        const lastAt = getSessionLastAt(item);
+                        const isDeleting = deletingSessionId === item.sessionId;
+                        const tokens = item.totalTokens ?? 0;
+                        return (
+                          <TableRow
+                            key={item.sessionId}
+                            className="cursor-pointer hover:bg-muted/40"
+                            onClick={() => void handleViewDetail(item.sessionId)}
+                          >
+                            <TableCell className="font-mono text-xs">{item.sessionId}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{getSessionCount(item)}</Badge>
+                            </TableCell>
+                            <TableCell className="max-w-[200px]">
+                              {item.lastModel ? (
+                                <span className="font-mono text-xs text-foreground/90" title={item.lastModel}>
+                                  {item.lastModel}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-mono text-xs text-muted-foreground">{formatTokensM(tokens)}</div>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {estimateCost(item.lastModel ?? '', tokens) ?? '—'}
+                            </TableCell>
+                            <TableCell>{lastAt ? formatDateTime(lastAt) : '-'}</TableCell>
+                            <TableCell>
+                              <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="rounded-xl border border-border/65 bg-background/55"
+                                  onClick={() => void handleViewDetail(item.sessionId)}
+                                  aria-label={`查看会话-${item.sessionId}`}
+                                >
+                                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="rounded-xl border border-border/65 bg-background/55"
+                                  onClick={() => void handleDelete(item.sessionId)}
+                                  disabled={isDeleting}
+                                  aria-label={`删除会话-${item.sessionId}`}
+                                >
+                                  {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </TabsContent>
             <TabsContent value="standalone" className="mt-0 outline-none">
               <p className="text-xs text-muted-foreground px-4 pt-3 pb-2 border-b border-border/40">
@@ -613,60 +674,107 @@ export default function AiSessionsPage() {
                   暂无记录。在 HS 编码页使用 AI 推荐后，将显示在此标签。
                 </p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="min-w-[140px] max-w-[240px]">用户输入摘要</TableHead>
-                      <TableHead>类型</TableHead>
-                      <TableHead>模型</TableHead>
-                      <TableHead className="min-w-[100px]">Token / 预估费用</TableHead>
-                      <TableHead>时间</TableHead>
-                      <TableHead className="w-[100px] text-right">操作</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <>
+                  <div className="md:hidden space-y-3 p-4 pt-3">
                     {standaloneRows.map((row) => {
                       const cost = estimateCost(row.model, row.totalTokens);
                       return (
-                        <TableRow key={row.id}>
-                          <TableCell className="max-w-[240px]">
-                            <span
-                              className="line-clamp-2 text-xs leading-snug text-foreground/90"
-                              title={row.promptBrief?.trim() || undefined}
-                            >
-                              {standaloneInputLabel(row)}
-                            </span>
-                          </TableCell>
-                          <TableCell>
+                        <MobileListCard
+                          key={row.id}
+                          title={standaloneInputLabel(row)}
+                          subtitle={formatDateTime(row.createdAt)}
+                          badge={
                             <Badge variant="secondary" className="font-normal">
                               {labelStandaloneRequestType(row.requestType)}
                             </Badge>
-                          </TableCell>
-                          <TableCell className="max-w-[200px] truncate font-mono text-xs" title={row.model}>
-                            {row.model}
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-mono text-xs text-muted-foreground">{formatTokensM(row.totalTokens)}</div>
-                            {cost ? <div className="mt-0.5 text-[10px] text-muted-foreground/80">{cost}</div> : null}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap text-xs">{formatDateTime(row.createdAt)}</TableCell>
-                          <TableCell className="text-right">
+                          }
+                          fields={[
+                            {
+                              label: '模型',
+                              value: (
+                                <span className="font-mono" title={row.model}>
+                                  {(row.model || '—').length > 20
+                                    ? `${(row.model || '').slice(0, 20)}…`
+                                    : row.model || '—'}
+                                </span>
+                              ),
+                            },
+                            { label: 'Token', value: formatTokensM(row.totalTokens), emphasis: 'primary' },
+                            { label: '预估', value: cost ?? '—' },
+                          ]}
+                          action={
                             <Button
                               type="button"
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
-                              className="h-8 rounded-lg gap-1.5"
+                              className="w-full gap-1.5"
                               onClick={() => setStandaloneDetailRow(row)}
                             >
                               <FileText className="h-3.5 w-3.5" />
                               详情
                             </Button>
-                          </TableCell>
-                        </TableRow>
+                          }
+                        />
                       );
                     })}
-                  </TableBody>
-                </Table>
+                  </div>
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="min-w-[140px] max-w-[240px]">用户输入摘要</TableHead>
+                          <TableHead>类型</TableHead>
+                          <TableHead>模型</TableHead>
+                          <TableHead className="min-w-[100px]">Token / 预估费用</TableHead>
+                          <TableHead>时间</TableHead>
+                          <TableHead className="w-[100px] text-right">操作</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {standaloneRows.map((row) => {
+                          const cost = estimateCost(row.model, row.totalTokens);
+                          return (
+                            <TableRow key={row.id}>
+                              <TableCell className="max-w-[240px]">
+                                <span
+                                  className="line-clamp-2 text-xs leading-snug text-foreground/90"
+                                  title={row.promptBrief?.trim() || undefined}
+                                >
+                                  {standaloneInputLabel(row)}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="font-normal">
+                                  {labelStandaloneRequestType(row.requestType)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="max-w-[200px] truncate font-mono text-xs" title={row.model}>
+                                {row.model}
+                              </TableCell>
+                              <TableCell>
+                                <div className="font-mono text-xs text-muted-foreground">{formatTokensM(row.totalTokens)}</div>
+                                {cost ? <div className="mt-0.5 text-[10px] text-muted-foreground/80">{cost}</div> : null}
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap text-xs">{formatDateTime(row.createdAt)}</TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 rounded-lg gap-1.5"
+                                  onClick={() => setStandaloneDetailRow(row)}
+                                >
+                                  <FileText className="h-3.5 w-3.5" />
+                                  详情
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
             </TabsContent>
           </Tabs>

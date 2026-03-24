@@ -30,6 +30,7 @@ import {
 } from '@/services/system.service';
 import { toast } from 'sonner';
 import { formatDateTime } from '@/lib/date-format';
+import { MobileListCard } from '@/components/mobile';
 
 type NotificationFilter = 'all' | 'unread';
 
@@ -170,7 +171,52 @@ export default function SystemNotificationsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="surface-panel overflow-hidden">
+          <div className="md:hidden space-y-3">
+            {loading ? (
+              <div className="surface-panel py-12 text-center text-sm text-muted-foreground">加载中...</div>
+            ) : filteredNotifications.length === 0 ? (
+              <div className="surface-panel py-12 text-center text-sm text-muted-foreground">暂无通知。</div>
+            ) : (
+              pagedNotifications.map((item) => {
+                const contentPreview = item.content
+                  ? item.content.length > 72 ? `${item.content.slice(0, 72)}…` : item.content
+                  : '-';
+                return (
+                  <MobileListCard
+                    key={item.id}
+                    title={item.title || '（无标题）'}
+                    subtitle={contentPreview}
+                    badge={
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">{getTypeLabel(item.type)}</Badge>
+                        <Badge variant={item.isRead ? 'secondary' : 'default'}>
+                          {item.isRead ? '已读' : '未读'}
+                        </Badge>
+                      </div>
+                    }
+                    fields={[
+                      { label: '时间', value: formatDateTime(item.createdAt) },
+                    ]}
+                    action={
+                      !item.isRead ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          disabled={markingId === item.id}
+                          onClick={() => handleMarkRead(item.id)}
+                        >
+                          <CheckCircle2 className="mr-1 h-4 w-4" />
+                          {markingId === item.id ? '处理中...' : '标记已读'}
+                        </Button>
+                      ) : undefined
+                    }
+                  />
+                );
+              })
+            )}
+          </div>
+          <div className="hidden md:block surface-panel overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>

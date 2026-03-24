@@ -29,6 +29,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { Role } from '@/types';
 import { toast } from 'sonner';
 import { formatDateTime } from '@/lib/date-format';
+import { MobileListCard } from '@/components/mobile';
 
 type StatusFilter = 'ALL' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 
@@ -246,7 +247,33 @@ export default function SystemImportRecordsPage() {
         </CardHeader>
 
         <CardContent>
-          <div className="surface-panel overflow-hidden">
+          <div className="md:hidden space-y-3">
+            {loading ? (
+              <div className="surface-panel py-12 text-center text-sm text-muted-foreground">加载中...</div>
+            ) : records.length === 0 ? (
+              <div className="surface-panel py-12 text-center text-sm text-muted-foreground">暂无导入记录。</div>
+            ) : (
+              records.map((record) => (
+                <MobileListCard
+                  key={record.id}
+                  title={record.fileName || '（无文件名）'}
+                  subtitle={`${formatDateTime(record.importedAt)} · ${record.importedBy || '—'}`}
+                  badge={
+                    <Badge variant={statusBadgeVariantMap[record.status] || 'outline'}>
+                      {getStatusLabel(record.status)}
+                    </Badge>
+                  }
+                  fields={[
+                    { label: '总行', value: String(record.totalRows) },
+                    { label: '成功', value: String(record.successRows), emphasis: 'success' },
+                    { label: '失败', value: String(record.failedRows), emphasis: 'danger' },
+                    { label: '错误', value: getErrorSummary(record.errorLog) },
+                  ]}
+                />
+              ))
+            )}
+          </div>
+          <div className="hidden md:block surface-panel overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>

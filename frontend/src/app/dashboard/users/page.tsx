@@ -31,6 +31,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { MobileListCard } from '@/components/mobile';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -168,7 +169,42 @@ export default function UsersPage() {
         )}
       </div>
 
-      <div className="surface-panel overflow-hidden">
+      {/* 移动端卡片列表 */}
+      <div className="space-y-3 md:hidden">
+        {loading ? (
+          <div className="surface-panel py-10 text-center text-sm text-muted-foreground">加载中...</div>
+        ) : pagedUsers.length === 0 ? (
+          <div className="surface-panel py-10 text-center text-sm text-muted-foreground">
+            {keyword ? '没有匹配的用户' : '暂无用户'}
+          </div>
+        ) : (
+          pagedUsers.map((user) => (
+            <MobileListCard
+              key={user.id}
+              title={user.name}
+              subtitle={user.username}
+              badge={getRoleBadge(user.role)}
+              fields={[
+                { label: '状态', value: user.isActive ? '正常' : '禁用', emphasis: user.isActive ? 'primary' : undefined },
+                { label: '最后登录', value: user.lastLoginAt ? format(new Date(user.lastLoginAt), 'MM-dd HH:mm') : '从未登录' },
+              ]}
+              action={
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="h-10 flex-1 rounded-xl" onClick={() => handleEdit(user)}>
+                    <Pencil className="mr-1 h-4 w-4" /> 编辑
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-10 rounded-xl px-3" onClick={() => handleDelete(user.id)}>
+                    <Trash className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              }
+            />
+          ))
+        )}
+      </div>
+
+      {/* 桌面端表格 */}
+      <div className="surface-panel hidden overflow-hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>

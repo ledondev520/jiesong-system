@@ -31,6 +31,7 @@ import { Input } from '@/components/ui/input';
 import { Search, X } from 'lucide-react';
 import { describeLogValues, labelForAction, labelForEntity } from './logDisplay';
 import { formatDateTime } from '@/lib/date-format';
+import { MobileListCard } from '@/components/mobile';
 
 type LogFilter = 'all' | 'import';
 
@@ -238,7 +239,39 @@ export default function SystemLogsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="surface-panel overflow-hidden">
+          <div className="md:hidden space-y-3">
+            {loading ? (
+              <div className="surface-panel py-12 text-center text-sm text-muted-foreground">加载中...</div>
+            ) : filteredLogs.length === 0 ? (
+              <div className="surface-panel py-12 text-center text-sm text-muted-foreground">暂无日志。</div>
+            ) : (
+              pagedLogs.map((log) => {
+                const { hints } = describeLogValues(log);
+                const summaryLine = hints[0]
+                  || (log.oldValue ? '含旧值快照' : log.newValue ? '含新值快照' : '-');
+                const summaryShort = summaryLine.length > 56 ? `${summaryLine.slice(0, 56)}…` : summaryLine;
+                return (
+                  <MobileListCard
+                    key={log.id}
+                    title={labelForAction(log.action)}
+                    subtitle={`${formatDateTime(log.createdAt)} · ${userLabel(log)}`}
+                    badge={
+                      <Badge variant="outline" className="w-fit text-xs">
+                        {labelForEntity(log.entity)}
+                      </Badge>
+                    }
+                    fields={[
+                      { label: '对象ID', value: log.entityId || '-' },
+                      { label: 'IP', value: log.ipAddress || '-' },
+                      { label: '动作码', value: log.action || '-' },
+                      { label: '摘要', value: summaryShort },
+                    ]}
+                  />
+                );
+              })
+            )}
+          </div>
+          <div className="hidden md:block surface-panel overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>

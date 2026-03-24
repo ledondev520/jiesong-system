@@ -16,7 +16,7 @@ import { contractDocService } from '@/services/contractDoc.service';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Trash2, Upload } from 'lucide-react';
+import { Trash2, Upload, FileText } from 'lucide-react';
 
 interface TemplateInfoItem {
   exists: boolean;
@@ -83,7 +83,40 @@ export default function ContractTemplatesPage() {
         }
       />
 
-      <div className="surface-panel overflow-hidden">
+      {/* 移动端卡片 */}
+      <div className="md:hidden">
+        {loading ? (
+          <div className="surface-panel py-10 text-center text-sm text-muted-foreground">加载中...</div>
+        ) : !currentTemplate ? (
+          <div className="surface-panel py-10 text-center text-sm text-muted-foreground">暂无模板，请先上传。</div>
+        ) : (
+          <div className="surface-panel space-y-3 p-4">
+            <div className="flex items-start gap-3">
+              <FileText className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+              <div className="flex-1 min-w-0">
+                <div className="truncate font-medium text-sm">{currentTemplate.filename || '-'}</div>
+                <div className="mt-1 flex gap-4 text-xs text-muted-foreground">
+                  <span>{typeof currentTemplate.size === 'number' ? `${(currentTemplate.size / 1024).toFixed(1)} KB` : '-'}</span>
+                  <span>{currentTemplate.updatedAt ? format(new Date(currentTemplate.updatedAt), 'yyyy-MM-dd HH:mm') : '-'}</span>
+                </div>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-10 w-full rounded-xl text-destructive border-destructive/30 hover:bg-destructive/5"
+              onClick={() => void handleDelete()}
+              disabled={deleting}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {deleting ? '删除中...' : '删除模板'}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* 桌面端表格 */}
+      <div className="surface-panel hidden overflow-hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>
