@@ -9,6 +9,7 @@ from scrape_hscode_raw import (
     collect_search_codes,
     collect_keyword_codes_tree,
     extract_code_links,
+    parse_chapter_list,
     parse_detail_page,
     rebuild_manifest_snapshot,
     write_json,
@@ -180,6 +181,12 @@ class ScrapeHsCodeRawTests(unittest.TestCase):
         self.assertIn("8417", summary["expanded_keywords"])
         self.assertIn("8401100000", summary["codes"])
         self.assertIn("8417100000", summary["codes"])
+
+    def test_parse_chapter_list_preserves_4digit_prefixes(self):
+        self.assertEqual(
+            parse_chapter_list("03,84,0307,8421"),
+            ["03", "84", "0307", "8421"],
+        )
 
     def test_rebuild_manifest_snapshot_counts_existing_records(self):
         with tempfile.TemporaryDirectory() as temp_dir:

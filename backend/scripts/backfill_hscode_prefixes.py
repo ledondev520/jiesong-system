@@ -18,6 +18,9 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+from typing import Callable
+
+from scrape_hscode_raw import collect_search_codes, make_session
 
 DEFAULT_RECORDS_DIR = Path(__file__).resolve().parents[1] / "data" / "hscode-live" / "records"
 DEFAULT_SCRAPER = Path(__file__).resolve().parent / "scrape_hscode_raw.py"
@@ -56,6 +59,35 @@ def build_missing_4digit_prefixes(chapters: list[str], existing_prefixes: dict[s
             missing_prefixes.append(prefix)
 
     return missing_prefixes
+
+
+def probe_prefixes_with_source_hits(
+    prefixes: list[str],
+    request_delay: float,
+    session_factory: Callable[[], object] = make_session,
+    search_fn: Callable[..., list[str]] = collect_search_codes,
+) -> list[str]:
+    if not prefixes:
+        return []
+
+    session = session_factory()
+    verified_prefixes: list[str] = []
+    try:
+        for prefix in prefixes:
+            codes = search_fn(
+                session=session,
+                keyword=prefix,
+                page=1,
+                request_delay=request_delay,
+            )
+            if codes:
+                verified_prefixes.append(prefix)
+    finally:
+        close = getattr(session, "close", None)
+        if callable(close):
+            close()
+
+    return verified_prefixes
 
 
 def select_shard(prefixes: list[str], shard_index: int, shard_count: int) -> list[str]:
@@ -108,6 +140,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--shard-index", type=int, default=0, help="0-based shard index for this terminal.")
     parser.add_argument("--limit", type=int, default=0, help="Optional limit for prefixes in this run.")
     parser.add_argument("--include-chapters", help="Optional comma-separated chapter list override, e.g. 84,85,90.")
+    parser.add_argument(
+        "--verify-source",
+        action="store_true",
+        help="Probe candidate 4-digit prefixes against the source search page and keep only prefixes with actual results.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Print planned prefixes without running the scraper.")
     args = parser.parse_args(argv)
 
@@ -118,6 +155,8 @@ def main(argv: list[str] | None = None) -> int:
     chapter_counts, existing_prefixes = scan_existing_records(records_dir)
     chapters = parse_comma_list(args.include_chapters) or find_truncated_chapters(chapter_counts, args.threshold)
     prefixes = build_missing_4digit_prefixes(chapters, existing_prefixes)
+    if args.verify_source:
+        prefixes = probe_prefixes_with_source_hits(prefixes, request_delay=args.request_delay)
     shard_prefixes = select_shard(prefixes, args.shard_index, args.shard_count)
     if args.limit > 0:
         shard_prefixes = shard_prefixes[: args.limit]

@@ -358,7 +358,7 @@ def parse_chapter_list(raw_value: str | None) -> list[str]:
         if not piece:
             continue
         if piece.isdigit():
-            chapters.append(f"{int(piece):02d}")
+            chapters.append(f"{int(piece):02d}" if len(piece) <= 2 else piece)
             continue
         raise ValueError(f"invalid chapter value: {piece}")
     return chapters

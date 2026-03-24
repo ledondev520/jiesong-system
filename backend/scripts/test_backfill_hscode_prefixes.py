@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from backfill_hscode_prefixes import (
     build_missing_4digit_prefixes,
     find_truncated_chapters,
+    probe_prefixes_with_source_hits,
     select_shard,
 )
 
@@ -44,6 +45,26 @@ class BackfillHsCodePrefixesTests(unittest.TestCase):
 
         self.assertEqual(select_shard(prefixes, shard_index=0, shard_count=2), ["8403", "8405", "8407"])
         self.assertEqual(select_shard(prefixes, shard_index=1, shard_count=2), ["8404", "8406"])
+
+    def test_probe_prefixes_with_source_hits_filters_empty_prefixes(self):
+        class FakeSession:
+            def close(self):
+                return None
+
+        def fake_search_fn(session, keyword, page, request_delay):
+            self.assertEqual(page, 1)
+            return ["5501100000"] if keyword in {"5501", "5516"} else []
+
+        prefixes = ["5501", "5517", "5516", "5599"]
+
+        verified = probe_prefixes_with_source_hits(
+            prefixes,
+            request_delay=0,
+            session_factory=FakeSession,
+            search_fn=fake_search_fn,
+        )
+
+        self.assertEqual(verified, ["5501", "5516"])
 
 
 if __name__ == "__main__":

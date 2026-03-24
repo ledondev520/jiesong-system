@@ -1,5 +1,361 @@
 # Ops Execution Center Plan
 
+## 2026-03-25 Round 58（HSCode 精确编码清尾差）
+
+### Goal
+- 清掉最后 `8` 个尾差前缀。
+- 不再使用前缀搜索页，而是切到“搜索引擎反查详情页编码 -> 精确 10 位码抓详情”的方式。
+
+### Planned Scope
+- 通过搜索引擎反查公开详情页，拿到每个尾差前缀至少一个可用的 `10` 位编码。
+- 用 `scrape_hscode_raw.py --chapters <10位编码列表>` 直接抓详情页。
+- 重建 `manifest / CSV / DB` 并确认尾差清零。
+
+### Verification Plan
+- 精确 `10` 位码补抓：
+  - `8445300000`
+  - `8446304000`
+  - `8450112000`
+  - `8451100000`
+  - `8521909090`
+  - `8523512000`
+  - `8525803900`
+  - `8527190000`
+- `python3 backend/scripts/scrape_hscode_raw.py --rebuild-manifest-only`
+- `python3 backend/scripts/export_hscode_csv.py`
+- `node backend/scripts/import-hscode-live.js`
+
+### Delivered
+- 最后 `8` 个尾差前缀已全部从 `0` 变为非零。
+- 三层数据最终对齐到 `15354`。
+- 精确编码策略已证明可行，说明这批尾差不是“没有数据”，而是此前入口不对。
+
+### Verification
+- manifest：`15354`
+- CSV：`15354`
+- DB：`15354`
+- 尾差前缀现状：
+  - `8445=1`
+  - `8446=1`
+  - `8450=1`
+  - `8451=1`
+  - `8521=1`
+  - `8523=1`
+  - `8525=1`
+  - `8527=1`
+
+### Remaining Risk
+- 当前官方表覆盖范围内的尾差已经清零。
+- 如果后续还要继续追求更高覆盖，下一步应扩展到更大章节范围或引入第三来源，而不是继续在当前尾差集上重复重跑。
+
+## 2026-03-24 Round 57（HSCode 尾差前缀继续压缩）
+
+### Goal
+- 针对 `84 / 85` 两章最后剩下的 `12` 个尾差前缀继续补抓。
+- 把尾差从双位数继续往下压，并确认三层最终一致。
+
+### Planned Scope
+- 定向补抓：
+  - `84`：`8445 / 8446 / 8450 / 8451 / 8455`
+  - `85`：`8521 / 8523 / 8525 / 8527 / 8533 / 8535 / 8543`
+- 重建 `manifest / CSV / DB`
+- 复核剩余尾差
+
+### Verification Plan
+- 两组 `scrape_hscode_raw.py --chapters <前缀列表> --skip-manifest`
+- `python3 backend/scripts/scrape_hscode_raw.py --rebuild-manifest-only`
+- `python3 backend/scripts/export_hscode_csv.py`
+- `node backend/scripts/import-hscode-live.js`
+
+### Delivered
+- 三层数据推进到 `15346`
+- 本轮新增覆盖：
+  - `8455=14`
+  - `8533=8`
+  - `8535=23`
+  - `8543=28`
+- 当前剩余尾差前缀：
+  - `84`：`8445 / 8446 / 8450 / 8451`
+  - `85`：`8521 / 8523 / 8525 / 8527`
+
+### Verification
+- manifest：`15346`
+- CSV：`15346`
+- DB：`15346`
+
+### Remaining Risk
+- 当前尾差已经收敛到 `8` 个前缀，继续靠同一搜索入口批量补抓的边际收益明显下降。
+- 后续应改成逐前缀策略，必要时换抓取入口或从详情页/第三来源补足。
+
+## 2026-03-24 Round 56（HSCode 官方对账收敛与残余缺口补抓）
+
+### Goal
+- 基于中国海关官方 HS4 表，对 `44 / 62 / 84 / 85 / 90` 五个章节做更系统的对账。
+- 对新识别出来的残余缺口继续补抓，并把官方表范围内的缺口尽量压缩。
+
+### Planned Scope
+- 先从官方表中抽取 `44 / 62 / 84 / 85 / 90` 的 HS4 前缀集。
+- 与本地 CSV 前缀覆盖逐章比对，形成残余缺口清单。
+- 对残余缺口分两轮补抓：
+  - 第一轮：`32` 个前缀
+  - 第二轮：剩余 `17` 个前缀
+- 最后重建 `manifest / CSV / DB` 并再次对账。
+
+### Verification Plan
+- 两轮 `scrape_hscode_raw.py --chapters <残余前缀列表> --skip-manifest`
+- `python3 backend/scripts/scrape_hscode_raw.py --rebuild-manifest-only`
+- `python3 backend/scripts/export_hscode_csv.py`
+- `node backend/scripts/import-hscode-live.js`
+- 官方表范围内残余缺口复核
+
+### Delivered
+- 已完成五个重点章节的系统对账。
+- 已执行两轮残余缺口前缀补抓。
+- 三层数据最终对齐到 `15273`。
+- 官方表覆盖范围内的缺口现状：
+  - `44`：`0`
+  - `62`：`0`
+  - `84`：`5`
+  - `85`：`7`
+  - `90`：`0`
+- 当前残余缺口前缀收敛为：
+  - `84`：`8445 / 8446 / 8450 / 8451 / 8455`
+  - `85`：`8521 / 8523 / 8525 / 8527 / 8533 / 8535 / 8543`
+
+### Verification
+- manifest：`15273`
+- CSV：`15273`
+- DB：`15273`
+- 官方表范围内清零章节：
+  - `44`
+  - `62`
+  - `90`
+- 官方表范围内仍有残余缺口的章节：
+  - `84`
+  - `85`
+
+### Remaining Risk
+- 当前已经不是“大面积缺失”状态，而是收敛到 `12` 个前缀的尾差。
+- 后续如果继续推进，应直接针对这 `12` 个前缀逐个判定：
+  - 是官方表存在但搜索页无法返回
+  - 还是需要换别的抓取入口
+
+## 2026-03-24 Round 55（HSCode 真实缺口前缀定向补抓）
+
+### Goal
+- 直接针对已经被官方二级来源确认的真实缺口前缀做补抓，而不再继续泛扫章节。
+- 完成 `manifest / CSV / DB` 重建，并确认这批前缀是否已经全部从 `0` 变为有覆盖。
+
+### Planned Scope
+- 定向补抓前缀：
+  - `4413`
+  - `4414`
+  - `4415`
+  - `6205`
+  - `6207`
+  - `8418`
+  - `8419`
+  - `8431`
+  - `8435`
+  - `8442`
+  - `8519`
+  - `9027`
+  - `9033`
+- 分两组并行执行 `scrape_hscode_raw.py --chapters <前缀列表> --skip-manifest`
+- 完成 `manifest -> CSV -> DB` 三层重建
+
+### Verification Plan
+- 定向补抓两组前缀
+- `python3 backend/scripts/scrape_hscode_raw.py --rebuild-manifest-only`
+- `python3 backend/scripts/export_hscode_csv.py`
+- `node backend/scripts/import-hscode-live.js`
+- 复核：
+  - 三层记录数一致
+  - 13 个前缀在 CSV 中都已变为 `> 0`
+
+### Delivered
+- 已完成 13 个真实缺口前缀的定向补抓。
+- `manifest / CSV / DB` 已全部重建到 `14734`。
+- 这轮相对上一版 `14391`，净新增 `343` 条。
+- 13 个已确认缺口前缀当前都已具备本地覆盖：
+  - `4413=1`
+  - `4414=9`
+  - `4415=7`
+  - `6205=29`
+  - `6207=50`
+  - `8418=30`
+  - `8419=53`
+  - `8431=17`
+  - `8435=2`
+  - `8442=11`
+  - `8519=15`
+  - `9027=37`
+  - `9033=4`
+
+### Verification
+- `python3 backend/scripts/scrape_hscode_raw.py --rebuild-manifest-only`
+  - 通过：`records=14734`
+- `python3 backend/scripts/export_hscode_csv.py`
+  - 通过：`14734` 行
+- `node backend/scripts/import-hscode-live.js`
+  - 通过：`processed=14734, upserted=14734`
+- 三层一致性复核：
+  - manifest：`14734`
+  - CSV：`14734`
+  - DB：`14734`
+- 章节增量复核：
+  - `44`: `492 -> 509`
+  - `62`: `605 -> 693`
+  - `84`: `862 -> 980`
+  - `85`: `792 -> 807`
+  - `90`: `471 -> 512`
+
+### Remaining Risk
+- 这批“已经被官方确认存在”的真实缺口前缀已经补齐，但并不等于整份 HSCode 数据已经全量完成。
+- 当前最合理的下一步，是再跑一轮官方二级来源对账，检查是否还有“官方存在、本地仍为 0”的前缀残留。
+
+## 2026-03-24 Round 54（HSCode 二级来源交叉验证）
+
+### Goal
+- 找到比原始搜索探针更稳定的二级来源，重新验证当前 `14391` 条 HSCode 数据是否仍有真实缺口。
+- 把“探针不稳定导致无法下结论”的状态，推进到“能确认哪些章节仍缺”的状态。
+
+### Planned Scope
+- 采用中国海关英文站公开的 HS4 官方统计表作为二级来源。
+- 用官方表中的 HS4 前缀，对照本地 [hscode-live.csv](/Users/helena/Cursor/jiesong_system/backend/data/hscode-live/hscode-live.csv) 的 `10` 位编码覆盖。
+- 重点复核此前存疑的章节：
+  - `44`
+  - `62`
+  - `84`
+  - `85`
+  - `90`
+- 将“官方存在、本地为 0”的前缀认定为真实缺口。
+
+### Verification Plan
+- 二级来源：`https://english.customs.gov.cn/Statics/6f72b62b-1a23-41bd-9094-9e10ff565138.html`
+- 本地对账：
+  - 统计官方确认存在的 HS4 前缀，在 CSV 中是否有任何 `10` 位编码以该前缀开头
+- 输出三类判断：
+  - 官方存在 + 本地有数据
+  - 官方存在 + 本地为 `0`
+  - 官方未确认，不纳入“真实缺口”结论
+
+### Delivered
+- 已引入中国海关英文站官方 HS4 统计表作为二级来源。
+- 已完成“官方 HS4 前缀 vs 本地 10 位编码覆盖”的硬对账。
+- 当前已确认的真实缺口前缀包括：
+  - `4413`
+  - `4414`
+  - `4415`
+  - `6205`
+  - `6207`
+  - `8418`
+  - `8419`
+  - `8431`
+  - `8435`
+  - `8442`
+  - `8519`
+  - `9027`
+  - `9033`
+- 当前不能据此认定为真实缺口的前缀：
+  - `8520`
+  - `9009`
+  - `6217`
+  - 原因：本次官方表检索未给出足够确认信号
+
+### Verification
+- 官方表中明确出现，且本地已有覆盖：
+  - `2845=14`
+  - `2853=33`
+  - `2910=9`
+  - `2920=43`
+  - `2922=101`
+- 官方表中明确出现，但本地当前为 `0`：
+  - `4413=0`
+  - `4414=0`
+  - `4415=0`
+  - `6205=0`
+  - `6207=0`
+  - `8418=0`
+  - `8419=0`
+  - `8431=0`
+  - `8435=0`
+  - `8442=0`
+  - `8519=0`
+  - `9027=0`
+  - `9033=0`
+
+### Remaining Risk
+- 现在已经不再是“能不能证明有缺失”的问题，而是“缺失范围有多大、下一轮如何补”的问题。
+- 本轮官方表是按 HS4 统计，能证明某个 `4` 位前缀当前在中国海关体系中确实存在，但不能直接给出该前缀下应有多少个 `10` 位编码。
+- 下一轮应切到“按已确认缺口前缀补抓”，而不是继续泛化扫章节。
+
+## 2026-03-24 Round 53（HSCode 定向增补与三层重建）
+
+### Goal
+- 对 `28 / 29 / 44 / 62 / 84 / 85 / 90` 七个可疑章节执行 4 位前缀定向补抓。
+- 完成 `manifest -> CSV -> 正式库` 三层重建，并重新判断当前是否还能继续认定“仍有缺失”。
+
+### Planned Scope
+- 按上一轮诊断结论，把 `98` 个 4 位前缀分两组补抓。
+- 重建 `backend/data/hscode-live/manifest.json`。
+- 重新导出 [hscode-live.csv](/Users/helena/Cursor/jiesong_system/backend/data/hscode-live/hscode-live.csv)。
+- 重新导入 `backend/prisma/dev.db` 的 `hs_codes`。
+- 对样本前缀做“本地覆盖 vs 源站命中”复核，避免只看中间元文件就下结论。
+
+### Verification Plan
+- `python3 backend/scripts/scrape_hscode_raw.py --rebuild-manifest-only`
+- `python3 backend/scripts/export_hscode_csv.py`
+- `node backend/scripts/import-hscode-live.js`
+- 统计核对：
+  - `manifest record_count`
+  - CSV 行数
+  - `hs_codes` 表记录数
+- 章节样本复核：
+  - 已补入样本：`2845 / 2853 / 2910 / 2920 / 2922`
+  - 待核样本：`4413 / 4414 / 6205 / 6207 / 6217 / 8418 / 8419 / 8519 / 8520 / 9009 / 9027 / 9033`
+
+### Delivered
+- 对 `98` 个 4 位前缀执行了定向补抓。
+- `manifest` 已从 `14161` 重建到 `14391`。
+- CSV 已从 `14161` 重导到 `14391`。
+- `hs_codes` 正式库已重导到 `14391`。
+- 七章中本轮确定出现净新增的只有：
+  - `28`：`511 -> 577`（`+66`）
+  - `29`：`1207 -> 1371`（`+164`）
+- 其余重点章节当前章节总数未继续增长：
+  - `44`：`492`
+  - `62`：`605`
+  - `84`：`862`
+  - `85`：`792`
+  - `90`：`471`
+
+### Verification
+- `python3 backend/scripts/scrape_hscode_raw.py --rebuild-manifest-only`
+  - 通过：`records=14391`
+- `python3 backend/scripts/export_hscode_csv.py`
+  - 通过：`14391` 行
+- `node backend/scripts/import-hscode-live.js`
+  - 通过：`processed=14391, upserted=14391`
+- 三层一致性复核：
+  - manifest：`14391`
+  - CSV：`14391`
+  - DB：`14391`
+- 样本前缀本地覆盖复核：
+  - 已补入：`2845=14`、`2853=33`、`2910=9`、`2920=43`、`2922=101`
+  - 当前仍为 `0`：`4413 / 4414 / 6205 / 6207 / 6217 / 8418 / 8419 / 8519 / 8520 / 9009 / 9027 / 9033`
+- 样本前缀源站复核：
+  - 本轮直接探针返回 `0`，不仅待核样本为 `0`，连已补入样本 `2845 / 2853 / 2910 / 2920 / 2922` 也回了 `0`
+  - 说明当前源站搜索探针已不足以作为“是否完整”的稳定证据
+
+### Remaining Risk
+- 当前最稳的结论是：这轮定向补抓确实把数据基线从 `14161` 拉升到了 `14391`，而且三层已经对齐。
+- 但“现在是否已经绝对无缺失”仍不能下最终结论，因为本轮 live probe 对已知存在前缀也出现了 `0` 命中，源站验证通道存在不稳定或限流迹象。
+- 下一阶段如果要继续追求“完整性证明”，应优先更换验证方式：
+  - 使用备用来源交叉对账
+  - 或改成更稳定的明细页/分类页探针
+  - 而不是继续盲目扩大量补抓
+
 ## 2026-03-23 Round 73 — Frontend E2E Stabilization Before Commit
 
 ### Goal
@@ -1896,3 +2252,81 @@
 
 ### Next
 - 进入第二阶段：优先批量补 controller 与高 ROI service 测试，逐轮复跑 coverage。
+
+## 2026-03-24 Round 52（HSCode 400 截断章节低频分片补抓）
+
+### Goal
+- 识别所有表现出“章节记录数卡在 400 条”的 HSCode 章节。
+- 将补抓策略从“二位章节号搜索”切换为“缺失四位前缀 + 低频分片终端”模式，避免大章节被搜索页上限截断。
+- 在不触发站点封控的前提下持续补齐 `backend/data/hscode-live/records`，后续再统一重建 manifest 并重新入库。
+
+### Root Cause
+- 线上 `hsbianma.com` 的二位章节搜索在大章节上会出现 20 页封顶，导致 `84/85/90/29...` 这类章节停在 400 条附近。
+- 高频连续请求会触发站点“查询过于频繁”提示；新会话 + 较低频率仍可获取数据。
+
+### Delivered
+- 新增 `backend/scripts/backfill_hscode_prefixes.py`：
+  - 自动扫描 `records/*.json`
+  - 识别记录数恰好为 `400` 的疑似截断章节
+  - 生成缺失的 4 位前缀列表
+  - 支持 `--shard-count/--shard-index` 分片，多终端低频并行运行
+  - 新增 `--verify-source`，可把“候选缺失前缀”再向源站查询一层，区分真缺失和假阳性
+- 新增 `backend/scripts/test_backfill_hscode_prefixes.py`，覆盖：
+  - 400 截断章节识别
+  - 缺失 4 位前缀生成
+  - 分片分配
+- 已增强 `backend/scripts/scrape_hscode_raw.py` 与其测试：
+  - `parse_chapter_list()` 现已保留 `0307`、`8421` 这类 4 位前缀，不再强制压成 2 位章节
+- 新增 `backend/scripts/diagnose_hscode_gaps.py` 与 `backend/scripts/test_diagnose_hscode_gaps.py`：
+  - 基于本地 4 位前缀分布 + 源站边界探测，给章节输出 `likely_complete_boundary / likely_incomplete / needs_manual_review`
+- 已完成后处理同步：
+  - `manifest` 重建
+  - CSV 重建
+  - 正式库重新入库
+
+### Final Status
+- 原始快照总量：`14161`
+- CSV 行数：`14161`
+- 本地正式库 `hs_codes`：`14161`
+- 之前大章节的 `400` 截断问题已经通过 4 位前缀补抓显著收敛。
+- `55` 章经现场核验后确认是旧阈值逻辑的假阳性，不是仍有大量缺失：
+  - `5501` 搜索有结果：`11`
+  - `5516` 搜索有结果：`20`
+  - `5517` 搜索结果：`0`
+  - `5599` 搜索结果：`0`
+- 因此，`55` 章的真实边界停在 `5516`，不是“还剩 `5517-5599` 没抓完”。
+- 当前“是否还有缺失”的判断更新为：
+  - `55`：已确认无缺失，属于 `likely_complete_boundary`
+  - `28, 29, 44, 62, 84, 85, 90`：已完成重点抽样，当前都命中了至少一个缺口前缀，属于“应继续增补”的章节
+    - `28`：补内部缺口 + 继续补边界（`2845=14`，`2853=20`）
+    - `29`：补内部缺口（`2910=9`，`2912=20`，`2943=0`）
+    - `44`：补内部缺口（`4413=1`，`4414=9`，`4422=0`）
+    - `62`：补内部缺口 + 继续补边界（`6205=20`，`6207=20`，`6217=20`)
+    - `84`：补内部缺口（`8418=20`，`8419=20`，`8488=0`）
+    - `85`：补内部缺口（`8519=15`，`8520=0`，`8550=0`）
+    - `90`：补内部缺口 + 继续补边界（`9027=20`，`9033=4`）
+
+### Verification
+- `python3 -m unittest backend/scripts/test_diagnose_hscode_gaps.py backend/scripts/test_scrape_hscode_raw.py backend/scripts/test_backfill_hscode_prefixes.py`
+  - 通过（14/14）。
+- `python3 backend/scripts/scrape_hscode_raw.py --rebuild-manifest-only`
+  - 通过，`records=14161`
+- `python3 backend/scripts/export_hscode_csv.py`
+  - 通过，导出 `14161` 行 CSV
+- `node backend/scripts/import-hscode-live.js`
+  - 通过，`processed=14161, upserted=14161`
+- 边界核验：
+  - `5501 -> 11`
+  - `5516 -> 20`
+  - `5517 -> 0`
+  - `5599 -> 0`
+- `python3 backend/scripts/diagnose_hscode_gaps.py --chapters 55 --request-delay 0.5`
+  - 输出 `likely_complete_boundary`
+- 七章重点抽样：
+  - `28`: `2838=0`, `2845=14`, `2853=20`
+  - `29`: `2910=9`, `2912=20`, `2943=0`
+  - `44`: `4413=1`, `4414=9`, `4422=0`
+  - `62`: `6205=20`, `6207=20`, `6217=20`
+  - `84`: `8418=20`, `8419=20`, `8488=0`
+  - `85`: `8519=15`, `8520=0`, `8550=0`
+  - `90`: `9009=0`, `9027=20`, `9033=4`
