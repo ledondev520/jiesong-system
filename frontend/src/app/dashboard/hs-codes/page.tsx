@@ -185,7 +185,7 @@ function HsCodesPageContent() {
     setAiRecommendLoading(true);
     setAiRecommendResult(null);
     try {
-      const res = await api.post<ApiResponse<AiRecommendPayload>>(
+      const res = await api.post<ApiResponse<AiRecommendPayload>, ApiResponse<AiRecommendPayload>>(
         '/hs-codes/ai-recommend',
         { productDescription: trimmed },
       );
@@ -475,7 +475,10 @@ function HsCodesPageContent() {
                     setFillResult(null);
                     try {
                       const desc = fillProductDescription.trim() || fillProductName.trim();
-                      const res = await api.post<ApiResponse<{ filledDeclarationElements: Array<{ element: string; value: string; uncertain?: boolean }> }>>(
+                      const res = await api.post<
+                        ApiResponse<{ filledDeclarationElements: Array<{ element: string; value: string; uncertain?: boolean }> }>,
+                        ApiResponse<{ filledDeclarationElements: Array<{ element: string; value: string; uncertain?: boolean }> }>
+                      >(
                         `/hs-codes/${selectedRecord.hsCode}/fill-declaration`,
                         { productDescription: desc, productName: fillProductName.trim() },
                       );

@@ -36,6 +36,15 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { TableStateRow } from '@/components/ui/data-state';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 
 const STATUS_LABEL_MAP: Record<InventoryStatus, string> = {
   [InventoryStatus.PRODUCING]: '生产中',
@@ -60,6 +69,7 @@ export default function InventoryPage() {
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [batchUpdating, setBatchUpdating] = useState(false);
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -249,7 +259,7 @@ export default function InventoryPage() {
         title="库存状态"
         description="管理商品库存状态，跟踪生产、包装、运输进度"
         actions={
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="hidden flex-wrap items-center gap-2 md:flex">
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
@@ -288,8 +298,163 @@ export default function InventoryPage() {
         }
       />
 
+      <div className="grid grid-cols-2 gap-3 md:hidden">
+        <Sheet open={mobileActionsOpen} onOpenChange={setMobileActionsOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" className="h-11 rounded-2xl">
+              <Search className="mr-2 h-4 w-4" />
+              搜索与批量操作
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="rounded-t-3xl px-0 pb-0">
+            <SheetHeader className="border-b px-5 pb-4">
+              <SheetTitle>搜索与批量操作</SheetTitle>
+              <SheetDescription>先缩小库存范围，再执行批量状态流转。</SheetDescription>
+            </SheetHeader>
+            <div className="space-y-4 px-5 py-5">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="搜索商品/采购合同..."
+                  value={keyword}
+                  onChange={(event) => { setKeyword(event.target.value); setCurrentPage(1); }}
+                  className="h-11 rounded-2xl border-border/70 bg-background/80 pl-9"
+                />
+              </div>
+              {keyword && (
+                <Button
+                  variant="outline"
+                  className="h-11 w-full rounded-2xl"
+                  onClick={() => { setKeyword(''); setDebouncedKeyword(''); setCurrentPage(1); }}
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  清空搜索
+                </Button>
+              )}
+              <div className="rounded-2xl bg-muted/50 p-4 text-sm text-muted-foreground">
+                当前已选 {selectedIds.length} 条库存记录
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                <Button
+                  variant="outline"
+                  className="h-11 rounded-2xl"
+                  disabled={batchUpdating || selectedIds.length === 0}
+                  onClick={() => void handleBatchStatusChange(InventoryStatus.INBOUND)}
+                >
+                  批量设为已入库
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-11 rounded-2xl"
+                  disabled={batchUpdating || selectedIds.length === 0}
+                  onClick={() => void handleBatchStatusChange(InventoryStatus.OUTBOUND)}
+                >
+                  批量设为已出库
+                </Button>
+              </div>
+            </div>
+            <div className="border-t px-5 py-4">
+              <Button variant="outline" className="h-11 w-full rounded-2xl" onClick={() => setMobileActionsOpen(false)}>
+                查看结果
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+        <div className="flex h-11 items-center justify-center rounded-2xl border border-border/70 bg-muted/35 text-sm font-medium text-foreground">
+          已选 {selectedIds.length} 条
+        </div>
+      </div>
+
       {/* 库存列表 */}
-      <div className="surface-panel overflow-hidden">
+      <div className="grid gap-3 md:hidden">
+        {loading ? (
+          <Card className="border-dashed border-border/70">
+            <CardContent className="py-10 text-center text-sm text-muted-foreground">加载中...</CardContent>
+          </Card>
+        ) : loadError ? (
+          <Card className="border-dashed border-border/70">
+            <CardContent className="space-y-4 py-10 text-center">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">数据加载失败</p>
+                <p className="text-sm text-muted-foreground">库存列表暂时不可用，请稍后重试。</p>
+              </div>
+              <Button variant="outline" size="sm" className="rounded-2xl" onClick={() => void loadInventory(debouncedKeyword)}>
+                <RefreshCw className="mr-1 h-4 w-4" />
+                重试
+              </Button>
+            </CardContent>
+          </Card>
+        ) : inventory.length === 0 ? (
+          <Card className="border-dashed border-border/70">
+            <CardContent className="py-10 text-center">
+              <p className="text-sm font-medium text-foreground">暂无库存记录</p>
+              <p className="mt-1 text-sm text-muted-foreground">当前关键词下没有匹配的库存条目。</p>
+            </CardContent>
+          </Card>
+        ) : (
+          pagedInventory.map((item) => {
+            const nextStatuses = getAllowedNextStatuses(item.status);
+            const itemLabel = item.product?.customsName || item.id;
+
+            return (
+              <Card key={item.id} className="border-border/70">
+                <CardContent className="space-y-4 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        checked={selectedIds.includes(item.id)}
+                        onCheckedChange={() => toggleSelectedId(item.id)}
+                        aria-label={`选择库存 ${itemLabel}`}
+                        className="mt-1"
+                      />
+                      <div className="space-y-1">
+                        <p className="text-base font-semibold tracking-tight">{item.product?.customsName}</p>
+                        <p className="text-sm text-muted-foreground">
+                          合同号：{item.purchaseItem?.purchaseContract?.contractNo || '-'}
+                        </p>
+                      </div>
+                    </div>
+                    {getStatusBadge(item.status)}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 rounded-2xl bg-muted/55 p-3">
+                    <div className="space-y-1">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">数量</p>
+                      <p className="text-sm font-medium">{item.quantity} {item.product?.unit}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">当前状态</p>
+                      <p className="text-sm font-medium">{STATUS_LABEL_MAP[item.status]}</p>
+                    </div>
+                  </div>
+
+                  {nextStatuses.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-border/70 px-4 py-3 text-sm text-muted-foreground">
+                      当前记录没有可用下一状态
+                    </div>
+                  ) : (
+                    <div className="grid gap-3">
+                      {nextStatuses.map((nextStatus) => (
+                        <Button
+                          key={`${item.id}-${nextStatus}-mobile`}
+                          variant="outline"
+                          className="h-11 rounded-2xl"
+                          onClick={() => void handleStatusChange(item.id, nextStatus)}
+                          aria-label={`将 ${itemLabel} 状态更新为 ${STATUS_LABEL_MAP[nextStatus]}`}
+                        >
+                          设为: {STATUS_LABEL_MAP[nextStatus]}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
+      </div>
+
+      <div className="hidden overflow-hidden surface-panel md:block">
         <Table>
           <TableHeader>
             <TableRow>

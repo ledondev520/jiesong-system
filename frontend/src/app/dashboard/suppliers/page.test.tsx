@@ -60,7 +60,7 @@ describe('SuppliersPage 交互逻辑', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '供应商管理' })).toBeInTheDocument();
-      expect(screen.getByText('暂无供应商数据。')).toBeInTheDocument();
+      expect(screen.getAllByText('暂无供应商数据。').length).toBeGreaterThan(0);
     });
   });
 
@@ -69,7 +69,7 @@ describe('SuppliersPage 交互逻辑', () => {
     const user = userEvent.setup();
     render(<SuppliersPage />);
 
-    await user.click(screen.getByRole('button', { name: /新增供应商/ }));
+    await user.click(screen.getAllByRole('button', { name: /新增供应商/ })[0]);
     expect(screen.getByText('供应商弹窗已打开')).toBeInTheDocument();
   });
 
@@ -81,5 +81,28 @@ describe('SuppliersPage 交互逻辑', () => {
       expect(mockToastError).toHaveBeenCalledWith('加载供应商失败');
     });
   });
-});
 
+  it('提供移动端搜索入口与供应商卡片动作', async () => {
+    mockGetAll.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: 'supplier-1',
+            name: '佛山陶瓷有限公司',
+            shortName: '佛山陶瓷',
+            contactName: '李总',
+            contactPhone: '13800000000',
+            hasQualityIssue: true,
+            aliases: [{ id: 'alias-1', alias: '陶瓷厂' }],
+          },
+        ],
+      },
+    });
+    render(<SuppliersPage />);
+
+    expect(await screen.findByRole('button', { name: '搜索与操作' })).toBeInTheDocument();
+    expect(screen.getAllByText('佛山陶瓷有限公司').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: '编辑 佛山陶瓷有限公司' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: '删除 佛山陶瓷有限公司' }).length).toBeGreaterThan(0);
+  });
+});

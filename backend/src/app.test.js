@@ -7,9 +7,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const Module = require('node:module');
+const http = require('node:http');
 const express = require('express');
 
-const loadApp = () => {
+const loadApp = (configOverride = {}) => {
   const originalLoad = Module._load;
   const appPath = require.resolve('./app');
 
@@ -27,6 +28,7 @@ const loadApp = () => {
             origin: [],
             credentials: true,
           },
+          ...configOverride,
         };
       }
       if (request === './routes') {
@@ -67,6 +69,16 @@ const loadApp = () => {
   }
 };
 
+const startServer = async (app) => {
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  return {
+    server,
+    baseUrl: `http://127.0.0.1:${address.port}`,
+  };
+};
+
 test('app: 以模块方式加载时不直接监听端口', () => {
   const app = loadApp();
   assert.equal(typeof app, 'function');
@@ -94,4 +106,54 @@ test('app: /health 返回基础健康信息', () => {
   assert.equal(payload.status, 'ok');
   assert.equal(payload.version, '1.0.0');
   assert.match(payload.timestamp, /^\d{4}-\d{2}-\d{2}T/);
+});
+
+test('app: 生产环境同源无 Origin 的请求仍可通过 CORS 到达路由', async () => {
+  const app = loadApp({
+    nodeEnv: 'production',
+    cors: {
+      origin: ['http://23.81.118.51'],
+      credentials: true,
+    },
+  });
+  const { server, baseUrl } = await startServer(app);
+
+  try {
+    const response = await fetch(`${baseUrl}/health`);
+    assert.equal(response.status, 200);
+
+    const payload = await response.json();
+    assert.equal(payload.status, 'ok');
+  } finally {
+    await new Promise((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
+});
+
+test('app: 生产环境显式非法 Origin 仍被拒绝', async () => {
+  const app = loadApp({
+    nodeEnv: 'production',
+    cors: {
+      origin: ['http://23.81.118.51'],
+      credentials: true,
+    },
+  });
+  const { server, baseUrl } = await startServer(app);
+
+  try {
+    const response = await fetch(`${baseUrl}/health`, {
+      headers: {
+        Origin: 'http://evil.example',
+      },
+    });
+    assert.equal(response.status, 500);
+
+    const body = await response.text();
+    assert.match(body, /CORS origin not allowed/);
+  } finally {
+    await new Promise((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
 });

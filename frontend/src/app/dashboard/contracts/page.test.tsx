@@ -71,7 +71,7 @@ describe('ContractsPage 交互逻辑', () => {
       expect(screen.getByRole('heading', { name: '采购合同' })).toBeInTheDocument();
       expect(screen.getByText('采购执行概览')).toBeInTheDocument();
       expect(screen.getByText('合作店铺')).toBeInTheDocument();
-      expect(screen.getByText('暂无采购合同')).toBeInTheDocument();
+      expect(screen.getAllByText('暂无采购合同').length).toBeGreaterThan(0);
     });
   });
 
@@ -80,7 +80,7 @@ describe('ContractsPage 交互逻辑', () => {
     const user = userEvent.setup();
     render(<ContractsPage />);
 
-    await user.click(screen.getByRole('button', { name: /新增采购/ }));
+    await user.click(screen.getAllByRole('button', { name: /新增采购/ })[0]);
     expect(mockPush).toHaveBeenCalledWith('/dashboard/purchase/create');
   });
 
@@ -91,5 +91,37 @@ describe('ContractsPage 交互逻辑', () => {
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('加载采购合同失败');
     });
+  });
+
+  it('提供移动端筛选入口与合同卡片动作', async () => {
+    mockGetAll.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: 'purchase-1',
+            contractNo: 'CG2500001',
+            status: 'SIGNED',
+            totalAmount: 12800,
+            paidAmount: 6400,
+            signedAt: '2026-03-24T00:00:00.000Z',
+            storeName: '上海店',
+            supplier: { name: '佛山陶瓷有限公司', hasQualityIssue: false },
+            items: [
+              {
+                id: 'item-1',
+                product: { customsName: '瓷砖' },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    render(<ContractsPage />);
+
+    expect(await screen.findByRole('button', { name: '筛选与搜索' })).toBeInTheDocument();
+    expect(screen.getAllByText('CG2500001').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('上海店').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: '查看 CG2500001 详情' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: '为 CG2500001 生成购销合同' }).length).toBeGreaterThan(0);
   });
 });

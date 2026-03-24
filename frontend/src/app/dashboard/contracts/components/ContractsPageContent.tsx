@@ -49,6 +49,14 @@ import { contractDocService } from '@/services/contractDoc.service';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 
 // 扩展类型
 interface PurchaseContractDetail extends PurchaseContract {
@@ -71,6 +79,7 @@ export default function ContractsPageContent() {
   const [purchaseStatusFilter, setPurchaseStatusFilter] = useState(statusFromUrl);
   const [productSearch, setProductSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   
   // 分页状态
   const [purchasePage, setPurchasePage] = useState(1);
@@ -205,6 +214,80 @@ export default function ContractsPageContent() {
     setPurchaseDetail(null);
   };
 
+  const hasActiveFilters = purchaseStatusFilter !== 'ALL' || Boolean(storeFilter) || Boolean(productSearch);
+  const storeOptions = useMemo(
+    () => Array.from(new Set(purchaseContracts.filter((c) => c.storeName).map((c) => c.storeName!))).sort(),
+    [purchaseContracts]
+  );
+
+  const resetFilters = () => {
+    setPurchaseStatusFilter('ALL');
+    setStoreFilter('');
+    setProductSearch('');
+    setPurchasePage(1);
+  };
+
+  const renderFilterControls = (variant: 'desktop' | 'mobile') => {
+    const isMobile = variant === 'mobile';
+    const triggerClassName = isMobile
+      ? 'h-11 w-full rounded-2xl border-border/70 bg-background/80 text-left'
+      : 'h-10 w-32 rounded-xl border-border/70 bg-background/70';
+    const storeClassName = isMobile
+      ? 'h-11 w-full rounded-2xl border-border/70 bg-background/80 text-left'
+      : 'h-10 w-36 rounded-xl border-border/70 bg-background/70';
+    const inputClassName = isMobile
+      ? 'h-11 w-full rounded-2xl border-border/70 bg-background/80'
+      : 'h-10 w-40 rounded-xl border-border/70 bg-background/70';
+
+    return (
+      <>
+        <div className={isMobile ? 'space-y-2' : 'contents'}>
+          {isMobile && <Label className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">合同状态</Label>}
+          <Select value={purchaseStatusFilter} onValueChange={setPurchaseStatusFilter}>
+            <SelectTrigger className={triggerClassName}>
+              <SelectValue placeholder="全部状态" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">全部状态</SelectItem>
+              <SelectItem value="DRAFT">草稿</SelectItem>
+              <SelectItem value="SIGNED">已签约</SelectItem>
+              <SelectItem value="PRODUCING">生产中</SelectItem>
+              <SelectItem value="SHIPPED">已发货</SelectItem>
+              <SelectItem value="RECEIVED">已收货</SelectItem>
+              <SelectItem value="COMPLETED">已完成</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className={isMobile ? 'space-y-2' : 'contents'}>
+          {isMobile && <Label className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">发货店铺</Label>}
+          <Select value={storeFilter} onValueChange={setStoreFilter}>
+            <SelectTrigger className={storeClassName}>
+              <SelectValue placeholder="全部店铺" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">全部店铺</SelectItem>
+              {storeOptions.map((store) => (
+                <SelectItem key={store} value={store}>{store}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className={isMobile ? 'space-y-2' : 'contents'}>
+          {isMobile && <Label htmlFor="mobile-product-search" className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">商品搜索</Label>}
+          <Input
+            id={isMobile ? 'mobile-product-search' : undefined}
+            placeholder="搜索商品名称..."
+            value={productSearch}
+            onChange={(e) => setProductSearch(e.target.value)}
+            className={inputClassName}
+          />
+        </div>
+      </>
+    );
+  };
+
   /**
    * 获取采购状态徽章
    */
@@ -240,39 +323,39 @@ export default function ContractsPageContent() {
             当前活跃合同 {procurementOverview.activeContracts}
           </Badge>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <Card className="border-border/70">
-            <CardContent className="flex items-center justify-between pt-6">
+            <CardContent className="flex items-center justify-between gap-3 pt-5">
               <div>
                 <p className="text-sm text-muted-foreground">待推进合同</p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums">{procurementOverview.activeContracts}</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{procurementOverview.activeContracts}</p>
               </div>
               <ShoppingCart className="h-5 w-5 text-primary" />
             </CardContent>
           </Card>
           <Card className="border-border/70">
-            <CardContent className="flex items-center justify-between pt-6">
+            <CardContent className="flex items-center justify-between gap-3 pt-5">
               <div>
                 <p className="text-sm text-muted-foreground">生产中</p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums">{procurementOverview.producingContracts}</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{procurementOverview.producingContracts}</p>
               </div>
               <Package className="h-5 w-5 text-amber-600" />
             </CardContent>
           </Card>
           <Card className="border-border/70">
-            <CardContent className="flex items-center justify-between pt-6">
+            <CardContent className="flex items-center justify-between gap-3 pt-5">
               <div>
                 <p className="text-sm text-muted-foreground">已发货待收货</p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums">{procurementOverview.shippedPendingReceipt}</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{procurementOverview.shippedPendingReceipt}</p>
               </div>
               <Truck className="h-5 w-5 text-emerald-600" />
             </CardContent>
           </Card>
           <Card className="border-border/70">
-            <CardContent className="flex items-center justify-between pt-6">
+            <CardContent className="flex items-center justify-between gap-3 pt-5">
               <div>
                 <p className="text-sm text-muted-foreground">合作店铺</p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums">{procurementOverview.activeStores}</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{procurementOverview.activeStores}</p>
               </div>
               <Store className="h-5 w-5 text-sky-600" />
             </CardContent>
@@ -282,67 +365,149 @@ export default function ContractsPageContent() {
 
       {/* 采购合同内容 */}
       <div className="space-y-4">
-          <div className="flex flex-wrap justify-between items-center gap-4">
+          <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-4">
             {/* 筛选区域 */}
-            <div className="surface-panel flex flex-wrap items-center gap-2 px-3 py-2">
+            <div className="hidden surface-panel flex-wrap items-center gap-2 px-3 py-2 md:flex">
               <Filter className="h-4 w-4 text-muted-foreground" />
-              {/* 状态筛选 */}
-              <Select value={purchaseStatusFilter} onValueChange={setPurchaseStatusFilter}>
-                <SelectTrigger className="h-10 w-32 rounded-xl border-border/70 bg-background/70">
-                  <SelectValue placeholder="全部状态" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">全部状态</SelectItem>
-                  <SelectItem value="DRAFT">草稿</SelectItem>
-                  <SelectItem value="SIGNED">已签约</SelectItem>
-                  <SelectItem value="PRODUCING">生产中</SelectItem>
-                  <SelectItem value="SHIPPED">已发货</SelectItem>
-                  <SelectItem value="RECEIVED">已收货</SelectItem>
-                  <SelectItem value="COMPLETED">已完成</SelectItem>
-                </SelectContent>
-              </Select>
-              {/* 发货店铺筛选 */}
-              <Select value={storeFilter} onValueChange={setStoreFilter}>
-                <SelectTrigger className="h-10 w-36 rounded-xl border-border/70 bg-background/70">
-                  <SelectValue placeholder="全部店铺" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">全部店铺</SelectItem>
-                  {Array.from(new Set(purchaseContracts.filter(c => c.storeName).map(c => c.storeName!))).sort().map(store => (
-                    <SelectItem key={store} value={store}>{store}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {/* 商品搜索 */}
-              <Input
-                placeholder="搜索商品名称..."
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-                className="h-10 w-40 rounded-xl border-border/70 bg-background/70"
-              />
-              {(purchaseStatusFilter !== 'ALL' || storeFilter || productSearch) && (
+              {renderFilterControls('desktop')}
+              {hasActiveFilters && (
                 <Button
                   variant="ghost" 
                   size="sm"
                   className="rounded-xl"
-                  onClick={() => {
-                    setPurchaseStatusFilter('ALL');
-                    setStoreFilter('');
-                    setProductSearch('');
-                    setPurchasePage(1);
-                  }}
+                  onClick={resetFilters}
                 >
                   <X className="h-4 w-4 mr-1" />
                   重置
                 </Button>
               )}
             </div>
-            <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/purchase/create')}>
+
+            <div className="grid grid-cols-2 gap-3 md:hidden">
+              <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" className="h-11 rounded-2xl">
+                    <Filter className="mr-2 h-4 w-4" />
+                    筛选与搜索
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="rounded-t-3xl px-0 pb-0">
+                  <SheetHeader className="border-b px-5 pb-4">
+                    <SheetTitle>筛选与搜索</SheetTitle>
+                    <SheetDescription>先收窄范围，再快速定位合同，避免在手机上来回滑动。</SheetDescription>
+                  </SheetHeader>
+                  <div className="space-y-5 px-5 py-5">
+                    {renderFilterControls('mobile')}
+                  </div>
+                  <div className="flex gap-3 border-t px-5 py-4">
+                    <Button variant="outline" className="h-11 flex-1 rounded-2xl" onClick={resetFilters}>
+                      重置
+                    </Button>
+                    <Button className="h-11 flex-1 rounded-2xl" onClick={() => setMobileFiltersOpen(false)}>
+                      查看结果
+                    </Button>
+                  </div>
+                </SheetContent>
+              </Sheet>
+              <Button className="h-11 rounded-2xl" onClick={() => router.push('/dashboard/purchase/create')}>
+                <Plus className="mr-2 h-4 w-4" /> 新增采购
+              </Button>
+            </div>
+
+            <Button className="hidden h-10 rounded-xl md:inline-flex" onClick={() => router.push('/dashboard/purchase/create')}>
               <Plus className="mr-2 h-4 w-4" /> 新增采购
             </Button>
           </div>
-          
-          <div className="surface-panel overflow-hidden">
+
+          <div className="grid gap-3 md:hidden">
+            {purchaseLoading ? (
+              <Card className="border-dashed border-border/70">
+                <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                  加载中...
+                </CardContent>
+              </Card>
+            ) : pagedPurchaseContracts.length === 0 ? (
+              <Card className="border-dashed border-border/70">
+                <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                  {hasActiveFilters ? '没有符合筛选条件的合同' : '暂无采购合同'}
+                </CardContent>
+              </Card>
+            ) : (
+              pagedPurchaseContracts.map((contract) => {
+                const firstProduct = contract.items?.[0]?.product;
+                const productName = firstProduct?.customsName || '未填写商品';
+                return (
+                  <Card key={contract.id} className="overflow-hidden border-border/70">
+                    <CardContent className="space-y-4 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 space-y-1">
+                          <p className="text-base font-semibold tracking-tight">{contract.contractNo}</p>
+                          <p className="truncate text-sm text-muted-foreground">{productName}</p>
+                        </div>
+                        <div className="shrink-0">{getPurchaseStatusBadge(contract.status)}</div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 rounded-2xl bg-muted/55 p-3">
+                        <div className="space-y-1">
+                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">供应商</p>
+                          <p className="text-sm font-medium">{contract.supplier?.name || '—'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">发货店铺</p>
+                          <p className="text-sm font-medium">{contract.storeName || '—'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">签订日期</p>
+                          <p className="text-sm font-medium">{contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '—'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">付款进度</p>
+                          <AmountText tone={contract.paidAmount < contract.totalAmount ? 'warning' : 'success'} size="sm">
+                            ¥{contract.paidAmount.toLocaleString()}
+                          </AmountText>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-2xl border border-border/70 bg-background px-3 py-3">
+                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">合同总额</p>
+                          <p className="mt-1 text-base font-semibold tabular-nums">¥{contract.totalAmount.toLocaleString()}</p>
+                        </div>
+                        <div className="rounded-2xl border border-border/70 bg-background px-3 py-3">
+                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">已付金额</p>
+                          <AmountText tone={contract.paidAmount < contract.totalAmount ? 'warning' : 'success'} size="sm" className="mt-1 block text-base font-semibold tabular-nums">
+                            ¥{contract.paidAmount.toLocaleString()}
+                          </AmountText>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <Button
+                          variant="outline"
+                          className="h-11 rounded-2xl"
+                          onClick={() => router.push(`/dashboard/purchase/${contract.id}`)}
+                          aria-label={`查看 ${contract.contractNo} 详情`}
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          查看详情
+                        </Button>
+                        <Button
+                          className="h-11 rounded-2xl"
+                          onClick={() => openGenerateDialog(contract.id)}
+                          aria-label={`为 ${contract.contractNo} 生成购销合同`}
+                        >
+                          <FileDown className="mr-2 h-4 w-4" />
+                          生成合同
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+
+          <div className="hidden overflow-hidden surface-panel md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -419,6 +584,7 @@ export default function ContractsPageContent() {
                             size="icon"
                             className="rounded-xl border border-border/65 bg-background/55"
                             onClick={() => router.push(`/dashboard/purchase/${contract.id}`)}
+                            aria-label={`查看 ${contract.contractNo} 详情`}
                             title="查看详情"
                           >
                             <Eye className="h-4 w-4" />
@@ -428,6 +594,7 @@ export default function ContractsPageContent() {
                             size="icon"
                             className="rounded-xl border border-border/65 bg-background/55"
                             onClick={() => openGenerateDialog(contract.id)}
+                            aria-label={`为 ${contract.contractNo} 生成购销合同`}
                             title="生成购销合同"
                           >
                             <FileDown className="h-4 w-4 text-primary" />
@@ -442,12 +609,12 @@ export default function ContractsPageContent() {
           </div>
           
           {/* 分页控件 */}
-          <div className="flex items-center justify-between py-4">
+          <div className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between">
             <div className="text-sm text-muted-foreground">
               共 {filteredPurchaseContracts.length} 条
               {purchaseTotalPages > 1 && `，第 ${purchasePage}/${purchaseTotalPages} 页`}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <PageSizeSelect
                 value={pageSize}
                 onChange={(size) => { setPageSize(size); setPurchasePage(1); }}

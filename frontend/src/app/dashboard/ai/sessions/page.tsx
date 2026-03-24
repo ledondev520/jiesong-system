@@ -278,8 +278,8 @@ export default function AiSessionsPage() {
     void (async () => {
       try {
         const [r1, r30] = await Promise.all([
-          api.get<ApiResponse<TokenStats>>(`/ai/token-stats?days=1`),
-          api.get<ApiResponse<TokenStats>>(`/ai/token-stats?days=30`),
+          api.get<ApiResponse<TokenStats>, ApiResponse<TokenStats>>(`/ai/token-stats?days=1`),
+          api.get<ApiResponse<TokenStats>, ApiResponse<TokenStats>>(`/ai/token-stats?days=30`),
         ]);
         if (!cancelled) {
           setStats24h(r1.data ?? null);

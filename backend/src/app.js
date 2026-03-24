@@ -27,12 +27,7 @@ const isProduction = config.nodeEnv === 'production';
 app.use(
   cors({
     origin: (origin, callback) => {
-      // 生产环境下，不允许空 origin（防止非浏览器直接访问）
-      if (isProduction && !origin) {
-        return callback(new Error('CORS origin required in production'));
-      }
-
-      // 无 origin 时（如 Postman/服务器间调用）允许
+      // 同源 GET、健康检查、服务器间调用等场景可能没有 Origin，生产环境也必须允许。
       if (!origin) {
         return callback(null, true);
       }
