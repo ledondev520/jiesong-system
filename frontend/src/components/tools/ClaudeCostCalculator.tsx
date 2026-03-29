@@ -304,6 +304,8 @@ export function ClaudeCostCalculator() {
               </p>
               <label className="cursor-pointer">
                 <input 
+                  id="claude-cost-screenshot-upload"
+                  name="claudeCostScreenshotUpload"
                   type="file" 
                   className="hidden" 
                   accept="image/*"

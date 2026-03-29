@@ -178,8 +178,10 @@ export function BatchImportDialog({
           {/* 输入区域 */}
           {inputMode === 'paste' ? (
             <div className="space-y-2">
-              <Label>商品名称列表（每行一个）</Label>
+              <Label htmlFor="batch-product-names">商品名称列表（每行一个）</Label>
               <Textarea
+                id="batch-product-names"
+                name="batchProductNames"
                 placeholder="请输入商品名称，每行一个&#10;例如：&#10;瓷砖&#10;木地板&#10;不锈钢螺丝"
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
@@ -191,9 +193,11 @@ export function BatchImportDialog({
             </div>
           ) : (
             <div className="space-y-2">
-              <Label>上传 Excel/CSV 文件</Label>
+              <Label htmlFor="batch-import-file">上传 Excel/CSV 文件</Label>
               <div className="flex items-center gap-2">
                 <Input
+                  id="batch-import-file"
+                  name="batchImportFile"
                   type="file"
                   accept=".txt,.csv"
                   onChange={handleFileUpload}
@@ -229,7 +233,7 @@ export function BatchImportDialog({
           {results.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>匹配结果</Label>
+                <p className="text-sm font-medium leading-none">匹配结果</p>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={handleClear}>
                     清空重填
@@ -269,6 +273,8 @@ export function BatchImportDialog({
                           <TableCell>
                             {result.match ? (
                               <input
+                                aria-label={`选择 ${result.productName} 的匹配结果`}
+                                name="batchImportMatchSelection"
                                 type="checkbox"
                                 checked={isSelected}
                                 onChange={() => handleSelectMatch(result)}

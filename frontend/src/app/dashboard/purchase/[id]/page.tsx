@@ -412,6 +412,8 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               )}
             </Button>
             <input
+              id="purchase-contract-attachment-upload"
+              name="purchaseContractAttachmentUpload"
               ref={fileInputRef}
               type="file"
               className="hidden"

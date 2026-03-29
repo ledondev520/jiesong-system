@@ -595,6 +595,8 @@ export function AIAssistant() {
             >
               {/* 隐藏的文件输入 */}
               <input
+                id="ai-assistant-image-upload"
+                name="aiAssistantImageUpload"
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"

@@ -454,6 +454,8 @@ function HsCodesPageContent() {
               </p>
               <div className="space-y-2">
                 <input
+                  id="hs-ai-fill-product-name"
+                  name="hsAiFillProductName"
                   type="text"
                   placeholder="商品名称（必填，如：天然石英石橱柜台面）"
                   value={fillProductName}
@@ -461,6 +463,8 @@ function HsCodesPageContent() {
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground/60"
                 />
                 <textarea
+                  id="hs-ai-fill-product-description"
+                  name="hsAiFillProductDescription"
                   placeholder="产品描述（选填，如：天然石英石含量≥93%，表面抛光，规格3200×1600mm，厚度20mm）"
                   value={fillProductDescription}
                   onChange={(e) => setFillProductDescription(e.target.value)}

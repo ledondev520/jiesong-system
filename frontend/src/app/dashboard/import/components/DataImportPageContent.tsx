@@ -223,6 +223,8 @@ export default function DataImportPage() {
                 onDrop={handleDrop}
               >
                 <input
+                  id="dashboard-data-import-file"
+                  name="dashboardDataImportFile"
                   ref={fileInputRef}
                   type="file"
                   accept=".csv"
