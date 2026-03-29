@@ -24,6 +24,7 @@
 ## Data classification
 - See `data-classification.json` for the authoritative classification map.
 - Restricted data: secrets, credentials, migration credentials, payment-related keys, and signed contract documents.
+- Agent/service-account credentials and credential hashes are also Restricted data and must never be printed in logs or committed to docs/tests.
 - Confidential data: internal business data (customer orders, contract amounts, supplier/客户联系人信息, operational KPIs).
 - Internal data: non-sensitive operational metrics, general feature flags, status enums, and non-production run metadata.
 - Default rule: if data is not explicitly public, treat it as Internal or Confidential.

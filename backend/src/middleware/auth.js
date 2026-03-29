@@ -11,6 +11,7 @@ const config = require('../config');
 const { createError } = require('./errorHandler');
 const { roleAuth, adminOnly } = require('./roleAuth');
 const prisma = require('../utils/prisma');
+const { parseAgentBearerToken, verifyAgentSecret } = require('../utils/agentCredentials');
 
 /**
  * 认证用户信息内存缓存（LRU 简化实现）
@@ -54,6 +55,89 @@ const clearAuthCache = (userId) => {
   if (userId) authCache.delete(userId);
 };
 
+const attachUserActor = (req, user) => {
+  req.user = user;
+  req.authActor = {
+    actorType: 'USER',
+    userId: user.id,
+    agentAccountId: null,
+    agentCredentialId: null,
+  };
+};
+
+const authenticateAgent = async (req, rawToken) => {
+  const parsedToken = parseAgentBearerToken(rawToken);
+  if (!parsedToken) {
+    throw createError('无效的Agent Token', 401);
+  }
+
+  const credential = await prisma.agentCredential.findUnique({
+    where: { credentialKey: parsedToken.credentialKey },
+    include: {
+      agentAccount: true,
+      grants: {
+        select: {
+          resource: true,
+          action: true,
+          scopeJson: true,
+        },
+      },
+    },
+  });
+
+  if (!credential || credential.status !== 'ACTIVE' || credential.revokedAt) {
+    throw createError('Agent credential 不可用', 401);
+  }
+
+  if (credential.expiresAt && credential.expiresAt.getTime() <= Date.now()) {
+    throw createError('Agent credential 已过期', 401);
+  }
+
+  if (!credential.agentAccount || credential.agentAccount.status !== 'ACTIVE') {
+    throw createError('Agent 账号不可用', 401);
+  }
+
+  if (!verifyAgentSecret(parsedToken.secret, credential.secretHash)) {
+    throw createError('无效的Agent Token', 401);
+  }
+
+  if (typeof prisma.agentCredential?.update === 'function') {
+    try {
+      await prisma.agentCredential.update({
+        where: { id: credential.id },
+        data: { lastUsedAt: new Date() },
+      });
+    } catch {
+      // 不阻断主认证流程；lastUsedAt 属于运维辅助字段
+    }
+  }
+
+  req.agent = {
+    id: credential.agentAccount.id,
+    name: credential.agentAccount.name,
+    slug: credential.agentAccount.slug,
+    status: credential.agentAccount.status,
+    defaultMode: credential.agentAccount.defaultMode || null,
+    grants: Array.isArray(credential.grants) ? credential.grants.map((grant) => ({
+      resource: grant.resource,
+      action: grant.action,
+      scopeJson: grant.scopeJson || null,
+    })) : [],
+  };
+  req.agentCredential = {
+    id: credential.id,
+    credentialKey: credential.credentialKey,
+    label: credential.label || null,
+    status: credential.status,
+  };
+  req.authActor = {
+    actorType: 'AGENT',
+    userId: null,
+    agentAccountId: credential.agentAccount.id,
+    agentCredentialId: credential.id,
+  };
+};
+
 /**
  * 职责：验证JWT Token，将用户信息附加到请求对象
  * 思路：
@@ -74,6 +158,11 @@ const authenticate = async (req, res, next) => {
     }
     
     const token = authHeader.split(' ')[1];
+
+    if (token.startsWith('jsa_')) {
+      await authenticateAgent(req, token);
+      return next();
+    }
     
     // 2. 验证Token
     let decoded;
@@ -119,7 +208,7 @@ const authenticate = async (req, res, next) => {
     }
     
     // 4. 附加用户信息
-    req.user = user;
+    attachUserActor(req, user);
     next();
   } catch (error) {
     next(error);

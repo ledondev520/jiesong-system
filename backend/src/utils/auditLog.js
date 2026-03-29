@@ -195,7 +195,10 @@ const stringifyLogValue = (value) => {
 /**
  * 职责：记录操作日志
  * @param {Object} params - 日志参数
+ * @param {string} params.actorType - Actor 类型（USER / AGENT）
  * @param {string} params.userId - 用户ID
+ * @param {string} params.agentAccountId - Agent 账号ID
+ * @param {string} params.agentCredentialId - Agent 凭证ID
  * @param {string} params.action - 操作类型 (CREATE/UPDATE/DELETE/LOGIN等)
  * @param {string} params.entity - 操作实体 (User/Supplier/Product等)
  * @param {string} params.entityId - 实体ID
@@ -204,7 +207,10 @@ const stringifyLogValue = (value) => {
  * @param {Object} params.req - Express请求对象
  */
 const logOperation = async ({
+  actorType = null,
   userId,
+  agentAccountId = null,
+  agentCredentialId = null,
   action,
   entity,
   entityId = null,
@@ -214,13 +220,19 @@ const logOperation = async ({
 }) => {
   try {
     const resolvedValues = resolveValues(action, entity, oldValue, newValue);
+    const resolvedActorType = String(actorType || (agentAccountId ? 'AGENT' : 'USER')).toUpperCase();
 
     await prisma.operationLog.create({
       data: {
-        userId,
+        actorType: resolvedActorType,
+        userId: resolvedActorType === 'USER' ? userId || null : null,
+        agentAccountId: resolvedActorType === 'AGENT' ? agentAccountId || null : null,
+        agentCredentialId: resolvedActorType === 'AGENT' ? agentCredentialId || null : null,
         action,
         entity,
         entityId,
+        requestId: req?.headers?.['x-request-id'] || null,
+        idempotencyKey: req?.headers?.['x-idempotency-key'] || null,
         oldValue: stringifyLogValue(resolvedValues.oldValue),
         newValue: stringifyLogValue(resolvedValues.newValue),
         ipAddress: req?.ip || req?.connection?.remoteAddress || null,
@@ -251,6 +263,7 @@ const auditMiddleware = (entity, action) => {
         // 只在成功操作时记录日志
         if (data.code >= 200 && data.code < 300 && req.user) {
           await logOperation({
+            actorType: 'USER',
             userId: req.user.id,
             action,
             entity,
@@ -273,22 +286,22 @@ const auditMiddleware = (entity, action) => {
  */
 const log = {
   create: (userId, entity, entityId, newValue, req) => 
-    logOperation({ userId, action: 'CREATE', entity, entityId, newValue, req }),
+    logOperation({ actorType: 'USER', userId, action: 'CREATE', entity, entityId, newValue, req }),
   
   update: (userId, entity, entityId, oldValue, newValue, req) =>
-    logOperation({ userId, action: 'UPDATE', entity, entityId, oldValue, newValue, req }),
+    logOperation({ actorType: 'USER', userId, action: 'UPDATE', entity, entityId, oldValue, newValue, req }),
   
   delete: (userId, entity, entityId, oldValue, req) =>
-    logOperation({ userId, action: 'DELETE', entity, entityId, oldValue, req }),
+    logOperation({ actorType: 'USER', userId, action: 'DELETE', entity, entityId, oldValue, req }),
   
   login: (userId, req) =>
-    logOperation({ userId, action: 'LOGIN', entity: 'User', entityId: userId, req }),
+    logOperation({ actorType: 'USER', userId, action: 'LOGIN', entity: 'User', entityId: userId, req }),
   
   logout: (userId, req) =>
-    logOperation({ userId, action: 'LOGOUT', entity: 'User', entityId: userId, req }),
+    logOperation({ actorType: 'USER', userId, action: 'LOGOUT', entity: 'User', entityId: userId, req }),
 
   action: (userId, action, entity, entityId = null, oldValue = null, newValue = null, req = null) =>
-    logOperation({ userId, action, entity, entityId, oldValue, newValue, req }),
+    logOperation({ actorType: 'USER', userId, action, entity, entityId, oldValue, newValue, req }),
 };
 
 module.exports = {

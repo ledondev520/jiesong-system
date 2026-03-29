@@ -65,6 +65,7 @@ const NOTIFICATION_TYPE = {
   RECEIVABLE_DUE: 'RECEIVABLE_DUE',     // 应收到期
   CONTAINER_ARRIVAL: 'CONTAINER_ARRIVAL', // 货柜到达
   LOW_STOCK: 'LOW_STOCK',               // 低库存预警
+  AGENT_CREDENTIAL: 'AGENT_CREDENTIAL', // Agent 凭证运维通知
   SYSTEM: 'SYSTEM',                     // 系统通知
 };
 

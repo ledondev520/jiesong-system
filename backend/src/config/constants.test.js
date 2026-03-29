@@ -81,7 +81,7 @@ test('NOTIFICATION_TYPE: 覆盖主要通知类型', () => {
 
   assert.deepStrictEqual(
     values,
-    ['PAYMENT_DUE', 'RECEIVABLE_DUE', 'CONTAINER_ARRIVAL', 'LOW_STOCK', 'SYSTEM'].sort(),
+    ['PAYMENT_DUE', 'RECEIVABLE_DUE', 'CONTAINER_ARRIVAL', 'LOW_STOCK', 'SYSTEM', 'AGENT_CREDENTIAL'].sort(),
   );
 });
 

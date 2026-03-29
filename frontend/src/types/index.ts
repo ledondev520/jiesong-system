@@ -20,6 +20,46 @@ export interface User {
   updatedAt: string;
 }
 
+export interface AgentGrant {
+  id?: string;
+  agentAccountId?: string;
+  agentCredentialId?: string | null;
+  resource: string;
+  action: string;
+  scopeJson?: string | null;
+  createdAt?: string;
+}
+
+export interface AgentCredential {
+  id: string;
+  credentialKey: string;
+  label?: string | null;
+  status: string;
+  secretPreview?: string | null;
+  expiresAt?: string | null;
+  lastUsedAt?: string | null;
+  createdAt: string;
+  revokedAt?: string | null;
+}
+
+export interface AgentAccount {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  status: string;
+  defaultMode: string;
+  createdAt: string;
+  updatedAt: string;
+  grants?: AgentGrant[];
+  credentials?: AgentCredential[];
+}
+
+export interface AgentCredentialIssueResult {
+  credential: AgentCredential;
+  token: string;
+}
+
 export interface Port {
   id: string;
   name: string;
@@ -159,21 +199,31 @@ export interface CustomsDeclarationItem {
 export interface CustomsDeclaration {
   id: string;
   declarationNo: string;
+  salesContractId?: string;
   status: CustomsDeclarationStatus;
-  exporter: string;
-  consignee: string;
-  destinationCountry: string;
-  portOfLoading?: string;
-  portOfDestination?: string;
-  transportMode?: string;
-  declarationDate: string;
+  // 实际 schema 字段（与旧前端类型存在命名差异，用可选字段兼容两种命名）
+  exporter?: string | null;
+  consignee?: string | null;
+  destinationCountry?: string | null;
+  portOfLoading?: string | null;
+  portOfDestination?: string | null;
+  transportMode?: string | null;
+  declarationDate?: string | null;
   releaseDate?: string | null;
+  declaredAt?: string | null;    // Prisma schema 实际字段名
+  exportDate?: string | null;    // Prisma schema 实际字段名（对应放行日期）
+  customsBroker?: string | null;
   currency: string;
+  exchangeRate?: number | null;
   totalAmount: number;
-  totalPackages: number;
-  grossWeight: number;
-  netWeight: number;
-  remarks?: string;
+  totalPackages?: number | null;  // 旧字段名（schema 中为 totalQuantity）
+  totalQuantity?: number | null;  // Prisma schema 实际字段名
+  grossWeight?: number | null;    // 旧字段名（schema 中为 totalGrossWeight）
+  totalGrossWeight?: number | null; // Prisma schema 实际字段名
+  netWeight?: number | null;      // 旧字段名（schema 中为 totalNetWeight）
+  totalNetWeight?: number | null;   // Prisma schema 实际字段名
+  remarks?: string | null;
+  note?: string | null;           // Prisma schema 实际字段名
   items?: CustomsDeclarationItem[];
   createdAt: string;
   updatedAt: string;
@@ -292,6 +342,7 @@ export interface SalesContract {
   items?: SalesItem[];
   packingItems?: PackingItem[];  // 装箱明细
   payments?: Payment[];
+  stores?: string[];  // 关联门店名称列表（由后端聚合自 packingItems）
 }
 
 export interface SalesItem {
@@ -373,6 +424,8 @@ export interface PackingItem {
 export enum PaymentType {
   PAYABLE = 'PAYABLE',
   RECEIVABLE = 'RECEIVABLE',
+  RECEIVABLE_RECEIPT = 'RECEIVABLE_RECEIPT',
+  RECEIVABLE_COLLECTION = 'RECEIVABLE_COLLECTION',
 }
 
 export interface Payment {

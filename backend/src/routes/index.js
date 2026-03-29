@@ -12,6 +12,7 @@ const { Router } = require('express');
 
 // 导入各业务路由
 const authRoutes = require('./auth');
+const agentRoutes = require('./agents');
 const supplierRoutes = require('./suppliers');
 const storeRoutes = require('./stores');
 const productRoutes = require('./products');
@@ -27,6 +28,7 @@ const userRoutes = require('./users');
 const dataImportRoutes = require('./dataImport');
 const dataExportRoutes = require('./dataExport');
 const dashboardRoutes = require('./dashboard');
+const searchRoutes = require('./search');
 const contractDocRoutes = require('./contractDoc');
 const storeRecommendRoutes = require('./storeRecommend');
 const customsDeclarationRoutes = require('./customsDeclarations');
@@ -44,6 +46,7 @@ const router = Router();
 
 // 认证路由（无需Token）
 router.use('/auth', authRoutes);
+router.use('/agents', agentRoutes);
 
 // 业务路由（需要Token）
 router.use('/suppliers', supplierRoutes);
@@ -60,6 +63,7 @@ router.use('/users', userRoutes);
 router.use('/import', dataImportRoutes);
 router.use('/export', dataExportRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/search', searchRoutes);
 router.use('/contract-doc', contractDocRoutes);  // 合同文档生成
 router.use('/store-recommend', storeRecommendRoutes);  // 门店采购建议
 router.use('/customs-declarations', customsDeclarationRoutes);

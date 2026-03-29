@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updatedAt": "2026-03-12",
+  "updatedAt": "2026-03-29",
   "owner": "security-team",
   "tiers": [
     {
@@ -9,9 +9,11 @@
       "purpose": "Secrets and high-impact business data with strong legal or financial exposure.",
       "examples": [
         "API tokens",
+        "agent/service-account credentials and one-time issued machine tokens",
         "password hashes and auth signing keys",
         "temporary default test credentials (for example admin/123456)",
         "database credentials",
+        "HSCIQ API keys",
         "backend environment overrides containing real secrets",
         "signed legal/financial contract artifacts"
       ],

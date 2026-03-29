@@ -9,6 +9,7 @@
 const { Router } = require('express');
 const purchaseController = require('../controllers/purchaseController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { accessAuth } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 const { upload } = require('../utils/upload');
 const { withAuditLog } = require('../middleware/auditLog');
@@ -29,13 +30,18 @@ router.get('/:id', withIdValidation, purchaseController.getById);
 // POST /api/v1/purchases - 创建采购合同
 router.post('/', [
   body('supplierId').notEmpty().withMessage('供应商ID不能为空'),
-], roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), handleValidation, withAuditLog(
-  { entity: 'PurchaseContract', action: 'CREATE', model: 'purchaseContract' },
+], accessAuth({ roles: ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'], capabilities: ['purchase.create'] }), handleValidation, withAuditLog(
+  {
+    entity: 'PurchaseContract',
+    action: 'CREATE',
+    model: 'purchaseContract',
+    getNewValue: ({ responseData, defaultValue }) => responseData || defaultValue,
+  },
   purchaseController.create
 ));
 
 // PUT /api/v1/purchases/:id - 更新采购合同
-router.put('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.put('/:id', withIdValidation, accessAuth({ roles: ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'], capabilities: ['purchase.update'] }), withAuditLog(
   { entity: 'PurchaseContract', action: 'UPDATE', model: 'purchaseContract' },
   purchaseController.update
 ));

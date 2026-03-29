@@ -19,6 +19,8 @@
 | 测试样例.md | 开发基线 | 测试先行样例与用例清单 |
 | 模拟数据汇总.md | 追踪清单 | 标记并汇总模拟数据位置 |
 | 前端统一重构验收清单.md | 验收台账 | 记录前端 shadcn/ui 统一重构的验收项与复核命令 |
+| 2026-03-28-ceo-roadmap-upgrade.md | 路线图 | CEO 视角的产品升级路线、30/90 天目标、取舍边界与检查点 |
+| plans/2026-03-29-agent-cli-mcp-ready-design.md | 架构设计 | 定义 Agent 独立账号、命令层、CLI 协议与 MCP-ready 演进路径 |
 | coverage-98-master-plan.md | 专项总纲 | 定义前端覆盖率提升到 98% 的分阶段路径、门禁与里程碑 |
 | coverage-98-ci-plan.md | CI 方案 | 定义 Coverage `>=98%` 的 CI 门禁切换顺序、前置条件、风险与回退 |
 | 系统架构落地执行方案.md | 执行总纲 | 定义多 Agent 协同的系统架构落地路径、WU清单与门禁 |
@@ -43,6 +45,8 @@
 - ✅ 测试样例 - 已完成（待审核）
 - ✅ 模拟数据汇总 - 已完成（待审核）
 - ✅ 前端统一重构验收清单 - 已完成
+- ✅ CEO 路线图升级计划 - 已完成
+- ✅ Agent CLI + MCP-ready 架构设计 - 已完成
 - ✅ Frontend Coverage 98 Master Plan - 已完成
 - ✅ Frontend Coverage 98 CI Gate Plan - 已完成
 - ✅ 系统架构落地执行方案 - 已完成
@@ -54,4 +58,6 @@
 
 ## 下一步
 - 用户审核确认文档
+- 先按 `plans/2026-03-29-agent-cli-mcp-ready-design.md` 落地 Agent 账号模型、统一搜索接口与命令层，再进入 CLI 与 MCP 封装
+- 先按 `2026-03-28-ceo-roadmap-upgrade.md` 推进路线图整理与 shell/workspace 升级，再把 `FE-COV-98` 作为护栏继续收口
 - 先按 `coverage-98-ci-plan.md` 处理 coverage 稳定性与门禁切换，再按 `coverage-98-master-plan.md` 执行 FE-COV-98 的 M1-M6

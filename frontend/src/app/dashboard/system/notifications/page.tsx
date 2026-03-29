@@ -39,6 +39,7 @@ const typeLabelMap: Record<string, string> = {
   IMPORT: '导入',
   CONTRACT: '合同',
   PAYMENT: '财务',
+  AGENT_CREDENTIAL: 'Agent 凭证',
 };
 
 const getTypeLabel = (type: string) => typeLabelMap[type] || type || '-';

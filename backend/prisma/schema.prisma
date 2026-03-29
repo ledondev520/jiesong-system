@@ -45,6 +45,61 @@ model User {
   @@map("users")
 }
 
+model AgentAccount {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  status      String   @default("ACTIVE")
+  defaultMode String   @default("READ_INGEST")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  credentials   AgentCredential[]
+  grants        AgentGrant[]
+  operationLogs OperationLog[]
+
+  @@map("agent_accounts")
+}
+
+model AgentCredential {
+  id               String   @id @default(cuid())
+  agentAccountId   String
+  credentialKey    String   @unique
+  label            String?
+  secretHash       String
+  secretPreview    String?
+  status           String   @default("ACTIVE")
+  expiresAt        DateTime?
+  lastUsedAt       DateTime?
+  createdAt        DateTime @default(now())
+  revokedAt        DateTime?
+
+  agentAccount   AgentAccount   @relation(fields: [agentAccountId], references: [id], onDelete: Cascade)
+  grants         AgentGrant[]
+  operationLogs  OperationLog[]
+
+  @@index([agentAccountId, status])
+  @@map("agent_credentials")
+}
+
+model AgentGrant {
+  id                String   @id @default(cuid())
+  agentAccountId    String
+  agentCredentialId String?
+  resource          String
+  action            String
+  scopeJson         String?
+  createdAt         DateTime @default(now())
+
+  agentAccount    AgentAccount    @relation(fields: [agentAccountId], references: [id], onDelete: Cascade)
+  agentCredential AgentCredential? @relation(fields: [agentCredentialId], references: [id], onDelete: Cascade)
+
+  @@unique([agentAccountId, agentCredentialId, resource, action])
+  @@index([agentAccountId, resource, action])
+  @@map("agent_grants")
+}
+
 // ==================== 基础数据 ====================
 
 model Port {
@@ -617,20 +672,30 @@ model TokenUsage {
 }
 
 model OperationLog {
-  id        String   @id @default(cuid())
-  userId    String
-  action    String
-  entity    String
-  entityId  String?
-  oldValue  String?
-  newValue  String?
-  ipAddress String?
-  userAgent String?
-  createdAt DateTime @default(now())
+  id                String   @id @default(cuid())
+  actorType         String   @default("USER")
+  userId            String?
+  agentAccountId    String?
+  agentCredentialId String?
+  requestId         String?
+  idempotencyKey    String?
+  action            String
+  entity            String
+  entityId          String?
+  oldValue          String?
+  newValue          String?
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user            User?            @relation(fields: [userId], references: [id])
+  agentAccount    AgentAccount?    @relation(fields: [agentAccountId], references: [id])
+  agentCredential AgentCredential? @relation(fields: [agentCredentialId], references: [id])
 
   @@index([userId])
+  @@index([actorType])
+  @@index([agentAccountId])
+  @@index([agentCredentialId])
   @@index([entity, entityId])
   @@index([createdAt])
   @@map("operation_logs")

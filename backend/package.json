@@ -3,9 +3,14 @@
   "version": "1.0.0",
   "description": "捷淞进销存系统后端API服务",
   "main": "src/app.js",
+  "bin": {
+    "jiesong": "./src/agent/cli/index.js"
+  },
   "scripts": {
     "dev": "nodemon src/app.js",
     "start": "node src/app.js",
+    "agent:cli": "node ./src/agent/cli/index.js",
+    "agent:mcp": "node ./src/agent/mcp/server.js",
     "test": "NODE_ENV=test JWT_SECRET=test-only-jwt-secret-for-ci-123456 node --test",
     "test:db": "NODE_ENV=test JWT_SECRET=test-only-jwt-secret-for-ci-123456 node --test src/integration/database.integration.js",
     "test:all": "npm run test && npm run test:db",

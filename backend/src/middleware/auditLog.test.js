@@ -169,3 +169,53 @@ test('withAuditLog: 支持从响应中解析 userId/entityId（登录场景）',
     auditLogUtils.logOperation = originalLogOperation;
   }
 });
+
+test('withAuditLog: 支持记录 Agent actor 审计信息', async () => {
+  const originalLogOperation = auditLogUtils.logOperation;
+  let captured = null;
+  auditLogUtils.logOperation = async (payload) => {
+    captured = payload;
+  };
+
+  try {
+    const handler = async (req, res) => {
+      res.status(201).json({
+        code: 201,
+        data: {
+          id: 'purchase-1',
+          contractNo: 'CG2600001',
+        },
+      });
+    };
+    const middleware = withAuditLog(
+      { entity: 'PurchaseContract', action: 'CREATE', model: 'purchaseContract', captureAfter: false },
+      handler
+    );
+    const req = {
+      method: 'POST',
+      params: {},
+      body: { supplierId: 'supplier-1' },
+      headers: {},
+      authActor: {
+        actorType: 'AGENT',
+        agentAccountId: 'agent-1',
+        agentCredentialId: 'cred-1',
+      },
+      agent: { id: 'agent-1' },
+      agentCredential: { id: 'cred-1' },
+    };
+    const res = createMockRes();
+
+    await middleware(req, res, () => {});
+    await waitForAsyncTasks();
+
+    assert.ok(captured, '应调用 logOperation');
+    assert.equal(captured.actorType, 'AGENT');
+    assert.equal(captured.userId, null);
+    assert.equal(captured.agentAccountId, 'agent-1');
+    assert.equal(captured.agentCredentialId, 'cred-1');
+    assert.equal(captured.entityId, 'purchase-1');
+  } finally {
+    auditLogUtils.logOperation = originalLogOperation;
+  }
+});

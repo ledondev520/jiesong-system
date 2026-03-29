@@ -10,6 +10,7 @@ const prisma = require('../utils/prisma');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const { normalizePagination } = require('../utils/pagination');
+const { createSupplier, updateSupplier } = require('../agent/commands/supplier');
 
 /**
  * 职责：获取供应商列表
@@ -82,20 +83,9 @@ const getById = async (req, res, next) => {
  */
 const create = async (req, res, next) => {
   try {
-    const data = req.body;
-    const supplier = await prisma.supplier.create({
-      data: {
-        name: data.name,
-        shortName: data.shortName,
-        contactName: data.contactName,
-        contactPhone: data.contactPhone,
-        contactEmail: data.contactEmail,
-        address: data.address,
-        phone: data.phone,
-        taxId: data.taxId,
-        bankName: data.bankName,
-        bankAccount: data.bankAccount,
-      },
+    const supplier = await createSupplier({
+      input: req.body,
+      prismaClient: prisma,
     });
     
     created(res, supplier, '供应商创建成功');
@@ -109,23 +99,10 @@ const create = async (req, res, next) => {
  */
 const update = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const data = req.body;
-    
-    const supplier = await prisma.supplier.update({
-      where: { id },
-      data: {
-        name: data.name,
-        shortName: data.shortName,
-        contactName: data.contactName,
-        contactPhone: data.contactPhone,
-        contactEmail: data.contactEmail,
-        address: data.address,
-        phone: data.phone,
-        taxId: data.taxId,
-        bankName: data.bankName,
-        bankAccount: data.bankAccount,
-      },
+    const supplier = await updateSupplier({
+      id: req.params.id,
+      input: req.body,
+      prismaClient: prisma,
     });
     
     success(res, supplier, '供应商更新成功');

@@ -11,10 +11,12 @@ const cors = require('cors');
 const compression = require('compression');
 const config = require('./config');
 const routes = require('./routes');
+const mcpRoutes = require('./routes/mcp');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./middleware/logger');
 const { gentleRateLimit } = require('./middleware/rateLimit');
 const { startInventoryAlertJob } = require('./jobs/inventoryAlertJob');
+const { startAgentCredentialAlertJob } = require('./jobs/agentCredentialAlertJob');
 
 const app = express();
 
@@ -93,6 +95,7 @@ app.get('/health', (req, res) => {
 
 // 4. API 路由（所有业务路由挂载在/api/v1 下）
 app.use('/api/v1', routes);
+app.use('/mcp', mcpRoutes);
 
 // ==================== 错误处理 ====================
 
@@ -108,6 +111,7 @@ const PORT = config.port;
 
 if (require.main === module) {
   startInventoryAlertJob();
+  startAgentCredentialAlertJob();
   app.listen(PORT, () => {
     console.log(`
 ╔════════════════════════════════════════════╗

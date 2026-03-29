@@ -37,7 +37,78 @@ const roleAuth = (...roles) => {
 
 const adminOnly = roleAuth('ADMIN');
 
+const parseCapability = (value) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+  const [resource, action] = normalized.split('.');
+  if (!resource || !action) {
+    return null;
+  }
+  return { resource, action };
+};
+
+const capabilityAuth = (...capabilities) => {
+  const required = capabilities.flat().map(parseCapability).filter(Boolean);
+
+  return (req, res, next) => {
+    if (req.authActor?.actorType === 'AGENT') {
+      const allowed = hasCapabilities(req.agent, required);
+
+      if (!allowed) {
+        return next(createError('Agent 无权限执行此操作', 403));
+      }
+      return next();
+    }
+
+    if (!req.user) {
+      return next(createError('请先登录', 401));
+    }
+
+    return next();
+  };
+};
+
+const hasCapabilities = (agent, capabilities) => {
+  const grants = Array.isArray(agent?.grants) ? agent.grants : [];
+  return capabilities.every((need) =>
+    grants.some((grant) => grant.resource === need.resource && grant.action === need.action)
+  );
+};
+
+const accessAuth = ({ roles = [], capabilities = [] } = {}) => {
+  const roleMiddleware = roles.length ? roleAuth(...roles) : null;
+  const capabilityMiddleware = capabilities.length ? capabilityAuth(...capabilities) : null;
+
+  return (req, res, next) => {
+    if (req.authActor?.actorType === 'AGENT') {
+      if (!capabilityMiddleware) {
+        return next(createError('Agent 无权限执行此操作', 403));
+      }
+      return capabilityMiddleware(req, res, next);
+    }
+
+    if (roleMiddleware) {
+      return roleMiddleware(req, res, next);
+    }
+
+    if (!req.user) {
+      return next(createError('请先登录', 401));
+    }
+
+    return next();
+  };
+};
+
 module.exports = {
   roleAuth,
   adminOnly,
+  capabilityAuth,
+  accessAuth,
+  parseCapability,
+  hasCapabilities,
 };

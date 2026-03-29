@@ -133,6 +133,59 @@ const buildDefaultValues = ({
   };
 };
 
+const resolveActor = async ({ options, req, res, payload, responseData, entityId, userId }) => {
+  const explicitActor = await resolveMaybe(options.getActor, {
+    req,
+    res,
+    payload,
+    responseData,
+    entityId,
+    userId,
+  });
+
+  if (explicitActor) {
+    return explicitActor;
+  }
+
+  if (req.authActor?.actorType === 'AGENT') {
+    return {
+      actorType: 'AGENT',
+      userId: null,
+      agentAccountId: req.authActor.agentAccountId || req.agent?.id || null,
+      agentCredentialId: req.authActor.agentCredentialId || req.agentCredential?.id || null,
+    };
+  }
+
+  if (req.authActor?.actorType === 'USER') {
+    return {
+      actorType: 'USER',
+      userId: req.authActor.userId || userId || req.user?.id || null,
+      agentAccountId: null,
+      agentCredentialId: null,
+    };
+  }
+
+  if (userId || req.user?.id) {
+    return {
+      actorType: 'USER',
+      userId: userId || req.user?.id || null,
+      agentAccountId: null,
+      agentCredentialId: null,
+    };
+  }
+
+  if (req.agent?.id || req.agentCredential?.id) {
+    return {
+      actorType: 'AGENT',
+      userId: null,
+      agentAccountId: req.agent?.id || null,
+      agentCredentialId: req.agentCredential?.id || null,
+    };
+  }
+
+  return null;
+};
+
 /**
  * 职责：包装控制器并在成功响应后记录审计日志
  * @param {Object} options - 审计配置
@@ -229,7 +282,18 @@ const withAuditLog = (options = {}, handler) => {
         if (!userId) {
           userId = req.user?.id || null;
         }
-        if (!userId) {
+
+        const actor = await resolveActor({
+          options,
+          req,
+          res,
+          payload,
+          responseData,
+          entityId: resolvedEntityId,
+          userId,
+        });
+
+        if (!actor) {
           return;
         }
 
@@ -283,7 +347,10 @@ const withAuditLog = (options = {}, handler) => {
         });
 
         await auditLogUtils.logOperation({
-          userId,
+          actorType: actor.actorType,
+          userId: actor.userId ?? userId ?? null,
+          agentAccountId: actor.agentAccountId ?? null,
+          agentCredentialId: actor.agentCredentialId ?? null,
           action,
           entity,
           entityId: resolvedEntityId,

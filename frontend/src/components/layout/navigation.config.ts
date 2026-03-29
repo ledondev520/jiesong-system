@@ -1,8 +1,10 @@
 import type { ComponentType } from 'react';
 import {
-  Bot,
+  Bell,
+  Database,
   Landmark,
   LayoutDashboard,
+  History,
   PackageOpen,
   ShoppingCart,
   SlidersHorizontal,
@@ -15,6 +17,14 @@ export interface TabConfig {
   label: string;
 }
 
+export interface SystemCenterLink {
+  href: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  desc: string;
+  detail: string;
+}
+
 export interface ModuleNavItem {
   key: string;
   href: string;
@@ -24,6 +34,7 @@ export interface ModuleNavItem {
   childPrefixes: string[];
   tabs: TabConfig[];
   visibleRoles?: Role[];
+  mobilePrimary?: boolean;
 }
 
 export const OPERATIONS_TABS: TabConfig[] = [
@@ -36,35 +47,53 @@ export const PROCUREMENT_TABS: TabConfig[] = [
   { href: '/dashboard/suppliers', label: '供应商管理' },
   { href: '/dashboard/inventory-container', label: '库存状态' },
   { href: '/dashboard/store-recommend', label: '采购建议' },
+  { href: '/dashboard/products', label: '商品档案' },
 ];
 
 export const EXPORT_TABS: TabConfig[] = [
   { href: '/dashboard/sales', label: '出口合同' },
-  { href: '/dashboard/tax-refunds', label: '出口退税' },
   { href: '/customs-declarations', label: '报关单' },
-  { href: '/dashboard/containers', label: '货柜管理' },
   { href: '/dashboard/hs-codes', label: 'HS 编码' },
 ];
 
 export const FINANCE_TABS: TabConfig[] = [
   { href: '/dashboard/finance', label: '财务概览' },
   { href: '/dashboard/finance/statements', label: '财务报表' },
-  { href: '/dashboard/payments', label: '收付管理' },
-  { href: '/dashboard/finance/receivable', label: '应收账款' },
-  { href: '/dashboard/finance/payable', label: '应付账款' },
-];
-
-export const AI_TABS: TabConfig[] = [
-  { href: '/dashboard/ai/sessions', label: 'AI 会话' },
+  { href: '/dashboard/payments', label: '收付款' },
 ];
 
 export const ADMIN_TABS: TabConfig[] = [
   { href: '/dashboard/settings', label: '系统配置' },
   { href: '/dashboard/users', label: '用户管理' },
-  { href: '/dashboard/system/notifications', label: '通知中心' },
+  { href: '/dashboard/agents', label: 'Agent 管理' },
+  { href: '/dashboard/about', label: '关于' },
+  { href: '/dashboard/ai/sessions', label: 'AI 日志' },
   { href: '/dashboard/system/logs', label: '系统日志' },
   { href: '/dashboard/system/import-records', label: '导入记录' },
-  { href: '/dashboard/contracts/templates', label: '合同模板' },
+];
+
+export const SYSTEM_CENTER_LINKS: SystemCenterLink[] = [
+  {
+    href: '/dashboard/system/notifications',
+    label: '通知中心',
+    icon: Bell,
+    desc: '查看系统通知和未读提醒',
+    detail: '管理所有系统消息、操作提醒与告警通知，支持批量已读。',
+  },
+  {
+    href: '/dashboard/system/logs',
+    label: '系统日志',
+    icon: History,
+    desc: '审计关键操作日志与变更记录',
+    detail: '追踪合同创建/修改/删除、数据导入等关键操作，支持 CSV 导出。',
+  },
+  {
+    href: '/dashboard/system/import-records',
+    label: '导入记录',
+    icon: Database,
+    desc: '复盘导入任务与失败明细',
+    detail: '查看历次数据导入的执行结果、成功率与失败行详情。',
+  },
 ];
 
 export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
@@ -76,6 +105,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     icon: LayoutDashboard,
     childPrefixes: ['/dashboard/ops-execution'],
     tabs: OPERATIONS_TABS,
+    mobilePrimary: true,
   },
   {
     key: 'procurement',
@@ -83,8 +113,9 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     defaultHref: '/dashboard/contracts',
     label: '采购',
     icon: ShoppingCart,
-    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers', '/dashboard/inventory-container', '/dashboard/store-recommend'],
+    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers', '/dashboard/inventory-container', '/dashboard/store-recommend', '/dashboard/products'],
     tabs: PROCUREMENT_TABS,
+    mobilePrimary: true,
   },
   {
     key: 'export',
@@ -92,8 +123,9 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     defaultHref: '/dashboard/sales',
     label: '出口',
     icon: PackageOpen,
-    childPrefixes: ['/dashboard/sales', '/dashboard/tax-refunds', '/customs-declarations', '/dashboard/containers', '/dashboard/hs-codes'],
+    childPrefixes: ['/dashboard/sales', '/dashboard/tax-refunds', '/customs-declarations', '/forex-verifications', '/dashboard/hs-codes'],
     tabs: EXPORT_TABS,
+    mobilePrimary: true,
   },
   {
     key: 'finance',
@@ -102,17 +134,8 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     label: '财务',
     icon: Landmark,
     childPrefixes: ['/dashboard/payments', '/dashboard/finance'],
-    // finance/payable 和 finance/receivable 路径前缀 /dashboard/finance 已覆盖
     tabs: FINANCE_TABS,
-  },
-  {
-    key: 'ai',
-    href: '/dashboard/ai/sessions',
-    defaultHref: '/dashboard/ai/sessions',
-    label: 'AI 助手',
-    icon: Bot,
-    childPrefixes: ['/dashboard/ai'],
-    tabs: AI_TABS,
+    mobilePrimary: true,
   },
   {
     key: 'admin',
@@ -120,7 +143,16 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     defaultHref: '/dashboard/settings',
     label: '系统管理',
     icon: SlidersHorizontal,
-    childPrefixes: ['/dashboard/contracts/templates', '/dashboard/settings', '/dashboard/import', '/dashboard/users', '/dashboard/system'],
+    childPrefixes: [
+      '/dashboard/contracts/templates',
+      '/dashboard/settings',
+      '/dashboard/import',
+      '/dashboard/users',
+      '/dashboard/agents',
+      '/dashboard/about',
+      '/dashboard/system',
+      '/dashboard/ai',
+    ],
     tabs: ADMIN_TABS,
     visibleRoles: [Role.ADMIN],
   },
@@ -140,6 +172,12 @@ export const SHELL_PREFETCH_ROUTES = [
 
 export const getVisibleModuleNavItems = (role?: Role | null) =>
   MODULE_NAV_ITEMS.filter((item) => !item.visibleRoles || (role ? item.visibleRoles.includes(role) : false));
+
+export const getPrimaryMobileModuleNavItems = (role?: Role | null) =>
+  getVisibleModuleNavItems(role).filter((item) => item.mobilePrimary);
+
+export const getSecondaryMobileModuleNavItems = (role?: Role | null) =>
+  getVisibleModuleNavItems(role).filter((item) => !item.mobilePrimary);
 
 export const getDefaultDashboardHref = (role?: Role | null) =>
   getVisibleModuleNavItems(role)[0]?.defaultHref ?? '/dashboard';

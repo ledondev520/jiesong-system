@@ -50,6 +50,11 @@ const loadApp = (configOverride = {}) => {
           startInventoryAlertJob: () => {},
         };
       }
+      if (request === './jobs/agentCredentialAlertJob') {
+        return {
+          startAgentCredentialAlertJob: () => {},
+        };
+      }
       if (request === './jobs/opsTaskReminderJob') {
         return {
           startOpsTaskReminderJob: () => {},

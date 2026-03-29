@@ -4,6 +4,7 @@
 
 ### 1) 访问控制与身份层（Identity & Access）
 - Enforce explicit身份校验 (JWT + role checks) for all sensitive routes.
+- Treat Agent / Service Account credentials as independent machine identities; never reuse employee passwords or browser sessions for automation.
 - Keep authentication middleware as single entry for route groups and validate user context before业务处理.
 - Use least-privilege账号 and role-to-resource mapping for every service boundary.
 - Disable默认凭证 and rotate all secrets periodically.
@@ -34,6 +35,7 @@
 
 ## Operational controls
 - Security-related changes should be documented in this file and reflected in `AGENTS.md` and `data-classification.json`.
+- Agent credentials must be stored hashed-at-rest, shown only once at issuance, and revocable without affecting human users.
 - Temporary test credentials (for example default admin passwords) must be explicitly labeled as non-production and replaced via environment variables before deployment.
 - Any runtime permission tightening should include a clear validation path and migration plan for existing environments.
 - Security failures on启动应优先阻断（尤其生产）而不是继续运行.

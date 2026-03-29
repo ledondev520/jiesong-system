@@ -13,6 +13,7 @@ const { validatePurchaseTransition, PURCHASE_STATUS } = require('../services/pur
 const { applyPurchaseInStock, revertPurchaseInStock } = require('../services/inventorySnapshot');
 const { normalizePagination } = require('../utils/pagination');
 const auditLog = require('../utils/auditLog');
+const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
 
 /**
  * 职责：获取采购合同列表
@@ -113,27 +114,11 @@ const getById = async (req, res, next) => {
  */
 const create = async (req, res, next) => {
   try {
-    const data = req.body;
-    
-    // 生成合同编号
-    const year = new Date().getFullYear().toString().slice(-2);
-    const count = await prisma.purchaseContract.count({
-      where: { contractNo: { startsWith: `CG${year}` } },
+    const contract = await createPurchaseWithItems({
+      input: req.body,
+      prismaClient: prisma,
     });
-    const contractNo = `CG${year}${String(count + 1).padStart(5, '0')}`;
-    
-    const contract = await prisma.purchaseContract.create({
-      data: {
-        contractNo,
-        supplierId: data.supplierId,
-        taxRate: data.taxRate || 13, // 默认税率 13%
-        signedAt: data.signedAt ? new Date(data.signedAt) : null,
-        expectedDate: data.expectedDate ? new Date(data.expectedDate) : null,
-        note: data.note,
-      },
-      include: { supplier: true },
-    });
-    
+
     created(res, contract, '采购合同创建成功');
   } catch (error) {
     next(error);
@@ -145,19 +130,10 @@ const create = async (req, res, next) => {
  */
 const update = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const data = req.body;
-    
-    const contract = await prisma.purchaseContract.update({
-      where: { id },
-      data: {
-        taxRate: data.taxRate !== undefined ? data.taxRate : undefined,
-        signedAt: data.signedAt ? new Date(data.signedAt) : undefined,
-        expectedDate: data.expectedDate ? new Date(data.expectedDate) : undefined,
-        invoiceNo: data.invoiceNo,
-        note: data.note,
-      },
-      include: { supplier: true },
+    const contract = await updatePurchase({
+      id: req.params.id,
+      input: req.body,
+      prismaClient: prisma,
     });
     
     success(res, contract, '采购合同更新成功');
