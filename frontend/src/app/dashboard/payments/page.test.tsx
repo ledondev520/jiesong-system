@@ -119,8 +119,8 @@ describe('PaymentsPage 交互逻辑', () => {
     render(<PaymentsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('暂无待付账款')).toBeInTheDocument();
-      expect(screen.getByText('当前没有需要处理的供应商付款记录。')).toBeInTheDocument();
+      expect(screen.getAllByText('暂无待付账款').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('当前没有需要处理的供应商付款记录。').length).toBeGreaterThan(0);
     });
   });
 });

@@ -2,6 +2,7 @@
 
 | ID | Priority | ETA | Slot | Status | Input | Output | Validation | DoD |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| FE-SHELL-02 | P0 | 30m | 1 | DONE | Header 头像菜单存在重复图标，且“个人设置”错误跳转到系统配置 | 用户级个人设置弹窗、头像/名称即时更新、头像直接点击上传/替换、额外偏好本地持久化、重复图标移除 | `npm run test -- src/components/layout/HeaderUserMenu.test.tsx src/components/layout/Header.test.tsx src/store/auth.store.test.ts` + `npm run lint -- src/components/layout/Header.tsx src/components/layout/HeaderUserMenu.tsx src/components/layout/HeaderProfileDialog.tsx src/components/layout/Header.test.tsx src/components/layout/HeaderUserMenu.test.tsx src/store/auth.store.ts src/store/auth.store.test.ts` + `npm run build` | 点击“个人设置”后进入真实的个人弹窗而非系统配置页，头像区不再重叠，头像不再依赖链接输入，定向测试/lint/build 全部通过 |
 | E2E-03 | P0 | 60m | 1 | DONE | Existing full-suite Playwright failures in production preview: hydration mismatch, stale mocks, and outdated IA assertions | Hydration-safe dashboard shell/date rendering, updated E2E mocks/assertions, import-history contract compatibility, and green pre-commit gates | `npm run test` + `npm run lint` + `npm run build` + `npm run test:e2e` | Full frontend gates are green on fresh production output and no known E2E red lights remain before commit |
 
 | ID | Priority | ETA | Slot | Status | Input | Output | Validation | DoD |

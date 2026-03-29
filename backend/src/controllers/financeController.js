@@ -136,6 +136,37 @@ const getOverdueReceivables = async (req, res, next) => {
   }
 };
 
+/**
+ * 职责：获取待分配收款（无合同关联的收款记录）
+ */
+const listUnallocatedPayments = async (req, res, next) => {
+  try {
+    const list = await financeService.listUnallocatedPayments();
+    success(res, list);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：将一笔收款分配到多张销售合同
+ * @param {Request} req.params.id - 收款 ID
+ * @param {Request} req.body.allocations - [{salesContractId, amount, note?}]
+ */
+const allocatePayment = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { allocations } = req.body;
+    if (!Array.isArray(allocations) || allocations.length === 0) {
+      return next(createError('allocations 不能为空', 400));
+    }
+    const result = await financeService.allocatePaymentToContracts(id, allocations);
+    success(res, result, '分配成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listPayments,
   createPayment,
@@ -144,4 +175,6 @@ module.exports = {
   getStats,
   getPaymentTrends,
   getOverdueReceivables,
+  listUnallocatedPayments,
+  allocatePayment,
 };

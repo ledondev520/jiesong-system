@@ -440,7 +440,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">{file.fileName}</p>
                       <p className="text-xs text-muted-foreground">
-                        {(file.fileSize / 1024).toFixed(1)} KB · {format(new Date(file.uploadedAt), 'yyyy-MM-dd HH:mm')}
+                        {((file.fileSize || 0) / 1024).toFixed(1)} KB · {format(new Date(file.uploadedAt), 'yyyy-MM-dd HH:mm')}
                       </p>
                     </div>
                   </div>

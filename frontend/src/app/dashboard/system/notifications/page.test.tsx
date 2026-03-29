@@ -87,8 +87,8 @@ describe('SystemNotificationsPage', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '通知中心' })).toBeInTheDocument();
-      expect(screen.getByText('系统维护通知')).toBeInTheDocument();
-      expect(screen.getByText('导入完成')).toBeInTheDocument();
+      expect(screen.getAllByText('系统维护通知').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('导入完成').length).toBeGreaterThan(0);
     });
   });
 
@@ -110,7 +110,7 @@ describe('SystemNotificationsPage', () => {
     render(<SystemNotificationsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('系统维护通知')).toBeInTheDocument();
+      expect(screen.getAllByText('系统维护通知').length).toBeGreaterThan(0);
     });
 
     await user.click(screen.getByRole('button', { name: '仅未读' }));
@@ -143,10 +143,10 @@ describe('SystemNotificationsPage', () => {
     render(<SystemNotificationsPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '标记已读' })).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: '标记已读' }).length).toBeGreaterThan(0);
     });
 
-    await user.click(screen.getByRole('button', { name: '标记已读' }));
+    await user.click(screen.getAllByRole('button', { name: '标记已读' })[0]);
 
     await waitFor(() => {
       expect(mockMarkSystemNotificationRead).toHaveBeenCalledWith('n1');

@@ -15,6 +15,7 @@ import { Header } from './Header';
 const mockLogout = vi.fn();
 const mockPush = vi.fn();
 const mockSearchDashboard = vi.fn();
+const mockUpdateProfile = vi.fn();
 const mockUser = {
   name: '管理员',
   username: 'admin',
@@ -22,9 +23,14 @@ const mockUser = {
 };
 
 vi.mock('@/store/auth.store', () => ({
-  useAuthStore: <T,>(selector: (state: { user: typeof mockUser; logout: () => void }) => T): T => selector({
+  useAuthStore: <T,>(selector: (state: {
+    user: typeof mockUser;
+    logout: () => void;
+    updateProfile: (profile: { name?: string; avatar?: string }) => void;
+  }) => T): T => selector({
     user: mockUser,
     logout: mockLogout,
+    updateProfile: mockUpdateProfile,
   }),
 }));
 
@@ -46,7 +52,7 @@ vi.mock('@/services/dashboardSearch.service', () => ({
       return `/dashboard/products?keyword=${encodeURIComponent(result.title)}`;
     }
 
-    return `/dashboard/containers/${result.id}`;
+    return `/dashboard/sales/${result.id}`;
   },
 }));
 
@@ -55,12 +61,15 @@ describe('Header', () => {
     mockLogout.mockReset();
     mockPush.mockReset();
     mockSearchDashboard.mockReset();
+    mockUpdateProfile.mockReset();
   });
 
   it('渲染搜索框与用户菜单', () => {
     render(<Header />);
 
-    expect(screen.getByPlaceholderText('搜索商品、供应商、货柜...')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('搜索商品、供应商、合同...')).toBeInTheDocument();
+    expect(screen.queryByText('当前模块')).not.toBeInTheDocument();
+    expect(screen.queryByText('经营中台')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '用户菜单' })).toBeInTheDocument();
   });
 
@@ -72,7 +81,7 @@ describe('Header', () => {
     const user = userEvent.setup();
     render(<Header />);
 
-    await user.type(screen.getByPlaceholderText('搜索商品、供应商、货柜...'), '瓷砖');
+    await user.type(screen.getByPlaceholderText('搜索商品、供应商、合同...'), '瓷砖');
 
     await waitFor(() => {
       expect(mockSearchDashboard).toHaveBeenCalledWith('瓷砖');
@@ -90,12 +99,24 @@ describe('Header', () => {
     const user = userEvent.setup();
     render(<Header />);
 
-    const input = screen.getByPlaceholderText('搜索商品、供应商、货柜...') as HTMLInputElement;
+    const input = screen.getByPlaceholderText('搜索商品、供应商、合同...') as HTMLInputElement;
     await user.type(input, '瓷砖');
 
     await user.click(await screen.findByRole('button', { name: /瓷砖 A/i }));
 
     expect(mockPush).toHaveBeenCalledWith('/dashboard/products?keyword=%E7%93%B7%E7%A0%96%20A');
     expect(input.value).toBe('');
+  });
+
+  it('点击个人设置后打开用户弹窗，而不是跳转系统配置', async () => {
+    const user = userEvent.setup();
+
+    render(<Header />);
+
+    await user.click(screen.getByRole('button', { name: '用户菜单' }));
+    await user.click(screen.getByRole('menuitem', { name: '个人设置' }));
+
+    expect(await screen.findByRole('dialog', { name: '个人设置' })).toBeInTheDocument();
+    expect(mockPush).not.toHaveBeenCalledWith('/dashboard/settings');
   });
 });

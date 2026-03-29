@@ -1,9 +1,11 @@
 /**
  * Input: 装箱明细（PackingItem[]）、商品信息（Product[]）
- * Output: 3D货柜可视化组件（含悬浮提示）
+ * Output: 3D货柜可视化组件（含悬浮提示 + 尺寸自动推算）
  * Pos: 货柜管理组件，展示3D装箱效果
  * 
  * 2026-01-26: 新增悬浮提示功能，鼠标移到箱子上显示商品名称和尺寸
+ * 2026-03-29: 当 PackingItem/Product 未填写长宽高时，自动从体积（volume/boxes）反推尺寸
+ *             推算的箱子以虚线边框区分，悬浮提示中注明"尺寸已预估"
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -21,7 +23,8 @@ import {
   PlacedBox, 
   CONTAINER_40HQ, 
   generateColor, 
-  mmToM 
+  mmToM,
+  inferBoxDimensions,
 } from '@/lib/binPacking';
 
 interface Container3DViewProps {
@@ -31,6 +34,7 @@ interface Container3DViewProps {
 
 /**
  * 职责：渲染单个箱子（含悬浮提示）
+ * 思路：isEstimated 箱子用橙色虚线边框区分，悬浮提示中注明尺寸来源
  */
 function BoxMesh({ 
   box, 
@@ -59,10 +63,11 @@ function BoxMesh({
     z: mmToM(box.posY + box.width / 2),
   }), [box]);
   
-  // 悬浮时轻微高亮
+  // 悬浮时轻微高亮；预估箱子边框用橙色区分
   const color = isHovered 
     ? new THREE.Color(box.color || '#4ECDC4').lerp(new THREE.Color('#ffffff'), 0.15)
     : box.color || '#4ECDC4';
+  const edgeColor = box.isEstimated ? '#F59E0B' : '#333';
   
   return (
     <mesh
@@ -86,13 +91,13 @@ function BoxMesh({
         transparent 
         opacity={isHovered ? 0.9 : 0.85}
       />
-      {/* 边框 */}
+      {/* 边框：预估箱子用橙色高亮边框 */}
       <lineSegments>
         <edgesGeometry args={[new THREE.BoxGeometry(size.x, size.y, size.z)]} />
-        <lineBasicMaterial color="#333" linewidth={1} />
+        <lineBasicMaterial color={edgeColor} linewidth={1} />
       </lineSegments>
       
-      {/* 悬浮提示 - 简洁显示商品名称 */}
+      {/* 悬浮提示 - 显示商品名称及尺寸来源 */}
       {isHovered && (
         <Html
           position={[0, size.y / 2 + 0.05, 0]}
@@ -100,7 +105,10 @@ function BoxMesh({
           style={{ pointerEvents: 'none' }}
         >
           <div className="bg-popover/92 text-popover-foreground px-2 py-1 rounded text-xs whitespace-nowrap border border-border/60">
-            {box.name}
+            <div>{box.name}</div>
+            {box.isEstimated && (
+              <div className="text-amber-500 mt-0.5">⚠ 尺寸已根据体积预估</div>
+            )}
           </div>
         </Html>
       )}
@@ -172,8 +180,17 @@ function ContainerFrame() {
   );
 }
 
+// 货柜中心点（Three.js 坐标系，单位米）——用作 OrbitControls target
+// 货柜从原点延伸，中心约在 (length/2, height/2, width/2) 处
+const CONTAINER_CENTER: [number, number, number] = [
+  mmToM(CONTAINER_40HQ.length / 2),
+  mmToM(CONTAINER_40HQ.height / 2),
+  mmToM(CONTAINER_40HQ.width / 2),
+];
+
 /**
  * 职责：3D场景主组件（含悬浮状态管理）
+ * 思路：OrbitControls target 指向货柜中心，避免锁死在货柜角点
  */
 function Scene({ 
   placedBoxes, 
@@ -186,15 +203,22 @@ function Scene({
   hoveredBoxId: string | null;
   onBoxHover: (boxId: string | null) => void;
 }) {
+  // 初始相机位置：从货柜中心偏移，给出斜侧视角
+  const camPos: [number, number, number] = [
+    CONTAINER_CENTER[0] + 8,
+    CONTAINER_CENTER[1] + 6,
+    CONTAINER_CENTER[2] + 10,
+  ];
   return (
     <>
-      <PerspectiveCamera makeDefault position={[15, 8, 10]} fov={50} />
+      <PerspectiveCamera makeDefault position={camPos} fov={50} />
       <OrbitControls 
+        target={CONTAINER_CENTER}
         enablePan={true}
         enableZoom={true}
         enableRotate={true}
-        minDistance={5}
-        maxDistance={30}
+        minDistance={3}
+        maxDistance={40}
       />
       
       {/* 光源 */}
@@ -236,20 +260,70 @@ export default function Container3DView({
   const [hoveredBoxId, setHoveredBoxId] = useState<string | null>(null);
   
   // 将 PackingItem 转换为 Box 格式
-  // 优先使用 PackingItem 中的尺寸，否则使用 Product 的尺寸，最后使用默认值
+  // 尺寸优先级：PackingItem 手填 > Product 档案 > 体积反推 > 固定默认500mm
   const boxes: Box[] = useMemo(() => {
     return packingItems.map(item => {
       const product = products.find(p => p.id === item.productId);
+
+      // 1. 优先用 PackingItem 手填的精确尺寸
+      const hasExactDims = item.length && item.width && item.height;
+      if (hasExactDims) {
+        return {
+          id: item.id,
+          name: product?.customsName || '未知商品',
+          length: item.length!,
+          width: item.width!,
+          height: item.height!,
+          weight: item.grossWeight,
+          color: generateColor(item.productId),
+          quantity: item.boxes || 1,
+          isEstimated: false,
+        };
+      }
+
+      // 2. 次优：使用商品档案中的尺寸
+      const hasProductDims = product?.length && product?.width && product?.height;
+      if (hasProductDims) {
+        return {
+          id: item.id,
+          name: product!.customsName || '未知商品',
+          length: product!.length!,
+          width: product!.width!,
+          height: product!.height!,
+          weight: item.grossWeight,
+          color: generateColor(item.productId),
+          quantity: item.boxes || 1,
+          isEstimated: false,
+        };
+      }
+
+      // 3. 体积反推：用 item.volume / item.boxes 得到每箱体积（CBM），再推算三维
+      //    备选：用 product.volume 作为每件体积，乘以装箱数量再除以箱数
+      const itemVolume = item.volume || 0;
+      const boxCount = item.boxes || 1;
+      const productVolume = product?.volume || 0;
+      const itemQty = item.quantity || 1;
+
+      // 1.1 若明细有总体积 → 单箱体积 = 总体积 / 箱数
+      // 1.2 若商品档案有单件体积 → 单箱体积 = 单件体积 * 件数 / 箱数
+      const perBoxCbm = itemVolume > 0
+        ? itemVolume / boxCount
+        : productVolume > 0
+          ? (productVolume * itemQty) / boxCount
+          : 0;
+
+      const inferred = inferBoxDimensions(perBoxCbm);
+
       return {
         id: item.id,
         name: product?.customsName || '未知商品',
-        // 尺寸优先级：PackingItem > Product > 默认 500mm
-        length: item.length || product?.length || 500,
-        width: item.width || product?.width || 500,
-        height: item.height || product?.height || 500,
+        length: inferred.length,
+        width: inferred.width,
+        height: inferred.height,
         weight: item.grossWeight,
         color: generateColor(item.productId),
-        quantity: item.boxes || 1,
+        quantity: boxCount,
+        isEstimated: true,
       };
     });
   }, [packingItems, products]);
@@ -258,9 +332,14 @@ export default function Container3DView({
   const packingResult = useMemo(() => {
     return packBoxes(boxes);
   }, [boxes]);
+
+  // 统计尺寸预估的商品行数（用于提示）
+  const estimatedCount = useMemo(() => {
+    return boxes.filter(b => b.isEstimated).length;
+  }, [boxes]);
   
   return (
-    <div className="w-full h-80 md:h-96 bg-muted rounded-lg overflow-hidden relative">
+    <div className="w-full h-[420px] md:h-[520px] bg-muted rounded-lg overflow-hidden relative">
       {/* 利用率信息 */}
       <div className="absolute top-4 left-4 z-10 bg-card/92 rounded-lg p-3 shadow border border-border/60">
         <div className="text-sm font-medium">装箱统计</div>
@@ -273,6 +352,11 @@ export default function Container3DView({
         <div className="text-xs font-medium mt-1">
           利用率: {packingResult.utilizationRate.toFixed(1)}%
         </div>
+        {estimatedCount > 0 && (
+          <div className="text-xs text-amber-500 mt-1 border-t border-border/40 pt-1">
+            ⚠ {estimatedCount} 项尺寸已预估
+          </div>
+        )}
       </div>
       
       {/* 操作提示 */}

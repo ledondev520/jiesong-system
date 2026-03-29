@@ -1,5 +1,6 @@
 ---
 name: api-contract-coordinator
+model: claude-4.6-sonnet-medium
 description: 接口契约协同负责人。负责前后端 API 契约定义、版本策略、联调节奏与兼容治理。use proactively：当涉及新增接口、字段变更、联调阻塞、版本兼容时立即委派。
 ---
 

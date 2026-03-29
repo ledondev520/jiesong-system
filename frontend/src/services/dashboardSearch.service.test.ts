@@ -83,12 +83,6 @@ describe('searchDashboard', () => {
         return Promise.resolve(mockPaginatedResponse([]));
       }
 
-      if (path === '/containers') {
-        return Promise.resolve(mockPaginatedResponse([
-          { id: 'c-1', contractNo: 'CT-001', status: 'IN_TRANSIT' },
-        ]));
-      }
-
       if (path === '/purchases') {
         return Promise.resolve(mockPaginatedResponse([
           { id: 'pc-1', contractNo: 'CG-001', supplier: { name: '佛山供应商' } },
@@ -106,18 +100,16 @@ describe('searchDashboard', () => {
 
     const results = await searchDashboard('瓷砖', { limit: 4 });
 
-    expect(api.get).toHaveBeenNthCalledWith(3, '/containers', {
+    // 货柜管理已并入出口合同，第二批仅查询采购与出口合同
+    expect(api.get).toHaveBeenNthCalledWith(3, '/purchases', {
       params: { keyword: '瓷砖', pageSize: 3 },
     });
-    expect(api.get).toHaveBeenNthCalledWith(4, '/purchases', {
+    expect(api.get).toHaveBeenNthCalledWith(4, '/sales', {
       params: { keyword: '瓷砖', pageSize: 3 },
     });
-    expect(api.get).toHaveBeenNthCalledWith(5, '/sales', {
-      params: { keyword: '瓷砖', pageSize: 3 },
-    });
+    expect(api.get).toHaveBeenCalledTimes(4);
     expect(results.map((result) => result.type)).toEqual([
       'product',
-      'container',
       'purchase',
       'sales',
     ]);

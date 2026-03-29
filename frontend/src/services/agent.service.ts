@@ -11,12 +11,6 @@ export type AgentAccountUpsertInput = {
   slug: string;
   description?: string;
   status?: string;
-  defaultMode?: string;
-  grants?: Array<{
-    resource: string;
-    action: string;
-    scopeJson?: Record<string, unknown> | null;
-  }>;
 };
 
 export const agentService = {

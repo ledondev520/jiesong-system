@@ -1,7 +1,7 @@
 /**
- * Input: 后端 /system/configs API（通过 configService）
- * Output: 系统参数表单（汇率/利润率）+ AI 模型/采样参数 + 数据字典（单位/报关公司）
- * Pos: 设置页 > 系统配置 Tab，管理员调整全局运营参数
+ * Input: 后端 /system/configs API（通过 configService）、/hs-codes/hsciq-usage API
+ * Output: 系统参数表单（汇率/利润率）+ AI 模型/采样参数（仅 Kimi/Moonshot）+ HSCIQ API 开关 + 数据字典（单位/报关公司）
+ * Pos: 设置页 > 系统配置 Tab，管理员调整全局运营参数与外部 API 集成
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -28,7 +28,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { Cpu, X, Save, Loader2, Eye, EyeOff, Key, ExternalLink, ChevronDown } from 'lucide-react';
+import { Cpu, X, Save, Loader2, Eye, EyeOff, Key, ExternalLink, Globe } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE, UNITS as INITIAL_UNITS } from '@/lib/constants';
 import { configService } from '@/services/config.service';
 import api from '@/lib/axios';
@@ -67,19 +68,19 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
   const [newBroker, setNewBroker] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  // Kimi API Key 相关状态
-  const [apiKeyPlaceholder, setApiKeyPlaceholder] = useState('');
-  const [newApiKey, setNewApiKey] = useState('');
+  // Kimi API Key 相关状态（后端返回完整密钥，仅管理员可见）
+  const [kimiApiKeyCurrent, setKimiApiKeyCurrent] = useState('');
+  const [kimiApiKeyNew, setKimiApiKeyNew] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
-  // MiniMax API Key 相关状态
-  const [minimaxKeyPlaceholder, setMinimaxKeyPlaceholder] = useState('');
-  const [newMinimaxKey, setNewMinimaxKey] = useState('');
-  const [showMinimaxKey, setShowMinimaxKey] = useState(false);
-  // 模型优先级配置
-  const [primaryModel, setPrimaryModel] = useState('kimi-k2-turbo-preview');
-  const [fallbackModel, setFallbackModel] = useState('kimi-k2-thinking-turbo');
+  // 场景化模型配置
+  const [chatModel, setChatModel] = useState('kimi-k2-turbo-preview');
+  const [hsCodeModel, setHsCodeModel] = useState('kimi-k2-turbo-preview');
   const [temperature, setTemperature] = useState<number>(0.7);
   const [maxTokens, setMaxTokens] = useState<number>(4096);
+  // HSCIQ 海关归类 API
+  const [hsciqEnabled, setHsciqEnabled] = useState(false);
+  const [hsciqUsage, setHsciqUsage] = useState<{ used: number; limit: number; remaining: number; available: boolean } | null>(null);
+  const [hsciqToggling, setHsciqToggling] = useState(false);
   // 汇率同步
   const [syncing, setSyncing] = useState(false);
 
@@ -102,23 +103,27 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
           if (typeof configs.profitRate === 'number') form.setValue('profitRate', configs.profitRate);
           if (Array.isArray(configs.units)) setUnits(configs.units);
           if (Array.isArray(configs.brokers)) setBrokers(configs.brokers);
-          // 1.1. 若后端返回 Kimi API Key 占位符（脱敏），显示提示用户当前已配置
+          // 1.1. Kimi API Key（后端返回完整密钥）
           if (typeof configs.apiKey === 'string' && configs.apiKey) {
-            setApiKeyPlaceholder(configs.apiKey);
+            setKimiApiKeyCurrent(configs.apiKey);
           }
-          // 1.2. 若后端返回 MiniMax API Key 占位符
-          if (typeof configs.minimaxApiKey === 'string' && configs.minimaxApiKey) {
-            setMinimaxKeyPlaceholder(configs.minimaxApiKey);
+          // 1.2. 场景化模型配置（优先新 key，兼容旧 key）
+          if (typeof configs.aiChatModel === 'string' && configs.aiChatModel) {
+            setChatModel(configs.aiChatModel);
+          } else if (typeof configs.aiPrimaryModel === 'string' && configs.aiPrimaryModel) {
+            setChatModel(configs.aiPrimaryModel);
           }
-          // 1.3. 模型优先级
-          if (typeof configs.aiPrimaryModel === 'string' && configs.aiPrimaryModel) {
-            setPrimaryModel(configs.aiPrimaryModel);
-          }
-          if (typeof configs.aiFallbackModel === 'string' && configs.aiFallbackModel) {
-            setFallbackModel(configs.aiFallbackModel);
+          if (typeof configs.aiHsCodeModel === 'string' && configs.aiHsCodeModel) {
+            setHsCodeModel(configs.aiHsCodeModel);
+          } else if (typeof configs.aiPrimaryModel === 'string' && configs.aiPrimaryModel) {
+            setHsCodeModel(configs.aiPrimaryModel);
           }
           if (typeof configs.aiTemperature === 'number') setTemperature(configs.aiTemperature);
           if (typeof configs.aiMaxTokens === 'number') setMaxTokens(configs.aiMaxTokens);
+          // 1.4. HSCIQ 开关
+          if (configs.hsciqEnabled === true || configs.hsciqEnabled === 'true') {
+            setHsciqEnabled(true);
+          }
         }
       } catch (error) {
         console.error('加载配置失败:', error);
@@ -129,6 +134,22 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
     };
     fetchConfigs();
   }, [form]);
+
+  // 0.1 加载 HSCIQ 使用统计
+  useEffect(() => {
+    const fetchHsciqUsage = async () => {
+      try {
+        const res = await api.get<ApiResponse<{ enabled: boolean; available: boolean; used: number; limit: number; remaining: number }>,
+          ApiResponse<{ enabled: boolean; available: boolean; used: number; limit: number; remaining: number }>>('/hs-codes/hsciq-usage');
+        if (res.data) {
+          setHsciqUsage({ used: res.data.used, limit: res.data.limit, remaining: res.data.remaining, available: res.data.available });
+        }
+      } catch {
+        // 非关键信息，静默忽略
+      }
+    };
+    fetchHsciqUsage();
+  }, [hsciqEnabled]);
 
   /** 职责：保存单个配置键值到后端 */
   const saveConfig = async (key: string, value: ConfigUpdateValue) => {
@@ -145,26 +166,18 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
         saveConfig('brokers', brokers),
       ];
       // 1.1. 若用户填写了新 Kimi API Key，一并保存
-      if (newApiKey.trim()) {
-        tasks.push(saveConfig('apiKey', newApiKey.trim()));
+      if (kimiApiKeyNew.trim()) {
+        tasks.push(saveConfig('apiKey', kimiApiKeyNew.trim()));
       }
-      // 1.2. 若用户填写了新 MiniMax API Key，一并保存
-      if (newMinimaxKey.trim()) {
-        tasks.push(saveConfig('minimaxApiKey', newMinimaxKey.trim()));
-      }
-      // 1.3. 模型优先级与采样参数
-      tasks.push(saveConfig('aiPrimaryModel', primaryModel));
-      tasks.push(saveConfig('aiFallbackModel', fallbackModel));
+      // 1.2. 场景化模型与采样参数
+      tasks.push(saveConfig('aiChatModel', chatModel));
+      tasks.push(saveConfig('aiHsCodeModel', hsCodeModel));
       tasks.push(saveConfig('aiTemperature', temperature));
       tasks.push(saveConfig('aiMaxTokens', maxTokens));
       await Promise.all(tasks);
-      if (newApiKey.trim()) {
-        setApiKeyPlaceholder('sk-****');
-        setNewApiKey('');
-      }
-      if (newMinimaxKey.trim()) {
-        setMinimaxKeyPlaceholder('sk-****');
-        setNewMinimaxKey('');
+      if (kimiApiKeyNew.trim()) {
+        setKimiApiKeyCurrent(kimiApiKeyNew.trim());
+        setKimiApiKeyNew('');
       }
       toast.success('系统配置已保存');
     } catch (error) {
@@ -185,6 +198,23 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
       toast.success('单位添加成功');
     } catch {
       toast.error('保存失败');
+    }
+  };
+
+  /**
+   * 职责：切换 HSCIQ 海关归类 API 开关（即时保存，无需表单提交）
+   * @param checked 开启/关闭
+   */
+  const handleHsciqToggle = async (checked: boolean) => {
+    setHsciqToggling(true);
+    try {
+      await saveConfig('hsciqEnabled', checked ? 'true' : 'false');
+      setHsciqEnabled(checked);
+      toast.success(checked ? 'HSCIQ 海关归类 API 已开启' : 'HSCIQ 海关归类 API 已关闭');
+    } catch {
+      toast.error('切换 HSCIQ 开关失败');
+    } finally {
+      setHsciqToggling(false);
     }
   };
 
@@ -404,216 +434,205 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
             </CardContent>
           </Card>
 
-          {/* 模型优先级与采样参数（置于 API Key 卡片之前） */}
+          {/* AI 模型优先级 + API Key 集成 */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Cpu className="h-4 w-4 text-muted-foreground" />
-                AI 模型优先级
+                AI 模型配置
               </CardTitle>
               <CardDescription>
-                配置 AI 助手的首选模型与备用模型。首选模型响应失败时自动切换至备用模型。
+                为不同使用场景选择合适的模型，配置采样参数与 API 密钥。每个场景内置自动降级，无需手动配置备用模型。
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">首选模型（Primary）</label>
-                  <Select value={primaryModel} onValueChange={setPrimaryModel}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="kimi-k2-turbo-preview">kimi-k2-turbo-preview（默认）</SelectItem>
-                      <SelectItem value="kimi-k2-thinking-turbo">kimi-k2-thinking-turbo（推理）</SelectItem>
-                      <SelectItem value="moonshot-v1-8k">moonshot-v1-8k（快速）</SelectItem>
-                      <SelectItem value="minimax-m2.7">minimax-m2.7（MiniMax）</SelectItem>
-                    </SelectContent>
-                  </Select>
+              {/* 上半区：左侧模型选择 + 右侧 API Key */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* 左列：场景化模型选择 */}
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">AI 助手问答</label>
+                    <Select value={chatModel} onValueChange={setChatModel}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="kimi-k2-turbo-preview">kimi-k2-turbo-preview（均衡）</SelectItem>
+                        <SelectItem value="moonshot-v1-8k">moonshot-v1-8k（快速）</SelectItem>
+                        <SelectItem value="kimi-k2-thinking-turbo">kimi-k2-thinking-turbo（深度推理）</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">用于 AI 聊天助手的日常问答。</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">HS Code 推荐与申报要素</label>
+                    <Select value={hsCodeModel} onValueChange={setHsCodeModel}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="kimi-k2-turbo-preview">kimi-k2-turbo-preview（均衡）</SelectItem>
+                        <SelectItem value="moonshot-v1-8k">moonshot-v1-8k（快速）</SelectItem>
+                        <SelectItem value="kimi-k2-thinking-turbo">kimi-k2-thinking-turbo（深度推理）</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">用于智能 HS 编码推荐与申报要素自动填写。</p>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">备用模型（Fallback）</label>
-                  <Select value={fallbackModel} onValueChange={setFallbackModel}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="kimi-k2-thinking-turbo">kimi-k2-thinking-turbo（推理）</SelectItem>
-                      <SelectItem value="kimi-k2-turbo-preview">kimi-k2-turbo-preview（默认）</SelectItem>
-                      <SelectItem value="moonshot-v1-8k">moonshot-v1-8k（快速）</SelectItem>
-                      <SelectItem value="minimax-m2.7">minimax-m2.7（MiniMax）</SelectItem>
-                    </SelectContent>
-                  </Select>
+
+                {/* 右列：API Key 配置 */}
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium flex items-center gap-1.5">
+                        <Key className="h-3.5 w-3.5 text-muted-foreground" />
+                        Kimi API Key
+                      </label>
+                      <a
+                        href="https://platform.moonshot.cn/console/account"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        控制台
+                      </a>
+                    </div>
+                    {kimiApiKeyCurrent && (
+                      <p className="text-xs text-muted-foreground font-mono break-all leading-relaxed select-all">{kimiApiKeyCurrent}</p>
+                    )}
+                    <div className="relative">
+                      <Input
+                        type={showApiKey ? 'text' : 'password'}
+                        placeholder={kimiApiKeyCurrent ? '输入新 Key 以覆盖' : '输入 Kimi API Key (sk-...)'}
+                        value={kimiApiKeyNew}
+                        onChange={(e) => setKimiApiKeyNew(e.target.value)}
+                        className="pr-10"
+                        autoComplete="off"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
+                        onClick={() => setShowApiKey((v) => !v)}
+                      >
+                        {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-3 max-w-xl">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <label className="text-sm font-medium" htmlFor="ai-temperature">
-                    采样温度（Temperature）
-                  </label>
-                  <span className="text-sm tabular-nums text-muted-foreground">
-                    {temperature.toFixed(1)} — {getTemperatureStyleLabel(temperature)}
-                  </span>
-                </div>
-                <Slider
-                  id="ai-temperature"
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  value={[temperature]}
-                  onValueChange={([v]) => setTemperature(v)}
-                  className="max-w-md"
-                />
-                <p className="text-xs text-muted-foreground">
-                  0–0.3 偏保守，0.4–0.7 均衡，0.8–1 更富创意；影响非推理对话的随机性。
-                </p>
-              </div>
+              {/* 下半区：采样参数 */}
+              <div className="border-t pt-4 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <label className="text-sm font-medium" htmlFor="ai-temperature">
+                        采样温度（Temperature）
+                      </label>
+                      <span className="text-sm tabular-nums text-muted-foreground">
+                        {(temperature ?? 0.7).toFixed(1)} — {getTemperatureStyleLabel(temperature ?? 0.7)}
+                      </span>
+                    </div>
+                    <Slider
+                      id="ai-temperature"
+                      min={0}
+                      max={1}
+                      step={0.1}
+                      value={[temperature ?? 0.7]}
+                      onValueChange={([v]) => setTemperature(v ?? 0.7)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      0–0.3 偏保守，0.4–0.7 均衡，0.8–1 更富创意。
+                    </p>
+                  </div>
 
-              <div className="space-y-2 max-w-md">
-                <label className="text-sm font-medium" htmlFor="ai-max-tokens">
-                  最大输出长度（Max tokens）
-                </label>
-                <Input
-                  id="ai-max-tokens"
-                  type="number"
-                  min={256}
-                  max={8192}
-                  step={256}
-                  value={maxTokens}
-                  onChange={(e) => {
-                    const v = e.target.valueAsNumber;
-                    if (!Number.isFinite(v)) return;
-                    const stepped = Math.round(v / 256) * 256;
-                    setMaxTokens(Math.min(8192, Math.max(256, stepped)));
-                  }}
-                />
-                <p className="text-xs text-muted-foreground">
-                  最大输出长度（token 数），影响 AI 回复的最大长度。
-                </p>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium" htmlFor="ai-max-tokens">
+                      最大输出长度（Max tokens）
+                    </label>
+                    <Input
+                      id="ai-max-tokens"
+                      type="number"
+                      min={256}
+                      max={8192}
+                      step={256}
+                      value={maxTokens}
+                      onChange={(e) => {
+                        const v = e.target.valueAsNumber;
+                        if (!Number.isFinite(v)) return;
+                        const stepped = Math.round(v / 256) * 256;
+                        setMaxTokens(Math.min(8192, Math.max(256, stepped)));
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      影响 AI 回复的最大长度。
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground border-t pt-4">
-                <span>当前首选：</span>
-                <Badge variant="outline" className="font-mono text-[10px]">{primaryModel}</Badge>
-                <span className="ml-2">备用：</span>
-                <Badge variant="outline" className="font-mono text-[10px]">{fallbackModel}</Badge>
+                <span>问答：</span>
+                <Badge variant="outline" className="font-mono text-[10px]">{chatModel}</Badge>
+                <span className="ml-2">HS推荐：</span>
+                <Badge variant="outline" className="font-mono text-[10px]">{hsCodeModel}</Badge>
               </div>
             </CardContent>
           </Card>
 
-          {/* AI 集成（Kimi）— 可折叠以减轻视觉重量 */}
-          <Card className="overflow-hidden p-0">
-            <details className="group">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
-                <span className="flex items-center gap-2 min-w-0">
-                  <Key className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="truncate">AI 集成（Kimi API）</span>
-                  {apiKeyPlaceholder ? (
-                    <Badge variant="secondary" className="text-[10px] font-normal shrink-0">已配置</Badge>
+          {/* HSCIQ 海关归类 API 开关 */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-base">HSCIQ 海关归类 API</CardTitle>
+                  {hsciqEnabled ? (
+                    <Badge variant="secondary" className="text-[10px] font-normal">已开启</Badge>
                   ) : (
-                    <Badge variant="outline" className="text-[10px] font-normal shrink-0">未配置</Badge>
+                    <Badge variant="outline" className="text-[10px] font-normal">已关闭</Badge>
                   )}
-                </span>
-                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-              </summary>
-              <CardContent className="border-t px-4 pb-4 pt-3 space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs text-muted-foreground max-w-prose">
-                    {apiKeyPlaceholder
-                      ? `当前已配置 API Key（${apiKeyPlaceholder}）。若需更新，在下方输入新密钥后点击保存。`
-                      : '尚未配置 Kimi API Key，请前往 Kimi 控制台获取密钥后填写。'}
-                  </p>
-                  <a
-                    href="https://platform.moonshot.cn/console/account"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    Kimi 控制台
-                  </a>
                 </div>
-                <div className="flex gap-2 max-w-md">
-                  <div className="relative flex-1">
-                    <Input
-                      type={showApiKey ? 'text' : 'password'}
-                      placeholder={apiKeyPlaceholder ? '输入新 API Key 以覆盖当前配置' : '输入 Kimi API Key (sk-...)'}
-                      value={newApiKey}
-                      onChange={(e) => setNewApiKey(e.target.value)}
-                      className="pr-10"
-                      autoComplete="off"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
-                      onClick={() => setShowApiKey((v) => !v)}
-                    >
-                      {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
+                <Switch
+                  checked={hsciqEnabled}
+                  onCheckedChange={handleHsciqToggle}
+                  disabled={hsciqToggling}
+                />
+              </div>
+              <CardDescription>
+                开启后，HS 编码推荐与申报要素填写将优先调用 HSCIQ 官方海关归类 API（含真实归类实例、官方税率与申报要素模板）。
+                关闭后仅使用本地数据库与 AI 推断。
+              </CardDescription>
+            </CardHeader>
+            {hsciqEnabled && hsciqUsage && (
+              <CardContent className="pt-0">
+                <div className="flex flex-wrap items-center gap-4 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <span>API 状态：</span>
+                    {hsciqUsage.available ? (
+                      <Badge variant="secondary" className="text-[10px]">已配置</Badge>
+                    ) : (
+                      <Badge variant="destructive" className="text-[10px]">未配置 API Key</Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span>今日调用：</span>
+                    <span className="tabular-nums font-medium text-foreground">{hsciqUsage.used}</span>
+                    <span>/</span>
+                    <span className="tabular-nums">{hsciqUsage.limit}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span>剩余配额：</span>
+                    <span className={`tabular-nums font-medium ${hsciqUsage.remaining <= 10 ? 'text-destructive' : 'text-foreground'}`}>
+                      {hsciqUsage.remaining}
+                    </span>
                   </div>
                 </div>
               </CardContent>
-            </details>
-          </Card>
-
-          {/* MiniMax AI 集成 */}
-          <Card className="overflow-hidden p-0">
-            <details className="group">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
-                <span className="flex items-center gap-2 min-w-0">
-                  <Key className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="truncate">AI 集成（MiniMax）</span>
-                  {minimaxKeyPlaceholder ? (
-                    <Badge variant="secondary" className="text-[10px] font-normal shrink-0">已配置</Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-[10px] font-normal shrink-0">未配置</Badge>
-                  )}
-                </span>
-                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-              </summary>
-              <CardContent className="border-t px-4 pb-4 pt-3 space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs text-muted-foreground max-w-prose">
-                    {minimaxKeyPlaceholder
-                      ? `当前已配置 MiniMax API Key（${minimaxKeyPlaceholder}）。若需更新，在下方输入新密钥后点击保存。`
-                      : '配置 MiniMax API Key，AI 助手将使用 minimax-m2.7 模型。'}
-                  </p>
-                  <a
-                    href="https://platform.minimax.io/user-center/basic-information"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    MiniMax 控制台
-                  </a>
-                </div>
-                <div className="flex gap-2 max-w-md">
-                  <div className="relative flex-1">
-                    <Input
-                      type={showMinimaxKey ? 'text' : 'password'}
-                      placeholder={minimaxKeyPlaceholder ? '输入新 API Key 以覆盖当前配置' : '输入 MiniMax API Key (sk-api-...)'}
-                      value={newMinimaxKey}
-                      onChange={(e) => setNewMinimaxKey(e.target.value)}
-                      className="pr-10"
-                      autoComplete="off"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
-                      onClick={() => setShowMinimaxKey((v) => !v)}
-                    >
-                      {showMinimaxKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </details>
+            )}
           </Card>
 
           <div className="flex justify-end">

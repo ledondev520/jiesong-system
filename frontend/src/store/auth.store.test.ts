@@ -55,4 +55,19 @@ describe('auth.store', () => {
     expect(state.user).toBeNull();
     expect(clearAuthToken).toHaveBeenCalledTimes(1);
   });
+
+  it('updateProfile: 仅更新当前用户的个人资料字段', () => {
+    useAuthStore.getState().login(mockUser, 'token-1');
+
+    useAuthStore.getState().updateProfile({
+      avatar: 'https://example.com/avatar.png',
+      name: '运营主管',
+    });
+
+    const state = useAuthStore.getState();
+    expect(state.user?.name).toBe('运营主管');
+    expect(state.user?.avatar).toBe('https://example.com/avatar.png');
+    expect(state.token).toBe('token-1');
+    expect(state.isAuthenticated).toBe(true);
+  });
 });

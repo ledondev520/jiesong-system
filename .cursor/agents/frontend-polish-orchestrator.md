@@ -1,5 +1,6 @@
 ---
 name: frontend-polish-orchestrator
+model: claude-4.6-sonnet-medium
 description: 前端美化总控。负责全系统美化任务拆解、阶段推进、风险控制与验收汇总。use proactively：当要执行“完整前端美化”或跨多页面改造时立即委派。
 ---
 

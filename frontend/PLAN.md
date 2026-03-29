@@ -1,3 +1,44 @@
+# 2026-03-29 Round 20: Header personal settings correction
+
+## Goal
+- Fix the duplicate user glyph in the header user trigger so the avatar area renders only one identity marker.
+- Replace the incorrect “个人设置” navigation-to-system-config behavior with a real user-level profile dialog.
+- Keep the existing system configuration route untouched while making profile edits immediately reflect in the current session.
+
+## Planned Execution
+- Add red tests first for the header menu flow and auth-store profile mutation.
+- Remove the extra `UserCircle` icon from `HeaderUserMenu`.
+- Add a shadcn-style profile dialog that supports:
+  - avatar replacement
+  - display-name editing
+  - extra personal preferences
+- Add a minimal `auth.store.updateProfile` action so saved profile changes refresh the header immediately.
+- Persist personal preferences locally without coupling them to the global system settings route.
+
+## Verification Plan
+- `npm run test -- src/components/layout/HeaderUserMenu.test.tsx src/components/layout/Header.test.tsx src/store/auth.store.test.ts`
+- `npm run lint -- src/components/layout/Header.tsx src/components/layout/HeaderUserMenu.tsx src/components/layout/HeaderProfileDialog.tsx src/components/layout/Header.test.tsx src/components/layout/HeaderUserMenu.test.tsx src/store/auth.store.ts src/store/auth.store.test.ts`
+- `npm run build`
+
+## Execution Outcome
+- `HeaderUserMenu.tsx` no longer renders the redundant right-side small-person icon in the trigger.
+- `HeaderUserMenu.tsx` now opens a real profile dialog instead of pushing the user into `/dashboard/settings`.
+- Added `HeaderProfileDialog.tsx` with direct avatar click-to-upload/replace behavior, a top-right clear action for existing avatars, editable display name, and per-user preferences rendered with existing shadcn/ui primitives.
+- Removed the avatar-link input and the bottom-row remove-avatar button so the dialog no longer asks users to manage image URLs.
+- `auth.store.ts` now exposes `updateProfile`, letting saved profile changes update the header immediately within the authenticated session.
+- Added focused regressions in:
+  - `src/components/layout/HeaderUserMenu.test.tsx`
+  - `src/components/layout/Header.test.tsx`
+  - `src/store/auth.store.test.ts`
+
+## Verification
+- `npm run test -- src/components/layout/HeaderUserMenu.test.tsx src/components/layout/Header.test.tsx src/store/auth.store.test.ts` => passed (`3` files / `9` tests).
+- `npm run lint -- src/components/layout/Header.tsx src/components/layout/HeaderUserMenu.tsx src/components/layout/HeaderProfileDialog.tsx src/components/layout/Header.test.tsx src/components/layout/HeaderUserMenu.test.tsx src/store/auth.store.ts src/store/auth.store.test.ts` => passed.
+- `npm run build` => passed.
+
+## Phase Boundary
+- This round is successful only if clicking “个人设置” opens a user-scoped dialog instead of the system configuration page, the header trigger no longer shows overlapping identity icons, and the targeted test/lint/build gates all stay green.
+
 # 2026-03-23 Round 19: Frontend E2E stabilization before commit
 
 ## Goal

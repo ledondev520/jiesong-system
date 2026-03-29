@@ -8,6 +8,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import CreatePurchasePage from './page';
 
 const mockPush = vi.fn();
@@ -89,5 +90,53 @@ describe('CreatePurchasePage 交互逻辑', () => {
       expect(mockToastError).toHaveBeenCalledWith('加载数据失败');
     });
   });
-});
 
+  it('关键表单字段具备正确的标签关联与 id/name 属性', async () => {
+    const user = userEvent.setup();
+
+    mockGetSuppliers.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: 'supplier-1',
+            name: '佛山市测试供应商',
+            contactName: '张经理',
+          },
+        ],
+      },
+    });
+    mockGetProducts.mockResolvedValue({ data: { items: [] } });
+    mockGetNextContractNo.mockResolvedValue({ data: { contractNo: 'CG2600001' } });
+    mockGetSuppliersByProducts.mockResolvedValue({ data: { supplierIds: [] } });
+
+    render(<CreatePurchasePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '新增采购合同' })).toBeInTheDocument();
+    });
+
+    expect(screen.getByLabelText('采购报价原文')).toHaveAttribute('name', 'quoteText');
+
+    await user.click(screen.getByRole('combobox', { name: '供应商' }));
+    expect(screen.getByLabelText('搜索供应商')).toHaveAttribute('name', 'supplierSearch');
+
+    await user.click(screen.getByRole('button', { name: /新增/ }));
+
+    expect(screen.getByLabelText('供应商名称 *')).toHaveAttribute('name', 'name');
+    expect(screen.getByLabelText('联系人')).toHaveAttribute('name', 'contactName');
+    expect(screen.getByLabelText('联系电话')).toHaveAttribute('name', 'contactPhone');
+    expect(screen.getByLabelText('公司地址')).toHaveAttribute('name', 'address');
+    expect(screen.getByLabelText('纳税人识别号')).toHaveAttribute('name', 'taxId');
+    expect(screen.getByLabelText('开户银行')).toHaveAttribute('name', 'bankName');
+    expect(screen.getByLabelText('银行账号')).toHaveAttribute('name', 'bankAccount');
+
+    const labelsWithTargets = Array.from(document.querySelectorAll('label[for]'));
+    expect(labelsWithTargets.length).toBeGreaterThan(0);
+
+    for (const label of labelsWithTargets) {
+      const htmlFor = label.getAttribute('for');
+      expect(htmlFor).toBeTruthy();
+      expect(document.getElementById(htmlFor!)).not.toBeNull();
+    }
+  });
+});

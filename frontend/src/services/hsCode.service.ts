@@ -1,7 +1,9 @@
 /**
- * Input: HSCode 查询参数
+ * Input: HSCode 查询参数（keyword 商品名称 / code HS 编码前缀）
  * Output: HSCode 前端服务
  * Pos: 商品管理页智能匹配服务层
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import api from '@/lib/axios';
@@ -17,23 +19,37 @@ export interface BatchHsCodeMatchResult {
 }
 
 export const hsCodeService = {
+  /**
+   * 职责：列表/搜索 HS 编码
+   * @param keyword - 商品名称关键词（模糊搜索）
+   * @param code - HS 编码前缀（纯数字，前缀精确匹配）
+   * @param fuzzy - 启用相似度模糊搜索（有 keyword 或 code 时才生效）
+   */
   list: async ({
     keyword = '',
+    code = '',
     page = 1,
     pageSize = 20,
     fuzzy = false,
   }: {
     keyword?: string;
+    /** HS 编码前缀（纯数字，独立于商品名称搜索） */
+    code?: string;
     page?: number;
     pageSize?: number;
-    /** 启用相似度模糊搜索（有 keyword 时才生效） */
     fuzzy?: boolean;
   } = {}) => {
     return api.get<
       ApiResponse<PaginatedResponse<HsCodeRecord & { similarity?: number; fuzzy?: boolean }>>,
       ApiResponse<PaginatedResponse<HsCodeRecord & { similarity?: number; fuzzy?: boolean }>>
     >('/hs-codes', {
-      params: { keyword, page, pageSize, fuzzy: fuzzy ? 'true' : undefined },
+      params: {
+        keyword: keyword || undefined,
+        code: code || undefined,
+        page,
+        pageSize,
+        fuzzy: fuzzy ? 'true' : undefined,
+      },
     });
   },
 

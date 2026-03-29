@@ -29,7 +29,7 @@ const pageCases: PageCase[] = [
   { name: 'AI 会话', path: '/dashboard/ai/sessions', minClicks: 0 },
   { name: 'AI Token 统计', path: '/dashboard/ai/token-stats', minClicks: 0 },
   { name: 'AI 模型管理', path: '/dashboard/ai/models', minClicks: 0 },
-  { name: '库存状态', path: '/dashboard/inventory-container' },
+  { name: '商品档案', path: '/dashboard/products' },
   { name: '库存管理', path: '/dashboard/inventory', minClicks: 0 },
   { name: '收付款', path: '/dashboard/payments' },
   { name: '采购建议', path: '/dashboard/store-recommend', minClicks: 0 },

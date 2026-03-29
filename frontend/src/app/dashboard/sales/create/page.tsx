@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Label } from '@/components/ui/label';
 import { Plus, Trash } from 'lucide-react';
 import { toast } from 'sonner';
 import { salesService } from '@/services/sales.service';
@@ -182,13 +183,17 @@ export default function CreateSalesPage() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="signedAt"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel className="mb-1.5">签订日期</FormLabel>
-                    <DatePicker date={field.value} setDate={field.onChange} />
+                <FormField
+                  control={form.control}
+                  name="signedAt"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                    <Label htmlFor="sales-signed-at" className="mb-1.5">签订日期</Label>
+                    <DatePicker
+                      date={field.value}
+                      setDate={field.onChange}
+                      triggerProps={{ id: 'sales-signed-at', name: 'signedAt' }}
+                    />
                     <FormMessage />
                   </FormItem>
                 )}

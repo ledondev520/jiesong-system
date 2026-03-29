@@ -335,12 +335,17 @@ export default function CreatePurchasePage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Textarea
-              placeholder="粘贴供应商报价信息 (如：'订购100平方米瓷砖，单价45元，供应商佛山陶瓷...')"
-              value={parseText}
-              onChange={(e) => setParseText(e.target.value)}
-              className="min-h-[100px]"
-            />
+            <div className="space-y-2">
+              <Label htmlFor="purchase-ai-quote-input">采购报价原文</Label>
+              <Textarea
+                id="purchase-ai-quote-input"
+                name="quoteText"
+                placeholder="粘贴供应商报价信息 (如：'订购100平方米瓷砖，单价45元，供应商佛山陶瓷...')"
+                value={parseText}
+                onChange={(e) => setParseText(e.target.value)}
+                className="min-h-[100px]"
+              />
+            </div>
             <Button onClick={handleParse} disabled={isParsing || !parseText} variant="default" className="shadow-sm">
               {isParsing ? '解析中...' : '解析报价'}
             </Button>
@@ -511,7 +516,13 @@ export default function CreatePurchasePage() {
                         </PopoverTrigger>
                         <PopoverContent className="w-[400px] p-0" align="start">
                           <Command shouldFilter={false}>
+                            <Label htmlFor="purchase-supplier-search" className="sr-only">
+                              搜索供应商
+                            </Label>
                             <CommandInput
+                              id="purchase-supplier-search"
+                              name="supplierSearch"
+                              aria-label="搜索供应商"
                               placeholder="输入供应商名称搜索..."
                               value={supplierSearch}
                               onValueChange={setSupplierSearch}
@@ -587,8 +598,14 @@ export default function CreatePurchasePage() {
                   name="signedAt"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel className="mb-1.5">签订日期</FormLabel>
-                      <DatePicker date={field.value} setDate={field.onChange} />
+                      <Label htmlFor="purchase-signed-at" className="mb-1.5">
+                        签订日期
+                      </Label>
+                      <DatePicker
+                        date={field.value}
+                        setDate={field.onChange}
+                        triggerProps={{ id: 'purchase-signed-at', name: 'signedAt' }}
+                      />
                       <FormMessage />
                     </FormItem>
                   )}
@@ -620,7 +637,7 @@ export default function CreatePurchasePage() {
 
                 {/* 合同预览 */}
                 <div className="md:col-span-2">
-                  <FormLabel>合同预览</FormLabel>
+                  <p className="text-sm font-medium leading-none">合同预览</p>
                   <div className="mt-2 p-4 bg-muted/30 rounded-lg border">
                     <div className="flex items-center gap-3">
                       <FileText className="h-8 w-8 text-primary" />
@@ -662,37 +679,79 @@ export default function CreatePurchasePage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>供应商名称 *</Label>
-              <Input value={newSupplierForm.name} onChange={(e) => setNewSupplierForm(prev => ({ ...prev, name: e.target.value }))} placeholder="例如：佛山市某某陶瓷有限公司" />
+              <Label htmlFor="new-supplier-name">供应商名称 *</Label>
+              <Input
+                id="new-supplier-name"
+                name="name"
+                value={newSupplierForm.name}
+                onChange={(e) => setNewSupplierForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="例如：佛山市某某陶瓷有限公司"
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>联系人</Label>
-                <Input value={newSupplierForm.contactName} onChange={(e) => setNewSupplierForm(prev => ({ ...prev, contactName: e.target.value }))} placeholder="例如：张经理" />
+                <Label htmlFor="new-supplier-contact-name">联系人</Label>
+                <Input
+                  id="new-supplier-contact-name"
+                  name="contactName"
+                  value={newSupplierForm.contactName}
+                  onChange={(e) => setNewSupplierForm(prev => ({ ...prev, contactName: e.target.value }))}
+                  placeholder="例如：张经理"
+                />
               </div>
               <div className="space-y-2">
-                <Label>联系电话</Label>
-                <Input value={newSupplierForm.contactPhone} onChange={(e) => setNewSupplierForm(prev => ({ ...prev, contactPhone: e.target.value }))} placeholder="例如：138xxxxxxxx" />
+                <Label htmlFor="new-supplier-contact-phone">联系电话</Label>
+                <Input
+                  id="new-supplier-contact-phone"
+                  name="contactPhone"
+                  value={newSupplierForm.contactPhone}
+                  onChange={(e) => setNewSupplierForm(prev => ({ ...prev, contactPhone: e.target.value }))}
+                  placeholder="例如：138xxxxxxxx"
+                />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>公司地址</Label>
-              <Input value={newSupplierForm.address} onChange={(e) => setNewSupplierForm(prev => ({ ...prev, address: e.target.value }))} placeholder="例如：广东省佛山市禅城区xxx" />
+              <Label htmlFor="new-supplier-address">公司地址</Label>
+              <Input
+                id="new-supplier-address"
+                name="address"
+                value={newSupplierForm.address}
+                onChange={(e) => setNewSupplierForm(prev => ({ ...prev, address: e.target.value }))}
+                placeholder="例如：广东省佛山市禅城区xxx"
+              />
             </div>
             <div className="border-t pt-4">
               <p className="text-sm font-medium mb-3">开票信息（合同用）</p>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>纳税人识别号</Label>
-                  <Input value={newSupplierForm.taxId} onChange={(e) => setNewSupplierForm(prev => ({ ...prev, taxId: e.target.value }))} placeholder="例如：91440000xxxxxxxxxx" />
+                  <Label htmlFor="new-supplier-tax-id">纳税人识别号</Label>
+                  <Input
+                    id="new-supplier-tax-id"
+                    name="taxId"
+                    value={newSupplierForm.taxId}
+                    onChange={(e) => setNewSupplierForm(prev => ({ ...prev, taxId: e.target.value }))}
+                    placeholder="例如：91440000xxxxxxxxxx"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label>开户银行</Label>
-                  <Input value={newSupplierForm.bankName} onChange={(e) => setNewSupplierForm(prev => ({ ...prev, bankName: e.target.value }))} placeholder="例如：中国银行佛山禅城支行" />
+                  <Label htmlFor="new-supplier-bank-name">开户银行</Label>
+                  <Input
+                    id="new-supplier-bank-name"
+                    name="bankName"
+                    value={newSupplierForm.bankName}
+                    onChange={(e) => setNewSupplierForm(prev => ({ ...prev, bankName: e.target.value }))}
+                    placeholder="例如：中国银行佛山禅城支行"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label>银行账号</Label>
-                  <Input value={newSupplierForm.bankAccount} onChange={(e) => setNewSupplierForm(prev => ({ ...prev, bankAccount: e.target.value }))} placeholder="例如：6217xxxxxxxxxxxxxxxx" />
+                  <Label htmlFor="new-supplier-bank-account">银行账号</Label>
+                  <Input
+                    id="new-supplier-bank-account"
+                    name="bankAccount"
+                    value={newSupplierForm.bankAccount}
+                    onChange={(e) => setNewSupplierForm(prev => ({ ...prev, bankAccount: e.target.value }))}
+                    placeholder="例如：6217xxxxxxxxxxxxxxxx"
+                  />
                 </div>
               </div>
             </div>

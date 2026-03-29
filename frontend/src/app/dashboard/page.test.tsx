@@ -23,10 +23,6 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard',
 }));
 
-vi.mock('@/components/tools/ProductTracker', () => ({
-  ProductTracker: () => <div>商品追踪模块</div>,
-}));
-
 vi.mock('@/services/ai.service', () => ({
   aiService: {
     getDashboardAnalytics: (...args: unknown[]) => mockGetDashboardAnalytics(...args),
@@ -64,18 +60,21 @@ describe('DashboardPage 交互逻辑', () => {
     });
   });
 
-  it('渲染四块工作区首屏结构', async () => {
+  it('渲染工作台首屏核心结构', async () => {
     render(<DashboardPage />);
 
+    // 高频动作区
+    await waitFor(() => {
+      expect(screen.getByText('新建采购')).toBeInTheDocument();
+      expect(screen.getByText('新建出口')).toBeInTheDocument();
+    });
+
+    // DataDashboard 区域会展示焦点/风险/趋势
     await waitFor(() => {
       expect(screen.getByText('当前焦点')).toBeInTheDocument();
-      expect(screen.getByText('高频动作')).toBeInTheDocument();
-      expect(screen.getByText('风险提醒')).toBeInTheDocument();
-      expect(screen.getByText('关键趋势')).toBeInTheDocument();
     });
 
     expect(screen.queryByText('快速录入')).not.toBeInTheDocument();
-    expect(screen.getByText('商品追踪模块')).toBeInTheDocument();
   });
 
   it('点击四个高频动作跳转对应页面', async () => {
@@ -83,19 +82,19 @@ describe('DashboardPage 交互逻辑', () => {
     render(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('高频动作')).toBeInTheDocument();
+      expect(screen.getByText('新建采购')).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole('button', { name: '新建采购录入采购合同' }));
     expect(mockPush).toHaveBeenCalledWith('/dashboard/purchase/create');
 
-    await user.click(screen.getByRole('button', { name: '新建销售创建出口合同' }));
+    await user.click(screen.getByRole('button', { name: '新建出口创建出口合同' }));
     expect(mockPush).toHaveBeenCalledWith('/dashboard/sales/create');
 
     await user.click(screen.getByRole('button', { name: '采购合同查看采购履约' }));
     expect(mockPush).toHaveBeenCalledWith('/dashboard/contracts');
 
-    await user.click(screen.getByRole('button', { name: '收付管理跟进回款与付款' }));
+    await user.click(screen.getByRole('button', { name: '收付款跟进回款与付款' }));
     expect(mockPush).toHaveBeenCalledWith('/dashboard/payments');
   });
 });

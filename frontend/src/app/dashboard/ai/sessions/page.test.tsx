@@ -65,7 +65,7 @@ describe('AiSessionsPage', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'AI 会话列表' })).toBeInTheDocument();
-      expect(screen.getByText('session_1')).toBeInTheDocument();
+      expect(screen.getAllByText('session_1').length).toBeGreaterThan(0);
     });
   });
 

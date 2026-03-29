@@ -14,8 +14,10 @@
     "test": "NODE_ENV=test JWT_SECRET=test-only-jwt-secret-for-ci-123456 node --test",
     "test:db": "NODE_ENV=test JWT_SECRET=test-only-jwt-secret-for-ci-123456 node --test src/integration/database.integration.js",
     "test:all": "npm run test && npm run test:db",
+    "db:backup": "node scripts/db-backup.js",
     "db:generate": "prisma generate",
-    "db:push": "prisma db push",
+    "db:migrate": "node scripts/db-backup.js && prisma migrate dev",
+    "db:push": "node scripts/db-backup.js && prisma db push",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio"
   },

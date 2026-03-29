@@ -22,7 +22,6 @@ import { isTabRouteActive, type TabConfig } from './navigation.config';
 
 export {
   ADMIN_TABS,
-  AI_TABS,
   EXPORT_TABS,
   FINANCE_TABS,
   OPERATIONS_TABS,

@@ -30,6 +30,7 @@ interface FinanceContractRecord {
     id: string;
     name: string;
   };
+  stores?: string[];
   items?: Array<{ store?: { id: string; name: string } }>;
 }
 
@@ -72,9 +73,23 @@ const createPaymentIdempotencyKey = (payload: FinanceCreatePaymentInput) => {
   });
 };
 
+export interface PaymentAllocation {
+  salesContractId: string;
+  amount: number;
+  note?: string;
+}
+
 export const financeService = {
   getPayments: async (params?: FinancePaymentQuery) => {
     return api.get<ApiResponse<PaginatedResponse<Payment>>, ApiResponse<PaginatedResponse<Payment>>>('/finance/payments', { params });
+  },
+
+  getUnallocatedPayments: async () => {
+    return api.get<ApiResponse<Payment[]>, ApiResponse<Payment[]>>('/finance/unallocated-payments');
+  },
+
+  allocatePayment: async (paymentId: string, allocations: PaymentAllocation[]) => {
+    return api.post<ApiResponse<Payment[]>, ApiResponse<Payment[]>>(`/finance/payments/${paymentId}/allocate`, { allocations });
   },
 
   getPayables: async (params?: { page?: number; pageSize?: number }) => {

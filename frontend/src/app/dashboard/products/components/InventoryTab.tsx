@@ -1,8 +1,8 @@
 /**
  * Input: 库存服务
- * Output: 库存状态管理页面（单条/批量状态流转）
- * Pos: 核心业务页面，管理商品库存状态与检索
- * 
+ * Output: 库存状态管理 Tab 组件（单条/批量状态流转）
+ * Pos: 商品档案页面的子 Tab
+ *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
@@ -30,8 +30,6 @@ import {
 import { MoreHorizontal, RefreshCw, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
@@ -60,7 +58,7 @@ const STATUS_LABEL_MAP: Record<InventoryStatus, string> = {
  *   1. 加载并展示库存列表
  *   2. 支持快速更新库存状态
  */
-export default function InventoryPage() {
+export function InventoryTab() {
   // 库存状态
   const [inventory, setInventory] = useState<Inventory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -254,49 +252,42 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
-      <PageHeader
-        title="库存状态"
-        description="管理商品库存状态，跟踪生产、包装、运输进度"
-        actions={
-          <div className="hidden flex-wrap items-center gap-2 md:flex">
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="搜索商品/采购合同..."
-                value={keyword}
-                onChange={(event) => { setKeyword(event.target.value); setCurrentPage(1); }}
-                className="h-10 rounded-xl border-border/70 bg-background/70 pl-9"
-              />
-            </div>
-            {keyword && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-10 rounded-xl"
-                onClick={() => { setKeyword(''); setDebouncedKeyword(''); setCurrentPage(1); }}
-              >
-                <X className="h-4 w-4 mr-1" />
-                重置
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              disabled={batchUpdating || selectedIds.length === 0}
-              onClick={() => handleBatchStatusChange(InventoryStatus.INBOUND)}
-            >
-              批量设为已入库
-            </Button>
-            <Button
-              variant="outline"
-              disabled={batchUpdating || selectedIds.length === 0}
-              onClick={() => handleBatchStatusChange(InventoryStatus.OUTBOUND)}
-            >
-              批量设为已出库
-            </Button>
-          </div>
-        }
-      />
+      <div className="hidden flex-wrap items-center gap-2 md:flex">
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="搜索商品/采购合同..."
+            value={keyword}
+            onChange={(event) => { setKeyword(event.target.value); setCurrentPage(1); }}
+            className="h-10 rounded-xl border-border/70 bg-background/70 pl-9"
+          />
+        </div>
+        {keyword && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-10 rounded-xl"
+            onClick={() => { setKeyword(''); setDebouncedKeyword(''); setCurrentPage(1); }}
+          >
+            <X className="h-4 w-4 mr-1" />
+            重置
+          </Button>
+        )}
+        <Button
+          variant="outline"
+          disabled={batchUpdating || selectedIds.length === 0}
+          onClick={() => handleBatchStatusChange(InventoryStatus.INBOUND)}
+        >
+          批量设为已入库
+        </Button>
+        <Button
+          variant="outline"
+          disabled={batchUpdating || selectedIds.length === 0}
+          onClick={() => handleBatchStatusChange(InventoryStatus.OUTBOUND)}
+        >
+          批量设为已出库
+        </Button>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 md:hidden">
         <Sheet open={mobileActionsOpen} onOpenChange={setMobileActionsOpen}>

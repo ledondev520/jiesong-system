@@ -22,6 +22,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const paymentSchema = z.object({
@@ -101,8 +102,12 @@ export function PaymentDialog({
               name="paymentDate"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>日期</FormLabel>
-                  <DatePicker date={field.value} setDate={field.onChange} />
+                  <Label htmlFor="payment-date">日期</Label>
+                  <DatePicker
+                    date={field.value}
+                    setDate={field.onChange}
+                    triggerProps={{ id: 'payment-date', name: 'paymentDate' }}
+                  />
                   <FormMessage />
                 </FormItem>
               )}

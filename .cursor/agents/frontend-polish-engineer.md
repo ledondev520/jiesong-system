@@ -1,5 +1,6 @@
 ---
 name: frontend-polish-engineer
+model: claude-4.6-sonnet-medium
 description: 前端高端美化专家。用于系统级UI重塑、工作台视觉升级、设计语言统一与体验提质。use proactively：当涉及页面改版、样式优化、视觉统一、交互动效、可用性提升时立即委派。
 ---
 

@@ -27,8 +27,7 @@ const exportTargets: Array<{ type: SystemExportType; label: string; desc: string
   { type: 'stores', label: '门店', desc: '导出门店与港口基础数据' },
   { type: 'products', label: '商品', desc: '导出商品主数据与分类信息' },
   { type: 'purchases', label: '采购合同', desc: '导出采购合同与付款状态' },
-  { type: 'sales', label: '出口合同', desc: '导出出口合同与收款状态' },
-  { type: 'containers', label: '货柜', desc: '导出货柜与装箱摘要数据' },
+  { type: 'sales', label: '出口合同', desc: '导出出口合同、装箱明细与收款状态' },
   { type: 'inventory', label: '库存', desc: '导出库存状态与关联合同' },
   { type: 'payments', label: '收付款', desc: '导出财务收付款记录' },
 ];

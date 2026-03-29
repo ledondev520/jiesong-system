@@ -1,7 +1,6 @@
 import type { ComponentType } from 'react';
 import {
   Bell,
-  Database,
   Landmark,
   LayoutDashboard,
   History,
@@ -39,13 +38,11 @@ export interface ModuleNavItem {
 
 export const OPERATIONS_TABS: TabConfig[] = [
   { href: '/dashboard', label: '工作台' },
-  { href: '/dashboard/ops-execution', label: '经营执行' },
 ];
 
 export const PROCUREMENT_TABS: TabConfig[] = [
   { href: '/dashboard/contracts', label: '采购合同' },
   { href: '/dashboard/suppliers', label: '供应商管理' },
-  { href: '/dashboard/inventory-container', label: '库存状态' },
   { href: '/dashboard/store-recommend', label: '采购建议' },
   { href: '/dashboard/products', label: '商品档案' },
 ];
@@ -64,12 +61,10 @@ export const FINANCE_TABS: TabConfig[] = [
 
 export const ADMIN_TABS: TabConfig[] = [
   { href: '/dashboard/settings', label: '系统配置' },
-  { href: '/dashboard/users', label: '用户管理' },
-  { href: '/dashboard/agents', label: 'Agent 管理' },
-  { href: '/dashboard/about', label: '关于' },
+  { href: '/dashboard/users', label: '账号管理' },
   { href: '/dashboard/ai/sessions', label: 'AI 日志' },
   { href: '/dashboard/system/logs', label: '系统日志' },
-  { href: '/dashboard/system/import-records', label: '导入记录' },
+  { href: '/dashboard/about', label: '关于' },
 ];
 
 export const SYSTEM_CENTER_LINKS: SystemCenterLink[] = [
@@ -87,13 +82,6 @@ export const SYSTEM_CENTER_LINKS: SystemCenterLink[] = [
     desc: '审计关键操作日志与变更记录',
     detail: '追踪合同创建/修改/删除、数据导入等关键操作，支持 CSV 导出。',
   },
-  {
-    href: '/dashboard/system/import-records',
-    label: '导入记录',
-    icon: Database,
-    desc: '复盘导入任务与失败明细',
-    detail: '查看历次数据导入的执行结果、成功率与失败行详情。',
-  },
 ];
 
 export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
@@ -103,7 +91,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     defaultHref: '/dashboard',
     label: '经营中台',
     icon: LayoutDashboard,
-    childPrefixes: ['/dashboard/ops-execution'],
+    childPrefixes: [],
     tabs: OPERATIONS_TABS,
     mobilePrimary: true,
   },
@@ -113,7 +101,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     defaultHref: '/dashboard/contracts',
     label: '采购',
     icon: ShoppingCart,
-    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers', '/dashboard/inventory-container', '/dashboard/store-recommend', '/dashboard/products'],
+    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers', '/dashboard/store-recommend', '/dashboard/products'],
     tabs: PROCUREMENT_TABS,
     mobilePrimary: true,
   },
@@ -148,7 +136,6 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
       '/dashboard/settings',
       '/dashboard/import',
       '/dashboard/users',
-      '/dashboard/agents',
       '/dashboard/about',
       '/dashboard/system',
       '/dashboard/ai',

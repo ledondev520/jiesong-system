@@ -58,6 +58,16 @@ router.get('/payment-trends', financeController.getPaymentTrends);
 // GET /api/v1/finance/overdue-receivables - 获取应收逾期预警（发货后超N天未收款）
 router.get('/overdue-receivables', financeController.getOverdueReceivables);
 
+// GET /api/v1/finance/unallocated-payments - 获取待分配收款列表
+router.get('/unallocated-payments', financeController.listUnallocatedPayments);
+
+// POST /api/v1/finance/payments/:id/allocate - 将收款分配到多张销售合同
+router.post(
+  '/payments/:id/allocate',
+  roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  financeController.allocatePayment
+);
+
 // ==================== 财务报表路由 ====================
 
 // GET /api/v1/finance/statements/analytics - 获取趋势分析数据和预警列表（必须在 /:year/:month 之前注册）

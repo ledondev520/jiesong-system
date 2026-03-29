@@ -2,6 +2,7 @@
 
 | Round | Scope | Tests | Lint | Build | Coverage | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 20 | Header personal settings correction (`FE-SHELL-02`) | Pass (`3` files / `10` tests) | Pass | Pass | Not run | Header user menu now opens a real personal-settings dialog, profile edits update the current session immediately, the duplicate trigger icon is gone, and avatar interaction is now direct click-to-upload/replace |
 | 19 | Frontend E2E stabilization before commit | Pass (`110` files / `356` unit tests + `57/57` Playwright) | Pass | Pass | Not run | The dashboard hydration mismatch and stale E2E contracts were fixed, a fresh production preview was rebuilt, and the repo moved from “feature-complete but gate-red” to genuinely commit-ready |
 | 18 | Frontend next iterations round 7 (`FE-MODULE-01` + `FE-QA-01`) | Pass (`10` page tests + `5` Playwright visuals) | Pass | Pass | Not run | Procurement/export now expose differentiated first-screen summaries, Playwright visual gating covers five critical pages, and the March frontend iteration plan is fully complete |
 | 17 | Frontend next iterations round 6 (`FE-AI-01`) | Pass (`2` files / `10` tests) | Pass | Pass | Not run | The AI assistant now mounts more selectively, opens from a quieter trigger, and uses a right-side panel instead of the louder floating bubble |

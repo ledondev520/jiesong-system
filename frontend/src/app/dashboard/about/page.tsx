@@ -99,9 +99,9 @@ export default function AboutAgentPage() {
         description="让内部同事的 Agent 用几句话或几条命令，就能接上这套系统。"
         actions={
           <Button asChild variant="outline">
-            <Link href="/dashboard/agents">
+            <Link href="/dashboard/users">
               <KeyRound className="mr-2 h-4 w-4" />
-              打开 Agent 管理
+              打开账号管理
             </Link>
           </Button>
         }
@@ -174,6 +174,26 @@ export default function AboutAgentPage() {
         <CodeBlock title="远程 HTTP MCP 最小探活（推荐）" code={mcpSnippet} copyLabel="复制探活命令" />
         <CodeBlock title="本机 CLI 查询示例" code={cliSearchSnippet} copyLabel="复制查询命令" />
         <CodeBlock title="本机 CLI 录入采购示例" code={cliCreateSnippet} copyLabel="复制录入命令" />
+        <CodeBlock
+          title="OpenClaw 客户端模板"
+          code={[
+            '# 推荐：先执行上面的一键安装命令',
+            'command: jiesong-agent-mcp',
+            'transport: stdio',
+            'base_url: 已写入 ~/.config/jiesong-agent/config.env',
+          ].join('\n')}
+          copyLabel="复制 OpenClaw 模板"
+        />
+        <CodeBlock
+          title="通用 MCP 客户端模板"
+          code={[
+            `endpoint: ${origin}/mcp`,
+            'auth_header: Authorization: Bearer <user-jwt-or-agent-token>',
+            'recommended_probe: tools/list',
+            'recommended_tool: search_entities',
+          ].join('\n')}
+          copyLabel="复制 MCP 模板"
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">

@@ -37,14 +37,14 @@ interface CustomsDeclarationDetailPageContentProps {
 }
 
 const detailFields = (declaration: CustomsDeclaration) => [
-  { label: '发货人', value: declaration.exporter },
-  { label: '收货人', value: declaration.consignee },
-  { label: '目的国', value: declaration.destinationCountry },
+  { label: '发货人', value: declaration.exporter || '-' },
+  { label: '收货人', value: declaration.consignee || '-' },
+  { label: '目的国', value: declaration.destinationCountry || '-' },
   { label: '起运港', value: declaration.portOfLoading || '-' },
   { label: '目的港', value: declaration.portOfDestination || '-' },
   { label: '运输方式', value: declaration.transportMode || '-' },
-  { label: '申报日期', value: declaration.declarationDate },
-  { label: '放行日期', value: declaration.releaseDate || '-' },
+  { label: '申报日期', value: declaration.declarationDate || declaration.declaredAt || '-' },
+  { label: '放行日期', value: declaration.releaseDate || declaration.exportDate || '-' },
   { label: '成交币种', value: declaration.currency },
 ];
 
@@ -83,9 +83,9 @@ export function CustomsDeclarationDetailPageContent({
 
   return (
     <div className="space-y-6 pb-10">
-      <PageHeader
+        <PageHeader
         title={declaration.declarationNo}
-        description={`${declaration.exporter} -> ${declaration.destinationCountry}`}
+        description={`${declaration.exporter || '待填写'} → ${declaration.destinationCountry || '待填写'}`}
         backHref="/customs-declarations"
         actions={
           <>
@@ -107,7 +107,7 @@ export function CustomsDeclarationDetailPageContent({
             <CardTitle className="text-sm text-muted-foreground">货值总额</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold">
-            {declaration.currency} {declaration.totalAmount.toLocaleString()}
+            {declaration.currency} {(declaration.totalAmount ?? 0).toLocaleString()}
           </CardContent>
         </Card>
         <Card className="surface-panel">
@@ -115,7 +115,7 @@ export function CustomsDeclarationDetailPageContent({
             <CardTitle className="text-sm text-muted-foreground">总件数</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold">
-            {declaration.totalPackages.toLocaleString()}
+            {(declaration.totalPackages ?? declaration.totalQuantity ?? 0).toLocaleString()}
           </CardContent>
         </Card>
         <Card className="surface-panel">
@@ -123,7 +123,7 @@ export function CustomsDeclarationDetailPageContent({
             <CardTitle className="text-sm text-muted-foreground">毛重</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold">
-            {declaration.grossWeight.toLocaleString()} kg
+            {(declaration.grossWeight ?? declaration.totalGrossWeight ?? 0).toLocaleString()} kg
           </CardContent>
         </Card>
         <Card className="surface-panel">
@@ -131,7 +131,7 @@ export function CustomsDeclarationDetailPageContent({
             <CardTitle className="text-sm text-muted-foreground">净重</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold">
-            {declaration.netWeight.toLocaleString()} kg
+            {(declaration.netWeight ?? declaration.totalNetWeight ?? 0).toLocaleString()} kg
           </CardContent>
         </Card>
       </div>
@@ -149,7 +149,7 @@ export function CustomsDeclarationDetailPageContent({
           ))}
           <div className="space-y-1 md:col-span-2 xl:col-span-3">
             <div className="text-sm text-muted-foreground">备注</div>
-            <div className="font-medium">{declaration.remarks || '-'}</div>
+            <div className="font-medium">{declaration.remarks || declaration.note || '-'}</div>
           </div>
         </CardContent>
       </Card>

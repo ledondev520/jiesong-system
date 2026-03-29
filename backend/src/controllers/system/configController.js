@@ -1,6 +1,6 @@
 /**
  * Input: prisma.systemConfig KV 存储
- * Output: 系统配置读写接口（平铺格式 + 分域格式）
+ * Output: 系统配置读写接口（平铺格式 + 分域格式）；仅 Kimi/Moonshot AI 密钥
  * Pos: 系统配置控制层，支持向后兼容的平铺 getConfigs 与新增的分域 getConfigsByDomain
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -31,12 +31,15 @@ const CONFIG_DOMAIN_MAP = {
   // AI 集成域：外部 AI 服务鉴权与参数
   apiKey:         { domain: 'ai', label: 'AI集成', note: 'Kimi API 密钥（脱敏存储）' },
   kimiModel:      { domain: 'ai', label: 'AI集成', note: 'Kimi 模型名称' },
-  minimaxApiKey:  { domain: 'ai', label: 'AI集成', note: 'MiniMax API 密钥（脱敏存储）' },
-  minimaxModel:   { domain: 'ai', label: 'AI集成', note: 'MiniMax 模型名称（默认 minimax-m2.7）' },
-  aiPrimaryModel: { domain: 'ai', label: 'AI集成', note: 'AI 首选模型' },
-  aiFallbackModel: { domain: 'ai', label: 'AI集成', note: 'AI 备用模型' },
+  aiChatModel:     { domain: 'ai', label: 'AI集成', note: 'AI 助手问答场景使用的模型' },
+  aiHsCodeModel:   { domain: 'ai', label: 'AI集成', note: 'HS Code 推荐与申报要素场景使用的模型' },
+  aiPrimaryModel:  { domain: 'ai', label: 'AI集成', note: '（旧）AI 首选模型（已迁移至场景化配置）' },
+  aiFallbackModel: { domain: 'ai', label: 'AI集成', note: '（旧）AI 备用模型（已迁移至场景化配置）' },
   aiTemperature:  { domain: 'ai', label: 'AI集成', note: '采样温度 0–1' },
   aiMaxTokens:    { domain: 'ai', label: 'AI集成', note: '最大输出 token 数' },
+
+  // HSCIQ 海关归类 API 集成
+  hsciqEnabled:   { domain: 'ai', label: 'AI集成', note: '是否启用 HSCIQ 海关归类 API（开启后 HS 编码推荐与申报要素将优先调用官方 API）' },
 };
 
 const getDomainMeta = (key) => CONFIG_DOMAIN_MAP[key] || { domain: 'other', label: '其他', note: '' };
@@ -68,6 +71,12 @@ const getConfigs = async (req, res, next) => {
       acc[config.key] = buildConfigValue(config.key, config.value);
       return acc;
     }, {});
+
+    // 若数据库未存储 API Key，降级读取环境变量（管理员需要看到实际使用的 Key）
+    const config = require('../../config');
+    if (!formatted.apiKey && config.kimi?.apiKey) {
+      formatted.apiKey = config.kimi.apiKey;
+    }
 
     success(res, formatted);
   } catch (error) {

@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Role } from '@/types';
 import {
   getDefaultDashboardHref,
+  getPrimaryMobileModuleNavItems,
+  getSecondaryMobileModuleNavItems,
   getModuleTargetHref,
   getVisibleModuleNavItems,
   isTabRouteActive,
@@ -24,6 +26,14 @@ describe('navigation.config helpers', () => {
 
     const visibleForAdmin = getVisibleModuleNavItems(Role.ADMIN);
     expect(visibleForAdmin.some((item) => item.key === 'admin')).toBe(true);
+  });
+
+  it('移动端主 Tab 和更多入口按配置分组', () => {
+    const primaryItems = getPrimaryMobileModuleNavItems(Role.ADMIN).map((item) => item.key);
+    const secondaryItems = getSecondaryMobileModuleNavItems(Role.ADMIN).map((item) => item.key);
+
+    expect(primaryItems).toEqual(['operations', 'procurement', 'export', 'finance']);
+    expect(secondaryItems).toEqual(['admin']);
   });
 
   it('返回当前角色的默认 dashboard 落点', () => {

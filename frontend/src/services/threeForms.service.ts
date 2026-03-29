@@ -88,6 +88,42 @@ export const threeFormsService = {
   },
 
   /**
+   * 下载三张表 Excel 文件
+   * 职责：请求后端生成 Excel 并触发浏览器下载
+   * @param salesContractId 合同 ID
+   * @param ids 可选，精确指定三张表 ID
+   */
+  downloadExcel: async (
+    salesContractId: string,
+    ids?: { customsDeclarationId?: string; forexId?: string; taxRefundId?: string },
+  ) => {
+    const params = new URLSearchParams();
+    if (ids?.customsDeclarationId) params.set('customsDeclarationId', ids.customsDeclarationId);
+    if (ids?.forexId) params.set('forexId', ids.forexId);
+    if (ids?.taxRefundId) params.set('taxRefundId', ids.taxRefundId);
+
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const response = await api.get(`/three-forms/export/${salesContractId}${qs}`, {
+      responseType: 'blob',
+    });
+
+    // 从 Content-Disposition 提取文件名，或使用默认名
+    const cd = (response.headers as Record<string, string>)['content-disposition'] || '';
+    const match = cd.match(/filename\*?=(?:UTF-8'')?([^;]+)/i);
+    const filename = match ? decodeURIComponent(match[1].replace(/"/g, '')) : `三张表_${salesContractId}.xlsx`;
+
+    const blob = new Blob([response.data as BlobPart], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  /**
    * 单独生成出口退税单
    */
   generateTaxRefund: async (data: {

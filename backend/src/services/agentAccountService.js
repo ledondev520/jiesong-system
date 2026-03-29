@@ -1,7 +1,9 @@
 /**
  * Input: Agent 账号与凭证管理请求
  * Output: Agent 账号、grant、credential 生命周期能力
- * Pos: Agent 管理服务层
+ * Pos: Agent 管理服务层；创建/更新时自动分配全量 capability，无需手动配置
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const crypto = require('node:crypto');
@@ -13,6 +15,15 @@ const { NOTIFICATION_TYPE, ROLES } = require('../config/constants');
 const DEFAULT_CREDENTIAL_EXPIRES_DAYS = 90;
 const MAX_CREDENTIAL_EXPIRES_DAYS = 365;
 const MAX_ACTIVE_CREDENTIALS_PER_AGENT = 2;
+
+/** Agent 创建时自动分配的全量能力集（与路由层 accessAuth/capabilityAuth 保持一致） */
+const ALL_AGENT_CAPABILITIES = [
+  { resource: 'search', action: 'read' },
+  { resource: 'purchase', action: 'create' },
+  { resource: 'purchase', action: 'update' },
+  { resource: 'supplier', action: 'create' },
+  { resource: 'supplier', action: 'update' },
+];
 const runInTransaction = (prismaClient, handler) => (
   typeof prismaClient.$transaction === 'function'
     ? prismaClient.$transaction(handler)
@@ -134,7 +145,8 @@ const createAgentAccount = async ({ input, prismaClient = prisma } = {}) => {
     throw createError('name 和 slug 不能为空', 400);
   }
 
-  const grants = Array.isArray(data.grants) ? data.grants.map(sanitizeGrant) : [];
+  // 自动分配全量能力，无需手动配置
+  const grants = ALL_AGENT_CAPABILITIES;
 
   return runInTransaction(prismaClient, async (tx) => {
     const account = await tx.agentAccount.create({
@@ -143,18 +155,16 @@ const createAgentAccount = async ({ input, prismaClient = prisma } = {}) => {
         slug,
         description: data.description || null,
         status: data.status || 'ACTIVE',
-        defaultMode: data.defaultMode || 'READ_INGEST',
+        defaultMode: 'READ_INGEST',
       },
     });
 
-    if (grants.length) {
-      await tx.agentGrant.createMany({
-        data: grants.map((grant) => ({
-          agentAccountId: account.id,
-          ...grant,
-        })),
-      });
-    }
+    await tx.agentGrant.createMany({
+      data: grants.map((grant) => ({
+        agentAccountId: account.id,
+        ...grant,
+      })),
+    });
 
     return tx.agentAccount.findUnique({
       where: { id: account.id },
@@ -168,7 +178,6 @@ const createAgentAccount = async ({ input, prismaClient = prisma } = {}) => {
 
 const updateAgentAccount = async ({ id, input, prismaClient = prisma } = {}) => {
   const data = input || {};
-  const grants = Array.isArray(data.grants) ? data.grants.map(sanitizeGrant) : null;
 
   return prismaClient.$transaction(async (tx) => {
     const account = await tx.agentAccount.update({
@@ -178,21 +187,17 @@ const updateAgentAccount = async ({ id, input, prismaClient = prisma } = {}) => 
         slug: data.slug,
         description: data.description,
         status: data.status,
-        defaultMode: data.defaultMode,
       },
     });
 
-    if (grants) {
-      await tx.agentGrant.deleteMany({ where: { agentAccountId: id } });
-      if (grants.length) {
-        await tx.agentGrant.createMany({
-          data: grants.map((grant) => ({
-            agentAccountId: id,
-            ...grant,
-          })),
-        });
-      }
-    }
+    // 每次更新时刷新为全量能力集，确保 Agent 权限始终完整
+    await tx.agentGrant.deleteMany({ where: { agentAccountId: id } });
+    await tx.agentGrant.createMany({
+      data: ALL_AGENT_CAPABILITIES.map((grant) => ({
+        agentAccountId: id,
+        ...grant,
+      })),
+    });
 
     return tx.agentAccount.findUnique({
       where: { id: account.id },

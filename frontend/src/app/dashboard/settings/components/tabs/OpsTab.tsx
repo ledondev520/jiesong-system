@@ -10,20 +10,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Bell, History, Database, type LucideIcon } from 'lucide-react';
-
-interface OpsLink {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  desc: string;
-}
-
-const opsLinks: OpsLink[] = [
-  { href: '/dashboard/system/notifications', label: '通知中心', icon: Bell, desc: '查看系统通知和未读提醒' },
-  { href: '/dashboard/system/logs', label: '系统日志', icon: History, desc: '审计关键操作日志与变更记录' },
-  { href: '/dashboard/system/import-records', label: '导入记录', icon: Database, desc: '复盘导入任务与失败明细' },
-];
+import { SYSTEM_CENTER_LINKS } from '@/components/layout/navigation.config';
 
 /**
  * 职责：渲染运维中心快捷入口卡片列表
@@ -33,7 +20,7 @@ export function OpsTab() {
 
   return (
     <div className="grid gap-4 md:grid-cols-3">
-      {opsLinks.map((item) => {
+      {SYSTEM_CENTER_LINKS.map((item) => {
         const Icon = item.icon;
         return (
           <Card

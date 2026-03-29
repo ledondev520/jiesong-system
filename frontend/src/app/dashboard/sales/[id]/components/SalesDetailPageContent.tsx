@@ -48,7 +48,7 @@ import {
 } from '@/components/ui/tabs';
 import { StatusBadge, type StatusBadgeConfig } from '@/components/ui/status-badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, FileDown, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet } from 'lucide-react';
 import { domToPng } from 'modern-screenshot';
 import { toast } from 'sonner';
 import { CONTAINER_40HQ } from '@/lib/binPacking';
@@ -95,10 +95,6 @@ export default function SalesDetailPage({ params }: PageProps) {
     height: 0,
   });
 
-  // 导出 Excel 状态
-  const [exportingExcel, setExportingExcel] = useState(false);
-  // 导出 PDF 状态
-  const [exportingPdf, setExportingPdf] = useState(false);
   // 一键生成三张表对话框状态
   const [threeFormsDialogOpen, setThreeFormsDialogOpen] = useState(false);
 
@@ -107,40 +103,6 @@ export default function SalesDetailPage({ params }: PageProps) {
   const statsRef = useRef<HTMLDivElement>(null);
   const packingRef = useRef<HTMLDivElement>(null);
   const view3dRef = useRef<HTMLDivElement>(null);
-
-  /**
-   * 职责：导出当前合同为标准出口 Excel（三 Sheet）
-   * 思路：调用 salesService.exportExcel 触发浏览器文件下载
-   */
-  const handleExportExcel = async () => {
-    if (!contract) return;
-    setExportingExcel(true);
-    try {
-      await salesService.exportExcel(contract.id, contract.contractNo);
-      toast.success(`${contract.contractNo} Excel 已下载`);
-    } catch {
-      toast.error('导出 Excel 失败，请稍后重试');
-    } finally {
-      setExportingExcel(false);
-    }
-  };
-
-  /**
-   * 职责：导出当前合同 PDF
-   */
-  const handleExportPdf = async () => {
-    if (!contract) return;
-    setExportingPdf(true);
-    try {
-      await salesService.exportPdf(contract.id, contract.contractNo);
-      toast.success(`${contract.contractNo} PDF 已下载`);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : '导出 PDF 失败，请稍后重试';
-      toast.error(message);
-    } finally {
-      setExportingPdf(false);
-    }
-  };
 
   const handleThreeFormsGenerated = (results: {
     customsDeclarationId?: string;
@@ -489,30 +451,6 @@ export default function SalesDetailPage({ params }: PageProps) {
           actions={
             <div className="flex items-center gap-2">
               {getStatusBadge(contract.status)}
-              <Button
-                variant="outline"
-                onClick={handleExportPdf}
-                disabled={exportingPdf}
-                aria-label="导出合同 PDF"
-              >
-                {exportingPdf
-                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  : <FileDown className="mr-2 h-4 w-4 text-primary" />
-                }
-                导出 PDF
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleExportExcel}
-                disabled={exportingExcel}
-                aria-label="导出标准出口 Excel"
-              >
-                {exportingExcel
-                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  : <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
-                }
-                导出 Excel
-              </Button>
               <Button variant="outline" onClick={handleSaveAsImage}>
                 <Camera className="mr-2 h-4 w-4" />
                 保存为图片

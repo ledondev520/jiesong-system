@@ -24,15 +24,18 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { CreditCard, ArrowUpRight, ArrowDownLeft, RefreshCw, Search, X } from 'lucide-react';
+import { CreditCard, ArrowUpRight, ArrowDownLeft, RefreshCw, Search, X, Plus, Split } from 'lucide-react';
 import { MobileListCard } from '@/components/mobile';
 import { PaymentDialog, type PaymentSubmitData } from '../../dashboard/finance/components/PaymentDialog';
+import { ReceiptDialog, type ReceiptSubmitData } from '../../dashboard/finance/components/ReceiptDialog';
+import { AllocateDialog } from '../../dashboard/finance/components/AllocateDialog';
 import { toast } from 'sonner';
 import { financeService } from '@/services/finance.service';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
 import { LoadingState, TableStateRow } from '@/components/ui/data-state';
+import type { Payment } from '@/types';
 
 interface PayableContract {
   id: string;
@@ -52,6 +55,7 @@ interface ReceivableContract {
   unreceiveAmount: number;
   exchangeRate: number;
   status: string;
+  stores?: string[];
   items?: Array<{ store?: { id: string; name: string } }>;
 }
 
@@ -96,11 +100,17 @@ function PaymentsPageContent() {
   // 列表关键词（客户端过滤：合同号 / 供应商或门店）
   const [keyword, setKeyword] = useState('');
 
+  // 待分配收款
+  const [unallocatedPayments, setUnallocatedPayments] = useState<Payment[]>([]);
+  const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
+  const [allocateTarget, setAllocateTarget] = useState<Payment | null>(null);
+
   // 0. 初始化加载
   useEffect(() => {
     fetchStats();
     fetchPayables();
     fetchReceivables();
+    fetchUnallocated();
   }, []);
 
   // 1. 加载统计数据
@@ -138,6 +148,16 @@ function PaymentsPageContent() {
     }
   };
 
+  // 3a. 加载待分配收款
+  const fetchUnallocated = async () => {
+    try {
+      const res = await financeService.getUnallocatedPayments();
+      setUnallocatedPayments(res.data || []);
+    } catch {
+      // 非关键错误，静默处理
+    }
+  };
+
   // 3. 加载应收账款（带缓存）
   const fetchReceivables = async () => {
     setReceivableLoading(true);
@@ -153,6 +173,8 @@ function PaymentsPageContent() {
           unreceiveAmount: item.unreceiveAmount ?? Math.max(0, item.totalAmount - (item.receivedAmount ?? 0)),
           exchangeRate: 0,
           status: item.status,
+          // 后端已聚合好的门店名称数组（优先）
+          stores: (item as unknown as { stores?: string[] }).stores,
           items: item.items,
         })),
       );
@@ -188,7 +210,7 @@ function PaymentsPageContent() {
     }
   };
 
-  // 处理收款提交
+  // 处理收款提交（保留：直接绑定合同的旧流程）
   const handleReceivableSubmit = async (data: PaymentSubmitData) => {
     if (!selectedReceivable) return;
     try {
@@ -212,10 +234,52 @@ function PaymentsPageContent() {
     }
   };
 
+  // 处理"先记录到账"提交（新流程：无合同，进入待分配池）
+  const handleReceiptSubmit = async (data: ReceiptSubmitData) => {
+    try {
+      await financeService.createPayment({
+        type: PaymentType.RECEIVABLE_RECEIPT,
+        amount: data.amount,
+        currency: data.currency,
+        paymentMethod: data.paymentMethod,
+        paymentDate: data.paymentDate.toISOString(),
+        note: data.note,
+      });
+      toast.success('到账记录已保存，请前往分配');
+      setReceiptDialogOpen(false);
+      fetchUnallocated();
+    } catch {
+      toast.error('记录到账失败');
+    }
+  };
+
+  // 处理分配提交
+  const handleAllocateSubmit = async (
+    paymentId: string,
+    allocations: { salesContractId: string; amount: number }[]
+  ) => {
+    try {
+      await financeService.allocatePayment(paymentId, allocations);
+      toast.success(`已分配 ${allocations.length} 张合同`);
+      setAllocateTarget(null);
+      invalidateCache('fin-receivables');
+      invalidateCache('fin-stats');
+      fetchUnallocated();
+      fetchReceivables();
+      fetchStats();
+    } catch {
+      toast.error('分配失败，请重试');
+    }
+  };
+
   // 获取门店名称（应收列表展示与关键词筛选）
+  // 优先使用后端已聚合的 stores 字段，fallback 到 items[].store.name
   const getStoreNames = (contract: ReceivableContract) => {
-    const stores = contract.items?.map((item) => item.store?.name).filter(Boolean);
-    return stores && stores.length > 0 ? stores.join(', ') : '-';
+    if (contract.stores && contract.stores.length > 0) {
+      return contract.stores.join(', ');
+    }
+    const fromItems = contract.items?.map((item) => item.store?.name).filter(Boolean) as string[];
+    return fromItems && fromItems.length > 0 ? fromItems.join(', ') : '-';
   };
 
   // 待付/待收基础列表（统计卡片用全量；表格再套关键词）
@@ -259,11 +323,54 @@ function PaymentsPageContent() {
         title="收付款"
         description="管理应付账款与应收账款"
         actions={
-          <Button variant="outline" size="sm" className="h-10" onClick={() => { fetchStats(); fetchPayables(); fetchReceivables(); }}>
-            <RefreshCw className="mr-2 h-4 w-4" /> 刷新
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" className="h-10" onClick={() => setReceiptDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> 记录到账
+            </Button>
+            <Button variant="outline" size="sm" className="h-10" onClick={() => { fetchStats(); fetchPayables(); fetchReceivables(); fetchUnallocated(); }}>
+              <RefreshCw className="mr-2 h-4 w-4" /> 刷新
+            </Button>
+          </div>
         }
       />
+
+      {/* 待分配款项池 */}
+      {unallocatedPayments.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50/50 dark:border-orange-900 dark:bg-orange-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium text-orange-700 dark:text-orange-400">
+              <Split className="h-4 w-4" />
+              待分配款项（{unallocatedPayments.length} 笔）
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {unallocatedPayments.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center justify-between rounded-lg border border-orange-200 bg-background px-3 py-2 dark:border-orange-900"
+              >
+                <div>
+                  <span className="font-semibold text-sm">
+                    {p.currency} {p.amount.toLocaleString()}
+                  </span>
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {new Date(p.paymentDate).toLocaleDateString('zh-CN')}
+                    {p.note && ` · ${p.note}`}
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs"
+                  onClick={() => setAllocateTarget(p)}
+                >
+                  <Split className="mr-1 h-3 w-3" /> 分配
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* 统计卡片 */}
       <div className="grid gap-4 md:grid-cols-2">
@@ -547,7 +654,7 @@ function PaymentsPageContent() {
         />
       )}
 
-      {/* 收款弹窗 */}
+      {/* 直接绑合同收款弹窗（保留旧流程） */}
       {selectedReceivable && (
         <PaymentDialog 
           open={!!selectedReceivable} 
@@ -559,6 +666,22 @@ function PaymentsPageContent() {
           onSubmit={handleReceivableSubmit}
         />
       )}
+
+      {/* 记录到账弹窗（新流程：先记录，后分配） */}
+      <ReceiptDialog
+        open={receiptDialogOpen}
+        onOpenChange={setReceiptDialogOpen}
+        onSubmit={handleReceiptSubmit}
+      />
+
+      {/* 分配弹窗 */}
+      <AllocateDialog
+        open={!!allocateTarget}
+        onOpenChange={(open) => !open && setAllocateTarget(null)}
+        payment={allocateTarget}
+        receivables={receivables}
+        onSubmit={handleAllocateSubmit}
+      />
     </div>
   );
 }

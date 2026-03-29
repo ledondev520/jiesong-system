@@ -8,6 +8,7 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   login: (user: User, token: string) => void;
+  updateProfile: (profile: Partial<Pick<User, 'name' | 'avatar'>>) => void;
   logout: () => void;
 }
 
@@ -20,6 +21,20 @@ export const useAuthStore = create<AuthState>()(
       login: (user, token) => {
         set({ user, token, isAuthenticated: true });
         setAuthToken(token);
+      },
+      updateProfile: (profile) => {
+        set((state) => {
+          if (!state.user) {
+            return state;
+          }
+
+          return {
+            user: {
+              ...state.user,
+              ...profile,
+            },
+          };
+        });
       },
       logout: () => {
         set({ user: null, token: null, isAuthenticated: false });

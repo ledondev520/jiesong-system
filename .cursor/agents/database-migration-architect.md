@@ -1,5 +1,6 @@
 ---
 name: database-migration-architect
+model: claude-4.6-sonnet-medium
 description: 数据库演进架构师。负责 Prisma schema 演进、迁移脚本策略、数据安全与回滚路径设计。use proactively：当涉及表结构变更、字段迁移、索引优化、数据一致性风险时立即委派。
 ---
 

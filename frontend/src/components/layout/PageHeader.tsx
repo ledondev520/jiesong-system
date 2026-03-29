@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 
 interface PageHeaderProps {
+  eyebrow?: string; // 标题上方的小引导词，用于标明工作场景
   title: string;
   description?: string;
   backHref?: string;   // 指定返回链接，不指定则使用router.back()
@@ -29,6 +30,7 @@ interface PageHeaderProps {
  *   3. 显示右侧操作按钮
  */
 export function PageHeader({ 
+  eyebrow,
   title, 
   description, 
   backHref, 
@@ -66,6 +68,11 @@ export function PageHeader({
 
         {/* 标题区域：移动端字号缩小以节省空间 */}
         <div className="min-w-0">
+          {eyebrow && (
+            <p className="mb-1 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              {eyebrow}
+            </p>
+          )}
           <h2 className="break-words text-xl font-semibold tracking-tight md:text-2xl">{title}</h2>
           {/* 描述文字：移动端隐藏，节省屏幕高度 */}
           {description && (

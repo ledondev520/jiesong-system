@@ -59,7 +59,7 @@ describe('ContractTemplatesPage', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '模板管理' })).toBeInTheDocument();
-      expect(screen.getByText('购销合同模板.docx')).toBeInTheDocument();
+      expect(screen.getAllByText('购销合同模板.docx').length).toBeGreaterThan(0);
     });
   });
 

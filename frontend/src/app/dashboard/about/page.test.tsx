@@ -25,6 +25,8 @@ describe('AboutAgentPage', () => {
       expect(screen.getByText('远程 Agent（推荐）')).toBeInTheDocument();
       expect(screen.getByText('本机 Agent / CLI')).toBeInTheDocument();
       expect(screen.getByText('一句话提示词示例')).toBeInTheDocument();
+      expect(screen.getByText('OpenClaw 客户端模板')).toBeInTheDocument();
+      expect(screen.getByText('通用 MCP 客户端模板')).toBeInTheDocument();
       expect(screen.getAllByText(/tools\/list/).length).toBeGreaterThan(0);
       expect(screen.getByText(/npm run agent:cli -- search/)).toBeInTheDocument();
       expect(screen.getByText(/curl -fsSL .*\/agent\/install\.sh \| bash/)).toBeInTheDocument();

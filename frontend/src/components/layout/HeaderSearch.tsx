@@ -12,7 +12,6 @@ import { startTransition, useEffect, useEffectEvent, useRef, useState } from 're
 import { useRouter } from 'next/navigation';
 import {
   Building2,
-  Container,
   FileText,
   Loader2,
   Package,
@@ -35,8 +34,6 @@ const getResultIcon = (type: DashboardSearchResultType) => {
       return <Package className="h-4 w-4 text-primary" />;
     case 'supplier':
       return <Building2 className="h-4 w-4 text-primary" />;
-    case 'container':
-      return <Container className="h-4 w-4 text-primary" />;
     case 'purchase':
     case 'sales':
       return <FileText className="h-4 w-4 text-primary" />;
@@ -49,12 +46,10 @@ const getTypeLabel = (type: DashboardSearchResultType) => {
       return '商品';
     case 'supplier':
       return '供应商';
-    case 'container':
-      return '货柜';
     case 'purchase':
       return '采购';
     case 'sales':
-      return '销售';
+      return '出口合同';
   }
 };
 
@@ -140,7 +135,7 @@ export function HeaderSearch() {
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         type="search"
-        placeholder="搜索商品、供应商、货柜..."
+        placeholder="搜索商品、供应商、合同..."
         className="h-10 bg-background pl-9"
         value={searchQuery}
         onChange={(event) => {

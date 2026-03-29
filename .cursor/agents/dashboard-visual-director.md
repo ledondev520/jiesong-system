@@ -1,5 +1,6 @@
 ---
 name: dashboard-visual-director
+model: claude-4.6-sonnet-medium
 description: 工作台视觉总监。专注 dashboard 信息架构、数据卡片质感、图表容器与关键指标动效设计。use proactively：当涉及工作台改版、数据看板美化、首页吸引力提升时立即委派。
 ---
 

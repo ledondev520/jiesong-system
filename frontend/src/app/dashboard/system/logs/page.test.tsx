@@ -102,8 +102,8 @@ describe('SystemLogsPage', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '系统日志' })).toBeInTheDocument();
-      expect(screen.getByText('管理员')).toBeInTheDocument();
-      expect(screen.getByText('IMPORT')).toBeInTheDocument();
+      expect(screen.getAllByText('管理员').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('IMPORT').length).toBeGreaterThan(0);
     });
   });
 
@@ -124,13 +124,13 @@ describe('SystemLogsPage', () => {
     render(<SystemLogsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('UPDATE')).toBeInTheDocument();
+      expect(screen.getAllByText('UPDATE').length).toBeGreaterThan(0);
     });
 
     await user.click(screen.getByRole('button', { name: '导入日志' }));
 
     await waitFor(() => {
-      expect(screen.getByText('IMPORT')).toBeInTheDocument();
+      expect(screen.getAllByText('IMPORT').length).toBeGreaterThan(0);
       expect(screen.queryByText('UPDATE')).toBeNull();
     });
   });

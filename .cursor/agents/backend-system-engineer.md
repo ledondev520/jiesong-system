@@ -1,5 +1,6 @@
 ---
 name: backend-system-engineer
+model: claude-4.6-sonnet-medium
 description: 后端系统工程师。负责服务层、接口契约、数据模型与性能可靠性落地。use proactively：当涉及 API 设计、后端重构、数据库演进、后端稳定性治理时立即委派。
 ---
 

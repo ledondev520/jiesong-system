@@ -2,6 +2,11 @@
 
 | ID | Trigger | Impact | Mitigation | Rollback Point | Status |
 | --- | --- | --- | --- | --- | --- |
+| R30 | Header account-menu work can keep mixing user-scoped profile actions with global system configuration navigation | Users land in the wrong management surface, and seemingly simple profile edits become coupled to admin-only settings | Lock the bug with focused tests first, keep the system settings route unchanged, and add a local profile dialog plus minimal store mutation instead of reusing `/dashboard/settings` | Revert `src/components/layout/Header.tsx`, `src/components/layout/HeaderUserMenu.tsx`, `src/components/layout/HeaderProfileDialog.tsx`, `src/components/layout/Header.test.tsx`, `src/components/layout/HeaderUserMenu.test.tsx`, `src/store/auth.store.ts`, and `src/store/auth.store.test.ts` | Open |
+
+## Round 20 Status Update
+
+- `R30`: Reduced. The header account menu now opens a real user-scoped profile dialog, immediate profile edits flow through `auth.store.updateProfile`, and focused tests/lint/build all passed.
 
 | R28 | The dashboard shell can render a different first frame on the server and client under production preview hydration | Playwright fails across multiple dashboard pages with production `React error #418`, blocking commit even when feature work is functionally done | Move persisted-auth hydration and time-based shell rendering to SSR-safe patterns, then rerun the full suite on a fresh preview | Revert `src/app/dashboard/layout.tsx`, `src/app/dashboard/layout.test.tsx`, `src/components/layout/Header.tsx`, `src/app/dashboard/purchase/create/components/CreatePurchasePageContent.tsx`, and `src/app/dashboard/sales/create/page.tsx` | Open |
 | R29 | E2E mocks and smoke/button assertions can drift away from the current IA and service contracts after the March frontend refactors | Import/settings/store-recommend flows show false failures, masking real regressions and preventing a trustworthy pre-commit gate | Update mocks and assertions together, add service compatibility where contracts legitimately widened, and rerun the entire Playwright suite instead of trusting focused subsets | Revert `e2e/helpers.ts`, `e2e/smoke.spec.ts`, `e2e/button-coverage.spec.ts`, and `src/services/dataImportService.ts` | Open |

@@ -178,7 +178,7 @@ describe('SalesDetailPage 交互逻辑', () => {
     });
   });
 
-  it('点击导出 PDF 会调用服务', async () => {
+  it('导出 PDF 按钮已移除，页面只保留保存为图片', async () => {
     mockGetById.mockResolvedValue({
       data: {
         id: 's-1',
@@ -195,16 +195,11 @@ describe('SalesDetailPage 交互逻辑', () => {
     mockProductGetAll.mockResolvedValue({ data: { items: [] } });
     mockStoreGetAll.mockResolvedValue({ data: { items: [] } });
     mockInventoryGetAll.mockResolvedValue({ data: { items: [] } });
-    mockExportPdf.mockResolvedValue(undefined);
 
-    const user = userEvent.setup();
     renderPage('s-1');
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /导出合同 PDF/ })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /导出合同 PDF/ })).not.toBeInTheDocument();
     });
-    await user.click(screen.getByRole('button', { name: /导出合同 PDF/ }));
-
-    expect(mockExportPdf).toHaveBeenCalledWith('s-1', 'EXP2500001');
   });
 });

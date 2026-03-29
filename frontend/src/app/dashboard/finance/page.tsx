@@ -209,12 +209,12 @@ export default function FinancePage() {
                 <div>
                   <p className="text-xs text-muted-foreground font-medium">当前结算汇率</p>
                   <p className="text-2xl font-bold tabular-nums">
-                    {exchangeRate ? exchangeRate.effectiveRate.toFixed(2) : '—'}
+                    {exchangeRate?.effectiveRate != null ? exchangeRate.effectiveRate.toFixed(2) : '—'}
                     <span className="text-sm font-normal text-muted-foreground ml-1">¥/$</span>
                   </p>
                   {exchangeRate && (
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      市场汇率 {exchangeRate.rate.toFixed(2)} · 风险缓冲 {exchangeRate.buffer.toFixed(2)}
+                      市场汇率 {exchangeRate.rate?.toFixed(2) ?? '—'} · 风险缓冲 {exchangeRate.buffer?.toFixed(2) ?? '—'}
                     </p>
                   )}
                 </div>

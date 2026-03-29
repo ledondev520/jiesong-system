@@ -1,3 +1,11 @@
+/**
+ * Input: AgentAccount 数据（编辑模式）或空（新建模式）
+ * Output: Agent 账号新建/编辑对话框，仅包含名称、slug、描述、状态
+ * Pos: 账号管理页面（users/page.tsx）的共享对话框组件
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -36,8 +44,6 @@ const agentSchema = z.object({
   slug: z.string().min(1, 'slug 必填'),
   description: z.string().optional(),
   status: z.string().min(1, '状态必填'),
-  defaultMode: z.string().min(1, '默认模式必填'),
-  capabilitiesText: z.string().optional(),
 });
 
 type AgentDialogFormValues = z.infer<typeof agentSchema>;
@@ -47,8 +53,6 @@ type AgentDialogSubmitPayload = {
   slug: string;
   description?: string;
   status: string;
-  defaultMode: string;
-  grants: Array<{ resource: string; action: string }>;
 };
 
 interface AgentAccountDialogProps {
@@ -57,22 +61,6 @@ interface AgentAccountDialogProps {
   agent?: AgentAccount | null;
   onSubmit: (data: AgentDialogSubmitPayload) => Promise<void>;
 }
-
-const serializeCapabilities = (agent?: AgentAccount | null) => (
-  agent?.grants?.map((grant) => `${grant.resource}.${grant.action}`).join('\n') || 'search.read\npurchase.create\nsupplier.create'
-);
-
-const parseCapabilities = (text: string | undefined) => (
-  String(text || '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((capability) => {
-      const [resource, action] = capability.split('.');
-      return { resource, action };
-    })
-    .filter((item) => item.resource && item.action)
-);
 
 export function AgentAccountDialog({
   open,
@@ -87,16 +75,12 @@ export function AgentAccountDialog({
       slug: '',
       description: '',
       status: 'ACTIVE',
-      defaultMode: 'READ_INGEST',
-      capabilitiesText: 'search.read\npurchase.create\nsupplier.create',
     },
     values: agent ? {
       name: agent.name,
       slug: agent.slug,
       description: agent.description || '',
       status: agent.status,
-      defaultMode: agent.defaultMode,
-      capabilitiesText: serializeCapabilities(agent),
     } : undefined,
   });
 
@@ -106,19 +90,17 @@ export function AgentAccountDialog({
       slug: data.slug.trim(),
       description: data.description?.trim() || '',
       status: data.status,
-      defaultMode: data.defaultMode,
-      grants: parseCapabilities(data.capabilitiesText),
     });
     form.reset();
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{agent ? '编辑 Agent' : '新增 Agent'}</DialogTitle>
           <DialogDescription>
-            Agent 账号用于 CLI / MCP / 外部自动化访问。签发 token 后仅显示一次，请立即保存。
+            Agent 账号用于 CLI / MCP / 外部自动化访问。接入后自动获得全部操作权限，无需手动配置。
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -163,8 +145,8 @@ export function AgentAccountDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="ACTIVE">ACTIVE</SelectItem>
-                        <SelectItem value="DISABLED">DISABLED</SelectItem>
+                        <SelectItem value="ACTIVE">启用</SelectItem>
+                        <SelectItem value="DISABLED">停用</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -174,32 +156,10 @@ export function AgentAccountDialog({
             </div>
             <FormField
               control={form.control}
-              name="defaultMode"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>默认模式</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="READ_ONLY">READ_ONLY</SelectItem>
-                      <SelectItem value="READ_INGEST">READ_INGEST</SelectItem>
-                      <SelectItem value="CUSTOM">CUSTOM</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>描述</FormLabel>
+                  <FormLabel>描述（可选）</FormLabel>
                   <FormControl>
                     <Textarea placeholder="例如：供 OpenClaw 执行采购查询与录入" {...field} />
                   </FormControl>
@@ -207,29 +167,9 @@ export function AgentAccountDialog({
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="capabilitiesText"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>能力清单</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      id="agent-capabilities"
-                      name="capabilitiesText"
-                      className="min-h-32 font-mono text-sm"
-                      placeholder={'search.read\npurchase.create\nsupplier.create'}
-                      {...field}
-                    />
-                  </FormControl>
-                  <p className="text-xs text-muted-foreground">每行一个 capability，格式：`resource.action`</p>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <DialogFooter>
               <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? '保存中...' : '保存 Agent'}
+                {form.formState.isSubmitting ? '保存中...' : '保存'}
               </Button>
             </DialogFooter>
           </form>

@@ -18,9 +18,16 @@ interface DatePickerProps {
   setDate: (date: Date | undefined) => void
   className?: string
   placeholder?: string
+  triggerProps?: Omit<React.ComponentProps<typeof Button>, "children" | "variant" | "className">
 }
 
-export function DatePicker({ date, setDate, className, placeholder = "Pick a date" }: DatePickerProps) {
+export function DatePicker({
+  date,
+  setDate,
+  className,
+  placeholder = "Pick a date",
+  triggerProps,
+}: DatePickerProps) {
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -31,6 +38,7 @@ export function DatePicker({ date, setDate, className, placeholder = "Pick a dat
             !date && "text-muted-foreground",
             className
           )}
+          {...triggerProps}
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
           {date ? format(date, "PPP") : <span>{placeholder}</span>}

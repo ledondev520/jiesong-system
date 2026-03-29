@@ -24,6 +24,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => ({
     get: (...args: unknown[]) => mockSearchParamGet(...args),
   }),
+  usePathname: () => '/dashboard/products',
 }));
 
 vi.mock('@/services/product.service', () => ({
@@ -48,6 +49,10 @@ vi.mock('./components/ProductDialog', () => ({
   }: {
     open: boolean;
   }) => (open ? <div>商品弹窗已打开</div> : null),
+}));
+
+vi.mock('./components/InventoryTab', () => ({
+  InventoryTab: () => <div>库存状态 Tab</div>,
 }));
 
 describe('ProductsPage 交互逻辑', () => {

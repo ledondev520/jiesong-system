@@ -1,7 +1,7 @@
 /**
- * Input: Kimi API、Prisma客户端
+ * Input: Kimi API（Moonshot 系列模型）、Prisma客户端
  * Output: AI对话和解析结果
- * Pos: AI服务，处理智能问答和辅助录入（含图像理解）
+ * Pos: AI服务，处理智能问答和辅助录入（含图像理解）；仅支持 Kimi/Moonshot 模型族
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -309,7 +309,11 @@ const resolveChatResult = async ({ userId, sessionId, message, imageUrl, useThin
 };
 
 /**
- * 职责：从 systemConfig 读取 AI 模型优先级与采样参数配置，带 30 秒内存缓存
+ * 职责：从 systemConfig 读取场景化 AI 模型配置与采样参数，带 30 秒内存缓存
+ * 思路：
+ *   - aiChatModel: AI 助手问答场景使用的模型
+ *   - aiHsCodeModel: HS Code 推荐与申报要素场景使用的模型
+ *   - 向后兼容旧的 aiPrimaryModel/aiFallbackModel（读取后映射为 chatModel/hsCodeModel）
  */
 let _modelConfigCache = null;
 let _modelConfigCacheAt = 0;
@@ -318,16 +322,22 @@ const getConfiguredModels = async () => {
   if (_modelConfigCache && now - _modelConfigCacheAt < 30_000) return _modelConfigCache;
 
   const rows = await prisma.systemConfig.findMany({
-    where: { key: { in: ['aiPrimaryModel', 'aiFallbackModel', 'aiTemperature', 'aiMaxTokens'] } },
+    where: { key: { in: ['aiChatModel', 'aiHsCodeModel', 'aiPrimaryModel', 'aiFallbackModel', 'aiTemperature', 'aiMaxTokens'] } },
     select: { key: true, value: true },
   });
 
   const map = Object.fromEntries(rows.map(r => [r.key, r.value]));
-  const primaryParsed = parseStoredConfigValue(map.aiPrimaryModel);
-  const fallbackParsed = parseStoredConfigValue(map.aiFallbackModel);
+
+  // 场景化模型（优先读新 key，兼容旧 key）
+  const chatModelParsed = parseStoredConfigValue(map.aiChatModel) || parseStoredConfigValue(map.aiPrimaryModel);
+  const hsCodeModelParsed = parseStoredConfigValue(map.aiHsCodeModel) || parseStoredConfigValue(map.aiFallbackModel) || parseStoredConfigValue(map.aiPrimaryModel);
+
   _modelConfigCache = {
-    defaultModel: (typeof primaryParsed === 'string' && primaryParsed) ? primaryParsed : MODELS.default,
-    thinkingModel: (typeof fallbackParsed === 'string' && fallbackParsed) ? fallbackParsed : MODELS.thinking,
+    chatModel: (typeof chatModelParsed === 'string' && chatModelParsed) ? chatModelParsed : MODELS.default,
+    hsCodeModel: (typeof hsCodeModelParsed === 'string' && hsCodeModelParsed) ? hsCodeModelParsed : MODELS.default,
+    // 向后兼容：chatModel 同时作为 defaultModel 供 chatSession 使用
+    defaultModel: (typeof chatModelParsed === 'string' && chatModelParsed) ? chatModelParsed : MODELS.default,
+    thinkingModel: MODELS.thinking,
     temperature: parseAiTemperature(map.aiTemperature),
     maxTokens: parseAiMaxTokens(map.aiMaxTokens),
   };
@@ -537,7 +547,7 @@ const callKimiAPI = async (messages, model = MODELS.default) => {
   const client = getOpenAIClient();
   if (!client) {
     return {
-      content: '抱歉，AI服务未配置API Key。',
+      content: '抱歉，Kimi AI 服务未配置 API Key。',
       model,
       tokenUsage: { promptTokens: 0, outputTokens: 0 },
     };
@@ -559,25 +569,23 @@ const callKimiAPI = async (messages, model = MODELS.default) => {
     
     const fullContent = await collectStreamText(stream);
     
-    // 3. 调用token统计接口估算消耗
+    // 2. Token 统计：调用 Kimi 专用接口
     const tokenEstimate = await estimateTokens(messages, model);
     const promptTokens = tokenEstimate.data?.total_tokens || 0;
-    
-    // 估算输出token（约为输出字符数/2）
     const outputTokens = Math.ceil(fullContent.length / 2);
     
     return {
       content: fullContent || '抱歉，我暂时无法回答这个问题。',
       model,
       tokenUsage: {
-        promptTokens,
+        promptTokens: Math.ceil(promptTokens),
         outputTokens,
       },
     };
   } catch (error) {
     console.error('Kimi API调用失败:', error.message);
     return {
-      content: '抱歉，AI服务暂时不可用，请稍后再试。',
+      content: '抱歉，Kimi AI 服务暂时不可用，请稍后再试。',
       model,
       tokenUsage: { promptTokens: 0, outputTokens: 0 },
     };
@@ -1058,6 +1066,7 @@ module.exports = {
   getTokenStats,
   generateGreetingStream,
   generateGreeting,
+  getConfiguredModels,
   MODELS,
   recordTokenUsage,
   isMissingDetailSnapshotColumnError,

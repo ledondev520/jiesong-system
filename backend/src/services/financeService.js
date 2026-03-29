@@ -43,6 +43,63 @@ const syncContractPaymentAmounts = async (tx, { purchaseContractId, salesContrac
   }
 };
 
+/**
+ * 职责：获取待分配收款列表（无关联合同的收款记录）
+ */
+const listUnallocatedPayments = async () => {
+  const payments = await prisma.payment.findMany({
+    where: {
+      type: 'RECEIVABLE_RECEIPT',
+      salesContractId: null,
+      purchaseContractId: null,
+    },
+    orderBy: { paymentDate: 'desc' },
+  });
+  return payments;
+};
+
+/**
+ * 职责：将一笔待分配收款分配到多张销售合同
+ * 思路：
+ *   1. 验证 paymentId 存在且类型为 RECEIVABLE_RECEIPT
+ *   2. 为每条 allocation 创建新的 Payment 记录（RECEIVABLE_COLLECTION 类型，关联合同）
+ *   3. 同步更新每张销售合同的 receivedAmount
+ * @param {string} paymentId - 待分配收款 ID
+ * @param {Array<{salesContractId: string, amount: number, note?: string}>} allocations - 分配明细
+ */
+const allocatePaymentToContracts = async (paymentId, allocations) => {
+  const receipt = await prisma.payment.findUnique({ where: { id: paymentId } });
+  if (!receipt) throw new Error('收款记录不存在');
+  if (receipt.type !== 'RECEIVABLE_RECEIPT') throw new Error('该记录不是待分配收款');
+
+  const result = await prisma.$transaction(async (tx) => {
+    const created = [];
+
+    for (const alloc of allocations) {
+      // 1. 创建关联合同的分配记录
+      const payment = await tx.payment.create({
+        data: {
+          type: 'RECEIVABLE_COLLECTION',
+          salesContractId: alloc.salesContractId,
+          amount: alloc.amount,
+          currency: receipt.currency,
+          paymentMethod: receipt.paymentMethod,
+          paymentDate: receipt.paymentDate,
+          note: alloc.note || `来自收款 #${paymentId.slice(-6)}`,
+        },
+      });
+      created.push(payment);
+
+      // 2. 同步合同已收金额
+      await syncContractPaymentAmounts(tx, { salesContractId: alloc.salesContractId });
+    }
+
+    return created;
+  });
+
+  return result;
+};
+
 const listPayments = async ({ page, pageSize, skip, type }) => {
   const where = type ? { type } : {};
 
@@ -312,6 +369,8 @@ const getOverdueReceivables = async (overdueDays = 30) => {
 module.exports = {
   listPayments,
   createPayment,
+  listUnallocatedPayments,
+  allocatePaymentToContracts,
   getPayables,
   getReceivables,
   getStats,

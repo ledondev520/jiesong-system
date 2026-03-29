@@ -66,10 +66,7 @@ export function HeaderMobileNav({
               <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
                 <Ship className="h-4 w-4" />
               </span>
-              <div className="grid gap-0.5 text-left">
-                <span>捷淞系统</span>
-                <span className="text-xs font-normal text-muted-foreground">Import &amp; Export</span>
-              </div>
+              <span>捷淞系统</span>
             </Link>
           </SheetTitle>
         </SheetHeader>

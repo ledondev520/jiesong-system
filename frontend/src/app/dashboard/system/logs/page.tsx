@@ -1,6 +1,6 @@
 /**
  * Input: 系统运维日志 API、logDisplay（动作/实体中文与摘要）
- * Output: 系统日志页面（查看操作日志/导入相关日志）
+ * Output: 系统日志页面（查看全部操作日志，纯中文展示）
  * Pos: 运维中心
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -33,21 +33,6 @@ import { describeLogValues, labelForAction, labelForEntity } from './logDisplay'
 import { formatDateTime } from '@/lib/date-format';
 import { MobileListCard } from '@/components/mobile';
 
-type LogFilter = 'all' | 'import';
-
-const normalize = (value: string) => value.toLowerCase();
-
-const isImportLog = (log: SystemLogItem) => {
-  const candidates = [
-    log.action,
-    log.entity,
-    log.entityId ?? '',
-    log.oldValue ?? '',
-    log.newValue ?? '',
-  ];
-  return candidates.some((item) => normalize(item).includes('import'));
-};
-
 /** 展示用用户标签（供列表与关键词筛选复用） */
 const userLabel = (log: SystemLogItem) => {
   if (log.user?.name) {
@@ -62,60 +47,49 @@ const userLabel = (log: SystemLogItem) => {
 export default function SystemLogsPage() {
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState<SystemLogItem[]>([]);
-  const [filter, setFilter] = useState<LogFilter>('all');
   const [exporting, setExporting] = useState(false);
   const [total, setTotal] = useState(0);
-  // 分页状态
+  const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [keyword, setKeyword] = useState('');
   const user = useAuthStore((state) => state.user);
-  const filteredLogs = useMemo(() => {
-    let result = filter === 'import' ? logs.filter(isImportLog) : logs;
-    if (keyword.trim()) {
-      const q = keyword.toLowerCase().trim();
-      result = result.filter(
-        (log) =>
-          userLabel(log).toLowerCase().includes(q) ||
-          (log.action || '').toLowerCase().includes(q) ||
-          (log.entity || '').toLowerCase().includes(q) ||
-          (log.entityId || '').toLowerCase().includes(q)
-      );
-    }
-    return result;
-  }, [filter, logs, keyword]);
-  const totalFilteredPages = Math.ceil(filteredLogs.length / pageSize);
-  const pagedLogs = filteredLogs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  // 筛选变化时重置页码
-  const handleFilterChange = useCallback((newFilter: LogFilter) => {
-    setFilter(newFilter);
-    setCurrentPage(1);
-  }, []);
 
   const canAccess = user?.role === Role.ADMIN;
+
+  const loadLogs = useCallback(async (page: number, size: number, kw: string) => {
+    setLoading(true);
+    try {
+      const response = await getSystemLogs({ page, pageSize: size, keyword: kw || undefined });
+      const items = response.data?.items || [];
+      setLogs(Array.isArray(items) ? items : []);
+      setTotal(response.data?.pagination?.total || 0);
+      setTotalPages(response.data?.pagination?.totalPages || 1);
+    } catch {
+      toast.error('加载日志失败');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const [debouncedKeyword, setDebouncedKeyword] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedKeyword(keyword), 400);
+    return () => clearTimeout(timer);
+  }, [keyword]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedKeyword]);
 
   useEffect(() => {
     if (!user || !canAccess) {
       setLoading(false);
       return;
     }
-
-    const loadLogs = async () => {
-      try {
-        const response = await getSystemLogs();
-        const items = response.data?.items || [];
-        setLogs(Array.isArray(items) ? items : []);
-        setTotal(response.data?.pagination?.total || 0);
-      } catch {
-        toast.error('加载日志失败');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadLogs();
-  }, [user, canAccess]);
+    loadLogs(currentPage, pageSize, debouncedKeyword);
+  }, [user, canAccess, currentPage, pageSize, debouncedKeyword, loadLogs]);
 
   if (!user) {
     return (
@@ -123,7 +97,7 @@ export default function SystemLogsPage() {
         <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
         <PageHeader
           title="系统日志"
-          description="查看系统操作日志。动作/对象为内部代码时可对照中文说明；「内容变更」中 JSON 为审计快照，部分类型会附一句话摘要。"
+          description="查看系统操作日志，记录所有用户操作与系统变更。"
         />
 
         <Card>
@@ -145,7 +119,7 @@ export default function SystemLogsPage() {
         <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
         <PageHeader
           title="系统日志"
-          description="查看系统操作日志。动作/对象为内部代码时可对照中文说明；「内容变更」中 JSON 为审计快照，部分类型会附一句话摘要。"
+          description="查看系统操作日志，记录所有用户操作与系统变更。"
         />
 
         <Card>
@@ -180,57 +154,33 @@ export default function SystemLogsPage() {
       <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
       <PageHeader
         title="系统日志"
-        description="查看系统操作日志。动作/对象为内部代码时可对照中文说明；「内容变更」中 JSON 为审计快照，部分类型会附一句话摘要。"
+        description="查看系统操作日志，记录所有用户操作与系统变更。"
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant={filter === 'all' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => handleFilterChange('all')}
-            >
-              全部日志
-            </Button>
-            <Button
-              variant={filter === 'import' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => handleFilterChange('import')}
-            >
-              导入日志
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={exporting}>
-              {exporting ? '导出中...' : '导出CSV'}
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={exporting}>
+            {exporting ? '导出中...' : '导出CSV'}
+          </Button>
         }
       />
 
       <Card>
         <CardHeader>
           <CardTitle>日志列表</CardTitle>
-          <CardDescription>
-            共 {total} 条记录（筛选后 {filteredLogs.length} 条），当前：{filter === 'all' ? '全部' : '导入相关'}
-          </CardDescription>
+          <CardDescription>共 {total} 条记录</CardDescription>
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 className="pl-9 h-9"
-                placeholder="搜索用户、动作、对象..."
+                placeholder="搜索用户、操作、业务模块..."
                 value={keyword}
-                onChange={(e) => {
-                  setKeyword(e.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={(e) => setKeyword(e.target.value)}
               />
             </div>
             {keyword && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  setKeyword('');
-                  setCurrentPage(1);
-                }}
+                onClick={() => setKeyword('')}
               >
                 <X className="h-4 w-4 mr-1" />
                 重置
@@ -242,10 +192,10 @@ export default function SystemLogsPage() {
           <div className="md:hidden space-y-3">
             {loading ? (
               <div className="surface-panel py-12 text-center text-sm text-muted-foreground">加载中...</div>
-            ) : filteredLogs.length === 0 ? (
+            ) : logs.length === 0 ? (
               <div className="surface-panel py-12 text-center text-sm text-muted-foreground">暂无日志。</div>
             ) : (
-              pagedLogs.map((log) => {
+              logs.map((log) => {
                 const { hints } = describeLogValues(log);
                 const summaryLine = hints[0]
                   || (log.oldValue ? '含旧值快照' : log.newValue ? '含新值快照' : '-');
@@ -261,10 +211,8 @@ export default function SystemLogsPage() {
                       </Badge>
                     }
                     fields={[
-                      { label: '对象ID', value: log.entityId || '-' },
-                      { label: 'IP', value: log.ipAddress || '-' },
-                      { label: '动作码', value: log.action || '-' },
-                      { label: '摘要', value: summaryShort },
+                      { label: 'IP 地址', value: log.ipAddress || '-' },
+                      { label: '变更摘要', value: summaryShort },
                     ]}
                   />
                 );
@@ -277,67 +225,42 @@ export default function SystemLogsPage() {
                 <TableRow>
                   <TableHead>时间</TableHead>
                   <TableHead>用户</TableHead>
-                  <TableHead>动作</TableHead>
-                  <TableHead>对象（业务）</TableHead>
-                  <TableHead>对象ID</TableHead>
-                  <TableHead>IP</TableHead>
-                  <TableHead className="w-[320px]">内容变更</TableHead>
+                  <TableHead>操作</TableHead>
+                  <TableHead>业务模块</TableHead>
+                  <TableHead>IP 地址</TableHead>
+                  <TableHead className="w-[320px]">变更摘要</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
+                    <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
                   </TableRow>
-                ) : filteredLogs.length === 0 ? (
+                ) : logs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">暂无日志。</TableCell>
+                    <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">暂无日志。</TableCell>
                   </TableRow>
                 ) : (
-                  pagedLogs.map((log) => {
+                  logs.map((log) => {
                     const { hints } = describeLogValues(log);
                     return (
                     <TableRow key={log.id}>
                       <TableCell>{formatDateTime(log.createdAt)}</TableCell>
                       <TableCell>{userLabel(log)}</TableCell>
                       <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                          <Badge variant="outline" className="w-fit text-xs">
-                            {labelForAction(log.action)}
-                          </Badge>
-                          {log.action && labelForAction(log.action) !== log.action && (
-                            <span className="text-[10px] text-muted-foreground font-mono">{log.action}</span>
-                          )}
-                        </div>
+                        <Badge variant="outline" className="w-fit text-xs">
+                          {labelForAction(log.action)}
+                        </Badge>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                          <span>{labelForEntity(log.entity)}</span>
-                          {log.entity && labelForEntity(log.entity) !== log.entity && (
-                            <span className="text-[10px] text-muted-foreground font-mono">{log.entity}</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{log.entityId || '-'}</TableCell>
+                      <TableCell>{labelForEntity(log.entity)}</TableCell>
                       <TableCell>{log.ipAddress || '-'}</TableCell>
                       <TableCell className="max-w-[340px] text-xs text-muted-foreground">
                         <div className="space-y-1.5">
-                          {hints.map((line, i) => (
+                          {hints.length > 0 ? hints.map((line, i) => (
                             <p key={i} className="text-foreground/90 leading-snug">
                               {line}
                             </p>
-                          ))}
-                          {log.oldValue && (
-                            <p className="whitespace-pre-wrap break-all border-t border-border/60 pt-1 text-[11px]">
-                              旧值（原始）：{log.oldValue}
-                            </p>
-                          )}
-                          {log.newValue && (
-                            <p className="whitespace-pre-wrap break-all text-[11px]">
-                              新值（原始）：{log.newValue}
-                            </p>
-                          )}
-                          {!log.oldValue && !log.newValue && hints.length === 0 && <p>-</p>}
+                          )) : <p>-</p>}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -349,7 +272,7 @@ export default function SystemLogsPage() {
           </div>
           {/* 分页控制 */}
           <div className="mt-4 flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span>第 {currentPage}/{Math.max(1, totalFilteredPages)} 页</span>
+            <span>第 {currentPage}/{Math.max(1, totalPages)} 页，共 {total} 条</span>
             <div className="flex items-center gap-2">
               <PageSizeSelect
                 value={pageSize}
@@ -366,8 +289,8 @@ export default function SystemLogsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage((p) => Math.min(totalFilteredPages, p + 1))}
-                disabled={currentPage === totalFilteredPages || totalFilteredPages <= 1}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
               >
                 下一页
               </Button>

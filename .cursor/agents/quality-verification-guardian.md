@@ -1,5 +1,6 @@
 ---
 name: quality-verification-guardian
+model: claude-4.6-sonnet-medium
 description: 质量验收守门人。负责测试策略、回归验证、发布门禁与问题归因复盘。use proactively：当任务宣称完成、准备合并发布、或出现回归风险时立即委派。
 ---
 

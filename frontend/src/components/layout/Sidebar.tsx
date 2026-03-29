@@ -6,12 +6,11 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  *
  * 导航分区结构：
- * - 经营中台：工作台、经营执行、库存状态
- * - 采购模块：采购合同、供应商管理、采购建议
- * - 出口模块：出口合同、出口退税、报关单、HS 编码
- * - 财务模块：收付款、财务报表
- * - AI 助手：AI 会话管理
- * - 系统管理：合同模板、系统设置
+ * - 经营中台：工作台、经营执行
+ * - 采购模块：采购合同、供应商管理、库存状态、采购建议、商品档案
+ * - 出口模块：出口合同、报关单、HS 编码
+ * - 财务模块：财务概览、财务报表、收付款
+ * - 系统管理：系统配置、用户管理、AI 日志、系统日志、导入记录
  */
 
 'use client';
@@ -20,9 +19,8 @@ import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { Ship, LogOut } from 'lucide-react';
+import { Ship } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
-import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   getModuleTargetHref,
@@ -46,7 +44,6 @@ const MAX_PREFETCH_ROUTES = 5;
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
   const prefetchedRoutesRef = useRef<Set<string>>(new Set());
 
@@ -87,10 +84,7 @@ export function Sidebar() {
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
             <Ship className="h-4 w-4" />
           </span>
-          <div className="grid gap-0.5">
-            <span>捷淞系统</span>
-            <span className="text-xs font-normal text-muted-foreground">Import & Export</span>
-          </div>
+          <span>捷淞系统</span>
         </Link>
       </div>
 
@@ -124,21 +118,8 @@ export function Sidebar() {
         </nav>
       </ScrollArea>
 
-      {/* 底部：用户信息 + 退出 */}
-      <div className="space-y-3 border-t border-sidebar-border p-4">
-        <div className="rounded-lg border bg-background px-3 py-2">
-          <div className="text-sm font-medium">{user?.name || '当前用户'}</div>
-          <div className="text-xs text-muted-foreground">{user?.role === 'ADMIN' ? '管理员权限' : '标准权限'}</div>
-        </div>
-        <Button
-          variant="ghost"
-          className="h-11 w-full justify-start gap-3 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          onClick={() => logout()}
-        >
-          <LogOut className="h-4 w-4" />
-          <span>退出登录</span>
-        </Button>
-      </div>
+      {/* 底部留白 — 用户操作统一由右上角头像菜单管理 */}
+      <div className="border-t border-sidebar-border p-2" />
     </div>
   );
 }

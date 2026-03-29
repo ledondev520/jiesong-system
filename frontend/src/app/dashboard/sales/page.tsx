@@ -232,6 +232,12 @@ export default function SalesPage() {
                 { label: '箱数', value: `${contract.totalBoxes || 0} 箱` },
                 { label: '体积', value: `${(contract.volume || 0).toFixed(2)} CBM` },
                 { label: '毛重', value: `${(contract.grossWeight || 0).toLocaleString()} kg` },
+                {
+                  label: '门店',
+                  value: contract.stores && contract.stores.length > 0
+                    ? contract.stores.join(', ')
+                    : '—',
+                },
               ]}
               amount={{
                 label: '合同金额',
@@ -278,11 +284,11 @@ export default function SalesPage() {
             <TableRow>
               <TableHead>合同编号</TableHead>
               <TableHead>目的港口</TableHead>
+              <TableHead>门店</TableHead>
               <TableHead>状态</TableHead>
               <TableHead>签订日期</TableHead>
               <TableHead className="text-right">箱数</TableHead>
               <TableHead className="text-right">体积 (CBM)</TableHead>
-              <TableHead className="text-right">毛重 (kg)</TableHead>
               <TableHead className="text-right">金额 ($)</TableHead>
               <TableHead className="w-[112px]">操作</TableHead>
             </TableRow>
@@ -306,13 +312,19 @@ export default function SalesPage() {
                     </div>
                   </TableCell>
                   <TableCell>{contract.port?.name || '-'}</TableCell>
+                  <TableCell>
+                    <span className="text-sm text-muted-foreground">
+                      {contract.stores && contract.stores.length > 0
+                        ? contract.stores.join(', ')
+                        : '-'}
+                    </span>
+                  </TableCell>
                   <TableCell>{getStatusBadge(contract.status)}</TableCell>
                   <TableCell>
                     {formatDate(contract.signedAt)}
                   </TableCell>
                   <TableCell className="text-right">{contract.totalBoxes || 0}</TableCell>
                   <TableCell className="text-right">{(contract.volume || 0).toFixed(2)}</TableCell>
-                  <TableCell className="text-right">{(contract.grossWeight || 0).toLocaleString()}</TableCell>
                   <TableCell className="text-right">
                     <AmountText tone="success">${contract.totalAmount.toLocaleString()}</AmountText>
                   </TableCell>

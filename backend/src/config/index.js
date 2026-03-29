@@ -1,6 +1,6 @@
 /**
  * Input: 环境变量 (.env)
- * Output: 统一配置对象
+ * Output: 统一配置对象（含 JWT、Kimi、HSCIQ、上传、CORS 配置）
  * Pos: 配置中心，集中管理所有环境变量
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -104,6 +104,12 @@ const config = {
   kimi: {
     apiKey: process.env.KIMI_API_KEY || '',
     baseUrl: process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1',
+  },
+
+  // HSCIQ API 配置（海关编码智能查询）
+  hsciq: {
+    apiKey: process.env.HSCIQ_API_KEY || '',
+    baseUrl: process.env.HSCIQ_BASE_URL || 'https://www.hsciq.com/mcp',
   },
   
   // 文件上传配置

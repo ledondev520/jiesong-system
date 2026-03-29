@@ -8,7 +8,7 @@
 
 import { startTransition, useCallback, useDeferredValue, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search, Plus, ReceiptText } from 'lucide-react';
+import { Search, ReceiptText, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TaxRefund } from '@/types';
 import { taxRefundService } from '@/services/taxRefund.service';
@@ -137,16 +137,17 @@ export function TaxRefundListPageContent() {
               onClick={handleGenerateDrafts}
               disabled={generatingDrafts}
             >
-              自动生成草稿
-            </Button>
-
-            <Button className="h-11 rounded-xl" onClick={() => router.push('/dashboard/tax-refunds/create')}>
-              <Plus className="mr-2 h-4 w-4" />
-              新建退税单
+              批量生成草稿
             </Button>
           </>
         }
       />
+
+      {/* 说明：退税单由出口合同流程自动生成 */}
+      <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-700">
+        <Info className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>退税单通过<strong>出口合同 → 一键生成三张表</strong>自动创建。此页面用于查看和跟进已生成的退税记录。</span>
+      </div>
 
       <div className="grid grid-cols-3 gap-3 md:gap-4">
         <Card className="surface-panel">

@@ -69,11 +69,10 @@ describe('Sidebar', () => {
     expect(getByText('系统管理')).toBeInTheDocument();
   });
 
-  it('点击退出登录调用logout', () => {
-    const { getByRole } = render(<Sidebar />);
-    fireEvent.click(getByRole('button', { name: '退出登录' }));
-
-    expect(mockLogout).toHaveBeenCalled();
+  it('侧边栏不再渲染退出登录按钮', () => {
+    const { queryByRole } = render(<Sidebar />);
+    expect(queryByRole('button', { name: '退出登录' })).not.toBeInTheDocument();
+    expect(mockLogout).not.toHaveBeenCalled();
   });
 
   it('系统管理路由下系统管理菜单激活', () => {

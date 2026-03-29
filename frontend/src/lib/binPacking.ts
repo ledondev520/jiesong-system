@@ -1,7 +1,7 @@
 /**
  * Input: 箱子尺寸列表、货柜尺寸
- * Output: 每个箱子在货柜中的3D位置
- * Pos: 工具库，实现3D装箱算法（底部优先堆叠）
+ * Output: 每个箱子在货柜中的3D位置；支持从体积自动推算尺寸
+ * Pos: 工具库，实现3D装箱算法（底部优先堆叠）+ 尺寸推算工具函数
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -25,6 +25,7 @@ export interface Box {
   weight?: number; // kg
   color?: string;  // 用于可视化
   quantity: number; // 箱数
+  isEstimated?: boolean; // 尺寸是否由体积推算（非用户填写）
 }
 
 // 放置后的箱子（包含位置信息）
@@ -227,4 +228,44 @@ export function generateColor(seed: string): string {
  */
 export function mmToM(mm: number): number {
   return mm / 1000;
+}
+
+/**
+ * 职责：根据单箱体积（CBM）推算长宽高尺寸
+ * 思路：
+ * 1. 将 CBM 转换为 mm³（1 CBM = 10^9 mm³）
+ * 2. 使用标准纸箱比例 1.2:1:0.8（长:宽:高）推算三边
+ *    L*W*H = V → 1.2x * x * 0.8x = V → 0.96x³ = V
+ * 3. 对边长做上下限夹紧，防止数据异常
+ * 
+ * @param volumeCbm - 单箱体积（CBM，立方米）
+ * @returns 推算的长宽高（mm）及 isEstimated 标记
+ */
+export function inferBoxDimensions(volumeCbm: number): {
+  length: number;
+  width: number;
+  height: number;
+  isEstimated: true;
+} {
+  // 0. 边界保护：体积过小或无效时给一个合理的最小默认值
+  if (!volumeCbm || volumeCbm <= 0) {
+    return { length: 500, width: 400, height: 300, isEstimated: true };
+  }
+
+  // 1. CBM → mm³
+  const volumeMm3 = volumeCbm * 1e9;
+
+  // 2. 标准纸箱比例 1.2:1:0.8，L*W*H = 0.96 * x³
+  const x = Math.cbrt(volumeMm3 / 0.96);
+
+  // 3. 夹紧到货柜单边合理范围 [100mm, 各轴最大值]
+  const clamp = (v: number, min: number, max: number) =>
+    Math.round(Math.max(min, Math.min(v, max)));
+
+  return {
+    length: clamp(x * 1.2, 100, CONTAINER_40HQ.length),
+    width:  clamp(x * 1.0, 100, CONTAINER_40HQ.width),
+    height: clamp(x * 0.8, 100, CONTAINER_40HQ.height),
+    isEstimated: true,
+  };
 }

@@ -23,27 +23,39 @@ const getSalesContracts = async ({ page, pageSize, status, storeId, keyword, lit
   }
 
   const skip = (page - 1) * pageSize;
-  const [contracts, total] = await Promise.all([
+  const [rawContracts, total] = await Promise.all([
     prisma.salesContract.findMany({
       where,
       skip,
       take: pageSize,
       include: lite
         ? {
-            port: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
+            port: { select: { id: true, name: true } },
+            packingItems: { include: { store: { select: { id: true, name: true } } } },
           }
         : {
             port: true,
+            packingItems: { include: { store: { select: { id: true, name: true } } } },
           },
       orderBy: { contractNo: 'desc' },
     }),
     prisma.salesContract.count({ where }),
   ]);
+
+  // 聚合门店名称去重列表，方便前端直接展示
+  const contracts = rawContracts.map((c) => {
+    const storeMap = new Map();
+    (c.packingItems || []).forEach((item) => {
+      if (item.store && !storeMap.has(item.store.id)) {
+        storeMap.set(item.store.id, item.store.name);
+      }
+    });
+    return {
+      ...c,
+      stores: Array.from(storeMap.values()),
+      packingItems: undefined,
+    };
+  });
 
   return { contracts, total };
 };

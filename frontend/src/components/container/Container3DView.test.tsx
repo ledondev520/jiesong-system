@@ -33,6 +33,12 @@ vi.mock('@/lib/binPacking', () => ({
   },
   mmToM: (v: number) => v / 1000,
   generateColor: () => '#4ECDC4',
+  inferBoxDimensions: vi.fn((item: { volumeCbm?: number }) => ({
+    length: item.volumeCbm ? Math.cbrt(item.volumeCbm * 1e9) * 1.2 : 500,
+    width: item.volumeCbm ? Math.cbrt(item.volumeCbm * 1e9) : 500,
+    height: item.volumeCbm ? Math.cbrt(item.volumeCbm * 1e9) * 0.8 : 500,
+    isEstimated: true,
+  })),
   packBoxes: () => ({
     placedBoxes: [{ id: 'b-1', name: '测试商品', length: 500, width: 500, height: 500, posX: 0, posY: 0, posZ: 0 }],
     unplacedBoxes: [{ id: 'b-2' }],

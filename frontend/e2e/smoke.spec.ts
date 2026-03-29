@@ -65,7 +65,7 @@ test.describe('侧边栏导航全覆盖', () => {
       { label: '工作台', path: '/dashboard', url: /\/dashboard$/, heading: '工作台' },
       { label: '采购合同', path: '/dashboard/contracts', url: /\/dashboard\/contracts$/, heading: '采购合同' },
       { label: '出口合同', path: '/dashboard/sales', url: /\/dashboard\/sales$/, heading: '出口合同' },
-      { label: '库存状态', path: '/dashboard/inventory-container', url: /\/dashboard\/inventory-container$/, heading: '库存状态' },
+      { label: '商品档案', path: '/dashboard/products', url: /\/dashboard\/products$/, heading: '商品管理' },
       { label: '收付款', path: '/dashboard/payments', url: /\/dashboard\/payments$/, heading: '收付款' },
       { label: '采购建议', path: '/dashboard/store-recommend', url: /\/dashboard\/store-recommend$/, heading: '门店采购指南' },
       { label: '基础设置', path: '/dashboard/settings', url: /\/dashboard\/settings$/, heading: '系统配置' },
@@ -133,8 +133,8 @@ test.describe('关键按钮交互', () => {
   });
 
   test('库存状态页：批量状态更新可触发', async ({ page }) => {
-    await signInAsAdmin(page, '/dashboard/inventory-container');
-    await expect(page.getByRole('heading', { name: '库存状态' })).toBeVisible();
+    await signInAsAdmin(page, '/dashboard/products');
+    await safeClick(page.getByRole('tab', { name: '库存状态' }));
 
     await safeClick(page.getByRole('checkbox', { name: /选择库存/ }));
 

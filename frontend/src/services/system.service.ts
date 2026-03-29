@@ -120,34 +120,6 @@ export const markSystemNotificationRead = async (id: string) => {
   return api.put<ApiResponse<null>, ApiResponse<null>>(`/system/notifications/${id}/read`);
 };
 
-export interface SystemImportRecordItem {
-  id: string;
-  fileName: string;
-  totalRows: number;
-  successRows: number;
-  failedRows: number;
-  status: string;
-  errorLog?: string | null;
-  importedAt: string;
-  importedBy: string;
-}
-
-export interface GetSystemImportRecordsParams {
-  page?: number;
-  pageSize?: number;
-  status?: string;
-  keyword?: string;
-}
-
-export const getSystemImportRecords = async (
-  params: GetSystemImportRecordsParams = { page: 1, pageSize: 50 }
-) => {
-  return api.get<ApiResponse<PaginatedResponse<SystemImportRecordItem>>, ApiResponse<PaginatedResponse<SystemImportRecordItem>>>(
-    '/import/history',
-    { params }
-  );
-};
-
 export interface SystemPortItem {
   id: string;
   name: string;

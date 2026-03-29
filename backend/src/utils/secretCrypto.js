@@ -117,13 +117,18 @@ const decryptApiKeyFromStorage = (storedValue) => {
   }
 };
 
-// 若解密失败，返回原始空串，调用方会统一脱敏处理
+/**
+ * 职责：对 API Key 做安全展示处理
+ * 思路：管理员端口已通过 roleAuth('ADMIN') 保护，直接返回明文密钥供管理员查看和管理
+ * @param {string} apiKey 解密后的明文
+ * @returns {string} 完整密钥（空串表示未配置）
+ */
 const maskApiKeyForApiResponse = (apiKey) => {
   if (typeof apiKey !== 'string' || !apiKey) {
     return '';
   }
 
-  return 'sk-****';
+  return apiKey;
 };
 
 const normalizeConfigValueForStorage = (key, value) => {

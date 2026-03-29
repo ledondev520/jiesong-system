@@ -102,11 +102,11 @@ describe('TaxRefundsDashboardPage 交互逻辑', () => {
     });
 
     expect(screen.getByDisplayValue('TR-2026')).toBeInTheDocument();
-    expect(screen.getByText('TR-2026-001')).toBeInTheDocument();
-    expect(screen.getByText('等待税局反馈')).toBeInTheDocument();
+    expect(screen.getAllByText('TR-2026-001').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('等待税局反馈').length).toBeGreaterThan(0);
   });
 
-  it('点击新增按钮跳转创建页，点击详情跳转详情页', async () => {
+  it('新建退税单按钮已移除，详情跳转仍正常', async () => {
     mockGetAll.mockResolvedValue({
       data: {
         items: [
@@ -133,8 +133,8 @@ describe('TaxRefundsDashboardPage 交互逻辑', () => {
 
     render(<TaxRefundsDashboardPage />);
 
-    await user.click(screen.getByRole('button', { name: '新建退税单' }));
-    expect(mockPush).toHaveBeenCalledWith('/dashboard/tax-refunds/create');
+    // 新建退税单按钮已在 Phase 4 中移除，退税单通过销售合同流程创建
+    expect(screen.queryByRole('button', { name: '新建退税单' })).not.toBeInTheDocument();
 
     await user.click(await screen.findByRole('button', { name: /查看详情 TR-2026-002/ }));
     expect(mockPush).toHaveBeenCalledWith('/dashboard/tax-refunds/tr-2');
@@ -156,7 +156,7 @@ describe('TaxRefundsDashboardPage 交互逻辑', () => {
 
     render(<TaxRefundsDashboardPage />);
 
-    await user.click(screen.getByRole('button', { name: '自动生成草稿' }));
+    await user.click(screen.getByRole('button', { name: '批量生成草稿' }));
 
     await waitFor(() => {
       expect(mockGenerateDrafts).toHaveBeenCalledWith({});

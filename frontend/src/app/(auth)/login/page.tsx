@@ -157,7 +157,6 @@ export default function LoginPage() {
           </span>
           <div className="text-center">
             <h1 className="text-xl font-semibold tracking-tight">捷淞系统</h1>
-            <p className="text-xs text-muted-foreground">Import & Export Management</p>
           </div>
         </div>
         <Card className="auth-card w-full">

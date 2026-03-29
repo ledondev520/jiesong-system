@@ -8,33 +8,45 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 const MOBILE_BREAKPOINT = 768;
+
+const getMobileSnapshot = () => {
+  if (typeof window === 'undefined') return false;
+
+  if (typeof window.matchMedia === 'function') {
+    return window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`).matches;
+  }
+
+  return window.innerWidth < MOBILE_BREAKPOINT;
+};
+
+const subscribeToMobileChanges = (onStoreChange: () => void) => {
+  if (typeof window === 'undefined') {
+    return () => {};
+  }
+
+  if (typeof window.matchMedia !== 'function') {
+    const resizeHandler = () => onStoreChange();
+    window.addEventListener('resize', resizeHandler);
+    return () => window.removeEventListener('resize', resizeHandler);
+  }
+
+  const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+  const handler = () => onStoreChange();
+  mql.addEventListener('change', handler);
+  return () => mql.removeEventListener('change', handler);
+};
 
 /**
  * 职责：监听窗口宽度变化，返回是否为移动端视口
  * 思路：
  *   1. SSR 阶段返回 false（服务端无法感知客户端视口）
- *   2. 客户端挂载后通过 matchMedia 精确监听断点变化
- *   3. 使用 matchMedia 而非 resize 事件，避免频繁触发
+ *   2. 客户端通过 matchMedia 精确监听断点变化，测试环境没有 matchMedia 时回退到 innerWidth
+ *   3. 使用 useSyncExternalStore 订阅外部状态，避免 effect 中同步 setState
  * @returns boolean - true 表示当前为移动端视口（< 768px）
  */
 export function useMobile(): boolean {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
-
-    // 1. 监听断点变化
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mql.addEventListener('change', handler);
-
-    // 0. 通过 handler 触发初始状态同步（避免在 effect body 内直接 setState）
-    handler({ matches: mql.matches } as MediaQueryListEvent);
-
-    return () => mql.removeEventListener('change', handler);
-  }, []);
-
-  return isMobile;
+  return useSyncExternalStore(subscribeToMobileChanges, getMobileSnapshot, () => false);
 }

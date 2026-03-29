@@ -7,6 +7,7 @@ node_modules/
 # 数据库
 *.db
 *.db-journal
+prisma/backups/
 
 # 上传文件
 uploads/
@@ -18,6 +19,10 @@ logs/
 # IDE
 .vscode/
 .idea/
+
+# AI 缓存 & HSCIQ 缓存
+data/hs-ai-cache.json
+data/hsciq-cache.json
 
 # 系统文件
 .DS_Store

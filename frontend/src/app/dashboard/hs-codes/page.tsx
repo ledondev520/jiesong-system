@@ -1,7 +1,7 @@
 /**
- * Input: HSCode 搜索服务、AI 推荐接口
- * Output: HSCode 查询页面（含 AI 推荐 HS 编码 + AI 填写申报要素 + 一键复制标准格式）
- * Pos: 基础档案子页面 - HSCode 检索
+ * Input: HSCode 搜索服务（keyword 商品名称 / code HS 编码前缀）、AI 推荐接口（集成 HSCIQ 归类实例 + 官方税率）
+ * Output: HSCode 查询页面（含双搜索框 + AI 推荐 HS 编码 + HSCIQ 官方税率 + AI 填写申报要素 + 一键复制报关格式）
+ * Pos: 出口模块子页面 - HSCode 检索
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -60,6 +60,20 @@ function parseDeclarationElements(value: string | null | undefined) {
     .filter(Boolean);
 }
 
+/** HSCIQ 编码详情（API 返回 camelCase 字段） */
+type HsciqDetail = {
+  code?: string;
+  name?: string;
+  taxes?: Record<string, string>;
+  extensions?: {
+    cn?: {
+      reporting?: Array<{ key: string; value: string; isRequired?: boolean }>;
+      regulatory?: Record<string, string>;
+      inspect?: Record<string, string>;
+    };
+  };
+} | null;
+
 /** AI 推荐接口返回的 data 载荷（与后端 success 的 data 字段一致） */
 type AiRecommendPayload = {
   recommendation: { hsCode: string; productName: string; reason: string; confidence?: number } | null;
@@ -68,6 +82,8 @@ type AiRecommendPayload = {
   reason?: string;
   /** AI 根据产品描述填写的申报要素具体值 */
   filledDeclarationElements?: Array<{ element: string; value: string; uncertain?: boolean }> | null;
+  /** HSCIQ 权威编码详情 */
+  hsciqDetail?: HsciqDetail;
 };
 
 function parseStructuredItems(value: string | null | undefined) {
@@ -133,16 +149,20 @@ function HsCodesPageContent() {
   const initialPage = parseInt(searchParams.get('page') || '1', 10);
   const initialPageSize = parseInt(searchParams.get('pageSize') || '20', 10);
 
+  const initialCode = searchParams.get('code') || '';
+
   const [results, setResults] = useState<HsCodeRecord[]>([]);
   const [isFuzzy, setIsFuzzy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [keyword, setKeyword] = useState(initialKeyword);
+  const [hsCodeInput, setHsCodeInput] = useState(initialCode); // HS 编码前缀独立搜索框
   const [pageSize, setPageSize] = useState(initialPageSize);
   const [selectedRecord, setSelectedRecord] = useState<HsCodeRecord | null>(null);
   const [page, setPage] = useState(initialPage);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const debouncedKeyword = useDebouncedValue(keyword, 500);
+  const debouncedHsCode = useDebouncedValue(hsCodeInput, 500);
   const declarationElements = parseDeclarationElements(selectedRecord?.declarationElements);
   const supervisionItems = parseStructuredItems(selectedRecord?.supervisionConditions);
   const inspectionItems = parseStructuredItems(selectedRecord?.inspectionQuarantine);
@@ -177,8 +197,9 @@ function HsCodesPageContent() {
    * 职责：调用后端 AI 推荐接口
    * 思路：用递增请求 id 丢弃过期响应，避免防抖/连点乱序覆盖结果
    * @param text 产品描述（已 trim 由调用方保证非空时发起）
+   * @param force 强制刷新（跳过并清除缓存）
    */
-  const runAiRecommend = useCallback(async (text: string) => {
+  const runAiRecommend = useCallback(async (text: string, force = false) => {
     const trimmed = text.trim();
     if (!trimmed) return;
     const id = ++aiRecommendReqIdRef.current;
@@ -187,7 +208,7 @@ function HsCodesPageContent() {
     try {
       const res = await api.post<ApiResponse<AiRecommendPayload>, ApiResponse<AiRecommendPayload>>(
         '/hs-codes/ai-recommend',
-        { productDescription: trimmed },
+        { productDescription: trimmed, force },
       );
       if (id !== aiRecommendReqIdRef.current) return;
       setAiRecommendResult(res.data ?? null);
@@ -239,48 +260,60 @@ function HsCodesPageContent() {
     setAiRecommendOpen(open);
   }, []);
 
-  // 将分页/关键词状态同步写入 URL，支持书签与浏览器回退
-  const syncToUrl = useCallback((kw: string, p: number, ps: number) => {
+  // 将分页/关键词/编码状态同步写入 URL，支持书签与浏览器回退
+  const syncToUrl = useCallback((kw: string, code: string, p: number, ps: number) => {
     const params = new URLSearchParams();
     if (kw) params.set('keyword', kw);
+    if (code) params.set('code', code);
     if (p > 1) params.set('page', String(p));
     if (ps !== 20) params.set('pageSize', String(ps));
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }, [router, pathname]);
 
-  // 列表/搜索触发（关键词/页码/每页条数变化时重新加载）
+  // 列表/搜索触发（关键词/编码/页码/每页条数变化时重新加载）
   useEffect(() => {
     const kw = debouncedKeyword.trim();
-    loadResults({ searchKeyword: kw, nextPage: page, currentPageSize: pageSize });
-    syncToUrl(kw, page, pageSize);
+    const code = debouncedHsCode.trim().replace(/\D/g, '');
+    loadResults({ searchKeyword: kw, searchCode: code, nextPage: page, currentPageSize: pageSize });
+    syncToUrl(kw, code, page, pageSize);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedKeyword, page, pageSize]);
+  }, [debouncedKeyword, debouncedHsCode, page, pageSize]);
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedKeyword]);
+  }, [debouncedKeyword, debouncedHsCode]);
 
+  /**
+   * 职责：加载 HS 编码搜索结果
+   * @param searchKeyword - 商品名称关键词
+   * @param searchCode - HS 编码前缀（纯数字）
+   */
   const loadResults = async ({
     searchKeyword,
+    searchCode = '',
     nextPage,
     currentPageSize = pageSize,
   }: {
     searchKeyword: string;
+    searchCode?: string;
     nextPage: number;
     currentPageSize?: number;
   }) => {
     setLoading(true);
     try {
-      const trimmed = searchKeyword.trim();
+      const trimmedKw = searchKeyword.trim();
+      const trimmedCode = searchCode.trim().replace(/\D/g, '');
+      const hasInput = trimmedKw.length >= 2 || trimmedCode.length >= 2;
       const response = await hsCodeService.list({
-        keyword: trimmed,
+        keyword: trimmedKw,
+        code: trimmedCode,
         page: nextPage,
         pageSize: currentPageSize,
-        fuzzy: trimmed.length >= 2,
+        fuzzy: hasInput,
       });
       setResults(response.data.items || []);
-      setIsFuzzy(!!(response.data as { fuzzy?: boolean }).fuzzy && trimmed.length >= 2);
+      setIsFuzzy(!!(response.data as { fuzzy?: boolean }).fuzzy && hasInput);
       setTotal(response.data.pagination.total || 0);
       setTotalPages(response.data.pagination.totalPages || 1);
     } catch (error) {
@@ -324,10 +357,11 @@ function HsCodesPageContent() {
         }
       />
 
-      {/* 搜索栏 */}
+      {/* 搜索栏：商品名称 + HS 编码分离 */}
       <Card className="mb-4">
         <CardContent className="pt-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {/* 商品名称搜索 */}
             <div className="relative min-w-0 flex-1">
               {loading ? (
                 <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
@@ -335,7 +369,7 @@ function HsCodesPageContent() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               )}
               <Input
-                placeholder="输入商品名称（支持相似度匹配）或 HSCode 编码..."
+                placeholder="商品名称（支持模糊匹配）"
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 className="pl-10 pr-9"
@@ -349,13 +383,35 @@ function HsCodesPageContent() {
                 </button>
               )}
             </div>
+            {/* HS 编码前缀搜索 */}
+            <div className="relative w-full sm:w-[200px]">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground select-none">HS</span>
+              <Input
+                placeholder="编码前缀（4–10位）"
+                value={hsCodeInput}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, '').slice(0, 12);
+                  setHsCodeInput(v);
+                }}
+                className="pl-9 pr-9 font-mono tabular-nums"
+                inputMode="numeric"
+              />
+              {hsCodeInput && (
+                <button
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => { setHsCodeInput(''); setPage(1); }}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
             <Select
               value={String(pageSize)}
               onValueChange={(v) => {
                 const ps = Number(v);
                 setPageSize(ps);
                 setPage(1);
-                loadResults({ searchKeyword: debouncedKeyword, nextPage: 1, currentPageSize: ps });
+                loadResults({ searchKeyword: debouncedKeyword, searchCode: debouncedHsCode, nextPage: 1, currentPageSize: ps });
               }}
             >
               <SelectTrigger className="h-10 w-full sm:w-[90px]">
@@ -506,13 +562,8 @@ function HsCodesPageContent() {
                     <button
                       type="button"
                       onClick={() => {
-                        const lines = [
-                          `HS 编码：${selectedRecord.hsCode}`,
-                          `商品名称：${fillProductName || selectedRecord.productName}`,
-                          `申报要素：`,
-                          ...fillResult.map((item, i) => `${i + 1}. ${item.element}：${item.value}${item.uncertain ? '（待确认）' : ''}`),
-                        ];
-                        void navigator.clipboard.writeText(lines.join('\n')).then(() => {
+                        const pipeValues = fillResult.map((item) => item.value).join('|');
+                        void navigator.clipboard.writeText(pipeValues).then(() => {
                           setFillCopied(true);
                           setTimeout(() => setFillCopied(false), 2000);
                         });
@@ -520,7 +571,7 @@ function HsCodesPageContent() {
                       className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                     >
                       {fillCopied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-                      {fillCopied ? '已复制' : '复制标准格式'}
+                      {fillCopied ? '已复制' : '复制报关格式'}
                     </button>
                   </div>
                   <div className="space-y-1.5">
@@ -556,9 +607,9 @@ function HsCodesPageContent() {
             {loading ? (
               <div className="text-center py-8 text-muted-foreground">搜索中...</div>
             ) : results.length === 0 ? (
-              keyword.trim() ? (
+              (keyword.trim() || hsCodeInput.trim()) ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  未找到相关结果，请尝试其他关键词
+                  未找到相关结果，请尝试其他关键词或编码
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
@@ -571,8 +622,8 @@ function HsCodesPageContent() {
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>
                     共 <span className="font-medium text-foreground">{total.toLocaleString()}</span> 条记录，每页 {pageSize} 条，第 {page} / {totalPages} 页
-                    {isFuzzy && keyword.trim() && (
-                      <Badge variant="secondary" className="ml-2 text-xs">相似度排序</Badge>
+                    {isFuzzy && (keyword.trim() || hsCodeInput.trim()) && (
+                      <Badge variant="secondary" className="ml-2 text-xs">{hsCodeInput.trim() && !keyword.trim() ? '编码前缀匹配' : '相似度排序'}</Badge>
                     )}
                   </span>
                 </div>
@@ -583,7 +634,7 @@ function HsCodesPageContent() {
                       <TableRow>
                         <TableHead className="w-[120px]">HSCode</TableHead>
                         <TableHead className="max-w-[260px]">商品名称</TableHead>
-                        {isFuzzy && keyword.trim() && <TableHead className="w-[76px]">置信分</TableHead>}
+                        {isFuzzy && (keyword.trim() || hsCodeInput.trim()) && <TableHead className="w-[76px]">置信分</TableHead>}
                         <TableHead className="w-[60px]">单位</TableHead>
                         <TableHead className="w-[80px]">退税率</TableHead>
                         <TableHead>申报要素</TableHead>
@@ -606,7 +657,7 @@ function HsCodesPageContent() {
                               {record.productName}
                             </span>
                           </TableCell>
-                          {isFuzzy && keyword.trim() && (
+                          {isFuzzy && (keyword.trim() || hsCodeInput.trim()) && (
                             <TableCell>
                               {record.similarity !== undefined ? (
                                 <Badge
@@ -709,7 +760,9 @@ function HsCodesPageContent() {
       {/* 数据说明 */}
       <div className="mt-4 text-xs text-muted-foreground">
         数据来源：海关总署 - 当前列表 {results.length} 条 / 总计 {total} 条
-        {keyword.trim() ? `（搜索：${keyword}）` : '（默认全量列表）'}
+        {keyword.trim() || hsCodeInput.trim()
+          ? `（${[keyword.trim() && `名称：${keyword}`, hsCodeInput.trim() && `编码：${hsCodeInput}`].filter(Boolean).join('，')}）`
+          : '（默认全量列表）'}
       </div>
 
       {/* AI 智能推荐弹窗 */}
@@ -775,17 +828,75 @@ function HsCodesPageContent() {
                         ) : null}
                       </div>
                       <p className="text-xs text-muted-foreground leading-relaxed">{aiRecommendResult.recommendation.reason}</p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setKeyword(aiRecommendResult.recommendation!.hsCode);
-                          setAiRecommendOpen(false);
-                        }}
-                      >
-                        使用此编码搜索
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const code = aiRecommendResult.recommendation!.hsCode.replace(/\D/g, '');
+                            setHsCodeInput(code);
+                            setKeyword('');
+                            setAiRecommendOpen(false);
+                          }}
+                        >
+                          使用此编码搜索
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground"
+                          disabled={aiRecommendLoading}
+                          onClick={() => void runAiRecommend(aiRecommendInput, true)}
+                        >
+                          刷新推荐
+                        </Button>
+                      </div>
                     </div>
+
+                    {/* HSCIQ 权威数据（税率、监管条件等） */}
+                    {aiRecommendResult.hsciqDetail?.taxes && (
+                      <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-4 space-y-2">
+                        <p className="text-sm font-medium flex items-center gap-1.5">
+                          <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />
+                          官方税率信息
+                        </p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                          {(() => {
+                            const taxes = aiRecommendResult.hsciqDetail!.taxes!;
+                            const labelMap: Record<string, string> = {
+                              mfnImportRate: '最惠国进口税率',
+                              generalImportRate: '普通进口税率',
+                              vatRate: '增值税率',
+                              exportTaxRebateRate: '出口退税率',
+                              consumptionTaxRate: '消费税率',
+                              exportRate: '出口税率',
+                              provisionalImportRate: '暂定进口税率',
+                              provisionalExportRate: '暂定出口税率',
+                            };
+                            return Object.entries(taxes)
+                              .filter(([, v]) => v && v !== '' && v !== '-')
+                              .slice(0, 8)
+                              .map(([k, v]) => (
+                                <div key={k} className="flex justify-between text-xs">
+                                  <span className="text-muted-foreground">{labelMap[k] || k}</span>
+                                  <span className="font-medium tabular-nums">{v}</span>
+                                </div>
+                              ));
+                          })()}
+                        </div>
+                        {aiRecommendResult.hsciqDetail!.extensions?.cn?.regulatory && Object.keys(aiRecommendResult.hsciqDetail!.extensions.cn.regulatory).length > 0 && (
+                          <div className="text-xs border-t pt-1.5 mt-1.5">
+                            <span className="text-muted-foreground">监管条件：</span>
+                            <span className="font-medium">
+                              {Object.entries(aiRecommendResult.hsciqDetail!.extensions!.cn!.regulatory!)
+                                .map(([k, v]) => `${k}(${v})`)
+                                .join('、')}
+                            </span>
+                          </div>
+                        )}
+                        <p className="text-[10px] text-muted-foreground">数据来源：HSCIQ 海关编码智能查询</p>
+                      </div>
+                    )}
 
                     {/* AI 填写的申报要素（推断值，建议在详情页使用精确版） */}
                     {aiRecommendResult.filledDeclarationElements && aiRecommendResult.filledDeclarationElements.length > 0 && (
@@ -795,16 +906,9 @@ function HsCodesPageContent() {
                           <button
                             type="button"
                             onClick={() => {
-                              const rec = aiRecommendResult.recommendation!;
-                              const lines = [
-                                `HS 编码：${rec.hsCode}`,
-                                `商品名称：${rec.productName}`,
-                                `申报要素：`,
-                                ...(aiRecommendResult.filledDeclarationElements || []).map(
-                                  (item, i) => `${i + 1}. ${item.element}：${item.value}${item.uncertain ? '（待确认）' : ''}`,
-                                ),
-                              ];
-                              void navigator.clipboard.writeText(lines.join('\n')).then(() => {
+                              const pipeValues = (aiRecommendResult.filledDeclarationElements || [])
+                                .map((item) => item.value).join('|');
+                              void navigator.clipboard.writeText(pipeValues).then(() => {
                                 setCopied(true);
                                 setTimeout(() => setCopied(false), 2000);
                               });
@@ -812,7 +916,7 @@ function HsCodesPageContent() {
                             className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                           >
                             {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-                            {copied ? '已复制' : '复制标准格式'}
+                            {copied ? '已复制' : '复制报关格式'}
                           </button>
                         </div>
                         <div className="space-y-1.5">
@@ -828,7 +932,9 @@ function HsCodesPageContent() {
                           ))}
                         </div>
                         <p className="text-[11px] text-muted-foreground leading-relaxed border-t pt-2">
-                          以上为 AI 参考推断，不保证精确。确认 HS 编码后，建议进入<strong>详情页</strong>使用「AI 辅助填写申报要素」获得基于真实要素模板的准确填写建议。
+                          {aiRecommendResult.hsciqDetail
+                            ? '申报要素模板来源于 HSCIQ 官方税则库，AI 已据此填写参考值。最终以海关正式归类为准。'
+                            : '以上为 AI 参考推断，不保证精确。确认 HS 编码后，建议进入详情页使用「AI 辅助填写申报要素」获得基于真实要素模板的准确填写建议。'}
                         </p>
                       </div>
                     )}
@@ -853,7 +959,7 @@ function HsCodesPageContent() {
                           key={c.id}
                           type="button"
                           className="flex w-full items-start gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-muted"
-                          onClick={() => { setKeyword(c.hsCode); setAiRecommendOpen(false); }}
+                          onClick={() => { setHsCodeInput(c.hsCode.replace(/\D/g, '')); setKeyword(''); setAiRecommendOpen(false); }}
                         >
                           <span className="font-mono break-all text-primary">{c.hsCode}</span>
                           <span className="min-w-0 flex-1 truncate text-muted-foreground">{c.productName}</span>

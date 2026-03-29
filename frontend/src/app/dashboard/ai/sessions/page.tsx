@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { ModuleTabHeader, AI_TABS } from '@/components/layout/ModuleTabHeader';
+import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -341,7 +341,7 @@ export default function AiSessionsPage() {
 
   return (
     <div className="space-y-6">
-      <ModuleTabHeader tabs={AI_TABS} moduleName="AI 助手" />
+      <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
       <PageHeader
         title="AI 会话列表"
         description="用量趋势见上图；下方用标签切换「聊天会话」与「其他 AI 调用」（含 HS 编码推荐）"

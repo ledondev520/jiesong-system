@@ -9,7 +9,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, Check, Package, Search, ClipboardList, ShoppingBag, AlertCircle } from 'lucide-react';
+import { Copy, Check, Package, Search, AlertCircle } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
 import {

@@ -4,6 +4,7 @@
  * Pos: 前端业务服务
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ * Note: 货柜管理已并入出口合同（同一数据表），container 类型已移除。
  */
 
 import api from '@/lib/axios';
@@ -19,7 +20,6 @@ import type {
 export type DashboardSearchResultType =
   | 'product'
   | 'supplier'
-  | 'container'
   | 'purchase'
   | 'sales';
 
@@ -72,14 +72,6 @@ const mapSupplierResults = (items: Supplier[]): DashboardSearchResult[] =>
     subtitle: supplier.shortName,
   }));
 
-const mapContainerResults = (items: SalesContract[]): DashboardSearchResult[] =>
-  items.map((container) => ({
-    type: 'container',
-    id: container.id,
-    title: container.contractNo,
-    subtitle: container.status,
-  }));
-
 const mapPurchaseResults = (items: PurchaseContract[]): DashboardSearchResult[] =>
   items.map((purchase) => ({
     type: 'purchase',
@@ -122,15 +114,13 @@ export const searchDashboard = async (
   }
 
   const remaining = limit - initialResults.length;
-  const [containersRes, purchasesRes, salesRes] = await Promise.all([
-    fetchSearchCollection<SalesContract>('/containers', normalizedQuery, remaining),
+  const [purchasesRes, salesRes] = await Promise.all([
     fetchSearchCollection<PurchaseContract>('/purchases', normalizedQuery, remaining),
     fetchSearchCollection<SalesContract>('/sales', normalizedQuery, remaining),
   ]);
 
   return [
     ...initialResults,
-    ...mapContainerResults(containersRes.data?.items || []),
     ...mapPurchaseResults(purchasesRes.data?.items || []),
     ...mapSalesResults(salesRes.data?.items || []),
   ].slice(0, limit);
@@ -142,8 +132,6 @@ export const getDashboardSearchHref = (result: DashboardSearchResult) => {
       return `/dashboard/products?keyword=${encodeURIComponent(result.title)}`;
     case 'supplier':
       return `/dashboard/suppliers?keyword=${encodeURIComponent(result.title)}`;
-    case 'container':
-      return `/dashboard/containers/${result.id}`;
     case 'purchase':
       return `/dashboard/purchase/${result.id}`;
     case 'sales':

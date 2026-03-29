@@ -12,15 +12,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  Bot,
-  Landmark,
-  LayoutDashboard,
   LogOut,
   MoreHorizontal,
-  PackageOpen,
   Settings,
   Ship,
-  ShoppingCart,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -34,36 +29,13 @@ import { useAuthStore } from '@/store/auth.store';
 import { Role } from '@/types';
 import {
   getModuleTargetHref,
+  getPrimaryMobileModuleNavItems,
+  getSecondaryMobileModuleNavItems,
   isModuleRouteActive,
   type ModuleNavItem,
 } from './navigation.config';
 
 // ==================== 类型定义 ====================
-
-interface TabItem {
-  key: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  /** 对应 ModuleNavItem，用于活动状态判断与跳转记忆 */
-  moduleItem?: ModuleNavItem;
-  /** 固定跳转路径（不使用 tab 记忆时使用） */
-  href?: string;
-}
-
-// ==================== 常量 ====================
-
-/**
- * 底部 TabBar 固定展示 4 个核心模块，第 5 位为"更多"汇总入口。
- * 模块 key 与 navigation.config 中的 ModuleNavItem.key 对应。
- */
-const PRIMARY_TAB_KEYS = ['operations', 'procurement', 'export', 'finance'];
-
-const TAB_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  operations: LayoutDashboard,
-  procurement: ShoppingCart,
-  export: PackageOpen,
-  finance: Landmark,
-};
 
 // ==================== 子组件 ====================
 
@@ -121,9 +93,13 @@ export function MobileTabBar({
   const logout = useAuthStore((state) => state.logout);
   const [moreOpen, setMoreOpen] = useState(false);
 
-  // 0. 分离主 Tab 模块和"更多"里的辅助模块
-  const primaryItems = visibleItems.filter((item) => PRIMARY_TAB_KEYS.includes(item.key));
-  const moreItems = visibleItems.filter((item) => !PRIMARY_TAB_KEYS.includes(item.key));
+  // 0. 分离主 Tab 模块和"更多"里的辅助模块，完全复用导航配置的分组语义
+  const primaryItems = getPrimaryMobileModuleNavItems(user?.role).filter((item) =>
+    visibleItems.some((visible) => visible.key === item.key),
+  );
+  const moreItems = getSecondaryMobileModuleNavItems(user?.role).filter((item) =>
+    visibleItems.some((visible) => visible.key === item.key),
+  );
 
   // 1. 判断"更多"是否有子项处于活动状态（用于高亮"更多"Tab）
   const isMoreActive = moreItems.some((item) => isModuleRouteActive(pathname, item));
@@ -152,13 +128,12 @@ export function MobileTabBar({
       >
         {/* 主模块 Tab */}
         {primaryItems.map((item) => {
-          const Icon = TAB_ICONS[item.key] ?? LayoutDashboard;
           const active = isModuleRouteActive(pathname, item);
           return (
             <TabButton
               key={item.key}
               label={item.label}
-              icon={Icon}
+              icon={item.icon}
               active={active}
               onClick={() => handleModuleNavigate(item)}
             />
@@ -191,10 +166,7 @@ export function MobileTabBar({
                 <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
                   <Ship className="h-4 w-4" />
                 </span>
-                <div className="grid gap-0.5 text-left">
-                  <span className="text-sm font-semibold">捷淞系统</span>
-                  <span className="text-xs font-normal text-muted-foreground">Import &amp; Export</span>
-                </div>
+                <span className="text-sm font-semibold">捷淞系统</span>
               </Link>
             </SheetTitle>
           </SheetHeader>

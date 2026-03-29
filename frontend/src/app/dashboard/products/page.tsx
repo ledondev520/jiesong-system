@@ -1,8 +1,8 @@
 /**
- * Input: 商品服务API
- * Output: 商品管理页面
- * Pos: 基础档案子页面
- * 
+ * Input: 商品服务API、库存服务API
+ * Output: 商品管理页面（含商品档案 + 库存状态两个子 Tab）
+ * Pos: 采购模块子页面
+ *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
@@ -25,9 +25,12 @@ import {
 import { Plus, Pencil, Trash, Search, Package, X } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ProductDialog } from './components/ProductDialog';
+import { InventoryTab } from './components/InventoryTab';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
 import { MobileListCard } from '@/components/mobile';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -187,12 +190,19 @@ function ProductsPageContent() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
+      <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
+      <PageHeader
         title="商品管理"
-        description="管理商品档案与规格信息"
-        backHref="/dashboard/settings?tab=master"
-        backLabel="返回"
-        actions={
+        description="管理商品档案、规格信息与库存状态"
+      />
+
+      <Tabs defaultValue="products" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="products">商品档案</TabsTrigger>
+          <TabsTrigger value="inventory">库存状态</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="products" className="space-y-6">
           <div className="flex flex-wrap gap-2">
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -218,165 +228,169 @@ function ProductsPageContent() {
               <Plus className="mr-2 h-4 w-4" /> 新增商品
             </Button>
           </div>
-        }
-      />
 
-      {/* 移动端卡片列表 */}
-      <div className="space-y-3 md:hidden">
-        {loading ? (
-          <div className="surface-panel py-10 text-center text-sm text-muted-foreground">加载中...</div>
-        ) : products.length === 0 ? (
-          <div className="surface-panel py-10 text-center text-sm text-muted-foreground">
-            {keyword ? '没有匹配的商品' : '暂无商品，点击右上角新增'}
-          </div>
-        ) : (
-          pagedProducts.map((product) => (
-            <MobileListCard
-              key={product.id}
-              title={product.customsName}
-              subtitle={[product.specification, product.unit].filter(Boolean).join(' · ') || '-'}
-              fields={[
-                { label: '包装规格', value: product.packingSpec || '-' },
-                { label: '毛重', value: product.grossWeight != null ? `${product.grossWeight} kg` : '-' },
-                { label: '净重', value: product.netWeight != null ? `${product.netWeight} kg` : '-' },
-                { label: '体积', value: product.volume != null ? `${product.volume} CBM` : '-' },
-              ]}
-              action={
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="h-10 flex-1 rounded-xl" onClick={() => handleEdit(product)}>
-                    <Pencil className="mr-1 h-4 w-4" /> 编辑
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-10 rounded-xl px-3" onClick={() => openDeleteDialog(product)}>
-                    <Trash className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              }
-            />
-          ))
-        )}
-      </div>
-
-      {/* 桌面端表格 */}
-      <div className="surface-panel hidden overflow-hidden md:block">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>报关名称</TableHead>
-              <TableHead>规格</TableHead>
-              <TableHead>单位</TableHead>
-              <TableHead className="hidden md:table-cell">包装规格</TableHead>
-              <TableHead className="hidden md:table-cell text-right">毛重(kg)</TableHead>
-              <TableHead className="hidden md:table-cell text-right">净重(kg)</TableHead>
-              <TableHead className="hidden md:table-cell text-right">体积(CBM)</TableHead>
-              <TableHead className="w-[100px]">操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+          {/* 移动端卡片列表 */}
+          <div className="space-y-3 md:hidden">
             {loading ? (
-               <TableRow>
-                 <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
-               </TableRow>
+              <div className="surface-panel py-10 text-center text-sm text-muted-foreground">加载中...</div>
             ) : products.length === 0 ? (
-               <TableRow>
-                 <TableCell colSpan={8} className="p-0">
-                   <EmptyState
-                     icon={Package}
-                     title="暂无商品"
-                     description="还没有添加任何商品，点击右上角「新增商品」开始创建。"
-                   />
-                 </TableCell>
-               </TableRow>
+              <div className="surface-panel py-10 text-center text-sm text-muted-foreground">
+                {keyword ? '没有匹配的商品' : '暂无商品，点击右上角新增'}
+              </div>
             ) : (
               pagedProducts.map((product) => (
-                <TableRow key={product.id}>
-                  <TableCell className="font-medium">{product.customsName}</TableCell>
-                  <TableCell>{product.specification || '-'}</TableCell>
-                  <TableCell>{product.unit || '-'}</TableCell>
-                  <TableCell className="hidden md:table-cell">{product.packingSpec || '-'}</TableCell>
-                  <TableCell className="hidden md:table-cell text-right">{product.grossWeight ?? '-'}</TableCell>
-                  <TableCell className="hidden md:table-cell text-right">{product.netWeight ?? '-'}</TableCell>
-                  <TableCell className="hidden md:table-cell text-right">{product.volume ?? '-'}</TableCell>
-                  <TableCell className="flex gap-1 sm:gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => handleEdit(product)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`删除商品 ${product.customsName}`}
-                      onClick={() => openDeleteDialog(product)}
-                    >
-                      <Trash className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                <MobileListCard
+                  key={product.id}
+                  title={product.customsName}
+                  subtitle={[product.specification, product.unit].filter(Boolean).join(' · ') || '-'}
+                  fields={[
+                    { label: '包装规格', value: product.packingSpec || '-' },
+                    { label: '毛重', value: product.grossWeight != null ? `${product.grossWeight} kg` : '-' },
+                    { label: '净重', value: product.netWeight != null ? `${product.netWeight} kg` : '-' },
+                    { label: '体积', value: product.volume != null ? `${product.volume} CBM` : '-' },
+                  ]}
+                  action={
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" className="h-10 flex-1 rounded-xl" onClick={() => handleEdit(product)}>
+                        <Pencil className="mr-1 h-4 w-4" /> 编辑
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-10 rounded-xl px-3" onClick={() => openDeleteDialog(product)}>
+                        <Trash className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  }
+                />
               ))
             )}
-          </TableBody>
-        </Table>
-      </div>
+          </div>
 
-      {/* 分页控制：手机端竖排，桌面端横排 */}
-      <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-        <span>共 {products.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
-        <div className="flex items-center gap-2">
-          <PageSizeSelect
-            value={pageSize}
-            onChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+          {/* 桌面端表格 */}
+          <div className="surface-panel hidden overflow-hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>报关名称</TableHead>
+                  <TableHead>规格</TableHead>
+                  <TableHead>单位</TableHead>
+                  <TableHead className="hidden md:table-cell">包装规格</TableHead>
+                  <TableHead className="hidden md:table-cell text-right">毛重(kg)</TableHead>
+                  <TableHead className="hidden md:table-cell text-right">净重(kg)</TableHead>
+                  <TableHead className="hidden md:table-cell text-right">体积(CBM)</TableHead>
+                  <TableHead className="w-[100px]">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                   <TableRow>
+                     <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
+                   </TableRow>
+                ) : products.length === 0 ? (
+                   <TableRow>
+                     <TableCell colSpan={8} className="p-0">
+                       <EmptyState
+                         icon={Package}
+                         title="暂无商品"
+                         description="还没有添加任何商品，点击右上角「新增商品」开始创建。"
+                       />
+                     </TableCell>
+                   </TableRow>
+                ) : (
+                  pagedProducts.map((product) => (
+                    <TableRow key={product.id}>
+                      <TableCell className="font-medium">{product.customsName}</TableCell>
+                      <TableCell>{product.specification || '-'}</TableCell>
+                      <TableCell>{product.unit || '-'}</TableCell>
+                      <TableCell className="hidden md:table-cell">{product.packingSpec || '-'}</TableCell>
+                      <TableCell className="hidden md:table-cell text-right">{product.grossWeight ?? '-'}</TableCell>
+                      <TableCell className="hidden md:table-cell text-right">{product.netWeight ?? '-'}</TableCell>
+                      <TableCell className="hidden md:table-cell text-right">{product.volume ?? '-'}</TableCell>
+                      <TableCell className="flex gap-1 sm:gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(product)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`删除商品 ${product.customsName}`}
+                          onClick={() => openDeleteDialog(product)}
+                        >
+                          <Trash className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* 分页控制 */}
+          <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+            <span>共 {products.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
+            <div className="flex items-center gap-2">
+              <PageSizeSelect
+                value={pageSize}
+                onChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                上一页
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages || totalPages <= 1}
+              >
+                下一页
+              </Button>
+            </div>
+          </div>
+
+          <ProductDialog
+            open={isDialogOpen}
+            onOpenChange={setIsDialogOpen}
+            product={editingProduct}
+            onSubmit={handleSubmit}
           />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-          >
-            上一页
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages || totalPages <= 1}
-          >
-            下一页
-          </Button>
-        </div>
-      </div>
 
-      <ProductDialog 
-        open={isDialogOpen} 
-        onOpenChange={setIsDialogOpen}
-        product={editingProduct}
-        onSubmit={handleSubmit}
-      />
+          <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>确认删除</AlertDialogTitle>
+                <AlertDialogDescription>
+                  确定要删除商品 <strong>{productToDelete?.customsName}</strong> 吗？
+                  <br />
+                  此操作无法撤销。
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel
+                  disabled={deleting}
+                  onClick={() => setProductToDelete(null)}
+                >
+                  取消
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteProduct}
+                  disabled={deleting}
+                  className="bg-destructive hover:bg-destructive/90"
+                >
+                  {deleting ? '删除中...' : '确认删除'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </TabsContent>
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
-            <AlertDialogDescription>
-              确定要删除商品 <strong>{productToDelete?.customsName}</strong> 吗？
-              <br />
-              此操作无法撤销。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              disabled={deleting}
-              onClick={() => setProductToDelete(null)}
-            >
-              取消
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteProduct}
-              disabled={deleting}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {deleting ? '删除中...' : '确认删除'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <TabsContent value="inventory">
+          <InventoryTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

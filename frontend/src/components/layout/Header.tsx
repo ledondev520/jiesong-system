@@ -10,11 +10,12 @@
 
 import { useSyncExternalStore } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { CalendarDays, Ship } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { Ship } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { getVisibleModuleNavItems } from './navigation.config';
+import { HeaderContextPills } from './HeaderContextPills';
 import { HeaderMobileNav } from './HeaderMobileNav';
 import { HeaderNotifications } from './HeaderNotifications';
 import { HeaderSearch } from './HeaderSearch';
@@ -31,7 +32,7 @@ const headerDateFormatter = new Intl.DateTimeFormat('zh-CN', {
 export function Header() {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
-  const router = useRouter();
+  const updateProfile = useAuthStore((state) => state.updateProfile);
   const pathname = usePathname();
   const mobileNavItems = getVisibleModuleNavItems(user?.role);
   const todayLabel = useSyncExternalStore(
@@ -77,11 +78,7 @@ export function Header() {
       </Link>
 
       <div className="flex flex-1 items-center gap-4">
-        {/* 日期显示：仅大屏展示 */}
-        <div className="hidden items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-xs text-muted-foreground lg:flex">
-          <CalendarDays className="h-3.5 w-3.5" />
-          <span suppressHydrationWarning>{todayLabel || '今天'}</span>
-        </div>
+        <HeaderContextPills todayLabel={todayLabel} />
 
         <HeaderSearch />
       </div>
@@ -94,7 +91,8 @@ export function Header() {
           displayName={user?.name}
           username={user?.username}
           initials={initials}
-          onOpenSettings={() => router.push('/dashboard/settings')}
+          avatar={user?.avatar}
+          onSaveProfile={updateProfile}
           onLogout={handleLogout}
         />
       </div>
