@@ -321,6 +321,12 @@
 | MOBILE-UX-02 | P0 | 40m | 1 | DONE | 收口供应商页手机端体验：新增底部搜索 Sheet + 供应商卡片流，修正双布局测试断言，并同步部署到 VPS 复验 |
 | MOBILE-UX-03 | P0 | 45m | 1 | DONE | 收口库存状态页手机端体验：新增底部搜索/批量操作 Sheet + 库存卡片流，修正双布局测试断言，并同步部署到 VPS 复验 |
 
+## 2026-03-30 Git 仓库精简收口
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| REPO-HYGIENE-02 | P0 | 25m | 1 | DONE | 盘点当前未提交文件，补齐 `.gitignore` 对 `frontend/qa-artifacts` 与 `frontend/backend PATCHES/RESULTS` 的忽略规则，并用 `git rm --cached` 将已跟踪过程产物从索引移除 |
+
 ## 2026-03-12 Backend Coverage 98
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |

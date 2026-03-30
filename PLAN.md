@@ -3098,3 +3098,49 @@
   - `/dashboard/inventory-container` 首屏出现 `搜索与批量操作`
   - 列表以库存卡片流展示
   - 卡片中可直接勾选库存记录
+
+## 2026-03-30 Round 72（Git 仓库精简收口）
+
+### Goal
+- 明确当前还有哪些文件未提交。
+- 清理已被 Git 跟踪、但不应该继续进入 GitHub 的过程产物。
+- 补齐 `.gitignore` 漏项，避免后续再次把 QA/中间产物提交上去。
+
+### Findings
+- 当前未提交改动只有一个文件：
+  - `AGENTS.md`
+- 但仓库中仍有一批“已被跟踪的非源码产物”：
+  - `frontend/qa-artifacts*`
+  - `frontend/qa-artifacts/**`
+  - `frontend/PATCHES/**`
+  - `frontend/RESULTS/**`
+  - `backend/PATCHES/**`
+  - `backend/RESULTS/**`
+- 这批文件合计 `52` 个，体积约 `2.2MB`。
+
+### Delivered
+- `.gitignore`
+  - 新增忽略规则：
+    - `frontend/qa-artifacts/`
+    - `frontend/qa-artifacts-*.png`
+    - `backend/PATCHES/`
+    - `backend/RESULTS/`
+    - `frontend/PATCHES/`
+    - `frontend/RESULTS/`
+- Git 索引清理
+  - 使用 `git rm --cached` 将上述 52 个过程产物从版本控制中摘除
+  - 保留本地文件，不做物理删除
+
+### Final Status
+- 当前“未提交但仍在工作区修改”的文件仍只有：
+  - `AGENTS.md`
+  - `.gitignore`
+- 已被跟踪的不必要 QA / PATCHES / RESULTS 文件，已经从 Git 索引移除，后续不会继续被提交。
+
+### Verification
+- `git status --short`
+  - 仅保留预期的 `.gitignore`、`AGENTS.md` 修改，以及被 `git rm --cached` 摘除的文件
+- `git ls-files | rg '^frontend/qa-artifacts|^frontend/PATCHES|^frontend/RESULTS|^backend/PATCHES|^backend/RESULTS'`
+  - 应返回空
+- `git check-ignore -v`
+  - 可验证新增规则已覆盖相关路径

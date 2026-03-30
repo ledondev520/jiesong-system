@@ -32,7 +32,7 @@
 ## Database safety rules
 - **禁止直接运行 `prisma db push`**。SQLite 下 `db push` 在表结构变更时会丢弃数据。
 - 表结构变更必须通过 `npm run db:migrate`（即 `prisma migrate dev`），该命令会先自动备份数据库。
-- 手动备份：`npm run db:backup`，备份文件保存在 `prisma/backups/`，保留最近 10 个。
+- 手动备份：`npm run db:backup`，备份文件保存在 `prisma/backups/`，保留最近 5 个。
 - 任何涉及数据库 schema 变更的操作前，必须确认 `prisma/backups/` 中有最新备份。
 - 回滚方案：将 `prisma/backups/` 中的备份文件复制为 `prisma/dev.db` 即可恢复。
 
@@ -42,3 +42,10 @@
 - For any config/security changes, update `SECURITY.md`, `AGENTS.md`, and `data-classification.json` together.
 - Use deterministic output in scripts and services (no random fallback secrets, no non-deterministic defaults in auth paths).
 - Document assumptions and any environment prerequisites inside the touched file as short comments.
+
+## Learned product & repo conventions (transcript-backed)
+- **Avoid duplicate primary UIs for the same data**: If two flows resolve to the same aggregate (e.g. 出口合同与货柜/排柜同源), keep a single navigation entry and one main surface; do not reintroduce parallel CRUD or search routes for the same entity.
+- **排柜 / 3D 可视化**: When carton length/width/height are missing, prefer deriving sensible defaults from known totals (e.g. total volume ÷ box count) for visualization instead of requiring exhaustive manual dimensions per line.
+- **HS 编码查询**: Keep numeric HS code (prefix) semantics consistent end-to-end for actions like「使用该编码搜索」; treat「商品名称」与「数字 HS 编码」as distinct query dimensions where mixing would confuse ranking or prefix logic.
+- **列表页模式**: Prefer shared patterns already in the app—server/client paging with page-size options (e.g. 20/50/100), search boxes paired with reset/clear, and mobile table views using `md:hidden` cards plus `hidden md:block` tables (e.g. `MobileListCard` from `@/components/mobile`).
+- **仓库可部署性**: Keep the GitHub-facing tree deployable and lean—do not commit build outputs, local DB files, or ad-hoc operational ledgers; tighten `.gitignore` when new artifact types appear.

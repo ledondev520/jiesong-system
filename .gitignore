@@ -70,6 +70,8 @@ coverage/
 .nyc_output/
 frontend/playwright-report/
 frontend/test-results/
+frontend/qa-artifacts/
+frontend/qa-artifacts-*.png
 
 # ============================================================
 # 临时文件
@@ -89,6 +91,10 @@ public/uploads/*
 # ============================================================
 PATCHES/
 RESULTS/
+backend/PATCHES/
+backend/RESULTS/
+frontend/PATCHES/
+frontend/RESULTS/
 
 # ============================================================
 # Agent 协作状态跟踪文件（会话间状态，不属于源码）
