@@ -38,6 +38,15 @@ type StreamPayload = {
   model?: string;
 };
 
+const FAB_MARGIN = 20;
+const MOBILE_FAB_BOTTOM_CLEARANCE = 96;
+const FAB_DRAG_THRESHOLD = 6;
+
+type FabPosition = {
+  x: number;
+  y: number;
+};
+
 /**
  * 流式接口必须直接请求后端，绕过 Next.js rewrite 代理。
  * Next.js Turbopack dev 代理可能缓冲 SSE 响应导致流式失效。
@@ -75,9 +84,57 @@ export function AIAssistant() {
   const [currentThinking, setCurrentThinking] = useState(''); // 当前思考内容
   const [isThinking, setIsThinking] = useState(false); // 是否正在思考
   const [expandedThinking, setExpandedThinking] = useState<Record<string, boolean>>({}); // 展开的思考内容
+  const [fabPosition, setFabPosition] = useState<FabPosition | null>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const dragStateRef = useRef<{
+    pointerId: number;
+    startClientX: number;
+    startClientY: number;
+    startX: number;
+    startY: number;
+    moved: boolean;
+  } | null>(null);
+  const suppressNextClickRef = useRef(false);
+
+  const getFabSize = useCallback(() => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    return {
+      width: rect?.width || 124,
+      height: rect?.height || 44,
+    };
+  }, []);
+
+  const clampFabPosition = useCallback((x: number, y: number) => {
+    if (typeof window === 'undefined') {
+      return { x, y };
+    }
+
+    const { width, height } = getFabSize();
+    const maxX = Math.max(FAB_MARGIN, window.innerWidth - width - FAB_MARGIN);
+    const maxY = Math.max(FAB_MARGIN, window.innerHeight - height - FAB_MARGIN);
+
+    return {
+      x: Math.min(Math.max(FAB_MARGIN, x), maxX),
+      y: Math.min(Math.max(FAB_MARGIN, y), maxY),
+    };
+  }, [getFabSize]);
+
+  const resolveDefaultFabPosition = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return { x: FAB_MARGIN, y: FAB_MARGIN };
+    }
+
+    const { width, height } = getFabSize();
+    const mobileBottomOffset = window.innerWidth < 768 ? MOBILE_FAB_BOTTOM_CLEARANCE : FAB_MARGIN;
+
+    return clampFabPosition(
+      window.innerWidth - width - FAB_MARGIN,
+      window.innerHeight - height - mobileBottomOffset,
+    );
+  }, [clampFabPosition, getFabSize]);
 
   // 滚动到底部
   useEffect(() => {
@@ -85,6 +142,70 @@ export function AIAssistant() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isOpen]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    setFabPosition((current) => current ?? resolveDefaultFabPosition());
+  }, [resolveDefaultFabPosition]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const handleResize = () => {
+      setFabPosition((current) => clampFabPosition(
+        current?.x ?? resolveDefaultFabPosition().x,
+        current?.y ?? resolveDefaultFabPosition().y,
+      ));
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const dragState = dragStateRef.current;
+      if (!dragState || event.pointerId !== dragState.pointerId) {
+        return;
+      }
+
+      const deltaX = event.clientX - dragState.startClientX;
+      const deltaY = event.clientY - dragState.startClientY;
+
+      if (!dragState.moved && Math.hypot(deltaX, deltaY) >= FAB_DRAG_THRESHOLD) {
+        dragState.moved = true;
+      }
+
+      if (!dragState.moved) {
+        return;
+      }
+
+      suppressNextClickRef.current = true;
+      setFabPosition(clampFabPosition(dragState.startX + deltaX, dragState.startY + deltaY));
+    };
+
+    const handlePointerUp = (event: PointerEvent) => {
+      const dragState = dragStateRef.current;
+      if (!dragState || event.pointerId !== dragState.pointerId) {
+        return;
+      }
+
+      dragStateRef.current = null;
+      triggerRef.current?.releasePointerCapture?.(event.pointerId);
+    };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+    };
+  }, [clampFabPosition, resolveDefaultFabPosition]);
 
   /**
    * 处理图片文件
@@ -404,17 +525,51 @@ export function AIAssistant() {
     }
   };
 
+  const handleTriggerPointerDown = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    if (isOpen) {
+      return;
+    }
+
+    const currentPosition = fabPosition ?? resolveDefaultFabPosition();
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startX: currentPosition.x,
+      startY: currentPosition.y,
+      moved: false,
+    };
+
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }, [fabPosition, isOpen, resolveDefaultFabPosition]);
+
+  const handleTriggerClick = useCallback(() => {
+    if (suppressNextClickRef.current) {
+      suppressNextClickRef.current = false;
+      return;
+    }
+
+    setIsOpen(true);
+  }, []);
+
   return (
     <>
       <Button
+        ref={triggerRef}
         variant="outline"
         className={cn(
-          'fixed bottom-5 right-5 z-[140] h-11 rounded-full border bg-background/95 px-4 text-foreground shadow-lg backdrop-blur transition-all duration-300 supports-[backdrop-filter]:bg-background/80',
+          'fixed z-[140] h-11 rounded-full border bg-background/95 px-4 text-foreground shadow-lg backdrop-blur transition-all duration-300 supports-[backdrop-filter]:bg-background/80 touch-none',
           // 手机底部留出更多空间，避免被系统手势区遮挡
           'mb-safe-area-inset-bottom',
           isOpen ? 'translate-y-2 opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
         )}
-        onClick={() => setIsOpen(true)}
+        style={
+          fabPosition
+            ? { left: `${fabPosition.x}px`, top: `${fabPosition.y}px` }
+            : undefined
+        }
+        onPointerDown={handleTriggerPointerDown}
+        onClick={handleTriggerClick}
         aria-label="AI 助手"
       >
         <Bot className="h-4 w-4 text-primary" />

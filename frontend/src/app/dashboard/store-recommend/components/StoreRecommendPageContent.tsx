@@ -9,7 +9,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, Check, Package, Search, AlertCircle } from 'lucide-react';
+import { Check, Package, Search, AlertCircle, Star, X, FileDown } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
 import {
@@ -23,8 +23,16 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { categoryIcons, PriorityBadge } from './storeRecommendShared';
+import { PriorityBadge } from './storeRecommendShared';
 
 /** 经处理后的单条清单项 */
 interface ChecklistItem {
@@ -70,41 +78,6 @@ function buildChecklist(
   }));
 }
 
-/**
- * 职责：将缺购商品格式化为可复制的纯文本清单
- */
-function formatMissingList(storeName: string, missing: ChecklistItem[]): string {
-  const byCategory: Record<string, ChecklistItem[]> = {};
-  for (const item of missing) {
-    if (!byCategory[item.category]) byCategory[item.category] = [];
-    byCategory[item.category].push(item);
-  }
-
-  const lines: string[] = [
-    `【${storeName} - 采购建议清单】`,
-    `共 ${missing.length} 件商品建议采购：`,
-    '',
-  ];
-
-  const priorityOrder = ['强烈建议', '建议', '可选'];
-  const sortedCategories = Object.keys(byCategory).sort();
-
-  for (const category of sortedCategories) {
-    const items = [...byCategory[category]].sort(
-      (a, b) => priorityOrder.indexOf(a.priority) - priorityOrder.indexOf(b.priority),
-    );
-    lines.push(`【${category}】`);
-    for (const item of items) {
-      const priorityLabel = item.priority === '强烈建议' ? '★必备' : item.priority === '建议' ? '☆推荐' : '';
-      const qtyHint = item.avgQtyPerStore ? `（参考用量：${item.avgQtyPerStore}${item.unit}）` : '';
-      lines.push(`- ${item.name}${item.supplement ? `（${item.supplement}）` : ''} ${priorityLabel}${qtyHint}`);
-    }
-    lines.push('');
-  }
-
-  return lines.join('\n').trim();
-}
-
 export function StoreRecommendPageContent() {
   const [storeList, setStoreList] = useState<string[]>([]);
   const [universalTemplate, setUniversalTemplate] = useState<UniversalTemplate | null>(null);
@@ -114,7 +87,9 @@ export function StoreRecommendPageContent() {
   const [loadingStore, setLoadingStore] = useState(false);
   const [search, setSearch] = useState('');
   const [onlyMissing, setOnlyMissing] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [onlyMustBuy, setOnlyMustBuy] = useState(false);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 50;
 
   // 0. 初始化：加载门店列表 + 通用模板
   useEffect(() => {
@@ -138,6 +113,12 @@ export function StoreRecommendPageContent() {
 
   // 1. 选择门店时加载该门店历史采购
   const handleStoreChange = useCallback(async (store: string) => {
+    if (store === '__clear__') {
+      setSelectedStore('');
+      setStoreTemplate(null);
+      setOnlyMissing(false);
+      return;
+    }
     setSelectedStore(store);
     setStoreTemplate(null);
     if (!store) return;
@@ -155,8 +136,16 @@ export function StoreRecommendPageContent() {
   // 2. 组合清单 + 搜索 + 过滤
   const allItems = useMemo(() => buildChecklist(universalTemplate, storeTemplate), [universalTemplate, storeTemplate]);
 
+  // "必须采买"门槛：3 家以上门店都买过
+  const majorityThreshold = 3;
+
+  const mustBuyItems = useMemo(
+    () => allItems.filter((item) => item.storeCount >= majorityThreshold),
+    [allItems, majorityThreshold],
+  );
+
   const filteredItems = useMemo(() => {
-    let items = allItems;
+    let items = onlyMustBuy ? mustBuyItems : allItems;
     if (onlyMissing && selectedStore) {
       items = items.filter((item) => !item.purchased);
     }
@@ -170,7 +159,13 @@ export function StoreRecommendPageContent() {
       );
     }
     return items;
-  }, [allItems, onlyMissing, selectedStore, search]);
+  }, [allItems, mustBuyItems, onlyMustBuy, onlyMissing, selectedStore, search]);
+
+  // 筛选变化时重置页码
+  useEffect(() => { setPage(1); }, [onlyMustBuy, onlyMissing, search, selectedStore]);
+
+  const totalPages = Math.ceil(filteredItems.length / PAGE_SIZE);
+  const pagedItems = filteredItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // 3. 统计数据
   const stats = useMemo(() => {
@@ -180,16 +175,40 @@ export function StoreRecommendPageContent() {
     return { total, purchased, missing };
   }, [allItems]);
 
-  // 4. 复制缺购清单
-  const handleCopy = useCallback(() => {
-    const missing = allItems.filter((i) => !i.purchased);
-    const storeName = selectedStore || '新客户';
-    const text = formatMissingList(storeName, missing);
-    void navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  // 4. 导出当前列表为 CSV
+  const handleExportCSV = useCallback(() => {
+    const items = onlyMustBuy ? mustBuyItems : filteredItems;
+    if (items.length === 0) return;
+
+    const header = selectedStore
+      ? '品类,商品名称,补充说明,优先级,参考用量,单位,覆盖门店数,是否已采购'
+      : '品类,商品名称,补充说明,优先级,参考用量,单位,覆盖门店数';
+
+    const rows = items.map((item) => {
+      const base = [
+        item.category,
+        item.name,
+        item.supplement || '',
+        item.priority,
+        item.avgQtyPerStore ?? '',
+        item.unit,
+        item.storeCount,
+      ];
+      if (selectedStore) base.push(item.purchased ? '是' : '否');
+      return base.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',');
     });
-  }, [allItems, selectedStore]);
+
+    const bom = '\uFEFF';
+    const csv = bom + [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const label = onlyMustBuy ? '必须采买' : selectedStore ? `${selectedStore}采购建议` : '采购建议';
+    a.download = `${label}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [filteredItems, mustBuyItems, onlyMustBuy, selectedStore]);
 
   return (
     <div className="flex flex-col h-full">
@@ -217,9 +236,16 @@ export function StoreRecommendPageContent() {
                 ) : storeList.length === 0 ? (
                   <SelectItem value="__empty__" disabled>暂无门店数据</SelectItem>
                 ) : (
-                  storeList.map((store) => (
-                    <SelectItem key={store} value={store}>{store}</SelectItem>
-                  ))
+                  <>
+                    {selectedStore && (
+                      <SelectItem value="__clear__" className="text-muted-foreground">
+                        <span className="flex items-center gap-1"><X className="h-3 w-3" />清除选择</span>
+                      </SelectItem>
+                    )}
+                    {storeList.map((store) => (
+                      <SelectItem key={store} value={store}>{store}</SelectItem>
+                    ))}
+                  </>
                 )}
               </SelectContent>
             </Select>
@@ -236,19 +262,34 @@ export function StoreRecommendPageContent() {
             )}
           </div>
 
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopy}
-              disabled={!selectedStore || stats.missing === 0}
-              className="gap-1.5"
-            >
-              {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied ? '已复制' : '复制缺购清单'}
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportCSV}
+            disabled={filteredItems.length === 0}
+            className="gap-1.5"
+          >
+            <FileDown className="h-3.5 w-3.5" />
+            导出 CSV
+          </Button>
         </div>
+
+        {/* "必须采买"摘要卡片 */}
+        {universalTemplate && mustBuyItems.length > 0 && onlyMustBuy && (
+          <Card className="border-amber-200 bg-amber-50/50">
+            <CardContent className="flex flex-wrap items-center gap-4 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Star className="h-4 w-4 text-amber-600" />
+                <span className="text-sm font-medium">
+                  必须采买清单：{mustBuyItems.length} 件商品
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  （3 家以上门店均购买）
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* 搜索 + 过滤 */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -261,6 +302,15 @@ export function StoreRecommendPageContent() {
               className="pl-9"
             />
           </div>
+          <Button
+            variant={onlyMustBuy ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setOnlyMustBuy((v) => !v)}
+            className={cn('gap-1.5 shrink-0', onlyMustBuy && 'bg-amber-600 hover:bg-amber-700')}
+          >
+            <Star className="h-3.5 w-3.5" />
+            {onlyMustBuy ? `必须采买 (${mustBuyItems.length})` : '只看必须采买'}
+          </Button>
           {selectedStore && (
             <Button
               variant={onlyMissing ? 'default' : 'outline'}
@@ -274,7 +324,7 @@ export function StoreRecommendPageContent() {
           )}
         </div>
 
-        {/* 清单内容 */}
+        {/* 清单内容 — 单一大表 */}
         {loadingInitial ? (
           <Card><CardContent className="py-12 text-center text-muted-foreground">加载推荐数据中...</CardContent></Card>
         ) : !universalTemplate || universalTemplate.totalProducts === 0 ? (
@@ -285,111 +335,109 @@ export function StoreRecommendPageContent() {
               <p className="text-xs mt-1">请先导入历史出货数据后再使用</p>
             </CardContent>
           </Card>
+        ) : filteredItems.length === 0 ? (
+          <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
+            {onlyMissing ? `${selectedStore} 已采购全部推荐商品` : '没有匹配的商品'}
+          </CardContent></Card>
         ) : (
-          <div className="space-y-3">
-            {/* 无搜索结果提示 */}
-            {filteredItems.length === 0 && (
-              <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
-                {onlyMissing ? `${selectedStore} 已采购全部推荐商品 🎉` : '没有匹配的商品'}
-              </CardContent></Card>
-            )}
-
-            {/* 按品类分组展示 */}
-            {(() => {
-              const byCategory: Record<string, typeof filteredItems> = {};
-              for (const item of filteredItems) {
-                if (!byCategory[item.category]) byCategory[item.category] = [];
-                byCategory[item.category].push(item);
-              }
-              const sortedCategories = Object.keys(byCategory).sort();
-
-              return sortedCategories.map((category) => {
-                const Icon = categoryIcons[category] ?? Package;
-                const items = byCategory[category];
-                const missingInCat = items.filter((i) => !i.purchased).length;
-
-                return (
-                  <Card key={category} className={cn(missingInCat > 0 && selectedStore ? '' : '')}>
-                    <CardContent className="pt-4 pb-3 px-4">
-                      {/* 品类标题 */}
-                      <div className="flex items-center gap-2 mb-3">
-                        <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span className="font-medium text-sm">{category}</span>
-                        <Badge variant="secondary" className="text-xs ml-auto">
-                          {items.length} 件
-                        </Badge>
-                        {selectedStore && missingInCat > 0 && (
-                          <Badge variant="outline" className="text-xs text-amber-600 border-amber-200 bg-amber-50">
-                            缺 {missingInCat}
-                          </Badge>
-                        )}
-                      </div>
-
-                      {/* 商品列表 */}
-                      <div className="divide-y divide-border/60">
-                        {items.map((item, index) => (
-                          <div
-                            key={`${item.name}-${index}`}
-                            className={cn(
-                              'flex items-center gap-3 py-2.5 text-sm',
-                              selectedStore && item.purchased && 'opacity-50',
-                            )}
-                          >
-                            {/* 采购状态圆点 */}
-                            {selectedStore ? (
-                              <div className={cn(
-                                'h-5 w-5 shrink-0 rounded-full border-2 flex items-center justify-center',
-                                item.purchased
-                                  ? 'border-green-500 bg-green-100 dark:bg-green-900/30'
-                                  : 'border-muted-foreground/30',
-                              )}>
-                                {item.purchased && <Check className="h-3 w-3 text-green-600" />}
-                              </div>
-                            ) : (
-                              <div className="h-5 w-5 shrink-0 rounded-full border-2 border-muted-foreground/20" />
-                            )}
-
-                            {/* 商品名称 */}
-                            <div className="flex-1 min-w-0">
-                              <span className={cn('font-medium', selectedStore && item.purchased && 'line-through text-muted-foreground')}>
-                                {item.name}
-                              </span>
-                              {item.supplement && (
-                                <span className="ml-1 text-xs text-muted-foreground">({item.supplement})</span>
-                              )}
-                            </div>
-
-                            {/* 优先级 */}
-                            <div className="shrink-0 hidden xs:block">
-                              <PriorityBadge priority={item.priority} />
-                            </div>
-
-                            {/* 参考用量 */}
-                            {item.avgQtyPerStore && (
-                              <span className="shrink-0 text-xs text-muted-foreground hidden sm:block">
-                                ~{item.avgQtyPerStore}{item.unit}
-                              </span>
-                            )}
-
-                            {/* 门店覆盖率 */}
-                            <span className="shrink-0 text-xs text-muted-foreground hidden md:block tabular-nums">
-                              {item.storeCount}家
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              });
-            })()}
+          <div className="surface-panel overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {selectedStore && <TableHead className="w-10"></TableHead>}
+                  <TableHead className="w-[90px]">品类</TableHead>
+                  <TableHead>商品名称</TableHead>
+                  <TableHead className="w-[72px]">优先级</TableHead>
+                  <TableHead className="w-[80px] text-right">参考用量</TableHead>
+                  <TableHead className="w-[50px] text-right">门店</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pagedItems.map((item, index) => (
+                  <TableRow
+                    key={`${item.name}-${index}`}
+                    className={cn(selectedStore && item.purchased && 'opacity-40')}
+                  >
+                    {selectedStore && (
+                      <TableCell className="px-2">
+                        <div className={cn(
+                          'mx-auto h-4 w-4 rounded-full border-[1.5px] flex items-center justify-center',
+                          item.purchased
+                            ? 'border-green-500 bg-green-100'
+                            : 'border-muted-foreground/25',
+                        )}>
+                          {item.purchased && <Check className="h-2.5 w-2.5 text-green-600" />}
+                        </div>
+                      </TableCell>
+                    )}
+                    <TableCell className="text-xs text-muted-foreground">{item.category}</TableCell>
+                    <TableCell>
+                      <span className={cn(
+                        'text-sm',
+                        selectedStore && item.purchased && 'line-through text-muted-foreground',
+                      )}>
+                        {item.name}
+                      </span>
+                      {item.supplement && (
+                        <span className="ml-1 text-[11px] text-muted-foreground">({item.supplement})</span>
+                      )}
+                    </TableCell>
+                    <TableCell><PriorityBadge priority={item.priority} /></TableCell>
+                    <TableCell className="text-right">
+                      {item.avgQtyPerStore ? (
+                        <span className={cn(
+                          'text-xs tabular-nums',
+                          onlyMustBuy ? 'rounded bg-amber-100 px-1 font-medium text-amber-800' : 'text-muted-foreground',
+                        )}>
+                          ~{item.avgQtyPerStore}{item.unit}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right text-xs tabular-nums text-muted-foreground">
+                      {item.storeCount}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <div className="flex items-center justify-between border-t px-3 py-2">
+              <span className="text-xs text-muted-foreground">
+                共 {filteredItems.length} 件{onlyMustBuy && `（${majorityThreshold}+ 家门店均购买）`}
+                {totalPages > 1 && `，第 ${page}/${totalPages} 页`}
+              </span>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    上一页
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  >
+                    下一页
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {/* 底部说明 */}
         {universalTemplate && (
           <p className="text-xs text-muted-foreground mt-2 pb-4">
-            数据来源：{universalTemplate.totalStores} 家客户历史出货记录；优先级基于商品覆盖门店数量计算。
+            数据来源：{universalTemplate.totalStores} 家客户历史出货记录。
+            「必须采买」= 3 家以上门店均购买的商品，参考用量为各店平均采购量。
             {selectedStore && loadingStore && ' 正在加载门店数据...'}
           </p>
         )}

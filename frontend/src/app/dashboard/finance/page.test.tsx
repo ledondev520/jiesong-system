@@ -58,6 +58,7 @@ describe('FinancePage 交互逻辑', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '财务驾驶舱' })).toBeInTheDocument();
+      expect(screen.getByText('先上传本期财务报表')).toBeInTheDocument();
       expect(screen.getByText('应付账款总额')).toBeInTheDocument();
       expect(screen.getByText('待收账款')).toBeInTheDocument();
     });

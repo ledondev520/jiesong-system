@@ -59,6 +59,7 @@ describe('SalesPage 交互逻辑', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '出口合同' })).toBeInTheDocument();
+      expect(screen.getByText('回签后先补录箱数、毛重与体积')).toBeInTheDocument();
       expect(screen.getByText('出口出运概览')).toBeInTheDocument();
       expect(screen.getByText('在途货柜')).toBeInTheDocument();
       expect(screen.getByText('暂无出口合同。')).toBeInTheDocument();

@@ -30,6 +30,7 @@ import {
   ChevronRight,
   BarChart3,
   RefreshCw,
+  Upload,
 } from 'lucide-react';
 import {
   LineChart,
@@ -199,6 +200,34 @@ export default function FinancePage() {
         }
       />
 
+      <section className="space-y-4">
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="space-y-4 pt-6">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">财务故事流</p>
+              <h3 className="text-lg font-semibold tracking-tight">先上传本期财务报表</h3>
+              <p className="text-sm leading-6 text-muted-foreground">
+                老板或财务进入后，第一步先上传本期三表，让系统刷新经营数据，再去看异常预警、收付款压力和明细跟进。
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Button asChild className="h-11 rounded-xl">
+                <Link href="/dashboard/finance/statements">
+                  <Upload className="mr-2 h-4 w-4" />
+                  上传本期财务报表
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="h-11 rounded-xl">
+                <Link href="/dashboard/payments">查看收付款记录</Link>
+              </Button>
+              <Button asChild variant="outline" className="h-11 rounded-xl">
+                <Link href="/dashboard/finance/statements">进入报表分析</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
       {/* 汇率与健康度横幅 */}
       {hasData && (
         <div className="grid gap-3 grid-cols-1 md:grid-cols-3">
@@ -268,7 +297,7 @@ export default function FinancePage() {
       )}
 
       {/* 四象KPI区域 */}
-      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-4">
         {/* 应付总额 */}
         <Card className="kpi-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -466,7 +495,7 @@ export default function FinancePage() {
       )}
 
       {/* 快捷导航区 */}
-      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-4">
         <Link href="/dashboard/finance/payable" className="group">
           <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm">
             <CardContent className="pt-4 pb-4">

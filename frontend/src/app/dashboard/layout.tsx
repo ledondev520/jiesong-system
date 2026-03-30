@@ -118,11 +118,11 @@ export default function DashboardLayout({
       <div className="hidden border-r bg-sidebar md:block">
         <Sidebar />
       </div>
-      <div className="flex flex-col">
+      <div className="flex min-w-0 flex-col">
         <Header />
         {/* 移动端底部 TabBar 高度补偿：56px + safe-area-inset-bottom */}
         <main
-          className="flex flex-1 flex-col gap-6 px-4 py-5 md:px-6 lg:px-8"
+          className="flex min-w-0 flex-1 flex-col gap-6 px-4 py-5 md:px-6 lg:px-8"
           style={{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom) + 1.25rem)' }}
         >
           {children}

@@ -22,6 +22,7 @@ describe('AboutAgentPage', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '关于 Agent 使用' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '打开项目驾驶舱' })).toBeInTheDocument();
       expect(screen.getByText('远程 Agent（推荐）')).toBeInTheDocument();
       expect(screen.getByText('本机 Agent / CLI')).toBeInTheDocument();
       expect(screen.getByText('一句话提示词示例')).toBeInTheDocument();

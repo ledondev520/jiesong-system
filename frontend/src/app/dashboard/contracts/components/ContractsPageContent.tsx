@@ -314,6 +314,34 @@ export default function ContractsPageContent() {
       />
 
       <section className="space-y-4">
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="space-y-4 pt-6">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">采购故事流</p>
+              <h3 className="text-lg font-semibold tracking-tight">先起草采购，再跟进回签与归档</h3>
+              <p className="text-sm leading-6 text-muted-foreground">
+                先从采购起单，选/建供应商并生成购销合同；等对方回签后，把文件归档，再把后续出口动作交给出口模块继续推进。
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Button className="h-11 rounded-xl" onClick={() => router.push('/dashboard/purchase/create')}>
+                <Plus className="mr-2 h-4 w-4" />
+                新增采购
+              </Button>
+              <Button variant="outline" className="h-11 rounded-xl" onClick={() => router.push('/dashboard/suppliers')}>
+                <Store className="mr-2 h-4 w-4" />
+                新增供应商
+              </Button>
+              <Button variant="outline" className="h-11 rounded-xl" onClick={() => setPurchaseStatusFilter('SIGNED')}>
+                <FileText className="mr-2 h-4 w-4" />
+                查看待回签归档
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-muted-foreground">采购执行概览</p>
@@ -323,7 +351,7 @@ export default function ContractsPageContent() {
             当前活跃合同 {procurementOverview.activeContracts}
           </Badge>
         </div>
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Card className="border-border/70">
             <CardContent className="flex items-center justify-between gap-3 pt-5">
               <div>
@@ -383,7 +411,7 @@ export default function ContractsPageContent() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3 md:hidden">
+            <div className="grid grid-cols-1 gap-3 md:hidden">
               <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
                 <SheetTrigger asChild>
                   <Button variant="outline" className="h-11 rounded-2xl">

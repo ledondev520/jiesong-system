@@ -69,6 +69,7 @@ describe('ContractsPage 交互逻辑', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '采购合同' })).toBeInTheDocument();
+      expect(screen.getByText('先起草采购，再跟进回签与归档')).toBeInTheDocument();
       expect(screen.getByText('采购执行概览')).toBeInTheDocument();
       expect(screen.getByText('合作店铺')).toBeInTheDocument();
       expect(screen.getAllByText('暂无采购合同').length).toBeGreaterThan(0);

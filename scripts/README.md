@@ -19,6 +19,7 @@
 | extract_export_complete.py | 数据提取 | 完整提取出口数据 |
 | merge_export_data.py | 数据合并 | 合并出口数据 |
 | debug_contract.py | 调试工具 | 调试合同数据 |
+| dev-cockpit-tunnel.sh | 开发穿透 | 把本地前端驾驶舱透到公网，供手机查看 |
 
 ## 使用说明
 
@@ -27,6 +28,12 @@
 # 在 backend 目录下执行（需要 Prisma 环境）
 node ../scripts/fix_export_contracts.js
 node ../scripts/fix_boxes_data.js
+```
+
+### 本地项目驾驶舱穿透
+```bash
+# 在 frontend 目录下执行，默认透出 http://127.0.0.1:3000
+npm run tunnel:cockpit
 ```
 
 ### Python 脚本

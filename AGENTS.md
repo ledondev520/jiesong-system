@@ -21,6 +21,10 @@
 - Use least privilege for files and directories created by the system, especially upload directories and temporary files.
 - Any privileged operation must fail closed (`throw`) in production and log with full context in non-production.
 
+## Subagent policy
+- 禁止在 Cursor 场景下自动/默认启动 subagent。
+- 当且仅当用户显式要求 Codex 进行子任务分发时，允许使用 `spawn_agent`，并且只用于该明确授权范围内。
+
 ## Data classification
 - See `data-classification.json` for the authoritative classification map.
 - Restricted data: secrets, credentials, migration credentials, payment-related keys, and signed contract documents.

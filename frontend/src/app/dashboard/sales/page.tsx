@@ -25,6 +25,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { AmountText } from '@/components/ui/amount-text';
+import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
   AlertDialog,
@@ -152,11 +153,11 @@ export default function SalesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4">
       <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
         title="出口合同"
-        description={`管理出口合同与装箱信息。共 ${contracts.length} 个合同。`}
+        description={`管理出口合同与装箱信息，共 ${contracts.length} 个合同`}
         actions={
           <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/sales/create')}>
             <Plus className="mr-2 h-4 w-4" /> 新增出口合同
@@ -164,55 +165,60 @@ export default function SalesPage() {
         }
       />
 
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">出口出运概览</p>
-            <h3 className="text-lg font-semibold tracking-tight">围绕装柜、在途与到港节点安排出口履约节奏</h3>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => router.push('/dashboard/tax-refunds')}>
-            前往退税跟进
-          </Button>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card className="border-border/70">
-            <CardContent className="flex items-center justify-between pt-6">
-              <div>
-                <p className="text-sm text-muted-foreground">待装柜合同</p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums">{exportOverview.preparing}</p>
-              </div>
-              <Boxes className="h-5 w-5 text-primary" />
-            </CardContent>
-          </Card>
-          <Card className="border-border/70">
-            <CardContent className="flex items-center justify-between pt-6">
-              <div>
-                <p className="text-sm text-muted-foreground">在途货柜</p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums">{exportOverview.inTransit}</p>
-              </div>
-              <Container className="h-5 w-5 text-sky-600" />
-            </CardContent>
-          </Card>
-          <Card className="border-border/70">
-            <CardContent className="flex items-center justify-between pt-6">
-              <div>
-                <p className="text-sm text-muted-foreground">已到港待结清</p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums">{exportOverview.arrivedPendingClose}</p>
-              </div>
-              <Anchor className="h-5 w-5 text-emerald-600" />
-            </CardContent>
-          </Card>
-          <Card className="border-border/70">
-            <CardContent className="flex items-center justify-between pt-6">
-              <div>
-                <p className="text-sm text-muted-foreground">总箱数</p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums">{exportOverview.totalBoxes}</p>
-              </div>
-              <Clock3 className="h-5 w-5 text-amber-600" />
-            </CardContent>
-          </Card>
-        </div>
-      </section>
+      {/* 快捷入口 — 横向紧凑 */}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3">
+        <span className="mr-auto text-sm text-muted-foreground">
+          回签后先补录箱数与重量，再推进报关与退税
+        </span>
+        <Button variant="outline" size="sm" className="h-8 rounded-lg" onClick={() => router.push('/customs-declarations')}>
+          <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
+          报关单
+        </Button>
+        <Button variant="outline" size="sm" className="h-8 rounded-lg" onClick={() => router.push('/dashboard/tax-refunds')}>
+          <Ship className="mr-1.5 h-3.5 w-3.5" />
+          退税跟进
+        </Button>
+      </div>
+
+      {/* 出运概览 — 紧凑统计行 */}
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <Card className="border-border/70">
+          <CardContent className="flex items-center justify-between px-4 py-3">
+            <div>
+              <p className="text-xs text-muted-foreground">待装柜</p>
+              <p className="text-xl font-semibold tabular-nums">{exportOverview.preparing}</p>
+            </div>
+            <Boxes className="h-4 w-4 text-primary" />
+          </CardContent>
+        </Card>
+        <Card className="border-border/70">
+          <CardContent className="flex items-center justify-between px-4 py-3">
+            <div>
+              <p className="text-xs text-muted-foreground">在途</p>
+              <p className="text-xl font-semibold tabular-nums">{exportOverview.inTransit}</p>
+            </div>
+            <Container className="h-4 w-4 text-sky-600" />
+          </CardContent>
+        </Card>
+        <Card className="border-border/70">
+          <CardContent className="flex items-center justify-between px-4 py-3">
+            <div>
+              <p className="text-xs text-muted-foreground">已到港</p>
+              <p className="text-xl font-semibold tabular-nums">{exportOverview.arrivedPendingClose}</p>
+            </div>
+            <Anchor className="h-4 w-4 text-emerald-600" />
+          </CardContent>
+        </Card>
+        <Card className="border-border/70">
+          <CardContent className="flex items-center justify-between px-4 py-3">
+            <div>
+              <p className="text-xs text-muted-foreground">总箱数</p>
+              <p className="text-xl font-semibold tabular-nums">{exportOverview.totalBoxes}</p>
+            </div>
+            <Clock3 className="h-4 w-4 text-amber-600" />
+          </CardContent>
+        </Card>
+      </div>
 
       {/* 移动端卡片视图 */}
       <div className="space-y-3 md:hidden">
@@ -279,18 +285,18 @@ export default function SalesPage() {
 
       {/* 桌面端表格视图 */}
       <div className="hidden surface-panel overflow-hidden md:block">
-        <Table>
+        <Table className="table-fixed w-full">
           <TableHeader>
             <TableRow>
-              <TableHead>合同编号</TableHead>
-              <TableHead>目的港口</TableHead>
+              <TableHead className="w-[130px]">合同编号</TableHead>
+              <TableHead className="w-[80px]">港口</TableHead>
               <TableHead>门店</TableHead>
-              <TableHead>状态</TableHead>
-              <TableHead>签订日期</TableHead>
-              <TableHead className="text-right">箱数</TableHead>
-              <TableHead className="text-right">体积 (CBM)</TableHead>
-              <TableHead className="text-right">金额 ($)</TableHead>
-              <TableHead className="w-[112px]">操作</TableHead>
+              <TableHead className="w-[80px]">状态</TableHead>
+              <TableHead className="w-[100px]">签订日期</TableHead>
+              <TableHead className="w-[60px] text-right">箱数</TableHead>
+              <TableHead className="w-[80px] text-right">体积</TableHead>
+              <TableHead className="w-[90px] text-right">金额 ($)</TableHead>
+              <TableHead className="w-[100px]">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -306,25 +312,29 @@ export default function SalesPage() {
               pagedContracts.map((contract) => (
                 <TableRow key={contract.id}>
                   <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <Ship className="h-4 w-4 text-primary" />
-                      {contract.contractNo}
+                    <div className="flex items-center gap-1.5">
+                      <Ship className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      <span className="truncate">{contract.contractNo}</span>
                     </div>
                   </TableCell>
-                  <TableCell>{contract.port?.name || '-'}</TableCell>
+                  <TableCell className="truncate">{contract.port?.name || '-'}</TableCell>
                   <TableCell>
-                    <span className="text-sm text-muted-foreground">
+                    <div className="flex flex-wrap gap-1">
                       {contract.stores && contract.stores.length > 0
-                        ? contract.stores.join(', ')
-                        : '-'}
-                    </span>
+                        ? contract.stores.map((store, i) => (
+                            <Badge key={i} variant="secondary" className="text-[11px] font-normal px-1.5 py-0">
+                              {store}
+                            </Badge>
+                          ))
+                        : <span className="text-muted-foreground">-</span>}
+                    </div>
                   </TableCell>
                   <TableCell>{getStatusBadge(contract.status)}</TableCell>
-                  <TableCell>
+                  <TableCell className="tabular-nums">
                     {formatDate(contract.signedAt)}
                   </TableCell>
-                  <TableCell className="text-right">{contract.totalBoxes || 0}</TableCell>
-                  <TableCell className="text-right">{(contract.volume || 0).toFixed(2)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{contract.totalBoxes || 0}</TableCell>
+                  <TableCell className="text-right tabular-nums">{(contract.volume || 0).toFixed(1)}</TableCell>
                   <TableCell className="text-right">
                     <AmountText tone="success">${contract.totalAmount.toLocaleString()}</AmountText>
                   </TableCell>
@@ -334,36 +344,36 @@ export default function SalesPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="rounded-xl border border-border/65 bg-background/55"
+                          className="h-8 w-8 rounded-lg border border-border/65 bg-background/55"
                           title="查看详情与装箱"
                           aria-label={`查看合同 ${contract.contractNo}`}
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-3.5 w-3.5" />
                         </Button>
                       </Link>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="rounded-xl border border-border/65 bg-background/55"
+                        className="h-8 w-8 rounded-lg border border-border/65 bg-background/55"
                         title="导出标准出口 Excel"
                         aria-label={`导出合同 ${contract.contractNo} Excel`}
                         disabled={exportingId === contract.id}
                         onClick={() => handleExportExcel(contract)}
                       >
                         {exportingId === contract.id
-                          ? <Loader2 className="h-4 w-4 animate-spin" />
-                          : <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
                         }
                       </Button>
                       <Button 
                         variant="ghost"
                         size="icon" 
-                        className="rounded-xl border border-border/65 bg-background/55"
+                        className="h-8 w-8 rounded-lg border border-border/65 bg-background/55"
                         title="删除合同"
                         aria-label={`删除合同 ${contract.contractNo}`}
                         onClick={() => openDeleteDialog(contract)}
                       >
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
                       </Button>
                     </div>
                   </TableCell>
@@ -375,7 +385,7 @@ export default function SalesPage() {
       </div>
 
       {/* 分页控制 */}
-      <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 pt-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>共 {contracts.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
         <div className="flex items-center gap-2">
           <PageSizeSelect

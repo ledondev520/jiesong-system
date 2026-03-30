@@ -64,6 +64,7 @@ export const ADMIN_TABS: TabConfig[] = [
   { href: '/dashboard/users', label: '账号管理' },
   { href: '/dashboard/ai/sessions', label: 'AI 日志' },
   { href: '/dashboard/system/logs', label: '系统日志' },
+  { href: '/dashboard/dev', label: '项目驾驶舱' },
   { href: '/dashboard/about', label: '关于' },
 ];
 

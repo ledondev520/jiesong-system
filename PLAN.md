@@ -1,5 +1,97 @@
 # Ops Execution Center Plan
 
+## 2026-03-30 Round 76（故事化工作台与模块首页收口）
+
+### Goal
+- 把首页从“模块入口集合”改成“角色故事流入口”。
+- 让采购、出口、财务三个模块首页在手机端更少横滑、更强调下一步动作。
+- 把业务员与老板的首屏心智区分清楚：业务员先起单，老板先上传财务报表。
+
+### Planned Scope
+- 工作台首页改为三条故事线：采购主线、出口跟进、财务上报。
+- 采购首页补“起草采购 -> 回签归档 -> 交给出口”的明确说明与 CTA。
+- 出口首页补“回签后先补录箱数/毛重/体积”的明确说明与 CTA。
+- 财务首页补“先上传本期财务报表”的明确说明与 CTA。
+- 模块 Tab Header 改为移动端可换行，减少横向滑动依赖。
+
+### Verification Plan
+- `cd frontend && npm test -- src/app/dashboard/page.test.tsx src/app/dashboard/contracts/page.test.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.test.tsx src/components/layout/ModuleTabHeader.test.tsx`
+
+### Delivered
+- 首页已改成“今日主任务 + 采购主线 + 出口跟进 + 财务上报”的故事化工作台。
+- 采购、出口、财务模块首页已增加故事流说明和一屏内明确 CTA。
+- 模块内 Tab Header 已改成移动端默认换行，减少必须横向滑动的情况。
+- 财务与出口首页的概览卡片已改成手机端单列优先，降低信息密度。
+
+### Verification
+- 定向测试：通过
+
+### Remaining Risk
+- 当前是“入口与流线”层重排，尚未把采购回签状态自动推送到首页任务卡，需要下一步把真实合同状态接进首页待办。
+- 采购、出口、财务页内部更深层的表单与明细区仍有继续瘦身空间，但首屏主路径已经明确。
+
+## 2026-03-30 Round 75（移动端交互收口）
+
+### Goal
+- 修复手机端弹窗过大导致关闭按钮不易触达的问题。
+- 收敛一级导航，移除重复的“项目驾驶舱”入口。
+- 让 AI 助手浮动按钮支持拖拽，避免遮挡底部 Tab。
+
+### Planned Scope
+- 统一调整共享 `DialogContent` 的移动端布局为全屏弹层，保留桌面端居中对话框。
+- 从一级导航模块移除 `项目驾驶舱`，保留系统管理内入口。
+- 为 `AIAssistant` 增加拖拽定位能力，并提高默认底部避让距离。
+
+### Verification Plan
+- `cd frontend && npm test -- src/components/layout/navigation.config.test.ts src/components/ui/dialog.test.tsx src/components/ai/AIAssistant.test.tsx`
+
+### Delivered
+- 已将共享对话框组件改为移动端默认全屏，关闭按钮跟随安全区。
+- 已从一级导航模块中移除 `项目驾驶舱`，避免与系统设置内入口重复。
+- 已为 AI 助手按钮增加拖拽能力，支持在手机端挪开底部遮挡。
+
+### Verification
+- 定向测试：通过
+
+### Remaining Risk
+- 当前验证覆盖了导航配置、共享弹窗样式类名和 AI 按钮拖拽交互，但还没有做登录后业务页的真机弹窗回归。
+- 某些页面若对 `DialogContent` 写了极强的自定义 class，仍可能需要单页微调。
+
+## 2026-03-30 Round 74（本地项目驾驶舱）
+
+### Goal
+- 在本地开发机上提供一个手机可访问的只读项目驾驶舱。
+- 目标不是远程开发，而是让你在手机上直接看到当前仓库正在改哪些文件、主线任务推进到哪、计划和指标发生了什么变化。
+
+### Planned Scope
+- 新增本地状态采集：git 分支、HEAD、工作树变更、diff stat、任务台账、计划片段、指标片段。
+- 新增只读驾驶舱页面和 `/api/dev/status` 状态接口。
+- 增加自动轮询刷新，方便手机打开后实时看到变化。
+- 给系统管理和关于页加一个明显入口，减少查找成本。
+
+### Verification Plan
+- `cd frontend && npm run lint -- src/lib/dev-cockpit.ts src/lib/dev-cockpit.test.ts src/app/api/dev/status/route.ts src/app/dashboard/dev/page.tsx src/app/dashboard/dev/DevCockpitClient.tsx src/app/dashboard/dev/DevCockpitClient.test.tsx src/app/dashboard/about/page.tsx src/components/layout/navigation.config.ts src/components/layout/navigation.config.test.ts`
+- `cd frontend && npm test -- src/lib/dev-cockpit.test.ts src/app/dashboard/dev/DevCockpitClient.test.tsx src/app/dashboard/about/page.test.tsx src/components/layout/navigation.config.test.ts`
+- `cd frontend && npm run build`
+
+### Delivered
+- 已新增 `/dashboard/dev` 项目驾驶舱。
+- 已新增 `/api/dev/status` 状态接口。
+- 已新增本地状态采集工具，支持读取 git / TASKS / PLAN / METRICS。
+- 已将项目驾驶舱挂入系统管理导航和关于页入口。
+- 已新增 `scripts/dev-cockpit-tunnel.sh` 和 `frontend` 的 `tunnel:cockpit` npm 命令，支持 cloudflared / wrangler 快速穿透本地预览。
+- 已为驾驶舱补了定向测试和自动轮询刷新。
+
+### Verification
+- 定向 lint：通过
+- 定向测试：通过
+- 前端 build：通过
+
+### Remaining Risk
+- 页面目前是只读控制台，不能直接在手机上修改代码或执行任意 shell，这符合当前目标，但也意味着它不是远程开发机。
+- 状态页依赖本地 git 命令和本地文件可读；如果未来把它迁到 VPS 或容器，需要确认工作树路径和执行权限仍然一致。
+- 长时间轮询会带来轻微开销，但当前刷新间隔只有 10 秒，且只在需要查看时打开即可。
+
 ## 2026-03-29 Round 73（系统管理“关于”模块：Agent 快速接入说明）
 
 ### Goal

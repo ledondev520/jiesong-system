@@ -56,7 +56,7 @@ export function ModuleTabHeader({ tabs, moduleName }: ModuleTabHeaderProps) {
   return (
     <div className="mb-6 border-b">
       <nav
-        className="flex items-end gap-0 overflow-x-auto scrollbar-none"
+        className="flex flex-wrap items-end gap-2 overflow-visible pb-2 scrollbar-none md:flex-nowrap md:gap-0 md:overflow-x-auto md:pb-0"
         aria-label={moduleName}
         /* 移动端横向滚动时不触发页面纵向滚动 */
         style={{ WebkitOverflowScrolling: 'touch' }}
@@ -68,12 +68,11 @@ export function ModuleTabHeader({ tabs, moduleName }: ModuleTabHeaderProps) {
               key={tab.href}
               href={tab.href}
               className={cn(
-                // 移动端更大触控区域 (min-h-[48px])，文字稍大
-                'relative flex min-h-[48px] items-center whitespace-nowrap px-3 py-2.5',
-                'text-sm font-medium transition-colors md:px-4',
+                'relative flex min-h-[44px] items-center whitespace-nowrap rounded-full border border-border/70 bg-background px-3 py-2.5',
+                'text-sm font-medium transition-colors md:min-h-[48px] md:rounded-none md:border-transparent md:bg-transparent md:px-4',
                 'hover:text-foreground',
                 active
-                  ? 'text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:rounded-t-full after:bg-primary'
+                  ? 'border-primary/30 bg-primary/10 text-foreground md:border-transparent md:bg-transparent after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:rounded-t-full after:bg-primary'
                   : 'text-muted-foreground',
               )}
             >

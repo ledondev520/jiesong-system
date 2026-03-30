@@ -36,6 +36,12 @@ describe('navigation.config helpers', () => {
     expect(secondaryItems).toEqual(['admin']);
   });
 
+  it('一级导航不展示项目驾驶舱模块', () => {
+    const visibleForAdmin = getVisibleModuleNavItems(Role.ADMIN).map((item) => item.key);
+
+    expect(visibleForAdmin).not.toContain('dev');
+  });
+
   it('返回当前角色的默认 dashboard 落点', () => {
     expect(getDefaultDashboardHref(Role.SALES)).toBe('/dashboard');
   });

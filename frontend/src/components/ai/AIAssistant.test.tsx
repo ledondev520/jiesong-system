@@ -204,4 +204,16 @@ describe('AIAssistant', () => {
       expect(screen.getByText('图片已准备好')).toBeInTheDocument();
     });
   });
+
+  it('悬浮按钮可拖拽移动，避免遮挡手机底部 Tab', async () => {
+    render(<AIAssistant />);
+
+    const trigger = screen.getByRole('button', { name: 'AI 助手' });
+    fireEvent.pointerDown(trigger, { clientX: 320, clientY: 640 });
+    fireEvent.pointerMove(window, { clientX: 120, clientY: 320 });
+    fireEvent.pointerUp(window, { clientX: 120, clientY: 320 });
+
+    expect(trigger.style.left).not.toBe('');
+    expect(trigger.style.top).not.toBe('');
+  });
 });
