@@ -27,6 +27,7 @@ const aiRoutes = require('./ai');
 const userRoutes = require('./users');
 const dataImportRoutes = require('./dataImport');
 const dataExportRoutes = require('./dataExport');
+const batchImportRoutes = require('./batchImport.routes');
 const dashboardRoutes = require('./dashboard');
 const searchRoutes = require('./search');
 const contractDocRoutes = require('./contractDoc');
@@ -74,5 +75,6 @@ router.use('/hs-codes', hsCodeRoutes);
 router.use('/three-forms', threeFormsRoutes);
 router.use('/ops-execution', opsExecutionRoutes);
 router.use('/procurement-template', procurementTemplateRoutes);  // 开业采购模板（CSV分析）
+router.use('/batch-import', batchImportRoutes);  // 批量导入
 
 module.exports = router;
