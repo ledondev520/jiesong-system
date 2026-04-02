@@ -19,6 +19,9 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
   }),
+  useSearchParams: () => ({
+    get: vi.fn(() => null),
+  }),
 }));
 
 vi.mock('@/store/auth.store', () => ({
@@ -146,5 +149,23 @@ describe('LoginPage 交互逻辑', () => {
       expect(screen.getByText('账号或密码错误')).toBeInTheDocument();
     });
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('触发登录限流时展示可操作提示', async () => {
+    mockAuthServiceLogin.mockRejectedValue({
+      message: '登录尝试过于频繁，请 15 分钟后再试',
+      retryAfter: 600,
+    });
+
+    const user = userEvent.setup();
+    render(<LoginPage />);
+
+    await user.type(screen.getByLabelText('用户名'), 'admin');
+    await user.type(screen.getByLabelText('密码'), '123456');
+    await user.click(screen.getByRole('button', { name: '登录' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('登录尝试过于频繁，请 10 分钟后再试，或切换账号后重试。')).toBeInTheDocument();
+    });
   });
 });

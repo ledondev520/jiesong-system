@@ -45,8 +45,8 @@ const salesSchema = z.object({
     storeId: z.string().min(1, '请选择门店'),
     quantity: z.number().min(0.01, '数量必填'),
     unit: z.string().optional(),
-    costPrice: z.number().min(0, '成本必填'),
-    sellingPrice: z.number().min(0, '售价必填'),
+    costPrice: z.number().min(0.01, '成本必填'),
+    sellingPrice: z.number().min(0.01, '售价必填'),
     note: z.string().optional(),
   })).min(1, '至少添加一项商品'),
 });
@@ -323,7 +323,14 @@ export default function CreateSalesPage() {
                              <FormControl>
                               <Input type="number" {...field} />
                             </FormControl>
-                            <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => remove(index)}
+                              aria-label={`删除第 ${index + 1} 行商品`}
+                              title="删除此行"
+                            >
                               <Trash className="h-4 w-4 text-destructive" />
                             </Button>
                           </div>
@@ -346,7 +353,7 @@ export default function CreateSalesPage() {
             <Button 
               type="submit" 
               size="lg"
-              disabled={!form.formState.isValid || form.formState.isSubmitting}
+              disabled={form.formState.isSubmitting}
             >
               {form.formState.isSubmitting ? '提交中...' : '创建合同'}
             </Button>

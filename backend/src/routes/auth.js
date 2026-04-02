@@ -24,6 +24,11 @@ router.post(
     windowMs: 15 * 60 * 1000,
     max: 10,
     message: '登录尝试过于频繁，请 15 分钟后再试',
+    keyGenerator: (req) => {
+      const ip = req.ip || req.connection.remoteAddress || 'unknown';
+      const username = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
+      return username ? `${ip}:${username}` : ip;
+    },
   }),
   validateLogin,
   handleValidation,

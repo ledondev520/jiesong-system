@@ -70,7 +70,7 @@ const forexVerificationConfig: ServicePageConfig = {
     },
   ],
   primaryCta: { label: '启动核销预审', href: '/login' },
-  secondaryCta: { label: '查看退税申报', href: '/tax-refunds' },
+  secondaryCta: { label: '查看退税申报', href: '/dashboard/tax-refunds' },
   aside: (
     <div className="space-y-3">
       <p className="text-sm font-medium text-foreground">适用场景</p>

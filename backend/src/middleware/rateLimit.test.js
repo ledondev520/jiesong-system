@@ -126,3 +126,35 @@ test('rateLimit: 响应头包含限流信息', async () => {
   assert.ok(headers['X-RateLimit-Remaining'] !== undefined);
   assert.ok(headers['X-RateLimit-Reset'] !== undefined);
 });
+
+test('rateLimit: 自定义 keyGenerator 可按 IP + 用户名分桶限流', async () => {
+  const limiter = rateLimit({
+    windowMs: 60000,
+    max: 1,
+    keyGenerator: (req) => `${req.ip}:${req.body.username}`,
+  });
+
+  const createReq = (username) => ({ ip: '192.168.1.8', body: { username } });
+  const createRes = () => {
+    const res = { statusCode: null, payload: null };
+    res.setHeader = () => {};
+    res.status = (code) => {
+      res.statusCode = code;
+      return res;
+    };
+    res.json = (payload) => {
+      res.payload = payload;
+    };
+    return res;
+  };
+
+  let nextCalled = 0;
+  limiter(createReq('admin'), createRes(), () => { nextCalled++; });
+  limiter(createReq('sales'), createRes(), () => { nextCalled++; });
+
+  const blockedRes = createRes();
+  limiter(createReq('admin'), blockedRes, () => { nextCalled++; });
+
+  assert.equal(nextCalled, 2);
+  assert.equal(blockedRes.statusCode, 429);
+});

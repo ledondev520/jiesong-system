@@ -8,6 +8,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import CreateSalesPage from './page';
 
 const mockPush = vi.fn();
@@ -81,6 +82,28 @@ describe('CreateSalesPage 交互逻辑', () => {
 
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('加载商品和门店数据失败');
+    });
+  });
+
+  it('空表单提交后显示字段级校验提示', async () => {
+    mockGetProducts.mockResolvedValue({ data: { items: [{ id: 'prod-1', customsName: '瓷砖' }] } });
+    mockGetStores.mockResolvedValue({ data: { items: [{ id: 'store-1', name: '上海店' }] } });
+
+    const user = userEvent.setup();
+    render(<CreateSalesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '创建合同' })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: '创建合同' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('请选择商品')).toBeInTheDocument();
+      expect(screen.getByText('请选择门店')).toBeInTheDocument();
+      expect(screen.getByText('数量必填')).toBeInTheDocument();
+      expect(screen.getByText('成本必填')).toBeInTheDocument();
+      expect(screen.getByText('售价必填')).toBeInTheDocument();
     });
   });
 });

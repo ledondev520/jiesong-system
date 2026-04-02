@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuthStore } from '@/store/auth.store';
 import type { ApiResponse } from '@/types';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -43,11 +44,20 @@ const QUICK_LOGIN_PROFILE_KEY = 'jiesong_quick_login_profile';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const login = useAuthStore((state) => state.login);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [quickLoginProfile, setQuickLoginProfile] = useState<QuickLoginProfile | null>(null);
+
+  // 检查会话过期参数
+  useEffect(() => {
+    const expired = searchParams.get('expired');
+    if (expired === '1') {
+      setError('登录会话已过期，请重新登录');
+    }
+  }, [searchParams]);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -106,6 +116,10 @@ export default function LoginPage() {
         throw new Error(result.message || '登录失败');
       }
     } catch (err: unknown) {
+      const retryAfter =
+        typeof err === 'object' && err !== null && 'retryAfter' in err
+          ? Number((err as { retryAfter?: unknown }).retryAfter)
+          : null;
       const rawMessage =
         err instanceof Error
           ? err.message
@@ -117,6 +131,9 @@ export default function LoginPage() {
         /ECONNREFUSED|Failed to proxy|Network Error|fetch failed|timeout/i.test(rawMessage)
       ) {
         setError('后端服务未连接，请先启动 backend 服务（默认端口 3000）');
+      } else if (retryAfter && Number.isFinite(retryAfter) && retryAfter > 0) {
+        const minutes = Math.ceil(retryAfter / 60);
+        setError(`登录尝试过于频繁，请 ${minutes} 分钟后再试，或切换账号后重试。`);
       } else if (rawMessage) {
         setError(rawMessage);
       } else {
