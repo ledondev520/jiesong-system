@@ -39,7 +39,7 @@ describe('taxRefundService', () => {
   it('create 调用新增接口', async () => {
     const payload = {
       refundNo: 'TR-20260307-01',
-      status: 'DRAFT',
+      status: 'DRAFT' as const,
       salesContractId: 'sc-1',
       customsDeclarationId: 'cd-1',
       forexVerificationId: 'fv-1',
@@ -59,7 +59,7 @@ describe('taxRefundService', () => {
   it('update 调用更新接口', async () => {
     const payload = {
       refundNo: 'TR-20260307-01',
-      status: 'REFUNDED',
+      status: 'REFUNDED' as const,
       salesContractId: 'sc-1',
       customsDeclarationId: 'cd-1',
       forexVerificationId: 'fv-1',

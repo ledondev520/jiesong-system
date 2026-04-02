@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { Dialog, DialogContent, DialogTitle } from './dialog';
 
 describe('DialogContent', () => {
-  it('默认携带移动端全屏弹层样式，确保关闭按钮可达', () => {
+  it('默认携带移动端全屏弹层样式', () => {
     render(
       <Dialog open>
         <DialogContent>

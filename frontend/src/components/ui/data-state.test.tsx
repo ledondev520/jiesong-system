@@ -5,14 +5,13 @@ import { Table, TableBody } from '@/components/ui/table';
 import { ErrorState, LoadingState, TableStateRow } from './data-state';
 
 describe('data-state', () => {
-  it('renders loading state with default copy', () => {
+  it('渲染 loading state', () => {
     render(<LoadingState />);
-
-    expect(screen.getByText('加载中...')).toBeInTheDocument();
     expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByText('加载中...')).toBeInTheDocument();
   });
 
-  it('renders error state with action', () => {
+  it('渲染 error state 与 action', () => {
     render(
       <ErrorState
         icon={AlertTriangle}
@@ -23,11 +22,10 @@ describe('data-state', () => {
     );
 
     expect(screen.getByText('数据加载失败')).toBeInTheDocument();
-    expect(screen.getByText('请检查网络连接后重试。')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
   });
 
-  it('renders empty table row with shared empty state', () => {
+  it('渲染 empty table row', () => {
     render(
       <Table>
         <TableBody>

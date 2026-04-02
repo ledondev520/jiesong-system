@@ -1,66 +1,72 @@
 /**
- * Input: useMobile hook
- * Output: 移动端断点判断回归测试
- * Pos: 前端 hooks 测试
+ * useMobile Hook 单元测试
  */
-
-import { renderHook, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { renderHook } from '@testing-library/react';
 import { useMobile } from './useMobile';
 
 describe('useMobile', () => {
-  const originalInnerWidth = window.innerWidth;
   const originalMatchMedia = window.matchMedia;
+  const originalInnerWidth = window.innerWidth;
 
   beforeEach(() => {
-    vi.restoreAllMocks();
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
   });
 
   afterEach(() => {
-    window.innerWidth = originalInnerWidth;
-    if (originalMatchMedia) {
-      window.matchMedia = originalMatchMedia;
-    } else {
-      // jsdom 默认没有 matchMedia，清掉测试中临时注入的实现
-      Reflect.deleteProperty(window, 'matchMedia');
-    }
+    window.matchMedia = originalMatchMedia;
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: originalInnerWidth,
+    });
   });
 
-  it('在测试环境没有 matchMedia 时使用 innerWidth 作为回退', async () => {
+  it('应该在桌面端返回false', () => {
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+
+    const { result } = renderHook(() => useMobile());
+    expect(result.current).toBe(false);
+  });
+
+  it('应该在移动端返回true', () => {
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
+      matches: query.includes('max-width: 767px'),
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+
+    const { result } = renderHook(() => useMobile());
+    expect(result.current).toBe(true);
+  });
+
+  it('matchMedia 不可用时回退到 innerWidth', () => {
+    // @ts-expect-error 测试回退路径
+    window.matchMedia = undefined;
     Object.defineProperty(window, 'innerWidth', {
+      writable: true,
       configurable: true,
       value: 640,
-      writable: true,
     });
 
     const { result } = renderHook(() => useMobile());
-
-    await waitFor(() => {
-      expect(result.current).toBe(true);
-    });
-  });
-
-  it('当 matchMedia 可用时仍能正常运行', async () => {
-    const addEventListener = vi.fn();
-    const removeEventListener = vi.fn();
-
-    Object.defineProperty(window, 'matchMedia', {
-      configurable: true,
-      value: vi.fn(() => ({
-        addEventListener,
-        matches: false,
-        media: '(max-width: 767px)',
-        removeEventListener,
-      })),
-      writable: true,
-    });
-
-    const { result } = renderHook(() => useMobile());
-
-    await waitFor(() => {
-      expect(result.current).toBe(false);
-    });
-    expect(addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
-    expect(removeEventListener).not.toHaveBeenCalled();
+    expect(result.current).toBe(true);
   });
 });

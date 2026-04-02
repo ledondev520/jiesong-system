@@ -9,6 +9,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import api from '@/lib/axios';
 import { customsDeclarationService } from './customsDeclaration.service';
+import { CustomsDeclarationStatus } from '@/types';
 
 vi.mock('@/lib/axios', () => ({
   default: {
@@ -41,7 +42,7 @@ describe('customsDeclarationService', () => {
   it('create 调用新增接口', async () => {
     const payload = {
       declarationNo: 'CUS-2026-001',
-      status: 'DRAFT',
+      status: CustomsDeclarationStatus.DRAFT,
       exporter: '捷淞供应链',
       consignee: 'Lima Tiles SAC',
       destinationCountry: '秘鲁',
@@ -67,7 +68,7 @@ describe('customsDeclarationService', () => {
   it('update 调用更新接口', async () => {
     const payload = {
       declarationNo: 'CUS-2026-001',
-      status: 'SUBMITTED',
+      status: CustomsDeclarationStatus.SUBMITTED,
       exporter: '捷淞供应链',
       consignee: 'Lima Tiles SAC',
       destinationCountry: '秘鲁',

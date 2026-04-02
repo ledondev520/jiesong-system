@@ -44,7 +44,12 @@ describe('purchaseService api', () => {
 
   it('create: 提交新增数据', async () => {
     (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
-    const payload = { contractNo: 'CG25001' };
+    const payload = {
+      supplierId: 'sup-001',
+      contractNo: 'CG25001',
+      taxRate: 13,
+      items: [{ productId: 'p1', quantity: 10, unitPrice: 100 }],
+    };
 
     await purchaseService.create(payload);
 
