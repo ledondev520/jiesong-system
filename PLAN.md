@@ -1,5 +1,265 @@
 # Ops Execution Center Plan
 
+## 2026-04-02 Round 84（出口合同第三方来源展示收口）
+
+### Goal
+- 把“仅捷淞货物 / 含第三方拼柜 / 第三方来源”从数据库字段延伸到出口合同常用页面，并补齐接口与测试闭环。
+
+### Planned Scope
+- `salesService` 返回 `hasThirdPartyCargo / sourceParties`。
+- 出口合同列表与详情信息区展示第三方拼柜标记和来源方。
+- 修复因首页文案演进导致的 `sales/page` 旧断言红灯。
+
+### Verification Plan
+- `node --test backend/src/services/salesService.test.js`
+- `cd frontend && npm test -- src/app/dashboard/sales/page.test.tsx src/components/sales/ContractInfoEditor.test.tsx`
+- `cd frontend && npm test -- src/app/dashboard/payments/page.test.tsx src/app/dashboard/finance/page.test.tsx src/services/finance.service.test.ts`
+
+### Delivered
+- `salesService` 已对出口合同聚合 `stores / hasThirdPartyCargo / sourceParties`，合同详情也返回相同第三方来源信息。
+- 出口合同列表页已展示“含第三方拼柜”徽标与“来源方：...”文案，移动端卡片同步展示第三方来源。
+- 合同详情信息卡已展示“货物归属”和“第三方来源”。
+- 已修复 `sales/page.test.tsx` 对旧首页文案的断言漂移，并补上服务层对第三方来源聚合的回归测试。
+
+### Verification
+- backend 定向测试：`8/8` 通过
+- frontend 出口域定向测试：`10/10` 通过
+- frontend 财务相关回归：`15/15` 通过
+
+### Remaining Risk
+- 当前第三方来源仍依赖导入备注/供货方信息质量；若历史记录没有清晰来源，仍会落到 `第三方拼柜` 兜底值。
+- 出口合同应收过滤已经按捷淞自有货物口径生效，但历史脏合同仍需要继续逐批清洗。
+
+## 2026-04-02 Round 83（客户级收款池与部分分摊）
+
+### Goal
+- 让收入记录先挂到客户，再支持把一笔收款拆分到多张合同，贴近真实“客户整笔打款”的业务方式。
+
+### Planned Scope
+- 为 `Payment` 增加 `customerName` 与 `sourcePaymentId`。
+- 原始收款保留在池中，直到全部分摊完才退出。
+- 收款池返回 `allocatedAmount / remainingAmount`。
+- 历史收入记录统一补客户名 `Sp food trading LLC`。
+
+### Verification Plan
+- `node --test backend/src/services/financeService.test.js backend/prisma/import-payments.test.js backend/src/routes/finance.test.js`
+- `cd frontend && npm test -- src/services/finance.service.test.ts src/app/dashboard/payments/page.test.tsx`
+- 真实库抽查客户名与剩余额
+
+### Delivered
+- 已完成 `Payment` 扩展：支持客户名与源收款追溯。
+- 已完成部分分摊逻辑：例如 `33000` 可先分 `30000`，剩余 `3000` 继续留池。
+- 已更新收款池 UI：展示客户名称与剩余待分配金额。
+- 已把现有 `25` 条收入统一补齐客户名 `Sp food trading LLC`。
+
+### Verification
+- backend 定向测试：`16/16` 通过
+- frontend 定向测试：`12/12` 通过
+- 真实库抽查：
+  - 收款池 `25` 笔
+  - 全部带 `customerName=Sp food trading LLC`
+  - 当前客户收入汇总 `$1,517,292.60`
+
+### Remaining Risk
+- 当前只是客户级收款池与部分分摊模型到位，合同级 `receivedAmount` 仍需靠后续实际分摊动作更新。
+- 现阶段因为你明确只有一个客户，所以默认客户名可用；若后续进入多客户阶段，需要把客户实体正式化。
+
+## 2026-04-02 Round 82（自进化闭环规划）
+
+### Goal
+- 把系统从“可观察 + 人工返修”提升到“事件可追溯、问题可归因、修复可验证、经验可固化”的 L2 闭环。
+- 不追求一步到位全自治；先把自进化所需的底座做成可运营、可审计、可回滚的系统。
+
+### Current Baseline
+- 已有基础件：`OperationLog`、`ImportRecord`、`ChatHistory`、`TokenUsage`、系统日志页、项目驾驶舱。
+- 当前缺口：事件口径分散，没有统一 case/incident 主实体，没有“根因 -> 修复 -> 验证 -> 固化”链路。
+- 当前真实状态更接近“有日志和记忆点的人工作业系统”，还不是“会持续学习的闭环系统”。
+
+### Recommended Scope
+- 采用 `L2 闭环增强` 作为本阶段目标，而不是直接做 `L3 全自治自进化`。
+- 先统一事件模型、追溯主线和修复闭环，再决定哪些动作可以半自动、哪些动作必须保留人工确认。
+- 第一阶段优先覆盖高价值场景：财务导入/挂账、AI 业务问答、关键业务写操作、异常修复。
+
+### Target Architecture
+- `Event Ledger`
+  统一沉淀导入、AI、业务写入、异常、验证结果等事件，要求带 `eventType / actor / entityRef / correlationId / payloadSnapshot`。
+- `Case Loop`
+  从事件聚合出可运营的 case，支持发现、分级、归因、指派、状态流转、证据挂载。
+- `Repair Loop`
+  从 case 生成修复动作或待办，串联人工确认、执行结果、回滚点和验收证据。
+- `Learning Loop`
+  修复通过后，把经验沉淀为规则、导入规范、提示词约束、诊断 playbook 或自动校验器。
+- `Ops Cockpit`
+  在现有系统日志页和项目驾驶舱之上，补事件时间线、case 漏斗、失败热点、规则命中率和返修效率面板。
+
+### Phased Delivery
+- `Phase 0`：统一术语与事件分类法，明确哪些对象是 `event / case / repair / rule / metric`。
+- `Phase 1`：补统一事件模型与最小采集面，优先接入导入、审计日志、AI 调用、关键业务写操作。
+- `Phase 2`：新增 case/trace 主实体和时间线视图，打通“发现问题 -> 找到根因证据”。
+- `Phase 3`：新增 repair 工作流和验收钩子，做到“修复后必须有验证结果”。
+- `Phase 4`：新增规则注册表与经验固化流程，让通过验证的修复经验进入下一轮判断。
+- `Phase 5`：补指标、灰度、审批和回滚策略，决定哪些闭环可半自动升级。
+
+### Definition of Done
+- 任一异常都能追到：来源事件、受影响实体、相关人/Agent、修复动作、验证结果、固化规则。
+- 新增同类问题时，不再依赖口头记忆，而是能复用已有 case、规则和 playbook。
+- 自动动作默认遵循安全边界：高风险写操作仍需显式确认，失败路径必须可回滚。
+
+### Verification Plan
+- `git diff --check`
+- `rg -n "Round 82|EVO-" PLAN.md TASKS.md RISKS.md METRICS.md docs/plans/2026-04-02-self-evolving-closure-design.md`
+
+## 2026-04-02 Round 81（付款备注规范收口）
+
+### Goal
+- 同时收口两件事：
+- 导入脚本把付款备注写成统一、可机读的格式
+- 后续手工录入收款时，把合同号稳定带进备注，喂给收款池自动匹配
+
+### Planned Scope
+- 为 `backend/prisma/import-payments.js` 增加结构化备注生成函数与安全模块导出。
+- 为收款录入增加 `合同号（选填）` 字段，并统一用前端 helper 生成备注。
+- 为导入脚本补 `QUIET=1` 模式，避免重导时刷满终端。
+
+### Verification Plan
+- `node --test backend/prisma/import-payments.test.js backend/src/services/financeService.test.js backend/src/routes/finance.test.js`
+- `cd frontend && npm test -- src/lib/finance-note.test.ts src/services/finance.service.test.ts src/app/dashboard/payments/page.test.tsx`
+
+### Delivered
+- 已为导入脚本补 `buildPaymentNote()`，导入备注会统一输出为：
+- `合同号:EXP... | 门店:... | 用途:...`
+- 或 `原始单号:... | 门店:... | 用途:...`
+- 或 `年度:... | 用途:...`
+- 已为收款录入增加 `合同号（选填）` 字段，并在提交时统一生成 `合同号:EXP... | 备注:...` 格式。
+- 已新增前端 `finance-note` helper 与后端导入脚本测试。
+- 已为导入脚本增加 `QUIET=1` 静默模式。
+
+### Verification
+- backend 定向测试：`13/13` 通过
+- frontend 定向测试：`13/13` 通过
+- 已用 `/Users/helena/Documents/捷淞/4-财务部/合同明细、美元交易.xlsx` 成功重导本地 `payments`
+
+### Remaining Risk
+- 当前 blocker 已收口：稳定原始文件位于 `/Users/helena/Documents/捷淞/4-财务部/合同明细、美元交易.xlsx`，后续应优先使用该路径而不是 WPS 缓存副本。
+- 剩余风险回到数据质量层：收入备注仍多为 `原始单号:POR...` 或 `收款合同X`，短期内高置信度自动匹配命中率仍有限。
+
+## 2026-04-01 Round 80（收款池半自动挂账）
+
+### Goal
+- 将“收款池”从纯人工分配升级为“高置信度自动匹配优先，剩余继续人工处理”的两段式流程。
+
+### Planned Scope
+- 在 `financeService` 新增收款池批量自动匹配逻辑。
+- 匹配规则限定为：备注命中唯一 `EXP...` 合同号，且到账金额等于合同待收金额。
+- 复用现有分配逻辑，不引入第二套挂账写入路径。
+- 在收付款页待分配卡片增加“自动匹配”按钮。
+
+### Verification Plan
+- `node --test backend/src/services/financeService.test.js backend/src/routes/finance.test.js`
+- `cd frontend && npm test -- src/services/finance.service.test.ts src/app/dashboard/payments/page.test.tsx`
+- 真实库只读抽查高置信度候选数
+
+### Delivered
+- 已新增后端自动匹配入口：批量扫描收款池并执行高置信度规则匹配。
+- 已新增前端显式触发入口：收款池卡片上的“自动匹配”按钮。
+- 已补齐后端规则测试、前端 service 测试、收款页交互测试。
+- 自动匹配命中后会复用现有分配逻辑，并把原始收款移出待分配池。
+
+### Verification
+- backend 定向测试：`9/9` 通过
+- frontend 定向测试：`10/10` 通过
+- 真实库只读抽查：当前收款池 `25` 笔，备注中 `EXP...` 合同引用 `0` 笔，高置信度候选 `0` 笔
+
+### Remaining Risk
+- 当前自动匹配规则已经接好，但历史导入数据备注质量不足，短期内不会自动清掉现有收款池。
+- 若要让这条能力真正出量，下一步要收口 `import-payments.js` / 新录入流程的备注规范，让合同号稳定进备注或单独字段。
+
+## 2026-04-01 Round 79（财务 P0 历史流水兼容）
+
+### Goal
+- 打通财务 P0 的最短可见闭环，让现有历史 `INCOME / EXPENSE` 付款数据能被当前财务页面消费。
+
+### Planned Scope
+- 在 `financeService` 内兼容历史付款类型与当前页面语义。
+- 让历史 `INCOME` 进入待分配收款池，并允许继续分配到销售合同。
+- 让历史 `INCOME / EXPENSE / PAYABLE / RECEIVABLE` 进入趋势统计，而不是只认新语义类型。
+- 收款分配后将原始到账记录移出待分配池，避免重复分配。
+
+### Verification Plan
+- `node --test backend/src/services/financeService.test.js`
+- 真实库抽查：`financeService.listUnallocatedPayments()` / `financeService.getPaymentTrends(90)`
+
+### Delivered
+- 已为历史 `INCOME` 增加待分配池兼容读取，并统一返回为 `RECEIVABLE_RECEIPT` 语义。
+- 已允许历史 `INCOME` 直接走收款分配流程。
+- 已在分配后把原始到账记录标记为 `RECEIVABLE_RECEIPT_ALLOCATED`，避免继续留在待分配池。
+- 已让趋势统计兼容 `INCOME / EXPENSE / PAYABLE / RECEIVABLE / RECEIVABLE_COLLECTION`。
+- 已补充服务层回归测试，锁定上述兼容行为。
+
+### Verification
+- `backend/src/services/financeService.test.js`：`6/6` 通过。
+- 真实库抽查：待分配收款 `25` 笔已恢复可见；近 `90` 天趋势已返回 `2` 个非空点。
+
+### Remaining Risk
+- 当前兼容层没有补做合同级自动挂账，`purchaseContract.paidAmount / salesContract.receivedAmount` 仍然主要依赖已关联记录。
+- 真实历史数据仍只有 `INCOME / EXPENSE` 两种原始类型，后续需要统一导入/录入语义，避免继续累积双轨类型。
+
+## 2026-04-01 Round 78（findings 剩余入口与频控收口）
+
+### Goal
+- 继续消化 findings 中剩余的入口割裂和高摩擦登录问题。
+
+### Planned Scope
+- 将 `/tax-refunds` 统一收敛到 `/dashboard/tax-refunds`
+- 同步外汇核销页等相关 CTA
+- 将登录限流从同 IP 一刀切改为按 `IP + 用户名` 分桶
+- 在登录页补充剩余等待时间提示
+
+### Verification Plan
+- `cd frontend && npm test -- src/app/tax-refunds/page.test.tsx 'src/app/(auth)/login/page.test.tsx'`
+- `cd backend && node --test src/middleware/rateLimit.test.js`
+
+### Delivered
+- 退税入口已统一跳转到 dashboard 业务页。
+- 外汇核销页中的退税 CTA 已同步为 dashboard 路径。
+- 登录限流已收敛为 `IP + 用户名` 分桶。
+- 登录页在 429 时会展示带剩余等待时间的可操作提示。
+
+### Verification
+- frontend 定向测试：通过
+- backend 限流中间件测试：通过
+
+### Remaining Risk
+- `findings.md` 中尚未收口的重点仍是“搜索功能缺失”“资源 404 错误”。
+
+## 2026-03-31 Round 77（基于 findings 的高优先级修复）
+
+### Goal
+- 直接处理 QA 报告中的高优先级交互问题，而不是只停留在工作台结构层。
+- 优先关掉会造成“页面不可访问”或“提交无反馈”的问题。
+
+### Planned Scope
+- 修复 `/dashboard/purchase` 404，提供兼容入口。
+- 提供自定义 404 页面，带明确返回动作。
+- 修复出口创建页空提交无字段级提示的问题。
+- 去掉所有页面顶部截图里出现的黄色细线。
+
+### Verification Plan
+- `cd frontend && npm test -- src/app/dashboard/purchase/page.test.tsx src/app/not-found.test.tsx src/app/dashboard/sales/create/page.test.tsx`
+
+### Delivered
+- 已新增采购兼容入口页，访问 `/dashboard/purchase` 自动跳转到采购合同列表。
+- 已新增业务友好的 404 页面，提供返回工作台/登录页按钮。
+- 已修复出口创建页提交按钮逻辑和成本/售价校验，空提交可见字段级错误。
+- 已调整全局背景层位置，避免顶部出现黄色细线。
+
+### Verification
+- 定向测试：通过
+
+### Remaining Risk
+- 404 和表单提示已收口；本轮后“退税双入口”和“登录频控提示”也已继续处理。
+- 报告中的“搜索功能缺失”“资源 404 错误”仍待继续处理。
+
 ## 2026-03-30 Round 76（故事化工作台与模块首页收口）
 
 ### Goal

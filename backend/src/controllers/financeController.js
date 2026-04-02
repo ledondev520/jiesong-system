@@ -149,6 +149,21 @@ const listUnallocatedPayments = async (req, res, next) => {
 };
 
 /**
+ * 职责：对收款池执行高置信度自动匹配
+ */
+const autoMatchPayments = async (req, res, next) => {
+  try {
+    const result = await financeService.autoMatchUnallocatedPayments();
+    const message = result.matchedCount > 0
+      ? `已自动匹配 ${result.matchedCount} 笔收款`
+      : '没有可自动匹配的收款';
+    success(res, result, message);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * 职责：将一笔收款分配到多张销售合同
  * @param {Request} req.params.id - 收款 ID
  * @param {Request} req.body.allocations - [{salesContractId, amount, note?}]
@@ -176,5 +191,6 @@ module.exports = {
   getPaymentTrends,
   getOverdueReceivables,
   listUnallocatedPayments,
+  autoMatchPayments,
   allocatePayment,
 };

@@ -26,6 +26,8 @@ interface FinanceContractRecord {
   receivedAmount?: number;
   unreceiveAmount?: number;
   status: string;
+  hasThirdPartyCargo?: boolean;
+  sourceParties?: string[];
   supplier?: {
     id: string;
     name: string;
@@ -44,6 +46,8 @@ export interface FinanceCreatePaymentInput {
   type: PaymentType;
   purchaseContractId?: string;
   salesContractId?: string;
+  sourcePaymentId?: string;
+  customerName?: string;
   amount: number;
   currency: string;
   paymentMethod: string;
@@ -79,6 +83,24 @@ export interface PaymentAllocation {
   note?: string;
 }
 
+export interface FinanceAutoMatchResult {
+  inspectedCount: number;
+  matchedCount: number;
+  skippedCount: number;
+  matched: Array<{
+    paymentId: string;
+    salesContractId: string;
+    contractNo: string;
+    amount: number;
+    rule: string;
+    confidence: string;
+  }>;
+  skipped: Array<{
+    paymentId: string;
+    reason: string;
+  }>;
+}
+
 export const financeService = {
   getPayments: async (params?: FinancePaymentQuery) => {
     return api.get<ApiResponse<PaginatedResponse<Payment>>, ApiResponse<PaginatedResponse<Payment>>>('/finance/payments', { params });
@@ -90,6 +112,10 @@ export const financeService = {
 
   allocatePayment: async (paymentId: string, allocations: PaymentAllocation[]) => {
     return api.post<ApiResponse<Payment[]>, ApiResponse<Payment[]>>(`/finance/payments/${paymentId}/allocate`, { allocations });
+  },
+
+  autoMatchUnallocatedPayments: async () => {
+    return api.post<ApiResponse<FinanceAutoMatchResult>, ApiResponse<FinanceAutoMatchResult>>('/finance/payments/auto-match');
   },
 
   getPayables: async (params?: { page?: number; pageSize?: number }) => {

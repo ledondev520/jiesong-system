@@ -367,7 +367,7 @@ export default function FinancePage() {
               USD {(stats?.receivable.unreceived ?? 0).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {receivableUrgent ? '⚠ 超过总额50%，建议跟进催收' : '待从门店收回'}
+              {receivableUrgent ? '⚠ 当前客户剩余欠款偏高，建议优先跟进' : '当前客户剩余欠款'}
             </p>
           </CardContent>
         </Card>

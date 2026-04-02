@@ -32,16 +32,31 @@ import {
 import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { normalizeContractRef } from '@/lib/finance-note';
 
 const receiptSchema = z.object({
   amount: z.number().min(0.01, '金额必须大于0'),
   currency: z.string().min(1, '请选择币种'),
   paymentDate: z.date(),
   paymentMethod: z.string().min(1, '请选择到账方式'),
+  customerName: z.string().min(1, '请填写客户名称'),
+  contractRef: z
+    .string()
+    .optional()
+    .transform((value) => normalizeContractRef(value))
+    .refine((value) => !value || /^EXP\d{5,}$/.test(value), '合同号格式应为 EXP250024'),
   note: z.string().optional(),
 });
 
-type ReceiptFormValues = z.infer<typeof receiptSchema>;
+interface ReceiptFormValues {
+  amount: number;
+  currency: string;
+  paymentDate: Date;
+  paymentMethod: string;
+  customerName: string;
+  contractRef?: string;
+  note?: string;
+}
 export type ReceiptSubmitData = ReceiptFormValues;
 
 interface ReceiptDialogProps {
@@ -62,6 +77,8 @@ export function ReceiptDialog({ open, onOpenChange, onSubmit }: ReceiptDialogPro
       currency: 'USD',
       paymentDate: new Date(),
       paymentMethod: '',
+      customerName: 'Sp food trading LLC',
+      contractRef: '',
       note: '',
     },
   });
@@ -164,12 +181,45 @@ export function ReceiptDialog({ open, onOpenChange, onSubmit }: ReceiptDialogPro
             />
             <FormField
               control={form.control}
+              name="customerName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>客户名称</FormLabel>
+                  <FormControl>
+                    <Input placeholder="例如: Sp food trading LLC" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="contractRef"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>合同号（选填）</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="例如: EXP250024"
+                      {...field}
+                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    填写后系统会按统一备注规范写入，供收款池自动匹配使用。
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
               name="note"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>备注（选填）</FormLabel>
                   <FormControl>
-                    <Input placeholder="例如: 3月份回款, 客户名称" {...field} />
+                    <Input placeholder="例如: 客户首笔回款, 尾款到账" {...field} />
                   </FormControl>
                 </FormItem>
               )}

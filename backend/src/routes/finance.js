@@ -61,6 +61,13 @@ router.get('/overdue-receivables', financeController.getOverdueReceivables);
 // GET /api/v1/finance/unallocated-payments - 获取待分配收款列表
 router.get('/unallocated-payments', financeController.listUnallocatedPayments);
 
+// POST /api/v1/finance/payments/auto-match - 对待分配收款执行高置信度自动匹配
+router.post(
+  '/payments/auto-match',
+  roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  financeController.autoMatchPayments
+);
+
 // POST /api/v1/finance/payments/:id/allocate - 将收款分配到多张销售合同
 router.post(
   '/payments/:id/allocate',

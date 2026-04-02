@@ -164,6 +164,44 @@ test('compareWithDatabase: 正确区分重复与新增记录', async () => {
   assert.equal(calls.findMany, 1);
 });
 
+test('deriveSourceParty: 第三方拼柜优先取厂家，其次购销合同号，否则标默认来源', () => {
+  assert.equal(
+    dataImportService.deriveSourceParty({
+      manufacturer: '阿珍贵州',
+      purchaseContractNo: 'CG2500001',
+      note: '非捷淞报关，属拼船或他方自行报关',
+    }),
+    '阿珍贵州',
+  );
+
+  assert.equal(
+    dataImportService.deriveSourceParty({
+      manufacturer: '',
+      purchaseContractNo: 'CG2500068',
+      note: '共用发票',
+    }),
+    'CG2500068',
+  );
+
+  assert.equal(
+    dataImportService.deriveSourceParty({
+      manufacturer: '',
+      purchaseContractNo: '',
+      note: '非捷淞报关，属拼船或他方自行报关',
+    }),
+    '第三方拼柜',
+  );
+
+  assert.equal(
+    dataImportService.deriveSourceParty({
+      manufacturer: '捷淞自有',
+      purchaseContractNo: 'CG2500002',
+      note: '正常记录',
+    }),
+    null,
+  );
+});
+
 test('importRecords: 同次导入命中映射缓存，且事务内写操作统一走 tx client', async () => {
   const preloadCalls = {
     portFindMany: 0,

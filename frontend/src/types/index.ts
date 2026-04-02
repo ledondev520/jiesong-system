@@ -343,6 +343,8 @@ export interface SalesContract {
   packingItems?: PackingItem[];  // 装箱明细
   payments?: Payment[];
   stores?: string[];  // 关联门店名称列表（由后端聚合自 packingItems）
+  hasThirdPartyCargo?: boolean;
+  sourceParties?: string[];
 }
 
 export interface SalesItem {
@@ -433,7 +435,11 @@ export interface Payment {
   type: PaymentType;
   purchaseContractId?: string;
   salesContractId?: string;
+  sourcePaymentId?: string;
+  customerName?: string;
   amount: number;
+  allocatedAmount?: number;
+  remainingAmount?: number;
   currency: string;
   paymentMethod?: string;
   paymentDate: string;

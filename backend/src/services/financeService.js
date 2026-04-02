@@ -6,6 +6,45 @@
 
 const prisma = require('../utils/prisma');
 
+const PAYMENT_TYPES = {
+  PAYABLE: 'PAYABLE',
+  PAYABLE_PAYMENT: 'PAYABLE_PAYMENT',
+  RECEIVABLE: 'RECEIVABLE',
+  RECEIVABLE_RECEIPT: 'RECEIVABLE_RECEIPT',
+  RECEIVABLE_RECEIPT_ALLOCATED: 'RECEIVABLE_RECEIPT_ALLOCATED',
+  RECEIVABLE_COLLECTION: 'RECEIVABLE_COLLECTION',
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+};
+
+const PAYABLE_FLOW_TYPES = new Set([
+  PAYMENT_TYPES.PAYABLE,
+  PAYMENT_TYPES.PAYABLE_PAYMENT,
+  PAYMENT_TYPES.EXPENSE,
+]);
+
+const RECEIVABLE_FLOW_TYPES = new Set([
+  PAYMENT_TYPES.RECEIVABLE,
+  PAYMENT_TYPES.RECEIVABLE_COLLECTION,
+  PAYMENT_TYPES.INCOME,
+]);
+
+const RECEIVABLE_SETTLEMENT_TYPES = [
+  PAYMENT_TYPES.RECEIVABLE,
+  PAYMENT_TYPES.RECEIVABLE_COLLECTION,
+  PAYMENT_TYPES.INCOME,
+];
+
+const RECEIPT_POOL_TYPES = new Set([
+  PAYMENT_TYPES.RECEIVABLE_RECEIPT,
+  PAYMENT_TYPES.INCOME,
+]);
+
+const DEFAULT_RECEIVABLE_CUSTOMER_NAME = 'Sp food trading LLC';
+const AUTO_MATCH_RULE = 'exact_contract_no_and_full_amount';
+const AUTO_MATCH_CONFIDENCE = 'high';
+const AUTO_MATCH_AMOUNT_TOLERANCE = 0.01;
+
 const trimIdempotencyKey = (value) => {
   if (typeof value !== 'string') {
     return null;
@@ -17,6 +56,238 @@ const trimIdempotencyKey = (value) => {
 const includePaymentRelations = {
   purchaseContract: { include: { supplier: true } },
   salesContract: true,
+  sourcePayment: true,
+};
+
+const OWNERSHIP_EXCLUSION_KEYWORDS = [
+  '非捷淞报关',
+  '拼船',
+  '他方自行报关',
+  '共用发票',
+];
+
+const withDefaultCustomerName = (value) => {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  return normalized || DEFAULT_RECEIVABLE_CUSTOMER_NAME;
+};
+
+const getReceiptAllocationTotals = async (receiptIds, db = prisma) => {
+  if (!Array.isArray(receiptIds) || receiptIds.length === 0) {
+    return new Map();
+  }
+
+  const grouped = await db.payment.groupBy({
+    by: ['sourcePaymentId'],
+    where: {
+      sourcePaymentId: { in: receiptIds },
+      type: PAYMENT_TYPES.RECEIVABLE_COLLECTION,
+    },
+    _sum: { amount: true },
+  });
+
+  return new Map(
+    grouped.map((row) => [row.sourcePaymentId, Number(row._sum.amount || 0)]),
+  );
+};
+
+const isJiesongOwnedPackingItem = (item) => {
+  if (typeof item?.isOwnedByJiesong === 'boolean') {
+    return item.isOwnedByJiesong;
+  }
+
+  const note = String(item?.note || '');
+  return !OWNERSHIP_EXCLUSION_KEYWORDS.some((keyword) => note.includes(keyword));
+};
+
+const getEffectiveSalesContractTotal = (contract) => {
+  if (!Array.isArray(contract?.packingItems) || contract.packingItems.length === 0) {
+    return Number(contract?.totalAmount || 0);
+  }
+
+  const excludedAmount = contract.packingItems.reduce((sum, item) => {
+    if (isJiesongOwnedPackingItem(item)) {
+      return sum;
+    }
+    return sum + Number(item.totalPrice || 0);
+  }, 0);
+
+  return Number(Math.max(Number(contract.totalAmount || 0) - excludedAmount, 0).toFixed(2));
+};
+
+const getOwnedStores = (packingItems = [], port) => {
+  const storeMap = new Map();
+  packingItems.forEach((item) => {
+    if (!isJiesongOwnedPackingItem(item)) {
+      return;
+    }
+    if (item.store && !storeMap.has(item.store.id)) {
+      storeMap.set(item.store.id, item.store.name);
+    }
+  });
+
+  const stores = Array.from(storeMap.values());
+  if (stores.length > 0) {
+    return stores;
+  }
+  if (port?.name) {
+    return [port.name];
+  }
+  return [];
+};
+
+const getThirdPartySources = (packingItems = []) => {
+  return Array.from(new Set(
+    packingItems
+      .filter((item) => !isJiesongOwnedPackingItem(item))
+      .map((item) => item.sourceParty || '第三方拼柜')
+      .filter(Boolean),
+  ));
+};
+
+const getPaymentAllocatedAmount = async (paymentId, db = prisma) => {
+  const total = await db.payment.aggregate({
+    where: {
+      sourcePaymentId: paymentId,
+      type: PAYMENT_TYPES.RECEIVABLE_COLLECTION,
+    },
+    _sum: { amount: true },
+  });
+  return Number(total._sum.amount || 0);
+};
+
+const attachReceiptBalance = (payment, allocationTotals = new Map()) => {
+  if (!payment || !RECEIPT_POOL_TYPES.has(payment.type)) {
+    return payment;
+  }
+
+  const allocatedAmount = Number(allocationTotals.get(payment.id) || 0);
+  const remainingAmount = Math.max(Number(payment.amount || 0) - allocatedAmount, 0);
+
+  return {
+    ...payment,
+    customerName: withDefaultCustomerName(payment.customerName),
+    allocatedAmount,
+    remainingAmount,
+  };
+};
+
+const normalizePaymentForRead = (payment) => {
+  if (!payment) {
+    return payment;
+  }
+
+  if (!payment.salesContractId && !payment.purchaseContractId) {
+    if (payment.type === PAYMENT_TYPES.INCOME) {
+      return {
+        ...payment,
+        type: PAYMENT_TYPES.RECEIVABLE_RECEIPT,
+        customerName: withDefaultCustomerName(payment.customerName),
+      };
+    }
+  }
+
+  if (PAYABLE_FLOW_TYPES.has(payment.type)) {
+    return { ...payment, type: PAYMENT_TYPES.PAYABLE };
+  }
+
+  if (
+    payment.type === PAYMENT_TYPES.RECEIVABLE
+    || payment.type === PAYMENT_TYPES.RECEIVABLE_COLLECTION
+  ) {
+    return {
+      ...payment,
+      type: PAYMENT_TYPES.RECEIVABLE,
+      customerName: payment.customerName || payment.sourcePayment?.customerName || null,
+    };
+  }
+
+  return payment;
+};
+
+const buildPaymentListWhere = (type) => {
+  if (!type) {
+    return {};
+  }
+
+  if (type === PAYMENT_TYPES.PAYABLE) {
+    return { type: { in: Array.from(PAYABLE_FLOW_TYPES) } };
+  }
+
+  if (type === PAYMENT_TYPES.RECEIVABLE) {
+    return {
+      type: {
+        in: [
+          PAYMENT_TYPES.RECEIVABLE,
+          PAYMENT_TYPES.RECEIVABLE_COLLECTION,
+          PAYMENT_TYPES.INCOME,
+        ],
+      },
+    };
+  }
+
+  if (type === PAYMENT_TYPES.RECEIVABLE_RECEIPT) {
+    return {
+      OR: Array.from(RECEIPT_POOL_TYPES).map((receiptType) => ({
+        type: receiptType,
+        salesContractId: null,
+        purchaseContractId: null,
+      })),
+    };
+  }
+
+  return { type };
+};
+
+const extractSalesContractRefs = (note) => {
+  if (typeof note !== 'string') {
+    return [];
+  }
+
+  return Array.from(new Set((note.toUpperCase().match(/EXP\d{5,}/g) || [])));
+};
+
+const findAutoMatchCandidate = async (payment) => {
+  const contractRefs = extractSalesContractRefs(payment.note);
+
+  if (contractRefs.length === 0) {
+    return { matched: false, reason: 'no_contract_reference' };
+  }
+
+  if (contractRefs.length > 1) {
+    return { matched: false, reason: 'multiple_contract_references' };
+  }
+
+  const contract = await prisma.salesContract.findUnique({
+    where: { contractNo: contractRefs[0] },
+    select: {
+      id: true,
+      contractNo: true,
+      totalAmount: true,
+      receivedAmount: true,
+      status: true,
+    },
+  });
+
+  if (!contract || contract.status === 'CANCELLED') {
+    return { matched: false, reason: 'contract_not_found' };
+  }
+
+  const unreceivedAmount = Math.max((contract.totalAmount || 0) - (contract.receivedAmount || 0), 0);
+  if (unreceivedAmount <= 0) {
+    return { matched: false, reason: 'contract_fully_received' };
+  }
+
+  const candidateAmount = Number(payment.remainingAmount ?? payment.amount ?? 0);
+  if (Math.abs(unreceivedAmount - candidateAmount) > AUTO_MATCH_AMOUNT_TOLERANCE) {
+    return { matched: false, reason: 'amount_mismatch' };
+  }
+
+  return {
+    matched: true,
+    contract,
+    rule: AUTO_MATCH_RULE,
+    confidence: AUTO_MATCH_CONFIDENCE,
+  };
 };
 
 const syncContractPaymentAmounts = async (tx, { purchaseContractId, salesContractId }) => {
@@ -33,7 +304,10 @@ const syncContractPaymentAmounts = async (tx, { purchaseContractId, salesContrac
 
   if (salesContractId) {
     const total = await tx.payment.aggregate({
-      where: { salesContractId },
+      where: {
+        salesContractId,
+        type: { in: RECEIVABLE_SETTLEMENT_TYPES },
+      },
       _sum: { amount: true },
     });
     await tx.salesContract.update({
@@ -48,14 +322,73 @@ const syncContractPaymentAmounts = async (tx, { purchaseContractId, salesContrac
  */
 const listUnallocatedPayments = async () => {
   const payments = await prisma.payment.findMany({
-    where: {
-      type: 'RECEIVABLE_RECEIPT',
-      salesContractId: null,
-      purchaseContractId: null,
-    },
+    where: buildPaymentListWhere(PAYMENT_TYPES.RECEIVABLE_RECEIPT),
     orderBy: { paymentDate: 'desc' },
   });
-  return payments;
+  const allocationTotals = await getReceiptAllocationTotals(payments.map((payment) => payment.id));
+
+  return payments
+    .map((payment) => attachReceiptBalance(normalizePaymentForRead(payment), allocationTotals))
+    .filter((payment) => Number(payment.remainingAmount || 0) > AUTO_MATCH_AMOUNT_TOLERANCE);
+};
+
+/**
+ * 职责：对收款池执行高置信度自动匹配
+ * 思路：
+ *   1. 仅处理未关联合同的待分配收款
+ *   2. 备注里必须命中唯一 EXP 合同号
+ *   3. 到账金额必须与合同待收金额完全一致（允许极小浮点误差）
+ *   4. 命中后复用现有分配逻辑；其余收款继续留在池中
+ */
+const autoMatchUnallocatedPayments = async () => {
+  const payments = await prisma.payment.findMany({
+    where: buildPaymentListWhere(PAYMENT_TYPES.RECEIVABLE_RECEIPT),
+    orderBy: { paymentDate: 'desc' },
+    select: {
+      id: true,
+      type: true,
+      amount: true,
+      currency: true,
+      note: true,
+      paymentDate: true,
+    },
+  });
+  const allocationTotals = await getReceiptAllocationTotals(payments.map((payment) => payment.id));
+
+  const matched = [];
+  const skipped = [];
+
+  for (const payment of payments) {
+    const candidate = await findAutoMatchCandidate(attachReceiptBalance(payment, allocationTotals));
+
+    if (!candidate.matched) {
+      skipped.push({ paymentId: payment.id, reason: candidate.reason });
+      continue;
+    }
+
+    await allocatePaymentToContracts(payment.id, [{
+      salesContractId: candidate.contract.id,
+      amount: Number(payment.amount),
+      note: `自动匹配 ${candidate.contract.contractNo} [${candidate.rule}]`,
+    }]);
+
+    matched.push({
+      paymentId: payment.id,
+      salesContractId: candidate.contract.id,
+      contractNo: candidate.contract.contractNo,
+      amount: Number(payment.amount),
+      rule: candidate.rule,
+      confidence: candidate.confidence,
+    });
+  }
+
+  return {
+    inspectedCount: payments.length,
+    matchedCount: matched.length,
+    skippedCount: skipped.length,
+    matched,
+    skipped,
+  };
 };
 
 /**
@@ -70,7 +403,18 @@ const listUnallocatedPayments = async () => {
 const allocatePaymentToContracts = async (paymentId, allocations) => {
   const receipt = await prisma.payment.findUnique({ where: { id: paymentId } });
   if (!receipt) throw new Error('收款记录不存在');
-  if (receipt.type !== 'RECEIVABLE_RECEIPT') throw new Error('该记录不是待分配收款');
+  if (!RECEIPT_POOL_TYPES.has(receipt.type)) throw new Error('该记录不是待分配收款');
+
+  const allocatedBefore = await getPaymentAllocatedAmount(paymentId);
+  const remainingBefore = Math.max(Number(receipt.amount || 0) - allocatedBefore, 0);
+  const requestedAmount = allocations.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  if (requestedAmount <= 0) {
+    throw new Error('分配金额必须大于 0');
+  }
+  if (requestedAmount - remainingBefore > AUTO_MATCH_AMOUNT_TOLERANCE) {
+    throw new Error('分配金额超出该笔收款剩余可分配金额');
+  }
 
   const result = await prisma.$transaction(async (tx) => {
     const created = [];
@@ -81,6 +425,8 @@ const allocatePaymentToContracts = async (paymentId, allocations) => {
         data: {
           type: 'RECEIVABLE_COLLECTION',
           salesContractId: alloc.salesContractId,
+          sourcePaymentId: paymentId,
+          customerName: withDefaultCustomerName(receipt.customerName),
           amount: alloc.amount,
           currency: receipt.currency,
           paymentMethod: receipt.paymentMethod,
@@ -94,6 +440,17 @@ const allocatePaymentToContracts = async (paymentId, allocations) => {
       await syncContractPaymentAmounts(tx, { salesContractId: alloc.salesContractId });
     }
 
+    const allocatedAfter = await getPaymentAllocatedAmount(paymentId, tx);
+    const remainingAfter = Math.max(Number(receipt.amount || 0) - allocatedAfter, 0);
+
+    if (remainingAfter <= AUTO_MATCH_AMOUNT_TOLERANCE) {
+      // 标记原始到账记录已完成分配，避免继续出现在待分配池中。
+      await tx.payment.update({
+        where: { id: paymentId },
+        data: { type: PAYMENT_TYPES.RECEIVABLE_RECEIPT_ALLOCATED },
+      });
+    }
+
     return created;
   });
 
@@ -101,7 +458,7 @@ const allocatePaymentToContracts = async (paymentId, allocations) => {
 };
 
 const listPayments = async ({ page, pageSize, skip, type }) => {
-  const where = type ? { type } : {};
+  const where = buildPaymentListWhere(type);
 
   const [payments, total] = await Promise.all([
     prisma.payment.findMany({
@@ -113,8 +470,12 @@ const listPayments = async ({ page, pageSize, skip, type }) => {
     }),
     prisma.payment.count({ where }),
   ]);
+  const allocationTotals = await getReceiptAllocationTotals(payments.map((payment) => payment.id));
 
-  return { payments, total };
+  return {
+    payments: payments.map((payment) => attachReceiptBalance(normalizePaymentForRead(payment), allocationTotals)),
+    total,
+  };
 };
 
 const createPayment = async (data = {}, options = {}) => {
@@ -137,6 +498,10 @@ const createPayment = async (data = {}, options = {}) => {
           type: data.type,
           purchaseContractId: data.purchaseContractId,
           salesContractId: data.salesContractId,
+          sourcePaymentId: data.sourcePaymentId,
+          customerName: data.customerName
+            ? withDefaultCustomerName(data.customerName)
+            : (RECEIPT_POOL_TYPES.has(data.type) ? DEFAULT_RECEIVABLE_CUSTOMER_NAME : null),
           amount: data.amount,
           currency: data.currency || 'CNY',
           paymentMethod: data.paymentMethod,
@@ -219,27 +584,23 @@ const getReceivables = async ({ page, pageSize, skip }) => {
   ]);
 
   const receivables = contracts.map((contract) => {
-    const storeMap = new Map();
-    contract.packingItems?.forEach((item) => {
-      if (item.store && !storeMap.has(item.store.id)) {
-        storeMap.set(item.store.id, item.store.name);
-      }
-    });
-    let stores = Array.from(storeMap.values());
-    if (!stores.length && contract.port?.name) {
-      stores = [contract.port.name];
-    }
+    const ownedTotalAmount = getEffectiveSalesContractTotal(contract);
+    const stores = getOwnedStores(contract.packingItems, contract.port);
+    const thirdPartySources = getThirdPartySources(contract.packingItems);
 
     return {
       ...contract,
-      unreceiveAmount: contract.totalAmount - contract.receivedAmount,
+      totalAmount: ownedTotalAmount,
+      unreceiveAmount: Math.max(ownedTotalAmount - contract.receivedAmount, 0),
       stores,
+      hasThirdPartyCargo: thirdPartySources.length > 0,
+      sourceParties: thirdPartySources,
       packingItems: undefined,
       port: undefined,
     };
-  });
+  }).filter((contract) => contract.totalAmount > 0);
 
-  return { receivables, total, page, pageSize };
+  return { receivables, total: receivables.length, page, pageSize };
 };
 
 const getStats = async () => {
@@ -248,10 +609,22 @@ const getStats = async () => {
     _sum: { totalAmount: true, paidAmount: true },
   });
 
-  const receivableStats = await prisma.salesContract.aggregate({
-    where: { NOT: { status: 'CANCELLED' } },
-    _sum: { totalAmount: true, receivedAmount: true },
+  const receivableContracts = await prisma.salesContract.findMany({
+    where: {
+      NOT: { status: 'CANCELLED' },
+      totalAmount: { gt: 0 },
+    },
+    include: {
+      packingItems: true,
+    },
   });
+
+  const receivableTotals = receivableContracts.reduce((acc, contract) => {
+    const ownedTotalAmount = getEffectiveSalesContractTotal(contract);
+    acc.total += ownedTotalAmount;
+    acc.received += Math.min(Number(contract.receivedAmount || 0), ownedTotalAmount);
+    return acc;
+  }, { total: 0, received: 0 });
 
   return {
     payable: {
@@ -260,9 +633,9 @@ const getStats = async () => {
       unpaid: (payableStats._sum.totalAmount || 0) - (payableStats._sum.paidAmount || 0),
     },
     receivable: {
-      total: receivableStats._sum.totalAmount || 0,
-      received: receivableStats._sum.receivedAmount || 0,
-      unreceived: (receivableStats._sum.totalAmount || 0) - (receivableStats._sum.receivedAmount || 0),
+      total: Number(receivableTotals.total.toFixed(2)),
+      received: Number(receivableTotals.received.toFixed(2)),
+      unreceived: Number((receivableTotals.total - receivableTotals.received).toFixed(2)),
     },
   };
 };
@@ -311,9 +684,9 @@ const getPaymentTrends = async (days = 90) => {
       weekMap.set(key, { label: toLabel(key), receivables: 0, payables: 0 });
     }
     const entry = weekMap.get(key);
-    if (p.type === 'RECEIVABLE_COLLECTION') {
+    if (RECEIVABLE_FLOW_TYPES.has(p.type)) {
       entry.receivables += Number(p.amount);
-    } else if (p.type === 'PAYABLE_PAYMENT') {
+    } else if (PAYABLE_FLOW_TYPES.has(p.type)) {
       entry.payables += Number(p.amount);
     }
   });
@@ -370,6 +743,7 @@ module.exports = {
   listPayments,
   createPayment,
   listUnallocatedPayments,
+  autoMatchUnallocatedPayments,
   allocatePaymentToContracts,
   getPayables,
   getReceivables,

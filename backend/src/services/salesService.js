@@ -10,6 +10,13 @@ const inventorySnapshot = require('./inventorySnapshot');
 
 const getCurrentYear = () => new Date().getFullYear().toString().slice(-2);
 
+const getThirdPartySources = (packingItems = []) => Array.from(new Set(
+  packingItems
+    .filter((item) => item.isOwnedByJiesong === false)
+    .map((item) => item.sourceParty || '第三方拼柜')
+    .filter(Boolean),
+));
+
 const getSalesContracts = async ({ page, pageSize, status, storeId, keyword, lite = false }) => {
   const where = {};
   if (status) {
@@ -31,11 +38,19 @@ const getSalesContracts = async ({ page, pageSize, status, storeId, keyword, lit
       include: lite
         ? {
             port: { select: { id: true, name: true } },
-            packingItems: { include: { store: { select: { id: true, name: true } } } },
+            packingItems: {
+              include: {
+                store: { select: { id: true, name: true } },
+              },
+            },
           }
         : {
             port: true,
-            packingItems: { include: { store: { select: { id: true, name: true } } } },
+            packingItems: {
+              include: {
+                store: { select: { id: true, name: true } },
+              },
+            },
           },
       orderBy: { contractNo: 'desc' },
     }),
@@ -50,9 +65,12 @@ const getSalesContracts = async ({ page, pageSize, status, storeId, keyword, lit
         storeMap.set(item.store.id, item.store.name);
       }
     });
+    const sourceParties = getThirdPartySources(c.packingItems || []);
     return {
       ...c,
       stores: Array.from(storeMap.values()),
+      hasThirdPartyCargo: sourceParties.length > 0,
+      sourceParties,
       packingItems: undefined,
     };
   });
@@ -86,7 +104,13 @@ const getSalesContractById = async (id) => {
     throw createError('出口合同不存在', 404);
   }
 
-  return contract;
+  const sourceParties = getThirdPartySources(contract.packingItems || []);
+
+  return {
+    ...contract,
+    hasThirdPartyCargo: sourceParties.length > 0,
+    sourceParties,
+  };
 };
 
 const createSalesContract = async (data = {}) => {

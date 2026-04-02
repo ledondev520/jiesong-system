@@ -9,6 +9,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import api from '@/lib/axios';
 import { financeService } from './finance.service';
+import { PaymentType } from '@/types';
 
 vi.mock('@/lib/axios', () => ({
   default: {
@@ -25,7 +26,7 @@ describe('financeService', () => {
   it('getPayments: 传递查询参数', async () => {
     (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
 
-    await financeService.getPayments({ page: 1, pageSize: 20, type: 'PAYABLE' });
+    await financeService.getPayments({ page: 1, pageSize: 20, type: PaymentType.PAYABLE });
 
     expect(api.get).toHaveBeenCalledWith('/finance/payments', {
       params: { page: 1, pageSize: 20, type: 'PAYABLE' },
@@ -35,7 +36,7 @@ describe('financeService', () => {
   it('createPayment: 提交新增数据', async () => {
     (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
     const payload = {
-      type: 'PAYABLE',
+      type: PaymentType.PAYABLE,
       purchaseContractId: 'ct-1',
       amount: 1000,
       currency: 'CNY',
@@ -58,7 +59,7 @@ describe('financeService', () => {
 
   it('createPayment: 并发重复请求复用幂等缓存', async () => {
     const payload = {
-      type: 'RECEIVABLE',
+      type: PaymentType.RECEIVABLE,
       salesContractId: 'ct-2',
       amount: 500,
       currency: 'USD',
@@ -112,6 +113,30 @@ describe('financeService', () => {
         received: 0,
         unreceived: 0,
       },
+    });
+  });
+
+  it('autoMatchUnallocatedPayments: 调用自动匹配接口', async () => {
+    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+
+    await financeService.autoMatchUnallocatedPayments();
+
+    expect(api.post).toHaveBeenCalledWith('/finance/payments/auto-match');
+  });
+
+  it('allocatePayment: 提交部分分摊明细', async () => {
+    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+
+    await financeService.allocatePayment('receipt-1', [
+      { salesContractId: 'sc-a', amount: 30000 },
+      { salesContractId: 'sc-b', amount: 3000 },
+    ]);
+
+    expect(api.post).toHaveBeenCalledWith('/finance/payments/receipt-1/allocate', {
+      allocations: [
+        { salesContractId: 'sc-a', amount: 30000 },
+        { salesContractId: 'sc-b', amount: 3000 },
+      ],
     });
   });
 });

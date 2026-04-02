@@ -17,9 +17,32 @@ test('getSalesContracts: 组装筛选条件并分页查询', async () => {
 
   prisma.salesContract.findMany = async (args) => {
     findManyArgs = args;
-    return [];
+    return [{
+      id: 'sc-1',
+      contractNo: 'EXP260001',
+      packingItems: [
+        {
+          id: 'pk-1',
+          isOwnedByJiesong: true,
+          sourceParty: null,
+          store: { id: 'store-1', name: '圣荷西2115' },
+        },
+        {
+          id: 'pk-2',
+          isOwnedByJiesong: false,
+          sourceParty: '阿珍贵州',
+          store: { id: 'store-2', name: '禧瑞都' },
+        },
+        {
+          id: 'pk-3',
+          isOwnedByJiesong: false,
+          sourceParty: '阿珍贵州',
+          store: { id: 'store-1', name: '圣荷西2115' },
+        },
+      ],
+    }];
   };
-  prisma.salesContract.count = async () => 0;
+  prisma.salesContract.count = async () => 1;
 
   try {
     const result = await salesService.getSalesContracts({
@@ -37,7 +60,11 @@ test('getSalesContracts: 组装筛选条件并分页查询', async () => {
     });
     assert.equal(findManyArgs.skip, 10);
     assert.equal(findManyArgs.take, 5);
-    assert.deepEqual(result, { contracts: [], total: 0 });
+    assert.equal(result.total, 1);
+    assert.equal(result.contracts.length, 1);
+    assert.deepEqual(result.contracts[0].stores, ['圣荷西2115', '禧瑞都']);
+    assert.equal(result.contracts[0].hasThirdPartyCargo, true);
+    assert.deepEqual(result.contracts[0].sourceParties, ['阿珍贵州']);
   } finally {
     prisma.salesContract.findMany = originalFindMany;
     prisma.salesContract.count = originalCount;
@@ -53,6 +80,27 @@ test('getSalesContractById: 合同不存在时抛出404', async () => {
       () => salesService.getSalesContractById('missing'),
       (error) => error.statusCode === 404 && error.message === '出口合同不存在',
     );
+  } finally {
+    prisma.salesContract.findUnique = originalFindUnique;
+  }
+});
+
+test('getSalesContractById: 返回第三方拼柜标记与来源方', async () => {
+  const originalFindUnique = prisma.salesContract.findUnique;
+  prisma.salesContract.findUnique = async () => ({
+    id: 'sc-2',
+    contractNo: 'EXP260002',
+    packingItems: [
+      { id: 'pk-1', isOwnedByJiesong: true, sourceParty: null },
+      { id: 'pk-2', isOwnedByJiesong: false, sourceParty: '绿零' },
+      { id: 'pk-3', isOwnedByJiesong: false, sourceParty: '' },
+    ],
+  });
+
+  try {
+    const result = await salesService.getSalesContractById('sc-2');
+    assert.equal(result.hasThirdPartyCargo, true);
+    assert.deepEqual(result.sourceParties, ['绿零', '第三方拼柜']);
   } finally {
     prisma.salesContract.findUnique = originalFindUnique;
   }

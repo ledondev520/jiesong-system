@@ -10,10 +10,11 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { SalesContract, SalesStatus } from '@/types';
 import { salesService } from '@/services/sales.service';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
+import { useTabSync } from '@/lib/tab-sync';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -37,32 +38,124 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Eye, Ship, Trash2, Loader2, FileSpreadsheet, Container, Anchor, Boxes, Clock3 } from 'lucide-react';
+import { Plus, Eye, Ship, Trash2, Loader2, FileSpreadsheet, Container, Anchor, Boxes, Clock3, Search, ArrowUpDown, ArrowUp, ArrowDown, Upload } from 'lucide-react';
+import { BatchImportDialog, type ImportRow } from '@/components/batch-import';
+import { batchImportService } from '@/services/batchImport.service';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { Input } from '@/components/ui/input';
 import { formatDate } from '@/lib/date-format';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { MobileListCard } from '@/components/mobile';
+type SortField = 'contractNo' | 'port' | 'status' | 'signedAt' | 'totalBoxes' | 'volume' | 'totalAmount';
+type SortOrder = 'asc' | 'desc';
+
+interface SortConfig {
+  field: SortField;
+  order: SortOrder;
+}
+
 export default function SalesPage() {
   const [contracts, setContracts] = useState<SalesContract[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   // 删除确认对话框状态
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [contractToDelete, setContractToDelete] = useState<SalesContract | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [exportingId, setExportingId] = useState<string | null>(null);
-  // 分页状态
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+
+  // 搜索状态
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // 排序状态
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'signedAt', order: 'desc' });
+
+  // 批量导入对话框状态
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+
+  // 从 URL 读取分页状态
+  const [currentPage, setCurrentPage] = useState(() => {
+    const page = searchParams.get('page');
+    return page ? parseInt(page, 10) : 1;
+  });
+  const [pageSize, setPageSize] = useState(() => {
+    const size = searchParams.get('pageSize');
+    return size ? parseInt(size, 10) : 20;
+  });
 
   useEffect(() => {
     loadContracts();
   }, []);
+
+  // 监听多标签页数据同步事件
+  useTabSync('sales-contract-created', useCallback(() => {
+    toast.info('新合同已创建，刷新列表');
+    invalidateCache('sales-contracts-list');
+    loadContracts();
+  }, []));
+
+  useTabSync('sales-contract-updated', useCallback(() => {
+    toast.info('合同已更新，刷新列表');
+    invalidateCache('sales-contracts-list');
+    loadContracts();
+  }, []));
+
+  useTabSync('sales-contract-deleted', useCallback(() => {
+    toast.info('合同已删除，刷新列表');
+    invalidateCache('sales-contracts-list');
+    loadContracts();
+  }, []));
+
+  // 同步 URL 参数到状态
+  useEffect(() => {
+    const page = searchParams.get('page');
+    const size = searchParams.get('pageSize');
+    const sort = searchParams.get('sort') as SortField | null;
+    const order = searchParams.get('order') as SortOrder | null;
+    const q = searchParams.get('q');
+
+    if (page) setCurrentPage(parseInt(page, 10));
+    if (size) setPageSize(parseInt(size, 10));
+    if (sort) setSortConfig(prev => ({ ...prev, field: sort }));
+    if (order) setSortConfig(prev => ({ ...prev, order }));
+    if (q !== null) setSearchQuery(q);
+  }, [searchParams]);
+
+  // 更新 URL 参数
+  const updateUrlParams = (params: { page?: number; pageSize?: number; sort?: SortField; order?: SortOrder; q?: string }) => {
+    const newParams = new URLSearchParams(searchParams.toString());
+
+    if (params.page !== undefined) {
+      if (params.page === 1) newParams.delete('page');
+      else newParams.set('page', params.page.toString());
+    }
+    if (params.pageSize !== undefined) {
+      if (params.pageSize === 20) newParams.delete('pageSize');
+      else newParams.set('pageSize', params.pageSize.toString());
+    }
+    if (params.sort !== undefined) {
+      if (params.sort === 'signedAt') newParams.delete('sort');
+      else newParams.set('sort', params.sort);
+    }
+    if (params.order !== undefined) {
+      if (params.order === 'desc') newParams.delete('order');
+      else newParams.set('order', params.order);
+    }
+    if (params.q !== undefined) {
+      if (params.q === '') newParams.delete('q');
+      else newParams.set('q', params.q);
+    }
+
+    const newUrl = newParams.toString() ? `${pathname}?${newParams.toString()}` : pathname;
+    router.replace(newUrl, { scroll: false });
+  };
 
   const loadContracts = async () => {
     setLoading(true);
@@ -118,12 +211,46 @@ export default function SalesPage() {
       setDeleteDialogOpen(false);
       setContractToDelete(null);
       invalidateCache('sales-contracts-list');
+      // 通知其他标签页
+      import('@/lib/tab-sync').then(({ getTabSyncManager }) => {
+        getTabSyncManager().send('sales-contract-deleted', { contractNo: contractToDelete!.contractNo });
+      });
       loadContracts(); // 刷新列表
     } catch {
       toast.error('删除合同失败');
     } finally {
       setDeleting(false);
     }
+  };
+
+  // 批量导入列定义
+  const importColumns = [
+    { key: 'productName', label: '商品名称', required: true },
+    { key: 'storeName', label: '门店名称', required: true },
+    { key: 'quantity', label: '数量', required: true },
+    { key: 'unit', label: '单位' },
+    { key: 'costPrice', label: '成本价', required: true },
+    { key: 'sellingPrice', label: '销售价', required: true },
+    { key: 'exchangeRate', label: '汇率' },
+  ];
+
+  // 批量导入模板数据
+  const importTemplateData = [
+    {
+      productName: '示例商品A',
+      storeName: '示例门店',
+      quantity: 100,
+      unit: '件',
+      costPrice: 50,
+      sellingPrice: 80,
+      exchangeRate: 7.2,
+    },
+  ];
+
+  // 处理批量导入
+  const handleBatchImport = async (data: ImportRow[]) => {
+    const result = await batchImportService.importSales(data);
+    return result.data;
   };
 
   /**
@@ -143,8 +270,84 @@ export default function SalesPage() {
     return <StatusBadge status={status} statusMap={{ [status]: config }} />;
   };
 
-  const totalPages = Math.ceil(contracts.length / pageSize);
-  const pagedContracts = contracts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  // 搜索过滤逻辑
+  const filteredContracts = useMemo(() => {
+    if (!searchQuery.trim()) return contracts;
+    const query = searchQuery.toLowerCase();
+    return contracts.filter(contract =>
+      contract.contractNo.toLowerCase().includes(query) ||
+      (contract.port?.name || '').toLowerCase().includes(query) ||
+      contract.stores?.some(store => store.toLowerCase().includes(query))
+    );
+  }, [contracts, searchQuery]);
+
+  // 排序逻辑
+  const sortedContracts = useMemo(() => {
+    const sorted = [...filteredContracts];
+    sorted.sort((a, b) => {
+      let aValue: string | number | Date | undefined;
+      let bValue: string | number | Date | undefined;
+
+      switch (sortConfig.field) {
+        case 'contractNo':
+          aValue = a.contractNo;
+          bValue = b.contractNo;
+          break;
+        case 'port':
+          aValue = a.port?.name || '';
+          bValue = b.port?.name || '';
+          break;
+        case 'status':
+          aValue = a.status;
+          bValue = b.status;
+          break;
+        case 'signedAt':
+          aValue = a.signedAt ? new Date(a.signedAt).getTime() : 0;
+          bValue = b.signedAt ? new Date(b.signedAt).getTime() : 0;
+          break;
+        case 'totalBoxes':
+          aValue = a.totalBoxes || 0;
+          bValue = b.totalBoxes || 0;
+          break;
+        case 'volume':
+          aValue = a.volume || 0;
+          bValue = b.volume || 0;
+          break;
+        case 'totalAmount':
+          aValue = a.totalAmount;
+          bValue = b.totalAmount;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return sortConfig.order === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.order === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [filteredContracts, sortConfig]);
+
+  // 分页逻辑
+  const totalPages = Math.ceil(sortedContracts.length / pageSize);
+  const pagedContracts = sortedContracts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  // 切换排序
+  const handleSort = (field: SortField) => {
+    setSortConfig(prev => {
+      const newOrder: SortOrder = prev.field === field && prev.order === 'asc' ? 'desc' : 'asc';
+      updateUrlParams({ sort: field, order: newOrder });
+      return { field, order: newOrder };
+    });
+  };
+
+  // 排序图标
+  const getSortIcon = (field: SortField) => {
+    if (sortConfig.field !== field) return <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/50" />;
+    return sortConfig.order === 'asc'
+      ? <ArrowUp className="h-3.5 w-3.5 text-primary" />
+      : <ArrowDown className="h-3.5 w-3.5 text-primary" />;
+  };
   const exportOverview = {
     preparing: contracts.filter((contract) => [SalesStatus.CONFIRMED, SalesStatus.PACKING].includes(contract.status)).length,
     inTransit: contracts.filter((contract) => contract.status === SalesStatus.SHIPPED).length,
@@ -159,9 +362,18 @@ export default function SalesPage() {
         title="出口合同"
         description={`管理出口合同与装箱信息，共 ${contracts.length} 个合同`}
         actions={
-          <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/sales/create')}>
-            <Plus className="mr-2 h-4 w-4" /> 新增出口合同
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl"
+              onClick={() => setImportDialogOpen(true)}
+            >
+              <Upload className="mr-2 h-4 w-4" /> 批量导入
+            </Button>
+            <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/sales/create')}>
+              <Plus className="mr-2 h-4 w-4" /> 新增出口合同
+            </Button>
+          </div>
         }
       />
 
@@ -244,6 +456,9 @@ export default function SalesPage() {
                     ? contract.stores.join(', ')
                     : '—',
                 },
+                ...(contract.hasThirdPartyCargo && contract.sourceParties?.length
+                  ? [{ label: '第三方来源', value: contract.sourceParties.join(', ') }]
+                  : []),
               ]}
               amount={{
                 label: '合同金额',
@@ -288,14 +503,70 @@ export default function SalesPage() {
         <Table className="table-fixed w-full">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[130px]">合同编号</TableHead>
-              <TableHead className="w-[80px]">港口</TableHead>
+              <TableHead className="w-[130px]">
+                <button
+                  data-testid="sort-contractNo"
+                  onClick={() => handleSort('contractNo')}
+                  className="flex items-center gap-1 hover:text-foreground transition-colors"
+                >
+                  合同编号 {getSortIcon('contractNo')}
+                </button>
+              </TableHead>
+              <TableHead className="w-[80px]">
+                <button
+                  data-testid="sort-port"
+                  onClick={() => handleSort('port')}
+                  className="flex items-center gap-1 hover:text-foreground transition-colors"
+                >
+                  港口 {getSortIcon('port')}
+                </button>
+              </TableHead>
               <TableHead>门店</TableHead>
-              <TableHead className="w-[80px]">状态</TableHead>
-              <TableHead className="w-[100px]">签订日期</TableHead>
-              <TableHead className="w-[60px] text-right">箱数</TableHead>
-              <TableHead className="w-[80px] text-right">体积</TableHead>
-              <TableHead className="w-[90px] text-right">金额 ($)</TableHead>
+              <TableHead className="w-[80px]">
+                <button
+                  data-testid="sort-status"
+                  onClick={() => handleSort('status')}
+                  className="flex items-center gap-1 hover:text-foreground transition-colors"
+                >
+                  状态 {getSortIcon('status')}
+                </button>
+              </TableHead>
+              <TableHead className="w-[100px]">
+                <button
+                  data-testid="sort-signedAt"
+                  onClick={() => handleSort('signedAt')}
+                  className="flex items-center gap-1 hover:text-foreground transition-colors"
+                >
+                  签订日期 {getSortIcon('signedAt')}
+                </button>
+              </TableHead>
+              <TableHead className="w-[60px] text-right">
+                <button
+                  data-testid="sort-totalBoxes"
+                  onClick={() => handleSort('totalBoxes')}
+                  className="flex items-center gap-1 hover:text-foreground transition-colors ml-auto"
+                >
+                  箱数 {getSortIcon('totalBoxes')}
+                </button>
+              </TableHead>
+              <TableHead className="w-[80px] text-right">
+                <button
+                  data-testid="sort-volume"
+                  onClick={() => handleSort('volume')}
+                  className="flex items-center gap-1 hover:text-foreground transition-colors ml-auto"
+                >
+                  体积 {getSortIcon('volume')}
+                </button>
+              </TableHead>
+              <TableHead className="w-[90px] text-right">
+                <button
+                  data-testid="sort-totalAmount"
+                  onClick={() => handleSort('totalAmount')}
+                  className="flex items-center gap-1 hover:text-foreground transition-colors ml-auto"
+                >
+                  金额 ($) {getSortIcon('totalAmount')}
+                </button>
+              </TableHead>
               <TableHead className="w-[100px]">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -310,7 +581,12 @@ export default function SalesPage() {
                </TableRow>
             ) : (
               pagedContracts.map((contract) => (
-                <TableRow key={contract.id}>
+                <TableRow
+                  key={contract.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => router.push(`/dashboard/sales/${contract.id}`)}
+                  data-testid={`contract-row-${contract.contractNo}`}
+                >
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-1.5">
                       <Ship className="h-3.5 w-3.5 shrink-0 text-primary" />
@@ -327,7 +603,17 @@ export default function SalesPage() {
                             </Badge>
                           ))
                         : <span className="text-muted-foreground">-</span>}
+                      {contract.hasThirdPartyCargo && (
+                        <Badge variant="outline" className="text-[11px] border-amber-500/40 text-amber-700">
+                          含第三方拼柜
+                        </Badge>
+                      )}
                     </div>
+                    {contract.hasThirdPartyCargo && contract.sourceParties?.length ? (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        来源方：{contract.sourceParties.join(', ')}
+                      </div>
+                    ) : null}
                   </TableCell>
                   <TableCell>{getStatusBadge(contract.status)}</TableCell>
                   <TableCell className="tabular-nums">
@@ -338,42 +624,54 @@ export default function SalesPage() {
                   <TableCell className="text-right">
                     <AmountText tone="success">${contract.totalAmount.toLocaleString()}</AmountText>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Link href={`/dashboard/sales/${contract.id}`}>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1">
+                      <Link
+                        href={`/dashboard/sales/${contract.id}`}
+                        data-testid={`contract-detail-${contract.contractNo}`}
+                      >
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-lg border border-border/65 bg-background/55"
+                          variant="default"
+                          size="sm"
+                          className="h-8 px-3 rounded-lg"
                           title="查看详情与装箱"
                           aria-label={`查看合同 ${contract.contractNo}`}
                         >
-                          <Eye className="h-3.5 w-3.5" />
+                          <Eye className="h-3.5 w-3.5 mr-1.5" />
+                          <span className="text-xs">详情</span>
                         </Button>
                       </Link>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="icon"
-                        className="h-8 w-8 rounded-lg border border-border/65 bg-background/55"
+                        className="h-8 w-8 rounded-lg"
                         title="导出标准出口 Excel"
                         aria-label={`导出合同 ${contract.contractNo} Excel`}
+                        data-testid={`contract-export-${contract.contractNo}`}
                         disabled={exportingId === contract.id}
-                        onClick={() => handleExportExcel(contract)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleExportExcel(contract);
+                        }}
                       >
                         {exportingId === contract.id
                           ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           : <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
                         }
                       </Button>
-                      <Button 
-                        variant="ghost"
-                        size="icon" 
-                        className="h-8 w-8 rounded-lg border border-border/65 bg-background/55"
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 rounded-lg hover:text-destructive hover:border-destructive"
                         title="删除合同"
                         aria-label={`删除合同 ${contract.contractNo}`}
-                        onClick={() => openDeleteDialog(contract)}
+                        data-testid={`contract-delete-${contract.contractNo}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDeleteDialog(contract);
+                        }}
                       >
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </TableCell>
@@ -384,18 +682,47 @@ export default function SalesPage() {
         </Table>
       </div>
 
+      {/* 搜索栏 */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            data-testid="sales-search-input"
+            placeholder="搜索合同号、港口、门店..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+              updateUrlParams({ q: e.target.value, page: 1 });
+            }}
+            className="pl-9 rounded-xl"
+          />
+        </div>
+        <span className="text-sm text-muted-foreground">
+          {searchQuery ? `找到 ${filteredContracts.length} 条结果` : `共 ${contracts.length} 个合同`}
+        </span>
+      </div>
+
       {/* 分页控制 */}
       <div className="flex flex-col gap-2 pt-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-        <span>共 {contracts.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
+        <span>共 {sortedContracts.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
         <div className="flex items-center gap-2">
           <PageSizeSelect
             value={pageSize}
-            onChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+            onChange={(size) => {
+              setPageSize(size);
+              setCurrentPage(1);
+              updateUrlParams({ pageSize: size, page: 1 });
+            }}
           />
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            onClick={() => {
+              const newPage = Math.max(1, currentPage - 1);
+              setCurrentPage(newPage);
+              updateUrlParams({ page: newPage });
+            }}
             disabled={currentPage === 1}
           >
             上一页
@@ -403,7 +730,11 @@ export default function SalesPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() => {
+              const newPage = Math.min(totalPages, currentPage + 1);
+              setCurrentPage(newPage);
+              updateUrlParams({ page: newPage });
+            }}
             disabled={currentPage === totalPages || totalPages <= 1}
           >
             下一页
@@ -441,6 +772,21 @@ export default function SalesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 批量导入对话框 */}
+      <BatchImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        title="批量导入出口合同"
+        description="上传 Excel 文件批量导入出口合同。请先下载模板，按照模板格式填写数据后上传。"
+        columns={importColumns}
+        templateData={importTemplateData}
+        onImport={handleBatchImport}
+        onSuccess={() => {
+          loadContracts();
+          invalidateCache('sales-contracts-list');
+        }}
+      />
     </div>
   );
 }

@@ -32,10 +32,12 @@ import { AllocateDialog } from '../../dashboard/finance/components/AllocateDialo
 import { toast } from 'sonner';
 import { financeService } from '@/services/finance.service';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
+import { errorLogger } from '@/lib/error-logger';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
 import { LoadingState, TableStateRow } from '@/components/ui/data-state';
 import type { Payment } from '@/types';
+import { buildReceiptNote } from '@/lib/finance-note';
 
 interface PayableContract {
   id: string;
@@ -56,6 +58,8 @@ interface ReceivableContract {
   exchangeRate: number;
   status: string;
   stores?: string[];
+  hasThirdPartyCargo?: boolean;
+  sourceParties?: string[];
   items?: Array<{ store?: { id: string; name: string } }>;
 }
 
@@ -104,6 +108,7 @@ function PaymentsPageContent() {
   const [unallocatedPayments, setUnallocatedPayments] = useState<Payment[]>([]);
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [allocateTarget, setAllocateTarget] = useState<Payment | null>(null);
+  const [autoMatching, setAutoMatching] = useState(false);
 
   // 0. 初始化加载
   useEffect(() => {
@@ -119,7 +124,7 @@ function PaymentsPageContent() {
       const data = await cachedFetch('fin-stats', () => financeService.getStats());
       setStats(data);
     } catch {
-      console.error('获取财务统计失败');
+      errorLogger.error('Payments', '获取财务统计失败');
     }
   };
 
@@ -175,6 +180,8 @@ function PaymentsPageContent() {
           status: item.status,
           // 后端已聚合好的门店名称数组（优先）
           stores: (item as unknown as { stores?: string[] }).stores,
+          hasThirdPartyCargo: (item as unknown as { hasThirdPartyCargo?: boolean }).hasThirdPartyCargo,
+          sourceParties: (item as unknown as { sourceParties?: string[] }).sourceParties,
           items: item.items,
         })),
       );
@@ -239,11 +246,15 @@ function PaymentsPageContent() {
     try {
       await financeService.createPayment({
         type: PaymentType.RECEIVABLE_RECEIPT,
+        customerName: data.customerName,
         amount: data.amount,
         currency: data.currency,
         paymentMethod: data.paymentMethod,
         paymentDate: data.paymentDate.toISOString(),
-        note: data.note,
+        note: buildReceiptNote({
+          contractRef: data.contractRef,
+          note: data.note,
+        }) || undefined,
       });
       toast.success('到账记录已保存，请前往分配');
       setReceiptDialogOpen(false);
@@ -269,6 +280,28 @@ function PaymentsPageContent() {
       fetchStats();
     } catch {
       toast.error('分配失败，请重试');
+    }
+  };
+
+  const handleAutoMatch = async () => {
+    setAutoMatching(true);
+    try {
+      const res = await financeService.autoMatchUnallocatedPayments();
+      const result = res.data;
+      if ((result?.matchedCount || 0) > 0) {
+        toast.success(`自动匹配 ${result?.matchedCount} 笔，剩余 ${result?.skippedCount || 0} 笔待人工处理`);
+      } else {
+        toast.message(`没有命中高置信度规则，${result?.skippedCount || 0} 笔继续留在收款池`);
+      }
+      invalidateCache('fin-receivables');
+      invalidateCache('fin-stats');
+      fetchUnallocated();
+      fetchReceivables();
+      fetchStats();
+    } catch {
+      toast.error('自动匹配失败，请稍后重试');
+    } finally {
+      setAutoMatching(false);
     }
   };
 
@@ -337,11 +370,21 @@ function PaymentsPageContent() {
       {/* 待分配款项池 */}
       {unallocatedPayments.length > 0 && (
         <Card className="border-orange-200 bg-orange-50/50 dark:border-orange-900 dark:bg-orange-950/20">
-          <CardHeader className="pb-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-3 pb-2">
             <CardTitle className="flex items-center gap-2 text-sm font-medium text-orange-700 dark:text-orange-400">
               <Split className="h-4 w-4" />
               待分配款项（{unallocatedPayments.length} 笔）
             </CardTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 border-orange-300 bg-background text-xs text-orange-700 hover:bg-orange-100 dark:border-orange-800 dark:text-orange-300 dark:hover:bg-orange-950"
+              onClick={() => void handleAutoMatch()}
+              disabled={autoMatching}
+            >
+              <RefreshCw className={`mr-1 h-3.5 w-3.5 ${autoMatching ? 'animate-spin' : ''}`} />
+              {autoMatching ? '自动匹配中' : '自动匹配'}
+            </Button>
           </CardHeader>
           <CardContent className="space-y-2">
             {unallocatedPayments.map((p) => (
@@ -350,10 +393,15 @@ function PaymentsPageContent() {
                 className="flex items-center justify-between rounded-lg border border-orange-200 bg-background px-3 py-2 dark:border-orange-900"
               >
                 <div>
-                  <span className="font-semibold text-sm">
-                    {p.currency} {p.amount.toLocaleString()}
-                  </span>
-                  <span className="ml-2 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-sm">
+                      {p.customerName || '未标注客户'}
+                    </span>
+                    <Badge variant="outline" className="text-[10px]">
+                      剩余待分配 {p.currency} {(p.remainingAmount ?? p.amount).toLocaleString()}
+                    </Badge>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
                     {new Date(p.paymentDate).toLocaleDateString('zh-CN')}
                     {p.note && ` · ${p.note}`}
                   </span>
@@ -559,10 +607,20 @@ function PaymentsPageContent() {
                   key={contract.id}
                   title={contract.contractNo}
                   subtitle={getStoreNames(contract)}
-                  badge={<Badge variant="outline" className="text-xs">{contract.status}</Badge>}
+                  badge={
+                    <div className="flex flex-wrap gap-1">
+                      <Badge variant="outline" className="text-xs">{contract.status}</Badge>
+                      <Badge variant={contract.hasThirdPartyCargo ? 'secondary' : 'outline'} className="text-xs">
+                        {contract.hasThirdPartyCargo ? '含第三方拼柜' : '仅捷淞货物'}
+                      </Badge>
+                    </div>
+                  }
                   fields={[
                     { label: '总金额', value: `$${contract.totalAmount.toLocaleString()}` },
                     { label: '已收', value: `$${contract.receivedAmount.toLocaleString()}`, emphasis: 'primary' },
+                    ...(contract.hasThirdPartyCargo && contract.sourceParties?.length
+                      ? [{ label: '来源方', value: contract.sourceParties.join(', ') }]
+                      : []),
                   ]}
                   amount={{ label: '待收', value: `$${contract.unreceiveAmount.toLocaleString()}`, emphasis: 'danger' }}
                   action={
@@ -618,7 +676,12 @@ function PaymentsPageContent() {
                       <TableCell className="font-medium">{contract.contractNo}</TableCell>
                       <TableCell>{getStoreNames(contract)}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{contract.status}</Badge>
+                        <div className="flex flex-wrap gap-1">
+                          <Badge variant="outline">{contract.status}</Badge>
+                          <Badge variant={contract.hasThirdPartyCargo ? 'secondary' : 'outline'}>
+                            {contract.hasThirdPartyCargo ? '含第三方拼柜' : '仅捷淞货物'}
+                          </Badge>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">{contract.totalAmount.toLocaleString()}</TableCell>
                       <TableCell className="text-right text-primary/80">
@@ -628,7 +691,7 @@ function PaymentsPageContent() {
                         {contract.unreceiveAmount.toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        <Button size="sm" variant="outline" onClick={() => setSelectedReceivable(contract)}>
+                        <Button size="sm" variant="outline" onClick={() => setSelectedReceivable(contract)} title={contract.sourceParties?.length ? `来源方: ${contract.sourceParties.join(', ')}` : undefined}>
                           <CreditCard className="mr-1 h-3 w-3" /> 收款
                         </Button>
                       </TableCell>

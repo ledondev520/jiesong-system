@@ -366,6 +366,8 @@ model PackingItem {
   salesContractId String   // 关联出口合同（即货柜）
   productId       String
   storeId         String?
+  isOwnedByJiesong Boolean @default(true)
+  sourceParty     String?
   quantity        Float
   unit            String?
   boxes           Int?
@@ -437,6 +439,8 @@ model Payment {
   type               String
   purchaseContractId String?
   salesContractId    String?
+  sourcePaymentId    String?
+  customerName       String?
   amount             Float
   currency           String   @default("CNY")
   paymentMethod      String?
@@ -447,7 +451,11 @@ model Payment {
 
   purchaseContract PurchaseContract? @relation(fields: [purchaseContractId], references: [id])
   salesContract    SalesContract?    @relation(fields: [salesContractId], references: [id])
+  sourcePayment    Payment?          @relation("PaymentAllocations", fields: [sourcePaymentId], references: [id])
+  allocations      Payment[]         @relation("PaymentAllocations")
 
+  @@index([sourcePaymentId])
+  @@index([customerName])
   @@map("payments")
 }
 

@@ -147,6 +147,34 @@ function isIrrelevant(row) {
   return note.includes('不相关') || broker === '不报关' || broker === '埋单';
 }
 
+function isOwnedByJiesong(record) {
+  const note = String(record?.record?.['备注'] || record?.['备注'] || record?.note || '');
+  return !(
+    note.includes('非捷淞报关')
+    || note.includes('拼船')
+    || note.includes('他方自行报关')
+    || note.includes('共用发票')
+  );
+}
+
+function deriveSourceParty(record) {
+  if (isOwnedByJiesong(record)) {
+    return null;
+  }
+
+  const manufacturer = String(record?.manufacturer || record?.record?.['厂家'] || '').trim();
+  if (manufacturer) {
+    return manufacturer;
+  }
+
+  const purchaseContractNo = String(record?.purchaseContractNo || record?.record?.['购销合同号'] || '').trim();
+  if (purchaseContractNo) {
+    return purchaseContractNo;
+  }
+
+  return '第三方拼柜';
+}
+
 const parseContainerDigits = (value) => String(value || '').replace(/\D/g, '');
 
 const getQuantityBucket = (value) => {
@@ -819,6 +847,8 @@ const addContainerItemIfNeeded = async (record, container, product, store, cache
       salesContractId: container.id,
       productId: product.id,
       storeId: store?.id,
+      isOwnedByJiesong: isOwnedByJiesong(record),
+      sourceParty: deriveSourceParty(record),
       quantity: record.quantity || 0,
       unit: standardizeUnit(record.unit),
       boxes: Number.isFinite(record.boxes) ? record.boxes : null,
@@ -1137,4 +1167,5 @@ module.exports = {
   importRecords,
   getImportHistory,
   getDatabaseStats,
+  deriveSourceParty,
 };

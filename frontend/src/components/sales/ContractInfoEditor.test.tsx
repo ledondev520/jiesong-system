@@ -26,7 +26,9 @@ const baseContract: SalesContract = {
   signedAt: '2026-02-01T00:00:00.000Z',
   estimatedArrival: '2026-03-01T00:00:00.000Z',
   portId: 'port-1',
-  port: { id: 'port-1', name: 'Los Angeles' },
+  hasThirdPartyCargo: true,
+  sourceParties: ['阿珍贵州', '刘总'],
+  port: { id: 'port-1', name: 'Los Angeles', code: 'LAX', isActive: true, createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-02-01T00:00:00.000Z' },
   createdAt: '2026-02-01T00:00:00.000Z',
   updatedAt: '2026-02-01T00:00:00.000Z',
 };
@@ -59,6 +61,8 @@ describe('ContractInfoEditor', () => {
     expect(screen.getByText('合同信息')).toBeInTheDocument();
     expect(screen.getByText('EXP260001')).toBeInTheDocument();
     expect(screen.getByText('$123,456')).toBeInTheDocument();
+    expect(screen.getByText('含第三方拼柜')).toBeInTheDocument();
+    expect(screen.getByText('阿珍贵州, 刘总')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '编辑' })).toBeInTheDocument();
   });
 
@@ -118,7 +122,7 @@ describe('ContractInfoEditor', () => {
     expect(screen.getByRole('button', { name: '保存中...' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '取消' })).toBeDisabled();
 
-    resolveSave?.();
+    (resolveSave as (() => void) | null)?.();
     await waitFor(() => {
       expect(screen.getByRole('button', { name: '编辑' })).toBeInTheDocument();
     });

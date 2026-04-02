@@ -121,6 +121,20 @@ export function ContractInfoEditor({ contract, stores, onSave }: ContractInfoEdi
           <div className="text-sm text-muted-foreground">已收款</div>
           <div className="font-medium">${contract.receivedAmount.toLocaleString()}</div>
         </div>
+        <div>
+          <div className="text-sm text-muted-foreground">货物归属</div>
+          <div className="font-medium">
+            {contract.hasThirdPartyCargo ? '含第三方拼柜' : '仅捷淞货物'}
+          </div>
+        </div>
+        <div>
+          <div className="text-sm text-muted-foreground">第三方来源</div>
+          <div className="font-medium">
+            {contract.sourceParties && contract.sourceParties.length > 0
+              ? contract.sourceParties.join(', ')
+              : '—'}
+          </div>
+        </div>
 
         {/* 可编辑字段 */}
         <div>

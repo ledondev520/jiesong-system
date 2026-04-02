@@ -12,7 +12,9 @@ const { PrismaClient } = require('@prisma/client');
 const XLSX = require('xlsx');
 
 const prisma = new PrismaClient();
-const FILE = '/Users/helena/Library/Containers/com.kingsoft.wpsoffice.mac/Data/Library/Application Support/Kingsoft/WPS Cloud Files/userdata/qing/filecache/212320004/团队文档/捷淞/合同明细、美元交易.xlsx';
+const FILE = process.env.FILE || '/Users/helena/Library/Containers/com.kingsoft.wpsoffice.mac/Data/Library/Application Support/Kingsoft/WPS Cloud Files/userdata/qing/filecache/212320004/团队文档/捷淞/合同明细、美元交易.xlsx';
+const QUIET = process.env.QUIET === '1';
+const DEFAULT_RECEIVABLE_CUSTOMER_NAME = 'Sp food trading LLC';
 
 /**
  * 职责：解析 "M/D/YY" 格式日期
@@ -20,8 +22,24 @@ const FILE = '/Users/helena/Library/Containers/com.kingsoft.wpsoffice.mac/Data/L
  * @returns {Date|null}
  */
 function parseDate(str) {
-  if (!str) return null;
+  if (!str && str !== 0) return null;
+  if (str instanceof Date) {
+    return str;
+  }
+  if (typeof str === 'number' && Number.isFinite(str)) {
+    const utcDays = Math.floor(str - 25569);
+    const utcValue = utcDays * 86400;
+    return new Date(utcValue * 1000);
+  }
   const s = String(str).trim();
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    const numeric = Number(s);
+    if (Number.isFinite(numeric)) {
+      const utcDays = Math.floor(numeric - 25569);
+      const utcValue = utcDays * 86400;
+      return new Date(utcValue * 1000);
+    }
+  }
   const parts = s.split('/');
   if (parts.length !== 3) return null;
   const month = parseInt(parts[0], 10);
@@ -51,10 +69,35 @@ function parseAmount(str) {
  * @returns {string|null}
  */
 function extractEXPNo(note) {
-  const m = note.match(/EXP\d{6,}/);
+  const normalized = String(note || '').toUpperCase();
+  const m = normalized.match(/EXP\d{6,}/);
   if (m) return m[0];
-  const m2 = note.match(/EXP\d{5,}/);
+  const m2 = normalized.match(/EXP\d{5,}/);
   return m2 ? m2[0] : null;
+}
+
+function buildPaymentNote({ contractRef, store, usage, year }) {
+  const normalizedRef = String(contractRef || '').trim();
+  const expNo = extractEXPNo(normalizedRef);
+  const parts = [];
+
+  if (expNo) {
+    parts.push(`合同号:${expNo}`);
+  } else if (normalizedRef) {
+    parts.push(`原始单号:${normalizedRef}`);
+  } else if (year) {
+    parts.push(`年度:${String(year).trim()}`);
+  }
+
+  if (store) {
+    parts.push(`门店:${String(store).trim()}`);
+  }
+
+  if (usage) {
+    parts.push(`用途:${String(usage).trim()}`);
+  }
+
+  return parts.join(' | ');
 }
 
 async function main() {
@@ -114,13 +157,18 @@ async function main() {
     }
 
     // 2.4 构建备注
-    const noteParts = [contractRef, store].filter(Boolean);
-    const note = noteParts.join(' - ') || `${year}年${usage}`;
+    const note = buildPaymentNote({
+      contractRef,
+      store,
+      usage,
+      year,
+    });
 
     await prisma.payment.create({
       data: {
         type,
         salesContractId,
+        customerName: isIncome ? DEFAULT_RECEIVABLE_CUSTOMER_NAME : null,
         amount: absAmount,
         currency: 'USD',
         paymentMethod: '电汇',
@@ -130,9 +178,11 @@ async function main() {
     });
     created++;
 
-    const icon = type === 'INCOME' ? '📥' : '📤';
-    const linked = salesContractId ? '✓' : ' ';
-    console.log(`  ${icon} ${year} ${dateStr.padEnd(10)} ${note.padEnd(30)} $${absAmount.toFixed(2).padStart(12)} [${linked}]`);
+    if (!QUIET) {
+      const icon = type === 'INCOME' ? '📥' : '📤';
+      const linked = salesContractId ? '✓' : ' ';
+      console.log(`  ${icon} ${year} ${dateStr.padEnd(10)} ${note.padEnd(30)} $${absAmount.toFixed(2).padStart(12)} [${linked}]`);
+    }
   }
 
   console.log(`\n=== 导入完成 ===`);
@@ -144,4 +194,18 @@ async function main() {
   await prisma.$disconnect();
 }
 
-main();
+if (require.main === module) {
+  main().catch(async (error) => {
+    console.error(error);
+    await prisma.$disconnect();
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  parseDate,
+  parseAmount,
+  extractEXPNo,
+  buildPaymentNote,
+  main,
+};

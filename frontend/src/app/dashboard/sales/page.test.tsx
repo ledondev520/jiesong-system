@@ -20,8 +20,13 @@ const mockToastSuccess = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
+    replace: vi.fn(),
   }),
   usePathname: () => '/dashboard/sales',
+  useSearchParams: () => ({
+    get: vi.fn(() => null),
+    toString: vi.fn(() => ''),
+  }),
 }));
 
 vi.mock('@/services/sales.service', () => ({
@@ -59,9 +64,9 @@ describe('SalesPage 交互逻辑', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '出口合同' })).toBeInTheDocument();
-      expect(screen.getByText('回签后先补录箱数、毛重与体积')).toBeInTheDocument();
-      expect(screen.getByText('出口出运概览')).toBeInTheDocument();
-      expect(screen.getByText('在途货柜')).toBeInTheDocument();
+      expect(screen.getByText('回签后先补录箱数与重量，再推进报关与退税')).toBeInTheDocument();
+      expect(screen.getByText('待装柜')).toBeInTheDocument();
+      expect(screen.getByText('在途')).toBeInTheDocument();
       expect(screen.getByText('暂无出口合同。')).toBeInTheDocument();
     });
   });
@@ -94,7 +99,10 @@ describe('SalesPage 交互逻辑', () => {
       volume: 1.2,
       grossWeight: 100,
       totalAmount: 1000,
+      hasThirdPartyCargo: true,
+      sourceParties: ['阿珍贵州'],
       port: { name: '深圳' },
+      stores: ['禧瑞都'],
     };
     mockGetAll.mockResolvedValue({ data: { items: [contract] } });
     mockDelete.mockResolvedValue({ code: 200 });
@@ -108,6 +116,8 @@ describe('SalesPage 交互逻辑', () => {
     await waitFor(() => {
       expect(mockDelete).toHaveBeenCalledWith('sc-1');
       expect(mockToastSuccess).toHaveBeenCalledWith('合同 EXP2500001 已删除');
+      expect(screen.getAllByText('含第三方拼柜').length).toBeGreaterThan(0);
+      expect(screen.getByText('来源方：阿珍贵州')).toBeInTheDocument();
     });
   });
 

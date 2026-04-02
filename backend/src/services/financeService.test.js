@@ -92,6 +92,60 @@ test('createPayment: 新建付款并回写采购已付金额', async () => {
   }
 });
 
+test('createPayment: 销售合同已收金额只统计收入类 payment', async () => {
+  const originalFindUnique = prisma.payment.findUnique;
+  const originalTransaction = prisma.$transaction;
+  let aggregateArgs = null;
+  let salesUpdateArgs = null;
+
+  prisma.payment.findUnique = async () => null;
+  prisma.$transaction = async (callback) => callback({
+    payment: {
+      create: async (args) => ({ id: 'pay-sales-1', ...args.data }),
+      aggregate: async (args) => {
+        aggregateArgs = args;
+        return { _sum: { amount: 1234 } };
+      },
+    },
+    purchaseContract: {
+      update: async () => {
+        throw new Error('purchase update should not be called');
+      },
+    },
+    salesContract: {
+      update: async (args) => {
+        salesUpdateArgs = args;
+        return { id: args.where.id };
+      },
+    },
+  });
+
+  try {
+    await financeService.createPayment(
+      {
+        type: 'RECEIVABLE',
+        salesContractId: 'sc-9',
+        amount: 1234,
+        currency: 'USD',
+        paymentDate: '2026-04-02',
+      },
+      { idempotencyKey: 'idem-sales-1' },
+    );
+
+    assert.deepEqual(aggregateArgs.where, {
+      salesContractId: 'sc-9',
+      type: { in: ['RECEIVABLE', 'RECEIVABLE_COLLECTION', 'INCOME'] },
+    });
+    assert.deepEqual(salesUpdateArgs, {
+      where: { id: 'sc-9' },
+      data: { receivedAmount: 1234 },
+    });
+  } finally {
+    prisma.payment.findUnique = originalFindUnique;
+    prisma.$transaction = originalTransaction;
+  }
+});
+
 test('createPayment: 并发唯一键冲突时返回已创建记录', async () => {
   const originalFindUnique = prisma.payment.findUnique;
   const originalTransaction = prisma.$transaction;
@@ -122,5 +176,471 @@ test('createPayment: 并发唯一键冲突时返回已创建记录', async () =>
   } finally {
     prisma.payment.findUnique = originalFindUnique;
     prisma.$transaction = originalTransaction;
+  }
+});
+
+test('listUnallocatedPayments: 兼容历史 INCOME 并按待分配收款返回', async () => {
+  const originalFindMany = prisma.payment.findMany;
+  let findManyArgs = null;
+
+  prisma.payment.findMany = async (args) => {
+    findManyArgs = args;
+    return [
+      {
+        id: 'legacy-income-1',
+        type: 'INCOME',
+        amount: 1200,
+        currency: 'USD',
+        paymentDate: new Date('2026-03-01T00:00:00.000Z'),
+      },
+    ];
+  };
+
+  try {
+    const payments = await financeService.listUnallocatedPayments();
+
+    assert.deepEqual(findManyArgs.where, {
+      OR: [
+        {
+          type: 'RECEIVABLE_RECEIPT',
+          salesContractId: null,
+          purchaseContractId: null,
+        },
+        {
+          type: 'INCOME',
+          salesContractId: null,
+          purchaseContractId: null,
+        },
+      ],
+    });
+    assert.equal(payments.length, 1);
+    assert.equal(payments[0].type, 'RECEIVABLE_RECEIPT');
+  } finally {
+    prisma.payment.findMany = originalFindMany;
+  }
+});
+
+test('allocatePaymentToContracts: 兼容历史 INCOME 收款进行分配', async () => {
+  const originalFindUnique = prisma.payment.findUnique;
+  const originalTransaction = prisma.$transaction;
+  let createArgs = null;
+  let updateArgs = null;
+  let aggregateCalls = [];
+
+  prisma.payment.findUnique = async () => ({
+    id: 'legacy-income-2',
+    type: 'INCOME',
+    currency: 'USD',
+    paymentMethod: 'wire',
+    paymentDate: new Date('2026-03-05T00:00:00.000Z'),
+    amount: 300,
+    customerName: 'Sp food trading LLC',
+  });
+  prisma.$transaction = async (callback) => callback({
+    payment: {
+      create: async (args) => {
+        createArgs = args;
+        return { id: 'alloc-1', ...args.data };
+      },
+      aggregate: async (args) => {
+        aggregateCalls.push(args);
+        if (args.where?.sourcePaymentId === 'legacy-income-2') {
+          return { _sum: { amount: 300 } };
+        }
+        return { _sum: { amount: 300 } };
+      },
+      update: async (args) => {
+        updateArgs = args;
+        return { id: args.where.id, ...args.data };
+      },
+    },
+    salesContract: {
+      update: async (args) => ({ id: args.where.id }),
+    },
+  });
+
+  try {
+    const result = await financeService.allocatePaymentToContracts('legacy-income-2', [
+      { salesContractId: 'sc-1', amount: 300 },
+    ]);
+
+    assert.equal(result.length, 1);
+    assert.equal(createArgs.data.type, 'RECEIVABLE_COLLECTION');
+    assert.equal(createArgs.data.salesContractId, 'sc-1');
+    assert.equal(createArgs.data.amount, 300);
+    assert.equal(createArgs.data.sourcePaymentId, 'legacy-income-2');
+    assert.equal(createArgs.data.customerName, 'Sp food trading LLC');
+    assert.deepEqual(updateArgs, {
+      where: { id: 'legacy-income-2' },
+      data: { type: 'RECEIVABLE_RECEIPT_ALLOCATED' },
+    });
+    assert.equal(aggregateCalls.some((args) => args.where?.sourcePaymentId === 'legacy-income-2'), true);
+  } finally {
+    prisma.payment.findUnique = originalFindUnique;
+    prisma.$transaction = originalTransaction;
+  }
+});
+
+test('getPaymentTrends: 兼容历史 INCOME/EXPENSE 流水', async () => {
+  const originalFindMany = prisma.payment.findMany;
+
+  prisma.payment.findMany = async () => [
+    {
+      paymentDate: new Date('2026-03-03T00:00:00.000Z'),
+      amount: 500,
+      type: 'INCOME',
+    },
+    {
+      paymentDate: new Date('2026-03-04T00:00:00.000Z'),
+      amount: 200,
+      type: 'EXPENSE',
+    },
+  ];
+
+  try {
+    const trends = await financeService.getPaymentTrends(30);
+
+    assert.deepEqual(trends, [
+      {
+        label: '3/2',
+        receivables: 500,
+        payables: 200,
+      },
+    ]);
+  } finally {
+    prisma.payment.findMany = originalFindMany;
+  }
+});
+
+test('autoMatchUnallocatedPayments: 命中唯一合同号且金额一致时自动挂账', async () => {
+  const originalPaymentFindMany = prisma.payment.findMany;
+  const originalPaymentFindUnique = prisma.payment.findUnique;
+  const originalSalesContractFindUnique = prisma.salesContract.findUnique;
+  const originalTransaction = prisma.$transaction;
+  let createArgs = null;
+  let paymentUpdateArgs = null;
+
+  prisma.payment.findMany = async () => ([
+    {
+      id: 'receipt-1',
+      type: 'INCOME',
+      amount: 68006,
+      currency: 'USD',
+      note: 'EXP250024 回款',
+      paymentDate: new Date('2026-03-10T00:00:00.000Z'),
+      customerName: 'Sp food trading LLC',
+    },
+  ]);
+  prisma.salesContract.findUnique = async ({ where }) => {
+    if (where.contractNo === 'EXP250024') {
+      return {
+        id: 'sc-24',
+        contractNo: 'EXP250024',
+        totalAmount: 68006,
+        receivedAmount: 0,
+        status: 'SHIPPED',
+      };
+    }
+    return null;
+  };
+  prisma.payment.findUnique = async ({ where }) => {
+    if (where.id === 'receipt-1') {
+      return {
+        id: 'receipt-1',
+        type: 'INCOME',
+        amount: 68006,
+        currency: 'USD',
+        paymentMethod: '电汇',
+        paymentDate: new Date('2026-03-10T00:00:00.000Z'),
+        note: 'EXP250024 回款',
+        customerName: 'Sp food trading LLC',
+      };
+    }
+    return null;
+  };
+  prisma.$transaction = async (callback) => callback({
+    payment: {
+      create: async (args) => {
+        createArgs = args;
+        return { id: 'alloc-auto-1', ...args.data };
+      },
+      aggregate: async () => ({ _sum: { amount: 68006 } }),
+      update: async (args) => {
+        paymentUpdateArgs = args;
+        return { id: args.where.id };
+      },
+    },
+    salesContract: {
+      update: async (args) => ({ id: args.where.id }),
+    },
+  });
+
+  try {
+    const result = await financeService.autoMatchUnallocatedPayments();
+
+    assert.equal(result.inspectedCount, 1);
+    assert.equal(result.matchedCount, 1);
+    assert.equal(result.skippedCount, 0);
+    assert.deepEqual(result.matched[0], {
+      paymentId: 'receipt-1',
+      salesContractId: 'sc-24',
+      contractNo: 'EXP250024',
+      amount: 68006,
+      rule: 'exact_contract_no_and_full_amount',
+      confidence: 'high',
+    });
+    assert.equal(createArgs.data.salesContractId, 'sc-24');
+    assert.equal(createArgs.data.customerName, 'Sp food trading LLC');
+    assert.match(createArgs.data.note, /自动匹配/);
+    assert.deepEqual(paymentUpdateArgs, {
+      where: { id: 'receipt-1' },
+      data: { type: 'RECEIVABLE_RECEIPT_ALLOCATED' },
+    });
+  } finally {
+    prisma.payment.findMany = originalPaymentFindMany;
+    prisma.payment.findUnique = originalPaymentFindUnique;
+    prisma.salesContract.findUnique = originalSalesContractFindUnique;
+    prisma.$transaction = originalTransaction;
+  }
+});
+
+test('autoMatchUnallocatedPayments: 备注模糊或金额不一致时保留在收款池', async () => {
+  const originalPaymentFindMany = prisma.payment.findMany;
+  const originalSalesContractFindUnique = prisma.salesContract.findUnique;
+  const originalPaymentFindUnique = prisma.payment.findUnique;
+  const originalTransaction = prisma.$transaction;
+  let transactionCalled = false;
+
+  prisma.payment.findMany = async () => ([
+    {
+      id: 'receipt-2',
+      type: 'INCOME',
+      amount: 50000,
+      currency: 'USD',
+      note: 'EXP250024 回款',
+      paymentDate: new Date('2026-03-11T00:00:00.000Z'),
+    },
+    {
+      id: 'receipt-3',
+      type: 'INCOME',
+      amount: 30000,
+      currency: 'USD',
+      note: '2025年收入',
+      paymentDate: new Date('2026-03-12T00:00:00.000Z'),
+    },
+  ]);
+  prisma.salesContract.findUnique = async ({ where }) => {
+    if (where.contractNo === 'EXP250024') {
+      return {
+        id: 'sc-24',
+        contractNo: 'EXP250024',
+        totalAmount: 68006,
+        receivedAmount: 0,
+        status: 'SHIPPED',
+      };
+    }
+    return null;
+  };
+  prisma.payment.findUnique = async () => {
+    throw new Error('should not try allocate skipped receipts');
+  };
+  prisma.$transaction = async () => {
+    transactionCalled = true;
+    throw new Error('should not open transaction');
+  };
+
+  try {
+    const result = await financeService.autoMatchUnallocatedPayments();
+
+    assert.equal(result.inspectedCount, 2);
+    assert.equal(result.matchedCount, 0);
+    assert.equal(result.skippedCount, 2);
+    assert.equal(transactionCalled, false);
+    assert.deepEqual(result.skipped, [
+      { paymentId: 'receipt-2', reason: 'amount_mismatch' },
+      { paymentId: 'receipt-3', reason: 'no_contract_reference' },
+    ]);
+  } finally {
+    prisma.payment.findMany = originalPaymentFindMany;
+    prisma.salesContract.findUnique = originalSalesContractFindUnique;
+    prisma.payment.findUnique = originalPaymentFindUnique;
+    prisma.$transaction = originalTransaction;
+  }
+});
+
+test('listUnallocatedPayments: 返回客户名与剩余可分配金额', async () => {
+  const originalFindMany = prisma.payment.findMany;
+  const originalGroupBy = prisma.payment.groupBy;
+
+  prisma.payment.findMany = async () => ([
+    {
+      id: 'receipt-partial-1',
+      type: 'INCOME',
+      amount: 33000,
+      currency: 'USD',
+      customerName: 'Sp food trading LLC',
+      paymentDate: new Date('2026-03-20T00:00:00.000Z'),
+      note: '客户整笔回款',
+    },
+  ]);
+  prisma.payment.groupBy = async () => ([
+    {
+      sourcePaymentId: 'receipt-partial-1',
+      _sum: { amount: 30000 },
+    },
+  ]);
+
+  try {
+    const payments = await financeService.listUnallocatedPayments();
+
+    assert.equal(payments.length, 1);
+    assert.equal(payments[0].customerName, 'Sp food trading LLC');
+    assert.equal(payments[0].allocatedAmount, 30000);
+    assert.equal(payments[0].remainingAmount, 3000);
+  } finally {
+    prisma.payment.findMany = originalFindMany;
+    prisma.payment.groupBy = originalGroupBy;
+  }
+});
+
+test('allocatePaymentToContracts: 部分分配后保留在收款池', async () => {
+  const originalFindUnique = prisma.payment.findUnique;
+  const originalTransaction = prisma.$transaction;
+  let updateArgs = null;
+
+  prisma.payment.findUnique = async () => ({
+    id: 'receipt-partial-2',
+    type: 'RECEIVABLE_RECEIPT',
+    amount: 33000,
+    currency: 'USD',
+    paymentMethod: 'wire',
+    paymentDate: new Date('2026-03-20T00:00:00.000Z'),
+    customerName: 'Sp food trading LLC',
+  });
+  prisma.$transaction = async (callback) => callback({
+    payment: {
+      create: async (args) => ({ id: 'alloc-partial-1', ...args.data }),
+      aggregate: async (args) => {
+        if (args.where?.sourcePaymentId === 'receipt-partial-2') {
+          return { _sum: { amount: 30000 } };
+        }
+        return { _sum: { amount: 30000 } };
+      },
+      update: async (args) => {
+        updateArgs = args;
+        return { id: args.where.id };
+      },
+    },
+    salesContract: {
+      update: async (args) => ({ id: args.where.id }),
+    },
+  });
+
+  try {
+    await financeService.allocatePaymentToContracts('receipt-partial-2', [
+      { salesContractId: 'sc-a', amount: 30000 },
+    ]);
+
+    assert.equal(updateArgs, null);
+  } finally {
+    prisma.payment.findUnique = originalFindUnique;
+    prisma.$transaction = originalTransaction;
+  }
+});
+
+test('getReceivables: 只统计捷淞自有货物金额', async () => {
+  const originalFindMany = prisma.salesContract.findMany;
+  const originalCount = prisma.salesContract.count;
+
+  prisma.salesContract.findMany = async () => ([
+    {
+      id: 'sc-owned-1',
+      contractNo: 'EXP250013',
+      totalAmount: 903233.0524,
+      receivedAmount: 0,
+      status: 'SHIPPED',
+      packingItems: [
+        {
+          totalPrice: 774800,
+          isOwnedByJiesong: false,
+          note: '非捷淞报关，属拼船或他方自行报关',
+          store: { id: 'store-1', name: '禧瑞都' },
+        },
+        {
+          totalPrice: 83578.05,
+          isOwnedByJiesong: true,
+          note: '喜安一起',
+          store: { id: 'store-1', name: '禧瑞都' },
+        },
+        {
+          totalPrice: 11100,
+          isOwnedByJiesong: true,
+          note: null,
+          store: { id: 'store-1', name: '禧瑞都' },
+        },
+      ],
+      port: null,
+    },
+  ]);
+  prisma.salesContract.count = async () => 1;
+
+  try {
+    const result = await financeService.getReceivables({ page: 1, pageSize: 20, skip: 0 });
+    assert.equal(result.receivables.length, 1);
+    assert.equal(result.receivables[0].contractNo, 'EXP250013');
+    assert.equal(result.receivables[0].totalAmount, 128433.05);
+    assert.equal(result.receivables[0].unreceiveAmount, 128433.05);
+  } finally {
+    prisma.salesContract.findMany = originalFindMany;
+    prisma.salesContract.count = originalCount;
+  }
+});
+
+test('getStats: 排除第三方拼柜金额后计算真实应收', async () => {
+  const originalPurchaseAggregate = prisma.purchaseContract.aggregate;
+  const originalSalesFindMany = prisma.salesContract.findMany;
+
+  prisma.purchaseContract.aggregate = async () => ({
+    _sum: { totalAmount: 1000, paidAmount: 200 },
+  });
+  prisma.salesContract.findMany = async () => ([
+    {
+      totalAmount: 903233.0524,
+      receivedAmount: 0,
+      packingItems: [
+        { totalPrice: 774800, isOwnedByJiesong: false, note: '非捷淞报关，属拼船或他方自行报关' },
+        { totalPrice: 83578.05, isOwnedByJiesong: true, note: null },
+        { totalPrice: 11100, isOwnedByJiesong: true, note: null },
+      ],
+    },
+    {
+      totalAmount: 3130,
+      receivedAmount: 0,
+      packingItems: [
+        { totalPrice: 600, isOwnedByJiesong: true, note: null },
+        { totalPrice: 100, isOwnedByJiesong: true, note: null },
+        { totalPrice: 880, isOwnedByJiesong: false, note: '共用发票' },
+      ],
+    },
+  ]);
+
+  try {
+    const stats = await financeService.getStats();
+
+    assert.deepEqual(stats, {
+      payable: {
+        total: 1000,
+        paid: 200,
+        unpaid: 800,
+      },
+      receivable: {
+        total: 130683.05,
+        received: 0,
+        unreceived: 130683.05,
+      },
+    });
+  } finally {
+    prisma.purchaseContract.aggregate = originalPurchaseAggregate;
+    prisma.salesContract.findMany = originalSalesFindMany;
   }
 });
