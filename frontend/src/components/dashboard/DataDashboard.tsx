@@ -22,6 +22,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { aiService, type DashboardAnalytics } from '@/services/ai.service';
+import { errorLogger } from '@/lib/error-logger';
 import {
   LineChart,
   Line,
@@ -139,7 +140,7 @@ export function DataDashboard() {
       const res = await aiService.getDashboardAnalytics();
       setData(res.data);
     } catch (e) {
-      console.error('获取分析数据失败:', e);
+      errorLogger.error('DataDashboard', e);
       setError(true);
     } finally {
       setLoading(false);

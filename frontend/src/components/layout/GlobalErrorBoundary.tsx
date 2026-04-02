@@ -11,6 +11,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle } from 'lucide-react';
+import { errorLogger } from '@/lib/error-logger';
 
 interface State {
   hasError: boolean;
@@ -40,8 +41,11 @@ export class GlobalErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: unknown, info: React.ErrorInfo) {
-    // 生产环境可对接 Sentry / 日志服务
-    console.error('[GlobalErrorBoundary]', error, info.componentStack);
+    // 使用errorLogger进行去重记录
+    errorLogger.error('GlobalErrorBoundary', {
+      error,
+      componentStack: info.componentStack,
+    });
   }
 
   handleReload = () => {

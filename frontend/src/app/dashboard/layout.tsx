@@ -14,6 +14,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { MobileTabBar } from '@/components/layout/MobileTabBar';
+import { NetworkStatus } from '@/components/ui/network-status';
 import { getDefaultDashboardHref, getModuleByPath, getVisibleModuleNavItems } from '@/components/layout/navigation.config';
 
 type PersistedAuthState = {
@@ -113,11 +114,13 @@ export default function DashboardLayout({
   const visibleItems = getVisibleModuleNavItems(user?.role);
 
   return (
-    <div className="grid min-h-screen w-full bg-muted/40 md:grid-cols-[260px_1fr]">
-      {/* 桌面端侧边栏：移动端隐藏 */}
-      <div className="hidden border-r bg-sidebar md:block">
-        <Sidebar />
-      </div>
+    <>
+      <NetworkStatus />
+      <div className="grid min-h-screen w-full bg-muted/40 md:grid-cols-[260px_1fr]">
+        {/* 桌面端侧边栏：移动端隐藏 */}
+        <div className="hidden border-r bg-sidebar md:block">
+          <Sidebar />
+        </div>
       <div className="flex min-w-0 flex-col">
         <Header />
         {/* 移动端底部 TabBar 高度补偿：56px + safe-area-inset-bottom */}
@@ -131,5 +134,6 @@ export default function DashboardLayout({
       {/* 移动端底部 TabBar：桌面端由 CSS md:hidden 控制不渲染 */}
       <MobileTabBar visibleItems={visibleItems} />
     </div>
+    </>
   );
 }

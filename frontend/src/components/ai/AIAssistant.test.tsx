@@ -100,7 +100,7 @@ describe('AIAssistant', () => {
       body: {
         getReader: () => reader,
       },
-    } as Response);
+    } as unknown as Response);
 
     const user = userEvent.setup();
     render(<AIAssistant />);

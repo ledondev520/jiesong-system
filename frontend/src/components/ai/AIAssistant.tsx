@@ -17,7 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Bot, Send, X, Image as ImageIcon, XCircle, Brain, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getAuthToken } from '@/lib/auth-token';
-import { getApiBaseUrl } from '@/lib/api-base-url';
+import { errorLogger } from '@/lib/error-logger';
 
 interface Message {
   id: string;
@@ -515,7 +515,7 @@ export function AIAssistant() {
         updateMessageById(assistantMessage.id, { content: '抱歉，我暂时无法回答这个问题。' });
       }
     } catch (error: unknown) {
-      console.error('AI请求失败:', error);
+      errorLogger.error('AIAssistant', error);
       updateMessageById(assistantMessage.id, {
         content: formatStreamErrorMessage(error),
       });
