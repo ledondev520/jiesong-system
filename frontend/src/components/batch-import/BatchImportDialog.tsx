@@ -210,7 +210,7 @@ export function BatchImportDialog({
                 isDragActive ? 'border-primary bg-primary/5' : 'border-muted'
               }`}
             >
-              <input {...getInputProps()} />
+              <input id="batch-import-file" name="batch-import-file" {...getInputProps()} />
               <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-lg font-medium">
                 {isDragActive ? '释放文件以上传' : '拖拽文件到此处，或点击选择'}
