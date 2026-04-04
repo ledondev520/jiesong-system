@@ -1,0 +1,55 @@
+/**
+ * 职责：帮助文档入口组件
+ * 思路：在 Header 或侧边栏提供帮助入口，链接到使用指南
+ */
+
+'use client';
+
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { HelpCircle, Book, MessageCircle, ExternalLink } from 'lucide-react';
+
+const HELP_LINKS = [
+  { label: '使用指南', href: '/help/guide', icon: Book },
+  { label: '常见问题', href: '/help/faq', icon: MessageCircle },
+  { label: '在线支持', href: 'https://support.example.com', icon: ExternalLink, external: true },
+];
+
+export function HelpMenu() {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          aria-label="帮助"
+          title="帮助"
+        >
+          <HelpCircle className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {HELP_LINKS.map((link) => (
+          <DropdownMenuItem key={link.label} asChild>
+            <a
+              href={link.href}
+              target={link.external ? '_blank' : undefined}
+              rel={link.external ? 'noopener noreferrer' : undefined}
+              className="flex items-center gap-2"
+            >
+              <link.icon className="h-4 w-4" />
+              <span>{link.label}</span>
+            </a>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

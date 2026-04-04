@@ -1,5 +1,10 @@
 # Task Plan
 
+## 2026-04-04 Checkpoint
+
+- Root cause confirmed for the latest AI sessions regression: the transient `auto` governance state was being persisted through the same localStorage path as explicit user preferences, so one failed-first bootstrap could overwrite durable sort/filter preferences.
+- Current fix boundary: keep automatic failed-first triage for the active dataset, but prevent `auto`-sourced state from being written back into localStorage.
+
 ## Goal
 
 Integrate `open-agent-sdk-typescript` into `jiesong_system` as an in-process Agent Runtime:
@@ -49,3 +54,12 @@ Integrate `open-agent-sdk-typescript` into `jiesong_system` as an in-process Age
 - That list-level prioritization is now in place with a fixed action-risk order and an action-state filter; the next step is optional user-controlled sorting rather than more hard-coded display signals.
 - User-controlled sort switching is now in place on top of the action-state filter, keeping risk-first as default while allowing recent-action and recent-message inspection modes.
 - The sessions list governance state now round-trips through URL query params (`sort`, `actionFilter`) so refresh and shared links preserve the current triage view.
+- The governance preset row is now sticky, keeping the most important triage controls visible while operators scroll through long session lists.
+- Session rows now carry two explicit governance layers of their own: SLA severity badges (`P1 / P2 / P3`) and duty-state hints (`需立即处理 / 待人工确认 / 已闭环`) across both desktop and mobile list views.
+- The page header area now also exposes one duty-summary alert that explains the current triage focus (failed-first, pending-confirmation, or cleared) and links directly into the matching preset view.
+- That duty-summary alert now also expresses simple aging/escalation hints: failed-action sessions older than 4 hours and pending confirmations older than 2 hours are called out inline so the operator can distinguish fresh issues from stale ones.
+- Those aging signals are now also surfaced as explicit summary badges (`超时失败 X`, `超时待确认 Y`) so operators can scan stale workload without parsing the full descriptive sentence.
+- The default risk sort now also consumes those aging signals directly: overdue failed sessions rise above overdue pending sessions, which in turn rise above fresh failed/pending sessions, while the other sort modes stay unchanged.
+- The page now also explains that behavior explicitly when `risk` sorting is active, so operators see the ranking rule instead of inferring it from row order alone.
+- The page now also explains governance-view source for the most important paths: it distinguishes automatic failed-first takeover from later manual operator overrides, reducing ambiguity about why the current filter/sort state is active.
+- Automatic failed-first takeover is now fully transient: it no longer persists through localStorage or URL query params, so the UI can explain that the page temporarily switched into a failed-first view without silently turning that state into a durable preference or share link.

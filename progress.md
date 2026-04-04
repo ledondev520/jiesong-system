@@ -1,5 +1,147 @@
 # 捷淞系统 UI 交互测试报告
 
+## 2026-04-04 自动治理视角不写 URL
+
+- 已把自动失败兜底进一步收口成真正的瞬时态：
+  - 不再污染 localStorage
+  - 现在也不再自动回写 URL query
+- 这样当前页仍然能自动切到失败优先视角，但这个临时状态不会悄悄变成可分享链接或长期偏好。
+- 已完成验证：
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`16/16`）
+  - `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 自动治理态现在已经彻底不持久化，但来源解释仍然只在前端
+  - 下一段如果继续推进，更适合把 URL、本地偏好、默认视图三类来源说明也补齐
+
+## 2026-04-04 治理视角来源提示
+
+- 已把治理状态再往前解释一层：
+  - 自动失败兜底时会直接显示 `来源：自动失败视角`
+  - 用户手动切换后会显示 `来源：手动调整`
+- 这样现在页面不只解释“怎么排”，也解释“为什么当前会落在这个视角”。
+- 已完成验证：
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`15/15`）
+  - `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 现在先只解释了自动/手动两条核心路径
+  - 下一段如果继续推进，最合理的是把 URL、本地偏好、默认视图三类来源也统一收口成同一套说明
+
+## 2026-04-04 风险排序显式提示
+
+- 已把默认排序规则从“只体现在结果里”推进到“页面可见”：
+  - `risk` 模式下现在会直接显示 `当前：超时优先风险排序`
+  - 并附一句简短顺序说明
+- 这样现在用户不需要猜为什么某条会话排在最前面。
+- 已完成验证：
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`15/15`）
+  - `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 现在解释的是排序规则，但还没解释“当前为什么落在 auto 失败视角”
+  - 下一段如果继续推进，更适合补治理状态来源提示，而不是继续加新排序文案
+
+## 2026-04-04 自动治理视角不污染偏好
+
+- 已修复 AI sessions 页面一个状态持久化回归：
+  - 页面在有失败动作时仍会自动切到失败优先视角
+  - 但这个 `auto` 视角不再覆盖用户原本存下来的 localStorage 偏好
+- 根因是最近把“自动治理兜底”和“用户显式偏好”接到了同一条持久化链路上，导致一次自动失败分诊就能把历史筛选偏好改写成 `failed / risk`。
+- 已补回归测试，覆盖：
+  - 先在有失败动作场景触发自动失败视角
+  - 再在无失败场景重新挂载页面
+  - 验证原有 `completed` 偏好仍能恢复，而不是落到空列表
+- 已完成验证：
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`15/15`）
+  - `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - `auto` 状态现在不会污染 localStorage，但仍可能同步到 URL
+  - 如果后续希望把自动分诊完全视为“瞬时态”，下一段再单独调整 query 回写策略
+
+## 2026-04-04 超时优先风险排序
+
+- 已把默认风险排序升级成真正会消费老化信号的排序：
+  - `超时失败`
+  - `超时待确认`
+  - `普通失败`
+  - `普通待确认`
+  - 其余动作/无动作
+- 这样现在 stale workload 不只是可见，而且会被默认顶到列表前面。
+- 已完成验证：
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`13/13`）
+  - `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 这套优先级仍是前端值班排序规则，不是后端正式 SLA
+  - 下一段如果继续推进，最合理的是给用户一个显式的“超时优先”排序标签或切换提示，避免默认规则过于隐性
+
+## 2026-04-04 摘要条超时聚合徽标
+
+- 已把顶部值班摘要里的老化信号再推进一层：
+  - `超时失败 X`
+  - `超时待确认 Y`
+- 现在用户不需要读完整句子，也能一眼扫到当前超时积压。
+- 已完成验证：
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`12/12`）
+  - `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 超时聚合已经更清晰了，但还没有真正进入排序逻辑
+  - 下一段如果继续推进，更值得做的是把列表排序升级成“超时优先”
+
+## 2026-04-04 摘要条老化升级提示
+
+- 已把顶部值班摘要继续推进到“带老化判断”的状态：
+  - 失败动作会话超过 4 小时时会直接提示超时数量
+  - 待确认会话挂起超过 2 小时时也会直接提示
+- 这样现在顶部不只告诉你“有问题”，还会告诉你“哪些问题已经拖久了”。
+- 已完成验证：
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`12/12`）
+  - `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 老化阈值目前还是前端展示规则，不是正式 SLA 契约
+  - 下一段如果继续推进，更合理的是把超时数量做成显式聚合，或者把排序进一步改成“超时优先”
+
+## 2026-04-04 顶部值班摘要条
+
+- 已把 AI 会话列表顶部再推进一层：
+  - 页面现在会直接显示当前值班摘要
+  - 存在失败动作时会提示“当前有 X 个失败动作会话需要优先处理”
+  - 并提供一键切到对应治理视角的入口
+- 这层摘要会根据当前会话集合自动切换为：
+  - 失败优先
+  - 待确认
+  - 已收口
+- 已完成验证：
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`12/12`）
+  - `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 摘要条目前还是静态规则提示，没有接超时/升级逻辑
+  - 下一段如果继续推进，最值得做的是把摘要条和 SLA 升级条件或待处理老化时间绑定起来
+
+## 2026-04-04 会话级 SLA 与值班提示
+
+- 已把 AI 会话列表继续推进成更像值班台的形态：
+  - 每条会话会显示 `SLA P1 / P2 / P3`
+  - 同时会显示 `需立即处理 / 待人工确认 / 已闭环`
+- 这层信号已经覆盖：
+  - 桌面表格
+  - 移动端卡片
+- 已完成验证：
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`12/12`）
+  - `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 现在的严重度和处置状态还是展示层信号
+  - 下一段如果继续推进，更值得做的是待处理摘要条或 SLA 超时/升级策略，而不是继续堆更多 badge
+
+## 2026-04-04 治理预设 Sticky 控制条
+
+- 已把顶部治理预设进一步收口成 sticky 控制条：
+  - 滚动列表时仍可见
+  - 当前激活态可直接辨认
+- 已完成验证：
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`12/12`）
+  - `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - sticky bar 还是轻量控制条，不是完整值班台
+  - 下一段应补会话级严重度徽标或待处理入口强化
+
 ## 2026-04-04 排序/筛选 URL 持久化
 
 - 已把 AI 会话列表的治理视角持久化到 URL：

@@ -4,7 +4,7 @@
  * Pos: 前端业务页测试
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AiSessionsPage from './page';
@@ -53,6 +53,10 @@ vi.mock('@/lib/api-cache', () => ({
 }));
 
 describe('AiSessionsPage', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     mockGetSessions.mockReset();
     mockGetStandaloneTokenUsage.mockReset();
@@ -141,6 +145,7 @@ describe('AiSessionsPage', () => {
     mockToastError.mockReset();
     mockRouterReplace.mockReset();
     mockSearchParams = new URLSearchParams();
+    window.localStorage.clear();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
@@ -212,7 +217,7 @@ describe('AiSessionsPage', () => {
       expect(screen.getAllByText(/finance \+1/).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/5 \/ 失败 1/).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/动作 2 · 已执行 1 · 失败 1/).length).toBeGreaterThan(0);
-      expect(screen.getByText(/失败动作/)).toBeInTheDocument();
+      expect(screen.getAllByText(/失败动作/).length).toBeGreaterThan(0);
       expect(screen.getByText(/2026-04-04 12:06:00/)).toBeInTheDocument();
       expect(screen.getByText('Agent 工具注册表')).toBeInTheDocument();
       expect(screen.getByText('主入口 unified')).toBeInTheDocument();
@@ -314,6 +319,7 @@ describe('AiSessionsPage', () => {
   });
 
   it('会话列表按动作风险排序，并支持按动作状态筛选', async () => {
+    mockSearchParams = new URLSearchParams('sort=risk&actionFilter=all');
     mockGetSessions.mockResolvedValue({
       data: [
         {
@@ -328,10 +334,10 @@ describe('AiSessionsPage', () => {
               actionType: 'AllocatePayment',
               description: '确认收款挂账',
               status: 'executed',
-              createdAt: '2026-04-04T04:01:00.000Z',
+              createdAt: '2020-04-04T04:01:00.000Z',
               timeline: [
-                { type: 'created', status: 'pending', detail: '确认收款挂账', at: '2026-04-04T04:01:00.000Z' },
-                { type: 'executed', status: 'executed', detail: '已执行挂账', at: '2026-04-04T04:05:00.000Z' },
+                { type: 'created', status: 'pending', detail: '确认收款挂账', at: '2020-04-04T04:01:00.000Z' },
+                { type: 'executed', status: 'executed', detail: '已执行挂账', at: '2020-04-04T04:05:00.000Z' },
               ],
             },
           ],
@@ -348,9 +354,9 @@ describe('AiSessionsPage', () => {
               actionType: 'UpdateInventoryStatus',
               description: '更新库存状态',
               status: 'pending',
-              createdAt: '2026-04-04T04:07:00.000Z',
+              createdAt: '2020-04-04T04:07:00.000Z',
               timeline: [
-                { type: 'created', status: 'pending', detail: '更新库存状态', at: '2026-04-04T04:07:00.000Z' },
+                { type: 'created', status: 'pending', detail: '更新库存状态', at: '2020-04-04T04:07:00.000Z' },
               ],
             },
           ],
@@ -367,11 +373,11 @@ describe('AiSessionsPage', () => {
               actionType: 'CreateTaxRefundDraft',
               description: '补建退税草稿',
               status: 'failed',
-              createdAt: '2026-04-04T04:00:00.000Z',
+              createdAt: '2020-04-04T04:00:00.000Z',
               resultDetail: '报关单缺失',
               timeline: [
-                { type: 'created', status: 'pending', detail: '补建退税草稿', at: '2026-04-04T04:00:00.000Z' },
-                { type: 'failed', status: 'failed', detail: '报关单缺失', at: '2026-04-04T04:06:00.000Z' },
+                { type: 'created', status: 'pending', detail: '补建退税草稿', at: '2020-04-04T04:00:00.000Z' },
+                { type: 'failed', status: 'failed', detail: '报关单缺失', at: '2020-04-04T04:06:00.000Z' },
               ],
             },
           ],
@@ -379,7 +385,6 @@ describe('AiSessionsPage', () => {
       ],
     });
 
-    const user = userEvent.setup();
     render(<AiSessionsPage />);
 
     await waitFor(() => {
@@ -387,7 +392,21 @@ describe('AiSessionsPage', () => {
       expect(rows[0]?.textContent).toContain('session_failed');
       expect(rows[1]?.textContent).toContain('session_pending');
       expect(rows[2]?.textContent).toContain('session_done');
+      expect(screen.getByText('当前：超时优先风险排序')).toBeInTheDocument();
+      expect(screen.getByTestId('sessions-governance-summary')).toHaveTextContent('当前有 1 个失败动作会话需要优先处理');
+      expect(screen.getByTestId('sessions-governance-summary')).toHaveTextContent('其中 1 个失败动作已超过 4 小时未处理');
+      expect(screen.getByText('超时失败 1')).toBeInTheDocument();
+      expect(screen.getByText('超时待确认 1')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '处理失败动作' })).toBeInTheDocument();
+      expect(screen.getAllByText('SLA P1').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('SLA P2').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('SLA P3').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('需立即处理').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('待人工确认').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('已闭环').length).toBeGreaterThan(0);
     });
+
+    const user = userEvent.setup();
 
     await user.click(screen.getByLabelText('排序方式'));
     await user.click(screen.getByRole('option', { name: '最近动作' }));
@@ -397,6 +416,7 @@ describe('AiSessionsPage', () => {
       expect(rows[0]?.textContent).toContain('session_pending');
       expect(rows[1]?.textContent).toContain('session_failed');
       expect(rows[2]?.textContent).toContain('session_done');
+      expect(screen.queryByText('当前：超时优先风险排序')).not.toBeInTheDocument();
     });
 
     await user.click(screen.getByLabelText('动作筛选'));
@@ -406,6 +426,76 @@ describe('AiSessionsPage', () => {
       const rows = Array.from(document.querySelectorAll('tbody tr'));
       expect(rows).toHaveLength(1);
       expect(rows[0]?.textContent).toContain('session_failed');
+    });
+  });
+
+  it('风险排序会优先显示超时会话，再按失败/待确认分层', async () => {
+    mockSearchParams = new URLSearchParams('sort=risk&actionFilter=all');
+    mockGetSessions.mockResolvedValue({
+      data: [
+        {
+          sessionId: 'session_failed_recent',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T11:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-failed-recent',
+              actionType: 'CreateTaxRefundDraft',
+              description: '补建退税草稿',
+              status: 'failed',
+              createdAt: '2026-04-04T04:00:00.000Z',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '补建退税草稿', at: '2026-04-04T04:00:00.000Z' },
+                { type: 'failed', status: 'failed', detail: '报关单缺失', at: '2026-04-04T04:06:00.000Z' },
+              ],
+            },
+          ],
+        },
+        {
+          sessionId: 'session_pending_stale',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T10:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-pending-stale',
+              actionType: 'UpdateInventoryStatus',
+              description: '更新库存状态',
+              status: 'pending',
+              createdAt: '2020-04-04T04:07:00.000Z',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '更新库存状态', at: '2020-04-04T04:07:00.000Z' },
+              ],
+            },
+          ],
+        },
+        {
+          sessionId: 'session_failed_stale',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T09:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-failed-stale',
+              actionType: 'CreateTaxRefundDraft',
+              description: '补建退税草稿',
+              status: 'failed',
+              createdAt: '2020-04-04T04:00:00.000Z',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '补建退税草稿', at: '2020-04-04T04:00:00.000Z' },
+                { type: 'failed', status: 'failed', detail: '报关单缺失', at: '2020-04-04T04:06:00.000Z' },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<AiSessionsPage />);
+
+    await waitFor(() => {
+      const rows = Array.from(document.querySelectorAll('tbody tr'));
+      expect(rows[0]?.textContent).toContain('session_failed_stale');
+      expect(rows[1]?.textContent).toContain('session_pending_stale');
+      expect(rows[2]?.textContent).toContain('session_failed_recent');
     });
   });
 
@@ -458,6 +548,8 @@ describe('AiSessionsPage', () => {
       const rows = Array.from(document.querySelectorAll('tbody tr'));
       expect(rows).toHaveLength(1);
       expect(rows[0]?.textContent).toContain('session_pending');
+      expect(screen.getByText('来源：URL 参数')).toBeInTheDocument();
+      expect(screen.getByText('链接参数优先于本地偏好和默认视图。')).toBeInTheDocument();
     });
 
     await user.click(screen.getByLabelText('动作筛选'));
@@ -524,6 +616,536 @@ describe('AiSessionsPage', () => {
       const rows = Array.from(document.querySelectorAll('tbody tr'));
       expect(rows).toHaveLength(1);
       expect(rows[0]?.textContent).toContain('session_pending');
+      expect(screen.getByText('来源：本地偏好')).toBeInTheDocument();
+      expect(screen.getByText('已恢复你上次保存的治理视角。')).toBeInTheDocument();
+    });
+  });
+
+  it('无 URL、无本地偏好、无失败动作时显示默认视图来源', async () => {
+    mockGetSessions.mockResolvedValue({
+      data: [
+        {
+          sessionId: 'session_done',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T08:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-done',
+              actionType: 'AllocatePayment',
+              description: '确认收款挂账',
+              status: 'executed',
+              createdAt: '2026-04-04T04:01:00.000Z',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '确认收款挂账', at: '2026-04-04T04:01:00.000Z' },
+                { type: 'executed', status: 'executed', detail: '已执行挂账', at: '2026-04-04T04:05:00.000Z' },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<AiSessionsPage />);
+
+    await waitFor(() => {
+      const rows = Array.from(document.querySelectorAll('tbody tr'));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.textContent).toContain('session_done');
+      expect(screen.getByText('来源：默认视图')).toBeInTheDocument();
+      expect(screen.getByText('当前使用系统默认的全量风险视图。')).toBeInTheDocument();
+    });
+  });
+
+  it('无 URL 参数且存在失败动作时，默认落到风险优先 + 有失败视角', async () => {
+    window.localStorage.setItem('ai-sessions-list-preferences', JSON.stringify({
+      sort: 'latest-message',
+      actionFilter: 'completed',
+    }));
+
+    mockGetSessions.mockResolvedValue({
+      data: [
+        {
+          sessionId: 'session_done',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T08:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-done',
+              actionType: 'AllocatePayment',
+              description: '确认收款挂账',
+              status: 'executed',
+              createdAt: '2026-04-04T04:01:00.000Z',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '确认收款挂账', at: '2026-04-04T04:01:00.000Z' },
+                { type: 'executed', status: 'executed', detail: '已执行挂账', at: '2026-04-04T04:05:00.000Z' },
+              ],
+            },
+          ],
+        },
+        {
+          sessionId: 'session_failed',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T10:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-failed',
+              actionType: 'CreateTaxRefundDraft',
+              description: '补建退税草稿',
+              status: 'failed',
+              createdAt: '2026-04-04T04:00:00.000Z',
+              resultDetail: '报关单缺失',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '补建退税草稿', at: '2026-04-04T04:00:00.000Z' },
+                { type: 'failed', status: 'failed', detail: '报关单缺失', at: '2026-04-04T04:06:00.000Z' },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<AiSessionsPage />);
+
+    await waitFor(() => {
+      const rows = Array.from(document.querySelectorAll('tbody tr'));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.textContent).toContain('session_failed');
+      expect(screen.getByText('来源：自动失败视角')).toBeInTheDocument();
+      expect(screen.getByText('检测到失败动作，系统临时切到失败优先视角。')).toBeInTheDocument();
+    });
+  });
+
+  it('自动失败视角不应自动写回 URL 参数', async () => {
+    mockGetSessions.mockResolvedValue({
+      data: [
+        {
+          sessionId: 'session_failed',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T10:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-failed',
+              actionType: 'CreateTaxRefundDraft',
+              description: '补建退税草稿',
+              status: 'failed',
+              createdAt: '2026-04-04T04:00:00.000Z',
+              resultDetail: '报关单缺失',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '补建退税草稿', at: '2026-04-04T04:00:00.000Z' },
+                { type: 'failed', status: 'failed', detail: '报关单缺失', at: '2026-04-04T04:06:00.000Z' },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<AiSessionsPage />);
+
+    await waitFor(() => {
+      const rows = Array.from(document.querySelectorAll('tbody tr'));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.textContent).toContain('session_failed');
+    });
+
+    expect(mockRouterReplace).not.toHaveBeenCalled();
+  });
+
+  it('自动失败视角下，手动切回全部后应保持全部视角', async () => {
+    mockGetSessions.mockResolvedValue({
+      data: [
+        {
+          sessionId: 'session_done',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T08:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-done',
+              actionType: 'AllocatePayment',
+              description: '确认收款挂账',
+              status: 'executed',
+              createdAt: '2026-04-04T04:01:00.000Z',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '确认收款挂账', at: '2026-04-04T04:01:00.000Z' },
+                { type: 'executed', status: 'executed', detail: '已执行挂账', at: '2026-04-04T04:05:00.000Z' },
+              ],
+            },
+          ],
+        },
+        {
+          sessionId: 'session_failed',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T10:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-failed',
+              actionType: 'CreateTaxRefundDraft',
+              description: '补建退税草稿',
+              status: 'failed',
+              createdAt: '2026-04-04T04:00:00.000Z',
+              resultDetail: '报关单缺失',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '补建退税草稿', at: '2026-04-04T04:00:00.000Z' },
+                { type: 'failed', status: 'failed', detail: '报关单缺失', at: '2026-04-04T04:06:00.000Z' },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const user = userEvent.setup();
+    render(<AiSessionsPage />);
+
+    await waitFor(() => {
+      const rows = Array.from(document.querySelectorAll('tbody tr'));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.textContent).toContain('session_failed');
+    });
+
+    await user.click(screen.getByRole('button', { name: /全部 2/ }));
+
+    await waitFor(() => {
+      const rows = Array.from(document.querySelectorAll('tbody tr'));
+      expect(rows).toHaveLength(2);
+      expect(rows[0]?.textContent).toContain('session_failed');
+      expect(rows[1]?.textContent).toContain('session_done');
+      expect(screen.getByText('来源：手动调整')).toBeInTheDocument();
+    });
+  });
+
+  it('自动失败视角不应污染已有本地偏好', async () => {
+    window.localStorage.setItem('ai-sessions-list-preferences', JSON.stringify({
+      sort: 'latest-message',
+      actionFilter: 'completed',
+    }));
+
+    mockGetSessions
+      .mockResolvedValueOnce({
+        data: [
+          {
+            sessionId: 'session_failed',
+            _count: { _all: 1 },
+            _max: { createdAt: '2026-03-01T10:00:00.000Z' },
+            pendingActionSummary: [
+              {
+                actionId: 'pa-failed',
+                actionType: 'CreateTaxRefundDraft',
+                description: '补建退税草稿',
+                status: 'failed',
+                createdAt: '2026-04-04T04:00:00.000Z',
+                resultDetail: '报关单缺失',
+                timeline: [
+                  { type: 'created', status: 'pending', detail: '补建退税草稿', at: '2026-04-04T04:00:00.000Z' },
+                  { type: 'failed', status: 'failed', detail: '报关单缺失', at: '2026-04-04T04:06:00.000Z' },
+                ],
+              },
+            ],
+          },
+          {
+            sessionId: 'session_done',
+            _count: { _all: 1 },
+            _max: { createdAt: '2026-03-01T08:00:00.000Z' },
+            pendingActionSummary: [
+              {
+                actionId: 'pa-done',
+                actionType: 'AllocatePayment',
+                description: '确认收款挂账',
+                status: 'executed',
+                createdAt: '2026-04-04T04:01:00.000Z',
+                timeline: [
+                  { type: 'created', status: 'pending', detail: '确认收款挂账', at: '2026-04-04T04:01:00.000Z' },
+                  { type: 'executed', status: 'executed', detail: '已执行挂账', at: '2026-04-04T04:05:00.000Z' },
+                ],
+              },
+            ],
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            sessionId: 'session_done',
+            _count: { _all: 1 },
+            _max: { createdAt: '2026-03-01T08:00:00.000Z' },
+            pendingActionSummary: [
+              {
+                actionId: 'pa-done',
+                actionType: 'AllocatePayment',
+                description: '确认收款挂账',
+                status: 'executed',
+                createdAt: '2026-04-04T04:01:00.000Z',
+                timeline: [
+                  { type: 'created', status: 'pending', detail: '确认收款挂账', at: '2026-04-04T04:01:00.000Z' },
+                  { type: 'executed', status: 'executed', detail: '已执行挂账', at: '2026-04-04T04:05:00.000Z' },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+
+    const firstRender = render(<AiSessionsPage />);
+
+    await waitFor(() => {
+      const rows = Array.from(document.querySelectorAll('tbody tr'));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.textContent).toContain('session_failed');
+    });
+
+    firstRender.unmount();
+
+    const secondRender = render(<AiSessionsPage />);
+
+    await waitFor(() => {
+      const rows = Array.from(document.querySelectorAll('tbody tr'));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.textContent).toContain('session_done');
+    });
+
+    secondRender.unmount();
+  });
+
+  it('顶部待处理 chips 会展示数量并能一键切换过滤视角', async () => {
+    mockSearchParams = new URLSearchParams('sort=risk&actionFilter=all');
+    mockGetSessions.mockResolvedValue({
+      data: [
+        {
+          sessionId: 'session_pending',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T09:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-pending',
+              actionType: 'UpdateInventoryStatus',
+              description: '更新库存状态',
+              status: 'pending',
+              createdAt: '2026-04-04T04:07:00.000Z',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '更新库存状态', at: '2026-04-04T04:07:00.000Z' },
+              ],
+            },
+          ],
+        },
+        {
+          sessionId: 'session_failed',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T10:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-failed',
+              actionType: 'CreateTaxRefundDraft',
+              description: '补建退税草稿',
+              status: 'failed',
+              createdAt: '2026-04-04T04:00:00.000Z',
+              resultDetail: '报关单缺失',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '补建退税草稿', at: '2026-04-04T04:00:00.000Z' },
+                { type: 'failed', status: 'failed', detail: '报关单缺失', at: '2026-04-04T04:06:00.000Z' },
+              ],
+            },
+          ],
+        },
+        {
+          sessionId: 'session_done',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T08:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-done',
+              actionType: 'AllocatePayment',
+              description: '确认收款挂账',
+              status: 'executed',
+              createdAt: '2026-04-04T04:01:00.000Z',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '确认收款挂账', at: '2026-04-04T04:01:00.000Z' },
+                { type: 'executed', status: 'executed', detail: '已执行挂账', at: '2026-04-04T04:05:00.000Z' },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const user = userEvent.setup();
+    render(<AiSessionsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /失败动作 1/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /待确认 1/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /待处理 2/ })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /待处理 2/ }));
+
+    await waitFor(() => {
+      const rows = Array.from(document.querySelectorAll('tbody tr'));
+      expect(rows).toHaveLength(2);
+      expect(rows[0]?.textContent).toContain('session_pending');
+      expect(rows[1]?.textContent).toContain('session_failed');
+    });
+  });
+
+  it('顶部 chips 会联动治理预设排序与筛选', async () => {
+    mockSearchParams = new URLSearchParams('sort=risk&actionFilter=all');
+    mockGetSessions.mockResolvedValue({
+      data: [
+        {
+          sessionId: 'session_pending',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T09:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-pending',
+              actionType: 'UpdateInventoryStatus',
+              description: '更新库存状态',
+              status: 'pending',
+              createdAt: '2026-04-04T04:07:00.000Z',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '更新库存状态', at: '2026-04-04T04:07:00.000Z' },
+              ],
+            },
+          ],
+        },
+        {
+          sessionId: 'session_failed',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T10:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-failed',
+              actionType: 'CreateTaxRefundDraft',
+              description: '补建退税草稿',
+              status: 'failed',
+              createdAt: '2026-04-04T04:00:00.000Z',
+              resultDetail: '报关单缺失',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '补建退税草稿', at: '2026-04-04T04:00:00.000Z' },
+                { type: 'failed', status: 'failed', detail: '报关单缺失', at: '2026-04-04T04:06:00.000Z' },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const user = userEvent.setup();
+    render(<AiSessionsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /待确认 1/ })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /待确认 1/ }));
+
+    await waitFor(() => {
+      const rows = Array.from(document.querySelectorAll('tbody tr'));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.textContent).toContain('session_pending');
+      const lastCall = mockRouterReplace.mock.calls.at(-1)?.[0] as string;
+      expect(lastCall).toContain('sort=latest-action');
+      expect(lastCall).toContain('actionFilter=pending');
+    });
+  });
+
+  it('顶部全部 chip 会恢复默认治理视角', async () => {
+    mockSearchParams = new URLSearchParams('sort=latest-action&actionFilter=pending');
+    mockGetSessions.mockResolvedValue({
+      data: [
+        {
+          sessionId: 'session_pending',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T09:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-pending',
+              actionType: 'UpdateInventoryStatus',
+              description: '更新库存状态',
+              status: 'pending',
+              createdAt: '2026-04-04T04:07:00.000Z',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '更新库存状态', at: '2026-04-04T04:07:00.000Z' },
+              ],
+            },
+          ],
+        },
+        {
+          sessionId: 'session_done',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T08:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-done',
+              actionType: 'AllocatePayment',
+              description: '确认收款挂账',
+              status: 'executed',
+              createdAt: '2026-04-04T04:01:00.000Z',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '确认收款挂账', at: '2026-04-04T04:01:00.000Z' },
+                { type: 'executed', status: 'executed', detail: '已执行挂账', at: '2026-04-04T04:05:00.000Z' },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const user = userEvent.setup();
+    render(<AiSessionsPage />);
+
+    await waitFor(() => {
+      const rows = Array.from(document.querySelectorAll('tbody tr'));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.textContent).toContain('session_pending');
+    });
+
+    await user.click(screen.getByRole('button', { name: /全部 2/ }));
+
+    await waitFor(() => {
+      const rows = Array.from(document.querySelectorAll('tbody tr'));
+      expect(rows).toHaveLength(2);
+      expect(rows[0]?.textContent).toContain('session_pending');
+      expect(rows[1]?.textContent).toContain('session_done');
+      const lastCall = mockRouterReplace.mock.calls.at(-1)?.[0] as string;
+      expect(lastCall).not.toContain('sort=latest-action');
+      expect(lastCall).not.toContain('actionFilter=pending');
+    });
+  });
+
+  it('治理预设入口条会以 sticky bar 形式展示，并高亮当前激活视角', async () => {
+    mockSearchParams = new URLSearchParams('sort=risk&actionFilter=failed');
+    mockGetSessions.mockResolvedValue({
+      data: [
+        {
+          sessionId: 'session_failed',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T10:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-failed',
+              actionType: 'CreateTaxRefundDraft',
+              description: '补建退税草稿',
+              status: 'failed',
+              createdAt: '2026-04-04T04:00:00.000Z',
+              resultDetail: '报关单缺失',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '补建退税草稿', at: '2026-04-04T04:00:00.000Z' },
+                { type: 'failed', status: 'failed', detail: '报关单缺失', at: '2026-04-04T04:06:00.000Z' },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<AiSessionsPage />);
+
+    await waitFor(() => {
+      const bar = screen.getByTestId('governance-presets');
+      expect(bar.className).toContain('sticky');
+      expect(bar.className).toContain('top-0');
+      expect(screen.getByRole('button', { name: /失败动作 1/ }).getAttribute('data-variant')).toBe('default');
+      expect(screen.getByRole('button', { name: /全部 1/ }).getAttribute('data-variant')).toBe('outline');
     });
   });
 });

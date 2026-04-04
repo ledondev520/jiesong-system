@@ -1,5 +1,255 @@
 # Ops Execution Center Plan
 
+## 2026-04-04 Round 119（自动治理视角不写 URL）
+
+### Goal
+- 把自动失败兜底彻底收口成瞬时态，避免它继续污染可分享的 URL。
+
+### Planned Scope
+- 保持自动失败视角在当前数据集内可用。
+- 阻止 `auto` 来源的治理状态回写 query 参数。
+- 对齐来源提示和旧测试口径，并更新 checkpoint。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- 自动失败视角现在既不会写 localStorage，也不会回写 URL query；它只在当前数据集内作为临时兜底存在。
+- 与此同时，页面仍会明确显示 `来源：自动失败视角`，所以用户能看见这是瞬时治理态，而不是持久配置。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`16/16`）
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+
+### Remaining Risk
+- 自动治理态现在已经不落本地偏好也不落 URL，但仍完全由前端推断；如果继续推进，下一步可以考虑把来源解释与服务端治理事件对齐。
+
+## 2026-04-04 Round 118（治理视角来源提示）
+
+### Goal
+- 让用户不只知道当前排序规则，还能知道“为什么此刻落在这个治理视角”。
+
+### Planned Scope
+- 为治理视角增加来源提示，至少覆盖 `auto` 和 `manual` 两条核心路径。
+- 当系统自动切到失败视角时，明确说明是自动失败视角。
+- 当用户手动切换后，明确说明当前已进入手动视角。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- AI sessions 页面现在会显示治理视角来源提示，例如 `来源：自动失败视角`、`来源：手动调整`。
+- 自动失败视角会明确告诉用户这是系统临时切到失败优先视角，手动操作后会切换成手动来源说明。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`15/15`）
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+
+### Remaining Risk
+- 现在已经能解释视角来源，但来源提示仍是页面本地解释，没有和后端事件或显式审计状态打通；如果继续推进，下一步可以把来源和 URL/local/default 三类也做成更一致的说明。
+
+## 2026-04-04 Round 117（风险排序显式提示）
+
+### Goal
+- 让 AI sessions 列表当前默认排序规则变成可见状态，而不是只能靠用户观察列表顺序反推。
+
+### Planned Scope
+- 在 `risk` 模式下显示“当前：超时优先风险排序”提示。
+- 同时给出简短的排序顺序说明。
+- 不改任何排序行为本身，只提升可解释性。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- AI sessions 页面在 `risk` 模式下会直接显示 `当前：超时优先风险排序`。
+- 用户还能直接看到顺序提示：超时失败、超时待确认、普通失败、普通待确认。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`15/15`）
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+
+### Remaining Risk
+- 排序规则现在已经可见，但“为什么当前是 auto 失败视角”之类的来源解释仍然不够强；如果继续推进，下一步可以补治理状态来源提示。
+
+## 2026-04-04 Round 116（自动治理视角不污染偏好）
+
+### Goal
+- 修复 AI sessions 页面把自动失败视角错误写入 localStorage，导致后续无失败场景也会被旧的失败筛选卡死的问题。
+
+### Planned Scope
+- 保持“有失败动作时自动进入失败视角”的兜底能力。
+- 阻止 `auto` 来源的治理状态覆盖用户原有的本地偏好。
+- 补回归测试与 checkpoint。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- 自动失败视角现在仍会在当前会话集合存在失败动作时生效，但不会再把这个临时兜底状态写回 localStorage。
+- 原有用户偏好可以在下一次无失败场景下继续恢复，不会因为一次自动分诊被永久改写成 `failed/risk`。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`15/15`）
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+
+### Remaining Risk
+- 自动治理状态目前仍会回写 URL query；这次只收口“污染本地偏好”的问题，没有改变 shareable URL 的现有行为。
+
+## 2026-04-04 Round 115（超时优先风险排序）
+
+### Goal
+- 让 AI 会话列表的默认风险排序真正把 stale workload 顶上来，而不只是把超时数显示在摘要条里。
+
+### Planned Scope
+- 将默认 `risk` 排序升级成：`超时失败 > 超时待确认 > 普通失败 > 普通待确认 > 其他动作 > 无动作`。
+- 保持现有 `latest-action / latest-message` 排序不变。
+- 补前端测试与 checkpoint。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- 默认风险排序现在会优先顶出超时失败和超时待确认会话，而不是只按失败/待确认大类再看最近动作时间。
+- `latest-action` 和 `latest-message` 排序口径保持不变，没有把老化规则扩散到所有模式。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`13/13`）
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+
+### Remaining Risk
+- 当前超时优先规则仍由前端本地时间阈值驱动，如果后续要形成正式 SLA，就需要把排序阈值和后端/通知侧统一。
+
+## 2026-04-04 Round 114（摘要条超时聚合徽标）
+
+### Goal
+- 让顶部值班摘要里的老化信号不再埋在描述文案里，而是变成一眼可扫的超时聚合徽标。
+
+### Planned Scope
+- 在值班摘要里直接显示 `超时失败 X` 和 `超时待确认 Y`。
+- 保持现有老化阈值和治理预设不变，只增强扫描效率。
+- 补前端测试和 checkpoint。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- 值班摘要现在会把老化数量直接显示成 `超时失败 X`、`超时待确认 Y` 徽标，而不是只藏在描述句子里。
+- 这样页面顶端已经能同时表达：当前重点、老化数量、以及一键切视角入口。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`12/12`）
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+
+### Remaining Risk
+- 当前超时聚合仍只在摘要条可见，没有直接参与排序或形成单独筛选口径；下一轮如果继续推进，最合理的是把排序进一步升级到“超时优先”。
+
+## 2026-04-04 Round 113（摘要条老化升级提示）
+
+### Goal
+- 让顶部值班摘要不只是告诉用户“有问题”，还能直接指出哪些失败/待确认动作已经老化到需要优先介入。
+
+### Planned Scope
+- 为失败动作会话增加 `超过 4 小时未处理` 的升级提示。
+- 为待确认会话增加 `挂起超过 2 小时` 的老化提示。
+- 保持实现为前端展示层规则，不改后端协议。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- 顶部值班摘要现在会在失败动作存在时额外提示“其中 X 个失败动作已超过 4 小时未处理”。
+- 如果待确认动作老化超过 2 小时，摘要条也会直接标出挂起数量，帮助用户优先处理陈旧确认流。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`12/12`）
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+
+### Remaining Risk
+- 当前老化升级仍只是一层页面提示，没有通知、升级链路或真正的 SLA 计时器；下一轮如果继续推进，应补更明确的“超时会话数”聚合和处理顺序建议。
+
+## 2026-04-04 Round 112（顶部值班摘要条）
+
+### Goal
+- 让 AI 日志页在顶部直接给出当前值班重点，而不需要用户先扫 chips 或逐行判断。
+
+### Planned Scope
+- 在治理预设条下方增加值班摘要 Alert。
+- 失败动作存在时直接给出红色摘要与“处理失败动作”入口。
+- 仅有待确认动作时给出确认提示；无待处理动作时给出已收口提示。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- AI 会话列表顶部现在会显示值班摘要条，并根据失败/待确认/已收口状态切换文案、样式和快捷入口。
+- 当存在失败动作会话时，页面会直接提示“当前有 X 个失败动作会话需要优先处理”，并提供一键切到失败视角的入口。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`12/12`）
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+
+### Remaining Risk
+- 当前摘要条还是规则驱动的静态运营提示，没有接 SLA 超时、升级策略或通知动作；如果继续推进，下一步应该把摘要条和升级条件绑定起来。
+
+## 2026-04-04 Round 111（会话级 SLA 与值班提示）
+
+### Goal
+- 让 AI 会话列表每一行都能直接表达“严重度 + 当前处置状态”，减少只靠顶部筛选再判断的成本。
+
+### Planned Scope
+- 为会话行补 `SLA P1 / P2 / P3` 徽标。
+- 为会话行补 `需立即处理 / 待人工确认 / 已闭环` 值班提示。
+- 同时覆盖桌面表格与移动卡片，并更新 checkpoint。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- 会话列表现在会按动作状态显示 `SLA P1 / P2 / P3`，分别对应失败、待确认、已闭环动作会话。
+- 同一位置新增 `需立即处理 / 待人工确认 / 已闭环` 值班提示，桌面和移动端都已对齐。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`12/12`）
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+
+### Remaining Risk
+- 当前“严重度 + 值班提示”仍是展示层信号，没有驱动自动升级、提醒或 SLA 超时规则；下一轮若继续推进，应补更明确的待处理摘要或升级策略。
+
+## 2026-04-04 Round 110（治理预设 Sticky 控制条）
+
+### Goal
+- 让 AI 日志页顶部治理预设在滚动列表时始终可见，真正变成值班控制条。
+
+### Planned Scope
+- 将顶部治理预设行改成 sticky 容器。
+- 保持现有预设行为不变，只强化可达性与控制台感。
+- 补前端测试与 checkpoint。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- 顶部 `全部 / 失败动作 / 待确认 / 待处理` 预设现在放进了 sticky 控制条。
+- 控制条在滚动时保持可见，且激活态测试已锁住。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`12/12`）
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+
+### Remaining Risk
+- 当前 sticky bar 还是轻量入口条，没有会话级 SLA 色带或更强的操作性；下一轮可以继续做值班台强化。
+
 ## 2026-04-04 Round 109（排序/筛选 URL 持久化）
 
 ### Goal

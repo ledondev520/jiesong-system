@@ -13,6 +13,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -29,7 +30,7 @@ import {
 } from '@/services/ai.service';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, RefreshCw, Trash2, MessageSquare, FileText, BarChart2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock3, Loader2, RefreshCw, Trash2, MessageSquare, FileText, BarChart2 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -93,6 +94,8 @@ const getSessionCount = (item: AiSessionItem) => {
 };
 
 const getSessionLastAt = (item: AiSessionItem) => item._max?.createdAt || null;
+const FAILED_ACTION_ESCALATION_MS = 4 * 60 * 60 * 1000;
+const PENDING_ACTION_ESCALATION_MS = 2 * 60 * 60 * 1000;
 const formatDomainSummary = (domains?: string[]) => {
   if (!domains?.length) return '—';
   if (domains.length === 1) return domains[0];
@@ -151,11 +154,67 @@ const hasCompletedPendingAction = (items?: AiPendingActionSummary[]) => {
     && normalized.every((item) => item.status === 'executed' || item.status === 'cancelled');
 };
 
+const isActionGroupAged = (items: AiPendingActionSummary[] | undefined, thresholdMs: number) => {
+  const latestActionAt = getLatestPendingActionAt(items);
+  if (!latestActionAt) return false;
+  return Date.now() - new Date(latestActionAt).getTime() >= thresholdMs;
+};
+
 const getPendingActionPriority = (items?: AiPendingActionSummary[]) => {
-  if (hasFailedPendingAction(items)) return 0;
-  if (hasPendingPendingAction(items)) return 1;
-  if ((items || []).length > 0) return 2;
-  return 3;
+  if (hasFailedPendingAction(items) && isActionGroupAged(items, FAILED_ACTION_ESCALATION_MS)) return 0;
+  if (hasPendingPendingAction(items) && isActionGroupAged(items, PENDING_ACTION_ESCALATION_MS)) return 1;
+  if (hasFailedPendingAction(items)) return 2;
+  if (hasPendingPendingAction(items)) return 3;
+  if ((items || []).length > 0) return 4;
+  return 5;
+};
+
+const getSessionSlaLevel = (items?: AiPendingActionSummary[]) => {
+  if (hasFailedPendingAction(items)) {
+    return {
+      label: 'SLA P1',
+      variant: 'destructive' as const,
+      emphasis: 'danger' as const,
+    };
+  }
+  if (hasPendingPendingAction(items)) {
+    return {
+      label: 'SLA P2',
+      variant: 'outline' as const,
+      emphasis: 'primary' as const,
+    };
+  }
+  if ((items || []).length > 0) {
+    return {
+      label: 'SLA P3',
+      variant: 'secondary' as const,
+      emphasis: 'success' as const,
+    };
+  }
+  return null;
+};
+
+const getSessionAttentionSignal = (items?: AiPendingActionSummary[]) => {
+  const summary = summarizePendingActionStatuses(items);
+  if (summary.failed) {
+    return {
+      label: '需立即处理',
+      variant: 'destructive' as const,
+    };
+  }
+  if (summary.pending) {
+    return {
+      label: '待人工确认',
+      variant: 'outline' as const,
+    };
+  }
+  if (summary.total) {
+    return {
+      label: '已闭环',
+      variant: 'secondary' as const,
+    };
+  }
+  return null;
 };
 
 const compareSessionRisk = (a: AiSessionItem, b: AiSessionItem) => {
@@ -200,11 +259,12 @@ const matchesActionFilter = (item: AiSessionItem, filter: string) => {
   if (filter === 'failed') return hasFailedPendingAction(item.pendingActionSummary);
   if (filter === 'pending') return hasPendingPendingAction(item.pendingActionSummary);
   if (filter === 'completed') return hasCompletedPendingAction(item.pendingActionSummary);
+  if (filter === 'actionable') return hasFailedPendingAction(item.pendingActionSummary) || hasPendingPendingAction(item.pendingActionSummary);
   return true;
 };
 
 const normalizeActionFilter = (value: string | null) => (
-  ['all', 'failed', 'pending', 'completed'].includes(String(value || '').trim()) ? String(value) : 'all'
+  ['all', 'failed', 'pending', 'completed', 'actionable'].includes(String(value || '').trim()) ? String(value) : 'all'
 );
 
 const normalizeSortMode = (value: string | null) => (
@@ -226,6 +286,180 @@ const readSessionListPreferences = () => {
   } catch {
     return null;
   }
+};
+
+const resolveSessionListGovernanceState = ({
+  searchParams,
+  stored,
+  sessions,
+}: {
+  searchParams: URLSearchParams;
+  stored: { sort: string; actionFilter: string } | null;
+  sessions: AiSessionItem[];
+}) => {
+  if (searchParams.has('sort') || searchParams.has('actionFilter')) {
+    return {
+      sortMode: normalizeSortMode(searchParams.get('sort')),
+      actionFilter: normalizeActionFilter(searchParams.get('actionFilter')),
+      source: 'url' as const,
+    };
+  }
+  if (sessions.some((item) => hasFailedPendingAction(item.pendingActionSummary))) {
+    return {
+      sortMode: 'risk',
+      actionFilter: 'failed',
+      source: 'auto' as const,
+    };
+  }
+  if (stored) {
+    return {
+      sortMode: stored.sort,
+      actionFilter: stored.actionFilter,
+      source: 'local' as const,
+    };
+  }
+  return {
+    sortMode: 'risk',
+    actionFilter: 'all',
+    source: 'default' as const,
+  };
+};
+
+const GOVERNANCE_PRESETS: Record<string, { actionFilter: string; sortMode: string }> = {
+  failed: { actionFilter: 'failed', sortMode: 'risk' },
+  pending: { actionFilter: 'pending', sortMode: 'latest-action' },
+  actionable: { actionFilter: 'actionable', sortMode: 'risk' },
+  all: { actionFilter: 'all', sortMode: 'risk' },
+};
+
+const countAgedActionSessions = ({
+  sessions,
+  matcher,
+  thresholdMs,
+  nowMs,
+}: {
+  sessions: AiSessionItem[];
+  matcher: (items?: AiPendingActionSummary[]) => boolean;
+  thresholdMs: number;
+  nowMs: number;
+}) => sessions.filter((item) => {
+  if (!matcher(item.pendingActionSummary)) return false;
+  const latestActionAt = getLatestPendingActionAt(item.pendingActionSummary);
+  if (!latestActionAt) return false;
+  return nowMs - new Date(latestActionAt).getTime() >= thresholdMs;
+}).length;
+
+const buildGovernanceSummary = ({
+  sessionsCount,
+  failedSessionCount,
+  pendingSessionCount,
+  actionableSessionCount,
+  agedFailedSessionCount,
+  agedPendingSessionCount,
+}: {
+  sessionsCount: number;
+  failedSessionCount: number;
+  pendingSessionCount: number;
+  actionableSessionCount: number;
+  agedFailedSessionCount: number;
+  agedPendingSessionCount: number;
+}) => {
+  if (!sessionsCount) return null;
+  if (failedSessionCount > 0) {
+    const staleFailedText = agedFailedSessionCount > 0
+      ? `其中 ${agedFailedSessionCount} 个失败动作已超过 4 小时未处理。`
+      : null;
+    const stalePendingText = agedPendingSessionCount > 0
+      ? `另有 ${agedPendingSessionCount} 个待确认会话已挂起超过 2 小时。`
+      : null;
+    return {
+      variant: 'destructive' as const,
+      title: `当前有 ${failedSessionCount} 个失败动作会话需要优先处理`,
+      description: [
+        pendingSessionCount > 0
+          ? `另有 ${pendingSessionCount} 个待确认会话仍在排队，建议先处理失败动作，再回到确认流。`
+          : '失败动作会话已自动进入风险优先视角，建议先排查失败原因。',
+        staleFailedText,
+        stalePendingText,
+      ].filter(Boolean).join(' '),
+      actionLabel: '处理失败动作',
+      preset: 'failed' as const,
+      Icon: AlertTriangle,
+      className: '',
+      agingBadges: [
+        agedFailedSessionCount > 0 ? { label: `超时失败 ${agedFailedSessionCount}`, variant: 'destructive' as const } : null,
+        agedPendingSessionCount > 0 ? { label: `超时待确认 ${agedPendingSessionCount}`, variant: 'outline' as const } : null,
+      ].filter(Boolean),
+    };
+  }
+  if (pendingSessionCount > 0) {
+    return {
+      variant: 'default' as const,
+      title: `当前有 ${pendingSessionCount} 个待确认会话等待人工确认`,
+      description: agedPendingSessionCount > 0
+        ? `其中 ${agedPendingSessionCount} 个待确认会话已挂起超过 2 小时，建议优先处理最早挂起的确认流。`
+        : '这些会话已进入确认流，建议按最近动作时间逐条处理，避免长时间挂起。',
+      actionLabel: '查看待确认',
+      preset: 'pending' as const,
+      Icon: Clock3,
+      className: 'border-amber-500/40 bg-amber-50/70 text-amber-950 [&>svg]:text-amber-600 dark:bg-amber-950/20 dark:text-amber-100',
+      agingBadges: [
+        agedPendingSessionCount > 0 ? { label: `超时待确认 ${agedPendingSessionCount}`, variant: 'outline' as const } : null,
+      ].filter(Boolean),
+    };
+  }
+  return {
+    variant: 'default' as const,
+    title: actionableSessionCount > 0 ? '当前待处理动作已全部收口' : '当前没有待处理动作会话',
+    description: '列表仍保留完整会话回放，但当前没有失败或待确认动作需要优先介入。',
+    actionLabel: '查看全部会话',
+    preset: 'all' as const,
+    Icon: CheckCircle2,
+    className: 'border-emerald-500/40 bg-emerald-50/70 text-emerald-950 [&>svg]:text-emerald-600 dark:bg-emerald-950/20 dark:text-emerald-100',
+    agingBadges: [],
+  };
+};
+
+const buildGovernanceSourceNote = ({
+  prefsSource,
+  actionFilter,
+}: {
+  prefsSource: 'bootstrap' | 'url' | 'auto' | 'local' | 'default' | 'manual';
+  actionFilter: string;
+}) => {
+  if (prefsSource === 'auto') {
+    return {
+      label: '来源：自动失败视角',
+      description: actionFilter === 'failed'
+        ? '检测到失败动作，系统临时切到失败优先视角。'
+        : '检测到异常动作，系统临时切到自动治理视角。',
+    };
+  }
+  if (prefsSource === 'manual') {
+    return {
+      label: '来源：手动调整',
+      description: '当前治理视角由你最近一次排序或筛选操作决定。',
+    };
+  }
+  if (prefsSource === 'url') {
+    return {
+      label: '来源：URL 参数',
+      description: '当前治理视角来自链接中的排序或筛选参数。',
+    };
+  }
+  if (prefsSource === 'local') {
+    return {
+      label: '来源：本地偏好',
+      description: '当前治理视角来自你上次保存的本地偏好。',
+    };
+  }
+  if (prefsSource === 'default') {
+    return {
+      label: '来源：默认视图',
+      description: '当前展示的是系统默认治理视角。',
+    };
+  }
+  return null;
 };
 
 const buildRegistryDomainStats = (toolRegistry: AiAgentToolRegistryResponse | null) => {
@@ -404,14 +638,10 @@ export default function AiSessionsPage() {
   const [standaloneLoading, setStandaloneLoading] = useState(true);
   const [standaloneDetailRow, setStandaloneDetailRow] = useState<AiStandaloneTokenRow | null>(null);
   const [toolRegistry, setToolRegistry] = useState<AiAgentToolRegistryResponse | null>(null);
-  const [actionFilter, setActionFilter] = useState<string>(() => {
-    if (searchParams.has('actionFilter')) return normalizeActionFilter(searchParams.get('actionFilter'));
-    return readSessionListPreferences()?.actionFilter || 'all';
-  });
-  const [sortMode, setSortMode] = useState<string>(() => {
-    if (searchParams.has('sort')) return normalizeSortMode(searchParams.get('sort'));
-    return readSessionListPreferences()?.sort || 'risk';
-  });
+  const [actionFilter, setActionFilter] = useState<string>('all');
+  const [sortMode, setSortMode] = useState<string>('risk');
+  const [prefsSource, setPrefsSource] = useState<'bootstrap' | 'url' | 'auto' | 'local' | 'default' | 'manual'>('bootstrap');
+  const [prefsDirty, setPrefsDirty] = useState(false);
 
   // 会话详情弹窗
   const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
@@ -427,6 +657,14 @@ export default function AiSessionsPage() {
   const [stats24h, setStats24h] = useState<TokenStats | null>(null);
   const [stats30d, setStats30d] = useState<TokenStats | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
+
+  const applyGovernancePreset = useCallback((preset: keyof typeof GOVERNANCE_PRESETS) => {
+    const next = GOVERNANCE_PRESETS[preset];
+    setActionFilter(next.actionFilter);
+    setSortMode(next.sortMode);
+    setPrefsSource('manual');
+    setPrefsDirty(true);
+  }, []);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -493,24 +731,31 @@ export default function AiSessionsPage() {
   }, [loadToolRegistry]);
 
   useEffect(() => {
-    const stored = readSessionListPreferences();
-    setActionFilter(searchParams.has('actionFilter')
-      ? normalizeActionFilter(searchParams.get('actionFilter'))
-      : (stored?.actionFilter || 'all'));
-    setSortMode(searchParams.has('sort')
-      ? normalizeSortMode(searchParams.get('sort'))
-      : (stored?.sort || 'risk'));
-  }, [searchParams]);
+    if (loading) return;
+    const next = resolveSessionListGovernanceState({
+      searchParams,
+      stored: readSessionListPreferences(),
+      sessions,
+    });
+    setActionFilter(next.actionFilter);
+    setSortMode(next.sortMode);
+    setPrefsSource(next.source);
+    setPrefsDirty(false);
+  }, [searchParams, sessions, loading]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (prefsSource === 'bootstrap' || prefsSource === 'auto') return;
     window.localStorage.setItem(SESSION_LIST_PREFS_KEY, JSON.stringify({
       sort: sortMode,
       actionFilter,
     }));
-  }, [sortMode, actionFilter]);
+  }, [sortMode, actionFilter, prefsSource]);
 
   useEffect(() => {
+    if (prefsSource === 'bootstrap') return;
+    if (prefsSource === 'auto') return;
+    if (!prefsDirty && prefsSource !== 'auto') return;
     const params = new URLSearchParams(searchParams.toString());
     if (sortMode === 'risk') {
       params.delete('sort');
@@ -525,7 +770,7 @@ export default function AiSessionsPage() {
     const query = params.toString();
     const nextUrl = query ? `${pathname}?${query}` : pathname;
     router.replace(nextUrl, { scroll: false });
-  }, [actionFilter, sortMode, pathname, router, searchParams]);
+  }, [actionFilter, sortMode, pathname, router, searchParams, prefsSource, prefsDirty]);
 
   useEffect(() => {
     let cancelled = false;
@@ -600,6 +845,36 @@ export default function AiSessionsPage() {
   const registryDomainStats = toolRegistry?.domains?.length
     ? toolRegistry.domains
     : buildRegistryDomainStats(toolRegistry);
+  const failedSessionCount = sessions.filter((item) => hasFailedPendingAction(item.pendingActionSummary)).length;
+  const pendingSessionCount = sessions.filter((item) => hasPendingPendingAction(item.pendingActionSummary)).length;
+  const actionableSessionCount = sessions.filter((item) =>
+    hasFailedPendingAction(item.pendingActionSummary) || hasPendingPendingAction(item.pendingActionSummary)
+  ).length;
+  const nowMs = Date.now();
+  const agedFailedSessionCount = countAgedActionSessions({
+    sessions,
+    matcher: hasFailedPendingAction,
+    thresholdMs: FAILED_ACTION_ESCALATION_MS,
+    nowMs,
+  });
+  const agedPendingSessionCount = countAgedActionSessions({
+    sessions,
+    matcher: hasPendingPendingAction,
+    thresholdMs: PENDING_ACTION_ESCALATION_MS,
+    nowMs,
+  });
+  const governanceSummary = buildGovernanceSummary({
+    sessionsCount: sessions.length,
+    failedSessionCount,
+    pendingSessionCount,
+    actionableSessionCount,
+    agedFailedSessionCount,
+    agedPendingSessionCount,
+  });
+  const governanceSourceNote = buildGovernanceSourceNote({
+    prefsSource,
+    actionFilter,
+  });
   const visibleSessions = [...sessions]
     .filter((item) => matchesActionFilter(item, actionFilter))
     .sort((a, b) => compareSessionsByMode(a, b, sortMode));
@@ -824,6 +1099,70 @@ export default function AiSessionsPage() {
 
       {/* 聊天会话 + 无 session 的 AI 调用（同一板块，Tabs 切换） */}
       <div className="space-y-2">
+        <div
+          data-testid="governance-presets"
+          className="sticky top-0 z-10 -mx-1 flex flex-wrap gap-2 rounded-xl border border-border/60 bg-background/95 px-1 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+        >
+          <Button
+            variant={actionFilter === 'all' && sortMode === 'risk' ? 'default' : 'outline'}
+            className="h-8 rounded-full px-3 text-xs"
+            onClick={() => applyGovernancePreset('all')}
+          >
+            全部 {sessions.length}
+          </Button>
+          <Button
+            variant={actionFilter === 'failed' ? 'default' : 'outline'}
+            className="h-8 rounded-full px-3 text-xs"
+            onClick={() => applyGovernancePreset('failed')}
+          >
+            失败动作 {failedSessionCount}
+          </Button>
+          <Button
+            variant={actionFilter === 'pending' ? 'default' : 'outline'}
+            className="h-8 rounded-full px-3 text-xs"
+            onClick={() => applyGovernancePreset('pending')}
+          >
+            待确认 {pendingSessionCount}
+          </Button>
+          <Button
+            variant={actionFilter === 'actionable' ? 'default' : 'outline'}
+            className="h-8 rounded-full px-3 text-xs"
+            onClick={() => applyGovernancePreset('actionable')}
+          >
+            待处理 {actionableSessionCount}
+          </Button>
+        </div>
+        {governanceSummary ? (
+          <Alert
+            data-testid="sessions-governance-summary"
+            variant={governanceSummary.variant}
+            className={governanceSummary.className}
+          >
+            <governanceSummary.Icon className="h-4 w-4" />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <AlertTitle>{governanceSummary.title}</AlertTitle>
+                <AlertDescription>{governanceSummary.description}</AlertDescription>
+                {governanceSummary.agingBadges?.length ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {governanceSummary.agingBadges.map((badge) => (
+                      <Badge key={badge.label} variant={badge.variant}>
+                        {badge.label}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              <Button
+                variant={governanceSummary.variant === 'destructive' ? 'destructive' : 'outline'}
+                className="h-8 shrink-0 rounded-full px-3 text-xs"
+                onClick={() => applyGovernancePreset(governanceSummary.preset)}
+              >
+                {governanceSummary.actionLabel}
+              </Button>
+            </div>
+          </Alert>
+        ) : null}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-sm font-medium text-foreground">会话与用量</h2>
@@ -833,7 +1172,11 @@ export default function AiSessionsPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">排序方式</span>
-            <Select value={sortMode} onValueChange={setSortMode}>
+            <Select value={sortMode} onValueChange={(value) => {
+              setSortMode(value);
+              setPrefsSource('manual');
+              setPrefsDirty(true);
+            }}>
               <SelectTrigger className="h-8 w-[150px] text-xs" aria-label="排序方式">
                 <SelectValue />
               </SelectTrigger>
@@ -844,7 +1187,11 @@ export default function AiSessionsPage() {
               </SelectContent>
             </Select>
             <span className="text-xs text-muted-foreground">动作筛选</span>
-            <Select value={actionFilter} onValueChange={setActionFilter}>
+            <Select value={actionFilter} onValueChange={(value) => {
+              setActionFilter(value);
+              setPrefsSource('manual');
+              setPrefsDirty(true);
+            }}>
               <SelectTrigger className="h-8 w-[150px] text-xs" aria-label="动作筛选">
                 <SelectValue />
               </SelectTrigger>
@@ -852,11 +1199,24 @@ export default function AiSessionsPage() {
                 <SelectItem value="all">全部</SelectItem>
                 <SelectItem value="failed">有失败</SelectItem>
                 <SelectItem value="pending">有待确认</SelectItem>
+                <SelectItem value="actionable">仅待处理</SelectItem>
                 <SelectItem value="completed">已完成动作</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
+        {sortMode === 'risk' ? (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <Badge variant="outline">当前：超时优先风险排序</Badge>
+            <span>顺序为超时失败、超时待确认、普通失败、普通待确认。</span>
+          </div>
+        ) : null}
+        {governanceSourceNote ? (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <Badge variant="secondary">{governanceSourceNote.label}</Badge>
+            <span>{governanceSourceNote.description}</span>
+          </div>
+        ) : null}
         <div className="surface-panel overflow-hidden">
           <Tabs defaultValue="chat" className="gap-0">
             <div className="border-b border-border/60 px-4 py-3">
@@ -880,12 +1240,20 @@ export default function AiSessionsPage() {
                     const actionStatusSummary = formatPendingActionStatusSummary(item.pendingActionSummary);
                     const latestActionAt = getLatestPendingActionAt(item.pendingActionSummary);
                     const actionHasFailed = hasFailedPendingAction(item.pendingActionSummary);
+                    const sla = getSessionSlaLevel(item.pendingActionSummary);
+                    const attentionSignal = getSessionAttentionSignal(item.pendingActionSummary);
                     return (
                       <MobileListCard
                         key={item.sessionId}
                         title={item.sessionId}
                         subtitle={lastAt ? formatDateTime(lastAt) : '—'}
-                        badge={<Badge variant="outline">消息 {getSessionCount(item)}</Badge>}
+                        badge={(
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant="outline">消息 {getSessionCount(item)}</Badge>
+                            {sla ? <Badge variant={sla.variant}>{sla.label}</Badge> : null}
+                            {attentionSignal ? <Badge variant={attentionSignal.variant}>{attentionSignal.label}</Badge> : null}
+                          </div>
+                        )}
                         fields={[
                           { label: '路由', value: item.routeMode || '—' },
                           { label: '域', value: formatDomainSummary(item.domainsTouched) },
@@ -967,13 +1335,21 @@ export default function AiSessionsPage() {
                         const actionStatusSummary = formatPendingActionStatusSummary(item.pendingActionSummary);
                         const latestActionAt = getLatestPendingActionAt(item.pendingActionSummary);
                         const actionHasFailed = hasFailedPendingAction(item.pendingActionSummary);
+                        const sla = getSessionSlaLevel(item.pendingActionSummary);
+                        const attentionSignal = getSessionAttentionSignal(item.pendingActionSummary);
                         return (
                           <TableRow
                             key={item.sessionId}
                             className="cursor-pointer hover:bg-muted/40"
                             onClick={() => void handleViewDetail(item.sessionId)}
                           >
-                            <TableCell className="font-mono text-xs">{item.sessionId}</TableCell>
+                            <TableCell className="font-mono text-xs">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span>{item.sessionId}</span>
+                                {sla ? <Badge variant={sla.variant}>{sla.label}</Badge> : null}
+                                {attentionSignal ? <Badge variant={attentionSignal.variant}>{attentionSignal.label}</Badge> : null}
+                              </div>
+                            </TableCell>
                             <TableCell>
                               {item.routeMode ? <Badge variant="secondary">{item.routeMode}</Badge> : '—'}
                             </TableCell>
