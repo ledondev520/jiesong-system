@@ -88,7 +88,12 @@ export function DataExportTab() {
             </div>
           )}
 
-          <Button className="w-full" onClick={handleExport} disabled={exporting}>
+          <Button
+            className="w-full"
+            onClick={handleExport}
+            disabled={exporting}
+            data-testid="system-export-button"
+          >
             <Download className="mr-2 h-4 w-4" />
             {exporting ? '导出中...' : '导出数据'}
           </Button>

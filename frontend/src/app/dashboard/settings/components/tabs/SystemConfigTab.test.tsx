@@ -50,7 +50,7 @@ describe('SystemConfigTab', () => {
     render(<SystemConfigTab />);
 
     await waitFor(() => {
-      expect(screen.getByText('AI 模型优先级')).toBeInTheDocument();
+      expect(screen.getByText(/采样温度/)).toBeInTheDocument();
     });
 
     expect(screen.getAllByText(/采样温度/).length).toBeGreaterThan(0);

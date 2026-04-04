@@ -64,7 +64,11 @@ function hasIdOrName(attributes: ts.JsxAttributes): boolean {
       return false;
     }
 
-    return prop.name.text === 'id' || prop.name.text === 'name';
+    if (ts.isIdentifier(prop.name)) {
+      return prop.name.text === 'id' || prop.name.text === 'name';
+    }
+
+    return false;
   });
 }
 
