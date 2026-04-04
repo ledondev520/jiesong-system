@@ -430,6 +430,7 @@ const buildGovernanceSourceNote = ({
   if (prefsSource === 'auto') {
     return {
       label: '来源：自动失败视角',
+      stateLabel: '瞬时态',
       description: actionFilter === 'failed'
         ? '检测到失败动作，系统临时切到失败优先视角。'
         : '检测到异常动作，系统临时切到自动治理视角。',
@@ -438,27 +439,42 @@ const buildGovernanceSourceNote = ({
   if (prefsSource === 'manual') {
     return {
       label: '来源：手动调整',
+      stateLabel: '已手动接管',
       description: '当前治理视角由你最近一次排序或筛选操作决定。',
     };
   }
   if (prefsSource === 'url') {
     return {
       label: '来源：URL 参数',
-      description: '当前治理视角来自链接中的排序或筛选参数。',
+      stateLabel: '已由链接固定',
+      description: '链接参数优先于本地偏好和默认视图。',
     };
   }
   if (prefsSource === 'local') {
     return {
       label: '来源：本地偏好',
-      description: '当前治理视角来自你上次保存的本地偏好。',
+      stateLabel: '仅当前设备',
+      description: '已恢复你上次保存的治理视角。',
     };
   }
   if (prefsSource === 'default') {
     return {
       label: '来源：默认视图',
-      description: '当前展示的是系统默认治理视角。',
+      stateLabel: '默认可复现',
+      description: '当前使用系统默认的全量风险视图。',
     };
   }
+  return null;
+};
+
+const buildGovernanceViewStateNote = (
+  prefsSource: 'bootstrap' | 'url' | 'auto' | 'local' | 'default' | 'manual'
+) => {
+  if (prefsSource === 'url') return '当前视角：可分享';
+  if (prefsSource === 'local') return '当前视角：仅本机';
+  if (prefsSource === 'default') return '当前视角：默认基线';
+  if (prefsSource === 'auto') return '当前视角：临时态';
+  if (prefsSource === 'manual') return '当前视角：手动维护';
   return null;
 };
 
@@ -755,7 +771,7 @@ export default function AiSessionsPage() {
   useEffect(() => {
     if (prefsSource === 'bootstrap') return;
     if (prefsSource === 'auto') return;
-    if (!prefsDirty && prefsSource !== 'auto') return;
+    if (!prefsDirty) return;
     const params = new URLSearchParams(searchParams.toString());
     if (sortMode === 'risk') {
       params.delete('sort');
@@ -875,6 +891,7 @@ export default function AiSessionsPage() {
     prefsSource,
     actionFilter,
   });
+  const governanceViewStateNote = buildGovernanceViewStateNote(prefsSource);
   const visibleSessions = [...sessions]
     .filter((item) => matchesActionFilter(item, actionFilter))
     .sort((a, b) => compareSessionsByMode(a, b, sortMode));
@@ -1145,7 +1162,7 @@ export default function AiSessionsPage() {
                 <AlertDescription>{governanceSummary.description}</AlertDescription>
                 {governanceSummary.agingBadges?.length ? (
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {governanceSummary.agingBadges.map((badge) => (
+                    {governanceSummary.agingBadges.map((badge) => badge && (
                       <Badge key={badge.label} variant={badge.variant}>
                         {badge.label}
                       </Badge>
@@ -1213,7 +1230,13 @@ export default function AiSessionsPage() {
         ) : null}
         {governanceSourceNote ? (
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            {governanceViewStateNote ? (
+              <Badge variant="outline">{governanceViewStateNote}</Badge>
+            ) : null}
             <Badge variant="secondary">{governanceSourceNote.label}</Badge>
+            {governanceSourceNote.stateLabel ? (
+              <Badge variant="outline">{governanceSourceNote.stateLabel}</Badge>
+            ) : null}
             <span>{governanceSourceNote.description}</span>
           </div>
         ) : null}
