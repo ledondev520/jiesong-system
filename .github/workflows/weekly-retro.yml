@@ -1,0 +1,60 @@
+# G-Stack Weekly Retro
+# 每周工程回顾
+
+name: Weekly Retro
+
+on:
+  schedule:
+    # 每周一早上 9 点运行
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+jobs:
+  weekly-retro:
+    name: Weekly Engineering Retro
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Generate weekly retro
+        run: |
+          if [ -f .gstack/weekly-retro.sh ]; then
+            bash .gstack/weekly-retro.sh
+          fi
+
+      - name: Upload retro report
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-retro-report
+          path: .gstack/loop-reports/weekly_retro_*.md
+          retention-days: 90
+
+      - name: Comment on PRs (if triggered by workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const reportsDir = '.gstack/loop-reports';
+            const files = fs.readdirSync(reportsDir);
+            const retroFile = files.find(f => f.startsWith('weekly_retro_'));
+
+            if (retroFile) {
+              const content = fs.readFileSync(path.join(reportsDir, retroFile), 'utf8');
+              console.log('Weekly retro generated:\n', content.substring(0, 500));
+            }
