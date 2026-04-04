@@ -86,7 +86,7 @@ jobs:
           # 添加实际部署命令
 
       - name: Notify deployment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             await github.rest.repos.createCommitStatus({
