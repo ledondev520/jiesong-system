@@ -17,10 +17,12 @@ const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockSearchParamGet = vi.fn();
 const mockRouterPush = vi.fn();
+const mockRouterReplace = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockRouterPush,
+    replace: mockRouterReplace,
     back: vi.fn(),
   }),
   useSearchParams: () => ({

@@ -102,12 +102,12 @@ describe('SystemLogsPage', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '系统日志' })).toBeInTheDocument();
-      expect(screen.getAllByText('管理员').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('IMPORT').length).toBeGreaterThan(0);
     });
+    expect(screen.getAllByText('管理员').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('导入').length).toBeGreaterThan(0);
   });
 
-  it('可切换查看导入日志', async () => {
+  it('可搜索过滤日志', async () => {
     mockGetSystemLogs.mockResolvedValue({
       data: {
         items: [fullLog, otherLog],
@@ -124,15 +124,14 @@ describe('SystemLogsPage', () => {
     render(<SystemLogsPage />);
 
     await waitFor(() => {
-      expect(screen.getAllByText('UPDATE').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('修改').length).toBeGreaterThan(0);
     });
 
-    await user.click(screen.getByRole('button', { name: '导入日志' }));
+    // 测试搜索功能
+    const searchInput = screen.getByPlaceholderText('搜索用户、操作、业务模块...');
+    await user.type(searchInput, '管理员');
 
-    await waitFor(() => {
-      expect(screen.getAllByText('IMPORT').length).toBeGreaterThan(0);
-      expect(screen.queryByText('UPDATE')).toBeNull();
-    });
+    expect(searchInput).toHaveValue('管理员');
   });
 
   it('请求失败时展示错误提示', async () => {

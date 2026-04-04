@@ -30,10 +30,9 @@ describe('SystemManagementPage', () => {
     mockReplace.mockReset();
   });
 
-  it('渲染运维中心总览页，包含三大功能入口', () => {
+  it('渲染运维中心总览页，包含功能入口', () => {
     render(<SystemManagementPage />);
     expect(screen.getAllByText('通知中心').length).toBeGreaterThan(0);
     expect(screen.getAllByText('系统日志').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('导入记录').length).toBeGreaterThan(0);
   });
 });

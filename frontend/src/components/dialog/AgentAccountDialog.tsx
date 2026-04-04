@@ -100,7 +100,7 @@ export function AgentAccountDialog({
         <DialogHeader>
           <DialogTitle>{agent ? '编辑 Agent' : '新增 Agent'}</DialogTitle>
           <DialogDescription>
-            Agent 账号用于 CLI / MCP / 外部自动化访问。接入后自动获得全部操作权限，无需手动配置。
+            Agent 账号用于 CLI / MCP / 外部自动化访问。当前实现会自动附加固定能力集，暂不支持在这里逐项勾选权限。
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>

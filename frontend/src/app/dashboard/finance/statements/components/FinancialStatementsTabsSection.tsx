@@ -388,7 +388,7 @@ export function FinancialStatementsTabsSection({
                       <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                       <YAxis tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} tick={{ fontSize: 12 }} domain={[0, 1.2]} />
                       <Tooltip
-                        formatter={(value: number | string | undefined) => [
+                        formatter={(value) => [
                           value !== undefined ? `${(Number(value) * 100).toFixed(1)}%` : '—',
                           '资产负债率',
                         ]}

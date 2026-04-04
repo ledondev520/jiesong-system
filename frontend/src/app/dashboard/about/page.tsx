@@ -162,7 +162,7 @@ export default function AboutAgentPage() {
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <div className="rounded-lg border p-3">
               <p className="font-medium text-foreground">1. 创建 Agent 账号</p>
-              <p>在「Agent 管理」里给这个 Agent 配能力，例如 `search.read`、`purchase.create`。</p>
+              <p>当前实现会自动赋予固定能力集：`search.read`、`purchase.create/update`、`supplier.create/update`。暂不支持在页面里逐项勾选权限。</p>
             </div>
             <div className="rounded-lg border p-3">
               <p className="font-medium text-foreground">2. 默认直接用自己的账号密码</p>

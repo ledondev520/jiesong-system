@@ -59,9 +59,9 @@ describe('UsersPage 交互逻辑', () => {
     render(<UsersPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '用户管理' })).toBeInTheDocument();
-      expect(screen.getByText('暂无用户。')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '账号管理' })).toBeInTheDocument();
     });
+    expect(screen.getByText('暂无用户')).toBeInTheDocument();
   });
 
   it('点击新增用户会打开弹窗', async () => {

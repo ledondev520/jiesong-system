@@ -34,4 +34,16 @@ describe('AboutAgentPage', () => {
       expect(screen.getByRole('button', { name: '复制安装命令' })).toBeInTheDocument();
     });
   });
+
+  it('展示当前实现的固定能力集说明，而不是手动配权限文案', async () => {
+    render(<AboutAgentPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/当前实现会自动赋予固定能力集/)).toBeInTheDocument();
+      expect(screen.getAllByText((_, element) => {
+        const text = element?.textContent || '';
+        return text.includes('search.read') && text.includes('purchase.create/update') && text.includes('supplier.create/update');
+      }).length).toBeGreaterThan(0);
+    });
+  });
 });

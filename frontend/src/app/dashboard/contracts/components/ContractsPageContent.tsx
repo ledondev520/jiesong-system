@@ -33,7 +33,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { AmountText } from '@/components/ui/amount-text';
-import { Plus, Eye, FileText, ShoppingCart, Package, Loader2, FileDown, Filter, X, Store, Truck } from 'lucide-react';
+import { Plus, Eye, ShoppingCart, Package, Loader2, FileDown, Filter, X, FileText, Store, Truck } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -312,34 +312,6 @@ export default function ContractsPageContent() {
         title="采购合同"
         description="管理供应商采购合同"
       />
-
-      <section className="space-y-4">
-        <Card className="border-primary/20 bg-primary/5">
-          <CardContent className="space-y-4 pt-6">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">采购故事流</p>
-              <h3 className="text-lg font-semibold tracking-tight">先起草采购，再跟进回签与归档</h3>
-              <p className="text-sm leading-6 text-muted-foreground">
-                先从采购起单，选/建供应商并生成购销合同；等对方回签后，把文件归档，再把后续出口动作交给出口模块继续推进。
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Button className="h-11 rounded-xl" onClick={() => router.push('/dashboard/purchase/create')}>
-                <Plus className="mr-2 h-4 w-4" />
-                新增采购
-              </Button>
-              <Button variant="outline" className="h-11 rounded-xl" onClick={() => router.push('/dashboard/suppliers')}>
-                <Store className="mr-2 h-4 w-4" />
-                新增供应商
-              </Button>
-              <Button variant="outline" className="h-11 rounded-xl" onClick={() => setPurchaseStatusFilter('SIGNED')}>
-                <FileText className="mr-2 h-4 w-4" />
-                查看待回签归档
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
 
       <section className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">

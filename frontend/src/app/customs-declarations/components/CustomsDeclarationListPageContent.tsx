@@ -53,12 +53,27 @@ const formatAmount = (amount: number, currency: string) =>
 export function CustomsDeclarationListPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
   const initialKeyword = searchParams.get('keyword') || '';
   const initialStatus = searchParams.get('status') || 'ALL';
 
   const [keyword, setKeyword] = useState(initialKeyword);
   const [status, setStatus] = useState(initialStatus);
   const deferredKeyword = useDeferredValue(keyword);
+
+  // 同步搜索状态到 URL
+  const updateUrlParams = useCallback((newKeyword: string, newStatus: string) => {
+    const params = new URLSearchParams();
+    if (newKeyword) params.set('keyword', newKeyword);
+    if (newStatus && newStatus !== 'ALL') params.set('status', newStatus);
+    const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+    router.replace(newUrl, { scroll: false });
+  }, [pathname, router]);
+
+  // 关键词变化时更新 URL
+  useEffect(() => {
+    updateUrlParams(deferredKeyword, status);
+  }, [deferredKeyword, status, updateUrlParams]);
 
   const [declarations, setDeclarations] = useState<CustomsDeclaration[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,7 +164,12 @@ export function CustomsDeclarationListPageContent() {
               <Button
                 variant="ghost"
                 className="h-11 rounded-xl"
-                onClick={() => { setKeyword(''); setStatus('ALL'); }}
+                onClick={() => {
+                  setKeyword('');
+                  setStatus('ALL');
+                  updateUrlParams('', 'ALL');
+                }}
+                data-testid="reset-filters"
               >
                 重置
               </Button>
@@ -240,7 +260,12 @@ export function CustomsDeclarationListPageContent() {
                 </TableRow>
               ) : (
                 declarations.map((declaration) => (
-                  <TableRow key={declaration.id}>
+                  <TableRow
+                    key={declaration.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => openDetail(declaration.id)}
+                    data-testid={`declaration-row-${declaration.declarationNo}`}
+                  >
                     <TableCell className="font-medium">{declaration.declarationNo}</TableCell>
                     <TableCell>{declaration.exporter}</TableCell>
                     <TableCell>{declaration.consignee}</TableCell>
@@ -252,11 +277,13 @@ export function CustomsDeclarationListPageContent() {
                     <TableCell className="text-right">
                       {formatAmount(declaration.totalAmount, declaration.currency)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <Button
-                        variant="outline"
+                        variant="default"
+                        size="sm"
                         className="rounded-xl"
                         aria-label={`查看详情 ${declaration.declarationNo}`}
+                        data-testid={`declaration-detail-${declaration.declarationNo}`}
                         onClick={() => openDetail(declaration.id)}
                       >
                         查看详情

@@ -37,7 +37,7 @@ describe('hsCodeService', () => {
     await hsCodeService.list({ page: 2, pageSize: 50 });
 
     expect(api.get).toHaveBeenCalledWith('/hs-codes', {
-      params: { keyword: '', page: 2, pageSize: 50 },
+      params: { keyword: undefined, code: undefined, page: 2, pageSize: 50 },
     });
   });
 });
