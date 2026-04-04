@@ -24,7 +24,7 @@ jobs:
     name: Pre-deploy Checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -60,7 +60,7 @@ jobs:
       name: staging
       url: https://staging.jiesong-system.com
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Deploy to Staging
         run: |
@@ -78,7 +78,7 @@ jobs:
       name: production
       url: https://jiesong-system.com
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Deploy to Production
         run: |
