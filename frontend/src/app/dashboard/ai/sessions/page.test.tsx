@@ -471,4 +471,59 @@ describe('AiSessionsPage', () => {
       expect(lastCall).not.toContain('actionFilter=pending');
     });
   });
+
+  it('无 URL 参数时从 localStorage 恢复排序和筛选偏好', async () => {
+    window.localStorage.setItem('ai-sessions-list-preferences', JSON.stringify({
+      sort: 'latest-action',
+      actionFilter: 'pending',
+    }));
+
+    mockGetSessions.mockResolvedValue({
+      data: [
+        {
+          sessionId: 'session_done',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T08:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-done',
+              actionType: 'AllocatePayment',
+              description: '确认收款挂账',
+              status: 'executed',
+              createdAt: '2026-04-04T04:01:00.000Z',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '确认收款挂账', at: '2026-04-04T04:01:00.000Z' },
+                { type: 'executed', status: 'executed', detail: '已执行挂账', at: '2026-04-04T04:05:00.000Z' },
+              ],
+            },
+          ],
+        },
+        {
+          sessionId: 'session_pending',
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T09:00:00.000Z' },
+          pendingActionSummary: [
+            {
+              actionId: 'pa-pending',
+              actionType: 'UpdateInventoryStatus',
+              description: '更新库存状态',
+              status: 'pending',
+              createdAt: '2026-04-04T04:07:00.000Z',
+              timeline: [
+                { type: 'created', status: 'pending', detail: '更新库存状态', at: '2026-04-04T04:07:00.000Z' },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<AiSessionsPage />);
+
+    await waitFor(() => {
+      const rows = Array.from(document.querySelectorAll('tbody tr'));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.textContent).toContain('session_pending');
+    });
+  });
 });
