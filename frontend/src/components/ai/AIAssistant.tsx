@@ -1,7 +1,7 @@
 /**
- * Input: Kimi AI API
- * Output: AI智能助手悬浮组件
- * Pos: 全局组件，提供AI问答和图片识别功能
+ * Input: Kimi AI API (via Open Agent SDK, SSE streaming)
+ * Output: AI 统一智能助手悬浮组件（财务/出口/系统配置一体，流式输出+图片上传+写操作二步确认）
+ * Pos: 全局组件，单入口 SSE 流式调用 unified agent
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -9,34 +9,33 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import NextImage from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bot, Send, X, Image as ImageIcon, XCircle, Brain, ChevronDown, ChevronUp } from 'lucide-react';
+import NextImage from 'next/image';
+import { Bot, Send, X, Brain, ChevronDown, ChevronUp, ShieldCheck, XOctagon, Loader2, CheckCircle2, Image as ImageIcon, XCircle, History, Plus, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getAuthToken } from '@/lib/auth-token';
 import { errorLogger } from '@/lib/error-logger';
+import { aiService, type AgentPendingAction, type AiActionRecommendation, type AiSessionItem, type AiChatHistoryItem } from '@/services/ai.service';
+import { getAuthToken } from '@/lib/auth-token';
+
+interface PendingActionState extends AgentPendingAction {
+  status: 'pending' | 'executing' | 'executed' | 'cancelled' | 'failed';
+  resultDetail?: string;
+}
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  thinking?: string; // AI思考过程
-  imageUrl?: string; // 图片URL（base64或远程URL）
-  model?: string; // 响应所用模型
+  thinking?: string;
+  imageUrl?: string;
+  model?: string;
+  actionRecommendations?: AiActionRecommendation[];
+  pendingActions?: PendingActionState[];
   createdAt: Date;
 }
-
-type StreamPayload = {
-  type: 'session' | 'start' | 'thinking' | 'chunk' | 'done' | 'error';
-  sessionId?: string;
-  content?: string;
-  message?: string;
-  tokenUsage?: unknown;
-  model?: string;
-};
 
 const FAB_MARGIN = 20;
 const MOBILE_FAB_BOTTOM_CLEARANCE = 96;
@@ -47,17 +46,17 @@ type FabPosition = {
   y: number;
 };
 
-/**
- * 流式接口必须直接请求后端，绕过 Next.js rewrite 代理。
- * Next.js Turbopack dev 代理可能缓冲 SSE 响应导致流式失效。
- * 生产环境使用 NEXT_PUBLIC_API_BASE_URL，开发环境回退到 localhost:3001。
- */
-const resolveStreamEndpoint = (): string => {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ||
-    (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:3001/api/v1` : '/api/v1');
-  return `${baseUrl.replace(/\/$/, '')}/ai/chat/stream`;
+const formatRecommendationPriority = (priority?: AiActionRecommendation['priority']) => {
+  if (priority === 'high') return '高优先';
+  if (priority === 'low') return '低优先';
+  return '中优先';
 };
+
+const formatRecommendationMode = (mode?: AiActionRecommendation['executionMode']) => (
+  mode === 'confirmable_write' ? '可确认执行' : '人工处理'
+);
+
+// 统一入口，不再区分 chat/agent 模式
 
 /**
  * 职责：渲染AI智能助手侧边面板
@@ -70,20 +69,16 @@ export function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'assistant',
-      content: '您好！我是捷淞系统的AI助手。您可以问我问题，也可以上传图片让我帮您识别和分析。支持粘贴、拖拽或点击上传图片。',
-      createdAt: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [pendingImage, setPendingImage] = useState<string | null>(null); // 待发送的图片（base64）
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [currentThinking, setCurrentThinking] = useState(''); // 当前思考内容
-  const [isThinking, setIsThinking] = useState(false); // 是否正在思考
-  const [expandedThinking, setExpandedThinking] = useState<Record<string, boolean>>({}); // 展开的思考内容
+  const [currentThinking, setCurrentThinking] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
+  const [expandedThinking, setExpandedThinking] = useState<Record<string, boolean>>({});
+  const [showSessionList, setShowSessionList] = useState(false);
+  const [sessionList, setSessionList] = useState<AiSessionItem[]>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false); // 展开的思考内容
   const [fabPosition, setFabPosition] = useState<FabPosition | null>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -207,50 +202,92 @@ export function AIAssistant() {
     };
   }, [clampFabPosition, resolveDefaultFabPosition]);
 
-  /**
-   * 处理图片文件
-   */
-  const handleImageFile = useCallback((file: File) => {
-    if (!file.type.startsWith('image/')) {
-      return;
+  const INITIAL_MESSAGE: Message = {
+    id: '1',
+    role: 'assistant',
+    content: '您好！我是捷淞智能助手。可以帮你查财务数据、出口合同、修改汇率等系统配置。直接提问即可，我会自动调用系统数据回答。',
+    createdAt: new Date(),
+  };
+
+  useEffect(() => {
+    if (messages.length === 0) setMessages([INITIAL_MESSAGE]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const loadSessions = useCallback(async () => {
+    setIsLoadingSessions(true);
+    try {
+      const resp = await aiService.getSessions();
+      setSessionList(resp.data ?? []);
+    } catch {
+      /* ignore */
+    } finally {
+      setIsLoadingSessions(false);
     }
-    
-    // 检查文件大小（限制5MB）
+  }, []);
+
+  const handleToggleSessionList = useCallback(() => {
+    setShowSessionList((prev) => {
+      if (!prev) loadSessions();
+      return !prev;
+    });
+  }, [loadSessions]);
+
+  const handleSelectSession = useCallback(async (sid: string) => {
+    setShowSessionList(false);
+    setSessionId(sid);
+    setMessages([INITIAL_MESSAGE]);
+    setIsLoading(true);
+    try {
+      const resp = await aiService.getChatHistory(sid);
+      const history: Message[] = (resp.data ?? []).map((item: AiChatHistoryItem) => ({
+        id: item.id,
+        role: item.role,
+        content: item.content,
+        imageUrl: item.imageUrl,
+        model: item.modelUsed,
+        actionRecommendations: item.actionRecommendations,
+        createdAt: new Date(item.createdAt),
+      }));
+      setMessages(history.length > 0 ? history : [INITIAL_MESSAGE]);
+    } catch {
+      setMessages([INITIAL_MESSAGE]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const handleNewSession = useCallback(() => {
+    setSessionId(null);
+    setMessages([INITIAL_MESSAGE]);
+    setShowSessionList(false);
+    setExpandedThinking({});
+  }, []);
+
+  const handleImageFile = useCallback((file: File) => {
+    if (!file.type.startsWith('image/')) return;
     if (file.size > 5 * 1024 * 1024) {
       alert('图片大小不能超过5MB');
       return;
     }
-    
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64 = e.target?.result as string;
-      setPendingImage(base64);
-    };
+    reader.onload = (e) => setPendingImage(e.target?.result as string);
     reader.readAsDataURL(file);
   }, []);
 
-  /**
-   * 处理粘贴事件
-   */
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
-    
     for (const item of items) {
       if (item.type.startsWith('image/')) {
         e.preventDefault();
         const file = item.getAsFile();
-        if (file) {
-          handleImageFile(file);
-        }
+        if (file) handleImageFile(file);
         return;
       }
     }
   }, [handleImageFile]);
 
-  /**
-   * 处理拖拽事件
-   */
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -267,30 +304,75 @@ export function AIAssistant() {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    
     const files = e.dataTransfer?.files;
-    if (files && files[0]) {
-      handleImageFile(files[0]);
-    }
+    if (files?.[0]) handleImageFile(files[0]);
   }, [handleImageFile]);
 
-  /**
-   * 处理文件选择
-   */
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      handleImageFile(file);
-    }
-    // 清空input以允许重复选择同一文件
+    if (file) handleImageFile(file);
     e.target.value = '';
   }, [handleImageFile]);
 
+  const clearPendingImage = useCallback(() => setPendingImage(null), []);
+
   /**
-   * 清除待发送图片
+   * 职责：确认执行一个 pendingAction
    */
-  const clearPendingImage = useCallback(() => {
-    setPendingImage(null);
+  const handleConfirmAction = useCallback(async (messageId: string, actionId: string) => {
+    setMessages((prev) => prev.map((msg) => {
+      if (msg.id !== messageId) return msg;
+      return {
+        ...msg,
+        pendingActions: msg.pendingActions?.map((a) =>
+          a.actionId === actionId ? { ...a, status: 'executing' as const } : a
+        ),
+      };
+    }));
+
+    try {
+      const result = await aiService.executeAgentAction(actionId);
+      setMessages((prev) => prev.map((msg) => {
+        if (msg.id !== messageId) return msg;
+        return {
+          ...msg,
+          pendingActions: msg.pendingActions?.map((a) =>
+            a.actionId === actionId
+              ? { ...a, status: 'executed' as const, resultDetail: result.data.detail }
+              : a
+          ),
+        };
+      }));
+    } catch (error: unknown) {
+      const detail = error instanceof Error ? error.message : '执行失败';
+      setMessages((prev) => prev.map((msg) => {
+        if (msg.id !== messageId) return msg;
+        return {
+          ...msg,
+          pendingActions: msg.pendingActions?.map((a) =>
+            a.actionId === actionId ? { ...a, status: 'failed' as const, resultDetail: detail } : a
+          ),
+        };
+      }));
+    }
+  }, []);
+
+  /**
+   * 职责：取消一个 pendingAction
+   */
+  const handleCancelAction = useCallback(async (messageId: string, actionId: string) => {
+    try {
+      await aiService.cancelAgentAction(actionId);
+    } catch { /* ignore */ }
+    setMessages((prev) => prev.map((msg) => {
+      if (msg.id !== messageId) return msg;
+      return {
+        ...msg,
+        pendingActions: msg.pendingActions?.map((a) =>
+          a.actionId === actionId ? { ...a, status: 'cancelled' as const } : a
+        ),
+      };
+    }));
   }, []);
 
   /**
@@ -322,7 +404,7 @@ export function AIAssistant() {
     });
   };
 
-  const createUserMessage = (text: string, imageUrl: string | null): Message => ({
+  const createUserMessage = (text: string, imageUrl?: string | null): Message => ({
     id: `${Date.now()}-user`,
     role: 'user',
     content: text,
@@ -343,181 +425,112 @@ export function AIAssistant() {
     );
   };
 
-  const parseStreamPayload = (line: string): StreamPayload | null => {
-    const trimmedLine = line.trim();
-    if (!trimmedLine.startsWith('data:')) {
-      return null;
-    }
-    const payload = trimmedLine.slice(5).trim();
-    if (!payload) {
-      return null;
-    }
-    try {
-      return JSON.parse(payload);
-    } catch {
-      return null;
-    }
-  };
-
-  const extractStreamPayloads = (chunkText: string, carryOver: string) => {
-    const merged = `${carryOver}${chunkText}`;
-    const lines = merged.split('\n');
-    const doneLines = lines.slice(0, -1);
-    const nextCarryOver = lines[lines.length - 1] || '';
-
-    return {
-      payloads: doneLines
-        .map((line) => parseStreamPayload(line))
-        .filter((entry): entry is StreamPayload => Boolean(entry)),
-      carryOver: nextCarryOver,
-    };
-  };
-
-  const formatStreamErrorMessage = (error: unknown) => {
-    const fallback = '抱歉，AI服务暂时不可用。';
+  const formatErrorMessage = (error: unknown) => {
     if (!(error instanceof Error)) {
-      return fallback;
+      return '抱歉，AI 助手暂时不可用。';
+    }
+    if (/503/.test(error.message) || /KIMI_API_KEY/i.test(error.message)) {
+      return '当前 AI 助手还未完成模型配置，请先检查系统 AI 设置。';
     }
     if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-      return '请先登录系统后再使用AI助手。';
+      return '请先登录系统后再使用 AI 助手。';
     }
     if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
       return '无法连接到服务器，请检查网络连接。';
     }
-    return error.message ? `请求失败：${error.message}` : fallback;
-  };
-
-  const buildChatRequestBody = (text: string, sessionIdValue: string | null, imageUrl: string | null) => ({
-    message: text,
-    sessionId: sessionIdValue,
-    ...(imageUrl ? { imageUrl } : {}),
-  });
-
-  const processStreamEvent = (
-    payload: StreamPayload,
-    assistantMessageId: string,
-    streamState: {
-      thinkingText: string;
-      answerText: string;
-      hasResult: boolean;
-    }
-  ) => {
-    if (payload.type === 'session' && payload.sessionId) {
-      setSessionId(payload.sessionId);
-      return;
-    }
-    if (payload.type === 'start') {
-      console.log('AI开始处理...');
-      return;
-    }
-    if (payload.type === 'thinking' && payload.content) {
-      streamState.thinkingText += payload.content;
-      setCurrentThinking(streamState.thinkingText);
-      updateMessageById(assistantMessageId, { thinking: streamState.thinkingText });
-      return;
-    }
-    if (payload.type === 'chunk' && payload.content) {
-      setIsThinking(false);
-      streamState.answerText += payload.content;
-      streamState.hasResult = true;
-      updateMessageById(assistantMessageId, {
-        content: streamState.answerText,
-        thinking: streamState.thinkingText,
-      });
-      return;
-    }
-    if (payload.type === 'done') {
-      setIsThinking(false);
-      updateMessageById(assistantMessageId, {
-        thinking: streamState.thinkingText,
-        model: payload.model || undefined,
-      });
-      return;
-    }
-    if (payload.type === 'error') {
-      setIsThinking(false);
-      streamState.hasResult = true;
-      updateMessageById(assistantMessageId, {
-        content: `抱歉，AI服务出错了: ${payload.message || '未知错误'}`,
-      });
-    }
-  };
-
-  const readAssistantStream = async (response: Response, assistantMessageId: string): Promise<boolean> => {
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error('无法读取AI返回的流式内容。');
-    }
-
-    const streamState = {
-      thinkingText: '',
-      answerText: '',
-      hasResult: false,
-    };
-    const decoder = new TextDecoder();
-    let carryOver = '';
-
-    const handleChunk = (chunkText: string) => {
-      const parsed = extractStreamPayloads(chunkText, carryOver);
-      carryOver = parsed.carryOver;
-      parsed.payloads.forEach((payload) => {
-        processStreamEvent(payload, assistantMessageId, streamState);
-      });
-    };
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      handleChunk(decoder.decode(value, { stream: true }));
-    }
-    handleChunk(decoder.decode());
-
-    const remainingPayload = parseStreamPayload(carryOver);
-    if (remainingPayload) {
-      processStreamEvent(remainingPayload, assistantMessageId, streamState);
-    }
-
-    return streamState.hasResult;
+    return error.message ? `请求失败：${error.message}` : '抱歉，AI 助手暂时不可用。';
   };
 
   const handleSend = async () => {
-    if ((!input.trim() && !pendingImage) || isLoading) return;
+    if (!input.trim() || isLoading) return;
 
-    const userMessage = input.trim() || (pendingImage ? '请分析这张图片' : '');
-    const currentImage = pendingImage;
-    const userMsg = createUserMessage(userMessage, currentImage);
+    const userMessage = input.trim();
+    const capturedImage = pendingImage;
+    const userMsg = createUserMessage(userMessage, capturedImage);
     const assistantMessage = createAssistantPlaceholder();
 
     setMessages((prev) => [...prev, userMsg, assistantMessage]);
     setInput('');
     setPendingImage(null);
     setIsLoading(true);
-    setCurrentThinking('');
     setIsThinking(true);
 
     try {
+      const { getApiBaseUrl } = await import('@/lib/api-base-url');
       const token = getAuthToken();
-      const response = await fetch(resolveStreamEndpoint(), {
+      const resp = await fetch(`${getApiBaseUrl()}/ai/agents/prompt-stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : '',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify(buildChatRequestBody(userMessage, sessionId, currentImage)),
+        body: JSON.stringify({
+          agentType: 'unified',
+          message: userMessage,
+          sessionId: sessionId || undefined,
+          ...(capturedImage ? { imageUrl: capturedImage } : {}),
+        }),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!resp.ok) {
+        const errBody = await resp.text().catch(() => '');
+        throw new Error(errBody || `HTTP ${resp.status}`);
       }
 
-      const hasResult = await readAssistantStream(response, assistantMessage.id);
-      if (!hasResult) {
-        updateMessageById(assistantMessage.id, { content: '抱歉，我暂时无法回答这个问题。' });
+      const reader = resp.body?.getReader();
+      if (!reader) throw new Error('No stream body');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let accumulatedText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const payload = JSON.parse(line.slice(6));
+            switch (payload.type) {
+              case 'session':
+                setSessionId(payload.sessionId);
+                break;
+              case 'chunk':
+                accumulatedText += payload.content || '';
+                setIsThinking(false);
+                updateMessageById(assistantMessage.id, { content: accumulatedText });
+                break;
+              case 'done': {
+                const pendingActions: PendingActionState[] | undefined =
+                  payload.pendingActions?.length
+                    ? payload.pendingActions.map((a: AgentPendingAction) => ({ ...a, status: 'pending' as const }))
+                    : undefined;
+                updateMessageById(assistantMessage.id, {
+                  content: accumulatedText || '抱歉，AI 助手没有返回有效结果。',
+                  model: payload.model,
+                  actionRecommendations: payload.actionRecommendations,
+                  pendingActions,
+                });
+                break;
+              }
+              case 'error':
+                throw new Error(payload.message || 'Agent error');
+            }
+          } catch (parseErr) {
+            if (parseErr instanceof SyntaxError) continue;
+            throw parseErr;
+          }
+        }
       }
     } catch (error: unknown) {
       errorLogger.error('AIAssistant', error);
       updateMessageById(assistantMessage.id, {
-        content: formatStreamErrorMessage(error),
+        content: formatErrorMessage(error),
       });
     } finally {
       setIsLoading(false);
@@ -587,23 +600,77 @@ export function AIAssistant() {
         )}
       >
         <Card className="flex h-full flex-col border-border/70 bg-background/95 shadow-2xl backdrop-blur supports-[backdrop-filter]:bg-background/85 rounded-none md:rounded-xl">
-          <CardHeader className="flex flex-row items-center justify-between border-b bg-muted/30 p-4">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Bot className="h-5 w-5 text-primary" />
-              捷淞智能助手
-            </CardTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setIsOpen(false)}
-              aria-label="收起AI助手"
-            >
-              <X className="h-5 w-5" />
-            </Button>
+          <CardHeader className="border-b bg-muted/30 p-0">
+            <div className="flex items-center justify-between px-4 py-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Bot className="h-5 w-5 text-primary" />
+                捷淞智能助手
+              </CardTitle>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={handleNewSession}
+                  aria-label="新建对话"
+                  title="新建对话"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={handleToggleSessionList}
+                  aria-label="历史对话"
+                  title="历史对话"
+                >
+                  <History className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setIsOpen(false)}
+                  aria-label="收起AI助手"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            {showSessionList && (
+              <div className="border-t max-h-52 overflow-y-auto">
+                {isLoadingSessions ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  </div>
+                ) : sessionList.length === 0 ? (
+                  <p className="py-4 text-center text-xs text-muted-foreground">暂无历史对话</p>
+                ) : (
+                  sessionList.map((s) => (
+                    <button
+                      key={s.sessionId}
+                      className={cn(
+                        'flex w-full items-start gap-2 px-4 py-2 text-left text-xs hover:bg-muted/50 transition-colors',
+                        s.sessionId === sessionId && 'bg-primary/10'
+                      )}
+                      onClick={() => handleSelectSession(s.sessionId)}
+                    >
+                      <MessageSquare className="h-3.5 w-3.5 shrink-0 mt-0.5 text-muted-foreground" />
+                      <div className="flex-1 min-w-0">
+                        <p className="truncate font-medium">{s.preview || s.sessionId.slice(0, 20)}</p>
+                        <p className="text-muted-foreground mt-0.5">
+                          {s._max?.createdAt ? new Date(s._max.createdAt).toLocaleDateString('zh-CN') : ''}
+                        </p>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </CardHeader>
           
-          <CardContent 
+          <CardContent
             className={cn(
               "flex-1 p-0 overflow-hidden bg-background transition-colors",
               isDragging && "bg-primary/5 border-2 border-dashed border-primary"
@@ -625,13 +692,12 @@ export function AIAssistant() {
                     <div
                       key={msg.id}
                       className={cn(
-                        "flex w-max max-w-[85%] flex-col gap-2 rounded-lg px-3 py-2 text-sm",
+                        "flex max-w-[85%] flex-col gap-2 rounded-lg px-3 py-2 text-sm break-words overflow-hidden",
                         msg.role === 'user'
                           ? "ml-auto bg-primary text-primary-foreground"
                           : "bg-muted text-foreground"
                       )}
                     >
-                      {/* 显示图片 */}
                       {msg.imageUrl && (
                         <div className="relative h-40 w-full max-w-xs overflow-hidden rounded-md">
                           <NextImage
@@ -643,7 +709,7 @@ export function AIAssistant() {
                           />
                         </div>
                       )}
-                      {/* 正在思考时在气泡内显示思考状态（流式阶段）*/}
+                      {/* 正在思考时在气泡内显示思考状态 */}
                       {isStreamingThis && !msg.content && (
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <Brain className="h-3 w-3 animate-pulse shrink-0" />
@@ -690,6 +756,78 @@ export function AIAssistant() {
                           )}
                         </span>
                       )}
+                      {msg.actionRecommendations && msg.actionRecommendations.length > 0 && (
+                        <div className="mt-2 rounded-lg border border-border/70 bg-background/60 p-2 text-xs">
+                          <p className="font-medium">诊断建议</p>
+                          <div className="mt-2 flex flex-col gap-2">
+                            {msg.actionRecommendations.map((recommendation) => (
+                              <div key={`${recommendation.code}-${recommendation.reason}`} className="rounded-md border border-border/60 bg-muted/50 p-2">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="font-medium">{recommendation.title}</span>
+                                  <span className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                    {formatRecommendationPriority(recommendation.priority)}
+                                  </span>
+                                  <span className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                    {formatRecommendationMode(recommendation.executionMode)}
+                                  </span>
+                                </div>
+                                <p className="mt-1 text-muted-foreground">{recommendation.reason}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {/* 待确认操作卡片 */}
+                      {msg.pendingActions && msg.pendingActions.length > 0 && (
+                        <div className="mt-2 flex flex-col gap-2 w-full">
+                          {msg.pendingActions.map((action) => (
+                            <div
+                              key={action.actionId}
+                              className={cn(
+                                'rounded-lg border p-2.5 text-xs',
+                                action.status === 'pending' && 'border-amber-400/60 bg-amber-50/80 dark:bg-amber-950/20',
+                                action.status === 'executing' && 'border-blue-400/60 bg-blue-50/80 dark:bg-blue-950/20',
+                                action.status === 'executed' && 'border-green-400/60 bg-green-50/80 dark:bg-green-950/20',
+                                action.status === 'cancelled' && 'border-muted bg-muted/50 opacity-60',
+                                action.status === 'failed' && 'border-red-400/60 bg-red-50/80 dark:bg-red-950/20',
+                              )}
+                            >
+                              <div className="flex items-start gap-2">
+                                {action.status === 'pending' && <ShieldCheck className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />}
+                                {action.status === 'executing' && <Loader2 className="h-3.5 w-3.5 text-blue-600 shrink-0 mt-0.5 animate-spin" />}
+                                {action.status === 'executed' && <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0 mt-0.5" />}
+                                {action.status === 'cancelled' && <XOctagon className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />}
+                                {action.status === 'failed' && <XOctagon className="h-3.5 w-3.5 text-red-600 shrink-0 mt-0.5" />}
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium leading-snug">{action.description}</p>
+                                  {action.resultDetail && (
+                                    <p className="mt-1 text-muted-foreground">{action.resultDetail}</p>
+                                  )}
+                                </div>
+                              </div>
+                              {action.status === 'pending' && (
+                                <div className="flex gap-2 mt-2">
+                                  <Button
+                                    size="sm"
+                                    className="h-7 rounded-md text-xs"
+                                    onClick={() => handleConfirmAction(msg.id, action.actionId)}
+                                  >
+                                    确认执行
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 rounded-md text-xs"
+                                    onClick={() => handleCancelAction(msg.id, action.actionId)}
+                                  >
+                                    取消
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       {/* 显示模型标签 */}
                       {msg.role === 'assistant' && msg.model && (
                         <div className="mt-1.5 flex items-center gap-1">
@@ -702,8 +840,6 @@ export function AIAssistant() {
                   );
                 })}
               </div>
-              
-              {/* 拖拽提示 */}
               {isDragging && (
                 <div className="absolute inset-0 flex items-center justify-center bg-primary/10 pointer-events-none">
                   <div className="flex flex-col items-center gap-2 text-primary">
@@ -716,31 +852,22 @@ export function AIAssistant() {
           </CardContent>
 
           <CardFooter className="p-3 bg-muted/20 flex-col gap-2">
-            {/* 待发送图片预览 */}
             {pendingImage && (
-              <div className="w-full flex items-center gap-2 p-2 bg-muted rounded-lg">
-                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded">
-                  <NextImage
-                    src={pendingImage}
-                    alt="待发送图片"
-                    fill
-                    unoptimized
-                    className="object-cover"
-                  />
-                </div>
-                <span className="text-xs text-muted-foreground flex-1">图片已准备好</span>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-6 w-6"
-                  onClick={clearPendingImage}
-                >
-                  <XCircle className="h-4 w-4" />
-                </Button>
+              <div className="flex items-center gap-2 w-full text-xs text-muted-foreground">
+                <ImageIcon className="h-3.5 w-3.5 shrink-0" />
+                <span>图片已准备好</span>
+                <button onClick={clearPendingImage} className="ml-auto hover:text-foreground">
+                  <XCircle className="h-3.5 w-3.5" />
+                </button>
               </div>
             )}
-            
-            {/* 输入区域 */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
             <form
               className="flex w-full gap-2"
               onSubmit={(e) => {
@@ -748,30 +875,18 @@ export function AIAssistant() {
                 handleSend();
               }}
             >
-              {/* 隐藏的文件输入 */}
-              <input
-                id="ai-assistant-image-upload"
-                name="aiAssistantImageUpload"
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileSelect}
-              />
-              
-              {/* 图片上传按钮 */}
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
                 size="icon"
+                variant="ghost"
+                className="shrink-0"
+                aria-label="上传图片"
                 onClick={() => fileInputRef.current?.click()}
-                title="上传图片"
               >
                 <ImageIcon className="h-4 w-4" />
               </Button>
-              
               <Input
-                placeholder={isLoading ? "AI思考中，可继续输入..." : "输入问题或粘贴图片..."}
+                placeholder={isLoading ? 'AI 助手分析中...' : '输入问题或粘贴图片...'}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onPaste={handlePaste}
@@ -780,15 +895,14 @@ export function AIAssistant() {
               <Button 
                 type="submit" 
                 size="icon" 
+                aria-label="发送消息"
                 disabled={isLoading || (!input.trim() && !pendingImage)}
               >
                 <Send className="h-4 w-4" />
               </Button>
             </form>
-            
-            {/* 提示文字 */}
             <p className="text-[10px] text-muted-foreground text-center">
-              支持粘贴、拖拽或点击上传图片
+              AI 助手会自动调用系统数据回答，写操作需确认后执行
             </p>
           </CardFooter>
         </Card>

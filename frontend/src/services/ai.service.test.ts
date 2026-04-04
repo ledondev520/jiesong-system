@@ -30,6 +30,16 @@ describe('aiService', () => {
     expect(api.get).toHaveBeenCalledWith('/ai/sessions');
   });
 
+  it('getChatHistory: 调用后端实际暴露的 history 端点', async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+
+    await aiService.getChatHistory('session_1', 2, 50);
+
+    expect(api.get).toHaveBeenCalledWith('/ai/history', {
+      params: { sessionId: 'session_1', page: 2, pageSize: 50 },
+    });
+  });
+
   it('deleteSession: 删除指定会话', async () => {
     (api.delete as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
 
@@ -52,6 +62,14 @@ describe('aiService', () => {
     await aiService.getModels();
 
     expect(api.get).toHaveBeenCalledWith('/ai/models');
+  });
+
+  it('getAgentToolRegistry: 拉取 Agent 工具注册表', async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+
+    await aiService.getAgentToolRegistry();
+
+    expect(api.get).toHaveBeenCalledWith('/ai/agents/tools');
   });
 
   it('getDashboardAnalytics: 拉取数据看板指标', async () => {
@@ -80,6 +98,22 @@ describe('aiService', () => {
     expect(api.post).toHaveBeenCalledWith('/ai/chat', {
       message: '解析图片',
       imageUrl: 'data:image/png;base64,xxx',
+    });
+  });
+
+  it('runBusinessAgent: 调用业务 Agent runtime 入口', async () => {
+    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+
+    await aiService.runBusinessAgent({
+      agentType: 'finance',
+      message: '当前客户还欠多少钱？',
+      sessionId: 'agent_finance_1',
+    });
+
+    expect(api.post).toHaveBeenCalledWith('/ai/agents/prompt', {
+      agentType: 'finance',
+      message: '当前客户还欠多少钱？',
+      sessionId: 'agent_finance_1',
     });
   });
 });

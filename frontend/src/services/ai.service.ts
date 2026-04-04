@@ -7,14 +7,100 @@
 import api from '@/lib/axios';
 import type { ApiResponse } from '@/types';
 
+export interface AiActionRecommendation {
+  code: string;
+  title: string;
+  domain: string;
+  priority: 'high' | 'medium' | 'low';
+  executionMode: 'manual' | 'confirmable_write';
+  reason: string;
+  actionType?: string | null;
+  params?: Record<string, unknown> | null;
+  sourceTool?: string | null;
+}
+
+export interface AiPendingActionSummary {
+  actionId: string;
+  actionType: string;
+  description: string;
+  status: 'pending' | 'executed' | 'cancelled' | 'failed';
+  createdAt?: string | null;
+  resultDetail?: string | null;
+  timeline?: Array<{
+    type: 'created' | 'pending' | 'executed' | 'cancelled' | 'failed';
+    status: 'pending' | 'executed' | 'cancelled' | 'failed';
+    detail?: string | null;
+    at: string;
+  }>;
+}
+
 export interface AiSessionItem {
   sessionId: string;
   totalTokens?: number;
   lastModel?: string;
+  preview?: string;
+  agentType?: AiBusinessAgentType | null;
+  routeMode?: string | null;
+  domainsTouched?: string[];
+  toolsUsed?: string[];
+  routePlan?: {
+    mode?: string | null;
+    requestedAgentType?: string | null;
+    preferredDomains?: string[];
+    selectedDomains?: string[];
+  } | null;
+  toolTraceSummary?: {
+    totalCalls?: number;
+    readCalls?: number;
+    writeCalls?: number;
+    successCount?: number;
+    failureCount?: number;
+    totalDurationMs?: number;
+  } | null;
+  actionRecommendations?: AiActionRecommendation[];
+  pendingActionSummary?: AiPendingActionSummary[];
   _max?: {
     createdAt?: string | null;
   } | null;
   _count?: number | { _all?: number } | null;
+}
+
+export interface AiChatHistoryItem {
+  id: string;
+  sessionId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  imageUrl?: string;
+  agentType?: AiBusinessAgentType | null;
+  routePlan?: {
+    mode?: string | null;
+    requestedAgentType?: string | null;
+    preferredDomains?: string[];
+    selectedDomains?: string[];
+  } | null;
+  selectedToolNames?: string[];
+  toolTraceSummary?: {
+    totalCalls?: number;
+    readCalls?: number;
+    writeCalls?: number;
+    successCount?: number;
+    failureCount?: number;
+    totalDurationMs?: number;
+    items?: Array<{
+      name: string;
+      domain: string;
+      access: string;
+      status: string;
+      durationMs: number;
+      error?: string | null;
+    }>;
+  } | null;
+  actionRecommendations?: AiActionRecommendation[];
+  pendingActionSummary?: AiPendingActionSummary[];
+  promptTokens?: number;
+  outputTokens?: number;
+  modelUsed?: string;
+  createdAt: string;
 }
 
 export interface AiTokenStatByModel {
@@ -35,6 +121,34 @@ export interface AiTokenStats {
 export interface AiModelsResponse {
   models: Record<string, string>;
   description: Record<string, string>;
+}
+
+export interface AiAgentToolRegistryItem {
+  name: string;
+  domain: string;
+  access: string;
+  confirmationRequired: boolean;
+  isComposite?: boolean;
+  allowedRoles: string[];
+  description: string;
+}
+
+export interface AiAgentToolRegistryResponse {
+  primaryAgentType: string;
+  legacyAgentTypes: string[];
+  viewerRole?: string | null;
+  domains?: Array<{
+    domain: string;
+    label: string;
+    description?: string;
+    toolCount: number;
+    readCount: number;
+    writeCount: number;
+    availableCount: number;
+    availableWriteCount: number;
+    compositeToolCount?: number;
+  }>;
+  tools: AiAgentToolRegistryItem[];
 }
 
 export interface DashboardAnalytics {
@@ -65,6 +179,70 @@ export interface AiTokenUsageResponse {
   message?: string;
 }
 
+export type AiBusinessAgentType = 'finance' | 'export' | 'executive' | 'unified';
+
+export interface AiBusinessAgentPromptInput {
+  agentType: AiBusinessAgentType;
+  message: string;
+  sessionId?: string;
+}
+
+export interface AgentPendingAction {
+  actionId: string;
+  actionType: string;
+  description: string;
+  params: Record<string, unknown>;
+}
+
+export interface AgentActionExecuteResult {
+  actionId: string;
+  actionType: string;
+  description: string;
+  success: boolean;
+  detail: string;
+}
+
+export interface AiBusinessAgentPromptResult {
+  sessionId: string;
+  agent: {
+    id: AiBusinessAgentType;
+    label: string;
+  };
+  text: string;
+  routePlan?: {
+    mode?: string | null;
+    requestedAgentType?: string | null;
+    preferredDomains?: string[];
+    selectedDomains?: string[];
+  };
+  toolTraceSummary?: {
+    totalCalls?: number;
+    readCalls?: number;
+    writeCalls?: number;
+    successCount?: number;
+    failureCount?: number;
+    totalDurationMs?: number;
+    items?: Array<{
+      name: string;
+      domain: string;
+      access: string;
+      status: string;
+      durationMs: number;
+      error?: string | null;
+    }>;
+  };
+  actionRecommendations?: AiActionRecommendation[];
+  pendingActionSummary?: AiPendingActionSummary[];
+  pendingActions?: AgentPendingAction[];
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+  };
+  numTurns?: number;
+  durationMs?: number;
+  model?: string;
+}
+
 /** 无 sessionId 的 Token 行（如 HS 编码推荐），供用量页展示 */
 export interface AiStandaloneTokenRow {
   id: string;
@@ -92,6 +270,13 @@ export const aiService = {
     );
   },
 
+  getChatHistory: async (sessionId: string, page = 1, pageSize = 100) => {
+    return api.get<ApiResponse<AiChatHistoryItem[]>, ApiResponse<AiChatHistoryItem[]>>(
+      '/ai/history',
+      { params: { sessionId, page, pageSize } },
+    );
+  },
+
   deleteSession: async (sessionId: string) => {
     return api.delete<ApiResponse<null>, ApiResponse<null>>(`/ai/sessions/${sessionId}`);
   },
@@ -104,6 +289,10 @@ export const aiService = {
 
   getModels: async () => {
     return api.get<ApiResponse<AiModelsResponse>, ApiResponse<AiModelsResponse>>('/ai/models');
+  },
+
+  getAgentToolRegistry: async () => {
+    return api.get<ApiResponse<AiAgentToolRegistryResponse>, ApiResponse<AiAgentToolRegistryResponse>>('/ai/agents/tools');
   },
 
   getDashboardAnalytics: async () => {
@@ -120,6 +309,27 @@ export const aiService = {
     return api.post<ApiResponse<AiTokenUsageResponse>, ApiResponse<AiTokenUsageResponse>, { message: string; imageUrl: string }>(
       '/ai/chat',
       { message, imageUrl },
+    );
+  },
+
+  runBusinessAgent: async (data: AiBusinessAgentPromptInput) => {
+    return api.post<ApiResponse<AiBusinessAgentPromptResult>, ApiResponse<AiBusinessAgentPromptResult>, AiBusinessAgentPromptInput>(
+      '/ai/agents/prompt',
+      data,
+    );
+  },
+
+  executeAgentAction: async (actionId: string) => {
+    return api.post<ApiResponse<AgentActionExecuteResult>, ApiResponse<AgentActionExecuteResult>, { actionId: string }>(
+      '/ai/agents/execute-action',
+      { actionId },
+    );
+  },
+
+  cancelAgentAction: async (actionId: string) => {
+    return api.post<ApiResponse<null>, ApiResponse<null>, { actionId: string }>(
+      '/ai/agents/cancel-action',
+      { actionId },
     );
   },
 };

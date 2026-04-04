@@ -9,6 +9,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { aiService, type AiSessionItem, type AiStandaloneTokenRow } from '@/services/ai.service';
+import {
+  aiService,
+  type AiActionRecommendation,
+  type AiAgentToolRegistryResponse,
+  type AiPendingActionSummary,
+  type AiSessionItem,
+  type AiStandaloneTokenRow,
+} from '@/services/ai.service';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, RefreshCw, Trash2, MessageSquare, FileText, BarChart2 } from 'lucide-react';
@@ -38,6 +46,27 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   modelUsed?: string;
+  routePlan?: {
+    mode?: string | null;
+    preferredDomains?: string[];
+    selectedDomains?: string[];
+  } | null;
+  selectedToolNames?: string[];
+  toolTraceSummary?: {
+    totalCalls?: number;
+    failureCount?: number;
+    totalDurationMs?: number;
+    items?: Array<{
+      name: string;
+      domain: string;
+      access: string;
+      status: string;
+      durationMs: number;
+      error?: string | null;
+    }>;
+  } | null;
+  actionRecommendations?: AiActionRecommendation[];
+  pendingActionSummary?: AiPendingActionSummary[];
   createdAt: string;
 }
 
@@ -64,6 +93,154 @@ const getSessionCount = (item: AiSessionItem) => {
 };
 
 const getSessionLastAt = (item: AiSessionItem) => item._max?.createdAt || null;
+const formatDomainSummary = (domains?: string[]) => {
+  if (!domains?.length) return '—';
+  if (domains.length === 1) return domains[0];
+  return `${domains[0]} +${domains.length - 1}`;
+};
+
+const summarizePendingActionStatuses = (items?: AiPendingActionSummary[]) => {
+  const summary = {
+    total: 0,
+    pending: 0,
+    executed: 0,
+    cancelled: 0,
+    failed: 0,
+  };
+  (items || []).forEach((item) => {
+    summary.total += 1;
+    if (item.status === 'pending') summary.pending += 1;
+    if (item.status === 'executed') summary.executed += 1;
+    if (item.status === 'cancelled') summary.cancelled += 1;
+    if (item.status === 'failed') summary.failed += 1;
+  });
+  return summary;
+};
+
+const formatPendingActionStatusSummary = (items?: AiPendingActionSummary[]) => {
+  const summary = summarizePendingActionStatuses(items);
+  if (!summary.total) return '—';
+  const parts = [`动作 ${summary.total}`];
+  if (summary.pending) parts.push(`待确认 ${summary.pending}`);
+  if (summary.executed) parts.push(`已执行 ${summary.executed}`);
+  if (summary.cancelled) parts.push(`已取消 ${summary.cancelled}`);
+  if (summary.failed) parts.push(`失败 ${summary.failed}`);
+  return parts.join(' · ');
+};
+
+const hasFailedPendingAction = (items?: AiPendingActionSummary[]) => (
+  (items || []).some((item) => item.status === 'failed')
+);
+
+const getLatestPendingActionAt = (items?: AiPendingActionSummary[]) => {
+  const timestamps = (items || []).flatMap((item) => {
+    const timelineTimes = (item.timeline || []).map((event) => event.at).filter(Boolean);
+    return [...timelineTimes, item.createdAt].filter(Boolean) as string[];
+  });
+  if (!timestamps.length) return null;
+  return timestamps.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+};
+
+const hasPendingPendingAction = (items?: AiPendingActionSummary[]) => (
+  (items || []).some((item) => item.status === 'pending')
+);
+
+const hasCompletedPendingAction = (items?: AiPendingActionSummary[]) => {
+  const normalized = items || [];
+  return normalized.length > 0
+    && normalized.every((item) => item.status === 'executed' || item.status === 'cancelled');
+};
+
+const getPendingActionPriority = (items?: AiPendingActionSummary[]) => {
+  if (hasFailedPendingAction(items)) return 0;
+  if (hasPendingPendingAction(items)) return 1;
+  if ((items || []).length > 0) return 2;
+  return 3;
+};
+
+const compareSessionRisk = (a: AiSessionItem, b: AiSessionItem) => {
+  const priorityDelta = getPendingActionPriority(a.pendingActionSummary) - getPendingActionPriority(b.pendingActionSummary);
+  if (priorityDelta !== 0) return priorityDelta;
+
+  const latestActionA = getLatestPendingActionAt(a.pendingActionSummary);
+  const latestActionB = getLatestPendingActionAt(b.pendingActionSummary);
+  if (latestActionA || latestActionB) {
+    const actionDelta = new Date(latestActionB || 0).getTime() - new Date(latestActionA || 0).getTime();
+    if (actionDelta !== 0) return actionDelta;
+  }
+
+  const lastAtA = getSessionLastAt(a);
+  const lastAtB = getSessionLastAt(b);
+  return new Date(lastAtB || 0).getTime() - new Date(lastAtA || 0).getTime();
+};
+
+const compareSessionByLatestAction = (a: AiSessionItem, b: AiSessionItem) => {
+  const latestActionA = getLatestPendingActionAt(a.pendingActionSummary);
+  const latestActionB = getLatestPendingActionAt(b.pendingActionSummary);
+  const actionDelta = new Date(latestActionB || 0).getTime() - new Date(latestActionA || 0).getTime();
+  if (actionDelta !== 0) return actionDelta;
+  return compareSessionRisk(a, b);
+};
+
+const compareSessionByLatestMessage = (a: AiSessionItem, b: AiSessionItem) => {
+  const lastAtA = getSessionLastAt(a);
+  const lastAtB = getSessionLastAt(b);
+  const delta = new Date(lastAtB || 0).getTime() - new Date(lastAtA || 0).getTime();
+  if (delta !== 0) return delta;
+  return compareSessionRisk(a, b);
+};
+
+const compareSessionsByMode = (a: AiSessionItem, b: AiSessionItem, mode: string) => {
+  if (mode === 'latest-action') return compareSessionByLatestAction(a, b);
+  if (mode === 'latest-message') return compareSessionByLatestMessage(a, b);
+  return compareSessionRisk(a, b);
+};
+
+const matchesActionFilter = (item: AiSessionItem, filter: string) => {
+  if (filter === 'failed') return hasFailedPendingAction(item.pendingActionSummary);
+  if (filter === 'pending') return hasPendingPendingAction(item.pendingActionSummary);
+  if (filter === 'completed') return hasCompletedPendingAction(item.pendingActionSummary);
+  return true;
+};
+
+const normalizeActionFilter = (value: string | null) => (
+  ['all', 'failed', 'pending', 'completed'].includes(String(value || '').trim()) ? String(value) : 'all'
+);
+
+const normalizeSortMode = (value: string | null) => (
+  ['risk', 'latest-action', 'latest-message'].includes(String(value || '').trim()) ? String(value) : 'risk'
+);
+
+const buildRegistryDomainStats = (toolRegistry: AiAgentToolRegistryResponse | null) => {
+  if (!toolRegistry?.tools?.length) return [];
+  const map = new Map<string, {
+    domain: string;
+    label: string;
+    toolCount: number;
+    compositeToolCount: number;
+    description?: string;
+  }>();
+  toolRegistry.tools.forEach((tool) => {
+    const current = map.get(tool.domain) || {
+      domain: tool.domain,
+      label: tool.domain,
+      toolCount: 0,
+      compositeToolCount: 0,
+      description: '',
+    };
+    current.toolCount += 1;
+    if (tool.isComposite) current.compositeToolCount += 1;
+    map.set(tool.domain, current);
+  });
+  return Array.from(map.values())
+    .sort((a, b) => b.toolCount - a.toolCount || a.domain.localeCompare(b.domain));
+};
+
+const formatRecommendationPriority = (priority?: string) => {
+  if (priority === 'high') return '高优先';
+  if (priority === 'low') return '低优先';
+  return '中优先';
+};
 
 /** 将 token 数格式化为易读单位（≥1K 用 K，≥1M 用 M） */
 const formatTokensM = (tokens: number) => {
@@ -200,12 +377,18 @@ const standaloneInputLabel = (row: AiStandaloneTokenRow) => {
 };
 
 export default function AiSessionsPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [sessions, setSessions] = useState<AiSessionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [standaloneRows, setStandaloneRows] = useState<AiStandaloneTokenRow[]>([]);
   const [standaloneLoading, setStandaloneLoading] = useState(true);
   const [standaloneDetailRow, setStandaloneDetailRow] = useState<AiStandaloneTokenRow | null>(null);
+  const [toolRegistry, setToolRegistry] = useState<AiAgentToolRegistryResponse | null>(null);
+  const [actionFilter, setActionFilter] = useState<string>(() => normalizeActionFilter(searchParams.get('actionFilter')));
+  const [sortMode, setSortMode] = useState<string>(() => normalizeSortMode(searchParams.get('sort')));
 
   // 会话详情弹窗
   const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
@@ -261,6 +444,15 @@ export default function AiSessionsPage() {
     }
   }, []);
 
+  const loadToolRegistry = useCallback(async () => {
+    try {
+      const response = await cachedFetch('ai-agent-tool-registry', () => aiService.getAgentToolRegistry());
+      setToolRegistry(response.data ?? null);
+    } catch {
+      setToolRegistry(null);
+    }
+  }, []);
+
   useEffect(() => {
     void loadSessions();
   }, [loadSessions]);
@@ -272,6 +464,32 @@ export default function AiSessionsPage() {
   useEffect(() => {
     void loadTokenStats(statsDays);
   }, [loadTokenStats, statsDays]);
+
+  useEffect(() => {
+    void loadToolRegistry();
+  }, [loadToolRegistry]);
+
+  useEffect(() => {
+    setActionFilter(normalizeActionFilter(searchParams.get('actionFilter')));
+    setSortMode(normalizeSortMode(searchParams.get('sort')));
+  }, [searchParams]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (sortMode === 'risk') {
+      params.delete('sort');
+    } else {
+      params.set('sort', sortMode);
+    }
+    if (actionFilter === 'all') {
+      params.delete('actionFilter');
+    } else {
+      params.set('actionFilter', actionFilter);
+    }
+    const query = params.toString();
+    const nextUrl = query ? `${pathname}?${query}` : pathname;
+    router.replace(nextUrl, { scroll: false });
+  }, [actionFilter, sortMode, pathname, router, searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -339,6 +557,17 @@ export default function AiSessionsPage() {
     ? sessions.find((s) => s.sessionId === detailSessionId)
     : undefined;
 
+  const registryReadCount = toolRegistry?.tools?.filter((tool) => tool.access === 'read').length ?? 0;
+  const registryWriteCount = toolRegistry?.tools?.filter((tool) => tool.access === 'write').length ?? 0;
+  const registryDomainCount = toolRegistry?.domains?.length
+    ?? (toolRegistry?.tools ? new Set(toolRegistry.tools.map((tool) => tool.domain)).size : 0);
+  const registryDomainStats = toolRegistry?.domains?.length
+    ? toolRegistry.domains
+    : buildRegistryDomainStats(toolRegistry);
+  const visibleSessions = [...sessions]
+    .filter((item) => matchesActionFilter(item, actionFilter))
+    .sort((a, b) => compareSessionsByMode(a, b, sortMode));
+
   return (
     <div className="space-y-6">
       <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
@@ -361,6 +590,61 @@ export default function AiSessionsPage() {
           </Button>
         }
       />
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Agent 工具注册表</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {toolRegistry ? (
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">主入口</p>
+                  <p className="mt-1 font-medium">主入口 {toolRegistry.primaryAgentType}</p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">当前角色</p>
+                  <p className="mt-1 font-medium">当前角色 {toolRegistry.viewerRole || '—'}</p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">读工具</p>
+                  <p className="mt-1 font-medium">{registryReadCount}</p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">写工具</p>
+                  <p className="mt-1 font-medium">{registryWriteCount}</p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">覆盖域</p>
+                  <p className="mt-1 font-medium">{registryDomainCount}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {registryDomainStats.map((item) => (
+                  <Badge key={item.domain} variant="outline" className="font-mono text-[10px]">
+                    {item.domain} ×{item.toolCount}{item.compositeToolCount ? ` / 复合 ${item.compositeToolCount}` : ''}
+                  </Badge>
+                ))}
+              </div>
+              {registryDomainStats.some((item) => item.description) ? (
+                <div className="grid gap-2 md:grid-cols-2">
+                  {registryDomainStats
+                    .filter((item) => item.description)
+                    .map((item) => (
+                      <div key={`${item.domain}-desc`} className="rounded-lg border p-3">
+                        <p className="text-xs font-medium text-foreground">{item.label || item.domain}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
+                      </div>
+                    ))}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">工具注册表加载失败或暂不可用。</div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Token 使用折线图 */}
       <Card>
@@ -504,11 +788,38 @@ export default function AiSessionsPage() {
 
       {/* 聊天会话 + 无 session 的 AI 调用（同一板块，Tabs 切换） */}
       <div className="space-y-2">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-          <h2 className="text-sm font-medium text-foreground">会话与用量</h2>
-          <p className="text-xs text-muted-foreground max-w-xl">
-            HS 编码推荐等不产生聊天会话，请切到「其他 AI 调用」查看 Token 与模型。
-          </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-sm font-medium text-foreground">会话与用量</h2>
+            <p className="text-xs text-muted-foreground max-w-xl">
+              HS 编码推荐等不产生聊天会话，请切到「其他 AI 调用」查看 Token 与模型。
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">排序方式</span>
+            <Select value={sortMode} onValueChange={setSortMode}>
+              <SelectTrigger className="h-8 w-[150px] text-xs" aria-label="排序方式">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="risk">风险优先</SelectItem>
+                <SelectItem value="latest-action">最近动作</SelectItem>
+                <SelectItem value="latest-message">最近消息</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="text-xs text-muted-foreground">动作筛选</span>
+            <Select value={actionFilter} onValueChange={setActionFilter}>
+              <SelectTrigger className="h-8 w-[150px] text-xs" aria-label="动作筛选">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部</SelectItem>
+                <SelectItem value="failed">有失败</SelectItem>
+                <SelectItem value="pending">有待确认</SelectItem>
+                <SelectItem value="completed">已完成动作</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="surface-panel overflow-hidden">
           <Tabs defaultValue="chat" className="gap-0">
@@ -522,14 +833,17 @@ export default function AiSessionsPage() {
               <div className="md:hidden space-y-3 p-4 pt-3">
                 {loading ? (
                   <div className="surface-panel py-12 text-center text-sm text-muted-foreground">加载中...</div>
-                ) : sessions.length === 0 ? (
-                  <div className="surface-panel py-12 text-center text-sm text-muted-foreground">暂无 AI 会话记录。</div>
+                ) : visibleSessions.length === 0 ? (
+                  <div className="surface-panel py-12 text-center text-sm text-muted-foreground">当前筛选下暂无 AI 会话记录。</div>
                 ) : (
-                  sessions.map((item) => {
+                  visibleSessions.map((item) => {
                     const lastAt = getSessionLastAt(item);
                     const isDeleting = deletingSessionId === item.sessionId;
                     const tokens = item.totalTokens ?? 0;
                     const costText = estimateCost(item.lastModel ?? '', tokens) ?? '—';
+                    const actionStatusSummary = formatPendingActionStatusSummary(item.pendingActionSummary);
+                    const latestActionAt = getLatestPendingActionAt(item.pendingActionSummary);
+                    const actionHasFailed = hasFailedPendingAction(item.pendingActionSummary);
                     return (
                       <MobileListCard
                         key={item.sessionId}
@@ -537,6 +851,13 @@ export default function AiSessionsPage() {
                         subtitle={lastAt ? formatDateTime(lastAt) : '—'}
                         badge={<Badge variant="outline">消息 {getSessionCount(item)}</Badge>}
                         fields={[
+                          { label: '路由', value: item.routeMode || '—' },
+                          { label: '域', value: formatDomainSummary(item.domainsTouched) },
+                          { label: '工具', value: item.toolTraceSummary?.totalCalls ? String(item.toolTraceSummary.totalCalls) : '—' },
+                          { label: '建议', value: item.actionRecommendations?.length ? String(item.actionRecommendations.length) : '—' },
+                          { label: '动作', value: actionStatusSummary },
+                          { label: '最近动作', value: latestActionAt ? formatDateTime(latestActionAt) : '—' },
+                          { label: '风险', value: actionHasFailed ? '失败动作' : '—' },
                           {
                             label: '模型',
                             value: item.lastModel ? (
@@ -582,6 +903,9 @@ export default function AiSessionsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>会话ID</TableHead>
+                      <TableHead>路由</TableHead>
+                      <TableHead>工具域</TableHead>
+                      <TableHead>工具调用</TableHead>
                       <TableHead>消息数</TableHead>
                       <TableHead>模型</TableHead>
                       <TableHead>Token 消耗</TableHead>
@@ -593,17 +917,20 @@ export default function AiSessionsPage() {
                   <TableBody>
                     {loading ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
+                        <TableCell colSpan={10} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
                       </TableRow>
-                    ) : sessions.length === 0 ? (
+                    ) : visibleSessions.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">暂无 AI 会话记录。</TableCell>
+                        <TableCell colSpan={10} className="py-12 text-center text-muted-foreground">当前筛选下暂无 AI 会话记录。</TableCell>
                       </TableRow>
                     ) : (
-                      sessions.map((item) => {
+                      visibleSessions.map((item) => {
                         const lastAt = getSessionLastAt(item);
                         const isDeleting = deletingSessionId === item.sessionId;
                         const tokens = item.totalTokens ?? 0;
+                        const actionStatusSummary = formatPendingActionStatusSummary(item.pendingActionSummary);
+                        const latestActionAt = getLatestPendingActionAt(item.pendingActionSummary);
+                        const actionHasFailed = hasFailedPendingAction(item.pendingActionSummary);
                         return (
                           <TableRow
                             key={item.sessionId}
@@ -611,6 +938,39 @@ export default function AiSessionsPage() {
                             onClick={() => void handleViewDetail(item.sessionId)}
                           >
                             <TableCell className="font-mono text-xs">{item.sessionId}</TableCell>
+                            <TableCell>
+                              {item.routeMode ? <Badge variant="secondary">{item.routeMode}</Badge> : '—'}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {formatDomainSummary(item.domainsTouched)}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              <div>
+                                {item.toolTraceSummary?.totalCalls
+                                  ? `${item.toolTraceSummary.totalCalls}${item.toolTraceSummary.failureCount ? ` / 失败 ${item.toolTraceSummary.failureCount}` : ''}`
+                                  : '—'}
+                              </div>
+                              {item.actionRecommendations?.length ? (
+                                <div className="mt-1 text-[10px] text-muted-foreground/80">
+                                  建议 {item.actionRecommendations.length}
+                                </div>
+                              ) : null}
+                              {item.pendingActionSummary?.length ? (
+                                <div className="mt-1 text-[10px] text-muted-foreground/80">
+                                  {actionStatusSummary}
+                                </div>
+                              ) : null}
+                              {latestActionAt ? (
+                                <div className="mt-1 text-[10px] text-muted-foreground/80">
+                                  最近动作 {formatDateTime(latestActionAt)}
+                                </div>
+                              ) : null}
+                              {actionHasFailed ? (
+                                <div className="mt-1 text-[10px] text-destructive">
+                                  失败动作
+                                </div>
+                              ) : null}
+                            </TableCell>
                             <TableCell>
                               <Badge variant="outline">{getSessionCount(item)}</Badge>
                             </TableCell>
@@ -840,12 +1200,34 @@ export default function AiSessionsPage() {
               会话详情：{detailSessionId}
             </DialogTitle>
             {detailSessionRow ? (
-              <p className="text-xs text-muted-foreground">
-                合计 Token {formatTokensM(detailSessionRow.totalTokens ?? 0)}
-                {estimateCost(detailSessionRow.lastModel ?? '', detailSessionRow.totalTokens ?? 0)
-                  ? ` · ${estimateCost(detailSessionRow.lastModel ?? '', detailSessionRow.totalTokens ?? 0)}`
-                  : ''}
-              </p>
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <p>
+                  合计 Token {formatTokensM(detailSessionRow.totalTokens ?? 0)}
+                  {estimateCost(detailSessionRow.lastModel ?? '', detailSessionRow.totalTokens ?? 0)
+                    ? ` · ${estimateCost(detailSessionRow.lastModel ?? '', detailSessionRow.totalTokens ?? 0)}`
+                    : ''}
+                </p>
+                <p>
+                  路由：{detailSessionRow.routeMode || '—'}
+                  <span className="mx-2 text-border">·</span>
+                  工具域：{formatDomainSummary(detailSessionRow.domainsTouched)}
+                </p>
+                {detailSessionRow.toolTraceSummary?.totalCalls ? (
+                  <p>
+                    工具调用：{detailSessionRow.toolTraceSummary.totalCalls}
+                    <span className="mx-2 text-border">·</span>
+                    失败：{detailSessionRow.toolTraceSummary.failureCount || 0}
+                    <span className="mx-2 text-border">·</span>
+                    耗时：{detailSessionRow.toolTraceSummary.totalDurationMs || 0} ms
+                  </p>
+                ) : null}
+                {detailSessionRow.actionRecommendations?.length ? (
+                  <p>推荐动作：{detailSessionRow.actionRecommendations.length}</p>
+                ) : null}
+                {detailSessionRow.pendingActionSummary?.length ? (
+                  <p>待确认动作：{detailSessionRow.pendingActionSummary.length}</p>
+                ) : null}
+              </div>
             ) : null}
             <DialogDescription className="sr-only">
               该会话内的历史消息列表，时间均为北京时间。
@@ -876,6 +1258,91 @@ export default function AiSessionsPage() {
                         {formatTime(msg.createdAt)}
                       </span>
                     </div>
+                    {msg.routePlan?.mode ? (
+                      <div className="mb-2 flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
+                        <Badge variant="secondary">{msg.routePlan.mode}</Badge>
+                        {msg.routePlan.selectedDomains?.length ? (
+                          <Badge variant="outline">{formatDomainSummary(msg.routePlan.selectedDomains)}</Badge>
+                        ) : null}
+                        {msg.selectedToolNames?.length ? (
+                          <Badge variant="outline">tools {msg.selectedToolNames.length}</Badge>
+                        ) : null}
+                        {msg.toolTraceSummary?.failureCount ? (
+                          <Badge variant="outline">fail {msg.toolTraceSummary.failureCount}</Badge>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {msg.toolTraceSummary?.items?.length ? (
+                      <div className="mb-2 rounded-md border border-border/60 bg-background/60 p-2 text-[10px]">
+                        <div className="mb-1 font-medium text-muted-foreground">工具调用明细</div>
+                        <div className="space-y-1">
+                          {msg.toolTraceSummary.items.map((item, index) => (
+                            <div key={`${msg.id}-${item.name}-${index}`} className="flex flex-wrap items-center gap-1.5">
+                              <Badge variant={item.status === 'failed' ? 'destructive' : 'outline'}>{item.status}</Badge>
+                              <span className="font-mono text-foreground/90">{item.name}</span>
+                              <span className="text-muted-foreground">{item.domain}</span>
+                              <span className="text-muted-foreground">{item.durationMs}ms</span>
+                              {item.error ? <span className="text-destructive">{item.error}</span> : null}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                    {msg.actionRecommendations?.length ? (
+                      <div className="mb-2 rounded-md border border-border/60 bg-background/60 p-2 text-[10px]">
+                        <div className="mb-1 font-medium text-muted-foreground">推荐动作</div>
+                        <div className="space-y-2">
+                          {msg.actionRecommendations.map((item, index) => (
+                            <div key={`${msg.id}-${item.code}-${index}`} className="rounded-md border border-border/50 bg-muted/30 p-2">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <Badge variant={item.priority === 'high' ? 'destructive' : 'outline'}>
+                                  {formatRecommendationPriority(item.priority)}
+                                </Badge>
+                                <Badge variant="outline">{item.executionMode}</Badge>
+                                <span className="font-medium text-foreground/90">{item.title}</span>
+                                <span className="text-muted-foreground">{item.domain}</span>
+                              </div>
+                              {item.reason ? (
+                                <div className="mt-1 leading-relaxed text-muted-foreground">{item.reason}</div>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                    {msg.pendingActionSummary?.length ? (
+                      <div className="mb-2 rounded-md border border-border/60 bg-background/60 p-2 text-[10px]">
+                        <div className="mb-1 font-medium text-muted-foreground">待确认动作</div>
+                        <div className="space-y-2">
+                          {msg.pendingActionSummary.map((item, index) => (
+                            <div key={`${msg.id}-${item.actionId}-${index}`} className="rounded-md border border-border/50 bg-muted/30 p-2">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <Badge variant={item.status === 'pending' ? 'outline' : 'secondary'}>{item.status}</Badge>
+                                <span className="font-medium text-foreground/90">{item.description}</span>
+                                <span className="text-muted-foreground">{item.actionType}</span>
+                              </div>
+                              {item.resultDetail ? (
+                                <div className="mt-1 leading-relaxed text-muted-foreground">{item.resultDetail}</div>
+                              ) : null}
+                              {item.timeline?.length ? (
+                                <div className="mt-2 rounded-md border border-border/40 bg-background/60 p-2">
+                                  <div className="mb-1 font-medium text-muted-foreground">动作时间线</div>
+                                  <div className="space-y-1">
+                                    {item.timeline.map((event, eventIndex) => (
+                                      <div key={`${item.actionId}-${event.type}-${eventIndex}`} className="flex flex-wrap items-center gap-1.5">
+                                        <Badge variant={event.status === 'pending' ? 'outline' : 'secondary'}>{event.type}</Badge>
+                                        <span className="text-muted-foreground">{formatTime(event.at)}</span>
+                                        {event.detail ? <span className="text-muted-foreground">{event.detail}</span> : null}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                   </div>
                 ))}
