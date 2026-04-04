@@ -17,8 +17,11 @@ const { requestLogger } = require('./middleware/logger');
 const { gentleRateLimit } = require('./middleware/rateLimit');
 const { startInventoryAlertJob } = require('./jobs/inventoryAlertJob');
 const { startAgentCredentialAlertJob } = require('./jobs/agentCredentialAlertJob');
+const { startPatrolJob } = require('./jobs/patrolJob');
 
 const app = express();
+// JSON API 通过前端 dev rewrite 代理时，304 空响应会让 axios/页面层误判为失败，因此关闭 ETag。
+app.disable('etag');
 
 const allowedOrigins = Array.isArray(config.cors.origin) ? config.cors.origin : [];
 const isProduction = config.nodeEnv === 'production';
@@ -112,6 +115,7 @@ const PORT = config.port;
 if (require.main === module) {
   startInventoryAlertJob();
   startAgentCredentialAlertJob();
+  startPatrolJob();
   app.listen(PORT, () => {
     console.log(`
 ╔════════════════════════════════════════════╗

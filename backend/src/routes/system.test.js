@@ -34,3 +34,8 @@ test('system route includes operation logs CSV export endpoint', () => {
   const index = getRouteIndex(systemRouter, '/logs/export/csv', 'get');
   assert.notEqual(index, -1, '缺少 GET /logs/export/csv 路由');
 });
+
+test('system route includes event ledger endpoint', () => {
+  const index = getRouteIndex(systemRouter, '/event-ledger', 'get');
+  assert.notEqual(index, -1, '缺少 GET /event-ledger 路由');
+});

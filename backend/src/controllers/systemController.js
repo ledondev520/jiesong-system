@@ -1,6 +1,6 @@
 /**
  * Input: /system/* API 控制器聚合
- * Output: 系统配置、通知、日志、港口与商品分类、导入导出统一入口
+ * Output: 系统配置、通知、日志、港口与商品分类、导入导出、巡检统一入口
  * Pos: 拆分后的系统控制器聚合层，统一对外导出入口
  */
 
@@ -34,6 +34,27 @@ const {
   exportData,
   exportDataPdf,
 } = require('./system/importExportController');
+const { getEventLedger } = require('./system/eventLedgerController');
+const { getPatrolStatus, executePatrol } = require('../jobs/patrolJob');
+const { success } = require('../utils/response');
+
+const getPatrolStatusCtrl = async (_req, res, next) => {
+  try {
+    const status = getPatrolStatus();
+    success(res, status);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const triggerPatrolCtrl = async (_req, res, next) => {
+  try {
+    const result = await executePatrol('manual');
+    success(res, result);
+  } catch (error) {
+    next(error);
+  }
+};
 
 module.exports = {
   getConfigs,
@@ -58,4 +79,7 @@ module.exports = {
   getImportRecords,
   exportData,
   exportDataPdf,
+  getEventLedger,
+  getPatrolStatus: getPatrolStatusCtrl,
+  triggerPatrol: triggerPatrolCtrl,
 };
