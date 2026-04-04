@@ -37,6 +37,13 @@ interface Message {
   createdAt: Date;
 }
 
+const INITIAL_MESSAGE: Message = {
+  id: '1',
+  role: 'assistant',
+  content: '您好！我是捷淞智能助手。可以帮你查财务数据、出口合同、修改汇率等系统配置。直接提问即可，我会自动调用系统数据回答。',
+  createdAt: new Date(),
+};
+
 const FAB_MARGIN = 20;
 const MOBILE_FAB_BOTTOM_CLEARANCE = 96;
 const FAB_DRAG_THRESHOLD = 6;
@@ -73,7 +80,7 @@ export function AIAssistant() {
   const [isLoading, setIsLoading] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [currentThinking, setCurrentThinking] = useState('');
+  const [currentThinking] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [expandedThinking, setExpandedThinking] = useState<Record<string, boolean>>({});
   const [showSessionList, setShowSessionList] = useState(false);
@@ -201,13 +208,6 @@ export function AIAssistant() {
       window.removeEventListener('pointercancel', handlePointerUp);
     };
   }, [clampFabPosition, resolveDefaultFabPosition]);
-
-  const INITIAL_MESSAGE: Message = {
-    id: '1',
-    role: 'assistant',
-    content: '您好！我是捷淞智能助手。可以帮你查财务数据、出口合同、修改汇率等系统配置。直接提问即可，我会自动调用系统数据回答。',
-    createdAt: new Date(),
-  };
 
   useEffect(() => {
     if (messages.length === 0) setMessages([INITIAL_MESSAGE]);
@@ -863,6 +863,8 @@ export function AIAssistant() {
             )}
             <input
               ref={fileInputRef}
+              id="ai-assistant-image-upload"
+              name="aiAssistantImageUpload"
               type="file"
               accept="image/*"
               className="hidden"

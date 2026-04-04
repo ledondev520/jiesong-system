@@ -3,8 +3,6 @@ import { render, screen } from '@testing-library/react';
 import { NetworkStatus } from './network-status';
 
 describe('network-status', () => {
-  const originalNavigator = window.navigator;
-
   beforeEach(() => {
     // Mock navigator.onLine
     Object.defineProperty(window.navigator, 'onLine', {

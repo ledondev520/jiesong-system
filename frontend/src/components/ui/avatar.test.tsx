@@ -50,7 +50,7 @@ describe('avatar', () => {
 
   it('应该支持 ref 转发', () => {
     const ref = { current: null as HTMLSpanElement | null };
-    render(<Avatar ref={(el) => (ref.current = el)} data-testid="avatar">内容</Avatar>);
+    render(<Avatar ref={(el) => { ref.current = el; }} data-testid="avatar">内容</Avatar>);
     expect(ref.current).toBeInstanceOf(HTMLSpanElement);
   });
 });

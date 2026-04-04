@@ -37,7 +37,7 @@ describe('progress', () => {
 
   it('应该支持 ref 转发', () => {
     const ref = { current: null as HTMLDivElement | null };
-    render(<Progress ref={(el) => (ref.current = el)} value={50} data-testid="progress" />);
+    render(<Progress ref={(el) => { ref.current = el; }} value={50} data-testid="progress" />);
     expect(ref.current).toBeInstanceOf(HTMLDivElement);
   });
 });

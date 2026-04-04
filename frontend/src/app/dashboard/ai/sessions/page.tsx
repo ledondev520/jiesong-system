@@ -478,6 +478,40 @@ const buildGovernanceViewStateNote = (
   return null;
 };
 
+const buildGovernanceReplayNote = (sessions: AiSessionItem[]) => {
+  const hasToolsLevel = sessions.some((item) => item.governanceReplayLevel === 'tools');
+  const hasRecommendationsLevel = sessions.some((item) => item.governanceReplayLevel === 'recommendations');
+  const hasActionsLevel = sessions.some((item) => item.governanceReplayLevel === 'actions');
+  const summary = sessions.reduce((acc, item) => {
+    const replaySummary = item.governanceReplaySummary;
+    const tools = replaySummary?.tools ?? Boolean(item.toolTraceSummary?.totalCalls);
+    const recommendations = replaySummary?.recommendations ?? Boolean(item.actionRecommendations?.length);
+    const actions = replaySummary?.actions ?? Boolean(item.pendingActionSummary?.length);
+    if (tools) acc.tools = true;
+    if (recommendations) acc.recommendations = true;
+    if (actions) acc.actions = true;
+    return acc;
+  }, { tools: false, recommendations: false, actions: false });
+  const hasReplaySignals = summary.tools || summary.recommendations || summary.actions;
+  if (!hasReplaySignals) return null;
+  return {
+    label: '当前数据：已审计回放',
+    description: '列表里的治理信号已来自持久化会话元数据，可在详情中继续回放工具、建议和动作轨迹。',
+    levelLabel: hasToolsLevel
+      ? '回放级别：工具层'
+      : hasRecommendationsLevel
+        ? '回放级别：建议层'
+        : hasActionsLevel
+          ? '回放级别：动作层'
+          : null,
+    badges: [
+      summary.tools ? '工具回放' : null,
+      summary.recommendations ? '建议回放' : null,
+      summary.actions ? '动作回放' : null,
+    ].filter(Boolean),
+  };
+};
+
 const buildRegistryDomainStats = (toolRegistry: AiAgentToolRegistryResponse | null) => {
   if (!toolRegistry?.tools?.length) return [];
   const map = new Map<string, {
@@ -892,6 +926,7 @@ export default function AiSessionsPage() {
     actionFilter,
   });
   const governanceViewStateNote = buildGovernanceViewStateNote(prefsSource);
+  const governanceReplayNote = buildGovernanceReplayNote(sessions);
   const visibleSessions = [...sessions]
     .filter((item) => matchesActionFilter(item, actionFilter))
     .sort((a, b) => compareSessionsByMode(a, b, sortMode));
@@ -1238,6 +1273,18 @@ export default function AiSessionsPage() {
               <Badge variant="outline">{governanceSourceNote.stateLabel}</Badge>
             ) : null}
             <span>{governanceSourceNote.description}</span>
+          </div>
+        ) : null}
+        {governanceReplayNote ? (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <Badge variant="secondary">{governanceReplayNote.label}</Badge>
+            {governanceReplayNote.levelLabel ? (
+              <Badge variant="outline">{governanceReplayNote.levelLabel}</Badge>
+            ) : null}
+            {governanceReplayNote.badges?.map((badge) => (
+              <Badge key={badge} variant="outline">{badge}</Badge>
+            ))}
+            <span>{governanceReplayNote.description}</span>
           </div>
         ) : null}
         <div className="surface-panel overflow-hidden">

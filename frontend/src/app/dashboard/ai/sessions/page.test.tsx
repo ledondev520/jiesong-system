@@ -154,11 +154,28 @@ describe('AiSessionsPage', () => {
       data: [
         {
           sessionId: 'session_1',
+          governanceReplayAvailable: true,
+          governanceReplayLevel: 'tools',
+          governanceReplaySummary: {
+            tools: true,
+            recommendations: true,
+            actions: true,
+          },
           _count: { _all: 3 },
           _max: { createdAt: '2026-03-01T10:00:00.000Z' },
           routeMode: 'cross-domain',
           domainsTouched: ['finance', 'inventory'],
           toolTraceSummary: { totalCalls: 5, failureCount: 1, totalDurationMs: 87 },
+          actionRecommendations: [
+            {
+              code: 'trade-compliance.prepare-tax-refund',
+              title: '补建退税草稿',
+              domain: 'trade-compliance',
+              priority: 'high',
+              executionMode: 'manual',
+              reason: '退税前置条件已满足',
+            },
+          ],
           pendingActionSummary: [
             {
               actionId: 'pa-1',
@@ -213,6 +230,11 @@ describe('AiSessionsPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'AI 会话列表' })).toBeInTheDocument();
       expect(screen.getAllByText('session_1').length).toBeGreaterThan(0);
+      expect(screen.getByText('当前数据：已审计回放')).toBeInTheDocument();
+      expect(screen.getByText('回放级别：工具层')).toBeInTheDocument();
+      expect(screen.getByText('工具回放')).toBeInTheDocument();
+      expect(screen.getByText('建议回放')).toBeInTheDocument();
+      expect(screen.getByText('动作回放')).toBeInTheDocument();
       expect(screen.getAllByText('cross-domain').length).toBeGreaterThan(0);
       expect(screen.getAllByText(/finance \+1/).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/5 \/ 失败 1/).length).toBeGreaterThan(0);
@@ -324,6 +346,7 @@ describe('AiSessionsPage', () => {
       data: [
         {
           sessionId: 'session_done',
+          governanceReplayAvailable: true,
           _count: { _all: 1 },
           _max: { createdAt: '2026-03-01T08:00:00.000Z' },
           routeMode: 'focused',
@@ -344,6 +367,7 @@ describe('AiSessionsPage', () => {
         },
         {
           sessionId: 'session_pending',
+          governanceReplayAvailable: true,
           _count: { _all: 1 },
           _max: { createdAt: '2026-03-01T09:00:00.000Z' },
           routeMode: 'focused',
@@ -363,6 +387,7 @@ describe('AiSessionsPage', () => {
         },
         {
           sessionId: 'session_failed',
+          governanceReplayAvailable: true,
           _count: { _all: 1 },
           _max: { createdAt: '2026-03-01T10:00:00.000Z' },
           routeMode: 'cross-domain',
@@ -443,10 +468,10 @@ describe('AiSessionsPage', () => {
               actionType: 'CreateTaxRefundDraft',
               description: '补建退税草稿',
               status: 'failed',
-              createdAt: '2026-04-04T04:00:00.000Z',
+              createdAt: '2999-04-04T04:00:00.000Z',
               timeline: [
-                { type: 'created', status: 'pending', detail: '补建退税草稿', at: '2026-04-04T04:00:00.000Z' },
-                { type: 'failed', status: 'failed', detail: '报关单缺失', at: '2026-04-04T04:06:00.000Z' },
+                { type: 'created', status: 'pending', detail: '补建退税草稿', at: '2999-04-04T04:00:00.000Z' },
+                { type: 'failed', status: 'failed', detail: '报关单缺失', at: '2999-04-04T04:06:00.000Z' },
               ],
             },
           ],
@@ -981,8 +1006,8 @@ describe('AiSessionsPage', () => {
     await waitFor(() => {
       const rows = Array.from(document.querySelectorAll('tbody tr'));
       expect(rows).toHaveLength(2);
-      expect(rows[0]?.textContent).toContain('session_pending');
-      expect(rows[1]?.textContent).toContain('session_failed');
+      expect(rows[0]?.textContent).toContain('session_failed');
+      expect(rows[1]?.textContent).toContain('session_pending');
     });
   });
 

@@ -1,5 +1,47 @@
 # 捷淞系统 UI 交互测试报告
 
+## 2026-04-04 回放级别显式化
+
+- 已把 replay provenance 再推进一层：
+  - 后端现在显式下发 `governanceReplayLevel`
+  - 前端会直接显示 `回放级别：工具层 / 建议层 / 动作层`
+- 这样现在这页不仅知道能回放什么，还知道系统给出的统一回放级别。
+- 已完成验证：
+  - `node --test backend/src/controllers/aiController.test.js` 通过（`5/5`）
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`17/17`）
+  - `git diff --check -- backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 这层 level 还是 controller 基于 summary 现算的
+  - 下一段如果继续推进，更适合把 replay level 沉到更稳定的服务端事件分类或独立持久字段
+
+## 2026-04-04 回放能力摘要显式化
+
+- 已把 replay provenance 再推进一层：
+  - 后端现在显式下发 `governanceReplaySummary`
+  - 前端列表会直接显示 `工具回放 / 建议回放 / 动作回放`
+- 这样现在这页不只是知道“能回放”，而是知道“能回放哪一层”。
+- 已完成验证：
+  - `node --test backend/src/controllers/aiController.test.js` 通过（`5/5`）
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`17/17`）
+  - `git diff --check -- backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 这层 summary 还是 controller 基于 metadata 现算的
+  - 下一段如果继续推进，更适合把 replay 层级进一步沉到更稳定的服务端事件分类或独立字段
+
+## 2026-04-04 审计回放状态显式化
+
+- 已把前端治理语义再往数据层推进一层：
+  - 页面会直接显示 `当前数据：已审计回放`
+  - 明确告诉用户当前列表里的治理信号已经来自持久化会话元数据
+  - 详情里可以继续回放工具、建议和动作轨迹
+- 已完成验证：
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`17/17`）
+  - `node --test backend/src/controllers/aiController.test.js` 通过（`5/5`）
+  - `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 这层 provenance 现在已经有后端显式字段支撑，但字段本身仍是 controller 基于 metadata 的计算结果
+  - 下一段如果继续推进，更适合把它进一步下沉成更稳定的服务端审计标志或事件分类
+
 ## 2026-04-04 自动治理视角不写 URL
 
 - 已把自动失败兜底进一步收口成真正的瞬时态：

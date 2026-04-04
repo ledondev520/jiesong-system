@@ -102,6 +102,13 @@ test('getChatHistory: 回传 metadata 中的 pendingActionSummary', async () => 
 
     assert.equal(capturedError, null);
     assert.equal(res.statusCode, 200);
+    assert.equal(res.payload.data.items[0].governanceReplayAvailable, true);
+    assert.equal(res.payload.data.items[0].governanceReplayLevel, 'actions');
+    assert.deepEqual(res.payload.data.items[0].governanceReplaySummary, {
+      tools: false,
+      recommendations: false,
+      actions: true,
+    });
     assert.deepEqual(res.payload.data.items[0].pendingActionSummary, [
       {
         actionId: 'pa-1',
@@ -157,6 +164,17 @@ test('getSessions: 会话列表包含 pendingActionSummary 摘要', async () => 
       metadata: JSON.stringify({
         agentType: 'unified',
         routePlan: { mode: 'cross-domain', selectedDomains: ['trade-compliance'] },
+        toolTraceSummary: { totalCalls: 2, failureCount: 0, totalDurationMs: 15 },
+        actionRecommendations: [
+          {
+            code: 'trade-compliance.prepare-tax-refund',
+            title: '补建退税草稿',
+            domain: 'trade-compliance',
+            priority: 'high',
+            executionMode: 'manual',
+            reason: '退税前置条件已满足',
+          },
+        ],
         pendingActionSummary: [
           {
             actionId: 'pa-1',
@@ -193,6 +211,13 @@ test('getSessions: 会话列表包含 pendingActionSummary 摘要', async () => 
 
     assert.equal(capturedError, null);
     assert.equal(res.statusCode, 200);
+    assert.equal(res.payload.data[0].governanceReplayAvailable, true);
+    assert.equal(res.payload.data[0].governanceReplayLevel, 'tools');
+    assert.deepEqual(res.payload.data[0].governanceReplaySummary, {
+      tools: true,
+      recommendations: true,
+      actions: true,
+    });
     assert.deepEqual(res.payload.data[0].pendingActionSummary, [
       {
         actionId: 'pa-1',

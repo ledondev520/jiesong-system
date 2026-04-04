@@ -46,7 +46,7 @@ describe('alert', () => {
 
   it('应该支持 ref 转发', () => {
     const ref = { current: null as HTMLDivElement | null };
-    render(<Alert ref={(el) => (ref.current = el)}>ref 测试</Alert>);
+    render(<Alert ref={(el) => { ref.current = el; }}>ref 测试</Alert>);
     expect(ref.current).toBeInstanceOf(HTMLDivElement);
   });
 });

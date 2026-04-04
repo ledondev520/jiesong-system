@@ -41,24 +41,24 @@ describe('errorLogger', () => {
 
   it('应该在开发环境记录信息', () => {
     const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'development';
+    (process.env as Record<string, string>).NODE_ENV = 'development';
 
     errorLogger.info('TestContext', 'info message');
 
     expect(console.log).toHaveBeenCalledWith('[TestContext] info message');
 
-    process.env.NODE_ENV = originalEnv;
+    (process.env as Record<string, string>).NODE_ENV = originalEnv ?? 'test';
   });
 
   it('不应该在生产环境记录信息', () => {
     const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
+    (process.env as Record<string, string>).NODE_ENV = 'production';
 
     errorLogger.info('TestContext', 'info message');
 
     expect(console.log).not.toHaveBeenCalled();
 
-    process.env.NODE_ENV = originalEnv;
+    (process.env as Record<string, string>).NODE_ENV = originalEnv ?? 'test';
   });
 
   it('应该返回错误统计', () => {

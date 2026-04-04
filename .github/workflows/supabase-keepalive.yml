@@ -41,17 +41,17 @@ jobs:
 
           # 1. 先 ping 项目根域名（不需要任何认证，确认项目在线）
           ROOT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            --max-time 30 "${BASE_URL}")
+            --max-time 30 "${BASE_URL}" || echo "000")
           echo "  根域名响应码：${ROOT_STATUS}"
 
           # 2. 再 ping REST API 端点（刷新 Supabase 活跃计时器的关键请求）
           REST_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             --max-time 30 \
             "${HEADERS[@]}" \
-            "${BASE_URL}/rest/v1/")
+            "${BASE_URL}/rest/v1/" || echo "000")
           echo "  REST API 响应码：${REST_STATUS}"
 
-          # 3. 判断项目是否在线（000 = 超时/无法连接，说明项目已暂停）
+          # 3. 判断项目是否在线（000 = 超时/无法连接，说明项目可能已暂停）
           if [ "${ROOT_STATUS}" = "000" ] && [ "${REST_STATUS}" = "000" ]; then
             echo "❌ 所有请求均超时，Supabase 项目可能已被暂停！请前往 Dashboard 手动恢复。"
             echo "   Dashboard: https://supabase.com/dashboard/project/${PROJECT_ID}"

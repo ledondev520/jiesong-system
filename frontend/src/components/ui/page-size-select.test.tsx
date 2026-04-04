@@ -4,18 +4,18 @@ import { PageSizeSelect } from './page-size-select';
 
 // Mock Select 组件
 vi.mock('@/components/ui/select', () => ({
-  Select: ({ children, value, onValueChange }: any) => (
+  Select: (props: { children: React.ReactNode; value?: string; onValueChange?: (value: string) => void }) => (
     <select
       data-testid="page-size-select"
-      value={value}
-      onChange={(e) => onValueChange?.(e.target.value)}
+      value={props.value}
+      onChange={(e) => props.onValueChange?.(e.target.value)}
     >
-      {children}
+      {props.children}
     </select>
   ),
-  SelectContent: ({ children }: any) => <>{children}</>,
-  SelectItem: ({ value, children }: any) => <option value={value}>{children}</option>,
-  SelectTrigger: ({ children }: any) => <>{children}</>,
+  SelectContent: (props: { children: React.ReactNode }) => <>{props.children}</>,
+  SelectItem: (props: { value: string; children: React.ReactNode }) => <option value={props.value}>{props.children}</option>,
+  SelectTrigger: (props: { children: React.ReactNode }) => <>{props.children}</>,
   SelectValue: () => null,
 }));
 

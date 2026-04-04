@@ -39,6 +39,13 @@ export interface AiSessionItem {
   totalTokens?: number;
   lastModel?: string;
   preview?: string;
+  governanceReplayAvailable?: boolean;
+  governanceReplayLevel?: 'none' | 'actions' | 'recommendations' | 'tools';
+  governanceReplaySummary?: {
+    tools: boolean;
+    recommendations: boolean;
+    actions: boolean;
+  };
   agentType?: AiBusinessAgentType | null;
   routeMode?: string | null;
   domainsTouched?: string[];
@@ -71,6 +78,13 @@ export interface AiChatHistoryItem {
   role: 'user' | 'assistant';
   content: string;
   imageUrl?: string;
+  governanceReplayAvailable?: boolean;
+  governanceReplayLevel?: 'none' | 'actions' | 'recommendations' | 'tools';
+  governanceReplaySummary?: {
+    tools: boolean;
+    recommendations: boolean;
+    actions: boolean;
+  };
   agentType?: AiBusinessAgentType | null;
   routePlan?: {
     mode?: string | null;

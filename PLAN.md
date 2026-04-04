@@ -1,5 +1,88 @@
 # Ops Execution Center Plan
 
+## 2026-04-04 Round 122（回放级别显式化）
+
+### Goal
+- 把 replay provenance 从三个位摘要再推进成一个服务端显式级别，让前端能直接展示“当前回放级别”。
+
+### Planned Scope
+- 在 controller 层基于 replay summary 计算 `governanceReplayLevel`。
+- 前端 service 接入该字段。
+- 列表头部显示 `回放级别：工具层 / 建议层 / 动作层`。
+
+### Verification Plan
+- `node --test backend/src/controllers/aiController.test.js`
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- `aiController` 现在会显式返回 `governanceReplayLevel`，当前取值按能力从高到低为 `tools / recommendations / actions / none`。
+- 前端 service 已接入该字段，列表页会直接显示 `回放级别：工具层` 这类等级提示。
+- 这样 provenance 现在同时具备：是否可回放、能回放哪几层、以及系统认定的统一回放级别。
+
+### Verification
+- `node --test backend/src/controllers/aiController.test.js` 通过（`5/5`）
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`17/17`）
+- `git diff --check -- backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 待本轮台账更新后一并校验
+
+### Remaining Risk
+- 当前 replay level 仍由 controller 基于 metadata 现算，不是数据库内独立持久字段；如果继续推进，下一步可以把 level 下沉到更稳定的服务端事件分类或物化字段。
+
+## 2026-04-04 Round 121（回放能力摘要显式化）
+
+### Goal
+- 把 provenance 从单一布尔值再推进成可消费的 replay summary，让前端明确知道“能回放什么”。
+
+### Planned Scope
+- 在 controller 层显式下发 `governanceReplaySummary`。
+- 至少区分：工具回放、建议回放、动作回放。
+- 前端列表头部消费该字段并显示对应回放 badge。
+
+### Verification Plan
+- `node --test backend/src/controllers/aiController.test.js`
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- `aiController` 现在会显式返回 `governanceReplaySummary = { tools, recommendations, actions }`。
+- 前端 service 已接入该字段，AI sessions 列表页会把它渲染成 `工具回放 / 建议回放 / 动作回放` 三类 badge。
+- 这样“已审计回放”不再只是一个总状态，而是能告诉用户当前到底能回放哪一层治理信号。
+
+### Verification
+- `node --test backend/src/controllers/aiController.test.js` 通过（`5/5`）
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`17/17`）
+- `git diff --check -- backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 待本轮台账更新后一并校验
+
+### Remaining Risk
+- 当前 replay summary 仍由 controller 基于 metadata 计算，不是独立持久化对象；如果继续推进，下一步可以把这些 summary 下沉到更稳定的服务端事件分类或物化字段。
+
+## 2026-04-04 Round 120（审计回放状态显式化）
+
+### Goal
+- 把“已审计回放”从前端推断语义升级成后端显式字段，再由前端直接消费。
+
+### Planned Scope
+- 在 `getSessions / getChatHistory` 中显式下发 `governanceReplayAvailable`。
+- 前端 service 类型接入该字段。
+- 列表页优先消费该字段，并保留现有元数据推断作为兼容 fallback。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- `backend/src/controllers/aiController.js` 现在会在 sessions/history 返回里显式给出 `governanceReplayAvailable`。
+- `frontend/src/services/ai.service.ts` 已接入该字段，AI sessions 列表页优先消费服务端显式 provenance，再回退到旧的前端聚合判断。
+- 页面仍会显示 `当前数据：已审计回放`，但这层状态现在已经不只是 UI 推断，而是有后端显式契约支撑。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`17/17`）
+- `node --test backend/src/controllers/aiController.test.js` 通过（`5/5`）
+- `git diff --check -- backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 待本轮台账更新后一并校验
+
+### Remaining Risk
+- 当前 provenance 已经显式下发，但仍是 controller 层基于 metadata 计算，而不是数据库内独立字段；如果继续推进，下一步可以下沉到更稳定的持久化标志或事件分类。
+
 ## 2026-04-04 Round 119（自动治理视角不写 URL）
 
 ### Goal

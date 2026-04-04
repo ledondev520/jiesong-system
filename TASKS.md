@@ -1,5 +1,29 @@
 # Frontend Polish Tasks
 
+## 2026-04-04 回放级别显式化
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-70 | P0 | 10m | 1 | DONE | 在 controller 显式计算并返回 `governanceReplayLevel` |
+| AGENT-V2-GOV-71 | P0 | 10m | 1 | DONE | 前端接入并显示 `回放级别：工具层/建议层/动作层` |
+| AGENT-V2-GOV-72 | P1 | 10m | 1 | DONE | 更新前后端测试与 checkpoint |
+
+## 2026-04-04 回放能力摘要显式化
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-67 | P0 | 10m | 1 | DONE | 在 controller 显式下发 `governanceReplaySummary` |
+| AGENT-V2-GOV-68 | P0 | 10m | 1 | DONE | 前端接入并渲染 `工具回放 / 建议回放 / 动作回放` badge |
+| AGENT-V2-GOV-69 | P1 | 10m | 1 | DONE | 更新前后端测试与 checkpoint |
+
+## 2026-04-04 审计回放状态显式化
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-64 | P0 | 10m | 1 | DONE | 在 `getSessions / getChatHistory` 显式下发 `governanceReplayAvailable` |
+| AGENT-V2-GOV-65 | P0 | 10m | 1 | DONE | 前端 service 和列表页切到消费显式 provenance 字段 |
+| AGENT-V2-GOV-66 | P1 | 10m | 1 | DONE | 更新前后端测试与 checkpoint |
+
 ## 2026-04-04 自动治理视角不写 URL
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |

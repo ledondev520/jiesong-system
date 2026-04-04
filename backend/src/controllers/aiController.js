@@ -160,6 +160,25 @@ const mergePendingActionSummary = (items = [], outcomeMap = new Map()) => (
   })
 );
 
+const hasGovernanceReplayMetadata = (metadata = {}) => (
+  Boolean(metadata?.toolTraceSummary?.totalCalls)
+  || Boolean(Array.isArray(metadata?.actionRecommendations) && metadata.actionRecommendations.length > 0)
+  || Boolean(Array.isArray(metadata?.pendingActionSummary) && metadata.pendingActionSummary.length > 0)
+);
+
+const buildGovernanceReplaySummary = (metadata = {}) => ({
+  tools: Boolean(metadata?.toolTraceSummary?.totalCalls),
+  recommendations: Boolean(Array.isArray(metadata?.actionRecommendations) && metadata.actionRecommendations.length > 0),
+  actions: Boolean(Array.isArray(metadata?.pendingActionSummary) && metadata.pendingActionSummary.length > 0),
+});
+
+const buildGovernanceReplayLevel = (summary = {}) => {
+  if (summary.tools) return 'tools';
+  if (summary.recommendations) return 'recommendations';
+  if (summary.actions) return 'actions';
+  return 'none';
+};
+
 /**
  * 职责：智能问答（支持图片）
  * 思路：
@@ -425,12 +444,18 @@ const getChatHistory = async (req, res, next) => {
       (item.parsedMetadata.pendingActionSummary || []).map((summary) => summary.actionId)
     );
     const outcomeMap = await buildPendingActionOutcomeMap(req.user.id, actionIds);
-    const enrichedMessages = parsedMessages.map((item) => ({
-      ...item,
-      ...item.parsedMetadata,
-      pendingActionSummary: mergePendingActionSummary(item.parsedMetadata.pendingActionSummary, outcomeMap),
-      parsedMetadata: undefined,
-    }));
+    const enrichedMessages = parsedMessages.map((item) => {
+      const replaySummary = buildGovernanceReplaySummary(item.parsedMetadata);
+      return {
+        ...item,
+        ...item.parsedMetadata,
+        governanceReplayAvailable: hasGovernanceReplayMetadata(item.parsedMetadata),
+        governanceReplaySummary: replaySummary,
+        governanceReplayLevel: buildGovernanceReplayLevel(replaySummary),
+        pendingActionSummary: mergePendingActionSummary(item.parsedMetadata.pendingActionSummary, outcomeMap),
+        parsedMetadata: undefined,
+      };
+    });
 
     paginated(res, enrichedMessages, total, parsedPage, parsedPageSize);
   } catch (error) {
@@ -517,20 +542,26 @@ const getSessions = async (req, res, next) => {
     const outcomeMap = await buildPendingActionOutcomeMap(req.user.id, pendingActionIds);
 
     // 5. 合并后返回
-    const enrichedSessions = sessions.map(s => ({
-      ...s,
-      totalTokens: tokenMap[s.sessionId] || 0,
-      lastModel: modelMap[s.sessionId] || null,
-      preview: previewMap[s.sessionId]?.text || '',
-      agentType: previewMap[s.sessionId]?.metadata?.agentType || null,
-      routePlan: previewMap[s.sessionId]?.metadata?.routePlan || null,
-      toolsUsed: previewMap[s.sessionId]?.metadata?.selectedToolNames || [],
-      routeMode: previewMap[s.sessionId]?.metadata?.routePlan?.mode || null,
-      domainsTouched: previewMap[s.sessionId]?.metadata?.routePlan?.selectedDomains || [],
-      toolTraceSummary: previewMap[s.sessionId]?.metadata?.toolTraceSummary || null,
-      actionRecommendations: previewMap[s.sessionId]?.metadata?.actionRecommendations || [],
-      pendingActionSummary: mergePendingActionSummary(previewMap[s.sessionId]?.metadata?.pendingActionSummary, outcomeMap),
-    }));
+    const enrichedSessions = sessions.map((s) => {
+      const replaySummary = buildGovernanceReplaySummary(previewMap[s.sessionId]?.metadata);
+      return {
+        ...s,
+        totalTokens: tokenMap[s.sessionId] || 0,
+        lastModel: modelMap[s.sessionId] || null,
+        preview: previewMap[s.sessionId]?.text || '',
+        agentType: previewMap[s.sessionId]?.metadata?.agentType || null,
+        routePlan: previewMap[s.sessionId]?.metadata?.routePlan || null,
+        toolsUsed: previewMap[s.sessionId]?.metadata?.selectedToolNames || [],
+        routeMode: previewMap[s.sessionId]?.metadata?.routePlan?.mode || null,
+        domainsTouched: previewMap[s.sessionId]?.metadata?.routePlan?.selectedDomains || [],
+        toolTraceSummary: previewMap[s.sessionId]?.metadata?.toolTraceSummary || null,
+        actionRecommendations: previewMap[s.sessionId]?.metadata?.actionRecommendations || [],
+        governanceReplayAvailable: hasGovernanceReplayMetadata(previewMap[s.sessionId]?.metadata),
+        governanceReplaySummary: replaySummary,
+        governanceReplayLevel: buildGovernanceReplayLevel(replaySummary),
+        pendingActionSummary: mergePendingActionSummary(previewMap[s.sessionId]?.metadata?.pendingActionSummary, outcomeMap),
+      };
+    });
 
     success(res, enrichedSessions);
   } catch (error) {
