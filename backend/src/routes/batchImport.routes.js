@@ -4,14 +4,14 @@
 
 const express = require('express');
 const router = express.Router();
-const { authenticate } = require('../middleware/auth');
+const { authenticate, roleAuth } = require('../middleware/auth');
 const batchImportService = require('../services/batchImportService');
 
 /**
  * POST /api/batch-import/sales
  * 批量导入销售合同
  */
-router.post('/sales', authenticate, async (req, res, next) => {
+router.post('/sales', authenticate, roleAuth('ADMIN', 'SALES'), async (req, res, next) => {
   try {
     const { data } = req.body;
     const userId = req.user.id;
@@ -47,7 +47,7 @@ router.post('/sales', authenticate, async (req, res, next) => {
  * POST /api/batch-import/purchase
  * 批量导入采购合同
  */
-router.post('/purchase', authenticate, async (req, res, next) => {
+router.post('/purchase', authenticate, roleAuth('ADMIN', 'PURCHASE'), async (req, res, next) => {
   try {
     const { data } = req.body;
     const userId = req.user.id;

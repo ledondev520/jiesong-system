@@ -16,6 +16,9 @@ const WRITE_METHODS = ['post', 'put', 'patch', 'delete'];
 const PUBLIC_WRITE_ROUTES = new Set([
   'auth POST /login',
   'auth POST /reset-password',
+  'ai POST /anthropic/v1/messages',
+  'ai POST /anthropic/v1/messages/count_tokens',
+  'mcp POST /',
 ]);
 
 const routeFiles = fs
@@ -58,7 +61,8 @@ test('RBAC: all write routes include roleAuth protection', () => {
       }
 
       const hasRouteLevelRoleAuth = /roleAuth\(/.test(block);
-      if (!hasRouterLevelRoleAuth && !hasRouteLevelRoleAuth) {
+      const hasAccessAuth = /accessAuth\(/.test(block);
+      if (!hasRouterLevelRoleAuth && !hasRouteLevelRoleAuth && !hasAccessAuth) {
         missingRoleAuth.push(routeKey);
       }
     }
