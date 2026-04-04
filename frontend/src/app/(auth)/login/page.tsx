@@ -9,7 +9,7 @@
 
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -42,7 +42,7 @@ type QuickLoginProfile = { username: string; password: string };
 
 const QUICK_LOGIN_PROFILE_KEY = 'jiesong_quick_login_profile';
 
-export default function LoginPage() {
+function LoginFormClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const login = useAuthStore((state) => state.login);
@@ -280,5 +280,29 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="auth-shell">
+          <div className="flex w-full max-w-md flex-col items-center">
+            <div className="mb-6 flex flex-col items-center gap-2">
+              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md">
+                <Ship className="h-6 w-6" />
+              </span>
+              <div className="text-center">
+                <h1 className="text-xl font-semibold tracking-tight">捷淞系统</h1>
+              </div>
+            </div>
+            <div className="text-muted-foreground">加载中...</div>
+          </div>
+        </div>
+      }
+    >
+      <LoginFormClient />
+    </Suspense>
   );
 }
