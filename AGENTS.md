@@ -1,5 +1,10 @@
 # Security & Development Operating Notes
 
+## Subagent policy (Cursor hard guardrail)
+- Cursor 默认不允许自动启动 subagent（包括任何“composer-*”类 worker 名称），即使会话中出现类似 `composer-2-fast` 的任务名也按**模型实例名称**处理，不能自动视作已授权子代理。
+- 仅在用户明确写明“允许你使用 subagent / 允许 spawn_agent”的指令下，才可以在本会话中调用 `spawn_agent`，且仅限该指令范围内的子任务。
+- 任何未经明确授权的 `spawn_agent` 调用都视为违规。
+
 ## Scope
 - Applies to the whole repository rooted at `/Users/helena/Cursor/jiesong_system`.
 - Security requirements are mandatory for code, scripts, docs, and operational procedures.

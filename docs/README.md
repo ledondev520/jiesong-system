@@ -21,6 +21,7 @@
 | 前端统一重构验收清单.md | 验收台账 | 记录前端 shadcn/ui 统一重构的验收项与复核命令 |
 | 2026-03-28-ceo-roadmap-upgrade.md | 路线图 | CEO 视角的产品升级路线、30/90 天目标、取舍边界与检查点 |
 | plans/2026-03-29-agent-cli-mcp-ready-design.md | 架构设计 | 定义 Agent 独立账号、命令层、CLI 协议与 MCP-ready 演进路径 |
+| plans/2026-04-04-universal-agent-runtime-v2-design.md | 架构设计 | 将 Agent 下一阶段收口为“一个对外通用主 Agent + 内部路由/工具域”的统一智能体方案 |
 | coverage-98-master-plan.md | 专项总纲 | 定义前端覆盖率提升到 98% 的分阶段路径、门禁与里程碑 |
 | coverage-98-ci-plan.md | CI 方案 | 定义 Coverage `>=98%` 的 CI 门禁切换顺序、前置条件、风险与回退 |
 | 系统架构落地执行方案.md | 执行总纲 | 定义多 Agent 协同的系统架构落地路径、WU清单与门禁 |
@@ -55,9 +56,13 @@
 - ✅ 库存链路 API 契约与联调面板 - 已完成（M7）
 - ✅ 发布结论（M5）- 已完成（Go）
 - ✅ 周节奏指标看板（V1）- 已完成
+- ✅ Agent Runtime 主链实现 - 已落地代码，当前主要缺口转为文档校正与收口
+- ✅ Universal Agent Runtime V2 方案 - 已完成设计稿，待进入实施拆解
 
 ## 下一步
 - 用户审核确认文档
-- 先按 `plans/2026-03-29-agent-cli-mcp-ready-design.md` 落地 Agent 账号模型、统一搜索接口与命令层，再进入 CLI 与 MCP 封装
+- Agent 相关文档改为以“实现状态校正”为主：收口 runtime/CLI/MCP 已落地事实、补当前剩余缺口与风险说明
+- 继续收口 Agent 实现与设计文档漂移，重点核对 grant 模型、默认权限口径与深度集成验证
+- 以 `plans/2026-04-04-universal-agent-runtime-v2-design.md` 为下一阶段 Agent 主线：统一到一个对外通用主 Agent，并扩工具面与内部路由
 - 先按 `2026-03-28-ceo-roadmap-upgrade.md` 推进路线图整理与 shell/workspace 升级，再把 `FE-COV-98` 作为护栏继续收口
 - 先按 `coverage-98-ci-plan.md` 处理 coverage 稳定性与门禁切换，再按 `coverage-98-master-plan.md` 执行 FE-COV-98 的 M1-M6

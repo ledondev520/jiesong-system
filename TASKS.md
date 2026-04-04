@@ -1,5 +1,207 @@
 # Frontend Polish Tasks
 
+## 2026-04-04 排序/筛选 URL 持久化
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-30 | P0 | 15m | 1 | DONE | 从 URL 恢复 `sort` 与 `actionFilter` 初始状态 |
+| AGENT-V2-GOV-31 | P0 | 15m | 1 | DONE | 在切换排序/筛选时回写 query，并保持默认值不落 URL |
+| AGENT-V2-GOV-32 | P1 | 10m | 1 | DONE | 更新测试与 checkpoint |
+
+## 2026-04-04 列表层可切换排序
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-27 | P0 | 15m | 1 | DONE | 增加 `排序方式` 控件：风险优先 / 最近动作 / 最近消息 |
+| AGENT-V2-GOV-28 | P0 | 10m | 1 | DONE | 让排序方式与动作筛选同时生效 |
+| AGENT-V2-GOV-29 | P1 | 10m | 1 | DONE | 更新前端测试与 checkpoint |
+
+## 2026-04-04 列表层动作排序与筛选
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-24 | P0 | 15m | 1 | DONE | 在会话列表按动作风险优先级排序 |
+| AGENT-V2-GOV-25 | P0 | 15m | 1 | DONE | 增加 `全部 / 有失败 / 有待确认 / 已完成动作` 筛选 |
+| AGENT-V2-GOV-26 | P1 | 10m | 1 | DONE | 更新前端测试与 checkpoint |
+
+## 2026-04-04 列表层失败高亮与最近动作时间
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-21 | P0 | 10m | 1 | DONE | 在列表层显示失败动作风险信号 |
+| AGENT-V2-GOV-22 | P0 | 10m | 1 | DONE | 在列表层显示最近动作时间 |
+| AGENT-V2-GOV-23 | P1 | 10m | 1 | DONE | 更新测试与 checkpoint |
+
+## 2026-04-04 列表层失败高亮与最近动作时间
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-18 | P0 | 15m | 1 | DONE | 在会话列表中高亮失败动作风险 |
+| AGENT-V2-GOV-19 | P0 | 10m | 1 | DONE | 在会话列表显示最近动作时间 |
+| AGENT-V2-GOV-20 | P1 | 10m | 1 | DONE | 更新前端测试与 checkpoint |
+
+## 2026-04-04 列表层动作状态汇总
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-15 | P0 | 15m | 1 | DONE | 在 AI sessions 桌面表格中显示动作状态汇总 |
+| AGENT-V2-GOV-16 | P0 | 10m | 1 | DONE | 在移动端会话卡片中显示相同的动作状态汇总 |
+| AGENT-V2-GOV-17 | P1 | 10m | 1 | DONE | 更新前端测试与 checkpoint |
+
+## 2026-04-04 待确认动作生命周期时间线
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-12 | P0 | 20m | 1 | DONE | 在 controller 中为 `pendingActionSummary` 组装 `created -> final-state` 时间线 |
+| AGENT-V2-GOV-13 | P0 | 15m | 1 | DONE | 在 AI sessions 详情中展示动作时间线与事件时间 |
+| AGENT-V2-GOV-14 | P1 | 10m | 1 | DONE | 更新 checkpoint 与 progress，记录 lifecycle timeline 已落地 |
+
+## 2026-04-04 待确认动作最终态回放
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-09 | P0 | 20m | 1 | DONE | 为 `AGENT_WRITE_CANCEL / AGENT_WRITE_FAILED` 补日志落点，并在执行日志中写入 `status/detail/sessionId` |
+| AGENT-V2-GOV-10 | P0 | 20m | 1 | DONE | 在 `getSessions / getChatHistory` 中用 `OperationLog` 覆盖 `pendingActionSummary` 最终态 |
+| AGENT-V2-GOV-11 | P1 | 15m | 1 | DONE | 在 AI sessions 详情中展示待确认动作的最终状态与结果说明，并更新 checkpoint |
+
+## 2026-04-04 确认执行链治理回放补齐
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-06 | P0 | 15m | 1 | DONE | 在 `persistAgentRun` 中持久化 `pendingActionSummary`，让待确认动作能随会话回放 |
+| AGENT-V2-GOV-07 | P0 | 15m | 1 | DONE | 为 `getSessions / getChatHistory` 补 `pendingActionSummary` 返回与后端测试 |
+| AGENT-V2-GOV-08 | P1 | 15m | 1 | DONE | 在 AI sessions 详情中展示“待确认动作”回放，并更新 checkpoint |
+
+## 2026-04-04 财务高置信挂账建议闭环
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-FIN-01 | P0 | 20m | 1 | DONE | 在 `DiagnoseSalesContractFlow` 中识别唯一高置信待分配收款，并升级为 `AllocatePayment` 建议 |
+| AGENT-V2-FIN-02 | P0 | 10m | 1 | DONE | 为“多命中保持 manual，避免误挂账”补测试护栏 |
+| AGENT-V2-FIN-03 | P1 | 10m | 1 | DONE | 更新 `PLAN.md / TASKS.md / RISKS.md / METRICS.md / task_plan.md / progress.md` checkpoint |
+
+## 2026-04-04 诊断建议进入确认执行链
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-CLOSE-01 | P0 | 25m | 1 | DONE | 为税退链路新增 `CreateCustomsDeclarationDraft / CreateForexVerificationDraft / CreateTaxRefundDraft` 三个受控写工具与 executor |
+| AGENT-V2-CLOSE-02 | P0 | 20m | 1 | DONE | 将组合诊断中的少量高价值建议升级为 `confirmable_write`，并在 runtime 内自动物化成 `pendingActions` |
+| AGENT-V2-CLOSE-03 | P1 | 15m | 1 | DONE | 在 `AIAssistant` 实时消息中展示 `actionRecommendations`，让建议与待确认动作同屏可见并补测试/checkpoint |
+
+## 2026-04-04 组合诊断建议闭环可见化
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-ACT-01 | P0 | 25m | 1 | DONE | 为三类组合诊断工具补结构化 `recommendedActions`，把 blocker/next step 升级为正式建议对象 |
+| AGENT-V2-ACT-02 | P0 | 20m | 1 | DONE | 在 runtime 执行层收集复合诊断建议，并沿 `ChatHistory / OperationLog` metadata 持久化到会话治理面 |
+| AGENT-V2-ACT-03 | P1 | 20m | 1 | DONE | 在 AI 会话页展示推荐动作回放和建议数量，并补后端/前端定向测试与 checkpoint |
+
+## 2026-04-04 组合型任务工具深化
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-TOOL-01 | P0 | 35m | 1 | DONE | 为 unified runtime 新增 `DiagnoseSalesContractFlow / DiagnosePurchaseExecution / DiagnoseTradeComplianceReadiness` 三个组合型诊断工具 |
+| AGENT-V2-TOOL-02 | P0 | 20m | 1 | DONE | 为 tool registry 增加 `isComposite` 与域级 `compositeToolCount`，区分基础工具与复合任务工具 |
+| AGENT-V2-TOOL-03 | P1 | 20m | 1 | DONE | 在 AI 会话页展示域描述与复合工具数量，并补对应后端/前端测试与 checkpoint |
+
+## 2026-04-04 Tool Registry 治理面接通
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-01 | P0 | 15m | 1 | DONE | 暴露 `GET /api/v1/ai/agents/tools`，让通用主 Agent 的工具注册表成为正式接口 |
+| AGENT-V2-GOV-02 | P0 | 20m | 1 | DONE | 为 frontend `aiService` 增加 tool registry 调用，并在 AI 会话页展示主入口、读/写工具数与覆盖域数 |
+| AGENT-V2-GOV-03 | P1 | 10m | 1 | DONE | 同步台账，记录 tool registry 已成为可见治理面 |
+| AGENT-V2-GOV-04 | P1 | 15m | 1 | DONE | 在 AI 会话详情中展示 `toolTraceSummary.items`，把工具调用回放推进到可见层 |
+| AGENT-V2-GOV-05 | P1 | 10m | 1 | DONE | 让 tool registry 成为 role-aware 治理面，展示当前角色和按域可用工具数量 |
+
+## 2026-04-04 Universal Agent 深写能力接入
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-WRITE-01 | P0 | 30m | 1 | DONE | 扩通用主 Agent 写工具到供应商新建/更新、采购合同新建/更新、库存状态更新 |
+| AGENT-V2-WRITE-02 | P0 | 20m | 1 | DONE | 为写工具补 `allowedRoles` 元数据，并在 runtime 内显式校验角色 |
+| AGENT-V2-WRITE-03 | P1 | 10m | 1 | DONE | 同步 `task_plan.md / progress.md / PLAN.md / TASKS.md`，记录深写能力接入与剩余测试风险 |
+
+## 2026-04-04 Universal Agent V2 可观测性接通
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-OBS-01 | P0 | 20m | 1 | DONE | 为 unified runtime 注入 internal specialist frame，并把 routePlan 作为统一 prompt 的内部路由上下文 |
+| AGENT-V2-OBS-02 | P0 | 30m | 1 | DONE | 让 `getSessions / getChatHistory` 返回 routeMode、domainsTouched、toolsUsed 等 route metadata |
+| AGENT-V2-OBS-03 | P0 | 25m | 1 | DONE | 在 AI 会话页显示 routeMode/工具域摘要，并在详情弹窗展示 routePlan 和 tools 数量 |
+| AGENT-V2-OBS-04 | P0 | 30m | 1 | DONE | 扩通用事实工具到合同详情、财务风险、低库存、税退详情等更深层查询 |
+| AGENT-V2-OBS-05 | P0 | 20m | 1 | DONE | 将工具调用明细汇总为 `toolTraceSummary`，写入 Agent metadata 与 `AGENT_RUN` 事件台账 |
+
+## 2026-04-04 Universal Agent Runtime V2 实施起步
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-IMP-01 | P0 | 30m | 1 | DONE | 在 `openAgentService` 中明确 `unified` 为主公开入口，并将 legacy preset 标记为内部兼容态 |
+| AGENT-V2-IMP-02 | P0 | 45m | 1 | DONE | 落第一版 tool registry，统一输出工具 metadata（domain/access/confirmationRequired） |
+| AGENT-V2-IMP-03 | P0 | 45m | 1 | DONE | 接入首批跨域读工具：统一搜索、库存概览、税退链路概览、最近事件 |
+| AGENT-V2-IMP-04 | P0 | 30m | 1 | DONE | 落轻量内部路由：按消息内容判断 focused/cross-domain/broad/legacy-explicit，并据此裁剪工具域 |
+| AGENT-V2-IMP-05 | P1 | 15m | 1 | DONE | 为 V2 起步实现补后端定向测试与 checkpoint 台账 |
+
+## 2026-04-04 Universal Agent Runtime V2 方案定稿
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-PLAN-01 | P0 | 30m | 1 | DONE | 输出通用主 Agent 方案：统一对外入口、内部工具域/路由、tool-first 感知、确认门写操作 |
+| AGENT-V2-PLAN-02 | P0 | 10m | 1 | DONE | 更新 `docs/README.md`、`PLAN.md`、`TASKS.md`，把 Universal Agent Runtime V2 纳入正式执行台账 |
+
+## 2026-04-04 Agent 剩余扫尾：旧路径排查 + 权限口径对齐
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-DOC-04 | P0 | 10m | 1 | DONE | 全仓扫描旧 `/ai/chat-history` 运行时调用，确认残留仅在历史修复说明文档中 |
+| AGENT-DOC-05 | P0 | 20m | 1 | DONE | 更新 About 页和 Agent 弹窗文案，统一为“固定能力集自动附加、暂不支持逐项勾选” |
+| AGENT-DOC-06 | P1 | 15m | 1 | DONE | 更新 `docs/plans/2026-03-29-agent-cli-mcp-ready-design.md`，补当前实现状态说明并记录与目标架构的差异 |
+
+## 2026-04-03 Agent 状态文档校正 + 历史接口修复
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-DOC-01 | P0 | 15m | 1 | DONE | 为 `aiService.getChatHistory` 增加失败测试并修正 `/ai/history` 路径，恢复前后端接口一致性 |
+| AGENT-DOC-02 | P0 | 20m | 1 | DONE | 更新 `task_plan.md / progress.md / docs/README.md`，把 Agent 状态从“待接入”校正为“主体已落地、剩余待收口” |
+| AGENT-DOC-03 | P1 | 10m | 1 | DONE | 同步 `PLAN.md / TASKS.md` checkpoint，记录本轮 Agent 文档校正与剩余风险 |
+
+## 2026-04-02 本地 API 304 代理链修复
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| API-PROXY-304-01 | P0 | 10m | 1 | DONE | 在 backend 应用入口禁用 ETag，修复 Next dev rewrite 代理下 `/api/v1/purchases` 等 JSON API 返回 304 导致页面误判失败的问题 |
+
+## 2026-04-02 采购合同页 FileText 图标回归修复
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| CONTRACTS-BUG-02 | P0 | 5m | 1 | DONE | 恢复采购合同页 `FileText` 图标 import，修复合同号列表项 `FileText is not defined` 运行时错误 |
+
+## 2026-04-02 采购合同页图标回归修复
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| CONTRACTS-BUG-01 | P0 | 5m | 1 | DONE | 恢复采购合同页 `Store` 图标 import，修复“合作店铺”概览卡 `Store is not defined` 运行时错误 |
+
+## 2026-04-02 采购合同页去故事流
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| CONTRACTS-UI-01 | P1 | 15m | 1 | DONE | 删除采购合同页顶部“采购故事流”引导卡片，保留列表区入口并同步更新页面测试断言 |
+
+## 2026-04-02 Open Agent Runtime 融合
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-RUNTIME-01 | P0 | 90m | 1 | DONE | 接入 `open-agent-sdk` 后端运行时，新增三类预置业务 agent 与 `/ai/agents/prompt` 只读执行入口 |
+| AGENT-RUNTIME-02 | P0 | 60m | 1 | DONE | AIAssistant 已集成 mode tabs + agent chips + runBusinessAgent 前端调用入口 |
+| AGENT-RUNTIME-03 | P1 | 90m | 1 | DONE | 确认后执行写动作工作流：AllocatePayment / UpdateExportContractStatus / CreatePaymentRecord 三个受控写工具，pendingAction 两阶段确认 |
+| AGENT-RUNTIME-04 | P1 | 90m | 1 | DONE | Agent 会话/用量/写执行沉淀到事件台账：AGENT_RUN + AGENT_WRITE_EXECUTE 事件，eventLedger AGENT 分类 |
+| AGENT-RUNTIME-05 | P0 | 60m | 1 | DONE | 统一入口重构：去掉 chat/agent Tab 和 Agent 选择器，合并为 unified agent 单入口；新增 UpdateSystemConfig + GetSystemConfig 工具；前端二步确认卡片 UI |
+| AGENT-RUNTIME-06 | P0 | 45m | 1 | DONE | 流式输出恢复（SSE via agent.query）+ 图片上传恢复 + 消息气泡溢出修复 |
+| AGENT-RUNTIME-07 | P0 | 30m | 1 | DONE | 会话历史列表：历史对话回溯、新建对话、会话切换 |
+| AGENT-RUNTIME-08 | P0 | 60m | 1 | DONE | 自进化巡检基础架构：PatrolService（业务+系统巡检规则）+ PatrolJob（每小时cron）+ 通知下发 + API 路由 |
+
 ## 2026-04-02 出口合同第三方来源展示收口
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |

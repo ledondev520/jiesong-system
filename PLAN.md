@@ -1,5 +1,723 @@
 # Ops Execution Center Plan
 
+## 2026-04-04 Round 109（排序/筛选 URL 持久化）
+
+### Goal
+- 让 AI 会话列表的治理视角在刷新后不丢失，并且可通过 URL 分享当前排序/筛选状态。
+
+### Planned Scope
+- 从 URL 读取 `sort` 与 `actionFilter` 初始化页面状态。
+- 在用户切换排序/筛选时回写 query。
+- 默认值不写回 URL，保持 query 干净。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- 页面现在会从 URL 恢复 `sort` 与 `actionFilter`。
+- 用户切换排序/筛选时会回写 URL。
+- 默认值继续省略，不污染 query。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`6/6`）
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+
+### Remaining Risk
+- 当前状态只持久化到 URL，还没有本地偏好记忆；如果继续推进，下一步可以加 local storage fallback。
+
+## 2026-04-04 Round 108（列表层可切换排序）
+
+### Goal
+- 让 AI 会话列表不只固定按风险排序，而是允许用户在风险优先、最近动作、最近消息之间切换。
+
+### Planned Scope
+- 增加 `排序方式` 控件。
+- 保持与现有动作筛选兼容。
+- 继续复用同一套桌面/移动数据源与排序逻辑。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- AI sessions 列表已新增 `排序方式`：`风险优先 / 最近动作 / 最近消息`。
+- 排序方式与现有 `动作筛选` 可同时生效。
+- 默认仍保持风险优先，不破坏当前治理默认口径。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`5/5`）
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+
+### Remaining Risk
+- 当前排序模式仍是页面内状态，不会记住用户偏好；如果继续推进，下一步可以补 URL 参数或本地持久化。
+
+## 2026-04-04 Round 107（列表层动作排序与筛选）
+
+### Goal
+- 把会话列表从“可分诊”推进到“可优先处理”：直接按动作风险排序，并提供动作状态筛选。
+
+### Planned Scope
+- 按 `失败动作 > 待确认动作 > 其他动作 > 无动作` 排序。
+- 增加动作筛选：`全部 / 有失败 / 有待确认 / 已完成动作`。
+- 保持移动端与桌面端共用同一套逻辑，不改后端。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- AI sessions 列表现在会按动作风险优先级自动排序。
+- 已新增 `动作筛选` 下拉：`全部 / 有失败 / 有待确认 / 已完成动作`。
+- 桌面表格和移动卡片都复用同一套排序/筛选规则。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`5/5`）
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+
+### Remaining Risk
+- 当前排序仍是固定优先级，不支持用户切换“按最近动作时间”或“按 Token/最近消息时间”排序；如果继续推进，下一步可以补真正的排序控件。
+
+## 2026-04-04 Round 106（列表层失败高亮与最近动作时间）
+
+### Goal
+- 让 AI 会话列表具备第一眼可分诊能力：直接暴露失败动作和最近动作时间。
+
+### Planned Scope
+- 在列表层显示 `失败动作` 风险信号。
+- 在列表层显示最近动作时间。
+- 保持移动端与桌面端一致，不改后端。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- 会话列表已新增 `失败动作` 风险提示。
+- 会话列表已新增 `最近动作 yyyy-MM-dd HH:mm:ss`。
+- 移动端卡片与桌面表格已保持一致。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`4/4`）
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx` 通过
+
+### Remaining Risk
+- 当前仍是“可分诊但不可排序”；下一步最值得做的是按失败优先和最近动作时间排序/筛选。
+
+## 2026-04-04 Round 105（列表层失败高亮与最近动作时间）
+
+### Goal
+- 让 AI 会话列表不仅能看动作状态计数，还能直接暴露“失败动作”风险和最近一次动作时间。
+
+### Planned Scope
+- 在 sessions 列表为 `pendingActionSummary` 增加失败动作高亮。
+- 在列表显示最近动作时间，便于按新近风险快速扫会话。
+- 保持前端内聚，不改后端数据结构。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- 会话列表现在会额外显示 `失败动作` 风险标签。
+- 同一位置会显示 `最近动作 yyyy-MM-dd HH:mm:ss`，基于现有 timeline/createdAt 聚合。
+- 桌面表格和移动卡片都已对齐这层治理信号。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`4/4`）
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx` 通过
+
+### Remaining Risk
+- 现在的列表高亮仍是文本级风险信号，没有按失败动作数量或最近失败时间排序；如果下一轮继续推，最有效的是加排序/筛选。
+
+## 2026-04-04 Round 104（列表层动作状态汇总）
+
+### Goal
+- 把待确认动作治理信号从详情页再推进到会话列表层，让用户不用点进详情也能快速扫出哪些会话仍挂着动作、哪些已经执行完。
+
+### Planned Scope
+- 在 AI sessions 列表中按会话汇总 `pending/executed/cancelled/failed` 数量。
+- 同时覆盖桌面表格和移动卡片视图。
+- 补前端测试并更新 checkpoint。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- AI sessions 列表现在会显示动作状态汇总，例如 `动作 2 · 待确认 1 · 已执行 1`。
+- 移动端卡片和桌面表格都已接上该摘要，不再只有详情页可见。
+- 该摘要基于现有 `pendingActionSummary`，不新增后端接口。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`4/4`）
+- `git diff --check -- frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx` 通过
+
+### Remaining Risk
+- 当前列表层只显示动作状态计数，不显示时间线摘要；如果后续列表要更强治理，还可以补“最近一次动作事件时间”或“有失败动作”的显式高亮。
+
+## 2026-04-04 Round 103（待确认动作生命周期时间线）
+
+### Goal
+- 把待确认动作 replay 从“最新态覆盖”升级成真正的生命周期时间线，至少能看到 `created -> executed/cancelled/failed`。
+- 保持实现克制：继续复用 `pendingActionSummary + OperationLog`，先做轻量时间线，不引入新表。
+
+### Planned Scope
+- 在 `pendingActionSummary` 中保留 `createdAt`，并在 controller 里基于 `OperationLog` 组装 timeline。
+- 在 AI sessions 详情中展示动作时间线与事件时间。
+- 保持最新态字段不变，时间线作为新增补充层。
+
+### Verification Plan
+- `node --test backend/src/controllers/aiController.test.js`
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `node -c backend/src/controllers/aiController.js`
+- `git diff --check -- backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- `getSessions / getChatHistory` 现在会为每个待确认动作组装 timeline，包含创建事件和后续执行/取消/失败事件。
+- 前端 AI sessions 详情现在会显示“动作时间线”，包含事件类型、时间和说明。
+- 最新态字段仍保留，页面同时能看“现在是什么状态”和“它怎么走到这一步”。
+
+### Verification
+- `node --test backend/src/controllers/aiController.test.js` 通过（`5/5`）
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`4/4`）
+- `node -c backend/src/controllers/aiController.js` 通过
+
+### Remaining Risk
+- 当前时间线仍依赖 `OperationLog` 文本载荷拼装，不适合表达更复杂的分支、重试或补偿回滚；如果动作生命周期继续变复杂，下一步仍应升级成显式 action event model。
+- sessions 列表层仍未显示 timeline 摘要；当前时间线只在详情里可见。
+
+## 2026-04-04 Round 102（待确认动作最终态回放）
+
+### Goal
+- 把 AI 会话治理回放从“动作创建快照”补成“能看到执行/取消/失败最终态”的状态回放。
+- 不重写历史聊天记录，而是复用 `OperationLog` 叠加动作结果，保持审计路径单一。
+
+### Planned Scope
+- 为 `AGENT_WRITE_CANCEL / AGENT_WRITE_FAILED` 增加审计落点，并在执行日志中补 `status/detail/sessionId`。
+- 在 `aiController.getSessions / getChatHistory` 中用 `OperationLog` 覆盖 `pendingActionSummary` 的最新状态。
+- 在 AI sessions 详情中展示最终状态和结果说明。
+
+### Verification Plan
+- `node --test backend/src/controllers/aiController.test.js`
+- `node --test backend/src/services/eventLedgerService.test.js`
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `node -c backend/src/services/openAgentService.js && node -c backend/src/controllers/aiController.js`
+- `git diff --check -- backend/src/services/openAgentService.js backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js backend/src/services/eventLedgerService.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- `executeAction` 现在会把 `status/detail/sessionId` 写入执行日志；`cancelAction` 也开始写 `AGENT_WRITE_CANCEL`，失败路径写 `AGENT_WRITE_FAILED`。
+- `getSessions / getChatHistory` 现在会从 `OperationLog` 合并待确认动作的最新状态和结果详情，不再只显示创建时的 `pending` 快照。
+- AI sessions 详情中的“待确认动作”区块现在能回放 `executed / cancelled / failed` 和对应结果说明。
+- `eventLedgerService` 已把新增 agent 动作事件纳入 AGENT 分类。
+
+### Verification
+- `node --test backend/src/controllers/aiController.test.js` 通过（`5/5`）
+- `node --test backend/src/services/eventLedgerService.test.js` 通过（`3/3`）
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`4/4`）
+- `node -c backend/src/services/openAgentService.js && node -c backend/src/controllers/aiController.js` 通过
+
+### Remaining Risk
+- 当前回放用的是 `OperationLog` 最新事件覆盖，而不是完整逐事件时间线；如果同一动作后续需要多次重试或撤销恢复，还需要真正的 lifecycle timeline。
+- sessions 列表层还没有把最终态做成汇总信号，目前最终态只在详情里可见。
+
+## 2026-04-04 Round 101（确认执行链治理回放补齐）
+
+### Goal
+- 让“建议 -> 待确认动作”的闭环不只在实时助手里可见，也能在 AI 会话治理面被回放。
+- 把已经物化过的 `pendingActions` 摘要持久化到 metadata，并接入 sessions/history 详情页。
+
+### Planned Scope
+- 在 `persistAgentRun` 中持久化 `pendingActionSummary`。
+- 在 `aiController.getSessions / getChatHistory` 中返回该摘要。
+- 在 AI sessions 详情弹窗中展示“待确认动作”回放。
+
+### Verification Plan
+- `node --test backend/src/controllers/aiController.test.js`
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `node -c backend/src/services/openAgentService.js`
+- `git diff --check -- backend/src/services/openAgentService.js backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- 已让 `persistAgentRun` 把本次 run 中生成的待确认动作摘要写入 `pendingActionSummary` metadata。
+- 已让 `getSessions / getChatHistory` 返回该摘要，和 `actionRecommendations` 一起进入治理层。
+- 已在 AI sessions 详情中增加“待确认动作”区块，能回放动作描述、类型与状态。
+
+### Verification
+- `node --test backend/src/controllers/aiController.test.js` 通过（`5/5`）
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`4/4`）
+- `node -c backend/src/services/openAgentService.js` 通过
+
+### Remaining Risk
+- 当前回放的是 run 生成时的摘要，后续用户在实时助手里执行/取消动作后，不会回写到历史 metadata；如果要做完整状态时间线，还需要把执行结果也并入会话 replay。
+- 目前 sessions 列表还只展示建议数，不显示待确认动作数量；若治理面要更强，可再补列表级摘要。
+
+## 2026-04-04 Round 100（财务高置信挂账建议闭环）
+
+### Goal
+- 把确认执行链从 tax-compliance 再推进一小段到财务侧，但只允许“唯一高置信待分配收款”升级成挂账建议。
+- 保持安全边界：只有唯一合同引用且金额完全吻合时，才给 `AllocatePayment` 的 `confirmable_write` 建议；多命中或模糊命中一律退回 `manual`。
+
+### Planned Scope
+- 在 `DiagnoseSalesContractFlow` 中增加高置信待分配收款识别。
+- 唯一命中时输出 `AllocatePayment` 建议参数；多命中时明确保持 `manual`。
+- 为该边界补后端测试并更新 checkpoint 台账。
+
+### Verification Plan
+- `node --test backend/src/services/openAgentService.test.js`
+- `node -c backend/src/services/openAgentService.js`
+- `git diff --check -- backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md`
+
+### Delivered
+- 已在销售合同流程诊断中增加“唯一高置信待分配收款”识别逻辑。
+- 现在当待分配收款里只有一笔唯一命中该合同、且剩余金额与合同待收金额一致时，会把“跟进合同回款”升级成 `AllocatePayment` 的 `confirmable_write` 建议。
+- 若同时命中多笔收款，则建议继续保持 `manual`，不自动进入确认执行链。
+- 已补定向测试，锁住“唯一命中升级、多命中不升级”的行为。
+
+### Verification
+- `node --test backend/src/services/openAgentService.test.js` 通过（`18/18`）
+- `node -c backend/src/services/openAgentService.js` 通过
+
+### Remaining Risk
+- 当前匹配仍基于备注中的唯一合同号引用和金额一致，不适用于客户级汇总收款或多合同混合回款；这类场景仍应保持人工判断。
+- 这一轮只升级了诊断建议，不改现有 `AllocatePayment` executor 语义；若后续要支持更复杂的半自动分摊，需要先做更强的候选解释与撤销机制。
+
+## 2026-04-04 Round 99（诊断建议进入确认执行链）
+
+### Goal
+- 让少量高价值、低风险的组合诊断建议不再停留在 `manual` 文本层，而是进入现有 `pendingAction` 确认执行链。
+- 保持安全边界不变：只接 draft 类、可回退的税退链路写动作，不接不可逆提交动作。
+
+### Planned Scope
+- 为税退链路新增 3 个受控写工具：`CreateCustomsDeclarationDraft / CreateForexVerificationDraft / CreateTaxRefundDraft`。
+- 在组合诊断构建器中为可安全物化的建议补 `actionType / params`，升级为 `confirmable_write`。
+- 在 runtime 执行层自动把 `confirmable_write` 建议物化为 `pendingActions`。
+- 在 `AIAssistant` 实时对话中展示 `actionRecommendations`，让建议与确认动作同屏可见。
+
+### Verification Plan
+- `node --test backend/src/services/openAgentService.test.js`
+- `cd frontend && npx vitest run src/components/ai/AIAssistant.test.tsx`
+- `node -c backend/src/services/openAgentService.js`
+- `git diff --check -- backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js frontend/src/components/ai/AIAssistant.tsx frontend/src/components/ai/AIAssistant.test.tsx task_plan.md progress.md PLAN.md TASKS.md RISKS.md METRICS.md`
+
+### Delivered
+- 已新增 3 个税退链路 draft 写工具，并沿用原有 `pendingAction -> confirm -> executor` 确认门。
+- 已让 `DiagnoseSalesContractFlow / DiagnoseTradeComplianceReadiness` 在参数充分时输出 `confirmable_write` 建议，并携带 `actionType / params`。
+- 已在 runtime 层自动把这类建议物化成待确认动作，不再要求模型额外再调用一次写工具。
+- 已在 `AIAssistant` 实时消息中显示“诊断建议”，并明确区分 `人工处理 / 可确认执行`。
+
+### Verification
+- `node --test backend/src/services/openAgentService.test.js` 通过（`16/16`）
+- `cd frontend && npx vitest run src/components/ai/AIAssistant.test.tsx` 通过（`11/11`）
+- `node -c backend/src/services/openAgentService.js` 通过
+
+### Remaining Risk
+- 当前只接了 tax-compliance draft 类动作，采购/库存/财务建议仍主要停留在 `manual`；下一段应继续挑选“可回退、参数完整”的建议进入确认执行链。
+- draft 编号当前在执行时按时间戳生成，足够实用但还不是正式业务编号策略；若后续要对接财务或报关正式单号规则，需要单独抽编号策略。
+
+## 2026-04-04 Round 98（组合诊断建议闭环可见化）
+
+### Goal
+- 让组合型诊断工具不只输出 `blockers / nextActions` 文本，还输出结构化 `recommendedActions`。
+- 把诊断建议沿 runtime metadata 持久化到 AI 会话治理面，形成“诊断 -> 建议 -> 回放”的最小闭环。
+
+### Planned Scope
+- 在 `openAgentService` 的 3 个组合诊断构建器中补 `recommendedActions`。
+- 在运行时工具执行层收集复合诊断建议，并持久化到 `ChatHistory / OperationLog` metadata。
+- 在 AI 会话页详情中展示推荐动作摘要，并在会话列表显示建议数。
+
+### Verification Plan
+- `node --test backend/src/services/openAgentService.test.js backend/src/services/eventLedgerService.test.js backend/src/controllers/aiController.test.js backend/src/routes/ai.test.js`
+- `cd frontend && npx vitest run src/services/ai.service.test.ts src/app/dashboard/ai/sessions/page.test.tsx`
+- `node -c backend/src/services/openAgentService.js && node -c backend/src/controllers/aiController.js`
+- `git diff --check -- backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js backend/src/controllers/aiController.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx task_plan.md findings.md progress.md PLAN.md TASKS.md RISKS.md METRICS.md`
+
+### Delivered
+- 已为 `DiagnoseSalesContractFlow / DiagnosePurchaseExecution / DiagnoseTradeComplianceReadiness` 增加结构化 `recommendedActions`，包含 `code / title / domain / priority / executionMode / reason`。
+- 已在 runtime 工具执行层拦截复合诊断输出，自动汇总本轮 `actionRecommendations`，并随 `toolTraceSummary` 一起写入 metadata。
+- 已让 `getSessions / getChatHistory` 返回 `actionRecommendations`，AI 会话页现在可回放“推荐动作”而不只是工具调用。
+- 已在会话列表和详情摘要中增加建议动作数量，治理面开始回答“这次诊断建议了什么”。
+
+### Verification
+- `node --test backend/src/services/openAgentService.test.js backend/src/services/eventLedgerService.test.js backend/src/controllers/aiController.test.js backend/src/routes/ai.test.js` 通过（`24/24`）
+- `cd frontend && npx vitest run src/services/ai.service.test.ts src/app/dashboard/ai/sessions/page.test.tsx` 通过（`14/14`）
+- `node -c backend/src/services/openAgentService.js && node -c backend/src/controllers/aiController.js` 通过
+
+### Remaining Risk
+- 当前 `recommendedActions` 仍以 `manual` 建议为主，还没有和现有 `pendingAction` 执行器形成真正的一键确认闭环；下一段应优先把少数可安全执行的建议接到 `confirmable_write`。
+
+## 2026-04-04 Round 97（组合型任务工具深化）
+
+### Goal
+- 让通用主 Agent 的工具域从“overview/detail 拼装”进一步升级成“可直接回答复杂任务”的组合型诊断工具。
+- 同时把组合能力变成正式治理面，让 AI 会话页能区分普通工具和复合诊断工具。
+
+### Planned Scope
+- 在 `openAgentService` 中新增 3 个组合型读工具：
+  - `DiagnoseSalesContractFlow`
+  - `DiagnosePurchaseExecution`
+  - `DiagnoseTradeComplianceReadiness`
+- 为 tool registry 增加 `isComposite` 与域级 `compositeToolCount`。
+- 在 AI 会话页展示按域复合工具数量和域描述。
+
+### Verification Plan
+- `node --test backend/src/services/openAgentService.test.js backend/src/services/eventLedgerService.test.js backend/src/controllers/aiController.test.js backend/src/routes/ai.test.js`
+- `cd frontend && npx vitest run src/services/ai.service.test.ts src/app/dashboard/ai/sessions/page.test.tsx`
+- `node -c backend/src/services/openAgentService.js && node -c backend/src/controllers/aiController.js`
+- `git diff --check -- backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx task_plan.md progress.md PLAN.md TASKS.md`
+
+### Delivered
+- 已新增 3 个组合型诊断工具，分别覆盖出口合同全链路、采购执行、税退链路 readiness。
+- 已新增对应聚合构建器：销售合同诊断会聚合回款、库存、报关、核销、退税；采购诊断会聚合付款、供应商风险、入库状态；税退诊断会判断报关/核销/退税就绪度。
+- 已为 tool registry 增加 `isComposite` 元数据，并在域级摘要中增加 `compositeToolCount`。
+- 已在 AI 会话页展示“域工具数 / 复合工具数”和域描述，治理面不再只看总量。
+
+### Verification
+- `node --test backend/src/services/openAgentService.test.js backend/src/services/eventLedgerService.test.js backend/src/controllers/aiController.test.js backend/src/routes/ai.test.js` 通过（`24/24`）
+- `cd frontend && npx vitest run src/services/ai.service.test.ts src/app/dashboard/ai/sessions/page.test.tsx` 通过（`14/14`）
+- `node -c backend/src/services/openAgentService.js && node -c backend/src/controllers/aiController.js` 通过
+
+### Remaining Risk
+- 这一轮仍是“组合型读工具”，不是完整的多步 workflow executor；后续如果要真正把复杂任务自动推进到写阶段，还需要把这些组合诊断与 pendingAction / policy / replay 串成闭环。
+
+## 2026-04-04 Round 96（Tool Registry 治理面接通）
+
+### Goal
+- 让通用主 Agent 的工具注册表不只存在于 backend 内部，而是成为可见、可治理的系统面。
+
+### Planned Scope
+- 暴露 `GET /api/v1/ai/agents/tools`。
+- 为 frontend `aiService` 增加 tool registry 调用。
+- 在 AI 会话页展示主入口、读/写工具数量与覆盖域数量。
+
+### Verification Plan
+- `node --test backend/src/routes/ai.test.js backend/src/controllers/aiController.test.js`
+- `cd frontend && npx vitest run src/services/ai.service.test.ts src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- backend/src/controllers/aiController.js backend/src/routes/ai.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx task_plan.md progress.md PLAN.md TASKS.md`
+
+### Delivered
+- 已新增 tool registry API：`GET /api/v1/ai/agents/tools`。
+- 已新增 frontend service：`aiService.getAgentToolRegistry()`。
+- 已在 AI 会话页增加 `Agent 工具注册表` 卡片，展示主入口、读工具数、写工具数、覆盖域数。
+- 已在 AI 会话详情里显示工具调用明细回放：工具名、成功/失败状态、耗时、错误原因。
+- 已把 registry payload 做成 role-aware，支持返回 `viewerRole` 与域级可用数量统计。
+
+### Verification
+- `node --test backend/src/routes/ai.test.js backend/src/controllers/aiController.test.js` 通过（`6/6`）
+- `cd frontend && npx vitest run src/services/ai.service.test.ts src/app/dashboard/ai/sessions/page.test.tsx` 通过（`14/14`）
+- `git diff --check -- backend/src/controllers/aiController.js backend/src/routes/ai.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx task_plan.md progress.md PLAN.md TASKS.md` 通过
+
+### Remaining Risk
+- 现在展示的是摘要治理面和轻量 replay，不是完整 registry explorer / full trace replay；如果后续要做更细治理，还需要补 domain 分组、角色筛选、风险级别、确认门查看，以及完整的逐次工具调用时间线。
+
+## 2026-04-04 Round 95（Universal Agent 深写能力接入）
+
+### Goal
+- 让统一主 Agent 不只会“深查”，也开始具备更深的、角色受控的系统写入能力。
+- 保持原则不变：写能力扩张，但必须经过确认门和角色门控。
+
+### Planned Scope
+- 扩通用主 Agent 的写工具到采购、供应商、库存状态。
+- 为写工具补 `allowedRoles` 元数据，并在 runtime 内显式校验角色。
+- 不改现有统一入口，不新增对外多 Agent 选择。
+
+### Verification Plan
+- `node --test backend/src/services/openAgentService.test.js`
+- `node -c backend/src/services/openAgentService.js && node -c backend/src/controllers/aiController.js`
+- `git diff --check -- backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js backend/src/controllers/aiController.js task_plan.md progress.md PLAN.md TASKS.md`
+
+### Delivered
+- 已新增更深写工具：`CreateSupplierRecord`、`UpdateSupplierRecord`、`CreatePurchaseContract`、`UpdatePurchaseContract`、`UpdateInventoryStatus`。
+- 已为写工具补 `allowedRoles` 元数据，并在 runtime 执行前显式校验角色。
+- 已保持 pendingAction 两阶段确认流不变，避免统一主 Agent 直接静默写库。
+
+### Verification
+- `node --test backend/src/services/openAgentService.test.js backend/src/services/eventLedgerService.test.js backend/src/controllers/aiController.test.js backend/src/routes/ai.test.js` 通过（`18/18`）
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`3/3`）
+- `node -c backend/src/services/openAgentService.js && node -c backend/src/controllers/aiController.js` 通过
+- `git diff --check -- backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js backend/src/services/eventLedgerService.test.js backend/src/controllers/aiController.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx task_plan.md progress.md PLAN.md TASKS.md` 通过
+
+### Remaining Risk
+- 当前已经能“更深写”，但还没有针对每个新写工具补完整 happy-path 集成测试；现阶段锁住的是 registry、角色门和语法正确性。
+
+## 2026-04-04 Round 94（Universal Agent V2 可观测性接通）
+
+### Goal
+- 把通用主 Agent 的 route metadata 真正暴露到可见层，而不只停留在 runtime 内部。
+- 同时把“隐藏 specialist”从概念推进到可执行实现：通过 internal specialist frame 注入统一 prompt。
+
+### Planned Scope
+- 为 `openAgentService` 增加 `buildSpecialistFrame / resolveSystemPrompt`。
+- 让 `persistAgentRun` 保存 routePlan 与 selectedToolNames。
+- 让 `aiController.getSessions / getChatHistory` 返回 route metadata。
+- 让 AI 会话页显示 routeMode / domainsTouched / toolsUsed。
+
+### Verification Plan
+- `node --test backend/src/services/openAgentService.test.js backend/src/routes/ai.test.js backend/src/controllers/aiController.test.js`
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `node -c backend/src/services/openAgentService.js && node -c backend/src/controllers/aiController.js`
+- `git diff --check -- backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js backend/src/controllers/aiController.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx task_plan.md progress.md PLAN.md TASKS.md`
+
+### Delivered
+- 已为 unified runtime 增加 internal specialist frame，并将 routePlan 注入系统提示词。
+- 已把 route metadata 从 runtime 持久化一路接到 `getSessions / getChatHistory`。
+- 已在 AI 会话页显示 routeMode、工具域摘要，并在会话详情展示 routePlan/tools 数量。
+- 已继续扩通用工具面到更深层事实工具：销售合同详情、采购合同详情、财务风险概览、低库存预警、报关/退税/核销详情。
+- 已把工具调用明细汇总成 `toolTraceSummary`，写入 Agent metadata 与 `AGENT_RUN` 事件台账细节。
+
+### Verification
+- `node --test backend/src/services/openAgentService.test.js backend/src/routes/ai.test.js backend/src/controllers/aiController.test.js` 通过（`13/13`）
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`3/3`）
+- `node -c backend/src/services/openAgentService.js && node -c backend/src/controllers/aiController.js` 通过
+- `git diff --check -- backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js backend/src/controllers/aiController.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx task_plan.md progress.md PLAN.md TASKS.md` 通过
+- `node --test backend/src/services/openAgentService.test.js backend/src/services/eventLedgerService.test.js backend/src/controllers/aiController.test.js backend/src/routes/ai.test.js` 通过（`17/17`）
+
+### Remaining Risk
+- 当前可观测性已经能看到 route 和 tool summary，但还不是完整 replay。若后续要做更强诊断能力，还需要把逐次工具调用顺序、失败重试、token 分摊与模型思考摘要做更细粒度沉淀。
+
+## 2026-04-04 Round 93（Universal Agent Runtime V2 实施起步）
+
+### Goal
+- 把通用主 Agent 的第一段实现真正落到 runtime 代码里，而不是只停留在方案。
+- 先完成最小但正确的骨架：统一主公开入口、legacy internal 模式标记、第一版 tool registry、第一批跨域读工具。
+
+### Planned Scope
+- 在 `openAgentService` 中明确 `PRIMARY_AGENT_TYPE=unified`。
+- 为 runtime 增加可导出的 tool registry。
+- 接入首批通用感知工具：统一搜索、库存概览、税退链路概览、最近事件。
+- 先不改写整套路由与前端交互，不在本轮引入真正的内部 sub-agent 编排。
+
+### Verification Plan
+- `node --test backend/src/services/openAgentService.test.js`
+- `node -c backend/src/services/openAgentService.js`
+- `git diff --check -- backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js task_plan.md progress.md PLAN.md TASKS.md`
+
+### Delivered
+- 已在 `openAgentService` 中明确 `unified` 为主公开入口，legacy preset 退为内部兼容态。
+- 已落第一版 tool registry 抽象，可枚举当前工具的 domain/access/confirmation 元数据。
+- 已新增 `SearchEntities`、`GetPurchaseOverview`、`GetSupplierOverview`、`GetInventoryOverview`、`GetTaxComplianceOverview`、`GetRecentEvents` 六类更通用的跨域读工具。
+- 已落轻量内部路由：按消息内容推断 `focused / cross-domain / broad / legacy-explicit`，先选择工具域，再交给 unified runtime。
+- 已用后端定向测试锁住“主公开入口 + registry + 路由 + 写工具确认标记”这批行为。
+
+### Verification
+- `node --test backend/src/services/openAgentService.test.js backend/src/routes/ai.test.js backend/src/controllers/aiController.test.js` 通过（`12/12`）
+- `node -c backend/src/services/openAgentService.js` 通过
+- `git diff --check -- backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js task_plan.md progress.md PLAN.md TASKS.md docs/plans/2026-04-04-universal-agent-runtime-v2-design.md docs/README.md` 通过
+
+### Remaining Risk
+- 当前还是“统一主 Agent + 工具面扩张”的第一步，下一段真正影响体验的会是：
+- 继续扩工具面到采购/销售/财务/库存/税退/系统的更深层查询
+- 把 routePlan / toolsUsed 进一步暴露到 UI 或事件台账，增强可观测性
+- 在工具面足够厚之后，再评估是否需要隐藏 specialist
+
+## 2026-04-04 Round 92（Universal Agent Runtime V2 方案定稿）
+
+### Goal
+- 将 Agent 下一阶段正式从“多业务预置 Agent”收口为“一个对外通用主 Agent + 内部路由/工具域”的架构。
+- 把用户对 Agent 的核心要求固化成可执行设计：全局数据感知、tool-first 认知、单一大脑、必要时内部子能力而非对外多人格。
+
+### Planned Scope
+- 基于现有 `openAgentService` 和工具池，输出下一阶段统一 Agent 方案设计稿。
+- 明确产品形态、工具层、能力模型、写操作边界、内部路由策略与分阶段 rollout。
+- 更新 docs 索引与 checkpoint 台账。
+
+### Verification Plan
+- `git diff --check -- docs/plans/2026-04-04-universal-agent-runtime-v2-design.md docs/README.md PLAN.md TASKS.md`
+
+### Delivered
+- 已新增 Universal Agent Runtime V2 方案文档，明确对外只保留一个主 Agent，财务/出口/老板视角退为内部工具域或内部路由能力。
+- 已明确推荐方向：一个通用外部 Agent、一个大工具面、tool-first 感知、可选隐藏 specialist、写操作继续走确认门。
+- 已同步更新 docs 索引和执行台账。
+
+### Verification
+- `git diff --check -- docs/plans/2026-04-04-universal-agent-runtime-v2-design.md docs/README.md PLAN.md TASKS.md` 通过
+
+### Remaining Risk
+- 本轮是架构定稿，不是代码落地；真正进入实施后，最大工作量会落在工具面扩展、tool registry 抽象、统一 prompt 重写和 runtime 观测面补齐。
+
+## 2026-04-04 Round 91（Agent 剩余扫尾：旧路径排查 + 权限口径对齐）
+
+### Goal
+- 确认仓库中不再残留旧的 `/ai/chat-history` 运行时调用。
+- 收口 Agent 权限口径漂移，让 UI 文案和设计文档都明确当前实现采用固定能力集，而不是手动逐项授权。
+
+### Planned Scope
+- 搜索并确认代码路径中不再有旧 `chat-history` 运行时调用。
+- 更新 About 页和 Agent 账号弹窗文案。
+- 在 `docs/plans/2026-03-29-agent-cli-mcp-ready-design.md` 增加实现状态说明。
+- 同步补一轮 `PLAN.md / TASKS.md` checkpoint。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/app/dashboard/about/page.test.tsx src/components/dialog/AgentAccountDialog.test.tsx`
+- `rg -n --hidden -S "/ai/chat-history" . --glob '!node_modules' --glob '!.git' --glob '!dist' --glob '!build'`
+
+### Delivered
+- 已确认运行时代码中不再残留旧的 `/ai/chat-history` 调用；当前命中只剩历史修复说明文档。
+- 已把 About 页“给 Agent 配能力”改为当前真实口径：固定能力集自动附加，暂不支持页面逐项勾选。
+- 已把 Agent 新建弹窗“自动获得全部操作权限”改为“固定能力集”说明。
+- 已在 Agent 架构设计文档中新增 2026-04-04 implementation status note，明确目标架构与当前实现的差异。
+
+### Verification
+- `cd frontend && npx vitest run src/app/dashboard/about/page.test.tsx src/components/dialog/AgentAccountDialog.test.tsx` 通过（`3/3`）
+- `rg -n --hidden -S "/ai/chat-history" . --glob '!node_modules' --glob '!.git' --glob '!dist' --glob '!build'` 当前仅命中文档中的历史修复说明，不再命中运行时代码
+- `git diff --check -- frontend/src/app/dashboard/about/page.tsx frontend/src/app/dashboard/about/page.test.tsx frontend/src/components/dialog/AgentAccountDialog.tsx frontend/src/components/dialog/AgentAccountDialog.test.tsx docs/plans/2026-03-29-agent-cli-mcp-ready-design.md PLAN.md TASKS.md` 通过
+
+### Remaining Risk
+- 这轮解决的是“口径漂移”，不是“能力模型重构”；若后续要做真正的显式 grant editor，仍需改后端服务、前端管理页和测试基线。
+
+## 2026-04-03 Round 90（Agent 状态文档校正 + 历史接口修复）
+
+### Goal
+- 修复 Agent 会话历史前端请求路径错误，恢复与后端 `/api/v1/ai/history` 的一致性。
+- 把 Agent 相关 markdown 台账更新到和当前代码一致，避免继续误判为“仍在方案阶段”。
+
+### Planned Scope
+- 在 frontend `aiService.getChatHistory()` 中把 `/ai/chat-history` 改为 `/ai/history`。
+- 以最小改动更新 `task_plan.md`、`progress.md`、`docs/README.md`。
+- 同步补一轮 `PLAN.md / TASKS.md` checkpoint。
+
+### Verification Plan
+- `cd frontend && npx vitest run src/services/ai.service.test.ts`
+
+### Delivered
+- 已按 TDD 为 `getChatHistory` 增加失败测试，并确认红灯来自错误路径。
+- 已修复 frontend history endpoint 到 `/ai/history`。
+- 已更新 Agent 相关状态文档，明确 runtime/CLI/MCP 主链已落地，当前剩余问题转为文档漂移、权限口径漂移和深度集成验证不足。
+
+### Verification
+- `cd frontend && npx vitest run src/services/ai.service.test.ts` 通过（`9/9`）
+- `git diff --check -- frontend/src/services/ai.service.ts frontend/src/services/ai.service.test.ts task_plan.md progress.md docs/README.md PLAN.md TASKS.md` 通过
+
+### Remaining Risk
+- 当前修复仅覆盖前端 service 路径；若还有其它旧调用写死 `/ai/chat-history`，仍需后续继续扫尾。
+- Agent 设计文档与实现的权限口径仍未完全统一，特别是默认 grant 与 update 权限边界。
+
+## 2026-04-02 Round 89（本地 API 304 代理链修复）
+
+### Goal
+- 修复前端经 `:3000 -> :3001` rewrite 代理调用 JSON API 时，被后端 `304 Not Modified` 空响应打断、页面误判为加载失败的问题。
+
+### Planned Scope
+- 在 backend 应用入口禁用 Express ETag，避免本地 API 返回 304。
+- 不改采购合同、销售合同等业务控制器逻辑。
+
+### Verification Plan
+- 手动刷新受影响页面，确认 `/api/v1/purchases`、`/api/v1/sales` 等请求回到 200 且页面不再 toast 失败。
+
+### Delivered
+- 已在 backend 应用入口禁用 ETag，规避 Next dev rewrite 代理链下的 304 空响应问题。
+
+### Verification
+- 未执行；本轮按当前请求先做最小修复，等待页面刷新确认。
+
+### Remaining Risk
+- 这次修复是全局关闭 API ETag；若后续需要为静态资源或特定下载接口恢复缓存协商，应按路由粒度单独设计，而不是重新全局开启。
+
+## 2026-04-02 Round 88（采购合同页 FileText 图标回归修复）
+
+### Goal
+- 修复采购合同页因图标 import 漏删导致的运行时 `ReferenceError: FileText is not defined`。
+
+### Planned Scope
+- 仅恢复 `ContractsPageContent` 中 `FileText` 图标 import。
+- 不调整表格结构与列表动作。
+
+### Verification Plan
+- `cd frontend && npm test -- src/app/dashboard/contracts/page.test.tsx`
+
+### Delivered
+- 已在采购合同页组件中恢复 `FileText` 图标 import，消除合同号列表项的运行时引用错误。
+
+### Verification
+- 未执行；本轮按当前请求仅做最小修复，未额外跑测试。
+
+### Remaining Risk
+- 这次连续两次报错说明该页面图标 import 与 JSX 使用存在人工删改回归风险；后续若再裁剪 UI，最好一起核对全部 lucide 图标引用。
+
+## 2026-04-02 Round 87（采购合同页 Store 图标回归修复）
+
+### Goal
+- 修复采购合同页因图标 import 漏删导致的运行时 `ReferenceError: Store is not defined`。
+
+### Planned Scope
+- 仅恢复 `ContractsPageContent` 中 `Store` 图标 import。
+- 不调整页面结构与其他交互。
+
+### Verification Plan
+- `cd frontend && npm test -- src/app/dashboard/contracts/page.test.tsx`
+
+### Delivered
+- 已在采购合同页组件中恢复 `Store` 图标 import，消除“合作店铺”概览卡运行时引用错误。
+
+### Verification
+- 未执行；本轮按当前请求仅做最小修复，未额外跑测试。
+
+### Remaining Risk
+- 若后续继续裁剪图标或首屏卡片，需要同步检查概览卡与列表动作区的图标引用是否仍在使用。
+
+## 2026-04-02 Round 86（采购合同页去故事流）
+
+### Goal
+- 采购合同页不再展示“采购故事流”首屏引导卡片，避免在合同管理页重复叙述采购主线。
+
+### Planned Scope
+- 删除采购合同页顶部“采购故事流”卡片与其附带按钮。
+- 保留列表区现有“新增采购”入口和采购执行概览区。
+- 同步移除页面测试中对旧引导文案的断言。
+
+### Verification Plan
+- `cd frontend && npm test -- src/app/dashboard/contracts/page.test.tsx`
+
+### Delivered
+- 已删除采购合同页顶部“采购故事流”卡片，页面首屏直接进入采购执行概览与合同列表。
+- 已保留列表区原有“新增采购”入口，不改采购创建跳转路径。
+- 已同步移除 `contracts/page.test.tsx` 中对旧引导文案的断言。
+
+### Verification
+- 未执行；本轮按当前请求仅做代码修改，未额外跑测试。
+
+### Remaining Risk
+- 若仓库后续要求前端测试全绿，仍需补跑 `contracts/page.test.tsx` 确认无其他依赖该首屏卡片的断言。
+
+## 2026-04-02 Round 85（Open Agent Runtime 融合 Phase 1）
+
+### Goal
+- 将 `open-agent-sdk-typescript` 以 in-process 方式接入现有系统，形成可扩展的 Agent Runtime 底座。
+- 第一阶段先跑通后端能力：共享 runtime + 三个预置业务 agent（财务 / 出口单证 / 老板驾驶舱）。
+- 保持安全边界：Phase 1 只读业务数据，不直接执行写库动作。
+
+### Planned Scope
+- backend 安装 `@codeany/open-agent-sdk`。
+- 新增 `openAgentService`，统一管理：
+  - 预置 agent prompt
+  - 只读业务工具池
+  - SDK runtime 调用
+  - 会话 / token / 审计回写
+- 在 `/api/v1/ai` 下新增业务 Agent 运行入口。
+- 使用现有 `ChatHistory / TokenUsage / OperationLog` 作为持久化与审计层，而不是默认文件 session。
+
+### Verification Plan
+- `node --test backend/src/routes/ai.test.js backend/src/controllers/aiController.test.js backend/src/services/openAgentService.test.js`
+- `cd backend && npm ls @codeany/open-agent-sdk`
+
+### Delivered
+- backend 已安装 `@codeany/open-agent-sdk@0.1.0`。
+- 已新增 [openAgentService.js](/Users/helena/Cursor/jiesong_system/backend/src/services/openAgentService.js)：
+  - 三个预置 agent：`finance / export / executive`
+  - 五个只读业务工具：财务概览、客户应收、出口概览、系统导入/操作概览、老板视角摘要
+  - 运行完成后回写 `ChatHistory / TokenUsage / OperationLog`
+- 已在 [aiController.js](/Users/helena/Cursor/jiesong_system/backend/src/controllers/aiController.js) 新增 `agentPrompt`
+- 已在 [ai.js](/Users/helena/Cursor/jiesong_system/backend/src/routes/ai.js) 新增 `POST /agents/prompt`
+
+### Verification
+- backend 定向测试：`7/7` 通过
+- 依赖确认：`npm ls @codeany/open-agent-sdk` 正常
+
+### Remaining Risk
+- 当前 runtime 启动仍依赖 `CODEANY_API_KEY` / `CODEANY_BASE_URL`，尚未接入系统配置面板。
+- 当前只完成 backend runtime 接线，前端尚未提供显式业务 Agent 调用入口。
+- 当前 Agent 工具池仍是 Phase 1 读能力，未进入“确认后执行写动作”的工作流。
+
 ## 2026-04-02 Round 84（出口合同第三方来源展示收口）
 
 ### Goal

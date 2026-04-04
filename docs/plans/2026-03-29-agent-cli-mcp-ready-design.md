@@ -213,6 +213,26 @@ Future capabilities:
 
 Agent permissions must not be inferred from user roles. They need their own explicit grant model.
 
+### Implementation Status Note (2026-04-04)
+
+The current repository implementation has not yet landed an explicit per-agent grant editor.
+
+What is in code today:
+
+- Agent accounts are still independent machine identities
+- Agent authorization is still capability-based at request time
+- But account creation/update currently auto-assigns a fixed capability set instead of letting admins configure grants per agent
+
+Current fixed capability set in code:
+
+- `search.read`
+- `purchase.create`
+- `purchase.update`
+- `supplier.create`
+- `supplier.update`
+
+So this document's "explicit grant model + default read/create only" remains the intended target architecture, not the exact current shipped behavior.
+
 ## Authentication Model
 
 ### Human Users
