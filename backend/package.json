@@ -25,6 +25,7 @@
     "seed": "node prisma/seed.js"
   },
   "dependencies": {
+    "@codeany/open-agent-sdk": "^0.1.0",
     "@prisma/client": "^5.8.0",
     "adm-zip": "^0.5.16",
     "bcrypt": "^6.0.0",

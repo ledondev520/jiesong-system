@@ -11,8 +11,25 @@ const aiController = require('../controllers/aiController');
 const { authenticate, roleAuth } = require('../middleware/auth');
 const { body, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
+const { SUPPORTED_AGENT_TYPES } = require('../services/openAgentService');
+const { isValidOpenAgentRuntimeToken } = require('../utils/openAgentRuntimeAuth');
 
 const router = Router();
+
+const authenticateOpenAgentRuntime = (req, res, next) => {
+  const token = req.get('x-api-key');
+  if (!isValidOpenAgentRuntimeToken(token)) {
+    return res.status(401).json({
+      code: 401,
+      message: 'invalid open-agent runtime token',
+    });
+  }
+  return next();
+};
+
+// Internal Anthropic-compatible shim for open-agent-sdk -> current Kimi/OpenAI-compatible API
+router.post('/anthropic/v1/messages', authenticateOpenAgentRuntime, aiController.anthropicCompatMessage);
+router.post('/anthropic/v1/messages/count_tokens', authenticateOpenAgentRuntime, aiController.anthropicCompatCountTokens);
 
 router.use(authenticate);
 
@@ -30,6 +47,40 @@ router.post('/chat/stream', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'W
 router.post('/parse', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), [
   body('type').notEmpty().withMessage('解析类型不能为空'),
 ], handleValidation, aiController.parseInput);
+
+// POST /api/v1/ai/agents/prompt - 运行预置业务 Agent（agentType 可选，默认 unified）
+router.post('/agents/prompt', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), [
+  body('agentType').optional().isIn(SUPPORTED_AGENT_TYPES).withMessage('agentType 不合法'),
+  body('message').notEmpty().withMessage('消息不能为空'),
+], handleValidation, aiController.agentPrompt);
+
+// GET /api/v1/ai/agents/tools - 获取 Agent 工具注册表
+router.get('/agents/tools', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), aiController.agentToolRegistry);
+
+// POST /api/v1/ai/agents/prompt-stream - SSE 流式运行预置业务 Agent
+router.post('/agents/prompt-stream', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), [
+  body('agentType').optional().isIn(SUPPORTED_AGENT_TYPES).withMessage('agentType 不合法'),
+  body('message').notEmpty().withMessage('消息不能为空'),
+], handleValidation, aiController.agentPromptStream);
+
+// POST /api/v1/ai/agents/execute-action - 执行用户确认后的 Agent 写操作
+router.post('/agents/execute-action', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), [
+  body('actionId').notEmpty().withMessage('actionId 不能为空'),
+], handleValidation, withAuditLog(
+  {
+    entity: 'AgentWriteAction',
+    action: 'EXECUTE',
+    captureBefore: false,
+    captureAfter: false,
+    getEntityId: ({ req }) => req.body?.actionId || null,
+  },
+  aiController.executeAgentAction
+));
+
+// POST /api/v1/ai/agents/cancel-action - 取消一个待确认的 Agent 写操作
+router.post('/agents/cancel-action', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), [
+  body('actionId').notEmpty().withMessage('actionId 不能为空'),
+], handleValidation, aiController.cancelAgentAction);
 
 // GET /api/v1/ai/history - 获取对话历史
 router.get('/history', aiController.getChatHistory);

@@ -10,6 +10,8 @@ const prisma = require('../utils/prisma');
 const { success, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const aiService = require('../services/aiService');
+const openAgentService = require('../services/openAgentService');
+const anthropicCompatService = require('../services/anthropicCompatService');
 const { normalizeConfigValueForStorage } = require('../utils/secretCrypto');
 
 const SSE_HEADERS = {
@@ -43,6 +45,11 @@ const parseContent = (body) => {
   return content;
 };
 
+const parseAgentType = (body) => {
+  const agentType = typeof body?.agentType === 'string' ? body.agentType.trim() : '';
+  return agentType || 'unified';
+};
+
 const setSseHeaders = (res) => {
   Object.entries(SSE_HEADERS).forEach(([key, value]) => {
     res.setHeader(key, value);
@@ -51,6 +58,107 @@ const setSseHeaders = (res) => {
 };
 
 const sendSseMessage = (res, payload) => res.write(`data: ${JSON.stringify(payload)}\n\n`);
+
+const PENDING_ACTION_EVENT_STATUS = {
+  AGENT_WRITE_EXECUTE: 'executed',
+  AGENT_WRITE_CANCEL: 'cancelled',
+  AGENT_WRITE_FAILED: 'failed',
+};
+
+const parseJsonSafely = (value) => {
+  if (!value) return null;
+  try {
+    return typeof value === 'string' ? JSON.parse(value) : value;
+  } catch {
+    return null;
+  }
+};
+
+const parseAgentMetadata = (raw) => {
+  if (!raw) return {};
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return {
+      agentType: parsed?.agentType || null,
+      routePlan: parsed?.routePlan || null,
+      selectedToolNames: Array.isArray(parsed?.selectedToolNames) ? parsed.selectedToolNames : [],
+      toolTraceSummary: parsed?.toolTraceSummary || null,
+      actionRecommendations: Array.isArray(parsed?.actionRecommendations) ? parsed.actionRecommendations : [],
+      pendingActionSummary: Array.isArray(parsed?.pendingActionSummary) ? parsed.pendingActionSummary : [],
+    };
+  } catch {
+    return {};
+  }
+};
+
+const buildPendingActionOutcomeMap = async (userId, actionIds = []) => {
+  const uniqueIds = Array.from(new Set((Array.isArray(actionIds) ? actionIds : []).filter(Boolean)));
+  if (!userId || uniqueIds.length === 0) return new Map();
+
+  const rows = await prisma.operationLog.findMany({
+    where: {
+      userId,
+      entityId: { in: uniqueIds },
+      action: { in: Object.keys(PENDING_ACTION_EVENT_STATUS) },
+    },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      entityId: true,
+      action: true,
+      newValue: true,
+      createdAt: true,
+    },
+  });
+
+  const map = new Map();
+  rows.forEach((row) => {
+    const details = parseJsonSafely(row.newValue) || {};
+    const current = map.get(row.entityId) || {
+      latest: null,
+      events: [],
+    };
+    const status = details?.status || PENDING_ACTION_EVENT_STATUS[row.action] || 'pending';
+    const resultDetail = details?.result?.detail || details?.detail || null;
+    current.events.push({
+      type: status,
+      status,
+      detail: resultDetail,
+      at: row.createdAt,
+    });
+    if (!current.latest) {
+      current.latest = {
+        status,
+        resultDetail,
+      };
+    }
+    map.set(row.entityId, current);
+  });
+  return map;
+};
+
+const mergePendingActionSummary = (items = [], outcomeMap = new Map()) => (
+  (Array.isArray(items) ? items : []).map((item) => {
+    const outcome = outcomeMap.get(item?.actionId);
+    const createdEvent = item?.createdAt ? [{
+      type: 'created',
+      status: 'pending',
+      detail: item.description,
+      at: item.createdAt,
+    }] : [];
+    if (!outcome) {
+      return {
+        ...item,
+        timeline: createdEvent,
+      };
+    }
+    return {
+      ...item,
+      status: outcome.latest?.status || item.status,
+      resultDetail: outcome.latest?.resultDetail || item.resultDetail || null,
+      timeline: [...createdEvent, ...(outcome.events || []).reverse()],
+    };
+  })
+);
 
 /**
  * 职责：智能问答（支持图片）
@@ -154,6 +262,127 @@ const parseInput = async (req, res, next) => {
 };
 
 /**
+ * 职责：运行预置业务 Agent
+ * 思路：
+ * 1. 校验 agentType / message
+ * 2. 调用 openAgentService 执行一次 in-process agent prompt
+ * 3. 返回会话、回答、token 用量与 Agent 类型
+ */
+const agentPrompt = async (req, res, next) => {
+  try {
+    const message = parseMessage(req.body);
+    const agentType = parseAgentType(req.body);
+    const result = await openAgentService.runAgentPrompt({
+      userId: req.user.id,
+      userRole: req.user.role,
+      agentType,
+      message,
+      sessionId: req.body?.sessionId,
+    });
+    success(res, result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：返回当前通用 Agent 的工具注册表，供治理与观测使用
+ */
+const agentToolRegistry = async (req, res, next) => {
+  try {
+    success(res, openAgentService.buildToolRegistryPayload(req.user?.role || null));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：SSE 流式运行预置业务 Agent
+ * 思路：
+ *   1. 设置 SSE 响应头
+ *   2. 迭代 openAgentService.runAgentPromptStream 生成器
+ *   3. 逐条 yield 事件写入 SSE
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
+const agentPromptStream = async (req, res) => {
+  setSseHeaders(res);
+  try {
+    const message = parseMessage(req.body);
+    const agentType = parseAgentType(req.body);
+    const gen = openAgentService.runAgentPromptStream({
+      userId: req.user.id,
+      userRole: req.user.role,
+      agentType,
+      message,
+      sessionId: req.body?.sessionId,
+      imageUrl: req.body?.imageUrl,
+    });
+    for await (const event of gen) {
+      sendSseMessage(res, event);
+    }
+    res.end();
+  } catch (error) {
+    sendSseMessage(res, { type: 'error', message: error.message });
+    res.end();
+  }
+};
+
+/**
+ * 职责：执行用户确认后的 Agent 写操作
+ * 思路：
+ *   1. 从 body 获取 actionId
+ *   2. 调用 openAgentService.executeAction 执行
+ *   3. 返回执行结果
+ */
+const executeAgentAction = async (req, res, next) => {
+  try {
+    const { actionId } = req.body;
+    if (!actionId || typeof actionId !== 'string') {
+      throw createError('actionId 不能为空', 400);
+    }
+    const result = await openAgentService.executeAction(actionId, req.user.id);
+    success(res, result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：取消一个待确认的 Agent 写操作
+ */
+const cancelAgentAction = async (req, res, next) => {
+  try {
+    const { actionId } = req.body;
+    if (!actionId || typeof actionId !== 'string') {
+      throw createError('actionId 不能为空', 400);
+    }
+    await openAgentService.cancelAction(actionId, req.user.id);
+    success(res, null, '操作已取消');
+  } catch (error) {
+    next(error);
+  }
+};
+
+const anthropicCompatMessage = async (req, res, next) => {
+  try {
+    const result = await anthropicCompatService.createMessage(req.body);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const anthropicCompatCountTokens = async (req, res, next) => {
+  try {
+    const result = await anthropicCompatService.countTokens(req.body);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * 职责：获取对话历史
  */
 const getChatHistory = async (req, res, next) => {
@@ -178,6 +407,7 @@ const getChatHistory = async (req, res, next) => {
           role: true,
           content: true,
           imageUrl: true,
+          metadata: true,
           promptTokens: true,
           outputTokens: true,
           modelUsed: true,
@@ -186,8 +416,23 @@ const getChatHistory = async (req, res, next) => {
       }),
       prisma.chatHistory.count({ where }),
     ]);
-    
-    paginated(res, messages, total, parsedPage, parsedPageSize);
+
+    const parsedMessages = messages.map((item) => ({
+      ...item,
+      parsedMetadata: parseAgentMetadata(item.metadata),
+    }));
+    const actionIds = parsedMessages.flatMap((item) =>
+      (item.parsedMetadata.pendingActionSummary || []).map((summary) => summary.actionId)
+    );
+    const outcomeMap = await buildPendingActionOutcomeMap(req.user.id, actionIds);
+    const enrichedMessages = parsedMessages.map((item) => ({
+      ...item,
+      ...item.parsedMetadata,
+      pendingActionSummary: mergePendingActionSummary(item.parsedMetadata.pendingActionSummary, outcomeMap),
+      parsedMetadata: undefined,
+    }));
+
+    paginated(res, enrichedMessages, total, parsedPage, parsedPageSize);
   } catch (error) {
     next(error);
   }
@@ -240,16 +485,51 @@ const getSessions = async (req, res, next) => {
       }
     }
 
-    // 3. 建立映射
+    // 3. 每个会话的第一条用户消息（作为预览标题）
+    const previewMap = {};
+    if (sessionIds.length > 0) {
+      const firstMessages = await prisma.chatHistory.findMany({
+        where: {
+          userId: req.user.id,
+          sessionId: { in: sessionIds },
+          role: 'user',
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { sessionId: true, content: true, metadata: true },
+      });
+      for (const row of firstMessages) {
+        if (!previewMap[row.sessionId]) {
+          previewMap[row.sessionId] = {
+            text: row.content?.slice(0, 60) || '',
+            metadata: parseAgentMetadata(row.metadata),
+          };
+        }
+      }
+    }
+
+    // 4. 建立映射
     const tokenMap = Object.fromEntries(
       tokensBySession.map(t => [t.sessionId, t._sum.totalTokens || 0])
     );
+    const pendingActionIds = Object.values(previewMap).flatMap((item) =>
+      (item?.metadata?.pendingActionSummary || []).map((summary) => summary.actionId)
+    );
+    const outcomeMap = await buildPendingActionOutcomeMap(req.user.id, pendingActionIds);
 
-    // 4. 合并后返回（totalTokens 单位为 token 数，前端转 M）
+    // 5. 合并后返回
     const enrichedSessions = sessions.map(s => ({
       ...s,
       totalTokens: tokenMap[s.sessionId] || 0,
       lastModel: modelMap[s.sessionId] || null,
+      preview: previewMap[s.sessionId]?.text || '',
+      agentType: previewMap[s.sessionId]?.metadata?.agentType || null,
+      routePlan: previewMap[s.sessionId]?.metadata?.routePlan || null,
+      toolsUsed: previewMap[s.sessionId]?.metadata?.selectedToolNames || [],
+      routeMode: previewMap[s.sessionId]?.metadata?.routePlan?.mode || null,
+      domainsTouched: previewMap[s.sessionId]?.metadata?.routePlan?.selectedDomains || [],
+      toolTraceSummary: previewMap[s.sessionId]?.metadata?.toolTraceSummary || null,
+      actionRecommendations: previewMap[s.sessionId]?.metadata?.actionRecommendations || [],
+      pendingActionSummary: mergePendingActionSummary(previewMap[s.sessionId]?.metadata?.pendingActionSummary, outcomeMap),
     }));
 
     success(res, enrichedSessions);
@@ -494,6 +774,13 @@ module.exports = {
   chat,
   chatStream,
   parseInput,
+  agentPrompt,
+  agentToolRegistry,
+  agentPromptStream,
+  executeAgentAction,
+  cancelAgentAction,
+  anthropicCompatMessage,
+  anthropicCompatCountTokens,
   getChatHistory,
   getSessions,
   getStandaloneTokenUsage,
