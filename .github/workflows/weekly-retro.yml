@@ -36,7 +36,7 @@ jobs:
           fi
 
       - name: Upload retro report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: weekly-retro-report
           path: .gstack/loop-reports/weekly_retro_*.md
