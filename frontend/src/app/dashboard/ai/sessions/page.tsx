@@ -211,6 +211,23 @@ const normalizeSortMode = (value: string | null) => (
   ['risk', 'latest-action', 'latest-message'].includes(String(value || '').trim()) ? String(value) : 'risk'
 );
 
+const SESSION_LIST_PREFS_KEY = 'ai-sessions-list-preferences';
+
+const readSessionListPreferences = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(SESSION_LIST_PREFS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { sort?: string; actionFilter?: string };
+    return {
+      sort: normalizeSortMode(parsed?.sort || null),
+      actionFilter: normalizeActionFilter(parsed?.actionFilter || null),
+    };
+  } catch {
+    return null;
+  }
+};
+
 const buildRegistryDomainStats = (toolRegistry: AiAgentToolRegistryResponse | null) => {
   if (!toolRegistry?.tools?.length) return [];
   const map = new Map<string, {
@@ -387,8 +404,14 @@ export default function AiSessionsPage() {
   const [standaloneLoading, setStandaloneLoading] = useState(true);
   const [standaloneDetailRow, setStandaloneDetailRow] = useState<AiStandaloneTokenRow | null>(null);
   const [toolRegistry, setToolRegistry] = useState<AiAgentToolRegistryResponse | null>(null);
-  const [actionFilter, setActionFilter] = useState<string>(() => normalizeActionFilter(searchParams.get('actionFilter')));
-  const [sortMode, setSortMode] = useState<string>(() => normalizeSortMode(searchParams.get('sort')));
+  const [actionFilter, setActionFilter] = useState<string>(() => {
+    if (searchParams.has('actionFilter')) return normalizeActionFilter(searchParams.get('actionFilter'));
+    return readSessionListPreferences()?.actionFilter || 'all';
+  });
+  const [sortMode, setSortMode] = useState<string>(() => {
+    if (searchParams.has('sort')) return normalizeSortMode(searchParams.get('sort'));
+    return readSessionListPreferences()?.sort || 'risk';
+  });
 
   // 会话详情弹窗
   const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
@@ -470,9 +493,22 @@ export default function AiSessionsPage() {
   }, [loadToolRegistry]);
 
   useEffect(() => {
-    setActionFilter(normalizeActionFilter(searchParams.get('actionFilter')));
-    setSortMode(normalizeSortMode(searchParams.get('sort')));
+    const stored = readSessionListPreferences();
+    setActionFilter(searchParams.has('actionFilter')
+      ? normalizeActionFilter(searchParams.get('actionFilter'))
+      : (stored?.actionFilter || 'all'));
+    setSortMode(searchParams.has('sort')
+      ? normalizeSortMode(searchParams.get('sort'))
+      : (stored?.sort || 'risk'));
   }, [searchParams]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(SESSION_LIST_PREFS_KEY, JSON.stringify({
+      sort: sortMode,
+      actionFilter,
+    }));
+  }, [sortMode, actionFilter]);
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
