@@ -1,5 +1,40 @@
 # Ops Execution Center Plan
 
+## 2026-04-05 Round 132（Prisma Migration 状态修复）
+
+### Goal
+- 把历史 failed/untracked Prisma migration 状态真正收口，让标准 `migrate status` / `migrate deploy` 重新可用，结束“功能已在库里、状态卡死”的分叉。
+
+### Planned Scope
+- 新增 migration repair service 与脚本，识别“schema effect 已存在”的 failed/missing migrations。
+- 提供 `db:migrate:repair` 脚本，统一做备份后修复 `_prisma_migrations`。
+- 运行 repair 后验证 `prisma migrate status` 与 `prisma migrate deploy` 恢复正常。
+
+### Verification Plan
+- `cd backend && node --test src/services/prismaMigrationRepairService.test.js src/services/agentReplaySummaryService.test.js src/services/openAgentService.test.js src/controllers/aiController.test.js src/services/governanceReplayService.test.js`
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `cd backend && npm run db:migrate:repair`
+- `cd backend && npx prisma migrate status --schema prisma/schema.prisma`
+- `cd backend && npx prisma migrate deploy --schema prisma/schema.prisma`
+- `git diff --check -- backend/package.json backend/scripts/repair-prisma-migration-state.js backend/src/services/prismaMigrationRepairService.js backend/src/services/prismaMigrationRepairService.test.js backend/src/services/agentReplaySummaryService.js backend/src/services/agentReplaySummaryService.test.js backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js PLAN.md TASKS.md task_plan.md progress.md`
+
+### Delivered
+- 新增 [prismaMigrationRepairService.js](/Users/helena/Cursor/jiesong_system/backend/src/services/prismaMigrationRepairService.js) 和 [repair-prisma-migration-state.js](/Users/helena/Cursor/jiesong_system/backend/scripts/repair-prisma-migration-state.js)，把 migration 修复从一次性手工操作变成可重复执行的工具链。
+- `backend/package.json` 新增 `db:migrate:repair`，会在备份后执行 repair 脚本。
+- repair 脚本已经把 2026-03-21 之后“effect 已存在但状态未完成”的 migration 收口到 `_prisma_migrations`，包括 `add_token_usage_detail_snapshot`、agent account/audit、customer receipt pool、third-party cargo、payment self-fk 和 replay summary migration。
+- 现在标准 Prisma 链路已恢复：`migrate status` 显示 up to date，`migrate deploy` 无 pending migrations。
+
+### Verification
+- `cd backend && node --test src/services/prismaMigrationRepairService.test.js src/services/agentReplaySummaryService.test.js src/services/openAgentService.test.js src/controllers/aiController.test.js src/services/governanceReplayService.test.js` 通过（`39/39`）
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`20/20`）
+- `cd backend && npm run db:migrate:repair` 通过
+- `cd backend && npx prisma migrate status --schema prisma/schema.prisma` 通过（`Database schema is up to date!`）
+- `cd backend && npx prisma migrate deploy --schema prisma/schema.prisma` 通过（`No pending migrations to apply.`）
+- `git diff --check -- backend/package.json backend/scripts/repair-prisma-migration-state.js backend/src/services/prismaMigrationRepairService.js backend/src/services/prismaMigrationRepairService.test.js backend/src/services/agentReplaySummaryService.js backend/src/services/agentReplaySummaryService.test.js backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js PLAN.md TASKS.md task_plan.md progress.md` 通过
+
+### Remaining Risk
+- 当前 migration 状态已经修通，但 repair 规则还是基于一组明确列出的“effect 已存在” schema 断言；如果后续还要继续靠 repair 工具自动收口更多历史 migration，需要把这些规则和 schema 验证继续扩全。
+
 ## 2026-04-05 Round 131（回放摘要服务层收口）
 
 ### Goal

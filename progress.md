@@ -1,5 +1,23 @@
 # 捷淞系统 UI 交互测试报告
 
+## 2026-04-05 Prisma Migration 状态修复
+
+- 已把 Prisma migration 链路再推进一层：
+  - 新增了 `prismaMigrationRepairService`
+  - 新增了 `db:migrate:repair`
+  - 已实际修复本地 `_prisma_migrations`，让 `migrate status` / `migrate deploy` 恢复正常
+- 这样现在这条链路不只是“功能能跑”，连标准 Prisma 迁移状态也重新收口了。
+- 已完成验证：
+  - `cd backend && node --test src/services/prismaMigrationRepairService.test.js src/services/agentReplaySummaryService.test.js src/services/openAgentService.test.js src/controllers/aiController.test.js src/services/governanceReplayService.test.js` 通过（`39/39`）
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`20/20`）
+  - `cd backend && npm run db:migrate:repair` 通过
+  - `cd backend && npx prisma migrate status --schema prisma/schema.prisma` 通过
+  - `cd backend && npx prisma migrate deploy --schema prisma/schema.prisma` 通过
+  - `git diff --check -- backend/package.json backend/scripts/repair-prisma-migration-state.js backend/src/services/prismaMigrationRepairService.js backend/src/services/prismaMigrationRepairService.test.js backend/src/services/agentReplaySummaryService.js backend/src/services/agentReplaySummaryService.test.js backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js PLAN.md TASKS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 当前 repair 规则已经够覆盖这批历史 migration，但仍是显式规则集
+  - 下一段如果继续推进，更适合把 migration health check 也做成更正式的诊断输出，而不是只停在 repair 脚本
+
 ## 2026-04-05 回放摘要服务层收口
 
 - 已把 replay summary 再推进一层：

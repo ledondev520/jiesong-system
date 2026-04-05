@@ -13,6 +13,7 @@
 - Latest dedicated-source checkpoint: replay baselines now also have a dedicated `AGENT_REPLAY_SNAPSHOT` log source, which is preferred over generic `AGENT_RUN` fallback and exposed in the UI as 回放快照.
 - Latest model-source checkpoint: replay baselines now also persist into a dedicated `AgentReplaySummary` model, which is read before snapshot/log fallbacks and gives provenance its first non-log summary store.
 - Latest service-layer checkpoint: `AgentReplaySummary` record building, upsert, and map loading are now centralized in `agentReplaySummaryService`, so replay summary persistence no longer lives as ad hoc helper logic inside controller/runtime files.
+- Latest migration-health checkpoint: a dedicated Prisma migration repair tool now reconciles `_prisma_migrations` with already-present schema effects, and standard `migrate status` / `migrate deploy` are healthy again in the local dev database.
 
 ## Goal
 

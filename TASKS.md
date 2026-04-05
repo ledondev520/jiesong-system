@@ -1,5 +1,13 @@
 # Frontend Polish Tasks
 
+## 2026-04-05 Prisma Migration 状态修复
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-107 | P0 | 15m | 1 | DONE | 新增 `prismaMigrationRepairService`，识别 schema 已生效但状态未收口的 migration |
+| AGENT-V2-GOV-108 | P0 | 10m | 1 | DONE | 新增 `db:migrate:repair` 脚本并实际修复 `_prisma_migrations` |
+| AGENT-V2-GOV-109 | P1 | 10m | 1 | DONE | 验证 `migrate status` / `migrate deploy` 恢复正常并更新 checkpoint |
+
 ## 2026-04-05 回放摘要服务层收口
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
