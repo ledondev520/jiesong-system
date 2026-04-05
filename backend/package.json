@@ -17,6 +17,7 @@
     "db:backup": "node scripts/db-backup.js",
     "db:generate": "prisma generate",
     "db:migrate": "node scripts/db-backup.js && prisma migrate dev",
+    "db:migrate:doctor": "node scripts/doctor-prisma-migrations.js",
     "db:migrate:repair": "node scripts/db-backup.js && node scripts/repair-prisma-migration-state.js",
     "db:push": "node scripts/db-backup.js && prisma db push",
     "db:seed": "prisma db seed",

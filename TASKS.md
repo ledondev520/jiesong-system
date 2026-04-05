@@ -1,5 +1,13 @@
 # Frontend Polish Tasks
 
+## 2026-04-05 Migration Health 诊断输出
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-110 | P0 | 10m | 1 | DONE | 新增 `prismaMigrationHealthService` 构建 migration health report |
+| AGENT-V2-GOV-111 | P0 | 10m | 1 | DONE | 新增 `db:migrate:doctor` 诊断脚本 |
+| AGENT-V2-GOV-112 | P1 | 10m | 1 | DONE | 更新测试并验证 doctor 输出 |
+
 ## 2026-04-05 Prisma Migration 状态修复
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |

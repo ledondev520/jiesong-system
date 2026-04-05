@@ -1,5 +1,21 @@
 # 捷淞系统 UI 交互测试报告
 
+## 2026-04-05 Migration Health 诊断输出
+
+- 已把 Prisma migration 链路再推进一层：
+  - 新增了 `prismaMigrationHealthService`
+  - 新增了 `db:migrate:doctor`
+  - 当前本地输出已经能正式给出 migration health report
+- 这样现在这条链路不只会修，还会先判断，而且能把状态明确成 `applied / repaired / pending / blocking`。
+- 已完成验证：
+  - `cd backend && node --test src/services/prismaMigrationHealthService.test.js src/services/prismaMigrationRepairService.test.js src/services/agentReplaySummaryService.test.js src/services/openAgentService.test.js src/controllers/aiController.test.js src/services/governanceReplayService.test.js` 通过（`40/40`）
+  - `cd backend && npm run db:migrate:doctor` 通过
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`20/20`）
+  - `git diff --check -- backend/package.json backend/scripts/doctor-prisma-migrations.js backend/src/services/prismaMigrationHealthService.js backend/src/services/prismaMigrationHealthService.test.js PLAN.md TASKS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 当前 health report 已经够做本地诊断，但还没变成正式 API / 页面
+  - 下一段如果继续推进，更适合把 doctor 输出接到系统诊断入口，而不是继续停在 CLI
+
 ## 2026-04-05 Prisma Migration 状态修复
 
 - 已把 Prisma migration 链路再推进一层：

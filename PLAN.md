@@ -1,5 +1,35 @@
 # Ops Execution Center Plan
 
+## 2026-04-05 Round 133（Migration Health 诊断输出）
+
+### Goal
+- 把 migration repair 从“能修”推进成“能判断”，让当前 Prisma migration 状态有正式的 report-only 诊断输出。
+
+### Planned Scope
+- 新增 `prismaMigrationHealthService`，构建 migration health report。
+- 新增 `db:migrate:doctor` 脚本输出当前状态。
+- 保持 repair 能力不变，只补报告层。
+
+### Verification Plan
+- `cd backend && node --test src/services/prismaMigrationHealthService.test.js src/services/prismaMigrationRepairService.test.js src/services/agentReplaySummaryService.test.js src/services/openAgentService.test.js src/controllers/aiController.test.js src/services/governanceReplayService.test.js`
+- `cd backend && npm run db:migrate:doctor`
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- backend/package.json backend/scripts/doctor-prisma-migrations.js backend/src/services/prismaMigrationHealthService.js backend/src/services/prismaMigrationHealthService.test.js PLAN.md TASKS.md task_plan.md progress.md`
+
+### Delivered
+- 新增 [prismaMigrationHealthService.js](/Users/helena/Cursor/jiesong_system/backend/src/services/prismaMigrationHealthService.js)，会把 migration 状态归类成 `applied / repaired / pending / blocking` 并汇总统计。
+- 新增 [doctor-prisma-migrations.js](/Users/helena/Cursor/jiesong_system/backend/scripts/doctor-prisma-migrations.js) 和 `db:migrate:doctor`，可以直接输出当前 migration 健康报告。
+- 当前本地诊断结果已经是 `healthy`，并明确显示 12 个 migration 全部处于 `applied`。
+
+### Verification
+- `cd backend && node --test src/services/prismaMigrationHealthService.test.js src/services/prismaMigrationRepairService.test.js src/services/agentReplaySummaryService.test.js src/services/openAgentService.test.js src/controllers/aiController.test.js src/services/governanceReplayService.test.js` 通过（`40/40`）
+- `cd backend && npm run db:migrate:doctor` 通过（输出 `healthy` 报告）
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`20/20`）
+- `git diff --check -- backend/package.json backend/scripts/doctor-prisma-migrations.js backend/src/services/prismaMigrationHealthService.js backend/src/services/prismaMigrationHealthService.test.js PLAN.md TASKS.md task_plan.md progress.md` 通过
+
+### Remaining Risk
+- 当前 health report 已经能诊断这批历史 migration，但仍然建立在显式 repair 规则集之上；如果后续还要继续靠 repair 工具自动收口更多历史 migration，需要把这些规则和 schema 验证继续扩全。
+
 ## 2026-04-05 Round 132（Prisma Migration 状态修复）
 
 ### Goal
