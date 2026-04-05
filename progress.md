@@ -1,5 +1,20 @@
 # 捷淞系统 UI 交互测试报告
 
+## 2026-04-05 回放摘要服务层收口
+
+- 已把 replay summary 再推进一层：
+  - 新增了 `agentReplaySummaryService`
+  - `openAgentService` 写时 summary upsert 已切到这个 service
+  - `aiController` 读时 summary fallback 也已切到这个 service
+- 这样现在 `AgentReplaySummary` 不只是一个模型，而是开始有正式服务层承接。
+- 已完成验证：
+  - `cd backend && node --test src/services/agentReplaySummaryService.test.js src/services/openAgentService.test.js src/controllers/aiController.test.js src/services/governanceReplayService.test.js` 通过（`38/38`）
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`20/20`）
+  - `git diff --check -- backend/src/services/agentReplaySummaryService.js backend/src/services/agentReplaySummaryService.test.js backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js PLAN.md TASKS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 服务层已经收口，但 migration 历史问题还在
+  - 下一段如果继续推进，更适合先清理 Prisma migration 状态，再谈更高层 replay 能力
+
 ## 2026-04-05 独立回放摘要模型
 
 - 已把 replay provenance 再推进一层：

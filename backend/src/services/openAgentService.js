@@ -23,6 +23,7 @@ const taxRefundService = require('./taxRefundService');
 const forexVerificationService = require('./forexVerificationService');
 const eventLedgerService = require('./eventLedgerService');
 const { buildGovernanceReplayProfile } = require('./governanceReplayService');
+const { buildReplaySummaryRecord, upsertReplaySummary } = require('./agentReplaySummaryService');
 const { getOpenAgentRuntimeToken } = require('../utils/openAgentRuntimeAuth');
 const { ROLES } = require('../config/constants');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
@@ -2557,15 +2558,10 @@ const persistAgentRun = async ({
         newValue: JSON.stringify(replaySnapshotValue),
       },
     }),
-    prisma.agentReplaySummary.upsert({
-      where: {
-        userId_sessionId: {
-          userId,
-          sessionId,
-        },
-      },
-      update: replaySummaryRecord,
-      create: replaySummaryRecord,
+    upsertReplaySummary({
+      userId,
+      sessionId,
+      governanceReplayProfile: metadataPayload.governanceReplayProfile,
     }),
   ]);
 };
@@ -2610,24 +2606,6 @@ const buildReplaySnapshotLogValue = ({
   },
   routePlan: routePlan || null,
   selectedToolNames: selectedToolNames || [],
-});
-
-const buildReplaySummaryRecord = ({
-  userId,
-  sessionId,
-  governanceReplayProfile,
-}) => ({
-  userId,
-  sessionId,
-  source: 'replay-summary-record',
-  level: governanceReplayProfile?.level || 'none',
-  summaryJson: JSON.stringify(governanceReplayProfile?.summary || {}),
-  countsJson: JSON.stringify(governanceReplayProfile?.counts || {}),
-  evidenceJson: JSON.stringify(governanceReplayProfile?.evidence || {}),
-  profileJson: JSON.stringify({
-    ...(governanceReplayProfile || {}),
-    source: 'replay-summary-record',
-  }),
 });
 
 /**

@@ -1,5 +1,33 @@
 # Ops Execution Center Plan
 
+## 2026-04-05 Round 131（回放摘要服务层收口）
+
+### Goal
+- 把 `AgentReplaySummary` 的读写从 controller/openAgentService 里的零散逻辑收口成正式 service，降低后续继续演进 replay provenance 的改动面。
+
+### Planned Scope
+- 新增 `agentReplaySummaryService`，集中承接 replay summary 的 record 构建、upsert 和读取映射。
+- `aiController` 改为通过 service 读取 summary fallback。
+- `openAgentService` 改为通过 service 写入 summary。
+
+### Verification Plan
+- `cd backend && node --test src/services/agentReplaySummaryService.test.js src/services/openAgentService.test.js src/controllers/aiController.test.js src/services/governanceReplayService.test.js`
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx`
+- `git diff --check -- backend/src/services/agentReplaySummaryService.js backend/src/services/agentReplaySummaryService.test.js backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js PLAN.md TASKS.md task_plan.md progress.md`
+
+### Delivered
+- 新增 [agentReplaySummaryService.js](/Users/helena/Cursor/jiesong_system/backend/src/services/agentReplaySummaryService.js)，集中封装 replay summary 的 record 构建、upsert、profile map 构建。
+- [openAgentService.js](/Users/helena/Cursor/jiesong_system/backend/src/services/openAgentService.js) 现在通过 service 写 summary，不再自己直接拼 record 或直接打 Prisma upsert。
+- [aiController.js](/Users/helena/Cursor/jiesong_system/backend/src/controllers/aiController.js) 现在通过 service 读取 `AgentReplaySummary`，不再自己维护读取细节。
+
+### Verification
+- `cd backend && node --test src/services/agentReplaySummaryService.test.js src/services/openAgentService.test.js src/controllers/aiController.test.js src/services/governanceReplayService.test.js` 通过（`38/38`）
+- `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`20/20`）
+- `git diff --check -- backend/src/services/agentReplaySummaryService.js backend/src/services/agentReplaySummaryService.test.js backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js PLAN.md TASKS.md task_plan.md progress.md` 通过
+
+### Remaining Risk
+- 这轮把独立 summary 模型收成了正式服务层，但 migration 历史问题依旧没清；如果继续推进，下一步更值得做的是把 Prisma migration 状态先修干净，而不是继续堆 replay 字段。
+
 ## 2026-04-05 Round 130（独立回放摘要模型）
 
 ### Goal

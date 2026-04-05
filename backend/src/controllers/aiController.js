@@ -13,6 +13,7 @@ const aiService = require('../services/aiService');
 const openAgentService = require('../services/openAgentService');
 const anthropicCompatService = require('../services/anthropicCompatService');
 const { buildGovernanceReplayProfile } = require('../services/governanceReplayService');
+const { buildReplaySummaryProfileMap } = require('../services/agentReplaySummaryService');
 const { normalizeConfigValueForStorage } = require('../utils/secretCrypto');
 
 const SSE_HEADERS = {
@@ -174,34 +175,6 @@ const buildPersistedReplayProfileMap = async (userId, sessionIds = []) => {
     if (current.source === 'agent-run-log' && next.source === 'replay-snapshot-log') {
       map.set(row.entityId, next);
     }
-  });
-
-  return map;
-};
-
-const buildReplaySummaryProfileMap = async (userId, sessionIds = []) => {
-  const uniqueIds = Array.from(new Set((Array.isArray(sessionIds) ? sessionIds : []).filter(Boolean)));
-  if (!userId || uniqueIds.length === 0 || !prisma.agentReplaySummary?.findMany) return new Map();
-
-  const rows = await prisma.agentReplaySummary.findMany({
-    where: {
-      userId,
-      sessionId: { in: uniqueIds },
-    },
-    select: {
-      sessionId: true,
-      profileJson: true,
-    },
-  });
-
-  const map = new Map();
-  rows.forEach((row) => {
-    const profile = parseJsonSafely(row.profileJson);
-    if (!profile) return;
-    map.set(row.sessionId, {
-      profile,
-      source: 'replay-summary-record',
-    });
   });
 
   return map;
