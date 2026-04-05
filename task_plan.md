@@ -4,6 +4,14 @@
 
 - Root cause confirmed for the latest AI sessions regression: the transient `auto` governance state was being persisted through the same localStorage path as explicit user preferences, so one failed-first bootstrap could overwrite durable sort/filter preferences.
 - Current fix boundary: keep automatic failed-first triage for the active dataset, but prevent `auto`-sourced state from being written back into localStorage.
+- Latest governance provenance checkpoint: replay signals now expose an explicit source contract (`session-metadata / none`) on the server boundary, so the list can explain not just replay depth but also where that replay capability currently comes from.
+- Latest service-boundary checkpoint: replay provenance is no longer classified ad hoc inside `aiController`; a dedicated `governanceReplayService` now builds one shared replay profile for sessions/history, and the page can render from that profile directly.
+- Latest evidence-strength checkpoint: replay source can now upgrade from `session-metadata` to `session-metadata+operation-log` when merged pending-action timelines include post-create lifecycle events from operation logs.
+- Latest evidence-visibility checkpoint: replay profiles now carry explicit evidence counts, so the UI can show how many operation-log lifecycle events support the current replay source.
+- Latest persistence checkpoint: agent run metadata now stores a baseline governanceReplayProfile snapshot, and read paths can reuse that persisted profile before applying runtime evidence upgrades.
+- Latest fallback-source checkpoint: when metadata lacks a replay baseline, sessions/history can now recover one from `AGENT_RUN` logs, giving replay provenance a second persisted source beyond chat metadata.
+- Latest dedicated-source checkpoint: replay baselines now also have a dedicated `AGENT_REPLAY_SNAPSHOT` log source, which is preferred over generic `AGENT_RUN` fallback and exposed in the UI as 回放快照.
+- Latest model-source checkpoint: replay baselines now also persist into a dedicated `AgentReplaySummary` model, which is read before snapshot/log fallbacks and gives provenance its first non-log summary store.
 
 ## Goal
 
@@ -67,3 +75,6 @@ Integrate `open-agent-sdk-typescript` into `jiesong_system` as an in-process Age
 - That auditability hint now also has a server-boundary contract: controller responses can explicitly mark governance replay availability, and the UI prefers that explicit field over pure client-side inference.
 - Provenance is now a little richer than a boolean: controller responses can also summarize which replay layers are present (tools, recommendations, actions), and the UI surfaces those layers as compact badges at the list level.
 - Provenance now also has a normalized level on the server boundary, so the UI can show one compact replay-level badge without re-deriving the precedence rules client-side.
+- That normalized replay level now also surfaces at the per-session row/card level, so operators can see replay depth without relying only on the global header strip.
+- Provenance now also exposes an explicit source on the server boundary, and the UI surfaces that source as `回放来源：会话元数据` so operators can distinguish metadata-backed replay from future stronger audit sources.
+- Provenance classification itself has now moved behind a dedicated backend service, which emits one `governanceReplayProfile` object and keeps the existing flat fields as compatibility output instead of leaving replay rules embedded in the controller.

@@ -1,10 +1,132 @@
 # 捷淞系统 UI 交互测试报告
 
+## 2026-04-05 独立回放摘要模型
+
+- 已把 replay provenance 再推进一层：
+  - Prisma schema 新增了 `AgentReplaySummary`
+  - `openAgentService` 写时会 upsert 这张独立 summary 表
+  - `aiController` 读时会优先从 `AgentReplaySummary` 恢复 replay baseline
+  - 前端头部会直接显示 `回放来源：回放摘要`
+- 这样现在 replay baseline 首次不再依附 `operationLog` 或 chat metadata，而是有了独立持久化 source。
+- 已完成验证：
+  - `node --test backend/src/services/eventLedgerService.test.js backend/src/controllers/aiController.test.js backend/src/services/governanceReplayService.test.js backend/src/services/openAgentService.test.js` 通过（`41/41`）
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`20/20`）
+  - `git diff --check -- backend/prisma/schema.prisma backend/prisma/migrations/20260405144500_add_agent_replay_summaries/migration.sql backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js backend/src/services/governanceReplayService.js backend/src/services/governanceReplayService.test.js backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js backend/src/services/eventLedgerService.js backend/src/services/eventLedgerService.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 功能上已经有独立 summary 模型，但本地 schema 应用走的是 fallback 路径
+  - 下一段如果继续推进，更适合先清理历史失败 migration，再把这套 summary 读写进一步做成正式服务层
+
+## 2026-04-05 专用回放快照源
+
+- 已把 replay provenance 再推进一层：
+  - `openAgentService` 现在会写入专用 `AGENT_REPLAY_SNAPSHOT`
+  - `aiController` 恢复 replay baseline 时会优先读取这条专用快照
+  - 前端头部会直接显示 `回放来源：回放快照` 或 `回放来源：回放快照 + 操作日志`
+- 这样现在 replay baseline 已经不再只是“借用 AGENT_RUN 日志”，而是开始有专门的快照来源。
+- 已完成验证：
+  - `node --test backend/src/services/eventLedgerService.test.js backend/src/controllers/aiController.test.js backend/src/services/governanceReplayService.test.js backend/src/services/openAgentService.test.js` 通过（`38/38`）
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`19/19`）
+  - `git diff --check -- backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js backend/src/services/governanceReplayService.js backend/src/services/governanceReplayService.test.js backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js backend/src/services/eventLedgerService.js backend/src/services/eventLedgerService.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 专用回放快照源已经落地，但仍然承载在 `operationLog`
+  - 下一段如果继续推进，更适合把 replay summary 从日志表里真正剥离出来
+
+## 2026-04-05 运行日志回放画像回退源
+
+- 已把 replay provenance 再推进一层：
+  - `governanceReplayService` 现在支持外部 persisted profile fallback
+  - `aiController` 会从 `AGENT_RUN` 日志里提取 replay profile 快照
+  - 前端头部会直接显示 `回放来源：运行日志` 或 `回放来源：运行日志 + 操作日志`
+- 这样现在 replay baseline 已经不只依赖 chat metadata，而是有了第二条独立的持久化 summary source。
+- 已完成验证：
+  - `node --test backend/src/controllers/aiController.test.js backend/src/services/governanceReplayService.test.js backend/src/services/openAgentService.test.js` 通过（`31/31`）
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`18/18`）
+  - `git diff --check -- backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js backend/src/services/governanceReplayService.js backend/src/services/governanceReplayService.test.js backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 运行日志现在已经能做 fallback，但仍不是独立 summary 表
+  - 下一段如果继续推进，更适合把 replay baseline / evidence 统一物化成独立 provenance source
+
+## 2026-04-05 基础回放画像持久化
+
+- 已把 replay provenance 再推进一层：
+  - `openAgentService` 写时会持久化基础 `governanceReplayProfile`
+  - `aiController` 读时会解析并复用这份 persisted profile
+  - `governanceReplayService` 会在这份 baseline 之上继续叠加 operation-log evidence
+- 这样现在这条链已经不是纯运行时重建，而是有了“写时快照 + 读时复用 + 运行时增强”的闭环。
+- 已完成验证：
+  - `node --test backend/src/controllers/aiController.test.js backend/src/services/governanceReplayService.test.js backend/src/services/openAgentService.test.js` 通过（`29/29`）
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`17/17`）
+  - `git diff --check -- backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js backend/src/services/governanceReplayService.js backend/src/services/governanceReplayService.test.js backend/src/services/openAgentService.js backend/src/services/openAgentService.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - baseline 现在已持久化，但仍存放在 chat metadata
+  - 下一段如果继续推进，更适合把 replay baseline / evidence 物化成独立 summary source，而不是继续堆 metadata
+
+## 2026-04-05 回放证据显式化
+
+- 已把 replay provenance 再推进一层：
+  - `governanceReplayProfile` 现在显式带 `evidence`
+  - 当前 evidence 至少包含 `operationLogEvents` 和 `actionLifecycleCount`
+  - 前端头部会直接显示 `操作日志证据 X`
+- 这样现在页面不只知道“来源更强”，也知道“有多少条操作日志证据在支撑它”。
+- 已完成验证：
+  - `node --test backend/src/controllers/aiController.test.js backend/src/services/governanceReplayService.test.js` 通过（`8/8`）
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`17/17`）
+  - `git diff --check -- backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js backend/src/services/governanceReplayService.js backend/src/services/governanceReplayService.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - evidence 现在已经显式化，但还是运行时聚合
+  - 下一段如果继续推进，更适合把 replay evidence 物化成更稳定的持久化 summary，而不是继续只在 UI 层加 badge
+
+## 2026-04-05 操作日志增强回放来源
+
+- 已把 replay provenance 再推进一层：
+  - 后端现在会识别 pending-action timeline 里的 operation-log 生命周期证据
+  - 带这类证据的会话会升级成 `session-metadata+operation-log`
+  - 前端头部会直接显示 `回放来源：会话元数据 + 操作日志`
+- 这样现在页面不只知道“回放来自 metadata”，还知道哪些会话已经有更强的操作日志证据支撑。
+- 已完成验证：
+  - `node --test backend/src/controllers/aiController.test.js backend/src/services/governanceReplayService.test.js` 通过（`8/8`）
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`17/17`）
+  - `git diff --check -- backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js backend/src/services/governanceReplayService.js backend/src/services/governanceReplayService.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - stronger source 现在已经能识别 operation-log 证据，但仍是运行时聚合
+  - 下一段如果继续推进，更适合把 replay evidence 进一步下沉成独立持久化 provenance，而不是只靠 timeline 重建
+
+## 2026-04-05 回放分类器服务化
+
+- 已把 replay provenance 再推进一层：
+  - 后端新增了独立 `governanceReplayService`
+  - `aiController` 现在返回统一的 `governanceReplayProfile`
+  - 前端列表页已经优先消费这份统一 profile，而不是继续依赖散落的 replay 字段
+- 这样现在这条链不只是“字段更多”，而是已经有了独立服务层：`source / summary / counts / level` 都由同一分类器生成。
+- 已完成验证：
+  - `node --test backend/src/controllers/aiController.test.js backend/src/services/governanceReplayService.test.js` 通过（`7/7`）
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`17/17`）
+  - `git diff --check -- backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js backend/src/services/governanceReplayService.js backend/src/services/governanceReplayService.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - profile 现在已经服务化，但底层仍来自 metadata
+  - 下一段如果继续推进，更适合把 replay profile 的来源再下沉到事件级/持久化 provenance，而不是继续在字段层横向扩展
+
+## 2026-04-05 回放来源显式化
+
+- 已把 replay provenance 再推进一层：
+  - 后端现在显式下发 `governanceReplaySource`
+  - 前端会直接显示 `回放来源：会话元数据`
+  - `当前数据：已审计回放` 现在不仅说明“可回放”，也说明“回放来自哪里”
+- 这样现在这页不仅知道能回放到哪一层，也知道这套回放能力当前依赖的持久化来源是什么。
+- 已完成验证：
+  - `node --test backend/src/controllers/aiController.test.js` 通过（`5/5`）
+  - `cd frontend && npx vitest run src/app/dashboard/ai/sessions/page.test.tsx` 通过（`17/17`）
+  - `git diff --check -- backend/src/controllers/aiController.js backend/src/controllers/aiController.test.js frontend/src/services/ai.service.ts frontend/src/app/dashboard/ai/sessions/page.tsx frontend/src/app/dashboard/ai/sessions/page.test.tsx PLAN.md TASKS.md RISKS.md METRICS.md task_plan.md progress.md` 通过
+- 当前剩余风险：
+  - 这层 source 还是 controller 基于 metadata 现算的
+  - 下一段如果继续推进，更适合把 replay source / level 一起沉到更稳定的服务端事件分类或独立持久字段
+
 ## 2026-04-04 回放级别显式化
 
 - 已把 replay provenance 再推进一层：
   - 后端现在显式下发 `governanceReplayLevel`
   - 前端会直接显示 `回放级别：工具层 / 建议层 / 动作层`
+  - 会话行和移动卡片也会直接显示 `工具层回放 / 建议层回放 / 动作层回放`
 - 这样现在这页不仅知道能回放什么，还知道系统给出的统一回放级别。
 - 已完成验证：
   - `node --test backend/src/controllers/aiController.test.js` 通过（`5/5`）

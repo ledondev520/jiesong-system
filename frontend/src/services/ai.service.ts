@@ -34,13 +34,40 @@ export interface AiPendingActionSummary {
   }>;
 }
 
+export interface AiGovernanceReplayProfile {
+  available: boolean;
+  source: 'none' | 'session-metadata' | 'session-metadata+operation-log' | 'agent-run-log' | 'agent-run-log+operation-log' | 'replay-snapshot-log' | 'replay-snapshot-log+operation-log' | 'replay-summary-record' | 'replay-summary-record+operation-log';
+  level: 'none' | 'actions' | 'recommendations' | 'tools';
+  evidence: {
+    operationLogEvents: number;
+    actionLifecycleCount: number;
+  };
+  counts: {
+    tools: number;
+    recommendations: number;
+    actions: number;
+  };
+  summary: {
+    tools: boolean;
+    recommendations: boolean;
+    actions: boolean;
+  };
+}
+
 export interface AiSessionItem {
   sessionId: string;
   totalTokens?: number;
   lastModel?: string;
   preview?: string;
+  governanceReplayProfile?: AiGovernanceReplayProfile;
   governanceReplayAvailable?: boolean;
+  governanceReplaySource?: 'none' | 'session-metadata' | 'session-metadata+operation-log' | 'agent-run-log' | 'agent-run-log+operation-log' | 'replay-snapshot-log' | 'replay-snapshot-log+operation-log' | 'replay-summary-record' | 'replay-summary-record+operation-log';
   governanceReplayLevel?: 'none' | 'actions' | 'recommendations' | 'tools';
+  governanceReplayCounts?: {
+    tools: number;
+    recommendations: number;
+    actions: number;
+  };
   governanceReplaySummary?: {
     tools: boolean;
     recommendations: boolean;
@@ -78,8 +105,15 @@ export interface AiChatHistoryItem {
   role: 'user' | 'assistant';
   content: string;
   imageUrl?: string;
+  governanceReplayProfile?: AiGovernanceReplayProfile;
   governanceReplayAvailable?: boolean;
+  governanceReplaySource?: 'none' | 'session-metadata' | 'session-metadata+operation-log' | 'agent-run-log' | 'agent-run-log+operation-log' | 'replay-snapshot-log' | 'replay-snapshot-log+operation-log' | 'replay-summary-record' | 'replay-summary-record+operation-log';
   governanceReplayLevel?: 'none' | 'actions' | 'recommendations' | 'tools';
+  governanceReplayCounts?: {
+    tools: number;
+    recommendations: number;
+    actions: number;
+  };
   governanceReplaySummary?: {
     tools: boolean;
     recommendations: boolean;

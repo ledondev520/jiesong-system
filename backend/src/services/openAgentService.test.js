@@ -505,3 +505,169 @@ test('resolveSdkSessionConfig: 新会话持久化，旧会话走 resume', () => 
   assert.equal(resumed.sessionId, 'agent_finance_demo');
   assert.equal(resumed.resume, 'agent_finance_demo');
 });
+
+test('buildAgentRunMetadata: 会持久化基础 governanceReplayProfile 快照', () => {
+  const metadata = openAgentService.buildAgentRunMetadata({
+    agentType: 'unified',
+    model: 'kimi-k2',
+    routePlan: { mode: 'cross-domain', selectedDomains: ['finance', 'trade-compliance'] },
+    selectedToolNames: ['SearchEntities'],
+    toolTraceSummary: { totalCalls: 1, failureCount: 0, totalDurationMs: 12 },
+    actionRecommendations: [
+      {
+        code: 'trade-compliance.prepare-tax-refund',
+        title: '补建退税草稿',
+        domain: 'trade-compliance',
+        priority: 'high',
+        executionMode: 'manual',
+        reason: '退税前置条件已满足',
+      },
+    ],
+    pendingActionSummary: [
+      {
+        actionId: 'pa-1',
+        actionType: 'CreateTaxRefundDraft',
+        description: '补建退税草稿',
+        status: 'pending',
+      },
+    ],
+  });
+
+  assert.deepEqual(metadata.governanceReplayProfile, {
+    available: true,
+    source: 'session-metadata',
+    level: 'tools',
+    evidence: {
+      operationLogEvents: 0,
+      actionLifecycleCount: 0,
+    },
+    summary: {
+      tools: true,
+      recommendations: true,
+      actions: true,
+    },
+    counts: {
+      tools: 1,
+      recommendations: 1,
+      actions: 1,
+    },
+  });
+});
+
+test('buildReplaySnapshotLogValue: 会生成专用 replay snapshot 日志载荷', () => {
+  const payload = openAgentService.buildReplaySnapshotLogValue({
+    governanceReplayProfile: {
+      available: true,
+      source: 'replay-snapshot-log',
+      level: 'tools',
+      evidence: {
+        operationLogEvents: 0,
+        actionLifecycleCount: 0,
+      },
+      summary: {
+        tools: true,
+        recommendations: true,
+        actions: true,
+      },
+      counts: {
+        tools: 1,
+        recommendations: 1,
+        actions: 1,
+      },
+    },
+    routePlan: { mode: 'cross-domain', selectedDomains: ['finance', 'inventory'] },
+    selectedToolNames: ['SearchEntities'],
+  });
+
+  assert.deepEqual(payload, {
+    source: 'open-agent-sdk',
+    replaySource: 'dedicated-replay-snapshot',
+    governanceReplayProfile: {
+      available: true,
+      source: 'replay-snapshot-log',
+      level: 'tools',
+      evidence: {
+        operationLogEvents: 0,
+        actionLifecycleCount: 0,
+      },
+      summary: {
+        tools: true,
+        recommendations: true,
+        actions: true,
+      },
+      counts: {
+        tools: 1,
+        recommendations: 1,
+        actions: 1,
+      },
+    },
+    routePlan: { mode: 'cross-domain', selectedDomains: ['finance', 'inventory'] },
+    selectedToolNames: ['SearchEntities'],
+  });
+});
+
+test('buildReplaySummaryRecord: 会生成独立 replay summary 持久化载荷', () => {
+  const record = openAgentService.buildReplaySummaryRecord({
+    userId: 'user-1',
+    sessionId: 'session-1',
+    governanceReplayProfile: {
+      available: true,
+      source: 'replay-summary-record',
+      level: 'tools',
+      evidence: {
+        operationLogEvents: 0,
+        actionLifecycleCount: 0,
+      },
+      summary: {
+        tools: true,
+        recommendations: true,
+        actions: true,
+      },
+      counts: {
+        tools: 2,
+        recommendations: 1,
+        actions: 1,
+      },
+    },
+  });
+
+  assert.deepEqual(record, {
+    userId: 'user-1',
+    sessionId: 'session-1',
+    source: 'replay-summary-record',
+    level: 'tools',
+    summaryJson: JSON.stringify({
+      tools: true,
+      recommendations: true,
+      actions: true,
+    }),
+    countsJson: JSON.stringify({
+      tools: 2,
+      recommendations: 1,
+      actions: 1,
+    }),
+    evidenceJson: JSON.stringify({
+      operationLogEvents: 0,
+      actionLifecycleCount: 0,
+    }),
+    profileJson: JSON.stringify({
+      available: true,
+      source: 'replay-summary-record',
+      level: 'tools',
+      evidence: {
+        operationLogEvents: 0,
+        actionLifecycleCount: 0,
+      },
+      summary: {
+        tools: true,
+        recommendations: true,
+        actions: true,
+      },
+      counts: {
+        tools: 2,
+        recommendations: 1,
+        actions: 1,
+      },
+    }),
+  });
+});

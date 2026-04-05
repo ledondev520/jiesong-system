@@ -12,6 +12,7 @@ const { createError } = require('../middleware/errorHandler');
 const aiService = require('../services/aiService');
 const openAgentService = require('../services/openAgentService');
 const anthropicCompatService = require('../services/anthropicCompatService');
+const { buildGovernanceReplayProfile } = require('../services/governanceReplayService');
 const { normalizeConfigValueForStorage } = require('../utils/secretCrypto');
 
 const SSE_HEADERS = {
@@ -85,6 +86,7 @@ const parseAgentMetadata = (raw) => {
       toolTraceSummary: parsed?.toolTraceSummary || null,
       actionRecommendations: Array.isArray(parsed?.actionRecommendations) ? parsed.actionRecommendations : [],
       pendingActionSummary: Array.isArray(parsed?.pendingActionSummary) ? parsed.pendingActionSummary : [],
+      governanceReplayProfile: parsed?.governanceReplayProfile || null,
     };
   } catch {
     return {};
@@ -136,6 +138,102 @@ const buildPendingActionOutcomeMap = async (userId, actionIds = []) => {
   return map;
 };
 
+const buildPersistedReplayProfileMap = async (userId, sessionIds = []) => {
+  const uniqueIds = Array.from(new Set((Array.isArray(sessionIds) ? sessionIds : []).filter(Boolean)));
+  if (!userId || uniqueIds.length === 0) return new Map();
+
+  const rows = await prisma.operationLog.findMany({
+    where: {
+      userId,
+      action: { in: ['AGENT_REPLAY_SNAPSHOT', 'AGENT_RUN'] },
+      entity: { in: ['AgentRuntimeReplay', 'AgentRuntime'] },
+      entityId: { in: uniqueIds },
+    },
+    orderBy: [{ createdAt: 'desc' }],
+    select: {
+      entityId: true,
+      action: true,
+      newValue: true,
+      createdAt: true,
+    },
+  });
+
+  const map = new Map();
+  rows.forEach((row) => {
+    const details = parseJsonSafely(row.newValue) || {};
+    if (!details?.governanceReplayProfile) return;
+    const next = {
+      profile: details.governanceReplayProfile,
+      source: row.action === 'AGENT_REPLAY_SNAPSHOT' ? 'replay-snapshot-log' : 'agent-run-log',
+    };
+    const current = map.get(row.entityId);
+    if (!current) {
+      map.set(row.entityId, next);
+      return;
+    }
+    if (current.source === 'agent-run-log' && next.source === 'replay-snapshot-log') {
+      map.set(row.entityId, next);
+    }
+  });
+
+  return map;
+};
+
+const buildReplaySummaryProfileMap = async (userId, sessionIds = []) => {
+  const uniqueIds = Array.from(new Set((Array.isArray(sessionIds) ? sessionIds : []).filter(Boolean)));
+  if (!userId || uniqueIds.length === 0 || !prisma.agentReplaySummary?.findMany) return new Map();
+
+  const rows = await prisma.agentReplaySummary.findMany({
+    where: {
+      userId,
+      sessionId: { in: uniqueIds },
+    },
+    select: {
+      sessionId: true,
+      profileJson: true,
+    },
+  });
+
+  const map = new Map();
+  rows.forEach((row) => {
+    const profile = parseJsonSafely(row.profileJson);
+    if (!profile) return;
+    map.set(row.sessionId, {
+      profile,
+      source: 'replay-summary-record',
+    });
+  });
+
+  return map;
+};
+
+const resolvePersistedReplayFallback = (metadata, replaySummaryMap, replayMap, sessionId) => {
+  if (metadata?.governanceReplayProfile) {
+    return {
+      profile: null,
+      source: null,
+    };
+  }
+  const summaryFallback = replaySummaryMap.get(sessionId) || null;
+  if (summaryFallback) {
+    return {
+      profile: summaryFallback.profile,
+      source: summaryFallback.source,
+    };
+  }
+  const fallback = replayMap.get(sessionId) || null;
+  if (!fallback) {
+    return {
+      profile: null,
+      source: null,
+    };
+  }
+  return {
+    profile: fallback.profile,
+    source: fallback.source,
+  };
+};
+
 const mergePendingActionSummary = (items = [], outcomeMap = new Map()) => (
   (Array.isArray(items) ? items : []).map((item) => {
     const outcome = outcomeMap.get(item?.actionId);
@@ -159,25 +257,6 @@ const mergePendingActionSummary = (items = [], outcomeMap = new Map()) => (
     };
   })
 );
-
-const hasGovernanceReplayMetadata = (metadata = {}) => (
-  Boolean(metadata?.toolTraceSummary?.totalCalls)
-  || Boolean(Array.isArray(metadata?.actionRecommendations) && metadata.actionRecommendations.length > 0)
-  || Boolean(Array.isArray(metadata?.pendingActionSummary) && metadata.pendingActionSummary.length > 0)
-);
-
-const buildGovernanceReplaySummary = (metadata = {}) => ({
-  tools: Boolean(metadata?.toolTraceSummary?.totalCalls),
-  recommendations: Boolean(Array.isArray(metadata?.actionRecommendations) && metadata.actionRecommendations.length > 0),
-  actions: Boolean(Array.isArray(metadata?.pendingActionSummary) && metadata.pendingActionSummary.length > 0),
-});
-
-const buildGovernanceReplayLevel = (summary = {}) => {
-  if (summary.tools) return 'tools';
-  if (summary.recommendations) return 'recommendations';
-  if (summary.actions) return 'actions';
-  return 'none';
-};
 
 /**
  * 职责：智能问答（支持图片）
@@ -444,15 +523,32 @@ const getChatHistory = async (req, res, next) => {
       (item.parsedMetadata.pendingActionSummary || []).map((summary) => summary.actionId)
     );
     const outcomeMap = await buildPendingActionOutcomeMap(req.user.id, actionIds);
+    const replaySummaryMap = await buildReplaySummaryProfileMap(
+      req.user.id,
+      Array.from(new Set(parsedMessages.map((item) => item.sessionId).filter(Boolean))),
+    );
+    const persistedReplayProfileMap = await buildPersistedReplayProfileMap(
+      req.user.id,
+      Array.from(new Set(parsedMessages.map((item) => item.sessionId).filter(Boolean))),
+    );
     const enrichedMessages = parsedMessages.map((item) => {
-      const replaySummary = buildGovernanceReplaySummary(item.parsedMetadata);
+      const pendingActionSummary = mergePendingActionSummary(item.parsedMetadata.pendingActionSummary, outcomeMap);
+      const replayFallback = resolvePersistedReplayFallback(item.parsedMetadata, replaySummaryMap, persistedReplayProfileMap, item.sessionId);
+      const replayProfile = buildGovernanceReplayProfile(item.parsedMetadata, {
+        pendingActionSummary,
+        persistedProfile: replayFallback.profile,
+        persistedSource: replayFallback.source,
+      });
       return {
         ...item,
         ...item.parsedMetadata,
-        governanceReplayAvailable: hasGovernanceReplayMetadata(item.parsedMetadata),
-        governanceReplaySummary: replaySummary,
-        governanceReplayLevel: buildGovernanceReplayLevel(replaySummary),
-        pendingActionSummary: mergePendingActionSummary(item.parsedMetadata.pendingActionSummary, outcomeMap),
+        governanceReplayAvailable: replayProfile.available,
+        governanceReplaySummary: replayProfile.summary,
+        governanceReplayCounts: replayProfile.counts,
+        governanceReplayLevel: replayProfile.level,
+        governanceReplaySource: replayProfile.source,
+        governanceReplayProfile: replayProfile,
+        pendingActionSummary,
         parsedMetadata: undefined,
       };
     });
@@ -540,10 +636,29 @@ const getSessions = async (req, res, next) => {
       (item?.metadata?.pendingActionSummary || []).map((summary) => summary.actionId)
     );
     const outcomeMap = await buildPendingActionOutcomeMap(req.user.id, pendingActionIds);
+    const replaySummaryMap = await buildReplaySummaryProfileMap(
+      req.user.id,
+      sessions.map((s) => s.sessionId),
+    );
+    const persistedReplayProfileMap = await buildPersistedReplayProfileMap(
+      req.user.id,
+      sessions.map((s) => s.sessionId),
+    );
 
     // 5. 合并后返回
     const enrichedSessions = sessions.map((s) => {
-      const replaySummary = buildGovernanceReplaySummary(previewMap[s.sessionId]?.metadata);
+      const pendingActionSummary = mergePendingActionSummary(previewMap[s.sessionId]?.metadata?.pendingActionSummary, outcomeMap);
+      const replayFallback = resolvePersistedReplayFallback(
+        previewMap[s.sessionId]?.metadata,
+        replaySummaryMap,
+        persistedReplayProfileMap,
+        s.sessionId,
+      );
+      const replayProfile = buildGovernanceReplayProfile(previewMap[s.sessionId]?.metadata, {
+        pendingActionSummary,
+        persistedProfile: replayFallback.profile,
+        persistedSource: replayFallback.source,
+      });
       return {
         ...s,
         totalTokens: tokenMap[s.sessionId] || 0,
@@ -556,10 +671,13 @@ const getSessions = async (req, res, next) => {
         domainsTouched: previewMap[s.sessionId]?.metadata?.routePlan?.selectedDomains || [],
         toolTraceSummary: previewMap[s.sessionId]?.metadata?.toolTraceSummary || null,
         actionRecommendations: previewMap[s.sessionId]?.metadata?.actionRecommendations || [],
-        governanceReplayAvailable: hasGovernanceReplayMetadata(previewMap[s.sessionId]?.metadata),
-        governanceReplaySummary: replaySummary,
-        governanceReplayLevel: buildGovernanceReplayLevel(replaySummary),
-        pendingActionSummary: mergePendingActionSummary(previewMap[s.sessionId]?.metadata?.pendingActionSummary, outcomeMap),
+        governanceReplayAvailable: replayProfile.available,
+        governanceReplaySummary: replayProfile.summary,
+        governanceReplayCounts: replayProfile.counts,
+        governanceReplayLevel: replayProfile.level,
+        governanceReplaySource: replayProfile.source,
+        governanceReplayProfile: replayProfile,
+        pendingActionSummary,
       };
     });
 

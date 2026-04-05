@@ -80,7 +80,7 @@ const buildTokenUsageWhere = (filters) => {
   return where;
 };
 
-const AGENT_ACTIONS = new Set(['AGENT_RUN', 'AGENT_WRITE_EXECUTE', 'AGENT_WRITE_CANCEL', 'AGENT_WRITE_FAILED']);
+const AGENT_ACTIONS = new Set(['AGENT_RUN', 'AGENT_REPLAY_SNAPSHOT', 'AGENT_WRITE_EXECUTE', 'AGENT_WRITE_CANCEL', 'AGENT_WRITE_FAILED']);
 
 const normalizeOperationLog = (log) => {
   const isAgent = AGENT_ACTIONS.has(log.action);

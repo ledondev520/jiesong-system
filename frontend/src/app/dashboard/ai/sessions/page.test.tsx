@@ -154,12 +154,24 @@ describe('AiSessionsPage', () => {
       data: [
         {
           sessionId: 'session_1',
-          governanceReplayAvailable: true,
-          governanceReplayLevel: 'tools',
-          governanceReplaySummary: {
-            tools: true,
-            recommendations: true,
-            actions: true,
+          governanceReplayProfile: {
+            available: true,
+            source: 'session-metadata+operation-log',
+            level: 'tools',
+            evidence: {
+              operationLogEvents: 2,
+              actionLifecycleCount: 2,
+            },
+            counts: {
+              tools: 5,
+              recommendations: 1,
+              actions: 2,
+            },
+            summary: {
+              tools: true,
+              recommendations: true,
+              actions: true,
+            },
           },
           _count: { _all: 3 },
           _max: { createdAt: '2026-03-01T10:00:00.000Z' },
@@ -232,9 +244,12 @@ describe('AiSessionsPage', () => {
       expect(screen.getAllByText('session_1').length).toBeGreaterThan(0);
       expect(screen.getByText('当前数据：已审计回放')).toBeInTheDocument();
       expect(screen.getByText('回放级别：工具层')).toBeInTheDocument();
-      expect(screen.getByText('工具回放')).toBeInTheDocument();
-      expect(screen.getByText('建议回放')).toBeInTheDocument();
-      expect(screen.getByText('动作回放')).toBeInTheDocument();
+      expect(screen.getByText('回放来源：会话元数据 + 操作日志')).toBeInTheDocument();
+      expect(screen.getAllByText('工具层回放').length).toBeGreaterThan(0);
+      expect(screen.getByText('工具回放 5')).toBeInTheDocument();
+      expect(screen.getByText('建议回放 1')).toBeInTheDocument();
+      expect(screen.getByText('动作回放 2')).toBeInTheDocument();
+      expect(screen.getByText('操作日志证据 2')).toBeInTheDocument();
       expect(screen.getAllByText('cross-domain').length).toBeGreaterThan(0);
       expect(screen.getAllByText(/finance \+1/).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/5 \/ 失败 1/).length).toBeGreaterThan(0);
@@ -246,6 +261,129 @@ describe('AiSessionsPage', () => {
       expect(screen.getByText('当前角色 FINANCE')).toBeInTheDocument();
       expect(screen.getByText('finance ×2 / 复合 1')).toBeInTheDocument();
       expect(screen.getByText('围绕应收、应付、回款、收款池与财务风险做事实查询和判断')).toBeInTheDocument();
+    });
+  });
+
+  it('当 replay profile 来自运行日志时，头部显示运行日志来源', async () => {
+    mockGetSessions.mockResolvedValue({
+      data: [
+        {
+          sessionId: 'session_agent_log',
+          governanceReplayProfile: {
+            available: true,
+            source: 'agent-run-log',
+            level: 'recommendations',
+            evidence: {
+              operationLogEvents: 0,
+              actionLifecycleCount: 0,
+            },
+            counts: {
+              tools: 0,
+              recommendations: 2,
+              actions: 0,
+            },
+            summary: {
+              tools: false,
+              recommendations: true,
+              actions: false,
+            },
+          },
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T10:00:00.000Z' },
+          routeMode: 'focused',
+          domainsTouched: ['finance'],
+        },
+      ],
+    });
+
+    render(<AiSessionsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('回放来源：运行日志')).toBeInTheDocument();
+      expect(screen.getByText('回放级别：建议层')).toBeInTheDocument();
+      expect(screen.getByText('建议回放 2')).toBeInTheDocument();
+    });
+  });
+
+  it('当 replay profile 来自回放快照时，头部显示回放快照来源', async () => {
+    mockGetSessions.mockResolvedValue({
+      data: [
+        {
+          sessionId: 'session_replay_snapshot',
+          governanceReplayProfile: {
+            available: true,
+            source: 'replay-snapshot-log',
+            level: 'tools',
+            evidence: {
+              operationLogEvents: 0,
+              actionLifecycleCount: 0,
+            },
+            counts: {
+              tools: 3,
+              recommendations: 1,
+              actions: 1,
+            },
+            summary: {
+              tools: true,
+              recommendations: true,
+              actions: true,
+            },
+          },
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T10:00:00.000Z' },
+          routeMode: 'cross-domain',
+          domainsTouched: ['finance', 'inventory'],
+        },
+      ],
+    });
+
+    render(<AiSessionsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('回放来源：回放快照')).toBeInTheDocument();
+      expect(screen.getByText('回放级别：工具层')).toBeInTheDocument();
+      expect(screen.getByText('工具回放 3')).toBeInTheDocument();
+    });
+  });
+
+  it('当 replay profile 来自回放摘要时，头部显示回放摘要来源', async () => {
+    mockGetSessions.mockResolvedValue({
+      data: [
+        {
+          sessionId: 'session_replay_summary',
+          governanceReplayProfile: {
+            available: true,
+            source: 'replay-summary-record',
+            level: 'tools',
+            evidence: {
+              operationLogEvents: 0,
+              actionLifecycleCount: 0,
+            },
+            counts: {
+              tools: 4,
+              recommendations: 2,
+              actions: 1,
+            },
+            summary: {
+              tools: true,
+              recommendations: true,
+              actions: true,
+            },
+          },
+          _count: { _all: 1 },
+          _max: { createdAt: '2026-03-01T10:00:00.000Z' },
+          routeMode: 'cross-domain',
+          domainsTouched: ['finance', 'inventory'],
+        },
+      ],
+    });
+
+    render(<AiSessionsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('回放来源：回放摘要')).toBeInTheDocument();
+      expect(screen.getByText('回放级别：工具层')).toBeInTheDocument();
+      expect(screen.getByText('工具回放 4')).toBeInTheDocument();
     });
   });
 

@@ -22,6 +22,7 @@ const customsDeclarationService = require('./customsDeclarationService');
 const taxRefundService = require('./taxRefundService');
 const forexVerificationService = require('./forexVerificationService');
 const eventLedgerService = require('./eventLedgerService');
+const { buildGovernanceReplayProfile } = require('./governanceReplayService');
 const { getOpenAgentRuntimeToken } = require('../utils/openAgentRuntimeAuth');
 const { ROLES } = require('../config/constants');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
@@ -2468,15 +2469,26 @@ const persistAgentRun = async ({
   actionRecommendations,
   pendingActionSummary,
 }) => {
-  const metadata = JSON.stringify({
+  const metadataPayload = buildAgentRunMetadata({
     source: 'open-agent-sdk',
     agentType,
     model,
+    routePlan,
+    selectedToolNames,
+    toolTraceSummary,
+    actionRecommendations,
+    pendingActionSummary,
+  });
+  const metadata = JSON.stringify(metadataPayload);
+  const replaySnapshotValue = buildReplaySnapshotLogValue({
+    governanceReplayProfile: metadataPayload.governanceReplayProfile,
     routePlan: routePlan || null,
     selectedToolNames: selectedToolNames || [],
-    toolTraceSummary: toolTraceSummary || null,
-    actionRecommendations: actionRecommendations || [],
-    pendingActionSummary: pendingActionSummary || [],
+  });
+  const replaySummaryRecord = buildReplaySummaryRecord({
+    userId,
+    sessionId,
+    governanceReplayProfile: metadataPayload.governanceReplayProfile,
   });
 
   await prisma.$transaction([
@@ -2531,11 +2543,92 @@ const persistAgentRun = async ({
           toolTraceSummary: toolTraceSummary || null,
           actionRecommendations: actionRecommendations || [],
           pendingActionSummary: pendingActionSummary || [],
+          governanceReplayProfile: metadataPayload.governanceReplayProfile,
         }),
       },
     }),
+    prisma.operationLog.create({
+      data: {
+        actorType: 'USER',
+        userId,
+        action: 'AGENT_REPLAY_SNAPSHOT',
+        entity: 'AgentRuntimeReplay',
+        entityId: sessionId,
+        newValue: JSON.stringify(replaySnapshotValue),
+      },
+    }),
+    prisma.agentReplaySummary.upsert({
+      where: {
+        userId_sessionId: {
+          userId,
+          sessionId,
+        },
+      },
+      update: replaySummaryRecord,
+      create: replaySummaryRecord,
+    }),
   ]);
 };
+
+const buildAgentRunMetadata = ({
+  source = 'open-agent-sdk',
+  agentType,
+  model,
+  routePlan,
+  selectedToolNames,
+  toolTraceSummary,
+  actionRecommendations,
+  pendingActionSummary,
+}) => ({
+  source,
+  agentType,
+  model,
+  routePlan: routePlan || null,
+  selectedToolNames: selectedToolNames || [],
+  toolTraceSummary: toolTraceSummary || null,
+  actionRecommendations: actionRecommendations || [],
+  pendingActionSummary: pendingActionSummary || [],
+  governanceReplayProfile: buildGovernanceReplayProfile({
+    toolTraceSummary: toolTraceSummary || null,
+    actionRecommendations: actionRecommendations || [],
+    pendingActionSummary: pendingActionSummary || [],
+  }),
+});
+
+const buildReplaySnapshotLogValue = ({
+  governanceReplayProfile,
+  routePlan,
+  selectedToolNames,
+}) => ({
+  source: 'open-agent-sdk',
+  replaySource: 'dedicated-replay-snapshot',
+  governanceReplayProfile: {
+    ...governanceReplayProfile,
+    source: governanceReplayProfile?.source === 'session-metadata'
+      ? 'replay-snapshot-log'
+      : governanceReplayProfile?.source,
+  },
+  routePlan: routePlan || null,
+  selectedToolNames: selectedToolNames || [],
+});
+
+const buildReplaySummaryRecord = ({
+  userId,
+  sessionId,
+  governanceReplayProfile,
+}) => ({
+  userId,
+  sessionId,
+  source: 'replay-summary-record',
+  level: governanceReplayProfile?.level || 'none',
+  summaryJson: JSON.stringify(governanceReplayProfile?.summary || {}),
+  countsJson: JSON.stringify(governanceReplayProfile?.counts || {}),
+  evidenceJson: JSON.stringify(governanceReplayProfile?.evidence || {}),
+  profileJson: JSON.stringify({
+    ...(governanceReplayProfile || {}),
+    source: 'replay-summary-record',
+  }),
+});
 
 /**
  * 职责：运行一次 Agent prompt（含只读 + 写工具）
@@ -2789,6 +2882,9 @@ module.exports = {
   isToolAllowedForRole,
   materializeRecommendationPendingActions,
   summarizeToolTrace,
+  buildAgentRunMetadata,
+  buildReplaySnapshotLogValue,
+  buildReplaySummaryRecord,
   resolveSdkSessionConfig,
   runAgentPrompt,
   runAgentPromptStream,

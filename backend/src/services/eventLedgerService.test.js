@@ -268,3 +268,51 @@ test('listEventLedger: AGENT_RUN 事件保留 routePlan 与 toolTraceSummary 明
     },
   );
 });
+
+test('listEventLedger: AGENT_REPLAY_SNAPSHOT 事件归类为 AGENT 并保留 replay profile', async () => {
+  await withStubbedLedgerSources(
+    {
+      operationLogFindMany: async () => ([
+        {
+          id: 'log-agent-snapshot-1',
+          actorType: 'USER',
+          userId: 'user-8',
+          agentAccountId: null,
+          requestId: 'req-agent-snapshot-1',
+          idempotencyKey: null,
+          action: 'AGENT_REPLAY_SNAPSHOT',
+          entity: 'AgentRuntimeReplay',
+          entityId: 'session-agent-snapshot-1',
+          oldValue: null,
+          newValue: JSON.stringify({
+            governanceReplayProfile: {
+              available: true,
+              source: 'replay-snapshot-log',
+              level: 'tools',
+              counts: { tools: 2, recommendations: 1, actions: 1 },
+            },
+          }),
+          ipAddress: '127.0.0.1',
+          userAgent: 'jest',
+          createdAt: new Date('2026-04-05T00:00:00.000Z'),
+        },
+      ]),
+      operationLogCount: async () => 1,
+      importRecordFindMany: async () => [],
+      importRecordCount: async () => 0,
+      chatHistoryFindMany: async () => [],
+      chatHistoryCount: async () => 0,
+      tokenUsageFindMany: async () => [],
+      tokenUsageCount: async () => 0,
+    },
+    async () => {
+      const result = await eventLedgerService.listEventLedger(1, 10, { category: 'AGENT' });
+
+      assert.equal(result.total, 1);
+      assert.equal(result.events[0].category, 'AGENT');
+      assert.equal(result.events[0].eventType, 'AGENT_AGENT_REPLAY_SNAPSHOT');
+      assert.equal(result.events[0].details.newValue.governanceReplayProfile.source, 'replay-snapshot-log');
+      assert.equal(result.events[0].details.newValue.governanceReplayProfile.counts.tools, 2);
+    },
+  );
+});

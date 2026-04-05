@@ -1,12 +1,83 @@
 # Frontend Polish Tasks
 
+## 2026-04-05 独立回放摘要模型
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-100 | P0 | 15m | 1 | DONE | 在 Prisma schema 中新增 `AgentReplaySummary` 模型与 migration |
+| AGENT-V2-GOV-101 | P0 | 10m | 1 | DONE | `openAgentService` 写时 upsert 独立 replay summary |
+| AGENT-V2-GOV-102 | P0 | 10m | 1 | DONE | `aiController` 读时优先查询 `AgentReplaySummary`，前端补 `回放摘要` 来源 |
+| AGENT-V2-GOV-103 | P1 | 10m | 1 | DONE | 更新 controller/service/UI 测试、迁移执行与 checkpoint |
+
+## 2026-04-05 专用回放快照源
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-96 | P0 | 10m | 1 | DONE | `openAgentService` 写入专用 `AGENT_REPLAY_SNAPSHOT` 日志载荷 |
+| AGENT-V2-GOV-97 | P0 | 10m | 1 | DONE | `aiController` 优先从 `AGENT_REPLAY_SNAPSHOT` 恢复 replay baseline |
+| AGENT-V2-GOV-98 | P0 | 10m | 1 | DONE | 前端来源说明补齐 `回放快照` / `回放快照 + 操作日志` |
+| AGENT-V2-GOV-99 | P1 | 10m | 1 | DONE | 更新 eventLedger/controller/service/UI 测试与 checkpoint |
+
+## 2026-04-05 运行日志回放画像回退源
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-92 | P0 | 10m | 1 | DONE | `governanceReplayService` 支持外部 persisted profile fallback |
+| AGENT-V2-GOV-93 | P0 | 10m | 1 | DONE | `aiController` 从 `AGENT_RUN` 日志提取 replay profile 作为回退源 |
+| AGENT-V2-GOV-94 | P0 | 10m | 1 | DONE | 前端来源说明补齐 `运行日志` / `运行日志 + 操作日志` |
+| AGENT-V2-GOV-95 | P1 | 10m | 1 | DONE | 更新 controller/service/UI 测试与 checkpoint |
+
+## 2026-04-05 基础回放画像持久化
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-88 | P0 | 15m | 1 | DONE | `openAgentService` 写时持久化基础 `governanceReplayProfile` |
+| AGENT-V2-GOV-89 | P0 | 10m | 1 | DONE | `aiController` 读时解析并复用 metadata 中的 persisted profile |
+| AGENT-V2-GOV-90 | P0 | 10m | 1 | DONE | `governanceReplayService` 优先消费 persisted profile，再做运行时 evidence 增强 |
+| AGENT-V2-GOV-91 | P1 | 10m | 1 | DONE | 更新 openAgent/controller/service 测试、前端回归与 checkpoint |
+
+## 2026-04-05 回放证据显式化
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-85 | P0 | 10m | 1 | DONE | 在 `governanceReplayProfile` 中增加 replay evidence 计数字段 |
+| AGENT-V2-GOV-86 | P0 | 10m | 1 | DONE | 前端头部增加 `操作日志证据 X` badge |
+| AGENT-V2-GOV-87 | P1 | 10m | 1 | DONE | 更新 service/controller/UI 测试与 checkpoint |
+
+## 2026-04-05 操作日志增强回放来源
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-81 | P0 | 10m | 1 | DONE | 在 `governanceReplayService` 识别 pending-action lifecycle 的 operation-log 证据 |
+| AGENT-V2-GOV-82 | P0 | 10m | 1 | DONE | `aiController` 改为 merge 动作时间线后再构建 replay profile |
+| AGENT-V2-GOV-83 | P0 | 10m | 1 | DONE | 前端来源说明升级为 `回放来源：会话元数据 + 操作日志` |
+| AGENT-V2-GOV-84 | P1 | 10m | 1 | DONE | 更新 service/controller/UI 测试与 checkpoint |
+
+## 2026-04-05 回放分类器服务化
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-77 | P0 | 15m | 1 | DONE | 新增 `governanceReplayService`，统一构建 replay profile |
+| AGENT-V2-GOV-78 | P0 | 10m | 1 | DONE | `aiController` 改为消费统一 `governanceReplayProfile` 并保持平铺字段兼容 |
+| AGENT-V2-GOV-79 | P0 | 10m | 1 | DONE | 前端列表页优先消费 `governanceReplayProfile`，不再依赖散落 replay 字段 |
+| AGENT-V2-GOV-80 | P1 | 10m | 1 | DONE | 更新后端 service/controller 测试、前端回归与 checkpoint |
+
+## 2026-04-05 回放来源显式化
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| AGENT-V2-GOV-74 | P0 | 10m | 1 | DONE | 在 controller 显式计算并返回 `governanceReplaySource` |
+| AGENT-V2-GOV-75 | P0 | 10m | 1 | DONE | 前端接入并显示 `回放来源：会话元数据` |
+| AGENT-V2-GOV-76 | P1 | 10m | 1 | DONE | 更新前后端测试与 checkpoint |
+
 ## 2026-04-04 回放级别显式化
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
 |---|---|---:|---:|---|---|
 | AGENT-V2-GOV-70 | P0 | 10m | 1 | DONE | 在 controller 显式计算并返回 `governanceReplayLevel` |
 | AGENT-V2-GOV-71 | P0 | 10m | 1 | DONE | 前端接入并显示 `回放级别：工具层/建议层/动作层` |
-| AGENT-V2-GOV-72 | P1 | 10m | 1 | DONE | 更新前后端测试与 checkpoint |
+| AGENT-V2-GOV-72 | P0 | 10m | 1 | DONE | 在会话行/移动卡片增加 `工具层回放 / 建议层回放 / 动作层回放` badge |
+| AGENT-V2-GOV-73 | P1 | 10m | 1 | DONE | 更新前后端测试与 checkpoint |
 
 ## 2026-04-04 回放能力摘要显式化
 

@@ -24,6 +24,7 @@ import {
   aiService,
   type AiActionRecommendation,
   type AiAgentToolRegistryResponse,
+  type AiGovernanceReplayProfile,
   type AiPendingActionSummary,
   type AiSessionItem,
   type AiStandaloneTokenRow,
@@ -478,25 +479,106 @@ const buildGovernanceViewStateNote = (
   return null;
 };
 
+const getGovernanceReplayProfile = (item: AiSessionItem): AiGovernanceReplayProfile => {
+  const profile = item.governanceReplayProfile;
+  if (profile) return profile;
+  const summary = item.governanceReplaySummary || {
+    tools: Boolean(item.toolTraceSummary?.totalCalls),
+    recommendations: Boolean(item.actionRecommendations?.length),
+    actions: Boolean(item.pendingActionSummary?.length),
+  };
+  const counts = item.governanceReplayCounts || {
+    tools: Number(item.toolTraceSummary?.totalCalls || 0),
+    recommendations: item.actionRecommendations?.length || 0,
+    actions: item.pendingActionSummary?.length || 0,
+  };
+  const level = item.governanceReplayLevel
+    || (summary.tools ? 'tools' : summary.recommendations ? 'recommendations' : summary.actions ? 'actions' : 'none');
+  const available = item.governanceReplayAvailable ?? (summary.tools || summary.recommendations || summary.actions);
+  const source = item.governanceReplaySource || (available ? 'session-metadata' : 'none');
+  const evidence = {
+    operationLogEvents: (item.pendingActionSummary || []).reduce((count, action) => (
+      count + ((action.timeline || []).filter((event) => event.type !== 'created').length)
+    ), 0),
+    actionLifecycleCount: (item.pendingActionSummary || []).filter((action) => (
+      (action.timeline || []).some((event) => event.type !== 'created')
+    )).length,
+  };
+
+  return {
+    available,
+    source,
+    level,
+    evidence,
+    counts,
+    summary,
+  };
+};
+
+const formatGovernanceReplaySource = (source: AiGovernanceReplayProfile['source']) => {
+  if (source === 'replay-summary-record+operation-log') return '回放来源：回放摘要 + 操作日志';
+  if (source === 'replay-summary-record') return '回放来源：回放摘要';
+  if (source === 'replay-snapshot-log+operation-log') return '回放来源：回放快照 + 操作日志';
+  if (source === 'replay-snapshot-log') return '回放来源：回放快照';
+  if (source === 'agent-run-log+operation-log') return '回放来源：运行日志 + 操作日志';
+  if (source === 'agent-run-log') return '回放来源：运行日志';
+  if (source === 'session-metadata+operation-log') return '回放来源：会话元数据 + 操作日志';
+  if (source === 'session-metadata') return '回放来源：会话元数据';
+  return null;
+};
+
 const buildGovernanceReplayNote = (sessions: AiSessionItem[]) => {
-  const hasToolsLevel = sessions.some((item) => item.governanceReplayLevel === 'tools');
-  const hasRecommendationsLevel = sessions.some((item) => item.governanceReplayLevel === 'recommendations');
-  const hasActionsLevel = sessions.some((item) => item.governanceReplayLevel === 'actions');
-  const summary = sessions.reduce((acc, item) => {
-    const replaySummary = item.governanceReplaySummary;
-    const tools = replaySummary?.tools ?? Boolean(item.toolTraceSummary?.totalCalls);
-    const recommendations = replaySummary?.recommendations ?? Boolean(item.actionRecommendations?.length);
-    const actions = replaySummary?.actions ?? Boolean(item.pendingActionSummary?.length);
-    if (tools) acc.tools = true;
-    if (recommendations) acc.recommendations = true;
-    if (actions) acc.actions = true;
+  const replayProfiles = sessions.map(getGovernanceReplayProfile);
+  const operationLogEvidenceCount = replayProfiles.reduce((count, profile) => count + profile.evidence.operationLogEvents, 0);
+  const hasToolsLevel = replayProfiles.some((profile) => profile.level === 'tools');
+  const hasRecommendationsLevel = replayProfiles.some((profile) => profile.level === 'recommendations');
+  const hasActionsLevel = replayProfiles.some((profile) => profile.level === 'actions');
+  const replaySource = replayProfiles.some((profile) => profile.source === 'replay-summary-record+operation-log')
+    ? 'replay-summary-record+operation-log'
+    : replayProfiles.some((profile) => profile.source === 'replay-summary-record')
+      ? 'replay-summary-record'
+      : replayProfiles.some((profile) => profile.source === 'replay-snapshot-log+operation-log')
+    ? 'replay-snapshot-log+operation-log'
+    : replayProfiles.some((profile) => profile.source === 'replay-snapshot-log')
+      ? 'replay-snapshot-log'
+      : replayProfiles.some((profile) => profile.source === 'agent-run-log+operation-log')
+    ? 'agent-run-log+operation-log'
+    : replayProfiles.some((profile) => profile.source === 'agent-run-log')
+      ? 'agent-run-log'
+      : replayProfiles.some((profile) => profile.source === 'session-metadata+operation-log')
+    ? 'session-metadata+operation-log'
+    : replayProfiles.some((profile) => profile.source === 'session-metadata')
+      ? 'session-metadata'
+      : 'none';
+  const summary = replayProfiles.reduce((acc, profile) => {
+    acc.toolCount += profile.counts.tools;
+    acc.recommendationCount += profile.counts.recommendations;
+    acc.actionCount += profile.counts.actions;
+    if (profile.summary.tools) acc.tools = true;
+    if (profile.summary.recommendations) acc.recommendations = true;
+    if (profile.summary.actions) acc.actions = true;
     return acc;
-  }, { tools: false, recommendations: false, actions: false });
+  }, { tools: false, recommendations: false, actions: false, toolCount: 0, recommendationCount: 0, actionCount: 0 });
   const hasReplaySignals = summary.tools || summary.recommendations || summary.actions;
   if (!hasReplaySignals) return null;
   return {
     label: '当前数据：已审计回放',
-    description: '列表里的治理信号已来自持久化会话元数据，可在详情中继续回放工具、建议和动作轨迹。',
+    sourceLabel: formatGovernanceReplaySource(replaySource),
+    description: replaySource === 'replay-summary-record+operation-log'
+      ? '当前回放能力来自独立回放摘要与动作操作日志，可在详情中继续回放工具、建议和动作轨迹。'
+      : replaySource === 'replay-summary-record'
+        ? '当前回放能力优先来自独立回放摘要，可在详情中继续回放工具、建议和动作轨迹。'
+      : replaySource === 'replay-snapshot-log+operation-log'
+      ? '当前回放能力来自专用回放快照与动作操作日志，可在详情中继续回放工具、建议和动作轨迹。'
+      : replaySource === 'replay-snapshot-log'
+        ? '当前回放能力优先来自专用回放快照，可在详情中继续回放工具、建议和动作轨迹。'
+      : replaySource === 'agent-run-log+operation-log'
+      ? '当前回放能力来自运行日志快照与动作操作日志，可在详情中继续回放工具、建议和动作轨迹。'
+      : replaySource === 'agent-run-log'
+        ? '当前回放能力优先来自持久化运行日志快照，可在详情中继续回放建议和动作轨迹。'
+      : replaySource === 'session-metadata+operation-log'
+      ? '当前回放能力同时来自持久化会话 metadata 和动作操作日志，可在详情中继续回放工具、建议和动作轨迹。'
+      : '当前回放能力基于持久化会话 metadata 聚合得出，可在详情中继续回放工具、建议和动作轨迹。',
     levelLabel: hasToolsLevel
       ? '回放级别：工具层'
       : hasRecommendationsLevel
@@ -505,11 +587,19 @@ const buildGovernanceReplayNote = (sessions: AiSessionItem[]) => {
           ? '回放级别：动作层'
           : null,
     badges: [
-      summary.tools ? '工具回放' : null,
-      summary.recommendations ? '建议回放' : null,
-      summary.actions ? '动作回放' : null,
+      summary.tools ? `工具回放 ${summary.toolCount}` : null,
+      summary.recommendations ? `建议回放 ${summary.recommendationCount}` : null,
+      summary.actions ? `动作回放 ${summary.actionCount}` : null,
+      operationLogEvidenceCount > 0 ? `操作日志证据 ${operationLogEvidenceCount}` : null,
     ].filter(Boolean),
   };
+};
+
+const formatSessionReplayLevel = (level?: AiSessionItem['governanceReplayLevel']) => {
+  if (level === 'tools') return '工具层回放';
+  if (level === 'recommendations') return '建议层回放';
+  if (level === 'actions') return '动作层回放';
+  return null;
 };
 
 const buildRegistryDomainStats = (toolRegistry: AiAgentToolRegistryResponse | null) => {
@@ -1278,6 +1368,9 @@ export default function AiSessionsPage() {
         {governanceReplayNote ? (
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <Badge variant="secondary">{governanceReplayNote.label}</Badge>
+            {governanceReplayNote.sourceLabel ? (
+              <Badge variant="outline">{governanceReplayNote.sourceLabel}</Badge>
+            ) : null}
             {governanceReplayNote.levelLabel ? (
               <Badge variant="outline">{governanceReplayNote.levelLabel}</Badge>
             ) : null}
@@ -1312,6 +1405,7 @@ export default function AiSessionsPage() {
                     const actionHasFailed = hasFailedPendingAction(item.pendingActionSummary);
                     const sla = getSessionSlaLevel(item.pendingActionSummary);
                     const attentionSignal = getSessionAttentionSignal(item.pendingActionSummary);
+                    const replayLevelLabel = formatSessionReplayLevel(getGovernanceReplayProfile(item).level);
                     return (
                       <MobileListCard
                         key={item.sessionId}
@@ -1322,6 +1416,7 @@ export default function AiSessionsPage() {
                             <Badge variant="outline">消息 {getSessionCount(item)}</Badge>
                             {sla ? <Badge variant={sla.variant}>{sla.label}</Badge> : null}
                             {attentionSignal ? <Badge variant={attentionSignal.variant}>{attentionSignal.label}</Badge> : null}
+                            {replayLevelLabel ? <Badge variant="secondary">{replayLevelLabel}</Badge> : null}
                           </div>
                         )}
                         fields={[
@@ -1407,6 +1502,7 @@ export default function AiSessionsPage() {
                         const actionHasFailed = hasFailedPendingAction(item.pendingActionSummary);
                         const sla = getSessionSlaLevel(item.pendingActionSummary);
                         const attentionSignal = getSessionAttentionSignal(item.pendingActionSummary);
+                        const replayLevelLabel = formatSessionReplayLevel(getGovernanceReplayProfile(item).level);
                         return (
                           <TableRow
                             key={item.sessionId}
@@ -1418,6 +1514,7 @@ export default function AiSessionsPage() {
                                 <span>{item.sessionId}</span>
                                 {sla ? <Badge variant={sla.variant}>{sla.label}</Badge> : null}
                                 {attentionSignal ? <Badge variant={attentionSignal.variant}>{attentionSignal.label}</Badge> : null}
+                                {replayLevelLabel ? <Badge variant="secondary">{replayLevelLabel}</Badge> : null}
                               </div>
                             </TableCell>
                             <TableCell>
