@@ -1,6 +1,6 @@
 /**
- * Input: 采购合同详情API、购销合同生成服务
- * Output: 采购合同详情页面（含商品明细、付款记录、合同文档预览）
+ * Input: 采购合同详情API、购销合同生成服务、SortableTableHead、useTableSort
+ * Output: 采购合同详情页面（含可排序商品明细、付款记录、合同文档预览）
  * Pos: 采购管理子页面，展示单个采购合同的完整信息
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect, use, useCallback, useRef } from 'react';
+import { useState, useEffect, use, useCallback, useRef, useMemo } from 'react';
 import { PurchaseContract, PurchaseItem, PurchaseStatus } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
 import { contractDocService } from '@/services/contractDoc.service';
@@ -31,10 +31,11 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 import {
   Dialog,
   DialogContent,
@@ -227,6 +228,33 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     }
   };
 
+  const purchaseLineItems = useMemo(() => contract?.items ?? [], [contract?.items]);
+
+  /**
+   * 职责：采购明细行排序取值（名称、规格、数量、单价、小计）
+   */
+  const purchaseLineAccessor = useCallback((item: PurchaseItem, key: string) => {
+    switch (key) {
+      case 'productName':
+        return item.product?.customsName ?? '';
+      case 'spec':
+        return item.specification || item.product?.specification || '';
+      case 'quantity':
+        return item.quantity;
+      case 'unitPrice':
+        return Number(item.unitPrice) || 0;
+      case 'lineTotal':
+        return (
+          Number(item.totalPrice) ||
+          Number(item.quantity || 0) * Number(item.unitPrice || 0)
+        );
+      default:
+        return null;
+    }
+  }, []);
+
+  const purchaseLineSort = useTableSort(purchaseLineItems, purchaseLineAccessor);
+
   if (loading) {
     return <div className="flex items-center justify-center h-64">加载中...</div>;
   }
@@ -339,22 +367,60 @@ export default function PurchaseDetailPage({ params }: PageProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>商品名称</TableHead>
-                <TableHead>规格</TableHead>
-                <TableHead className="text-right">数量</TableHead>
-                <TableHead className="text-right">单价 (¥)</TableHead>
-                <TableHead className="text-right">小计 (¥)</TableHead>
+                <SortableTableHead
+                  sortKey="productName"
+                  currentSortKey={purchaseLineSort.sortKey}
+                  currentSortDir={purchaseLineSort.sortDir}
+                  onSort={purchaseLineSort.onSort}
+                >
+                  商品名称
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="spec"
+                  currentSortKey={purchaseLineSort.sortKey}
+                  currentSortDir={purchaseLineSort.sortDir}
+                  onSort={purchaseLineSort.onSort}
+                >
+                  规格
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="quantity"
+                  currentSortKey={purchaseLineSort.sortKey}
+                  currentSortDir={purchaseLineSort.sortDir}
+                  onSort={purchaseLineSort.onSort}
+                  className="text-right"
+                >
+                  数量
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="unitPrice"
+                  currentSortKey={purchaseLineSort.sortKey}
+                  currentSortDir={purchaseLineSort.sortDir}
+                  onSort={purchaseLineSort.onSort}
+                  className="text-right"
+                >
+                  单价 (¥)
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="lineTotal"
+                  currentSortKey={purchaseLineSort.sortKey}
+                  currentSortDir={purchaseLineSort.sortDir}
+                  onSort={purchaseLineSort.onSort}
+                  className="text-right"
+                >
+                  小计 (¥)
+                </SortableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!contract.items?.length ? (
+              {!purchaseLineSort.sortedData.length ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
                     暂无商品明细
                   </TableCell>
                 </TableRow>
               ) : (
-                contract.items.map((item: PurchaseItem) => (
+                purchaseLineSort.sortedData.map((item: PurchaseItem) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">
                       {item.product?.customsName || '未知商品'}

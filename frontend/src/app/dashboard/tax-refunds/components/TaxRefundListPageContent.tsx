@@ -2,11 +2,15 @@
  * Input: 退税服务、URL 查询参数、router
  * Output: 退税列表页
  * Pos: 退税管理主列表页
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 'use client';
 
 import { startTransition, useCallback, useDeferredValue, useEffect, useState } from 'react';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, ReceiptText, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -64,6 +68,26 @@ export function TaxRefundListPageContent() {
   useEffect(() => {
     void loadTaxRefunds();
   }, [loadTaxRefunds]);
+
+  const sort = useTableSort<TaxRefund, string>(
+    taxRefunds,
+    useCallback((item, key) => {
+      switch (key) {
+        case 'refundNo':
+          return item.refundNo ?? '';
+        case 'declaredAmount':
+          return item.declaredAmount;
+        case 'refundableAmount':
+          return item.refundableAmount;
+        case 'refundedAmount':
+          return item.refundedAmount;
+        case 'appliedAt':
+          return item.appliedAt ?? '';
+        default:
+          return null;
+      }
+    }, [])
+  );
 
   const totalRefundable = taxRefunds.reduce((sum, item) => sum + item.refundableAmount, 0);
   const totalRefunded = taxRefunds.reduce((sum, item) => sum + item.refundedAmount, 0);
@@ -177,7 +201,7 @@ export function TaxRefundListPageContent() {
         ) : taxRefunds.length === 0 ? (
           <div className="surface-panel py-10 text-center text-sm text-muted-foreground">暂无退税记录</div>
         ) : (
-          taxRefunds.map((taxRefund) => (
+          sort.sortedData.map((taxRefund) => (
             <MobileListCard
               key={taxRefund.id}
               title={taxRefund.refundNo}
@@ -211,12 +235,50 @@ export function TaxRefundListPageContent() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>退税单号</TableHead>
+                <SortableTableHead
+                  sortKey="refundNo"
+                  currentSortKey={sort.sortKey}
+                  currentSortDir={sort.sortDir}
+                  onSort={sort.onSort}
+                >
+                  退税单号
+                </SortableTableHead>
                 <TableHead>状态</TableHead>
-                <TableHead className="text-right">申报金额</TableHead>
-                <TableHead className="text-right">可退金额</TableHead>
-                <TableHead className="text-right">已退金额</TableHead>
-                <TableHead>申请日期</TableHead>
+                <SortableTableHead
+                  sortKey="declaredAmount"
+                  currentSortKey={sort.sortKey}
+                  currentSortDir={sort.sortDir}
+                  onSort={sort.onSort}
+                  className="text-right"
+                >
+                  申报金额
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="refundableAmount"
+                  currentSortKey={sort.sortKey}
+                  currentSortDir={sort.sortDir}
+                  onSort={sort.onSort}
+                  className="text-right"
+                >
+                  可退金额
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="refundedAmount"
+                  currentSortKey={sort.sortKey}
+                  currentSortDir={sort.sortDir}
+                  onSort={sort.onSort}
+                  className="text-right"
+                >
+                  已退金额
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="appliedAt"
+                  currentSortKey={sort.sortKey}
+                  currentSortDir={sort.sortDir}
+                  onSort={sort.onSort}
+                >
+                  申请日期
+                </SortableTableHead>
                 <TableHead>备注</TableHead>
                 <TableHead className="w-[140px] text-right">操作</TableHead>
               </TableRow>
@@ -235,7 +297,7 @@ export function TaxRefundListPageContent() {
                   </TableCell>
                 </TableRow>
               ) : (
-                taxRefunds.map((taxRefund) => (
+                sort.sortedData.map((taxRefund) => (
                   <TableRow key={taxRefund.id}>
                     <TableCell className="font-medium">{taxRefund.refundNo}</TableCell>
                     <TableCell>

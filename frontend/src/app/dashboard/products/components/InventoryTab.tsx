@@ -1,6 +1,6 @@
 /**
- * Input: 库存服务
- * Output: 库存状态管理 Tab 组件（单条/批量状态流转）
+ * Input: 库存服务、SortableTableHead、useTableSort
+ * Output: 库存状态管理 Tab 组件（单条/批量状态流转、桌面表列排序）
  * Pos: 商品档案页面的子 Tab
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Inventory, InventoryStatus } from '@/types';
 import { inventoryService } from '@/services/inventory.service';
 import {
@@ -43,6 +43,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 
 const STATUS_LABEL_MAP: Record<InventoryStatus, string> = {
   [InventoryStatus.PRODUCING]: '生产中',
@@ -246,9 +248,30 @@ export function InventoryTab() {
     }
   };
 
-  // 客户端分页计算
-  const totalPages = Math.ceil(inventory.length / pageSize);
-  const pagedInventory = inventory.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  /**
+   * 职责：库存表排序字段（商品名、合同号、数量）
+   */
+  const inventoryAccessor = useCallback((item: Inventory, key: string) => {
+    switch (key) {
+      case 'productName':
+        return item.product?.customsName ?? '';
+      case 'contractNo':
+        return item.purchaseItem?.purchaseContract?.contractNo ?? '';
+      case 'quantity':
+        return item.quantity;
+      default:
+        return null;
+    }
+  }, []);
+
+  const inventorySort = useTableSort(inventory, inventoryAccessor);
+
+  // 客户端分页计算（在排序结果上切片）
+  const totalPages = Math.ceil(inventorySort.sortedData.length / pageSize);
+  const pagedInventory = inventorySort.sortedData.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   return (
     <div className="space-y-6">
@@ -456,9 +479,30 @@ export function InventoryTab() {
                   aria-label="全选库存记录"
                 />
               </TableHead>
-              <TableHead>商品名称</TableHead>
-              <TableHead>采购合同</TableHead>
-              <TableHead>数量</TableHead>
+              <SortableTableHead
+                sortKey="productName"
+                currentSortKey={inventorySort.sortKey}
+                currentSortDir={inventorySort.sortDir}
+                onSort={inventorySort.onSort}
+              >
+                商品名称
+              </SortableTableHead>
+              <SortableTableHead
+                sortKey="contractNo"
+                currentSortKey={inventorySort.sortKey}
+                currentSortDir={inventorySort.sortDir}
+                onSort={inventorySort.onSort}
+              >
+                采购合同
+              </SortableTableHead>
+              <SortableTableHead
+                sortKey="quantity"
+                currentSortKey={inventorySort.sortKey}
+                currentSortDir={inventorySort.sortDir}
+                onSort={inventorySort.onSort}
+              >
+                数量
+              </SortableTableHead>
               <TableHead>当前状态</TableHead>
               <TableHead className="w-[100px]">操作</TableHead>
             </TableRow>

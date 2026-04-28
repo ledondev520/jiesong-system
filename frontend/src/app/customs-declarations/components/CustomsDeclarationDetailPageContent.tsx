@@ -1,6 +1,6 @@
 /**
- * Input: 报关单 ID、报关单服务、router
- * Output: 报关单详情页
+ * Input: 报关单 ID、报关单服务、router、SortableTableHead、useTableSort
+ * Output: 报关单详情页（含可排序商品明细表）
  * Pos: 报关单管理详情展示页
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,9 +8,9 @@
 
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { CustomsDeclaration } from '@/types';
+import type { CustomsDeclaration, CustomsDeclarationItem } from '@/types';
 import { customsDeclarationService } from '@/services/customsDeclaration.service';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -24,10 +24,11 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 import { FilePenLine } from 'lucide-react';
 import { toast } from 'sonner';
 import { CustomsDeclarationStatusBadge } from './CustomsDeclarationStatusBadge';
@@ -72,6 +73,32 @@ export function CustomsDeclarationDetailPageContent({
 
     void loadDeclaration();
   }, [id]);
+
+  const customsLineItems = useMemo(() => declaration?.items ?? [], [declaration?.items]);
+
+  /**
+   * 职责：报关明细行排序取值
+   */
+  const customsLineAccessor = useCallback((item: CustomsDeclarationItem, key: string) => {
+    switch (key) {
+      case 'productName':
+        return item.productName;
+      case 'hsCode':
+        return item.hsCode;
+      case 'quantity':
+        return item.quantity;
+      case 'unit':
+        return item.unit || '';
+      case 'unitPrice':
+        return item.unitPrice ?? null;
+      case 'totalPrice':
+        return item.totalPrice ?? null;
+      default:
+        return null;
+    }
+  }, []);
+
+  const customsLineSort = useTableSort(customsLineItems, customsLineAccessor);
 
   if (loading) {
     return <div className="py-14 text-center text-muted-foreground">加载中...</div>;
@@ -162,17 +189,62 @@ export function CustomsDeclarationDetailPageContent({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>商品名称</TableHead>
-                <TableHead>HS 编码</TableHead>
-                <TableHead className="text-right">数量</TableHead>
-                <TableHead>单位</TableHead>
-                <TableHead className="text-right">单价</TableHead>
-                <TableHead className="text-right">总价</TableHead>
+                <SortableTableHead
+                  sortKey="productName"
+                  currentSortKey={customsLineSort.sortKey}
+                  currentSortDir={customsLineSort.sortDir}
+                  onSort={customsLineSort.onSort}
+                >
+                  商品名称
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="hsCode"
+                  currentSortKey={customsLineSort.sortKey}
+                  currentSortDir={customsLineSort.sortDir}
+                  onSort={customsLineSort.onSort}
+                >
+                  HS 编码
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="quantity"
+                  currentSortKey={customsLineSort.sortKey}
+                  currentSortDir={customsLineSort.sortDir}
+                  onSort={customsLineSort.onSort}
+                  className="text-right"
+                >
+                  数量
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="unit"
+                  currentSortKey={customsLineSort.sortKey}
+                  currentSortDir={customsLineSort.sortDir}
+                  onSort={customsLineSort.onSort}
+                >
+                  单位
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="unitPrice"
+                  currentSortKey={customsLineSort.sortKey}
+                  currentSortDir={customsLineSort.sortDir}
+                  onSort={customsLineSort.onSort}
+                  className="text-right"
+                >
+                  单价
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="totalPrice"
+                  currentSortKey={customsLineSort.sortKey}
+                  currentSortDir={customsLineSort.sortDir}
+                  onSort={customsLineSort.onSort}
+                  className="text-right"
+                >
+                  总价
+                </SortableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {declaration.items?.length ? (
-                declaration.items.map((item, index) => (
+              {customsLineSort.sortedData.length ? (
+                customsLineSort.sortedData.map((item, index) => (
                   <TableRow key={item.id || `${item.productName}-${index}`}>
                     <TableCell className="font-medium">{item.productName}</TableCell>
                     <TableCell>{item.hsCode}</TableCell>

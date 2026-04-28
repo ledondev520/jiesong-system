@@ -35,6 +35,8 @@
 
 ## Operational controls
 - Security-related changes should be documented in this file and reflected in `AGENTS.md` and `data-classification.json`.
+- `.brv/context-tree/` is for Internal engineering memory only. Do not store Restricted secrets, Confidential business figures, customer/contact details, signed contract data, or raw operational ledgers in ByteRover memory.
+- ByteRover runtime/provider state is local-only under `state/byterover-home/` and must stay ignored from source control.
 - Agent credentials must be stored hashed-at-rest, shown only once at issuance, and revocable without affecting human users.
 - Temporary test credentials (for example default admin passwords) must be explicitly labeled as non-production and replaced via environment variables before deployment.
 - Any runtime permission tightening should include a clear validation path and migration plan for existing environments.

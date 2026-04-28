@@ -1,6 +1,6 @@
 /**
- * Input: 商品服务API、库存服务API
- * Output: 商品管理页面（含商品档案 + 库存状态两个子 Tab）
+ * Input: 商品服务API、库存服务API、SortableTableHead、useTableSort
+ * Output: 商品管理页面（含商品档案列排序、库存状态两个子 Tab）
  * Pos: 采购模块子页面
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,7 +8,7 @@
 
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Product } from '@/types';
 import { productService } from '@/services/product.service';
@@ -42,6 +42,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 
 /**
  * 职责：将输入值延迟一段时间后再稳定输出，避免高频副作用触发。
@@ -185,8 +187,32 @@ function ProductsPageContent() {
     }
   };
 
-  const totalPages = Math.ceil(products.length / pageSize);
-  const pagedProducts = products.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  /**
+   * 职责：从商品行取出报关名与数值型计量字段供表格排序
+   */
+  const productAccessor = useCallback((item: Product, key: string) => {
+    switch (key) {
+      case 'customsName':
+        return item.customsName;
+      case 'grossWeight':
+        return item.grossWeight ?? null;
+      case 'netWeight':
+        return item.netWeight ?? null;
+      case 'volume':
+        return item.volume ?? null;
+      case 'specification':
+        return item.specification ?? '';
+      case 'unit':
+        return item.unit ?? '';
+      default:
+        return null;
+    }
+  }, []);
+
+  const productSort = useTableSort(products, productAccessor);
+
+  const totalPages = Math.ceil(productSort.sortedData.length / pageSize);
+  const pagedProducts = productSort.sortedData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="space-y-6">
@@ -269,13 +295,58 @@ function ProductsPageContent() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>报关名称</TableHead>
-                  <TableHead>规格</TableHead>
-                  <TableHead>单位</TableHead>
+                  <SortableTableHead
+                    sortKey="customsName"
+                    currentSortKey={productSort.sortKey}
+                    currentSortDir={productSort.sortDir}
+                    onSort={productSort.onSort}
+                  >
+                    报关名称
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey="specification"
+                    currentSortKey={productSort.sortKey}
+                    currentSortDir={productSort.sortDir}
+                    onSort={productSort.onSort}
+                  >
+                    规格
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey="unit"
+                    currentSortKey={productSort.sortKey}
+                    currentSortDir={productSort.sortDir}
+                    onSort={productSort.onSort}
+                  >
+                    单位
+                  </SortableTableHead>
                   <TableHead className="hidden md:table-cell">包装规格</TableHead>
-                  <TableHead className="hidden md:table-cell text-right">毛重(kg)</TableHead>
-                  <TableHead className="hidden md:table-cell text-right">净重(kg)</TableHead>
-                  <TableHead className="hidden md:table-cell text-right">体积(CBM)</TableHead>
+                  <SortableTableHead
+                    sortKey="grossWeight"
+                    currentSortKey={productSort.sortKey}
+                    currentSortDir={productSort.sortDir}
+                    onSort={productSort.onSort}
+                    className="hidden md:table-cell text-right"
+                  >
+                    毛重(kg)
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey="netWeight"
+                    currentSortKey={productSort.sortKey}
+                    currentSortDir={productSort.sortDir}
+                    onSort={productSort.onSort}
+                    className="hidden md:table-cell text-right"
+                  >
+                    净重(kg)
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey="volume"
+                    currentSortKey={productSort.sortKey}
+                    currentSortDir={productSort.sortDir}
+                    onSort={productSort.onSort}
+                    className="hidden md:table-cell text-right"
+                  >
+                    体积(CBM)
+                  </SortableTableHead>
                   <TableHead className="w-[100px]">操作</TableHead>
                 </TableRow>
               </TableHeader>

@@ -57,6 +57,9 @@ export const FINANCE_TABS: TabConfig[] = [
   { href: '/dashboard/finance', label: '财务概览' },
   { href: '/dashboard/finance/statements', label: '财务报表' },
   { href: '/dashboard/payments', label: '收付款' },
+  { href: '/dashboard/finance/bank-flow', label: '银行流水' },
+  { href: '/dashboard/finance/invoices', label: '发票台账' },
+  { href: '/dashboard/finance/reconciliation', label: '对账分析' },
 ];
 
 export const ADMIN_TABS: TabConfig[] = [

@@ -17,6 +17,9 @@ const mockGetPayables = vi.fn();
 const mockGetReceivables = vi.fn();
 const mockGetUnallocatedPayments = vi.fn();
 const mockAutoMatchUnallocatedPayments = vi.fn();
+const mockGetFullReconciliation = vi.fn();
+const mockGetTransactionStats = vi.fn();
+const mockGetIncomingSummary = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -39,6 +42,12 @@ vi.mock('@/services/finance.service', () => ({
   },
 }));
 
+vi.mock('@/services/bankFlow.service', () => ({
+  getFullReconciliation: (...args: unknown[]) => mockGetFullReconciliation(...args),
+  getTransactionStats: (...args: unknown[]) => mockGetTransactionStats(...args),
+  getIncomingSummary: (...args: unknown[]) => mockGetIncomingSummary(...args),
+}));
+
 vi.mock('../../dashboard/finance/components/PaymentDialog', () => ({
   PaymentDialog: () => null,
 }));
@@ -58,7 +67,29 @@ describe('PaymentsPage 交互逻辑', () => {
     mockGetReceivables.mockReset();
     mockGetUnallocatedPayments.mockReset();
     mockAutoMatchUnallocatedPayments.mockReset();
+    mockGetFullReconciliation.mockReset();
+    mockGetTransactionStats.mockReset();
+    mockGetIncomingSummary.mockReset();
     mockGetUnallocatedPayments.mockResolvedValue({ data: [] });
+    mockGetFullReconciliation.mockResolvedValue({
+      matched: [],
+      unmatchedPayments: [],
+      unmatchedInvoices: [],
+      summary: {
+        matchedCount: 0,
+        normalCount: 0,
+        underInvoicedCount: 0,
+        underInvoicedGap: 0,
+        overInvoicedCount: 0,
+        overInvoicedGap: 0,
+        unmatchedPaymentCount: 0,
+        unmatchedPaymentTotal: 0,
+        unmatchedInvoiceCount: 0,
+        unmatchedInvoiceTotal: 0,
+      },
+    });
+    mockGetTransactionStats.mockResolvedValue({ totalIn: 0, totalOut: 0, netFlow: 0, txnCount: 0 });
+    mockGetIncomingSummary.mockResolvedValue({ items: [], total: 0 });
   });
 
   it('初始化会请求统计/应付/应收数据', async () => {
@@ -127,8 +158,7 @@ describe('PaymentsPage 交互逻辑', () => {
     render(<PaymentsPage />);
 
     await waitFor(() => {
-      expect(screen.getAllByText('暂无待付账款').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('当前没有需要处理的供应商付款记录。').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('暂无付款数据').length).toBeGreaterThan(0);
     });
   });
 

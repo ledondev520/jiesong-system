@@ -1,6 +1,6 @@
 /**
- * Input: opsExecutionService（未发货清单 API）
- * Output: 未发货清单Tab组件（筛选、汇总卡片、表格、分发操作）
+ * Input: opsExecutionService（未发货清单 API）、SortableTableHead、useTableSort
+ * Output: 未发货清单Tab组件（筛选、汇总卡片、可排序表格、分发操作）
  * Pos: 经营执行中台 - 未发货清单子Tab
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useEffect, useEffectEvent, useMemo, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react';
 import { AlertCircle, Loader2, X } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -36,6 +36,8 @@ import {
   type OpsUnshippedItem,
   type OpsUnshippedSummary,
 } from '@/services/opsExecution.service';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 
 const STATUS_OPTIONS = [
   { value: 'ALL', label: '全部状态' },
@@ -114,6 +116,29 @@ export function UnshippedListTab() {
     () => Number(summary.totalQuantity || 0).toLocaleString(),
     [summary.totalQuantity],
   );
+
+  /**
+   * 职责：未发货清单行排序取值（订单号、SKU 名、数量、记录数、负责人）
+   */
+  const unshippedAccessor = useCallback((item: OpsUnshippedItem, key: string) => {
+    switch (key) {
+      case 'orderNo':
+        return item.orderNo;
+      case 'skuName':
+        return item.skuName;
+      case 'quantity':
+        return item.quantity;
+      case 'recordCount':
+        return item.recordCount;
+      case 'assigneeName':
+        return item.assigneeName || '';
+      default:
+        return null;
+    }
+  }, []);
+
+  const unshippedSort = useTableSort(items, unshippedAccessor);
+  const sortedUnshippedItems = unshippedSort.sortedData;
 
   const handleSaveAssignee = async (item: OpsUnshippedItem) => {
     const nextAssigneeName = (draftAssignees[item.key] || '').trim();
@@ -259,7 +284,7 @@ export function UnshippedListTab() {
             <>
               {/* 移动端卡片视图 */}
               <div className="space-y-3 md:hidden">
-                {items.map((item) => (
+                {sortedUnshippedItems.map((item) => (
                   <div key={item.key} className="surface-panel space-y-3 p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -306,17 +331,54 @@ export function UnshippedListTab() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>订单号</TableHead>
-                      <TableHead>SKU / 商品</TableHead>
+                      <SortableTableHead
+                        sortKey="orderNo"
+                        currentSortKey={unshippedSort.sortKey}
+                        currentSortDir={unshippedSort.sortDir}
+                        onSort={unshippedSort.onSort}
+                      >
+                        订单号
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey="skuName"
+                        currentSortKey={unshippedSort.sortKey}
+                        currentSortDir={unshippedSort.sortDir}
+                        onSort={unshippedSort.onSort}
+                      >
+                        SKU / 商品
+                      </SortableTableHead>
                       <TableHead>仓库状态</TableHead>
-                      <TableHead className="text-right">待处理数量</TableHead>
-                      <TableHead className="text-right">记录数</TableHead>
-                      <TableHead>负责人</TableHead>
+                      <SortableTableHead
+                        sortKey="quantity"
+                        currentSortKey={unshippedSort.sortKey}
+                        currentSortDir={unshippedSort.sortDir}
+                        onSort={unshippedSort.onSort}
+                        className="text-right"
+                      >
+                        待处理数量
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey="recordCount"
+                        currentSortKey={unshippedSort.sortKey}
+                        currentSortDir={unshippedSort.sortDir}
+                        onSort={unshippedSort.onSort}
+                        className="text-right"
+                      >
+                        记录数
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey="assigneeName"
+                        currentSortKey={unshippedSort.sortKey}
+                        currentSortDir={unshippedSort.sortDir}
+                        onSort={unshippedSort.onSort}
+                      >
+                        负责人
+                      </SortableTableHead>
                       <TableHead className="w-[180px]">操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {items.map((item) => (
+                    {sortedUnshippedItems.map((item) => (
                       <TableRow key={item.key}>
                         <TableCell className="font-medium">{item.orderNo}</TableCell>
                         <TableCell>

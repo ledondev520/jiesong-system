@@ -12,6 +12,8 @@ import FinancePage from './page';
 
 const mockGetStats = vi.fn();
 const mockApiGet = vi.fn();
+const mockGetTransactionStats = vi.fn();
+const mockGetInvoiceStats = vi.fn();
 
 vi.mock('@/services/finance.service', () => ({
   financeService: {
@@ -23,6 +25,11 @@ vi.mock('@/lib/axios', () => ({
   default: {
     get: (...args: unknown[]) => mockApiGet(...args),
   },
+}));
+
+vi.mock('@/services/bankFlow.service', () => ({
+  getTransactionStats: (...args: unknown[]) => mockGetTransactionStats(...args),
+  getInvoiceStats: (...args: unknown[]) => mockGetInvoiceStats(...args),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -42,9 +49,20 @@ describe('FinancePage 交互逻辑', () => {
   beforeEach(() => {
     mockGetStats.mockReset();
     mockApiGet.mockReset();
+    mockGetTransactionStats.mockReset();
+    mockGetInvoiceStats.mockReset();
     // 默认 exchange-rate 返回
     mockApiGet.mockResolvedValue({
       data: { rate: 6.8, buffer: 0.2, effectiveRate: 6.6 },
+    });
+    mockGetTransactionStats.mockResolvedValue({ totalIn: 0, totalOut: 0, netFlow: 0, txnCount: 0 });
+    mockGetInvoiceStats.mockResolvedValue({
+      validTotal: 0,
+      validTax: 0,
+      validAmount: 0,
+      validCount: 0,
+      reversedCount: 0,
+      totalCount: 0,
     });
   });
 

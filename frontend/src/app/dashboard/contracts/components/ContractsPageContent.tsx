@@ -1,6 +1,6 @@
 /**
- * Input: 采购合同服务
- * Output: 采购合同管理页面
+ * Input: 采购合同服务、SortableTableHead、useTableSort
+ * Output: 采购合同管理页面（筛选、分页、桌面表列排序）
  * Pos: 核心业务页面，管理供应商采购合同
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PurchaseContract, PurchaseStatus, PurchaseItem } from '@/types';
@@ -49,6 +49,8 @@ import { contractDocService } from '@/services/contractDoc.service';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { Card, CardContent } from '@/components/ui/card';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 import {
   Sheet,
   SheetContent,
@@ -112,9 +114,35 @@ export default function ContractsPageContent() {
     }
     return filtered;
   }, [purchaseContracts, purchaseStatusFilter, storeFilter, productSearch]);
-  
-  const purchaseTotalPages = Math.ceil(filteredPurchaseContracts.length / pageSize);
-  const pagedPurchaseContracts = filteredPurchaseContracts.slice(
+
+  /**
+   * 职责：按列从采购合同中取出用于排序的可比字段
+   * 思路：合同编号、供应商用字符串；签订日期用时间戳；金额用数值
+   */
+  const purchaseAccessor = useCallback(
+    (item: PurchaseContract, key: string) => {
+      switch (key) {
+        case 'contractNo':
+          return item.contractNo;
+        case 'supplier':
+          return item.supplier?.name ?? '';
+        case 'signedAt':
+          return item.signedAt ? new Date(item.signedAt).getTime() : null;
+        case 'totalAmount':
+          return item.totalAmount;
+        case 'paidAmount':
+          return item.paidAmount;
+        default:
+          return null;
+      }
+    },
+    []
+  );
+
+  const purchaseSort = useTableSort(filteredPurchaseContracts, purchaseAccessor);
+
+  const purchaseTotalPages = Math.ceil(purchaseSort.sortedData.length / pageSize);
+  const pagedPurchaseContracts = purchaseSort.sortedData.slice(
     (purchasePage - 1) * pageSize,
     purchasePage * pageSize
   );
@@ -511,14 +539,51 @@ export default function ContractsPageContent() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>合同编号</TableHead>
+                  <SortableTableHead
+                    sortKey="contractNo"
+                    currentSortKey={purchaseSort.sortKey}
+                    currentSortDir={purchaseSort.sortDir}
+                    onSort={purchaseSort.onSort}
+                  >
+                    合同编号
+                  </SortableTableHead>
                   <TableHead>商品名称</TableHead>
-                  <TableHead>供应商</TableHead>
+                  <SortableTableHead
+                    sortKey="supplier"
+                    currentSortKey={purchaseSort.sortKey}
+                    currentSortDir={purchaseSort.sortDir}
+                    onSort={purchaseSort.onSort}
+                  >
+                    供应商
+                  </SortableTableHead>
                   <TableHead>发货店铺</TableHead>
-                  <TableHead>签订日期</TableHead>
+                  <SortableTableHead
+                    sortKey="signedAt"
+                    currentSortKey={purchaseSort.sortKey}
+                    currentSortDir={purchaseSort.sortDir}
+                    onSort={purchaseSort.onSort}
+                  >
+                    签订日期
+                  </SortableTableHead>
                   <TableHead>状态</TableHead>
-                  <TableHead className="text-right">总金额 (¥)</TableHead>
-                  <TableHead className="text-right">已付 (¥)</TableHead>
+                  <SortableTableHead
+                    sortKey="totalAmount"
+                    currentSortKey={purchaseSort.sortKey}
+                    currentSortDir={purchaseSort.sortDir}
+                    onSort={purchaseSort.onSort}
+                    className="text-right"
+                  >
+                    总金额 (¥)
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey="paidAmount"
+                    currentSortKey={purchaseSort.sortKey}
+                    currentSortDir={purchaseSort.sortDir}
+                    onSort={purchaseSort.onSort}
+                    className="text-right"
+                  >
+                    已付 (¥)
+                  </SortableTableHead>
                   <TableHead className="w-[100px]">操作</TableHead>
                 </TableRow>
               </TableHeader>

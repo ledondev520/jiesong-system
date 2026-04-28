@@ -2,11 +2,15 @@
  * Input: 系统通知 API
  * Output: 通知中心页面（查看通知、标记已读）
  * Pos: 运维中心
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 import { CheckCircle2, Search, X } from 'lucide-react';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { Button } from '@/components/ui/button';
@@ -91,8 +95,25 @@ export default function SystemNotificationsPage() {
     }
     return result;
   }, [filter, notifications, keyword]);
-  const totalPages = Math.ceil(filteredNotifications.length / pageSize);
-  const pagedNotifications = filteredNotifications.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const sort = useTableSort<SystemNotificationItem, string>(
+    filteredNotifications,
+    useCallback((item, key) => {
+      switch (key) {
+        case 'createdAt':
+          return item.createdAt ? new Date(item.createdAt).getTime() : null;
+        case 'type':
+          return getTypeLabel(item.type);
+        case 'title':
+          return item.title ?? '';
+        default:
+          return null;
+      }
+    }, [])
+  );
+
+  const totalPages = Math.ceil(sort.sortedData.length / pageSize);
+  const pagedNotifications = sort.sortedData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleMarkRead = async (id: string) => {
     setMarkingId(id);
@@ -175,7 +196,7 @@ export default function SystemNotificationsPage() {
           <div className="md:hidden space-y-3">
             {loading ? (
               <div className="surface-panel py-12 text-center text-sm text-muted-foreground">加载中...</div>
-            ) : filteredNotifications.length === 0 ? (
+            ) : sort.sortedData.length === 0 ? (
               <div className="surface-panel py-12 text-center text-sm text-muted-foreground">暂无通知。</div>
             ) : (
               pagedNotifications.map((item) => {
@@ -221,9 +242,30 @@ export default function SystemNotificationsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>时间</TableHead>
-                  <TableHead>类型</TableHead>
-                  <TableHead>标题</TableHead>
+                  <SortableTableHead
+                    sortKey="createdAt"
+                    currentSortKey={sort.sortKey}
+                    currentSortDir={sort.sortDir}
+                    onSort={sort.onSort}
+                  >
+                    时间
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey="type"
+                    currentSortKey={sort.sortKey}
+                    currentSortDir={sort.sortDir}
+                    onSort={sort.onSort}
+                  >
+                    类型
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey="title"
+                    currentSortKey={sort.sortKey}
+                    currentSortDir={sort.sortDir}
+                    onSort={sort.onSort}
+                  >
+                    标题
+                  </SortableTableHead>
                   <TableHead>内容</TableHead>
                   <TableHead>状态</TableHead>
                   <TableHead className="w-[140px]">操作</TableHead>
@@ -234,7 +276,7 @@ export default function SystemNotificationsPage() {
                   <TableRow>
                     <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
                   </TableRow>
-                ) : filteredNotifications.length === 0 ? (
+                ) : sort.sortedData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">暂无通知。</TableCell>
                   </TableRow>
@@ -277,7 +319,7 @@ export default function SystemNotificationsPage() {
           </div>
           {/* 分页控制 */}
           <div className="mt-4 flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span>共 {filteredNotifications.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
+            <span>共 {sort.sortedData.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
             <div className="flex items-center gap-2">
               <PageSizeSelect
                 value={pageSize}

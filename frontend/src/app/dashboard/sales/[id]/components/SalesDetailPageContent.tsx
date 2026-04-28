@@ -1,6 +1,6 @@
 /**
- * Input: 出口合同详情API、商品API
- * Output: 出口合同详情页面（含装箱管理和3D可视化）
+ * Input: 出口合同详情API、商品API、SortableTableHead、useTableSort
+ * Output: 出口合同详情页面（含可排序装箱明细、3D可视化）
  * Pos: 销售管理子页面，展示合同详情与装箱可视化
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -25,6 +25,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 import {
   Dialog,
   DialogContent,
@@ -422,6 +424,32 @@ export default function SalesDetailPage({ params }: PageProps) {
     return <StatusBadge status={status} statusMap={statusMap} />;
   };
 
+  const packingRows = useMemo(() => contract?.packingItems ?? [], [contract?.packingItems]);
+
+  /**
+   * 职责：装箱明细行排序取值
+   */
+  const packingAccessor = useCallback((item: PackingItem, key: string) => {
+    switch (key) {
+      case 'productName':
+        return item.product?.customsName ?? '';
+      case 'quantity':
+        return item.quantity;
+      case 'boxes':
+        return item.boxes ?? null;
+      case 'unitPrice':
+        return item.unitPrice ?? null;
+      case 'totalPrice':
+        return item.totalPrice ?? null;
+      case 'grossWeight':
+        return item.grossWeight ?? null;
+      default:
+        return null;
+    }
+  }, []);
+
+  const packingSort = useTableSort(packingRows, packingAccessor);
+
   if (loading) {
     return <div className="flex items-center justify-center h-64">加载中...</div>;
   }
@@ -544,24 +572,71 @@ export default function SalesDetailPage({ params }: PageProps) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>商品名称</TableHead>
-                    <TableHead className="text-right">数量</TableHead>
-                    <TableHead className="text-right">箱数</TableHead>
-                    <TableHead className="text-right">单价($)</TableHead>
-                    <TableHead className="text-right">总价($)</TableHead>
-                    <TableHead className="text-right">毛重(kg)</TableHead>
+                    <SortableTableHead
+                      sortKey="productName"
+                      currentSortKey={packingSort.sortKey}
+                      currentSortDir={packingSort.sortDir}
+                      onSort={packingSort.onSort}
+                    >
+                      商品名称
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="quantity"
+                      currentSortKey={packingSort.sortKey}
+                      currentSortDir={packingSort.sortDir}
+                      onSort={packingSort.onSort}
+                      className="text-right"
+                    >
+                      数量
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="boxes"
+                      currentSortKey={packingSort.sortKey}
+                      currentSortDir={packingSort.sortDir}
+                      onSort={packingSort.onSort}
+                      className="text-right"
+                    >
+                      箱数
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="unitPrice"
+                      currentSortKey={packingSort.sortKey}
+                      currentSortDir={packingSort.sortDir}
+                      onSort={packingSort.onSort}
+                      className="text-right"
+                    >
+                      单价($)
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="totalPrice"
+                      currentSortKey={packingSort.sortKey}
+                      currentSortDir={packingSort.sortDir}
+                      onSort={packingSort.onSort}
+                      className="text-right"
+                    >
+                      总价($)
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="grossWeight"
+                      currentSortKey={packingSort.sortKey}
+                      currentSortDir={packingSort.sortDir}
+                      onSort={packingSort.onSort}
+                      className="text-right"
+                    >
+                      毛重(kg)
+                    </SortableTableHead>
                     <TableHead className="w-[80px]">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {!contract.packingItems?.length ? (
+                  {!packingSort.sortedData.length ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
                         暂无装箱商品，点击&quot;添加商品&quot;开始装柜
                       </TableCell>
                     </TableRow>
                   ) : (
-                    contract.packingItems.map((item) => {
+                    packingSort.sortedData.map((item) => {
                       return (
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">

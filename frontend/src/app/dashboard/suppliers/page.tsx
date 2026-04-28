@@ -1,6 +1,6 @@
 /**
- * Input: 供应商服务API
- * Output: 供应商管理页面
+ * Input: 供应商服务API、SortableTableHead、useTableSort
+ * Output: 供应商管理页面（搜索、分页、桌面表列排序）
  * Pos: 基础档案子页面
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Supplier } from '@/types';
 import { supplierService } from '@/services/supplier.service';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -123,8 +125,27 @@ export default function SuppliersPage() {
         );
       })
     : suppliers;
-  const totalPages = Math.ceil(filteredSuppliers.length / pageSize);
-  const pagedSuppliers = filteredSuppliers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  /**
+   * 职责：从供应商行取出排序用字段（公司名、别名拼接）
+   */
+  const supplierAccessor = useCallback((item: Supplier, key: string) => {
+    switch (key) {
+      case 'name':
+        return item.name;
+      case 'aliases':
+        return item.aliases?.map((a) => a.alias).join(' ') ?? '';
+      case 'contactName':
+        return item.contactName ?? '';
+      default:
+        return null;
+    }
+  }, []);
+
+  const supplierSort = useTableSort(filteredSuppliers, supplierAccessor);
+
+  const totalPages = Math.ceil(supplierSort.sortedData.length / pageSize);
+  const pagedSuppliers = supplierSort.sortedData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleReset = () => {
     setKeyword('');
@@ -289,9 +310,30 @@ export default function SuppliersPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>公司名称</TableHead>
-              <TableHead>别名</TableHead>
-              <TableHead>联系人</TableHead>
+              <SortableTableHead
+                sortKey="name"
+                currentSortKey={supplierSort.sortKey}
+                currentSortDir={supplierSort.sortDir}
+                onSort={supplierSort.onSort}
+              >
+                公司名称
+              </SortableTableHead>
+              <SortableTableHead
+                sortKey="aliases"
+                currentSortKey={supplierSort.sortKey}
+                currentSortDir={supplierSort.sortDir}
+                onSort={supplierSort.onSort}
+              >
+                别名
+              </SortableTableHead>
+              <SortableTableHead
+                sortKey="contactName"
+                currentSortKey={supplierSort.sortKey}
+                currentSortDir={supplierSort.sortDir}
+                onSort={supplierSort.onSort}
+              >
+                联系人
+              </SortableTableHead>
               <TableHead>质量状态</TableHead>
               <TableHead className="w-[100px]">操作</TableHead>
             </TableRow>

@@ -9,6 +9,8 @@
 'use client';
 
 import { startTransition, useCallback, useDeferredValue, useEffect, useState } from 'react';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { CustomsDeclaration } from '@/types';
 import { customsDeclarationService } from '@/services/customsDeclaration.service';
@@ -103,6 +105,26 @@ export function CustomsDeclarationListPageContent() {
   useEffect(() => {
     void loadDeclarations();
   }, [loadDeclarations]);
+
+  const sort = useTableSort<CustomsDeclaration, string>(
+    declarations,
+    useCallback((item, key) => {
+      switch (key) {
+        case 'declarationNo':
+          return item.declarationNo ?? '';
+        case 'exporter':
+          return item.exporter ?? '';
+        case 'destinationCountry':
+          return item.destinationCountry ?? '';
+        case 'declarationDate':
+          return item.declarationDate ?? '';
+        case 'totalAmount':
+          return item.totalAmount;
+        default:
+          return null;
+      }
+    }, [])
+  );
 
   const draftCount = declarations.filter((item) => item.status === 'DRAFT').length;
   const releasedCount = declarations.filter((item) => item.status === 'RELEASED').length;
@@ -235,13 +257,49 @@ export function CustomsDeclarationListPageContent() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>报关单号</TableHead>
-                <TableHead>发货人</TableHead>
+                <SortableTableHead
+                  sortKey="declarationNo"
+                  currentSortKey={sort.sortKey}
+                  currentSortDir={sort.sortDir}
+                  onSort={sort.onSort}
+                >
+                  报关单号
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="exporter"
+                  currentSortKey={sort.sortKey}
+                  currentSortDir={sort.sortDir}
+                  onSort={sort.onSort}
+                >
+                  发货人
+                </SortableTableHead>
                 <TableHead>收货人</TableHead>
-                <TableHead>目的国</TableHead>
+                <SortableTableHead
+                  sortKey="destinationCountry"
+                  currentSortKey={sort.sortKey}
+                  currentSortDir={sort.sortDir}
+                  onSort={sort.onSort}
+                >
+                  目的国
+                </SortableTableHead>
                 <TableHead>状态</TableHead>
-                <TableHead>申报日期</TableHead>
-                <TableHead className="text-right">货值</TableHead>
+                <SortableTableHead
+                  sortKey="declarationDate"
+                  currentSortKey={sort.sortKey}
+                  currentSortDir={sort.sortDir}
+                  onSort={sort.onSort}
+                >
+                  申报日期
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="totalAmount"
+                  currentSortKey={sort.sortKey}
+                  currentSortDir={sort.sortDir}
+                  onSort={sort.onSort}
+                  className="text-right"
+                >
+                  货值
+                </SortableTableHead>
                 <TableHead className="w-[140px] text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
@@ -259,7 +317,7 @@ export function CustomsDeclarationListPageContent() {
                   </TableCell>
                 </TableRow>
               ) : (
-                declarations.map((declaration) => (
+                sort.sortedData.map((declaration) => (
                   <TableRow
                     key={declaration.id}
                     className="cursor-pointer hover:bg-muted/50"

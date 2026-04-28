@@ -1,7 +1,9 @@
 /**
- * Input: 合同模板服务
- * Output: 合同模板管理页面
+ * Input: 合同模板服务、SortableTableHead、useTableSort
+ * Output: 合同模板管理页面（模板列表列排序）
  * Pos: 合同管理子页面
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 'use client';
@@ -17,6 +19,8 @@ import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Trash2, Upload, FileText } from 'lucide-react';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 
 interface TemplateInfoItem {
   exists: boolean;
@@ -47,7 +51,23 @@ export default function ContractTemplatesPage() {
     void loadTemplates();
   }, [loadTemplates]);
 
-  const currentTemplate = useMemo(() => items[0] || null, [items]);
+  const templateSort = useTableSort<TemplateInfoItem, string>(
+    items,
+    useCallback((row, key) => {
+      switch (key) {
+        case 'filename':
+          return row.filename ?? '';
+        case 'size':
+          return row.size ?? null;
+        case 'updatedAt':
+          return row.updatedAt ? new Date(row.updatedAt).getTime() : null;
+        default:
+          return null;
+      }
+    }, [])
+  );
+
+  const currentTemplate = useMemo(() => templateSort.sortedData[0] || null, [templateSort.sortedData]);
 
   const handleDelete = async () => {
     if (!window.confirm('确定删除当前模板吗？删除后将无法生成购销合同。')) {
@@ -120,9 +140,30 @@ export default function ContractTemplatesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>文件名</TableHead>
-              <TableHead>大小</TableHead>
-              <TableHead>更新时间</TableHead>
+              <SortableTableHead
+                sortKey="filename"
+                currentSortKey={templateSort.sortKey}
+                currentSortDir={templateSort.sortDir}
+                onSort={templateSort.onSort}
+              >
+                文件名
+              </SortableTableHead>
+              <SortableTableHead
+                sortKey="size"
+                currentSortKey={templateSort.sortKey}
+                currentSortDir={templateSort.sortDir}
+                onSort={templateSort.onSort}
+              >
+                大小
+              </SortableTableHead>
+              <SortableTableHead
+                sortKey="updatedAt"
+                currentSortKey={templateSort.sortKey}
+                currentSortDir={templateSort.sortDir}
+                onSort={templateSort.onSort}
+              >
+                更新时间
+              </SortableTableHead>
               <TableHead className="w-[100px]">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -136,16 +177,18 @@ export default function ContractTemplatesPage() {
                 <TableCell colSpan={4} className="py-12 text-center text-muted-foreground">暂无模板，请先上传。</TableCell>
               </TableRow>
             ) : (
-              <TableRow>
-                <TableCell className="font-medium">{currentTemplate.filename || '-'}</TableCell>
-                <TableCell>{typeof currentTemplate.size === 'number' ? `${(currentTemplate.size / 1024).toFixed(1)} KB` : '-'}</TableCell>
-                <TableCell>{currentTemplate.updatedAt ? format(new Date(currentTemplate.updatedAt), 'yyyy-MM-dd HH:mm') : '-'}</TableCell>
-                <TableCell>
-                  <Button variant="ghost" size="icon" className="rounded-xl border border-border/65 bg-background/55" onClick={() => void handleDelete()} disabled={deleting}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </TableCell>
-              </TableRow>
+              templateSort.sortedData.map((row) => (
+                <TableRow key={row.filename || 'template'}>
+                  <TableCell className="font-medium">{row.filename || '-'}</TableCell>
+                  <TableCell>{typeof row.size === 'number' ? `${(row.size / 1024).toFixed(1)} KB` : '-'}</TableCell>
+                  <TableCell>{row.updatedAt ? format(new Date(row.updatedAt), 'yyyy-MM-dd HH:mm') : '-'}</TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="icon" className="rounded-xl border border-border/65 bg-background/55" onClick={() => void handleDelete()} disabled={deleting}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>

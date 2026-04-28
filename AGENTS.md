@@ -10,6 +10,13 @@
 - Security requirements are mandatory for code, scripts, docs, and operational procedures.
 - All automation and scripts in this repo should follow the controls below unless explicitly overridden by an approved incident procedure.
 
+## ByteRover project memory
+- This repo has local ByteRover engineering memory in `.brv/context-tree/`.
+- Use `scripts/brv-local.sh` from the repo root instead of calling global `brv` directly; the wrapper keeps ByteRover runtime state under `state/byterover-home/`.
+- Before substantive coding or debugging, run a focused memory lookup with `scripts/brv-local.sh query "<topic>"` or `scripts/brv-local.sh search "<topic>" --limit 5 --format json`. If no provider is connected, the wrapper automatically downgrades `query` to local search.
+- After meaningful fixes, migrations, deployment changes, or repo-specific lessons, run `scripts/brv-local.sh curate "<durable technical conclusion>"` and include up to five relevant repo files with `-f`.
+- Store only reusable technical memory. Do not put secrets, credentials, customer financial data, contract values, or personal/user-profile memory in `.brv/context-tree/`.
+
 ## UI Design System (强制)
 - **所有前端页面开发必须遵循 SHADCN/UI 设计风格**.
 - 优先使用 shadcn/ui 组件库 (https://ui.shadcn.com)，禁止自行造轮子.

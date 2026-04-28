@@ -1,6 +1,6 @@
 /**
- * Input: opsExecutionService（门店采购清单模板 API）
- * Output: 门店采购清单Tab组件（生成、保存模板、一键导出）
+ * Input: opsExecutionService（门店采购清单模板 API）、SortableTableHead、useTableSort
+ * Output: 门店采购清单Tab组件（生成、保存模板、一键导出、明细表列排序）
  * Pos: 经营执行中台 - 门店采购清单子Tab
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ClipboardList, Download, Loader2, Save } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -32,8 +32,11 @@ import {
 import { toast } from 'sonner';
 import {
   opsExecutionService,
+  type PurchaseChecklistItem,
   type PurchaseChecklistResult,
 } from '@/services/opsExecution.service';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 
 const STORE_TYPE_OPTIONS = ['标准店', '旗舰店'] as const;
 const OPENING_STAGE_OPTIONS = ['筹备期', '试营业', '正式营业'] as const;
@@ -53,6 +56,28 @@ export function PurchaseChecklistTab() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  const checklistRows = useMemo(() => result?.items ?? [], [result?.items]);
+
+  /**
+   * 职责：采购清单生成结果行的排序取值
+   */
+  const checklistAccessor = useCallback((item: PurchaseChecklistItem, key: string) => {
+    switch (key) {
+      case 'category':
+        return item.category;
+      case 'itemName':
+        return item.itemName;
+      case 'quantity':
+        return item.quantity;
+      case 'notes':
+        return item.notes || '';
+      default:
+        return null;
+    }
+  }, []);
+
+  const checklistSort = useTableSort(checklistRows, checklistAccessor);
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -209,15 +234,44 @@ export function PurchaseChecklistTab() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>分类</TableHead>
-                    <TableHead>采购项</TableHead>
-                    <TableHead className="text-right">数量</TableHead>
-                    <TableHead>备注</TableHead>
+                    <SortableTableHead
+                      sortKey="category"
+                      currentSortKey={checklistSort.sortKey}
+                      currentSortDir={checklistSort.sortDir}
+                      onSort={checklistSort.onSort}
+                    >
+                      分类
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="itemName"
+                      currentSortKey={checklistSort.sortKey}
+                      currentSortDir={checklistSort.sortDir}
+                      onSort={checklistSort.onSort}
+                    >
+                      采购项
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="quantity"
+                      currentSortKey={checklistSort.sortKey}
+                      currentSortDir={checklistSort.sortDir}
+                      onSort={checklistSort.onSort}
+                      className="text-right"
+                    >
+                      数量
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="notes"
+                      currentSortKey={checklistSort.sortKey}
+                      currentSortDir={checklistSort.sortDir}
+                      onSort={checklistSort.onSort}
+                    >
+                      备注
+                    </SortableTableHead>
                     <TableHead className="w-[90px]">属性</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {result.items.map((item) => (
+                  {checklistSort.sortedData.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>{item.category}</TableCell>
                       <TableCell className="font-medium">{item.itemName}</TableCell>

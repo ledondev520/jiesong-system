@@ -9,6 +9,8 @@
 'use client';
 
 import { useEffect, useCallback, useState } from 'react';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -90,6 +92,22 @@ export default function SystemLogsPage() {
     }
     loadLogs(currentPage, pageSize, debouncedKeyword);
   }, [user, canAccess, currentPage, pageSize, debouncedKeyword, loadLogs]);
+
+  const sort = useTableSort<SystemLogItem, string>(
+    logs,
+    useCallback((item, key) => {
+      switch (key) {
+        case 'createdAt':
+          return item.createdAt ? new Date(item.createdAt).getTime() : null;
+        case 'user':
+          return userLabel(item);
+        case 'entity':
+          return labelForEntity(item.entity);
+        default:
+          return null;
+      }
+    }, [])
+  );
 
   if (!user) {
     return (
@@ -195,7 +213,7 @@ export default function SystemLogsPage() {
             ) : logs.length === 0 ? (
               <div className="surface-panel py-12 text-center text-sm text-muted-foreground">暂无日志。</div>
             ) : (
-              logs.map((log) => {
+              sort.sortedData.map((log) => {
                 const { hints } = describeLogValues(log);
                 const summaryLine = hints[0]
                   || (log.oldValue ? '含旧值快照' : log.newValue ? '含新值快照' : '-');
@@ -223,10 +241,31 @@ export default function SystemLogsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>时间</TableHead>
-                  <TableHead>用户</TableHead>
+                  <SortableTableHead
+                    sortKey="createdAt"
+                    currentSortKey={sort.sortKey}
+                    currentSortDir={sort.sortDir}
+                    onSort={sort.onSort}
+                  >
+                    时间
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey="user"
+                    currentSortKey={sort.sortKey}
+                    currentSortDir={sort.sortDir}
+                    onSort={sort.onSort}
+                  >
+                    用户
+                  </SortableTableHead>
                   <TableHead>操作</TableHead>
-                  <TableHead>业务模块</TableHead>
+                  <SortableTableHead
+                    sortKey="entity"
+                    currentSortKey={sort.sortKey}
+                    currentSortDir={sort.sortDir}
+                    onSort={sort.onSort}
+                  >
+                    业务模块
+                  </SortableTableHead>
                   <TableHead>IP 地址</TableHead>
                   <TableHead className="w-[320px]">变更摘要</TableHead>
                 </TableRow>
@@ -241,7 +280,7 @@ export default function SystemLogsPage() {
                     <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">暂无日志。</TableCell>
                   </TableRow>
                 ) : (
-                  logs.map((log) => {
+                  sort.sortedData.map((log) => {
                     const { hints } = describeLogValues(log);
                     return (
                     <TableRow key={log.id}>

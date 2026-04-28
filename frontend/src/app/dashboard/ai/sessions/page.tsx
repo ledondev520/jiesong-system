@@ -1,6 +1,6 @@
 /**
- * Input: AI 会话 API、Token 统计 API、独立 Token 记录 API（含 promptBrief）
- * Output: AI 会话管理页面（用量折线图、24h/30d 摘要卡片；聊天会话 / 其他 AI 调用 Tabs 与费用展示）
+ * Input: AI 会话 API、Token 统计 API、独立 Token 记录 API（含 promptBrief）、SortableTableHead、useTableSort
+ * Output: AI 会话管理页面（用量折线图、24h/30d 摘要卡片；聊天/独立调用 Tabs、列排序与费用展示）
  * Pos: Dashboard AI 管理模块
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -15,6 +15,8 @@ import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1021,6 +1023,55 @@ export default function AiSessionsPage() {
     .filter((item) => matchesActionFilter(item, actionFilter))
     .sort((a, b) => compareSessionsByMode(a, b, sortMode));
 
+  const sessionTableSort = useTableSort<AiSessionItem, string>(
+    visibleSessions,
+    useCallback((item, key) => {
+      switch (key) {
+        case 'sessionId':
+          return item.sessionId;
+        case 'routeMode':
+          return item.routeMode ?? '';
+        case 'domains':
+          return formatDomainSummary(item.domainsTouched);
+        case 'toolCalls':
+          return item.toolTraceSummary?.totalCalls ?? null;
+        case 'msgCount':
+          return getSessionCount(item);
+        case 'model':
+          return item.lastModel ?? '';
+        case 'tokens':
+          return item.totalTokens ?? null;
+        case 'estCost':
+          return item.totalTokens ?? null;
+        case 'lastAt': {
+          const t = getSessionLastAt(item);
+          return t ? new Date(t).getTime() : null;
+        }
+        default:
+          return null;
+      }
+    }, [])
+  );
+
+  const standaloneTableSort = useTableSort<AiStandaloneTokenRow, string>(
+    standaloneRows,
+    useCallback((row, key) => {
+      switch (key) {
+        case 'prompt':
+          return row.promptBrief?.trim() || '';
+        case 'model':
+          return row.model ?? '';
+        case 'tokens':
+          return row.totalTokens ?? null;
+        case 'createdAt':
+          return new Date(row.createdAt).getTime();
+        default:
+          return null;
+      }
+    }, []),
+    { key: 'createdAt', dir: 'desc' }
+  );
+
   return (
     <div className="space-y-6">
       <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
@@ -1395,7 +1446,7 @@ export default function AiSessionsPage() {
                 ) : visibleSessions.length === 0 ? (
                   <div className="surface-panel py-12 text-center text-sm text-muted-foreground">当前筛选下暂无 AI 会话记录。</div>
                 ) : (
-                  visibleSessions.map((item) => {
+                  sessionTableSort.sortedData.map((item) => {
                     const lastAt = getSessionLastAt(item);
                     const isDeleting = deletingSessionId === item.sessionId;
                     const tokens = item.totalTokens ?? 0;
@@ -1471,15 +1522,78 @@ export default function AiSessionsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>会话ID</TableHead>
-                      <TableHead>路由</TableHead>
-                      <TableHead>工具域</TableHead>
-                      <TableHead>工具调用</TableHead>
-                      <TableHead>消息数</TableHead>
-                      <TableHead>模型</TableHead>
-                      <TableHead>Token 消耗</TableHead>
-                      <TableHead>预估费用</TableHead>
-                      <TableHead>最近消息时间</TableHead>
+                      <SortableTableHead
+                        sortKey="sessionId"
+                        currentSortKey={sessionTableSort.sortKey}
+                        currentSortDir={sessionTableSort.sortDir}
+                        onSort={sessionTableSort.onSort}
+                      >
+                        会话ID
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey="routeMode"
+                        currentSortKey={sessionTableSort.sortKey}
+                        currentSortDir={sessionTableSort.sortDir}
+                        onSort={sessionTableSort.onSort}
+                      >
+                        路由
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey="domains"
+                        currentSortKey={sessionTableSort.sortKey}
+                        currentSortDir={sessionTableSort.sortDir}
+                        onSort={sessionTableSort.onSort}
+                      >
+                        工具域
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey="toolCalls"
+                        currentSortKey={sessionTableSort.sortKey}
+                        currentSortDir={sessionTableSort.sortDir}
+                        onSort={sessionTableSort.onSort}
+                      >
+                        工具调用
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey="msgCount"
+                        currentSortKey={sessionTableSort.sortKey}
+                        currentSortDir={sessionTableSort.sortDir}
+                        onSort={sessionTableSort.onSort}
+                      >
+                        消息数
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey="model"
+                        currentSortKey={sessionTableSort.sortKey}
+                        currentSortDir={sessionTableSort.sortDir}
+                        onSort={sessionTableSort.onSort}
+                      >
+                        模型
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey="tokens"
+                        currentSortKey={sessionTableSort.sortKey}
+                        currentSortDir={sessionTableSort.sortDir}
+                        onSort={sessionTableSort.onSort}
+                      >
+                        Token 消耗
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey="estCost"
+                        currentSortKey={sessionTableSort.sortKey}
+                        currentSortDir={sessionTableSort.sortDir}
+                        onSort={sessionTableSort.onSort}
+                      >
+                        预估费用
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey="lastAt"
+                        currentSortKey={sessionTableSort.sortKey}
+                        currentSortDir={sessionTableSort.sortDir}
+                        onSort={sessionTableSort.onSort}
+                      >
+                        最近消息时间
+                      </SortableTableHead>
                       <TableHead className="w-[120px]">操作</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1493,7 +1607,7 @@ export default function AiSessionsPage() {
                         <TableCell colSpan={10} className="py-12 text-center text-muted-foreground">当前筛选下暂无 AI 会话记录。</TableCell>
                       </TableRow>
                     ) : (
-                      visibleSessions.map((item) => {
+                      sessionTableSort.sortedData.map((item) => {
                         const lastAt = getSessionLastAt(item);
                         const isDeleting = deletingSessionId === item.sessionId;
                         const tokens = item.totalTokens ?? 0;
@@ -1615,7 +1729,7 @@ export default function AiSessionsPage() {
               ) : (
                 <>
                   <div className="md:hidden space-y-3 p-4 pt-3">
-                    {standaloneRows.map((row) => {
+                    {standaloneTableSort.sortedData.map((row) => {
                       const cost = estimateCost(row.model, row.totalTokens);
                       return (
                         <MobileListCard
@@ -1661,16 +1775,46 @@ export default function AiSessionsPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="min-w-[140px] max-w-[240px]">用户输入摘要</TableHead>
+                          <SortableTableHead
+                            sortKey="prompt"
+                            currentSortKey={standaloneTableSort.sortKey}
+                            currentSortDir={standaloneTableSort.sortDir}
+                            onSort={standaloneTableSort.onSort}
+                            className="min-w-[140px] max-w-[240px]"
+                          >
+                            用户输入摘要
+                          </SortableTableHead>
                           <TableHead>类型</TableHead>
-                          <TableHead>模型</TableHead>
-                          <TableHead className="min-w-[100px]">Token / 预估费用</TableHead>
-                          <TableHead>时间</TableHead>
+                          <SortableTableHead
+                            sortKey="model"
+                            currentSortKey={standaloneTableSort.sortKey}
+                            currentSortDir={standaloneTableSort.sortDir}
+                            onSort={standaloneTableSort.onSort}
+                          >
+                            模型
+                          </SortableTableHead>
+                          <SortableTableHead
+                            sortKey="tokens"
+                            currentSortKey={standaloneTableSort.sortKey}
+                            currentSortDir={standaloneTableSort.sortDir}
+                            onSort={standaloneTableSort.onSort}
+                            className="min-w-[100px]"
+                          >
+                            Token / 预估费用
+                          </SortableTableHead>
+                          <SortableTableHead
+                            sortKey="createdAt"
+                            currentSortKey={standaloneTableSort.sortKey}
+                            currentSortDir={standaloneTableSort.sortDir}
+                            onSort={standaloneTableSort.onSort}
+                          >
+                            时间
+                          </SortableTableHead>
                           <TableHead className="w-[100px] text-right">操作</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {standaloneRows.map((row) => {
+                        {standaloneTableSort.sortedData.map((row) => {
                           const cost = estimateCost(row.model, row.totalTokens);
                           return (
                             <TableRow key={row.id}>

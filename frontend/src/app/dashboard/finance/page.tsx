@@ -1,6 +1,6 @@
 /**
- * Input: 后端 finance/stats、finance/payment-trends、system/exchange-rate API
- * Output: 财务经营驾驶舱页面（KPI + 完成率 + 汇率 + 紧迫信号 + 趋势折线图 + 快捷导航）
+ * Input: 后端 finance/stats、finance/payment-trends、system/exchange-rate、bank-flow/stats、invoices/stats API
+ * Output: 财务经营驾驶舱页面（KPI + 完成率 + 汇率 + 银行流水/发票摘要 + 紧迫信号 + 趋势折线图 + 快捷导航）
  * Pos: 财务模块首页，提供管理层决策快速视图
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -31,6 +31,8 @@ import {
   BarChart3,
   RefreshCw,
   Upload,
+  Landmark,
+  FileText,
 } from 'lucide-react';
 import {
   LineChart,
@@ -46,6 +48,10 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
 import { financeService } from '@/services/finance.service';
+import {
+  getTransactionStats, getInvoiceStats,
+  type BankFlowStats, type InvoiceStats,
+} from '@/services/bankFlow.service';
 import api from '@/lib/axios';
 import { type ApiResponse } from '@/types';
 import { cachedFetch } from '@/lib/api-cache';
@@ -93,6 +99,8 @@ export default function FinancePage() {
   const [trends, setTrends] = useState<PaymentTrendPoint[]>([]);
   const [trendDays, setTrendDays] = useState<30 | 90>(90);
   const [overdueList, setOverdueList] = useState<OverdueItem[]>([]);
+  const [bankStats, setBankStats] = useState<BankFlowStats | null>(null);
+  const [invStats, setInvStats] = useState<InvoiceStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
@@ -105,18 +113,22 @@ export default function FinancePage() {
     setLoadError(false);
 
     try {
-      const [statsRes, rateRes, trendsRes, overdueRes] = await Promise.all([
+      const [statsRes, rateRes, trendsRes, overdueRes, bankStatsRes, invStatsRes] = await Promise.all([
         cachedFetch('fin-stats', () => financeService.getStats()),
         cachedFetch('fin-exchange-rate', () => api.get<ApiResponse<ExchangeRate>, ApiResponse<ExchangeRate>>('/system/exchange-rate')),
         cachedFetch(`fin-payment-trends-${trendDays}`, () => api.get<ApiResponse<PaymentTrendPoint[]>, ApiResponse<PaymentTrendPoint[]>>(
           `/finance/payment-trends?days=${trendDays}`
         )),
         cachedFetch('fin-overdue-receivables', () => api.get<ApiResponse<OverdueItem[]>, ApiResponse<OverdueItem[]>>('/finance/overdue-receivables')),
+        getTransactionStats().catch(() => null),
+        getInvoiceStats().catch(() => null),
       ]);
       setStats(statsRes);
       if (rateRes.data) setExchangeRate(rateRes.data);
       if (trendsRes.data) setTrends(trendsRes.data);
       if (overdueRes.data) setOverdueList(overdueRes.data);
+      setBankStats(bankStatsRes);
+      setInvStats(invStatsRes);
     } catch (err) {
       console.error('获取财务数据失败:', err);
       setLoadError(true);
@@ -449,6 +461,95 @@ export default function FinancePage() {
         </CardContent>
       </Card>
 
+      {/* 银行流水 & 发票台账摘要 */}
+      {(bankStats || invStats) && (
+        <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+          {bankStats && (
+            <Link href="/dashboard/finance/bank-flow" className="group">
+              <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm h-full">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Landmark className="h-4 w-4 text-primary" />
+                      <CardTitle className="text-sm font-medium">银行流水</CardTitle>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">总收入</p>
+                      <p className="text-base font-bold text-green-600 tabular-nums">
+                        ¥{bankStats.totalIn.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">总支出</p>
+                      <p className="text-base font-bold text-red-600 tabular-nums">
+                        ¥{bankStats.totalOut.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">净现金流</p>
+                      <p className={`text-base font-bold tabular-nums ${bankStats.netFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ¥{bankStats.netFlow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">交易笔数</p>
+                      <p className="text-base font-bold tabular-nums">{bankStats.txnCount.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+
+          {invStats && (
+            <Link href="/dashboard/finance/invoices" className="group">
+              <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm h-full">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-primary" />
+                      <CardTitle className="text-sm font-medium">发票台账</CardTitle>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">有效发票金额</p>
+                      <p className="text-base font-bold text-primary tabular-nums">
+                        ¥{invStats.validTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">有效税额</p>
+                      <p className="text-base font-bold tabular-nums">
+                        ¥{invStats.validTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">有效发票数</p>
+                      <p className="text-base font-bold tabular-nums">{invStats.validCount.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">已红冲 / 总记录</p>
+                      <p className="text-base font-bold tabular-nums text-muted-foreground">
+                        {invStats.reversedCount} / {invStats.totalCount}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+        </div>
+      )}
+
       {/* 应收逾期预警 */}
       {overdueList.length > 0 && (
         <Card className="border-amber-500/40 bg-amber-50/20 dark:bg-amber-950/10">
@@ -495,7 +596,7 @@ export default function FinancePage() {
       )}
 
       {/* 快捷导航区 */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-3">
         <Link href="/dashboard/finance/payable" className="group">
           <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm">
             <CardContent className="pt-4 pb-4">
@@ -547,6 +648,34 @@ export default function FinancePage() {
                   <p className="text-xs text-muted-foreground mt-0.5">趋势图表与三表概览</p>
                 </div>
                 <BarChart3 className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/dashboard/finance/bank-flow" className="group">
+          <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">银行流水查询</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">按对方名称、日期查看资金往来</p>
+                </div>
+                <Landmark className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/dashboard/finance/invoices" className="group">
+          <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">发票台账查询</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">按销方、状态筛选发票明细</p>
+                </div>
+                <FileText className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
             </CardContent>
           </Card>

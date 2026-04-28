@@ -1,6 +1,6 @@
 /**
- * Input: procurementTemplateService（门店列表、通用模板、门店历史采购）
- * Output: 采购建议动态清单页面（选择客户后展示推荐商品与缺购商品）
+ * Input: procurementTemplateService（门店列表、通用模板、门店历史采购）、SortableTableHead、useTableSort
+ * Output: 采购建议动态清单页面（选择客户后展示推荐商品与缺购商品、桌面表列排序）
  * Pos: 采购模块子页面，帮助销售人员快速告知客户还需采购哪些商品
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -9,6 +9,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 import { Check, Package, Search, AlertCircle, Star, X, FileDown } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
@@ -164,8 +166,26 @@ export function StoreRecommendPageContent() {
   // 筛选变化时重置页码
   useEffect(() => { setPage(1); }, [onlyMustBuy, onlyMissing, search, selectedStore]);
 
-  const totalPages = Math.ceil(filteredItems.length / PAGE_SIZE);
-  const pagedItems = filteredItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const checklistSort = useTableSort<ChecklistItem, string>(
+    filteredItems,
+    useCallback((item, key) => {
+      switch (key) {
+        case 'category':
+          return item.category;
+        case 'name':
+          return item.name;
+        case 'avgQty':
+          return item.avgQtyPerStore ?? null;
+        case 'storeCount':
+          return item.storeCount;
+        default:
+          return null;
+      }
+    }, [])
+  );
+
+  const totalPages = Math.ceil(checklistSort.sortedData.length / PAGE_SIZE);
+  const pagedItems = checklistSort.sortedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // 3. 统计数据
   const stats = useMemo(() => {
@@ -335,7 +355,7 @@ export function StoreRecommendPageContent() {
               <p className="text-xs mt-1">请先导入历史出货数据后再使用</p>
             </CardContent>
           </Card>
-        ) : filteredItems.length === 0 ? (
+        ) : checklistSort.sortedData.length === 0 ? (
           <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
             {onlyMissing ? `${selectedStore} 已采购全部推荐商品` : '没有匹配的商品'}
           </CardContent></Card>
@@ -345,11 +365,42 @@ export function StoreRecommendPageContent() {
               <TableHeader>
                 <TableRow>
                   {selectedStore && <TableHead className="w-10"></TableHead>}
-                  <TableHead className="w-[90px]">品类</TableHead>
-                  <TableHead>商品名称</TableHead>
+                  <SortableTableHead
+                    sortKey="category"
+                    currentSortKey={checklistSort.sortKey}
+                    currentSortDir={checklistSort.sortDir}
+                    onSort={checklistSort.onSort}
+                    className="w-[90px]"
+                  >
+                    品类
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey="name"
+                    currentSortKey={checklistSort.sortKey}
+                    currentSortDir={checklistSort.sortDir}
+                    onSort={checklistSort.onSort}
+                  >
+                    商品名称
+                  </SortableTableHead>
                   <TableHead className="w-[72px]">优先级</TableHead>
-                  <TableHead className="w-[80px] text-right">参考用量</TableHead>
-                  <TableHead className="w-[50px] text-right">门店</TableHead>
+                  <SortableTableHead
+                    sortKey="avgQty"
+                    currentSortKey={checklistSort.sortKey}
+                    currentSortDir={checklistSort.sortDir}
+                    onSort={checklistSort.onSort}
+                    className="w-[80px] text-right"
+                  >
+                    参考用量
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey="storeCount"
+                    currentSortKey={checklistSort.sortKey}
+                    currentSortDir={checklistSort.sortDir}
+                    onSort={checklistSort.onSort}
+                    className="w-[50px] text-right"
+                  >
+                    门店
+                  </SortableTableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -404,7 +455,7 @@ export function StoreRecommendPageContent() {
             </Table>
             <div className="flex items-center justify-between border-t px-3 py-2">
               <span className="text-xs text-muted-foreground">
-                共 {filteredItems.length} 件{onlyMustBuy && `（${majorityThreshold}+ 家门店均购买）`}
+                共 {checklistSort.sortedData.length} 件{onlyMustBuy && `（${majorityThreshold}+ 家门店均购买）`}
                 {totalPages > 1 && `，第 ${page}/${totalPages} 页`}
               </span>
               {totalPages > 1 && (

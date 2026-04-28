@@ -874,3 +874,84 @@ model ImportRecord {
 
   @@map("import_records")
 }
+
+// ==================== 银行流水与发票原始数据 ====================
+
+model FinanceDataBatch {
+  id            String   @id @default(cuid())
+  type          String   // BANK_FLOW | INVOICE
+  fileName      String
+  recordCount   Int
+  dataStartDate String?  // 数据覆盖起始日期 yyyy-MM-dd
+  dataEndDate   String?  // 数据覆盖结束日期 yyyy-MM-dd
+  note          String?
+  importedAt    DateTime @default(now())
+
+  bankTransactions BankTransaction[]
+  invoiceRecords   InvoiceRecord[]
+
+  @@map("finance_data_batches")
+}
+
+model BankTransaction {
+  id          String   @id @default(cuid())
+  batchId     String
+  txnTime     String   // 交易时间（原始字符串，保留精度）
+  txnDate     String   // 交易日期 yyyy-MM-dd（用于筛选）
+  amount      Float    // 正=收入，负=支出
+  payer       String?  // 付方名称
+  payee       String?  // 收方名称
+  summary     String?  // 摘要
+  txnType     String?  // 交易类型
+  txnId       String?  // 交易流水号
+  balance     Float?   // 余额
+  counterpart String?  // 对方名称（付/收方中非本公司的一方）
+  direction   String   // IN | OUT
+  createdAt   DateTime @default(now())
+
+  batch FinanceDataBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([txnDate])
+  @@index([counterpart])
+  @@index([direction])
+  @@map("bank_transactions")
+}
+
+model InvoiceRecord {
+  id            String   @id @default(cuid())
+  batchId       String
+  invNo         String?  // 数电发票号码或发票号码
+  invCode       String?  // 发票代码
+  seller        String   // 销方名称
+  sellerTaxId   String?  // 销方识别号
+  buyer         String?  // 购方名称
+  buyerTaxId    String?  // 购方识别号
+  invDate       String   // 开票日期 yyyy-MM-dd
+  invDateFull   String?  // 开票日期原始（含时分秒）
+  itemName      String?  // 货物或应税劳务名称
+  spec          String?  // 规格型号
+  unit          String?  // 单位
+  qty           Float?   // 数量
+  unitPrice     Float?   // 单价
+  amount        Float    // 不含税金额
+  taxRate       String?  // 税率
+  tax           Float    // 税额
+  total         Float    // 价税合计
+  invoiceType   String?  // 发票票种
+  status        String   // 发票状态：正常、已红冲-全额等
+  isPositive    String   // 是否正数发票：是/否
+  riskLevel     String?  // 发票风险等级
+  issuer        String?  // 开票人
+  remark        String?  // 备注
+  taxClassCode  String?  // 税收分类编码
+  createdAt     DateTime @default(now())
+
+  batch FinanceDataBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([invDate])
+  @@index([seller])
+  @@index([status])
+  @@map("invoice_records")
+}

@@ -8,7 +8,9 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 import { format } from 'date-fns';
 import { User, Role } from '@/types';
 import type { AgentAccount } from '@/types';
@@ -218,8 +220,26 @@ export default function UsersPage() {
     ));
   }, [users, keyword]);
 
-  const totalPages = Math.ceil(filteredUsers.length / pageSize);
-  const pagedUsers = filteredUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const userSort = useTableSort<User, string>(
+    filteredUsers,
+    useCallback((item, key) => {
+      switch (key) {
+        case 'name':
+          return item.name ?? '';
+        case 'username':
+          return item.username ?? '';
+        case 'role':
+          return String(item.role ?? '');
+        case 'lastLoginAt':
+          return item.lastLoginAt ? new Date(item.lastLoginAt).getTime() : null;
+        default:
+          return null;
+      }
+    }, [])
+  );
+
+  const totalPages = Math.ceil(userSort.sortedData.length / pageSize);
+  const pagedUsers = userSort.sortedData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="space-y-6">
@@ -306,11 +326,39 @@ export default function UsersPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>姓名</TableHead>
-                <TableHead>账号</TableHead>
-                <TableHead>角色</TableHead>
+                <SortableTableHead
+                  sortKey="name"
+                  currentSortKey={userSort.sortKey}
+                  currentSortDir={userSort.sortDir}
+                  onSort={userSort.onSort}
+                >
+                  姓名
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="username"
+                  currentSortKey={userSort.sortKey}
+                  currentSortDir={userSort.sortDir}
+                  onSort={userSort.onSort}
+                >
+                  账号
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="role"
+                  currentSortKey={userSort.sortKey}
+                  currentSortDir={userSort.sortDir}
+                  onSort={userSort.onSort}
+                >
+                  角色
+                </SortableTableHead>
                 <TableHead>状态</TableHead>
-                <TableHead>最后登录</TableHead>
+                <SortableTableHead
+                  sortKey="lastLoginAt"
+                  currentSortKey={userSort.sortKey}
+                  currentSortDir={userSort.sortDir}
+                  onSort={userSort.onSort}
+                >
+                  最后登录
+                </SortableTableHead>
                 <TableHead className="w-[100px]">操作</TableHead>
               </TableRow>
             </TableHeader>
@@ -362,7 +410,7 @@ export default function UsersPage() {
 
         {totalPages > 1 && (
           <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span>共 {filteredUsers.length} 条，第 {currentPage}/{totalPages} 页</span>
+            <span>共 {userSort.sortedData.length} 条，第 {currentPage}/{totalPages} 页</span>
             <div className="flex items-center gap-2">
               <PageSizeSelect value={pageSize} onChange={(size) => { setPageSize(size); setCurrentPage(1); }} />
               <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>上一页</Button>

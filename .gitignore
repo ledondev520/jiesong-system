@@ -115,6 +115,7 @@ METRICS.md
 .codepilot-uploads/
 skills/
 ops/
+state/byterover-home/
 
 # ============================================================
 # docs 下的内部过程产物（保留 api-contracts、PRD、架构文档）
@@ -155,3 +156,15 @@ __pycache__/
 # docs 下的业务数据 CSV（导入用原始数据，不入库）
 # ============================================================
 docs/*.csv
+docs/analyze_finance.py
+docs/generate_html_report.py
+docs/finance-report.html
+docs/*财务分析报告*.md
+
+# 本地隧道地址会随运行环境变化；TUNNEL_URL.txt 历史上已被跟踪，
+# 因此已跟踪副本仍需在提交时显式排除。
+TUNNEL_URL.txt
+
+# ByteRover — .brv/context-tree/ contains a nested .git managed by brv vc.
+# Without these entries, `git add .` fails with "does not have a commit checked out".
+.brv/

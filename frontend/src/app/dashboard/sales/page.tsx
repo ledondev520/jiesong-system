@@ -1,10 +1,10 @@
 /**
- * Input: 出口合同服务 (salesService)
- * Output: 出口合同列表页面（含删除功能）
+ * Input: 出口合同服务 (salesService)、通用表格排序 hook
+ * Output: 出口合同列表页面（含删除、列排序、分页与搜索）
  * Pos: 出口合同管理入口，展示合同列表、货柜信息，支持删除操作
- * 
+ *
  * 2026-01-26 新增：管理员可删除出口合同（带确认对话框）
- * 
+ *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
@@ -38,7 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Eye, Ship, Trash2, Loader2, FileSpreadsheet, Container, Anchor, Boxes, Clock3, Search, ArrowUpDown, ArrowUp, ArrowDown, Upload } from 'lucide-react';
+import { Plus, Eye, Ship, Trash2, Loader2, FileSpreadsheet, Container, Anchor, Boxes, Clock3, Search, Upload } from 'lucide-react';
 import { BatchImportDialog, type ImportRow } from '@/components/batch-import';
 import { batchImportService } from '@/services/batchImport.service';
 import Link from 'next/link';
@@ -50,13 +50,8 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { MobileListCard } from '@/components/mobile';
-type SortField = 'contractNo' | 'port' | 'status' | 'signedAt' | 'totalBoxes' | 'volume' | 'totalAmount';
-type SortOrder = 'asc' | 'desc';
-
-interface SortConfig {
-  field: SortField;
-  order: SortOrder;
-}
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 
 export default function SalesPage() {
   const [contracts, setContracts] = useState<SalesContract[]>([]);
@@ -73,9 +68,6 @@ export default function SalesPage() {
 
   // 搜索状态
   const [searchQuery, setSearchQuery] = useState('');
-
-  // 排序状态
-  const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'signedAt', order: 'desc' });
 
   // 批量导入对话框状态
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -117,19 +109,15 @@ export default function SalesPage() {
   useEffect(() => {
     const page = searchParams.get('page');
     const size = searchParams.get('pageSize');
-    const sort = searchParams.get('sort') as SortField | null;
-    const order = searchParams.get('order') as SortOrder | null;
     const q = searchParams.get('q');
 
     if (page) setCurrentPage(parseInt(page, 10));
     if (size) setPageSize(parseInt(size, 10));
-    if (sort) setSortConfig(prev => ({ ...prev, field: sort }));
-    if (order) setSortConfig(prev => ({ ...prev, order }));
     if (q !== null) setSearchQuery(q);
   }, [searchParams]);
 
   // 更新 URL 参数
-  const updateUrlParams = (params: { page?: number; pageSize?: number; sort?: SortField; order?: SortOrder; q?: string }) => {
+  const updateUrlParams = (params: { page?: number; pageSize?: number; q?: string }) => {
     const newParams = new URLSearchParams(searchParams.toString());
 
     if (params.page !== undefined) {
@@ -139,14 +127,6 @@ export default function SalesPage() {
     if (params.pageSize !== undefined) {
       if (params.pageSize === 20) newParams.delete('pageSize');
       else newParams.set('pageSize', params.pageSize.toString());
-    }
-    if (params.sort !== undefined) {
-      if (params.sort === 'signedAt') newParams.delete('sort');
-      else newParams.set('sort', params.sort);
-    }
-    if (params.order !== undefined) {
-      if (params.order === 'desc') newParams.delete('order');
-      else newParams.set('order', params.order);
     }
     if (params.q !== undefined) {
       if (params.q === '') newParams.delete('q');
@@ -281,73 +261,36 @@ export default function SalesPage() {
     );
   }, [contracts, searchQuery]);
 
-  // 排序逻辑
-  const sortedContracts = useMemo(() => {
-    const sorted = [...filteredContracts];
-    sorted.sort((a, b) => {
-      let aValue: string | number | Date | undefined;
-      let bValue: string | number | Date | undefined;
+  /**
+   * 职责：从出口合同行取出可排序字段（编号、日期时间戳、箱数、体积、金额）
+   */
+  const salesAccessor = useCallback((item: SalesContract, key: string) => {
+    switch (key) {
+      case 'contractNo':
+        return item.contractNo;
+      case 'signedAt':
+        return item.signedAt ? new Date(item.signedAt).getTime() : null;
+      case 'totalBoxes':
+        return item.totalBoxes ?? null;
+      case 'volume':
+        return item.volume ?? null;
+      case 'totalAmount':
+        return item.totalAmount;
+      case 'portName':
+        return item.port?.name ?? '';
+      case 'stores':
+        return item.stores?.join(' ') ?? '';
+      default:
+        return null;
+    }
+  }, []);
 
-      switch (sortConfig.field) {
-        case 'contractNo':
-          aValue = a.contractNo;
-          bValue = b.contractNo;
-          break;
-        case 'port':
-          aValue = a.port?.name || '';
-          bValue = b.port?.name || '';
-          break;
-        case 'status':
-          aValue = a.status;
-          bValue = b.status;
-          break;
-        case 'signedAt':
-          aValue = a.signedAt ? new Date(a.signedAt).getTime() : 0;
-          bValue = b.signedAt ? new Date(b.signedAt).getTime() : 0;
-          break;
-        case 'totalBoxes':
-          aValue = a.totalBoxes || 0;
-          bValue = b.totalBoxes || 0;
-          break;
-        case 'volume':
-          aValue = a.volume || 0;
-          bValue = b.volume || 0;
-          break;
-        case 'totalAmount':
-          aValue = a.totalAmount;
-          bValue = b.totalAmount;
-          break;
-        default:
-          return 0;
-      }
-
-      if (aValue < bValue) return sortConfig.order === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortConfig.order === 'asc' ? 1 : -1;
-      return 0;
-    });
-    return sorted;
-  }, [filteredContracts, sortConfig]);
+  const salesSort = useTableSort<SalesContract, string>(filteredContracts, salesAccessor, { key: 'signedAt', dir: 'desc' });
+  const sortedContracts = salesSort.sortedData;
 
   // 分页逻辑
   const totalPages = Math.ceil(sortedContracts.length / pageSize);
   const pagedContracts = sortedContracts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  // 切换排序
-  const handleSort = (field: SortField) => {
-    setSortConfig(prev => {
-      const newOrder: SortOrder = prev.field === field && prev.order === 'asc' ? 'desc' : 'asc';
-      updateUrlParams({ sort: field, order: newOrder });
-      return { field, order: newOrder };
-    });
-  };
-
-  // 排序图标
-  const getSortIcon = (field: SortField) => {
-    if (sortConfig.field !== field) return <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/50" />;
-    return sortConfig.order === 'asc'
-      ? <ArrowUp className="h-3.5 w-3.5 text-primary" />
-      : <ArrowDown className="h-3.5 w-3.5 text-primary" />;
-  };
   const exportOverview = {
     preparing: contracts.filter((contract) => [SalesStatus.CONFIRMED, SalesStatus.PACKING].includes(contract.status)).length,
     inTransit: contracts.filter((contract) => contract.status === SalesStatus.SHIPPED).length,
@@ -503,70 +446,74 @@ export default function SalesPage() {
         <Table className="table-fixed w-full">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[130px]">
-                <button
-                  data-testid="sort-contractNo"
-                  onClick={() => handleSort('contractNo')}
-                  className="flex items-center gap-1 hover:text-foreground transition-colors"
-                >
-                  合同编号 {getSortIcon('contractNo')}
-                </button>
-              </TableHead>
-              <TableHead className="w-[80px]">
-                <button
-                  data-testid="sort-port"
-                  onClick={() => handleSort('port')}
-                  className="flex items-center gap-1 hover:text-foreground transition-colors"
-                >
-                  港口 {getSortIcon('port')}
-                </button>
-              </TableHead>
-              <TableHead>门店</TableHead>
-              <TableHead className="w-[80px]">
-                <button
-                  data-testid="sort-status"
-                  onClick={() => handleSort('status')}
-                  className="flex items-center gap-1 hover:text-foreground transition-colors"
-                >
-                  状态 {getSortIcon('status')}
-                </button>
-              </TableHead>
-              <TableHead className="w-[100px]">
-                <button
-                  data-testid="sort-signedAt"
-                  onClick={() => handleSort('signedAt')}
-                  className="flex items-center gap-1 hover:text-foreground transition-colors"
-                >
-                  签订日期 {getSortIcon('signedAt')}
-                </button>
-              </TableHead>
-              <TableHead className="w-[60px] text-right">
-                <button
-                  data-testid="sort-totalBoxes"
-                  onClick={() => handleSort('totalBoxes')}
-                  className="flex items-center gap-1 hover:text-foreground transition-colors ml-auto"
-                >
-                  箱数 {getSortIcon('totalBoxes')}
-                </button>
-              </TableHead>
-              <TableHead className="w-[80px] text-right">
-                <button
-                  data-testid="sort-volume"
-                  onClick={() => handleSort('volume')}
-                  className="flex items-center gap-1 hover:text-foreground transition-colors ml-auto"
-                >
-                  体积 {getSortIcon('volume')}
-                </button>
-              </TableHead>
-              <TableHead className="w-[90px] text-right">
-                <button
-                  data-testid="sort-totalAmount"
-                  onClick={() => handleSort('totalAmount')}
-                  className="flex items-center gap-1 hover:text-foreground transition-colors ml-auto"
-                >
-                  金额 ($) {getSortIcon('totalAmount')}
-                </button>
-              </TableHead>
+              <SortableTableHead
+                className="w-[130px]"
+                sortKey="contractNo"
+                currentSortKey={salesSort.sortKey}
+                currentSortDir={salesSort.sortDir}
+                onSort={salesSort.onSort}
+                data-testid="sort-contractNo"
+              >
+                合同编号
+              </SortableTableHead>
+              <SortableTableHead
+                className="w-[80px]"
+                sortKey="portName"
+                currentSortKey={salesSort.sortKey}
+                currentSortDir={salesSort.sortDir}
+                onSort={salesSort.onSort}
+              >
+                港口
+              </SortableTableHead>
+              <SortableTableHead
+                sortKey="stores"
+                currentSortKey={salesSort.sortKey}
+                currentSortDir={salesSort.sortDir}
+                onSort={salesSort.onSort}
+              >
+                门店
+              </SortableTableHead>
+              <TableHead className="w-[80px]">状态</TableHead>
+              <SortableTableHead
+                className="w-[100px]"
+                sortKey="signedAt"
+                currentSortKey={salesSort.sortKey}
+                currentSortDir={salesSort.sortDir}
+                onSort={salesSort.onSort}
+                data-testid="sort-signedAt"
+              >
+                签订日期
+              </SortableTableHead>
+              <SortableTableHead
+                className="w-[60px] text-right"
+                sortKey="totalBoxes"
+                currentSortKey={salesSort.sortKey}
+                currentSortDir={salesSort.sortDir}
+                onSort={salesSort.onSort}
+                data-testid="sort-totalBoxes"
+              >
+                箱数
+              </SortableTableHead>
+              <SortableTableHead
+                className="w-[80px] text-right"
+                sortKey="volume"
+                currentSortKey={salesSort.sortKey}
+                currentSortDir={salesSort.sortDir}
+                onSort={salesSort.onSort}
+                data-testid="sort-volume"
+              >
+                体积
+              </SortableTableHead>
+              <SortableTableHead
+                className="w-[90px] text-right"
+                sortKey="totalAmount"
+                currentSortKey={salesSort.sortKey}
+                currentSortDir={salesSort.sortDir}
+                onSort={salesSort.onSort}
+                data-testid="sort-totalAmount"
+              >
+                金额 ($)
+              </SortableTableHead>
               <TableHead className="w-[100px]">操作</TableHead>
             </TableRow>
           </TableHeader>

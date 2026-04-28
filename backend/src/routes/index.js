@@ -40,6 +40,7 @@ const hsCodeRoutes = require('./hsCodes');
 const threeFormsRoutes = require('./threeForms');
 const opsExecutionRoutes = require('./opsExecution');
 const procurementTemplateRoutes = require('./procurementTemplate');
+const bankFlowRoutes = require('./bankFlow');
 
 const router = Router();
 
@@ -76,5 +77,6 @@ router.use('/three-forms', threeFormsRoutes);
 router.use('/ops-execution', opsExecutionRoutes);
 router.use('/procurement-template', procurementTemplateRoutes);  // 开业采购模板（CSV分析）
 router.use('/batch-import', batchImportRoutes);  // 批量导入
+router.use('/bank-flow', bankFlowRoutes);  // 银行流水与发票查询
 
 module.exports = router;

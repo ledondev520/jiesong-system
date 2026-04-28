@@ -29,6 +29,8 @@ import type { ApiResponse } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/lib/hooks/useTableSort';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -339,6 +341,22 @@ function HsCodesPageContent() {
     return new Date(record.effectiveDate) < new Date('2025-01-01');
   };
 
+  const sort = useTableSort<HsCodeRecord, string>(
+    results,
+    useCallback((record, key) => {
+      switch (key) {
+        case 'hsCode':
+          return record.hsCode ?? '';
+        case 'productName':
+          return record.productName ?? '';
+        case 'refundRate':
+          return record.refundRate ?? null;
+        default:
+          return null;
+      }
+    }, [])
+  );
+
   return (
     <div className="flex flex-col h-full">
       <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
@@ -632,17 +650,41 @@ function HsCodesPageContent() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[120px]">HSCode</TableHead>
-                        <TableHead className="max-w-[260px]">商品名称</TableHead>
+                        <SortableTableHead
+                          sortKey="hsCode"
+                          currentSortKey={sort.sortKey}
+                          currentSortDir={sort.sortDir}
+                          onSort={sort.onSort}
+                          className="w-[120px]"
+                        >
+                          HSCode
+                        </SortableTableHead>
+                        <SortableTableHead
+                          sortKey="productName"
+                          currentSortKey={sort.sortKey}
+                          currentSortDir={sort.sortDir}
+                          onSort={sort.onSort}
+                          className="max-w-[260px]"
+                        >
+                          商品名称
+                        </SortableTableHead>
                         {isFuzzy && (keyword.trim() || hsCodeInput.trim()) && <TableHead className="w-[76px]">置信分</TableHead>}
                         <TableHead className="w-[60px]">单位</TableHead>
-                        <TableHead className="w-[80px]">退税率</TableHead>
+                        <SortableTableHead
+                          sortKey="refundRate"
+                          currentSortKey={sort.sortKey}
+                          currentSortDir={sort.sortDir}
+                          onSort={sort.onSort}
+                          className="w-[80px]"
+                        >
+                          退税率
+                        </SortableTableHead>
                         <TableHead>申报要素</TableHead>
                         <TableHead className="w-[40px]" />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {results.map((record) => (
+                      {sort.sortedData.map((record) => (
                         <TableRow
                           key={record.id}
                           className={cn(
