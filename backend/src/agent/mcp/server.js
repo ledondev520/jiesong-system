@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Input: stdio JSON-RPC / 环境变量 baseUrl+token
- * Output: MCP stdio server，暴露捷淞系统全量查询与操作能力
+ * Output: MCP stdio server，暴露捷淞国际物流全量查询与操作能力
  * Pos: Agent 通过 MCP 协议接入系统
  */
 

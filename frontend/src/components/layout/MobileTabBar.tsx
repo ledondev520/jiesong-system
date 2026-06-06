@@ -166,7 +166,7 @@ export function MobileTabBar({
                 <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
                   <Ship className="h-4 w-4" />
                 </span>
-                <span className="text-sm font-semibold">捷淞系统</span>
+                <span className="text-sm font-semibold">捷淞国际物流</span>
               </Link>
             </SheetTitle>
           </SheetHeader>

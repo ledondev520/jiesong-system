@@ -41,13 +41,13 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "捷淞系统",
-  description: "进出口贸易管理系统",
+  title: "捷淞国际物流",
+  description: "JIESONG",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "捷淞系统",
+    title: "捷淞国际物流",
   },
 };
 

@@ -86,7 +86,7 @@ const UNIFIED_SYSTEM_PROMPT = [
 const AGENT_PRESETS = {
   unified: {
     id: 'unified',
-    label: '捷淞智能助手',
+    label: 'JIESONG 助手',
     isPublic: true,
     isLegacy: false,
     prompt: UNIFIED_SYSTEM_PROMPT,

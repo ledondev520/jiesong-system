@@ -40,7 +40,7 @@ interface Message {
 const INITIAL_MESSAGE: Message = {
   id: '1',
   role: 'assistant',
-  content: '您好！我是捷淞智能助手。可以帮你查财务数据、出口合同、修改汇率等系统配置。直接提问即可，我会自动调用系统数据回答。',
+  content: '您好！我是JIESONG 助手。可以帮你查财务数据、出口合同、修改汇率等系统配置。直接提问即可，我会自动调用系统数据回答。',
   createdAt: new Date(),
 };
 
@@ -604,7 +604,7 @@ export function AIAssistant() {
             <div className="flex items-center justify-between px-4 py-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Bot className="h-5 w-5 text-primary" />
-                捷淞智能助手
+                JIESONG 助手
               </CardTitle>
               <div className="flex items-center gap-1">
                 <Button

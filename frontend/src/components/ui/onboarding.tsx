@@ -21,8 +21,8 @@ const ONBOARDING_KEY = 'jiesong_onboarding_completed';
 
 const ONBOARDING_STEPS = [
   {
-    title: '欢迎使用捷淞系统',
-    description: '进出口贸易管理一体化平台，让采购、出口、财务协同更高效。',
+    title: '欢迎使用捷淞国际物流',
+    description: 'JIESONG，让采购、出口、财务协同更高效。',
     icon: Ship,
     color: 'text-blue-500',
   },
@@ -40,7 +40,7 @@ const ONBOARDING_STEPS = [
   },
   {
     title: '开始使用',
-    description: '点击"开始使用"进入工作台，开始您的进出口业务管理。',
+    description: '点击"开始使用"进入工作台，开始您的业务管理。',
     icon: CheckCircle,
     color: 'text-purple-500',
   },

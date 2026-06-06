@@ -68,7 +68,7 @@ describe('AIAssistant', () => {
 
     await user.click(screen.getByRole('button', { name: 'AI 助手' }));
     expect(screen.getByRole('complementary', { name: 'AI 助手侧边面板' })).toBeInTheDocument();
-    expect(screen.getByText('捷淞智能助手')).toBeInTheDocument();
+    expect(screen.getByText('JIESONG 助手')).toBeInTheDocument();
   });
 
   it('流式发送消息显示逐步内容', async () => {

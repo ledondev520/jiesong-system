@@ -188,7 +188,7 @@ async function importPurchaseContracts() {
 
 async function main() {
   console.log('========================================');
-  console.log('  捷淞系统 — 采购数据批量导入');
+  console.log('  捷淞国际物流 — 采购数据批量导入');
   console.log('========================================');
 
   try {

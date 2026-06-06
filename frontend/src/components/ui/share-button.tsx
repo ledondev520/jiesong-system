@@ -29,7 +29,7 @@ interface ShareButtonProps {
 
 export function ShareButton({
   url,
-  title = '捷淞系统',
+  title = '捷淞国际物流',
   variant = 'outline',
   size = 'sm',
 }: ShareButtonProps) {

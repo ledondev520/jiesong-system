@@ -69,12 +69,12 @@ export function Header() {
       <Link
         href="/dashboard"
         className="flex items-center gap-2 md:hidden"
-        aria-label="捷淞系统首页"
+        aria-label="捷淞国际物流首页"
       >
         <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
           <Ship className="h-3.5 w-3.5" />
         </span>
-        <span className="text-sm font-semibold">捷淞系统</span>
+        <span className="text-sm font-semibold">捷淞国际物流</span>
       </Link>
 
       <div className="flex flex-1 items-center gap-4">

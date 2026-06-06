@@ -104,7 +104,7 @@ const runCli = async (argv, {
   // help 不需要认证
   if (args[0] === 'help' || args[0] === '--help' || args[0] === '-h' || !args[0]) {
     stdout.write(`
-捷淞系统 CLI (jiesong)
+捷淞国际物流 CLI (jiesong)
 
 环境变量:
   JIESONG_BASE_URL    后端地址 (默认: http://localhost:3001)

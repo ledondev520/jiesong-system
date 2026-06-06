@@ -187,7 +187,7 @@ function LoginFormClient() {
             </div>
           </div>
           <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight">捷淞系统</h1>
+            <h1 className="text-2xl font-bold tracking-tight">捷淞国际物流</h1>
           </div>
         </div>
 
@@ -314,7 +314,7 @@ function LoginFormClient() {
 
         {/* 底部版权 */}
         <p className="mt-6 text-[11px] text-muted-foreground/50">
-          © 捷淞系统 · 安全可靠的进出口贸易管理平台
+          © 捷淞国际物流 · JIESONG
         </p>
       </div>
     </div>
@@ -335,8 +335,8 @@ export default function LoginPage() {
                 </div>
               </div>
               <div className="text-center">
-                <h1 className="text-2xl font-bold tracking-tight">捷淞系统</h1>
-                <p className="mt-1 text-sm text-muted-foreground/80">进出口贸易一站式管理平台</p>
+                <h1 className="text-2xl font-bold tracking-tight">捷淞国际物流</h1>
+                <p className="mt-1 text-sm text-muted-foreground/80">JIESONG</p>
               </div>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground/60">

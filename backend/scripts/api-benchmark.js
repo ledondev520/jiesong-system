@@ -92,7 +92,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`\n捷淞系统 API 性能基线测试`);
+  console.log(`\n捷淞国际物流 API 性能基线测试`);
   console.log(`目标: P95 < ${TARGET_MS}ms | 并发: ${CONCURRENCY} | 每端点: ${REQUESTS_PER_ENDPOINT} 次`);
   console.log(`Base URL: ${BASE_URL}\n`);
 

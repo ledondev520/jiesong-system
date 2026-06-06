@@ -178,7 +178,7 @@ export function Sidebar() {
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/20">
             <Ship className="h-4 w-4" />
           </span>
-          <span>捷淞系统</span>
+          <span>捷淞国际物流</span>
         </Link>
       </div>
 
