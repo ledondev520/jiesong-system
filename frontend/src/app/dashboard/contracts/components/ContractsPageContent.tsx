@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PurchaseContract, PurchaseStatus, PurchaseItem } from '@/types';
@@ -34,7 +34,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { AmountText } from '@/components/ui/amount-text';
-import { Plus, Eye, ShoppingCart, Package, Loader2, FileDown, Filter, X, FileText, Store, Truck } from 'lucide-react';
+import { Plus, Eye, ShoppingCart, Package, Loader2, FileDown, Filter, X, FileText, Store, Truck, Upload, Download } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -183,6 +183,12 @@ export default function ContractsPageContent() {
     depositRate: '30',
   });
 
+  // 批量导入导出状态
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResultOpen, setImportResultOpen] = useState(false);
+  const [importResult, setImportResult] = useState<{ successRows: number; failedRows: number; errors: { row: number; error: string }[] } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // 0. 初始化加载
   useEffect(() => {
     loadPurchaseContracts();
@@ -233,6 +239,56 @@ export default function ContractsPageContent() {
       toast.error(message);
     } finally {
       setGenerateLoading(false);
+    }
+  };
+
+  // 6. 导出采购合同 Excel
+  const handleExport = async () => {
+    try {
+      const params: { status?: string; dateFrom?: string; dateTo?: string } = {};
+      if (purchaseStatusFilter && purchaseStatusFilter !== 'ALL') params.status = purchaseStatusFilter;
+      const blob = await purchaseService.exportExcel(params);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `采购合同导出_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success('导出成功');
+    } catch {
+      toast.error('导出失败');
+    }
+  };
+
+  // 7. 批量导入
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    setImportLoading(true);
+    try {
+      const response = await purchaseService.importExcel(file);
+      setImportResult(response.data);
+      setImportResultOpen(true);
+      if (response.data?.failedRows === 0) {
+        toast.success(`成功导入 ${response.data.successRows} 条合同`);
+      } else {
+        toast.warning(`导入完成：成功 ${response.data.successRows} 条，失败 ${response.data.failedRows} 条`);
+      }
+      // 刷新列表
+      await loadPurchaseContracts();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '导入失败';
+      toast.error(message);
+    } finally {
+      setImportLoading(false);
     }
   };
 
@@ -455,14 +511,28 @@ export default function ContractsPageContent() {
                   </div>
                 </SheetContent>
               </Sheet>
+              <Button variant="outline" className="h-11 rounded-2xl" onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" /> 导出 Excel
+              </Button>
+              <Button variant="outline" className="h-11 rounded-2xl" onClick={handleImportClick} disabled={importLoading}>
+                <Upload className="mr-2 h-4 w-4" /> 批量导入
+              </Button>
               <Button className="h-11 rounded-2xl" onClick={() => router.push('/dashboard/purchase/create')}>
                 <Plus className="mr-2 h-4 w-4" /> 新增采购
               </Button>
             </div>
 
-            <Button className="hidden h-10 rounded-xl md:inline-flex" onClick={() => router.push('/dashboard/purchase/create')}>
-              <Plus className="mr-2 h-4 w-4" /> 新增采购
-            </Button>
+            <div className="hidden md:flex md:items-center md:gap-2">
+              <Button variant="outline" className="h-10 rounded-xl" onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" /> 导出 Excel
+              </Button>
+              <Button variant="outline" className="h-10 rounded-xl" onClick={handleImportClick} disabled={importLoading}>
+                <Upload className="mr-2 h-4 w-4" /> 批量导入
+              </Button>
+              <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/purchase/create')}>
+                <Plus className="mr-2 h-4 w-4" /> 新增采购
+              </Button>
+            </div>
           </div>
 
           <div className="grid gap-3 md:hidden">
@@ -865,6 +935,59 @@ export default function ContractsPageContent() {
                   生成合同
                 </>
               )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 隐藏的文件选择器 */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
+      {/* 导入结果弹窗 */}
+      <Dialog open={importResultOpen} onOpenChange={setImportResultOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>导入结果</DialogTitle>
+            <DialogDescription>
+              成功 {importResult?.successRows ?? 0} 条，失败 {importResult?.failedRows ?? 0} 条
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {(importResult?.errors.length ?? 0) > 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-destructive">失败明细：</p>
+                <div className="max-h-[40vh] overflow-y-auto rounded-lg border border-border/70">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-16">行号</TableHead>
+                        <TableHead>错误原因</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {importResult?.errors.map((err, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell className="tabular-nums">{err.row}</TableCell>
+                          <TableCell className="text-destructive text-sm">{err.error}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">全部导入成功，无失败记录。</p>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setImportResultOpen(false)}>
+              关闭
             </Button>
           </div>
         </DialogContent>

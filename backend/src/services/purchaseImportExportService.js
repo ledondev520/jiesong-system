@@ -1,0 +1,326 @@
+/**
+ * Input: Prisma 客户端、Excel 文件路径或查询参数
+ * Output: Excel Buffer 或导入结果统计
+ * Pos: 采购合同批量导入导出服务
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
+
+const xlsx = require('xlsx');
+const fs = require('fs');
+const prisma = require('../utils/prisma');
+const { createError } = require('../middleware/errorHandler');
+
+const STATUS_LABEL_MAP = {
+  DRAFT: '草稿',
+  SIGNED: '已签订',
+  PRODUCING: '生产中',
+  SHIPPED: '已发货',
+  RECEIVED: '已收货',
+  COMPLETED: '已完成',
+  CANCELLED: '已取消',
+};
+
+const STATUS_VALUE_MAP = {
+  '草稿': 'DRAFT',
+  '已签订': 'SIGNED',
+  '已确认': 'SIGNED',
+  '生产中': 'PRODUCING',
+  '已发货': 'SHIPPED',
+  '已收货': 'RECEIVED',
+  '已完成': 'COMPLETED',
+  '已取消': 'CANCELLED',
+};
+
+const VALID_STATUSES = Object.keys(STATUS_VALUE_MAP);
+
+/**
+ * 职责：生成下一个采购合同编号
+ * 思路：按 CG + 年份后两位 + 5 位序号；若冲突则递增重试
+ */
+const generateNextContractNo = async () => {
+  const year = new Date().getFullYear().toString().slice(-2);
+  const prefix = `CG${year}`;
+  const count = await prisma.purchaseContract.count({
+    where: { contractNo: { startsWith: prefix } },
+  });
+  let seq = count + 1;
+  let contractNo = `${prefix}${String(seq).padStart(5, '0')}`;
+
+  // 避免极端并发或残留数据导致冲突
+  const existing = await prisma.purchaseContract.findUnique({
+    where: { contractNo },
+    select: { id: true },
+  });
+  if (existing) {
+    const maxRecord = await prisma.purchaseContract.findFirst({
+      where: { contractNo: { startsWith: prefix } },
+      orderBy: { contractNo: 'desc' },
+      select: { contractNo: true },
+    });
+    const maxSeq = maxRecord ? parseInt(maxRecord.contractNo.slice(prefix.length), 10) : 0;
+    seq = maxSeq + 1;
+    contractNo = `${prefix}${String(seq).padStart(5, '0')}`;
+  }
+
+  return contractNo;
+};
+
+/**
+ * 职责：将 Buffer 或 ArrayBuffer 转为 Node Buffer
+ */
+const toBuffer = (ab) => {
+  if (Buffer.isBuffer(ab)) return ab;
+  const buf = Buffer.alloc(ab.byteLength);
+  const view = new Uint8Array(ab);
+  for (let i = 0; i < buf.length; i++) {
+    buf[i] = view[i];
+  }
+  return buf;
+};
+
+/**
+ * 职责：格式化日期为 yyyy-MM-dd
+ */
+const formatDate = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 10);
+};
+
+/**
+ * 职责：解析 Excel 中的日期值
+ * 思路：xlsx 读取时日期可能是数字（序列号）或字符串
+ */
+const parseExcelDate = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  if (value instanceof Date) return value;
+  if (typeof value === 'number') {
+    // Excel 日期序列号转 JS Date
+    const d = xlsx.SSF.parse_date_code(value);
+    if (d) return new Date(d.y, d.m - 1, d.d);
+  }
+  if (typeof value === 'string') {
+    const s = value.trim();
+    // yyyy-MM-dd / yyyy/MM/dd
+    const m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+    if (m) {
+      const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      if (!Number.isNaN(d.getTime())) return d;
+    }
+  }
+  return null;
+};
+
+/**
+ * 职责：解析金额
+ */
+const parseAmount = (value) => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/,/g, '').trim();
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+};
+
+/**
+ * 职责：导出采购合同为 Excel
+ * 思路：
+ *   1. 按查询参数筛选合同
+ *   2. 查询供应商信息
+ *   3. 组装数据并使用 xlsx 生成 Buffer
+ * @param {Object} query - 查询参数 { status, supplierId, dateFrom, dateTo }
+ * @returns {Promise<{buffer: Buffer, filename: string}>}
+ */
+const exportPurchasesExcel = async (query = {}) => {
+  const { status, supplierId, dateFrom, dateTo } = query;
+
+  const where = {};
+  if (status) where.status = status;
+  if (supplierId) where.supplierId = supplierId;
+  if (dateFrom || dateTo) {
+    where.signedAt = {};
+    if (dateFrom) where.signedAt.gte = new Date(dateFrom);
+    if (dateTo) where.signedAt.lte = new Date(dateTo);
+  }
+
+  const contracts = await prisma.purchaseContract.findMany({
+    where,
+    include: { supplier: true },
+    orderBy: { contractNo: 'desc' },
+  });
+
+  const rows = contracts.map((c) => ({
+    '合同编号': c.contractNo,
+    '供应商名称': c.supplier?.name || '',
+    '签订日期': formatDate(c.signedAt),
+    '总金额': c.totalAmount,
+    '币种': 'CNY',
+    '状态': STATUS_LABEL_MAP[c.status] || c.status,
+    '备注': c.note || '',
+  }));
+
+  const worksheet = xlsx.utils.json_to_sheet(rows);
+  const workbook = xlsx.utils.book_new();
+  xlsx.utils.book_append_sheet(workbook, worksheet, '采购合同');
+
+  // 设置列宽
+  worksheet['!cols'] = [
+    { wch: 16 }, // 合同编号
+    { wch: 24 }, // 供应商名称
+    { wch: 12 }, // 签订日期
+    { wch: 14 }, // 总金额
+    { wch: 8 },  // 币种
+    { wch: 10 }, // 状态
+    { wch: 30 }, // 备注
+  ];
+
+  const buffer = toBuffer(xlsx.write(workbook, { bookType: 'xlsx', type: 'buffer' }));
+  const filename = `采购合同导出_${formatDate()}.xlsx`;
+  return { buffer, filename };
+};
+
+/**
+ * 职责：从 Excel 批量导入采购合同
+ * 思路：
+ *   1. 读取 Excel 文件
+ *   2. 逐行校验（供应商名称必填、日期格式、金额格式、状态有效性）
+ *   3. 查找供应商 ID（不存在则报错）
+ *   4. 合同编号留空则自动生成
+ *   5. 写入数据库
+ *   6. 返回成功/失败统计及错误明细
+ * @param {string} filePath - 上传的 Excel 文件路径
+ * @param {string} _userId - 操作用户 ID（预留）
+ * @returns {Promise<{successRows: number, failedRows: number, errors: Array}>}
+ */
+const importPurchasesExcel = async (filePath, _userId) => {
+  if (!fs.existsSync(filePath)) {
+    throw createError('上传文件不存在', 400);
+  }
+
+  const workbook = xlsx.readFile(filePath);
+  const sheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[sheetName];
+  const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+  if (rawData.length < 2) {
+    throw createError('Excel 文件为空或缺少数据行', 400);
+  }
+
+  // 解析表头（支持中英文及常见别名）
+  const headers = rawData[0].map((h) => (typeof h === 'string' ? h.trim() : ''));
+  const colIndex = {};
+  const findCol = (names) => {
+    for (let i = 0; i < headers.length; i++) {
+      const h = headers[i];
+      for (const name of names) {
+        if (h === name) return i;
+      }
+    }
+    return -1;
+  };
+
+  colIndex.contractNo = findCol(['合同编号', '合同号', '编号']);
+  colIndex.supplierName = findCol(['供应商名称', '供应商', 'supplierName', '厂家']);
+  colIndex.signedAt = findCol(['签订日期', '签订时间', '日期', 'signedAt']);
+  colIndex.totalAmount = findCol(['总金额', '金额', 'totalAmount', '总价']);
+  colIndex.currency = findCol(['币种', '货币', 'currency']);
+  colIndex.status = findCol(['状态', 'status']);
+  colIndex.note = findCol(['备注', '说明', 'note']);
+
+  if (colIndex.supplierName === -1) {
+    throw createError('Excel 缺少「供应商名称」列，请检查表头', 400);
+  }
+
+  const errors = [];
+  let successRows = 0;
+  let failedRows = 0;
+
+  // 预加载所有供应商，避免 N+1
+  const allSuppliers = await prisma.supplier.findMany({ select: { id: true, name: true } });
+  const supplierMap = new Map(allSuppliers.map((s) => [s.name, s.id]));
+
+  const dataRows = rawData.slice(1);
+
+  for (let i = 0; i < dataRows.length; i++) {
+    const row = dataRows[i];
+    const rowNum = i + 2; // Excel 行号（含表头）
+
+    try {
+      const supplierName = String(row[colIndex.supplierName] || '').trim();
+      if (!supplierName) {
+        throw new Error(`第 ${rowNum} 行：供应商名称为空`);
+      }
+
+      const supplierId = supplierMap.get(supplierName);
+      if (!supplierId) {
+        throw new Error(`第 ${rowNum} 行：供应商「${supplierName}」不存在，请先创建供应商`);
+      }
+
+      let contractNo = colIndex.contractNo !== -1 ? String(row[colIndex.contractNo] || '').trim() : '';
+      if (!contractNo) {
+        contractNo = await generateNextContractNo();
+      } else {
+        // 检查合同编号是否已存在
+        const existing = await prisma.purchaseContract.findUnique({
+          where: { contractNo },
+          select: { id: true },
+        });
+        if (existing) {
+          throw new Error(`第 ${rowNum} 行：合同编号「${contractNo}」已存在`);
+        }
+      }
+
+      const signedAt = colIndex.signedAt !== -1 ? parseExcelDate(row[colIndex.signedAt]) : null;
+
+      const totalAmount = colIndex.totalAmount !== -1 ? parseAmount(row[colIndex.totalAmount]) : null;
+      if (totalAmount !== null && (totalAmount < 0 || Number.isNaN(totalAmount))) {
+        throw new Error(`第 ${rowNum} 行：总金额格式不正确`);
+      }
+
+      let status = 'DRAFT';
+      if (colIndex.status !== -1) {
+        const statusInput = String(row[colIndex.status] || '').trim();
+        if (statusInput) {
+          if (!VALID_STATUSES.includes(statusInput)) {
+            throw new Error(
+              `第 ${rowNum} 行：状态「${statusInput}」无效，可选值：${VALID_STATUSES.join('、')}`
+            );
+          }
+          status = STATUS_VALUE_MAP[statusInput];
+        }
+      }
+
+      const note = colIndex.note !== -1 ? String(row[colIndex.note] || '').trim() : '';
+
+      await prisma.purchaseContract.create({
+        data: {
+          contractNo,
+          supplierId,
+          signedAt,
+          totalAmount: totalAmount ?? 0,
+          status,
+          note: note || null,
+        },
+      });
+
+      successRows++;
+    } catch (error) {
+      failedRows++;
+      errors.push({
+        row: rowNum,
+        error: error.message,
+      });
+    }
+  }
+
+  return { successRows, failedRows, errors };
+};
+
+module.exports = {
+  exportPurchasesExcel,
+  importPurchasesExcel,
+};

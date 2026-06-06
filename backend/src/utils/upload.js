@@ -67,6 +67,31 @@ const upload = multer({
   },
 });
 
+// 合同附件专用：限制 10MB，仅允许 pdf/jpg/png/xlsx/docx
+const contractFileFilter = (req, file, cb) => {
+  const allowedTypes = [
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ];
+
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('仅支持 PDF、JPG、PNG、XLSX、DOCX 格式'), false);
+  }
+};
+
+const contractUpload = multer({
+  storage,
+  fileFilter: contractFileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB
+  },
+});
+
 /**
  * 职责：获取文件的相对路径（用于存储到数据库）
  * @param {string} absolutePath - 文件绝对路径
@@ -98,6 +123,7 @@ const deleteFile = (relativePath) => {
 
 module.exports = {
   upload,
+  contractUpload,
   getRelativePath,
   getFullPath,
   deleteFile,

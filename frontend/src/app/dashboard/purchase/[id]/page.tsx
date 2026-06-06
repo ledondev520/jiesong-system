@@ -8,21 +8,11 @@
 
 'use client';
 
-import { useState, useEffect, use, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, use, useCallback, useMemo } from 'react';
 import { PurchaseContract, PurchaseItem, PurchaseStatus } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
 import { contractDocService } from '@/services/contractDoc.service';
-import api from '@/lib/axios';
-import type { ApiResponse } from '@/types';
-
-interface ContractFile {
-  id: string;
-  fileName: string;
-  fileType: string;
-  fileSize: number;
-  filePath: string;
-  uploadedAt: string;
-}
+import { listContractFiles, type ContractFile } from '@/services/contractFile.service';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,10 +35,11 @@ import {
 } from '@/components/ui/dialog';
 import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Progress } from '@/components/ui/progress';
-import { Package, DollarSign, Building2, FileDown, Loader2, Eye, Download, Paperclip, Upload, Trash2, FileText } from 'lucide-react';
+import { Package, DollarSign, Building2, FileDown, Loader2, Eye, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { PageHeader } from '@/components/layout/PageHeader';
+import ContractFiles from '@/components/contract/ContractFiles';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -75,8 +66,6 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [contractFiles, setContractFiles] = useState<ContractFile[]>([]);
-  const [uploadingFile, setUploadingFile] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   /**
    * 职责：加载采购合同详情 + 附件列表
@@ -86,7 +75,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     try {
       const [contractRes, filesRes] = await Promise.all([
         purchaseService.getById(id),
-        api.get<ApiResponse<ContractFile[]>, ApiResponse<ContractFile[]>>(`/purchases/${id}/files`),
+        listContractFiles(id, 'PURCHASE'),
       ]);
       setContract(contractRes.data || null);
       if (filesRes.data) setContractFiles(filesRes.data);
@@ -100,47 +89,6 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   useEffect(() => {
     void loadData();
   }, [loadData]);
-
-  /**
-   * 职责：上传合同附件到后端
-   */
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    setUploadingFile(true);
-    try {
-      const res = await fetch(`/api/v1/purchases/${id}/files`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('auth-token') || sessionStorage.getItem('auth-token') || ''}` },
-        body: formData,
-      });
-      if (!res.ok) throw new Error('上传失败');
-      toast.success(`「${file.name}」上传成功`);
-      void loadData();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : '附件上传失败');
-    } finally {
-      setUploadingFile(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  /**
-   * 职责：删除指定附件
-   */
-  const handleFileDelete = async (fileId: string, fileName: string) => {
-    try {
-      await api.delete(`/purchases/files/${fileId}`);
-      setContractFiles((prev) => prev.filter((f) => f.id !== fileId));
-      toast.success(`「${fileName}」已删除`);
-    } catch {
-      toast.error('删除附件失败');
-    }
-  };
 
   /**
    * 职责：获取状态徽章
@@ -458,83 +406,15 @@ export default function PurchaseDetailPage({ params }: PageProps) {
       )}
 
       {/* 合同附件 */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Paperclip className="h-5 w-5 text-muted-foreground" />
-              <CardTitle>合同附件</CardTitle>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingFile}
-            >
-              {uploadingFile ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />上传中...</>
-              ) : (
-                <><Upload className="mr-2 h-4 w-4" />上传附件</>
-              )}
-            </Button>
-            <input
-              id="purchase-contract-attachment-upload"
-              name="purchaseContractAttachmentUpload"
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls"
-              onChange={handleFileUpload}
-            />
-          </div>
-          <CardDescription>
-            支持 PDF、Word、Excel、图片等格式，用于归档原始合同或补充文件
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {contractFiles.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
-              <Paperclip className="h-8 w-8 opacity-30" />
-              <p className="text-sm">暂无附件，点击「上传附件」归档合同文件</p>
-            </div>
-          ) : (
-            <div className="divide-y">
-              {contractFiles.map((file) => (
-                <div key={file.id} className="flex items-center justify-between py-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <FileText className="h-5 w-5 text-primary flex-shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{file.fileName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {((file.fileSize || 0) / 1024).toFixed(1)} KB · {format(new Date(file.uploadedAt), 'yyyy-MM-dd HH:mm')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0 ml-4">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      asChild
-                    >
-                      <a href={`/api/v1/purchases/files/${file.id}/download`} target="_blank" download={file.fileName}>
-                        <Download className="h-4 w-4" />
-                      </a>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => handleFileDelete(file.id, file.fileName)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <ContractFiles
+        contractId={id}
+        contractType="PURCHASE"
+        files={contractFiles}
+        onChange={setContractFiles}
+        title="合同附件"
+        description="支持 PDF、JPG、PNG、XLSX、DOCX 格式，单文件最大 10MB，用于归档原始合同或补充文件"
+        emptyHint="暂无附件，点击「上传附件」归档合同文件"
+      />
 
       {/* 生成购销合同弹窗 */}
       <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>

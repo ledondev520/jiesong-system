@@ -651,7 +651,9 @@ model ContractFile {
   fileName           String
   filePath           String
   fileType           String
+  mimeType           String   @default("")
   fileSize           Int
+  description        String?
   uploadedAt         DateTime @default(now())
 
   purchaseContract PurchaseContract @relation(fields: [purchaseContractId], references: [id], onDelete: Cascade)
@@ -665,7 +667,9 @@ model SalesContractFile {
   fileName        String
   filePath        String
   fileType        String
+  mimeType        String   @default("")
   fileSize        Int
+  description     String?
   uploadedAt      DateTime @default(now())
 
   salesContract SalesContract @relation(fields: [salesContractId], references: [id], onDelete: Cascade)

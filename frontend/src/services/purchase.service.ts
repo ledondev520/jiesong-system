@@ -86,6 +86,12 @@ const crud = createCrudService<PurchaseContract, PurchaseCreatePayload, Partial<
   '/purchases'
 );
 
+export interface ImportResult {
+  successRows: number;
+  failedRows: number;
+  errors: { row: number; error: string }[];
+}
+
 export interface ProductPriceHistory {
   averagePrice: number | null;
   minPrice: number | null;
@@ -124,6 +130,32 @@ export const purchaseService = {
       '/purchases/suppliers-by-products',
       { productIds },
     );
+  },
+
+  /**
+   * 导出采购合同 Excel。
+   */
+  exportExcel: async (params?: { status?: string; supplierId?: string; dateFrom?: string; dateTo?: string }) => {
+    const response = await api.get('/purchases/export', {
+      params,
+      responseType: 'blob',
+      cache: { enabled: false },
+    } as any);
+    return response as unknown as Blob;
+  },
+
+  /**
+   * 批量导入采购合同 Excel。
+   */
+  importExcel: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiResponse<ImportResult>, ApiResponse<ImportResult>, FormData>(
+      '/purchases/import',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response;
   },
 
   /**

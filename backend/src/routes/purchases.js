@@ -13,10 +13,17 @@ const { accessAuth } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 const { upload } = require('../utils/upload');
 const { withAuditLog } = require('../middleware/auditLog');
+const purchaseImportExportController = require('../controllers/purchaseImportExportController');
 
 const router = Router();
 
 router.use(authenticate);
+
+// GET /api/v1/purchases/export - 导出采购合同 Excel
+router.get('/export', purchaseImportExportController.exportExcel);
+
+// POST /api/v1/purchases/import - 批量导入采购合同 Excel
+router.post('/import', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), upload.single('file'), purchaseImportExportController.importExcel);
 
 // GET /api/v1/purchases - 获取采购合同列表
 router.get('/', withPaginationValidation, purchaseController.list);

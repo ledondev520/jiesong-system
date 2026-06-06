@@ -43,6 +43,7 @@ const opsExecutionRoutes = require('./opsExecution');
 const procurementTemplateRoutes = require('./procurementTemplate');
 const bankFlowRoutes = require('./bankFlow');
 const notificationRoutes = require('./notifications');
+const fileRoutes = require('./files');
 
 const router = Router();
 
@@ -82,5 +83,6 @@ router.use('/procurement-template', procurementTemplateRoutes);  // 开业采购
 router.use('/batch-import', batchImportRoutes);  // 批量导入
 router.use('/bank-flow', bankFlowRoutes);  // 银行流水与发票查询
 router.use('/notifications', notificationRoutes);  // 站内通知
+router.use('/', fileRoutes);  // 合同附件（/contracts/:id/files, /files/:id/download）
 
 module.exports = router;

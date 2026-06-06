@@ -49,6 +49,7 @@ function LoginFormClient() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [isClientReady, setIsClientReady] = useState(false);
   const [quickLoginProfile, setQuickLoginProfile] = useState<QuickLoginProfile | null>(null);
 
   // 检查会话过期参数
@@ -66,6 +67,11 @@ function LoginFormClient() {
       password: '',
     },
   });
+
+  // Hydration 完成前禁用提交，避免浏览器按原生 GET 表单把账号密码拼进 URL。
+  useEffect(() => {
+    setIsClientReady(true);
+  }, []);
 
   // 恢复快捷登录入口（当前浏览器维度）
   useEffect(() => {
@@ -154,7 +160,7 @@ function LoginFormClient() {
   }
 
   const handleQuickLogin = useCallback(() => {
-    if (!quickLoginProfile || isLoading) {
+    if (!quickLoginProfile || !isClientReady || isLoading) {
       return;
     }
 
@@ -162,7 +168,7 @@ function LoginFormClient() {
     form.setValue('password', quickLoginProfile.password, { shouldDirty: true, shouldValidate: true });
     setError(null);
     void performLogin(quickLoginProfile.username, quickLoginProfile.password);
-  }, [form, isLoading, performLogin, quickLoginProfile]);
+  }, [form, isClientReady, isLoading, performLogin, quickLoginProfile]);
 
   return (
     <div className="auth-shell">
@@ -258,7 +264,7 @@ function LoginFormClient() {
                       variant="outline"
                       className="h-11 w-full rounded-xl border-primary/20 bg-primary/[0.04] text-primary transition-all hover:bg-primary/8 hover:border-primary/30"
                       onClick={handleQuickLogin}
-                      disabled={isLoading}
+                      disabled={!isClientReady || isLoading}
                     >
                       <LogIn className="mr-2 h-4 w-4" />
                       一键登录（{quickLoginProfile.username}）
@@ -269,7 +275,7 @@ function LoginFormClient() {
                 <Button
                   type="submit"
                   className="h-11 w-full rounded-xl text-sm font-medium shadow-md shadow-primary/20 transition-all duration-200 hover:shadow-lg hover:shadow-primary/25 hover:brightness-105 active:scale-[0.985]"
-                  disabled={isLoading}
+                  disabled={!isClientReady || isLoading}
                 >
                   {isLoading ? (
                     <>
