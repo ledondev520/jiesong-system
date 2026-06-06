@@ -1,5 +1,22 @@
 # Ops Execution Center Plan
 
+## 2026-06-06 LOGIN-01（域名登录点击无效修复）
+
+### Goal
+- 修复 `https://celerada.link/login` 点击登录后未进入系统的问题。
+- 保持 `xuminjie` 管理员账号和首次登录后的本地快捷登录能力可用。
+
+### Delivered
+- 线上排查确认账号接口登录成功，但前端按钮在 JS hydration 前可点击时会触发浏览器原生 GET 表单提交，导致 URL 变成 `/login?username=...&password=...`，没有调用登录 API。
+- 更新登录页：hydration 完成前禁用登录和一键登录按钮，避免账号密码进入 URL，并确保点击只走 React 登录流程。
+
+### Verification
+- `cd frontend && npm run test -- 'src/app/(auth)/login/page.test.tsx'`：通过，`6` 个测试。
+- `cd frontend && npx tsc --noEmit`：通过。
+
+### Remaining
+- 需要部署后用真实域名页面再次点击验证：应请求 `/api/v1/auth/login`，写入 session/local storage，并跳转 `/dashboard`。
+
 ## 2026-06-06 CI-03（GitHub 自动构建与验收修复）
 
 ### Goal
