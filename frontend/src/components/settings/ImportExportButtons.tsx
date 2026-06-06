@@ -24,7 +24,7 @@ interface ImportExportButtonsProps<T extends Record<string, unknown>> {
   data: T[];
   filename: string;
   columns: { key: string; label: string }[];
-  onImport: (rows: T[]) => Promise<void>;
+  onImport: (rows: Array<Record<string, unknown>>) => Promise<void>;
   importPreviewRows?: number;
 }
 
@@ -36,8 +36,8 @@ export function ImportExportButtons<T extends Record<string, unknown>>({
   importPreviewRows = 5,
 }: ImportExportButtonsProps<T>) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [previewRows, setPreviewRows] = useState<T[]>([]);
-  const [allImportRows, setAllImportRows] = useState<T[]>([]);
+  const [previewRows, setPreviewRows] = useState<Array<Record<string, unknown>>>([]);
+  const [allImportRows, setAllImportRows] = useState<Array<Record<string, unknown>>>([]);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importing, setImporting] = useState(false);
 

@@ -183,7 +183,7 @@ export default function FinancePage() {
 
   // 计算同比/环比（基于 trends 数组最后两个点）
   const { payableTrend, receivableTrend, payableTrendDir, receivableTrendDir } = useMemo(() => {
-    if (trends.length < 2) {
+    if (trends.length < 2 || !trends[trends.length - 1] || !trends[trends.length - 2]) {
       return {
         payableTrend: '环比持平',
         receivableTrend: '环比持平',
@@ -203,7 +203,7 @@ export default function FinancePage() {
 
   // 现金流预测（简单线性外推）
   const cashFlowForecast = useMemo(() => {
-    if (trends.length < 2) return [];
+    if (trends.length < 2 || !trends[trends.length - 1] || !trends[trends.length - 2]) return [];
     const last = trends[trends.length - 1];
     const prev = trends[trends.length - 2];
     const delta = (last.receivables - last.payables) - (prev.receivables - prev.payables);

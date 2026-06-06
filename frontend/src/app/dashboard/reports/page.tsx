@@ -31,16 +31,22 @@ import {
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ComposedChart,
+  Area,
+  Legend,
 } from 'recharts';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, OPERATIONS_TABS } from '@/components/layout/ModuleTabHeader';
 import { reportsService, type BusinessOverview } from '@/services/reports.service';
 import { Button } from '@/components/ui/button';
+import { ChartTooltip } from '@/components/finance/ChartTooltip';
 
 const formatCurrency = (amount: number, currency: 'USD' | 'CNY') => {
   const symbol = currency === 'USD' ? '$' : '¥';
@@ -48,6 +54,12 @@ const formatCurrency = (amount: number, currency: 'USD' | 'CNY') => {
 };
 
 const formatPercent = (value: number) => `${(value * 100).toFixed(1)}%`;
+
+const REPORT_COLORS = {
+  sales: '#10b981',
+  purchases: '#ef4444',
+  profit: '#3b82f6',
+};
 
 export default function BusinessReportsPage() {
   const [data, setData] = useState<BusinessOverview | null>(null);
@@ -319,7 +331,7 @@ export default function BusinessReportsPage() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={trends.monthlySales}>
+                <ComposedChart data={trends.monthlySales}>
                   <CartesianGrid vertical={false} strokeDasharray="4 4" stroke="var(--border)" />
                   <XAxis
                     dataKey="month"
@@ -335,24 +347,23 @@ export default function BusinessReportsPage() {
                     tickLine={false}
                   />
                   <Tooltip
-                    contentStyle={{
-                      borderRadius: '12px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--card)',
-                      fontSize: '13px',
-                    }}
-                    formatter={(value) => [`$${Number(value).toLocaleString()}`, '销售额']}
-                    labelFormatter={(label) => `${label}`}
+                    content={
+                      <ChartTooltip
+                        valueFormatter={(v) => `$${Number(v).toLocaleString()}`}
+                      />
+                    }
                   />
+                  <Legend />
+                  <Bar dataKey="amount" name="销售额" fill={REPORT_COLORS.sales} radius={[4, 4, 0, 0]} />
                   <Line
                     type="monotone"
                     dataKey="amount"
-                    stroke="var(--chart-3)"
-                    strokeWidth={2.5}
-                    dot={{ fill: 'var(--chart-3)', r: 5, strokeWidth: 2, stroke: 'var(--background)' }}
-                    activeDot={{ r: 7, strokeWidth: 2, stroke: 'var(--background)' }}
+                    name="趋势线"
+                    stroke={REPORT_COLORS.profit}
+                    strokeWidth={2}
+                    dot={false}
                   />
-                </LineChart>
+                </ComposedChart>
               </ResponsiveContainer>
             )}
           </CardContent>

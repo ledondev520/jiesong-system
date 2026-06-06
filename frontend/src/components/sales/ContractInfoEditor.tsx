@@ -106,16 +106,16 @@ export function ContractInfoEditor({ contract, stores, onSave }: ContractInfoEdi
     {
       icon: <DollarSign className="h-4 w-4 text-muted-foreground" />,
       label: '总金额',
-      value: `$${contract.totalAmount.toLocaleString()}`,
+      value: `$${(contract.totalAmount || 0).toLocaleString()}`,
       editable: false,
       highlight: true,
     },
     {
       icon: <DollarSign className="h-4 w-4 text-muted-foreground" />,
       label: '已收款',
-      value: `$${contract.receivedAmount.toLocaleString()}`,
+      value: `$${(contract.receivedAmount || 0).toLocaleString()}`,
       editable: false,
-      highlight: contract.receivedAmount > 0,
+      highlight: (contract.receivedAmount || 0) > 0,
     },
     {
       icon: <Container className="h-4 w-4 text-muted-foreground" />,

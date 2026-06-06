@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/table';
 import { BatchActionBar } from '@/components/settings/BatchActionBar';
 import { ImportExportButtons } from '@/components/settings/ImportExportButtons';
+import * as XLSX from 'xlsx';
 
 export default function PortsPage() {
   const [ports, setPorts] = useState<SystemPortItem[]>([]);
@@ -201,7 +202,7 @@ export default function PortsPage() {
               </Button>
             )}
             <ImportExportButtons
-              data={filteredPorts}
+              data={filteredPorts as unknown as Record<string, unknown>[]}
               filename="港口数据"
               columns={[
                 { key: 'name', label: '名称' },
@@ -230,11 +231,10 @@ export default function PortsPage() {
         onExport={() => {
           const selected = ports.filter((p) => selectedIds.has(p.id));
           if (selected.length === 0) return;
-          const { utils, writeFile } = require('xlsx');
-          const ws = utils.json_to_sheet(selected.map((p) => ({ 名称: p.name, 代码: p.code, 状态: p.isActive ? '正常' : '已停用' })));
-          const wb = utils.book_new();
-          utils.book_append_sheet(wb, ws, '港口');
-          writeFile(wb, '选中港口数据.xlsx');
+          const ws = XLSX.utils.json_to_sheet(selected.map((p) => ({ 名称: p.name, 代码: p.code, 状态: p.isActive ? '正常' : '已停用' })));
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, '港口');
+          XLSX.writeFile(wb, '选中港口数据.xlsx');
           toast.success('导出成功');
         }}
         onClear={() => setSelectedIds(new Set())}

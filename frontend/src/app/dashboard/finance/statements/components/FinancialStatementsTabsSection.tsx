@@ -4,8 +4,8 @@
  * Pos: 财务报表页主分析区
  */
 
-import { Building2, DollarSign, AlertTriangle, AlertCircle, BarChart3, Loader2, Scale, TrendingUp, Wallet } from 'lucide-react';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Building2, DollarSign, AlertTriangle, AlertCircle, BarChart3, Loader2, Scale, TrendingUp, Wallet, PieChart as PieChartIcon, Activity } from 'lucide-react';
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, LineChart, Pie, PieChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -14,17 +14,19 @@ import type { AnalyticsData, FinancialPeriod } from '@/services/financialStateme
 import { profitColor } from './financialStatementsFormatting';
 
 const COLORS = {
-  revenue: '#3b82f6',
+  revenue: '#10b981',
   cost: '#f59e0b',
   admin: '#8b5cf6',
   financial: '#06b6d4',
-  selling: '#10b981',
+  selling: '#3b82f6',
   netProfit: '#22c55e',
   assets: '#3b82f6',
   liabilities: '#ef4444',
   equity: '#10b981',
   cash: '#f59e0b',
 };
+
+const PIE_COLORS = ['#f59e0b', '#8b5cf6', '#06b6d4', '#3b82f6'];
 
 function ChartTooltipContent({
   active,
@@ -40,18 +42,24 @@ function ChartTooltipContent({
   }
 
   return (
-    <div className="rounded-lg border bg-background p-3 text-xs shadow-lg">
+    <div className="rounded-xl border border-border/80 bg-card/95 px-4 py-3 text-xs shadow-xl backdrop-blur-sm">
       <p className="mb-2 font-semibold text-foreground">{label}</p>
-      {payload.map((item, index) => (
-        <div key={`${item.name}-${index}`} className="flex items-center justify-between gap-4">
-          <span style={{ color: item.color }} className="font-medium">
-            {item.name}
-          </span>
-          <span className="font-mono text-foreground">
-            ¥{Number(item.value).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}
-          </span>
-        </div>
-      ))}
+      <div className="space-y-1.5">
+        {payload.map((item, index) => (
+          <div key={`${item.name}-${index}`} className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <span
+                className="inline-block h-2 w-2 rounded-full"
+                style={{ backgroundColor: item.color }}
+              />
+              <span className="font-medium text-muted-foreground">{item.name}</span>
+            </div>
+            <span className="font-mono font-bold text-foreground">
+              ¥{Number(item.value).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -227,6 +235,30 @@ export function FinancialStatementsTabsSection({
   currentDetail,
   detailLoading,
 }: FinancialStatementsTabsSectionProps) {
+  // 支出分类占比数据（取最新一期）
+  const latestTrend = analytics.trends[analytics.trends.length - 1];
+  const expensePieData = latestTrend
+    ? [
+        { name: '营业成本', value: latestTrend.costOfSales, color: PIE_COLORS[0] },
+        { name: '管理费用', value: latestTrend.adminExpenses, color: PIE_COLORS[1] },
+        { name: '财务费用', value: latestTrend.financialExpenses, color: PIE_COLORS[2] },
+        { name: '销售费用', value: latestTrend.sellingExpenses, color: PIE_COLORS[3] },
+      ].filter((d) => d.value > 0)
+    : [];
+
+  // 最近 10 期经营指标（带状态标签）
+  const recentMetrics = [...analytics.trends].reverse().slice(0, 10).map((t) => {
+    const profitRate = t.revenue > 0 ? (t.netProfit / t.revenue) * 100 : 0;
+    return {
+      label: t.label,
+      revenue: t.revenue,
+      cost: t.costOfSales + t.adminExpenses + t.financialExpenses + t.sellingExpenses,
+      profit: t.netProfit,
+      profitRate,
+      status: t.netProfit >= 0 ? ('profit' as const) : ('loss' as const),
+    };
+  });
+
   return (
     <>
       <div data-testid="financial-statements-tabs">
@@ -250,14 +282,14 @@ export function FinancialStatementsTabsSection({
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <ComposedChart data={analytics.trends} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="label" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
-                    <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`} tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                    <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`} tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
                     <Tooltip content={<ChartTooltipContent />} />
                     <Legend />
-                    <ReferenceLine y={0} stroke="#6b7280" strokeDasharray="3 3" />
-                    <Area type="monotone" dataKey="revenue" name="营业收入" fill={COLORS.revenue} fillOpacity={0.1} stroke={COLORS.revenue} strokeWidth={2} />
-                    <Line type="monotone" dataKey="netProfit" name="净利润" stroke={COLORS.netProfit} strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                    <ReferenceLine y={0} stroke="var(--border)" strokeDasharray="3 3" />
+                    <Bar dataKey="revenue" name="营业收入" fill={COLORS.revenue} radius={[4, 4, 0, 0]} />
+                    <Line type="monotone" dataKey="netProfit" name="净利润" stroke={COLORS.netProfit} strokeWidth={2.5} dot={{ r: 4, fill: COLORS.netProfit, strokeWidth: 2, stroke: 'var(--background)' }} activeDot={{ r: 6 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -284,45 +316,142 @@ export function FinancialStatementsTabsSection({
                     })}
                     margin={{ top: 10, right: 30, left: 20, bottom: 5 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                    <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`} tick={{ fontSize: 12 }} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                    <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`} tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
                     <Tooltip content={<ChartTooltipContent />} />
                     <Legend />
-                    <ReferenceLine y={0} stroke="#6b7280" strokeDasharray="3 3" />
+                    <ReferenceLine y={0} stroke="var(--border)" strokeDasharray="3 3" />
                     <Line type="monotone" dataKey="revenueYTD" name="营收累计" stroke={COLORS.revenue} strokeWidth={2} dot={false} />
                     <Line type="monotone" dataKey="netProfitYTD" name="净利润累计" stroke={COLORS.netProfit} strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          <TabsContent value="expenses">
+            {/* 最近经营指标表 */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-primary" />
-                  月度费用结构
+                <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                  <Activity className="h-4 w-4 text-primary" />
+                  最近经营指标
                 </CardTitle>
-                <CardDescription>营业成本 + 管理费用 + 财务费用 + 销售费用（元）</CardDescription>
+                <CardDescription className="text-xs">最近 {recentMetrics.length} 期营收、成本与利润状态</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={360}>
-                  <BarChart data={analytics.trends} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                    <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`} tick={{ fontSize: 12 }} />
-                    <Tooltip content={<ChartTooltipContent />} />
-                    <Legend />
-                    <Bar dataKey="costOfSales" name="营业成本" stackId="a" fill={COLORS.cost} />
-                    <Bar dataKey="adminExpenses" name="管理费用" stackId="a" fill={COLORS.admin} />
-                    <Bar dataKey="financialExpenses" name="财务费用" stackId="a" fill={COLORS.financial} />
-                    <Bar dataKey="sellingExpenses" name="销售费用" stackId="a" fill={COLORS.selling} radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="py-2 text-left font-medium text-muted-foreground">账期</th>
+                        <th className="py-2 text-right font-medium text-muted-foreground">营业收入</th>
+                        <th className="py-2 text-right font-medium text-muted-foreground">总费用</th>
+                        <th className="py-2 text-right font-medium text-muted-foreground">净利润</th>
+                        <th className="py-2 text-right font-medium text-muted-foreground">净利率</th>
+                        <th className="py-2 text-left font-medium text-muted-foreground">状态</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentMetrics.map((m) => (
+                        <tr key={m.label} className="border-b border-border/50 transition-colors hover:bg-muted/30">
+                          <td className="py-1.5 font-medium">{m.label}</td>
+                          <td className="py-1.5 text-right tabular-nums">¥{m.revenue.toLocaleString()}</td>
+                          <td className="py-1.5 text-right tabular-nums text-red-600">¥{m.cost.toLocaleString()}</td>
+                          <td className={`py-1.5 text-right tabular-nums font-semibold ${m.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            ¥{m.profit.toLocaleString()}
+                          </td>
+                          <td className="py-1.5 text-right tabular-nums">{m.profitRate.toFixed(1)}%</td>
+                          <td className="py-1.5">
+                            {m.status === 'profit' ? (
+                              <Badge variant="outline" className="text-emerald-600 border-emerald-200 text-[10px]">盈利</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-red-600 border-red-200 text-[10px]">亏损</Badge>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="expenses" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-primary" />
+                    月度费用结构
+                  </CardTitle>
+                  <CardDescription>营业成本 + 管理费用 + 财务费用 + 销售费用（元）</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={360}>
+                    <BarChart data={analytics.trends} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                      <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                      <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`} tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                      <Tooltip content={<ChartTooltipContent />} />
+                      <Legend />
+                      <Bar dataKey="costOfSales" name="营业成本" stackId="a" fill={COLORS.cost} radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="adminExpenses" name="管理费用" stackId="a" fill={COLORS.admin} radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="financialExpenses" name="财务费用" stackId="a" fill={COLORS.financial} radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="sellingExpenses" name="销售费用" stackId="a" fill={COLORS.selling} radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <PieChartIcon className="h-5 w-5 text-primary" />
+                    支出分类占比
+                  </CardTitle>
+                  <CardDescription>最新账期各项费用占比分布</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {expensePieData.length === 0 ? (
+                    <div className="flex flex-col items-center gap-2 py-14 text-center">
+                      <span className="rounded-full bg-muted/50 p-3">
+                        <PieChartIcon className="h-5 w-5 text-muted-foreground/50" />
+                      </span>
+                      <p className="text-sm text-muted-foreground/60">暂无费用数据</p>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={360}>
+                      <PieChart>
+                        <Tooltip
+                          formatter={(value: unknown, name: unknown) => [
+                            `¥${Number(value ?? 0).toLocaleString('zh-CN')}`,
+                            String(name),
+                          ]}
+                        />
+                        <Legend />
+                        <Pie
+                          data={expensePieData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={80}
+                          outerRadius={120}
+                          paddingAngle={3}
+                          strokeWidth={2}
+                          stroke="var(--background)"
+                        >
+                          {expensePieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="balance" className="space-y-4">
@@ -337,12 +466,12 @@ export function FinancialStatementsTabsSection({
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <LineChart data={analytics.trends} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                    <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`} tick={{ fontSize: 12 }} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                    <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`} tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
                     <Tooltip content={<ChartTooltipContent />} />
                     <Legend />
-                    <ReferenceLine y={0} stroke="#6b7280" strokeDasharray="3 3" />
+                    <ReferenceLine y={0} stroke="var(--border)" strokeDasharray="3 3" />
                     <Line type="monotone" dataKey="totalAssets" name="资产合计" stroke={COLORS.assets} strokeWidth={2} dot={{ r: 3 }} />
                     <Line type="monotone" dataKey="totalLiabilities" name="负债合计" stroke={COLORS.liabilities} strokeWidth={2} dot={{ r: 3 }} />
                     <Line type="monotone" dataKey="totalEquity" name="所有者权益" stroke={COLORS.equity} strokeWidth={2.5} dot={{ r: 4 }} />
@@ -363,11 +492,17 @@ export function FinancialStatementsTabsSection({
                 <CardContent>
                   <ResponsiveContainer width="100%" height={220}>
                     <AreaChart data={analytics.trends} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                      <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`} tick={{ fontSize: 12 }} />
+                      <defs>
+                        <linearGradient id="cashGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={COLORS.cash} stopOpacity={0.2} />
+                          <stop offset="95%" stopColor={COLORS.cash} stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                      <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                      <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`} tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
                       <Tooltip content={<ChartTooltipContent />} />
-                      <Area type="monotone" dataKey="cash" name="货币资金" stroke={COLORS.cash} fill={COLORS.cash} fillOpacity={0.15} strokeWidth={2} />
+                      <Area type="monotone" dataKey="cash" name="货币资金" stroke={COLORS.cash} fill="url(#cashGradient)" strokeWidth={2} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -384,10 +519,16 @@ export function FinancialStatementsTabsSection({
                 <CardContent>
                   <ResponsiveContainer width="100%" height={220}>
                     <LineChart data={analytics.trends} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                      <YAxis tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} tick={{ fontSize: 12 }} domain={[0, 1.2]} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                      <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                      <YAxis tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} domain={[0, 1.2]} axisLine={false} tickLine={false} />
                       <Tooltip
+                        contentStyle={{
+                          borderRadius: '12px',
+                          border: '1px solid var(--border)',
+                          background: 'var(--card)',
+                          fontSize: '13px',
+                        }}
                         formatter={(value) => [
                           value !== undefined ? `${(Number(value) * 100).toFixed(1)}%` : '—',
                           '资产负债率',

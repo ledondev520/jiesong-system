@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/table';
 import { BatchActionBar } from '@/components/settings/BatchActionBar';
 import { ImportExportButtons } from '@/components/settings/ImportExportButtons';
+import * as XLSX from 'xlsx';
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<SystemCategoryItem[]>([]);
@@ -193,7 +194,7 @@ export default function CategoriesPage() {
               </Button>
             )}
             <ImportExportButtons
-              data={filteredCategories}
+              data={filteredCategories as unknown as Record<string, unknown>[]}
               filename="商品分类"
               columns={[
                 { key: 'name', label: '名称' },
@@ -220,11 +221,10 @@ export default function CategoriesPage() {
         onExport={() => {
           const selected = categories.filter((c) => selectedIds.has(c.id));
           if (selected.length === 0) return;
-          const { utils, writeFile } = require('xlsx');
-          const ws = utils.json_to_sheet(selected.map((c) => ({ 名称: c.name })));
-          const wb = utils.book_new();
-          utils.book_append_sheet(wb, ws, '分类');
-          writeFile(wb, '选中分类数据.xlsx');
+          const ws = XLSX.utils.json_to_sheet(selected.map((c) => ({ 名称: c.name })));
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, '分类');
+          XLSX.writeFile(wb, '选中分类数据.xlsx');
           toast.success('导出成功');
         }}
         onClear={() => setSelectedIds(new Set())}

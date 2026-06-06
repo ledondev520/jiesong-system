@@ -2,7 +2,7 @@
  * Input: 采购合同详情API、购销合同生成服务、SortableTableHead、useTableSort
  * Output: 采购合同详情页面（含可排序商品明细、付款记录、合同文档预览）
  * Pos: 采购管理子页面，展示单个采购合同的完整信息
- * 
+ *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
@@ -33,23 +33,179 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Progress } from '@/components/ui/progress';
-import { Package, DollarSign, Building2, FileDown, Loader2, Eye, Download } from 'lucide-react';
+import {
+  Package,
+  DollarSign,
+  Building2,
+  FileDown,
+  Loader2,
+  Eye,
+  Download,
+  Circle,
+  CheckCircle2,
+  Truck,
+  PackageCheck,
+  X,
+  FileText,
+  Phone,
+  User,
+  MapPin,
+  CreditCard,
+  Receipt,
+  Calendar,
+  Store,
+  Percent,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { PageHeader } from '@/components/layout/PageHeader';
 import ContractFiles from '@/components/contract/ContractFiles';
+import { cn } from '@/lib/utils';
 
 interface PageProps {
   params: Promise<{ id: string }>;
+}
+
+/**
+ * 职责：状态 pill 组件（详情页用）
+ */
+function StatusPill({ status }: { status: PurchaseStatus }) {
+  const config: Record<
+    PurchaseStatus,
+    { label: string; icon: React.ReactNode; className: string }
+  > = {
+    [PurchaseStatus.DRAFT]: {
+      label: '草稿',
+      icon: <Circle className="h-3 w-3 fill-current" />,
+      className: 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-950 dark:text-slate-400 dark:border-slate-800',
+    },
+    [PurchaseStatus.SIGNED]: {
+      label: '已确认',
+      icon: <CheckCircle2 className="h-3 w-3" />,
+      className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800',
+    },
+    [PurchaseStatus.PRODUCING]: {
+      label: '生产中',
+      icon: <Loader2 className="h-3 w-3 animate-spin" />,
+      className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800',
+    },
+    [PurchaseStatus.SHIPPED]: {
+      label: '已发货',
+      icon: <Truck className="h-3 w-3" />,
+      className: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800',
+    },
+    [PurchaseStatus.RECEIVED]: {
+      label: '已收货',
+      icon: <PackageCheck className="h-3 w-3" />,
+      className: 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-400 dark:border-violet-800',
+    },
+    [PurchaseStatus.COMPLETED]: {
+      label: '已完成',
+      icon: <CheckCircle2 className="h-3 w-3" />,
+      className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800',
+    },
+    [PurchaseStatus.CANCELLED]: {
+      label: '已取消',
+      icon: <X className="h-3 w-3" />,
+      className: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800',
+    },
+  };
+
+  const c = config[status] || config[PurchaseStatus.DRAFT];
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap',
+        c.className
+      )}
+    >
+      {c.icon}
+      {c.label}
+    </span>
+  );
+}
+
+/**
+ * 职责：合同状态时间线
+ * 思路：按标准流程展示各状态节点，当前状态高亮，已完成节点打勾
+ */
+function ContractTimeline({ currentStatus }: { currentStatus: PurchaseStatus }) {
+  const steps = [
+    { status: PurchaseStatus.DRAFT, label: '草稿', icon: <FileText className="h-3.5 w-3.5" /> },
+    { status: PurchaseStatus.SIGNED, label: '已确认', icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
+    { status: PurchaseStatus.PRODUCING, label: '生产中', icon: <Loader2 className="h-3.5 w-3.5" /> },
+    { status: PurchaseStatus.SHIPPED, label: '已发货', icon: <Truck className="h-3.5 w-3.5" /> },
+    { status: PurchaseStatus.RECEIVED, label: '已收货', icon: <PackageCheck className="h-3.5 w-3.5" /> },
+    { status: PurchaseStatus.COMPLETED, label: '已完成', icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
+  ];
+
+  const currentIndex = steps.findIndex((s) => s.status === currentStatus);
+  const isCancelled = currentStatus === PurchaseStatus.CANCELLED;
+
+  return (
+    <div className="rounded-xl border border-border/40 bg-card p-5 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+      <h3 className="mb-4 text-sm font-medium">合同进度</h3>
+      {isCancelled ? (
+        <div className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-400">
+          <X className="h-4 w-4" />
+          该合同已取消
+        </div>
+      ) : (
+        <div className="flex items-start justify-between">
+          {steps.map((step, idx) => {
+            const isCompleted = idx <= currentIndex;
+            const isCurrent = idx === currentIndex;
+            return (
+              <div key={step.status} className="flex flex-1 flex-col items-center gap-2">
+                <div
+                  className={cn(
+                    'flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors',
+                    isCurrent
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : isCompleted
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-600 dark:bg-emerald-950'
+                        : 'border-border bg-muted text-muted-foreground'
+                  )}
+                >
+                  {isCompleted && !isCurrent ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : (
+                    step.icon
+                  )}
+                </div>
+                <span
+                  className={cn(
+                    'text-[11px] font-medium',
+                    isCurrent ? 'text-primary' : isCompleted ? 'text-foreground' : 'text-muted-foreground'
+                  )}
+                >
+                  {step.label}
+                </span>
+                {idx < steps.length - 1 && (
+                  <div
+                    className={cn(
+                      'absolute mt-4 h-[2px] w-[calc(16.66%-2rem)]',
+                      idx < currentIndex ? 'bg-emerald-500' : 'bg-border'
+                    )}
+                    style={{ marginLeft: '2rem' }}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function PurchaseDetailPage({ params }: PageProps) {
   const { id } = use(params);
   const [contract, setContract] = useState<PurchaseContract | null>(null);
   const [loading, setLoading] = useState(true);
-  
+
   // 生成合同文档弹窗状态
   const [generateOpen, setGenerateOpen] = useState(false);
   const [generateLoading, setGenerateLoading] = useState(false);
@@ -59,7 +215,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     deliveryContact: '',
     depositRate: '30',
   });
-  
+
   // PDF预览状态
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -91,39 +247,19 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   }, [loadData]);
 
   /**
-   * 职责：获取状态徽章
-   */
-  const getStatusBadge = (status: PurchaseStatus) => {
-    const statusMap: Record<PurchaseStatus, { label: string; tone: React.ComponentProps<typeof SemanticBadge>["tone"] }> = {
-      [PurchaseStatus.DRAFT]: { label: '草稿', tone: 'neutral' },
-      [PurchaseStatus.SIGNED]: { label: '已签订', tone: 'info' },
-      [PurchaseStatus.PRODUCING]: { label: '生产中', tone: 'warning' },
-      [PurchaseStatus.SHIPPED]: { label: '已发货', tone: 'progress' },
-      [PurchaseStatus.RECEIVED]: { label: '已收货', tone: 'secondary' },
-      [PurchaseStatus.COMPLETED]: { label: '已完成', tone: 'success' },
-      [PurchaseStatus.CANCELLED]: { label: '已取消', tone: 'danger' },
-    };
-    const config = statusMap[status] || { label: status, tone: 'neutral' as const };
-    return <SemanticBadge tone={config.tone}>{config.label}</SemanticBadge>;
-  };
-
-  /**
    * 职责：生成购销合同文档
    */
   const handleGenerateContract = async () => {
     if (!contract) return;
-    
+
     setGenerateLoading(true);
     try {
-      const blob = await contractDocService.generateFromPurchase(
-        contract.id,
-        generateForm
-      );
-      
+      const blob = await contractDocService.generateFromPurchase(contract.id, generateForm);
+
       // 下载文件
       const filename = `购销合同${contract.contractNo?.replace('PO', 'CG') || ''}.docx`;
       contractDocService.downloadDocument(blob, filename);
-      
+
       toast.success('合同文档已生成');
       setGenerateOpen(false);
     } catch (error: unknown) {
@@ -139,7 +275,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
    */
   const viewContractPdf = async () => {
     if (!contract) return;
-    
+
     setPdfLoading(true);
     try {
       // 尝试获取合同PDF（假设有此API）
@@ -192,10 +328,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
       case 'unitPrice':
         return Number(item.unitPrice) || 0;
       case 'lineTotal':
-        return (
-          Number(item.totalPrice) ||
-          Number(item.quantity || 0) * Number(item.unitPrice || 0)
-        );
+        return Number(item.totalPrice) || Number(item.quantity || 0) * Number(item.unitPrice || 0);
       default:
         return null;
     }
@@ -204,17 +337,24 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const purchaseLineSort = useTableSort(purchaseLineItems, purchaseLineAccessor);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64">加载中...</div>;
+    return <div className="flex h-64 items-center justify-center">加载中...</div>;
   }
 
   if (!contract) {
-    return <div className="text-center py-10">合同不存在</div>;
+    return <div className="py-10 text-center">合同不存在</div>;
   }
 
   // 计算付款进度
-  const paidPercent = contract.totalAmount > 0 
-    ? Math.min((contract.paidAmount / contract.totalAmount) * 100, 100) 
-    : 0;
+  const paidPercent =
+    contract.totalAmount > 0 ? Math.min((contract.paidAmount / contract.totalAmount) * 100, 100) : 0;
+
+  // 计算税额与小计
+  const subtotal = purchaseLineItems.reduce(
+    (sum, item) => sum + (Number(item.totalPrice) || Number(item.quantity || 0) * Number(item.unitPrice || 0)),
+    0
+  );
+  const taxAmount = subtotal * (contract.taxRate / 100);
+  const grandTotal = subtotal + taxAmount;
 
   return (
     <div className="space-y-6 pb-10">
@@ -223,26 +363,26 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         title={contract.contractNo}
         description={`供应商: ${contract.supplier?.name || '未知'} | 签订日期: ${contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}`}
         actions={
-          <div className="flex items-center gap-2">
-            {getStatusBadge(contract.status)}
-            <Button variant="outline" onClick={handleExportPdf} disabled={exportingPdf}>
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusPill status={contract.status} />
+            <Button variant="outline" className="h-9 rounded-md text-xs" onClick={handleExportPdf} disabled={exportingPdf}>
               {exportingPdf ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Download className="mr-2 h-4 w-4" />
+                <Download className="mr-1.5 h-3.5 w-3.5" />
               )}
               导出 PDF
             </Button>
-            <Button variant="outline" onClick={viewContractPdf} disabled={pdfLoading}>
+            <Button variant="outline" className="h-9 rounded-md text-xs" onClick={viewContractPdf} disabled={pdfLoading}>
               {pdfLoading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Eye className="mr-2 h-4 w-4" />
+                <Eye className="mr-1.5 h-3.5 w-3.5" />
               )}
               查看合同
             </Button>
-            <Button onClick={() => setGenerateOpen(true)}>
-              <FileDown className="mr-2 h-4 w-4" />
+            <Button className="h-9 rounded-md text-xs" onClick={() => setGenerateOpen(true)}>
+              <FileDown className="mr-1.5 h-3.5 w-3.5" />
               生成购销合同
             </Button>
           </div>
@@ -250,36 +390,42 @@ export default function PurchaseDetailPage({ params }: PageProps) {
       />
 
       {/* 汇总卡片 */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-primary" />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                <DollarSign className="h-4 w-4 text-primary" />
+              </div>
               <div>
-                <div className="text-2xl font-bold">¥{contract.totalAmount.toLocaleString()}</div>
+                <div className="text-xl font-bold tabular-nums">¥{contract.totalAmount.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">合同金额</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-primary" />
-              <div>
-                <div className="text-2xl font-bold">¥{contract.paidAmount.toLocaleString()}</div>
+        <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10">
+                <Receipt className="h-4 w-4 text-emerald-600" />
+              </div>
+              <div className="flex-1">
+                <div className="text-xl font-bold tabular-nums">¥{contract.paidAmount.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">已付金额</p>
+                <Progress value={paidPercent} className="mt-2 h-1.5" />
               </div>
             </div>
-            <Progress value={paidPercent} className="mt-2 h-2" />
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-primary" />
+        <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
+                <DollarSign className="h-4 w-4 text-amber-600" />
+              </div>
               <div>
-                <div className="text-2xl font-bold">
+                <div className="text-xl font-bold tabular-nums">
                   ¥{(contract.totalAmount - contract.paidAmount).toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground">待付金额</p>
@@ -287,12 +433,14 @@ export default function PurchaseDetailPage({ params }: PageProps) {
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary" />
-              <div>
-                <div className="text-lg font-medium truncate max-w-[150px]" title={contract.supplier?.name}>
+        <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-500/10">
+                <Building2 className="h-4 w-4 text-sky-600" />
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-lg font-medium" title={contract.supplier?.name}>
                   {contract.supplier?.name || '-'}
                 </div>
                 <p className="text-xs text-muted-foreground">供应商</p>
@@ -302,108 +450,222 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         </Card>
       </div>
 
-      {/* 商品明细 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            商品明细
-          </CardTitle>
-          <CardDescription>采购合同包含的商品列表</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableTableHead
-                  sortKey="productName"
-                  currentSortKey={purchaseLineSort.sortKey}
-                  currentSortDir={purchaseLineSort.sortDir}
-                  onSort={purchaseLineSort.onSort}
-                >
-                  商品名称
-                </SortableTableHead>
-                <SortableTableHead
-                  sortKey="spec"
-                  currentSortKey={purchaseLineSort.sortKey}
-                  currentSortDir={purchaseLineSort.sortDir}
-                  onSort={purchaseLineSort.onSort}
-                >
-                  规格
-                </SortableTableHead>
-                <SortableTableHead
-                  sortKey="quantity"
-                  currentSortKey={purchaseLineSort.sortKey}
-                  currentSortDir={purchaseLineSort.sortDir}
-                  onSort={purchaseLineSort.onSort}
-                  className="text-right"
-                >
-                  数量
-                </SortableTableHead>
-                <SortableTableHead
-                  sortKey="unitPrice"
-                  currentSortKey={purchaseLineSort.sortKey}
-                  currentSortDir={purchaseLineSort.sortDir}
-                  onSort={purchaseLineSort.onSort}
-                  className="text-right"
-                >
-                  单价 (¥)
-                </SortableTableHead>
-                <SortableTableHead
-                  sortKey="lineTotal"
-                  currentSortKey={purchaseLineSort.sortKey}
-                  currentSortDir={purchaseLineSort.sortDir}
-                  onSort={purchaseLineSort.onSort}
-                  className="text-right"
-                >
-                  小计 (¥)
-                </SortableTableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!purchaseLineSort.sortedData.length ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
-                    暂无商品明细
-                  </TableCell>
-                </TableRow>
-              ) : (
-                purchaseLineSort.sortedData.map((item: PurchaseItem) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">
-                      {item.product?.customsName || '未知商品'}
-                    </TableCell>
-                    <TableCell>
-                      {item.specification || item.product?.specification || '-'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {item.quantity} {item.unit || item.product?.unit}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      ¥{(Number(item.unitPrice) || 0).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      ¥{(Number(item.totalPrice) || Number(item.quantity || 0) * Number(item.unitPrice || 0)).toLocaleString()}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {/* 时间线 */}
+      <ContractTimeline currentStatus={contract.status} />
 
-      {/* 备注 */}
-      {contract.note && (
-        <Card>
-          <CardHeader>
-            <CardTitle>备注</CardTitle>
+      {/* 两列信息卡片 */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* 基本信息 */}
+        <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">基本信息</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">{contract.note}</p>
+          <CardContent className="space-y-3 pt-0">
+            <div className="flex items-start gap-3">
+              <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">合同编号</p>
+                <p className="font-mono text-sm font-medium">{contract.contractNo}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">签订日期</p>
+                <p className="text-sm">
+                  {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '—'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Store className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">发货店铺</p>
+                <p className="text-sm">{contract.storeName || '—'}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Percent className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">税率</p>
+                <p className="text-sm">{contract.taxRate}%</p>
+              </div>
+            </div>
+            {contract.note && (
+              <div className="rounded-lg bg-muted/50 p-3">
+                <p className="text-xs text-muted-foreground">备注</p>
+                <p className="mt-1 text-sm">{contract.note}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
-      )}
+
+        {/* 供应商信息 */}
+        <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">供应商信息</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            <div className="flex items-start gap-3">
+              <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">公司名称</p>
+                <p className="text-sm font-medium">{contract.supplier?.name || '—'}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <User className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">联系人</p>
+                <p className="text-sm">{contract.supplier?.contactName || '—'}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Phone className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">联系电话</p>
+                <p className="text-sm">{contract.supplier?.contactPhone || '—'}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">公司地址</p>
+                <p className="text-sm">{contract.supplier?.address || '—'}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">银行信息</p>
+                <p className="text-sm">
+                  {contract.supplier?.bankName || '—'} / {contract.supplier?.bankAccount || '—'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 商品明细 */}
+      <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+            <Package className="h-4 w-4" />
+            商品明细
+          </CardTitle>
+          <CardDescription>
+            共 {purchaseLineItems.length} 项商品 · 税率 {contract.taxRate}%
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!purchaseLineSort.sortedData.length ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">暂无商品明细</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b border-border/60 bg-muted/40 hover:bg-muted/40">
+                    <TableHead className="w-10 text-center text-xs">#</TableHead>
+                    <SortableTableHead
+                      sortKey="productName"
+                      currentSortKey={purchaseLineSort.sortKey}
+                      currentSortDir={purchaseLineSort.sortDir}
+                      onSort={purchaseLineSort.onSort}
+                      className="text-xs"
+                    >
+                      商品名称
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="spec"
+                      currentSortKey={purchaseLineSort.sortKey}
+                      currentSortDir={purchaseLineSort.sortDir}
+                      className="text-xs"
+                    >
+                      规格
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="quantity"
+                      currentSortKey={purchaseLineSort.sortKey}
+                      currentSortDir={purchaseLineSort.sortDir}
+                      className="text-right text-xs"
+                    >
+                      数量
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="unitPrice"
+                      currentSortKey={purchaseLineSort.sortKey}
+                      currentSortDir={purchaseLineSort.sortDir}
+                      className="text-right text-xs"
+                    >
+                      单价 (¥)
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="lineTotal"
+                      currentSortKey={purchaseLineSort.sortKey}
+                      currentSortDir={purchaseLineSort.sortDir}
+                      className="text-right text-xs"
+                    >
+                      小计 (¥)
+                    </SortableTableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {purchaseLineSort.sortedData.map((item: PurchaseItem, idx: number) => (
+                    <TableRow key={item.id} className="border-b border-border/30">
+                      <TableCell className="text-center text-xs text-muted-foreground">{idx + 1}</TableCell>
+                      <TableCell className="text-sm font-medium">
+                        {item.product?.customsName || '未知商品'}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {item.specification || item.product?.specification || '-'}
+                      </TableCell>
+                      <TableCell className="text-right text-sm tabular-nums">
+                        {item.quantity} {item.unit || item.product?.unit}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm tabular-nums">
+                        ¥{(Number(item.unitPrice) || 0).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm font-medium tabular-nums">
+                        ¥
+                        {(
+                          Number(item.totalPrice) ||
+                          Number(item.quantity || 0) * Number(item.unitPrice || 0)
+                        ).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {/* 合计行 */}
+                  <TableRow className="border-b-0 bg-muted/30 font-medium">
+                    <TableCell colSpan={5} className="text-right text-xs text-muted-foreground">
+                      小计
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm tabular-nums text-emerald-600">
+                      ¥{subtotal.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow className="border-b-0 bg-muted/30">
+                    <TableCell colSpan={5} className="text-right text-xs text-muted-foreground">
+                      税额 ({contract.taxRate}%)
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm tabular-nums text-muted-foreground">
+                      ¥{taxAmount.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow className="border-b-0 bg-muted/40">
+                    <TableCell colSpan={5} className="text-right text-sm font-medium">
+                      合计
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-base font-bold tabular-nums text-emerald-600">
+                      ¥{grandTotal.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* 合同附件 */}
       <ContractFiles
@@ -424,57 +686,65 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               <FileDown className="h-5 w-5 text-primary" />
               生成购销合同
             </DialogTitle>
-            <DialogDescription>
-              填写收货信息后，系统将自动生成标准购销合同文档
-            </DialogDescription>
+            <DialogDescription>填写收货信息后，系统将自动生成标准购销合同文档</DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="storeName">收货店铺名称</Label>
-              <Input 
+              <Input
                 id="storeName"
                 placeholder="例如：米尔皮塔"
                 value={generateForm.storeName}
-                onChange={(e) => setGenerateForm(prev => ({ ...prev, storeName: e.target.value }))}
+                onChange={(e) =>
+                  setGenerateForm((prev) => ({ ...prev, storeName: e.target.value }))
+                }
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="deliveryAddress">收货地址</Label>
-              <Input 
+              <Input
                 id="deliveryAddress"
                 placeholder="完整收货地址"
                 value={generateForm.deliveryAddress}
-                onChange={(e) => setGenerateForm(prev => ({ ...prev, deliveryAddress: e.target.value }))}
+                onChange={(e) =>
+                  setGenerateForm((prev) => ({ ...prev, deliveryAddress: e.target.value }))
+                }
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="deliveryContact">收货联系人</Label>
-              <Input 
+              <Input
                 id="deliveryContact"
                 placeholder="联系人及电话"
                 value={generateForm.deliveryContact}
-                onChange={(e) => setGenerateForm(prev => ({ ...prev, deliveryContact: e.target.value }))}
+                onChange={(e) =>
+                  setGenerateForm((prev) => ({ ...prev, deliveryContact: e.target.value }))
+                }
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="depositRate">首付比例 (%)</Label>
-              <Input 
+              <Input
                 id="depositRate"
                 type="number"
                 min="0"
                 max="100"
                 placeholder="默认30%"
                 value={generateForm.depositRate}
-                onChange={(e) => setGenerateForm(prev => ({ ...prev, depositRate: e.target.value }))}
+                onChange={(e) =>
+                  setGenerateForm((prev) => ({ ...prev, depositRate: e.target.value }))
+                }
               />
-              <p className="text-xs text-muted-foreground">合同中&quot;第一笔款项&quot;的比例，默认为30%</p>
+              <p className="text-xs text-muted-foreground">
+                合同中&quot;第一笔款项&quot;的比例，默认为30%
+              </p>
             </div>
           </div>
-          
+
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setGenerateOpen(false)}>
               取消
@@ -497,26 +767,25 @@ export default function PurchaseDetailPage({ params }: PageProps) {
       </Dialog>
 
       {/* PDF预览弹窗 */}
-      <Dialog open={pdfDialogOpen} onOpenChange={(open) => {
-        setPdfDialogOpen(open);
-        if (!open && pdfUrl) {
-          URL.revokeObjectURL(pdfUrl);
-          setPdfUrl(null);
-        }
-      }}>
-        <DialogContent className="max-w-4xl h-[80vh]">
+      <Dialog
+        open={pdfDialogOpen}
+        onOpenChange={(open) => {
+          setPdfDialogOpen(open);
+          if (!open && pdfUrl) {
+            URL.revokeObjectURL(pdfUrl);
+            setPdfUrl(null);
+          }
+        }}
+      >
+        <DialogContent className="h-[80vh] max-w-4xl">
           <DialogHeader>
             <DialogTitle>合同预览：{contract.contractNo}</DialogTitle>
           </DialogHeader>
-          <div className="flex-1 h-full">
+          <div className="h-full flex-1">
             {pdfUrl ? (
-              <iframe 
-                src={pdfUrl} 
-                className="w-full h-full border rounded"
-                title="合同预览"
-              />
+              <iframe src={pdfUrl} className="h-full w-full rounded border" title="合同预览" />
             ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
+              <div className="flex h-full items-center justify-center text-muted-foreground">
                 暂无合同文档
               </div>
             )}

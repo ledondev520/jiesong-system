@@ -2,7 +2,7 @@
  * Input: 采购合同服务、SortableTableHead、useTableSort
  * Output: 采购合同管理页面（筛选、分页、桌面表列排序）
  * Pos: 核心业务页面，管理供应商采购合同
- * 
+ *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
@@ -32,9 +32,27 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { AmountText } from '@/components/ui/amount-text';
-import { Plus, Eye, ShoppingCart, Package, Loader2, FileDown, Filter, X, FileText, Store, Truck, Upload, Download } from 'lucide-react';
+import {
+  Plus,
+  Eye,
+  ShoppingCart,
+  Package,
+  Loader2,
+  FileDown,
+  Filter,
+  X,
+  FileText,
+  Store,
+  Truck,
+  Upload,
+  Download,
+  Circle,
+  CheckCircle2,
+  PackageCheck,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -51,6 +69,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { Card, CardContent } from '@/components/ui/card';
 import { useTableSort } from '@/lib/hooks/useTableSort';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
   Sheet,
   SheetContent,
@@ -59,6 +78,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
 
 // 扩展类型
 interface PurchaseContractDetail extends PurchaseContract {
@@ -66,48 +86,150 @@ interface PurchaseContractDetail extends PurchaseContract {
 }
 
 /**
- * 职责：渲染采购合同管理页面
- * 思路：
- *   1. 显示采购合同列表
- *   2. 提供筛选和分页
- *   3. 支持查看详情和生成合同文档
+ * 职责：生成分页页码数组
  */
+function getPageNumbers(current: number, total: number): (number | 'ellipsis')[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const pages: (number | 'ellipsis')[] = [1];
+  if (current > 4) pages.push('ellipsis');
+  const start = Math.max(2, current - 2);
+  const end = Math.min(total - 1, current + 2);
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (current < total - 3) pages.push('ellipsis');
+  if (total > 1) pages.push(total);
+  return pages;
+}
+
+/**
+ * 职责：状态 pill 组件（带图标）
+ */
+function StatusPill({ status }: { status: PurchaseStatus }) {
+  const config: Record<
+    PurchaseStatus,
+    { label: string; icon: React.ReactNode; className: string }
+  > = {
+    [PurchaseStatus.DRAFT]: {
+      label: '草稿',
+      icon: <Circle className="h-3 w-3 fill-current" />,
+      className: 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-950 dark:text-slate-400 dark:border-slate-800',
+    },
+    [PurchaseStatus.SIGNED]: {
+      label: '已确认',
+      icon: <CheckCircle2 className="h-3 w-3" />,
+      className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800',
+    },
+    [PurchaseStatus.PRODUCING]: {
+      label: '生产中',
+      icon: <Loader2 className="h-3 w-3 animate-spin" />,
+      className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800',
+    },
+    [PurchaseStatus.SHIPPED]: {
+      label: '已发货',
+      icon: <Truck className="h-3 w-3" />,
+      className: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800',
+    },
+    [PurchaseStatus.RECEIVED]: {
+      label: '已收货',
+      icon: <PackageCheck className="h-3 w-3" />,
+      className: 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-400 dark:border-violet-800',
+    },
+    [PurchaseStatus.COMPLETED]: {
+      label: '已完成',
+      icon: <CheckCircle2 className="h-3 w-3" />,
+      className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800',
+    },
+    [PurchaseStatus.CANCELLED]: {
+      label: '已取消',
+      icon: <X className="h-3 w-3" />,
+      className: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800',
+    },
+  };
+
+  const c = config[status] || config[PurchaseStatus.DRAFT];
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap',
+        c.className
+      )}
+    >
+      {c.icon}
+      {c.label}
+    </span>
+  );
+}
+
+/**
+ * 职责：根据采购状态返回左侧色条颜色
+ */
+const getPurchaseStatusColor = (status: PurchaseStatus) => {
+  switch (status) {
+    case PurchaseStatus.DRAFT:
+    case PurchaseStatus.SIGNED:
+      return '#3b82f6';
+    case PurchaseStatus.PRODUCING:
+    case PurchaseStatus.SHIPPED:
+      return '#f59e0b';
+    case PurchaseStatus.RECEIVED:
+    case PurchaseStatus.COMPLETED:
+      return '#10b981';
+    case PurchaseStatus.CANCELLED:
+      return '#ef4444';
+    default:
+      return '#10b981';
+  }
+};
+
+/**
+ * 职责：金额格式化（CNY=绿色）
+ */
+function formatAmount(amount: number) {
+  return (
+    <span className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+      ¥{amount.toLocaleString()}
+    </span>
+  );
+}
+
 export default function ContractsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusFromUrl = searchParams.get('status') || 'ALL';
-  
+
   // 筛选状态
   const [purchaseStatusFilter, setPurchaseStatusFilter] = useState(statusFromUrl);
   const [productSearch, setProductSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  
+
   // 分页状态
   const [purchasePage, setPurchasePage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  
+
   // 同步URL参数变化
   useEffect(() => {
     setPurchaseStatusFilter(statusFromUrl || 'ALL');
   }, [statusFromUrl]);
-  
+
   // 采购合同状态
   const [purchaseContracts, setPurchaseContracts] = useState<PurchaseContract[]>([]);
   const [purchaseLoading, setPurchaseLoading] = useState(true);
-  
+
   // 计算筛选后的采购合同（用于分页显示）
   const filteredPurchaseContracts = useMemo(() => {
     let filtered = purchaseContracts;
     if (purchaseStatusFilter && purchaseStatusFilter !== 'ALL') {
-      filtered = filtered.filter(c => c.status === purchaseStatusFilter);
+      filtered = filtered.filter((c) => c.status === purchaseStatusFilter);
     }
     if (storeFilter && storeFilter !== 'ALL') {
-      filtered = filtered.filter(c => c.storeName?.includes(storeFilter));
+      filtered = filtered.filter((c) => c.storeName?.includes(storeFilter));
     }
     if (productSearch.trim()) {
       const search = productSearch.trim().toLowerCase();
-      filtered = filtered.filter(c => {
+      filtered = filtered.filter((c) => {
         const productName = c.items?.[0]?.product?.customsName || '';
         return productName.toLowerCase().includes(search);
       });
@@ -117,7 +239,6 @@ export default function ContractsPageContent() {
 
   /**
    * 职责：按列从采购合同中取出用于排序的可比字段
-   * 思路：合同编号、供应商用字符串；签订日期用时间戳；金额用数值
    */
   const purchaseAccessor = useCallback(
     (item: PurchaseContract, key: string) => {
@@ -132,6 +253,8 @@ export default function ContractsPageContent() {
           return item.totalAmount;
         case 'paidAmount':
           return item.paidAmount;
+        case 'status':
+          return item.status;
         default:
           return null;
       }
@@ -150,9 +273,15 @@ export default function ContractsPageContent() {
     const activeContracts = purchaseContracts.filter((contract) =>
       [PurchaseStatus.DRAFT, PurchaseStatus.SIGNED, PurchaseStatus.PRODUCING].includes(contract.status)
     ).length;
-    const producingContracts = purchaseContracts.filter((contract) => contract.status === PurchaseStatus.PRODUCING).length;
-    const shippedPendingReceipt = purchaseContracts.filter((contract) => contract.status === PurchaseStatus.SHIPPED).length;
-    const activeStores = new Set(purchaseContracts.map((contract) => contract.storeName).filter(Boolean)).size;
+    const producingContracts = purchaseContracts.filter(
+      (contract) => contract.status === PurchaseStatus.PRODUCING
+    ).length;
+    const shippedPendingReceipt = purchaseContracts.filter(
+      (contract) => contract.status === PurchaseStatus.SHIPPED
+    ).length;
+    const activeStores = new Set(
+      purchaseContracts.map((contract) => contract.storeName).filter(Boolean)
+    ).size;
 
     return {
       activeContracts,
@@ -161,17 +290,17 @@ export default function ContractsPageContent() {
       activeStores,
     };
   }, [purchaseContracts]);
-  
+
   // 筛选或每页条数变化时重置页码
   useEffect(() => {
     setPurchasePage(1);
   }, [purchaseStatusFilter, storeFilter, productSearch, pageSize]);
-  
+
   // 采购详情弹窗状态
   const [detailOpen, setDetailOpen] = useState(false);
   const detailLoading = false;
   const [purchaseDetail, setPurchaseDetail] = useState<PurchaseContractDetail | null>(null);
-  
+
   // 生成合同文档弹窗状态
   const [generateOpen, setGenerateOpen] = useState(false);
   const [generateLoading, setGenerateLoading] = useState(false);
@@ -186,7 +315,11 @@ export default function ContractsPageContent() {
   // 批量导入导出状态
   const [importLoading, setImportLoading] = useState(false);
   const [importResultOpen, setImportResultOpen] = useState(false);
-  const [importResult, setImportResult] = useState<{ successRows: number; failedRows: number; errors: { row: number; error: string }[] } | null>(null);
+  const [importResult, setImportResult] = useState<{
+    successRows: number;
+    failedRows: number;
+    errors: { row: number; error: string }[];
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 0. 初始化加载
@@ -198,9 +331,8 @@ export default function ContractsPageContent() {
   const loadPurchaseContracts = async () => {
     setPurchaseLoading(true);
     try {
-      const response = await cachedFetch(
-        'purchase-contracts-list',
-        () => purchaseService.getAll({ page: 1, pageSize: 100 }),
+      const response = await cachedFetch('purchase-contracts-list', () =>
+        purchaseService.getAll({ page: 1, pageSize: 100 })
       );
       setPurchaseContracts(response.data?.items || []);
     } catch {
@@ -220,18 +352,15 @@ export default function ContractsPageContent() {
   // 5. 生成购销合同文档
   const handleGenerateContract = async () => {
     if (!selectedPurchaseId) return;
-    
+
     setGenerateLoading(true);
     try {
-      const blob = await contractDocService.generateFromPurchase(
-        selectedPurchaseId,
-        generateForm
-      );
-      
-      const contract = purchaseContracts.find(c => c.id === selectedPurchaseId);
+      const blob = await contractDocService.generateFromPurchase(selectedPurchaseId, generateForm);
+
+      const contract = purchaseContracts.find((c) => c.id === selectedPurchaseId);
       const filename = `购销合同${contract?.contractNo?.replace('PO', 'CG') || ''}.docx`;
       contractDocService.downloadDocument(blob, filename);
-      
+
       toast.success('合同文档已生成');
       setGenerateOpen(false);
     } catch (error: unknown) {
@@ -280,7 +409,9 @@ export default function ContractsPageContent() {
       if (response.data?.failedRows === 0) {
         toast.success(`成功导入 ${response.data.successRows} 条合同`);
       } else {
-        toast.warning(`导入完成：成功 ${response.data.successRows} 条，失败 ${response.data.failedRows} 条`);
+        toast.warning(
+          `导入完成：成功 ${response.data.successRows} 条，失败 ${response.data.failedRows} 条`
+        );
       }
       // 刷新列表
       await loadPurchaseContracts();
@@ -300,7 +431,10 @@ export default function ContractsPageContent() {
 
   const hasActiveFilters = purchaseStatusFilter !== 'ALL' || Boolean(storeFilter) || Boolean(productSearch);
   const storeOptions = useMemo(
-    () => Array.from(new Set(purchaseContracts.filter((c) => c.storeName).map((c) => c.storeName!))).sort(),
+    () =>
+      Array.from(
+        new Set(purchaseContracts.filter((c) => c.storeName).map((c) => c.storeName!))
+      ).sort(),
     [purchaseContracts]
   );
 
@@ -314,19 +448,23 @@ export default function ContractsPageContent() {
   const renderFilterControls = (variant: 'desktop' | 'mobile') => {
     const isMobile = variant === 'mobile';
     const triggerClassName = isMobile
-      ? 'h-11 w-full rounded-2xl border-border/70 bg-background/80 text-left'
-      : 'h-10 w-32 rounded-xl border-border/70 bg-background/70';
+      ? 'h-11 w-full rounded-xl border-border/70 bg-background/80 text-left'
+      : 'h-9 w-32 rounded-md border-border/60 bg-background text-left text-xs';
     const storeClassName = isMobile
-      ? 'h-11 w-full rounded-2xl border-border/70 bg-background/80 text-left'
-      : 'h-10 w-36 rounded-xl border-border/70 bg-background/70';
+      ? 'h-11 w-full rounded-xl border-border/70 bg-background/80 text-left'
+      : 'h-9 w-36 rounded-md border-border/60 bg-background text-left text-xs';
     const inputClassName = isMobile
-      ? 'h-11 w-full rounded-2xl border-border/70 bg-background/80'
-      : 'h-10 w-40 rounded-xl border-border/70 bg-background/70';
+      ? 'h-11 w-full rounded-xl border-border/70 bg-background/80'
+      : 'h-9 w-40 rounded-md border-border/60 bg-background text-xs';
 
     return (
       <>
         <div className={isMobile ? 'space-y-2' : 'contents'}>
-          {isMobile && <Label className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">合同状态</Label>}
+          {isMobile && (
+            <Label className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              合同状态
+            </Label>
+          )}
           <Select value={purchaseStatusFilter} onValueChange={setPurchaseStatusFilter}>
             <SelectTrigger className={triggerClassName}>
               <SelectValue placeholder="全部状态" />
@@ -344,7 +482,11 @@ export default function ContractsPageContent() {
         </div>
 
         <div className={isMobile ? 'space-y-2' : 'contents'}>
-          {isMobile && <Label className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">发货店铺</Label>}
+          {isMobile && (
+            <Label className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              发货店铺
+            </Label>
+          )}
           <Select value={storeFilter} onValueChange={setStoreFilter}>
             <SelectTrigger className={storeClassName}>
               <SelectValue placeholder="全部店铺" />
@@ -352,14 +494,23 @@ export default function ContractsPageContent() {
             <SelectContent>
               <SelectItem value="ALL">全部店铺</SelectItem>
               {storeOptions.map((store) => (
-                <SelectItem key={store} value={store}>{store}</SelectItem>
+                <SelectItem key={store} value={store}>
+                  {store}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
         <div className={isMobile ? 'space-y-2' : 'contents'}>
-          {isMobile && <Label htmlFor="mobile-product-search" className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">商品搜索</Label>}
+          {isMobile && (
+            <Label
+              htmlFor="mobile-product-search"
+              className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground"
+            >
+              商品搜索
+            </Label>
+          )}
           <Input
             id={isMobile ? 'mobile-product-search' : undefined}
             placeholder="搜索商品名称..."
@@ -372,94 +523,78 @@ export default function ContractsPageContent() {
     );
   };
 
-  /**
-   * 职责：根据采购状态返回左侧色条颜色
-   * 思路：DRAFT/SIGNED→蓝色；PRODUCING/SHIPPED→琥珀色；RECEIVED/COMPLETED→绿色；CANCELLED→红色
-   */
-  const getPurchaseStatusColor = (status: PurchaseStatus) => {
-    switch (status) {
-      case PurchaseStatus.DRAFT:
-      case PurchaseStatus.SIGNED:
-        return 'oklch(0.55 0.1 250)';
-      case PurchaseStatus.PRODUCING:
-      case PurchaseStatus.SHIPPED:
-        return 'oklch(0.6 0.12 85)';
-      case PurchaseStatus.RECEIVED:
-      case PurchaseStatus.COMPLETED:
-        return 'oklch(0.55 0.14 150)';
-      case PurchaseStatus.CANCELLED:
-        return 'oklch(0.55 0.1 25)';
-      default:
-        return 'oklch(0.55 0.14 150)';
-    }
-  };
-
-  /**
-   * 获取采购状态徽章
-   */
-  const getPurchaseStatusBadge = (status: PurchaseStatus) => {
-    const statusMap: Record<PurchaseStatus, { label: string; tone: React.ComponentProps<typeof SemanticBadge>["tone"] }> = {
-      [PurchaseStatus.DRAFT]: { label: '草稿', tone: 'neutral' },
-      [PurchaseStatus.SIGNED]: { label: '已签订', tone: 'info' },
-      [PurchaseStatus.PRODUCING]: { label: '生产中', tone: 'warning' },
-      [PurchaseStatus.SHIPPED]: { label: '已发货', tone: 'progress' },
-      [PurchaseStatus.RECEIVED]: { label: '已收货', tone: 'secondary' },
-      [PurchaseStatus.COMPLETED]: { label: '已完成', tone: 'success' },
-      [PurchaseStatus.CANCELLED]: { label: '已取消', tone: 'danger' },
-    };
-    const config = statusMap[status] || { label: status, tone: 'neutral' as const };
-    return <SemanticBadge tone={config.tone}>{config.label}</SemanticBadge>;
-  };
+  const pageNumbers = useMemo(
+    () => getPageNumbers(purchasePage, purchaseTotalPages),
+    [purchasePage, purchaseTotalPages]
+  );
 
   return (
     <div className="space-y-6">
       <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
-      <PageHeader
-        title="采购合同"
-      />
+      <PageHeader title="采购合同" />
 
+      {/* 概览卡片 */}
       <section className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h3 className="text-sm font-medium text-muted-foreground">采购执行概览</h3>
-          <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">
+          <Badge
+            variant="outline"
+            className="rounded-full border-border/60 bg-background px-3 py-1 text-xs shadow-[0_1px_3px_rgba(0,0,0,0.05)]"
+          >
             当前活跃合同 {procurementOverview.activeContracts}
           </Badge>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Card className="border-border/70">
+          <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
             <CardContent className="flex items-center justify-between gap-3 pt-5">
               <div>
                 <p className="text-sm text-muted-foreground">待推进合同</p>
-                <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{procurementOverview.activeContracts}</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
+                  {procurementOverview.activeContracts}
+                </p>
               </div>
-              <ShoppingCart className="h-5 w-5 text-primary" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                <ShoppingCart className="h-4 w-4 text-primary" />
+              </div>
             </CardContent>
           </Card>
-          <Card className="border-border/70">
+          <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
             <CardContent className="flex items-center justify-between gap-3 pt-5">
               <div>
                 <p className="text-sm text-muted-foreground">生产中</p>
-                <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{procurementOverview.producingContracts}</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
+                  {procurementOverview.producingContracts}
+                </p>
               </div>
-              <Package className="h-5 w-5 text-amber-600" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
+                <Package className="h-4 w-4 text-amber-600" />
+              </div>
             </CardContent>
           </Card>
-          <Card className="border-border/70">
+          <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
             <CardContent className="flex items-center justify-between gap-3 pt-5">
               <div>
                 <p className="text-sm text-muted-foreground">已发货待收货</p>
-                <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{procurementOverview.shippedPendingReceipt}</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
+                  {procurementOverview.shippedPendingReceipt}
+                </p>
               </div>
-              <Truck className="h-5 w-5 text-emerald-600" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10">
+                <Truck className="h-4 w-4 text-emerald-600" />
+              </div>
             </CardContent>
           </Card>
-          <Card className="border-border/70">
+          <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
             <CardContent className="flex items-center justify-between gap-3 pt-5">
               <div>
                 <p className="text-sm text-muted-foreground">合作店铺</p>
-                <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{procurementOverview.activeStores}</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
+                  {procurementOverview.activeStores}
+                </p>
               </div>
-              <Store className="h-5 w-5 text-sky-600" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-500/10">
+                <Store className="h-4 w-4 text-sky-600" />
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -467,259 +602,318 @@ export default function ContractsPageContent() {
 
       {/* 采购合同内容 */}
       <div className="space-y-4">
-          <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-4">
-            {/* 筛选区域 */}
-            <div className="hidden surface-panel flex-wrap items-center gap-2 px-3 py-2 md:flex">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              {renderFilterControls('desktop')}
-              {hasActiveFilters && (
-                <Button
-                  variant="ghost" 
-                  size="sm"
-                  className="rounded-xl"
-                  onClick={resetFilters}
-                >
-                  <X className="h-4 w-4 mr-1" />
-                  重置
-                </Button>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 md:hidden">
-              <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="outline" className="h-11 rounded-2xl">
-                    <Filter className="mr-2 h-4 w-4" />
-                    筛选与搜索
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="bottom" className="rounded-t-3xl px-0 pb-0">
-                  <SheetHeader className="border-b px-5 pb-4">
-                    <SheetTitle>筛选与搜索</SheetTitle>
-                    <SheetDescription>先收窄范围，再快速定位合同，避免在手机上来回滑动。</SheetDescription>
-                  </SheetHeader>
-                  <div className="space-y-5 px-5 py-5">
-                    {renderFilterControls('mobile')}
-                  </div>
-                  <div className="flex gap-3 border-t px-5 py-4">
-                    <Button variant="outline" className="h-11 flex-1 rounded-2xl" onClick={resetFilters}>
-                      重置
-                    </Button>
-                    <Button className="h-11 flex-1 rounded-2xl" onClick={() => setMobileFiltersOpen(false)}>
-                      查看结果
-                    </Button>
-                  </div>
-                </SheetContent>
-              </Sheet>
-              <Button variant="outline" className="h-11 rounded-2xl" onClick={handleExport}>
-                <Download className="mr-2 h-4 w-4" /> 导出 Excel
+        <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-4">
+          {/* 筛选区域 */}
+          <div className="hidden flex-wrap items-center gap-2 rounded-md border border-border/60 bg-background p-1.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] md:flex">
+            <Filter className="ml-1 h-3.5 w-3.5 text-muted-foreground" />
+            {renderFilterControls('desktop')}
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" className="h-8 rounded-md text-xs" onClick={resetFilters}>
+                <X className="mr-1 h-3 w-3" />
+                重置
               </Button>
-              <Button variant="outline" className="h-11 rounded-2xl" onClick={handleImportClick} disabled={importLoading}>
-                <Upload className="mr-2 h-4 w-4" /> 批量导入
-              </Button>
-              <Button className="h-11 rounded-2xl" onClick={() => router.push('/dashboard/purchase/create')}>
-                <Plus className="mr-2 h-4 w-4" /> 新增采购
-              </Button>
-            </div>
-
-            <div className="hidden md:flex md:items-center md:gap-2">
-              <Button variant="outline" className="h-10 rounded-xl" onClick={handleExport}>
-                <Download className="mr-2 h-4 w-4" /> 导出 Excel
-              </Button>
-              <Button variant="outline" className="h-10 rounded-xl" onClick={handleImportClick} disabled={importLoading}>
-                <Upload className="mr-2 h-4 w-4" /> 批量导入
-              </Button>
-              <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/purchase/create')}>
-                <Plus className="mr-2 h-4 w-4" /> 新增采购
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid gap-3 md:hidden">
-            {purchaseLoading ? (
-              <Card className="border-dashed border-border/70">
-                <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                  加载中...
-                </CardContent>
-              </Card>
-            ) : pagedPurchaseContracts.length === 0 ? (
-              <Card className="border-dashed border-border/70">
-                <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                  {hasActiveFilters ? '没有符合筛选条件的合同' : '暂无采购合同'}
-                </CardContent>
-              </Card>
-            ) : (
-              pagedPurchaseContracts.map((contract) => {
-                const firstProduct = contract.items?.[0]?.product;
-                const productName = firstProduct?.customsName || '未填写商品';
-                return (
-                  <Card key={contract.id} className="overflow-hidden border-border/70">
-                    <CardContent className="space-y-4 p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 space-y-1">
-                          <p className="text-base font-semibold tracking-tight">{contract.contractNo}</p>
-                          <p className="truncate text-sm text-muted-foreground">{productName}</p>
-                        </div>
-                        <div className="shrink-0">{getPurchaseStatusBadge(contract.status)}</div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 rounded-2xl bg-muted/55 p-3">
-                        <div className="space-y-1">
-                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">供应商</p>
-                          <p className="text-sm font-medium">{contract.supplier?.name || '—'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">合同总额</p>
-                          <p className="text-sm font-semibold tabular-nums">¥{contract.totalAmount.toLocaleString()}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between rounded-2xl border border-border/70 bg-background px-3 py-3">
-                        <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">已付金额</p>
-                        <AmountText tone={contract.paidAmount < contract.totalAmount ? 'warning' : 'success'} size="sm" className="text-base font-semibold tabular-nums">
-                          ¥{contract.paidAmount.toLocaleString()}
-                        </AmountText>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <Button
-                          variant="outline"
-                          className="h-11 rounded-2xl"
-                          onClick={() => router.push(`/dashboard/purchase/${contract.id}`)}
-                          aria-label={`查看 ${contract.contractNo} 详情`}
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          查看详情
-                        </Button>
-                        <Button
-                          className="h-11 rounded-2xl"
-                          onClick={() => openGenerateDialog(contract.id)}
-                          aria-label={`为 ${contract.contractNo} 生成购销合同`}
-                        >
-                          <FileDown className="mr-2 h-4 w-4" />
-                          生成合同
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })
             )}
           </div>
 
-          
-          {/* 桌面端卡片网格视图 */}
-          <div className="hidden md:block">
-            {purchaseLoading ? (
-              <div className="py-12 text-center text-muted-foreground">加载中...</div>
-            ) : pagedPurchaseContracts.length === 0 ? (
+          <div className="grid grid-cols-1 gap-3 md:hidden">
+            <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="h-11 rounded-xl">
+                  <Filter className="mr-2 h-4 w-4" />
+                  筛选与搜索
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="rounded-t-3xl px-0 pb-0">
+                <SheetHeader className="border-b px-5 pb-4">
+                  <SheetTitle>筛选与搜索</SheetTitle>
+                  <SheetDescription>
+                    先收窄范围，再快速定位合同，避免在手机上来回滑动。
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="space-y-5 px-5 py-5">{renderFilterControls('mobile')}</div>
+                <div className="flex gap-3 border-t px-5 py-4">
+                  <Button variant="outline" className="h-11 flex-1 rounded-2xl" onClick={resetFilters}>
+                    重置
+                  </Button>
+                  <Button className="h-11 flex-1 rounded-2xl" onClick={() => setMobileFiltersOpen(false)}>
+                    查看结果
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+            <Button variant="outline" className="h-11 rounded-2xl" onClick={handleExport}>
+              <Download className="mr-2 h-4 w-4" /> 导出 Excel
+            </Button>
+            <Button variant="outline" className="h-11 rounded-2xl" onClick={handleImportClick} disabled={importLoading}>
+              <Upload className="mr-2 h-4 w-4" /> 批量导入
+            </Button>
+            <Button className="h-11 rounded-2xl" onClick={() => router.push('/dashboard/purchase/create')}>
+              <Plus className="mr-2 h-4 w-4" /> 新增采购
+            </Button>
+          </div>
+
+          <div className="hidden md:flex md:items-center md:gap-2">
+            <Button variant="outline" className="h-9 rounded-md text-xs" onClick={handleExport}>
+              <Download className="mr-1.5 h-3.5 w-3.5" /> 导出 Excel
+            </Button>
+            <Button
+              variant="outline"
+              className="h-9 rounded-md text-xs"
+              onClick={handleImportClick}
+              disabled={importLoading}
+            >
+              <Upload className="mr-1.5 h-3.5 w-3.5" /> 批量导入
+            </Button>
+            <Button className="h-9 rounded-md text-xs" onClick={() => router.push('/dashboard/purchase/create')}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" /> 新增采购
+            </Button>
+          </div>
+        </div>
+
+        {/* 移动端卡片 */}
+        <div className="grid gap-3 md:hidden">
+          {purchaseLoading ? (
+            <Card className="border-dashed border-border/70">
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                加载中...
+              </CardContent>
+            </Card>
+          ) : pagedPurchaseContracts.length === 0 ? (
+            <Card className="border-dashed border-border/70">
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                {hasActiveFilters ? '没有符合筛选条件的合同' : '暂无采购合同'}
+              </CardContent>
+            </Card>
+          ) : (
+            pagedPurchaseContracts.map((contract) => {
+              const firstProduct = contract.items?.[0]?.product;
+              const productName = firstProduct?.customsName || '未填写商品';
+              return (
+                <Card
+                  key={contract.id}
+                  className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]"
+                >
+                  <CardContent className="space-y-4 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 space-y-1">
+                        <p className="text-base font-semibold tracking-tight">{contract.contractNo}</p>
+                        <p className="truncate text-sm text-muted-foreground">{productName}</p>
+                      </div>
+                      <div className="shrink-0">
+                        <StatusPill status={contract.status} />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 rounded-lg bg-muted/40 p-3">
+                      <div className="space-y-1">
+                        <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">供应商</p>
+                        <p className="text-sm font-medium">{contract.supplier?.name || '—'}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">合同总额</p>
+                        <p className="text-sm font-semibold tabular-nums text-emerald-600">
+                          ¥{contract.totalAmount.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-lg border border-border/40 bg-background px-3 py-2.5">
+                      <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">已付金额</p>
+                      <AmountText
+                        tone={contract.paidAmount < contract.totalAmount ? 'warning' : 'success'}
+                        size="sm"
+                        className="text-base font-semibold tabular-nums"
+                      >
+                        ¥{contract.paidAmount.toLocaleString()}
+                      </AmountText>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        variant="outline"
+                        className="h-9 rounded-lg text-xs"
+                        onClick={() => router.push(`/dashboard/purchase/${contract.id}`)}
+                        aria-label={`查看 ${contract.contractNo} 详情`}
+                      >
+                        <Eye className="mr-1.5 h-3.5 w-3.5" />
+                        查看详情
+                      </Button>
+                      <Button
+                        className="h-9 rounded-lg text-xs"
+                        onClick={() => openGenerateDialog(contract.id)}
+                        aria-label={`为 ${contract.contractNo} 生成购销合同`}
+                      >
+                        <FileDown className="mr-1.5 h-3.5 w-3.5" />
+                        生成合同
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </div>
+
+        {/* 桌面端表格视图 */}
+        <div className="hidden overflow-hidden rounded-xl border border-border/40 bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] md:block">
+          {purchaseLoading ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">加载中...</div>
+          ) : pagedPurchaseContracts.length === 0 ? (
+            <div className="py-12">
               <EmptyState
                 icon={<ShoppingCart className="h-8 w-8" />}
                 title="暂无采购合同"
                 description="还没有创建任何采购合同，点击下方的按钮开始创建"
                 action={{ label: '新建采购合同', onClick: () => router.push('/dashboard/purchase/create') }}
               />
-            ) : (
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
-                {pagedPurchaseContracts.map((contract) => {
-                  const firstProduct = contract.items?.[0]?.product;
-                  const productName = firstProduct?.customsName || '-';
-                  const isUnpaid = contract.paidAmount < contract.totalAmount;
-                  return (
-                    <Card
-                      key={contract.id}
-                      className="cursor-pointer border-border/40 border-l-[3px] bg-card/60 transition-all duration-300 hover:border-primary/20 hover:bg-card hover:shadow-md hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/10"
-                      style={{ borderLeftColor: getPurchaseStatusColor(contract.status) }}
-                      onClick={() => router.push(`/dashboard/purchase/${contract.id}`)}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b border-border/60 bg-muted/40 hover:bg-muted/40">
+                    <SortableTableHead
+                      sortKey="contractNo"
+                      currentSortKey={purchaseSort.sortKey}
+                      currentSortDir={purchaseSort.sortDir}
+                      onSort={purchaseSort.onSort}
+                      className="w-[140px]"
                     >
-                      <CardContent className="space-y-3 p-4">
-                        {/* 头部：编号 + 状态 */}
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                              <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                              <span className="truncate">{contract.contractNo}</span>
-                            </div>
-                            <p className="mt-0.5 text-xs text-muted-foreground truncate" title={productName}>
-                              {productName}
-                            </p>
+                      合同编号
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="supplier"
+                      currentSortKey={purchaseSort.sortKey}
+                      currentSortDir={purchaseSort.sortDir}
+                      onSort={purchaseSort.onSort}
+                    >
+                      供应商
+                    </SortableTableHead>
+                    <TableHead>店铺</TableHead>
+                    <SortableTableHead
+                      sortKey="signedAt"
+                      currentSortKey={purchaseSort.sortKey}
+                      currentSortDir={purchaseSort.sortDir}
+                      onSort={purchaseSort.onSort}
+                      className="w-[110px]"
+                    >
+                      签订日期
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="totalAmount"
+                      currentSortKey={purchaseSort.sortKey}
+                      currentSortDir={purchaseSort.sortDir}
+                      onSort={purchaseSort.onSort}
+                      className="text-right"
+                    >
+                      合同金额
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="paidAmount"
+                      currentSortKey={purchaseSort.sortKey}
+                      currentSortDir={purchaseSort.sortDir}
+                      onSort={purchaseSort.onSort}
+                      className="text-right"
+                    >
+                      已付金额
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="status"
+                      currentSortKey={purchaseSort.sortKey}
+                      currentSortDir={purchaseSort.sortDir}
+                      onSort={purchaseSort.onSort}
+                      className="w-[100px]"
+                    >
+                      状态
+                    </SortableTableHead>
+                    <TableHead className="w-[140px] text-right">操作</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pagedPurchaseContracts.map((contract) => {
+                    const isUnpaid = contract.paidAmount < contract.totalAmount;
+                    return (
+                      <TableRow
+                        key={contract.id}
+                        className="group cursor-pointer border-b border-border/30 transition-colors hover:bg-muted/30"
+                        onClick={() => router.push(`/dashboard/purchase/${contract.id}`)}
+                      >
+                        <TableCell className="relative font-mono text-sm font-medium">
+                          {/* 左侧状态色条（hover时显示） */}
+                          <div
+                            className="absolute left-0 top-0 bottom-0 w-[3px] opacity-0 transition-opacity group-hover:opacity-100"
+                            style={{ backgroundColor: getPurchaseStatusColor(contract.status) }}
+                          />
+                          <div className="flex items-center gap-1.5">
+                            <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            {contract.contractNo}
                           </div>
-                          {getPurchaseStatusBadge(contract.status)}
-                        </div>
-
-                        {/* 供应商 + 店铺 */}
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <span className="shrink-0">供应商:</span>
-                            <span className="truncate font-medium text-foreground">
-                              {contract.supplier?.name || '—'}
-                            </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="text-sm">{contract.supplier?.name || '—'}</span>
                             {contract.supplier?.hasQualityIssue && (
-                              <Badge variant="destructive" className="ml-1 text-[10px] px-1 py-0">质量问题</Badge>
+                              <Badge variant="destructive" className="mt-1 w-fit rounded px-1 py-0 text-[10px]">
+                                质量问题
+                              </Badge>
                             )}
                           </div>
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <span className="shrink-0">店铺:</span>
-                            <span className="truncate text-foreground">{contract.storeName || '—'}</span>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {contract.storeName || '—'}
+                        </TableCell>
+                        <TableCell className="text-sm tabular-nums text-muted-foreground">
+                          {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '—'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {formatAmount(contract.totalAmount)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          <AmountText tone={isUnpaid ? 'warning' : 'success'}>
+                            ¥{contract.paidAmount.toLocaleString()}
+                          </AmountText>
+                        </TableCell>
+                        <TableCell>
+                          <StatusPill status={contract.status} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-md"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/dashboard/purchase/${contract.id}`);
+                              }}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-md"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openGenerateDialog(contract.id);
+                              }}
+                            >
+                              <FileDown className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <span className="shrink-0">签订:</span>
-                            <span className="text-foreground">
-                              {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '—'}
-                            </span>
-                          </div>
-                        </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
 
-                        {/* 金额 */}
-                        <div className="flex items-end justify-between border-t border-border/30 pt-2">
-                          <div>
-                            <p className="text-[11px] text-muted-foreground">总金额</p>
-                            <p className="text-base font-bold tabular-nums text-foreground">
-                              ¥{contract.totalAmount.toLocaleString()}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-[11px] text-muted-foreground">已付</p>
-                            <AmountText tone={isUnpaid ? 'warning' : 'success'} className="text-base font-bold tabular-nums">
-                              ¥{contract.paidAmount.toLocaleString()}
-                            </AmountText>
-                          </div>
-                        </div>
-
-                        {/* 操作 */}
-                        <div className="flex gap-2 pt-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 flex-1 rounded-lg text-xs"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(`/dashboard/purchase/${contract.id}`);
-                            }}
-                          >
-                            <Eye className="mr-1 h-3 w-3" /> 查看
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="h-8 flex-1 rounded-lg text-xs"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openGenerateDialog(contract.id);
-                            }}
-                          >
-                            <FileDown className="mr-1 h-3 w-3" /> 生成合同
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          
-          {/* 分页控件 */}
-          <div className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between">
+        {/* 分页控件 */}
+        {purchaseTotalPages > 0 && (
+          <div className="flex flex-col gap-3 py-2 md:flex-row md:items-center md:justify-between">
             <div className="text-sm text-muted-foreground">
               共 {filteredPurchaseContracts.length} 条
               {purchaseTotalPages > 1 && `，第 ${purchasePage}/${purchaseTotalPages} 页`}
@@ -727,26 +921,51 @@ export default function ContractsPageContent() {
             <div className="flex flex-wrap items-center gap-2">
               <PageSizeSelect
                 value={pageSize}
-                onChange={(size) => { setPageSize(size); setPurchasePage(1); }}
+                onChange={(size) => {
+                  setPageSize(size);
+                  setPurchasePage(1);
+                }}
               />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPurchasePage(p => Math.max(1, p - 1))}
-                disabled={purchasePage === 1}
-              >
-                上一页
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPurchasePage(p => Math.min(purchaseTotalPages, p + 1))}
-                disabled={purchasePage === purchaseTotalPages || purchaseTotalPages <= 1}
-              >
-                下一页
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 rounded-md"
+                  onClick={() => setPurchasePage((p) => Math.max(1, p - 1))}
+                  disabled={purchasePage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {pageNumbers.map((page, idx) =>
+                  page === 'ellipsis' ? (
+                    <span key={`ellipsis-${idx}`} className="px-1 text-xs text-muted-foreground">
+                      ...
+                    </span>
+                  ) : (
+                    <Button
+                      key={page}
+                      variant={purchasePage === page ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-8 min-w-[2rem] rounded-md px-2 text-xs"
+                      onClick={() => setPurchasePage(page)}
+                    >
+                      {page}
+                    </Button>
+                  )
+                )}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 rounded-md"
+                  onClick={() => setPurchasePage((p) => Math.min(purchaseTotalPages, p + 1))}
+                  disabled={purchasePage === purchaseTotalPages || purchaseTotalPages <= 1}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
+        )}
       </div>
 
       {/* 采购合同详情弹窗 */}
@@ -769,21 +988,19 @@ export default function ContractsPageContent() {
                 <DialogDescription>
                   供应商：{purchaseDetail.supplier?.name || '未知'}
                   {' | '}
-                  {purchaseDetail.signedAt ? `签订日期：${format(new Date(purchaseDetail.signedAt), 'yyyy-MM-dd')}` : '未设置签订日期'}
-                  {purchaseDetail.storeName && (
-                    <> | 发货店铺：{purchaseDetail.storeName}</>
-                  )}
+                  {purchaseDetail.signedAt
+                    ? `签订日期：${format(new Date(purchaseDetail.signedAt), 'yyyy-MM-dd')}`
+                    : '未设置签订日期'}
+                  {purchaseDetail.storeName && <> | 发货店铺：{purchaseDetail.storeName}</>}
                 </DialogDescription>
               </DialogHeader>
-              
+
               <div className="space-y-4">
                 {/* 金额汇总 */}
-                <div className="grid grid-cols-3 gap-4 p-4 bg-muted rounded-lg">
+                <div className="grid grid-cols-3 gap-4 rounded-lg bg-muted p-4">
                   <div>
                     <p className="text-sm text-muted-foreground">合同金额</p>
-                    <p className="text-xl font-bold">
-                      ¥{purchaseDetail.totalAmount.toLocaleString()}
-                    </p>
+                    <p className="text-xl font-bold">¥{purchaseDetail.totalAmount.toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">已付款</p>
@@ -793,13 +1010,15 @@ export default function ContractsPageContent() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">状态</p>
-                    <div className="mt-1">{getPurchaseStatusBadge(purchaseDetail.status)}</div>
+                    <div className="mt-1">
+                      <StatusPill status={purchaseDetail.status} />
+                    </div>
                   </div>
                 </div>
-                
+
                 {/* 商品明细 */}
                 <div>
-                  <h4 className="font-medium mb-2 flex items-center gap-2">
+                  <h4 className="mb-2 flex items-center gap-2 font-medium">
                     <Package className="h-4 w-4" />
                     商品明细
                   </h4>
@@ -837,15 +1056,13 @@ export default function ContractsPageContent() {
                       </TableBody>
                     </Table>
                   ) : (
-                    <p className="text-center py-4 text-muted-foreground">
-                      暂无商品明细
-                    </p>
+                    <p className="py-4 text-center text-muted-foreground">暂无商品明细</p>
                   )}
                 </div>
-                
+
                 {/* 备注 */}
                 {purchaseDetail.note && (
-                  <div className="p-3 bg-muted rounded">
+                  <div className="rounded bg-muted p-3">
                     <p className="text-sm text-muted-foreground">备注：{purchaseDetail.note}</p>
                   </div>
                 )}
@@ -868,57 +1085,65 @@ export default function ContractsPageContent() {
               <FileDown className="h-5 w-5 text-primary" />
               生成购销合同
             </DialogTitle>
-            <DialogDescription>
-              填写收货信息后，系统将自动生成标准购销合同文档
-            </DialogDescription>
+            <DialogDescription>填写收货信息后，系统将自动生成标准购销合同文档</DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="storeName">收货店铺名称</Label>
-              <Input 
+              <Input
                 id="storeName"
                 placeholder="例如：米尔皮塔"
                 value={generateForm.storeName}
-                onChange={(e) => setGenerateForm(prev => ({ ...prev, storeName: e.target.value }))}
+                onChange={(e) =>
+                  setGenerateForm((prev) => ({ ...prev, storeName: e.target.value }))
+                }
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="deliveryAddress">收货地址</Label>
-              <Input 
+              <Input
                 id="deliveryAddress"
                 placeholder="完整收货地址"
                 value={generateForm.deliveryAddress}
-                onChange={(e) => setGenerateForm(prev => ({ ...prev, deliveryAddress: e.target.value }))}
+                onChange={(e) =>
+                  setGenerateForm((prev) => ({ ...prev, deliveryAddress: e.target.value }))
+                }
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="deliveryContact">收货联系人</Label>
-              <Input 
+              <Input
                 id="deliveryContact"
                 placeholder="联系人及电话"
                 value={generateForm.deliveryContact}
-                onChange={(e) => setGenerateForm(prev => ({ ...prev, deliveryContact: e.target.value }))}
+                onChange={(e) =>
+                  setGenerateForm((prev) => ({ ...prev, deliveryContact: e.target.value }))
+                }
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="depositRate">首付比例 (%)</Label>
-              <Input 
+              <Input
                 id="depositRate"
                 type="number"
                 min="0"
                 max="100"
                 placeholder="默认30%"
                 value={generateForm.depositRate}
-                onChange={(e) => setGenerateForm(prev => ({ ...prev, depositRate: e.target.value }))}
+                onChange={(e) =>
+                  setGenerateForm((prev) => ({ ...prev, depositRate: e.target.value }))
+                }
               />
-              <p className="text-xs text-muted-foreground">合同中&quot;第一笔款项&quot;的比例，默认为30%</p>
+              <p className="text-xs text-muted-foreground">
+                合同中&quot;第一笔款项&quot;的比例，默认为30%
+              </p>
             </div>
           </div>
-          
+
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setGenerateOpen(false)}>
               取消

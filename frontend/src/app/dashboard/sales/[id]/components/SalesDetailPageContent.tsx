@@ -533,8 +533,8 @@ export default function SalesDetailPage({ params }: PageProps) {
       timeline.push({
         date: lastPayment.paymentDate,
         label: '收款记录',
-        description: `$${contract.receivedAmount.toLocaleString()} / $${contract.totalAmount.toLocaleString()}`,
-        state: contract.receivedAmount >= contract.totalAmount ? 'completed' as const : 'pending' as const,
+        description: `$${(contract.receivedAmount || 0).toLocaleString()} / $${(contract.totalAmount || 0).toLocaleString()}`,
+        state: (contract.receivedAmount || 0) >= (contract.totalAmount || 0) ? 'completed' as const : 'pending' as const,
       });
     }
 
@@ -665,18 +665,18 @@ export default function SalesDetailPage({ params }: PageProps) {
             <div className="flex items-center gap-2">
               <DollarSign className="h-5 w-5 text-primary" />
               <div>
-                <div className="text-2xl font-bold">${contract.totalAmount.toLocaleString()}</div>
+                <div className="text-2xl font-bold">${(contract.totalAmount || 0).toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">合同金额</p>
               </div>
             </div>
-            {contract.receivedAmount > 0 && (
+            {(contract.receivedAmount || 0) > 0 && (
               <div className="mt-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">已收款</span>
-                  <span className="font-medium">${contract.receivedAmount.toLocaleString()}</span>
+                  <span className="font-medium">${(contract.receivedAmount || 0).toLocaleString()}</span>
                 </div>
                 <Progress 
-                  value={Math.min((contract.receivedAmount / contract.totalAmount) * 100, 100)} 
+                  value={Math.min(((contract.receivedAmount || 0) / (contract.totalAmount || 1)) * 100, 100)} 
                   className="mt-1 h-1.5" 
                 />
               </div>
@@ -1033,7 +1033,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                 收款记录
               </CardTitle>
               <CardDescription>
-                已收款项明细，总计 ${contract.receivedAmount.toLocaleString()} / ${contract.totalAmount.toLocaleString()}
+                已收款项明细，总计 ${(contract.receivedAmount || 0).toLocaleString()} / ${(contract.totalAmount || 0).toLocaleString()}
               </CardDescription>
             </CardHeader>
             <CardContent>
