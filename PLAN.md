@@ -13,9 +13,12 @@
 ### Verification
 - `cd frontend && npm run test -- 'src/app/(auth)/login/page.test.tsx'`：通过，`6` 个测试。
 - `cd frontend && npx tsc --noEmit`：通过。
+- `cd frontend && npm run build`：通过，保留既有非阻断 Turbopack NFT warning。
+- 线上 `https://celerada.link/login` 手动流验证：`xuminjie / 83922898` 登录成功，跳转 `/dashboard`，写入 `sessionStorage` token 和 `localStorage` 快捷登录资料。
+- 线上一键登录验证：预置 `jiesong_quick_login_profile` 后点击 `一键登录（xuminjie）`，成功跳转 `/dashboard`。
 
 ### Remaining
-- 需要部署后用真实域名页面再次点击验证：应请求 `/api/v1/auth/login`，写入 session/local storage，并跳转 `/dashboard`。
+- 当前域名登录与快捷登录已恢复。VPS 运行目录存在历史本地改动；本轮只同步登录页修复并重建前端，未重置生产工作树。
 
 ## 2026-06-06 CI-03（GitHub 自动构建与验收修复）
 
