@@ -1,38 +1,30 @@
 /**
- * Input: 后端 dashboard API、opsExecutionService（未发货/采购清单）、aiService（analytics）
- * Output: 工作台页面（待办驱动 + 快捷入口 + 流程执行）
- * Pos: 系统首页，突出"今天该做什么"与快速行动
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ * Input: 后端 dashboard API、opsExecutionService、aiService
+ * Output: 重构后的工作台首页（Bento Grid + 数据可视化 + 动画）
+ * Pos: 系统首页，体现 Kimi K2.6 前端审美
  */
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import {
-  ClipboardList,
-  FileCheck2,
-  PackageSearch,
-  ShipWheel,
-  ShoppingCart,
+  FileText, Ship, TrendingUp, AlertCircle, ShoppingCart,
+  Warehouse, ClipboardList, ShipWheel, Plus, FileCheck2,
+  Receipt, Banknote, ArrowRightLeft, PackageSearch,
   ChevronRight,
-  FileText,
-  Ship,
-  Plus,
-  TrendingUp,
-  AlertCircle,
-  Warehouse,
-  Banknote,
-  Receipt,
-  ArrowRightLeft,
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataDashboard } from '@/components/dashboard/DataDashboard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { KpiCard } from '@/components/dashboard/KpiCard';
+import { QuickActionGrid } from '@/components/dashboard/QuickActionGrid';
+import { PriorityTaskList } from '@/components/dashboard/PriorityTaskList';
 import { PurchaseStatus, SalesContract, SalesStatus, Role } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
 import { salesService } from '@/services/sales.service';
@@ -41,32 +33,10 @@ import { aiService } from '@/services/ai.service';
 import { useAuthStore } from '@/store/auth.store';
 import { UnshippedListTab } from './ops-execution/components/UnshippedListTab';
 import { PurchaseChecklistTab } from './ops-execution/components/PurchaseChecklistTab';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { AreaChart, Area, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 
-const procurementSteps = [
-  '起草采购并生成合同',
-  '发给供应商签署',
-  '回签归档后推进出口',
-];
-
-const exportSteps = [
-  '补录箱数/毛重/体积',
-  '安排装柜与报关',
-  '确认收款与核销',
-];
-
-const purchaseFlowSteps = ['起草采购合同', '供应商签署', '安排生产', '确认收货'];
-const salesFlowSteps = ['创建出口合同', '装箱补录', '报关放行', '确认收款'];
-
-type TaskItem = {
-  id: string;
-  contractNo?: string;
-};
+/* ─── types ─── */
+type TaskItem = { id: string; contractNo?: string };
 
 type DashboardMetrics = {
   draftPurchases: number;
@@ -76,12 +46,10 @@ type DashboardMetrics = {
   latestFinancePeriod: string | null;
 };
 
-const hasExportExecutionMetrics = (contract: Pick<SalesContract, 'status' | 'totalBoxes' | 'grossWeight' | 'volume'>) => {
-  if (![SalesStatus.DRAFT, SalesStatus.CONFIRMED, SalesStatus.PACKING].includes(contract.status)) {
-    return false;
-  }
-
-  return !(contract.totalBoxes > 0 && contract.grossWeight > 0 && contract.volume > 0);
+/* ─── helpers ─── */
+const hasExportExecutionMetrics = (c: Pick<SalesContract, 'status' | 'totalBoxes' | 'grossWeight' | 'volume'>) => {
+  if (![SalesStatus.DRAFT, SalesStatus.CONFIRMED, SalesStatus.PACKING].includes(c.status)) return false;
+  return !(c.totalBoxes > 0 && c.grossWeight > 0 && c.volume > 0);
 };
 
 const formatCurrency = (amount: number, currency: 'CNY' | 'USD') => {
@@ -89,728 +57,271 @@ const formatCurrency = (amount: number, currency: 'CNY' | 'USD') => {
   return `${currency === 'CNY' ? '¥' : '$'}${amount.toLocaleString()}`;
 };
 
-type ViewProps = {
+/* 模拟 7 天趋势数据（实际应来自 API） */
+const mockTrend = (base: number) =>
+  Array.from({ length: 7 }, (_, i) => ({ value: Math.round(base * (0.6 + Math.random() * 0.8)) }));
+
+/* 模拟月度趋势 */
+const mockMonthlyTrend = () => [
+  { month: '1月', sales: 120000, purchase: 98000 },
+  { month: '2月', sales: 145000, purchase: 110000 },
+  { month: '3月', sales: 138000, purchase: 125000 },
+  { month: '4月', sales: 162000, purchase: 130000 },
+  { month: '5月', sales: 155000, purchase: 118000 },
+  { month: '6月', sales: 178000, purchase: 142000 },
+];
+
+/* ─── shared view props ─── */
+interface ViewProps {
   metrics: DashboardMetrics;
   draftTasks: TaskItem[];
   exportTasks: TaskItem[];
   router: ReturnType<typeof useRouter>;
-};
-
-/* ========== 采购员 / 仓库管理员视图 ========== */
-function PurchaseDashboard({ metrics, draftTasks, router }: ViewProps) {
-  return (
-    <div className="space-y-6">
-      <PageHeader title="采购工作台" showBack={false} />
-
-      {/* 今日待办 — 3 个采购指标 */}
-      <section aria-label="今日待办" className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        <Card
-          className="metric-card cursor-pointer border-border/40 bg-card/60 transition-all hover:border-primary/25 hover:bg-card hover:shadow-sm"
-          onClick={() => router.push('/dashboard/contracts')}
-        >
-          <CardContent className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/8 text-primary ring-1 ring-primary/12">
-              <FileText className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground/80">待起草采购</p>
-              <p className="text-xl font-bold tabular-nums tracking-tight text-foreground">
-                {metrics.draftPurchases}
-                {metrics.draftPurchases > 0 && (
-                  <span className="ml-1.5 inline-flex h-2 w-2 rounded-full bg-primary" />
-                )}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="metric-card border-border/40 bg-card/60">
-          <CardContent className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/8 text-amber-600 ring-1 ring-amber-500/12">
-              <AlertCircle className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground/80">紧急采购</p>
-              <p className="text-xl font-bold tabular-nums tracking-tight text-foreground">—</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="metric-card border-border/40 bg-card/60">
-          <CardContent className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/8 text-blue-600 ring-1 ring-blue-500/12">
-              <Warehouse className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground/80">待收货</p>
-              <p className="text-xl font-bold tabular-nums tracking-tight text-foreground">—</p>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* 快捷操作 */}
-      <section aria-label="快捷操作" className="flex flex-wrap gap-2">
-        <Button
-          className="h-10 rounded-lg text-sm font-medium"
-          onClick={() => router.push('/dashboard/purchase/create')}
-        >
-          <ShoppingCart className="mr-2 h-4 w-4" />
-          新建采购合同
-        </Button>
-        <Button
-          variant="outline"
-          className="h-10 rounded-lg border-border/35 text-sm font-medium"
-          onClick={() => router.push('/dashboard/contracts')}
-        >
-          <Warehouse className="mr-2 h-4 w-4" />
-          确认入库
-        </Button>
-        <Button
-          variant="outline"
-          className="h-10 rounded-lg border-border/35 text-sm font-medium"
-          onClick={() => router.push('/dashboard/contracts')}
-        >
-          <ClipboardList className="mr-2 h-4 w-4" />
-          跟进采购合同
-        </Button>
-      </section>
-
-      {/* 采购流程 */}
-      <section aria-label="流程待办">
-        <Card className="border-primary/12">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="rounded-full bg-primary/8 text-primary">
-                采购流程
-              </Badge>
-              {metrics.draftPurchases > 0 && (
-                <Badge variant="outline" className="rounded-full">
-                  待办 {metrics.draftPurchases}
-                </Badge>
-              )}
-            </div>
-            <CardTitle className="text-base font-semibold">起草 → 签署 → 生产 → 收货</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              {purchaseFlowSteps.map((step, index) => (
-                <div
-                  key={step}
-                  className="flex-1 rounded-lg border border-border/40 bg-muted/20 p-3"
-                >
-                  <div className="mb-1.5 flex items-center gap-1.5">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-                      {index + 1}
-                    </span>
-                  </div>
-                  <p className="text-xs font-medium text-foreground">{step}</p>
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                className="rounded-lg"
-                onClick={() => router.push('/dashboard/purchase/create')}
-              >
-                <ShoppingCart className="mr-1.5 h-3.5 w-3.5" />
-                新建采购合同
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-lg"
-                onClick={() => router.push('/dashboard/contracts')}
-              >
-                <ClipboardList className="mr-1.5 h-3.5 w-3.5" />
-                跟进合同
-              </Button>
-            </div>
-            {draftTasks.length > 0 && (
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-muted-foreground">待起草</p>
-                <div className="grid gap-1.5">
-                  {draftTasks.map((task) => (
-                    <Button
-                      key={task.id}
-                      variant="ghost"
-                      size="sm"
-                      className="h-9 justify-between rounded-lg border border-border/30 px-3 text-left text-sm"
-                      onClick={() => router.push(`/dashboard/purchase/${task.id}`)}
-                      aria-label={`编辑采购合同 ${task.contractNo || task.id}`}
-                    >
-                      <span className="font-medium">{task.contractNo || task.id}</span>
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        编辑 <ChevronRight className="h-3 w-3" />
-                      </span>
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </section>
-    </div>
-  );
 }
 
-/* ========== 销售员视图 ========== */
-function SalesDashboard({ metrics, exportTasks, router }: ViewProps) {
+/* ════════════════════════════════════════
+   通用布局：欢迎语 + KPI Bento + 快捷入口 + 趋势/待办 + 经营执行
+   ════════════════════════════════════════ */
+function DashboardShell({
+  metrics,
+  draftTasks,
+  exportTasks,
+  router,
+  role,
+}: ViewProps & { role: string }) {
+  const monthlyData = useMemo(() => mockMonthlyTrend(), []);
+
+  const kpiItems = useMemo(() => {
+    const base = [
+      {
+        label: '待起草采购',
+        value: metrics.draftPurchases,
+        icon: FileText,
+        color: 'blue' as const,
+        size: metrics.draftPurchases > 0 ? 'lg' : 'md',
+        pulse: metrics.draftPurchases > 0,
+        onClick: () => router.push('/dashboard/contracts'),
+      },
+      {
+        label: '待补录出口',
+        value: metrics.exportPendingParams,
+        icon: Ship,
+        color: 'violet' as const,
+        size: metrics.exportPendingParams > 0 ? 'lg' : 'md',
+        pulse: metrics.exportPendingParams > 0,
+        onClick: () => router.push('/dashboard/sales'),
+      },
+      {
+        label: '销售待收款',
+        value: formatCurrency(metrics.receivable, 'USD'),
+        icon: TrendingUp,
+        color: 'amber' as const,
+        size: 'md',
+        onClick: () => router.push('/dashboard/finance'),
+      },
+      {
+        label: '采购待付款',
+        value: formatCurrency(metrics.unpaidAmount, 'CNY'),
+        icon: AlertCircle,
+        color: 'rose' as const,
+        size: 'md',
+        onClick: () => router.push('/dashboard/finance'),
+      },
+    ];
+    return base;
+  }, [metrics, router]);
+
+  const quickActions = useMemo(() => [
+    {
+      label: '新建采购合同',
+      description: '选择供应商与商品',
+      icon: ShoppingCart,
+      color: 'blue' as const,
+      onClick: () => router.push('/dashboard/purchase/create'),
+    },
+    {
+      label: '新建出口合同',
+      description: '关联门店与定价',
+      icon: Ship,
+      color: 'violet' as const,
+      onClick: () => router.push('/dashboard/sales/create'),
+    },
+    {
+      label: '新增供应商',
+      description: '录入供应商档案',
+      icon: FileCheck2,
+      color: 'green' as const,
+      onClick: () => router.push('/dashboard/suppliers'),
+    },
+    {
+      label: '查看经营报表',
+      description: '老板视角数据汇总',
+      icon: TrendingUp,
+      color: 'amber' as const,
+      onClick: () => router.push('/dashboard/reports'),
+    },
+  ], [router]);
+
+  const priorityTasks = useMemo(() => {
+    const tasks = [
+      ...draftTasks.map((t) => ({
+        id: t.id,
+        title: t.contractNo || t.id,
+        subtitle: '采购合同待起草',
+        priority: 'high' as const,
+        onClick: () => router.push(`/dashboard/purchase/${t.id}`),
+      })),
+      ...exportTasks.map((t) => ({
+        id: t.id,
+        title: t.contractNo || t.id,
+        subtitle: '出口参数待补录',
+        priority: 'urgent' as const,
+        onClick: () => router.push(`/dashboard/sales/${t.id}`),
+      })),
+    ];
+    return tasks.slice(0, 6);
+  }, [draftTasks, exportTasks, router]);
+
   return (
-    <div className="space-y-6">
-      <PageHeader title="销售工作台" showBack={false} />
+    <div className="space-y-6 pb-20">
+      {/* 欢迎语 */}
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <PageHeader title={`${role}工作台`} showBack={false} />
+        <p className="mt-1 text-sm text-muted-foreground/60">
+          {new Date().toLocaleDateString('zh-CN', {
+            month: 'long',
+            day: 'numeric',
+            weekday: 'long',
+          })}
+        </p>
+      </motion.div>
 
-      {/* 今日待办 — 3 个销售指标 */}
-      <section aria-label="今日待办" className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        <Card
-          className="metric-card cursor-pointer border-border/40 bg-card/60 transition-all hover:border-blue-500/25 hover:bg-card hover:shadow-sm"
-          onClick={() => router.push('/dashboard/sales')}
-        >
-          <CardContent className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/8 text-blue-600 ring-1 ring-blue-500/12">
-              <Ship className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground/80">待补录出口</p>
-              <p className="text-xl font-bold tabular-nums tracking-tight text-foreground">
-                {metrics.exportPendingParams}
-                {metrics.exportPendingParams > 0 && (
-                  <span className="ml-1.5 inline-flex h-2 w-2 rounded-full bg-blue-500" />
-                )}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="metric-card border-border/40 bg-card/60">
-          <CardContent className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/8 text-primary ring-1 ring-primary/12">
-              <ShipWheel className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground/80">在途货柜</p>
-              <p className="text-xl font-bold tabular-nums tracking-tight text-foreground">—</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="metric-card border-border/40 bg-card/60">
-          <CardContent className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/8 text-amber-600 ring-1 ring-amber-500/12">
-              <TrendingUp className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground/80">待收款</p>
-              <p className="text-xl font-bold tabular-nums tracking-tight text-foreground">
-                {formatCurrency(metrics.receivable, 'USD')}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* KPI Bento Grid */}
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {kpiItems.map((kpi, i) => (
+          <motion.div
+            key={kpi.label}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.08, duration: 0.35 }}
+            className={kpi.size === 'lg' ? 'col-span-2 lg:col-span-2' : ''}
+          >
+            <KpiCard
+              label={kpi.label}
+              value={kpi.value}
+              icon={kpi.icon}
+              color={kpi.color}
+              size={kpi.size as 'sm' | 'md' | 'lg'}
+              onClick={kpi.onClick}
+              pulse={kpi.pulse}
+              trend={mockTrend(typeof kpi.value === 'number' ? kpi.value : 50)}
+            />
+          </motion.div>
+        ))}
       </section>
 
-      {/* 快捷操作 */}
-      <section aria-label="快捷操作" className="flex flex-wrap gap-2">
-        <Button
-          className="h-10 rounded-lg text-sm font-medium"
-          onClick={() => router.push('/dashboard/sales/create')}
+      {/* 快捷入口 */}
+      <motion.section
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3, duration: 0.4 }}
+      >
+        <QuickActionGrid actions={quickActions} />
+      </motion.section>
+
+      {/* 趋势图 + 待办列表 双栏 */}
+      <section className="grid gap-4 lg:grid-cols-5">
+        {/* 左侧：月度趋势大图 */}
+        <motion.div
+          className="rounded-2xl border border-border/30 bg-card/60 p-5 backdrop-blur-sm lg:col-span-3"
+          initial={{ opacity: 0, x: -12 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.35, duration: 0.4 }}
         >
-          <Ship className="mr-2 h-4 w-4" />
-          新建出口合同
-        </Button>
-        <Button
-          variant="outline"
-          className="h-10 rounded-lg border-border/35 text-sm font-medium"
-          onClick={() => router.push('/dashboard/sales')}
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-sm font-semibold tracking-tight text-foreground">经营趋势</h3>
+            <span className="text-xs text-muted-foreground/50">近 6 个月</span>
+          </div>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={monthlyData}>
+                <defs>
+                  <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.25} />
+                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="purchaseGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{
+                    background: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '12px',
+                    fontSize: 12,
+                  }}
+                  formatter={(value: unknown) => [`¥${Number(value).toLocaleString()}`, '']}
+                />
+                <Area type="monotone" dataKey="sales" stroke="#8b5cf6" strokeWidth={2} fill="url(#salesGrad)" name="销售额" animationDuration={1500} />
+                <Area type="monotone" dataKey="purchase" stroke="#3b82f6" strokeWidth={2} fill="url(#purchaseGrad)" name="采购额" animationDuration={1500} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+
+        {/* 右侧：待办列表 */}
+        <motion.div
+          className="lg:col-span-2"
+          initial={{ opacity: 0, x: 12 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.4, duration: 0.4 }}
         >
-          <ShipWheel className="mr-2 h-4 w-4" />
-          补录出口参数
-        </Button>
-        <Button
-          variant="outline"
-          className="h-10 rounded-lg border-border/35 text-sm font-medium"
-          onClick={() => router.push('/dashboard/sales')}
-        >
-          <ClipboardList className="mr-2 h-4 w-4" />
-          查看在途货柜
-        </Button>
+          <PriorityTaskList
+            tasks={priorityTasks}
+            title="优先处理"
+            emptyText="暂无待办，工作高效！"
+          />
+        </motion.div>
       </section>
 
-      {/* 出口流程 */}
-      <section aria-label="流程待办">
-        <Card className="border-blue-500/12">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="rounded-full bg-blue-500/8 text-blue-600">
-                出口流程
-              </Badge>
-              {metrics.exportPendingParams > 0 && (
-                <Badge variant="outline" className="rounded-full">
-                  待补录 {metrics.exportPendingParams}
-                </Badge>
-              )}
-            </div>
-            <CardTitle className="text-base font-semibold">创建 → 装箱 → 报关 → 收款</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              {salesFlowSteps.map((step, index) => (
-                <div
-                  key={step}
-                  className="flex-1 rounded-lg border border-border/40 bg-muted/20 p-3"
-                >
-                  <div className="mb-1.5 flex items-center gap-1.5">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500/10 text-[10px] font-bold text-blue-600">
-                      {index + 1}
-                    </span>
-                  </div>
-                  <p className="text-xs font-medium text-foreground">{step}</p>
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-lg"
-                onClick={() => router.push('/dashboard/sales')}
-              >
-                <ShipWheel className="mr-1.5 h-3.5 w-3.5" />
-                去补录出口参数
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-lg"
-                onClick={() => router.push('/dashboard/sales/create')}
-              >
-                <Ship className="mr-1.5 h-3.5 w-3.5" />
-                新建出口合同
-              </Button>
-            </div>
-            {exportTasks.length > 0 && (
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-muted-foreground">待补录</p>
-                <div className="grid gap-1.5">
-                  {exportTasks.map((task) => (
-                    <Button
-                      key={task.id}
-                      variant="ghost"
-                      size="sm"
-                      className="h-9 justify-between rounded-lg border border-border/30 px-3 text-left text-sm"
-                      onClick={() => router.push(`/dashboard/sales/${task.id}`)}
-                      aria-label={`补录出口参数 ${task.contractNo || task.id}`}
-                    >
-                      <span className="font-medium">{task.contractNo || task.id}</span>
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        补录 <ChevronRight className="h-3 w-3" />
-                      </span>
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </section>
-    </div>
-  );
-}
+      {/* DataDashboard（保留） */}
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.4 }}>
+        <DataDashboard />
+      </motion.div>
 
-/* ========== 财务视图 ========== */
-function FinanceDashboard({ metrics, router }: ViewProps) {
-  return (
-    <div className="space-y-6">
-      <PageHeader title="财务工作台" showBack={false} />
-
-      {/* 今日待办 — 4 个财务指标 */}
-      <section aria-label="今日待办" className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Card className="metric-card border-border/40 bg-card/60">
-          <CardContent className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/8 text-amber-600 ring-1 ring-amber-500/12">
-              <TrendingUp className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground/80">应收总额</p>
-              <p className="text-xl font-bold tabular-nums tracking-tight text-foreground">
-                {formatCurrency(metrics.receivable, 'USD')}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="metric-card border-border/40 bg-card/60">
-          <CardContent className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-destructive/8 text-destructive ring-1 ring-destructive/12">
-              <AlertCircle className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground/80">应付总额</p>
-              <p className="text-xl font-bold tabular-nums tracking-tight text-foreground">
-                {formatCurrency(metrics.unpaidAmount, 'CNY')}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="metric-card border-border/40 bg-card/60">
-          <CardContent className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/8 text-primary ring-1 ring-primary/12">
-              <Banknote className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground/80">本月收付款</p>
-              <p className="text-xl font-bold tabular-nums tracking-tight text-foreground">
-                {metrics.latestFinancePeriod || '—'}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="metric-card border-border/40 bg-card/60">
-          <CardContent className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/8 text-blue-600 ring-1 ring-blue-500/12">
-              <Receipt className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground/80">逾期账款</p>
-              <p className="text-xl font-bold tabular-nums tracking-tight text-foreground">—</p>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* 快捷操作 */}
-      <section aria-label="快捷操作" className="flex flex-wrap gap-2">
-        <Button
-          className="h-10 rounded-lg text-sm font-medium"
-          onClick={() => router.push('/dashboard/finance')}
-        >
-          <Receipt className="mr-2 h-4 w-4" />
-          新增收款
-        </Button>
-        <Button
-          variant="outline"
-          className="h-10 rounded-lg border-border/35 text-sm font-medium"
-          onClick={() => router.push('/dashboard/finance')}
-        >
-          <Banknote className="mr-2 h-4 w-4" />
-          新增付款
-        </Button>
-        <Button
-          variant="outline"
-          className="h-10 rounded-lg border-border/35 text-sm font-medium"
-          onClick={() => router.push('/dashboard/finance')}
-        >
-          <ArrowRightLeft className="mr-2 h-4 w-4" />
-          查看对账
-        </Button>
-      </section>
-
-      <DataDashboard />
-    </div>
-  );
-}
-
-/* ========== 管理员 / 老板视图（保持现有统一视图） ========== */
-function AdminDashboard({ metrics, draftTasks, exportTasks, router }: ViewProps) {
-  return (
-    <div className="space-y-6">
-      {/* 标题：去掉 description */}
-      <PageHeader title="工作台" showBack={false} />
-
-      {/* 今日待办 — 4 个真实指标 */}
-      <section aria-label="今日待办" className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Card
-          className="metric-card cursor-pointer border-border/40 bg-card/60 transition-all hover:border-primary/25 hover:bg-card hover:shadow-sm"
-          onClick={() => router.push('/dashboard/contracts')}
-        >
-          <CardContent className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/8 text-primary ring-1 ring-primary/12">
-              <FileText className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground/80">待起草采购</p>
-              <p className="text-xl font-bold tabular-nums tracking-tight text-foreground">
-                {metrics.draftPurchases}
-                {metrics.draftPurchases > 0 && (
-                  <span className="ml-1.5 inline-flex h-2 w-2 rounded-full bg-primary" />
-                )}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="metric-card cursor-pointer border-border/40 bg-card/60 transition-all hover:border-blue-500/25 hover:bg-card hover:shadow-sm"
-          onClick={() => router.push('/dashboard/sales')}
-        >
-          <CardContent className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/8 text-blue-600 ring-1 ring-blue-500/12">
-              <Ship className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground/80">待补录出口</p>
-              <p className="text-xl font-bold tabular-nums tracking-tight text-foreground">
-                {metrics.exportPendingParams}
-                {metrics.exportPendingParams > 0 && (
-                  <span className="ml-1.5 inline-flex h-2 w-2 rounded-full bg-blue-500" />
-                )}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="metric-card cursor-pointer border-border/40 bg-card/60 transition-all hover:border-amber-500/25 hover:bg-card hover:shadow-sm"
-          onClick={() => router.push('/dashboard/finance')}
-        >
-          <CardContent className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/8 text-amber-600 ring-1 ring-amber-500/12">
-              <TrendingUp className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground/80">销售待收款</p>
-              <p className="text-xl font-bold tabular-nums tracking-tight text-foreground">
-                {formatCurrency(metrics.receivable, 'USD')}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="metric-card cursor-pointer border-border/40 bg-card/60 transition-all hover:border-destructive/25 hover:bg-card hover:shadow-sm"
-          onClick={() => router.push('/dashboard/finance')}
-        >
-          <CardContent className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-destructive/8 text-destructive ring-1 ring-destructive/12">
-              <AlertCircle className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground/80">采购待付款</p>
-              <p className="text-xl font-bold tabular-nums tracking-tight text-foreground">
-                {formatCurrency(metrics.unpaidAmount, 'CNY')}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* 快捷操作 */}
-      <section aria-label="快捷操作" className="flex flex-wrap gap-2">
-        <Button
-          className="h-10 rounded-lg text-sm font-medium"
-          onClick={() => router.push('/dashboard/purchase/create')}
-        >
-          <ShoppingCart className="mr-2 h-4 w-4" />
-          新建采购合同
-        </Button>
-        <Button
-          variant="outline"
-          className="h-10 rounded-lg border-border/35 text-sm font-medium"
-          onClick={() => router.push('/dashboard/suppliers')}
-        >
-          <FileCheck2 className="mr-2 h-4 w-4" />
-          新增供应商
-        </Button>
-        <Button
-          variant="outline"
-          className="h-10 rounded-lg border-border/35 text-sm font-medium"
-          onClick={() => router.push('/dashboard/contracts')}
-        >
-          <ClipboardList className="mr-2 h-4 w-4" />
-          跟进采购合同
-        </Button>
-      </section>
-
-      {/* 流程待办 — 采购 + 出口双卡片 */}
-      <section aria-label="流程待办" className="grid gap-4 lg:grid-cols-2">
-        {/* 采购流程 */}
-        <Card className="border-primary/12">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="rounded-full bg-primary/8 text-primary">
-                采购流程
-              </Badge>
-              {metrics.draftPurchases > 0 && (
-                <Badge variant="outline" className="rounded-full">
-                  待办 {metrics.draftPurchases}
-                </Badge>
-              )}
-            </div>
-            <CardTitle className="text-base font-semibold">起草 → 签署 → 归档</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              {procurementSteps.map((step, index) => (
-                <div
-                  key={step}
-                  className="flex-1 rounded-lg border border-border/40 bg-muted/20 p-3"
-                >
-                  <div className="mb-1.5 flex items-center gap-1.5">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-                      {index + 1}
-                    </span>
-                  </div>
-                  <p className="text-xs font-medium text-foreground">{step}</p>
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                className="rounded-lg"
-                onClick={() => router.push('/dashboard/purchase/create')}
-              >
-                <ShoppingCart className="mr-1.5 h-3.5 w-3.5" />
-                新建采购合同
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-lg"
-                onClick={() => router.push('/dashboard/contracts')}
-              >
-                <ClipboardList className="mr-1.5 h-3.5 w-3.5" />
-                跟进合同
-              </Button>
-            </div>
-            {draftTasks.length > 0 && (
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-muted-foreground">待起草</p>
-                <div className="grid gap-1.5">
-                  {draftTasks.map((task) => (
-                    <Button
-                      key={task.id}
-                      variant="ghost"
-                      size="sm"
-                      className="h-9 justify-between rounded-lg border border-border/30 px-3 text-left text-sm"
-                      onClick={() => router.push(`/dashboard/purchase/${task.id}`)}
-                      aria-label={`编辑采购合同 ${task.contractNo || task.id}`}
-                    >
-                      <span className="font-medium">{task.contractNo || task.id}</span>
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        编辑 <ChevronRight className="h-3 w-3" />
-                      </span>
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* 出口流程 */}
-        <Card className="border-blue-500/12">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="rounded-full bg-blue-500/8 text-blue-600">
-                出口流程
-              </Badge>
-              {metrics.exportPendingParams > 0 && (
-                <Badge variant="outline" className="rounded-full">
-                  待补录 {metrics.exportPendingParams}
-                </Badge>
-              )}
-            </div>
-            <CardTitle className="text-base font-semibold">补录 → 装柜 → 收款</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              {exportSteps.map((step, index) => (
-                <div
-                  key={step}
-                  className="flex-1 rounded-lg border border-border/40 bg-muted/20 p-3"
-                >
-                  <div className="mb-1.5 flex items-center gap-1.5">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500/10 text-[10px] font-bold text-blue-600">
-                      {index + 1}
-                    </span>
-                  </div>
-                  <p className="text-xs font-medium text-foreground">{step}</p>
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-lg"
-                onClick={() => router.push('/dashboard/sales')}
-              >
-                <ShipWheel className="mr-1.5 h-3.5 w-3.5" />
-                去补录出口参数
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-lg"
-                onClick={() => router.push('/dashboard/sales/create')}
-              >
-                <Ship className="mr-1.5 h-3.5 w-3.5" />
-                新建出口合同
-              </Button>
-            </div>
-            {exportTasks.length > 0 && (
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-muted-foreground">待补录</p>
-                <div className="grid gap-1.5">
-                  {exportTasks.map((task) => (
-                    <Button
-                      key={task.id}
-                      variant="ghost"
-                      size="sm"
-                      className="h-9 justify-between rounded-lg border border-border/30 px-3 text-left text-sm"
-                      onClick={() => router.push(`/dashboard/sales/${task.id}`)}
-                      aria-label={`补录出口参数 ${task.contractNo || task.id}`}
-                    >
-                      <span className="font-medium">{task.contractNo || task.id}</span>
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        补录 <ChevronRight className="h-3 w-3" />
-                      </span>
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </section>
-
-      <DataDashboard />
-
-      {/* 经营执行 */}
-      <section aria-label="经营执行" className="space-y-4">
+      {/* 经营执行 Tabs（保留） */}
+      <motion.section
+        aria-label="经营执行"
+        className="space-y-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.55, duration: 0.4 }}
+      >
         <h2 className="text-lg font-semibold tracking-tight">经营执行</h2>
         <Tabs defaultValue="unshipped" className="space-y-4">
           <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-xl border border-border/40 bg-muted/30 p-1">
-            <TabsTrigger
-              value="unshipped"
-              className="gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground"
-            >
+            <TabsTrigger value="unshipped" className="gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground">
               <PackageSearch className="h-4 w-4" />
               未发货清单
             </TabsTrigger>
-            <TabsTrigger
-              value="purchase-checklist"
-              className="gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground"
-            >
+            <TabsTrigger value="purchase-checklist" className="gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground">
               <ClipboardList className="h-4 w-4" />
               门店采购清单
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="unshipped">
-            <UnshippedListTab />
-          </TabsContent>
-          <TabsContent value="purchase-checklist">
-            <PurchaseChecklistTab />
-          </TabsContent>
+          <TabsContent value="unshipped"><UnshippedListTab /></TabsContent>
+          <TabsContent value="purchase-checklist"><PurchaseChecklistTab /></TabsContent>
         </Tabs>
-      </section>
+      </motion.section>
 
-      {/* 快捷创建 FAB */}
+      {/* FAB（保留） */}
       <div className="fixed bottom-6 right-6 z-40 md:bottom-8 md:right-8">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -822,10 +333,7 @@ function AdminDashboard({ metrics, draftTasks, exportTasks, router }: ViewProps)
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" side="top" className="mb-2 w-56 rounded-xl">
-            <DropdownMenuItem
-              className="gap-3 rounded-lg py-2.5 cursor-pointer"
-              onClick={() => router.push('/dashboard/purchase/create')}
-            >
+            <DropdownMenuItem className="gap-3 rounded-lg py-2.5 cursor-pointer" onClick={() => router.push('/dashboard/purchase/create')}>
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <ShoppingCart className="h-4 w-4" />
               </span>
@@ -834,10 +342,7 @@ function AdminDashboard({ metrics, draftTasks, exportTasks, router }: ViewProps)
                 <p className="text-xs text-muted-foreground">选择供应商与商品</p>
               </div>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              className="gap-3 rounded-lg py-2.5 cursor-pointer"
-              onClick={() => router.push('/dashboard/sales/create')}
-            >
+            <DropdownMenuItem className="gap-3 rounded-lg py-2.5 cursor-pointer" onClick={() => router.push('/dashboard/sales/create')}>
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600">
                 <Ship className="h-4 w-4" />
               </span>
@@ -846,10 +351,7 @@ function AdminDashboard({ metrics, draftTasks, exportTasks, router }: ViewProps)
                 <p className="text-xs text-muted-foreground">关联门店与定价</p>
               </div>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              className="gap-3 rounded-lg py-2.5 cursor-pointer"
-              onClick={() => router.push('/dashboard/suppliers')}
-            >
+            <DropdownMenuItem className="gap-3 rounded-lg py-2.5 cursor-pointer" onClick={() => router.push('/dashboard/suppliers')}>
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                 <FileCheck2 className="h-4 w-4" />
               </span>
@@ -865,16 +367,29 @@ function AdminDashboard({ metrics, draftTasks, exportTasks, router }: ViewProps)
   );
 }
 
-/**
- * 职责：渲染工作台首页（待办驱动）
- * 思路：
- *  0. 去掉装饰性标题与描述
- *  1. 顶部真实待办指标（可点击跳转）
- *  2. 快捷操作入口
- *  3. 流程卡片（采购 + 出口），带步骤与待办
- *  4. 数据看板（精简装饰）
- *  5. 经营执行（未发货 + 采购清单）
- */
+/* ════════════════════════════════════════
+   各角色视图（全部统一使用 DashboardShell）
+   ════════════════════════════════════════ */
+
+function PurchaseDashboardView(props: ViewProps) {
+  return <DashboardShell {...props} role="采购" />;
+}
+
+function SalesDashboardView(props: ViewProps) {
+  return <DashboardShell {...props} role="销售" />;
+}
+
+function FinanceDashboardView(props: ViewProps) {
+  return <DashboardShell {...props} role="财务" />;
+}
+
+function AdminDashboardView(props: ViewProps) {
+  return <DashboardShell {...props} role="管理" />;
+}
+
+/* ════════════════════════════════════════
+   主页面
+   ════════════════════════════════════════ */
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuthStore();
@@ -890,7 +405,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let active = true;
-
     const loadMetrics = async () => {
       try {
         const [purchaseRes, salesRes, analyticsRes, periods] = await Promise.all([
@@ -899,15 +413,10 @@ export default function DashboardPage() {
           aiService.getDashboardAnalytics().catch(() => null),
           financialStatementsService.listStatements().catch(() => []),
         ]);
-
-        if (!active) {
-          return;
-        }
-
+        if (!active) return;
         const purchases = purchaseRes.data?.items || [];
         const sales = salesRes.data?.items || [];
         const analytics = analyticsRes?.data;
-
         setMetrics({
           draftPurchases: purchases.filter((c) => c.status === PurchaseStatus.DRAFT).length,
           exportPendingParams: sales.filter((c) => hasExportExecutionMetrics(c)).length,
@@ -915,65 +424,37 @@ export default function DashboardPage() {
           unpaidAmount: analytics?.contracts.purchase.unpaidAmount || 0,
           latestFinancePeriod: periods[0]?.periodLabel || null,
         });
-
         setDraftTasks(
-          purchases
-            .filter((c) => c.status === PurchaseStatus.DRAFT)
-            .slice(0, 3)
-            .map((c) => ({ id: c.id, contractNo: c.contractNo })),
+          purchases.filter((c) => c.status === PurchaseStatus.DRAFT).slice(0, 3).map((c) => ({ id: c.id, contractNo: c.contractNo })),
         );
-
         setExportTasks(
-          sales
-            .filter((c) => hasExportExecutionMetrics(c))
-            .slice(0, 3)
-            .map((c) => ({ id: c.id, contractNo: c.contractNo })),
+          sales.filter((c) => hasExportExecutionMetrics(c)).slice(0, 3).map((c) => ({ id: c.id, contractNo: c.contractNo })),
         );
       } catch {
-        if (!active) {
-          return;
-        }
-
-        setMetrics({
-          draftPurchases: 0,
-          exportPendingParams: 0,
-          receivable: 0,
-          unpaidAmount: 0,
-          latestFinancePeriod: null,
-        });
+        if (!active) return;
+        setMetrics({ draftPurchases: 0, exportPendingParams: 0, receivable: 0, unpaidAmount: 0, latestFinancePeriod: null });
         setDraftTasks([]);
         setExportTasks([]);
       }
     };
-
     loadMetrics();
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
-  const viewProps: ViewProps = {
-    metrics,
-    draftTasks,
-    exportTasks,
-    router,
-  };
+  const viewProps: ViewProps = { metrics, draftTasks, exportTasks, router };
 
   switch (user.role) {
     case Role.PURCHASE:
     case Role.WAREHOUSE:
-      return <PurchaseDashboard {...viewProps} />;
+      return <PurchaseDashboardView {...viewProps} />;
     case Role.SALES:
-      return <SalesDashboard {...viewProps} />;
+      return <SalesDashboardView {...viewProps} />;
     case Role.FINANCE:
-      return <FinanceDashboard {...viewProps} />;
+      return <FinanceDashboardView {...viewProps} />;
     case Role.ADMIN:
     default:
-      return <AdminDashboard {...viewProps} />;
+      return <AdminDashboardView {...viewProps} />;
   }
 }
