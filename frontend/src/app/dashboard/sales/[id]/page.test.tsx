@@ -140,7 +140,7 @@ describe('SalesDetailPage 交互逻辑', () => {
       expect(screen.getByText('暂无装箱商品，点击"添加商品"开始装柜')).toBeInTheDocument();
       expect(screen.getByText('暂无附件，点击「上传附件」归档出货源文件')).toBeInTheDocument();
     });
-    expect(mockApiGet).toHaveBeenCalledWith('/sales/s-1/files');
+    expect(mockApiGet).toHaveBeenCalledWith('/contracts/s-1/files', { params: { contractType: 'SALES' } });
     expect(mockProductGetAll).not.toHaveBeenCalled();
     expect(mockStoreGetAll).not.toHaveBeenCalled();
     expect(mockInventoryGetAll).not.toHaveBeenCalled();
