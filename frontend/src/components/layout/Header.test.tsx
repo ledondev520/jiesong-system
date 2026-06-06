@@ -67,7 +67,7 @@ describe('Header', () => {
   it('渲染搜索框与用户菜单', () => {
     render(<Header />);
 
-    expect(screen.getByPlaceholderText('搜索商品、供应商、合同...')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /搜索商品、供应商、合同/ })).toBeInTheDocument();
     expect(screen.queryByText('当前模块')).not.toBeInTheDocument();
     expect(screen.queryByText('经营中台')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '用户菜单' })).toBeInTheDocument();
@@ -81,7 +81,8 @@ describe('Header', () => {
     const user = userEvent.setup();
     render(<Header />);
 
-    await user.type(screen.getByPlaceholderText('搜索商品、供应商、合同...'), '瓷砖');
+    await user.click(screen.getByRole('button', { name: /搜索商品、供应商、合同/ }));
+    await user.type(screen.getByPlaceholderText('输入关键词搜索...'), '瓷砖');
 
     await waitFor(() => {
       expect(mockSearchDashboard).toHaveBeenCalledWith('瓷砖');
@@ -99,13 +100,14 @@ describe('Header', () => {
     const user = userEvent.setup();
     render(<Header />);
 
-    const input = screen.getByPlaceholderText('搜索商品、供应商、合同...') as HTMLInputElement;
+    await user.click(screen.getByRole('button', { name: /搜索商品、供应商、合同/ }));
+    const input = screen.getByPlaceholderText('输入关键词搜索...') as HTMLInputElement;
     await user.type(input, '瓷砖');
 
-    await user.click(await screen.findByRole('button', { name: /瓷砖 A/i }));
+    await user.click(await screen.findByText('瓷砖 A'));
 
     expect(mockPush).toHaveBeenCalledWith('/dashboard/products?keyword=%E7%93%B7%E7%A0%96%20A');
-    expect(input.value).toBe('');
+    expect(screen.queryByPlaceholderText('输入关键词搜索...')).not.toBeInTheDocument();
   });
 
   it('点击个人设置后打开用户弹窗，而不是跳转系统配置', async () => {

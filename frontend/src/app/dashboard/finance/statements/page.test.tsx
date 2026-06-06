@@ -332,9 +332,9 @@ describe('FinancialStatementsPage', () => {
   it('加载后展示页面标题、tab 和历史预警', async () => {
     render(<FinancialStatementsPage />);
 
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '财务报表分析' })).toBeInTheDocument();
-    });
+    expect(
+      await screen.findByRole('heading', { name: '财务报表分析' }, { timeout: 10000 }),
+    ).toBeInTheDocument();
 
     expect(screen.getByText('收益趋势')).toBeInTheDocument();
     expect(screen.getByText('费用结构')).toBeInTheDocument();

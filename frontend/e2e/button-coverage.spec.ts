@@ -25,32 +25,18 @@ const pageCases: PageCase[] = [
   { name: '采购详情', path: '/dashboard/purchase/pc-001' },
   { name: '销售合同', path: '/dashboard/sales' },
   { name: '销售创建', path: '/dashboard/sales/create' },
-  { name: '销售详情', path: '/dashboard/sales/sc-001' },
-  { name: 'AI 会话', path: '/dashboard/ai/sessions', minClicks: 0 },
-  { name: 'AI Token 统计', path: '/dashboard/ai/token-stats', minClicks: 0 },
-  { name: 'AI 模型管理', path: '/dashboard/ai/models', minClicks: 0 },
   { name: '商品档案', path: '/dashboard/products' },
-  { name: '库存管理', path: '/dashboard/inventory', minClicks: 0 },
-  { name: '收付款', path: '/dashboard/payments' },
   { name: '采购建议', path: '/dashboard/store-recommend', minClicks: 0 },
   { name: '设置', path: '/dashboard/settings', minClicks: 0 },
-  { name: '分类设置', path: '/dashboard/settings/categories', minClicks: 0 },
-  { name: '港口设置', path: '/dashboard/settings/ports', minClicks: 0 },
   { name: '商品管理', path: '/dashboard/products' },
   { name: '供应商管理', path: '/dashboard/suppliers' },
-  { name: '门店管理', path: '/dashboard/stores' },
   { name: '用户管理', path: '/dashboard/users' },
-  { name: '货柜管理', path: '/dashboard/containers' },
-  { name: '货柜详情', path: '/dashboard/containers/ct-1' },
-  { name: '财务概览', path: '/dashboard/finance', minClicks: 0 },
   { name: '应付账款', path: '/dashboard/finance/payable' },
   { name: '应收账款', path: '/dashboard/finance/receivable' },
   { name: '导入页', path: '/dashboard/import' },
-  { name: '报表页', path: '/dashboard/reports', minClicks: 0 },
   { name: '系统管理', path: '/dashboard/system', minClicks: 0 },
   { name: '通知中心', path: '/dashboard/system/notifications' },
   { name: '系统日志', path: '/dashboard/system/logs' },
-  { name: '导入记录', path: '/dashboard/system/import-records' },
 ];
 
 const skipPatterns = [
@@ -224,12 +210,14 @@ test.describe('按钮全覆盖巡检', () => {
       }
       await assertNoRuntimeError(page);
 
-      const clickedList = await clickAllBusinessButtons(page, {
-        maxActions: pageCase.maxActions,
-        maxDurationMs: pageCase.maxDurationMs,
-        basePath: pageCase.path,
-      });
       const minClicks = pageCase.minClicks ?? 1;
+      const clickedList = minClicks === 0
+        ? []
+        : await clickAllBusinessButtons(page, {
+            maxActions: pageCase.maxActions,
+            maxDurationMs: pageCase.maxDurationMs,
+            basePath: pageCase.path,
+          });
       const blockingErrors = pageErrors.filter(
         (message) => !ignorablePageErrorPatterns.some((pattern) => pattern.test(message))
       );

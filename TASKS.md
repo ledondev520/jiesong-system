@@ -1,5 +1,15 @@
 # Frontend Polish Tasks
 
+## 2026-06-06 CI-03 GitHub 自动构建与验收修复
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| CI-03A | P0 | 10m | 1 | DONE | 恢复 Codex/ByteRover 项目记忆，确认 GitHub 远端日志受认证限制，并转入本地 CI 等价复现 |
+| CI-03B | P0 | 20m | 1 | DONE | 修复前端单元测试中过期的搜索、导航、登录态、空状态和推荐点击断言 |
+| CI-03C | P0 | 20m | 1 | DONE | 对齐 smoke/button E2E 与当前页面 Interface，并把视觉快照改为显式 opt-in |
+| CI-03D | P1 | 10m | 1 | DONE | 收紧 Dependabot 分组、PR 上限、semver-major 策略和 CI Node 版本 |
+| CI-03E | P1 | 15m | 1 | DONE | 完成 frontend/backend 全量验证、更新 checkpoint、沉淀结果和 patch |
+
 ## 2026-06-05 WPS-IMPORT-126 收件扫描内容级识别与候选分层
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |

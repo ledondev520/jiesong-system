@@ -11,6 +11,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DashboardPage from './page';
 import type { ReactNode } from 'react';
+import { Role } from '@/types';
 
 const mockPush = vi.fn();
 const mockGetDashboardAnalytics = vi.fn();
@@ -24,6 +25,12 @@ vi.mock('next/navigation', () => ({
     back: vi.fn(),
   }),
   usePathname: () => '/dashboard',
+}));
+
+vi.mock('@/store/auth.store', () => ({
+  useAuthStore: () => ({
+    user: { id: 'u-1', name: '管理员', role: Role.ADMIN },
+  }),
 }));
 
 vi.mock('@/services/ai.service', () => ({

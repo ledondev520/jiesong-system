@@ -12,6 +12,11 @@ const screenshotOptions = {
 
 const getHeaderDateMask = (page: Page) => page.locator('header >> text=/\\d{2}\\/\\d{2}/');
 
+test.skip(
+  process.env.VISUAL_REGRESSION !== '1',
+  'Visual snapshots are platform-specific and run only when VISUAL_REGRESSION=1.',
+);
+
 test.describe('visual regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockApiRoutes(page);
@@ -26,7 +31,7 @@ test.describe('visual regression', () => {
 
   test('visual-dashboard', async ({ page }) => {
     await signInAsAdmin(page, '/dashboard');
-    await expect(page.getByRole('heading', { name: '当前焦点' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible();
     await expect(page).toHaveScreenshot('dashboard-page.png', {
       ...screenshotOptions,
       mask: [getHeaderDateMask(page)],
@@ -44,7 +49,7 @@ test.describe('visual regression', () => {
 
   test('visual-finance', async ({ page }) => {
     await signInAsAdmin(page, '/dashboard/finance');
-    await expect(page.getByText('当前结算汇率')).toBeVisible();
+    await expect(page.getByRole('heading', { name: '财务驾驶舱' })).toBeVisible();
     await expect(page).toHaveScreenshot('finance-page.png', {
       ...screenshotOptions,
       mask: [getHeaderDateMask(page)],
@@ -66,7 +71,7 @@ test.describe('visual regression mobile', () => {
 
   test('visual-mobile-dashboard-first-screen', async ({ page }) => {
     await signInAsAdmin(page, '/dashboard');
-    await expect(page.getByRole('button', { name: '打开导航菜单' })).toBeVisible();
+    await expect(page.getByLabel('底部导航')).toBeVisible();
     await expect(page).toHaveScreenshot('dashboard-mobile-first-screen.png', screenshotOptions);
   });
 });

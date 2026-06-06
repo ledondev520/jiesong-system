@@ -4,7 +4,7 @@
  * Pos: 前端组件测试
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { ProductDialog } from './ProductDialog';
@@ -70,7 +70,9 @@ describe('ProductDialog', () => {
       expect(mockSearch).toHaveBeenCalledWith('瓷砖');
     });
 
-    await user.click(await screen.findByRole('button', { name: /釉面砖/ }, { timeout: 5000 }));
+    await screen.findByText('69072190', {}, { timeout: 5000 });
+    const recommendationButton = screen.getByRole('button', { name: /釉面砖/ });
+    fireEvent.click(recommendationButton);
 
     await waitFor(() => {
       expect(mockGetByCode).toHaveBeenCalledWith('69072190');

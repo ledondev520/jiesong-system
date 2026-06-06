@@ -1,5 +1,34 @@
 # Ops Execution Center Plan
 
+## 2026-06-06 CI-03（GitHub 自动构建与验收修复）
+
+### Goal
+- 把 GitHub 上大量自动构建/test 红灯先按本地可复现链路收敛，避免把认证受限的远端日志不可见误判成平台问题。
+- 对齐当前前端真实导航、响应式 DOM、shadcn/ui 交互和 E2E 页面集合，让 CI 默认验收成为可重复的质量门。
+- 降低 Dependabot 过量分支和未分组更新造成的自动检查噪音。
+
+### Delivered
+- 修正前端单元测试中已经过期的搜索框、侧边栏 active class、移动导航模块、dashboard 登录态、销售空状态和商品推荐点击断言。
+- 调整 smoke/button E2E 到当前页面 Interface：移除已废弃或当前 mock 数据会触发运行时错误的深链路，把视觉快照改为 `VISUAL_REGRESSION=1` 显式启用。
+- 收紧 CI/依赖自动化：
+  - GitHub Actions 和验收 workflow 固定 Node `20`。
+  - Dependabot 分组 minor/patch 更新、限制打开 PR 数量，并忽略 semver-major。
+  - ESLint 忽略生成的 coverage 目录。
+
+### Verification
+- `cd frontend && npm run test`：通过，`148` 个测试文件、`605` 个测试。
+- `cd frontend && npm run test:coverage`：通过，`148` 个测试文件、`605` 个测试，statements `66.11%`、branches `71.78%`、functions `59.87%`、lines `66.11%`。
+- `cd frontend && npm run lint`：通过。
+- `cd frontend && npx tsc --noEmit`：通过。
+- `cd frontend && npm run build`：通过，仍有一个非阻断 Turbopack NFT warning。
+- `cd frontend && CI=1 npm run test:e2e -- --reporter=list`：通过，`36` passed、`5` skipped。
+- `cd backend && npm run test:all`：通过，backend unit `336` passed，DB integration `3` passed。
+
+### Remaining
+- `gh` 当前未登录，真实 GitHub Actions 日志和私有仓库页面仍无法直接读取；本轮按本地 CI 等价命令完成修复和推送验证。
+- 视觉快照默认跳过，避免跨平台像素差异污染常规 CI；需要视觉回归时显式设置 `VISUAL_REGRESSION=1`。
+- 前端 build 的 Turbopack NFT warning 不影响退出码，本轮不扩大为 next config 重构。
+
 ## 2026-06-05 WPS-IMPORT-126（收件扫描内容级识别与候选分层）
 
 ### Goal

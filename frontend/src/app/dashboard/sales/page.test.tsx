@@ -66,7 +66,7 @@ describe('SalesPage 交互逻辑', () => {
       expect(screen.getByRole('heading', { name: '销售合同' })).toBeInTheDocument();
       expect(screen.getByText('待装柜')).toBeInTheDocument();
       expect(screen.getByText('在途')).toBeInTheDocument();
-      expect(screen.getByText('暂无销售合同')).toBeInTheDocument();
+      expect(screen.getAllByText('暂无销售合同')).toHaveLength(2);
     });
   });
 

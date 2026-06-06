@@ -32,7 +32,7 @@ describe('navigation.config helpers', () => {
     const primaryItems = getPrimaryMobileModuleNavItems(Role.ADMIN).map((item) => item.key);
     const secondaryItems = getSecondaryMobileModuleNavItems(Role.ADMIN).map((item) => item.key);
 
-    expect(primaryItems).toEqual(['operations', 'procurement', 'export', 'finance']);
+    expect(primaryItems).toEqual(['operations', 'procurement', 'export', 'logistics', 'finance']);
     expect(secondaryItems).toEqual(['admin']);
   });
 
