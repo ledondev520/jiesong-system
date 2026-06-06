@@ -25,6 +25,7 @@ import {
 import { KpiCard } from '@/components/dashboard/KpiCard';
 import { QuickActionGrid } from '@/components/dashboard/QuickActionGrid';
 import { PriorityTaskList } from '@/components/dashboard/PriorityTaskList';
+import { DashboardPurchaseRecommend } from '@/components/dashboard/DashboardPurchaseRecommend';
 import { PurchaseStatus, SalesContract, SalesStatus, Role } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
 import { salesService } from '@/services/sales.service';
@@ -292,6 +293,15 @@ function DashboardShell({
       </section>
 
       {/* DataDashboard（保留） */}
+      {/* 采购建议 */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.48, duration: 0.4 }}
+      >
+        <DashboardPurchaseRecommend />
+      </motion.div>
+
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.4 }}>
         <DataDashboard />
       </motion.div>
