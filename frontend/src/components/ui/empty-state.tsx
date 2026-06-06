@@ -32,7 +32,7 @@ function isActionObject(action: EmptyStateAction | ReactNode): action is EmptySt
   );
 }
 
-function isReactComponent(icon: unknown): icon is ComponentType<any> {
+function isReactComponent(icon: unknown): icon is ComponentType<{ className?: string }> {
   return (
     icon != null &&
     (typeof icon === 'function' ||
@@ -46,7 +46,6 @@ export function EmptyState({ icon, title, description, action, className }: Empt
       {icon && (
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground">
           {isValidElement(icon) ? icon : isReactComponent(icon) ? (
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             <>{React.createElement(icon, { className: 'h-8 w-8' })}</>
           ) : (
             <>{icon}</>

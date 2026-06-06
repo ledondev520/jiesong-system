@@ -12,14 +12,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { Supplier } from '@/types';
 import { supplierService } from '@/services/supplier.service';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Pencil, Trash2, Factory, AlertTriangle, Search, X } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -40,7 +32,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/lib/hooks/useTableSort';
 
 export default function SuppliersPage() {

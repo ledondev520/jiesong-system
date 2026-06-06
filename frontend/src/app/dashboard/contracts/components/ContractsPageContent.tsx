@@ -50,7 +50,6 @@ import { contractDocService } from '@/services/contractDoc.service';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { Card, CardContent } from '@/components/ui/card';
-import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/lib/hooks/useTableSort';
 import {
   Sheet,
