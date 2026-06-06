@@ -11,7 +11,17 @@
 import { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Paperclip, Upload, Loader2, FileText, Download, Trash2, Eye } from 'lucide-react';
+import {
+  Upload,
+  Loader2,
+  FileText,
+  FileSpreadsheet,
+  FileImage,
+  File,
+  Download,
+  Trash2,
+  Eye,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import {
@@ -26,6 +36,7 @@ import {
   deleteContractFile,
   getContractFileDownloadUrl,
 } from '@/services/contractFile.service';
+import { cn } from '@/lib/utils';
 
 interface ContractFilesProps {
   contractId: string;
@@ -35,6 +46,40 @@ interface ContractFilesProps {
   title?: string;
   description?: string;
   emptyHint?: string;
+}
+
+/**
+ * 职责：根据文件类型返回对应图标
+ */
+function FileTypeIcon({ fileName, className }: { fileName: string; className?: string }) {
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  if (['pdf', 'doc', 'docx'].includes(ext)) {
+    return <FileText className={cn('text-blue-600', className)} />;
+  }
+  if (['xls', 'xlsx', 'csv'].includes(ext)) {
+    return <FileSpreadsheet className={cn('text-emerald-600', className)} />;
+  }
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+    return <FileImage className={cn('text-violet-600', className)} />;
+  }
+  return <File className={cn('text-slate-500', className)} />;
+}
+
+/**
+ * 职责：根据文件类型返回背景色
+ */
+function FileTypeBg({ fileName }: { fileName: string }) {
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  if (['pdf', 'doc', 'docx'].includes(ext)) {
+    return 'bg-blue-50 dark:bg-blue-950';
+  }
+  if (['xls', 'xlsx', 'csv'].includes(ext)) {
+    return 'bg-emerald-50 dark:bg-emerald-950';
+  }
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+    return 'bg-violet-50 dark:bg-violet-950';
+  }
+  return 'bg-slate-50 dark:bg-slate-900';
 }
 
 export default function ContractFiles({
@@ -97,27 +142,28 @@ export default function ContractFiles({
 
   return (
     <>
-      <Card>
+      <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Paperclip className="h-5 w-5 text-muted-foreground" />
-              <CardTitle>{title}</CardTitle>
+            <div>
+              <CardTitle className="text-sm font-medium">{title}</CardTitle>
+              <CardDescription className="text-xs">{description}</CardDescription>
             </div>
             <Button
               variant="outline"
               size="sm"
+              className="h-8 rounded-md text-xs"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
             >
               {uploading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                   上传中...
                 </>
               ) : (
                 <>
-                  <Upload className="mr-2 h-4 w-4" />
+                  <Upload className="mr-1.5 h-3.5 w-3.5" />
                   上传附件
                 </>
               )}
@@ -131,60 +177,63 @@ export default function ContractFiles({
               onChange={handleUpload}
             />
           </div>
-          <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>
           {files.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
-              <Paperclip className="h-8 w-8 opacity-30" />
+            <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/60 py-10 text-muted-foreground">
+              <File className="h-8 w-8 opacity-30" />
               <p className="text-sm">{emptyHint}</p>
             </div>
           ) : (
-            <div className="divide-y">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {files.map((file) => (
                 <div
                   key={file.id}
-                  className="flex items-center justify-between py-3"
+                  className="group flex items-center gap-3 rounded-lg border border-border/40 bg-card p-3 transition-all hover:border-border/80 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <FileText className="h-5 w-5 text-primary flex-shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {file.fileName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatFileSize(file.fileSize)} ·{' '}
-                        {format(new Date(file.uploadedAt), 'yyyy-MM-dd HH:mm')}
-                        {file.description ? ` · ${file.description}` : ''}
-                      </p>
-                    </div>
+                  <div
+                    className={cn(
+                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-md',
+                      FileTypeBg({ fileName: file.fileName })
+                    )}
+                  >
+                    <FileTypeIcon fileName={file.fileName} className="h-5 w-5" />
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0 ml-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium" title={file.fileName}>
+                      {file.fileName}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {formatFileSize(file.fileSize)} · {format(new Date(file.uploadedAt), 'yyyy-MM-dd')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                     {isPreviewable(file) && (
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-7 w-7 rounded-md"
                         onClick={() => setPreviewFile(file)}
                       >
-                        <Eye className="h-4 w-4" />
+                        <Eye className="h-3.5 w-3.5" />
                       </Button>
                     )}
-                    <Button variant="ghost" size="icon" asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md" asChild>
                       <a
                         href={getContractFileDownloadUrl(file.id)}
                         target="_blank"
                         download={file.fileName}
                       >
-                        <Download className="h-4 w-4" />
+                        <Download className="h-3.5 w-3.5" />
                       </a>
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="text-destructive hover:text-destructive"
+                      className="h-7 w-7 rounded-md text-destructive hover:text-destructive"
                       onClick={() => handleDelete(file.id, file.fileName)}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </div>
@@ -195,30 +244,23 @@ export default function ContractFiles({
       </Card>
 
       {/* 预览弹窗 */}
-      <Dialog
-        open={!!previewFile}
-        onOpenChange={(open) => !open && setPreviewFile(null)}
-      >
-        <DialogContent className="max-w-4xl h-[80vh]">
+      <Dialog open={!!previewFile} onOpenChange={(open) => !open && setPreviewFile(null)}>
+        <DialogContent className="h-[80vh] max-w-4xl">
           <DialogHeader className="flex flex-row items-center justify-between">
-            <DialogTitle className="truncate pr-8">
-              {previewFile?.fileName}
-            </DialogTitle>
+            <DialogTitle className="truncate pr-8">{previewFile?.fileName}</DialogTitle>
           </DialogHeader>
-          <div className="flex-1 h-full overflow-hidden">
+          <div className="h-full flex-1 overflow-hidden">
             {previewFile &&
-              (previewFile.mimeType || previewFile.fileType)?.startsWith(
-                'image/'
-              ) ? (
+            (previewFile.mimeType || previewFile.fileType)?.startsWith('image/') ? (
               <img
                 src={getContractFileDownloadUrl(previewFile.id)}
                 alt={previewFile.fileName}
-                className="w-full h-full object-contain"
+                className="h-full w-full object-contain"
               />
             ) : previewFile ? (
               <iframe
                 src={getContractFileDownloadUrl(previewFile.id)}
-                className="w-full h-full border rounded"
+                className="h-full w-full rounded border"
                 title={previewFile.fileName}
               />
             ) : null}
