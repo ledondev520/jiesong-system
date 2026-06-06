@@ -341,7 +341,7 @@ export default function BusinessReportsPage() {
                       background: 'var(--card)',
                       fontSize: '13px',
                     }}
-                    formatter={(value: number) => [`$${value.toLocaleString()}`, '销售额']}
+                    formatter={(value) => [`$${Number(value).toLocaleString()}`, '销售额']}
                     labelFormatter={(label) => `${label}`}
                   />
                   <Line
