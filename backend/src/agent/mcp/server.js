@@ -192,7 +192,26 @@ const buildTools = () => ([
 ]);
 
 const createMcpServer = (client) => {
-  const tools = buildTools();
+  const allTools = buildTools();
+
+  const toolToMethod = {
+    'search_entities': 'searchEntities',
+    'list_sales_contracts': 'listSalesContracts',
+    'get_sales_contract': 'getSalesContractById',
+    'list_inventories': 'listInventories',
+    'list_payments': 'listPayments',
+    'get_payables': 'getPayables',
+    'get_receivables': 'getReceivables',
+    'list_customs_declarations': 'listCustomsDeclarations',
+    'get_dashboard_analytics': 'getDashboardAnalytics',
+    'create_purchase_with_items': 'createPurchase',
+    'create_supplier': 'createSupplier',
+    'update_supplier': 'updateSupplier',
+    'update_purchase': 'updatePurchase',
+    'run_agent': 'agentPrompt',
+  };
+
+  const tools = allTools.filter(t => typeof client[toolToMethod[t.name]] === 'function');
 
   const handlers = {
     async initialize(params = {}) {
