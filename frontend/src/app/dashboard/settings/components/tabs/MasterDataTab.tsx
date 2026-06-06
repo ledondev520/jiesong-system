@@ -11,7 +11,7 @@
 import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
-  Package, Users, SearchCheck, Anchor, Tag, type LucideIcon,
+  Package, Users, SearchCheck, Anchor, Tag, Building2, type LucideIcon,
 } from 'lucide-react';
 
 interface MasterLink {
@@ -27,6 +27,7 @@ const masterDataLinks: MasterLink[] = [
   { href: '/dashboard/hs-codes', label: 'HSCode 查询', icon: SearchCheck, desc: '查询海关编码与退税率' },
   { href: '/dashboard/settings/ports', label: '港口管理', icon: Anchor, desc: '维护装卸港口基础数据' },
   { href: '/dashboard/settings/categories', label: '商品分类', icon: Tag, desc: '管理商品分类体系' },
+  { href: '/dashboard/settings/customs-brokers', label: '报关公司', icon: Building2, desc: '管理报关公司档案' },
 ];
 
 /**

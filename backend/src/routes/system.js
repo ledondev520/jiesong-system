@@ -103,6 +103,29 @@ router.delete('/categories/:id', roleAuth('ADMIN'), withIdValidation, withAuditL
   systemController.removeCategory
 ));
 
+// GET /api/v1/system/customs-brokers - 获取报关公司列表
+router.get('/customs-brokers', withPaginationValidation, systemController.getCustomsBrokers);
+
+// POST /api/v1/system/customs-brokers - 创建报关公司（仅管理员）
+router.post('/customs-brokers', roleAuth('ADMIN'), [
+  body('name').notEmpty().withMessage('报关公司名称不能为空'),
+], handleValidation, withAuditLog(
+  { entity: 'CustomsBroker', action: 'CREATE', model: 'customsBroker' },
+  systemController.createCustomsBroker
+));
+
+// PUT /api/v1/system/customs-brokers/:id - 更新报关公司（仅管理员）
+router.put('/customs-brokers/:id', roleAuth('ADMIN'), withIdValidation, withAuditLog(
+  { entity: 'CustomsBroker', action: 'UPDATE', model: 'customsBroker' },
+  systemController.updateCustomsBroker
+));
+
+// DELETE /api/v1/system/customs-brokers/:id - 停用报关公司（仅管理员）
+router.delete('/customs-brokers/:id', roleAuth('ADMIN'), withIdValidation, withAuditLog(
+  { entity: 'CustomsBroker', action: 'DELETE', model: 'customsBroker' },
+  systemController.removeCustomsBroker
+));
+
 // POST /api/v1/system/import - 导入CSV数据（仅管理员）
 router.post('/import', roleAuth('ADMIN'), upload.single('file'), withAuditLog(
   {

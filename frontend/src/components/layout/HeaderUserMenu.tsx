@@ -75,6 +75,7 @@ interface HeaderUserMenuProps {
   username?: string;
   initials: string;
   avatar?: string;
+  lastLoginAt?: string;
   onSaveProfile: (profile: HeaderProfileDraft) => void;
   onLogout: () => void;
 }
@@ -84,6 +85,7 @@ export function HeaderUserMenu({
   username,
   initials,
   avatar,
+  lastLoginAt,
   onSaveProfile,
   onLogout,
 }: HeaderUserMenuProps) {
@@ -121,11 +123,16 @@ export function HeaderUserMenu({
             <span className="sr-only">用户菜单</span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" className="min-w-[200px]">
           <DropdownMenuLabel>
             <div className="flex flex-col">
               <span>{resolvedDisplayName}</span>
               <span className="text-xs font-normal text-muted-foreground">{username}</span>
+              {lastLoginAt && (
+                <span className="text-[11px] font-normal text-muted-foreground/70 mt-0.5">
+                  最后登录: {new Date(lastLoginAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />

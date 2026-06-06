@@ -942,6 +942,7 @@ export default function ContractsPageContent() {
 
       {/* 隐藏的文件选择器 */}
       <input
+        id="contract-import-file-input"
         ref={fileInputRef}
         type="file"
         accept=".xlsx,.xls"

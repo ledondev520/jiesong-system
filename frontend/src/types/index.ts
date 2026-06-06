@@ -69,6 +69,34 @@ export interface Port {
   updatedAt: string;
 }
 
+export interface ProductCategory {
+  id: string;
+  name: string;
+  parentId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  parent?: {
+    id: string;
+    name: string;
+  } | null;
+  _count?: {
+    products?: number;
+    children?: number;
+  };
+}
+
+export interface CustomsBroker {
+  id: string;
+  name: string;
+  contact?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Supplier {
   id: string;
   name: string;           // 供应商全称（合同用）
@@ -480,4 +508,30 @@ export interface Notification {
   link?: string;
   isRead: boolean;
   createdAt: string;
+}
+
+export interface ContractTemplate {
+  id: string;
+  name: string;
+  type: 'PURCHASE' | 'SALES';
+  supplierId?: string | null;
+  taxRate?: number | null;
+  note?: string | null;
+  items: ContractTemplateItem[];
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContractTemplateItem {
+  productId: string;
+  quantity: number;
+  unitPrice?: number;
+  unit?: string;
+  note?: string;
+  // sales-specific
+  storeId?: string;
+  costPrice?: number;
+  sellingPrice?: number;
+  exchangeRate?: number;
 }

@@ -8,6 +8,7 @@ const { success, created, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
 const { createError } = require('../middleware/errorHandler');
 const salesService = require('../services/salesService');
+const contractTemplateService = require('../services/contractTemplateService');
 const auditLog = require('../utils/auditLog');
 const prisma = require('../utils/prisma');
 
@@ -35,7 +36,39 @@ const getById = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
-    const contract = await salesService.createSalesContract(req.body || {});
+    let data = req.body || {};
+    let template = null;
+
+    // 如果提供了 templateId，合并模板数据
+    if (req.query.templateId) {
+      template = await contractTemplateService.getById(req.query.templateId);
+      if (template.type !== 'SALES') {
+        throw createError('模板类型不匹配', 400);
+      }
+      data = {
+        exchangeRate: data.exchangeRate !== undefined ? data.exchangeRate : template.items?.[0]?.exchangeRate,
+        note: data.note || template.note,
+        ...data,
+      };
+    }
+
+    const contract = await salesService.createSalesContract(data);
+
+    // 如果模板包含明细，自动添加
+    if (template && template.items && template.items.length > 0) {
+      for (const item of template.items) {
+        await salesService.addSalesItem(contract.id, {
+          productId: item.productId,
+          storeId: item.storeId,
+          quantity: item.quantity,
+          unit: item.unit,
+          costPrice: item.costPrice,
+          sellingPrice: item.sellingPrice,
+          note: item.note,
+        });
+      }
+    }
+
     created(res, contract, '出口合同创建成功');
   } catch (error) {
     next(error);

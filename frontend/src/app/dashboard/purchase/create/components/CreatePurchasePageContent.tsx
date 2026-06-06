@@ -52,7 +52,7 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
-import { Wand2, Plus, Trash, Loader2, UserPlus, Check, ChevronsUpDown, Star } from 'lucide-react';
+import { Wand2, Plus, Trash, Loader2, UserPlus, Check, ChevronsUpDown, Star, Save, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -63,6 +63,8 @@ import {
 } from '@/services/purchase.service';
 import { supplierService } from '@/services/supplier.service';
 import { productService } from '@/services/product.service';
+import { contractTemplateService } from '@/services/contractTemplate.service';
+import { ContractTemplate } from '@/types';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PriceGuard } from '@/components/purchase/PriceGuard';
 
@@ -118,6 +120,14 @@ export default function CreatePurchasePage() {
   const [parseText, setParseText] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+
+  // 合同模板
+  const [templates, setTemplates] = useState<ContractTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   // 表单
   const form = useForm<PurchaseFormValues>({
@@ -179,6 +189,21 @@ export default function CreatePurchasePage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productIdsKey]);
+
+  // ============== 加载合同模板 ==============
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const res = await contractTemplateService.getByType('PURCHASE');
+        setTemplates(res.data || []);
+      } catch {
+        // 静默失败，模板功能是辅助性的
+      } finally {
+        setTemplatesLoading(false);
+      }
+    };
+    void loadTemplates();
+  }, []);
 
   // ============== 加载数据 ==============
   useEffect(() => {
@@ -320,6 +345,92 @@ export default function CreatePurchasePage() {
     }
   };
 
+  // ============== 应用模板 ==============
+  const handleApplyTemplate = (templateId: string) => {
+    if (!templateId) {
+      setSelectedTemplateId('');
+      return;
+    }
+    const template = templates.find((t) => t.id === templateId);
+    if (!template) return;
+
+    // 预填充表单
+    if (template.supplierId) {
+      form.setValue('supplierId', template.supplierId);
+    }
+    if (template.taxRate !== null && template.taxRate !== undefined) {
+      form.setValue('taxRate', template.taxRate);
+    }
+    if (template.note) {
+      form.setValue('note', template.note);
+    }
+
+    // 应用明细（仅保留当前仍存在的商品）
+    const validItems = (template.items || []).filter((item) =>
+      products.some((p) => p.id === item.productId)
+    );
+    if (validItems.length > 0) {
+      form.setValue(
+        'items',
+        validItems.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity || 0,
+          unitPrice: item.unitPrice || 0,
+          unit: item.unit || '',
+          note: item.note || '',
+          priceNote: '',
+        }))
+      );
+      if (validItems.length < (template.items || []).length) {
+        toast.warning('部分模板商品已不存在，已自动过滤');
+      }
+    }
+
+    setSelectedTemplateId(templateId);
+    toast.success(`已应用模板：${template.name}`);
+  };
+
+  // ============== 保存为模板 ==============
+  const handleSaveTemplate = async () => {
+    if (!templateName.trim()) {
+      toast.error('请输入模板名称');
+      return;
+    }
+    const data = form.getValues();
+    if (!data.items || data.items.length === 0) {
+      toast.error('请至少添加一项商品');
+      return;
+    }
+
+    setSavingTemplate(true);
+    try {
+      await contractTemplateService.create({
+        name: templateName.trim(),
+        type: 'PURCHASE',
+        supplierId: data.supplierId || null,
+        taxRate: data.taxRate,
+        note: data.note || null,
+        items: data.items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          unit: item.unit,
+          note: item.note,
+        })),
+      });
+      toast.success('模板保存成功');
+      setShowSaveTemplateDialog(false);
+      setTemplateName('');
+      // 刷新模板列表
+      const res = await contractTemplateService.getByType('PURCHASE');
+      setTemplates(res.data || []);
+    } catch {
+      toast.error('保存模板失败');
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
   // ============== 提交 ==============
   const onSubmit = async (data: PurchaseFormValues) => {
     try {
@@ -383,6 +494,41 @@ export default function CreatePurchasePage() {
         title="新增采购合同"
         description="先添加商品，系统会推荐曾供应过该商品的供应商"
       />
+
+      {/* 模板选择器 */}
+      <Card className="md:col-span-2">
+        <CardContent className="flex flex-wrap items-center gap-3 py-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <FileText className="h-4 w-4" />
+            从模板创建
+          </div>
+          <Select
+            value={selectedTemplateId}
+            onValueChange={handleApplyTemplate}
+            disabled={templatesLoading}
+          >
+            <SelectTrigger className="w-[240px]">
+              <SelectValue placeholder={templatesLoading ? '加载中...' : '选择合同模板'} />
+            </SelectTrigger>
+            <SelectContent>
+              {templates.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}（{t.items?.length || 0} 项）
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSaveTemplateDialog(true)}
+          >
+            <Save className="mr-1 h-4 w-4" />
+            保存为模板
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Stepper */}
       <div className="flex items-center justify-center gap-2">

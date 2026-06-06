@@ -94,6 +94,7 @@ export function Header() {
           username={user?.username}
           initials={initials}
           avatar={user?.avatar}
+          lastLoginAt={user?.lastLoginAt}
           onSaveProfile={updateProfile}
           onLogout={handleLogout}
         />

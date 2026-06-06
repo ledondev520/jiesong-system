@@ -199,6 +199,44 @@ export const deleteSystemCategory = async (id: string) => {
   return api.delete<ApiResponse<null>, ApiResponse<null>>(`/system/categories/${id}`);
 };
 
+export interface SystemCustomsBrokerItem {
+  id: string;
+  name: string;
+  contact?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GetSystemCustomsBrokersParams {
+  page?: number;
+  pageSize?: number;
+  keyword?: string;
+  includeInactive?: boolean;
+}
+
+export const getSystemCustomsBrokers = async (params: GetSystemCustomsBrokersParams = { page: 1, pageSize: 100 }) => {
+  return api.get<ApiResponse<PaginatedResponse<SystemCustomsBrokerItem>>, ApiResponse<PaginatedResponse<SystemCustomsBrokerItem>>>(
+    '/system/customs-brokers',
+    { params }
+  );
+};
+
+export const createSystemCustomsBroker = async (data: Pick<SystemCustomsBrokerItem, 'name' | 'contact' | 'phone' | 'email' | 'address'> & { isActive?: boolean }) => {
+  return api.post<ApiResponse<SystemCustomsBrokerItem>, ApiResponse<SystemCustomsBrokerItem>>('/system/customs-brokers', data);
+};
+
+export const updateSystemCustomsBroker = async (id: string, data: Partial<Pick<SystemCustomsBrokerItem, 'name' | 'contact' | 'phone' | 'email' | 'address' | 'isActive'>>) => {
+  return api.put<ApiResponse<SystemCustomsBrokerItem>, ApiResponse<SystemCustomsBrokerItem>>(`/system/customs-brokers/${id}`, data);
+};
+
+export const deleteSystemCustomsBroker = async (id: string) => {
+  return api.delete<ApiResponse<null>, ApiResponse<null>>(`/system/customs-brokers/${id}`);
+};
+
 export type SystemExportType =
   | 'suppliers'
   | 'stores'

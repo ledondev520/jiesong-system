@@ -123,6 +123,7 @@ export default function ContractFiles({
               )}
             </Button>
             <input
+              id="contract-file-upload"
               ref={fileInputRef}
               type="file"
               className="hidden"

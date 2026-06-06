@@ -34,6 +34,12 @@ const {
   exportData,
   exportDataPdf,
 } = require('./system/importExportController');
+const {
+  getCustomsBrokers,
+  createCustomsBroker,
+  updateCustomsBroker,
+  removeCustomsBroker,
+} = require('./system/customsBrokerController');
 const { getEventLedger } = require('./system/eventLedgerController');
 const { getPatrolStatus, executePatrol } = require('../jobs/patrolJob');
 const { success } = require('../utils/response');
@@ -75,6 +81,10 @@ module.exports = {
   createCategory,
   updateCategory,
   removeCategory,
+  getCustomsBrokers,
+  createCustomsBroker,
+  updateCustomsBroker,
+  removeCustomsBroker,
   importData,
   getImportRecords,
   exportData,
