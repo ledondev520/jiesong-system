@@ -21,12 +21,13 @@ import { Button } from '@/components/ui/button';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { ArrowDownLeft, ArrowUpRight, Search, X, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Search, X, ChevronLeft, ChevronRight, FileText, ArrowLeftRight } from 'lucide-react';
 import Link from 'next/link';
 import {
   getTransactions, getTransactionStats, getBatches,
   type BankTransaction, type BankFlowStats, type FinanceDataBatch,
 } from '@/services/bankFlow.service';
+import { PaymentListCard } from '@/components/finance/PaymentListCard';
 
 function fmt(n: number) {
   return new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
@@ -44,6 +45,8 @@ export default function BankFlowPage() {
   const [direction, setDirection] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [amountMin, setAmountMin] = useState('');
+  const [amountMax, setAmountMax] = useState('');
   const [stats, setStats] = useState<BankFlowStats | null>(null);
   const [batches, setBatches] = useState<FinanceDataBatch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,11 +88,21 @@ export default function BankFlowPage() {
     }, [])
   );
 
+  // 客户端金额过滤
+  const filteredByAmount = sort.sortedData.filter(item => {
+    const abs = Math.abs(item.amount);
+    if (amountMin && abs < Number(amountMin)) return false;
+    if (amountMax && abs > Number(amountMax)) return false;
+    return true;
+  });
+
   const totalPages = Math.ceil(total / pageSize);
 
   const resetFilters = () => {
-    setSearch(''); setDirection(''); setDateFrom(''); setDateTo(''); setPage(1);
+    setSearch(''); setDirection(''); setDateFrom(''); setDateTo(''); setAmountMin(''); setAmountMax(''); setPage(1);
   };
+
+  const hasFilters = search || direction || dateFrom || dateTo || amountMin || amountMax;
 
   return (
     <div className="space-y-4">
@@ -99,22 +112,30 @@ export default function BankFlowPage() {
         {/* KPI */}
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            <Card><CardContent className="pt-4 pb-3 px-4">
-              <p className="text-xs text-muted-foreground mb-1">总收入</p>
-              <p className="text-lg font-bold text-green-600">{fmt(stats.totalIn)}</p>
-            </CardContent></Card>
-            <Card><CardContent className="pt-4 pb-3 px-4">
-              <p className="text-xs text-muted-foreground mb-1">总支出</p>
-              <p className="text-lg font-bold text-red-600">{fmt(stats.totalOut)}</p>
-            </CardContent></Card>
-            <Card><CardContent className="pt-4 pb-3 px-4">
-              <p className="text-xs text-muted-foreground mb-1">净现金流</p>
-              <p className={`text-lg font-bold ${stats.netFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>{fmt(stats.netFlow)}</p>
-            </CardContent></Card>
-            <Card><CardContent className="pt-4 pb-3 px-4">
-              <p className="text-xs text-muted-foreground mb-1">交易笔数</p>
-              <p className="text-lg font-bold">{stats.txnCount.toLocaleString()}</p>
-            </CardContent></Card>
+            <Card>
+              <CardContent className="pt-4 pb-3 px-4">
+                <p className="text-xs text-muted-foreground mb-1">总收入</p>
+                <p className="text-lg font-bold text-emerald-600">{fmt(stats.totalIn)}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-3 px-4">
+                <p className="text-xs text-muted-foreground mb-1">总支出</p>
+                <p className="text-lg font-bold text-red-600">{fmt(stats.totalOut)}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-3 px-4">
+                <p className="text-xs text-muted-foreground mb-1">净现金流</p>
+                <p className={`text-lg font-bold ${stats.netFlow >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{fmt(stats.netFlow)}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-3 px-4">
+                <p className="text-xs text-muted-foreground mb-1">交易笔数</p>
+                <p className="text-lg font-bold">{stats.txnCount.toLocaleString()}</p>
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -153,15 +174,53 @@ export default function BankFlowPage() {
           <Input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }} className="w-[140px] h-9" />
           <span className="text-muted-foreground text-sm">~</span>
           <Input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }} className="w-[140px] h-9" />
-          {(search || direction || dateFrom || dateTo) && (
+          <Input
+            type="number"
+            placeholder="最小金额"
+            value={amountMin}
+            onChange={e => { setAmountMin(e.target.value); setPage(1); }}
+            className="w-[100px] h-9"
+          />
+          <span className="text-muted-foreground text-sm">-</span>
+          <Input
+            type="number"
+            placeholder="最大金额"
+            value={amountMax}
+            onChange={e => { setAmountMax(e.target.value); setPage(1); }}
+            className="w-[100px] h-9"
+          />
+          {hasFilters && (
             <Button variant="ghost" size="sm" onClick={resetFilters}>
               <X className="h-3 w-3 mr-1" />清除
             </Button>
           )}
         </div>
 
-        {/* 表格 */}
-        <Card>
+        {/* 移动端卡片视图 */}
+        <div className="space-y-2 md:hidden mb-4">
+          {loading ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">加载中...</div>
+          ) : filteredByAmount.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              {hasFilters ? '没有匹配当前筛选条件的记录' : '暂无数据'}
+            </div>
+          ) : (
+            filteredByAmount.map(item => (
+              <PaymentListCard
+                key={item.id}
+                direction={item.direction === 'IN' ? 'IN' : 'OUT'}
+                amount={Math.abs(item.amount)}
+                date={item.txnDate}
+                counterpart={item.counterpart || undefined}
+                summary={item.summary || undefined}
+                txnType={item.txnType || undefined}
+              />
+            ))
+          )}
+        </div>
+
+        {/* 桌面端表格 */}
+        <Card className="hidden md:block">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -175,7 +234,7 @@ export default function BankFlowPage() {
                   >
                     日期
                   </SortableTableHead>
-                  <TableHead className="w-[50px]">方向</TableHead>
+                  <TableHead className="w-[60px]">方向</TableHead>
                   <SortableTableHead
                     sortKey="amount"
                     currentSortKey={sort.sortKey}
@@ -214,18 +273,18 @@ export default function BankFlowPage() {
               <TableBody>
                 {loading ? (
                   <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">加载中...</TableCell></TableRow>
-                ) : items.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
-                ) : sort.sortedData.map(item => (
+                ) : filteredByAmount.length === 0 ? (
+                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">{hasFilters ? '没有匹配当前筛选条件的记录' : '暂无数据'}</TableCell></TableRow>
+                ) : filteredByAmount.map(item => (
                   <TableRow key={item.id}>
                     <TableCell className="text-xs tabular-nums">{item.txnDate}</TableCell>
                     <TableCell>
                       {item.direction === 'IN'
-                        ? <Badge variant="outline" className="text-green-600 border-green-200"><ArrowDownLeft className="h-3 w-3 mr-0.5" />收</Badge>
-                        : <Badge variant="outline" className="text-red-600 border-red-200"><ArrowUpRight className="h-3 w-3 mr-0.5" />付</Badge>}
+                        ? <Badge variant="outline" className="text-emerald-600 border-emerald-200 text-[10px]"><ArrowDownLeft className="h-3 w-3 mr-0.5" />收</Badge>
+                        : <Badge variant="outline" className="text-red-600 border-red-200 text-[10px]"><ArrowUpRight className="h-3 w-3 mr-0.5" />付</Badge>}
                     </TableCell>
-                    <TableCell className={`text-right tabular-nums font-medium ${item.direction === 'IN' ? 'text-green-600' : 'text-red-600'}`}>
-                      {fmt(Math.abs(item.amount))}
+                    <TableCell className={`text-right tabular-nums font-medium ${item.direction === 'IN' ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {item.direction === 'IN' ? '+' : '-'}{fmt(Math.abs(item.amount))}
                     </TableCell>
                     <TableCell className="max-w-[200px]">
                       {item.counterpart ? (
@@ -256,10 +315,31 @@ export default function BankFlowPage() {
           </div>
         </Card>
 
+        {/* 合计栏 */}
+        {stats && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3">
+            <div className="flex items-center gap-4 text-sm">
+              <span className="text-muted-foreground">本页合计</span>
+              <span className="font-semibold text-emerald-600">
+                收 ¥{fmt(filteredByAmount.filter(i => i.direction === 'IN').reduce((s, i) => s + Math.abs(i.amount), 0))}
+              </span>
+              <span className="font-semibold text-red-600">
+                付 ¥{fmt(filteredByAmount.filter(i => i.direction === 'OUT').reduce((s, i) => s + Math.abs(i.amount), 0))}
+              </span>
+              <span className="font-semibold text-foreground">
+                净 ¥{fmt(
+                  filteredByAmount.filter(i => i.direction === 'IN').reduce((s, i) => s + Math.abs(i.amount), 0) -
+                  filteredByAmount.filter(i => i.direction === 'OUT').reduce((s, i) => s + Math.abs(i.amount), 0)
+                )}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">共 {total.toLocaleString()} 条</p>
+          </div>
+        )}
+
         {/* 分页 */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-3">
-            <p className="text-xs text-muted-foreground">共 {total.toLocaleString()} 条</p>
+          <div className="flex items-center justify-end mt-3">
             <div className="flex items-center gap-1">
               <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
                 <ChevronLeft className="h-4 w-4" />

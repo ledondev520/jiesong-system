@@ -1,6 +1,6 @@
 /**
  * Input: 销售合同详情API、商品API、SortableTableHead、useTableSort
- * Output: 销售合同详情页面（含可排序装箱明细、3D可视化、源文件附件）
+ * Output: 销售合同详情页面（含可排序装箱明细、3D可视化、源文件附件、物流时间线、货柜详情、报关信息、收款记录）
  * Pos: 销售管理子页面，展示合同详情与装箱可视化
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -9,7 +9,7 @@
 'use client';
 
 import { useState, useEffect, use, lazy, Suspense, useMemo, useRef, useCallback } from 'react';
-import { SalesContract, PackingItem, Product, Store, SalesStatus, Inventory } from '@/types';
+import { SalesContract, PackingItem, Product, Store, SalesStatus, Inventory, Payment, PaymentType } from '@/types';
 import { salesService } from '@/services/sales.service';
 import { productService } from '@/services/product.service';
 import { storeService } from '@/services/store.service';
@@ -49,9 +49,9 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { StatusBadge, type StatusBadgeConfig } from '@/components/ui/status-badge';
+import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet } from 'lucide-react';
+import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, Container, Anchor, Truck, CheckCircle2, CircleDashed, CircleDot, Clock, ArrowRight, DollarSign, MapPin, Ruler } from 'lucide-react';
 import { domToPng } from 'modern-screenshot';
 import { toast } from 'sonner';
 import { CONTAINER_40HQ } from '@/lib/binPacking';
@@ -67,6 +67,25 @@ import { ContractInfoEditor } from '@/components/sales/ContractInfoEditor';
 interface PageProps {
   params: Promise<{ id: string }>;
 }
+
+const LOGISTICS_EVENTS = [
+  { status: SalesStatus.DRAFT, label: '合同草稿', icon: CircleDashed },
+  { status: SalesStatus.CONFIRMED, label: '合同确认', icon: CircleDot },
+  { status: SalesStatus.PACKING, label: '装箱装柜', icon: Boxes },
+  { status: SalesStatus.SHIPPED, label: '报关发运', icon: Truck },
+  { status: SalesStatus.ARRIVED, label: '到港清关', icon: Anchor },
+  { status: SalesStatus.COMPLETED, label: '收款完成', icon: CheckCircle2 },
+];
+
+const STATUS_ORDER: Record<SalesStatus, number> = {
+  [SalesStatus.DRAFT]: 0,
+  [SalesStatus.CONFIRMED]: 1,
+  [SalesStatus.PACKING]: 2,
+  [SalesStatus.SHIPPED]: 3,
+  [SalesStatus.ARRIVED]: 4,
+  [SalesStatus.COMPLETED]: 5,
+  [SalesStatus.CANCELLED]: -1,
+};
 
 export default function SalesDetailPage({ params }: PageProps) {
   const { id } = use(params);
@@ -89,12 +108,11 @@ export default function SalesDetailPage({ params }: PageProps) {
     storeId: '',
     quantity: 0,
     boxes: 0,
-    unitPrice: 0,  // 单价（USD）
+    unitPrice: 0,
     grossWeight: 0,
     netWeight: 0,
     volume: 0,
     note: '',
-    // 商品尺寸（用于3D可视化）
     length: 0,
     width: 0,
     height: 0,
@@ -299,7 +317,6 @@ export default function SalesDetailPage({ params }: PageProps) {
    */
   const handleEditItem = (item: PackingItem) => {
     setEditingItem(item);
-    // 获取商品的尺寸信息（优先使用 PackingItem 保存的尺寸）
     const product = item.product || products.find(p => p.id === item.productId);
     setItemForm({
       productId: item.productId,
@@ -311,7 +328,6 @@ export default function SalesDetailPage({ params }: PageProps) {
       netWeight: item.netWeight || 0,
       volume: item.volume || 0,
       note: item.note || '',
-      // 优先使用 PackingItem 中保存的尺寸，否则使用 Product 的尺寸
       length: item.length || product?.length || 0,
       width: item.width || product?.width || 0,
       height: item.height || product?.height || 0,
@@ -358,17 +374,14 @@ export default function SalesDetailPage({ params }: PageProps) {
 
   /**
    * 职责：计算商品优先级并排序
-   * 思路：有库存的商品优先，按目的港门店关联排序
    */
   const sortedProducts = useMemo(() => {
-    // 1. 获取有库存的商品ID集合
     const productsWithInventory = new Set(
       inventories
         .filter(inv => inv.quantity > 0)
         .map(inv => inv.productId)
     );
     
-    // 2. 过滤搜索关键词
     let filtered = products;
     if (productSearch.trim()) {
       const keyword = productSearch.toLowerCase();
@@ -378,7 +391,6 @@ export default function SalesDetailPage({ params }: PageProps) {
       );
     }
     
-    // 3. 排序：有库存的优先
     return [...filtered].sort((a, b) => {
       const aHasInventory = productsWithInventory.has(a.id) ? 1 : 0;
       const bHasInventory = productsWithInventory.has(b.id) ? 1 : 0;
@@ -405,7 +417,6 @@ export default function SalesDetailPage({ params }: PageProps) {
         grossWeight: product.grossWeight || prev.grossWeight,
         netWeight: product.netWeight || prev.netWeight,
         volume: product.volume || prev.volume,
-        // 自动填充商品尺寸（用于3D可视化）
         length: product.length || 0,
         width: product.width || 0,
         height: product.height || 0,
@@ -419,7 +430,7 @@ export default function SalesDetailPage({ params }: PageProps) {
    * 职责：获取状态徽章
    */
   const getStatusBadge = (status: SalesStatus) => {
-    const statusMap: Record<SalesStatus, StatusBadgeConfig> = {
+    const statusMap: Record<SalesStatus, { label: string; tone: React.ComponentProps<typeof SemanticBadge>['tone'] }> = {
       [SalesStatus.DRAFT]: { label: '草稿', tone: 'neutral' },
       [SalesStatus.CONFIRMED]: { label: '已确认', tone: 'info' },
       [SalesStatus.PACKING]: { label: '装箱中', tone: 'warning' },
@@ -428,7 +439,8 @@ export default function SalesDetailPage({ params }: PageProps) {
       [SalesStatus.COMPLETED]: { label: '已完成', tone: 'secondary' },
       [SalesStatus.CANCELLED]: { label: '已取消', tone: 'danger' },
     };
-    return <StatusBadge status={status} statusMap={statusMap} />;
+    const config = statusMap[status] || { label: status, tone: 'neutral' as const };
+    return <SemanticBadge tone={config.tone}>{config.label}</SemanticBadge>;
   };
 
   const packingRows = useMemo(() => contract?.packingItems ?? [], [contract?.packingItems]);
@@ -457,6 +469,114 @@ export default function SalesDetailPage({ params }: PageProps) {
 
   const packingSort = useTableSort(packingRows, packingAccessor);
 
+  /**
+   * 职责：构建物流时间线数据
+   */
+  const logisticsTimeline = useMemo(() => {
+    if (!contract) return [];
+    const currentStep = STATUS_ORDER[contract.status] ?? 0;
+    const timeline = [];
+
+    // 合同创建
+    timeline.push({
+      date: contract.createdAt,
+      label: '合同创建',
+      description: `合同编号 ${contract.contractNo}`,
+      state: 'completed' as const,
+    });
+
+    if (contract.signedAt) {
+      timeline.push({
+        date: contract.signedAt,
+        label: '合同签订',
+        description: contract.port?.name ? `目的港：${contract.port.name}` : '合同已签订',
+        state: 'completed' as const,
+      });
+    }
+
+    if (contract.packingItems && contract.packingItems.length > 0) {
+      timeline.push({
+        date: contract.updatedAt,
+        label: '装箱完成',
+        description: `${contract.totalBoxes || 0} 箱，${(contract.volume || 0).toFixed(2)} CBM`,
+        state: currentStep >= STATUS_ORDER[SalesStatus.PACKING] ? 'completed' as const : 'pending' as const,
+      });
+    }
+
+    if (contract.shippedAt) {
+      timeline.push({
+        date: contract.shippedAt,
+        label: '报关发运',
+        description: contract.customsBroker ? `报关行：${contract.customsBroker}` : '已报关发运',
+        state: 'completed' as const,
+      });
+    } else if (currentStep >= STATUS_ORDER[SalesStatus.SHIPPED]) {
+      timeline.push({
+        date: contract.updatedAt,
+        label: '报关发运',
+        description: '已报关发运',
+        state: 'completed' as const,
+      });
+    }
+
+    if (contract.estimatedArrival) {
+      timeline.push({
+        date: contract.estimatedArrival,
+        label: '预计到港',
+        description: contract.port?.name ? `目的港：${contract.port.name}` : '',
+        state: currentStep >= STATUS_ORDER[SalesStatus.ARRIVED] ? 'completed' as const : 'pending' as const,
+      });
+    }
+
+    if (contract.payments && contract.payments.length > 0) {
+      const lastPayment = contract.payments[contract.payments.length - 1];
+      timeline.push({
+        date: lastPayment.paymentDate,
+        label: '收款记录',
+        description: `$${contract.receivedAmount.toLocaleString()} / $${contract.totalAmount.toLocaleString()}`,
+        state: contract.receivedAmount >= contract.totalAmount ? 'completed' as const : 'pending' as const,
+      });
+    }
+
+    return timeline;
+  }, [contract]);
+
+  /**
+   * 职责：提取报关 HS 编码列表
+   */
+  const hsCodeList = useMemo(() => {
+    if (!contract?.packingItems) return [];
+    const map = new Map<string, { hsCode: string; productName: string; quantity: number; totalPrice: number }>();
+    for (const item of contract.packingItems) {
+      const hs = item.product?.hsCode;
+      if (!hs) continue;
+      const existing = map.get(hs);
+      if (existing) {
+        existing.quantity += item.quantity;
+        existing.totalPrice += item.totalPrice || 0;
+      } else {
+        map.set(hs, {
+          hsCode: hs,
+          productName: item.product?.customsName || '未知商品',
+          quantity: item.quantity,
+          totalPrice: item.totalPrice || 0,
+        });
+      }
+    }
+    return Array.from(map.values());
+  }, [contract?.packingItems]);
+
+  /**
+   * 职责：收款记录
+   */
+  const paymentRecords = useMemo(() => {
+    return contract?.payments?.filter(p =>
+      p.type === PaymentType.RECEIVABLE ||
+      p.type === PaymentType.RECEIVABLE_RECEIPT ||
+      p.type === PaymentType.RECEIVABLE_COLLECTION
+    ) ?? [];
+  }, [contract?.payments]);
+
   if (loading) {
     return <div className="flex items-center justify-center h-64">加载中...</div>;
   }
@@ -470,10 +590,11 @@ export default function SalesDetailPage({ params }: PageProps) {
   const weightUsed = contract.grossWeight || 0;
   const weightPercent = Math.min((weightUsed / CONTAINER_40HQ.maxWeight) * 100, 100);
   
-  // 计算 CBM（使用厂家建议值）
   const maxCBM = CONTAINER_40HQ.maxVolume;
   const usedCBM = volumeUsed;
   const cbmPercent = Math.min((usedCBM / maxCBM) * 100, 100);
+
+  const currentStepIndex = STATUS_ORDER[contract.status] ?? 0;
 
   return (
     <div className="space-y-6 pb-10">
@@ -542,11 +663,140 @@ export default function SalesDetailPage({ params }: PageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-primary" />
+              <DollarSign className="h-5 w-5 text-primary" />
               <div>
                 <div className="text-2xl font-bold">${contract.totalAmount.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">合同金额</p>
               </div>
+            </div>
+            {contract.receivedAmount > 0 && (
+              <div className="mt-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">已收款</span>
+                  <span className="font-medium">${contract.receivedAmount.toLocaleString()}</span>
+                </div>
+                <Progress 
+                  value={Math.min((contract.receivedAmount / contract.totalAmount) * 100, 100)} 
+                  className="mt-1 h-1.5" 
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 货柜详情 + 物流时间线 + 报关/收款 概览 */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* 货柜详情卡片 */}
+        <Card className="lg:col-span-1">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+              <Container className="h-4 w-4 text-primary" />
+              货柜详情
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            <div className="flex items-center gap-3 rounded-lg bg-muted/40 p-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10">
+                <Container className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">{contract.contractNo}</p>
+                <p className="text-xs text-muted-foreground">40HQ 标准货柜</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">尺寸</p>
+                <p className="text-sm font-medium tabular-nums">
+                  {CONTAINER_40HQ.length}×{CONTAINER_40HQ.width}×{CONTAINER_40HQ.height} mm
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">体积</p>
+                <p className="text-sm font-medium tabular-nums">{usedCBM.toFixed(2)} / {maxCBM} CBM</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">毛重</p>
+                <p className="text-sm font-medium tabular-nums">{weightUsed.toLocaleString()} kg</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">净重</p>
+                <p className="text-sm font-medium tabular-nums">{(contract.netWeight || 0).toLocaleString()} kg</p>
+              </div>
+            </div>
+            {contract.port?.name && (
+              <div className="flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2">
+                <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">目的港：</span>
+                <span className="text-xs font-medium">{contract.port.name}</span>
+              </div>
+            )}
+            {contract.isFumigated && (
+              <div className="flex items-center gap-2 text-xs text-amber-700">
+                <PackageCheck className="h-3.5 w-3.5" />
+                <span>已熏蒸处理</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 物流时间线 */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+              <Truck className="h-4 w-4 text-primary" />
+              物流时间线
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex items-center gap-1.5 mb-4 overflow-x-auto pb-1">
+              {LOGISTICS_EVENTS.map((event, idx) => {
+                const EventIcon = event.icon;
+                const isCompleted = idx <= currentStepIndex;
+                const isCurrent = idx === currentStepIndex;
+                return (
+                  <div key={event.status} className="flex items-center gap-1.5 shrink-0">
+                    <div
+                      className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                        isCompleted
+                          ? isCurrent
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-primary/10 text-primary'
+                          : 'bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      <EventIcon className="h-3 w-3" />
+                      {event.label}
+                    </div>
+                    {idx < LOGISTICS_EVENTS.length - 1 && (
+                      <ArrowRight className={`h-3 w-3 shrink-0 ${isCompleted && idx < currentStepIndex ? 'text-primary/50' : 'text-muted-foreground/30'}`} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="space-y-0">
+              {logisticsTimeline.map((item, idx) => (
+                <div key={idx} className="relative flex gap-4 pb-4 last:pb-0">
+                  <div className="flex flex-col items-center">
+                    <div className={`h-2 w-2 rounded-full ${item.state === 'completed' ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
+                    {idx < logisticsTimeline.length - 1 && (
+                      <div className={`w-px flex-1 mt-1 ${item.state === 'completed' ? 'bg-primary/30' : 'bg-border'}`} />
+                    )}
+                  </div>
+                  <div className="flex-1 -mt-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium">{item.label}</span>
+                      <span className="text-xs text-muted-foreground tabular-nums">{formatDate(item.date)}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+                  </div>
+                </div>
+              ))}
+              {logisticsTimeline.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-6">暂无物流记录</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -558,6 +808,8 @@ export default function SalesDetailPage({ params }: PageProps) {
           <TabsTrigger value="packing">装箱明细</TabsTrigger>
           <TabsTrigger value="3d">3D 可视化</TabsTrigger>
           <TabsTrigger value="info">合同信息</TabsTrigger>
+          <TabsTrigger value="customs">报关信息</TabsTrigger>
+          <TabsTrigger value="payments">收款记录</TabsTrigger>
         </TabsList>
 
         {/* 装箱明细 */}
@@ -725,6 +977,112 @@ export default function SalesDetailPage({ params }: PageProps) {
               }
             }}
           />
+        </TabsContent>
+
+        {/* 报关信息 */}
+        <TabsContent value="customs">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileSpreadsheet className="h-5 w-5 text-primary" />
+                报关 HS 编码
+              </CardTitle>
+              <CardDescription>
+                根据装箱明细自动汇总的海关申报信息
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {hsCodeList.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">
+                  暂无报关信息，请先在装箱明细中添加带有 HS 编码的商品
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>HS 编码</TableHead>
+                      <TableHead>商品名称</TableHead>
+                      <TableHead className="text-right">数量</TableHead>
+                      <TableHead className="text-right">总价 ($)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {hsCodeList.map((item, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-mono text-sm font-medium">{item.hsCode}</TableCell>
+                        <TableCell>{item.productName}</TableCell>
+                        <TableCell className="text-right">{item.quantity.toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          ${item.totalPrice.toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 收款记录 */}
+        <TabsContent value="payments">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-primary" />
+                收款记录
+              </CardTitle>
+              <CardDescription>
+                已收款项明细，总计 ${contract.receivedAmount.toLocaleString()} / ${contract.totalAmount.toLocaleString()}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {paymentRecords.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">
+                  暂无收款记录
+                </div>
+              ) : (
+                <div className="space-y-0">
+                  {paymentRecords.map((payment, idx) => (
+                    <div key={payment.id} className="relative flex gap-4 pb-5 last:pb-0">
+                      <div className="flex flex-col items-center">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
+                          <DollarSign className="h-3 w-3 text-primary" />
+                        </div>
+                        {idx < paymentRecords.length - 1 && (
+                          <div className="w-px flex-1 mt-2 bg-border" />
+                        )}
+                      </div>
+                      <div className="flex-1 -mt-0.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium">
+                            {payment.type === PaymentType.RECEIVABLE_RECEIPT ? '预收款' :
+                             payment.type === PaymentType.RECEIVABLE_COLLECTION ? '尾款收款' : '收款'}
+                          </span>
+                          <span className="text-sm font-bold tabular-nums">${payment.amount.toLocaleString()}</span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatDate(payment.paymentDate)}
+                          </span>
+                          {payment.paymentMethod && (
+                            <span className="text-xs text-muted-foreground">{payment.paymentMethod}</span>
+                          )}
+                          {payment.currency && payment.currency !== 'USD' && (
+                            <span className="text-xs text-muted-foreground">{payment.currency}</span>
+                          )}
+                        </div>
+                        {payment.note && (
+                          <p className="text-xs text-muted-foreground mt-1">{payment.note}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

@@ -135,4 +135,16 @@ router.get('/greeting', aiController.getGreeting);
 // GET /api/v1/ai/greeting/stream - 流式获取AI问候语（支持 thinking）
 router.get('/greeting/stream', aiController.getGreetingStream);
 
+// ─── AI 用量统计路由 ───
+const aiUsageController = require('../controllers/aiUsageController');
+
+// GET /api/v1/ai/usage/trend - 用量趋势（按日期聚合）
+router.get('/usage/trend', aiUsageController.getUsageTrend);
+
+// GET /api/v1/ai/usage/calls - 调用明细列表
+router.get('/usage/calls', aiUsageController.getCallDetails);
+
+// GET /api/v1/ai/usage/summary - 用量汇总（今日/本周/本月/总计）
+router.get('/usage/summary', aiUsageController.getUsageSummary);
+
 module.exports = router;

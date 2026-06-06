@@ -1,6 +1,6 @@
 /**
- * Input: 商品分类服务API
- * Output: 商品分类管理页面（搜索、分页、CRUD）
+ * Input: 商品分类服务 API
+ * Output: 商品分类管理页面（表格、批量操作、导入导出）
  * Pos: 系统设置 > 基础数据 > 商品分类
  */
 
@@ -18,7 +18,6 @@ import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2, Tag, Search, X } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
@@ -32,6 +31,17 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { BatchActionBar } from '@/components/settings/BatchActionBar';
+import { ImportExportButtons } from '@/components/settings/ImportExportButtons';
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<SystemCategoryItem[]>([]);
@@ -43,6 +53,7 @@ export default function CategoriesPage() {
   const [pageSize, setPageSize] = useState(20);
   const [formName, setFormName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadCategories();
@@ -84,6 +95,17 @@ export default function CategoriesPage() {
     }
   };
 
+  const handleBatchDelete = async () => {
+    if (confirm(`确定要删除选中的 ${selectedIds.size} 个分类吗？`)) {
+      const ids = Array.from(selectedIds);
+      const results = await Promise.allSettled(ids.map((id) => deleteSystemCategory(id)));
+      const successCount = results.filter((r) => r.status === 'fulfilled').length;
+      setCategories(categories.filter((c) => !selectedIds.has(c.id)));
+      setSelectedIds(new Set());
+      toast.success(`已删除 ${successCount} 个分类`);
+    }
+  };
+
   const handleSubmit = async () => {
     const name = formName.trim();
     if (!name) {
@@ -108,6 +130,19 @@ export default function CategoriesPage() {
     }
   };
 
+  const handleImport = async (rows: Array<Record<string, unknown>>) => {
+    const payloads = rows
+      .map((r) => ({
+        name: String(r['名称'] || r['name'] || ''),
+      }))
+      .filter((r) => r.name);
+
+    if (payloads.length === 0) throw new Error('无有效数据');
+
+    await Promise.allSettled(payloads.map((p) => createSystemCategory(p)));
+    loadCategories();
+  };
+
   const filteredCategories = keyword.trim()
     ? categories.filter((c) => c.name.toLowerCase().includes(keyword.trim().toLowerCase()))
     : categories;
@@ -115,21 +150,35 @@ export default function CategoriesPage() {
   const totalPages = Math.ceil(filteredCategories.length / pageSize);
   const pagedCategories = filteredCategories.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+  const toggleSelect = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === pagedCategories.length && pagedCategories.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pagedCategories.map((c) => c.id)));
+    }
+  };
+
   const handleReset = () => {
     setKeyword('');
     setCurrentPage(1);
   };
 
   return (
-    <div className="space-y-6">
-      <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
+    <div className="space-y-5">
       <PageHeader
         title="商品分类"
         description="管理商品分类体系"
         actions={
           <div className="hidden flex-wrap items-center gap-2 md:flex">
             <div className="relative w-full sm:w-56">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="搜索分类名称..."
                 value={keyword}
@@ -139,10 +188,18 @@ export default function CategoriesPage() {
             </div>
             {keyword && (
               <Button variant="ghost" size="sm" className="h-10 rounded-xl" onClick={handleReset}>
-                <X className="h-4 w-4 mr-1" />
+                <X className="mr-1 h-4 w-4" />
                 重置
               </Button>
             )}
+            <ImportExportButtons
+              data={filteredCategories}
+              filename="商品分类"
+              columns={[
+                { key: 'name', label: '名称' },
+              ]}
+              onImport={handleImport}
+            />
             <Button onClick={handleCreate} className="h-10 rounded-xl">
               <Plus className="mr-2 h-4 w-4" /> 新增分类
             </Button>
@@ -157,64 +214,85 @@ export default function CategoriesPage() {
         </Button>
       </div>
 
-      <div className="hidden md:block">
+      <BatchActionBar
+        count={selectedIds.size}
+        onDelete={handleBatchDelete}
+        onExport={() => {
+          const selected = categories.filter((c) => selectedIds.has(c.id));
+          if (selected.length === 0) return;
+          const { utils, writeFile } = require('xlsx');
+          const ws = utils.json_to_sheet(selected.map((c) => ({ 名称: c.name })));
+          const wb = utils.book_new();
+          utils.book_append_sheet(wb, ws, '分类');
+          writeFile(wb, '选中分类数据.xlsx');
+          toast.success('导出成功');
+        }}
+        onClear={() => setSelectedIds(new Set())}
+      />
+
+      <div className="hidden md:block surface-panel overflow-hidden">
         {loading ? (
           <div className="py-12 text-center text-muted-foreground">加载中...</div>
         ) : pagedCategories.length === 0 ? (
-          <EmptyState
-            icon={<Tag className="h-8 w-8" />}
-            title={keyword ? "没有符合条件的分类" : "暂无分类数据"}
-            description="还没有添加任何商品分类，点击下方的按钮开始创建"
-            action={{ label: '新增分类', onClick: () => setIsDialogOpen(true) }}
-          />
-        ) : (
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
-            {pagedCategories.map((category) => (
-              <Card
-                key={category.id}
-                className="cursor-pointer border-border/40 border-l-[3px] bg-card/60 transition-all duration-300 hover:border-primary/20 hover:bg-card hover:shadow-md hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/10"
-                style={{ borderLeftColor: 'oklch(0.55 0.14 200)' }}
-                onClick={() => handleEdit(category)}
-              >
-                <CardContent className="space-y-3 p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-foreground truncate">{category.name}</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {category.parent && (
-                          <Badge variant="secondary" className="text-[10px]">父级: {category.parent.name}</Badge>
-                        )}
-                        {category._count?.products !== undefined && category._count.products > 0 && (
-                          <Badge variant="outline" className="text-[10px]">商品: {category._count.products}</Badge>
-                        )}
-                        {category._count?.children !== undefined && category._count.children > 0 && (
-                          <Badge variant="outline" className="text-[10px]">子分类: {category._count.children}</Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 pt-1 border-t border-border/30">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 flex-1 rounded-lg text-xs"
-                      onClick={(e) => { e.stopPropagation(); handleEdit(category); }}
-                    >
-                      <Pencil className="mr-1 h-3 w-3" /> 编辑
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 flex-1 rounded-lg text-xs text-destructive hover:bg-destructive/10"
-                      onClick={(e) => { e.stopPropagation(); handleDelete(category.id); }}
-                    >
-                      <Trash2 className="mr-1 h-3 w-3" /> 删除
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="py-16">
+            <EmptyState
+              icon={<Tag className="h-8 w-8" />}
+              title={keyword ? '没有符合条件的分类' : '暂无分类数据'}
+              description="还没有添加任何商品分类，点击下方的按钮开始创建"
+              action={{ label: '新增分类', onClick: () => setIsDialogOpen(true) }}
+            />
           </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={pagedCategories.length > 0 && selectedIds.size === pagedCategories.length}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </TableHead>
+                <TableHead className="w-12 text-muted-foreground">#</TableHead>
+                <TableHead className="text-muted-foreground">名称</TableHead>
+                <TableHead className="text-muted-foreground">父级</TableHead>
+                <TableHead className="text-muted-foreground">商品数</TableHead>
+                <TableHead className="w-[100px] text-muted-foreground">操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pagedCategories.map((category, index) => (
+                <TableRow key={category.id} className="group transition-colors hover:bg-muted/40">
+                  <TableCell>
+                    <Checkbox checked={selectedIds.has(category.id)} onCheckedChange={() => toggleSelect(category.id)} />
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {(currentPage - 1) * pageSize + index + 1}
+                  </TableCell>
+                  <TableCell className="font-medium">{category.name}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {category.parent?.name || '-'}
+                  </TableCell>
+                  <TableCell>
+                    {category._count?.products !== undefined && category._count.products > 0 ? (
+                      <Badge variant="outline" className="text-[10px]">{category._count.products}</Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(category)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(category.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </div>
 
@@ -243,19 +321,11 @@ export default function CategoriesPage() {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    variant="outline"
-                    className="h-11 rounded-2xl"
-                    onClick={() => handleEdit(category)}
-                  >
+                  <Button variant="outline" className="h-11 rounded-2xl" onClick={() => handleEdit(category)}>
                     <Pencil className="mr-2 h-4 w-4" />
                     编辑
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="h-11 rounded-2xl border-destructive/30 text-destructive hover:bg-destructive/5 hover:text-destructive"
-                    onClick={() => handleDelete(category.id)}
-                  >
+                  <Button variant="outline" className="h-11 rounded-2xl border-destructive/30 text-destructive hover:bg-destructive/5 hover:text-destructive" onClick={() => handleDelete(category.id)}>
                     <Trash2 className="mr-2 h-4 w-4" />
                     删除
                   </Button>
@@ -301,12 +371,7 @@ export default function CategoriesPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="category-name">分类名称 *</Label>
-              <Input
-                id="category-name"
-                placeholder="例如：家具"
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-              />
+              <Input id="category-name" placeholder="例如：家具" value={formName} onChange={(e) => setFormName(e.target.value)} />
             </div>
           </div>
           <DialogFooter>

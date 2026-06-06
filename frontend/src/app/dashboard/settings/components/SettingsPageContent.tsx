@@ -10,16 +10,14 @@
 
 import { Suspense } from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader';
 import { SystemConfigTab } from './tabs/SystemConfigTab';
 
 /**
- * 职责：渲染系统配置页（参数设置 + AI API Key），其余功能通过 ADMIN_TABS 直达独立页
+ * 职责：渲染系统配置页（参数设置 + AI API Key）
  */
 export default function SettingsPageContent() {
   return (
     <div className="space-y-6">
-      <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
       <PageHeader
         title="系统配置"
         description="全局运营参数与 AI 集成配置"

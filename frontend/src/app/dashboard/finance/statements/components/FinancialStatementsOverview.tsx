@@ -96,6 +96,17 @@ interface FinancialStatementsOverviewProps {
   warningAlerts: FinancialAlert[];
 }
 
+function calcTrend(current: number | null | undefined, previous: number | null | undefined): { dir: 'up' | 'down' | 'neutral'; text: string } {
+  if (current == null || previous == null || previous === 0) return { dir: 'neutral', text: '环比持平' };
+  const diff = ((current - previous) / Math.abs(previous)) * 100;
+  const sign = diff > 0 ? '+' : '';
+  if (Math.abs(diff) < 0.1) return { dir: 'neutral', text: '环比持平' };
+  return {
+    dir: diff > 0 ? 'up' : 'down',
+    text: `环比 ${sign}${diff.toFixed(1)}%`,
+  };
+}
+
 export function FinancialStatementsOverview({
   analytics,
   currentDetail,
@@ -189,41 +200,56 @@ export function FinancialStatementsOverview({
                 加载账期数据...
               </div>
             )}
-            <KpiCard
-              title={`本期营业收入（${currentDetail?.periodLabel ?? currentPeriod?.periodLabel ?? ''}）`}
-              value={fmtWan(latestIncomeStatement?.revenueMonth)}
-              subValue={`累计：${fmtWan(latestIncomeStatement?.revenueYTD)}`}
-              icon={TrendingUp}
-              trend="up"
-            />
-            <KpiCard
-              title="本期净利润"
-              value={fmtWan(latestIncomeStatement?.netProfitMonth)}
-              subValue={`累计：${fmtWan(latestIncomeStatement?.netProfitYTD)}`}
-              icon={DollarSign}
-              valueClass={profitColor(latestIncomeStatement?.netProfitMonth)}
-              trend={
-                latestIncomeStatement?.netProfitMonth != null
-                  ? latestIncomeStatement.netProfitMonth >= 0
-                    ? 'up'
-                    : 'down'
-                  : 'neutral'
-              }
-            />
-            <KpiCard
-              title="资产负债率"
-              value={fmtPercent(debtRatioVal)}
-              subValue={`负债 ${fmtWan(latestBalanceSheet?.totalLiabilities)} / 资产 ${fmtWan(latestBalanceSheet?.totalAssets)}`}
-              icon={Scale}
-              valueClass={debtRatioVal != null && debtRatioVal > 0.7 ? 'text-destructive' : 'text-foreground'}
-            />
-            <KpiCard
-              title="所有者权益"
-              value={fmtWan(latestBalanceSheet?.totalEquity)}
-              subValue={`货币资金：${fmtAmount(latestBalanceSheet?.cashAndEquivalents)}`}
-              icon={Wallet}
-              valueClass={profitColor(latestBalanceSheet?.totalEquity)}
-            />
+            {(() => {
+              const trends = analytics?.trends ?? [];
+              const prev = trends.length >= 2 ? trends[trends.length - 2] : null;
+              const curr = trends.length >= 1 ? trends[trends.length - 1] : null;
+              const revenueTrend = calcTrend(latestIncomeStatement?.revenueMonth, prev?.revenue);
+              const profitTrend = calcTrend(latestIncomeStatement?.netProfitMonth, prev?.netProfit);
+              const prevDebtRatio = prev && prev.totalAssets ? prev.totalLiabilities / prev.totalAssets : null;
+              const debtTrend = calcTrend(debtRatioVal, prevDebtRatio);
+              const equityTrend = calcTrend(latestBalanceSheet?.totalEquity, prev?.totalEquity);
+
+              return (
+                <>
+                  <KpiCard
+                    title={`本期营业收入（${currentDetail?.periodLabel ?? currentPeriod?.periodLabel ?? ''}）`}
+                    value={fmtWan(latestIncomeStatement?.revenueMonth)}
+                    subValue={`累计：${fmtWan(latestIncomeStatement?.revenueYTD)}`}
+                    icon={TrendingUp}
+                    trend={revenueTrend.dir}
+                    trendValue={revenueTrend.text}
+                  />
+                  <KpiCard
+                    title="本期净利润"
+                    value={fmtWan(latestIncomeStatement?.netProfitMonth)}
+                    subValue={`累计：${fmtWan(latestIncomeStatement?.netProfitYTD)}`}
+                    icon={DollarSign}
+                    valueClass={profitColor(latestIncomeStatement?.netProfitMonth)}
+                    trend={profitTrend.dir}
+                    trendValue={profitTrend.text}
+                  />
+                  <KpiCard
+                    title="资产负债率"
+                    value={fmtPercent(debtRatioVal)}
+                    subValue={`负债 ${fmtWan(latestBalanceSheet?.totalLiabilities)} / 资产 ${fmtWan(latestBalanceSheet?.totalAssets)}`}
+                    icon={Scale}
+                    valueClass={debtRatioVal != null && debtRatioVal > 0.7 ? 'text-destructive' : 'text-foreground'}
+                    trend={debtTrend.dir}
+                    trendValue={debtTrend.text}
+                  />
+                  <KpiCard
+                    title="所有者权益"
+                    value={fmtWan(latestBalanceSheet?.totalEquity)}
+                    subValue={`货币资金：${fmtAmount(latestBalanceSheet?.cashAndEquivalents)}`}
+                    icon={Wallet}
+                    valueClass={profitColor(latestBalanceSheet?.totalEquity)}
+                    trend={equityTrend.dir}
+                    trendValue={equityTrend.text}
+                  />
+                </>
+              );
+            })()}
           </div>
 
           <Card>

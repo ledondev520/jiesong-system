@@ -20,8 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { StatusBadge, type StatusBadgeConfig } from '@/components/ui/status-badge';
-import { Loader2, Save, Pencil } from 'lucide-react';
+import { SemanticBadge } from '@/components/ui/semantic-badge';
+import { Loader2, Save, Pencil, DollarSign, Scale, Container, Calendar, MapPin, Ship, CheckCircle2 } from 'lucide-react';
 import { formatDate } from '@/lib/date-format';
 
 interface ContractInfoEditorProps {
@@ -70,7 +70,7 @@ export function ContractInfoEditor({ contract, stores, onSave }: ContractInfoEdi
   };
 
   const getStatusBadge = (status: SalesStatus) => {
-    const statusMap: Record<SalesStatus, StatusBadgeConfig> = {
+    const statusMap: Record<SalesStatus, { label: string; tone: React.ComponentProps<typeof SemanticBadge>['tone'] }> = {
       [SalesStatus.DRAFT]: { label: '草稿', tone: 'neutral' },
       [SalesStatus.CONFIRMED]: { label: '已确认', tone: 'info' },
       [SalesStatus.PACKING]: { label: '装箱中', tone: 'warning' },
@@ -79,7 +79,8 @@ export function ContractInfoEditor({ contract, stores, onSave }: ContractInfoEdi
       [SalesStatus.COMPLETED]: { label: '已完成', tone: 'secondary' },
       [SalesStatus.CANCELLED]: { label: '已取消', tone: 'danger' },
     };
-    return <StatusBadge status={status} statusMap={statusMap} />;
+    const config = statusMap[status] || { label: status, tone: 'neutral' as const };
+    return <SemanticBadge tone={config.tone}>{config.label}</SemanticBadge>;
   };
 
   // 从 stores 中获取唯一的港口列表
@@ -88,124 +89,157 @@ export function ContractInfoEditor({ contract, stores, onSave }: ContractInfoEdi
     .map(s => s.port!)
     .filter((port, index, self) => self.findIndex(p => p.id === port.id) === index);
 
+  const infoItems = [
+    {
+      icon: <Ship className="h-4 w-4 text-muted-foreground" />,
+      label: '合同编号',
+      value: contract.contractNo,
+      editable: false,
+    },
+    {
+      icon: <CheckCircle2 className="h-4 w-4 text-muted-foreground" />,
+      label: '状态',
+      value: getStatusBadge(contract.status),
+      editable: false,
+      isElement: true,
+    },
+    {
+      icon: <DollarSign className="h-4 w-4 text-muted-foreground" />,
+      label: '总金额',
+      value: `$${contract.totalAmount.toLocaleString()}`,
+      editable: false,
+      highlight: true,
+    },
+    {
+      icon: <DollarSign className="h-4 w-4 text-muted-foreground" />,
+      label: '已收款',
+      value: `$${contract.receivedAmount.toLocaleString()}`,
+      editable: false,
+      highlight: contract.receivedAmount > 0,
+    },
+    {
+      icon: <Container className="h-4 w-4 text-muted-foreground" />,
+      label: '货物归属',
+      value: contract.hasThirdPartyCargo ? '含第三方拼柜' : '仅捷淞货物',
+      editable: false,
+    },
+    {
+      icon: <Scale className="h-4 w-4 text-muted-foreground" />,
+      label: '第三方来源',
+      value: contract.sourceParties && contract.sourceParties.length > 0
+        ? contract.sourceParties.join(', ')
+        : '—',
+      editable: false,
+    },
+    {
+      icon: <DollarSign className="h-4 w-4 text-muted-foreground" />,
+      label: '汇率',
+      value: isEditing ? undefined : String(contract.exchangeRate),
+      editable: true,
+      editRender: (
+        <Input
+          type="number"
+          step="0.01"
+          value={form.exchangeRate}
+          onChange={(e) => setForm(prev => ({ ...prev, exchangeRate: parseFloat(e.target.value) || 0 }))}
+          className="h-8"
+        />
+      ),
+    },
+    {
+      icon: <MapPin className="h-4 w-4 text-muted-foreground" />,
+      label: '目的港',
+      value: isEditing ? undefined : (contract.port?.name || '-'),
+      editable: true,
+      editRender: (
+        <Select value={form.portId} onValueChange={(v) => setForm(prev => ({ ...prev, portId: v }))}>
+          <SelectTrigger className="h-8">
+            <SelectValue placeholder="选择目的港" />
+          </SelectTrigger>
+          <SelectContent>
+            {ports.map(port => (
+              <SelectItem key={port.id} value={port.id}>{port.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ),
+    },
+    {
+      icon: <Calendar className="h-4 w-4 text-muted-foreground" />,
+      label: '签订日期',
+      value: isEditing ? undefined : formatDate(contract.signedAt),
+      editable: true,
+      editRender: (
+        <Input
+          type="date"
+          value={form.signedAt}
+          onChange={(e) => setForm(prev => ({ ...prev, signedAt: e.target.value }))}
+          className="h-8"
+        />
+      ),
+    },
+    {
+      icon: <Calendar className="h-4 w-4 text-muted-foreground" />,
+      label: '预计到达',
+      value: isEditing ? undefined : formatDate(contract.estimatedArrival),
+      editable: true,
+      editRender: (
+        <Input
+          type="date"
+          value={form.estimatedArrival}
+          onChange={(e) => setForm(prev => ({ ...prev, estimatedArrival: e.target.value }))}
+          className="h-8"
+        />
+      ),
+    },
+  ];
+
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-row items-center justify-between pb-4">
         <div>
-          <CardTitle>合同信息</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Ship className="h-5 w-5 text-primary" />
+            合同信息
+          </CardTitle>
           <CardDescription>
             {isEditing ? '编辑合同基本信息' : '查看合同详情'}
           </CardDescription>
         </div>
         {!isEditing && (
-          <Button variant="outline" onClick={() => setIsEditing(true)}>
+          <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
             <Pencil className="mr-2 h-4 w-4" /> 编辑
           </Button>
         )}
       </CardHeader>
-      <CardContent className="grid gap-4 md:grid-cols-2">
-        {/* 只读字段 */}
-        <div>
-          <div className="text-sm text-muted-foreground">合同编号</div>
-          <div className="font-medium">{contract.contractNo}</div>
-        </div>
-        <div>
-          <div className="text-sm text-muted-foreground">状态</div>
-          <div>{getStatusBadge(contract.status)}</div>
-        </div>
-        <div>
-          <div className="text-sm text-muted-foreground">总金额（自动计算）</div>
-          <div className="font-medium text-primary">${contract.totalAmount.toLocaleString()}</div>
-        </div>
-        <div>
-          <div className="text-sm text-muted-foreground">已收款</div>
-          <div className="font-medium">${contract.receivedAmount.toLocaleString()}</div>
-        </div>
-        <div>
-          <div className="text-sm text-muted-foreground">货物归属</div>
-          <div className="font-medium">
-            {contract.hasThirdPartyCargo ? '含第三方拼柜' : '仅捷淞货物'}
-          </div>
-        </div>
-        <div>
-          <div className="text-sm text-muted-foreground">第三方来源</div>
-          <div className="font-medium">
-            {contract.sourceParties && contract.sourceParties.length > 0
-              ? contract.sourceParties.join(', ')
-              : '—'}
-          </div>
-        </div>
-
-        {/* 可编辑字段 */}
-        <div>
-          <div className="text-sm text-muted-foreground mb-1">汇率</div>
-          {isEditing ? (
-            <Input
-              type="number"
-              step="0.01"
-              value={form.exchangeRate}
-              onChange={(e) => setForm(prev => ({ ...prev, exchangeRate: parseFloat(e.target.value) || 0 }))}
-            />
-          ) : (
-            <div className="font-medium">{contract.exchangeRate}</div>
-          )}
-        </div>
-
-        <div>
-          <div className="text-sm text-muted-foreground mb-1">目的港</div>
-          {isEditing ? (
-            <Select value={form.portId} onValueChange={(v) => setForm(prev => ({ ...prev, portId: v }))}>
-              <SelectTrigger>
-                <SelectValue placeholder="选择目的港" />
-              </SelectTrigger>
-              <SelectContent>
-                {ports.map(port => (
-                  <SelectItem key={port.id} value={port.id}>{port.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <div className="font-medium">{contract.port?.name || '-'}</div>
-          )}
-        </div>
-
-        <div>
-          <div className="text-sm text-muted-foreground mb-1">签订日期</div>
-          {isEditing ? (
-            <Input
-              type="date"
-              value={form.signedAt}
-              onChange={(e) => setForm(prev => ({ ...prev, signedAt: e.target.value }))}
-            />
-          ) : (
-            <div className="font-medium">
-              {formatDate(contract.signedAt)}
+      <CardContent>
+        <div className="grid gap-3 md:grid-cols-2">
+          {infoItems.map((item, idx) => (
+            <div key={idx} className="flex items-start gap-3 rounded-lg border border-border/50 p-3">
+              <div className="mt-0.5">{item.icon}</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{item.label}</p>
+                {isEditing && item.editable && item.editRender ? (
+                  <div className="mt-1">{item.editRender}</div>
+                ) : item.isElement ? (
+                  <div className="mt-1">{item.value as React.ReactNode}</div>
+                ) : (
+                  <p className={`text-sm font-medium truncate ${item.highlight ? 'text-primary' : ''}`}>
+                    {item.value as string}
+                  </p>
+                )}
+              </div>
             </div>
-          )}
-        </div>
-
-        <div>
-          <div className="text-sm text-muted-foreground mb-1">预计到达</div>
-          {isEditing ? (
-            <Input
-              type="date"
-              value={form.estimatedArrival}
-              onChange={(e) => setForm(prev => ({ ...prev, estimatedArrival: e.target.value }))}
-            />
-          ) : (
-            <div className="font-medium">
-              {formatDate(contract.estimatedArrival)}
-            </div>
-          )}
+          ))}
         </div>
 
         {/* 编辑模式下的操作按钮 */}
         {isEditing && (
-          <div className="md:col-span-2 flex gap-2 justify-end pt-4 border-t">
-            <Button variant="outline" onClick={() => setIsEditing(false)} disabled={saving}>
+          <div className="flex gap-2 justify-end pt-5 border-t mt-5">
+            <Button variant="outline" size="sm" onClick={() => setIsEditing(false)} disabled={saving}>
               取消
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button size="sm" onClick={handleSave} disabled={saving}>
               {saving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

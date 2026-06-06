@@ -4,6 +4,7 @@
  * Pos: 销售合同管理入口，展示合同列表、货柜信息，支持删除操作
  *
  * 2026-01-26 新增：管理员可删除销售合同（带确认对话框）
+ * 2026-06-07 改造：物流进度可视化、货柜信息、金额列优化、状态图标化
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -19,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
 import { AmountText } from '@/components/ui/amount-text';
-import { Badge } from '@/components/ui/badge';
+import { SemanticBadge } from '@/components/ui/semantic-badge';
 
 import {
   AlertDialog,
@@ -31,7 +32,29 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Eye, Ship, Trash2, Loader2, FileSpreadsheet, Container, Anchor, Boxes, Clock3, Search, Upload, ArrowUp, ArrowDown, Warehouse } from 'lucide-react';
+import {
+  Plus,
+  Eye,
+  Ship,
+  Trash2,
+  Loader2,
+  FileSpreadsheet,
+  Container,
+  Anchor,
+  Boxes,
+  Clock3,
+  Search,
+  Upload,
+  ArrowUp,
+  ArrowDown,
+  Warehouse,
+  Truck,
+  CheckCircle2,
+  CircleDashed,
+  PackageCheck,
+  CircleDot,
+  ArrowRight,
+} from 'lucide-react';
 import { BatchImportDialog, type ImportRow } from '@/components/batch-import';
 import { batchImportService } from '@/services/batchImport.service';
 import Link from 'next/link';
@@ -44,6 +67,25 @@ import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeade
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { MobileListCard } from '@/components/mobile';
 import { useTableSort } from '@/lib/hooks/useTableSort';
+
+const LOGISTICS_STEPS = [
+  { key: 'draft', label: '草稿', status: SalesStatus.DRAFT },
+  { key: 'confirmed', label: '确认', status: SalesStatus.CONFIRMED },
+  { key: 'packing', label: '装箱', status: SalesStatus.PACKING },
+  { key: 'shipped', label: '发运', status: SalesStatus.SHIPPED },
+  { key: 'arrived', label: '到港', status: SalesStatus.ARRIVED },
+  { key: 'completed', label: '收款', status: SalesStatus.COMPLETED },
+];
+
+const STATUS_STEP_MAP: Record<SalesStatus, number> = {
+  [SalesStatus.DRAFT]: 0,
+  [SalesStatus.CONFIRMED]: 1,
+  [SalesStatus.PACKING]: 2,
+  [SalesStatus.SHIPPED]: 3,
+  [SalesStatus.ARRIVED]: 4,
+  [SalesStatus.COMPLETED]: 5,
+  [SalesStatus.CANCELLED]: -1,
+};
 
 export default function SalesPage() {
   const [contracts, setContracts] = useState<SalesContract[]>([]);
@@ -251,17 +293,22 @@ export default function SalesPage() {
    * 获取状态徽章
    */
   const getStatusBadge = (status: SalesStatus) => {
-    const statusConfig: Record<SalesStatus, { label: string; className: string }> = {
-      [SalesStatus.DRAFT]: { label: '草稿', className: 'bg-gray-100 text-gray-700 hover:bg-gray-100 border-gray-200' },
-      [SalesStatus.CONFIRMED]: { label: '已确认', className: 'bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-200' },
-      [SalesStatus.PACKING]: { label: '装柜中', className: 'bg-purple-50 text-purple-700 hover:bg-purple-50 border-purple-200' },
-      [SalesStatus.SHIPPED]: { label: '已发运', className: 'bg-orange-50 text-orange-700 hover:bg-orange-50 border-orange-200' },
-      [SalesStatus.ARRIVED]: { label: '已到达', className: 'bg-cyan-50 text-cyan-700 hover:bg-cyan-50 border-cyan-200' },
-      [SalesStatus.COMPLETED]: { label: '已完成', className: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200' },
-      [SalesStatus.CANCELLED]: { label: '已取消', className: 'bg-red-50 text-red-700 hover:bg-red-50 border-red-200' },
+    const statusConfig: Record<SalesStatus, { label: string; tone: React.ComponentProps<typeof SemanticBadge>['tone']; icon: React.ReactNode }> = {
+      [SalesStatus.DRAFT]: { label: '草稿', tone: 'neutral', icon: <CircleDashed className="h-3 w-3" /> },
+      [SalesStatus.CONFIRMED]: { label: '已确认', tone: 'info', icon: <CircleDot className="h-3 w-3" /> },
+      [SalesStatus.PACKING]: { label: '装柜中', tone: 'warning', icon: <Boxes className="h-3 w-3" /> },
+      [SalesStatus.SHIPPED]: { label: '已发运', tone: 'progress', icon: <Truck className="h-3 w-3" /> },
+      [SalesStatus.ARRIVED]: { label: '已到达', tone: 'success', icon: <Anchor className="h-3 w-3" /> },
+      [SalesStatus.COMPLETED]: { label: '已收款', tone: 'success', icon: <CheckCircle2 className="h-3 w-3" /> },
+      [SalesStatus.CANCELLED]: { label: '已取消', tone: 'danger', icon: <CircleDashed className="h-3 w-3" /> },
     };
-    const config = statusConfig[status] || { label: status, className: 'bg-gray-100 text-gray-700 hover:bg-gray-100 border-gray-200' };
-    return <Badge variant="outline" className={config.className}>{config.label}</Badge>;
+    const config = statusConfig[status] || { label: status, tone: 'neutral', icon: null };
+    return (
+      <SemanticBadge tone={config.tone} className="gap-1">
+        {config.icon}
+        {config.label}
+      </SemanticBadge>
+    );
   };
 
   // 搜索过滤逻辑
@@ -312,8 +359,80 @@ export default function SalesPage() {
     totalBoxes: contracts.reduce((sum, contract) => sum + (contract.totalBoxes || 0), 0),
   };
 
+  /**
+   * 职责：渲染物流进度条
+   * 思路：根据合同当前状态，高亮已完成的步骤，当前步骤用不同样式
+   */
+  const LogisticsProgress = ({ status }: { status: SalesStatus }) => {
+    if (status === SalesStatus.CANCELLED) {
+      return (
+        <div className="flex items-center gap-1 text-xs text-destructive/70">
+          <CircleDashed className="h-3 w-3" />
+          <span>已取消</span>
+        </div>
+      );
+    }
+    const currentStep = STATUS_STEP_MAP[status] ?? 0;
+    return (
+      <div className="flex items-center gap-0.5">
+        {LOGISTICS_STEPS.map((step, idx) => {
+          const isCompleted = idx <= currentStep;
+          const isCurrent = idx === currentStep;
+          return (
+            <div key={step.key} className="flex items-center">
+              <div
+                className={`h-1.5 rounded-full transition-all duration-500 ${
+                  isCompleted
+                    ? isCurrent
+                      ? 'w-5 bg-primary'
+                      : 'w-3.5 bg-primary/70'
+                    : 'w-3.5 bg-muted'
+                }`}
+                title={step.label}
+              />
+              {idx < LOGISTICS_STEPS.length - 1 && (
+                <div className={`w-0.5 h-px ${isCompleted && idx < currentStep ? 'bg-primary/40' : 'bg-muted'}`} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  /**
+   * 职责：渲染货柜信息
+   */
+  const ContainerInfo = ({ contract }: { contract: SalesContract }) => {
+    if (!contract.totalBoxes && !contract.volume && !contract.grossWeight) return null;
+    return (
+      <div className="flex items-center gap-3 rounded-lg bg-muted/40 px-3 py-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10">
+          <Container className="h-3.5 w-3.5 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium truncate">{contract.contractNo}</span>
+            <span className="text-[10px] text-muted-foreground">40HQ</span>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+            {contract.totalBoxes ? <span>{contract.totalBoxes} 箱</span> : null}
+            {contract.volume ? <span>{contract.volume.toFixed(1)} CBM</span> : null}
+            {contract.grossWeight ? <span>{contract.grossWeight.toLocaleString()} kg</span> : null}
+          </div>
+        </div>
+        {contract.port?.name && (
+          <div className="shrink-0 text-[10px] text-muted-foreground flex items-center gap-0.5">
+            <ArrowRight className="h-2.5 w-2.5" />
+            {contract.port.name}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div className="min-w-0 space-y-4">
+    <div className="min-w-0 space-y-5">
       <ModuleTabHeader tabs={EXPORT_TABS} moduleName="销售" />
       <PageHeader
         title="销售合同"
@@ -334,7 +453,7 @@ export default function SalesPage() {
       />
 
       {/* 快捷入口 — 横向紧凑 */}
-      <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
         <Button variant="outline" size="sm" className="h-8 rounded-lg" onClick={() => router.push('/dashboard/logistics')}>
           <Warehouse className="mr-1.5 h-3.5 w-3.5" />
           仓储物流
@@ -351,7 +470,7 @@ export default function SalesPage() {
 
       {/* 出运概览 — 紧凑统计行 */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Card className="border-border/70">
+        <Card className="border-border/60">
           <CardContent className="flex items-center justify-between px-4 py-3">
             <div>
               <p className="text-xs text-muted-foreground">待装柜</p>
@@ -360,7 +479,7 @@ export default function SalesPage() {
             <Boxes className="h-4 w-4 text-primary" />
           </CardContent>
         </Card>
-        <Card className="border-border/70">
+        <Card className="border-border/60">
           <CardContent className="flex items-center justify-between px-4 py-3">
             <div>
               <p className="text-xs text-muted-foreground">在途</p>
@@ -369,7 +488,7 @@ export default function SalesPage() {
             <Container className="h-4 w-4 text-sky-600" />
           </CardContent>
         </Card>
-        <Card className="border-border/70">
+        <Card className="border-border/60">
           <CardContent className="flex items-center justify-between px-4 py-3">
             <div>
               <p className="text-xs text-muted-foreground">已到港</p>
@@ -378,7 +497,7 @@ export default function SalesPage() {
             <Anchor className="h-4 w-4 text-emerald-600" />
           </CardContent>
         </Card>
-        <Card className="border-border/70">
+        <Card className="border-border/60">
           <CardContent className="flex items-center justify-between px-4 py-3">
             <div>
               <p className="text-xs text-muted-foreground">总箱数</p>
@@ -523,7 +642,7 @@ export default function SalesPage() {
                   {/* 头部：合同编号 + 状态 */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <Ship className="h-4 w-4 shrink-0 text-primary" />
+                      <Ship className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <span className="font-semibold text-sm truncate">{contract.contractNo}</span>
                     </div>
                     <div className="shrink-0">
@@ -531,24 +650,30 @@ export default function SalesPage() {
                     </div>
                   </div>
 
-                  {/* 港口 */}
-                  <div className="text-sm text-muted-foreground">
-                    {contract.port?.name || '未知目的港'}
+                  {/* 物流进度条 */}
+                  <div className="flex items-center justify-between">
+                    <LogisticsProgress status={contract.status} />
+                    <span className="text-[10px] text-muted-foreground ml-2">
+                      {LOGISTICS_STEPS[STATUS_STEP_MAP[contract.status] ?? 0]?.label}
+                    </span>
                   </div>
+
+                  {/* 货柜信息 */}
+                  <ContainerInfo contract={contract} />
 
                   {/* 门店 + 第三方拼柜 */}
                   <div className="flex flex-wrap gap-1">
                     {contract.stores && contract.stores.length > 0
                       ? contract.stores.map((store, i) => (
-                          <Badge key={i} variant="secondary" className="text-[11px] font-normal px-1.5 py-0">
+                          <span key={i} className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                             {store}
-                          </Badge>
+                          </span>
                         ))
                       : <span className="text-xs text-muted-foreground">-</span>}
                     {contract.hasThirdPartyCargo && (
-                      <Badge variant="outline" className="text-[11px] border-amber-500/40 text-amber-700 bg-amber-50">
+                      <span className="inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 border border-amber-200">
                         含第三方拼柜
-                      </Badge>
+                      </span>
                     )}
                   </div>
                   {contract.hasThirdPartyCargo && contract.sourceParties?.length ? (
@@ -560,25 +685,32 @@ export default function SalesPage() {
                   {/* 数据行 */}
                   <div className="grid grid-cols-3 gap-2 text-sm">
                     <div>
-                      <p className="text-xs text-muted-foreground">签订日期</p>
-                      <p className="tabular-nums">{formatDate(contract.signedAt) || '—'}</p>
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">签订日期</p>
+                      <p className="tabular-nums text-sm">{formatDate(contract.signedAt) || '—'}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">箱数</p>
-                      <p className="tabular-nums">{contract.totalBoxes || 0} 箱</p>
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">箱数</p>
+                      <p className="tabular-nums text-sm">{contract.totalBoxes || 0} 箱</p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">体积</p>
-                      <p className="tabular-nums">{(contract.volume || 0).toFixed(1)} CBM</p>
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">体积</p>
+                      <p className="tabular-nums text-sm">{(contract.volume || 0).toFixed(1)} CBM</p>
                     </div>
                   </div>
 
-                  {/* 金额 */}
+                  {/* 金额 — 右对齐，区分货币 */}
                   <div className="flex items-center justify-between pt-2 border-t border-border/30">
-                    <span className="text-xs text-muted-foreground">合同金额</span>
-                    <span className="text-base font-semibold tabular-nums">
-                      <AmountText tone="success">${contract.totalAmount.toLocaleString()}</AmountText>
-                    </span>
+                    <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">合同金额</span>
+                    <div className="text-right">
+                      <span className="text-sm font-semibold tabular-nums">
+                        <AmountText tone="success">${contract.totalAmount.toLocaleString()}</AmountText>
+                      </span>
+                      {contract.receivedAmount > 0 && (
+                        <p className="text-[10px] text-muted-foreground">
+                          已收 ${contract.receivedAmount.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   {/* 操作按钮 */}

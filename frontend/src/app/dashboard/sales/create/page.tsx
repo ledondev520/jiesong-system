@@ -1,6 +1,14 @@
+/**
+ * Input: 商品、门店、销售服务
+ * Output: 出口合同创建页面（含分步向导、门店搜索卡片选择、商品定价实时利润计算、货柜选择器）
+ * Pos: 销售管理创建入口
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -28,13 +36,14 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash } from 'lucide-react';
+import { Plus, Trash, Search, Store as StoreIcon, Package, DollarSign, ArrowRight, ArrowLeft, Container, Check, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import { salesService } from '@/services/sales.service';
 import { productService } from '@/services/product.service';
 import { storeService } from '@/services/store.service';
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE } from '@/lib/constants';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { SemanticBadge } from '@/components/ui/semantic-badge';
 
 const salesSchema = z.object({
   contractNo: z.string().optional(),
@@ -91,6 +100,13 @@ export default function CreateSalesPage() {
     return sum + (Number(item.quantity) || 0) * (Number(item.sellingPrice) || 0);
   }, 0);
 
+  const totalCost = watchItems.reduce((sum, item) => {
+    return sum + (Number(item.quantity) || 0) * (Number(item.costPrice) || 0);
+  }, 0);
+
+  const totalProfit = totalAmount * (exchangeRate || DEFAULT_EXCHANGE_RATE) - totalCost;
+  const profitMargin = totalAmount > 0 ? (totalProfit / (totalAmount * (exchangeRate || DEFAULT_EXCHANGE_RATE))) * 100 : 0;
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -117,7 +133,6 @@ export default function CreateSalesPage() {
   // Auto-calculate selling price when cost price changes
   const handleCostChange = (index: number, cost: number) => {
     const price = salesService.calculatePrice(cost, exchangeRate, DEFAULT_PROFIT_RATE);
-    // We need to update the form value for sellingPrice
     const currentItem = form.getValues(`items.${index}`);
     update(index, { ...currentItem, costPrice: cost, sellingPrice: price });
   };
@@ -164,7 +179,29 @@ export default function CreateSalesPage() {
 
   const goToStep1 = () => setCurrentStep(1);
 
-  const steps = ['基本信息', '销售明细'];
+  const steps = [
+    { id: 1, label: '基本信息', description: '合同编号、日期、汇率' },
+    { id: 2, label: '销售明细', description: '门店、商品、定价' },
+  ];
+
+  const [storeSearch, setStoreSearch] = useState('');
+  const [productSearch, setProductSearch] = useState('');
+
+  const filteredStores = useMemo(() => {
+    if (!storeSearch.trim()) return stores;
+    const q = storeSearch.toLowerCase();
+    return stores.filter(s => s.name.toLowerCase().includes(q) || s.port?.name?.toLowerCase().includes(q));
+  }, [stores, storeSearch]);
+
+  const filteredProducts = useMemo(() => {
+    if (!productSearch.trim()) return products;
+    const q = productSearch.toLowerCase();
+    return products.filter(p =>
+      p.customsName?.toLowerCase().includes(q) ||
+      p.specification?.toLowerCase().includes(q) ||
+      p.hsCode?.toLowerCase().includes(q)
+    );
+  }, [products, productSearch]);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-10">
@@ -174,28 +211,43 @@ export default function CreateSalesPage() {
       />
 
       {/* Stepper */}
-      <div className="flex items-center justify-center gap-2">
-        {steps.map((step, idx) => (
-          <div key={step} className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCurrentStep(idx + 1)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                currentStep === idx + 1
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
-            >
-              <span className={`flex h-5 w-5 items-center justify-center rounded-full text-xs ${
-                currentStep === idx + 1 ? 'bg-primary-foreground text-primary' : 'bg-background text-muted-foreground'
-              }`}>
-                {idx + 1}
-              </span>
-              {step}
-            </button>
-            {idx < steps.length - 1 && <div className="h-px w-8 bg-border" />}
-          </div>
-        ))}
+      <div className="flex items-center justify-center">
+        <div className="flex items-center gap-0">
+          {steps.map((step, idx) => (
+            <div key={step.id} className="flex items-center">
+              <button
+                type="button"
+                onClick={() => step.id === 1 && setCurrentStep(1)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                  currentStep === step.id
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : currentStep > step.id
+                    ? 'bg-primary/10 text-primary'
+                    : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                  currentStep === step.id
+                    ? 'bg-primary-foreground text-primary'
+                    : currentStep > step.id
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background text-muted-foreground'
+                }`}>
+                  {currentStep > step.id ? <Check className="h-3.5 w-3.5" /> : step.id}
+                </div>
+                <div className="text-left hidden sm:block">
+                  <p className="text-sm font-medium leading-none">{step.label}</p>
+                  <p className={`text-[11px] mt-0.5 ${currentStep === step.id ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                    {step.description}
+                  </p>
+                </div>
+              </button>
+              {idx < steps.length - 1 && (
+                <div className={`w-8 h-px mx-1 ${currentStep > step.id ? 'bg-primary' : 'bg-border'}`} />
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       <Form {...form}>
@@ -203,7 +255,10 @@ export default function CreateSalesPage() {
           {currentStep === 1 && (
             <Card>
               <CardHeader>
-                <CardTitle>基本信息</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Container className="h-5 w-5 text-primary" />
+                  基本信息
+                </CardTitle>
               </CardHeader>
               <CardContent className="grid gap-6 md:grid-cols-3">
                 <FormField
@@ -268,164 +323,324 @@ export default function CreateSalesPage() {
               </CardContent>
               <div className="px-6 pb-6 flex justify-end gap-4">
                 <Button type="button" variant="outline" onClick={() => router.back()}>取消</Button>
-                <Button type="button" onClick={goToStep2}>下一步：销售明细</Button>
+                <Button type="button" onClick={goToStep2}>
+                  下一步：销售明细
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
               </div>
             </Card>
           )}
 
           {currentStep === 2 && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>销售明细</CardTitle>
-                <div className="text-lg font-bold">
-                  总计: ${totalAmount.toLocaleString()}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {fields.map((field, index) => (
-                  <div key={field.id} className="grid gap-4 md:grid-cols-12 items-end border-b pb-4">
-                    <div className="md:col-span-3">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.productId`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className={index !== 0 ? "sr-only" : ""}>
-                              商品 <span className="text-destructive">*</span>
-                            </FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="选择商品" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {products.map(p => (
-                                  <SelectItem key={p.id} value={p.id}>{p.customsName}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+            <div className="space-y-4">
+              {/* 利润概览 */}
+              <Card className="border-border/60">
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">合同总额</p>
+                      <p className="text-lg font-bold tabular-nums">${totalAmount.toLocaleString()}</p>
                     </div>
-
-                    <div className="md:col-span-3">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.storeId`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className={index !== 0 ? "sr-only" : ""}>
-                              门店 <span className="text-destructive">*</span>
-                            </FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="选择门店" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {stores.map(s => (
-                                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">总成本 (¥)</p>
+                      <p className="text-lg font-bold tabular-nums">¥{totalCost.toLocaleString()}</p>
                     </div>
-                    
-                    <div className="md:col-span-2">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.quantity`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className={index !== 0 ? "sr-only" : ""}>
-                              数量 <span className="text-destructive">*</span>
-                            </FormLabel>
-                            <FormControl>
-                              <Input type="number" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">预估利润 (¥)</p>
+                      <p className={`text-lg font-bold tabular-nums ${totalProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+                        ¥{Math.round(totalProfit).toLocaleString()}
+                      </p>
                     </div>
-
-                    <div className="md:col-span-2">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.costPrice`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className={index !== 0 ? "sr-only" : ""}>
-                              成本 (¥) <span className="text-destructive">*</span>
-                            </FormLabel>
-                            <FormControl>
-                              <Input 
-                                type="number" 
-                                {...field} 
-                                onChange={(e) => handleCostChange(index, parseFloat(e.target.value))}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.sellingPrice`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className={index !== 0 ? "sr-only" : ""}>
-                              售价 ($) <span className="text-destructive">*</span>
-                            </FormLabel>
-                            <div className="flex gap-2">
-                               <FormControl>
-                                <Input type="number" {...field} />
-                              </FormControl>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => remove(index)}
-                                aria-label={`删除第 ${index + 1} 行商品`}
-                                title="删除此行"
-                              >
-                                <Trash className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">利润率</p>
+                      <p className={`text-lg font-bold tabular-nums ${profitMargin >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+                        {profitMargin.toFixed(1)}%
+                      </p>
                     </div>
                   </div>
-                ))}
-                
-                <Button type="button" variant="outline" onClick={() => append({ productId: '', storeId: '', quantity: 0, unit: '', costPrice: 0, sellingPrice: 0, note: '' })}>
-                  <Plus className="h-4 w-4 mr-2" /> 添加商品
-                </Button>
-              </CardContent>
-              <div className="px-6 pb-6 flex justify-end gap-4">
-                <Button type="button" variant="outline" onClick={goToStep1}>上一步</Button>
-                <Button type="button" variant="outline" onClick={() => router.back()}>取消</Button>
-                <Button 
-                  type="submit" 
-                  size="lg"
-                  disabled={form.formState.isSubmitting}
-                >
-                  {form.formState.isSubmitting ? '提交中...' : '创建合同'}
-                </Button>
-              </div>
-            </Card>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-4">
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5 text-primary" />
+                    销售明细
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {fields.map((field, index) => (
+                    <div key={field.id} className="rounded-xl border border-border/60 p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          第 {index + 1} 项
+                        </span>
+                        {fields.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-destructive"
+                            onClick={() => remove(index)}
+                          >
+                            <Trash className="h-3.5 w-3.5 mr-1" />
+                            删除
+                          </Button>
+                        )}
+                      </div>
+
+                      <div className="grid gap-4 md:grid-cols-12 items-end">
+                        {/* 商品选择 */}
+                        <div className="md:col-span-4">
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.productId`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>
+                                  商品 <span className="text-destructive">*</span>
+                                </FormLabel>
+                                <div className="relative">
+                                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground z-10" />
+                                  <Input
+                                    placeholder="搜索商品..."
+                                    value={productSearch}
+                                    onChange={(e) => setProductSearch(e.target.value)}
+                                    className="pl-8 h-9 text-sm mb-1.5"
+                                  />
+                                </div>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger className="h-9">
+                                      <SelectValue placeholder="选择商品" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent className="max-h-[280px]">
+                                    {filteredProducts.map(p => (
+                                      <SelectItem key={p.id} value={p.id}>
+                                        <div className="flex items-center gap-2">
+                                          <Package className="h-3 w-3 text-muted-foreground" />
+                                          <span>{p.customsName}</span>
+                                          {p.hsCode && (
+                                            <span className="text-[10px] text-muted-foreground font-mono">HS:{p.hsCode}</span>
+                                          )}
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        {/* 门店选择 */}
+                        <div className="md:col-span-3">
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.storeId`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>
+                                  门店 <span className="text-destructive">*</span>
+                                </FormLabel>
+                                <div className="relative">
+                                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground z-10" />
+                                  <Input
+                                    placeholder="搜索门店..."
+                                    value={storeSearch}
+                                    onChange={(e) => setStoreSearch(e.target.value)}
+                                    className="pl-8 h-9 text-sm mb-1.5"
+                                  />
+                                </div>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger className="h-9">
+                                      <SelectValue placeholder="选择门店" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent className="max-h-[280px]">
+                                    {filteredStores.map(s => (
+                                      <SelectItem key={s.id} value={s.id}>
+                                        <div className="flex items-center gap-2">
+                                          <StoreIcon className="h-3 w-3 text-muted-foreground" />
+                                          <span>{s.name}</span>
+                                          {s.port?.name && (
+                                            <span className="text-[10px] text-muted-foreground">{s.port.name}</span>
+                                          )}
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
+                        <div className="md:col-span-2">
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.quantity`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>
+                                  数量 <span className="text-destructive">*</span>
+                                </FormLabel>
+                                <FormControl>
+                                  <Input type="number" {...field} className="h-9" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="md:col-span-3">
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.unit`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>单位</FormLabel>
+                                <FormControl>
+                                  <Input {...field} placeholder="件 / 箱 / kg" className="h-9" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+
+                      {/* 定价行 */}
+                      <div className="grid gap-4 md:grid-cols-12 items-end">
+                        <div className="md:col-span-3">
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.costPrice`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>
+                                  成本 (¥) <span className="text-destructive">*</span>
+                                </FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    {...field} 
+                                    className="h-9"
+                                    onChange={(e) => handleCostChange(index, parseFloat(e.target.value))}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="md:col-span-3">
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.sellingPrice`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>
+                                  售价 ($) <span className="text-destructive">*</span>
+                                </FormLabel>
+                                <FormControl>
+                                  <Input type="number" {...field} className="h-9" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        {/* 实时利润计算 */}
+                        <div className="md:col-span-6">
+                          <div className="rounded-lg bg-muted/50 p-3">
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                              <Calculator className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-[11px] text-muted-foreground">实时计算</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div>
+                                <p className="text-[10px] text-muted-foreground">小计 ($)</p>
+                                <p className="text-sm font-semibold tabular-nums">
+                                  ${(watchItems[index]?.quantity * watchItems[index]?.sellingPrice || 0).toLocaleString()}
+                                </p>
+                              </div>
+                              <div className="h-6 w-px bg-border" />
+                              <div>
+                                <p className="text-[10px] text-muted-foreground">成本 (¥)</p>
+                                <p className="text-sm font-semibold tabular-nums">
+                                  ¥{(watchItems[index]?.quantity * watchItems[index]?.costPrice || 0).toLocaleString()}
+                                </p>
+                              </div>
+                              <div className="h-6 w-px bg-border" />
+                              <div>
+                                <p className="text-[10px] text-muted-foreground">利润 (¥)</p>
+                                <p className={`text-sm font-semibold tabular-nums ${
+                                  ((watchItems[index]?.quantity * watchItems[index]?.sellingPrice || 0) * exchangeRate - 
+                                   (watchItems[index]?.quantity * watchItems[index]?.costPrice || 0)) >= 0 
+                                    ? 'text-emerald-600' : 'text-destructive'
+                                }`}>
+                                  ¥{Math.round(
+                                    (watchItems[index]?.quantity * watchItems[index]?.sellingPrice || 0) * exchangeRate -
+                                    (watchItems[index]?.quantity * watchItems[index]?.costPrice || 0)
+                                  ).toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.note`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>备注</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="可选备注" className="h-9" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => append({ productId: '', storeId: '', quantity: 0, unit: '', costPrice: 0, sellingPrice: 0, note: '' })}
+                    className="w-full h-10"
+                  >
+                    <Plus className="h-4 w-4 mr-2" /> 添加商品
+                  </Button>
+                </CardContent>
+                <div className="px-6 pb-6 flex justify-end gap-4">
+                  <Button type="button" variant="outline" onClick={goToStep1}>
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    上一步
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => router.back()}>取消</Button>
+                  <Button 
+                    type="submit" 
+                    size="lg"
+                    disabled={form.formState.isSubmitting}
+                  >
+                    {form.formState.isSubmitting ? '提交中...' : '创建合同'}
+                  </Button>
+                </div>
+              </Card>
+            </div>
           )}
         </form>
       </Form>

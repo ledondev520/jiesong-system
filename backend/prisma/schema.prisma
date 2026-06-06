@@ -1027,3 +1027,24 @@ model InvoiceRecord {
   @@index([status])
   @@map("invoice_records")
 }
+
+model AiUsageLog {
+  id        String   @id @default(uuid())
+  userId    String
+  userName  String?
+  action    String   // CHAT / PARSE / AGENT / HS_CODE
+  model     String   // kimi-k2-turbo-preview / gpt-4 / etc
+  promptTokens    Int      @default(0)
+  completionTokens Int     @default(0)
+  totalTokens     Int      @default(0)
+  durationMs  Int        @default(0)
+  status      String     // SUCCESS / ERROR
+  errorMessage String?
+  metadata    String?    // JSON string
+  createdAt   DateTime   @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("ai_usage_logs")
+}

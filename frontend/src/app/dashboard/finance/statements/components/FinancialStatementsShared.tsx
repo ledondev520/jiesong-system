@@ -17,7 +17,11 @@ import {
   CheckCircle2,
   TrendingDown,
   TrendingUp,
+  Minus,
+  ArrowUpRight,
+  ArrowDownRight,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { FinancialAlert, FinancialPeriod } from '@/services/financialStatements.service';
 
 export type StatementsBalanceSheet = NonNullable<FinancialPeriod['balanceSheet']>;
@@ -63,6 +67,7 @@ export function KpiCard({
   subValue,
   icon: Icon,
   trend,
+  trendValue,
   valueClass,
 }: {
   title: string;
@@ -70,13 +75,19 @@ export function KpiCard({
   subValue?: string;
   icon: ComponentType<{ className?: string }>;
   trend?: 'up' | 'down' | 'neutral';
+  trendValue?: string;
   valueClass?: string;
 }) {
+  const isUp = trend === 'up';
+  const isDown = trend === 'down';
+
   return (
-    <Card className="kpi-card">
+    <Card className="kpi-card relative overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
+        <div className="rounded-lg bg-primary/5 p-2 text-primary/70">
+          <Icon className="h-4 w-4" />
+        </div>
       </CardHeader>
       <CardContent>
         <div className={`text-2xl font-bold tracking-tight ${valueClass ?? ''}`}>{value}</div>
@@ -85,6 +96,23 @@ export function KpiCard({
             {trend === 'up' && <TrendingUp className="h-3 w-3 text-emerald-500" />}
             {trend === 'down' && <TrendingDown className="h-3 w-3 text-destructive" />}
             <p className="text-xs text-muted-foreground">{subValue}</p>
+          </div>
+        )}
+        {trendValue && (
+          <div className="mt-2 flex items-center gap-1.5">
+            <span
+              className={cn(
+                'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold',
+                isUp && 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400',
+                isDown && 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400',
+                !isUp && !isDown && 'bg-muted text-muted-foreground'
+              )}
+            >
+              {isUp && <ArrowUpRight className="h-3 w-3" />}
+              {isDown && <ArrowDownRight className="h-3 w-3" />}
+              {!isUp && !isDown && <Minus className="h-3 w-3" />}
+              {trendValue}
+            </span>
           </div>
         )}
       </CardContent>
@@ -131,18 +159,24 @@ export const ChartTooltipContent = ({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-lg border bg-background p-3 text-xs shadow-lg">
+    <div className="rounded-xl border border-border/80 bg-card/95 px-4 py-3 text-xs shadow-xl backdrop-blur-sm">
       <p className="mb-2 font-semibold text-foreground">{label}</p>
-      {payload.map((item, index) => (
-        <div key={`${item.name}-${index}`} className="flex items-center justify-between gap-4">
-          <span style={{ color: item.color }} className="font-medium">
-            {item.name}
-          </span>
-          <span className="font-mono text-foreground">
-            ¥{Number(item.value).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}
-          </span>
-        </div>
-      ))}
+      <div className="space-y-1.5">
+        {payload.map((item, index) => (
+          <div key={`${item.name}-${index}`} className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <span
+                className="inline-block h-2 w-2 rounded-full"
+                style={{ backgroundColor: item.color }}
+              />
+              <span className="font-medium text-muted-foreground">{item.name}</span>
+            </div>
+            <span className="font-mono font-bold text-foreground">
+              ¥{Number(item.value).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

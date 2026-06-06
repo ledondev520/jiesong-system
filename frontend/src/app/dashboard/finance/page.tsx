@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -33,16 +33,25 @@ import {
   Upload,
   Landmark,
   FileText,
+  Activity,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
+  Area,
+  AreaChart,
+  ComposedChart,
+  ReferenceLine,
 } from 'recharts';
 import Link from 'next/link';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -57,6 +66,8 @@ import { type ApiResponse } from '@/types';
 import { cachedFetch } from '@/lib/api-cache';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState, LoadingState } from '@/components/ui/data-state';
+import { KpiCard } from '@/components/finance/KpiCard';
+import { ChartTooltip } from '@/components/finance/ChartTooltip';
 
 interface PaymentTrendPoint {
   label: string;
@@ -84,6 +95,33 @@ interface ExchangeRate {
   rate: number;
   buffer: number;
   effectiveRate: number;
+}
+
+const FINANCE_COLORS = {
+  income: '#10b981',
+  expense: '#ef4444',
+  profit: '#3b82f6',
+  primary: 'hsl(var(--primary))',
+  warning: '#f59e0b',
+};
+
+function fmtCurrency(n: number, currency = '¥') {
+  return `${currency}${n.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
+
+function calcTrendDirection(current: number, previous: number): 'up' | 'down' | 'neutral' {
+  if (!previous || previous === 0) return 'neutral';
+  const diff = ((current - previous) / previous) * 100;
+  if (diff > 0.1) return 'up';
+  if (diff < -0.1) return 'down';
+  return 'neutral';
+}
+
+function calcTrendValue(current: number, previous: number): string {
+  if (!previous || previous === 0) return '环比持平';
+  const diff = ((current - previous) / previous) * 100;
+  const sign = diff > 0 ? '+' : '';
+  return `环比 ${sign}${diff.toFixed(1)}%`;
 }
 
 /**
@@ -142,6 +180,41 @@ export default function FinancePage() {
     void loadData(hasLoadedRef.current);
     hasLoadedRef.current = true;
   }, [loadData]);
+
+  // 计算同比/环比（基于 trends 数组最后两个点）
+  const { payableTrend, receivableTrend, payableTrendDir, receivableTrendDir } = useMemo(() => {
+    if (trends.length < 2) {
+      return {
+        payableTrend: '环比持平',
+        receivableTrend: '环比持平',
+        payableTrendDir: 'neutral' as const,
+        receivableTrendDir: 'neutral' as const,
+      };
+    }
+    const last = trends[trends.length - 1];
+    const prev = trends[trends.length - 2];
+    return {
+      payableTrend: calcTrendValue(last.payables, prev.payables),
+      receivableTrend: calcTrendValue(last.receivables, prev.receivables),
+      payableTrendDir: calcTrendDirection(last.payables, prev.payables),
+      receivableTrendDir: calcTrendDirection(last.receivables, prev.receivables),
+    };
+  }, [trends]);
+
+  // 现金流预测（简单线性外推）
+  const cashFlowForecast = useMemo(() => {
+    if (trends.length < 2) return [];
+    const last = trends[trends.length - 1];
+    const prev = trends[trends.length - 2];
+    const delta = (last.receivables - last.payables) - (prev.receivables - prev.payables);
+    const base = last.receivables - last.payables;
+    return [
+      { label: `${last.label} (实际)`, value: base, type: 'actual' },
+      { label: '预测 +1期', value: base + delta, type: 'forecast' },
+      { label: '预测 +2期', value: base + delta * 2, type: 'forecast' },
+      { label: '预测 +3期', value: base + delta * 3, type: 'forecast' },
+    ];
+  }, [trends]);
 
   if (loading) {
     return (
@@ -213,7 +286,7 @@ export default function FinancePage() {
       />
 
       <section className="space-y-4">
-        <Card className="border-primary/20 bg-primary/5">
+        <Card className="border-primary/20 bg-primary/[0.03]">
           <CardContent className="space-y-4 pt-6">
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">财务故事流</p>
@@ -244,7 +317,7 @@ export default function FinancePage() {
       {hasData && (
         <div className="grid gap-3 grid-cols-1 md:grid-cols-3">
           {/* 汇率卡 */}
-          <Card className="border-primary/20 bg-primary/5">
+          <Card className="border-primary/20 bg-primary/[0.03]">
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -265,19 +338,19 @@ export default function FinancePage() {
           </Card>
 
           {/* 应付完成率 */}
-          <Card className={payableUrgent ? 'border-destructive/40 bg-destructive/5' : 'border-green-500/30 bg-green-50/30 dark:bg-green-950/10'}>
+          <Card className={payableUrgent ? 'border-destructive/40 bg-destructive/5' : 'border-emerald-500/30 bg-emerald-50/30 dark:bg-emerald-950/10'}>
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-medium text-muted-foreground">应付账款完成率</p>
                 {payableUrgent
                   ? <AlertTriangle className="h-4 w-4 text-destructive" />
-                  : <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  : <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                 }
               </div>
               <p className="text-2xl font-bold tabular-nums mb-2">{payableRate}%</p>
               <Progress
                 value={payableRate}
-                className={`h-2 ${payableUrgent ? '[&>div]:bg-destructive' : '[&>div]:bg-green-600'}`}
+                className={`h-2 ${payableUrgent ? '[&>div]:bg-destructive' : '[&>div]:bg-emerald-600'}`}
               />
               <p className="text-xs text-muted-foreground mt-1.5">
                 已付 ¥{(stats?.payable.paid ?? 0).toLocaleString()} / 总额 ¥{(stats?.payable.total ?? 0).toLocaleString()}
@@ -286,19 +359,19 @@ export default function FinancePage() {
           </Card>
 
           {/* 应收完成率 */}
-          <Card className={receivableUrgent ? 'border-amber-500/40 bg-amber-50/30 dark:bg-amber-950/10' : 'border-green-500/30 bg-green-50/30 dark:bg-green-950/10'}>
+          <Card className={receivableUrgent ? 'border-amber-500/40 bg-amber-50/30 dark:bg-amber-950/10' : 'border-emerald-500/30 bg-emerald-50/30 dark:bg-emerald-950/10'}>
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-medium text-muted-foreground">应收账款完成率</p>
                 {receivableUrgent
                   ? <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  : <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  : <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                 }
               </div>
               <p className="text-2xl font-bold tabular-nums mb-2">{receivableRate}%</p>
               <Progress
                 value={receivableRate}
-                className={`h-2 ${receivableUrgent ? '[&>div]:bg-amber-500' : '[&>div]:bg-green-600'}`}
+                className={`h-2 ${receivableUrgent ? '[&>div]:bg-amber-500' : '[&>div]:bg-emerald-600'}`}
               />
               <p className="text-xs text-muted-foreground mt-1.5">
                 已收 USD {(stats?.receivable.received ?? 0).toLocaleString()} / 总额 USD {(stats?.receivable.total ?? 0).toLocaleString()}
@@ -308,90 +381,51 @@ export default function FinancePage() {
         </div>
       )}
 
-      {/* 四象KPI区域 */}
+      {/* 四象KPI区域 - 使用专业卡片 */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-4">
-        {/* 应付总额 */}
-        <Card className="kpi-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">应付账款总额</CardTitle>
-            <ArrowUpRight className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tabular-nums text-primary">
-              ¥{(stats?.payable.total ?? 0).toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              已付 ¥{(stats?.payable.paid ?? 0).toLocaleString()}
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* 待付账款 */}
-        <Card className={`kpi-card ${payableUrgent ? 'border-destructive/30' : ''}`}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-1">
-              待付账款
-              {payableUrgent && (
-                <Badge variant="destructive" className="text-[10px] px-1 py-0 h-4">待处理</Badge>
-              )}
-            </CardTitle>
-            <Wallet className={`h-4 w-4 ${payableUrgent ? 'text-destructive' : 'text-muted-foreground'}`} />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-3xl font-bold tabular-nums ${payableUrgent ? 'text-destructive' : ''}`}>
-              ¥{(stats?.payable.unpaid ?? 0).toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {payableUrgent ? '⚠ 超过总额50%，建议优先处理' : '尚未支付给供应商'}
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* 应收总额 */}
-        <Card className="kpi-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">应收账款总额</CardTitle>
-            <ArrowDownLeft className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tabular-nums text-primary">
-              USD {(stats?.receivable.total ?? 0).toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              已收 USD {(stats?.receivable.received ?? 0).toLocaleString()}
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* 待收账款 */}
-        <Card className={`kpi-card ${receivableUrgent ? 'border-amber-500/30' : ''}`}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-1">
-              待收账款
-              {receivableUrgent && (
-                <Badge className="text-[10px] px-1 py-0 h-4 bg-amber-500 hover:bg-amber-500">催收</Badge>
-              )}
-            </CardTitle>
-            <DollarSign className={`h-4 w-4 ${receivableUrgent ? 'text-amber-600' : 'text-muted-foreground'}`} />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-3xl font-bold tabular-nums ${receivableUrgent ? 'text-amber-600' : ''}`}>
-              USD {(stats?.receivable.unreceived ?? 0).toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {receivableUrgent ? '⚠ 当前客户剩余欠款偏高，建议优先跟进' : '当前客户剩余欠款'}
-            </p>
-          </CardContent>
-        </Card>
+        <KpiCard
+          label="应付账款总额"
+          value={`¥${(stats?.payable.total ?? 0).toLocaleString()}`}
+          subLabel={`已付 ¥${(stats?.payable.paid ?? 0).toLocaleString()}`}
+          trend={payableTrendDir}
+          trendValue={payableTrend}
+          icon={<ArrowUpRight className="h-4 w-4" />}
+        />
+        <KpiCard
+          label="待付账款"
+          value={`¥${(stats?.payable.unpaid ?? 0).toLocaleString()}`}
+          subLabel={payableUrgent ? '超过总额50%，建议优先处理' : '尚未支付给供应商'}
+          trend="down"
+          trendValue={payableUrgent ? '高风险' : '正常'}
+          icon={<Wallet className="h-4 w-4" />}
+          valueClassName={payableUrgent ? 'text-destructive' : undefined}
+        />
+        <KpiCard
+          label="应收账款总额"
+          value={`USD ${(stats?.receivable.total ?? 0).toLocaleString()}`}
+          subLabel={`已收 USD ${(stats?.receivable.received ?? 0).toLocaleString()}`}
+          trend={receivableTrendDir}
+          trendValue={receivableTrend}
+          icon={<ArrowDownLeft className="h-4 w-4" />}
+        />
+        <KpiCard
+          label="待收账款"
+          value={`USD ${(stats?.receivable.unreceived ?? 0).toLocaleString()}`}
+          subLabel={receivableUrgent ? '当前客户剩余欠款偏高，建议优先跟进' : '当前客户剩余欠款'}
+          trend="neutral"
+          trendValue={receivableUrgent ? '需跟进' : '正常'}
+          icon={<DollarSign className="h-4 w-4" />}
+          valueClassName={receivableUrgent ? 'text-amber-600' : undefined}
+        />
       </div>
 
-      {/* 收付款趋势折线图 */}
+      {/* 收支对比柱状图 */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div>
-            <CardTitle className="text-sm font-medium">收付款趋势</CardTitle>
+            <CardTitle className="text-sm font-medium">收支对比</CardTitle>
             <CardDescription className="text-xs">
-              {trendDays === 30 ? '近 30 天' : '近 90 天'}按周统计的资金流向
+              {trendDays === 30 ? '近 30 天' : '近 90 天'} 应收 vs 应付资金对比
             </CardDescription>
           </div>
           <div className="flex gap-1.5">
@@ -422,44 +456,75 @@ export default function FinancePage() {
               className="py-10"
             />
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={trends} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} width={50} />
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={trends} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} width={50} axisLine={false} tickLine={false} />
                 <Tooltip
-                  formatter={
-                    /* Recharts Formatter generics require exact overload match; cast avoids inference errors */
-                    ((value: number | string | undefined, name: string | undefined) => [
-                      Number(value ?? 0).toLocaleString(),
-                      (name ?? '') === 'receivables' ? '应收回款' : '应付付款',
-                    ]) as Parameters<typeof Tooltip>[0]['formatter']
+                  content={
+                    <ChartTooltip
+                      valueFormatter={(v) => Number(v).toLocaleString('zh-CN')}
+                    />
                   }
                 />
                 <Legend
                   formatter={(value) => value === 'receivables' ? '应收回款 (USD)' : '应付付款 (CNY)'}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="receivables"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                  activeDot={{ r: 5 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="payables"
-                  stroke="hsl(var(--destructive))"
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                  activeDot={{ r: 5 }}
-                />
-              </LineChart>
+                <Bar dataKey="receivables" name="receivables" fill={FINANCE_COLORS.income} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="payables" name="payables" fill={FINANCE_COLORS.expense} radius={[4, 4, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
           )}
         </CardContent>
       </Card>
+
+      {/* 现金流预测 */}
+      {cashFlowForecast.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <Activity className="h-4 w-4 text-primary" />
+              现金流预测
+            </CardTitle>
+            <CardDescription className="text-xs">
+              基于近期收支趋势线性外推（单位：USD/CNY 混合）
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={cashFlowForecast} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="forecastGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={FINANCE_COLORS.profit} stopOpacity={0.2} />
+                    <stop offset="95%" stopColor={FINANCE_COLORS.profit} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} width={50} axisLine={false} tickLine={false} />
+                <Tooltip
+                  content={
+                    <ChartTooltip
+                      valueFormatter={(v) => Number(v).toLocaleString('zh-CN')}
+                    />
+                  }
+                />
+                <ReferenceLine y={0} stroke="var(--border)" />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke={FINANCE_COLORS.profit}
+                  fill="url(#forecastGradient)"
+                  strokeWidth={2}
+                  dot={{ r: 4, fill: FINANCE_COLORS.profit, strokeWidth: 2, stroke: 'var(--background)' }}
+                  activeDot={{ r: 6 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* 银行流水 & 发票台账摘要 */}
       {(bankStats || invStats) && (
@@ -480,7 +545,7 @@ export default function FinancePage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-xs text-muted-foreground">总收入</p>
-                      <p className="text-base font-bold text-green-600 tabular-nums">
+                      <p className="text-base font-bold text-emerald-600 tabular-nums">
                         ¥{bankStats.totalIn.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </div>
@@ -492,7 +557,7 @@ export default function FinancePage() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">净现金流</p>
-                      <p className={`text-base font-bold tabular-nums ${bankStats.netFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <p className={`text-base font-bold tabular-nums ${bankStats.netFlow >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                         ¥{bankStats.netFlow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </div>
@@ -552,11 +617,11 @@ export default function FinancePage() {
 
       {/* 应收逾期预警 */}
       {overdueList.length > 0 && (
-        <Card className="border-amber-500/40 bg-amber-50/20 dark:bg-amber-950/10">
+        <Card className="border-red-500/40 bg-red-50/20 dark:bg-red-950/10">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-600" />
-              <CardTitle className="text-sm font-medium text-amber-800 dark:text-amber-400">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <CardTitle className="text-sm font-medium text-red-800 dark:text-red-400">
                 应收逾期预警 · {overdueList.length} 单待催收
               </CardTitle>
             </div>
@@ -569,15 +634,15 @@ export default function FinancePage() {
               {overdueList.slice(0, 5).map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between rounded-md border border-amber-200/50 bg-background px-3 py-2 text-sm"
+                  className="flex items-center justify-between rounded-md border border-red-200/50 bg-background px-3 py-2 text-sm"
                 >
                   <div className="flex items-center gap-3">
                     <span className="font-mono font-medium">{item.contractNo}</span>
-                    <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-700 dark:text-amber-400">
+                    <Badge variant="outline" className="text-xs border-red-500/50 text-red-700 dark:text-red-400">
                       逾期 {item.overdueDays} 天
                     </Badge>
                   </div>
-                  <span className="tabular-nums text-amber-700 dark:text-amber-400 font-medium">
+                  <span className="tabular-nums text-red-700 dark:text-red-400 font-medium">
                     USD {item.unreceived.toLocaleString()}
                   </span>
                 </div>
@@ -640,7 +705,7 @@ export default function FinancePage() {
         </Link>
 
         <Link href="/dashboard/finance/statements" className="group">
-          <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm border-primary/20 bg-primary/5">
+          <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm border-primary/20 bg-primary/[0.03]">
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
                 <div>
