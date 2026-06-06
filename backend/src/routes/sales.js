@@ -1,10 +1,11 @@
 /**
  * Input: 销售控制器、exportService
- * Output: 出口合同管理路由（含装箱管理、Excel 导出）
+ * Output: 出口合同管理路由（含装箱管理、Excel/PDF 导出和源文件附件）
  * Pos: 销售路由，处理出口合同CRUD操作
  * 
  * 2026-01-20 重构：合并货柜功能，EXP号即货柜号
  * 2026-02-21 新增：GET /:id/export-excel 生成三 Sheet 标准出口 Excel
+ * 2026-06-03 新增：/:id/files 出口源文件附件上传、列表、下载、删除
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -16,6 +17,7 @@ const { exportSalesContractPdf } = require('../services/pdfExportService');
 const { authenticate, roleAuth } = require('../middleware/auth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
+const { upload } = require('../utils/upload');
 
 const router = Router();
 const WRITE_ROLES = ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'];
@@ -82,6 +84,24 @@ router.delete('/:id/packing-items/:itemId', withIdValidation, roleAuth(...WRITE_
 ));
 
 // ==================== 其他功能 ====================
+
+// POST /api/v1/sales/:id/files - 上传出口合同附件
+router.post('/:id/files', withIdValidation, roleAuth(...WRITE_ROLES), upload.single('file'), withAuditLog(
+  { entity: 'SalesContractFile', action: 'CREATE', model: 'salesContractFile' },
+  salesController.uploadFile
+));
+
+// GET /api/v1/sales/:id/files - 获取出口合同附件列表
+router.get('/:id/files', withIdValidation, salesController.getFiles);
+
+// DELETE /api/v1/sales/files/:fileId - 删除出口合同附件
+router.delete('/files/:fileId', roleAuth(...WRITE_ROLES), withAuditLog(
+  { entity: 'SalesContractFile', action: 'DELETE', model: 'salesContractFile', idParam: 'fileId' },
+  salesController.deleteFile
+));
+
+// GET /api/v1/sales/files/:fileId/download - 下载出口合同附件
+router.get('/files/:fileId/download', salesController.downloadFile);
 
 // PUT /api/v1/sales/:id/status - 更新合同状态
 router.put('/:id/status', withIdValidation, roleAuth(...WRITE_ROLES), withAuditLog(

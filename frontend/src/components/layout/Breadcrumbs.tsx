@@ -1,0 +1,92 @@
+/**
+ * Input: 当前 pathname、路由配置
+ * Output: 面包屑导航组件
+ * Pos: 全局面包屑，显示用户当前位置
+ */
+
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { ChevronRight, Home } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+const routeLabelMap: Record<string, string> = {
+  dashboard: '工作台',
+  contracts: '采购合同',
+  purchase: '采购',
+  sales: '销售合同',
+  suppliers: '供应商',
+  products: '商品档案',
+  inventory: '库存',
+  finance: '财务',
+  payments: '收付款',
+  statements: '财务报表',
+  'bank-flow': '银行流水',
+  'hs-codes': 'HS编码',
+  'tax-refunds': '退税',
+  'customs-declarations': '报关单',
+  settings: '设置',
+  users: '用户管理',
+  'store-recommend': '门店推荐',
+  import: '导入记录',
+  about: '关于',
+  dev: '开发',
+  ai: 'AI助手',
+  create: '创建',
+  edit: '编辑',
+  template: '模板',
+  templates: '模板管理',
+  'ops-execution': '经营执行',
+};
+
+export function Breadcrumbs({ className }: { className?: string }) {
+  const pathname = usePathname();
+  if (!pathname || pathname === '/dashboard') return null;
+
+  const segments = pathname
+    .replace(/^\/dashboard\/?/, '')
+    .split('/')
+    .filter(Boolean);
+
+  const crumbs = segments.map((segment, index) => {
+    const href = '/dashboard/' + segments.slice(0, index + 1).join('/');
+    const label = routeLabelMap[segment] || segment;
+    const isLast = index === segments.length - 1;
+    return { href, label, isLast };
+  });
+
+  return (
+    <nav
+      aria-label="面包屑"
+      className={cn(
+        'flex items-center gap-1.5 text-sm text-muted-foreground',
+        className,
+      )}
+    >
+      <Link
+        href="/dashboard"
+        className="flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors hover:bg-accent hover:text-foreground"
+      >
+        <Home className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">工作台</span>
+      </Link>
+
+      {crumbs.map((crumb) => (
+        <div key={crumb.href} className="flex items-center gap-1.5">
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />
+          {crumb.isLast ? (
+            <span className="font-medium text-foreground">{crumb.label}</span>
+          ) : (
+            <Link
+              href={crumb.href}
+              className="rounded-md px-1.5 py-0.5 transition-colors hover:bg-accent hover:text-foreground"
+            >
+              {crumb.label}
+            </Link>
+          )}
+        </div>
+      ))}
+    </nav>
+  );
+}

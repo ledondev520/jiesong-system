@@ -28,7 +28,7 @@
 | storeController.js | 门店管理 CRUD + 港口 |
 | productController.js | 商品管理 + 历史价格 |
 | purchaseController.js | 采购合同 + 文件上传 |
-| salesController.js | 出口合同 + 价格计算 |
+| salesController.js | 出口合同 + 价格计算 + 源文件附件 |
 | containerController.js | 货柜管理 + 装箱明细 |
 | inventoryController.js | 库存状态管理 |
 | financeController.js | 付款与账款管理 |
@@ -45,6 +45,7 @@
 | importService.js | CSV数据解析与导入 |
 | exportService.js | 多格式数据导出 (CSV) |
 | pdfExportService.js | 销售合同 / 系统数据 PDF 导出 |
+| patrolService.js | 业务 / 系统巡检、管理员通知、系统操作日志 |
 
 ## 工具清单
 

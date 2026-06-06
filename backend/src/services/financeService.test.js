@@ -316,6 +316,7 @@ test('autoMatchUnallocatedPayments: 命中唯一合同号且金额一致时自�
   const originalPaymentFindMany = prisma.payment.findMany;
   const originalPaymentFindUnique = prisma.payment.findUnique;
   const originalSalesContractFindUnique = prisma.salesContract.findUnique;
+  const originalSalesContractFindMany = prisma.salesContract.findMany;
   const originalTransaction = prisma.$transaction;
   let createArgs = null;
   let paymentUpdateArgs = null;
@@ -343,6 +344,15 @@ test('autoMatchUnallocatedPayments: 命中唯一合同号且金额一致时自�
     }
     return null;
   };
+  prisma.salesContract.findMany = async () => ([
+    {
+      id: 'sc-24',
+      contractNo: 'EXP250024',
+      totalAmount: 68006,
+      receivedAmount: 0,
+      status: 'SHIPPED',
+    },
+  ]);
   prisma.payment.findUnique = async ({ where }) => {
     if (where.id === 'receipt-1') {
       return {
@@ -400,6 +410,7 @@ test('autoMatchUnallocatedPayments: 命中唯一合同号且金额一致时自�
     prisma.payment.findMany = originalPaymentFindMany;
     prisma.payment.findUnique = originalPaymentFindUnique;
     prisma.salesContract.findUnique = originalSalesContractFindUnique;
+    prisma.salesContract.findMany = originalSalesContractFindMany;
     prisma.$transaction = originalTransaction;
   }
 });
@@ -407,6 +418,7 @@ test('autoMatchUnallocatedPayments: 命中唯一合同号且金额一致时自�
 test('autoMatchUnallocatedPayments: 备注模糊或金额不一致时保留在收款池', async () => {
   const originalPaymentFindMany = prisma.payment.findMany;
   const originalSalesContractFindUnique = prisma.salesContract.findUnique;
+  const originalSalesContractFindMany = prisma.salesContract.findMany;
   const originalPaymentFindUnique = prisma.payment.findUnique;
   const originalTransaction = prisma.$transaction;
   let transactionCalled = false;
@@ -441,6 +453,15 @@ test('autoMatchUnallocatedPayments: 备注模糊或金额不一致时保留在�
     }
     return null;
   };
+  prisma.salesContract.findMany = async () => ([
+    {
+      id: 'sc-24',
+      contractNo: 'EXP250024',
+      totalAmount: 68006,
+      receivedAmount: 0,
+      status: 'SHIPPED',
+    },
+  ]);
   prisma.payment.findUnique = async () => {
     throw new Error('should not try allocate skipped receipts');
   };
@@ -463,6 +484,7 @@ test('autoMatchUnallocatedPayments: 备注模糊或金额不一致时保留在�
   } finally {
     prisma.payment.findMany = originalPaymentFindMany;
     prisma.salesContract.findUnique = originalSalesContractFindUnique;
+    prisma.salesContract.findMany = originalSalesContractFindMany;
     prisma.payment.findUnique = originalPaymentFindUnique;
     prisma.$transaction = originalTransaction;
   }
@@ -599,30 +621,35 @@ test('getReceivables: 只统计捷淞自有货物金额', async () => {
 test('getStats: 排除第三方拼柜金额后计算真实应收', async () => {
   const originalPurchaseAggregate = prisma.purchaseContract.aggregate;
   const originalSalesFindMany = prisma.salesContract.findMany;
+  const originalPackingItemGroupBy = prisma.packingItem.groupBy;
 
   prisma.purchaseContract.aggregate = async () => ({
     _sum: { totalAmount: 1000, paidAmount: 200 },
   });
   prisma.salesContract.findMany = async () => ([
     {
+      id: 'contract-1',
       totalAmount: 903233.0524,
       receivedAmount: 0,
-      packingItems: [
-        { totalPrice: 774800, isOwnedByJiesong: false, note: '非捷淞报关，属拼船或他方自行报关' },
-        { totalPrice: 83578.05, isOwnedByJiesong: true, note: null },
-        { totalPrice: 11100, isOwnedByJiesong: true, note: null },
-      ],
     },
     {
+      id: 'contract-2',
       totalAmount: 3130,
       receivedAmount: 0,
-      packingItems: [
-        { totalPrice: 600, isOwnedByJiesong: true, note: null },
-        { totalPrice: 100, isOwnedByJiesong: true, note: null },
-        { totalPrice: 880, isOwnedByJiesong: false, note: '共用发票' },
-      ],
     },
   ]);
+  prisma.packingItem.groupBy = async ({ where }) => {
+    if (where.isOwnedByJiesong === false) {
+      return [
+        { salesContractId: 'contract-1', _sum: { totalPrice: 774800 } },
+        { salesContractId: 'contract-2', _sum: { totalPrice: 880 } },
+      ];
+    }
+    return [
+      { salesContractId: 'contract-1', _sum: { totalPrice: 869478.05 } },
+      { salesContractId: 'contract-2', _sum: { totalPrice: 1580 } },
+    ];
+  };
 
   try {
     const stats = await financeService.getStats();
@@ -642,5 +669,6 @@ test('getStats: 排除第三方拼柜金额后计算真实应收', async () => {
   } finally {
     prisma.purchaseContract.aggregate = originalPurchaseAggregate;
     prisma.salesContract.findMany = originalSalesFindMany;
+    prisma.packingItem.groupBy = originalPackingItemGroupBy;
   }
 });

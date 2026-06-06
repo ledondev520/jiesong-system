@@ -5,7 +5,7 @@
 FROM node:20-alpine AS base
 
 # 安装必要的系统依赖
-RUN apk add --no-cache python3 make g++ sqlite
+RUN apk add --no-cache python3 make g++ postgresql-client
 
 # 工作目录
 WORKDIR /app

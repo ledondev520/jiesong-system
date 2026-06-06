@@ -28,7 +28,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => ({
     get: (...args: unknown[]) => mockSearchParamGet(...args),
   }),
-  usePathname: () => '/customs-declarations',
+  usePathname: () => '/dashboard/customs-declarations',
 }));
 
 vi.mock('@/services/customsDeclaration.service', () => ({
@@ -152,7 +152,7 @@ describe('CustomsDeclarationsPage 交互逻辑', () => {
     });
 
     await user.click(screen.getByRole('button', { name: /查看详情 CUS-2026-002/ }));
-    expect(mockRouterPush).toHaveBeenCalledWith('/customs-declarations/cd-2');
+    expect(mockRouterPush).toHaveBeenCalledWith('/dashboard/customs-declarations/cd-2');
   });
 
   it('加载失败时提示错误', async () => {

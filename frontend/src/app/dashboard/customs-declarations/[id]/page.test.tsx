@@ -140,7 +140,7 @@ describe('CustomsDeclarationDetailPage 交互逻辑', () => {
     });
 
     await user.click(screen.getByRole('button', { name: '编辑报关单' }));
-    expect(mockRouterPush).toHaveBeenCalledWith('/customs-declarations/cd-1/edit');
+    expect(mockRouterPush).toHaveBeenCalledWith('/dashboard/customs-declarations/cd-1/edit');
   });
 
   it('加载失败时提示错误', async () => {

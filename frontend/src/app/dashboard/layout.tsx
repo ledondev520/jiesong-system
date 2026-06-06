@@ -13,6 +13,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 import { MobileTabBar } from '@/components/layout/MobileTabBar';
 import { NetworkStatus } from '@/components/ui/network-status';
 import { getDefaultDashboardHref, getModuleByPath, getVisibleModuleNavItems } from '@/components/layout/navigation.config';
@@ -128,6 +129,7 @@ export default function DashboardLayout({
           className="flex min-w-0 flex-1 flex-col gap-6 px-4 py-5 md:px-6 lg:px-8"
           style={{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom) + 1.25rem)' }}
         >
+          <Breadcrumbs />
           {children}
         </main>
       </div>

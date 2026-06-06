@@ -153,26 +153,27 @@ export function DataDashboard() {
 
   if (loading) {
     return (
-      <div className="grid gap-6">
+      <div className="space-y-8">
         <section className="space-y-3" aria-labelledby="dashboard-focus-heading">
-          <h2 id="dashboard-focus-heading" className="text-base font-semibold text-foreground">当前焦点</h2>
-          <Card>
-            <CardContent className="flex h-40 items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <h3 id="dashboard-focus-heading" className="text-sm font-semibold text-foreground">优先处理</h3>
+          <Card className="border-border/40">
+            <CardContent className="flex h-48 items-center justify-center">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/60" />
             </CardContent>
           </Card>
         </section>
         <section className="space-y-3" aria-labelledby="dashboard-risk-heading">
-          <h2 id="dashboard-risk-heading" className="text-base font-semibold text-foreground">风险提醒</h2>
-          <Card>
-            <CardContent className="h-24 animate-pulse rounded-xl bg-muted/40" />
-          </Card>
+          <h3 id="dashboard-risk-heading" className="text-sm font-semibold text-foreground">需关注</h3>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <Card className="border-border/40"><CardContent className="h-24 animate-pulse rounded-xl bg-muted/30" /></Card>
+            <Card className="border-border/40"><CardContent className="h-24 animate-pulse rounded-xl bg-muted/30" /></Card>
+          </div>
         </section>
         <section className="space-y-3" aria-labelledby="dashboard-trend-heading">
-          <h2 id="dashboard-trend-heading" className="text-base font-semibold text-foreground">关键趋势</h2>
+          <h3 id="dashboard-trend-heading" className="text-sm font-semibold text-foreground">经营趋势</h3>
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card><CardContent className="h-56 animate-pulse rounded-xl bg-muted/40" /></Card>
-            <Card><CardContent className="h-56 animate-pulse rounded-xl bg-muted/40" /></Card>
+            <Card className="border-border/40"><CardContent className="h-60 animate-pulse rounded-xl bg-muted/30" /></Card>
+            <Card className="border-border/40"><CardContent className="h-60 animate-pulse rounded-xl bg-muted/30" /></Card>
           </div>
         </section>
       </div>
@@ -182,12 +183,14 @@ export function DataDashboard() {
   if (error || !data) {
     return (
       <section className="space-y-3" aria-labelledby="dashboard-focus-heading">
-        <h2 id="dashboard-focus-heading" className="text-base font-semibold text-foreground">当前焦点</h2>
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-            <AlertCircle className="h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">数据加载失败，请重试</p>
-            <Button variant="outline" size="sm" onClick={fetchData}>重新加载</Button>
+        <h3 id="dashboard-focus-heading" className="text-sm font-semibold text-foreground">优先处理</h3>
+        <Card className="border-border/40">
+          <CardContent className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+            <span className="rounded-full bg-muted/60 p-4">
+              <AlertCircle className="h-6 w-6 text-muted-foreground/70" />
+            </span>
+            <p className="text-sm text-muted-foreground/80">数据加载失败，请重试</p>
+            <Button variant="outline" size="sm" className="rounded-lg h-9 px-4" onClick={fetchData}>重新加载</Button>
           </CardContent>
         </Card>
       </section>
@@ -198,27 +201,31 @@ export function DataDashboard() {
   const risks = deriveRiskItems(data);
 
   return (
-    <div className="space-y-6">
-      <section className="space-y-3" aria-labelledby="dashboard-focus-heading">
-        <h2 id="dashboard-focus-heading" className="text-base font-semibold text-foreground">当前焦点</h2>
-        <Card className="border-primary/20 bg-primary/5">
-          <CardContent className="grid gap-6 pt-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background px-3 py-1 text-xs font-medium text-primary">
+    <div className="space-y-8">
+      {/* 优先处理 */}
+      <section className="space-y-4" aria-labelledby="dashboard-focus-heading">
+        <h3 id="dashboard-focus-heading" className="text-sm font-semibold text-foreground">优先处理</h3>
+        <Card className="group relative overflow-hidden border-primary/10 bg-primary/[0.03] transition-all duration-300 hover:border-primary/18 hover:shadow-md">
+          <div className="absolute inset-x-0 top-0 h-px bg-primary/15" />
+          <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-primary/[0.05] blur-3xl transition-opacity group-hover:opacity-100" />
+
+          <CardContent className="relative grid gap-6 pt-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/12 bg-background/70 px-3.5 py-1.5 text-xs font-semibold text-primary shadow-sm">
                 <ArrowUpRight className="h-3.5 w-3.5" />
                 今日优先事项
               </div>
               <div>
-                <h3 className="text-2xl font-semibold tracking-tight text-foreground">{focus.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">{focus.description}</p>
+                <h3 className="text-[1.35rem] font-bold tracking-tight text-foreground">{focus.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground/80">{focus.description}</p>
               </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
               {focus.metrics.map((metric) => (
-                <div key={metric.label} className="rounded-xl border bg-background/80 p-4">
-                  <p className="text-xs text-muted-foreground">{metric.label}</p>
-                  <p className="mt-2 text-xl font-semibold text-foreground">{metric.value}</p>
+                <div key={metric.label} className="rounded-xl border border-border/40 bg-background/60 p-4 transition-all duration-200 hover:border-primary/15 hover:bg-background/80 hover:shadow-sm">
+                  <p className="text-xs font-medium text-muted-foreground/80">{metric.label}</p>
+                  <p className="mt-2 text-xl font-bold tabular-nums tracking-tight text-foreground">{metric.value}</p>
                 </div>
               ))}
             </div>
@@ -226,27 +233,34 @@ export function DataDashboard() {
         </Card>
       </section>
 
-      <section className="space-y-3" aria-labelledby="dashboard-risk-heading">
-        <h2 id="dashboard-risk-heading" className="text-base font-semibold text-foreground">风险提醒</h2>
+      {/* 需关注 */}
+      <section className="space-y-4" aria-labelledby="dashboard-risk-heading">
+        <h3 id="dashboard-risk-heading" className="text-sm font-semibold text-foreground">需关注</h3>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {risks.length > 0 ? (
             risks.map((risk) => (
-              <Card key={`${risk.title}-${risk.value}`}>
-                <CardContent className="flex items-start gap-3 pt-6">
-                  <span className={risk.tone === 'high' ? 'mt-0.5 text-destructive' : 'mt-0.5 text-amber-600'}>
+              <Card key={`${risk.title}-${risk.value}`} className="group border-border/40 transition-all duration-200 hover:border-border/60 hover:shadow-sm">
+                <CardContent className="flex items-start gap-3.5 pt-6">
+                  <span className={
+                    risk.tone === 'high'
+                      ? 'mt-0.5 rounded-xl bg-destructive/8 p-2 text-destructive ring-1 ring-destructive/15'
+                      : 'mt-0.5 rounded-xl bg-amber-500/8 p-2 text-amber-600 ring-1 ring-amber-500/15'
+                  }>
                     <AlertTriangle className="h-4 w-4" />
                   </span>
                   <div className="space-y-1">
-                    <p className="text-sm font-medium text-foreground">{risk.title}</p>
-                    <p className="text-sm text-muted-foreground">{risk.value}</p>
+                    <p className="text-sm font-semibold text-foreground">{risk.title}</p>
+                    <p className="text-sm text-muted-foreground/80">{risk.value}</p>
                   </div>
                 </CardContent>
               </Card>
             ))
           ) : (
-            <Card className="md:col-span-2 xl:col-span-3">
-              <CardContent className="flex items-center gap-3 pt-6 text-sm text-muted-foreground">
-                <ShieldCheck className="h-4 w-4 text-primary" />
+            <Card className="md:col-span-2 xl:col-span-3 border-border/40">
+              <CardContent className="flex items-center gap-3.5 pt-6 text-sm text-muted-foreground/80">
+                <span className="rounded-xl bg-primary/8 p-2 text-primary ring-1 ring-primary/15">
+                  <ShieldCheck className="h-4 w-4" />
+                </span>
                 <span>当前没有需要立即处理的经营风险</span>
               </CardContent>
             </Card>
@@ -254,31 +268,42 @@ export function DataDashboard() {
         </div>
       </section>
 
-      <section className="space-y-3" aria-labelledby="dashboard-trend-heading">
-        <h2 id="dashboard-trend-heading" className="text-base font-semibold text-foreground">关键趋势</h2>
+      {/* 经营趋势 */}
+      <section className="space-y-4" aria-labelledby="dashboard-trend-heading">
+        <h3 id="dashboard-trend-heading" className="text-sm font-semibold text-foreground">经营趋势</h3>
+        
         <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
+          <Card className="border-border/40">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">月度出货趋势</CardTitle>
-              <CardDescription>最近 6 个月合同数量变化</CardDescription>
+              <CardTitle className="text-sm font-semibold">月度出货趋势</CardTitle>
+              <CardDescription className="text-xs text-muted-foreground/70">最近 6 个月合同数量变化</CardDescription>
             </CardHeader>
             <CardContent>
               {data.shipments.monthly.length === 0 ? (
-                <p className="py-12 text-center text-sm text-muted-foreground">暂无出货趋势数据</p>
+                <div className="flex flex-col items-center gap-2 py-14 text-center">
+                  <span className="rounded-full bg-muted/50 p-3">
+                    <TrendingUp className="h-5 w-5 text-muted-foreground/50" />
+                  </span>
+                  <p className="text-sm text-muted-foreground/60">暂无出货趋势数据</p>
+                </div>
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={[...data.shipments.monthly].reverse()}>
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="month" tick={{ fontSize: 12 }} tickFormatter={(v) => v.substring(5)} />
-                    <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-                    <Tooltip formatter={(value) => [`${value} 份`, '合同数量']} labelFormatter={(label) => `${label}`} />
+                    <CartesianGrid vertical={false} strokeDasharray="4 4" stroke="var(--border)" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickFormatter={(v) => v.substring(5)} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} allowDecimals={false} axisLine={false} tickLine={false} />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: '13px' }}
+                      formatter={(value) => [`${value} 份`, '合同数量']} 
+                      labelFormatter={(label) => `${label}`} 
+                    />
                     <Line
                       type="monotone"
                       dataKey="count"
                       stroke="var(--chart-3)"
-                      strokeWidth={2}
-                      dot={{ fill: 'var(--chart-3)', r: 4 }}
-                      activeDot={{ r: 6 }}
+                      strokeWidth={2.5}
+                      dot={{ fill: 'var(--chart-3)', r: 5, strokeWidth: 2, stroke: 'var(--background)' }}
+                      activeDot={{ r: 7, strokeWidth: 2, stroke: 'var(--background)' }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -286,41 +311,51 @@ export function DataDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-border/40">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">热门采购商品</CardTitle>
-              <CardDescription>按采购次数排序，保留最核心的商品趋势。</CardDescription>
+              <CardTitle className="text-sm font-semibold">热门采购商品</CardTitle>
+              <CardDescription className="text-xs text-muted-foreground/70">按采购次数排序，保留最核心的商品趋势。</CardDescription>
             </CardHeader>
             <CardContent>
               {data.topProducts.length === 0 ? (
-                <p className="py-12 text-center text-sm text-muted-foreground">暂无商品数据</p>
+                <div className="flex flex-col items-center gap-2 py-14 text-center">
+                  <span className="rounded-full bg-muted/50 p-3">
+                    <Package className="h-5 w-5 text-muted-foreground/50" />
+                  </span>
+                  <p className="text-sm text-muted-foreground/60">暂无商品数据</p>
+                </div>
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={data.topProducts.slice(0, 6)}>
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
+                  <BarChart data={data.topProducts.slice(0, 6)} barGap={6}>
+                    <CartesianGrid vertical={false} strokeDasharray="4 4" stroke="var(--border)" />
                     <XAxis
                       dataKey="productName"
-                      tick={{ fontSize: 10 }}
-                      height={60}
+                      tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
+                      height={55}
                       interval={0}
-                      tickFormatter={(v) => v.length > 6 ? `${v.substring(0, 6)}..` : v}
+                      tickFormatter={(v) => v.length > 5 ? `${v.substring(0, 5)}..` : v}
+                      axisLine={false}
+                      tickLine={false}
                     />
-                    <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
                     <YAxis
                       yAxisId="right"
                       orientation="right"
-                      tick={{ fontSize: 12 }}
+                      tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
                       tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v))}
+                      axisLine={false}
+                      tickLine={false}
                     />
                     <Tooltip
+                      contentStyle={{ borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: '13px' }}
                       formatter={(value, name) => [
                         name === 'count' ? `${value} 次` : Number(value || 0).toLocaleString(),
                         name === 'count' ? '采购次数' : '采购数量',
                       ]}
                     />
-                    <Legend formatter={(value) => (value === 'count' ? '采购次数' : '采购数量')} />
-                    <Bar yAxisId="left" dataKey="count" fill="var(--chart-3)" radius={[4, 4, 0, 0]} name="count" />
-                    <Bar yAxisId="right" dataKey="quantity" fill="var(--chart-1)" radius={[4, 4, 0, 0]} name="quantity" opacity={0.7} />
+                    <Legend formatter={(value) => (value === 'count' ? '采购次数' : '采购数量')} iconType="circle" iconSize={8} />
+                    <Bar yAxisId="left" dataKey="count" fill="var(--chart-3)" radius={[6, 6, 0, 0]} name="count" barSize={20} />
+                    <Bar yAxisId="right" dataKey="quantity" fill="var(--chart-1)" radius={[6, 6, 0, 0]} name="quantity" opacity={0.65} barSize={20} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -328,37 +363,44 @@ export function DataDashboard() {
           </Card>
         </div>
 
+        {/* KPI 概览 */}
         <div className="grid gap-4 md:grid-cols-3">
-          <Card className="kpi-card">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">采购合同</CardTitle>
-              <FileText className="h-4 w-4 text-primary" />
+          <Card className="kpi-card group">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">采购合同</CardTitle>
+              <span className="rounded-xl bg-primary/8 p-2 text-primary ring-1 ring-primary/12 transition-all duration-200 group-hover:bg-primary/12">
+                <FileText className="h-4 w-4" />
+              </span>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold tabular-nums">{data.contracts.purchase.count}</div>
-              <p className="text-xs text-muted-foreground">总金额: {formatAmount(data.contracts.purchase.totalAmount, 'CNY')}</p>
+              <div className="text-[2rem] font-bold tabular-nums tracking-tight leading-none">{data.contracts.purchase.count}</div>
+              <p className="mt-2 text-xs font-medium text-muted-foreground/70">总金额 {formatAmount(data.contracts.purchase.totalAmount, 'CNY')}</p>
             </CardContent>
           </Card>
 
-          <Card className="kpi-card">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">销售合同</CardTitle>
-              <TrendingUp className="h-4 w-4 text-primary" />
+          <Card className="kpi-card group">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">销售合同</CardTitle>
+              <span className="rounded-xl bg-primary/8 p-2 text-primary ring-1 ring-primary/12 transition-all duration-200 group-hover:bg-primary/12">
+                <TrendingUp className="h-4 w-4" />
+              </span>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold tabular-nums">{data.contracts.sales.count}</div>
-              <p className="text-xs text-muted-foreground">总金额: {formatAmount(data.contracts.sales.totalAmount, 'USD')}</p>
+              <div className="text-[2rem] font-bold tabular-nums tracking-tight leading-none">{data.contracts.sales.count}</div>
+              <p className="mt-2 text-xs font-medium text-muted-foreground/70">总金额 {formatAmount(data.contracts.sales.totalAmount, 'USD')}</p>
             </CardContent>
           </Card>
 
-          <Card className="kpi-card">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">库存概览</CardTitle>
-              <Package className="h-4 w-4 text-primary" />
+          <Card className="kpi-card group">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">库存概览</CardTitle>
+              <span className="rounded-xl bg-primary/8 p-2 text-primary ring-1 ring-primary/12 transition-all duration-200 group-hover:bg-primary/12">
+                <Package className="h-4 w-4" />
+              </span>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold tabular-nums">{data.inventory.productCount}</div>
-              <p className="text-xs text-muted-foreground">库存记录: {data.inventory.recordCount} 条</p>
+              <div className="text-[2rem] font-bold tabular-nums tracking-tight leading-none">{data.inventory.productCount}</div>
+              <p className="mt-2 text-xs font-medium text-muted-foreground/70">库存记录 {data.inventory.recordCount} 条</p>
             </CardContent>
           </Card>
         </div>

@@ -1,9 +1,9 @@
 /**
- * Input: 出口合同服务 (salesService)、通用表格排序 hook
- * Output: 出口合同列表页面（含删除、列排序、分页与搜索）
- * Pos: 出口合同管理入口，展示合同列表、货柜信息，支持删除操作
+ * Input: 销售合同服务 (salesService)、通用表格排序 hook
+ * Output: 销售合同列表页面（含删除、列排序、分页与搜索）
+ * Pos: 销售合同管理入口，展示合同列表、货柜信息，支持删除操作
  *
- * 2026-01-26 新增：管理员可删除出口合同（带确认对话框）
+ * 2026-01-26 新增：管理员可删除销售合同（带确认对话框）
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -17,17 +17,10 @@ import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { useTabSync } from '@/lib/tab-sync';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+
 import { AmountText } from '@/components/ui/amount-text';
 import { Badge } from '@/components/ui/badge';
-import { StatusBadge } from '@/components/ui/status-badge';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Eye, Ship, Trash2, Loader2, FileSpreadsheet, Container, Anchor, Boxes, Clock3, Search, Upload } from 'lucide-react';
+import { Plus, Eye, Ship, Trash2, Loader2, FileSpreadsheet, Container, Anchor, Boxes, Clock3, Search, Upload, ArrowUp, ArrowDown, Warehouse } from 'lucide-react';
 import { BatchImportDialog, type ImportRow } from '@/components/batch-import';
 import { batchImportService } from '@/services/batchImport.service';
 import Link from 'next/link';
@@ -50,7 +43,6 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { MobileListCard } from '@/components/mobile';
-import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/lib/hooks/useTableSort';
 
 export default function SalesPage() {
@@ -146,7 +138,7 @@ export default function SalesPage() {
       );
       setContracts(response.data?.items || []);
     } catch {
-      toast.error('加载出口合同失败');
+      toast.error('加载销售合同失败');
     } finally {
       setLoading(false);
     }
@@ -161,9 +153,9 @@ export default function SalesPage() {
   };
 
   /**
-   * 职责：导出单份合同为标准出口 Excel（三 Sheet）
+   * 职责：导出单份合同为标准销售 Excel（三 Sheet）
    * 思路：调用 salesService.exportExcel 触发浏览器下载
-   * @param contract - 要导出的出口合同对象
+   * @param contract - 要导出的销售合同对象
    */
   const handleExportExcel = async (contract: SalesContract) => {
     setExportingId(contract.id);
@@ -234,20 +226,42 @@ export default function SalesPage() {
   };
 
   /**
+   * 职责：根据销售状态返回左侧色条颜色
+   * 思路：DRAFT/CONFIRMED→蓝色；PACKING/SHIPPED→琥珀色；ARRIVED/COMPLETED→绿色；CANCELLED→红色
+   */
+  const getSalesStatusColor = (status: SalesStatus) => {
+    switch (status) {
+      case SalesStatus.DRAFT:
+      case SalesStatus.CONFIRMED:
+        return 'oklch(0.55 0.1 250)';
+      case SalesStatus.PACKING:
+      case SalesStatus.SHIPPED:
+        return 'oklch(0.6 0.12 85)';
+      case SalesStatus.ARRIVED:
+      case SalesStatus.COMPLETED:
+        return 'oklch(0.55 0.14 150)';
+      case SalesStatus.CANCELLED:
+        return 'oklch(0.55 0.1 25)';
+      default:
+        return 'oklch(0.55 0.14 150)';
+    }
+  };
+
+  /**
    * 获取状态徽章
    */
   const getStatusBadge = (status: SalesStatus) => {
-    const statusMap: Record<SalesStatus, { label: string; tone: NonNullable<Parameters<typeof StatusBadge>[0]['statusMap']>[keyof NonNullable<Parameters<typeof StatusBadge>[0]['statusMap']>]['tone'] }> = {
-      [SalesStatus.DRAFT]: { label: '草稿', tone: 'neutral' },
-      [SalesStatus.CONFIRMED]: { label: '已确认', tone: 'info' },
-      [SalesStatus.PACKING]: { label: '装柜中', tone: 'warning' },
-      [SalesStatus.SHIPPED]: { label: '已发运', tone: 'progress' },
-      [SalesStatus.ARRIVED]: { label: '已到达', tone: 'success' },
-      [SalesStatus.COMPLETED]: { label: '已完成', tone: 'secondary' },
-      [SalesStatus.CANCELLED]: { label: '已取消', tone: 'danger' },
+    const statusConfig: Record<SalesStatus, { label: string; className: string }> = {
+      [SalesStatus.DRAFT]: { label: '草稿', className: 'bg-gray-100 text-gray-700 hover:bg-gray-100 border-gray-200' },
+      [SalesStatus.CONFIRMED]: { label: '已确认', className: 'bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-200' },
+      [SalesStatus.PACKING]: { label: '装柜中', className: 'bg-purple-50 text-purple-700 hover:bg-purple-50 border-purple-200' },
+      [SalesStatus.SHIPPED]: { label: '已发运', className: 'bg-orange-50 text-orange-700 hover:bg-orange-50 border-orange-200' },
+      [SalesStatus.ARRIVED]: { label: '已到达', className: 'bg-cyan-50 text-cyan-700 hover:bg-cyan-50 border-cyan-200' },
+      [SalesStatus.COMPLETED]: { label: '已完成', className: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200' },
+      [SalesStatus.CANCELLED]: { label: '已取消', className: 'bg-red-50 text-red-700 hover:bg-red-50 border-red-200' },
     };
-    const config = statusMap[status] || { label: status, tone: 'neutral' as const };
-    return <StatusBadge status={status} statusMap={{ [status]: config }} />;
+    const config = statusConfig[status] || { label: status, className: 'bg-gray-100 text-gray-700 hover:bg-gray-100 border-gray-200' };
+    return <Badge variant="outline" className={config.className}>{config.label}</Badge>;
   };
 
   // 搜索过滤逻辑
@@ -262,7 +276,7 @@ export default function SalesPage() {
   }, [contracts, searchQuery]);
 
   /**
-   * 职责：从出口合同行取出可排序字段（编号、日期时间戳、箱数、体积、金额）
+   * 职责：从销售合同行取出可排序字段（编号、日期时间戳、箱数、体积、金额）
    */
   const salesAccessor = useCallback((item: SalesContract, key: string) => {
     switch (key) {
@@ -300,10 +314,9 @@ export default function SalesPage() {
 
   return (
     <div className="min-w-0 space-y-4">
-      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
+      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="销售" />
       <PageHeader
-        title="出口合同"
-        description={`管理出口合同与装箱信息，共 ${contracts.length} 个合同`}
+        title="销售合同"
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -314,18 +327,19 @@ export default function SalesPage() {
               <Upload className="mr-2 h-4 w-4" /> 批量导入
             </Button>
             <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/sales/create')}>
-              <Plus className="mr-2 h-4 w-4" /> 新增出口合同
+              <Plus className="mr-2 h-4 w-4" /> 新增销售合同
             </Button>
           </div>
         }
       />
 
       {/* 快捷入口 — 横向紧凑 */}
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3">
-        <span className="mr-auto text-sm text-muted-foreground">
-          回签后先补录箱数与重量，再推进报关与退税
-        </span>
-        <Button variant="outline" size="sm" className="h-8 rounded-lg" onClick={() => router.push('/customs-declarations')}>
+      <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3">
+        <Button variant="outline" size="sm" className="h-8 rounded-lg" onClick={() => router.push('/dashboard/logistics')}>
+          <Warehouse className="mr-1.5 h-3.5 w-3.5" />
+          仓储物流
+        </Button>
+        <Button variant="outline" size="sm" className="h-8 rounded-lg" onClick={() => router.push('/dashboard/customs-declarations')}>
           <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
           报关单
         </Button>
@@ -380,7 +394,16 @@ export default function SalesPage() {
         {loading ? (
           <div className="surface-panel py-12 text-center text-sm text-muted-foreground">加载中...</div>
         ) : contracts.length === 0 ? (
-          <div className="surface-panel py-12 text-center text-sm text-muted-foreground">暂无出口合同</div>
+          <div className="surface-panel flex flex-col items-center justify-center py-16 text-center">
+            <Ship className="h-16 w-16 text-muted-foreground/30 mb-4" />
+            <h3 className="text-lg font-semibold text-muted-foreground mb-2">暂无销售合同</h3>
+            <p className="text-sm text-muted-foreground mb-6 max-w-xs">
+              还没有创建任何销售合同，点击下方的按钮开始创建
+            </p>
+            <Button onClick={() => router.push('/dashboard/sales/create')}>
+              <Plus className="mr-2 h-4 w-4" /> 新建销售合同
+            </Button>
+          </div>
         ) : (
           pagedContracts.map((contract) => (
             <MobileListCard
@@ -392,16 +415,12 @@ export default function SalesPage() {
                 { label: '签订日期', value: formatDate(contract.signedAt) || '—' },
                 { label: '箱数', value: `${contract.totalBoxes || 0} 箱` },
                 { label: '体积', value: `${(contract.volume || 0).toFixed(2)} CBM` },
-                { label: '毛重', value: `${(contract.grossWeight || 0).toLocaleString()} kg` },
                 {
                   label: '门店',
                   value: contract.stores && contract.stores.length > 0
                     ? contract.stores.join(', ')
                     : '—',
                 },
-                ...(contract.hasThirdPartyCargo && contract.sourceParties?.length
-                  ? [{ label: '第三方来源', value: contract.sourceParties.join(', ') }]
-                  : []),
               ]}
               amount={{
                 label: '合同金额',
@@ -441,192 +460,177 @@ export default function SalesPage() {
         )}
       </div>
 
-      {/* 桌面端表格视图 */}
-      <div className="hidden surface-panel overflow-hidden md:block">
-        <Table className="table-fixed w-full">
-          <TableHeader>
-            <TableRow>
-              <SortableTableHead
-                className="w-[130px]"
-                sortKey="contractNo"
-                currentSortKey={salesSort.sortKey}
-                currentSortDir={salesSort.sortDir}
-                onSort={salesSort.onSort}
-                data-testid="sort-contractNo"
+      {/* 桌面端卡片视图 */}
+      <div className="hidden md:block space-y-4">
+        {/* 排序栏 */}
+        <div className="flex items-center gap-1 flex-wrap border-b border-border/40 pb-3">
+          <span className="text-xs text-muted-foreground mr-2">排序</span>
+          {[
+            { key: 'contractNo', label: '合同编号', testId: 'sort-contractNo' },
+            { key: 'portName', label: '港口' },
+            { key: 'signedAt', label: '签订日期', testId: 'sort-signedAt' },
+            { key: 'totalBoxes', label: '箱数', testId: 'sort-totalBoxes' },
+            { key: 'volume', label: '体积', testId: 'sort-volume' },
+            { key: 'totalAmount', label: '金额', testId: 'sort-totalAmount' },
+          ].map(({ key, label, testId }) => {
+            const isActive = salesSort.sortKey === key;
+            return (
+              <button
+                key={key}
+                data-testid={testId}
+                onClick={() => salesSort.onSort(key)}
+                className={`inline-flex items-center rounded-md px-2 py-1 text-xs transition-colors ${
+                  isActive
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
               >
-                合同编号
-              </SortableTableHead>
-              <SortableTableHead
-                className="w-[80px]"
-                sortKey="portName"
-                currentSortKey={salesSort.sortKey}
-                currentSortDir={salesSort.sortDir}
-                onSort={salesSort.onSort}
+                {label}
+                {isActive && (
+                  salesSort.sortDir === 'asc'
+                    ? <ArrowUp className="ml-1 h-3 w-3" />
+                    : <ArrowDown className="ml-1 h-3 w-3" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {loading ? (
+          <div className="surface-panel py-12 text-center text-sm text-muted-foreground">加载中...</div>
+        ) : contracts.length === 0 ? (
+          <div className="surface-panel flex flex-col items-center justify-center py-16 text-center">
+            <Ship className="h-16 w-16 text-muted-foreground/30 mb-4" />
+            <h3 className="text-lg font-semibold text-muted-foreground mb-2">暂无销售合同</h3>
+            <p className="text-sm text-muted-foreground mb-6 max-w-xs">
+              还没有创建任何销售合同，点击下方的按钮开始创建
+            </p>
+            <Button onClick={() => router.push('/dashboard/sales/create')}>
+              <Plus className="mr-2 h-4 w-4" /> 新建销售合同
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            {pagedContracts.map((contract) => (
+              <Card
+                key={contract.id}
+                className="border-border/40 border-l-[3px] hover:border-primary/20 hover:shadow-md transition-all duration-300 cursor-pointer hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/10"
+                style={{ borderLeftColor: getSalesStatusColor(contract.status) }}
+                onClick={() => router.push(`/dashboard/sales/${contract.id}`)}
+                data-testid={`contract-row-${contract.contractNo}`}
               >
-                港口
-              </SortableTableHead>
-              <SortableTableHead
-                sortKey="stores"
-                currentSortKey={salesSort.sortKey}
-                currentSortDir={salesSort.sortDir}
-                onSort={salesSort.onSort}
-              >
-                门店
-              </SortableTableHead>
-              <TableHead className="w-[80px]">状态</TableHead>
-              <SortableTableHead
-                className="w-[100px]"
-                sortKey="signedAt"
-                currentSortKey={salesSort.sortKey}
-                currentSortDir={salesSort.sortDir}
-                onSort={salesSort.onSort}
-                data-testid="sort-signedAt"
-              >
-                签订日期
-              </SortableTableHead>
-              <SortableTableHead
-                className="w-[60px] text-right"
-                sortKey="totalBoxes"
-                currentSortKey={salesSort.sortKey}
-                currentSortDir={salesSort.sortDir}
-                onSort={salesSort.onSort}
-                data-testid="sort-totalBoxes"
-              >
-                箱数
-              </SortableTableHead>
-              <SortableTableHead
-                className="w-[80px] text-right"
-                sortKey="volume"
-                currentSortKey={salesSort.sortKey}
-                currentSortDir={salesSort.sortDir}
-                onSort={salesSort.onSort}
-                data-testid="sort-volume"
-              >
-                体积
-              </SortableTableHead>
-              <SortableTableHead
-                className="w-[90px] text-right"
-                sortKey="totalAmount"
-                currentSortKey={salesSort.sortKey}
-                currentSortDir={salesSort.sortDir}
-                onSort={salesSort.onSort}
-                data-testid="sort-totalAmount"
-              >
-                金额 ($)
-              </SortableTableHead>
-              <TableHead className="w-[100px]">操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-               <TableRow>
-                 <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
-               </TableRow>
-            ) : contracts.length === 0 ? (
-               <TableRow>
-                 <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">暂无出口合同。</TableCell>
-               </TableRow>
-            ) : (
-              pagedContracts.map((contract) => (
-                <TableRow
-                  key={contract.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => router.push(`/dashboard/sales/${contract.id}`)}
-                  data-testid={`contract-row-${contract.contractNo}`}
-                >
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-1.5">
-                      <Ship className="h-3.5 w-3.5 shrink-0 text-primary" />
-                      <span className="truncate">{contract.contractNo}</span>
+                <CardContent className="p-4 space-y-3">
+                  {/* 头部：合同编号 + 状态 */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Ship className="h-4 w-4 shrink-0 text-primary" />
+                      <span className="font-semibold text-sm truncate">{contract.contractNo}</span>
                     </div>
-                  </TableCell>
-                  <TableCell className="truncate">{contract.port?.name || '-'}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {contract.stores && contract.stores.length > 0
-                        ? contract.stores.map((store, i) => (
-                            <Badge key={i} variant="secondary" className="text-[11px] font-normal px-1.5 py-0">
-                              {store}
-                            </Badge>
-                          ))
-                        : <span className="text-muted-foreground">-</span>}
-                      {contract.hasThirdPartyCargo && (
-                        <Badge variant="outline" className="text-[11px] border-amber-500/40 text-amber-700">
-                          含第三方拼柜
-                        </Badge>
-                      )}
+                    <div className="shrink-0">
+                      {getStatusBadge(contract.status)}
                     </div>
-                    {contract.hasThirdPartyCargo && contract.sourceParties?.length ? (
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        来源方：{contract.sourceParties.join(', ')}
-                      </div>
-                    ) : null}
-                  </TableCell>
-                  <TableCell>{getStatusBadge(contract.status)}</TableCell>
-                  <TableCell className="tabular-nums">
-                    {formatDate(contract.signedAt)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{contract.totalBoxes || 0}</TableCell>
-                  <TableCell className="text-right tabular-nums">{(contract.volume || 0).toFixed(1)}</TableCell>
-                  <TableCell className="text-right">
-                    <AmountText tone="success">${contract.totalAmount.toLocaleString()}</AmountText>
-                  </TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center gap-1">
-                      <Link
-                        href={`/dashboard/sales/${contract.id}`}
-                        data-testid={`contract-detail-${contract.contractNo}`}
-                      >
-                        <Button
-                          variant="default"
-                          size="sm"
-                          className="h-8 px-3 rounded-lg"
-                          title="查看详情与装箱"
-                          aria-label={`查看合同 ${contract.contractNo}`}
-                        >
-                          <Eye className="h-3.5 w-3.5 mr-1.5" />
-                          <span className="text-xs">详情</span>
-                        </Button>
-                      </Link>
+                  </div>
+
+                  {/* 港口 */}
+                  <div className="text-sm text-muted-foreground">
+                    {contract.port?.name || '未知目的港'}
+                  </div>
+
+                  {/* 门店 + 第三方拼柜 */}
+                  <div className="flex flex-wrap gap-1">
+                    {contract.stores && contract.stores.length > 0
+                      ? contract.stores.map((store, i) => (
+                          <Badge key={i} variant="secondary" className="text-[11px] font-normal px-1.5 py-0">
+                            {store}
+                          </Badge>
+                        ))
+                      : <span className="text-xs text-muted-foreground">-</span>}
+                    {contract.hasThirdPartyCargo && (
+                      <Badge variant="outline" className="text-[11px] border-amber-500/40 text-amber-700 bg-amber-50">
+                        含第三方拼柜
+                      </Badge>
+                    )}
+                  </div>
+                  {contract.hasThirdPartyCargo && contract.sourceParties?.length ? (
+                    <div className="text-xs text-muted-foreground">
+                      来源方：{contract.sourceParties.join(', ')}
+                    </div>
+                  ) : null}
+
+                  {/* 数据行 */}
+                  <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">签订日期</p>
+                      <p className="tabular-nums">{formatDate(contract.signedAt) || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">箱数</p>
+                      <p className="tabular-nums">{contract.totalBoxes || 0} 箱</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">体积</p>
+                      <p className="tabular-nums">{(contract.volume || 0).toFixed(1)} CBM</p>
+                    </div>
+                  </div>
+
+                  {/* 金额 */}
+                  <div className="flex items-center justify-between pt-2 border-t border-border/30">
+                    <span className="text-xs text-muted-foreground">合同金额</span>
+                    <span className="text-base font-semibold tabular-nums">
+                      <AmountText tone="success">${contract.totalAmount.toLocaleString()}</AmountText>
+                    </span>
+                  </div>
+
+                  {/* 操作按钮 */}
+                  <div className="flex items-center gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
+                    <Link
+                      href={`/dashboard/sales/${contract.id}`}
+                      data-testid={`contract-detail-${contract.contractNo}`}
+                      className="flex-1"
+                    >
                       <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 rounded-lg"
-                        title="导出标准出口 Excel"
-                        aria-label={`导出合同 ${contract.contractNo} Excel`}
-                        data-testid={`contract-export-${contract.contractNo}`}
-                        disabled={exportingId === contract.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleExportExcel(contract);
-                        }}
+                        variant="default"
+                        size="sm"
+                        className="h-8 w-full rounded-lg text-xs"
+                        title="查看详情与装箱"
+                        aria-label={`查看合同 ${contract.contractNo}`}
                       >
-                        {exportingId === contract.id
-                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          : <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
-                        }
+                        <Eye className="h-3.5 w-3.5 mr-1.5" />
+                        <span className="text-xs">详情</span>
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 rounded-lg hover:text-destructive hover:border-destructive"
-                        title="删除合同"
-                        aria-label={`删除合同 ${contract.contractNo}`}
-                        data-testid={`contract-delete-${contract.contractNo}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openDeleteDialog(contract);
-                        }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                    </Link>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-lg text-xs"
+                      title="导出标准出口 Excel"
+                      aria-label={`导出合同 ${contract.contractNo} Excel`}
+                      data-testid={`contract-export-${contract.contractNo}`}
+                      disabled={exportingId === contract.id}
+                      onClick={() => handleExportExcel(contract)}
+                    >
+                      {exportingId === contract.id
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <FileSpreadsheet className="mr-1 h-3.5 w-3.5 text-emerald-600" />}
+                      Excel
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-lg text-xs text-destructive hover:bg-destructive/10"
+                      title="删除合同"
+                      aria-label={`删除合同 ${contract.contractNo}`}
+                      data-testid={`contract-delete-${contract.contractNo}`}
+                      onClick={() => openDeleteDialog(contract)}
+                    >
+                      <Trash2 className="mr-1 h-3.5 w-3.5" /> 删除
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 搜索栏 */}
@@ -695,7 +699,7 @@ export default function SalesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除出口合同 <strong>{contractToDelete?.contractNo}</strong> 吗？
+              确定要删除销售合同 <strong>{contractToDelete?.contractNo}</strong> 吗？
               <br />
               此操作将同时删除该合同下的所有装箱明细，且无法撤销。
             </AlertDialogDescription>
@@ -724,8 +728,8 @@ export default function SalesPage() {
       <BatchImportDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
-        title="批量导入出口合同"
-        description="上传 Excel 文件批量导入出口合同。请先下载模板，按照模板格式填写数据后上传。"
+        title="批量导入销售合同"
+        description="上传 Excel 文件批量导入销售合同。请先下载模板，按照模板格式填写数据后上传。"
         columns={importColumns}
         templateData={importTemplateData}
         onImport={handleBatchImport}

@@ -117,7 +117,9 @@ describe('CreatePurchasePage 交互逻辑', () => {
 
     expect(screen.getByLabelText('采购报价原文')).toHaveAttribute('name', 'quoteText');
 
-    await user.click(screen.getByRole('combobox', { name: '供应商' }));
+    await user.click(screen.getAllByRole('button', { name: /合同信息/ })[0]);
+
+    await user.click(screen.getByRole('combobox', { name: '供应商 *' }));
     expect(screen.getByLabelText('搜索供应商')).toHaveAttribute('name', 'supplierSearch');
 
     await user.click(screen.getByRole('button', { name: /新增/ }));

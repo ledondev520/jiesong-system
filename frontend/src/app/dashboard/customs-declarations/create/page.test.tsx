@@ -108,7 +108,7 @@ describe('CreateCustomsDeclarationPage 交互逻辑', () => {
     });
 
     expect(mockToastSuccess).toHaveBeenCalledWith('报关单创建成功');
-    expect(mockPush).toHaveBeenCalledWith('/customs-declarations/cd-new');
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/customs-declarations/cd-new');
   });
 
   it('创建失败时提示错误', async () => {

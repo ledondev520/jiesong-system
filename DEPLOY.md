@@ -1,271 +1,226 @@
-# 捷淞进销存系统 - 部署指南
+# 捷淞系统部署指南
 
-## 📋 目录
-
-- [方案一：VPS 一键部署（推荐）](#方案一 vps 一键部署推荐)
-- [方案二：Docker 部署](#方案二 docker 部署)
-- [方案三：PaaS 平台部署](#方案三 paas 平台部署)
-- [常见问题](#常见问题)
+> 本文档覆盖：本地开发 → Docker部署 → VPS生产部署 → 数据迁移
 
 ---
 
-## 方案一：VPS 一键部署（推荐）
-
-### 1. 准备 VPS
-
-**推荐配置：**
-| 配置项 | 最低要求 | 推荐配置 |
-|--------|----------|----------|
-| CPU | 1 核 | 2 核 |
-| 内存 | 1GB | 2GB |
-| 硬盘 | 20GB | 40GB+ |
-| 系统 | Ubuntu 20.04 | Ubuntu 22.04 |
-
-**推荐服务商：**
-- 阿里云 ECS
-- 腾讯云 CVM
-- AWS EC2
-- DigitalOcean Droplet
-
-### 2. 上传代码
+## 一、本地开发
 
 ```bash
-# 方式 1：使用 Git
-git clone https://github.com/ledondev520/jiesong-system.git
-cd jiesong-system
+# 1. 启动后端
+cd backend
+npm install
+npm run db:generate   # 生成 Prisma Client
+npm run db:push       # 同步数据库 schema
+npm run db:seed       # 可选：导入种子数据
+npm run dev           # 开发模式启动（:3001）
 
-# 方式 2：使用 SCP
-scp -r ./* root@your-vps-ip:/opt/jiesong-system
+# 2. 启动前端（新终端）
+cd frontend
+npm install
+npm run dev           # 开发模式启动（:3000）
 ```
 
-### 3. 执行部署脚本
-
-```bash
-cd /opt/jiesong-system
-chmod +x deploy.sh
-sudo ./deploy.sh
-```
-
-### 4. 访问系统
-
-部署完成后，访问：`http://你的 VPS-IP`
-
-**默认账号：**
-- 用户名：`admin`
-- 密码：`admin123`
+访问：http://localhost:3000
 
 ---
 
-## 方案二：Docker 部署
+## 二、Docker 部署（推荐测试环境）
 
 ### 前置要求
+- Docker + Docker Compose
 
-- Docker 20.10+
-- Docker Compose 2.0+
-
-### 1. 克隆代码
+### 部署步骤
 
 ```bash
-git clone https://github.com/ledondev520/jiesong-system.git
-cd jiesong-system
-```
-
-### 2. 配置环境变量
-
-```bash
-# 创建 .env 文件
-cat > .env << EOF
-JWT_SECRET=your-super-secret-jwt-key-$(openssl rand -hex 32)
-EOF
-```
-
-### 3. 启动服务
-
-```bash
+# 1. 构建并启动（含 PostgreSQL）
 docker compose up -d
-```
 
-### 4. 查看状态
+# 2. 执行数据库迁移
+docker compose exec backend npx prisma migrate deploy
 
-```bash
+# 3. 查看状态
 docker compose ps
-docker compose logs -f
 ```
 
-### 5. 访问系统
+访问：http://localhost（Nginx 反向代理）
 
-访问：`http://你的服务器-IP`
+### 数据持久化
+- PostgreSQL 数据：`docker volume ls | grep postgres`
+- 上传文件：`./backend/uploads/`
 
 ---
 
-## 方案三：PaaS 平台部署
+## 三、VPS 生产部署（推荐生产环境）
 
-### Railway 部署（推荐）
+### 前置要求
+- Ubuntu 20.04+ / Debian 11+
+- 域名已解析到 VPS IP（可选）
 
-1. 访问 [railway.app](https://railway.app)
-2. 点击 "New Project" → "Deploy from GitHub repo"
-3. 选择 `jiesong-system` 仓库
-4. 添加环境变量：
-   ```
-   JWT_SECRET=your-secret-key
-   NODE_ENV=production
-   ```
-5. Railway 会自动构建并部署
-
-### Vercel 部署（仅前端）
-
-1. 访问 [vercel.com](https://vercel.com)
-2. 导入 `frontend` 目录
-3. 设置环境变量：
-   ```
-   NEXT_PUBLIC_API_BASE_URL=https://your-backend-url.railway.app
-   ```
-
----
-
-## 🔧 常用运维命令
-
-### PM2 管理
+### 一键部署
 
 ```bash
-# 查看状态
-pm2 status
+# 1. 上传项目文件到 VPS
+rsync -avz --exclude=node_modules --exclude=.git ./ root@your-vps-ip:/opt/jiesong-system/
 
-# 查看日志
-pm2 logs
-
-# 重启服务
-pm2 restart all
-
-# 停止服务
-pm2 stop all
-
-# 删除服务
-pm2 delete all
+# 2. SSH 登录并执行部署脚本
+ssh root@your-vps-ip
+cd /opt/jiesong-system
+bash deploy.sh
 ```
 
-### Nginx 管理
+部署脚本会自动完成：
+- 安装 Node.js 20 + PM2 + Nginx
+- 安装 PostgreSQL
+- 构建前端
+- 配置反向代理
+- 启动服务
+
+### 手动部署（如需更精细控制）
 
 ```bash
-# 查看状态
-systemctl status nginx
+# 1. 安装 PostgreSQL
+sudo apt update
+sudo apt install -y postgresql postgresql-contrib
+sudo -u postgres psql -c "CREATE USER jiesong WITH PASSWORD 'your_strong_password';"
+sudo -u postgres psql -c "CREATE DATABASE jiesong OWNER jiesong;"
 
-# 重启
-systemctl restart nginx
+# 2. 配置环境变量
+cp backend/.env.example backend/.env
+# 编辑 backend/.env，填入：
+#   DATABASE_URL=postgresql://jiesong:your_strong_password@localhost:5432/jiesong?schema=public
+#   JWT_SECRET=<随机生成的长字符串>
+#   KIMI_API_KEY=<你的 Moonshot API Key>
 
-# 查看日志
-tail -f /var/log/nginx/access.log
-tail -f /var/log/nginx/error.log
-```
+# 3. 构建
+cd backend && npm ci && npx prisma generate && npx prisma migrate deploy
+cd ../frontend && npm ci && npm run build
 
-### Docker 管理
-
-```bash
-# 重启所有服务
-docker compose restart
-
-# 查看日志
-docker compose logs -f
-
-# 停止所有服务
-docker compose down
-
-# 清理并重建
-docker compose down -v && docker compose up -d
+# 4. 启动（PM2）
+pm2 start ecosystem.config.js
+pm2 save
+pm2 startup
 ```
 
 ---
 
-## 🔒 安全建议
+## 四、数据迁移：SQLite → PostgreSQL
 
-### 1. 修改默认密码
+### 场景
+本地开发使用 SQLite，线上使用 PostgreSQL。需要将本地数据同步到线上。
 
-登录后立即修改管理员密码！
-
-### 2. 配置 HTTPS
-
-```bash
-# 使用 Let's Encrypt
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d your-domain.com
-```
-
-### 3. 配置防火墙
-
-```bash
-# 仅开放必要端口
-sudo ufw allow 22/tcp   # SSH
-sudo ufw allow 80/tcp   # HTTP
-sudo ufw allow 443/tcp  # HTTPS
-sudo ufw enable
-```
-
-### 4. 定期备份
-
-```bash
-# 备份数据库
-sqlite3 backend/prisma/dev.db ".backup 'backup-$(date +%Y%m%d).db'"
-```
-
----
-
-## ❓ 常见问题
-
-### Q1: 无法访问页面
-
-**检查服务状态：**
-```bash
-pm2 status
-systemctl status nginx
-```
-
-**检查端口：**
-```bash
-netstat -tlnp | grep -E '80|3001|3002'
-```
-
-### Q2: 登录提示网络错误
-
-**检查后端日志：**
-```bash
-pm2 logs jiesong-backend
-```
-
-**检查 API 连通性：**
-```bash
-curl http://localhost:3001/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}'
-```
-
-### Q3: 数据库迁移失败
+### 方案 A：SQL 导出导入（推荐）
 
 ```bash
 cd backend
-npx prisma migrate deploy
-# 或者
-npx prisma db push
+
+# 1. 生成迁移 SQL 文件
+node scripts/migrate-sqlite-to-postgres.js
+
+# 2. 确保 PostgreSQL 数据库已初始化
+DATABASE_URL="postgresql://jiesong:pass@localhost:5432/jiesong?schema=public" npx prisma db push
+
+# 3. 执行迁移
+psql -U jiesong -d jiesong -f prisma/migration-to-postgres.sql
 ```
 
-### Q4: 前端构建失败
+### 方案 B：Prisma 数据库迁移（干净环境）
 
 ```bash
-cd frontend
-rm -rf node_modules package-lock.json .next
-npm install
-npm run build
+# 1. 导出 SQLite 数据为 JSON
+sqlite3 prisma/dev.db ".mode json" "SELECT * FROM users" > users.json
+# ... 对每个表重复
+
+# 2. 切换到 PostgreSQL
+export DATABASE_URL="postgresql://..."
+npx prisma db push
+
+# 3. 编写导入脚本写入 PostgreSQL
+```
+
+### 方案 C：持续同步（开发→线上）
+
+开发环境定期导出数据，线上导入：
+
+```bash
+# 开发机执行
+sqlite3 prisma/dev.db .dump > backup.sql
+scp backup.sql root@vps-ip:/tmp/
+
+# VPS 执行
+psql -U jiesong -d jiesong -f /tmp/backup.sql
 ```
 
 ---
 
-## 📞 技术支持
+## 五、环境变量配置
 
-如遇问题，请检查：
-1. 服务器日志
-2. 应用日志
-3. 网络连接
+### 后端 `.env`
 
-如需协助，请提供：
-- 错误信息截图
-- 相关日志内容
-- 服务器配置信息
+```bash
+# 必须配置
+JWT_SECRET=                      # 随机长字符串（生产环境必须修改）
+DATABASE_URL=                    # SQLite 或 PostgreSQL 连接字符串
+
+# 推荐配置
+KIMI_API_KEY=                    # Moonshot API Key（AI助手功能）
+KIMI_BASE_URL=https://api.moonshot.cn/v1
+
+# 可选配置
+PORT=3001
+NODE_ENV=production
+CORS_ORIGIN=http://localhost:3000
+UPLOAD_DIR=./uploads
+MAX_FILE_SIZE=10mb
+```
+
+### 前端 `.env.local` / `.env.production`
+
+```bash
+# 开发环境
+NEXT_PUBLIC_API_BASE_URL=http://localhost:3001/api/v1
+
+# 生产环境（Docker/VPS）
+NEXT_PUBLIC_API_BASE_URL=/api/v1
+```
+
+---
+
+## 六、常见问题
+
+### Q: 部署后前端白屏
+- 检查 `NEXT_PUBLIC_API_BASE_URL` 是否正确
+- 检查 Nginx 配置中的 proxy_pass 是否正确
+
+### Q: 数据库连接失败
+- 检查 `DATABASE_URL` 格式
+- PostgreSQL: 确认用户、数据库、权限已创建
+- SQLite: 确认文件路径可写
+
+### Q: AI助手无法使用
+- 检查 `KIMI_API_KEY` 是否配置
+- 检查后端日志中的 API 调用错误
+
+### Q: 文件上传失败
+- 检查 `UPLOAD_DIR` 目录是否存在且可写
+- 检查 Nginx `client_max_body_size` 配置
+
+---
+
+## 七、服务管理命令
+
+```bash
+# PM2 管理
+pm2 status              # 查看状态
+pm2 logs                # 查看日志
+pm2 restart all         # 重启全部
+pm2 reload jiesong-backend  # 零停机重启后端
+
+# Nginx
+nginx -t                # 测试配置
+systemctl reload nginx  # 重载配置
+
+# PostgreSQL
+sudo -u postgres psql   # 进入 psql
+pg_dump -U jiesong jiesong > backup.sql  # 备份
+```

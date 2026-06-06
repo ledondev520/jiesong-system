@@ -6,6 +6,8 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
   PATROL_CATEGORIES,
@@ -30,5 +32,20 @@ describe('patrolService', () => {
     assert.equal(typeof service.runSystemPatrol, 'function');
     assert.equal(typeof service.persistPatrolFindings, 'function');
     assert.equal(typeof service.runFullPatrol, 'function');
+  });
+
+  it('巡检通知接收人使用当前 User Interface 的启用字段', () => {
+    const source = fs.readFileSync(path.join(__dirname, 'patrolService.js'), 'utf8');
+
+    assert.match(source, /where:\s*\{\s*role:\s*'ADMIN',\s*isActive:\s*true\s*\}/);
+    assert.doesNotMatch(source, /status:\s*'active'/);
+  });
+
+  it('系统巡检操作日志使用 OperationLog 当前 Interface', () => {
+    const source = fs.readFileSync(path.join(__dirname, 'patrolService.js'), 'utf8');
+
+    assert.match(source, /actorType:\s*'SYSTEM'/);
+    assert.doesNotMatch(source, /userId:\s*'system'/);
+    assert.doesNotMatch(source, /detail:\s*JSON\.stringify/);
   });
 });

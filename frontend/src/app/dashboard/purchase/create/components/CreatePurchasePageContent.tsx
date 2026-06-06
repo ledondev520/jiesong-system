@@ -53,13 +53,14 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
-import { Wand2, Plus, Trash, Eye, FileText, Loader2, UserPlus, Check, ChevronsUpDown, Star } from 'lucide-react';
+import { Wand2, Plus, Trash, Loader2, UserPlus, Check, ChevronsUpDown, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
   ParsedQuoteItem,
   PurchaseCreatePayload,
   purchaseService,
+  ProductPriceHistory,
 } from '@/services/purchase.service';
 import { supplierService } from '@/services/supplier.service';
 import { productService } from '@/services/product.service';
@@ -79,6 +80,7 @@ const purchaseSchema = z.object({
     unitPrice: z.number().min(0, '单价必须大于等于0'),
     unit: z.string().optional(),
     note: z.string().optional(),
+    priceNote: z.string().optional(),
   })).min(1, '至少添加一项商品'),
 });
 
@@ -116,6 +118,7 @@ export default function CreatePurchasePage() {
   // AI 解析
   const [parseText, setParseText] = useState('');
   const [isParsing, setIsParsing] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
 
   // 表单
   const form = useForm<PurchaseFormValues>({
@@ -126,9 +129,12 @@ export default function CreatePurchasePage() {
       signedAt: undefined,
       taxRate: 13,
       note: '',
-      items: [{ productId: '', quantity: 0, unitPrice: 0, unit: '', note: '' }],
+      items: [{ productId: '', quantity: 0, unitPrice: 0, unit: '', note: '', priceNote: '' }],
     },
   });
+
+  // 商品价格历史缓存（按 productId）
+  const [priceHistoryMap, setPriceHistoryMap] = useState<Record<string, ProductPriceHistory>>({});
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -148,6 +154,32 @@ export default function CreatePurchasePage() {
   const totalAmount = watchItems.reduce((sum, item) => {
     return sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
   }, 0);
+
+  // ============== 加载商品价格历史 ==============
+  const productIdsKey = useMemo(
+    () => watchItems.map((i) => i.productId).filter(Boolean).sort().join(','),
+    [watchItems],
+  );
+
+  useEffect(() => {
+    const selectedProductIds = watchItems
+      .map((item) => item.productId)
+      .filter((id): id is string => Boolean(id));
+    const uniqueIds = [...new Set(selectedProductIds)];
+
+    uniqueIds.forEach(async (productId) => {
+      if (priceHistoryMap[productId]) return;
+      try {
+        const res = await purchaseService.getProductPriceHistory(productId);
+        if (res.data) {
+          setPriceHistoryMap((prev) => ({ ...prev, [productId]: res.data }));
+        }
+      } catch {
+        // 静默失败，价格对比是辅助性的
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productIdsKey]);
 
   // ============== 加载数据 ==============
   useEffect(() => {
@@ -292,20 +324,37 @@ export default function CreatePurchasePage() {
   // ============== 提交 ==============
   const onSubmit = async (data: PurchaseFormValues) => {
     try {
-      // 转换数据格式以匹配后端期望
+      // 检查价格预警：若触发警告但未填写备注，阻止提交
+      for (let i = 0; i < data.items.length; i++) {
+        const item = data.items[i];
+        const history = item.productId ? priceHistoryMap[item.productId] : null;
+        if (history && history.averagePrice !== null && item.unitPrice > history.averagePrice * 1.1) {
+          if (!item.priceNote || item.priceNote.trim().length === 0) {
+            toast.error(`第 ${i + 1} 项商品价格高于历史均价，请填写备注说明原因`);
+            return;
+          }
+        }
+      }
+
+      // 转换数据格式以匹配后端期望（将 priceNote 合并到 note）
       const submitData: PurchaseCreatePayload = {
         supplierId: data.supplierId,
         contractNo: data.contractNo,
         signedAt: data.signedAt?.toISOString(),
         taxRate: data.taxRate,
         note: data.note,
-        items: data.items.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          unit: item.unit,
-          note: item.note,
-        })),
+        items: data.items.map((item) => {
+          const notes: string[] = [];
+          if (item.note) notes.push(item.note);
+          if (item.priceNote) notes.push(`价格预警说明：${item.priceNote}`);
+          return {
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            unit: item.unit,
+            note: notes.join(' | ') || undefined,
+          };
+        }),
       };
       await purchaseService.create(submitData);
       toast.success('采购合同创建成功');
@@ -313,6 +362,17 @@ export default function CreatePurchasePage() {
     } catch {
       toast.error('创建失败');
     }
+  };
+
+  const goToStep1 = () => setCurrentStep(1);
+
+  const goToStep2 = async () => {
+    const valid = await form.trigger('items');
+    if (!valid) {
+      toast.error('请完善采购明细信息');
+      return;
+    }
+    setCurrentStep(2);
   };
 
   // 当前选中的供应商
@@ -325,346 +385,430 @@ export default function CreatePurchasePage() {
         description="先添加商品，系统会推荐曾供应过该商品的供应商"
       />
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* AI 智能录入 */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wand2 className="h-5 w-5 text-primary" />
-              AI 智能录入
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="purchase-ai-quote-input">采购报价原文</Label>
-              <Textarea
-                id="purchase-ai-quote-input"
-                name="quoteText"
-                placeholder="粘贴供应商报价信息 (如：'订购100平方米瓷砖，单价45元，供应商佛山陶瓷...')"
-                value={parseText}
-                onChange={(e) => setParseText(e.target.value)}
-                className="min-h-[100px]"
-              />
-            </div>
-            <Button onClick={handleParse} disabled={isParsing || !parseText} variant="default" className="shadow-sm">
-              {isParsing ? '解析中...' : '解析报价'}
-            </Button>
-          </CardContent>
-        </Card>
+      {/* Stepper */}
+      <div className="flex items-center justify-center gap-2">
+        {['采购明细', '合同信息'].map((step, idx) => (
+          <div key={step} className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentStep(idx + 1)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                currentStep === idx + 1
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              }`}
+            >
+              <span className={`flex h-5 w-5 items-center justify-center rounded-full text-xs ${
+                currentStep === idx + 1 ? 'bg-primary-foreground text-primary' : 'bg-background text-muted-foreground'
+              }`}>
+                {idx + 1}
+              </span>
+              {step}
+            </button>
+            {idx < 1 && <div className="h-px w-8 bg-border" />}
+          </div>
+        ))}
+      </div>
 
+      <div className="grid gap-6 md:grid-cols-2">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="contents">
-            {/* 采购明细 - 放在前面 */}
-            <Card className="md:col-span-2">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>采购明细</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">先选择商品，系统会推荐供应商</p>
-                </div>
-                <div className="text-lg font-bold">总计: ¥{totalAmount.toLocaleString()}</div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {fields.map((field, index) => (
-                  <div key={field.id} className="grid gap-4 md:grid-cols-12 items-end border-b pb-4">
-                    <div className="md:col-span-4">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.productId`}
-                        render={({ field }) => {
-                          return (
-                            <FormItem>
-                              <FormLabel className={index !== 0 ? 'sr-only' : ''}>商品</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
+            {currentStep === 1 && (
+              <>
+                {/* AI 智能录入 */}
+                <Card className="md:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Wand2 className="h-5 w-5 text-primary" />
+                      AI 智能录入
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="purchase-ai-quote-input">采购报价原文</Label>
+                      <Textarea
+                        id="purchase-ai-quote-input"
+                        name="quoteText"
+                        placeholder="粘贴供应商报价信息 (如：'订购100平方米瓷砖，单价45元，供应商佛山陶瓷...')"
+                        value={parseText}
+                        onChange={(e) => setParseText(e.target.value)}
+                        className="min-h-[100px]"
+                      />
+                    </div>
+                    <Button type="button" onClick={handleParse} disabled={isParsing || !parseText} variant="default" className="shadow-sm">
+                      {isParsing ? '解析中...' : '解析报价'}
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* 采购明细 - 放在前面 */}
+                <Card className="md:col-span-2">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle>采购明细</CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1">先选择商品，系统会推荐供应商</p>
+                    </div>
+                    <div className="text-lg font-bold">总计: ¥{totalAmount.toLocaleString()}</div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {fields.map((field, index) => (
+                      <div key={field.id} className="grid gap-4 md:grid-cols-12 items-end border-b pb-4">
+                        <div className="md:col-span-4">
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.productId`}
+                            render={({ field }) => {
+                              return (
+                                <FormItem>
+                                  <FormLabel className={index !== 0 ? 'sr-only' : ''}>
+                                    商品 <span className="text-destructive">*</span>
+                                  </FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="选择商品" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {products.map(p => (
+                                        <SelectItem key={p.id} value={p.id}>{p.customsName}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.quantity`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className={index !== 0 ? 'sr-only' : ''}>
+                                  数量 <span className="text-destructive">*</span>
+                                </FormLabel>
                                 <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="选择商品" />
-                                  </SelectTrigger>
+                                  <Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
                                 </FormControl>
-                                <SelectContent>
-                                  {products.map(p => (
-                                    <SelectItem key={p.id} value={p.id}>{p.customsName}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          );
-                        }}
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.quantity`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className={index !== 0 ? 'sr-only' : ''}>数量</FormLabel>
-                            <FormControl>
-                              <Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.unit`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className={index !== 0 ? 'sr-only' : ''}>单位</FormLabel>
-                            <FormControl>
-                              <Input {...field} placeholder="件/箱/平米" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.unitPrice`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className={index !== 0 ? 'sr-only' : ''}>单价 (¥)</FormLabel>
-                            <FormControl>
-                              <Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                            </FormControl>
-                            <FormMessage />
-                            {/* 智能比价红绿灯：与历史成交价对比 */}
-                            {watchItems[index]?.productId && (
-                              <PriceGuard
-                                productId={watchItems[index].productId}
-                                currentPrice={watchItems[index]?.unitPrice || 0}
-                                supplierId={form.watch('supplierId')}
-                              />
+                                <FormMessage />
+                              </FormItem>
                             )}
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.unit`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className={index !== 0 ? 'sr-only' : ''}>单位</FormLabel>
+                                <FormControl>
+                                  <Input {...field} placeholder="件/箱/平米" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.unitPrice`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className={index !== 0 ? 'sr-only' : ''}>
+                                  单价 (¥) <span className="text-destructive">*</span>
+                                </FormLabel>
+                                <FormControl>
+                                  <Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                                </FormControl>
+                                <FormMessage />
+                                {/* 智能比价红绿灯：与历史成交价对比 */}
+                                {watchItems[index]?.productId && (
+                                  <PriceGuard
+                                    productId={watchItems[index].productId}
+                                    currentPrice={watchItems[index]?.unitPrice || 0}
+                                    supplierId={form.watch('supplierId')}
+                                  />
+                                )}
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <div className="md:col-span-1 text-right pb-2 font-medium">
+                          ¥{((watchItems[index]?.quantity || 0) * (watchItems[index]?.unitPrice || 0)).toLocaleString()}
+                        </div>
+                        <div className="md:col-span-1">
+                          <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
+                            <Trash className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+
+                        {/* 价格历史对比与预警备注 */}
+                        {(() => {
+                          const item = watchItems[index];
+                          const history = item?.productId ? priceHistoryMap[item.productId] : null;
+                          const showHistory = history && history.count > 0;
+                          const isHighPrice = showHistory && history.averagePrice !== null && item.unitPrice > history.averagePrice * 1.1;
+                          if (!showHistory) return null;
+                          return (
+                            <div className="md:col-span-12">
+                              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                <span>历史采购：均价 ¥{history.averagePrice} / 最低 ¥{history.minPrice} / 最高 ¥{history.maxPrice}（共 {history.count} 笔）</span>
+                              </div>
+                              {isHighPrice && (
+                                <div className="mt-2 space-y-2">
+                                  <p className="text-xs text-destructive font-medium">
+                                    当前价格高于历史均价 {((item.unitPrice - history.averagePrice!) / history.averagePrice! * 100).toFixed(1)}%，请说明原因
+                                  </p>
+                                  <FormField
+                                    control={form.control}
+                                    name={`items.${index}.priceNote`}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormControl>
+                                          <Input
+                                            {...field}
+                                            placeholder="请填写价格偏高原因（必填）"
+                                            className="border-destructive focus-visible:ring-destructive"
+                                          />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ))}
+                    <Button type="button" variant="outline" onClick={() => append({ productId: '', quantity: 0, unitPrice: 0, unit: '', note: '', priceNote: '' })}>
+                      <Plus className="h-4 w-4 mr-2" /> 添加商品
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <div className="md:col-span-2 flex justify-end gap-4">
+                  <Button type="button" variant="outline" onClick={() => router.back()}>取消</Button>
+                  <Button type="button" size="lg" onClick={goToStep2}>
+                    下一步：合同信息
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {currentStep === 2 && (
+              <>
+                {/* 合同详情 */}
+                <Card className="md:col-span-2">
+                  <CardHeader>
+                    <CardTitle>合同信息</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid gap-6 md:grid-cols-3">
+                    {/* 合同编号 */}
+                    <FormField
+                      control={form.control}
+                      name="contractNo"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>合同编号</FormLabel>
+                          <FormControl>
+                            {contractNoLoading ? (
+                              <div className="flex items-center gap-2 h-10 px-3 text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin" />生成中...
+                              </div>
+                            ) : (
+                              <Input {...field} disabled className="font-mono" />
+                            )}
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* 供应商 Combobox */}
+                    <FormField
+                      control={form.control}
+                      name="supplierId"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <div className="flex items-center justify-between">
+                            <FormLabel>供应商 <span className="text-destructive">*</span></FormLabel>
+                            <Button type="button" variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setShowNewSupplierDialog(true)}>
+                              <UserPlus className="h-3 w-3 mr-1" />新增
+                            </Button>
+                          </div>
+                          <Popover open={supplierOpen} onOpenChange={setSupplierOpen}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={supplierOpen}
+                                  className={cn('w-full justify-between font-normal', !field.value && 'text-muted-foreground')}
+                                >
+                                  {selectedSupplier ? selectedSupplier.name : '搜索或选择供应商...'}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[400px] p-0" align="start">
+                              <Command shouldFilter={false}>
+                                <Label htmlFor="purchase-supplier-search" className="sr-only">
+                                  搜索供应商
+                                </Label>
+                                <CommandInput
+                                  id="purchase-supplier-search"
+                                  name="supplierSearch"
+                                  aria-label="搜索供应商"
+                                  placeholder="输入供应商名称搜索..."
+                                  value={supplierSearch}
+                                  onValueChange={setSupplierSearch}
+                                />
+                                <CommandList>
+                                  <CommandEmpty>
+                                    <div className="py-2">
+                                      <p className="text-muted-foreground">未找到匹配供应商</p>
+                                      <Button
+                                        type="button"
+                                        variant="link"
+                                        size="sm"
+                                        onClick={() => {
+                                          setNewSupplierForm(prev => ({ ...prev, name: supplierSearch }));
+                                          setShowNewSupplierDialog(true);
+                                          setSupplierOpen(false);
+                                        }}
+                                      >
+                                        {`+ 新增 "${supplierSearch}"`}
+                                      </Button>
+                                    </div>
+                                  </CommandEmpty>
+                                  {recommendedSupplierIds.size > 0 && sortedSuppliers.some(s => s.isRecommended) && (
+                                    <CommandGroup heading="推荐供应商">
+                                      {sortedSuppliers.filter(s => s.isRecommended).map(s => (
+                                        <CommandItem
+                                          key={s.id}
+                                          value={s.id}
+                                          onSelect={() => {
+                                            field.onChange(s.id);
+                                            setSupplierOpen(false);
+                                            setSupplierSearch('');
+                                          }}
+                                        >
+                                          <Check className={cn('mr-2 h-4 w-4', field.value === s.id ? 'opacity-100' : 'opacity-0')} />
+                                          <Star className="mr-1 h-3 w-3 text-primary" />
+                                          <span>{s.name}</span>
+                                          {s.contactName && <span className="text-muted-foreground text-xs ml-2">({s.contactName})</span>}
+                                          <Badge variant="secondary" className="ml-auto text-xs">曾供应</Badge>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  )}
+                                  <CommandGroup heading={recommendedSupplierIds.size > 0 ? '全部供应商' : '供应商列表'}>
+                                    {sortedSuppliers.filter(s => !s.isRecommended).map(s => (
+                                      <CommandItem
+                                        key={s.id}
+                                        value={s.id}
+                                        onSelect={() => {
+                                          field.onChange(s.id);
+                                          setSupplierOpen(false);
+                                          setSupplierSearch('');
+                                        }}
+                                      >
+                                        <Check className={cn('mr-2 h-4 w-4', field.value === s.id ? 'opacity-100' : 'opacity-0')} />
+                                        <span>{s.name}</span>
+                                        {s.contactName && <span className="text-muted-foreground text-xs ml-2">({s.contactName})</span>}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* 签订日期 */}
+                    <FormField
+                      control={form.control}
+                      name="signedAt"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <Label htmlFor="purchase-signed-at" className="mb-1.5">
+                            签订日期
+                          </Label>
+                          <DatePicker
+                            date={field.value}
+                            setDate={field.onChange}
+                            triggerProps={{ id: 'purchase-signed-at', name: 'signedAt' }}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* 税率 */}
+                    <FormField
+                      control={form.control}
+                      name="taxRate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>税率 (%) <span className="text-destructive">*</span></FormLabel>
+                          <Select onValueChange={(val) => field.onChange(Number(val))} defaultValue={String(field.value)}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="选择税率" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="1">1% (小规模纳税人)</SelectItem>
+                              <SelectItem value="13">13% (一般纳税人)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* 备注 */}
+                    <div className="md:col-span-3">
+                      <FormField
+                        control={form.control}
+                        name="note"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>备注</FormLabel>
+                            <FormControl>
+                              <Textarea {...field} placeholder="填写合同备注信息（可选）" className="min-h-[80px]" />
+                            </FormControl>
+                            <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
-                    <div className="md:col-span-1 text-right pb-2 font-medium">
-                      ¥{((watchItems[index]?.quantity || 0) * (watchItems[index]?.unitPrice || 0)).toLocaleString()}
-                    </div>
-                    <div className="md:col-span-1">
-                      <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
-                        <Trash className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-                <Button type="button" variant="outline" onClick={() => append({ productId: '', quantity: 0, unitPrice: 0, unit: '', note: '' })}>
-                  <Plus className="h-4 w-4 mr-2" /> 添加商品
-                </Button>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
 
-            {/* 合同详情 */}
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle>合同信息</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-6 md:grid-cols-3">
-                {/* 合同编号 */}
-                <FormField
-                  control={form.control}
-                  name="contractNo"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>合同编号</FormLabel>
-                      <FormControl>
-                        {contractNoLoading ? (
-                          <div className="flex items-center gap-2 h-10 px-3 text-muted-foreground">
-                            <Loader2 className="h-4 w-4 animate-spin" />生成中...
-                          </div>
-                        ) : (
-                          <Input {...field} disabled className="font-mono" />
-                        )}
-                      </FormControl>
-                      <FormDescription>格式：CG + 年份 + 5位序号</FormDescription>
-                    </FormItem>
-                  )}
-                />
-
-                {/* 供应商 Combobox */}
-                <FormField
-                  control={form.control}
-                  name="supplierId"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <div className="flex items-center justify-between">
-                        <FormLabel>供应商</FormLabel>
-                        <Button type="button" variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setShowNewSupplierDialog(true)}>
-                          <UserPlus className="h-3 w-3 mr-1" />新增
-                        </Button>
-                      </div>
-                      <Popover open={supplierOpen} onOpenChange={setSupplierOpen}>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              aria-expanded={supplierOpen}
-                              className={cn('w-full justify-between font-normal', !field.value && 'text-muted-foreground')}
-                            >
-                              {selectedSupplier ? selectedSupplier.name : '搜索或选择供应商...'}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[400px] p-0" align="start">
-                          <Command shouldFilter={false}>
-                            <Label htmlFor="purchase-supplier-search" className="sr-only">
-                              搜索供应商
-                            </Label>
-                            <CommandInput
-                              id="purchase-supplier-search"
-                              name="supplierSearch"
-                              aria-label="搜索供应商"
-                              placeholder="输入供应商名称搜索..."
-                              value={supplierSearch}
-                              onValueChange={setSupplierSearch}
-                            />
-                            <CommandList>
-                              <CommandEmpty>
-                                <div className="py-2">
-                                  <p className="text-muted-foreground">未找到匹配供应商</p>
-                                  <Button
-                                    type="button"
-                                    variant="link"
-                                    size="sm"
-                                    onClick={() => {
-                                      setNewSupplierForm(prev => ({ ...prev, name: supplierSearch }));
-                                      setShowNewSupplierDialog(true);
-                                      setSupplierOpen(false);
-                                    }}
-                                  >
-                                    {`+ 新增 "${supplierSearch}"`}
-                                  </Button>
-                                </div>
-                              </CommandEmpty>
-                              {recommendedSupplierIds.size > 0 && sortedSuppliers.some(s => s.isRecommended) && (
-                                <CommandGroup heading="推荐供应商">
-                                  {sortedSuppliers.filter(s => s.isRecommended).map(s => (
-                                    <CommandItem
-                                      key={s.id}
-                                      value={s.id}
-                                      onSelect={() => {
-                                        field.onChange(s.id);
-                                        setSupplierOpen(false);
-                                        setSupplierSearch('');
-                                      }}
-                                    >
-                                      <Check className={cn('mr-2 h-4 w-4', field.value === s.id ? 'opacity-100' : 'opacity-0')} />
-                                      <Star className="mr-1 h-3 w-3 text-primary" />
-                                      <span>{s.name}</span>
-                                      {s.contactName && <span className="text-muted-foreground text-xs ml-2">({s.contactName})</span>}
-                                      <Badge variant="secondary" className="ml-auto text-xs">曾供应</Badge>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              )}
-                              <CommandGroup heading={recommendedSupplierIds.size > 0 ? '全部供应商' : '供应商列表'}>
-                                {sortedSuppliers.filter(s => !s.isRecommended).map(s => (
-                                  <CommandItem
-                                    key={s.id}
-                                    value={s.id}
-                                    onSelect={() => {
-                                      field.onChange(s.id);
-                                      setSupplierOpen(false);
-                                      setSupplierSearch('');
-                                    }}
-                                  >
-                                    <Check className={cn('mr-2 h-4 w-4', field.value === s.id ? 'opacity-100' : 'opacity-0')} />
-                                    <span>{s.name}</span>
-                                    {s.contactName && <span className="text-muted-foreground text-xs ml-2">({s.contactName})</span>}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* 签订日期 */}
-                <FormField
-                  control={form.control}
-                  name="signedAt"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <Label htmlFor="purchase-signed-at" className="mb-1.5">
-                        签订日期
-                      </Label>
-                      <DatePicker
-                        date={field.value}
-                        setDate={field.onChange}
-                        triggerProps={{ id: 'purchase-signed-at', name: 'signedAt' }}
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* 税率 */}
-                <FormField
-                  control={form.control}
-                  name="taxRate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>税率 (%)</FormLabel>
-                      <Select onValueChange={(val) => field.onChange(Number(val))} defaultValue={String(field.value)}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="选择税率" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="1">1% (小规模纳税人)</SelectItem>
-                          <SelectItem value="13">13% (一般纳税人)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>用于生成购销合同</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* 合同预览 */}
-                <div className="md:col-span-2">
-                  <p className="text-sm font-medium leading-none">合同预览</p>
-                  <div className="mt-2 p-4 bg-muted/30 rounded-lg border">
-                    <div className="flex items-center gap-3">
-                      <FileText className="h-8 w-8 text-primary" />
-                      <div className="flex-1">
-                        <p className="font-medium">购销合同</p>
-                        <p className="text-sm text-muted-foreground">填写完成后，可在采购详情页生成并预览标准购销合同文档</p>
-                      </div>
-                      <Button type="button" variant="outline" disabled>
-                        <Eye className="h-4 w-4 mr-2" />创建后预览
-                      </Button>
-                    </div>
-                  </div>
+                {/* 提交按钮 */}
+                <div className="md:col-span-2 flex justify-end gap-4">
+                  <Button type="button" variant="outline" onClick={goToStep1}>上一步</Button>
+                  <Button type="button" variant="outline" onClick={() => router.back()}>取消</Button>
+                  <Button 
+                    type="submit" 
+                    size="lg"
+                    disabled={form.formState.isSubmitting}
+                  >
+                    {form.formState.isSubmitting ? '提交中...' : '创建合同'}
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* 提交按钮 */}
-            <div className="md:col-span-2 flex justify-end gap-4">
-              <Button type="button" variant="outline" onClick={() => router.back()}>取消</Button>
-              <Button 
-                type="submit" 
-                size="lg"
-                disabled={!form.formState.isValid || form.formState.isSubmitting}
-              >
-                {form.formState.isSubmitting ? '提交中...' : '创建合同'}
-              </Button>
-            </div>
+              </>
+            )}
           </form>
         </Form>
       </div>

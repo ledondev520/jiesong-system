@@ -269,7 +269,7 @@ const persistPatrolFindings = async (findings) => {
   if (findings.length === 0) return { total: 0, notified: 0 };
 
   const admins = await prisma.user.findMany({
-    where: { role: 'ADMIN', status: 'active' },
+    where: { role: 'ADMIN', isActive: true },
     select: { id: true },
   });
 
@@ -303,11 +303,11 @@ const persistPatrolFindings = async (findings) => {
   try {
     await prisma.operationLog.create({
       data: {
+        actorType: 'SYSTEM',
         action: 'PATROL_RUN',
         entity: 'System',
         entityId: 'patrol',
-        userId: 'system',
-        detail: JSON.stringify({
+        newValue: JSON.stringify({
           totalFindings: findings.length,
           critical: findings.filter((f) => f.severity === SEVERITY.CRITICAL).length,
           warning: findings.filter((f) => f.severity === SEVERITY.WARNING).length,
@@ -359,11 +359,11 @@ const executeAutoFixes = async (findings) => {
 
       await prisma.operationLog.create({
         data: {
+          actorType: 'SYSTEM',
           action: 'PATROL_AUTO_FIX',
           entity: finding.entityType || 'System',
           entityId: finding.entityId || 'patrol',
-          userId: 'system',
-          detail: JSON.stringify({
+          newValue: JSON.stringify({
             rule: finding.rule,
             autoFixAction: finding.autoFixAction,
             result,

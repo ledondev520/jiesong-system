@@ -11,3 +11,8 @@ test('dashboardController: 模块可正常加载并导出', () => {
   const mod = require('./dashboardController');
   assert.ok(mod !== undefined);
 });
+
+test('dashboardController: 导出包含 getBusinessOverview', () => {
+  const mod = require('./dashboardController');
+  assert.strictEqual(typeof mod.getBusinessOverview, 'function');
+});

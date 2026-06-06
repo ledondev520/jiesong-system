@@ -5,6 +5,7 @@
 // 
 // 2026-01-20 重构：合并货柜与出口合同，用 EXP 号作为货柜标识
 // 2026-02-21 迁移：SQLite → Supabase (PostgreSQL)
+// 2026-06-03 新增：SalesContractFile 归档出口合同/装箱/报关源文件附件
 
 generator client {
   provider = "prisma-client-js"
@@ -275,6 +276,9 @@ model PurchaseContract {
   payments Payment[]
   files    ContractFile[]
 
+  @@index([status])
+  @@index([supplierId])
+  @@index([createdAt])
   @@map("purchase_contracts")
 }
 
@@ -295,6 +299,8 @@ model PurchaseItem {
   product          Product          @relation(fields: [productId], references: [id])
   inventories      Inventory[]
 
+  @@index([purchaseContractId])
+  @@index([productId])
   @@map("purchase_items")
 }
 
@@ -335,7 +341,11 @@ model SalesContract {
   payments     Payment[]
   inventories  Inventory[]
   taxRefunds   TaxRefund[]
+  files        SalesContractFile[]
 
+  @@index([status])
+  @@index([portId])
+  @@index([createdAt])
   @@map("sales_contracts")
 }
 
@@ -358,6 +368,8 @@ model SalesItem {
   store         Store         @relation(fields: [storeId], references: [id])
   inventories   Inventory[]
 
+  @@index([salesContractId])
+  @@index([productId])
   @@map("sales_items")
 }
 
@@ -429,6 +441,10 @@ model Inventory {
   salesItem     SalesItem?     @relation(fields: [salesItemId], references: [id])
   salesContract SalesContract? @relation(fields: [salesContractId], references: [id])
 
+  @@index([status])
+  @@index([productId])
+  @@index([salesContractId])
+  @@index([createdAt])
   @@map("inventories")
 }
 
@@ -457,6 +473,10 @@ model Payment {
 
   @@index([sourcePaymentId])
   @@index([customerName])
+  @@index([type])
+  @@index([purchaseContractId])
+  @@index([salesContractId])
+  @@index([createdAt])
   @@map("payments")
 }
 
@@ -639,6 +659,21 @@ model ContractFile {
   @@map("contract_files")
 }
 
+model SalesContractFile {
+  id              String   @id @default(cuid())
+  salesContractId String
+  fileName        String
+  filePath        String
+  fileType        String
+  fileSize        Int
+  uploadedAt      DateTime @default(now())
+
+  salesContract SalesContract @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
+
+  @@index([salesContractId])
+  @@map("sales_contract_files")
+}
+
 // ==================== AI与日志 ====================
 
 model ChatHistory {
@@ -748,11 +783,11 @@ model SystemConfig {
 model Notification {
   id        String   @id @default(cuid())
   userId    String
-  type      String
+  type      String   // PURCHASE_DRAFT, SALES_DRAFT, OVERDUE_RECEIVABLE, LOW_STOCK
   title     String
-  content   String
+  content   String?
+  link      String?  // 点击跳转的URL
   isRead    Boolean  @default(false)
-  metadata  String?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])

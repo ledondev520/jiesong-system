@@ -464,3 +464,20 @@ export interface PaginatedResponse<T> {
     totalPages: number;
   };
 }
+
+export type NotificationType =
+  | 'PURCHASE_DRAFT'
+  | 'SALES_DRAFT'
+  | 'OVERDUE_RECEIVABLE'
+  | 'LOW_STOCK';
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  content?: string;
+  link?: string;
+  isRead: boolean;
+  createdAt: string;
+}

@@ -7,6 +7,7 @@ import {
   PackageOpen,
   ShoppingCart,
   SlidersHorizontal,
+  Warehouse,
 } from 'lucide-react';
 import { getModuleTabOrRoot } from '@/lib/tab-memory';
 import { Role } from '@/types';
@@ -38,24 +39,33 @@ export interface ModuleNavItem {
 
 export const OPERATIONS_TABS: TabConfig[] = [
   { href: '/dashboard', label: '工作台' },
+  { href: '/dashboard/reports', label: '经营报表' },
 ];
 
 export const PROCUREMENT_TABS: TabConfig[] = [
   { href: '/dashboard/contracts', label: '采购合同' },
   { href: '/dashboard/suppliers', label: '供应商管理' },
   { href: '/dashboard/store-recommend', label: '采购建议' },
-  { href: '/dashboard/products', label: '商品档案' },
 ];
 
 export const EXPORT_TABS: TabConfig[] = [
-  { href: '/dashboard/sales', label: '出口合同' },
-  { href: '/customs-declarations', label: '报关单' },
+  { href: '/dashboard/sales', label: '销售合同' },
+  { href: '/dashboard/customs-declarations', label: '报关单' },
+  { href: '/dashboard/hs-codes', label: 'HS 编码' },
+];
+
+export const LOGISTICS_TABS: TabConfig[] = [
+  { href: '/dashboard/logistics', label: '库存总览' },
+  { href: '/dashboard/logistics/containers', label: '货柜装箱' },
+  { href: '/dashboard/customs-declarations', label: '报关单' },
   { href: '/dashboard/hs-codes', label: 'HS 编码' },
 ];
 
 export const FINANCE_TABS: TabConfig[] = [
   { href: '/dashboard/finance', label: '财务概览' },
   { href: '/dashboard/finance/statements', label: '财务报表' },
+  { href: '/dashboard/finance/receivable', label: '应收账款' },
+  { href: '/dashboard/finance/payable', label: '应付账款' },
   { href: '/dashboard/payments', label: '收付款' },
   { href: '/dashboard/finance/bank-flow', label: '银行流水' },
   { href: '/dashboard/finance/invoices', label: '发票台账' },
@@ -65,6 +75,7 @@ export const FINANCE_TABS: TabConfig[] = [
 export const ADMIN_TABS: TabConfig[] = [
   { href: '/dashboard/settings', label: '系统配置' },
   { href: '/dashboard/users', label: '账号管理' },
+  { href: '/dashboard/products', label: '商品档案' },
   { href: '/dashboard/ai/sessions', label: 'AI 日志' },
   { href: '/dashboard/system/logs', label: '系统日志' },
   { href: '/dashboard/dev', label: '项目驾驶舱' },
@@ -95,7 +106,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     defaultHref: '/dashboard',
     label: '经营中台',
     icon: LayoutDashboard,
-    childPrefixes: [],
+    childPrefixes: ['/dashboard/reports'],
     tabs: OPERATIONS_TABS,
     mobilePrimary: true,
   },
@@ -105,7 +116,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     defaultHref: '/dashboard/contracts',
     label: '采购',
     icon: ShoppingCart,
-    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers', '/dashboard/store-recommend', '/dashboard/products'],
+    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers', '/dashboard/store-recommend'],
     tabs: PROCUREMENT_TABS,
     mobilePrimary: true,
   },
@@ -113,10 +124,20 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     key: 'export',
     href: '/dashboard/sales',
     defaultHref: '/dashboard/sales',
-    label: '出口',
+    label: '销售',
     icon: PackageOpen,
-    childPrefixes: ['/dashboard/sales', '/dashboard/tax-refunds', '/customs-declarations', '/forex-verifications', '/dashboard/hs-codes'],
+    childPrefixes: ['/dashboard/sales', '/dashboard/tax-refunds', '/dashboard/customs-declarations', '/forex-verifications', '/dashboard/hs-codes'],
     tabs: EXPORT_TABS,
+    mobilePrimary: true,
+  },
+  {
+    key: 'logistics',
+    href: '/dashboard/logistics',
+    defaultHref: '/dashboard/logistics',
+    label: '仓储物流',
+    icon: Warehouse,
+    childPrefixes: ['/dashboard/logistics', '/dashboard/customs-declarations', '/dashboard/hs-codes'],
+    tabs: LOGISTICS_TABS,
     mobilePrimary: true,
   },
   {
@@ -143,6 +164,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
       '/dashboard/about',
       '/dashboard/system',
       '/dashboard/ai',
+      '/dashboard/products',
     ],
     tabs: ADMIN_TABS,
     visibleRoles: [Role.ADMIN],
@@ -153,7 +175,7 @@ export const SHELL_PREFETCH_ROUTES = [
   '/dashboard/purchase/create',
   '/dashboard/sales/create',
   '/dashboard/tax-refunds/create',
-  '/customs-declarations/create',
+  '/dashboard/customs-declarations/create',
   '/dashboard/contracts',
   '/dashboard/payments',
   '/dashboard/finance/statements',
@@ -194,7 +216,8 @@ export const isModuleRouteActive = (pathname: string, item: Pick<ModuleNavItem, 
 export const getModuleByPath = (pathname: string) =>
   MODULE_NAV_ITEMS.find((item) => isModuleRouteActive(pathname, item));
 
-export const isTabRouteActive = (pathname: string, href: string) => {
+export const isTabRouteActive = (pathname: string | null, href: string) => {
+  if (!pathname) return false;
   if (href === '/dashboard') return pathname === '/dashboard';
   if (href === '/dashboard/finance') return pathname === '/dashboard/finance';
   return pathname === href || pathname.startsWith(`${href}/`);

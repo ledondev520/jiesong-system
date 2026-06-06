@@ -28,6 +28,29 @@ export interface DashboardStats {
   };
 }
 
+export interface BusinessOverview {
+  overview: {
+    totalSales: number;
+    totalPurchases: number;
+    grossProfit: number;
+    profitMargin: number;
+  };
+  funds: {
+    totalReceivable: number;
+    totalPayable: number;
+    overdueReceivable: number;
+    overduePayable: number;
+  };
+  inventory: {
+    totalItems: number;
+    lowStockItems: number;
+    inTransitContainers: number;
+  };
+  trends: {
+    monthlySales: Array<{ month: string; amount: number }>;
+  };
+}
+
 export const reportsService = {
   getSuppliers: async (params?: { pageSize?: number }) => {
     return api.get<ApiResponse<PaginatedResponse<SupplierLite>>, ApiResponse<PaginatedResponse<SupplierLite>>>(
@@ -57,5 +80,9 @@ export const reportsService = {
     return api.get<ApiResponse<PurchaseSummaryResponse>, ApiResponse<PurchaseSummaryResponse>>('/sales', {
       params: { storeId, pageSize: 1 },
     });
+  },
+
+  getBusinessOverview: async () => {
+    return api.get<ApiResponse<BusinessOverview>, ApiResponse<BusinessOverview>>('/reports/business-overview');
   },
 };

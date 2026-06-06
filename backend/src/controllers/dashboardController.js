@@ -10,6 +10,7 @@
 
 const prisma = require('../utils/prisma');
 const { success } = require('../utils/response');
+const { generateForUser } = require('../services/notificationService');
 
 /**
  * 职责：获取仪表盘统计数据
@@ -104,6 +105,11 @@ const getStats = async (req, res, next) => {
         sales: recentSales,
       },
     };
+
+    // 3. 异步生成通知（不阻塞响应）
+    if (req.user?.id) {
+      generateForUser(req.user.id).catch(() => {});
+    }
 
     success(res, data);
   } catch (error) {
@@ -379,8 +385,138 @@ const getAnalytics = async (req, res, next) => {
   }
 };
 
+/**
+ * 职责：获取经营数据报表（老板视角）
+ * 思路：
+ *   1. 聚合销售/采购合同金额，计算毛利与利润率
+ *   2. 通过原始查询计算应收、应付及逾期金额
+ *   3. 统计库存总量、低库存预警、在途货柜
+ *   4. 按月聚合近 6 个月销售趋势
+ */
+const getBusinessOverview = async (req, res, next) => {
+  try {
+    // 1. 经营概览聚合
+    const [salesAgg, purchaseAgg] = await Promise.all([
+      prisma.salesContract.aggregate({
+        _sum: { totalAmount: true, receivedAmount: true },
+      }),
+      prisma.purchaseContract.aggregate({
+        _sum: { totalAmount: true, paidAmount: true },
+      }),
+    ]);
+
+    const totalSales = salesAgg._sum.totalAmount || 0;
+    const totalPurchases = purchaseAgg._sum.totalAmount || 0;
+    const grossProfit = totalSales - totalPurchases;
+    const profitMargin = totalSales > 0 ? grossProfit / totalSales : 0;
+
+    // 2. 资金状况（原始查询精确计算差额，避免全表扫描）
+    const [
+      receivableResult,
+      payableResult,
+      overdueReceivableResult,
+      overduePayableResult,
+    ] = await Promise.all([
+      prisma.$queryRaw`
+        SELECT COALESCE(SUM(totalAmount - receivedAmount), 0) as amount
+        FROM sales_contracts
+        WHERE totalAmount > receivedAmount
+      `,
+      prisma.$queryRaw`
+        SELECT COALESCE(SUM(totalAmount - paidAmount), 0) as amount
+        FROM purchase_contracts
+        WHERE totalAmount > paidAmount
+      `,
+      prisma.$queryRaw`
+        SELECT COALESCE(SUM(totalAmount - receivedAmount), 0) as amount
+        FROM sales_contracts
+        WHERE totalAmount > receivedAmount
+          AND (
+            (estimatedArrival IS NOT NULL AND estimatedArrival < datetime('now'))
+            OR (estimatedArrival IS NULL AND shippedAt IS NOT NULL AND shippedAt < datetime('now'))
+          )
+      `,
+      prisma.$queryRaw`
+        SELECT COALESCE(SUM(totalAmount - paidAmount), 0) as amount
+        FROM purchase_contracts
+        WHERE totalAmount > paidAmount
+          AND expectedDate IS NOT NULL
+          AND expectedDate < datetime('now')
+      `,
+    ]);
+
+    const totalReceivable = Number(receivableResult[0]?.amount || 0);
+    const totalPayable = Number(payableResult[0]?.amount || 0);
+    const overdueReceivable = Number(overdueReceivableResult[0]?.amount || 0);
+    const overduePayable = Number(overduePayableResult[0]?.amount || 0);
+
+    // 3. 库存与物流
+    const [inventoryCount, lowStockResult, inTransitContainers] = await Promise.all([
+      prisma.inventory.count(),
+      prisma.$queryRaw`
+        SELECT COUNT(*) as count
+        FROM inventories i
+        JOIN products p ON i.productId = p.id
+        WHERE i.quantity < p.lowStockThreshold AND p.lowStockThreshold > 0
+      `,
+      prisma.salesContract.count({
+        where: { status: { in: ['SHIPPED', 'ARRIVED'] } },
+      }),
+    ]);
+
+    const lowStockItems = Number(lowStockResult[0]?.count || 0);
+
+    // 4. 月度销售趋势（近 6 个月）
+    const monthlySalesResult = await prisma.$queryRaw`
+      SELECT
+        strftime('%Y-%m', signedAt) as month,
+        SUM(totalAmount) as amount
+      FROM sales_contracts
+      WHERE signedAt >= datetime('now', '-6 months')
+        AND signedAt IS NOT NULL
+      GROUP BY strftime('%Y-%m', signedAt)
+      ORDER BY month ASC
+    `;
+
+    const monthlySales = Array.isArray(monthlySalesResult)
+      ? monthlySalesResult.map((row) => ({
+          month: String(row.month),
+          amount: Number(row.amount || 0),
+        }))
+      : [];
+
+    const data = {
+      overview: {
+        totalSales,
+        totalPurchases,
+        grossProfit,
+        profitMargin,
+      },
+      funds: {
+        totalReceivable,
+        totalPayable,
+        overdueReceivable,
+        overduePayable,
+      },
+      inventory: {
+        totalItems: inventoryCount,
+        lowStockItems,
+        inTransitContainers,
+      },
+      trends: {
+        monthlySales,
+      },
+    };
+
+    success(res, data);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getStats,
   trackProduct,
   getAnalytics,
+  getBusinessOverview,
 };

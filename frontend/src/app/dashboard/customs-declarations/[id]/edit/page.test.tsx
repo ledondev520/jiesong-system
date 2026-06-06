@@ -148,7 +148,7 @@ describe('EditCustomsDeclarationPage 交互逻辑', () => {
     });
 
     expect(mockToastSuccess).toHaveBeenCalledWith('报关单更新成功');
-    expect(mockRouterPush).toHaveBeenCalledWith('/customs-declarations/cd-2');
+    expect(mockRouterPush).toHaveBeenCalledWith('/dashboard/customs-declarations/cd-2');
   });
 
   it('加载失败时提示错误', async () => {

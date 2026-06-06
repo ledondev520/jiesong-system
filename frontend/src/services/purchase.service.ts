@@ -86,6 +86,14 @@ const crud = createCrudService<PurchaseContract, PurchaseCreatePayload, Partial<
   '/purchases'
 );
 
+export interface ProductPriceHistory {
+  averagePrice: number | null;
+  minPrice: number | null;
+  maxPrice: number | null;
+  count: number;
+  history: { contractNo: string; price: number; date: string }[];
+}
+
 /**
  * 采购服务（含报价解析与供应商查询）。
  */
@@ -97,6 +105,15 @@ export const purchaseService = {
    */
   getNextContractNo: async () => {
     return api.get<ApiResponse<{ contractNo: string }>, ApiResponse<{ contractNo: string }>>('/purchases/options/next-no');
+  },
+
+  /**
+   * 根据商品ID获取历史采购价格统计。
+   */
+  getProductPriceHistory: async (productId: string) => {
+    return api.get<ApiResponse<ProductPriceHistory>, ApiResponse<ProductPriceHistory>>(
+      `/purchases/price-history/${productId}`,
+    );
   },
 
   /**

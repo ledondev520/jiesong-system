@@ -61,4 +61,22 @@ describe('reportsService', () => {
 
     expect(api.get).toHaveBeenCalledWith('/sales', { params: { storeId: 'store-1', pageSize: 1 } });
   });
+
+  it('应该获取经营数据报表', async () => {
+    const mockResponse = {
+      code: 200,
+      data: {
+        overview: { totalSales: 100000, totalPurchases: 80000, grossProfit: 20000, profitMargin: 0.2 },
+        funds: { totalReceivable: 50000, totalPayable: 30000, overdueReceivable: 10000, overduePayable: 5000 },
+        inventory: { totalItems: 199, lowStockItems: 12, inTransitContainers: 41 },
+        trends: { monthlySales: [{ month: '2026-01', amount: 100000 }] },
+      },
+    };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await reportsService.getBusinessOverview();
+
+    expect(api.get).toHaveBeenCalledWith('/reports/business-overview');
+    expect(result.data).toEqual(mockResponse);
+  });
 });

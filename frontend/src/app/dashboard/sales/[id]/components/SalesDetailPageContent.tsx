@@ -1,6 +1,6 @@
 /**
- * Input: 出口合同详情API、商品API、SortableTableHead、useTableSort
- * Output: 出口合同详情页面（含可排序装箱明细、3D可视化）
+ * Input: 销售合同详情API、商品API、SortableTableHead、useTableSort
+ * Output: 销售合同详情页面（含可排序装箱明细、3D可视化、源文件附件）
  * Pos: 销售管理子页面，展示合同详情与装箱可视化
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,12 +8,13 @@
 
 'use client';
 
-import { useState, useEffect, use, lazy, Suspense, useMemo, useRef, useCallback } from 'react';
-import { SalesContract, PackingItem, Product, Store, SalesStatus, Inventory } from '@/types';
+import { useState, useEffect, use, lazy, Suspense, useMemo, useRef, useCallback, type ChangeEvent } from 'react';
+import { SalesContract, PackingItem, Product, Store, SalesStatus, Inventory, type ApiResponse } from '@/types';
 import { salesService } from '@/services/sales.service';
 import { productService } from '@/services/product.service';
 import { storeService } from '@/services/store.service';
 import { inventoryService } from '@/services/inventory.service';
+import api from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -50,7 +51,7 @@ import {
 } from '@/components/ui/tabs';
 import { StatusBadge, type StatusBadgeConfig } from '@/components/ui/status-badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet } from 'lucide-react';
+import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, Paperclip, Upload, Loader2, FileText, Download, Trash2 } from 'lucide-react';
 import { domToPng } from 'modern-screenshot';
 import { toast } from 'sonner';
 import { CONTAINER_40HQ } from '@/lib/binPacking';
@@ -66,6 +67,15 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+interface SalesContractFile {
+  id: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  filePath: string;
+  uploadedAt: string;
+}
+
 export default function SalesDetailPage({ params }: PageProps) {
   const { id } = use(params);
   const [contract, setContract] = useState<SalesContract | null>(null);
@@ -73,6 +83,8 @@ export default function SalesDetailPage({ params }: PageProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [inventories, setInventories] = useState<Inventory[]>([]);
+  const [contractFiles, setContractFiles] = useState<SalesContractFile[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [referenceDataLoading, setReferenceDataLoading] = useState(false);
   const referenceDataLoadedRef = useRef(false);
   const [activeTab, setActiveTab] = useState('packing');
@@ -105,6 +117,7 @@ export default function SalesDetailPage({ params }: PageProps) {
   const statsRef = useRef<HTMLDivElement>(null);
   const packingRef = useRef<HTMLDivElement>(null);
   const view3dRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleThreeFormsGenerated = (results: {
     customsDeclarationId?: string;
@@ -113,7 +126,7 @@ export default function SalesDetailPage({ params }: PageProps) {
   }) => {
     if (results.customsDeclarationId) toast.success(`报关单已生成`);
     if (results.forexId) toast.success(`外汇核销单已生成`);
-    if (results.taxRefundId) toast.success(`出口退税单已生成`);
+    if (results.taxRefundId) toast.success(`销售退税单已生成`);
   };
 
   /**
@@ -220,8 +233,12 @@ export default function SalesDetailPage({ params }: PageProps) {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const contractRes = await salesService.getById(id);
+      const [contractRes, filesRes] = await Promise.all([
+        salesService.getById(id),
+        api.get<ApiResponse<SalesContractFile[]>, ApiResponse<SalesContractFile[]>>(`/sales/${id}/files`),
+      ]);
       setContract(contractRes.data);
+      setContractFiles(filesRes.data || []);
     } catch {
       toast.error('加载数据失败');
     } finally {
@@ -346,6 +363,42 @@ export default function SalesDetailPage({ params }: PageProps) {
       void loadData();
     } catch {
       toast.error('保存失败');
+    }
+  };
+
+  const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    setUploadingFile(true);
+    try {
+      const token = localStorage.getItem('auth-token') || sessionStorage.getItem('auth-token') || '';
+      const res = await fetch(`/api/v1/sales/${id}/files`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (!res.ok) throw new Error('上传失败');
+      toast.success(`「${file.name}」上传成功`);
+      void loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '附件上传失败');
+    } finally {
+      setUploadingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFileDelete = async (fileId: string, fileName: string) => {
+    try {
+      await api.delete(`/sales/files/${fileId}`);
+      setContractFiles((prev) => prev.filter((file) => file.id !== fileId));
+      toast.success(`「${fileName}」已删除`);
+    } catch {
+      toast.error('删除附件失败');
     }
   };
 
@@ -720,6 +773,80 @@ export default function SalesDetailPage({ params }: PageProps) {
           />
         </TabsContent>
       </Tabs>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Paperclip className="h-5 w-5 text-muted-foreground" />
+              <CardTitle>源文件附件</CardTitle>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingFile}
+            >
+              {uploadingFile ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />上传中...</>
+              ) : (
+                <><Upload className="mr-2 h-4 w-4" />上传附件</>
+              )}
+            </Button>
+            <input
+              id="sales-contract-attachment-upload"
+              name="salesContractAttachmentUpload"
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls"
+              onChange={handleFileUpload}
+            />
+          </div>
+          <CardDescription>
+            归档 WPS 出货合同、装箱单、报关单、退税联、提单等原始文件
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {contractFiles.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
+              <Paperclip className="h-8 w-8 opacity-30" />
+              <p className="text-sm">暂无附件，点击「上传附件」归档出货源文件</p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {contractFiles.map((file) => (
+                <div key={file.id} className="flex items-center justify-between py-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <FileText className="h-5 w-5 flex-shrink-0 text-primary" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{file.fileName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {((file.fileSize || 0) / 1024).toFixed(1)} KB · {formatDate(file.uploadedAt)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="ml-4 flex flex-shrink-0 items-center gap-1">
+                    <Button variant="ghost" size="icon" asChild>
+                      <a href={`/api/v1/sales/files/${file.id}/download`} target="_blank" download={file.fileName}>
+                        <Download className="h-4 w-4" />
+                      </a>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => handleFileDelete(file.id, file.fileName)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* 添加/编辑商品对话框 */}
       <Dialog open={isItemDialogOpen} onOpenChange={setIsItemDialogOpen}>

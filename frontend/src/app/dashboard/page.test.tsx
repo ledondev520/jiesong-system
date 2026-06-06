@@ -108,19 +108,16 @@ describe('DashboardPage 交互逻辑', () => {
     render(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('今日主任务')).toBeInTheDocument();
-      expect(screen.getByText('采购主线')).toBeInTheDocument();
-      expect(screen.getByText('出口跟进')).toBeInTheDocument();
-      expect(screen.getByText('财务上报')).toBeInTheDocument();
-      expect(screen.getByText('待起草 2 份')).toBeInTheDocument();
-      expect(screen.getByText('待补录 1 份')).toBeInTheDocument();
-      expect(screen.getByText('最新账期 2026年3月账期')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '继续编辑采购合同 PO-001' })).toBeInTheDocument();
+      expect(screen.getByText('采购流程')).toBeInTheDocument();
+      expect(screen.getByText('出口流程')).toBeInTheDocument();
+      expect(screen.getByText('待办 2')).toBeInTheDocument();
+      expect(screen.getByText('待补录 1')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '编辑采购合同 PO-001' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '补录出口参数 EXP-001' })).toBeInTheDocument();
     });
 
     await waitFor(() => {
-      expect(screen.getByText('当前焦点')).toBeInTheDocument();
+      expect(screen.getByText('优先处理')).toBeInTheDocument();
     });
 
     expect(screen.getByText('起草采购并生成合同')).toBeInTheDocument();
@@ -131,22 +128,19 @@ describe('DashboardPage 交互逻辑', () => {
     render(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('今日主任务')).toBeInTheDocument();
+      expect(screen.getByText('采购流程')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: '新建采购合同' }));
+    await user.click(screen.getAllByRole('button', { name: '新建采购合同' })[0]);
     expect(mockPush).toHaveBeenCalledWith('/dashboard/purchase/create');
 
-    await user.click(screen.getByRole('button', { name: '新增供应商档案' }));
+    await user.click(screen.getAllByRole('button', { name: '新增供应商' })[0]);
     expect(mockPush).toHaveBeenCalledWith('/dashboard/suppliers');
 
-    await user.click(screen.getByRole('button', { name: '跟进采购合同' }));
+    await user.click(screen.getAllByRole('button', { name: '跟进采购合同' })[0]);
     expect(mockPush).toHaveBeenCalledWith('/dashboard/contracts');
 
     await user.click(screen.getByRole('button', { name: '去补录出口参数' }));
     expect(mockPush).toHaveBeenCalledWith('/dashboard/sales');
-
-    await user.click(screen.getByRole('button', { name: '上传本期财务报表' }));
-    expect(mockPush).toHaveBeenCalledWith('/dashboard/finance/statements');
   });
 });

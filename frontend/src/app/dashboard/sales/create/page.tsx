@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { Product, Store } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Form,
   FormControl,
@@ -58,6 +59,7 @@ export default function CreateSalesPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [contractNoLoading, setContractNoLoading] = useState(true);
+  const [currentStep, setCurrentStep] = useState(1);
 
   const form = useForm<SalesFormValues>({
     resolver: zodResolver(salesSchema),
@@ -155,6 +157,15 @@ export default function CreateSalesPage() {
     }
   };
 
+  const goToStep2 = async () => {
+    const valid = await form.trigger('exchangeRate');
+    if (valid) setCurrentStep(2);
+  };
+
+  const goToStep1 = () => setCurrentStep(1);
+
+  const steps = ['基本信息', '销售明细'];
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-10">
       <PageHeader
@@ -162,202 +173,260 @@ export default function CreateSalesPage() {
         description="创建新的销售合同并自动计算报价。"
       />
 
+      {/* Stepper */}
+      <div className="flex items-center justify-center gap-2">
+        {steps.map((step, idx) => (
+          <div key={step} className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentStep(idx + 1)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                currentStep === idx + 1
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              }`}
+            >
+              <span className={`flex h-5 w-5 items-center justify-center rounded-full text-xs ${
+                currentStep === idx + 1 ? 'bg-primary-foreground text-primary' : 'bg-background text-muted-foreground'
+              }`}>
+                {idx + 1}
+              </span>
+              {step}
+            </button>
+            {idx < steps.length - 1 && <div className="h-px w-8 bg-border" />}
+          </div>
+        ))}
+      </div>
+
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="contents">
-          <Card>
-            <CardHeader>
-              <CardTitle>合同详情</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-6 md:grid-cols-3">
-              <FormField
-                control={form.control}
-                name="contractNo"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>合同编号</FormLabel>
-                    <FormControl>
-                      <Input {...field} disabled={contractNoLoading} />
-                    </FormControl>
-                    <FormDescription>自动生成</FormDescription>
-                  </FormItem>
-                )}
-              />
+          {currentStep === 1 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>基本信息</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-6 md:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="contractNo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>合同编号</FormLabel>
+                      <FormControl>
+                        <Input {...field} disabled={contractNoLoading} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
                   name="signedAt"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                    <Label htmlFor="sales-signed-at" className="mb-1.5">签订日期</Label>
-                    <DatePicker
-                      date={field.value}
-                      setDate={field.onChange}
-                      triggerProps={{ id: 'sales-signed-at', name: 'signedAt' }}
-                    />
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <Label htmlFor="sales-signed-at" className="mb-1.5">签订日期</Label>
+                      <DatePicker
+                        date={field.value}
+                        setDate={field.onChange}
+                        triggerProps={{ id: 'sales-signed-at', name: 'signedAt' }}
+                      />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="exchangeRate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>汇率</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" {...field} />
-                    </FormControl>
-                    <FormDescription>默认: {DEFAULT_EXCHANGE_RATE}</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
+                <FormField
+                  control={form.control}
+                  name="exchangeRate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>汇率 <span className="text-destructive">*</span></FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" {...field} />
+                      </FormControl>
+                      <FormDescription>默认: {DEFAULT_EXCHANGE_RATE}</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>销售明细</CardTitle>
-              <div className="text-lg font-bold">
-                总计: ${totalAmount.toLocaleString()}
+                <div className="md:col-span-3">
+                  <FormField
+                    control={form.control}
+                    name="note"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>备注</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} placeholder="填写备注信息（可选）" className="min-h-[80px]" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </CardContent>
+              <div className="px-6 pb-6 flex justify-end gap-4">
+                <Button type="button" variant="outline" onClick={() => router.back()}>取消</Button>
+                <Button type="button" onClick={goToStep2}>下一步：销售明细</Button>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {fields.map((field, index) => (
-                <div key={field.id} className="grid gap-4 md:grid-cols-12 items-end border-b pb-4">
-                  <div className="md:col-span-3">
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.productId`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className={index !== 0 ? "sr-only" : ""}>商品</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+            </Card>
+          )}
+
+          {currentStep === 2 && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>销售明细</CardTitle>
+                <div className="text-lg font-bold">
+                  总计: ${totalAmount.toLocaleString()}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {fields.map((field, index) => (
+                  <div key={field.id} className="grid gap-4 md:grid-cols-12 items-end border-b pb-4">
+                    <div className="md:col-span-3">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.productId`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className={index !== 0 ? "sr-only" : ""}>
+                              商品 <span className="text-destructive">*</span>
+                            </FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="选择商品" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {products.map(p => (
+                                  <SelectItem key={p.id} value={p.id}>{p.customsName}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="md:col-span-3">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.storeId`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className={index !== 0 ? "sr-only" : ""}>
+                              门店 <span className="text-destructive">*</span>
+                            </FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="选择门店" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {stores.map(s => (
+                                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <div className="md:col-span-2">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.quantity`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className={index !== 0 ? "sr-only" : ""}>
+                              数量 <span className="text-destructive">*</span>
+                            </FormLabel>
                             <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="选择商品" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {products.map(p => (
-                                <SelectItem key={p.id} value={p.id}>{p.customsName}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="md:col-span-3">
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.storeId`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className={index !== 0 ? "sr-only" : ""}>门店</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="选择门店" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {stores.map(s => (
-                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <div className="md:col-span-2">
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.quantity`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className={index !== 0 ? "sr-only" : ""}>数量</FormLabel>
-                          <FormControl>
-                            <Input type="number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.costPrice`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className={index !== 0 ? "sr-only" : ""}>成本 (¥)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              {...field} 
-                              onChange={(e) => handleCostChange(index, parseFloat(e.target.value))}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.sellingPrice`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className={index !== 0 ? "sr-only" : ""}>售价 ($)</FormLabel>
-                          <div className="flex gap-2">
-                             <FormControl>
                               <Input type="number" {...field} />
                             </FormControl>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => remove(index)}
-                              aria-label={`删除第 ${index + 1} 行商品`}
-                              title="删除此行"
-                            >
-                              <Trash className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-              ))}
-              
-              <Button type="button" variant="outline" onClick={() => append({ productId: '', storeId: '', quantity: 0, unit: '', costPrice: 0, sellingPrice: 0, note: '' })}>
-                <Plus className="h-4 w-4 mr-2" /> 添加商品
-              </Button>
-            </CardContent>
-          </Card>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
-          <div className="flex justify-end gap-4">
-            <Button type="button" variant="outline" onClick={() => router.back()}>取消</Button>
-            <Button 
-              type="submit" 
-              size="lg"
-              disabled={form.formState.isSubmitting}
-            >
-              {form.formState.isSubmitting ? '提交中...' : '创建合同'}
-            </Button>
-          </div>
+                    <div className="md:col-span-2">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.costPrice`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className={index !== 0 ? "sr-only" : ""}>
+                              成本 (¥) <span className="text-destructive">*</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                {...field} 
+                                onChange={(e) => handleCostChange(index, parseFloat(e.target.value))}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.sellingPrice`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className={index !== 0 ? "sr-only" : ""}>
+                              售价 ($) <span className="text-destructive">*</span>
+                            </FormLabel>
+                            <div className="flex gap-2">
+                               <FormControl>
+                                <Input type="number" {...field} />
+                              </FormControl>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => remove(index)}
+                                aria-label={`删除第 ${index + 1} 行商品`}
+                                title="删除此行"
+                              >
+                                <Trash className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                ))}
+                
+                <Button type="button" variant="outline" onClick={() => append({ productId: '', storeId: '', quantity: 0, unit: '', costPrice: 0, sellingPrice: 0, note: '' })}>
+                  <Plus className="h-4 w-4 mr-2" /> 添加商品
+                </Button>
+              </CardContent>
+              <div className="px-6 pb-6 flex justify-end gap-4">
+                <Button type="button" variant="outline" onClick={goToStep1}>上一步</Button>
+                <Button type="button" variant="outline" onClick={() => router.back()}>取消</Button>
+                <Button 
+                  type="submit" 
+                  size="lg"
+                  disabled={form.formState.isSubmitting}
+                >
+                  {form.formState.isSubmitting ? '提交中...' : '创建合同'}
+                </Button>
+              </div>
+            </Card>
+          )}
         </form>
       </Form>
     </div>

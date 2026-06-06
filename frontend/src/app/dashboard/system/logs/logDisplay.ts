@@ -29,6 +29,7 @@ export function labelForEntity(entity: string | null | undefined): string {
   const map: Record<string, string> = {
     StoreRecommend: '门店采购建议',
     ContractFile: '合同文件',
+    SalesContractFile: '出口合同文件',
     ContractTemplate: '合同模板',
     PurchaseContract: '采购合同',
     PurchaseItem: '采购明细',

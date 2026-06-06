@@ -29,6 +29,7 @@ const dataImportRoutes = require('./dataImport');
 const dataExportRoutes = require('./dataExport');
 const batchImportRoutes = require('./batchImport.routes');
 const dashboardRoutes = require('./dashboard');
+const reportsRoutes = require('./reports');
 const searchRoutes = require('./search');
 const contractDocRoutes = require('./contractDoc');
 const storeRecommendRoutes = require('./storeRecommend');
@@ -41,6 +42,7 @@ const threeFormsRoutes = require('./threeForms');
 const opsExecutionRoutes = require('./opsExecution');
 const procurementTemplateRoutes = require('./procurementTemplate');
 const bankFlowRoutes = require('./bankFlow');
+const notificationRoutes = require('./notifications');
 
 const router = Router();
 
@@ -65,6 +67,7 @@ router.use('/users', userRoutes);
 router.use('/import', dataImportRoutes);
 router.use('/export', dataExportRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/reports', reportsRoutes);
 router.use('/search', searchRoutes);
 router.use('/contract-doc', contractDocRoutes);  // 合同文档生成
 router.use('/store-recommend', storeRecommendRoutes);  // 门店采购建议
@@ -78,5 +81,6 @@ router.use('/ops-execution', opsExecutionRoutes);
 router.use('/procurement-template', procurementTemplateRoutes);  // 开业采购模板（CSV分析）
 router.use('/batch-import', batchImportRoutes);  // 批量导入
 router.use('/bank-flow', bankFlowRoutes);  // 银行流水与发票查询
+router.use('/notifications', notificationRoutes);  // 站内通知
 
 module.exports = router;

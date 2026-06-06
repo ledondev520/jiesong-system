@@ -1,6 +1,6 @@
 /**
- * Input: 搜索关键字、统一搜索服务
- * Output: Header 全局搜索输入与结果面板
+ * Input: 搜索关键字、统一搜索服务、Command 组件
+ * Output: Header 全局搜索输入与 Command 弹窗面板
  * Pos: 前端布局子组件
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,7 +8,7 @@
 
 'use client';
 
-import { startTransition, useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Building2,
@@ -17,16 +17,21 @@ import {
   Package,
   Search,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   getDashboardSearchHref,
   searchDashboard,
   type DashboardSearchResult,
   type DashboardSearchResultType,
 } from '@/services/dashboardSearch.service';
-
-const SEARCH_DEBOUNCE_MS = 300;
 
 const getResultIcon = (type: DashboardSearchResultType) => {
   switch (type) {
@@ -49,54 +54,33 @@ const getTypeLabel = (type: DashboardSearchResultType) => {
     case 'purchase':
       return '采购';
     case 'sales':
-      return '出口合同';
+      return '销售合同';
   }
 };
 
 export function HeaderSearch() {
   const router = useRouter();
-  const searchRef = useRef<HTMLDivElement>(null);
-  const requestRef = useRef(0);
-
+  const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<DashboardSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [showResults, setShowResults] = useState(false);
 
-  const runSearch = useEffectEvent(async (query: string, requestId: number) => {
-    setIsSearching(true);
-
-    try {
-      const results = await searchDashboard(query);
-
-      if (requestRef.current !== requestId) {
-        return;
+  // 监听 Cmd+K / Ctrl+K 快捷键
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setOpen((prev) => !prev);
       }
+    };
 
-      startTransition(() => {
-        setSearchResults(results);
-      });
-    } catch (error) {
-      console.error('搜索失败:', error);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
-      if (requestRef.current !== requestId) {
-        return;
-      }
-
-      startTransition(() => {
-        setSearchResults([]);
-      });
-    } finally {
-      if (requestRef.current === requestId) {
-        setIsSearching(false);
-      }
-    }
-  });
-
+  // 搜索逻辑
   useEffect(() => {
     const normalizedQuery = searchQuery.trim();
-    const nextRequestId = requestRef.current + 1;
-    requestRef.current = nextRequestId;
 
     if (normalizedQuery.length < 2) {
       setSearchResults([]);
@@ -104,82 +88,96 @@ export function HeaderSearch() {
       return;
     }
 
-    const timer = window.setTimeout(() => {
-      void runSearch(normalizedQuery, nextRequestId);
-    }, SEARCH_DEBOUNCE_MS);
+    setIsSearching(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const results = await searchDashboard(normalizedQuery);
+        setSearchResults(results);
+      } catch (error) {
+        console.error('搜索失败:', error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
 
     return () => window.clearTimeout(timer);
   }, [searchQuery]);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-        setShowResults(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleResultClick = (result: DashboardSearchResult) => {
+  const handleSelect = (result: DashboardSearchResult) => {
     const href = getDashboardSearchHref(result);
-
-    setShowResults(false);
+    setOpen(false);
     setSearchQuery('');
+    setSearchResults([]);
     router.push(href);
   };
 
   return (
-    <div ref={searchRef} className="relative w-full max-w-md">
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-      <Input
-        type="search"
-        placeholder="搜索商品、供应商、合同..."
-        className="h-10 bg-background pl-9"
-        value={searchQuery}
-        onChange={(event) => {
-          setSearchQuery(event.target.value);
-          setShowResults(true);
-        }}
-        onFocus={() => setShowResults(true)}
-      />
-
-      {showResults && (searchQuery.trim().length >= 2 || isSearching) && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-80 overflow-y-auto rounded-xl border bg-popover shadow-md">
-          {isSearching ? (
-            <div className="flex items-center justify-center py-4 text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              搜索中...
-            </div>
-          ) : searchResults.length > 0 ? (
-            <div className="py-1">
-              {searchResults.map((result, index) => (
-                <button
-                  key={`${result.type}-${result.id}-${index}`}
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-accent"
-                  onClick={() => handleResultClick(result)}
-                >
-                  {getResultIcon(result.type)}
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium">{result.title}</div>
-                    {result.subtitle && (
-                      <div className="truncate text-xs text-muted-foreground">{result.subtitle}</div>
-                    )}
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    {getTypeLabel(result.type)}
-                  </Badge>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="py-4 text-center text-sm text-muted-foreground">
-              未找到相关结果
-            </div>
-          )}
+    <>
+      {/* 搜索触发器：点击打开 Command 弹窗 */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="relative w-full max-w-md"
+      >
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="flex h-10 items-center rounded-lg border border-input/80 bg-muted/50 pl-9 pr-3 text-sm text-muted-foreground shadow-sm transition-colors hover:border-primary/30 hover:bg-muted">
+          <span className="flex-1 text-left">搜索商品、供应商、合同...</span>
+          <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium opacity-100 sm:inline-flex">
+            <span className="text-xs">⌘</span>K
+          </kbd>
         </div>
-      )}
-    </div>
+      </button>
+
+      {/* Command 弹窗搜索面板 */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogHeader className="sr-only">
+          <DialogTitle>全局搜索</DialogTitle>
+          <DialogDescription>搜索采购合同、销售合同、供应商、商品</DialogDescription>
+        </DialogHeader>
+        <DialogContent className="overflow-hidden p-0">
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder="输入关键词搜索..."
+              value={searchQuery}
+              onValueChange={setSearchQuery}
+            />
+            <CommandList>
+              {isSearching ? (
+                <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  搜索中...
+                </div>
+              ) : searchQuery.trim().length < 2 ? (
+                <CommandEmpty>输入至少 2 个字符开始搜索</CommandEmpty>
+              ) : searchResults.length === 0 ? (
+                <CommandEmpty>未找到相关结果</CommandEmpty>
+              ) : (
+                <CommandGroup heading="搜索结果">
+                  {searchResults.map((result, index) => (
+                    <CommandItem
+                      key={`${result.type}-${result.id}-${index}`}
+                      onSelect={() => handleSelect(result)}
+                      className="flex items-center gap-3"
+                    >
+                      {getResultIcon(result.type)}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{result.title}</div>
+                        {result.subtitle && (
+                          <div className="truncate text-xs text-muted-foreground">{result.subtitle}</div>
+                        )}
+                      </div>
+                      <span className="shrink-0 rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        {getTypeLabel(result.type)}
+                      </span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+            </CommandList>
+          </Command>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -78,7 +78,9 @@ export function Header() {
       </Link>
 
       <div className="flex flex-1 items-center gap-4">
-        <HeaderContextPills todayLabel={todayLabel} />
+        <div className="lg:hidden">
+          <HeaderContextPills todayLabel={todayLabel} />
+        </div>
 
         <HeaderSearch />
       </div>

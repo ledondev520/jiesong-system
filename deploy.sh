@@ -36,7 +36,8 @@ apt-get install -y \
   git \
   ufw \
   fail2ban \
-  sqlite3
+  postgresql \
+  postgresql-contrib
 
 # =============================================================================
 # 2. 安装 Node.js (LTS 版本)
@@ -55,6 +56,18 @@ log_info "已安装 Node.js $NODE_VERSION, npm $NPM_VERSION"
 # =============================================================================
 log_info "正在安装 PM2..."
 npm install -g pm2
+
+# =============================================================================
+# 3.5 配置 PostgreSQL
+# =============================================================================
+log_info "配置 PostgreSQL..."
+systemctl start postgresql
+systemctl enable postgresql
+
+# 创建数据库用户和数据库
+sudo -u postgres psql -c "CREATE USER jiesong WITH PASSWORD 'jiesong_pass';" 2>/dev/null || true
+sudo -u postgres psql -c "CREATE DATABASE jiesong OWNER jiesong;" 2>/dev/null || true
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE jiesong TO jiesong;" 2>/dev/null || true
 
 # =============================================================================
 # 4. 创建应用目录和用户
@@ -110,12 +123,37 @@ cat > $APP_DIR/backend/.env << 'EOF'
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 JWT_EXPIRES_IN=7d
 
-# 数据库配置 (SQLite)
-DATABASE_URL="file:./dev.db"
+# 数据库配置 (PostgreSQL)
+DATABASE_URL="postgresql://jiesong:jiesong_pass@localhost:5432/jiesong?schema=public"
 
 # 服务器配置
 PORT=3001
 NODE_ENV=production
+EOF
+
+# 后端环境变量示例
+cat > $APP_DIR/backend/.env.example << 'EOF'
+# JWT 配置
+JWT_SECRET=
+JWT_EXPIRES_IN=7d
+
+# 数据库 (PostgreSQL)
+DATABASE_URL=postgresql://jiesong:jiesong_pass@localhost:5432/jiesong?schema=public
+
+# 服务器
+PORT=3001
+NODE_ENV=production
+
+# Kimi API
+KIMI_API_KEY=
+KIMI_BASE_URL=https://api.moonshot.cn/v1
+
+# CORS
+CORS_ORIGIN=http://localhost:3000
+
+# 文件上传
+UPLOAD_DIR=./uploads
+MAX_FILE_SIZE=10mb
 EOF
 
 # 前端环境变量
@@ -176,6 +214,7 @@ cd $APP_DIR
 
 # 运行数据库迁移
 cd backend
+log_info "执行数据库迁移..."
 npx prisma migrate deploy || npx prisma db push
 
 # 使用 PM2 启动

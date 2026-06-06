@@ -1,14 +1,10 @@
-import { Suspense } from 'react';
-import { CustomsDeclarationDetailPageContent } from '../components/CustomsDeclarationDetailPageContent';
+import { redirect } from 'next/navigation';
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export default function CustomsDeclarationDetailPage({ params }: PageProps) {
-  return (
-    <Suspense fallback={<div className="py-12 text-center text-muted-foreground">加载中...</div>}>
-      <CustomsDeclarationDetailPageContent params={params} />
-    </Suspense>
-  );
+export default async function CustomsDeclarationDetailRedirectPage({ params }: PageProps) {
+  const { id } = await params;
+  redirect(`/dashboard/customs-declarations/${id}`);
 }

@@ -16,6 +16,52 @@ const auditLog = require('../utils/auditLog');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
 
 /**
+ * 职责：检查商品价格是否高于历史均价并生成警告
+ * 思路：对每个商品查询历史采购均价，若当前价高于均价10%则生成警告
+ * @param {Array} items - 采购明细列表
+ * @param {Object} prismaClient - Prisma客户端
+ * @returns {Array} 警告列表
+ */
+const checkPriceWarnings = async (items, prismaClient) => {
+  const warnings = [];
+
+  for (const item of items) {
+    if (!item.productId || !item.unitPrice || item.unitPrice <= 0) continue;
+
+    const historyItems = await prismaClient.purchaseItem.findMany({
+      where: { productId: item.productId, quantity: { gt: 0 } },
+      include: {
+        purchaseContract: { select: { contractNo: true, createdAt: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (historyItems.length === 0) continue;
+
+    const prices = historyItems.map((h) => h.totalPrice / h.quantity).filter((p) => Number.isFinite(p) && p > 0);
+    if (prices.length === 0) continue;
+
+    const averagePrice = prices.reduce((sum, p) => sum + p, 0) / prices.length;
+    if (averagePrice <= 0) continue;
+
+    const currentPrice = item.unitPrice;
+    const diffPct = ((currentPrice - averagePrice) / averagePrice) * 100;
+
+    if (diffPct > 10) {
+      warnings.push({
+        productId: item.productId,
+        currentPrice: Number(currentPrice.toFixed(2)),
+        averagePrice: Number(averagePrice.toFixed(2)),
+        diffPct: Number(diffPct.toFixed(1)),
+        message: `当前价格 ¥${currentPrice} 高于历史均价 ¥${averagePrice.toFixed(2)} ${diffPct.toFixed(1)}%，请说明原因`,
+      });
+    }
+  }
+
+  return warnings;
+};
+
+/**
  * 职责：获取采购合同列表
  * 思路：支持关键字搜索合同编号和供应商名称
  */
@@ -111,6 +157,7 @@ const getById = async (req, res, next) => {
 
 /**
  * 职责：创建采购合同
+ * 思路：创建完成后检查商品价格是否高于历史均价10%以上，若有则返回警告
  */
 const create = async (req, res, next) => {
   try {
@@ -119,7 +166,14 @@ const create = async (req, res, next) => {
       prismaClient: prisma,
     });
 
-    created(res, contract, '采购合同创建成功');
+    const warnings = await checkPriceWarnings(req.body.items || [], prisma);
+
+    if (warnings.length > 0) {
+      const warningMessages = warnings.map((w) => w.message).join('；');
+      created(res, { contract, warnings }, `采购合同创建成功，但${warningMessages}`);
+    } else {
+      created(res, contract, '采购合同创建成功');
+    }
   } catch (error) {
     next(error);
   }
@@ -407,6 +461,74 @@ const getNextContractNo = async (req, res, next) => {
 };
 
 /**
+ * 职责：获取商品历史采购价格统计
+ * 思路：查询 PurchaseItem 中该商品的所有历史记录，计算均价、最低价、最高价
+ * @param productId 商品ID
+ * @returns { averagePrice, minPrice, maxPrice, count, history }
+ */
+const getProductPriceHistory = async (req, res, next) => {
+  try {
+    const { productId } = req.params;
+
+    const historyItems = await prisma.purchaseItem.findMany({
+      where: { productId, quantity: { gt: 0 } },
+      include: {
+        purchaseContract: { select: { contractNo: true, createdAt: true } },
+        product: { select: { customsName: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (historyItems.length === 0) {
+      return success(res, {
+        averagePrice: null,
+        minPrice: null,
+        maxPrice: null,
+        count: 0,
+        history: [],
+      });
+    }
+
+    const prices = historyItems
+      .map((h) => ({
+        contractNo: h.purchaseContract.contractNo,
+        price: h.totalPrice / h.quantity,
+        date: h.purchaseContract.createdAt,
+      }))
+      .filter((h) => Number.isFinite(h.price) && h.price > 0);
+
+    if (prices.length === 0) {
+      return success(res, {
+        averagePrice: null,
+        minPrice: null,
+        maxPrice: null,
+        count: 0,
+        history: [],
+      });
+    }
+
+    const priceValues = prices.map((p) => p.price);
+    const averagePrice = priceValues.reduce((sum, p) => sum + p, 0) / priceValues.length;
+    const minPrice = Math.min(...priceValues);
+    const maxPrice = Math.max(...priceValues);
+
+    success(res, {
+      averagePrice: Number(averagePrice.toFixed(2)),
+      minPrice: Number(minPrice.toFixed(2)),
+      maxPrice: Number(maxPrice.toFixed(2)),
+      count: priceValues.length,
+      history: prices.map((p) => ({
+        contractNo: p.contractNo,
+        price: Number(p.price.toFixed(2)),
+        date: p.date,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * 职责：根据商品ID列表获取曾供应过这些商品的供应商ID
  * 思路：查询 PurchaseItem 中包含这些商品的记录，获取对应的 PurchaseContract，再获取 supplierId
  * @param productIds 商品ID数组
@@ -460,5 +582,6 @@ module.exports = {
   deleteFile,
   downloadFile,
   getNextContractNo,
+  getProductPriceHistory,
   getSuppliersByProducts,
 };

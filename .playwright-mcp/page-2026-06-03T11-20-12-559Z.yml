@@ -1,0 +1,47 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e4]:
+      - link "捷淞系统" [ref=e6] [cursor=pointer]:
+        - /url: /dashboard
+        - img [ref=e8]
+        - generic [ref=e12]: 捷淞系统
+      - navigation [ref=e14]:
+        - link "经营中台" [ref=e15] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e16]
+          - generic [ref=e21]: 经营中台
+        - link "采购" [ref=e22] [cursor=pointer]:
+          - /url: /dashboard/contracts
+          - img [ref=e23]
+          - generic [ref=e27]: 采购
+        - link "出口" [ref=e28] [cursor=pointer]:
+          - /url: /dashboard/sales
+          - img [ref=e29]
+          - generic [ref=e33]: 出口
+        - link "财务" [ref=e34] [cursor=pointer]:
+          - /url: /dashboard/finance
+          - img [ref=e35]
+          - generic [ref=e37]: 财务
+    - generic [ref=e39]:
+      - banner [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e42]:
+            - img [ref=e43]
+            - generic [ref=e45]: 06/03周三
+          - generic [ref=e46]:
+            - img [ref=e47]
+            - searchbox "搜索商品、供应商、合同..." [ref=e50]
+        - generic [ref=e51]:
+          - button "切换到夜间模式" [ref=e52]:
+            - img
+          - button "通知" [ref=e53]:
+            - img
+            - generic [ref=e54]: 通知
+          - button "用户菜单" [ref=e55]:
+            - generic [ref=e57]: 用
+            - generic [ref=e59]: 管理员
+            - generic [ref=e60]: 用户菜单
+      - main [ref=e61]:
+        - generic [ref=e62]: 加载中...
+  - region "Notifications alt+T"
+  - alert [ref=e63]

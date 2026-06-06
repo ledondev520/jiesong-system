@@ -82,6 +82,9 @@ router.delete('/files/:fileId', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE'
 // GET /api/v1/purchases/files/:fileId/download - 下载合同文件
 router.get('/files/:fileId/download', purchaseController.downloadFile);
 
+// GET /api/v1/purchases/price-history/:productId - 获取商品历史采购价格统计
+router.get('/price-history/:productId', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), purchaseController.getProductPriceHistory);
+
 // POST /api/v1/purchases/suppliers-by-products - 根据商品获取曾供应过的供应商
 router.post('/suppliers-by-products', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), purchaseController.getSuppliersByProducts);
 

@@ -65,7 +65,7 @@ describe('Sidebar', () => {
     // 当前路由是 /dashboard/contracts，对应 "采购" 模块
     const current = getByText('采购').closest('a');
     expect(current?.className.includes('bg-background')).toBe(true);
-    expect(getByText('出口')).toBeInTheDocument();
+    expect(getByText('销售')).toBeInTheDocument();
     expect(getByText('系统管理')).toBeInTheDocument();
   });
 

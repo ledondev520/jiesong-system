@@ -28,6 +28,7 @@ const CRITICAL_FIELDS_BY_ENTITY = {
   PurchaseContract: ['status', 'supplierId', 'taxRate', 'signedAt', 'expectedDate', 'invoiceNo', 'note', 'totalAmount', 'paidAmount'],
   PurchaseItem: ['productId', 'quantity', 'unit', 'unitPrice', 'totalPrice', 'specification', 'note'],
   ContractFile: ['fileName', 'filePath', 'fileType', 'fileSize'],
+  SalesContractFile: ['fileName', 'filePath', 'fileType', 'fileSize'],
   PriceHistory: ['productId', 'price', 'supplierId', 'unitPrice'],
   Payment: ['type', 'amount', 'currency', 'paymentMethod', 'paymentDate', 'note', 'purchaseContractId', 'salesContractId'],
   SupplierAlias: ['alias', 'supplierId'],

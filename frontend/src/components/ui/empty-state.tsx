@@ -1,57 +1,71 @@
-'use client';
-
 /**
- * Input: 图标、标题、描述、操作按钮（可选）
- * Output: 统一风格的空态卡片，用于列表/表格无数据时的友好提示
- * Pos: 全局公共 UI 组件，供所有业务列表页复用
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ * Input: 图标、标题、描述、可选操作按钮
+ * Output: 空状态展示组件
+ * Pos: 全局 UI 组件，用于列表/页面无数据时的统一占位
  */
 
-import React from 'react';
-import { LucideIcon } from 'lucide-react';
+import React, { ReactNode, ComponentType, isValidElement } from 'react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+
+interface EmptyStateAction {
+  label: string;
+  onClick: () => void;
+}
 
 interface EmptyStateProps {
-  icon?: LucideIcon;
+  icon?: ReactNode | ComponentType<{ className?: string }>;
   title: string;
   description?: string;
-  action?: React.ReactNode;
+  action?: EmptyStateAction | ReactNode;
   className?: string;
 }
 
-/**
- * 职责：展示统一风格的空态提示，包含图标、标题、描述和可选操作按钮
- * @param icon        Lucide 图标组件
- * @param title       主标题（必填）
- * @param description 副标题说明（可选）
- * @param action      操作按钮（可选，如「新建」按钮）
- * @param className   额外 className
- */
-export function EmptyState({
-  icon: Icon,
-  title,
-  description,
-  action,
-  className,
-}: EmptyStateProps) {
+function isActionObject(action: EmptyStateAction | ReactNode): action is EmptyStateAction {
   return (
-    <div
-      className={cn(
-        'flex flex-col items-center justify-center py-16 px-6 text-center',
-        className,
-      )}
-    >
-      {Icon && (
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
-          <Icon className="h-8 w-8 text-muted-foreground" />
+    typeof action === 'object' &&
+    action !== null &&
+    !isValidElement(action) &&
+    !Array.isArray(action) &&
+    'label' in action &&
+    'onClick' in action
+  );
+}
+
+function isReactComponent(icon: unknown): icon is ComponentType<any> {
+  return (
+    icon != null &&
+    (typeof icon === 'function' ||
+      (typeof icon === 'object' && 'render' in icon))
+  );
+}
+
+export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
+  return (
+    <div className={cn('flex flex-col items-center justify-center py-16 text-center', className)}>
+      {icon && (
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground">
+          {isValidElement(icon) ? icon : isReactComponent(icon) ? (
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            <>{React.createElement(icon, { className: 'h-8 w-8' })}</>
+          ) : (
+            <>{icon}</>
+          )}
         </div>
       )}
-      <h3 className="text-base font-semibold text-foreground">{title}</h3>
+      <h3 className="text-lg font-semibold text-foreground">{title}</h3>
       {description && (
-        <p className="mt-1.5 text-sm text-muted-foreground max-w-xs">{description}</p>
+        <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">{description}</p>
       )}
-      {action && <div className="mt-5">{action}</div>}
+      {action && (
+        isActionObject(action) ? (
+          <Button className="mt-5 rounded-lg shadow-sm" onClick={action.onClick}>
+            {action.label}
+          </Button>
+        ) : (
+          <div className="mt-5">{action}</div>
+        )
+      )}
     </div>
   );
 }

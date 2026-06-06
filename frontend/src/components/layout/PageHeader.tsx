@@ -51,7 +51,7 @@ export function PageHeader({
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3 md:items-start md:gap-4 md:pb-4">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 pb-3 md:items-start md:gap-4 md:pb-4">
       <div className="flex min-w-0 items-center gap-2 md:items-start md:gap-3">
         {/* 返回按钮：有 backHref 时自动显示；可通过 showBack 强制控制 */}
         {shouldShowBack && (
@@ -59,7 +59,7 @@ export function PageHeader({
             variant="outline"
             size="sm"
             onClick={handleBack}
-            className="h-9 shrink-0 gap-1 md:mt-0.5"
+            className="h-9 shrink-0 gap-1 rounded-lg border-border/50 md:mt-0.5"
           >
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">{backLabel}</span>

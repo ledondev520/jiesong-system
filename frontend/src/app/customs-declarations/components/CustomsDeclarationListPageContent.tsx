@@ -132,7 +132,7 @@ export function CustomsDeclarationListPageContent() {
 
   const openDetail = (id: string) => {
     startTransition(() => {
-      router.push(`/customs-declarations/${id}`);
+      router.push(`/dashboard/customs-declarations/${id}`);
     });
   };
 
@@ -208,7 +208,7 @@ export function CustomsDeclarationListPageContent() {
 
             <Button
               className="h-11 rounded-xl"
-              onClick={() => router.push('/customs-declarations/create')}
+              onClick={() => router.push('/dashboard/customs-declarations/create')}
             >
               <Plus className="mr-2 h-4 w-4" />
               新建报关单

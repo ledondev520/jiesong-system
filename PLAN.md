@@ -1,5 +1,2056 @@
 # Ops Execution Center Plan
 
+## 2026-06-05 WPS-IMPORT-126（收件扫描内容级识别与候选分层）
+
+### Goal
+- 把长程导入目标改成可量化收件 checkpoint：扫描器不只看文件名，还要读取可解析文档内容，并区分“强正式报关候选”“参考汇总线索”“弱关键词候选”。
+- 避免把 Downloads 里的 `出货汇总`、工作簿或其它参考表误当成正式报关单，继续保持不编造、不弱证据写库。
+- 本轮只读扫描，不写库、不复制文件、不删除文件。
+
+### Delivered
+- 更新 `scripts/scan_wps_missing_evidence_inbox.py`：
+  - 对 `.docx/.xlsx/.csv/.txt` 做内容抽取，对 `.pdf/.xls/.doc` 做有限二进制字符串 hint 抽取。
+  - 对重叠扫描目录做真实路径去重，避免 `/Users/helena/Downloads` 与其子目录重复计数。
+  - 增加 `strong_formal_customs_candidate`、`reference_summary_not_formal_customs`、`weak_keyword_candidate` 三档候选状态。
+  - 报告新增内容扫描数、扫描失败/跳过数、正式信号命中和强/参考候选计数。
+- 刷新输出：
+  - `tmp/wps_11_export_list_raw/parsed/wps_missing_evidence_incoming_scan.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_missing_evidence_incoming_scan.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_missing_evidence_incoming_scan.md`
+
+### Verification
+- `python3 -m py_compile scripts/scan_wps_missing_evidence_inbox.py`：通过。
+- `python3 scripts/scan_wps_missing_evidence_inbox.py`：通过，扫描文件 `591`，内容扫描文件 `135`，内容扫描失败/跳过 `8`，`cloud_exact_ready_to_close=0`，`formal_candidate_files=3`，`formal_strong_candidate_files=0`，`formal_reference_candidate_files=2`，`ready_for_apply=0`。
+- `python3 scripts/build_wps_missing_evidence_intake_package.py`：通过，`total_rows=174`、`ready_for_apply=0`。
+- `python3 scripts/audit_wps_import_completion.py`：通过，`db_source_gaps=170`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+- `python3 scripts/build_wps_remaining_closure_register.py`：通过，`total_rows=174`、`db_source_gap_rows=170`。
+- `python3 scripts/build_wps_remaining_action_matrix.py`：通过，`total_rows=174`、`auto_writable=0`。
+- `git diff --check`：通过。
+
+### Remaining
+- 当前仍未发现可关闭 cloud-only 缺口的 SHA1 精确原件。
+- 当前没有强正式报关候选；`出货汇总.xlsx` 和 `出货汇总(1).xlsx` 只作为参考汇总线索，不能作为正式报关单入库。
+- 长程 goal 仍未完成；后续收到正式文件后先放入收件目录，再复跑本扫描器和对应 validation runner。
+
+## 2026-06-05 WPS-IMPORT-125（缺失材料本机收件扫描）
+
+### Goal
+- 继续推进完整导入目标，把上一轮收件校验包落到本机扫描执行上。
+- 默认扫描项目收件目录和 Downloads，自动识别是否已有 SHA1 精确 cloud-only 原件或正式报关候选文件。
+- 本轮只读扫描，不写库、不复制文件、不删除文件。
+
+### Delivered
+- 新增脚本 `scripts/scan_wps_missing_evidence_inbox.py`。
+- 新增默认收件目录：
+  - `tmp/wps_missing_evidence_inbox`
+  - `tmp/wps_11_export_list_raw/incoming`
+- 新增输出：
+  - `tmp/wps_11_export_list_raw/parsed/wps_missing_evidence_incoming_scan.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_missing_evidence_incoming_scan.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_missing_evidence_incoming_scan.md`
+- 默认扫描目录：
+  - `tmp/wps_missing_evidence_inbox`
+  - `tmp/wps_11_export_list_raw/incoming`
+  - `/Users/helena/Downloads`
+  - `/Users/helena/Downloads/出口外贸`
+
+### Verification
+- `python3 -m py_compile scripts/scan_wps_missing_evidence_inbox.py`：通过。
+- `python3 scripts/scan_wps_missing_evidence_inbox.py`：通过，扫描文件 `622`，`cloud_exact_ready_to_close=0`，`formal_candidate_files=0`，`ready_for_apply=0`，`skipped=0`。
+- `python3 scripts/build_wps_missing_evidence_intake_package.py`：通过，`total_rows=174`、`ready_for_apply=0`。
+- `python3 scripts/audit_wps_import_completion.py`：通过，`db_source_gaps=170`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+
+### Remaining
+- 当前仍未发现可关闭 cloud-only 缺口的 SHA1 精确原件。
+- 当前仍未发现正式报关候选文件。
+- 长程 goal 仍未完成；后续可把新文件放入默认收件目录后复跑扫描器。
+
+## 2026-06-05 WPS-IMPORT-124（缺失材料收件校验包）
+
+### Goal
+- 继续推进完整导入目标，把剩余 `174` 行行动矩阵转成可收件、可校验、可复跑的材料验收包。
+- 解决“缺失的东西怎么搞”的执行问题：收到文件或裁决后，不再重新翻长报告，而是按验收标准、严格字段和校验命令进入下一轮 dry-run/apply。
+- 本轮只读，不写库、不复制文件、不删除文件。
+
+### Delivered
+- 新增脚本 `scripts/build_wps_missing_evidence_intake_package.py`。
+- 新增输出：
+  - `tmp/wps_11_export_list_raw/parsed/wps_missing_evidence_intake_package.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_missing_evidence_intake_package.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_missing_evidence_intake_package.md`
+- 收件包覆盖 `174` 行剩余事项，当前 `ready_for_apply=0`。
+- 材料类型分布：
+  - `price_or_business_decision=48`
+  - `quantity_split_or_aggregate_evidence=42`
+  - `historical_keep_or_cleanup_policy=32`
+  - `formal_contract_or_keep_decision=19`
+  - `formal_customs_document=19`
+  - `product_alias_or_original_page=6`
+  - `store_ownership_evidence=6`
+  - `exact_cloud_original=2`
+- P0 收件明细现在明确列出 cloud-only 原件的目标 size/SHA1、正式报关材料的必要字段、业务裁决项的复跑脚本。
+
+### Verification
+- `python3 -m py_compile scripts/build_wps_missing_evidence_intake_package.py`：通过。
+- `python3 scripts/build_wps_missing_evidence_intake_package.py`：通过，`total_rows=174`、`ready_for_apply=0`、`cloud_ready_to_copy=0`、`formal_customs_candidate_count=0`。
+- `python3 scripts/audit_wps_import_completion.py`：通过，`db_source_gaps=170`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+- `python3 scripts/build_wps_remaining_closure_register.py`：通过，`total_rows=174`、`db_source_gap_rows=170`。
+- `python3 scripts/build_wps_remaining_action_matrix.py`：通过，`total_rows=174`、`auto_writable=0`。
+
+### Remaining
+- 长程 goal 仍未完成。
+- 当前仍无自动写库项；收到材料后先跑收件包对应 validation runner，再根据 dry-run 结果进入单独 apply。
+
+## 2026-06-05 WPS-IMPORT-123（缺失项解决路径刷新）
+
+### Goal
+- 回答并固化“剩余缺失项怎么处理”的工程路线，避免继续把无精确原件、无正式报关材料的项当作可自动导入项反复扫描。
+- 刷新 cloud-only 原件、正式报关材料、完成度审计、关闭台账和行动矩阵，确认当前哪些能继续自动推进，哪些只能等外部原件或业务裁决。
+- 本轮只读，不写库、不复制文件、不删除文件。
+
+### Delivered
+- 复跑 cloud-only 窄探测与广域本机搜索：
+  - 目标 `2` 个。
+  - 可复制目标 `0`。
+  - `CG2500045` PDF 精确命中 `0`。
+  - 根目录当前版 `出货汇总.xlsx` 同名候选 `5`，目标 SHA1 精确命中 `0`。
+- 复跑正式报关材料缺口复核：
+  - `formal_evidence_required / PENDING-威斯敏` 共 `18` 行。
+  - 占位报关单 `3` 张。
+  - 正式报关候选 `0`。
+  - 最近装箱源只能部分命中，不能替代正式报关单。
+- 复跑阻断关闭清单：
+  - `placeholder_declaration_missing_formal_original=3`。
+  - `item_inherits_placeholder_without_complete_source_set=15`。
+  - 自动可写 `0`。
+- 重建完成度审计、总关闭台账和行动矩阵：
+  - `db_source_gaps=170`。
+  - `total_rows=174`。
+  - `pending_auto_writes=0`。
+  - `decision_items=2`。
+  - `cloud_only_files=2`。
+
+### Resolution Path
+- 精确原件路径：只在拿到目标 size/SHA1 精确匹配文件后运行 `probe_wps_cloud_only_files.py` 和 `close_wps_cloud_only_files.py`，否则不复制、不替换旧版本。
+- 正式报关路径：`BGNDING-*` 占位单必须补正式 18 位海关编号、正式报关单原件和正式明细；装箱源、占位 HS、invoice 列不能替代正式报关材料。
+- 业务裁决路径：零价、零数量、历史占位、门店/价格/数量冲突进入行动矩阵；没有裁决或原文页证据前不改价、不删行、不补 note。
+
+### Remaining
+- 当前长程目标仍未完成。
+- 可自动推进项仍为 `0`；后续实际写库只会在收到精确原件、正式材料或明确裁决后作为单独 dry-run/apply 任务执行。
+
+## 2026-06-05 WPS-IMPORT-122（PENDING 正式化阻断报告）
+
+### Goal
+- 继续推进完整导入目标，在 PENDING 销售/装箱占位清理路径收敛后，复核剩余 PENDING 是否还有可严格自动收口项。
+- 把 PENDING 销售、装箱、报关三条 Interface 分开分类，避免把正式销售/装箱 owner 误当正式报关材料。
+- 本轮只读，不写库、不删除、不复制文件。
+
+### Delivered
+- 新增脚本 `scripts/classify_wps_pending_formalization_blockers.py`。
+- 输出：
+  - `tmp/wps_11_export_list_raw/parsed/wps_pending_formalization_blockers.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_pending_formalization_blockers.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_pending_formalization_blockers.md`
+- 当前 PENDING 正式化报告总行：`22`。
+- Interface 分布：`packing=11`、`sales=8`、`customs=3`。
+- 自动可写：`0`。
+
+### Verification
+- `python3 -m py_compile scripts/classify_wps_pending_formalization_blockers.py`：通过。
+- `python3 scripts/classify_wps_pending_formalization_blockers.py`：通过，`total=22`、`auto_writable=0`。
+- `python3 scripts/audit_wps_import_completion.py`：通过，`db_source_gaps=170`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+- `python3 scripts/build_wps_remaining_closure_register.py`：通过，`total_rows=174`、`db_source_gap_rows=170`。
+- `python3 scripts/build_wps_remaining_action_matrix.py`：通过，`total_rows=174`、`auto_writable=0`。
+
+### Remaining
+- PENDING 销售：`6` 条找不到唯一正式销售 owner；`2` 条为 0 数量历史占位。
+- PENDING 装箱：`9` 条有报关明细引用，不能删除；`2` 条为 0 数量历史占位。
+- PENDING 报关：`3` 张 `BGNDING-*` 占位单缺正式 18 位海关编号和正式报关单原件。
+
+## 2026-06-05 WPS-IMPORT-121（PENDING 装箱占位被正式来源覆盖清理）
+
+### Goal
+- 继续推进完整导入目标，处理 P0 `formalize_pending_contract` 中已能被现有正式 `EXP*` WPS 装箱来源唯一覆盖的装箱占位行。
+- 只删除无报关明细引用、无 WPS 来源、数量为正数，且同商品/同门店/同数量/同单位存在唯一正式 WPS 装箱来源行的 `PENDING-*` 装箱占位。
+- 如 PENDING 行存在历史备注，先把备注追加到正式装箱来源行 note，再删除占位，避免丢失历史信息。
+
+### Delivered
+- 新增脚本 `scripts/cleanup_wps_pending_packing_items_covered_by_formal_sources.js`。
+- 写库前 dry-run：`candidateCount=12`、`deleteCount=1`、`keptCount=11`。
+- 数据库备份：`backend/prisma/backups/dev_2026-06-04_16-58-38.db`。
+- apply 后实际删除 `1` 条零价 PENDING 装箱占位：`PENDING-Burbank / 餐盘 / Burbank / 1000 个`。
+- 将原备注 `机动备用` 追加到正式 `EXP260006` 装箱行 note。
+- 二次 dry-run：`deleteCount=0`，本路径可写项清空。
+- DB 来源缺口：`171 -> 170`。
+- 关闭总台账：`175 -> 174`。
+- 行动矩阵：`175 -> 174`。
+
+### Verification
+- `node --check scripts/cleanup_wps_pending_packing_items_covered_by_formal_sources.js`：通过。
+- `node scripts/cleanup_wps_pending_packing_items_covered_by_formal_sources.js`：apply 后二次 dry-run 通过，`deleteCount=0`。
+- `node scripts/audit_wps_db_source_coverage.js`：通过，`total_without_source=170`。
+- `node scripts/classify_wps_source_gaps.js`：通过，`total_without_source=170`、`sales_eligible=0`、`packing_eligible=0`。
+- `node scripts/build_wps_source_gap_detail_packet.js`：通过，`total=170`、`packing_item_missing_source=35`。
+- `python3 scripts/classify_wps_source_gap_disposition.py`：通过，`total=170`、`auto_writable=0`、`no_candidate_source_required=15`。
+- `python3 scripts/build_wps_remaining_source_gap_execution_plan.py`：通过，`row_count=170`、`auto_writable=0`。
+- `python3 scripts/classify_wps_no_candidate_source_blockers.py`：通过，`total=15`、`pending_contract_placeholder=9`。
+- `python3 scripts/audit_wps_import_completion.py`：通过，`db_source_gaps=170`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+- `python3 scripts/build_wps_remaining_closure_register.py`：通过，`total_rows=174`、`db_source_gap_rows=170`。
+- `python3 scripts/build_wps_remaining_action_matrix.py`：通过，`total_rows=174`、`auto_writable=0`。
+
+### Remaining
+- 当前自动可写项再次归零。
+- 长程 goal 仍未完成；剩余为 `170` 个 DB 来源缺口、`2` 个业务/正式材料裁决项和 `2` 个 cloud-only 原件缺口。
+- `PENDING-威斯敏` 装箱行均有报关明细引用；`PENDING-圣荷西2115` 装箱行为 0 数量历史占位，不能自动删除。
+
+## 2026-06-05 WPS-IMPORT-120（PENDING 销售占位被正式来源覆盖清理）
+
+### Goal
+- 继续推进完整导入目标，处理 P0 `formalize_pending_contract` 中已能被现有正式 `EXP*` WPS 来源唯一覆盖的销售占位行。
+- 只删除无库存引用、无 WPS 来源、售价和成本均为 `0`、数量为正数，且同商品/同门店/同数量存在唯一正式 WPS 销售来源行的 `PENDING-*` 销售占位。
+- 不动装箱和报关行；`PENDING-威斯敏` 的装箱/报关仍有下游引用和正式报关材料缺口。
+
+### Delivered
+- 新增脚本 `scripts/cleanup_wps_pending_sales_items_covered_by_formal_sources.js`。
+- 写库前 dry-run：`candidateCount=12`、`deleteCount=4`、`keptCount=8`。
+- 数据库备份：`backend/prisma/backups/dev_2026-06-04_16-45-02.db`。
+- apply 后实际删除 `4` 条零价 PENDING 销售占位，并给对应正式销售行补单位。
+- 二次 dry-run：`deleteCount=0`，本路径可写项清空。
+- DB 来源缺口：`175 -> 171`。
+- 关闭总台账：`179 -> 175`。
+- 行动矩阵：`179 -> 175`。
+
+### Verification
+- `node --check scripts/cleanup_wps_pending_sales_items_covered_by_formal_sources.js`：通过。
+- `node scripts/cleanup_wps_pending_sales_items_covered_by_formal_sources.js`：apply 后二次 dry-run 通过，`deleteCount=0`。
+- `node scripts/audit_wps_db_source_coverage.js`：通过，`total_without_source=171`。
+- `node scripts/classify_wps_source_gaps.js`：通过，`total_without_source=171`、`sales_eligible=0`、`packing_eligible=0`。
+- `node scripts/build_wps_source_gap_detail_packet.js`：通过，`total=171`。
+- `python3 scripts/classify_wps_source_gap_disposition.py`：通过，`total=171`、`auto_writable=0`。
+- `python3 scripts/build_wps_remaining_source_gap_execution_plan.py`：通过，`row_count=171`、`auto_writable=0`。
+- `python3 scripts/classify_wps_operational_retention_blockers.py`：通过，`total=78`、`pending_contract_placeholder=10`。
+- `python3 scripts/audit_wps_import_completion.py`：通过，`db_source_gaps=171`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+- `python3 scripts/build_wps_remaining_closure_register.py`：通过，`total_rows=175`、`db_source_gap_rows=171`。
+- `python3 scripts/build_wps_remaining_action_matrix.py`：通过，`total_rows=175`、`auto_writable=0`。
+
+### Remaining
+- 当前自动可写项再次归零。
+- 长程 goal 仍未完成；剩余为 `171` 个 DB 来源缺口、`2` 个业务/正式材料裁决项和 `2` 个 cloud-only 原件缺口。
+- `PENDING-威斯敏` 剩余销售占位里，`LED吊灯`、`人造石英石制品`、`厨房石`、`吧台玉石`、`桌面`、`洗手盘` 暂无唯一正式销售来源覆盖；不能自动删除或挂来源。
+
+## 2026-06-05 WPS-IMPORT-119（出货汇总销售来源 note 收口）
+
+### Goal
+- 继续推进完整导入目标，处理行动矩阵中的 P0 `recover_missing_sales_original` 和同类 no-candidate 销售来源缺口。
+- 只在 `出货汇总` 源行能严格证明同合同、同商品、同门店、同售价，且数量为单行精确命中或同价多行精确加总时，给销售明细补来源 note。
+- 不改商品、门店、数量、价格、规格、库存或报关数据。
+
+### Delivered
+- 新增脚本 `scripts/backfill_wps_sales_from_shipment_summary_notes.js`。
+- 写库前 dry-run：`salesItemUpdates=8`、`skippedCount=5`。
+- 数据库备份：`backend/prisma/backups/dev_2026-06-04_16-28-20.db`。
+- apply 后实际补来源 note：`8` 条销售明细。
+- 二次 dry-run：`salesItemUpdates=0`，本路径可写项清空。
+- DB 来源缺口：`183 -> 175`。
+- 关闭总台账：`187 -> 179`。
+- 行动矩阵：`187 -> 179`。
+
+### Verification
+- `node --check scripts/backfill_wps_sales_from_shipment_summary_notes.js`：通过。
+- `node scripts/backfill_wps_sales_from_shipment_summary_notes.js`：apply 后二次 dry-run 通过，`salesItemUpdates=0`。
+- `node scripts/audit_wps_db_source_coverage.js`：通过，`total_without_source=175`。
+- `node scripts/classify_wps_source_gaps.js`：通过，`total_without_source=175`、`sales_eligible=0`、`packing_eligible=0`。
+- `node scripts/build_wps_source_gap_detail_packet.js`：通过，`total=175`。
+- `python3 scripts/classify_wps_source_gap_disposition.py`：通过，`total=175`、`auto_writable=0`。
+- `python3 scripts/build_wps_remaining_closure_register.py`：通过，`total_rows=179`、`db_source_gap_rows=175`、`pending_auto_writes=0`。
+- `python3 scripts/build_wps_remaining_action_matrix.py`：通过，`total_rows=179`、`auto_writable=0`。
+- `python3 scripts/audit_wps_import_completion.py`：通过，`db_source_gaps=175`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+
+### Remaining
+- 当前自动可写项再次归零。
+- 长程 goal 仍未完成；剩余为 `175` 个 DB 来源缺口、`2` 个业务/正式材料裁决项和 `2` 个 cloud-only 原件缺口。
+
+## 2026-06-05 WPS-IMPORT-118（剩余导入行动矩阵）
+
+### Goal
+- 继续推进完整导入目标，在 `auto_writable=0` 后把 `187` 行关闭台账翻译成可执行行动矩阵。
+- 明确每类缺口需要谁补什么证据、收到证据后复跑哪个脚本，以及当前禁止自动写入的原因。
+- 不写库、不复制文件、不改业务字段。
+
+### Delivered
+- 新增只读脚本 `scripts/build_wps_remaining_action_matrix.py`。
+- 生成行动矩阵：
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_action_matrix.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_action_matrix.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_action_matrix.md`
+- 总行数：`187`，与关闭台账一致。
+- 优先级分布：
+  - `P0=49`
+  - `P1=106`
+  - `P2=32`
+- 行动线分布：
+  - `price_or_zero_price_decision=47`
+  - `quantity_split_or_aggregate_evidence=42`
+  - `historical_keep_or_cleanup_policy=32`
+  - `formalize_pending_contract=24`
+  - `formal_customs_evidence=19`
+  - `confirm_product_alias_or_original_page=11`
+  - `store_ownership_decision=6`
+  - `recover_missing_sales_original=3`
+  - `fetch_exact_cloud_original=2`
+  - `sales_store_price_decision=1`
+
+### Verification
+- `python3 -m py_compile scripts/build_wps_remaining_action_matrix.py`：通过。
+- `python3 scripts/build_wps_remaining_closure_register.py`：通过，`total_rows=187`、`pending_auto_writes=0`。
+- `python3 scripts/build_wps_remaining_action_matrix.py`：通过，`total_rows=187`、`auto_writable=0`。
+- `python3 scripts/audit_wps_import_completion.py`：仍为 `db_source_gaps=183`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+
+### Remaining
+- 当前没有可自动写库项；下一次实际写入必须由行动矩阵中的目标证据或裁决触发。
+- 长程 goal 仍未完成，因为来源缺口、裁决项和 cloud-only 原件缺口仍未关闭。
+
+## 2026-06-05 WPS-IMPORT-117（cloud-only 原件广域本机搜索）
+
+### Goal
+- 继续推进 `2` 个 cloud-only 原件缺口。
+- 不只查固定 WPS/Downloads 路径，而是按文件名和目标大小在本机常见目录、WPS 缓存目录和临时目录做只读广域搜索。
+- 若找到目标 SHA1 精确副本，则进入关闭工具；否则把未命中证据固化为可复跑报告。
+
+### Delivered
+- 新增只读脚本 `scripts/probe_wps_cloud_only_broad_local_search.py`。
+- 生成广域搜索报告：
+  - `tmp/wps_11_export_list_raw/parsed/wps_cloud_only_broad_local_search.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_cloud_only_broad_local_search.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_cloud_only_broad_local_search.md`
+- 搜索结果：
+  - `11-报关记录/20250815禧瑞都/购销合同CG2500045-不锈钢桶-禧瑞都.pdf`：候选 `0`，精确命中 `0`。
+  - `root_shipment_cloud / 出货汇总.xlsx`：同名候选 `5`，精确命中 `0`。
+- `ready_to_copy_count=0`，没有复制、没有写库。
+
+### Verification
+- `python3 -m py_compile scripts/probe_wps_cloud_only_broad_local_search.py`：通过。
+- `python3 scripts/probe_wps_cloud_only_broad_local_search.py`：通过，`target_count=2`、`ready_to_copy_count=0`。
+- `python3 scripts/probe_wps_cloud_only_files.py`：通过，`target_count=2`、`ready_to_copy_count=0`。
+- `python3 scripts/audit_wps_import_completion.py`：`db_source_gaps=183`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+
+### Remaining
+- 两个 cloud-only 原件仍未关闭；必须取得目标 SHA1 精确副本后才能复制到项目源目录。
+- 当前长程 goal 仍未完成。
+
+## 2026-06-04 WPS-IMPORT-116（剩余导入关闭总台账）
+
+### Goal
+- 把所有剩余事项从分散报告合并为一个总关闭台账。
+- 总台账必须与完成度审计数字一致：`183` 个 DB 来源缺口、`2` 个业务/正式材料裁决项、`2` 个 cloud-only 原件。
+- 明确当前是否还有自动可写项，以及每个剩余项的关闭条件和禁止动作。
+
+### Delivered
+- 新增只读脚本 `scripts/build_wps_remaining_closure_register.py`。
+- 生成总台账：
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_closure_register.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_closure_register.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_closure_register.md`
+- 总台账行数：`187`
+  - DB 来源缺口：`183`
+  - 业务/正式材料裁决项：`2`
+  - cloud-only 原件：`2`
+- 自动可写仍为 `0`。
+
+### Verification
+- `python3 -m py_compile scripts/build_wps_remaining_closure_register.py`：通过。
+- `python3 scripts/build_wps_remaining_closure_register.py`：通过，`status=remaining_closure_register_ready`、`total_rows=187`、`db_source_gap_rows=183`、`decision_items=2`、`cloud_original_gaps=2`、`pending_auto_writes=0`。
+- `python3 scripts/audit_wps_import_completion.py`：`db_source_gaps=183`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+
+### Remaining
+- 当前剩余事项已经全部进入关闭台账；没有新的自动写库路径。
+- 长程 goal 仍未完成，因为 DB 来源缺口、业务/正式材料裁决项和 cloud-only 原件缺口仍未关闭。
+
+## 2026-06-04 WPS-IMPORT-115（操作性历史行保留/清理关闭清单）
+
+### Goal
+- 继续推进剩余 `operational_keep_or_cleanup_decision=60`、`pending_placeholder_review=14`、`operational_review=8`。
+- 复核这些零价、零数量、PENDING 或操作标记历史行是否存在可自动删除、合并或补来源 note 的子集。
+- 若没有可写项，则把保留/清理需要的业务裁决和证据条件固化为可复跑清单。
+
+### Delivered
+- 新增只读脚本 `scripts/classify_wps_operational_retention_blockers.py`。
+- 生成操作性历史行保留/清理关闭清单：
+  - `tmp/wps_11_export_list_raw/parsed/wps_operational_retention_blockers.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_operational_retention_blockers.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_operational_retention_blockers.md`
+- 当前 `82` 条操作性保留/清理项分布：
+  - `nonzero_quantity_zero_price_no_refs=36`
+  - `zero_quantity_zero_price_no_refs=24`
+  - `pending_contract_placeholder=14`
+  - `operational_marker_no_refs=6`
+  - `operational_no_refs_unspecified=2`
+- 严格来源覆盖重复候选：`0`。
+- 自动可写仍为 `0`。
+
+### Verification
+- `python3 -m py_compile scripts/classify_wps_operational_retention_blockers.py`：通过。
+- `python3 scripts/classify_wps_operational_retention_blockers.py`：通过，`total=82`、`auto_writable=0`、`exact_duplicate_candidates=0`。
+- `python3 scripts/audit_wps_import_completion.py`：`db_source_gaps=183`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+
+### Remaining
+- 这 82 条不能仅凭无引用自动删除；必须先确认历史保留/清理口径或补来源材料。
+- 当前长程 goal 仍未完成。
+
+## 2026-06-04 WPS-IMPORT-114（正式报关材料缺口关闭清单）
+
+### Goal
+- 继续推进 `formal_evidence_required=18` 来源缺口。
+- 复核 `PENDING-威斯敏` 三张占位报关单是否存在正式报关原件、正式 18 位海关编号或完整 WPS 装箱源集合可自动收口。
+- 若没有可写项，则把父报关单和明细继承缺口固化为可复跑关闭清单。
+
+### Delivered
+- 新增只读脚本 `scripts/classify_wps_formal_evidence_blockers.py`。
+- 重新运行 `scripts/analyze_wps_formal_customs_source_gaps.py`。
+- 生成正式报关材料缺口清单：
+  - `tmp/wps_11_export_list_raw/parsed/wps_formal_evidence_blockers.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_formal_evidence_blockers.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_formal_evidence_blockers.md`
+- 当前 `18` 条正式材料缺口分布：
+  - `placeholder_declaration_missing_formal_original=3`
+  - `item_inherits_placeholder_without_complete_source_set=15`
+- 正式报关候选：`0`。
+- 自动可写仍为 `0`。
+
+### Verification
+- `python3 -m py_compile scripts/classify_wps_formal_evidence_blockers.py`：通过。
+- `python3 scripts/analyze_wps_formal_customs_source_gaps.py`：通过，`disposition_rows=18`、`declaration_count=3`、`auto_writable=0`、`formal_customs_candidate_count=0`。
+- `python3 scripts/classify_wps_formal_evidence_blockers.py`：通过，`total=18`、`auto_writable=0`。
+- `python3 scripts/audit_wps_import_completion.py`：`db_source_gaps=183`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+
+### Remaining
+- `BGNDING-威斯敏`、`BGNDING-威斯敏-2`、`BGNDING-威斯敏-3` 仍缺正式 18 位海关编号或正式报关单原件。
+- 最近 WPS 装箱源只是 `EXP260005 / 31-威斯敏` 等部分命中，不能替代正式报关材料。
+- 当前长程 goal 仍未完成。
+
+## 2026-06-04 WPS-IMPORT-113（操作性候选冲突阻断原因分类）
+
+### Goal
+- 继续推进剩余 `candidate_conflict_review=36` 来源缺口。
+- 判断这些操作性历史行是否还有可自动补来源 note、删除或合并的安全子集。
+- 若没有可写项，则把每条阻断原因固化为可复跑报告。
+
+### Delivered
+- 新增只读脚本 `scripts/classify_wps_operational_candidate_conflict_blockers.py`。
+- 生成阻断原因报告：
+  - `tmp/wps_11_export_list_raw/parsed/wps_operational_candidate_conflict_blockers.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_operational_candidate_conflict_blockers.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_operational_candidate_conflict_blockers.md`
+- 当前 `36` 条操作性候选冲突分布：
+  - `quantity_conflict_same_store=22`
+  - `zero_quantity_candidate_quantity_conflict=6`
+  - `store_conflict_same_product=6`
+  - `same_quantity_price_conflict=2`
+- 自动可写仍为 `0`。
+
+### Verification
+- `python3 -m py_compile scripts/classify_wps_operational_candidate_conflict_blockers.py`：通过。
+- `python3 scripts/classify_wps_operational_candidate_conflict_blockers.py`：通过，`total=36`、`auto_writable=0`。
+- `python3 scripts/audit_wps_import_completion.py`：`db_source_gaps=183`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+
+### Remaining
+- 同门店数量冲突需要拆分/聚合数量证据或确认保留历史口径。
+- 0 数量候选冲突需要确认是否历史占位，或补能证明应按源数量修正的文件证据。
+- 同商品门店冲突需要门店归属裁决或组合门店拆分证据。
+- 同数量价格冲突需要业务确认零价行应保留、改价、删除或合并。
+- 当前长程 goal 仍未完成。
+
+## 2026-06-04 WPS-IMPORT-112（no-candidate 来源缺口关闭路径归因）
+
+### Goal
+- 回答剩余 `source_required_no_candidate=24` 条到底缺什么，以及还有没有可自动推进的来源补齐项。
+- 不猜测文件内容、不写库；只把缺失物分成可执行证据篮子。
+
+### Delivered
+- 新增只读脚本 `scripts/classify_wps_no_candidate_source_blockers.py`。
+- 生成 no-candidate 来源缺口阻断报告：
+  - `tmp/wps_11_export_list_raw/parsed/wps_no_candidate_source_blockers.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_no_candidate_source_blockers.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_no_candidate_source_blockers.md`
+- 当前 `24` 条 no-candidate 缺口分布：
+  - `sales_contract_has_sources_but_no_product_match=10`
+  - `pending_contract_placeholder=10`
+  - `sales_contract_missing_from_standardized_sources=3`
+  - `packing_contract_has_sources_but_no_product_match=1`
+- 自动可写仍为 `0`。
+
+### Verification
+- `python3 -m py_compile scripts/classify_wps_no_candidate_source_blockers.py`：通过。
+- `python3 scripts/classify_wps_no_candidate_source_blockers.py`：通过，`total=24`、`auto_writable=0`。
+- `python3 scripts/probe_wps_cloud_only_files.py`：通过，`target_count=2`、`ready_to_copy_count=0`。
+- `python3 scripts/audit_wps_import_completion.py`：`db_source_gaps=183`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+
+### Remaining
+- `PENDING-*` 占位行需要正式合同/装箱/报关材料，或业务确认继续保留为无来源历史行。
+- 商品不匹配类需要商品别名证据或原销售/装箱页正文；不能用同合同相似商品补 note。
+- 标准化源里连同合同也没有的 3 条销售行，需要重新取得原件或确认历史保留口径。
+- 当前长程 goal 仍未完成。
+
+## 2026-06-04 WPS-IMPORT-111（剩余候选映射阻断原因分类）
+
+### Goal
+- 继续推进剩余 `23` 条候选映射复核项。
+- 先横向检查是否还有“多个带来源拆分行加总覆盖无来源聚合行”的可写子集。
+- 若没有可写项，则把每条阻断原因固化为可复跑报告，避免后续重复扫描同一批候选。
+
+### Delivered
+- 新增只读脚本 `scripts/classify_wps_remaining_candidate_blockers.py`。
+- 生成阻断原因报告：
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_candidate_blockers.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_candidate_blockers.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_candidate_blockers.md`
+- 横向扫描“无来源聚合行被多个带来源拆分行完整覆盖”的候选：`0`。
+- 剩余 `23` 条候选映射复核项阻断分布：
+  - `quantity_conflict=14`
+  - `price_conflict=6`
+  - `multi_candidate_quantity_sum_price_conflict=3`
+- 自动可写仍为 `0`。
+
+### Verification
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m py_compile scripts/classify_wps_remaining_candidate_blockers.py`：通过。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/classify_wps_remaining_candidate_blockers.py`：通过，`total=23`、`auto_writable=0`。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/audit_wps_import_completion.py`：`db_source_gaps=183`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+- `git diff --check`：通过。
+
+### Remaining
+- 剩余候选映射复核没有自动写库项；需要更强文件证据或业务裁决。
+- 当前长程 goal 仍未完成。
+
+## 2026-06-04 WPS-IMPORT-110（多候选中的唯一组合门店覆盖收口）
+
+### Goal
+- 继续推进 `multi_candidate_manual_review` 中仍可由唯一兼容候选证明的组合门店拆分重复行。
+- 避免因为“存在多个候选”就跳过所有项；只要其中唯一一个候选严格兼容、其他候选数量/门店不兼容，即可安全收口。
+
+### Delivered
+- 扩展 `scripts/cleanup_wps_aggregate_alias_source_owner_items.js`：
+  - 原先只处理 `candidate_count=1`。
+  - 现在会扫描所有候选来源，只在唯一兼容的同 Interface 组合门店 owner 存在时生成删除计划。
+- 写库前备份：`backend/prisma/backups/dev_2026-06-04_14-56-23.db`。
+- 已删除 `2` 条无来源拆分装箱行：
+  - `EXP250027 / 窗帘 / 米尔皮塔 / 31`
+  - `EXP250027 / 窗帘 / 圣荷西625 / 31`
+- 保留带 WPS 来源的组合门店装箱行：`EXP250027 / 窗帘 / 米尔皮塔、圣荷西625 / 31`，来源为 `_wps_cloud_root/出货汇总.xlsx#出货汇总0315_补充:85`。
+- DB 来源缺口从 `185` 降到 `183`；候选映射复核从 `25` 降到 `23`。
+- 二次 dry-run 已确认该脚本剩余 `deleteCount=0`。
+
+### Verification
+- `node -c scripts/cleanup_wps_aggregate_alias_source_owner_items.js`：通过。
+- `node scripts/cleanup_wps_aggregate_alias_source_owner_items.js`：apply 前 dry-run 通过，`candidateCount=25`、`deleteCount=2`。
+- `npm run db:backup`：通过，生成 `backend/prisma/backups/dev_2026-06-04_14-56-23.db`。
+- `node scripts/cleanup_wps_aggregate_alias_source_owner_items.js --apply`：通过，删除 `2` 条拆分装箱行。
+- 写库后顺序复跑：
+  - `node scripts/audit_wps_db_source_coverage.js`：`total_without_source=183`。
+  - `node scripts/build_wps_source_gap_detail_packet.js`：`total=183`。
+  - `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/classify_wps_source_gap_disposition.py`：`total=183`。
+  - `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/analyze_wps_candidate_source_mappings.py`：`total=23`。
+  - `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/analyze_wps_candidate_source_ownership.py`：`total=23`。
+  - `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/build_wps_remaining_source_gap_execution_plan.py`：`row_count=183`、`auto_writable=0`。
+  - `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/audit_wps_import_completion.py`：`db_source_gaps=183`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+  - `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --create-missing-contracts`：`salesMergeCreates=0`、`salesMergeUpdates=0`、`salesMergeUnmatched=0`。
+  - `git diff --check`：通过。
+
+### Remaining
+- 剩余来源缺口 `183` 条，当前 `auto_writable=0`。
+- 候选映射复核剩余 `23` 条，主要是数量、价格、门店或多候选冲突。
+- 长程 goal 仍未完成。
+
+## 2026-06-04 WPS-IMPORT-109（组合门店别名聚合来源收口）
+
+### Goal
+- 继续推进 `candidate_mapping_review` 中由组合门店别名漏判造成的残余来源缺口。
+- 识别 `圣荷西2115和625` 覆盖 `圣荷西625`、`圣荷西625店和红木城店` 覆盖两个拆分门店等情况。
+- 在备份数据库后，删除无来源、无下游引用、且已由带 WPS 来源组合门店行覆盖的拆分销售/装箱重复行。
+
+### Delivered
+- 新增 `scripts/cleanup_wps_aggregate_alias_source_owner_items.js`。
+- 生成并应用计划：`tmp/wps_11_export_list_raw/parsed/wps_aggregate_alias_source_owner_cleanup_plan.json`。
+- 写库前备份：`backend/prisma/backups/dev_2026-06-04_14-45-16.db`。
+- 已删除 `7` 条无来源拆分重复行：
+  - 销售：`EXP250021 / LED吊灯 / 圣荷西625 / 29 / 100`
+  - 装箱：`EXP250021 / LED吊灯 / 圣荷西2115 / 29`
+  - 装箱：`EXP250021 / LED吊灯 / 圣荷西625 / 29`
+  - 装箱：`EXP250021 / 人造石英石台面 / 圣荷西625店 / 229.7`
+  - 装箱：`EXP250021 / 人造石英石台面 / 红木城店 / 229.7`
+  - 装箱：`EXP250020 / 椅子 / 圣荷西625店 / 100`
+  - 装箱：`EXP250020 / 椅子 / 红木城店 / 100`
+- DB 来源缺口从 `192` 降到 `185`；候选映射复核从 `32` 降到 `25`。
+- 二次 dry-run 已确认该脚本剩余 `deleteCount=0`。
+
+### Verification
+- `node -c scripts/cleanup_wps_aggregate_alias_source_owner_items.js`：通过。
+- `node scripts/cleanup_wps_aggregate_alias_source_owner_items.js`：apply 前 dry-run 通过，`candidateCount=26`、`deleteCount=7`。
+- `npm run db:backup`：通过，生成 `backend/prisma/backups/dev_2026-06-04_14-45-16.db`。
+- `node scripts/cleanup_wps_aggregate_alias_source_owner_items.js --apply`：通过，删除 `7` 条拆分重复行。
+- 写库后顺序复跑：
+  - `node scripts/audit_wps_db_source_coverage.js`：`total_without_source=185`。
+  - `node scripts/build_wps_source_gap_detail_packet.js`：`total=185`。
+  - `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/classify_wps_source_gap_disposition.py`：`total=185`。
+  - `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/analyze_wps_candidate_source_mappings.py`：`total=25`。
+  - `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/analyze_wps_candidate_source_ownership.py`：`transfer_candidate_count=0`。
+  - `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/build_wps_remaining_source_gap_execution_plan.py`：`row_count=185`、`auto_writable=0`。
+  - `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/audit_wps_import_completion.py`：`db_source_gaps=185`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+  - `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --create-missing-contracts`：`salesMergeCreates=0`、`salesMergeUpdates=0`、`salesMergeUnmatched=0`。
+  - `git diff --check`：通过。
+
+### Remaining
+- 剩余来源缺口 `185` 条，当前 `auto_writable=0`。
+- 候选映射复核剩余 `25` 条，主要是数量、价格、门店或多候选冲突。
+- 长程 goal 仍未完成。
+
+## 2026-06-04 WPS-IMPORT-108（操作性缺口重复覆盖复核）
+
+### Goal
+- 回答剩余 `118` 条零值/操作性来源缺口里，是否还存在可被带 WPS 来源现库行严格覆盖、因此可进入后续清理的子集。
+- 只读复核，不删除、不改 note、不写数据库。
+- 把零价/非零价同数量冲突单独列出，避免把历史操作行误当成可自动合并项。
+
+### Delivered
+- 新增 `scripts/analyze_wps_operational_duplicate_coverage.js`。
+- 生成复核报告：
+  - `tmp/wps_11_export_list_raw/parsed/wps_operational_duplicate_coverage.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_operational_duplicate_coverage.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_operational_duplicate_coverage.md`
+- 复核 `118` 条操作性缺口：
+  - 严格覆盖候选：`0`
+  - 零价/非零价近似价格冲突：`2`
+  - 无带来源严格重复行：`116`
+  - 自动可写：`0`
+- 两条近似价格冲突已列入报告，但不能自动删除：
+  - `EXP250025 / 瓷砖 / Westminster / 72`：零价行 vs 带来源 `15` 单价行。
+  - `EXP250013 / 自助餐台 / 安纳汉姆 / 3`：零价行 vs 带来源 `7450` 单价行。
+
+### Verification
+- `node -c scripts/analyze_wps_operational_duplicate_coverage.js`：通过。
+- `node scripts/analyze_wps_operational_duplicate_coverage.js`：通过，`totalOperationalRows=118`、`exactDuplicateCandidates=0`、`nearPriceConflictReviews=2`、`autoWritable=0`。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/audit_wps_import_completion.py`：`pending_auto_writes=0`、`db_source_gaps=192`、`decision_items=2`、`cloud_only_files=2`。
+- `node scripts/audit_wps_db_source_coverage.js`：`total_without_source=192`。
+
+### Remaining
+- 操作性零值队列没有可自动删除/合并项；后续只能按业务裁决、正式材料或更强文件证据收口。
+- 当前长程 goal 仍未完成。
+
+## 2026-06-04 WPS-IMPORT-107（聚合门店来源覆盖销售行收口）
+
+### Goal
+- 继续推进 `WPS-IMPORT-105` 筛出的 `5` 条聚合门店占用转移候选。
+- 在备份数据库后，保留更贴近源文件的带 WPS 来源聚合门店销售行，删除无来源、无库存引用、且被聚合行覆盖的拆分销售重复行。
+- 删除前把拆分行单位合并到聚合保留行，避免丢失单位字段。
+
+### Delivered
+- 新增 `scripts/cleanup_wps_aggregate_source_owner_sales_items.js`。
+- 生成 dry-run/apply 计划：`tmp/wps_11_export_list_raw/parsed/wps_aggregate_source_owner_sales_cleanup_plan.json`。
+- 写库前备份：`backend/prisma/backups/dev_2026-06-04_14-18-10.db`。
+- 已删除 `5` 条无来源拆分销售行：
+  - `EXP250021 / LED吊灯 / 圣荷西2115 / 29 / 100`
+  - `EXP250021 / 人造石英石台面 / 圣荷西625店 / 229.7 / 110`
+  - `EXP250021 / 人造石英石台面 / 红木城店 / 229.7 / 110`
+  - `EXP250020 / 椅子 / 圣荷西625店 / 100 / 35`
+  - `EXP250020 / 椅子 / 红木城店 / 100 / 35`
+- 保留对应带 WPS 来源的聚合门店销售行，并补单位 `个`、`平方米`、`把`。
+- 来源缺口从 `197` 降到 `192`；候选映射复核从 `37` 降到 `32`；聚合占用转移候选从 `5` 降到 `0`。
+
+### Verification
+- `node -c scripts/cleanup_wps_aggregate_source_owner_sales_items.js`：通过。
+- `node scripts/cleanup_wps_aggregate_source_owner_sales_items.js`：dry-run 通过，apply 前 `deleteCount=5`。
+- `npm run db:backup`：通过，生成 `backend/prisma/backups/dev_2026-06-04_14-18-10.db`。
+- `node scripts/cleanup_wps_aggregate_source_owner_sales_items.js --apply`：通过，删除 `5` 条拆分重复销售行。
+- 写库后复跑：
+  - `node scripts/audit_wps_db_source_coverage.js`：`total_without_source=192`。
+  - `node scripts/build_wps_source_gap_detail_packet.js`：`total=192`。
+  - `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/classify_wps_source_gap_disposition.py`：`total=192`。
+  - `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/analyze_wps_candidate_source_mappings.py`：`total=32`。
+  - `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/analyze_wps_candidate_source_ownership.py`：`transfer_candidate_count=0`。
+  - `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/build_wps_remaining_source_gap_execution_plan.py`：`row_count=192`。
+  - `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/audit_wps_import_completion.py`：`db_source_gaps=192`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+  - `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --create-missing-contracts`：`salesMergeCreates=0`、`salesMergeUpdates=0`、`salesMergeUnmatched=0`。
+  - `git diff --check`：通过。
+
+### Remaining
+- 来源缺口仍有 `192` 条，当前 `auto_writable=0`。
+- 剩余候选映射复核为 `32` 条，主要是字段冲突或多候选，不再有聚合占用转移候选。
+- 长程 goal 仍未完成。
+
+## 2026-06-04 WPS-IMPORT-106（重复来源占用销售行收口）
+
+### Goal
+- 继续推进 `WPS-IMPORT-105` 筛出的 `2` 条同字段无引用占用复核项。
+- 在备份数据库后，删除无来源 note、无库存引用、且已被同合同/商品/门店/数量/售价的带 WPS 来源销售行覆盖的重复行。
+- 保留现库中缺来源重复行唯一多出的单位字段，把单位合并到带 WPS 来源的保留行，避免删除时丢字段。
+
+### Delivered
+- 新增 `scripts/cleanup_wps_duplicate_source_owner_sales_items.js`。
+- 生成 dry-run/apply 计划：`tmp/wps_11_export_list_raw/parsed/wps_duplicate_source_owner_sales_cleanup_plan.json`。
+- 写库前备份：`backend/prisma/backups/dev_2026-06-04_14-07-14.db`。
+- 已删除 `EXP250019 / 亚克力板` 的 `2` 条无来源重复销售行，并给保留的带 WPS 来源销售行补单位 `张`。
+- 来源缺口从 `199` 降到 `197`；候选映射复核从 `39` 降到 `37`。
+
+### Verification
+- `node -c scripts/cleanup_wps_duplicate_source_owner_sales_items.js`：通过。
+- `node scripts/cleanup_wps_duplicate_source_owner_sales_items.js`：dry-run 通过，apply 前 `deleteCount=2`。
+- `npm run db:backup`：通过，生成 `backend/prisma/backups/dev_2026-06-04_14-07-14.db`。
+- `node scripts/cleanup_wps_duplicate_source_owner_sales_items.js --apply`：通过，删除 `2` 条重复销售行。
+- `node scripts/audit_wps_db_source_coverage.js`：`total_without_source=197`。
+- `node scripts/build_wps_source_gap_detail_packet.js`：`total=197`。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/build_wps_remaining_source_gap_execution_plan.py`：`row_count=197`。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/audit_wps_import_completion.py`：`db_source_gaps=197`、`pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=2`。
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --create-missing-contracts`：`salesMergeCreates=0`、`salesMergeUpdates=0`、`salesMergeUnmatched=0`。
+- `git diff --check`：通过。
+
+### Remaining
+- 来源缺口仍有 `197` 条，当前 `auto_writable=0`。
+- 聚合门店占用转移候选仍有 `5` 条，但不能直接把一个 WPS 来源复制到多条销售/装箱行。
+- 长程 goal 仍未完成。
+
+## 2026-06-04 WPS-IMPORT-105（候选来源占用/转移复核）
+
+### Goal
+- 继续推进剩余 `199` 条来源缺口中的 `39` 条候选映射复核项。
+- 在不写库、不移动 note、不删除行的前提下，检查“候选 WPS 来源已挂到其他 DB 行”时，那个占用行是否有库存/报关引用、是否是聚合门店行、是否可能作为后续拆分/转移候选。
+- 把原先宽泛的 `candidate_mapping_review=39` 进一步缩小为可重点复核的子集。
+
+### Delivered
+- 新增只读脚本 `scripts/analyze_wps_candidate_source_ownership.py`。
+- 生成候选来源占用复核报告：
+  - `tmp/wps_11_export_list_raw/parsed/wps_candidate_source_ownership_review.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_candidate_source_ownership_review.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_candidate_source_ownership_review.md`
+- 当前 `39` 条候选映射复核项拆成：
+  - `owner_conflicts_or_partial_match_review=26`
+  - `multi_candidate_still_requires_review=6`
+  - `aggregate_owner_no_refs_transfer_candidate=5`
+  - `duplicate_exact_owner_no_refs_review=2`
+- 本轮发现 `5` 条聚合门店占用来源、且目标行/占用行均无下游引用，可作为后续人工拆分/转移候选；另有 `2` 条同字段无引用占用行需要判断谁应保留。
+- 自动可写仍为 `0`。
+
+### Verification
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m py_compile scripts/analyze_wps_candidate_source_ownership.py`：通过。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/analyze_wps_candidate_source_ownership.py`：通过，`total=39`、`transfer_candidate_count=5`、`auto_writable=0`。
+
+### Remaining
+- `aggregate_owner_no_refs_transfer_candidate` 不是 apply 授权；后续如要处理，必须单独做目标行/占用行字段、note、引用、备份和 dry-run/apply 流程。
+- 剩余全局状态仍需以完成度审计为准；长程 goal 未完成。
+
+## 2026-06-04 WPS-IMPORT-104（cloud-only 日志接口线索探测）
+
+### Goal
+- 继续推进剩余 `2` 个 cloud-only 原件缺口。
+- 在不联网、不输出 token/cookie、不写库的前提下，只读扫描 WPS 本机日志，确认是否存在可用下载 URL、接口词或错误码线索。
+- 避免把 WPS 日志中的普通命中、旧路径或敏感接口痕迹误当成可下载原件证明。
+
+### Delivered
+- 新增只读脱敏脚本 `scripts/probe_wps_cloud_only_log_api_clues.py`。
+- 生成日志接口线索报告：
+  - `tmp/wps_11_export_list_raw/parsed/wps_cloud_only_log_api_clues.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_cloud_only_log_api_clues.md`
+- 当前结论：
+  - 扫描最新 `120` 个 WPS 相关日志文件。
+  - `11-报关记录/20250815禧瑞都/购销合同CG2500045-不锈钢桶-禧瑞都.pdf`：没有匹配到下载 URL、接口词或错误码线索。
+  - 根目录当前版 `出货汇总.xlsx`：没有匹配到下载 URL、接口词或错误码线索。
+  - `target_count=2`，两个目标均为 `no_api_clues_in_matching_log_lines`。
+
+### Verification
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m py_compile scripts/probe_wps_cloud_only_log_api_clues.py`：通过。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/probe_wps_cloud_only_log_api_clues.py`：通过，`log_files_scanned=120`、`target_count=2`、`url_clues=0`。
+- 脱敏输出复核：报告没有日志正文样例，`token/cookie` 只出现在安全说明中。
+
+### Remaining
+- 两个 cloud-only 原件仍没有可复用下载 URL 或当前 SHA1 精确本机副本。
+- 后续仍只能通过 WPS 客户端真实缓存出目标 SHA1 文件、或取得有效云端 fileId/下载原件后，再运行 probe/close 流程。
+- 长程 goal 仍未完成。
+
+## 2026-06-04 WPS-IMPORT-103（cloud-only 下载手柄探测）
+
+### Goal
+- 继续推进剩余 `2` 个 cloud-only 原件缺口。
+- 在不联网、不输出 token、不写库的前提下，抽取 WPS 本机 metadata/cache/transfer 中的 `fileId`、`groupId`、`taskId` 和下载状态。
+- 判断当前是否已经具备可直接下载或复用的本机下载手柄。
+
+### Delivered
+- 新增只读脚本 `scripts/probe_wps_cloud_only_download_handles.py`。
+- 生成下载手柄探测报告：
+  - `tmp/wps_11_export_list_raw/parsed/wps_cloud_only_download_handles.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_cloud_only_download_handles.md`
+- 当前结论：
+  - `11-报关记录/20250815禧瑞都/购销合同CG2500045-不锈钢桶-禧瑞都.pdf`：`insufficient_cloud_file_id`，metadata 目标 SHA1/size 明确，但本机 metadata 的 `fileId=-1`；旧 transfer 命中是 `20250728禧瑞都` 路径、不同 size，不是目标原件。
+  - 根目录当前版 `出货汇总.xlsx`：`valid_file_id_but_stale_cache`，`fileId=425927234267` 有效，但 `20` 条同 fileId cache 记录都指向旧 SHA1/旧大小，没有目标 `90013/d4755...` transfer 产物。
+  - `directly_downloadable_count=0`。
+
+### Verification
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m py_compile scripts/probe_wps_cloud_only_download_handles.py`：通过。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/probe_wps_cloud_only_download_handles.py`：通过，`target_count=2`、`directly_downloadable_count=0`。
+
+### Remaining
+- `CG2500045` 无年份 PDF 需要 WPS 刷新出有效 cloud fileId，或通过客户端打开精确云路径生成新下载任务。
+- 根目录当前版 `出货汇总.xlsx` 需要 WPS 认证客户端/API 强制刷新当前版本；旧 cache 不能关闭缺口。
+- 长程 goal 仍未完成。
+
+## 2026-06-04 WPS-IMPORT-102（剩余来源缺口执行队列）
+
+### Goal
+- 继续推进剩余 `199` 条 DB 来源缺口。
+- 汇总现有 `disposition`、候选映射复核、操作性复核和正式报关复核报告，生成逐条执行队列。
+- 对每条缺口列出后续必要输入、禁止动作和安全下一步，避免把业务判断、弱证据或已消费来源伪装成文件事实。
+
+### Delivered
+- 新增只读脚本 `scripts/build_wps_remaining_source_gap_execution_plan.py`。
+- 生成执行队列：
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_source_gap_execution_plan.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_source_gap_execution_plan.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_source_gap_execution_plan.md`
+- 当前 `199` 条缺口按动作族拆成：
+  - `operational_keep_or_cleanup_decision=60`
+  - `candidate_mapping_review=39`
+  - `candidate_conflict_review=36`
+  - `source_required_no_candidate=24`
+  - `formal_evidence_required=18`
+  - `pending_placeholder_review=14`
+  - `operational_review=8`
+- 本轮只读，数据库写入 `0`，来源 note 写入 `0`，删除 `0`。
+
+### Verification
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m py_compile scripts/build_wps_remaining_source_gap_execution_plan.py`：通过。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/build_wps_remaining_source_gap_execution_plan.py`：通过，`row_count=199`、`auto_writable=0`、`db_writes=0`。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/audit_wps_import_completion.py`：通过，`pending_auto_writes=0`、`db_source_gaps=199`、`decision_items=2`、`cloud_only_files=2`。
+- `node scripts/audit_wps_db_source_coverage.js`：通过，`total_without_source=199`。
+- `git diff --check`：通过。
+
+### Remaining
+- 这 `199` 条仍不是自动可写来源 note；本轮只是把后续处理前置条件和禁止动作逐条固化。
+- 真正写库仍需要独立 dry-run/apply task，并且只允许消费正式材料、唯一未消费来源或明确业务裁决。
+- 长程 goal 仍未完成。
+
+## 2026-06-04 WPS-IMPORT-101（cloud-only 原件关闭工具）
+
+### Goal
+- 继续推进剩余 `2` 个 cloud-only 原件缺口。
+- 先复核当前本机候选是否已出现 WPS metadata SHA1 精确副本。
+- 新增一个可复跑关闭工具：只有本机候选 SHA1 精确等于 WPS metadata 时，才复制到项目 WPS 源目录；目标已有旧版本时先保留 `.superseded-*` 备份。
+
+### Delivered
+- 新增 `scripts/close_wps_cloud_only_files.py`。
+- 生成关闭计划：
+  - `tmp/wps_11_export_list_raw/parsed/wps_cloud_only_close_plan.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_cloud_only_close_plan.md`
+- 重新运行 cloud-only 窄探测和深探测：
+  - `ready_to_copy_count=0`
+  - `target_count=2`
+- 当前关闭计划结果：
+  - `ready_to_copy_count=0`
+  - `already_closed_count=0`
+  - `not_ready_count=2`
+  - `db_writes=0`
+  - `copied_count=0`
+
+### Verification
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m py_compile scripts/close_wps_cloud_only_files.py`：通过。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/close_wps_cloud_only_files.py`：通过，`target_count=2`、`not_ready_count=2`、`copied_count=0`。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/probe_wps_cloud_only_files.py`：通过，`ready_to_copy_count=0`。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/probe_wps_cloud_only_deep_state.py`：通过，`target_count=2`。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/audit_wps_import_completion.py`：通过，`pending_auto_writes=0`、`db_source_gaps=199`、`decision_items=2`、`cloud_only_files=2`。
+- `node scripts/audit_wps_db_source_coverage.js`：通过，`total_without_source=199`。
+- `git diff --check`：通过。
+
+### Remaining
+- `11-报关记录/20250815禧瑞都/购销合同CG2500045-不锈钢桶-禧瑞都.pdf` 仍没有本机精确 SHA1 副本。
+- 根目录当前版 `出货汇总.xlsx` 仍没有本机精确 SHA1 副本；项目源目录和 WPS 本机路径仍是旧 67KB 版本，不能替换当前 metadata 目标。
+- 后续如果 WPS 客户端下载出目标 SHA1 文件，先运行 `probe_wps_cloud_only_files.py`，再运行 `close_wps_cloud_only_files.py --apply --replace-existing`，然后重跑云端 metadata 盘点、出口文件留存审计和完成度审计。
+
+## 2026-06-04 WPS-IMPORT-100（剩余裁决只读执行方案）
+
+### Goal
+- 继续推进剩余 `2` 个业务/正式材料裁决项。
+- 在不写库、不复制、不删除的前提下，把后续可执行动作拆成分支方案。
+- 明确每个分支需要的业务裁决或正式材料、目标 DB 行、引用状态和执行前安全检查。
+
+### Delivered
+- 新增只读脚本 `scripts/build_wps_remaining_decision_execution_plan.py`。
+- 生成执行方案：
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_decision_execution_plan.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_decision_execution_plan.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_decision_execution_plan.md`
+- 当前方案覆盖 `2` 个 subject、`6` 个分支：
+  - `EXP2500002 / 瓷砖`：`keep_current`、`assign_771_84_to_anaheim`、`assign_771_84_to_burbank`、`split_771_84`。
+  - `EXP2400006`：`keep_reference_only`、`create_customs_after_formal_evidence`。
+- 方案直接列出目标行 ID、库存/报关引用数、必要输入和安全检查；本轮数据库写入 `0`、文件复制 `0`、文件删除 `0`。
+
+### Verification
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m py_compile scripts/build_wps_remaining_decision_execution_plan.py`：通过。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/build_wps_remaining_decision_execution_plan.py`：通过，`subjects=2`、`db_writes=0`。
+
+### Remaining
+- `EXP2500002 / 771.84 平方米瓷砖` 仍不能自动选择 Burbank / 安纳汉姆 / 拆分 / 保留现状；如选择 Burbank，还必须确认价格来源是合同页 `25.0` 还是出货汇总 `3.0`。
+- `EXP2400006` 仍不能用 `222920240004561873` 或 `invoice_no=25312000000011328975` 创建报关单；必须取得正式 18 位海关编号和正式报关材料。
+- 长程 goal 仍未完成；本轮只是把后续裁决后的执行路径固化为可复跑、可审计方案。
+
+## 2026-06-04 WPS-IMPORT-99（cloud-only WPS 内部状态深探测）
+
+### Goal
+- 继续推进剩余 `2` 个 cloud-only 原件缺口。
+- 除常规路径和 WPS `cache.db` 外，进一步复核 WPS 本机 `syncassistant.db`、`precloudfile.db`、`transferhelper.db`、`datacache.db`、`cachedata` 和日志命中情况。
+- 确认是否存在隐藏下载、传输队列、RPC 缓存或本机缓存文件可用于关闭原件缺口。
+
+### Delivered
+- 新增只读脚本 `scripts/probe_wps_cloud_only_deep_state.py`。
+- 生成深探测报告：
+  - `tmp/wps_11_export_list_raw/parsed/wps_cloud_only_deep_state.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_cloud_only_deep_state.md`
+- 结论：
+  - `CG2500045` 无年份 PDF：没有 `cachedata` 目标大小文件；`syncassistant` 只有旧 `20250728禧瑞都` 路径、size `452772` 的失败记录，错误 `-5 文件不存在`，不是目标 size `348470` / SHA1 `c4bf...` 原件。
+  - 根目录当前版 `出货汇总.xlsx`：没有 `cachedata` 目标大小文件；`syncassistant` 只有团队目录旧 `fileId=427264929193`、size `39820` 的已完成记录，没有根目录当前 `fileId=425927234267`、size `90013` 的下载任务。
+  - `precloudfile`、`transferhelper`、`datacache` 均没有两个当前目标的可用记录。
+
+### Verification
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m py_compile scripts/probe_wps_cloud_only_deep_state.py`：通过。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/probe_wps_cloud_only_deep_state.py`：通过，`target_count=2`、`log_hit_files=45`，但 `cachedata_size_matches=0`。
+
+### Remaining
+- 两个 cloud-only 原件仍未取得 SHA1 精确本机副本。
+- 只有 WPS 客户端真实缓存出目标 SHA1 文件，或取得可下载的有效云端 fileId/原件，才能关闭这两个文件留存缺口。
+
+## 2026-06-04 WPS-IMPORT-98（剩余裁决项引用状态复核）
+
+### Goal
+- 继续推进剩余 `2` 个业务/正式材料裁决项。
+- 在不写库的前提下，补齐“这些行是否已有库存或报关引用”的证据，判断后续业务裁决后是否技术上可改、可删或可保留。
+
+### Delivered
+- 增强 `scripts/build_wps_remaining_decision_dossier.py`，在现库销售行中增加 `inventory_refs`，在现库装箱行中增加 `customs_refs`。
+- 重新生成：
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_decision_dossier.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_decision_dossier.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_decision_dossier.md`
+- 当前两个裁决项的引用状态：
+  - `EXP2500002 / 瓷砖`：相关销售库存引用合计 `0`，相关装箱报关引用合计 `0`。
+  - `EXP2400006`：相关销售库存引用合计 `0`，相关装箱报关引用合计 `0`。
+
+### Verification
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m py_compile scripts/build_wps_remaining_decision_dossier.py`：通过。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/build_wps_remaining_decision_dossier.py`：通过，`decision_items=2`。
+
+### Remaining
+- 引用为 `0` 只说明后续裁决后技术上可操作，不等于可以自动改或删。
+- `EXP2500002 / 771.84 平方米瓷砖` 仍需指定 Burbank / 安纳汉姆 / 拆分 / 保留现状。
+- `EXP2400006` 仍需正式 18 位海关编号或正式报关单原件；不能用 `invoice_no` 或 `222920240004561873` 替代。
+
+## 2026-06-04 WPS-IMPORT-97（云端原件当前 metadata 复核）
+
+### Goal
+- 继续处理剩余 `2` 个 cloud-only 原件缺口。
+- 刷新 WPS 根目录清单 metadata，避免继续使用旧的 `出货汇总.xlsx` 89KB/50b6 结论。
+- 只在本机文件 SHA1 与 WPS metadata SHA1 完全一致时，才允许关闭原件留存缺口。
+
+### Delivered
+- 重新运行完成度审计和 cloud-only 窄探测，确认当前仍为 `cloud_only_files=2`、`ready_to_copy_count=0`。
+- 根目录当前版 `出货汇总.xlsx` 已刷新为 size `90013`、SHA1 `d4755f642c13f61a6c9aedec233c31e74f58d0d3`。
+- 主目录无年份 PDF `11-报关记录/20250815禧瑞都/购销合同CG2500045-不锈钢桶-禧瑞都.pdf` 仍为 size `348470`、SHA1 `c4bfefb55677fdb20e0a249400681ce73c14aa25`。
+- 尝试用本机 WPS 打开旧缓存 `出货汇总.xlsx` 触发同步；30 秒后 WPS 本机文件仍是 size `67152`、SHA1 `92f422118e855cdcc600dea505eb961fd1689773`，项目源目录也仍是同一旧版本。
+- Computer Use 仍无法附着到 WPS 窗口，错误为 `procNotFound`；本轮改用 WPS 进程、cache.db、metadata、文件大小和 SHA1 作为证据。
+
+### Verification
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/audit_wps_import_completion.py`：通过，`pending_auto_writes=0`、`db_source_gaps=199`、`decision_items=2`、`cloud_only_files=2`。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/probe_wps_cloud_only_files.py`：通过，`target_count=2`、`ready_to_copy_count=0`。
+- WPS 打开触发同步后复核 SHA1：没有出现 metadata 目标 SHA1 的本机文件。
+
+### Remaining
+- 两个 cloud-only 原件仍未取得 SHA1 精确本机副本，不能用旧缓存、同名文件或其他目录版本关闭。
+- 长程 goal 仍未完成；剩余是 `199` 条已分层来源缺口、`2` 个业务/正式材料裁决项、`2` 个云端原件副本缺口。
+
+## 2026-06-04 WPS-IMPORT-96（销售别名 no-candidate 来源复核）
+
+### Goal
+- 继续复核剩余 `no_candidate_source_required=24` 中的 `13` 条销售来源缺口。
+- 只允许同合同、数量、单价完全一致，且商品别名唯一、源行未被其他 note 消费的销售行补来源 note。
+
+### Delivered
+- 新增 `scripts/backfill_wps_sales_item_strict_alias_source_notes.js`。
+- dry-run 结果为 `salesItemUpdates=0`、`skippedCount=13`。
+- 关键结论：
+  - `EXP2500004 / LED吊灯 / 34 @188` 可用别名命中源文件 `吊灯`，但源行已被其他销售 note 消费，不能复用。
+  - `EXP250020 / 人造石英石制品 / 325.1 @62` 可用别名命中源文件 `人造石英石板材`，但源行已被其他销售 note 消费，不能复用。
+  - `EXP250010 / 餐盘 / 8000 @1.2` 有两个同内容 WPS 源副本，不能自动选。
+  - 其余销售 no-candidate 项没有同合同、数量、单价、商品别名强一致候选。
+
+### Verification
+- `node -c scripts/backfill_wps_sales_item_strict_alias_source_notes.js`：通过。
+- `node scripts/backfill_wps_sales_item_strict_alias_source_notes.js`：通过，`targetCount=13`、`salesItemUpdates=0`、`skippedCount=13`。
+
+### Remaining
+- 剩余销售 no-candidate 不能自动写来源 note。
+- 长程 goal 仍未完成；当前仍有 `199` 条 DB 来源缺口、`2` 个业务/正式材料裁决项、`2` 个 cloud-only 原件缺口。
+
+## 2026-06-04 WPS-IMPORT-95（全量装箱源漏匹配来源回填）
+
+### Goal
+- 继续推进剩余 `no_candidate_source_required=28`。
+- 只处理被 `preferred_packing_items.csv` 漏掉、但在全量 `packing_items.csv` 中存在唯一强匹配的装箱来源；只补来源 note，不改业务字段。
+
+### Delivered
+- 新增 `scripts/backfill_wps_packing_item_all_source_notes.js`。
+- 写库前备份数据库：`backend/prisma/backups/dev_2026-06-04_11-28-51.db`。
+- 实际给 `4` 条装箱明细追加 `[WPS_PACKING_ALL_SOURCE]` 来源 note：
+  - `EXP250012 / 餐盘 / 禧瑞都 / 4000 个` -> `_wps_cloud_root/出货汇总.xlsx#出货汇总0315_补充:61`
+  - `EXP2400001 / 瓷砖 / 禧瑞都 / 234.24 平方米` -> `_wps_cloud_root/出货汇总.xlsx#出货汇总0315_补充:87`
+  - `EXP2400001 / 瓷砖 / 禧瑞都 / 2 平方米` -> `_wps_cloud_root/出货汇总.xlsx#出货汇总0315_补充:88`
+  - `EXP250020 / 人造石英石制品 / 米尔皮塔 / 325.1 平方米` -> `_wps_cloud_root/出货汇总.xlsx#出货汇总0315_补充:258`
+- `EXP250017 / 切骨机 / 1` 因源行和 DB 行都缺箱数、重量、体积、厂家等装箱锚点，继续跳过。
+- `PENDING-威斯敏` 和 `PENDING-Burbank` 继续跳过，不用弱证据关闭占位缺口。
+
+### Verification
+- `node -c scripts/backfill_wps_packing_item_all_source_notes.js`：通过。
+- `node scripts/backfill_wps_packing_item_all_source_notes.js`：dry-run 为 `packingItemUpdates=4`。
+- `node scripts/backfill_wps_packing_item_all_source_notes.js --apply`：已应用 `4` 条 note-only 更新。
+- 写库后复跑 `node scripts/backfill_wps_packing_item_all_source_notes.js`：`packingItemUpdates=0`。
+- `node scripts/backfill_wps_packing_item_source_notes.js`：`packingItemUpdates=0`。
+- `node scripts/build_wps_source_gap_detail_packet.js`：`total=199`。
+- `python3 scripts/classify_wps_source_gap_disposition.py`：`total=199`、`auto_writable=0`、`no_candidate_source_required=24`。
+- `node scripts/audit_wps_db_source_coverage.js`：`total_without_source=199`。
+- `python3 scripts/audit_wps_import_completion.py`：`pending_auto_writes=0`、`db_source_gaps=199`、`decision_items=2`、`cloud_only_files=2`。
+- 出口源、真实凭证、采购凭证 dry-run 均为 `0` 待写入。
+
+### Remaining
+- 剩余 `199` 条 DB 来源缺口分层为：`zero_or_operational_review=118`、`candidate_mapping_review=39`、`no_candidate_source_required=24`、`formal_evidence_required=18`。
+- `no_candidate_source_required=24` 中剩余装箱项要么是占位合同，要么缺少足够装箱锚点；销售项没有同合同同商品同数量同价的唯一来源，继续不硬补。
+
+## 2026-06-04 WPS-IMPORT-94（PENDING-威斯敏正式报关来源缺口复核）
+
+### Goal
+- 继续推进剩余 `formal_evidence_required=18` 的正式报关来源缺口。
+- 只读核对 `PENDING-威斯敏` 三张占位报关单与现有 WPS 装箱源、真实凭证抽取、附件清单之间是否存在可证明来源；不把近似装箱行或占位 HS 编码当正式报关证据。
+
+### Delivered
+- 新增 `scripts/analyze_wps_formal_customs_source_gaps.py`。
+- 生成正式报关来源缺口复核报告：
+  - `tmp/wps_11_export_list_raw/parsed/wps_formal_customs_gap_review.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_formal_customs_gap_review.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_formal_customs_gap_review.md`
+- 复核范围：
+  - `BGNDING-威斯敏`，9 条占位报关明细。
+  - `BGNDING-威斯敏-2`，3 条占位报关明细。
+  - `BGNDING-威斯敏-3`，3 条占位报关明细。
+- 结论：
+  - `auto_writable=0`。
+  - 三张占位单均为 `no_complete_placeholder_source_match_and_no_formal_evidence_found`。
+  - 现有 `evidence_db_mapping.csv`、`evidence_extracts.csv`、`attachment_inventory.csv` 中命中 `EXP260005/EXP260006/EXP260007/威斯敏` 的正式报关候选为 `0`。
+  - 最近源集合均指向 `EXP260005 / 31-威斯敏`，但只部分命中：主占位单 `matched=3/missing=6/extra=3`，两个 3 项占位单均为 `matched=1/missing=2/extra=5`。
+
+### Verification
+- `python3 -m py_compile scripts/analyze_wps_formal_customs_source_gaps.py`：通过。
+- `python3 scripts/analyze_wps_formal_customs_source_gaps.py`：通过，`disposition_rows=18`、`declaration_count=3`、`auto_writable=0`、`formal_customs_candidate_count=0`。
+
+### Remaining
+- `PENDING-威斯敏` 三张占位报关单仍需正式报关单或正式海关编号；没有正式材料前不写报关来源 note、不替换 HS 编码。
+- 总 WPS 导入 goal 仍未完成；本轮只是把 `formal_evidence_required=18` 收窄成可审计材料缺口。
+
+## 2026-06-04 WPS-IMPORT-93（CG2500013 采购错挂修复）
+
+### Goal
+- 继续推进采购侧最后一个来源缺口 `CG2500013`。
+- 不再把 PDF 旧抽取失败当作事实；用当前可用 `pypdf` 运行时重新抽取 PDF 正文，并按文件内容修正数据库。
+
+### Delivered
+- 修正 `scripts/extract_wps_purchase_evidence.py`：
+  - PDF 文本合同现在可抽供应商税号、地址、银行信息。
+  - PDF 文本表格可抽采购明细。
+- 新增 `scripts/repair_wps_cg2500013_purchase_contract.js`。
+- 写库前备份数据库：`backend/prisma/backups/dev_2026-06-04_11-10-35.db`。
+- 已把 `CG2500013` 从错误重复的屏风合同修正为 PDF 证明的釉面砖合同：
+  - 供应商：`佛山市铭源金属制品有限公司` -> `临沂市宏宇艺术腰线有限公司`
+  - 签订日期：`2025-05-27` -> `2025-05-26`
+  - 总额：`17529` -> `11925`
+  - 明细：`不锈钢屏风 / 15.04 平方米 / 1031.41 / 17529` -> `釉面砖 / 70 平方米 / 150.758 / 11925`
+  - 合同状态保持原 `COMPLETED`，因为 PDF 只证明合同事实，不证明业务状态应变更。
+- `CG2500014` 的屏风合同和 DOCX 来源保留不动。
+
+### Verification
+- `python3 -m py_compile scripts/extract_wps_purchase_evidence.py`：通过。
+- Codex Python 运行 `scripts/extract_wps_purchase_evidence.py`：通过，`item_count=343`，`CG2500013` PDF 解析为 `ok/pdf_text`，明细 `釉面砖 / 70 平方米 / 11925`。
+- `node -c scripts/repair_wps_cg2500013_purchase_contract.js`：通过。
+- `node scripts/repair_wps_cg2500013_purchase_contract.js`：dry-run 通过；源 PDF SHA1 与上传附件 SHA1 均为 `1115ea8a98d70369bae10c56aa4018332b4d8e90`。
+- `node scripts/repair_wps_cg2500013_purchase_contract.js --apply`：已应用，创建/补齐 `临沂市宏宇艺术腰线有限公司` 供应商，更新 `1` 个合同头和 `1` 条采购明细。
+- `node scripts/backfill_wps_purchase_item_source_notes.js`：`purchaseItemUpdates=0`、`skippedCount=0`。
+- `node scripts/backfill_wps_purchase_item_strict_alias_source_notes.js`：`purchaseItemUpdates=0`、`quantityUnitCorrections=0`、`skippedCount=0`。
+- `node scripts/import_wps_purchase_evidence.js --allow-header-only-contracts`：`supplierCreates=0`、`supplierUpdates=0`、`productCreates=0`、`productUpdates=0`、`contractCreates=0`、`headerOnlyContractCreates=0`、`purchaseItemCreates=0`。
+- `node scripts/audit_wps_db_source_coverage.js`：`total_without_source=203`；`purchase_contracts=192/192`、`purchase_items=278/278`。
+- `python3 scripts/audit_wps_import_completion.py`：`pending_auto_writes=0`、`db_source_gaps=203`、`decision_items=2`、`cloud_only_files=2`。
+- `python3 scripts/classify_wps_source_gap_disposition.py`：`total=203`、`auto_writable=0`，采购类缺口已消失。
+
+### Remaining
+- 采购侧来源缺口已清零。
+- 剩余 `203` 条 DB 来源缺口为销售、装箱、报关来源缺口：`zero_or_operational_review=118`、`candidate_mapping_review=39`、`no_candidate_source_required=28`、`formal_evidence_required=18`。
+- `EXP2500002 / 瓷砖` 仍需业务裁决 `771.84` 平方米销售行归属/拆分。
+- `EXP2400006` 仍需正式 `18` 位海关编号或正式报关单原件。
+- 两个 cloud-only 原件缺口仍未找到 SHA1 精确本机文件。
+
+## 2026-06-04 WPS-IMPORT-92（采购别名强匹配来源回填）
+
+### Goal
+- 根据当前进度收窄阶段目标：只处理采购侧仍能由同合同、金额、单价、数量和商品别名强对齐证明的来源缺口。
+- 可证明的采购明细补来源 note；不能由正文或唯一凭证证明的采购项继续留入备忘录，不凭商品相似度硬写库。
+
+### Delivered
+- 新增 `scripts/backfill_wps_purchase_item_strict_alias_source_notes.js`。
+- 写库前备份数据库：`backend/prisma/backups/dev_2026-06-04_06-50-27.db`。
+- 实际给 `18` 条采购明细追加 `[WPS_PURCHASE_EVIDENCE]` + `[WPS_PURCHASE_STRICT_ALIAS]` 来源 note。
+- 修正 `3` 条历史 `quantity=0/unit=数量` 的数量/单位错位：
+  - `CG2500058 / 切菜机`：`0 / 2` -> `2 / 台`
+  - `CG2500098 / 机柜`：`0 / 14` -> `14 / 个`
+  - `CG2500126 / 灯具`：`0 / 180` -> `180 / 个`
+- 采购来源覆盖提升到：
+  - `purchase_items`：`277/278`
+  - `purchase_contracts`：`191/192`
+- 总 DB 来源缺口从 `223` 降到 `205`。
+
+### Verification
+- `node -c scripts/backfill_wps_purchase_item_strict_alias_source_notes.js`：通过。
+- 写库后复跑 `node scripts/backfill_wps_purchase_item_strict_alias_source_notes.js`：`purchaseItemUpdates=0`、`quantityUnitCorrections=0`、`skippedCount=1`。
+- `node scripts/backfill_wps_purchase_item_source_notes.js`：`purchaseItemUpdates=0`、`skippedCount=1`。
+- `node scripts/import_wps_purchase_evidence.js --allow-header-only-contracts`：`supplierCreates=0`、`supplierUpdates=0`、`productCreates=0`、`productUpdates=0`、`contractCreates=0`、`headerOnlyContractCreates=0`、`purchaseItemCreates=0`、`skipped=192`。
+- `node scripts/audit_wps_db_source_coverage.js`：`total_without_source=205`。
+- `python3 scripts/audit_wps_import_completion.py`：`pending_auto_writes=0`、`db_source_gaps=205`、`decision_items=2`、`cloud_only_files=2`。
+- 来源缺口明细和 disposition 已刷新到 `205` 条。
+
+### Remaining
+- `CG2500013 / 不锈钢屏风` 的采购合同头和明细仍缺来源；该 PDF 当前无可抽取正文，且严格别名匹配为 `no_strict_alias_match`。
+- `EXP2500002 / 瓷砖` 仍需业务裁决 `771.84` 平方米销售行归属/拆分。
+- `EXP2400006` 仍需正式 `18` 位海关编号或正式报关单原件。
+- 两个 cloud-only 原件缺口仍未找到 SHA1 精确本机文件。
+
+## 2026-06-04 WPS-IMPORT-91（零值/操作性历史来源缺口复核）
+
+### Goal
+- 继续推进剩余 `223` 条 DB 来源缺口里的最大子集 `zero_or_operational_review=118`。
+- 判断这些零数量、零售价、PENDING 占位、非捷淞/拼船/自行报关历史行是否有库存或报关引用，以及是否存在可自动补来源 note 或可自动清理的子集。
+
+### Delivered
+- 新增只读脚本 `scripts/analyze_wps_operational_source_gaps.py`。
+- 生成零值/操作性来源缺口复核报告：
+  - `tmp/wps_11_export_list_raw/parsed/wps_operational_source_gap_review.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_operational_source_gap_review.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_operational_source_gap_review.md`
+- 对 `118` 条记录给出 verdict：
+  - `candidate_conflict_review=36`
+  - `zero_price_no_ref_review=36`
+  - `zero_quantity_price_no_ref_review=24`
+  - `pending_placeholder_review=14`
+  - `operational_marker_no_ref_review=6`
+  - `operational_no_ref_review=2`
+- 当前 `inventory_refs=0`、`customs_refs=0`；但本轮仍不自动删除、不自动补 note。
+
+### Verification
+- `python3 -m py_compile scripts/analyze_wps_operational_source_gaps.py`：通过。
+- `python3 scripts/analyze_wps_operational_source_gaps.py`：通过，`total=118`、`auto_writable=0`。
+- `python3 scripts/audit_wps_import_completion.py`：仍为 `pending_auto_writes=0`、`db_source_gaps=223`、`decision_items=2`、`cloud_only_files=2`。
+- `git diff --check`：通过。
+
+### Remaining
+- `36` 条存在候选来源但未严格匹配，仍需逐项复核候选字段，不能硬挂 note。
+- `36` 条非零数量但售价为 `0`，可能是成本、报关或历史操作行，需要业务确认后才可清理或保留。
+- `24` 条零数量零价格、无引用，可作为人工清理候选，但不能自动删除。
+- `14` 条 PENDING 占位需要确认占位合同口径。
+
+## 2026-06-04 WPS-IMPORT-90（候选来源映射深度复核）
+
+### Goal
+- 继续推进剩余 `223` 条 DB 来源缺口里的 `candidate_mapping_review=39` 子集，判断这些“有候选来源”的记录是否存在可安全自动回填来源 note 的深层子集。
+- 只读比较 DB 行、候选 WPS 源行、以及候选源是否已经挂到其他 DB 行 note；不复用已经被其他行消费的来源。
+
+### Delivered
+- 新增只读脚本 `scripts/analyze_wps_candidate_source_mappings.py`。
+- 生成候选来源映射复核报告：
+  - `tmp/wps_11_export_list_raw/parsed/wps_candidate_source_mapping_review.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_candidate_source_mapping_review.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_candidate_source_mapping_review.md`
+- 对 `39` 条候选映射缺口给出 verdict：
+  - `candidate_already_attached_elsewhere=33`
+  - `multi_candidate_manual_review=6`
+- 字段差异集中在 `quantity=24`、`volume=16`、`net_weight=14`、`gross_weight=14`、`store=13`、`boxes=12`、`price=9`。
+
+### Verification
+- `python3 -m py_compile scripts/analyze_wps_candidate_source_mappings.py`：通过。
+- `python3 scripts/analyze_wps_candidate_source_mappings.py`：通过，`total=39`、`auto_writable=0`。
+- `python3 scripts/audit_wps_import_completion.py`：仍为 `pending_auto_writes=0`、`db_source_gaps=223`、`decision_items=2`、`cloud_only_files=2`。
+
+### Remaining
+- 33 条候选源已经挂在其他 DB 行，不能复用关闭当前缺口；典型例子是组合门店/拆分行已经消费同一 WPS 来源。
+- 6 条多候选仍需人工选择或补强规则；当前没有可自动写库项。
+- 长程目标仍受 `223` 条来源缺口、`2` 条业务/正式材料裁决项、`2` 个 cloud-only 原件缺口限制。
+
+## 2026-06-04 WPS-IMPORT-89（来源缺口处置分层）
+
+### Goal
+- 根据当前进度继续收窄长程目标：自动导入和安全 note 回填已经归零，本轮只把 `223` 条 DB 来源缺口分层为可复核处置队列。
+- 不把没有唯一来源证据的历史行写回数据库；需要业务判断、正式材料或更强来源的项进入备忘录。
+
+### Delivered
+- 新增只读脚本 `scripts/classify_wps_source_gap_disposition.py`。
+- 生成来源缺口处置分层报告：
+  - `tmp/wps_11_export_list_raw/parsed/wps_source_gap_disposition.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_source_gap_disposition.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_source_gap_disposition.md`
+- 对 `223` 条缺口分层：
+  - `zero_or_operational_review=118`
+  - `candidate_mapping_review=39`
+  - `no_candidate_source_required=28`
+  - `formal_evidence_required=18`
+  - `purchase_unique_evidence_required=16`
+  - `purchase_ambiguous_evidence_required=4`
+- 所有记录 `auto_writable=false`；本轮不写数据库、不复制文件、不修改 note。
+
+### Verification
+- `python3 -m py_compile scripts/classify_wps_source_gap_disposition.py`：通过。
+- `python3 scripts/classify_wps_source_gap_disposition.py`：通过，`total=223`、`auto_writable=0`。
+- `python3 scripts/audit_wps_import_completion.py`：仍为 `pending_auto_writes=0`、`db_source_gaps=223`、`decision_items=2`、`cloud_only_files=2`。
+
+### Remaining
+- `formal_evidence_required=18` 主要是 `PENDING-威斯敏` 占位报关相关缺口，需要正式报关材料或继续保留占位状态。
+- `candidate_mapping_review=39` 需要逐项复核候选来源与商品、门店、规格、数量、价格是否能唯一映射。
+- `purchase_*_evidence_required=20` 需要唯一采购凭证明细或合同正文口径确认。
+- `EXP2500002 / 瓷砖`、`EXP2400006`、两个 cloud-only 原件缺口仍按既有裁决/文件缺口保留。
+
+## 2026-06-04 WPS-IMPORT-88（仅云端原件窄探测与同步尝试）
+
+### Goal
+- 继续推进 WPS 文件完整留存：针对当前 `cloud_only_files=2` 的两个具体原件缺口做窄范围反查，不再跑长时间全量盘点。
+- 只有找到 metadata SHA1 精确匹配的本机文件才复制保留；同名、旧版本、相似大小都不能关闭缺口。
+
+### Delivered
+- 新增只读脚本 `scripts/probe_wps_cloud_only_files.py`。
+- 生成窄探测报告：
+  - `tmp/wps_11_export_list_raw/parsed/wps_cloud_only_probe.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_cloud_only_probe.md`
+- 对两个目标逐项反查：
+  - 项目源目录精确路径。
+  - WPS 团队文档/根目录本机路径。
+  - `~/Downloads` 和 `~/Downloads/出口外贸` 同名候选。
+  - WPS `cache.db` 中 `file_metadata_table`、`filecache_data`、`filetransfer_table`。
+- 尝试打开本机 WPS 根目录旧缓存 `出货汇总.xlsx` 触发同步；20 秒后仍为旧 67KB 文件，SHA1 `92f422118e855cdcc600dea505eb961fd1689773`。
+
+### Verification
+- `python3 -m py_compile scripts/probe_wps_cloud_only_files.py`：通过。
+- `python3 scripts/probe_wps_cloud_only_files.py`：通过，`target_count=2`、`ready_to_copy_count=0`。
+- `python3 scripts/audit_wps_import_completion.py`：仍为 `pending_auto_writes=0`、`db_source_gaps=223`、`decision_items=2`、`cloud_only_files=2`。
+- `node scripts/audit_wps_export_file_retention.js`：仍为 `cloud_only_files=2`、附件物理缺失 `0`、正式 `EXP*` 附件覆盖 `42/42`。
+
+### Remaining
+- `CG2500045` 无年份 PDF：WPS cache metadata 有目标 size/SHA1，但项目源目录、WPS 团队文档精确路径和 Downloads 都没有本机文件。
+- 根目录当前版 `出货汇总.xlsx`：项目和 WPS 本机都是旧 67KB 版本；Downloads 中同名文件为 82KB 另一个 SHA1；没有 89KB / `50b6...` 精确文件。
+- 因 `ready_to_copy_count=0`，本轮不复制文件、不写数据库。
+
+## 2026-06-04 WPS-IMPORT-87（云端原件缺口审计口径修正）
+
+### Goal
+- 继续推进完整 WPS 导入目标里的“文件留存可验证”部分，修正完成度审计与出口文件留存审计对 `cloud_only_files` 的口径不一致。
+- 保持事实分层：`11-报关记录` 主目录缺口和 WPS 根目录清单当前版缺口不是同一个 scope，不能互相抵消，也不能混成同一条业务缺口。
+
+### Delivered
+- 修正 `scripts/audit_wps_import_completion.py`：
+  - 同时读取 `wps_cloud_metadata.json` 和 `root_shipment_cloud/wps_cloud_metadata.json`。
+  - 输出 `cloud_only_files=2`、`main_directory_cloud_only_files=1`、`root_shipment_cloud_only_files=1`。
+  - Markdown 中列出两个 scope 的具体路径、大小和 SHA1。
+- 修正 `scripts/audit_wps_export_file_retention.js`：
+  - 在汇总里增加 `main_directory_cloud_only_files` 和 `root_shipment_cloud_only_files`。
+  - 保留 `cloud_only_files` 作为跨 scope 合计。
+
+### Verification
+- `python3 -m py_compile scripts/audit_wps_import_completion.py`：通过。
+- `node -c scripts/audit_wps_export_file_retention.js`：通过。
+- `python3 scripts/audit_wps_import_completion.py`：通过，`cloud_only_files=2`、主目录 `1`、根目录 `1`。
+- `node scripts/audit_wps_export_file_retention.js`：通过，`cloud_only_files=2`、主目录 `1`、根目录 `1`。
+
+### Remaining
+- 主目录缺口：`11-报关记录/20250815禧瑞都/购销合同CG2500045-不锈钢桶-禧瑞都.pdf`。
+- 根目录缺口：当前版 `出货汇总.xlsx`，metadata size `89876`、SHA1 `50b6a6841c6fd81826066ccf7db0c332f7614935`。
+- 当前自动可写入项仍为 `0`；本轮不写数据库、不复制文件、不用旧缓存冒充当前版。
+
+## 2026-06-04 WPS-IMPORT-86（剩余裁决结构化证据包）
+
+### Goal
+- 根据当前进度收窄长程目标：自动可写入项已经归零，后续只继续推进可验证的裁决证据，不凭路径、模板或相似文件补业务事实。
+- 将剩余 `2` 个业务/正式材料裁决项从长字符串裁决包升级为结构化 dossier，便于后续由业务或正式材料直接决断。
+
+### Delivered
+- 新增只读脚本 `scripts/build_wps_remaining_decision_dossier.py`。
+- 生成结构化证据包：
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_decision_dossier.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_decision_dossier.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_remaining_decision_dossier.md`
+- 证据包覆盖：
+  - `EXP2500002 / 瓷砖`：源销售行、源装箱行、现库销售行、现库装箱行、反证和可选动作。
+  - `EXP2400006`：源销售/装箱行、现库销售/装箱、现库报关空缺、相关保留文件、真实凭证抽取行、反证和可选动作。
+
+### Verification
+- `python3 scripts/build_wps_remaining_decision_dossier.py`：通过，`decision_items=2`。
+- `python3 scripts/audit_wps_import_completion.py`：仍为 `pending_auto_writes=0`、`db_source_gaps=223`、`decision_items=2`；本轮之前的完成度审计只统计主目录云端缺口，后续由 WPS-IMPORT-87 修正为跨 scope 合计 `cloud_only_files=2`。
+
+### Remaining
+- `EXP2500002 / 瓷砖` 仍需业务指定 `771.84` 平方米销售行归属、拆分比例，或确认保留现状。
+- `EXP2400006` 仍需正式 `18` 位海关编号或正式报关单原件；没有正式编号前不创建报关单。
+- `CG2500045` 无年份路径 PDF 仍是主目录云端原件副本留存缺口，不用已缓存 `2025年8月` DOCX/PDF 冒充；根目录当前版 `出货汇总.xlsx` 另作为独立 scope 缺口保留。
+
+## 2026-06-04 WPS-IMPORT-85（唯一 WPS 云端原件缺口复核）
+
+### Goal
+- 继续推进长程目标里的“WPS 云库文件完整保留”要求，复核完成度审计里唯一 `cloud_only_files=1` 的条目能否自动补齐。
+
+### Delivered
+- 复核唯一主目录云端缺口：
+  - `11-报关记录/20250815禧瑞都/购销合同CG2500045-不锈钢桶-禧瑞都.pdf`
+  - metadata size `348470`
+  - metadata sha1 `c4bfefb55677fdb20e0a249400681ce73c14aa25`
+  - metadata `file_id=-1`
+- 查验本机 WPS 缓存和项目源目录：
+  - 无年份路径 `11-报关记录/20250815禧瑞都/` 本机目录为空。
+  - `2025年8月/20250815禧瑞都/购销合同CG2500045-不锈钢桶-禧瑞都.docx` 已缓存并保留。
+  - `2025年8月/20250815禧瑞都/归档-购销合同CG2500045-不锈钢桶-禧瑞都.pdf` 已缓存并保留。
+- 尝试读取 WPS 客户端窗口状态，Computer Use 对 WPS 可访问性树超时；未能通过 GUI 自动打开该无年份路径副本。
+
+### Verification
+- `python3 scripts/audit_wps_import_completion.py`：仍为 `cloud_only_files=1`，目标即上述 CG2500045 PDF。
+- 目标本机 WPS 目录 `.../11-报关记录/20250815禧瑞都/` 为空。
+- 针对 `CG2500045` / `不锈钢桶` 的限定查找只发现已保留的 `2025年8月` DOCX 与归档 PDF。
+
+### Remaining
+- 该条目继续作为“云端原件副本未缓存”保留；当前没有可证明的本机文件可复制，也没有有效 file id 可直接下载。
+- 因同合同业务数据已由已缓存 DOCX/归档 PDF 覆盖，本轮不写数据库、不创建附件、不用其他文件冒充这个无年份路径 PDF。
+
+## 2026-06-04 WPS-IMPORT-84（出口附件页面验收与运行时启动修复）
+
+### Goal
+- 按当前进度收紧阶段目标：先证明已导入的 WPS 出口源文件在系统页面真实可见、可下载，再继续处理剩余来源缺口。
+- 权限类本机操作默认自行处理；只有无法用文件/数据库证据决断的数据归属继续留入备忘录。
+
+### Delivered
+- 创建本地开发测试账号 `codex_test`（`ADMIN`、`isActive=true`），仅用于本机页面验收；未把口令写入仓库文件。
+- 修复后端启动巡检的两个旧 Interface 使用：
+  - `User.status='active'` 改为当前 `User.isActive=true`。
+  - 系统巡检操作日志改为 `actorType='SYSTEM'` + `newValue`，不再写旧 `detail` 或伪 `userId='system'`。
+- 后端 `PORT=3001`、前端 `PORT=3002` 已用于真实页面验收。
+
+### Verification
+- `npm test -- src/services/patrolService.test.js`：`4/4` 通过。
+- 测试账号登录接口：`POST /api/v1/auth/login` 返回 `200`，角色 `ADMIN`。
+- 附件接口样本：`EXP2400001` (`cmn4pd7fx004x1pfe5a6rfg9n`) `GET /api/v1/sales/:id/files` 返回 `33` 个附件。
+- 下载接口样本：首个 PDF `GET /api/v1/sales/files/:fileId/download` 支持 range，返回 `206`、`application/pdf`、`16` bytes。
+- 页面验收：登录后打开 `http://localhost:3002/dashboard/sales/cmn4pd7fx004x1pfe5a6rfg9n`，能看到“源文件附件”和 `1-报关单捷淞WHSU6140958.pdf`。
+- 截图证据：`tmp/wps_11_export_list_raw/parsed/sales_contract_files_page_EXP2400001.png`。
+
+### Remaining
+- 长程目标仍未完成：来源覆盖审计仍有 `223` 条来源 note 缺口，裁决包仍有 `2` 条业务/正式材料裁决项，另有 `1` 个 WPS 云端当前版文件仍未缓存。
+- `TUNNEL_URL.txt` 仍是既有无关改动，本轮未触碰。
+
+## 2026-06-03 WPS-IMPORT-83（出口合同源文件附件 Interface 与导入）
+
+### Goal
+- 把上一轮已证明保留的 WPS 出货/报关源文件推进到线上系统可访问附件，而不是只停留在项目源目录。
+- 保持 Interface 窄而深：新增 `SalesContractFile` 挂在出口合同，不为装箱/报关/退税各自造浅层附件表。
+
+### Delivered
+- 新增 `SalesContractFile` 模型和 migration：`backend/prisma/migrations/20260603035140_add_sales_contract_files/migration.sql`。
+- 后端新增出口合同附件路由：
+  - `POST /api/v1/sales/:id/files`
+  - `GET /api/v1/sales/:id/files`
+  - `DELETE /api/v1/sales/files/:fileId`
+  - `GET /api/v1/sales/files/:fileId/download`
+- 前端销售详情页新增“源文件附件”卡片，支持上传、下载、删除。
+- 新增 `scripts/import_wps_export_files.js`，默认 dry-run，显式 `--apply` 后复制 WPS 出口侧源文件并创建附件记录。
+- 写库/复制前备份：`backend/prisma/backups/dev_2026-06-03_03-52-51.db`。
+- 实际导入：
+  - 新增 `SalesContractFile` 记录 `211`
+  - 复制文件约 `239158827` bytes 到 `backend/uploads/sales-contracts`
+  - 业务字段更新 `0`
+- 更新 `scripts/audit_wps_export_file_retention.js`，纳入 `SalesContractFile` 表覆盖与物理文件缺失审计。
+
+### Verification
+- `npm run db:migrate:doctor`：healthy，`appliedCount=14`、`pendingCount=0`、`blockingCount=0`。
+- `node scripts/import_wps_export_files.js` 写入后 dry-run：`salesContractFileCreates=0`。
+- `node scripts/audit_wps_export_file_retention.js`：`sales_contract_file_records=211`、`db_exp_contracts_with_sales_contract_file_records=42`、`auto_attach_candidates=0`、`db_records_missing_physical=0`。
+- `npm test`（backend，授权环境）：`329/329` 通过。
+- `npm run lint`（frontend）：通过。
+- `npm test -- 'src/app/dashboard/sales/[id]/page.test.tsx'`：`4/4` 通过。
+
+### Remaining
+- 出口侧附件已可在销售合同详情页访问；剩余长程缺口仍是 `223` 条来源 note 缺口、`2` 条业务/正式材料裁决项，以及 WPS 云端未缓存正文线索。
+- `TUNNEL_URL.txt` 仍是既有无关改动，本轮未触碰。
+
+## 2026-06-03 WPS-IMPORT-82（出货源文件留存审计）
+
+### Goal
+- 继续推进“文件内容与线上系统对齐”的目标，复核出货/报关侧 WPS 源文件是否已经在项目源目录保留，并按正式 `EXP*` 出口合同统计覆盖。
+- 不引入新附件表，不写数据库；先证明现有文件留存和当前系统 Interface 缺口。
+
+### Delivered
+- 新增只读审计脚本 `scripts/audit_wps_export_file_retention.js`。
+- 生成出货源文件留存审计：
+  - `tmp/wps_11_export_list_raw/parsed/wps_export_file_retention_audit.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_export_file_retention_audit.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_export_file_retention_audit.md`
+- 当前正式出口合同留存覆盖：
+  - `db_exp_sales_contracts=42`
+  - `db_exp_contracts_with_any_retained_export_file=42`
+  - `db_exp_contracts_with_high_value_retained_export_file=42`
+  - `db_exp_contracts_without_retained_export_file=0`
+- 明确当前 DB 中 `PENDING-Burbank`、`PENDING-圣荷西2115`、`PENDING-威斯敏` 是占位销售合同，不计作正式 EXP 文件留存缺口。
+- 明确当前数据库只有采购合同 `ContractFile` 附件 Interface；出口合同、装箱、报关、退税没有同类附件 Interface。
+
+### Verification
+- `node -c scripts/audit_wps_export_file_retention.js` 通过。
+- `node scripts/audit_wps_export_file_retention.js` 通过，输出 `status=export_file_retention_audited`。
+- 审计保持只读：没有数据库写入、没有文件复制或删除。
+
+### Remaining
+- 出口侧源文件已在项目源目录保留并能按正式 EXP 覆盖，但尚不能像采购合同一样通过系统附件表在页面下载；是否新增出口附件 Interface 需要后续单独设计。
+- WPS 云端仍有 `2` 个未缓存正文线索：`11-报关记录/20250815禧瑞都/购销合同CG2500045-不锈钢桶-禧瑞都.pdf` 和根目录当前版 `出货汇总.xlsx`。
+- 主完成度仍受 `223` 条来源 note 缺口和 `2` 条业务/正式材料裁决项限制，不能标记长程目标完成。
+
+## 2026-06-03 WPS-IMPORT-81（采购 typo 孤儿附件恢复）
+
+### Goal
+- 继续收口剩余物理孤儿附件；识别旧上传文件名中多写一个 `0`、但可唯一匹配现有采购合同和 WPS 首选 DOCX 的 PDF。
+- 只恢复有强证据的 typo 附件，不处理合同号不存在或无法推断的文件。
+
+### Delivered
+- 扩展 `scripts/audit_wps_purchase_file_retention.js`：
+  - 新增 `direct_recoverable_physical_orphans`
+  - 新增 `typo_recoverable_physical_orphans`
+  - 对 `CG26000014 -> CG2600014`、`CG26000015 -> CG2600015` 这类“删一个 0 后唯一命中现有合同，且同合同已有 WPS 首选源”的文件列为可恢复。
+- 写库前备份：`backend/prisma/backups/dev_2026-06-03_03-35-24.db`。
+- 实际恢复 `2` 条 `ContractFile` 记录：
+  - `contracts/CG26000014-1774883282574.pdf` -> `CG2600014`
+  - `contracts/CG26000015-1774883282568.pdf` -> `CG2600015`
+- 写入后附件覆盖：
+  - `contract_file_records=350`
+  - `physical_upload_orphans=2`
+  - `recoverable_physical_orphans=0`
+  - `unrecoverable_physical_orphans=2`
+  - `db_records_missing_physical=0`
+
+### Verification
+- `node -c scripts/audit_wps_purchase_file_retention.js` 通过。
+- `node scripts/audit_wps_purchase_file_retention.js` 写入前通过，`typo_recoverable_physical_orphans=2`。
+- `node scripts/recover_wps_purchase_orphan_files.js` 写入前 dry-run：`contractFileCreates=2`、`skippedCount=0`。
+- `node scripts/recover_wps_purchase_orphan_files.js --apply` 通过：新增 `ContractFile` 记录 `2`。
+- 写入后基于最新审计的 `node scripts/recover_wps_purchase_orphan_files.js` dry-run：`contractFileCreates=0`、`skippedCount=0`。
+- WPS 主完成度和三条业务导入 dry-run 未出现新增待写入项。
+
+### Remaining
+- 仍有 `2` 个不可恢复物理孤儿文件：
+  - `contracts/CG000012-1774883281335.pdf`：无法推断合同号。
+  - `contracts/CG2400005-1774883281266.pdf`：推断合同号现库不存在。
+- WPS 主导入完成度仍受业务/正式材料未决项限制，不能标记长程目标完成。
+
+## 2026-06-03 WPS-IMPORT-80（采购物理孤儿附件恢复）
+
+### Goal
+- 继续推进文件留存闭环：处理 `backend/uploads/contracts` 中已存在但没有 `ContractFile` 记录的历史物理文件。
+- 只恢复能从文件名推断到现有采购合同的强匹配附件；不能推断或合同不存在的继续保留为待复核项。
+
+### Delivered
+- 扩展 `scripts/audit_wps_purchase_file_retention.js`，输出：
+  - `recoverable_physical_orphans`
+  - `unrecoverable_physical_orphans`
+- 新增默认 dry-run 的恢复脚本 `scripts/recover_wps_purchase_orphan_files.js`。
+- 写库前备份：`backend/prisma/backups/dev_2026-06-03_03-29-30.db`。
+- 实际恢复 `71` 条 `ContractFile` 记录，均对应已存在的 `backend/uploads/contracts/*` 文件；没有复制或删除物理文件。
+- 写入后附件覆盖：
+  - `contract_file_records=348`
+  - `physical_upload_orphans=4`
+  - `recoverable_physical_orphans=0`
+  - `unrecoverable_physical_orphans=4`
+  - `db_records_missing_physical=0`
+
+### Verification
+- `node -c scripts/recover_wps_purchase_orphan_files.js` 通过。
+- `node scripts/recover_wps_purchase_orphan_files.js` 写入前 dry-run：`contractFileCreates=71`、`skippedCount=0`。
+- `node scripts/recover_wps_purchase_orphan_files.js --apply` 通过：新增 `ContractFile` 记录 `71`。
+- 写入后 `node scripts/audit_wps_purchase_file_retention.js` 通过：可恢复孤儿归零。
+- 写入后基于最新审计的 `node scripts/recover_wps_purchase_orphan_files.js` dry-run：`contractFileCreates=0`、`skippedCount=0`。
+
+### Remaining
+- 仍有 `4` 个不可恢复物理孤儿文件：
+  - `contracts/CG000012-1774883281335.pdf`：无法推断合同号。
+  - `contracts/CG2400005-1774883281266.pdf`：推断合同号现库不存在。
+  - `contracts/CG26000014-1774883282574.pdf`：推断合同号现库不存在。
+  - `contracts/CG26000015-1774883282568.pdf`：推断合同号现库不存在。
+- WPS 主导入完成度仍受业务/正式材料未决项限制，不能标记长程目标完成。
+
+## 2026-06-03 WPS-IMPORT-79（采购合同附件留存入库）
+
+### Goal
+- 继续推进“文件内容与线上系统对齐”的目标，不只保留 WPS 源目录文件，还要让采购合同页面能看到并下载对应历史合同附件。
+- 审计 WPS 首选采购凭证、系统 `ContractFile` 附件表和 `backend/uploads/contracts` 物理文件之间的覆盖关系。
+
+### Delivered
+- 新增只读附件留存审计脚本 `scripts/audit_wps_purchase_file_retention.js`。
+- 新增默认 dry-run 的附件导入脚本 `scripts/import_wps_purchase_files.js`。
+- 生成附件覆盖审计与导入计划：
+  - `tmp/wps_11_export_list_raw/parsed/wps_purchase_file_retention_audit.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_purchase_file_retention_audit.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_purchase_file_retention_audit.md`
+  - `tmp/wps_11_export_list_raw/parsed/wps_purchase_file_import_plan.json`
+- 写库前备份：`backend/prisma/backups/dev_2026-06-03_03-22-15.db`。
+- 实际复制 WPS 首选采购凭证到 `backend/uploads/contracts/WPS-*.{xlsx,docx,pdf}`，并新增 `ContractFile` 记录 `186` 条。
+- WPS 首选采购凭证附件覆盖结果：
+  - `preferred_wps_purchase_sources=192`
+  - `preferred_wps_sources_existing_on_disk=192`
+  - `contracts_with_file_records=192`
+  - `auto_attach_candidates=0`
+- 没有修改采购合同、采购明细、供应商、商品或金额等业务字段。
+
+### Verification
+- `node -c scripts/audit_wps_purchase_file_retention.js` 通过。
+- `node scripts/audit_wps_purchase_file_retention.js` 写入前通过，发现 `auto_attach_candidates=186`。
+- `node -c scripts/import_wps_purchase_files.js` 通过。
+- `node scripts/import_wps_purchase_files.js` 写入前 dry-run：`contractFileCreates=186`、`skippedCount=0`、`totalBytesToCopy=66124524`。
+- `node scripts/import_wps_purchase_files.js --apply` 通过：新增附件记录 `186` 条。
+- 写入后重跑附件审计候选归零；基于最新审计的 `node scripts/import_wps_purchase_files.js` dry-run：`contractFileCreates=0`、`skippedCount=0`。
+- 写入后 `node scripts/audit_wps_purchase_file_retention.js`：`contract_file_records=277`、`contracts_with_file_records=192`、`db_records_missing_physical=0`、`auto_attach_candidates=0`。
+
+### Remaining
+- `backend/uploads/contracts` 中仍有 `75` 个历史物理孤儿文件；其中 `74` 个可从文件名推断合同号，但不属于本轮 WPS 首选采购凭证导入，后续需单独审计是否应该恢复附件记录。
+- WPS 导入主完成度仍受 `EXP2500002`、`EXP2400006`、`CG2500045`、`CG2500013` 等未决项限制，不能标记长程目标完成。
+
+## 2026-06-03 WPS-IMPORT-78（来源缺口逐条明细包）
+
+### Goal
+- 继续推进完整导入目标；在自动写库项归零后，把剩余 `223` 条来源 note 缺口从汇总分类升级为逐条可评审清单。
+- 让后续业务裁决或补材料时能直接定位 DB 行、缺口原因、匹配失败阶段和下一步动作。
+
+### Delivered
+- 新增只读明细包脚本 `scripts/build_wps_source_gap_detail_packet.js`。
+- 生成逐条来源缺口明细：
+  - `tmp/wps_11_export_list_raw/parsed/wps_source_gap_details.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_source_gap_details.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_source_gap_details.md`
+- 明细包总数与来源覆盖审计严格对齐：`223` 条。
+- 分桶结果：
+  - 销售明细缺来源：`137`
+  - 装箱明细缺来源：`48`
+  - 采购明细缺来源：`19`
+  - 报关明细继承父报关单缺来源：`15`
+  - 报关单缺来源：`3`
+  - 采购合同头缺来源：`1`
+- 本轮没有写数据库。
+
+### Verification
+- `node -c scripts/build_wps_source_gap_detail_packet.js` 通过。
+- `node scripts/build_wps_source_gap_detail_packet.js` 通过，输出 `total=223`。
+- 刷新 note-only dry-run 计划后仍无可写入来源 note：
+  - `node scripts/backfill_wps_purchase_item_source_notes.js`：`purchaseItemUpdates=0`、`skippedCount=19`
+  - `node scripts/backfill_wps_packing_item_source_notes.js`：`packingItemUpdates=0`、`skippedCount=48`
+  - `node scripts/backfill_wps_purchase_mismatch_source_notes.js`：`purchaseContractUpdates=0`、`purchaseItemUpdates=0`、`skippedCount=1`
+- `node scripts/classify_wps_source_gaps.js` 通过，`total_without_source=223`、`sales_eligible=0`、`packing_eligible=0`。
+
+### Remaining
+- 本轮只把剩余来源缺口变成逐条可评审交付物，不改变完成度结论。
+- 自动安全写库项仍为 `0`；剩余业务/正式材料裁决仍集中在 `EXP2500002` 和 `EXP2400006`。
+- `CG2500045` 顶层旧副本仍只在 WPS metadata 可见；`CG2500013` 仍因同目录正文候选不唯一保留。
+
+## 2026-06-03 WPS-IMPORT-77（剩余来源缺口分类）
+
+### Goal
+- 继续推进完整导入目标，在没有新的安全写库项时，把剩余来源缺口按可操作类别固化，避免后续重复试探或弱证据误写。
+- 重点复核剩余装箱明细是否能由当前标准化导入计划唯一补 note。
+
+### Delivered
+- 新增只读分类脚本 `scripts/classify_wps_source_gaps.js`。
+- 生成剩余来源缺口分类报告：
+  - `tmp/wps_11_export_list_raw/parsed/wps_source_gap_classification.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_source_gap_classification.md`
+- 复核结论：
+  - 销售明细缺口 `137`，当前安全唯一回填 `0`。
+  - 装箱明细缺口 `48`，当前安全唯一回填 `0`。
+  - 采购合同剩余来源缺口为 `CG2500013`。
+  - 采购明细剩余来源缺口 `19`。
+  - `PENDING-威斯敏` 占位报关相关缺口 `18`。
+- 本轮没有写数据库。
+
+### Verification
+- `node -c scripts/classify_wps_source_gaps.js` 通过。
+- `node scripts/classify_wps_source_gaps.js` 通过，输出 `total_without_source=223`、`sales_eligible=0`、`packing_eligible=0`。
+- `node scripts/audit_wps_db_source_coverage.js` 通过，`total_without_source=223`。
+- `python3 scripts/audit_wps_import_completion.py` 通过，`pending_auto_writes=0`、`db_source_gaps=223`、`decision_items=2`、`cloud_only_files=1`。
+- 三条导入 dry-run 仍为 `0` 待业务写入：出口源、真实凭证、采购凭证。
+
+### Remaining
+- 剩余 `223` 条来源标记缺口已分桶：
+  - 销售明细 `137`
+  - 装箱明细 `48`
+  - 采购合同头 `1`
+  - 采购明细 `19`
+  - `PENDING-威斯敏` 占位报关单及明细继承 `18`
+- `EXP2500002 / 瓷砖 / 合同:13` 仍需要业务确认门店归属或拆分。
+- `EXP2400006` 仍需要正式 18 位海关编号。
+- `CG2500045` 顶层旧副本仍只在云端 metadata 可见；业务数据已由已缓存正文覆盖。
+- `CG2500013` 仍因同目录正文候选不唯一保留。
+
+## 2026-06-03 WPS-IMPORT-76（采购合同号口径冲突来源 note 回填）
+
+### Goal
+- 继续降低来源缺口，同时把“文件名合同号”和“正文合同号”冲突显式记录出来。
+- 先复核销售明细缺口是否能用当前 `import_plan.json` 的标准化销售源唯一回填；不能唯一命中的不硬挂。
+
+### Delivered
+- 只读分析销售明细来源缺口：`137` 条缺来源 note 的销售明细，用当前标准化销售源严格匹配后可安全回填数为 `0`。
+- 新增采购合同号冲突来源回填脚本 `scripts/backfill_wps_purchase_mismatch_source_notes.js`。
+- 写库前备份：`backend/prisma/backups/dev_2026-06-03_03-01-44.db`。
+- 实际只回填 `CG2400019` 合同头 note `1` 条、采购明细 note `1` 条。
+- note 明确标记 `filename_contract_no=CG2400019`、`body_contract_no=CG2400016`、`body_contract_no_mismatch`、`pdf_text_blocked`。
+- 没有修改合同号、供应商、日期、金额、商品、数量、单价或任何业务字段。
+- 回填后来源覆盖改善：
+  - 缺来源标记总数：`225 -> 223`
+  - `purchase_contracts`: `190/192 -> 191/192`
+  - `purchase_items`: `258/278 -> 259/278`
+
+### Verification
+- `node -c scripts/backfill_wps_purchase_mismatch_source_notes.js` 通过。
+- `node scripts/backfill_wps_purchase_mismatch_source_notes.js` 写库前 dry-run：`purchaseContractUpdates=1`、`purchaseItemUpdates=1`、`skippedCount=1`。
+- `node scripts/backfill_wps_purchase_mismatch_source_notes.js --apply` 通过：`purchaseContractUpdates=1`、`purchaseItemUpdates=1`。
+- 写库后 `node scripts/backfill_wps_purchase_mismatch_source_notes.js` 通过 dry-run：`purchaseContractUpdates=0`、`purchaseItemUpdates=0`、`skippedCount=1`。
+- 写库后 `node scripts/audit_wps_db_source_coverage.js` 通过：`total_without_source=223`。
+- 写库后 `python3 scripts/audit_wps_import_completion.py` 通过：`pending_auto_writes=0`、`db_source_gaps=223`、`decision_items=2`、`cloud_only_files=1`。
+- 三条导入 dry-run 仍为 `0` 待业务写入：出口源、真实凭证、采购凭证。
+
+### Remaining
+- 剩余 `223` 条来源标记缺口集中在销售明细 `137`、装箱明细 `48`、采购明细 `19`、`PENDING-威斯敏` 报关占位 `3` 张及其明细 `15` 条、采购合同头 `1`。
+- `CG2500013` 仍跳过：PDF 文件名合同号是 `CG2500013`，但同目录正文候选不唯一，不能安全挂来源。
+- `EXP2500002 / 瓷砖 / 合同:13` 仍需要业务确认门店归属或拆分。
+- `EXP2400006` 仍需要正式 18 位海关编号。
+- `CG2500045` 顶层旧副本仍只在云端 metadata 可见；业务数据已由已缓存正文覆盖。
+
+## 2026-06-03 WPS-IMPORT-75（占位报关单来源 note 回填）
+
+### Goal
+- 继续降低报关记录来源缺口，但不把占位编号伪装成正式海关编号。
+- 只处理整张占位报关单明细集合能与同一 WPS 装箱源集合完全匹配的记录；不能完整匹配的继续保留。
+
+### Delivered
+- 新增占位报关单来源回填脚本 `scripts/backfill_wps_customs_placeholder_source_notes.js`。
+- 写库前备份：`backend/prisma/backups/dev_2026-06-03_02-54-43.db`。
+- 实际只回填 `BGP250028` 报关单头 note：`1` 条。
+- note 明确标记 `not_formal_customs_no`，说明这是占位来源，不是正式 18 位海关编号。
+- 没有修改报关编号、合同、商品、HS、数量、单位、退税或任何业务字段。
+- 回填后来源覆盖改善：
+  - 缺来源标记总数：`242 -> 225`
+  - `customs_declarations`: `27/31 -> 28/31`
+  - `customs_declaration_items_inherit_declaration_note`: `26/57 -> 42/57`
+
+### Verification
+- `node -c scripts/backfill_wps_customs_placeholder_source_notes.js` 通过。
+- `node scripts/backfill_wps_customs_placeholder_source_notes.js` 写库前 dry-run：`customsDeclarationUpdates=1`、`skippedCount=3`。
+- `node scripts/backfill_wps_customs_placeholder_source_notes.js --apply` 通过：`customsDeclarationUpdates=1`。
+- 写库后 `node scripts/backfill_wps_customs_placeholder_source_notes.js` 通过 dry-run：`customsDeclarationUpdates=0`、`skippedCount=3`。
+- 写库后 `node scripts/audit_wps_db_source_coverage.js` 通过：`total_without_source=225`。
+- 写库后 `python3 scripts/audit_wps_import_completion.py` 通过：`pending_auto_writes=0`、`db_source_gaps=225`、`decision_items=2`、`cloud_only_files=1`。
+- 三条导入 dry-run 仍为 `0` 待业务写入：出口源、真实凭证、采购凭证。
+
+### Remaining
+- 剩余 `225` 条来源标记缺口集中在销售明细 `137`、装箱明细 `48`、采购明细 `20`、`PENDING-威斯敏` 报关占位 `3` 张及其明细 `15` 条、采购合同头 `2`。
+- `PENDING-威斯敏` 三张占位报关单不能完整匹配同一个 WPS 源集合，本轮继续跳过。
+- `EXP2500002 / 瓷砖 / 合同:13` 仍需要业务确认门店归属或拆分。
+- `EXP2400006` 仍需要正式 18 位海关编号。
+- `CG2500045` 顶层旧副本仍只在云端 metadata 可见；业务数据已由已缓存正文覆盖。
+
+## 2026-06-03 WPS-IMPORT-74（装箱明细来源 note 回填）
+
+### Goal
+- 继续降低已入库装箱明细缺少 WPS 文件来源 note 的缺口。
+- 只处理能从 WPS 装箱源行唯一证明的明细；对 0 数量、缺少来源数量或字段不足的行不硬挂来源。
+
+### Delivered
+- 新增装箱明细来源回填脚本 `scripts/backfill_wps_packing_item_source_notes.js`。
+- 写库前备份：`backend/prisma/backups/dev_2026-06-03_02-48-40.db`。
+- 实际只回填装箱明细 note：`4` 条。
+- 没有修改商品、门店、数量、箱数、重量、体积、厂家、规格、采购合同号或价格等业务字段。
+- 回填后来源覆盖改善：
+  - 缺来源标记总数：`246 -> 242`
+  - `packing_items`: `393/445 -> 397/445`
+
+### Verification
+- `node -c scripts/backfill_wps_packing_item_source_notes.js` 通过。
+- `node scripts/backfill_wps_packing_item_source_notes.js` 写库前 dry-run：`packingItemUpdates=4`、`skippedCount=48`。
+- `node scripts/backfill_wps_packing_item_source_notes.js --apply` 通过：`packingItemUpdates=4`。
+- 写库后 `node scripts/backfill_wps_packing_item_source_notes.js` 通过 dry-run：`packingItemUpdates=0`、`skippedCount=48`。
+- 写库后 `node scripts/audit_wps_db_source_coverage.js` 通过：`total_without_source=242`。
+- 写库后 `python3 scripts/audit_wps_import_completion.py` 通过：`pending_auto_writes=0`、`db_source_gaps=242`、`decision_items=2`、`cloud_only_files=1`。
+- 三条导入 dry-run 仍为 `0` 待业务写入：出口源、真实凭证、采购凭证。
+
+### Remaining
+- 剩余 `242` 条来源标记缺口集中在销售明细 `137`、装箱明细 `48`、采购明细 `20`、报关单 `4`、报关明细继承缺口 `31`、采购合同头 `2`。
+- 销售明细本轮按严格规则无法唯一命中来源行，继续不自动回填。
+- 装箱明细剩余 `48` 条多为 0 数量、PENDING 合同、门店/来源拆分不足或源行字段不完整；继续留作后续证据补强。
+- `EXP2500002 / 瓷砖 / 合同:13` 仍需要业务确认门店归属或拆分。
+- `EXP2400006` 仍需要正式 18 位海关编号。
+- `CG2500045` 顶层旧副本仍只在云端 metadata 可见；业务数据已由已缓存正文覆盖。
+
+## 2026-06-03 WPS-IMPORT-73（采购明细来源 note 回填）
+
+### Goal
+- 继续降低已入库记录缺少 WPS 文件来源 note 的缺口。
+- 只处理采购明细中可由采购凭证明细唯一证明的来源：合同号、商品、数量、单价或总额必须同时匹配；不能唯一匹配的保留到备忘录。
+
+### Delivered
+- 新增采购明细来源回填脚本 `scripts/backfill_wps_purchase_item_source_notes.js`。
+- 写库前备份：`backend/prisma/backups/dev_2026-06-03_02-42-05.db`。
+- 实际只回填采购明细 note：`87` 条。
+- 没有修改商品、数量、单价、总额、供应商、合同头等业务字段。
+- 回填后来源覆盖改善：
+  - 缺来源标记总数：`333 -> 246`
+  - `purchase_items`: `171/278 -> 258/278`
+
+### Verification
+- `node -c scripts/backfill_wps_purchase_item_source_notes.js` 通过。
+- `node scripts/backfill_wps_purchase_item_source_notes.js` 写库前 dry-run：`purchaseItemUpdates=87`、`skippedCount=20`。
+- `node scripts/backfill_wps_purchase_item_source_notes.js --apply` 通过：`purchaseItemUpdates=87`。
+- 写库后 `node scripts/backfill_wps_purchase_item_source_notes.js` 通过 dry-run：`purchaseItemUpdates=0`、`skippedCount=20`。
+- 写库后 `node scripts/audit_wps_db_source_coverage.js` 通过：`total_without_source=246`。
+- 写库后 `python3 scripts/audit_wps_import_completion.py` 通过：`pending_auto_writes=0`、`db_source_gaps=246`、`decision_items=2`、`cloud_only_files=1`。
+- 三条导入 dry-run 仍为 `0` 待业务写入：出口源、真实凭证、采购凭证。
+
+### Remaining
+- 剩余 `246` 条来源标记缺口集中在销售明细 `137`、装箱明细 `52`、采购明细 `20`、报关单 `4`、报关明细继承缺口 `31`、采购合同头 `2`。
+- 采购明细剩余 `20` 条中含 `CG2500107 / 密胺餐具` 双源歧义，以及若干无唯一匹配项；后续不能按近似名称硬挂来源。
+- `EXP2500002 / 瓷砖 / 合同:13` 仍需要业务确认门店归属或拆分。
+- `EXP2400006` 仍需要正式 18 位海关编号。
+- `CG2500045` 顶层旧副本仍只在云端 metadata 可见；业务数据已由已缓存正文覆盖。
+
+## 2026-06-03 WPS-IMPORT-72（合同头来源 note 回填与数据库来源覆盖审计）
+
+### Goal
+- 继续推进“数据库内容与 WPS 文件正文对齐”的可验证性，不只证明没有待写入项，还要证明已入库记录可追溯到文件来源。
+- 先处理低风险、可唯一证明的合同头来源缺口：只补 note，不改金额、日期、状态、门店、供应商等业务字段。
+
+### Delivered
+- 新增只读来源覆盖审计 `scripts/audit_wps_db_source_coverage.js`，输出：
+  - `tmp/wps_11_export_list_raw/parsed/wps_db_source_coverage.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_db_source_coverage.md`
+- 新增合同头来源回填脚本 `scripts/backfill_wps_contract_source_notes.js`。
+- 写库前备份：`backend/prisma/backups/dev_2026-06-03_02-34-38.db`。
+- 实际只回填合同头 note：
+  - 出口合同头来源 note：`39`
+  - 采购合同头来源 note：`89`
+- 回填后来源覆盖改善：
+  - 缺来源标记总数：`461 -> 333`
+  - `sales_contracts`: `3/42 -> 42/42`
+  - `purchase_contracts`: `101/192 -> 190/192`
+- `audit_wps_import_completion.py` 已接入数据库来源覆盖审计；当前完成度状态更新为 `db_source_gaps_present`。
+
+### Verification
+- `node -c scripts/audit_wps_db_source_coverage.js` 通过。
+- `node scripts/audit_wps_db_source_coverage.js` 通过，回填后 `total_without_source=333`。
+- `node -c scripts/backfill_wps_contract_source_notes.js` 通过。
+- `node scripts/backfill_wps_contract_source_notes.js --apply` 通过，`salesContractUpdates=39`、`purchaseContractUpdates=89`。
+- 写库后 `node scripts/backfill_wps_contract_source_notes.js` 通过 dry-run，`salesContractUpdates=0`、`purchaseContractUpdates=0`。
+- `python3 scripts/audit_wps_import_completion.py` 通过，`pending_auto_writes=0`、`db_source_gaps=333`。
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --create-missing-contracts --update-contract-aggregates --infer-sales-store-from-source-path` 通过 dry-run，待写入为 `0`。
+
+### Remaining
+- 剩余 `333` 条来源标记缺口集中在销售明细、装箱明细、采购明细、少量报关单/报关明细；后续只能按源文件行号、商品、数量、规格、门店/供应商唯一匹配后分批补 note。
+- `EXP2500002 / 瓷砖 / 合同:13` 仍需要业务确认门店归属或拆分。
+- `EXP2400006` 仍需要正式 18 位海关编号。
+- `CG2500045` 顶层旧副本仍只在云端 metadata 可见；业务数据已由已缓存正文覆盖。
+
+## 2026-06-03 WPS-IMPORT-71（完成度审计与剩余阻断归档）
+
+### Goal
+- 继续沿完整 WPS 历史导入目标推进，明确当前是否还有可自动写库项，而不是只看旧的源/库行数粗差异。
+- 把出口源、真实凭证、采购凭证、WPS 云端正文覆盖和裁决包合成一个可复跑审计报告，作为后续完成度验收入口。
+
+### Delivered
+- 新增只读脚本 `scripts/audit_wps_import_completion.py`。
+- 生成完成度审计报告：
+  - `tmp/wps_11_export_list_raw/parsed/wps_import_completion_audit.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_import_completion_audit.md`
+- 当前审计状态为 `blocked_by_business_or_formal_evidence`，不是脚本漏导：
+  - 自动可写入项合计 `0`
+  - 出口源装箱未匹配 `0`
+  - 出口源销售未匹配 `0`
+  - 出口源 warnings `0`
+  - 待业务/正式凭证裁决项 `2`
+  - 仅云端原件缺口 `1`
+
+### Verification
+- `python3 -m py_compile scripts/audit_wps_import_completion.py` 通过。
+- `python3 scripts/audit_wps_import_completion.py` 通过，输出 `pending_auto_writes=0`、`decision_items=2`、`cloud_only_files=1`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决仍为 `2`。
+
+### Remaining
+- `EXP2500002 / 瓷砖 / 合同:13` 仍需要业务确认门店归属或拆分。
+- `EXP2400006` 仍需要正式 18 位海关编号。
+- `CG2500045` 顶层旧副本仍只在云端 metadata 可见；业务数据已由已缓存正文覆盖。
+
+## 2026-06-03 WPS-IMPORT-70（WPS 索引刷新与凭证运行时校验）
+
+### Goal
+- 继续核对 WPS 云端历史文件是否还有新正文可导入，并验证剩余 2 条裁决项是否能从刷新后的索引/抽取结果中自动收口。
+- 防止用缺少 PDF 依赖的系统 Python 运行真实凭证抽取，造成大量 `empty_text` 假 blocked 项。
+
+### Delivered
+- 重新盘点 `11-报关记录/%`：WPS 云端文件仍为 `579` 个，已有本机正文或项目源目录保留 `578` 个，仅云端可见 `1` 个。
+- 当前仅云端可见文件仍是 `11-报关记录/20250815禧瑞都/购销合同CG2500045-不锈钢桶-禧瑞都.pdf`；同合同业务数据已由 2025 年 8 月目录 DOCX/PDF 覆盖并入库。
+- 重新跑附件盘点、采购抽取、出口源分析：没有新的缺失出口合同，也没有新的可自动导入采购合同。
+- 发现并纠正一次运行时误差：系统 Python 缺 PDF 正文依赖时会把大量真实凭证误标为 `empty_text`，导致裁决包假增至 `35` 条；改用 Codex Python 运行时后恢复为 `status_counts.ok=41`、`blocked=1`、裁决包 `2` 条。
+
+### Verification
+- `python3 scripts/inventory_wps_cloud_metadata.py --prefix '11-报关记录/%' --copy-cached` 通过，`cached_file_count=578`、`cloud_only_file_count=1`。
+- `python3 scripts/inventory_wps_export_attachments.py` 通过，附件文件数 `575`、采购合同 `377`。
+- `python3 scripts/extract_wps_purchase_evidence.py` 通过，`ready_missing_contract_count=0`、`header_ready_missing_contract_count=0`。
+- `python3 scripts/analyze_wps_export_sources.py` 通过，`contracts_missing_in_db=[]`。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/extract_wps_export_evidence.py` 通过，`status_counts.ok=41`、`mapping_action_counts.blocked=1`。
+- `node scripts/import_wps_export_evidence.js` 通过 dry-run，待写入为 `0`。
+- `node scripts/import_wps_purchase_evidence.js --allow-header-only-contracts` 通过 dry-run，待写入为 `0`。
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --create-missing-contracts --update-contract-aggregates --infer-sales-store-from-source-path` 通过 dry-run，待写入为 `0`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数 `2`。
+
+### Remaining
+- `EXP2500002 / 瓷砖 / 合同:13` 仍需要业务确认门店归属或拆分。
+- `EXP2400006` 仍需要正式 18 位海关编号。
+- WPS 云端仍有 `CG2500045` 顶层旧副本无本机正文；当前只作为原件缺口保留，不影响已入库业务数据。
+
+## 2026-06-03 WPS-IMPORT-69（EXP2500001 错挂来源收口）
+
+### Goal
+- 继续处理剩余 WPS 待裁决包中能由现库字段和来源 note 直接证明的项。
+- 对厂家字段冲突的装箱候选，不删除、不合并；只清理明显错挂的 WPS 来源 note。
+
+### Delivered
+- `EXP2500001 / 冷冻肉切片机` 的假歧义已收口：
+  - `南常` 行继续保留 `_wps_cloud_root/出货汇总.xlsx#出货汇总0315_补充:233` 来源。
+  - `切肉机` 行保留 `11-报关记录/出货汇总(1).xlsx#汇总单:56` 来源。
+  - 从 `南常` 行移除了字段冲突的 `出货汇总(1):56` 来源 note。
+- 没有删除任一装箱行，也没有改数量、重量、体积、厂家、价格等业务字段。
+- 决策包从 `3` 条降到 `2` 条，装箱歧义归零。
+
+### Verification
+- 写库前备份：`backend/prisma/backups/dev_2026-06-03_02-11-50.db`。
+- `node scripts/dedupe_wps_packing_duplicates.js --apply` 只执行 `1` 条 note 更新，`deleteCount=0`。
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --create-missing-contracts --update-contract-aggregates --infer-sales-store-from-source-path` 通过，`packingMergeUnmatched=0`、销售新增/更新为 `0`、`skipped=1`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数 `2`。
+- `node scripts/dedupe_wps_packing_duplicates.js` 通过，`updateCount=0`、`deleteCount=0`。
+- `node scripts/cleanup_wps_ambiguous_sales_store.js`、`node scripts/import_wps_export_evidence.js`、`node scripts/import_wps_purchase_evidence.js --allow-header-only-contracts` 均通过 dry-run。
+
+### Remaining
+- `EXP2500002 / 瓷砖 / 合同:13` 仍缺门店；同一 `771.84` 数量在根目录出货汇总指向 `Burbank`，在两个团队目录出货汇总副本指向 `安纳汉姆`，需要业务指定归属或拆分比例。
+- `EXP2400006` 仍缺正式 18 位海关编号；出货汇总 `invoice_no`、发票汇总模板污染和旧 `.xls` 底稿金额都不能替代正式报关编号。
+
+## 2026-06-03 WPS-IMPORT-68（EXP250027 混合门店拆分收口）
+
+### Goal
+- 继续推进当前 WPS 历史导入剩余裁决包中可由文件正文直接证明的部分。
+- 不替用户裁决业务口径；只处理能由源文件数量、门店、港口和现库状态共同证明的导入项。
+
+### Delivered
+- `EXP250027 / 窗帘` 已按 `_wps_cloud_root/出货汇总.xlsx` 两条正文证据收口：
+  - `米尔皮塔、圣荷西625 / Oakland / 31套`
+  - `禧瑞都 / 洛杉矶 / 35套`
+- 新增组合门店 `米尔皮塔、圣荷西625`，仅因源行给出了现有真实港口 `Oakland`；`混合港口` 的组合门店仍不自动创建。
+- 新增 `EXP250027 / 窗帘 / 米尔皮塔、圣荷西625 / 31套` 装箱行，并用 31+35 的装箱数量精确覆盖销售合同 `66套 @50`，拆成两条销售证据行。
+- 删除旧的 `[WPS_SOURCE_PATH_STORE]` 弱路径销售行 `EXP250027 / 窗帘 / 米尔皮塔 / 66套 @50`；该行已被两条同源拆分销售行完整覆盖且无库存引用。
+- 决策包从 `6` 条降到 `3` 条，剩余全部需要业务裁决或正式凭证补充。
+
+### Verification
+- 写库前备份：
+  - `backend/prisma/backups/dev_2026-06-03_01-57-04.db`
+  - `backend/prisma/backups/dev_2026-06-03_02-01-36.db`
+  - `backend/prisma/backups/dev_2026-06-03_02-02-26.db`
+  - `backend/prisma/backups/dev_2026-06-03_02-03-23.db`
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --create-missing-contracts --update-contract-aggregates --infer-sales-store-from-source-path` 通过，最终 dry-run 为 `packingMergeCreates=0`、`salesMergeUpdates=0`、`salesMergeCreates=0`、`salesMergeUnmatched=0`、`skipped=1`。
+- `node scripts/cleanup_wps_ambiguous_sales_store.js` 通过，最终 dry-run 为 `updateCount=0`、`deleteCount=0`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数 `3`。
+- `python3 scripts/analyze_wps_export_sources.py`、`node scripts/dedupe_wps_packing_duplicates.js`、`node scripts/import_wps_export_evidence.js`、`node scripts/import_wps_purchase_evidence.js --allow-header-only-contracts` 均通过 dry-run。
+
+### Remaining
+- `EXP2500001 / 冷冻肉切片机` 两条旧装箱候选最高同分，但厂家字段冲突，不能自动合并。
+- `EXP2500002 / 瓷砖 / 合同:13` 仍缺门店；同商品装箱候选跨 `Burbank` 与 `安纳汉姆`，需要业务指定归属或拆分比例。
+- `EXP2400006` 仍缺正式 18 位海关编号；出货汇总 `invoice_no` 和旧 `.xls` 底稿金额不能替代正式编号。
+
+## 2026-06-03 Round 94（旧 XLS 报关底稿可读化复核）
+
+### Goal
+- 继续推进 WPS 历史导入剩余凭证 blocked 项，优先处理可由本机依赖自行解决的旧 `.xls` 读取问题。
+- 保持真实凭证导入 Interface 保守：没有正式 18 位海关编号时，不创建报关单，不用商业发票号、合同号或底稿金额替代。
+
+### Delivered
+- `scripts/extract_wps_export_evidence.py` 已支持通过前端现有 `xlsx` 依赖读取 OLE2/BIFF 旧 `.xls`，不新增依赖、不联网。
+- 两个旧 `.xls` 不再被标记为 `empty_text`：
+  - `一般贸易报关发票 合同 装箱单 出口报关单-1单.xls`：可读到底稿商品、重量、金额，但缺正式海关编号，且缺唯一 EXP 归属。
+  - `一般贸易报关发票 合同 装箱单 出口报关单-2单空运.xls`：可读到 `EXP2400006`、客户、商品、重量、金额，但缺正式海关编号。
+- `scripts/build_wps_import_decision_packet.py` 已更新旧 `.xls` 裁决文案：从“需要转换”改为“已可读，但需要正式海关编号/归属裁决”。
+- 本轮没有写数据库；真实凭证导入 dry-run 仍为 `0` 创建、`0` 更新。
+
+### Verification
+- `python3 -m py_compile scripts/build_wps_import_decision_packet.py scripts/extract_wps_export_evidence.py` 通过。
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/extract_wps_export_evidence.py` 通过，`status_counts.ok=38`、`readiness_counts.needs_review=4`、`ready_for_mapping=34`。
+- `node scripts/import_wps_export_evidence.js` 通过 dry-run，报关/退税/商品新增更新均为 `0`。
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts` 通过 dry-run，出口源新增更新均为 `0`，剩余装箱歧义 `12`。
+- `node scripts/import_wps_purchase_evidence.js` 通过 dry-run，采购新增更新均为 `0`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数保持 `20`。
+
+### Remaining
+- 旧 `.xls` 的阻塞已经从技术读取问题收敛为业务/凭证问题：需要正式 18 位海关编号；第 1 单还需要确认唯一 EXP 归属。
+- 其余剩余事项仍为 `20` 条：合同号冲突 `1`、装箱歧义 `12`、混合门店/港口 `1`、采购缺口 `2`、商业发票 `2`、旧 `.xls` 报关底稿 `2`。
+
+## 2026-06-02 WPS-IMPORT-29（WPS 云端合同正文回收与采购补导入）
+
+### Goal
+- 继续处理全量 `11-报关记录` 中仍仅云端可见的采购合同文件，把能通过 WPS 客户端打开/下载的正文固化到项目临时源目录，并把可由合同正文证明的采购合同写入数据库。
+
+### Planned Scope
+- 用 WPS 客户端逐个触发 `2026年3月/4月/5月` 云端采购合同下载。
+- 修正 `inventory_wps_cloud_metadata.py`，补充 SHA1、本机团队文档路径和项目源目录已存在文件的识别，避免把已落盘文件误报为云端缺口。
+- 重跑附件盘点、采购抽取、出口源分析和三条导入 dry-run。
+- 对可自动写库的采购合同先备份数据库，再 apply；不能自动决断的事项继续留在待裁决包。
+- 核对出货汇总 Excel 是否为这些缺失采购合同提供具体乙方名称。
+
+### Delivered
+- 全量 `11-报关记录` 云端索引仍为 `579` 个文件；本机可读正文从 `537` 个提升到 `576` 个，仅云端可见从 `42` 个降到 `3` 个。
+- 本轮通过 WPS 客户端和源目录校验回收 `2026年3月/4月/5月` 的采购合同正文；剩余采购合同云端缺口只剩 `20250815禧瑞都/购销合同CG2500045-不锈钢桶-禧瑞都.pdf` 这个顶层旧副本。
+- 已导入 `16` 份采购合同、`16` 条采购明细，并新增 `7` 个供应商、`3` 个产品；写库前备份为 `backend/prisma/backups/dev_2026-06-02_16-11-44.db`。
+- 出货汇总核对完成：这 16 份合同里只有 `CG2600013` 在出货汇总中出现，但供应商名称与合同正文乙方不一致；其余 15 个合同号未出现在出货汇总中，不能从出货汇总推断乙方。
+
+### Verification
+- `python3 -m py_compile scripts/inventory_wps_cloud_metadata.py` 通过。
+- `python3 scripts/inventory_wps_cloud_metadata.py --prefix '11-报关记录/%' --copy-cached` 通过，`cached_file_count=576`、`cloud_only_file_count=3`。
+- `python3 scripts/inventory_wps_export_attachments.py` 通过，附件文件数 `570`。
+- `python3 scripts/extract_wps_purchase_evidence.py` 通过，`ready_missing_contract_count=0`。
+- `python3 scripts/analyze_wps_export_sources.py` 通过，`contracts_missing_in_db=[]`。
+- `node scripts/import_wps_purchase_evidence.js --apply` 通过；写库后 dry-run 为 `0`。
+- `node scripts/import_wps_export_evidence.js` 通过 dry-run，待写入为 `0`。
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts` 通过 dry-run，商品/合同/装箱/销售待写入为 `0`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决 `49` 条。
+
+### Remaining Risk
+- `CG2600024`、`CG2600030`、`CG2600031` 只有归档 PDF 且当前无可抽取文本，未找到同合同号 Word 正文；需要可读版合同或人工确认乙方与明细。
+- 顶层旧副本 `11-报关记录/20250815禧瑞都/购销合同CG2500045-不锈钢桶-禧瑞都.pdf` 仍未落盘；业务数据已由 `2025年8月/20250815禧瑞都` 下同合同号 DOCX 覆盖。
+- ByteRover 本地 daemon 仍启动超时；本轮按当前文件证据和脚本校验继续推进。
+
+## 2026-06-02 WPS-IMPORT-25（WPS 云盘 2026 年 4/5 月补导入）
+
+### Goal
+- 把已从 WPS 云盘缓存到本地的 2026 年 4/5 月出货源文件接入历史导入链路，自动补齐可由文件证据证明的缺失合同、装箱、销售和采购数据。
+
+### Planned Scope
+- 修正 `preferred_packing_items` 选择规则，避免空 `装货` sheet 和普通 `箱单` 压过可用的 `装箱清单`。
+- 为 WPS 出货导入新增 `--create-missing-contracts`，按 `contracts.csv` 中的源文件证据创建缺失 EXP 合同头。
+- 导入 `EXP260005`、`EXP260006`、`EXP260007` 的合同头、装箱明细和销售明细。
+- 导入 WPS 缓存新增采购合同 `CG2600036`。
+
+### Delivered
+- WPS 云盘新增缓存文件已同步到 `tmp/wps_11_export_list_raw/11-报关记录/2026年4月` 和 `2026年5月`。
+- 已创建 `EXP260005`、`EXP260006`、`EXP260007` 三个出口合同头，并写入对应 `25` 条装箱明细、`22` 条销售明细。
+- 已导入 `CG2600036` 采购合同，供应商为 `广州高邦装饰材料有限公司`，金额 `10629`，明细为 `金属蜂窝板` `22.8` 平方米。
+- 出口源导入和采购凭证导入均已验证幂等，dry-run 待写入为 `0`。
+
+### Verification
+- `node --check scripts/import_wps_export_sources.js` 通过。
+- `python3 -m py_compile scripts/analyze_wps_export_sources.py` 通过。
+- `python3 scripts/analyze_wps_export_sources.py` 通过，`contracts_missing_in_db=[]`。
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts` 通过，待创建/更新为 `0`。
+- `node scripts/import_wps_purchase_evidence.js` 通过，待创建/更新为 `0`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，剩余待裁决 `39` 条。
+
+### Remaining Risk
+- WPS 云盘 `2026年5月` 目录可见的其他采购合同文件尚未全部下载到本地缓存；已下载并可证明的 `CG2600036` 已处理，其他未缓存文件继续作为待补材料来源。
+- 旧的 `EXP250027` 混合门店/港口和 39 条待裁决事项仍需业务判断。
+
+## 2026-06-02 WPS-IMPORT-26（WPS 云端未缓存文件盘点）
+
+### Goal
+- 在无法直接读取 WPS 云端正文前，把 `11-报关记录/2026年4月` 与 `2026年5月` 的云端文件索引固化成可复跑产物，区分“已缓存可抽取”和“仅云端可见不能写库”。
+
+### Planned Scope
+- 新增 WPS `cache.db` 只读盘点脚本，输出云端路径、WPS 文件 ID、本机缓存状态、可复制路径。
+- 把已缓存的 2026 年 4/5 月文件复制到项目临时源目录。
+- 重跑采购附件盘点、采购合同抽取、采购导入 dry-run 和待裁决包。
+- 将仍未缓存文件写入待裁决备忘录，不从文件名推断乙方或明细。
+
+### Delivered
+- 新增 `scripts/inventory_wps_cloud_metadata.py`，可从 WPS 本机索引盘点云端文件，并可选复制已缓存文件。
+- 已生成 `tmp/wps_11_export_list_raw/parsed/wps_cloud_metadata.csv/json/summary.md`。
+- 本轮确认 `2026年4月/5月` 云端索引共有 `35` 个文件：`5` 个已有本机缓存并复制，`30` 个仍仅云端可见。
+- 全 WPS 本机缓存只额外发现一个私人空间 `CG2600022` 同名 DOCX；由于与团队文档索引大小不同，未作为正式 `11-报关记录` 来源写库。
+
+### Verification
+- `python3 -m py_compile scripts/inventory_wps_cloud_metadata.py` 通过。
+- `python3 scripts/inventory_wps_cloud_metadata.py --prefix '11-报关记录/2026年4月/%' --prefix '11-报关记录/2026年5月/%' --copy-cached` 通过。
+- `python3 scripts/inventory_wps_export_attachments.py` 通过，附件总数 `531`。
+- `python3 scripts/extract_wps_purchase_evidence.py` 通过，`ready_missing_contract_count=0`。
+- `node scripts/import_wps_purchase_evidence.js` 通过 dry-run，合同创建 `0`、采购明细创建 `0`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，业务待裁决仍为 `39` 条。
+
+### Remaining Risk
+- WPS 客户端当前素材页/云盘入口加载失败，无法在本轮继续批量触发下载；需要后续在 WPS 中实际打开/下载 30 个云端合同正文后再重跑抽取。
+- 云端元数据只能证明文件存在，不能证明乙方、合同明细、金额和签署日期；当前不能从文件名造采购合同数据。
+
+## 2026-06-02 WPS-IMPORT-27（全量出货清单证据补导入）
+
+### Goal
+- 继续把用户所说“出货清单/出货汇总”范围里的 WPS 云端文件纳入证据链，不只看 2026 年 4/5 月；对能由文件正文证明的数据直接写入数据库，对不能读取正文的云端文件继续留备忘录。
+
+### Planned Scope
+- 全量盘点 `11-报关记录/%` 云端索引，复制所有已缓存文件到项目临时源目录。
+- 明确 WPS 云端没有顶层 `11-出货清单` 文件夹；当前团队文档可证明的主目录是 `11-报关记录`，另有 WPS 根目录 `出货汇总.xlsx` 与团队根目录 `装货清单.xlsx`。
+- 把 WPS 根目录 `出货汇总.xlsx` 和团队根目录 `装货清单.xlsx` 保留到 `_wps_cloud_root`，作为独立来源进入解析。
+- 写入由 `_wps_cloud_root/出货汇总.xlsx` 证明的合同汇总、装箱和销售补充数据。
+
+### Delivered
+- `11-报关记录` 全量云端索引已固化：`579` 个文件，其中 `534` 个已有本机缓存并确认在项目临时源目录，`45` 个仍仅云端可见。
+- 已保留 `_wps_cloud_root/出货汇总.xlsx`（WPS 根目录，sheet `出货汇总0315_补充`，`343` 行）和 `_wps_cloud_root/装货清单.xlsx`（团队根目录 `捷淞/装货清单.xlsx`）。
+- 出货源分析从 `41` 个合同提升到 `42` 个合同；`EXP250018` 已由根目录 `出货汇总.xlsx` 证明并纳入源合同集合。
+- 写库补入：商品字段更新 `22`，合同汇总更新 `19`，装箱更新 `124`，装箱新增 `38`，销售新增 `2`。
+- 写库前备份：`backend/prisma/backups/dev_2026-06-02_15-24-39.db`。
+
+### Verification
+- `python3 scripts/inventory_wps_cloud_metadata.py --prefix '11-报关记录/%' --copy-cached` 通过。
+- `python3 scripts/analyze_wps_export_sources.py` 通过，`contracts_missing_in_db=[]`。
+- `node scripts/import_wps_export_sources.js --apply --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts` 通过。
+- 写库后 `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts` 通过，商品/合同/装箱/销售待写入均为 `0`。
+- `node scripts/import_wps_purchase_evidence.js` 通过 dry-run，待写入为 `0`。
+- `node scripts/import_wps_export_evidence.js` 通过 dry-run，待写入为 `0`。
+- 写库后数据库计数：出口合同 `45`，销售明细 `435`，装箱明细 `469`，采购合同 `170`，采购明细 `228`，报关单 `31`，报关明细 `57`，退税 `4`，商品 `172`。
+
+### Remaining Risk
+- 全量云端索引仍有 `45` 个文件仅云端可见，主要是采购合同 DOCX/PDF；未下载正文前不能抽取乙方、明细和金额。
+- 待裁决包增至 `47` 条，其中装箱歧义由 `4` 条增至 `12` 条；这是新证据暴露的同分旧行候选，当前保留人工裁决，不自动乱选。
+
+## 2026-06-02 WPS-IMPORT-28（WPS 本机直路径文件回收）
+
+### Goal
+- 复核 `11-报关记录` 中没有 `filecache_data` 记录、但可能已经实际落在本机团队文档路径下的文件，减少误判为“仅云端可见”的合同缺口。
+
+### Planned Scope
+- 修正 `scripts/inventory_wps_cloud_metadata.py`，在 WPS cache 记录缺失时回查 `团队文档/捷淞/<云端路径>`。
+- 重新复制全量 `11-报关记录` 已可读文件到项目临时源目录。
+- 重跑附件盘点、采购抽取、出口源分析和三条导入 dry-run。
+- 更新待裁决备忘录、风险、指标和检查点。
+
+### Delivered
+- `inventory_wps_cloud_metadata.py` 现在能区分 `filecache` 与 `direct-local` 两种本机可读来源。
+- 全量 `11-报关记录` 云端索引仍为 `579` 个文件；本机可用正文从 `534` 个提升到 `537` 个，仅云端可见从 `45` 个降为 `42` 个。
+- 本轮找回并复制的 `3` 个直路径文件是 `CG2500107` 和两份 `CG2500054`；它们已从未缓存清单中移除。
+- 重跑采购抽取后，采购合同附件抽取数为 `346`，`ready_missing_contract_count=0`；三条导入 dry-run 仍为 `0` 待写入。
+
+### Verification
+- `python3 -m py_compile scripts/inventory_wps_cloud_metadata.py` 通过。
+- `python3 scripts/inventory_wps_cloud_metadata.py --prefix '11-报关记录/%' --copy-cached` 通过。
+- `python3 scripts/inventory_wps_export_attachments.py` 通过，附件总数 `539`。
+- `python3 scripts/extract_wps_purchase_evidence.py` 通过，`ready_missing_contract_count=0`。
+- `python3 scripts/analyze_wps_export_sources.py` 通过，`contracts_missing_in_db=[]`。
+- `node scripts/import_wps_purchase_evidence.js` 通过 dry-run，待写入为 `0`。
+- `node scripts/import_wps_export_evidence.js` 通过 dry-run，待写入为 `0`。
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts` 通过，商品/合同/装箱/销售待写入均为 `0`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决仍为 `47` 条。
+
+### Remaining Risk
+- 剩余 `42` 个文件仍只有 WPS 云端索引、没有正文，不能从文件名推断乙方、金额或明细。
+- ByteRover 本地 daemon 仍启动超时；本轮按 checkpoint 和当前验证输出继续推进。
+
 ## 2026-04-05 Round 133（Migration Health 诊断输出）
 
 ### Goal
@@ -4867,3 +6918,2105 @@
   - 应返回空
 - `git check-ignore -v`
   - 可验证新增规则已覆盖相关路径
+
+## 2026-06-02 Round 73（WPS 历史出货源文件盘点与导入前核对）
+
+### Goal
+- 从 WPS/本机 `11-报关记录` 历史出货资料中找出现系统需要补齐的数据。
+- 建立“源文件 -> 可导入字段 -> 现库差异”的核对链路。
+- 在未解决源文件歧义前，不直接改写业务数据库。
+
+### Findings
+- 已定位并复制 WPS 本地同步源目录到被 `.gitignore` 覆盖的临时目录：
+  - `tmp/wps_11_export_list_raw/11-报关记录`
+- 源目录规模：
+  - 约 `671M`
+  - `540` 个文件
+  - `70` 个相关 Excel 工作簿可读取
+- 出口合同源文件：
+  - `39` 个 EXP 出口合同工作簿
+  - 解析到 `37` 个内容层面的 EXP 合同
+  - 数据库已有 `42` 个销售合同
+  - 源文件有、数据库没有：`0`
+  - 数据库有、源文件没有：`5`
+- 主要差异不是“主合同缺失”，而是明细与凭证链路未完整补齐：
+  - 建议落库装箱/出货候选行：`288`
+  - 建议落库销售商品候选行：`283`
+  - 发票汇总行：`741`
+  - 两边都有但行数不一致、需要补齐/重算的合同：`31`
+
+### Delivered
+- 新增只读解析脚本：
+  - `scripts/analyze_wps_export_sources.py`
+- 更新脚本目录说明：
+  - `scripts/README.md`
+- 生成导入前核对产物：
+  - `tmp/wps_11_export_list_raw/parsed/import_gap_report.md`
+  - `tmp/wps_11_export_list_raw/parsed/db_comparison.csv`
+  - `tmp/wps_11_export_list_raw/parsed/preferred_packing_items.csv`
+  - `tmp/wps_11_export_list_raw/parsed/preferred_sales_items.csv`
+  - `tmp/wps_11_export_list_raw/parsed/invoice_summary_items.csv`
+
+### Key Decision
+- 源文件合同号按 Excel 内容优先，而不是按文件名优先。
+- 原因：用户要求系统信息必须与文件内容对齐，不允许根据文件名猜测或编造。
+
+### Open Risk
+- `外销出口合同+发票+箱单+EXP250018 925圣荷西.xlsx` 文件名是 `EXP250018`，但工作簿内容合同号是 `EXP250019`。
+- 在人工确认该文件是否应修正为 EXP250018 前，不应把它强行导入 EXP250018。
+
+### Validation
+- `python3 scripts/analyze_wps_export_sources.py`
+  - 通过，成功生成解析与差异报告
+- `python3 -m py_compile scripts/analyze_wps_export_sources.py`
+  - 通过
+
+## 2026-06-02 Round 74（WPS 导入脚本与低风险主数据入库）
+
+### Goal
+- 在不编造数据、不破坏现有关联的前提下，把 WPS 解析产物推进到可写库导入链路。
+- 先执行低风险主数据补齐；高风险明细表只生成计划并加保护。
+
+### Delivered
+- 新增幂等导入脚本：
+  - `scripts/import_wps_export_sources.js`
+- 默认 dry-run，输出：
+  - `tmp/wps_11_export_list_raw/parsed/import_plan.json`
+- 已实际写库的低风险数据：
+  - 新增 `20` 个源文件明确出现的商品
+  - 新增 `2` 个源文件明确出现且能匹配既有港口的门店
+  - 补齐 `94 + 1` 个商品空字段尾差（HS 编码、申报要素、单位、规格等）
+- 未执行的高风险数据：
+  - 未替换装箱明细
+  - 未替换销售明细
+  - 未动报关明细
+
+### Safety
+- 写库前已备份本地数据库：
+  - `backend/prisma/backups/dev_2026-06-02_03-40-43.db`
+- 脚本新增硬保护：
+  - 如果 `--apply --replace-packing` 会影响已被报关明细引用的装箱行，默认拒绝执行。
+  - 当前 dry-run 识别到 `16` 条风险装箱行。
+
+### Current Import Plan
+- 排除 `EXP250018 925圣荷西.xlsx` 歧义文件后：
+  - 装箱候选行：`276`
+  - 销售候选行：`271`
+  - 可安全推出门店的销售行：`189`
+  - 无法安全推出门店、暂不导入的销售行：`82`
+  - 明显第三方拼柜/埋单类装箱行：`6`
+
+### Validation
+- `node scripts/import_wps_export_sources.js --apply`
+  - 通过，仅补商品/门店主数据
+- `node scripts/import_wps_export_sources.js --replace-packing --update-contract-aggregates`
+  - 通过，dry-run 生成明细替换计划
+- `node scripts/import_wps_export_sources.js --apply --replace-packing --update-contract-aggregates`
+  - 按预期拒绝执行，避免断开已有报关明细链接
+- `node --check scripts/import_wps_export_sources.js`
+  - 通过
+
+### Next
+- 下一步不能用“删除后重建”方式导入装箱明细。
+- 应实现 merge 策略：按合同、商品、数量、箱数、毛重、净重、体积匹配既有装箱行，只补空字段；无法匹配时再新增，并保留 WPS source note。
+
+## 2026-06-02 Round 75（WPS 装箱与销售明细 merge 入库）
+
+### Goal
+- 将 WPS 出货合同中的装箱明细与可确认门店的销售明细安全合并到数据库。
+- 保留旧装箱行和报关链接；不删除重建。
+
+### Delivered
+- `scripts/import_wps_export_sources.js` 增加：
+  - `--merge-packing`
+  - `--merge-sales`
+  - 源行业务去重
+  - 无数量/箱数/重量/体积证据的装箱候选过滤
+  - merge 后幂等 dry-run
+- 实际写库：
+  - 装箱明细：`348 -> 393`
+  - 销售明细：`323 -> 366`
+  - 装箱 WPS 来源标记：`264`
+  - 销售 WPS 来源标记：`183`
+  - 报关明细链接保持：`31 -> 31`
+- 合同装箱汇总已按去重后的 WPS 候选重算。
+
+### Remaining Data Exceptions
+- `EXP250018 925圣荷西.xlsx` 仍因文件名与内容合同号不一致被排除。
+- 装箱 merge 仍有 `4` 条因旧行匹配歧义而未动。
+- 销售 merge 仍有 `79` 条因无法从源文件安全推出门店而未动。
+- `EXP250027` 有 `米尔皮塔、圣荷西625、禧瑞都 / 混合港口` 组合，未自动建门店。
+
+### Validation
+- `node --check scripts/import_wps_export_sources.js`
+  - 通过
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates`
+  - 通过，最终 dry-run 显示：
+    - `productCreates=0`
+    - `productUpdates=0`
+    - `storeCreates=0`
+    - `contractUpdates=0`
+    - `packingMergeUpdates=0`
+    - `packingMergeCreates=0`
+    - `salesMergeUpdates=0`
+    - `salesMergeCreates=0`
+
+## 2026-06-02 Round 76（WPS 发票汇总安全审计）
+
+### Goal
+- 判断 `invoice_summary_items.csv` 是否能作为报关单、发票、退税/核销链路的直接导入来源。
+- 在导入脚本的报关/退税 Interface 上加拒写保护，避免污染源进入业务库。
+
+### Delivered
+- `scripts/import_wps_export_sources.js` 新增 `invoice_summary_audit.json` 输出。
+- `--merge-customs` / `--merge-tax-refunds` 现在会先审计发票汇总：
+  - 排除合同号不一致源文件后，发票汇总候选行：`718`
+  - 覆盖合同：`37`
+  - 唯一报关单号：`19`
+  - 唯一发票号：`19`
+  - 跨合同重复报关单号：`19`
+  - 跨合同重复发票号：`19`
+- 结论：`发票汇总` 疑似模板/旧数据复用，不能直接落库到报关和退税链路。
+- `--apply --merge-customs` 已在事务前拒绝执行，不会写库。
+
+### Validation
+- `node --check scripts/import_wps_export_sources.js`
+  - 通过
+- `node scripts/import_wps_export_sources.js --merge-customs --merge-tax-refunds`
+  - 通过 dry-run，输出 `customsImportBlocked=true`、`taxRefundImportBlocked=true`
+- `node scripts/import_wps_export_sources.js --apply --merge-customs`
+  - 按预期失败并拒写：重复报关单号 `19` 个，重复发票号 `19` 个
+- 本地库计数保持不变：
+  - `customs_declarations=4`
+  - `customs_declaration_items=31`
+  - `tax_refunds=2`
+  - `forex_verifications=4`
+
+### Next
+- 报关/退税/发票不能再依赖 `发票汇总` 表。
+- 下一步应从真实 `报关单`、`出口退税联`、`发票` PDF/附件抽取数据，再与 EXP 合同、装箱明细做匹配。
+
+## 2026-06-02 Round 77（WPS 附件凭证盘点）
+
+### Goal
+- 建立真实凭证抽取队列，区分报关单、出口退税联、发票、提单、采购合同等附件类别。
+- 不解析 PDF 正文、不写库，只先明确哪些文件可能支撑报关/退税/发票链路。
+
+### Delivered
+- 新增 `scripts/inventory_wps_export_attachments.py`。
+- 输出：
+  - `tmp/wps_11_export_list_raw/parsed/attachment_inventory.csv`
+  - `tmp/wps_11_export_list_raw/parsed/attachment_inventory.json`
+  - `tmp/wps_11_export_list_raw/parsed/attachment_inventory_summary.md`
+- 附件总数：`526`
+  - PDF：`281`
+  - DOCX：`170`
+  - XLS/XLSX：`75`
+- 关键分类：
+  - 报关单候选：`7`
+  - 出口退税联/退税用途候选：`4`
+  - 真实销项发票候选：`2`
+  - 进项发票候选：`23`
+  - 提单/电放/HBL 候选：`11`
+  - 采购合同：`342`
+  - `外销出口合同+发票+箱单` 归档包：`42`，已单独分类，不再当作真实发票凭证
+- 当前能归属到高价值凭证的 EXP 合同：`13`。
+
+### Validation
+- `python3 -m py_compile scripts/inventory_wps_export_attachments.py`
+  - 通过
+- `python3 scripts/inventory_wps_export_attachments.py`
+  - 通过，生成附件盘点产物
+
+### Next
+- 对 `customs_declaration`、`export_tax_refund`、`output_invoice` 三类先做 PDF 正文抽取。
+- 多合同共目录的文件仍需二次确认，例如 `2024年/1201 安纳汉姆 吴物流` 同时归到 `EXP2400005;EXP2400006`。
+
+## 2026-06-02 Round 78（WPS 真实凭证正文抽取）
+
+### Goal
+- 从真实报关单、出口退税联、销项发票候选附件中抽取正文与关键字段。
+- 输出数据库映射 dry-run，明确哪些能进入落库复核，哪些仍需 OCR、旧 XLS 支持或人工归属确认。
+
+### Delivered
+- 新增 `scripts/extract_wps_export_evidence.py`。
+- 输出：
+  - `tmp/wps_11_export_list_raw/parsed/evidence_extracts.csv`
+  - `tmp/wps_11_export_list_raw/parsed/evidence_extracts.json`
+  - `tmp/wps_11_export_list_raw/parsed/evidence_items.csv`
+  - `tmp/wps_11_export_list_raw/parsed/evidence_db_mapping.csv`
+  - `tmp/wps_11_export_list_raw/parsed/evidence_extracts_summary.md`
+- 抽取目标文件：`13`
+  - `ok`: `9`
+  - `empty_text`: `4`
+- 抽取退税联商品明细：`25`
+- Readiness：
+  - `ready_for_mapping`: `5`
+  - `needs_review`: `4`
+  - `blocked`: `4`
+- 数据库映射 dry-run：
+  - `create_customs_declaration_draft`: `3`
+  - `needs_customs_declaration_first`: `2`
+  - `blocked`: `8`
+
+### Key Evidence
+- 可进入映射复核的真实报关单：
+  - `EXP2400001` / `530420240040849246`
+  - `EXP2400002` / `531620240161954788`
+  - `EXP2400003` / `531620240163191537`
+- 可进入映射复核但需先创建报关单的退税联：
+  - `EXP2400001` / `530420240040849246` / `19` 条明细 / USD `42684.2`
+  - `EXP2400002` / `531620240161954788` / `6` 条明细 / USD `31315.0`
+
+### Validation
+- `python3 -m py_compile scripts/extract_wps_export_evidence.py`
+  - 通过
+- `python3 scripts/extract_wps_export_evidence.py`
+  - 通过，生成正文抽取与数据库映射 dry-run
+- 本轮未写库，报关/退税/核销表计数保持：
+  - `customs_declarations=4`
+  - `customs_declaration_items=31`
+  - `tax_refunds=2`
+  - `forex_verifications=4`
+
+### Next
+- WPS-IMPORT-11 应先写入 3 个真实报关单草稿，再处理 2 份退税联明细。
+- `output_invoice` 的两个 PDF 目前 `empty_text`，需要 OCR 或人工复核。
+- `EXP2400005;EXP2400006` 共目录报关单仍不能自动裁决合同归属。
+- `.xls` 旧格式当前缺 `xlrd`，已显式 blocked，不猜内容。
+
+## 2026-06-02 Round 79（WPS 真实凭证安全写库）
+
+### Goal
+- 基于 `evidence_db_mapping.csv`，只把真实凭证已经证明且能归属到单一 EXP 合同的数据写入本地数据库。
+- 保持 dry-run、备份、幂等验证和来源 note。
+
+### Delivered
+- 新增 `scripts/import_wps_export_evidence.js`。
+- 写库前备份：
+  - `backend/prisma/backups/dev_2026-06-02_04-16-10.db`
+- 实际写入：
+  - 商品：`158 -> 161`
+  - 报关单：`4 -> 7`
+  - 报关明细：`31 -> 56`
+  - 退税记录：`2 -> 4`
+- 新增真实报关单草稿：
+  - `EXP2400001` / `530420240040849246` / 明细 `19` 条 / USD `42684.2`
+  - `EXP2400002` / `531620240161954788` / 明细 `6` 条 / USD `31315.0`
+  - `EXP2400003` / `531620240163191537` / 仅报关单头，明细仍待补
+- 新增退税草稿：
+  - `TX530420240040849246` / declaredAmount `42684.2`
+  - `TX531620240161954788` / declaredAmount `31315.0`
+- 商品口径处理：
+  - 新增 `支撑柱 / 7308900000`
+  - 新增 `接油盘 / 7323990000`
+  - 新增 `烤盘 / 7323930000`
+  - 补齐 `非金属矿物制品*瓷砖 / 6907219000` 的 HS 编码
+
+### Validation
+- `node --check scripts/import_wps_export_evidence.js`
+  - 通过
+- `node scripts/import_wps_export_evidence.js`
+  - 写库前 dry-run 通过
+- `npm run db:backup`
+  - 通过，生成 `dev_2026-06-02_04-16-10.db`
+- `node scripts/import_wps_export_evidence.js --apply`
+  - 通过
+- 第二次 `node scripts/import_wps_export_evidence.js --apply`
+  - 只补来源 note 尾差
+- 最终 `node scripts/import_wps_export_evidence.js`
+  - 幂等，通过，全部待写入为 `0`，仍有 `8` 个 blocked/skipped
+
+### Remaining
+- `EXP2400005/EXP2400006` 共目录报关单 `222920240004561873` 仍未自动归属。
+- 两个销项发票 PDF 是 `empty_text`，需要 OCR 或人工录入。
+- 两个旧 `.xls` 报关表当前缺 `xlrd`，保持 `unsupported_excel_suffix`。
+
+## 2026-06-02 Round 80（WPS 图片发票 OCR 与剩余 blocked 复核）
+
+### Goal
+- 对 WPS 真实凭证剩余 blocked 项做本机可行的第二轮处理。
+- 在不扩大写库 Interface 的前提下，让图片型销项发票进入可复核状态，并明确旧 `.xls` 与共目录归属还缺什么。
+
+### Delivered
+- `scripts/extract_wps_export_evidence.py` 增加图片 PDF OCR fallback：
+  - 先走 `pypdf` 正文抽取。
+  - 正文为空时读取 PDF 内嵌图片。
+  - 用本机 `tesseract -l eng+snum` 做有限 OCR。
+  - 输出新增 `extraction_method` 字段，区分 `pdf_text`、`ocr_image_eng_snum`、`legacy_xls_unsupported`。
+- 两个图片型 `output_invoice` 已从 `empty_text` 变为 `ok / needs_review`：
+  - `2024年/0530 C店第一柜/4-销项材料/发票.pdf`：OCR 识别到 `EXP2400001` 商业发票上下文，但无正式 20 位发票号，保留复核。
+  - `2024年/0423 集中采购，陶瓷，屏风/归档-发票POR2400003.pdf`：OCR 识别到 `POR2400003` 采购侧发票上下文，未匹配 EXP 销售合同，保留复核。
+- 两个旧 `.xls` 报关文件继续 blocked，原因从泛化的 `unsupported_excel_suffix` 收窄为 `legacy_xls_requires_xlrd_or_conversion`。
+
+### Validation
+- `python3 -m py_compile scripts/extract_wps_export_evidence.py`
+  - 通过
+- `node --check scripts/import_wps_export_evidence.js`
+  - 通过
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/extract_wps_export_evidence.py`
+  - 通过，抽取结果：
+    - `extract_count=13`
+    - `item_count=25`
+    - `ok=11`
+    - `empty_text=2`
+    - `ready_for_mapping=5`
+    - `needs_review=6`
+    - `blocked=2`
+- `node scripts/import_wps_export_evidence.js`
+  - 通过 dry-run：
+    - `productCreates=0`
+    - `productUpdates=0`
+    - `customsCreates=0`
+    - `customsUpdates=0`
+    - `customsItemCreates=0`
+    - `taxRefundCreates=0`
+    - `taxRefundUpdates=0`
+    - `skipped=13`
+- 数据库计数保持：
+  - `products=161`
+  - `stores=19`
+  - `packing_items=393`
+  - `sales_items=366`
+  - `customs_declarations=7`
+  - `customs_declaration_items=56`
+  - `tax_refunds=4`
+  - `forex_verifications=4`
+
+### Remaining
+- OCR 仅有英文/数字语言包，不能证明中文税票号、税号和完整金额；发票 OCR 结果不能直接落库。
+- `EXP2400005/EXP2400006` 共目录下两个旧 `.xls` 需要 LibreOffice/xlrd/人工导出后的受控转换，才能继续抽取。
+- 历史数据正式上线前仍缺人工裁决：`EXP250018` 文件名/内容合同号不一致、4 条装箱歧义、79 条销售门店不明、1 个混合港口门店组合。
+
+## 2026-06-02 Round 81（WPS 共目录报关单归属与写库）
+
+### Goal
+- 处理 `EXP2400005/EXP2400006` 共目录报关单归属，不依赖旧 `.xls` 猜测。
+- 只在报关 PDF 明细与既有合同/箱单候选唯一匹配时写库。
+- 避免重复底单和普通报关单明细造成重复报关或无凭证退税。
+
+### Delivered
+- `scripts/extract_wps_export_evidence.py` 增加：
+  - 报关 PDF 明细解析，支持 `222920240004561873` 这种海关报关单文本格式。
+  - 报关头部日期、件数、毛重、净重 fallback 解析。
+  - 多合同目录的 item-match 归属：用报关明细的商品、数量、单价、总价、毛净重与 `preferred_packing_items.csv` / `preferred_sales_items.csv` 做唯一匹配。
+- `scripts/import_wps_export_evidence.js` 增加：
+  - 同一报关单重复来源去重，避免 `原件 + 底单` 重复创建。
+  - 只有 `export_tax_refund` 明细才生成退税草稿；普通 `customs_declaration` 明细只写报关链路。
+- 实际写库：
+  - 商品 `密胺餐盘` 补 HS：`3924100000`
+  - 新增报关单：`EXP2400005 / 222920240004561873`
+  - 新增报关明细：`密胺餐盘 / 3924100000 / 145.4 千克 / USD 894.3`
+  - 未新增退税草稿
+
+### Validation
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m py_compile scripts/extract_wps_export_evidence.py`
+  - 通过
+- `node --check scripts/import_wps_export_evidence.js`
+  - 通过
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/extract_wps_export_evidence.py`
+  - 通过，抽取结果：
+    - `extract_count=13`
+    - `item_count=27`
+    - `ready_for_mapping=7`
+    - `needs_review=4`
+    - `blocked=2`
+    - `create_customs_declaration_draft=2`，其中一条是重复底单来源
+- `node scripts/import_wps_export_evidence.js`
+  - 写库前 dry-run：`customsCreates=1`、`customsItemCreates=1`、`taxRefundCreates=0`
+- `cd backend && npm run db:backup`
+  - 通过，生成 `backend/prisma/backups/dev_2026-06-02_04-34-28.db`
+- `node scripts/import_wps_export_evidence.js --apply`
+  - 通过，实际写入 1 个报关单和 1 条明细
+- 最终 `node scripts/import_wps_export_evidence.js`
+  - 幂等，通过，全部待写入为 `0`，`skipped=12`
+
+### Current Counts
+- `products=161`
+- `stores=19`
+- `packing_items=393`
+- `sales_items=366`
+- `customs_declarations=8`
+- `customs_declaration_items=57`
+- `tax_refunds=4`
+- `forex_verifications=4`
+
+### Remaining
+- 两个旧 `.xls` 仍未解析，但 `222920240004561873` 的报关事实已由 PDF 覆盖；后续只需确认它们是否还有 PDF 未覆盖的额外合同/发票/箱单信息。
+- `EXP2400006` 仍没有对应独立报关单证据，不应把 `222920240004561873` 分摊或复制给它。
+- 发票 OCR 仍需人工复核后才能决定是否进入发票/退税链路。
+
+## 2026-06-02 Round 82（WPS 采购合同凭证抽取与导入）
+
+### Goal
+- 从 WPS 采购合同附件中补齐供应商/采购合同/采购明细链路。
+- 只导入 DOCX/XLSX 中字段齐全、库里缺失、明细金额有效的采购合同。
+- 不消费只有 PDF 且当前运行时无法抽正文的合同。
+
+### Delivered
+- 新增 `scripts/extract_wps_purchase_evidence.py`：
+  - 消费 `attachment_inventory.csv` 中 `purchase_contract` 附件。
+  - 抽取合同号、供应商、签订日期、总金额、税率、供方税号/地址/银行/账号和明细表。
+  - 输出 `purchase_evidence_extracts.csv`、`purchase_evidence_items.csv`、`purchase_evidence_preferred.csv`、`purchase_evidence_summary.*`。
+  - 对明细数量/单价/总价缺失或为 0 的合同降级为 `needs_review`。
+- 新增 `scripts/import_wps_purchase_evidence.js`：
+  - 默认 dry-run。
+  - 只导入 `ready_for_import` 且当前库里不存在的采购合同。
+  - 幂等创建商品、采购合同、采购明细；只在供应商字段为空时补字段。
+- 实际写库：
+  - 新增商品：`2`
+  - 更新商品单位：`5`
+  - 新增采购合同：`66`
+  - 新增采购明细：`79`
+  - 新增供应商：`0`
+
+### Validation
+- `python3 -m py_compile scripts/extract_wps_purchase_evidence.py`
+  - 通过
+- `python3 scripts/extract_wps_purchase_evidence.py`
+  - 写库后通过：
+    - `extract_count=342`
+    - `preferred_contract_count=173`
+    - `item_count=342`
+    - `ready_missing_contract_count=0`
+    - `already_in_db=163`
+    - `needs_review=14`
+    - `blocked=165`
+- `node --check scripts/import_wps_purchase_evidence.js`
+  - 通过
+- `node scripts/import_wps_purchase_evidence.js`
+  - 写库后幂等 dry-run：
+    - `supplierCreates=0`
+    - `supplierUpdates=0`
+    - `productCreates=0`
+    - `productUpdates=0`
+    - `contractCreates=0`
+    - `purchaseItemCreates=0`
+- `cd backend && npm run db:backup`
+  - 通过，生成 `backend/prisma/backups/dev_2026-06-02_04-50-55.db`
+- `node scripts/import_wps_purchase_evidence.js --apply`
+  - 通过
+
+### Current Counts
+- `suppliers=82`
+- `products=163`
+- `purchase_contracts=157`
+- `purchase_items=186`
+- `sales_contracts=42`
+- `sales_items=366`
+- `packing_items=393`
+- `customs_declarations=8`
+- `customs_declaration_items=57`
+- `tax_refunds=4`
+
+### Remaining
+- 采购合同还剩 `14` 个 `needs_review`：主要是缺签订日期、缺供应商、缺金额/明细，或仅 PDF 且当前 Python 缺 `pypdf`。
+- 采购合同 PDF 读取依赖需要恢复后再重跑，可继续从 `purchase_evidence_summary.json` 的缺口清单推进。
+
+## 2026-06-02 Round 83（WPS 采购合同 needs_review 收口）
+
+### Goal
+- 继续处理 WPS 采购合同剩余缺口中可由源文件内容直接证明的部分。
+- 修正抽取 Interface，而不是为单个合同手写数据。
+- 写库前备份，写库后验证幂等。
+
+### Delivered
+- `scripts/extract_wps_purchase_evidence.py` 增强：
+  - 支持 Excel `Date: 2024-...` 日期格式。
+  - 从 Excel 页尾乙方侧字段抽取供应商名称、税号、地址、银行和账号。
+  - 剔除 `小计`、`合计`、甲乙方页尾、数量金额为 0 的占位行，避免把页尾信息当采购明细。
+  - 修正 `CG2500091` 这类表格中“单位/数量”单元格互换的情况。
+  - 保留含型号数字的商品名，例如 `冷冻肉切片机 NFC-350YD`，不再因包含数字而误跳过。
+- 实际写库：
+  - 新增供应商：`1`
+  - 更新供应商空字段：`2`
+  - 新增商品：`2`
+  - 新增采购合同：`10`
+  - 新增采购明细：`38`
+
+### Validation
+- `python3 -m py_compile scripts/extract_wps_purchase_evidence.py`
+  - 通过
+- `python3 scripts/extract_wps_purchase_evidence.py`
+  - 写库后通过：
+    - `extract_count=342`
+    - `preferred_contract_count=173`
+    - `item_count=276`
+    - `ready_missing_contract_count=0`
+    - `already_in_db=173`
+    - `needs_review=4`
+    - `blocked=165`
+- `node --check scripts/import_wps_purchase_evidence.js`
+  - 通过
+- `node scripts/import_wps_purchase_evidence.js`
+  - 写库后幂等 dry-run：
+    - `supplierCreates=0`
+    - `supplierUpdates=0`
+    - `productCreates=0`
+    - `productUpdates=0`
+    - `contractCreates=0`
+    - `purchaseItemCreates=0`
+- `cd backend && npm run db:backup`
+  - 通过，生成 `backend/prisma/backups/dev_2026-06-02_05-01-40.db`
+- `node scripts/import_wps_purchase_evidence.js --apply`
+  - 通过
+
+### Current Counts
+- `suppliers=83`
+- `products=165`
+- `purchase_contracts=167`
+- `purchase_items=224`
+- `sales_contracts=42`
+- `sales_items=366`
+- `packing_items=393`
+- `customs_declarations=8`
+- `customs_declaration_items=57`
+- `tax_refunds=4`
+
+### Remaining
+- 采购合同唯一合同层面缺口仍有 `6` 个：
+  - `CG2400008`：源 Excel 乙方为空/0，缺供应商名，不能自动补。
+  - `CG2400013`：正文有总额口径，但缺可导入的逐项金额明细，暂不编造明细。
+  - `CG2400027`、`CG2500095`、`CG2600013`：仅 PDF，当前系统 Python 缺 `pypdf`，暂不能抽正文。
+  - `CG2500041`：DOCX 内图片 CRC 损坏，当前 `python-docx` 无法读取。
+
+## 2026-06-02 Round 84（WPS 损坏 DOCX 采购合同 XML fallback）
+
+### Goal
+- 继续消化采购合同剩余 blocked 项。
+- 不安装新依赖、不读取坏图片，只在 DOCX 正文 XML 可读时抽取合同事实。
+
+### Delivered
+- `scripts/extract_wps_purchase_evidence.py` 增加 DOCX XML fallback：
+  - `python-docx` 遇到图片 CRC 损坏时，改读 `word/document.xml`。
+  - 从 XML 中抽取段落和表格，复用既有采购合同字段抽取与导入判断。
+- `CG2500041` 从 `blocked` 变为 `ready_for_import`：
+  - 供应商：`佛山市顺德区盈顺澳电器实业有限公司`
+  - 签订日期：`2025-07-25`
+  - 总金额：`102850.0`
+  - 明细：`餐桌 / 32 套 / 102850.0`
+- 实际写库：
+  - 新增采购合同：`1`
+  - 新增采购明细：`1`
+
+### Validation
+- `python3 -m py_compile scripts/extract_wps_purchase_evidence.py`
+  - 通过
+- `python3 scripts/extract_wps_purchase_evidence.py`
+  - 写库后通过：
+    - `extract_count=342`
+    - `preferred_contract_count=173`
+    - `item_count=277`
+    - `ready_missing_contract_count=0`
+    - `already_in_db=174`
+    - `needs_review=4`
+    - `blocked=164`
+- `node --check scripts/import_wps_purchase_evidence.js`
+  - 通过
+- `node scripts/import_wps_purchase_evidence.js`
+  - 写库后幂等 dry-run：新增/更新全为 `0`
+- `cd backend && npm run db:backup`
+  - 通过，生成 `backend/prisma/backups/dev_2026-06-02_05-06-43.db`
+- `node scripts/import_wps_purchase_evidence.js --apply`
+  - 通过
+
+### Current Counts
+- `suppliers=83`
+- `products=165`
+- `purchase_contracts=168`
+- `purchase_items=225`
+- `sales_contracts=42`
+- `sales_items=366`
+- `packing_items=393`
+- `customs_declarations=8`
+- `customs_declaration_items=57`
+- `tax_refunds=4`
+
+### Remaining
+- 采购合同唯一合同层面缺口仍有 `7` 个：
+  - `CG2400008`：源 Excel 乙方为空/0，缺供应商名。
+  - `CG2400013`：缺可导入逐项明细。
+  - `CG2400019`、`CG2400027`、`CG2500013`、`CG2500095`、`CG2600013`：PDF-only，当前环境无 `pdftotext`/`mutool`，系统 Python 也无 `pypdf`/`PyPDF2`。
+
+## 2026-06-02 Round 85（WPS DOCX 异常条目采购合同收口）
+
+### Goal
+- 回应采购合同缺口盘点，继续处理 PDF-only 清单中其实存在同名 DOCX 的可证明合同。
+- 不使用 OCR 猜乙方；优先读取 DOCX 正文 XML，只有字段齐全才写库。
+
+### Delivered
+- `scripts/extract_wps_purchase_evidence.py` 增强：
+  - `python-docx` 遇到非 `BadZipFile` 的异常条目错误时，也尝试读取 `word/document.xml`。
+  - 金额解析支持中文逗号 `，`，避免 `3，600` 被解析为 `3`。
+- `CG2500095` 从缺口清单中收口：
+  - 供应商：`上海雅称广告装潢设计有限公司`
+  - 签订日期：`2025-10-25`
+  - 总金额：`104068.0`
+  - 明细：`酒架 / 1 套 / 100000.0`，`餐边柜 / 2 套 / 4068.0`
+- 实际写库：
+  - 更新供应商空字段：`1`
+  - 新增采购合同：`1`
+  - 新增采购明细：`2`
+
+### Validation
+- `python3 -m py_compile scripts/extract_wps_purchase_evidence.py`
+  - 通过
+- `python3 scripts/extract_wps_purchase_evidence.py`
+  - 写库后通过：
+    - `extract_count=342`
+    - `preferred_contract_count=173`
+    - `item_count=279`
+    - `ready_missing_contract_count=0`
+    - `already_in_db=175`
+    - `needs_review=4`
+    - `blocked=163`
+- `node scripts/import_wps_purchase_evidence.js`
+  - 写库后幂等 dry-run：
+    - `supplierCreates=0`
+    - `supplierUpdates=0`
+    - `productCreates=0`
+    - `productUpdates=0`
+    - `contractCreates=0`
+    - `purchaseItemCreates=0`
+    - `skipped=173`
+- `cd backend && npm run db:backup`
+  - 通过，生成 `backend/prisma/backups/dev_2026-06-02_14-00-26.db`
+- `node scripts/import_wps_purchase_evidence.js --apply`
+  - 通过
+
+### Current Counts
+- `suppliers=83`
+- `products=165`
+- `purchase_contracts=169`
+- `purchase_items=227`
+- `sales_contracts=42`
+- `sales_items=366`
+- `packing_items=393`
+- `customs_declarations=8`
+- `customs_declaration_items=57`
+- `tax_refunds=4`
+
+### Remaining
+- 当前缺失采购合同数收敛为 `4`：
+  - `CG2400008`：Excel 有 16 条明细和总额 `215466.14`，但乙方/供应商为空，出货汇总也没有正式乙方名称。
+  - `CG2400013`：DOCX 有乙方 `佛山市顺德区盈顺澳电器实业有限公司` 和日期，但缺可导入逐项金额明细。
+  - `CG2400027`：PDF 仍无法抽正文；同名 DOCX 内合同号实际为 `CG2500008`，不能按文件名强改。
+  - `CG2600013`：PDF 仍无法抽正文；同名 DOCX 内合同号实际为 `CG2600014`，不能按文件名强改。
+- `CG2400019` 与 `CG2500013` 的 PDF 仍无法抽正文，但对应合同号已在数据库中存在，不再列为缺失采购合同。
+
+## 2026-06-02 Round 86（WPS 出口明细尾差补齐与剩余异常复核）
+
+### Goal
+- 复跑完整 WPS 出口源 merge，检查前序新增商品后是否产生新的装箱/销售尾差。
+- 对剩余旧 `.xls` 与采购 PDF 做现有工具可行性复核，继续坚持不猜数据。
+
+### Delivered
+- 写库前备份：
+  - `backend/prisma/backups/dev_2026-06-02_14-10-18.db`
+- 实际写库：
+  - 更新商品空字段：`3`
+    - `支撑柱` 补规格
+    - `烤盘` 补规格/申报要素
+    - `接油盘` 补规格
+  - 新增装箱明细：`7`
+  - 新增销售明细：`4`
+- 数据来源均来自 WPS 出口合同/出货清单 Excel 行：
+  - `EXP2400001`、`EXP2400002`、`EXP2500003`、`EXP250012`、`EXP250014`、`EXP250025`
+- 对剩余采购 PDF 做中文 OCR 复核：
+  - `CG2400027` 可读出合同号和日期，但乙方为空、产品清单不可用，不能入库。
+  - `CG2600013` 首页分辨率过低，OCR 不可用，不能入库。
+- 对两个旧 `.xls` 做工具复核：
+  - 当前无 `xlrd`、LibreOffice、`ssconvert`。
+  - 同目录 `222920240004561873` 报关 PDF 已覆盖并写入 `EXP2400005` 的报关事实。
+  - 旧 `.xls` 是否还有 PDF 未覆盖的额外发票/箱单信息，仍需转换后复核。
+
+### Validation
+- `node scripts/import_wps_export_sources.js --apply --merge-packing --merge-sales --update-contract-aggregates`
+  - 通过
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates`
+  - 写库后幂等 dry-run：
+    - `productUpdates=0`
+    - `packingMergeCreates=0`
+    - `salesMergeCreates=0`
+    - `packingMergeUnmatched=4`
+    - `skipped=79`
+    - `warnings=1`
+- 写库后计数：
+  - `products=165`
+  - `sales_items=370`
+  - `packing_items=400`
+  - `customs_declarations=8`
+  - `customs_declaration_items=57`
+  - `tax_refunds=4`
+
+### Remaining
+- 出口源明细可自动 merge 的部分已清零。
+- 剩余仍需业务裁决或额外可读源：
+  - `EXP250018` 文件名/内容合同号不一致。
+  - `4` 条装箱旧行匹配歧义。
+  - `79` 条销售行缺门店证据。
+  - `1` 个混合港口门店组合。
+  - 两个旧 `.xls` 需转换后确认是否有 PDF 未覆盖信息。
+  - 两份 OCR 发票仍缺正式发票号/税号等可落库字段。
+  - 采购合同 `CG2400008`、`CG2400013`、`CG2400027`、`CG2600013` 仍缺可导入证据。
+
+## 2026-06-02 Round 87（WPS 中文 OCR 复核与待裁决备忘录）
+
+### Goal
+- 继续推进能自动处理的 OCR 复核。
+- 将不能自动裁决的事项汇总成业务备忘录，后续由用户集中处理。
+
+### Delivered
+- `scripts/extract_wps_export_evidence.py` 增强：
+  - `pypdf` 改为可选依赖；系统 Python 缺 PDF 依赖时不再导致整脚本崩溃。
+  - 图片型 PDF OCR 会检测本机语言包；可用时优先 `chi_sim+eng+snum`。
+- 重跑真实凭证抽取：
+  - `extract_count=13`
+  - `item_count=27`
+  - `ready_for_mapping=7`
+  - `needs_review=4`
+  - `blocked=2`
+- 中文 OCR 改善了两份商业发票预览，但仍缺正式 20 位发票号，不能写库。
+- 新增业务裁决备忘录：
+  - `docs/wps-import-decision-memo.md`
+
+### Validation
+- `python3 -m py_compile scripts/extract_wps_export_evidence.py`
+  - 通过
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/extract_wps_export_evidence.py`
+  - 通过
+- `node scripts/import_wps_export_evidence.js`
+  - dry-run 通过，待写入 `0`
+- `node scripts/import_wps_purchase_evidence.js`
+  - dry-run 通过，待写入 `0`
+
+### Remaining
+- 自动可写库项目前已清零。
+- 需要业务裁决的事项集中记录在 `docs/wps-import-decision-memo.md`。
+
+## 2026-06-02 Round 88（WPS 待裁决包自动生成）
+
+### Goal
+- 将不能自动决断的事项从手写备忘录升级为可复跑数据产物。
+- 让用户后续可以按 CSV/Markdown 明细逐条裁决，而不是依赖对话上下文。
+
+### Delivered
+- 新增脚本：
+  - `scripts/build_wps_import_decision_packet.py`
+- 生成产物：
+  - `tmp/wps_11_export_list_raw/parsed/wps_import_decision_packet.csv`
+  - `tmp/wps_11_export_list_raw/parsed/wps_import_decision_packet.json`
+  - `tmp/wps_11_export_list_raw/parsed/wps_import_decision_packet.md`
+- 更新备忘录：
+  - `docs/wps-import-decision-memo.md`
+
+### Current Decision Packet
+- 待裁决总数：`95`
+- 分类：
+  - `source_contract_mismatch=1`
+  - `packing_ambiguous_match=4`
+  - `sales_missing_store=79`
+  - `store_port_mapping=1`
+  - `purchase_contract_gap=4`
+  - `evidence_output_invoice_blocked=2`
+  - `evidence_export_tax_refund_blocked=2`
+  - `evidence_customs_declaration_blocked=2`
+
+### Validation
+- `python3 -m py_compile scripts/build_wps_import_decision_packet.py`
+  - 通过
+- `python3 scripts/build_wps_import_decision_packet.py`
+  - 通过，生成 `95` 条明细
+
+### Remaining
+- 自动可写库项仍为 `0`。
+- 后续用户裁决后，可用裁决包行号/来源反向定位并补导入。
+
+## 2026-06-02 Round 89（WPS 源路径门店推断销售尾差收口）
+
+### Goal
+- 继续推进用户要求的“能自动处理的先处理”，把缺门店销售行中能从源文件路径唯一判断的部分收口。
+- 保持门店推断 Interface 保守：只接受现有门店名在源路径中唯一命中，不新建门店、不用默认门店。
+
+### Delivered
+- `scripts/import_wps_export_sources.js` 增加 `--infer-sales-store-from-source-path`：
+  - 销售行先沿用装箱行/合同层门店推断。
+  - 仍缺门店时，才从 `source_file#sheet:row` 中匹配现有门店名。
+  - 若短门店名被更长门店名包含，仅保留更长命中，避免 `圣荷西` 与 `圣荷西2115` 同时命中造成误判。
+  - 推断写入的销售明细 note 带 `[WPS_SOURCE_PATH_STORE] <门店名>`。
+- 写库前备份：
+  - `backend/prisma/backups/dev_2026-06-02_14-24-25.db`
+- 实际写库：
+  - 销售明细更新：`18`
+  - 销售明细新增：`38`
+  - 路径门店推断：`56`
+  - 销售明细总数：`370 -> 408`
+- 重新生成待裁决包：
+  - 总数：`95 -> 39`
+  - `sales_missing_store`: `79 -> 23`
+
+### Validation
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path`
+  - 写库前 dry-run 通过：`salesStorePathInferences=56`，`salesMergeUpdates=18`，`salesMergeCreates=38`。
+- `cd backend && npm run db:backup`
+  - 通过，生成 `backend/prisma/backups/dev_2026-06-02_14-24-25.db`。
+- `node scripts/import_wps_export_sources.js --apply --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path`
+  - 通过，实际写入上述销售行。
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path`
+  - 写库后幂等 dry-run：`salesMergeUpdates=0`，`salesMergeCreates=0`，`packingMergeCreates=0`。
+- `python3 scripts/build_wps_import_decision_packet.py`
+  - 通过，生成 `39` 条待裁决明细。
+
+### Remaining
+- 仍需业务裁决的事项已集中在 `docs/wps-import-decision-memo.md` 和 `tmp/wps_11_export_list_raw/parsed/wps_import_decision_packet.*`：
+  - `EXP250018` 文件名/内容合同号不一致。
+  - `4` 条装箱旧行匹配歧义。
+  - `23` 条销售行仍缺门店证据，主要是 `C店第一柜/第二柜` 这类路径没有匹配到现有系统门店。
+  - `1` 个混合港口门店组合。
+  - `4` 个采购合同缺口。
+  - `6` 个报关/退税/发票凭证 blocked 项。
+
+## 2026-06-02 Round 90（12-报关单独立 PDF 纳入真实凭证链路）
+
+### Goal
+- 继续查找 WPS/本机资料中未纳入的历史出货凭证。
+- 将 `/Users/helena/Documents/捷淞/12-报关单` 的独立报关 PDF 保留到项目临时归档，并通过既有真实凭证导入 Interface 写入数据库。
+
+### Delivered
+- 新增保留源目录：
+  - `tmp/wps_12_customs_forms_raw/12-报关单`
+- `scripts/extract_wps_export_evidence.py` 增强：
+  - 除 `11-报关记录` 附件清单外，同时读取 `12-报关单` 下的独立 PDF。
+  - 从文件名提取 EXP 合同号，仅作为独立报关单文件夹的合同归属线索。
+  - 输出继续复用 `evidence_extracts.*`、`evidence_items.csv`、`evidence_db_mapping.csv`。
+- 写库前备份：
+  - `backend/prisma/backups/dev_2026-06-02_14-34-44.db`
+- 实际写库：
+  - 新增报关单头：`23`
+  - 报关单总数：`8 -> 31`
+  - `EXP250013` 的两份同号 PDF 去重，只写入 `530420250041342302` 一次。
+
+### Validation
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/extract_wps_export_evidence.py`
+  - 通过：`extract_count=37`，`ready_for_mapping=31`，写库前 `create_customs_declaration_draft=24`。
+- `node scripts/import_wps_export_evidence.js`
+  - 写库前 dry-run：`customsCreates=23`，`customsItemCreates=0`。
+- `cd backend && npm run db:backup`
+  - 通过，生成 `backend/prisma/backups/dev_2026-06-02_14-34-44.db`。
+- `node scripts/import_wps_export_evidence.js --apply`
+  - 通过，实际写入 `23` 个报关单头。
+- 写库后复跑：
+  - 抽取映射变为 `update_existing_customs_declaration=29`、`update_existing_tax_refund=2`、`blocked=6`。
+  - 导入 dry-run 为 `customsCreates=0`、`customsItemCreates=0`、`taxRefundCreates=0`。
+
+### Remaining
+- 这批 `12-报关单` PDF 多数只提供报关单号/合同号/部分头部信息，未抽出可证明的商品明细；因此本轮只写报关单头，不补报关明细金额。
+- 剩余人工裁决包仍为 `39` 条；新增独立报关 PDF 没有增加新的待裁决项。
+
+## 2026-06-03 Round 91（扫描 PDF 采购合同复核导入）
+
+### Goal
+- 继续推进“能自动处理的先处理”，把此前只因扫描 PDF 无正文而挂起的采购合同逐页复核。
+- 保持采购抽取 Interface 不变：可导入项仍必须经过 `purchase_evidence_preferred.csv`、dry-run、备份、写库、幂等复跑。
+
+### Delivered
+- `scripts/extract_wps_purchase_evidence.py` 增加路径级 `pdf_ocr_curated` 兜底，只覆盖已人工复核图片页的 4 个扫描 PDF：
+  - `CG2400027`
+  - `CG2600024`
+  - `CG2600030`
+  - `CG2600031`
+- 写库前备份：
+  - `backend/prisma/backups/dev_2026-06-02_16-34-47.db`
+- 实际写库：
+  - 新增采购合同：`4`
+  - 新增采购明细：`18`
+  - 新增供应商：`3`
+  - 新增商品/费用行：`17`
+
+### Validation
+- `python3 -m py_compile scripts/extract_wps_purchase_evidence.py`
+  - 通过
+- `python3 scripts/extract_wps_purchase_evidence.py`
+  - 写库前 `ready_missing_contract_count=4`
+  - 写库后 `ready_missing_contract_count=0`
+- `node scripts/import_wps_purchase_evidence.js`
+  - 写库前 dry-run：`contractCreates=4`、`purchaseItemCreates=18`
+  - 写库后 dry-run：全部待写入为 `0`
+- `python3 scripts/build_wps_import_decision_packet.py`
+  - 待裁决总数：`49 -> 45`
+  - `purchase_contract_gap`: `6 -> 2`
+
+### Remaining
+- 采购合同剩余人工裁决项只剩：
+  - `CG2400008`：有明细和总额，但缺正式乙方。
+  - `CG2400013`：有乙方和日期，但缺逐项明细与总额。
+
+## 2026-06-03 Round 92（合同聚合门店推断销售缺口收口）
+
+### Goal
+- 继续处理剩余待裁决包里“销售行缺门店”的可自动部分。
+- 不新建门店、不使用默认门店，只在合同聚合中唯一匹配到现有门店时才补销售行。
+
+### Delivered
+- `scripts/import_wps_export_sources.js` 增加合同聚合门店推断：
+  - 装箱行门店仍优先。
+  - 其次使用 `contracts.csv` 里聚合出的唯一现有门店。
+  - 最后才使用源文件路径唯一现有门店匹配。
+  - 多门店/混合港口仍跳过。
+- 写库前备份：
+  - `backend/prisma/backups/dev_2026-06-02_16-46-40.db`
+- 实际写库：
+  - 新增销售明细：`23`
+  - 更新销售明细：`7`
+  - 新建门店：`0`
+
+### Validation
+- `node --check scripts/import_wps_export_sources.js`
+  - 通过
+- `node scripts/import_wps_export_sources.js --apply --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts`
+  - 通过，`salesMergeCreates=23`、`salesMergeUpdates=7`、`salesStoreContractInferences=30`
+- 写库后复跑同一 dry-run：
+  - `salesMergeCreates=0`
+  - `salesMergeUpdates=0`
+  - `skipped=0`
+- `python3 scripts/build_wps_import_decision_packet.py`
+  - 待裁决总数：`45 -> 22`
+  - `sales_missing_store`: `23 -> 0`
+- `node scripts/import_wps_purchase_evidence.js`
+  - 采购待写入为 `0`
+- `node scripts/import_wps_export_evidence.js`
+  - 报关/退税真实凭证待写入为 `0`
+
+### Remaining
+- 仍需人工裁决 `22` 条：
+  - `EXP250018` 文件名/内容合同号不一致。
+  - `12` 条装箱旧行匹配歧义。
+  - `1` 个混合港口/多门店组合。
+  - `2` 个采购合同缺口。
+  - `6` 个发票/退税/旧 `.xls` 凭证 blocked 项。
+
+## 2026-06-03 Round 93（退税用途确认表唯一报关单映射）
+
+### Goal
+- 继续清理真实凭证 blocked 项。
+- 对缺报关单号但能通过合同唯一现有报关单证明归属的退税用途确认发票明细，保留凭证来源并创建/补充退税草稿。
+
+### Delivered
+- `scripts/extract_wps_export_evidence.py` 增加唯一现有报关单推断：
+  - 只作用于 `export_tax_refund`。
+  - 合同在数据库中有且只有一个报关单时，补入该报关单号。
+  - 推断来源写入 `contract_inference=unique_contract_customs:*`。
+- `scripts/import_wps_export_evidence.js` 增加退税映射动作处理：
+  - 支持 `create_tax_refund_draft`。
+  - 支持 `update_existing_tax_refund`。
+  - 同一报关单多份退税用途明细去重，避免重复草稿。
+- 写库前备份：
+  - `backend/prisma/backups/dev_2026-06-02_17-00-12.db`
+- 实际写库：
+  - 新增退税草稿：`1`
+  - 合同：`EXP2500001`
+  - 报关单：`531620250160484436`
+  - `declaredAmount=0`，不编造退税金额，仅保留来源 note。
+
+### Validation
+- `python3 -m py_compile scripts/extract_wps_export_evidence.py`
+  - 通过
+- `node --check scripts/import_wps_export_evidence.js`
+  - 通过
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/extract_wps_export_evidence.py`
+  - 通过，写库前出现 `create_tax_refund_draft=2`、`update_existing_tax_refund=3`
+  - 写库后变为 `update_existing_tax_refund=5`
+- `node scripts/import_wps_export_evidence.js --apply`
+  - 通过，新增退税草稿 `1`
+- 写库后 dry-run：
+  - 真实凭证导入待写入 `0`
+  - 出口源 merge 待写入 `0`
+  - 采购合同导入待写入 `0`
+- `python3 scripts/build_wps_import_decision_packet.py`
+  - 待裁决总数：`22 -> 20`
+  - `evidence_export_tax_refund_blocked`: `2 -> 0`
+
+### Remaining
+- 仍需人工裁决 `20` 条：
+  - `EXP250018` 文件名/内容合同号不一致。
+  - `12` 条装箱旧行匹配歧义。
+  - `1` 个混合港口/多门店组合。
+  - `2` 个采购合同缺口。
+  - `2` 个销项发票 OCR blocked 项。
+  - `2` 个旧 `.xls` 报关底稿 blocked 项。
+
+## 2026-06-03 Round 96（WPS 云端缺口复核与装箱重复行去重）
+
+### Goal
+- 继续处理无需业务判断即可收口的 WPS 历史出货尾差。
+- 复核仍仅云端可见的 `出货汇总.xlsx` 是否已被 WPS 客户端缓存。
+- 清理由重复 WPS 汇总来源造成、且可证明无报关引用的装箱重复旧行。
+
+### Delivered
+- 复核 WPS 客户端当前打开的 `出货汇总`：
+  - 本机缓存大小 `67152`、SHA1 `92f422118e855cdcc600dea505eb961fd1689773`。
+  - 与项目已保留的 `_wps_cloud_root/出货汇总.xlsx` 一致。
+  - 不等于仍缺的 `11-报关记录/出货汇总.xlsx`（元数据大小 `39820`、SHA1 `e5044cdf4d9b307a0f427b18bf344539728447d4`），所以不覆盖云端缺口。
+- 新增 `scripts/dedupe_wps_packing_duplicates.js`：
+  - 只读取当前 `import_plan.json` 中同分装箱候选。
+  - 仅删除无 `customsDeclarationItem` 引用的重复行。
+  - 要求保留行字段兼容、来源 note 覆盖删除行来源、来源覆盖更完整。
+- 写库前备份：
+  - `backend/prisma/backups/dev_2026-06-02_17-36-41.db`
+  - `backend/prisma/backups/dev_2026-06-02_17-40-18.db`
+- 实际写库：
+  - 删除可证明重复装箱行：`29`
+  - 装箱行总数：`469 -> 440`
+
+### Validation
+- `node --check scripts/import_wps_export_sources.js scripts/dedupe_wps_packing_duplicates.js`
+  - 通过
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts`
+  - dry-run 通过，`packingMergeCreates=0`、`packingMergeUpdates=0`、`packingMergeUnmatched=5`
+- `node scripts/dedupe_wps_packing_duplicates.js`
+  - dry-run 通过，`deleteCount=0`
+- `node scripts/import_wps_export_evidence.js`
+  - dry-run 通过，新增/更新均为 `0`
+- `node scripts/import_wps_purchase_evidence.js`
+  - dry-run 通过，新增/更新均为 `0`
+- `python3 scripts/build_wps_import_decision_packet.py`
+  - 待裁决总数：`20 -> 13`
+  - `packing_ambiguous_match`: `12 -> 5`
+
+### Remaining
+- 仍需人工裁决 `13` 条：
+  - `EXP250018` 文件名/内容合同号不一致。
+  - `5` 条装箱旧行匹配歧义。
+  - `1` 个混合港口/多门店组合。
+  - `2` 个采购合同缺口。
+  - `2` 个销项发票 OCR blocked 项。
+  - `2` 个旧 `.xls` 报关底稿 blocked 项。
+
+## 2026-06-03 Round 97（CG2400013 采购合同头留存）
+
+### Goal
+- 继续处理无需业务判断即可保留的采购合同证据。
+- 对正文能证明合同号、乙方、日期、总额但缺逐项明细的采购合同，只创建合同头，不编造采购明细。
+
+### Delivered
+- `scripts/extract_wps_purchase_evidence.py` 增加：
+  - `总金额为：xxx元` 识别。
+  - `13%增值税` 税率识别。
+  - `header_ready_for_import` 状态：仅当合同号、乙方、日期、总额齐全，且唯一缺口是逐项明细时触发。
+- `scripts/import_wps_purchase_evidence.js` 增加显式参数：
+  - `--allow-header-only-contracts`
+  - 仅创建 DRAFT 采购合同头，不创建采购明细。
+- 写库前备份：
+  - `backend/prisma/backups/dev_2026-06-02_17-52-53.db`
+- 实际写库：
+  - 新增采购合同头：`CG2400013`
+  - 乙方：`佛山市顺德区盈顺澳电器实业有限公司`
+  - 签订日期：`2024-09-28`
+  - 合同总额：`172370`
+  - 新增采购明细：`0`
+
+### Validation
+- `python3 -m py_compile scripts/extract_wps_purchase_evidence.py scripts/build_wps_import_decision_packet.py`
+  - 通过
+- `node --check scripts/import_wps_purchase_evidence.js`
+  - 通过
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/extract_wps_purchase_evidence.py`
+  - 写库前：`header_ready_missing_contract_count=1`
+  - 写库后：`header_ready_missing_contract_count=0`
+- `node scripts/import_wps_purchase_evidence.js --allow-header-only-contracts --apply`
+  - 通过，`contractCreates=1`、`headerOnlyContractCreates=1`、`purchaseItemCreates=0`
+- 写库后 dry-run：
+  - 采购导入新增/更新 `0`
+  - 出口源 merge 新增/更新 `0`
+  - 真实凭证新增/更新 `0`
+  - 装箱去重 `deleteCount=0`
+- `python3 scripts/build_wps_import_decision_packet.py`
+  - 待裁决总数：`13 -> 12`
+  - `purchase_contract_gap`: `2 -> 1`
+
+### Remaining
+- 仍需人工裁决 `12` 条：
+  - `EXP250018` 文件名/内容合同号不一致。
+  - `5` 条装箱旧行匹配歧义。
+  - `1` 个混合港口/多门店组合。
+  - `1` 个采购合同乙方缺口：`CG2400008`。
+  - `2` 个销项发票 OCR blocked 项。
+  - `2` 个旧 `.xls` 报关底稿 blocked 项。
+
+## 2026-06-03 Round 98（EXP250019 错配源按正文归集与销售售价校正）
+
+### Goal
+- 继续消除不需要业务裁决的文件名/正文合同号错配。
+- 让已记录 WPS 来源的销售行售价回到源文件内容，避免数据库与文件正文不一致。
+
+### Delivered
+- 复核 `EXP250018 925圣荷西.xlsx`：
+  - 文件名合同号为 `EXP250018`。
+  - 合同页明确 `NO.: EXP250019`。
+  - 装货页合同号列均为 `EXP250019`。
+  - 结论：按工作簿正文归入 `EXP250019`。
+- `scripts/import_wps_export_sources.js` 调整：
+  - 文件名/正文错配仍默认保护。
+  - 但解析器已判定 `按工作簿内容中的合同号归集` 的来源不再排除。
+  - 销售 merge 增加精确来源匹配；同一 WPS 来源已记录时，可用该来源修正自身售价。
+- `scripts/build_wps_import_decision_packet.py` 调整：
+  - 已按正文自动归集的错配不再进入业务裁决包。
+- 写库前备份：
+  - `backend/prisma/backups/dev_2026-06-02_18-01-51.db`
+  - `backend/prisma/backups/dev_2026-06-02_18-05-03.db`
+- 实际写库：
+  - `EXP250019` 合同汇总更新：`1`
+  - 装箱更新：`2`
+  - 装箱新增：`1`
+  - 销售新增：`9`
+  - 销售售价修正：`40`
+
+### Validation
+- `node --check scripts/import_wps_export_sources.js`
+  - 通过
+- `python3 -m py_compile scripts/build_wps_import_decision_packet.py`
+  - 通过
+- 写库后 dry-run：
+  - 出口源商品/合同/装箱/销售新增更新均为 `0`
+  - `salesMergeUnmatched=0`
+  - 采购导入新增/更新 `0`
+  - 真实凭证新增/更新 `0`
+  - 装箱去重 `deleteCount=0`
+- `python3 scripts/build_wps_import_decision_packet.py`
+  - 待裁决总数：`12 -> 11`
+  - `source_contract_mismatch`: `1 -> 0`
+
+### Remaining
+- 仍需人工裁决 `11` 条：
+  - `5` 条装箱旧行匹配歧义。
+  - `1` 个混合港口/多门店组合。
+  - `1` 个采购合同乙方缺口：`CG2400008`。
+  - `2` 个销项发票 OCR blocked 项。
+  - `2` 个旧 `.xls` 报关底稿 blocked 项。
+
+## 2026-06-03 Round 99（EXP2400001 完全重复装箱行收口）
+
+### Goal
+- 继续清理剩余装箱歧义中可由数据库字段证明的重复行。
+- 只删除业务字段完全一致、无报关引用、无来源差异的重复装箱行。
+
+### Delivered
+- 扩展 `scripts/dedupe_wps_packing_duplicates.js`：
+  - 原有来源覆盖规则保留。
+  - 新增 `exact_duplicate_no_refs`：候选业务字段完全一致且两边无报关明细引用时，可删除一条重复行。
+- `EXP2400001` 源行 `出货清单:12` 的两个候选均为同一合同、同一商品、同一门店、同一数量/箱数/毛重/净重/体积，均无报关引用。
+- 写库前备份：
+  - `backend/prisma/backups/dev_2026-06-02_18-11-17.db`
+  - `backend/prisma/backups/dev_2026-06-02_18-13-19.db`
+- 实际写库：
+  - 删除完全重复装箱行：`1`
+  - 给保留行补充规格和 WPS 来源 note：`1`
+
+### Validation
+- `node --check scripts/dedupe_wps_packing_duplicates.js`
+  - 通过
+- `node scripts/dedupe_wps_packing_duplicates.js`
+  - 写库后 `deleteCount=0`
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts`
+  - 出口源新增/更新 `0`
+  - `packingMergeUnmatched=4`
+  - `salesMergeUnmatched=0`
+- `node scripts/import_wps_purchase_evidence.js --allow-header-only-contracts`
+  - 新增/更新 `0`
+- `node scripts/import_wps_export_evidence.js`
+  - 新增/更新 `0`
+- `python3 scripts/build_wps_import_decision_packet.py`
+  - 待裁决总数：`11 -> 10`
+  - `packing_ambiguous_match`: `5 -> 4`
+
+### Remaining
+- 仍需人工裁决 `10` 条：
+  - `4` 条装箱旧行匹配歧义。
+  - `1` 个混合港口/多门店组合。
+  - `1` 个采购合同乙方缺口：`CG2400008`。
+  - `2` 个销项发票 OCR blocked 项。
+  - `2` 个旧 `.xls` 报关底稿 blocked 项。
+
+## 2026-06-03 Round 100（CG2400008 签章 PDF 乙方复核与采购补导入）
+
+### Goal
+- 继续推进剩余采购缺口，确认 `CG2400008` 是否能从同目录签章 PDF 中证明正式乙方。
+- 保持采购导入 Interface 保守：PDF 只证明乙方名称，XLSX 只提供明细；不把 Excel 尾部误抽到的甲方税号/银行写入乙方供应商。
+
+### Delivered
+- 将 `归档-购销合同 CG2400008 阿宗订单.pdf` 渲染为高分辨率图片后用中文 OCR 和图像复核，确认乙方为 `云浮市锦德石业有限公司`。
+- `scripts/extract_wps_purchase_evidence.py` 增加已复核 PDF 证据：
+  - PDF 提供 `CG2400008` 的乙方、日期、总额、税率。
+  - 同合同号 XLSX 仍作为 16 条采购明细来源。
+  - 从签章 PDF 回填乙方时，清空 XLSX 误抽到的税号/地址/银行字段，避免把甲方资料写到供应商。
+- 写库前备份：
+  - `backend/prisma/backups/dev_2026-06-02_18-25-45.db`
+- 实际写库：
+  - 新增采购合同：`CG2400008`
+  - 乙方：`云浮市锦德石业有限公司`
+  - 签订日期：`2024-05-14`
+  - 合同总额：`215466.14`
+  - 新增采购明细：`16`
+  - 新增商品：`7`
+  - 新增/更新供应商：`0`
+
+### Validation
+- `python3 -m py_compile scripts/extract_wps_purchase_evidence.py scripts/build_wps_import_decision_packet.py scripts/analyze_wps_export_sources.py scripts/extract_wps_export_evidence.py scripts/inventory_wps_cloud_metadata.py`
+  - 通过
+- `node --check scripts/import_wps_purchase_evidence.js`
+  - 通过
+- 写库后 dry-run：
+  - 采购导入新增/更新 `0`
+  - 出口源新增/更新 `0`
+  - 真实凭证新增/更新 `0`
+  - 装箱去重 `deleteCount=0`
+- `python3 scripts/build_wps_import_decision_packet.py`
+  - 待裁决总数：`10 -> 9`
+  - `purchase_contract_gap`: `1 -> 0`
+
+### Remaining
+- 仍需人工裁决 `9` 条：
+  - `4` 条装箱旧行匹配歧义。
+  - `1` 个混合港口/多门店组合。
+  - `2` 个销项发票 OCR blocked 项。
+  - `2` 个旧 `.xls` 报关底稿 blocked 项。
+
+## 2026-06-03 Round 101（商业发票 reference-only 收口）
+
+### Goal
+- 复核剩余两份 `output_invoice` blocked 文件是否真是正式税票缺字段，还是商业发票参考件。
+- 不把商业发票编号、合同号或 POR/EXP 编号写入税票/退税链路。
+
+### Delivered
+- 将两份发票 PDF 渲染为高分辨率图片后复核标题和编号区域：
+  - `2024年/0423 集中采购，陶瓷，屏风/归档-发票POR2400003.pdf`
+  - `2024年/0530 C店第一柜/4-销项材料/发票.pdf`
+- 两份页面标题均为 `COMMERCIAL INVOICE`：
+  - `POR2400003` 是商业发票编号。
+  - `EXP2400001` 是商业发票/合同号。
+- `scripts/extract_wps_export_evidence.py` 已新增商业发票识别：
+  - `COMMERCIAL INVOICE` 标记为 `reference_only`。
+  - 数据库映射动作为 `commercial_invoice_reference_only`。
+  - 不再进入 `blocked`，也不再要求补正式 20 位税票号。
+- 本轮没有写数据库。
+
+### Validation
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m py_compile scripts/extract_wps_export_evidence.py`
+  - 通过
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/extract_wps_export_evidence.py`
+  - `reference_only=2`
+  - `commercial_invoice_reference_only=2`
+  - `blocked=2`
+- `node scripts/import_wps_export_evidence.js`
+  - 报关/退税/商品新增更新均为 `0`
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts`
+  - 出口源新增更新均为 `0`
+- `node scripts/import_wps_purchase_evidence.js --allow-header-only-contracts`
+  - 采购新增更新均为 `0`
+- `node scripts/dedupe_wps_packing_duplicates.js`
+  - `deleteCount=0`
+- `python3 scripts/build_wps_import_decision_packet.py`
+  - 待裁决总数：`9 -> 7`
+  - `evidence_output_invoice_blocked`: `2 -> 0`
+
+### Remaining
+- 仍需人工裁决 `7` 条：
+  - `4` 条装箱旧行匹配歧义。
+  - `1` 个混合港口/多门店组合。
+  - `2` 个旧 `.xls` 报关底稿 blocked 项。
+
+## 2026-06-03 Round 102（旧 XLS 报关底稿副本收口）
+
+### Goal
+- 核对两个旧 `.xls` 报关底稿是否仍是正式报关缺口，还是已被同目录正式报关 PDF 覆盖。
+- 不用底稿金额、商业合同号或箱单信息替代正式 18 位海关编号。
+
+### Delivered
+- 对照 `2024年/1201 安纳汉姆 吴物流` 同目录文件：
+  - 正式报关 PDF `HDUJSLX24PA00215_222920240004561873报关单.pdf` 已在库中对应 `EXP2400005 / 222920240004561873`。
+  - `一般贸易报关发票 合同 装箱单 出口报关单-1单.xls` 与该正式 PDF 的商品、件数、毛重、净重/数量、金额一致，已标记为旧底稿副本 `reference_only`。
+  - `一般贸易报关发票 合同 装箱单 出口报关单-2单空运.xls` 仍只证明 `EXP2400006` 的底稿数据，没有找到正式 18 位海关编号，继续留给业务补材料。
+- `scripts/extract_wps_export_evidence.py` 新增路径级旧底稿副本规则，映射动作为 `evidence_reference_only`；本轮没有写数据库。
+
+### Validation
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m py_compile scripts/extract_wps_export_evidence.py`
+  - 通过
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/extract_wps_export_evidence.py`
+  - `reference_only=3`
+  - `commercial_invoice_reference_only=2`
+  - `evidence_reference_only=1`
+  - `blocked=1`
+- `node scripts/import_wps_export_evidence.js`
+  - 报关/退税/商品新增更新均为 `0`
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts`
+  - 出口源新增更新均为 `0`
+  - 装箱 merge 未唯一匹配 `4`
+- `node scripts/import_wps_purchase_evidence.js`
+  - 采购新增更新均为 `0`
+- `node scripts/dedupe_wps_packing_duplicates.js`
+  - `deleteCount=0`
+- `python3 scripts/build_wps_import_decision_packet.py`
+  - 待裁决总数：`7 -> 6`
+  - `evidence_customs_declaration_blocked`: `2 -> 1`
+
+### Remaining
+- 仍需人工裁决 `6` 条：
+  - `4` 条装箱旧行匹配歧义。
+  - `1` 个混合港口/多门店组合。
+  - `1` 个 `EXP2400006` 旧 `.xls` 空运报关底稿缺正式海关编号。
+
+## 2026-06-03 Round 103（WPS 云端剩余文件下载收口）
+
+### Goal
+- 用 WPS 客户端继续下载此前仅云端可见的 `11-报关记录` 文件，减少未保留正文。
+- 新下载文件必须重新进入抽取/导入 dry-run，不能因为文件名看起来有用就写库。
+
+### Delivered
+- 通过 WPS 云文档搜索并打开下载：
+  - `11-报关记录/91310000MAD74FYH58-20250604235840-出口退税用途确认发票明细..xlsx`
+  - `11-报关记录/出货汇总.xlsx`
+- 刷新 WPS 云端索引后，`11-报关记录` 文件总数仍为 `579`，本机可用正文从 `576` 提升到 `578`，仅云端可见从 `3` 降到 `1`。
+- `20250604235840` 退税用途确认发票明细已抽出 `14` 个进项发票号；因无报关单号、无唯一出口合同归属，标记为 `tax_refund_invoice_list_reference_only`，不写退税草稿。
+- 顶层 `11-报关记录/出货汇总.xlsx` 已纳入出口源分析；它与根目录 `_wps_cloud_root/出货汇总.xlsx` 不同，但源行去重后没有新增或更新写库项。
+- 搜索最后一个 `20250815禧瑞都/购销合同CG2500045-不锈钢桶-禧瑞都.pdf` 时，WPS 只返回已缓存的 `归档-购销合同CG2500045-不锈钢桶-禧瑞都.pdf`，未返回 348KB 顶层旧副本；业务数据已由同合同号 DOCX 覆盖。
+
+### Validation
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/inventory_wps_cloud_metadata.py --prefix '11-报关记录/%' --copy-cached`
+  - `cached_file_count=578`
+  - `cloud_only_file_count=1`
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/analyze_wps_export_sources.py`
+  - `workbooks_read=50`
+  - `source_contracts=42`
+  - `contracts_missing_in_db=[]`
+- `/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/extract_wps_export_evidence.py`
+  - `extract_count=39`
+  - `reference_only=4`
+  - `tax_refund_invoice_list_reference_only=1`
+  - `blocked=1`
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts`
+  - 出口源新增/更新 `0`
+  - 装箱 merge 未唯一匹配 `4`
+- `node scripts/import_wps_export_evidence.js`
+  - 报关/退税/商品新增更新均为 `0`
+- `node scripts/import_wps_purchase_evidence.js --allow-header-only-contracts`
+  - 采购新增更新均为 `0`
+- `node scripts/dedupe_wps_packing_duplicates.js`
+  - `deleteCount=0`
+- `python3 scripts/build_wps_import_decision_packet.py`
+  - 待裁决总数保持 `6`
+
+### Remaining
+- 仍需人工裁决 `6` 条：
+  - `4` 条装箱旧行匹配歧义。
+  - `1` 个混合港口/多门店组合。
+  - `1` 个 `EXP2400006` 旧 `.xls` 空运报关底稿缺正式海关编号。
+- 云端正文只剩 `1` 个未保留副本：`11-报关记录/20250815禧瑞都/购销合同CG2500045-不锈钢桶-禧瑞都.pdf`；业务数据已由 `2025年8月/20250815禧瑞都` 下同合同号 DOCX 覆盖。
+
+## 2026-06-03 Round 104（EXP250027 混合门店汇总行收口）
+
+### Goal
+- 处理 `EXP250027` 窗帘混合门店行：能由源文件加总证明重复的先自动清理，不能判断的门店归属留在裁决包。
+- 防止后续复跑重新创建“米尔皮塔、圣荷西625”这类多门店合并名称。
+
+### Delivered
+- `scripts/analyze_wps_export_sources.py` 现在会在混合门店汇总行被更细的拆分源行加总覆盖时，选用拆分源行；本轮 `66` 套窗帘行被 `_wps_cloud_root/出货汇总.xlsx` 的 `31+35` 两行替代。
+- `scripts/import_wps_export_sources.js` 不再为带 `、/，/,/；` 的多门店名称自动创建门店，避免把业务口径问题写成主数据。
+- `scripts/dedupe_wps_packing_duplicates.js` 新增“拆分源行覆盖无门店汇总行”的删除规则；写库前已备份 `backend/prisma/backups/dev_2026-06-02_19-43-14.db`，删除 `EXP250027` 无门店 `66` 套窗帘汇总装箱行 `1` 条。
+- 同轮执行出口源 merge，补记 `禧瑞都` 35 套窗帘行的 WPS 来源，并更新合同汇总；没有新建商品、门店、合同、装箱或销售行。
+
+### Validation
+- `python3 -m py_compile scripts/analyze_wps_export_sources.py scripts/build_wps_import_decision_packet.py scripts/extract_wps_export_evidence.py scripts/inventory_wps_cloud_metadata.py`
+  - 通过
+- `node -c scripts/import_wps_export_sources.js`
+  - 通过
+- `node -c scripts/dedupe_wps_packing_duplicates.js`
+  - 通过
+- `python3 scripts/analyze_wps_export_sources.py`
+  - `workbooks_read=50`
+  - `source_contracts=42`
+  - `source_packing_items=1149`
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts`
+  - 出口源新增/更新 `0`
+  - 装箱 merge 未唯一匹配 `5`
+- `node scripts/dedupe_wps_packing_duplicates.js`
+  - `deleteCount=0`
+- `node scripts/import_wps_export_evidence.js`
+  - 报关/退税/商品新增更新均为 `0`
+- `node scripts/import_wps_purchase_evidence.js --allow-header-only-contracts`
+  - 采购新增更新均为 `0`
+- `python3 scripts/build_wps_import_decision_packet.py`
+  - 待裁决总数 `7`
+
+### Remaining
+- 仍需人工裁决 `7` 条：
+  - `5` 条装箱旧行匹配歧义，其中新增明确暴露的 `EXP250027` 31 套窗帘行需要确认归属米尔皮塔、圣荷西625、按比例拆分，或建立新门店口径。
+  - `1` 个 `EXP250027` 31 套窗帘多门店口径。
+  - `1` 个 `EXP2400006` 旧 `.xls` 空运报关底稿缺正式海关编号。
+
+## 2026-06-03 Round 105（装箱裁决包可判读性收口）
+
+### Goal
+- 不写数据库，提升剩余 7 条裁决项的可判读性，避免把低分候选或只有 ID 的候选交给业务判断。
+- 继续检查是否还有能用现有来源自动收口的装箱歧义。
+
+### Delivered
+- `scripts/import_wps_export_sources.js` 的装箱歧义候选现在只输出最高同分候选；`EXP250027` 不再把低分 `禧瑞都` 35 套行混入候选列表。
+- `scripts/build_wps_import_decision_packet.py` 读取数据库候选行摘要，裁决包中每条装箱歧义都带源行和候选行的门店、商品、数量、箱数、毛重/净重/体积、厂家。
+- 复核 `EXP2500001`：两个旧候选都记录了同一 `出货汇总(1)` 来源，但厂家字段冲突，且其中一条另有 `_wps_cloud_root` 来源；未达到可证明重复，继续留给业务裁决。
+
+### Validation
+- `node -c scripts/import_wps_export_sources.js`
+  - 通过
+- `python3 -m py_compile scripts/build_wps_import_decision_packet.py`
+  - 通过
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts`
+  - 出口源新增/更新 `0`
+  - 装箱 merge 未唯一匹配 `5`
+- `python3 scripts/build_wps_import_decision_packet.py`
+  - 待裁决总数 `7`
+  - 裁决包装箱歧义已输出候选摘要
+
+### Remaining
+- 仍需人工裁决 `7` 条；本轮没有新增数据缺口，也没有数据库写入。
+
+## 2026-06-03 Round 106（销售路径门店推断收紧）
+
+### Goal
+- 防止销售合同 sheet 缺门店时，用文件名路径给多门店商品猜单一门店。
+- 把此前被路径推断遮住的销售门店口径问题显式加入裁决包。
+
+### Delivered
+- `scripts/import_wps_export_sources.js` 增加保护：同合同同商品的装箱来源出现多个门店时，销售行不再使用 `--infer-sales-store-from-source-path` 推断门店。
+- `scripts/build_wps_import_decision_packet.py` 支持 `sales_row_ambiguous_packing_stores`，把这些销售行输出为 `sales_missing_store`。
+- 重建导入计划后，销售路径推断从 `21` 条降到 `1` 条，新增暴露 `19` 条销售门店待裁决项。
+- 本轮不写数据库，不删除或重写既有销售行；只阻止后续复跑继续扩大路径猜测。
+
+### Validation
+- `node -c scripts/import_wps_export_sources.js`
+  - 通过
+- `python3 -m py_compile scripts/build_wps_import_decision_packet.py`
+  - 通过
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts`
+  - `salesRowsToWrite=276`
+  - `salesStorePathInferences=1`
+  - `skipped=19`
+  - 新增/更新 `0`
+- `python3 scripts/build_wps_import_decision_packet.py`
+  - 待裁决总数 `26`
+  - `sales_missing_store=19`
+
+### Remaining
+- 剩余待裁决 `26` 条：
+  - `5` 条装箱旧行匹配歧义。
+  - `19` 条销售门店归属/拆分口径。
+  - `1` 个 `EXP250027` 31 套窗帘多门店口径。
+  - `1` 个 `EXP2400006` 旧 `.xls` 空运报关底稿缺正式海关编号。
+
+## 2026-06-03 Round 107（同源装箱数量修正销售门店）
+
+### Goal
+- 在不回退“禁止路径猜门店”的前提下，继续收口可由文件内容证明的销售门店缺口。
+- 只使用同一源文件、同一合同、同一商品、同一数量唯一命中的装箱行门店修正销售行。
+
+### Delivered
+- `scripts/import_wps_export_sources.js` 新增同源装箱数量门店推断：销售行缺门店且同商品多门店时，若同源装箱行按数量唯一命中一个现有门店，则使用该门店，并在 note 中记录 `[WPS_PACKING_QUANTITY_STORE]`。
+- 销售源行去重 key 增加源文件、sheet、行号，避免不同 WPS 工作簿中数值相同的销售行被折叠掉。
+- 装箱写库仍使用去重后的行；销售门店证明使用原始装箱证据行，避免重复写装箱同时保留来源证据。
+- 写库前备份 `backend/prisma/backups/dev_2026-06-02_20-26-39.db`。
+- 实际更新 `13` 条销售明细：`8` 条门店修正，`5` 条补充 WPS 来源 note；新增销售行 `0`。
+
+### Validation
+- `node -c scripts/import_wps_export_sources.js` 通过。
+- `node scripts/import_wps_export_sources.js --apply --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts` 通过。
+- 写库后 `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts` 通过，销售新增/更新 `0`，`salesStorePackingQuantityInferences=13`，`skipped=7`。
+- `node scripts/import_wps_export_evidence.js` 通过 dry-run，新增/更新 `0`。
+- `node scripts/import_wps_purchase_evidence.js --allow-header-only-contracts` 通过 dry-run，新增/更新 `0`。
+- `node scripts/dedupe_wps_packing_duplicates.js` 通过 dry-run，`deleteCount=0`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数 `14`。
+
+### Remaining
+- 剩余待裁决 `14` 条：
+  - `5` 条装箱旧行匹配歧义。
+  - `7` 条销售门店归属/拆分口径。
+  - `1` 个 `EXP250027` 31 套窗帘多门店口径。
+  - `1` 个 `EXP2400006` 旧 `.xls` 空运报关底稿缺正式海关编号。
+
+## 2026-06-03 Round 108（不可靠路径门店销售行清理）
+
+### Goal
+- 清理此前由文件路径猜门店、但当前装箱候选门店已经证明不可靠的销售行。
+- 不用新的猜测替代旧猜测；不能自动确认的销售行继续留在裁决包。
+
+### Delivered
+- 新增 `scripts/cleanup_wps_ambiguous_sales_store.js`，基于当前 `import_plan.json` 中的 `sales_row_ambiguous_packing_stores` 检查数据库中已有 `[WPS_SOURCE_PATH_STORE]` 销售行。
+- 清理规则：只有当路径推断出来的门店不在当前装箱候选门店集合内时才删除。
+- 写库前备份 `backend/prisma/backups/dev_2026-06-02_20-36-41.db`。
+- 实际删除 `1` 条销售明细：`EXP250028 / 铁艺屏风 / 合同:10`，原门店 `圣荷西625` 不在当前候选 `米尔皮塔 / 圣马特店 / 安纳汉姆` 内。
+
+### Validation
+- `node -c scripts/cleanup_wps_ambiguous_sales_store.js` 通过。
+- `node scripts/cleanup_wps_ambiguous_sales_store.js --apply` 通过，删除 `1` 条。
+- 写库后 `node scripts/cleanup_wps_ambiguous_sales_store.js` 通过，`deleteCount=0`。
+- 写库后出口源 merge dry-run 新增/更新 `0`，销售 skipped 仍为 `7`。
+- 真实凭证、采购凭证、装箱去重 dry-run 均无新增写库项。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数仍为 `14`。
+
+### Remaining
+- 剩余 `14` 条仍是业务裁决或正式凭证缺口；本轮只移除了一个已证明错误的数据库归属。
+
+## 2026-06-03 Round 109（销售门店跨源数量一致性收口）
+
+### Goal
+- 继续处理销售缺门店项中可由当前文件证据自行确认的部分。
+- 不用文件路径或行序猜测；只接受同合同、同商品、同数量的全量装箱证据全部指向同一个已知门店。
+
+### Delivered
+- `scripts/import_wps_export_sources.js` 增加跨源数量一致性门店推断：若销售行缺门店，且所有匹配的装箱证据在同合同、同商品、同数量下只出现一个已知门店，则使用该门店，来源 note 使用 `[WPS_PACKING_QUANTITY_CONSENSUS_STORE]`。
+- 该规则只收口 `EXP2500002 / 瓷砖 / 合同:14` 的 `300` 平方米销售行；三处装箱证据都指向 `安纳汉姆`。
+- 现库已存在该同源销售行且门店正确，所以本轮未写数据库。
+- `scripts/build_wps_import_decision_packet.py` 修正销售源行数量展示，避免把数字型 `unit` 列拼成 `771.84771.84`；并为 `sales_missing_store` 补充销售源行、同商品装箱候选、现库同商品销售摘要。
+
+### Validation
+- `python3 -m py_compile scripts/build_wps_import_decision_packet.py` 通过。
+- 出口源 merge dry-run 新增/更新 `0`；`salesStorePackingQuantityInferences=14`；`skipped=6`。
+- 不可靠路径门店清理 dry-run `deleteCount=0`。
+- 真实凭证、采购凭证、装箱去重 dry-run 均无新增写库或删除项。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数 `13`。
+- `git diff --check` 通过。
+
+### Remaining
+- 剩余待裁决 `13` 条：
+  - `5` 条装箱旧行匹配歧义。
+  - `6` 条销售门店归属/拆分口径。
+  - `1` 个 `EXP250027` 31 套窗帘多门店口径。
+  - `1` 个 `EXP2400006` 旧 `.xls` 空运报关底稿缺正式海关编号。
+
+## 2026-06-03 Round 110（WPS filecache 孤儿线索补强）
+
+### Goal
+- 继续压实 WPS 云端文件保全证据，避免仅看 metadata tree 漏掉 WPS 本地 filecache 曾记录过但当前 metadata 不再返回的旧文件。
+- 不把不可读、不可下载、已显示“文件不存在”的旧记录写入业务表。
+
+### Delivered
+- `scripts/inventory_wps_cloud_metadata.py` 增加 metadata 外 filecache 线索和真实失败下载记录输出。
+- 全量 `11-报关记录/%` 复跑后，metadata 主计数保持 `579` 个文件、`578` 个本机可读、`1` 个仅云端可见。
+- 新增报告 `5` 条 metadata 外 filecache 线索，其中包括 `20250728禧瑞都/购销合同CG2500045-不锈钢桶-禧瑞都.pdf`。
+- 新增报告 `4` 条真实失败下载记录，均为 `20250728禧瑞都` 下旧合同文件，错误为 `-5 文件不存在`。
+- WPS UI 搜索 `CG2500045 不锈钢桶` 仍只返回已缓存的 `归档-购销合同CG2500045-不锈钢桶-禧瑞都.pdf`，未返回 348KB 顶层旧副本。
+
+### Validation
+- `python3 -m py_compile scripts/inventory_wps_cloud_metadata.py` 通过。
+- `python3 scripts/inventory_wps_cloud_metadata.py --prefix '11-报关记录/%' --copy-cached` 通过。
+- 出口源 merge dry-run 新增/更新 `0`。
+- 采购凭证 dry-run 新增/更新 `0`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数仍为 `13`。
+
+### Remaining
+- 剩余待裁决仍为 `13` 条；本轮只补强云端文件保全证据，不改变业务导入状态。
+
+## 2026-06-03 Round 111（根目录清单补下载与导入）
+
+### Goal
+- 继续沿 WPS 根目录清单线索推进，避免只看 `11-报关记录` 而漏掉用户手工放在根目录的装货/出货清单。
+- 对能从文件正文证明合同号和装箱字段的行写库；对无法缓存的当前版本只记录线索。
+
+### Delivered
+- 通过 WPS 客户端打开并下载 `919清单.xlsx` 与 `0429装货清单-叶总.xlsx`，保留到 `tmp/wps_11_export_list_raw/11-报关记录/_wps_cloud_root/`。
+- `scripts/analyze_wps_export_sources.py` 放宽清单类工作簿识别：文件名含 `清单` 时也进入表头解析，仍要求行内有合同号才进入导入队列。
+- `919清单.xlsx` 新增解析 `8` 条 `EXP250016` 装箱源行，但均被现有来源覆盖，无需写库。
+- `0429装货清单-叶总.xlsx` 新增解析 `7` 条装箱源行，其中 `EXP260005` 1 条可由正文证明且现库缺失。
+- 写库前备份 `backend/prisma/backups/dev_2026-06-02_21-28-31.db`。
+- 实际写入 `EXP260005` 1 条装箱行：数量 `20` 个、箱数 `20`、毛重 `247.05`、净重 `195.775`、体积 `6.705`、规格 `510*510*810`；同时更新 `EXP260005` 合同汇总箱数/重量/体积。
+
+### Validation
+- `python3 -m py_compile scripts/analyze_wps_export_sources.py scripts/inventory_wps_cloud_metadata.py scripts/build_wps_import_decision_packet.py` 通过。
+- 写库后出口源 merge dry-run 新增/更新 `0`，`packingMergeUnmatched=5`，`skipped=6`。
+- `node scripts/dedupe_wps_packing_duplicates.js` 通过 dry-run，`deleteCount=0`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数仍为 `13`。
+
+### Remaining
+- WPS metadata 中根目录 `出货汇总.xlsx` 当前版本为 `89876` 字节、SHA1 `50b6a6841c6fd81826066ccf7db0c332f7614935`，但 WPS 本机缓存和界面搜索当前只能取得旧缓存版本 `67152` 字节、SHA1 `92f422118e855cdcc600dea505eb961fd1689773`。
+- 剩余待裁决仍为 `13` 条：`5` 条装箱旧行匹配歧义、`6` 条销售门店归属/拆分、`1` 个 `EXP250027` 31 套窗帘门店口径、`1` 个 `EXP2400006` 旧空运底稿缺正式海关编号。
+
+## 2026-06-03 Round 112（根目录清单可复跑盘点）
+
+### Goal
+- 把 WPS 根目录出货/装货/清单线索从人工搜索结果固化为可复跑盘点，避免后续遗漏顶层文件。
+- 继续下载还能取得正文的根目录清单，并验证是否有新增可写库项。
+
+### Delivered
+- `scripts/inventory_wps_cloud_metadata.py` 现在会把 WPS 顶层文件复制到 `tmp/wps_11_export_list_raw/11-报关记录/_wps_cloud_root/`。
+- 新增独立盘点产物目录：`tmp/wps_11_export_list_raw/parsed/root_shipment_cloud/`。
+- 根目录盘点覆盖 5 个候选：`出货汇总.xlsx`、`装货清单.xlsx`、`919清单.xlsx`、`0429装货清单-叶总.xlsx`、`0718装货单.xlsx`。
+- 通过 WPS 客户端打开并下载根目录 `0718装货单.xlsx`，保留到 `_wps_cloud_root`；大小 `8340`，SHA1 `002c0a791aa58c2e4c3fead3fd3d0de3709d8102`。
+- `0718装货单.xlsx` 解析出 `9` 条 `EXP250012` 装箱源行，但被现有来源覆盖，无需写库。
+
+### Validation
+- 根目录盘点 `cached_file_count=4`、`cloud_only_file_count=1`，唯一未缓存为当前 89KB 根目录 `出货汇总.xlsx`。
+- `python3 scripts/analyze_wps_export_sources.py` 通过，工作簿读取数 `53`，装箱源行 `1173`。
+- 出口源 merge dry-run 新增/更新 `0`，装箱未匹配歧义仍为 `5`，销售 skipped 仍为 `6`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数仍为 `13`。
+
+### Remaining
+- 根目录 `出货汇总.xlsx` 当前 89KB metadata 版本仍未缓存；已保留的 67KB 旧缓存版本继续只作为已读来源，不冒充当前版本。
+- 剩余待裁决仍为 `13` 条，均为业务裁决或正式凭证缺口。
+
+## 2026-06-03 Round 113（云端缺口报告与最终只读校验）
+
+### Goal
+- 把 WPS 云端盘点中的“仅云端可见文件”从采购合同专用分组扩展为通用分组，避免根目录 `出货汇总.xlsx` 这类非采购文件只能从 JSON 中查找。
+- 复跑全量只读导入校验，确认能自动处理的写库项已经归零。
+
+### Delivered
+- `scripts/inventory_wps_cloud_metadata.py` 的 summary JSON/Markdown 新增 `cloud_only_files` 通用清单，输出路径、metadata 大小和 SHA1。
+- 复跑 `11-报关记录/%` 云端盘点：当前 579 个云端索引文件中 578 个本机可读，唯一仍仅云端可见的是 `11-报关记录/20250815禧瑞都/购销合同CG2500045-不锈钢桶-禧瑞都.pdf`。
+- 复跑根目录清单盘点：5 个候选中 4 个本机可读，唯一仍仅云端可见的是当前 89KB `出货汇总.xlsx`。
+- 复跑出口源、附件、真实凭证、采购凭证和裁决包校验，未发现新的可自动写库项。
+
+### Validation
+- `python3 -m py_compile scripts/inventory_wps_cloud_metadata.py scripts/analyze_wps_export_sources.py scripts/build_wps_import_decision_packet.py` 通过。
+- `python3 scripts/analyze_wps_export_sources.py` 通过，工作簿读取数 `53`，源合同 `42`，`contracts_missing_in_db=[]`。
+- 出口源 merge dry-run 新增/更新 `0`，装箱未匹配歧义 `5`，销售 skipped `6`。
+- 装箱去重 dry-run `deleteCount=0`；不可靠路径门店清理 dry-run `deleteCount=0`。
+- 真实凭证 dry-run 新增/更新 `0`；采购凭证 dry-run 新增/更新 `0`。
+- 待裁决包总数 `13`。
+
+### Remaining
+- 自动导入链路当前已无可安全推进项。
+- 剩余 `13` 条必须由业务裁决或补正式凭证后继续：`5` 条装箱匹配歧义、`6` 条销售门店归属/拆分、`1` 个 `EXP250027` 31 套窗帘门店口径、`1` 个 `EXP2400006` 旧空运底稿缺正式海关编号。
+
+## 2026-06-03 Round 114（出货清单参考凭证入库）
+
+### Goal
+- 复核用户提到的 `11-出货清单` 云端目录是否存在，避免漏采历史出货合同/清单。
+- 对已保留但只作为普通附件的 `0802出货清单.xlsx` 继续抽取结构化申报信息，并只写入能与正式报关明细安全对齐的字段。
+
+### Delivered
+- WPS metadata 和 WPS 客户端均未发现名为 `11-出货清单` 的目录；当前可证明的历史出货主目录仍为 `11-报关记录`。
+- WPS 客户端宽搜 `出货清单` 只命中 `11-报关记录/2024年/0802 C店第二柜/0802出货清单.xlsx`。
+- `scripts/extract_wps_export_evidence.py` 新增 `shipment_list` 参考凭证抽取，能读取出货清单里的 HS 编码、申报信息、境内货源地，并通过唯一现有报关单归属到 `EXP2400002 / 531620240161954788`。
+- `scripts/import_wps_export_evidence.js` 新增报关明细申报要素补充：只在正式报关明细已有、`declarationElements` 为空、itemNo/名称/HS 均安全命中时更新；不创建新报关单，不覆盖已有申报要素。
+- 写库前备份 `backend/prisma/backups/dev_2026-06-02_22-06-29.db`。
+- 实际补入 `4` 条正式报关明细申报要素：`电磁炉`、`电烤炉`、`不锈钢圈`、`铁艺屏风`。
+
+### Validation
+- 使用 Codex 工作区 Python 复跑 `scripts/extract_wps_export_evidence.py`，PDF 抽取和出货清单抽取均通过，抽取文件 `40`，明细 `33`。
+- 写库前真实凭证 dry-run：`customsItemUpdates=4`，其余新增/更新为 `0`。
+- 写库后真实凭证 dry-run：所有新增/更新为 `0`。
+- 数据库抽查 `531620240161954788` 当轮已有 `4` 条 `declarationElements`，`烤盘` 与 `瓷砖` 两条当轮未自动写入；`瓷砖` 已在 Round 115 补入，`烤盘` 已在 Round 116 由正式出口退税联补入。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，原主待裁决包仍为 `13` 条。
+
+### Remaining
+- `0802出货清单.xlsx` 的 `烤盘` 行 HS 与正式报关明细不一致，`陶瓷` 行与正式报关明细 `瓷砖` 名称不一致；这两条参考表问题当轮未自动写入。后续 `瓷砖` 已由 `出口申报信息.xlsx` 补入，`烤盘` 已由正式出口退税联 PDF 补入。
+
+## 2026-06-03 Round 115（出口申报信息参考凭证入库）
+
+### Goal
+- 继续盘点所有出货/装货/申报清单类附件，避免只抽 `0802出货清单.xlsx` 而漏掉同目录更接近正式申报的表格。
+- 对 `出口申报信息.xlsx` 中能与正式报关明细安全对齐的申报要素补库。
+
+### Delivered
+- `scripts/extract_wps_export_evidence.py` 的 `shipment_list` 入口从 `出货清单` 扩展到 `出货清单|出口申报信息`。
+- 盘点候选表格后确认：
+  - `2024年/0802 C店第二柜/出口申报信息.xlsx` 带 HS、申报信息、境内货源地、合同号。
+  - `2024年/1128 外州第1柜/装货清单.xlsx` 只有 HS，没有申报信息，不用于补正式报关申报要素。
+  - 根目录 `0429装货清单-叶总.xlsx` 主要是装箱字段，已由出口源导入链路处理。
+- 写库前备份 `backend/prisma/backups/dev_2026-06-02_22-16-59.db`。
+- 实际补入 `EXP2400002 / 531620240161954788` 第 5 项 `瓷砖` 的正式报关明细申报要素。
+
+### Validation
+- 工作区 Python 复跑 `scripts/extract_wps_export_evidence.py` 通过，抽取文件 `41`，明细 `39`，`shipment_list` 映射动作 `2`。
+- 写库前真实凭证 dry-run：`customsItemUpdates=1`，其余新增/更新为 `0`。
+- 写库后真实凭证 dry-run：所有新增/更新为 `0`。
+- 数据库抽查 `531620240161954788`：`电磁炉`、`电烤炉`、`不锈钢圈`、`瓷砖`、`铁艺屏风` 5 条已有申报要素。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，主待裁决包仍为 `13` 条。
+
+### Remaining
+- 当轮 `烤盘` 仍未自动写入：两个参考表 HS 均为 `7323920000`，但正式报关明细 item 3 为 `7323930000`，且两个参考表的材质描述也不完全一致。后续已在 Round 116 用正式出口退税联 PDF 补入。
+
+## 2026-06-03 Round 116（正式退税联申报要素补库）
+
+### Goal
+- 复核正式出口退税联 PDF 正文是否能解决 `EXP2400002` 的 `烤盘` 申报要素缺口。
+- 将正式凭证中能完整抽取、且与现有正式报关明细 itemNo/品名/HS 完全对齐的申报要素补入库内空字段。
+
+### Delivered
+- `scripts/extract_wps_export_evidence.py` 支持从正式报关/退税 PDF 明细中抽取 `declaration_elements`，并清理 PDF 断行导致的空格。
+- `scripts/import_wps_export_evidence.js` 将申报要素补库来源从 `shipment_list` 扩展到正式 `export_tax_refund/customs_declaration` 明细，并优先使用正式凭证；只写现有报关明细空字段，不覆盖已有值。
+- 导入器新增完整性门槛：申报要素至少形成 6 个分段，避免写入 PDF 抽取出的半截长字段。
+- 写库前备份 `backend/prisma/backups/dev_2026-06-02_22-31-30.db`。
+- 实际补入 `11` 条正式报关明细申报要素：`530420240040849246` 10 条，`531620240161954788` 的 `烤盘` 1 条。
+
+### Validation
+- 工作区 Python 复跑 `scripts/extract_wps_export_evidence.py` 通过，抽取文件 `41`，明细 `39`。
+- `python3 -m py_compile scripts/extract_wps_export_evidence.py scripts/analyze_wps_export_sources.py scripts/build_wps_import_decision_packet.py scripts/inventory_wps_cloud_metadata.py` 通过。
+- `node -c scripts/import_wps_export_evidence.js` 通过。
+- 写库前真实凭证 dry-run：`customsItemUpdates=11`，其余新增/更新为 `0`。
+- 写库后真实凭证 dry-run：所有新增/更新为 `0`。
+- 数据库抽查 `531620240161954788`：`6 / 6` 条明细已有申报要素；`530420240040849246`：`10 / 19` 条明细已有申报要素。
+- 出口源 merge、采购凭证、装箱去重、不可靠销售门店清理 dry-run 均无新增写库或删除项。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，主待裁决包仍为 `13` 条。
+
+### Remaining
+- `530420240040849246` 剩余 9 条明细在 PDF 抽取中只能得到半截申报要素，继续留空，不自动写入。
+- 剩余主裁决包仍为 `13` 条，均为装箱匹配、销售门店拆分、31 套窗帘门店口径和 `EXP2400006` 正式海关编号缺口。
+
+## 2026-06-03 Round 117（正式 PDF 五段完整申报要素补库）
+
+### Goal
+- 复核 `530420240040849246` 剩余 9 条空申报要素中，是否存在被上一轮“至少 6 段”门槛误挡的完整正式 PDF 字段。
+- 只补入能由 PDF 坐标文字证明完整、且与现有正式报关明细 itemNo/品名/HS 完全对齐的字段。
+
+### Delivered
+- 用 pypdf 坐标文字复核 `2024年/0530 C店第一柜/5-出口退税联.pdf`，确认 item 10 `支撑柱` 的申报要素完整显示为 `0|0|支撑用途|304不锈钢|支撑柱`。
+- `scripts/import_wps_export_evidence.js` 的完整性门槛从单纯 `>=6` 段调整为：`>=6` 段直接可用；`5` 段也可用，但末段不能是明显断句符号或未完连词。
+- 写库前备份 `backend/prisma/backups/dev_2026-06-02_22-41-29.db`。
+- 实际补入 `530420240040849246` 第 10 项 `支撑柱` 1 条正式报关明细申报要素。
+
+### Validation
+- `node -c scripts/import_wps_export_evidence.js` 通过。
+- 写库前真实凭证 dry-run：`customsItemUpdates=1`，且唯一计划为 `530420240040849246 #10 支撑柱`。
+- 写库后真实凭证 dry-run：所有新增/更新为 `0`。
+- 数据库抽查 `530420240040849246`：`11 / 19` 条明细已有申报要素；item 10 已写入 `0|0|支撑用途|304不锈钢|支撑柱`。
+
+### Remaining
+- `530420240040849246` 剩余 8 条空申报要素仍为半截字段：4 条 `钢化玻璃` 末段停在 `未用其他材料镶框或`，3 条 `电磁炉` 停在 `电磁炉是应用电磁感应原理对食品`，1 条 `电烤炉` 停在 `烧烤炉采用红外线发热技术原理，`。继续留空，不自动写入。
+
+## 2026-06-03 Round 118（EXP2400006 正式编号缺口复核）
+
+### Goal
+- 对剩余裁决包中唯一真实凭证缺口 `EXP2400006` 再做一次本机源文件和 WPS 云端索引复核。
+- 把“为什么不能自动创建报关单”的证据写进裁决包，而不是只保留简短缺口描述。
+
+### Delivered
+- 复核 `2024年/1201 安纳汉姆 吴物流` 同目录 PDF/XLS：
+  - `一般贸易报关发票 合同 装箱单 出口报关单-2单空运.xls` 能读取 `EXP2400006`、客户 `Sp food trading LLC`、`密胺餐盘`、件数 `8`、毛重 `125`、净重/数量 `110`、金额 `676.5`，但海关编号为空。
+  - 同目录正式报关单/放行单均为 `222920240004561873`，毛净重 `147.9/145.4`、金额 `894.3`，已归属 `EXP2400005`。
+  - `外销出口合同+发票+箱单+EXP2400006.pdf/xlsx` 只证明销售合同和金额，不是正式报关单。
+- `scripts/build_wps_import_decision_packet.py` 现在会为真实凭证 blocked 项补充同目录云端索引相关文件和已识别正式报关编号摘要。
+- 复跑裁决包后，`EXP2400006` 条目明确列出同目录云端索引相关文件和 `222920240004561873 -> EXP2400005` 对照。
+
+### Validation
+- `python3 -m py_compile scripts/build_wps_import_decision_packet.py` 通过。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数仍为 `13`。
+- `node scripts/import_wps_export_evidence.js` 通过 dry-run，报关、报关明细、退税新增/更新均为 `0`。
+- `node scripts/import_wps_export_sources.js --merge-packing --merge-sales --update-contract-aggregates --infer-sales-store-from-source-path --create-missing-contracts` 通过 dry-run，商品、合同、装箱、销售新增/更新均为 `0`；装箱未匹配歧义仍为 `5`，销售门店跳过仍为 `6`。
+- `node scripts/import_wps_purchase_evidence.js` 通过 dry-run，供应商、商品、采购合同、采购明细新增/更新均为 `0`。
+- `node scripts/dedupe_wps_packing_duplicates.js` 通过 dry-run，待删除重复装箱行为 `0`。
+- `node scripts/cleanup_wps_ambiguous_sales_store.js` 通过 dry-run，待删除不可靠销售门店行为 `0`。
+- `git diff --check` 通过。
+
+### Remaining
+- `EXP2400006` 仍不能自动创建报关单；需要正式 18 位海关编号或正式报关单原件。
+
+## 2026-06-03 Round 119（路径门店推断污染清理）
+
+### Goal
+- 继续复核 WPS 历史导入中早期由文件名路径推断门店的销售行，确保系统销售明细不保留已被装箱证据反证的门店归属。
+- 只清理可由当前文件证据和现库重复行共同证明的污染项，不把仍需业务判断的多门店销售行强行归属。
+
+### Delivered
+- `scripts/cleanup_wps_ambiguous_sales_store.js` 已从只检查当前 6 条待裁决销售行，扩展为全量审计 `[WPS_SOURCE_PATH_STORE]` 销售行。
+- 新规则只删除同时满足以下条件的记录：
+  - 同合同、同商品、同数量的装箱源行唯一指向另一个门店。
+  - 现库已存在同源、同商品、同数量、同售价且门店正确的销售行。
+  - 待删路径推断行没有库存引用。
+- 写库前备份 `backend/prisma/backups/dev_2026-06-02_23-03-05.db`。
+- 实际删除 `19` 条路径门店推断重复污染行；销售明细总数从 `466` 降为 `447`。
+
+### Validation
+- `node --check scripts/cleanup_wps_ambiguous_sales_store.js` 通过。
+- 写库前 `node scripts/cleanup_wps_ambiguous_sales_store.js` dry-run：`deleteCount=19`、`pathInferredRows=59`。
+- `node scripts/cleanup_wps_ambiguous_sales_store.js --apply` 通过，实际删除 `19` 条。
+- 写库后 `node scripts/cleanup_wps_ambiguous_sales_store.js` dry-run：`deleteCount=0`、`pathInferredRows=40`。
+- 路径推断审计：`conflictsExactQuantity=0`、`supportedExactQuantity=27`、`needsReview=13`。
+- 出口源 merge dry-run 新增/更新为 `0`；采购 dry-run 新增/更新为 `0`；真实凭证 dry-run 新增/更新为 `0`；装箱去重 dry-run 待删除为 `0`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，主待裁决包仍为 `13` 条。
+- `git diff --check` 通过。
+
+### Remaining
+- 这轮清理的是隐藏重复污染，不改变主裁决包：仍需业务裁决 5 条装箱歧义、6 条销售门店/拆分、1 条 `EXP250027` 31 套窗帘门店口径，以及 `EXP2400006` 正式海关编号缺口。
+
+## 2026-06-03 Round 120（路径门店推断复核显式化）
+
+### Goal
+- 继续审计清理后仍保留的 `[WPS_SOURCE_PATH_STORE]` 销售行，避免没有同数量装箱证据唯一支持的门店推断隐藏在数据库里。
+- 只把证据不足但未被反证的行放入业务裁决包，不自动删除、不自动改门店。
+
+### Delivered
+- `scripts/cleanup_wps_ambiguous_sales_store.js` 的 dry-run 输出已补充 kept 原因：
+  - `path_store_supported_by_exact_quantity_packing`
+  - `path_store_without_exact_quantity_packing_evidence`
+  - `path_store_multiple_exact_quantity_packing_stores`
+- `scripts/build_wps_import_decision_packet.py` 新增 `sales_path_store_inference_review` 类别，将证据不足的路径门店推断销售行作为 P2 复核项输出。
+- 裁决包从 `13` 条增至 `23` 条；新增的 `10` 条不是新发现可自动写入项，而是此前已入库但证据不足的路径门店推断行。
+
+### Validation
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数 `23`。
+- `node scripts/cleanup_wps_ambiguous_sales_store.js` dry-run 仍为 `deleteCount=0`，路径推断销售行 `40`。
+
+### Remaining
+- 自动安全写入/删除仍为 `0`。
+- 需要业务确认的新增 P2 项为 10 条路径门店推断复核：若确认门店无误则保留；若实际为其他门店或多门店拆分，需要提供源销售合同页、装箱清单或拆分依据。
+
+## 2026-06-03 Round 121（同源装货商品别名门店证据）
+
+### Goal
+- 继续收口路径门店推断复核项中能由同一 WPS 文件正文证明的门店归属。
+- 只允许非常窄的商品别名证据：同一源文件、同一合同、同一数量，且装货行 note 明确包含销售合同商品名。
+
+### Delivered
+- `scripts/import_wps_export_sources.js` 新增同源装货商品别名数量证据口径；本轮命中 `EXP250016 / 玻璃瓶 / 合 同:14`：
+  - 销售合同商品 `玻璃瓶`，数量 `5250`。
+  - 同文件装货页为 `玻璃酒瓶`，数量 `5250`，门店 `圣荷西2115`，note 为 `提前送达的玻璃瓶`。
+- 写库前备份 `backend/prisma/backups/dev_2026-06-02_23-29-03.db`。
+- 实际修正该销售行门店：`圣荷西 -> 圣荷西2115`，并补充 `[WPS_PACKING_QUANTITY_ALIAS_STORE]` 证据标记。
+- 同时给 14 条已由同源装货数量支持的销售行补充 `[WPS_PACKING_QUANTITY_*_STORE]` 证据 note，避免只改数据不留证明。
+- 裁决包从 `23` 条降到 `22` 条，`sales_path_store_inference_review` 从 `10` 条降到 `9` 条。
+
+### Validation
+- 写库后出口源 merge dry-run 新增/更新为 `0`。
+- `node scripts/cleanup_wps_ambiguous_sales_store.js` dry-run：`deleteCount=0`、`pathInferredRows=40`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数 `22`。
+
+### Remaining
+- 自动安全写入/删除再次归零。
+- 仍需业务裁决 5 条装箱歧义、6 条销售门店/拆分、9 条路径门店推断复核、1 个 31 套窗帘门店口径、1 个 `EXP2400006` 正式海关编号缺口。
+
+## 2026-06-03 Round 122（同质多门店销售补价）
+
+### Goal
+- 继续收口剩余销售缺门店项，优先处理能由同质销售行组证明的价格补录。
+- 不按销售合同源行行号猜门店，只在“销售源行同质 + 装箱门店集合 + 现库同数量门店销售行集合”完全对齐时补现有行售价和来源 note。
+
+### Delivered
+- `scripts/import_wps_export_sources.js` 新增同质多门店销售行补价规则：
+  - 同一合同、同一商品、同一数量、同一单价的多条缺门店销售源行视为一个同质组。
+  - 同数量装箱证据的唯一门店集合必须与现库同数量、同商品、无 WPS 来源、售价为 `0` 的销售行集合完全一致。
+  - 只更新这些现有门店行的售价和 WPS 来源 note，不新建销售行，不指定“第 N 行属于某门店”。
+- 本轮命中 `EXP250028 / 铁艺屏风`：
+  - 销售合同 `合 同:10`、`合 同:12` 均为 `2` 套、单价 `4800`。
+  - 装箱与现库对应两个 `2` 套门店行：`米尔皮塔`、`圣马特店`。
+  - 写库前备份 `backend/prisma/backups/dev_2026-06-02_23-51-14.db`。
+  - 已将这两个现有销售行售价从 `0` 更新为 `4800`，并补充两条 WPS 销售源行和 `[WPS_SALES_HOMOGENEOUS_GROUP_PRICE]` 证据 note；`安纳汉姆` 1 套行保持不动。
+- 裁决包从 `22` 条降到 `20` 条，`sales_missing_store` 从 `6` 条降到 `4` 条。
+
+### Validation
+- `node -c scripts/import_wps_export_sources.js` 通过。
+- 写库前出口源 dry-run：`salesMergeUpdates=2`、`salesStoreHomogeneousGroupInferences=1`、`salesMergeCreates=0`。
+- 写库后出口源 dry-run：商品/合同/装箱/销售新增更新均为 `0`；`packingMergeUnmatched=5`、`skipped=4`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数 `20`。
+- `node scripts/import_wps_export_evidence.js` dry-run：报关、报关明细、退税新增/更新均为 `0`。
+- `node scripts/import_wps_purchase_evidence.js --allow-header-only-contracts` dry-run：供应商、商品、采购合同、采购明细新增/更新均为 `0`。
+- `node scripts/dedupe_wps_packing_duplicates.js` dry-run：`deleteCount=0`。
+- `node scripts/cleanup_wps_ambiguous_sales_store.js` dry-run：`deleteCount=0`、`pathInferredRows=40`。
+
+### Remaining
+- 自动安全写入/删除再次归零。
+- 仍需业务裁决 5 条装箱歧义、4 条销售门店/拆分、9 条路径门店推断复核、1 个 31 套窗帘门店口径、1 个 `EXP2400006` 正式海关编号缺口。
+
+## 2026-06-03 Round 123（同源同商品残余配对）
+
+### Goal
+- 继续收口剩余销售缺门店和路径门店复核项中能由同一 WPS 文件内部结构证明的门店。
+- 只允许同源同商品残余唯一配对，不用文件名路径替代装货页证据，不改销售数量。
+
+### Delivered
+- `scripts/import_wps_export_sources.js` 新增同源同商品残余配对规则：
+  - 同一合同、同一商品、同一源文件的销售行数必须等于装货行数。
+  - 先用同数量唯一命中配对；如果只剩 1 条销售行和 1 条装货行，才用剩余装货行门店作为销售门店证据。
+  - 只补门店证据 note，不修改销售数量或装箱数量。
+- `scripts/cleanup_wps_ambiguous_sales_store.js` 识别 `[WPS_PACKING_RESIDUAL_PRODUCT_STORE]`，避免已被残余配对证明的路径门店行继续进入 P2 复核。
+- 本轮命中 `EXP250025 / 瓷砖`：
+  - 同源销售行：`合 同:10 / 181.44`、`合 同:12 / 72`。
+  - 同源装货行：`装货:3 / Burbank / 201.6`、`装货:5 / Westminster / 72`。
+  - `72` 已唯一命中 `Westminster`，剩余 `181.44` 销售行与剩余 `Burbank` 装货行形成残余配对。
+  - 写库前备份 `backend/prisma/backups/dev_2026-06-03_00-33-46.db`。
+  - 已给现有 `Burbank` 销售行补充 `[WPS_PACKING_RESIDUAL_PRODUCT_STORE] Burbank`，未改销售数量。
+- 裁决包从 `20` 条降到 `18` 条：`sales_missing_store` 从 `4` 降到 `3`，`sales_path_store_inference_review` 从 `9` 降到 `8`。
+
+### Validation
+- `node -c scripts/import_wps_export_sources.js` 和 `node -c scripts/cleanup_wps_ambiguous_sales_store.js` 通过。
+- 写库前出口源 dry-run：`salesMergeUpdates=1`、`salesStoreResidualProductInferences=1`、`salesMergeCreates=0`。
+- 写库后出口源 dry-run：商品/合同/装箱/销售新增更新均为 `0`；`skipped=3`。
+- `node scripts/cleanup_wps_ambiguous_sales_store.js` dry-run：`deleteCount=0`、`pathInferredRows=40`、`keptCount=43`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数 `18`。
+- `node scripts/import_wps_export_evidence.js` dry-run：报关、报关明细、退税新增/更新均为 `0`。
+- `node scripts/import_wps_purchase_evidence.js --allow-header-only-contracts` dry-run：供应商、商品、采购合同、采购明细新增/更新均为 `0`。
+- `node scripts/dedupe_wps_packing_duplicates.js` dry-run：`deleteCount=0`。
+- `git diff --check` 通过。
+
+### Remaining
+- 自动安全写入/删除再次归零。
+- 仍需业务裁决 5 条装箱歧义、3 条销售门店/拆分、8 条路径门店推断复核、1 个 31 套窗帘门店口径、1 个 `EXP2400006` 正式海关编号缺口。
+
+## 2026-06-03 Round 124（同源同价路径重复清理）
+
+### Goal
+- 继续清理早期 `[WPS_SOURCE_PATH_STORE]` 路径门店推断留下的旧重复销售行。
+- 只删除已经被同一 WPS 来源、同合同、同商品、同数量、同售价的非路径推断销售行完全覆盖的记录；售价不一致时不自动裁决。
+
+### Delivered
+- `scripts/cleanup_wps_ambiguous_sales_store.js` 新增同源同价重复保护规则：
+  - 待删行必须带 `[WPS_SOURCE_PATH_STORE]`。
+  - 待删行不能有库存引用。
+  - 库里必须存在同一合同、同一商品、同一数量、同一售价、同一 WPS source 的非路径推断销售行。
+- 本轮命中 `EXP250014` 4 条旧路径门店行：
+  - `餐桌 / 49 / 805`
+  - `瓷砖 / 705 / 12`
+  - `电磁炉 / 100 / 28`
+  - `烤盘 / 300 / 13`
+- 写库前备份 `backend/prisma/backups/dev_2026-06-03_00-50-11.db`，随后删除上述 4 条旧重复行。
+- `EXP250014` 的 `电烤炉`、`新型无烟火锅`、`地膜` 因同源非路径行售价不一致，未删除，继续留给业务裁决。
+- 裁决包从 `18` 条降到 `14` 条：`sales_path_store_inference_review` 从 `8` 降到 `4`。
+
+### Validation
+- `node -c scripts/cleanup_wps_ambiguous_sales_store.js` 通过。
+- 写库前清理 dry-run：`deleteCount=4`，只命中上述 4 条 `EXP250014` 同源同价重复行。
+- 写库后清理 dry-run：`deleteCount=0`、`pathInferredRows=36`。
+- 出口源 merge dry-run：商品/合同/装箱/销售新增更新均为 `0`；`packingMergeUnmatched=5`、`skipped=3`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数 `14`。
+
+### Remaining
+- 自动安全写入/删除再次归零。
+- 仍需业务裁决 5 条装箱歧义、3 条销售门店/拆分、4 条路径门店推断复核、1 个 31 套窗帘门店口径、1 个 `EXP2400006` 正式海关编号缺口。
+
+## 2026-06-03 Round 125（同源正确价格转移）
+
+### Goal
+- 继续收口 `EXP250014` 剩余 3 条路径门店推断复核项。
+- 在不按文件名猜门店的前提下，把源销售合同/发票页的正确价格保留到更强门店证据的现库行上。
+
+### Delivered
+- `scripts/cleanup_wps_ambiguous_sales_store.js` 新增同源正确价格转移规则：
+  - 弱路径行必须带 `[WPS_SOURCE_PATH_STORE]`，且售价等于源销售合同/发票页价格。
+  - 强门店行必须是同源、同合同、同商品、同数量、非路径推断，并带 `[WPS_CONTRACT_STORE]`。
+  - 强门店行价格与源文件不一致时，先把强门店行价格改为源文件价格，再删除弱路径行。
+  - 弱路径行有库存引用时不处理。
+- 本轮命中 `EXP250014` 3 条：
+  - `电烤炉`: `圣荷西2115` 价格 `28 -> 170`，删除 `圣荷西 / 170` 弱路径行。
+  - `新型无烟火锅`: `圣荷西2115` 价格 `390 -> 370`，删除 `圣荷西 / 370` 弱路径行。
+  - `地膜`: `圣荷西2115` 价格 `105.71 -> 10`，删除 `圣荷西 / 10` 弱路径行。
+- 写库前备份 `backend/prisma/backups/dev_2026-06-03_01-06-07.db`。
+- 裁决包从 `14` 条降到 `11` 条：`sales_path_store_inference_review` 从 `4` 降到 `1`。
+
+### Validation
+- `node -c scripts/cleanup_wps_ambiguous_sales_store.js` 通过。
+- 写库前清理 dry-run：`updateCount=3`、`deleteCount=3`，只命中上述 3 条 `EXP250014`。
+- 写库后清理 dry-run：`updateCount=0`、`deleteCount=0`、`pathInferredRows=33`。
+- 出口源 merge dry-run：商品/合同/装箱/销售新增更新均为 `0`；`packingMergeUnmatched=5`、`skipped=3`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数 `11`。
+
+### Remaining
+- 自动安全写入/删除再次归零。
+- 仍需业务裁决 5 条装箱歧义、3 条销售门店/拆分、1 条路径门店推断复核、1 个 31 套窗帘门店口径、1 个 `EXP2400006` 正式海关编号缺口。
+
+## 2026-06-03 Round 126（EXP2400006 发票列反证）
+
+### Goal
+- 复核 `EXP2400006` 是否能从现有 WPS 索引或出货汇总中找到正式报关编号。
+- 防止把出货汇总 `invoice_no` 或污染发票汇总误当正式海关编号写库。
+
+### Delivered
+- `scripts/build_wps_import_decision_packet.py` 已把同合同出货汇总 `invoice_no` 线索写入 blocked 证据。
+- 复核结果：
+  - `_wps_cloud_root/出货汇总.xlsx#出货汇总0315_补充:58` 的 `25312000000011328975` 位于 `invoice_no` 列，不是正式 18 位海关编号。
+  - `EXP2400006.xlsx` 发票汇总页存在复制自 `EXP2400005` 的大量发票号模板污染，不能作为 `EXP2400006` 报关依据。
+  - 同目录正式报关单 `222920240004561873` 仍只证明 `EXP2400005`，不能套给 `EXP2400006`。
+- 本轮没有写数据库；裁决包保持 `11` 条。
+
+### Validation
+- `python3 -m py_compile scripts/build_wps_import_decision_packet.py` 通过。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数保持 `11`。
+
+### Remaining
+- `EXP2400006` 仍需正式 18 位海关编号或正式报关单原件。
+
+## 2026-06-03 Round 127（已有组合门店装箱源行保留）
+
+### Goal
+- 继续处理剩余装箱歧义中“源文件写组合门店、现库只有单门店候选”的项目。
+- 不把组合门店源行硬分配给任一单门店；只在组合门店本身已存在时，作为独立源装箱行保留文件正文。
+
+### Delivered
+- `scripts/import_wps_export_sources.js` 新增很窄的装箱 merge 规则：
+  - 源行门店必须已经能解析到现有门店。
+  - 最高分旧装箱候选都不是这个源门店。
+  - 不自动创建新的组合门店；不修改或删除旧单门店候选。
+- 写库前备份 `backend/prisma/backups/dev_2026-06-03_01-25-58.db`。
+- 新增 3 条组合门店装箱源行：
+  - `EXP250020 / 椅子 / 圣荷西625店和红木城店 / 100把`
+  - `EXP250021 / 人造石英石台面 / 圣荷西625店和红木城店 / 229.7平方米`
+  - `EXP250021 / LED吊灯 / 圣荷西2115和625 / 29个`
+- 裁决包从 `11` 条降到 `8` 条，`packing_ambiguous_match` 从 `5` 降到 `2`。
+
+### Validation
+- 写库后出口源 merge dry-run：商品/合同/门店/装箱/销售新增更新均为 `0`；`packingMergeUnmatched=2`、`skipped=3`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数 `8`。
+
+### Remaining
+- 自动安全写入再次归零。
+- 仍需业务裁决 2 条装箱歧义、3 条销售门店/拆分、1 条路径门店推断复核、1 个 `EXP250027` 31 套窗帘门店口径、1 个 `EXP2400006` 正式海关编号缺口。
+
+## 2026-06-03 Round 128（销售规格数量门店证据）
+
+### Goal
+- 继续收口剩余销售门店缺口中能由源文件规格、数量和同源装箱行证明的项目。
+- 修正销售源解析中把商品名误当规格的浅层问题，避免规格证据失真。
+
+### Delivered
+- `scripts/analyze_wps_export_sources.py` 已把销售合同页 `包装/Package` 解析为销售规格，不再把 `货物名称及规格` 商品名重复写入规格字段。
+- `scripts/import_wps_export_sources.js` 新增 `[WPS_PACKING_SPEC_QUANTITY_STORE]` 口径：
+  - 同源装箱行中同合同、同商品、同数量、同规格唯一指向一个门店时，可补销售门店证据。
+  - 已入库装箱行 note 记录同一 WPS 源文件，且同合同、同商品、同数量、同规格唯一指向一个门店时，也可补销售门店证据。
+  - 同一销售行已有不同装箱门店标记时，不自动改门店，进入 `sales_store_conflict` 裁决项。
+- 写库前备份：
+  - `backend/prisma/backups/dev_2026-06-03_01-34-23.db`
+  - `backend/prisma/backups/dev_2026-06-03_01-40-24.db`
+- 本轮写入结果：
+  - 第一次写库补强 `EXP250013` 两条自助餐台门店证据：`2149*1150*1100 -> 安纳汉姆`、`2654*1160*1100 -> 禧瑞都`。
+  - 第二次写库补强 6 条销售 note，包括 `EXP250014` 3 条、`EXP250025` 1 条、`EXP250028` 2 条铁艺屏风现有销售行。
+  - `EXP250019 / 瓷砖 / 合 同:18` 因现有 `Burbank` 与新证据 `Westminster` 冲突，未写库，进入裁决包。
+- `scripts/build_wps_import_decision_packet.py` 新增 `sales_store_conflict` 类别，避免把门店冲突混同为缺门店。
+
+### Validation
+- 写库后出口源 merge dry-run：商品/合同/门店/装箱/销售新增更新均为 `0`；`packingMergeUnmatched=2`、`salesMergeUnmatched=1`、`skipped=1`。
+- `node scripts/cleanup_wps_ambiguous_sales_store.js` dry-run：`updateCount=0`、`deleteCount=0`。
+- `node scripts/dedupe_wps_packing_duplicates.js` dry-run：`deleteCount=0`。
+- `node scripts/import_wps_export_evidence.js` dry-run：报关/报关明细/退税新增更新均为 `0`。
+- `node scripts/import_wps_purchase_evidence.js --allow-header-only-contracts` dry-run：采购新增更新均为 `0`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数 `7`。
+
+### Remaining
+- 自动安全写入再次归零。
+- 仍需业务裁决 2 条装箱歧义、1 条销售缺门店、1 条销售门店冲突、1 条路径门店推断复核、1 个 `EXP250027` 31 套窗帘门店口径、1 个 `EXP2400006` 正式海关编号缺口。
+
+## 2026-06-03 Round 129（错挂装箱来源迁移）
+
+### Goal
+- 继续收口 `EXP250019 / 瓷砖 / 合 同:18` 的 Burbank/Westminster 门店冲突。
+- 区分业务拆分冲突和现库来源 note 错挂，能由文件正文证明的错挂来源直接修正。
+
+### Delivered
+- `scripts/import_wps_export_sources.js` 新增装箱来源迁移保护：
+  - 当旧装箱行已经记录某 WPS source，但旧行门店与源行门店冲突时，先检查旧行是否有报关明细引用。
+  - 无报关引用时，从旧行 note 移除错挂来源，再按源行门店匹配或新增正确装箱行。
+  - 有报关引用时不自动迁移，进入 unmatched。
+- 写库前备份：`backend/prisma/backups/dev_2026-06-03_01-48-12.db`。
+- 本轮写入结果：
+  - Westminster `501.12` 平方米装箱行只保留 `EXP250019 1017Westminster.xlsx#装货:11` 来源。
+  - 新增 Burbank `501.12` 平方米装箱行，来源为 `EXP250018 925圣荷西.xlsx#装货:11`，字段为 `261` 箱、毛/净/体积 `11500/11400/6.8`、规格 `800*800*40`、厂家 `黎总`。
+- `sales_store_conflict` 从裁决包消失。
+
+### Validation
+- 写库后出口源 merge dry-run：商品/合同/门店/装箱/销售新增更新均为 `0`；`packingMergeUnmatched=2`、`salesMergeUnmatched=0`、`skipped=1`。
+- `python3 scripts/build_wps_import_decision_packet.py` 通过，待裁决总数 `6`。
+- `node scripts/cleanup_wps_ambiguous_sales_store.js` dry-run：`updateCount=0`、`deleteCount=0`。
+- `node scripts/dedupe_wps_packing_duplicates.js` dry-run：`deleteCount=0`，`EXP2500001` 厂家冲突和 `EXP250027` 31 套窗帘仍不可自动删除。
+- `node scripts/import_wps_export_evidence.js` dry-run：报关/报关明细/退税新增更新均为 `0`。
+- `node scripts/import_wps_purchase_evidence.js --allow-header-only-contracts` dry-run：采购新增更新均为 `0`。
+- `git diff --check` 通过。
+
+### Remaining
+- 自动安全写入再次归零。
+- 仍需业务裁决 2 条装箱歧义、1 条销售缺门店、1 条路径门店推断复核、1 个 `EXP250027` 31 套窗帘门店口径、1 个 `EXP2400006` 正式海关编号缺口。

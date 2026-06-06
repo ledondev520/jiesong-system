@@ -1,5 +1,608 @@
 # Frontend Polish Tasks
 
+## 2026-06-05 WPS-IMPORT-126 收件扫描内容级识别与候选分层
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-126A | P0 | 10m | 1 | DONE | 将收件扫描从路径命中扩展为路径加内容命中，支持常见表格和文档内容抽取 |
+| WPS-IMPORT-126B | P0 | 10m | 1 | DONE | 对重叠目录去重，并把正式报关候选分为强候选、参考汇总线索和弱关键词候选 |
+| WPS-IMPORT-126C | P1 | 10m | 1 | DONE | 复跑本机扫描，确认当前 0 个强正式候选、0 个 cloud 精确原件、0 个可 apply 项 |
+| WPS-IMPORT-126D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-05 WPS-IMPORT-125 缺失材料本机收件扫描
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-125A | P0 | 10m | 1 | DONE | 读取收件校验包，提取 `exact_cloud_original` 与 `formal_customs_document` 扫描规则 |
+| WPS-IMPORT-125B | P0 | 15m | 1 | DONE | 新增只读本机收件扫描器，识别 SHA1 精确 cloud 原件和正式报关候选 |
+| WPS-IMPORT-125C | P1 | 10m | 1 | DONE | 建立默认项目收件目录并扫描 Downloads，确认当前无 ready 项 |
+| WPS-IMPORT-125D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-05 WPS-IMPORT-124 缺失材料收件校验包
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-124A | P0 | 10m | 1 | DONE | 读取行动矩阵、cloud-only 探测和正式报关材料阻断报告，确认收件字段来源 |
+| WPS-IMPORT-124B | P0 | 15m | 1 | DONE | 新增只读收件校验脚本，输出缺失材料验收标准、严格字段、校验命令和禁止动作 |
+| WPS-IMPORT-124C | P1 | 10m | 1 | DONE | 生成 `wps_missing_evidence_intake_package.{json,csv,md}`，确认覆盖 174 行且 `ready_for_apply=0` |
+| WPS-IMPORT-124D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-05 WPS-IMPORT-123 缺失项解决路径刷新
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-123A | P0 | 10m | 1 | DONE | 复跑 cloud-only 窄探测和广域本机搜索，确认 2 个目标是否已有 SHA1 精确本机副本 |
+| WPS-IMPORT-123B | P0 | 10m | 1 | DONE | 复跑 PENDING-威斯敏 正式报关材料缺口复核，确认正式报关候选和完整装箱源集合 |
+| WPS-IMPORT-123C | P0 | 10m | 1 | DONE | 重建完成度审计、总关闭台账和行动矩阵，确认自动可写项仍为 0 |
+| WPS-IMPORT-123D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、结果日志和 patch |
+
+## 2026-06-05 WPS-IMPORT-122 PENDING 正式化阻断报告
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-122A | P0 | 10m | 1 | DONE | 读取现库剩余 `PENDING-*` 销售、装箱和报关链路 |
+| WPS-IMPORT-122B | P0 | 10m | 1 | DONE | 新增只读分类脚本，区分正式 owner 缺失、0 数量、报关引用和正式报关原件缺失 |
+| WPS-IMPORT-122C | P1 | 10m | 1 | DONE | 输出 `wps_pending_formalization_blockers.{json,csv,md}`，确认 `auto_writable=0` |
+| WPS-IMPORT-122D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-05 WPS-IMPORT-121 PENDING 装箱占位被正式来源覆盖清理
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-121A | P0 | 10m | 1 | DONE | 结构化比对 `PENDING-*` 装箱占位与现库正式 `EXP*` WPS 装箱来源行 |
+| WPS-IMPORT-121B | P0 | 10m | 1 | DONE | 新增 dry-run/apply 脚本，只允许唯一正式来源覆盖无报关引用 PENDING 装箱占位 |
+| WPS-IMPORT-121C | P0 | 10m | 1 | DONE | 备份数据库后 apply，删除 1 条 PENDING 装箱占位并把历史备注追加到正式装箱行 |
+| WPS-IMPORT-121D | P1 | 10m | 1 | DONE | 重建来源覆盖、缺口明细、分层、执行计划、no-candidate blocker、总台账、行动矩阵和完成度审计 |
+| WPS-IMPORT-121E | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-05 WPS-IMPORT-120 PENDING 销售占位被正式来源覆盖清理
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-120A | P0 | 10m | 1 | DONE | 结构化比对 `PENDING-*` 销售占位与现库正式 `EXP*` WPS 来源销售行 |
+| WPS-IMPORT-120B | P0 | 10m | 1 | DONE | 新增 dry-run/apply 脚本，只允许唯一正式来源覆盖零价无引用 PENDING 销售占位 |
+| WPS-IMPORT-120C | P0 | 10m | 1 | DONE | 备份数据库后 apply，删除 4 条 PENDING 销售占位并补齐正式销售行单位 |
+| WPS-IMPORT-120D | P1 | 10m | 1 | DONE | 重建来源覆盖、缺口明细、分层、执行计划、操作性 blocker、总台账、行动矩阵和完成度审计 |
+| WPS-IMPORT-120E | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-05 WPS-IMPORT-119 出货汇总销售来源 note 收口
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-119A | P0 | 10m | 1 | DONE | 针对 no-candidate 销售缺口，比对 `出货汇总` 同合同、同商品、同门店、同售价和数量覆盖关系 |
+| WPS-IMPORT-119B | P0 | 10m | 1 | DONE | 新增 note-only dry-run/apply 脚本，支持单行精确命中和同价多行精确加总 |
+| WPS-IMPORT-119C | P0 | 10m | 1 | DONE | 备份数据库后 apply，给 8 条销售明细补 `[WPS_SHIPMENT_SUMMARY_SALES_SOURCE]` 来源 note |
+| WPS-IMPORT-119D | P1 | 10m | 1 | DONE | 重建来源覆盖、缺口明细、分层、no-candidate、总台账、行动矩阵和完成度审计 |
+| WPS-IMPORT-119E | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-05 WPS-IMPORT-118 剩余导入行动矩阵
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-118A | P0 | 10m | 1 | DONE | 读取 `wps_remaining_closure_register.json`，把 187 行关闭条件翻译成行动线、责任输入和复跑脚本 |
+| WPS-IMPORT-118B | P0 | 10m | 1 | DONE | 新增只读行动矩阵脚本，输出 `wps_remaining_action_matrix.{json,csv,md}` |
+| WPS-IMPORT-118C | P1 | 10m | 1 | DONE | 校验行动矩阵总行数与关闭台账一致，修正 `quantity_conflict_same_store` 分类口径 |
+| WPS-IMPORT-118D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-05 WPS-IMPORT-117 cloud-only 原件广域本机搜索
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-117A | P0 | 10m | 1 | DONE | 新增只读广域本机搜索脚本，按 cloud-only 目标文件名、大小和 SHA1 扫描常见本机目录、WPS 缓存和临时目录 |
+| WPS-IMPORT-117B | P0 | 10m | 1 | DONE | 输出 `wps_cloud_only_broad_local_search.{json,csv,md}`，确认 PDF 候选 0、根目录 `出货汇总.xlsx` 同名候选 5 但精确命中 0 |
+| WPS-IMPORT-117C | P0 | 10m | 1 | DONE | 复跑 cloud-only 窄探测和完成度审计，确认 `ready_to_copy_count=0`、`cloud_only_files=2` |
+| WPS-IMPORT-117D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-116 剩余导入关闭总台账
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-116A | P0 | 10m | 1 | DONE | 汇总五个 DB 来源缺口分桶、剩余裁决执行方案和 cloud-only 探测报告 |
+| WPS-IMPORT-116B | P0 | 10m | 1 | DONE | 新增只读总台账脚本，生成 `wps_remaining_closure_register.{json,csv,md}` |
+| WPS-IMPORT-116C | P0 | 10m | 1 | DONE | 校验总台账数量与完成度审计一致：`183+2+2=187` |
+| WPS-IMPORT-116D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-115 操作性历史行保留/清理关闭清单
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-115A | P0 | 10m | 1 | DONE | 复核操作性保留/清理队列与严格来源覆盖重复报告 |
+| WPS-IMPORT-115B | P0 | 10m | 1 | DONE | 新增只读关闭清单脚本，区分零价、零数量、PENDING 和操作标记行 |
+| WPS-IMPORT-115C | P1 | 10m | 1 | DONE | 输出 `wps_operational_retention_blockers.{json,csv,md}`，确认严格重复覆盖候选为 0 |
+| WPS-IMPORT-115D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-114 正式报关材料缺口关闭清单
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-114A | P0 | 10m | 1 | DONE | 复跑 `PENDING-威斯敏` 正式报关来源缺口复核 |
+| WPS-IMPORT-114B | P0 | 10m | 1 | DONE | 新增只读关闭清单脚本，区分占位父单缺正式原件和明细继承父单缺口 |
+| WPS-IMPORT-114C | P1 | 10m | 1 | DONE | 输出 `wps_formal_evidence_blockers.{json,csv,md}`，确认正式报关候选为 0 |
+| WPS-IMPORT-114D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-113 操作性候选冲突阻断原因分类
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-113A | P0 | 10m | 1 | DONE | 新增只读分类脚本，读取 `candidate_conflict_review=36` 的执行队列 |
+| WPS-IMPORT-113B | P0 | 10m | 1 | DONE | 输出 `wps_operational_candidate_conflict_blockers.{json,csv,md}`，归因数量、零数量、门店和价格冲突 |
+| WPS-IMPORT-113C | P1 | 10m | 1 | DONE | 复跑完成度审计，确认没有自动写库项 |
+| WPS-IMPORT-113D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-112 no-candidate 来源缺口关闭路径归因
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-112A | P0 | 10m | 1 | DONE | 新增只读分类脚本，读取 `source_required_no_candidate=24` 的执行队列 |
+| WPS-IMPORT-112B | P0 | 10m | 1 | DONE | 输出 `wps_no_candidate_source_blockers.{json,csv,md}`，归因 PENDING、商品不匹配和同合同源缺失 |
+| WPS-IMPORT-112C | P1 | 10m | 1 | DONE | 复跑 cloud-only 窄探测和完成度审计，确认没有自动写库或复制项 |
+| WPS-IMPORT-112D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-111 剩余候选映射阻断原因分类
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-111A | P0 | 10m | 1 | DONE | 新增只读阻断原因分类脚本，读取剩余 23 条候选映射复核项 |
+| WPS-IMPORT-111B | P0 | 10m | 1 | DONE | 横向扫描是否存在多个带来源拆分行加总覆盖无来源聚合行，确认候选为 0 |
+| WPS-IMPORT-111C | P1 | 10m | 1 | DONE | 输出 `wps_remaining_candidate_blockers.{json,csv,md}`，分出数量冲突、价格冲突和多候选加总价格冲突 |
+| WPS-IMPORT-111D | P1 | 10m | 1 | DONE | 复跑完成度审计和 diff check，确认仍无自动可写项 |
+| WPS-IMPORT-111E | P1 | 10m | 1 | DONE | 更新检查点、指标、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-110 多候选中的唯一组合门店覆盖收口
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-110A | P0 | 10m | 1 | DONE | 扩展组合门店别名清理脚本，允许多候选中唯一兼容组合门店来源通过 |
+| WPS-IMPORT-110B | P0 | 10m | 1 | DONE | dry-run 确认 `EXP250027 / 窗帘` 2 条拆分装箱行由 `米尔皮塔、圣荷西625` 组合门店行覆盖 |
+| WPS-IMPORT-110C | P0 | 10m | 1 | DONE | 备份数据库后 apply，删除 2 条无来源拆分装箱行 |
+| WPS-IMPORT-110D | P1 | 10m | 1 | DONE | 顺序重建来源缺口明细、分层、候选映射、占用复核、执行队列和完成度审计 |
+| WPS-IMPORT-110E | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-109 组合门店别名聚合来源收口
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-109A | P0 | 10m | 1 | DONE | 新增组合门店别名覆盖 dry-run/apply 脚本，识别 `圣荷西2115和625` 对 `圣荷西625` 等别名覆盖 |
+| WPS-IMPORT-109B | P0 | 10m | 1 | DONE | dry-run 确认 7 条无来源拆分销售/装箱行由带 WPS 来源组合门店行覆盖 |
+| WPS-IMPORT-109C | P0 | 10m | 1 | DONE | 备份数据库后 apply，删除 1 条销售行和 6 条装箱行 |
+| WPS-IMPORT-109D | P1 | 10m | 1 | DONE | 顺序重建来源缺口明细、分层、候选复核、操作复核、执行队列和完成度审计 |
+| WPS-IMPORT-109E | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-108 操作性缺口重复覆盖复核
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-108A | P0 | 10m | 1 | DONE | 新增只读复核脚本，检查 118 条操作性来源缺口是否被带 WPS 来源现库行严格覆盖 |
+| WPS-IMPORT-108B | P0 | 10m | 1 | DONE | 输出 `wps_operational_duplicate_coverage.{json,csv,md}`，确认严格覆盖候选为 0 |
+| WPS-IMPORT-108C | P1 | 10m | 1 | DONE | 识别 2 条零价/非零价近似价格冲突，作为复核项而非自动清理项 |
+| WPS-IMPORT-108D | P1 | 10m | 1 | DONE | 复跑完成度审计和来源覆盖审计，确认当前仍无自动可写项 |
+| WPS-IMPORT-108E | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-107 聚合门店来源覆盖销售行收口
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-107A | P0 | 10m | 1 | DONE | 为 5 条聚合门店占用候选新增 dry-run/apply 清理脚本 |
+| WPS-IMPORT-107B | P0 | 10m | 1 | DONE | dry-run 确认 5 条无来源拆分销售行由带 WPS 来源聚合行覆盖，并合并单位字段 |
+| WPS-IMPORT-107C | P0 | 10m | 1 | DONE | 备份数据库后 apply，删除 5 条拆分重复销售行 |
+| WPS-IMPORT-107D | P1 | 10m | 1 | DONE | 重建来源缺口明细、分层、候选复核、执行队列和完成度审计 |
+| WPS-IMPORT-107E | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-106 重复来源占用销售行收口
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-106A | P0 | 10m | 1 | DONE | 为 2 条同字段无引用占用复核项新增 dry-run/apply 清理脚本 |
+| WPS-IMPORT-106B | P0 | 10m | 1 | DONE | dry-run 确认 2 条无来源重复销售行可由带 WPS 来源行覆盖，并合并单位字段 |
+| WPS-IMPORT-106C | P0 | 10m | 1 | DONE | 备份数据库后 apply，删除 2 条重复销售行 |
+| WPS-IMPORT-106D | P1 | 10m | 1 | DONE | 重建来源缺口明细、分层、候选复核、执行队列和完成度审计 |
+| WPS-IMPORT-106E | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-105 候选来源占用/转移复核
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-105A | P0 | 10m | 1 | DONE | 读取 `wps_candidate_source_mapping_review.json` 和现库引用关系 |
+| WPS-IMPORT-105B | P0 | 15m | 1 | DONE | 新增 `analyze_wps_candidate_source_ownership.py`，复核候选来源占用行是否有库存/报关引用 |
+| WPS-IMPORT-105C | P0 | 10m | 1 | DONE | 生成 `wps_candidate_source_ownership_review.{json,csv,md}`，识别 5 条聚合占用转移候选 |
+| WPS-IMPORT-105D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-104 cloud-only 日志接口线索探测
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-104A | P0 | 10m | 1 | DONE | 新增只读脱敏日志探针，读取 cloud-only 目标和 WPS 本机日志 |
+| WPS-IMPORT-104B | P0 | 10m | 1 | DONE | 输出 URL host/path/query key、接口词和错误码摘要，不输出 token/cookie/日志正文 |
+| WPS-IMPORT-104C | P0 | 10m | 1 | DONE | 生成 `wps_cloud_only_log_api_clues.{json,md}`，确认两个目标均无接口线索 |
+| WPS-IMPORT-104D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-103 cloud-only 下载手柄探测
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-103A | P0 | 10m | 1 | DONE | 抽取两个 cloud-only 目标在 WPS metadata/cache/transfer 中的 fileId、groupId、taskId |
+| WPS-IMPORT-103B | P0 | 15m | 1 | DONE | 新增 `probe_wps_cloud_only_download_handles.py`，不联网、不输出 token、不写库 |
+| WPS-IMPORT-103C | P0 | 10m | 1 | DONE | 生成 `wps_cloud_only_download_handles.{json,md}` 并确认 `directly_downloadable_count=0` |
+| WPS-IMPORT-103D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-102 剩余来源缺口执行队列
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-102A | P0 | 10m | 1 | DONE | 读取 199 条来源缺口分层、候选映射、操作性复核和正式报关复核报告 |
+| WPS-IMPORT-102B | P0 | 15m | 1 | DONE | 新增 `build_wps_remaining_source_gap_execution_plan.py`，逐条输出必要输入、禁止动作和安全下一步 |
+| WPS-IMPORT-102C | P0 | 10m | 1 | DONE | 生成 `wps_remaining_source_gap_execution_plan.{json,csv,md}`，确认 `auto_writable=0` |
+| WPS-IMPORT-102D | P1 | 10m | 1 | DONE | 复跑完成度审计、来源覆盖审计和 diff check |
+| WPS-IMPORT-102E | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-101 cloud-only 原件关闭工具
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-101A | P0 | 10m | 1 | DONE | 复跑 cloud-only 窄探测和 WPS 内部深探测，确认当前仍无 SHA1 精确副本 |
+| WPS-IMPORT-101B | P0 | 15m | 1 | DONE | 新增 `close_wps_cloud_only_files.py`，只在 SHA1 精确匹配时复制项目源文件 |
+| WPS-IMPORT-101C | P0 | 10m | 1 | DONE | 生成 `wps_cloud_only_close_plan.{json,md}`，确认 `not_ready_count=2`、`copied_count=0` |
+| WPS-IMPORT-101D | P1 | 10m | 1 | DONE | 复跑完成度审计、来源覆盖审计和 diff check |
+| WPS-IMPORT-101E | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-100 剩余裁决只读执行方案
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-100A | P0 | 10m | 1 | DONE | 新增只读执行方案脚本，读取剩余裁决 dossier 与现库目标行 |
+| WPS-IMPORT-100B | P0 | 10m | 1 | DONE | 为 `EXP2500002 / 瓷砖` 输出保留、归属安纳汉姆、归属 Burbank、拆分 4 个分支 |
+| WPS-IMPORT-100C | P0 | 10m | 1 | DONE | 为 `EXP2400006` 输出 reference-only 与正式材料后创建报关 2 个分支 |
+| WPS-IMPORT-100D | P1 | 10m | 1 | DONE | 生成 `wps_remaining_decision_execution_plan.{json,csv,md}` 并确认本轮写入为 0 |
+| WPS-IMPORT-100E | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、备忘录、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-99 cloud-only WPS 内部状态深探测
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-99A | P0 | 10m | 1 | DONE | 识别 WPS 云同步进程打开的本机数据库、端口和日志位置 |
+| WPS-IMPORT-99B | P0 | 15m | 1 | DONE | 新增深探测脚本复核 sync/transfer/precloud/datacache/cachedata/logs |
+| WPS-IMPORT-99C | P0 | 10m | 1 | DONE | 生成 `wps_cloud_only_deep_state.{json,md}`，确认没有隐藏本机下载状态 |
+| WPS-IMPORT-99D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-98 剩余裁决项引用状态复核
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-98A | P0 | 10m | 1 | DONE | 复核 `EXP2500002` 与 `EXP2400006` 相关现库销售/装箱行引用关系 |
+| WPS-IMPORT-98B | P0 | 10m | 1 | DONE | 增强剩余裁决 dossier，列出销售库存引用和装箱报关引用 |
+| WPS-IMPORT-98C | P1 | 10m | 1 | DONE | 重新生成 `wps_remaining_decision_dossier.{json,csv,md}` |
+| WPS-IMPORT-98D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-97 云端原件当前 metadata 复核
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-97A | P0 | 10m | 1 | DONE | 刷新完成度审计，确认当前自动可写项、来源缺口和 cloud-only 原件数量 |
+| WPS-IMPORT-97B | P0 | 10m | 1 | DONE | 复核两个 cloud-only 目标的当前 WPS metadata 和本机候选 SHA1 |
+| WPS-IMPORT-97C | P1 | 10m | 1 | DONE | 尝试打开 WPS 旧缓存触发根目录 `出货汇总.xlsx` 同步并复查 SHA1 |
+| WPS-IMPORT-97D | P1 | 10m | 1 | DONE | 记录 WPS 窗口自动化限制、结果、指标、风险和 patch |
+
+## 2026-06-04 WPS-IMPORT-96 销售别名 no-candidate 来源复核
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-96A | P0 | 10m | 1 | DONE | 从剩余 no-candidate 中筛出 13 条销售来源缺口 |
+| WPS-IMPORT-96B | P0 | 15m | 1 | DONE | 新增销售别名强匹配 dry-run 脚本 |
+| WPS-IMPORT-96C | P0 | 10m | 1 | DONE | 确认 `salesItemUpdates=0`，原因是源行已消费、重复源副本或无强候选 |
+| WPS-IMPORT-96D | P1 | 10m | 1 | DONE | 更新检查点、指标、风险、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-95 全量装箱源漏匹配来源回填
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-95A | P0 | 10m | 1 | DONE | 从 `no_candidate_source_required=28` 中筛出全量装箱源可唯一强匹配的记录 |
+| WPS-IMPORT-95B | P0 | 15m | 1 | DONE | 新增全量装箱源来源 note 回填脚本，默认 dry-run |
+| WPS-IMPORT-95C | P0 | 10m | 1 | DONE | 备份数据库并应用 4 条 note-only 来源回填 |
+| WPS-IMPORT-95D | P1 | 10m | 1 | DONE | 复跑来源缺口明细、分层、完成度审计和三条主 dry-run |
+| WPS-IMPORT-95E | P1 | 10m | 1 | DONE | 更新检查点、备忘录、指标、风险、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-94 PENDING-威斯敏正式报关来源缺口复核
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-94A | P0 | 10m | 1 | DONE | 复核 `formal_evidence_required=18` 的 DB 占位报关单和明细 |
+| WPS-IMPORT-94B | P0 | 15m | 1 | DONE | 新增只读脚本比对占位报关单、WPS 装箱源集合、正式凭证候选 |
+| WPS-IMPORT-94C | P0 | 10m | 1 | DONE | 生成 `wps_formal_customs_gap_review.{json,csv,md}` 并确认 `auto_writable=0` |
+| WPS-IMPORT-94D | P1 | 10m | 1 | DONE | 更新检查点、备忘录、指标、风险、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-93 CG2500013 采购错挂修复
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-93A | P0 | 10m | 1 | DONE | 用当前 PDF 运行时重新抽取 `CG2500013` 原件正文 |
+| WPS-IMPORT-93B | P0 | 10m | 1 | DONE | 修正采购凭证抽取脚本，支持 PDF 文本表格明细 |
+| WPS-IMPORT-93C | P0 | 10m | 1 | DONE | 新增 `CG2500013` 专用修复脚本并生成 dry-run 计划 |
+| WPS-IMPORT-93D | P0 | 10m | 1 | DONE | 备份数据库并应用合同头、明细和供应商修复 |
+| WPS-IMPORT-93E | P1 | 10m | 1 | DONE | 复跑采购导入、来源覆盖、完成度审计和来源分层报告 |
+| WPS-IMPORT-93F | P1 | 10m | 1 | DONE | 更新检查点、备忘录、指标、风险、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-92 采购别名强匹配来源回填
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-92A | P0 | 10m | 1 | DONE | 复核剩余采购来源缺口，确认只处理同合同、金额、单价、数量和商品别名强对齐子集 |
+| WPS-IMPORT-92B | P0 | 15m | 1 | DONE | 新增严格采购别名来源 note 回填脚本，默认 dry-run |
+| WPS-IMPORT-92C | P0 | 10m | 1 | DONE | 写库前备份数据库并应用 18 条采购明细来源 note、3 条数量/单位错位修正 |
+| WPS-IMPORT-92D | P1 | 10m | 1 | DONE | 复跑 dry-run、采购导入 dry-run、来源覆盖审计和完成度审计 |
+| WPS-IMPORT-92E | P1 | 10m | 1 | DONE | 更新检查点、备忘录、指标、风险、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-91 零值/操作性历史来源缺口复核
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-91A | P0 | 10m | 1 | DONE | 从 `zero_or_operational_review=118` 中抽取 DB 行、候选来源和操作性标记 |
+| WPS-IMPORT-91B | P0 | 15m | 1 | DONE | 新增只读脚本检查库存/报关引用并生成 verdict |
+| WPS-IMPORT-91C | P0 | 10m | 1 | DONE | 生成 `wps_operational_source_gap_review.{json,csv,md}` 并确认 `auto_writable=0` |
+| WPS-IMPORT-91D | P1 | 10m | 1 | DONE | 复跑完成度审计、diff check 并更新检查点、指标、风险、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-90 候选来源映射深度复核
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-90A | P0 | 10m | 1 | DONE | 从 `candidate_mapping_review=39` 中抽取候选源、DB 行和来源 note 消费情况 |
+| WPS-IMPORT-90B | P0 | 15m | 1 | DONE | 新增只读脚本对比 DB 行、WPS 源行、候选源是否已挂到其他 note |
+| WPS-IMPORT-90C | P0 | 10m | 1 | DONE | 生成 `wps_candidate_source_mapping_review.{json,csv,md}` 并确认 `auto_writable=0` |
+| WPS-IMPORT-90D | P1 | 10m | 1 | DONE | 复跑完成度审计并更新检查点、指标、风险、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-89 来源缺口处置分层
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-89A | P0 | 10m | 1 | DONE | 按当前完成度审计确认阶段目标：自动可写项归零，剩余来源缺口只做处置分层 |
+| WPS-IMPORT-89B | P0 | 15m | 1 | DONE | 新增只读 disposition 分类脚本，消费 `wps_source_gap_details.json` |
+| WPS-IMPORT-89C | P0 | 10m | 1 | DONE | 生成 `wps_source_gap_disposition.{json,csv,md}` 并确认 `auto_writable=0` |
+| WPS-IMPORT-89D | P1 | 10m | 1 | DONE | 复跑完成度审计并更新检查点、指标、风险、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-88 仅云端原件窄探测与同步尝试
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-88A | P0 | 10m | 1 | DONE | 新增只读窄探测脚本，只针对当前两个 cloud-only 目标反查 |
+| WPS-IMPORT-88B | P0 | 10m | 1 | DONE | 扫描项目源目录、WPS 本机路径、Downloads 和 WPS cache.db 候选 |
+| WPS-IMPORT-88C | P1 | 10m | 1 | DONE | 尝试打开根目录旧缓存 `出货汇总.xlsx` 触发 WPS 同步并复核 SHA1 |
+| WPS-IMPORT-88D | P1 | 10m | 1 | DONE | 复跑窄探测、完成度审计、出口文件留存审计并更新检查点 |
+
+## 2026-06-04 WPS-IMPORT-87 云端原件缺口审计口径修正
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-87A | P0 | 10m | 1 | DONE | 查清完成度审计 `cloud_only_files=1` 与出口留存审计 `cloud_only_files=2` 的口径差异 |
+| WPS-IMPORT-87B | P0 | 10m | 1 | DONE | 修正完成度审计，合并主目录与根目录清单 metadata 并按 scope 输出 |
+| WPS-IMPORT-87C | P1 | 10m | 1 | DONE | 修正出口留存审计摘要，增加主目录/根目录分 scope 计数 |
+| WPS-IMPORT-87D | P1 | 10m | 1 | DONE | 复跑审计并更新检查点、指标、风险、结果日志和 patch |
+
+## 2026-06-04 WPS-IMPORT-86 剩余裁决结构化证据包
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-86A | P0 | 10m | 1 | DONE | 按当前进度把阶段目标收窄为剩余裁决证据包，不再寻找无证据写库项 |
+| WPS-IMPORT-86B | P0 | 15m | 1 | DONE | 新增只读脚本生成 `wps_remaining_decision_dossier.{json,csv,md}` |
+| WPS-IMPORT-86C | P0 | 10m | 1 | DONE | 将 `EXP2500002 / 瓷砖` 拆成源销售、源装箱、现库行、反证和可选动作 |
+| WPS-IMPORT-86D | P0 | 10m | 1 | DONE | 将 `EXP2400006` 拆成源文件、现库、保留附件、真实凭证抽取和正式编号反证 |
+| WPS-IMPORT-86E | P1 | 10m | 1 | DONE | 更新脚本索引、检查点、结果日志、指标、风险和 patch |
+
+## 2026-06-04 WPS-IMPORT-85 唯一 WPS 云端原件缺口复核
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-85A | P0 | 10m | 1 | DONE | 从完成度审计定位唯一 `cloud_only_files=1` 条目 |
+| WPS-IMPORT-85B | P0 | 10m | 1 | DONE | 查验 WPS 本机缓存和项目源目录是否已有同名/同合同文件 |
+| WPS-IMPORT-85C | P1 | 10m | 1 | DONE | 尝试读取 WPS 客户端状态并记录 GUI 自动化限制 |
+| WPS-IMPORT-85D | P1 | 10m | 1 | DONE | 更新备忘录：该无年份路径 PDF 继续作为原件副本缺口，不写库、不冒充 |
+
+## 2026-06-04 WPS-IMPORT-84 出口附件页面验收与运行时启动修复
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-84A | P0 | 10m | 1 | DONE | 按当前进度更新阶段目标：先完成出口附件页面可见/可下载闭环 |
+| WPS-IMPORT-84B | P0 | 10m | 1 | DONE | 创建本地测试账号并验证登录接口 |
+| WPS-IMPORT-84C | P0 | 10m | 1 | DONE | 修复后端启动巡检旧 Interface 使用并补测试 |
+| WPS-IMPORT-84D | P0 | 10m | 1 | DONE | 验证销售附件列表和下载接口 |
+| WPS-IMPORT-84E | P0 | 10m | 1 | DONE | 用真实前端页面登录并截图验证“源文件附件”区域 |
+| WPS-IMPORT-84F | P1 | 10m | 1 | DONE | 补齐结果记录、指标、风险和 patch |
+
+## 2026-06-03 WPS-IMPORT-83 出口合同源文件附件 Interface 与导入
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-83A | P0 | 15m | 1 | DONE | 新增 `SalesContractFile` 模型、migration 和后端附件路由 |
+| WPS-IMPORT-83B | P0 | 15m | 1 | DONE | 在销售详情页新增源文件附件卡片 |
+| WPS-IMPORT-83C | P0 | 15m | 1 | DONE | 新增并执行 WPS 出口源文件附件导入脚本 |
+| WPS-IMPORT-83D | P1 | 15m | 1 | DONE | 扩展出口文件留存审计，确认附件记录覆盖和物理文件存在性 |
+| WPS-IMPORT-83E | P1 | 15m | 1 | DONE | 跑 migration doctor、后端测试、前端 lint、销售详情页测试并更新检查点 |
+
+## 2026-06-03 WPS-IMPORT-82 出货源文件留存审计
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-82A | P0 | 10m | 1 | DONE | 复核销售合同模型和上传目录，确认出口侧没有现成附件 Interface |
+| WPS-IMPORT-82B | P0 | 15m | 1 | DONE | 新增出货源文件留存只读审计脚本，按正式 `EXP*` 合同统计覆盖 |
+| WPS-IMPORT-82C | P1 | 10m | 1 | DONE | 生成 JSON/CSV/Markdown 审计包并修正占位合同口径 |
+| WPS-IMPORT-82D | P1 | 10m | 1 | DONE | 更新检查点、备忘录、指标、风险、结果日志和 patch |
+
+## 2026-06-03 WPS-IMPORT-81 采购 typo 孤儿附件恢复
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-81A | P0 | 10m | 1 | DONE | 复核剩余 4 个不可恢复孤儿 PDF，识别多写一个 0 的合同号候选 |
+| WPS-IMPORT-81B | P0 | 10m | 1 | DONE | 扩展附件留存审计，输出 typo 可恢复候选 |
+| WPS-IMPORT-81C | P0 | 10m | 1 | DONE | 备份数据库并恢复 2 条 typo PDF 附件记录 |
+| WPS-IMPORT-81D | P1 | 10m | 1 | DONE | 复跑审计、恢复 dry-run 和三条业务导入 dry-run |
+| WPS-IMPORT-81E | P1 | 10m | 1 | DONE | 更新检查点、备忘录、指标、结果日志和 patch |
+
+## 2026-06-03 WPS-IMPORT-80 采购物理孤儿附件恢复
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-80A | P0 | 10m | 1 | DONE | 扩展附件留存审计，区分可恢复与不可恢复物理孤儿文件 |
+| WPS-IMPORT-80B | P0 | 10m | 1 | DONE | 新增物理孤儿附件恢复脚本，默认 dry-run |
+| WPS-IMPORT-80C | P0 | 10m | 1 | DONE | 备份数据库并恢复 71 条强匹配 `ContractFile` 记录 |
+| WPS-IMPORT-80D | P1 | 10m | 1 | DONE | 复跑审计和恢复 dry-run，确认可恢复孤儿归零 |
+| WPS-IMPORT-80E | P1 | 10m | 1 | DONE | 更新检查点、备忘录、指标、风险、结果日志和 patch |
+
+## 2026-06-03 WPS-IMPORT-79 采购合同附件留存入库
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-79A | P0 | 10m | 1 | DONE | 审计 WPS 首选采购凭证、系统附件表和物理上传文件覆盖关系 |
+| WPS-IMPORT-79B | P0 | 15m | 1 | DONE | 新增采购合同附件导入脚本，默认 dry-run、确定性文件名 |
+| WPS-IMPORT-79C | P0 | 15m | 1 | DONE | 备份数据库并复制 186 份 WPS 首选采购凭证，创建 186 条 `ContractFile` 记录 |
+| WPS-IMPORT-79D | P1 | 10m | 1 | DONE | 复跑附件导入 dry-run 和附件留存审计，确认候选归零 |
+| WPS-IMPORT-79E | P1 | 10m | 1 | DONE | 更新检查点、备忘录、指标、风险、结果日志和 patch |
+
+## 2026-06-03 WPS-IMPORT-78 来源缺口逐条明细包
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-78A | P0 | 10m | 1 | DONE | 刷新采购/装箱/mismatch note-only dry-run 计划，确认无新增安全回填项 |
+| WPS-IMPORT-78B | P0 | 15m | 1 | DONE | 新增来源缺口逐条明细包脚本，输出 JSON/CSV/Markdown |
+| WPS-IMPORT-78C | P1 | 10m | 1 | DONE | 校验明细包总数与来源覆盖审计 `223` 对齐 |
+| WPS-IMPORT-78D | P1 | 10m | 1 | DONE | 更新检查点、备忘录、指标、结果日志和 patch |
+
+## 2026-06-03 WPS-IMPORT-77 剩余来源缺口分类
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-77A | P0 | 10m | 1 | DONE | 用标准化装箱源复核 48 条装箱来源缺口，确认无安全唯一回填项 |
+| WPS-IMPORT-77B | P0 | 10m | 1 | DONE | 新增剩余来源缺口分类脚本，输出 JSON/Markdown |
+| WPS-IMPORT-77C | P1 | 10m | 1 | DONE | 重跑来源覆盖、完成度审计、裁决包和三条导入 dry-run |
+| WPS-IMPORT-77D | P1 | 10m | 1 | DONE | 更新检查点、备忘录、指标、结果日志和 patch |
+
+## 2026-06-03 WPS-IMPORT-76 采购合同号口径冲突来源 note 回填
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-76A | P0 | 10m | 1 | DONE | 用标准化销售源分析 137 条销售明细来源缺口，确认无安全唯一回填项 |
+| WPS-IMPORT-76B | P0 | 10m | 1 | DONE | 新增采购合同号口径冲突来源 note 回填脚本，默认 dry-run |
+| WPS-IMPORT-76C | P0 | 10m | 1 | DONE | 备份数据库并给 `CG2400019` 合同头/明细回填 mismatch 来源 note |
+| WPS-IMPORT-76D | P1 | 10m | 1 | DONE | 重跑来源覆盖、完成度审计、裁决包和三条导入 dry-run |
+| WPS-IMPORT-76E | P1 | 10m | 1 | DONE | 更新检查点、备忘录、指标、风险、结果日志和 patch |
+
+## 2026-06-03 WPS-IMPORT-75 占位报关单来源 note 回填
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-75A | P0 | 10m | 1 | DONE | 分析报关单来源缺口，区分正式凭证缺口与 WPS 占位来源缺口 |
+| WPS-IMPORT-75B | P0 | 10m | 1 | DONE | 新增占位报关单来源 note 回填脚本，默认 dry-run |
+| WPS-IMPORT-75C | P0 | 10m | 1 | DONE | 备份数据库并给 `BGP250028` 回填占位来源 note |
+| WPS-IMPORT-75D | P1 | 10m | 1 | DONE | 重跑来源覆盖、完成度审计、裁决包和三条导入 dry-run |
+| WPS-IMPORT-75E | P1 | 10m | 1 | DONE | 更新检查点、备忘录、指标、风险、结果日志和 patch |
+
+## 2026-06-03 WPS-IMPORT-74 装箱明细来源 note 回填
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-74A | P0 | 10m | 1 | DONE | 只读分析销售/装箱明细来源缺口，确认下一批唯一匹配对象 |
+| WPS-IMPORT-74B | P0 | 10m | 1 | DONE | 新增装箱明细来源 note 回填脚本，默认 dry-run |
+| WPS-IMPORT-74C | P0 | 10m | 1 | DONE | 备份数据库并回填 4 条装箱明细来源 note |
+| WPS-IMPORT-74D | P1 | 10m | 1 | DONE | 重跑来源覆盖、完成度审计、裁决包和三条导入 dry-run |
+| WPS-IMPORT-74E | P1 | 10m | 1 | DONE | 更新检查点、备忘录、指标、风险、结果日志和 patch |
+
+## 2026-06-03 WPS-IMPORT-73 采购明细来源 note 回填
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-73A | P0 | 10m | 1 | DONE | 新增采购明细来源 note 回填脚本，默认 dry-run |
+| WPS-IMPORT-73B | P0 | 10m | 1 | DONE | 抽查回填计划，确认只追加来源 note、不改业务字段 |
+| WPS-IMPORT-73C | P0 | 10m | 1 | DONE | 备份数据库并回填 87 条采购明细来源 note |
+| WPS-IMPORT-73D | P1 | 10m | 1 | DONE | 重跑来源覆盖、完成度审计、裁决包和三条导入 dry-run |
+| WPS-IMPORT-73E | P1 | 10m | 1 | DONE | 更新检查点、备忘录、指标、风险、结果日志和 patch |
+
+## 2026-06-03 WPS-IMPORT-72 合同头来源 note 回填与数据库来源覆盖审计
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-72A | P0 | 10m | 1 | DONE | 新增已入库 WPS 来源覆盖审计，统计各表 note 来源缺口 |
+| WPS-IMPORT-72B | P0 | 10m | 1 | DONE | 新增合同头来源 note 回填脚本，默认 dry-run |
+| WPS-IMPORT-72C | P0 | 10m | 1 | DONE | 备份数据库并只回填出口/采购合同头来源 note |
+| WPS-IMPORT-72D | P1 | 10m | 1 | DONE | 重跑来源覆盖、完成度审计和导入 dry-run |
+| WPS-IMPORT-72E | P1 | 10m | 1 | DONE | 更新检查点、备忘录、指标、风险、结果日志和 patch |
+
+## 2026-06-03 WPS-IMPORT-71 完成度审计与剩余阻断归档
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-71A | P0 | 10m | 1 | DONE | 复核当前裁决包、旧粗粒度差异报告和三条导入计划输出 |
+| WPS-IMPORT-71B | P0 | 10m | 1 | DONE | 新增只读完成度审计脚本，汇总自动可写项、裁决项和云端原件缺口 |
+| WPS-IMPORT-71C | P1 | 10m | 1 | DONE | 生成 `wps_import_completion_audit.json/md` 并修正待裁决字段渲染 |
+| WPS-IMPORT-71D | P1 | 10m | 1 | DONE | 更新检查点、备忘录、指标、风险、结果日志和 patch |
+
+## 2026-06-03 WPS-IMPORT-70 WPS 索引刷新与凭证运行时校验
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-70A | P0 | 10m | 1 | DONE | 刷新全量 `11-报关记录` WPS 云端索引并复制可用正文 |
+| WPS-IMPORT-70B | P0 | 10m | 1 | DONE | 重跑附件盘点、采购抽取和出口源分析，确认无新增可自动导入项 |
+| WPS-IMPORT-70C | P0 | 10m | 1 | DONE | 用 Codex Python 重跑真实凭证抽取，修正系统 Python 缺 PDF 依赖导致的假 `empty_text` |
+| WPS-IMPORT-70D | P1 | 10m | 1 | DONE | 重跑出口源、采购、真实凭证导入 dry-run 和裁决包 |
+| WPS-IMPORT-70E | P1 | 10m | 1 | DONE | 更新检查点、待裁决备忘录、风险、结果日志和 patch |
+
+## 2026-06-03 WPS-IMPORT-69 EXP2500001 错挂来源收口
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-69A | P0 | 10m | 1 | DONE | 复核 `EXP2500001 / 冷冻肉切片机` 两条候选装箱行完整字段和来源 note |
+| WPS-IMPORT-69B | P0 | 10m | 1 | DONE | 扩展装箱去重脚本，支持只移除字段冲突的错挂来源 note |
+| WPS-IMPORT-69C | P0 | 10m | 1 | DONE | 备份数据库并移除 `南常` 行上的 `出货汇总(1):56` 错挂来源 |
+| WPS-IMPORT-69D | P1 | 10m | 1 | DONE | 重跑导入 dry-run、裁决包、清理脚本和凭证导入 dry-run |
+| WPS-IMPORT-69E | P1 | 10m | 1 | DONE | 更新待裁决备忘录、指标、风险、结果和 patch |
+
+## 2026-06-03 WPS-IMPORT-68 EXP250027 混合门店拆分收口
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-68A | P0 | 10m | 1 | DONE | 复核 `EXP250027 / 窗帘` 源装箱行，确认 `31+35=66` 的文件正文证据 |
+| WPS-IMPORT-68B | P0 | 10m | 1 | DONE | 收紧组合门店创建规则，只允许有真实现有港口的源组合门店自动创建 |
+| WPS-IMPORT-68C | P0 | 10m | 1 | DONE | 导入 `米尔皮塔、圣荷西625` 组合门店装箱行，并按装箱数量拆分销售行 |
+| WPS-IMPORT-68D | P0 | 10m | 1 | DONE | 删除已被同源拆分销售行覆盖的旧路径门店销售行 |
+| WPS-IMPORT-68E | P1 | 10m | 1 | DONE | 跑幂等回归并更新待裁决备忘录、风险、指标和结果日志 |
+
+## 2026-06-03 旧 XLS 报关底稿可读化复核
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-33A | P0 | 10m | 1 | DONE | 复用前端 `xlsx` 依赖读取旧 OLE2/BIFF `.xls` 报关底稿 |
+| WPS-IMPORT-33B | P0 | 10m | 1 | DONE | 重跑真实凭证抽取，确认旧 `.xls` 从 `empty_text` 变成 `needs_review` |
+| WPS-IMPORT-33C | P0 | 10m | 1 | DONE | 复跑真实凭证、出口源和采购导入 dry-run，确认没有新增写库项 |
+| WPS-IMPORT-33D | P1 | 10m | 1 | DONE | 更新待裁决包、业务备忘录和检查点 |
+
+## 2026-06-02 WPS 云端合同正文回收与采购补导入
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-29A | P0 | 15m | 1 | DONE | 通过 WPS 客户端触发 2026 年 3/4/5 月云端采购合同正文下载 |
+| WPS-IMPORT-29B | P0 | 10m | 1 | DONE | 修正 WPS 云端索引盘点，识别 SHA1、本机直路径和项目源目录已存在文件 |
+| WPS-IMPORT-29C | P0 | 10m | 1 | DONE | 重跑附件盘点、采购抽取、出口源分析和导入 dry-run |
+| WPS-IMPORT-29D | P0 | 10m | 1 | DONE | 备份数据库并导入 16 份可证明采购合同和明细 |
+| WPS-IMPORT-29E | P1 | 10m | 1 | DONE | 核对出货汇总 Excel 是否写明缺失采购合同乙方，并更新备忘录/检查点 |
+
+## 2026-06-02 WPS 云盘 2026 年 4/5 月补导入
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-25A | P0 | 10m | 1 | DONE | 同步已缓存的 WPS 云盘 2026 年 4/5 月出货/采购源文件 |
+| WPS-IMPORT-25B | P0 | 15m | 1 | DONE | 修正装箱源选择规则并新增缺失 EXP 合同头创建 Interface |
+| WPS-IMPORT-25C | P0 | 10m | 1 | DONE | 导入 `EXP260005/006/007` 合同头、装箱和销售明细 |
+| WPS-IMPORT-25D | P0 | 10m | 1 | DONE | 导入 `CG2600036` 采购合同和明细 |
+| WPS-IMPORT-25E | P1 | 10m | 1 | DONE | 运行幂等校验并更新备忘录/检查点 |
+| WPS-IMPORT-26A | P0 | 10m | 1 | DONE | 新增 WPS 云端索引只读盘点脚本 |
+| WPS-IMPORT-26B | P0 | 10m | 1 | DONE | 固化 2026 年 4/5 月云端文件缓存状态并复制已缓存文件 |
+| WPS-IMPORT-26C | P0 | 10m | 1 | DONE | 重跑采购抽取和导入 dry-run，确认无新增可写库合同 |
+| WPS-IMPORT-26D | P1 | 10m | 1 | DONE | 更新待裁决备忘录、风险、指标和检查点 |
+| WPS-IMPORT-27A | P0 | 10m | 1 | DONE | 全量盘点 `11-报关记录` 云端索引并复制所有已缓存文件 |
+| WPS-IMPORT-27B | P0 | 10m | 1 | DONE | 保留 WPS 根目录 `出货汇总.xlsx` 与 `装货清单.xlsx` 作为 `_wps_cloud_root` 证据源 |
+| WPS-IMPORT-27C | P0 | 15m | 1 | DONE | 基于根目录 `出货汇总.xlsx` 补导入可证明装箱/销售/合同汇总字段 |
+| WPS-IMPORT-27D | P1 | 10m | 1 | DONE | 复跑幂等校验并更新待裁决包/检查点 |
+| WPS-IMPORT-28A | P0 | 10m | 1 | DONE | 修正 WPS 云端索引盘点，回查团队文档本机直路径 |
+| WPS-IMPORT-28B | P0 | 10m | 1 | DONE | 重跑全量 `11-报关记录` 复制，找回 3 个直路径文件 |
+| WPS-IMPORT-28C | P0 | 10m | 1 | DONE | 重跑采购抽取、出口分析和导入 dry-run |
+| WPS-IMPORT-28D | P1 | 10m | 1 | DONE | 更新待裁决备忘录、风险、指标和检查点 |
+
 ## 2026-04-05 Migration Health 诊断输出
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
@@ -864,3 +1467,69 @@
 | EXP-02 | P2 | 45m | 1 | TODO | 汇率自动同步：定时拉取央行/ExchangeRate-API 公开汇率，写入 `system_configs`，财务模块付款换算自动引用最新汇率而非手动填写 |
 | EXP-03 | P2 | 60m | 1 | TODO | 合同 Word 模板导出：基于 `docxtemplater`，采购/销售合同详情页增加「导出 Word」选项，输出带公司抬头/盖章位置的标准合同格式 |
 | EXP-04 | P2 | 120m | 2 | TODO | 供应商文件自服务门户 V1：生成带时效的供应商上传链接，供应商无需登录即可上传报价单/发票/合规文件，文件归入对应采购合同附件 |
+
+## 2026-06-02 WPS 历史出货导入链路
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-01 | P0 | 40m | 1 | DONE | 查找并保存 WPS `11-报关记录` 源文件，建立只读解析脚本，生成合同/装箱/销售/发票汇总与现库差异报告 |
+| WPS-IMPORT-02 | P0 | 30m | 1 | TODO | 人工确认 `EXP250018 925圣荷西.xlsx` 文件名与内容合同号不一致问题；确认后决定归入 EXP250018、EXP250019 或保留异常 |
+| WPS-IMPORT-03 | P0 | 60m | 1 | DONE | 基于 `preferred_packing_items.csv` 与 `preferred_sales_items.csv` 设计幂等导入脚本；已低风险补齐商品/门店主数据，明细替换路径默认 dry-run 并加保护 |
+| WPS-IMPORT-04 | P0 | 45m | 1 | DONE | 审计 `invoice_summary_items.csv` 报关/发票号复用情况；已确认该表疑似模板/旧数据复用，导入脚本对报关/退税写入默认拒写 |
+| WPS-IMPORT-05 | P1 | 30m | 1 | DONE | 盘点采购合同 PDF/DOCX、报关单、退税联等凭证文件的附件归属，避免把凭证内容误写入商品行字段 |
+| WPS-IMPORT-06 | P0 | 60m | 1 | DONE | 实现装箱明细 merge 导入策略：保留已有报关链接，按合同/商品/数量/箱数/重量/体积匹配后补空字段，无法匹配才新增 |
+| WPS-IMPORT-07 | P0 | 45m | 1 | DONE | 实现销售明细 merge 导入策略：只导入能从源文件安全推出门店的销售行，补售价/规格/来源，无法确认门店的行保留为 skipped |
+| WPS-IMPORT-08 | P0 | 45m | 1 | TODO | 处理剩余异常：2 条装箱歧义、1 条销售缺门店、1 个 `EXP250027` 31 套窗帘多门店口径、1 条路径门店推断复核和 1 个 `EXP2400006` 旧空运报关底稿缺正式海关编号项 |
+| WPS-IMPORT-09 | P0 | 30m | 1 | DONE | 盘点真实报关单、出口退税联、发票、提单、采购合同等附件队列，生成 `attachment_inventory.*`，明确哪些 EXP 合同有高价值凭证 |
+| WPS-IMPORT-10 | P0 | 60m | 1 | DONE | 从真实报关单、出口退税联、发票 PDF/附件正文抽取关键字段和退税联明细，生成 `evidence_extracts.*` / `evidence_db_mapping.csv`，不写库 |
+| WPS-IMPORT-11 | P0 | 60m | 1 | DONE | 基于 `evidence_db_mapping.csv` 备份后安全写入真实报关单草稿、报关明细、退税草稿，并验证导入脚本幂等 |
+| WPS-IMPORT-12 | P0 | 60m | 1 | DONE | 处理剩余真实凭证 blocked 项：已为销项发票补有限 OCR 并保留复核；旧 `.xls` 因缺转换/读取依赖继续 blocked；`EXP2400005/EXP2400006` 共目录仍需人工归属裁决 |
+| WPS-IMPORT-13 | P0 | 45m | 1 | DONE | 绕开旧 `.xls`，用同目录真实报关单 PDF 明细唯一匹配 `EXP2400005`，写入 `222920240004561873` 报关单与 1 条明细，并验证幂等 |
+| WPS-IMPORT-14 | P0 | 30m | 1 | TODO | 人工核对两份 OCR 发票：`EXP2400001` 商业发票与 `POR2400003` 采购侧发票，决定是否录入发票模块或仅作为附件证据 |
+| WPS-IMPORT-15 | P1 | 30m | 1 | DONE | 判断两个旧 `.xls` 是否只是已由 PDF 覆盖的重复底稿；`1单.xls` 已证明为 `EXP2400005 / 222920240004561873` 的旧底稿副本，`2单空运.xls` 仍缺正式海关编号 |
+| WPS-IMPORT-16 | P0 | 75m | 1 | DONE | 抽取 WPS 采购合同凭证，安全导入 66 个缺失采购合同、79 条采购明细、2 个商品和 5 个商品单位补齐，并验证幂等 |
+| WPS-IMPORT-17 | P1 | 45m | 1 | DONE | 修正采购合同 DOCX/XLSX 抽取规则，安全导入 10 个缺失采购合同、38 条采购明细、1 个供应商和 2 个商品，并验证幂等 |
+| WPS-IMPORT-18 | P1 | 45m | 1 | DONE | 为图片 CRC 损坏 DOCX 增加正文 XML fallback，安全导入 `CG2500041` 采购合同和 1 条采购明细，并验证幂等 |
+| WPS-IMPORT-19 | P1 | 45m | 1 | DONE | 扩大 DOCX XML fallback 覆盖异常条目场景，安全导入 `CG2500095` 采购合同和 2 条采购明细；剩余真实缺口收敛为 `CG2400008`、`CG2400013`、`CG2400027`、`CG2600013` |
+| WPS-IMPORT-20 | P0 | 30m | 1 | DONE | 复跑出口源 merge 后补齐新增商品带出的尾差：安全写入 7 条装箱明细、4 条销售明细和 3 个商品字段，并验证幂等 |
+| WPS-IMPORT-21 | P0 | 25m | 1 | DONE | 将真实凭证 OCR 改为优先中文语言包，复核后确认仍无新增可写库项，并生成 `docs/wps-import-decision-memo.md` 待业务裁决 |
+| WPS-IMPORT-22 | P0 | 25m | 1 | DONE | 新增可复跑待裁决包脚本，输出 `wps_import_decision_packet.csv/json/md`，把 95 条剩余人工裁决事项逐条列明 |
+| WPS-IMPORT-23 | P0 | 30m | 1 | DONE | 增加源文件路径唯一门店推断，安全写入 56 条销售行门店归属，待裁决包从 95 条降到 39 条 |
+| WPS-IMPORT-24 | P0 | 35m | 1 | DONE | 纳入 `12-报关单` 独立 PDF 归档与抽取，安全写入 23 个新报关单头并验证幂等 |
+| WPS-IMPORT-30 | P0 | 35m | 1 | DONE | 复核 4 份扫描 PDF 采购合同，安全写入 `CG2400027`、`CG2600024`、`CG2600030`、`CG2600031` 及 18 条采购明细，采购待裁决缺口降到 2 |
+| WPS-IMPORT-31 | P0 | 25m | 1 | DONE | 用合同聚合中的唯一现有门店补齐销售明细门店，安全新增 23 条销售明细、更新 7 条旧销售明细，待裁决包从 45 条降到 22 条 |
+| WPS-IMPORT-32 | P0 | 25m | 1 | DONE | 用唯一现有报关单补映射退税用途确认发票明细，安全新增 `EXP2500001` 退税草稿 1 条，待裁决包从 22 条降到 20 条 |
+| WPS-IMPORT-34 | P0 | 35m | 1 | DONE | 复核 WPS 客户端 `出货汇总` 不是仍缺云端副本；安全删除 29 条可证明重复装箱行，待裁决包从 20 条降到 13 条 |
+| WPS-IMPORT-35 | P0 | 25m | 1 | DONE | 对 `CG2400013` 只导入合同头 DRAFT，不创建明细，待裁决包从 13 条降到 12 条 |
+| WPS-IMPORT-36 | P0 | 35m | 1 | DONE | 将文件名错配但正文一致的 `EXP250018 925圣荷西.xlsx` 按正文归入 `EXP250019`，写入缺失装箱/销售并修正 40 条销售售价，待裁决包从 12 条降到 11 条 |
+| WPS-IMPORT-37 | P0 | 25m | 1 | DONE | 删除 `EXP2400001` 1 条完全重复且无报关引用的装箱行，补来源 note，待裁决包从 11 条降到 10 条 |
+| WPS-IMPORT-38 | P0 | 30m | 1 | DONE | 用签章 PDF 复核 `CG2400008` 乙方并结合 XLSX 明细入库，新增 1 份采购合同、16 条采购明细和 7 个商品，待裁决包从 10 条降到 9 条 |
+| WPS-IMPORT-39 | P0 | 20m | 1 | DONE | 复核两份 output_invoice PDF 为商业发票，将其标记为 reference-only，不再作为税票 blocked 项，待裁决包从 9 条降到 7 条 |
+| WPS-IMPORT-40 | P0 | 20m | 1 | DONE | 复核旧 `.xls` 报关底稿，确认 `1单.xls` 为正式报关单 `222920240004561873 / EXP2400005` 的参考副本，待裁决包从 7 条降到 6 条 |
+| WPS-IMPORT-41 | P0 | 25m | 1 | DONE | 用 WPS 客户端下载并保留 `20250604235840` 退税发票清单和顶层 `出货汇总.xlsx`，云端仅正文缺口从 3 个降到 1 个；两者均无新增写库项 |
+| WPS-IMPORT-42 | P0 | 30m | 1 | DONE | 用 `_wps_cloud_root/出货汇总.xlsx` 的 31+35 拆分证据删除 `EXP250027` 无门店 66 套窗帘汇总重复行；防止多门店合并名称自动建门店，待裁决包明确为 7 条 |
+| WPS-IMPORT-43 | P0 | 20m | 1 | DONE | 装箱歧义裁决包补充源行/候选行摘要，并只列最高同分候选；复核 `EXP2500001` 不是可证明重复，继续留待业务裁决 |
+| WPS-IMPORT-44 | P0 | 25m | 1 | DONE | 收紧销售路径门店推断：同合同同商品装箱多门店时不再用文件路径猜销售门店，新增暴露 19 条销售门店待裁决项 |
+| WPS-IMPORT-45 | P0 | 25m | 1 | DONE | 用同源装箱行的商品和数量唯一命中证据修正 8 条销售门店、补 5 条来源 note，销售门店待裁决从 19 条降到 7 条 |
+| WPS-IMPORT-46 | P0 | 20m | 1 | DONE | 清理 1 条已证明不可靠的 WPS 路径门店销售行，避免 `EXP250028` 铁艺屏风继续挂到不在装箱候选内的圣荷西625 |
+| WPS-IMPORT-47 | P0 | 20m | 1 | DONE | 用同合同同商品同数量的全量装箱证据唯一门店收口 `EXP2500002` 300 平方米销售行，待裁决包从 14 条降到 13 条 |
+| WPS-IMPORT-48 | P1 | 20m | 1 | DONE | 补强 WPS 云端盘点，记录 5 条 metadata 外 filecache 线索和 4 条 `文件不存在` 失败下载，避免漏判旧云端文件 |
+| WPS-IMPORT-49 | P0 | 30m | 1 | DONE | 下载并保留 WPS 根目录 `919清单.xlsx` 与 `0429装货清单-叶总.xlsx`；放宽清单类工作簿识别并安全写入 `EXP260005` 1 条装箱行 |
+| WPS-IMPORT-50 | P0 | 25m | 1 | DONE | 将 WPS 根目录出货/装货/清单候选做成独立可复跑盘点，下载保留 `0718装货单.xlsx`，确认当前仅 89KB 根目录 `出货汇总.xlsx` 未缓存 |
+| WPS-IMPORT-51 | P0 | 15m | 1 | DONE | 补强 WPS 云端盘点报告的“仅云端可见文件”清单，并复跑全量只读导入校验；确认自动导入已归零，剩余 13 条留待业务裁决 |
+| WPS-IMPORT-52 | P0 | 25m | 1 | DONE | 复核 WPS 中不存在 `11-出货清单` 目录；将 `0802出货清单.xlsx` 升级为 shipment_list 参考凭证，并安全补入 4 条正式报关明细申报要素 |
+| WPS-IMPORT-53 | P0 | 20m | 1 | DONE | 将 `出口申报信息.xlsx` 纳入 shipment_list 参考凭证抽取，安全补入 `EXP2400002` 正式报关明细 `瓷砖` 申报要素 |
+| WPS-IMPORT-54 | P0 | 25m | 1 | DONE | 从正式出口退税联 PDF 抽取完整申报要素，安全补入 11 条现有正式报关明细空字段，并验证幂等 |
+| WPS-IMPORT-55 | P0 | 15m | 1 | DONE | 复核正式 PDF 坐标文字，安全补入 `530420240040849246` 第 10 项 `支撑柱` 5 段完整申报要素 |
+| WPS-IMPORT-56 | P0 | 15m | 1 | DONE | 复核 `EXP2400006` 同目录源文件与 WPS 云端索引，补强裁决包中的正式海关编号缺口证据 |
+| WPS-IMPORT-57 | P0 | 20m | 1 | DONE | 全量审计 WPS 路径门店推断，删除 19 条与同数量装箱唯一门店冲突且已有正确重复行的销售污染行 |
+| WPS-IMPORT-58 | P1 | 15m | 1 | DONE | 将剩余 10 条证据不足的路径门店推断销售行纳入裁决包，避免隐藏在数据库中 |
+| WPS-IMPORT-59 | P0 | 20m | 1 | DONE | 用同源装货备注中的商品别名与同数量证据修正 `EXP250016` 玻璃瓶销售门店，并补齐 14 条销售行装货数量证据 note |
+| WPS-IMPORT-60 | P0 | 20m | 1 | DONE | 用同质销售行组证据给 `EXP250028` 两条 2 套铁艺屏风现有门店销售行补售价和来源 note，销售门店待裁决从 6 条降到 4 条 |
+| WPS-IMPORT-61 | P0 | 20m | 1 | DONE | 用同源同商品残余配对证据给 `EXP250025` 181.44 平方米瓷砖行补 `Burbank` 装货证据 note，待裁决包从 20 条降到 18 条 |
+| WPS-IMPORT-62 | P0 | 20m | 1 | DONE | 清理 `EXP250014` 4 条同源同数量同价格的旧路径门店重复销售行；价格不一致的 3 条继续留裁决，待裁决包从 18 条降到 14 条 |
+| WPS-IMPORT-63 | P0 | 20m | 1 | DONE | 将 `EXP250014` 剩余 3 条同源正确价格转移到 `圣荷西2115` 强门店行并删除弱路径行，待裁决包从 14 条降到 11 条 |
+| WPS-IMPORT-64 | P1 | 15m | 1 | DONE | 补强 `EXP2400006` blocked 证据：出货汇总 `invoice_no=25312000000011328975` 不是正式 18 位海关编号，继续不创建报关单 |
+| WPS-IMPORT-65 | P0 | 20m | 1 | DONE | 对已存在组合门店的 3 条装箱源行新增独立来源装箱行，不硬匹配单门店候选；待裁决包从 11 条降到 8 条 |
+| WPS-IMPORT-66 | P0 | 20m | 1 | DONE | 修正销售规格解析并用同源/已入库装箱规格数量证据补强 6 条销售行 note；`EXP250019` Burbank/Westminster 冲突转入裁决包，待裁决包稳定为 7 条 |
+| WPS-IMPORT-67 | P0 | 20m | 1 | DONE | 迁移 `EXP250019` 错挂装箱来源：从 Westminster 501.12 平方米行移除 `925圣荷西#装货:11`，新增 Burbank 501.12 平方米装箱行，待裁决包从 7 条降到 6 条 |

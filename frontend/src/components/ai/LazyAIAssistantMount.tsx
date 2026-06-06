@@ -20,7 +20,6 @@ export function LazyAIAssistantMount() {
   const shouldMount =
     !isAiWorkspace && (
       pathname.startsWith('/dashboard') ||
-      pathname.startsWith('/customs-declarations') ||
       pathname.startsWith('/tax-refunds')
     );
 

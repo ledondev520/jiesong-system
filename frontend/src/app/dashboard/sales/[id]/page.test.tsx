@@ -1,6 +1,6 @@
 /**
- * Input: 出口合同详情页、sales/product/store/inventory 服务、router、toast
- * Output: 出口合同详情页交互逻辑测试结果
+ * Input: 销售合同详情页、sales/product/store/inventory 服务、router、toast
+ * Output: 销售合同详情页交互逻辑测试结果
  * Pos: 前端详情页交互测试
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -16,6 +16,8 @@ const mockGetById = vi.fn();
 const mockProductGetAll = vi.fn();
 const mockStoreGetAll = vi.fn();
 const mockInventoryGetAll = vi.fn();
+const mockApiGet = vi.fn();
+const mockApiDelete = vi.fn();
 const mockToastError = vi.fn();
 const mockExportPdf = vi.fn();
 
@@ -68,6 +70,13 @@ vi.mock('@/services/inventory.service', () => ({
   },
 }));
 
+vi.mock('@/lib/axios', () => ({
+  default: {
+    get: (...args: unknown[]) => mockApiGet(...args),
+    delete: (...args: unknown[]) => mockApiDelete(...args),
+  },
+}));
+
 vi.mock('sonner', () => ({
   toast: {
     error: (...args: unknown[]) => mockToastError(...args),
@@ -90,8 +99,11 @@ describe('SalesDetailPage 交互逻辑', () => {
     mockProductGetAll.mockReset();
     mockStoreGetAll.mockReset();
     mockInventoryGetAll.mockReset();
+    mockApiGet.mockReset();
+    mockApiDelete.mockReset();
     mockToastError.mockReset();
     mockExportPdf.mockReset();
+    mockApiGet.mockResolvedValue({ data: [] });
   });
 
   /**
@@ -126,7 +138,9 @@ describe('SalesDetailPage 交互逻辑', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'EXP2500001' })).toBeInTheDocument();
       expect(screen.getByText('暂无装箱商品，点击"添加商品"开始装柜')).toBeInTheDocument();
+      expect(screen.getByText('暂无附件，点击「上传附件」归档出货源文件')).toBeInTheDocument();
     });
+    expect(mockApiGet).toHaveBeenCalledWith('/sales/s-1/files');
     expect(mockProductGetAll).not.toHaveBeenCalled();
     expect(mockStoreGetAll).not.toHaveBeenCalled();
     expect(mockInventoryGetAll).not.toHaveBeenCalled();

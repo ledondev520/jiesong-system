@@ -1,10 +1,5 @@
-import { Suspense } from 'react';
-import { CustomsDeclarationListPageContent } from './components/CustomsDeclarationListPageContent';
+import { redirect } from 'next/navigation';
 
-export default function CustomsDeclarationsPage() {
-  return (
-    <Suspense fallback={<div className="py-12 text-center text-muted-foreground">加载中...</div>}>
-      <CustomsDeclarationListPageContent />
-    </Suspense>
-  );
+export default function CustomsDeclarationsRedirectPage() {
+  redirect('/dashboard/customs-declarations');
 }

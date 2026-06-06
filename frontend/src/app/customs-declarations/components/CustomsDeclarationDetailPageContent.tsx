@@ -113,13 +113,13 @@ export function CustomsDeclarationDetailPageContent({
         <PageHeader
         title={declaration.declarationNo}
         description={`${declaration.exporter || '待填写'} → ${declaration.destinationCountry || '待填写'}`}
-        backHref="/customs-declarations"
+        backHref="/dashboard/customs-declarations"
         actions={
           <>
             <CustomsDeclarationStatusBadge status={declaration.status} />
             <Button
               className="rounded-xl"
-              onClick={() => router.push(`/customs-declarations/${declaration.id}/edit`)}
+              onClick={() => router.push(`/dashboard/customs-declarations/${declaration.id}/edit`)}
             >
               <FilePenLine className="mr-2 h-4 w-4" />
               编辑报关单

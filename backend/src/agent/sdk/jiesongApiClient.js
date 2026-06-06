@@ -66,6 +66,7 @@ class JiesongApiClient {
     return payload?.data ?? payload;
   }
 
+  // ── 统一搜索 ──
   async searchEntities({ query, types, limit }) {
     return this.request('/api/v1/search', {
       query: {
@@ -76,6 +77,7 @@ class JiesongApiClient {
     });
   }
 
+  // ── 采购 ──
   async createPurchase(input) {
     return this.request('/api/v1/purchases', {
       method: 'POST',
@@ -83,6 +85,14 @@ class JiesongApiClient {
     });
   }
 
+  async updatePurchase(id, input) {
+    return this.request(`/api/v1/purchases/${id}`, {
+      method: 'PUT',
+      body: input,
+    });
+  }
+
+  // ── 供应商 ──
   async createSupplier(input) {
     return this.request('/api/v1/suppliers', {
       method: 'POST',
@@ -97,11 +107,65 @@ class JiesongApiClient {
     });
   }
 
-  async updatePurchase(id, input) {
-    return this.request(`/api/v1/purchases/${id}`, {
-      method: 'PUT',
-      body: input,
+  // ── 销售/出口 ──
+  async listSalesContracts({ status, storeId, keyword, page = 1, pageSize = 20 } = {}) {
+    return this.request('/api/v1/sales', {
+      query: { status, storeId, keyword, page, pageSize },
     });
+  }
+
+  async getSalesContractById(id) {
+    return this.request(`/api/v1/sales/${id}`);
+  }
+
+  // ── 库存 ──
+  async listInventories({ status, productId, keyword, page = 1, pageSize = 20 } = {}) {
+    return this.request('/api/v1/inventory', {
+      query: { status, productId, keyword, page, pageSize },
+    });
+  }
+
+  // ── 财务 ──
+  async listPayments({ type, page = 1, pageSize = 20 } = {}) {
+    return this.request('/api/v1/finance/payments', {
+      query: { type, page, pageSize },
+    });
+  }
+
+  async getPayables({ page = 1, pageSize = 20 } = {}) {
+    return this.request('/api/v1/finance/payables', {
+      query: { page, pageSize },
+    });
+  }
+
+  async getReceivables({ page = 1, pageSize = 20, overdueDays } = {}) {
+    return this.request('/api/v1/finance/receivables', {
+      query: { page, pageSize, overdueDays },
+    });
+  }
+
+  // ── 报关 ──
+  async listCustomsDeclarations({ salesContractId, page = 1, pageSize = 20 } = {}) {
+    return this.request('/api/v1/customs-declarations', {
+      query: { salesContractId, page, pageSize },
+    });
+  }
+
+  // ── Dashboard ──
+  async getDashboardAnalytics() {
+    return this.request('/api/v1/dashboard/analytics');
+  }
+
+  // ── Agent 运行时 ──
+  async agentPrompt({ message, agentType = 'unified', sessionId }) {
+    return this.request('/api/v1/ai/agents/prompt', {
+      method: 'POST',
+      body: { message, agentType, sessionId },
+    });
+  }
+
+  async getAgentTools() {
+    return this.request('/api/v1/ai/agents/tools');
   }
 }
 

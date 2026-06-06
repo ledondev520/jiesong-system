@@ -246,6 +246,29 @@ const extractSalesContractRefs = (note) => {
   return Array.from(new Set((note.toUpperCase().match(/EXP\d{5,}/g) || [])));
 };
 
+const evaluateMatch = (payment, contract) => {
+  if (!contract || contract.status === 'CANCELLED') {
+    return { matched: false, reason: 'contract_not_found' };
+  }
+
+  const unreceivedAmount = Math.max((contract.totalAmount || 0) - (contract.receivedAmount || 0), 0);
+  if (unreceivedAmount <= 0) {
+    return { matched: false, reason: 'contract_fully_received' };
+  }
+
+  const candidateAmount = Number(payment.remainingAmount ?? payment.amount ?? 0);
+  if (Math.abs(unreceivedAmount - candidateAmount) > AUTO_MATCH_AMOUNT_TOLERANCE) {
+    return { matched: false, reason: 'amount_mismatch' };
+  }
+
+  return {
+    matched: true,
+    contract,
+    rule: AUTO_MATCH_RULE,
+    confidence: AUTO_MATCH_CONFIDENCE,
+  };
+};
+
 const findAutoMatchCandidate = async (payment) => {
   const contractRefs = extractSalesContractRefs(payment.note);
 
@@ -268,26 +291,49 @@ const findAutoMatchCandidate = async (payment) => {
     },
   });
 
-  if (!contract || contract.status === 'CANCELLED') {
-    return { matched: false, reason: 'contract_not_found' };
+  return evaluateMatch(payment, contract);
+};
+
+/**
+ * 批量自动匹配（消除 N+1）
+ */
+const findAutoMatchCandidatesBatch = async (payments) => {
+  // 1. 提取所有唯一合同编号
+  const refMap = new Map();
+  payments.forEach((payment) => {
+    const refs = extractSalesContractRefs(payment.note);
+    if (refs.length === 1) {
+      refMap.set(refs[0], payment);
+    }
+  });
+
+  if (refMap.size === 0) return new Map();
+
+  // 2. 一次性查询所有候选合同
+  const contracts = await prisma.salesContract.findMany({
+    where: {
+      contractNo: { in: Array.from(refMap.keys()) },
+      status: { not: 'CANCELLED' },
+    },
+    select: {
+      id: true,
+      contractNo: true,
+      totalAmount: true,
+      receivedAmount: true,
+      status: true,
+    },
+  });
+
+  const contractByNo = new Map(contracts.map((c) => [c.contractNo, c]));
+
+  // 3. 内存中完成匹配评估
+  const results = new Map();
+  for (const [contractNo, payment] of refMap) {
+    const contract = contractByNo.get(contractNo);
+    results.set(payment.id, evaluateMatch(payment, contract));
   }
 
-  const unreceivedAmount = Math.max((contract.totalAmount || 0) - (contract.receivedAmount || 0), 0);
-  if (unreceivedAmount <= 0) {
-    return { matched: false, reason: 'contract_fully_received' };
-  }
-
-  const candidateAmount = Number(payment.remainingAmount ?? payment.amount ?? 0);
-  if (Math.abs(unreceivedAmount - candidateAmount) > AUTO_MATCH_AMOUNT_TOLERANCE) {
-    return { matched: false, reason: 'amount_mismatch' };
-  }
-
-  return {
-    matched: true,
-    contract,
-    rule: AUTO_MATCH_RULE,
-    confidence: AUTO_MATCH_CONFIDENCE,
-  };
+  return results;
 };
 
 const syncContractPaymentAmounts = async (tx, { purchaseContractId, salesContractId }) => {
@@ -358,8 +404,13 @@ const autoMatchUnallocatedPayments = async () => {
   const matched = [];
   const skipped = [];
 
+  // 批量匹配（消除 N+1：一次查询替代多次 findUnique）
+  const candidates = await findAutoMatchCandidatesBatch(
+    payments.map((p) => attachReceiptBalance(p, allocationTotals))
+  );
+
   for (const payment of payments) {
-    const candidate = await findAutoMatchCandidate(attachReceiptBalance(payment, allocationTotals));
+    const candidate = candidates.get(payment.id) || { matched: false, reason: 'no_contract_reference' };
 
     if (!candidate.matched) {
       skipped.push({ paymentId: payment.id, reason: candidate.reason });
@@ -418,9 +469,9 @@ const allocatePaymentToContracts = async (paymentId, allocations) => {
 
   const result = await prisma.$transaction(async (tx) => {
     const created = [];
+    const affectedSalesContractIds = new Set();
 
     for (const alloc of allocations) {
-      // 1. 创建关联合同的分配记录
       const payment = await tx.payment.create({
         data: {
           type: 'RECEIVABLE_COLLECTION',
@@ -435,9 +486,22 @@ const allocatePaymentToContracts = async (paymentId, allocations) => {
         },
       });
       created.push(payment);
+      affectedSalesContractIds.add(alloc.salesContractId);
+    }
 
-      // 2. 同步合同已收金额
-      await syncContractPaymentAmounts(tx, { salesContractId: alloc.salesContractId });
+    // 批量更新：一次性聚合所有受影响合同的收款总额
+    for (const salesContractId of affectedSalesContractIds) {
+      const total = await tx.payment.aggregate({
+        where: {
+          salesContractId,
+          type: { in: RECEIVABLE_SETTLEMENT_TYPES },
+        },
+        _sum: { amount: true },
+      });
+      await tx.salesContract.update({
+        where: { id: salesContractId },
+        data: { receivedAmount: total._sum.amount || 0 },
+      });
     }
 
     const allocatedAfter = await getPaymentAllocatedAmount(paymentId, tx);
@@ -609,18 +673,63 @@ const getStats = async () => {
     _sum: { totalAmount: true, paidAmount: true },
   });
 
-  const receivableContracts = await prisma.salesContract.findMany({
+  // 1. 轻量查询销售合同，避免 include packingItems 全表扫描
+  const contracts = await prisma.salesContract.findMany({
     where: {
       NOT: { status: 'CANCELLED' },
       totalAmount: { gt: 0 },
     },
-    include: {
-      packingItems: true,
+    select: {
+      id: true,
+      totalAmount: true,
+      receivedAmount: true,
     },
   });
 
-  const receivableTotals = receivableContracts.reduce((acc, contract) => {
-    const ownedTotalAmount = getEffectiveSalesContractTotal(contract);
+  if (contracts.length === 0) {
+    return {
+      payable: {
+        total: payableStats._sum.totalAmount || 0,
+        paid: payableStats._sum.paidAmount || 0,
+        unpaid: (payableStats._sum.totalAmount || 0) - (payableStats._sum.paidAmount || 0),
+      },
+      receivable: { total: 0, received: 0, unreceived: 0 },
+    };
+  }
+
+  const contractIds = contracts.map((c) => c.id);
+
+  // 2. 使用 groupBy 按合同聚合 packingItem 总额，替代内存 reduce
+  const packingGroups = await prisma.packingItem.groupBy({
+    by: ['salesContractId'],
+    where: { salesContractId: { in: contractIds } },
+    _sum: { totalPrice: true },
+  });
+
+  // 3. 使用 groupBy 聚合每个合同的非捷淞拥有 packingItem 总额
+  const nonOwnedGroups = await prisma.packingItem.groupBy({
+    by: ['salesContractId'],
+    where: {
+      salesContractId: { in: contractIds },
+      isOwnedByJiesong: false,
+    },
+    _sum: { totalPrice: true },
+  });
+
+  const packingTotalMap = new Map(packingGroups.map((g) => [g.salesContractId, Number(g._sum.totalPrice || 0)]));
+  const nonOwnedMap = new Map(nonOwnedGroups.map((g) => [g.salesContractId, Number(g._sum.totalPrice || 0)]));
+
+  const receivableTotals = contracts.reduce((acc, contract) => {
+    const packingTotal = packingTotalMap.get(contract.id) || 0;
+    const nonOwnedTotal = nonOwnedMap.get(contract.id) || 0;
+
+    // 如果合同有 packingItems，effectiveTotal = totalAmount - nonOwnedTotal
+    // 因为 recalculateContractStats 保证 totalAmount = sum(all packingItems.totalPrice)
+    // 如果没有 packingItems，packingTotal 为 0，此时 effectiveTotal = totalAmount
+    const ownedTotalAmount = packingTotal > 0
+      ? Math.max(Number(contract.totalAmount || 0) - nonOwnedTotal, 0)
+      : Number(contract.totalAmount || 0);
+
     acc.total += ownedTotalAmount;
     acc.received += Math.min(Number(contract.receivedAmount || 0), ownedTotalAmount);
     return acc;

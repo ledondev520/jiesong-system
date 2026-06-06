@@ -7,6 +7,27 @@ version: '3.8'
 
 services:
   # =============================================================================
+  # 数据库服务 (PostgreSQL)
+  # =============================================================================
+  db:
+    image: postgres:15-alpine
+    container_name: jiesong-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=jiesong
+      - POSTGRES_USER=jiesong
+      - POSTGRES_PASSWORD=jiesong_pass
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - jiesong-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jiesong -d jiesong"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
   # 后端服务
   # =============================================================================
   backend:
@@ -20,14 +41,17 @@ services:
       - PORT=3001
       - JWT_SECRET=${JWT_SECRET:-change-this-secret-key-in-production}
       - JWT_EXPIRES_IN=7d
-      - DATABASE_URL=file:/app/data/dev.db
+      - DATABASE_URL=postgresql://jiesong:jiesong_pass@db:5432/jiesong?schema=public
     volumes:
       - backend-data:/app/data
       - backend-logs:/app/logs
     networks:
       - jiesong-network
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -40,7 +64,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_API_BASE_URL=/api/v1
+        # 部署时请替换为实际 VPS IP 地址或域名
+        - NEXT_PUBLIC_API_BASE_URL=http://YOUR_VPS_IP/api/v1
     container_name: jiesong-frontend
     restart: unless-stopped
     environment:
@@ -80,3 +105,4 @@ volumes:
   backend-data:
   backend-logs:
   nginx-logs:
+  postgres-data:

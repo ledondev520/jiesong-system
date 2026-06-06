@@ -56,7 +56,7 @@ describe('DataDashboard', () => {
     await waitFor(() => {
       expect(screen.getByText('优先处理回款')).toBeInTheDocument();
       expect(screen.getByText(/待收回款/)).toBeInTheDocument();
-      expect(screen.getByText('关键趋势')).toBeInTheDocument();
+      expect(screen.getByText('经营趋势')).toBeInTheDocument();
     });
   });
 

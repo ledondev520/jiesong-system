@@ -1,13 +1,15 @@
 /**
  * Input: sales service 层
  * Output: 出口合同 HTTP 控制器
- * Pos: 纯路由适配层，业务逻辑收敛至 services/salesService
+ * Pos: 纯路由适配层，业务逻辑收敛至 services/salesService；附件上传/列表/下载/删除在本层适配
  */
 
 const { success, created, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
+const { createError } = require('../middleware/errorHandler');
 const salesService = require('../services/salesService');
 const auditLog = require('../utils/auditLog');
+const prisma = require('../utils/prisma');
 
 const list = async (req, res, next) => {
   try {
@@ -163,6 +165,91 @@ const removePackingItem = async (req, res, next) => {
   }
 };
 
+const uploadFile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.file) {
+      throw createError('请选择要上传的文件', 400);
+    }
+
+    const file = req.file;
+    const { getRelativePath } = require('../utils/upload');
+
+    const contractFile = await prisma.salesContractFile.create({
+      data: {
+        salesContractId: id,
+        fileName: file.originalname,
+        filePath: getRelativePath(file.path),
+        fileType: file.mimetype,
+        fileSize: file.size,
+      },
+    });
+
+    created(res, contractFile, '文件上传成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getFiles = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const files = await prisma.salesContractFile.findMany({
+      where: { salesContractId: id },
+      orderBy: { uploadedAt: 'desc' },
+    });
+
+    success(res, files);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteFile = async (req, res, next) => {
+  try {
+    const { fileId } = req.params;
+
+    const file = await prisma.salesContractFile.findUnique({
+      where: { id: fileId },
+    });
+
+    if (!file) {
+      throw createError('文件不存在', 404);
+    }
+
+    await prisma.salesContractFile.delete({
+      where: { id: fileId },
+    });
+
+    success(res, null, '文件删除成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
+const downloadFile = async (req, res, next) => {
+  try {
+    const { fileId } = req.params;
+    const path = require('path');
+    const { getFullPath } = require('../utils/upload');
+
+    const file = await prisma.salesContractFile.findUnique({ where: { id: fileId } });
+    if (!file) throw createError('文件不存在', 404);
+
+    const absolutePath = path.isAbsolute(file.filePath)
+      ? file.filePath
+      : getFullPath(file.filePath);
+
+    res.download(absolutePath, file.fileName, (err) => {
+      if (err && !res.headersSent) next(err);
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   list,
   getById,
@@ -176,4 +263,8 @@ module.exports = {
   addPackingItem,
   updatePackingItem,
   removePackingItem,
+  uploadFile,
+  getFiles,
+  deleteFile,
+  downloadFile,
 };

@@ -21,7 +21,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash, AlertTriangle, Search, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Factory, AlertTriangle, Search, X } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { SupplierDialog } from './components/SupplierDialog';
 import type { SupplierFormValues } from './components/SupplierDialog';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -157,7 +158,6 @@ export default function SuppliersPage() {
       <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
       <PageHeader 
         title="供应商管理"
-        description="管理供应商档案与质量记录"
         actions={
           <div className="hidden flex-wrap items-center gap-2 md:flex">
             <div className="relative w-full sm:w-56">
@@ -269,17 +269,6 @@ export default function SuppliersPage() {
                   </div>
                 </div>
 
-                {supplier.aliases && supplier.aliases.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">别名</p>
-                    <div className="flex flex-wrap gap-2">
-                      {supplier.aliases.map((alias) => (
-                        <Badge key={alias.id} variant="secondary" className="rounded-full text-xs">{alias.alias}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 <div className="grid grid-cols-2 gap-3">
                   <Button
                     variant="outline"
@@ -296,7 +285,7 @@ export default function SuppliersPage() {
                     onClick={() => handleDelete(supplier.id)}
                     aria-label={`删除 ${supplier.name}`}
                   >
-                    <Trash className="mr-2 h-4 w-4" />
+                    <Trash2 className="mr-2 h-4 w-4" />
                     删除
                   </Button>
                 </div>
@@ -307,87 +296,92 @@ export default function SuppliersPage() {
       </div>
 
       <div className="hidden overflow-hidden surface-panel md:block">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <SortableTableHead
-                sortKey="name"
-                currentSortKey={supplierSort.sortKey}
-                currentSortDir={supplierSort.sortDir}
-                onSort={supplierSort.onSort}
+      {/* 桌面端卡片视图 */}
+      <div className="hidden md:block">
+        {loading ? (
+          <div className="py-12 text-center text-muted-foreground">加载中...</div>
+        ) : pagedSuppliers.length === 0 ? (
+          <EmptyState
+            icon={<Factory className="h-8 w-8" />}
+            title={keyword ? "没有符合条件的供应商" : "暂无供应商数据"}
+            description="还没有添加任何供应商，点击下方的按钮开始创建"
+            action={{ label: '新增供应商', onClick: () => setIsDialogOpen(true) }}
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+            {pagedSuppliers.map((supplier) => (
+              <Card
+                key={supplier.id}
+                className="cursor-pointer border-border/40 border-l-[3px] bg-card/60 transition-all duration-300 hover:border-primary/20 hover:bg-card hover:shadow-md hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/10"
+                style={{ borderLeftColor: supplier.hasQualityIssue ? 'oklch(0.58 0.2 25)' : 'oklch(0.55 0.14 150)' }}
+                onClick={() => handleEdit(supplier)}
               >
-                公司名称
-              </SortableTableHead>
-              <SortableTableHead
-                sortKey="aliases"
-                currentSortKey={supplierSort.sortKey}
-                currentSortDir={supplierSort.sortDir}
-                onSort={supplierSort.onSort}
-              >
-                别名
-              </SortableTableHead>
-              <SortableTableHead
-                sortKey="contactName"
-                currentSortKey={supplierSort.sortKey}
-                currentSortDir={supplierSort.sortDir}
-                onSort={supplierSort.onSort}
-              >
-                联系人
-              </SortableTableHead>
-              <TableHead>质量状态</TableHead>
-              <TableHead className="w-[100px]">操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-               <TableRow>
-                 <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
-               </TableRow>
-            ) : pagedSuppliers.length === 0 ? (
-               <TableRow>
-                 <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">{keyword ? '没有符合条件的供应商' : '暂无供应商数据。'}</TableCell>
-               </TableRow>
-            ) : (
-              pagedSuppliers.map((supplier) => (
-                <TableRow key={supplier.id}>
-                  <TableCell>
-                    <div className="font-medium">{supplier.name}</div>
-                    {supplier.shortName && <div className="text-xs text-muted-foreground">{supplier.shortName}</div>}
-                  </TableCell>
-                  <TableCell>
+                <CardContent className="space-y-3 p-4">
+                  {/* 公司名称 + 质量状态 */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{supplier.name}</p>
+                      {supplier.shortName && (
+                        <p className="text-xs text-muted-foreground">{supplier.shortName}</p>
+                      )}
+                    </div>
+                    {supplier.hasQualityIssue ? (
+                      <Badge variant="destructive" className="shrink-0 text-[11px]">
+                        <AlertTriangle className="mr-1 h-3 w-3" /> 质量问题
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="shrink-0 border-primary/20 bg-primary/5 text-primary text-[11px]">
+                        正常
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* 别名 */}
+                  {supplier.aliases && supplier.aliases.length > 0 && (
                     <div className="flex flex-wrap gap-1">
-                      {supplier.aliases?.map(a => (
-                        <Badge key={a.id} variant="secondary" className="text-xs">{a.alias}</Badge>
+                      {supplier.aliases.map((a) => (
+                        <Badge key={a.id} variant="secondary" className="text-[11px]">{a.alias}</Badge>
                       ))}
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>{supplier.contactName}</div>
-                    <div className="text-xs text-muted-foreground">{supplier.contactPhone}</div>
-                  </TableCell>
-                  <TableCell>
-                    {supplier.hasQualityIssue ? (
-                      <div className="flex items-center gap-2 text-destructive">
-                        <AlertTriangle className="h-4 w-4" />
-                        <span className="text-sm font-medium">质量问题</span>
-                      </div>
-                    ) : (
-                      <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary">正常</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="flex gap-2">
-                    <Button variant="ghost" size="icon" className="rounded-xl border border-border/65 bg-background/55" onClick={() => handleEdit(supplier)} aria-label={`编辑 ${supplier.name}`}>
-                      <Pencil className="h-4 w-4" />
+                  )}
+
+                  {/* 联系人 */}
+                  <div className="space-y-0.5 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                      <span className="shrink-0">联系人:</span>
+                      <span className="font-medium text-foreground">{supplier.contactName || '—'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="shrink-0">电话:</span>
+                      <span className="text-foreground">{supplier.contactPhone || '—'}</span>
+                    </div>
+                  </div>
+
+                  {/* 操作 */}
+                  <div className="flex gap-2 pt-1 border-t border-border/30">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 flex-1 rounded-lg text-xs"
+                      onClick={(e) => { e.stopPropagation(); handleEdit(supplier); }}
+                    >
+                      <Pencil className="mr-1 h-3 w-3" /> 编辑
                     </Button>
-                    <Button variant="ghost" size="icon" className="rounded-xl border border-border/65 bg-background/55" onClick={() => handleDelete(supplier.id)} aria-label={`删除 ${supplier.name}`}>
-                      <Trash className="h-4 w-4 text-destructive" />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 flex-1 rounded-lg text-xs text-destructive hover:bg-destructive/10"
+                      onClick={(e) => { e.stopPropagation(); handleDelete(supplier.id); }}
+                    >
+                      <Trash2 className="mr-1 h-3 w-3" /> 删除
                     </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
       </div>
 
       {/* 分页控制 */}

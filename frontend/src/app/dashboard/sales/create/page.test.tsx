@@ -69,8 +69,8 @@ describe('CreateSalesPage 交互逻辑', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '创建出口合同' })).toBeInTheDocument();
-      expect(screen.getByText('销售明细')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /创建合同/ })).toBeInTheDocument();
+      expect(screen.getAllByText('基本信息').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByRole('button', { name: /下一步/ })).toBeInTheDocument();
     });
   });
 
@@ -91,6 +91,12 @@ describe('CreateSalesPage 交互逻辑', () => {
 
     const user = userEvent.setup();
     render(<CreateSalesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '下一步：销售明细' })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: '下一步：销售明细' }));
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: '创建合同' })).toBeInTheDocument();

@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updatedAt": "2026-04-22",
+  "updatedAt": "2026-06-03",
   "owner": "security-team",
   "tiers": [
     {
@@ -30,7 +30,8 @@
       },
       "paths": [
         "backend/.env",
-        "backend/src/config/index.js"
+        "backend/src/config/index.js",
+        "backend/uploads/"
       ]
     },
     {

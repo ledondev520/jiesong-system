@@ -15,6 +15,7 @@ import { PurchaseContract, PurchaseStatus, PurchaseItem } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
 import { cachedFetch } from '@/lib/api-cache';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   Table,
   TableBody,
@@ -317,6 +318,28 @@ export default function ContractsPageContent() {
   };
 
   /**
+   * 职责：根据采购状态返回左侧色条颜色
+   * 思路：DRAFT/SIGNED→蓝色；PRODUCING/SHIPPED→琥珀色；RECEIVED/COMPLETED→绿色；CANCELLED→红色
+   */
+  const getPurchaseStatusColor = (status: PurchaseStatus) => {
+    switch (status) {
+      case PurchaseStatus.DRAFT:
+      case PurchaseStatus.SIGNED:
+        return 'oklch(0.55 0.1 250)';
+      case PurchaseStatus.PRODUCING:
+      case PurchaseStatus.SHIPPED:
+        return 'oklch(0.6 0.12 85)';
+      case PurchaseStatus.RECEIVED:
+      case PurchaseStatus.COMPLETED:
+        return 'oklch(0.55 0.14 150)';
+      case PurchaseStatus.CANCELLED:
+        return 'oklch(0.55 0.1 25)';
+      default:
+        return 'oklch(0.55 0.14 150)';
+    }
+  };
+
+  /**
    * 获取采购状态徽章
    */
   const getPurchaseStatusBadge = (status: PurchaseStatus) => {
@@ -338,15 +361,11 @@ export default function ContractsPageContent() {
       <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
       <PageHeader
         title="采购合同"
-        description="管理供应商采购合同"
       />
 
       <section className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">采购执行概览</p>
-            <h3 className="text-lg font-semibold tracking-tight">围绕下单、生产与收货节奏安排跟进动作</h3>
-          </div>
+          <h3 className="text-sm font-medium text-muted-foreground">采购执行概览</h3>
           <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">
             当前活跃合同 {procurementOverview.activeContracts}
           </Badge>
@@ -481,32 +500,16 @@ export default function ContractsPageContent() {
                           <p className="text-sm font-medium">{contract.supplier?.name || '—'}</p>
                         </div>
                         <div className="space-y-1">
-                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">发货店铺</p>
-                          <p className="text-sm font-medium">{contract.storeName || '—'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">签订日期</p>
-                          <p className="text-sm font-medium">{contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '—'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">付款进度</p>
-                          <AmountText tone={contract.paidAmount < contract.totalAmount ? 'warning' : 'success'} size="sm">
-                            ¥{contract.paidAmount.toLocaleString()}
-                          </AmountText>
+                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">合同总额</p>
+                          <p className="text-sm font-semibold tabular-nums">¥{contract.totalAmount.toLocaleString()}</p>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="rounded-2xl border border-border/70 bg-background px-3 py-3">
-                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">合同总额</p>
-                          <p className="mt-1 text-base font-semibold tabular-nums">¥{contract.totalAmount.toLocaleString()}</p>
-                        </div>
-                        <div className="rounded-2xl border border-border/70 bg-background px-3 py-3">
-                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">已付金额</p>
-                          <AmountText tone={contract.paidAmount < contract.totalAmount ? 'warning' : 'success'} size="sm" className="mt-1 block text-base font-semibold tabular-nums">
-                            ¥{contract.paidAmount.toLocaleString()}
-                          </AmountText>
-                        </div>
+                      <div className="flex items-center justify-between rounded-2xl border border-border/70 bg-background px-3 py-3">
+                        <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">已付金额</p>
+                        <AmountText tone={contract.paidAmount < contract.totalAmount ? 'warning' : 'success'} size="sm" className="text-base font-semibold tabular-nums">
+                          ¥{contract.paidAmount.toLocaleString()}
+                        </AmountText>
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
@@ -535,142 +538,115 @@ export default function ContractsPageContent() {
             )}
           </div>
 
-          <div className="hidden overflow-hidden surface-panel md:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <SortableTableHead
-                    sortKey="contractNo"
-                    currentSortKey={purchaseSort.sortKey}
-                    currentSortDir={purchaseSort.sortDir}
-                    onSort={purchaseSort.onSort}
-                  >
-                    合同编号
-                  </SortableTableHead>
-                  <TableHead>商品名称</TableHead>
-                  <SortableTableHead
-                    sortKey="supplier"
-                    currentSortKey={purchaseSort.sortKey}
-                    currentSortDir={purchaseSort.sortDir}
-                    onSort={purchaseSort.onSort}
-                  >
-                    供应商
-                  </SortableTableHead>
-                  <TableHead>发货店铺</TableHead>
-                  <SortableTableHead
-                    sortKey="signedAt"
-                    currentSortKey={purchaseSort.sortKey}
-                    currentSortDir={purchaseSort.sortDir}
-                    onSort={purchaseSort.onSort}
-                  >
-                    签订日期
-                  </SortableTableHead>
-                  <TableHead>状态</TableHead>
-                  <SortableTableHead
-                    sortKey="totalAmount"
-                    currentSortKey={purchaseSort.sortKey}
-                    currentSortDir={purchaseSort.sortDir}
-                    onSort={purchaseSort.onSort}
-                    className="text-right"
-                  >
-                    总金额 (¥)
-                  </SortableTableHead>
-                  <SortableTableHead
-                    sortKey="paidAmount"
-                    currentSortKey={purchaseSort.sortKey}
-                    currentSortDir={purchaseSort.sortDir}
-                    onSort={purchaseSort.onSort}
-                    className="text-right"
-                  >
-                    已付 (¥)
-                  </SortableTableHead>
-                  <TableHead className="w-[100px]">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {purchaseLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">
-                      加载中...
-                    </TableCell>
-                  </TableRow>
-                ) : pagedPurchaseContracts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">
-                      {(purchaseStatusFilter !== 'ALL' || storeFilter || productSearch) ? '没有符合筛选条件的合同' : '暂无采购合同'}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  pagedPurchaseContracts.map((contract) => {
-                    const firstProduct = contract.items?.[0]?.product;
-                    const productName = firstProduct?.customsName || '-';
-                    return (
-                    <TableRow key={contract.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          {contract.contractNo}
+          
+          {/* 桌面端卡片网格视图 */}
+          <div className="hidden md:block">
+            {purchaseLoading ? (
+              <div className="py-12 text-center text-muted-foreground">加载中...</div>
+            ) : pagedPurchaseContracts.length === 0 ? (
+              <EmptyState
+                icon={<ShoppingCart className="h-8 w-8" />}
+                title="暂无采购合同"
+                description="还没有创建任何采购合同，点击下方的按钮开始创建"
+                action={{ label: '新建采购合同', onClick: () => router.push('/dashboard/purchase/create') }}
+              />
+            ) : (
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+                {pagedPurchaseContracts.map((contract) => {
+                  const firstProduct = contract.items?.[0]?.product;
+                  const productName = firstProduct?.customsName || '-';
+                  const isUnpaid = contract.paidAmount < contract.totalAmount;
+                  return (
+                    <Card
+                      key={contract.id}
+                      className="cursor-pointer border-border/40 border-l-[3px] bg-card/60 transition-all duration-300 hover:border-primary/20 hover:bg-card hover:shadow-md hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/10"
+                      style={{ borderLeftColor: getPurchaseStatusColor(contract.status) }}
+                      onClick={() => router.push(`/dashboard/purchase/${contract.id}`)}
+                    >
+                      <CardContent className="space-y-3 p-4">
+                        {/* 头部：编号 + 状态 */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                              <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                              <span className="truncate">{contract.contractNo}</span>
+                            </div>
+                            <p className="mt-0.5 text-xs text-muted-foreground truncate" title={productName}>
+                              {productName}
+                            </p>
+                          </div>
+                          {getPurchaseStatusBadge(contract.status)}
                         </div>
-                      </TableCell>
-                      <TableCell className="max-w-[150px] truncate" title={productName}>
-                        {productName || <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell>
-                        {contract.supplier?.name ? (
-                          <>
-                            {contract.supplier.name}
-                            {contract.supplier.hasQualityIssue && (
-                              <Badge variant="destructive" className="ml-2 text-xs">质量问题</Badge>
+
+                        {/* 供应商 + 店铺 */}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <span className="shrink-0">供应商:</span>
+                            <span className="truncate font-medium text-foreground">
+                              {contract.supplier?.name || '—'}
+                            </span>
+                            {contract.supplier?.hasQualityIssue && (
+                              <Badge variant="destructive" className="ml-1 text-[10px] px-1 py-0">质量问题</Badge>
                             )}
-                          </>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-[120px] truncate" title={contract.storeName || ''}>
-                        {contract.storeName || '-'}
-                      </TableCell>
-                      <TableCell>
-                        {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}
-                      </TableCell>
-                      <TableCell>{getPurchaseStatusBadge(contract.status)}</TableCell>
-                      <TableCell className="text-right font-medium">
-                        {contract.totalAmount.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <AmountText tone={contract.paidAmount < contract.totalAmount ? 'warning' : 'success'}>
-                          {contract.paidAmount.toLocaleString()}
-                        </AmountText>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            className="rounded-xl border border-border/65 bg-background/55"
-                            onClick={() => router.push(`/dashboard/purchase/${contract.id}`)}
-                            aria-label={`查看 ${contract.contractNo} 详情`}
-                            title="查看详情"
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <span className="shrink-0">店铺:</span>
+                            <span className="truncate text-foreground">{contract.storeName || '—'}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <span className="shrink-0">签订:</span>
+                            <span className="text-foreground">
+                              {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '—'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 金额 */}
+                        <div className="flex items-end justify-between border-t border-border/30 pt-2">
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">总金额</p>
+                            <p className="text-base font-bold tabular-nums text-foreground">
+                              ¥{contract.totalAmount.toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[11px] text-muted-foreground">已付</p>
+                            <AmountText tone={isUnpaid ? 'warning' : 'success'} className="text-base font-bold tabular-nums">
+                              ¥{contract.paidAmount.toLocaleString()}
+                            </AmountText>
+                          </div>
+                        </div>
+
+                        {/* 操作 */}
+                        <div className="flex gap-2 pt-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 flex-1 rounded-lg text-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/dashboard/purchase/${contract.id}`);
+                            }}
                           >
-                            <Eye className="h-4 w-4" />
+                            <Eye className="mr-1 h-3 w-3" /> 查看
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            className="rounded-xl border border-border/65 bg-background/55"
-                            onClick={() => openGenerateDialog(contract.id)}
-                            aria-label={`为 ${contract.contractNo} 生成购销合同`}
-                            title="生成购销合同"
+                          <Button
+                            size="sm"
+                            className="h-8 flex-1 rounded-lg text-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openGenerateDialog(contract.id);
+                            }}
                           >
-                            <FileDown className="h-4 w-4 text-primary" />
+                            <FileDown className="mr-1 h-3 w-3" /> 生成合同
                           </Button>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  )})
-                )}
-              </TableBody>
-            </Table>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </div>
           
           {/* 分页控件 */}

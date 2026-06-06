@@ -14,6 +14,8 @@ import { Product } from '@/types';
 import { productService } from '@/services/product.service';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -22,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Pencil, Trash, Search, Package, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Package, X } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ProductDialog } from './components/ProductDialog';
 import { InventoryTab } from './components/InventoryTab';
@@ -219,7 +221,6 @@ function ProductsPageContent() {
       <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
       <PageHeader
         title="商品管理"
-        description="管理商品档案、规格信息与库存状态"
       />
 
       <Tabs defaultValue="products" className="space-y-4">
@@ -281,7 +282,7 @@ function ProductsPageContent() {
                         <Pencil className="mr-1 h-4 w-4" /> 编辑
                       </Button>
                       <Button variant="ghost" size="sm" className="h-10 rounded-xl px-3" onClick={() => openDeleteDialog(product)}>
-                        <Trash className="h-4 w-4 text-destructive" />
+                        <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                   }
@@ -292,107 +293,93 @@ function ProductsPageContent() {
 
           {/* 桌面端表格 */}
           <div className="surface-panel hidden overflow-hidden md:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <SortableTableHead
-                    sortKey="customsName"
-                    currentSortKey={productSort.sortKey}
-                    currentSortDir={productSort.sortDir}
-                    onSort={productSort.onSort}
+          {/* 桌面端卡片视图 */}
+          <div className="hidden md:block">
+            {loading ? (
+              <div className="py-12 text-center text-muted-foreground">加载中...</div>
+            ) : products.length === 0 ? (
+              <EmptyState
+                icon={<Package className="h-8 w-8" />}
+                title="暂无商品"
+                description="还没有添加任何商品，点击下方的按钮开始创建"
+                action={{ label: '新增商品', onClick: () => setIsDialogOpen(true) }}
+              />
+            ) : (
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+                {pagedProducts.map((product) => (
+                  <Card
+                    key={product.id}
+                    className="cursor-pointer border-border/40 border-l-[3px] bg-card/60 transition-all duration-300 hover:border-primary/20 hover:bg-card hover:shadow-md hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/10"
+                    style={{ borderLeftColor: 'oklch(0.55 0.14 150)' }}
+                    onClick={() => handleEdit(product)}
                   >
-                    报关名称
-                  </SortableTableHead>
-                  <SortableTableHead
-                    sortKey="specification"
-                    currentSortKey={productSort.sortKey}
-                    currentSortDir={productSort.sortDir}
-                    onSort={productSort.onSort}
-                  >
-                    规格
-                  </SortableTableHead>
-                  <SortableTableHead
-                    sortKey="unit"
-                    currentSortKey={productSort.sortKey}
-                    currentSortDir={productSort.sortDir}
-                    onSort={productSort.onSort}
-                  >
-                    单位
-                  </SortableTableHead>
-                  <TableHead className="hidden md:table-cell">包装规格</TableHead>
-                  <SortableTableHead
-                    sortKey="grossWeight"
-                    currentSortKey={productSort.sortKey}
-                    currentSortDir={productSort.sortDir}
-                    onSort={productSort.onSort}
-                    className="hidden md:table-cell text-right"
-                  >
-                    毛重(kg)
-                  </SortableTableHead>
-                  <SortableTableHead
-                    sortKey="netWeight"
-                    currentSortKey={productSort.sortKey}
-                    currentSortDir={productSort.sortDir}
-                    onSort={productSort.onSort}
-                    className="hidden md:table-cell text-right"
-                  >
-                    净重(kg)
-                  </SortableTableHead>
-                  <SortableTableHead
-                    sortKey="volume"
-                    currentSortKey={productSort.sortKey}
-                    currentSortDir={productSort.sortDir}
-                    onSort={productSort.onSort}
-                    className="hidden md:table-cell text-right"
-                  >
-                    体积(CBM)
-                  </SortableTableHead>
-                  <TableHead className="w-[100px]">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                   <TableRow>
-                     <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
-                   </TableRow>
-                ) : products.length === 0 ? (
-                   <TableRow>
-                     <TableCell colSpan={8} className="p-0">
-                       <EmptyState
-                         icon={Package}
-                         title="暂无商品"
-                         description="还没有添加任何商品，点击右上角「新增商品」开始创建。"
-                       />
-                     </TableCell>
-                   </TableRow>
-                ) : (
-                  pagedProducts.map((product) => (
-                    <TableRow key={product.id}>
-                      <TableCell className="font-medium">{product.customsName}</TableCell>
-                      <TableCell>{product.specification || '-'}</TableCell>
-                      <TableCell>{product.unit || '-'}</TableCell>
-                      <TableCell className="hidden md:table-cell">{product.packingSpec || '-'}</TableCell>
-                      <TableCell className="hidden md:table-cell text-right">{product.grossWeight ?? '-'}</TableCell>
-                      <TableCell className="hidden md:table-cell text-right">{product.netWeight ?? '-'}</TableCell>
-                      <TableCell className="hidden md:table-cell text-right">{product.volume ?? '-'}</TableCell>
-                      <TableCell className="flex gap-1 sm:gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(product)}>
-                          <Pencil className="h-4 w-4" />
+                    <CardContent className="space-y-3 p-4">
+                      {/* 名称 + 分类 */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">{product.customsName}</p>
+                          <p className="text-xs text-muted-foreground">{product.specification || '—'}</p>
+                        </div>
+                        <Badge variant="outline" className="shrink-0 text-[11px]">
+                          {product.unit || '件'}
+                        </Badge>
+                      </div>
+
+                      {/* 规格信息 */}
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="rounded-lg bg-muted/40 p-2">
+                          <p className="text-[10px] text-muted-foreground">毛重</p>
+                          <p className="text-sm font-bold tabular-nums">{product.grossWeight || 0}kg</p>
+                        </div>
+                        <div className="rounded-lg bg-muted/40 p-2">
+                          <p className="text-[10px] text-muted-foreground">净重</p>
+                          <p className="text-sm font-bold tabular-nums">{product.netWeight || 0}kg</p>
+                        </div>
+                        <div className="rounded-lg bg-muted/40 p-2">
+                          <p className="text-[10px] text-muted-foreground">体积</p>
+                          <p className="text-sm font-bold tabular-nums">{product.volume || 0}CBM</p>
+                        </div>
+                      </div>
+
+                      {/* 包装 + HS */}
+                      <div className="space-y-0.5 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
+                          <span className="shrink-0">包装:</span>
+                          <span className="text-foreground">{product.packingSpec || '—'}</span>
+                        </div>
+                        {product.hsCode && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="shrink-0">HS编码:</span>
+                            <span className="font-mono text-foreground">{product.hsCode}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 操作 */}
+                      <div className="flex gap-2 pt-1 border-t border-border/30">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 flex-1 rounded-lg text-xs"
+                          onClick={(e) => { e.stopPropagation(); handleEdit(product); }}
+                        >
+                          <Pencil className="mr-1 h-3 w-3" /> 编辑
                         </Button>
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`删除商品 ${product.customsName}`}
-                          onClick={() => openDeleteDialog(product)}
+                          variant="outline"
+                          size="sm"
+                          className="h-8 flex-1 rounded-lg text-xs text-destructive hover:bg-destructive/10"
+                          onClick={(e) => { e.stopPropagation(); openDeleteDialog(product); }}
                         >
-                          <Trash className="h-4 w-4 text-destructive" />
+                          <Trash2 className="mr-1 h-3 w-3" /> 删除
                         </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
           </div>
 
           {/* 分页控制 */}

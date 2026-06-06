@@ -1,12 +1,8 @@
 #!/usr/bin/env node
 /**
  * Input: stdio JSON-RPC / 环境变量 baseUrl+token
- * Output: 最小可用 MCP stdio server
- * Pos: 在 CLI 稳定后对外封装 MCP tools
- *
- * 说明：
- * - 当前实现为 stdio transport，适合本机/VPS sidecar 调用。
- * - 远程 HTTP MCP 暂未在本轮实现。
+ * Output: MCP stdio server，暴露捷淞系统全量查询与操作能力
+ * Pos: Agent 通过 MCP 协议接入系统
  */
 
 const readline = require('node:readline');
@@ -18,20 +14,114 @@ const SUPPORTED_PROTOCOL_VERSIONS = [LATEST_PROTOCOL_VERSION, '2024-11-05'];
 const buildTools = () => ([
   {
     name: 'search_entities',
-    description: 'Search products, suppliers, purchases, and sales from Jiesong.',
+    description: '统一搜索：产品、供应商、采购合同、出口合同',
     inputSchema: {
       type: 'object',
       properties: {
-        query: { type: 'string' },
-        types: { type: 'array', items: { type: 'string' } },
-        limit: { type: 'integer' },
+        query: { type: 'string', description: '搜索关键词' },
+        types: { type: 'array', items: { type: 'string', enum: ['product', 'supplier', 'purchase', 'sales'] } },
+        limit: { type: 'integer', default: 10 },
       },
       required: ['query'],
     },
   },
   {
+    name: 'list_sales_contracts',
+    description: '列出出口合同，支持状态、门店、关键词筛选',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', description: '合同状态: DRAFT, CONFIRMED, PACKING, SHIPPED, ARRIVED, COMPLETED' },
+        storeId: { type: 'string' },
+        keyword: { type: 'string' },
+        page: { type: 'integer', default: 1 },
+        pageSize: { type: 'integer', default: 20 },
+      },
+    },
+  },
+  {
+    name: 'get_sales_contract',
+    description: '查看单条出口合同详情',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: '合同 ID' },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'list_inventories',
+    description: '列出库存记录，支持状态、产品筛选',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', description: '库存状态: PRODUCING, PACKING, SHIPPING, INBOUND, OUTBOUND' },
+        productId: { type: 'string' },
+        keyword: { type: 'string' },
+        page: { type: 'integer', default: 1 },
+        pageSize: { type: 'integer', default: 20 },
+      },
+    },
+  },
+  {
+    name: 'list_payments',
+    description: '列出收付款记录',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: ['INCOME', 'EXPENSE'], description: '收入或支出' },
+        page: { type: 'integer', default: 1 },
+        pageSize: { type: 'integer', default: 20 },
+      },
+    },
+  },
+  {
+    name: 'get_payables',
+    description: '列出应付账款',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        page: { type: 'integer', default: 1 },
+        pageSize: { type: 'integer', default: 20 },
+      },
+    },
+  },
+  {
+    name: 'get_receivables',
+    description: '列出应收账款（含逾期）',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        overdueDays: { type: 'integer', description: '逾期天数阈值' },
+        page: { type: 'integer', default: 1 },
+        pageSize: { type: 'integer', default: 20 },
+      },
+    },
+  },
+  {
+    name: 'list_customs_declarations',
+    description: '列出报关单',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        salesContractId: { type: 'string', description: '关联的出口合同 ID' },
+        page: { type: 'integer', default: 1 },
+        pageSize: { type: 'integer', default: 20 },
+      },
+    },
+  },
+  {
+    name: 'get_dashboard_analytics',
+    description: '获取经营看板数据（合同统计、应收、库存、出货趋势）',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
     name: 'create_purchase_with_items',
-    description: 'Create one purchase contract with items in a single operation.',
+    description: '创建采购合同（含明细）',
     inputSchema: {
       type: 'object',
       properties: {
@@ -45,7 +135,7 @@ const buildTools = () => ([
   },
   {
     name: 'create_supplier',
-    description: 'Create one supplier record.',
+    description: '创建供应商',
     inputSchema: {
       type: 'object',
       properties: {
@@ -59,7 +149,7 @@ const buildTools = () => ([
   },
   {
     name: 'update_supplier',
-    description: 'Update one supplier record.',
+    description: '更新供应商',
     inputSchema: {
       type: 'object',
       properties: {
@@ -74,7 +164,7 @@ const buildTools = () => ([
   },
   {
     name: 'update_purchase',
-    description: 'Update one purchase contract.',
+    description: '更新采购合同',
     inputSchema: {
       type: 'object',
       properties: {
@@ -84,6 +174,19 @@ const buildTools = () => ([
         invoiceNo: { type: 'string' },
       },
       required: ['id'],
+    },
+  },
+  {
+    name: 'run_agent',
+    description: '调用 AI Agent 进行自然语言查询或分析',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', description: '用户问题或指令' },
+        agentType: { type: 'string', enum: ['unified', 'finance', 'export', 'executive'], default: 'unified' },
+        sessionId: { type: 'string' },
+      },
+      required: ['message'],
     },
   },
 ]);
@@ -104,7 +207,7 @@ const createMcpServer = (client) => {
         },
         serverInfo: {
           name: 'jiesong-mcp',
-          version: '0.1.0',
+          version: '0.2.0',
         },
       };
     },
@@ -116,49 +219,50 @@ const createMcpServer = (client) => {
     async callTool(params = {}) {
       const args = params.arguments || {};
 
-      if (params.name === 'search_entities') {
-        const result = await client.searchEntities(args);
+      const callAndReturn = async (promise) => {
+        const result = await promise;
         return {
-          content: [{ type: 'text', text: JSON.stringify(result) }],
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
           structuredContent: result,
         };
-      }
+      };
 
-      if (params.name === 'create_purchase_with_items') {
-        const result = await client.createPurchase(args);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result) }],
-          structuredContent: result,
-        };
+      switch (params.name) {
+        case 'search_entities':
+          return callAndReturn(client.searchEntities(args));
+        case 'list_sales_contracts':
+          return callAndReturn(client.listSalesContracts(args));
+        case 'get_sales_contract':
+          return callAndReturn(client.getSalesContractById(args.id));
+        case 'list_inventories':
+          return callAndReturn(client.listInventories(args));
+        case 'list_payments':
+          return callAndReturn(client.listPayments(args));
+        case 'get_payables':
+          return callAndReturn(client.getPayables(args));
+        case 'get_receivables':
+          return callAndReturn(client.getReceivables(args));
+        case 'list_customs_declarations':
+          return callAndReturn(client.listCustomsDeclarations(args));
+        case 'get_dashboard_analytics':
+          return callAndReturn(client.getDashboardAnalytics());
+        case 'create_purchase_with_items':
+          return callAndReturn(client.createPurchase(args));
+        case 'create_supplier':
+          return callAndReturn(client.createSupplier(args));
+        case 'update_supplier': {
+          const { id, ...payload } = args;
+          return callAndReturn(client.updateSupplier(id, payload));
+        }
+        case 'update_purchase': {
+          const { id, ...payload } = args;
+          return callAndReturn(client.updatePurchase(id, payload));
+        }
+        case 'run_agent':
+          return callAndReturn(client.agentPrompt(args));
+        default:
+          throw new Error(`Unknown tool: ${params.name}`);
       }
-
-      if (params.name === 'create_supplier') {
-        const result = await client.createSupplier(args);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result) }],
-          structuredContent: result,
-        };
-      }
-
-      if (params.name === 'update_supplier') {
-        const { id, ...payload } = args;
-        const result = await client.updateSupplier(id, payload);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result) }],
-          structuredContent: result,
-        };
-      }
-
-      if (params.name === 'update_purchase') {
-        const { id, ...payload } = args;
-        const result = await client.updatePurchase(id, payload);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result) }],
-          structuredContent: result,
-        };
-      }
-
-      throw new Error(`Unknown tool: ${params.name}`);
     },
   };
 
