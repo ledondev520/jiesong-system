@@ -1,12 +1,12 @@
-'use client';
-
 /**
  * Input: purchaseService, supplierService, productService
  * Output: 创建采购合同页面
  * Pos: 采购合同创建入口
- * 
+ *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
+
+'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -52,7 +52,24 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
-import { Wand2, Plus, Trash, Loader2, UserPlus, Check, ChevronsUpDown, Star, Save, FileText } from 'lucide-react';
+import {
+  Wand2,
+  Plus,
+  Trash,
+  Loader2,
+  UserPlus,
+  Check,
+  ChevronsUpDown,
+  Star,
+  Save,
+  FileText,
+  Search,
+  Package,
+  Calculator,
+  ArrowRight,
+  ArrowLeft,
+  X,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -67,6 +84,14 @@ import { contractTemplateService } from '@/services/contractTemplate.service';
 import { ContractTemplate } from '@/types';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PriceGuard } from '@/components/purchase/PriceGuard';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 // ============== Schema ==============
 const purchaseSchema = z.object({
@@ -75,14 +100,18 @@ const purchaseSchema = z.object({
   signedAt: z.date().optional(),
   taxRate: z.number().min(0).max(100),
   note: z.string().optional(),
-  items: z.array(z.object({
-    productId: z.string().min(1, '请选择商品'),
-    quantity: z.number().min(0.01, '数量必须大于0'),
-    unitPrice: z.number().min(0, '单价必须大于等于0'),
-    unit: z.string().optional(),
-    note: z.string().optional(),
-    priceNote: z.string().optional(),
-  })).min(1, '至少添加一项商品'),
+  items: z
+    .array(
+      z.object({
+        productId: z.string().min(1, '请选择商品'),
+        quantity: z.number().min(0.01, '数量必须大于0'),
+        unitPrice: z.number().min(0, '单价必须大于等于0'),
+        unit: z.string().optional(),
+        note: z.string().optional(),
+        priceNote: z.string().optional(),
+      })
+    )
+    .min(1, '至少添加一项商品'),
 });
 
 type PurchaseFormValues = z.infer<typeof purchaseSchema>;
@@ -93,29 +122,133 @@ interface RecommendedSupplier extends Supplier {
   purchaseCount?: number;
 }
 
+/**
+ * 职责：步骤指示器
+ * 思路：已完成步骤显示勾选，当前步骤高亮，未完成步骤显示数字
+ */
+function StepIndicator({
+  steps,
+  currentStep,
+  onChange,
+}: {
+  steps: string[];
+  currentStep: number;
+  onChange: (step: number) => void;
+}) {
+  return (
+    <div className="flex items-center justify-center gap-0">
+      {steps.map((step, idx) => {
+        const stepNum = idx + 1;
+        const isCompleted = stepNum < currentStep;
+        const isCurrent = stepNum === currentStep;
+        return (
+          <div key={step} className="flex items-center">
+            <button
+              type="button"
+              onClick={() => onChange(stepNum)}
+              className="flex items-center gap-2.5 rounded-full px-4 py-2.5 text-sm font-medium transition-all"
+            >
+              <span
+                className={cn(
+                  'flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold transition-colors',
+                  isCurrent
+                    ? 'bg-primary text-primary-foreground'
+                    : isCompleted
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-muted text-muted-foreground'
+                )}
+              >
+                {isCompleted ? <Check className="h-3.5 w-3.5" /> : stepNum}
+              </span>
+              <span
+                className={cn(
+                  isCurrent ? 'text-primary' : isCompleted ? 'text-foreground' : 'text-muted-foreground'
+                )}
+              >
+                {step}
+              </span>
+            </button>
+            {idx < steps.length - 1 && (
+              <div className={cn('mx-2 h-px w-8', isCompleted ? 'bg-emerald-500' : 'bg-border')} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * 职责：价格汇总卡片
+ */
+function PriceSummary({
+  subtotal,
+  taxRate,
+}: {
+  subtotal: number;
+  taxRate: number;
+}) {
+  const taxAmount = subtotal * (taxRate / 100);
+  const total = subtotal + taxAmount;
+
+  return (
+    <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
+      <div className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <Calculator className="h-3.5 w-3.5" />
+        价格汇总
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">商品小计</span>
+          <span className="font-mono font-medium tabular-nums">¥{subtotal.toLocaleString()}</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">税额 ({taxRate}%)</span>
+          <span className="font-mono tabular-nums text-muted-foreground">
+            ¥{taxAmount.toLocaleString()}
+          </span>
+        </div>
+        <div className="border-t border-border/40 pt-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">合计</span>
+            <span className="font-mono text-lg font-bold tabular-nums text-emerald-600">
+              ¥{total.toLocaleString()}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CreatePurchasePage() {
   const router = useRouter();
-  
+
   // 基础数据
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [contractNoLoading, setContractNoLoading] = useState(true);
-  
+
   // 供应商 Combobox
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [supplierSearch, setSupplierSearch] = useState('');
-  
+
   // 推荐供应商（根据选中商品）
   const [recommendedSupplierIds, setRecommendedSupplierIds] = useState<Set<string>>(new Set());
-  
+
   // 新增供应商弹窗
   const [showNewSupplierDialog, setShowNewSupplierDialog] = useState(false);
   const [newSupplierForm, setNewSupplierForm] = useState({
-    name: '', contactName: '', contactPhone: '', address: '',
-    taxId: '', bankName: '', bankAccount: '',
+    name: '',
+    contactName: '',
+    contactPhone: '',
+    address: '',
+    taxId: '',
+    bankName: '',
+    bankAccount: '',
   });
   const [savingSupplier, setSavingSupplier] = useState(false);
-  
+
   // AI 解析
   const [parseText, setParseText] = useState('');
   const [isParsing, setIsParsing] = useState(false);
@@ -128,6 +261,11 @@ export default function CreatePurchasePage() {
   const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
   const [templateName, setTemplateName] = useState('');
   const [savingTemplate, setSavingTemplate] = useState(false);
+
+  // 批量商品选择器
+  const [showBatchSelector, setShowBatchSelector] = useState(false);
+  const [batchSearch, setBatchSearch] = useState('');
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
 
   // 表单
   const form = useForm<PurchaseFormValues>({
@@ -152,6 +290,7 @@ export default function CreatePurchasePage() {
 
   const watchItems = useWatch({ control: form.control, name: 'items' });
   const watchSupplierId = useWatch({ control: form.control, name: 'supplierId' });
+  const watchTaxRate = useWatch({ control: form.control, name: 'taxRate' }) ?? 13;
 
   useEffect(() => {
     if (!form.getValues('signedAt')) {
@@ -167,7 +306,7 @@ export default function CreatePurchasePage() {
   // ============== 加载商品价格历史 ==============
   const productIdsKey = useMemo(
     () => watchItems.map((i) => i.productId).filter(Boolean).sort().join(','),
-    [watchItems],
+    [watchItems]
   );
 
   useEffect(() => {
@@ -231,15 +370,13 @@ export default function CreatePurchasePage() {
 
   // ============== 根据选中商品推荐供应商 ==============
   useEffect(() => {
-    const selectedProductIds = watchItems
-      .map(item => item.productId)
-      .filter(id => id && id.length > 0);
-    
+    const selectedProductIds = watchItems.map((item) => item.productId).filter((id) => id && id.length > 0);
+
     if (selectedProductIds.length === 0) {
       setRecommendedSupplierIds(new Set());
       return;
     }
-    
+
     // 查询曾经供应过这些商品的供应商
     const fetchRecommendedSuppliers = async () => {
       try {
@@ -251,21 +388,22 @@ export default function CreatePurchasePage() {
         // 静默失败，推荐功能是辅助性的
       }
     };
-    
+
     fetchRecommendedSuppliers();
   }, [watchItems]);
 
   // ============== 供应商列表（推荐优先） ==============
   const sortedSuppliers = useMemo((): RecommendedSupplier[] => {
     const filtered = supplierSearch.trim()
-      ? suppliers.filter(s =>
-          s.name.toLowerCase().includes(supplierSearch.toLowerCase()) ||
-          (s.contactName && s.contactName.toLowerCase().includes(supplierSearch.toLowerCase()))
+      ? suppliers.filter(
+          (s) =>
+            s.name.toLowerCase().includes(supplierSearch.toLowerCase()) ||
+            (s.contactName && s.contactName.toLowerCase().includes(supplierSearch.toLowerCase()))
         )
       : suppliers;
-    
+
     return filtered
-      .map(s => ({
+      .map((s) => ({
         ...s,
         isRecommended: recommendedSupplierIds.has(s.id),
       }))
@@ -287,10 +425,18 @@ export default function CreatePurchasePage() {
     try {
       const response = await supplierService.create(newSupplierForm);
       const newSupplier = response.data;
-      setSuppliers(prev => [newSupplier, ...prev]);
+      setSuppliers((prev) => [newSupplier, ...prev]);
       form.setValue('supplierId', newSupplier.id);
       setShowNewSupplierDialog(false);
-      setNewSupplierForm({ name: '', contactName: '', contactPhone: '', address: '', taxId: '', bankName: '', bankAccount: '' });
+      setNewSupplierForm({
+        name: '',
+        contactName: '',
+        contactPhone: '',
+        address: '',
+        taxId: '',
+        bankName: '',
+        bankAccount: '',
+      });
       toast.success('供应商创建成功');
     } catch {
       toast.error('创建供应商失败');
@@ -307,13 +453,12 @@ export default function CreatePurchasePage() {
       const result = await purchaseService.parseQuote(parseText);
       if (result.success && result.data.length > 0) {
         const normalizedItems = result.data.map((item: ParsedQuoteItem) => {
-          const matchedProduct =
-            item.productId
-              ? products.find((product) => product.id === item.productId)
-              : products.find((product) => {
-                  if (!item.productName) return false;
-                  return product.customsName.toLowerCase().includes(item.productName.toLowerCase());
-                });
+          const matchedProduct = item.productId
+            ? products.find((product) => product.id === item.productId)
+            : products.find((product) => {
+                if (!item.productName) return false;
+                return product.customsName.toLowerCase().includes(item.productName.toLowerCase());
+              });
 
           const fallbackNote = item.productName ? `AI识别商品：${item.productName}` : undefined;
 
@@ -330,7 +475,9 @@ export default function CreatePurchasePage() {
         normalizedItems.forEach((item) => append(item));
 
         if (unresolvedCount > 0) {
-          toast.success(`解析完成，已添加 ${normalizedItems.length} 条，${unresolvedCount} 条需手动选择商品`);
+          toast.success(
+            `解析完成，已添加 ${normalizedItems.length} 条，${unresolvedCount} 条需手动选择商品`
+          );
         } else {
           toast.success(`解析完成，已添加 ${normalizedItems.length} 条报价`);
         }
@@ -366,9 +513,7 @@ export default function CreatePurchasePage() {
     }
 
     // 应用明细（仅保留当前仍存在的商品）
-    const validItems = (template.items || []).filter((item) =>
-      products.some((p) => p.id === item.productId)
-    );
+    const validItems = (template.items || []).filter((item) => products.some((p) => p.id === item.productId));
     if (validItems.length > 0) {
       form.setValue(
         'items',
@@ -431,6 +576,31 @@ export default function CreatePurchasePage() {
     }
   };
 
+  // ============== 批量添加商品 ==============
+  const handleBatchAdd = () => {
+    const toAdd = products.filter((p) => selectedProductIds.has(p.id));
+    toAdd.forEach((p) => {
+      append({
+        productId: p.id,
+        quantity: 0,
+        unitPrice: 0,
+        unit: p.unit || '',
+        note: '',
+        priceNote: '',
+      });
+    });
+    setSelectedProductIds(new Set());
+    setShowBatchSelector(false);
+    setBatchSearch('');
+    toast.success(`已添加 ${toAdd.length} 项商品`);
+  };
+
+  const filteredBatchProducts = useMemo(() => {
+    if (!batchSearch.trim()) return products;
+    const kw = batchSearch.trim().toLowerCase();
+    return products.filter((p) => p.customsName.toLowerCase().includes(kw));
+  }, [products, batchSearch]);
+
   // ============== 提交 ==============
   const onSubmit = async (data: PurchaseFormValues) => {
     try {
@@ -486,17 +656,17 @@ export default function CreatePurchasePage() {
   };
 
   // 当前选中的供应商
-  const selectedSupplier = suppliers.find(s => s.id === watchSupplierId);
+  const selectedSupplier = suppliers.find((s) => s.id === watchSupplierId);
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-10">
+    <div className="mx-auto max-w-5xl space-y-6 pb-10">
       <PageHeader
         title="新增采购合同"
         description="先添加商品，系统会推荐曾供应过该商品的供应商"
       />
 
       {/* 模板选择器 */}
-      <Card className="md:col-span-2">
+      <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)] md:col-span-2">
         <CardContent className="flex flex-wrap items-center gap-3 py-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <FileText className="h-4 w-4" />
@@ -507,7 +677,7 @@ export default function CreatePurchasePage() {
             onValueChange={handleApplyTemplate}
             disabled={templatesLoading}
           >
-            <SelectTrigger className="w-[240px]">
+            <SelectTrigger className="h-9 w-[240px] rounded-md text-xs">
               <SelectValue placeholder={templatesLoading ? '加载中...' : '选择合同模板'} />
             </SelectTrigger>
             <SelectContent>
@@ -522,38 +692,21 @@ export default function CreatePurchasePage() {
             type="button"
             variant="outline"
             size="sm"
+            className="h-8 rounded-md text-xs"
             onClick={() => setShowSaveTemplateDialog(true)}
           >
-            <Save className="mr-1 h-4 w-4" />
+            <Save className="mr-1 h-3.5 w-3.5" />
             保存为模板
           </Button>
         </CardContent>
       </Card>
 
       {/* Stepper */}
-      <div className="flex items-center justify-center gap-2">
-        {['采购明细', '合同信息'].map((step, idx) => (
-          <div key={step} className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCurrentStep(idx + 1)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                currentStep === idx + 1
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
-            >
-              <span className={`flex h-5 w-5 items-center justify-center rounded-full text-xs ${
-                currentStep === idx + 1 ? 'bg-primary-foreground text-primary' : 'bg-background text-muted-foreground'
-              }`}>
-                {idx + 1}
-              </span>
-              {step}
-            </button>
-            {idx < 1 && <div className="h-px w-8 bg-border" />}
-          </div>
-        ))}
-      </div>
+      <StepIndicator
+        steps={['采购明细', '合同信息']}
+        currentStep={currentStep}
+        onChange={setCurrentStep}
+      />
 
       <div className="grid gap-6 md:grid-cols-2">
         <Form {...form}>
@@ -561,10 +714,10 @@ export default function CreatePurchasePage() {
             {currentStep === 1 && (
               <>
                 {/* AI 智能录入 */}
-                <Card className="md:col-span-2">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Wand2 className="h-5 w-5 text-primary" />
+                <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)] md:col-span-2">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                      <Wand2 className="h-4 w-4 text-primary" />
                       AI 智能录入
                     </CardTitle>
                   </CardHeader>
@@ -577,27 +730,53 @@ export default function CreatePurchasePage() {
                         placeholder="粘贴供应商报价信息 (如：'订购100平方米瓷砖，单价45元，供应商佛山陶瓷...')"
                         value={parseText}
                         onChange={(e) => setParseText(e.target.value)}
-                        className="min-h-[100px]"
+                        className="min-h-[100px] rounded-md"
                       />
                     </div>
-                    <Button type="button" onClick={handleParse} disabled={isParsing || !parseText} variant="default" className="shadow-sm">
+                    <Button
+                      type="button"
+                      onClick={handleParse}
+                      disabled={isParsing || !parseText}
+                      variant="default"
+                      className="h-9 rounded-md text-xs shadow-sm"
+                    >
                       {isParsing ? '解析中...' : '解析报价'}
                     </Button>
                   </CardContent>
                 </Card>
 
-                {/* 采购明细 - 放在前面 */}
-                <Card className="md:col-span-2">
-                  <CardHeader className="flex flex-row items-center justify-between">
+                {/* 采购明细 */}
+                <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)] md:col-span-2">
+                  <CardHeader className="flex flex-row items-center justify-between pb-3">
                     <div>
-                      <CardTitle>采购明细</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">先选择商品，系统会推荐供应商</p>
+                      <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                        <Package className="h-4 w-4" />
+                        采购明细
+                      </CardTitle>
+                      <p className="mt-1 text-xs text-muted-foreground">先选择商品，系统会推荐供应商</p>
                     </div>
-                    <div className="text-lg font-bold">总计: ¥{totalAmount.toLocaleString()}</div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 rounded-md text-xs"
+                        onClick={() => setShowBatchSelector(true)}
+                      >
+                        <Plus className="mr-1 h-3.5 w-3.5" />
+                        批量添加
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {/* 价格汇总 */}
+                    <PriceSummary subtotal={totalAmount} taxRate={watchTaxRate} />
+
                     {fields.map((field, index) => (
-                      <div key={field.id} className="grid gap-4 md:grid-cols-12 items-end border-b pb-4">
+                      <div
+                        key={field.id}
+                        className="grid gap-3 rounded-lg border border-border/40 bg-card p-4 md:grid-cols-12 md:items-end"
+                      >
                         <div className="md:col-span-4">
                           <FormField
                             control={form.control}
@@ -605,18 +784,20 @@ export default function CreatePurchasePage() {
                             render={({ field }) => {
                               return (
                                 <FormItem>
-                                  <FormLabel className={index !== 0 ? 'sr-only' : ''}>
+                                  <FormLabel className="text-xs">
                                     商品 <span className="text-destructive">*</span>
                                   </FormLabel>
                                   <Select onValueChange={field.onChange} value={field.value}>
                                     <FormControl>
-                                      <SelectTrigger>
+                                      <SelectTrigger className="h-9 rounded-md text-xs">
                                         <SelectValue placeholder="选择商品" />
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                      {products.map(p => (
-                                        <SelectItem key={p.id} value={p.id}>{p.customsName}</SelectItem>
+                                      {products.map((p) => (
+                                        <SelectItem key={p.id} value={p.id}>
+                                          {p.customsName}
+                                        </SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>
@@ -632,11 +813,19 @@ export default function CreatePurchasePage() {
                             name={`items.${index}.quantity`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className={index !== 0 ? 'sr-only' : ''}>
+                                <FormLabel className="text-xs">
                                   数量 <span className="text-destructive">*</span>
                                 </FormLabel>
                                 <FormControl>
-                                  <Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    className="h-9 rounded-md text-xs"
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(parseFloat(e.target.value) || 0)
+                                    }
+                                  />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -649,9 +838,13 @@ export default function CreatePurchasePage() {
                             name={`items.${index}.unit`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className={index !== 0 ? 'sr-only' : ''}>单位</FormLabel>
+                                <FormLabel className="text-xs">单位</FormLabel>
                                 <FormControl>
-                                  <Input {...field} placeholder="件/箱/平米" />
+                                  <Input
+                                    className="h-9 rounded-md text-xs"
+                                    {...field}
+                                    placeholder="件/箱/平米"
+                                  />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -664,11 +857,19 @@ export default function CreatePurchasePage() {
                             name={`items.${index}.unitPrice`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className={index !== 0 ? 'sr-only' : ''}>
+                                <FormLabel className="text-xs">
                                   单价 (¥) <span className="text-destructive">*</span>
                                 </FormLabel>
                                 <FormControl>
-                                  <Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    className="h-9 rounded-md text-xs"
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(parseFloat(e.target.value) || 0)
+                                    }
+                                  />
                                 </FormControl>
                                 <FormMessage />
                                 {/* 智能比价红绿灯：与历史成交价对比 */}
@@ -683,11 +884,25 @@ export default function CreatePurchasePage() {
                             )}
                           />
                         </div>
-                        <div className="md:col-span-1 text-right pb-2 font-medium">
-                          ¥{((watchItems[index]?.quantity || 0) * (watchItems[index]?.unitPrice || 0)).toLocaleString()}
+                        <div className="md:col-span-1 text-right">
+                          <p className="text-[11px] text-muted-foreground">小计</p>
+                          <p className="font-mono text-sm font-semibold tabular-nums text-emerald-600">
+                            ¥
+                            {(
+                              (watchItems[index]?.quantity || 0) *
+                              (watchItems[index]?.unitPrice || 0)
+                            ).toLocaleString()}
+                          </p>
                         </div>
-                        <div className="md:col-span-1">
-                          <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
+                        <div className="md:col-span-1 flex justify-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-md"
+                            onClick={() => remove(index)}
+                            disabled={fields.length <= 1}
+                          >
                             <Trash className="h-4 w-4 text-destructive" />
                           </Button>
                         </div>
@@ -697,17 +912,30 @@ export default function CreatePurchasePage() {
                           const item = watchItems[index];
                           const history = item?.productId ? priceHistoryMap[item.productId] : null;
                           const showHistory = history && history.count > 0;
-                          const isHighPrice = showHistory && history.averagePrice !== null && item.unitPrice > history.averagePrice * 1.1;
+                          const isHighPrice =
+                            showHistory &&
+                            history.averagePrice !== null &&
+                            item.unitPrice > history.averagePrice * 1.1;
                           if (!showHistory) return null;
                           return (
                             <div className="md:col-span-12">
                               <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                                <span>历史采购：均价 ¥{history.averagePrice} / 最低 ¥{history.minPrice} / 最高 ¥{history.maxPrice}（共 {history.count} 笔）</span>
+                                <span>
+                                  历史采购：均价 ¥{history.averagePrice} / 最低 ¥
+                                  {history.minPrice} / 最高 ¥{history.maxPrice}（共 {history.count}{' '}
+                                  笔）
+                                </span>
                               </div>
                               {isHighPrice && (
                                 <div className="mt-2 space-y-2">
-                                  <p className="text-xs text-destructive font-medium">
-                                    当前价格高于历史均价 {((item.unitPrice - history.averagePrice!) / history.averagePrice! * 100).toFixed(1)}%，请说明原因
+                                  <p className="text-xs font-medium text-destructive">
+                                    当前价格高于历史均价{' '}
+                                    {(
+                                      ((item.unitPrice - history.averagePrice!) /
+                                        history.averagePrice!) *
+                                      100
+                                    ).toFixed(1)}
+                                    %，请说明原因
                                   </p>
                                   <FormField
                                     control={form.control}
@@ -718,7 +946,7 @@ export default function CreatePurchasePage() {
                                           <Input
                                             {...field}
                                             placeholder="请填写价格偏高原因（必填）"
-                                            className="border-destructive focus-visible:ring-destructive"
+                                            className="h-8 rounded-md border-destructive text-xs focus-visible:ring-destructive"
                                           />
                                         </FormControl>
                                         <FormMessage />
@@ -732,16 +960,38 @@ export default function CreatePurchasePage() {
                         })()}
                       </div>
                     ))}
-                    <Button type="button" variant="outline" onClick={() => append({ productId: '', quantity: 0, unitPrice: 0, unit: '', note: '', priceNote: '' })}>
-                      <Plus className="h-4 w-4 mr-2" /> 添加商品
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-9 rounded-md text-xs"
+                      onClick={() =>
+                        append({
+                          productId: '',
+                          quantity: 0,
+                          unitPrice: 0,
+                          unit: '',
+                          note: '',
+                          priceNote: '',
+                        })
+                      }
+                    >
+                      <Plus className="mr-1.5 h-3.5 w-3.5" /> 添加商品
                     </Button>
                   </CardContent>
                 </Card>
 
-                <div className="md:col-span-2 flex justify-end gap-4">
-                  <Button type="button" variant="outline" onClick={() => router.back()}>取消</Button>
-                  <Button type="button" size="lg" onClick={goToStep2}>
+                <div className="flex justify-end gap-3 md:col-span-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 rounded-md text-sm"
+                    onClick={() => router.back()}
+                  >
+                    取消
+                  </Button>
+                  <Button type="button" className="h-10 rounded-md text-sm" onClick={goToStep2}>
                     下一步：合同信息
+                    <ArrowRight className="ml-1.5 h-4 w-4" />
                   </Button>
                 </div>
               </>
@@ -750,25 +1000,30 @@ export default function CreatePurchasePage() {
             {currentStep === 2 && (
               <>
                 {/* 合同详情 */}
-                <Card className="md:col-span-2">
-                  <CardHeader>
-                    <CardTitle>合同信息</CardTitle>
+                <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)] md:col-span-2">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">合同信息</CardTitle>
                   </CardHeader>
-                  <CardContent className="grid gap-6 md:grid-cols-3">
+                  <CardContent className="grid gap-5 md:grid-cols-3">
                     {/* 合同编号 */}
                     <FormField
                       control={form.control}
                       name="contractNo"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>合同编号</FormLabel>
+                          <FormLabel className="text-xs">合同编号</FormLabel>
                           <FormControl>
                             {contractNoLoading ? (
-                              <div className="flex items-center gap-2 h-10 px-3 text-muted-foreground">
-                                <Loader2 className="h-4 w-4 animate-spin" />生成中...
+                              <div className="flex h-10 items-center gap-2 rounded-md border border-border/60 bg-muted px-3 text-xs text-muted-foreground">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                生成中...
                               </div>
                             ) : (
-                              <Input {...field} disabled className="font-mono" />
+                              <Input
+                                {...field}
+                                disabled
+                                className="h-10 rounded-md font-mono text-xs"
+                              />
                             )}
                           </FormControl>
                         </FormItem>
@@ -782,9 +1037,18 @@ export default function CreatePurchasePage() {
                       render={({ field }) => (
                         <FormItem className="flex flex-col">
                           <div className="flex items-center justify-between">
-                            <FormLabel>供应商 <span className="text-destructive">*</span></FormLabel>
-                            <Button type="button" variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setShowNewSupplierDialog(true)}>
-                              <UserPlus className="h-3 w-3 mr-1" />新增
+                            <FormLabel className="text-xs">
+                              供应商 <span className="text-destructive">*</span>
+                            </FormLabel>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-xs"
+                              onClick={() => setShowNewSupplierDialog(true)}
+                            >
+                              <UserPlus className="mr-1 h-3 w-3" />
+                              新增
                             </Button>
                           </div>
                           <Popover open={supplierOpen} onOpenChange={setSupplierOpen}>
@@ -794,10 +1058,13 @@ export default function CreatePurchasePage() {
                                   variant="outline"
                                   role="combobox"
                                   aria-expanded={supplierOpen}
-                                  className={cn('w-full justify-between font-normal', !field.value && 'text-muted-foreground')}
+                                  className={cn(
+                                    'h-10 justify-between rounded-md text-xs font-normal',
+                                    !field.value && 'text-muted-foreground'
+                                  )}
                                 >
                                   {selectedSupplier ? selectedSupplier.name : '搜索或选择供应商...'}
-                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
                                 </Button>
                               </FormControl>
                             </PopoverTrigger>
@@ -823,7 +1090,10 @@ export default function CreatePurchasePage() {
                                         variant="link"
                                         size="sm"
                                         onClick={() => {
-                                          setNewSupplierForm(prev => ({ ...prev, name: supplierSearch }));
+                                          setNewSupplierForm((prev) => ({
+                                            ...prev,
+                                            name: supplierSearch,
+                                          }));
                                           setShowNewSupplierDialog(true);
                                           setSupplierOpen(false);
                                         }}
@@ -832,9 +1102,51 @@ export default function CreatePurchasePage() {
                                       </Button>
                                     </div>
                                   </CommandEmpty>
-                                  {recommendedSupplierIds.size > 0 && sortedSuppliers.some(s => s.isRecommended) && (
-                                    <CommandGroup heading="推荐供应商">
-                                      {sortedSuppliers.filter(s => s.isRecommended).map(s => (
+                                  {recommendedSupplierIds.size > 0 &&
+                                    sortedSuppliers.some((s) => s.isRecommended) && (
+                                      <CommandGroup heading="推荐供应商">
+                                        {sortedSuppliers
+                                          .filter((s) => s.isRecommended)
+                                          .map((s) => (
+                                            <CommandItem
+                                              key={s.id}
+                                              value={s.id}
+                                              onSelect={() => {
+                                                field.onChange(s.id);
+                                                setSupplierOpen(false);
+                                                setSupplierSearch('');
+                                              }}
+                                            >
+                                              <Check
+                                                className={cn(
+                                                  'mr-2 h-4 w-4',
+                                                  field.value === s.id
+                                                    ? 'opacity-100'
+                                                    : 'opacity-0'
+                                                )}
+                                              />
+                                              <Star className="mr-1 h-3 w-3 text-primary" />
+                                              <span>{s.name}</span>
+                                              {s.contactName && (
+                                                <span className="ml-2 text-xs text-muted-foreground">
+                                                  ({s.contactName})
+                                                </span>
+                                              )}
+                                              <Badge variant="secondary" className="ml-auto text-xs">
+                                                曾供应
+                                              </Badge>
+                                            </CommandItem>
+                                          ))}
+                                      </CommandGroup>
+                                    )}
+                                  <CommandGroup
+                                    heading={
+                                      recommendedSupplierIds.size > 0 ? '全部供应商' : '供应商列表'
+                                    }
+                                  >
+                                    {sortedSuppliers
+                                      .filter((s) => !s.isRecommended)
+                                      .map((s) => (
                                         <CommandItem
                                           key={s.id}
                                           value={s.id}
@@ -844,31 +1156,22 @@ export default function CreatePurchasePage() {
                                             setSupplierSearch('');
                                           }}
                                         >
-                                          <Check className={cn('mr-2 h-4 w-4', field.value === s.id ? 'opacity-100' : 'opacity-0')} />
-                                          <Star className="mr-1 h-3 w-3 text-primary" />
+                                          <Check
+                                            className={cn(
+                                              'mr-2 h-4 w-4',
+                                              field.value === s.id
+                                                ? 'opacity-100'
+                                                : 'opacity-0'
+                                            )}
+                                          />
                                           <span>{s.name}</span>
-                                          {s.contactName && <span className="text-muted-foreground text-xs ml-2">({s.contactName})</span>}
-                                          <Badge variant="secondary" className="ml-auto text-xs">曾供应</Badge>
+                                          {s.contactName && (
+                                            <span className="ml-2 text-xs text-muted-foreground">
+                                              ({s.contactName})
+                                            </span>
+                                          )}
                                         </CommandItem>
                                       ))}
-                                    </CommandGroup>
-                                  )}
-                                  <CommandGroup heading={recommendedSupplierIds.size > 0 ? '全部供应商' : '供应商列表'}>
-                                    {sortedSuppliers.filter(s => !s.isRecommended).map(s => (
-                                      <CommandItem
-                                        key={s.id}
-                                        value={s.id}
-                                        onSelect={() => {
-                                          field.onChange(s.id);
-                                          setSupplierOpen(false);
-                                          setSupplierSearch('');
-                                        }}
-                                      >
-                                        <Check className={cn('mr-2 h-4 w-4', field.value === s.id ? 'opacity-100' : 'opacity-0')} />
-                                        <span>{s.name}</span>
-                                        {s.contactName && <span className="text-muted-foreground text-xs ml-2">({s.contactName})</span>}
-                                      </CommandItem>
-                                    ))}
                                   </CommandGroup>
                                 </CommandList>
                               </Command>
@@ -885,7 +1188,7 @@ export default function CreatePurchasePage() {
                       name="signedAt"
                       render={({ field }) => (
                         <FormItem className="flex flex-col">
-                          <Label htmlFor="purchase-signed-at" className="mb-1.5">
+                          <Label htmlFor="purchase-signed-at" className="mb-1.5 text-xs">
                             签订日期
                           </Label>
                           <DatePicker
@@ -904,10 +1207,15 @@ export default function CreatePurchasePage() {
                       name="taxRate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>税率 (%) <span className="text-destructive">*</span></FormLabel>
-                          <Select onValueChange={(val) => field.onChange(Number(val))} defaultValue={String(field.value)}>
+                          <FormLabel className="text-xs">
+                            税率 (%) <span className="text-destructive">*</span>
+                          </FormLabel>
+                          <Select
+                            onValueChange={(val) => field.onChange(Number(val))}
+                            defaultValue={String(field.value)}
+                          >
                             <FormControl>
-                              <SelectTrigger>
+                              <SelectTrigger className="h-10 rounded-md text-xs">
                                 <SelectValue placeholder="选择税率" />
                               </SelectTrigger>
                             </FormControl>
@@ -928,9 +1236,13 @@ export default function CreatePurchasePage() {
                         name="note"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>备注</FormLabel>
+                            <FormLabel className="text-xs">备注</FormLabel>
                             <FormControl>
-                              <Textarea {...field} placeholder="填写合同备注信息（可选）" className="min-h-[80px]" />
+                              <Textarea
+                                {...field}
+                                placeholder="填写合同备注信息（可选）"
+                                className="min-h-[80px] rounded-md"
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -941,12 +1253,27 @@ export default function CreatePurchasePage() {
                 </Card>
 
                 {/* 提交按钮 */}
-                <div className="md:col-span-2 flex justify-end gap-4">
-                  <Button type="button" variant="outline" onClick={goToStep1}>上一步</Button>
-                  <Button type="button" variant="outline" onClick={() => router.back()}>取消</Button>
-                  <Button 
-                    type="submit" 
-                    size="lg"
+                <div className="flex justify-end gap-3 md:col-span-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 rounded-md text-sm"
+                    onClick={goToStep1}
+                  >
+                    <ArrowLeft className="mr-1.5 h-4 w-4" />
+                    上一步
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 rounded-md text-sm"
+                    onClick={() => router.back()}
+                  >
+                    取消
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="h-10 rounded-md text-sm"
                     disabled={form.formState.isSubmitting}
                   >
                     {form.formState.isSubmitting ? '提交中...' : '创建合同'}
@@ -958,12 +1285,133 @@ export default function CreatePurchasePage() {
         </Form>
       </div>
 
+      {/* 批量商品选择器弹窗 */}
+      <Dialog open={showBatchSelector} onOpenChange={setShowBatchSelector}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm font-medium">
+              <Package className="h-4 w-4" />
+              批量添加商品
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="搜索商品名称..."
+                value={batchSearch}
+                onChange={(e) => setBatchSearch(e.target.value)}
+                className="h-9 rounded-md pl-9 text-xs"
+              />
+            </div>
+            <div className="max-h-[320px] overflow-y-auto rounded-md border border-border/40">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                    <TableHead className="w-10 text-center">
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 rounded border-border"
+                        checked={
+                          filteredBatchProducts.length > 0 &&
+                          filteredBatchProducts.every((p) => selectedProductIds.has(p.id))
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedProductIds(
+                              new Set(filteredBatchProducts.map((p) => p.id))
+                            );
+                          } else {
+                            setSelectedProductIds(new Set());
+                          }
+                        }}
+                      />
+                    </TableHead>
+                    <TableHead className="text-xs">商品名称</TableHead>
+                    <TableHead className="text-xs">规格</TableHead>
+                    <TableHead className="text-xs">单位</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredBatchProducts.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="py-6 text-center text-xs text-muted-foreground">
+                        未找到匹配商品
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredBatchProducts.map((product) => (
+                      <TableRow
+                        key={product.id}
+                        className="cursor-pointer"
+                        onClick={() => {
+                          const next = new Set(selectedProductIds);
+                          if (next.has(product.id)) {
+                            next.delete(product.id);
+                          } else {
+                            next.add(product.id);
+                          }
+                          setSelectedProductIds(next);
+                        }}
+                      >
+                        <TableCell className="text-center">
+                          <input
+                            type="checkbox"
+                            className="h-3.5 w-3.5 rounded border-border"
+                            checked={selectedProductIds.has(product.id)}
+                            onChange={() => {}}
+                          />
+                        </TableCell>
+                        <TableCell className="text-sm">{product.customsName}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {product.specification || '-'}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {product.unit || '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">
+                已选择 {selectedProductIds.size} 项
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 rounded-md text-xs"
+                  onClick={() => {
+                    setSelectedProductIds(new Set());
+                    setShowBatchSelector(false);
+                  }}
+                >
+                  取消
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-8 rounded-md text-xs"
+                  onClick={handleBatchAdd}
+                  disabled={selectedProductIds.size === 0}
+                >
+                  确认添加
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* 新增供应商弹窗 */}
       <Dialog open={showNewSupplierDialog} onOpenChange={setShowNewSupplierDialog}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5" />新增供应商
+            <DialogTitle className="flex items-center gap-2 text-sm font-medium">
+              <UserPlus className="h-4 w-4" />
+              新增供应商
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -973,7 +1421,9 @@ export default function CreatePurchasePage() {
                 id="new-supplier-name"
                 name="name"
                 value={newSupplierForm.name}
-                onChange={(e) => setNewSupplierForm(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(e) =>
+                  setNewSupplierForm((prev) => ({ ...prev, name: e.target.value }))
+                }
                 placeholder="例如：佛山市某某陶瓷有限公司"
               />
             </div>
@@ -984,7 +1434,9 @@ export default function CreatePurchasePage() {
                   id="new-supplier-contact-name"
                   name="contactName"
                   value={newSupplierForm.contactName}
-                  onChange={(e) => setNewSupplierForm(prev => ({ ...prev, contactName: e.target.value }))}
+                  onChange={(e) =>
+                    setNewSupplierForm((prev) => ({ ...prev, contactName: e.target.value }))
+                  }
                   placeholder="例如：张经理"
                 />
               </div>
@@ -994,7 +1446,9 @@ export default function CreatePurchasePage() {
                   id="new-supplier-contact-phone"
                   name="contactPhone"
                   value={newSupplierForm.contactPhone}
-                  onChange={(e) => setNewSupplierForm(prev => ({ ...prev, contactPhone: e.target.value }))}
+                  onChange={(e) =>
+                    setNewSupplierForm((prev) => ({ ...prev, contactPhone: e.target.value }))
+                  }
                   placeholder="例如：138xxxxxxxx"
                 />
               </div>
@@ -1005,12 +1459,14 @@ export default function CreatePurchasePage() {
                 id="new-supplier-address"
                 name="address"
                 value={newSupplierForm.address}
-                onChange={(e) => setNewSupplierForm(prev => ({ ...prev, address: e.target.value }))}
+                onChange={(e) =>
+                  setNewSupplierForm((prev) => ({ ...prev, address: e.target.value }))
+                }
                 placeholder="例如：广东省佛山市禅城区xxx"
               />
             </div>
             <div className="border-t pt-4">
-              <p className="text-sm font-medium mb-3">开票信息（合同用）</p>
+              <p className="mb-3 text-sm font-medium">开票信息（合同用）</p>
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="new-supplier-tax-id">纳税人识别号</Label>
@@ -1018,7 +1474,9 @@ export default function CreatePurchasePage() {
                     id="new-supplier-tax-id"
                     name="taxId"
                     value={newSupplierForm.taxId}
-                    onChange={(e) => setNewSupplierForm(prev => ({ ...prev, taxId: e.target.value }))}
+                    onChange={(e) =>
+                      setNewSupplierForm((prev) => ({ ...prev, taxId: e.target.value }))
+                    }
                     placeholder="例如：91440000xxxxxxxxxx"
                   />
                 </div>
@@ -1028,7 +1486,9 @@ export default function CreatePurchasePage() {
                     id="new-supplier-bank-name"
                     name="bankName"
                     value={newSupplierForm.bankName}
-                    onChange={(e) => setNewSupplierForm(prev => ({ ...prev, bankName: e.target.value }))}
+                    onChange={(e) =>
+                      setNewSupplierForm((prev) => ({ ...prev, bankName: e.target.value }))
+                    }
                     placeholder="例如：中国银行佛山禅城支行"
                   />
                 </div>
@@ -1038,7 +1498,9 @@ export default function CreatePurchasePage() {
                     id="new-supplier-bank-account"
                     name="bankAccount"
                     value={newSupplierForm.bankAccount}
-                    onChange={(e) => setNewSupplierForm(prev => ({ ...prev, bankAccount: e.target.value }))}
+                    onChange={(e) =>
+                      setNewSupplierForm((prev) => ({ ...prev, bankAccount: e.target.value }))
+                    }
                     placeholder="例如：6217xxxxxxxxxxxxxxxx"
                   />
                 </div>
@@ -1046,9 +1508,44 @@ export default function CreatePurchasePage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewSupplierDialog(false)}>取消</Button>
+            <Button variant="outline" onClick={() => setShowNewSupplierDialog(false)}>
+              取消
+            </Button>
             <Button onClick={handleSaveNewSupplier} disabled={savingSupplier}>
-              {savingSupplier ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />保存中...</>) : '保存供应商'}
+              {savingSupplier ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  保存中...
+                </>
+              ) : (
+                '保存供应商'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 保存模板弹窗 */}
+      <Dialog open={showSaveTemplateDialog} onOpenChange={setShowSaveTemplateDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-medium">保存为模板</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label htmlFor="template-name">模板名称</Label>
+            <Input
+              id="template-name"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="例如：标准瓷砖采购模板"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveTemplateDialog(false)}>
+              取消
+            </Button>
+            <Button onClick={handleSaveTemplate} disabled={savingTemplate}>
+              {savingTemplate ? '保存中...' : '保存'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -64,7 +64,6 @@ export const LOGISTICS_TABS: TabConfig[] = [
 
 export const FINANCE_TABS: TabConfig[] = [
   { href: '/dashboard/finance', label: '财务概览' },
-  { href: '/dashboard/finance/statements', label: '财务报表' },
   { href: '/dashboard/finance/receivable', label: '应收账款' },
   { href: '/dashboard/finance/payable', label: '应付账款' },
   { href: '/dashboard/payments', label: '收付款' },

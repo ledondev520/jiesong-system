@@ -23,6 +23,7 @@ import {
   TableCell,
   TableHeader,
   TableRow,
+  TableHead,
 } from '@/components/ui/table';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/lib/hooks/useTableSort';
@@ -580,6 +581,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                       sortKey="spec"
                       currentSortKey={purchaseLineSort.sortKey}
                       currentSortDir={purchaseLineSort.sortDir}
+                      onSort={purchaseLineSort.onSort}
                       className="text-xs"
                     >
                       规格
@@ -588,6 +590,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                       sortKey="quantity"
                       currentSortKey={purchaseLineSort.sortKey}
                       currentSortDir={purchaseLineSort.sortDir}
+                      onSort={purchaseLineSort.onSort}
                       className="text-right text-xs"
                     >
                       数量
@@ -596,6 +599,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                       sortKey="unitPrice"
                       currentSortKey={purchaseLineSort.sortKey}
                       currentSortDir={purchaseLineSort.sortDir}
+                      onSort={purchaseLineSort.onSort}
                       className="text-right text-xs"
                     >
                       单价 (¥)
@@ -604,6 +608,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                       sortKey="lineTotal"
                       currentSortKey={purchaseLineSort.sortKey}
                       currentSortDir={purchaseLineSort.sortDir}
+                      onSort={purchaseLineSort.onSort}
                       className="text-right text-xs"
                     >
                       小计 (¥)

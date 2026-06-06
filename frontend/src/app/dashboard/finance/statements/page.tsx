@@ -1,13 +1,13 @@
 /**
- * Input: 财务报表页路由请求
- * Output: 财务报表分析页面入口
- * Pos: 财务模块报表分析路由
+ * Input: 路由请求
+ * Output: 重定向到财务概览
+ * Pos: 财务报表路由已合并到财务概览
  *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ * Note: 财务报表功能已整合至财务概览模块，不再单独展示。
  */
 
-import { FinancialStatementsPageContent } from './components/FinancialStatementsPageContent';
+import { redirect } from 'next/navigation';
 
 export default function FinancialStatementsPage() {
-  return <FinancialStatementsPageContent />;
+  redirect('/dashboard/finance');
 }
