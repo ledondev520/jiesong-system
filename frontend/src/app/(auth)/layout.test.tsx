@@ -26,7 +26,17 @@ describe('AuthLayout', () => {
       username: 'admin',
       password: 'cached-password',
     }));
+    localStorage.setItem('quickLoginEnabled', 'true');
+    localStorage.setItem('quickLoginPassword', 'cached-password');
+    localStorage.setItem('saved_login_credentials', JSON.stringify({
+      username: 'admin',
+      password: 'cached-password',
+    }));
     sessionStorage.setItem('quickLoginProfile', JSON.stringify({
+      username: 'admin',
+      password: 'session-password',
+    }));
+    sessionStorage.setItem('oneClickLoginCredentials', JSON.stringify({
       username: 'admin',
       password: 'session-password',
     }));
@@ -44,7 +54,11 @@ describe('AuthLayout', () => {
       expect(localStorage.getItem('jiesong_quick_login_profile')).toBeNull();
       expect(localStorage.getItem('quickLoginProfile')).toBeNull();
       expect(localStorage.getItem('saved_login_profile')).toBeNull();
+      expect(localStorage.getItem('quickLoginEnabled')).toBeNull();
+      expect(localStorage.getItem('quickLoginPassword')).toBeNull();
+      expect(localStorage.getItem('saved_login_credentials')).toBeNull();
       expect(sessionStorage.getItem('quickLoginProfile')).toBeNull();
+      expect(sessionStorage.getItem('oneClickLoginCredentials')).toBeNull();
       expect(localStorage.getItem('dashboard:last-tab')).toBe('/dashboard');
       expect(localStorage.getItem(LEGACY_AUTH_CLEANUP_VERSION_KEY)).toBe(LEGACY_AUTH_CLEANUP_VERSION);
     });

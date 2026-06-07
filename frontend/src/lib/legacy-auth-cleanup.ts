@@ -8,24 +8,44 @@
 
 const KNOWN_LEGACY_QUICK_LOGIN_KEYS = [
   'jiesong_quick_login_profile',
+  'jiesong_quick_login_enabled',
+  'jiesong_quick_login_user',
+  'jiesong_quick_login_username',
+  'jiesong_quick_login_password',
   'jiesong_login_profile',
   'quick_login_profile',
   'quickLoginProfile',
+  'quickLoginEnabled',
+  'quickLoginAccount',
+  'quickLoginUser',
+  'quickLoginUsername',
+  'quickLoginPassword',
   'remembered_login_profile',
   'rememberedLoginProfile',
+  'rememberedCredentials',
+  'saved_login_credentials',
+  'savedLoginCredentials',
 ];
 
 const LEGACY_QUICK_LOGIN_KEY_PATTERNS = [
   /quick[_-]?login/i,
   /quickLogin/,
+  /quick.*(auth|credential|password|profile|user(name)?)/i,
+  /(auth|credential|password|profile|user(name)?).*quick/i,
+  /one[_-]?(tap|click).*(login|auth)/i,
+  /(login|auth).*one[_-]?(tap|click)/i,
+  /shortcut.*(login|auth)/i,
+  /(login|auth).*shortcut/i,
   /remembered[_-]?login/i,
   /rememberedLogin/,
+  /remembered.*(credential|password|profile)/i,
   /saved[_-]?login[_-]?profile/i,
   /savedLoginProfile/,
+  /saved.*(credential|password).*login/i,
 ];
 
 export const LEGACY_AUTH_CLEANUP_VERSION_KEY = 'jiesong_auth_cleanup_version';
-export const LEGACY_AUTH_CLEANUP_VERSION = '2026-06-07-no-quick-login';
+export const LEGACY_AUTH_CLEANUP_VERSION = '2026-06-07-no-quick-login-v2';
 
 const isLegacyQuickLoginKey = (key: string): boolean =>
   KNOWN_LEGACY_QUICK_LOGIN_KEYS.includes(key) ||
@@ -54,7 +74,7 @@ const clearLegacyQuickLoginStorage = (storage: Storage | undefined): void => {
 export const LEGACY_AUTH_CLEANUP_INLINE_SCRIPT = `
 (function(){
   var knownKeys=${JSON.stringify(KNOWN_LEGACY_QUICK_LOGIN_KEYS)};
-  var patterns=[/quick[_-]?login/i,/quickLogin/,/remembered[_-]?login/i,/rememberedLogin/,/saved[_-]?login[_-]?profile/i,/savedLoginProfile/];
+  var patterns=[/quick[_-]?login/i,/quickLogin/,/quick.*(auth|credential|password|profile|user(name)?)/i,/(auth|credential|password|profile|user(name)?).*quick/i,/one[_-]?(tap|click).*(login|auth)/i,/(login|auth).*one[_-]?(tap|click)/i,/shortcut.*(login|auth)/i,/(login|auth).*shortcut/i,/remembered[_-]?login/i,/rememberedLogin/,/remembered.*(credential|password|profile)/i,/saved[_-]?login[_-]?profile/i,/savedLoginProfile/,/saved.*(credential|password).*login/i];
   function isLegacyKey(key){return knownKeys.indexOf(key)>=0||patterns.some(function(pattern){return pattern.test(key);});}
   function clean(storage){
     if(!storage){return;}

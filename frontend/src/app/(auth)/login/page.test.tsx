@@ -49,6 +49,7 @@ describe('LoginPage 交互逻辑', () => {
     mockAuthStoreLogin.mockReset();
     mockAuthServiceLogin.mockReset();
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   it('默认渲染登录表单，且未登录过时不展示快捷登录按钮', () => {
@@ -94,7 +95,20 @@ describe('LoginPage 交互逻辑', () => {
       username: 'admin',
       password: 'old-password',
     }));
+    localStorage.setItem('quickLoginEnabled', 'true');
+    localStorage.setItem('quickLoginUsername', 'admin');
+    localStorage.setItem('quickLoginPassword', 'old-password');
+    localStorage.setItem('jiesong_quick_login_enabled', 'true');
+    localStorage.setItem('jiesong_quick_login_password', 'old-password');
+    localStorage.setItem('saved_login_credentials', JSON.stringify({
+      username: 'admin',
+      password: 'old-password',
+    }));
     sessionStorage.setItem('quickLoginProfile', JSON.stringify({
+      username: 'admin',
+      password: 'session-password',
+    }));
+    sessionStorage.setItem('oneClickLoginCredentials', JSON.stringify({
       username: 'admin',
       password: 'session-password',
     }));
@@ -105,7 +119,14 @@ describe('LoginPage 交互逻辑', () => {
       expect(localStorage.getItem('jiesong_quick_login_profile')).toBeNull();
       expect(localStorage.getItem('quickLoginProfile')).toBeNull();
       expect(localStorage.getItem('saved_login_profile')).toBeNull();
+      expect(localStorage.getItem('quickLoginEnabled')).toBeNull();
+      expect(localStorage.getItem('quickLoginUsername')).toBeNull();
+      expect(localStorage.getItem('quickLoginPassword')).toBeNull();
+      expect(localStorage.getItem('jiesong_quick_login_enabled')).toBeNull();
+      expect(localStorage.getItem('jiesong_quick_login_password')).toBeNull();
+      expect(localStorage.getItem('saved_login_credentials')).toBeNull();
       expect(sessionStorage.getItem('quickLoginProfile')).toBeNull();
+      expect(sessionStorage.getItem('oneClickLoginCredentials')).toBeNull();
       expect(localStorage.getItem(LEGACY_AUTH_CLEANUP_VERSION_KEY)).toBe(LEGACY_AUTH_CLEANUP_VERSION);
       expect(screen.queryByRole('button', { name: /一键登录/ })).not.toBeInTheDocument();
     });
