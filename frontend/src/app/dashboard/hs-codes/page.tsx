@@ -1,7 +1,7 @@
 /**
  * Input: HSCode 搜索服务（keyword 商品名称 / code HS 编码前缀）、AI 推荐接口（集成 HSCIQ 归类实例 + 官方税率）
  * Output: HSCode 查询页面（含双搜索框 + AI 推荐 HS 编码 + HSCIQ 官方税率 + AI 填写申报要素 + 一键复制报关格式）
- * Pos: 出口模块子页面 - HSCode 检索
+ * Pos: 仓储物流模块子页面 - HSCode 检索
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -28,7 +28,7 @@ import api from '@/lib/axios';
 import type { ApiResponse } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
+import { ModuleTabHeader, LOGISTICS_TABS } from '@/components/layout/ModuleTabHeader';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/lib/hooks/useTableSort';
 import { Badge } from '@/components/ui/badge';
@@ -359,7 +359,7 @@ function HsCodesPageContent() {
 
   return (
     <div className="flex flex-col h-full">
-      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
+      <ModuleTabHeader tabs={LOGISTICS_TABS} moduleName="仓储物流" />
       <PageHeader
         title="HS 编码查询"
         description="默认展示全量列表。输入商品名称（可模糊）或 4–12 位纯数字 HS 编码（支持首尾空格，自动 trim）即可检索；编码按库内 hsCode 前缀精确匹配。"

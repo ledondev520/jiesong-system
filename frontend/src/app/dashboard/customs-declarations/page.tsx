@@ -1,13 +1,11 @@
 /**
- * Input: 路由请求
- * Output: 重定向到出口退税
- * Pos: 报关单路由已合并到出口退税
- *
- * Note: 报关单功能已整合至出口退税模块，不再单独展示。
+ * Input: 报关单列表组件
+ * Output: 仓储物流模块下的报关单管理入口
+ * Pos: 仓储物流 > 报关单列表页
  */
 
-import { redirect } from 'next/navigation';
+import { CustomsDeclarationListPageContent } from '@/app/customs-declarations/components/CustomsDeclarationListPageContent';
 
 export default function CustomsDeclarationsPage() {
-  redirect('/dashboard/tax-refunds');
+  return <CustomsDeclarationListPageContent />;
 }

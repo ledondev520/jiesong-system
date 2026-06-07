@@ -47,11 +47,9 @@ import {
   Upload,
   ArrowUp,
   ArrowDown,
-  Warehouse,
   Truck,
   CheckCircle2,
   CircleDashed,
-  PackageCheck,
   CircleDot,
   ArrowRight,
 } from 'lucide-react';
@@ -451,22 +449,6 @@ export default function SalesPage() {
           </div>
         }
       />
-
-      {/* 快捷入口 — 横向紧凑 */}
-      <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
-        <Button variant="outline" size="sm" className="h-8 rounded-lg" onClick={() => router.push('/dashboard/logistics')}>
-          <Warehouse className="mr-1.5 h-3.5 w-3.5" />
-          仓储物流
-        </Button>
-        <Button variant="outline" size="sm" className="h-8 rounded-lg" onClick={() => router.push('/dashboard/customs-declarations')}>
-          <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
-          报关单
-        </Button>
-        <Button variant="outline" size="sm" className="h-8 rounded-lg" onClick={() => router.push('/dashboard/tax-refunds')}>
-          <Ship className="mr-1.5 h-3.5 w-3.5" />
-          退税跟进
-        </Button>
-      </div>
 
       {/* 出运概览 — 紧凑统计行 */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">

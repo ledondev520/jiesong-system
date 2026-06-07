@@ -118,18 +118,17 @@ describe('DashboardPage 交互逻辑', () => {
 
     await waitFor(() => {
       expect(screen.getByText('管理工作台')).toBeInTheDocument();
+      expect(screen.getByText('采购、销售、仓储物流、财务')).toBeInTheDocument();
       expect(screen.getByText('待起草采购')).toBeInTheDocument();
       expect(screen.getByText('待补录出口')).toBeInTheDocument();
     });
 
-    await waitFor(() => {
-      expect(screen.getAllByText('优先处理')[0]).toBeInTheDocument();
-    });
-
-    expect(screen.getAllByText('经营趋势')[0]).toBeInTheDocument();
+    expect(screen.getByText('仓储物流')).toBeInTheDocument();
+    expect(screen.getByText('财务')).toBeInTheDocument();
+    expect(screen.getByText('近期待办')).toBeInTheDocument();
   });
 
-  it('点击故事动作跳转到对应主线路径', async () => {
+  it('点击模块动作跳转到对应主线路径', async () => {
     const user = userEvent.setup();
     render(<DashboardPage />);
 
@@ -140,10 +139,13 @@ describe('DashboardPage 交互逻辑', () => {
     await user.click(screen.getAllByText('新建采购合同')[0].closest('button')!);
     expect(mockPush).toHaveBeenCalledWith('/dashboard/purchase/create');
 
-    await user.click(screen.getAllByText('新增供应商')[0].closest('button')!);
+    await user.click(screen.getAllByText('供应商')[0].closest('button')!);
     expect(mockPush).toHaveBeenCalledWith('/dashboard/suppliers');
 
-    await user.click(screen.getAllByText('待起草采购')[0].closest('div')!);
+    await user.click(screen.getByRole('button', { name: /进入仓储物流/ }));
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/logistics');
+
+    await user.click(screen.getByRole('button', { name: /^进入采购/ }));
     expect(mockPush).toHaveBeenCalledWith('/dashboard/contracts');
   });
 });

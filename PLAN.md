@@ -9119,3 +9119,27 @@
 ### Remaining
 - 自动安全写入再次归零。
 - 仍需业务裁决 2 条装箱歧义、1 条销售缺门店、1 条路径门店推断复核、1 个 `EXP250027` 31 套窗帘门店口径、1 个 `EXP2400006` 正式海关编号缺口。
+
+## 2026-06-07 Round 130（管理工作台与模块归属）
+
+### Goal
+- 修复仓储物流、HS 编码、报关单与销售模块之间的路由归属串扰。
+- 将首页从混合经营中台改为四个并行模块的管理工作台。
+
+### Delivered
+- `/dashboard` 首页改为采购、销售、仓储物流、财务四个模块入口，并保留近期待办与快速新建。
+- 侧边栏顶级入口从「经营中台」改为「管理工作台」。
+- `/dashboard/hs-codes` 改用仓储物流 Tab，不再使用销售 Tab。
+- `/dashboard/customs-declarations` 恢复报关单列表入口，不再重定向到出口退税。
+- 销售模块去掉 HS 编码 Tab 和销售页中的仓储物流/报关单跨模块快捷入口。
+
+### Validation
+- 目标前端测试 6 个文件、27 个用例通过。
+- 目标文件 lint 通过。
+- `npx tsc --noEmit` 通过。
+- `npm run build` 通过，保留既有 Turbopack NFT warning。
+- Playwright 验证 `/dashboard`、`/dashboard/hs-codes`、`/dashboard/customs-declarations` 均可渲染，HS/报关单停留在仓储物流 Tab。
+
+### Remaining
+- 本轮未调整仓储物流徽标统计；当前仍沿用既有侧边栏计数逻辑。
+- 本轮不改变线上/线下数据同步状态。
