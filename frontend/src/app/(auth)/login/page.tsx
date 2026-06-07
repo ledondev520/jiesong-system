@@ -4,7 +4,7 @@
  * Pos: 认证模块入口，负责用户登录与快捷登录入口
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
- * Security: 快捷登录会在当前浏览器保存最近一次成功登录账号信息，仅用于已登录账号的下次一键登录
+ * Security: 快捷登录资料带版本校验；本地开发模式可使用默认测试账号快捷入口
  */
 
 'use client';
@@ -38,9 +38,19 @@ const loginSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
-type QuickLoginProfile = { username: string; password: string };
+type QuickLoginProfile = { version: 2; username: string; password: string; source: 'saved' | 'dev-default' };
 
 const QUICK_LOGIN_PROFILE_KEY = 'jiesong_quick_login_profile';
+const QUICK_LOGIN_PROFILE_VERSION = 2;
+const DEV_QUICK_LOGIN_PROFILE: QuickLoginProfile | null =
+  process.env.NODE_ENV === 'development'
+    ? {
+        version: QUICK_LOGIN_PROFILE_VERSION,
+        username: 'admin',
+        password: '123456',
+        source: 'dev-default',
+      }
+    : null;
 
 function LoginFormClient() {
   const router = useRouter();
@@ -73,27 +83,44 @@ function LoginFormClient() {
     setIsClientReady(true);
   }, []);
 
-  // 恢复快捷登录入口（当前浏览器维度）
+  // 恢复快捷登录入口（当前浏览器维度），旧版本缓存不再复用，避免失效密码触发错误登录。
   useEffect(() => {
     const savedRaw = localStorage.getItem(QUICK_LOGIN_PROFILE_KEY);
     if (!savedRaw) {
+      setQuickLoginProfile(DEV_QUICK_LOGIN_PROFILE);
       return;
     }
 
     try {
-      const parsed: QuickLoginProfile = JSON.parse(savedRaw);
-      if (parsed.username && parsed.password) {
-        setQuickLoginProfile(parsed);
+      const parsed = JSON.parse(savedRaw) as Partial<QuickLoginProfile>;
+      if (
+        parsed.version === QUICK_LOGIN_PROFILE_VERSION &&
+        parsed.username &&
+        parsed.password
+      ) {
+        setQuickLoginProfile({
+          version: QUICK_LOGIN_PROFILE_VERSION,
+          username: parsed.username,
+          password: parsed.password,
+          source: 'saved',
+        });
       } else {
         localStorage.removeItem(QUICK_LOGIN_PROFILE_KEY);
+        setQuickLoginProfile(DEV_QUICK_LOGIN_PROFILE);
       }
     } catch {
       localStorage.removeItem(QUICK_LOGIN_PROFILE_KEY);
+      setQuickLoginProfile(DEV_QUICK_LOGIN_PROFILE);
     }
   }, []);
 
   const persistQuickLoginProfile = useCallback((username: string, password: string) => {
-    const profile: QuickLoginProfile = { username, password };
+    const profile: QuickLoginProfile = {
+      version: QUICK_LOGIN_PROFILE_VERSION,
+      username,
+      password,
+      source: 'saved',
+    };
     localStorage.setItem(QUICK_LOGIN_PROFILE_KEY, JSON.stringify(profile));
     setQuickLoginProfile(profile);
   }, []);
@@ -104,7 +131,7 @@ function LoginFormClient() {
    * @param {string} password - 密码
    * @returns {Promise<void>} 登录流程执行结果
    */
-  const performLogin = useCallback(async (username: string, password: string) => {
+  const performLogin = useCallback(async (username: string, password: string, source: 'manual' | 'quick' = 'manual') => {
     setIsLoading(true);
     setError(null);
 
@@ -122,6 +149,11 @@ function LoginFormClient() {
         throw new Error(result.message || '登录失败');
       }
     } catch (err: unknown) {
+      if (source === 'quick') {
+        localStorage.removeItem(QUICK_LOGIN_PROFILE_KEY);
+        setQuickLoginProfile(DEV_QUICK_LOGIN_PROFILE);
+      }
+
       const retryAfter =
         typeof err === 'object' && err !== null && 'retryAfter' in err
           ? Number((err as { retryAfter?: unknown }).retryAfter)
@@ -140,6 +172,8 @@ function LoginFormClient() {
       } else if (retryAfter && Number.isFinite(retryAfter) && retryAfter > 0) {
         const minutes = Math.ceil(retryAfter / 60);
         setError(`登录尝试过于频繁，请 ${minutes} 分钟后再试，或切换账号后重试。`);
+      } else if (source === 'quick' && /用户名或密码错误|账号或密码错误|正确的用户和密码/i.test(rawMessage)) {
+        setError('快捷登录信息已失效，请手动输入账号密码后重新登录。');
       } else if (rawMessage) {
         setError(rawMessage);
       } else {
@@ -167,7 +201,7 @@ function LoginFormClient() {
     form.setValue('username', quickLoginProfile.username, { shouldDirty: true, shouldValidate: true });
     form.setValue('password', quickLoginProfile.password, { shouldDirty: true, shouldValidate: true });
     setError(null);
-    void performLogin(quickLoginProfile.username, quickLoginProfile.password);
+    void performLogin(quickLoginProfile.username, quickLoginProfile.password, 'quick');
   }, [form, isClientReady, isLoading, performLogin, quickLoginProfile]);
 
   return (
@@ -195,7 +229,7 @@ function LoginFormClient() {
           <CardHeader className="space-y-2 pb-5">
             <CardTitle className="text-lg font-semibold">系统登录</CardTitle>
             <CardDescription className="text-sm leading-relaxed">
-              {quickLoginProfile ? '你已开启快捷登录，可一键进入系统。' : '首次登录成功后，下次可使用快捷登录。'}
+              请输入账号密码登录捷淞进销存系统。
             </CardDescription>
           </CardHeader>
           <CardContent className="pb-5">

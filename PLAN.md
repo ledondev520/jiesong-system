@@ -1,5 +1,30 @@
 # Ops Execution Center Plan
 
+## 2026-06-07 LOGIN-02（本地快捷登录缓存失效与文案修复）
+
+### Goal
+- 修复本地开发服务中点击快捷登录后落入“请输入正确的用户和密码”错误的问题。
+- 去掉登录卡片中“你已开启快捷登录，可一键进入系统。”这句状态文案。
+
+### Delivered
+- 登录页快捷登录资料升级为版本化结构；旧版浏览器缓存会自动清理，不再继续拿失效密码发起登录。
+- 本地开发模式在没有有效缓存时提供 `admin` 开发快捷入口；当前本地库确认 `admin` 启用，默认测试密码匹配。
+- 快捷登录失败时清理缓存并提示“快捷登录信息已失效，请手动输入账号密码后重新登录。”，避免把缓存问题误报成普通账号密码错误。
+- 登录卡片描述改为固定文案“请输入账号密码登录捷淞进销存系统。”，不再显示“你已开启快捷登录”。
+- 导出 `ApiRequestConfig` 并让采购导出复用既有缓存配置 Interface，修复全量 TypeScript 检查中暴露的既有类型阻断。
+
+### Verification
+- `cd frontend && npm run test -- 'src/app/(auth)/login/page.test.tsx'`：通过，`8` 个测试。
+- `cd frontend && npx tsc --noEmit`：通过。
+- `cd frontend && npm run lint`：通过，保留既有 `31` 个 warning，`0` error。
+- `cd frontend && npm run build`：通过，保留既有 Turbopack NFT warning。
+- Playwright 本地页面检查 `http://localhost:3000/login`：旧版 `jiesong_quick_login_profile` 被清空；“你已开启快捷登录”命中数为 `0`；开发快捷按钮显示 `一键登录（admin）`。
+- Playwright 本地点击验证：点击 `一键登录（admin）` 后跳转到 `http://localhost:3000/dashboard`，没有错误提示。
+
+### Remaining
+- 本轮只修复本地开发快捷登录与登录页文案，没有同步线上部署。
+- 本地开发快捷入口只在 `NODE_ENV=development` 下启用；生产仍依赖用户手动成功登录后写入的版本化快捷登录资料。
+
 ## 2026-06-07 WPS-IMPORT-127（瓷砖价格与剩余裁决收口）
 
 ### Goal

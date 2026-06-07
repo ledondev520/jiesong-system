@@ -12,7 +12,7 @@ const api = axios.create({
   },
 });
 
-type ApiRequestConfig<D = unknown> = AxiosRequestConfig<D> & {
+export type ApiRequestConfig<D = unknown> = AxiosRequestConfig<D> & {
   cache?: {
     enabled?: boolean;
     ttlMs?: number;

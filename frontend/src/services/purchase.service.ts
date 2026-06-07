@@ -1,4 +1,4 @@
-import api from '@/lib/axios';
+import api, { type ApiRequestConfig } from '@/lib/axios';
 import type { ApiResponse, PurchaseContract } from '@/types';
 import { createCrudService } from './crudService';
 
@@ -136,11 +136,12 @@ export const purchaseService = {
    * 导出采购合同 Excel。
    */
   exportExcel: async (params?: { status?: string; supplierId?: string; dateFrom?: string; dateTo?: string }) => {
-    const response = await api.get('/purchases/export', {
+    const requestConfig: ApiRequestConfig = {
       params,
       responseType: 'blob',
       cache: { enabled: false },
-    } as { cache?: { enabled?: boolean } });
+    };
+    const response = await api.get('/purchases/export', requestConfig);
     return response as unknown as Blob;
   },
 
