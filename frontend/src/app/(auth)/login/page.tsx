@@ -1,10 +1,10 @@
 /**
  * Input: 登录API、认证状态存储
  * Output: 登录页面
- * Pos: 认证模块入口，负责用户登录与快捷登录入口
+ * Pos: 认证模块入口，负责用户登录与旧快捷登录缓存清理
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
- * Security: 快捷登录不复用浏览器缓存密码；仅本地开发模式提供默认测试账号快捷入口
+ * Security: 登录页不保存或提交浏览器缓存密码；旧快捷登录缓存仅清理，不再作为登录凭据
  */
 
 'use client';
@@ -29,7 +29,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserPlus, KeyRound, Eye, EyeOff, Ship, AlertCircle, LogIn, Loader2 } from 'lucide-react';
+import { UserPlus, KeyRound, Eye, EyeOff, Ship, AlertCircle, Loader2 } from 'lucide-react';
 import { authService, type LoginResponse } from '@/services/auth.service';
 
 const loginSchema = z.object({
@@ -38,17 +38,8 @@ const loginSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
-type QuickLoginProfile = { username: string; password: string; source: 'dev-default' };
 
 const QUICK_LOGIN_PROFILE_KEY = 'jiesong_quick_login_profile';
-const DEV_QUICK_LOGIN_PROFILE: QuickLoginProfile | null =
-  process.env.NODE_ENV === 'development'
-    ? {
-        username: 'admin',
-        password: '123456',
-        source: 'dev-default',
-      }
-    : null;
 
 function LoginFormClient() {
   const router = useRouter();
@@ -58,7 +49,6 @@ function LoginFormClient() {
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [isClientReady, setIsClientReady] = useState(false);
-  const [quickLoginProfile, setQuickLoginProfile] = useState<QuickLoginProfile | null>(null);
 
   // 检查会话过期参数
   useEffect(() => {
@@ -84,12 +74,10 @@ function LoginFormClient() {
   // 清理旧版快捷登录缓存：旧实现保存过密码，不能再作为登录凭据复用。
   useEffect(() => {
     localStorage.removeItem(QUICK_LOGIN_PROFILE_KEY);
-    setQuickLoginProfile(DEV_QUICK_LOGIN_PROFILE);
   }, []);
 
   const clearLegacyQuickLoginProfile = useCallback(() => {
     localStorage.removeItem(QUICK_LOGIN_PROFILE_KEY);
-    setQuickLoginProfile(DEV_QUICK_LOGIN_PROFILE);
   }, []);
 
   /**
@@ -98,7 +86,7 @@ function LoginFormClient() {
    * @param {string} password - 密码
    * @returns {Promise<void>} 登录流程执行结果
    */
-  const performLogin = useCallback(async (username: string, password: string, source: 'manual' | 'quick' = 'manual') => {
+  const performLogin = useCallback(async (username: string, password: string) => {
     setIsLoading(true);
     setError(null);
 
@@ -116,11 +104,6 @@ function LoginFormClient() {
         throw new Error(result.message || '登录失败');
       }
     } catch (err: unknown) {
-      if (source === 'quick') {
-        localStorage.removeItem(QUICK_LOGIN_PROFILE_KEY);
-        setQuickLoginProfile(null);
-      }
-
       const retryAfter =
         typeof err === 'object' && err !== null && 'retryAfter' in err
           ? Number((err as { retryAfter?: unknown }).retryAfter)
@@ -139,8 +122,6 @@ function LoginFormClient() {
       } else if (retryAfter && Number.isFinite(retryAfter) && retryAfter > 0) {
         const minutes = Math.ceil(retryAfter / 60);
         setError(`登录尝试过于频繁，请 ${minutes} 分钟后再试，或切换账号后重试。`);
-      } else if (source === 'quick' && /用户名或密码错误|账号或密码错误|正确的用户和密码/i.test(rawMessage)) {
-        setError('本地快捷登录账号与数据库密码不一致，请手动输入账号密码登录。');
       } else if (rawMessage) {
         setError(rawMessage);
       } else {
@@ -159,17 +140,6 @@ function LoginFormClient() {
   async function onSubmit(data: LoginFormValues) {
     await performLogin(data.username.trim(), data.password);
   }
-
-  const handleQuickLogin = useCallback(() => {
-    if (!quickLoginProfile || !isClientReady || isLoading) {
-      return;
-    }
-
-    form.setValue('username', quickLoginProfile.username, { shouldDirty: true, shouldValidate: true });
-    form.setValue('password', quickLoginProfile.password, { shouldDirty: true, shouldValidate: true });
-    setError(null);
-    void performLogin(quickLoginProfile.username, quickLoginProfile.password, 'quick');
-  }, [form, isClientReady, isLoading, performLogin, quickLoginProfile]);
 
   return (
     <div className="auth-shell">
@@ -254,22 +224,6 @@ function LoginFormClient() {
                   <div className="flex items-start gap-2.5 rounded-xl border border-destructive/20 bg-destructive/[0.06] px-4 py-3 text-sm text-destructive">
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                     <p>{error}</p>
-                  </div>
-                )}
-
-                {quickLoginProfile && (
-                  <div className="space-y-2 rounded-xl border border-primary/12 bg-primary/[0.04] p-3">
-                    <p className="text-sm font-medium text-foreground">快捷登录</p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-11 w-full rounded-xl border-primary/20 bg-primary/[0.04] text-primary transition-all hover:bg-primary/8 hover:border-primary/30"
-                      onClick={handleQuickLogin}
-                      disabled={!isClientReady || isLoading}
-                    >
-                      <LogIn className="mr-2 h-4 w-4" />
-                      一键登录（{quickLoginProfile.username}）
-                    </Button>
                   </div>
                 )}
 

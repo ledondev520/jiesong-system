@@ -1,5 +1,28 @@
 # Ops Execution Center Plan
 
+## 2026-06-07 LOGIN-04（移除硬编码快捷登录入口）
+
+### Goal
+- 修复本地开发服务中点击“快捷登录 / 一键登录”后仍可能提交硬编码 `admin / 123456`，进而提示“请输入正确的用户和密码”的问题。
+- 确认注册页和认证页不再显示“你已开启快捷登录”或任何快捷登录状态提示。
+
+### Delivered
+- 登录页移除开发环境硬编码的一键登录入口，不再在前端持有或提交默认密码。
+- 保留旧 `jiesong_quick_login_profile` 清理逻辑：进入登录页和手动登录成功后都会删除旧缓存，避免历史浏览器数据继续影响登录。
+- 登录页头部注释同步更新为“旧快捷登录缓存清理”，避免后续误把旧功能当成仍可用 Interface。
+- 登录页与注册页测试补充反向断言，确保“快捷登录 / 一键登录 / 你已开启快捷登录”不会重新出现在认证 UI。
+
+### Verification
+- `cd frontend && npm run test -- 'src/app/(auth)/login/page.test.tsx' 'src/app/(auth)/register/page.test.tsx'`：通过，`9` 个测试。
+- `cd frontend && npm run lint -- 'src/app/(auth)/login/page.tsx' 'src/app/(auth)/login/page.test.tsx' 'src/app/(auth)/register/page.tsx' 'src/app/(auth)/register/page.test.tsx'`：通过，`0` error。
+- Playwright 本地页面检查：`http://localhost:3000/login` 与 `http://localhost:3000/register` 均未命中 `快捷登录|一键登录|你已开启快捷登录`。
+- `git diff --check`：通过。
+- `cd frontend && npx tsc --noEmit`：仍被既有 `src/app/dashboard/contracts/template/page.test.tsx` 的 `ContractTemplateUploadPage` 返回 `void` 问题阻断；本轮认证页目标文件未新增类型错误。
+
+### Remaining
+- 本轮不处理既有合同模板测试类型错误。
+- 当前工作区仍有未提交的性能巡检相关改动，未混入本轮登录/注册修复。
+
 ## 2026-06-07 LOGIN-03（快捷登录不再复用缓存密码）
 
 ### Goal

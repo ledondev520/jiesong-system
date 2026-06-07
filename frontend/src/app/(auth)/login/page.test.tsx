@@ -55,8 +55,10 @@ describe('LoginPage 交互逻辑', () => {
     expect(screen.getByLabelText('密码')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '登录' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /一键登录/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('快捷登录')).not.toBeInTheDocument();
     expect(screen.queryByText(/测试阶段账号/)).not.toBeInTheDocument();
     expect(screen.queryByText(/开启快捷登录/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/你已开启快捷登录/)).not.toBeInTheDocument();
   });
 
   it('旧版快捷登录资料会被清理，避免继续使用失效密码', async () => {
