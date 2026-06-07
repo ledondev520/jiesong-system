@@ -7,6 +7,7 @@
 const ExcelJS = require('exceljs');
 const prisma = require('../utils/prisma');
 const { buildWhere } = require('./customsDeclarationService');
+const { createError } = require('../middleware/errorHandler');
 
 /**
  * 生成报关单
@@ -284,9 +285,9 @@ const exportThreeFormsExcel = async (salesContractId, ids = {}) => {
   // 1. 获取合同及最新生成的三张表
   const contract = await prisma.salesContract.findUnique({
     where: { id: salesContractId },
-    select: { contractNo: true, totalAmount: true, currency: true },
+    select: { contractNo: true, totalAmount: true },
   });
-  if (!contract) throw new Error('合同不存在');
+  if (!contract) throw createError('合同不存在', 404);
 
   const cdWhere = ids.customsDeclarationId
     ? { id: ids.customsDeclarationId }

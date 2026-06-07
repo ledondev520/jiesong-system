@@ -1,5 +1,17 @@
 # Frontend Polish Tasks
 
+## 2026-06-07 PERF-API-03 非读接口守卫路径 SLA
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| PERF-API-03A | P0 | 5m | 1 | DONE | 恢复性能目标上下文，读取剩余非读路由清单和当前工作区状态 |
+| PERF-API-03B | P0 | 15m | 1 | DONE | 设计非破坏性 guard-path allowlist，覆盖缺字段、缺文件、缺资源、未授权等本地守卫路径 |
+| PERF-API-03C | P0 | 15m | 1 | DONE | 新增 `scripts/audit_api_non_read_guard_times.js` 并输出 JSON/Markdown 证据 |
+| PERF-API-03D | P1 | 10m | 1 | DONE | 将 guard-path 结果接入 `scripts/audit_api_route_inventory.js` 的覆盖来源 |
+| PERF-API-03E | P0 | 10m | 1 | DONE | 修复三表导出查询不存在 `currency` 字段导致的 500，并补服务测试 |
+| PERF-API-03F | P1 | 10m | 1 | DONE | 在当前代码临时后端 `3012` 复跑 guard 巡检和路由覆盖清单，确认覆盖提升到 `173/265` |
+| PERF-API-03G | P1 | 20m | 1 | TODO | 为剩余 `92` 条成功路径设计测试库夹具，优先处理写接口中有强验证和可回滚的模块 |
+
 ## 2026-06-07 PERF-API-02 读接口覆盖闭环与附件列表修复
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |

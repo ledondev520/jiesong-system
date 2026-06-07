@@ -1,5 +1,29 @@
 # Ops Execution Center Plan
 
+## 2026-06-07 PERF-API-03（非读接口守卫路径 SLA）
+
+### Goal
+- 在不污染当前业务库的前提下，继续推进剩余 `145` 条非普通读路由的 `2s` 响应目标。
+- 先覆盖有明确本地校验、缺文件、缺资源或鉴权守卫的非读 Interface，证明这些本地守卫路径不会造成页面卡顿。
+
+### Delivered
+- 新增 `scripts/audit_api_non_read_guard_times.js`，只跑 allowlist 中确认不写库的 guard-path 请求。
+- 路由覆盖清单接入 `tmp/performance/api-non-read-guard-times.json`，measurement source 标记为 `api-non-read-guard-times`。
+- 修复三表导出真实错误：`threeFormsService.exportThreeFormsExcel` 不再查询当前 `SalesContract` 模型不存在的 `currency` 字段；合同不存在时返回受控 `404`。
+- 新增 `backend/src/services/threeFormsService.test.js`，覆盖三表导出缺合同路径和字段选择。
+
+### Verification
+- `API_BASE_URL=http://localhost:3012 node scripts/audit_api_non_read_guard_times.js`：`53` 个 guard 样本，`53` OK、`0` error、`0` 超过 `2000ms`；最慢 `auth_change_password_wrong_old=407ms`。
+- `node scripts/audit_api_route_inventory.js`：后端 `265` 条路由，已测 `173` 条，未测 `92` 条。
+- 覆盖分布：`read=114/114`、`ai_external=9/12`、`auth_write=4/5`、`export=9/14`、`import=15/16`、`write=22/104`。
+- `cd backend && NODE_ENV=test JWT_SECRET=test-only-jwt-secret-for-ci-123456 node --test src/services/threeFormsService.test.js src/services/fileService.test.js src/services/patrolService.test.js src/services/authService.test.js src/controllers/authController.test.js src/routes/auth.test.js src/services/taxRateService.test.js src/services/agentAccountService.test.js`：通过，`20` 个测试。
+- `node --check scripts/audit_api_non_read_guard_times.js scripts/audit_api_route_inventory.js backend/src/services/threeFormsService.js backend/src/services/threeFormsService.test.js`：通过。
+- `git diff --check`：通过。
+
+### Remaining
+- 性能目标尚未完成：仍有 `92` 条路由没有任何实测覆盖。
+- 本轮 guard-path 只证明本地验证/鉴权/缺资源路径响应快；写入成功路径、真实导入 payload、真实导出文件、AI provider 调用仍需要测试库或独立 SLA。
+
 ## 2026-06-07 PERF-API-02（读接口覆盖闭环与附件列表修复）
 
 ### Goal
