@@ -50,15 +50,36 @@ const saveFirstId = (key) => (json) => {
   if (item?.contractNo) state[`${key}ContractNo`] = item.contractNo;
 };
 
+const saveFirstFields = (mapping) => (json) => {
+  const item = firstItem(json);
+  if (!item || typeof item !== 'object') return;
+  for (const [stateKey, field] of Object.entries(mapping)) {
+    if (item[field] !== undefined && item[field] !== null && item[field] !== '') {
+      state[stateKey] = item[field];
+    }
+  }
+};
+
+const saveFirstValue = (key) => (json) => {
+  const item = firstItem(json);
+  if (item !== null && item !== undefined && item !== '') state[key] = item;
+};
+
 const optionalPath = (key, template) => () => {
   const value = state[key];
   return value ? template(value) : null;
+};
+
+const optionalPathAll = (keys, template) => () => {
+  const values = keys.map((key) => state[key]);
+  return values.every(Boolean) ? template(...values) : null;
 };
 
 const coreCases = [
   { id: 'health', method: 'GET', path: '/health', auth: false },
   { id: 'auth_login', method: 'POST', path: '/api/v1/auth/login', auth: false, body: () => ({ username: USERNAME, password: PASSWORD }), skipAfterToken: true },
   { id: 'auth_me', method: 'GET', path: '/api/v1/auth/me' },
+  { id: 'auth_users', method: 'GET', path: '/api/v1/auth/users' },
 
   { id: 'dashboard_stats', method: 'GET', path: '/api/v1/dashboard/stats' },
   { id: 'dashboard_analytics', method: 'GET', path: '/api/v1/dashboard/analytics' },
@@ -66,15 +87,16 @@ const coreCases = [
 
   { id: 'suppliers_list', method: 'GET', path: '/api/v1/suppliers?page=1&pageSize=20', save: saveFirstId('supplierId') },
   { id: 'supplier_detail', method: 'GET', path: optionalPath('supplierId', (id) => `/api/v1/suppliers/${id}`) },
-  { id: 'stores_list', method: 'GET', path: '/api/v1/stores?page=1&pageSize=20', save: saveFirstId('storeId') },
+  { id: 'stores_list', method: 'GET', path: '/api/v1/stores?page=1&pageSize=20', save: (json) => { saveFirstId('storeId')(json); saveFirstFields({ storeName: 'name' })(json); } },
   { id: 'store_detail', method: 'GET', path: optionalPath('storeId', (id) => `/api/v1/stores/${id}`) },
-  { id: 'store_ports_options', method: 'GET', path: '/api/v1/stores/options/ports' },
-  { id: 'products_list', method: 'GET', path: '/api/v1/products?page=1&pageSize=20', save: saveFirstId('productId') },
+  { id: 'store_ports_options', method: 'GET', path: '/api/v1/stores/options/ports', save: saveFirstFields({ portId: 'id' }) },
+  { id: 'products_list', method: 'GET', path: '/api/v1/products?page=1&pageSize=20', save: (json) => { saveFirstId('productId')(json); saveFirstFields({ productName: 'customsName' })(json); } },
   { id: 'product_detail', method: 'GET', path: optionalPath('productId', (id) => `/api/v1/products/${id}`) },
   { id: 'product_suppliers', method: 'GET', path: optionalPath('productId', (id) => `/api/v1/products/${id}/suppliers`) },
   { id: 'product_price_history', method: 'GET', path: optionalPath('productId', (id) => `/api/v1/products/${id}/price-history`) },
   { id: 'product_price_trend', method: 'GET', path: optionalPath('productId', (id) => `/api/v1/products/${id}/price-trend`) },
   { id: 'product_categories_options', method: 'GET', path: '/api/v1/products/options/categories' },
+  { id: 'dashboard_track_product', method: 'GET', path: optionalPath('productName', (name) => `/api/v1/dashboard/track-product?product=${encodeURIComponent(name)}`) },
 
   { id: 'purchases_list', method: 'GET', path: '/api/v1/purchases?page=1&pageSize=20', save: saveFirstId('purchaseId') },
   { id: 'purchase_next_no', method: 'GET', path: '/api/v1/purchases/options/next-no' },
@@ -89,6 +111,7 @@ const coreCases = [
   { id: 'sales_files', method: 'GET', path: optionalPath('salesId', (id) => `/api/v1/sales/${id}/files`) },
 
   { id: 'containers_list', method: 'GET', path: '/api/v1/containers?page=1&pageSize=20', save: saveFirstId('containerId') },
+  { id: 'container_next_no', method: 'GET', path: optionalPath('portId', (id) => `/api/v1/containers/next-no/${id}`) },
   { id: 'container_detail', method: 'GET', path: optionalPath('containerId', (id) => `/api/v1/containers/${id}`) },
   { id: 'container_items', method: 'GET', path: optionalPath('containerId', (id) => `/api/v1/containers/${id}/items`) },
   { id: 'container_items_summary', method: 'GET', path: optionalPath('containerId', (id) => `/api/v1/containers/${id}/items/summary`) },
@@ -110,18 +133,20 @@ const coreCases = [
   { id: 'finance_payment_trends', method: 'GET', path: '/api/v1/finance/payment-trends' },
   { id: 'finance_overdue_receivables', method: 'GET', path: '/api/v1/finance/overdue-receivables' },
   { id: 'finance_unallocated_payments', method: 'GET', path: '/api/v1/finance/unallocated-payments' },
-  { id: 'finance_statements', method: 'GET', path: '/api/v1/finance/statements' },
+  { id: 'finance_statements', method: 'GET', path: '/api/v1/finance/statements', save: saveFirstFields({ statementYear: 'year', statementMonth: 'month' }) },
+  { id: 'finance_statement_detail', method: 'GET', path: optionalPathAll(['statementYear', 'statementMonth'], (year, month) => `/api/v1/finance/statements/${year}/${month}`) },
   { id: 'finance_statements_analytics', method: 'GET', path: '/api/v1/finance/statements/analytics' },
   { id: 'finance_unmatched', method: 'GET', path: '/api/v1/finance/unmatched?page=1&pageSize=20' },
   { id: 'finance_purchase_contracts_for_match', method: 'GET', path: '/api/v1/finance/contracts-for-match?contractType=PURCHASE' },
   { id: 'finance_sales_contracts_for_match', method: 'GET', path: '/api/v1/finance/contracts-for-match?contractType=SALES' },
 
-  { id: 'bank_transactions', method: 'GET', path: '/api/v1/bank-flow/transactions?page=1&pageSize=20' },
+  { id: 'bank_transactions', method: 'GET', path: '/api/v1/bank-flow/transactions?page=1&pageSize=20', save: saveFirstFields({ bankCounterpart: 'counterpart' }) },
   { id: 'bank_transaction_stats', method: 'GET', path: '/api/v1/bank-flow/transactions/stats' },
   { id: 'bank_invoices', method: 'GET', path: '/api/v1/bank-flow/invoices?page=1&pageSize=20' },
   { id: 'bank_invoice_stats', method: 'GET', path: '/api/v1/bank-flow/invoices/stats' },
   { id: 'bank_invoices_by_seller', method: 'GET', path: '/api/v1/bank-flow/invoices/by-seller' },
   { id: 'bank_batches', method: 'GET', path: '/api/v1/bank-flow/batches' },
+  { id: 'bank_reconciliation', method: 'GET', path: optionalPath('bankCounterpart', (counterpart) => `/api/v1/bank-flow/reconciliation?counterpart=${encodeURIComponent(counterpart)}`) },
   { id: 'bank_reconciliation_full', method: 'GET', path: '/api/v1/bank-flow/reconciliation/full' },
   { id: 'bank_incoming_summary', method: 'GET', path: '/api/v1/bank-flow/incoming-summary' },
 
@@ -133,9 +158,12 @@ const coreCases = [
   { id: 'tax_refund_detail', method: 'GET', path: optionalPath('taxRefundId', (id) => `/api/v1/tax-refunds/${id}`) },
   { id: 'tax_rates_list', method: 'GET', path: '/api/v1/tax-rates?page=1&pageSize=20', save: saveFirstId('taxRateId') },
   { id: 'tax_rate_detail', method: 'GET', path: optionalPath('taxRateId', (id) => `/api/v1/tax-rates/${id}`) },
+  { id: 'tax_rate_detail_missing', method: 'GET', path: '/api/v1/tax-rates/perf-missing-tax-rate', expectedStatuses: [404] },
 
-  { id: 'hs_codes_list', method: 'GET', path: '/api/v1/hs-codes?page=1&pageSize=20' },
+  { id: 'hs_codes_list', method: 'GET', path: '/api/v1/hs-codes?page=1&pageSize=20', save: saveFirstFields({ hsCode: 'hsCode' }) },
   { id: 'hs_codes_search', method: 'GET', path: '/api/v1/hs-codes/search?keyword=%E7%93%B7%E7%A0%96' },
+  { id: 'hs_code_detail', method: 'GET', path: optionalPath('hsCode', (code) => `/api/v1/hs-codes/${code}`) },
+  { id: 'hsciq_detail', method: 'GET', path: optionalPath('hsCode', (code) => `/api/v1/hs-codes/hsciq-detail/${code}`), expectedStatuses: [200, 403, 429, 503] },
   { id: 'hsciq_usage', method: 'GET', path: '/api/v1/hs-codes/hsciq-usage' },
 
   { id: 'ai_models', method: 'GET', path: '/api/v1/ai/models' },
@@ -153,6 +181,7 @@ const coreCases = [
   { id: 'user_detail', method: 'GET', path: optionalPath('userId', (id) => `/api/v1/users/${id}`) },
   { id: 'agents_list', method: 'GET', path: '/api/v1/agents?page=1&pageSize=20', save: saveFirstId('agentId') },
   { id: 'agent_detail', method: 'GET', path: optionalPath('agentId', (id) => `/api/v1/agents/${id}`) },
+  { id: 'agent_detail_missing', method: 'GET', path: '/api/v1/agents/perf-missing-agent', expectedStatuses: [404] },
   { id: 'notifications_list', method: 'GET', path: '/api/v1/notifications?page=1&pageSize=20' },
   { id: 'notifications_unread_count', method: 'GET', path: '/api/v1/notifications/unread-count' },
 
@@ -175,10 +204,14 @@ const coreCases = [
   { id: 'store_recommend_stores', method: 'GET', path: '/api/v1/store-recommend/stores' },
   { id: 'contract_doc_template_check', method: 'GET', path: '/api/v1/contract-doc/template/check' },
   { id: 'contract_doc_templates', method: 'GET', path: '/api/v1/contract-doc/templates' },
-  { id: 'contract_templates', method: 'GET', path: '/api/v1/contract-templates' },
+  { id: 'contract_templates', method: 'GET', path: '/api/v1/contract-templates', save: saveFirstId('contractTemplateId') },
+  { id: 'contract_template_detail', method: 'GET', path: optionalPath('contractTemplateId', (id) => `/api/v1/contract-templates/${id}`) },
+  { id: 'contract_template_detail_missing', method: 'GET', path: '/api/v1/contract-templates/perf-missing-template', expectedStatuses: [404] },
+  { id: 'generic_contract_files', method: 'GET', path: optionalPath('salesId', (id) => `/api/v1/contracts/${id}/files`) },
   { id: 'ops_unshipped', method: 'GET', path: '/api/v1/ops-execution/unshipped?page=1&pageSize=20' },
   { id: 'ops_purchase_checklist_templates', method: 'GET', path: '/api/v1/ops-execution/purchase-checklist/templates' },
-  { id: 'procurement_template_stores', method: 'GET', path: '/api/v1/procurement-template/stores' },
+  { id: 'procurement_template_stores', method: 'GET', path: '/api/v1/procurement-template/stores', save: saveFirstValue('procurementStoreName') },
+  { id: 'procurement_template_store_detail', method: 'GET', path: optionalPath('procurementStoreName', (name) => `/api/v1/procurement-template/stores/${encodeURIComponent(name)}`) },
   { id: 'procurement_template_universal', method: 'GET', path: '/api/v1/procurement-template/universal' },
 ];
 
@@ -244,20 +277,22 @@ const runRequest = async (testCase, token) => {
 
   const durationMs = Math.round(performance.now() - started);
   const json = testCase.acceptsBlob ? null : readJson(text);
-  if (testCase.save && json && response.ok) {
+  const expectedStatus = Array.isArray(testCase.expectedStatuses) && testCase.expectedStatuses.includes(response.status);
+  if (testCase.save && json && (response.ok || expectedStatus)) {
     testCase.save(json, state);
   }
+  const ok = response.ok || expectedStatus;
 
   return {
     id: testCase.id,
     method: testCase.method,
     path: resolvedPath,
-    status: response.ok ? 'OK' : 'HTTP_ERROR',
+    status: ok ? 'OK' : 'HTTP_ERROR',
     httpStatus: response.status,
     durationMs,
     overThreshold: durationMs > THRESHOLD_MS,
     contentLength: Number(response.headers.get('content-length')) || Buffer.byteLength(text),
-    message: response.ok ? '' : (json?.message || text.slice(0, 160)),
+    message: response.ok ? '' : (expectedStatus ? `expected HTTP ${response.status}: ${json?.message || text.slice(0, 160)}` : (json?.message || text.slice(0, 160))),
   };
 };
 

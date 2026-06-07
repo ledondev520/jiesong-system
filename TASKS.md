@@ -1,5 +1,17 @@
 # Frontend Polish Tasks
 
+## 2026-06-07 PERF-API-02 读接口覆盖闭环与附件列表修复
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| PERF-API-02A | P0 | 5m | 1 | DONE | 恢复性能目标上下文，确认当前未提交改动集中在巡检脚本和附件列表后端修复 |
+| PERF-API-02B | P0 | 10m | 1 | DONE | 修复路由覆盖清单的动态路由匹配，避免 `:id` 路由被误判未覆盖 |
+| PERF-API-02C | P0 | 15m | 1 | DONE | 扩展读接口巡检样本，补齐 dashboard track、finance statement、bank reconciliation、HS detail、合同附件等读取路径 |
+| PERF-API-02D | P0 | 10m | 1 | DONE | 修复 `/api/v1/contracts/:contractId/files` 的参数校验和 Prisma client 导入错误 |
+| PERF-API-02E | P1 | 10m | 1 | DONE | 为 `fileService.listFiles` 增加采购/销售附件列表单元测试 |
+| PERF-API-02F | P1 | 15m | 1 | DONE | 复跑 123 个接口响应样本和 265 条路由覆盖清单，确认普通读接口 `114/114` 全覆盖且 0 个超过 2 秒 |
+| PERF-API-02G | P1 | 10m | 1 | TODO | 设计写接口、导入/导出、AI 外部调用的测试库夹具和分层 SLA，不污染当前业务库 |
+
 ## 2026-06-07 LOGIN-04 移除硬编码快捷登录入口
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |

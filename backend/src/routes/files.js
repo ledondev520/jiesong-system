@@ -11,17 +11,21 @@ const fileController = require('../controllers/fileController');
 const { authenticate, roleAuth } = require('../middleware/auth');
 const { contractUpload } = require('../utils/upload');
 const { withAuditLog } = require('../middleware/auditLog');
-const { withIdValidation } = require('../utils/validators');
+const { param, handleValidation } = require('../utils/validators');
 
 const router = Router();
 const WRITE_ROLES = ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'];
+const withContractIdValidation = [
+  param('contractId').notEmpty().withMessage('合同ID不能为空').isString().withMessage('合同ID格式无效'),
+  handleValidation,
+];
 
 router.use(authenticate);
 
 // POST /api/v1/contracts/:contractId/files — 上传附件
 router.post(
   '/contracts/:contractId/files',
-  withIdValidation,
+  withContractIdValidation,
   roleAuth(...WRITE_ROLES),
   contractUpload.single('file'),
   withAuditLog(
@@ -33,7 +37,7 @@ router.post(
 // GET /api/v1/contracts/:contractId/files — 列出附件
 router.get(
   '/contracts/:contractId/files',
-  withIdValidation,
+  withContractIdValidation,
   fileController.listFiles
 );
 

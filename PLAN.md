@@ -1,5 +1,31 @@
 # Ops Execution Center Plan
 
+## 2026-06-07 PERF-API-02（读接口覆盖闭环与附件列表修复）
+
+### Goal
+- 继续推进“所有接口响应 2 秒以内”目标，先把普通读接口覆盖从上一轮 `79/114`、修正后 `111/114` 补到 `114/114`。
+- 修复巡检扩展时暴露的合同附件列表真实后端错误，避免页面读取附件时落入 400/500。
+
+### Delivered
+- 修复 `scripts/audit_api_route_inventory.js` 的动态路由匹配：`:id` 现在能正确匹配实测路径。
+- 扩展 `scripts/audit_api_response_times.js` 到 `123` 个样本，覆盖全部 `114` 条普通读路由；无当前数据的详情路由用格式合法的 missing fixture 响应测量。
+- 修复 `/api/v1/contracts/:contractId/files`：
+  - 路由层改为校验 `contractId`，不再误用只校验 `id` 的通用校验器。
+  - `fileService` 改为直接导入 Prisma client，修复 `Cannot read properties of undefined (reading 'contractFile')`。
+- 新增 `backend/src/services/fileService.test.js`，覆盖采购/销售合同附件列表的 Prisma delegate 调用。
+
+### Verification
+- `API_BASE_URL=http://localhost:3011 node scripts/audit_api_response_times.js`：`123` 个样本，`120` OK、`3` skipped、`0` HTTP error、`0` 超过 `2000ms`；最慢 `auth_login=413ms`。
+- `node scripts/audit_api_route_inventory.js`：后端 `265` 条路由，已实测 `120` 条；普通 `read` 路由 `114/114` 全覆盖。
+- `/api/v1/contracts/:contractId/files` 单点验证：用当前销售合同 ID 请求返回 `200`，响应数据为数组。
+- `cd backend && NODE_ENV=test JWT_SECRET=test-only-jwt-secret-for-ci-123456 node --test src/services/fileService.test.js src/services/patrolService.test.js src/services/authService.test.js src/controllers/authController.test.js src/routes/auth.test.js src/services/taxRateService.test.js src/services/agentAccountService.test.js`：通过，`19` 个测试。
+- `node --check backend/src/services/fileService.test.js backend/src/services/fileService.js backend/src/routes/files.js scripts/audit_api_response_times.js scripts/audit_api_route_inventory.js`：通过。
+- `git diff --check`：通过。
+
+### Remaining
+- 性能目标尚未完成：`145` 条路由仍未纳入安全实测，其中 `write=103`、`import=13`、`export=13`、`ai_external=12`、`auth_write=4`。
+- 写接口必须用测试库或可回滚夹具，导入/导出要按 payload 分层，AI 外部调用要单独 SLA；不能用本轮读接口结果替代。
+
 ## 2026-06-07 LOGIN-04（移除硬编码快捷登录入口）
 
 ### Goal

@@ -65,8 +65,13 @@ const getRoutesFromRouter = (router, mount) => {
 
 const routeToRegex = (routePath) => {
   const escaped = routePath
-    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    .replace(/\\:([A-Za-z0-9_]+)/g, '[^/]+');
+    .split('/')
+    .map((segment) => {
+      if (!segment) return '';
+      if (segment.startsWith(':')) return '[^/]+';
+      return segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    })
+    .join('/');
   return new RegExp(`^${escaped}(?:\\?.*)?$`);
 };
 

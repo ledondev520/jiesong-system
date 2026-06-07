@@ -6,7 +6,7 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-const { prisma } = require('../utils/prisma');
+const prisma = require('../utils/prisma');
 const { deleteFile: removeFile, getFullPath } = require('../utils/upload');
 
 const CONTRACT_TYPE = {
