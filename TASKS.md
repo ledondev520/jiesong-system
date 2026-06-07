@@ -1,5 +1,15 @@
 # Frontend Polish Tasks
 
+## 2026-06-07 CI-04 GitHub Code Quality Node 版本固定
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| CI-04A | P0 | 5m | 1 | DONE | 恢复 Codex/ByteRover 项目记忆，确认 `gh` 未登录且公开 GitHub API 返回私有仓库 404 |
+| CI-04B | P0 | 10m | 1 | DONE | 复现当前 Code Quality 本地等价命令，确认 lint 和 TypeScript 均通过 |
+| CI-04C | P0 | 10m | 1 | DONE | 核对前端 lockfile 引擎要求，确认依赖树要求 `Node >=20.19.0` |
+| CI-04D | P0 | 10m | 1 | DONE | 固定所有前端依赖安装相关 GitHub Actions 的 Node 版本为 `20.19.0` |
+| CI-04E | P1 | 10m | 1 | DONE | 运行安装 dry-run、lint、workflow diff 检查，并记录 `gh` 认证和既有工作区删除限制 |
+
 ## 2026-06-07 FINANCE-NAV-01 财务模块顶层 Tab 收敛
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |

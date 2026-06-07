@@ -1,5 +1,29 @@
 # Ops Execution Center Plan
 
+## 2026-06-07 CI-04（GitHub Code Quality Node 版本固定）
+
+### Goal
+- 修复 GitHub `CI / Code Quality` 在依赖安装阶段可能因 runner 解析到过旧 Node 20.x 而提前失败的问题。
+- 让所有会安装前端依赖的 GitHub Actions 明确使用前端 lockfile 已要求的 `Node 20.19.0`。
+- 不混入当前工作区已有的业务页面改动。
+
+### Delivered
+- 将 `.github/workflows/ci.yml` 中 `quality`、`test`、`build` 三个 job 的 Node 版本从 `20` 固定为 `20.19.0`。
+- 同步固定 `test-and-acceptance.yml`、`qa.yml`、`pr-review.yml`、`weekly-retro.yml`、`security.yml` 和 `deploy.yml` 的 Node 版本声明。
+- 根因证据：`frontend/package-lock.json` 中多个依赖声明 `node >=20.19.0`，其中 `eslint-visitor-keys@5.0.1` 要求 `^20.19.0 || ^22.13.0 || >=24`。
+
+### Verification
+- `rg -n "node-version: '20'|NODE_VERSION: '20'" .github/workflows`：无命中。
+- `rg -n "20\\.19\\.0" .github/workflows`：命中 `13` 处 Node 声明。
+- `cd frontend && npm ci --dry-run --ignore-scripts`：通过；本机 Node `23.11.0` 触发 `EBADENGINE` warning，进一步确认依赖树对 Node 版本敏感。
+- `cd frontend && npm run lint`：通过，`0` error、`1` warning。
+- `git diff --check -- .github/workflows`：通过。
+- `cd frontend && ./node_modules/.bin/tsc --noEmit --pretty false`：通过。
+
+### Remaining
+- `gh auth status` 显示未登录，私有仓库 GitHub Actions 真实日志当前无法读取；本轮按可复现的 Code Quality 安装环境风险修复。
+- 当前工作区仍有未提交业务改动，提交时必须只纳入本轮 CI 记录文件，不能混入业务页面文件。
+
 ## 2026-06-07 FINANCE-NAV-01（财务模块顶层 Tab 收敛）
 
 ### Goal
