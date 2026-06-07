@@ -1,5 +1,28 @@
 # Ops Execution Center Plan
 
+## 2026-06-07 LOGIN-05（认证页组旧登录资料清理）
+
+### Goal
+- 处理本地开发服务中仍可能看到旧“快捷登录 / 一键登录”入口的问题，避免旧客户端资料继续触发错误登录。
+- 确认注册页不显示“你已开启快捷登录”，并且进入注册页时也会清理历史登录资料。
+
+### Delivered
+- 新增 `frontend/src/app/(auth)/layout.tsx`，在登录、注册、忘记密码等认证页面组加载时统一删除旧 `jiesong_quick_login_profile`。
+- 该认证页组布局不渲染任何 UI，不新增登录入口；登录页仍只走手动账号密码登录。
+- 新增 `frontend/src/app/(auth)/layout.test.tsx`，覆盖认证页组加载时旧登录资料会被清空。
+- 清理 `frontend/.next` 前端编译缓存；当前 `http://localhost:3000` 已由原前端父进程重新编译到新代码，未保留 3002 临时实例。
+
+### Verification
+- `cd frontend && npm run test -- 'src/app/(auth)/layout.test.tsx' 'src/app/(auth)/login/page.test.tsx' 'src/app/(auth)/register/page.test.tsx'`：通过，`10` 个测试。
+- `cd frontend && npm run lint -- 'src/app/(auth)/layout.tsx' 'src/app/(auth)/layout.test.tsx' 'src/app/(auth)/login/page.tsx' 'src/app/(auth)/login/page.test.tsx' 'src/app/(auth)/register/page.tsx' 'src/app/(auth)/register/page.test.tsx'`：通过，`0` error。
+- Playwright 本地页面验证：预置旧 `jiesong_quick_login_profile` 后打开 `http://localhost:3000/login` 与 `http://localhost:3000/register`，两页本地缓存均为 `null`，`快捷登录|一键登录|你已开启快捷登录` 可见文本命中数均为 `0`。
+- `git diff --check`：通过。
+- `cd frontend && npx tsc --noEmit`：被既有 `src/app/dashboard/contracts/template/page.test.tsx` 阻断，错误为 `ContractTemplateUploadPage` 返回 `void`，不是本轮认证页改动引入。
+
+### Remaining
+- 目标 UI 已收口；若浏览器仍显示旧按钮，剩余原因应是打开了非 `http://localhost:3000` 的旧预览入口或未刷新旧标签。
+- 本轮不处理既有合同模板测试类型错误。
+
 ## 2026-06-07 PERF-API-03（非读接口守卫路径 SLA）
 
 ### Goal
