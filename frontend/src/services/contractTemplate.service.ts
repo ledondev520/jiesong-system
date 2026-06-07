@@ -1,8 +1,8 @@
 import api from '@/lib/axios';
-import type { ApiResponse, ContractTemplate, PaginatedResponse } from '@/types';
+import type { ApiResponse, ContractTemplate } from '@/types';
 import { createCrudService } from './crudService';
 
-export type ContractTemplateCreatePayload = {
+type ContractTemplateCreatePayload = {
   name: string;
   type: 'PURCHASE' | 'SALES';
   supplierId?: string | null;
@@ -11,7 +11,7 @@ export type ContractTemplateCreatePayload = {
   items: unknown[];
 };
 
-export type ContractTemplateQuery = { type?: string };
+type ContractTemplateQuery = { type?: string };
 
 const crud = createCrudService<
   ContractTemplate,

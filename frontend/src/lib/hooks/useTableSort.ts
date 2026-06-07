@@ -10,11 +10,6 @@ import { useState, useMemo, useCallback } from 'react';
 
 export type SortDirection = 'asc' | 'desc' | null;
 
-export interface SortState<K extends string = string> {
-  key: K | null;
-  dir: SortDirection;
-}
-
 export interface UseTableSortResult<T, K extends string = string> {
   sortedData: T[];
   sortKey: K | null;

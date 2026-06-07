@@ -207,7 +207,6 @@ export function FinancialStatementsOverview({
             {(() => {
               const trends = analytics?.trends ?? [];
               const prev = trends.length >= 2 ? trends[trends.length - 2] : null;
-              const curr = trends.length >= 1 ? trends[trends.length - 1] : null;
               const revenueTrend = calcTrend(latestIncomeStatement?.revenueMonth, prev?.revenue);
               const profitTrend = calcTrend(latestIncomeStatement?.netProfitMonth, prev?.netProfit);
               const prevDebtRatio = prev && prev.totalAssets ? prev.totalLiabilities / prev.totalAssets : null;

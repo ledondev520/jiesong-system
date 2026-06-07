@@ -36,15 +36,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash, Search, Store as StoreIcon, Package, DollarSign, ArrowRight, ArrowLeft, Container, Check, Calculator } from 'lucide-react';
+import { Plus, Trash, Search, Store as StoreIcon, Package, ArrowRight, ArrowLeft, Container, Check, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import { salesService } from '@/services/sales.service';
 import { productService } from '@/services/product.service';
 import { storeService } from '@/services/store.service';
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE } from '@/lib/constants';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { SemanticBadge } from '@/components/ui/semantic-badge';
-
 const salesSchema = z.object({
   contractNo: z.string().optional(),
   signedAt: z.date().optional(),

@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { ArrowDownLeft, ArrowUpRight, Search, X, ChevronLeft, ChevronRight, FileText, ArrowLeftRight, Upload } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Search, X, ChevronLeft, ChevronRight, FileText, Upload } from 'lucide-react';
 import Link from 'next/link';
 import {
   getTransactions, getTransactionStats, getBatches,

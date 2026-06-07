@@ -31,7 +31,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserDialog } from '../../users/components/UserDialog';
 import { PermissionMatrix } from '@/components/settings/PermissionMatrix';
 import { MobileListCard } from '@/components/mobile';
-import { Card, CardContent } from '@/components/ui/card';
+
 
 const ROLE_META: Record<Role, { label: string; className: string }> = {
   [Role.ADMIN]: { label: '管理员', className: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800' },

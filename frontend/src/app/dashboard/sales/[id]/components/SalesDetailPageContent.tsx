@@ -9,7 +9,7 @@
 'use client';
 
 import { useState, useEffect, use, lazy, Suspense, useMemo, useRef, useCallback } from 'react';
-import { SalesContract, PackingItem, Product, Store, SalesStatus, Inventory, Payment, PaymentType } from '@/types';
+import { SalesContract, PackingItem, Product, Store, SalesStatus, Inventory, PaymentType } from '@/types';
 import { salesService } from '@/services/sales.service';
 import { productService } from '@/services/product.service';
 import { storeService } from '@/services/store.service';
@@ -51,7 +51,7 @@ import {
 } from '@/components/ui/tabs';
 import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, Container, Anchor, Truck, CheckCircle2, CircleDashed, CircleDot, Clock, ArrowRight, DollarSign, MapPin, Ruler } from 'lucide-react';
+import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, Container, Anchor, Truck, CheckCircle2, CircleDashed, CircleDot, Clock, ArrowRight, DollarSign, MapPin } from 'lucide-react';
 import { domToPng } from 'modern-screenshot';
 import { toast } from 'sonner';
 import { CONTAINER_40HQ } from '@/lib/binPacking';

@@ -1,7 +1,7 @@
 /**
  * Input: reportsService.getBusinessOverview API
  * Output: 经营数据报表页面（老板视角）
- * Pos: Dashboard > 经营报表，提供公司整体经营状况、资金风险、库存健康度与趋势
+ * Pos: Dashboard > 经营执行，提供公司整体经营状况、资金风险、库存健康度与趋势
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -29,17 +29,14 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import {
-  LineChart,
-  Line,
-  BarChart,
   Bar,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   ComposedChart,
-  Area,
   Legend,
 } from 'recharts';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -87,7 +84,7 @@ export default function BusinessReportsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="经营报表" showBack={false} />
+        <PageHeader title="经营执行" showBack={false} />
         <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/60" />
@@ -99,7 +96,7 @@ export default function BusinessReportsPage() {
   if (error || !data) {
     return (
       <div className="space-y-6">
-        <PageHeader title="经营报表" showBack={false} />
+        <PageHeader title="经营执行" showBack={false} />
         <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
         <Card className="border-border/40">
           <CardContent className="flex flex-col items-center justify-center gap-4 py-16 text-center">
@@ -120,7 +117,7 @@ export default function BusinessReportsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="经营报表" showBack={false} />
+      <PageHeader title="经营执行" showBack={false} />
       <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
 
       {/* 经营概览 */}

@@ -36,7 +36,6 @@ import {
   type InvoiceRecord,
   type ContractForMatch,
   type PurchaseContractForMatch,
-  type SalesContractForMatch,
 } from '@/services/bankFlow.service';
 
 function fmt(n: number) {
@@ -45,10 +44,6 @@ function fmt(n: number) {
 
 function isPurchaseContract(c: ContractForMatch): c is PurchaseContractForMatch {
   return 'supplier' in c;
-}
-
-function isSalesContract(c: ContractForMatch): c is SalesContractForMatch {
-  return 'packingItems' in c;
 }
 
 function contractLabel(c: ContractForMatch): string {

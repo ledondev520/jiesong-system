@@ -252,6 +252,7 @@ export default function ContractFiles({
           <div className="h-full flex-1 overflow-hidden">
             {previewFile &&
             (previewFile.mimeType || previewFile.fileType)?.startsWith('image/') ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={getContractFileDownloadUrl(previewFile.id)}
                 alt={previewFile.fileName}

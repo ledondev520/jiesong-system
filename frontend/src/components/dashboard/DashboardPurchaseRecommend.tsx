@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Package, AlertCircle, Star, ArrowRight } from 'lucide-react';
+import { Package, AlertCircle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { procurementTemplateService, type TemplateItem } from '@/services/procurementTemplate.service';

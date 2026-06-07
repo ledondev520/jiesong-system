@@ -100,10 +100,6 @@ const FINANCE_COLORS = {
   warning: '#f59e0b',
 };
 
-function fmtCurrency(n: number, currency = '¥') {
-  return `${currency}${n.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-}
-
 function calcTrendDirection(current: number, previous: number): 'up' | 'down' | 'neutral' {
   if (!previous || previous === 0) return 'neutral';
   const diff = ((current - previous) / previous) * 100;
@@ -285,7 +281,7 @@ export default function FinancePage() {
           <CardContent className="space-y-4 pt-6">
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">公司财务进度</p>
-              <h3 className="text-lg font-semibold tracking-tight">先看收付压力，再下钻经营报表</h3>
+              <h3 className="text-lg font-semibold tracking-tight">先看收付压力，再下钻经营执行</h3>
               <p className="text-sm leading-6 text-muted-foreground">
                 财务总览先给出应付完成率、应收完成率和待付待收风险；报表区块保留三表导入、账期选择和收入利润、成本结构、资产负债下钻。
               </p>
@@ -706,7 +702,7 @@ export default function FinancePage() {
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-primary">经营报表下钻</p>
+                  <p className="text-sm font-medium text-primary">经营执行下钻</p>
                   <p className="text-xs text-muted-foreground mt-0.5">收入利润、成本结构、资产负债</p>
                 </div>
                 <BarChart3 className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
@@ -751,7 +747,7 @@ export default function FinancePage() {
             <EmptyState
               icon={DollarSign}
               title="暂无财务记录"
-              description="导入采购或销售合同数据后，应付 / 应收账款将自动汇总显示在此。"
+              description="导入采购或出口合同数据后，应付 / 应收账款将自动汇总显示在此。"
               action={
                 <div className="flex flex-wrap justify-center gap-3">
                   <Button asChild variant="outline" size="sm">
