@@ -1,5 +1,32 @@
 # Ops Execution Center Plan
 
+## 2026-06-07 PERF-API-05（合同/货柜写成功路径临时库 SLA）
+
+### Goal
+- 继续推进“所有接口 2 秒以内”目标，补齐采购、销售、货柜这类复杂写路径的真实成功路径响应时间。
+- 继续只打复制库，不污染当前业务库；状态变更选择不触发库存出入库的早期流转。
+
+### Delivered
+- 扩展 `scripts/audit_api_write_success_times.js`，在既有 29 个小写入样本基础上新增采购、销售、货柜成功路径和临时基础资料夹具。
+- 新增覆盖的主要 Interface：
+  - 采购：创建、更新、添加明细、状态 `DRAFT -> PENDING_INSPECTION`、按商品查供应商、删除。
+  - 销售：创建、更新、添加销售明细、装箱明细增删改、状态 `DRAFT -> PENDING_SHIPMENT`、删除。
+  - 货柜：创建、更新、装箱明细增删改、状态 `SHIPPED`、删除。
+- 临时基础资料使用独立港口、门店、供应商、商品，巡检末尾清理。
+
+### Verification
+- 使用复制库 `tmp/performance/perf-api-write.db` 和临时后端 `3014`。
+- `API_BASE_URL=http://localhost:3014 API_PERF_ALLOW_WRITES=true API_PERF_DISPOSABLE_DB=true node scripts/audit_api_write_success_times.js`：`58` 个样本，`58` OK、`0` error、`0` 超过 `2000ms`；最慢 `user_create_success=408ms`。
+- `node scripts/audit_api_route_inventory.js`：后端 `265` 条路由，已测 `215` 条，未测 `50` 条。
+- 覆盖分布：`read=114/114`、`auth_write=5/5`、`write=63/104`、`ai_external=9/12`、`export=9/14`、`import=15/16`。
+- `node --check scripts/audit_api_write_success_times.js scripts/audit_api_route_inventory.js`：通过。
+- `git diff --check`：通过。
+- 临时后端 `3014` 已停止；真实库 `backend/prisma/dev.db` 修改时间为 `2026-06-07 20:00:12`，复制库修改时间为 `2026-06-07 20:07:29`。
+
+### Remaining
+- 性能目标尚未完成：仍有 `50` 条路由没有实测覆盖。
+- 剩余未测集中在 `write=41`、`export=5`、`ai_external=3`、`import=1`；下一阶段应继续处理报关/退税/财务/通知/Agent 凭证写路径，以及导入导出和 provider-backed AI 路径。
+
 ## 2026-06-07 LOGIN-06（快捷登录旧状态清理与认证页防缓存）
 
 ### Goal
