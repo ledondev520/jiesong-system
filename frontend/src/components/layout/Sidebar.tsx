@@ -12,61 +12,27 @@
  * - 财务模块：财务总览、收付管理
  * - AI 助手：AI 会话
  * - 系统管理：系统配置、用户管理、商品档案、系统日志
+ *
+ * 侧边栏只负责模块入口与选中态，不拉取业务数据、不显示待办数量徽标。
  */
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Ship } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { purchaseService } from '@/services/purchase.service';
-import { salesService } from '@/services/sales.service';
-import { financeService } from '@/services/finance.service';
-import { PurchaseStatus, SalesStatus, SalesContract } from '@/types';
 import {
   getModuleTargetHref,
   getVisibleModuleNavItems,
   isModuleRouteActive,
-  ModuleNavItem,
   SHELL_PREFETCH_ROUTES,
 } from './navigation.config';
 
 const MAX_PREFETCH_ROUTES = 5;
-
-// ==================== Badge 辅助函数 ====================
-
-const hasExportExecutionMetrics = (contract: Pick<SalesContract, 'status' | 'totalBoxes' | 'grossWeight' | 'volume'>) => {
-  if (![SalesStatus.DRAFT, SalesStatus.CONFIRMED, SalesStatus.PACKING].includes(contract.status)) {
-    return false;
-  }
-  return !(contract.totalBoxes > 0 && contract.grossWeight > 0 && contract.volume > 0);
-};
-
-interface ModuleBadgeCounts {
-  operations: number;
-  procurement: number;
-  export: number;
-  finance: number;
-}
-
-const getModuleBadge = (item: ModuleNavItem, counts: ModuleBadgeCounts): number | null => {
-  switch (item.key) {
-    case 'operations':
-      return counts.operations > 0 ? counts.operations : null;
-    case 'procurement':
-      return counts.procurement > 0 ? counts.procurement : null;
-    case 'export':
-      return counts.export > 0 ? counts.export : null;
-    case 'finance':
-      return counts.finance > 0 ? counts.finance : null;
-    default:
-      return null;
-  }
-};
 
 // ==================== 组件 ====================
 
@@ -76,7 +42,8 @@ const getModuleBadge = (item: ModuleNavItem, counts: ModuleBadgeCounts): number 
  *   1. 侧边栏只显示 6 个模块入口，不列子页面
  *   2. 模块激活判断：当前路径属于该模块任一子路由前缀即高亮
  *   3. 子页面切换由各页面顶部的 ModuleTabHeader 水平 Tab 栏负责
- *   4. 空闲时预取各模块入口路由
+ *   4. 不显示跨模块待办数量，避免导航与业务数据耦合
+ *   5. 空闲时预取各模块入口路由
  */
 export function Sidebar() {
   const pathname = usePathname();
@@ -85,57 +52,6 @@ export function Sidebar() {
   const prefetchedRoutesRef = useRef<Set<string>>(new Set());
 
   const visibleItems = getVisibleModuleNavItems(user?.role);
-
-  const [badgeCounts, setBadgeCounts] = useState<ModuleBadgeCounts>({
-    operations: 0,
-    procurement: 0,
-    export: 0,
-    finance: 0,
-  });
-
-  // mount 时请求一次各模块待处理数量
-  useEffect(() => {
-    let active = true;
-
-    const loadBadgeCounts = async () => {
-      try {
-        const [purchaseRes, salesRes, receivableRes] = await Promise.all([
-          purchaseService.getAll({ page: 1, pageSize: 100, lite: true }),
-          salesService.getAll({ page: 1, pageSize: 100, lite: true }),
-          financeService.getReceivables({ page: 1, pageSize: 1 }),
-        ]);
-
-        if (!active) return;
-
-        const purchases = purchaseRes.data?.items || [];
-        const sales = salesRes.data?.items || [];
-        const draftPurchases = purchases.filter((contract) => contract.status === PurchaseStatus.DRAFT).length;
-        const exportPendingParams = sales.filter((contract) => hasExportExecutionMetrics(contract)).length;
-        const pendingReceivables = receivableRes.data?.pagination?.total || 0;
-
-        setBadgeCounts({
-          operations: draftPurchases + exportPendingParams,
-          procurement: draftPurchases,
-          export: exportPendingParams,
-          finance: pendingReceivables,
-        });
-      } catch {
-        if (!active) return;
-        setBadgeCounts({
-          operations: 0,
-          procurement: 0,
-          export: 0,
-          finance: 0,
-        });
-      }
-    };
-
-    loadBadgeCounts();
-
-    return () => {
-      active = false;
-    };
-  }, []);
 
   // 空闲时预取各模块入口路由 + 高频操作页
   useEffect(() => {
@@ -182,7 +98,6 @@ export function Sidebar() {
           <div className="grid gap-1">
             {visibleItems.map((item) => {
               const isActive = isModuleRouteActive(pathname, item);
-              const badge = getModuleBadge(item, badgeCounts);
               // 点击模块时，优先跳转到上次记忆的子页面
               const handleModuleClick = (e: React.MouseEvent) => {
                 e.preventDefault();
@@ -213,11 +128,6 @@ export function Sidebar() {
                     <item.icon className="h-3.5 w-3.5" />
                   </span>
                   <span className="flex-1">{item.label}</span>
-                  {badge !== null && (
-                    <span className="ml-auto flex h-4 min-w-[16px] items-center justify-center rounded-md bg-primary/90 px-1 text-[10px] font-medium text-primary-foreground">
-                      {badge > 99 ? '99+' : badge}
-                    </span>
-                  )}
                 </Link>
               );
             })}
