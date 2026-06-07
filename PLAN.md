@@ -1,5 +1,28 @@
 # Ops Execution Center Plan
 
+## 2026-06-07 LOGIN-06（快捷登录旧状态清理与认证页防缓存）
+
+### Goal
+- 处理本地开发服务中点击旧“快捷登录”仍提交失效密码并提示“请输入正确的用户和密码”的问题。
+- 去掉注册页上可能来自旧认证状态的“你已开启快捷登录”提示，并让认证页不再复用旧页面缓存。
+
+### Delivered
+- 新增 `frontend/src/lib/legacy-auth-cleanup.ts`，集中清理历史快捷登录资料：`jiesong_quick_login_profile`、`quickLoginProfile`、`saved_login_profile` 等旧 key 和匹配旧 quick-login 命名的 key。
+- `frontend/src/app/(auth)/layout.tsx` 与登录页改为调用共享清理模块；注册页进入认证页面组时也会清理旧快捷登录状态。
+- `frontend/middleware.ts` 与 `frontend/next.config.ts` 为 `/login`、`/register`、`/forgot-password` 增加认证页防缓存策略，降低旧客户端继续显示旧快捷登录按钮的概率。
+- 当前本地 `admin` 账号已验证存在、启用，且默认测试密码匹配；后端登录成功，问题不属于后端密码错误。
+
+### Verification
+- `cd frontend && npm test -- --run 'src/app/(auth)/login/page.test.tsx' 'src/app/(auth)/layout.test.tsx' 'src/app/(auth)/register/page.test.tsx'`：通过，`10` 个测试。
+- `cd frontend && npx eslint 'src/app/(auth)/login/page.tsx' 'src/app/(auth)/layout.tsx' 'src/app/(auth)/login/page.test.tsx' 'src/app/(auth)/layout.test.tsx' 'src/app/(auth)/register/page.tsx' 'src/app/(auth)/register/page.test.tsx' 'src/lib/legacy-auth-cleanup.ts' 'middleware.ts' 'next.config.ts'`：通过。
+- Playwright 本地页面验证：`http://localhost:3000/login` 和 `http://localhost:3000/register` 均未命中 `快捷登录|一键登录|已开启快捷登录`；预置旧 localStorage 后刷新登录页，旧 key 均清空，清理版本为 `2026-06-07-no-quick-login`。
+- `curl -X POST http://localhost:3001/api/v1/auth/login` 使用 `admin/123456` 返回 `200` 和 token，确认后端当前可登录。
+- `cd frontend && npx tsc --noEmit`：仍被既有 `src/app/dashboard/contracts/template/page.test.tsx` 中 `ContractTemplateUploadPage` 返回 `void` 阻断，不是本轮改动引入。
+
+### Remaining
+- 当前 3000 实时页面已无快捷登录入口；如果用户浏览器仍看到旧按钮，应优先核对地址栏是否为 `http://localhost:3000`，并刷新旧标签以获取新认证页缓存策略。
+- 本轮不处理既有合同模板测试类型错误。
+
 ## 2026-06-07 PERF-API-04（写接口成功路径临时库 SLA）
 
 ### Goal

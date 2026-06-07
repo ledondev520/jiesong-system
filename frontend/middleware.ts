@@ -49,6 +49,9 @@ const SENSITIVE_PATTERNS = [
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const isAuthPage = ['/login', '/register', '/forgot-password'].some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`)
+  );
 
   // 检查是否是敏感路径
   const isSensitivePath = SENSITIVE_PATHS.some(
@@ -98,6 +101,9 @@ export function middleware(request: NextRequest) {
   response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (isAuthPage) {
+    response.headers.set('Cache-Control', 'private, no-store, max-age=0, must-revalidate');
+  }
 
   return response;
 }

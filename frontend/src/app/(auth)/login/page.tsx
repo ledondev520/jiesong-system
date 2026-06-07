@@ -31,6 +31,7 @@ import {
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserPlus, KeyRound, Eye, EyeOff, Ship, AlertCircle, Loader2 } from 'lucide-react';
 import { authService, type LoginResponse } from '@/services/auth.service';
+import { clearLegacyQuickLoginState } from '@/lib/legacy-auth-cleanup';
 
 const loginSchema = z.object({
   username: z.string().min(1, '请输入用户名'),
@@ -38,8 +39,6 @@ const loginSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
-
-const QUICK_LOGIN_PROFILE_KEY = 'jiesong_quick_login_profile';
 
 function LoginFormClient() {
   const router = useRouter();
@@ -73,11 +72,11 @@ function LoginFormClient() {
 
   // 清理旧版快捷登录缓存：旧实现保存过密码，不能再作为登录凭据复用。
   useEffect(() => {
-    localStorage.removeItem(QUICK_LOGIN_PROFILE_KEY);
+    clearLegacyQuickLoginState();
   }, []);
 
   const clearLegacyQuickLoginProfile = useCallback(() => {
-    localStorage.removeItem(QUICK_LOGIN_PROFILE_KEY);
+    clearLegacyQuickLoginState();
   }, []);
 
   /**

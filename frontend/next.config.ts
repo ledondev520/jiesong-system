@@ -104,6 +104,33 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        source: '/login',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'private, no-store, max-age=0, must-revalidate',
+          },
+        ],
+      },
+      {
+        source: '/register',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'private, no-store, max-age=0, must-revalidate',
+          },
+        ],
+      },
+      {
+        source: '/forgot-password',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'private, no-store, max-age=0, must-revalidate',
+          },
+        ],
+      },
     ];
   },
 

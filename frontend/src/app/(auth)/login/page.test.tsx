@@ -10,6 +10,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LoginPage from './page';
+import {
+  LEGACY_AUTH_CLEANUP_VERSION,
+  LEGACY_AUTH_CLEANUP_VERSION_KEY,
+} from '@/lib/legacy-auth-cleanup';
 
 const mockPush = vi.fn();
 const mockAuthStoreLogin = vi.fn();
@@ -82,11 +86,22 @@ describe('LoginPage 交互逻辑', () => {
       username: 'admin',
       password: 'old-password',
     }));
+    localStorage.setItem('quickLoginProfile', JSON.stringify({
+      username: 'admin',
+      password: 'old-password',
+    }));
+    localStorage.setItem('saved_login_profile', JSON.stringify({
+      username: 'admin',
+      password: 'old-password',
+    }));
 
     render(<LoginPage />);
 
     await waitFor(() => {
       expect(localStorage.getItem('jiesong_quick_login_profile')).toBeNull();
+      expect(localStorage.getItem('quickLoginProfile')).toBeNull();
+      expect(localStorage.getItem('saved_login_profile')).toBeNull();
+      expect(localStorage.getItem(LEGACY_AUTH_CLEANUP_VERSION_KEY)).toBe(LEGACY_AUTH_CLEANUP_VERSION);
       expect(screen.queryByRole('button', { name: /一键登录/ })).not.toBeInTheDocument();
     });
   });
