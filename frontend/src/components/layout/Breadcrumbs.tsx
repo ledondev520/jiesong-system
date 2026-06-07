@@ -15,16 +15,17 @@ const routeLabelMap: Record<string, string> = {
   dashboard: '工作台',
   contracts: '采购合同',
   purchase: '采购',
-  sales: '销售合同',
+  sales: '出口合同',
   suppliers: '供应商',
   products: '商品档案',
   inventory: '库存',
+  'inventory-status': '库存状态',
   finance: '财务',
-  payments: '收付款',
+  payments: '收付管理',
   statements: '财务报表',
   'bank-flow': '银行流水',
   'hs-codes': 'HS编码',
-  'tax-refunds': '退税',
+  'tax-refunds': '出口退税',
   'customs-declarations': '报关单',
   settings: '设置',
   users: '用户管理',
@@ -49,9 +50,18 @@ export function Breadcrumbs({ className }: { className?: string }) {
     .split('/')
     .filter(Boolean);
 
+  /**
+   * 判断 segment 是否为 cuid / uuid 等数据库 ID（长度 >20 的字母数字混合）
+   * 是则替换为"详情"，避免面包屑显示无意义的随机字符串
+   */
+  const isDbId = (s: string) => /^[a-z0-9]{20,}$/i.test(s);
+
   const crumbs = segments.map((segment, index) => {
     const href = '/dashboard/' + segments.slice(0, index + 1).join('/');
-    const label = routeLabelMap[segment] || segment;
+    let label = routeLabelMap[segment] || segment;
+    if (isDbId(segment)) {
+      label = '详情';
+    }
     const isLast = index === segments.length - 1;
     return { href, label, isLast };
   });
