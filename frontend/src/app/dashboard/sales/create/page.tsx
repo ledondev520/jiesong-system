@@ -1,7 +1,7 @@
 /**
  * Input: 商品、门店、销售服务
  * Output: 出口合同创建页面（含分步向导、门店搜索卡片选择、商品定价实时利润计算、货柜选择器）
- * Pos: 销售管理创建入口
+ * Pos: 出口管理创建入口
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -181,7 +181,7 @@ export default function CreateSalesPage() {
 
   const steps = [
     { id: 1, label: '基本信息', description: '合同编号、日期、汇率' },
-    { id: 2, label: '销售明细', description: '门店、商品、定价' },
+    { id: 2, label: '出口明细', description: '门店、商品、定价' },
   ];
 
   const [storeSearch, setStoreSearch] = useState('');
@@ -207,7 +207,7 @@ export default function CreateSalesPage() {
     <div className="space-y-6 max-w-5xl mx-auto pb-10">
       <PageHeader
         title="创建出口合同"
-        description="创建新的销售合同并自动计算报价。"
+        description="创建新的出口合同并自动计算报价。"
       />
 
       {/* Stepper */}
@@ -324,7 +324,7 @@ export default function CreateSalesPage() {
               <div className="px-6 pb-6 flex justify-end gap-4">
                 <Button type="button" variant="outline" onClick={() => router.back()}>取消</Button>
                 <Button type="button" onClick={goToStep2}>
-                  下一步：销售明细
+                  下一步：出口明细
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
@@ -365,7 +365,7 @@ export default function CreateSalesPage() {
                 <CardHeader className="flex flex-row items-center justify-between pb-4">
                   <CardTitle className="flex items-center gap-2">
                     <Package className="h-5 w-5 text-primary" />
-                    销售明细
+                    出口明细
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">

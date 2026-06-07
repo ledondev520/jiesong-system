@@ -1,16 +1,16 @@
 /**
  * Input: 用户认证状态、路由信息
- * Output: 侧边导航栏组件（6 大模块分区）
+ * Output: 侧边导航栏组件（顶级模块分区）
  * Pos: 全局布局组件，提供系统导航功能
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  *
  * 导航分区结构：
  * - 经营中台：工作台、经营执行
- * - 采购模块：采购合同、供应商管理、库存状态、采购建议
- * - 销售模块：销售合同、报关单、HS 编码
- * - 仓储物流：库存总览、货柜装箱、报关单、HS 编码
- * - 财务模块：财务概览、财务报表、收付款
+ * - 采购模块：采购合同、供应商管理、库存状态
+ * - 出口模块：出口合同、出口退税、HS 编码
+ * - 财务模块：财务总览、收付管理
+ * - AI 助手：AI 会话
  * - 系统管理：系统配置、用户管理、商品档案、系统日志
  */
 
@@ -50,7 +50,6 @@ interface ModuleBadgeCounts {
   operations: number;
   procurement: number;
   export: number;
-  logistics: number;
   finance: number;
 }
 
@@ -62,8 +61,6 @@ const getModuleBadge = (item: ModuleNavItem, counts: ModuleBadgeCounts): number 
       return counts.procurement > 0 ? counts.procurement : null;
     case 'export':
       return counts.export > 0 ? counts.export : null;
-    case 'logistics':
-      return counts.logistics > 0 ? counts.logistics : null;
     case 'finance':
       return counts.finance > 0 ? counts.finance : null;
     default:
@@ -74,7 +71,7 @@ const getModuleBadge = (item: ModuleNavItem, counts: ModuleBadgeCounts): number 
 // ==================== 组件 ====================
 
 /**
- * 职责：渲染侧边导航栏（6 个顶级模块入口）
+ * 职责：渲染侧边导航栏（顶级模块入口）
  * 思路：
  *   1. 侧边栏只显示 6 个模块入口，不列子页面
  *   2. 模块激活判断：当前路径属于该模块任一子路由前缀即高亮
@@ -93,7 +90,6 @@ export function Sidebar() {
     operations: 0,
     procurement: 0,
     export: 0,
-    logistics: 0,
     finance: 0,
   });
 
@@ -121,7 +117,6 @@ export function Sidebar() {
           operations: draftPurchases + exportPendingParams,
           procurement: draftPurchases,
           export: exportPendingParams,
-          logistics: 0,
           finance: pendingReceivables,
         });
       } catch {
@@ -130,7 +125,6 @@ export function Sidebar() {
           operations: 0,
           procurement: 0,
           export: 0,
-          logistics: 0,
           finance: 0,
         });
       }

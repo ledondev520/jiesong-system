@@ -21,18 +21,21 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TaxRefundStatusBadge, taxRefundStatusOptions } from './TaxRefundStatusBadge';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { MobileListCard } from '@/components/mobile';
+import { CustomsDeclarationListPageContent } from '@/app/customs-declarations/components/CustomsDeclarationListPageContent';
 
 const DEFAULT_PAGE_SIZE = 20;
 
 export function TaxRefundListPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const activeView = searchParams.get('view') === 'customs' ? 'customs' : 'refunds';
   const initialKeyword = searchParams.get('keyword') || '';
   const initialStatus = searchParams.get('status') || 'ALL';
 
@@ -114,14 +117,19 @@ export function TaxRefundListPageContent() {
     }
   };
 
+  const handleViewChange = (view: string) => {
+    router.replace(view === 'customs' ? '/dashboard/tax-refunds?view=customs' : '/dashboard/tax-refunds', { scroll: false });
+  };
+
   return (
     <div className="space-y-6 pb-10">
       <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
         title="出口退税"
-        description="管理退税批次、申报进度与到账状态。"
+        description="合并查看报关单与退税记录，跟进出口申报、退税批次与到账状态。"
         actions={
-          <>
+          activeView === 'refunds' ? (
+            <>
             <div className="relative w-full sm:w-64">
               <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -163,9 +171,22 @@ export function TaxRefundListPageContent() {
             >
               批量生成草稿
             </Button>
-          </>
+            </>
+          ) : undefined
         }
       />
+
+      <Tabs value={activeView} onValueChange={handleViewChange} className="space-y-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2 border bg-background">
+          <TabsTrigger value="customs">报关单</TabsTrigger>
+          <TabsTrigger value="refunds">退税记录</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="customs" className="mt-0">
+          <CustomsDeclarationListPageContent embedded />
+        </TabsContent>
+
+        <TabsContent value="refunds" className="mt-0 space-y-6">
 
       {/* 说明：退税单由出口合同流程自动生成 */}
       <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-700">
@@ -333,6 +354,8 @@ export function TaxRefundListPageContent() {
           onChange={(size) => setPageSize(size)}
         />
       </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

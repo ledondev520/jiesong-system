@@ -1,5 +1,30 @@
 # Ops Execution Center Plan
 
+## 2026-06-07 FINANCE-NAV-01（财务模块顶层 Tab 收敛）
+
+### Goal
+- 对齐线上截图中的财务三入口形态：`财务概览`、`财务报表`、`收付管理`。
+- 移除本地开发机里把应收、应付、银行流水、发票台账、对账分析全部暴露为财务顶层 Tab 的冗余结构。
+- 保留下钻能力：旧应收/应付 URL 回跳到收付管理对应视图，银行流水/发票/对账分析继续作为收付管理相关明细页使用。
+
+### Delivered
+- `FINANCE_TABS` 从 `7` 个顶层入口收敛为 `3` 个：财务概览、财务报表、收付管理。
+- `isTabRouteActive` 将旧应收/应付、银行流水、发票台账、对账分析路径归到 `收付管理` 顶层 Tab 激活态。
+- `/dashboard/finance/statements` 恢复为财务报表页面，不再重定向到财务概览。
+- `/dashboard/finance/receivable` 与 `/dashboard/finance/payable` 改为兼容跳转，分别进入 `/dashboard/payments?tab=receivable` 与 `/dashboard/payments?tab=payable`。
+- 财务概览内的应收/应付入口改为指向收付管理内部视图；页面标题和面包屑统一为 `收付管理`。
+
+### Verification
+- `cd frontend && npm test -- --run src/components/layout/navigation.config.test.ts src/app/dashboard/finance/page.test.tsx src/app/dashboard/payments/page.test.tsx src/app/dashboard/finance/receivable/page.test.tsx src/app/dashboard/finance/payable/page.test.tsx`：通过，`5` 个文件、`18` 个测试。
+- `cd frontend && npx eslint ...`（目标财务导航、页面、旧跳转测试文件）：通过，`0` error；仍有财务概览页既有未使用导入 warning。
+- `git diff --check -- <本轮财务导航文件>`：通过。
+- 当前本地 `3000` dev 构建已重新编译出 `财务概览 / 财务报表 / 收付管理` 三入口配置。
+- `cd frontend && npx tsc --noEmit --pretty false`：通过。
+
+### Remaining
+- 工作区存在并行/既有改动：`frontend/src/app/dashboard/suppliers/page.tsx` 与 `frontend/src/app/dashboard/suppliers/page.test.tsx` 修改；本轮未回滚、未混入。
+- 如果浏览器仍显示旧七 Tab，原因应是旧 dev chunk 或旧标签缓存；当前 `3000` 服务已经生成新的三入口 chunk，刷新或重启前端服务即可取新页面。
+
 ## 2026-06-07 LOGIN-08（会话过期收敛跳转）
 
 ### Goal
@@ -20,6 +45,33 @@
 
 ### Remaining
 - 当前会话过期收敛目标已完成；真实 401 收敛由单元测试覆盖，登录页过期提示由本地页面验证覆盖。
+
+## 2026-06-07 PERF-API-09（接口性能全覆盖收口）
+
+### Goal
+- 收口“所有接口 2 秒以内”目标，把上一轮剩余的文件、合同文档、AI 本地/降级路径、HS 申报填写、系统汇率同步和巡检触发纳入可重复审计。
+- 保持巡检只打复制库和临时后端；外部 provider 不稳定时走本地或降级成功路径，不把网络波动误判为本地 Interface 性能失败。
+
+### Delivered
+- `scripts/audit_api_write_success_times.js` 扩展到 `122` 个写成功样本，补齐合同模板上传/生成/删除、统一附件和采购/销售附件上传删除、财务报表目录导入、巡检触发、AI greeting stream、HS AI 推荐、HS 申报填写和汇率同步降级。
+- 合同文档模板与财务报表导入目录支持测试专用路径，巡检不依赖真实业务目录或仓库外固定文件。
+- 汇率同步新增外部请求超时控制，外部失败时在 2 秒内返回当前配置和 `degraded` 状态；同时修复写入 `systemConfig` 时使用当前 Prisma schema 不支持的 `domain` 字段问题。
+- HS 申报填写修复 `rawElements` 返回未定义变量的问题。
+- AI 默认外部请求超时从 `3500ms` 收紧到 `1800ms`，避免默认配置下单个 provider 请求突破 2 秒目标。
+
+### Verification
+- `cd backend && npm test -- src/controllers/system/configController.test.js src/services/financialStatementsService.test.js src/services/contractDocService.test.js src/services/fileService.test.js src/services/hsCodeService.test.js src/controllers/system/importExportController.test.js src/services/patrolService.test.js src/services/taxRefundExportService.test.js`：通过，`25` 个测试。
+- `node --check` 覆盖本轮脚本、控制器、路由和服务文件：通过。
+- `git diff --check` 覆盖本轮后端与巡检脚本文件：通过。
+- 使用复制库 `tmp/performance/perf-api-write.db` 和临时后端 `3014`。
+- `API_BASE_URL=http://localhost:3014 API_PERF_ALLOW_WRITES=true API_PERF_DISPOSABLE_DB=true node scripts/audit_api_write_success_times.js`：`122` 个样本，`122` OK、`0` error、`0` 超过 `2000ms`；最慢 `finance_auto_match_success=1075ms`。
+- `node scripts/audit_api_route_inventory.js`：后端 `265` 条路由，已测 `265` 条，未测 `0` 条。
+- 覆盖分布：`read=114/114`、`auth_write=5/5`、`write=104/104`、`ai_external=12/12`、`export=14/14`、`import=16/16`。
+- 临时后端 `3014` 已停止；`backend/uploads` 无 `perf-*` 残留文件。
+
+### Remaining
+- 当前路由清单下，“所有接口 2 秒以内”的本地可验证目标已完成。
+- 外部 AI provider 和外部汇率源的真实网络质量仍属于外部依赖 SLA；本轮通过本地强制路径、短超时和降级响应保证系统 Interface 在本地开发服务中可用且不阻塞。
 
 ## 2026-06-07 PERF-API-07（库存/财务/运营写成功路径临时库 SLA）
 
@@ -89,16 +141,18 @@
 - 确认注册页不再显示“你已开启快捷登录”，并降低旧认证状态在页面渲染前影响 UI 的概率。
 
 ### Delivered
-- `frontend/src/lib/legacy-auth-cleanup.ts` 扩展旧快捷登录清理 Interface：同时清理 `localStorage` 与 `sessionStorage` 中的历史快捷登录 key 和 quick-login 命名变体。
-- 新增 `LEGACY_AUTH_CLEANUP_INLINE_SCRIPT`，让认证页 HTML 在 React effect 之前先清理旧状态。
+- `frontend/src/lib/legacy-auth-cleanup.ts` 继续加宽旧快捷登录清理 Interface：覆盖 `enabled/user/password/credentials` 这类拆分 key，以及 quick-login、one-click-login、shortcut-login 命名变体。
+- 更新 `LEGACY_AUTH_CLEANUP_VERSION` 到 `2026-06-07-no-quick-login-v2`，让认证页能标记已执行新一轮清理。
 - `frontend/src/app/(auth)/layout.tsx` 在登录、注册、忘记密码认证页组渲染提前清理脚本，同时保留 hydration 后的清理兜底。
-- 登录页和认证页组测试补充 `sessionStorage` 快捷登录残留与提前脚本断言；注册页继续断言不出现“你已开启快捷登录 / 快捷登录”。
+- 登录页和认证页组测试补充更宽的 `localStorage` / `sessionStorage` 快捷登录残留断言；注册页继续断言不出现“你已开启快捷登录 / 快捷登录”。
 
 ### Verification
-- `cd frontend && npm test -- --run 'src/app/(auth)/login/page.test.tsx' 'src/app/(auth)/layout.test.tsx' 'src/app/(auth)/register/page.test.tsx'`：通过，`3` 个文件、`11` 个测试。
-- `cd frontend && npx eslint 'src/app/(auth)/login/page.tsx' 'src/app/(auth)/layout.tsx' 'src/app/(auth)/login/page.test.tsx' 'src/app/(auth)/layout.test.tsx' 'src/app/(auth)/register/page.tsx' 'src/app/(auth)/register/page.test.tsx' 'src/lib/legacy-auth-cleanup.ts'`：通过。
-- `cd frontend && npx tsc --noEmit --pretty false`：仍被既有 `src/app/dashboard/contracts/template/page.test.tsx` 中 `ContractTemplateUploadPage` 返回 `void` 阻断，不是本轮认证改动引入。
-- `rg -n --hidden --glob '!node_modules/**' --glob '!**/*.map' "你已开启快捷登录|一键登录|快捷登录" frontend/.next frontend/src`：当前源码和 dev 编译缓存里没有可点击快捷登录入口或注册页提示，仅剩注释、测试断言和清理模块文本。
+- `cd frontend && npm test -- src/app/(auth)/login/page.test.tsx src/app/(auth)/register/page.test.tsx src/app/(auth)/layout.test.tsx`：通过，`3` 个文件、`11` 个测试。
+- `cd frontend && npx eslint src/lib/legacy-auth-cleanup.ts src/app/(auth)/login/page.tsx src/app/(auth)/login/page.test.tsx src/app/(auth)/register/page.tsx src/app/(auth)/register/page.test.tsx src/app/(auth)/layout.tsx src/app/(auth)/layout.test.tsx`：通过。
+- `cd frontend && npx tsc --noEmit --pretty false`：通过。
+- `curl -s http://localhost:3000/login | rg -n "快捷登录|一键登录|你已开启快捷登录"`：无命中。
+- `curl -s http://localhost:3000/register | rg -n "快捷登录|一键登录|你已开启快捷登录"`：无命中。
+- `rg -n --hidden --glob '!node_modules/**' --glob '!**/*.map' "你已开启快捷登录|一键登录|快捷登录" frontend/src frontend/.next`：无真实 UI 命中，仅剩注释、测试断言和清理模块文本。
 
 ### Remaining
 - 如果浏览器里仍能看到旧按钮，优先刷新当前 `http://localhost:3000` 认证页或重启前端开发服务；本轮代码已经让新页面在渲染前清理旧快捷登录状态。
@@ -9490,3 +9544,48 @@
 
 ### Remaining
 - 全量 `npx tsc --noEmit` 当前被未提交的登录页测试改动阻塞，阻塞点是 `frontend/src/app/(auth)/login/page.test.tsx` 的 `user` 未定义，非本轮采购模板改动。
+
+## 2026-06-07 Round 132（供应商管理表单页）
+
+### Goal
+- 将采购模块中的「供应商管理」从卡片/表格列表页改为表单工作页。
+- 保留供应商检索能力，但把主要操作 Interface 收敛到可直接维护档案的表单。
+
+### Delivered
+- `/dashboard/suppliers` 改为左侧供应商索引、右侧供应商档案表单的双栏工作页。
+- 新建、选择、编辑、删除供应商都在同一个页面完成，不再依赖供应商弹窗。
+- 表单覆盖公司名称、简称、别名、联系人、电话、邮箱、地址、税号、开户行、银行账号、质量问题标记与说明。
+
+### Validation
+- 目标测试 `frontend/src/app/dashboard/suppliers/page.test.tsx`：4 个用例通过。
+- 目标文件 lint 通过。
+- `npx tsc --noEmit` 通过。
+- `npm run build` 通过，保留既有 Turbopack NFT warning。
+- 生产预览验证 `/dashboard/suppliers`：页面渲染为供应商索引 + 档案表单；选择已有供应商后表单可回填并切换为编辑模式。
+
+### Remaining
+- 本轮未改供应商后端字段结构。
+- 当前工作区仍有其他并行未提交改动，本轮提交只覆盖供应商表单页相关文件。
+
+## 2026-06-07 Round 133（AI 助手独立模块）
+
+### Goal
+- 将 AI 助手从系统管理下方拎出来，作为侧边栏独立顶级模块。
+- AI 模块需要呈现会话、工具注册表、Token 用量趋势和费用统计等模块信息。
+
+### Delivered
+- 新增 AI 助手顶级模块，侧边栏显示「AI 助手」。
+- 新增 `AI_TABS`，当前包含「AI 会话」。
+- `/dashboard/ai/sessions` 改用 AI 助手模块 Tab，不再显示系统管理 Tab。
+- 新增 `/dashboard/ai` 兼容入口，自动跳转 `/dashboard/ai/sessions`。
+- 系统管理不再把 `/dashboard/ai` 作为自己的子路由。
+
+### Validation
+- 目标测试 4 个文件、36 个用例通过。
+- 目标 lint 通过。
+- `npx tsc --noEmit` 通过。
+- `npm run build` 通过，保留既有 Turbopack NFT warning。
+- 生产预览验证：侧边栏独立显示 AI 助手，`/dashboard/ai` 自动进入 `/dashboard/ai/sessions`，页面显示「AI 会话」Tab 与 AI 会话列表信息。
+
+### Remaining
+- 本轮未把右下角悬浮聊天面板改成完整页面式聊天工作台；当前仍沿用全局悬浮助手。

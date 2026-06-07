@@ -21,7 +21,7 @@ on:
           - production
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '20.19.0'
 
 jobs:
   # 预部署检查

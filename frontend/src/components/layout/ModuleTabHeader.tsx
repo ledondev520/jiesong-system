@@ -21,10 +21,10 @@ import { saveModuleTab } from '@/lib/tab-memory';
 import { isTabRouteActive, type TabConfig } from './navigation.config';
 
 export {
+  AI_TABS,
   ADMIN_TABS,
   EXPORT_TABS,
   FINANCE_TABS,
-  LOGISTICS_TABS,
   OPERATIONS_TABS,
   PROCUREMENT_TABS,
 } from './navigation.config';

@@ -1,5 +1,17 @@
 # Frontend Polish Tasks
 
+## 2026-06-07 FINANCE-NAV-01 财务模块顶层 Tab 收敛
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| FINANCE-NAV-01A | P0 | 5m | 1 | DONE | 恢复 Codex/ByteRover 项目记忆，确认线上截图是三入口财务导航，本地源码为七入口 |
+| FINANCE-NAV-01B | P0 | 10m | 1 | DONE | 对比部署规则、git 状态与本地导航配置，确认本地 `main` 超前 `origin/main` 且财务 Tab 被后续改动重新拆散 |
+| FINANCE-NAV-01C | P0 | 10m | 1 | DONE | 将 `FINANCE_TABS` 收敛为财务概览、财务报表、收付管理，并把明细页归入收付管理激活态 |
+| FINANCE-NAV-01D | P0 | 10m | 1 | DONE | 恢复财务报表路由为独立页面，旧应收/应付路由改为收付管理兼容跳转 |
+| FINANCE-NAV-01E | P1 | 10m | 1 | DONE | 更新财务概览入口文案、面包屑、旧路由测试和导航配置测试 |
+| FINANCE-NAV-01F | P1 | 10m | 1 | DONE | 运行目标测试、目标 lint、diff 检查和本地 dev chunk 文案验证 |
+| FINANCE-NAV-01G | P1 | 5m | 1 | DONE | 复跑 TypeScript 检查通过，并记录供应商页并行改动未混入本轮判断 |
+
 ## 2026-06-07 LOGIN-08 会话过期收敛跳转
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
@@ -11,6 +23,19 @@
 | LOGIN-08E | P1 | 10m | 1 | DONE | 运行目标测试、目标 lint 和全量 TypeScript 检查 |
 | LOGIN-08F | P1 | 5m | 1 | DONE | 用本地浏览器确认 `/login?expired=1` 登录页提示可见 |
 
+## 2026-06-07 PERF-API-09 接口性能全覆盖收口
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| PERF-API-09A | P0 | 5m | 1 | DONE | 恢复 Codex/ByteRover 项目记忆，确认上一轮覆盖为 `246/265`，剩余 `19` 条未测 |
+| PERF-API-09B | P0 | 10m | 1 | DONE | 阅读合同文档、附件、导入导出、AI、HS 申报填写、巡检和汇率同步实现，确定可本地验证路径 |
+| PERF-API-09C | P0 | 15m | 1 | DONE | 扩展写成功路径巡检到 `122` 个样本，补齐剩余文件、导入导出、AI/HS 和系统任务路径 |
+| PERF-API-09D | P0 | 10m | 1 | DONE | 修复 HS 申报填写 `rawElements` 未定义和汇率同步 `domain` 字段写入不兼容问题 |
+| PERF-API-09E | P0 | 10m | 1 | DONE | 为合同模板、财务报表目录和汇率同步降级补充目标单元测试 |
+| PERF-API-09F | P0 | 15m | 1 | DONE | 复制 SQLite 库并在 `3014` 启动临时后端，运行 `122` 个写成功路径样本 |
+| PERF-API-09G | P1 | 10m | 1 | DONE | 刷新路由覆盖清单，确认 `265/265` 全覆盖且 `0` 个接口超过 `2s` |
+| PERF-API-09H | P1 | 5m | 1 | DONE | 检查临时上传残留、更新结果/指标/风险/patch，并停止临时后端 |
+
 ## 2026-06-07 PERF-API-07 库存/财务/运营写成功路径临时库 SLA
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
@@ -21,7 +46,7 @@
 | PERF-API-07D | P0 | 10m | 1 | DONE | 调整写巡检默认请求间隔到 `700ms`，避免样本数增加后触发全局限流 |
 | PERF-API-07E | P0 | 15m | 1 | DONE | 复制 SQLite 库并在 `3014` 启动临时后端，运行 `100` 个写成功路径样本 |
 | PERF-API-07F | P1 | 10m | 1 | DONE | 刷新路由覆盖清单，确认覆盖提升到 `246/265`、write 覆盖到 `93/104` |
-| PERF-API-07G | P1 | 20m | 1 | TODO | 为剩余 `19` 条路由设计 multipart 文件、导入导出、AI provider 和外部同步分层验证 |
+| PERF-API-07G | P1 | 20m | 1 | DONE | 剩余 `19` 条路由已由 `PERF-API-09` 分层补齐，当前覆盖 `265/265` |
 
 ## 2026-06-07 PERF-API-06 Agent/税退/通知写成功路径临时库 SLA
 
@@ -41,10 +66,10 @@
 |---|---|---:|---:|---|---|
 | LOGIN-07A | P0 | 5m | 1 | DONE | 恢复 Codex/ByteRover 项目记忆，确认历史问题集中在旧快捷登录缓存与认证页提示 |
 | LOGIN-07B | P0 | 10m | 1 | DONE | 检查当前登录页、注册页、认证页组布局与旧清理模块，确认源码没有可见快捷登录按钮 |
-| LOGIN-07C | P0 | 10m | 1 | DONE | 扩展旧快捷登录清理 Interface，同时清理 `localStorage` 与 `sessionStorage` |
+| LOGIN-07C | P0 | 10m | 1 | DONE | 扩展旧快捷登录清理 Interface，同时清理 `localStorage` 与 `sessionStorage` 中的拆分 key 与命名变体 |
 | LOGIN-07D | P0 | 10m | 1 | DONE | 在认证页组渲染提前清理脚本，避免旧状态在 React effect 前影响页面 |
-| LOGIN-07E | P1 | 10m | 1 | DONE | 补充登录/认证页组测试，覆盖 sessionStorage 残留与提前脚本渲染 |
-| LOGIN-07F | P1 | 10m | 1 | DONE | 运行目标测试、目标 lint、TypeScript 检查并记录既有阻断项 |
+| LOGIN-07E | P1 | 10m | 1 | DONE | 补充登录/认证页组测试，覆盖更宽的旧快捷登录残留与提前脚本渲染 |
+| LOGIN-07F | P1 | 10m | 1 | DONE | 运行目标测试、目标 lint、TypeScript 检查与本地页面文案回归 |
 
 ## 2026-06-07 PERF-API-05 合同/货柜写成功路径临时库 SLA
 
@@ -1730,3 +1755,15 @@
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
 |---|---|---:|---:|---|---|
 | WU-FE-PROCUREMENT-TEMPLATE | P0 | 20m | 1 | DONE | 移除采购模块独立「合同模板」Tab；在采购合同页内嵌模板管理弹窗；旧模板 URL 重定向回采购合同页；完成目标测试、lint、构建和生产预览验证 |
+
+## 2026-06-07 供应商管理表单页
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WU-FE-SUPPLIERS-FORM | P0 | 20m | 1 | DONE | 将供应商管理从卡片/表格列表页改为左侧索引 + 右侧档案表单页；支持新建、选择编辑、删除；完成目标测试、lint、类型检查、构建和浏览器验证 |
+
+## 2026-06-07 AI 助手独立模块
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WU-FE-AI-MODULE | P0 | 20m | 1 | DONE | 将 AI 助手恢复为侧边栏独立顶级模块；新增 AI 会话 Tab；`/dashboard/ai` 兼容跳转会话列表；完成目标测试、lint、类型检查、构建和浏览器验证 |

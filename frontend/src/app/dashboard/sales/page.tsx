@@ -178,7 +178,7 @@ export default function SalesPage() {
       );
       setContracts(response.data?.items || []);
     } catch {
-      toast.error('加载销售合同失败');
+      toast.error('加载出口合同失败');
     } finally {
       setLoading(false);
     }
@@ -431,9 +431,9 @@ export default function SalesPage() {
 
   return (
     <div className="min-w-0 space-y-5">
-      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="销售" />
+      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
-        title="销售合同"
+        title="出口合同"
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -444,7 +444,7 @@ export default function SalesPage() {
               <Upload className="mr-2 h-4 w-4" /> 批量导入
             </Button>
             <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/sales/create')}>
-              <Plus className="mr-2 h-4 w-4" /> 新增销售合同
+              <Plus className="mr-2 h-4 w-4" /> 新增出口合同
             </Button>
           </div>
         }
@@ -497,12 +497,12 @@ export default function SalesPage() {
         ) : contracts.length === 0 ? (
           <div className="surface-panel flex flex-col items-center justify-center py-16 text-center">
             <Ship className="h-16 w-16 text-muted-foreground/30 mb-4" />
-            <h3 className="text-lg font-semibold text-muted-foreground mb-2">暂无销售合同</h3>
+            <h3 className="text-lg font-semibold text-muted-foreground mb-2">暂无出口合同</h3>
             <p className="text-sm text-muted-foreground mb-6 max-w-xs">
-              还没有创建任何销售合同，点击下方的按钮开始创建
+              还没有创建任何出口合同，点击下方的按钮开始创建
             </p>
             <Button onClick={() => router.push('/dashboard/sales/create')}>
-              <Plus className="mr-2 h-4 w-4" /> 新建销售合同
+              <Plus className="mr-2 h-4 w-4" /> 新建出口合同
             </Button>
           </div>
         ) : (
@@ -602,12 +602,12 @@ export default function SalesPage() {
         ) : contracts.length === 0 ? (
           <div className="surface-panel flex flex-col items-center justify-center py-16 text-center">
             <Ship className="h-16 w-16 text-muted-foreground/30 mb-4" />
-            <h3 className="text-lg font-semibold text-muted-foreground mb-2">暂无销售合同</h3>
+            <h3 className="text-lg font-semibold text-muted-foreground mb-2">暂无出口合同</h3>
             <p className="text-sm text-muted-foreground mb-6 max-w-xs">
-              还没有创建任何销售合同，点击下方的按钮开始创建
+              还没有创建任何出口合同，点击下方的按钮开始创建
             </p>
             <Button onClick={() => router.push('/dashboard/sales/create')}>
-              <Plus className="mr-2 h-4 w-4" /> 新建销售合同
+              <Plus className="mr-2 h-4 w-4" /> 新建出口合同
             </Button>
           </div>
         ) : (
@@ -813,7 +813,7 @@ export default function SalesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除销售合同 <strong>{contractToDelete?.contractNo}</strong> 吗？
+              确定要删除出口合同 <strong>{contractToDelete?.contractNo}</strong> 吗？
               <br />
               此操作将同时删除该合同下的所有装箱明细，且无法撤销。
             </AlertDialogDescription>
@@ -842,8 +842,8 @@ export default function SalesPage() {
       <BatchImportDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
-        title="批量导入销售合同"
-        description="上传 Excel 文件批量导入销售合同。请先下载模板，按照模板格式填写数据后上传。"
+        title="批量导入出口合同"
+        description="上传 Excel 文件批量导入出口合同。请先下载模板，按照模板格式填写数据后上传。"
         columns={importColumns}
         templateData={importTemplateData}
         onImport={handleBatchImport}

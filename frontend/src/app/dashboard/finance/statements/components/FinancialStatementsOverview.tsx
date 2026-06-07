@@ -1,7 +1,7 @@
 /**
- * Input: 财务报表页概览数据、操作回调与状态
- * Output: 页面头部、空态、预警、KPI 与营运资金概览
- * Pos: 财务报表页概览分区
+ * Input: 财务报表概览数据、操作回调与状态
+ * Output: 可独立或嵌入展示的页面头部、空态、预警、KPI 与营运资金概览
+ * Pos: 财务报表概览分区
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -93,6 +93,7 @@ interface FinancialStatementsOverviewProps {
   onSelectPeriod: (value: string) => void;
   periods: FinancialPeriod[];
   selectedPeriod: string;
+  showHeader?: boolean;
   warningAlerts: FinancialAlert[];
 }
 
@@ -123,44 +124,47 @@ export function FinancialStatementsOverview({
   onSelectPeriod,
   periods,
   selectedPeriod,
+  showHeader = true,
   warningAlerts,
 }: FinancialStatementsOverviewProps) {
   return (
     <>
-      <PageHeader
-        title="财务报表分析"
-        description="三表数据可视化看板：资产负债表 · 利润表 · 智能预警"
-        actions={
-          <div className="flex items-center gap-2">
-            {hasData && (
-              <Select value={selectedPeriod} onValueChange={onSelectPeriod}>
-                <SelectTrigger className="w-36">
-                  <SelectValue placeholder="选择账期" />
-                </SelectTrigger>
-                <SelectContent>
-                  {periods.map((period) => (
-                    <SelectItem key={period.id} value={`${period.year}-${period.month}`}>
-                      {period.periodLabel}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <Button onClick={onOpenUploadDialog} variant="default" className="h-10">
-              <Upload className="mr-2 h-4 w-4" />
-              上传三表 Excel
-            </Button>
-            <Button onClick={onImportAll} disabled={importing} variant="outline" className="h-10">
-              {importing ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="mr-2 h-4 w-4" />
+      {showHeader && (
+        <PageHeader
+          title="财务报表分析"
+          description="三表数据可视化看板：资产负债表 · 利润表 · 智能预警"
+          actions={
+            <div className="flex items-center gap-2">
+              {hasData && (
+                <Select value={selectedPeriod} onValueChange={onSelectPeriod}>
+                  <SelectTrigger className="w-36">
+                    <SelectValue placeholder="选择账期" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {periods.map((period) => (
+                      <SelectItem key={period.id} value={`${period.year}-${period.month}`}>
+                        {period.periodLabel}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
-              扫描导入全部
-            </Button>
-          </div>
-        }
-      />
+              <Button onClick={onOpenUploadDialog} variant="default" className="h-10">
+                <Upload className="mr-2 h-4 w-4" />
+                上传三表 Excel
+              </Button>
+              <Button onClick={onImportAll} disabled={importing} variant="outline" className="h-10">
+                {importing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                扫描导入全部
+              </Button>
+            </div>
+          }
+        />
+      )}
 
       {!hasData && (
         <Card className="border-dashed">

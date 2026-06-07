@@ -1,11 +1,11 @@
 /**
- * Input: 报关单列表组件
- * Output: 仓储物流模块下的报关单管理入口
- * Pos: 仓储物流 > 报关单列表页
+ * Input: 无
+ * Output: 重定向到出口退税页的报关单工作区
+ * Pos: 报关单旧列表入口兼容路由
  */
 
-import { CustomsDeclarationListPageContent } from '@/app/customs-declarations/components/CustomsDeclarationListPageContent';
+import { redirect } from 'next/navigation';
 
 export default function CustomsDeclarationsPage() {
-  return <CustomsDeclarationListPageContent />;
+  redirect('/dashboard/tax-refunds?view=customs');
 }

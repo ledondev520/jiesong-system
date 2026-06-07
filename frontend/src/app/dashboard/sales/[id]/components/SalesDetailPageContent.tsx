@@ -1,7 +1,7 @@
 /**
- * Input: 销售合同详情API、商品API、SortableTableHead、useTableSort
- * Output: 销售合同详情页面（含可排序装箱明细、3D可视化、源文件附件、物流时间线、货柜详情、报关信息、收款记录）
- * Pos: 销售管理子页面，展示合同详情与装箱可视化
+ * Input: 出口合同详情API、商品API、SortableTableHead、useTableSort
+ * Output: 出口合同详情页面（含可排序装箱明细、3D可视化、源文件附件、物流时间线、货柜详情、报关信息、收款记录）
+ * Pos: 出口管理子页面，展示合同详情与装箱可视化
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -134,7 +134,7 @@ export default function SalesDetailPage({ params }: PageProps) {
   }) => {
     if (results.customsDeclarationId) toast.success(`报关单已生成`);
     if (results.forexId) toast.success(`外汇核销单已生成`);
-    if (results.taxRefundId) toast.success(`销售退税单已生成`);
+    if (results.taxRefundId) toast.success('出口退税单已生成');
   };
 
   /**

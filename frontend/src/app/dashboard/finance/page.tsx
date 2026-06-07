@@ -1,7 +1,7 @@
 /**
  * Input: 后端 finance/stats、finance/payment-trends、system/exchange-rate、bank-flow/stats、invoices/stats API
- * Output: 财务经营驾驶舱页面（KPI + 完成率 + 汇率 + 银行流水/发票摘要 + 紧迫信号 + 趋势折线图 + 快捷导航）
- * Pos: 财务模块首页，提供管理层决策快速视图
+ * Output: 财务总览页面（收付进度 + 报表分析 + 汇率 + 银行流水/发票摘要 + 紧迫信号 + 趋势折线图 + 快捷导航）
+ * Pos: 财务模块首页，提供公司财务进度驾驶舱
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -30,16 +30,11 @@ import {
   ChevronRight,
   BarChart3,
   RefreshCw,
-  Upload,
   Landmark,
   FileText,
   Activity,
-  ArrowUp,
-  ArrowDown,
 } from 'lucide-react';
 import {
-  LineChart,
-  Line,
   BarChart,
   Bar,
   XAxis,
@@ -50,7 +45,6 @@ import {
   ResponsiveContainer,
   Area,
   AreaChart,
-  ComposedChart,
   ReferenceLine,
 } from 'recharts';
 import Link from 'next/link';
@@ -68,6 +62,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState, LoadingState } from '@/components/ui/data-state';
 import { KpiCard } from '@/components/finance/KpiCard';
 import { ChartTooltip } from '@/components/finance/ChartTooltip';
+import { FinancialStatementsDashboardSection } from './statements/components/FinancialStatementsDashboardSection';
 
 interface PaymentTrendPoint {
   label: string;
@@ -125,11 +120,11 @@ function calcTrendValue(current: number, previous: number): string {
 }
 
 /**
- * 职责：渲染财务经营驾驶舱
+ * 职责：渲染财务总览驾驶舱
  * 思路：
  *   1. 顶部 KPI 卡片：总额、已付/已收、待付/待收（带完成率进度条）
  *   2. 中部驾驶舱卡片：汇率显示、紧迫性预警、账款健康度
- *   3. 底部快捷导航：应付、应收、报表、收付款记录
+ *   3. 内嵌报表分析：收入利润、成本结构、资产负债、账期详情
  */
 export default function FinancePage() {
   const [stats, setStats] = useState<FinanceStats | null>(null);
@@ -229,8 +224,8 @@ export default function FinancePage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="财务驾驶舱"
-          description="资金流水与应收应付全局概览，实时监控经营健康度。"
+          title="财务总览"
+          description="公司财务进度、收支健康、成本结构与利润趋势。"
           actions={
             <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={refreshing}>
               <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
@@ -270,8 +265,8 @@ export default function FinancePage() {
     <div className="space-y-6">
       <ModuleTabHeader tabs={FINANCE_TABS} moduleName="财务" />
       <PageHeader
-        title="财务驾驶舱"
-        description="资金流水与应收应付全局概览，实时监控经营健康度。"
+        title="财务总览"
+        description="公司财务进度、收支健康、成本结构与利润趋势。"
         actions={
           <Button
             variant="outline"
@@ -289,24 +284,24 @@ export default function FinancePage() {
         <Card className="border-primary/20 bg-primary/[0.03]">
           <CardContent className="space-y-4 pt-6">
             <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">财务故事流</p>
-              <h3 className="text-lg font-semibold tracking-tight">先上传本期财务报表</h3>
+              <p className="text-sm font-medium text-muted-foreground">公司财务进度</p>
+              <h3 className="text-lg font-semibold tracking-tight">先看收付压力，再下钻经营报表</h3>
               <p className="text-sm leading-6 text-muted-foreground">
-                老板或财务进入后，第一步先上传本期三表，让系统刷新经营数据，再去看异常预警、收付款压力和明细跟进。
+                财务总览先给出应付完成率、应收完成率和待付待收风险；报表区块保留三表导入、账期选择和收入利润、成本结构、资产负债下钻。
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <Button asChild className="h-11 rounded-xl">
-                <Link href="/dashboard/finance/statements">
-                  <Upload className="mr-2 h-4 w-4" />
-                  上传本期财务报表
+                <Link href="/dashboard/payments">
+                  <Wallet className="mr-2 h-4 w-4" />
+                  进入收付管理
                 </Link>
               </Button>
               <Button asChild variant="outline" className="h-11 rounded-xl">
-                <Link href="/dashboard/payments">查看收付款记录</Link>
+                <Link href="/dashboard/payments?tab=payable">查看待付风险</Link>
               </Button>
               <Button asChild variant="outline" className="h-11 rounded-xl">
-                <Link href="/dashboard/finance/statements">进入报表分析</Link>
+                <Link href="#financial-statements">查看报表分析</Link>
               </Button>
             </div>
           </CardContent>
@@ -615,6 +610,8 @@ export default function FinancePage() {
         </div>
       )}
 
+      <FinancialStatementsDashboardSection />
+
       {/* 应收逾期预警 */}
       {overdueList.length > 0 && (
         <Card className="border-red-500/40 bg-red-50/20 dark:bg-red-950/10">
@@ -650,7 +647,7 @@ export default function FinancePage() {
               {overdueList.length > 5 && (
                 <p className="text-xs text-center text-muted-foreground pt-1">
                   还有 {overdueList.length - 5} 条逾期记录，
-                  <Link href="/dashboard/finance/receivable" className="text-primary underline-offset-2 hover:underline">
+                  <Link href="/dashboard/payments?tab=receivable" className="text-primary underline-offset-2 hover:underline">
                     查看全部应收明细
                   </Link>
                 </p>
@@ -662,7 +659,7 @@ export default function FinancePage() {
 
       {/* 快捷导航区 */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-3">
-        <Link href="/dashboard/finance/payable" className="group">
+        <Link href="/dashboard/payments?tab=payable" className="group">
           <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm">
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
@@ -676,7 +673,7 @@ export default function FinancePage() {
           </Card>
         </Link>
 
-        <Link href="/dashboard/finance/receivable" className="group">
+        <Link href="/dashboard/payments?tab=receivable" className="group">
           <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm">
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
@@ -695,7 +692,7 @@ export default function FinancePage() {
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">收付款记录</p>
+                  <p className="text-sm font-medium">收付管理</p>
                   <p className="text-xs text-muted-foreground mt-0.5">流水明细与登记操作</p>
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -704,13 +701,13 @@ export default function FinancePage() {
           </Card>
         </Link>
 
-        <Link href="/dashboard/finance/statements" className="group">
+        <Link href="#financial-statements" className="group">
           <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm border-primary/20 bg-primary/[0.03]">
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-primary">财务报表分析</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">趋势图表与三表概览</p>
+                  <p className="text-sm font-medium text-primary">经营报表下钻</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">收入利润、成本结构、资产负债</p>
                 </div>
                 <BarChart3 className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
               </div>
@@ -758,10 +755,10 @@ export default function FinancePage() {
               action={
                 <div className="flex flex-wrap justify-center gap-3">
                   <Button asChild variant="outline" size="sm">
-                    <Link href="/dashboard/finance/payable">查看应付明细</Link>
+                    <Link href="/dashboard/payments?tab=payable">查看应付明细</Link>
                   </Button>
                   <Button asChild size="sm">
-                    <Link href="/dashboard/finance/receivable">查看应收明细</Link>
+                    <Link href="/dashboard/payments?tab=receivable">查看应收明细</Link>
                   </Button>
                 </div>
               }

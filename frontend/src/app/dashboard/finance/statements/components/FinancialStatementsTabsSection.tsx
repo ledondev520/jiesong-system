@@ -1,7 +1,7 @@
 /**
  * Input: 财务趋势、账期列表与当前详情
- * Output: 财务报表页标签图表区与历史预警区
- * Pos: 财务报表页主分析区
+ * Output: 财务总览页内下钻图表区与历史预警区
+ * Pos: 财务报表主分析区
  */
 
 import { Building2, DollarSign, AlertTriangle, AlertCircle, BarChart3, Loader2, Scale, TrendingUp, Wallet, PieChart as PieChartIcon, Activity } from 'lucide-react';
@@ -9,7 +9,6 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Leg
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { AnalyticsData, FinancialPeriod } from '@/services/financialStatements.service';
 import { profitColor } from './financialStatementsFormatting';
 
@@ -261,16 +260,12 @@ export function FinancialStatementsTabsSection({
 
   return (
     <>
-      <div data-testid="financial-statements-tabs">
-        <Tabs defaultValue="trends" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="trends">收益趋势</TabsTrigger>
-            <TabsTrigger value="expenses">费用结构</TabsTrigger>
-            <TabsTrigger value="balance">资产负债</TabsTrigger>
-            <TabsTrigger value="detail">账期详情</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="trends" className="space-y-4">
+      <div data-testid="financial-statements-drilldowns" className="space-y-6">
+        <section id="finance-income-profit" className="scroll-mt-24 space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold tracking-tight">收入与利润趋势</h3>
+            <p className="text-sm text-muted-foreground">下钻查看营业收入、净利润与最近账期经营状态。</p>
+          </div>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -375,9 +370,13 @@ export function FinancialStatementsTabsSection({
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+        </section>
 
-          <TabsContent value="expenses" className="space-y-4">
+        <section id="finance-cost-structure" className="scroll-mt-24 space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold tracking-tight">成本结构</h3>
+            <p className="text-sm text-muted-foreground">下钻查看营业成本、管理费用、财务费用与销售费用构成。</p>
+          </div>
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
                 <CardHeader>
@@ -452,9 +451,13 @@ export function FinancialStatementsTabsSection({
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
+        </section>
 
-          <TabsContent value="balance" className="space-y-4">
+        <section id="finance-balance" className="scroll-mt-24 space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold tracking-tight">资产负债</h3>
+            <p className="text-sm text-muted-foreground">下钻查看资产、负债、权益、货币资金与资产负债率趋势。</p>
+          </div>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -541,9 +544,13 @@ export function FinancialStatementsTabsSection({
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
+        </section>
 
-          <TabsContent value="detail">
+        <section id="finance-period-detail" className="scroll-mt-24 space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold tracking-tight">账期详情</h3>
+            <p className="text-sm text-muted-foreground">下钻查看当前账期的资产负债表和利润表明细。</p>
+          </div>
             {detailLoading ? (
               <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -596,8 +603,7 @@ export function FinancialStatementsTabsSection({
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
-        </Tabs>
+        </section>
       </div>
 
       {analytics.historicalAlerts.length > 0 && (

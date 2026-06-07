@@ -241,6 +241,7 @@ describe('AiSessionsPage', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'AI 会话列表' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'AI 会话' })).toHaveAttribute('href', '/dashboard/ai/sessions');
       expect(screen.getAllByText('session_1').length).toBeGreaterThan(0);
       expect(screen.getByText('当前数据：已审计回放')).toBeInTheDocument();
       expect(screen.getByText('回放级别：工具层')).toBeInTheDocument();

@@ -1,6 +1,6 @@
 /**
  * Input: 后端 finance API、bank-flow reconciliation/incoming-summary API
- * Output: 收付款管理页面（应付+应收 Tab，合同为空时自动用银行流水 fallback 填充）
+ * Output: 收付管理页面（应付+应收 Tab，合同为空时自动用银行流水 fallback 填充）
  * Pos: 核心业务页面，管理所有收付款，银行流水数据直接嵌入应付/应收列表
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -80,7 +80,7 @@ interface FinanceStats {
 }
 
 /**
- * 职责：渲染收付款管理页面
+ * 职责：渲染收付管理页面
  * 思路：
  *   1. 顶部显示统计卡片
  *   2. 使用Tab切换应付/应收列表
@@ -494,7 +494,7 @@ function PaymentsPageContent() {
     <div className="space-y-6">
       <ModuleTabHeader tabs={FINANCE_TABS} moduleName="财务" />
       <PageHeader
-        title="收付款"
+        title="收付管理"
         description="管理应付账款与应收账款"
         actions={
           <div className="flex gap-2">
@@ -1093,7 +1093,7 @@ export default function PaymentsPage() {
       fallback={
         <LoadingState
           title="加载中..."
-          description="正在同步收付款视图和筛选状态。"
+          description="正在同步收付管理视图和筛选状态。"
           className="min-h-[10rem] border-0 bg-transparent"
         />
       }

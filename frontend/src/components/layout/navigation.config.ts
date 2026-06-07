@@ -1,13 +1,13 @@
 import type { ComponentType } from 'react';
 import {
   Bell,
+  Bot,
   Landmark,
   LayoutDashboard,
   History,
   PackageOpen,
   ShoppingCart,
   SlidersHorizontal,
-  Warehouse,
 } from 'lucide-react';
 import { getModuleTabOrRoot } from '@/lib/tab-memory';
 import { Role } from '@/types';
@@ -39,34 +39,28 @@ export interface ModuleNavItem {
 
 export const OPERATIONS_TABS: TabConfig[] = [
   { href: '/dashboard', label: '工作台' },
-  { href: '/dashboard/reports', label: '经营报表' },
+  { href: '/dashboard/reports', label: '经营执行' },
 ];
 
 export const PROCUREMENT_TABS: TabConfig[] = [
   { href: '/dashboard/contracts', label: '采购合同' },
   { href: '/dashboard/suppliers', label: '供应商管理' },
+  { href: '/dashboard/inventory-status', label: '库存状态' },
 ];
 
 export const EXPORT_TABS: TabConfig[] = [
-  { href: '/dashboard/sales', label: '销售合同' },
+  { href: '/dashboard/sales', label: '出口合同' },
   { href: '/dashboard/tax-refunds', label: '出口退税' },
-];
-
-export const LOGISTICS_TABS: TabConfig[] = [
-  { href: '/dashboard/logistics', label: '库存总览' },
-  { href: '/dashboard/logistics/containers', label: '货柜装箱' },
-  { href: '/dashboard/customs-declarations', label: '报关单' },
   { href: '/dashboard/hs-codes', label: 'HS 编码' },
 ];
 
 export const FINANCE_TABS: TabConfig[] = [
-  { href: '/dashboard/finance', label: '财务概览' },
-  { href: '/dashboard/finance/receivable', label: '应收账款' },
-  { href: '/dashboard/finance/payable', label: '应付账款' },
-  { href: '/dashboard/payments', label: '收付款' },
-  { href: '/dashboard/finance/bank-flow', label: '银行流水' },
-  { href: '/dashboard/finance/invoices', label: '发票台账' },
-  { href: '/dashboard/finance/reconciliation', label: '对账分析' },
+  { href: '/dashboard/finance', label: '财务总览' },
+  { href: '/dashboard/payments', label: '收付管理' },
+];
+
+export const AI_TABS: TabConfig[] = [
+  { href: '/dashboard/ai/sessions', label: 'AI 会话' },
 ];
 
 export const ADMIN_TABS: TabConfig[] = [
@@ -74,8 +68,6 @@ export const ADMIN_TABS: TabConfig[] = [
   { href: '/dashboard/users', label: '账号管理' },
   { href: '/dashboard/products', label: '商品档案' },
   { href: '/dashboard/system/logs', label: '系统日志' },
-  { href: '/dashboard/dev', label: '项目驾驶舱' },
-  { href: '/dashboard/about', label: '关于' },
 ];
 
 export const SYSTEM_CENTER_LINKS: SystemCenterLink[] = [
@@ -100,7 +92,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     key: 'operations',
     href: '/dashboard',
     defaultHref: '/dashboard',
-    label: '管理工作台',
+    label: '经营中台',
     icon: LayoutDashboard,
     childPrefixes: ['/dashboard/reports'],
     tabs: OPERATIONS_TABS,
@@ -112,7 +104,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     defaultHref: '/dashboard/contracts',
     label: '采购',
     icon: ShoppingCart,
-    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers'],
+    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers', '/dashboard/inventory-status', '/dashboard/logistics'],
     tabs: PROCUREMENT_TABS,
     mobilePrimary: true,
   },
@@ -120,20 +112,16 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     key: 'export',
     href: '/dashboard/sales',
     defaultHref: '/dashboard/sales',
-    label: '销售',
+    label: '出口',
     icon: PackageOpen,
-    childPrefixes: ['/dashboard/sales', '/dashboard/tax-refunds', '/forex-verifications'],
+    childPrefixes: [
+      '/dashboard/sales',
+      '/dashboard/tax-refunds',
+      '/dashboard/customs-declarations',
+      '/dashboard/hs-codes',
+      '/forex-verifications',
+    ],
     tabs: EXPORT_TABS,
-    mobilePrimary: true,
-  },
-  {
-    key: 'logistics',
-    href: '/dashboard/logistics',
-    defaultHref: '/dashboard/logistics',
-    label: '仓储物流',
-    icon: Warehouse,
-    childPrefixes: ['/dashboard/logistics', '/dashboard/customs-declarations', '/dashboard/hs-codes'],
-    tabs: LOGISTICS_TABS,
     mobilePrimary: true,
   },
   {
@@ -145,6 +133,15 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     childPrefixes: ['/dashboard/payments', '/dashboard/finance'],
     tabs: FINANCE_TABS,
     mobilePrimary: true,
+  },
+  {
+    key: 'ai',
+    href: '/dashboard/ai/sessions',
+    defaultHref: '/dashboard/ai/sessions',
+    label: 'AI 助手',
+    icon: Bot,
+    childPrefixes: ['/dashboard/ai'],
+    tabs: AI_TABS,
   },
   {
     key: 'admin',
@@ -161,7 +158,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
       '/dashboard/users',
       '/dashboard/about',
       '/dashboard/system',
-      '/dashboard/ai',
+      '/dashboard/dev',
       '/dashboard/products',
     ],
     tabs: ADMIN_TABS,
@@ -172,11 +169,10 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
 export const SHELL_PREFETCH_ROUTES = [
   '/dashboard/purchase/create',
   '/dashboard/sales/create',
-  '/dashboard/tax-refunds/create',
-  '/dashboard/customs-declarations/create',
+  '/dashboard/inventory-status',
+  '/dashboard/tax-refunds',
   '/dashboard/contracts',
   '/dashboard/payments',
-  '/dashboard/finance/statements',
   '/dashboard/users',
   '/dashboard/system',
 ] as const;
@@ -217,6 +213,37 @@ export const getModuleByPath = (pathname: string) =>
 export const isTabRouteActive = (pathname: string | null, href: string) => {
   if (!pathname) return false;
   if (href === '/dashboard') return pathname === '/dashboard';
-  if (href === '/dashboard/finance') return pathname === '/dashboard/finance';
+  if (href === '/dashboard/contracts') {
+    return pathname === '/dashboard/contracts' || pathname.startsWith('/dashboard/contracts/');
+  }
+  if (href === '/dashboard/inventory-status') {
+    return (
+      pathname === '/dashboard/inventory-status' ||
+      pathname.startsWith('/dashboard/inventory-status/') ||
+      pathname === '/dashboard/logistics' ||
+      pathname.startsWith('/dashboard/logistics/')
+    );
+  }
+  if (href === '/dashboard/tax-refunds') {
+    return (
+      pathname === '/dashboard/tax-refunds' ||
+      pathname.startsWith('/dashboard/tax-refunds/') ||
+      pathname === '/dashboard/customs-declarations' ||
+      pathname.startsWith('/dashboard/customs-declarations/')
+    );
+  }
+  if (href === '/dashboard/finance') {
+    return pathname === '/dashboard/finance' || pathname === '/dashboard/finance/statements';
+  }
+  if (href === '/dashboard/payments') {
+    return [
+      '/dashboard/payments',
+      '/dashboard/finance/receivable',
+      '/dashboard/finance/payable',
+      '/dashboard/finance/bank-flow',
+      '/dashboard/finance/invoices',
+      '/dashboard/finance/reconciliation',
+    ].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  }
   return pathname === href || pathname.startsWith(`${href}/`);
 };

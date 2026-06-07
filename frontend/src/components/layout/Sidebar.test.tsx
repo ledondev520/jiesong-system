@@ -65,7 +65,8 @@ describe('Sidebar', () => {
     // 当前路由是 /dashboard/contracts，对应 "采购" 模块
     const current = getByText('采购').closest('a');
     expect(current?.className.includes('bg-sidebar-accent')).toBe(true);
-    expect(getByText('销售')).toBeInTheDocument();
+    expect(getByText('出口')).toBeInTheDocument();
+    expect(getByText('AI 助手')).toBeInTheDocument();
     expect(getByText('系统管理')).toBeInTheDocument();
   });
 
@@ -83,6 +84,16 @@ describe('Sidebar', () => {
     expect(settingLink?.className.includes('bg-sidebar-accent')).toBe(true);
   });
 
+  it('AI 助手路由下 AI 助手菜单激活', () => {
+    mockPathname = '/dashboard/ai/sessions';
+    const { getByText } = render(<Sidebar />);
+
+    const aiLink = getByText('AI 助手').closest('a');
+    const adminLink = getByText('系统管理').closest('a');
+    expect(aiLink?.className).toContain('bg-sidebar-accent text-sidebar-accent-foreground');
+    expect(adminLink?.className).not.toContain('bg-sidebar-accent text-sidebar-accent-foreground');
+  });
+
   it('非管理员角色不再显示系统管理入口', () => {
     mockUser.role = Role.SALES;
     mockPathname = '/dashboard/settings';
@@ -97,6 +108,7 @@ describe('Sidebar', () => {
 
     expect(mockPrefetch).toHaveBeenCalledWith('/dashboard');
     expect(mockPrefetch).toHaveBeenCalledWith('/dashboard/contracts');
+    expect(mockPrefetch).toHaveBeenCalledWith('/dashboard/ai/sessions');
     expect(mockPrefetch).toHaveBeenCalledWith('/dashboard/settings');
 
     vi.useRealTimers();
