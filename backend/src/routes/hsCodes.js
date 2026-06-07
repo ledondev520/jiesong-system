@@ -245,7 +245,7 @@ router.post(
         filledDeclarationElements = JSON.parse(arrMatch[0]);
       }
 
-      success(res, { filledDeclarationElements, rawElements: elements });
+      success(res, { filledDeclarationElements, rawElements: templateElements });
     } catch (error) {
       next(error);
     }

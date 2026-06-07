@@ -12,8 +12,9 @@ const fs = require('fs').promises;
 const path = require('path');
 const AdmZip = require('adm-zip');
 
-// 模板路径
-const TEMPLATE_PATH = path.join(__dirname, '../../templates/购销合同模板.docx');
+// 模板路径；巡检和部署环境可通过环境变量切到可控位置，避免覆盖仓库内真实模板。
+const DEFAULT_TEMPLATE_PATH = path.join(__dirname, '../../templates/购销合同模板.docx');
+const getTemplatePath = () => process.env.CONTRACT_DOC_TEMPLATE_PATH || DEFAULT_TEMPLATE_PATH;
 
 /**
  * 职责：将数字金额转换为大写中文
@@ -116,13 +117,13 @@ const formatNumber = (num) => {
 const generatePurchaseContract = async (purchaseContract, options = {}) => {
   // 0. 检查模板是否存在
   try {
-    await fs.access(TEMPLATE_PATH);
+    await fs.access(getTemplatePath());
   } catch {
     throw new Error('合同模板文件不存在，请先上传模板');
   }
   
   // 1. 读取模板
-  const zip = new AdmZip(TEMPLATE_PATH);
+  const zip = new AdmZip(getTemplatePath());
   
   // 2. 获取 document.xml
   const documentXml = zip.getEntry('word/document.xml');
@@ -241,7 +242,7 @@ const generateFilename = (purchaseContract, storeName) => {
  */
 const checkTemplateExists = async () => {
   try {
-    await fs.access(TEMPLATE_PATH);
+    await fs.access(getTemplatePath());
     return true;
   } catch {
     return false;
@@ -253,7 +254,9 @@ const checkTemplateExists = async () => {
  * @param {Buffer} buffer - 模板文件Buffer
  */
 const saveTemplate = async (buffer) => {
-  await fs.writeFile(TEMPLATE_PATH, buffer);
+  const templatePath = getTemplatePath();
+  await fs.mkdir(path.dirname(templatePath), { recursive: true });
+  await fs.writeFile(templatePath, buffer);
 };
 
 /**
@@ -262,10 +265,11 @@ const saveTemplate = async (buffer) => {
  */
 const getTemplateInfo = async () => {
   try {
-    const stat = await fs.stat(TEMPLATE_PATH);
+    const templatePath = getTemplatePath();
+    const stat = await fs.stat(templatePath);
     return {
       exists: true,
-      filename: path.basename(TEMPLATE_PATH),
+      filename: path.basename(templatePath),
       size: stat.size,
       updatedAt: stat.mtime,
     };
@@ -278,10 +282,11 @@ const getTemplateInfo = async () => {
  * 职责：删除模板文件
  */
 const removeTemplate = async () => {
-  await fs.unlink(TEMPLATE_PATH);
+  await fs.unlink(getTemplatePath());
 };
 
 module.exports = {
+  getTemplatePath,
   generatePurchaseContract,
   generateFilename,
   checkTemplateExists,

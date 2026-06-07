@@ -11,9 +11,11 @@ const path = require('path');
 const ExcelJS = require('exceljs');
 const prisma = require('../utils/prisma');
 
-// 会计报表所在根目录
-const STATEMENTS_FOLDER =
+// 会计报表所在根目录；巡检和部署环境可通过环境变量提供，不再绑定单一本机路径。
+const DEFAULT_STATEMENTS_FOLDER =
   '/Users/helena/Documents/上海捷淞国际物流有限公司20260213100830';
+const getStatementsFolder = () =>
+  process.env.FINANCIAL_STATEMENTS_FOLDER || DEFAULT_STATEMENTS_FOLDER;
 
 // ==================== Excel 解析工具 ====================
 
@@ -130,12 +132,13 @@ function getLastDayOfMonth(year, month) {
  */
 async function importFromFolder() {
   const results = { imported: 0, skipped: 0, errors: [] };
+  const statementsFolder = getStatementsFolder();
 
-  if (!fs.existsSync(STATEMENTS_FOLDER)) {
-    throw new Error(`会计报表目录不存在: ${STATEMENTS_FOLDER}`);
+  if (!fs.existsSync(statementsFolder)) {
+    throw new Error(`会计报表目录不存在: ${statementsFolder}`);
   }
 
-  const entries = fs.readdirSync(STATEMENTS_FOLDER, { withFileTypes: true });
+  const entries = fs.readdirSync(statementsFolder, { withFileTypes: true });
   const periodFolders = entries
     .filter((e) => e.isDirectory())
     .map((e) => e.name)
@@ -150,7 +153,7 @@ async function importFromFolder() {
         continue;
       }
 
-      const folderPath = path.join(STATEMENTS_FOLDER, folderName);
+      const folderPath = path.join(statementsFolder, folderName);
       const files = fs.readdirSync(folderPath).filter((f) => f.endsWith('.xlsx'));
       if (files.length === 0) {
         results.skipped++;
@@ -610,6 +613,7 @@ async function importFromBuffer(buffer, year, month, periodLabel) {
 }
 
 module.exports = {
+  getStatementsFolder,
   importFromFolder,
   importSingleFile,
   importFromBuffer,

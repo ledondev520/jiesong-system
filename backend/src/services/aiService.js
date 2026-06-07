@@ -30,7 +30,7 @@ const shouldForceLocalAI =
   process.env.AI_FORCE_LOCAL === 'true' ||
   ((isCiRuntime || isTestRuntime) && process.env.AI_ALLOW_REMOTE !== 'true');
 
-const kimiRequestTimeoutMs = parsePositiveIntEnv(process.env.KIMI_REQUEST_TIMEOUT_MS, 3500, 500, 30000);
+const kimiRequestTimeoutMs = parsePositiveIntEnv(process.env.KIMI_REQUEST_TIMEOUT_MS, 1800, 500, 30000);
 const kimiGreetingTimeoutMs = parsePositiveIntEnv(process.env.KIMI_GREETING_TIMEOUT_MS, 1200, 200, 10000);
 
 // Kimi 模型配置

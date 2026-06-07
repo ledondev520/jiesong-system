@@ -16,6 +16,8 @@ const THRESHOLD_MS = Number(process.env.API_BENCH_THRESHOLD_MS || 2000);
 const TIMEOUT_MS = Number(process.env.API_BENCH_TIMEOUT_MS || 10000);
 const DELAY_MS = Number(process.env.API_BENCH_DELAY_MS || 700);
 const OUTPUT_DIR = path.resolve(process.cwd(), 'tmp/performance');
+const UPLOAD_DIR = path.resolve(process.cwd(), 'backend/uploads');
+const CONTRACTS_UPLOAD_DIR = path.join(UPLOAD_DIR, 'contracts');
 
 const state = {
   runId: `perf-${Date.now()}`,
@@ -58,6 +60,55 @@ const readPath = (value, segments) => segments.reduce((current, segment) => curr
 const savePath = (key, segments) => (json) => {
   const value = readPath(json, segments);
   if (value) state[key] = value;
+};
+const saveFileMeta = (idKey, pathKey) => (json) => {
+  savePath(idKey, ['data', 'id'])(json);
+  savePath(pathKey, ['data', 'filePath'])(json);
+};
+
+const createUploadForm = (fileName, fields = {}, options = {}) => {
+  const form = new FormData();
+  form.append(
+    options.fieldName || 'file',
+    new Blob([options.content || `performance file audit ${state.runId}\n`], {
+      type: options.mimeType || 'application/pdf',
+    }),
+    fileName,
+  );
+  for (const [key, value] of Object.entries(fields)) {
+    form.append(key, String(value));
+  }
+  return form;
+};
+
+const findContractDocxTemplate = () => {
+  if (process.env.API_PERF_CONTRACT_DOCX_TEMPLATE) {
+    return process.env.API_PERF_CONTRACT_DOCX_TEMPLATE;
+  }
+  const firstDocx = fs
+    .readdirSync(CONTRACTS_UPLOAD_DIR)
+    .find((fileName) => fileName.toLowerCase().endsWith('.docx'));
+  if (!firstDocx) {
+    throw new Error(`Missing DOCX fixture in ${CONTRACTS_UPLOAD_DIR}`);
+  }
+  return path.join(CONTRACTS_UPLOAD_DIR, firstDocx);
+};
+
+const createContractTemplateForm = () => {
+  const templatePath = findContractDocxTemplate();
+  return createUploadForm(`perf-template-${state.runId}.docx`, {}, {
+    fieldName: 'template',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    content: fs.readFileSync(templatePath),
+  });
+};
+
+const removeUploadedFile = (filePath) => {
+  if (!filePath) return;
+  const fullPath = path.isAbsolute(filePath) ? filePath : path.join(UPLOAD_DIR, filePath);
+  if (fs.existsSync(fullPath)) {
+    fs.unlinkSync(fullPath);
+  }
 };
 
 const cases = [
@@ -355,6 +406,28 @@ const cases = [
     method: 'POST',
     path: '/api/v1/sales/calculate-price',
     body: () => ({ costPrice: 100, exchangeRate: 7, profitRate: 1.3 }),
+  },
+  {
+    id: 'ai_config_update_success',
+    category: 'write_success',
+    method: 'PUT',
+    path: '/api/v1/ai/config',
+    body: () => ({
+      primaryModel: 'kimi-k2-turbo-preview',
+      fallbackModel: 'moonshot-v1-8k',
+    }),
+  },
+  {
+    id: 'ai_session_delete_success',
+    category: 'write_success',
+    method: 'DELETE',
+    path: () => `/api/v1/ai/sessions/perf-session-${state.runId}`,
+  },
+  {
+    id: 'ai_greeting_stream_success',
+    category: 'ai_external',
+    method: 'GET',
+    path: '/api/v1/ai/greeting/stream',
   },
   {
     id: 'contract_fixture_port_create_success',
@@ -1008,6 +1081,151 @@ const cases = [
     }),
   },
   {
+    id: 'contract_doc_template_upload_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/contract-doc/template',
+    body: () => createContractTemplateForm(),
+  },
+  {
+    id: 'contract_doc_generate_success',
+    category: 'write_success',
+    method: 'POST',
+    path: () => `/api/v1/contract-doc/generate/${state.purchaseId}`,
+    body: () => ({
+      storeName: '性能巡检门店',
+      deliveryAddress: '性能巡检地址',
+      deliveryContact: '性能巡检联系人',
+      depositRate: 30,
+    }),
+  },
+  {
+    id: 'contract_doc_template_delete_success',
+    category: 'write_success',
+    method: 'DELETE',
+    path: '/api/v1/contract-doc/template',
+  },
+  {
+    id: 'unified_contract_file_upload_success',
+    category: 'write_success_file_fixture',
+    method: 'POST',
+    path: () => `/api/v1/contracts/${state.purchaseId}/files`,
+    body: () => createUploadForm(`perf-unified-${state.runId}.pdf`, {
+      contractType: 'PURCHASE',
+      description: 'performance unified file audit',
+    }),
+    save: saveFileMeta('unifiedFileId', 'unifiedFilePath'),
+    expectedStatuses: [201],
+  },
+  {
+    id: 'unified_file_delete_success',
+    category: 'write_success',
+    method: 'DELETE',
+    path: () => `/api/v1/files/${state.unifiedFileId}`,
+  },
+  {
+    id: 'purchase_file_upload_for_delete_success',
+    category: 'write_success_file_fixture',
+    method: 'POST',
+    path: () => `/api/v1/purchases/${state.purchaseId}/files`,
+    body: () => createUploadForm(`perf-purchase-${state.runId}.pdf`),
+    save: saveFileMeta('purchaseFileId', 'purchaseFilePath'),
+    expectedStatuses: [201],
+  },
+  {
+    id: 'purchase_file_delete_success',
+    category: 'write_success',
+    method: 'DELETE',
+    path: () => `/api/v1/purchases/files/${state.purchaseFileId}`,
+    after: () => removeUploadedFile(state.purchaseFilePath),
+  },
+  {
+    id: 'sales_file_upload_for_delete_success',
+    category: 'write_success_file_fixture',
+    method: 'POST',
+    path: () => `/api/v1/sales/${state.salesId}/files`,
+    body: () => createUploadForm(`perf-sales-${state.runId}.pdf`),
+    save: saveFileMeta('salesFileId', 'salesFilePath'),
+    expectedStatuses: [201],
+  },
+  {
+    id: 'sales_file_delete_success',
+    category: 'write_success',
+    method: 'DELETE',
+    path: () => `/api/v1/sales/files/${state.salesFileId}`,
+    after: () => removeUploadedFile(state.salesFilePath),
+  },
+  {
+    id: 'hs_code_batch_match_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/hs-codes/batch-match',
+    body: () => ({ productNames: ['改良种用濒危野马'] }),
+  },
+  {
+    id: 'hs_code_ai_recommend_local_success',
+    category: 'ai_external',
+    method: 'POST',
+    path: '/api/v1/hs-codes/ai-recommend',
+    body: () => ({ productDescription: '改良种用濒危野马' }),
+  },
+  {
+    id: 'hs_code_fill_declaration_local_success',
+    category: 'ai_external',
+    method: 'POST',
+    path: '/api/v1/hs-codes/0101210010/fill-declaration',
+    body: () => ({
+      productName: '改良种用濒危野马',
+      productDescription: '改良种用濒危野马，非品牌，出口不享惠',
+    }),
+  },
+  {
+    id: 'data_export_compat_suppliers_success',
+    category: 'export_success',
+    method: 'GET',
+    path: '/api/v1/export/suppliers',
+  },
+  {
+    id: 'system_export_suppliers_success',
+    category: 'export_success',
+    method: 'GET',
+    path: '/api/v1/system/export/suppliers',
+  },
+  {
+    id: 'system_export_suppliers_pdf_success',
+    category: 'export_success',
+    method: 'GET',
+    path: '/api/v1/system/export/suppliers/pdf',
+  },
+  {
+    id: 'tax_refunds_export_empty_success',
+    category: 'export_success',
+    method: 'POST',
+    path: '/api/v1/tax-refunds/export',
+    body: () => ({ keyword: `NO_MATCH_${state.runId}` }),
+  },
+  {
+    id: 'finance_statements_import_folder_success',
+    category: 'import_success',
+    method: 'POST',
+    path: '/api/v1/finance/statements/import-folder',
+    body: () => ({}),
+  },
+  {
+    id: 'system_patrol_trigger_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/system/patrol/trigger',
+    body: () => ({}),
+  },
+  {
+    id: 'system_exchange_rate_sync_degraded_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/system/exchange-rate/sync',
+    body: () => ({}),
+  },
+  {
     id: 'sales_delete_success',
     category: 'write_success',
     method: 'DELETE',
@@ -1085,6 +1303,7 @@ const runRequest = async (testCase, token) => {
   }
 
   const body = typeof testCase.body === 'function' ? testCase.body() : testCase.body;
+  const isMultipart = typeof FormData !== 'undefined' && body instanceof FormData;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
   const started = performance.now();
@@ -1093,11 +1312,11 @@ const runRequest = async (testCase, token) => {
 
   try {
     const headers = { Authorization: `Bearer ${token}` };
-    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    if (body !== undefined && !isMultipart) headers['Content-Type'] = 'application/json';
     response = await fetch(buildUrl(pathname), {
       method: testCase.method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body !== undefined ? (isMultipart ? body : JSON.stringify(body)) : undefined,
       signal: controller.signal,
     });
     text = await response.text();
@@ -1124,6 +1343,9 @@ const runRequest = async (testCase, token) => {
   const expectedStatus = expectedStatuses.includes(response.status);
   if (expectedStatus && typeof testCase.save === 'function') {
     testCase.save(json);
+  }
+  if (expectedStatus && typeof testCase.after === 'function') {
+    testCase.after(json);
   }
 
   return {
@@ -1196,7 +1418,7 @@ const writeOutputs = (results) => {
 - Generated at: ${summary.generatedAt}
 
 ## Scope
-This audit writes to a disposable database copy only. It covers selected success-path write interfaces for users, suppliers, products, stores, system dictionaries, contract templates, purchase contracts, sales contracts, containers, Agent credentials, notifications, customs declarations, tax refunds, tax rates, forex verifications, inventory status changes, finance matching/allocation, operations checklists, store recommendation, and price calculation. It does not cover file uploads, large imports/exports, provider-backed AI calls, or operational jobs.
+This audit writes to a disposable database copy only. It covers selected success-path write interfaces for users, suppliers, products, stores, system dictionaries, contract templates, purchase contracts, sales contracts, containers, Agent credentials, notifications, customs declarations, tax refunds, tax rates, forex verifications, inventory status changes, finance matching/allocation, operations checklists, store recommendation, file upload/delete, selected exports/imports, patrol trigger, HS local batch match, AI config/session cleanup, AI local/degraded provider paths, exchange-rate sync degraded fallback, contract-doc template generation, and price calculation.
 
 ## Over Threshold Or Error
 ${problemLines}

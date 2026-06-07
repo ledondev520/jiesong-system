@@ -15,6 +15,15 @@ const {
   normalizeConfigValueForStorage,
 } = require('../../utils/secretCrypto');
 
+const parsePositiveIntEnv = (value, fallback) => {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+const EXCHANGE_RATE_SYNC_TIMEOUT_MS = parsePositiveIntEnv(
+  process.env.EXCHANGE_RATE_SYNC_TIMEOUT_MS,
+  1800,
+);
+
 /**
  * 配置键到域的映射表（不改 schema，仅在应用层做域划分）
  * - 新增配置 key 时，须在此表补充对应域，否则归入 "其他" 域。
@@ -58,6 +67,54 @@ const formatConfigResponse = (configRecord) => {
     value: buildConfigValue(configRecord.key, configRecord.value),
   };
 };
+
+const resolveExchangeRateConfig = async () => {
+  const config = await prisma.systemConfig.findUnique({
+    where: { key: 'exchangeRate' },
+  });
+
+  let rate = { rate: 6.8, buffer: 0.2, effectiveRate: 6.6 };
+  if (config) {
+    try {
+      const parsed = JSON.parse(config.value);
+      rate = {
+        ...parsed,
+        effectiveRate: parsed.rate - (parsed.buffer || 0.2),
+      };
+    } catch (parseError) {
+      // exchangeRate 配置值不是合法 JSON，降级为默认值并记录以便排查。
+      console.warn('[configController] exchangeRate 解析失败，使用默认值:', parseError?.message);
+    }
+  }
+
+  return rate;
+};
+
+const fetchUsdCnyRate = async () => new Promise((resolve, reject) => {
+  const url = 'https://open.er-api.com/v6/latest/USD';
+  const request = https.get(url, (response) => {
+    let data = '';
+    response.on('data', (chunk) => { data += chunk; });
+    response.on('end', () => {
+      try {
+        const parsed = JSON.parse(data);
+        const cnyRate = parsed?.rates?.CNY;
+        if (typeof cnyRate !== 'number' || cnyRate <= 0) {
+          reject(new Error('汇率数据异常'));
+        } else {
+          resolve(Math.round(cnyRate * 100) / 100);
+        }
+      } catch {
+        reject(new Error('解析汇率响应失败'));
+      }
+    });
+  });
+
+  request.setTimeout(EXCHANGE_RATE_SYNC_TIMEOUT_MS, () => {
+    request.destroy(new Error(`汇率同步超时 ${EXCHANGE_RATE_SYNC_TIMEOUT_MS}ms`));
+  });
+  request.on('error', reject);
+});
 
 /**
  * 职责：获取所有系统配置（平铺格式，向后兼容）
@@ -157,25 +214,7 @@ const updateConfig = async (req, res, next) => {
  */
 const getExchangeRate = async (req, res, next) => {
   try {
-    const config = await prisma.systemConfig.findUnique({
-      where: { key: 'exchangeRate' },
-    });
-
-    let rate = { rate: 6.8, buffer: 0.2, effectiveRate: 6.6 };
-    if (config) {
-      try {
-        const parsed = JSON.parse(config.value);
-        rate = {
-          ...parsed,
-          effectiveRate: parsed.rate - (parsed.buffer || 0.2),
-        };
-      } catch (parseError) {
-        // exchangeRate 配置值不是合法 JSON，降级为默认值并记录以便排查
-        console.warn('[configController] exchangeRate 解析失败，使用默认值:', parseError?.message);
-      }
-    }
-
-    success(res, rate);
+    success(res, await resolveExchangeRateConfig());
   } catch (error) {
     next(error);
   }
@@ -190,27 +229,8 @@ const getExchangeRate = async (req, res, next) => {
  */
 const syncExchangeRate = async (req, res, next) => {
   try {
-    // 1. 从免费开放 API 获取汇率
-    const rate = await new Promise((resolve, reject) => {
-      const url = 'https://open.er-api.com/v6/latest/USD';
-      https.get(url, (response) => {
-        let data = '';
-        response.on('data', (chunk) => { data += chunk; });
-        response.on('end', () => {
-          try {
-            const parsed = JSON.parse(data);
-            const cnyRate = parsed?.rates?.CNY;
-            if (typeof cnyRate !== 'number' || cnyRate <= 0) {
-              reject(new Error('汇率数据异常'));
-            } else {
-              resolve(Math.round(cnyRate * 100) / 100);
-            }
-          } catch {
-            reject(new Error('解析汇率响应失败'));
-          }
-        });
-      }).on('error', reject);
-    });
+    // 1. 从免费开放 API 获取汇率；外部慢或失败时必须快速降级，不能拖慢系统设置界面。
+    const rate = await fetchUsdCnyRate();
 
     // 2. 读取现有配置（保留 buffer）
     const existing = await prisma.systemConfig.findUnique({
@@ -229,12 +249,22 @@ const syncExchangeRate = async (req, res, next) => {
     await prisma.systemConfig.upsert({
       where: { key: 'exchangeRate' },
       update: { value: newValue, note: `汇率自动同步 - ${new Date().toISOString()}` },
-      create: { key: 'exchangeRate', value: newValue, note: '汇率自动同步', domain: 'params' },
+      create: { key: 'exchangeRate', value: newValue, note: '汇率自动同步' },
     });
 
     success(res, { rate, buffer, effectiveRate: rate - buffer }, `汇率已同步：1 USD = ${rate} CNY`);
   } catch (error) {
-    next(createError(`汇率同步失败: ${error.message}`, 503));
+    try {
+      const currentRate = await resolveExchangeRateConfig();
+      success(res, {
+        ...currentRate,
+        source: 'cached',
+        syncStatus: 'degraded',
+        error: error.message,
+      }, `汇率同步暂不可用，已返回当前系统汇率：${currentRate.rate}`);
+    } catch (fallbackError) {
+      next(createError(`汇率同步失败: ${fallbackError.message}`, 503));
+    }
   }
 };
 
