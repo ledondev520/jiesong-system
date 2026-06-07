@@ -54,6 +54,11 @@ const saveId = (key) => (json) => {
   const id = dataOf(json)?.id;
   if (id) state[key] = id;
 };
+const readPath = (value, segments) => segments.reduce((current, segment) => current?.[segment], value);
+const savePath = (key, segments) => (json) => {
+  const value = readPath(json, segments);
+  if (value) state[key] = value;
+};
 
 const cases = [
   {
@@ -252,6 +257,77 @@ const cases = [
     path: () => `/api/v1/users/${state.userId}`,
   },
   {
+    id: 'agent_create_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/agents',
+    body: () => ({
+      name: `性能Agent-${state.runId}`,
+      slug: `perf-agent-${state.runId}`,
+      description: 'performance agent success audit',
+    }),
+    save: saveId('agentId'),
+    expectedStatuses: [201],
+  },
+  {
+    id: 'agent_update_success',
+    category: 'write_success',
+    method: 'PUT',
+    path: () => `/api/v1/agents/${state.agentId}`,
+    body: () => ({
+      name: `性能Agent更新-${state.runId}`,
+      slug: `perf-agent-${state.runId}`,
+      description: 'performance agent update audit',
+      status: 'ACTIVE',
+    }),
+  },
+  {
+    id: 'agent_credential_issue_success',
+    category: 'write_success',
+    method: 'POST',
+    path: () => `/api/v1/agents/${state.agentId}/credentials`,
+    body: () => ({ label: `perf-${state.runId}`, expiresInDays: 7 }),
+    save: savePath('agentCredentialId', ['data', 'credential', 'id']),
+    expectedStatuses: [201],
+  },
+  {
+    id: 'agent_credential_rotate_success',
+    category: 'write_success',
+    method: 'POST',
+    path: () => `/api/v1/agents/credentials/${state.agentCredentialId}/rotate`,
+    body: () => ({ expiresInDays: 14 }),
+    save: savePath('rotatedAgentCredentialId', ['data', 'credential', 'id']),
+    expectedStatuses: [201],
+  },
+  {
+    id: 'agent_credential_revoke_success',
+    category: 'write_success',
+    method: 'POST',
+    path: () => `/api/v1/agents/credentials/${state.rotatedAgentCredentialId}/revoke`,
+    body: () => ({}),
+  },
+  {
+    id: 'notification_list_for_mark_read_success',
+    category: 'write_success_fixture',
+    method: 'GET',
+    path: '/api/v1/notifications?page=1&pageSize=1',
+    save: savePath('notificationId', ['data', 'items', 0, 'id']),
+  },
+  {
+    id: 'notification_mark_read_success',
+    category: 'write_success',
+    method: 'POST',
+    path: () => `/api/v1/notifications/${state.notificationId}/read`,
+    body: () => ({}),
+  },
+  {
+    id: 'notification_mark_all_read_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/notifications/read-all',
+    body: () => ({}),
+  },
+  {
     id: 'contract_template_create_success',
     category: 'write_success',
     method: 'POST',
@@ -312,6 +388,7 @@ const cases = [
     path: '/api/v1/products',
     body: () => ({
       customsName: `性能合同商品-${state.runId}`,
+      hsCode: `6907${state.runId.replace(/\D/g, '').slice(-6)}`,
       unit: '件',
       lowStockThreshold: 1,
       grossWeight: 1.2,
@@ -460,6 +537,27 @@ const cases = [
     }),
   },
   {
+    id: 'customs_auto_drafts_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/customs-declarations/auto-drafts',
+    body: () => ({ salesContractId: state.salesId, replaceExisting: true }),
+    save: savePath('autoCustomsDeclarationId', ['data', 'items', 0, 'customsDeclarationId']),
+  },
+  {
+    id: 'tax_refund_auto_drafts_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/tax-refunds/auto-drafts',
+    body: () => ({ customsDeclarationId: state.autoCustomsDeclarationId, replaceExisting: true }),
+  },
+  {
+    id: 'customs_auto_draft_delete_success',
+    category: 'write_success_cleanup',
+    method: 'DELETE',
+    path: () => `/api/v1/customs-declarations/${state.autoCustomsDeclarationId}`,
+  },
+  {
     id: 'sales_delete_packing_item_success',
     category: 'write_success',
     method: 'DELETE',
@@ -562,6 +660,104 @@ const cases = [
     category: 'write_success',
     method: 'DELETE',
     path: () => `/api/v1/containers/${state.containerId}`,
+  },
+  {
+    id: 'tax_rate_create_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/tax-rates',
+    body: () => ({
+      productId: state.contractProductId,
+      hsCode: `6907${state.runId.replace(/\D/g, '').slice(-6)}`,
+      purchaseTaxRate: 13,
+      refundRate: 9,
+      effectiveFrom: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      isActive: true,
+      note: 'performance tax rate success audit',
+    }),
+    save: saveId('taxRateId'),
+    expectedStatuses: [201],
+  },
+  {
+    id: 'tax_rate_update_success',
+    category: 'write_success',
+    method: 'PUT',
+    path: () => `/api/v1/tax-rates/${state.taxRateId}`,
+    body: () => ({ refundRate: 11, note: 'performance tax rate update audit' }),
+  },
+  {
+    id: 'tax_rate_delete_success',
+    category: 'write_success',
+    method: 'DELETE',
+    path: () => `/api/v1/tax-rates/${state.taxRateId}`,
+  },
+  {
+    id: 'customs_declaration_create_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/customs-declarations',
+    body: () => ({
+      declarationNo: `CUS-PERF-${state.runId}`,
+      salesContractId: state.salesId,
+      declaredAt: new Date().toISOString(),
+      customsBroker: 'performance broker',
+      currency: 'USD',
+      exchangeRate: 7.1,
+      totalAmount: 40,
+      totalQuantity: 2,
+      totalNetWeight: 2,
+      totalGrossWeight: 2.4,
+      status: 'DRAFT',
+      note: 'performance customs declaration success audit',
+    }),
+    save: saveId('customsDeclarationId'),
+    expectedStatuses: [201],
+  },
+  {
+    id: 'customs_declaration_update_success',
+    category: 'write_success',
+    method: 'PUT',
+    path: () => `/api/v1/customs-declarations/${state.customsDeclarationId}`,
+    body: () => ({ status: 'DECLARED', totalAmount: 42, note: 'performance customs declaration update audit' }),
+  },
+  {
+    id: 'tax_refund_create_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/tax-refunds',
+    body: () => ({
+      refundNo: `TR-PERF-${state.runId}`,
+      salesContractId: state.salesId,
+      customsDeclarationId: state.customsDeclarationId,
+      declaredAmount: 42,
+      refundableAmount: 4.62,
+      refundedAmount: 0,
+      appliedAt: new Date().toISOString(),
+      status: 'DRAFT',
+      match_status: 'pending',
+      note: 'performance tax refund success audit',
+    }),
+    save: saveId('taxRefundId'),
+    expectedStatuses: [201],
+  },
+  {
+    id: 'tax_refund_update_success',
+    category: 'write_success',
+    method: 'PUT',
+    path: () => `/api/v1/tax-refunds/${state.taxRefundId}`,
+    body: () => ({ status: 'APPLIED', refundableAmount: 5.12, note: 'performance tax refund update audit' }),
+  },
+  {
+    id: 'tax_refund_delete_success',
+    category: 'write_success',
+    method: 'DELETE',
+    path: () => `/api/v1/tax-refunds/${state.taxRefundId}`,
+  },
+  {
+    id: 'customs_declaration_delete_success',
+    category: 'write_success',
+    method: 'DELETE',
+    path: () => `/api/v1/customs-declarations/${state.customsDeclarationId}`,
   },
   {
     id: 'sales_delete_success',
@@ -752,7 +948,7 @@ const writeOutputs = (results) => {
 - Generated at: ${summary.generatedAt}
 
 ## Scope
-This audit writes to a disposable database copy only. It covers selected success-path write interfaces for users, suppliers, products, stores, system dictionaries, contract templates, purchase contracts, sales contracts, containers, and price calculation. It does not cover file uploads, large imports/exports, provider-backed AI calls, or operational jobs.
+This audit writes to a disposable database copy only. It covers selected success-path write interfaces for users, suppliers, products, stores, system dictionaries, contract templates, purchase contracts, sales contracts, containers, Agent credentials, notifications, customs declarations, tax refunds, tax rates, and price calculation. It does not cover file uploads, large imports/exports, provider-backed AI calls, or operational jobs.
 
 ## Over Threshold Or Error
 ${problemLines}

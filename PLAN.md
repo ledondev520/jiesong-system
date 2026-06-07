@@ -1,5 +1,35 @@
 # Ops Execution Center Plan
 
+## 2026-06-07 PERF-API-06（Agent/税退/通知写成功路径临时库 SLA）
+
+### Goal
+- 继续推进“所有接口 2 秒以内”目标，补齐可安全构造的 Agent 凭证、通知已读、报关、退税、退税率写成功路径。
+- 仍只打复制库和临时后端，不污染当前业务数据；把 provider、文件、导入导出和运维任务留到下一层。
+
+### Delivered
+- 扩展 `scripts/audit_api_write_success_times.js`，写成功路径样本从 `58` 个扩展到 `78` 个。
+- 新增覆盖的主要 Interface：
+  - Agent：创建、更新、凭证签发、凭证轮换、凭证吊销。
+  - 通知：读取一条当前用户通知、单条已读、全部已读。
+  - 报关/退税：报关单自动草稿、退税自动草稿、报关单 CRUD、退税记录 CRUD。
+  - 退税率：创建、更新、删除。
+- 修复 `Notification` schema 缺少 `metadata` 的真实可用性问题：补回 Prisma schema 字段，并新增迁移 `20260607122054_add_notification_metadata`；本地库已通过备份后 `migrate deploy` 应用。
+
+### Verification
+- `cd backend && npm test -- src/services/agentAccountService.test.js src/services/agentCredentialAlertService.test.js src/services/inventoryAlertService.test.js src/services/customsDeclarationService.test.js src/services/taxRefundService.test.js src/services/taxRateService.test.js src/routes/taxModules.test.js`：通过，`31` 个测试。
+- `node --check scripts/audit_api_write_success_times.js`：通过。
+- `cd backend && npx prisma validate`：通过。
+- `cd backend && npx prisma migrate deploy`：应用 `20260607122054_add_notification_metadata` 成功；回滚备份点为 `backend/prisma/backups/dev_2026-06-07_12-20-54.db`。
+- 使用复制库 `tmp/performance/perf-api-write.db` 和临时后端 `3014`。
+- `API_BASE_URL=http://localhost:3014 API_PERF_ALLOW_WRITES=true API_PERF_DISPOSABLE_DB=true node scripts/audit_api_write_success_times.js`：`78` 个样本，`78` OK、`0` error、`0` 超过 `2000ms`；最慢 `user_create_success=403ms`。
+- `node scripts/audit_api_route_inventory.js`：后端 `265` 条路由，已测 `232` 条，未测 `33` 条。
+- 覆盖分布：`read=114/114`、`auth_write=5/5`、`write=80/104`、`ai_external=9/12`、`export=9/14`、`import=15/16`。
+- 临时后端 `3014` 已停止。
+
+### Remaining
+- 性能目标尚未完成：仍有 `33` 条路由没有实测覆盖。
+- 剩余未测集中在 `write=24`、`export=5`、`ai_external=3`、`import=1`；下一阶段应处理合同文档/文件删除/财务核销/库存状态/运营清单/系统任务，以及导入导出和 provider-backed AI 路径。
+
 ## 2026-06-07 LOGIN-07（认证页旧快捷登录提前清理）
 
 ### Goal

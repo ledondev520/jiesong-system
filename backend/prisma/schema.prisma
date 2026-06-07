@@ -805,6 +805,7 @@ model Notification {
   title     String
   content   String?
   link      String?  // 点击跳转的URL
+  metadata  String?
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 
