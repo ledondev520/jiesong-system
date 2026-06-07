@@ -1,5 +1,17 @@
 # Frontend Polish Tasks
 
+## 2026-06-07 PERF-API-04 写接口成功路径临时库 SLA
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| PERF-API-04A | P0 | 5m | 1 | DONE | 恢复性能目标上下文，确认当前覆盖为 `173/265`，剩余 `92` 条未测 |
+| PERF-API-04B | P0 | 15m | 1 | DONE | 设计必须显式允许写入且只能指向临时端口的写成功路径巡检脚本 |
+| PERF-API-04C | P0 | 15m | 1 | DONE | 新增 `scripts/audit_api_write_success_times.js`，覆盖 29 个小写入成功路径 |
+| PERF-API-04D | P1 | 10m | 1 | DONE | 将 `api-write-success-times` 接入路由覆盖清单 |
+| PERF-API-04E | P0 | 10m | 1 | DONE | 复制 SQLite 库并在 `3014` 启动临时后端，运行写成功路径巡检 |
+| PERF-API-04F | P1 | 10m | 1 | DONE | 复跑路由清单，确认覆盖提升到 `197/265`，剩余 `68` 条 |
+| PERF-API-04G | P1 | 10m | 1 | TODO | 继续为剩余 `59` 条 write 路由设计可回滚成功路径夹具，文件/AI/导入导出单独分层 |
+
 ## 2026-06-07 LOGIN-05 认证页组旧登录资料清理
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |

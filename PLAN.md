@@ -1,5 +1,30 @@
 # Ops Execution Center Plan
 
+## 2026-06-07 PERF-API-04（写接口成功路径临时库 SLA）
+
+### Goal
+- 在不污染当前业务库的前提下，开始覆盖剩余写接口的真实成功路径，而不是只测 guard-path。
+- 优先选择用户、供应商、商品、门店、系统字典、合同模板和销售价格计算等小写入 Interface，验证本地成功路径响应均低于 `2s`。
+
+### Delivered
+- 新增 `scripts/audit_api_write_success_times.js`，默认拒绝运行；必须同时设置 `API_PERF_ALLOW_WRITES=true` 与 `API_PERF_DISPOSABLE_DB=true`，且 `API_BASE_URL` 不能指向常规 `3000/3001`。
+- 写成功路径巡检覆盖 `29` 个样本：系统配置、港口、门店、分类、报关行、供应商、商品、用户、认证用户更新、合同模板和销售价格计算。
+- `scripts/audit_api_route_inventory.js` 接入 `tmp/performance/api-write-success-times.json`，新增 measurement source `api-write-success-times`。
+- 使用 `backend/prisma/dev.db` 的复制库 `tmp/performance/perf-api-write.db` 启动临时后端 `3014`，完成后已停止。
+
+### Verification
+- `API_BASE_URL=http://localhost:3014 API_PERF_ALLOW_WRITES=true API_PERF_DISPOSABLE_DB=true node scripts/audit_api_write_success_times.js`：`29` 个样本，`29` OK、`0` error、`0` 超过 `2000ms`；最慢 `user_create_success=404ms`。
+- `node scripts/audit_api_route_inventory.js`：后端 `265` 条路由，已测 `197` 条，未测 `68` 条。
+- 覆盖分布：`read=114/114`、`auth_write=5/5`、`write=45/104`、`ai_external=9/12`、`export=9/14`、`import=15/16`。
+- `node --check scripts/audit_api_write_success_times.js scripts/audit_api_route_inventory.js`：通过。
+- `git diff --check`：通过。
+- 安全拒绝验证：未设置写入开关时，脚本输出 `Refusing to run write audit: set API_PERF_ALLOW_WRITES=true for a disposable backend only.`。
+- 临时后端 `3014` 已停止；真实库 `backend/prisma/dev.db` 修改时间仍为 `2026-06-07 19:34:47`，写入目标是复制库 `tmp/performance/perf-api-write.db`。
+
+### Remaining
+- 性能目标尚未完成：仍有 `68` 条路由没有实测覆盖。
+- 剩余未测集中在 `write=59`、`export=5`、`ai_external=3`、`import=1`；下一阶段需要继续扩展临时库夹具、文件导入/导出样本和 AI provider 独立 SLA。
+
 ## 2026-06-07 LOGIN-05（认证页组旧登录资料清理）
 
 ### Goal

@@ -13,6 +13,7 @@ const ROUTES_DIR = path.join(ROOT, 'backend/src/routes');
 const OUTPUT_DIR = path.join(ROOT, 'tmp/performance');
 const API_RESULTS_PATH = path.join(OUTPUT_DIR, 'api-response-times.json');
 const NON_READ_GUARD_RESULTS_PATH = path.join(OUTPUT_DIR, 'api-non-read-guard-times.json');
+const WRITE_SUCCESS_RESULTS_PATH = path.join(OUTPUT_DIR, 'api-write-success-times.json');
 const PAGE_RESULTS_PATH = path.join(OUTPUT_DIR, 'page-navigation-times.json');
 
 const indexSource = fs.readFileSync(path.join(ROUTES_DIR, 'index.js'), 'utf8');
@@ -100,6 +101,20 @@ const loadMeasuredCalls = () => {
         method: row.method,
         path: row.path,
         source: 'api-non-read-guard-times',
+        durationMs: row.durationMs,
+        status: row.httpStatus || row.status,
+      });
+    }
+  }
+
+  if (fs.existsSync(WRITE_SUCCESS_RESULTS_PATH)) {
+    const payload = JSON.parse(fs.readFileSync(WRITE_SUCCESS_RESULTS_PATH, 'utf8'));
+    for (const row of payload.results || []) {
+      if (!row.path || row.status !== 'OK') continue;
+      calls.push({
+        method: row.method,
+        path: row.path,
+        source: 'api-write-success-times',
         durationMs: row.durationMs,
         status: row.httpStatus || row.status,
       });
