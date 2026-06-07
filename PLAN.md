@@ -1,5 +1,30 @@
 # Ops Execution Center Plan
 
+## 2026-06-07 WPS-IMPORT-127（瓷砖价格与剩余裁决收口）
+
+### Goal
+- 按用户裁决修正瓷砖销售价格口径：销售价使用平方米口径和历史/合同销售价，不把出货汇总里的装箱/出货值当销售价。
+- 明确 `EXP2400006` 不创建报关单。
+- 明确 `PENDING-威斯敏` 作为战略落位占位保留。
+
+### Delivered
+- 复核历史瓷砖销售价：已带正式销售来源的瓷砖价格主要落在 `10` 至 `40.3` 元/平方米，常见值包括 `25`、`30`、`33`、`35`、`36.48`、`40`；`EXP2500002 / 771.84 平方米` 的正式销售合同价为 `25` 元/平方米。
+- 备份数据库后更新 `EXP2500002 / 瓷砖 / Burbank / 771.84 平方米` 销售价为 `25`，并补充业务裁决 note；删除同合同同数量的安纳汉姆重复销售/装箱行，保留安纳汉姆 `300` 平方米来源行。
+- `EXP2400006` 合同与零价销售占位已标记为参考/历史占位，不创建报关单。
+- `PENDING-威斯敏` 合同、销售、装箱和占位报关记录已标记为战略落位保留，不作为正式合同/正式报关单。
+- 完成度审计脚本现在会读取数据库业务裁决 note，避免已关闭裁决项继续出现在待裁决清单里。
+
+### Verification
+- `cd backend && npm run db:backup`：通过，回滚点为 `backend/prisma/backups/dev_2026-06-07_08-50-41.db`。
+- `python3 -m py_compile scripts/audit_wps_import_completion.py scripts/build_wps_remaining_decision_execution_plan.py scripts/build_wps_remaining_closure_register.py`：通过。
+- `python3 scripts/audit_wps_import_completion.py`：通过，`pending_auto_writes=0`、`db_source_gaps=150`、`decision_items=0`、`cloud_only_files=2`。
+- `python3 scripts/build_wps_remaining_closure_register.py`：通过，`total_rows=152`、`db_source_gap_rows=150`、`decision_items=0`、`cloud_original_gaps=2`。
+- `python3 scripts/build_wps_remaining_action_matrix.py`：通过，`total_rows=152`、`auto_writable=0`。
+
+### Remaining
+- 线下仍剩 `150` 条来源追溯缺口和 `2` 个 cloud-only 原件缺口；这些不是新的业务裁决项。
+- 本轮只更新线下数据库与审计脚本，没有同步线上数据库。
+
 ## 2026-06-06 LOGIN-01（域名登录点击无效修复）
 
 ### Goal

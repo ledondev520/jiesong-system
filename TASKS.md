@@ -1,5 +1,15 @@
 # Frontend Polish Tasks
 
+## 2026-06-07 WPS-IMPORT-127 瓷砖价格与剩余裁决收口
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WPS-IMPORT-127A | P0 | 10m | 1 | DONE | 复核历史瓷砖销售价格和 `EXP2500002` 合同销售价，确认 `3.0` 不是销售价 |
+| WPS-IMPORT-127B | P0 | 10m | 1 | DONE | 备份数据库后修正 Burbank 771.84 平方米瓷砖销售价，并清理同数量重复归属 |
+| WPS-IMPORT-127C | P0 | 10m | 1 | DONE | 标记 `EXP2400006` 不创建报关单，标记 `PENDING-威斯敏` 为战略占位 |
+| WPS-IMPORT-127D | P1 | 10m | 1 | DONE | 更新完成度审计、裁决执行计划和总关闭台账，确认 `decision_items=0` |
+| WPS-IMPORT-127E | P1 | 10m | 1 | DONE | 更新 checkpoint、指标、风险、结果日志和 patch |
+
 ## 2026-06-06 LOGIN-01 域名登录点击无效修复
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
