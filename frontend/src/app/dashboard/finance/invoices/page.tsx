@@ -21,12 +21,13 @@ import { Button } from '@/components/ui/button';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Search, X, ChevronLeft, ChevronRight, FileText, Landmark } from 'lucide-react';
+import { Search, X, ChevronLeft, ChevronRight, FileText, Landmark, Upload } from 'lucide-react';
 import Link from 'next/link';
 import {
   getInvoices, getInvoiceStats, getBatches,
   type InvoiceRecord, type InvoiceStats, type FinanceDataBatch,
 } from '@/services/bankFlow.service';
+import { InvoiceImportDialog } from './components/InvoiceImportDialog';
 
 function fmt(n: number) {
   return new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
@@ -53,6 +54,7 @@ export default function InvoicesPage() {
   const [stats, setStats] = useState<InvoiceStats | null>(null);
   const [batches, setBatches] = useState<FinanceDataBatch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [importOpen, setImportOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -167,6 +169,9 @@ export default function InvoicesPage() {
               <X className="h-3 w-3 mr-1" />清除
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+            <Upload className="h-3 w-3 mr-1" />导入
+          </Button>
         </div>
 
         {/* 表格 */}
@@ -291,6 +296,8 @@ export default function InvoicesPage() {
             </div>
           </div>
         )}
+
+        <InvoiceImportDialog open={importOpen} onOpenChange={setImportOpen} onSuccess={loadData} />
       </div>
     </div>
   );

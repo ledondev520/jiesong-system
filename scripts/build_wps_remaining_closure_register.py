@@ -99,6 +99,8 @@ def decision_rows() -> tuple[list[dict[str, Any]], dict[str, Any]]:
     report = load_json(DECISION_JSON, {})
     rows: list[dict[str, Any]] = []
     for plan in report.get("plans") or []:
+        if str(plan.get("status", "")).startswith("closed_"):
+            continue
         required_inputs = []
         options = []
         for option in plan.get("decision_options") or []:

@@ -23,6 +23,11 @@ export interface BankTransaction {
   balance: number | null;
   counterpart: string | null;
   direction: 'IN' | 'OUT';
+  matchedContractId: string | null;
+  matchedContractType: string | null;
+  matchScore: number | null;
+  matchStatus: 'PENDING' | 'MATCHED' | 'IGNORED';
+  matchedAt: string | null;
   batch?: { fileName: string; importedAt: string };
 }
 
@@ -45,6 +50,11 @@ export interface InvoiceRecord {
   status: string;
   isPositive: string;
   riskLevel: string | null;
+  matchedContractId: string | null;
+  matchedContractType: string | null;
+  matchScore: number | null;
+  matchStatus: 'PENDING' | 'MATCHED' | 'IGNORED';
+  matchedAt: string | null;
   batch?: { fileName: string; importedAt: string };
 }
 
@@ -246,5 +256,170 @@ export interface IncomingSummaryResult {
  */
 export async function getIncomingSummary(): Promise<IncomingSummaryResult> {
   const res: { data: IncomingSummaryResult } = await api.get('/bank-flow/incoming-summary');
+  return res.data;
+}
+
+// ==================== 智能关联引擎 API ====================
+
+export interface UnmatchedItemsResult {
+  bankItems: BankTransaction[];
+  invoiceItems: InvoiceRecord[];
+  bankTotal: number;
+  invoiceTotal: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface AutoMatchResult {
+  bankMatched: number;
+  bankTotal: number;
+  invoiceMatched: number;
+  invoiceTotal: number;
+  details: {
+    bank: Array<{ id: string; matched: boolean; contractId?: string; contractType?: string; score: number }>;
+    invoices: Array<{ id: string; matched: boolean; contractId?: string; contractType?: string; score: number }>;
+  };
+}
+
+export interface PurchaseContractForMatch {
+  id: string;
+  contractNo: string;
+  supplierId: string;
+  totalAmount: number;
+  paidAmount: number;
+  status: string;
+  signedAt: string | null;
+  supplier: { id: string; name: string; shortName?: string | null };
+}
+
+export interface SalesContractForMatch {
+  id: string;
+  contractNo: string;
+  totalAmount: number;
+  receivedAmount: number;
+  status: string;
+  signedAt: string | null;
+  portId: string | null;
+  port: { id: string; name: string } | null;
+  packingItems: Array<{ id: string; store: { id: string; name: string } | null }>;
+}
+
+export type ContractForMatch = PurchaseContractForMatch | SalesContractForMatch;
+
+/**
+ * 职责：获取未匹配项列表
+ */
+export async function getUnmatchedItems(params?: { page?: number; pageSize?: number; type?: 'BANK' | 'INVOICE' }): Promise<UnmatchedItemsResult> {
+  const res: { data: UnmatchedItemsResult } = await api.get('/finance/unmatched', { params });
+  return res.data;
+}
+
+/**
+ * 职责：触发自动匹配
+ */
+export async function postAutoMatch(): Promise<AutoMatchResult> {
+  const res: { data: AutoMatchResult } = await api.post('/finance/auto-match');
+  return res.data;
+}
+
+/**
+ * 职责：人工确认关联
+ */
+export async function postManualMatch(body: {
+  entityType: 'BANK' | 'INVOICE';
+  entityId: string;
+  contractId: string;
+  contractType: 'PURCHASE' | 'SALES';
+}): Promise<BankTransaction | InvoiceRecord> {
+  const res: { data: BankTransaction | InvoiceRecord } = await api.post('/finance/match', body);
+  return res.data;
+}
+
+/**
+ * 职责：解除关联
+ */
+export async function postUnmatch(body: { entityType: 'BANK' | 'INVOICE'; entityId: string }): Promise<BankTransaction | InvoiceRecord> {
+  const res: { data: BankTransaction | InvoiceRecord } = await api.post('/finance/unmatch', body);
+  return res.data;
+}
+
+/**
+ * 职责：忽略该项
+ */
+export async function postIgnore(body: { entityType: 'BANK' | 'INVOICE'; entityId: string }): Promise<BankTransaction | InvoiceRecord> {
+  const res: { data: BankTransaction | InvoiceRecord } = await api.post('/finance/ignore', body);
+  return res.data;
+}
+
+/**
+ * 职责：获取可用于匹配的合同列表
+ */
+export async function getContractsForMatch(contractType: 'PURCHASE' | 'SALES', search?: string): Promise<ContractForMatch[]> {
+  const res: { data: ContractForMatch[] } = await api.get('/finance/contracts-for-match', { params: { contractType, search } });
+  return res.data;
+}
+
+// ==================== 数据导入 API ====================
+
+export interface ImportPreviewResult<T = Record<string, unknown>> {
+  preview: T[];
+  mapping: Record<string, string>;
+  totalRows: number;
+  validRows: number;
+  errorRows: number;
+  errors: Array<{ row: number; reason: string; data: unknown }>;
+}
+
+export interface ImportResult {
+  success: number;
+  failed: number;
+  skipped: number;
+  batchId: string | null;
+  errors: Array<{ reason: string; data: unknown }>;
+  parseErrors: Array<{ row: number; reason: string; data: unknown }>;
+  preview: unknown[];
+}
+
+/**
+ * 职责：预览银行对账单解析结果
+ */
+export async function previewBankFlowImport(file: File, bankType: string): Promise<ImportPreviewResult> {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('bankType', bankType);
+  const res: { data: ImportPreviewResult } = await api.post('/bank-flow/import/preview', form);
+  return res.data;
+}
+
+/**
+ * 职责：批量导入银行对账单
+ */
+export async function importBankFlow(file: File, bankType: string): Promise<ImportResult> {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('bankType', bankType);
+  const res: { data: ImportResult } = await api.post('/bank-flow/import', form);
+  return res.data;
+}
+
+/**
+ * 职责：预览发票解析结果
+ */
+export async function previewInvoiceImport(file: File, invoiceType: string): Promise<ImportPreviewResult> {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('invoiceType', invoiceType);
+  const res: { data: ImportPreviewResult } = await api.post('/bank-flow/invoices/import/preview', form);
+  return res.data;
+}
+
+/**
+ * 职责：批量导入发票
+ */
+export async function importInvoices(file: File, invoiceType: string): Promise<ImportResult> {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('invoiceType', invoiceType);
+  const res: { data: ImportResult } = await api.post('/bank-flow/invoices/import', form);
   return res.data;
 }

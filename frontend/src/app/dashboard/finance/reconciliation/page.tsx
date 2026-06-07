@@ -1,7 +1,7 @@
 /**
- * Input: bank-flow/reconciliation/full API
- * Output: 对账分析页面（银行流水 vs 发票按供应商汇总匹配展示；各表支持列排序）
- * Pos: 财务模块-对账分析子页面
+ * Input: financeMatchService API
+ * Output: 智能关联对账分析页面（三栏：银行流水 / 合同 / 发票）
+ * Pos: 财务模块-智能关联对账分析子页面
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -9,13 +9,11 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { SortableTableHead } from '@/components/ui/sortable-table-head';
-import { useTableSort } from '@/lib/hooks/useTableSort';
 import Link from 'next/link';
 import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -23,134 +21,174 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Search, RefreshCw, AlertTriangle, FileWarning,
-  Landmark, FileText,
+  Landmark, FileText, Zap, Link2, Unlink, EyeOff,
+  ArrowRightLeft, Package, Ship,
 } from 'lucide-react';
 import {
   getFullReconciliation,
-  type FullReconciliationResult, type MatchedEntry,
-  type UnmatchedPayment, type UnmatchedInvoice,
+  getUnmatchedItems,
+  postAutoMatch,
+  postManualMatch,
+  postIgnore,
+  getContractsForMatch,
+  type FullReconciliationResult,
+  type BankTransaction,
+  type InvoiceRecord,
+  type ContractForMatch,
+  type PurchaseContractForMatch,
+  type SalesContractForMatch,
 } from '@/services/bankFlow.service';
 
 function fmt(n: number) {
   return new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
 
-function GapBadge({ gap, category }: { gap: number; category: string }) {
-  if (category === 'under_invoiced') {
-    return <Badge variant="destructive" className="text-[10px]">缺票 ¥{fmt(gap)}</Badge>;
+function isPurchaseContract(c: ContractForMatch): c is PurchaseContractForMatch {
+  return 'supplier' in c;
+}
+
+function isSalesContract(c: ContractForMatch): c is SalesContractForMatch {
+  return 'packingItems' in c;
+}
+
+function contractLabel(c: ContractForMatch): string {
+  if (isPurchaseContract(c)) {
+    return c.supplier?.name || c.contractNo;
   }
-  if (category === 'over_invoiced') {
-    return <Badge className="text-[10px] bg-amber-500 hover:bg-amber-500">多开 ¥{fmt(Math.abs(gap))}</Badge>;
+  const stores = Array.from(new Set(c.packingItems?.map(p => p.store?.name).filter(Boolean)));
+  return stores.length > 0 ? stores.join(', ') : (c.port?.name || c.contractNo);
+}
+
+function contractUnpaid(c: ContractForMatch): number {
+  if (isPurchaseContract(c)) {
+    return Math.max(c.totalAmount - (c.paidAmount || 0), 0);
   }
-  return <Badge variant="outline" className="text-green-600 border-green-200 text-[10px]">已匹配</Badge>;
+  return Math.max(c.totalAmount - (c.receivedAmount || 0), 0);
 }
 
 export default function ReconciliationPage() {
-  const [data, setData] = useState<FullReconciliationResult | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [tab, setTab] = useState('matched');
+  // ========== 原有对账分析数据 ==========
+  const [reconData, setReconData] = useState<FullReconciliationResult | null>(null);
+  const [reconLoading, setReconLoading] = useState(true);
+  const [tab, setTab] = useState('analysis');
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  // ========== 智能关联数据 ==========
+  const [bankItems, setBankItems] = useState<BankTransaction[]>([]);
+  const [invoiceItems, setInvoiceItems] = useState<InvoiceRecord[]>([]);
+  const [bankTotal, setBankTotal] = useState(0);
+  const [invoiceTotal, setInvoiceTotal] = useState(0);
+  const [matchLoading, setMatchLoading] = useState(false);
+
+  const [selectedBankId, setSelectedBankId] = useState<string | null>(null);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
+
+  const [contractType, setContractType] = useState<'PURCHASE' | 'SALES'>('PURCHASE');
+  const [contractSearch, setContractSearch] = useState('');
+  const [contracts, setContracts] = useState<ContractForMatch[]>([]);
+  const [contractsLoading, setContractsLoading] = useState(false);
+
+  const loadRecon = useCallback(async () => {
+    setReconLoading(true);
     try {
       const result = await getFullReconciliation();
-      setData(result);
-    } catch { /* */ } finally { setLoading(false); }
+      setReconData(result);
+    } catch { /* */ } finally { setReconLoading(false); }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  const loadUnmatched = useCallback(async () => {
+    try {
+      const result = await getUnmatchedItems({ page: 1, pageSize: 100 });
+      setBankItems(result.bankItems);
+      setInvoiceItems(result.invoiceItems);
+      setBankTotal(result.bankTotal);
+      setInvoiceTotal(result.invoiceTotal);
+    } catch { /* */ }
+  }, []);
 
-  const q = search.toLowerCase().trim();
+  const loadContracts = useCallback(async () => {
+    setContractsLoading(true);
+    try {
+      const list = await getContractsForMatch(contractType, contractSearch || undefined);
+      setContracts(list);
+    } catch { /* */ } finally { setContractsLoading(false); }
+  }, [contractType, contractSearch]);
 
-  const filteredMatched: MatchedEntry[] = data
-    ? data.matched.filter(m =>
-      !q || m.payName.toLowerCase().includes(q) || (m.invName || '').toLowerCase().includes(q)
-    )
-    : [];
+  const loadAll = useCallback(async () => {
+    await Promise.all([loadRecon(), loadUnmatched()]);
+  }, [loadRecon, loadUnmatched]);
 
-  const filteredUnmatchedPay: UnmatchedPayment[] = data
-    ? data.unmatchedPayments.filter(p => !q || p.counterpart.toLowerCase().includes(q))
-    : [];
+  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => { loadContracts(); }, [loadContracts]);
 
-  const filteredUnmatchedInv: UnmatchedInvoice[] = data
-    ? data.unmatchedInvoices.filter(i => !q || i.seller.toLowerCase().includes(q))
-    : [];
+  const selectedBank = bankItems.find(b => b.id === selectedBankId);
+  const selectedInvoice = invoiceItems.find(i => i.id === selectedInvoiceId);
+  const selectedContract = contracts.find(c => c.id === selectedContractId);
+  const hasSelection = !!(selectedBank || selectedInvoice);
+  const canLink = hasSelection && !!selectedContract;
 
-  const matchedSort = useTableSort<MatchedEntry, string>(
-    filteredMatched,
-    useCallback((item, key) => {
-      switch (key) {
-        case 'payName':
-          return item.payName;
-        case 'netPaid':
-          return item.netPaid;
-        case 'totalInvoice':
-          return item.totalInvoice;
-        case 'gap':
-          return item.gap;
-        case 'txnCount':
-          return item.txnCount;
-        case 'invCount':
-          return item.invCount;
-        default:
-          return null;
-      }
-    }, [])
-  );
+  const handleAutoMatch = async () => {
+    setMatchLoading(true);
+    try {
+      await postAutoMatch();
+      await loadAll();
+    } catch { /* */ } finally { setMatchLoading(false); }
+  };
 
-  const unmatchedPaySort = useTableSort<UnmatchedPayment, string>(
-    filteredUnmatchedPay,
-    useCallback((item, key) => {
-      switch (key) {
-        case 'counterpart':
-          return item.counterpart;
-        case 'netPaid':
-          return item.netPaid;
-        case 'txnCount':
-          return item.txnCount;
-        default:
-          return null;
-      }
-    }, [])
-  );
+  const handleLink = async () => {
+    if (!canLink) return;
+    const entityType = selectedBank ? 'BANK' : 'INVOICE';
+    const entityId = selectedBank ? selectedBank.id : selectedInvoice!.id;
+    try {
+      await postManualMatch({
+        entityType,
+        entityId,
+        contractId: selectedContract!.id,
+        contractType,
+      });
+      setSelectedBankId(null);
+      setSelectedInvoiceId(null);
+      setSelectedContractId(null);
+      await loadUnmatched();
+      await loadRecon();
+    } catch { /* */ }
+  };
 
-  const unmatchedInvSort = useTableSort<UnmatchedInvoice, string>(
-    filteredUnmatchedInv,
-    useCallback((item, key) => {
-      switch (key) {
-        case 'seller':
-          return item.seller;
-        case 'totalInvoice':
-          return item.totalInvoice;
-        case 'invCount':
-          return item.invCount;
-        default:
-          return null;
-      }
-    }, [])
-  );
+  const handleIgnore = async (entityType: 'BANK' | 'INVOICE', entityId: string) => {
+    try {
+      await postIgnore({ entityType, entityId });
+      if (entityType === 'BANK' && selectedBankId === entityId) setSelectedBankId(null);
+      if (entityType === 'INVOICE' && selectedInvoiceId === entityId) setSelectedInvoiceId(null);
+      await loadUnmatched();
+    } catch { /* */ }
+  };
 
-  const s = data?.summary;
+  const s = reconData?.summary;
 
   return (
     <div className="space-y-4">
       <ModuleTabHeader tabs={FINANCE_TABS} />
 
-      <div className="px-1">
-        <div className="flex items-center justify-between mb-4">
+      <div className="px-1 space-y-4">
+        {/* 操作栏 */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold">对账分析</h2>
-            <p className="text-xs text-muted-foreground">银行流水与发票按供应商自动匹配，识别缺票、多开票和未关联记录</p>
+            <p className="text-xs text-muted-foreground">银行流水与发票自动匹配 + 合同智能关联引擎</p>
           </div>
-          <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />刷新
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={loadAll} disabled={matchLoading || reconLoading}>
+              <RefreshCw className={`h-4 w-4 mr-1 ${(matchLoading || reconLoading) ? 'animate-spin' : ''}`} />刷新
+            </Button>
+            <Button size="sm" onClick={handleAutoMatch} disabled={matchLoading}>
+              <Zap className="h-4 w-4 mr-1" />自动匹配
+            </Button>
+          </div>
         </div>
 
         {/* 汇总卡片 */}
         {s && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <Card>
               <CardContent className="pt-4 pb-3 px-4">
                 <p className="text-xs text-muted-foreground mb-1">已匹配供应商</p>
@@ -174,284 +212,387 @@ export default function ReconciliationPage() {
             </Card>
             <Card>
               <CardContent className="pt-4 pb-3 px-4">
-                <p className="text-xs text-muted-foreground mb-1">无票付款</p>
-                <p className="text-lg font-bold">{s.unmatchedPaymentCount}</p>
-                <p className="text-[10px] text-muted-foreground">合计 ¥{fmt(s.unmatchedPaymentTotal)}</p>
+                <p className="text-xs text-muted-foreground mb-1">未匹配流水</p>
+                <p className="text-lg font-bold">{bankTotal}</p>
+                <p className="text-[10px] text-muted-foreground">待人工核对</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-4 pb-3 px-4">
-                <p className="text-xs text-muted-foreground mb-1">无流水发票</p>
-                <p className="text-lg font-bold">{s.unmatchedInvoiceCount}</p>
-                <p className="text-[10px] text-muted-foreground">合计 ¥{fmt(s.unmatchedInvoiceTotal)}</p>
+                <p className="text-xs text-muted-foreground mb-1">未匹配发票</p>
+                <p className="text-lg font-bold">{invoiceTotal}</p>
+                <p className="text-[10px] text-muted-foreground">待人工核对</p>
               </CardContent>
             </Card>
           </div>
         )}
 
-        {/* 搜索 */}
-        <div className="relative max-w-sm mb-3">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="搜索供应商名称"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-8 h-9"
-          />
-        </div>
-
-        {loading ? (
-          <Card><CardContent className="py-16 text-center text-muted-foreground">正在分析数据...</CardContent></Card>
-        ) : (
-          <Tabs value={tab} onValueChange={setTab}>
-            <TabsList className="mb-3">
-              <TabsTrigger value="matched" className="text-xs">
-                已匹配 ({filteredMatched.length})
-              </TabsTrigger>
-              <TabsTrigger value="unmatched_pay" className="text-xs">
-                无票付款 ({filteredUnmatchedPay.length})
-              </TabsTrigger>
-              <TabsTrigger value="unmatched_inv" className="text-xs">
-                无流水发票 ({filteredUnmatchedInv.length})
-              </TabsTrigger>
-            </TabsList>
-
-            {/* 已匹配供应商 */}
-            <TabsContent value="matched">
-              <Card>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <SortableTableHead
-                          sortKey="payName"
-                          currentSortKey={matchedSort.sortKey}
-                          currentSortDir={matchedSort.sortDir}
-                          onSort={matchedSort.onSort}
-                        >
-                          供应商
-                        </SortableTableHead>
-                        <SortableTableHead
-                          sortKey="netPaid"
-                          currentSortKey={matchedSort.sortKey}
-                          currentSortDir={matchedSort.sortDir}
-                          onSort={matchedSort.onSort}
-                          className="text-right"
-                        >
-                          净付款
-                        </SortableTableHead>
-                        <SortableTableHead
-                          sortKey="totalInvoice"
-                          currentSortKey={matchedSort.sortKey}
-                          currentSortDir={matchedSort.sortDir}
-                          onSort={matchedSort.onSort}
-                          className="text-right"
-                        >
-                          有效发票
-                        </SortableTableHead>
-                        <SortableTableHead
-                          sortKey="gap"
-                          currentSortKey={matchedSort.sortKey}
-                          currentSortDir={matchedSort.sortDir}
-                          onSort={matchedSort.onSort}
-                          className="text-right"
-                        >
-                          差额
-                        </SortableTableHead>
-                        <TableHead>状态</TableHead>
-                        <SortableTableHead
-                          sortKey="txnCount"
-                          currentSortKey={matchedSort.sortKey}
-                          currentSortDir={matchedSort.sortDir}
-                          onSort={matchedSort.onSort}
-                          className="text-right w-[60px]"
-                        >
-                          流水
-                        </SortableTableHead>
-                        <SortableTableHead
-                          sortKey="invCount"
-                          currentSortKey={matchedSort.sortKey}
-                          currentSortDir={matchedSort.sortDir}
-                          onSort={matchedSort.onSort}
-                          className="text-right w-[60px]"
-                        >
-                          发票
-                        </SortableTableHead>
-                        <TableHead className="w-[80px]">操作</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredMatched.length === 0 ? (
-                        <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">暂无匹配数据</TableCell></TableRow>
-                      ) : matchedSort.sortedData.map(m => (
-                        <TableRow key={m.payName} className={m.category === 'under_invoiced' ? 'bg-red-50/30 dark:bg-red-950/5' : m.category === 'over_invoiced' ? 'bg-amber-50/30 dark:bg-amber-950/5' : ''}>
-                          <TableCell className="max-w-[200px]">
-                            <span className="text-sm font-medium truncate block">{m.payName}</span>
-                            {m.invName && <span className="text-[10px] text-muted-foreground">发票名: {m.invName}</span>}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums font-medium">{fmt(m.netPaid)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{fmt(m.totalInvoice)}</TableCell>
-                          <TableCell className={`text-right tabular-nums font-medium ${m.gap > 0 ? 'text-red-600' : m.gap < 0 ? 'text-amber-600' : ''}`}>
-                            {m.gap > 0 ? '+' : ''}{fmt(m.gap)}
-                          </TableCell>
-                          <TableCell><GapBadge gap={m.gap} category={m.category} /></TableCell>
-                          <TableCell className="text-right text-xs text-muted-foreground">{m.txnCount}</TableCell>
-                          <TableCell className="text-right text-xs text-muted-foreground">{m.invCount}</TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" asChild>
-                                <Link href={`/dashboard/finance/bank-flow?search=${encodeURIComponent(m.payName)}`} title="查看流水">
-                                  <Landmark className="h-3.5 w-3.5" />
-                                </Link>
-                              </Button>
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" asChild>
-                                <Link href={`/dashboard/finance/invoices?search=${encodeURIComponent(m.invName || m.payName)}`} title="查看发票">
-                                  <FileText className="h-3.5 w-3.5" />
-                                </Link>
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </Card>
-            </TabsContent>
-
-            {/* 无票付款 */}
-            <TabsContent value="unmatched_pay">
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
-                    <FileWarning className="h-4 w-4 text-red-500" />
-                    <CardTitle className="text-sm">只有付款、没有对应发票的支出</CardTitle>
-                  </div>
-                  <CardDescription className="text-xs">这些付款对方在发票记录中未找到匹配的销方</CardDescription>
-                </CardHeader>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <SortableTableHead
-                          sortKey="counterpart"
-                          currentSortKey={unmatchedPaySort.sortKey}
-                          currentSortDir={unmatchedPaySort.sortDir}
-                          onSort={unmatchedPaySort.onSort}
-                        >
-                          付款对方
-                        </SortableTableHead>
-                        <SortableTableHead
-                          sortKey="netPaid"
-                          currentSortKey={unmatchedPaySort.sortKey}
-                          currentSortDir={unmatchedPaySort.sortDir}
-                          onSort={unmatchedPaySort.onSort}
-                          className="text-right"
-                        >
-                          净付款
-                        </SortableTableHead>
-                        <SortableTableHead
-                          sortKey="txnCount"
-                          currentSortKey={unmatchedPaySort.sortKey}
-                          currentSortDir={unmatchedPaySort.sortDir}
-                          onSort={unmatchedPaySort.onSort}
-                          className="text-right"
-                        >
-                          交易笔数
-                        </SortableTableHead>
-                        <TableHead className="w-[80px]">操作</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredUnmatchedPay.length === 0 ? (
-                        <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
-                      ) : unmatchedPaySort.sortedData.map(p => (
-                        <TableRow key={p.counterpart}>
-                          <TableCell className="font-medium">{p.counterpart}</TableCell>
-                          <TableCell className="text-right tabular-nums text-red-600 font-medium">{fmt(p.netPaid)}</TableCell>
-                          <TableCell className="text-right text-muted-foreground">{p.txnCount}</TableCell>
-                          <TableCell>
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" asChild>
-                              <Link href={`/dashboard/finance/bank-flow?search=${encodeURIComponent(p.counterpart)}`} title="查看流水">
-                                <Landmark className="h-3.5 w-3.5" />
-                              </Link>
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </Card>
-            </TabsContent>
-
-            {/* 无流水发票 */}
-            <TabsContent value="unmatched_inv">
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-500" />
-                    <CardTitle className="text-sm">有发票但未找到对应银行流水</CardTitle>
-                  </div>
-                  <CardDescription className="text-xs">可能为个人垫付、跨年结算或名称不匹配导致</CardDescription>
-                </CardHeader>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <SortableTableHead
-                          sortKey="seller"
-                          currentSortKey={unmatchedInvSort.sortKey}
-                          currentSortDir={unmatchedInvSort.sortDir}
-                          onSort={unmatchedInvSort.onSort}
-                        >
-                          发票销方
-                        </SortableTableHead>
-                        <SortableTableHead
-                          sortKey="totalInvoice"
-                          currentSortKey={unmatchedInvSort.sortKey}
-                          currentSortDir={unmatchedInvSort.sortDir}
-                          onSort={unmatchedInvSort.onSort}
-                          className="text-right"
-                        >
-                          有效发票金额
-                        </SortableTableHead>
-                        <SortableTableHead
-                          sortKey="invCount"
-                          currentSortKey={unmatchedInvSort.sortKey}
-                          currentSortDir={unmatchedInvSort.sortDir}
-                          onSort={unmatchedInvSort.onSort}
-                          className="text-right"
-                        >
-                          发票张数
-                        </SortableTableHead>
-                        <TableHead className="w-[80px]">操作</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredUnmatchedInv.length === 0 ? (
-                        <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
-                      ) : unmatchedInvSort.sortedData.map(i => (
-                        <TableRow key={i.seller}>
-                          <TableCell className="font-medium">{i.seller}</TableCell>
-                          <TableCell className="text-right tabular-nums font-medium">{fmt(i.totalInvoice)}</TableCell>
-                          <TableCell className="text-right text-muted-foreground">{i.invCount}</TableCell>
-                          <TableCell>
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" asChild>
-                              <Link href={`/dashboard/finance/invoices?search=${encodeURIComponent(i.seller)}`} title="查看发票">
-                                <FileText className="h-3.5 w-3.5" />
-                              </Link>
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </Card>
-            </TabsContent>
-          </Tabs>
+        {/* 选中操作栏 */}
+        {hasSelection && (
+          <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/50 rounded-lg border">
+            <span className="text-sm">
+              已选：
+              {selectedBank && <span className="font-medium">流水 {selectedBank.counterpart}</span>}
+              {selectedInvoice && <span className="font-medium">发票 {selectedInvoice.seller}</span>}
+              {selectedContract && (
+                <>
+                  <ArrowRightLeft className="inline h-3 w-3 mx-1 text-muted-foreground" />
+                  <span className="font-medium">{contractType === 'PURCHASE' ? '采购' : '销售'}合同 {contractLabel(selectedContract)}</span>
+                </>
+              )}
+            </span>
+            <div className="flex-1" />
+            <Button size="sm" variant="default" disabled={!canLink} onClick={handleLink}>
+              <Link2 className="h-4 w-4 mr-1" />确认关联
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => { setSelectedBankId(null); setSelectedInvoiceId(null); }}>
+              <Unlink className="h-4 w-4 mr-1" />取消选择
+            </Button>
+          </div>
         )}
+
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList>
+            <TabsTrigger value="analysis" className="text-xs">对账分析</TabsTrigger>
+            <TabsTrigger value="match" className="text-xs">智能关联</TabsTrigger>
+          </TabsList>
+
+          {/* 原有对账分析 Tab */}
+          <TabsContent value="analysis">
+            {reconLoading ? (
+              <Card><CardContent className="py-16 text-center text-muted-foreground">正在分析数据...</CardContent></Card>
+            ) : !reconData ? (
+              <Card><CardContent className="py-16 text-center text-muted-foreground">暂无数据</CardContent></Card>
+            ) : (
+              <ReconciliationAnalysisView data={reconData} />
+            )}
+          </TabsContent>
+
+          {/* 智能关联 Tab */}
+          <TabsContent value="match">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* 左：未匹配银行流水 */}
+              <Card className="flex flex-col max-h-[70vh]">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-2">
+                    <Landmark className="h-4 w-4 text-blue-500" />
+                    <CardTitle className="text-sm">未匹配银行流水</CardTitle>
+                    <Badge variant="secondary" className="text-[10px]">{bankTotal}</Badge>
+                  </div>
+                </CardHeader>
+                <div className="flex-1 overflow-auto px-4 pb-4">
+                  {bankItems.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">暂无未匹配流水</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {bankItems.map(txn => (
+                        <div
+                          key={txn.id}
+                          className={`p-2 rounded-md border cursor-pointer transition-colors ${
+                            selectedBankId === txn.id
+                              ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                              : 'border-border hover:bg-accent'
+                          }`}
+                          onClick={() => {
+                            setSelectedBankId(prev => prev === txn.id ? null : txn.id);
+                            setSelectedInvoiceId(null);
+                            setContractType(txn.direction === 'OUT' ? 'PURCHASE' : 'SALES');
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium truncate max-w-[140px]">{txn.counterpart || '-'}</span>
+                            <span className={`text-sm font-bold tabular-nums ${txn.direction === 'OUT' ? 'text-red-600' : 'text-green-600'}`}>
+                              {txn.direction === 'OUT' ? '-' : '+'}¥{fmt(Math.abs(txn.amount))}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-[10px] text-muted-foreground">{txn.txnDate}</span>
+                            <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{txn.summary || ''}</span>
+                          </div>
+                          <div className="flex justify-end gap-1 mt-1">
+                            <Button size="sm" variant="ghost" className="h-6 text-[10px] px-1" onClick={(e) => { e.stopPropagation(); handleIgnore('BANK', txn.id); }}>
+                              <EyeOff className="h-3 w-3 mr-0.5" />忽略
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </Card>
+
+              {/* 中：合同列表 */}
+              <Card className="flex flex-col max-h-[70vh]">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-2">
+                    {contractType === 'PURCHASE' ? <Package className="h-4 w-4 text-orange-500" /> : <Ship className="h-4 w-4 text-teal-500" />}
+                    <CardTitle className="text-sm">合同列表</CardTitle>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="flex rounded-md border overflow-hidden">
+                      <button
+                        className={`px-2 py-1 text-xs ${contractType === 'PURCHASE' ? 'bg-primary text-primary-foreground' : 'bg-background'}`}
+                        onClick={() => setContractType('PURCHASE')}
+                      >采购</button>
+                      <button
+                        className={`px-2 py-1 text-xs ${contractType === 'SALES' ? 'bg-primary text-primary-foreground' : 'bg-background'}`}
+                        onClick={() => setContractType('SALES')}
+                      >销售</button>
+                    </div>
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2 top-1.5 h-3 w-3 text-muted-foreground" />
+                      <Input
+                        placeholder="搜索合同或客户"
+                        value={contractSearch}
+                        onChange={e => setContractSearch(e.target.value)}
+                        className="pl-6 h-7 text-xs"
+                      />
+                    </div>
+                  </div>
+                </CardHeader>
+                <div className="flex-1 overflow-auto px-4 pb-4">
+                  {contractsLoading ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">加载中...</p>
+                  ) : contracts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">无合同数据</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {contracts.map(c => (
+                        <div
+                          key={c.id}
+                          className={`p-2 rounded-md border cursor-pointer transition-colors ${
+                            selectedContractId === c.id
+                              ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                              : 'border-border hover:bg-accent'
+                          }`}
+                          onClick={() => setSelectedContractId(prev => prev === c.id ? null : c.id)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">{c.contractNo}</span>
+                            <Badge variant="outline" className="text-[10px]">{contractType === 'PURCHASE' ? '采购' : '销售'}</Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5 truncate">{contractLabel(c)}</div>
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-[10px] text-muted-foreground">总额 ¥{fmt(c.totalAmount)}</span>
+                            <span className="text-[10px] font-medium text-orange-600">未收/付 ¥{fmt(contractUnpaid(c))}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </Card>
+
+              {/* 右：未匹配发票 */}
+              <Card className="flex flex-col max-h-[70vh]">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-violet-500" />
+                    <CardTitle className="text-sm">未匹配发票</CardTitle>
+                    <Badge variant="secondary" className="text-[10px]">{invoiceTotal}</Badge>
+                  </div>
+                </CardHeader>
+                <div className="flex-1 overflow-auto px-4 pb-4">
+                  {invoiceItems.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">暂无未匹配发票</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {invoiceItems.map(inv => (
+                        <div
+                          key={inv.id}
+                          className={`p-2 rounded-md border cursor-pointer transition-colors ${
+                            selectedInvoiceId === inv.id
+                              ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                              : 'border-border hover:bg-accent'
+                          }`}
+                          onClick={() => {
+                            setSelectedInvoiceId(prev => prev === inv.id ? null : inv.id);
+                            setSelectedBankId(null);
+                            setContractType('PURCHASE');
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium truncate max-w-[140px]">{inv.seller}</span>
+                            <span className="text-sm font-bold tabular-nums">¥{fmt(inv.total)}</span>
+                          </div>
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-[10px] text-muted-foreground">{inv.invDate}</span>
+                            <span className="text-[10px] text-muted-foreground">{inv.invNo || '-'}</span>
+                          </div>
+                          <div className="flex justify-end gap-1 mt-1">
+                            <Button size="sm" variant="ghost" className="h-6 text-[10px] px-1" onClick={(e) => { e.stopPropagation(); handleIgnore('INVOICE', inv.id); }}>
+                              <EyeOff className="h-3 w-3 mr-0.5" />忽略
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
+
+// ========== 原有对账分析视图（提取为子组件，保持功能完整）==========
+
+function ReconciliationAnalysisView({ data }: { data: FullReconciliationResult }) {
+  const [search, setSearch] = useState('');
+  const q = search.toLowerCase().trim();
+
+  const filteredMatched = data.matched.filter(m =>
+    !q || m.payName.toLowerCase().includes(q) || (m.invName || '').toLowerCase().includes(q)
+  );
+  const filteredUnmatchedPay = data.unmatchedPayments.filter(p => !q || p.counterpart.toLowerCase().includes(q));
+  const filteredUnmatchedInv = data.unmatchedInvoices.filter(i => !q || i.seller.toLowerCase().includes(q));
+
+  return (
+    <div className="space-y-4">
+      <div className="relative max-w-sm">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="搜索供应商名称"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="pl-8 h-9"
+        />
+      </div>
+
+      <div className="space-y-4">
+        {/* 已匹配供应商 */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">已匹配供应商 ({filteredMatched.length})</CardTitle></CardHeader>
+          <div className="overflow-x-auto px-4 pb-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>供应商</TableHead>
+                  <TableHead className="text-right">净付款</TableHead>
+                  <TableHead className="text-right">有效发票</TableHead>
+                  <TableHead className="text-right">差额</TableHead>
+                  <TableHead>状态</TableHead>
+                  <TableHead className="w-[80px]">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredMatched.length === 0 ? (
+                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">暂无匹配数据</TableCell></TableRow>
+                ) : filteredMatched.map(m => (
+                  <TableRow key={m.payName} className={m.category === 'under_invoiced' ? 'bg-red-50/30 dark:bg-red-950/5' : m.category === 'over_invoiced' ? 'bg-amber-50/30 dark:bg-amber-950/5' : ''}>
+                    <TableCell className="max-w-[200px]">
+                      <span className="text-sm font-medium truncate block">{m.payName}</span>
+                      {m.invName && <span className="text-[10px] text-muted-foreground">发票名: {m.invName}</span>}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">{fmt(m.netPaid)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmt(m.totalInvoice)}</TableCell>
+                    <TableCell className={`text-right tabular-nums font-medium ${m.gap > 0 ? 'text-red-600' : m.gap < 0 ? 'text-amber-600' : ''}`}>
+                      {m.gap > 0 ? '+' : ''}{fmt(m.gap)}
+                    </TableCell>
+                    <TableCell>
+                      {m.category === 'under_invoiced' ? (
+                        <Badge variant="destructive" className="text-[10px]">缺票 ¥{fmt(m.gap)}</Badge>
+                      ) : m.category === 'over_invoiced' ? (
+                        <Badge className="text-[10px] bg-amber-500 hover:bg-amber-500">多开 ¥{fmt(Math.abs(m.gap))}</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-green-600 border-green-200 text-[10px]">已匹配</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" asChild>
+                          <Link href={`/dashboard/finance/bank-flow?search=${encodeURIComponent(m.payName)}`}><Landmark className="h-3.5 w-3.5" /></Link>
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" asChild>
+                          <Link href={`/dashboard/finance/invoices?search=${encodeURIComponent(m.invName || m.payName)}`}><FileText className="h-3.5 w-3.5" /></Link>
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+
+        {/* 无票付款 */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <FileWarning className="h-4 w-4 text-red-500" />
+              <CardTitle className="text-sm">无票付款 ({filteredUnmatchedPay.length})</CardTitle>
+            </div>
+          </CardHeader>
+          <div className="overflow-x-auto px-4 pb-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>付款对方</TableHead>
+                  <TableHead className="text-right">净付款</TableHead>
+                  <TableHead className="text-right">交易笔数</TableHead>
+                  <TableHead className="w-[80px]">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUnmatchedPay.length === 0 ? (
+                  <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
+                ) : filteredUnmatchedPay.map(p => (
+                  <TableRow key={p.counterpart}>
+                    <TableCell className="font-medium">{p.counterpart}</TableCell>
+                    <TableCell className="text-right tabular-nums text-red-600 font-medium">{fmt(p.netPaid)}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{p.txnCount}</TableCell>
+                    <TableCell>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" asChild>
+                        <Link href={`/dashboard/finance/bank-flow?search=${encodeURIComponent(p.counterpart)}`}><Landmark className="h-3.5 w-3.5" /></Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+
+        {/* 无流水发票 */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <CardTitle className="text-sm">无流水发票 ({filteredUnmatchedInv.length})</CardTitle>
+            </div>
+          </CardHeader>
+          <div className="overflow-x-auto px-4 pb-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>发票销方</TableHead>
+                  <TableHead className="text-right">有效发票金额</TableHead>
+                  <TableHead className="text-right">发票张数</TableHead>
+                  <TableHead className="w-[80px]">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUnmatchedInv.length === 0 ? (
+                  <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
+                ) : filteredUnmatchedInv.map(i => (
+                  <TableRow key={i.seller}>
+                    <TableCell className="font-medium">{i.seller}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">{fmt(i.totalInvoice)}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{i.invCount}</TableCell>
+                    <TableCell>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" asChild>
+                        <Link href={`/dashboard/finance/invoices?search=${encodeURIComponent(i.seller)}`}><FileText className="h-3.5 w-3.5" /></Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
       </div>
     </div>
   );

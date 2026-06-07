@@ -1310,6 +1310,7 @@ export default function CreatePurchasePage() {
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
                     <TableHead className="w-10 text-center">
                       <input
+                        id="batch-select-all"
                         type="checkbox"
                         className="h-3.5 w-3.5 rounded border-border"
                         checked={
@@ -1356,6 +1357,7 @@ export default function CreatePurchasePage() {
                       >
                         <TableCell className="text-center">
                           <input
+                            id={`batch-product-${product.id}`}
                             type="checkbox"
                             className="h-3.5 w-3.5 rounded border-border"
                             checked={selectedProductIds.has(product.id)}

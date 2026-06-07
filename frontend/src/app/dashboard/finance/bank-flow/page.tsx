@@ -21,13 +21,14 @@ import { Button } from '@/components/ui/button';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { ArrowDownLeft, ArrowUpRight, Search, X, ChevronLeft, ChevronRight, FileText, ArrowLeftRight } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Search, X, ChevronLeft, ChevronRight, FileText, ArrowLeftRight, Upload } from 'lucide-react';
 import Link from 'next/link';
 import {
   getTransactions, getTransactionStats, getBatches,
   type BankTransaction, type BankFlowStats, type FinanceDataBatch,
 } from '@/services/bankFlow.service';
 import { PaymentListCard } from '@/components/finance/PaymentListCard';
+import { BankFlowImportDialog } from './components/BankFlowImportDialog';
 
 function fmt(n: number) {
   return new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
@@ -50,6 +51,7 @@ export default function BankFlowPage() {
   const [stats, setStats] = useState<BankFlowStats | null>(null);
   const [batches, setBatches] = useState<FinanceDataBatch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [importOpen, setImportOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -194,6 +196,9 @@ export default function BankFlowPage() {
               <X className="h-3 w-3 mr-1" />清除
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+            <Upload className="h-3 w-3 mr-1" />导入
+          </Button>
         </div>
 
         {/* 移动端卡片视图 */}
@@ -351,6 +356,8 @@ export default function BankFlowPage() {
             </div>
           </div>
         )}
+
+        <BankFlowImportDialog open={importOpen} onOpenChange={setImportOpen} onSuccess={loadData} />
       </div>
     </div>
   );

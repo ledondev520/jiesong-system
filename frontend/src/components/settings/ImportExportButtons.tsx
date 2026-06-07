@@ -120,7 +120,7 @@ export function ImportExportButtons<T extends Record<string, unknown>>({
           <Upload className="h-3.5 w-3.5" />
           导入 Excel
         </Button>
-        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
+        <input ref={fileRef} id="import-file-input" type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
       </div>
 
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>

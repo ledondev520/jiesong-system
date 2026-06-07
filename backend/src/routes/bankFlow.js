@@ -8,7 +8,8 @@
 
 const { Router } = require('express');
 const ctrl = require('../controllers/bankFlowController');
-const { authenticate } = require('../middleware/auth');
+const importCtrl = require('../controllers/financeImportController');
+const { authenticate, roleAuth } = require('../middleware/auth');
 const { withPaginationValidation } = require('../utils/validators');
 
 const router = Router();
@@ -41,5 +42,17 @@ router.get('/reconciliation/full', ctrl.getFullReconciliation);
 
 // GET /api/v1/bank-flow/incoming-summary
 router.get('/incoming-summary', ctrl.getIncomingSummary);
+
+// POST /api/v1/bank-flow/import/preview — 预览银行对账单
+router.post('/import/preview', roleAuth('ADMIN', 'FINANCE'), importCtrl.upload.single('file'), importCtrl.previewBankFlow);
+
+// POST /api/v1/bank-flow/import — 导入银行对账单
+router.post('/import', roleAuth('ADMIN', 'FINANCE'), importCtrl.upload.single('file'), importCtrl.importBankFlow);
+
+// POST /api/v1/bank-flow/invoices/import/preview — 预览发票
+router.post('/invoices/import/preview', roleAuth('ADMIN', 'FINANCE'), importCtrl.upload.single('file'), importCtrl.previewInvoices);
+
+// POST /api/v1/bank-flow/invoices/import — 导入发票
+router.post('/invoices/import', roleAuth('ADMIN', 'FINANCE'), importCtrl.upload.single('file'), importCtrl.importInvoices);
 
 module.exports = router;

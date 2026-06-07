@@ -187,6 +187,11 @@ def exp2500002_plan() -> dict[str, Any]:
     burbank_packing = find_by(db_packing, store="Burbank", quantity=771.84)
     anaheim_771_packing = find_by(db_packing, store="安纳汉姆", quantity=771.84)
     anaheim_300_packing = find_by(db_packing, store="安纳汉姆", quantity=300.0)
+    burbank_decision_note = str((burbank_sales[0].get("note") if burbank_sales else "") or "")
+    resolved_to_burbank = (
+        "BUSINESS_DECISION_2026-06-07" in burbank_decision_note
+        and not anaheim_sales
+    )
 
     shared_safety = [
         "写库前必须备份 backend/prisma/dev.db。",
@@ -196,12 +201,12 @@ def exp2500002_plan() -> dict[str, Any]:
     ]
     return {
         "subject": "EXP2500002 / 瓷砖",
-        "status": "awaiting_business_decision",
+        "status": "closed_by_business_decision" if resolved_to_burbank else "awaiting_business_decision",
         "current_rows": {
             "sales": [row_ref(row) for row in db_sales],
             "packing": [row_ref(row) for row in db_packing],
         },
-        "decision_options": [
+        "decision_options": [] if resolved_to_burbank else [
             {
                 "option": "keep_current",
                 "required_input": ["确认暂不处理门店冲突"],
@@ -314,16 +319,17 @@ def exp2400006_plan() -> dict[str, Any]:
         "不能使用出货汇总 invoice_no=25312000000011328975 替代海关编号。",
         "写库后必须运行真实凭证导入 dry-run、完成度审计和来源覆盖审计。",
     ]
+    resolved_reference_only = "不创建报关单" in str((contract or {}).get("note") or "")
     return {
         "subject": "EXP2400006",
-        "status": "awaiting_formal_evidence",
+        "status": "closed_reference_only" if resolved_reference_only else "awaiting_formal_evidence",
         "current_rows": {
             "contract": contract,
             "sales": [row_ref(row) for row in db_sales],
             "packing": [row_ref(row) for row in db_packing],
             "customs": db_customs,
         },
-        "decision_options": [
+        "decision_options": [] if resolved_reference_only else [
             {
                 "option": "keep_reference_only",
                 "required_input": ["确认该空运底稿仅作参考，不创建报关单"],
@@ -369,6 +375,7 @@ def exp2400006_plan() -> dict[str, Any]:
 def build_report() -> dict[str, Any]:
     dossier = load_json(DOSSIER_JSON, {})
     plans = [exp2500002_plan(), exp2400006_plan()]
+    unresolved = [plan for plan in plans if not str(plan.get("status", "")).startswith("closed_")]
     return {
         "status": "remaining_decision_execution_plan_ready",
         "mode": "read_only_no_apply",
@@ -377,7 +384,7 @@ def build_report() -> dict[str, Any]:
             "subjects": len(plans),
             "db_writes": 0,
             "file_copies": 0,
-            "requires_user_or_formal_decision": 2,
+            "requires_user_or_formal_decision": len(unresolved),
         },
         "plans": plans,
     }
@@ -386,6 +393,15 @@ def build_report() -> dict[str, Any]:
 def write_csv(report: dict[str, Any]) -> None:
     rows = []
     for plan in report["plans"]:
+        if str(plan.get("status", "")).startswith("closed_"):
+            rows.append({
+                "subject": plan["subject"],
+                "option": "closed",
+                "required_input": "",
+                "operation_count": 0,
+                "operation_kinds": "",
+            })
+            continue
         for option in plan["decision_options"]:
             rows.append({
                 "subject": plan["subject"],
@@ -438,6 +454,9 @@ def write_md(report: dict[str, Any]) -> None:
             f"- 状态：`{plan['status']}`",
             "",
         ])
+        if str(plan.get("status", "")).startswith("closed_"):
+            lines.extend(["该项已按数据库中的业务决策备注关闭；当前无需用户继续裁决。", ""])
+            continue
         for option in plan["decision_options"]:
             lines.extend([
                 f"### {option['option']}",

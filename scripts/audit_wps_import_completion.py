@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 PARSED_DIR = ROOT / "tmp/wps_11_export_list_raw/parsed"
+DB_PATH = ROOT / "backend/prisma/dev.db"
 
 
 def load_json(path: Path, default: Any) -> Any:
@@ -35,10 +37,46 @@ def sum_keys(data: dict[str, Any], keys: list[str]) -> int:
     return sum(int_number(data.get(key)) for key in keys)
 
 
+def db_value(query: str, params: tuple[Any, ...] = ()) -> Any:
+    if not DB_PATH.exists():
+        return None
+    with sqlite3.connect(str(DB_PATH)) as conn:
+        row = conn.execute(query, params).fetchone()
+    return row[0] if row else None
+
+
+def decision_is_resolved(item: dict[str, Any]) -> bool:
+    subject = str(item.get("subject") or "")
+    category = str(item.get("category") or "")
+    if "EXP2500002" in subject and category == "sales_missing_store":
+        note = db_value(
+            """
+            SELECT si.note
+            FROM sales_items si
+            JOIN sales_contracts sc ON sc.id = si.salesContractId
+            JOIN products p ON p.id = si.productId
+            JOIN stores st ON st.id = si.storeId
+            WHERE sc.contractNo = 'EXP2500002'
+              AND p.customsName LIKE '%瓷砖%'
+              AND st.name = 'Burbank'
+              AND abs(si.quantity - 771.84) < 0.0001
+            LIMIT 1
+            """
+        )
+        return "BUSINESS_DECISION_2026-06-07" in str(note or "")
+    if "EXP2400006" in subject and category == "evidence_customs_declaration_blocked":
+        note = db_value(
+            "SELECT note FROM sales_contracts WHERE contractNo = 'EXP2400006' LIMIT 1"
+        )
+        return "不创建报关单" in str(note or "")
+    return False
+
+
 def decision_summary(decisions: list[dict[str, Any]]) -> dict[str, Any]:
-    counts = Counter(item.get("category", "unknown") for item in decisions)
+    unresolved = [item for item in decisions if not decision_is_resolved(item)]
+    counts = Counter(item.get("category", "unknown") for item in unresolved)
     return {
-        "count": len(decisions),
+        "count": len(unresolved),
         "counts": dict(sorted(counts.items())),
         "items": [
             {
@@ -49,7 +87,7 @@ def decision_summary(decisions: list[dict[str, Any]]) -> dict[str, Any]:
                 "required_decision": item.get("required_decision"),
                 "suggested_next_step": item.get("suggested_next_step"),
             }
-            for item in decisions
+            for item in unresolved
         ],
     }
 

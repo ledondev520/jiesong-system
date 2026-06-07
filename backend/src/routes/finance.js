@@ -10,6 +10,7 @@ const { Router } = require('express');
 const multer = require('multer');
 const financeController = require('../controllers/financeController');
 const financialStatementsController = require('../controllers/financialStatementsController');
+const financeMatchController = require('../controllers/financeMatchController');
 const { authenticate, roleAuth } = require('../middleware/auth');
 const { withPaginationValidation, body, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
@@ -100,5 +101,41 @@ router.get('/statements', financialStatementsController.listStatements);
 
 // GET /api/v1/finance/statements/:year/:month - 获取指定账期详情
 router.get('/statements/:year/:month', financialStatementsController.getStatementDetail);
+
+// ==================== 智能关联引擎路由 ====================
+
+// POST /api/v1/finance/auto-match - 触发自动匹配
+router.post(
+  '/auto-match',
+  roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  financeMatchController.autoMatch
+);
+
+// GET /api/v1/finance/unmatched - 获取未匹配项列表
+router.get('/unmatched', withPaginationValidation, financeMatchController.getUnmatched);
+
+// GET /api/v1/finance/contracts-for-match - 获取可用于匹配的合同列表
+router.get('/contracts-for-match', financeMatchController.listContracts);
+
+// POST /api/v1/finance/match - 人工确认关联
+router.post(
+  '/match',
+  roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  financeMatchController.manualMatch
+);
+
+// POST /api/v1/finance/unmatch - 解除关联
+router.post(
+  '/unmatch',
+  roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  financeMatchController.unmatch
+);
+
+// POST /api/v1/finance/ignore - 忽略该项
+router.post(
+  '/ignore',
+  roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  financeMatchController.ignore
+);
 
 module.exports = router;
