@@ -6,7 +6,7 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const prisma = require('../utils/prisma');
 const config = require('../config');

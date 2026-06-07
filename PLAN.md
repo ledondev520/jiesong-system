@@ -1,5 +1,57 @@
 # Ops Execution Center Plan
 
+## 2026-06-07 LOGIN-03（快捷登录不再复用缓存密码）
+
+### Goal
+- 修复本地开发服务点击快捷登录后仍可能拿浏览器缓存旧密码登录，进而提示“请输入正确的用户和密码”的问题。
+- 确认注册/登录认证页面不再显示“你已开启快捷登录，可一键进入系统。”这句状态文案。
+
+### Delivered
+- 登录页旧快捷登录缓存 `jiesong_quick_login_profile` 进入页面即清理，不再解析或复用缓存里的用户名/密码。
+- 手动登录成功后只清理旧缓存，不再把密码写回浏览器本地存储。
+- 本地开发快捷登录只保留代码内置的 `admin / 123456` 开发入口；若该入口与本地库不一致，提示改为“本地快捷登录账号与数据库密码不一致，请手动输入账号密码登录。”，不再透出普通账号密码错误文案。
+- 注册页源码未包含该状态文案；认证页面搜索确认目标文案已不存在。
+
+### Verification
+- `cd frontend && npm run test -- 'src/app/(auth)/login/page.test.tsx' 'src/app/(auth)/register/page.test.tsx'`：通过，`9` 个测试。
+- `cd frontend && npm run lint -- 'src/app/(auth)/login/page.tsx' 'src/app/(auth)/login/page.test.tsx' 'src/app/(auth)/register/page.tsx' 'src/app/(auth)/register/page.test.tsx'`：通过，`0` error。
+- `cd frontend && npx tsc --noEmit`：本次登录/注册文件无新增类型错误；全量检查仍被既有 `src/app/dashboard/contracts/template/page.test.tsx` 的 `ContractTemplateUploadPage` 返回 `void` 问题阻断。
+- `rg -n "你已开启快捷登录|请输入正确的用户和密码" 'frontend/src/app/(auth)'`：无命中。
+
+### Remaining
+- 本轮只调整本地代码与认证页测试，尚未处理既有合同模板页面类型错误。
+
+## 2026-06-07 PERF-API-01（接口响应基线与启动巡检降噪）
+
+### Goal
+- 建立当前本地后端接口响应时间基线，围绕“页面切换慢 / 接口 2 秒内”目标找出真实慢点。
+- 优先修复会影响本地使用体验的认证路径和启动后台任务噪音。
+
+### Delivered
+- 新增只读巡检脚本 `scripts/audit_api_response_times.js`，覆盖本地页面切换常用读接口、详情接口和关键查询，共 `110` 个样本。
+- 修正巡检样本：`/finance/contracts-for-match` 按当前 Interface 带 `contractType=PURCHASE/SALES`，避免把缺参数 400 误判为性能问题。
+- `authService` 从 `bcryptjs` 切到项目已安装的原生 `bcrypt`，降低登录密码校验路径的 CPU 阻塞风险。
+- 开发模式启动后端时不再立即跑 patrol；生产或显式 `PATROL_RUN_ON_START=true` 时仍可启动即巡检。
+- 修复 patrol 通知写库：当前 `Notification` Interface 没有 `metadata` 字段，改为写入 `link`，避免启动时 Prisma validation error。
+- 新增 `scripts/audit_page_navigation_times.js`，用 Playwright 自动登录并测主要页面切换耗时，同时记录页面期间触发的 API 请求耗时。
+- 新增 `scripts/audit_api_route_inventory.js`，从 Express Router 读取后端路由清单，按 read/write/import/export/ai_external 分类，并对齐当前实测覆盖。
+
+### Verification
+- 历史后端日志：`139` 条请求中有 `2` 条超过 2 秒；分别是一次 `POST /api/v1/auth/login` `32401ms`，一次 AI agent 外部调用 `14480ms`。
+- 旧进程基线：`110` 个样本，`108` OK、`0` 超过 2 秒、`0` HTTP 错误、`2` 个因当前库无数据跳过；最慢 `hs_codes_list=854ms`。
+- 新代码临时后端 `3011` 基线：`110` 个样本，`108` OK、`0` 超过 2 秒、`0` HTTP 错误、`2` 个因当前库无数据跳过；最慢 `auth_login=409ms`。
+- 新代码临时后端登录重复测速：`5` 次均返回 200，耗时 `0.404s` 至 `0.824s`。
+- 当前本地前端 `3000` 页面导航基线：`31` 个主要页面、`2` 轮共 `62` 次导航全部通过，`0` 个页面超过 2 秒；最慢 `dashboard_home=1287ms`。
+- 页面导航期间触发的 API 请求：`0` 个超过 2 秒；最慢请求为通知生成 `352ms`。
+- 路由清单：后端共 `265` 条路由；当前实测覆盖 `85` 条，其中普通读接口覆盖 `79/114`，写接口、导入、导出、AI 外部调用已明确列为未闭环范围。
+- `cd backend && NODE_ENV=test JWT_SECRET=test-only-jwt-secret-for-ci-123456 node --test src/services/patrolService.test.js src/services/authService.test.js src/controllers/authController.test.js src/routes/auth.test.js`：通过，`7` 个测试。
+- `node --check scripts/audit_api_response_times.js scripts/audit_page_navigation_times.js scripts/audit_api_route_inventory.js`：通过。
+- 临时后端启动验证：开发模式启动不立即执行 patrol，未再出现 `metadata` 写库错误。
+
+### Remaining
+- 已证明当前热路径页面切换和普通读接口均低于 2 秒；尚未把写库 POST/PUT/DELETE、文件导入/导出大 payload、AI 外部模型调用纳入安全实测。
+- 下一步需要针对 `tmp/performance/api-route-inventory.md` 中未测的 `180` 条路由做安全样本分层：只读可直接扩展，写接口必须用测试库或回滚夹具，AI 外部调用必须单独 SLA，不应和普通 CRUD 合并。
+
 ## 2026-06-07 LOGIN-02（本地快捷登录缓存失效与文案修复）
 
 ### Goal
@@ -9143,3 +9195,23 @@
 ### Remaining
 - 本轮未调整仓储物流徽标统计；当前仍沿用既有侧边栏计数逻辑。
 - 本轮不改变线上/线下数据同步状态。
+
+## 2026-06-07 Round 131（采购合同模板归属）
+
+### Goal
+- 将采购模块中的「合同模板」从独立 Tab/页面入口收回到采购合同页内部。
+- 避免模板管理作为采购模块的单独页面 Interface。
+
+### Delivered
+- 采购模块 Tab 只保留「采购合同」「供应商管理」。
+- 采购合同页工具栏新增「合同模板」弹窗入口，支持查看当前模板、上传 `.docx` 替换模板、删除模板。
+- 旧 `/dashboard/contracts/templates` 与 `/dashboard/contracts/template` 路由改为重定向回 `/dashboard/contracts`。
+
+### Validation
+- 目标测试 4 个文件、18 个用例通过。
+- 目标文件 lint 通过。
+- `npm run build` 通过，保留既有 Turbopack NFT warning。
+- 生产预览验证：采购 Tab 不再显示合同模板；页内弹窗可打开；旧模板 URL 自动回采购合同页。
+
+### Remaining
+- 全量 `npx tsc --noEmit` 当前被未提交的登录页测试改动阻塞，阻塞点是 `frontend/src/app/(auth)/login/page.test.tsx` 的 `user` 未定义，非本轮采购模板改动。

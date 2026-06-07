@@ -283,14 +283,7 @@ const persistPatrolFindings = async (findings) => {
         type: 'PATROL_ALERT',
         title: finding.title,
         content: finding.detail,
-        metadata: JSON.stringify({
-          category: finding.category,
-          severity: finding.severity,
-          rule: finding.rule,
-          entityType: finding.entityType,
-          entityId: finding.entityId,
-          autoFixPolicy: finding.autoFixPolicy,
-        }),
+        link: '/dashboard/system/notifications',
       });
     }
   }

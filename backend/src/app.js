@@ -115,7 +115,9 @@ const PORT = config.port;
 if (require.main === module) {
   startInventoryAlertJob();
   startAgentCredentialAlertJob();
-  startPatrolJob();
+  startPatrolJob({
+    runOnStart: config.nodeEnv === 'production' || process.env.PATROL_RUN_ON_START === 'true',
+  });
   app.listen(PORT, () => {
     console.log(`
 ╔════════════════════════════════════════════╗
