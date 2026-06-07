@@ -10,7 +10,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DashboardPage from './page';
-import type { ReactNode } from 'react';
 import { Role } from '@/types';
 
 const mockPush = vi.fn();
@@ -55,21 +54,6 @@ vi.mock('@/services/financialStatements.service', () => ({
   financialStatementsService: {
     listStatements: (...args: unknown[]) => mockListStatements(...args),
   },
-}));
-
-vi.mock('recharts', () => ({
-  ResponsiveContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  LineChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  Line: () => <div>Line</div>,
-  BarChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  Bar: () => <div>Bar</div>,
-  AreaChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  Area: () => <div>Area</div>,
-  XAxis: () => <div>XAxis</div>,
-  YAxis: () => <div>YAxis</div>,
-  CartesianGrid: () => <div>Grid</div>,
-  Tooltip: () => <div>Tooltip</div>,
-  Legend: () => <div>Legend</div>,
 }));
 
 describe('DashboardPage 交互逻辑', () => {
@@ -117,35 +101,31 @@ describe('DashboardPage 交互逻辑', () => {
     render(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('管理工作台')).toBeInTheDocument();
-      expect(screen.getByText('采购、销售、仓储物流、财务')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '工作台' })).toBeInTheDocument();
       expect(screen.getByText('待起草采购')).toBeInTheDocument();
-      expect(screen.getByText('待补录出口')).toBeInTheDocument();
+      expect(screen.getByText('出口待补录')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('仓储物流')).toBeInTheDocument();
-    expect(screen.getByText('财务')).toBeInTheDocument();
+    expect(screen.queryByText('仓储物流')).not.toBeInTheDocument();
+    expect(screen.getByText('库存记录')).toBeInTheDocument();
     expect(screen.getByText('近期待办')).toBeInTheDocument();
   });
 
-  it('点击模块动作跳转到对应主线路径', async () => {
+  it('点击快速动作跳转到对应路径', async () => {
     const user = userEvent.setup();
     render(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('管理工作台')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '工作台' })).toBeInTheDocument();
     });
 
-    await user.click(screen.getAllByText('新建采购合同')[0].closest('button')!);
+    await user.click(screen.getByRole('button', { name: /新建采购合同/ }));
     expect(mockPush).toHaveBeenCalledWith('/dashboard/purchase/create');
 
-    await user.click(screen.getAllByText('供应商')[0].closest('button')!);
-    expect(mockPush).toHaveBeenCalledWith('/dashboard/suppliers');
+    await user.click(screen.getByRole('button', { name: /新建出口合同/ }));
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/sales/create');
 
-    await user.click(screen.getByRole('button', { name: /进入仓储物流/ }));
-    expect(mockPush).toHaveBeenCalledWith('/dashboard/logistics');
-
-    await user.click(screen.getByRole('button', { name: /^进入采购/ }));
-    expect(mockPush).toHaveBeenCalledWith('/dashboard/contracts');
+    await user.click(screen.getByRole('button', { name: /查看报关单/ }));
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/tax-refunds?view=customs');
   });
 });

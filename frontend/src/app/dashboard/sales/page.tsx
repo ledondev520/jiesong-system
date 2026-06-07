@@ -1,9 +1,9 @@
 /**
- * Input: 销售合同服务 (salesService)、通用表格排序 hook
- * Output: 销售合同列表页面（含删除、列排序、分页与搜索）
- * Pos: 销售合同管理入口，展示合同列表、货柜信息，支持删除操作
+ * Input: 出口合同服务 (salesService)、通用表格排序 hook
+ * Output: 出口合同列表页面（含删除、列排序、分页与搜索）
+ * Pos: 出口合同管理入口，展示合同列表、货柜信息，支持删除操作
  *
- * 2026-01-26 新增：管理员可删除销售合同（带确认对话框）
+ * 2026-01-26 新增：管理员可删除出口合同（带确认对话框）
  * 2026-06-07 改造：物流进度可视化、货柜信息、金额列优化、状态图标化
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -195,7 +195,7 @@ export default function SalesPage() {
   /**
    * 职责：导出单份合同为标准销售 Excel（三 Sheet）
    * 思路：调用 salesService.exportExcel 触发浏览器下载
-   * @param contract - 要导出的销售合同对象
+   * @param contract - 要导出的出口合同对象
    */
   const handleExportExcel = async (contract: SalesContract) => {
     setExportingId(contract.id);
@@ -321,7 +321,7 @@ export default function SalesPage() {
   }, [contracts, searchQuery]);
 
   /**
-   * 职责：从销售合同行取出可排序字段（编号、日期时间戳、箱数、体积、金额）
+   * 职责：从出口合同行取出可排序字段（编号、日期时间戳、箱数、体积、金额）
    */
   const salesAccessor = useCallback((item: SalesContract, key: string) => {
     switch (key) {

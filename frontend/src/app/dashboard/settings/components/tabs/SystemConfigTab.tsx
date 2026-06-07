@@ -406,7 +406,7 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                           {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : '同步'}
                         </Button>
                       </div>
-                      <FormDescription>用于销售合同的初始汇率填充。</FormDescription>
+                      <FormDescription>用于出口合同的初始汇率填充。</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

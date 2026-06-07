@@ -9,6 +9,7 @@
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
 import { TaxRefundForm } from '../components/TaxRefundForm';
 import { taxRefundService, type TaxRefundUpsertInput } from '@/services/taxRefund.service';
 
@@ -30,6 +31,7 @@ export default function CreateTaxRefundPage() {
 
   return (
     <div className="space-y-6 pb-10">
+      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
         title="新建退税单"
         description="录入退税批次主键、金额与申报时间。"

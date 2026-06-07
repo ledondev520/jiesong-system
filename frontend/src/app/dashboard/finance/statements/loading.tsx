@@ -1,7 +1,7 @@
 /**
  * Input: none
- * Output: 财务报表兼容跳转骨架屏
- * Pos: Next.js App Router streaming skeleton，旧报表路由跳转时即时展示
+ * Output: 财务报表页面骨架屏
+ * Pos: Next.js App Router streaming skeleton，财务报表加载时即时展示
  */
 
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -12,7 +12,7 @@ export default function StatementsLoading() {
       {/* Tab 导航占位 */}
       <div className="mb-6 border-b">
         <div className="flex items-end gap-0 h-11">
-          {['财务总览', '收付管理'].map((label) => (
+          {['财务概览', '财务报表', '收付管理'].map((label) => (
             <div
               key={label}
               className="flex min-h-[44px] items-center px-4 py-2.5 text-sm text-muted-foreground"

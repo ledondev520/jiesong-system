@@ -11,6 +11,7 @@
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
 import { CustomsDeclarationForm } from '@/app/customs-declarations/components/CustomsDeclarationForm';
 import { customsDeclarationService } from '@/services/customsDeclaration.service';
 import type { CustomsDeclarationUpsertInput } from '@/services/customsDeclaration.service';
@@ -33,10 +34,11 @@ export default function CreateCustomsDeclarationPage() {
 
   return (
     <div className="space-y-6 pb-10">
+      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
         title="新建报关单"
         description="录入出口报关基础信息、金额重量与商品申报明细。"
-        backHref="/dashboard/customs-declarations"
+        backHref="/dashboard/tax-refunds?view=customs"
       />
       <CustomsDeclarationForm
         submitLabel="保存并查看详情"

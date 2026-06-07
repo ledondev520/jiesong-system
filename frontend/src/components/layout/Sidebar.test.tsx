@@ -70,6 +70,12 @@ describe('Sidebar', () => {
     expect(getByText('系统管理')).toBeInTheDocument();
   });
 
+  it('不再渲染仓储物流顶层入口', () => {
+    const { queryByText } = render(<Sidebar />);
+
+    expect(queryByText('仓储物流')).not.toBeInTheDocument();
+  });
+
   it('侧边栏不再渲染退出登录按钮', () => {
     const { queryByRole } = render(<Sidebar />);
     expect(queryByRole('button', { name: '退出登录' })).not.toBeInTheDocument();

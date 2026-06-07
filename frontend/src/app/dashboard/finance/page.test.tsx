@@ -1,6 +1,6 @@
 /**
- * Input: 财务驾驶舱页面、finance stats API、system exchange-rate API
- * Output: 财务驾驶舱页交互逻辑测试结果
+ * Input: 财务概览页面、finance stats API、system exchange-rate API、financial statements API
+ * Output: 财务概览页交互逻辑测试结果
  * Pos: 前端业务页交互测试
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -71,10 +71,6 @@ describe('FinancePage 交互逻辑', () => {
     mockGetStatementDetail.mockReset();
     mockImportFromFolder.mockReset();
     mockImportFile.mockReset();
-    // 默认 exchange-rate 返回
-    mockApiGet.mockResolvedValue({
-      data: { rate: 6.8, buffer: 0.2, effectiveRate: 6.6 },
-    });
     mockGetTransactionStats.mockResolvedValue({ totalIn: 0, totalOut: 0, netFlow: 0, txnCount: 0 });
     mockGetInvoiceStats.mockResolvedValue({
       validTotal: 0,
@@ -150,7 +146,7 @@ describe('FinancePage 交互逻辑', () => {
       balanceSheet,
       incomeStatement,
     };
-    mockGetAnalytics.mockResolvedValue({
+    const analytics = {
       trends: [
         {
           label: '2025-01',
@@ -178,7 +174,36 @@ describe('FinancePage 交互逻辑', () => {
         incomeStatement,
       },
       totalPeriods: 1,
+    };
+    mockApiGet.mockImplementation((url: string) => {
+      if (url.includes('/system/exchange-rate')) {
+        return Promise.resolve({
+          data: { rate: 6.8, buffer: 0.2, effectiveRate: 6.6 },
+        });
+      }
+      if (url.includes('/finance/payment-trends')) {
+        return Promise.resolve({
+          data: [
+            { label: '上期', receivables: 800, payables: 300 },
+            { label: '本期', receivables: 1000, payables: 400 },
+          ],
+        });
+      }
+      if (url.includes('/finance/overdue-receivables')) {
+        return Promise.resolve({ data: [] });
+      }
+      if (url.includes('/finance/statements/analytics')) {
+        return Promise.resolve({ code: 200, data: analytics });
+      }
+      if (url.includes('/finance/statements/2025/1')) {
+        return Promise.resolve({ code: 200, data: period });
+      }
+      if (url.includes('/finance/statements')) {
+        return Promise.resolve({ code: 200, data: [period] });
+      }
+      return Promise.resolve({ data: null });
     });
+    mockGetAnalytics.mockResolvedValue(analytics);
     mockListStatements.mockResolvedValue([period]);
     mockGetStatementDetail.mockResolvedValue(period);
   });
@@ -192,16 +217,13 @@ describe('FinancePage 交互逻辑', () => {
     render(<FinancePage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '财务总览' })).toBeInTheDocument();
-      expect(screen.getByText('先看收付压力，再下钻经营报表')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '财务概览' })).toBeInTheDocument();
+      expect(screen.getByText('先看收付压力，再下钻经营执行')).toBeInTheDocument();
       expect(screen.getByText('应付账款总额')).toBeInTheDocument();
       expect(screen.getByText('待收账款')).toBeInTheDocument();
       expect(screen.getByText(/当前客户剩余欠款/)).toBeInTheDocument();
       expect(screen.getByText('经营进度与报表分析')).toBeInTheDocument();
-      expect(screen.getAllByText('收入与利润趋势').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('成本结构').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('资产负债').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('账期详情').length).toBeGreaterThan(0);
+      expect(screen.getByTestId('financial-statements-section')).toBeInTheDocument();
     });
   });
 

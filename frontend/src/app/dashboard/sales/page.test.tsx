@@ -1,6 +1,6 @@
 /**
- * Input: 销售合同页面、salesService、router、toast
- * Output: 销售合同页交互逻辑测试结果
+ * Input: 出口合同页面、salesService、router、toast
+ * Output: 出口合同页交互逻辑测试结果
  * Pos: 前端业务页交互测试
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -58,24 +58,24 @@ describe('SalesPage 交互逻辑', () => {
     mockToastSuccess.mockReset();
   });
 
-  it('加载后展示销售模块概览与空态文案', async () => {
+  it('加载后展示出口模块概览与空态文案', async () => {
     mockGetAll.mockResolvedValue({ data: { items: [] } });
     render(<SalesPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '销售合同' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '出口合同' })).toBeInTheDocument();
       expect(screen.getByText('待装柜')).toBeInTheDocument();
       expect(screen.getByText('在途')).toBeInTheDocument();
-      expect(screen.getAllByText('暂无销售合同')).toHaveLength(2);
+      expect(screen.getAllByText('暂无出口合同')).toHaveLength(2);
     });
   });
 
-  it('点击新增销售合同按钮会跳转创建页', async () => {
+  it('点击新增出口合同按钮会跳转创建页', async () => {
     mockGetAll.mockResolvedValue({ data: { items: [] } });
     const user = userEvent.setup();
     render(<SalesPage />);
 
-    await user.click(screen.getByRole('button', { name: /新增销售合同/ }));
+    await user.click(screen.getByRole('button', { name: /新增出口合同/ }));
     expect(mockPush).toHaveBeenCalledWith('/dashboard/sales/create');
   });
 
@@ -84,7 +84,7 @@ describe('SalesPage 交互逻辑', () => {
     render(<SalesPage />);
 
     await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalledWith('加载销售合同失败');
+      expect(mockToastError).toHaveBeenCalledWith('加载出口合同失败');
     });
   });
 

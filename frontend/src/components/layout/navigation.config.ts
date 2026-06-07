@@ -55,7 +55,8 @@ export const EXPORT_TABS: TabConfig[] = [
 ];
 
 export const FINANCE_TABS: TabConfig[] = [
-  { href: '/dashboard/finance', label: '财务总览' },
+  { href: '/dashboard/finance', label: '财务概览' },
+  { href: '/dashboard/finance/statements', label: '财务报表' },
   { href: '/dashboard/payments', label: '收付管理' },
 ];
 
@@ -232,9 +233,7 @@ export const isTabRouteActive = (pathname: string | null, href: string) => {
       pathname.startsWith('/dashboard/customs-declarations/')
     );
   }
-  if (href === '/dashboard/finance') {
-    return pathname === '/dashboard/finance' || pathname === '/dashboard/finance/statements';
-  }
+  if (href === '/dashboard/finance') return pathname === '/dashboard/finance';
   if (href === '/dashboard/payments') {
     return [
       '/dashboard/payments',

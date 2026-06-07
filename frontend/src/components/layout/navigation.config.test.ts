@@ -51,10 +51,30 @@ describe('navigation.config helpers', () => {
     expect(procurement?.childPrefixes).not.toContain('/dashboard/contract-templates');
   });
 
+  it('出口模块只保留出口合同、出口退税和 HS 编码', () => {
+    const exportModule = MODULE_NAV_ITEMS.find((item) => item.key === 'export');
+
+    expect(exportModule?.label).toBe('出口');
+    expect(exportModule?.tabs.map((tab) => tab.label)).toEqual(['出口合同', '出口退税', 'HS 编码']);
+    expect(exportModule?.childPrefixes).toContain('/dashboard/customs-declarations');
+    expect(exportModule?.childPrefixes).toContain('/dashboard/hs-codes');
+  });
+
+  it('顶层导航不再展示仓储物流模块', () => {
+    expect(MODULE_NAV_ITEMS.map((item) => item.key)).not.toContain('logistics');
+    expect(MODULE_NAV_ITEMS.map((item) => item.label)).not.toContain('仓储物流');
+  });
+
   it('财务模块只保留两个顶层工作入口', () => {
     const finance = MODULE_NAV_ITEMS.find((item) => item.key === 'finance');
 
-    expect(finance?.tabs.map((tab) => tab.label)).toEqual(['财务总览', '收付管理']);
+    expect(finance?.tabs.map((tab) => tab.label)).toEqual(['财务概览', '财务报表', '收付管理']);
+  });
+
+  it('系统管理只保留常规管理入口', () => {
+    const admin = MODULE_NAV_ITEMS.find((item) => item.key === 'admin');
+
+    expect(admin?.tabs.map((tab) => tab.label)).toEqual(['系统配置', '账号管理', '商品档案', '系统日志']);
   });
 
   it('AI 助手作为独立模块，不挂在系统管理 Tab 下', () => {
@@ -79,14 +99,21 @@ describe('navigation.config helpers', () => {
     expect(getModuleTargetHref(adminItem!)).toBe('/dashboard/settings');
   });
 
-  it('finance tab 合并报表路由，收付子路由仍归到收付管理', () => {
+  it('finance tab 激活与 statements 不串扰', () => {
     expect(isTabRouteActive('/dashboard/finance', '/dashboard/finance')).toBe(true);
-    expect(isTabRouteActive('/dashboard/finance/statements', '/dashboard/finance')).toBe(true);
+    expect(isTabRouteActive('/dashboard/finance/statements', '/dashboard/finance')).toBe(false);
+    expect(isTabRouteActive('/dashboard/finance/statements', '/dashboard/finance/statements')).toBe(true);
     expect(isTabRouteActive('/dashboard/finance/statements', '/dashboard/payments')).toBe(false);
     expect(isTabRouteActive('/dashboard/finance/receivable', '/dashboard/payments')).toBe(true);
     expect(isTabRouteActive('/dashboard/finance/payable', '/dashboard/payments')).toBe(true);
     expect(isTabRouteActive('/dashboard/finance/bank-flow', '/dashboard/payments')).toBe(true);
     expect(isTabRouteActive('/dashboard/finance/invoices', '/dashboard/payments')).toBe(true);
     expect(isTabRouteActive('/dashboard/finance/reconciliation', '/dashboard/payments')).toBe(true);
+  });
+
+  it('旧仓储物流路径归入采购库存状态，报关单归入出口退税', () => {
+    expect(isTabRouteActive('/dashboard/logistics', '/dashboard/inventory-status')).toBe(true);
+    expect(isTabRouteActive('/dashboard/customs-declarations', '/dashboard/tax-refunds')).toBe(true);
+    expect(isTabRouteActive('/dashboard/customs-declarations/create', '/dashboard/tax-refunds')).toBe(true);
   });
 });

@@ -10,6 +10,7 @@ import userEvent from '@testing-library/user-event';
 import TaxRefundsDashboardPage from './page';
 
 const mockPush = vi.fn();
+const mockReplace = vi.fn();
 const mockGetAll = vi.fn();
 const mockGenerateDrafts = vi.fn();
 const mockSearchParamGet = vi.fn();
@@ -19,6 +20,7 @@ const mockToastSuccess = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
+    replace: mockReplace,
   }),
   useSearchParams: () => ({
     get: (...args: unknown[]) => mockSearchParamGet(...args),
@@ -49,6 +51,7 @@ vi.mock('@/lib/api-cache', () => ({
 describe('TaxRefundsDashboardPage 交互逻辑', () => {
   beforeEach(() => {
     mockPush.mockReset();
+    mockReplace.mockReset();
     mockGetAll.mockReset();
     mockGenerateDrafts.mockReset();
     mockToastError.mockReset();
@@ -102,6 +105,8 @@ describe('TaxRefundsDashboardPage 交互逻辑', () => {
     });
 
     expect(screen.getByDisplayValue('TR-2026')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '报关单' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '退税记录' })).toBeInTheDocument();
     expect(screen.getAllByText('TR-2026-001').length).toBeGreaterThan(0);
     expect(screen.getAllByText('等待税局反馈').length).toBeGreaterThan(0);
   });
@@ -133,7 +138,7 @@ describe('TaxRefundsDashboardPage 交互逻辑', () => {
 
     render(<TaxRefundsDashboardPage />);
 
-    // 新建退税单按钮已在 Phase 4 中移除，退税单通过销售合同流程创建
+    // 新建退税单按钮已移除，退税单通过出口合同流程创建
     expect(screen.queryByRole('button', { name: '新建退税单' })).not.toBeInTheDocument();
 
     await user.click(await screen.findByRole('button', { name: /查看详情 TR-2026-002/ }));

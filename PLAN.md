@@ -1,5 +1,60 @@
 # Ops Execution Center Plan
 
+## 2026-06-07 NAV-FE-11（业务模块导航收口）
+
+### Goal
+- 将顶层导航收敛为 `经营中台 / 采购 / 出口 / 财务 / AI 助手 / 系统管理` 六个 Module。
+- 移除顶层 `仓储物流`，将库存状态并入采购，将报关单并入出口退税工作区。
+- 保留旧路由兼容，不做数据库或后端重构。
+
+### Delivered
+- `navigation.config.ts` 收敛顶层 Module：`采购` 增加 `库存状态`，`出口` 固定为 `出口合同 / 出口退税 / HS 编码`，系统管理移除 `项目驾驶舱 / 关于` 顶层 Tab。
+- 新增 `/dashboard/inventory-status`，复用现有 `InventoryTab`；旧 `/dashboard/logistics` 跳转到库存状态，旧 `/dashboard/logistics/containers` 跳到出口合同。
+- `/dashboard/tax-refunds` 改为合并工作区，内部切换 `报关单 / 退税记录`；旧 `/dashboard/customs-declarations` 跳到 `?view=customs`，详情/创建/编辑页保留并显示出口 Tab。
+- `/dashboard` 工作台移除四个重复模块卡片，改为经营指标、近期待办、快速动作和资金摘要；`/dashboard/reports` 作为 `经营执行` 使用。
+- 财务恢复三入口：`财务概览 / 财务报表 / 收付管理`，`/dashboard/finance/statements` 重新渲染独立财务报表页。
+
+### Verification
+- 导航测试：`cd frontend && npm test -- --run src/components/layout/navigation.config.test.ts src/components/layout/Sidebar.test.ts src/components/layout/ModuleTabHeader.test.ts` 通过，`21` 个测试。
+- 页面归属测试：`cd frontend && npm test -- --run src/app/dashboard/page.test.tsx src/app/dashboard/tax-refunds/page.test.tsx src/app/dashboard/hs-codes/page.test.tsx src/app/dashboard/ai/page.test.tsx` 通过，`11` 个测试。
+- 相关回归测试：报关单、财务报表、财务概览、出口合同创建/列表测试通过，`18` 个测试。
+- 目标 lint 通过；`cd frontend && npx tsc --noEmit --pretty false` 通过；`git diff --check` 通过。
+- 独立浏览器验收通过，截图在 `RESULTS/nav-workbench-dashboard.png`、`RESULTS/nav-procurement-inventory-status.png`、`RESULTS/nav-export-tax-customs.png`。
+
+### Remaining
+- 本轮不删除旧页面能力，只移除顶层暴露并保留兼容跳转。
+- 工作区里存在非本轮 backend 导出差异和 `.playwright-mcp` 未跟踪文件，提交时不能混入。
+
+## 2026-06-07 PERF-FE-10（销售详情点击无响应诊断与首屏瘦身）
+
+### Goal
+- 解释销售合同卡片点击“详情”后长时间无响应的真实原因，区分开发模式冷编译、前端 dev 代理、源码编译错误、后端接口和页面首屏 bundle。
+- 保持本地仍使用 `localhost:3000` 前端与 `localhost:3001` 后端，不新增额外开发端口。
+- 让销售详情热路径进入可交互范围，并留下可复验数字。
+
+### Delivered
+- 修复销售页编译阻断：`frontend/src/components/mobile/index.ts` 重复导出 `MobileListCard`，导致销售列表和详情页返回 `500`。
+- 增加本机 `frontend/.env.local`，用 `NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1` 让 axios 业务请求直连后端，避开 Next dev rewrite 的秒级代理开销；保留 `/api/v1` rewrite 给仍使用原生 `fetch` 的上传/下载路径。
+- 将销售详情页非首屏能力改为按需加载：`modern-screenshot` 在点击“保存为图片”时才加载；“一键生成三张表”对话框只在打开时懒加载。
+- 重启并清理不健康的旧 `3000` Next dev 进程，恢复当前前端监听。
+
+### Evidence
+- 故障时，详情页 HTML 请求曾出现 `169.16s`、`47.63s`，后端对应业务接口为毫秒级。
+- 未修复前真实浏览器点击 EXP260007：点击到标题出现 `5844ms`，详情接口 `82ms`，附件接口 `57ms`。
+- 二次热路径未修复前仍为 `2897ms`，但详情接口仅 `19ms`，附件接口 `1ms`，证明瓶颈在前端 bundle / dev 编译，不在销售详情数据 Interface。
+- 修复后真实浏览器点击 EXP260007：`417ms`、`824ms`；详情接口 `16ms`、`8ms`；附件接口 `10ms`、`2ms`。
+- `/api/v1/contracts/:id/files` rewrite 已恢复为单 `/api/v1` 前缀，不再出现 `/api/v1/api/v1/...`。
+
+### Verification
+- `cd frontend && npm test -- --run 'src/app/dashboard/sales/[id]/page.test.tsx'`：通过，`4` 个测试。
+- `cd frontend && npx eslint 'src/app/dashboard/sales/[id]/components/SalesDetailPageContent.tsx' 'src/components/mobile/index.ts'`：通过。
+- `cd frontend && npx tsc --noEmit --pretty false`：通过。
+- 一次性 Playwright 浏览器测速：登录、打开销售列表、点击 EXP260007 详情，点击到标题出现低于 `1s`。
+
+### Remaining
+- Next dev 刚重启后的页面 HTML 仍会有冷编译等待，例如销售列表曾有 `54.82s` / `34.95s` 的冷启动样本；这类等待不应出现在生产构建，但本地 dev 首次访问仍可能出现。
+- 若要让本地与线上性能口径更一致，下一步应增加一个固定的“本地预览模式”脚本：先 build，再用同一 `3000` 或指定端口 start 做验收；这属于运行方式补强，不是当前销售详情 Interface 问题。
+
 ## 2026-06-07 CI-04（GitHub Code Quality Node 版本固定）
 
 ### Goal
@@ -9633,3 +9688,25 @@
 
 ### Remaining
 - 本轮不改变模块实际待办统计的业务逻辑，只是不再在左侧导航展示。
+
+## 2026-06-07 Round 135（财务总览与报表合并）
+
+### Goal
+- 财务模块顶部只保留「财务总览」「收付管理」两个入口。
+- 将财务报表能力并入财务总览，让同一页面承接公司财务进度、收付压力、收入利润、成本结构、资产负债和账期详情下钻。
+
+### Delivered
+- `FINANCE_TABS` 收敛为「财务总览」「收付管理」，旧 `/dashboard/finance/statements` 兼容跳转到 `/dashboard/finance#financial-statements`。
+- 财务总览页标题、描述和顶部行动区改为先看收付压力，再进入收付管理或报表分析。
+- 新增财务总览内嵌报表分析区块，复用现有财务报表服务 Interface、上传三表 Excel、扫描导入全部和账期选择。
+- 原报表图表从内部大 Tab 改为页内锚点区块：收入与利润趋势、成本结构、资产负债、账期详情。
+
+### Validation
+- 目标测试 6 个文件、19 个用例通过。
+- 触达文件 lint 通过。
+- `npx tsc --noEmit --pretty false` 通过；先清理了损坏的 `.next/dev/types` 生成缓存。
+- `git diff --check` 通过。
+
+### Remaining
+- 旧目标测试中包含 `src/app/dashboard/payments/page.test.tsx` 时，会被仓库既有 `frontend/src/components/mobile/index.ts` 重复导出 `MobileListCard` 阻塞，非本轮财务合并改动。
+- 本地 3000 独立无登录浏览器打开 `/dashboard/finance` 时 body 为空且无前端错误，无法作为有效业务页面文本验证；本轮以目标测试、lint、类型检查和源码锚点检查交付。

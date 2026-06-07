@@ -1,7 +1,7 @@
 /**
  * Input: HSCode 搜索服务（keyword 商品名称 / code HS 编码前缀）、AI 推荐接口（集成 HSCIQ 归类实例 + 官方税率）
  * Output: HSCode 查询页面（含双搜索框 + AI 推荐 HS 编码 + HSCIQ 官方税率 + AI 填写申报要素 + 一键复制报关格式）
- * Pos: 仓储物流模块子页面 - HSCode 检索
+ * Pos: 出口模块子页面 - HSCode 检索
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */

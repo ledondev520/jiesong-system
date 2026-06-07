@@ -30,6 +30,7 @@ vi.mock('react', async () => {
 });
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/dashboard/customs-declarations/cd-1',
   useRouter: () => ({
     push: mockRouterPush,
     back: vi.fn(),

@@ -76,7 +76,7 @@ function TabButton({
 /**
  * 职责：渲染移动端底部固定 TabBar，提供核心模块快速跳转和"更多"二级菜单
  * 思路：
- *   1. 前 4 个 Tab 直接映射到核心模块（经营中台、采购、销售、财务）
+ *   1. 前 4 个 Tab 直接映射到核心模块（经营中台、采购、出口、财务）
  *   2. 第 5 个 Tab"更多"打开底部 Sheet，包含 AI 助手、系统管理、用户信息与退出
  *   3. 活动状态：使用 isModuleRouteActive 精确判断当前模块
  *   4. 点击模块时保留 tab 记忆跳转（getModuleTargetHref）

@@ -93,10 +93,10 @@ describe('CreateSalesPage 交互逻辑', () => {
     render(<CreateSalesPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '下一步：销售明细' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '下一步：出口明细' })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: '下一步：销售明细' }));
+    await user.click(screen.getByRole('button', { name: '下一步：出口明细' }));
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: '创建合同' })).toBeInTheDocument();

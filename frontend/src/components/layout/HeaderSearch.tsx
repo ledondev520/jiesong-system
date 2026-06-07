@@ -54,7 +54,7 @@ const getTypeLabel = (type: DashboardSearchResultType) => {
     case 'purchase':
       return '采购';
     case 'sales':
-      return '销售合同';
+      return '出口合同';
   }
 };
 
@@ -133,7 +133,7 @@ export function HeaderSearch() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogHeader className="sr-only">
           <DialogTitle>全局搜索</DialogTitle>
-          <DialogDescription>搜索采购合同、销售合同、供应商、商品</DialogDescription>
+          <DialogDescription>搜索采购合同、出口合同、供应商、商品</DialogDescription>
         </DialogHeader>
         <DialogContent className="overflow-hidden p-0">
           <Command shouldFilter={false}>

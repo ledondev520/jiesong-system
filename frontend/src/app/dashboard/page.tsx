@@ -1,7 +1,7 @@
 /**
- * Input: 后端 dashboard API、采购/销售列表、当前用户
- * Output: 管理工作台首页（采购、销售、仓储物流、财务四个并行模块入口）
- * Pos: 系统首页，作为顶级模块导航与待办摘要的统一入口
+ * Input: 后端 dashboard API、采购/出口列表、当前用户
+ * Output: 经营中台工作台首页（跨业务指标、待办与快速动作）
+ * Pos: 经营中台首页，作为业务执行摘要而不是重复模块入口
  */
 
 'use client';
@@ -11,21 +11,16 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowRight,
   Banknote,
-  Boxes,
-  ClipboardList,
   FileText,
-  Landmark,
-  PackageOpen,
+  PackageCheck,
   Receipt,
-  Search,
   Ship,
   ShoppingCart,
-  Warehouse,
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, OPERATIONS_TABS } from '@/components/layout/ModuleTabHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { PurchaseStatus, SalesContract, SalesStatus } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
 import { salesService } from '@/services/sales.service';
@@ -41,20 +36,7 @@ type DashboardMetrics = {
   receivable: number;
   unpaidAmount: number;
   inventoryRecords: number;
-  productCount: number;
   latestFinancePeriod: string | null;
-};
-
-type WorkbenchModule = {
-  key: string;
-  title: string;
-  icon: typeof ShoppingCart;
-  href: string;
-  badge: string;
-  primaryLabel: string;
-  primaryHref: string;
-  metrics: Array<{ label: string; value: string | number }>;
-  links: Array<{ label: string; href: string; icon: typeof ShoppingCart }>;
 };
 
 const hasExportExecutionMetrics = (contract: Pick<SalesContract, 'status' | 'totalBoxes' | 'grossWeight' | 'volume'>) => {
@@ -67,8 +49,6 @@ const formatCurrency = (amount: number, currency: 'CNY' | 'USD') => {
   return `${currency === 'CNY' ? '¥' : '$'}${Math.round(amount).toLocaleString()}`;
 };
 
-const formatCount = (value: number) => value.toLocaleString();
-
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuthStore();
@@ -78,7 +58,6 @@ export default function DashboardPage() {
     receivable: 0,
     unpaidAmount: 0,
     inventoryRecords: 0,
-    productCount: 0,
     latestFinancePeriod: null,
   });
   const [draftTasks, setDraftTasks] = useState<TaskItem[]>([]);
@@ -109,7 +88,6 @@ export default function DashboardPage() {
           receivable: analytics?.contracts.sales.receivable || 0,
           unpaidAmount: analytics?.contracts.purchase.unpaidAmount || 0,
           inventoryRecords: analytics?.inventory.recordCount || 0,
-          productCount: analytics?.inventory.productCount || 0,
           latestFinancePeriod: periods[0]?.periodLabel || null,
         });
         setDraftTasks(draftPurchaseItems.slice(0, 4).map((contract) => ({ id: contract.id, contractNo: contract.contractNo })));
@@ -122,7 +100,6 @@ export default function DashboardPage() {
           receivable: 0,
           unpaidAmount: 0,
           inventoryRecords: 0,
-          productCount: 0,
           latestFinancePeriod: null,
         });
         setDraftTasks([]);
@@ -136,82 +113,11 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const modules = useMemo<WorkbenchModule[]>(() => [
-    {
-      key: 'procurement',
-      title: '采购',
-      icon: ShoppingCart,
-      href: '/dashboard/contracts',
-      badge: `${formatCount(metrics.draftPurchases)} 待起草`,
-      primaryLabel: '进入采购',
-      primaryHref: '/dashboard/contracts',
-      metrics: [
-        { label: '待起草采购', value: metrics.draftPurchases },
-        { label: '采购待付款', value: formatCurrency(metrics.unpaidAmount, 'CNY') },
-      ],
-      links: [
-        { label: '采购合同', href: '/dashboard/contracts', icon: FileText },
-        { label: '供应商', href: '/dashboard/suppliers', icon: ClipboardList },
-      ],
-    },
-    {
-      key: 'sales',
-      title: '销售',
-      icon: PackageOpen,
-      href: '/dashboard/sales',
-      badge: `${formatCount(metrics.exportPendingParams)} 待补录`,
-      primaryLabel: '进入销售',
-      primaryHref: '/dashboard/sales',
-      metrics: [
-        { label: '待补录出口', value: metrics.exportPendingParams },
-        { label: '销售待收款', value: formatCurrency(metrics.receivable, 'USD') },
-      ],
-      links: [
-        { label: '销售合同', href: '/dashboard/sales', icon: Ship },
-        { label: '出口退税', href: '/dashboard/tax-refunds', icon: Receipt },
-      ],
-    },
-    {
-      key: 'logistics',
-      title: '仓储物流',
-      icon: Warehouse,
-      href: '/dashboard/logistics',
-      badge: `${formatCount(metrics.inventoryRecords)} 库存记录`,
-      primaryLabel: '进入仓储物流',
-      primaryHref: '/dashboard/logistics',
-      metrics: [
-        { label: '库存记录', value: metrics.inventoryRecords },
-        { label: '商品档案', value: metrics.productCount },
-      ],
-      links: [
-        { label: '货柜装箱', href: '/dashboard/logistics/containers', icon: Boxes },
-        { label: '报关与 HS', href: '/dashboard/customs-declarations', icon: Search },
-      ],
-    },
-    {
-      key: 'finance',
-      title: '财务',
-      icon: Landmark,
-      href: '/dashboard/finance',
-      badge: metrics.latestFinancePeriod || '未上传账期',
-      primaryLabel: '进入财务',
-      primaryHref: '/dashboard/finance',
-      metrics: [
-        { label: '应收账款', value: formatCurrency(metrics.receivable, 'USD') },
-        { label: '应付账款', value: formatCurrency(metrics.unpaidAmount, 'CNY') },
-      ],
-      links: [
-        { label: '应收', href: '/dashboard/finance/receivable', icon: Banknote },
-        { label: '应付', href: '/dashboard/finance/payable', icon: Receipt },
-      ],
-    },
-  ], [metrics]);
-
   const topTasks = useMemo(() => [
     ...draftTasks.map((task) => ({
       id: task.id,
       title: task.contractNo || task.id,
-      label: '采购待起草',
+      label: '采购合同待起草',
       href: `/dashboard/purchase/${task.id}`,
     })),
     ...exportTasks.map((task) => ({
@@ -222,62 +128,35 @@ export default function DashboardPage() {
     })),
   ].slice(0, 6), [draftTasks, exportTasks]);
 
+  const indicators = [
+    { label: '待起草采购', value: metrics.draftPurchases, icon: ShoppingCart },
+    { label: '出口待补录', value: metrics.exportPendingParams, icon: Ship },
+    { label: '库存记录', value: metrics.inventoryRecords, icon: PackageCheck },
+    { label: '最新账期', value: metrics.latestFinancePeriod || '未上传', icon: Receipt },
+  ];
+
   if (!user) return null;
 
   return (
     <div className="space-y-8 pb-16">
+      <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
       <PageHeader
-        title="管理工作台"
-        description="采购、销售、仓储物流、财务"
+        title="工作台"
+        description="集中查看采购、出口、库存与资金的关键待办。"
         showBack={false}
       />
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="模块入口">
-        {modules.map((item) => (
-          <Card key={item.key} className="overflow-hidden border-border/70">
-            <CardHeader className="space-y-4 pb-3">
-              <div className="flex items-start justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => router.push(item.href)}
-                  className="flex min-w-0 items-center gap-3 text-left"
-                >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                    <item.icon className="h-5 w-5" />
-                  </span>
-                  <CardTitle className="truncate text-xl">{item.title}</CardTitle>
-                </button>
-                <Badge variant="secondary" className="shrink-0 rounded-md">
-                  {item.badge}
-                </Badge>
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="经营指标">
+        {indicators.map((item) => (
+          <Card key={item.label} className="border-border/70">
+            <CardContent className="flex items-center justify-between p-4">
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">{item.label}</p>
+                <p className="mt-1 truncate text-2xl font-semibold tabular-nums">{item.value}</p>
               </div>
-              <Button className="w-full justify-between rounded-md" onClick={() => router.push(item.primaryHref)}>
-                {item.primaryLabel}
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <dl className="grid grid-cols-2 gap-2">
-                {item.metrics.map((metric) => (
-                  <div key={metric.label} className="rounded-md bg-muted/50 p-3">
-                    <dt className="truncate text-xs text-muted-foreground">{metric.label}</dt>
-                    <dd className="mt-1 truncate text-lg font-semibold tabular-nums">{metric.value}</dd>
-                  </div>
-                ))}
-              </dl>
-              <div className="grid grid-cols-2 gap-2">
-                {item.links.map((link) => (
-                  <Button
-                    key={link.href}
-                    variant="outline"
-                    className="justify-start gap-2 rounded-md px-3"
-                    onClick={() => router.push(link.href)}
-                  >
-                    <link.icon className="h-4 w-4" />
-                    <span className="truncate">{link.label}</span>
-                  </Button>
-                ))}
-              </div>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <item.icon className="h-5 w-5" />
+              </span>
             </CardContent>
           </Card>
         ))}
@@ -288,7 +167,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold tracking-tight">近期待办</h2>
             <Button variant="ghost" className="rounded-md" onClick={() => router.push('/dashboard/reports')}>
-              经营报表
+              经营执行
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -315,7 +194,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold tracking-tight">快速新建</h2>
+          <h2 className="text-lg font-semibold tracking-tight">快速动作</h2>
           <div className="grid gap-2">
             <Button className="justify-start rounded-md" onClick={() => router.push('/dashboard/purchase/create')}>
               <ShoppingCart className="mr-2 h-4 w-4" />
@@ -323,13 +202,35 @@ export default function DashboardPage() {
             </Button>
             <Button className="justify-start rounded-md" variant="outline" onClick={() => router.push('/dashboard/sales/create')}>
               <Ship className="mr-2 h-4 w-4" />
-              新建销售合同
+              新建出口合同
             </Button>
-            <Button className="justify-start rounded-md" variant="outline" onClick={() => router.push('/dashboard/customs-declarations/create')}>
+            <Button className="justify-start rounded-md" variant="outline" onClick={() => router.push('/dashboard/tax-refunds?view=customs')}>
               <FileText className="mr-2 h-4 w-4" />
-              新建报关单
+              查看报关单
             </Button>
           </div>
+
+          <Card className="border-border/70">
+            <CardHeader>
+              <CardTitle className="text-sm text-muted-foreground">资金摘要</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <Banknote className="h-4 w-4" />
+                  出口待收
+                </span>
+                <span className="font-medium tabular-nums">{formatCurrency(metrics.receivable, 'USD')}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <Receipt className="h-4 w-4" />
+                  采购待付
+                </span>
+                <span className="font-medium tabular-nums">{formatCurrency(metrics.unpaidAmount, 'CNY')}</span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </section>
     </div>

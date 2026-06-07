@@ -1,16 +1,15 @@
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import FinancialStatementsPage from './page';
 
-const mockRedirect = vi.fn();
-
-vi.mock('next/navigation', () => ({
-  redirect: (href: string) => mockRedirect(href),
+vi.mock('./components/FinancialStatementsPageContent', () => ({
+  FinancialStatementsPageContent: () => <div data-testid="financial-statements-page-content" />,
 }));
 
-describe('FinancialStatementsPage 兼容路由', () => {
-  it('跳转到财务总览报表分析锚点', () => {
-    FinancialStatementsPage();
+describe('FinancialStatementsPage', () => {
+  it('渲染财务报表独立页面内容', () => {
+    render(<FinancialStatementsPage />);
 
-    expect(mockRedirect).toHaveBeenCalledWith('/dashboard/finance#financial-statements');
+    expect(screen.getByTestId('financial-statements-page-content')).toBeInTheDocument();
   });
 });

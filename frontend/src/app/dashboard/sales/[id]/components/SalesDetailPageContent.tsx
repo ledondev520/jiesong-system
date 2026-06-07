@@ -52,16 +52,19 @@ import {
 import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Progress } from '@/components/ui/progress';
 import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, Container, Anchor, Truck, CheckCircle2, CircleDashed, CircleDot, Clock, ArrowRight, DollarSign, MapPin } from 'lucide-react';
-import { domToPng } from 'modern-screenshot';
 import { toast } from 'sonner';
 import { CONTAINER_40HQ } from '@/lib/binPacking';
 import { formatDate } from '@/lib/date-format';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { GenerateThreeFormsDialog } from '@/components/dialog/GenerateThreeFormsDialog';
 import ContractFiles from '@/components/contract/ContractFiles';
 
 // 动态导入 3D 组件（避免 SSR 问题）
 const Container3DView = lazy(() => import('@/components/container/Container3DView'));
+const GenerateThreeFormsDialog = lazy(() =>
+  import('@/components/dialog/GenerateThreeFormsDialog').then((module) => ({
+    default: module.GenerateThreeFormsDialog,
+  })),
+);
 import { ContractInfoEditor } from '@/components/sales/ContractInfoEditor';
 
 interface PageProps {
@@ -150,6 +153,7 @@ export default function SalesDetailPage({ params }: PageProps) {
     const prevTab = activeTab;
     
     try {
+      const { domToPng } = await import('modern-screenshot');
       await loadReferenceData();
       const images: string[] = [];
 
@@ -1299,12 +1303,16 @@ export default function SalesDetailPage({ params }: PageProps) {
         </DialogContent>
       </Dialog>
 
-      <GenerateThreeFormsDialog
-        open={threeFormsDialogOpen}
-        onOpenChange={setThreeFormsDialogOpen}
-        salesContract={contract}
-        onGenerated={handleThreeFormsGenerated}
-      />
+      {threeFormsDialogOpen && (
+        <Suspense fallback={null}>
+          <GenerateThreeFormsDialog
+            open={threeFormsDialogOpen}
+            onOpenChange={setThreeFormsDialogOpen}
+            salesContract={contract}
+            onGenerated={handleThreeFormsGenerated}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

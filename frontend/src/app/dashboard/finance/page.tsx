@@ -1,6 +1,6 @@
 /**
  * Input: 后端 finance/stats、finance/payment-trends、system/exchange-rate、bank-flow/stats、invoices/stats API
- * Output: 财务总览页面（收付进度 + 报表分析 + 汇率 + 银行流水/发票摘要 + 紧迫信号 + 趋势折线图 + 快捷导航）
+ * Output: 财务概览页面（收付进度 + 报表分析 + 汇率 + 银行流水/发票摘要 + 紧迫信号 + 趋势折线图 + 快捷导航）
  * Pos: 财务模块首页，提供公司财务进度驾驶舱
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -116,7 +116,7 @@ function calcTrendValue(current: number, previous: number): string {
 }
 
 /**
- * 职责：渲染财务总览驾驶舱
+ * 职责：渲染财务概览驾驶舱
  * 思路：
  *   1. 顶部 KPI 卡片：总额、已付/已收、待付/待收（带完成率进度条）
  *   2. 中部驾驶舱卡片：汇率显示、紧迫性预警、账款健康度
@@ -211,7 +211,7 @@ export default function FinancePage() {
     return (
       <LoadingState
         title="加载中..."
-        description="正在同步财务总览、汇率和账款趋势数据。"
+        description="正在同步财务概览、汇率和账款趋势数据。"
       />
     );
   }
@@ -220,7 +220,7 @@ export default function FinancePage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="财务总览"
+          title="财务概览"
           description="公司财务进度、收支健康、成本结构与利润趋势。"
           actions={
             <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={refreshing}>
@@ -261,7 +261,7 @@ export default function FinancePage() {
     <div className="space-y-6">
       <ModuleTabHeader tabs={FINANCE_TABS} moduleName="财务" />
       <PageHeader
-        title="财务总览"
+        title="财务概览"
         description="公司财务进度、收支健康、成本结构与利润趋势。"
         actions={
           <Button
@@ -283,7 +283,7 @@ export default function FinancePage() {
               <p className="text-sm font-medium text-muted-foreground">公司财务进度</p>
               <h3 className="text-lg font-semibold tracking-tight">先看收付压力，再下钻经营执行</h3>
               <p className="text-sm leading-6 text-muted-foreground">
-                财务总览先给出应付完成率、应收完成率和待付待收风险；报表区块保留三表导入、账期选择和收入利润、成本结构、资产负债下钻。
+                财务概览先给出应付完成率、应收完成率和待付待收风险；报表区块保留三表导入、账期选择和收入利润、成本结构、资产负债下钻。
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">

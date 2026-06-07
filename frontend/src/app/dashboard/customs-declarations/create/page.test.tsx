@@ -17,6 +17,7 @@ const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/dashboard/customs-declarations/create',
   useRouter: () => ({
     push: mockPush,
     back: vi.fn(),

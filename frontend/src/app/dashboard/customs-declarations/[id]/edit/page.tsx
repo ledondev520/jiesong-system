@@ -17,6 +17,7 @@ import {
   type CustomsDeclarationUpsertInput,
 } from '@/services/customsDeclaration.service';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
 import { CustomsDeclarationForm } from '@/app/customs-declarations/components/CustomsDeclarationForm';
 
 interface EditCustomsDeclarationContentProps {
@@ -67,6 +68,7 @@ function EditCustomsDeclarationContent({
 
   return (
     <div className="space-y-6 pb-10">
+      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
         title="编辑报关单"
         description={`更新 ${declaration.declarationNo} 的申报字段与商品明细。`}

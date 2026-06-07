@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import type { TaxRefund } from '@/types';
 import { taxRefundService, type TaxRefundUpsertInput } from '@/services/taxRefund.service';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
 import { TaxRefundForm } from '../../components/TaxRefundForm';
 
 interface EditTaxRefundContentProps {
@@ -60,6 +61,7 @@ function EditTaxRefundContent({ params }: EditTaxRefundContentProps) {
 
   return (
     <div className="space-y-6 pb-10">
+      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
         title="编辑退税单"
         description={`更新 ${taxRefund.refundNo} 的状态、金额与到账信息。`}

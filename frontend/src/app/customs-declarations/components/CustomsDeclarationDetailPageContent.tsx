@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import type { CustomsDeclaration, CustomsDeclarationItem } from '@/types';
 import { customsDeclarationService } from '@/services/customsDeclaration.service';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -110,10 +111,11 @@ export function CustomsDeclarationDetailPageContent({
 
   return (
     <div className="space-y-6 pb-10">
-        <PageHeader
+      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
+      <PageHeader
         title={declaration.declarationNo}
         description={`${declaration.exporter || '待填写'} → ${declaration.destinationCountry || '待填写'}`}
-        backHref="/dashboard/customs-declarations"
+        backHref="/dashboard/tax-refunds?view=customs"
         actions={
           <>
             <CustomsDeclarationStatusBadge status={declaration.status} />
