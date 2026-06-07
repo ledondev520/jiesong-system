@@ -14,7 +14,7 @@ const USERNAME = process.env.API_BENCH_USERNAME || 'admin';
 const PASSWORD = process.env.API_BENCH_PASSWORD || '123456';
 const THRESHOLD_MS = Number(process.env.API_BENCH_THRESHOLD_MS || 2000);
 const TIMEOUT_MS = Number(process.env.API_BENCH_TIMEOUT_MS || 10000);
-const DELAY_MS = Number(process.env.API_BENCH_DELAY_MS || 250);
+const DELAY_MS = Number(process.env.API_BENCH_DELAY_MS || 700);
 const OUTPUT_DIR = path.resolve(process.cwd(), 'tmp/performance');
 
 const state = {
@@ -328,6 +328,13 @@ const cases = [
     body: () => ({}),
   },
   {
+    id: 'system_notification_mark_read_success',
+    category: 'write_success',
+    method: 'PUT',
+    path: () => `/api/v1/system/notifications/${state.notificationId}/read`,
+    body: () => ({}),
+  },
+  {
     id: 'contract_template_create_success',
     category: 'write_success',
     method: 'POST',
@@ -456,6 +463,87 @@ const cases = [
     method: 'POST',
     path: '/api/v1/purchases/suppliers-by-products',
     body: () => ({ productIds: [state.contractProductId] }),
+  },
+  {
+    id: 'inventory_fixture_supplier_create_success',
+    category: 'write_success_fixture',
+    method: 'POST',
+    path: '/api/v1/suppliers',
+    body: () => ({ name: `性能库存供应商-${state.runId}`, shortName: `库存供-${state.runId.slice(-5)}` }),
+    save: saveId('inventorySupplierId'),
+    expectedStatuses: [201],
+  },
+  {
+    id: 'inventory_fixture_product_create_success',
+    category: 'write_success_fixture',
+    method: 'POST',
+    path: '/api/v1/products',
+    body: () => ({
+      customsName: `性能库存商品-${state.runId}`,
+      unit: '件',
+      lowStockThreshold: 1,
+    }),
+    save: saveId('inventoryProductId'),
+    expectedStatuses: [201],
+  },
+  {
+    id: 'inventory_fixture_purchase_create_success',
+    category: 'write_success_fixture',
+    method: 'POST',
+    path: '/api/v1/purchases',
+    body: () => ({
+      contractNo: `CG-PERF-INV-${state.runId}`,
+      supplierId: state.inventorySupplierId,
+      taxRate: 13,
+      note: 'performance inventory fixture audit',
+      items: [{
+        productId: state.inventoryProductId,
+        quantity: 1,
+        unit: '件',
+        unitPrice: 10,
+        specification: 'performance inventory fixture',
+      }],
+    }),
+    save: saveId('inventoryPurchaseId'),
+    expectedStatuses: [201],
+  },
+  {
+    id: 'inventory_fixture_purchase_pending_success',
+    category: 'write_success_fixture',
+    method: 'PUT',
+    path: () => `/api/v1/purchases/${state.inventoryPurchaseId}/status`,
+    body: () => ({ status: 'PENDING_INSPECTION' }),
+  },
+  {
+    id: 'inventory_fixture_purchase_in_stock_success',
+    category: 'write_success_fixture',
+    method: 'PUT',
+    path: () => `/api/v1/purchases/${state.inventoryPurchaseId}/status`,
+    body: () => ({ status: 'IN_STOCK' }),
+  },
+  {
+    id: 'inventory_list_for_status_success',
+    category: 'write_success_fixture',
+    method: 'GET',
+    path: () => `/api/v1/inventory/product/${state.inventoryProductId}`,
+    save: (json) => {
+      savePath('inventoryId', ['data', 'inventories', 0, 'id'])(json);
+      savePath('inventoryStatus', ['data', 'inventories', 0, 'status'])(json);
+    },
+  },
+  {
+    id: 'inventory_status_same_success',
+    category: 'write_success',
+    method: 'PUT',
+    path: () => `/api/v1/inventory/${state.inventoryId}/status`,
+    body: () => ({ status: state.inventoryStatus || 'INBOUND' }),
+  },
+  {
+    id: 'inventory_batch_status_same_success',
+    category: 'write_success',
+    method: 'PUT',
+    path: '/api/v1/inventory/batch-status',
+    body: () => ({ ids: [state.inventoryId], status: state.inventoryStatus || 'INBOUND' }),
   },
   {
     id: 'sales_create_success',
@@ -721,6 +809,34 @@ const cases = [
     body: () => ({ status: 'DECLARED', totalAmount: 42, note: 'performance customs declaration update audit' }),
   },
   {
+    id: 'forex_verification_create_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/forex-verifications',
+    body: () => ({
+      verificationNo: `FX-PERF-${state.runId}`,
+      salesContractId: state.salesId,
+      customsDeclarationId: state.customsDeclarationId,
+      bankName: 'performance bank',
+      currency: 'USD',
+      receivedAmount: 42,
+      settledAmount: 42,
+      exchangeRate: 7.1,
+      verifiedAt: new Date().toISOString(),
+      status: 'PENDING',
+      note: 'performance forex verification success audit',
+    }),
+    save: saveId('forexVerificationId'),
+    expectedStatuses: [201],
+  },
+  {
+    id: 'forex_verification_update_success',
+    category: 'write_success',
+    method: 'PUT',
+    path: () => `/api/v1/forex-verifications/${state.forexVerificationId}`,
+    body: () => ({ status: 'VERIFIED', note: 'performance forex verification update audit' }),
+  },
+  {
     id: 'tax_refund_create_success',
     category: 'write_success',
     method: 'POST',
@@ -754,10 +870,142 @@ const cases = [
     path: () => `/api/v1/tax-refunds/${state.taxRefundId}`,
   },
   {
+    id: 'forex_verification_delete_success',
+    category: 'write_success',
+    method: 'DELETE',
+    path: () => `/api/v1/forex-verifications/${state.forexVerificationId}`,
+  },
+  {
     id: 'customs_declaration_delete_success',
     category: 'write_success',
     method: 'DELETE',
     path: () => `/api/v1/customs-declarations/${state.customsDeclarationId}`,
+  },
+  {
+    id: 'finance_auto_match_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/finance/auto-match',
+    body: () => ({}),
+  },
+  {
+    id: 'finance_payments_auto_match_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/finance/payments/auto-match',
+    body: () => ({}),
+  },
+  {
+    id: 'finance_fixture_sales_create_success',
+    category: 'write_success_fixture',
+    method: 'POST',
+    path: '/api/v1/sales',
+    body: () => ({
+      contractNo: `EXP-PERF-FIN-${state.runId}`,
+      exchangeRate: 7,
+      note: 'performance finance fixture audit',
+    }),
+    save: saveId('financeSalesId'),
+    expectedStatuses: [201],
+  },
+  {
+    id: 'finance_receipt_create_success',
+    category: 'write_success_fixture',
+    method: 'POST',
+    path: '/api/v1/finance/payments',
+    body: () => ({
+      type: 'RECEIVABLE_RECEIPT',
+      customerName: 'Performance Customer',
+      amount: 10,
+      currency: 'USD',
+      paymentMethod: 'WIRE',
+      paymentDate: new Date().toISOString(),
+      note: `performance receipt for ${state.financeSalesId}`,
+    }),
+    save: saveId('financeReceiptId'),
+    expectedStatuses: [201],
+  },
+  {
+    id: 'finance_payment_allocate_success',
+    category: 'write_success',
+    method: 'POST',
+    path: () => `/api/v1/finance/payments/${state.financeReceiptId}/allocate`,
+    body: () => ({
+      allocations: [{
+        salesContractId: state.financeSalesId,
+        amount: 10,
+        note: 'performance payment allocation audit',
+      }],
+    }),
+  },
+  {
+    id: 'ops_purchase_checklist_generate_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/ops-execution/purchase-checklist/generate',
+    body: () => ({ storeType: '标准店', openingStage: '筹备期' }),
+  },
+  {
+    id: 'ops_purchase_checklist_template_update_success',
+    category: 'write_success',
+    method: 'PUT',
+    path: '/api/v1/ops-execution/purchase-checklist/templates',
+    body: () => ({
+      storeType: `性能店-${state.runId}`,
+      openingStage: '筹备期',
+      templateName: `性能店采购清单-${state.runId}`,
+      items: [{
+        id: 'perf-item-1',
+        category: '前厅',
+        itemName: '性能巡检物料',
+        quantity: 1,
+        unit: '件',
+        required: true,
+        notes: 'performance checklist audit',
+      }],
+    }),
+  },
+  {
+    id: 'ops_purchase_checklist_export_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/ops-execution/purchase-checklist/export',
+    body: () => ({
+      storeType: '标准店',
+      openingStage: '筹备期',
+      templateName: '标准店-筹备期',
+      items: [{
+        id: 'perf-export-1',
+        category: '前厅',
+        itemName: '性能巡检导出物料',
+        quantity: 1,
+        unit: '件',
+        required: true,
+        notes: 'performance checklist export audit',
+      }],
+    }),
+  },
+  {
+    id: 'ops_unshipped_assign_success',
+    category: 'write_success',
+    method: 'PUT',
+    path: '/api/v1/ops-execution/unshipped/assign',
+    body: () => ({
+      salesContractId: state.salesId,
+      productId: state.contractProductId,
+      status: 'SHIPPING',
+      assigneeName: '性能巡检负责人',
+    }),
+  },
+  {
+    id: 'store_recommend_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/store-recommend/recommend',
+    body: () => ({
+      referenceStoreIds: [state.contractStoreId],
+      targetStoreName: `性能门店建议-${state.runId}`,
+    }),
   },
   {
     id: 'sales_delete_success',
@@ -948,7 +1196,7 @@ const writeOutputs = (results) => {
 - Generated at: ${summary.generatedAt}
 
 ## Scope
-This audit writes to a disposable database copy only. It covers selected success-path write interfaces for users, suppliers, products, stores, system dictionaries, contract templates, purchase contracts, sales contracts, containers, Agent credentials, notifications, customs declarations, tax refunds, tax rates, and price calculation. It does not cover file uploads, large imports/exports, provider-backed AI calls, or operational jobs.
+This audit writes to a disposable database copy only. It covers selected success-path write interfaces for users, suppliers, products, stores, system dictionaries, contract templates, purchase contracts, sales contracts, containers, Agent credentials, notifications, customs declarations, tax refunds, tax rates, forex verifications, inventory status changes, finance matching/allocation, operations checklists, store recommendation, and price calculation. It does not cover file uploads, large imports/exports, provider-backed AI calls, or operational jobs.
 
 ## Over Threshold Or Error
 ${problemLines}

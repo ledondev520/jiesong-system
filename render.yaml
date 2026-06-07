@@ -1,0 +1,54 @@
+# Render 部署配置
+# 文档: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: jiesong-backend
+    runtime: node
+    plan: starter
+    region: singapore
+    buildCommand: cd backend && npm ci --production && npx prisma generate
+    startCommand: cd backend && node src/app.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        fromDatabase:
+          name: jiesong-db
+          property: connectionString
+      - key: DIRECT_URL
+        fromDatabase:
+          name: jiesong-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: UPLOAD_DIR
+        value: ./uploads
+    disk:
+      name: uploads
+      mountPath: /app/backend/uploads
+      sizeGB: 1
+
+  - type: web
+    name: jiesong-frontend
+    runtime: static
+    plan: starter
+    region: singapore
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/.next/static
+    envVars:
+      - key: NEXT_PUBLIC_API_BASE_URL
+        fromService:
+          type: web
+          name: jiesong-backend
+          property: host
+
+databases:
+  - name: jiesong-db
+    plan: starter
+    region: singapore
+    ipAllowList: []

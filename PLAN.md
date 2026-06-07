@@ -1,5 +1,36 @@
 # Ops Execution Center Plan
 
+## 2026-06-07 PERF-API-07（库存/财务/运营写成功路径临时库 SLA）
+
+### Goal
+- 继续推进“所有接口 2 秒以内”目标，补齐库存状态、外汇核销、财务自动匹配/分配、运营采购清单、门店推荐等本地成功路径。
+- 继续只打复制库和临时后端；剩余文件上传/删除、合同文档、AI provider、外部汇率同步、导入导出单独分层。
+
+### Delivered
+- 扩展 `scripts/audit_api_write_success_times.js`，写成功路径样本从 `78` 个扩展到 `100` 个。
+- 新增覆盖的主要 Interface：
+  - 库存：同状态单条更新、同状态批量更新；库存夹具通过独立采购入库生成，留在复制库。
+  - 外汇核销：创建、更新、删除。
+  - 财务：智能关联自动匹配、收款池自动匹配、收款创建、收款分配；分配使用独立销售合同夹具，避免影响主清理链路。
+  - 运营执行：采购清单生成、采购清单模板保存、采购清单导出、未发货负责人分发。
+  - 门店推荐：基于参考门店生成采购建议。
+  - 系统通知：`/system/notifications/:id/read` 成功路径。
+- 写巡检默认间隔从 `250ms` 调整为 `700ms`，避免 `100` 个样本加登录请求触发全局 `100/min` 限流，把 SLA 巡检误判为 429。
+
+### Verification
+- `cd backend && npm test -- src/services/forexVerificationService.test.js src/services/financeService.test.js src/controllers/opsExecutionController.test.js`：通过，`22` 个测试。
+- `node --check scripts/audit_api_write_success_times.js`：通过。
+- `git diff --check`：通过。
+- 使用复制库 `tmp/performance/perf-api-write.db` 和临时后端 `3014`。
+- `API_BASE_URL=http://localhost:3014 API_PERF_ALLOW_WRITES=true API_PERF_DISPOSABLE_DB=true node scripts/audit_api_write_success_times.js`：`100` 个样本，`100` OK、`0` error、`0` 超过 `2000ms`；最慢 `finance_auto_match_success=998ms`。
+- `node scripts/audit_api_route_inventory.js`：后端 `265` 条路由，已测 `246` 条，未测 `19` 条。
+- 覆盖分布：`read=114/114`、`auth_write=5/5`、`write=93/104`、`ai_external=9/12`、`export=10/14`、`import=15/16`。
+- 临时后端 `3014` 已停止。
+
+### Remaining
+- 性能目标尚未完成：仍有 `19` 条路由没有实测覆盖。
+- 剩余未测集中在合同文档模板/生成、文件删除、HS Code AI provider 路径、系统汇率同步/巡检触发、真实导入导出；这些需要 multipart 文件夹具、外部依赖 SLA 或更细的运维任务隔离。
+
 ## 2026-06-07 PERF-API-06（Agent/税退/通知写成功路径临时库 SLA）
 
 ### Goal

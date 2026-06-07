@@ -1,0 +1,43 @@
+# Fly.io 部署配置
+# 部署步骤:
+# 1. 安装 flyctl: curl -L https://fly.io/install.sh | sh
+# 2. 登录: flyctl auth login
+# 3. 创建应用: flyctl apps create jiesong-backend
+# 4. 创建数据库: flyctl postgres create --name jiesong-db
+# 5. 连接数据库: flyctl postgres attach jiesong-db --app jiesong-backend
+# 6. 设置密钥: flyctl secrets set JWT_SECRET=your-secret JWT_EXPIRES_IN=7d
+# 7. 部署: flyctl deploy
+
+app = 'jiesong-backend'
+primary_region = 'sin'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  NODE_ENV = 'production'
+  PORT = '3001'
+  UPLOAD_DIR = './uploads'
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[http_service.checks]]
+  interval = '30s'
+  timeout = '5s'
+  grace_period = '10s'
+  method = 'GET'
+  path = '/api/v1/health'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'
+
+[mounts]
+  source = 'uploads_data'
+  destination = '/app/uploads'
