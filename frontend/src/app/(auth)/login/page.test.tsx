@@ -104,6 +104,11 @@ describe('LoginPage 交互逻辑', () => {
       username: 'admin',
       password: 'old-password',
     }));
+    localStorage.setItem('jiesong_saved_username', 'admin');
+    localStorage.setItem('jiesong_saved_credentials', JSON.stringify({
+      username: 'admin',
+      password: 'old-password',
+    }));
     sessionStorage.setItem('quickLoginProfile', JSON.stringify({
       username: 'admin',
       password: 'session-password',
@@ -125,6 +130,8 @@ describe('LoginPage 交互逻辑', () => {
       expect(localStorage.getItem('jiesong_quick_login_enabled')).toBeNull();
       expect(localStorage.getItem('jiesong_quick_login_password')).toBeNull();
       expect(localStorage.getItem('saved_login_credentials')).toBeNull();
+      expect(localStorage.getItem('jiesong_saved_username')).toBeNull();
+      expect(localStorage.getItem('jiesong_saved_credentials')).toBeNull();
       expect(sessionStorage.getItem('quickLoginProfile')).toBeNull();
       expect(sessionStorage.getItem('oneClickLoginCredentials')).toBeNull();
       expect(localStorage.getItem(LEGACY_AUTH_CLEANUP_VERSION_KEY)).toBe(LEGACY_AUTH_CLEANUP_VERSION);

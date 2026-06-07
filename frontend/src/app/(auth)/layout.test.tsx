@@ -32,6 +32,11 @@ describe('AuthLayout', () => {
       username: 'admin',
       password: 'cached-password',
     }));
+    localStorage.setItem('jiesong_saved_username', 'admin');
+    localStorage.setItem('jiesong_saved_credentials', JSON.stringify({
+      username: 'admin',
+      password: 'cached-password',
+    }));
     sessionStorage.setItem('quickLoginProfile', JSON.stringify({
       username: 'admin',
       password: 'session-password',
@@ -57,6 +62,8 @@ describe('AuthLayout', () => {
       expect(localStorage.getItem('quickLoginEnabled')).toBeNull();
       expect(localStorage.getItem('quickLoginPassword')).toBeNull();
       expect(localStorage.getItem('saved_login_credentials')).toBeNull();
+      expect(localStorage.getItem('jiesong_saved_username')).toBeNull();
+      expect(localStorage.getItem('jiesong_saved_credentials')).toBeNull();
       expect(sessionStorage.getItem('quickLoginProfile')).toBeNull();
       expect(sessionStorage.getItem('oneClickLoginCredentials')).toBeNull();
       expect(localStorage.getItem('dashboard:last-tab')).toBe('/dashboard');

@@ -23,6 +23,8 @@ const KNOWN_LEGACY_QUICK_LOGIN_KEYS = [
   'remembered_login_profile',
   'rememberedLoginProfile',
   'rememberedCredentials',
+  'jiesong_saved_username',
+  'jiesong_saved_credentials',
   'saved_login_credentials',
   'savedLoginCredentials',
 ];
@@ -42,10 +44,11 @@ const LEGACY_QUICK_LOGIN_KEY_PATTERNS = [
   /saved[_-]?login[_-]?profile/i,
   /savedLoginProfile/,
   /saved.*(credential|password).*login/i,
+  /saved.*(credential|password)/i,
 ];
 
 export const LEGACY_AUTH_CLEANUP_VERSION_KEY = 'jiesong_auth_cleanup_version';
-export const LEGACY_AUTH_CLEANUP_VERSION = '2026-06-07-no-quick-login-v2';
+export const LEGACY_AUTH_CLEANUP_VERSION = '2026-06-07-no-quick-login-v3';
 
 const isLegacyQuickLoginKey = (key: string): boolean =>
   KNOWN_LEGACY_QUICK_LOGIN_KEYS.includes(key) ||
@@ -74,7 +77,7 @@ const clearLegacyQuickLoginStorage = (storage: Storage | undefined): void => {
 export const LEGACY_AUTH_CLEANUP_INLINE_SCRIPT = `
 (function(){
   var knownKeys=${JSON.stringify(KNOWN_LEGACY_QUICK_LOGIN_KEYS)};
-  var patterns=[/quick[_-]?login/i,/quickLogin/,/quick.*(auth|credential|password|profile|user(name)?)/i,/(auth|credential|password|profile|user(name)?).*quick/i,/one[_-]?(tap|click).*(login|auth)/i,/(login|auth).*one[_-]?(tap|click)/i,/shortcut.*(login|auth)/i,/(login|auth).*shortcut/i,/remembered[_-]?login/i,/rememberedLogin/,/remembered.*(credential|password|profile)/i,/saved[_-]?login[_-]?profile/i,/savedLoginProfile/,/saved.*(credential|password).*login/i];
+  var patterns=[/quick[_-]?login/i,/quickLogin/,/quick.*(auth|credential|password|profile|user(name)?)/i,/(auth|credential|password|profile|user(name)?).*quick/i,/one[_-]?(tap|click).*(login|auth)/i,/(login|auth).*one[_-]?(tap|click)/i,/shortcut.*(login|auth)/i,/(login|auth).*shortcut/i,/remembered[_-]?login/i,/rememberedLogin/,/remembered.*(credential|password|profile)/i,/saved[_-]?login[_-]?profile/i,/savedLoginProfile/,/saved.*(credential|password).*login/i,/saved.*(credential|password)/i];
   function isLegacyKey(key){return knownKeys.indexOf(key)>=0||patterns.some(function(pattern){return pattern.test(key);});}
   function clean(storage){
     if(!storage){return;}
