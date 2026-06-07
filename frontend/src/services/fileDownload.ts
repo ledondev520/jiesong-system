@@ -3,7 +3,7 @@
  */
 import { ApiResponse } from '@/types';
 
-export interface DownloadRequestError extends Error {
+interface DownloadRequestError extends Error {
   status: number;
   payload?: unknown;
 }

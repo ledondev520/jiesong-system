@@ -24,7 +24,7 @@ import { Upload, FileSpreadsheet, AlertCircle, CheckCircle } from 'lucide-react'
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
-export interface ImportColumn {
+interface ImportColumn {
   key: string;
   label: string;
   required?: boolean;

@@ -9,7 +9,7 @@ export interface StoreStats {
   categories: Array<{ name: string; amount: number; count: number }>;
 }
 
-export interface Recommendation {
+interface Recommendation {
   productId: string;
   productName: string;
   category: string;

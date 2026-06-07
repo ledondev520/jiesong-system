@@ -2,7 +2,7 @@ import api from '@/lib/axios';
 import type { ApiResponse, PaginatedResponse } from '@/types';
 
 export type QueryDictionary = Record<string, unknown>;
-export type CrudServiceResponse<T> = Promise<ApiResponse<T>>;
+type CrudServiceResponse<T> = Promise<ApiResponse<T>>;
 
 export interface CrudServiceOptions {
   /**

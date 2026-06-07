@@ -38,7 +38,7 @@ export interface UniversalTemplate {
 }
 
 /** 指定门店的历史采购明细项 */
-export interface StoreItem {
+interface StoreItem {
   name: string;
   supplement: string;
   category: string;

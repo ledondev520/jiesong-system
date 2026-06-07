@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 
 // ==================== 类型定义 ====================
 
-export interface MobileActionBarProps {
+interface MobileActionBarProps {
   /** 主操作（右侧突出按钮） */
   primaryAction?: {
     label: string;

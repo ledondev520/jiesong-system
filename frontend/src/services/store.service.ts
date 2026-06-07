@@ -1,7 +1,7 @@
 import type { Store } from '@/types';
 import { createCrudService } from './crudService';
 
-export type StoreListQuery = {
+type StoreListQuery = {
   page?: number;
   pageSize?: number;
   lite?: boolean;

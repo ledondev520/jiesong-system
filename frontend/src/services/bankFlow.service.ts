@@ -153,7 +153,7 @@ export async function getBatches(type?: string): Promise<FinanceDataBatch[]> {
 }
 
 /** 关联对账结果 */
-export interface ReconciliationResult {
+interface ReconciliationResult {
   counterpart: string;
   bankFlow: {
     items: BankTransaction[];
@@ -184,7 +184,7 @@ export async function getReconciliation(counterpart: string): Promise<Reconcilia
 }
 
 /** 对账匹配条目 */
-export interface MatchedEntry {
+interface MatchedEntry {
   payName: string;
   invName?: string;
   netPaid: number;
@@ -198,14 +198,14 @@ export interface MatchedEntry {
 }
 
 /** 未匹配付款 */
-export interface UnmatchedPayment {
+interface UnmatchedPayment {
   counterpart: string;
   netPaid: number;
   txnCount: number;
 }
 
 /** 未匹配发票 */
-export interface UnmatchedInvoice {
+interface UnmatchedInvoice {
   seller: string;
   totalInvoice: number;
   invCount: number;
@@ -239,7 +239,7 @@ export async function getFullReconciliation(): Promise<FullReconciliationResult>
 }
 
 /** 银行收入按对手方汇总单条 */
-export interface IncomingSummaryItem {
+interface IncomingSummaryItem {
   name: string;
   totalIn: number;
   txnCount: number;
@@ -292,7 +292,7 @@ export interface PurchaseContractForMatch {
   supplier: { id: string; name: string; shortName?: string | null };
 }
 
-export interface SalesContractForMatch {
+interface SalesContractForMatch {
   id: string;
   contractNo: string;
   totalAmount: number;

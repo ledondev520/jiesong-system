@@ -10,7 +10,7 @@ import api from '@/lib/axios';
 
 // ==================== 类型定义 ====================
 
-export interface BalanceSheet {
+interface BalanceSheet {
   id: string;
   periodId: string;
   cashAndEquivalents: number | null;
@@ -37,7 +37,7 @@ export interface BalanceSheet {
   totalEquity: number | null;
 }
 
-export interface IncomeStatement {
+interface IncomeStatement {
   id: string;
   periodId: string;
   // 本月金额
@@ -81,7 +81,7 @@ export interface FinancialPeriod {
   incomeStatement: IncomeStatement | null;
 }
 
-export interface TrendDataPoint {
+interface TrendDataPoint {
   label: string;
   month: number;
   year: number;
@@ -119,7 +119,7 @@ export interface AnalyticsData {
   totalPeriods: number;
 }
 
-export interface ImportResult {
+interface ImportResult {
   imported: number;
   skipped: number;
   errors: string[];

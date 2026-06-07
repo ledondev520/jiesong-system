@@ -4,7 +4,7 @@ import { createCrudService } from './crudService';
 
 type PurchaseContractQuery = { page?: number; pageSize?: number; keyword?: string; lite?: boolean };
 
-export type PurchaseCreateItemPayload = {
+type PurchaseCreateItemPayload = {
   productId: string;
   quantity: number;
   unitPrice: number;

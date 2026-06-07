@@ -151,7 +151,7 @@ export interface AiChatHistoryItem {
   createdAt: string;
 }
 
-export interface AiTokenStatByModel {
+interface AiTokenStatByModel {
   model: string;
   requests: number;
   tokens: number;
@@ -171,7 +171,7 @@ export interface AiModelsResponse {
   description: Record<string, string>;
 }
 
-export interface AiAgentToolRegistryItem {
+interface AiAgentToolRegistryItem {
   name: string;
   domain: string;
   access: string;
@@ -227,7 +227,7 @@ export interface AiTokenUsageResponse {
   message?: string;
 }
 
-export type AiBusinessAgentType = 'finance' | 'export' | 'executive' | 'unified';
+type AiBusinessAgentType = 'finance' | 'export' | 'executive' | 'unified';
 
 export interface AiBusinessAgentPromptInput {
   agentType: AiBusinessAgentType;

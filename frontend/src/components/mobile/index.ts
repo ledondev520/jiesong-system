@@ -10,7 +10,5 @@
  */
 
 export { MobileListCard } from './MobileListCard';
-export type { MobileListCardProps, MobileListCardField } from './MobileListCard';
 
 export { MobileActionBar } from './MobileActionBar';
-export type { MobileActionBarProps } from './MobileActionBar';

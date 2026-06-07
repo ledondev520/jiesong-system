@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 
 // ==================== 类型定义 ====================
 
-export interface MobileListCardField {
+interface MobileListCardField {
   /** 字段标签 */
   label: string;
   /** 字段值 */
@@ -22,7 +22,7 @@ export interface MobileListCardField {
   emphasis?: 'primary' | 'danger' | 'success';
 }
 
-export interface MobileListCardProps {
+interface MobileListCardProps {
   /** 主标题（如合同编号） */
   title: string;
   /** 副标题（如供应商/客户名称），支持字符串或 ReactNode */

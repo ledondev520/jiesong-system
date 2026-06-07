@@ -20,7 +20,7 @@ export interface User {
   updatedAt: string;
 }
 
-export interface AgentGrant {
+interface AgentGrant {
   id?: string;
   agentAccountId?: string;
   agentCredentialId?: string | null;
@@ -30,7 +30,7 @@ export interface AgentGrant {
   createdAt?: string;
 }
 
-export interface AgentCredential {
+interface AgentCredential {
   id: string;
   credentialKey: string;
   label?: string | null;
@@ -60,7 +60,7 @@ export interface AgentCredentialIssueResult {
   token: string;
 }
 
-export interface Port {
+interface Port {
   id: string;
   name: string;
   code: string;
@@ -69,7 +69,7 @@ export interface Port {
   updatedAt: string;
 }
 
-export interface ProductCategory {
+interface ProductCategory {
   id: string;
   name: string;
   parentId?: string | null;
@@ -85,7 +85,7 @@ export interface ProductCategory {
   };
 }
 
-export interface CustomsBroker {
+interface CustomsBroker {
   id: string;
   name: string;
   contact?: string | null;
@@ -120,7 +120,7 @@ export interface Supplier {
   aliases?: SupplierAlias[];
 }
 
-export interface SupplierAlias {
+interface SupplierAlias {
   id: string;
   alias: string;
   supplierId: string;
@@ -196,7 +196,7 @@ export interface HsCodeRecord {
   confidenceScore?: number;
 }
 
-export interface ProductSupplier {
+interface ProductSupplier {
   id: string;
   productId: string;
   supplierId: string;
@@ -375,7 +375,7 @@ export interface SalesContract {
   sourceParties?: string[];
 }
 
-export interface SalesItem {
+interface SalesItem {
   id: string;
   salesContractId: string;
   productId: string;
@@ -523,7 +523,7 @@ export interface ContractTemplate {
   updatedAt: string;
 }
 
-export interface ContractTemplateItem {
+interface ContractTemplateItem {
   productId: string;
   quantity: number;
   unitPrice?: number;

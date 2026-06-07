@@ -9,7 +9,7 @@
 import api from '@/lib/axios';
 import type { PaginatedResponse } from '@/types';
 
-export interface ImportAnalysis {
+interface ImportAnalysis {
   totalRows: number;
   seqRange: { min: number; max: number };
   missingSeqs: number[];
@@ -25,7 +25,7 @@ export interface NewRecord {
   data: Record<string, string>;
 }
 
-export interface ImportComparison {
+interface ImportComparison {
   summary: {
     total: number;
     new: number;

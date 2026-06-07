@@ -8,7 +8,7 @@ import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-export type PaymentDirection = 'IN' | 'OUT' | 'TRANSFER';
+type PaymentDirection = 'IN' | 'OUT' | 'TRANSFER';
 
 interface PaymentListCardProps {
   direction: PaymentDirection;
