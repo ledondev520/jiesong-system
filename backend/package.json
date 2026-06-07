@@ -60,5 +60,22 @@
     "node": ">=18.0.0"
   },
   "author": "捷淞国际物流",
-  "license": "MIT"
+  "license": "MIT",
+  "knip": {
+    "entry": [
+      "src/app.js",
+      "src/routes/*.js",
+      "src/controllers/**/*.js",
+      "src/middleware/*.js",
+      "src/agent/**/*.js"
+    ],
+    "ignore": [
+      "**/*.test.js",
+      "prisma/migrations/**",
+      "prisma/fix-*.js",
+      "prisma/import-*.js",
+      "prisma/seed_*.js",
+      "scripts/*.js"
+    ]
+  }
 }

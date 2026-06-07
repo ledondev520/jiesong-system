@@ -283,7 +283,6 @@ const listEventLedger = async (page, pageSize, filters = {}) => {
 };
 
 module.exports = {
-  EVENT_LEDGER_SOURCES,
-  EVENT_CATEGORIES,
   listEventLedger,
+  EVENT_LEDGER_SOURCES,
 };
