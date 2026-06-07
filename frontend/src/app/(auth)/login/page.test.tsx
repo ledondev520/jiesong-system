@@ -56,26 +56,26 @@ describe('LoginPage 交互逻辑', () => {
     expect(screen.getByRole('button', { name: '登录' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /一键登录/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/测试阶段账号/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/你已开启快捷登录/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/开启快捷登录/)).not.toBeInTheDocument();
   });
 
-  it('本地存在快捷登录资料时展示一键登录入口', async () => {
+  it('旧版快捷登录资料会被清理，避免继续使用失效密码', async () => {
     localStorage.setItem('jiesong_quick_login_profile', JSON.stringify({
       version: 2,
       username: 'admin',
-      password: '123456',
+      password: 'old-password',
       source: 'saved',
     }));
 
     render(<LoginPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '一键登录（admin）' })).toBeInTheDocument();
+      expect(localStorage.getItem('jiesong_quick_login_profile')).toBeNull();
+      expect(screen.queryByRole('button', { name: /一键登录/ })).not.toBeInTheDocument();
     });
-    expect(screen.queryByText(/你已开启快捷登录/)).not.toBeInTheDocument();
   });
 
-  it('旧版快捷登录资料会被清理，避免继续使用失效密码', async () => {
+  it('无效快捷登录资料会被清理，避免继续使用缓存密码', async () => {
     localStorage.setItem('jiesong_quick_login_profile', JSON.stringify({
       username: 'admin',
       password: 'old-password',
@@ -89,7 +89,13 @@ describe('LoginPage 交互逻辑', () => {
     });
   });
 
-  it('手动登录成功后写入快捷登录资料并跳转工作台', async () => {
+  it('手动登录成功后清理旧快捷登录资料并跳转工作台', async () => {
+    localStorage.setItem('jiesong_quick_login_profile', JSON.stringify({
+      version: 2,
+      username: 'admin',
+      password: 'old-password',
+      source: 'saved',
+    }));
     mockAuthServiceLogin.mockResolvedValue({
       code: 200,
       data: {
@@ -117,12 +123,10 @@ describe('LoginPage 交互逻辑', () => {
       expect(mockPush).toHaveBeenCalledWith('/dashboard');
     });
 
-    expect(localStorage.getItem('jiesong_quick_login_profile')).toBe(
-      JSON.stringify({ version: 2, username: 'admin', password: '123456', source: 'saved' }),
-    );
+    expect(localStorage.getItem('jiesong_quick_login_profile')).toBeNull();
   });
 
-  it('点击一键登录后直接自动登录', async () => {
+  it('旧快捷登录资料不会触发自动登录', async () => {
     localStorage.setItem('jiesong_quick_login_profile', JSON.stringify({
       version: 2,
       username: 'admin',
@@ -137,41 +141,13 @@ describe('LoginPage 交互逻辑', () => {
       },
     });
 
-    const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.click(screen.getByRole('button', { name: '一键登录（admin）' }));
-
-    expect(screen.getByLabelText('用户名')).toHaveValue('admin');
-    expect(screen.getByLabelText('密码')).toHaveValue('123456');
-
     await waitFor(() => {
-      expect(mockAuthServiceLogin).toHaveBeenCalledWith({
-        username: 'admin',
-        password: '123456',
-      });
-      expect(mockPush).toHaveBeenCalledWith('/dashboard');
+      expect(screen.queryByRole('button', { name: /一键登录/ })).not.toBeInTheDocument();
     });
-  });
-
-  it('一键登录资料失效时清理缓存并提示手动登录', async () => {
-    localStorage.setItem('jiesong_quick_login_profile', JSON.stringify({
-      version: 2,
-      username: 'admin',
-      password: 'old-password',
-      source: 'saved',
-    }));
-    mockAuthServiceLogin.mockRejectedValue(new Error('用户名或密码错误'));
-
-    const user = userEvent.setup();
-    render(<LoginPage />);
-
-    await user.click(screen.getByRole('button', { name: '一键登录（admin）' }));
-
-    await waitFor(() => {
-      expect(screen.getByText('快捷登录信息已失效，请手动输入账号密码后重新登录。')).toBeInTheDocument();
-      expect(localStorage.getItem('jiesong_quick_login_profile')).toBeNull();
-    });
+    expect(mockAuthServiceLogin).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('登录失败时展示错误提示', async () => {

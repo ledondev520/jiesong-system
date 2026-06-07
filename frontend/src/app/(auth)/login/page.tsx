@@ -4,7 +4,7 @@
  * Pos: 认证模块入口，负责用户登录与快捷登录入口
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
- * Security: 快捷登录资料带版本校验；本地开发模式可使用默认测试账号快捷入口
+ * Security: 快捷登录不复用浏览器缓存密码；仅本地开发模式提供默认测试账号快捷入口
  */
 
 'use client';
@@ -38,14 +38,12 @@ const loginSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
-type QuickLoginProfile = { version: 2; username: string; password: string; source: 'saved' | 'dev-default' };
+type QuickLoginProfile = { username: string; password: string; source: 'dev-default' };
 
 const QUICK_LOGIN_PROFILE_KEY = 'jiesong_quick_login_profile';
-const QUICK_LOGIN_PROFILE_VERSION = 2;
 const DEV_QUICK_LOGIN_PROFILE: QuickLoginProfile | null =
   process.env.NODE_ENV === 'development'
     ? {
-        version: QUICK_LOGIN_PROFILE_VERSION,
         username: 'admin',
         password: '123456',
         source: 'dev-default',
@@ -83,46 +81,15 @@ function LoginFormClient() {
     setIsClientReady(true);
   }, []);
 
-  // 恢复快捷登录入口（当前浏览器维度），旧版本缓存不再复用，避免失效密码触发错误登录。
+  // 清理旧版快捷登录缓存：旧实现保存过密码，不能再作为登录凭据复用。
   useEffect(() => {
-    const savedRaw = localStorage.getItem(QUICK_LOGIN_PROFILE_KEY);
-    if (!savedRaw) {
-      setQuickLoginProfile(DEV_QUICK_LOGIN_PROFILE);
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(savedRaw) as Partial<QuickLoginProfile>;
-      if (
-        parsed.version === QUICK_LOGIN_PROFILE_VERSION &&
-        parsed.username &&
-        parsed.password
-      ) {
-        setQuickLoginProfile({
-          version: QUICK_LOGIN_PROFILE_VERSION,
-          username: parsed.username,
-          password: parsed.password,
-          source: 'saved',
-        });
-      } else {
-        localStorage.removeItem(QUICK_LOGIN_PROFILE_KEY);
-        setQuickLoginProfile(DEV_QUICK_LOGIN_PROFILE);
-      }
-    } catch {
-      localStorage.removeItem(QUICK_LOGIN_PROFILE_KEY);
-      setQuickLoginProfile(DEV_QUICK_LOGIN_PROFILE);
-    }
+    localStorage.removeItem(QUICK_LOGIN_PROFILE_KEY);
+    setQuickLoginProfile(DEV_QUICK_LOGIN_PROFILE);
   }, []);
 
-  const persistQuickLoginProfile = useCallback((username: string, password: string) => {
-    const profile: QuickLoginProfile = {
-      version: QUICK_LOGIN_PROFILE_VERSION,
-      username,
-      password,
-      source: 'saved',
-    };
-    localStorage.setItem(QUICK_LOGIN_PROFILE_KEY, JSON.stringify(profile));
-    setQuickLoginProfile(profile);
+  const clearLegacyQuickLoginProfile = useCallback(() => {
+    localStorage.removeItem(QUICK_LOGIN_PROFILE_KEY);
+    setQuickLoginProfile(DEV_QUICK_LOGIN_PROFILE);
   }, []);
 
   /**
@@ -142,7 +109,7 @@ function LoginFormClient() {
       });
 
       if (result.code === 200 && result.data) {
-        persistQuickLoginProfile(username, password);
+        clearLegacyQuickLoginProfile();
         login(result.data.user, result.data.token);
         router.push('/dashboard');
       } else {
@@ -151,7 +118,7 @@ function LoginFormClient() {
     } catch (err: unknown) {
       if (source === 'quick') {
         localStorage.removeItem(QUICK_LOGIN_PROFILE_KEY);
-        setQuickLoginProfile(DEV_QUICK_LOGIN_PROFILE);
+        setQuickLoginProfile(null);
       }
 
       const retryAfter =
@@ -173,7 +140,7 @@ function LoginFormClient() {
         const minutes = Math.ceil(retryAfter / 60);
         setError(`登录尝试过于频繁，请 ${minutes} 分钟后再试，或切换账号后重试。`);
       } else if (source === 'quick' && /用户名或密码错误|账号或密码错误|正确的用户和密码/i.test(rawMessage)) {
-        setError('快捷登录信息已失效，请手动输入账号密码后重新登录。');
+        setError('本地快捷登录账号与数据库密码不一致，请手动输入账号密码登录。');
       } else if (rawMessage) {
         setError(rawMessage);
       } else {
@@ -182,7 +149,7 @@ function LoginFormClient() {
     } finally {
       setIsLoading(false);
     }
-  }, [login, persistQuickLoginProfile, router]);
+  }, [clearLegacyQuickLoginProfile, login, router]);
 
   /**
    * 职责：提交登录表单并处理登录结果
