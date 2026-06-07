@@ -1,5 +1,26 @@
 # Ops Execution Center Plan
 
+## 2026-06-07 LOGIN-08（会话过期收敛跳转）
+
+### Goal
+- 将 dashboard 内多个并发 401 / 会话过期错误收敛到统一入口。
+- 失效后清理本地认证状态，只提示一次，并直接跳转到登录页让用户重新登录。
+
+### Delivered
+- 新增 `frontend/src/lib/auth-session.ts` 作为会话过期 Module：外部 Interface 只暴露认证路由判断、失效状态清理、过期处理入口和测试重置入口。
+- `handleExpiredAuthSession` 清理 `jiesong_access_token` 与 `auth-storage`，避免登录页重新 hydration 后仍认为用户已登录。
+- 多个并发 401 通过 `expiredSessionHandled` 收敛为单次处理，避免页面堆叠多个“登录会话已过期” toast。
+- `frontend/src/lib/axios.ts` 的 401 响应处理改为只调用会话过期入口，保留认证页请求失败不跳转的行为。
+
+### Verification
+- `cd frontend && npm test -- --run src/lib/auth-session.test.ts src/lib/auth-token.test.ts src/lib/axios.test.ts`：通过，`3` 个文件、`12` 个测试。
+- `cd frontend && npx eslint src/lib/auth-session.ts src/lib/auth-session.test.ts src/lib/axios.ts src/lib/axios.test.ts`：通过。
+- `cd frontend && npx tsc --noEmit --pretty false`：通过。
+- Playwright 本地页面验证：`http://localhost:3000/login?expired=1` 可见“登录会话已过期，请重新登录”。
+
+### Remaining
+- 当前会话过期收敛目标已完成；真实 401 收敛由单元测试覆盖，登录页过期提示由本地页面验证覆盖。
+
 ## 2026-06-07 PERF-API-07（库存/财务/运营写成功路径临时库 SLA）
 
 ### Goal

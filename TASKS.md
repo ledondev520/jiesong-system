@@ -1,5 +1,16 @@
 # Frontend Polish Tasks
 
+## 2026-06-07 LOGIN-08 会话过期收敛跳转
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| LOGIN-08A | P0 | 5m | 1 | DONE | 恢复 Codex/ByteRover 项目记忆，确认当前问题不是旧快捷登录，而是 dashboard 401 处理没有统一收敛 |
+| LOGIN-08B | P0 | 10m | 1 | DONE | 新增会话过期 Module，统一清理 token 与 `auth-storage`，并识别认证页不跳转 |
+| LOGIN-08C | P0 | 10m | 1 | DONE | 将 axios 401 响应处理改为调用统一入口，多个并发 401 只处理一次 |
+| LOGIN-08D | P1 | 10m | 1 | DONE | 补充会话过期测试，覆盖单次提示、单次跳转、认证页跳转豁免与状态清理 |
+| LOGIN-08E | P1 | 10m | 1 | DONE | 运行目标测试、目标 lint 和全量 TypeScript 检查 |
+| LOGIN-08F | P1 | 5m | 1 | DONE | 用本地浏览器确认 `/login?expired=1` 登录页提示可见 |
+
 ## 2026-06-07 PERF-API-07 库存/财务/运营写成功路径临时库 SLA
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |

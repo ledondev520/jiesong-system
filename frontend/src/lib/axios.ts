@@ -1,5 +1,6 @@
 import axios, { type AxiosRequestConfig } from 'axios';
-import { clearAuthToken, getAuthToken } from '@/lib/auth-token';
+import { getAuthToken } from '@/lib/auth-token';
+import { handleExpiredAuthSession } from '@/lib/auth-session';
 import { getApiBaseUrl } from '@/lib/api-base-url';
 
 // Create Axios instance
@@ -183,36 +184,8 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response) {
-      // Handle 401 Unauthorized - 会话过期处理
-      // 若已在 auth 页面（登录/注册/忘记密码），不再重复重定向，
-      // 避免 401 触发整页刷新导致表单被清空。
       if (error.response.status === 401) {
-        if (typeof window !== 'undefined') {
-          const authPaths = ['/login', '/register', '/forgot-password'];
-          const isAuthPage = authPaths.some((p) => window.location.pathname.startsWith(p));
-          if (!isAuthPage) {
-            clearAuthToken();
-            // 显示会话过期提示（使用 setTimeout 确保 toast 能正常显示）
-            setTimeout(() => {
-              // 动态导入 toast 避免循环依赖
-              import('sonner').then(({ toast }) => {
-                toast.error('登录会话已过期，请重新登录', {
-                  duration: 5000,
-                  action: {
-                    label: '去登录',
-                    onClick: () => {
-                      window.location.href = '/login';
-                    },
-                  },
-                });
-              });
-              // 延迟跳转，让用户看到提示
-              setTimeout(() => {
-                window.location.href = '/login?expired=1';
-              }, 1500);
-            }, 0);
-          }
-        }
+        handleExpiredAuthSession();
       }
       return Promise.reject(error.response.data);
     }
