@@ -1,255 +1,265 @@
 /**
- * Input: 供应商服务API、SortableTableHead、useTableSort
- * Output: 供应商管理页面（搜索、分页、桌面表列排序）
- * Pos: 基础档案子页面
+ * Input: 供应商服务API、React Hook Form、ModuleTabHeader
+ * Output: 供应商管理表单页（左侧选择供应商，右侧维护档案表单）
+ * Pos: 采购模块基础档案表单页
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Supplier } from '@/types';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFieldArray, useForm, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { toast } from 'sonner';
+import {
+  AlertTriangle,
+  Building2,
+  CheckCircle2,
+  Mail,
+  Phone,
+  Plus,
+  RotateCcw,
+  Save,
+  Search,
+  Trash2,
+  User,
+  X,
+} from 'lucide-react';
+import type { Supplier } from '@/types';
 import { supplierService } from '@/services/supplier.service';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Plus,
-  Pencil,
-  Trash2,
-  Factory,
-  AlertTriangle,
-  Search,
-  X,
-  LayoutGrid,
-  List,
-  Star,
-  Phone,
-  User,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react';
-import { EmptyState } from '@/components/ui/empty-state';
-import { SupplierDialog } from './components/SupplierDialog';
-import type { SupplierFormValues } from './components/SupplierDialog';
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
-import { toast } from 'sonner';
-import { Input } from '@/components/ui/input';
-import { PageSizeSelect } from '@/components/ui/page-size-select';
-import { Card, CardContent } from '@/components/ui/card';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
-import { useTableSort } from '@/lib/hooks/useTableSort';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 
-// 扩展供应商类型用于展示（后端返回的可选统计字段）
 interface SupplierDisplay extends Supplier {
-  rating?: number;
   purchaseCount?: number;
   recentTransactionAmount?: number;
 }
 
-/**
- * 职责：生成分页页码数组（显示当前页前后各2页 + 首尾页）
- */
-function getPageNumbers(current: number, total: number): (number | 'ellipsis')[] {
-  if (total <= 7) {
-    return Array.from({ length: total }, (_, i) => i + 1);
-  }
-  const pages: (number | 'ellipsis')[] = [1];
-  if (current > 4) pages.push('ellipsis');
-  const start = Math.max(2, current - 2);
-  const end = Math.min(total - 1, current + 2);
-  for (let i = start; i <= end; i++) pages.push(i);
-  if (current < total - 3) pages.push('ellipsis');
-  if (total > 1) pages.push(total);
-  return pages;
+const supplierSchema = z.object({
+  name: z.string().min(1, '公司名称必填'),
+  shortName: z.string().optional(),
+  contactName: z.string().optional(),
+  contactPhone: z.string().optional(),
+  contactEmail: z.string().email('邮箱格式不正确').optional().or(z.literal('')),
+  address: z.string().optional(),
+  phone: z.string().optional(),
+  taxId: z.string().optional(),
+  bankName: z.string().optional(),
+  bankAccount: z.string().optional(),
+  hasQualityIssue: z.boolean(),
+  qualityNote: z.string().optional(),
+  aliases: z.array(z.object({
+    alias: z.string().min(1, '别名不能为空'),
+  })).optional(),
+});
+
+type SupplierFormValues = z.infer<typeof supplierSchema>;
+type SupplierStatusFilter = 'all' | 'normal' | 'issue';
+
+const emptySupplierValues: SupplierFormValues = {
+  name: '',
+  shortName: '',
+  contactName: '',
+  contactPhone: '',
+  contactEmail: '',
+  address: '',
+  phone: '',
+  taxId: '',
+  bankName: '',
+  bankAccount: '',
+  hasQualityIssue: false,
+  qualityNote: '',
+  aliases: [],
+};
+
+function supplierToFormValues(supplier: SupplierDisplay): SupplierFormValues {
+  return {
+    name: supplier.name,
+    shortName: supplier.shortName || '',
+    contactName: supplier.contactName || '',
+    contactPhone: supplier.contactPhone || '',
+    contactEmail: supplier.contactEmail || '',
+    address: supplier.address || '',
+    phone: supplier.phone || '',
+    taxId: supplier.taxId || '',
+    bankName: supplier.bankName || '',
+    bankAccount: supplier.bankAccount || '',
+    hasQualityIssue: supplier.hasQualityIssue,
+    qualityNote: supplier.qualityNote || '',
+    aliases: supplier.aliases?.map((alias) => ({ alias: alias.alias })) || [],
+  };
 }
 
-/**
- * 职责：渲染星级评分
- */
-function RatingStars({ rating }: { rating?: number }) {
-  if (rating == null) return null;
-  return (
-    <div className="flex items-center gap-0.5">
-      {Array.from({ length: 5 }, (_, i) => (
-        <Star
-          key={i}
-          className={cn(
-            'h-3 w-3',
-            i < Math.round(rating) ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'
-          )}
-        />
-      ))}
-      <span className="ml-1 text-xs text-muted-foreground">{rating.toFixed(1)}</span>
-    </div>
-  );
+function toSupplierPayload(values: SupplierFormValues) {
+  return {
+    ...values,
+    aliases: values.aliases
+      ?.map((alias) => ({ alias: alias.alias.trim() }))
+      .filter((alias) => alias.alias.length > 0),
+  };
 }
 
-/**
- * 职责：渲染供应商头像（首字母）
- */
-function SupplierAvatar({ name, hasQualityIssue }: { name: string; hasQualityIssue: boolean }) {
-  const initial = name.charAt(0).toUpperCase();
-  return (
-    <div
-      className={cn(
-        'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold',
-        hasQualityIssue
-          ? 'bg-destructive/10 text-destructive'
-          : 'bg-primary/10 text-primary'
-      )}
-    >
-      {initial}
-    </div>
+function supplierInitial(name: string) {
+  return name.trim().charAt(0).toUpperCase() || '供';
+}
+
+function SupplierStatusBadge({ hasIssue }: { hasIssue: boolean }) {
+  return hasIssue ? (
+    <Badge variant="destructive" className="gap-1 rounded-full px-2 py-0.5 text-[11px]">
+      <AlertTriangle className="h-3 w-3" />
+      质量问题
+    </Badge>
+  ) : (
+    <Badge variant="outline" className="gap-1 rounded-full border-primary/20 bg-primary/5 px-2 py-0.5 text-[11px] text-primary">
+      <CheckCircle2 className="h-3 w-3" />
+      正常
+    </Badge>
   );
 }
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<SupplierDisplay[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingSupplier, setEditingSupplier] = useState<SupplierDisplay | null>(null);
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-
-  // 搜索与分页状态
+  const [activeSupplierId, setActiveSupplierId] = useState<string | null>(null);
   const [keyword, setKeyword] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'normal' | 'issue'>('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [statusFilter, setStatusFilter] = useState<SupplierStatusFilter>('all');
 
-  useEffect(() => {
-    loadSuppliers();
-  }, []);
+  const form = useForm<SupplierFormValues>({
+    resolver: zodResolver(supplierSchema),
+    defaultValues: emptySupplierValues,
+  });
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: 'aliases',
+  });
+  const hasQualityIssue = useWatch({
+    control: form.control,
+    name: 'hasQualityIssue',
+  });
 
-  const loadSuppliers = async () => {
+  const loadSuppliers = useCallback(async () => {
     setLoading(true);
     try {
       const response = await cachedFetch('suppliers-list', () => supplierService.getAll({ page: 1, pageSize: 100 }));
-      setSuppliers((response.data?.items || []) as SupplierDisplay[]);
+      const items = (response.data?.items || []) as SupplierDisplay[];
+      setSuppliers(items);
+      return items;
     } catch {
       toast.error('加载供应商失败');
+      return [];
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleCreate = () => {
-    setEditingSupplier(null);
-    setIsDialogOpen(true);
-  };
-
-  const handleEdit = (supplier: SupplierDisplay) => {
-    setEditingSupplier(supplier);
-    setIsDialogOpen(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (confirm('确定要删除此供应商吗？')) {
-      try {
-        await supplierService.delete(id);
-        setSuppliers(suppliers.filter((s) => s.id !== id));
-        toast.success('供应商已删除');
-      } catch {
-        toast.error('删除失败');
-      }
-    }
-  };
-
-  const handleSubmit = async (data: SupplierFormValues) => {
-    const payload = {
-      ...data,
-      aliases: data.aliases?.map((alias) => ({ alias: alias.alias })),
-    };
-
-    try {
-      if (editingSupplier) {
-        await supplierService.update(editingSupplier.id, payload);
-        toast.success('供应商更新成功');
-      } else {
-        await supplierService.create(payload);
-        toast.success('供应商创建成功');
-      }
-      setIsDialogOpen(false);
-      invalidateCache('suppliers-list');
-      loadSuppliers();
-    } catch {
-      toast.error(editingSupplier ? '更新失败' : '创建失败');
-    }
-  };
-
-  // 根据关键词与状态过滤
-  const filteredSuppliers = useMemo(() => {
-    let list = suppliers;
-    if (keyword.trim()) {
-      const kw = keyword.trim().toLowerCase();
-      list = list.filter(
-        (s) =>
-          s.name.toLowerCase().includes(kw) ||
-          (s.shortName || '').toLowerCase().includes(kw) ||
-          (s.contactName || '').toLowerCase().includes(kw) ||
-          (s.aliases || []).some((a) => a.alias.toLowerCase().includes(kw))
-      );
-    }
-    if (statusFilter === 'normal') {
-      list = list.filter((s) => !s.hasQualityIssue);
-    } else if (statusFilter === 'issue') {
-      list = list.filter((s) => s.hasQualityIssue);
-    }
-    return list;
-  }, [suppliers, keyword, statusFilter]);
-
-  /**
-   * 职责：从供应商行取出排序用字段
-   */
-  const supplierAccessor = useCallback((item: SupplierDisplay, key: string) => {
-    switch (key) {
-      case 'name':
-        return item.name;
-      case 'aliases':
-        return item.aliases?.map((a) => a.alias).join(' ') ?? '';
-      case 'contactName':
-        return item.contactName ?? '';
-      default:
-        return null;
-    }
   }, []);
 
-  const supplierSort = useTableSort(filteredSuppliers, supplierAccessor);
+  useEffect(() => {
+    loadSuppliers();
+  }, [loadSuppliers]);
 
-  const totalPages = Math.ceil(supplierSort.sortedData.length / pageSize);
-  const pagedSuppliers = supplierSort.sortedData.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
+  const activeSupplier = useMemo(
+    () => suppliers.find((supplier) => supplier.id === activeSupplierId) || null,
+    [activeSupplierId, suppliers],
   );
 
-  const handleReset = () => {
+  useEffect(() => {
+    if (activeSupplier) {
+      form.reset(supplierToFormValues(activeSupplier));
+    } else if (activeSupplierId === null) {
+      form.reset(emptySupplierValues);
+    }
+  }, [activeSupplier, activeSupplierId, form]);
+
+  const filteredSuppliers = useMemo(() => {
+    const kw = keyword.trim().toLowerCase();
+    return suppliers.filter((supplier) => {
+      const matchesKeyword = !kw || [
+        supplier.name,
+        supplier.shortName,
+        supplier.contactName,
+        supplier.contactPhone,
+        supplier.contactEmail,
+        ...(supplier.aliases?.map((alias) => alias.alias) || []),
+      ].some((value) => (value || '').toLowerCase().includes(kw));
+
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'normal' && !supplier.hasQualityIssue) ||
+        (statusFilter === 'issue' && supplier.hasQualityIssue);
+
+      return matchesKeyword && matchesStatus;
+    });
+  }, [keyword, statusFilter, suppliers]);
+
+  const normalCount = suppliers.filter((supplier) => !supplier.hasQualityIssue).length;
+  const issueCount = suppliers.length - normalCount;
+  const hasActiveFilters = keyword.trim() || statusFilter !== 'all';
+
+  const resetFilters = () => {
     setKeyword('');
     setStatusFilter('all');
-    setCurrentPage(1);
   };
 
-  const pageNumbers = useMemo(() => getPageNumbers(currentPage, totalPages), [currentPage, totalPages]);
+  const startNewSupplier = () => {
+    setActiveSupplierId(null);
+    form.reset(emptySupplierValues);
+  };
 
-  const hasActiveFilters = keyword.trim() || statusFilter !== 'all';
+  const selectSupplier = (supplier: SupplierDisplay) => {
+    setActiveSupplierId(supplier.id);
+  };
+
+  const handleSubmit = async (values: SupplierFormValues) => {
+    const payload = toSupplierPayload(values);
+
+    try {
+      if (activeSupplier) {
+        await supplierService.update(activeSupplier.id, payload);
+        toast.success('供应商更新成功');
+      } else {
+        const response = await supplierService.create(payload);
+        setActiveSupplierId(response.data?.id || null);
+        toast.success('供应商创建成功');
+      }
+      invalidateCache('suppliers-list');
+      await loadSuppliers();
+    } catch {
+      toast.error(activeSupplier ? '更新失败' : '创建失败');
+    }
+  };
+
+  const handleDeleteActive = async () => {
+    if (!activeSupplier) return;
+    if (!confirm(`确定要删除供应商「${activeSupplier.name}」吗？`)) return;
+
+    try {
+      await supplierService.delete(activeSupplier.id);
+      toast.success('供应商已删除');
+      setActiveSupplierId(null);
+      form.reset(emptySupplierValues);
+      invalidateCache('suppliers-list');
+      await loadSuppliers();
+    } catch {
+      toast.error('删除失败');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -257,552 +267,399 @@ export default function SuppliersPage() {
       <PageHeader
         title="供应商管理"
         actions={
-          <div className="hidden flex-wrap items-center gap-2 md:flex">
-            <Button onClick={handleCreate} className="h-9 rounded-lg text-sm">
-              <Plus className="mr-1.5 h-4 w-4" /> 新增供应商
-            </Button>
-          </div>
+          <Button onClick={startNewSupplier} className="h-9 rounded-lg text-sm">
+            <Plus className="mr-1.5 h-4 w-4" />
+            新建供应商档案
+          </Button>
         }
       />
 
-      {/* 一体化筛选栏 */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative w-full sm:w-60">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="搜索供应商名称..."
-              value={keyword}
-              onChange={(e) => {
-                setKeyword(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="h-9 rounded-md border-border/60 bg-background pl-9 text-sm shadow-[0_1px_3px_rgba(0,0,0,0.05)]"
-            />
+      <div className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
+        <aside className="rounded-xl border border-border/50 bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+          <div className="space-y-4 border-b border-border/50 p-4">
+            <div>
+              <p className="text-sm font-semibold">供应商索引</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                共 {suppliers.length} 家，正常 {normalCount} 家，质量问题 {issueCount} 家。
+              </p>
+            </div>
+
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={keyword}
+                onChange={(event) => setKeyword(event.target.value)}
+                placeholder="搜索名称、联系人、别名..."
+                className="h-9 rounded-lg pl-9"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-1 rounded-lg border border-border/60 bg-muted/30 p-1">
+              {[
+                ['all', '全部'],
+                ['normal', '正常'],
+                ['issue', '质量问题'],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setStatusFilter(value as SupplierStatusFilter)}
+                  className={cn(
+                    'h-8 rounded-md text-xs font-medium transition-colors',
+                    statusFilter === value
+                      ? value === 'issue'
+                        ? 'bg-destructive text-destructive-foreground'
+                        : 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-background hover:text-foreground',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" className="h-8 w-full rounded-lg text-xs" onClick={resetFilters}>
+                <X className="mr-1.5 h-3.5 w-3.5" />
+                清空筛选
+              </Button>
+            )}
           </div>
 
-          <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background p-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-            <button
-              onClick={() => setStatusFilter('all')}
-              className={cn(
-                'h-7 rounded px-2.5 text-xs font-medium transition-colors',
-                statusFilter === 'all' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              全部
-            </button>
-            <button
-              onClick={() => setStatusFilter('normal')}
-              className={cn(
-                'h-7 rounded px-2.5 text-xs font-medium transition-colors',
-                statusFilter === 'normal' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              正常
-            </button>
-            <button
-              onClick={() => setStatusFilter('issue')}
-              className={cn(
-                'h-7 rounded px-2.5 text-xs font-medium transition-colors',
-                statusFilter === 'issue' ? 'bg-destructive text-destructive-foreground' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              质量问题
-            </button>
+          <div className="max-h-[620px] overflow-y-auto p-2">
+            {loading ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">加载中...</div>
+            ) : filteredSuppliers.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border/70 px-4 py-10 text-center text-sm text-muted-foreground">
+                {hasActiveFilters ? '没有符合条件的供应商' : '暂无供应商'}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredSuppliers.map((supplier) => (
+                  <button
+                    key={supplier.id}
+                    type="button"
+                    onClick={() => selectSupplier(supplier)}
+                    aria-label={`选择供应商 ${supplier.name}`}
+                    className={cn(
+                      'w-full rounded-lg border px-3 py-3 text-left transition-colors',
+                      activeSupplierId === supplier.id
+                        ? 'border-primary/40 bg-primary/5'
+                        : 'border-transparent hover:border-border hover:bg-muted/50',
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={cn(
+                          'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold',
+                          supplier.hasQualityIssue
+                            ? 'bg-destructive/10 text-destructive'
+                            : 'bg-primary/10 text-primary',
+                        )}
+                      >
+                        {supplierInitial(supplier.name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="truncate text-sm font-semibold">{supplier.name}</p>
+                          <SupplierStatusBadge hasIssue={supplier.hasQualityIssue} />
+                        </div>
+                        <div className="mt-1 space-y-1 text-xs text-muted-foreground">
+                          <p className="truncate">
+                            联系人：<span className="text-foreground">{supplier.contactName || '待补充'}</span>
+                          </p>
+                          <p className="truncate">
+                            电话：<span className="text-foreground">{supplier.contactPhone || '—'}</span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </aside>
+
+        <section className="rounded-xl border border-border/50 bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+          <div className="flex flex-col gap-3 border-b border-border/50 p-5 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-semibold">供应商档案表单</h2>
+                <Badge variant={activeSupplier ? 'outline' : 'secondary'} className="rounded-full">
+                  {activeSupplier ? '编辑现有档案' : '新建档案'}
+                </Badge>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                维护合同生成、联系人、税号和收款账户信息。
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" className="h-9 rounded-lg text-sm" onClick={startNewSupplier}>
+                <RotateCcw className="mr-1.5 h-4 w-4" />
+                清空新建
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 rounded-lg border-destructive/30 text-sm text-destructive hover:bg-destructive/5 hover:text-destructive"
+                disabled={!activeSupplier}
+                onClick={handleDeleteActive}
+              >
+                <Trash2 className="mr-1.5 h-4 w-4" />
+                删除当前
+              </Button>
+            </div>
           </div>
 
-          {hasActiveFilters && (
-            <Button variant="ghost" size="sm" className="h-9 rounded-md text-xs" onClick={handleReset}>
-              <X className="mr-1 h-3.5 w-3.5" />
-              重置
-            </Button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-md border border-border/60 bg-background p-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={cn(
-                'flex h-7 w-7 items-center justify-center rounded transition-colors',
-                viewMode === 'grid' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'
-              )}
-              aria-label="网格视图"
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={cn(
-                'flex h-7 w-7 items-center justify-center rounded transition-colors',
-                viewMode === 'list' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'
-              )}
-              aria-label="列表视图"
-            >
-              <List className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 移动端操作栏 */}
-      <div className="grid grid-cols-2 gap-3 md:hidden">
-        <Sheet open={mobileSearchOpen} onOpenChange={setMobileSearchOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" className="h-11 rounded-xl">
-              <Search className="mr-2 h-4 w-4" />
-              搜索与操作
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-3xl px-0 pb-0">
-            <SheetHeader className="border-b px-5 pb-4">
-              <SheetTitle>搜索与操作</SheetTitle>
-              <SheetDescription>先缩小结果范围，再进入供应商档案操作。</SheetDescription>
-            </SheetHeader>
-            <div className="space-y-4 px-5 py-5">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="搜索供应商名称..."
-                  value={keyword}
-                  onChange={(e) => {
-                    setKeyword(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="h-11 rounded-xl border-border/70 bg-background/80 pl-9"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 p-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>公司名称 *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="工商注册名称" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="shortName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>简称</FormLabel>
+                      <FormControl>
+                        <Input placeholder="内部常用称呼" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant={statusFilter === 'all' ? 'default' : 'outline'}
-                  className="h-10 flex-1 rounded-xl text-xs"
-                  onClick={() => setStatusFilter('all')}
-                >
-                  全部
+
+              <div className="rounded-xl border border-border/50 p-4">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">供应商别名</p>
+                    <p className="mt-1 text-xs text-muted-foreground">用于搜索和匹配采购合同里的历史称呼。</p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg" onClick={() => append({ alias: '' })}>
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    添加别名
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {fields.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-border/70 px-3 py-3 text-sm text-muted-foreground">
+                      暂无别名。
+                    </p>
+                  ) : (
+                    fields.map((field, index) => (
+                      <div key={field.id} className="flex gap-2">
+                        <FormField
+                          control={form.control}
+                          name={`aliases.${index}.alias`}
+                          render={({ field }) => (
+                            <FormItem className="flex-1">
+                              <FormControl>
+                                <Input placeholder="例如：黎总、陶瓷厂" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button type="button" variant="ghost" size="icon" className="h-10 w-10" onClick={() => remove(index)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="contactName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="inline-flex items-center gap-1.5">
+                        <User className="h-3.5 w-3.5" />
+                        联系人
+                      </FormLabel>
+                      <FormControl>
+                        <Input placeholder="姓名" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="contactPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="inline-flex items-center gap-1.5">
+                        <Phone className="h-3.5 w-3.5" />
+                        联系电话
+                      </FormLabel>
+                      <FormControl>
+                        <Input placeholder="手机或座机" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="contactEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="inline-flex items-center gap-1.5">
+                        <Mail className="h-3.5 w-3.5" />
+                        邮箱
+                      </FormLabel>
+                      <FormControl>
+                        <Input placeholder="电子邮箱" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="rounded-xl border border-border/50 p-4">
+                <div className="mb-4">
+                  <p className="text-sm font-semibold">合同与财务信息</p>
+                  <p className="mt-1 text-xs text-muted-foreground">这些字段会进入采购合同、付款和后续对账流程。</p>
+                </div>
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="address"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>公司地址</FormLabel>
+                        <FormControl>
+                          <Input placeholder="完整公司地址" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>公司电话</FormLabel>
+                          <FormControl>
+                            <Input placeholder="座机电话" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="taxId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>纳税人识别号</FormLabel>
+                          <FormControl>
+                            <Input placeholder="税号" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="bankName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>开户银行</FormLabel>
+                          <FormControl>
+                            <Input placeholder="银行名称" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="bankAccount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>银行账号</FormLabel>
+                          <FormControl>
+                            <Input placeholder="银行账号" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
+                <FormField
+                  control={form.control}
+                  name="hasQualityIssue"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel className="font-semibold text-destructive">质量问题标记</FormLabel>
+                        <FormDescription>供应商出现过质量问题时勾选，后续采购选择会显示风险提示。</FormDescription>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
+                {hasQualityIssue && (
+                  <FormField
+                    control={form.control}
+                    name="qualityNote"
+                    render={({ field }) => (
+                      <FormItem className="mt-4">
+                        <FormLabel>问题描述</FormLabel>
+                        <FormControl>
+                          <Textarea placeholder="请描述质量问题、发生时间和处理结果..." className="min-h-24 resize-none" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 border-t border-border/50 pt-5 sm:flex-row sm:justify-end">
+                <Button type="button" variant="outline" className="h-10 rounded-lg" onClick={startNewSupplier}>
+                  取消并新建
                 </Button>
-                <Button
-                  variant={statusFilter === 'normal' ? 'default' : 'outline'}
-                  className="h-10 flex-1 rounded-xl text-xs"
-                  onClick={() => setStatusFilter('normal')}
-                >
-                  正常
-                </Button>
-                <Button
-                  variant={statusFilter === 'issue' ? 'destructive' : 'outline'}
-                  className="h-10 flex-1 rounded-xl text-xs"
-                  onClick={() => setStatusFilter('issue')}
-                >
-                  质量问题
+                <Button type="submit" className="h-10 rounded-lg" disabled={form.formState.isSubmitting}>
+                  <Save className="mr-1.5 h-4 w-4" />
+                  {form.formState.isSubmitting ? '保存中...' : activeSupplier ? '保存修改' : '创建供应商'}
                 </Button>
               </div>
-              {hasActiveFilters && (
-                <Button variant="outline" className="h-11 w-full rounded-xl" onClick={handleReset}>
-                  <X className="mr-2 h-4 w-4" />
-                  清空搜索
-                </Button>
-              )}
-            </div>
-            <div className="flex gap-3 border-t px-5 py-4">
-              <Button variant="outline" className="h-11 flex-1 rounded-xl" onClick={() => setMobileSearchOpen(false)}>
-                查看结果
-              </Button>
-              <Button className="h-11 flex-1 rounded-xl" onClick={handleCreate}>
-                <Plus className="mr-2 h-4 w-4" />
-                新增供应商
-              </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
-        <Button onClick={handleCreate} className="h-11 rounded-xl">
-          <Plus className="mr-2 h-4 w-4" /> 新增供应商
-        </Button>
+            </form>
+          </Form>
+        </section>
       </div>
-
-      {/* 移动端卡片 */}
-      <div className="grid gap-3 md:hidden">
-        {loading ? (
-          <Card className="border-dashed border-border/70">
-            <CardContent className="py-10 text-center text-sm text-muted-foreground">加载中...</CardContent>
-          </Card>
-        ) : pagedSuppliers.length === 0 ? (
-          <Card className="border-dashed border-border/70">
-            <CardContent className="py-10 text-center text-sm text-muted-foreground">
-              {keyword || statusFilter !== 'all' ? '没有符合条件的供应商' : '暂无供应商数据。'}
-            </CardContent>
-          </Card>
-        ) : (
-          pagedSuppliers.map((supplier) => (
-            <Card
-              key={supplier.id}
-              className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition-all hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)]"
-            >
-              <CardContent className="space-y-4 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <SupplierAvatar name={supplier.name} hasQualityIssue={supplier.hasQualityIssue} />
-                    <div className="min-w-0 space-y-0.5">
-                      <p className="text-sm font-semibold tracking-tight">{supplier.name}</p>
-                      {supplier.shortName && <p className="truncate text-xs text-muted-foreground">{supplier.shortName}</p>}
-                      <RatingStars rating={supplier.rating} />
-                    </div>
-                  </div>
-                  {supplier.hasQualityIssue ? (
-                    <div className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                      质量问题
-                    </div>
-                  ) : (
-                    <Badge
-                      variant="outline"
-                      className="shrink-0 rounded-full border-primary/20 bg-primary/5 px-2 py-0.5 text-[11px] text-primary"
-                    >
-                      正常
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 rounded-lg bg-muted/40 p-3">
-                  <div className="space-y-1">
-                    <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">联系人</p>
-                    <p className="flex items-center gap-1 text-xs font-medium">
-                      <User className="h-3 w-3 text-muted-foreground" />
-                      {supplier.contactName || '—'}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">联系电话</p>
-                    <p className="flex items-center gap-1 text-xs font-medium">
-                      <Phone className="h-3 w-3 text-muted-foreground" />
-                      {supplier.contactPhone || '—'}
-                    </p>
-                  </div>
-                  {supplier.purchaseCount != null && (
-                    <div className="space-y-1">
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">合作次数</p>
-                      <p className="text-xs font-medium">{supplier.purchaseCount} 次</p>
-                    </div>
-                  )}
-                  {supplier.recentTransactionAmount != null && (
-                    <div className="space-y-1">
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">最近交易</p>
-                      <p className="text-xs font-medium tabular-nums text-emerald-600">
-                        ¥{supplier.recentTransactionAmount.toLocaleString()}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {supplier.aliases && supplier.aliases.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {supplier.aliases.map((a) => (
-                      <Badge key={a.id} variant="secondary" className="rounded-md text-[10px]">
-                        {a.alias}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    variant="outline"
-                    className="h-9 rounded-lg text-xs"
-                    onClick={() => handleEdit(supplier)}
-                    aria-label={`编辑 ${supplier.name}`}
-                  >
-                    <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                    编辑
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-9 rounded-lg border-destructive/30 text-xs text-destructive hover:bg-destructive/5 hover:text-destructive"
-                    onClick={() => handleDelete(supplier.id)}
-                    aria-label={`删除 ${supplier.name}`}
-                  >
-                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                    删除
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-
-      {/* 桌面端视图 */}
-      <div className="hidden md:block">
-        {loading ? (
-          <div className="rounded-xl border border-border/40 bg-card py-12 text-center text-sm text-muted-foreground shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-            加载中...
-          </div>
-        ) : pagedSuppliers.length === 0 ? (
-          <div className="rounded-xl border border-border/40 bg-card py-12 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-            <EmptyState
-              icon={<Factory className="h-8 w-8" />}
-              title={keyword || statusFilter !== 'all' ? '没有符合条件的供应商' : '暂无供应商数据'}
-              description="还没有添加任何供应商，点击下方的按钮开始创建"
-              action={{ label: '新增供应商', onClick: () => setIsDialogOpen(true) }}
-            />
-          </div>
-        ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
-            {pagedSuppliers.map((supplier) => (
-              <Card
-                key={supplier.id}
-                className="group cursor-pointer overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition-all hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)]"
-                onClick={() => handleEdit(supplier)}
-              >
-                <div className="flex">
-                  {/* 左侧状态色条 */}
-                  <div
-                    className="w-[3px] shrink-0 transition-opacity group-hover:opacity-100 opacity-60"
-                    style={{
-                      backgroundColor: supplier.hasQualityIssue ? '#ef4444' : '#10b981',
-                    }}
-                  />
-                  <CardContent className="flex-1 space-y-3 p-4">
-                    {/* 头部：头像 + 名称 + 状态 */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 items-start gap-3">
-                        <SupplierAvatar name={supplier.name} hasQualityIssue={supplier.hasQualityIssue} />
-                        <div className="min-w-0 space-y-0.5">
-                          <p className="text-sm font-semibold text-foreground truncate">{supplier.name}</p>
-                          {supplier.shortName && <p className="text-xs text-muted-foreground">{supplier.shortName}</p>}
-                          <RatingStars rating={supplier.rating} />
-                        </div>
-                      </div>
-                      {supplier.hasQualityIssue ? (
-                        <Badge
-                          variant="destructive"
-                          className="shrink-0 rounded-full px-2 py-0.5 text-[11px]"
-                        >
-                          <AlertTriangle className="mr-1 h-3 w-3" /> 质量问题
-                        </Badge>
-                      ) : (
-                        <Badge
-                          variant="outline"
-                          className="shrink-0 rounded-full border-primary/20 bg-primary/5 px-2 py-0.5 text-[11px] text-primary"
-                        >
-                          正常
-                        </Badge>
-                      )}
-                    </div>
-
-                    {/* 别名 */}
-                    {supplier.aliases && supplier.aliases.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {supplier.aliases.map((a) => (
-                          <Badge key={a.id} variant="secondary" className="rounded-md text-[10px]">
-                            {a.alias}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* 联系人与统计 */}
-                    <div className="space-y-1 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1.5">
-                        <User className="h-3 w-3 shrink-0" />
-                        <span className="shrink-0">联系人:</span>
-                        <span className="truncate font-medium text-foreground">{supplier.contactName || '—'}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Phone className="h-3 w-3 shrink-0" />
-                        <span className="shrink-0">电话:</span>
-                        <span className="truncate text-foreground">{supplier.contactPhone || '—'}</span>
-                      </div>
-                      {supplier.purchaseCount != null && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="shrink-0">合作次数:</span>
-                          <span className="font-medium text-foreground">{supplier.purchaseCount} 次</span>
-                        </div>
-                      )}
-                      {supplier.recentTransactionAmount != null && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="shrink-0">最近交易:</span>
-                          <span className="font-medium tabular-nums text-emerald-600">
-                            ¥{supplier.recentTransactionAmount.toLocaleString()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 操作 */}
-                    <div className="flex gap-2 border-t border-border/30 pt-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 flex-1 rounded-md text-xs"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEdit(supplier);
-                        }}
-                        aria-label={`编辑 ${supplier.name}`}
-                      >
-                        <Pencil className="mr-1 h-3 w-3" /> 编辑
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 flex-1 rounded-md text-xs text-destructive hover:bg-destructive/10"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(supplier.id);
-                        }}
-                        aria-label={`删除 ${supplier.name}`}
-                      >
-                        <Trash2 className="mr-1 h-3 w-3" /> 删除
-                      </Button>
-                    </div>
-                  </CardContent>
-                </div>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-xl border border-border/40 bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="w-10 text-center">#</TableHead>
-                  <TableHead>供应商名称</TableHead>
-                  <TableHead>联系人</TableHead>
-                  <TableHead>电话</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pagedSuppliers.map((supplier, idx) => (
-                  <TableRow
-                    key={supplier.id}
-                    className="group cursor-pointer transition-colors"
-                    onClick={() => handleEdit(supplier)}
-                  >
-                    <TableCell className="text-center text-xs text-muted-foreground">
-                      {(currentPage - 1) * pageSize + idx + 1}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <SupplierAvatar name={supplier.name} hasQualityIssue={supplier.hasQualityIssue} />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium">{supplier.name}</p>
-                          {supplier.shortName && <p className="text-xs text-muted-foreground">{supplier.shortName}</p>}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm">{supplier.contactName || '—'}</TableCell>
-                    <TableCell className="text-sm">{supplier.contactPhone || '—'}</TableCell>
-                    <TableCell>
-                      {supplier.hasQualityIssue ? (
-                        <Badge variant="destructive" className="rounded-full px-2 py-0.5 text-[11px]">
-                          <AlertTriangle className="mr-1 h-3 w-3" /> 质量问题
-                        </Badge>
-                      ) : (
-                        <Badge
-                          variant="outline"
-                          className="rounded-full border-primary/20 bg-primary/5 px-2 py-0.5 text-[11px] text-primary"
-                        >
-                          正常
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-md"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEdit(supplier);
-                          }}
-                          aria-label={`编辑 ${supplier.name}`}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-md text-destructive hover:text-destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(supplier.id);
-                          }}
-                          aria-label={`删除 ${supplier.name}`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </div>
-
-      {/* 分页控制 */}
-      {totalPages > 0 && (
-        <div className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <span>
-            共 {filteredSuppliers.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}
-          </span>
-          <div className="flex flex-wrap items-center gap-2">
-            <PageSizeSelect
-              value={pageSize}
-              onChange={(size) => {
-                setPageSize(size);
-                setCurrentPage(1);
-              }}
-            />
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 rounded-md"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              {pageNumbers.map((page, idx) =>
-                page === 'ellipsis' ? (
-                  <span key={`ellipsis-${idx}`} className="px-1 text-xs text-muted-foreground">
-                    ...
-                  </span>
-                ) : (
-                  <Button
-                    key={page}
-                    variant={currentPage === page ? 'default' : 'outline'}
-                    size="sm"
-                    className="h-8 min-w-[2rem] rounded-md px-2 text-xs"
-                    onClick={() => setCurrentPage(page)}
-                  >
-                    {page}
-                  </Button>
-                )
-              )}
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 rounded-md"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages || totalPages <= 1}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <SupplierDialog
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        supplier={editingSupplier}
-        onSubmit={handleSubmit}
-      />
     </div>
   );
 }
