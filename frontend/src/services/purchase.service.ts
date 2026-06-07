@@ -140,7 +140,7 @@ export const purchaseService = {
       params,
       responseType: 'blob',
       cache: { enabled: false },
-    } as any);
+    } as { cache?: { enabled?: boolean } });
     return response as unknown as Blob;
   },
 

@@ -90,8 +90,11 @@ export default function CategoriesPage() {
         await deleteSystemCategory(id);
         setCategories(categories.filter((c) => c.id !== id));
         toast.success('分类删除成功');
-      } catch (err: any) {
-        toast.error(err?.response?.data?.message || '删除失败');
+      } catch (err) {
+        const msg = err && typeof err === 'object' && 'response' in err
+          ? (err.response as { data?: { message?: string } })?.data?.message
+          : undefined;
+        toast.error(msg || '删除失败');
       }
     }
   };
