@@ -14,6 +14,7 @@ import ContractsPage from './page';
 const mockPush = vi.fn();
 const mockSearchParamGet = vi.fn();
 const mockGetAll = vi.fn();
+const mockGetTemplates = vi.fn();
 const mockToastError = vi.fn();
 
 vi.mock('next/navigation', () => ({
@@ -38,6 +39,9 @@ vi.mock('@/services/contractDoc.service', () => ({
   contractDocService: {
     generateFromPurchase: vi.fn(),
     downloadDocument: vi.fn(),
+    getTemplates: (...args: unknown[]) => mockGetTemplates(...args),
+    uploadTemplate: vi.fn(),
+    deleteTemplate: vi.fn(),
   },
 }));
 
@@ -59,8 +63,10 @@ describe('ContractsPage 交互逻辑', () => {
     mockPush.mockReset();
     mockSearchParamGet.mockReset();
     mockGetAll.mockReset();
+    mockGetTemplates.mockReset();
     mockToastError.mockReset();
     mockSearchParamGet.mockReturnValue('');
+    mockGetTemplates.mockResolvedValue({ data: { items: [] } });
   });
 
   it('加载后展示采购模块概览与空态文案', async () => {
@@ -82,6 +88,24 @@ describe('ContractsPage 交互逻辑', () => {
 
     await user.click(screen.getAllByRole('button', { name: /新增采购/ })[0]);
     expect(mockPush).toHaveBeenCalledWith('/dashboard/purchase/create');
+  });
+
+  it('合同模板在采购合同页内弹窗管理', async () => {
+    mockGetAll.mockResolvedValue({ data: { items: [] } });
+    mockGetTemplates.mockResolvedValue({
+      data: {
+        items: [{ exists: true, filename: '购销合同模板.docx', size: 2048, updatedAt: '2026-03-01T10:00:00.000Z' }],
+      },
+    });
+    const user = userEvent.setup();
+    render(<ContractsPage />);
+
+    const templateButtons = await screen.findAllByRole('button', { name: /合同模板/ });
+    await user.click(templateButtons[0]);
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(await screen.findByText('购销合同模板.docx')).toBeInTheDocument();
+    expect(mockPush).not.toHaveBeenCalledWith('/dashboard/contract-templates');
   });
 
   it('加载失败时提示错误', async () => {

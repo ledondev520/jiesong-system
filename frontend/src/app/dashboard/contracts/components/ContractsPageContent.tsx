@@ -13,7 +13,7 @@ import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTab
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PurchaseContract, PurchaseStatus, PurchaseItem } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
-import { cachedFetch } from '@/lib/api-cache';
+import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import {
@@ -28,6 +28,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -83,6 +84,13 @@ import { cn } from '@/lib/utils';
 // 扩展类型
 interface PurchaseContractDetail extends PurchaseContract {
   items?: PurchaseItem[];
+}
+
+interface TemplateInfoItem {
+  exists: boolean;
+  filename?: string;
+  size?: number;
+  updatedAt?: string;
 }
 
 /**
@@ -320,12 +328,41 @@ export default function ContractsPageContent() {
     failedRows: number;
     errors: { row: number; error: string }[];
   } | null>(null);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [templateItems, setTemplateItems] = useState<TemplateInfoItem[]>([]);
+  const [templateLoading, setTemplateLoading] = useState(false);
+  const [selectedTemplateFile, setSelectedTemplateFile] = useState<File | null>(null);
+  const [templateUploading, setTemplateUploading] = useState(false);
+  const [templateDeleting, setTemplateDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 0. 初始化加载
   useEffect(() => {
     loadPurchaseContracts();
   }, []);
+
+  const currentTemplate = useMemo(
+    () => templateItems.find((item) => item.exists) || templateItems[0] || null,
+    [templateItems]
+  );
+
+  const loadContractTemplates = useCallback(async () => {
+    setTemplateLoading(true);
+    try {
+      const response = await cachedFetch('contract-templates', () => contractDocService.getTemplates());
+      setTemplateItems(response.data?.items || []);
+    } catch {
+      toast.error('加载合同模板失败');
+    } finally {
+      setTemplateLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (templateDialogOpen) {
+      void loadContractTemplates();
+    }
+  }, [loadContractTemplates, templateDialogOpen]);
 
   // 1. 加载采购合同（带缓存，pageSize 降至 100 减少负载）
   const loadPurchaseContracts = async () => {
@@ -420,6 +457,48 @@ export default function ContractsPageContent() {
       toast.error(message);
     } finally {
       setImportLoading(false);
+    }
+  };
+
+  const handleTemplateUpload = async () => {
+    if (!selectedTemplateFile) {
+      toast.error('请先选择模板文件');
+      return;
+    }
+    if (!selectedTemplateFile.name.toLowerCase().endsWith('.docx')) {
+      toast.error('仅支持 .docx 模板文件');
+      return;
+    }
+
+    setTemplateUploading(true);
+    try {
+      await contractDocService.uploadTemplate(selectedTemplateFile);
+      invalidateCache('contract-templates');
+      toast.success('模板上传成功');
+      setSelectedTemplateFile(null);
+      await loadContractTemplates();
+    } catch {
+      toast.error('模板上传失败');
+    } finally {
+      setTemplateUploading(false);
+    }
+  };
+
+  const handleTemplateDelete = async () => {
+    if (!window.confirm('确定删除当前模板吗？删除后将无法生成购销合同。')) {
+      return;
+    }
+
+    setTemplateDeleting(true);
+    try {
+      await contractDocService.deleteTemplate();
+      invalidateCache('contract-templates');
+      toast.success('模板已删除');
+      await loadContractTemplates();
+    } catch {
+      toast.error('删除模板失败');
+    } finally {
+      setTemplateDeleting(false);
     }
   };
 
@@ -647,6 +726,9 @@ export default function ContractsPageContent() {
             <Button variant="outline" className="h-11 rounded-2xl" onClick={handleImportClick} disabled={importLoading}>
               <Upload className="mr-2 h-4 w-4" /> 批量导入
             </Button>
+            <Button variant="outline" className="h-11 rounded-2xl" onClick={() => setTemplateDialogOpen(true)}>
+              <FileText className="mr-2 h-4 w-4" /> 合同模板
+            </Button>
             <Button className="h-11 rounded-2xl" onClick={() => router.push('/dashboard/purchase/create')}>
               <Plus className="mr-2 h-4 w-4" /> 新增采购
             </Button>
@@ -663,6 +745,13 @@ export default function ContractsPageContent() {
               disabled={importLoading}
             >
               <Upload className="mr-1.5 h-3.5 w-3.5" /> 批量导入
+            </Button>
+            <Button
+              variant="outline"
+              className="h-9 rounded-md text-xs"
+              onClick={() => setTemplateDialogOpen(true)}
+            >
+              <FileText className="mr-1.5 h-3.5 w-3.5" /> 合同模板
             </Button>
             <Button className="h-9 rounded-md text-xs" onClick={() => router.push('/dashboard/purchase/create')}>
               <Plus className="mr-1.5 h-3.5 w-3.5" /> 新增采购
@@ -1162,6 +1251,86 @@ export default function ContractsPageContent() {
               )}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 合同模板弹窗 */}
+      <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              合同模板
+            </DialogTitle>
+            <DialogDescription>
+              采购合同生成文档时使用的 Word 模板，作为采购合同页内部工具管理。
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-lg border border-border/70 bg-muted/30 p-4">
+              <p className="text-sm font-medium">当前模板</p>
+              {templateLoading ? (
+                <p className="mt-2 text-sm text-muted-foreground">加载中...</p>
+              ) : currentTemplate ? (
+                <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                  <p className="break-all text-foreground">{currentTemplate.filename || '未命名模板'}</p>
+                  <p>
+                    {typeof currentTemplate.size === 'number'
+                      ? `${(currentTemplate.size / 1024).toFixed(1)} KB`
+                      : '大小未知'}
+                    {' · '}
+                    {currentTemplate.updatedAt
+                      ? format(new Date(currentTemplate.updatedAt), 'yyyy-MM-dd HH:mm')
+                      : '更新时间未知'}
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">当前尚未上传模板。</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="purchase-contract-template-file">替换模板</Label>
+              <Input
+                id="purchase-contract-template-file"
+                type="file"
+                accept=".docx"
+                onChange={(event) => setSelectedTemplateFile(event.target.files?.[0] || null)}
+              />
+              <p className="text-xs text-muted-foreground">仅支持 .docx 模板文件。</p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button
+              variant="outline"
+              className="text-destructive hover:bg-destructive/10"
+              onClick={() => void handleTemplateDelete()}
+              disabled={!currentTemplate || templateDeleting}
+            >
+              <X className="mr-2 h-4 w-4" />
+              {templateDeleting ? '删除中...' : '删除模板'}
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setTemplateDialogOpen(false)}>
+                关闭
+              </Button>
+              <Button onClick={() => void handleTemplateUpload()} disabled={templateUploading}>
+                {templateUploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    上传中...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    上传模板
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

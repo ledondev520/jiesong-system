@@ -42,6 +42,13 @@ describe('navigation.config helpers', () => {
     expect(visibleForAdmin).not.toContain('dev');
   });
 
+  it('采购模块 Tab 不再把合同模板作为独立页面', () => {
+    const procurement = MODULE_NAV_ITEMS.find((item) => item.key === 'procurement');
+
+    expect(procurement?.tabs.map((tab) => tab.label)).toEqual(['采购合同', '供应商管理']);
+    expect(procurement?.childPrefixes).not.toContain('/dashboard/contract-templates');
+  });
+
   it('返回当前角色的默认 dashboard 落点', () => {
     expect(getDefaultDashboardHref(Role.SALES)).toBe('/dashboard');
   });

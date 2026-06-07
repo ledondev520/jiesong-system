@@ -45,7 +45,6 @@ export const OPERATIONS_TABS: TabConfig[] = [
 export const PROCUREMENT_TABS: TabConfig[] = [
   { href: '/dashboard/contracts', label: '采购合同' },
   { href: '/dashboard/suppliers', label: '供应商管理' },
-  { href: '/dashboard/contract-templates', label: '合同模板' },
 ];
 
 export const EXPORT_TABS: TabConfig[] = [
@@ -113,7 +112,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     defaultHref: '/dashboard/contracts',
     label: '采购',
     icon: ShoppingCart,
-    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers', '/dashboard/contract-templates'],
+    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers'],
     tabs: PROCUREMENT_TABS,
     mobilePrimary: true,
   },
@@ -154,7 +153,6 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     label: '系统管理',
     icon: SlidersHorizontal,
     childPrefixes: [
-      '/dashboard/contracts/templates',
       '/dashboard/settings',
       '/dashboard/settings/ports',
       '/dashboard/settings/categories',
