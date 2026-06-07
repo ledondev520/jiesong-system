@@ -1,5 +1,16 @@
 # Frontend Polish Tasks
 
+## 2026-06-07 LOGIN-07 认证页旧快捷登录提前清理
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| LOGIN-07A | P0 | 5m | 1 | DONE | 恢复 Codex/ByteRover 项目记忆，确认历史问题集中在旧快捷登录缓存与认证页提示 |
+| LOGIN-07B | P0 | 10m | 1 | DONE | 检查当前登录页、注册页、认证页组布局与旧清理模块，确认源码没有可见快捷登录按钮 |
+| LOGIN-07C | P0 | 10m | 1 | DONE | 扩展旧快捷登录清理 Interface，同时清理 `localStorage` 与 `sessionStorage` |
+| LOGIN-07D | P0 | 10m | 1 | DONE | 在认证页组渲染提前清理脚本，避免旧状态在 React effect 前影响页面 |
+| LOGIN-07E | P1 | 10m | 1 | DONE | 补充登录/认证页组测试，覆盖 sessionStorage 残留与提前脚本渲染 |
+| LOGIN-07F | P1 | 10m | 1 | DONE | 运行目标测试、目标 lint、TypeScript 检查并记录既有阻断项 |
+
 ## 2026-06-07 PERF-API-05 合同/货柜写成功路径临时库 SLA
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |

@@ -1,5 +1,27 @@
 # Ops Execution Center Plan
 
+## 2026-06-07 LOGIN-07（认证页旧快捷登录提前清理）
+
+### Goal
+- 处理本地开发服务中仍可能点到旧“快捷登录”并提交失效密码的问题。
+- 确认注册页不再显示“你已开启快捷登录”，并降低旧认证状态在页面渲染前影响 UI 的概率。
+
+### Delivered
+- `frontend/src/lib/legacy-auth-cleanup.ts` 扩展旧快捷登录清理 Interface：同时清理 `localStorage` 与 `sessionStorage` 中的历史快捷登录 key 和 quick-login 命名变体。
+- 新增 `LEGACY_AUTH_CLEANUP_INLINE_SCRIPT`，让认证页 HTML 在 React effect 之前先清理旧状态。
+- `frontend/src/app/(auth)/layout.tsx` 在登录、注册、忘记密码认证页组渲染提前清理脚本，同时保留 hydration 后的清理兜底。
+- 登录页和认证页组测试补充 `sessionStorage` 快捷登录残留与提前脚本断言；注册页继续断言不出现“你已开启快捷登录 / 快捷登录”。
+
+### Verification
+- `cd frontend && npm test -- --run 'src/app/(auth)/login/page.test.tsx' 'src/app/(auth)/layout.test.tsx' 'src/app/(auth)/register/page.test.tsx'`：通过，`3` 个文件、`11` 个测试。
+- `cd frontend && npx eslint 'src/app/(auth)/login/page.tsx' 'src/app/(auth)/layout.tsx' 'src/app/(auth)/login/page.test.tsx' 'src/app/(auth)/layout.test.tsx' 'src/app/(auth)/register/page.tsx' 'src/app/(auth)/register/page.test.tsx' 'src/lib/legacy-auth-cleanup.ts'`：通过。
+- `cd frontend && npx tsc --noEmit --pretty false`：仍被既有 `src/app/dashboard/contracts/template/page.test.tsx` 中 `ContractTemplateUploadPage` 返回 `void` 阻断，不是本轮认证改动引入。
+- `rg -n --hidden --glob '!node_modules/**' --glob '!**/*.map' "你已开启快捷登录|一键登录|快捷登录" frontend/.next frontend/src`：当前源码和 dev 编译缓存里没有可点击快捷登录入口或注册页提示，仅剩注释、测试断言和清理模块文本。
+
+### Remaining
+- 如果浏览器里仍能看到旧按钮，优先刷新当前 `http://localhost:3000` 认证页或重启前端开发服务；本轮代码已经让新页面在渲染前清理旧快捷登录状态。
+- 本轮不处理既有合同模板测试类型错误。
+
 ## 2026-06-07 PERF-API-05（合同/货柜写成功路径临时库 SLA）
 
 ### Goal

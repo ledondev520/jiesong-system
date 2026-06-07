@@ -26,6 +26,10 @@ describe('AuthLayout', () => {
       username: 'admin',
       password: 'cached-password',
     }));
+    sessionStorage.setItem('quickLoginProfile', JSON.stringify({
+      username: 'admin',
+      password: 'session-password',
+    }));
     localStorage.setItem('dashboard:last-tab', '/dashboard');
 
     render(
@@ -40,8 +44,22 @@ describe('AuthLayout', () => {
       expect(localStorage.getItem('jiesong_quick_login_profile')).toBeNull();
       expect(localStorage.getItem('quickLoginProfile')).toBeNull();
       expect(localStorage.getItem('saved_login_profile')).toBeNull();
+      expect(sessionStorage.getItem('quickLoginProfile')).toBeNull();
       expect(localStorage.getItem('dashboard:last-tab')).toBe('/dashboard');
       expect(localStorage.getItem(LEGACY_AUTH_CLEANUP_VERSION_KEY)).toBe(LEGACY_AUTH_CLEANUP_VERSION);
     });
+  });
+
+  it('渲染提前清理旧快捷登录状态的脚本', () => {
+    render(
+      <AuthLayout>
+        <div>认证页面内容</div>
+      </AuthLayout>,
+    );
+
+    const script = document.querySelector<HTMLScriptElement>('script#legacy-auth-cleanup');
+    expect(script).not.toBeNull();
+    expect(script?.textContent).toContain('jiesong_quick_login_profile');
+    expect(script?.textContent).toContain('sessionStorage');
   });
 });

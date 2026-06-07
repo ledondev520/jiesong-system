@@ -94,6 +94,10 @@ describe('LoginPage 交互逻辑', () => {
       username: 'admin',
       password: 'old-password',
     }));
+    sessionStorage.setItem('quickLoginProfile', JSON.stringify({
+      username: 'admin',
+      password: 'session-password',
+    }));
 
     render(<LoginPage />);
 
@@ -101,6 +105,7 @@ describe('LoginPage 交互逻辑', () => {
       expect(localStorage.getItem('jiesong_quick_login_profile')).toBeNull();
       expect(localStorage.getItem('quickLoginProfile')).toBeNull();
       expect(localStorage.getItem('saved_login_profile')).toBeNull();
+      expect(sessionStorage.getItem('quickLoginProfile')).toBeNull();
       expect(localStorage.getItem(LEGACY_AUTH_CLEANUP_VERSION_KEY)).toBe(LEGACY_AUTH_CLEANUP_VERSION);
       expect(screen.queryByRole('button', { name: /一键登录/ })).not.toBeInTheDocument();
     });
