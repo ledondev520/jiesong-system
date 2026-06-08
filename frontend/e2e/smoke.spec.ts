@@ -64,8 +64,8 @@ test.describe('侧边栏导航全覆盖', () => {
     const navCases = [
       { label: '经营中台', path: '/dashboard', url: /\/dashboard$/, heading: '工作台' },
       { label: '采购', path: '/dashboard/contracts', url: /\/dashboard\/contracts$/, heading: '采购合同' },
-      { label: '销售', path: '/dashboard/sales', url: /\/dashboard\/sales$/, heading: '销售合同' },
-      { label: '仓储物流', path: '/dashboard/logistics', url: /\/dashboard\/logistics$/, heading: '库存总览' },
+      { label: '出口', path: '/dashboard/sales', url: /\/dashboard\/sales$/, heading: '出口合同' },
+      { label: '财务', path: '/dashboard/finance', url: /\/dashboard\/finance$/, heading: '财务概览' },
       { label: '系统管理', path: '/dashboard/settings', url: /\/dashboard\/settings$/, heading: '系统配置' },
     ] as const;
 
@@ -94,34 +94,34 @@ test.describe('侧边栏导航全覆盖', () => {
 });
 
 test.describe('关键按钮交互', () => {
-  test('工作台快捷入口：新建采购 / 新建销售', async ({ page }) => {
+  test('工作台快捷入口：新建采购 / 新建出口', async ({ page }) => {
     await signInAsAdmin(page, '/dashboard');
 
-    await safeClick(page.getByRole('button', { name: /^新建采购/ }));
+    await safeClick(page.getByRole('button', { name: /^新建采购合同/ }));
     await expect(page).toHaveURL(/\/dashboard\/purchase\/create$/);
     await expect(page.getByRole('heading', { name: '新增采购合同' })).toBeVisible();
 
     await page.goto('/dashboard');
     await page.waitForLoadState('domcontentloaded');
-    await safeClick(page.getByRole('button', { name: /^新增供应商/ }));
-    await expect(page).toHaveURL(/\/dashboard\/suppliers$/);
-    await expect(page.getByRole('heading', { name: '供应商管理' })).toBeVisible();
+    await safeClick(page.getByRole('button', { name: /^新建出口合同/ }));
+    await expect(page).toHaveURL(/\/dashboard\/sales\/create$/);
+    await expect(page.getByRole('heading', { name: '创建出口合同' })).toBeVisible();
   });
 
   test('采购合同页：新增采购按钮跳转', async ({ page }) => {
     await signInAsAdmin(page, '/dashboard/contracts');
     await expect(page.getByRole('heading', { name: '采购合同' })).toBeVisible();
 
-    await safeClick(page.getByRole('button', { name: /^新增采购/ }));
+    await safeClick(page.getByRole('button', { name: /^新增采购|^新建采购/ }));
     await expect(page).toHaveURL(/\/dashboard\/purchase\/create$/);
     await expect(page.getByRole('heading', { name: '新增采购合同' })).toBeVisible();
   });
 
   test('出口合同页：新增按钮可用', async ({ page }) => {
     await signInAsAdmin(page, '/dashboard/sales');
-    await expect(page.getByRole('heading', { name: '销售合同' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '出口合同' })).toBeVisible();
 
-    await safeClick(page.getByRole('button', { name: /^新增销售合同/ }));
+    await safeClick(page.getByRole('button', { name: /^新增出口合同|^新建出口合同/ }));
     await expect(page).toHaveURL(/\/dashboard\/sales\/create$/, { timeout: 10000 });
     await expect(page.getByRole('heading', { name: '创建出口合同' })).toBeVisible();
   });
@@ -163,8 +163,10 @@ test.describe('关键按钮交互', () => {
     await signInAsAdmin(page, '/dashboard/settings');
     await expect(page.getByRole('heading', { name: '系统配置' })).toBeVisible();
 
-    await safeClick(page.getByRole('link', { name: '账号管理' }));
-    await expect(page).toHaveURL(/\/dashboard\/users$/);
-    await expect(page.getByRole('heading', { name: '账号管理' })).toBeVisible();
+    const accountTab = page.getByRole('link', { name: /^账号管理$/ });
+    const settingsUserLink = page.getByRole('link', { name: /^用户管理$/ });
+    await safeClick((await accountTab.count()) ? accountTab : settingsUserLink);
+    await expect(page).toHaveURL(/\/dashboard\/(settings\/users|users)$/);
+    await expect(page.getByRole('heading', { name: /账号管理|用户管理/ })).toBeVisible();
   });
 });

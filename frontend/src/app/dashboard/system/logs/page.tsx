@@ -61,7 +61,7 @@ const userLabel = (log: SystemLogItem) => {
 };
 
 const ACTION_OPTIONS = [
-  { value: '', label: '全部操作' },
+  { value: 'ALL_ACTIONS', label: '全部操作' },
   { value: 'CREATE', label: '新建' },
   { value: 'UPDATE', label: '修改' },
   { value: 'DELETE', label: '删除' },
@@ -72,6 +72,8 @@ const ACTION_OPTIONS = [
   { value: 'GENERATE', label: '生成' },
   { value: 'UPLOAD', label: '上传' },
 ];
+
+const ALL_USERS_VALUE = 'ALL_USERS';
 
 export default function SystemLogsPage() {
   const [loading, setLoading] = useState(true);
@@ -281,7 +283,10 @@ export default function SystemLogsPage() {
               <div className="grid gap-3 rounded-lg border bg-muted/30 p-3 sm:grid-cols-2 lg:grid-cols-4 animate-fade-in-up">
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">操作类型</label>
-                  <Select value={filterAction} onValueChange={setFilterAction}>
+                  <Select
+                    value={filterAction || ACTION_OPTIONS[0].value}
+                    onValueChange={(value) => setFilterAction(value === ACTION_OPTIONS[0].value ? '' : value)}
+                  >
                     <SelectTrigger className="h-9 text-sm">
                       <SelectValue placeholder="全部操作" />
                     </SelectTrigger>
@@ -294,12 +299,15 @@ export default function SystemLogsPage() {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">操作用户</label>
-                  <Select value={filterUserId} onValueChange={setFilterUserId}>
+                  <Select
+                    value={filterUserId || ALL_USERS_VALUE}
+                    onValueChange={(value) => setFilterUserId(value === ALL_USERS_VALUE ? '' : value)}
+                  >
                     <SelectTrigger className="h-9 text-sm">
                       <SelectValue placeholder="全部用户" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">全部用户</SelectItem>
+                      <SelectItem value={ALL_USERS_VALUE}>全部用户</SelectItem>
                       {uniqueUsers.map(([id, name]) => (
                         <SelectItem key={id} value={id}>{name}</SelectItem>
                       ))}

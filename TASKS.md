@@ -22,6 +22,12 @@
 | CI-05P | P0 | 10m | 1 | DONE | 复查 GitHub `Security Scan #58`，确认红灯来自 audit 报告缺失、CodeQL 权限/设置和 TruffleHog 扫描范围 |
 | CI-05Q | P0 | 10m | 1 | DONE | 修复 `security.yml`：生成 npm audit JSON、补 CodeQL 权限/版本、按事件设置 TruffleHog base/head |
 | CI-05R | P1 | 5m | 1 | DONE | 校验安全扫描 workflow YAML 与 npm audit 报告生成，并更新 PLAN/TASKS |
+| CI-05S | P0 | 10m | 1 | DONE | 复查 GitHub `Test And Acceptance #104`，确认剩余红灯集中在前端 E2E Acceptance |
+| CI-05T | P0 | 15m | 1 | DONE | 对齐 E2E smoke/button coverage 到当前导航 Module、收付管理路径和设置页用户管理路径 |
+| CI-05U | P0 | 15m | 1 | DONE | 补齐 E2E mock 数据：采购模板、合同附件、经营报表、财务报表、收付对账、银行流水/发票统计 |
+| CI-05V | P0 | 10m | 1 | DONE | 修复系统日志 shadcn Select 空值选项，避免筛选面板打开后运行时错误 |
+| CI-05W | P1 | 10m | 1 | DONE | 重建前端生产预览并复跑 E2E smoke/button coverage，确认 `35/35` 通过 |
+| CI-05X | P1 | 5m | 1 | DONE | 记录 Deploy 仍被 GitHub Secrets 缺失阻塞，提交时继续隔离非本轮 backend 差异 |
 
 ## 2026-06-07 NAV-FE-11 业务模块导航收口
 

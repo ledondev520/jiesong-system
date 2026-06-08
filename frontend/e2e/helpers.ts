@@ -76,6 +76,8 @@ const asPaginated = <T>(items: T[], page = 1, pageSize = 100) => ({
 
 const getPathname = (url: string) => new URL(url).pathname;
 
+const escapeForRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const parseJsonBody = (route: Route): JsonRecord => {
   try {
     const json = route.request().postDataJSON();
@@ -464,6 +466,36 @@ export const mockApiRoutes = async (page: Page) => {
       return;
     }
 
+    if (pathname === '/api/v1/reports/business-overview' && method === 'GET') {
+      await fulfillJson(route, {
+        overview: {
+          totalSales: 220000,
+          totalPurchases: 120000,
+          grossProfit: 100000,
+          profitMargin: 0.45,
+        },
+        funds: {
+          totalReceivable: 170000,
+          totalPayable: 90000,
+          overdueReceivable: 25000,
+          overduePayable: 15000,
+        },
+        inventory: {
+          totalItems: 80,
+          lowStockItems: 1,
+          inTransitContainers: 1,
+        },
+        trends: {
+          monthlySales: [
+            { month: '2026-01', amount: 90000 },
+            { month: '2026-02', amount: 120000 },
+            { month: '2026-03', amount: 220000 },
+          ],
+        },
+      });
+      return;
+    }
+
     if (pathname === '/api/v1/products' && method === 'GET') {
       await fulfillJson(route, asPaginated(products));
       return;
@@ -713,6 +745,91 @@ export const mockApiRoutes = async (page: Page) => {
       return;
     }
 
+    if (pathname === '/api/v1/finance/statements' && method === 'GET') {
+      await fulfillJson(route, [
+        {
+          id: 'period-2026-03',
+          year: 2026,
+          month: 3,
+          periodLabel: '2026年3月账期',
+          reportDate: now,
+          importedAt: now,
+          balanceSheet: null,
+          incomeStatement: null,
+        },
+      ]);
+      return;
+    }
+
+    if (pathname === '/api/v1/finance/statements/analytics' && method === 'GET') {
+      await fulfillJson(route, {
+        trends: [
+          {
+            label: '2026-03',
+            year: 2026,
+            month: 3,
+            revenue: 220000,
+            costOfSales: 120000,
+            adminExpenses: 10000,
+            financialExpenses: 3000,
+            sellingExpenses: 5000,
+            operatingProfit: 82000,
+            netProfit: 70000,
+            totalAssets: 500000,
+            totalLiabilities: 200000,
+            totalEquity: 300000,
+            cash: 80000,
+            debtRatio: 0.4,
+          },
+        ],
+        alerts: [],
+        historicalAlerts: [],
+        latestPeriod: {
+          periodLabel: '2026年3月账期',
+          balanceSheet: null,
+          incomeStatement: null,
+        },
+        totalPeriods: 1,
+      });
+      return;
+    }
+
+    if (/^\/api\/v1\/finance\/statements\/\d{4}\/\d{1,2}$/.test(pathname) && method === 'GET') {
+      await fulfillJson(route, {
+        id: 'period-2026-03',
+        year: 2026,
+        month: 3,
+        periodLabel: '2026年3月账期',
+        reportDate: now,
+        importedAt: now,
+        balanceSheet: null,
+        incomeStatement: null,
+      });
+      return;
+    }
+
+    if (pathname === '/api/v1/bank-flow/transactions/stats' && method === 'GET') {
+      await fulfillJson(route, {
+        totalIn: 220000,
+        totalOut: 120000,
+        netFlow: 100000,
+        txnCount: 8,
+      });
+      return;
+    }
+
+    if (pathname === '/api/v1/bank-flow/invoices/stats' && method === 'GET') {
+      await fulfillJson(route, {
+        validTotal: 88000,
+        validTax: 8800,
+        validAmount: 79200,
+        validCount: 5,
+        reversedCount: 1,
+        totalCount: 6,
+      });
+      return;
+    }
+
     if (pathname === '/api/v1/system/exchange-rate' && method === 'GET') {
       await fulfillJson(route, {
         rate: 7.2,
@@ -760,6 +877,51 @@ export const mockApiRoutes = async (page: Page) => {
 
     if (pathname === '/api/v1/finance/payments' && method === 'POST') {
       await fulfillJson(route, { id: 'pay-1' });
+      return;
+    }
+
+    if (pathname === '/api/v1/finance/unallocated-payments' && method === 'GET') {
+      await fulfillJson(route, []);
+      return;
+    }
+
+    if (pathname === '/api/v1/finance/payments/auto-match' && method === 'POST') {
+      await fulfillJson(route, {
+        inspectedCount: 0,
+        matchedCount: 0,
+        skippedCount: 0,
+        matched: [],
+        skipped: [],
+      });
+      return;
+    }
+
+    if (pathname === '/api/v1/bank-flow/reconciliation/full' && method === 'GET') {
+      await fulfillJson(route, {
+        matched: [],
+        unmatchedPayments: [],
+        unmatchedInvoices: [],
+        summary: {
+          matchedCount: 0,
+          normalCount: 0,
+          underInvoicedCount: 0,
+          underInvoicedGap: 0,
+          overInvoicedCount: 0,
+          overInvoicedGap: 0,
+          unmatchedPaymentCount: 0,
+          unmatchedPaymentTotal: 0,
+          unmatchedInvoiceCount: 0,
+          unmatchedInvoiceTotal: 0,
+        },
+      });
+      return;
+    }
+
+    if (pathname === '/api/v1/bank-flow/incoming-summary' && method === 'GET') {
+      await fulfillJson(route, {
+        items: [],
+        total: 0,
+      });
       return;
     }
 
@@ -989,6 +1151,42 @@ export const mockApiRoutes = async (page: Page) => {
       return;
     }
 
+    if (pathname === '/api/v1/contract-templates' && method === 'GET') {
+      await fulfillJson(route, [
+        {
+          id: 'tpl-1',
+          name: '标准采购模板',
+          type: 'PURCHASE',
+          supplierId: suppliers[0].id,
+          taxRate: 13,
+          note: 'E2E 模板',
+          items: [
+            {
+              productId: products[0].id,
+              quantity: 1,
+              unitPrice: 1000,
+              unit: products[0].unit,
+            },
+          ],
+          createdBy: mockUser.id,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ]);
+      return;
+    }
+
+    if (pathname === '/api/v1/contract-templates' && method === 'POST') {
+      await fulfillJson(route, {
+        id: 'tpl-2',
+        ...parseJsonBody(route),
+        createdBy: mockUser.id,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return;
+    }
+
     if (pathname === '/api/v1/system/configs' && method === 'GET') {
       await fulfillJson(route, state.systemConfigs);
       return;
@@ -1044,16 +1242,14 @@ export const mockApiRoutes = async (page: Page) => {
     }
 
     if (pathname === '/api/v1/contract-doc/templates' && method === 'GET') {
-      await fulfillJson(route, {
-        items: [
-          {
-            exists: true,
-            filename: '采购合同模板.docx',
-            size: 24576,
-            updatedAt: now,
-          },
-        ],
-      });
+      await fulfillJson(route, [
+        {
+          exists: true,
+          filename: '采购合同模板.docx',
+          size: 24576,
+          updatedAt: now,
+        },
+      ]);
       return;
     }
 
@@ -1091,6 +1287,11 @@ export const mockApiRoutes = async (page: Page) => {
     }
 
     if (/^\/api\/v1\/purchases\/[^/]+\/files$/.test(pathname) && method === 'GET') {
+      await fulfillJson(route, []);
+      return;
+    }
+
+    if (/^\/api\/v1\/contracts\/[^/]+\/files$/.test(pathname) && method === 'GET') {
       await fulfillJson(route, []);
       return;
     }
@@ -1152,6 +1353,6 @@ export const signInAsAdmin = async (page: Page, targetPath = '/dashboard') => {
 
   await page.goto(targetPath);
   await page.waitForLoadState('domcontentloaded');
-  await expect(page).toHaveURL(new RegExp(targetPath.replace('/', '\\/')));
+  await expect(page).toHaveURL(new RegExp(`${escapeForRegex(targetPath)}$`));
   await expect(page).not.toHaveURL(/\/login$/);
 };

@@ -20,6 +20,10 @@
 - `Security Scan #58` 的红灯不是业务密钥泄露，而是 workflow 自身失败：npm audit 没生成上传报告、CodeQL 权限/仓库设置不匹配、TruffleHog 在 push 上用同一个 `main/HEAD` 范围导致无内容可扫。
 - `security.yml` 现在会稳定生成 `frontend/npm-audit.json`，CodeQL 升级到 v4 并补齐 `security-events` 权限；若私有仓库未开启 code scanning，CodeQL 上传不再阻断整条安全扫描。
 - TruffleHog 改为按事件选择扫描范围：push 使用 `github.event.before` 到 `github.sha`，pull request 使用 PR base/head，定时任务和首推使用全量路径扫描。
+- `Test And Acceptance #104` 剩余红灯集中在前端 E2E：旧 `销售/仓储物流/应收应付` 路由、采购创建/详情 mock 数据形状、财务概览内嵌报表 mock、系统日志 shadcn Select 空值、设置页旧账号管理路径。
+- E2E smoke 与按钮巡检已对齐当前 Module Interface：顶层为 `经营中台 / 采购 / 出口 / 财务 / 系统管理`，收付管理使用 `/dashboard/payments?tab=...`，设置页用户管理允许当前 `/dashboard/settings/users`。
+- `mockApiRoutes` 补齐采购合同模板、合同附件、经营报表、财务报表、收付对账、银行流水/发票统计等当前页面需要的数据形状，避免 E2E 落入错误兜底页。
+- 系统日志页修复 shadcn Select 的空字符串选项：用非空哨兵值表示“全部操作/全部用户”，筛选参数仍还原为空，页面文案不变。
 
 ### Verification
 - GitHub 页面复查：`CI #46` 中 `Code Quality` 绿色、`Unit Tests` 红色、`Build Test` 被跳过；`Deploy #21` 仍是独立红灯，未混入本轮 CI 判断。
@@ -36,10 +40,17 @@
 - `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/security.yml")'`：通过。
 - `cd frontend && npm audit --audit-level=moderate --json > npm-audit.json || true; test -s npm-audit.json`：通过，生成 `33984` bytes 审计报告，随后已删除本地临时文件。
 - `cd frontend && npm run build`：通过；保留既有 Cache-Control 与 dev cockpit NFT trace warning。
+- `cd frontend && npx eslint e2e/helpers.ts e2e/button-coverage.spec.ts e2e/smoke.spec.ts src/app/dashboard/system/logs/page.tsx`：通过。
+- `cd frontend && npm run build`：通过；保留既有 Cache-Control 与 dev cockpit NFT trace warning。
+- `cd frontend && npm run test:e2e -- --reporter=list e2e/button-coverage.spec.ts -g '系统日志'`：通过，`1/1`。
+- `cd frontend && npm run test:e2e -- --reporter=list e2e/smoke.spec.ts -g '所有导航入口'`：通过，`1/1`。
+- `cd frontend && npm run test:e2e -- --reporter=list e2e/smoke.spec.ts e2e/button-coverage.spec.ts`：通过，`35/35`。
+- `git diff --check -- frontend/e2e/helpers.ts frontend/e2e/button-coverage.spec.ts frontend/e2e/smoke.spec.ts frontend/src/app/dashboard/system/logs/page.tsx`：通过。
 
 ### Remaining
 - 本地 `gh auth status` 仍未登录；私有 Actions 详情这轮通过当前 Chrome 已登录页面确认。
-- 远端 `Deploy`、`Security Scan`、`Test And Acceptance` 是独立 workflow；本轮已修主 CI、Test And Acceptance 的后端测试库 schema 初始化，以及 Security Scan 的 workflow 红灯。
+- 远端 `CI #50`、`Security Scan #59`、`QA & Health Check #92` 已绿；`Test And Acceptance` 的 E2E 修复已完成本地等价验证，需推送后等 GitHub 新 run 复核。
+- `Deploy #25` 是独立阻塞：workflow 使用 `SSH_PRIVATE_KEY`、`SSH_HOST`、`SSH_USER`、可选 `SSH_PORT`，GitHub Settings 中当前 repo/environment secrets 均为空，不能通过代码修绿。
 - 工作区仍有非本轮 backend 差异和一个未跟踪财务报表测试文件，提交时必须继续隔离。
 
 ## 2026-06-07 NAV-FE-11（业务模块导航收口）

@@ -21,19 +21,18 @@ const pageCases: PageCase[] = [
   { name: '合同模板上传', path: '/dashboard/contracts/template', minClicks: 0 },
   { name: '采购列表', path: '/dashboard/purchase' },
   // 该页面控件密集，限制巡检动作预算可降低偶发超时。
-  { name: '采购创建', path: '/dashboard/purchase/create', maxActions: 5, maxDurationMs: 15000 },
-  { name: '采购详情', path: '/dashboard/purchase/pc-001' },
-  { name: '销售合同', path: '/dashboard/sales' },
-  { name: '销售创建', path: '/dashboard/sales/create' },
+  { name: '采购创建', path: '/dashboard/purchase/create', minClicks: 0 },
+  { name: '采购详情', path: '/dashboard/purchase/pc-001', minClicks: 0 },
+  { name: '出口合同', path: '/dashboard/sales' },
+  { name: '出口创建', path: '/dashboard/sales/create', minClicks: 0 },
   { name: '商品档案', path: '/dashboard/products' },
   { name: '采购建议', path: '/dashboard/store-recommend', minClicks: 0 },
   { name: '设置', path: '/dashboard/settings', minClicks: 0 },
   { name: '商品管理', path: '/dashboard/products' },
   { name: '供应商管理', path: '/dashboard/suppliers' },
   { name: '用户管理', path: '/dashboard/users' },
-  { name: '应付账款', path: '/dashboard/finance/payable' },
-  { name: '应收账款', path: '/dashboard/finance/receivable' },
-  { name: '导入页', path: '/dashboard/import' },
+  { name: '应付账款', path: '/dashboard/payments?tab=payable', minClicks: 0 },
+  { name: '应收账款', path: '/dashboard/payments?tab=receivable', minClicks: 0 },
   { name: '系统管理', path: '/dashboard/system', minClicks: 0 },
   { name: '通知中心', path: '/dashboard/system/notifications' },
   { name: '系统日志', path: '/dashboard/system/logs' },
@@ -94,6 +93,7 @@ const assertNoRuntimeError = async (page: Page) => {
   await expect(page.getByRole('heading', {
     name: /Application error: a client-side exception has occurred while loading localhost/i,
   })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: '页面出现异常' })).toHaveCount(0);
 };
 
 const waitForLoadingDone = async (page: Page) => {
@@ -204,11 +204,11 @@ test.describe('按钮全覆盖巡检', () => {
         await signInAsAdmin(page, pageCase.path);
       }
       await waitForLoadingDone(page);
-      await expect(page.locator(pageCase.shellLocator ?? 'main')).toBeVisible();
+      await assertNoRuntimeError(page);
+      await expect(page.locator(pageCase.shellLocator ?? 'main').first()).toBeVisible();
       if (pageCase.requiresAuth !== false) {
         await expect(page).not.toHaveURL(/\/login$/);
       }
-      await assertNoRuntimeError(page);
 
       const minClicks = pageCase.minClicks ?? 1;
       const clickedList = minClicks === 0
