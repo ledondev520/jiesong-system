@@ -15,6 +15,11 @@ const parseJsonSafely = (value) => {
   }
 };
 
+const isMissingDatabaseUrlError = (error) => (
+  error?.name === 'PrismaClientInitializationError'
+  && String(error?.message || '').includes('DATABASE_URL')
+);
+
 const buildReplaySummaryRecord = ({
   userId,
   sessionId,
@@ -44,32 +49,43 @@ const upsertReplaySummary = async ({
     sessionId,
     governanceReplayProfile,
   });
-  return prisma.agentReplaySummary.upsert({
-    where: {
-      userId_sessionId: {
-        userId,
-        sessionId,
+  try {
+    return await prisma.agentReplaySummary.upsert({
+      where: {
+        userId_sessionId: {
+          userId,
+          sessionId,
+        },
       },
-    },
-    update: record,
-    create: record,
-  });
+      update: record,
+      create: record,
+    });
+  } catch (error) {
+    if (isMissingDatabaseUrlError(error)) return null;
+    throw error;
+  }
 };
 
 const buildReplaySummaryProfileMap = async (userId, sessionIds = []) => {
   const uniqueIds = Array.from(new Set((Array.isArray(sessionIds) ? sessionIds : []).filter(Boolean)));
   if (!userId || uniqueIds.length === 0 || !prisma.agentReplaySummary?.findMany) return new Map();
 
-  const rows = await prisma.agentReplaySummary.findMany({
-    where: {
-      userId,
-      sessionId: { in: uniqueIds },
-    },
-    select: {
-      sessionId: true,
-      profileJson: true,
-    },
-  });
+  let rows;
+  try {
+    rows = await prisma.agentReplaySummary.findMany({
+      where: {
+        userId,
+        sessionId: { in: uniqueIds },
+      },
+      select: {
+        sessionId: true,
+        profileJson: true,
+      },
+    });
+  } catch (error) {
+    if (isMissingDatabaseUrlError(error)) return new Map();
+    throw error;
+  }
 
   const map = new Map();
   rows.forEach((row) => {

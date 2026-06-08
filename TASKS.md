@@ -9,8 +9,11 @@
 | CI-05C | P0 | 10m | 1 | DONE | 本地复跑 GitHub 标注的销售/财务失败测试，确认本地超前提交已修复旧断言 |
 | CI-05D | P0 | 10m | 1 | DONE | 为退税创建、详情、编辑测试补齐 `usePathname` mock，匹配当前导航 Module Interface |
 | CI-05E | P0 | 10m | 1 | DONE | 优化报关创建页失败分支测试输入方式，避免 CI 中逐字符输入超时 |
-| CI-05F | P0 | 15m | 1 | DONE | 运行前端目标测试、完整 coverage、lint、TypeScript、后端测试和前端生产构建 |
-| CI-05G | P1 | 5m | 1 | DONE | 更新 PLAN/TASKS，并隔离非本轮 backend 差异和未跟踪财务报表测试文件 |
+| CI-05F | P0 | 10m | 1 | DONE | 复查 GitHub `CI #47`，确认前端测试已过，新的红灯来自后端测试缺 `DATABASE_URL` |
+| CI-05G | P0 | 10m | 1 | DONE | 为主 CI 与 Test And Acceptance 后端测试显式设置 SQLite `DATABASE_URL=file:./dev.db` |
+| CI-05H | P0 | 10m | 1 | DONE | 为可选 replay summary 持久化/读取补充缺库地址降级保护与服务测试 |
+| CI-05I | P0 | 15m | 1 | DONE | 运行前端目标测试、完整 coverage、lint、TypeScript、后端 `test:all` 和前端生产构建 |
+| CI-05J | P1 | 5m | 1 | DONE | 更新 PLAN/TASKS，并隔离非本轮 backend 差异和未跟踪财务报表测试文件 |
 
 ## 2026-06-07 NAV-FE-11 业务模块导航收口
 

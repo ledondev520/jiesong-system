@@ -21,6 +21,8 @@ jobs:
       - name: Run backend all tests (unit + db integration)
         run: npm run test:all
         working-directory: backend
+        env:
+          DATABASE_URL: file:./dev.db
 
   frontend-unit:
     name: Frontend Unit And Coverage

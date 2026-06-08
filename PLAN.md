@@ -11,7 +11,9 @@
 - GitHub Actions 当前最新远端提交 `785969d` 上，`Code Quality` 已通过；红灯来自 `Unit Tests`，旧失败集中在销售/财务页面断言与后续本地测试暴露的退税页面 `usePathname` mock 缺失、报关创建页失败分支超时。
 - 退税创建、详情、编辑测试补齐 `next/navigation` 的 `usePathname` mock，匹配 `ModuleTabHeader` 当前 Interface。
 - 报关创建页失败分支改用直接 `change` 填值，保留提交行为验证，同时避免 CI 环境里逐字符输入拖到测试超时。
-- 本轮只改测试文件，不改业务页面实现或后端 Interface。
+- `CI` 与 `Test And Acceptance` 的后端测试步骤显式设置 `DATABASE_URL=file:./dev.db`，不依赖 GitHub runner 上不存在的 `.env`。
+- `agentReplaySummaryService` 对缺失 `DATABASE_URL` 的可选 replay summary 持久化/读取做降级，避免非核心 replay summary Adapter 让 AI 会话列表 Interface 失败。
+- 本轮不改业务页面实现；后端改动限定在可选 replay summary 读写降级。
 
 ### Verification
 - GitHub 页面复查：`CI #46` 中 `Code Quality` 绿色、`Unit Tests` 红色、`Build Test` 被跳过；`Deploy #21` 仍是独立红灯，未混入本轮 CI 判断。
@@ -21,11 +23,12 @@
 - `cd frontend && npm run lint`：通过，`0` error、`2` 个既有 unused type warning。
 - `cd frontend && ./node_modules/.bin/tsc --noEmit --pretty false`：通过。
 - `cd backend && npx prisma generate && npm run test`：通过，`354` 个后端测试。
+- `cd backend && DATABASE_URL=file:./dev.db npm run test:all`：通过，后端单元测试 `356` 个、数据库集成测试 `3` 个。
 - `cd frontend && npm run build`：通过；保留既有 Cache-Control 与 dev cockpit NFT trace warning。
 
 ### Remaining
 - 本地 `gh auth status` 仍未登录；私有 Actions 详情这轮通过当前 Chrome 已登录页面确认。
-- 远端 `Deploy` workflow 仍有独立红灯，需要单独打开部署日志处理；本轮只收口 `CI / Unit Tests`。
+- 远端 `Deploy`、`Security Scan`、`Test And Acceptance` 是独立 workflow；本轮已修主 CI 和 Test And Acceptance 的后端测试环境变量，部署和安全扫描如果继续红需要单独看日志。
 - 工作区仍有非本轮 backend 差异和一个未跟踪财务报表测试文件，提交时必须继续隔离。
 
 ## 2026-06-07 NAV-FE-11（业务模块导航收口）

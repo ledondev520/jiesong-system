@@ -135,3 +135,49 @@ test('buildReplaySummaryProfileMap: 从 AgentReplaySummary 构建 session -> pro
     }
   }
 });
+
+test('buildReplaySummaryProfileMap: DATABASE_URL 缺失时降级为空映射', async () => {
+  const originalFindMany = prisma.agentReplaySummary?.findMany;
+  prisma.agentReplaySummary = prisma.agentReplaySummary || {};
+  prisma.agentReplaySummary.findMany = async () => {
+    const error = new Error('Environment variable not found: DATABASE_URL.');
+    error.name = 'PrismaClientInitializationError';
+    throw error;
+  };
+
+  try {
+    const map = await agentReplaySummaryService.buildReplaySummaryProfileMap('user-1', ['session-1']);
+    assert.equal(map.size, 0);
+  } finally {
+    if (originalFindMany) {
+      prisma.agentReplaySummary.findMany = originalFindMany;
+    } else {
+      delete prisma.agentReplaySummary;
+    }
+  }
+});
+
+test('upsertReplaySummary: DATABASE_URL 缺失时跳过可选持久化', async () => {
+  const originalUpsert = prisma.agentReplaySummary?.upsert;
+  prisma.agentReplaySummary = prisma.agentReplaySummary || {};
+  prisma.agentReplaySummary.upsert = async () => {
+    const error = new Error('Environment variable not found: DATABASE_URL.');
+    error.name = 'PrismaClientInitializationError';
+    throw error;
+  };
+
+  try {
+    const result = await agentReplaySummaryService.upsertReplaySummary({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      governanceReplayProfile: { level: 'tools' },
+    });
+    assert.equal(result, null);
+  } finally {
+    if (originalUpsert) {
+      prisma.agentReplaySummary.upsert = originalUpsert;
+    } else {
+      delete prisma.agentReplaySummary;
+    }
+  }
+});

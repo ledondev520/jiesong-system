@@ -68,6 +68,8 @@ jobs:
           retention-days: 7
 
       - name: Run backend tests
+        env:
+          DATABASE_URL: file:./dev.db
         run: |
           cd backend
           npm ci
