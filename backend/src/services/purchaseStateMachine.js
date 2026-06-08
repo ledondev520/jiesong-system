@@ -58,6 +58,5 @@ const validatePurchaseTransition = (currentStatus, nextStatus) => {
 
 module.exports = {
   PURCHASE_STATUS,
-  VALID_TRANSITIONS,
   validatePurchaseTransition,
 };

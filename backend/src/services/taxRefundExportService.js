@@ -389,8 +389,5 @@ const exportTaxRefunds = async (filters = {}) => {
 };
 
 module.exports = {
-  MATCH_STATUS,
   exportTaxRefunds,
-  normalizeIdentifier,
-  normalizeVatRateType,
 };

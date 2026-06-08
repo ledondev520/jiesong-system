@@ -115,13 +115,7 @@ const buildGovernanceReplayProfile = (metadata = {}, options = {}) => {
 };
 
 module.exports = {
-  hasGovernanceReplayMetadata,
-  buildGovernanceReplaySummary,
-  buildGovernanceReplayCounts,
   buildGovernanceReplayLevel,
   buildGovernanceReplaySource,
   buildGovernanceReplayProfile,
-  hasOperationLogReplayEvidence,
-  buildGovernanceReplayEvidence,
-  getPersistedGovernanceReplayProfile,
 };

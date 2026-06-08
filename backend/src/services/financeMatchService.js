@@ -618,6 +618,4 @@ module.exports = {
   unmatch,
   ignore,
   listContractsForMatch,
-  MATCH_STATUS,
-  CONTRACT_TYPE,
 };

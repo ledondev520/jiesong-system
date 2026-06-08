@@ -155,7 +155,6 @@ const normalizeConfigValueForResponse = (key, rawValue) => {
 };
 
 module.exports = {
-  isApiKeyConfigKey,
   normalizeConfigValueForStorage,
   normalizeConfigValueForResponse,
 };

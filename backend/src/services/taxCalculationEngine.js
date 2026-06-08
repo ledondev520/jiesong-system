@@ -424,8 +424,6 @@ const exportTaxCalculationPdf = async (contractOrId) => {
 };
 
 module.exports = {
-  HS_RULES,
-  normalizeHsCode,
   lookupHsCode,
   calculateTaxSummary,
   exportTaxCalculationExcel,

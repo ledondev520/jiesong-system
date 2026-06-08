@@ -307,6 +307,5 @@ const log = {
 
 module.exports = {
   logOperation,
-  auditMiddleware,
   log,
 };

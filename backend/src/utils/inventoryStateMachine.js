@@ -66,6 +66,5 @@ const validateInventoryTransition = (currentStatus, nextStatus, inventory = {}) 
 };
 
 module.exports = {
-  VALID_TRANSITIONS,
   validateInventoryTransition,
 };

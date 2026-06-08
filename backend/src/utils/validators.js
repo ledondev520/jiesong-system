@@ -95,5 +95,4 @@ module.exports = {
   withIdValidation,
   body,
   param,
-  query,
 };
