@@ -74,6 +74,7 @@ jobs:
           cd backend
           npm ci
           npx prisma generate
+          npx prisma migrate deploy
           npm run test
 
   # 构建测试

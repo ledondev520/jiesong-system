@@ -13,6 +13,9 @@
 - 报关创建页失败分支改用直接 `change` 填值，保留提交行为验证，同时避免 CI 环境里逐字符输入拖到测试超时。
 - `CI` 与 `Test And Acceptance` 的后端测试步骤显式设置 `DATABASE_URL=file:./dev.db`，不依赖 GitHub runner 上不存在的 `.env`。
 - `agentReplaySummaryService` 对缺失 `DATABASE_URL` 的可选 replay summary 持久化/读取做降级，避免非核心 replay summary Adapter 让 AI 会话列表 Interface 失败。
+- GitHub `CI #48` 继续暴露出后端测试库为空：前端单测和覆盖率已通过，后端测试因缺少 schema 表失败；现在两个后端测试 workflow 都在测试前执行 `prisma migrate deploy`。
+- 修正 `20260607122054_add_notification_metadata` 为 no-op；基础迁移已创建 `notifications.metadata`，重复 `ALTER TABLE` 会让任何空 SQLite 库迁移失败。
+- `agentReplaySummaryService` 进一步对 `agent_replay_summaries` 表不存在的可选持久化/读取降级，保持 AI 会话查询 Interface 可用。
 - 本轮不改业务页面实现；后端改动限定在可选 replay summary 读写降级。
 
 ### Verification
@@ -24,11 +27,14 @@
 - `cd frontend && ./node_modules/.bin/tsc --noEmit --pretty false`：通过。
 - `cd backend && npx prisma generate && npm run test`：通过，`354` 个后端测试。
 - `cd backend && DATABASE_URL=file:./dev.db npm run test:all`：通过，后端单元测试 `356` 个、数据库集成测试 `3` 个。
+- `cd backend && DATABASE_URL=file:./ci-empty.db npx prisma migrate deploy && DATABASE_URL=file:./ci-empty.db npm run test`：通过，空库迁移后后端单元测试 `358/358`。
+- `cd backend && DATABASE_URL=file:./ci-empty-all.db npx prisma migrate deploy && DATABASE_URL=file:./ci-empty-all.db npm run test:all`：通过，后端单元测试 `358/358`、数据库集成测试 `3/3`。
+- `git diff --check -- .github/workflows/ci.yml .github/workflows/test-and-acceptance.yml backend/src/services/agentReplaySummaryService.js backend/src/services/agentReplaySummaryService.test.js backend/prisma/migrations/20260607122054_add_notification_metadata/migration.sql`：通过。
 - `cd frontend && npm run build`：通过；保留既有 Cache-Control 与 dev cockpit NFT trace warning。
 
 ### Remaining
 - 本地 `gh auth status` 仍未登录；私有 Actions 详情这轮通过当前 Chrome 已登录页面确认。
-- 远端 `Deploy`、`Security Scan`、`Test And Acceptance` 是独立 workflow；本轮已修主 CI 和 Test And Acceptance 的后端测试环境变量，部署和安全扫描如果继续红需要单独看日志。
+- 远端 `Deploy`、`Security Scan`、`Test And Acceptance` 是独立 workflow；本轮已修主 CI 和 Test And Acceptance 的后端测试库 schema 初始化，部署和安全扫描如果继续红需要单独看日志。
 - 工作区仍有非本轮 backend 差异和一个未跟踪财务报表测试文件，提交时必须继续隔离。
 
 ## 2026-06-07 NAV-FE-11（业务模块导航收口）

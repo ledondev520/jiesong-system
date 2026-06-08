@@ -14,6 +14,11 @@
 | CI-05H | P0 | 10m | 1 | DONE | 为可选 replay summary 持久化/读取补充缺库地址降级保护与服务测试 |
 | CI-05I | P0 | 15m | 1 | DONE | 运行前端目标测试、完整 coverage、lint、TypeScript、后端 `test:all` 和前端生产构建 |
 | CI-05J | P1 | 5m | 1 | DONE | 更新 PLAN/TASKS，并隔离非本轮 backend 差异和未跟踪财务报表测试文件 |
+| CI-05K | P0 | 10m | 1 | DONE | 复查 GitHub `CI #48`，确认前端已过、后端因空 SQLite 测试库缺 schema 表失败 |
+| CI-05L | P0 | 10m | 1 | DONE | 修正重复 `notifications.metadata` 迁移为 no-op，使空库 `prisma migrate deploy` 可通过 |
+| CI-05M | P0 | 10m | 1 | DONE | 在主 CI 与 Test And Acceptance 后端测试前执行 `prisma migrate deploy` |
+| CI-05N | P0 | 10m | 1 | DONE | 为 replay summary 表缺失补充可选持久化降级测试 |
+| CI-05O | P1 | 10m | 1 | DONE | 用空库迁移后运行后端 `test` 与 `test:all`，确认 GitHub runner 等价路径通过 |
 
 ## 2026-06-07 NAV-FE-11 业务模块导航收口
 

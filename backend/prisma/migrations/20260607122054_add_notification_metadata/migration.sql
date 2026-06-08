@@ -1,2 +1,2 @@
--- Add notification metadata used by Agent credential and inventory alert Modules.
-ALTER TABLE "notifications" ADD COLUMN "metadata" TEXT;
+-- No-op: baseline migration already creates notifications.metadata.
+-- Keeping this migration preserves migration ordering without breaking fresh SQLite deploys.

@@ -15,10 +15,19 @@ const parseJsonSafely = (value) => {
   }
 };
 
-const isMissingDatabaseUrlError = (error) => (
-  error?.name === 'PrismaClientInitializationError'
-  && String(error?.message || '').includes('DATABASE_URL')
-);
+const isOptionalPersistenceUnavailableError = (error) => {
+  const message = String(error?.message || '');
+  return (
+    (
+      error?.name === 'PrismaClientInitializationError'
+      && message.includes('DATABASE_URL')
+    )
+    || (
+      error?.code === 'P2021'
+      && message.includes('agent_replay_summaries')
+    )
+  );
+};
 
 const buildReplaySummaryRecord = ({
   userId,
@@ -61,7 +70,7 @@ const upsertReplaySummary = async ({
       create: record,
     });
   } catch (error) {
-    if (isMissingDatabaseUrlError(error)) return null;
+    if (isOptionalPersistenceUnavailableError(error)) return null;
     throw error;
   }
 };
@@ -83,7 +92,7 @@ const buildReplaySummaryProfileMap = async (userId, sessionIds = []) => {
       },
     });
   } catch (error) {
-    if (isMissingDatabaseUrlError(error)) return new Map();
+    if (isOptionalPersistenceUnavailableError(error)) return new Map();
     throw error;
   }
 
