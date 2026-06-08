@@ -17,6 +17,9 @@
 - 修正 `20260607122054_add_notification_metadata` 为 no-op；基础迁移已创建 `notifications.metadata`，重复 `ALTER TABLE` 会让任何空 SQLite 库迁移失败。
 - `agentReplaySummaryService` 进一步对 `agent_replay_summaries` 表不存在的可选持久化/读取降级，保持 AI 会话查询 Interface 可用。
 - 本轮不改业务页面实现；后端改动限定在可选 replay summary 读写降级。
+- `Security Scan #58` 的红灯不是业务密钥泄露，而是 workflow 自身失败：npm audit 没生成上传报告、CodeQL 权限/仓库设置不匹配、TruffleHog 在 push 上用同一个 `main/HEAD` 范围导致无内容可扫。
+- `security.yml` 现在会稳定生成 `frontend/npm-audit.json`，CodeQL 升级到 v4 并补齐 `security-events` 权限；若私有仓库未开启 code scanning，CodeQL 上传不再阻断整条安全扫描。
+- TruffleHog 改为按事件选择扫描范围：push 使用 `github.event.before` 到 `github.sha`，pull request 使用 PR base/head，定时任务和首推使用全量路径扫描。
 
 ### Verification
 - GitHub 页面复查：`CI #46` 中 `Code Quality` 绿色、`Unit Tests` 红色、`Build Test` 被跳过；`Deploy #21` 仍是独立红灯，未混入本轮 CI 判断。
@@ -30,11 +33,13 @@
 - `cd backend && DATABASE_URL=file:./ci-empty.db npx prisma migrate deploy && DATABASE_URL=file:./ci-empty.db npm run test`：通过，空库迁移后后端单元测试 `358/358`。
 - `cd backend && DATABASE_URL=file:./ci-empty-all.db npx prisma migrate deploy && DATABASE_URL=file:./ci-empty-all.db npm run test:all`：通过，后端单元测试 `358/358`、数据库集成测试 `3/3`。
 - `git diff --check -- .github/workflows/ci.yml .github/workflows/test-and-acceptance.yml backend/src/services/agentReplaySummaryService.js backend/src/services/agentReplaySummaryService.test.js backend/prisma/migrations/20260607122054_add_notification_metadata/migration.sql`：通过。
+- `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/security.yml")'`：通过。
+- `cd frontend && npm audit --audit-level=moderate --json > npm-audit.json || true; test -s npm-audit.json`：通过，生成 `33984` bytes 审计报告，随后已删除本地临时文件。
 - `cd frontend && npm run build`：通过；保留既有 Cache-Control 与 dev cockpit NFT trace warning。
 
 ### Remaining
 - 本地 `gh auth status` 仍未登录；私有 Actions 详情这轮通过当前 Chrome 已登录页面确认。
-- 远端 `Deploy`、`Security Scan`、`Test And Acceptance` 是独立 workflow；本轮已修主 CI 和 Test And Acceptance 的后端测试库 schema 初始化，部署和安全扫描如果继续红需要单独看日志。
+- 远端 `Deploy`、`Security Scan`、`Test And Acceptance` 是独立 workflow；本轮已修主 CI、Test And Acceptance 的后端测试库 schema 初始化，以及 Security Scan 的 workflow 红灯。
 - 工作区仍有非本轮 backend 差异和一个未跟踪财务报表测试文件，提交时必须继续隔离。
 
 ## 2026-06-07 NAV-FE-11（业务模块导航收口）

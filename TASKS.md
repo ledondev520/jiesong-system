@@ -19,6 +19,9 @@
 | CI-05M | P0 | 10m | 1 | DONE | 在主 CI 与 Test And Acceptance 后端测试前执行 `prisma migrate deploy` |
 | CI-05N | P0 | 10m | 1 | DONE | 为 replay summary 表缺失补充可选持久化降级测试 |
 | CI-05O | P1 | 10m | 1 | DONE | 用空库迁移后运行后端 `test` 与 `test:all`，确认 GitHub runner 等价路径通过 |
+| CI-05P | P0 | 10m | 1 | DONE | 复查 GitHub `Security Scan #58`，确认红灯来自 audit 报告缺失、CodeQL 权限/设置和 TruffleHog 扫描范围 |
+| CI-05Q | P0 | 10m | 1 | DONE | 修复 `security.yml`：生成 npm audit JSON、补 CodeQL 权限/版本、按事件设置 TruffleHog base/head |
+| CI-05R | P1 | 5m | 1 | DONE | 校验安全扫描 workflow YAML 与 npm audit 报告生成，并更新 PLAN/TASKS |
 
 ## 2026-06-07 NAV-FE-11 业务模块导航收口
 
