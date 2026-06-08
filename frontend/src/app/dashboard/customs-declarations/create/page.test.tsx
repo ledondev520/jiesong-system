@@ -7,7 +7,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CreateCustomsDeclarationPage from './page';
 
@@ -15,6 +15,12 @@ const mockPush = vi.fn();
 const mockCreate = vi.fn();
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
+
+const setFieldValue = (label: string, value: string) => {
+  fireEvent.change(screen.getByLabelText(label), {
+    target: { value },
+  });
+};
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard/customs-declarations/create',
@@ -118,22 +124,22 @@ describe('CreateCustomsDeclarationPage 交互逻辑', () => {
 
     render(<CreateCustomsDeclarationPage />);
 
-    await user.type(screen.getByLabelText('报关单号'), 'CUS-2026-011');
-    await user.type(screen.getByLabelText('发货人'), '捷淞供应链');
-    await user.type(screen.getByLabelText('收货人'), 'Santiago Stone');
-    await user.type(screen.getByLabelText('目的国'), '智利');
-    await user.type(screen.getByLabelText('起运港'), '宁波');
-    await user.type(screen.getByLabelText('目的港'), 'San Antonio');
-    await user.type(screen.getByLabelText('申报日期'), '2026-03-07');
-    await user.type(screen.getByLabelText('成交币种'), 'USD');
-    await user.type(screen.getByLabelText('货值总额'), '68000');
-    await user.type(screen.getByLabelText('总件数'), '960');
-    await user.type(screen.getByLabelText('毛重 (kg)'), '14000');
-    await user.type(screen.getByLabelText('净重 (kg)'), '13500');
-    await user.type(screen.getByLabelText('商品名称'), '抛光砖');
-    await user.type(screen.getByLabelText('商品 HS 编码'), '69072290');
-    await user.type(screen.getByLabelText('申报数量'), '960');
-    await user.type(screen.getByLabelText('单价'), '70.83');
+    setFieldValue('报关单号', 'CUS-2026-011');
+    setFieldValue('发货人', '捷淞供应链');
+    setFieldValue('收货人', 'Santiago Stone');
+    setFieldValue('目的国', '智利');
+    setFieldValue('起运港', '宁波');
+    setFieldValue('目的港', 'San Antonio');
+    setFieldValue('申报日期', '2026-03-07');
+    setFieldValue('成交币种', 'USD');
+    setFieldValue('货值总额', '68000');
+    setFieldValue('总件数', '960');
+    setFieldValue('毛重 (kg)', '14000');
+    setFieldValue('净重 (kg)', '13500');
+    setFieldValue('商品名称', '抛光砖');
+    setFieldValue('商品 HS 编码', '69072290');
+    setFieldValue('申报数量', '960');
+    setFieldValue('单价', '70.83');
 
     await user.click(screen.getByRole('button', { name: '保存并查看详情' }));
 

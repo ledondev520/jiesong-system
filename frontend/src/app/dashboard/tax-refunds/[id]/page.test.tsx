@@ -32,6 +32,7 @@ vi.mock('next/navigation', () => ({
     push: mockRouterPush,
     back: vi.fn(),
   }),
+  usePathname: () => '/dashboard/tax-refunds/tr-1',
 }));
 
 vi.mock('@/services/taxRefund.service', () => ({

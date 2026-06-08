@@ -19,6 +19,7 @@ vi.mock('next/navigation', () => ({
     push: mockPush,
     back: vi.fn(),
   }),
+  usePathname: () => '/dashboard/tax-refunds/create',
 }));
 
 vi.mock('@/services/taxRefund.service', () => ({

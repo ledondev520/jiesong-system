@@ -1,5 +1,33 @@
 # Ops Execution Center Plan
 
+## 2026-06-08 CI-05（GitHub Unit Tests 退税/报关测试修复）
+
+### Goal
+- 使用当前 Chrome 已登录的 `ledondev520` GitHub 账号复查私有仓库 `jiesong-system` 的 Actions 红灯。
+- 区分已修复的 `CI / Code Quality` 与当前失败的 `CI / Unit Tests`，避免把不同失败类型混在一起。
+- 修复会在 GitHub CI 中阻断的前端测试，并确认本地等价 CI 门禁通过。
+
+### Delivered
+- GitHub Actions 当前最新远端提交 `785969d` 上，`Code Quality` 已通过；红灯来自 `Unit Tests`，旧失败集中在销售/财务页面断言与后续本地测试暴露的退税页面 `usePathname` mock 缺失、报关创建页失败分支超时。
+- 退税创建、详情、编辑测试补齐 `next/navigation` 的 `usePathname` mock，匹配 `ModuleTabHeader` 当前 Interface。
+- 报关创建页失败分支改用直接 `change` 填值，保留提交行为验证，同时避免 CI 环境里逐字符输入拖到测试超时。
+- 本轮只改测试文件，不改业务页面实现或后端 Interface。
+
+### Verification
+- GitHub 页面复查：`CI #46` 中 `Code Quality` 绿色、`Unit Tests` 红色、`Build Test` 被跳过；`Deploy #21` 仍是独立红灯，未混入本轮 CI 判断。
+- `cd frontend && npm test -- --run src/app/dashboard/sales/create/page.test.tsx src/app/dashboard/sales/page.test.tsx src/app/dashboard/finance/page.test.tsx`：通过，`3` 个文件、`10` 个测试。
+- `cd frontend && npm test -- --run src/app/dashboard/customs-declarations/create/page.test.tsx src/app/dashboard/tax-refunds/create/page.test.tsx 'src/app/dashboard/tax-refunds/[id]/page.test.tsx' 'src/app/dashboard/tax-refunds/[id]/edit/page.test.tsx'`：通过，`4` 个文件、`9` 个测试。
+- `cd frontend && npm test -- --coverage`：通过，`150` 个测试文件、`609` 个测试。
+- `cd frontend && npm run lint`：通过，`0` error、`2` 个既有 unused type warning。
+- `cd frontend && ./node_modules/.bin/tsc --noEmit --pretty false`：通过。
+- `cd backend && npx prisma generate && npm run test`：通过，`354` 个后端测试。
+- `cd frontend && npm run build`：通过；保留既有 Cache-Control 与 dev cockpit NFT trace warning。
+
+### Remaining
+- 本地 `gh auth status` 仍未登录；私有 Actions 详情这轮通过当前 Chrome 已登录页面确认。
+- 远端 `Deploy` workflow 仍有独立红灯，需要单独打开部署日志处理；本轮只收口 `CI / Unit Tests`。
+- 工作区仍有非本轮 backend 差异和一个未跟踪财务报表测试文件，提交时必须继续隔离。
+
 ## 2026-06-07 NAV-FE-11（业务模块导航收口）
 
 ### Goal
