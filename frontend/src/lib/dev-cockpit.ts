@@ -7,7 +7,7 @@ interface DevFileChange {
   path: string;
 }
 
-export interface DevTaskRow {
+interface DevTaskRow {
   id: string;
   priority: string;
   estimated: string;
@@ -16,7 +16,7 @@ export interface DevTaskRow {
   task: string;
 }
 
-export interface DevSectionExcerpt {
+interface DevSectionExcerpt {
   title: string;
   lines: string[];
 }

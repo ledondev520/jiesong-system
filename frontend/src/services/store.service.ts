@@ -19,4 +19,4 @@ export const storeService = {
 /**
  * 保留显式返回类型，供服务测试与调用方类型推断使用。
  */
-export type StoreService = typeof storeService;
+type StoreService = typeof storeService;

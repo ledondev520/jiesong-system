@@ -172,17 +172,6 @@ interface ReconciliationResult {
   gap: number;
 }
 
-/**
- * 职责：获取指定对方的银行流水 + 发票关联对账
- * @param counterpart 对方名称（模糊匹配）
- */
-export async function getReconciliation(counterpart: string): Promise<ReconciliationResult> {
-  const res: { data: ReconciliationResult } = await api.get('/bank-flow/reconciliation', {
-    params: { counterpart },
-  });
-  return res.data;
-}
-
 /** 对账匹配条目 */
 interface MatchedEntry {
   payName: string;
@@ -332,14 +321,6 @@ export async function postManualMatch(body: {
   contractType: 'PURCHASE' | 'SALES';
 }): Promise<BankTransaction | InvoiceRecord> {
   const res: { data: BankTransaction | InvoiceRecord } = await api.post('/finance/match', body);
-  return res.data;
-}
-
-/**
- * 职责：解除关联
- */
-export async function postUnmatch(body: { entityType: 'BANK' | 'INVOICE'; entityId: string }): Promise<BankTransaction | InvoiceRecord> {
-  const res: { data: BankTransaction | InvoiceRecord } = await api.post('/finance/unmatch', body);
   return res.data;
 }
 
