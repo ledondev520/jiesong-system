@@ -45,6 +45,7 @@
     "multer": "^1.4.5-lts.1",
     "openai": "^6.16.0",
     "papaparse": "^5.5.3",
+    "pdfjs-dist": "^6.1.200",
     "pdfkit": "^0.16.0",
     "pino": "^10.3.1",
     "pino-pretty": "^13.1.3",

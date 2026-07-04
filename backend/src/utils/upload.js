@@ -1,6 +1,6 @@
 /**
  * Input: multer库、配置
- * Output: 文件上传中间件
+ * Output: 文件上传中间件（通用 upload、合同附件 contractUpload、装箱单核对 pdfCheckUpload）
  * Pos: 文件上传工具，处理合同文件等上传
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -92,6 +92,21 @@ const contractUpload = multer({
   },
 });
 
+// 装箱单核对专用：仅 PDF、内存存储（比对为一次性操作，不落盘）
+const pdfCheckUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('仅支持 PDF 格式的装箱单'), false);
+    }
+  },
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20MB
+  },
+});
+
 /**
  * 职责：获取文件的相对路径（用于存储到数据库）
  * @param {string} absolutePath - 文件绝对路径
@@ -124,6 +139,7 @@ const deleteFile = (relativePath) => {
 module.exports = {
   upload,
   contractUpload,
+  pdfCheckUpload,
   getRelativePath,
   getFullPath,
   deleteFile,

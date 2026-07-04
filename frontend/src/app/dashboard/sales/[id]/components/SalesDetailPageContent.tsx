@@ -1,7 +1,7 @@
 /**
- * Input: 出口合同详情API、商品API、binPacking（出柜双80%判定）、SortableTableHead、useTableSort
- * Output: 出口合同详情页面（出柜条件横幅、可排序装箱明细、3D可视化、源文件附件、物流时间线、货柜详情、报关信息、收款记录）
- * Pos: 出口管理子页面，展示合同详情、装箱可视化与出柜条件判定
+ * Input: 出口合同详情API、商品API、binPacking（出柜双80%判定）、PackingListCheckDialog、SortableTableHead、useTableSort
+ * Output: 出口合同详情页面（出柜条件横幅、可排序装箱明细、3D可视化、船司装箱单核对、源文件附件、物流时间线、货柜详情、报关信息、收款记录）
+ * Pos: 出口管理子页面，展示合同详情、装箱可视化、出柜条件判定与装箱单核对
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -51,7 +51,7 @@ import {
 } from '@/components/ui/tabs';
 import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, Container, Anchor, Truck, CheckCircle2, CircleDashed, CircleDot, Clock, ArrowRight, DollarSign, MapPin } from 'lucide-react';
+import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, FileSearch, Container, Anchor, Truck, CheckCircle2, CircleDashed, CircleDot, Clock, ArrowRight, DollarSign, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { CONTAINER_40HQ, SHIPPING_READY_THRESHOLD_PCT, evaluateShippingReadiness } from '@/lib/binPacking';
 import { formatDate } from '@/lib/date-format';
@@ -63,6 +63,11 @@ const Container3DView = lazy(() => import('@/components/container/Container3DVie
 const GenerateThreeFormsDialog = lazy(() =>
   import('@/components/dialog/GenerateThreeFormsDialog').then((module) => ({
     default: module.GenerateThreeFormsDialog,
+  })),
+);
+const PackingListCheckDialog = lazy(() =>
+  import('@/components/dialog/PackingListCheckDialog').then((module) => ({
+    default: module.PackingListCheckDialog,
   })),
 );
 import { ContractInfoEditor } from '@/components/sales/ContractInfoEditor';
@@ -123,6 +128,8 @@ export default function SalesDetailPage({ params }: PageProps) {
 
   // 一键生成三张表对话框状态
   const [threeFormsDialogOpen, setThreeFormsDialogOpen] = useState(false);
+  // 船司装箱单核对对话框状态
+  const [packingCheckOpen, setPackingCheckOpen] = useState(false);
 
   // 截图区域引用
   const headerRef = useRef<HTMLDivElement>(null);
@@ -617,6 +624,10 @@ export default function SalesDetailPage({ params }: PageProps) {
               <Button variant="outline" onClick={handleSaveAsImage}>
                 <Camera className="mr-2 h-4 w-4" />
                 保存为图片
+              </Button>
+              <Button variant="outline" onClick={() => setPackingCheckOpen(true)}>
+                <FileSearch className="mr-2 h-4 w-4" />
+                核对船司装箱单
               </Button>
               <Button
                 variant="default"
@@ -1352,6 +1363,17 @@ export default function SalesDetailPage({ params }: PageProps) {
             onOpenChange={setThreeFormsDialogOpen}
             salesContract={contract}
             onGenerated={handleThreeFormsGenerated}
+          />
+        </Suspense>
+      )}
+
+      {packingCheckOpen && (
+        <Suspense fallback={null}>
+          <PackingListCheckDialog
+            open={packingCheckOpen}
+            onOpenChange={setPackingCheckOpen}
+            contractId={contract.id}
+            contractNo={contract.contractNo}
           />
         </Suspense>
       )}

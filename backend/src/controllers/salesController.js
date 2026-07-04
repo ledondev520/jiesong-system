@@ -283,6 +283,23 @@ const downloadFile = async (req, res, next) => {
   }
 };
 
+/**
+ * 职责：核对船司装箱单 PDF 与系统装箱数据
+ * 思路：接收内存中的 PDF 文件 → packingListCheckService 解析并比对 → 返回差异报告
+ */
+const checkPackingList = async (req, res, next) => {
+  try {
+    if (!req.file?.buffer) {
+      throw createError('请选择要核对的装箱单 PDF', 400);
+    }
+    const { checkPackingListPdf } = require('../services/packingListCheckService');
+    const result = await checkPackingListPdf(req.params.id, req.file.buffer);
+    success(res, result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   list,
   getById,
@@ -300,4 +317,5 @@ module.exports = {
   getFiles,
   deleteFile,
   downloadFile,
+  checkPackingList,
 };

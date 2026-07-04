@@ -8,6 +8,37 @@ type SalesListQuery = { page?: number; pageSize?: number; keyword?: string; lite
 type SalesCreatePayload = Partial<SalesContract>;
 type SalesUpdatePayload = Partial<SalesContract>;
 
+/** 装箱单核对：单个字段比对结果（matched=null 表示系统未录入、跳过比对） */
+export interface PackingListCheckField {
+  key: string;
+  label: string;
+  expected: string | number | null;
+  matched: boolean | null;
+  closest: string | number | null;
+}
+
+/** 装箱单核对：明细行比对结果 */
+export interface PackingListCheckItem {
+  productName: string;
+  boxes: { expected: number | null; matched: boolean | null; closest: number | null };
+  quantity: { expected: number | null; matched: boolean | null; closest: number | null };
+}
+
+/** 装箱单核对：整体结果 */
+export interface PackingListCheckResult {
+  summary: {
+    ok: boolean;
+    fieldTotal: number;
+    fieldMismatched: number;
+    itemCheckTotal: number;
+    itemCheckMismatched: number;
+    pdfNumberCount: number;
+    pdfTextLength: number;
+  };
+  fields: PackingListCheckField[];
+  items: PackingListCheckItem[];
+}
+
 const crud = createCrudService<SalesContract, SalesCreatePayload, SalesUpdatePayload, SalesListQuery>('/sales');
 
 /**
@@ -78,6 +109,19 @@ export const salesService = {
       },
     });
     await downloadResponseBlob(response, `${contractNo}_sales_contract.pdf`);
+  },
+
+  /**
+   * 上传船司装箱单 PDF 与系统装箱数据比对。
+   */
+  checkPackingList: async (id: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<ApiResponse<PackingListCheckResult>, ApiResponse<PackingListCheckResult>, FormData>(
+      `/sales/${id}/packing-list-check`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
   },
 
   /**
