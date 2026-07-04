@@ -32,6 +32,8 @@ const CONFIG_DOMAIN_MAP = {
   // 基础参数域：影响定价与汇率计算的全局数值
   exchangeRate: { domain: 'params', label: '基础参数', note: '用于销售合同初始汇率填充' },
   profitRate:   { domain: 'params', label: '基础参数', note: '例如 1.3 表示 30% 利润率' },
+  stampPlatformUrl: { domain: 'params', label: '基础参数', note: '线上盖章平台链接（购销合同生成后跳转盖章）' },
+  invoiceTitleInfo: { domain: 'params', label: '基础参数', note: '我方开票抬头信息（催票文本附带，多行）' },
 
   // 数据字典域：系统枚举值与下拉列表
   units:        { domain: 'dictionary', label: '数据字典', note: '商品计量单位枚举' },

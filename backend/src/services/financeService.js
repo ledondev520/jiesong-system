@@ -521,8 +521,13 @@ const allocatePaymentToContracts = async (paymentId, allocations) => {
   return result;
 };
 
-const listPayments = async ({ page, pageSize, skip, type }) => {
-  const where = buildPaymentListWhere(type);
+const listPayments = async ({ page, pageSize, skip, type, purchaseContractId, salesContractId }) => {
+  // 支持按采购/出口合同过滤，供合同详情页展示该合同的付款轨迹（定金/尾款时间）
+  const where = {
+    ...buildPaymentListWhere(type),
+    ...(purchaseContractId ? { purchaseContractId } : {}),
+    ...(salesContractId ? { salesContractId } : {}),
+  };
 
   const [payments, total] = await Promise.all([
     prisma.payment.findMany({

@@ -40,6 +40,10 @@ export interface FinancePaymentQuery {
   page?: number;
   pageSize?: number;
   type?: PaymentType;
+  /** 按采购合同过滤（合同详情页展示付款轨迹） */
+  purchaseContractId?: string;
+  /** 按出口合同过滤 */
+  salesContractId?: string;
 }
 
 export interface FinanceCreatePaymentInput {

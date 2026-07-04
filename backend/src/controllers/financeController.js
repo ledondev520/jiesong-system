@@ -17,13 +17,15 @@ const { createError } = require('../middleware/errorHandler');
 const listPayments = async (req, res, next) => {
   try {
     const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
-    const { type } = req.query;
+    const { type, purchaseContractId, salesContractId } = req.query;
 
     const { payments, total } = await financeService.listPayments({
       page,
       pageSize,
       skip,
       type,
+      purchaseContractId: typeof purchaseContractId === 'string' && purchaseContractId ? purchaseContractId : undefined,
+      salesContractId: typeof salesContractId === 'string' && salesContractId ? salesContractId : undefined,
     });
 
     paginated(res, payments, total, page, pageSize);

@@ -1,7 +1,7 @@
 /**
- * Input: 采购合同详情API、购销合同生成服务、SortableTableHead、useTableSort
- * Output: 采购合同详情页面（含可排序商品明细、付款记录、合同文档预览）
- * Pos: 采购管理子页面，展示单个采购合同的完整信息
+ * Input: 采购合同详情API、购销合同生成服务、系统配置（盖章平台/开票抬头）、PurchaseFlowPanel、SortableTableHead、useTableSort
+ * Output: 采购合同详情页面（商品明细、付款与发票面板、在线盖章跳转、合同文档预览）
+ * Pos: 采购管理子页面，承载「签合同→盖章→付款→催票」的单合同全流程操作
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -57,11 +57,14 @@ import {
   Calendar,
   Store,
   Percent,
+  Stamp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { PageHeader } from '@/components/layout/PageHeader';
 import ContractFiles from '@/components/contract/ContractFiles';
+import { PurchaseFlowPanel } from './components/PurchaseFlowPanel';
+import { configService } from '@/services/config.service';
 import { cn } from '@/lib/utils';
 
 interface PageProps {
@@ -224,6 +227,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const [exportingPdf, setExportingPdf] = useState(false);
   const [contractFiles, setContractFiles] = useState<ContractFile[]>([]);
 
+  // 系统配置：线上盖章平台链接 + 我方开票抬头（选填）
+  const [stampPlatformUrl, setStampPlatformUrl] = useState('');
+  const [invoiceTitleInfo, setInvoiceTitleInfo] = useState('');
+
   /**
    * 职责：加载采购合同详情 + 附件列表
    */
@@ -246,6 +253,34 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  // 加载系统配置（盖章平台链接、开票抬头），失败不阻塞页面
+  useEffect(() => {
+    const fetchConfigs = async () => {
+      try {
+        const response = await configService.getSystemConfig();
+        const configs = response.data as Record<string, unknown> | undefined;
+        if (typeof configs?.stampPlatformUrl === 'string') setStampPlatformUrl(configs.stampPlatformUrl);
+        if (typeof configs?.invoiceTitleInfo === 'string') setInvoiceTitleInfo(configs.invoiceTitleInfo);
+      } catch {
+        // 配置读取失败时保持默认，不影响详情页
+      }
+    };
+    void fetchConfigs();
+  }, []);
+
+  /**
+   * 职责：跳转线上盖章平台（系统配置 stampPlatformUrl）
+   * 思路：未配置时提示管理员到「设置 > 系统配置」维护链接
+   */
+  const handleOpenStampPlatform = () => {
+    const url = stampPlatformUrl.trim();
+    if (!url) {
+      toast.info('尚未配置线上盖章平台链接，请到「设置 → 系统配置」中填写');
+      return;
+    }
+    window.open(url.startsWith('http') ? url : `https://${url}`, '_blank', 'noopener,noreferrer');
+  };
 
   /**
    * 职责：生成购销合同文档
@@ -382,6 +417,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               )}
               查看合同
             </Button>
+            <Button variant="outline" className="h-9 rounded-md text-xs" onClick={handleOpenStampPlatform}>
+              <Stamp className="mr-1.5 h-3.5 w-3.5" />
+              在线盖章
+            </Button>
             <Button className="h-9 rounded-md text-xs" onClick={() => setGenerateOpen(true)}>
               <FileDown className="mr-1.5 h-3.5 w-3.5" />
               生成购销合同
@@ -453,6 +492,9 @@ export default function PurchaseDetailPage({ params }: PageProps) {
 
       {/* 时间线 */}
       <ContractTimeline currentStatus={contract.status} />
+
+      {/* 付款与发票（复制汇款信息 / 登记付款 / 催开发票） */}
+      <PurchaseFlowPanel contract={contract} onUpdated={loadData} invoiceTitleInfo={invoiceTitleInfo} />
 
       {/* 两列信息卡片 */}
       <div className="grid gap-4 md:grid-cols-2">
