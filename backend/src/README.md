@@ -10,10 +10,11 @@
 
 | 文件/目录 | 地位 | 功能 |
 |-----------|------|------|
-| app.js | 入口 | Express 应用初始化和启动 |
+| app.js | 入口 | Express 应用初始化和启动（含定时任务启动） |
 | config/ | 配置层 | 环境变量和常量定义（含配置/常量单元测试） |
 | controllers/ | 控制层 | 处理 HTTP 请求，调用服务层 |
 | integration/ | 集成测试层 | 数据库集成测试（schema/事务/seed 幂等） |
+| jobs/ | 定时任务层 | 库存预警、出口提醒（每月5号退税/缺票提醒）等定时任务 |
 | middleware/ | 中间件层 | 认证、日志、错误处理（含单元测试） |
 | routes/ | 路由层 | 定义 API 路由和参数验证 |
 | services/ | 服务层 | 业务逻辑实现 |
@@ -40,11 +41,13 @@
 | 文件 | 功能 |
 |------|------|
 | authService.js | 登录验证、Token生成、密码管理、找回密码 |
-| financeService.js | 付款记录幂等写入、应收应付聚合 |
+| financeService.js | 付款记录幂等写入、应收应付聚合（支持按合同过滤） |
 | aiService.js | Kimi API集成、智能问答、内容解析 |
 | importService.js | CSV数据解析与导入 |
-| exportService.js | 多格式数据导出 (CSV) |
+| exportService.js | 多格式数据导出（CSV + 出口合同五 Sheet Excel 含商业发票/税务测算） |
 | pdfExportService.js | 销售合同 / 系统数据 PDF 导出 |
+| packingListCheckService.js | 船司装箱单 PDF 解析（pdfjs-dist）与系统数据逐项比对 |
+| exportReminderService.js | 每月5号出口退税提醒、已出货缺发票提醒（幂等通知） |
 | patrolService.js | 业务 / 系统巡检、管理员通知、系统操作日志 |
 
 ## 工具清单
