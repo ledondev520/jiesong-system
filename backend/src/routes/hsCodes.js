@@ -55,6 +55,26 @@ function attachConfidenceToCandidates(rows, { exactMatch = false } = {}) {
   });
 }
 
+function buildEvidenceSourceLabel(source) {
+  if (source === 'hsciq_instance') return 'HSCIQ 归类实例 + AI 归纳';
+  if (source === 'local_snapshot') return '本地税则快照 + AI 归纳';
+  return 'AI 推断';
+}
+
+function buildDeclarationTemplateLabel(source) {
+  if (source === 'hsciq') return 'HSCIQ 编码详情';
+  if (source === 'local') return '本地税则快照';
+  return 'AI 推断';
+}
+
+function collectPendingConfirmationFields(filledDeclarationElements) {
+  if (!Array.isArray(filledDeclarationElements)) return [];
+  return filledDeclarationElements
+    .filter((item) => item && item.uncertain)
+    .map((item) => String(item.element || '').trim())
+    .filter(Boolean);
+}
+
 const router = Router();
 
 router.use(authenticate);
@@ -245,7 +265,14 @@ router.post(
         filledDeclarationElements = JSON.parse(arrMatch[0]);
       }
 
-      success(res, { filledDeclarationElements, rawElements: templateElements });
+      const source = hsciqElements.length > 0 ? 'hsciq' : localElements.length > 0 ? 'local' : 'ai';
+      success(res, {
+        filledDeclarationElements,
+        rawElements: templateElements,
+        elementSource: source,
+        elementSourceLabel: buildDeclarationTemplateLabel(source),
+        pendingConfirmationFields: collectPendingConfirmationFields(filledDeclarationElements),
+      });
     } catch (error) {
       next(error);
     }
@@ -313,6 +340,7 @@ router.post(
     // 0.5 并行获取参考上下文：HSCIQ 归类实例 + 本地税则库
     let hsciqHint = '';
     let localHint = '';
+    let usedHsciqInstance = false;
     const hsciqOn = await isHsciqToggleOn();
 
     const contextTasks = [];
@@ -349,6 +377,7 @@ router.post(
               const uniqueLines = [...new Set(lines)].slice(0, 10);
               if (uniqueLines.length > 0) {
                 hsciqHint = `\n\n以下是海关归类实例库中的真实归类案例（权威性高，务必重点参考）：\n${uniqueLines.join('\n')}`;
+                usedHsciqInstance = true;
               }
             }
           })
@@ -507,6 +536,9 @@ router.post(
     // 7. 填写申报要素（优先 HSCIQ 权威数据 → 本地库模板 → AI 推断）
     let filledDeclarationElements = null;
     let hsciqDetail = null; // 供前端展示完整编码详情
+    let declarationTemplateElements = [];
+    let declarationTemplateSource = 'ai';
+    let localTemplateRecord = null;
     if (recNorm && recommendation) {
       try {
         // 7.0 尝试从 HSCIQ 获取编码详情（含官方申报要素模板）
@@ -525,6 +557,7 @@ router.post(
 
         // 7.1 确定申报要素模板来源
         const hsRecord = await hsCodeService.searchByHsCode(recNorm);
+        localTemplateRecord = hsRecord || null;
         const localElements =
           hsRecord && typeof hsRecord.declarationElements === 'string'
             ? hsRecord.declarationElements.split(/[|｜]/).map((e) => e.trim()).filter(Boolean)
@@ -532,6 +565,8 @@ router.post(
 
         // 优先级：HSCIQ 官方要素 > 本地库要素 > AI 自由推断
         const templateElements = hsciqElements.length > 0 ? hsciqElements : localElements;
+        declarationTemplateElements = templateElements;
+        declarationTemplateSource = hsciqElements.length > 0 ? 'hsciq' : localElements.length > 0 ? 'local' : 'ai';
 
         let fillUserContent;
         if (templateElements.length > 0) {
@@ -597,6 +632,30 @@ router.post(
       candidates,
       filledDeclarationElements,
       hsciqDetail: hsciqDetail || null,
+      evidence: {
+        recommendationSource: usedHsciqInstance ? 'hsciq_instance' : localHint ? 'local_snapshot' : 'ai',
+        recommendationSourceLabel: buildEvidenceSourceLabel(usedHsciqInstance ? 'hsciq_instance' : localHint ? 'local_snapshot' : 'ai'),
+        declarationTemplateSource,
+        declarationTemplateSourceLabel: buildDeclarationTemplateLabel(declarationTemplateSource),
+        declarationTemplateElements,
+        pendingConfirmationFields: collectPendingConfirmationFields(filledDeclarationElements),
+        hsciq: {
+          enabled: hsciqOn,
+          available: hsciqService.isAvailable(),
+          usedInstance: usedHsciqInstance,
+          usedCodeDetail: Boolean(hsciqDetail),
+          quotaRemaining: hsciqService.getUsageStats().remaining,
+        },
+        localSnapshot: localTemplateRecord
+          ? {
+            hsCode: localTemplateRecord.hsCode,
+            productName: localTemplateRecord.productName,
+            sourceUrl: localTemplateRecord.sourceUrl || null,
+            effectiveDate: localTemplateRecord.effectiveDate || null,
+            fetchedAt: localTemplateRecord.fetchedAt || null,
+          }
+          : null,
+      },
     };
 
     // 8. 写入缓存，下次相同查询直接返回

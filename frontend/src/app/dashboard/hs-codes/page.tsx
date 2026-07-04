@@ -86,6 +86,28 @@ type AiRecommendPayload = {
   filledDeclarationElements?: Array<{ element: string; value: string; uncertain?: boolean }> | null;
   /** HSCIQ 权威编码详情 */
   hsciqDetail?: HsciqDetail;
+  evidence?: {
+    recommendationSource: 'hsciq_instance' | 'local_snapshot' | 'ai';
+    recommendationSourceLabel: string;
+    declarationTemplateSource: 'hsciq' | 'local' | 'ai';
+    declarationTemplateSourceLabel: string;
+    declarationTemplateElements?: string[];
+    pendingConfirmationFields?: string[];
+    hsciq?: {
+      enabled: boolean;
+      available: boolean;
+      usedInstance: boolean;
+      usedCodeDetail: boolean;
+      quotaRemaining: number;
+    };
+    localSnapshot?: {
+      hsCode: string;
+      productName: string;
+      sourceUrl?: string | null;
+      effectiveDate?: string | Date | null;
+      fetchedAt?: string | Date | null;
+    } | null;
+  };
 };
 
 function parseStructuredItems(value: string | null | undefined) {
@@ -894,6 +916,60 @@ function HsCodesPageContent() {
                         </Button>
                       </div>
                     </div>
+
+                    {/* 推荐证据链 */}
+                    {aiRecommendResult.evidence && (
+                      <div className="rounded-lg border bg-background p-4 space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-medium">推荐证据链</p>
+                          <Badge variant="secondary">{aiRecommendResult.evidence.recommendationSourceLabel}</Badge>
+                          <Badge variant="outline">要素模板：{aiRecommendResult.evidence.declarationTemplateSourceLabel}</Badge>
+                        </div>
+                        <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                          <div>
+                            <span className="font-medium text-foreground">HSCIQ：</span>
+                            {aiRecommendResult.evidence.hsciq?.enabled
+                              ? aiRecommendResult.evidence.hsciq.available
+                                ? `已启用，剩余额度 ${aiRecommendResult.evidence.hsciq.quotaRemaining}`
+                                : '已启用但未配置密钥'
+                              : '未启用'}
+                          </div>
+                          <div>
+                            <span className="font-medium text-foreground">归类实例：</span>
+                            {aiRecommendResult.evidence.hsciq?.usedInstance ? '已参考' : '未使用'}
+                            <span className="mx-1">/</span>
+                            <span className="font-medium text-foreground">编码详情：</span>
+                            {aiRecommendResult.evidence.hsciq?.usedCodeDetail ? '已命中' : '未命中'}
+                          </div>
+                          {aiRecommendResult.evidence.localSnapshot ? (
+                            <div className="sm:col-span-2">
+                              <span className="font-medium text-foreground">本地快照：</span>
+                              {aiRecommendResult.evidence.localSnapshot.hsCode} {aiRecommendResult.evidence.localSnapshot.productName}
+                              {aiRecommendResult.evidence.localSnapshot.effectiveDate
+                                ? `，版本日期 ${new Date(aiRecommendResult.evidence.localSnapshot.effectiveDate).toISOString().slice(0, 10)}`
+                                : ''}
+                            </div>
+                          ) : null}
+                        </div>
+                        {aiRecommendResult.evidence.declarationTemplateElements && aiRecommendResult.evidence.declarationTemplateElements.length > 0 ? (
+                          <div className="space-y-1.5 border-t pt-2">
+                            <p className="text-xs font-medium text-muted-foreground">该编码要求填写的申报要素</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {aiRecommendResult.evidence.declarationTemplateElements.map((item, index) => (
+                                <Badge key={`${item}-${index}`} variant="outline" className="max-w-full whitespace-normal text-left font-normal">
+                                  {item}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                        {aiRecommendResult.evidence.pendingConfirmationFields && aiRecommendResult.evidence.pendingConfirmationFields.length > 0 ? (
+                          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                            仍需确认：{aiRecommendResult.evidence.pendingConfirmationFields.join('、')}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
 
                     {/* HSCIQ 权威数据（税率、监管条件等） */}
                     {aiRecommendResult.hsciqDetail?.taxes && (
