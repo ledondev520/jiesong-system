@@ -43,7 +43,6 @@ const allRoutes = [
   { id: 'finance_invoices', path: '/dashboard/finance/invoices' },
   { id: 'finance_reconciliation', path: '/dashboard/finance/reconciliation' },
   { id: 'products', path: '/dashboard/products' },
-  { id: 'store_recommend', path: '/dashboard/store-recommend' },
   { id: 'ai_sessions', path: '/dashboard/ai/sessions' },
   { id: 'settings_home', path: '/dashboard/settings' },
   { id: 'users', path: '/dashboard/users' },

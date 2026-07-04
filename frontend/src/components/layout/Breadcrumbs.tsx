@@ -29,7 +29,6 @@ const routeLabelMap: Record<string, string> = {
   'customs-declarations': '报关单',
   settings: '设置',
   users: '用户管理',
-  'store-recommend': '门店推荐',
   import: '导入记录',
   about: '关于',
   dev: '开发',
@@ -38,7 +37,6 @@ const routeLabelMap: Record<string, string> = {
   edit: '编辑',
   template: '模板',
   templates: '模板管理',
-  'ops-execution': '经营执行',
 };
 
 export function Breadcrumbs({ className }: { className?: string }) {

@@ -18,7 +18,7 @@ describe('ModuleTabHeader', () => {
         tabs={[
           { href: '/dashboard/contracts', label: '采购合同' },
           { href: '/dashboard/suppliers', label: '供应商管理' },
-          { href: '/dashboard/store-recommend', label: '采购建议' },
+          { href: '/dashboard/inventory-status', label: '库存状态' },
           { href: '/dashboard/products', label: '商品档案' },
         ]}
       />,
