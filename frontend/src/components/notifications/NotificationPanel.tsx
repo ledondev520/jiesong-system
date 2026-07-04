@@ -9,7 +9,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { FileText, Ship, TrendingUp, AlertTriangle, Check, CheckCheck, Loader2 } from 'lucide-react';
+import { FileText, Ship, TrendingUp, AlertTriangle, Check, CheckCheck, Loader2, ReceiptText, Landmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,8 @@ const typeIconMap: Record<NotificationType, typeof FileText> = {
   SALES_DRAFT: Ship,
   OVERDUE_RECEIVABLE: TrendingUp,
   LOW_STOCK: AlertTriangle,
+  TAX_REFUND_MONTHLY: Landmark,
+  INVOICE_MISSING: ReceiptText,
 };
 
 const typeColorMap: Record<NotificationType, string> = {
@@ -27,6 +29,8 @@ const typeColorMap: Record<NotificationType, string> = {
   SALES_DRAFT: 'bg-amber-500/10 text-amber-600',
   OVERDUE_RECEIVABLE: 'bg-rose-500/10 text-rose-600',
   LOW_STOCK: 'bg-orange-500/10 text-orange-600',
+  TAX_REFUND_MONTHLY: 'bg-emerald-500/10 text-emerald-600',
+  INVOICE_MISSING: 'bg-violet-500/10 text-violet-600',
 };
 
 interface NotificationPanelProps {

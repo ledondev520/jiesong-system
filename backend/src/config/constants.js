@@ -67,6 +67,8 @@ const NOTIFICATION_TYPE = {
   LOW_STOCK: 'LOW_STOCK',               // 低库存预警
   AGENT_CREDENTIAL: 'AGENT_CREDENTIAL', // Agent 凭证运维通知
   SYSTEM: 'SYSTEM',                     // 系统通知
+  TAX_REFUND_MONTHLY: 'TAX_REFUND_MONTHLY', // 每月5号出口退税申报提醒
+  INVOICE_MISSING: 'INVOICE_MISSING',   // 货已出但未登记发票号（催票）
 };
 
 // 导入状态

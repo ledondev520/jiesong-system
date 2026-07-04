@@ -18,6 +18,7 @@ const { gentleRateLimit } = require('./middleware/rateLimit');
 const { startInventoryAlertJob } = require('./jobs/inventoryAlertJob');
 const { startAgentCredentialAlertJob } = require('./jobs/agentCredentialAlertJob');
 const { startPatrolJob } = require('./jobs/patrolJob');
+const { startExportReminderJob } = require('./jobs/exportReminderJob');
 
 const app = express();
 // JSON API 通过前端 dev rewrite 代理时，304 空响应会让 axios/页面层误判为失败，因此关闭 ETag。
@@ -115,6 +116,7 @@ const PORT = config.port;
 if (require.main === module) {
   startInventoryAlertJob();
   startAgentCredentialAlertJob();
+  startExportReminderJob();
   startPatrolJob({
     runOnStart: config.nodeEnv === 'production' || process.env.PATROL_RUN_ON_START === 'true',
   });

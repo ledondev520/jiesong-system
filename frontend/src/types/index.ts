@@ -497,7 +497,9 @@ export type NotificationType =
   | 'PURCHASE_DRAFT'
   | 'SALES_DRAFT'
   | 'OVERDUE_RECEIVABLE'
-  | 'LOW_STOCK';
+  | 'LOW_STOCK'
+  | 'TAX_REFUND_MONTHLY'
+  | 'INVOICE_MISSING';
 
 export interface Notification {
   id: string;
