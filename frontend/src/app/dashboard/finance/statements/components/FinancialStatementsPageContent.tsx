@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import {
@@ -19,8 +19,13 @@ import {
   FinancialStatementsLoadingState,
   FinancialStatementsOverview,
 } from './FinancialStatementsOverview';
-import { FinancialStatementsTabsSection } from './FinancialStatementsTabsSection';
 import { FinancialStatementsUploadDialog } from './FinancialStatementsUploadDialog';
+
+const FinancialStatementsTabsSection = lazy(() =>
+  import('./FinancialStatementsTabsSection').then((module) => ({
+    default: module.FinancialStatementsTabsSection,
+  }))
+);
 
 export function FinancialStatementsPageContent() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
@@ -35,6 +40,7 @@ export function FinancialStatementsPageContent() {
   const [uploadYear, setUploadYear] = useState(String(new Date().getFullYear()));
   const [uploadMonth, setUploadMonth] = useState(String(new Date().getMonth() + 1));
   const [uploading, setUploading] = useState(false);
+  const [showDrilldowns, setShowDrilldowns] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadData = useCallback(async () => {
@@ -151,6 +157,16 @@ export function FinancialStatementsPageContent() {
   const warningAlerts = analytics?.alerts.filter((alert) => alert.level === 'warning') ?? [];
   const hasData = Boolean(analytics && analytics.totalPeriods > 0);
 
+  useEffect(() => {
+    if (!hasData || !analytics || loading) {
+      setShowDrilldowns(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => setShowDrilldowns(true), 1200);
+    return () => window.clearTimeout(timer);
+  }, [analytics, hasData, loading]);
+
   return (
     <div className="space-y-6" data-testid="financial-statements-page-content">
       <ModuleTabHeader tabs={FINANCE_TABS} moduleName="财务" />
@@ -178,13 +194,15 @@ export function FinancialStatementsPageContent() {
             warningAlerts={warningAlerts}
           />
 
-          {hasData && analytics && (
-            <FinancialStatementsTabsSection
-              analytics={analytics}
-              periods={periods}
-              currentDetail={currentDetail}
-              detailLoading={detailLoading}
-            />
+          {hasData && analytics && showDrilldowns && (
+            <Suspense fallback={<FinancialStatementsLoadingState count={2} />}>
+              <FinancialStatementsTabsSection
+                analytics={analytics}
+                periods={periods}
+                currentDetail={currentDetail}
+                detailLoading={detailLoading}
+              />
+            </Suspense>
           )}
 
           <FinancialStatementsUploadDialog

@@ -8,7 +8,7 @@
 
 'use client';
 
-import { Suspense, useState, useEffect, useMemo } from 'react';
+import { Suspense, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { PaymentType } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -125,30 +125,22 @@ function PaymentsPageContent() {
   const [reconData, setReconData] = useState<FullReconciliationResult | null>(null);
   const [bankStats, setBankStats] = useState<BankFlowStats | null>(null);
   const [incomingData, setIncomingData] = useState<IncomingSummaryResult | null>(null);
-
-  // 0. 初始化加载
-  useEffect(() => {
-    fetchStats();
-    fetchPayables();
-    fetchReceivables();
-    fetchUnallocated();
-    getFullReconciliation().then(setReconData).catch(() => {});
-    getTransactionStats().then(setBankStats).catch(() => {});
-    getIncomingSummary().then(setIncomingData).catch(() => {});
-  }, []);
+  const payableDataLoadedRef = useRef(false);
+  const receivableDataLoadedRef = useRef(false);
+  const reconciliationLoadedRef = useRef(false);
 
   // 1. 加载统计数据
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const data = await cachedFetch('fin-stats', () => financeService.getStats());
       setStats(data);
     } catch {
       errorLogger.error('Payments', '获取财务统计失败');
     }
-  };
+  }, []);
 
   // 2. 加载应付账款（带缓存）
-  const fetchPayables = async () => {
+  const fetchPayables = useCallback(async () => {
     setPayableLoading(true);
     setPayableError(false);
     try {
@@ -170,20 +162,20 @@ function PaymentsPageContent() {
     } finally {
       setPayableLoading(false);
     }
-  };
+  }, []);
 
   // 3a. 加载待分配收款
-  const fetchUnallocated = async () => {
+  const fetchUnallocated = useCallback(async () => {
     try {
       const res = await financeService.getUnallocatedPayments();
       setUnallocatedPayments(res.data || []);
     } catch {
       // 非关键错误，静默处理
     }
-  };
+  }, []);
 
   // 3. 加载应收账款（带缓存）
-  const fetchReceivables = async () => {
+  const fetchReceivables = useCallback(async () => {
     setReceivableLoading(true);
     setReceivableError(false);
     try {
@@ -210,7 +202,68 @@ function PaymentsPageContent() {
     } finally {
       setReceivableLoading(false);
     }
-  };
+  }, []);
+
+  const fetchReconciliation = useCallback(async (force = false) => {
+    if (!force && reconciliationLoadedRef.current) {
+      return;
+    }
+    reconciliationLoadedRef.current = true;
+    try {
+      const data = await getFullReconciliation();
+      setReconData(data);
+    } catch {
+      reconciliationLoadedRef.current = false;
+    }
+  }, []);
+
+  const loadPayableData = useCallback(async (force = false) => {
+    if (!force && payableDataLoadedRef.current) {
+      return;
+    }
+    payableDataLoadedRef.current = true;
+    await Promise.all([
+      fetchPayables(),
+      getTransactionStats().then(setBankStats).catch(() => {}),
+    ]);
+  }, [fetchPayables]);
+
+  const loadReceivableData = useCallback(async (force = false) => {
+    if (!force && receivableDataLoadedRef.current) {
+      return;
+    }
+    receivableDataLoadedRef.current = true;
+    await Promise.all([
+      fetchReceivables(),
+      getIncomingSummary().then(setIncomingData).catch(() => {}),
+      getTransactionStats().then(setBankStats).catch(() => {}),
+    ]);
+  }, [fetchReceivables]);
+
+  // 0. 初始化基础数据；业务列表按当前 Tab 懒加载
+  useEffect(() => {
+    void fetchStats();
+    void fetchUnallocated();
+  }, [fetchStats, fetchUnallocated]);
+
+  useEffect(() => {
+    if (activeTab === 'receivable') {
+      void loadReceivableData();
+      return;
+    }
+    void loadPayableData();
+  }, [activeTab, loadPayableData, loadReceivableData]);
+
+  useEffect(() => {
+    if (activeTab !== 'payable') {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void fetchReconciliation();
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, fetchReconciliation]);
 
   // 处理付款提交
   const handlePayableSubmit = async (data: PaymentSubmitData) => {
@@ -501,7 +554,21 @@ function PaymentsPageContent() {
             <Button size="sm" className="h-10" onClick={() => setReceiptDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" /> 记录到账
             </Button>
-            <Button variant="outline" size="sm" className="h-10" onClick={() => { fetchStats(); fetchPayables(); fetchReceivables(); fetchUnallocated(); }}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-10"
+              onClick={() => {
+                void fetchStats();
+                void fetchUnallocated();
+                if (activeTab === 'receivable') {
+                  void loadReceivableData(true);
+                } else {
+                  void loadPayableData(true);
+                  void fetchReconciliation(true);
+                }
+              }}
+            >
               <RefreshCw className="mr-2 h-4 w-4" /> 刷新
             </Button>
           </div>

@@ -861,7 +861,10 @@ export default function AiSessionsPage() {
   }, [loadSessions]);
 
   useEffect(() => {
-    void loadStandaloneTokens();
+    const timer = window.setTimeout(() => {
+      void loadStandaloneTokens();
+    }, 2500);
+    return () => window.clearTimeout(timer);
   }, [loadStandaloneTokens]);
 
   useEffect(() => {
@@ -917,7 +920,8 @@ export default function AiSessionsPage() {
   useEffect(() => {
     let cancelled = false;
     setSummaryLoading(true);
-    void (async () => {
+    const timer = window.setTimeout(() => {
+      void (async () => {
       try {
         const [r1, r30] = await Promise.all([
           api.get<ApiResponse<TokenStats>, ApiResponse<TokenStats>>(`/ai/token-stats?days=1`),
@@ -935,9 +939,11 @@ export default function AiSessionsPage() {
       } finally {
         if (!cancelled) setSummaryLoading(false);
       }
-    })();
+      })();
+    }, 2500);
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, []);
 

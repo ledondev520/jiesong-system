@@ -64,7 +64,7 @@ export default function PortsPage() {
   const loadPorts = async () => {
     setLoading(true);
     try {
-      const response = await getSystemPorts({ page: 1, pageSize: 1000 });
+      const response = await getSystemPorts({ page: 1, pageSize: 100 });
       setPorts(response.data?.items || []);
     } catch {
       toast.error('加载港口失败');

@@ -67,7 +67,7 @@ export default function CustomsBrokersPage() {
   const loadBrokers = async () => {
     setLoading(true);
     try {
-      const response = await getSystemCustomsBrokers({ page: 1, pageSize: 1000 });
+      const response = await getSystemCustomsBrokers({ page: 1, pageSize: 100 });
       setBrokers(response.data?.items || []);
     } catch {
       toast.error('加载报关公司失败');

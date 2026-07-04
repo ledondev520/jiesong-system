@@ -63,7 +63,7 @@ export default function CategoriesPage() {
   const loadCategories = async () => {
     setLoading(true);
     try {
-      const response = await getSystemCategories({ page: 1, pageSize: 1000 });
+      const response = await getSystemCategories({ page: 1, pageSize: 100 });
       setCategories(response.data?.items || []);
     } catch {
       toast.error('加载商品分类失败');

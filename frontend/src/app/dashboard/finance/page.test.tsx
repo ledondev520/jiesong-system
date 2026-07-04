@@ -222,8 +222,9 @@ describe('FinancePage 交互逻辑', () => {
       expect(screen.getByText('应付账款总额')).toBeInTheDocument();
       expect(screen.getByText('待收账款')).toBeInTheDocument();
       expect(screen.getByText(/当前客户剩余欠款/)).toBeInTheDocument();
-      expect(screen.getByText('经营进度与报表分析')).toBeInTheDocument();
-      expect(screen.getByTestId('financial-statements-section')).toBeInTheDocument();
+      expect(screen.getByText('财务报表分析')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /查看报表分析/ })).toHaveAttribute('href', '/dashboard/finance/statements');
+      expect(screen.queryByTestId('financial-statements-section')).not.toBeInTheDocument();
     });
   });
 

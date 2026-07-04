@@ -7,6 +7,28 @@
  */
 
 const prisma = require('../utils/prisma');
+const LIST_CACHE_TTL_MS = 60 * 1000;
+const listCache = new Map();
+
+const getListCacheKey = ({ keyword, code, page, pageSize }) => JSON.stringify({ keyword, code, page, pageSize });
+
+const getCachedList = (key) => {
+  const cached = listCache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.createdAt > LIST_CACHE_TTL_MS) {
+    listCache.delete(key);
+    return null;
+  }
+  return cached.value;
+};
+
+const setCachedList = (key, value) => {
+  listCache.set(key, { createdAt: Date.now(), value });
+  if (listCache.size > 100) {
+    listCache.delete(listCache.keys().next().value);
+  }
+};
+
 // 懒加载 aiService，避免循环依赖（aiService 不依赖本模块）
 let _aiService = null;
 const getAiService = () => {
@@ -94,6 +116,16 @@ const listHsCodes = async ({ keyword = '', code = '', page = 1, pageSize = 50 } 
   const normalizedCode = normalizeKeyword(code).replace(/\D/g, '');
   const safePage = Math.max(parseInt(page, 10) || 1, 1);
   const safePageSize = Math.min(Math.max(parseInt(pageSize, 10) || 50, 1), 200);
+  const cacheKey = getListCacheKey({
+    keyword: normalizedKeyword,
+    code: normalizedCode,
+    page: safePage,
+    pageSize: safePageSize,
+  });
+  const cached = getCachedList(cacheKey);
+  if (cached) {
+    return cached;
+  }
 
   // 1. 构建 where 条件：keyword → 商品名，code → 编码前缀，可组合（AND）
   const conditions = [];
@@ -134,7 +166,7 @@ const listHsCodes = async ({ keyword = '', code = '', page = 1, pageSize = 50 } 
     prisma.hsCode.count({ where }),
   ]);
 
-  return {
+  const result = {
     items,
     pagination: {
       page: safePage,
@@ -143,6 +175,8 @@ const listHsCodes = async ({ keyword = '', code = '', page = 1, pageSize = 50 } 
       totalPages: Math.max(Math.ceil(total / safePageSize), 1),
     },
   };
+  setCachedList(cacheKey, result);
+  return result;
 };
 
 const searchByProductName = async (keyword) => {

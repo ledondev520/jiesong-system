@@ -13,6 +13,9 @@ const BASE_URL = process.env.API_BASE_URL || 'http://localhost:3001';
 const USERNAME = process.env.API_BENCH_USERNAME || 'admin';
 const PASSWORD = process.env.API_BENCH_PASSWORD || '123456';
 const THRESHOLD_MS = Number(process.env.API_BENCH_THRESHOLD_MS || 2000);
+const DETAIL_TARGET_MS = Number(process.env.API_BENCH_DETAIL_TARGET_MS || 500);
+const ORDINARY_TARGET_MS = Number(process.env.API_BENCH_ORDINARY_TARGET_MS || 1000);
+const DEFERRED_TARGET_MS = Number(process.env.API_BENCH_DEFERRED_TARGET_MS || 2000);
 const TIMEOUT_MS = Number(process.env.API_BENCH_TIMEOUT_MS || 10000);
 const DELAY_MS = Number(process.env.API_BENCH_DELAY_MS || 650);
 const OUTPUT_DIR = path.resolve(process.cwd(), 'tmp/performance');
@@ -73,6 +76,21 @@ const optionalPath = (key, template) => () => {
 const optionalPathAll = (keys, template) => () => {
   const values = keys.map((key) => state[key]);
   return values.every(Boolean) ? template(...values) : null;
+};
+
+const resolveSla = (testCase) => {
+  if (testCase.sla) return testCase.sla;
+  if (/(^|_)detail($|_)|_files$/.test(testCase.id)) {
+    return { profile: 'detail', targetMs: DETAIL_TARGET_MS };
+  }
+  if (
+    testCase.acceptsBlob ||
+    /(^|_)(export|download|upload|import|sync|trigger|stream)($|_)/.test(testCase.id) ||
+    /^hsciq_/.test(testCase.id)
+  ) {
+    return { profile: 'deferred', targetMs: DEFERRED_TARGET_MS };
+  }
+  return { profile: 'ordinary', targetMs: ORDINARY_TARGET_MS };
 };
 
 const coreCases = [
@@ -230,6 +248,7 @@ const getToken = async () => {
 
 const runRequest = async (testCase, token) => {
   const resolvedPath = typeof testCase.path === 'function' ? testCase.path(state) : testCase.path;
+  const sla = resolveSla(testCase);
   if (!resolvedPath) {
     return {
       id: testCase.id,
@@ -237,6 +256,9 @@ const runRequest = async (testCase, token) => {
       path: null,
       status: 'SKIPPED',
       durationMs: null,
+      slaProfile: sla.profile,
+      targetMs: sla.targetMs,
+      overTarget: false,
       overThreshold: false,
       message: 'missing fixture id',
     };
@@ -268,6 +290,9 @@ const runRequest = async (testCase, token) => {
       status: 'ERROR',
       httpStatus: null,
       durationMs,
+      slaProfile: sla.profile,
+      targetMs: sla.targetMs,
+      overTarget: durationMs > sla.targetMs,
       overThreshold: durationMs > THRESHOLD_MS,
       message: error.name === 'AbortError' ? `timeout after ${TIMEOUT_MS}ms` : error.message,
     };
@@ -290,6 +315,9 @@ const runRequest = async (testCase, token) => {
     status: ok ? 'OK' : 'HTTP_ERROR',
     httpStatus: response.status,
     durationMs,
+    slaProfile: sla.profile,
+    targetMs: sla.targetMs,
+    overTarget: durationMs > sla.targetMs,
     overThreshold: durationMs > THRESHOLD_MS,
     contentLength: Number(response.headers.get('content-length')) || Buffer.byteLength(text),
     message: response.ok ? '' : (expectedStatus ? `expected HTTP ${response.status}: ${json?.message || text.slice(0, 160)}` : (json?.message || text.slice(0, 160))),
@@ -298,12 +326,12 @@ const runRequest = async (testCase, token) => {
 
 const toMarkdown = (results, meta) => {
   const rows = results
-    .map((item) => `| ${item.id} | ${item.method} | ${item.httpStatus ?? item.status} | ${item.durationMs ?? '-'} | ${item.overThreshold ? 'YES' : 'NO'} | ${item.path || '-'} | ${String(item.message || '').replace(/\|/g, '/')} |`)
+    .map((item) => `| ${item.id} | ${item.slaProfile || '-'} | ${item.targetMs ?? '-'} | ${item.method} | ${item.httpStatus ?? item.status} | ${item.durationMs ?? '-'} | ${item.overTarget ? 'YES' : 'NO'} | ${item.overThreshold ? 'YES' : 'NO'} | ${item.path || '-'} | ${String(item.message || '').replace(/\|/g, '/')} |`)
     .join('\n');
 
   const issueRows = results
-    .filter((item) => item.overThreshold || item.status === 'ERROR' || item.status === 'HTTP_ERROR')
-    .map((item) => `- ${item.id}: ${item.durationMs}ms ${item.path || ''} ${item.message ? `(${item.message})` : ''}`)
+    .filter((item) => item.overThreshold || item.overTarget || item.status === 'ERROR' || item.status === 'HTTP_ERROR')
+    .map((item) => `- ${item.id}: ${item.durationMs}ms / target ${item.targetMs ?? '-'}ms / hard ${meta.thresholdMs}ms ${item.path || ''} ${item.message ? `(${item.message})` : ''}`)
     .join('\n') || '- None';
 
   return `# API Response Time Audit
@@ -315,17 +343,18 @@ const toMarkdown = (results, meta) => {
 - OK: ${meta.ok}
 - HTTP errors: ${meta.httpErrors}
 - Skipped: ${meta.skipped}
+- Over target: ${meta.overTarget}
 - Over threshold: ${meta.overThreshold}
 - Problem cases: ${meta.problemCases}
 - Max duration: ${meta.maxDurationMs}ms (${meta.maxDurationCase || 'n/a'})
 - Generated at: ${meta.generatedAt}
 
-## Over Threshold Or Error
+## Over Target, Over Hard Threshold Or Error
 ${issueRows}
 
 ## Results
-| ID | Method | HTTP/Status | Duration ms | >2s | Path | Message |
-|---|---|---:|---:|---|---|---|
+| ID | SLA | Target ms | Method | HTTP/Status | Duration ms | >target | >2s | Path | Message |
+|---|---|---:|---|---:|---:|---|---|---|---|
 ${rows}
 `;
 };
@@ -338,7 +367,7 @@ async function main() {
   for (const testCase of coreCases) {
     const result = await runRequest(testCase, token);
     results.push(result);
-    const marker = result.overThreshold ? 'SLOW' : result.status;
+    const marker = result.overThreshold ? 'SLOW' : (result.overTarget ? 'TARGET' : result.status);
     process.stdout.write(`${marker.padEnd(10)} ${String(result.durationMs ?? '-').padStart(5)}ms ${testCase.id}\n`);
     await sleep(DELAY_MS);
   }
@@ -346,12 +375,18 @@ async function main() {
   const meta = {
     baseUrl: BASE_URL,
     thresholdMs: THRESHOLD_MS,
+    targets: {
+      detailMs: DETAIL_TARGET_MS,
+      ordinaryMs: ORDINARY_TARGET_MS,
+      deferredMs: DEFERRED_TARGET_MS,
+    },
     total: results.length,
     ok: results.filter((item) => item.status === 'OK').length,
     httpErrors: results.filter((item) => item.status === 'HTTP_ERROR' || item.status === 'ERROR').length,
     skipped: results.filter((item) => item.status === 'SKIPPED').length,
+    overTarget: results.filter((item) => item.overTarget).length,
     overThreshold: results.filter((item) => item.overThreshold).length,
-    problemCases: results.filter((item) => item.overThreshold || item.status === 'ERROR' || item.status === 'HTTP_ERROR').length,
+    problemCases: results.filter((item) => item.overTarget || item.overThreshold || item.status === 'ERROR' || item.status === 'HTTP_ERROR').length,
     generatedAt: new Date().toISOString(),
   };
   const completed = results.filter((item) => typeof item.durationMs === 'number');

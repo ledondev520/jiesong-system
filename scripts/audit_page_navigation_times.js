@@ -19,33 +19,34 @@ const THRESHOLD_MS = Number(process.env.PAGE_BENCH_THRESHOLD_MS || 2000);
 const NAV_TIMEOUT_MS = Number(process.env.PAGE_BENCH_NAV_TIMEOUT_MS || 15000);
 const SETTLE_TIMEOUT_MS = Number(process.env.PAGE_BENCH_SETTLE_TIMEOUT_MS || 3500);
 const PASSES = Number(process.env.PAGE_BENCH_PASSES || 2);
+const ROUTE_DELAY_MS = Number(process.env.PAGE_BENCH_ROUTE_DELAY_MS || 500);
+const ROUTE_IDS = (process.env.PAGE_BENCH_ROUTE_IDS || '')
+  .split(',')
+  .map((item) => item.trim())
+  .filter(Boolean);
 const OUTPUT_DIR = path.resolve(process.cwd(), 'tmp/performance');
 
-const routes = [
+const allRoutes = [
   { id: 'dashboard_home', path: '/dashboard' },
-  { id: 'purchase_list', path: '/dashboard/purchase' },
-  { id: 'sales_list', path: '/dashboard/sales' },
+  { id: 'reports', path: '/dashboard/reports' },
   { id: 'contracts', path: '/dashboard/contracts' },
-  { id: 'logistics_home', path: '/dashboard/logistics' },
-  { id: 'containers', path: '/dashboard/logistics/containers' },
-  { id: 'customs_declarations', path: '/dashboard/customs-declarations' },
+  { id: 'suppliers', path: '/dashboard/suppliers' },
+  { id: 'inventory_status', path: '/dashboard/inventory-status' },
+  { id: 'sales_list', path: '/dashboard/sales' },
   { id: 'tax_refunds', path: '/dashboard/tax-refunds' },
+  { id: 'tax_refunds_customs', path: '/dashboard/tax-refunds?view=customs' },
   { id: 'hs_codes', path: '/dashboard/hs-codes' },
   { id: 'finance_home', path: '/dashboard/finance' },
-  { id: 'finance_payable', path: '/dashboard/finance/payable' },
-  { id: 'finance_receivable', path: '/dashboard/finance/receivable' },
+  { id: 'finance_statements', path: '/dashboard/finance/statements' },
+  { id: 'payments', path: '/dashboard/payments' },
   { id: 'finance_bank_flow', path: '/dashboard/finance/bank-flow' },
   { id: 'finance_invoices', path: '/dashboard/finance/invoices' },
   { id: 'finance_reconciliation', path: '/dashboard/finance/reconciliation' },
-  { id: 'finance_statements', path: '/dashboard/finance/statements' },
-  { id: 'payments', path: '/dashboard/payments' },
   { id: 'products', path: '/dashboard/products' },
-  { id: 'suppliers', path: '/dashboard/suppliers' },
   { id: 'store_recommend', path: '/dashboard/store-recommend' },
-  { id: 'reports', path: '/dashboard/reports' },
   { id: 'ai_sessions', path: '/dashboard/ai/sessions' },
   { id: 'settings_home', path: '/dashboard/settings' },
-  { id: 'settings_users', path: '/dashboard/settings/users' },
+  { id: 'users', path: '/dashboard/users' },
   { id: 'settings_ports', path: '/dashboard/settings/ports' },
   { id: 'settings_categories', path: '/dashboard/settings/categories' },
   { id: 'settings_customs_brokers', path: '/dashboard/settings/customs-brokers' },
@@ -54,9 +55,19 @@ const routes = [
   { id: 'system_notifications', path: '/dashboard/system/notifications' },
   { id: 'about', path: '/dashboard/about' },
 ];
+const routes = ROUTE_IDS.length > 0
+  ? allRoutes.filter((route) => ROUTE_IDS.includes(route.id))
+  : allRoutes;
+
+if (ROUTE_IDS.length > 0 && routes.length !== ROUTE_IDS.length) {
+  const known = new Set(allRoutes.map((route) => route.id));
+  const missing = ROUTE_IDS.filter((id) => !known.has(id));
+  throw new Error(`Unknown PAGE_BENCH_ROUTE_IDS: ${missing.join(', ')}`);
+}
 
 const buildUrl = (pathname) => new URL(pathname, FRONTEND_URL).toString();
 const buildAuthUrl = (pathname) => new URL(pathname, AUTH_BASE_URL).toString();
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const login = async () => {
   const response = await fetch(buildAuthUrl('/api/v1/auth/login'), {
@@ -84,10 +95,17 @@ const writeReport = (results, meta) => {
     row.apiRequests.filter((request) => request.durationMs !== null && request.durationMs > THRESHOLD_MS)
       .map((request) => ({ routeId: row.id, pass: row.pass, ...request })),
   );
+  const apiHttpErrors = results.flatMap((row) =>
+    row.apiRequests.filter((request) => {
+      if (request.status === 'FAILED') return true;
+      return typeof request.status === 'number' && request.status >= 400;
+    }).map((request) => ({ routeId: row.id, pass: row.pass, ...request })),
+  );
 
   const summary = {
     frontendUrl: FRONTEND_URL,
     thresholdMs: THRESHOLD_MS,
+    routeDelayMs: ROUTE_DELAY_MS,
     passes: PASSES,
     totalRoutes: routes.length,
     totalRuns: results.length,
@@ -95,13 +113,14 @@ const writeReport = (results, meta) => {
     failed: failed.length,
     overThreshold: overThreshold.length,
     apiOverThreshold: apiOverThreshold.length,
+    apiHttpErrors: apiHttpErrors.length,
     maxDurationMs: max?.durationMs ?? null,
     maxDurationRoute: max?.id ?? null,
     generatedAt: new Date().toISOString(),
     ...meta,
   };
 
-  fs.writeFileSync(jsonPath, JSON.stringify({ summary, results, apiOverThreshold }, null, 2));
+  fs.writeFileSync(jsonPath, JSON.stringify({ summary, results, apiOverThreshold, apiHttpErrors }, null, 2));
 
   const lines = [
     '# Page Navigation Time Audit',
@@ -109,6 +128,7 @@ const writeReport = (results, meta) => {
     '## Summary',
     `- Frontend URL: ${summary.frontendUrl}`,
     `- Threshold: ${summary.thresholdMs}ms`,
+    `- Route delay: ${summary.routeDelayMs}ms`,
     `- Passes: ${summary.passes}`,
     `- Routes: ${summary.totalRoutes}`,
     `- Runs: ${summary.totalRuns}`,
@@ -116,6 +136,7 @@ const writeReport = (results, meta) => {
     `- Failed: ${summary.failed}`,
     `- Page runs over threshold: ${summary.overThreshold}`,
     `- API calls over threshold: ${summary.apiOverThreshold}`,
+    `- API HTTP errors: ${summary.apiHttpErrors}`,
     `- Max page duration: ${summary.maxDurationMs ?? '-'}ms (${summary.maxDurationRoute ?? '-'})`,
     `- Generated at: ${summary.generatedAt}`,
     '',
@@ -129,6 +150,10 @@ const writeReport = (results, meta) => {
     '## API Calls Over Threshold',
     ...(apiOverThreshold.map((row) => `- pass ${row.pass} ${row.routeId}: ${row.method} ${row.url} ${row.status || '-'} ${row.durationMs}ms`)),
     apiOverThreshold.length ? '' : '- None',
+    '',
+    '## API HTTP Errors',
+    ...(apiHttpErrors.map((row) => `- pass ${row.pass} ${row.routeId}: ${row.method} ${row.url} ${row.status || '-'} ${row.durationMs}ms ${row.errorText || ''}`)),
+    apiHttpErrors.length ? '' : '- None',
     '',
     '## Results',
     '| Pass | ID | Status | Duration ms | >2s | API count | Slowest API ms | Path | Message |',
@@ -229,9 +254,20 @@ const run = async () => {
         apiRequests: activeRequests,
         message,
       };
+      const apiErrorCount = row.apiRequests.filter((request) => {
+        if (request.status === 'FAILED') return true;
+        return typeof request.status === 'number' && request.status >= 400;
+      }).length;
+      if (status === 'OK' && apiErrorCount > 0) {
+        row.status = 'API_HTTP_ERROR';
+        row.message = `${apiErrorCount} API request(s) returned HTTP error`;
+      }
       results.push(row);
       const flag = row.overThreshold || row.status !== 'OK' ? 'SLOW/ERR' : 'OK';
       console.log(`${flag.padEnd(8)} pass=${pass} ${String(durationMs).padStart(5)}ms ${route.id}`);
+      if (ROUTE_DELAY_MS > 0) {
+        await sleep(ROUTE_DELAY_MS);
+      }
     }
   }
 
@@ -242,7 +278,7 @@ const run = async () => {
   console.log(`\nWrote ${report.jsonPath}`);
   console.log(`Wrote ${report.mdPath}`);
 
-  if (report.summary.failed || report.summary.overThreshold || report.summary.apiOverThreshold) {
+  if (report.summary.failed || report.summary.overThreshold || report.summary.apiOverThreshold || report.summary.apiHttpErrors) {
     process.exitCode = 1;
   }
 };

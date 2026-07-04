@@ -92,7 +92,7 @@ describe('PaymentsPage 交互逻辑', () => {
     mockGetIncomingSummary.mockResolvedValue({ items: [], total: 0 });
   });
 
-  it('初始化会请求统计/应付/应收数据', async () => {
+  it('初始化只请求统计/应付数据，不预拉应收数据', async () => {
     mockGetStats.mockResolvedValue({
       data: {
         payable: { total: 1000, paid: 300, unpaid: 700 },
@@ -107,8 +107,31 @@ describe('PaymentsPage 交互逻辑', () => {
     await waitFor(() => {
       expect(mockGetStats).toHaveBeenCalledTimes(1);
       expect(mockGetPayables).toHaveBeenCalledWith({ pageSize: 100 });
-      expect(mockGetReceivables).toHaveBeenCalledWith({ pageSize: 100 });
       expect(mockGetUnallocatedPayments).toHaveBeenCalledTimes(1);
+    });
+    expect(mockGetReceivables).not.toHaveBeenCalled();
+    expect(mockGetIncomingSummary).not.toHaveBeenCalled();
+    expect(mockGetFullReconciliation).not.toHaveBeenCalled();
+  });
+
+  it('切到应收 Tab 后再请求应收数据', async () => {
+    mockGetStats.mockResolvedValue({
+      data: {
+        payable: { total: 1000, paid: 300, unpaid: 700 },
+        receivable: { total: 2000, received: 500, unreceived: 1500 },
+      },
+    });
+    mockGetPayables.mockResolvedValue({ data: { items: [] } });
+    mockGetReceivables.mockResolvedValue({ data: { items: [] } });
+    const user = userEvent.setup();
+
+    render(<PaymentsPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /应收账款/ }));
+
+    await waitFor(() => {
+      expect(mockGetReceivables).toHaveBeenCalledWith({ pageSize: 100 });
+      expect(mockGetIncomingSummary).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -221,7 +244,7 @@ describe('PaymentsPage 交互逻辑', () => {
     await waitFor(() => {
       expect(mockAutoMatchUnallocatedPayments).toHaveBeenCalledTimes(1);
       expect(mockGetUnallocatedPayments.mock.calls.length).toBeGreaterThan(1);
-      expect(mockGetReceivables.mock.calls.length).toBeGreaterThan(1);
+      expect(mockGetReceivables).toHaveBeenCalledWith({ pageSize: 100 });
       expect(mockGetStats.mock.calls.length).toBeGreaterThan(1);
     });
   });

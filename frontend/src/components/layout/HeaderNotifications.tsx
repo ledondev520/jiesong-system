@@ -44,17 +44,12 @@ export function HeaderNotifications() {
     }
   }, []);
 
-  // 首次挂载时生成通知并拉取列表
+  // 首次挂载只读通知列表；生成通知属于写操作，不能放在全局 Header 里拖慢每次页面切换。
   useEffect(() => {
     let active = true;
-    const init = async () => {
-      try {
-        await notificationService.generate();
-      } catch {
-        // 忽略生成失败
-      }
+    const init = () => {
       if (active) {
-        await loadNotifications();
+        void loadNotifications();
       }
     };
     init();

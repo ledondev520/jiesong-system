@@ -8,7 +8,7 @@
 
 'use client';
 
-import { startTransition, useCallback, useDeferredValue, useEffect, useState } from 'react';
+import { lazy, startTransition, Suspense, useCallback, useDeferredValue, useEffect, useState } from 'react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/lib/hooks/useTableSort';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -28,9 +28,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { TaxRefundStatusBadge, taxRefundStatusOptions } from './TaxRefundStatusBadge';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { MobileListCard } from '@/components/mobile';
-import { CustomsDeclarationListPageContent } from '@/app/customs-declarations/components/CustomsDeclarationListPageContent';
 
 const DEFAULT_PAGE_SIZE = 20;
+
+const CustomsDeclarationListPageContent = lazy(() =>
+  import('@/app/customs-declarations/components/CustomsDeclarationListPageContent').then((module) => ({
+    default: module.CustomsDeclarationListPageContent,
+  }))
+);
 
 export function TaxRefundListPageContent() {
   const router = useRouter();
@@ -69,8 +74,12 @@ export function TaxRefundListPageContent() {
   }, [deferredKeyword, status, pageSize]);
 
   useEffect(() => {
+    if (activeView !== 'refunds') {
+      setLoading(false);
+      return;
+    }
     void loadTaxRefunds();
-  }, [loadTaxRefunds]);
+  }, [activeView, loadTaxRefunds]);
 
   const sort = useTableSort<TaxRefund, string>(
     taxRefunds,
@@ -183,7 +192,11 @@ export function TaxRefundListPageContent() {
         </TabsList>
 
         <TabsContent value="customs" className="mt-0">
-          <CustomsDeclarationListPageContent embedded />
+          {activeView === 'customs' && (
+            <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">加载报关单...</div>}>
+              <CustomsDeclarationListPageContent embedded />
+            </Suspense>
+          )}
         </TabsContent>
 
         <TabsContent value="refunds" className="mt-0 space-y-6">

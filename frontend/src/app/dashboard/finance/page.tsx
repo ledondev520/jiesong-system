@@ -1,6 +1,6 @@
 /**
  * Input: 后端 finance/stats、finance/payment-trends、system/exchange-rate、bank-flow/stats、invoices/stats API
- * Output: 财务概览页面（收付进度 + 报表分析 + 汇率 + 银行流水/发票摘要 + 紧迫信号 + 趋势折线图 + 快捷导航）
+ * Output: 财务概览页面（收付进度 + 汇率 + 银行流水/发票摘要 + 紧迫信号 + 趋势折线图 + 快捷导航）
  * Pos: 财务模块首页，提供公司财务进度驾驶舱
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -62,7 +62,6 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState, LoadingState } from '@/components/ui/data-state';
 import { KpiCard } from '@/components/finance/KpiCard';
 import { ChartTooltip } from '@/components/finance/ChartTooltip';
-import { FinancialStatementsDashboardSection } from './statements/components/FinancialStatementsDashboardSection';
 
 interface PaymentTrendPoint {
   label: string;
@@ -120,7 +119,7 @@ function calcTrendValue(current: number, previous: number): string {
  * 思路：
  *   1. 顶部 KPI 卡片：总额、已付/已收、待付/待收（带完成率进度条）
  *   2. 中部驾驶舱卡片：汇率显示、紧迫性预警、账款健康度
- *   3. 内嵌报表分析：收入利润、成本结构、资产负债、账期详情
+ *   3. 报表分析入口：三表分析放在专门页面，避免概览首屏重复加载重模块
  */
 export default function FinancePage() {
   const [stats, setStats] = useState<FinanceStats | null>(null);
@@ -283,7 +282,7 @@ export default function FinancePage() {
               <p className="text-sm font-medium text-muted-foreground">公司财务进度</p>
               <h3 className="text-lg font-semibold tracking-tight">先看收付压力，再下钻经营执行</h3>
               <p className="text-sm leading-6 text-muted-foreground">
-                财务概览先给出应付完成率、应收完成率和待付待收风险；报表区块保留三表导入、账期选择和收入利润、成本结构、资产负债下钻。
+                财务概览先给出应付完成率、应收完成率和待付待收风险；三表导入、账期选择和收入利润、成本结构、资产负债下钻集中放在报表分析页面。
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
@@ -297,7 +296,7 @@ export default function FinancePage() {
                 <Link href="/dashboard/payments?tab=payable">查看待付风险</Link>
               </Button>
               <Button asChild variant="outline" className="h-11 rounded-xl">
-                <Link href="#financial-statements">查看报表分析</Link>
+                <Link href="/dashboard/finance/statements">查看报表分析</Link>
               </Button>
             </div>
           </CardContent>
@@ -606,8 +605,6 @@ export default function FinancePage() {
         </div>
       )}
 
-      <FinancialStatementsDashboardSection />
-
       {/* 应收逾期预警 */}
       {overdueList.length > 0 && (
         <Card className="border-red-500/40 bg-red-50/20 dark:bg-red-950/10">
@@ -697,12 +694,12 @@ export default function FinancePage() {
           </Card>
         </Link>
 
-        <Link href="#financial-statements" className="group">
+        <Link href="/dashboard/finance/statements" className="group">
           <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm border-primary/20 bg-primary/[0.03]">
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-primary">经营执行下钻</p>
+                  <p className="text-sm font-medium text-primary">财务报表分析</p>
                   <p className="text-xs text-muted-foreground mt-0.5">收入利润、成本结构、资产负债</p>
                 </div>
                 <BarChart3 className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
