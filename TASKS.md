@@ -1842,3 +1842,12 @@
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
 |---|---|---:|---:|---|---|
 | WU-FE-FINANCE-OVERVIEW-MERGE | P0 | 20m | 1 | DONE | 财务顶层 Tab 收敛为「财务总览」「收付管理」；旧报表路由跳转总览锚点；总览页内嵌报表分析、上传导入和四个下钻区块；完成目标测试、lint、类型检查 |
+
+## 2026-07-05 汉化收口 + WPS 2026-07 数据导入 + 双端部署
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| WU-I18N-SWEEP | P0 | 30m | 1 | DONE | 全面汉化收口：后端 errorHandler 统一把 Prisma/Multer/JWT/JSON 等英文技术错误转中文（新增单测）；前端 axios 拦截器把超时/断网错误转中文；清理 date-picker/command/dialog/sheet/费用计算器/SLA 徽章等残留英文文案，并同步测试断言 |
+| WU-WPS-202607-IMPORT | P0 | 40m | 1 | DONE | WPS 2026-07 增量导入脚本（幂等，dry-run/--apply）：EXP260008/009 出口合同全量（明细/装箱/附件）、EXP260004 头修复、CG2600035/40 采购补建、招行 2026-05/06 流水 30 笔付款收款登记；本地与 VPS 双端执行并核对一致 |
+| WU-SCHEMA-DRIFT-FIX | P0 | 30m | 1 | DONE | 发现 VPS 库缺 mimeType/metadata 等列（历史 db push 欠账）：备份 VPS 库后用 migrate diff 生成追平 SQL 应用；补交 20260704190000_sync_schema_drift 迁移 + migration_lock.toml，两端 migrate status 均绿，全新库回放验证通过 |
+| WU-DEPLOY-VPS | P0 | 20m | 1 | DONE | 推送 main 触发 GitHub Actions 部署（pre-deploy lint/tsc/vitest/build 全绿）；VPS 更新到最新提交、pm2 重启、线上 /login 200、API 中文鉴权响应、EXP260008/009 数据/附件落库核对通过 |
