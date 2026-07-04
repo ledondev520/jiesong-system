@@ -34,6 +34,7 @@
 | api-contracts/库存链路契约.md | 领域契约 | 定义库存查询、状态机与批量状态更新接口契约 |
 | api-contracts/库存链路联调面板.md | 联调台账 | 跟踪库存链路 READY/BLOCKED/DONE 与阻塞解除 |
 | quality/README.md | 子目录索引 | 维护质量门禁与发布结论文档导航 |
+| wps-import/README.md | 子目录索引 | WPS 增量导入源文件归档（按月），供幂等导入脚本在本地/VPS 使用 |
 | quality/发布结论_M5_20260212.md | 发布报告 | 记录 M5 门禁证据、风险评估与 Go/No-Go 结论 |
 | 周节奏指标看板.md | 指标看板 | 追踪每周质量/效率/回归率并给出迭代建议 |
 
