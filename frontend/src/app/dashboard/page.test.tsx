@@ -109,6 +109,28 @@ describe('DashboardPage 交互逻辑', () => {
     expect(screen.queryByText('仓储物流')).not.toBeInTheDocument();
     expect(screen.getByText('库存记录')).toBeInTheDocument();
     expect(screen.getByText('近期待办')).toBeInTheDocument();
+    expect(screen.getByText('出口全流程')).toBeInTheDocument();
+  });
+
+  it('全流程导航条按步骤跳转对应模块', async () => {
+    const user = userEvent.setup();
+    render(<DashboardPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('出口全流程')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /采购签约/ }));
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/purchase');
+
+    await user.click(screen.getByRole('button', { name: /排柜出货/ }));
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/sales');
+
+    await user.click(screen.getByRole('button', { name: /出口退税/ }));
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/tax-refunds');
+
+    await user.click(screen.getByRole('button', { name: /财务分析/ }));
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/finance');
   });
 
   it('点击快速动作跳转到对应路径', async () => {

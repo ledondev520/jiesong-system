@@ -1,7 +1,7 @@
 /**
- * Input: 后端 dashboard API、采购/出口列表、当前用户
- * Output: 经营中台工作台首页（跨业务指标、待办与快速动作）
- * Pos: 经营中台首页，作为业务执行摘要而不是重复模块入口
+ * Input: 后端 dashboard API、采购/出口列表、当前用户、ExportFlowNav（出口全流程导航）
+ * Output: 经营中台工作台首页（出口全流程导航条、跨业务指标、待办与快速动作）
+ * Pos: 经营中台首页，作为业务执行摘要与全流程入口，而不是重复模块入口
  */
 
 'use client';
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, OPERATIONS_TABS } from '@/components/layout/ModuleTabHeader';
+import { ExportFlowNav } from '@/components/dashboard/ExportFlowNav';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PurchaseStatus, SalesContract, SalesStatus } from '@/types';
@@ -145,6 +146,8 @@ export default function DashboardPage() {
         description="集中查看采购、出口、库存与资金的关键待办。"
         showBack={false}
       />
+
+      <ExportFlowNav />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="经营指标">
         {indicators.map((item) => (
