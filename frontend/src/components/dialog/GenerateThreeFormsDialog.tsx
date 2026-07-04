@@ -1,17 +1,18 @@
 /**
- * Input: 出口合同 ID 及其装箱明细（含商品档案中已存储的 hsCode）
- * Output: 一键生成三张表（报关单、外汇核销、出口退税）
+ * Input: 出口合同 ID 及其装箱明细（含商品档案中已存储的 hsCode）、HS 编码库（退税率查询）
+ * Output: 一键生成三张表（报关单、外汇核销、出口退税），并对退税率为 0 的商品给出「无退税」警示
  * Pos: 出口合同详情页操作组件
  *
  * 设计原则：HS 编码应维护在商品档案（Product.hsCode）中，此处直接复用；
  * 对于缺失 HS 编码的商品，允许在表格内内联输入或点击"AI 建议"填充。
+ * 打开对话框时自动查询各行 HS 编码的退税率，refundRate === 0 视为无出口退税，红色警示。
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -136,6 +137,49 @@ export function GenerateThreeFormsDialog({
   // 当前有效行统计
   const readyCount = displayRows.filter((r) => r.hsCode.trim()).length;
   const missingCount = displayRows.length - readyCount;
+  // 无出口退税商品（退税率明确为 0）：需要警示，出口后无法退税
+  const noRefundRows = displayRows.filter((r) => r.refundRate === 0);
+
+  // 打开对话框时，为已有 HS 编码但退税率未知的行查询退税率（用于无退税警示）
+  useEffect(() => {
+    if (!open) return;
+    const pending = (rows.length > 0 ? rows : initialRows)
+      .map((row, index) => ({ row, index }))
+      .filter(({ row }) => !!row?.packingItem && row.hsCode.trim() && row.refundRate == null);
+    if (pending.length === 0) return;
+
+    let cancelled = false;
+    const lookup = async () => {
+      // 1. 去重后逐码查询 HS 库（404/异常视为未知，不标警示）
+      const uniqueCodes = Array.from(new Set(pending.map(({ row }) => row.hsCode.trim())));
+      const rateMap = new Map<string, number | null>();
+      await Promise.all(
+        uniqueCodes.map(async (code) => {
+          try {
+            const res = await hsCodeService.getByCode(code);
+            rateMap.set(code, typeof res.data?.refundRate === 'number' ? res.data.refundRate : null);
+          } catch {
+            rateMap.set(code, null);
+          }
+        }),
+      );
+      if (cancelled) return;
+      // 2. 回填各行退税率
+      setRows((prev) => {
+        const base = prev.length > 0 ? prev : initialRows;
+        return base.map((row) => {
+          if (!row?.packingItem || !row.hsCode.trim() || row.refundRate != null) return row;
+          const rate = rateMap.get(row.hsCode.trim());
+          return rate === undefined ? row : { ...row, refundRate: rate };
+        });
+      });
+    };
+    void lookup();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialRows]);
 
   /**
    * 获取当前可操作的行列表：rows 有值时用 rows，否则用 initialRows 初始化
@@ -392,6 +436,22 @@ export function GenerateThreeFormsDialog({
             </Card>
           )}
 
+          {/* 警示：无出口退税商品（退税率为 0） */}
+          {noRefundRows.length > 0 && (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="py-2 px-4">
+                <div className="flex items-start gap-2 text-sm text-red-700">
+                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <p>
+                    <strong>{noRefundRows.length} 个商品无出口退税</strong>
+                    （退税率 0%）：{noRefundRows.map((r) => r.productName).join('、')}。
+                    该部分货值无法申请退税，请在报价与成本核算时留意。
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* 商品 HS 编码确认表格 */}
           <div className="border rounded-lg overflow-hidden">
             <Table>
@@ -408,7 +468,10 @@ export function GenerateThreeFormsDialog({
               </TableHeader>
               <TableBody>
                 {displayRows.map((row, index) => !row.packingItem ? null : (
-                  <TableRow key={row.packingItem.id} className={!row.hsCode.trim() ? 'bg-red-50' : ''}>
+                  <TableRow
+                    key={row.packingItem.id}
+                    className={!row.hsCode.trim() ? 'bg-red-50' : row.refundRate === 0 ? 'bg-amber-50/70' : ''}
+                  >
                     <TableCell className="font-medium max-w-[160px] truncate" title={row.productName}>
                       {row.productName}
                     </TableCell>
@@ -440,11 +503,16 @@ export function GenerateThreeFormsDialog({
                       <SourceBadge source={row.source} />
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {row.refundRate !== null && row.refundRate !== undefined
-                        ? `${row.refundRate}%`
-                        : row.source === 'stored'
-                          ? <span className="text-xs">—</span>
-                          : <span className="text-xs text-muted-foreground">—</span>}
+                      {row.refundRate === 0 ? (
+                        <span className="inline-flex items-center gap-1 font-medium text-red-600">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          0%（无退税）
+                        </span>
+                      ) : row.refundRate !== null && row.refundRate !== undefined ? (
+                        `${row.refundRate}%`
+                      ) : (
+                        <span className="text-xs">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {row.source !== 'stored' && (

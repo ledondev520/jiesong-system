@@ -98,7 +98,7 @@ test('exportSalesContractExcel: 附带税务测算 sheet', async () => {
 
     assert.deepEqual(
       workbook.worksheets.map((sheet) => sheet.name),
-      ['合同信息', '商品明细', '装箱清单', '税务测算'],
+      ['合同信息', '商品明细', '装箱清单', '商业发票', '税务测算'],
     );
     const taxSheet = workbook.getWorksheet('税务测算');
     assert.equal(taxSheet.getCell('A2').value, '合同编号');
@@ -107,6 +107,15 @@ test('exportSalesContractExcel: 附带税务测算 sheet', async () => {
     assert.equal(taxSheet.getCell('B6').value, 86.02);
     assert.equal(taxSheet.getCell('A9').value, '苹果');
     assert.equal(taxSheet.getCell('B9').value, '0808100000');
+
+    // 商业发票 Sheet：头两行为发票号/日期，第4行起为明细，末行为 TOTAL
+    const invoiceSheet = workbook.getWorksheet('商业发票');
+    assert.equal(invoiceSheet.getCell('B2').value, 'Invoice No.: EXP-0010');
+    assert.equal(invoiceSheet.getCell('B4').value, '苹果');
+    assert.equal(invoiceSheet.getCell('C4').value, '0808100000');
+    assert.equal(invoiceSheet.getCell('G4').value, 150);
+    assert.equal(invoiceSheet.getCell('B5').value, 'TOTAL');
+    assert.equal(invoiceSheet.getCell('G5').value, 150);
   } finally {
     prisma.salesContract.findUnique = originalFindUnique;
   }

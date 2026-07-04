@@ -1,7 +1,7 @@
 /**
  * Input: Prisma客户端、数据库数据
  * Output: CSV/Excel格式的导出数据
- * Pos: 数据导出服务，生成各种格式的导出文件（含销售合同三 Sheet Excel 标准出口模板）
+ * Pos: 数据导出服务，生成各种格式的导出文件（含销售合同五 Sheet Excel 标准出口模板：合同信息/商品明细/装箱清单/商业发票/税务测算）
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -324,14 +324,15 @@ const applyHeaderStyle = (worksheet) => {
 };
 
 /**
- * 职责：生成单份销售合同的标准出口 Excel（合同信息 + 商品明细 + 装箱清单 + 税务测算）
+ * 职责：生成单份销售合同的标准出口 Excel（合同信息 + 商品明细 + 装箱清单 + 商业发票 + 税务测算）
  * 思路：
  *   1. 查询销售合同及其关联的销售明细（items）与装箱明细（packingItems）
  *   2. Sheet 1 输出合同基本信息（键值对形式）
  *   3. Sheet 2 输出商品明细列表（每行一个明细条目）
  *   4. Sheet 3 输出装箱清单（Packing List）
- *   5. Sheet 4 输出税务测算摘要与逐行退税结果
- *   6. 写入 Buffer 返回，供路由层设置响应头并下载
+ *   5. Sheet 4 输出商业发票（Commercial Invoice，价格与装箱清单同口径 USD）
+ *   6. Sheet 5 输出税务测算摘要与逐行退税结果
+ *   7. 写入 Buffer 返回，供路由层设置响应头并下载
  * @param {string} contractId - 销售合同 ID
  * @returns {{ buffer: Buffer, filename: string }}
  */
@@ -483,7 +484,63 @@ const exportSalesContractExcel = async (contractId) => {
     sheet3.addRow({ index: '-', containerNo: contract.contractNo, productName: '（暂无装箱明细）' });
   }
 
-  // ==================== Sheet 4: 税务测算 ====================
+  // ==================== Sheet 4: 商业发票（Commercial Invoice） ====================
+  // 价格口径与装箱清单一致（USD 单价/总价），无装箱价格时回退到销售明细售价
+  const sheetInvoice = workbook.addWorksheet('商业发票');
+  sheetInvoice.columns = [
+    { header: '序号', key: 'index', width: 8 },
+    { header: '品名（报关）', key: 'productName', width: 30 },
+    { header: 'HS编码', key: 'hsCode', width: 16 },
+    { header: '数量', key: 'quantity', width: 10 },
+    { header: '单位', key: 'unit', width: 8 },
+    { header: '单价 (USD)', key: 'unitPrice', width: 14 },
+    { header: '金额 (USD)', key: 'amount', width: 14 },
+    { header: '备注', key: 'note', width: 24 },
+  ];
+  applyHeaderStyle(sheetInvoice);
+
+  // 1. 发票头信息（Invoice No. / Date / 目的港）
+  sheetInvoice.addRow({ index: '', productName: `Invoice No.: ${contract.contractNo}`, hsCode: '', quantity: '', unit: '', unitPrice: '', amount: '', note: '' });
+  sheetInvoice.addRow({ index: '', productName: `Date: ${contract.signedAt ? formatDate(contract.signedAt) : formatDate()}`, hsCode: '', quantity: '', unit: '', unitPrice: '', amount: '', note: `目的港: ${contract.port?.name || '-'}` });
+
+  // 2. 逐行输出发票明细（优先装箱明细，缺价格回退销售明细售价）
+  const invoiceSource = contract.packingItems.length > 0 ? contract.packingItems : contract.items;
+  let invoiceTotal = 0;
+  invoiceSource.forEach((item, idx) => {
+    const quantity = Number(item.quantity) || 0;
+    const unitPrice = Number(item.unitPrice ?? item.sellingPrice) || 0;
+    const amount = Number(item.totalPrice) || quantity * unitPrice;
+    invoiceTotal += amount;
+    sheetInvoice.addRow({
+      index: idx + 1,
+      productName: item.product?.customsName || '-',
+      hsCode: item.product?.hsCode || '',
+      quantity,
+      unit: item.unit || item.product?.unit || '-',
+      unitPrice,
+      amount: Math.round(amount * 100) / 100,
+      note: item.note || '',
+    });
+  });
+
+  if (invoiceSource.length === 0) {
+    sheetInvoice.addRow({ index: '-', productName: '（暂无发票明细，请先补充装箱/销售明细）' });
+  } else {
+    // 3. 合计行（与合同金额对照，便于核对定价口径）
+    const totalRow = sheetInvoice.addRow({
+      index: '',
+      productName: 'TOTAL',
+      hsCode: '',
+      quantity: '',
+      unit: '',
+      unitPrice: '',
+      amount: Math.round(invoiceTotal * 100) / 100,
+      note: `合同金额 $${contract.totalAmount.toFixed(2)}${Math.abs(invoiceTotal - contract.totalAmount) > 0.01 ? '（与明细合计存在差异，请核对）' : ''}`,
+    });
+    totalRow.font = { bold: true };
+  }
+
+  // ==================== Sheet 5: 税务测算 ====================
   const taxResult = calculateTaxSummary(contract);
   const sheet4 = workbook.addWorksheet('税务测算');
   sheet4.columns = [
