@@ -7,7 +7,14 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { CONTAINER_40HQ, generateColor, inferBoxDimensions, mmToM, packBoxes } from './binPacking';
+import {
+  CONTAINER_40HQ,
+  evaluateShippingReadiness,
+  generateColor,
+  inferBoxDimensions,
+  mmToM,
+  packBoxes,
+} from './binPacking';
 
 describe('binPacking', () => {
   it('packBoxes: 可放置箱子时返回 placed 结果与利用率', () => {
@@ -97,5 +104,44 @@ describe('inferBoxDimensions', () => {
     // length 应约为 width 的 1.2 倍，height 约为 0.8 倍（允许1mm舍入误差）
     expect(dims.length / dims.width).toBeCloseTo(1.2, 0);
     expect(dims.height / dims.width).toBeCloseTo(0.8, 0);
+  });
+});
+
+describe('evaluateShippingReadiness', () => {
+  it('毛重达到 22t 的 80%（17.6t）即可出柜', () => {
+    const r = evaluateShippingReadiness(17600, 10);
+    expect(r.weightPct).toBe(80);
+    expect(r.ready).toBe(true);
+    expect(r.reachedBy).toBe('weight');
+  });
+
+  it('体积达到 68CBM 的 80%（54.4）即可出柜', () => {
+    const r = evaluateShippingReadiness(1000, 54.4);
+    expect(r.volumePct).toBe(80);
+    expect(r.ready).toBe(true);
+    expect(r.reachedBy).toBe('volume');
+  });
+
+  it('双指标均达标时 reachedBy 为 both', () => {
+    const r = evaluateShippingReadiness(22000, 68);
+    expect(r.weightPct).toBe(100);
+    expect(r.volumePct).toBe(100);
+    expect(r.ready).toBe(true);
+    expect(r.reachedBy).toBe('both');
+  });
+
+  it('双指标均未达 80% 时不可出柜', () => {
+    const r = evaluateShippingReadiness(11000, 34);
+    expect(r.weightPct).toBe(50);
+    expect(r.volumePct).toBe(50);
+    expect(r.ready).toBe(false);
+    expect(r.reachedBy).toBe('none');
+  });
+
+  it('空值/0 安全处理', () => {
+    const r = evaluateShippingReadiness(0, 0);
+    expect(r.weightPct).toBe(0);
+    expect(r.volumePct).toBe(0);
+    expect(r.ready).toBe(false);
   });
 });

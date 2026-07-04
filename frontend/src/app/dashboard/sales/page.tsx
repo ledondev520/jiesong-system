@@ -1,7 +1,7 @@
 /**
- * Input: 出口合同服务 (salesService)、通用表格排序 hook
- * Output: 出口合同列表页面（含删除、列排序、分页与搜索）
- * Pos: 出口合同管理入口，展示合同列表、货柜信息，支持删除操作
+ * Input: 出口合同服务 (salesService)、binPacking（出柜双80%判定）、通用表格排序 hook
+ * Output: 出口合同列表页面（含删除、列排序、分页与搜索、出柜条件徽章）
+ * Pos: 出口合同管理入口，展示合同列表、货柜信息与出柜双80%指标，支持删除操作
  *
  * 2026-01-26 新增：管理员可删除出口合同（带确认对话框）
  * 2026-06-07 改造：物流进度可视化、货柜信息、金额列优化、状态图标化
@@ -14,6 +14,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { SalesContract, SalesStatus } from '@/types';
 import { salesService } from '@/services/sales.service';
+import { evaluateShippingReadiness } from '@/lib/binPacking';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { useTabSync } from '@/lib/tab-sync';
 import { Button } from '@/components/ui/button';
@@ -399,10 +400,16 @@ export default function SalesPage() {
   };
 
   /**
-   * 职责：渲染货柜信息
+   * 职责：渲染货柜信息（含出柜双80%指标徽章）
+   * 思路：毛重(22t)/体积(68CBM)任一利用率 ≥ 80% 显示「可出柜」，仅装箱前状态显示未达标提示
    */
   const ContainerInfo = ({ contract }: { contract: SalesContract }) => {
     if (!contract.totalBoxes && !contract.volume && !contract.grossWeight) return null;
+    const readiness = evaluateShippingReadiness(contract.grossWeight || 0, contract.volume || 0);
+    const beforeShipment =
+      contract.status === SalesStatus.DRAFT ||
+      contract.status === SalesStatus.CONFIRMED ||
+      contract.status === SalesStatus.PACKING;
     return (
       <div className="flex items-center gap-3 rounded-lg bg-muted/40 px-3 py-2">
         <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10">
@@ -412,6 +419,20 @@ export default function SalesPage() {
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-medium truncate">{contract.contractNo}</span>
             <span className="text-[10px] text-muted-foreground">40HQ</span>
+            {beforeShipment && (
+              readiness.ready ? (
+                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-px text-[10px] font-medium text-emerald-700">
+                  可出柜
+                </span>
+              ) : (
+                <span
+                  className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700"
+                  title={`毛重 ${readiness.weightPct.toFixed(0)}% / 体积 ${readiness.volumePct.toFixed(0)}%，任一 ≥ 80% 可出柜`}
+                >
+                  {Math.max(readiness.weightPct, readiness.volumePct).toFixed(0)}% 未达80%
+                </span>
+              )
+            )}
           </div>
           <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
             {contract.totalBoxes ? <span>{contract.totalBoxes} 箱</span> : null}

@@ -1,7 +1,7 @@
 /**
- * Input: 出口合同详情API、商品API、SortableTableHead、useTableSort
- * Output: 出口合同详情页面（含可排序装箱明细、3D可视化、源文件附件、物流时间线、货柜详情、报关信息、收款记录）
- * Pos: 出口管理子页面，展示合同详情与装箱可视化
+ * Input: 出口合同详情API、商品API、binPacking（出柜双80%判定）、SortableTableHead、useTableSort
+ * Output: 出口合同详情页面（出柜条件横幅、可排序装箱明细、3D可视化、源文件附件、物流时间线、货柜详情、报关信息、收款记录）
+ * Pos: 出口管理子页面，展示合同详情、装箱可视化与出柜条件判定
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -53,7 +53,7 @@ import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Progress } from '@/components/ui/progress';
 import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, Container, Anchor, Truck, CheckCircle2, CircleDashed, CircleDot, Clock, ArrowRight, DollarSign, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
-import { CONTAINER_40HQ } from '@/lib/binPacking';
+import { CONTAINER_40HQ, SHIPPING_READY_THRESHOLD_PCT, evaluateShippingReadiness } from '@/lib/binPacking';
 import { formatDate } from '@/lib/date-format';
 import { PageHeader } from '@/components/layout/PageHeader';
 import ContractFiles from '@/components/contract/ContractFiles';
@@ -598,6 +598,9 @@ export default function SalesDetailPage({ params }: PageProps) {
   const usedCBM = volumeUsed;
   const cbmPercent = Math.min((usedCBM / maxCBM) * 100, 100);
 
+  // 出柜条件：毛重(22t)或体积(68CBM)任一利用率 ≥ 80%
+  const readiness = evaluateShippingReadiness(weightUsed, usedCBM);
+
   const currentStepIndex = STATUS_ORDER[contract.status] ?? 0;
 
   return (
@@ -625,6 +628,45 @@ export default function SalesDetailPage({ params }: PageProps) {
             </div>
           }
         />
+      </div>
+
+      {/* 出柜条件（双80%指标）：毛重 22t / 体积 68CBM 任一 ≥ 80% 即可出柜 */}
+      <div
+        className={
+          readiness.ready
+            ? 'flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-900 dark:bg-emerald-950/40'
+            : 'flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/40'
+        }
+      >
+        <div className="flex items-center gap-2">
+          {readiness.ready ? (
+            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+          ) : (
+            <CircleDashed className="h-5 w-5 text-amber-600" />
+          )}
+          <span className={readiness.ready ? 'text-sm font-semibold text-emerald-700 dark:text-emerald-400' : 'text-sm font-semibold text-amber-700 dark:text-amber-400'}>
+            {readiness.ready ? '满足出柜条件' : '未达出柜标准'}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            （毛重或体积任一利用率 ≥ {SHIPPING_READY_THRESHOLD_PCT}%）
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <Weight className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-muted-foreground">毛重利用率</span>
+          <span className={readiness.weightPct >= SHIPPING_READY_THRESHOLD_PCT ? 'font-semibold tabular-nums text-emerald-700 dark:text-emerald-400' : 'font-semibold tabular-nums'}>
+            {readiness.weightPct.toFixed(1)}%
+          </span>
+          <span className="text-muted-foreground">/ {CONTAINER_40HQ.maxWeight / 1000}t</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <Boxes className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-muted-foreground">体积利用率</span>
+          <span className={readiness.volumePct >= SHIPPING_READY_THRESHOLD_PCT ? 'font-semibold tabular-nums text-emerald-700 dark:text-emerald-400' : 'font-semibold tabular-nums'}>
+            {readiness.volumePct.toFixed(1)}%
+          </span>
+          <span className="text-muted-foreground">/ {CONTAINER_40HQ.maxVolume} CBM</span>
+        </div>
       </div>
 
       {/* 容量概览 */}

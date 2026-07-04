@@ -1,7 +1,7 @@
 /**
- * Input: 箱子尺寸列表、货柜尺寸
- * Output: 每个箱子在货柜中的3D位置；支持从体积自动推算尺寸
- * Pos: 工具库，实现3D装箱算法（底部优先堆叠）+ 尺寸推算工具函数
+ * Input: 箱子尺寸列表、货柜尺寸、合同毛重/体积汇总
+ * Output: 每个箱子在货柜中的3D位置；支持从体积自动推算尺寸；出柜条件（双80%）判定
+ * Pos: 工具库，实现3D装箱算法（底部优先堆叠）+ 尺寸推算 + 出柜指标判定
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -12,8 +12,45 @@ export const CONTAINER_40HQ = {
   width: 2350,    // 宽度 (mm) - 内径
   height: 2690,   // 高度 (mm) - 内径
   maxVolume: 68,  // 厂家建议最大装载体积 (CBM)
-  maxWeight: 22500, // 厂家建议最大毛重 (kg) = 22.5吨
+  maxWeight: 22000, // 厂家建议最大毛重 (kg) = 22吨
 };
+
+// 出柜条件阈值：毛重或体积任一利用率 ≥ 80% 即可出柜
+export const SHIPPING_READY_THRESHOLD_PCT = 80;
+
+/** 出柜条件判定结果 */
+export interface ShippingReadiness {
+  /** 毛重利用率（%，相对 22t，不封顶） */
+  weightPct: number;
+  /** 体积利用率（%，相对 68 CBM，不封顶） */
+  volumePct: number;
+  /** 是否满足出柜条件（任一指标 ≥ 80%） */
+  ready: boolean;
+  /** 达标途径：weight/volume/both/none */
+  reachedBy: 'weight' | 'volume' | 'both' | 'none';
+}
+
+/**
+ * 职责：判定货柜是否满足出柜条件（双 80% 标准）
+ * 思路：
+ *   1. 分别计算毛重（/22t）与体积（/68CBM）利用率
+ *   2. 任一 ≥ 80% 即视为可出柜
+ * @param grossWeightKg 合同总毛重（kg）
+ * @param volumeCbm 合同总体积（CBM）
+ * @returns 双指标利用率与判定结果
+ */
+export function evaluateShippingReadiness(grossWeightKg: number, volumeCbm: number): ShippingReadiness {
+  const weightPct = Math.round(((grossWeightKg || 0) / CONTAINER_40HQ.maxWeight) * 1000) / 10;
+  const volumePct = Math.round(((volumeCbm || 0) / CONTAINER_40HQ.maxVolume) * 1000) / 10;
+  const weightOk = weightPct >= SHIPPING_READY_THRESHOLD_PCT;
+  const volumeOk = volumePct >= SHIPPING_READY_THRESHOLD_PCT;
+  return {
+    weightPct,
+    volumePct,
+    ready: weightOk || volumeOk,
+    reachedBy: weightOk && volumeOk ? 'both' : weightOk ? 'weight' : volumeOk ? 'volume' : 'none',
+  };
+}
 
 // 箱子接口
 export interface Box {
