@@ -124,7 +124,7 @@ export function AgentAccountDialog({
                 name="slug"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Slug</FormLabel>
+                    <FormLabel>唯一标识（Slug）</FormLabel>
                     <FormControl>
                       <Input placeholder="例如：purchase-bot" {...field} />
                     </FormControl>

@@ -189,7 +189,11 @@ api.interceptors.response.use(
       }
       return Promise.reject(error.response.data);
     }
-    return Promise.reject(error);
+    // 无响应（超时/断网）时 axios 的 message 是英文，统一转成中文提示
+    const isTimeout = error.code === 'ECONNABORTED' || /timeout/i.test(String(error.message || ''));
+    const friendly = new Error(isTimeout ? '请求超时，请稍后重试' : '网络连接失败，请检查网络后重试');
+    friendly.name = error.name || 'NetworkError';
+    return Promise.reject(friendly);
   }
 );
 

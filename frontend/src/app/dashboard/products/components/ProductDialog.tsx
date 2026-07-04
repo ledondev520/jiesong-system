@@ -295,7 +295,7 @@ export function ProductDialog({
               <div className="col-span-2 rounded-xl border border-border/70 bg-muted/30 p-4">
                 <div className="space-y-3">
                   <div>
-                    <p className="text-sm font-medium">HSCode 智能匹配</p>
+                    <p className="text-sm font-medium">HS 编码智能匹配</p>
                     <p className="text-xs text-muted-foreground">
                       基于报关名称自动推荐编码，也可点击按钮立即发起匹配。
                     </p>

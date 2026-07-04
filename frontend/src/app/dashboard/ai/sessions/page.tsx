@@ -175,21 +175,21 @@ const getPendingActionPriority = (items?: AiPendingActionSummary[]) => {
 const getSessionSlaLevel = (items?: AiPendingActionSummary[]) => {
   if (hasFailedPendingAction(items)) {
     return {
-      label: 'SLA P1',
+      label: '有失败动作·急',
       variant: 'destructive' as const,
       emphasis: 'danger' as const,
     };
   }
   if (hasPendingPendingAction(items)) {
     return {
-      label: 'SLA P2',
+      label: '有待确认动作',
       variant: 'outline' as const,
       emphasis: 'primary' as const,
     };
   }
   if ((items || []).length > 0) {
     return {
-      label: 'SLA P3',
+      label: '动作已完成',
       variant: 'secondary' as const,
       emphasis: 'success' as const,
     };

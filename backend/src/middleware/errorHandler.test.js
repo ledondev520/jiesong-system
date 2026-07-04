@@ -79,6 +79,53 @@ test('errorHandler: 开发环境包含堆栈信息', () => {
   process.env.NODE_ENV = originalEnv;
 });
 
+test('errorHandler: 英文技术错误转为通用中文提示', () => {
+  const originalConsole = console.error;
+  console.error = () => {};
+
+  // 500 英文错误 → 通用服务器错误提示
+  const res500 = createMockResponse();
+  errorHandler(new Error("Cannot read properties of undefined (reading 'id')"), {}, res500, () => {});
+  assert.equal(res500.payload.message, '服务器内部错误，请稍后重试');
+
+  // 400 英文错误 → 通用请求失败提示
+  const res400 = createMockResponse();
+  errorHandler(createError('Invalid input', 400), {}, res400, () => {});
+  assert.equal(res400.payload.message, '请求处理失败，请检查输入后重试');
+
+  console.error = originalConsole;
+});
+
+test('errorHandler: 已知错误族映射为具体中文提示', () => {
+  const originalConsole = console.error;
+  console.error = () => {};
+
+  // Prisma 唯一性冲突
+  const prismaError = new Error('Unique constraint failed on the fields: (`contractNo`)');
+  prismaError.code = 'P2002';
+  const resPrisma = createMockResponse();
+  errorHandler(prismaError, {}, resPrisma, () => {});
+  assert.match(resPrisma.payload.message, /唯一性冲突/);
+
+  // Multer 文件过大
+  const multerError = new Error('File too large');
+  multerError.code = 'LIMIT_FILE_SIZE';
+  multerError.statusCode = 400;
+  const resMulter = createMockResponse();
+  errorHandler(multerError, {}, resMulter, () => {});
+  assert.match(resMulter.payload.message, /文件大小超出限制/);
+
+  // JWT 过期
+  const jwtError = new Error('jwt expired');
+  jwtError.name = 'TokenExpiredError';
+  jwtError.statusCode = 401;
+  const resJwt = createMockResponse();
+  errorHandler(jwtError, {}, resJwt, () => {});
+  assert.match(resJwt.payload.message, /登录已过期/);
+
+  console.error = originalConsole;
+});
+
 test('errorHandler: 生产环境不暴露堆栈信息', () => {
   const originalEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = 'production';

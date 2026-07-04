@@ -486,7 +486,7 @@ function HsCodesPageContent() {
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-1">HSCode</h3>
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">HS 编码</h3>
                 <p className="text-lg font-semibold">{selectedRecord.hsCode}</p>
               </div>
               <div>

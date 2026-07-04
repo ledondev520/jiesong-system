@@ -562,9 +562,9 @@ describe('AiSessionsPage', () => {
       expect(screen.getByText('超时失败 1')).toBeInTheDocument();
       expect(screen.getByText('超时待确认 1')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '处理失败动作' })).toBeInTheDocument();
-      expect(screen.getAllByText('SLA P1').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('SLA P2').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('SLA P3').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('有失败动作·急').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('有待确认动作').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('动作已完成').length).toBeGreaterThan(0);
       expect(screen.getAllByText('需立即处理').length).toBeGreaterThan(0);
       expect(screen.getAllByText('待人工确认').length).toBeGreaterThan(0);
       expect(screen.getAllByText('已闭环').length).toBeGreaterThan(0);

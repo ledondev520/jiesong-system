@@ -25,7 +25,7 @@ export function DatePicker({
   date,
   setDate,
   className,
-  placeholder = "Pick a date",
+  placeholder = "选择日期",
   triggerProps,
 }: DatePickerProps) {
   return (

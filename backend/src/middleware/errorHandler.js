@@ -18,10 +18,62 @@ const notFoundHandler = (req, res, next) => {
   next(error);
 };
 
+// 已知技术错误 → 中文提示映射（Prisma / Multer / JWT / JSON 解析）
+const PRISMA_ERROR_MESSAGES = {
+  P2002: '数据已存在（唯一性冲突），请勿重复提交',
+  P2003: '存在关联数据，无法执行该操作',
+  P2025: '记录不存在或已被删除',
+};
+
+const MULTER_ERROR_MESSAGES = {
+  LIMIT_FILE_SIZE: '文件大小超出限制，请压缩后重试',
+  LIMIT_FILE_COUNT: '文件数量超出限制',
+  LIMIT_UNEXPECTED_FILE: '上传字段不符合要求',
+};
+
+/**
+ * 职责：判断消息是否包含中文（业务错误均为中文文案）
+ * @param {string} message - 错误消息
+ * @returns {boolean}
+ */
+const hasChinese = (message) => /[\u4e00-\u9fff]/.test(String(message || ''));
+
+/**
+ * 职责：将技术类英文错误转换为用户可读的中文提示
+ * 思路：
+ *   1. 命中已知错误族（Prisma 错误码 / Multer 错误码 / JWT / JSON 解析）→ 使用对应中文
+ *   2. 消息已含中文（业务错误）→ 原样返回
+ *   3. 其余英文技术错误 → 按状态码返回通用中文，原始消息只进日志
+ * @param {Error} err - 错误对象
+ * @param {number} statusCode - HTTP 状态码
+ * @returns {string} 中文错误消息
+ */
+const toClientMessage = (err, statusCode) => {
+  if (err?.code && PRISMA_ERROR_MESSAGES[err.code]) {
+    return PRISMA_ERROR_MESSAGES[err.code];
+  }
+  if (err?.code && MULTER_ERROR_MESSAGES[err.code]) {
+    return MULTER_ERROR_MESSAGES[err.code];
+  }
+  if (err?.name === 'TokenExpiredError') {
+    return '登录已过期，请重新登录';
+  }
+  if (err?.name === 'JsonWebTokenError') {
+    return '登录凭证无效，请重新登录';
+  }
+  if (err instanceof SyntaxError && 'body' in err) {
+    return '请求格式错误（JSON 解析失败）';
+  }
+  if (hasChinese(err?.message)) {
+    return err.message;
+  }
+  return statusCode >= 500 ? '服务器内部错误，请稍后重试' : '请求处理失败，请检查输入后重试';
+};
+
 /**
  * 职责：统一处理所有错误，返回标准格式响应
  * 思路：
- * 1. 提取错误状态码和消息
+ * 1. 提取错误状态码，将英文技术错误转换为中文提示
  * 2. 开发环境返回详细堆栈信息
  * 3. 生产环境隐藏敏感信息
  * @param {Error} err - 错误对象
@@ -33,10 +85,10 @@ const errorHandler = (err, req, res, next) => {
   // 1. 确定状态码
   const statusCode = err.statusCode || 500;
   
-  // 2. 构建响应对象
+  // 2. 构建响应对象（统一输出中文提示，原始英文消息只进日志）
   const response = {
     code: statusCode,
-    message: err.message || '服务器内部错误',
+    message: toClientMessage(err, statusCode),
     data: null,
   };
   

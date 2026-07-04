@@ -322,7 +322,7 @@ export function ClaudeCostCalculator() {
         {/* 手动输入区域 */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="cacheRead">Cache Read</Label>
+            <Label htmlFor="cacheRead">缓存读取（Cache Read）</Label>
             <Input
               id="cacheRead"
               type="text"
@@ -332,7 +332,7 @@ export function ClaudeCostCalculator() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="cacheWrite">Cache Write</Label>
+            <Label htmlFor="cacheWrite">缓存写入（Cache Write）</Label>
             <Input
               id="cacheWrite"
               type="text"
@@ -342,7 +342,7 @@ export function ClaudeCostCalculator() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="input">Input</Label>
+            <Label htmlFor="input">输入（Input）</Label>
             <Input
               id="input"
               type="text"
@@ -352,7 +352,7 @@ export function ClaudeCostCalculator() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="output">Output</Label>
+            <Label htmlFor="output">输出（Output）</Label>
             <Input
               id="output"
               type="text"
@@ -367,10 +367,10 @@ export function ClaudeCostCalculator() {
         <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded">
           <p className="font-medium mb-1">费率（每百万 token）：</p>
           <div className="grid grid-cols-2 gap-1">
-            <span>Input: ${RATES.input}</span>
-            <span>Output: ${RATES.output}</span>
-            <span>Cache Read: ${RATES.cacheRead}</span>
-            <span>Cache Write: ${RATES.cacheWrite}</span>
+            <span>输入: ${RATES.input}</span>
+            <span>输出: ${RATES.output}</span>
+            <span>缓存读取: ${RATES.cacheRead}</span>
+            <span>缓存写入: ${RATES.cacheWrite}</span>
           </div>
         </div>
 
@@ -382,19 +382,19 @@ export function ClaudeCostCalculator() {
           </h4>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Cache Read:</span>
+              <span className="text-muted-foreground">缓存读取:</span>
               <span>{formatCurrency(costs.cacheRead)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Cache Write:</span>
+              <span className="text-muted-foreground">缓存写入:</span>
               <span>{formatCurrency(costs.cacheWrite)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Input:</span>
+              <span className="text-muted-foreground">输入:</span>
               <span>{formatCurrency(costs.input)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Output:</span>
+              <span className="text-muted-foreground">输出:</span>
               <span>{formatCurrency(costs.output)}</span>
             </div>
           </div>

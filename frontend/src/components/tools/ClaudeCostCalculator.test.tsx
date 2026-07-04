@@ -63,10 +63,10 @@ describe('ClaudeCostCalculator', () => {
     render(<ClaudeCostCalculator />);
 
     // 使用 change 直接赋值，避免覆盖率模式下逐字符输入引发偶发超时
-    fireEvent.change(screen.getByLabelText('Cache Read'), { target: { value: '1000000' } });
-    fireEvent.change(screen.getByLabelText('Cache Write'), { target: { value: '1000000' } });
-    fireEvent.change(screen.getByLabelText('Input'), { target: { value: '1000000' } });
-    fireEvent.change(screen.getByLabelText('Output'), { target: { value: '1000000' } });
+    fireEvent.change(screen.getByLabelText('缓存读取（Cache Read）'), { target: { value: '1000000' } });
+    fireEvent.change(screen.getByLabelText('缓存写入（Cache Write）'), { target: { value: '1000000' } });
+    fireEvent.change(screen.getByLabelText('输入（Input）'), { target: { value: '1000000' } });
+    fireEvent.change(screen.getByLabelText('输出（Output）'), { target: { value: '1000000' } });
 
     expect(screen.getByText('总 token 数: 4,000,000')).toBeInTheDocument();
     expect(screen.getByText('$31.75')).toBeInTheDocument();

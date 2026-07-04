@@ -478,7 +478,7 @@ export function AIAssistant() {
       }
 
       const reader = resp.body?.getReader();
-      if (!reader) throw new Error('No stream body');
+      if (!reader) throw new Error('AI 响应流读取失败，请重试');
 
       const decoder = new TextDecoder();
       let buffer = '';

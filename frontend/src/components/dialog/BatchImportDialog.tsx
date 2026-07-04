@@ -109,7 +109,7 @@ export function BatchImportDialog({
       const successCount = matchResults.filter((r) => r.match).length;
       toast.success(`匹配完成：${successCount}/${matchResults.length} 个商品`);
     } catch {
-      toast.error('HSCode 匹配失败');
+      toast.error('HS 编码匹配失败');
     } finally {
       setMatching(false);
     }
@@ -250,7 +250,7 @@ export function BatchImportDialog({
                     <TableRow>
                       <TableHead className="w-[40px]">选择</TableHead>
                       <TableHead>商品名称</TableHead>
-                      <TableHead>HSCode</TableHead>
+                      <TableHead>HS 编码</TableHead>
                       <TableHead>匹配结果</TableHead>
                       <TableHead>退税率</TableHead>
                       <TableHead>置信度</TableHead>
