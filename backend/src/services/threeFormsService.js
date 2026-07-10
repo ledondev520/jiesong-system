@@ -1,13 +1,60 @@
 /**
- * Input: 出口合同 ID、报关单数据
- * Output: 一键生成三张表（报关单、外汇核销单、出口退税单）及 Excel 导出
- * Pos: 出口退税模块服务层，负责三表联动生成
+ * Input: 出口合同 ID、人工确认的 HS 覆盖与额外单据信息
+ * Output: 后端权威准备度、一键生成三张表（报关单、外汇核销单、出口退税单）及 Excel 导出
+ * Pos: 出口退税模块服务层，所有生成路径先通过出口单证准备 Module
  */
 
 const ExcelJS = require('exceljs');
 const prisma = require('../utils/prisma');
 const { buildWhere } = require('./customsDeclarationService');
 const { createError } = require('../middleware/errorHandler');
+const {
+  assertExportReadiness,
+  getExportReadiness,
+} = require('./exportReadinessService');
+
+const HS_OVERRIDE_SOURCES = new Set([
+  'manual',
+  'ai',
+  'manual_confirmation',
+  'ai_suggestion',
+]);
+
+const extractHsOverrides = (items = []) => (Array.isArray(items) ? items : [])
+  .filter((item) => (
+    item?.packingItemId
+    && item?.hsCode
+    && HS_OVERRIDE_SOURCES.has(item?.hsSource)
+  ))
+  .map((item) => ({
+    packingItemId: item.packingItemId,
+    hsCode: item.hsCode,
+  }));
+
+const buildPreparedItems = (readiness) => readiness.lines.map((line) => ({
+  productId: line.productId,
+  packingItemId: line.packingItemId,
+  productName: line.productName,
+  hsCode: line.hsCode,
+  declarationElements: line.declarationElements,
+  quantity: line.quantity,
+  unit: line.unit,
+  unitPrice: line.unitPriceUsd,
+  totalPrice: line.totalPriceUsd,
+  refundRate: line.hsEvidence?.refundRate ?? null,
+  purchaseVatRate: line.purchaseVatRate,
+  purchaseCostCny: line.purchaseCostCny,
+  refundBaseCny: line.refundBaseCny,
+  estimatedRefundCny: line.estimatedRefundCny,
+}));
+
+const previewThreeForms = async ({ salesContractId, items = [], profitRate } = {}) => {
+  if (!salesContractId) throw createError('缺少出口合同 ID', 400);
+  return getExportReadiness(salesContractId, {
+    overrides: extractHsOverrides(items),
+    profitRate,
+  });
+};
 
 /**
  * 生成报关单
@@ -16,7 +63,19 @@ const { createError } = require('../middleware/errorHandler');
  * @param {Array} params.items - 商品明细列表
  * @param {Object} params.extraData - 额外数据（发货人、收货人等）
  */
-const generateCustomsDeclaration = async ({ salesContractId, items, extraData = {} }) => {
+const generateCustomsDeclaration = async ({
+  salesContractId,
+  items,
+  extraData = {},
+  itemsPrepared = false,
+}) => {
+  let resolvedItems = Array.isArray(items) ? items : [];
+  if (!itemsPrepared) {
+    const readiness = await previewThreeForms({ salesContractId, items: resolvedItems });
+    assertExportReadiness(readiness, { requireCustoms: true });
+    resolvedItems = buildPreparedItems(readiness);
+  }
+
   const tx = await prisma.$transaction(async (tx) => {
     // 获取出口合同详情
     const contract = await tx.salesContract.findUnique({
@@ -42,8 +101,8 @@ const generateCustomsDeclaration = async ({ salesContractId, items, extraData = 
     const declarationNo = `BG${contract.contractNo.slice(2)}${seq}`;
 
     // 计算总额
-    const totalAmount = items.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
-    const totalQuantity = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    const totalAmount = resolvedItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+    const totalQuantity = resolvedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
 
     // 创建报关单（仅写入 schema 中存在的字段）
     const customsDeclaration = await tx.customsDeclaration.create({
@@ -62,10 +121,8 @@ const generateCustomsDeclaration = async ({ salesContractId, items, extraData = 
     });
 
     // 创建报关单明细
-    if (items && items.length > 0) {
-      // 过滤掉缺少 productId 的项，避免 FK 约束异常
-      const validItems = items.filter((item) => item.productId && typeof item.productId === 'string');
-      const customsItems = validItems.map((item, index) => ({
+    if (resolvedItems.length > 0) {
+      const customsItems = resolvedItems.map((item, index) => ({
         customsDeclarationId: customsDeclaration.id,
         productId: item.productId,
         packingItemId: item.packingItemId || null,
@@ -79,11 +136,7 @@ const generateCustomsDeclaration = async ({ salesContractId, items, extraData = 
         totalPrice: item.totalPrice || 0,
       }));
 
-      if (customsItems.length > 0) {
-        await tx.customsDeclarationItem.createMany({
-          data: customsItems,
-        });
-      }
+      await tx.customsDeclarationItem.createMany({ data: customsItems });
     }
 
     return customsDeclaration;
@@ -99,7 +152,12 @@ const generateCustomsDeclaration = async ({ salesContractId, items, extraData = 
  * @param {string} params.customsDeclarationId - 报关单 ID
  * @param {Object} params.extraData - 额外数据（银行名称等）
  */
-const generateForexVerification = async ({ salesContractId, customsDeclarationId, extraData = {} }) => {
+const generateForexVerification = async ({
+  salesContractId,
+  customsDeclarationId,
+  extraData = {},
+  receivedAmount,
+}) => {
   const tx = await prisma.$transaction(async (tx) => {
     // 获取出口合同详情
     const contract = await tx.salesContract.findUnique({
@@ -133,7 +191,9 @@ const generateForexVerification = async ({ salesContractId, customsDeclarationId
         status: 'PENDING',
         bankName: extraData.bankName || '',
         currency: 'USD',
-        receivedAmount: contract.totalAmount || 0,
+        receivedAmount: Number.isFinite(Number(receivedAmount))
+          ? Number(receivedAmount)
+          : (contract.totalAmount || 0),
         settledAmount: 0,
         exchangeRate: contract.exchangeRate || 1,
         note: extraData.note || '',
@@ -154,7 +214,20 @@ const generateForexVerification = async ({ salesContractId, customsDeclarationId
  * @param {string} params.forexVerificationId - 外汇核销单 ID
  * @param {Array} params.items - 商品明细列表（含 HSCode 和退税率）
  */
-const generateTaxRefund = async ({ salesContractId, customsDeclarationId, forexVerificationId, items }) => {
+const generateTaxRefund = async ({
+  salesContractId,
+  customsDeclarationId,
+  forexVerificationId,
+  items,
+  itemsPrepared = false,
+}) => {
+  let resolvedItems = Array.isArray(items) ? items : [];
+  if (!itemsPrepared) {
+    const readiness = await previewThreeForms({ salesContractId, items: resolvedItems });
+    assertExportReadiness(readiness, { requireCustoms: false, requireTaxRefund: true });
+    resolvedItems = buildPreparedItems(readiness);
+  }
+
   const tx = await prisma.$transaction(async (tx) => {
     // 获取出口合同详情
     const contract = await tx.salesContract.findUnique({
@@ -177,17 +250,14 @@ const generateTaxRefund = async ({ salesContractId, customsDeclarationId, forexV
     const taxSeq = existingTaxCount > 0 ? `-${existingTaxCount + 1}` : '';
     const refundNo = `TX${contract.contractNo.slice(2)}${taxSeq}`;
 
-    // 计算可退税额
-    let refundableAmount = 0;
-    if (items && items.length > 0) {
-      for (const item of items) {
-        if (item.refundRate !== undefined && item.refundRate !== null) {
-          // 退税额 = 不含税金额 × 退税率
-          const taxExcludedAmount = (item.totalPrice || 0) / (1 + 0.13); // 假设增值税率 13%
-          refundableAmount += taxExcludedAmount * (item.refundRate / 100);
-        }
-      }
-    }
+    // 外贸企业免退税：以采购专票注明金额为计税依据，预计应退税额 = 计税依据 × 当前退税率。
+    const declaredAmount = resolvedItems.reduce((sum, item) => sum + (item.refundBaseCny || 0), 0);
+    const refundableAmount = resolvedItems.reduce((sum, item) => sum + (item.estimatedRefundCny || 0), 0);
+    const vatRates = Array.from(new Set(
+      resolvedItems
+        .map((item) => Number(item.purchaseVatRate))
+        .filter(Number.isFinite),
+    ));
 
     // 创建出口退税单（使用 schema 实际字段名：match_status 为下划线命名）
     const taxRefund = await tx.taxRefund.create({
@@ -198,10 +268,11 @@ const generateTaxRefund = async ({ salesContractId, customsDeclarationId, forexV
         forexVerificationId,
         status: 'DRAFT',
         match_status: 'pending',
-        declaredAmount: 0,
+        vat_rate_type: vatRates.length === 1 ? Math.round(vatRates[0]) : null,
+        declaredAmount,
         refundableAmount,
         refundedAmount: 0,
-        note: `基于报关单 ${customsDeclarationId} 和外汇核销单 ${forexVerificationId} 生成`,
+        note: `预计值：按采购含税成本及采购税率还原专票注明金额，再乘当前退税率；最终以供应商发票、报关单和税务系统确认为准。关联报关单 ${customsDeclarationId}、核销单 ${forexVerificationId}`,
       },
     });
 
@@ -229,10 +300,27 @@ const generateThreeForms = async ({
   generateForex = true,
   generateTaxRefund: needTaxRefund = true,  // 重命名避免与外层函数 generateTaxRefund 同名冲突
 }) => {
+  if (!generateCustoms && !generateForex && !needTaxRefund) {
+    throw createError('至少选择一张单据', 400);
+  }
+  if (generateForex && !generateCustoms) {
+    throw createError('生成外汇核销单前必须同时生成报关单', 400);
+  }
+  if (needTaxRefund && (!generateCustoms || !generateForex)) {
+    throw createError('生成出口退税单前必须同时生成报关单和外汇核销单', 400);
+  }
+
+  const readiness = await previewThreeForms({ salesContractId, items });
+  assertExportReadiness(readiness, {
+    requireCustoms: generateCustoms,
+    requireTaxRefund: needTaxRefund,
+  });
+  const preparedItems = buildPreparedItems(readiness);
   const results = {
     customsDeclarationId: null,
     forexId: null,
     taxRefundId: null,
+    warnings: readiness.issues.filter((issue) => issue.severity === 'warning'),
   };
 
   let customsDeclarationId = null;
@@ -242,8 +330,9 @@ const generateThreeForms = async ({
   if (generateCustoms) {
     const customsDeclaration = await generateCustomsDeclaration({
       salesContractId,
-      items,
+      items: preparedItems,
       extraData: extraData.customs || {},
+      itemsPrepared: true,
     });
     customsDeclarationId = customsDeclaration.id;
     results.customsDeclarationId = customsDeclarationId;
@@ -255,6 +344,7 @@ const generateThreeForms = async ({
       salesContractId,
       customsDeclarationId,
       extraData: extraData.forex || {},
+      receivedAmount: readiness.summary.totalExportAmountUsd,
     });
     forexVerificationId = forexVerification.id;
     results.forexId = forexVerificationId;
@@ -266,7 +356,8 @@ const generateThreeForms = async ({
       salesContractId,
       customsDeclarationId,
       forexVerificationId,
-      items,
+      items: preparedItems,
+      itemsPrepared: true,
     });
     results.taxRefundId = taxRefund.id;
   }
@@ -468,5 +559,10 @@ module.exports = {
   generateForexVerification,
   generateTaxRefund,
   generateThreeForms,
+  previewThreeForms,
   exportThreeFormsExcel,
+  _internal: {
+    buildPreparedItems,
+    extractHsOverrides,
+  },
 };

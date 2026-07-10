@@ -1,6 +1,6 @@
 /**
- * Input: HSCode 查询参数（keyword 商品名称 / code HS 编码前缀）
- * Output: HSCode 前端服务
+ * Input: HSCode 查询参数与人工税则证据更新字段
+ * Output: HSCode 查询、匹配和证据化更新前端 Module
  * Pos: 商品管理页智能匹配服务层
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -16,6 +16,20 @@ export interface BatchHsCodeMatchResult {
   hsCode: string | null;
   match: HsCodeRecord | null;
   confidence: 'exact' | 'high' | 'low' | 'none';
+}
+
+export interface UpdateHsCodeInput {
+  taxRate?: number | null;
+  refundRate?: number | null;
+  exportTaxRate?: number | null;
+  vatRate?: number | null;
+  unit?: string | null;
+  note?: string | null;
+  declarationElements?: string | null;
+  supervisionConditions?: string | null;
+  inspectionQuarantine?: string | null;
+  effectiveDate?: string;
+  sourceUrl?: string;
 }
 
 export const hsCodeService = {
@@ -69,6 +83,10 @@ export const hsCodeService = {
 
   searchByHsCode: async (code: string) => {
     return hsCodeService.getByCode(code);
+  },
+
+  update: async (code: string, data: UpdateHsCodeInput) => {
+    return api.put<ApiResponse<HsCodeRecord>, ApiResponse<HsCodeRecord>>(`/hs-codes/${code}`, data);
   },
 
   batchMatch: async (productNames: string[]) => {

@@ -17,9 +17,10 @@ const getRouteIndex = (router, path, method) => {
   });
 };
 
-test('hsCodes: router exposes GET /search and GET /:code', () => {
+test('hsCodes: router exposes search, detail and manual evidence update routes', () => {
   assert.notEqual(getRouteIndex(hsCodesRouter, '/search', 'get'), -1, '缺少 GET /search');
   assert.notEqual(getRouteIndex(hsCodesRouter, '/:code', 'get'), -1, '缺少 GET /:code');
+  assert.notEqual(getRouteIndex(hsCodesRouter, '/:code', 'put'), -1, '缺少 PUT /:code');
 });
 
 test('hsCodes: route index mounts /hs-codes router', () => {

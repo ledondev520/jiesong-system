@@ -1,6 +1,6 @@
 /**
- * Input: HSCode 搜索服务（keyword 商品名称 / code HS 编码前缀）、AI 推荐接口（集成 HSCIQ 归类实例 + 官方税率）
- * Output: HSCode 查询页面（含双搜索框 + AI 推荐 HS 编码 + HSCIQ 官方税率 + AI 填写申报要素 + 一键复制报关格式）
+ * Input: HSCode 搜索/人工更新服务、AI 推荐接口（集成 HSCIQ 归类实例 + 官方税率）
+ * Output: HSCode 查询页面（含双搜索、AI 推荐、证据化人工税则更新、申报要素填写与复制）
  * Pos: 出口模块子页面 - HSCode 检索
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -22,8 +22,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, ChevronRight, X, Sparkles, Loader2, Copy, Check } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Search, ChevronRight, X, Sparkles, Loader2, Copy, Check, Pencil } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import api from '@/lib/axios';
 import type { ApiResponse } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -35,6 +42,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 /**
  * 防抖 Hook - 延迟输入触发
@@ -208,6 +217,17 @@ function HsCodesPageContent() {
   const [fillLoading, setFillLoading] = useState(false);
   const [fillResult, setFillResult] = useState<Array<{ element: string; value: string; uncertain?: boolean }> | null>(null);
   const [fillCopied, setFillCopied] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editForm, setEditForm] = useState({
+    refundRate: '',
+    exportTaxRate: '',
+    vatRate: '',
+    effectiveDate: '',
+    sourceUrl: '',
+    declarationElements: '',
+    note: '',
+  });
 
   // 切换到新记录时重置 AI 填写区状态
   useEffect(() => {
@@ -216,6 +236,56 @@ function HsCodesPageContent() {
     setFillResult(null);
     setFillCopied(false);
   }, [selectedRecord?.id]);
+
+  const openEvidenceEditor = () => {
+    if (!selectedRecord) return;
+    setEditForm({
+      refundRate: selectedRecord.refundRate == null ? '' : String(selectedRecord.refundRate),
+      exportTaxRate: selectedRecord.exportTaxRate == null ? '' : String(selectedRecord.exportTaxRate),
+      vatRate: selectedRecord.vatRate == null ? '' : String(selectedRecord.vatRate),
+      effectiveDate: selectedRecord.effectiveDate
+        ? new Date(selectedRecord.effectiveDate).toISOString().slice(0, 10)
+        : '',
+      sourceUrl: selectedRecord.sourceUrl || '',
+      declarationElements: selectedRecord.declarationElements || '',
+      note: selectedRecord.note || '',
+    });
+    setEditOpen(true);
+  };
+
+  const saveEvidenceUpdate = async () => {
+    if (!selectedRecord) return;
+    if (!editForm.effectiveDate || !editForm.sourceUrl.trim()) {
+      toast.error('请填写生效日期和官方来源链接');
+      return;
+    }
+    const toNullableNumber = (value: string) => value.trim() === '' ? null : Number(value);
+    setEditSaving(true);
+    try {
+      const response = await hsCodeService.update(selectedRecord.hsCode, {
+        refundRate: toNullableNumber(editForm.refundRate),
+        exportTaxRate: toNullableNumber(editForm.exportTaxRate),
+        vatRate: toNullableNumber(editForm.vatRate),
+        effectiveDate: editForm.effectiveDate,
+        sourceUrl: editForm.sourceUrl.trim(),
+        declarationElements: editForm.declarationElements.trim() || null,
+        note: editForm.note.trim() || null,
+      });
+      const updated = response.data;
+      if (updated) {
+        setSelectedRecord(updated);
+        setResults((previous) => previous.map((record) => (
+          record.hsCode === updated.hsCode ? updated : record
+        )));
+      }
+      setEditOpen(false);
+      toast.success('HS 税则证据已更新');
+    } catch {
+      toast.error('HS 税则更新失败，请检查税率、日期和来源链接');
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   /**
    * 职责：调用后端 AI 推荐接口
@@ -482,6 +552,10 @@ function HsCodesPageContent() {
               {isExpiredHsCode(selectedRecord) && (
                 <Badge variant="destructive" className="text-xs">已过期</Badge>
               )}
+              <Button variant="outline" size="sm" className="ml-auto" onClick={openEvidenceEditor}>
+                <Pencil className="mr-2 h-4 w-4" />
+                人工更新税则
+              </Button>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -828,6 +902,102 @@ function HsCodesPageContent() {
           ? `（${[keyword.trim() && `名称：${keyword}`, hsCodeInput.trim() && `编码：${hsCodeInput}`].filter(Boolean).join('，')}）`
           : '（默认全量列表）'}
       </div>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>人工更新 HS 税则证据</DialogTitle>
+            <DialogDescription>
+              修改税率会影响出口警示与预计退税，必须同时留存生效日期和可追溯的官方来源链接。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="hs-refund-rate">出口退税率（%）</Label>
+              <Input
+                id="hs-refund-rate"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={editForm.refundRate}
+                onChange={(event) => setEditForm((form) => ({ ...form, refundRate: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="hs-export-tax-rate">出口税率（%）</Label>
+              <Input
+                id="hs-export-tax-rate"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={editForm.exportTaxRate}
+                onChange={(event) => setEditForm((form) => ({ ...form, exportTaxRate: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="hs-vat-rate">增值税率（%）</Label>
+              <Input
+                id="hs-vat-rate"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={editForm.vatRate}
+                onChange={(event) => setEditForm((form) => ({ ...form, vatRate: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-1">
+              <Label htmlFor="hs-effective-date">生效日期</Label>
+              <Input
+                id="hs-effective-date"
+                type="date"
+                value={editForm.effectiveDate}
+                onChange={(event) => setEditForm((form) => ({ ...form, effectiveDate: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="hs-source-url">官方来源链接</Label>
+              <Input
+                id="hs-source-url"
+                type="url"
+                placeholder="https://..."
+                value={editForm.sourceUrl}
+                onChange={(event) => setEditForm((form) => ({ ...form, sourceUrl: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-3">
+              <Label htmlFor="hs-declaration-template">申报要素模板</Label>
+              <Textarea
+                id="hs-declaration-template"
+                rows={2}
+                placeholder="用 | 分隔各项；这里只保存模板，不代替具体商品的实际申报值"
+                value={editForm.declarationElements}
+                onChange={(event) => setEditForm((form) => ({ ...form, declarationElements: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-3">
+              <Label htmlFor="hs-evidence-note">复核备注</Label>
+              <Textarea
+                id="hs-evidence-note"
+                rows={2}
+                value={editForm.note}
+                onChange={(event) => setEditForm((form) => ({ ...form, note: event.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setEditOpen(false)} disabled={editSaving}>
+              取消
+            </Button>
+            <Button type="button" onClick={() => void saveEvidenceUpdate()} disabled={editSaving}>
+              {editSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              保存税则证据
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* AI 智能推荐弹窗 */}
       <Dialog open={aiRecommendOpen} onOpenChange={handleAiRecommendDialogChange}>

@@ -11,6 +11,7 @@ import { hsCodeService } from './hsCode.service';
 vi.mock('@/lib/axios', () => ({
   default: {
     get: vi.fn(),
+    put: vi.fn(),
   },
 }));
 
@@ -38,6 +39,24 @@ describe('hsCodeService', () => {
 
     expect(api.get).toHaveBeenCalledWith('/hs-codes', {
       params: { keyword: undefined, code: undefined, page: 2, pageSize: 50 },
+    });
+  });
+
+  it('update: 提交税率与证据字段到编码更新路径', async () => {
+    await hsCodeService.update('6907219000', {
+      refundRate: 0,
+      vatRate: 13,
+      effectiveDate: '2026-01-01',
+      sourceUrl: 'https://www.chinatax.gov.cn/example',
+      note: '人工复核',
+    });
+
+    expect(api.put).toHaveBeenCalledWith('/hs-codes/6907219000', {
+      refundRate: 0,
+      vatRate: 13,
+      effectiveDate: '2026-01-01',
+      sourceUrl: 'https://www.chinatax.gov.cn/example',
+      note: '人工复核',
     });
   });
 });

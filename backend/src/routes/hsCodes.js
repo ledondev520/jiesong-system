@@ -1,7 +1,7 @@
 /**
  * Input: hsCodeService, aiService, aiCache, hsciqService, prisma（systemConfig 开关）
- * Output: HSCode 查询路由（含 AI 推荐 HS 编码 + HSCIQ 权威归类实例 + AI 申报要素填写 + 推荐缓存 + HSCIQ 使用统计）
- * Pos: 提供本地 HSCode 搜索、详情、AI推荐（集成 HSCIQ 归类实例辅助 + 申报要素自动填值 + 透明缓存 + 系统开关控制）接口
+ * Output: HSCode 查询/人工证据更新路由（含 AI 推荐、HSCIQ 权威归类实例、申报要素填写、推荐缓存与使用统计）
+ * Pos: 提供本地 HSCode 搜索、详情、证据化更新与 AI 推荐的 Interface
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -16,6 +16,7 @@ const aiCache = require('../utils/aiCache');
 const prisma = require('../utils/prisma');
 const { success } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
+const { withAuditLog } = require('../middleware/auditLog');
 
 /**
  * 职责：判断 HSCIQ API 是否被系统设置开关启用
@@ -144,6 +145,41 @@ router.get('/hsciq-usage', async (req, res, next) => {
     next(error);
   }
 });
+
+/**
+ * PUT /api/hs-codes/:code
+ * 人工更新当前税则快照；税率变化必须同时留存生效日期和官方来源。
+ */
+router.put(
+  '/:code',
+  roleAuth('ADMIN', 'PURCHASE', 'FINANCE'),
+  withAuditLog(
+    {
+      entity: 'HsCode',
+      action: 'UPDATE',
+      model: 'hsCode',
+      idParam: 'code',
+      idField: 'hsCode',
+      captureBefore: false,
+      captureAfter: false,
+      getEntityId: ({ req }) => req.params.code,
+      getOldValue: () => null,
+      getNewValue: ({ req, responseData }) => ({
+        hsCode: req.params.code,
+        changedFields: Object.keys(req.body || {}).sort(),
+        refundRate: responseData?.refundRate ?? null,
+        vatRate: responseData?.vatRate ?? null,
+        exportTaxRate: responseData?.exportTaxRate ?? null,
+        effectiveDate: responseData?.effectiveDate ?? null,
+        sourceUrl: responseData?.sourceUrl ?? null,
+      }),
+    },
+    async (req, res) => {
+      const record = await hsCodeService.updateHsCode(req.params.code, req.body || {});
+      success(res, record, 'HS 税则更新成功');
+    },
+  ),
+);
 
 router.get('/:code', async (req, res, next) => {
   try {

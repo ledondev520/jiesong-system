@@ -21,6 +21,27 @@ describe('threeFormsService', () => {
     vi.clearAllMocks();
   });
 
+  it('应该请求后端权威的出口单证准备度预览', async () => {
+    const mockResponse = { code: 200, data: { customsReady: false, taxRefundReady: false, lines: [] } };
+    vi.mocked(api.post).mockResolvedValue(mockResponse);
+    const payload = {
+      salesContractId: 'sc-1',
+      items: [{
+        productName: '瓷砖',
+        hsCode: '6907219000',
+        hsSource: 'history' as const,
+        quantity: 10,
+        unitPrice: 1,
+        totalPrice: 10,
+        packingItemId: 'pk-1',
+      }],
+    };
+
+    await threeFormsService.previewThreeForms(payload);
+
+    expect(api.post).toHaveBeenCalledWith('/three-forms/preview', payload);
+  });
+
   it('应该一键生成三张表', async () => {
     const mockResponse = { code: 200, data: { customsDeclarationId: 'cd-1', forexId: 'f-1', taxRefundId: 'tr-1' } };
     vi.mocked(api.post).mockResolvedValueOnce(mockResponse);

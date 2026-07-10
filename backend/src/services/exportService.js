@@ -10,6 +10,7 @@ const ExcelJS = require('exceljs');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { calculateTaxSummary } = require('./taxCalculationEngine');
+const { getExportReadiness } = require('./exportReadinessService');
 
 /**
  * 职责：导出数据
@@ -361,6 +362,10 @@ const exportSalesContractExcel = async (contractId) => {
     throw createError(`合同不存在: ${contractId}`, 404);
   }
 
+  // 出口发票、HS 与税务测算必须共用同一个权威准备度，避免各 Sheet 各算一套。
+  const exportReadiness = await getExportReadiness(contractId);
+  const taxResult = calculateTaxSummary(exportReadiness);
+
   const workbook = new ExcelJS.Workbook();
   workbook.creator = '捷淞进销存系统';
   workbook.created = new Date();
@@ -503,23 +508,23 @@ const exportSalesContractExcel = async (contractId) => {
   sheetInvoice.addRow({ index: '', productName: `Invoice No.: ${contract.contractNo}`, hsCode: '', quantity: '', unit: '', unitPrice: '', amount: '', note: '' });
   sheetInvoice.addRow({ index: '', productName: `Date: ${contract.signedAt ? formatDate(contract.signedAt) : formatDate()}`, hsCode: '', quantity: '', unit: '', unitPrice: '', amount: '', note: `目的港: ${contract.port?.name || '-'}` });
 
-  // 2. 逐行输出发票明细（优先装箱明细，缺价格回退销售明细售价）
-  const invoiceSource = contract.packingItems.length > 0 ? contract.packingItems : contract.items;
+  // 2. 商业发票严格使用全量装箱明细及本次解析后的 HS，不再回退到另一套销售明细。
+  const invoiceSource = exportReadiness.lines;
   let invoiceTotal = 0;
   invoiceSource.forEach((item, idx) => {
     const quantity = Number(item.quantity) || 0;
-    const unitPrice = Number(item.unitPrice ?? item.sellingPrice) || 0;
-    const amount = Number(item.totalPrice) || quantity * unitPrice;
+    const unitPrice = Number(item.unitPriceUsd) || 0;
+    const amount = Number(item.totalPriceUsd) || quantity * unitPrice;
     invoiceTotal += amount;
     sheetInvoice.addRow({
       index: idx + 1,
-      productName: item.product?.customsName || '-',
-      hsCode: item.product?.hsCode || '',
+      productName: item.productName || '-',
+      hsCode: item.hsCode || '',
       quantity,
-      unit: item.unit || item.product?.unit || '-',
+      unit: item.unit || '-',
       unitPrice,
       amount: Math.round(amount * 100) / 100,
-      note: item.note || '',
+      note: `${item.hsSource || 'missing'}${item.hsEvidence?.effectiveDate ? ` / 税则生效 ${formatDate(item.hsEvidence.effectiveDate)}` : ''}`,
     });
   });
 
@@ -541,7 +546,6 @@ const exportSalesContractExcel = async (contractId) => {
   }
 
   // ==================== Sheet 5: 税务测算 ====================
-  const taxResult = calculateTaxSummary(contract);
   const sheet4 = workbook.addWorksheet('税务测算');
   sheet4.columns = [
     { header: '字段/商品', key: 'field', width: 22 },
@@ -553,13 +557,15 @@ const exportSalesContractExcel = async (contractId) => {
   applyHeaderStyle(sheet4);
 
   [
-    ['合同编号', contract.contractNo, '', '', '税务测算基于当前销售明细/装箱明细'],
+    ['合同编号', contract.contractNo, '', '', '税务测算与商业发票共用全量装箱明细'],
     ['汇率', taxResult.summary.exchangeRate, '', '', 'USD -> CNY'],
-    ['销售金额(USD)', taxResult.summary.totalSalesUsd, '', '', '按明细汇总'],
-    ['销售金额(CNY)', taxResult.summary.totalSalesCny, '', '', '按汇率折算'],
-    ['预计退税额(CNY)', taxResult.summary.totalRefundAmountCny, '', '', '按 HS 规则估算'],
-    ['不可退税额(CNY)', taxResult.summary.totalNonRefundableTaxCny, '', '', '税负差额'],
-    ['待确认行数', taxResult.summary.fallbackLineCount, '', '', '未匹配税则需人工复核'],
+    ['销售金额(USD)', taxResult.summary.totalSalesUsd, '', '', '仅作出口货值参考'],
+    ['采购专票预计计税依据(CNY)', taxResult.summary.totalRefundBaseCny, '', '', '采购含税成本 ÷（1 + 采购增值税率）'],
+    ['预计退税额(CNY)', taxResult.summary.totalRefundAmountCny, '', '', '预计计税依据 × 当前出口退税率'],
+    ['不可退进项税(CNY)', taxResult.summary.totalNonRefundableTaxCny, '', '', '预计计税依据 × max(采购税率-退税率, 0)'],
+    ['0%退税行数', taxResult.summary.noRefundLineCount, '', '', '可以形成单证，但需显著警示'],
+    ['缺少当前税则证据', taxResult.summary.fallbackLineCount, '', '', '缺证据时禁止生成正式申报单据'],
+    ['阻塞项/警示项', `${taxResult.summary.errorCount}/${taxResult.summary.warningCount}`, '', '', '预计值；最终以供应商发票、报关单和税务系统为准'],
   ].forEach(([field, value, refund, nonRefund, description]) => {
     sheet4.addRow({ field, value, refund, nonRefund, description });
   });
@@ -579,7 +585,7 @@ const exportSalesContractExcel = async (contractId) => {
         value: line.hsCode || '-',
         refund: line.estimatedRefundCny,
         nonRefund: line.nonRefundableTaxCny,
-        description: `${line.hsDescription} / 退税率${line.refundRate}% / ${line.matchType}`,
+        description: `${line.hsDescription} / 退税率${line.refundRate ?? '-'}% / ${line.hsSource} / 生效${formatDate(line.evidenceEffectiveDate)}`,
       });
     });
   }

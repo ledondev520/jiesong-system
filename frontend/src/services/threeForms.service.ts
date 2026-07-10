@@ -19,6 +19,7 @@ export interface ThreeFormsGenerateInput {
     refundRate?: number;
     packingItemId?: string;
     productId?: string;
+    hsSource?: 'stored' | 'history' | 'ai' | 'manual' | 'missing';
   }[];
   extraData?: {
     customs?: {
@@ -47,9 +48,83 @@ export interface ThreeFormsGenerateResult {
   customsDeclarationId: string | null;
   forexId: string | null;
   taxRefundId: string | null;
+  warnings?: ExportReadinessIssue[];
+}
+
+export interface ExportReadinessIssue {
+  code: string;
+  severity: 'error' | 'warning';
+  scope: 'all' | 'customs' | 'tax_refund';
+  message: string;
+  packingItemId?: string;
+  productName?: string;
+}
+
+export interface ExportReadinessLine {
+  packingItemId: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unit: string;
+  hsCode: string;
+  hsSource: 'customs_history' | 'product_archive' | 'manual_confirmation' | 'missing';
+  hsEvidence: {
+    productName: string;
+    refundRate: number | null;
+    vatRate: number | null;
+    effectiveDate: string | null;
+    fetchedAt: string | null;
+    sourceUrl: string | null;
+  } | null;
+  declarationElements: string;
+  declarationTemplate: string;
+  unitPriceUsd: number;
+  totalPriceUsd: number;
+  storedTotalPriceUsd: number;
+  recommendedUnitPriceUsd: number | null;
+  pricingFormula: string;
+  pricingProfitRate: number;
+  exchangeRate: number;
+  purchaseCostCny: number;
+  purchaseVatRate: number | null;
+  refundBaseCny: number;
+  estimatedRefundCny: number;
+  nonRefundableInputTaxCny: number;
+  issues: ExportReadinessIssue[];
+}
+
+export interface ExportReadinessResult {
+  contractId: string;
+  contractNo: string;
+  exchangeRate: number;
+  profitRate: number;
+  customsReady: boolean;
+  taxRefundReady: boolean;
+  lines: ExportReadinessLine[];
+  issues: ExportReadinessIssue[];
+  summary: {
+    lineCount: number;
+    totalExportAmountUsd: number;
+    storedContractTotalUsd: number;
+    totalPurchaseCostCny: number;
+    totalRefundBaseCny: number;
+    totalEstimatedRefundCny: number;
+    totalNonRefundableInputTaxCny: number;
+    noRefundLineCount: number;
+    errorCount: number;
+    warningCount: number;
+  };
 }
 
 export const threeFormsService = {
+  /** 获取不写库的后端权威出口单证准备度。 */
+  previewThreeForms: async (data: Pick<ThreeFormsGenerateInput, 'salesContractId' | 'items'> & { profitRate?: number }) => {
+    return api.post<ApiResponse<ExportReadinessResult>, ApiResponse<ExportReadinessResult>, typeof data>(
+      '/three-forms/preview',
+      data,
+    );
+  },
+
   /**
    * 一键生成三张表
    */

@@ -1,124 +1,82 @@
 /**
- * Input: 销售合同对象或合同 ID
- * Output: 税务测算结果，以及 Excel/PDF 导出二进制
- * Pos: 税务测算引擎，集中处理 HS 编码匹配、出口退税估算与导出
+ * Input: 出口单证准备度结果或出口合同 ID
+ * Output: 基于当前税则证据和采购专票口径的税务测算，以及 Excel/PDF 导出二进制
+ * Pos: 税务测算 Module；不内置税则小表，不从出口销售额反推采购发票金额
  */
 
 const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit');
-const prisma = require('../utils/prisma');
+const { createError } = require('../middleware/errorHandler');
+const { getExportReadiness } = require('./exportReadinessService');
 
 const EXCEL_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const PDF_MIME = 'application/pdf';
 
-const HS_RULES = Object.freeze([
-  { code: '0808100000', description: '鲜苹果', vatRate: 13, refundRate: 9, taxCategory: '农产品' },
-  { code: '0806100000', description: '鲜葡萄', vatRate: 13, refundRate: 9, taxCategory: '农产品' },
-  { code: '0810909000', description: '其他鲜水果', vatRate: 13, refundRate: 9, taxCategory: '农产品' },
-  { code: '3924100000', description: '塑料制餐厨用品', vatRate: 13, refundRate: 13, taxCategory: '塑料制品' },
-  { code: '3924900000', description: '其他塑料家庭用品', vatRate: 13, refundRate: 13, taxCategory: '塑料制品' },
-  { code: '6911101900', description: '其他瓷餐具及厨房用品', vatRate: 13, refundRate: 13, taxCategory: '陶瓷制品' },
-  { code: '0808', description: '鲜苹果及相关鲜果', vatRate: 13, refundRate: 9, taxCategory: '农产品' },
-  { code: '3924', description: '塑料制餐厨及家庭用品', vatRate: 13, refundRate: 13, taxCategory: '塑料制品' },
-  { code: '69', description: '陶瓷制品', vatRate: 13, refundRate: 13, taxCategory: '陶瓷制品' },
-]);
-
-const DEFAULT_RULE = Object.freeze({
-  description: '未匹配税则，请人工确认',
-  vatRate: 13,
-  refundRate: 0,
-  taxCategory: '待确认',
-});
-
 const formatDate = (value) => {
-  const date = value ? new Date(value) : new Date();
-  return date.toISOString().slice(0, 10);
+  if (!value) return '-';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '-' : date.toISOString().slice(0, 10);
 };
 
 const roundCurrency = (value) => {
   const numeric = Number(value);
-  if (!Number.isFinite(numeric)) {
-    return 0;
-  }
-  return Number(numeric.toFixed(2));
+  return Number.isFinite(numeric) ? Number(numeric.toFixed(2)) : 0;
 };
 
-const toNumber = (value, fallback = 0) => {
+const toNullableNumber = (value) => {
+  if (value === null || value === undefined || value === '') return null;
   const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
+  return Number.isFinite(numeric) ? numeric : null;
 };
 
-const normalizeHsCode = (value) => {
-  const digits = String(value ?? '')
-    .replace(/\D/g, '')
-    .slice(0, 10);
+const normalizeHsCode = (value) => String(value ?? '').replace(/\D/g, '').slice(0, 10);
 
-  if (!digits) {
-    return '';
-  }
-
-  if (digits.length >= 10) {
-    return digits;
-  }
-
-  return digits.padEnd(10, '0');
-};
-
-const lookupHsCode = (value) => {
-  const rawDigits = String(value ?? '')
-    .replace(/\D/g, '')
-    .slice(0, 10);
+/**
+ * 职责：只在调用者提供的当前税则证据中做精确匹配；未命中时显式返回缺证据。
+ */
+const lookupHsCode = (value, currentRecords = []) => {
   const normalizedCode = normalizeHsCode(value);
-
-  if (!rawDigits) {
+  const record = (Array.isArray(currentRecords) ? currentRecords : []).find((item) => (
+    normalizeHsCode(item?.hsCode) === normalizedCode
+  ));
+  if (!record || normalizedCode.length !== 10) {
     return {
       normalizedCode,
       matchedCode: null,
-      matchType: 'missing',
-      ...DEFAULT_RULE,
+      matchType: 'missing_evidence',
+      description: '当前税则证据缺失，禁止据此估算退税',
+      vatRate: null,
+      refundRate: null,
     };
   }
-
-  const exactRule = HS_RULES.find((rule) => rule.code.length === 10 && rule.code === normalizedCode);
-  if (exactRule) {
-    return {
-      normalizedCode,
-      matchedCode: exactRule.code,
-      matchType: 'exact',
-      ...exactRule,
-    };
-  }
-
-  const prefixRule = HS_RULES
-    .filter((rule) => rawDigits.startsWith(rule.code) || normalizedCode.startsWith(rule.code))
-    .sort((left, right) => right.code.length - left.code.length)[0];
-
-  if (prefixRule) {
-    return {
-      normalizedCode,
-      matchedCode: prefixRule.code,
-      matchType: 'prefix',
-      ...prefixRule,
-    };
-  }
-
   return {
     normalizedCode,
-    matchedCode: null,
-    matchType: 'fallback',
-    ...DEFAULT_RULE,
+    matchedCode: normalizedCode,
+    matchType: 'exact',
+    description: record.productName || record.description || '当前税则记录',
+    vatRate: toNullableNumber(record.vatRate),
+    refundRate: toNullableNumber(record.refundRate),
+    effectiveDate: record.effectiveDate || null,
+    fetchedAt: record.fetchedAt || null,
+    sourceUrl: record.sourceUrl || null,
   };
 };
 
-const collectPdfBuffer = (doc) => {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    doc.on('data', (chunk) => chunks.push(chunk));
-    doc.on('error', reject);
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.end();
-  });
+const resolveReadiness = async (input) => {
+  if (typeof input === 'string') return getExportReadiness(input);
+  if (input?.exportReadiness?.lines && input?.exportReadiness?.summary) return input.exportReadiness;
+  if (input?.lines && input?.summary && (input.contractId || input.contractNo)) return input;
+  if (input?.id) return getExportReadiness(input.id);
+  throw createError('税务测算需要出口合同 ID 或出口单证准备度结果', 400);
 };
+
+const collectPdfBuffer = (doc) => new Promise((resolve, reject) => {
+  const chunks = [];
+  doc.on('data', (chunk) => chunks.push(chunk));
+  doc.on('error', reject);
+  doc.on('end', () => resolve(Buffer.concat(chunks)));
+  doc.end();
+});
 
 const applyHeaderStyle = (worksheet) => {
   const headerRow = worksheet.getRow(1);
@@ -126,175 +84,126 @@ const applyHeaderStyle = (worksheet) => {
     cell.font = { bold: true, color: { argb: 'FF1F2D3D' } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EEF7' } };
     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-    cell.border = {
-      bottom: { style: 'thin', color: { argb: 'FFADC0D8' } },
-    };
+    cell.border = { bottom: { style: 'thin', color: { argb: 'FFADC0D8' } } };
   });
 };
 
-const createFilenameBase = (contractNo) => `${contractNo || 'unknown'}_税务测算_${formatDate()}`;
+const createFilenameBase = (contractNo) => `${contractNo || 'unknown'}_税务测算_${formatDate(new Date())}`;
 
-const loadSalesContract = async (contractId) => {
-  const contract = await prisma.salesContract.findUnique({
-    where: { id: contractId },
-    include: {
-      port: true,
-      items: {
-        include: {
-          product: true,
-          store: true,
-        },
-      },
-      packingItems: {
-        include: {
-          product: true,
-          store: true,
-        },
-      },
-    },
-  });
-
-  if (!contract) {
-    throw new Error(`合同不存在: ${contractId}`);
-  }
-
-  return contract;
-};
-
-const resolveContract = async (contractOrId) => {
-  if (typeof contractOrId === 'string') {
-    return loadSalesContract(contractOrId);
-  }
-  return contractOrId;
-};
-
-const extractLineItems = (contract = {}) => {
-  const hasPackingItems = Array.isArray(contract.packingItems) && contract.packingItems.length > 0;
-  const sourceItems = hasPackingItems ? contract.packingItems : (contract.items || []);
-
-  return sourceItems.map((item) => {
-    const quantity = toNumber(item.quantity);
-    const unitPriceUsd = toNumber(
-      item.unitPrice,
-      Number.isFinite(Number(item.sellingPrice))
-        ? Number(item.sellingPrice)
-        : quantity > 0
-          ? toNumber(item.totalPrice) / quantity
-          : 0,
-    );
-    const lineAmountUsd = roundCurrency(
-      Number.isFinite(Number(item.totalPrice)) ? Number(item.totalPrice) : quantity * unitPriceUsd,
-    );
-
+/**
+ * 职责：将出口准备度的逐行事实转换为可导出的税务摘要。
+ * 退税基数直接使用准备度 Module 已按采购含税成本和采购税率推导的发票注明金额。
+ */
+const calculateTaxSummary = (readiness = {}) => {
+  const exchangeRate = roundCurrency(readiness.exchangeRate || 0);
+  const lines = (Array.isArray(readiness.lines) ? readiness.lines : []).map((line, index) => {
+    const evidence = line.hsEvidence || null;
+    const lineAmountUsd = roundCurrency(line.totalPriceUsd);
     return {
-      productName: item.product?.customsName || item.product?.name || '-',
-      hsCode: item.hsCode || item.product?.hsCode || '',
-      declaration: item.declaration || item.product?.declaration || '',
-      storeName: item.store?.name || contract.port?.name || '-',
-      quantity: roundCurrency(quantity),
-      unit: item.unit || item.product?.unit || '-',
-      unitPriceUsd: roundCurrency(unitPriceUsd),
+      index: line.index || index + 1,
+      productName: line.productName || '-',
+      hsCode: normalizeHsCode(line.hsCode),
+      hsDescription: evidence?.productName || '当前税则证据缺失',
+      declaration: line.declarationElements || '',
+      storeName: line.storeName || readiness.portName || '-',
+      quantity: roundCurrency(line.quantity),
+      unit: line.unit || '-',
+      unitPriceUsd: roundCurrency(line.unitPriceUsd),
       lineAmountUsd,
-      note: item.note || '',
-    };
-  });
-};
-
-const calculateTaxSummary = (contract = {}) => {
-  const exchangeRate = roundCurrency(toNumber(contract.exchangeRate, 1));
-  const lines = extractLineItems(contract).map((line, index) => {
-    const hsRule = lookupHsCode(line.hsCode);
-    const lineAmountCny = roundCurrency(line.lineAmountUsd * exchangeRate);
-    const refundBaseCny = roundCurrency(
-      hsRule.vatRate > 0 ? lineAmountCny / (1 + hsRule.vatRate / 100) : lineAmountCny,
-    );
-    const estimatedRefundCny = roundCurrency(refundBaseCny * (hsRule.refundRate / 100));
-    const nonRefundableTaxCny = roundCurrency(
-      refundBaseCny * (Math.max(hsRule.vatRate - hsRule.refundRate, 0) / 100),
-    );
-
-    return {
-      index: index + 1,
-      productName: line.productName,
-      hsCode: hsRule.normalizedCode,
-      hsDescription: hsRule.description,
-      declaration: line.declaration || '',
-      storeName: line.storeName,
-      quantity: line.quantity,
-      unit: line.unit,
-      unitPriceUsd: line.unitPriceUsd,
-      lineAmountUsd: line.lineAmountUsd,
       exchangeRate,
-      lineAmountCny,
-      vatRate: hsRule.vatRate,
-      refundRate: hsRule.refundRate,
-      refundBaseCny,
-      estimatedRefundCny,
-      nonRefundableTaxCny,
-      taxCategory: hsRule.taxCategory,
-      matchType: hsRule.matchType,
-      note: line.note,
+      lineAmountCny: roundCurrency(lineAmountUsd * exchangeRate),
+      vatRate: toNullableNumber(line.purchaseVatRate),
+      refundRate: toNullableNumber(evidence?.refundRate),
+      refundBaseCny: roundCurrency(line.refundBaseCny),
+      estimatedRefundCny: roundCurrency(line.estimatedRefundCny),
+      nonRefundableTaxCny: roundCurrency(line.nonRefundableInputTaxCny),
+      hsSource: line.hsSource || 'missing',
+      evidenceEffectiveDate: evidence?.effectiveDate || null,
+      evidenceFetchedAt: evidence?.fetchedAt || null,
+      evidenceSourceUrl: evidence?.sourceUrl || null,
+      matchType: evidence ? 'current_snapshot' : 'missing_evidence',
+      note: line.note || '',
     };
   });
 
+  const issues = Array.isArray(readiness.issues) ? readiness.issues : [];
   const summary = {
     currency: 'CNY',
     exchangeRate,
     totalSalesUsd: roundCurrency(lines.reduce((sum, line) => sum + line.lineAmountUsd, 0)),
     totalSalesCny: roundCurrency(lines.reduce((sum, line) => sum + line.lineAmountCny, 0)),
+    totalPurchaseCostCny: roundCurrency(readiness.summary?.totalPurchaseCostCny),
     totalRefundBaseCny: roundCurrency(lines.reduce((sum, line) => sum + line.refundBaseCny, 0)),
     totalRefundAmountCny: roundCurrency(lines.reduce((sum, line) => sum + line.estimatedRefundCny, 0)),
     totalNonRefundableTaxCny: roundCurrency(lines.reduce((sum, line) => sum + line.nonRefundableTaxCny, 0)),
     lineCount: lines.length,
-    matchedLineCount: lines.filter((line) => line.matchType === 'exact' || line.matchType === 'prefix').length,
-    fallbackLineCount: lines.filter((line) => line.matchType === 'fallback' || line.matchType === 'missing').length,
+    matchedLineCount: lines.filter((line) => line.matchType === 'current_snapshot').length,
+    fallbackLineCount: lines.filter((line) => line.matchType === 'missing_evidence').length,
+    noRefundLineCount: lines.filter((line) => line.refundRate === 0).length,
+    errorCount: issues.filter((issue) => issue.severity === 'error').length,
+    warningCount: issues.filter((issue) => issue.severity === 'warning').length,
+    customsReady: Boolean(readiness.customsReady),
+    taxRefundReady: Boolean(readiness.taxRefundReady),
   };
+
+  const evidenceByCode = new Map();
+  lines.forEach((line) => {
+    if (!line.hsCode || line.matchType !== 'current_snapshot' || evidenceByCode.has(line.hsCode)) return;
+    evidenceByCode.set(line.hsCode, {
+      hsCode: line.hsCode,
+      description: line.hsDescription,
+      vatRate: line.vatRate,
+      refundRate: line.refundRate,
+      hsSource: line.hsSource,
+      effectiveDate: line.evidenceEffectiveDate,
+      fetchedAt: line.evidenceFetchedAt,
+      sourceUrl: line.evidenceSourceUrl,
+    });
+  });
 
   return {
     contract: {
-      id: contract.id,
-      contractNo: contract.contractNo || '-',
+      id: readiness.contractId,
+      contractNo: readiness.contractNo || '-',
       exchangeRate,
-      portName: contract.port?.name || '-',
-      note: contract.note || '',
+      portName: readiness.portName || '-',
+      note: readiness.note || '',
     },
     summary,
     lines,
-    rules: HS_RULES.map((rule) => ({
-      hsCode: rule.code,
-      description: rule.description,
-      vatRate: rule.vatRate,
-      refundRate: rule.refundRate,
-      taxCategory: rule.taxCategory,
-    })),
+    evidence: Array.from(evidenceByCode.values()),
+    issues,
   };
 };
 
-const exportTaxCalculationExcel = async (contractOrId) => {
-  const contract = await resolveContract(contractOrId);
-  const taxResult = calculateTaxSummary(contract);
-
+const exportTaxCalculationExcel = async (contractOrReadiness) => {
+  const readiness = await resolveReadiness(contractOrReadiness);
+  const taxResult = calculateTaxSummary(readiness);
   const workbook = new ExcelJS.Workbook();
   workbook.creator = '捷淞进销存系统';
   workbook.created = new Date();
 
   const summarySheet = workbook.addWorksheet('税务汇总');
   summarySheet.columns = [
-    { header: '字段', key: 'field', width: 24 },
-    { header: '值', key: 'value', width: 24 },
+    { header: '字段', key: 'field', width: 26 },
+    { header: '值', key: 'value', width: 28 },
   ];
   applyHeaderStyle(summarySheet);
   [
     ['合同编号', taxResult.contract.contractNo],
     ['汇率', taxResult.summary.exchangeRate],
-    ['销售金额(USD)', taxResult.summary.totalSalesUsd],
-    ['销售金额(CNY)', taxResult.summary.totalSalesCny],
+    ['销售金额(USD，仅作货值参考)', taxResult.summary.totalSalesUsd],
+    ['销售金额(CNY，仅作货值参考)', taxResult.summary.totalSalesCny],
     ['预计退税额(CNY)', taxResult.summary.totalRefundAmountCny],
-    ['退税基数(CNY)', taxResult.summary.totalRefundBaseCny],
-    ['不可退税额(CNY)', taxResult.summary.totalNonRefundableTaxCny],
+    ['采购专票预计计税依据(CNY)', taxResult.summary.totalRefundBaseCny],
+    ['不可退进项税额(CNY)', taxResult.summary.totalNonRefundableTaxCny],
     ['明细行数', taxResult.summary.lineCount],
-    ['已匹配行数', taxResult.summary.matchedLineCount],
-    ['待确认行数', taxResult.summary.fallbackLineCount],
+    ['当前税则证据行数', taxResult.summary.matchedLineCount],
+    ['缺少当前证据行数', taxResult.summary.fallbackLineCount],
+    ['0%退税行数', taxResult.summary.noRefundLineCount],
+    ['阻塞项/警示项', `${taxResult.summary.errorCount}/${taxResult.summary.warningCount}`],
+    ['退税资料状态', taxResult.summary.taxRefundReady ? '估算资料已齐' : '资料未齐，禁止正式申报'],
+    ['测算口径', '预计值；最终以供应商发票、报关单和税务系统确认为准'],
     ['目的港', taxResult.contract.portName],
     ['备注', taxResult.contract.note || '-'],
   ].forEach(([field, value]) => summarySheet.addRow({ field, value }));
@@ -304,39 +213,52 @@ const exportTaxCalculationExcel = async (contractOrId) => {
     { header: '序号', key: 'index', width: 8 },
     { header: '商品名称', key: 'productName', width: 20 },
     { header: 'HS编码', key: 'hsCode', width: 16 },
-    { header: 'HS描述', key: 'hsDescription', width: 24 },
-    { header: '申报要素', key: 'declaration', width: 28 },
-    { header: '门店/客户', key: 'storeName', width: 18 },
+    { header: '当前税则品名', key: 'hsDescription', width: 26 },
+    { header: '实际申报要素', key: 'declaration', width: 30 },
+    { header: '门店/目的港', key: 'storeName', width: 18 },
     { header: '数量', key: 'quantity', width: 10 },
     { header: '单位', key: 'unit', width: 8 },
     { header: '单价(USD)', key: 'unitPriceUsd', width: 12 },
     { header: '金额(USD)', key: 'lineAmountUsd', width: 12 },
-    { header: '退税基数(CNY)', key: 'refundBaseCny', width: 14 },
+    { header: '采购专票预计依据(CNY)', key: 'refundBaseCny', width: 20 },
     { header: '预计退税额(CNY)', key: 'estimatedRefundCny', width: 16 },
-    { header: '不可退税额(CNY)', key: 'nonRefundableTaxCny', width: 16 },
-    { header: '增值税率(%)', key: 'vatRate', width: 12 },
-    { header: '退税率(%)', key: 'refundRate', width: 12 },
-    { header: '匹配类型', key: 'matchType', width: 12 },
-    { header: '税务分类', key: 'taxCategory', width: 14 },
+    { header: '不可退进项税(CNY)', key: 'nonRefundableTaxCny', width: 16 },
+    { header: '采购增值税率(%)', key: 'vatRate', width: 14 },
+    { header: '当前退税率(%)', key: 'refundRate', width: 13 },
+    { header: '证据状态', key: 'matchType', width: 16 },
+    { header: 'HS来源', key: 'hsSource', width: 18 },
+    { header: '税则生效日期', key: 'evidenceEffectiveDate', width: 15 },
+    { header: '来源链接', key: 'evidenceSourceUrl', width: 34 },
     { header: '备注', key: 'note', width: 20 },
   ];
   applyHeaderStyle(detailSheet);
   if (!taxResult.lines.length) {
-    detailSheet.addRow({ index: '-', productName: '（暂无可测算明细）' });
+    detailSheet.addRow({ index: '-', productName: '（暂无可测算装箱明细）' });
   } else {
-    taxResult.lines.forEach((line) => detailSheet.addRow(line));
+    taxResult.lines.forEach((line) => detailSheet.addRow({
+      ...line,
+      evidenceEffectiveDate: formatDate(line.evidenceEffectiveDate),
+    }));
   }
 
-  const ruleSheet = workbook.addWorksheet('HS编码规则');
-  ruleSheet.columns = [
-    { header: 'HS编码/前缀', key: 'hsCode', width: 18 },
-    { header: '描述', key: 'description', width: 28 },
-    { header: '增值税率(%)', key: 'vatRate', width: 14 },
-    { header: '退税率(%)', key: 'refundRate', width: 14 },
-    { header: '税务分类', key: 'taxCategory', width: 18 },
+  const evidenceSheet = workbook.addWorksheet('当前税则证据');
+  evidenceSheet.columns = [
+    { header: 'HS编码', key: 'hsCode', width: 18 },
+    { header: '税则品名', key: 'description', width: 30 },
+    { header: '采购增值税率(%)', key: 'vatRate', width: 16 },
+    { header: '出口退税率(%)', key: 'refundRate', width: 16 },
+    { header: 'HS来源', key: 'hsSource', width: 18 },
+    { header: '生效日期', key: 'effectiveDate', width: 15 },
+    { header: '采集/复核日期', key: 'fetchedAt', width: 16 },
+    { header: '官方来源', key: 'sourceUrl', width: 42 },
   ];
-  applyHeaderStyle(ruleSheet);
-  taxResult.rules.forEach((rule) => ruleSheet.addRow(rule));
+  applyHeaderStyle(evidenceSheet);
+  taxResult.evidence.forEach((record) => evidenceSheet.addRow({
+    ...record,
+    effectiveDate: formatDate(record.effectiveDate),
+    fetchedAt: formatDate(record.fetchedAt),
+  }));
+  if (!taxResult.evidence.length) evidenceSheet.addRow({ description: '（暂无当前税则证据）' });
 
   const rawBuffer = await workbook.xlsx.writeBuffer();
   return {
@@ -359,59 +281,47 @@ const addPdfSection = (doc, title) => {
   doc.moveDown(0.4);
   doc.font('Helvetica-Bold').fontSize(12).fillColor('#1F2D3D').text(title);
   doc.moveDown(0.2);
-  doc.fillColor('black');
-  doc.font('Helvetica').fontSize(10);
+  doc.fillColor('black').font('Helvetica').fontSize(10);
 };
 
-const addPdfKeyValues = (doc, rows) => {
-  rows.forEach(([label, value]) => {
-    doc.font('Helvetica-Bold').text(`${label}:`, { continued: true });
-    doc.font('Helvetica').text(` ${value}`);
-  });
-};
+const addPdfKeyValues = (doc, rows) => rows.forEach(([label, value]) => {
+  doc.font('Helvetica-Bold').text(`${label}:`, { continued: true });
+  doc.font('Helvetica').text(` ${value}`);
+});
 
-const addPdfLineItems = (doc, lines) => {
-  if (!lines.length) {
-    doc.text('（暂无可测算明细）');
-    return;
-  }
-
-  lines.forEach((line) => {
-    doc.text(
-      `${line.index}. ${line.productName} | HS:${line.hsCode || '-'} | USD:${line.lineAmountUsd.toFixed(2)} | 退税:${line.estimatedRefundCny.toFixed(2)} | 不可退:${line.nonRefundableTaxCny.toFixed(2)} | ${line.taxCategory}`,
-    );
-  });
-};
-
-const exportTaxCalculationPdf = async (contractOrId) => {
-  const contract = await resolveContract(contractOrId);
-  const taxResult = calculateTaxSummary(contract);
-  const doc = new PDFDocument({
-    margin: 40,
-    size: 'A4',
-    compress: false,
-  });
+const exportTaxCalculationPdf = async (contractOrReadiness) => {
+  const readiness = await resolveReadiness(contractOrReadiness);
+  const taxResult = calculateTaxSummary(readiness);
+  const doc = new PDFDocument({ margin: 40, size: 'A4', compress: false });
 
   addPdfTitle(doc, 'Tax Calculation Report', `Contract ${taxResult.contract.contractNo}`);
-
   addPdfSection(doc, 'Summary');
   addPdfKeyValues(doc, [
     ['Contract No.', taxResult.contract.contractNo],
     ['Port', taxResult.contract.portName],
     ['Exchange Rate', taxResult.summary.exchangeRate.toFixed(2)],
-    ['Sales Amount (USD)', taxResult.summary.totalSalesUsd.toFixed(2)],
-    ['Sales Amount (CNY)', taxResult.summary.totalSalesCny.toFixed(2)],
+    ['Sales Amount (USD, reference only)', taxResult.summary.totalSalesUsd.toFixed(2)],
     ['Estimated Refund (CNY)', taxResult.summary.totalRefundAmountCny.toFixed(2)],
-    ['Refund Base (CNY)', taxResult.summary.totalRefundBaseCny.toFixed(2)],
-    ['Non-refundable Tax (CNY)', taxResult.summary.totalNonRefundableTaxCny.toFixed(2)],
-    ['Matched Lines', `${taxResult.summary.matchedLineCount}/${taxResult.summary.lineCount}`],
+    ['Estimated Invoice Basis (CNY)', taxResult.summary.totalRefundBaseCny.toFixed(2)],
+    ['Non-refundable Input Tax (CNY)', taxResult.summary.totalNonRefundableTaxCny.toFixed(2)],
+    ['Current Evidence Lines', `${taxResult.summary.matchedLineCount}/${taxResult.summary.lineCount}`],
+    ['Blocking / Warning', `${taxResult.summary.errorCount}/${taxResult.summary.warningCount}`],
   ]);
 
   addPdfSection(doc, 'Line Items');
-  addPdfLineItems(doc, taxResult.lines);
+  if (!taxResult.lines.length) {
+    doc.text('(No packing lines available)');
+  } else {
+    taxResult.lines.forEach((line) => {
+      doc.text(
+        `${line.index}. ${line.productName} | HS:${line.hsCode || '-'} | USD:${line.lineAmountUsd.toFixed(2)} | Refund:${line.estimatedRefundCny.toFixed(2)} | Non-refundable:${line.nonRefundableTaxCny.toFixed(2)} | ${line.hsSource}`,
+      );
+    });
+  }
 
   doc.moveDown(1);
-  doc.fontSize(8).fillColor('#6F7F8E').text(`Exported at: ${formatDate(new Date())}`);
+  doc.fontSize(8).fillColor('#6F7F8E').text('Estimate only. Final amounts require supplier invoices, customs declaration and tax-system confirmation.');
+  doc.text(`Exported at: ${formatDate(new Date())}`);
   doc.fillColor('black');
 
   const buffer = await collectPdfBuffer(doc);

@@ -17,6 +17,19 @@ const router = Router();
 router.use(authenticate);
 
 /**
+ * POST /api/three-forms/preview
+ * 返回后端权威的全量装箱行、HS 证据、定价建议与单证阻塞项，不写业务数据。
+ */
+router.post('/preview', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE'), wrapAsync(async (req, res) => {
+  const readiness = await threeFormsService.previewThreeForms({
+    salesContractId: req.body?.salesContractId,
+    items: req.body?.items || [],
+    profitRate: req.body?.profitRate,
+  });
+  success(res, readiness);
+}));
+
+/**
  * POST /api/three-forms/generate
  * 一键生成三张表（报关单、外汇核销单、出口退税单）
  * 思路：SALES/PURCHASE/FINANCE/WAREHOUSE 均可发起，不限 ADMIN

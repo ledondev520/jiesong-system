@@ -1,7 +1,7 @@
 /**
  * Input: hsCodeService、prisma
- * Output: HSCode 服务层搜索测试
- * Pos: 后端服务层测试
+ * Output: HSCode 搜索与人工证据化更新测试
+ * Pos: 后端服务层测试，锁定当前税则快照的可追溯更新 Interface
  */
 
 const test = require('node:test');
@@ -145,5 +145,57 @@ test('listHsCodes: 纯数字关键词同时查商品名包含与 hsCode 前缀',
         { hsCode: { startsWith: '0802909020' } },
       ],
     });
+  });
+});
+
+test('updateHsCode: 税率更新必须同时提交生效日期和官方来源，并刷新采集时间', async () => {
+  let updatedArgs = null;
+
+  await withMockDelegate('hsCode', {
+    findUnique: async () => ({
+      id: 'hs-1',
+      hsCode: '6907219000',
+      effectiveDate: new Date('2025-01-01T00:00:00.000Z'),
+      sourceUrl: null,
+    }),
+    update: async (args) => {
+      updatedArgs = args;
+      return { id: 'hs-1', ...args.data, hsCode: '6907219000' };
+    },
+  }, async () => {
+    const result = await hsCodeService.updateHsCode('6907219000', {
+      refundRate: 0,
+      vatRate: 13,
+      effectiveDate: '2026-01-01',
+      sourceUrl: 'https://www.chinatax.gov.cn/example',
+      note: '2026 年人工复核',
+    });
+
+    assert.equal(updatedArgs.where.hsCode, '6907219000');
+    assert.equal(updatedArgs.data.refundRate, 0);
+    assert.equal(updatedArgs.data.vatRate, 13);
+    assert.equal(updatedArgs.data.sourceUrl, 'https://www.chinatax.gov.cn/example');
+    assert.equal(updatedArgs.data.effectiveDate.toISOString(), '2026-01-01T00:00:00.000Z');
+    assert.ok(updatedArgs.data.fetchedAt instanceof Date);
+    assert.equal(result.note, '2026 年人工复核');
+  });
+});
+
+test('updateHsCode: 无来源的税率修改被拒绝，防止无证据覆盖当前税则', async () => {
+  await withMockDelegate('hsCode', {
+    findUnique: async () => ({
+      id: 'hs-1',
+      hsCode: '6907219000',
+      effectiveDate: new Date('2025-01-01T00:00:00.000Z'),
+      sourceUrl: null,
+    }),
+  }, async () => {
+    await assert.rejects(
+      () => hsCodeService.updateHsCode('6907219000', {
+        refundRate: 0,
+        effectiveDate: '2026-01-01',
+      }),
+      (error) => error.statusCode === 400 && /来源链接/.test(error.message),
+    );
   });
 });

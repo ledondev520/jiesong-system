@@ -1,14 +1,24 @@
 /**
  * Input: 商品名或 HSCode 查询参数、Prisma 客户端、aiService（懒加载）
- * Output: HSCode 查询结果与税率（支持精确/模糊搜索 + AI 兜底批量推荐 + 独立编码前缀查询）
- * Pos: HSCode 服务层，负责本地商品编码检索；batchMatchHsCodes 采用两轮策略提升准确率
+ * Output: HSCode 查询结果、税率与带来源证据的人工更新
+ * Pos: HSCode 服务层，负责本地商品编码检索与当前税则快照维护；batchMatchHsCodes 采用两轮策略提升准确率
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');
+const { createError } = require('../middleware/errorHandler');
 const LIST_CACHE_TTL_MS = 60 * 1000;
 const listCache = new Map();
+
+const RATE_UPDATE_FIELDS = ['taxRate', 'refundRate', 'exportTaxRate', 'vatRate'];
+const TEXT_UPDATE_FIELDS = [
+  'unit',
+  'note',
+  'declarationElements',
+  'supervisionConditions',
+  'inspectionQuarantine',
+];
 
 const getListCacheKey = ({ keyword, code, page, pageSize }) => JSON.stringify({ keyword, code, page, pageSize });
 
@@ -216,6 +226,75 @@ const searchByHsCode = async (code) => {
 const getTaxRate = async (code) => {
   const record = await searchByHsCode(code);
   return record ? record.taxRate : null;
+};
+
+const parseRate = (field, value) => {
+  if (value === null || value === '') {
+    if (field === 'taxRate') throw createError('综合税率不能为空', 400);
+    return null;
+  }
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0 || number > 100) {
+    throw createError(`${field} 必须是 0–100 之间的数字`, 400);
+  }
+  return number;
+};
+
+const parseEffectiveDate = (value) => {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) throw createError('生效日期格式不正确', 400);
+  return date;
+};
+
+const parseSourceUrl = (value) => {
+  const raw = String(value || '').trim();
+  try {
+    const url = new URL(raw);
+    if (!['http:', 'https:'].includes(url.protocol)) throw new Error('unsupported protocol');
+    return url.toString();
+  } catch {
+    throw createError('官方来源链接必须是有效的 http(s) 地址', 400);
+  }
+};
+
+/**
+ * 职责：人工维护当前 HS 税则快照，并强制将税率变化绑定到生效日期和来源证据。
+ */
+const updateHsCode = async (code, payload = {}) => {
+  const normalizedCode = String(code || '').replace(/\D/g, '');
+  if (!/^\d{10}$/.test(normalizedCode)) throw createError('HS 编码必须为 10 位数字', 400);
+
+  const existing = await prisma.hsCode.findUnique({ where: { hsCode: normalizedCode } });
+  if (!existing) throw createError('HSCode 不存在', 404);
+
+  const hasOwn = (field) => Object.prototype.hasOwnProperty.call(payload, field);
+  const rateChanged = RATE_UPDATE_FIELDS.some(hasOwn);
+  if (rateChanged && (!hasOwn('effectiveDate') || !hasOwn('sourceUrl'))) {
+    throw createError('修改税率时必须同时填写生效日期和官方来源链接', 400);
+  }
+
+  const data = {};
+  RATE_UPDATE_FIELDS.forEach((field) => {
+    if (hasOwn(field)) data[field] = parseRate(field, payload[field]);
+  });
+  TEXT_UPDATE_FIELDS.forEach((field) => {
+    if (hasOwn(field)) {
+      const value = payload[field];
+      data[field] = value === null ? null : String(value).trim() || null;
+    }
+  });
+  if (hasOwn('effectiveDate')) data.effectiveDate = parseEffectiveDate(payload.effectiveDate);
+  if (hasOwn('sourceUrl')) data.sourceUrl = parseSourceUrl(payload.sourceUrl);
+
+  if (Object.keys(data).length === 0) throw createError('没有可更新的 HS 税则字段', 400);
+  data.fetchedAt = new Date();
+
+  const updated = await prisma.hsCode.update({
+    where: { hsCode: normalizedCode },
+    data,
+  });
+  listCache.clear();
+  return updated;
 };
 
 /**
@@ -533,6 +612,7 @@ module.exports = {
   fuzzySearchHsCodes,
   searchByProductName,
   searchByHsCode,
+  updateHsCode,
   getTaxRate,
   batchMatchHsCodes,
 };

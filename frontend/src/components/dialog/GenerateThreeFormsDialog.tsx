@@ -1,18 +1,18 @@
 /**
- * Input: 出口合同 ID 及其装箱明细（含商品档案中已存储的 hsCode）、HS 编码库（退税率查询）
- * Output: 一键生成三张表（报关单、外汇核销、出口退税），并对退税率为 0 的商品给出「无退税」警示
- * Pos: 出口合同详情页操作组件
+ * Input: 出口合同装箱明细、后端权威出口准备度、历史/商品档案 HS 与 AI 建议
+ * Output: 全量商品 HS/价格/申报要素校验、一键生成三张表与无退税警示
+ * Pos: 出口合同详情页单证确认 Module，缺任一装箱行时禁止生成
  *
  * 设计原则：HS 编码应维护在商品档案（Product.hsCode）中，此处直接复用；
  * 对于缺失 HS 编码的商品，允许在表格内内联输入或点击"AI 建议"填充。
- * 打开对话框时自动查询各行 HS 编码的退税率，refundRate === 0 视为无出口退税，红色警示。
+ * 打开或修改 HS 后由后端统一校验当前税则、退税率、出口售价、申报要素和采购退税基数。
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -34,10 +34,15 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { hsCodeService } from '@/services/hsCode.service';
-import { threeFormsService, type ThreeFormsGenerateInput } from '@/services/threeForms.service';
+import {
+  threeFormsService,
+  type ExportReadinessLine,
+  type ExportReadinessResult,
+  type ThreeFormsGenerateInput,
+} from '@/services/threeForms.service';
 import { toast } from 'sonner';
 import {
-  FileText, DollarSign, ReceiptText, CheckCircle2, AlertCircle,
+  FileText, DollarSign, ReceiptText, AlertCircle,
   Loader2, Sparkles,
 } from 'lucide-react';
 import type { SalesContract, PackingItem } from '@/types';
@@ -50,7 +55,7 @@ interface GenerateThreeFormsDialogProps {
 }
 
 /** 每行商品的 HS 编码来源 */
-type HsSource = 'stored' | 'ai' | 'manual' | 'missing';
+type HsSource = 'stored' | 'history' | 'ai' | 'manual' | 'missing';
 
 /** 每行商品的展示状态 */
 interface ProductRow {
@@ -64,6 +69,8 @@ interface ProductRow {
   refundRate?: number | null;
   /** AI 建议获取中 */
   suggesting?: boolean;
+  /** 后端权威的当前税则、定价和退税准备结果 */
+  readinessLine?: ExportReadinessLine;
 }
 
 const THREE_FORMS_CONFIG = [
@@ -74,10 +81,18 @@ const THREE_FORMS_CONFIG = [
 
 /** 根据来源显示对应徽章 */
 function SourceBadge({ source }: { source: HsSource }) {
-  if (source === 'stored') return <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 text-xs">存档</Badge>;
+  if (source === 'history') return <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-xs text-emerald-700">历史报关</Badge>;
+  if (source === 'stored') return <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 text-xs">商品档案</Badge>;
   if (source === 'ai') return <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50 text-xs">AI 建议</Badge>;
   if (source === 'manual') return <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50 text-xs">手动</Badge>;
   return <Badge variant="outline" className="text-red-500 border-red-300 bg-red-50 text-xs">未填写</Badge>;
+}
+
+function toUiHsSource(source: ExportReadinessLine['hsSource']): HsSource {
+  if (source === 'customs_history') return 'history';
+  if (source === 'product_archive') return 'stored';
+  if (source === 'manual_confirmation') return 'manual';
+  return 'missing';
 }
 
 export function GenerateThreeFormsDialog({
@@ -94,6 +109,9 @@ export function GenerateThreeFormsDialog({
    */
   const [rows, setRows] = useState<ProductRow[]>([]);
   const [batchSuggesting, setBatchSuggesting] = useState(false);
+  const [readiness, setReadiness] = useState<ExportReadinessResult | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const previewRequestIdRef = useRef(0);
 
   // 从合同装箱明细派生初始行（仅 open 切换为 true 时重建，否则保留用户编辑状态）
   // 过滤掉异常数据（null/undefined），确保每行都有合法的 PackingItem
@@ -125,6 +143,8 @@ export function GenerateThreeFormsDialog({
       // 关闭时仅停止加载状态，不清空 rows（保留 AI 已匹配结果）
       setGenerating(false);
       setBatchSuggesting(false);
+      setPreviewLoading(false);
+      previewRequestIdRef.current += 1;
     }
   };
 
@@ -139,47 +159,63 @@ export function GenerateThreeFormsDialog({
   const missingCount = displayRows.length - readyCount;
   // 无出口退税商品（退税率明确为 0）：需要警示，出口后无法退税
   const noRefundRows = displayRows.filter((r) => r.refundRate === 0);
+  const previewSignature = displayRows
+    .map((row) => `${row.packingItem.id}:${row.hsCode.trim()}:${row.source}`)
+    .join('|');
 
-  // 打开对话框时，为已有 HS 编码但退税率未知的行查询退税率（用于无退税警示）
+  // 打开或人工/AI 修改 HS 编码后，重新读取后端权威的全量单证准备度。
   useEffect(() => {
     if (!open) return;
-    const pending = (rows.length > 0 ? rows : initialRows)
-      .map((row, index) => ({ row, index }))
-      .filter(({ row }) => !!row?.packingItem && row.hsCode.trim() && row.refundRate == null);
-    if (pending.length === 0) return;
-
-    let cancelled = false;
-    const lookup = async () => {
-      // 1. 去重后逐码查询 HS 库（404/异常视为未知，不标警示）
-      const uniqueCodes = Array.from(new Set(pending.map(({ row }) => row.hsCode.trim())));
-      const rateMap = new Map<string, number | null>();
-      await Promise.all(
-        uniqueCodes.map(async (code) => {
-          try {
-            const res = await hsCodeService.getByCode(code);
-            rateMap.set(code, typeof res.data?.refundRate === 'number' ? res.data.refundRate : null);
-          } catch {
-            rateMap.set(code, null);
-          }
-        }),
-      );
-      if (cancelled) return;
-      // 2. 回填各行退税率
-      setRows((prev) => {
-        const base = prev.length > 0 ? prev : initialRows;
+    const requestId = ++previewRequestIdRef.current;
+    const baseRows = displayRows;
+    setPreviewLoading(true);
+    void threeFormsService.previewThreeForms({
+      salesContractId: salesContract.id,
+      items: baseRows.map((row) => ({
+        productId: row.packingItem.productId,
+        packingItemId: row.packingItem.id,
+        productName: row.productName,
+        hsCode: row.hsCode.trim(),
+        hsSource: row.source,
+        quantity: row.packingItem.quantity,
+        unit: row.packingItem.unit || row.packingItem.product?.unit || '',
+        unitPrice: row.packingItem.unitPrice || 0,
+        totalPrice: row.packingItem.totalPrice || 0,
+      })),
+    }).then((response) => {
+      if (previewRequestIdRef.current !== requestId || !response.data) return;
+      const nextReadiness = response.data;
+      setReadiness(nextReadiness);
+      const lineById = new Map(nextReadiness.lines.map((line) => [line.packingItemId, line]));
+      setRows((current) => {
+        const base = current.length > 0 ? current : initialRows;
         return base.map((row) => {
-          if (!row?.packingItem || !row.hsCode.trim() || row.refundRate != null) return row;
-          const rate = rateMap.get(row.hsCode.trim());
-          return rate === undefined ? row : { ...row, refundRate: rate };
+          const line = lineById.get(row.packingItem.id);
+          if (!line) return row;
+          const preserveOverride = row.source === 'manual' || row.source === 'ai';
+          return {
+            ...row,
+            hsCode: preserveOverride ? row.hsCode : line.hsCode,
+            source: preserveOverride ? row.source : toUiHsSource(line.hsSource),
+            refundRate: line.hsEvidence?.refundRate ?? null,
+            readinessLine: line,
+          };
         });
       });
-    };
-    void lookup();
+    }).catch((error: unknown) => {
+      if (previewRequestIdRef.current !== requestId) return;
+      setReadiness(null);
+      const apiMsg = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(apiMsg || '出口单证准备度校验失败');
+    }).finally(() => {
+      if (previewRequestIdRef.current === requestId) setPreviewLoading(false);
+    });
     return () => {
-      cancelled = true;
+      if (previewRequestIdRef.current === requestId) previewRequestIdRef.current += 1;
     };
+    // previewSignature 只包含用户可变的 HS 值/来源，readinessLine 更新不会触发循环。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialRows]);
+  }, [open, salesContract.id, previewSignature, initialRows]);
 
   /**
    * 获取当前可操作的行列表：rows 有值时用 rows，否则用 initialRows 初始化
@@ -187,6 +223,39 @@ export function GenerateThreeFormsDialog({
    */
   const getBaseRows = (prev: ProductRow[]): ProductRow[] =>
     prev.length > 0 ? prev : initialRows;
+
+  const blockingIssues = readiness?.issues.filter((issue) => issue.severity === 'error') || [];
+  const requiresCustoms = selectedForms.includes('customs');
+  const requiresTaxRefund = selectedForms.includes('tax-refund');
+  const generationReady = Boolean(
+    readiness
+    && (!requiresCustoms || readiness.customsReady)
+    && (!requiresTaxRefund || readiness.taxRefundReady)
+    && missingCount === 0,
+  );
+
+  /** 保持报关单 → 外汇核销 → 退税的依赖顺序，避免选择无效组合。 */
+  const toggleForm = (formId: string) => {
+    setSelectedForms((current) => {
+      const selected = new Set(current);
+      if (selected.has(formId)) {
+        selected.delete(formId);
+        if (formId === 'customs') {
+          selected.delete('forex');
+          selected.delete('tax-refund');
+        }
+        if (formId === 'forex') selected.delete('tax-refund');
+      } else {
+        selected.add(formId);
+        if (formId === 'forex') selected.add('customs');
+        if (formId === 'tax-refund') {
+          selected.add('customs');
+          selected.add('forex');
+        }
+      }
+      return THREE_FORMS_CONFIG.map((form) => form.id).filter((id) => selected.has(id));
+    });
+  };
 
   /** 手动修改某行的 HS 编码 */
   const handleHsCodeChange = (index: number, value: string) => {
@@ -305,14 +374,23 @@ export function GenerateThreeFormsDialog({
   const handleGenerateForms = async () => {
     setGenerating(true);
     try {
-      const validRows = displayRows.filter((r) => r.hsCode.trim());
-      if (validRows.length === 0) {
-        toast.error('没有填写 HS 编码的商品，无法生成单据');
+      if (displayRows.length === 0) {
+        toast.error('当前货柜没有装箱商品，无法生成单据');
+        setGenerating(false);
+        return;
+      }
+      if (missingCount > 0) {
+        toast.error(`仍有 ${missingCount} 个商品缺少 HS 编码，必须全部补齐后再生成`);
+        setGenerating(false);
+        return;
+      }
+      if (!generationReady) {
+        toast.error(blockingIssues[0]?.message || '出口单证资料仍有阻塞项，请先补齐');
         setGenerating(false);
         return;
       }
 
-      const items = validRows.map((r) => ({
+      const items = displayRows.map((r) => ({
         productId: r.packingItem.productId,        // Product 主键（必填，FK 约束）
         packingItemId: r.packingItem.id,           // PackingItem id（可选）
         productName: r.productName,
@@ -322,6 +400,7 @@ export function GenerateThreeFormsDialog({
         unitPrice: r.packingItem.unitPrice || 0,
         totalPrice: r.packingItem.totalPrice || 0,
         refundRate: r.refundRate ?? undefined,
+        hsSource: r.source,
       }));
 
       const payload: ThreeFormsGenerateInput = {
@@ -345,6 +424,9 @@ export function GenerateThreeFormsDialog({
       };
 
       toast.success(`生成成功：${selectedForms.length} 张单据，正在下载 Excel...`);
+      if (results.warnings?.length) {
+        toast.warning(`已生成，但有 ${results.warnings.length} 项风险需人工复核`);
+      }
       onGenerated?.(generatedFormIds);
 
       // 自动下载合并的三张表 Excel
@@ -380,6 +462,7 @@ export function GenerateThreeFormsDialog({
             合同编号：{salesContract.contractNo} &nbsp;|&nbsp; 共 {displayRows.length} 个商品，
             {readyCount} 个已有 HS 编码
             {missingCount > 0 && <span className="text-red-500 ml-1">，{missingCount} 个待填写</span>}
+            {previewLoading && <span className="ml-2 text-muted-foreground">· 正在校验当前税则与价格</span>}
           </DialogDescription>
         </DialogHeader>
 
@@ -391,11 +474,7 @@ export function GenerateThreeFormsDialog({
                 key={form.id}
                 variant={selectedForms.includes(form.id) ? 'default' : 'outline'}
                 size="sm"
-                onClick={() =>
-                  setSelectedForms((prev) =>
-                    prev.includes(form.id) ? prev.filter((f) => f !== form.id) : [...prev, form.id]
-                  )
-                }
+                onClick={() => toggleForm(form.id)}
               >
                 <form.icon className="h-4 w-4 mr-1" />
                 {form.name}
@@ -421,6 +500,45 @@ export function GenerateThreeFormsDialog({
             )}
           </div>
 
+          {readiness ? (
+            <Card className={blockingIssues.length > 0 ? 'border-amber-300 bg-amber-50/60' : 'border-emerald-200 bg-emerald-50/60'}>
+              <CardContent className="grid gap-3 px-4 py-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">报关资料</p>
+                  <p className={readiness.customsReady ? 'font-medium text-emerald-700' : 'font-medium text-amber-800'}>
+                    {readiness.customsReady ? '完整' : '有阻塞项'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">退税估算资料</p>
+                  <p className={readiness.taxRefundReady ? 'font-medium text-emerald-700' : 'font-medium text-amber-800'}>
+                    {readiness.taxRefundReady ? '完整' : '有阻塞项'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">出口明细合计</p>
+                  <p className="font-medium tabular-nums">${readiness.summary.totalExportAmountUsd.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">预计退税</p>
+                  <p className="font-medium tabular-nums">¥{readiness.summary.totalEstimatedRefundCny.toLocaleString()}</p>
+                </div>
+                {blockingIssues.length > 0 ? (
+                  <div className="sm:col-span-2 lg:col-span-4">
+                    <p className="text-xs font-medium text-amber-900">生成前必须处理</p>
+                    <ul className="mt-1 space-y-1 text-xs text-amber-900">
+                      {blockingIssues.slice(0, 4).map((issue, index) => (
+                        <li key={`${issue.packingItemId || 'global'}-${issue.code}-${index}`}>
+                          {issue.productName ? `${issue.productName}：` : ''}{issue.message}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
+
           {/* 提示：HS 编码应在商品档案中维护 */}
           {missingCount > 0 && (
             <Card className="border-amber-200 bg-amber-50">
@@ -428,8 +546,8 @@ export function GenerateThreeFormsDialog({
                 <div className="flex items-start gap-2 text-sm text-amber-800">
                   <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                   <p>
-                    建议在<strong>商品档案</strong>中为每个商品预先设定 HS 编码，避免每次生成时重复匹配。
-                    下方表格允许临时手动填写，但该值不会保存回商品档案。
+                    系统优先使用该商品最近一次正式报关的 HS 编码，其次使用商品档案编码；都没有时才需要 AI 建议或人工输入。
+                    人工覆盖只用于本次单证，生成后会作为下一次的历史报关依据。
                   </p>
                 </div>
               </CardContent>
@@ -474,30 +592,33 @@ export function GenerateThreeFormsDialog({
                   >
                     <TableCell className="font-medium max-w-[160px] truncate" title={row.productName}>
                       {row.productName}
+                      {row.readinessLine?.issues.some((issue) => issue.severity === 'error') ? (
+                        <p className="mt-1 whitespace-normal text-[11px] font-normal leading-4 text-amber-700">
+                          {row.readinessLine.issues.find((issue) => issue.severity === 'error')?.message}
+                        </p>
+                      ) : null}
                     </TableCell>
                     <TableCell className="text-sm">
                       {row.packingItem.quantity ?? '-'} {row.packingItem.unit || row.packingItem.product?.unit || ''}
                     </TableCell>
                     <TableCell className="text-sm">
-                      {row.packingItem.totalPrice?.toFixed(2) ?? '-'}
+                      {row.readinessLine?.totalPriceUsd ? (
+                        `$${row.readinessLine.totalPriceUsd.toFixed(2)}`
+                      ) : row.readinessLine?.recommendedUnitPriceUsd ? (
+                        <span className="text-amber-700">
+                          待录入<br />建议单价 ${row.readinessLine.recommendedUnitPriceUsd.toFixed(2)}
+                        </span>
+                      ) : '-'}
                     </TableCell>
                     <TableCell>
-                      {row.source === 'stored' ? (
-                        /* 存档编码只读展示，附绿色对勾 */
-                        <div className="flex items-center gap-1 font-mono text-sm">
-                          <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                          {row.hsCode}
-                        </div>
-                      ) : (
-                        /* 非存档编码可内联编辑 */
-                        <Input
-                          value={row.hsCode}
-                          onChange={(e) => handleHsCodeChange(index, e.target.value)}
-                          placeholder="输入 HS 编码"
-                          className="h-7 text-sm font-mono"
-                          maxLength={20}
-                        />
-                      )}
+                      <Input
+                        aria-label={`${row.productName} HS 编码`}
+                        value={row.hsCode}
+                        onChange={(e) => handleHsCodeChange(index, e.target.value)}
+                        placeholder="输入 10 位 HS 编码"
+                        className="h-7 text-sm font-mono"
+                        maxLength={20}
+                      />
                     </TableCell>
                     <TableCell>
                       <SourceBadge source={row.source} />
@@ -513,24 +634,28 @@ export function GenerateThreeFormsDialog({
                       ) : (
                         <span className="text-xs">—</span>
                       )}
+                      {row.readinessLine?.hsEvidence?.effectiveDate ? (
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">
+                          生效 {new Date(row.readinessLine.hsEvidence.effectiveDate).toLocaleDateString('zh-CN')}
+                        </p>
+                      ) : null}
                     </TableCell>
                     <TableCell>
-                      {row.source !== 'stored' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleSuggestOne(index)}
-                          disabled={row.suggesting || batchSuggesting}
-                          className="h-7 px-2 text-purple-600 hover:text-purple-700"
-                          title="AI 建议 HS 编码"
-                        >
-                          {row.suggesting ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Sparkles className="h-3 w-3" />
-                          )}
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleSuggestOne(index)}
+                        disabled={row.suggesting || batchSuggesting}
+                        className="h-7 px-2 text-purple-600 hover:text-purple-700"
+                        title="查询其他 HS 编码建议"
+                        aria-label={`为 ${row.productName} 查询 HS 编码建议`}
+                      >
+                        {row.suggesting ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3 w-3" />
+                        )}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -555,7 +680,7 @@ export function GenerateThreeFormsDialog({
           </Button>
           <Button
             onClick={handleGenerateForms}
-            disabled={generating || selectedForms.length === 0 || readyCount === 0}
+            disabled={generating || previewLoading || selectedForms.length === 0 || !generationReady}
           >
             {generating ? (
               <>

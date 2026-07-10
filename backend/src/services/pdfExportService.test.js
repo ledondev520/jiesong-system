@@ -25,6 +25,9 @@ test('exportSalesContractPdf: 合同不存在时抛出404业务错误', async ()
 
 test('exportSalesContractPdf: 生成合同 PDF', async () => {
   const originalFindUnique = prisma.salesContract.findUnique;
+  const originalCustomsFindMany = prisma.customsDeclarationItem.findMany;
+  const originalHsFindMany = prisma.hsCode.findMany;
+  const originalTaxRateFindMany = prisma.taxRate.findMany;
   prisma.salesContract.findUnique = async () => ({
     id: 'contract-id',
     contractNo: 'EXP-0001',
@@ -62,6 +65,8 @@ test('exportSalesContractPdf: 生成合同 PDF', async () => {
     ],
     packingItems: [
       {
+        id: 'packing-1',
+        productId: 'product-1',
         quantity: 10,
         unit: 'pcs',
         boxes: 2,
@@ -69,8 +74,16 @@ test('exportSalesContractPdf: 生成合同 PDF', async () => {
         netWeight: 11,
         volume: 1.2,
         unitPrice: 3,
+        totalPrice: 30,
+        purchaseCost: 113,
+        note: '',
+        purchaseItem: { purchaseContract: { taxRate: 13 } },
         product: {
+          id: 'product-1',
           customsName: 'Widget',
+          hsCode: '3924100000',
+          declaration: '品牌类型:0|用途:餐厨收纳',
+          unit: 'pcs',
         },
         store: {
           name: 'Demo Store',
@@ -78,6 +91,17 @@ test('exportSalesContractPdf: 生成合同 PDF', async () => {
       },
     ],
   });
+  prisma.customsDeclarationItem.findMany = async () => [];
+  prisma.hsCode.findMany = async () => ([{
+    hsCode: '3924100000',
+    productName: '塑料制餐厨用品',
+    refundRate: 13,
+    vatRate: 13,
+    effectiveDate: new Date('2026-01-01T00:00:00.000Z'),
+    fetchedAt: new Date('2026-03-01T00:00:00.000Z'),
+    sourceUrl: 'https://example.test/3924100000',
+  }]);
+  prisma.taxRate.findMany = async () => [];
 
   try {
     const result = await exportSalesContractPdf('contract-id');
@@ -88,6 +112,9 @@ test('exportSalesContractPdf: 生成合同 PDF', async () => {
     assert.equal(result.buffer.slice(0, 4).toString(), '%PDF');
   } finally {
     prisma.salesContract.findUnique = originalFindUnique;
+    prisma.customsDeclarationItem.findMany = originalCustomsFindMany;
+    prisma.hsCode.findMany = originalHsFindMany;
+    prisma.taxRate.findMany = originalTaxRateFindMany;
   }
 });
 

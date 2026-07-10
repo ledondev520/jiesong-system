@@ -13,6 +13,7 @@ const PDFDocument = require('pdfkit');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { calculateTaxSummary } = require('./taxCalculationEngine');
+const { getExportReadiness } = require('./exportReadinessService');
 
 const DEFAULT_LOGO_PATH = path.join(__dirname, '../../assets/pdf-logo.png');
 const DEFAULT_STAMP_PATH = path.join(__dirname, '../../assets/pdf-stamp.png');
@@ -248,6 +249,8 @@ const exportSalesContractPdf = async (contractId) => {
     throw createError(`合同不存在: ${contractId}`, 404);
   }
 
+  const exportReadiness = await getExportReadiness(contractId);
+
   const statusLabelMap = {
     DRAFT: '草稿',
     CONFIRMED: '已确认',
@@ -300,23 +303,26 @@ const exportSalesContractPdf = async (contractId) => {
     return `${productName} | Boxes:${safeText(item.boxes)} | Qty:${formatMoney(item.quantity)} ${safeText(item.unit)} | Weight:${formatMoney(item.grossWeight)}kg / ${formatMoney(item.netWeight)}kg | Volume:${formatMoney(item.volume)} | Store:${storeName}`;
   });
 
-  const taxResult = calculateTaxSummary(contract);
+  const taxResult = calculateTaxSummary(exportReadiness);
   doc.moveDown(0.6);
   addSectionTitle(doc, 'Tax Summary');
   addKVSection(doc, [
     ['Estimated Refund (CNY)', formatMoney(taxResult.summary.totalRefundAmountCny)],
     ['Refund Base (CNY)', formatMoney(taxResult.summary.totalRefundBaseCny)],
     ['Non-refundable Tax (CNY)', formatMoney(taxResult.summary.totalNonRefundableTaxCny)],
-    ['Matched Lines', `${taxResult.summary.matchedLineCount}/${taxResult.summary.lineCount}`],
+    ['Current Evidence Lines', `${taxResult.summary.matchedLineCount}/${taxResult.summary.lineCount}`],
     ['Pending Review Lines', taxResult.summary.fallbackLineCount],
+    ['No-refund Lines', taxResult.summary.noRefundLineCount],
+    ['Blocking / Warning', `${taxResult.summary.errorCount}/${taxResult.summary.warningCount}`],
   ]);
 
   addParagraphList(doc, 'Tax Lines', taxResult.lines || [], (line) => {
-    return `${line.productName} | HS:${safeText(line.hsCode)} | Refund:${formatMoney(line.estimatedRefundCny)} CNY | Non-refundable:${formatMoney(line.nonRefundableTaxCny)} CNY | ${line.hsDescription}`;
+    return `${line.productName} | HS:${safeText(line.hsCode)} | Refund:${formatMoney(line.estimatedRefundCny)} CNY | Non-refundable:${formatMoney(line.nonRefundableTaxCny)} CNY | ${line.hsDescription} | ${line.hsSource}`;
   });
 
   doc.moveDown(1);
   doc.fontSize(8).fillColor('#6F7F8E');
+  doc.text('Estimate only; final amounts require supplier invoices, customs declaration and tax-system confirmation.');
   doc.text(`Exported at: ${formatDate(new Date())}`);
   doc.fillColor('black');
 

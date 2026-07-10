@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import HsCodesPage from './page';
 
 const mockList = vi.fn();
+const mockUpdate = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
@@ -20,12 +21,14 @@ vi.mock('@/services/hsCode.service', () => ({
     list: (...args: unknown[]) => mockList(...args),
     search: vi.fn(),
     getByCode: vi.fn(),
+    update: (...args: unknown[]) => mockUpdate(...args),
   },
 }));
 
 describe('HsCodesPage', () => {
   beforeEach(() => {
     mockList.mockReset();
+    mockUpdate.mockReset();
     mockList.mockResolvedValue({
       data: {
         items: [
@@ -46,6 +49,18 @@ describe('HsCodesPage', () => {
           total: 1,
           totalPages: 1,
         },
+      },
+    });
+    mockUpdate.mockResolvedValue({
+      data: {
+        id: 'hs-1',
+        hsCode: '69072190',
+        productName: '抛光瓷砖',
+        unit: '平方米',
+        refundRate: 0,
+        vatRate: 13,
+        effectiveDate: '2026-01-01T00:00:00.000Z',
+        sourceUrl: 'https://www.chinatax.gov.cn/example',
       },
     });
   });
@@ -98,5 +113,27 @@ describe('HsCodesPage', () => {
     expect(screen.getByText('检验检疫')).toBeInTheDocument();
     expect(screen.getByText('进口商品检验')).toBeInTheDocument();
     expect(screen.getByText('出口商品检验')).toBeInTheDocument();
+  });
+
+  it('详情页可人工更新退税率并强制留存生效日期和来源', async () => {
+    render(<HsCodesPage />);
+
+    fireEvent.click(await screen.findByText('抛光瓷砖'));
+    fireEvent.click(await screen.findByRole('button', { name: '人工更新税则' }));
+
+    fireEvent.change(screen.getByLabelText('出口退税率（%）'), { target: { value: '0' } });
+    fireEvent.change(screen.getByLabelText('生效日期'), { target: { value: '2026-01-01' } });
+    fireEvent.change(screen.getByLabelText('官方来源链接'), {
+      target: { value: 'https://www.chinatax.gov.cn/example' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '保存税则证据' }));
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith('69072190', expect.objectContaining({
+        refundRate: 0,
+        effectiveDate: '2026-01-01',
+        sourceUrl: 'https://www.chinatax.gov.cn/example',
+      }));
+    });
   });
 });
