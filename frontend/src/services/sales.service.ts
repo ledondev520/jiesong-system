@@ -85,6 +85,14 @@ export const salesService = {
     return api.delete<ApiResponse<void>, ApiResponse<void>>(`/sales/${salesContractId}/packing-items/${itemId}`);
   },
 
+  /** 按出口合同状态机推进到下一阶段。 */
+  updateStatus: async (id: string, status: SalesContract['status']) => {
+    return api.put<ApiResponse<SalesContract>, ApiResponse<SalesContract>, { status: SalesContract['status'] }>(
+      `/sales/${id}/status`,
+      { status },
+    );
+  },
+
   /**
    * 导出单份出口合同为三 Sheet 标准 Excel。
    */

@@ -117,7 +117,7 @@ function LoginFormClient() {
       if (
         /ECONNREFUSED|Failed to proxy|Network Error|fetch failed|timeout/i.test(rawMessage)
       ) {
-        setError('后端服务未连接，请先启动 backend 服务（默认端口 3000）');
+        setError('后端服务未连接，请先启动 backend 服务（默认端口 3001）');
       } else if (retryAfter && Number.isFinite(retryAfter) && retryAfter > 0) {
         const minutes = Math.ceil(retryAfter / 60);
         setError(`登录尝试过于频繁，请 ${minutes} 分钟后再试，或切换账号后重试。`);

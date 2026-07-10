@@ -9,6 +9,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CONTAINER_40HQ,
+  buildPackingBoxes,
   evaluateShippingReadiness,
   generateColor,
   inferBoxDimensions,
@@ -143,5 +144,68 @@ describe('evaluateShippingReadiness', () => {
     expect(r.weightPct).toBe(0);
     expect(r.volumePct).toBe(0);
     expect(r.ready).toBe(false);
+  });
+
+  it('超过 40HQ 任一安全上限时即使达到80%也不可出柜', () => {
+    const r = evaluateShippingReadiness(22060.3, 63.3);
+
+    expect(r.utilizationReady).toBe(true);
+    expect(r.overloaded).toBe(true);
+    expect(r.overloadReasons).toEqual(['weight']);
+    expect(r.ready).toBe(false);
+  });
+
+  it('存在未装箱时商业利用率达标也不可出柜', () => {
+    const r = evaluateShippingReadiness(8235, 63.85, { unplacedBoxCount: 8 });
+
+    expect(r.utilizationReady).toBe(true);
+    expect(r.physicalFit).toBe(false);
+    expect(r.ready).toBe(false);
+  });
+});
+
+describe('buildPackingBoxes', () => {
+  it('优先使用明细精确尺寸并按箱数构建箱型', () => {
+    const boxes = buildPackingBoxes([
+      {
+        id: 'pk-1',
+        productId: 'p-1',
+        boxes: 3,
+        quantity: 6,
+        volume: 1.2,
+        length: 1000,
+        width: 500,
+        height: 400,
+        product: { id: 'p-1', customsName: '酒架' },
+      },
+    ]);
+
+    expect(boxes).toHaveLength(1);
+    expect(boxes[0]).toMatchObject({
+      id: 'pk-1',
+      name: '酒架',
+      length: 1000,
+      width: 500,
+      height: 400,
+      quantity: 3,
+      isEstimated: false,
+    });
+  });
+
+  it('缺少尺寸时按总体积除以箱数推算并明确标记', () => {
+    const boxes = buildPackingBoxes([
+      {
+        id: 'pk-2',
+        productId: 'p-2',
+        boxes: 2,
+        quantity: 4,
+        volume: 1,
+        product: { id: 'p-2', customsName: '灯具' },
+      },
+    ]);
+
+    expect(boxes[0].quantity).toBe(2);
+    expect(boxes[0].isEstimated).toBe(true);
+    expect(boxes[0].length * boxes[0].width * boxes[0].height).toBeGreaterThan(0.4e9);
   });
 });

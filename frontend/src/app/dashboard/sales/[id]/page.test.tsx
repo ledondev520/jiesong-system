@@ -20,6 +20,8 @@ const mockApiGet = vi.fn();
 const mockApiDelete = vi.fn();
 const mockToastError = vi.fn();
 const mockExportPdf = vi.fn();
+const mockExportExcel = vi.fn();
+const mockUpdateSalesStatus = vi.fn();
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react');
@@ -49,6 +51,8 @@ vi.mock('@/services/sales.service', () => ({
     updatePackingItem: vi.fn(),
     removePackingItem: vi.fn(),
     exportPdf: (...args: unknown[]) => mockExportPdf(...args),
+    exportExcel: (...args: unknown[]) => mockExportExcel(...args),
+    updateStatus: (...args: unknown[]) => mockUpdateSalesStatus(...args),
   },
 }));
 
@@ -103,6 +107,8 @@ describe('SalesDetailPage 交互逻辑', () => {
     mockApiDelete.mockReset();
     mockToastError.mockReset();
     mockExportPdf.mockReset();
+    mockExportExcel.mockReset();
+    mockUpdateSalesStatus.mockReset();
     mockApiGet.mockResolvedValue({ data: [] });
   });
 
@@ -215,5 +221,99 @@ describe('SalesDetailPage 交互逻辑', () => {
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /导出合同 PDF/ })).not.toBeInTheDocument();
     });
+  });
+
+  it('详情页可直接导出标准出口工作簿', async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: 's-1',
+        contractNo: 'EXP260008',
+        status: 'PACKING',
+        totalBoxes: 1,
+        volume: 60,
+        grossWeight: 1000,
+        totalAmount: 100,
+        packingItems: [],
+        port: { name: 'Oakland' },
+      },
+    });
+    mockExportExcel.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    renderPage('s-1');
+
+    const exportButton = await screen.findByRole('button', { name: '导出出口工作簿' });
+    await user.click(exportButton);
+
+    expect(mockExportExcel).toHaveBeenCalledWith('s-1', 'EXP260008');
+  });
+
+  it('商业利用率达标但有箱件未装下时禁止确认发运', async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: 's-1',
+        contractNo: 'EXP260008',
+        status: 'PACKING',
+        totalBoxes: 1,
+        volume: 60,
+        grossWeight: 1000,
+        totalAmount: 100,
+        packingItems: [
+          {
+            id: 'pk-oversize',
+            productId: 'p-1',
+            boxes: 1,
+            quantity: 1,
+            volume: 60,
+            length: 13000,
+            width: 1000,
+            height: 1000,
+            product: { id: 'p-1', customsName: '超长货物' },
+          },
+        ],
+        port: { name: 'Oakland' },
+      },
+    });
+
+    renderPage('s-1');
+
+    expect(await screen.findByText('不可出货：仍有 1 箱未装下')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '确认发运' })).toBeDisabled();
+  });
+
+  it('装柜达标且全部箱件可放下时允许确认发运', async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: 's-1',
+        contractNo: 'EXP260008',
+        status: 'PACKING',
+        totalBoxes: 1,
+        volume: 60,
+        grossWeight: 1000,
+        totalAmount: 100,
+        packingItems: [
+          {
+            id: 'pk-fit',
+            productId: 'p-1',
+            boxes: 1,
+            quantity: 1,
+            volume: 60,
+            length: 1000,
+            width: 1000,
+            height: 1000,
+            product: { id: 'p-1', customsName: '可装货物' },
+          },
+        ],
+        port: { name: 'Oakland' },
+      },
+    });
+    mockUpdateSalesStatus.mockResolvedValue({ data: { status: 'SHIPPED' } });
+    const user = userEvent.setup();
+    renderPage('s-1');
+
+    const shipButton = await screen.findByRole('button', { name: '确认发运' });
+    expect(shipButton).toBeEnabled();
+    await user.click(shipButton);
+
+    expect(mockUpdateSalesStatus).toHaveBeenCalledWith('s-1', 'SHIPPED');
   });
 });

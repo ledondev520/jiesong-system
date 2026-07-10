@@ -132,7 +132,7 @@ export function FinancialStatementsOverview({
       {showHeader && (
         <PageHeader
           title="财务报表分析"
-          description="三表数据可视化看板：资产负债表 · 利润表 · 智能预警"
+          description="月度会计数据看板：资产负债表 · 利润表 · 智能预警"
           actions={
             <div className="flex items-center gap-2">
               {hasData && (
@@ -151,7 +151,7 @@ export function FinancialStatementsOverview({
               )}
               <Button onClick={onOpenUploadDialog} variant="default" className="h-10">
                 <Upload className="mr-2 h-4 w-4" />
-                上传三表 Excel
+                上传月度会计报表
               </Button>
               <Button onClick={onImportAll} disabled={importing} variant="outline" className="h-10">
                 {importing ? (

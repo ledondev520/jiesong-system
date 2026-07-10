@@ -1,5 +1,38 @@
 # Ops Execution Center Plan
 
+## 2026-07-10 FLOW-01（出口专项单主线路与安全出货契约）
+
+### Goal
+- 将采购、付款、生产、排柜、单证、发票、退税和财务从分散页面收敛成同一笔出口专项单的八阶段主线路。
+- 统一前后端采购/出口状态 Interface，并在确认发运前同时校验商业利用率、安全上限和 3D 物理可装载性。
+- 首页只展示每笔专项单的唯一下一动作，删除没有实例状态的静态七步导航和重复待办。
+
+### Delivered
+- 完成代码、数据、真实浏览器三层审计，确认六个顶层 Module 足够；主要缺口是纵向编排、金额/文档真实性和财税证据，不再新增顶层入口。
+- 采购状态统一为 `DRAFT → SIGNED → PRODUCING → READY → SHIPPED → RECEIVED → COMPLETED`，出口状态统一为 `DRAFT → CONFIRMED → PACKING → SHIPPED → ARRIVED → COMPLETED`；旧状态仅在兼容 Adapter 归一化。
+- 新增后端发运准备 Module：40HQ 使用 22,000kg / 68m³，重量或体积任一达到 80% 只表示商业利用率达标；超重/超体积、缺箱数或 3D 未放置箱均阻止确认发运。
+- 采购详情与出口详情增加按状态推进的主动作；出口详情直接提供出口工作簿，并区分“导出出口工作簿”和“生成申报三表”。
+- 新增八阶段 `tradeWorkflowService` 与 `/dashboard/trade-workflows` Interface，按出口合同关联采购、付款、生产、排柜、文件、报关、发票、退税和收款，返回阻塞原因、风险与唯一下一动作。
+- 工作台改为专项单卡片：显示阶段完整度、八阶段状态、当前原因、数据风险和唯一 CTA；删除静态 `ExportFlowNav` 与重复“近期待办”。
+- 财务概览先把美元应收按有效汇率换算成人民币后再进入公司级图表/预测，页面明确 USD/CNY 口径；月报上传文案改为真实支持的“月度会计报表 Excel”。
+- 根目录 `start.sh` 降级为权威 `scripts/start-local.sh` 的兼容入口，统一前端 3000 / 后端 3001；清理认证布局内造成 Next dev issue 的直接脚本节点。
+
+### Verification
+- `cd backend && node --test <状态/出货/专项单/控制器目标>`：`39/39` 通过。
+- `cd frontend && npm test -- --run <认证/首页/采购/出口/财务目标>`：`64/64` 通过。
+- `cd backend && node --test src/controllers/dashboardController.test.js src/services/tradeWorkflowService.test.js`：`7/7` 通过。
+- `cd frontend && npm test -- --run src/app/dashboard/page.test.tsx src/components/dashboard/TradeWorkflowBoard.test.tsx src/services/tradeWorkflow.service.test.ts`：`6/6` 通过。
+- `cd frontend && npm test -- --run src/components/ui/progress.test.tsx`：`7/7` 通过，进度条现在暴露真实 `aria-valuenow`。
+- `cd frontend && npx tsc --noEmit`：通过。
+- 触达前端文件 ESLint：`0 errors / 2` 个既有未使用类型 warning。
+- `git diff --check`：通过。
+
+### Remaining
+- P0：采购合同金额含税口径、全明细 Word、真实 PDF、生成件/盖章件分层归档和供应商收款户名/支行/联行号仍需落地。
+- P0：HS 当前税率证据、申报三表金额公式、船司 PDF 逐行持久化核对、退税材料清单和官方版本信息仍需收口。
+- P1：月度会计报表导入仍需预览确认；单柜毛利需要把美元收款、采购成本和汇率证据放到同一详情。
+- 历史已发运但当前算法判定超载/未装完的合同只做风险提示，不自动回写或篡改历史状态。
+
 ## 2026-06-08 CI-05（GitHub Unit Tests 退税/报关测试修复）
 
 ### Goal

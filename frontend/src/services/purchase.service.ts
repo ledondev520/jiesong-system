@@ -122,6 +122,14 @@ export const purchaseService = {
     );
   },
 
+  /** 按采购合同状态机推进到下一阶段。 */
+  updateStatus: async (id: string, status: PurchaseContract['status']) => {
+    return api.put<ApiResponse<PurchaseContract>, ApiResponse<PurchaseContract>, { status: PurchaseContract['status'] }>(
+      `/purchases/${id}/status`,
+      { status },
+    );
+  },
+
   /**
    * 根据商品ID列表返回供应商ID数组。
    */

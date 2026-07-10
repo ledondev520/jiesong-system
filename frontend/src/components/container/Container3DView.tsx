@@ -18,13 +18,11 @@ import { OrbitControls, Text, PerspectiveCamera, Html } from '@react-three/drei'
 import * as THREE from 'three';
 import { PackingItem, Product } from '@/types';
 import { 
+  buildPackingBoxes,
   packBoxes, 
-  Box, 
   PlacedBox, 
   CONTAINER_40HQ, 
-  generateColor, 
   mmToM,
-  inferBoxDimensions,
 } from '@/lib/binPacking';
 
 interface Container3DViewProps {
@@ -259,74 +257,11 @@ export default function Container3DView({
   // 悬浮状态
   const [hoveredBoxId, setHoveredBoxId] = useState<string | null>(null);
   
-  // 将 PackingItem 转换为 Box 格式
-  // 尺寸优先级：PackingItem 手填 > Product 档案 > 体积反推 > 固定默认500mm
-  const boxes: Box[] = useMemo(() => {
-    return packingItems.map(item => {
-      const product = products.find(p => p.id === item.productId);
-
-      // 1. 优先用 PackingItem 手填的精确尺寸
-      const hasExactDims = item.length && item.width && item.height;
-      if (hasExactDims) {
-        return {
-          id: item.id,
-          name: product?.customsName || '未知商品',
-          length: item.length!,
-          width: item.width!,
-          height: item.height!,
-          weight: item.grossWeight,
-          color: generateColor(item.productId),
-          quantity: item.boxes || 1,
-          isEstimated: false,
-        };
-      }
-
-      // 2. 次优：使用商品档案中的尺寸
-      const hasProductDims = product?.length && product?.width && product?.height;
-      if (hasProductDims) {
-        return {
-          id: item.id,
-          name: product!.customsName || '未知商品',
-          length: product!.length!,
-          width: product!.width!,
-          height: product!.height!,
-          weight: item.grossWeight,
-          color: generateColor(item.productId),
-          quantity: item.boxes || 1,
-          isEstimated: false,
-        };
-      }
-
-      // 3. 体积反推：用 item.volume / item.boxes 得到每箱体积（CBM），再推算三维
-      //    备选：用 product.volume 作为每件体积，乘以装箱数量再除以箱数
-      const itemVolume = item.volume || 0;
-      const boxCount = item.boxes || 1;
-      const productVolume = product?.volume || 0;
-      const itemQty = item.quantity || 1;
-
-      // 1.1 若明细有总体积 → 单箱体积 = 总体积 / 箱数
-      // 1.2 若商品档案有单件体积 → 单箱体积 = 单件体积 * 件数 / 箱数
-      const perBoxCbm = itemVolume > 0
-        ? itemVolume / boxCount
-        : productVolume > 0
-          ? (productVolume * itemQty) / boxCount
-          : 0;
-
-      const inferred = inferBoxDimensions(perBoxCbm);
-
-      return {
-        id: item.id,
-        name: product?.customsName || '未知商品',
-        length: inferred.length,
-        width: inferred.width,
-        height: inferred.height,
-        weight: item.grossWeight,
-        color: generateColor(item.productId),
-        quantity: boxCount,
-        isEstimated: true,
-      };
-    });
-  }, [packingItems, products]);
+  // 统一复用详情页的箱型构建规则，避免 3D 图与出货门槛各算一套。
+  const boxes = useMemo(
+    () => buildPackingBoxes(packingItems, products),
+    [packingItems, products],
+  );
   
   // 执行装箱算法
   const packingResult = useMemo(() => {

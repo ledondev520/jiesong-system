@@ -201,7 +201,7 @@ export function FinancialStatementsDashboardSection() {
               )}
               <Button onClick={() => setUploadDialogOpen(true)} className="h-9">
                 <Upload className="mr-2 h-4 w-4" />
-                上传三表 Excel
+                上传月度会计报表
               </Button>
               <Button onClick={handleImport} disabled={importing} variant="outline" className="h-9 bg-background">
                 {importing ? (

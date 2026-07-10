@@ -62,6 +62,10 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState, LoadingState } from '@/components/ui/data-state';
 import { KpiCard } from '@/components/finance/KpiCard';
 import { ChartTooltip } from '@/components/finance/ChartTooltip';
+import {
+  buildCnyCashFlowForecast,
+  convertPaymentTrendsToCny,
+} from '@/lib/finance-currency';
 
 interface PaymentTrendPoint {
   label: string;
@@ -191,20 +195,15 @@ export default function FinancePage() {
     };
   }, [trends]);
 
-  // 现金流预测（简单线性外推）
-  const cashFlowForecast = useMemo(() => {
-    if (trends.length < 2 || !trends[trends.length - 1] || !trends[trends.length - 2]) return [];
-    const last = trends[trends.length - 1];
-    const prev = trends[trends.length - 2];
-    const delta = (last.receivables - last.payables) - (prev.receivables - prev.payables);
-    const base = last.receivables - last.payables;
-    return [
-      { label: `${last.label} (实际)`, value: base, type: 'actual' },
-      { label: '预测 +1期', value: base + delta, type: 'forecast' },
-      { label: '预测 +2期', value: base + delta * 2, type: 'forecast' },
-      { label: '预测 +3期', value: base + delta * 3, type: 'forecast' },
-    ];
-  }, [trends]);
+  // 应收为 USD、应付为 CNY，统一按当前结算汇率折算为 CNY 后才允许比较和预测。
+  const cnyTrends = useMemo(
+    () => convertPaymentTrendsToCny(trends, exchangeRate?.effectiveRate || 0),
+    [exchangeRate?.effectiveRate, trends],
+  );
+  const cashFlowForecast = useMemo(
+    () => buildCnyCashFlowForecast(cnyTrends),
+    [cnyTrends],
+  );
 
   if (loading) {
     return (
@@ -415,7 +414,7 @@ export default function FinancePage() {
           <div>
             <CardTitle className="text-sm font-medium">收支对比</CardTitle>
             <CardDescription className="text-xs">
-              {trendDays === 30 ? '近 30 天' : '近 90 天'} 应收 vs 应付资金对比
+              {trendDays === 30 ? '近 30 天' : '近 90 天'} 应收按 {exchangeRate?.effectiveRate.toFixed(2)} 折算后与应付对比（CNY）
             </CardDescription>
           </div>
           <div className="flex gap-1.5">
@@ -438,7 +437,7 @@ export default function FinancePage() {
           </div>
         </CardHeader>
         <CardContent>
-          {trends.length === 0 ? (
+          {cnyTrends.length === 0 ? (
             <EmptyState
               icon={BarChart3}
               title="暂无收付款数据"
@@ -447,22 +446,22 @@ export default function FinancePage() {
             />
           ) : (
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={trends} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+              <BarChart data={cnyTrends} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} width={50} axisLine={false} tickLine={false} />
                 <Tooltip
                   content={
                     <ChartTooltip
-                      valueFormatter={(v) => Number(v).toLocaleString('zh-CN')}
+                      valueFormatter={(v) => `¥${Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}
                     />
                   }
                 />
                 <Legend
-                  formatter={(value) => value === 'receivables' ? '应收回款 (USD)' : '应付付款 (CNY)'}
+                  formatter={(value) => value === 'receivablesCny' ? '应收回款折算 (CNY)' : '应付付款 (CNY)'}
                 />
-                <Bar dataKey="receivables" name="receivables" fill={FINANCE_COLORS.income} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="payables" name="payables" fill={FINANCE_COLORS.expense} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="receivablesCny" name="receivablesCny" fill={FINANCE_COLORS.income} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="payablesCny" name="payablesCny" fill={FINANCE_COLORS.expense} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -478,7 +477,7 @@ export default function FinancePage() {
               现金流预测
             </CardTitle>
             <CardDescription className="text-xs">
-              基于近期收支趋势线性外推（单位：USD/CNY 混合）
+              应收按当前结算汇率 {exchangeRate?.effectiveRate.toFixed(2)} 折算，统一以 CNY 线性外推
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -496,7 +495,7 @@ export default function FinancePage() {
                 <Tooltip
                   content={
                     <ChartTooltip
-                      valueFormatter={(v) => Number(v).toLocaleString('zh-CN')}
+                      valueFormatter={(v) => `¥${Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}
                     />
                   }
                 />

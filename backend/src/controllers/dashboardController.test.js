@@ -16,3 +16,8 @@ test('dashboardController: 导出包含 getBusinessOverview', () => {
   const mod = require('./dashboardController');
   assert.strictEqual(typeof mod.getBusinessOverview, 'function');
 });
+
+test('dashboardController: 导出专项单主线路查询', () => {
+  const mod = require('./dashboardController');
+  assert.strictEqual(typeof mod.getTradeWorkflows, 'function');
+});

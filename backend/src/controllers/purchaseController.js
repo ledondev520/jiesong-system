@@ -9,7 +9,11 @@
 const prisma = require('../utils/prisma');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
-const { validatePurchaseTransition, PURCHASE_STATUS } = require('../services/purchaseStateMachine');
+const {
+  validatePurchaseTransition,
+  normalizePurchaseStatus,
+  PURCHASE_STATUS,
+} = require('../services/purchaseStateMachine');
 const { applyPurchaseInStock, revertPurchaseInStock } = require('../services/inventorySnapshot');
 const { normalizePagination } = require('../utils/pagination');
 const auditLog = require('../utils/auditLog');
@@ -278,7 +282,7 @@ const addItem = async (req, res, next) => {
 const updateStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const targetStatus = typeof req.body?.status === 'string' ? req.body.status.trim() : req.body?.status;
+    const targetStatus = normalizePurchaseStatus(req.body?.status);
 
     if (!targetStatus) {
       throw createError('status 不能为空', 400);
@@ -309,12 +313,12 @@ const updateStatus = async (req, res, next) => {
       });
 
       // 正向流转：入库时创建库存记录
-      if (isTransition && targetStatus === PURCHASE_STATUS.IN_STOCK) {
+      if (isTransition && targetStatus === PURCHASE_STATUS.RECEIVED) {
         applyResult = await applyPurchaseInStock(tx, id);
       }
 
       // 反向流转：从入库状态回退时，回滚库存记录
-      if (isTransition && existingContract.status === PURCHASE_STATUS.IN_STOCK) {
+      if (isTransition && normalizePurchaseStatus(existingContract.status) === PURCHASE_STATUS.RECEIVED) {
         revertResult = await revertPurchaseInStock(tx, id);
       }
 
@@ -328,7 +332,7 @@ const updateStatus = async (req, res, next) => {
         action: 'REVERT_IN_STOCK',
         entity: 'PurchaseContract',
         entityId: id,
-        oldValue: { status: PURCHASE_STATUS.IN_STOCK, revertedInventoryCount: revertResult.reverted },
+        oldValue: { status: PURCHASE_STATUS.RECEIVED, revertedInventoryCount: revertResult.reverted },
         newValue: { status: targetStatus },
         req,
         note: `采购入库回滚：恢复 ${revertResult.reverted} 条库存记录`,
@@ -344,7 +348,7 @@ const updateStatus = async (req, res, next) => {
         entity: 'PurchaseContract',
         entityId: id,
         oldValue: { status: contract.status },
-        newValue: { status: PURCHASE_STATUS.IN_STOCK, createdCount: applyResult.created, skippedCount: applyResult.skipped },
+        newValue: { status: PURCHASE_STATUS.RECEIVED, createdCount: applyResult.created, skippedCount: applyResult.skipped },
         req,
         note: `采购入库：创建 ${applyResult.created} 条库存记录，跳过 ${applyResult.skipped} 条`,
       });

@@ -1,6 +1,6 @@
 /**
  * Input: 上传弹窗状态、文件、账期参数与提交动作
- * Output: 三表 Excel 上传导入对话框
+ * Output: 月度会计报表 Excel 上传导入对话框
  * Pos: 财务报表页导入交互分区
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -55,7 +55,7 @@ export function FinancialStatementsUploadDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5 text-primary" />
-            上传三表 Excel 文件
+            上传月度会计报表 Excel
           </DialogTitle>
           <DialogDescription>
             上传包含「资产负债表」「利润表」两个 Sheet 的 Excel 文件，解析后写入指定账期。

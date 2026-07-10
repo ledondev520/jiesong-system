@@ -20,6 +20,7 @@ const PURCHASE_STATUS = {
   DRAFT: 'DRAFT',           // 草稿
   SIGNED: 'SIGNED',         // 已签订
   PRODUCING: 'PRODUCING',   // 生产中
+  READY: 'READY',           // 生产完成，待装柜
   SHIPPED: 'SHIPPED',       // 已发货
   RECEIVED: 'RECEIVED',     // 已收货
   COMPLETED: 'COMPLETED',   // 已完成
@@ -30,8 +31,9 @@ const PURCHASE_STATUS = {
 const SALES_STATUS = {
   DRAFT: 'DRAFT',         // 草稿
   CONFIRMED: 'CONFIRMED', // 已确认
-  PAID: 'PAID',           // 已收款
-  SHIPPED: 'SHIPPED',     // 已发货
+  PACKING: 'PACKING',     // 装柜中
+  SHIPPED: 'SHIPPED',     // 已发运
+  ARRIVED: 'ARRIVED',     // 已到港
   COMPLETED: 'COMPLETED', // 已完成
   CANCELLED: 'CANCELLED', // 已取消
 };

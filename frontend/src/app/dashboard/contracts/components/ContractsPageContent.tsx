@@ -133,6 +133,11 @@ function StatusPill({ status }: { status: PurchaseStatus }) {
       icon: <Loader2 className="h-3 w-3 animate-spin" />,
       className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800',
     },
+    [PurchaseStatus.READY]: {
+      label: '生产完成',
+      icon: <PackageCheck className="h-3 w-3" />,
+      className: 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950 dark:text-cyan-400 dark:border-cyan-800',
+    },
     [PurchaseStatus.SHIPPED]: {
       label: '已发货',
       icon: <Truck className="h-3 w-3" />,
@@ -179,6 +184,7 @@ const getPurchaseStatusColor = (status: PurchaseStatus) => {
     case PurchaseStatus.SIGNED:
       return '#3b82f6';
     case PurchaseStatus.PRODUCING:
+    case PurchaseStatus.READY:
     case PurchaseStatus.SHIPPED:
       return '#f59e0b';
     case PurchaseStatus.RECEIVED:
@@ -279,7 +285,7 @@ export default function ContractsPageContent() {
   );
   const procurementOverview = useMemo(() => {
     const activeContracts = purchaseContracts.filter((contract) =>
-      [PurchaseStatus.DRAFT, PurchaseStatus.SIGNED, PurchaseStatus.PRODUCING].includes(contract.status)
+      [PurchaseStatus.DRAFT, PurchaseStatus.SIGNED, PurchaseStatus.PRODUCING, PurchaseStatus.READY].includes(contract.status)
     ).length;
     const producingContracts = purchaseContracts.filter(
       (contract) => contract.status === PurchaseStatus.PRODUCING
@@ -553,6 +559,7 @@ export default function ContractsPageContent() {
               <SelectItem value="DRAFT">草稿</SelectItem>
               <SelectItem value="SIGNED">已签约</SelectItem>
               <SelectItem value="PRODUCING">生产中</SelectItem>
+              <SelectItem value="READY">生产完成</SelectItem>
               <SelectItem value="SHIPPED">已发货</SelectItem>
               <SelectItem value="RECEIVED">已收货</SelectItem>
               <SelectItem value="COMPLETED">已完成</SelectItem>

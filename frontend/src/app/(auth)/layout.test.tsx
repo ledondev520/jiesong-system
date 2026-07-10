@@ -71,16 +71,13 @@ describe('AuthLayout', () => {
     });
   });
 
-  it('渲染提前清理旧快捷登录状态的脚本', () => {
+  it('不在客户端 JSX 中渲染原生 script，避免 React 导航错误', () => {
     render(
       <AuthLayout>
         <div>认证页面内容</div>
       </AuthLayout>,
     );
 
-    const script = document.querySelector<HTMLScriptElement>('script#legacy-auth-cleanup');
-    expect(script).not.toBeNull();
-    expect(script?.textContent).toContain('jiesong_quick_login_profile');
-    expect(script?.textContent).toContain('sessionStorage');
+    expect(document.querySelector('script#legacy-auth-cleanup')).toBeNull();
   });
 });

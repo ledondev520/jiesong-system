@@ -175,16 +175,33 @@ test('addSalesItem: 未传 sellingPrice 时按汇率与利润率计算并回写�
   }
 });
 
-test('updateSalesStatus: 传入 out_stock 时触发自动出库扣减', async () => {
+test('updateSalesStatus: 历史 out_stock 会规范为 SHIPPED 并触发自动出库扣减', async () => {
   const originalTransaction = prisma.$transaction;
   const originalApplySalesOutStock = inventorySnapshot.applySalesOutStock;
   let updatedStatus = null;
+  let updatedData = null;
   let outStockCalled = false;
 
   prisma.$transaction = async (fn) => fn({
     salesContract: {
-      findUnique: async () => ({ id: 'sc-1', status: 'PENDING_SHIPMENT' }),
+      findUnique: async () => ({
+        id: 'sc-1',
+        status: 'PENDING_SHIPMENT',
+        grossWeight: 1000,
+        volume: 60,
+        packingItems: [{
+          id: 'pk-1',
+          boxes: 1,
+          quantity: 1,
+          volume: 60,
+          length: 1000,
+          width: 1000,
+          height: 1000,
+          product: { customsName: '可装货物' },
+        }],
+      }),
       update: async (args) => {
+        updatedData = args.data;
         updatedStatus = args.data.status;
         return { id: 'sc-1', status: args.data.status };
       },
@@ -197,9 +214,55 @@ test('updateSalesStatus: 传入 out_stock 时触发自动出库扣减', async ()
 
   try {
     const contract = await salesService.updateSalesStatus('sc-1', 'out_stock');
-    assert.equal(updatedStatus, 'OUT_STOCK');
+    assert.equal(updatedStatus, 'SHIPPED');
+    assert.ok(updatedData.shippedAt instanceof Date);
     assert.equal(outStockCalled, true);
-    assert.equal(contract.status, 'OUT_STOCK');
+    assert.equal(contract.status, 'SHIPPED');
+  } finally {
+    prisma.$transaction = originalTransaction;
+    inventorySnapshot.applySalesOutStock = originalApplySalesOutStock;
+  }
+});
+
+test('updateSalesStatus: 有箱件无法放入时拒绝确认发运', async () => {
+  const originalTransaction = prisma.$transaction;
+  const originalApplySalesOutStock = inventorySnapshot.applySalesOutStock;
+  let outStockCalled = false;
+
+  prisma.$transaction = async (fn) => fn({
+    salesContract: {
+      findUnique: async () => ({
+        id: 'sc-1',
+        status: 'PACKING',
+        grossWeight: 1000,
+        volume: 60,
+        packingItems: [{
+          id: 'pk-1',
+          boxes: 1,
+          quantity: 1,
+          volume: 60,
+          length: 13000,
+          width: 1000,
+          height: 1000,
+          product: { customsName: '超长货物' },
+        }],
+      }),
+      update: async () => {
+        throw new Error('不应更新');
+      },
+    },
+  });
+  inventorySnapshot.applySalesOutStock = async () => {
+    outStockCalled = true;
+    return { results: [] };
+  };
+
+  try {
+    await assert.rejects(
+      () => salesService.updateSalesStatus('sc-1', 'SHIPPED'),
+      (error) => error.statusCode === 400 && /仍有 1 箱无法装入/.test(error.message),
+    );
+    assert.equal(outStockCalled, false);
   } finally {
     prisma.$transaction = originalTransaction;
     inventorySnapshot.applySalesOutStock = originalApplySalesOutStock;

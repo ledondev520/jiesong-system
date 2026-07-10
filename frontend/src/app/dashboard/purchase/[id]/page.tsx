@@ -58,6 +58,7 @@ import {
   Store,
   Percent,
   Stamp,
+  ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -70,6 +71,15 @@ import { cn } from '@/lib/utils';
 interface PageProps {
   params: Promise<{ id: string }>;
 }
+
+const PURCHASE_NEXT_ACTIONS: Partial<Record<PurchaseStatus, { status: PurchaseStatus; label: string }>> = {
+  [PurchaseStatus.DRAFT]: { status: PurchaseStatus.SIGNED, label: '确认已签约' },
+  [PurchaseStatus.SIGNED]: { status: PurchaseStatus.PRODUCING, label: '开始生产' },
+  [PurchaseStatus.PRODUCING]: { status: PurchaseStatus.READY, label: '确认生产完成' },
+  [PurchaseStatus.READY]: { status: PurchaseStatus.SHIPPED, label: '确认供应商已发货' },
+  [PurchaseStatus.SHIPPED]: { status: PurchaseStatus.RECEIVED, label: '确认收货' },
+  [PurchaseStatus.RECEIVED]: { status: PurchaseStatus.COMPLETED, label: '完成采购' },
+};
 
 /**
  * 职责：状态 pill 组件（详情页用）
@@ -93,6 +103,11 @@ function StatusPill({ status }: { status: PurchaseStatus }) {
       label: '生产中',
       icon: <Loader2 className="h-3 w-3 animate-spin" />,
       className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800',
+    },
+    [PurchaseStatus.READY]: {
+      label: '生产完成',
+      icon: <PackageCheck className="h-3 w-3" />,
+      className: 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950 dark:text-cyan-400 dark:border-cyan-800',
     },
     [PurchaseStatus.SHIPPED]: {
       label: '已发货',
@@ -140,6 +155,7 @@ function ContractTimeline({ currentStatus }: { currentStatus: PurchaseStatus }) 
     { status: PurchaseStatus.DRAFT, label: '草稿', icon: <FileText className="h-3.5 w-3.5" /> },
     { status: PurchaseStatus.SIGNED, label: '已确认', icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
     { status: PurchaseStatus.PRODUCING, label: '生产中', icon: <Loader2 className="h-3.5 w-3.5" /> },
+    { status: PurchaseStatus.READY, label: '生产完成', icon: <PackageCheck className="h-3.5 w-3.5" /> },
     { status: PurchaseStatus.SHIPPED, label: '已发货', icon: <Truck className="h-3.5 w-3.5" /> },
     { status: PurchaseStatus.RECEIVED, label: '已收货', icon: <PackageCheck className="h-3.5 w-3.5" /> },
     { status: PurchaseStatus.COMPLETED, label: '已完成', icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
@@ -226,6 +242,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [contractFiles, setContractFiles] = useState<ContractFile[]>([]);
+  const [statusUpdating, setStatusUpdating] = useState(false);
 
   // 系统配置：线上盖章平台链接 + 我方开票抬头（选填）
   const [stampPlatformUrl, setStampPlatformUrl] = useState('');
@@ -348,6 +365,24 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     }
   };
 
+  /** 顺序推进采购状态，成功后刷新整份合同与付款汇总。 */
+  const handleAdvanceStatus = async () => {
+    if (!contract) return;
+    const nextAction = PURCHASE_NEXT_ACTIONS[contract.status];
+    if (!nextAction) return;
+
+    setStatusUpdating(true);
+    try {
+      await purchaseService.updateStatus(contract.id, nextAction.status);
+      toast.success(`已推进到「${nextAction.label}」阶段`);
+      await loadData();
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : '状态推进失败');
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
   const purchaseLineItems = useMemo(() => contract?.items ?? [], [contract?.items]);
 
   /**
@@ -391,6 +426,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   );
   const taxAmount = subtotal * (contract.taxRate / 100);
   const grandTotal = subtotal + taxAmount;
+  const nextPurchaseAction = PURCHASE_NEXT_ACTIONS[contract.status];
 
   return (
     <div className="space-y-6 pb-10">
@@ -401,6 +437,16 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={contract.status} />
+            {nextPurchaseAction && (
+              <Button className="h-9 rounded-md text-xs" onClick={handleAdvanceStatus} disabled={statusUpdating}>
+                {statusUpdating ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ArrowRight className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                {nextPurchaseAction.label}
+              </Button>
+            )}
             <Button variant="outline" className="h-9 rounded-md text-xs" onClick={handleExportPdf} disabled={exportingPdf}>
               {exportingPdf ? (
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />

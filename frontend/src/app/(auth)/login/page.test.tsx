@@ -216,6 +216,18 @@ describe('LoginPage 交互逻辑', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
+  it('后端连接失败时提示权威的 3001 端口', async () => {
+    mockAuthServiceLogin.mockRejectedValue(new Error('Network Error'));
+    const user = userEvent.setup();
+    render(<LoginPage />);
+
+    await user.type(screen.getByLabelText('用户名'), 'admin');
+    await user.type(screen.getByLabelText('密码'), '123456');
+    await user.click(screen.getByRole('button', { name: '登录' }));
+
+    expect(await screen.findByText('后端服务未连接，请先启动 backend 服务（默认端口 3001）')).toBeInTheDocument();
+  });
+
   it('触发登录限流时展示可操作提示', async () => {
     mockAuthServiceLogin.mockRejectedValue({
       message: '登录尝试过于频繁，请 15 分钟后再试',

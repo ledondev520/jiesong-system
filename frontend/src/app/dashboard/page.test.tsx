@@ -17,6 +17,7 @@ const mockGetDashboardAnalytics = vi.fn();
 const mockPurchaseGetAll = vi.fn();
 const mockSalesGetAll = vi.fn();
 const mockListStatements = vi.fn();
+const mockListTradeWorkflows = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -56,6 +57,12 @@ vi.mock('@/services/financialStatements.service', () => ({
   },
 }));
 
+vi.mock('@/services/tradeWorkflow.service', () => ({
+  tradeWorkflowService: {
+    list: (...args: unknown[]) => mockListTradeWorkflows(...args),
+  },
+}));
+
 describe('DashboardPage 交互逻辑', () => {
   beforeEach(() => {
     mockPush.mockReset();
@@ -63,6 +70,7 @@ describe('DashboardPage 交互逻辑', () => {
     mockPurchaseGetAll.mockReset();
     mockSalesGetAll.mockReset();
     mockListStatements.mockReset();
+    mockListTradeWorkflows.mockReset();
     mockGetDashboardAnalytics.mockResolvedValue({
       data: {
         contracts: {
@@ -95,6 +103,31 @@ describe('DashboardPage 交互逻辑', () => {
     mockListStatements.mockResolvedValue([
       { id: 'fs-1', periodLabel: '2026年3月账期' },
     ]);
+    mockListTradeWorkflows.mockResolvedValue({
+      data: [{
+        id: 's-1',
+        contractNo: 'EXP-001',
+        status: 'PACKING',
+        purchaseContractNos: ['CG-001'],
+        completedStageCount: 2,
+        stageCount: 8,
+        nextAction: { label: '登记采购尾款', href: '/dashboard/purchase/p-1' },
+        issues: [],
+        stages: [
+          { key: 'procurement', label: '采购签约', status: 'completed', reason: '已签约' },
+          { key: 'payment', label: '采购付款', status: 'current', reason: '仍有尾款待付' },
+        ],
+        readiness: {
+          weightPct: 20, volumePct: 30, utilizationReady: false, overloaded: false,
+          overloadReasons: [], physicalFit: true, placedBoxCount: 10, unplacedBoxCount: 0,
+          estimatedDimensionCount: 0, missingBoxItemCount: 0, blockers: ['under-utilized'], ready: false,
+        },
+        finance: {
+          purchaseTotal: 10000, purchasePaid: 3000, salesTotalUsd: 2000,
+          receivedUsd: 0, exchangeRate: 6.64,
+        },
+      }],
+    });
   });
 
   it('渲染工作台首屏核心结构', async () => {
@@ -108,29 +141,20 @@ describe('DashboardPage 交互逻辑', () => {
 
     expect(screen.queryByText('仓储物流')).not.toBeInTheDocument();
     expect(screen.getByText('库存记录')).toBeInTheDocument();
-    expect(screen.getByText('近期待办')).toBeInTheDocument();
-    expect(screen.getByText('出口全流程')).toBeInTheDocument();
+    expect(screen.getByText('出口专项单主线路')).toBeInTheDocument();
+    expect(screen.getByText('EXP-001')).toBeInTheDocument();
   });
 
-  it('全流程导航条按步骤跳转对应模块', async () => {
+  it('首页只给出该专项单的唯一下一动作', async () => {
     const user = userEvent.setup();
     render(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('出口全流程')).toBeInTheDocument();
+      expect(screen.getByText('EXP-001')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: /采购签约/ }));
-    expect(mockPush).toHaveBeenCalledWith('/dashboard/purchase');
-
-    await user.click(screen.getByRole('button', { name: /排柜出货/ }));
-    expect(mockPush).toHaveBeenCalledWith('/dashboard/sales');
-
-    await user.click(screen.getByRole('button', { name: /出口退税/ }));
-    expect(mockPush).toHaveBeenCalledWith('/dashboard/tax-refunds');
-
-    await user.click(screen.getByRole('button', { name: /财务分析/ }));
-    expect(mockPush).toHaveBeenCalledWith('/dashboard/finance');
+    await user.click(screen.getByRole('button', { name: 'EXP-001 下一步：登记采购尾款' }));
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/purchase/p-1');
   });
 
   it('点击快速动作跳转到对应路径', async () => {

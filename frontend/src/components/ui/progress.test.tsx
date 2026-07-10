@@ -20,9 +20,9 @@ describe('progress', () => {
   });
 
   it('应该根据 value 显示进度', () => {
-    const { container } = render(<Progress value={75} data-testid="progress" />);
-    const indicator = container.querySelector('[data-state="indeterminate"]');
-    expect(indicator).toBeInTheDocument();
+    render(<Progress value={75} data-testid="progress" />);
+    expect(screen.getByTestId('progress')).toHaveAttribute('aria-valuenow', '75');
+    expect(screen.getByTestId('progress')).toHaveAttribute('data-state', 'loading');
   });
 
   it('应该支持 value 为 0', () => {

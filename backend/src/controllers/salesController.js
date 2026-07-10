@@ -116,7 +116,7 @@ const updateStatus = async (req, res, next) => {
         action: contract._revertInfo.action,
         entity: 'SalesContract',
         entityId: req.params.id,
-        oldValue: { status: 'OUT_STOCK', revertedCount: contract._revertInfo.revertedCount },
+        oldValue: { status: 'SHIPPED', revertedCount: contract._revertInfo.revertedCount },
         newValue: { status: req.body?.status },
         req,
         note: contract._revertInfo.note,
@@ -131,7 +131,7 @@ const updateStatus = async (req, res, next) => {
         entity: 'SalesContract',
         entityId: req.params.id,
         oldValue: { status: contract.status },
-        newValue: { status: 'OUT_STOCK', allocatedQuantity: contract._applyInfo.allocatedQuantity },
+        newValue: { status: 'SHIPPED', allocatedQuantity: contract._applyInfo.allocatedQuantity },
         req,
         note: contract._applyInfo.note,
       });

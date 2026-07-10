@@ -15,6 +15,7 @@ import PurchaseDetailPage from './page';
 const mockGetById = vi.fn();
 const mockToastError = vi.fn();
 const mockExportPurchasePdf = vi.fn();
+const mockUpdatePurchaseStatus = vi.fn();
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react');
@@ -40,6 +41,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/services/purchase.service', () => ({
   purchaseService: {
     getById: (...args: unknown[]) => mockGetById(...args),
+    updateStatus: (...args: unknown[]) => mockUpdatePurchaseStatus(...args),
   },
 }));
 
@@ -83,6 +85,7 @@ describe('PurchaseDetailPage 交互逻辑', () => {
     mockGetById.mockReset();
     mockToastError.mockReset();
     mockExportPurchasePdf.mockReset();
+    mockUpdatePurchaseStatus.mockReset();
   });
 
   /**
@@ -174,5 +177,46 @@ describe('PurchaseDetailPage 交互逻辑', () => {
     await user.click(screen.getByRole('button', { name: /导出 PDF/ }));
 
     expect(mockExportPurchasePdf).toHaveBeenCalledWith('p-1', 'PO2500001');
+  });
+
+  it('详情页提供明确的下一阶段动作并顺序推进状态', async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: 'p-1',
+        contractNo: 'CG2600001',
+        status: 'DRAFT',
+        totalAmount: 1000,
+        paidAmount: 0,
+        supplier: { name: '供应商A' },
+        items: [],
+      },
+    });
+    mockUpdatePurchaseStatus.mockResolvedValue({ data: { status: 'SIGNED' } });
+
+    const user = userEvent.setup();
+    renderPage('p-1');
+
+    const nextButton = await screen.findByRole('button', { name: '确认已签约' });
+    await user.click(nextButton);
+
+    expect(mockUpdatePurchaseStatus).toHaveBeenCalledWith('p-1', 'SIGNED');
+  });
+
+  it('生产中合同的下一动作是确认生产完成', async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: 'p-1',
+        contractNo: 'CG2600001',
+        status: 'PRODUCING',
+        totalAmount: 1000,
+        paidAmount: 300,
+        supplier: { name: '供应商A' },
+        items: [],
+      },
+    });
+
+    renderPage('p-1');
+
+    expect(await screen.findByRole('button', { name: '确认生产完成' })).toBeInTheDocument();
   });
 });

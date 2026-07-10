@@ -51,9 +51,15 @@ import {
 } from '@/components/ui/tabs';
 import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, FileSearch, Container, Anchor, Truck, CheckCircle2, CircleDashed, CircleDot, Clock, ArrowRight, DollarSign, MapPin } from 'lucide-react';
+import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, FileSearch, Container, Anchor, Truck, CheckCircle2, CircleDashed, CircleDot, Clock, ArrowRight, DollarSign, MapPin, AlertTriangle, Loader2, Download } from 'lucide-react';
 import { toast } from 'sonner';
-import { CONTAINER_40HQ, SHIPPING_READY_THRESHOLD_PCT, evaluateShippingReadiness } from '@/lib/binPacking';
+import {
+  CONTAINER_40HQ,
+  SHIPPING_READY_THRESHOLD_PCT,
+  buildPackingBoxes,
+  evaluateShippingReadiness,
+  packBoxes,
+} from '@/lib/binPacking';
 import { formatDate } from '@/lib/date-format';
 import { PageHeader } from '@/components/layout/PageHeader';
 import ContractFiles from '@/components/contract/ContractFiles';
@@ -95,6 +101,14 @@ const STATUS_ORDER: Record<SalesStatus, number> = {
   [SalesStatus.CANCELLED]: -1,
 };
 
+const SALES_NEXT_ACTIONS: Partial<Record<SalesStatus, { status: SalesStatus; label: string }>> = {
+  [SalesStatus.DRAFT]: { status: SalesStatus.CONFIRMED, label: '确认出口合同' },
+  [SalesStatus.CONFIRMED]: { status: SalesStatus.PACKING, label: '开始装柜' },
+  [SalesStatus.PACKING]: { status: SalesStatus.SHIPPED, label: '确认发运' },
+  [SalesStatus.SHIPPED]: { status: SalesStatus.ARRIVED, label: '确认到港' },
+  [SalesStatus.ARRIVED]: { status: SalesStatus.COMPLETED, label: '确认收款完成' },
+};
+
 export default function SalesDetailPage({ params }: PageProps) {
   const { id } = use(params);
   const [contract, setContract] = useState<SalesContract | null>(null);
@@ -130,6 +144,8 @@ export default function SalesDetailPage({ params }: PageProps) {
   const [threeFormsDialogOpen, setThreeFormsDialogOpen] = useState(false);
   // 船司装箱单核对对话框状态
   const [packingCheckOpen, setPackingCheckOpen] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [exportingWorkbook, setExportingWorkbook] = useState(false);
 
   // 截图区域引用
   const headerRef = useRef<HTMLDivElement>(null);
@@ -145,6 +161,33 @@ export default function SalesDetailPage({ params }: PageProps) {
     if (results.customsDeclarationId) toast.success(`报关单已生成`);
     if (results.forexId) toast.success(`外汇核销单已生成`);
     if (results.taxRefundId) toast.success('出口退税单已生成');
+  };
+
+  const handleExportWorkbook = async () => {
+    if (!contract) return;
+    setExportingWorkbook(true);
+    try {
+      await salesService.exportExcel(contract.id, contract.contractNo);
+      toast.success('出口工作簿已导出');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : '导出出口工作簿失败');
+    } finally {
+      setExportingWorkbook(false);
+    }
+  };
+
+  const handleAdvanceStatus = async (nextStatus: SalesStatus) => {
+    if (!contract) return;
+    setStatusUpdating(true);
+    try {
+      await salesService.updateStatus(contract.id, nextStatus);
+      toast.success('出口合同阶段已更新');
+      await loadData();
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : '状态推进失败');
+    } finally {
+      setStatusUpdating(false);
+    }
   };
 
   /**
@@ -455,6 +498,15 @@ export default function SalesDetailPage({ params }: PageProps) {
   };
 
   const packingRows = useMemo(() => contract?.packingItems ?? [], [contract?.packingItems]);
+  const packingBoxes = useMemo(
+    () => buildPackingBoxes(packingRows, products),
+    [packingRows, products],
+  );
+  const packingPlan = useMemo(() => packBoxes(packingBoxes), [packingBoxes]);
+  const estimatedDimensionCount = useMemo(
+    () => packingBoxes.filter((box) => box.isEstimated).length,
+    [packingBoxes],
+  );
 
   /**
    * 职责：装箱明细行排序取值
@@ -606,9 +658,24 @@ export default function SalesDetailPage({ params }: PageProps) {
   const cbmPercent = Math.min((usedCBM / maxCBM) * 100, 100);
 
   // 出柜条件：毛重(22t)或体积(68CBM)任一利用率 ≥ 80%
-  const readiness = evaluateShippingReadiness(weightUsed, usedCBM);
+  const readiness = evaluateShippingReadiness(weightUsed, usedCBM, {
+    unplacedBoxCount: packingPlan.unplacedBoxes.length,
+  });
 
   const currentStepIndex = STATUS_ORDER[contract.status] ?? 0;
+  const nextSalesAction = SALES_NEXT_ACTIONS[contract.status];
+  const shipmentBlocked = nextSalesAction?.status === SalesStatus.SHIPPED && !readiness.ready;
+  const collectionBlocked = nextSalesAction?.status === SalesStatus.COMPLETED
+    && (contract.receivedAmount || 0) < (contract.totalAmount || 0);
+  const nextActionBlocked = shipmentBlocked || collectionBlocked;
+  const readinessHeadline = readiness.overloaded
+    ? `不可出货：${readiness.overloadReasons.includes('weight') ? '毛重超过 22t' : ''}${readiness.overloadReasons.length === 2 ? '、' : ''}${readiness.overloadReasons.includes('volume') ? '体积超过 68 CBM' : ''}`
+    : !readiness.physicalFit
+      ? `不可出货：仍有 ${readiness.unplacedBoxCount} 箱未装下`
+      : readiness.ready
+        ? '满足出柜条件且全部箱件可装下'
+        : '未达出柜标准';
+  const readinessIsBlocking = readiness.overloaded || !readiness.physicalFit;
 
   return (
     <div className="space-y-6 pb-10">
@@ -619,8 +686,22 @@ export default function SalesDetailPage({ params }: PageProps) {
           description={`目的港: ${contract.port?.name || '未指定'} | 签订: ${formatDate(contract.signedAt)} | 预计到达: ${formatDate(contract.estimatedArrival)}`}
           backHref="/dashboard/sales"
           actions={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {getStatusBadge(contract.status)}
+              {nextSalesAction && (
+                <Button
+                  onClick={() => handleAdvanceStatus(nextSalesAction.status)}
+                  disabled={statusUpdating || nextActionBlocked}
+                  title={shipmentBlocked ? readinessHeadline : collectionBlocked ? '合同尚未收齐货款' : undefined}
+                >
+                  {statusUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
+                  {nextSalesAction.label}
+                </Button>
+              )}
+              <Button variant="outline" onClick={handleExportWorkbook} disabled={exportingWorkbook}>
+                {exportingWorkbook ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                导出出口工作簿
+              </Button>
               <Button variant="outline" onClick={handleSaveAsImage}>
                 <Camera className="mr-2 h-4 w-4" />
                 保存为图片
@@ -634,7 +715,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                 onClick={() => setThreeFormsDialogOpen(true)}
               >
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
-                一键生成三张表
+                生成申报三表
               </Button>
             </div>
           }
@@ -644,19 +725,23 @@ export default function SalesDetailPage({ params }: PageProps) {
       {/* 出柜条件（双80%指标）：毛重 22t / 体积 68CBM 任一 ≥ 80% 即可出柜 */}
       <div
         className={
-          readiness.ready
+          readinessIsBlocking
+            ? 'flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-red-200 bg-red-50/70 px-4 py-3 dark:border-red-900 dark:bg-red-950/40'
+            : readiness.ready
             ? 'flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-900 dark:bg-emerald-950/40'
             : 'flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/40'
         }
       >
         <div className="flex items-center gap-2">
-          {readiness.ready ? (
+          {readinessIsBlocking ? (
+            <AlertTriangle className="h-5 w-5 text-red-600" />
+          ) : readiness.ready ? (
             <CheckCircle2 className="h-5 w-5 text-emerald-600" />
           ) : (
             <CircleDashed className="h-5 w-5 text-amber-600" />
           )}
-          <span className={readiness.ready ? 'text-sm font-semibold text-emerald-700 dark:text-emerald-400' : 'text-sm font-semibold text-amber-700 dark:text-amber-400'}>
-            {readiness.ready ? '满足出柜条件' : '未达出柜标准'}
+          <span className={readinessIsBlocking ? 'text-sm font-semibold text-red-700 dark:text-red-400' : readiness.ready ? 'text-sm font-semibold text-emerald-700 dark:text-emerald-400' : 'text-sm font-semibold text-amber-700 dark:text-amber-400'}>
+            {readinessHeadline}
           </span>
           <span className="text-xs text-muted-foreground">
             （毛重或体积任一利用率 ≥ {SHIPPING_READY_THRESHOLD_PCT}%）
@@ -670,6 +755,19 @@ export default function SalesDetailPage({ params }: PageProps) {
           </span>
           <span className="text-muted-foreground">/ {CONTAINER_40HQ.maxWeight / 1000}t</span>
         </div>
+        <div className="flex items-center gap-2 text-xs">
+          <Container className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-muted-foreground">3D排柜</span>
+          <span className={readiness.physicalFit ? 'font-semibold text-emerald-700 dark:text-emerald-400' : 'font-semibold text-red-700 dark:text-red-400'}>
+            已装 {packingPlan.placedBoxes.length} 箱 / 未装 {packingPlan.unplacedBoxes.length} 箱
+          </span>
+        </div>
+        {estimatedDimensionCount > 0 && (
+          <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {estimatedDimensionCount} 项尺寸由体积推算，出货前需复核
+          </div>
+        )}
         <div className="flex items-center gap-2 text-xs">
           <Boxes className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-muted-foreground">体积利用率</span>

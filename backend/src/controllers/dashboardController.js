@@ -11,6 +11,19 @@
 const prisma = require('../utils/prisma');
 const { success } = require('../utils/response');
 const { generateForUser } = require('../services/notificationService');
+const { listTradeWorkflows } = require('../services/tradeWorkflowService');
+
+/**
+ * 职责：返回按出口合同聚合的专项单主线路，供工作台展示唯一下一动作。
+ */
+const getTradeWorkflows = async (req, res, next) => {
+  try {
+    const workflows = await listTradeWorkflows({ limit: req.query?.limit });
+    success(res, workflows);
+  } catch (error) {
+    next(error);
+  }
+};
 
 /**
  * 职责：获取仪表盘统计数据
@@ -519,4 +532,5 @@ module.exports = {
   trackProduct,
   getAnalytics,
   getBusinessOverview,
+  getTradeWorkflows,
 };

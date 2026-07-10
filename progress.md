@@ -1,5 +1,59 @@
 # 捷淞系统 UI 交互测试报告
 
+## 2026-07-10 出口专项单全流程重构
+
+### Phase 1-2: 现状审计、主线路与状态契约
+
+- **Status:** completed；当前进入 Phase 3 采购合同与付款闭环
+- **Started:** 2026-07-10（Asia/Shanghai）
+- Actions taken:
+  - 确认本轮 `/goal` 已由线程自动建立并处于 active。
+  - 完整读取 `byterover`、`brainstorming`、Product Design audit、planning-with-files 及其强制引用。
+  - 运行 Codex memory auto-context、ByteRover 本地查询和 Product Design user-context preflight。
+  - 确认工作区干净，盘点最近已交付的七步导航、PDF 核对、提醒和数据导入提交。
+  - 将本地文件化计划从旧 Agent Runtime 目标刷新为本轮出口专项单全流程目标。
+  - 完成工作台、采购列表/详情、出口列表/详情与 3D 排柜的真实浏览器审阅；证据仅保存在 gitignored `logs/user-journey-audit/2026-07-10/`。
+  - 统一采购和出口状态机，详情页增加合法的下一状态动作，旧状态通过兼容 Adapter 读取。
+  - 将 40HQ 出货拆成商业利用率、安全上限和 3D 物理可装三层；后端在写入 `SHIPPED` 前强制校验。
+  - 新增八阶段专项单主线路与工作台卡片，删除静态七步流程和重复“近期待办”。
+  - 修正财务图表混币种、月报名称、本地启动端口和认证页 Next issue 来源。
+- Files created/modified:
+  - `task_plan.md`
+  - `findings.md`
+  - `progress.md`
+  - `backend/src/services/tradeWorkflowService.js`
+  - `backend/src/services/shipmentReadinessService.js`
+  - `frontend/src/components/dashboard/TradeWorkflowBoard.tsx`
+
+### Test Results
+
+| Test | Expected | Actual | Status |
+| --- | --- | --- | --- |
+| Goal 状态读取 | 本轮用户故事为 active goal | 已确认 active | PASS |
+| Git 起点检查 | 开始前无用户未提交改动 | `main...origin/main`，工作区干净 | PASS |
+| Product Design preflight | 获取已保存设计上下文 | 无保存上下文，改用当前产品证据 | PASS |
+| ByteRover preflight | 获取相关工程记忆或安全降级 | provider 不可用，已降级本地搜索 | PASS |
+| 专项单后端契约 | 八阶段、阻塞、次月 5 日准备日 | `7/7` | PASS |
+| 工作台主线路 | 阶段完整度、风险与唯一下一动作 | `6/6` | PASS |
+| 后端目标回归 | 状态/控制器/出货/专项单 | `39/39` | PASS |
+| 前端目标回归 | 认证/首页/采购/出口/财务 | `64/64` | PASS |
+| 触达文件 ESLint | 0 error | `0 errors / 2` 个既有 warnings | PASS |
+| TypeScript | 无类型错误 | `npx tsc --noEmit` | PASS |
+| diff check | 无空白错误 | `git diff --check` | PASS |
+
+### Error Log
+
+| Error | Attempt | Resolution |
+| --- | ---: | --- |
+| `create_goal`：thread already has an unfinished goal | 1 | 使用 `get_goal` 读取并确认现有本轮 goal |
+| ByteRover provider-backed query unavailable | 1 | wrapper 自动 fallback 到 local search |
+| planning 文件补丁上下文不匹配 | 1 | 读取实际标题后拆分补丁成功落盘 |
+| zsh：动态路由 `[id]` 路径无匹配 | 1 | 改用单引号路径读取 |
+| 出口详情页定位不到“出口退税”二级导航 | 1 | 详情页确实不渲染该导航；使用已知规范 URL 继续审阅，不重复点击 |
+| `npm run typecheck` 不存在 | 1 | 改用 `npx tsc --noEmit`，通过 |
+
+---
+
 ## 2026-04-05 Migration Health 诊断输出
 
 - 已把 Prisma migration 链路再推进一层：

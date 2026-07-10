@@ -5,8 +5,13 @@ const {
   normalizeFilterStatus,
   parseNullableNumber,
 } = require('./shared/contractUtils');
-const { SALES_STATUS, validateSalesTransition } = require('./salesStateMachine');
+const {
+  SALES_STATUS,
+  normalizeSalesStatus,
+  validateSalesTransition,
+} = require('./salesStateMachine');
 const inventorySnapshot = require('./inventorySnapshot');
+const { evaluateShipmentReadiness } = require('./shipmentReadinessService');
 
 const getCurrentYear = () => new Date().getFullYear().toString().slice(-2);
 
@@ -171,7 +176,7 @@ const addSalesItem = async (id, data = {}) => {
 };
 
 const updateSalesStatus = async (id, status, context = {}) => {
-  const targetStatus = normalizeFilterStatus(typeof status === 'string' ? status.trim() : status);
+  const targetStatus = normalizeSalesStatus(status);
 
   if (!targetStatus) {
     throw createError('status 不能为空', 400);
@@ -183,7 +188,32 @@ const updateSalesStatus = async (id, status, context = {}) => {
   const contract = await prisma.$transaction(async (tx) => {
     const existingContract = await tx.salesContract.findUnique({
       where: { id },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        status: true,
+        grossWeight: true,
+        volume: true,
+        packingItems: {
+          select: {
+            id: true,
+            boxes: true,
+            quantity: true,
+            volume: true,
+            length: true,
+            width: true,
+            height: true,
+            product: {
+              select: {
+                customsName: true,
+                length: true,
+                width: true,
+                height: true,
+                volume: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!existingContract) {
@@ -196,18 +226,37 @@ const updateSalesStatus = async (id, status, context = {}) => {
     }
 
     const isTransition = existingContract.status !== targetStatus;
+    if (isTransition && targetStatus === SALES_STATUS.SHIPPED) {
+      const readiness = evaluateShipmentReadiness(existingContract);
+      if (!readiness.ready) {
+        let message = '当前货柜不满足发运条件';
+        if (readiness.unplacedBoxCount > 0) {
+          message = `仍有 ${readiness.unplacedBoxCount} 箱无法装入 40HQ 货柜`;
+        } else if (readiness.overloaded) {
+          message = `货柜${readiness.overloadReasons.includes('weight') ? '毛重超过22吨' : '体积超过68立方米'}`;
+        } else if (readiness.missingBoxItemCount > 0 || existingContract.packingItems.length === 0) {
+          message = '装箱明细或箱数未填写完整';
+        } else if (!readiness.utilizationReady) {
+          message = '毛重和体积均未达到80%出柜标准';
+        }
+        throw createError(message, 400);
+      }
+    }
     const contract = await tx.salesContract.update({
       where: { id },
-      data: { status: targetStatus },
+      data: {
+        status: targetStatus,
+        ...(isTransition && targetStatus === SALES_STATUS.SHIPPED ? { shippedAt: new Date() } : {}),
+      },
     });
 
     // 正向流转：出库时扣减库存
-    if (isTransition && targetStatus === SALES_STATUS.OUT_STOCK) {
+    if (isTransition && targetStatus === SALES_STATUS.SHIPPED) {
       applyResult = await inventorySnapshot.applySalesOutStock(tx, id);
     }
 
     // 反向流转：从出库状态回退时，恢复库存
-    if (isTransition && existingContract.status === SALES_STATUS.OUT_STOCK) {
+    if (isTransition && normalizeSalesStatus(existingContract.status) === SALES_STATUS.SHIPPED) {
       revertResult = await inventorySnapshot.revertSalesOutStock(tx, id);
     }
 

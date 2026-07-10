@@ -1,55 +1,51 @@
 /**
- * Input: 采购合同状态机配置
- * Output: 采购合同状态流转规则与校验结果
- * Pos: 约束采购合同状态只能按单向链路变更
+ * Input: 采购合同当前状态与目标状态（支持历史别名）
+ * Output: 规范状态与单向流转校验结果
+ * Pos: 采购合同状态的权威契约
  *
- * 采购流转：DRAFT -> PENDING_INSPECTION -> IN_STOCK -> COMPLETED
+ * 采购流转：DRAFT -> SIGNED -> PRODUCING -> READY -> SHIPPED -> RECEIVED -> COMPLETED
  */
 
-const PURCHASE_STATUS = {
-  DRAFT: 'DRAFT',
-  PENDING_INSPECTION: 'PENDING_INSPECTION',
-  IN_STOCK: 'IN_STOCK',
-  COMPLETED: 'COMPLETED',
-};
+const { PURCHASE_STATUS } = require('../config/constants');
 
-const VALID_TRANSITIONS = {
-  [PURCHASE_STATUS.DRAFT]: [PURCHASE_STATUS.PENDING_INSPECTION],
-  [PURCHASE_STATUS.PENDING_INSPECTION]: [PURCHASE_STATUS.IN_STOCK],
-  [PURCHASE_STATUS.IN_STOCK]: [PURCHASE_STATUS.COMPLETED],
+const LEGACY_STATUS_ALIASES = Object.freeze({
+  PENDING_INSPECTION: PURCHASE_STATUS.PRODUCING,
+  IN_STOCK: PURCHASE_STATUS.RECEIVED,
+});
+
+const VALID_TRANSITIONS = Object.freeze({
+  [PURCHASE_STATUS.DRAFT]: [PURCHASE_STATUS.SIGNED, PURCHASE_STATUS.CANCELLED],
+  [PURCHASE_STATUS.SIGNED]: [PURCHASE_STATUS.PRODUCING, PURCHASE_STATUS.CANCELLED],
+  [PURCHASE_STATUS.PRODUCING]: [PURCHASE_STATUS.READY, PURCHASE_STATUS.CANCELLED],
+  [PURCHASE_STATUS.READY]: [PURCHASE_STATUS.SHIPPED, PURCHASE_STATUS.CANCELLED],
+  [PURCHASE_STATUS.SHIPPED]: [PURCHASE_STATUS.RECEIVED, PURCHASE_STATUS.CANCELLED],
+  [PURCHASE_STATUS.RECEIVED]: [PURCHASE_STATUS.COMPLETED, PURCHASE_STATUS.CANCELLED],
   [PURCHASE_STATUS.COMPLETED]: [],
+  [PURCHASE_STATUS.CANCELLED]: [],
+});
+
+const normalizePurchaseStatus = (status) => {
+  if (typeof status !== 'string') return null;
+  const normalized = status.trim().toUpperCase();
+  return LEGACY_STATUS_ALIASES[normalized] || normalized;
 };
 
-/**
- * 验证采购合同状态流转是否合法。
- * @param {string} currentStatus 当前状态
- * @param {string} nextStatus 目标状态
- * @returns {{ valid: boolean, message?: string }}
- */
 const validatePurchaseTransition = (currentStatus, nextStatus) => {
-  if (!Object.values(PURCHASE_STATUS).includes(nextStatus)) {
+  const normalizedCurrent = normalizePurchaseStatus(currentStatus);
+  const normalizedNext = normalizePurchaseStatus(nextStatus);
+
+  if (!Object.values(PURCHASE_STATUS).includes(normalizedNext)) {
+    return { valid: false, message: `不支持的采购合同状态: ${nextStatus}` };
+  }
+  if (!Object.values(PURCHASE_STATUS).includes(normalizedCurrent)) {
+    return { valid: false, message: `不支持的当前采购合同状态: ${currentStatus}` };
+  }
+  if (normalizedCurrent === normalizedNext) return { valid: true };
+
+  if (!(VALID_TRANSITIONS[normalizedCurrent] || []).includes(normalizedNext)) {
     return {
       valid: false,
-      message: `不支持的采购合同状态: ${nextStatus}`,
-    };
-  }
-
-  if (currentStatus === nextStatus) {
-    return { valid: true };
-  }
-
-  if (!Object.values(PURCHASE_STATUS).includes(currentStatus)) {
-    return {
-      valid: false,
-      message: `不支持的当前采购合同状态: ${currentStatus}`,
-    };
-  }
-
-  const allowedNextStatuses = VALID_TRANSITIONS[currentStatus] || [];
-  if (!allowedNextStatuses.includes(nextStatus)) {
-    return {
-      valid: false,
-      message: `非法状态流转: ${currentStatus} -> ${nextStatus}`,
+      message: `非法状态流转: ${normalizedCurrent} -> ${normalizedNext}`,
     };
   }
 
@@ -58,5 +54,6 @@ const validatePurchaseTransition = (currentStatus, nextStatus) => {
 
 module.exports = {
   PURCHASE_STATUS,
+  normalizePurchaseStatus,
   validatePurchaseTransition,
 };

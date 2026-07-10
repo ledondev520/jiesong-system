@@ -57,7 +57,7 @@ test('PURCHASE_STATUS: 覆盖采购流程状态', () => {
 
   assert.deepStrictEqual(
     values,
-    ['DRAFT', 'SIGNED', 'PRODUCING', 'SHIPPED', 'RECEIVED', 'COMPLETED', 'CANCELLED'].sort(),
+    ['DRAFT', 'SIGNED', 'PRODUCING', 'READY', 'SHIPPED', 'RECEIVED', 'COMPLETED', 'CANCELLED'].sort(),
   );
 });
 
@@ -66,7 +66,7 @@ test('SALES_STATUS: 覆盖销售流程状态', () => {
 
   assert.deepStrictEqual(
     values,
-    ['DRAFT', 'CONFIRMED', 'PAID', 'SHIPPED', 'COMPLETED', 'CANCELLED'].sort(),
+    ['DRAFT', 'CONFIRMED', 'PACKING', 'SHIPPED', 'ARRIVED', 'COMPLETED', 'CANCELLED'].sort(),
   );
 });
 

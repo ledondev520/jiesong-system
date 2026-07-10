@@ -290,6 +290,7 @@ export enum PurchaseStatus {
   DRAFT = 'DRAFT',
   SIGNED = 'SIGNED',
   PRODUCING = 'PRODUCING',
+  READY = 'READY',
   SHIPPED = 'SHIPPED',
   RECEIVED = 'RECEIVED',
   COMPLETED = 'COMPLETED',

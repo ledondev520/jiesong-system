@@ -24,7 +24,17 @@ export interface ShippingReadiness {
   weightPct: number;
   /** 体积利用率（%，相对 68 CBM，不封顶） */
   volumePct: number;
-  /** 是否满足出柜条件（任一指标 ≥ 80%） */
+  /** 商业利用率是否达标（任一指标 ≥ 80%） */
+  utilizationReady: boolean;
+  /** 是否超过 40HQ 任一安全上限 */
+  overloaded: boolean;
+  /** 超限指标 */
+  overloadReasons: Array<'weight' | 'volume'>;
+  /** 3D 排柜是否已放下全部箱件 */
+  physicalFit: boolean;
+  /** 未能放入货柜的箱数 */
+  unplacedBoxCount: number;
+  /** 是否同时满足利用率、上限与物理可装载性 */
   ready: boolean;
   /** 达标途径：weight/volume/both/none */
   reachedBy: 'weight' | 'volume' | 'both' | 'none';
@@ -39,15 +49,30 @@ export interface ShippingReadiness {
  * @param volumeCbm 合同总体积（CBM）
  * @returns 双指标利用率与判定结果
  */
-export function evaluateShippingReadiness(grossWeightKg: number, volumeCbm: number): ShippingReadiness {
+export function evaluateShippingReadiness(
+  grossWeightKg: number,
+  volumeCbm: number,
+  physical: { unplacedBoxCount?: number } = {},
+): ShippingReadiness {
   const weightPct = Math.round(((grossWeightKg || 0) / CONTAINER_40HQ.maxWeight) * 1000) / 10;
   const volumePct = Math.round(((volumeCbm || 0) / CONTAINER_40HQ.maxVolume) * 1000) / 10;
   const weightOk = weightPct >= SHIPPING_READY_THRESHOLD_PCT;
   const volumeOk = volumePct >= SHIPPING_READY_THRESHOLD_PCT;
+  const overloadReasons: Array<'weight' | 'volume'> = [];
+  if ((grossWeightKg || 0) > CONTAINER_40HQ.maxWeight) overloadReasons.push('weight');
+  if ((volumeCbm || 0) > CONTAINER_40HQ.maxVolume) overloadReasons.push('volume');
+  const utilizationReady = weightOk || volumeOk;
+  const unplacedBoxCount = Math.max(0, Math.trunc(physical.unplacedBoxCount || 0));
+  const physicalFit = unplacedBoxCount === 0;
   return {
     weightPct,
     volumePct,
-    ready: weightOk || volumeOk,
+    utilizationReady,
+    overloaded: overloadReasons.length > 0,
+    overloadReasons,
+    physicalFit,
+    unplacedBoxCount,
+    ready: utilizationReady && overloadReasons.length === 0 && physicalFit,
     reachedBy: weightOk && volumeOk ? 'both' : weightOk ? 'weight' : volumeOk ? 'volume' : 'none',
   };
 }
@@ -63,6 +88,82 @@ export interface Box {
   color?: string;  // 用于可视化
   quantity: number; // 箱数
   isEstimated?: boolean; // 尺寸是否由体积推算（非用户填写）
+}
+
+export interface PackingBoxProductSource {
+  id: string;
+  customsName?: string | null;
+  length?: number | null;
+  width?: number | null;
+  height?: number | null;
+  volume?: number | null;
+}
+
+export interface PackingBoxItemSource {
+  id: string;
+  productId: string;
+  boxes?: number | null;
+  quantity?: number | null;
+  volume?: number | null;
+  grossWeight?: number | null;
+  length?: number | null;
+  width?: number | null;
+  height?: number | null;
+  product?: PackingBoxProductSource | null;
+}
+
+/**
+ * 职责：把装箱明细统一转换成 3D 排柜箱型。
+ * 规则：明细尺寸 > 商品档案尺寸 > 按单箱体积推算；推算结果明确标记。
+ */
+export function buildPackingBoxes(
+  packingItems: PackingBoxItemSource[],
+  products: PackingBoxProductSource[] = [],
+): Box[] {
+  return packingItems.map((item) => {
+    const product = item.product || products.find((entry) => entry.id === item.productId);
+    const quantity = Math.max(0, Math.trunc(Number(item.boxes) || 0));
+    const itemHasDimensions = Boolean(item.length && item.width && item.height);
+    const productHasDimensions = Boolean(product?.length && product?.width && product?.height);
+
+    if (itemHasDimensions || productHasDimensions) {
+      return {
+        id: item.id,
+        name: product?.customsName || '未知商品',
+        length: Number(itemHasDimensions ? item.length : product?.length),
+        width: Number(itemHasDimensions ? item.width : product?.width),
+        height: Number(itemHasDimensions ? item.height : product?.height),
+        weight: Number(item.grossWeight) || 0,
+        color: generateColor(item.productId),
+        quantity,
+        isEstimated: false,
+      };
+    }
+
+    const itemVolume = Number(item.volume) || 0;
+    const productVolume = Number(product?.volume) || 0;
+    const itemQuantity = Number(item.quantity) || 0;
+    const perBoxCbm = quantity > 0
+      ? itemVolume > 0
+        ? itemVolume / quantity
+        : productVolume > 0
+          ? (productVolume * itemQuantity) / quantity
+          : 0
+      : 0;
+    const inferred = inferBoxDimensions(perBoxCbm);
+
+    return {
+      id: item.id,
+      name: product?.customsName || '未知商品',
+      length: inferred.length,
+      width: inferred.width,
+      height: inferred.height,
+      weight: Number(item.grossWeight) || 0,
+      color: generateColor(item.productId),
+      quantity,
+      isEstimated: true,
+    };
+  });
 }
 
 // 放置后的箱子（包含位置信息）
