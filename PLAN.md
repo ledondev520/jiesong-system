@@ -1,5 +1,24 @@
 # Ops Execution Center Plan
 
+## 2026-07-10 PERF-FE-12（顶层 Module 切换性能优化）
+
+### Goal
+- 停止登录后对采购、出口、财务、AI 助手及高频操作页的批量预取，消除 Next dev 并发冷编译风暴。
+- 保留顶层 Module 的上次子页面记忆，只在 hover/focus 表达导航意图时预取唯一目标。
+- 将出口 Excel、财务图表和 AI 用量图表从首屏静态依赖改为按需加载，缩小页面 Module 的初始实现负担。
+
+### Work Units
+- PERF-FE-12A：用失败测试锁定“初始不批量预取、意图预取去重、记忆目标不变”。
+- PERF-FE-12B：收敛 Sidebar 预取 Implementation，删除无调用方的批量路由清单。
+- PERF-FE-12C：出口批量导入 Excel Module 仅在弹窗打开时加载。
+- PERF-FE-12D：财务和 AI 图表通过内部 Seam 延迟加载，首屏先呈现业务摘要。
+- PERF-FE-12E：目标/全量测试、类型、lint、生产构建和冷暖路径复测。
+
+### DoD
+- 登录后不再自动预取 12 个业务路由；单次导航意图最多预取 1 个目标且重复 hover/focus 不重复请求。
+- 出口列表首屏不包含 `xlsx`，财务概览和 AI 会话首屏不静态包含 `recharts`。
+- 既有 Module 入口、Tab 记忆、列表、图表和批量导入行为保持可用；生产构建和前端全量回归通过。
+
 ## 2026-07-10 FLOW-07A（最终简化与交付审计）
 
 ### Delivered

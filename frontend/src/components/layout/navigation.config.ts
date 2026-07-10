@@ -167,17 +167,6 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
   },
 ];
 
-export const SHELL_PREFETCH_ROUTES = [
-  '/dashboard/purchase/create',
-  '/dashboard/sales/create',
-  '/dashboard/inventory-status',
-  '/dashboard/tax-refunds',
-  '/dashboard/contracts',
-  '/dashboard/payments',
-  '/dashboard/users',
-  '/dashboard/system',
-] as const;
-
 export const getVisibleModuleNavItems = (role?: Role | null) =>
   MODULE_NAV_ITEMS.filter((item) => !item.visibleRoles || (role ? item.visibleRoles.includes(role) : false));
 

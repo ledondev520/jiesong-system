@@ -7,8 +7,8 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { fireEvent, render } from '@testing-library/react';
+import type { AnchorHTMLAttributes, ReactNode } from 'react';
 import { Role } from '@/types';
 import { Sidebar } from './Sidebar';
 
@@ -37,8 +37,12 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('next/link', () => ({
-  default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => (
-    <a href={href} className={className}>
+  default: ({
+    href,
+    children,
+    ...props
+  }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; children: ReactNode }) => (
+    <a href={href} {...props}>
       {children}
     </a>
   ),
@@ -107,15 +111,34 @@ describe('Sidebar', () => {
     expect(queryByText('系统管理')).not.toBeInTheDocument();
   });
 
-  it('空闲时预取可见导航路由', () => {
+  it('初始渲染和空闲阶段不批量预取业务路由', () => {
     vi.useFakeTimers();
     render(<Sidebar />);
     vi.runOnlyPendingTimers();
 
-    expect(mockPrefetch).toHaveBeenCalledWith('/dashboard');
-    expect(mockPrefetch).toHaveBeenCalledWith('/dashboard/contracts');
-    expect(mockPrefetch).toHaveBeenCalledWith('/dashboard/ai/sessions');
-    expect(mockPrefetch).toHaveBeenCalledWith('/dashboard/settings');
+    expect(mockPrefetch).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
+  it('只在用户表达导航意图时预取记忆目标且同一路由只预取一次', () => {
+    vi.useFakeTimers();
+    vi.mocked(localStorage.getItem).mockImplementation((key) => (
+      key === 'tab_memory_/dashboard/finance' ? '/dashboard/finance/statements' : null
+    ));
+    const { getByText } = render(<Sidebar />);
+    const financeLink = getByText('财务').closest('a');
+
+    expect(financeLink).not.toBeNull();
+    fireEvent.mouseEnter(financeLink!);
+    fireEvent.focus(financeLink!);
+    fireEvent.mouseEnter(financeLink!);
+
+    expect(mockPrefetch).toHaveBeenCalledTimes(1);
+    expect(mockPrefetch).toHaveBeenCalledWith('/dashboard/finance/statements');
+
+    fireEvent.click(financeLink!);
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/finance/statements');
 
     vi.useRealTimers();
   });

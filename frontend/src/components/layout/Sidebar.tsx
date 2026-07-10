@@ -18,7 +18,7 @@
 
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -29,10 +29,7 @@ import {
   getModuleTargetHref,
   getVisibleModuleNavItems,
   isModuleRouteActive,
-  SHELL_PREFETCH_ROUTES,
 } from './navigation.config';
-
-const MAX_PREFETCH_ROUTES = 5;
 
 // ==================== 组件 ====================
 
@@ -43,7 +40,7 @@ const MAX_PREFETCH_ROUTES = 5;
  *   2. 模块激活判断：当前路径属于该模块任一子路由前缀即高亮
  *   3. 子页面切换由各页面顶部的 ModuleTabHeader 水平 Tab 栏负责
  *   4. 不显示跨模块待办数量，避免导航与业务数据耦合
- *   5. 空闲时预取各模块入口路由
+ *   5. 仅在 hover/focus 表达导航意图时预取唯一目标路由
  */
 export function Sidebar() {
   const pathname = usePathname();
@@ -52,33 +49,6 @@ export function Sidebar() {
   const prefetchedRoutesRef = useRef<Set<string>>(new Set());
 
   const visibleItems = getVisibleModuleNavItems(user?.role);
-
-  // 空闲时预取各模块入口路由 + 高频操作页
-  useEffect(() => {
-    const routesToPrefetch = [
-      ...visibleItems.map((i) => i.defaultHref),
-      ...SHELL_PREFETCH_ROUTES,
-    ]
-      .slice(0, MAX_PREFETCH_ROUTES + SHELL_PREFETCH_ROUTES.length)
-      .filter((href) => !prefetchedRoutesRef.current.has(href));
-
-    if (routesToPrefetch.length === 0) return;
-
-    const prefetch = () => {
-      routesToPrefetch.forEach((href) => {
-        router.prefetch(href);
-        prefetchedRoutesRef.current.add(href);
-      });
-    };
-
-    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
-      const idleId = window.requestIdleCallback(prefetch);
-      return () => window.cancelIdleCallback(idleId);
-    }
-
-    const timer = setTimeout(prefetch, 300);
-    return () => clearTimeout(timer);
-  }, [visibleItems, router, pathname]);
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -103,12 +73,22 @@ export function Sidebar() {
                 e.preventDefault();
                 router.push(getModuleTargetHref(item));
               };
+              const handleModuleIntent = () => {
+                const targetHref = getModuleTargetHref(item);
+                if (prefetchedRoutesRef.current.has(targetHref)) {
+                  return;
+                }
+                prefetchedRoutesRef.current.add(targetHref);
+                router.prefetch(targetHref);
+              };
 
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   onClick={handleModuleClick}
+                  onMouseEnter={handleModuleIntent}
+                  onFocus={handleModuleIntent}
                   className={cn(
                     'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                     isActive
