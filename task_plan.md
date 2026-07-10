@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-Phase 8 — 简化、端到端 QA 与交付（in_progress）
+Phase 8 — 简化、端到端 QA 与交付（completed）
 
 ## Phases
 
@@ -19,7 +19,7 @@ Phase 8 — 简化、端到端 QA 与交付（in_progress）
 | 5. 出口单证与核对闭环 | completed | 已完成全量三单/Excel、历史 HS 与当前证据、统一金额口径、船司 PDF 原件/差异/人工结论持久化 |
 | 6. 发票与出口退税闭环 | completed | 已完成催票清单、多发票号码/选填附件、次月 5 日内部提醒、2026 外贸企业材料清单、采购/发票/税号关联校验与三 Sheet Excel |
 | 7. 财务与成本分析闭环 | completed | 已完成单柜 USD 收款、CNY 采购成本分摊、预计退税与商品毛利/现金流，以及月度账表预览确认和成本结构留存 |
-| 8. 简化、端到端 QA 与交付 | in_progress | 重复入口已收口，全量 lint/type/test/build 已通过；继续完成最终差异审计、台账、提交和认证阻塞说明 |
+| 8. 简化、端到端 QA 与交付 | completed | 重复入口和最后一条陈旧验收路径已收口；全量 lint/type/test/build、迁移健康、真实数据只读演练、台账和认证阻塞说明均完成 |
 
 ## User-story Acceptance Contract
 
@@ -82,6 +82,5 @@ Phase 8 — 简化、端到端 QA 与交付（in_progress）
 
 ## Next Concrete Actions
 
-1. 审阅最终 diff、过期引用和安全范围，确认没有把业务数据、工作簿或认证资料写入仓库。
-2. 更新 PLAN/TASKS/RISKS/METRICS、结果和 patch 交付物，完成 FLOW-06B 独立提交。
-3. 完成全流程最终状态审计；浏览器认证阻塞按事实留存，不伪造已登录验收。
+1. 当前目标已完成；保持真实业务阻塞项，不批量制造历史财务、发票、税率或生产资料。
+2. 若后续进入发布阶段，按独立任务执行远端推送、部署与已登录生产验收，不把本地绿灯误称为线上完成。

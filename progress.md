@@ -1,5 +1,29 @@
 # 捷淞系统 UI 交互测试报告
 
+## 2026-07-10 Phase 8：最终简化与交付审计
+
+- **Status:** completed
+- 八阶段专项单主线、单据证据、税务准备和财务收口共形成 8 个独立功能提交；顶层业务 Module 保持 6 个。
+- 最终可执行代码搜索未发现重复报表区块、目录扫描路由或旧月报直写调用；仅保留“这些路由必须不存在”的负向测试。
+- 静态审计发现性能守卫脚本仍请求旧 `/finance/statements/import-file`，已在 `e535bcf` 改为分别验证 preview/confirm 缺文件保护。
+- 应用内浏览器与真实 Chrome 的 localhost 登录态均过期并跳到 `/login?expired=1`；未读取/注入认证资料，未改动用户已有 Chrome 标签。
+- 当前仓库未推送、未部署；交付结论仅覆盖本地实现和验证。
+
+### Final Verification
+
+| Test | Actual | Status |
+| --- | --- | --- |
+| 后端全量测试 | `464/464` | PASS |
+| 数据库集成测试 | `3/3` | PASS |
+| 前端全量测试 | `163 files / 664 tests` | PASS |
+| TypeScript | `npx tsc --noEmit` | PASS |
+| ESLint | `0 errors / 4 existing warnings` | PASS |
+| 生产构建 | 51 路由；既有 dev cockpit NFT warning | PASS |
+| Migration health | `21/21`，pending/blocking 0 | PASS |
+| 真实月报只读演练 | 13/13 可预览，账期 `12 → 12` | PASS |
+| 双浏览器已登录 UI | 两者会话过期；未使用凭据 | DEFERRED |
+| 最终过期引用搜索 | 可执行代码中旧月报路径 0，负向测试 1 | PASS |
+
 ## 2026-07-10 Phase 7B：月度账表预览确认
 
 - **Status:** completed；Phase 8 最终审计进行中
