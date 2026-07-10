@@ -1,5 +1,6 @@
 import api, { type ApiRequestConfig } from '@/lib/axios';
 import type { ApiResponse, PurchaseContract } from '@/types';
+import type { ContractFile } from './contractFile.service';
 import { createCrudService } from './crudService';
 
 type PurchaseContractQuery = { page?: number; pageSize?: number; keyword?: string; lite?: boolean };
@@ -112,6 +113,39 @@ export type PurchaseProductionDetailPayload = {
   height: number | null;
 };
 
+export interface PurchaseInvoicePreparation {
+  purchaseContractId: string;
+  complete: boolean;
+  fileRequired: false;
+  invoiceNumbers: string[];
+  invoiceFiles: ContractFile[];
+  issues: Array<{ code: string; severity: 'error' | 'warning'; message: string }>;
+  amounts: {
+    taxRate: number;
+    netAmount: number;
+    taxAmount: number;
+    grossAmount: number;
+  };
+  request: {
+    contractNo: string;
+    supplierName: string;
+    supplierTaxId: string;
+    lines: Array<{
+      purchaseItemId: string;
+      productId: string;
+      productName: string;
+      specification?: string | null;
+      unit: string;
+      quantity: number;
+      netUnitPrice: number;
+      netAmount: number;
+      taxRate: number;
+      taxAmount: number;
+      grossAmount: number;
+    }>;
+  };
+}
+
 /**
  * 采购服务（含报价解析与供应商查询）。
  */
@@ -149,6 +183,22 @@ export const purchaseService = {
       ApiResponse<PurchaseContract>,
       { items: PurchaseProductionDetailPayload[] }
     >(`/purchases/${id}/production-details`, { items });
+  },
+
+  /** 读取由采购明细推导的催票清单、已登记号码和选填附件。 */
+  getInvoicePreparation: async (id: string) => {
+    return api.get<ApiResponse<PurchaseInvoicePreparation>, ApiResponse<PurchaseInvoicePreparation>>(
+      `/purchases/${id}/invoice-preparation`,
+    );
+  },
+
+  /** 通过专用 Interface 登记一份或多份供应商发票号码。 */
+  registerInvoiceNumbers: async (id: string, invoiceNumbers: string[]) => {
+    return api.put<
+      ApiResponse<PurchaseInvoicePreparation>,
+      ApiResponse<PurchaseInvoicePreparation>,
+      { invoiceNumbers: string[] }
+    >(`/purchases/${id}/invoice-numbers`, { invoiceNumbers });
   },
 
   /**

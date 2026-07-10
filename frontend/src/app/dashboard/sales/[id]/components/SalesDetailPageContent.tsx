@@ -1,6 +1,6 @@
 /**
- * Input: 出口合同详情、已完工采购来源、binPacking（出柜双80%判定）、装箱单核对与导出工具
- * Output: 出口详情（采购资料导入、装箱明细、3D排柜、图片导出、出柜门槛、单证核对与收款）
+ * Input: 出口合同详情、采购来源、40HQ 排柜、单证核对和退税材料准备 Interface
+ * Output: 排柜/发运、出口单证、船司核对、退税材料和收款的专项单主页面
  * Pos: 出口专项单装柜主页面，复用采购完工资料并承载排柜到发运的唯一主线路
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -51,7 +51,7 @@ import {
 } from '@/components/ui/tabs';
 import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, FileSearch, Container, Anchor, Truck, CheckCircle2, CircleDashed, CircleDot, Clock, ArrowRight, DollarSign, MapPin, AlertTriangle, Loader2, Download, LockKeyhole } from 'lucide-react';
+import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, FileSearch, FileCheck2, Container, Anchor, Truck, CheckCircle2, CircleDashed, CircleDot, Clock, ArrowRight, DollarSign, MapPin, AlertTriangle, Loader2, Download, LockKeyhole } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   CONTAINER_40HQ,
@@ -75,6 +75,11 @@ const GenerateThreeFormsDialog = lazy(() =>
 const PackingListCheckDialog = lazy(() =>
   import('@/components/dialog/PackingListCheckDialog').then((module) => ({
     default: module.PackingListCheckDialog,
+  })),
+);
+const TaxRefundPreparationDialog = lazy(() =>
+  import('@/components/dialog/TaxRefundPreparationDialog').then((module) => ({
+    default: module.TaxRefundPreparationDialog,
   })),
 );
 const ImportPurchaseItemsDialog = lazy(() =>
@@ -150,6 +155,7 @@ export default function SalesDetailPage({ params }: PageProps) {
   const [threeFormsDialogOpen, setThreeFormsDialogOpen] = useState(false);
   // 船司装箱单核对对话框状态
   const [packingCheckOpen, setPackingCheckOpen] = useState(false);
+  const [taxPreparationOpen, setTaxPreparationOpen] = useState(false);
   const [importPurchaseOpen, setImportPurchaseOpen] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [exportingWorkbook, setExportingWorkbook] = useState(false);
@@ -718,6 +724,10 @@ export default function SalesDetailPage({ params }: PageProps) {
               <Button variant="outline" onClick={() => setPackingCheckOpen(true)}>
                 <FileSearch className="mr-2 h-4 w-4" />
                 核对船司装箱单
+              </Button>
+              <Button variant="outline" onClick={() => setTaxPreparationOpen(true)}>
+                <FileCheck2 className="mr-2 h-4 w-4" />
+                检查退税材料
               </Button>
               <Button
                 variant="default"
@@ -1529,6 +1539,17 @@ export default function SalesDetailPage({ params }: PageProps) {
             contractId={contract.id}
             contractNo={contract.contractNo}
             onChanged={loadData}
+          />
+        </Suspense>
+      )}
+
+      {taxPreparationOpen && (
+        <Suspense fallback={null}>
+          <TaxRefundPreparationDialog
+            open={taxPreparationOpen}
+            onOpenChange={setTaxPreparationOpen}
+            salesContractId={contract.id}
+            contractNo={contract.contractNo}
           />
         </Suspense>
       )}

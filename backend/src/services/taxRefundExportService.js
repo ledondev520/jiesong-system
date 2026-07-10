@@ -5,6 +5,8 @@
  */
 
 const prisma = require('../utils/prisma');
+const { normalizeInvoiceNumbers } = require('./purchaseInvoiceService');
+const { normalizePurchaseTaxRate } = require('./purchaseAmountService');
 
 const MATCH_STATUS = {
   PENDING: 'pending',
@@ -33,6 +35,15 @@ const normalizeVatRateType = (value) => {
 
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+/** 发票号码属于业务标识，不能像内部关联号一样删除前导 0。 */
+const normalizeInvoiceIdentifier = (value) => {
+  try {
+    return normalizeInvoiceNumbers(value).join('，');
+  } catch {
+    return '';
+  }
 };
 
 const buildWhere = ({ ids, salesContractId, status, keyword } = {}) => {
@@ -126,7 +137,7 @@ const buildFixes = (record, normalizedRelationNo, normalizedInvoiceNo) => {
       field: 'invoice_no',
       from: record.invoice_no,
       to: normalizedInvoiceNo,
-      suggestion: '去除空格与前导0后重新保存发票号',
+      suggestion: '去除分隔符两侧空格并按规范分隔后重新保存发票号（保留前导0）',
     });
   }
 
@@ -183,7 +194,7 @@ const buildAmountWarnings = (record) => {
   return warnings;
 };
 
-const buildRelationInvoiceWarnings = (evaluations) => {
+const findInvoiceRelationConflicts = (evaluations) => {
   const grouped = new Map();
 
   evaluations.forEach((item) => {
@@ -191,20 +202,19 @@ const buildRelationInvoiceWarnings = (evaluations) => {
       return;
     }
 
-    if (!grouped.has(item.normalizedRelationNo)) {
-      grouped.set(item.normalizedRelationNo, new Set());
-    }
-
-    grouped.get(item.normalizedRelationNo).add(item.normalizedInvoiceNo);
+    item.normalizedInvoiceNumbers.forEach((invoiceNo) => {
+      if (!grouped.has(invoiceNo)) grouped.set(invoiceNo, new Set());
+      grouped.get(invoiceNo).add(item.normalizedRelationNo);
+    });
   });
 
   return Array.from(grouped.entries())
-    .filter(([, invoices]) => invoices.size > 1)
-    .map(([relationNo, invoices]) => ({
-      code: 'relation_invoice_conflict',
-      relation_no: relationNo,
-      invoice_nos: Array.from(invoices),
-      message: `关联号 ${relationNo} 对应多个发票号`,
+    .filter(([, relations]) => relations.size > 1)
+    .map(([invoiceNo, relations]) => ({
+      code: 'invoice_relation_conflict',
+      invoice_no: invoiceNo,
+      relation_nos: Array.from(relations),
+      message: `发票号 ${invoiceNo} 被关联到多个采购合同`,
     }));
 };
 
@@ -225,12 +235,21 @@ const buildPurchaseContractMap = async () => {
       return;
     }
 
-    map.set(key, {
+    const value = {
       id: contract.id,
       contractNo: contract.contractNo,
       invoiceNo: contract.invoiceNo,
-      normalizedInvoiceNo: normalizeIdentifier(contract.invoiceNo),
+      invoiceNumbers: normalizeInvoiceNumbers(contract.invoiceNo),
       taxRate: contract.taxRate,
+    };
+    const aliases = [
+      contract.contractNo,
+      contract.contractNo?.replace(/^PO/i, 'CG'),
+      contract.contractNo?.replace(/^CG/i, 'PO'),
+    ];
+    aliases.forEach((alias) => {
+      const aliasKey = normalizeIdentifier(alias);
+      if (aliasKey && !map.has(aliasKey)) map.set(aliasKey, value);
     });
   });
 
@@ -239,7 +258,8 @@ const buildPurchaseContractMap = async () => {
 
 const evaluateRecord = (record, purchaseContractMap) => {
   const normalizedRelationNo = normalizeIdentifier(record.relation_no);
-  const normalizedInvoiceNo = normalizeIdentifier(record.invoice_no);
+  const normalizedInvoiceNo = normalizeInvoiceIdentifier(record.invoice_no);
+  const normalizedInvoiceNumbers = normalizeInvoiceNumbers(record.invoice_no);
   const normalizedVatRateType = normalizeVatRateType(record.vat_rate_type);
   const fixes = buildFixes(record, normalizedRelationNo, normalizedInvoiceNo);
   const errors = [];
@@ -263,30 +283,57 @@ const evaluateRecord = (record, purchaseContractMap) => {
     });
   }
 
-  if (normalizedVatRateType !== 1 && normalizedVatRateType !== 13) {
+  if (
+    normalizedVatRateType === null
+    || normalizedVatRateType <= 0
+    || normalizedVatRateType > 100
+  ) {
     errors.push({
       code: 'invalid_vat_rate_type',
       taxRefundId: record.id,
       refundNo: record.refundNo,
-      message: 'vat_rate_type 仅支持 1 或 13',
+      message: '征税率必须是大于0且不超过100的有效百分比',
     });
   }
 
   const purchaseContract = normalizedRelationNo ? purchaseContractMap.get(normalizedRelationNo) : null;
   if (normalizedRelationNo && !purchaseContract) {
-    warnings.push({
+    errors.push({
       code: 'relation_not_found',
       taxRefundId: record.id,
       refundNo: record.refundNo,
       relation_no: normalizedRelationNo,
-      message: '未找到关联采购合同，无法进行主数据比对',
+      message: '未找到关联采购合同，不能完成主数据比对或导出',
     });
+  }
+
+  if (purchaseContract && normalizedInvoiceNumbers.length > 0) {
+    if (purchaseContract.invoiceNumbers.length === 0) {
+      errors.push({
+        code: 'purchase_invoice_numbers_missing',
+        taxRefundId: record.id,
+        refundNo: record.refundNo,
+        relation_no: normalizedRelationNo,
+        message: '关联采购合同尚未登记供应商发票号码',
+      });
+    } else if (!normalizedInvoiceNumbers.every((number) => purchaseContract.invoiceNumbers.includes(number))) {
+      errors.push({
+        code: 'invoice_no_mismatch',
+        taxRefundId: record.id,
+        refundNo: record.refundNo,
+        relation_no: normalizedRelationNo,
+        invoice_no: normalizedInvoiceNo,
+        message: '退税记录发票号与关联采购合同登记的发票号不一致',
+      });
+    }
   }
 
   if (
     purchaseContract
-    && (normalizedVatRateType === 1 || normalizedVatRateType === 13)
-    && Number(purchaseContract.taxRate) !== normalizedVatRateType
+    && normalizedVatRateType !== null
+    && normalizedVatRateType > 0
+    && normalizedVatRateType <= 100
+    && normalizePurchaseTaxRate(purchaseContract.taxRate) !== normalizedVatRateType
   ) {
     errors.push({
       code: 'vat_rate_mismatch',
@@ -294,9 +341,9 @@ const evaluateRecord = (record, purchaseContractMap) => {
       refundNo: record.refundNo,
       relation_no: normalizedRelationNo,
       invoice_no: normalizedInvoiceNo,
-      expected: Number(purchaseContract.taxRate),
+      expected: normalizePurchaseTaxRate(purchaseContract.taxRate),
       actual: normalizedVatRateType,
-      message: `税率不一致，采购合同税率 ${purchaseContract.taxRate}，退税记录税率 ${normalizedVatRateType}`,
+      message: `税率不一致，采购合同税率 ${normalizePurchaseTaxRate(purchaseContract.taxRate)}，退税记录税率 ${normalizedVatRateType}`,
     });
   }
 
@@ -306,6 +353,7 @@ const evaluateRecord = (record, purchaseContractMap) => {
     record,
     normalizedRelationNo,
     normalizedInvoiceNo,
+    normalizedInvoiceNumbers,
     normalizedVatRateType,
     purchaseContract,
     fixes,
@@ -339,6 +387,25 @@ const exportTaxRefunds = async (filters = {}) => {
 
   const purchaseContractMap = await buildPurchaseContractMap();
   const evaluations = records.map((record) => evaluateRecord(record, purchaseContractMap));
+  const invoiceRelationConflicts = findInvoiceRelationConflicts(evaluations);
+
+  invoiceRelationConflicts.forEach((conflict) => {
+    evaluations
+      .filter((item) => item.normalizedInvoiceNumbers.includes(conflict.invoice_no))
+      .forEach((item) => {
+        item.errors.push({
+          ...conflict,
+          taxRefundId: item.record.id,
+          refundNo: item.record.refundNo,
+          message: `${conflict.message}，存在重复申报风险`,
+        });
+      });
+  });
+
+  evaluations.forEach((item) => {
+    item.match_status = item.errors.length === 0 ? MATCH_STATUS.PASSED : MATCH_STATUS.BLOCKED;
+    item.exportItem.match_status = item.match_status;
+  });
 
   for (const item of evaluations) {
     await prisma.taxRefund.update({
@@ -347,10 +414,7 @@ const exportTaxRefunds = async (filters = {}) => {
     });
   }
 
-  const warnings = [
-    ...buildRelationInvoiceWarnings(evaluations),
-    ...evaluations.flatMap((item) => item.warnings),
-  ];
+  const warnings = evaluations.flatMap((item) => item.warnings);
   const fixes = evaluations.flatMap((item) => item.fixes);
   const errors = evaluations.flatMap((item) => item.errors);
 

@@ -8,8 +8,9 @@
 
 const prisma = require('../utils/prisma');
 const { NOTIFICATION_TYPE, ROLES } = require('../config/constants');
+const { OFFICIAL_RULES } = require('./taxRefundPreparationService');
 
-// 每月退税申报提醒日（国家税务总局增值税申报期通常为每月1-15日，5号提醒留足准备时间）
+// 5号仅是内部材料准备节点，不代表法定申报截止日。
 const TAX_REFUND_REMINDER_DAY = 5;
 
 // 退税提醒接收角色：管理员 + 财务
@@ -79,8 +80,8 @@ const runMonthlyTaxRefundReminder = async (tx = prisma, options = {}) => {
   const pendingNos = pendingContracts.map((c) => c.contractNo).slice(0, 5).join('、');
   const title = `出口退税申报提醒：${monthLabel}发运 ${shippedContracts.length} 柜`;
   const content = pendingContracts.length > 0
-    ? `${pendingNos}${pendingContracts.length > 5 ? ' 等' : ''} 共 ${pendingContracts.length} 柜尚未创建退税单。请按国家税务总局申报期要求（每月1-15日）整理报关单、发票与收汇资料，完成增值税免抵退税申报。`
-    : `上月发运的 ${shippedContracts.length} 柜均已创建退税单，请核对申报材料并在申报期内（每月1-15日）完成提交。`;
+    ? `${pendingNos}${pendingContracts.length > 5 ? ' 等' : ''} 共 ${pendingContracts.length} 柜尚未创建退税准备记录。次月5日仅为内部准备节点，请整理报关单、供应商增值税专用发票、进货/出口明细及收汇材料。常规口径为报关出口次月起至次年4月30日前的各增值税纳税申报期；最终以主管税务机关和当期申报期为准。`
+    : `上月发运的 ${shippedContracts.length} 柜均已创建退税准备记录。次月5日仅为内部准备节点，请继续核对申报凭证、备案单证和收汇要求；最终以主管税务机关和当期申报期为准。`;
 
   // 4. 对目标角色逐用户创建（本月幂等）
   const recipientIds = await findRecipientIds(tx, TAX_REFUND_NOTIFY_ROLES);
@@ -105,11 +106,14 @@ const runMonthlyTaxRefundReminder = async (tx = prisma, options = {}) => {
       type: NOTIFICATION_TYPE.TAX_REFUND_MONTHLY,
       title,
       content,
-      link: '/dashboard/tax-refunds',
+      link: `/dashboard/sales/${pendingContracts[0]?.id || shippedContracts[0].id}`,
       metadata: JSON.stringify({
         month: monthLabel,
         shippedCount: shippedContracts.length,
         pendingCount: pendingContracts.length,
+        internalPrepareDay: TAX_REFUND_REMINDER_DAY,
+        ruleEffectiveFrom: OFFICIAL_RULES.effectiveFrom,
+        managementDocument: OFFICIAL_RULES.managementDocument,
       }),
     }));
 
@@ -135,18 +139,19 @@ const runInvoiceMissingReminder = async (tx = prisma, options = {}) => {
   todayStart.setHours(0, 0, 0, 0);
 
   // 1. 货已出但未登记发票号的采购合同
-  const missingContracts = await tx.purchaseContract.findMany({
+  const candidates = await tx.purchaseContract.findMany({
     where: {
       status: { in: ['SHIPPED', 'RECEIVED', 'COMPLETED'] },
-      OR: [{ invoiceNo: null }, { invoiceNo: '' }],
     },
     select: {
       id: true,
       contractNo: true,
+      invoiceNo: true,
       supplier: { select: { name: true } },
     },
     orderBy: { updatedAt: 'desc' },
   });
+  const missingContracts = candidates.filter((contract) => !String(contract.invoiceNo || '').trim());
 
   if (missingContracts.length === 0) {
     return { skipped: true, reason: 'no-missing-invoice', created: 0, contracts: 0 };
@@ -157,7 +162,7 @@ const runInvoiceMissingReminder = async (tx = prisma, options = {}) => {
     .map((c) => `${c.contractNo}（${c.supplier?.name || '未知供应商'}）`)
     .join('、');
   const title = `${missingContracts.length} 份采购合同待催开发票`;
-  const content = `${summary}${missingContracts.length > 5 ? ' 等' : ''} 货已出但未登记发票号。请在合同详情页使用「催开发票」复制开票信息发给供应商，收票后登记发票号。`;
+  const content = `${summary}${missingContracts.length > 5 ? ' 等' : ''} 货已出但未登记发票号。请在采购合同详情使用「催开发票」发送品名、单位、数量、金额和税率，收票后登记号码；发票原件附件选填。`;
 
   // 2. 对目标角色逐用户创建（当日幂等）
   const recipientIds = await findRecipientIds(tx, INVOICE_NOTIFY_ROLES);
@@ -182,7 +187,7 @@ const runInvoiceMissingReminder = async (tx = prisma, options = {}) => {
       type: NOTIFICATION_TYPE.INVOICE_MISSING,
       title,
       content,
-      link: '/dashboard/contracts',
+      link: `/dashboard/purchase/${missingContracts[0].id}`,
       metadata: JSON.stringify({
         missingCount: missingContracts.length,
         contractIds: missingContracts.slice(0, 20).map((c) => c.id),

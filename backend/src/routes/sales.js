@@ -136,6 +136,12 @@ router.post(
 // GET /api/v1/sales/:id/packing-list-checks - 历史核对记录
 router.get('/:id/packing-list-checks', withIdValidation, salesController.listPackingListChecks);
 
+// GET /api/v1/sales/:id/tax-refund-preparation - 退税申报/备案/收汇内部准备清单
+router.get('/:id/tax-refund-preparation', withIdValidation, salesController.getTaxRefundPreparation);
+
+// GET /api/v1/sales/:id/tax-refund-preparation/export - 导出内部准备清单 Excel
+router.get('/:id/tax-refund-preparation/export', withIdValidation, salesController.exportTaxRefundPreparation);
+
 // PUT /api/v1/sales/:id/packing-list-checks/:checkId/review - 人工通过/驳回
 router.put(
   '/:id/packing-list-checks/:checkId/review',

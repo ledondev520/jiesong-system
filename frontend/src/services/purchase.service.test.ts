@@ -91,6 +91,24 @@ describe('purchaseService api', () => {
 
     expect(api.put).toHaveBeenCalledWith('/purchases/pc1/production-details', { items });
   });
+
+  it('getInvoicePreparation: 读取合同内唯一催票与发票登记状态', async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+
+    await purchaseService.getInvoicePreparation('pc1');
+
+    expect(api.get).toHaveBeenCalledWith('/purchases/pc1/invoice-preparation');
+  });
+
+  it('registerInvoiceNumbers: 通过专用入口登记多个号码', async () => {
+    (api.put as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+
+    await purchaseService.registerInvoiceNumbers('pc1', ['INV-001', 'INV-002']);
+
+    expect(api.put).toHaveBeenCalledWith('/purchases/pc1/invoice-numbers', {
+      invoiceNumbers: ['INV-001', 'INV-002'],
+    });
+  });
 });
 
 describe('purchaseService.getNextContractNo', () => {

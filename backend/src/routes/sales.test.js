@@ -69,6 +69,11 @@ test('sales route includes persistent packing-list check history and review endp
   assert.notEqual(getRouteIndex(salesRouter, '/:id/packing-list-checks/:checkId/review', 'put'), -1);
 });
 
+test('sales route includes tax-refund preparation checklist and Excel export endpoints', () => {
+  assert.notEqual(getRouteIndex(salesRouter, '/:id/tax-refund-preparation', 'get'), -1);
+  assert.notEqual(getRouteIndex(salesRouter, '/:id/tax-refund-preparation/export', 'get'), -1);
+});
+
 test('sales export routes: 缺失合同时将404错误传给 next', async () => {
   const originalSalesContractFindUnique = prisma.salesContract.findUnique;
   prisma.salesContract.findUnique = async () => null;

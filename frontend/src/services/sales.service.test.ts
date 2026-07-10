@@ -101,6 +101,12 @@ describe('salesService api', () => {
       note: '已与船司复核',
     });
   });
+
+  it('getTaxRefundPreparation: 读取专项单当前材料准备度', async () => {
+    await salesService.getTaxRefundPreparation('sc-1');
+
+    expect(api.get).toHaveBeenCalledWith('/sales/sc-1/tax-refund-preparation');
+  });
 });
 
 describe('salesService.calculatePrice', () => {

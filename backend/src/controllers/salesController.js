@@ -12,6 +12,7 @@ const contractTemplateService = require('../services/contractTemplateService');
 const auditLog = require('../utils/auditLog');
 const packingListCheckService = require('../services/packingListCheckService');
 const fileService = require('../services/fileService');
+const taxRefundPreparationService = require('../services/taxRefundPreparationService');
 
 const list = async (req, res, next) => {
   try {
@@ -349,6 +350,28 @@ const reviewPackingListCheck = async (req, res, next) => {
   }
 };
 
+/** 汇总当前专项单的申报凭证、备案单证、收汇节点和 2026 规则口径。 */
+const getTaxRefundPreparation = async (req, res, next) => {
+  try {
+    const preparation = await taxRefundPreparationService.getTaxRefundPreparation(req.params.id);
+    success(res, preparation);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** 导出内部材料准备清单；该文件不伪装成税务机关正式回执。 */
+const exportTaxRefundPreparation = async (req, res, next) => {
+  try {
+    const result = await taxRefundPreparationService.exportTaxRefundPreparation(req.params.id);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(result.fileName)}`);
+    res.send(result.buffer);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   list,
   getById,
@@ -371,4 +394,6 @@ module.exports = {
   checkPackingList,
   listPackingListChecks,
   reviewPackingListCheck,
+  getTaxRefundPreparation,
+  exportTaxRefundPreparation,
 };

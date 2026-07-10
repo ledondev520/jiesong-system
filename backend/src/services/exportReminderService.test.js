@@ -63,9 +63,12 @@ test('runMonthlyTaxRefundReminder: 5号为上月发运合同生成提醒（含�
   assert.equal(result.contracts, 2);
   assert.match(tx.created[0].title, /2026年6月发运 2 柜/);
   assert.match(tx.created[0].content, /EXP-002/);
-  assert.match(tx.created[0].content, /1 柜尚未创建退税单/);
+  assert.match(tx.created[0].content, /1 柜尚未创建退税准备记录/);
+  assert.match(tx.created[0].content, /次月5日仅为内部准备节点/);
+  assert.match(tx.created[0].content, /次年4月30日前/);
+  assert.doesNotMatch(tx.created[0].content, /每月1-15日/);
   assert.equal(tx.created[0].type, 'TAX_REFUND_MONTHLY');
-  assert.equal(tx.created[0].link, '/dashboard/tax-refunds');
+  assert.equal(tx.created[0].link, '/dashboard/sales/sc2');
 });
 
 test('runMonthlyTaxRefundReminder: 本月已提醒的用户不重复生成', async () => {
@@ -98,8 +101,9 @@ test('runInvoiceMissingReminder: 已出货缺发票合同生成催票提醒', as
   assert.equal(result.contracts, 2);
   assert.match(tx.created[0].title, /2 份采购合同待催开发票/);
   assert.match(tx.created[0].content, /PO-001（供应商A）/);
+  assert.match(tx.created[0].content, /发票原件附件选填/);
   assert.equal(tx.created[0].type, 'INVOICE_MISSING');
-  assert.equal(tx.created[0].link, '/dashboard/contracts');
+  assert.equal(tx.created[0].link, '/dashboard/purchase/pc1');
 });
 
 test('runInvoiceMissingReminder: 当日已提醒则跳过重复用户', async () => {

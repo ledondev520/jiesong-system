@@ -69,6 +69,62 @@ export interface PackingListCheckRecord {
   comparison: PackingListCheckResult;
 }
 
+export type TaxPreparationStatus = 'ready' | 'missing' | 'review' | 'not_applicable';
+export type TaxPreparationRequirement = 'required' | 'conditional' | 'post_submission';
+
+export interface TaxRefundPreparation {
+  salesContractId: string;
+  contractNo: string;
+  preparationReady: boolean;
+  collectionReady: boolean;
+  checklist: Array<{
+    id: string;
+    label: string;
+    category: string;
+    requirement: TaxPreparationRequirement;
+    status: TaxPreparationStatus;
+    evidence?: string | null;
+    message: string;
+  }>;
+  blockers: string[];
+  warnings: string[];
+  invoiceLinks: Array<{
+    purchaseContractId: string;
+    purchaseContractNo: string;
+    supplierName: string;
+    supplierTaxId: string;
+    invoiceNumbers: string[];
+    invoiceFileCount: number;
+    invoiceFileRequired: false;
+    taxRate: number;
+    netAmount: number;
+    taxAmount: number;
+    grossAmount: number;
+  }>;
+  deadlines: {
+    basisDate?: string | null;
+    filingStart?: string | null;
+    internalPrepareOn?: string | null;
+    primaryFilingEnd?: string | null;
+    collectionDeadline?: string | null;
+    supplementaryWindowEnd?: string | null;
+    filingArchiveDueRule: string;
+    retentionYears: number;
+  };
+  officialRules: {
+    effectiveFrom: string;
+    policyDocument: string;
+    managementDocument: string;
+    filingRule: string;
+    externalTradeMaterials: string;
+    filingArchiveRule: string;
+    collectionRule: string;
+    internalReminderDisclaimer: string;
+    sources: { policy: string; management: string; interpretation: string };
+  };
+  disclaimer: string;
+}
+
 export interface AvailablePurchasePackingItem {
   id: string;
   productId: string;
@@ -234,6 +290,22 @@ export const salesService = {
       `/sales/${id}/packing-list-checks/${checkId}/review`,
       { decision, note },
     );
+  },
+
+  /** 读取专项单的退税申报凭证、备案单证、收汇与期限清单。 */
+  getTaxRefundPreparation: async (id: string) => {
+    return api.get<ApiResponse<TaxRefundPreparation>, ApiResponse<TaxRefundPreparation>>(
+      `/sales/${id}/tax-refund-preparation`,
+    );
+  },
+
+  /** 下载内部材料准备 Excel，不将其表述为税务机关正式回执。 */
+  exportTaxRefundPreparation: async (id: string, contractNo: string) => {
+    const token = getAuthToken();
+    const response = await fetch(`/api/v1/sales/${id}/tax-refund-preparation/export`, {
+      headers: { Authorization: token ? `Bearer ${token}` : '' },
+    });
+    await downloadResponseBlob(response, `出口退税材料准备清单-${contractNo}.xlsx`);
   },
 
   /**

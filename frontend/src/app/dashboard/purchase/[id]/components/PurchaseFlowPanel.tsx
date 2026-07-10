@@ -1,6 +1,6 @@
 /**
- * Input: 采购合同详情（含供应商/明细/付款记录）、financeService、purchaseService、configService
- * Output: 付款与发票面板（付款记录、复制汇款信息、登记付款、催开发票、发票号登记）
+ * Input: 采购合同详情（含供应商/明细/付款记录）、付款与供应商发票准备 Interface
+ * Output: 付款轨迹、汇款文本、催票清单、规范化发票号码和选填发票附件
  * Pos: 采购合同详情页子组件，覆盖「签合同 → 付定金 → 付尾款 → 催发票」链路动作
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,13 +8,15 @@
 
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import {
   Banknote,
   Copy,
   CreditCard,
+  FileUp,
+  Loader2,
   Plus,
   Receipt,
   ReceiptText,
@@ -50,7 +52,11 @@ import {
 } from '@/components/ui/table';
 import { PaymentDialog, type PaymentSubmitData } from '../../../finance/components/PaymentDialog';
 import { financeService } from '@/services/finance.service';
-import { purchaseService } from '@/services/purchase.service';
+import {
+  purchaseService,
+  type PurchaseInvoicePreparation,
+} from '@/services/purchase.service';
+import { uploadContractFile } from '@/services/contractFile.service';
 import { PaymentType, type PurchaseContract } from '@/types';
 import { calculatePurchaseLineAmounts, summarizePurchaseAmounts } from '@/lib/purchase-amount';
 
@@ -89,6 +95,7 @@ const formatMoney = (n: number) => `¥${n.toLocaleString('zh-CN', { minimumFract
  *   4. 「催开发票」生成开票信息文本 + 登记发票号（PurchaseContract.invoiceNo）
  */
 export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: PurchaseFlowPanelProps) {
+  const invoiceFileInputRef = useRef<HTMLInputElement>(null);
   const [remitOpen, setRemitOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
@@ -98,9 +105,12 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
   const [depositRate, setDepositRate] = useState('30');
   const [customAmount, setCustomAmount] = useState('');
 
-  // 发票号登记
+  // 发票号码与选填原件使用同一弹窗完成，避免再建平行发票页面。
   const [invoiceNoInput, setInvoiceNoInput] = useState(contract.invoiceNo || '');
   const [savingInvoiceNo, setSavingInvoiceNo] = useState(false);
+  const [loadingInvoice, setLoadingInvoice] = useState(false);
+  const [uploadingInvoice, setUploadingInvoice] = useState(false);
+  const [invoicePreparation, setInvoicePreparation] = useState<PurchaseInvoicePreparation | null>(null);
 
   const supplier = contract.supplier;
   const items = useMemo(() => contract.items ?? [], [contract.items]);
@@ -118,6 +128,17 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
   const remaining = amountSummary.remainingAmount;
   // 购销合同号：PO 前缀转 CG（与购销合同文档编号规则一致）
   const cgNo = contract.contractNo?.replace('PO', 'CG') || contract.contractNo;
+
+  useEffect(() => {
+    setInvoiceNoInput(String(contract.invoiceNo || '').replace(/[，,;；\s]+/g, '\n').trim());
+  }, [contract.invoiceNo]);
+
+  const invoiceNumbers = useMemo(() => (
+    String(contract.invoiceNo || '')
+      .split(/[\s,，;；]+/)
+      .map((value) => value.trim())
+      .filter(Boolean)
+  ), [contract.invoiceNo]);
 
   // 1. 按用途推导汇款金额
   const remitAmount = useMemo(() => {
@@ -212,20 +233,68 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
    * 职责：保存发票号到采购合同（催票后登记）
    */
   const handleSaveInvoiceNo = async () => {
-    const value = invoiceNoInput.trim();
-    if (!value) {
+    const values = invoiceNoInput
+      .split(/[\s,，;；]+/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (values.length === 0) {
       toast.error('请输入发票号码');
       return;
     }
     setSavingInvoiceNo(true);
     try {
-      await purchaseService.update(contract.id, { invoiceNo: value });
-      toast.success('发票号已登记');
-      onUpdated();
-    } catch {
-      toast.error('登记发票号失败');
+      const response = await purchaseService.registerInvoiceNumbers(contract.id, values);
+      if (response.data) {
+        setInvoicePreparation(response.data);
+        setInvoiceNoInput(response.data.invoiceNumbers.join('\n'));
+      }
+      toast.success('供应商发票号码已登记');
+      await Promise.resolve(onUpdated());
+    } catch (error: unknown) {
+      const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(message || '登记发票号失败');
     } finally {
       setSavingInvoiceNo(false);
+    }
+  };
+
+  const handleInvoiceOpenChange = (next: boolean) => {
+    setInvoiceOpen(next);
+    if (!next) return;
+    setLoadingInvoice(true);
+    void purchaseService.getInvoicePreparation(contract.id)
+      .then((response) => {
+        if (!response.data) return;
+        setInvoicePreparation(response.data);
+        setInvoiceNoInput(response.data.invoiceNumbers.join('\n'));
+      })
+      .catch(() => toast.error('发票准备状态加载失败'))
+      .finally(() => setLoadingInvoice(false));
+  };
+
+  const handleInvoiceFileUpload = async (file: File) => {
+    setUploadingInvoice(true);
+    try {
+      const response = await uploadContractFile(
+        contract.id,
+        'PURCHASE',
+        file,
+        '供应商发票原件（选填）',
+        'SUPPLIER_INVOICE',
+      );
+      if (response.data) {
+        setInvoicePreparation((current) => current ? {
+          ...current,
+          invoiceFiles: [response.data!, ...current.invoiceFiles.filter((item) => item.id !== response.data?.id)],
+        } : current);
+      }
+      toast.success('供应商发票附件已归档');
+      await Promise.resolve(onUpdated());
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : '供应商发票附件上传失败');
+    } finally {
+      setUploadingInvoice(false);
+      if (invoiceFileInputRef.current) invoiceFileInputRef.current.value = '';
     }
   };
 
@@ -242,9 +311,9 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
             {amountSummary.overpaidAmount > 0
               ? `，超付 ${formatMoney(amountSummary.overpaidAmount)}`
               : remaining > 0 ? `，待付 ${formatMoney(remaining)}` : '，已付清'}
-            {contract.invoiceNo ? (
+            {invoiceNumbers.length > 0 ? (
               <Badge variant="outline" className="ml-2 border-emerald-300 bg-emerald-50 text-emerald-700">
-                发票号 {contract.invoiceNo}
+                已登记 {invoiceNumbers.length} 个发票号
               </Badge>
             ) : (
               <Badge variant="outline" className="ml-2 border-amber-300 bg-amber-50 text-amber-700">
@@ -262,7 +331,7 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             登记付款
           </Button>
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setInvoiceOpen(true)}>
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => handleInvoiceOpenChange(true)}>
             <ReceiptText className="mr-1.5 h-3.5 w-3.5" />
             催开发票
           </Button>
@@ -385,7 +454,7 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
       />
 
       {/* 催开发票弹窗 */}
-      <Dialog open={invoiceOpen} onOpenChange={setInvoiceOpen}>
+      <Dialog open={invoiceOpen} onOpenChange={handleInvoiceOpenChange}>
         <DialogContent className="sm:max-w-[560px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -393,7 +462,7 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
               催开发票
             </DialogTitle>
             <DialogDescription>
-              将开票信息发给供应商开具增值税专用发票，收到后在下方登记发票号。
+              将清单发给供应商开具增值税专用发票；号码必须登记，原件附件选填。
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -402,12 +471,25 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
               <Copy className="mr-1.5 h-3.5 w-3.5" />
               复制开票信息
             </Button>
+            {loadingInvoice ? (
+              <div className="flex items-center gap-2 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />正在读取已登记发票...
+              </div>
+            ) : invoicePreparation?.issues.some((issue) => issue.code !== 'MISSING_INVOICE_NUMBER') ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                {invoicePreparation.issues
+                  .filter((issue) => issue.code !== 'MISSING_INVOICE_NUMBER')
+                  .map((issue) => issue.message)
+                  .join('；')}
+              </div>
+            ) : null}
             <div className="space-y-2 border-t pt-4">
-              <Label htmlFor="invoice-no-input">发票号码登记</Label>
-              <div className="flex gap-2">
-                <Input
+              <Label htmlFor="invoice-no-input">发票号码登记（每行或逗号分隔）</Label>
+              <div className="flex items-end gap-2">
+                <Textarea
                   id="invoice-no-input"
-                  placeholder="例如：25442000000012345678（多张可用逗号分隔）"
+                  rows={3}
+                  placeholder={'例如：\n25442000000012345678\n25442000000012345679'}
                   value={invoiceNoInput}
                   onChange={(e) => setInvoiceNoInput(e.target.value)}
                 />
@@ -415,9 +497,46 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
                   {savingInvoiceNo ? '保存中...' : '保存'}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                发票文件可在下方「合同附件」上传归档（选填），发票号必须登记。
-              </p>
+            </div>
+            <div className="space-y-2 border-t pt-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <Label>供应商发票原件（选填）</Label>
+                  <p className="mt-1 text-xs text-muted-foreground">不上传文件也可完成号码登记；上传后按供应商发票分类归档。</p>
+                </div>
+                <input
+                  ref={invoiceFileInputRef}
+                  id="supplier-invoice-file-input"
+                  name="supplierInvoiceFile"
+                  type="file"
+                  className="hidden"
+                  aria-label="上传供应商发票原件"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void handleInvoiceFileUpload(file);
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={uploadingInvoice}
+                  onClick={() => invoiceFileInputRef.current?.click()}
+                >
+                  {uploadingInvoice
+                    ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    : <FileUp className="mr-1.5 h-3.5 w-3.5" />}
+                  {uploadingInvoice ? '上传中...' : '上传发票原件'}
+                </Button>
+              </div>
+              {(invoicePreparation?.invoiceFiles.length || 0) > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {invoicePreparation?.invoiceFiles.map((file) => (
+                    <Badge key={file.id} variant="secondary" className="max-w-full truncate">{file.fileName}</Badge>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </DialogContent>

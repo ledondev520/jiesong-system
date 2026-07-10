@@ -9,6 +9,7 @@ const { evaluateShipmentReadiness } = require('./shipmentReadinessService');
 const { normalizePurchaseStatus, PURCHASE_STATUS } = require('./purchaseStateMachine');
 const { normalizeSalesStatus, SALES_STATUS } = require('./salesStateMachine');
 const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
+const { normalizeInvoiceNumbers } = require('./purchaseInvoiceService');
 
 const PURCHASE_RANK = Object.freeze({
   [PURCHASE_STATUS.DRAFT]: 0,
@@ -33,6 +34,13 @@ const SALES_RANK = Object.freeze({
 
 const unique = (values) => Array.from(new Set(values.filter(Boolean)));
 const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
+const hasInvoiceNumbers = (value) => {
+  try {
+    return normalizeInvoiceNumbers(value).length > 0;
+  } catch {
+    return false;
+  }
+};
 
 const getTaxPreparationDate = (shippedAt) => {
   if (!shippedAt) return null;
@@ -100,9 +108,9 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   const taxRefunds = salesContract.taxRefunds || [];
   const taxCompleted = taxRefunds.some((refund) => ['APPLIED', 'APPROVED', 'REFUNDED'].includes(refund.status));
   const invoicesComplete = linkedPurchases.length > 0 && linkedPurchases.every((purchase) => (
-    Boolean(purchase.invoiceNo)
+    hasInvoiceNumbers(purchase.invoiceNo)
     || packingItems.some((item) => (
-      Boolean(item.invoiceNo)
+      hasInvoiceNumbers(item.invoiceNo)
       && getPurchaseByNo(purchaseMap, item.purchaseContractNo)?.contractNo === purchase.contractNo
     ))
   ));
@@ -232,7 +240,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
           key: 'tax-refund', label: '退税准备', status: 'current',
           reason: prepareOn ? `${prepareOn} 为内部准备提醒；法定期限以当前税务规则和申报期为准` : '内部准备提醒待生成',
           prepareOn,
-          action: { label: '检查退税材料', href: '/dashboard/tax-refunds' },
+          action: { label: '检查退税材料', href: `/dashboard/sales/${salesContract.id}` },
         };
 
   const financeStage = allPurchasesPaid && receivableComplete

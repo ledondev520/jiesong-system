@@ -31,6 +31,30 @@ router.get('/', withPaginationValidation, purchaseController.list);
 // GET /api/v1/purchases/options/next-no - 获取下一个合同编号（必须位于 /:id 之前）
 router.get('/options/next-no', purchaseController.getNextContractNo);
 
+// GET /api/v1/purchases/:id/invoice-preparation - 获取催票明细、号码和选填附件状态
+router.get('/:id/invoice-preparation', withIdValidation, purchaseController.getInvoicePreparation);
+
+// PUT /api/v1/purchases/:id/invoice-numbers - 规范化登记一份或多份供应商发票号码
+router.put(
+  '/:id/invoice-numbers',
+  withIdValidation,
+  accessAuth({
+    roles: ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'],
+    capabilities: ['purchase.update'],
+  }),
+  withAuditLog({
+    entity: 'PurchaseContract',
+    action: 'REGISTER_SUPPLIER_INVOICE',
+    model: 'purchaseContract',
+    captureBefore: false,
+    captureAfter: false,
+    getNewValue: ({ responseData }) => ({
+      invoiceCount: responseData?.invoiceNumbers?.length || 0,
+      hasInvoiceFile: (responseData?.invoiceFiles?.length || 0) > 0,
+    }),
+  }, purchaseController.registerInvoiceNumbers),
+);
+
 // GET /api/v1/purchases/:id - 获取采购合同详情
 router.get('/:id', withIdValidation, purchaseController.getById);
 

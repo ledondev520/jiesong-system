@@ -25,6 +25,7 @@ const {
   evaluatePurchaseProductionReadiness,
   updatePurchaseProductionDetails,
 } = require('../services/purchaseProductionService');
+const purchaseInvoiceService = require('../services/purchaseInvoiceService');
 
 /**
  * 职责：检查商品价格是否高于历史均价并生成警告
@@ -165,6 +166,29 @@ const getById = async (req, res, next) => {
       ...contract,
       productionReadiness: evaluatePurchaseProductionReadiness(contract.items),
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** 读取当前采购合同的催票清单、发票号码和选填附件状态。 */
+const getInvoicePreparation = async (req, res, next) => {
+  try {
+    const preparation = await purchaseInvoiceService.getPurchaseInvoicePreparation(req.params.id);
+    success(res, preparation);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** 通过专用 Interface 规范化并登记一份或多份供应商发票号码。 */
+const registerInvoiceNumbers = async (req, res, next) => {
+  try {
+    const preparation = await purchaseInvoiceService.registerPurchaseInvoiceNumbers(
+      req.params.id,
+      { invoiceNumbers: req.body?.invoiceNumbers },
+    );
+    success(res, preparation, '供应商发票号码已登记');
   } catch (error) {
     next(error);
   }
@@ -667,6 +691,8 @@ const getSuppliersByProducts = async (req, res, next) => {
 module.exports = {
   list,
   getById,
+  getInvoicePreparation,
+  registerInvoiceNumbers,
   create,
   update,
   remove,

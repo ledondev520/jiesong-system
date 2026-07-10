@@ -159,6 +159,24 @@ test('PO/CG 合同号别名下的装箱明细发票号可正确结清', () => {
   assert.equal(workflow.stages.find((stage) => stage.key === 'invoice').status, 'completed');
 });
 
+test('仅空白发票号不能完成供应商发票阶段，发票原件仍为选填', () => {
+  const purchaseMap = new Map([['PO260001', {
+    ...basePurchase,
+    contractNo: 'PO260001',
+    invoiceNo: '  ， ; ',
+    files: [{ category: 'SUPPLIER_INVOICE', fileName: '发票.pdf' }],
+  }]]);
+  const workflow = buildTradeWorkflow({
+    ...baseSales,
+    status: 'SHIPPED',
+    packingItems: [{ ...baseSales.packingItems[0], purchaseContractNo: 'PO260001', invoiceNo: null }],
+  }, purchaseMap);
+
+  const invoice = workflow.stages.find((stage) => stage.key === 'invoice');
+  assert.equal(invoice.status, 'current');
+  assert.match(invoice.reason, /发票号码未登记/);
+});
+
 test('仅上传任意 PDF 不能伪装完成出口单证，必须有持久化核对结论', () => {
   const workflow = buildTradeWorkflow({
     ...baseSales,

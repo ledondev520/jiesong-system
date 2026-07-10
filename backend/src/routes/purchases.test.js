@@ -48,3 +48,8 @@ test('purchases route includes batch production detail update before status comp
   assert.notEqual(statusIndex, -1, '缺少 PUT /:id/status 路由');
   assert.ok(productionIndex < statusIndex, '生产资料路由应在状态推进路由前注册');
 });
+
+test('purchases route exposes one invoice preparation/read-write flow under the purchase contract', () => {
+  assert.notEqual(getRouteIndex(purchasesRouter, '/:id/invoice-preparation', 'get'), -1);
+  assert.notEqual(getRouteIndex(purchasesRouter, '/:id/invoice-numbers', 'put'), -1);
+});
