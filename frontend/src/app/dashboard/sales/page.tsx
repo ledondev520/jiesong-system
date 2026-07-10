@@ -1,5 +1,5 @@
 /**
- * Input: 出口合同服务 (salesService)、binPacking（出柜双80%判定）、通用表格排序 hook
+ * Input: 出口合同服务 (salesService)、binPacking（出柜双80%判定）、通用表格排序 hook、按需 Excel 导入 Module
  * Output: 出口合同列表页面（含删除、列排序、分页与搜索、出柜条件徽章）
  * Pos: 出口合同管理入口，展示合同列表、货柜信息与出柜双80%指标，支持删除操作
  *
@@ -11,7 +11,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { lazy, Suspense, useState, useEffect, useMemo, useCallback } from 'react';
 import { SalesContract, SalesStatus } from '@/types';
 import { salesService } from '@/services/sales.service';
 import { evaluateShippingReadiness } from '@/lib/binPacking';
@@ -54,7 +54,7 @@ import {
   CircleDot,
   ArrowRight,
 } from 'lucide-react';
-import { BatchImportDialog, type ImportRow } from '@/components/batch-import';
+import type { ImportRow } from '@/components/batch-import';
 import { batchImportService } from '@/services/batchImport.service';
 import Link from 'next/link';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -66,6 +66,12 @@ import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeade
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { MobileListCard } from '@/components/mobile';
 import { useTableSort } from '@/lib/hooks/useTableSort';
+
+const LazyBatchImportDialog = lazy(() =>
+  import('@/components/batch-import').then((module) => ({
+    default: module.BatchImportDialog,
+  }))
+);
 
 const LOGISTICS_STEPS = [
   { key: 'draft', label: '草稿', status: SalesStatus.DRAFT },
@@ -859,20 +865,24 @@ export default function SalesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* 批量导入对话框 */}
-      <BatchImportDialog
-        open={importDialogOpen}
-        onOpenChange={setImportDialogOpen}
-        title="批量导入出口合同"
-        description="上传 Excel 文件批量导入出口合同。请先下载模板，按照模板格式填写数据后上传。"
-        columns={importColumns}
-        templateData={importTemplateData}
-        onImport={handleBatchImport}
-        onSuccess={() => {
-          loadContracts();
-          invalidateCache('sales-contracts-list');
-        }}
-      />
+      {/* Excel 解析依赖仅在用户打开批量导入时加载。 */}
+      {importDialogOpen && (
+        <Suspense fallback={null}>
+          <LazyBatchImportDialog
+            open={importDialogOpen}
+            onOpenChange={setImportDialogOpen}
+            title="批量导入出口合同"
+            description="上传 Excel 文件批量导入出口合同。请先下载模板，按照模板格式填写数据后上传。"
+            columns={importColumns}
+            templateData={importTemplateData}
+            onImport={handleBatchImport}
+            onSuccess={() => {
+              loadContracts();
+              invalidateCache('sales-contracts-list');
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

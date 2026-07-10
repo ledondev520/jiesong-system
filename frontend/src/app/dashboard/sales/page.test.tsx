@@ -16,6 +16,16 @@ const mockGetAll = vi.fn();
 const mockDelete = vi.fn();
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
+const { mockBatchImportDialog } = vi.hoisted(() => ({
+  mockBatchImportDialog: vi.fn(),
+}));
+
+vi.mock('@/components/batch-import', () => ({
+  BatchImportDialog: (props: { open: boolean }) => {
+    mockBatchImportDialog(props);
+    return <div data-testid="batch-import-dialog" data-open={String(props.open)} />;
+  },
+}));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -56,6 +66,7 @@ describe('SalesPage 交互逻辑', () => {
     mockDelete.mockReset();
     mockToastError.mockReset();
     mockToastSuccess.mockReset();
+    mockBatchImportDialog.mockReset();
   });
 
   it('加载后展示出口模块概览与空态文案', async () => {
@@ -77,6 +88,22 @@ describe('SalesPage 交互逻辑', () => {
 
     await user.click(screen.getByRole('button', { name: /新增出口合同/ }));
     expect(mockPush).toHaveBeenCalledWith('/dashboard/sales/create');
+  });
+
+  it('初始不挂载 Excel 导入 Module，点击批量导入后才加载', async () => {
+    mockGetAll.mockResolvedValue({ data: { items: [] } });
+    const user = userEvent.setup();
+    render(<SalesPage />);
+
+    await screen.findByRole('heading', { name: '出口合同' });
+    expect(mockBatchImportDialog).not.toHaveBeenCalled();
+
+    const importButtons = screen.getAllByRole('button', { name: '批量导入' });
+    await user.click(importButtons[0]);
+
+    await waitFor(() => {
+      expect(mockBatchImportDialog).toHaveBeenCalledWith(expect.objectContaining({ open: true }));
+    });
   });
 
   it('加载失败时提示错误', async () => {
