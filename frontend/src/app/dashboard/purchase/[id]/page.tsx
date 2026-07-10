@@ -1,7 +1,7 @@
 /**
  * Input: 采购合同详情API、购销合同生成服务、系统配置（盖章平台/开票抬头）、PurchaseFlowPanel、SortableTableHead、useTableSort
- * Output: 采购合同详情页面（商品明细、付款与发票面板、在线盖章跳转、合同文档预览）
- * Pos: 采购管理子页面，承载「签合同→盖章→付款→催票」的单合同全流程操作
+ * Output: 采购合同详情页面（商品明细、合同归档、付款、生产资料、实物图与发票面板）
+ * Pos: 采购管理子页面，承载「签合同→盖章→付款→生产完工→催票」的单合同主线路
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -66,6 +66,7 @@ import { format } from 'date-fns';
 import { PageHeader } from '@/components/layout/PageHeader';
 import ContractFiles from '@/components/contract/ContractFiles';
 import { PurchaseFlowPanel } from './components/PurchaseFlowPanel';
+import { PurchaseProductionPanel } from './components/PurchaseProductionPanel';
 import { configService } from '@/services/config.service';
 import { cn } from '@/lib/utils';
 import { calculatePurchaseLineAmounts, summarizePurchaseAmounts } from '@/lib/purchase-amount';
@@ -449,6 +450,17 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     ? Math.min((amountSummary.paidAmount / amountSummary.grossAmount) * 100, 100)
     : 0;
   const nextPurchaseAction = PURCHASE_NEXT_ACTIONS[contract.status];
+  const productionCompletionBlocked = [PurchaseStatus.PRODUCING, PurchaseStatus.READY].includes(contract.status)
+    && contract.productionReadiness?.ready === false;
+  const productionStageVisible = [
+    PurchaseStatus.PRODUCING,
+    PurchaseStatus.READY,
+    PurchaseStatus.SHIPPED,
+    PurchaseStatus.RECEIVED,
+    PurchaseStatus.COMPLETED,
+  ].includes(contract.status);
+  const productionPhotoFiles = contractFiles.filter((file) => file.category === 'PRODUCTION_PHOTO');
+  const generalContractFiles = contractFiles.filter((file) => file.category !== 'PRODUCTION_PHOTO');
 
   return (
     <div className="space-y-6 pb-10">
@@ -460,7 +472,12 @@ export default function PurchaseDetailPage({ params }: PageProps) {
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={contract.status} />
             {nextPurchaseAction && (
-              <Button className="h-9 rounded-md text-xs" onClick={handleAdvanceStatus} disabled={statusUpdating}>
+              <Button
+                className="h-9 rounded-md text-xs"
+                onClick={handleAdvanceStatus}
+                disabled={statusUpdating || productionCompletionBlocked}
+                title={productionCompletionBlocked ? '请先补齐所有商品的规格、箱数、毛净重和体积' : undefined}
+              >
                 {statusUpdating ? (
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                 ) : (
@@ -577,6 +594,18 @@ export default function PurchaseDetailPage({ params }: PageProps) {
 
       {/* 付款与发票（复制汇款信息 / 登记付款 / 催开发票） */}
       <PurchaseFlowPanel contract={contract} onUpdated={loadData} invoiceTitleInfo={invoiceTitleInfo} />
+
+      {productionStageVisible ? (
+        <PurchaseProductionPanel
+          contract={contract}
+          photoFiles={productionPhotoFiles}
+          onPhotoFilesChange={(files) => setContractFiles((current) => [
+            ...files,
+            ...current.filter((file) => file.category !== 'PRODUCTION_PHOTO'),
+          ])}
+          onUpdated={loadData}
+        />
+      ) : null}
 
       {/* 两列信息卡片 */}
       <div className="grid gap-4 md:grid-cols-2">
@@ -799,14 +828,16 @@ export default function PurchaseDetailPage({ params }: PageProps) {
       <ContractFiles
         contractId={id}
         contractType="PURCHASE"
-        files={contractFiles}
-        onChange={setContractFiles}
+        files={generalContractFiles}
+        onChange={(files) => setContractFiles((current) => [
+          ...files,
+          ...current.filter((file) => file.category === 'PRODUCTION_PHOTO'),
+        ])}
         title="合同附件"
         description="支持 PDF、JPG、PNG、XLSX、DOCX 格式，单文件最大 10MB，用于归档原始合同或补充文件"
         emptyHint="暂无附件，点击「上传附件」归档合同文件"
         categoryOptions={[
           { value: 'SIGNED_CONTRACT', label: '供应商盖章件' },
-          { value: 'PRODUCTION_PHOTO', label: '生产实物图（选填）' },
           { value: 'SUPPLIER_INVOICE', label: '供应商发票' },
           { value: 'OTHER', label: '其他附件' },
         ]}

@@ -43,6 +43,17 @@ const basePurchase = {
   totalAmount: 5000,
   paidAmount: 1500,
   invoiceNo: null,
+  items: [{
+    id: 'pi-1',
+    specification: '标准箱',
+    boxes: 1,
+    grossWeight: 1000,
+    netWeight: 950,
+    volume: 60,
+    length: 1000,
+    width: 1000,
+    height: 1000,
+  }],
   files: [{ id: 'cf-1', fileName: '盖章合同.pdf', category: 'SIGNED_CONTRACT' }],
 };
 
@@ -116,6 +127,19 @@ test('历史 OTHER 分类的 Word/PDF 附件可作为签章存档兼容', () => 
   );
 
   assert.equal(workflow.stages.find((stage) => stage.key === 'procurement').status, 'completed');
+});
+
+test('历史状态已完成但缺箱规资料时生产阶段不得伪装完成', () => {
+  const workflow = buildTradeWorkflow(
+    baseSales,
+    new Map([[basePurchase.contractNo, { ...basePurchase, items: [{ id: 'pi-1' }] }]]),
+  );
+
+  const production = workflow.stages.find((stage) => stage.key === 'production');
+  assert.equal(production.status, 'current');
+  assert.match(production.reason, /生产完成状态.*仍缺失/);
+  assert.equal(production.action.label, '补齐生产资料');
+  assert.ok(workflow.issues.includes('采购生产状态已完成，但装柜输入资料不完整'));
 });
 
 test('PO/CG 合同号别名下的装箱明细发票号可正确结清', () => {

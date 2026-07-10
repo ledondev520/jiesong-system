@@ -72,6 +72,25 @@ describe('purchaseService api', () => {
 
     expect(api.delete).toHaveBeenCalledWith('/purchases/pc1');
   });
+
+  it('updateProductionDetails: 批量提交生产规格和装柜输入资料', async () => {
+    (api.put as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+    const items = [{
+      id: 'pi-1',
+      specification: '标准箱',
+      boxes: 10,
+      grossWeight: 100,
+      netWeight: 95,
+      volume: 1.2,
+      length: null,
+      width: null,
+      height: null,
+    }];
+
+    await purchaseService.updateProductionDetails('pc1', items);
+
+    expect(api.put).toHaveBeenCalledWith('/purchases/pc1/production-details', { items });
+  });
 });
 
 describe('purchaseService.getNextContractNo', () => {

@@ -310,6 +310,7 @@ export interface PurchaseContract {
   status: PurchaseStatus;
   signedAt?: string;
   expectedDate?: string;
+  productionCompletedAt?: string;
   invoiceNo?: string;
   storeName?: string;  // 发货店铺名称
   note?: string;
@@ -318,6 +319,33 @@ export interface PurchaseContract {
   supplier?: Supplier;
   items?: PurchaseItem[];
   payments?: Payment[];
+  productionReadiness?: PurchaseProductionReadiness;
+}
+
+export interface PurchaseProductionIssue {
+  code: string;
+  label: string;
+}
+
+export interface PurchaseProductionReadinessItem {
+  id?: string;
+  ready: boolean;
+  issues: PurchaseProductionIssue[];
+  dimensionsEstimated: boolean;
+}
+
+export interface PurchaseProductionReadiness {
+  ready: boolean;
+  itemCount: number;
+  incompleteItemCount: number;
+  estimatedDimensionItemCount: number;
+  items: PurchaseProductionReadinessItem[];
+  totals: {
+    boxes: number;
+    grossWeight: number;
+    netWeight: number;
+    volume: number;
+  };
 }
 
 export interface PurchaseItem {
@@ -329,6 +357,13 @@ export interface PurchaseItem {
   unitPrice: number;
   totalPrice: number;
   specification?: string;
+  boxes?: number | null;
+  grossWeight?: number | null;
+  netWeight?: number | null;
+  volume?: number | null;
+  length?: number | null;
+  width?: number | null;
+  height?: number | null;
   note?: string;
   createdAt: string;
   updatedAt: string;
@@ -429,6 +464,7 @@ export interface Inventory {
 export interface PackingItem {
   id: string;
   salesContractId: string;  // 关联出口合同（即货柜）
+  purchaseItemId?: string;
   productId: string;
   storeId?: string;
   quantity: number;
@@ -437,6 +473,10 @@ export interface PackingItem {
   grossWeight?: number;
   netWeight?: number;
   volume?: number;
+  specification?: string;
+  manufacturer?: string;
+  purchaseContractNo?: string;
+  purchaseCost?: number;
   // 价格信息（USD）
   unitPrice?: number;   // 单价（USD）
   totalPrice?: number;  // 总价（USD）= 单价 * 数量

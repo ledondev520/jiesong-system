@@ -59,6 +59,7 @@ interface ContractFilesProps {
   description?: string;
   emptyHint?: string;
   categoryOptions?: Array<{ value: ContractFileCategory; label: string }>;
+  accept?: string;
 }
 
 /**
@@ -104,6 +105,7 @@ export default function ContractFiles({
   description = '支持 PDF、JPG、PNG、XLSX、DOCX 格式，单文件最大 10MB',
   emptyHint = '暂无附件，点击「上传附件」归档合同文件',
   categoryOptions,
+  accept = '.pdf,.jpg,.jpeg,.png,.xlsx,.docx',
 }: ContractFilesProps) {
   const [uploading, setUploading] = useState(false);
   const [previewFile, setPreviewFile] = useState<ContractFile | null>(null);
@@ -168,7 +170,7 @@ export default function ContractFiles({
               <CardDescription className="text-xs">{description}</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              {categoryOptions?.length ? (
+              {resolvedCategoryOptions.length > 1 ? (
                 <Select value={uploadCategory} onValueChange={(value) => setUploadCategory(value as ContractFileCategory)}>
                   <SelectTrigger className="h-8 w-[150px] text-xs" aria-label="附件类型">
                     <SelectValue />
@@ -200,7 +202,7 @@ export default function ContractFiles({
               type="file"
               aria-label="上传合同附件"
               className="hidden"
-              accept=".pdf,.jpg,.jpeg,.png,.xlsx,.docx"
+              accept={accept}
               onChange={handleUpload}
             />
           </div>

@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const config = require('../config');
+const { createError } = require('../middleware/errorHandler');
 const { deleteFile: removeFile, getFullPath } = require('../utils/upload');
 
 const CONTRACT_TYPE = {
@@ -42,6 +43,16 @@ const secureStoredFile = (absolutePath) => {
   fs.chmodSync(absolutePath, 0o600);
 };
 
+const validateUploadedFileCategory = (file, category) => {
+  if (
+    category === CONTRACT_FILE_CATEGORY.PRODUCTION_PHOTO
+    && !['image/jpeg', 'image/png'].includes(file?.mimetype)
+  ) {
+    if (file?.path && fs.existsSync(file.path)) fs.unlinkSync(file.path);
+    throw createError('生产实物图仅支持 JPG、PNG 格式', 400);
+  }
+};
+
 /**
  * 职责：统一创建合同附件记录
  * @param {string} contractId - 合同ID
@@ -51,6 +62,8 @@ const secureStoredFile = (absolutePath) => {
  */
 const createFile = async (contractId, contractType, file, description, category) => {
   const { getRelativePath } = require('../utils/upload');
+  const normalizedCategory = normalizeCategory(category);
+  validateUploadedFileCategory(file, normalizedCategory);
   secureStoredFile(file.path);
   const baseData = {
     fileName: file.originalname,
@@ -59,7 +72,7 @@ const createFile = async (contractId, contractType, file, description, category)
     mimeType: file.mimetype,
     fileSize: file.size,
     description: description || null,
-    category: normalizeCategory(category),
+    category: normalizedCategory,
     checksum: null,
   };
 

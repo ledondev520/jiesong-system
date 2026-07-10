@@ -1,7 +1,7 @@
 /**
- * Input: 出口合同详情API、商品API、binPacking（出柜双80%判定）、PackingListCheckDialog、SortableTableHead、useTableSort
- * Output: 出口合同详情页面（出柜条件横幅、可排序装箱明细、3D可视化、船司装箱单核对、源文件附件、物流时间线、货柜详情、报关信息、收款记录）
- * Pos: 出口管理子页面，展示合同详情、装箱可视化、出柜条件判定与装箱单核对
+ * Input: 出口合同详情、已完工采购来源、binPacking（出柜双80%判定）、装箱单核对与导出工具
+ * Output: 出口详情（采购资料导入、装箱明细、3D排柜、图片导出、出柜门槛、单证核对与收款）
+ * Pos: 出口专项单装柜主页面，复用采购完工资料并承载排柜到发运的唯一主线路
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -51,7 +51,7 @@ import {
 } from '@/components/ui/tabs';
 import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, FileSearch, Container, Anchor, Truck, CheckCircle2, CircleDashed, CircleDot, Clock, ArrowRight, DollarSign, MapPin, AlertTriangle, Loader2, Download } from 'lucide-react';
+import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, FileSearch, Container, Anchor, Truck, CheckCircle2, CircleDashed, CircleDot, Clock, ArrowRight, DollarSign, MapPin, AlertTriangle, Loader2, Download, LockKeyhole } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   CONTAINER_40HQ,
@@ -63,6 +63,7 @@ import {
 import { formatDate } from '@/lib/date-format';
 import { PageHeader } from '@/components/layout/PageHeader';
 import ContractFiles from '@/components/contract/ContractFiles';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // 动态导入 3D 组件（避免 SSR 问题）
 const Container3DView = lazy(() => import('@/components/container/Container3DView'));
@@ -74,6 +75,11 @@ const GenerateThreeFormsDialog = lazy(() =>
 const PackingListCheckDialog = lazy(() =>
   import('@/components/dialog/PackingListCheckDialog').then((module) => ({
     default: module.PackingListCheckDialog,
+  })),
+);
+const ImportPurchaseItemsDialog = lazy(() =>
+  import('./ImportPurchaseItemsDialog').then((module) => ({
+    default: module.ImportPurchaseItemsDialog,
   })),
 );
 import { ContractInfoEditor } from '@/components/sales/ContractInfoEditor';
@@ -144,6 +150,7 @@ export default function SalesDetailPage({ params }: PageProps) {
   const [threeFormsDialogOpen, setThreeFormsDialogOpen] = useState(false);
   // 船司装箱单核对对话框状态
   const [packingCheckOpen, setPackingCheckOpen] = useState(false);
+  const [importPurchaseOpen, setImportPurchaseOpen] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [exportingWorkbook, setExportingWorkbook] = useState(false);
 
@@ -372,6 +379,7 @@ export default function SalesDetailPage({ params }: PageProps) {
   const handleEditItem = (item: PackingItem) => {
     setEditingItem(item);
     const product = item.product || products.find(p => p.id === item.productId);
+    const sourceLocked = Boolean(item.purchaseItemId);
     setItemForm({
       productId: item.productId,
       storeId: item.storeId || '',
@@ -382,9 +390,9 @@ export default function SalesDetailPage({ params }: PageProps) {
       netWeight: item.netWeight || 0,
       volume: item.volume || 0,
       note: item.note || '',
-      length: item.length || product?.length || 0,
-      width: item.width || product?.width || 0,
-      height: item.height || product?.height || 0,
+      length: item.length || (!sourceLocked ? product?.length : 0) || 0,
+      width: item.width || (!sourceLocked ? product?.width : 0) || 0,
+      height: item.height || (!sourceLocked ? product?.height : 0) || 0,
     });
     setIsItemDialogOpen(true);
   };
@@ -421,8 +429,8 @@ export default function SalesDetailPage({ params }: PageProps) {
       }
       setIsItemDialogOpen(false);
       void loadData();
-    } catch {
-      toast.error('保存失败');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : '保存失败');
     }
   };
 
@@ -498,6 +506,7 @@ export default function SalesDetailPage({ params }: PageProps) {
   };
 
   const packingRows = useMemo(() => contract?.packingItems ?? [], [contract?.packingItems]);
+  const sourceFieldsLocked = Boolean(editingItem?.purchaseItemId);
   const packingBoxes = useMemo(
     () => buildPackingBoxes(packingRows, products),
     [packingRows, products],
@@ -978,9 +987,14 @@ export default function SalesDetailPage({ params }: PageProps) {
                 </CardTitle>
                 <CardDescription>管理货柜内的商品</CardDescription>
               </div>
-              <Button onClick={handleAddItem}>
-                <Plus className="mr-2 h-4 w-4" /> 添加商品
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" onClick={() => setImportPurchaseOpen(true)}>
+                  <PackageCheck className="mr-2 h-4 w-4" /> 从已完工采购导入
+                </Button>
+                <Button onClick={handleAddItem}>
+                  <Plus className="mr-2 h-4 w-4" /> 手动添加商品
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -1046,7 +1060,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                   {!packingSort.sortedData.length ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
-                        暂无装箱商品，点击&quot;添加商品&quot;开始装柜
+                        暂无装箱商品，可从已完工采购导入，也可手动添加
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -1055,11 +1069,16 @@ export default function SalesDetailPage({ params }: PageProps) {
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">
                             {item.product?.customsName || '未知商品'}
-                            {item.product?.specification && (
+                            {(item.specification || item.product?.specification) && (
                               <span className="text-xs text-muted-foreground ml-1">
-                                ({item.product.specification})
+                                ({item.specification || item.product?.specification})
                               </span>
                             )}
+                            {item.purchaseContractNo ? (
+                              <span className="mt-0.5 block font-mono text-[11px] text-muted-foreground">
+                                来源 {item.purchaseContractNo}
+                              </span>
+                            ) : null}
                           </TableCell>
                           <TableCell className="text-right">{item.quantity || '-'}</TableCell>
                           <TableCell className="text-right">{item.boxes ?? '-'}</TableCell>
@@ -1071,10 +1090,20 @@ export default function SalesDetailPage({ params }: PageProps) {
                           </TableCell>
                           <TableCell className="text-right">{item.grossWeight || '-'}</TableCell>
                           <TableCell className="flex gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => handleEditItem(item)}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`编辑 ${item.product?.customsName || '装箱商品'}`}
+                              onClick={() => handleEditItem(item)}
+                            >
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteItem(item.id)}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`删除 ${item.product?.customsName || '装箱商品'}`}
+                              onClick={() => handleDeleteItem(item.id)}
+                            >
                               <Trash className="h-4 w-4 text-destructive" />
                             </Button>
                           </TableCell>
@@ -1257,10 +1286,20 @@ export default function SalesDetailPage({ params }: PageProps) {
           <DialogHeader>
             <DialogTitle>{editingItem ? '编辑商品' : '添加商品到货柜'}</DialogTitle>
             <DialogDescription>
-              填写商品信息和规格尺寸，尺寸将用于3D可视化
+              {sourceFieldsLocked
+                ? '采购来源资料保持锁定，仅补充出口售价和备注。'
+                : '填写商品信息和规格尺寸，尺寸将用于3D可视化。'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {sourceFieldsLocked ? (
+              <Alert>
+                <LockKeyhole className="h-4 w-4" />
+                <AlertDescription>
+                  数量、箱数、毛净重、体积和尺寸来自采购完工资料。若需改变箱数，请删除后重新导入，系统会重新计算剩余可排数量。
+                </AlertDescription>
+              </Alert>
+            ) : null}
             <div className="space-y-2">
               <label className="text-sm font-medium">商品 *</label>
               {/* 搜索框 */}
@@ -1333,27 +1372,33 @@ export default function SalesDetailPage({ params }: PageProps) {
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">长度 (mm)</label>
                     <Input 
+                      aria-label="长度"
                       type="number" 
                       value={itemForm.length || ''}
                       placeholder="500"
+                      disabled={sourceFieldsLocked}
                       onChange={(e) => setItemForm(prev => ({ ...prev, length: parseFloat(e.target.value) || 0 }))}
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">宽度 (mm)</label>
                     <Input 
+                      aria-label="宽度"
                       type="number" 
                       value={itemForm.width || ''}
                       placeholder="500"
+                      disabled={sourceFieldsLocked}
                       onChange={(e) => setItemForm(prev => ({ ...prev, width: parseFloat(e.target.value) || 0 }))}
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">高度 (mm)</label>
                     <Input 
+                      aria-label="高度"
                       type="number" 
                       value={itemForm.height || ''}
                       placeholder="500"
+                      disabled={sourceFieldsLocked}
                       onChange={(e) => setItemForm(prev => ({ ...prev, height: parseFloat(e.target.value) || 0 }))}
                     />
                   </div>
@@ -1365,16 +1410,20 @@ export default function SalesDetailPage({ params }: PageProps) {
               <div className="space-y-2">
                 <label className="text-sm font-medium">数量</label>
                 <Input 
+                  aria-label="数量"
                   type="number" 
                   value={itemForm.quantity}
+                  disabled={sourceFieldsLocked}
                   onChange={(e) => setItemForm(prev => ({ ...prev, quantity: parseFloat(e.target.value) || 0 }))}
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">箱数</label>
                 <Input 
+                  aria-label="箱数"
                   type="number" 
                   value={itemForm.boxes}
+                  disabled={sourceFieldsLocked}
                   onChange={(e) => setItemForm(prev => ({ ...prev, boxes: parseInt(e.target.value) || 0 }))}
                 />
               </div>
@@ -1385,6 +1434,7 @@ export default function SalesDetailPage({ params }: PageProps) {
               <div className="space-y-2">
                 <label className="text-sm font-medium">单价 (USD)</label>
                 <Input 
+                  aria-label="单价"
                   type="number" 
                   step="0.01"
                   value={itemForm.unitPrice || ''}
@@ -1405,27 +1455,33 @@ export default function SalesDetailPage({ params }: PageProps) {
               <div className="space-y-2">
                 <label className="text-sm font-medium">毛重 (kg)</label>
                 <Input 
+                  aria-label="毛重"
                   type="number" 
                   step="0.01"
                   value={itemForm.grossWeight}
+                  disabled={sourceFieldsLocked}
                   onChange={(e) => setItemForm(prev => ({ ...prev, grossWeight: parseFloat(e.target.value) || 0 }))}
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">净重 (kg)</label>
                 <Input 
+                  aria-label="净重"
                   type="number" 
                   step="0.01"
                   value={itemForm.netWeight}
+                  disabled={sourceFieldsLocked}
                   onChange={(e) => setItemForm(prev => ({ ...prev, netWeight: parseFloat(e.target.value) || 0 }))}
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">体积 (CBM)</label>
                 <Input 
+                  aria-label="体积"
                   type="number" 
                   step="0.0001"
                   value={itemForm.volume}
+                  disabled={sourceFieldsLocked}
                   onChange={(e) => setItemForm(prev => ({ ...prev, volume: parseFloat(e.target.value) || 0 }))}
                 />
                 {/* 体积预估提示 */}
@@ -1472,6 +1528,17 @@ export default function SalesDetailPage({ params }: PageProps) {
             onOpenChange={setPackingCheckOpen}
             contractId={contract.id}
             contractNo={contract.contractNo}
+          />
+        </Suspense>
+      )}
+
+      {importPurchaseOpen && (
+        <Suspense fallback={null}>
+          <ImportPurchaseItemsDialog
+            open={importPurchaseOpen}
+            onOpenChange={setImportPurchaseOpen}
+            salesContractId={contract.id}
+            onImported={loadData}
           />
         </Suspense>
       )}

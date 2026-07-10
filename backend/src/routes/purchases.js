@@ -65,6 +65,12 @@ router.post('/:id/items', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES
   purchaseController.addItem
 ));
 
+// PUT /api/v1/purchases/:id/production-details - 批量保存生产规格、箱数、重量、体积与箱体尺寸
+router.put('/:id/production-details', withIdValidation, accessAuth({
+  roles: ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'],
+  capabilities: ['purchase.update'],
+}), purchaseController.updateProductionDetails);
+
 // PUT /api/v1/purchases/:id/status - 更新合同状态
 router.put('/:id/status', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
   { entity: 'PurchaseContract', action: 'UPDATE', model: 'purchaseContract' },

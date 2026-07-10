@@ -66,6 +66,12 @@ router.post('/:id/items', withIdValidation, roleAuth(...WRITE_ROLES), withAuditL
 
 // ==================== 装箱明细 ====================
 
+// GET /api/v1/sales/:id/available-purchase-items - 已完工且尚有剩余箱数的采购明细
+router.get('/:id/available-purchase-items', withIdValidation, salesController.getAvailablePurchaseItems);
+
+// POST /api/v1/sales/:id/import-purchase-items - 从采购完工资料批量导入装箱明细
+router.post('/:id/import-purchase-items', withIdValidation, roleAuth(...WRITE_ROLES), salesController.importPurchasePackingItems);
+
 // POST /api/v1/sales/:id/packing-items - 添加装箱明细
 router.post('/:id/packing-items', withIdValidation, roleAuth(...WRITE_ROLES), withAuditLog(
   { entity: 'PackingItem', action: 'CREATE', model: 'packingItem' },

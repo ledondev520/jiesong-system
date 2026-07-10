@@ -332,3 +332,215 @@ test('addPackingItem: 计算 totalPrice 并回写货柜统计', async () => {
     prisma.salesContract.update = originalUpdate;
   }
 });
+
+test('getAvailablePurchaseItems: 只返回已完工且仍有未排箱数的采购明细', async () => {
+  const originalSalesFindUnique = prisma.salesContract.findUnique;
+  const originalPurchaseFindMany = prisma.purchaseItem.findMany;
+  prisma.salesContract.findUnique = async () => ({ id: 'sc-1' });
+  prisma.purchaseItem.findMany = async () => [{
+    id: 'pi-1',
+    quantity: 100,
+    unit: '件',
+    totalPrice: 1130,
+    specification: '标准箱',
+    boxes: 10,
+    grossWeight: 1000,
+    netWeight: 950,
+    volume: 5,
+    length: 500,
+    width: 400,
+    height: 300,
+    product: { id: 'p-1', customsName: '测试商品' },
+    purchaseContract: {
+      id: 'pc-1',
+      contractNo: 'CG260001',
+      status: 'READY',
+      supplier: { id: 'supplier-1', name: '测试供应商' },
+    },
+    packingItems: [{ boxes: 4, quantity: 40, grossWeight: 400, netWeight: 380, volume: 2 }],
+  }];
+
+  try {
+    const result = await salesService.getAvailablePurchaseItems('sc-1');
+    assert.equal(result.length, 1);
+    assert.deepEqual(result[0].remaining, {
+      boxes: 6,
+      quantity: 60,
+      grossWeight: 600,
+      netWeight: 570,
+      volume: 3,
+    });
+    assert.equal(result[0].totalPrice, undefined);
+    assert.equal(result[0].unitPrice, undefined);
+  } finally {
+    prisma.salesContract.findUnique = originalSalesFindUnique;
+    prisma.purchaseItem.findMany = originalPurchaseFindMany;
+  }
+});
+
+test('importPurchasePackingItems: 按选中箱数同比例带入数量、重量、体积和采购成本', async () => {
+  const originalTransaction = prisma.$transaction;
+  const createdRows = [];
+  let updatedStats = null;
+  const source = {
+    id: 'pi-1',
+    productId: 'p-1',
+    quantity: 100,
+    unit: '件',
+    totalPrice: 1130,
+    specification: '标准箱',
+    boxes: 10,
+    grossWeight: 1000,
+    netWeight: 950,
+    volume: 5,
+    length: 500,
+    width: 400,
+    height: 300,
+    purchaseContract: {
+      contractNo: 'CG260001',
+      status: 'READY',
+      supplier: { name: '测试供应商' },
+    },
+    packingItems: [],
+  };
+  prisma.$transaction = async (callback) => callback({
+    salesContract: {
+      findUnique: async () => ({ id: 'sc-1' }),
+      update: async (args) => {
+        updatedStats = args.data;
+        return args.data;
+      },
+    },
+    purchaseItem: {
+      findMany: async () => [source],
+    },
+    packingItem: {
+      create: async (args) => {
+        createdRows.push(args.data);
+        return { id: 'pk-1', ...args.data };
+      },
+      aggregate: async () => ({
+        _sum: { boxes: 4, grossWeight: 400, netWeight: 380, volume: 2, totalPrice: null },
+      }),
+    },
+  });
+
+  try {
+    const result = await salesService.importPurchasePackingItems('sc-1', [{
+      purchaseItemId: 'pi-1',
+      boxes: 4,
+    }]);
+
+    assert.equal(result.importedCount, 1);
+    assert.deepEqual(createdRows[0], {
+      salesContractId: 'sc-1',
+      purchaseItemId: 'pi-1',
+      productId: 'p-1',
+      quantity: 40,
+      unit: '件',
+      boxes: 4,
+      grossWeight: 400,
+      netWeight: 380,
+      volume: 2,
+      unitPrice: null,
+      totalPrice: null,
+      specification: '标准箱',
+      manufacturer: '测试供应商',
+      purchaseContractNo: 'CG260001',
+      purchaseCost: 452,
+      length: 500,
+      width: 400,
+      height: 300,
+      isOwnedByJiesong: true,
+      note: '从采购合同 CG260001 完工资料导入',
+    });
+    assert.deepEqual(updatedStats, {
+      totalBoxes: 4,
+      grossWeight: 400,
+      netWeight: 380,
+      volume: 2,
+      totalAmount: 0,
+    });
+  } finally {
+    prisma.$transaction = originalTransaction;
+  }
+});
+
+test('updatePackingItem: 采购来源行的箱数和货物资料不可绕过导入剩余量直接修改', async () => {
+  const originalFindFirst = prisma.packingItem.findFirst;
+  const originalUpdate = prisma.packingItem.update;
+  const originalAggregate = prisma.packingItem.aggregate;
+  const originalSalesUpdate = prisma.salesContract.update;
+  let updateCalled = false;
+
+  prisma.packingItem.findFirst = async () => ({
+    id: 'pk-imported',
+    salesContractId: 'sc-1',
+    purchaseItemId: 'pi-1',
+    quantity: 40,
+    boxes: 4,
+    grossWeight: 400,
+    netWeight: 380,
+    volume: 2,
+    length: 500,
+    width: 400,
+    height: 300,
+  });
+  prisma.packingItem.update = async () => {
+    updateCalled = true;
+    return { id: 'pk-imported' };
+  };
+  prisma.packingItem.aggregate = async () => ({ _sum: {} });
+  prisma.salesContract.update = async () => ({ id: 'sc-1' });
+
+  try {
+    await assert.rejects(
+      () => salesService.updatePackingItem('sc-1', 'pk-imported', {
+        quantity: 40,
+        boxes: 5,
+        grossWeight: 400,
+        netWeight: 380,
+        volume: 2,
+        length: 500,
+        width: 400,
+        height: 300,
+        unitPrice: 12,
+      }),
+      (error) => error.statusCode === 400 && /删除后重新按箱数导入/.test(error.message),
+    );
+    assert.equal(updateCalled, false);
+  } finally {
+    prisma.packingItem.findFirst = originalFindFirst;
+    prisma.packingItem.update = originalUpdate;
+    prisma.packingItem.aggregate = originalAggregate;
+    prisma.salesContract.update = originalSalesUpdate;
+  }
+});
+
+test('removePackingItem: 不能通过其他出口合同编号删除不属于当前合同的装箱行', async () => {
+  const originalFindFirst = prisma.packingItem.findFirst;
+  const originalDelete = prisma.packingItem.delete;
+  const originalAggregate = prisma.packingItem.aggregate;
+  const originalSalesUpdate = prisma.salesContract.update;
+  let deleteCalled = false;
+
+  prisma.packingItem.findFirst = async () => null;
+  prisma.packingItem.delete = async () => {
+    deleteCalled = true;
+  };
+  prisma.packingItem.aggregate = async () => ({ _sum: {} });
+  prisma.salesContract.update = async () => ({ id: 'sc-1' });
+
+  try {
+    await assert.rejects(
+      () => salesService.removePackingItem('sc-other', 'pk-1'),
+      (error) => error.statusCode === 404 && /装箱明细不存在/.test(error.message),
+    );
+    assert.equal(deleteCalled, false);
+  } finally {
+    prisma.packingItem.findFirst = originalFindFirst;
+    prisma.packingItem.delete = originalDelete;
+    prisma.packingItem.aggregate = originalAggregate;
+    prisma.salesContract.update = originalSalesUpdate;
+  }
+});

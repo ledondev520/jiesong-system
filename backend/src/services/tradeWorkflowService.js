@@ -8,6 +8,7 @@ const prisma = require('../utils/prisma');
 const { evaluateShipmentReadiness } = require('./shipmentReadinessService');
 const { normalizePurchaseStatus, PURCHASE_STATUS } = require('./purchaseStateMachine');
 const { normalizeSalesStatus, SALES_STATUS } = require('./salesStateMachine');
+const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
 
 const PURCHASE_RANK = Object.freeze({
   [PURCHASE_STATUS.DRAFT]: 0,
@@ -70,8 +71,17 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   const allPurchasesPaid = linkedPurchases.length > 0
     && purchaseTotal > 0
     && purchasePaid >= purchaseTotal - 0.01;
-  const allProductionReady = linkedPurchases.length > 0 && linkedPurchases.every((contract) => (
+  const productionReadiness = linkedPurchases.map((contract) => ({
+    contract,
+    readiness: evaluatePurchaseProductionReadiness(contract.items || []),
+  }));
+  const allProductionReady = productionReadiness.length > 0 && productionReadiness.every(({ contract, readiness }) => (
     (PURCHASE_RANK[normalizePurchaseStatus(contract.status)] ?? -1) >= PURCHASE_RANK[PURCHASE_STATUS.READY]
+    && readiness.ready
+  ));
+  const productionIncompletePurchase = productionReadiness.find(({ contract, readiness }) => (
+    (PURCHASE_RANK[normalizePurchaseStatus(contract.status)] ?? -1) >= PURCHASE_RANK[PURCHASE_STATUS.READY]
+    && !readiness.ready
   ));
   const allPurchasesSigned = linkedPurchases.length > 0 && linkedPurchases.every((contract) => (
     (PURCHASE_RANK[normalizePurchaseStatus(contract.status)] ?? -1) >= PURCHASE_RANK[PURCHASE_STATUS.SIGNED]
@@ -141,8 +151,14 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
     : allProductionReady
       ? { key: 'production', label: '生产与资料', status: 'completed', reason: '供应商已确认生产完成' }
       : {
-          key: 'production', label: '生产与资料', status: 'current', reason: '待确认生产完成并补充实物图、箱规和重量',
-          action: { label: '更新生产状态', href: `/dashboard/purchase/${firstPurchase?.id}` },
+          key: 'production', label: '生产与资料', status: 'current',
+          reason: productionIncompletePurchase
+            ? '已有生产完成状态，但规格、箱数、毛净重或体积仍缺失；实物图为选填'
+            : '待补齐规格、箱数、毛净重和体积并确认生产完成；实物图为选填',
+          action: {
+            label: '补齐生产资料',
+            href: `/dashboard/purchase/${productionIncompletePurchase?.contract.id || firstPurchase?.id}`,
+          },
         };
 
   let loadingStage;
@@ -229,6 +245,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
     || stages.find((stage) => stage.status !== 'completed');
   const issues = [];
   if (purchasePaid > purchaseTotal + 0.01) issues.push('采购已付金额超过合同金额');
+  if (productionIncompletePurchase) issues.push('采购生产状态已完成，但装柜输入资料不完整');
   if (readiness.overloaded) issues.push('货柜超过 40HQ 安全上限');
   if (readiness.unplacedBoxCount > 0) issues.push(`仍有 ${readiness.unplacedBoxCount} 箱无法装入`);
   if (salesContract.shippedAt && salesContract.createdAt && new Date(salesContract.shippedAt) < new Date(salesContract.createdAt)) {
@@ -280,7 +297,7 @@ const listTradeWorkflows = async ({ limit = 20 } = {}) => {
   const purchases = aliases.length > 0
     ? await prisma.purchaseContract.findMany({
         where: { contractNo: { in: aliases } },
-        include: { files: true },
+        include: { files: true, items: true },
       })
     : [];
   const purchaseMap = new Map();

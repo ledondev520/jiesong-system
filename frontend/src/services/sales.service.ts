@@ -39,6 +39,41 @@ export interface PackingListCheckResult {
   items: PackingListCheckItem[];
 }
 
+export interface AvailablePurchasePackingItem {
+  id: string;
+  productId: string;
+  quantity: number;
+  unit?: string | null;
+  specification: string;
+  boxes: number;
+  grossWeight: number;
+  netWeight: number;
+  volume: number;
+  length?: number | null;
+  width?: number | null;
+  height?: number | null;
+  product: { id: string; customsName: string };
+  purchaseContract: {
+    id: string;
+    contractNo: string;
+    supplier: { id: string; name: string };
+  };
+  allocated: {
+    boxes: number;
+    quantity: number;
+    grossWeight: number;
+    netWeight: number;
+    volume: number;
+  };
+  remaining: {
+    boxes: number;
+    quantity: number;
+    grossWeight: number;
+    netWeight: number;
+    volume: number;
+  };
+}
+
 const crud = createCrudService<SalesContract, SalesCreatePayload, SalesUpdatePayload, SalesListQuery>('/sales');
 
 /**
@@ -83,6 +118,26 @@ export const salesService = {
 
   removePackingItem: async (salesContractId: string, itemId: string) => {
     return api.delete<ApiResponse<void>, ApiResponse<void>>(`/sales/${salesContractId}/packing-items/${itemId}`);
+  },
+
+  /** 查询已完工且仍有未排箱数的采购明细。 */
+  getAvailablePurchaseItems: async (salesContractId: string) => {
+    return api.get<
+      ApiResponse<AvailablePurchasePackingItem[]>,
+      ApiResponse<AvailablePurchasePackingItem[]>
+    >(`/sales/${salesContractId}/available-purchase-items`);
+  },
+
+  /** 按箱数把采购生产资料带入当前货柜。 */
+  importPurchaseItems: async (
+    salesContractId: string,
+    items: Array<{ purchaseItemId: string; boxes: number }>,
+  ) => {
+    return api.post<
+      ApiResponse<{ importedCount: number; items: PackingItem[] }>,
+      ApiResponse<{ importedCount: number; items: PackingItem[] }>,
+      { items: Array<{ purchaseItemId: string; boxes: number }> }
+    >(`/sales/${salesContractId}/import-purchase-items`, { items });
   },
 
   /** 按出口合同状态机推进到下一阶段。 */

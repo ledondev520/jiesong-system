@@ -12,6 +12,19 @@ const {
 } = require('./salesStateMachine');
 const inventorySnapshot = require('./inventorySnapshot');
 const { evaluateShipmentReadiness } = require('./shipmentReadinessService');
+const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
+
+const READY_PURCHASE_STATUSES = Object.freeze([
+  'READY',
+  'SHIPPED',
+  'RECEIVED',
+  'COMPLETED',
+  'PENDING_SHIPMENT',
+  'OUT_STOCK',
+  'IN_STOCK',
+  'PAID',
+  'DELIVERED',
+]);
 
 const getCurrentYear = () => new Date().getFullYear().toString().slice(-2);
 
@@ -345,9 +358,72 @@ const addPackingItem = async (id, data = {}) => {
   return item;
 };
 
+const SOURCE_LOCKED_PACKING_FIELDS = Object.freeze([
+  'quantity',
+  'boxes',
+  'grossWeight',
+  'netWeight',
+  'volume',
+  'length',
+  'width',
+  'height',
+]);
+
+const SOURCE_LOCKED_PACKING_LABELS = Object.freeze({
+  quantity: '数量',
+  boxes: '箱数',
+  grossWeight: '毛重',
+  netWeight: '净重',
+  volume: '体积',
+  length: '长度',
+  width: '宽度',
+  height: '高度',
+});
+
+const hasOwn = (value, field) => Object.prototype.hasOwnProperty.call(value, field);
+
+const samePackingNumber = (current, next) => {
+  const currentNumber = current === null || current === undefined || current === '' ? 0 : Number(current);
+  const nextNumber = next === null || next === undefined || next === '' ? 0 : Number(next);
+  return Number.isFinite(currentNumber)
+    && Number.isFinite(nextNumber)
+    && Math.abs(currentNumber - nextNumber) <= 0.000001;
+};
+
 const updatePackingItem = async (id, itemId, data = {}) => {
-  const unitPrice = data.unitPrice || null;
-  const totalPrice = unitPrice && data.quantity ? unitPrice * data.quantity : null;
+  const existing = await prisma.packingItem.findFirst({
+    where: { id: itemId, salesContractId: id },
+    select: {
+      id: true,
+      purchaseItemId: true,
+      quantity: true,
+      boxes: true,
+      grossWeight: true,
+      netWeight: true,
+      volume: true,
+      unitPrice: true,
+      length: true,
+      width: true,
+      height: true,
+    },
+  });
+  if (!existing) throw createError('装箱明细不存在', 404);
+
+  if (existing.purchaseItemId) {
+    const changedField = SOURCE_LOCKED_PACKING_FIELDS.find((field) => (
+      hasOwn(data, field) && !samePackingNumber(existing[field], data[field])
+    ));
+    if (changedField) {
+      throw createError(
+        `该装箱明细来源于采购，${SOURCE_LOCKED_PACKING_LABELS[changedField]}由导入比例锁定；若需调整，请删除后重新按箱数导入`,
+        400,
+      );
+    }
+  }
+
+  const unitPrice = data.unitPrice === undefined ? existing.unitPrice : (data.unitPrice || null);
+  const quantity = data.quantity === undefined ? existing.quantity : data.quantity;
+  const totalPrice = unitPrice && quantity ? unitPrice * quantity : null;
 
   const item = await prisma.packingItem.update({
     where: { id: itemId },
@@ -361,9 +437,9 @@ const updatePackingItem = async (id, itemId, data = {}) => {
       unitPrice,
       totalPrice,
       storeId: data.storeId || null,
-      length: data.length || null,
-      width: data.width || null,
-      height: data.height || null,
+      length: data.length === undefined ? undefined : (data.length || null),
+      width: data.width === undefined ? undefined : (data.width || null),
+      height: data.height === undefined ? undefined : (data.height || null),
       note: data.note,
     },
     include: { product: true, store: true },
@@ -374,17 +450,23 @@ const updatePackingItem = async (id, itemId, data = {}) => {
 };
 
 const removePackingItem = async (id, itemId) => {
+  const existing = await prisma.packingItem.findFirst({
+    where: { id: itemId, salesContractId: id },
+    select: { id: true },
+  });
+  if (!existing) throw createError('装箱明细不存在', 404);
+
   await prisma.packingItem.delete({ where: { id: itemId } });
   await recalculateContractStats(id);
 };
 
-const recalculateContractStats = async (contractId) => {
-  const stats = await prisma.packingItem.aggregate({
+const recalculateContractStats = async (contractId, prismaClient = prisma) => {
+  const stats = await prismaClient.packingItem.aggregate({
     where: { salesContractId: contractId },
     _sum: { boxes: true, grossWeight: true, netWeight: true, volume: true, totalPrice: true },
   });
 
-  await prisma.salesContract.update({
+  await prismaClient.salesContract.update({
     where: { id: contractId },
     data: {
       totalBoxes: stats._sum.boxes || 0,
@@ -393,6 +475,213 @@ const recalculateContractStats = async (contractId) => {
       volume: stats._sum.volume || 0,
       totalAmount: stats._sum.totalPrice || 0,
     },
+  });
+};
+
+const roundAllocation = (value, digits = 6) => {
+  const factor = 10 ** digits;
+  return Math.round((Number(value) + Number.EPSILON) * factor) / factor;
+};
+
+const getAllocatedTotals = (packingItems = []) => packingItems.reduce((sum, item) => ({
+  boxes: sum.boxes + (Number(item.boxes) || 0),
+  quantity: sum.quantity + (Number(item.quantity) || 0),
+  grossWeight: sum.grossWeight + (Number(item.grossWeight) || 0),
+  netWeight: sum.netWeight + (Number(item.netWeight) || 0),
+  volume: sum.volume + (Number(item.volume) || 0),
+}), { boxes: 0, quantity: 0, grossWeight: 0, netWeight: 0, volume: 0 });
+
+const buildAvailablePurchaseItem = (source) => {
+  const allocated = getAllocatedTotals(source.packingItems);
+  const remaining = {
+    boxes: Math.max((Number(source.boxes) || 0) - allocated.boxes, 0),
+    quantity: roundAllocation(Math.max((Number(source.quantity) || 0) - allocated.quantity, 0)),
+    grossWeight: roundAllocation(Math.max((Number(source.grossWeight) || 0) - allocated.grossWeight, 0)),
+    netWeight: roundAllocation(Math.max((Number(source.netWeight) || 0) - allocated.netWeight, 0)),
+    volume: roundAllocation(Math.max((Number(source.volume) || 0) - allocated.volume, 0)),
+  };
+  return {
+    id: source.id,
+    productId: source.productId,
+    quantity: source.quantity,
+    unit: source.unit,
+    specification: source.specification,
+    boxes: source.boxes,
+    grossWeight: source.grossWeight,
+    netWeight: source.netWeight,
+    volume: source.volume,
+    length: source.length,
+    width: source.width,
+    height: source.height,
+    product: source.product,
+    purchaseContract: {
+      id: source.purchaseContract.id,
+      contractNo: source.purchaseContract.contractNo,
+      supplier: source.purchaseContract.supplier,
+    },
+    allocated,
+    remaining,
+  };
+};
+
+/**
+ * 职责：列出已经确认完工、生产资料完整且仍有剩余箱数的采购明细。
+ */
+const getAvailablePurchaseItems = async (salesContractId) => {
+  const contract = await prisma.salesContract.findUnique({
+    where: { id: salesContractId },
+    select: { id: true },
+  });
+  if (!contract) throw createError('出口合同不存在', 404);
+
+  const sources = await prisma.purchaseItem.findMany({
+    where: { purchaseContract: { status: { in: READY_PURCHASE_STATUSES } } },
+    select: {
+      id: true,
+      productId: true,
+      quantity: true,
+      unit: true,
+      specification: true,
+      boxes: true,
+      grossWeight: true,
+      netWeight: true,
+      volume: true,
+      length: true,
+      width: true,
+      height: true,
+      product: { select: { id: true, customsName: true } },
+      purchaseContract: {
+        select: {
+          id: true,
+          contractNo: true,
+          status: true,
+          productionCompletedAt: true,
+          supplier: { select: { id: true, name: true } },
+        },
+      },
+      packingItems: {
+        select: {
+          salesContractId: true,
+          boxes: true,
+          quantity: true,
+          grossWeight: true,
+          netWeight: true,
+          volume: true,
+        },
+      },
+    },
+    orderBy: [
+      { purchaseContract: { productionCompletedAt: 'asc' } },
+      { createdAt: 'asc' },
+    ],
+  });
+
+  return sources
+    .filter((source) => evaluatePurchaseProductionReadiness([source]).ready)
+    .map(buildAvailablePurchaseItem)
+    .filter((source) => source.remaining.boxes > 0);
+};
+
+/**
+ * 职责：按选中箱数把采购完工资料同比例导入货柜，保留采购明细来源以支持拆柜和剩余量追踪。
+ */
+const importPurchasePackingItems = async (salesContractId, selections = []) => {
+  if (!Array.isArray(selections) || selections.length === 0) {
+    throw createError('至少选择一条已完工采购明细', 400);
+  }
+  const normalized = selections.map((selection) => ({
+    purchaseItemId: String(selection?.purchaseItemId || '').trim(),
+    boxes: Number(selection?.boxes),
+  }));
+  if (normalized.some((selection) => !selection.purchaseItemId)) {
+    throw createError('采购明细ID不能为空', 400);
+  }
+  if (normalized.some((selection) => !Number.isInteger(selection.boxes) || selection.boxes <= 0)) {
+    throw createError('导入箱数必须为正整数', 400);
+  }
+  if (new Set(normalized.map((selection) => selection.purchaseItemId)).size !== normalized.length) {
+    throw createError('不能重复选择同一采购明细', 400);
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const salesContract = await tx.salesContract.findUnique({
+      where: { id: salesContractId },
+      select: { id: true },
+    });
+    if (!salesContract) throw createError('出口合同不存在', 404);
+
+    const sources = await tx.purchaseItem.findMany({
+      where: {
+        id: { in: normalized.map((selection) => selection.purchaseItemId) },
+        purchaseContract: { status: { in: READY_PURCHASE_STATUSES } },
+      },
+      include: {
+        product: { select: { id: true, customsName: true } },
+        purchaseContract: {
+          select: {
+            id: true,
+            contractNo: true,
+            status: true,
+            supplier: { select: { id: true, name: true } },
+          },
+        },
+        packingItems: {
+          select: {
+            boxes: true,
+            quantity: true,
+            grossWeight: true,
+            netWeight: true,
+            volume: true,
+          },
+        },
+      },
+    });
+    const sourceById = new Map(sources.map((source) => [source.id, source]));
+    const createdItems = [];
+
+    for (const selection of normalized) {
+      const source = sourceById.get(selection.purchaseItemId);
+      if (!source) throw createError(`采购明细 ${selection.purchaseItemId} 不存在或尚未确认完工`, 400);
+      if (!evaluatePurchaseProductionReadiness([source]).ready) {
+        throw createError(`采购明细 ${selection.purchaseItemId} 的生产资料不完整`, 400);
+      }
+
+      const available = buildAvailablePurchaseItem(source);
+      if (selection.boxes > available.remaining.boxes) {
+        throw createError(`采购明细 ${selection.purchaseItemId} 最多可导入 ${available.remaining.boxes} 箱`, 400);
+      }
+      const ratio = selection.boxes / Number(source.boxes);
+      const purchaseContractNo = source.purchaseContract.contractNo;
+      const item = await tx.packingItem.create({
+        data: {
+          salesContractId,
+          purchaseItemId: source.id,
+          productId: source.productId,
+          quantity: roundAllocation(Number(source.quantity) * ratio),
+          unit: source.unit,
+          boxes: selection.boxes,
+          grossWeight: roundAllocation(Number(source.grossWeight) * ratio),
+          netWeight: roundAllocation(Number(source.netWeight) * ratio),
+          volume: roundAllocation(Number(source.volume) * ratio),
+          unitPrice: null,
+          totalPrice: null,
+          specification: source.specification,
+          manufacturer: source.purchaseContract.supplier?.name || null,
+          purchaseContractNo,
+          purchaseCost: roundAllocation(Number(source.totalPrice) * ratio, 2),
+          length: source.length,
+          width: source.width,
+          height: source.height,
+          isOwnedByJiesong: true,
+          note: `从采购合同 ${purchaseContractNo} 完工资料导入`,
+        },
+        include: { product: true, store: true },
+      });
+      createdItems.push(item);
+    }
+
+    await recalculateContractStats(salesContractId, tx);
+    return { importedCount: createdItems.length, items: createdItems };
   });
 };
 
@@ -409,4 +698,6 @@ module.exports = {
   addPackingItem,
   updatePackingItem,
   removePackingItem,
+  getAvailablePurchaseItems,
+  importPurchasePackingItems,
 };

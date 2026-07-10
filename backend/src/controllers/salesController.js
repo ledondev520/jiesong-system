@@ -178,6 +178,41 @@ const addPackingItem = async (req, res, next) => {
   }
 };
 
+/** 列出可直接带入当前货柜的已完工采购明细及剩余箱数。 */
+const getAvailablePurchaseItems = async (req, res, next) => {
+  try {
+    const items = await salesService.getAvailablePurchaseItems(req.params.id);
+    success(res, items);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** 按选中箱数从采购完工资料创建装箱明细。 */
+const importPurchasePackingItems = async (req, res, next) => {
+  try {
+    const result = await salesService.importPurchasePackingItems(req.params.id, req.body?.items);
+    await auditLog.logOperation({
+      userId: req.user?.id,
+      action: 'IMPORT_PURCHASE_PACKING_ITEMS',
+      entity: 'SalesContract',
+      entityId: req.params.id,
+      newValue: {
+        importedCount: result.importedCount,
+        sources: (req.body?.items || []).map((item) => ({
+          purchaseItemId: item.purchaseItemId,
+          boxes: item.boxes,
+        })),
+      },
+      req,
+      note: '从已完工采购资料导入装箱明细',
+    });
+    created(res, result, `已导入 ${result.importedCount} 条装箱明细`);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const updatePackingItem = async (req, res, next) => {
   try {
     const { id, itemId } = req.params;
@@ -311,6 +346,8 @@ module.exports = {
   getNextContractNo,
   calculatePrice,
   addPackingItem,
+  getAvailablePurchaseItems,
+  importPurchasePackingItems,
   updatePackingItem,
   removePackingItem,
   uploadFile,

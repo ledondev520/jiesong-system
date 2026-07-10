@@ -39,3 +39,12 @@ test('purchases route order: /options/next-no must be before /:id for GET', () =
     `路由顺序错误：/options/next-no(index=${optionsIndex}) 应在 /:id(index=${idIndex}) 之前`
   );
 });
+
+test('purchases route includes batch production detail update before status completion', () => {
+  const productionIndex = getRouteIndex(purchasesRouter, '/:id/production-details', 'put');
+  const statusIndex = getRouteIndex(purchasesRouter, '/:id/status', 'put');
+
+  assert.notEqual(productionIndex, -1, '缺少 PUT /:id/production-details 路由');
+  assert.notEqual(statusIndex, -1, '缺少 PUT /:id/status 路由');
+  assert.ok(productionIndex < statusIndex, '生产资料路由应在状态推进路由前注册');
+});

@@ -221,6 +221,73 @@ describe('PurchaseDetailPage 交互逻辑', () => {
     expect(await screen.findByRole('button', { name: '确认生产完成' })).toBeInTheDocument();
   });
 
+  it('生产资料缺项时禁用确认生产完成，避免只改状态不留箱规', async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: 'p-1',
+        contractNo: 'CG2600001',
+        status: 'PRODUCING',
+        totalAmount: 1000,
+        paidAmount: 300,
+        supplier: { name: '供应商A' },
+        items: [{
+          id: 'pi-1',
+          productId: 'product-1',
+          quantity: 10,
+          unitPrice: 10,
+          totalPrice: 113,
+          product: { customsName: '测试商品' },
+        }],
+        productionReadiness: {
+          ready: false,
+          itemCount: 1,
+          incompleteItemCount: 1,
+          estimatedDimensionItemCount: 1,
+          totals: { boxes: 0, grossWeight: 0, netWeight: 0, volume: 0 },
+          items: [{ id: 'pi-1', ready: false, dimensionsEstimated: true, issues: [{ code: 'MISSING_BOXES', label: '箱数' }] }],
+        },
+      },
+    });
+
+    renderPage('p-1');
+
+    expect(await screen.findByRole('button', { name: '确认生产完成' })).toBeDisabled();
+    expect(screen.getByText(/测试商品：箱数/)).toBeInTheDocument();
+  });
+
+  it('历史生产完成合同缺生产资料时也禁止直接确认供应商发货', async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: 'p-1',
+        contractNo: 'CG2600001',
+        status: 'READY',
+        totalAmount: 1000,
+        paidAmount: 300,
+        supplier: { name: '供应商A' },
+        items: [{
+          id: 'pi-1',
+          productId: 'product-1',
+          quantity: 10,
+          unitPrice: 10,
+          totalPrice: 113,
+          product: { customsName: '测试商品' },
+        }],
+        productionReadiness: {
+          ready: false,
+          itemCount: 1,
+          incompleteItemCount: 1,
+          estimatedDimensionItemCount: 1,
+          totals: { boxes: 0, grossWeight: 0, netWeight: 0, volume: 0 },
+          items: [{ id: 'pi-1', ready: false, dimensionsEstimated: true, issues: [{ code: 'MISSING_VOLUME', label: '总体积' }] }],
+        },
+      },
+    });
+
+    renderPage('p-1');
+
+    expect(await screen.findByRole('button', { name: '确认供应商已发货' })).toBeDisabled();
+  });
+
   it('采购详情把单价解释为不含税、明细与合同总额解释为含税且不重复加税', async () => {
     mockGetById.mockResolvedValue({
       data: {

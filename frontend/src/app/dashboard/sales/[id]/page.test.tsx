@@ -143,7 +143,7 @@ describe('SalesDetailPage 交互逻辑', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'EXP2500001' })).toBeInTheDocument();
-      expect(screen.getByText('暂无装箱商品，点击"添加商品"开始装柜')).toBeInTheDocument();
+      expect(screen.getByText('暂无装箱商品，可从已完工采购导入，也可手动添加')).toBeInTheDocument();
       expect(screen.getByText('暂无附件，点击「上传附件」归档出货源文件')).toBeInTheDocument();
     });
     expect(mockApiGet).toHaveBeenCalledWith('/contracts/s-1/files', { params: { contractType: 'SALES' } });
@@ -315,5 +315,51 @@ describe('SalesDetailPage 交互逻辑', () => {
     await user.click(shipButton);
 
     expect(mockUpdateSalesStatus).toHaveBeenCalledWith('s-1', 'SHIPPED');
+  });
+
+  it('采购导入的装箱行锁定来源数量、箱数、重量和尺寸，避免破坏剩余量', async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: 's-1',
+        contractNo: 'EXP260008',
+        status: 'PACKING',
+        totalBoxes: 4,
+        volume: 2,
+        grossWeight: 400,
+        totalAmount: 0,
+        packingItems: [{
+          id: 'pk-imported',
+          purchaseItemId: 'pi-1',
+          purchaseContractNo: 'CG260001',
+          productId: 'p-1',
+          quantity: 40,
+          boxes: 4,
+          unitPrice: null,
+          grossWeight: 400,
+          netWeight: 380,
+          volume: 2,
+          length: 500,
+          width: 400,
+          height: 300,
+          product: { id: 'p-1', customsName: '已完工商品' },
+        }],
+        port: { name: 'Oakland' },
+      },
+    });
+    mockProductGetAll.mockResolvedValue({ data: { items: [] } });
+    mockStoreGetAll.mockResolvedValue({ data: { items: [] } });
+    mockInventoryGetAll.mockResolvedValue({ data: { items: [] } });
+    const user = userEvent.setup();
+    renderPage('s-1');
+
+    await user.click(await screen.findByRole('button', { name: '编辑 已完工商品' }));
+
+    expect(screen.getByText(/若需改变箱数，请删除后重新导入/)).toBeInTheDocument();
+    expect(screen.getByRole('spinbutton', { name: '数量' })).toBeDisabled();
+    expect(screen.getByRole('spinbutton', { name: '箱数' })).toBeDisabled();
+    expect(screen.getByRole('spinbutton', { name: '毛重' })).toBeDisabled();
+    expect(screen.getByRole('spinbutton', { name: '净重' })).toBeDisabled();
+    expect(screen.getByRole('spinbutton', { name: '体积' })).toBeDisabled();
+    expect(screen.getByRole('spinbutton', { name: '单价' })).toBeEnabled();
   });
 });

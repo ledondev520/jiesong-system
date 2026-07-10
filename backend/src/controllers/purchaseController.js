@@ -20,6 +20,11 @@ const auditLog = require('../utils/auditLog');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
 const contractTemplateService = require('../services/contractTemplateService');
 const { calculateNewLineTotal, normalizePurchaseTaxRate } = require('../services/purchaseAmountService');
+const {
+  assertPurchaseProductionReady,
+  evaluatePurchaseProductionReadiness,
+  updatePurchaseProductionDetails,
+} = require('../services/purchaseProductionService');
 
 /**
  * 职责：检查商品价格是否高于历史均价并生成警告
@@ -156,7 +161,10 @@ const getById = async (req, res, next) => {
       throw createError('采购合同不存在', 404);
     }
     
-    success(res, contract);
+    success(res, {
+      ...contract,
+      productionReadiness: evaluatePurchaseProductionReadiness(contract.items),
+    });
   } catch (error) {
     next(error);
   }
@@ -287,6 +295,30 @@ const addItem = async (req, res, next) => {
 };
 
 /**
+ * 职责：批量保存采购明细的生产/装柜输入资料，允许先保存不完整草稿。
+ */
+const updateProductionDetails = async (req, res, next) => {
+  try {
+    const contract = await updatePurchaseProductionDetails(req.params.id, req.body?.items);
+    await auditLog.logOperation({
+      userId: req.user?.id,
+      action: 'UPDATE_PRODUCTION_DETAILS',
+      entity: 'PurchaseContract',
+      entityId: req.params.id,
+      newValue: {
+        itemIds: (req.body?.items || []).map((item) => item.id),
+        itemCount: (req.body?.items || []).length,
+      },
+      req,
+      note: '更新采购生产资料（规格、箱数、重量、体积和可选箱体尺寸）',
+    });
+    success(res, contract, '生产资料已保存');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * 职责：更新合同状态
  */
 const updateStatus = async (req, res, next) => {
@@ -304,7 +336,23 @@ const updateStatus = async (req, res, next) => {
     const contract = await prisma.$transaction(async (tx) => {
       const existingContract = await tx.purchaseContract.findUnique({
         where: { id },
-        select: { id: true, status: true },
+        select: {
+          id: true,
+          status: true,
+          items: {
+            select: {
+              id: true,
+              specification: true,
+              boxes: true,
+              grossWeight: true,
+              netWeight: true,
+              volume: true,
+              length: true,
+              width: true,
+              height: true,
+            },
+          },
+        },
       });
 
       if (!existingContract) {
@@ -317,9 +365,20 @@ const updateStatus = async (req, res, next) => {
       }
 
       const isTransition = existingContract.status !== targetStatus;
+      if (
+        isTransition
+        && [PURCHASE_STATUS.READY, PURCHASE_STATUS.SHIPPED].includes(targetStatus)
+      ) {
+        assertPurchaseProductionReady(existingContract.items);
+      }
       const contract = await tx.purchaseContract.update({
         where: { id },
-        data: { status: targetStatus },
+        data: {
+          status: targetStatus,
+          ...(isTransition && targetStatus === PURCHASE_STATUS.READY
+            ? { productionCompletedAt: new Date() }
+            : {}),
+        },
       });
 
       // 正向流转：入库时创建库存记录
@@ -612,6 +671,7 @@ module.exports = {
   update,
   remove,
   addItem,
+  updateProductionDetails,
   updateStatus,
   uploadFile,
   getFiles,

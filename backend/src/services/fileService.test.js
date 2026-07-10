@@ -77,6 +77,27 @@ test('createFile: 用户上传的合同凭证落盘后收紧为 0600 权限', as
   }
 });
 
+test('createFile: 生产实物图分类只接受 JPG/PNG，错误文件不留在磁盘', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-production-photo-'));
+  const filePath = path.join(tempDir, 'not-photo.pdf');
+  fs.writeFileSync(filePath, '%PDF');
+
+  try {
+    await assert.rejects(
+      () => fileService.createFile('purchase-1', 'PURCHASE', {
+        originalname: 'not-photo.pdf',
+        path: filePath,
+        mimetype: 'application/pdf',
+        size: 4,
+      }, null, 'PRODUCTION_PHOTO'),
+      (error) => error.statusCode === 400 && /生产实物图仅支持 JPG、PNG/.test(error.message),
+    );
+    assert.equal(fs.existsSync(filePath), false);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test('listFiles: 销售合同附件走 salesContractFile delegate', async () => {
   let findManyArgs = null;
 

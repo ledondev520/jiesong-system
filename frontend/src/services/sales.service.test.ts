@@ -67,6 +67,23 @@ describe('salesService api', () => {
 
     expect(api.delete).toHaveBeenCalledWith('/sales/123');
   });
+
+  it('getAvailablePurchaseItems: 查询当前货柜可用的采购完工来源', async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+
+    await salesService.getAvailablePurchaseItems('sc-1');
+
+    expect(api.get).toHaveBeenCalledWith('/sales/sc-1/available-purchase-items');
+  });
+
+  it('importPurchaseItems: 按箱数批量导入采购明细', async () => {
+    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+    const items = [{ purchaseItemId: 'pi-1', boxes: 4 }];
+
+    await salesService.importPurchaseItems('sc-1', items);
+
+    expect(api.post).toHaveBeenCalledWith('/sales/sc-1/import-purchase-items', { items });
+  });
 });
 
 describe('salesService.calculatePrice', () => {

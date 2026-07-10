@@ -107,8 +107,8 @@ describe('TaxRefundsDashboardPage 交互逻辑', () => {
     expect(screen.getByDisplayValue('TR-2026')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '报关单' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '退税记录' })).toBeInTheDocument();
-    expect(screen.getAllByText('TR-2026-001').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('等待税局反馈').length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('TR-2026-001')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('等待税局反馈')).length).toBeGreaterThan(0);
   });
 
   it('新建退税单按钮已移除，详情跳转仍正常', async () => {

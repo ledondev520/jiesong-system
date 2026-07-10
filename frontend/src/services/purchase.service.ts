@@ -100,6 +100,18 @@ export interface ProductPriceHistory {
   history: { contractNo: string; price: number; date: string }[];
 }
 
+export type PurchaseProductionDetailPayload = {
+  id: string;
+  specification: string;
+  boxes: number | null;
+  grossWeight: number | null;
+  netWeight: number | null;
+  volume: number | null;
+  length: number | null;
+  width: number | null;
+  height: number | null;
+};
+
 /**
  * 采购服务（含报价解析与供应商查询）。
  */
@@ -128,6 +140,15 @@ export const purchaseService = {
       `/purchases/${id}/status`,
       { status },
     );
+  },
+
+  /** 批量保存供应商完工后的规格、箱数、重量、体积与可选单箱尺寸。 */
+  updateProductionDetails: async (id: string, items: PurchaseProductionDetailPayload[]) => {
+    return api.put<
+      ApiResponse<PurchaseContract>,
+      ApiResponse<PurchaseContract>,
+      { items: PurchaseProductionDetailPayload[] }
+    >(`/purchases/${id}/production-details`, { items });
   },
 
   /**

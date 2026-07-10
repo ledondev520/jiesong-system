@@ -282,6 +282,7 @@ model PurchaseContract {
   status       String   @default("DRAFT")
   signedAt     DateTime?
   expectedDate DateTime?
+  productionCompletedAt DateTime? // 生产资料完整并确认完工的时间
   invoiceNo    String?
   storeName    String?  // 发货店铺名称
   note         String?
@@ -308,6 +309,13 @@ model PurchaseItem {
   unitPrice          Float
   totalPrice         Float
   specification      String?
+  boxes              Int?     // 本采购明细总箱数
+  grossWeight        Float?   // 本采购明细总毛重 (kg)
+  netWeight          Float?   // 本采购明细总净重 (kg)
+  volume             Float?   // 本采购明细总体积 (CBM)
+  length             Float?   // 单箱长度 (mm)，可不填并由总体积/箱数推算
+  width              Float?   // 单箱宽度 (mm)
+  height             Float?   // 单箱高度 (mm)
   note               String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
@@ -315,6 +323,7 @@ model PurchaseItem {
   purchaseContract PurchaseContract @relation(fields: [purchaseContractId], references: [id], onDelete: Cascade)
   product          Product          @relation(fields: [productId], references: [id])
   inventories      Inventory[]
+  packingItems     PackingItem[]
 
   @@index([purchaseContractId])
   @@index([productId])
@@ -394,6 +403,7 @@ model SalesItem {
 model PackingItem {
   id              String   @id @default(cuid())
   salesContractId String   // 关联出口合同（即货柜）
+  purchaseItemId  String?  // 来源采购明细，允许一条采购明细拆分到多个货柜
   productId       String
   storeId         String?
   isOwnedByJiesong Boolean @default(true)
@@ -429,10 +439,13 @@ model PackingItem {
   updatedAt       DateTime @updatedAt
 
   salesContract SalesContract @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
+  purchaseItem  PurchaseItem? @relation(fields: [purchaseItemId], references: [id], onDelete: SetNull)
   customsDeclarationItems CustomsDeclarationItem[]
   product       Product       @relation(fields: [productId], references: [id])
   store         Store?        @relation(fields: [storeId], references: [id])
 
+  @@index([salesContractId])
+  @@index([purchaseItemId])
   @@map("packing_items")
 }
 
