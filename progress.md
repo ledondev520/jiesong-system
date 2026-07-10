@@ -1,5 +1,38 @@
 # 捷淞系统 UI 交互测试报告
 
+## 2026-07-10 Phase 7B：月度账表预览确认
+
+- **Status:** completed；Phase 8 最终审计进行中
+- 月度会计报表已改成唯一的“文件选择 → 只读预览 → 异常/平衡提示 → 明确覆盖 → 单事务写入”线路。
+- 删除重复报表区块、前端“扫描导入全部”、后端目录扫描路由/实现及陈旧性能场景；财务概览只保留前往专用报表页的入口。
+- 预览凭证绑定文件与账期，文件/年月改变后不能沿用；同账期必须单独确认覆盖。
+- 真实文件只读演练：21 个候选、13 个有效会计工作簿、13/13 可预览、12 个既有账期；数据库账期数 12 → 12，零写入。
+
+### Verification（阶段性）
+
+| Test | Actual | Status |
+| --- | --- | --- |
+| 后端目标测试 | `7/7` | PASS |
+| 前端目标测试 | `5 files / 11 tests` | PASS |
+| 后端全量测试 | `464/464` | PASS |
+| 数据库集成测试 | `3/3` | PASS |
+| 前端全量测试（独占复跑） | `163 files / 664 tests` | PASS |
+| TypeScript | `npx tsc --noEmit` | PASS |
+| 全量 ESLint | `0 errors / 4 existing warnings` | PASS |
+| 前端生产构建 | 51 个路由完成生成；保留既有 dev cockpit NFT warning | PASS |
+| migration 健康 | `21/21`，pending/blocking 均为 0 | PASS |
+| 旧目录导入路由 TDD RED | 新增删除契约后按预期失败：route index `12 !== -1` | EXPECTED RED |
+| 旧目录导入路由 TDD GREEN | 删除实现后 `2/2` route tests | PASS |
+| 应用内浏览器 | 报表 URL 可达，但会话随后重定向到“登录会话已过期”；未读取或注入认证资料 | DEFERRED |
+| diff check | 无空白错误 | PASS |
+
+### Error Log
+
+| Error | Attempt | Resolution |
+| --- | ---: | --- |
+| 根目录不存在 `package.json`，脚本清单读取报 `MODULE_NOT_FOUND` | 1 | 改为只读取真实存在的 `backend/package.json` 与 `frontend/package.json` |
+| 前端全量测试与后端/数据库/Lint 四路并发时，两个无关创建页用例超过 20 秒 | 1 | 不改代码；隔离复跑同两文件 `4/4` 通过，单个用例约 0.7-1.2 秒，确认是机器资源争用；全量测试改为独占复跑 |
+
 ## 2026-07-10 Phase 7A：单柜财务与现金流
 
 - **Status:** completed；Phase 7B 月度报表预览确认进行中

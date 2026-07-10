@@ -1136,13 +1136,6 @@ const cases = [
     body: () => ({ keyword: `NO_MATCH_${state.runId}` }),
   },
   {
-    id: 'finance_statements_import_folder_success',
-    category: 'import_success',
-    method: 'POST',
-    path: '/api/v1/finance/statements/import-folder',
-    body: () => ({}),
-  },
-  {
     id: 'system_patrol_trigger_success',
     category: 'write_success',
     method: 'POST',

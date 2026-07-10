@@ -1,7 +1,7 @@
 /**
  * Input: 财务控制器、财务报表控制器、multer
- * Output: 财务管理路由（付款记录 + 财务报表分析 + 文件上传导入）
- * Pos: 财务路由，处理付款记录、账款查询、财务报表导入与分析
+ * Output: 财务管理路由（付款记录 + 财务报表分析 + 文件预览确认导入）
+ * Pos: 财务路由，处理付款记录、账款查询，以及不可绕过预览的月报写入
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -20,8 +20,8 @@ const excelUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB 上限
   fileFilter: (req, file, cb) => {
-    if (!file.originalname.match(/\.(xlsx|xls)$/i)) {
-      return cb(new Error('只支持 .xlsx 或 .xls 格式的 Excel 文件'), false);
+    if (!file.originalname.match(/\.xlsx$/i)) {
+      return cb(new Error('只支持 .xlsx 格式的 Excel 文件'), false);
     }
     cb(null, true);
   },
@@ -81,19 +81,20 @@ router.post(
 // GET /api/v1/finance/statements/analytics - 获取趋势分析数据和预警列表（必须在 /:year/:month 之前注册）
 router.get('/statements/analytics', financialStatementsController.getAnalytics);
 
-// POST /api/v1/finance/statements/import-folder - 从本地目录批量导入账期 Excel
+// POST /api/v1/finance/statements/import-file/preview - 只读解析，不写数据库
 router.post(
-  '/statements/import-folder',
-  roleAuth('ADMIN', 'FINANCE'),
-  financialStatementsController.importFromFolder,
-);
-
-// POST /api/v1/finance/statements/import-file - 上传单个 Excel 文件导入指定账期
-router.post(
-  '/statements/import-file',
+  '/statements/import-file/preview',
   roleAuth('ADMIN', 'FINANCE'),
   excelUpload.single('file'),
-  financialStatementsController.importFile,
+  financialStatementsController.previewFile,
+);
+
+// POST /api/v1/finance/statements/import-file/confirm - 携预览凭证确认写入
+router.post(
+  '/statements/import-file/confirm',
+  roleAuth('ADMIN', 'FINANCE'),
+  excelUpload.single('file'),
+  financialStatementsController.confirmFile,
 );
 
 // GET /api/v1/finance/statements - 获取所有账期列表

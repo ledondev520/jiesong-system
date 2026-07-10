@@ -12,6 +12,7 @@ import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import {
   financialStatementsService,
   type AnalyticsData,
+  type FinancialStatementImportPreview,
   type FinancialPeriod,
 } from '@/services/financialStatements.service';
 import { toast } from 'sonner';
@@ -34,12 +35,14 @@ export function FinancialStatementsPageContent() {
   const [currentDetail, setCurrentDetail] = useState<FinancialPeriod | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadYear, setUploadYear] = useState(String(new Date().getFullYear()));
   const [uploadMonth, setUploadMonth] = useState(String(new Date().getMonth() + 1));
-  const [uploading, setUploading] = useState(false);
+  const [statementPreview, setStatementPreview] = useState<FinancialStatementImportPreview | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [overwriteConfirmed, setOverwriteConfirmed] = useState(false);
   const [showDrilldowns, setShowDrilldowns] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -94,55 +97,75 @@ export function FinancialStatementsPageContent() {
     }
   }, [selectedPeriod, loadDetail]);
 
-  const handleImport = async () => {
-    setImporting(true);
-    try {
-      const result = await financialStatementsService.importFromFolder();
-      toast.success(`导入完成：成功 ${result.imported} 个账期，跳过 ${result.skipped} 个`);
-      if (result.errors.length > 0) {
-        toast.warning(`${result.errors.length} 个账期导入失败：${result.errors[0]}`);
-      }
-      invalidateCache('fin-statements');
-      setSelectedPeriod('');
-      await loadData();
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : '导入失败';
-      toast.error(message);
-    } finally {
-      setImporting(false);
+  const getUploadPeriod = () => {
+    const year = parseInt(uploadYear, 10);
+    const month = parseInt(uploadMonth, 10);
+    if (Number.isNaN(year) || year < 2000 || year > 2099 || Number.isNaN(month) || month < 1 || month > 12) {
+      toast.error('请填写有效的年份（2000-2099）和月份（1-12）');
+      return null;
     }
+    return { year, month, periodLabel: `${year}年${month}账期` };
   };
 
-  const handleFileUpload = async () => {
+  const handleFilePreview = async () => {
     if (!uploadFile) {
       return;
     }
-
-    const year = parseInt(uploadYear, 10);
-    const month = parseInt(uploadMonth, 10);
-    if (Number.isNaN(year) || Number.isNaN(month) || month < 1 || month > 12) {
-      toast.error('请填写有效的年份（如 2025）和月份（1-12）');
-      return;
-    }
-
-    setUploading(true);
+    const period = getUploadPeriod();
+    if (!period) return;
+    setPreviewing(true);
     try {
-      const periodLabel = `${year}年${month}账期`;
-      const result = await financialStatementsService.importFile(uploadFile, year, month, periodLabel);
-      toast.success(result.message);
-      setUploadDialogOpen(false);
-      setUploadFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      setSelectedPeriod('');
-      await loadData();
-      setSelectedPeriod(`${year}-${month}`);
+      const preview = await financialStatementsService.previewFile(
+        uploadFile,
+        period.year,
+        period.month,
+        period.periodLabel,
+      );
+      setStatementPreview(preview);
+      setOverwriteConfirmed(false);
+      if (preview.ready) toast.success('解析完成，请核对后确认写入');
+      else toast.error(`解析发现 ${preview.blockers.length} 个阻塞项，暂不可写入`);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : '上传失败';
+      const message = error instanceof Error ? error.message : '解析失败';
       toast.error(message);
     } finally {
-      setUploading(false);
+      setPreviewing(false);
+    }
+  };
+
+  const resetUpload = () => {
+    setUploadFile(null);
+    setStatementPreview(null);
+    setOverwriteConfirmed(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleFileConfirm = async () => {
+    if (!uploadFile || !statementPreview) return;
+    const period = getUploadPeriod();
+    if (!period) return;
+    setConfirming(true);
+    try {
+      const result = await financialStatementsService.confirmFile(
+        uploadFile,
+        period.year,
+        period.month,
+        statementPreview.previewId,
+        overwriteConfirmed,
+        period.periodLabel,
+      );
+      toast.success(result.message);
+      setUploadDialogOpen(false);
+      resetUpload();
+      invalidateCache('fin-statements');
+      setSelectedPeriod('');
+      await loadData();
+      setSelectedPeriod(`${period.year}-${period.month}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '确认写入失败';
+      toast.error(message);
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -183,10 +206,8 @@ export function FinancialStatementsPageContent() {
             debtRatioVal={debtRatioVal}
             detailLoading={detailLoading}
             hasData={hasData}
-            importing={importing}
             latestBalanceSheet={latestBs}
             latestIncomeStatement={latestIs}
-            onImportAll={handleImport}
             onOpenUploadDialog={() => setUploadDialogOpen(true)}
             onSelectPeriod={setSelectedPeriod}
             periods={periods}
@@ -207,22 +228,37 @@ export function FinancialStatementsPageContent() {
 
           <FinancialStatementsUploadDialog
             open={uploadDialogOpen}
-            onOpenChange={setUploadDialogOpen}
-            uploadFile={uploadFile}
-            onUploadFileChange={setUploadFile}
-            uploadYear={uploadYear}
-            onYearChange={setUploadYear}
-            uploadMonth={uploadMonth}
-            onMonthChange={setUploadMonth}
-            uploading={uploading}
-            onSubmit={handleFileUpload}
-            fileInputRef={fileInputRef}
-            onClearFile={() => {
-              setUploadFile(null);
-              if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-              }
+            onOpenChange={(open) => {
+              setUploadDialogOpen(open);
+              if (!open) resetUpload();
             }}
+            uploadFile={uploadFile}
+            onUploadFileChange={(file) => {
+              setUploadFile(file);
+              setStatementPreview(null);
+              setOverwriteConfirmed(false);
+            }}
+            uploadYear={uploadYear}
+            onYearChange={(value) => {
+              setUploadYear(value);
+              setStatementPreview(null);
+              setOverwriteConfirmed(false);
+            }}
+            uploadMonth={uploadMonth}
+            onMonthChange={(value) => {
+              setUploadMonth(value);
+              setStatementPreview(null);
+              setOverwriteConfirmed(false);
+            }}
+            preview={statementPreview}
+            previewing={previewing}
+            confirming={confirming}
+            overwriteConfirmed={overwriteConfirmed}
+            onOverwriteConfirmedChange={setOverwriteConfirmed}
+            onPreview={handleFilePreview}
+            onConfirm={handleFileConfirm}
+            fileInputRef={fileInputRef}
+            onClearFile={resetUpload}
           />
         </>
       )}

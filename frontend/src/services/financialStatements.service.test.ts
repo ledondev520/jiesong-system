@@ -17,16 +17,6 @@ describe('financialStatementsService', () => {
     vi.clearAllMocks();
   });
 
-  it('应该从文件夹导入', async () => {
-    const mockResponse = { code: 200, data: { imported: 5, skipped: 0, errors: [] } };
-    vi.mocked(api.post).mockResolvedValueOnce(mockResponse);
-
-    const result = await financialStatementsService.importFromFolder();
-
-    expect(api.post).toHaveBeenCalledWith('/finance/statements/import-folder');
-    expect(result.imported).toBe(5);
-  });
-
   it('应该获取账期列表', async () => {
     const mockResponse = { code: 200, data: [{ id: '1', year: 2024, month: 1 }] };
     vi.mocked(api.get).mockResolvedValueOnce(mockResponse);
@@ -57,14 +47,42 @@ describe('financialStatementsService', () => {
     expect(result.totalPeriods).toBe(10);
   });
 
-  it('应该导入文件', async () => {
+  it('应该先上传文件生成只读预览', async () => {
     const mockFile = new File(['content'], 'test.xlsx');
-    const mockResponse = { code: 200, message: '导入成功', data: { imported: 1, skipped: 0, errors: [] } };
+    const mockResponse = { code: 200, message: '预览完成', data: { previewId: 'preview-1', ready: true } };
     vi.mocked(api.post).mockResolvedValueOnce(mockResponse);
 
-    const result = await financialStatementsService.importFile(mockFile, 2024, 1);
+    const result = await financialStatementsService.previewFile(mockFile, 2024, 1);
 
-    expect(api.post).toHaveBeenCalled();
-    expect(result.message).toBe('导入成功');
+    expect(api.post).toHaveBeenCalledWith(
+      '/finance/statements/import-file/preview',
+      expect.any(FormData),
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    expect(result.previewId).toBe('preview-1');
+  });
+
+  it('应该携带预览凭证明确确认写入', async () => {
+    const mockFile = new File(['content'], 'test.xlsx');
+    const mockResponse = { code: 200, message: '确认导入成功', data: { imported: 1, overwritten: true } };
+    vi.mocked(api.post).mockResolvedValueOnce(mockResponse);
+
+    const result = await financialStatementsService.confirmFile(
+      mockFile,
+      2024,
+      1,
+      'preview-1',
+      true,
+    );
+
+    expect(api.post).toHaveBeenCalledWith(
+      '/finance/statements/import-file/confirm',
+      expect.any(FormData),
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    const formData = vi.mocked(api.post).mock.calls[0][1] as FormData;
+    expect(formData.get('previewId')).toBe('preview-1');
+    expect(formData.get('allowOverwrite')).toBe('true');
+    expect(result.message).toBe('确认导入成功');
   });
 });

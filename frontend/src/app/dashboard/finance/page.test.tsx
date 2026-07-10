@@ -1,5 +1,5 @@
 /**
- * Input: 财务概览页面、finance stats API、system exchange-rate API、financial statements API
+ * Input: 财务概览页面、finance stats、汇率、银行流水和发票统计 Interface
  * Output: 财务概览页交互逻辑测试结果
  * Pos: 前端业务页交互测试
  *
@@ -14,11 +14,6 @@ const mockGetStats = vi.fn();
 const mockApiGet = vi.fn();
 const mockGetTransactionStats = vi.fn();
 const mockGetInvoiceStats = vi.fn();
-const mockGetAnalytics = vi.fn();
-const mockListStatements = vi.fn();
-const mockGetStatementDetail = vi.fn();
-const mockImportFromFolder = vi.fn();
-const mockImportFile = vi.fn();
 
 vi.mock('@/services/finance.service', () => ({
   financeService: {
@@ -35,16 +30,6 @@ vi.mock('@/lib/axios', () => ({
 vi.mock('@/services/bankFlow.service', () => ({
   getTransactionStats: (...args: unknown[]) => mockGetTransactionStats(...args),
   getInvoiceStats: (...args: unknown[]) => mockGetInvoiceStats(...args),
-}));
-
-vi.mock('@/services/financialStatements.service', () => ({
-  financialStatementsService: {
-    getAnalytics: (...args: unknown[]) => mockGetAnalytics(...args),
-    listStatements: (...args: unknown[]) => mockListStatements(...args),
-    getStatementDetail: (...args: unknown[]) => mockGetStatementDetail(...args),
-    importFromFolder: (...args: unknown[]) => mockImportFromFolder(...args),
-    importFile: (...args: unknown[]) => mockImportFile(...args),
-  },
 }));
 
 vi.mock('next/navigation', () => ({
@@ -66,11 +51,6 @@ describe('FinancePage 交互逻辑', () => {
     mockApiGet.mockReset();
     mockGetTransactionStats.mockReset();
     mockGetInvoiceStats.mockReset();
-    mockGetAnalytics.mockReset();
-    mockListStatements.mockReset();
-    mockGetStatementDetail.mockReset();
-    mockImportFromFolder.mockReset();
-    mockImportFile.mockReset();
     mockGetTransactionStats.mockResolvedValue({ totalIn: 0, totalOut: 0, netFlow: 0, txnCount: 0 });
     mockGetInvoiceStats.mockResolvedValue({
       validTotal: 0,
@@ -80,101 +60,6 @@ describe('FinancePage 交互逻辑', () => {
       reversedCount: 0,
       totalCount: 0,
     });
-    const balanceSheet = {
-      id: 'bs-1',
-      periodId: 'period-1',
-      cashAndEquivalents: 80000,
-      shortTermInvestments: 0,
-      accountsReceivable: 120000,
-      prepaidExpenses: 10000,
-      otherReceivables: 5000,
-      inventory: 45000,
-      totalCurrentAssets: 260000,
-      totalNonCurrentAssets: 240000,
-      totalAssets: 500000,
-      accountsPayable: 90000,
-      advancedReceipts: 0,
-      staffWagesPayable: 12000,
-      taxesPayable: 8000,
-      otherPayables: 5000,
-      totalCurrentLiabilities: 115000,
-      totalNonCurrentLiabilities: 85000,
-      totalLiabilities: 200000,
-      paidInCapital: 200000,
-      capitalReserve: 20000,
-      surplusReserve: 10000,
-      retainedEarnings: 70000,
-      totalEquity: 300000,
-    };
-    const incomeStatement = {
-      id: 'is-1',
-      periodId: 'period-1',
-      revenueMonth: 100000,
-      costOfSalesMonth: 40000,
-      taxesMonth: 3000,
-      sellingExpensesMonth: 5000,
-      adminExpensesMonth: 10000,
-      financialExpensesMonth: 3000,
-      investmentIncomeMonth: 0,
-      operatingProfitMonth: 42000,
-      nonOperatingIncomeMonth: 0,
-      nonOperatingExpensesMonth: 0,
-      totalProfitMonth: 42000,
-      incomeTaxMonth: 7000,
-      netProfitMonth: 35000,
-      revenueYTD: 100000,
-      costOfSalesYTD: 40000,
-      taxesYTD: 3000,
-      sellingExpensesYTD: 5000,
-      adminExpensesYTD: 10000,
-      financialExpensesYTD: 3000,
-      investmentIncomeYTD: 0,
-      operatingProfitYTD: 42000,
-      nonOperatingIncomeYTD: 0,
-      nonOperatingExpensesYTD: 0,
-      totalProfitYTD: 42000,
-      incomeTaxYTD: 7000,
-      netProfitYTD: 35000,
-    };
-    const period = {
-      id: 'period-1',
-      year: 2025,
-      month: 1,
-      periodLabel: '2025年1月',
-      reportDate: '2025-01-31',
-      importedAt: '2025-02-01',
-      balanceSheet,
-      incomeStatement,
-    };
-    const analytics = {
-      trends: [
-        {
-          label: '2025-01',
-          year: 2025,
-          month: 1,
-          revenue: 100000,
-          costOfSales: 40000,
-          adminExpenses: 10000,
-          financialExpenses: 3000,
-          sellingExpenses: 5000,
-          operatingProfit: 42000,
-          netProfit: 35000,
-          totalAssets: 500000,
-          totalLiabilities: 200000,
-          totalEquity: 300000,
-          cash: 80000,
-          debtRatio: 0.4,
-        },
-      ],
-      alerts: [],
-      historicalAlerts: [],
-      latestPeriod: {
-        periodLabel: '2025年1月',
-        balanceSheet,
-        incomeStatement,
-      },
-      totalPeriods: 1,
-    };
     mockApiGet.mockImplementation((url: string) => {
       if (url.includes('/system/exchange-rate')) {
         return Promise.resolve({
@@ -192,20 +77,8 @@ describe('FinancePage 交互逻辑', () => {
       if (url.includes('/finance/overdue-receivables')) {
         return Promise.resolve({ data: [] });
       }
-      if (url.includes('/finance/statements/analytics')) {
-        return Promise.resolve({ code: 200, data: analytics });
-      }
-      if (url.includes('/finance/statements/2025/1')) {
-        return Promise.resolve({ code: 200, data: period });
-      }
-      if (url.includes('/finance/statements')) {
-        return Promise.resolve({ code: 200, data: [period] });
-      }
       return Promise.resolve({ data: null });
     });
-    mockGetAnalytics.mockResolvedValue(analytics);
-    mockListStatements.mockResolvedValue([period]);
-    mockGetStatementDetail.mockResolvedValue(period);
   });
 
   it('加载完成后展示统计信息', async () => {

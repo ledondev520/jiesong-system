@@ -1,21 +1,15 @@
 /**
- * Input: Excel 会计报表文件路径 / Prisma 数据库
- * Output: 财务报表数据（资产负债表、利润表）的 CRUD、批量导入、趋势分析、预警
- * Pos: 财务报表业务服务层，负责 Excel 解析、幂等写入、智能预警计算
+ * Input: Excel 会计报表 Buffer、账期与 Prisma 数据库
+ * Output: 只读解析预览、确认后事务写入、财务报表查询、趋势分析和预警
+ * Pos: 财务报表业务服务层；上传文件必须跨越“预览 → 明确确认”Interface 后才能写库
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-const fs = require('fs');
-const path = require('path');
+const crypto = require('crypto');
 const ExcelJS = require('exceljs');
 const prisma = require('../utils/prisma');
-
-// 会计报表所在根目录；巡检和部署环境可通过环境变量提供，不再绑定单一本机路径。
-const DEFAULT_STATEMENTS_FOLDER =
-  '/Users/helena/Documents/上海捷淞国际物流有限公司20260213100830';
-const getStatementsFolder = () =>
-  process.env.FINANCIAL_STATEMENTS_FOLDER || DEFAULT_STATEMENTS_FOLDER;
+const { createError } = require('../middleware/errorHandler');
 
 // ==================== Excel 解析工具 ====================
 
@@ -98,18 +92,6 @@ function toNum(val) {
 }
 
 /**
- * 职责：从文件夹名称中提取年份和月份
- * 思路：匹配 "2025年6账期" 格式
- * @param {string} folderName
- * @returns {{ year: number, month: number } | null}
- */
-function extractPeriodFromFolder(folderName) {
-  const match = folderName.match(/(\d{4})年(\d{1,2})账期/);
-  if (!match) return null;
-  return { year: parseInt(match[1]), month: parseInt(match[2]) };
-}
-
-/**
  * 职责：根据年月计算期末日期（该月最后一天）
  * @param {number} year
  * @param {number} month
@@ -119,169 +101,221 @@ function getLastDayOfMonth(year, month) {
   return new Date(year, month, 0); // Day 0 of next month = last day of current
 }
 
-// ==================== 导入核心逻辑 ====================
+const formatPeriodEnd = (year, month) => {
+  const day = getLastDayOfMonth(year, month).getDate();
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+};
 
-/**
- * 职责：扫描会计报表根目录，解析所有月份 Excel，幂等写入数据库
- * 思路：
- *   1. 遍历子目录，提取年月信息
- *   2. 找到对应的 Excel 文件
- *   3. 用 ExcelJS 读取三个 sheet
- *   4. upsert FinancialPeriod -> BalanceSheetEntry -> IncomeStatementEntry
- * @returns {{ imported: number, skipped: number, errors: string[] }}
- */
-async function importFromFolder() {
-  const results = { imported: 0, skipped: 0, errors: [] };
-  const statementsFolder = getStatementsFolder();
+const buildBalanceSheetData = (bsMap) => ({
+  cashAndEquivalents: bsMap['1']?.end ?? null,
+  shortTermInvestments: bsMap['2']?.end ?? null,
+  accountsReceivable: bsMap['4']?.end ?? null,
+  prepaidExpenses: bsMap['5']?.end ?? null,
+  otherReceivables: bsMap['8']?.end ?? null,
+  inventory: bsMap['9']?.end ?? null,
+  totalCurrentAssets: bsMap['15']?.end ?? null,
+  totalNonCurrentAssets: bsMap['29']?.end ?? null,
+  totalAssets: bsMap['30']?.end ?? null,
+  accountsPayable: bsMap['33']?.end ?? null,
+  advancedReceipts: bsMap['34']?.end ?? null,
+  staffWagesPayable: bsMap['35']?.end ?? null,
+  taxesPayable: bsMap['36']?.end ?? null,
+  otherPayables: bsMap['39']?.end ?? null,
+  totalCurrentLiabilities: bsMap['41']?.end ?? null,
+  totalNonCurrentLiabilities: bsMap['46']?.end ?? null,
+  totalLiabilities: bsMap['47']?.end ?? null,
+  paidInCapital: bsMap['48']?.end ?? null,
+  capitalReserve: bsMap['49']?.end ?? null,
+  surplusReserve: bsMap['50']?.end ?? null,
+  retainedEarnings: bsMap['51']?.end ?? null,
+  totalEquity: bsMap['52']?.end ?? null,
+});
 
-  if (!fs.existsSync(statementsFolder)) {
-    throw new Error(`会计报表目录不存在: ${statementsFolder}`);
-  }
+const buildIncomeStatementData = (isMap) => ({
+  revenueMonth: isMap['1']?.month ?? null,
+  costOfSalesMonth: isMap['2']?.month ?? null,
+  taxesMonth: isMap['3']?.month ?? null,
+  sellingExpensesMonth: isMap['11']?.month ?? null,
+  adminExpensesMonth: isMap['14']?.month ?? null,
+  financialExpensesMonth: isMap['18']?.month ?? null,
+  investmentIncomeMonth: isMap['20']?.month ?? null,
+  operatingProfitMonth: isMap['21']?.month ?? null,
+  nonOperatingIncomeMonth: isMap['22']?.month ?? null,
+  nonOperatingExpensesMonth: isMap['24']?.month ?? null,
+  totalProfitMonth: isMap['30']?.month ?? null,
+  incomeTaxMonth: isMap['31']?.month ?? null,
+  netProfitMonth: isMap['32']?.month ?? null,
+  revenueYTD: isMap['1']?.ytd ?? null,
+  costOfSalesYTD: isMap['2']?.ytd ?? null,
+  taxesYTD: isMap['3']?.ytd ?? null,
+  sellingExpensesYTD: isMap['11']?.ytd ?? null,
+  adminExpensesYTD: isMap['14']?.ytd ?? null,
+  financialExpensesYTD: isMap['18']?.ytd ?? null,
+  investmentIncomeYTD: isMap['20']?.ytd ?? null,
+  operatingProfitYTD: isMap['21']?.ytd ?? null,
+  nonOperatingIncomeYTD: isMap['22']?.ytd ?? null,
+  nonOperatingExpensesYTD: isMap['24']?.ytd ?? null,
+  totalProfitYTD: isMap['30']?.ytd ?? null,
+  incomeTaxYTD: isMap['31']?.ytd ?? null,
+  netProfitYTD: isMap['32']?.ytd ?? null,
+});
 
-  const entries = fs.readdirSync(statementsFolder, { withFileTypes: true });
-  const periodFolders = entries
-    .filter((e) => e.isDirectory())
-    .map((e) => e.name)
-    .filter((name) => /\d{4}年\d{1,2}账期/.test(name))
-    .sort();
-
-  for (const folderName of periodFolders) {
-    try {
-      const period = extractPeriodFromFolder(folderName);
-      if (!period) {
-        results.skipped++;
-        continue;
-      }
-
-      const folderPath = path.join(statementsFolder, folderName);
-      const files = fs.readdirSync(folderPath).filter((f) => f.endsWith('.xlsx'));
-      if (files.length === 0) {
-        results.skipped++;
-        continue;
-      }
-
-      const xlsxPath = path.join(folderPath, files[0]);
-      await importSingleFile(xlsxPath, period.year, period.month, folderName);
-      results.imported++;
-    } catch (err) {
-      results.errors.push(`${folderName}: ${err.message}`);
-    }
-  }
-
-  return results;
-}
-
-/**
- * 职责：解析单个 Excel 文件并写入数据库
- * @param {string} filePath - Excel 文件绝对路径
- * @param {number} year
- * @param {number} month
- * @param {string} periodLabel - 显示标签，如 "2025年1账期"
- */
-async function importSingleFile(filePath, year, month, periodLabel) {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(filePath);
-
+const parseWorkbook = (workbook) => {
   const bsSheet = workbook.getWorksheet('资产负债表');
   const isSheet = workbook.getWorksheet('利润表');
-
   if (!bsSheet || !isSheet) {
-    throw new Error('缺少必要的 sheet（资产负债表 或 利润表）');
+    throw createError('文件缺少必要的 Sheet（资产负债表、利润表）', 400);
+  }
+  return {
+    balanceSheet: buildBalanceSheetData(parseBalanceSheet(bsSheet)),
+    incomeStatement: buildIncomeStatementData(parseIncomeStatement(isSheet)),
+  };
+};
+
+const parseStatementBuffer = async (buffer) => {
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    throw createError('会计报表文件为空', 400);
+  }
+  const workbook = new ExcelJS.Workbook();
+  try {
+    await workbook.xlsx.load(buffer);
+  } catch {
+    throw createError('无法解析会计报表，请确认文件是有效的 .xlsx 工作簿', 400);
+  }
+  return parseWorkbook(workbook);
+};
+
+const createPreviewId = (buffer, year, month, periodLabel) => crypto
+  .createHash('sha256')
+  .update(buffer)
+  .update(JSON.stringify({ year, month, periodLabel }))
+  .digest('hex');
+
+const countPopulatedFields = (record) => Object.values(record).filter((value) => value !== null).length;
+const roundMoney = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+
+const buildStatementPreview = ({
+  buffer,
+  year,
+  month,
+  periodLabel,
+  parsed,
+  existing,
+}) => {
+  const { balanceSheet, incomeStatement } = parsed;
+  const blockers = [];
+  const warnings = [];
+  [
+    ['资产总计', balanceSheet.totalAssets],
+    ['负债合计', balanceSheet.totalLiabilities],
+    ['所有者权益合计', balanceSheet.totalEquity],
+  ].forEach(([label, value]) => {
+    if (value === null) blockers.push(`缺少关键科目：${label}`);
+  });
+  const profitValues = [
+    incomeStatement.revenueMonth,
+    incomeStatement.costOfSalesMonth,
+    incomeStatement.netProfitMonth,
+  ];
+  if (profitValues.every((value) => value === null)) {
+    blockers.push('利润表未识别到本月营业收入、营业成本或净利润');
+  } else {
+    if (incomeStatement.revenueMonth === null) warnings.push('本月营业收入为空，保留为空值并在报表分析中按 0 展示');
+    if (incomeStatement.costOfSalesMonth === null) warnings.push('本月营业成本为空，保留为空值并在报表分析中按 0 展示');
+    if (incomeStatement.netProfitMonth === null) warnings.push('本月净利润为空，保留为空值并在报表分析中按 0 展示');
   }
 
-  const bsMap = parseBalanceSheet(bsSheet);
-  const isMap = parseIncomeStatement(isSheet);
+  const accountingEquationDifference = (
+    balanceSheet.totalAssets === null
+    || balanceSheet.totalLiabilities === null
+    || balanceSheet.totalEquity === null
+  ) ? null : roundMoney(
+    balanceSheet.totalAssets - balanceSheet.totalLiabilities - balanceSheet.totalEquity,
+  );
+  if (accountingEquationDifference !== null && Math.abs(accountingEquationDifference) > 1) {
+    blockers.push(`资产负债表不平衡，资产与负债加权益相差 CNY ${accountingEquationDifference.toFixed(2)}`);
+  }
+  if (existing) warnings.push(`账期 ${periodLabel} 已存在，确认后将覆盖更新原账期`);
 
-  const reportDate = getLastDayOfMonth(year, month);
+  const costStructure = {
+    costOfSales: Number(incomeStatement.costOfSalesMonth || 0),
+    taxes: Number(incomeStatement.taxesMonth || 0),
+    sellingExpenses: Number(incomeStatement.sellingExpensesMonth || 0),
+    adminExpenses: Number(incomeStatement.adminExpensesMonth || 0),
+    financialExpenses: Number(incomeStatement.financialExpensesMonth || 0),
+  };
+  costStructure.total = roundMoney(Object.values(costStructure).reduce((sum, value) => sum + value, 0));
 
-  // 1. Upsert FinancialPeriod
-  const fp = await prisma.financialPeriod.upsert({
-    where: { year_month: { year, month } },
-    create: {
+  return {
+    previewId: createPreviewId(buffer, year, month, periodLabel),
+    ready: blockers.length === 0,
+    period: {
       year,
       month,
       periodLabel,
+      reportDate: formatPeriodEnd(year, month),
+      existing: Boolean(existing),
+    },
+    summary: {
+      balanceSheetFieldCount: countPopulatedFields(balanceSheet),
+      incomeStatementFieldCount: countPopulatedFields(incomeStatement),
+      totalAssets: balanceSheet.totalAssets,
+      totalLiabilities: balanceSheet.totalLiabilities,
+      totalEquity: balanceSheet.totalEquity,
+      accountingEquationDifference,
+      revenueMonth: incomeStatement.revenueMonth,
+      costOfSalesMonth: incomeStatement.costOfSalesMonth,
+      netProfitMonth: incomeStatement.netProfitMonth,
+      costStructure,
+    },
+    blockers,
+    warnings,
+    balanceSheet,
+    incomeStatement,
+  };
+};
+
+const previewFromBuffer = async (
+  buffer,
+  year,
+  month,
+  periodLabel,
+  prismaClient = prisma,
+) => {
+  const parsed = await parseStatementBuffer(buffer);
+  const existing = await prismaClient.financialPeriod.findUnique({
+    where: { year_month: { year, month } },
+    select: { id: true },
+  });
+  return buildStatementPreview({ buffer, year, month, periodLabel, parsed, existing });
+};
+
+const persistStatement = async (preview, prismaClient = prisma) => prismaClient.$transaction(async (tx) => {
+  const reportDate = getLastDayOfMonth(preview.period.year, preview.period.month);
+  const fp = await tx.financialPeriod.upsert({
+    where: { year_month: { year: preview.period.year, month: preview.period.month } },
+    update: { periodLabel: preview.period.periodLabel, reportDate, updatedAt: new Date() },
+    create: {
+      year: preview.period.year,
+      month: preview.period.month,
+      periodLabel: preview.period.periodLabel,
       reportDate,
     },
-    update: {
-      periodLabel,
-      reportDate,
-      updatedAt: new Date(),
-    },
   });
-
-  // 2. Upsert BalanceSheetEntry
-  const bsData = {
-    periodId: fp.id,
-    cashAndEquivalents:          bsMap['1']?.end ?? null,
-    shortTermInvestments:        bsMap['2']?.end ?? null,
-    accountsReceivable:          bsMap['4']?.end ?? null,
-    prepaidExpenses:             bsMap['5']?.end ?? null,
-    otherReceivables:            bsMap['8']?.end ?? null,
-    inventory:                   bsMap['9']?.end ?? null,
-    totalCurrentAssets:          bsMap['15']?.end ?? null,
-    totalNonCurrentAssets:       bsMap['29']?.end ?? null,
-    totalAssets:                 bsMap['30']?.end ?? null,
-    accountsPayable:             bsMap['33']?.end ?? null,
-    advancedReceipts:            bsMap['34']?.end ?? null,
-    staffWagesPayable:           bsMap['35']?.end ?? null,
-    taxesPayable:                bsMap['36']?.end ?? null,
-    otherPayables:               bsMap['39']?.end ?? null,
-    totalCurrentLiabilities:     bsMap['41']?.end ?? null,
-    totalNonCurrentLiabilities:  bsMap['46']?.end ?? null,
-    totalLiabilities:            bsMap['47']?.end ?? null,
-    paidInCapital:               bsMap['48']?.end ?? null,
-    capitalReserve:              bsMap['49']?.end ?? null,
-    surplusReserve:              bsMap['50']?.end ?? null,
-    retainedEarnings:            bsMap['51']?.end ?? null,
-    totalEquity:                 bsMap['52']?.end ?? null,
-  };
-
-  await prisma.balanceSheetEntry.upsert({
+  const balanceData = { periodId: fp.id, ...preview.balanceSheet };
+  const incomeData = { periodId: fp.id, ...preview.incomeStatement };
+  await tx.balanceSheetEntry.upsert({
     where: { periodId: fp.id },
-    create: bsData,
-    update: { ...bsData },
+    create: balanceData,
+    update: preview.balanceSheet,
   });
-
-  // 3. Upsert IncomeStatementEntry
-  const isData = {
-    periodId: fp.id,
-    // 本月金额
-    revenueMonth:               isMap['1']?.month ?? null,
-    costOfSalesMonth:           isMap['2']?.month ?? null,
-    taxesMonth:                 isMap['3']?.month ?? null,
-    sellingExpensesMonth:       isMap['11']?.month ?? null,
-    adminExpensesMonth:         isMap['14']?.month ?? null,
-    financialExpensesMonth:     isMap['18']?.month ?? null,
-    investmentIncomeMonth:      isMap['20']?.month ?? null,
-    operatingProfitMonth:       isMap['21']?.month ?? null,
-    nonOperatingIncomeMonth:    isMap['22']?.month ?? null,
-    nonOperatingExpensesMonth:  isMap['24']?.month ?? null,
-    totalProfitMonth:           isMap['30']?.month ?? null,
-    incomeTaxMonth:             isMap['31']?.month ?? null,
-    netProfitMonth:             isMap['32']?.month ?? null,
-    // 本年累计
-    revenueYTD:                 isMap['1']?.ytd ?? null,
-    costOfSalesYTD:             isMap['2']?.ytd ?? null,
-    taxesYTD:                   isMap['3']?.ytd ?? null,
-    sellingExpensesYTD:         isMap['11']?.ytd ?? null,
-    adminExpensesYTD:           isMap['14']?.ytd ?? null,
-    financialExpensesYTD:       isMap['18']?.ytd ?? null,
-    investmentIncomeYTD:        isMap['20']?.ytd ?? null,
-    operatingProfitYTD:         isMap['21']?.ytd ?? null,
-    nonOperatingIncomeYTD:      isMap['22']?.ytd ?? null,
-    nonOperatingExpensesYTD:    isMap['24']?.ytd ?? null,
-    totalProfitYTD:             isMap['30']?.ytd ?? null,
-    incomeTaxYTD:               isMap['31']?.ytd ?? null,
-    netProfitYTD:               isMap['32']?.ytd ?? null,
-  };
-
-  await prisma.incomeStatementEntry.upsert({
+  await tx.incomeStatementEntry.upsert({
     where: { periodId: fp.id },
-    create: isData,
-    update: { ...isData },
+    create: incomeData,
+    update: preview.incomeStatement,
   });
-}
+  return fp;
+});
 
 // ==================== 查询逻辑 ====================
 
@@ -510,113 +544,36 @@ async function getAnalytics() {
   };
 }
 
-/**
- * 职责：从 Buffer（上传的 Excel 文件）解析并导入指定账期
- * 思路：用 ExcelJS 读取 buffer，复用与 importSingleFile 相同的解析与 upsert 逻辑
- * @param {Buffer} buffer - 上传的 Excel 文件 buffer
- * @param {number} year - 账期年份
- * @param {number} month - 账期月份
- * @param {string} periodLabel - 显示标签，如 "2025年12账期"
- * @returns {{ imported: number, skipped: number, errors: string[] }}
- */
-async function importFromBuffer(buffer, year, month, periodLabel) {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
-
-  const bsSheet = workbook.getWorksheet('资产负债表');
-  const isSheet = workbook.getWorksheet('利润表');
-
-  if (!bsSheet || !isSheet) {
-    throw new Error('文件缺少必要的 sheet（资产负债表 或 利润表），请确认上传的是三表 Excel 文件');
+/** 用户上传确认入口：重算预览凭证、验证覆盖意图，再在单事务中写入三张表。 */
+async function confirmImportFromBuffer(
+  buffer,
+  year,
+  month,
+  periodLabel,
+  { previewId, allowOverwrite = false } = {},
+  prismaClient = prisma,
+) {
+  const preview = await previewFromBuffer(buffer, year, month, periodLabel, prismaClient);
+  if (!previewId || preview.previewId !== previewId) {
+    throw createError('预览已失效，请重新解析当前文件和账期', 409);
   }
-
-  const bsMap = parseBalanceSheet(bsSheet);
-  const isMap = parseIncomeStatement(isSheet);
-  const reportDate = getLastDayOfMonth(year, month);
-
-  // 1. Upsert FinancialPeriod
-  const fp = await prisma.financialPeriod.upsert({
-    where: { year_month: { year, month } },
-    update: { periodLabel, reportDate, updatedAt: new Date() },
-    create: { year, month, periodLabel, reportDate },
-  });
-
-  // 2. Upsert BalanceSheetEntry
-  const bsData = {
-    periodId: fp.id,
-    cashAndEquivalents:         bsMap['1']?.end ?? null,
-    shortTermInvestments:       bsMap['2']?.end ?? null,
-    accountsReceivable:         bsMap['4']?.end ?? null,
-    prepaidExpenses:            bsMap['5']?.end ?? null,
-    otherReceivables:           bsMap['8']?.end ?? null,
-    inventory:                  bsMap['9']?.end ?? null,
-    totalCurrentAssets:         bsMap['15']?.end ?? null,
-    totalNonCurrentAssets:      bsMap['29']?.end ?? null,
-    totalAssets:                bsMap['30']?.end ?? null,
-    accountsPayable:            bsMap['33']?.end ?? null,
-    advancedReceipts:           bsMap['34']?.end ?? null,
-    staffWagesPayable:          bsMap['35']?.end ?? null,
-    taxesPayable:               bsMap['36']?.end ?? null,
-    otherPayables:              bsMap['39']?.end ?? null,
-    totalCurrentLiabilities:    bsMap['41']?.end ?? null,
-    totalNonCurrentLiabilities: bsMap['46']?.end ?? null,
-    totalLiabilities:           bsMap['47']?.end ?? null,
-    paidInCapital:              bsMap['48']?.end ?? null,
-    capitalReserve:             bsMap['49']?.end ?? null,
-    surplusReserve:             bsMap['50']?.end ?? null,
-    retainedEarnings:           bsMap['51']?.end ?? null,
-    totalEquity:                bsMap['52']?.end ?? null,
+  if (!preview.ready) throw createError(preview.blockers.join('；'), 400);
+  if (preview.period.existing && !allowOverwrite) {
+    throw createError(`账期 ${periodLabel} 已存在，请明确确认覆盖后再写入`, 409);
+  }
+  await persistStatement(preview, prismaClient);
+  return {
+    imported: 1,
+    skipped: 0,
+    errors: [],
+    overwritten: preview.period.existing,
+    period: preview.period,
   };
-  await prisma.balanceSheetEntry.upsert({
-    where: { periodId: fp.id },
-    create: bsData,
-    update: { ...bsData },
-  });
-
-  // 3. Upsert IncomeStatementEntry
-  const isData = {
-    periodId: fp.id,
-    revenueMonth:               isMap['1']?.month ?? null,
-    costOfSalesMonth:           isMap['2']?.month ?? null,
-    taxesMonth:                 isMap['3']?.month ?? null,
-    sellingExpensesMonth:       isMap['11']?.month ?? null,
-    adminExpensesMonth:         isMap['14']?.month ?? null,
-    financialExpensesMonth:     isMap['18']?.month ?? null,
-    investmentIncomeMonth:      isMap['20']?.month ?? null,
-    operatingProfitMonth:       isMap['21']?.month ?? null,
-    nonOperatingIncomeMonth:    isMap['22']?.month ?? null,
-    nonOperatingExpensesMonth:  isMap['24']?.month ?? null,
-    totalProfitMonth:           isMap['30']?.month ?? null,
-    incomeTaxMonth:             isMap['31']?.month ?? null,
-    netProfitMonth:             isMap['32']?.month ?? null,
-    revenueYTD:                 isMap['1']?.ytd ?? null,
-    costOfSalesYTD:             isMap['2']?.ytd ?? null,
-    taxesYTD:                   isMap['3']?.ytd ?? null,
-    sellingExpensesYTD:         isMap['11']?.ytd ?? null,
-    adminExpensesYTD:           isMap['14']?.ytd ?? null,
-    financialExpensesYTD:       isMap['18']?.ytd ?? null,
-    investmentIncomeYTD:        isMap['20']?.ytd ?? null,
-    operatingProfitYTD:         isMap['21']?.ytd ?? null,
-    nonOperatingIncomeYTD:      isMap['22']?.ytd ?? null,
-    nonOperatingExpensesYTD:    isMap['24']?.ytd ?? null,
-    totalProfitYTD:             isMap['30']?.ytd ?? null,
-    incomeTaxYTD:               isMap['31']?.ytd ?? null,
-    netProfitYTD:               isMap['32']?.ytd ?? null,
-  };
-  await prisma.incomeStatementEntry.upsert({
-    where: { periodId: fp.id },
-    create: isData,
-    update: { ...isData },
-  });
-
-  return { imported: 1, skipped: 0, errors: [] };
 }
 
 module.exports = {
-  getStatementsFolder,
-  importFromFolder,
-  importSingleFile,
-  importFromBuffer,
+  previewFromBuffer,
+  confirmImportFromBuffer,
   listPeriods,
   getPeriodDetail,
   getAnalytics,

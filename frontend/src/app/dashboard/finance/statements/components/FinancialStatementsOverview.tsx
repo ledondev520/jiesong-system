@@ -23,7 +23,6 @@ import {
   DollarSign,
   Loader2,
   Package,
-  RefreshCw,
   Scale,
   TrendingDown,
   TrendingUp,
@@ -85,10 +84,8 @@ interface FinancialStatementsOverviewProps {
   debtRatioVal: number | null;
   detailLoading: boolean;
   hasData: boolean;
-  importing: boolean;
   latestBalanceSheet: StatementsBalanceSheet | null | undefined;
   latestIncomeStatement: StatementsIncomeStatement | null | undefined;
-  onImportAll: () => void;
   onOpenUploadDialog: () => void;
   onSelectPeriod: (value: string) => void;
   periods: FinancialPeriod[];
@@ -116,10 +113,8 @@ export function FinancialStatementsOverview({
   debtRatioVal,
   detailLoading,
   hasData,
-  importing,
   latestBalanceSheet,
   latestIncomeStatement,
-  onImportAll,
   onOpenUploadDialog,
   onSelectPeriod,
   periods,
@@ -153,14 +148,6 @@ export function FinancialStatementsOverview({
                 <Upload className="mr-2 h-4 w-4" />
                 上传月度会计报表
               </Button>
-              <Button onClick={onImportAll} disabled={importing} variant="outline" className="h-10">
-                {importing ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                )}
-                扫描导入全部
-              </Button>
             </div>
           }
         />
@@ -173,7 +160,7 @@ export function FinancialStatementsOverview({
             <div className="text-center">
               <p className="text-lg font-semibold text-muted-foreground">暂无财务报表数据</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                点击上方&ldquo;扫描导入全部账期&rdquo;按钮，自动读取 2025 年 1-12 账期数据
+                点击上方&ldquo;上传月度会计报表&rdquo;，先核对解析预览，再确认写入账期
               </p>
             </div>
           </CardContent>

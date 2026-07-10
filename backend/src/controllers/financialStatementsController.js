@@ -1,30 +1,12 @@
 /**
- * Input: HTTP 请求（路由参数/请求体）
- * Output: 财务报表数据 JSON 响应
- * Pos: 财务报表控制器，处理导入、查询、分析请求
+ * Input: HTTP 请求（路由参数、上传工作簿、预览凭证）
+ * Output: 财务报表预览、确认写入、查询与分析 JSON 响应
+ * Pos: 财务报表 HTTP Adapter；上传工作簿不能绕过预览直接写库
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const financialStatementsService = require('../services/financialStatementsService');
-
-/**
- * 职责：触发从本地文件夹批量导入所有账期
- * POST /api/v1/finance/statements/import-folder
- */
-const importFromFolder = async (req, res) => {
-  try {
-    const result = await financialStatementsService.importFromFolder();
-    return res.json({
-      code: 200,
-      message: `导入完成：成功 ${result.imported} 个账期，跳过 ${result.skipped} 个`,
-      data: result,
-    });
-  } catch (err) {
-    console.error('[financialStatements] importFromFolder error:', err);
-    return res.status(500).json({ code: 500, message: err.message });
-  }
-};
 
 /**
  * 职责：获取所有账期列表（含摘要指标）
@@ -78,40 +60,81 @@ const getAnalytics = async (req, res) => {
   }
 };
 
-/**
- * 职责：接收上传的 Excel 文件，解析并导入指定账期
- * POST /api/v1/finance/statements/import-file
- * @param req.file - multer 上传的文件对象（buffer 存在于 req.file.buffer）
- * @param req.body.year - 账期年份（必填）
- * @param req.body.month - 账期月份（必填）
- * @param req.body.periodLabel - 账期标签（选填，默认为 "${year}年${month}账期"）
- */
-const importFile = async (req, res) => {
+const parseUploadPeriod = (req, res) => {
+  if (!req.file?.buffer) {
+    res.status(400).json({ code: 400, message: '请上传 .xlsx 会计报表' });
+    return null;
+  }
+  const year = parseInt(req.body.year, 10);
+  const month = parseInt(req.body.month, 10);
+  if (Number.isNaN(year) || year < 2000 || year > 2099 || Number.isNaN(month) || month < 1 || month > 12) {
+    res.status(400).json({ code: 400, message: '年份或月份参数无效（年份 2000~2099，月份 1~12）' });
+    return null;
+  }
+  return {
+    year,
+    month,
+    periodLabel: req.body.periodLabel?.trim() || `${year}年${month}账期`,
+  };
+};
+
+const sendStatementError = (res, err, action) => {
+  console.error(`[financialStatements] ${action} error:`, err);
+  const status = Number(err?.statusCode || err?.status || 500);
+  return res.status(status).json({ code: status, message: err.message });
+};
+
+/** 只读解析上传文件，返回关键科目、平衡校验和覆盖风险，不写数据库。 */
+const previewFile = async (req, res) => {
+  const period = parseUploadPeriod(req, res);
+  if (!period) return undefined;
   try {
-    if (!req.file) {
-      return res.status(400).json({ code: 400, message: '请上传 Excel 文件' });
-    }
-    const year = parseInt(req.body.year);
-    const month = parseInt(req.body.month);
-    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
-      return res.status(400).json({ code: 400, message: '年份或月份参数无效（month 须在 1~12）' });
-    }
-    const periodLabel = req.body.periodLabel?.trim() || `${year}年${month}账期`;
-    const result = await financialStatementsService.importFromBuffer(req.file.buffer, year, month, periodLabel);
+    const preview = await financialStatementsService.previewFromBuffer(
+      req.file.buffer,
+      period.year,
+      period.month,
+      period.periodLabel,
+    );
     return res.json({
       code: 200,
-      message: `导入完成：${periodLabel} 已成功写入数据库`,
+      message: preview.ready ? '解析完成，请核对后确认写入' : '解析完成，但存在阻塞项',
+      data: preview,
+    });
+  } catch (err) {
+    return sendStatementError(res, err, 'previewFile');
+  }
+};
+
+/** 使用同一文件与预览凭证确认写入；同账期覆盖必须显式勾选。 */
+const confirmFile = async (req, res) => {
+  const period = parseUploadPeriod(req, res);
+  if (!period) return undefined;
+  try {
+    const result = await financialStatementsService.confirmImportFromBuffer(
+      req.file.buffer,
+      period.year,
+      period.month,
+      period.periodLabel,
+      {
+        previewId: String(req.body.previewId || '').trim(),
+        allowOverwrite: req.body.allowOverwrite === 'true' || req.body.allowOverwrite === true,
+      },
+    );
+    return res.json({
+      code: 200,
+      message: result.overwritten
+        ? `${period.periodLabel} 已确认覆盖更新`
+        : `${period.periodLabel} 已确认写入`,
       data: result,
     });
   } catch (err) {
-    console.error('[financialStatements] importFile error:', err);
-    return res.status(500).json({ code: 500, message: err.message });
+    return sendStatementError(res, err, 'confirmFile');
   }
 };
 
 module.exports = {
-  importFromFolder,
-  importFile,
+  previewFile,
+  confirmFile,
   listStatements,
   getStatementDetail,
   getAnalytics,
