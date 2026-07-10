@@ -1,6 +1,6 @@
 /**
- * Input: 出口合同详情、采购来源、40HQ 排柜、单证核对和退税材料准备 Interface
- * Output: 排柜/发运、出口单证、船司核对、退税材料和收款的专项单主页面
+ * Input: 出口合同详情、采购来源、40HQ 排柜、单证核对、退税准备与单柜财务 Interface
+ * Output: 排柜/发运、出口单证、船司核对、退税材料和财务结算的专项单主页面
  * Pos: 出口专项单装柜主页面，复用采购完工资料并承载排柜到发运的唯一主线路
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -9,7 +9,7 @@
 'use client';
 
 import { useState, useEffect, use, lazy, Suspense, useMemo, useRef, useCallback } from 'react';
-import { SalesContract, PackingItem, Product, Store, SalesStatus, Inventory, PaymentType } from '@/types';
+import { SalesContract, PackingItem, Product, Store, SalesStatus, Inventory } from '@/types';
 import { salesService } from '@/services/sales.service';
 import { productService } from '@/services/product.service';
 import { storeService } from '@/services/store.service';
@@ -51,7 +51,7 @@ import {
 } from '@/components/ui/tabs';
 import { SemanticBadge } from '@/components/ui/semantic-badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, FileSearch, FileCheck2, Container, Anchor, Truck, CheckCircle2, CircleDashed, CircleDot, Clock, ArrowRight, DollarSign, MapPin, AlertTriangle, Loader2, Download, LockKeyhole } from 'lucide-react';
+import { Plus, Pencil, Trash, Package, Weight, Box, Boxes, Search, PackageCheck, Camera, FileSpreadsheet, FileSearch, FileCheck2, Container, Anchor, Truck, CheckCircle2, CircleDashed, CircleDot, ArrowRight, DollarSign, MapPin, AlertTriangle, Loader2, Download, LockKeyhole } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   CONTAINER_40HQ,
@@ -85,6 +85,11 @@ const TaxRefundPreparationDialog = lazy(() =>
 const ImportPurchaseItemsDialog = lazy(() =>
   import('./ImportPurchaseItemsDialog').then((module) => ({
     default: module.ImportPurchaseItemsDialog,
+  })),
+);
+const SalesFinancePanel = lazy(() =>
+  import('./SalesFinancePanel').then((module) => ({
+    default: module.SalesFinancePanel,
   })),
 );
 import { ContractInfoEditor } from '@/components/sales/ContractInfoEditor';
@@ -644,17 +649,6 @@ export default function SalesDetailPage({ params }: PageProps) {
     return Array.from(map.values());
   }, [contract?.packingItems]);
 
-  /**
-   * 职责：收款记录
-   */
-  const paymentRecords = useMemo(() => {
-    return contract?.payments?.filter(p =>
-      p.type === PaymentType.RECEIVABLE ||
-      p.type === PaymentType.RECEIVABLE_RECEIPT ||
-      p.type === PaymentType.RECEIVABLE_COLLECTION
-    ) ?? [];
-  }, [contract?.payments]);
-
   if (loading) {
     return <div className="flex items-center justify-center h-64">加载中...</div>;
   }
@@ -983,7 +977,7 @@ export default function SalesDetailPage({ params }: PageProps) {
           <TabsTrigger value="3d">3D 可视化</TabsTrigger>
           <TabsTrigger value="info">合同信息</TabsTrigger>
           <TabsTrigger value="customs">报关信息</TabsTrigger>
-          <TabsTrigger value="payments">收款记录</TabsTrigger>
+          <TabsTrigger value="finance">财务结算</TabsTrigger>
         </TabsList>
 
         {/* 装箱明细 */}
@@ -1218,65 +1212,17 @@ export default function SalesDetailPage({ params }: PageProps) {
           </Card>
         </TabsContent>
 
-        {/* 收款记录 */}
-        <TabsContent value="payments">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
-                收款记录
-              </CardTitle>
-              <CardDescription>
-                已收款项明细，总计 ${(contract.receivedAmount || 0).toLocaleString()} / ${(contract.totalAmount || 0).toLocaleString()}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {paymentRecords.length === 0 ? (
-                <div className="text-center py-10 text-muted-foreground">
-                  暂无收款记录
-                </div>
-              ) : (
-                <div className="space-y-0">
-                  {paymentRecords.map((payment, idx) => (
-                    <div key={payment.id} className="relative flex gap-4 pb-5 last:pb-0">
-                      <div className="flex flex-col items-center">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
-                          <DollarSign className="h-3 w-3 text-primary" />
-                        </div>
-                        {idx < paymentRecords.length - 1 && (
-                          <div className="w-px flex-1 mt-2 bg-border" />
-                        )}
-                      </div>
-                      <div className="flex-1 -mt-0.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium">
-                            {payment.type === PaymentType.RECEIVABLE_RECEIPT ? '预收款' :
-                             payment.type === PaymentType.RECEIVABLE_COLLECTION ? '尾款收款' : '收款'}
-                          </span>
-                          <span className="text-sm font-bold tabular-nums">${payment.amount.toLocaleString()}</span>
-                        </div>
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {formatDate(payment.paymentDate)}
-                          </span>
-                          {payment.paymentMethod && (
-                            <span className="text-xs text-muted-foreground">{payment.paymentMethod}</span>
-                          )}
-                          {payment.currency && payment.currency !== 'USD' && (
-                            <span className="text-xs text-muted-foreground">{payment.currency}</span>
-                          )}
-                        </div>
-                        {payment.note && (
-                          <p className="text-xs text-muted-foreground mt-1">{payment.note}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {/* 单柜财务结算：仅进入标签时加载，避免阻塞装柜首屏。 */}
+        <TabsContent value="finance">
+          {activeTab === 'finance' && (
+            <Suspense fallback={<div className="py-10 text-center text-sm text-muted-foreground">正在汇总财务数据...</div>}>
+              <SalesFinancePanel
+                salesContractId={contract.id}
+                contractNo={contract.contractNo}
+                onChanged={loadData}
+              />
+            </Suspense>
+          )}
         </TabsContent>
       </Tabs>
 

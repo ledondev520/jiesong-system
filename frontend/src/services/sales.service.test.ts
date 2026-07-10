@@ -1,6 +1,6 @@
 /**
  * Input: 销售服务请求与价格计算函数
- * Output: 出口合同、船司核对历史/人工结论及价格计算测试
+ * Output: 出口合同、船司核对、单柜财务汇总及价格计算测试
  * Pos: 前端业务服务 Module 测试
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -106,6 +106,12 @@ describe('salesService api', () => {
     await salesService.getTaxRefundPreparation('sc-1');
 
     expect(api.get).toHaveBeenCalledWith('/sales/sc-1/tax-refund-preparation');
+  });
+
+  it('getFinanceSummary: 读取单柜收入、成本、退税与现金流统一口径', async () => {
+    await salesService.getFinanceSummary('sc-1');
+
+    expect(api.get).toHaveBeenCalledWith('/sales/sc-1/finance-summary');
   });
 });
 

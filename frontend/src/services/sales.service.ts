@@ -125,6 +125,71 @@ export interface TaxRefundPreparation {
   disclaimer: string;
 }
 
+export type SalesFinanceIssueSeverity = 'error' | 'warning' | 'info';
+
+/** 单份出口专项单的收入、采购成本、退税与现金流统一口径。 */
+export interface SalesFinanceSummary {
+  salesContractId: string;
+  contractNo: string;
+  currencyPolicy: {
+    salesReceiptCurrency: 'USD';
+    purchasePaymentCurrency: 'CNY';
+    conversionRate: number | null;
+  };
+  marginReady: boolean;
+  cashReady: boolean;
+  revenue: {
+    contractTotalUsd: number;
+    ownedRevenueUsd: number;
+    receivedUsd: number;
+    outstandingUsd: number;
+    receivedSource: 'payment_records' | 'legacy_contract_balance';
+  };
+  cost: {
+    purchaseCostCny: number;
+    paidPurchaseCostCny: number;
+    outstandingPurchaseCostCny: number;
+  };
+  tax: {
+    estimatedRefundCny: number;
+    actualRefundedCny: number;
+  };
+  profit: {
+    expectedRevenueCny: number;
+    estimatedGrossProfitCny: number;
+    estimatedGrossMarginPct: number;
+    scope: string;
+  };
+  cashFlow: {
+    customerReceiptsCny: number;
+    actualTaxRefundCny: number;
+    supplierPaymentsCny: number;
+    netCashCny: number;
+  };
+  receipts: Array<{
+    id: string;
+    amountUsd: number;
+    paymentDate?: string | null;
+    paymentMethod?: string | null;
+    note?: string | null;
+  }>;
+  linkedPurchases: Array<{
+    id?: string | null;
+    contractNo: string;
+    supplierName?: string | null;
+    allocatedCostCny: number;
+    allocatedPaidCny: number;
+    outstandingCny: number;
+    allocationRatioPct: number;
+    lastPaymentAt?: string | null;
+  }>;
+  issues: Array<{
+    code: string;
+    severity: SalesFinanceIssueSeverity;
+    message: string;
+  }>;
+}
+
 export interface AvailablePurchasePackingItem {
   id: string;
   productId: string;
@@ -296,6 +361,13 @@ export const salesService = {
   getTaxRefundPreparation: async (id: string) => {
     return api.get<ApiResponse<TaxRefundPreparation>, ApiResponse<TaxRefundPreparation>>(
       `/sales/${id}/tax-refund-preparation`,
+    );
+  },
+
+  /** 读取单柜美元收入、人民币成本、退税和现金流的统一财务口径。 */
+  getFinanceSummary: async (id: string) => {
+    return api.get<ApiResponse<SalesFinanceSummary>, ApiResponse<SalesFinanceSummary>>(
+      `/sales/${id}/finance-summary`,
     );
   },
 

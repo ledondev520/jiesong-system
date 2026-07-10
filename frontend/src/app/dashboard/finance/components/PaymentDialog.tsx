@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -42,6 +43,7 @@ interface PaymentDialogProps {
   contractNo: string;
   contractId: string;
   remainingAmount: number;
+  currency?: string;
   onSubmit: (data: PaymentSubmitData) => Promise<void>;
 }
 
@@ -51,8 +53,11 @@ export function PaymentDialog({
   type,
   contractNo,
   remainingAmount,
+  currency,
   onSubmit,
 }: PaymentDialogProps) {
+  const resolvedCurrency = currency || (type === PaymentType.PAYABLE ? 'CNY' : 'USD');
+  const currencySymbol = resolvedCurrency === 'USD' ? '$' : resolvedCurrency === 'CNY' ? '¥' : '';
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
@@ -63,9 +68,24 @@ export function PaymentDialog({
     },
   });
 
+  useEffect(() => {
+    if (!open) return;
+    form.reset({
+      amount: remainingAmount,
+      paymentDate: new Date(),
+      paymentMethod: '',
+      note: '',
+    });
+  }, [form, open, remainingAmount]);
+
   const handleSubmit = async (data: PaymentFormValues) => {
     await onSubmit(data);
-    form.reset();
+    form.reset({
+      amount: remainingAmount,
+      paymentDate: new Date(),
+      paymentMethod: '',
+      note: '',
+    });
   };
 
   const title = type === PaymentType.PAYABLE ? '录入付款' : '录入收款';
@@ -80,7 +100,7 @@ export function PaymentDialog({
         <div className="text-sm text-muted-foreground mb-4">
           合同: <span className="font-medium text-foreground">{contractNo}</span>
           <br />
-          待结金额: <span className="font-medium text-foreground">¥{remainingAmount.toLocaleString()}</span>
+          待结金额: <span className="font-medium text-foreground">{resolvedCurrency} {currencySymbol}{remainingAmount.toLocaleString()}</span>
         </div>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -91,7 +111,7 @@ export function PaymentDialog({
                 <FormItem>
                   <FormLabel>{label}</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} />
+                    <Input type="number" min="0.01" step="0.01" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -118,7 +138,7 @@ export function PaymentDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>方式</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="选择方式" />

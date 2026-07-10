@@ -1,6 +1,6 @@
 /**
- * Input: sales 与 packingListCheck 服务层
- * Output: 出口合同、装箱单核对历史及人工结论 HTTP 适配
+ * Input: sales、packingListCheck 与单柜财务服务层
+ * Output: 出口合同、装箱单核对、退税准备和单柜财务结算 HTTP 适配
  * Pos: 纯路由适配层，业务逻辑收敛至 services Module
  */
 
@@ -13,6 +13,7 @@ const auditLog = require('../utils/auditLog');
 const packingListCheckService = require('../services/packingListCheckService');
 const fileService = require('../services/fileService');
 const taxRefundPreparationService = require('../services/taxRefundPreparationService');
+const salesFinanceService = require('../services/salesFinanceService');
 
 const list = async (req, res, next) => {
   try {
@@ -372,6 +373,16 @@ const exportTaxRefundPreparation = async (req, res, next) => {
   }
 };
 
+/** 返回一个专项单的美元回款、人民币成本、退税和现金流统一口径。 */
+const getFinanceSummary = async (req, res, next) => {
+  try {
+    const summary = await salesFinanceService.getSalesFinanceSummary(req.params.id);
+    success(res, summary);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   list,
   getById,
@@ -396,4 +407,5 @@ module.exports = {
   reviewPackingListCheck,
   getTaxRefundPreparation,
   exportTaxRefundPreparation,
+  getFinanceSummary,
 };

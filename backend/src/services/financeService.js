@@ -5,6 +5,7 @@
  */
 
 const prisma = require('../utils/prisma');
+const { createError } = require('../middleware/errorHandler');
 
 const PAYMENT_TYPES = {
   PAYABLE: 'PAYABLE',
@@ -51,6 +52,30 @@ const trimIdempotencyKey = (value) => {
   }
   const normalized = value.trim();
   return normalized ? normalized : null;
+};
+
+const normalizeCurrency = (value, fallback = 'CNY') => (
+  String(value || fallback).trim().toUpperCase()
+);
+
+/** 合同汇总字段没有逐笔汇率，因此只允许在合同本位币内累计，防止直接混加。 */
+const validateContractPaymentCurrency = (data = {}) => {
+  const currency = normalizeCurrency(data.currency);
+  if (
+    data.salesContractId
+    && RECEIVABLE_SETTLEMENT_TYPES.includes(data.type)
+    && currency !== 'USD'
+  ) {
+    throw createError('出口合同收款只支持 USD；其他币种请先在银行侧换汇并按美元到账登记', 400);
+  }
+  if (
+    data.purchaseContractId
+    && PAYABLE_FLOW_TYPES.has(data.type)
+    && currency !== 'CNY'
+  ) {
+    throw createError('采购合同付款只支持 CNY；其他币种需先换算并保留换汇凭证', 400);
+  }
+  return currency;
 };
 
 const includePaymentRelations = {
@@ -112,6 +137,15 @@ const getEffectiveSalesContractTotal = (contract) => {
   }, 0);
 
   return Number(Math.max(Number(contract.totalAmount || 0) - excludedAmount, 0).toFixed(2));
+};
+
+/** 混柜合同的已收款按自有收入占合同总额的比例归属，不能把第三方回款算入捷淞。 */
+const getEffectiveSalesReceived = (contract, ownedTotalAmount = getEffectiveSalesContractTotal(contract)) => {
+  const contractTotal = Number(contract?.totalAmount || 0);
+  const received = Number(contract?.receivedAmount || 0);
+  if (contractTotal <= 0 || ownedTotalAmount <= 0 || received <= 0) return 0;
+  const ownershipRatio = Math.min(Math.max(ownedTotalAmount / contractTotal, 0), 1);
+  return Number(Math.min(received * ownershipRatio, ownedTotalAmount).toFixed(2));
 };
 
 const getOwnedStores = (packingItems = [], port) => {
@@ -247,6 +281,9 @@ const extractSalesContractRefs = (note) => {
 };
 
 const evaluateMatch = (payment, contract) => {
+  if (normalizeCurrency(payment?.currency, '') !== 'USD') {
+    return { matched: false, reason: 'unsupported_currency' };
+  }
   if (!contract || contract.status === 'CANCELLED') {
     return { matched: false, reason: 'contract_not_found' };
   }
@@ -339,7 +376,7 @@ const findAutoMatchCandidatesBatch = async (payments) => {
 const syncContractPaymentAmounts = async (tx, { purchaseContractId, salesContractId }) => {
   if (purchaseContractId) {
     const total = await tx.payment.aggregate({
-      where: { purchaseContractId },
+      where: { purchaseContractId, currency: 'CNY' },
       _sum: { amount: true },
     });
     await tx.purchaseContract.update({
@@ -353,6 +390,7 @@ const syncContractPaymentAmounts = async (tx, { purchaseContractId, salesContrac
       where: {
         salesContractId,
         type: { in: RECEIVABLE_SETTLEMENT_TYPES },
+        currency: 'USD',
       },
       _sum: { amount: true },
     });
@@ -455,6 +493,9 @@ const allocatePaymentToContracts = async (paymentId, allocations) => {
   const receipt = await prisma.payment.findUnique({ where: { id: paymentId } });
   if (!receipt) throw new Error('收款记录不存在');
   if (!RECEIPT_POOL_TYPES.has(receipt.type)) throw new Error('该记录不是待分配收款');
+  if (normalizeCurrency(receipt.currency, '') !== 'USD') {
+    throw createError('出口合同收款分配只支持 USD；当前到账币种无法直接计入美元应收', 400);
+  }
 
   const allocatedBefore = await getPaymentAllocatedAmount(paymentId);
   const remainingBefore = Math.max(Number(receipt.amount || 0) - allocatedBefore, 0);
@@ -495,6 +536,7 @@ const allocatePaymentToContracts = async (paymentId, allocations) => {
         where: {
           salesContractId,
           type: { in: RECEIVABLE_SETTLEMENT_TYPES },
+          currency: 'USD',
         },
         _sum: { amount: true },
       });
@@ -548,6 +590,7 @@ const listPayments = async ({ page, pageSize, skip, type, purchaseContractId, sa
 };
 
 const createPayment = async (data = {}, options = {}) => {
+  const currency = validateContractPaymentCurrency(data);
   const idempotencyKey = trimIdempotencyKey(options.idempotencyKey);
 
   if (idempotencyKey) {
@@ -572,7 +615,7 @@ const createPayment = async (data = {}, options = {}) => {
             ? withDefaultCustomerName(data.customerName)
             : (RECEIPT_POOL_TYPES.has(data.type) ? DEFAULT_RECEIVABLE_CUSTOMER_NAME : null),
           amount: data.amount,
-          currency: data.currency || 'CNY',
+          currency,
           paymentMethod: data.paymentMethod,
           paymentDate: new Date(data.paymentDate),
           note: data.note,
@@ -654,13 +697,15 @@ const getReceivables = async ({ page, pageSize, skip }) => {
 
   const receivables = contracts.map((contract) => {
     const ownedTotalAmount = getEffectiveSalesContractTotal(contract);
+    const ownedReceivedAmount = getEffectiveSalesReceived(contract, ownedTotalAmount);
     const stores = getOwnedStores(contract.packingItems, contract.port);
     const thirdPartySources = getThirdPartySources(contract.packingItems);
 
     return {
       ...contract,
       totalAmount: ownedTotalAmount,
-      unreceiveAmount: Math.max(ownedTotalAmount - contract.receivedAmount, 0),
+      receivedAmount: ownedReceivedAmount,
+      unreceiveAmount: Number(Math.max(ownedTotalAmount - ownedReceivedAmount, 0).toFixed(2)),
       stores,
       hasThirdPartyCargo: thirdPartySources.length > 0,
       sourceParties: thirdPartySources,
@@ -736,7 +781,7 @@ const getStats = async () => {
       : Number(contract.totalAmount || 0);
 
     acc.total += ownedTotalAmount;
-    acc.received += Math.min(Number(contract.receivedAmount || 0), ownedTotalAmount);
+    acc.received += getEffectiveSalesReceived(contract, ownedTotalAmount);
     return acc;
   }, { total: 0, received: 0 });
 
@@ -768,7 +813,7 @@ const getPaymentTrends = async (days = 90) => {
 
   const payments = await prisma.payment.findMany({
     where: { paymentDate: { gte: since } },
-    select: { paymentDate: true, amount: true, type: true },
+    select: { paymentDate: true, amount: true, type: true, currency: true },
     orderBy: { paymentDate: 'asc' },
   });
 
@@ -798,9 +843,9 @@ const getPaymentTrends = async (days = 90) => {
       weekMap.set(key, { label: toLabel(key), receivables: 0, payables: 0 });
     }
     const entry = weekMap.get(key);
-    if (RECEIVABLE_FLOW_TYPES.has(p.type)) {
+    if (RECEIVABLE_FLOW_TYPES.has(p.type) && normalizeCurrency(p.currency, '') === 'USD') {
       entry.receivables += Number(p.amount);
-    } else if (PAYABLE_FLOW_TYPES.has(p.type)) {
+    } else if (PAYABLE_FLOW_TYPES.has(p.type) && normalizeCurrency(p.currency, '') === 'CNY') {
       entry.payables += Number(p.amount);
     }
   });

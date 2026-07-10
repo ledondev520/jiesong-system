@@ -1,6 +1,6 @@
 /**
  * Input: 销售控制器、exportService
- * Output: 出口合同管理路由（含装箱管理、导出、附件、船司装箱单持久化核对与人工结论）
+ * Output: 出口合同管理路由（含装箱、单证核对、退税准备与单柜财务结算）
  * Pos: 销售路由，处理出口合同CRUD操作
  * 
  * 2026-01-20 重构：合并货柜功能，EXP号即货柜号
@@ -141,6 +141,9 @@ router.get('/:id/tax-refund-preparation', withIdValidation, salesController.getT
 
 // GET /api/v1/sales/:id/tax-refund-preparation/export - 导出内部准备清单 Excel
 router.get('/:id/tax-refund-preparation/export', withIdValidation, salesController.exportTaxRefundPreparation);
+
+// GET /api/v1/sales/:id/finance-summary - 单柜收入、成本、退税与现金流统一口径
+router.get('/:id/finance-summary', withIdValidation, salesController.getFinanceSummary);
 
 // PUT /api/v1/sales/:id/packing-list-checks/:checkId/review - 人工通过/驳回
 router.put(

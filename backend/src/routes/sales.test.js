@@ -74,6 +74,10 @@ test('sales route includes tax-refund preparation checklist and Excel export end
   assert.notEqual(getRouteIndex(salesRouter, '/:id/tax-refund-preparation/export', 'get'), -1);
 });
 
+test('sales route includes single-container finance summary endpoint', () => {
+  assert.notEqual(getRouteIndex(salesRouter, '/:id/finance-summary', 'get'), -1);
+});
+
 test('sales export routes: 缺失合同时将404错误传给 next', async () => {
   const originalSalesContractFindUnique = prisma.salesContract.findUnique;
   prisma.salesContract.findUnique = async () => null;

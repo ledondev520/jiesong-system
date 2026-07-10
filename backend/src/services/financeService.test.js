@@ -81,7 +81,7 @@ test('createPayment: 新建付款并回写采购已付金额', async () => {
 
     assert.equal(result.reused, false);
     assert.equal(createArgs.data.idempotencyKey, 'idem-2');
-    assert.deepEqual(aggregateArgs.where, { purchaseContractId: 'pc-1' });
+    assert.deepEqual(aggregateArgs.where, { purchaseContractId: 'pc-1', currency: 'CNY' });
     assert.deepEqual(purchaseUpdateArgs, {
       where: { id: 'pc-1' },
       data: { paidAmount: 888 },
@@ -135,6 +135,7 @@ test('createPayment: 销售合同已收金额只统计收入类 payment', async 
     assert.deepEqual(aggregateArgs.where, {
       salesContractId: 'sc-9',
       type: { in: ['RECEIVABLE', 'RECEIVABLE_COLLECTION', 'INCOME'] },
+      currency: 'USD',
     });
     assert.deepEqual(salesUpdateArgs, {
       where: { id: 'sc-9' },
@@ -144,6 +145,29 @@ test('createPayment: 销售合同已收金额只统计收入类 payment', async 
     prisma.payment.findUnique = originalFindUnique;
     prisma.$transaction = originalTransaction;
   }
+});
+
+test('createPayment: 销售收款只接受 USD，采购付款只接受 CNY', async () => {
+  await assert.rejects(
+    () => financeService.createPayment({
+      type: 'RECEIVABLE',
+      salesContractId: 'sc-1',
+      amount: 700,
+      currency: 'CNY',
+      paymentDate: '2026-07-01',
+    }),
+    /出口合同收款只支持 USD/,
+  );
+  await assert.rejects(
+    () => financeService.createPayment({
+      type: 'PAYABLE',
+      purchaseContractId: 'pc-1',
+      amount: 100,
+      currency: 'USD',
+      paymentDate: '2026-07-01',
+    }),
+    /采购合同付款只支持 CNY/,
+  );
 });
 
 test('createPayment: 并发唯一键冲突时返回已创建记录', async () => {
@@ -289,11 +313,19 @@ test('getPaymentTrends: 兼容历史 INCOME/EXPENSE 流水', async () => {
       paymentDate: new Date('2026-03-03T00:00:00.000Z'),
       amount: 500,
       type: 'INCOME',
+      currency: 'USD',
     },
     {
       paymentDate: new Date('2026-03-04T00:00:00.000Z'),
       amount: 200,
       type: 'EXPENSE',
+      currency: 'CNY',
+    },
+    {
+      paymentDate: new Date('2026-03-04T00:00:00.000Z'),
+      amount: 999,
+      type: 'EXPENSE',
+      currency: 'USD',
     },
   ];
 
@@ -309,6 +341,45 @@ test('getPaymentTrends: 兼容历史 INCOME/EXPENSE 流水', async () => {
     ]);
   } finally {
     prisma.payment.findMany = originalFindMany;
+  }
+});
+
+test('autoMatchUnallocatedPayments: 非 USD 到账不与美元出口合同自动挂账', async () => {
+  const originalPaymentFindMany = prisma.payment.findMany;
+  const originalSalesContractFindMany = prisma.salesContract.findMany;
+  const originalTransaction = prisma.$transaction;
+  let transactionCalled = false;
+
+  prisma.payment.findMany = async () => ([{
+    id: 'receipt-cny',
+    type: 'INCOME',
+    amount: 68006,
+    currency: 'CNY',
+    note: 'EXP250024 回款',
+    paymentDate: new Date('2026-03-10T00:00:00.000Z'),
+  }]);
+  prisma.salesContract.findMany = async () => ([{
+    id: 'sc-24',
+    contractNo: 'EXP250024',
+    totalAmount: 68006,
+    receivedAmount: 0,
+    status: 'SHIPPED',
+  }]);
+  prisma.$transaction = async () => {
+    transactionCalled = true;
+    throw new Error('should not allocate unsupported currency');
+  };
+
+  try {
+    const result = await financeService.autoMatchUnallocatedPayments();
+
+    assert.equal(result.matchedCount, 0);
+    assert.deepEqual(result.skipped, [{ paymentId: 'receipt-cny', reason: 'unsupported_currency' }]);
+    assert.equal(transactionCalled, false);
+  } finally {
+    prisma.payment.findMany = originalPaymentFindMany;
+    prisma.salesContract.findMany = originalSalesContractFindMany;
+    prisma.$transaction = originalTransaction;
   }
 });
 
@@ -612,6 +683,35 @@ test('getReceivables: 只统计捷淞自有货物金额', async () => {
     assert.equal(result.receivables[0].contractNo, 'EXP250013');
     assert.equal(result.receivables[0].totalAmount, 128433.05);
     assert.equal(result.receivables[0].unreceiveAmount, 128433.05);
+  } finally {
+    prisma.salesContract.findMany = originalFindMany;
+    prisma.salesContract.count = originalCount;
+  }
+});
+
+test('getReceivables: 混柜合同回款按自有收入比例归属', async () => {
+  const originalFindMany = prisma.salesContract.findMany;
+  const originalCount = prisma.salesContract.count;
+
+  prisma.salesContract.findMany = async () => ([{
+    id: 'sc-mixed-receipt',
+    contractNo: 'EXP260019',
+    totalAmount: 1000,
+    receivedAmount: 400,
+    status: 'SHIPPED',
+    packingItems: [
+      { totalPrice: 600, isOwnedByJiesong: true, store: null },
+      { totalPrice: 400, isOwnedByJiesong: false, sourceParty: '第三方拼柜', store: null },
+    ],
+    port: null,
+  }]);
+  prisma.salesContract.count = async () => 1;
+
+  try {
+    const result = await financeService.getReceivables({ page: 1, pageSize: 20, skip: 0 });
+    assert.equal(result.receivables[0].totalAmount, 600);
+    assert.equal(result.receivables[0].receivedAmount, 240);
+    assert.equal(result.receivables[0].unreceiveAmount, 360);
   } finally {
     prisma.salesContract.findMany = originalFindMany;
     prisma.salesContract.count = originalCount;
