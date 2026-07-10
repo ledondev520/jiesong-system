@@ -90,9 +90,12 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   const salesStatus = normalizeSalesStatus(salesContract.status);
   const salesRank = SALES_RANK[salesStatus] ?? 0;
   const readiness = evaluateShipmentReadiness(salesContract);
-  const salesFiles = salesContract.files || [];
-  const hasExportWorkbook = salesFiles.some((file) => /\.xlsx?$/i.test(file.fileName || ''));
-  const hasCarrierPdf = salesFiles.some((file) => /\.pdf$/i.test(file.fileName || ''));
+  const packingListChecks = [...(salesContract.packingListChecks || [])].sort((left, right) => (
+    new Date(right.checkedAt || right.createdAt || 0).getTime()
+    - new Date(left.checkedAt || left.createdAt || 0).getTime()
+  ));
+  const latestPackingListCheck = packingListChecks[0] || null;
+  const packingListCheckPassed = ['PASSED', 'APPROVED'].includes(latestPackingListCheck?.status);
   const hasDeclaration = (salesContract.customsDeclarations || []).length > 0;
   const taxRefunds = salesContract.taxRefunds || [];
   const taxCompleted = taxRefunds.some((refund) => ['APPLIED', 'APPROVED', 'REFUNDED'].includes(refund.status));
@@ -192,14 +195,23 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
     };
   }
 
-  const documentsComplete = hasExportWorkbook && hasCarrierPdf && hasDeclaration;
+  const packingListCheckGap = !latestPackingListCheck
+    ? '船司装箱单核对'
+    : latestPackingListCheck.status === 'DIFFERENCE'
+      ? '船司装箱单存在差异'
+      : latestPackingListCheck.status === 'NEEDS_MANUAL_REVIEW'
+        ? '船司装箱单待人工核对'
+        : latestPackingListCheck.status === 'REJECTED'
+          ? '船司装箱单人工复核未通过'
+          : null;
+  const documentsComplete = packingListCheckPassed && hasDeclaration;
   const documentsStage = documentsComplete
-    ? { key: 'documents', label: '出口单证', status: 'completed', reason: '工作簿、船司文件与报关记录已齐' }
+    ? { key: 'documents', label: '出口单证', status: 'completed', reason: '报关记录与最新船司装箱单核对已通过，可随时导出工作簿' }
     : salesRank < SALES_RANK[SALES_STATUS.PACKING]
       ? { key: 'documents', label: '出口单证', status: 'pending', reason: '进入装柜后准备出口单证' }
       : {
           key: 'documents', label: '出口单证', status: 'current',
-          reason: `待补：${[!hasExportWorkbook && '出口工作簿', !hasCarrierPdf && '船司 PDF', !hasDeclaration && '报关记录'].filter(Boolean).join('、')}`,
+          reason: `待处理：${[!hasDeclaration && '申报三表', !packingListCheckPassed && packingListCheckGap].filter(Boolean).join('、')}`,
           action: { label: '完善出口单证', href: `/dashboard/sales/${salesContract.id}` },
         };
 
@@ -284,6 +296,11 @@ const listTradeWorkflows = async ({ limit = 20 } = {}) => {
       files: true,
       customsDeclarations: { select: { id: true, status: true } },
       taxRefunds: { select: { id: true, status: true } },
+      packingListChecks: {
+        take: 1,
+        orderBy: [{ checkedAt: 'desc' }, { createdAt: 'desc' }],
+        include: { file: { select: { id: true, fileName: true, category: true } } },
+      },
     },
   });
   const purchaseNos = unique(salesContracts.flatMap((contract) => (

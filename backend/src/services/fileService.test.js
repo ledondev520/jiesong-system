@@ -172,3 +172,53 @@ test('archiveGeneratedFile: 相同内容已归档时复用记录而不制造重�
   assert.equal(result, existing);
   assert.equal(createCalls, 0);
 });
+
+test('archiveBufferFile: 船司 PDF 按内容去重归档到独立受限目录', async () => {
+  const uploadRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-carrier-document-'));
+  let createData = null;
+  try {
+    const result = await fileService.archiveBufferFile({
+      contractId: 'sales-1',
+      contractType: 'SALES',
+      buffer: Buffer.from('%PDF-carrier'),
+      fileName: 'carrier.pdf',
+      mimeType: 'application/pdf',
+      category: 'CARRIER_DOCUMENT',
+      storageScope: 'carrier-documents',
+      uploadRoot,
+      prismaClient: {
+        salesContractFile: {
+          findFirst: async () => null,
+          create: async ({ data }) => {
+            createData = data;
+            return { id: 'carrier-file', ...data };
+          },
+        },
+      },
+    });
+
+    assert.equal(result.id, 'carrier-file');
+    assert.match(createData.filePath, /^carrier-documents[/\\]/);
+    assert.equal(fs.statSync(path.join(uploadRoot, createData.filePath)).mode & 0o777, 0o600);
+  } finally {
+    fs.rmSync(uploadRoot, { recursive: true, force: true });
+  }
+});
+
+test('deleteFileRecord: 已关联核对历史的船司原件禁止删除', async () => {
+  let deleteCalls = 0;
+  await withMockDelegates({
+    contractFile: { findUnique: async () => null },
+    salesContractFile: {
+      findUnique: async () => ({ id: 'file-1', filePath: 'carrier.pdf' }),
+      delete: async () => { deleteCalls += 1; },
+    },
+    packingListCheck: { count: async () => 1 },
+  }, async () => {
+    await assert.rejects(
+      () => fileService.deleteFileRecord('file-1'),
+      (error) => error.statusCode === 409 && /不能删除/.test(error.message),
+    );
+  });
+  assert.equal(deleteCalls, 0);
+});

@@ -1,7 +1,7 @@
 /**
- * Input: sales service 层
- * Output: 出口合同 HTTP 控制器
- * Pos: 纯路由适配层，业务逻辑收敛至 services/salesService；附件上传/列表/下载/删除在本层适配
+ * Input: sales 与 packingListCheck 服务层
+ * Output: 出口合同、装箱单核对历史及人工结论 HTTP 适配
+ * Pos: 纯路由适配层，业务逻辑收敛至 services Module
  */
 
 const { success, created, paginated } = require('../utils/response');
@@ -10,7 +10,8 @@ const { createError } = require('../middleware/errorHandler');
 const salesService = require('../services/salesService');
 const contractTemplateService = require('../services/contractTemplateService');
 const auditLog = require('../utils/auditLog');
-const prisma = require('../utils/prisma');
+const packingListCheckService = require('../services/packingListCheckService');
+const fileService = require('../services/fileService');
 
 const list = async (req, res, next) => {
   try {
@@ -241,18 +242,13 @@ const uploadFile = async (req, res, next) => {
       throw createError('请选择要上传的文件', 400);
     }
 
-    const file = req.file;
-    const { getRelativePath } = require('../utils/upload');
-
-    const contractFile = await prisma.salesContractFile.create({
-      data: {
-        salesContractId: id,
-        fileName: file.originalname,
-        filePath: getRelativePath(file.path),
-        fileType: file.mimetype,
-        fileSize: file.size,
-      },
-    });
+    const contractFile = await fileService.createFile(
+      id,
+      fileService.CONTRACT_TYPE.SALES,
+      req.file,
+      req.body?.description,
+      req.body?.category,
+    );
 
     created(res, contractFile, '文件上传成功');
   } catch (error) {
@@ -264,10 +260,7 @@ const getFiles = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const files = await prisma.salesContractFile.findMany({
-      where: { salesContractId: id },
-      orderBy: { uploadedAt: 'desc' },
-    });
+    const files = await fileService.listFiles(id, fileService.CONTRACT_TYPE.SALES);
 
     success(res, files);
   } catch (error) {
@@ -279,17 +272,9 @@ const deleteFile = async (req, res, next) => {
   try {
     const { fileId } = req.params;
 
-    const file = await prisma.salesContractFile.findUnique({
-      where: { id: fileId },
-    });
-
-    if (!file) {
-      throw createError('文件不存在', 404);
-    }
-
-    await prisma.salesContractFile.delete({
-      where: { id: fileId },
-    });
+    const file = await fileService.findFileById(fileId);
+    if (!file || file.contractType !== fileService.CONTRACT_TYPE.SALES) throw createError('文件不存在', 404);
+    await fileService.deleteFileRecord(fileId);
 
     success(res, null, '文件删除成功');
   } catch (error) {
@@ -303,8 +288,8 @@ const downloadFile = async (req, res, next) => {
     const path = require('path');
     const { getFullPath } = require('../utils/upload');
 
-    const file = await prisma.salesContractFile.findUnique({ where: { id: fileId } });
-    if (!file) throw createError('文件不存在', 404);
+    const file = await fileService.findFileById(fileId);
+    if (!file || file.contractType !== fileService.CONTRACT_TYPE.SALES) throw createError('文件不存在', 404);
 
     const absolutePath = path.isAbsolute(file.filePath)
       ? file.filePath
@@ -320,16 +305,45 @@ const downloadFile = async (req, res, next) => {
 
 /**
  * 职责：核对船司装箱单 PDF 与系统装箱数据
- * 思路：接收内存中的 PDF 文件 → packingListCheckService 解析并比对 → 返回差异报告
+ * 思路：接收内存中的 PDF 文件 → 解析/比对 → 受限归档 → 持久化差异记录
  */
 const checkPackingList = async (req, res, next) => {
   try {
     if (!req.file?.buffer) {
       throw createError('请选择要核对的装箱单 PDF', 400);
     }
-    const { checkPackingListPdf } = require('../services/packingListCheckService');
-    const result = await checkPackingListPdf(req.params.id, req.file.buffer);
+    const result = await packingListCheckService.checkPackingListPdf(req.params.id, req.file, {
+      checkedById: req.user?.id || null,
+    });
+    created(res, result, '装箱单核对完成并已归档');
+  } catch (error) {
+    next(error);
+  }
+};
+
+const listPackingListChecks = async (req, res, next) => {
+  try {
+    const result = await packingListCheckService.listPackingListChecks(req.params.id, {
+      limit: req.query.limit,
+    });
     success(res, result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const reviewPackingListCheck = async (req, res, next) => {
+  try {
+    const result = await packingListCheckService.reviewPackingListCheck(
+      req.params.id,
+      req.params.checkId,
+      {
+        decision: req.body.decision,
+        note: req.body.note,
+        reviewedById: req.user?.id || null,
+      },
+    );
+    success(res, result, '人工核对结论已保存');
   } catch (error) {
     next(error);
   }
@@ -355,4 +369,6 @@ module.exports = {
   deleteFile,
   downloadFile,
   checkPackingList,
+  listPackingListChecks,
+  reviewPackingListCheck,
 };

@@ -1,5 +1,31 @@
 # 捷淞系统 UI 交互测试报告
 
+## 2026-07-10 Phase 5B：船司装箱单核对持久化
+
+- **Status:** completed；Phase 6 供应商发票与出口退税闭环进行中
+- 船司 PDF 现在按内容校验和受限归档，保存自动结论、逐商品差异、核对人、复核人和人工说明；被核对记录引用的原件不可删除。
+- 商品身份先按商品名或 10 位 HS 匹配，身份未命中时不再使用 PDF 全文中的重复数字伪造箱数/数量一致。
+- 图片型 PDF 保留原件并转人工复核；结构化结果入库但不保存原始 PDF 文本。
+- 核对历史和人工通过/驳回已接入出口详情；八阶段专项单以最新核对记录为准，较新的差异会重新阻塞出口单证阶段。
+- 首轮迁移误挂的 `SalesItem` 关系已用第二次正式迁移删除，最终模型不包含无关销售明细外键。
+
+### Verification
+
+| Test | Actual | Status |
+| --- | --- | --- |
+| 后端全量测试 | `437/437` | PASS |
+| 数据库集成测试 | `3/3` | PASS |
+| 前端全量测试 | `159 files / 652 tests` | PASS |
+| TypeScript | `npx tsc --noEmit` | PASS |
+| 全量 ESLint | `0 errors / 4 existing warnings` | PASS |
+| 前端生产构建 | 51 个路由完成生成；保留既有 dev cockpit NFT warning | PASS |
+| migration 健康 | `21/21`，pending/blocking 均为 0 | PASS |
+| 真实库记录数 | 销售合同 47、销售附件 214、装箱明细 449，均未变化 | PASS |
+| 最终核对表 | 17 个预期字段、`salesItemId` 0 | PASS |
+| diff check | 无空白错误 | PASS |
+
+---
+
 ## 2026-07-10 Phase 5A：出口单证、HS 证据与统一退税口径
 
 - **Status:** completed；Phase 5B 船司 PDF 核对持久化进行中

@@ -158,3 +158,48 @@ test('PO/CG 合同号别名下的装箱明细发票号可正确结清', () => {
 
   assert.equal(workflow.stages.find((stage) => stage.key === 'invoice').status, 'completed');
 });
+
+test('仅上传任意 PDF 不能伪装完成出口单证，必须有持久化核对结论', () => {
+  const workflow = buildTradeWorkflow({
+    ...baseSales,
+    files: [{ id: 'pdf-1', fileName: 'other.pdf', category: 'OTHER' }],
+    customsDeclarations: [{ id: 'cd-1', status: 'DRAFT' }],
+    packingListChecks: [],
+  }, new Map([[basePurchase.contractNo, { ...basePurchase, paidAmount: 5000 }]]));
+
+  const documents = workflow.stages.find((stage) => stage.key === 'documents');
+  assert.equal(documents.status, 'current');
+  assert.match(documents.reason, /船司装箱单核对/);
+});
+
+test('最新船司核对通过且已有报关记录时出口单证阶段完成', () => {
+  const workflow = buildTradeWorkflow({
+    ...baseSales,
+    customsDeclarations: [{ id: 'cd-1', status: 'DRAFT' }],
+    packingListChecks: [{
+      id: 'check-1',
+      status: 'PASSED',
+      checkedAt: new Date('2026-07-10T00:00:00.000Z'),
+      file: { id: 'carrier-1', category: 'CARRIER_DOCUMENT', fileName: 'packing-list.pdf' },
+    }],
+  }, new Map([[basePurchase.contractNo, { ...basePurchase, paidAmount: 5000 }]]));
+
+  const documents = workflow.stages.find((stage) => stage.key === 'documents');
+  assert.equal(documents.status, 'completed');
+  assert.match(documents.reason, /核对已通过/);
+});
+
+test('较新的差异记录覆盖旧通过记录，出口单证重新变为待处理', () => {
+  const workflow = buildTradeWorkflow({
+    ...baseSales,
+    customsDeclarations: [{ id: 'cd-1', status: 'DRAFT' }],
+    packingListChecks: [
+      { id: 'check-old', status: 'PASSED', checkedAt: new Date('2026-07-09T00:00:00.000Z') },
+      { id: 'check-new', status: 'DIFFERENCE', checkedAt: new Date('2026-07-10T00:00:00.000Z') },
+    ],
+  }, new Map([[basePurchase.contractNo, { ...basePurchase, paidAmount: 5000 }]]));
+
+  const documents = workflow.stages.find((stage) => stage.key === 'documents');
+  assert.equal(documents.status, 'current');
+  assert.match(documents.reason, /存在差异/);
+});

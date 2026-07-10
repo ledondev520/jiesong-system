@@ -19,7 +19,11 @@ export interface PackingListCheckField {
 
 /** 装箱单核对：明细行比对结果 */
 export interface PackingListCheckItem {
+  packingItemId?: string | null;
+  productId?: string | null;
   productName: string;
+  hsCode?: string;
+  identity: { expected: string; matched: boolean; closest: string | null };
   boxes: { expected: number | null; matched: boolean | null; closest: number | null };
   quantity: { expected: number | null; matched: boolean | null; closest: number | null };
 }
@@ -28,6 +32,7 @@ export interface PackingListCheckItem {
 export interface PackingListCheckResult {
   summary: {
     ok: boolean;
+    manualReviewRequired: boolean;
     fieldTotal: number;
     fieldMismatched: number;
     itemCheckTotal: number;
@@ -37,6 +42,31 @@ export interface PackingListCheckResult {
   };
   fields: PackingListCheckField[];
   items: PackingListCheckItem[];
+}
+
+export type PackingListCheckStatus =
+  | 'PASSED'
+  | 'DIFFERENCE'
+  | 'NEEDS_MANUAL_REVIEW'
+  | 'APPROVED'
+  | 'REJECTED';
+
+export interface PackingListCheckRecord {
+  id: string;
+  salesContractId: string;
+  salesContractFileId: string;
+  automaticStatus: PackingListCheckStatus;
+  status: PackingListCheckStatus;
+  fieldMismatched: number;
+  itemCheckMismatched: number;
+  parserVersion: string;
+  checkedAt: string;
+  reviewedAt?: string | null;
+  reviewNote?: string | null;
+  checkedBy?: { id: string; name: string } | null;
+  reviewedBy?: { id: string; name: string } | null;
+  file: { id: string; fileName: string; uploadedAt?: string };
+  comparison: PackingListCheckResult;
 }
 
 export interface AvailablePurchasePackingItem {
@@ -180,10 +210,29 @@ export const salesService = {
   checkPackingList: async (id: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post<ApiResponse<PackingListCheckResult>, ApiResponse<PackingListCheckResult>, FormData>(
+    return api.post<ApiResponse<PackingListCheckRecord>, ApiResponse<PackingListCheckRecord>, FormData>(
       `/sales/${id}/packing-list-check`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+  },
+
+  listPackingListChecks: async (id: string, limit = 20) => {
+    return api.get<ApiResponse<PackingListCheckRecord[]>, ApiResponse<PackingListCheckRecord[]>>(
+      `/sales/${id}/packing-list-checks`,
+      { params: { limit } },
+    );
+  },
+
+  reviewPackingListCheck: async (
+    id: string,
+    checkId: string,
+    decision: 'APPROVED' | 'REJECTED',
+    note: string,
+  ) => {
+    return api.put<ApiResponse<PackingListCheckRecord>, ApiResponse<PackingListCheckRecord>>(
+      `/sales/${id}/packing-list-checks/${checkId}/review`,
+      { decision, note },
     );
   },
 

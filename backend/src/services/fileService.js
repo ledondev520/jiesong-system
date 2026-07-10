@@ -1,6 +1,6 @@
 /**
  * Input: Prisma Client、文件上传工具
- * Output: 统一合同附件服务，并将落盘附件收紧为最小文件权限
+ * Output: 统一合同附件服务、Buffer 归档与受保护凭证删除约束
  * Pos: 文件管理领域服务，屏蔽采购/出口合同附件的底层表差异
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -88,10 +88,10 @@ const createFile = async (contractId, contractType, file, description, category)
 };
 
 /**
- * 职责：把系统生成的 Word/PDF 以内容校验和归档为合同版本。
+ * 职责：把内存文件按内容校验和归档为合同附件。
  * 相同合同、分类和内容复用既有记录；新内容写入 0700 目录和 0600 文件。
  */
-const archiveGeneratedFile = async ({
+const archiveBufferFile = async ({
   contractId,
   contractType = CONTRACT_TYPE.PURCHASE,
   buffer,
@@ -99,11 +99,13 @@ const archiveGeneratedFile = async ({
   mimeType,
   category,
   description,
+  storageScope = 'ingested',
+  defaultDescription = '归档文件',
   uploadRoot = config.upload.dir,
   prismaClient = prisma,
 } = {}) => {
   if (!contractId || !Buffer.isBuffer(buffer) || buffer.length === 0) {
-    throw new Error('归档系统生成合同缺少合同ID或文件内容');
+    throw new Error('归档文件缺少合同ID或文件内容');
   }
   const normalizedCategory = normalizeCategory(category);
   const checksum = crypto.createHash('sha256').update(buffer).digest('hex');
@@ -122,7 +124,8 @@ const archiveGeneratedFile = async ({
   const dateDir = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const safeContractId = String(contractId).replace(/[^a-zA-Z0-9_-]/g, '_');
   const extension = path.extname(fileName || '') || (mimeType === 'application/pdf' ? '.pdf' : '.bin');
-  const directory = path.join(uploadRoot, 'generated', dateDir, safeContractId);
+  const safeStorageScope = String(storageScope || 'ingested').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const directory = path.join(uploadRoot, safeStorageScope, dateDir, safeContractId);
   fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
   fs.chmodSync(directory, 0o700);
   const absolutePath = path.join(directory, `${checksum}${extension}`);
@@ -137,12 +140,18 @@ const archiveGeneratedFile = async ({
       fileType: mimeType,
       mimeType,
       fileSize: buffer.length,
-      description: description || '系统生成合同版本',
+      description: description || defaultDescription,
       category: normalizedCategory,
       checksum,
     },
   });
 };
+
+const archiveGeneratedFile = async (options = {}) => archiveBufferFile({
+  ...options,
+  storageScope: 'generated',
+  defaultDescription: '系统生成合同版本',
+});
 
 /**
  * 职责：统一查询合同附件列表
@@ -189,6 +198,12 @@ const deleteFileRecord = async (fileId) => {
   if (!file) return null;
 
   if (file.contractType === CONTRACT_TYPE.SALES) {
+    const checkCount = await prisma.packingListCheck.count({
+      where: { salesContractFileId: fileId },
+    });
+    if (checkCount > 0) {
+      throw createError('该船司文件已有装箱单核对记录，不能删除；请保留原始凭证', 409);
+    }
     await prisma.salesContractFile.delete({ where: { id: fileId } });
   } else {
     await prisma.contractFile.delete({ where: { id: fileId } });
@@ -203,6 +218,7 @@ const deleteFileRecord = async (fileId) => {
 module.exports = {
   CONTRACT_TYPE,
   CONTRACT_FILE_CATEGORY,
+  archiveBufferFile,
   archiveGeneratedFile,
   createFile,
   listFiles,

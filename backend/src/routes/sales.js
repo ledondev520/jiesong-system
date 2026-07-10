@@ -1,12 +1,12 @@
 /**
  * Input: 销售控制器、exportService
- * Output: 出口合同管理路由（含装箱管理、Excel/PDF 导出、源文件附件和船司装箱单核对）
+ * Output: 出口合同管理路由（含装箱管理、导出、附件、船司装箱单持久化核对与人工结论）
  * Pos: 销售路由，处理出口合同CRUD操作
  * 
  * 2026-01-20 重构：合并货柜功能，EXP号即货柜号
  * 2026-02-21 新增：GET /:id/export-excel 生成三 Sheet 标准出口 Excel
  * 2026-06-03 新增：/:id/files 出口源文件附件上传、列表、下载、删除
- * 2026-07-04 新增：POST /:id/packing-list-check 船司装箱单 PDF 比对核对
+ * 2026-07-10 升级：船司装箱单 PDF 原件、差异、历史和人工结论持久化
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -16,7 +16,7 @@ const salesController = require('../controllers/salesController');
 const { exportSalesContractExcel } = require('../services/exportService');
 const { exportSalesContractPdf } = require('../services/pdfExportService');
 const { authenticate, roleAuth } = require('../middleware/auth');
-const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
+const { withIdValidation, withPaginationValidation, body, param, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 const { upload, pdfCheckUpload } = require('../utils/upload');
 
@@ -110,13 +110,57 @@ router.delete('/files/:fileId', roleAuth(...WRITE_ROLES), withAuditLog(
 // GET /api/v1/sales/files/:fileId/download - 下载出口合同附件
 router.get('/files/:fileId/download', salesController.downloadFile);
 
-// POST /api/v1/sales/:id/packing-list-check - 上传船司装箱单 PDF 与系统数据比对（不落盘）
+// POST /api/v1/sales/:id/packing-list-check - 比对、归档并保存一次船司装箱单核对
 router.post(
   '/:id/packing-list-check',
   withIdValidation,
   roleAuth(...WRITE_ROLES),
   pdfCheckUpload.single('file'),
-  salesController.checkPackingList
+  withAuditLog({
+    entity: 'PackingListCheck',
+    action: 'CREATE',
+    model: 'packingListCheck',
+    captureAfter: false,
+    getEntityId: ({ responseData }) => responseData?.id,
+    getNewValue: ({ responseData }) => ({
+      id: responseData?.id,
+      status: responseData?.status,
+      automaticStatus: responseData?.automaticStatus,
+      fieldMismatched: responseData?.fieldMismatched,
+      itemCheckMismatched: responseData?.itemCheckMismatched,
+      salesContractFileId: responseData?.salesContractFileId,
+    }),
+  }, salesController.checkPackingList),
+);
+
+// GET /api/v1/sales/:id/packing-list-checks - 历史核对记录
+router.get('/:id/packing-list-checks', withIdValidation, salesController.listPackingListChecks);
+
+// PUT /api/v1/sales/:id/packing-list-checks/:checkId/review - 人工通过/驳回
+router.put(
+  '/:id/packing-list-checks/:checkId/review',
+  [
+    param('id').notEmpty().withMessage('ID不能为空').isString().withMessage('ID格式无效'),
+    param('checkId').notEmpty().withMessage('核对记录 ID 不能为空'),
+    body('decision').isIn(['APPROVED', 'REJECTED']).withMessage('核对结论无效'),
+    body('note').trim().notEmpty().withMessage('请填写人工核对说明').isLength({ max: 1000 }).withMessage('人工核对说明不能超过 1000 字'),
+    handleValidation,
+  ],
+  roleAuth(...WRITE_ROLES),
+  withAuditLog({
+    entity: 'PackingListCheck',
+    action: 'UPDATE',
+    model: 'packingListCheck',
+    idParam: 'checkId',
+    captureBefore: false,
+    captureAfter: false,
+    getNewValue: ({ responseData }) => ({
+      id: responseData?.id,
+      status: responseData?.status,
+      reviewedAt: responseData?.reviewedAt,
+      hasReviewNote: Boolean(responseData?.reviewNote),
+    }),
+  }, salesController.reviewPackingListCheck),
 );
 
 // PUT /api/v1/sales/:id/status - 更新合同状态

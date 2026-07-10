@@ -63,6 +63,12 @@ test('sales route includes PDF export endpoint', () => {
   assert.notEqual(pdfExportIndex, -1, '缺少 GET /:id/export-pdf 路由');
 });
 
+test('sales route includes persistent packing-list check history and review endpoints', () => {
+  assert.notEqual(getRouteIndex(salesRouter, '/:id/packing-list-check', 'post'), -1);
+  assert.notEqual(getRouteIndex(salesRouter, '/:id/packing-list-checks', 'get'), -1);
+  assert.notEqual(getRouteIndex(salesRouter, '/:id/packing-list-checks/:checkId/review', 'put'), -1);
+});
+
 test('sales export routes: 缺失合同时将404错误传给 next', async () => {
   const originalSalesContractFindUnique = prisma.salesContract.findUnique;
   prisma.salesContract.findUnique = async () => null;

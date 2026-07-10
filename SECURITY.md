@@ -14,6 +14,7 @@
 - Run Node进程 with最小权限 (non-root, locked-down directories) and mount config with read-only policy where possible.
 - Keep upload/storage directories explicitly created and scoped to应用用户.
 - Contract evidence written by `backend/src/services/fileService.js` must use `0700` directories and `0600` files; permission tightening must succeed before the database record is created.
+- Carrier packing-list originals are Restricted evidence: `packingListCheckService.js` must archive them through `fileService.js`, persist only structured comparison results (never raw extracted PDF text), and prevent deletion while a check record references the file.
 - Add startup checks for config file accessibility and permission drift.
 
 ### 3) 网络与应用边界层（Application & Network）
@@ -24,7 +25,7 @@
 
 ### 4) 数据与隐私层（Data Protection）
 - Classify data by tier per `data-classification.json` and apply处理规则 in code and documents.
-- Treat supplier bank routing fields and signed/generated contract artifacts as Restricted data; do not include their values in logs, engineering memory, or test fixtures copied from production.
+- Treat supplier bank routing fields, signed/generated contract artifacts, carrier packing lists, and their review records as Restricted data; do not include their values in logs, engineering memory, or test fixtures copied from production.
 - Store secrets in `.env` only, never in repository tracked text.
 - Redact PII/敏感字段 in logs and exports; avoid writing raw identifiers to audit channels unless authorized.
 - Use prepared statements/ORM boundaries and strict参数校验 before persistence.

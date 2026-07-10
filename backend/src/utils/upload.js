@@ -1,6 +1,6 @@
 /**
  * Input: multer库、配置
- * Output: 文件上传中间件（通用 upload、合同附件 contractUpload、装箱单核对 pdfCheckUpload）
+ * Output: 文件上传中间件（通用 upload、合同附件 contractUpload、装箱单核对内存接收 pdfCheckUpload）
  * Pos: 文件上传工具，处理合同文件等上传
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -92,7 +92,7 @@ const contractUpload = multer({
   },
 });
 
-// 装箱单核对专用：仅 PDF、内存存储（比对为一次性操作，不落盘）
+// 装箱单核对专用：先以内存接收，解析通过或转人工核对后由 fileService 受限归档原件。
 const pdfCheckUpload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {

@@ -1528,6 +1528,7 @@ export default function SalesDetailPage({ params }: PageProps) {
             onOpenChange={setPackingCheckOpen}
             contractId={contract.id}
             contractNo={contract.contractNo}
+            onChanged={loadData}
           />
         </Suspense>
       )}

@@ -50,7 +50,7 @@
 | threeFormsService.js | 基于出口准备度预览/生成报关单、外汇核销单、出口退税单与三 Sheet Excel |
 | taxCalculationEngine.js | 将出口准备度转换为统一税务摘要与 Excel/PDF，不内置税则小表 |
 | hsCodeService.js | HS 本地/AI 检索与强制来源证据的人工税则更新 |
-| packingListCheckService.js | 船司装箱单 PDF 解析（pdfjs-dist）与系统数据逐项比对 |
+| packingListCheckService.js | 船司装箱单 PDF 受限归档、逐商品比对、历史记录与人工复核结论 |
 | exportReminderService.js | 每月5号出口退税提醒、已出货缺发票提醒（幂等通知） |
 | patrolService.js | 业务 / 系统巡检、管理员通知、系统操作日志 |
 

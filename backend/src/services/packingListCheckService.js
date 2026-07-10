@@ -1,28 +1,39 @@
 /**
- * Input: 船司装箱单 PDF Buffer（pdfjs-dist 解析）、出口合同及装箱明细（Prisma）
- * Output: 装箱单与系统数据的逐项比对结果（合同号/箱数/毛重/净重/体积/明细行，含差异警示）
- * Pos: 出口环节核对服务，供 POST /sales/:id/packing-list-check 使用
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ * Input: 船司装箱单 PDF、出口合同装箱事实、核对人和人工复核结论
+ * Output: 原 PDF 受限归档、逐商品差异、历史记录及最终核对结论
+ * Pos: 出口单证阶段的船司装箱单核对 Module
  */
 
 const path = require('path');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
+const {
+  archiveBufferFile,
+  CONTRACT_FILE_CATEGORY,
+  CONTRACT_TYPE,
+} = require('./fileService');
 
-// pdfjs-dist 标准字体目录（缺失时部分 PDF 会告警甚至解析失败）
+const PARSER_VERSION = '2026-07-product-scoped-v1';
+const CHECK_STATUS = Object.freeze({
+  PASSED: 'PASSED',
+  DIFFERENCE: 'DIFFERENCE',
+  NEEDS_MANUAL_REVIEW: 'NEEDS_MANUAL_REVIEW',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+});
+
 const PDFJS_STANDARD_FONTS_DIR = path.join(
   path.dirname(require.resolve('pdfjs-dist/package.json')),
   'standard_fonts/',
 );
 
-/**
- * 职责：用 pdfjs-dist 提取 PDF 全文文本（逐页拼接）
- * 思路：pdfjs-dist 仅提供 ESM legacy 构建，CommonJS 下通过动态 import 加载；
- *       资源释放需调用 loadingTask.destroy()（文档代理本身无 destroy）
- * @param {Buffer} buffer PDF 文件内容
- * @returns {Promise<string>} 全文文本
- */
+const CHECK_INCLUDE = Object.freeze({
+  file: true,
+  checkedBy: { select: { id: true, name: true } },
+  reviewedBy: { select: { id: true, name: true } },
+});
+
+/** 职责：用 pdfjs-dist 提取 PDF 全文文本（逐页拼接）。 */
 const extractPdfText = async (buffer) => {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const loadingTask = pdfjs.getDocument({
@@ -45,115 +56,145 @@ const extractPdfText = async (buffer) => {
   }
 };
 
-/**
- * 职责：从 PDF 文本中提取所有数值（去千分位）
- * @param {string} text PDF 全文
- * @returns {number[]} 数值列表（保留重复）
- */
 const extractNumbers = (text) => {
   const matches = String(text || '').match(/\d[\d,]*(?:\.\d+)?/g) || [];
   return matches
     .map((token) => Number.parseFloat(token.replace(/,/g, '')))
-    .filter((n) => Number.isFinite(n));
+    .filter((number) => Number.isFinite(number));
 };
 
-/**
- * 职责：在 PDF 数值集合中查找与期望值最接近的数，并判断是否在容差内匹配
- * 思路：容差取「绝对容差」与「相对容差 × 期望值」二者较大者，兼顾小数值与大数值
- * @param {number[]} numbers PDF 提取的数值列表
- * @param {number} expected 系统期望值
- * @param {number} tolAbs 绝对容差
- * @param {number} tolRel 相对容差（如 0.005 = 0.5%）
- * @returns {{ matched: boolean, closest: number|null }}
- */
 const matchNumber = (numbers, expected, tolAbs = 0, tolRel = 0) => {
-  if (!Number.isFinite(expected)) {
-    return { matched: false, closest: null };
-  }
+  if (!Number.isFinite(expected)) return { matched: false, closest: null };
   const tolerance = Math.max(tolAbs, Math.abs(expected) * tolRel);
   let closest = null;
   let minDiff = Infinity;
-  for (const n of numbers) {
-    const diff = Math.abs(n - expected);
+  for (const number of numbers) {
+    const diff = Math.abs(number - expected);
     if (diff < minDiff) {
       minDiff = diff;
-      closest = n;
+      closest = number;
     }
   }
   return { matched: closest !== null && minDiff <= tolerance, closest };
 };
 
+const normalizeHsCode = (value) => String(value || '').replace(/\D/g, '').slice(0, 10);
+
+const getItemIdentityCandidates = (item) => {
+  const productName = String(item?.product?.customsName || '').trim();
+  const hsCode = normalizeHsCode(item?.product?.hsCode);
+  return [productName, hsCode.length === 10 ? hsCode : ''].filter(Boolean);
+};
+
+const findEarliestIdentity = (lowerText, candidates, startAt = 0) => {
+  let best = null;
+  candidates.forEach((candidate) => {
+    const index = lowerText.indexOf(candidate.toLowerCase(), startAt);
+    if (index >= 0 && (!best || index < best.index)) best = { index, candidate };
+  });
+  return best;
+};
+
 /**
- * 职责：将合同数据与 PDF 文本做逐项比对（纯函数，便于测试）
- * 思路：
- *   1. 合同号做子串匹配（忽略大小写与空白）
- *   2. 汇总指标（箱数/毛重/净重/体积）在 PDF 数值集合中按容差匹配
- *   3. 每条装箱明细的箱数与数量分别匹配，任一缺失记为差异
- * @param {object} contract 含 contractNo/totalBoxes/grossWeight/netWeight/volume/packingItems
- * @param {string} pdfText PDF 全文文本
- * @returns {{ summary: object, fields: object[], items: object[] }}
+ * 职责：定位单个商品在 PDF 中的局部文本片段，避免用整份 PDF 的重复数字伪造逐行匹配。
  */
+const locateItemSegment = (text, item, nextItem, startAt = 0) => {
+  const lowerText = text.toLowerCase();
+  const identity = findEarliestIdentity(lowerText, getItemIdentityCandidates(item), startAt);
+  if (!identity) return { matched: false, closest: null, segment: '', nextCursor: startAt };
+
+  const nextIdentity = nextItem
+    ? findEarliestIdentity(
+        lowerText,
+        getItemIdentityCandidates(nextItem),
+        identity.index + identity.candidate.length,
+      )
+    : null;
+  const end = nextIdentity?.index || Math.min(text.length, identity.index + 400);
+  return {
+    matched: true,
+    closest: identity.candidate,
+    segment: text.slice(identity.index, end),
+    nextCursor: identity.index + identity.candidate.length,
+  };
+};
+
+/** 职责：将合同当前事实与 PDF 文本做汇总及逐商品局部比对。 */
 const buildComparison = (contract, pdfText) => {
   const text = String(pdfText || '');
   const compactText = text.replace(/\s+/g, '').toLowerCase();
   const numbers = extractNumbers(text);
+  const contractCandidates = [contract.contractNo, contract.containerLabel]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+  const matchedContractIdentity = contractCandidates.find((candidate) => (
+    compactText.includes(candidate.replace(/\s+/g, '').toLowerCase())
+  ));
 
-  // 1. 合同号匹配
-  const contractNo = String(contract.contractNo || '');
-  const contractNoFound = contractNo
-    ? compactText.includes(contractNo.replace(/\s+/g, '').toLowerCase())
-    : false;
-
-  // 2. 汇总指标匹配（箱数精确；毛重/净重 ±1kg 或 0.5%；体积 ±0.05 或 1%）
   const fieldDefs = [
     { key: 'totalBoxes', label: '总箱数', expected: contract.totalBoxes, tolAbs: 0, tolRel: 0 },
     { key: 'grossWeight', label: '毛重 (kg)', expected: contract.grossWeight, tolAbs: 1, tolRel: 0.005 },
     { key: 'netWeight', label: '净重 (kg)', expected: contract.netWeight, tolAbs: 1, tolRel: 0.005 },
     { key: 'volume', label: '体积 (CBM)', expected: contract.volume, tolAbs: 0.05, tolRel: 0.01 },
   ];
-
   const fields = [
     {
       key: 'contractNo',
       label: '合同号/柜号',
-      expected: contractNo || '-',
-      matched: contractNoFound,
-      closest: contractNoFound ? contractNo : null,
+      expected: contractCandidates.join(' / ') || '-',
+      matched: Boolean(matchedContractIdentity),
+      closest: matchedContractIdentity || null,
     },
     ...fieldDefs.map(({ key, label, expected, tolAbs, tolRel }) => {
       const value = Number(expected) || 0;
-      if (value <= 0) {
-        // 系统未录入该指标，跳过比对（不算差异，但标记提示）
-        return { key, label, expected: null, matched: null, closest: null };
-      }
+      if (value <= 0) return { key, label, expected: null, matched: null, closest: null };
       const { matched, closest } = matchNumber(numbers, value, tolAbs, tolRel);
       return { key, label, expected: value, matched, closest };
     }),
   ];
 
-  // 3. 装箱明细逐行匹配（箱数精确 + 数量精确）
-  const items = (contract.packingItems || []).map((item) => {
+  let cursor = 0;
+  const packingItems = contract.packingItems || [];
+  const items = packingItems.map((item, index) => {
     const productName = item.product?.customsName || '未知商品';
+    const hsCode = normalizeHsCode(item.product?.hsCode);
+    const identityExpected = [productName, hsCode].filter(Boolean).join(' / ');
+    const located = locateItemSegment(text, item, packingItems[index + 1], cursor);
+    if (located.matched) cursor = located.nextCursor;
+    const scopedNumbers = located.matched ? extractNumbers(located.segment) : [];
     const boxes = Number(item.boxes) || 0;
     const quantity = Number(item.quantity) || 0;
-    const boxesResult = boxes > 0 ? matchNumber(numbers, boxes, 0, 0) : { matched: null, closest: null };
-    const quantityResult = quantity > 0 ? matchNumber(numbers, quantity, 0, 0) : { matched: null, closest: null };
+    const boxesResult = !located.matched || boxes <= 0
+      ? { matched: null, closest: null }
+      : matchNumber(scopedNumbers, boxes, 0, 0);
+    const quantityResult = !located.matched || quantity <= 0
+      ? { matched: null, closest: null }
+      : matchNumber(scopedNumbers, quantity, 0, 0);
     return {
+      packingItemId: item.id || null,
+      productId: item.productId || null,
       productName,
-      boxes: { expected: boxes > 0 ? boxes : null, matched: boxesResult.matched, closest: boxesResult.closest },
-      quantity: { expected: quantity > 0 ? quantity : null, matched: quantityResult.matched, closest: quantityResult.closest },
+      hsCode,
+      identity: {
+        expected: identityExpected,
+        matched: located.matched,
+        closest: located.closest,
+      },
+      boxes: { expected: boxes > 0 ? boxes : null, ...boxesResult },
+      quantity: { expected: quantity > 0 ? quantity : null, ...quantityResult },
     };
   });
 
-  // 4. 汇总统计（matched === null 的字段视为未比对，不计入差异）
-  const comparableFields = fields.filter((f) => f.matched !== null);
-  const mismatchedFields = comparableFields.filter((f) => f.matched === false);
-  const itemChecks = items.flatMap((i) => [i.boxes, i.quantity]).filter((c) => c.matched !== null);
-  const mismatchedItemChecks = itemChecks.filter((c) => c.matched === false);
-
+  const comparableFields = fields.filter((field) => field.matched !== null);
+  const mismatchedFields = comparableFields.filter((field) => field.matched === false);
+  const itemChecks = items
+    .flatMap((item) => [item.identity, item.boxes, item.quantity])
+    .filter((check) => check.matched !== null);
+  const mismatchedItemChecks = itemChecks.filter((check) => check.matched === false);
   return {
     summary: {
       ok: mismatchedFields.length === 0 && mismatchedItemChecks.length === 0,
+      manualReviewRequired: false,
       fieldTotal: comparableFields.length,
       fieldMismatched: mismatchedFields.length,
       itemCheckTotal: itemChecks.length,
@@ -166,48 +207,178 @@ const buildComparison = (contract, pdfText) => {
   };
 };
 
+const buildManualReviewComparison = (textLength = 0) => ({
+  summary: {
+    ok: false,
+    manualReviewRequired: true,
+    fieldTotal: 0,
+    fieldMismatched: 0,
+    itemCheckTotal: 0,
+    itemCheckMismatched: 0,
+    pdfNumberCount: 0,
+    pdfTextLength: textLength,
+  },
+  fields: [],
+  items: [],
+});
+
+const safeJsonParse = (value, fallback) => {
+  try {
+    return typeof value === 'string' ? JSON.parse(value) : value || fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const toCheckRecord = (record) => {
+  if (!record) return null;
+  const { summaryJson, resultJson, ...rest } = record;
+  const summary = safeJsonParse(summaryJson, {});
+  return {
+    ...rest,
+    summary,
+    comparison: safeJsonParse(resultJson, { summary, fields: [], items: [] }),
+  };
+};
+
+const normalizeUploadedPdf = (file) => {
+  const normalized = Buffer.isBuffer(file)
+    ? { buffer: file, originalname: '船司装箱单.pdf', mimetype: 'application/pdf' }
+    : file;
+  if (!Buffer.isBuffer(normalized?.buffer) || normalized.buffer.length === 0) {
+    throw createError('请选择要核对的装箱单 PDF', 400);
+  }
+  if (normalized.mimetype && normalized.mimetype !== 'application/pdf') {
+    throw createError('仅支持 PDF 格式的装箱单', 400);
+  }
+  return {
+    buffer: normalized.buffer,
+    fileName: path.basename(normalized.originalname || '船司装箱单.pdf'),
+    mimeType: 'application/pdf',
+  };
+};
+
 /**
- * 职责：解析上传的船司装箱单 PDF 并与出口合同数据比对
- * 思路：
- *   1. 读取合同（含装箱明细与商品名）
- *   2. pdf-parse 提取全文文本，文本过短视为扫描件（无法比对）
- *   3. 调 buildComparison 输出结构化比对结果
- * @param {string} contractId 出口合同 ID
- * @param {Buffer} pdfBuffer 上传的 PDF 文件内容
- * @returns {Promise<object>} 比对结果
- * @throws 404 合同不存在；422 PDF 无可提取文本
+ * 职责：解析、归档并持久化一次核对。图片型 PDF 进入人工复核，不丢失原始文件。
  */
-const checkPackingListPdf = async (contractId, pdfBuffer) => {
-  // 1. 查询合同
-  const contract = await prisma.salesContract.findUnique({
+const checkPackingListPdf = async (contractId, uploadedFile, {
+  checkedById = null,
+  prismaClient = prisma,
+  extractText = extractPdfText,
+  archiveFile = archiveBufferFile,
+} = {}) => {
+  const file = normalizeUploadedPdf(uploadedFile);
+  const contract = await prismaClient.salesContract.findUnique({
     where: { id: contractId },
     include: {
-      packingItems: { include: { product: { select: { customsName: true } } } },
+      packingItems: {
+        include: { product: { select: { customsName: true, hsCode: true } } },
+        orderBy: { createdAt: 'asc' },
+      },
     },
   });
-  if (!contract) {
-    throw createError('出口合同不存在', 404);
-  }
+  if (!contract) throw createError('出口合同不存在', 404);
 
-  // 2. 解析 PDF 文本
   let rawText;
   try {
-    rawText = await extractPdfText(pdfBuffer);
-  } catch (error) {
+    rawText = await extractText(file.buffer);
+  } catch {
     throw createError('PDF 解析失败，请确认文件未损坏', 422);
   }
-
   const text = String(rawText || '').trim();
-  if (text.length < 20) {
-    throw createError('PDF 中未提取到有效文本（可能是扫描件/图片型 PDF），无法自动比对，请人工核对', 422);
-  }
+  const comparison = text.length < 20
+    ? buildManualReviewComparison(text.length)
+    : buildComparison(contract, text);
+  const automaticStatus = comparison.summary.manualReviewRequired
+    ? CHECK_STATUS.NEEDS_MANUAL_REVIEW
+    : comparison.summary.ok
+      ? CHECK_STATUS.PASSED
+      : CHECK_STATUS.DIFFERENCE;
 
-  // 3. 比对
-  return buildComparison(contract, text);
+  const fileRecord = await archiveFile({
+    contractId,
+    contractType: CONTRACT_TYPE.SALES,
+    buffer: file.buffer,
+    fileName: file.fileName,
+    mimeType: file.mimeType,
+    category: CONTRACT_FILE_CATEGORY.CARRIER_DOCUMENT,
+    description: '船司装箱单核对原件',
+    storageScope: 'carrier-documents',
+    defaultDescription: '船司装箱单核对原件',
+    prismaClient,
+  });
+
+  const record = await prismaClient.packingListCheck.create({
+    data: {
+      salesContractId: contractId,
+      salesContractFileId: fileRecord.id,
+      checkedById,
+      automaticStatus,
+      status: automaticStatus,
+      summaryJson: JSON.stringify(comparison.summary),
+      resultJson: JSON.stringify(comparison),
+      fieldMismatched: comparison.summary.fieldMismatched,
+      itemCheckMismatched: comparison.summary.itemCheckMismatched,
+      parserVersion: PARSER_VERSION,
+    },
+    include: CHECK_INCLUDE,
+  });
+  return toCheckRecord(record);
+};
+
+const listPackingListChecks = async (contractId, { limit = 20 } = {}, prismaClient = prisma) => {
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 100));
+  const records = await prismaClient.packingListCheck.findMany({
+    where: { salesContractId: contractId },
+    orderBy: [{ checkedAt: 'desc' }, { createdAt: 'desc' }],
+    take: safeLimit,
+    include: CHECK_INCLUDE,
+  });
+  return records.map(toCheckRecord);
+};
+
+const reviewPackingListCheck = async (contractId, checkId, {
+  decision,
+  note,
+  reviewedById = null,
+} = {}, prismaClient = prisma) => {
+  if (![CHECK_STATUS.APPROVED, CHECK_STATUS.REJECTED].includes(decision)) {
+    throw createError('人工核对结论必须为 APPROVED 或 REJECTED', 400);
+  }
+  const reviewNote = String(note || '').trim();
+  if (!reviewNote) throw createError('请填写人工核对说明', 400);
+  if (reviewNote.length > 1000) throw createError('人工核对说明不能超过 1000 字', 400);
+
+  const existing = await prismaClient.packingListCheck.findFirst({
+    where: { id: checkId, salesContractId: contractId },
+  });
+  if (!existing) throw createError('装箱单核对记录不存在', 404);
+  const updated = await prismaClient.packingListCheck.update({
+    where: { id: checkId },
+    data: {
+      status: decision,
+      reviewNote,
+      reviewedById,
+      reviewedAt: new Date(),
+    },
+    include: CHECK_INCLUDE,
+  });
+  return toCheckRecord(updated);
 };
 
 module.exports = {
+  CHECK_STATUS,
+  PARSER_VERSION,
   buildComparison,
   checkPackingListPdf,
-  _internal: { extractNumbers, matchNumber, extractPdfText },
+  listPackingListChecks,
+  reviewPackingListCheck,
+  _internal: {
+    buildManualReviewComparison,
+    extractNumbers,
+    extractPdfText,
+    locateItemSegment,
+    matchNumber,
+    toCheckRecord,
+  },
 };

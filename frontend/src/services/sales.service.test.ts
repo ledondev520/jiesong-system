@@ -1,7 +1,7 @@
 /**
- * Input: 销售服务价格计算函数
- * Output: 价格计算单元测试
- * Pos: 前端业务服务测试
+ * Input: 销售服务请求与价格计算函数
+ * Output: 出口合同、船司核对历史/人工结论及价格计算测试
+ * Pos: 前端业务服务 Module 测试
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -83,6 +83,23 @@ describe('salesService api', () => {
     await salesService.importPurchaseItems('sc-1', items);
 
     expect(api.post).toHaveBeenCalledWith('/sales/sc-1/import-purchase-items', { items });
+  });
+
+  it('listPackingListChecks: 读取当前出口合同的核对历史', async () => {
+    await salesService.listPackingListChecks('sc-1', 10);
+
+    expect(api.get).toHaveBeenCalledWith('/sales/sc-1/packing-list-checks', {
+      params: { limit: 10 },
+    });
+  });
+
+  it('reviewPackingListCheck: 保存人工通过结论与说明', async () => {
+    await salesService.reviewPackingListCheck('sc-1', 'check-1', 'APPROVED', '已与船司复核');
+
+    expect(api.put).toHaveBeenCalledWith('/sales/sc-1/packing-list-checks/check-1/review', {
+      decision: 'APPROVED',
+      note: '已与船司复核',
+    });
   });
 });
 

@@ -12,8 +12,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "sqlite"
-  url       = env("DATABASE_URL")   // 本地开发默认使用 SQLite（file:./dev.db）
+  provider = "sqlite"
+  url      = env("DATABASE_URL") // 本地开发默认使用 SQLite（file:./dev.db）
 }
 
 // Role 类型说明 (SQLite 不支持枚举，使用 String):
@@ -26,23 +26,25 @@ datasource db {
 // ==================== 用户与权限 ====================
 
 model User {
-  id            String    @id @default(cuid())
-  username      String    @unique
-  password      String
-  name          String
-  role          String    @default("SALES") // ADMIN, PURCHASE, SALES, FINANCE, WAREHOUSE
-  email         String?
-  phone         String?
-  avatar        String?
-  isActive      Boolean   @default(true)
-  lastLoginAt   DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  username    String    @unique
+  password    String
+  name        String
+  role        String    @default("SALES") // ADMIN, PURCHASE, SALES, FINANCE, WAREHOUSE
+  email       String?
+  phone       String?
+  avatar      String?
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  operationLogs OperationLog[]
-  chatHistories ChatHistory[]
-  agentReplaySummaries AgentReplaySummary[]
-  notifications Notification[]
+  operationLogs             OperationLog[]
+  chatHistories             ChatHistory[]
+  agentReplaySummaries      AgentReplaySummary[]
+  notifications             Notification[]
+  packingListChecksChecked  PackingListCheck[]   @relation("PackingListCheckedBy")
+  packingListChecksReviewed PackingListCheck[]   @relation("PackingListReviewedBy")
 
   @@map("users")
 }
@@ -65,21 +67,21 @@ model AgentAccount {
 }
 
 model AgentCredential {
-  id               String   @id @default(cuid())
-  agentAccountId   String
-  credentialKey    String   @unique
-  label            String?
-  secretHash       String
-  secretPreview    String?
-  status           String   @default("ACTIVE")
-  expiresAt        DateTime?
-  lastUsedAt       DateTime?
-  createdAt        DateTime @default(now())
-  revokedAt        DateTime?
+  id             String    @id @default(cuid())
+  agentAccountId String
+  credentialKey  String    @unique
+  label          String?
+  secretHash     String
+  secretPreview  String?
+  status         String    @default("ACTIVE")
+  expiresAt      DateTime?
+  lastUsedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  revokedAt      DateTime?
 
-  agentAccount   AgentAccount   @relation(fields: [agentAccountId], references: [id], onDelete: Cascade)
-  grants         AgentGrant[]
-  operationLogs  OperationLog[]
+  agentAccount  AgentAccount   @relation(fields: [agentAccountId], references: [id], onDelete: Cascade)
+  grants        AgentGrant[]
+  operationLogs OperationLog[]
 
   @@index([agentAccountId, status])
   @@map("agent_credentials")
@@ -94,7 +96,7 @@ model AgentGrant {
   scopeJson         String?
   createdAt         DateTime @default(now())
 
-  agentAccount    AgentAccount    @relation(fields: [agentAccountId], references: [id], onDelete: Cascade)
+  agentAccount    AgentAccount     @relation(fields: [agentAccountId], references: [id], onDelete: Cascade)
   agentCredential AgentCredential? @relation(fields: [agentCredentialId], references: [id], onDelete: Cascade)
 
   @@unique([agentAccountId, agentCredentialId, resource, action])
@@ -119,28 +121,28 @@ model Port {
 }
 
 model Supplier {
-  id              String    @id @default(cuid())
-  name            String    // 供应商全称（合同用）
-  shortName       String?   // 简称
+  id              String   @id @default(cuid())
+  name            String // 供应商全称（合同用）
+  shortName       String? // 简称
   // 联系人信息
   contactName     String?
   contactPhone    String?
   contactEmail    String?
   // 公司信息（合同用）
-  address         String?   // 公司地址
-  phone           String?   // 公司电话
-  taxId           String?   // 纳税人识别号/税号
-  bankAccountName String?   // 收款户名
-  bankName        String?   // 开户银行名称
-  bankBranch      String?   // 开户支行
-  bankCode        String?   // 联行号/银行编号
-  bankAccount     String?   // 银行账号
+  address         String? // 公司地址
+  phone           String? // 公司电话
+  taxId           String? // 纳税人识别号/税号
+  bankAccountName String? // 收款户名
+  bankName        String? // 开户银行名称
+  bankBranch      String? // 开户支行
+  bankCode        String? // 联行号/银行编号
+  bankAccount     String? // 银行账号
   // 状态
-  hasQualityIssue Boolean   @default(false)
+  hasQualityIssue Boolean  @default(false)
   qualityNote     String?
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   aliases           SupplierAlias[]
   purchaseContracts PurchaseContract[]
@@ -180,38 +182,38 @@ model Store {
 }
 
 model Product {
-  id            String   @id @default(cuid())
-  customsName   String
-  description   String?
-  specification String?  // 原文本规格（兼容历史数据）
-  unit          String?
-  lowStockThreshold Float @default(0)
-  categoryId    String?
+  id                String   @id @default(cuid())
+  customsName       String
+  description       String?
+  specification     String? // 原文本规格（兼容历史数据）
+  unit              String?
+  lowStockThreshold Float    @default(0)
+  categoryId        String?
   // 海关申报信息
-  hsCode        String?  // HS编码（10位海关编码）
-  declaration   String?  // 申报要素（汇总）
+  hsCode            String? // HS编码（10位海关编码）
+  declaration       String? // 申报要素（汇总）
   // 重量信息
-  grossWeight   Float?   // 毛重 (kg/件)
-  netWeight     Float?   // 净重 (kg/件)
-  volume        Float?   // 体积 (CBM/件)
-  packingSpec   String?  // 包装规格 (如: 4片/箱)
+  grossWeight       Float? // 毛重 (kg/件)
+  netWeight         Float? // 净重 (kg/件)
+  volume            Float? // 体积 (CBM/件)
+  packingSpec       String? // 包装规格 (如: 4片/箱)
   // 尺寸信息（用于3D可视化）
-  length        Float?   // 长度 (mm)
-  width         Float?   // 宽度 (mm)
-  height        Float?   // 高度 (mm)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  length            Float? // 长度 (mm)
+  width             Float? // 宽度 (mm)
+  height            Float? // 高度 (mm)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  category       ProductCategory? @relation(fields: [categoryId], references: [id])
-  suppliers      ProductSupplier[]
-  purchaseItems  PurchaseItem[]
-  salesItems     SalesItem[]
-  inventories    Inventory[]
-  packingItems   PackingItem[]
+  category                ProductCategory?         @relation(fields: [categoryId], references: [id])
+  suppliers               ProductSupplier[]
+  purchaseItems           PurchaseItem[]
+  salesItems              SalesItem[]
+  inventories             Inventory[]
+  packingItems            PackingItem[]
   customsDeclarationItems CustomsDeclarationItem[]
-  priceHistories PriceHistory[]
-  taxRates       TaxRate[]
+  priceHistories          PriceHistory[]
+  taxRates                TaxRate[]
 
   @@map("products")
 }
@@ -273,23 +275,23 @@ model PriceHistory {
 // ==================== 采购管理 ====================
 
 model PurchaseContract {
-  id           String   @id @default(cuid())
-  contractNo   String   @unique
-  supplierId   String
-  totalAmount  Float    @default(0)
-  paidAmount   Float    @default(0)
-  taxRate      Int      @default(13)  // 税率（%），通常为 1 或 13
-  status       String   @default("DRAFT")
-  signedAt     DateTime?
-  expectedDate DateTime?
+  id                    String    @id @default(cuid())
+  contractNo            String    @unique
+  supplierId            String
+  totalAmount           Float     @default(0)
+  paidAmount            Float     @default(0)
+  taxRate               Int       @default(13) // 税率（%），通常为 1 或 13
+  status                String    @default("DRAFT")
+  signedAt              DateTime?
+  expectedDate          DateTime?
   productionCompletedAt DateTime? // 生产资料完整并确认完工的时间
-  invoiceNo    String?
-  storeName    String?  // 发货店铺名称
-  note         String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  invoiceNo             String?
+  storeName             String? // 发货店铺名称
+  note                  String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  supplier Supplier         @relation(fields: [supplierId], references: [id])
+  supplier Supplier       @relation(fields: [supplierId], references: [id])
   items    PurchaseItem[]
   payments Payment[]
   files    ContractFile[]
@@ -309,13 +311,13 @@ model PurchaseItem {
   unitPrice          Float
   totalPrice         Float
   specification      String?
-  boxes              Int?     // 本采购明细总箱数
-  grossWeight        Float?   // 本采购明细总毛重 (kg)
-  netWeight          Float?   // 本采购明细总净重 (kg)
-  volume             Float?   // 本采购明细总体积 (CBM)
-  length             Float?   // 单箱长度 (mm)，可不填并由总体积/箱数推算
-  width              Float?   // 单箱宽度 (mm)
-  height             Float?   // 单箱高度 (mm)
+  boxes              Int? // 本采购明细总箱数
+  grossWeight        Float? // 本采购明细总毛重 (kg)
+  netWeight          Float? // 本采购明细总净重 (kg)
+  volume             Float? // 本采购明细总体积 (CBM)
+  length             Float? // 单箱长度 (mm)，可不填并由总体积/箱数推算
+  width              Float? // 单箱宽度 (mm)
+  height             Float? // 单箱高度 (mm)
   note               String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
@@ -334,40 +336,41 @@ model PurchaseItem {
 // 重构说明：一个出口合同 EXP = 一个货柜，合并管理
 
 model SalesContract {
-  id             String   @id @default(cuid())
-  contractNo     String   @unique  // EXP 编号，同时作为货柜标识
+  id               String    @id @default(cuid())
+  contractNo       String    @unique // EXP 编号，同时作为货柜标识
   // 销售信息
-  totalAmount    Float    @default(0)
-  receivedAmount Float    @default(0)
-  exchangeRate   Float
-  status         String   @default("DRAFT")  // DRAFT/CONFIRMED/PACKING/SHIPPED/ARRIVED/COMPLETED
-  signedAt       DateTime?
-  note           String?
+  totalAmount      Float     @default(0)
+  receivedAmount   Float     @default(0)
+  exchangeRate     Float
+  status           String    @default("DRAFT") // DRAFT/CONFIRMED/PACKING/SHIPPED/ARRIVED/COMPLETED
+  signedAt         DateTime?
+  note             String?
   // 货柜信息（合并自原 Container 表）
-  portId         String?  // 目的港口
-  totalBoxes     Int      @default(0)
-  grossWeight    Float    @default(0)
-  netWeight      Float    @default(0)
-  volume         Float    @default(0)
-  shippedAt      DateTime?
+  portId           String? // 目的港口
+  totalBoxes       Int       @default(0)
+  grossWeight      Float     @default(0)
+  netWeight        Float     @default(0)
+  volume           Float     @default(0)
+  shippedAt        DateTime?
   estimatedArrival DateTime?
-  customsBroker  String?
-  isFumigated    Boolean?
-  hasTaxRefund   Boolean?
-  containerLabel String?  // 物理货柜编号（如 "02-振宗"），与 EXP 合同号区分
+  customsBroker    String?
+  isFumigated      Boolean?
+  hasTaxRefund     Boolean?
+  containerLabel   String? // 物理货柜编号（如 "02-振宗"），与 EXP 合同号区分
   // 时间戳
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  port         Port?         @relation(fields: [portId], references: [id])
+  port                Port?                @relation(fields: [portId], references: [id])
   customsDeclarations CustomsDeclaration[]
-  forexVerifications ForexVerification[]
-  items        SalesItem[]
-  packingItems PackingItem[] // 装箱明细
-  payments     Payment[]
-  inventories  Inventory[]
-  taxRefunds   TaxRefund[]
-  files        SalesContractFile[]
+  forexVerifications  ForexVerification[]
+  items               SalesItem[]
+  packingItems        PackingItem[] // 装箱明细
+  payments            Payment[]
+  inventories         Inventory[]
+  taxRefunds          TaxRefund[]
+  files               SalesContractFile[]
+  packingListChecks   PackingListCheck[]
 
   @@index([status])
   @@index([portId])
@@ -391,8 +394,8 @@ model SalesItem {
 
   salesContract SalesContract @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
   product       Product       @relation(fields: [productId], references: [id])
-  store         Store         @relation(fields: [storeId], references: [id])
-  inventories   Inventory[]
+  store             Store              @relation(fields: [storeId], references: [id])
+  inventories       Inventory[]
 
   @@index([salesContractId])
   @@index([productId])
@@ -401,48 +404,48 @@ model SalesItem {
 
 // 装箱明细（原 ContainerItem，现关联 SalesContract）
 model PackingItem {
-  id              String   @id @default(cuid())
-  salesContractId String   // 关联出口合同（即货柜）
-  purchaseItemId  String?  // 来源采购明细，允许一条采购明细拆分到多个货柜
-  productId       String
-  storeId         String?
-  isOwnedByJiesong Boolean @default(true)
-  sourceParty     String?
-  quantity        Float
-  unit            String?
-  boxes           Int?
-  grossWeight     Float?
-  netWeight       Float?
-  volume          Float?
+  id                 String   @id @default(cuid())
+  salesContractId    String // 关联出口合同（即货柜）
+  purchaseItemId     String? // 来源采购明细，允许一条采购明细拆分到多个货柜
+  productId          String
+  storeId            String?
+  isOwnedByJiesong   Boolean  @default(true)
+  sourceParty        String?
+  quantity           Float
+  unit               String?
+  boxes              Int?
+  grossWeight        Float?
+  netWeight          Float?
+  volume             Float?
   // 价格信息（USD）
-  unitPrice       Float?   // 单价（USD）
-  totalPrice      Float?   // 总价（USD）= 单价 * 数量
+  unitPrice          Float? // 单价（USD）
+  totalPrice         Float? // 总价（USD）= 单价 * 数量
   // 商品详情（来自出货清单）
-  supplement      String?  // 商品补充信息（如型号、颜色、用途等）
-  specification   String?  // 规格/尺寸（如 "510*510*810"）
-  manufacturer    String?  // 厂家名称
-  invoiceNo       String?  // 发票号码（增值税发票，退税核销用）
+  supplement         String? // 商品补充信息（如型号、颜色、用途等）
+  specification      String? // 规格/尺寸（如 "510*510*810"）
+  manufacturer       String? // 厂家名称
+  invoiceNo          String? // 发票号码（增值税发票，退税核销用）
   purchaseContractNo String? // 购销合同号（对应采购合同）
-  purchaseCost    Float?   // 采购金额（人民币）
-  hsMatchConfidence Float? // HS编码匹配置信度（0-100）
-  hsMatchMethod   String?  // HS编码匹配方式（精确/别名/模糊等）
+  purchaseCost       Float? // 采购金额（人民币）
+  hsMatchConfidence  Float? // HS编码匹配置信度（0-100）
+  hsMatchMethod      String? // HS编码匹配方式（精确/别名/模糊等）
   // 商品规格尺寸（用于3D可视化，单位 mm）
-  length          Float?   // 长度 (mm)
-  width           Float?   // 宽度 (mm)
-  height          Float?   // 高度 (mm)
+  length             Float? // 长度 (mm)
+  width              Float? // 宽度 (mm)
+  height             Float? // 高度 (mm)
   // 3D 装箱位置（由装箱算法计算）
-  posX            Float?   // 在货柜中的 X 位置 (mm)
-  posY            Float?   // 在货柜中的 Y 位置 (mm)
-  posZ            Float?   // 在货柜中的 Z 位置 (mm)
-  note            String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  posX               Float? // 在货柜中的 X 位置 (mm)
+  posY               Float? // 在货柜中的 Y 位置 (mm)
+  posZ               Float? // 在货柜中的 Z 位置 (mm)
+  note               String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  salesContract SalesContract @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
-  purchaseItem  PurchaseItem? @relation(fields: [purchaseItemId], references: [id], onDelete: SetNull)
+  salesContract           SalesContract            @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
+  purchaseItem            PurchaseItem?            @relation(fields: [purchaseItemId], references: [id], onDelete: SetNull)
   customsDeclarationItems CustomsDeclarationItem[]
-  product       Product       @relation(fields: [productId], references: [id])
-  store         Store?        @relation(fields: [storeId], references: [id])
+  product                 Product                  @relation(fields: [productId], references: [id])
+  store                   Store?                   @relation(fields: [storeId], references: [id])
 
   @@index([salesContractId])
   @@index([purchaseItemId])
@@ -456,7 +459,7 @@ model Inventory {
   productId       String
   purchaseItemId  String?
   salesItemId     String?
-  salesContractId String?   // 关联出口合同（代替原 containerId）
+  salesContractId String? // 关联出口合同（代替原 containerId）
   quantity        Float
   unit            String?
   status          String    @default("PRODUCING")
@@ -513,22 +516,22 @@ model Payment {
 // ==================== 出口退税 ====================
 
 model CustomsDeclaration {
-  id             String   @id @default(cuid())
-  declarationNo  String   @unique
-  salesContractId String
-  declaredAt     DateTime?
-  exportDate     DateTime?
-  customsBroker  String?
-  currency       String   @default("USD")
-  exchangeRate   Float?
-  totalAmount    Float    @default(0)
-  totalQuantity  Float    @default(0)
-  totalNetWeight Float    @default(0)
-  totalGrossWeight Float  @default(0)
-  status         String   @default("DRAFT") // DRAFT/DECLARED/RELEASED/VOID
-  note           String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id               String    @id @default(cuid())
+  declarationNo    String    @unique
+  salesContractId  String
+  declaredAt       DateTime?
+  exportDate       DateTime?
+  customsBroker    String?
+  currency         String    @default("USD")
+  exchangeRate     Float?
+  totalAmount      Float     @default(0)
+  totalQuantity    Float     @default(0)
+  totalNetWeight   Float     @default(0)
+  totalGrossWeight Float     @default(0)
+  status           String    @default("DRAFT") // DRAFT/DECLARED/RELEASED/VOID
+  note             String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   salesContract      SalesContract            @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
   items              CustomsDeclarationItem[]
@@ -540,21 +543,21 @@ model CustomsDeclaration {
 }
 
 model CustomsDeclarationItem {
-  id                 String   @id @default(cuid())
+  id                   String   @id @default(cuid())
   customsDeclarationId String
-  productId          String
-  packingItemId      String?
-  taxRateId          String?
-  itemNo             Int?
-  customsName        String
-  hsCode             String?
-  declarationElements String?
-  quantity           Float
-  unit               String?
-  unitPrice          Float?
-  totalPrice         Float?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  productId            String
+  packingItemId        String?
+  taxRateId            String?
+  itemNo               Int?
+  customsName          String
+  hsCode               String?
+  declarationElements  String?
+  quantity             Float
+  unit                 String?
+  unitPrice            Float?
+  totalPrice           Float?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   customsDeclaration CustomsDeclaration @relation(fields: [customsDeclarationId], references: [id], onDelete: Cascade)
   product            Product            @relation(fields: [productId], references: [id])
@@ -569,20 +572,20 @@ model CustomsDeclarationItem {
 }
 
 model ForexVerification {
-  id                  String   @id @default(cuid())
-  verificationNo      String   @unique
-  salesContractId     String
+  id                   String    @id @default(cuid())
+  verificationNo       String    @unique
+  salesContractId      String
   customsDeclarationId String?
-  bankName            String?
-  currency            String   @default("USD")
-  receivedAmount      Float
-  settledAmount       Float?
-  exchangeRate        Float?
-  verifiedAt          DateTime?
-  status              String   @default("PENDING") // PENDING/VERIFIED/FAILED
-  note                String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  bankName             String?
+  currency             String    @default("USD")
+  receivedAmount       Float
+  settledAmount        Float?
+  exchangeRate         Float?
+  verifiedAt           DateTime?
+  status               String    @default("PENDING") // PENDING/VERIFIED/FAILED
+  note                 String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   salesContract      SalesContract       @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
   customsDeclaration CustomsDeclaration? @relation(fields: [customsDeclarationId], references: [id])
@@ -594,24 +597,24 @@ model ForexVerification {
 }
 
 model TaxRefund {
-  id                  String   @id @default(cuid())
-  refundNo            String   @unique
-  salesContractId     String
+  id                   String    @id @default(cuid())
+  refundNo             String    @unique
+  salesContractId      String
   customsDeclarationId String
-  forexVerificationId String?
-  relation_no         String?
-  invoice_no          String?
-  vat_rate_type       Int?
-  match_status        String   @default("pending") // pending/passed/blocked
-  status              String   @default("DRAFT") // DRAFT/APPLIED/APPROVED/REFUNDED/REJECTED
-  declaredAmount      Float    @default(0)
-  refundableAmount    Float    @default(0)
-  refundedAmount      Float    @default(0)
-  appliedAt           DateTime?
-  refundedAt          DateTime?
-  note                String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  forexVerificationId  String?
+  relation_no          String?
+  invoice_no           String?
+  vat_rate_type        Int?
+  match_status         String    @default("pending") // pending/passed/blocked
+  status               String    @default("DRAFT") // DRAFT/APPLIED/APPROVED/REFUNDED/REJECTED
+  declaredAmount       Float     @default(0)
+  refundableAmount     Float     @default(0)
+  refundedAmount       Float     @default(0)
+  appliedAt            DateTime?
+  refundedAt           DateTime?
+  note                 String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   salesContract      SalesContract      @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
   customsDeclaration CustomsDeclaration @relation(fields: [customsDeclarationId], references: [id])
@@ -624,17 +627,17 @@ model TaxRefund {
 }
 
 model TaxRate {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   productId       String
   hsCode          String?
-  purchaseTaxRate Float    @default(13)
+  purchaseTaxRate Float     @default(13)
   refundRate      Float
   effectiveFrom   DateTime
   effectiveTo     DateTime?
-  isActive        Boolean  @default(true)
+  isActive        Boolean   @default(true)
   note            String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   product                 Product                  @relation(fields: [productId], references: [id], onDelete: Cascade)
   customsDeclarationItems CustomsDeclarationItem[]
@@ -645,8 +648,8 @@ model TaxRate {
 }
 
 model HsCode {
-  id                    String   @id @default(cuid())
-  hsCode                String   @unique
+  id                    String    @id @default(cuid())
+  hsCode                String    @unique
   productName           String
   taxRate               Float
   refundRate            Float?
@@ -708,11 +711,42 @@ model SalesContractFile {
   checksum        String?
   uploadedAt      DateTime @default(now())
 
-  salesContract SalesContract @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
+  salesContract     SalesContract      @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
+  packingListChecks PackingListCheck[]
 
   @@index([salesContractId])
   @@index([category])
   @@map("sales_contract_files")
+}
+
+model PackingListCheck {
+  id                  String    @id @default(cuid())
+  salesContractId     String
+  salesContractFileId String
+  checkedById         String?
+  reviewedById        String?
+  automaticStatus     String // PASSED / DIFFERENCE / NEEDS_MANUAL_REVIEW
+  status              String // PASSED / DIFFERENCE / NEEDS_MANUAL_REVIEW / APPROVED / REJECTED
+  summaryJson         String
+  resultJson          String?
+  fieldMismatched     Int       @default(0)
+  itemCheckMismatched Int       @default(0)
+  parserVersion       String    @default("2026-07")
+  checkedAt           DateTime  @default(now())
+  reviewedAt          DateTime?
+  reviewNote          String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  salesContract SalesContract     @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
+  file          SalesContractFile @relation(fields: [salesContractFileId], references: [id], onDelete: Restrict)
+  checkedBy     User?             @relation("PackingListCheckedBy", fields: [checkedById], references: [id], onDelete: SetNull)
+  reviewedBy    User?             @relation("PackingListReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([salesContractId, checkedAt])
+  @@index([salesContractFileId])
+  @@index([status])
+  @@map("packing_list_checks")
 }
 
 // ==================== AI与日志 ====================
@@ -824,10 +858,10 @@ model SystemConfig {
 model Notification {
   id        String   @id @default(cuid())
   userId    String
-  type      String   // PURCHASE_DRAFT, SALES_DRAFT, OVERDUE_RECEIVABLE, LOW_STOCK
+  type      String // PURCHASE_DRAFT, SALES_DRAFT, OVERDUE_RECEIVABLE, LOW_STOCK
   title     String
   content   String?
-  link      String?  // 点击跳转的URL
+  link      String? // 点击跳转的URL
   metadata  String?
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -842,15 +876,15 @@ model Notification {
 
 model FinancialPeriod {
   id          String   @id @default(cuid())
-  year        Int      // 会计年度，如 2025
-  month       Int      // 账期月份 1-12
-  periodLabel String   // 显示标签，如 "2025年1账期"
+  year        Int // 会计年度，如 2025
+  month       Int // 账期月份 1-12
+  periodLabel String // 显示标签，如 "2025年1账期"
   reportDate  DateTime // 期末日期，如 2025-01-31
   importedAt  DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  balanceSheet     BalanceSheetEntry?
-  incomeStatement  IncomeStatementEntry?
+  balanceSheet    BalanceSheetEntry?
+  incomeStatement IncomeStatementEntry?
 
   @@unique([year, month])
   @@map("financial_periods")
@@ -874,16 +908,16 @@ model BalanceSheetEntry {
   totalAssets           Float? // 资产合计 行次30
 
   // 流动负债
-  accountsPayable            Float? // 应付账款 行次33
-  advancedReceipts           Float? // 预收账款 行次34
-  staffWagesPayable          Float? // 应付职工薪酬 行次35
-  taxesPayable               Float? // 应交税费 行次36
-  otherPayables              Float? // 其他应付款 行次39
-  totalCurrentLiabilities    Float? // 流动负债合计 行次41
+  accountsPayable         Float? // 应付账款 行次33
+  advancedReceipts        Float? // 预收账款 行次34
+  staffWagesPayable       Float? // 应付职工薪酬 行次35
+  taxesPayable            Float? // 应交税费 行次36
+  otherPayables           Float? // 其他应付款 行次39
+  totalCurrentLiabilities Float? // 流动负债合计 行次41
 
   // 非流动负债
   totalNonCurrentLiabilities Float? // 非流动负债合计 行次46
-  totalLiabilities            Float? // 负债合计 行次47
+  totalLiabilities           Float? // 负债合计 行次47
 
   // 所有者权益
   paidInCapital    Float? // 实收资本 行次48
@@ -902,34 +936,34 @@ model IncomeStatementEntry {
   periodId String @unique
 
   // 本月金额
-  revenueMonth             Float? // 营业收入 行次1
-  costOfSalesMonth         Float? // 营业成本 行次2
-  taxesMonth               Float? // 税金及附加 行次3
-  sellingExpensesMonth     Float? // 销售费用 行次11
-  adminExpensesMonth       Float? // 管理费用 行次14
-  financialExpensesMonth   Float? // 财务费用 行次18
-  investmentIncomeMonth    Float? // 投资收益 行次20
-  operatingProfitMonth     Float? // 营业利润 行次21
-  nonOperatingIncomeMonth  Float? // 营业外收入 行次22
+  revenueMonth              Float? // 营业收入 行次1
+  costOfSalesMonth          Float? // 营业成本 行次2
+  taxesMonth                Float? // 税金及附加 行次3
+  sellingExpensesMonth      Float? // 销售费用 行次11
+  adminExpensesMonth        Float? // 管理费用 行次14
+  financialExpensesMonth    Float? // 财务费用 行次18
+  investmentIncomeMonth     Float? // 投资收益 行次20
+  operatingProfitMonth      Float? // 营业利润 行次21
+  nonOperatingIncomeMonth   Float? // 营业外收入 行次22
   nonOperatingExpensesMonth Float? // 营业外支出 行次24
-  totalProfitMonth         Float? // 利润总额 行次30
-  incomeTaxMonth           Float? // 所得税费用 行次31
-  netProfitMonth           Float? // 净利润 行次32
+  totalProfitMonth          Float? // 利润总额 行次30
+  incomeTaxMonth            Float? // 所得税费用 行次31
+  netProfitMonth            Float? // 净利润 行次32
 
   // 本年累计金额
-  revenueYTD             Float? // 营业收入
-  costOfSalesYTD         Float? // 营业成本
-  taxesYTD               Float? // 税金及附加
-  sellingExpensesYTD     Float? // 销售费用
-  adminExpensesYTD       Float? // 管理费用
-  financialExpensesYTD   Float? // 财务费用
-  investmentIncomeYTD    Float? // 投资收益
-  operatingProfitYTD     Float? // 营业利润
-  nonOperatingIncomeYTD  Float? // 营业外收入
+  revenueYTD              Float? // 营业收入
+  costOfSalesYTD          Float? // 营业成本
+  taxesYTD                Float? // 税金及附加
+  sellingExpensesYTD      Float? // 销售费用
+  adminExpensesYTD        Float? // 管理费用
+  financialExpensesYTD    Float? // 财务费用
+  investmentIncomeYTD     Float? // 投资收益
+  operatingProfitYTD      Float? // 营业利润
+  nonOperatingIncomeYTD   Float? // 营业外收入
   nonOperatingExpensesYTD Float? // 营业外支出
-  totalProfitYTD         Float? // 利润总额
-  incomeTaxYTD           Float? // 所得税费用
-  netProfitYTD           Float? // 净利润
+  totalProfitYTD          Float? // 利润总额
+  incomeTaxYTD            Float? // 所得税费用
+  netProfitYTD            Float? // 净利润
 
   period FinancialPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
 
@@ -939,16 +973,16 @@ model IncomeStatementEntry {
 // ==================== 合同模板 ====================
 
 model ContractTemplate {
-  id          String   @id @default(cuid())
-  name        String
-  type        String   // PURCHASE / SALES
-  supplierId  String?
-  taxRate     Int?
-  note        String?
-  items       String   // JSON 字符串，存储商品明细模板
-  createdBy   String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  name       String
+  type       String // PURCHASE / SALES
+  supplierId String?
+  taxRate    Int?
+  note       String?
+  items      String // JSON 字符串，存储商品明细模板
+  createdBy  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([type])
   @@index([createdBy])
@@ -975,11 +1009,11 @@ model ImportRecord {
 
 model FinanceDataBatch {
   id            String   @id @default(cuid())
-  type          String   // BANK_FLOW | INVOICE
+  type          String // BANK_FLOW | INVOICE
   fileName      String
   recordCount   Int
-  dataStartDate String?  // 数据覆盖起始日期 yyyy-MM-dd
-  dataEndDate   String?  // 数据覆盖结束日期 yyyy-MM-dd
+  dataStartDate String? // 数据覆盖起始日期 yyyy-MM-dd
+  dataEndDate   String? // 数据覆盖结束日期 yyyy-MM-dd
   note          String?
   importedAt    DateTime @default(now())
 
@@ -990,26 +1024,26 @@ model FinanceDataBatch {
 }
 
 model BankTransaction {
-  id                  String   @id @default(cuid())
+  id                  String    @id @default(cuid())
   batchId             String
-  txnTime             String   // 交易时间（原始字符串，保留精度）
-  txnDate             String   // 交易日期 yyyy-MM-dd（用于筛选）
-  amount              Float    // 正=收入，负=支出
-  payer               String?  // 付方名称
-  payee               String?  // 收方名称
-  summary             String?  // 摘要
-  txnType             String?  // 交易类型
-  txnId               String?  // 交易流水号
-  balance             Float?   // 余额
-  counterpart         String?  // 对方名称（付/收方中非本公司的一方）
-  direction           String   // IN | OUT
+  txnTime             String // 交易时间（原始字符串，保留精度）
+  txnDate             String // 交易日期 yyyy-MM-dd（用于筛选）
+  amount              Float // 正=收入，负=支出
+  payer               String? // 付方名称
+  payee               String? // 收方名称
+  summary             String? // 摘要
+  txnType             String? // 交易类型
+  txnId               String? // 交易流水号
+  balance             Float? // 余额
+  counterpart         String? // 对方名称（付/收方中非本公司的一方）
+  direction           String // IN | OUT
   // 智能关联引擎字段
   matchedContractId   String?
-  matchedContractType String?  // PURCHASE / SALES
+  matchedContractType String? // PURCHASE / SALES
   matchScore          Float?
-  matchStatus         String   @default("PENDING") // PENDING / MATCHED / IGNORED
+  matchStatus         String    @default("PENDING") // PENDING / MATCHED / IGNORED
   matchedAt           DateTime?
-  createdAt           DateTime @default(now())
+  createdAt           DateTime  @default(now())
 
   batch FinanceDataBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
@@ -1023,39 +1057,39 @@ model BankTransaction {
 }
 
 model InvoiceRecord {
-  id                  String   @id @default(cuid())
+  id                  String    @id @default(cuid())
   batchId             String
-  invNo               String?  // 数电发票号码或发票号码
-  invCode             String?  // 发票代码
-  seller              String   // 销方名称
-  sellerTaxId         String?  // 销方识别号
-  buyer               String?  // 购方名称
-  buyerTaxId          String?  // 购方识别号
-  invDate             String   // 开票日期 yyyy-MM-dd
-  invDateFull         String?  // 开票日期原始（含时分秒）
-  itemName            String?  // 货物或应税劳务名称
-  spec                String?  // 规格型号
-  unit                String?  // 单位
-  qty                 Float?   // 数量
-  unitPrice           Float?   // 单价
-  amount              Float    // 不含税金额
-  taxRate             String?  // 税率
-  tax                 Float    // 税额
-  total               Float    // 价税合计
-  invoiceType         String?  // 发票票种
-  status              String   // 发票状态：正常、已红冲-全额等
-  isPositive          String   // 是否正数发票：是/否
-  riskLevel           String?  // 发票风险等级
-  issuer              String?  // 开票人
-  remark              String?  // 备注
-  taxClassCode        String?  // 税收分类编码
+  invNo               String? // 数电发票号码或发票号码
+  invCode             String? // 发票代码
+  seller              String // 销方名称
+  sellerTaxId         String? // 销方识别号
+  buyer               String? // 购方名称
+  buyerTaxId          String? // 购方识别号
+  invDate             String // 开票日期 yyyy-MM-dd
+  invDateFull         String? // 开票日期原始（含时分秒）
+  itemName            String? // 货物或应税劳务名称
+  spec                String? // 规格型号
+  unit                String? // 单位
+  qty                 Float? // 数量
+  unitPrice           Float? // 单价
+  amount              Float // 不含税金额
+  taxRate             String? // 税率
+  tax                 Float // 税额
+  total               Float // 价税合计
+  invoiceType         String? // 发票票种
+  status              String // 发票状态：正常、已红冲-全额等
+  isPositive          String // 是否正数发票：是/否
+  riskLevel           String? // 发票风险等级
+  issuer              String? // 开票人
+  remark              String? // 备注
+  taxClassCode        String? // 税收分类编码
   // 智能关联引擎字段
   matchedContractId   String?
-  matchedContractType String?  // PURCHASE / SALES
+  matchedContractType String? // PURCHASE / SALES
   matchScore          Float?
-  matchStatus         String   @default("PENDING") // PENDING / MATCHED / IGNORED
+  matchStatus         String    @default("PENDING") // PENDING / MATCHED / IGNORED
   matchedAt           DateTime?
-  createdAt           DateTime @default(now())
+  createdAt           DateTime  @default(now())
 
   batch FinanceDataBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
@@ -1069,19 +1103,19 @@ model InvoiceRecord {
 }
 
 model AiUsageLog {
-  id        String   @id @default(uuid())
-  userId    String
-  userName  String?
-  action    String   // CHAT / PARSE / AGENT / HS_CODE
-  model     String   // kimi-k2-turbo-preview / gpt-4 / etc
-  promptTokens    Int      @default(0)
-  completionTokens Int     @default(0)
-  totalTokens     Int      @default(0)
-  durationMs  Int        @default(0)
-  status      String     // SUCCESS / ERROR
-  errorMessage String?
-  metadata    String?    // JSON string
-  createdAt   DateTime   @default(now())
+  id               String   @id @default(uuid())
+  userId           String
+  userName         String?
+  action           String // CHAT / PARSE / AGENT / HS_CODE
+  model            String // kimi-k2-turbo-preview / gpt-4 / etc
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  totalTokens      Int      @default(0)
+  durationMs       Int      @default(0)
+  status           String // SUCCESS / ERROR
+  errorMessage     String?
+  metadata         String? // JSON string
+  createdAt        DateTime @default(now())
 
   @@index([userId])
   @@index([action])
