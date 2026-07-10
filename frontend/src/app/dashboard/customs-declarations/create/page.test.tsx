@@ -63,23 +63,23 @@ describe('CreateCustomsDeclarationPage 交互逻辑', () => {
 
     expect(screen.getByRole('heading', { name: '新建报关单' })).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText('报关单号'), 'CUS-2026-010');
-    await user.type(screen.getByLabelText('发货人'), '捷淞供应链');
-    await user.type(screen.getByLabelText('收货人'), 'Bogota Ceramica');
-    await user.type(screen.getByLabelText('目的国'), '哥伦比亚');
-    await user.type(screen.getByLabelText('起运港'), '上海');
-    await user.type(screen.getByLabelText('目的港'), 'Buenaventura');
-    await user.type(screen.getByLabelText('申报日期'), '2026-03-06');
-    await user.type(screen.getByLabelText('成交币种'), 'USD');
-    await user.type(screen.getByLabelText('货值总额'), '88000');
-    await user.type(screen.getByLabelText('总件数'), '1200');
-    await user.type(screen.getByLabelText('毛重 (kg)'), '18000');
-    await user.type(screen.getByLabelText('净重 (kg)'), '17350');
-    await user.type(screen.getByLabelText('商品名称'), '釉面砖');
-    await user.type(screen.getByLabelText('商品 HS 编码'), '69072190');
-    await user.type(screen.getByLabelText('申报数量'), '1200');
-    await user.type(screen.getByLabelText('单价'), '73.33');
-    await user.type(screen.getByLabelText('备注'), '整柜出运');
+    setFieldValue('报关单号', 'CUS-2026-010');
+    setFieldValue('发货人', '捷淞供应链');
+    setFieldValue('收货人', 'Bogota Ceramica');
+    setFieldValue('目的国', '哥伦比亚');
+    setFieldValue('起运港', '上海');
+    setFieldValue('目的港', 'Buenaventura');
+    setFieldValue('申报日期', '2026-03-06');
+    setFieldValue('成交币种', 'USD');
+    setFieldValue('货值总额', '88000');
+    setFieldValue('总件数', '1200');
+    setFieldValue('毛重 (kg)', '18000');
+    setFieldValue('净重 (kg)', '17350');
+    setFieldValue('商品名称', '釉面砖');
+    setFieldValue('商品 HS 编码', '69072190');
+    setFieldValue('申报数量', '1200');
+    setFieldValue('单价', '73.33');
+    setFieldValue('备注', '整柜出运');
 
     await user.click(screen.getByRole('button', { name: '保存并查看详情' }));
 

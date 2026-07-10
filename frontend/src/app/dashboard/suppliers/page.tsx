@@ -62,7 +62,10 @@ const supplierSchema = z.object({
   address: z.string().optional(),
   phone: z.string().optional(),
   taxId: z.string().optional(),
+  bankAccountName: z.string().optional(),
   bankName: z.string().optional(),
+  bankBranch: z.string().optional(),
+  bankCode: z.string().optional(),
   bankAccount: z.string().optional(),
   hasQualityIssue: z.boolean(),
   qualityNote: z.string().optional(),
@@ -83,7 +86,10 @@ const emptySupplierValues: SupplierFormValues = {
   address: '',
   phone: '',
   taxId: '',
+  bankAccountName: '',
   bankName: '',
+  bankBranch: '',
+  bankCode: '',
   bankAccount: '',
   hasQualityIssue: false,
   qualityNote: '',
@@ -100,7 +106,10 @@ function supplierToFormValues(supplier: SupplierDisplay): SupplierFormValues {
     address: supplier.address || '',
     phone: supplier.phone || '',
     taxId: supplier.taxId || '',
+    bankAccountName: supplier.bankAccountName || '',
     bankName: supplier.bankName || '',
+    bankBranch: supplier.bankBranch || '',
+    bankCode: supplier.bankCode || '',
     bankAccount: supplier.bankAccount || '',
     hasQualityIssue: supplier.hasQualityIssue,
     qualityNote: supplier.qualityNote || '',
@@ -585,12 +594,12 @@ export default function SuppliersPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <FormField
                       control={form.control}
-                      name="bankName"
+                      name="bankAccountName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>开户银行</FormLabel>
+                          <FormLabel>收款户名</FormLabel>
                           <FormControl>
-                            <Input placeholder="银行名称" {...field} />
+                            <Input placeholder="银行账户户名" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -610,6 +619,47 @@ export default function SuppliersPage() {
                       )}
                     />
                   </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="bankName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>开户银行</FormLabel>
+                          <FormControl>
+                            <Input placeholder="银行名称" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="bankBranch"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>开户支行</FormLabel>
+                          <FormControl>
+                            <Input placeholder="例如：佛山祖庙支行" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="bankCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>联行号 / 银行编号</FormLabel>
+                        <FormControl>
+                          <Input placeholder="银行联行号或汇款所需银行编号" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
               </div>
 

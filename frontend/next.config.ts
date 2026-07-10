@@ -50,6 +50,7 @@ const nextConfig: NextConfig = {
 
   /* HTTP 头配置 - 缓存与安全策略 */
   async headers() {
+    // _next/static 使用 Next.js 内置的环境感知策略；开发块若强制 immutable 会导致新旧渲染代码混用。
     return [
       {
         source: '/(.*)',
@@ -65,15 +66,6 @@ const nextConfig: NextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
-          },
-        ],
-      },
-      {
-        source: '/_next/static/(.*)',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
           },
         ],
       },

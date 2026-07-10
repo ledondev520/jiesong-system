@@ -74,6 +74,22 @@ describe('contractDocService', () => {
     expect(result).toBeNull();
   });
 
+  it('exportPurchasePdf: 请求生成并归档 PDF 版本后触发下载', async () => {
+    const blob = new Blob(['%PDF-demo'], { type: 'application/pdf' });
+    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(blob);
+    const download = vi.spyOn(contractDocService, 'downloadDocument').mockImplementation(() => {});
+
+    await contractDocService.exportPurchasePdf('pc-1', 'CG2600001');
+
+    expect(api.post).toHaveBeenCalledWith(
+      '/contract-doc/generate/pc-1',
+      { format: 'pdf' },
+      { responseType: 'blob' },
+    );
+    expect(download).toHaveBeenCalledWith(blob, 'CG2600001_purchase_contract.pdf');
+    download.mockRestore();
+  });
+
   it('downloadDocument: 触发浏览器下载', () => {
     const originalCreateObjectURL = URL.createObjectURL;
     const originalRevokeObjectURL = URL.revokeObjectURL;

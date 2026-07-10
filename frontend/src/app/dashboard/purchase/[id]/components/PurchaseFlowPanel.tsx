@@ -52,6 +52,7 @@ import { PaymentDialog, type PaymentSubmitData } from '../../../finance/componen
 import { financeService } from '@/services/finance.service';
 import { purchaseService } from '@/services/purchase.service';
 import { PaymentType, type PurchaseContract } from '@/types';
+import { calculatePurchaseLineAmounts, summarizePurchaseAmounts } from '@/lib/purchase-amount';
 
 /** 付款用途选项：定金/尾款/自定义，决定汇款文本与默认金额 */
 type RemitPurpose = 'deposit' | 'balance' | 'custom';
@@ -108,14 +109,13 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
     [contract.payments],
   );
 
-  // 金额口径与详情页一致：小计 = Σ明细，税额 = 小计 × 税率，价税合计 = 小计 + 税额
-  const subtotal = items.reduce(
-    (sum, item) => sum + (Number(item.totalPrice) || Number(item.quantity || 0) * Number(item.unitPrice || 0)),
-    0,
-  );
-  const taxAmount = subtotal * (contract.taxRate / 100);
-  const grandTotal = subtotal + taxAmount;
-  const remaining = Math.max(contract.totalAmount - contract.paidAmount, 0);
+  const amountSummary = useMemo(() => summarizePurchaseAmounts({
+    items,
+    taxRate: contract.taxRate,
+    totalAmount: contract.totalAmount,
+    paidAmount: contract.paidAmount,
+  }), [items, contract.taxRate, contract.totalAmount, contract.paidAmount]);
+  const remaining = amountSummary.remainingAmount;
   // 购销合同号：PO 前缀转 CG（与购销合同文档编号规则一致）
   const cgNo = contract.contractNo?.replace('PO', 'CG') || contract.contractNo;
 
@@ -123,13 +123,13 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
   const remitAmount = useMemo(() => {
     if (remitPurpose === 'deposit') {
       const rate = Number.parseFloat(depositRate) || 0;
-      return Math.round(contract.totalAmount * rate) / 100;
+      return Math.round(amountSummary.grossAmount * rate) / 100;
     }
     if (remitPurpose === 'balance') {
       return remaining;
     }
     return Number.parseFloat(customAmount) || 0;
-  }, [remitPurpose, depositRate, customAmount, contract.totalAmount, remaining]);
+  }, [remitPurpose, depositRate, customAmount, amountSummary.grossAmount, remaining]);
 
   const purposeLabel =
     remitPurpose === 'deposit'
@@ -142,8 +142,10 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
   const remitText = useMemo(() => {
     const lines = [
       '【汇款信息】',
-      `收款户名：${supplier?.name || '（未录入供应商全称）'}`,
+      `收款户名：${supplier?.bankAccountName || supplier?.name || '（未录入）'}`,
       `开户银行：${supplier?.bankName || '（未录入，请在供应商档案补充）'}`,
+      `开户支行：${supplier?.bankBranch || '（未录入，请在供应商档案补充）'}`,
+      `联行号/银行编号：${supplier?.bankCode || '（未录入，请在供应商档案补充）'}`,
       `银行账号：${supplier?.bankAccount || '（未录入，请在供应商档案补充）'}`,
       `付款事由：购销合同 ${cgNo} ${purposeLabel}`,
       `付款金额：${formatMoney(remitAmount)}`,
@@ -153,26 +155,35 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
 
   // 3. 开票信息文本（品名/单位/数量/金额/税点 + 我方抬头）
   const invoiceText = useMemo(() => {
+    const contractTotalDiffers = amountSummary.issues.some(
+      (issue) => issue.code === 'CONTRACT_LINE_MISMATCH',
+    );
     const lines = [
       `【开票信息】购销合同 ${cgNo}`,
       `销方（供应商）：${supplier?.name || '—'}`,
       '—— 商品明细 ——',
       ...items.map((item, idx) => {
-        const lineTotal = Number(item.totalPrice) || Number(item.quantity || 0) * Number(item.unitPrice || 0);
+        const lineTotal = calculatePurchaseLineAmounts(item, amountSummary.taxRate).grossAmount;
         const unit = item.unit || item.product?.unit || '';
-        return `${idx + 1}. ${item.product?.customsName || '未知商品'}｜${item.quantity}${unit}｜单价 ${formatMoney(Number(item.unitPrice) || 0)}｜金额 ${formatMoney(lineTotal)}`;
+        return `${idx + 1}. ${item.product?.customsName || '未知商品'}｜${item.quantity}${unit}｜不含税单价 ${formatMoney(Number(item.unitPrice) || 0)}｜含税金额 ${formatMoney(lineTotal)}`;
       }),
-      `不含税合计：${formatMoney(subtotal)}`,
-      `税率：${contract.taxRate}%（增值税专用发票）`,
-      `税额：${formatMoney(taxAmount)}`,
-      `价税合计：${formatMoney(grandTotal)}`,
+      `不含税合计：${formatMoney(amountSummary.netAmount)}`,
+      `税率：${amountSummary.taxRate}%（增值税专用发票）`,
+      `税额：${formatMoney(amountSummary.taxAmount)}`,
+      `价税合计（按商品明细）：${formatMoney(amountSummary.lineGrossAmount)}`,
     ];
+    if (contractTotalDiffers) {
+      lines.push(
+        `合同含税总额：${formatMoney(amountSummary.grossAmount)}`,
+        '金额提示：合同总额与商品明细不一致，请先按原合同复核，确认后再开票。',
+      );
+    }
     if (invoiceTitleInfo?.trim()) {
       lines.push('—— 购方开票抬头 ——', invoiceTitleInfo.trim());
     }
     lines.push('请开具增值税专用发票后回传发票号码，谢谢！');
     return lines.join('\n');
-  }, [cgNo, supplier, items, subtotal, taxAmount, grandTotal, contract.taxRate, invoiceTitleInfo]);
+  }, [cgNo, supplier, items, amountSummary, invoiceTitleInfo]);
 
   /**
    * 职责：登记一笔付款（定金/尾款）到收付管理
@@ -227,8 +238,10 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
             付款与发票
           </CardTitle>
           <CardDescription className="mt-1">
-            已付 {formatMoney(contract.paidAmount)} / 合同 {formatMoney(contract.totalAmount)}
-            {remaining > 0 ? `，待付 ${formatMoney(remaining)}` : '，已付清'}
+            已付 {formatMoney(amountSummary.paidAmount)} / 合同含税额 {formatMoney(amountSummary.grossAmount)}
+            {amountSummary.overpaidAmount > 0
+              ? `，超付 ${formatMoney(amountSummary.overpaidAmount)}`
+              : remaining > 0 ? `，待付 ${formatMoney(remaining)}` : '，已付清'}
             {contract.invoiceNo ? (
               <Badge variant="outline" className="ml-2 border-emerald-300 bg-emerald-50 text-emerald-700">
                 发票号 {contract.invoiceNo}
@@ -342,9 +355,9 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
               )}
             </div>
             <Textarea readOnly value={remitText} className="min-h-[160px] font-mono text-xs" />
-            {(!supplier?.bankName || !supplier?.bankAccount) && (
+            {(!supplier?.bankAccountName || !supplier?.bankName || !supplier?.bankBranch || !supplier?.bankCode || !supplier?.bankAccount) && (
               <p className="text-xs text-amber-600">
-                供应商银行信息不完整，请先在「供应商管理」中补录开户银行与账号。
+                供应商收款信息不完整，请先在「供应商管理」补录户名、银行、支行、联行号和账号。
               </p>
             )}
           </div>

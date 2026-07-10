@@ -119,6 +119,7 @@ describe('PurchaseDetailPage 交互逻辑', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'PO2500001' })).toBeInTheDocument();
       expect(screen.getByText('暂无商品明细')).toBeInTheDocument();
+      expect(screen.getByRole('list', { name: '采购合同进度' })).toBeInTheDocument();
     });
   });
 
@@ -218,5 +219,37 @@ describe('PurchaseDetailPage 交互逻辑', () => {
     renderPage('p-1');
 
     expect(await screen.findByRole('button', { name: '确认生产完成' })).toBeInTheDocument();
+  });
+
+  it('采购详情把单价解释为不含税、明细与合同总额解释为含税且不重复加税', async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: 'p-1',
+        contractNo: 'CG2600002',
+        status: 'SIGNED',
+        taxRate: 13,
+        totalAmount: 1130,
+        paidAmount: 300,
+        supplier: { name: '供应商A' },
+        items: [{
+          id: 'pi-1',
+          purchaseContractId: 'p-1',
+          productId: 'product-1',
+          quantity: 10,
+          unit: '件',
+          unitPrice: 100,
+          totalPrice: 1130,
+          product: { customsName: '酒架', unit: '件' },
+        }],
+      },
+    });
+
+    renderPage('p-1');
+
+    expect(await screen.findByText('不含税合计')).toBeInTheDocument();
+    expect(screen.getByText('含税合计')).toBeInTheDocument();
+    expect(screen.getByText('¥1,000')).toBeInTheDocument();
+    expect(screen.getByText('¥130')).toBeInTheDocument();
+    expect(screen.queryByText('¥1,276.9')).not.toBeInTheDocument();
   });
 });

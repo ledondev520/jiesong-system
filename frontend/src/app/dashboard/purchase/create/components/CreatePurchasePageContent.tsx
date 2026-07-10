@@ -37,6 +37,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -243,7 +244,10 @@ export default function CreatePurchasePage() {
     contactPhone: '',
     address: '',
     taxId: '',
+    bankAccountName: '',
     bankName: '',
+    bankBranch: '',
+    bankCode: '',
     bankAccount: '',
   });
   const [savingSupplier, setSavingSupplier] = useState(false);
@@ -433,7 +437,10 @@ export default function CreatePurchasePage() {
         contactPhone: '',
         address: '',
         taxId: '',
+        bankAccountName: '',
         bankName: '',
+        bankBranch: '',
+        bankCode: '',
         bankAccount: '',
       });
       toast.success('供应商创建成功');
@@ -1292,6 +1299,7 @@ export default function CreatePurchasePage() {
               <Package className="h-4 w-4" />
               批量添加商品
             </DialogTitle>
+            <DialogDescription>选择本次购销合同要采购的一个或多个商品。</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="relative">
@@ -1414,6 +1422,7 @@ export default function CreatePurchasePage() {
               <UserPlus className="h-4 w-4" />
               新增供应商
             </DialogTitle>
+            <DialogDescription>录入签约、汇款和开票所需的供应商档案。</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -1482,6 +1491,16 @@ export default function CreatePurchasePage() {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="new-supplier-bank-account-name">收款户名</Label>
+                  <Input
+                    id="new-supplier-bank-account-name"
+                    name="bankAccountName"
+                    value={newSupplierForm.bankAccountName}
+                    onChange={(e) => setNewSupplierForm((prev) => ({ ...prev, bankAccountName: e.target.value }))}
+                    placeholder="供应商银行账户户名"
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="new-supplier-bank-name">开户银行</Label>
                   <Input
                     id="new-supplier-bank-name"
@@ -1491,6 +1510,26 @@ export default function CreatePurchasePage() {
                       setNewSupplierForm((prev) => ({ ...prev, bankName: e.target.value }))
                     }
                     placeholder="例如：中国银行佛山禅城支行"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-supplier-bank-branch">开户支行</Label>
+                  <Input
+                    id="new-supplier-bank-branch"
+                    name="bankBranch"
+                    value={newSupplierForm.bankBranch}
+                    onChange={(e) => setNewSupplierForm((prev) => ({ ...prev, bankBranch: e.target.value }))}
+                    placeholder="例如：佛山祖庙支行"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-supplier-bank-code">联行号 / 银行编号</Label>
+                  <Input
+                    id="new-supplier-bank-code"
+                    name="bankCode"
+                    value={newSupplierForm.bankCode}
+                    onChange={(e) => setNewSupplierForm((prev) => ({ ...prev, bankCode: e.target.value }))}
+                    placeholder="银行联行号或编号"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1531,6 +1570,7 @@ export default function CreatePurchasePage() {
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle className="text-sm font-medium">保存为模板</DialogTitle>
+            <DialogDescription>将当前采购明细保存为之后可重复使用的合同模板。</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <Label htmlFor="template-name">模板名称</Label>

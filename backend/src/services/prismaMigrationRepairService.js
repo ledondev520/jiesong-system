@@ -38,7 +38,15 @@ const REPAIR_RULES = {
   '20260405144500_add_agent_replay_summaries': (snapshot) => (
     snapshot.tables.has('agent_replay_summaries')
   ),
+  '20260607122054_add_notification_metadata': (snapshot) => (
+    snapshot.columns.notifications?.has('metadata')
+  ),
 };
+
+// 该迁移已被明确改为 no-op，因为 baseline 已创建 metadata；只允许这一条同步 checksum。
+const CHECKSUM_SYNC_MIGRATIONS = new Set([
+  '20260607122054_add_notification_metadata',
+]);
 
 const readRepositoryMigrations = (migrationsDir) => {
   const entries = fs.readdirSync(migrationsDir, { withFileTypes: true });
@@ -113,6 +121,19 @@ const collectMigrationRepairPlan = ({ repositoryMigrations, appliedRows, schemaS
         id: applied.id,
       });
     }
+
+    if (
+      applied.checksum
+      && applied.checksum !== repo.checksum
+      && CHECKSUM_SYNC_MIGRATIONS.has(migrationName)
+    ) {
+      plan.push({
+        type: 'sync_checksum',
+        migrationName,
+        id: applied.id,
+        checksum: repo.checksum,
+      });
+    }
   });
 
   return plan;
@@ -121,6 +142,15 @@ const collectMigrationRepairPlan = ({ repositoryMigrations, appliedRows, schemaS
 const applyMigrationRepairPlan = async (prisma, plan = []) => {
   const now = Date.now();
   for (const step of plan) {
+    if (step.type === 'sync_checksum') {
+      await prisma.$executeRawUnsafe(
+        'UPDATE _prisma_migrations SET checksum = ?, logs = COALESCE(logs, \'\') || ? WHERE id = ?',
+        step.checksum,
+        '\n[repair] synchronized checksum for verified no-op migration.',
+        step.id,
+      );
+      continue;
+    }
     if (step.type === 'mark_finished') {
       await prisma.$executeRawUnsafe(
         'UPDATE _prisma_migrations SET finished_at = ?, applied_steps_count = 1, logs = COALESCE(logs, \'\') || ? WHERE id = ?',

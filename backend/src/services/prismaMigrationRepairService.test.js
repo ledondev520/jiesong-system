@@ -55,3 +55,31 @@ test('collectMigrationRepairPlan: 会为已存在 schema effect 的失败/缺失
     },
   ]);
 });
+
+test('collectMigrationRepairPlan: 仅对已确认 no-op 且 schema effect 存在的迁移同步校验和', () => {
+  const plan = collectMigrationRepairPlan({
+    repositoryMigrations: [{
+      migrationName: '20260607122054_add_notification_metadata',
+      checksum: 'current-checksum',
+    }],
+    appliedRows: [{
+      id: 'notification-migration',
+      migrationName: '20260607122054_add_notification_metadata',
+      checksum: 'old-checksum',
+      finishedAt: new Date(),
+      rolledBackAt: null,
+    }],
+    schemaSnapshot: {
+      tables: new Set(['notifications']),
+      columns: { notifications: new Set(['metadata']) },
+      foreignKeys: {},
+    },
+  });
+
+  assert.deepEqual(plan, [{
+    type: 'sync_checksum',
+    migrationName: '20260607122054_add_notification_metadata',
+    id: 'notification-migration',
+    checksum: 'current-checksum',
+  }]);
+});

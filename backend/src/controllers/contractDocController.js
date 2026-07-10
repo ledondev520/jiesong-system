@@ -1,13 +1,14 @@
 /**
  * Input: 采购合同ID
- * Output: 购销合同Word文档
- * Pos: 控制器，处理合同文档生成请求
+ * Output: 购销合同 Word/PDF 文档
+ * Pos: 控制器，处理合同文档生成、下载与预览请求
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');
 const contractDocService = require('../services/contractDocService');
+const fileService = require('../services/fileService');
 const { success } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 
@@ -22,11 +23,11 @@ const generateFromPurchase = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { storeName, deliveryAddress, deliveryContact, depositRate } = req.body;
-    
-    // 0. 检查模板是否存在
-    const templateExists = await contractDocService.checkTemplateExists();
-    if (!templateExists) {
-      throw createError('合同模板不存在，请先上传模板文件', 400);
+    const format = String(req.body?.format || 'docx').toLowerCase() === 'pdf' ? 'pdf' : 'docx';
+
+    if (format === 'docx') {
+      const templateExists = await contractDocService.checkTemplateExists();
+      if (!templateExists) throw createError('合同模板不存在，请先上传模板文件', 400);
     }
     
     // 1. 获取采购合同详情
@@ -46,19 +47,38 @@ const generateFromPurchase = async (req, res, next) => {
       throw createError('采购合同不存在', 404);
     }
     
-    // 2. 生成文档
-    const buffer = await contractDocService.generatePurchaseContract(purchaseContract, {
+    const options = {
       storeName,
       deliveryAddress,
       deliveryContact,
-      depositRate: depositRate ? parseInt(depositRate) : 30, // 默认30%
+      depositRate: depositRate === undefined ? 30 : Number(depositRate),
+    };
+    const isPdf = format === 'pdf';
+    const buffer = isPdf
+      ? await contractDocService.generatePurchaseContractPdf(purchaseContract, options)
+      : await contractDocService.generatePurchaseContract(purchaseContract, options);
+    const filename = isPdf
+      ? contractDocService.generatePdfFilename(purchaseContract)
+      : contractDocService.generateFilename(purchaseContract, storeName);
+    const mimeType = isPdf
+      ? 'application/pdf'
+      : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const category = isPdf ? 'SYSTEM_GENERATED_PDF' : 'SYSTEM_GENERATED_WORD';
+
+    // 系统生成件先归档再返回，确保下载成功对应一份可追溯版本。
+    await fileService.archiveGeneratedFile({
+      contractId: id,
+      contractType: 'PURCHASE',
+      buffer,
+      fileName: filename,
+      mimeType,
+      category,
+      description: isPdf ? '系统生成 PDF 合同' : '系统生成 Word 合同',
     });
-    
-    // 3. 返回文档（文件名格式：购销合同CGXXXXXX-店铺-产品名.docx）
-    const filename = contractDocService.generateFilename(purchaseContract, storeName);
+
     const encodedFilename = encodeURIComponent(filename);
-    
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+
+    res.setHeader('Content-Type', mimeType);
     res.setHeader('Content-Disposition', `attachment; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`);
     res.send(buffer);
     
@@ -149,11 +169,11 @@ const getContractPdf = async (req, res, next) => {
       throw createError('采购合同不存在', 404);
     }
     
-    const buffer = await contractDocService.generatePurchaseContract(purchaseContract, {});
-    const filename = contractDocService.generateFilename(purchaseContract, purchaseContract.storeName);
+    const buffer = await contractDocService.generatePurchaseContractPdf(purchaseContract, {});
+    const filename = contractDocService.generatePdfFilename(purchaseContract);
     const encodedFilename = encodeURIComponent(filename);
     
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`);
     res.send(buffer);
   } catch (error) {

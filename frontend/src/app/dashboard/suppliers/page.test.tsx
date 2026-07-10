@@ -67,6 +67,9 @@ describe('SuppliersPage 表单页交互逻辑', () => {
     expect(screen.getByRole('heading', { name: '供应商档案表单' })).toBeInTheDocument();
     expect(screen.getByText('暂无供应商')).toBeInTheDocument();
     expect(screen.getByLabelText('公司名称 *')).toBeInTheDocument();
+    expect(screen.getByLabelText('收款户名')).toBeInTheDocument();
+    expect(screen.getByLabelText('开户支行')).toBeInTheDocument();
+    expect(screen.getByLabelText('联行号 / 银行编号')).toBeInTheDocument();
     expect(screen.queryByText('供应商弹窗已打开')).not.toBeInTheDocument();
   });
 

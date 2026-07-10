@@ -46,3 +46,33 @@ test('auditLog: 支持写入 Agent actor 字段', async () => {
     prisma.operationLog.create = originalCreate;
   }
 });
+
+test('auditLog: 供应商银行路由字段只记变更不记明文', async () => {
+  const mod = require('./auditLog');
+  const originalCreate = prisma.operationLog.create;
+  let captured = null;
+
+  prisma.operationLog.create = async ({ data }) => {
+    captured = data;
+    return data;
+  };
+
+  try {
+    await mod.logOperation({
+      userId: 'user-1',
+      action: 'UPDATE',
+      entity: 'Supplier',
+      entityId: 'supplier-1',
+      oldValue: { name: '测试供应商', bankAccount: 'OLD-ACCOUNT', bankCode: 'OLD-CODE' },
+      newValue: { name: '测试供应商', bankAccount: 'NEW-ACCOUNT', bankCode: 'NEW-CODE' },
+    });
+
+    assert.ok(captured);
+    assert.doesNotMatch(captured.oldValue || '', /OLD-ACCOUNT|OLD-CODE/);
+    assert.doesNotMatch(captured.newValue || '', /NEW-ACCOUNT|NEW-CODE/);
+    assert.match(captured.oldValue || '', /\[REDACTED\]/);
+    assert.match(captured.newValue || '', /\[REDACTED\]/);
+  } finally {
+    prisma.operationLog.create = originalCreate;
+  }
+});

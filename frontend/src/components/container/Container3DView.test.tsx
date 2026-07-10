@@ -25,26 +25,17 @@ vi.mock('@react-three/drei', () => ({
   Html: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock('@/lib/binPacking', () => ({
-  CONTAINER_40HQ: {
-    length: 12032,
-    width: 2350,
-    height: 2690,
-  },
-  mmToM: (v: number) => v / 1000,
-  generateColor: () => '#4ECDC4',
-  inferBoxDimensions: vi.fn((item: { volumeCbm?: number }) => ({
-    length: item.volumeCbm ? Math.cbrt(item.volumeCbm * 1e9) * 1.2 : 500,
-    width: item.volumeCbm ? Math.cbrt(item.volumeCbm * 1e9) : 500,
-    height: item.volumeCbm ? Math.cbrt(item.volumeCbm * 1e9) * 0.8 : 500,
-    isEstimated: true,
-  })),
-  packBoxes: () => ({
-    placedBoxes: [{ id: 'b-1', name: '测试商品', length: 500, width: 500, height: 500, posX: 0, posY: 0, posZ: 0 }],
-    unplacedBoxes: [{ id: 'b-2' }],
-    utilizationRate: 52.5,
-  }),
-}));
+vi.mock('@/lib/binPacking', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/binPacking')>();
+  return {
+    ...actual,
+    packBoxes: () => ({
+      placedBoxes: [{ id: 'b-1', name: '测试商品', length: 500, width: 500, height: 500, posX: 0, posY: 0, posZ: 0 }],
+      unplacedBoxes: [{ id: 'b-2' }],
+      utilizationRate: 52.5,
+    }),
+  };
+});
 
 describe('Container3DView', () => {
   beforeEach(() => {

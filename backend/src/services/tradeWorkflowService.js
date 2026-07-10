@@ -50,6 +50,12 @@ const getPurchaseByNo = (purchaseMap, contractNo) => {
     || null;
 };
 
+const hasSignedContractArchive = (purchase) => (purchase.files || []).some((file) => {
+  if (file.category === 'SIGNED_CONTRACT') return true;
+  const isLegacyUnclassified = !file.category || file.category === 'OTHER';
+  return isLegacyUnclassified && /\.(pdf|docx?)$/i.test(file.fileName || '');
+});
+
 const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   const packingItems = salesContract.packingItems || [];
   const purchaseContractNos = unique(packingItems.map((item) => item.purchaseContractNo));
@@ -67,6 +73,10 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   const allProductionReady = linkedPurchases.length > 0 && linkedPurchases.every((contract) => (
     (PURCHASE_RANK[normalizePurchaseStatus(contract.status)] ?? -1) >= PURCHASE_RANK[PURCHASE_STATUS.READY]
   ));
+  const allPurchasesSigned = linkedPurchases.length > 0 && linkedPurchases.every((contract) => (
+    (PURCHASE_RANK[normalizePurchaseStatus(contract.status)] ?? -1) >= PURCHASE_RANK[PURCHASE_STATUS.SIGNED]
+  ));
+  const purchaseMissingSignedArchive = linkedPurchases.find((contract) => !hasSignedContractArchive(contract));
   const salesStatus = normalizeSalesStatus(salesContract.status);
   const salesRank = SALES_RANK[salesStatus] ?? 0;
   const readiness = evaluateShipmentReadiness(salesContract);
@@ -78,7 +88,10 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   const taxCompleted = taxRefunds.some((refund) => ['APPLIED', 'APPROVED', 'REFUNDED'].includes(refund.status));
   const invoicesComplete = linkedPurchases.length > 0 && linkedPurchases.every((purchase) => (
     Boolean(purchase.invoiceNo)
-    || packingItems.some((item) => item.purchaseContractNo === purchase.contractNo && item.invoiceNo)
+    || packingItems.some((item) => (
+      Boolean(item.invoiceNo)
+      && getPurchaseByNo(purchaseMap, item.purchaseContractNo)?.contractNo === purchase.contractNo
+    ))
   ));
   const receivableComplete = Number(salesContract.totalAmount) > 0
     && Number(salesContract.receivedAmount) >= Number(salesContract.totalAmount) - 0.01;
@@ -95,14 +108,20 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
           key: 'procurement', label: '采购签约', status: 'blocked', reason: `找不到购销合同 ${missingPurchaseNos.join('、')}`,
           action: { label: '修正合同关联', href: `/dashboard/sales/${salesContract.id}` },
         }
-      : linkedPurchases.every((contract) => (
-          (PURCHASE_RANK[normalizePurchaseStatus(contract.status)] ?? -1) >= PURCHASE_RANK[PURCHASE_STATUS.SIGNED]
-        ))
-        ? { key: 'procurement', label: '采购签约', status: 'completed', reason: `已关联 ${linkedPurchases.length} 份购销合同` }
-        : {
+      : !allPurchasesSigned
+        ? {
             key: 'procurement', label: '采购签约', status: 'current', reason: '仍有购销合同待签约',
             action: { label: '完成购销合同签约', href: `/dashboard/purchase/${firstPurchase?.id}` },
-          };
+          }
+        : purchaseMissingSignedArchive
+          ? {
+              key: 'procurement', label: '采购签约', status: 'current', reason: '已签约，仍有供应商盖章件未归档',
+              action: { label: '上传供应商盖章件', href: `/dashboard/purchase/${purchaseMissingSignedArchive.id}` },
+            }
+          : {
+              key: 'procurement', label: '采购签约', status: 'completed',
+              reason: `已关联 ${linkedPurchases.length} 份购销合同，盖章件已归档`,
+            };
 
   const paymentStage = linkedPurchases.length === 0
     ? { key: 'payment', label: '采购付款', status: 'pending', reason: '先关联购销合同' }

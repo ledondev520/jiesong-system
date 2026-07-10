@@ -109,7 +109,10 @@ export interface Supplier {
   address?: string;       // 公司地址
   phone?: string;         // 公司电话
   taxId?: string;         // 纳税人识别号/税号
+  bankAccountName?: string; // 收款户名
   bankName?: string;      // 开户银行名称
+  bankBranch?: string;    // 开户支行
+  bankCode?: string;      // 联行号/银行编号
   bankAccount?: string;   // 银行账号
   // 状态
   hasQualityIssue: boolean;

@@ -6,8 +6,12 @@
 
 const prisma = require('../../../utils/prisma');
 const { createError } = require('../../../middleware/errorHandler');
+const {
+  calculateNewLineTotal,
+  normalizePurchaseTaxRate,
+} = require('../../../services/purchaseAmountService');
 
-const normalizeItem = (item, index) => {
+const normalizeItem = (item, index, taxRate) => {
   if (!item || typeof item !== 'object') {
     throw createError(`第 ${index + 1} 条采购明细格式非法`, 400);
   }
@@ -31,7 +35,8 @@ const normalizeItem = (item, index) => {
     unit: item.unit || null,
     specification: item.specification || null,
     note: item.note || null,
-    totalPrice: quantity * unitPrice,
+    // 唯一口径：unitPrice 为不含税单价，totalPrice 为含税行总额。
+    totalPrice: calculateNewLineTotal({ quantity, unitPrice }, taxRate),
   };
 };
 
@@ -44,7 +49,8 @@ const createPurchaseWithItems = async ({ input, prismaClient = prisma } = {}) =>
     throw createError('至少提供一条采购明细', 400);
   }
 
-  const normalizedItems = data.items.map(normalizeItem);
+  const taxRate = normalizePurchaseTaxRate(data.taxRate ?? 13);
+  const normalizedItems = data.items.map((item, index) => normalizeItem(item, index, taxRate));
   const totalAmount = normalizedItems.reduce((sum, item) => sum + item.totalPrice, 0);
 
   return prismaClient.$transaction(async (tx) => {
@@ -60,7 +66,7 @@ const createPurchaseWithItems = async ({ input, prismaClient = prisma } = {}) =>
       data: {
         contractNo: nextContractNo,
         supplierId: data.supplierId,
-        taxRate: data.taxRate || 13,
+        taxRate,
         signedAt: data.signedAt ? new Date(data.signedAt) : null,
         expectedDate: data.expectedDate ? new Date(data.expectedDate) : null,
         note: data.note || null,

@@ -18,7 +18,10 @@ const createSupplier = async ({ input, prismaClient = prisma } = {}) => {
       address: data.address || null,
       phone: data.phone || null,
       taxId: data.taxId || null,
+      bankAccountName: data.bankAccountName || null,
       bankName: data.bankName || null,
+      bankBranch: data.bankBranch || null,
+      bankCode: data.bankCode || null,
       bankAccount: data.bankAccount || null,
     },
   });

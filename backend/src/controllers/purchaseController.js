@@ -19,6 +19,7 @@ const { normalizePagination } = require('../utils/pagination');
 const auditLog = require('../utils/auditLog');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
 const contractTemplateService = require('../services/contractTemplateService');
+const { calculateNewLineTotal, normalizePurchaseTaxRate } = require('../services/purchaseAmountService');
 
 /**
  * 职责：检查商品价格是否高于历史均价并生成警告
@@ -43,7 +44,8 @@ const checkPriceWarnings = async (items, prismaClient) => {
 
     if (historyItems.length === 0) continue;
 
-    const prices = historyItems.map((h) => h.totalPrice / h.quantity).filter((p) => Number.isFinite(p) && p > 0);
+    // 历史对比统一使用不含税单价，避免拿含税行总额/数量与当前不含税单价比较。
+    const prices = historyItems.map((h) => Number(h.unitPrice)).filter((p) => Number.isFinite(p) && p > 0);
     if (prices.length === 0) continue;
 
     const averagePrice = prices.reduce((sum, p) => sum + p, 0) / prices.length;
@@ -244,30 +246,38 @@ const addItem = async (req, res, next) => {
   try {
     const { id } = req.params;
     const data = req.body;
-    
-    const item = await prisma.purchaseItem.create({
-      data: {
-        purchaseContractId: id,
-        productId: data.productId,
-        quantity: data.quantity,
-        unit: data.unit,
-        unitPrice: data.unitPrice,
-        totalPrice: data.quantity * data.unitPrice,
-        specification: data.specification,
-        note: data.note,
-      },
-      include: { product: true },
-    });
-    
-    // 更新合同总金额
-    const total = await prisma.purchaseItem.aggregate({
-      where: { purchaseContractId: id },
-      _sum: { totalPrice: true },
-    });
-    
-    await prisma.purchaseContract.update({
-      where: { id },
-      data: { totalAmount: total._sum.totalPrice || 0 },
+
+    const item = await prisma.$transaction(async (tx) => {
+      const contract = await tx.purchaseContract.findUnique({
+        where: { id },
+        select: { taxRate: true },
+      });
+      if (!contract) throw createError('采购合同不存在', 404);
+
+      const taxRate = normalizePurchaseTaxRate(contract.taxRate);
+      const createdItem = await tx.purchaseItem.create({
+        data: {
+          purchaseContractId: id,
+          productId: data.productId,
+          quantity: data.quantity,
+          unit: data.unit,
+          unitPrice: data.unitPrice,
+          totalPrice: calculateNewLineTotal(data, taxRate),
+          specification: data.specification,
+          note: data.note,
+        },
+        include: { product: true },
+      });
+
+      const total = await tx.purchaseItem.aggregate({
+        where: { purchaseContractId: id },
+        _sum: { totalPrice: true },
+      });
+      await tx.purchaseContract.update({
+        where: { id },
+        data: { totalAmount: total._sum.totalPrice || 0 },
+      });
+      return createdItem;
     });
     
     created(res, item, '采购明细添加成功');

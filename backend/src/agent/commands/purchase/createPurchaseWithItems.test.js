@@ -53,9 +53,9 @@ test('createPurchaseWithItems: 事务内创建合同和明细并返回完整结�
 
   assert.equal(result.contractNo, 'CG2600013');
   assert.equal(calls[0][0], 'contract.create');
-  assert.equal(calls[0][1].totalAmount, 450);
+  assert.equal(calls[0][1].totalAmount, 508.5);
   assert.equal(calls[1][0], 'items.createMany');
-  assert.equal(calls[1][1][0].totalPrice, 450);
+  assert.equal(calls[1][1][0].totalPrice, 508.5);
 });
 
 test('createPurchaseWithItems: 缺少 items 时拒绝', async () => {

@@ -59,6 +59,7 @@ import {
   Percent,
   Stamp,
   ArrowRight,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -67,6 +68,7 @@ import ContractFiles from '@/components/contract/ContractFiles';
 import { PurchaseFlowPanel } from './components/PurchaseFlowPanel';
 import { configService } from '@/services/config.service';
 import { cn } from '@/lib/utils';
+import { calculatePurchaseLineAmounts, summarizePurchaseAmounts } from '@/lib/purchase-amount';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -146,22 +148,74 @@ function StatusPill({ status }: { status: PurchaseStatus }) {
   );
 }
 
+const PURCHASE_TIMELINE_STEPS = [
+  { status: PurchaseStatus.DRAFT, label: '草稿', icon: FileText },
+  { status: PurchaseStatus.SIGNED, label: '已确认', icon: CheckCircle2 },
+  { status: PurchaseStatus.PRODUCING, label: '生产中', icon: Loader2 },
+  { status: PurchaseStatus.READY, label: '生产完成', icon: PackageCheck },
+  { status: PurchaseStatus.SHIPPED, label: '已发货', icon: Truck },
+  { status: PurchaseStatus.RECEIVED, label: '已收货', icon: PackageCheck },
+  { status: PurchaseStatus.COMPLETED, label: '已完成', icon: CheckCircle2 },
+] as const;
+
+function PurchaseTimelineStep({
+  step,
+  index,
+  currentIndex,
+}: {
+  step: (typeof PURCHASE_TIMELINE_STEPS)[number];
+  index: number;
+  currentIndex: number;
+}) {
+  const isCompleted = index <= currentIndex;
+  const isCurrent = index === currentIndex;
+  const StepIcon = step.icon;
+
+  return (
+    <li className="relative flex flex-1 flex-col items-center gap-2">
+      <div
+        className={cn(
+          'z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors',
+          isCurrent
+            ? 'border-primary bg-primary text-primary-foreground'
+            : isCompleted
+              ? 'border-emerald-500 bg-emerald-50 text-emerald-600 dark:bg-emerald-950'
+              : 'border-border bg-muted text-muted-foreground'
+        )}
+      >
+        {isCompleted && !isCurrent ? (
+          <CheckCircle2 className="h-4 w-4" />
+        ) : (
+          <StepIcon className="h-3.5 w-3.5" />
+        )}
+      </div>
+      <span
+        className={cn(
+          'text-[11px] font-medium',
+          isCurrent ? 'text-primary' : isCompleted ? 'text-foreground' : 'text-muted-foreground'
+        )}
+      >
+        {step.label}
+      </span>
+      {index < PURCHASE_TIMELINE_STEPS.length - 1 ? (
+        <span
+          aria-hidden="true"
+          className={cn(
+            'absolute left-[calc(50%+1rem)] top-4 h-[2px] w-[calc(100%-2rem)]',
+            index < currentIndex ? 'bg-emerald-500' : 'bg-border'
+          )}
+        />
+      ) : null}
+    </li>
+  );
+}
+
 /**
  * 职责：合同状态时间线
  * 思路：按标准流程展示各状态节点，当前状态高亮，已完成节点打勾
  */
 function ContractTimeline({ currentStatus }: { currentStatus: PurchaseStatus }) {
-  const steps = [
-    { status: PurchaseStatus.DRAFT, label: '草稿', icon: <FileText className="h-3.5 w-3.5" /> },
-    { status: PurchaseStatus.SIGNED, label: '已确认', icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
-    { status: PurchaseStatus.PRODUCING, label: '生产中', icon: <Loader2 className="h-3.5 w-3.5" /> },
-    { status: PurchaseStatus.READY, label: '生产完成', icon: <PackageCheck className="h-3.5 w-3.5" /> },
-    { status: PurchaseStatus.SHIPPED, label: '已发货', icon: <Truck className="h-3.5 w-3.5" /> },
-    { status: PurchaseStatus.RECEIVED, label: '已收货', icon: <PackageCheck className="h-3.5 w-3.5" /> },
-    { status: PurchaseStatus.COMPLETED, label: '已完成', icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
-  ];
-
-  const currentIndex = steps.findIndex((s) => s.status === currentStatus);
+  const currentIndex = PURCHASE_TIMELINE_STEPS.findIndex((step) => step.status === currentStatus);
   const isCancelled = currentStatus === PurchaseStatus.CANCELLED;
 
   return (
@@ -173,49 +227,16 @@ function ContractTimeline({ currentStatus }: { currentStatus: PurchaseStatus }) 
           该合同已取消
         </div>
       ) : (
-        <div className="flex items-start justify-between">
-          {steps.map((step, idx) => {
-            const isCompleted = idx <= currentIndex;
-            const isCurrent = idx === currentIndex;
-            return (
-              <div key={step.status} className="flex flex-1 flex-col items-center gap-2">
-                <div
-                  className={cn(
-                    'flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors',
-                    isCurrent
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : isCompleted
-                        ? 'border-emerald-500 bg-emerald-50 text-emerald-600 dark:bg-emerald-950'
-                        : 'border-border bg-muted text-muted-foreground'
-                  )}
-                >
-                  {isCompleted && !isCurrent ? (
-                    <CheckCircle2 className="h-4 w-4" />
-                  ) : (
-                    step.icon
-                  )}
-                </div>
-                <span
-                  className={cn(
-                    'text-[11px] font-medium',
-                    isCurrent ? 'text-primary' : isCompleted ? 'text-foreground' : 'text-muted-foreground'
-                  )}
-                >
-                  {step.label}
-                </span>
-                {idx < steps.length - 1 && (
-                  <div
-                    className={cn(
-                      'absolute mt-4 h-[2px] w-[calc(16.66%-2rem)]',
-                      idx < currentIndex ? 'bg-emerald-500' : 'bg-border'
-                    )}
-                    style={{ marginLeft: '2rem' }}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <ol className="flex items-start justify-between" aria-label="采购合同进度">
+          {PURCHASE_TIMELINE_STEPS.map((step, index) => (
+            <PurchaseTimelineStep
+              key={step.status}
+              step={step}
+              index={index}
+              currentIndex={currentIndex}
+            />
+          ))}
+        </ol>
       )}
     </div>
   );
@@ -315,6 +336,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
 
       toast.success('合同文档已生成');
       setGenerateOpen(false);
+      await loadData();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '生成合同文档失败';
       toast.error(message);
@@ -357,6 +379,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     try {
       await contractDocService.exportPurchasePdf(contract.id, contract.contractNo);
       toast.success('合同 PDF 已下载');
+      await loadData();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '导出 PDF 失败';
       toast.error(message);
@@ -399,11 +422,11 @@ export default function PurchaseDetailPage({ params }: PageProps) {
       case 'unitPrice':
         return Number(item.unitPrice) || 0;
       case 'lineTotal':
-        return Number(item.totalPrice) || Number(item.quantity || 0) * Number(item.unitPrice || 0);
+        return calculatePurchaseLineAmounts(item, contract?.taxRate).grossAmount;
       default:
         return null;
     }
-  }, []);
+  }, [contract?.taxRate]);
 
   const purchaseLineSort = useTableSort(purchaseLineItems, purchaseLineAccessor);
 
@@ -416,16 +439,15 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   }
 
   // 计算付款进度
-  const paidPercent =
-    contract.totalAmount > 0 ? Math.min((contract.paidAmount / contract.totalAmount) * 100, 100) : 0;
-
-  // 计算税额与小计
-  const subtotal = purchaseLineItems.reduce(
-    (sum, item) => sum + (Number(item.totalPrice) || Number(item.quantity || 0) * Number(item.unitPrice || 0)),
-    0
-  );
-  const taxAmount = subtotal * (contract.taxRate / 100);
-  const grandTotal = subtotal + taxAmount;
+  const amountSummary = summarizePurchaseAmounts({
+    items: purchaseLineItems,
+    taxRate: contract.taxRate,
+    totalAmount: contract.totalAmount,
+    paidAmount: contract.paidAmount,
+  });
+  const paidPercent = amountSummary.grossAmount > 0
+    ? Math.min((amountSummary.paidAmount / amountSummary.grossAmount) * 100, 100)
+    : 0;
   const nextPurchaseAction = PURCHASE_NEXT_ACTIONS[contract.status];
 
   return (
@@ -484,8 +506,8 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                 <DollarSign className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <div className="text-xl font-bold tabular-nums">¥{contract.totalAmount.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">合同金额</p>
+                <div className="text-xl font-bold tabular-nums">¥{amountSummary.grossAmount.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">合同含税金额</p>
               </div>
             </div>
           </CardContent>
@@ -512,7 +534,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               </div>
               <div>
                 <div className="text-xl font-bold tabular-nums">
-                  ¥{(contract.totalAmount - contract.paidAmount).toLocaleString()}
+                  ¥{amountSummary.remainingAmount.toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground">待付金额</p>
               </div>
@@ -535,6 +557,20 @@ export default function PurchaseDetailPage({ params }: PageProps) {
           </CardContent>
         </Card>
       </div>
+
+      {amountSummary.issues.length > 0 && (
+        <div role="alert" className="rounded-lg border border-amber-300/70 bg-amber-50/70 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-medium">金额数据需要复核</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs">
+                {amountSummary.issues.map((issue) => <li key={issue.code}>{issue.message}</li>)}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 时间线 */}
       <ContractTimeline currentStatus={contract.status} />
@@ -577,7 +613,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               <Percent className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">税率</p>
-                <p className="text-sm">{contract.taxRate}%</p>
+                <p className="text-sm">{amountSummary.taxRate}%</p>
               </div>
             </div>
             {contract.note && (
@@ -626,10 +662,12 @@ export default function PurchaseDetailPage({ params }: PageProps) {
             <div className="flex items-start gap-3">
               <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div>
-                <p className="text-xs text-muted-foreground">银行信息</p>
-                <p className="text-sm">
-                  {contract.supplier?.bankName || '—'} / {contract.supplier?.bankAccount || '—'}
+                <p className="text-xs text-muted-foreground">收款账户</p>
+                <p className="text-sm">户名：{contract.supplier?.bankAccountName || contract.supplier?.name || '—'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {contract.supplier?.bankName || '—'} · {contract.supplier?.bankBranch || '—'} · 联行号 {contract.supplier?.bankCode || '—'}
                 </p>
+                <p className="font-mono text-xs">账号 {contract.supplier?.bankAccount || '—'}</p>
               </div>
             </div>
           </CardContent>
@@ -644,7 +682,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
             商品明细
           </CardTitle>
           <CardDescription>
-            共 {purchaseLineItems.length} 项商品 · 税率 {contract.taxRate}%
+            共 {purchaseLineItems.length} 项商品 · 不含税单价 · 发票税率 {amountSummary.taxRate}%
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -690,7 +728,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                       onSort={purchaseLineSort.onSort}
                       className="text-right text-xs"
                     >
-                      单价 (¥)
+                      不含税单价 (¥)
                     </SortableTableHead>
                     <SortableTableHead
                       sortKey="lineTotal"
@@ -699,7 +737,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                       onSort={purchaseLineSort.onSort}
                       className="text-right text-xs"
                     >
-                      小计 (¥)
+                      含税小计 (¥)
                     </SortableTableHead>
                   </TableRow>
                 </TableHeader>
@@ -721,36 +759,33 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm font-medium tabular-nums">
                         ¥
-                        {(
-                          Number(item.totalPrice) ||
-                          Number(item.quantity || 0) * Number(item.unitPrice || 0)
-                        ).toLocaleString()}
+                        {calculatePurchaseLineAmounts(item, amountSummary.taxRate).grossAmount.toLocaleString()}
                       </TableCell>
                     </TableRow>
                   ))}
                   {/* 合计行 */}
                   <TableRow className="border-b-0 bg-muted/30 font-medium">
                     <TableCell colSpan={5} className="text-right text-xs text-muted-foreground">
-                      小计
+                      不含税合计
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm tabular-nums text-emerald-600">
-                      ¥{subtotal.toLocaleString()}
+                      ¥{amountSummary.netAmount.toLocaleString()}
                     </TableCell>
                   </TableRow>
                   <TableRow className="border-b-0 bg-muted/30">
                     <TableCell colSpan={5} className="text-right text-xs text-muted-foreground">
-                      税额 ({contract.taxRate}%)
+                      其中税额 ({amountSummary.taxRate}%)
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm tabular-nums text-muted-foreground">
-                      ¥{taxAmount.toLocaleString()}
+                      ¥{amountSummary.taxAmount.toLocaleString()}
                     </TableCell>
                   </TableRow>
                   <TableRow className="border-b-0 bg-muted/40">
                     <TableCell colSpan={5} className="text-right text-sm font-medium">
-                      合计
+                      含税合计
                     </TableCell>
                     <TableCell className="text-right font-mono text-base font-bold tabular-nums text-emerald-600">
-                      ¥{grandTotal.toLocaleString()}
+                      ¥{amountSummary.lineGrossAmount.toLocaleString()}
                     </TableCell>
                   </TableRow>
                 </TableBody>
@@ -769,6 +804,12 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         title="合同附件"
         description="支持 PDF、JPG、PNG、XLSX、DOCX 格式，单文件最大 10MB，用于归档原始合同或补充文件"
         emptyHint="暂无附件，点击「上传附件」归档合同文件"
+        categoryOptions={[
+          { value: 'SIGNED_CONTRACT', label: '供应商盖章件' },
+          { value: 'PRODUCTION_PHOTO', label: '生产实物图（选填）' },
+          { value: 'SUPPLIER_INVOICE', label: '供应商发票' },
+          { value: 'OTHER', label: '其他附件' },
+        ]}
       />
 
       {/* 生成购销合同弹窗 */}

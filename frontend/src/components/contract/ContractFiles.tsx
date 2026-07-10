@@ -10,6 +10,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   Upload,
@@ -30,13 +31,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import type { ContractFile, ContractType } from '@/services/contractFile.service';
+import type { ContractFile, ContractFileCategory, ContractType } from '@/services/contractFile.service';
 import {
   uploadContractFile,
   deleteContractFile,
   getContractFileDownloadUrl,
 } from '@/services/contractFile.service';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const CATEGORY_LABELS: Record<ContractFileCategory, string> = {
+  OTHER: '其他附件',
+  SIGNED_CONTRACT: '供应商盖章件',
+  PRODUCTION_PHOTO: '生产实物图',
+  SUPPLIER_INVOICE: '供应商发票',
+  CARRIER_DOCUMENT: '船司文件',
+  SYSTEM_GENERATED_WORD: '系统生成 Word',
+  SYSTEM_GENERATED_PDF: '系统生成 PDF',
+};
 
 interface ContractFilesProps {
   contractId: string;
@@ -46,6 +58,7 @@ interface ContractFilesProps {
   title?: string;
   description?: string;
   emptyHint?: string;
+  categoryOptions?: Array<{ value: ContractFileCategory; label: string }>;
 }
 
 /**
@@ -90,10 +103,15 @@ export default function ContractFiles({
   title = '合同附件',
   description = '支持 PDF、JPG、PNG、XLSX、DOCX 格式，单文件最大 10MB',
   emptyHint = '暂无附件，点击「上传附件」归档合同文件',
+  categoryOptions,
 }: ContractFilesProps) {
   const [uploading, setUploading] = useState(false);
   const [previewFile, setPreviewFile] = useState<ContractFile | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resolvedCategoryOptions = categoryOptions?.length
+    ? categoryOptions
+    : [{ value: 'OTHER' as ContractFileCategory, label: CATEGORY_LABELS.OTHER }];
+  const [uploadCategory, setUploadCategory] = useState<ContractFileCategory>(resolvedCategoryOptions[0].value);
 
   const isPreviewable = (file: ContractFile) => {
     const mime = file.mimeType || file.fileType || '';
@@ -107,7 +125,7 @@ export default function ContractFiles({
 
       setUploading(true);
       try {
-        const res = await uploadContractFile(contractId, contractType, file);
+        const res = await uploadContractFile(contractId, contractType, file, undefined, uploadCategory);
         if (res.data) {
           onChange([res.data, ...files]);
           toast.success(`「${file.name}」上传成功`);
@@ -119,7 +137,7 @@ export default function ContractFiles({
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     },
-    [contractId, contractType, files, onChange]
+    [contractId, contractType, files, onChange, uploadCategory]
   );
 
   const handleDelete = useCallback(
@@ -144,34 +162,43 @@ export default function ContractFiles({
     <>
       <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <CardTitle className="text-sm font-medium">{title}</CardTitle>
               <CardDescription className="text-xs">{description}</CardDescription>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 rounded-md text-xs"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-            >
-              {uploading ? (
-                <>
-                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  上传中...
-                </>
-              ) : (
-                <>
-                  <Upload className="mr-1.5 h-3.5 w-3.5" />
-                  上传附件
-                </>
-              )}
-            </Button>
+            <div className="flex items-center gap-2">
+              {categoryOptions?.length ? (
+                <Select value={uploadCategory} onValueChange={(value) => setUploadCategory(value as ContractFileCategory)}>
+                  <SelectTrigger className="h-8 w-[150px] text-xs" aria-label="附件类型">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {resolvedCategoryOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-md text-xs"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? (
+                  <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />上传中...</>
+                ) : (
+                  <><Upload className="mr-1.5 h-3.5 w-3.5" />上传附件</>
+                )}
+              </Button>
+            </div>
             <input
               id="contract-file-upload"
               ref={fileInputRef}
               type="file"
+              aria-label="上传合同附件"
               className="hidden"
               accept=".pdf,.jpg,.jpeg,.png,.xlsx,.docx"
               onChange={handleUpload}
@@ -203,16 +230,20 @@ export default function ContractFiles({
                     <p className="truncate text-sm font-medium" title={file.fileName}>
                       {file.fileName}
                     </p>
+                    <Badge variant="outline" className="mt-1 rounded px-1.5 py-0 text-[10px] font-normal">
+                      {CATEGORY_LABELS[file.category || 'OTHER']}
+                    </Badge>
                     <p className="text-[11px] text-muted-foreground">
                       {formatFileSize(file.fileSize)} · {format(new Date(file.uploadedAt), 'yyyy-MM-dd')}
                     </p>
                   </div>
-                  <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
                     {isPreviewable(file) && (
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 rounded-md"
+                        aria-label={`预览${file.fileName}`}
                         onClick={() => setPreviewFile(file)}
                       >
                         <Eye className="h-3.5 w-3.5" />
@@ -223,6 +254,7 @@ export default function ContractFiles({
                         href={getContractFileDownloadUrl(file.id)}
                         target="_blank"
                         download={file.fileName}
+                        aria-label={`下载${file.fileName}`}
                       >
                         <Download className="h-3.5 w-3.5" />
                       </a>
@@ -231,6 +263,7 @@ export default function ContractFiles({
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 rounded-md text-destructive hover:text-destructive"
+                      aria-label={`删除${file.fileName}`}
                       onClick={() => handleDelete(file.id, file.fileName)}
                     >
                       <Trash2 className="h-3.5 w-3.5" />

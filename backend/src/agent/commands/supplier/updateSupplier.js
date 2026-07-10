@@ -12,7 +12,10 @@ const updateSupplier = async ({ id, input, prismaClient = prisma } = {}) => {
       address: input?.address,
       phone: input?.phone,
       taxId: input?.taxId,
+      bankAccountName: input?.bankAccountName,
       bankName: input?.bankName,
+      bankBranch: input?.bankBranch,
+      bankCode: input?.bankCode,
       bankAccount: input?.bankAccount,
     },
   });

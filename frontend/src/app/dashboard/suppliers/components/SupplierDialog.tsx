@@ -37,7 +37,10 @@ const supplierSchema = z.object({
   address: z.string().optional(),
   phone: z.string().optional(),        // 公司电话
   taxId: z.string().optional(),        // 纳税人识别号/税号
+  bankAccountName: z.string().optional(), // 收款户名
   bankName: z.string().optional(),     // 开户银行名称
+  bankBranch: z.string().optional(),   // 开户支行
+  bankCode: z.string().optional(),     // 联行号/银行编号
   bankAccount: z.string().optional(),  // 银行账号
   // 状态
   hasQualityIssue: z.boolean(),
@@ -74,7 +77,10 @@ export function SupplierDialog({
       address: '',
       phone: '',
       taxId: '',
+      bankAccountName: '',
       bankName: '',
+      bankBranch: '',
+      bankCode: '',
       bankAccount: '',
       hasQualityIssue: false,
       qualityNote: '',
@@ -89,7 +95,10 @@ export function SupplierDialog({
       address: supplier.address || '',
       phone: supplier.phone || '',
       taxId: supplier.taxId || '',
+      bankAccountName: supplier.bankAccountName || '',
       bankName: supplier.bankName || '',
+      bankBranch: supplier.bankBranch || '',
+      bankCode: supplier.bankCode || '',
       bankAccount: supplier.bankAccount || '',
       hasQualityIssue: supplier.hasQualityIssue,
       qualityNote: supplier.qualityNote || '',
@@ -256,6 +265,30 @@ export function SupplierDialog({
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
+                    name="bankAccountName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>收款户名</FormLabel>
+                        <FormControl><Input placeholder="银行账户户名" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="bankAccount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>银行账号</FormLabel>
+                        <FormControl><Input placeholder="银行账号" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
                     name="phone"
                     render={({ field }) => (
                       <FormItem>
@@ -298,18 +331,27 @@ export function SupplierDialog({
                   />
                   <FormField
                     control={form.control}
-                    name="bankAccount"
+                    name="bankBranch"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>银行账号</FormLabel>
-                        <FormControl>
-                          <Input placeholder="银行账号" {...field} />
-                        </FormControl>
+                        <FormLabel>开户支行</FormLabel>
+                        <FormControl><Input placeholder="开户支行" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
+                <FormField
+                  control={form.control}
+                  name="bankCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>联行号 / 银行编号</FormLabel>
+                      <FormControl><Input placeholder="银行联行号或编号" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             </div>
 

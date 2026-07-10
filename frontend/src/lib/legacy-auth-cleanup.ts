@@ -74,25 +74,6 @@ const clearLegacyQuickLoginStorage = (storage: Storage | undefined): void => {
   }
 };
 
-export const LEGACY_AUTH_CLEANUP_INLINE_SCRIPT = `
-(function(){
-  var knownKeys=${JSON.stringify(KNOWN_LEGACY_QUICK_LOGIN_KEYS)};
-  var patterns=[/quick[_-]?login/i,/quickLogin/,/quick.*(auth|credential|password|profile|user(name)?)/i,/(auth|credential|password|profile|user(name)?).*quick/i,/one[_-]?(tap|click).*(login|auth)/i,/(login|auth).*one[_-]?(tap|click)/i,/shortcut.*(login|auth)/i,/(login|auth).*shortcut/i,/remembered[_-]?login/i,/rememberedLogin/,/remembered.*(credential|password|profile)/i,/saved[_-]?login[_-]?profile/i,/savedLoginProfile/,/saved.*(credential|password).*login/i,/saved.*(credential|password)/i];
-  function isLegacyKey(key){return knownKeys.indexOf(key)>=0||patterns.some(function(pattern){return pattern.test(key);});}
-  function clean(storage){
-    if(!storage){return;}
-    knownKeys.forEach(function(key){storage.removeItem(key);});
-    var keys=[];
-    for(var index=0;index<storage.length;index+=1){var key=storage.key(index);if(key){keys.push(key);}}
-    keys.forEach(function(key){if(isLegacyKey(key)){storage.removeItem(key);}});
-  }
-  try{
-    clean(window.localStorage);
-    clean(window.sessionStorage);
-    window.localStorage.setItem(${JSON.stringify(LEGACY_AUTH_CLEANUP_VERSION_KEY)},${JSON.stringify(LEGACY_AUTH_CLEANUP_VERSION)});
-  }catch(error){}
-})();`;
-
 export function clearLegacyQuickLoginState(): void {
   if (typeof window === 'undefined') {
     return;

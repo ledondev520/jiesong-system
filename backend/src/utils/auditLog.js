@@ -1,6 +1,6 @@
 /**
  * Input: Prisma客户端、请求对象
- * Output: 操作日志记录
+ * Output: 操作日志记录，供应商银行路由字段仅保留脱敏变更轨迹
  * Pos: 审计日志工具，记录用户操作
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -16,19 +16,26 @@ const SENSITIVE_KEY_PATTERNS = [
   /api[-_]?key/i,
   /credential/i,
 ];
+const REDACTED_AUDIT_FIELDS = new Set([
+  'bankAccountName',
+  'bankName',
+  'bankBranch',
+  'bankCode',
+  'bankAccount',
+]);
 
 const CRITICAL_FIELDS_BY_ENTITY = {
   User: ['username', 'name', 'role', 'email', 'phone', 'isActive', 'avatar'],
   Store: ['name', 'portId', 'contactName', 'contactPhone', 'contactEmail', 'address', 'isActive'],
-  Supplier: ['name', 'shortName', 'contactName', 'contactPhone', 'contactEmail', 'address', 'phone', 'taxId', 'bankName', 'bankAccount', 'isActive', 'hasQualityIssue', 'qualityNote'],
+  Supplier: ['name', 'shortName', 'contactName', 'contactPhone', 'contactEmail', 'address', 'phone', 'taxId', 'bankAccountName', 'bankName', 'bankBranch', 'bankCode', 'bankAccount', 'isActive', 'hasQualityIssue', 'qualityNote'],
   Product: ['customsName', 'description', 'specification', 'unit', 'categoryId', 'grossWeight', 'netWeight', 'volume', 'packingSpec', 'length', 'width', 'height', 'isActive'],
   ProductCategory: ['name', 'parentId'],
   Port: ['name', 'code', 'isActive'],
   SalesContract: ['status', 'exchangeRate', 'signedAt', 'estimatedArrival', 'portId', 'note', 'totalAmount', 'totalBoxes', 'grossWeight', 'netWeight', 'volume', 'customsBroker', 'isFumigated', 'hasTaxRefund', 'shippedAt'],
   PurchaseContract: ['status', 'supplierId', 'taxRate', 'signedAt', 'expectedDate', 'invoiceNo', 'note', 'totalAmount', 'paidAmount'],
   PurchaseItem: ['productId', 'quantity', 'unit', 'unitPrice', 'totalPrice', 'specification', 'note'],
-  ContractFile: ['fileName', 'filePath', 'fileType', 'fileSize'],
-  SalesContractFile: ['fileName', 'filePath', 'fileType', 'fileSize'],
+  ContractFile: ['fileName', 'filePath', 'fileType', 'fileSize', 'category', 'checksum'],
+  SalesContractFile: ['fileName', 'filePath', 'fileType', 'fileSize', 'category', 'checksum'],
   PriceHistory: ['productId', 'price', 'supplierId', 'unitPrice'],
   Payment: ['type', 'amount', 'currency', 'paymentMethod', 'paymentDate', 'note', 'purchaseContractId', 'salesContractId'],
   SupplierAlias: ['alias', 'supplierId'],
@@ -62,6 +69,10 @@ const isSensitiveField = (key) => {
   }
 
   if (SENSITIVE_FIELDS.has(normalized)) {
+    return true;
+  }
+
+  if ([...REDACTED_AUDIT_FIELDS].some((field) => field.toLowerCase() === normalized)) {
     return true;
   }
 
@@ -129,8 +140,8 @@ const toComparable = (value) => {
 const buildCriticalComparison = (entity, oldValue = null, newValue = null) => {
   const normalizedEntity = normalizeEntity(entity);
   const criticalKeys = CRITICAL_FIELDS_BY_ENTITY[normalizedEntity] || [];
-  const oldRecord = sanitizeValue(oldValue);
-  const newRecord = sanitizeValue(newValue);
+  const oldRecord = isObject(oldValue) ? oldValue : null;
+  const newRecord = isObject(newValue) ? newValue : null;
 
   if (!criticalKeys.length || !isObject(oldRecord) || !isObject(newRecord)) {
     return {
@@ -153,8 +164,13 @@ const buildCriticalComparison = (entity, oldValue = null, newValue = null) => {
       return;
     }
 
-    before[key] = sanitizeValue(oldKeyValue);
-    after[key] = sanitizeValue(newKeyValue);
+    if (REDACTED_AUDIT_FIELDS.has(key)) {
+      before[key] = oldKeyValue === null || oldKeyValue === undefined ? null : '[REDACTED]';
+      after[key] = newKeyValue === null || newKeyValue === undefined ? null : '[REDACTED]';
+    } else {
+      before[key] = sanitizeValue(oldKeyValue);
+      after[key] = sanitizeValue(newKeyValue);
+    }
     hasChange = true;
   });
 
@@ -171,7 +187,7 @@ const resolveValues = (action, entity, oldValue, newValue) => {
   const newSanitized = sanitizeValue(newValue);
 
   if (action === 'UPDATE') {
-    const comparison = buildCriticalComparison(entity, oldSanitized, newSanitized);
+    const comparison = buildCriticalComparison(entity, oldValue, newValue);
     if (comparison.hasChange) {
       return { oldValue: comparison.before, newValue: comparison.after };
     }

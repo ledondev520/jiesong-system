@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updatedAt": "2026-06-03",
+  "updatedAt": "2026-07-10",
   "owner": "security-team",
   "tiers": [
     {
@@ -15,12 +15,15 @@
         "database credentials",
         "HSCIQ API keys",
         "backend environment overrides containing real secrets",
-        "signed legal/financial contract artifacts"
+        "signed and system-generated legal/financial contract artifacts",
+        "supplier bank account names, account numbers, branches, and bank routing codes"
       ],
       "controls": {
         "storage": [
-          "Only in .env or secret manager",
-          "Least privilege file mode (<=600 for backend .env)"
+          "Secrets only in .env or secret manager",
+          "Restricted business records only in the application database or protected contract-evidence storage",
+          "Least privilege file mode (<=600 for backend .env)",
+          "Contract artifact directories use 0700 and files use 0600"
         ],
         "transfer": [
           "Encrypt in transit (TLS)",

@@ -129,7 +129,10 @@ describe('CreatePurchasePage 交互逻辑', () => {
     expect(screen.getByLabelText('联系电话')).toHaveAttribute('name', 'contactPhone');
     expect(screen.getByLabelText('公司地址')).toHaveAttribute('name', 'address');
     expect(screen.getByLabelText('纳税人识别号')).toHaveAttribute('name', 'taxId');
+    expect(screen.getByLabelText('收款户名')).toHaveAttribute('name', 'bankAccountName');
     expect(screen.getByLabelText('开户银行')).toHaveAttribute('name', 'bankName');
+    expect(screen.getByLabelText('开户支行')).toHaveAttribute('name', 'bankBranch');
+    expect(screen.getByLabelText('联行号 / 银行编号')).toHaveAttribute('name', 'bankCode');
     expect(screen.getByLabelText('银行账号')).toHaveAttribute('name', 'bankAccount');
 
     const labelsWithTargets = Array.from(document.querySelectorAll('label[for]'));

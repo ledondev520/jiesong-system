@@ -43,7 +43,7 @@ const basePurchase = {
   totalAmount: 5000,
   paidAmount: 1500,
   invoiceNo: null,
-  files: [],
+  files: [{ id: 'cf-1', fileName: '盖章合同.pdf', category: 'SIGNED_CONTRACT' }],
 };
 
 test('从采购合同号关联整笔专项单并给出最早下一动作', () => {
@@ -92,4 +92,45 @@ test('发运后的内部退税准备日为次月5日', () => {
   const taxStage = workflow.stages.find((stage) => stage.key === 'tax-refund');
   assert.equal(taxStage.prepareOn, '2026-08-05');
   assert.match(taxStage.reason, /内部准备提醒/);
+});
+
+test('已签约但未归档盖章件时采购阶段仍待办', () => {
+  const workflow = buildTradeWorkflow(
+    baseSales,
+    new Map([[basePurchase.contractNo, { ...basePurchase, files: [] }]]),
+  );
+
+  const procurement = workflow.stages.find((stage) => stage.key === 'procurement');
+  assert.equal(procurement.status, 'current');
+  assert.match(procurement.reason, /盖章件/);
+  assert.equal(procurement.action.label, '上传供应商盖章件');
+});
+
+test('历史 OTHER 分类的 Word/PDF 附件可作为签章存档兼容', () => {
+  const workflow = buildTradeWorkflow(
+    baseSales,
+    new Map([[
+      basePurchase.contractNo,
+      { ...basePurchase, files: [{ fileName: '历史购销合同.docx', category: 'OTHER' }] },
+    ]]),
+  );
+
+  assert.equal(workflow.stages.find((stage) => stage.key === 'procurement').status, 'completed');
+});
+
+test('PO/CG 合同号别名下的装箱明细发票号可正确结清', () => {
+  const workflow = buildTradeWorkflow(
+    {
+      ...baseSales,
+      status: 'SHIPPED',
+      packingItems: [{
+        ...baseSales.packingItems[0],
+        purchaseContractNo: 'PO260001',
+        invoiceNo: 'INV-260001',
+      }],
+    },
+    new Map([[basePurchase.contractNo, basePurchase]]),
+  );
+
+  assert.equal(workflow.stages.find((stage) => stage.key === 'invoice').status, 'completed');
 });

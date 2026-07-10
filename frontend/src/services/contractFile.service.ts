@@ -18,11 +18,21 @@ export interface ContractFile {
   fileSize: number;
   filePath: string;
   description?: string | null;
+  category?: ContractFileCategory;
+  checksum?: string | null;
   uploadedAt: string;
   contractType?: 'PURCHASE' | 'SALES';
 }
 
 export type ContractType = 'PURCHASE' | 'SALES';
+export type ContractFileCategory =
+  | 'OTHER'
+  | 'SIGNED_CONTRACT'
+  | 'PRODUCTION_PHOTO'
+  | 'SUPPLIER_INVOICE'
+  | 'CARRIER_DOCUMENT'
+  | 'SYSTEM_GENERATED_WORD'
+  | 'SYSTEM_GENERATED_PDF';
 
 /**
  * 职责：获取合同附件列表
@@ -41,12 +51,14 @@ export const uploadContractFile = async (
   contractId: string,
   contractType: ContractType,
   file: File,
-  description?: string
+  description?: string,
+  category: ContractFileCategory = 'OTHER',
 ) => {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('contractType', contractType);
   if (description) formData.append('description', description);
+  formData.append('category', category);
 
   const token = getAuthToken();
   const res = await fetch(`/api/v1/contracts/${contractId}/files`, {

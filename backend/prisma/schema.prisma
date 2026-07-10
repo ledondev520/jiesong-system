@@ -130,7 +130,10 @@ model Supplier {
   address         String?   // 公司地址
   phone           String?   // 公司电话
   taxId           String?   // 纳税人识别号/税号
+  bankAccountName String?   // 收款户名
   bankName        String?   // 开户银行名称
+  bankBranch      String?   // 开户支行
+  bankCode        String?   // 联行号/银行编号
   bankAccount     String?   // 银行账号
   // 状态
   hasQualityIssue Boolean   @default(false)
@@ -668,10 +671,14 @@ model ContractFile {
   mimeType           String   @default("")
   fileSize           Int
   description        String?
+  category           String   @default("OTHER") // SIGNED_CONTRACT/PRODUCTION_PHOTO/SUPPLIER_INVOICE/SYSTEM_GENERATED_*
+  checksum           String?
   uploadedAt         DateTime @default(now())
 
   purchaseContract PurchaseContract @relation(fields: [purchaseContractId], references: [id], onDelete: Cascade)
 
+  @@index([purchaseContractId])
+  @@index([category])
   @@map("contract_files")
 }
 
@@ -684,11 +691,14 @@ model SalesContractFile {
   mimeType        String   @default("")
   fileSize        Int
   description     String?
+  category        String   @default("OTHER") // CARRIER_DOCUMENT/SYSTEM_GENERATED_*/OTHER
+  checksum        String?
   uploadedAt      DateTime @default(now())
 
   salesContract SalesContract @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
 
   @@index([salesContractId])
+  @@index([category])
   @@map("sales_contract_files")
 }
 

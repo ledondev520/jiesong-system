@@ -31,6 +31,7 @@
 - Keep dependencies updated with minimal privilege; avoid adding packages that require elevated permissions or execute shell by default.
 - Enforce permission checks before loading `.env` and config files as implemented in `backend/src/config/index.js`.
 - Use least privilege for files and directories created by the system, especially upload directories and temporary files.
+- Contract attachments and generated documents must be stored in `0700` directories with `0600` file mode; `backend/src/services/fileService.js` is the enforcement point and must fail before persistence if permission tightening fails.
 - Any privileged operation must fail closed (`throw`) in production and log with full context in non-production.
 
 ## Subagent policy
@@ -39,7 +40,7 @@
 
 ## Data classification
 - See `data-classification.json` for the authoritative classification map.
-- Restricted data: secrets, credentials, migration credentials, payment-related keys, and signed contract documents.
+- Restricted data: secrets, credentials, migration credentials, payment-related keys, supplier bank routing details, and signed/generated contract documents.
 - Agent/service-account credentials and credential hashes are also Restricted data and must never be printed in logs or committed to docs/tests.
 - Confidential data: internal business data (customer orders, contract amounts, supplier/客户联系人信息, operational KPIs).
 - Internal data: non-sensitive operational metrics, general feature flags, status enums, and non-production run metadata.
