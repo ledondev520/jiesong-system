@@ -1,5 +1,5 @@
 /**
- * Input: 后端 finance/stats、finance/payment-trends、system/exchange-rate、bank-flow/stats、invoices/stats API
+ * Input: 后端财务 Interface、银行流水/发票统计 Interface、按需图表 Module
  * Output: 财务概览页面（收付进度 + 汇率 + 银行流水/发票摘要 + 紧迫信号 + 趋势折线图 + 快捷导航）
  * Pos: 财务模块首页，提供公司财务进度驾驶舱
  *
@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -32,21 +32,7 @@ import {
   RefreshCw,
   Landmark,
   FileText,
-  Activity,
 } from 'lucide-react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Area,
-  AreaChart,
-  ReferenceLine,
-} from 'recharts';
 import Link from 'next/link';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
@@ -61,11 +47,20 @@ import { cachedFetch } from '@/lib/api-cache';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState, LoadingState } from '@/components/ui/data-state';
 import { KpiCard } from '@/components/finance/KpiCard';
-import { ChartTooltip } from '@/components/finance/ChartTooltip';
 import {
   buildCnyCashFlowForecast,
   convertPaymentTrendsToCny,
 } from '@/lib/finance-currency';
+
+const FinanceOverviewCharts = lazy(() => import('./components/FinanceOverviewCharts'));
+
+const financeChartsFallback = (
+  <Card aria-busy="true">
+    <CardContent className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+      正在加载财务趋势图...
+    </CardContent>
+  </Card>
+);
 
 interface PaymentTrendPoint {
   label: string;
@@ -94,14 +89,6 @@ interface ExchangeRate {
   buffer: number;
   effectiveRate: number;
 }
-
-const FINANCE_COLORS = {
-  income: '#10b981',
-  expense: '#ef4444',
-  profit: '#3b82f6',
-  primary: 'hsl(var(--primary))',
-  warning: '#f59e0b',
-};
 
 function calcTrendDirection(current: number, previous: number): 'up' | 'down' | 'neutral' {
   if (!previous || previous === 0) return 'neutral';
@@ -408,112 +395,15 @@ export default function FinancePage() {
         />
       </div>
 
-      {/* 收支对比柱状图 */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <div>
-            <CardTitle className="text-sm font-medium">收支对比</CardTitle>
-            <CardDescription className="text-xs">
-              {trendDays === 30 ? '近 30 天' : '近 90 天'} 应收按 {exchangeRate?.effectiveRate.toFixed(2)} 折算后与应付对比（CNY）
-            </CardDescription>
-          </div>
-          <div className="flex gap-1.5">
-            <Button
-              size="sm"
-              variant={trendDays === 30 ? 'default' : 'outline'}
-              className="h-7 px-2 text-xs"
-              onClick={() => setTrendDays(30)}
-            >
-              30天
-            </Button>
-            <Button
-              size="sm"
-              variant={trendDays === 90 ? 'default' : 'outline'}
-              className="h-7 px-2 text-xs"
-              onClick={() => setTrendDays(90)}
-            >
-              90天
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {cnyTrends.length === 0 ? (
-            <EmptyState
-              icon={BarChart3}
-              title="暂无收付款数据"
-              description="请先录入收付款记录，趋势图会在此自动生成。"
-              className="py-10"
-            />
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={cnyTrends} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} width={50} axisLine={false} tickLine={false} />
-                <Tooltip
-                  content={
-                    <ChartTooltip
-                      valueFormatter={(v) => `¥${Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}
-                    />
-                  }
-                />
-                <Legend
-                  formatter={(value) => value === 'receivablesCny' ? '应收回款折算 (CNY)' : '应付付款 (CNY)'}
-                />
-                <Bar dataKey="receivablesCny" name="receivablesCny" fill={FINANCE_COLORS.income} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="payablesCny" name="payablesCny" fill={FINANCE_COLORS.expense} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* 现金流预测 */}
-      {cashFlowForecast.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm font-medium">
-              <Activity className="h-4 w-4 text-primary" />
-              现金流预测
-            </CardTitle>
-            <CardDescription className="text-xs">
-              应收按当前结算汇率 {exchangeRate?.effectiveRate.toFixed(2)} 折算，统一以 CNY 线性外推
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={cashFlowForecast} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="forecastGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={FINANCE_COLORS.profit} stopOpacity={0.2} />
-                    <stop offset="95%" stopColor={FINANCE_COLORS.profit} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} width={50} axisLine={false} tickLine={false} />
-                <Tooltip
-                  content={
-                    <ChartTooltip
-                      valueFormatter={(v) => `¥${Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}
-                    />
-                  }
-                />
-                <ReferenceLine y={0} stroke="var(--border)" />
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke={FINANCE_COLORS.profit}
-                  fill="url(#forecastGradient)"
-                  strokeWidth={2}
-                  dot={{ r: 4, fill: FINANCE_COLORS.profit, strokeWidth: 2, stroke: 'var(--background)' }}
-                  activeDot={{ r: 6 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
+      <Suspense fallback={financeChartsFallback}>
+        <FinanceOverviewCharts
+          cnyTrends={cnyTrends}
+          cashFlowForecast={cashFlowForecast}
+          trendDays={trendDays}
+          effectiveRate={exchangeRate?.effectiveRate ?? null}
+          onTrendDaysChange={setTrendDays}
+        />
+      </Suspense>
 
       {/* 银行流水 & 发票台账摘要 */}
       {(bankStats || invStats) && (

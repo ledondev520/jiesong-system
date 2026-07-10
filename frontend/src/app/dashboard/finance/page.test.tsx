@@ -8,6 +8,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
 import FinancePage from './page';
 
 const mockGetStats = vi.fn();
@@ -81,6 +82,13 @@ describe('FinancePage 交互逻辑', () => {
     });
   });
 
+  it('图表库通过延迟加载的内部 Module 隔离', () => {
+    const pageSource = readFileSync('src/app/dashboard/finance/page.tsx', 'utf8');
+
+    expect(pageSource).not.toContain("from 'recharts'");
+    expect(pageSource).toContain("import('./components/FinanceOverviewCharts')");
+  });
+
   it('加载完成后展示统计信息', async () => {
     mockGetStats.mockResolvedValue({
       payable: { total: 1200, paid: 400, unpaid: 800 },
@@ -98,7 +106,10 @@ describe('FinancePage 交互逻辑', () => {
       expect(screen.getByText('财务报表分析')).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /查看报表分析/ })).toHaveAttribute('href', '/dashboard/finance/statements');
       expect(screen.queryByTestId('financial-statements-section')).not.toBeInTheDocument();
-    });
+      expect(screen.getByTestId('finance-overview-charts')).toBeInTheDocument();
+      expect(screen.getByText('收支对比')).toBeInTheDocument();
+      expect(screen.getByText('现金流预测')).toBeInTheDocument();
+    }, { timeout: 5000 });
   });
 
   it('初始加载中会显示加载文案', () => {

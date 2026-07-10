@@ -22,6 +22,7 @@
 ### Progress
 - 已完成 Sidebar 意图预取：初始化预取调用 `13 → 0`，同一目标 hover/focus 去重为 1 次。
 - 已完成出口 Excel 导入延迟加载：弹窗关闭时不挂载导入 Module，点击“批量导入”后再加载；目标测试 `6/6` 通过。
+- 已完成财务/AI 图表内部 Seam：页面首屏不再静态引用 `recharts`，数据就绪后由 Suspense 加载图表；目标测试 `25/25`、ESLint、TypeScript 和 diff check 通过。
 
 ## 2026-07-10 FLOW-07A（最终简化与交付审计）
 

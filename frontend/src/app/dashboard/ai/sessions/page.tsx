@@ -1,5 +1,5 @@
 /**
- * Input: AI 会话 API、Token 统计 API、独立 Token 记录 API（含 promptBrief）、SortableTableHead、useTableSort
+ * Input: AI 会话 Interface、Token 统计 Interface、独立 Token 记录 Interface（含 promptBrief）、按需图表 Module
  * Output: AI 会话管理页面（用量折线图、24h/30d 摘要卡片；聊天/独立调用 Tabs、列排序与费用展示）
  * Pos: Dashboard AI 管理模块
  *
@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, AI_TABS } from '@/components/layout/ModuleTabHeader';
@@ -36,14 +36,19 @@ import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, CheckCircle2, Clock3, Loader2, RefreshCw, Trash2, MessageSquare, FileText, BarChart2 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
 import { formatDateTime, formatTime } from '@/lib/date-format';
 import api from '@/lib/axios';
 import type { ApiResponse, PaginatedResponse } from '@/types';
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from 'recharts';
 import { MobileListCard } from '@/components/mobile';
+
+const AiTokenUsageChart = lazy(() => import('./components/AiTokenUsageChart'));
+
+const aiTokenChartFallback = (
+  <div className="flex h-[220px] items-center justify-center gap-2 text-sm text-muted-foreground" role="status">
+    <Loader2 className="h-4 w-4 animate-spin" />
+    正在加载用量图表...
+  </div>
+);
 
 interface ChatMessage {
   id: string;
@@ -662,53 +667,6 @@ const buildChartData = (daily: DailyStat[]) => {
   };
 };
 
-const MODEL_COLORS = [
-  '#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#14b8a6',
-];
-
-/** 后端按北京时间（UTC+8）整点分桶返回的 yyyy-MM-dd HH:00 */
-const SHANGHAI_HOUR_BUCKET = /^(\d{4}-\d{2}-\d{2}) (\d{2}):00$/;
-
-/** 职责：将北京时间分桶字符串解析为 Date（固定 +08:00，与浏览器本地时区无关） */
-const parseShanghaiHourBucket = (value: string): Date | null => {
-  const m = value.match(SHANGHAI_HOUR_BUCKET);
-  if (!m) return null;
-  return new Date(`${m[1]}T${m[2]}:00:00+08:00`);
-};
-
-/** 职责：折线图横轴刻度——近 24 小时为北京时间「时:分」，其它区间为「月/日」 */
-const formatChartXTick = (value: string, statsDays: string) => {
-  if (statsDays === '1') {
-    const d = parseShanghaiHourBucket(value);
-    if (d) return format(d, 'HH:mm');
-  }
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    try {
-      return format(new Date(`${value}T12:00:00+08:00`), 'M/d');
-    } catch {
-      return value;
-    }
-  }
-  return value;
-};
-
-/** 职责：Tooltip 横轴标签：24 小时为整点；按日区间为北京日历日 */
-const formatChartTooltipLabel = (value: string, statsDays: string) => {
-  if (statsDays === '1') {
-    const d = parseShanghaiHourBucket(value);
-    if (d) return `${format(d, 'M/d HH:mm')}（北京时间）`;
-  }
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    try {
-      const d = new Date(`${value}T12:00:00+08:00`);
-      return `${format(d, 'yyyy-MM-dd')}（北京时间·按日）`;
-    } catch {
-      return value;
-    }
-  }
-  return value;
-};
-
 /**
  * 各模型 Token 估算单价（每千 token，人民币元）
  * 数据来源：官方定价页，仅供参考，实际费用以平台账单为准
@@ -1195,40 +1153,9 @@ export default function AiSessionsPage() {
               </Link>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-                <XAxis
-                  dataKey="day"
-                  tick={{ fontSize: 11 }}
-                  minTickGap={statsDays === '1' ? 16 : 8}
-                  tickFormatter={(v: string) => formatChartXTick(v, statsDays)}
-                />
-                <YAxis
-                  tick={{ fontSize: 12 }}
-                  tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}K` : String(v)}
-                />
-                <Tooltip
-                  labelFormatter={(label) => formatChartTooltipLabel(String(label), statsDays)}
-                  formatter={(value, name) => [
-                    formatTokensM(typeof value === 'number' ? value : Number(value ?? 0)),
-                    String(name),
-                  ]}
-                />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                {chartModels.map((model, i) => (
-                  <Line
-                    key={model}
-                    type="monotone"
-                    dataKey={model}
-                    stroke={MODEL_COLORS[i % MODEL_COLORS.length]}
-                    strokeWidth={2}
-                    dot={false}
-                    name={model}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
+            <Suspense fallback={aiTokenChartFallback}>
+              <AiTokenUsageChart data={chartData} models={chartModels} statsDays={statsDays} />
+            </Suspense>
           )}
           <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
             <Card className="border-border/70 shadow-none">

@@ -7,6 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { readFileSync } from 'node:fs';
 import AiSessionsPage from './page';
 import api from '@/lib/axios';
 
@@ -147,6 +148,38 @@ describe('AiSessionsPage', () => {
     mockSearchParams = new URLSearchParams();
     window.localStorage.clear();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
+  });
+
+  it('图表库通过延迟加载的内部 Module 隔离', () => {
+    const pageSource = readFileSync('src/app/dashboard/ai/sessions/page.tsx', 'utf8');
+
+    expect(pageSource).not.toContain("from 'recharts'");
+    expect(pageSource).toContain("import('./components/AiTokenUsageChart')");
+  });
+
+  it('有 Token 数据时加载内部图表 Module', async () => {
+    mockGetSessions.mockResolvedValue({ data: [] });
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (String(url).includes('/ai/token-stats?days=7')) {
+        return Promise.resolve({
+          data: {
+            period: '7d',
+            totalRequests: 2,
+            totalTokens: 1200,
+            byModel: [{ model: 'gpt-5', requests: 2, tokens: 1200 }],
+            daily: [{ day: '2026-07-10', model: 'gpt-5', tokens: 1200, requests: 2, successRate: 1 }],
+          },
+        });
+      }
+      if (String(url).includes('/ai/token-stats')) {
+        return Promise.resolve({ data: { period: 'summary', totalRequests: 0, totalTokens: 0, byModel: [], daily: [] } });
+      }
+      return Promise.resolve({ data: null });
+    });
+
+    render(<AiSessionsPage />);
+
+    expect(await screen.findByTestId('ai-token-usage-chart', undefined, { timeout: 5000 })).toBeInTheDocument();
   });
 
   it('加载后展示会话列表', async () => {

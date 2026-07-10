@@ -7,8 +7,8 @@
 | PERF-FE-12A | P0 | 10m | 1 | DONE | 失败测试锁定初始不批量预取、意图预取去重和记忆目标不变 |
 | PERF-FE-12B | P0 | 15m | 1 | DONE | 实现 Sidebar 单目标意图预取并删除无调用方批量路由清单 |
 | PERF-FE-12C | P0 | 15m | 1 | DONE | 出口 Excel 批量导入 Module 仅在打开弹窗时加载 |
-| PERF-FE-12D | P1 | 20m | 1 | DOING | 财务与 AI 图表拆到延迟加载的内部 Module |
-| PERF-FE-12E | P0 | 20m | 1 | TODO | 目标/全量测试、类型、lint、生产构建、包体与冷暖路径复测 |
+| PERF-FE-12D | P1 | 20m | 1 | DONE | 财务与 AI 图表拆到延迟加载的内部 Module |
+| PERF-FE-12E | P0 | 20m | 1 | DOING | 目标/全量测试、类型、lint、生产构建、包体与冷暖路径复测 |
 | PERF-FE-12F | P1 | 10m | 1 | TODO | 更新结果、风险、指标、Patch 与 ByteRover 技术结论 |
 
 ## 2026-07-10 FLOW 出口专项单全流程重构
