@@ -121,6 +121,23 @@ test('persistAgentRun: 使用交互式事务统一持久化运行记录与回放
   ]);
 });
 
+test('buildAgentDoneEvent: 最终事件携带完整文本供无 partial chunk 客户端兜底', () => {
+  const event = openAgentService.buildAgentDoneEvent({
+    responseText: '5',
+    sessionId: 'session-1',
+    model: 'stable-model',
+    pendingActions: [],
+    usage: { input_tokens: 2, output_tokens: 1 },
+    routePlan: null,
+    toolTraceSummary: null,
+    actionRecommendations: [],
+  });
+
+  assert.equal(event.type, 'done');
+  assert.equal(event.content, '5');
+  assert.equal(event.model, 'stable-model');
+});
+
 test('listToolRegistry: 暴露通用主 Agent 的跨域工具面与写操作确认标记', () => {
   const registry = openAgentService.listToolRegistry();
   const names = registry.map((item) => item.name);

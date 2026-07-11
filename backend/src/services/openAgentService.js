@@ -2585,6 +2585,27 @@ const buildAgentRunMetadata = ({
   }),
 });
 
+const buildAgentDoneEvent = ({
+  responseText,
+  sessionId,
+  model,
+  pendingActions,
+  usage,
+  routePlan,
+  toolTraceSummary,
+  actionRecommendations,
+}) => ({
+  type: 'done',
+  content: responseText,
+  sessionId,
+  model,
+  pendingActions,
+  usage,
+  routePlan,
+  toolTraceSummary,
+  actionRecommendations,
+});
+
 const buildReplaySnapshotLogValue = ({
   governanceReplayProfile,
   routePlan,
@@ -2823,8 +2844,8 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
     });
 
     // 4. 发送完成事件
-    yield {
-      type: 'done',
+    yield buildAgentDoneEvent({
+      responseText: finalText,
       sessionId: resolvedSessionId,
       model: runtimeConfig.model,
       pendingActions,
@@ -2832,7 +2853,7 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
       routePlan,
       toolTraceSummary: summarizeToolTrace(toolTrace),
       actionRecommendations,
-    };
+    });
   } finally {
     await agent.close();
   }
@@ -2855,6 +2876,7 @@ module.exports = {
   materializeRecommendationPendingActions,
   summarizeToolTrace,
   buildAgentRunMetadata,
+  buildAgentDoneEvent,
   buildReplaySnapshotLogValue,
   buildReplaySummaryRecord,
   resolveSdkSessionConfig,

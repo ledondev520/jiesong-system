@@ -106,6 +106,30 @@ describe('AIAssistant', () => {
     });
   });
 
+  it('模型未产生 partial chunk 时使用 done 事件中的最终文本', async () => {
+    const reader = createMockSseReader([
+      'data: {"type":"session","sessionId":"unified_done_only"}\n\n',
+      'data: {"type":"done","content":"5","model":"moonshot-v1-8k","pendingActions":[]}\n\n',
+    ]);
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      body: { getReader: () => reader },
+    } as unknown as Response);
+
+    const user = userEvent.setup();
+    render(<AIAssistant />);
+
+    await user.click(screen.getByRole('button', { name: 'AI 助手' }));
+    await user.type(screen.getByPlaceholderText('输入问题或粘贴图片...'), '2+3？');
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => {
+      expect(screen.getByText('5')).toBeInTheDocument();
+      expect(screen.queryByText('抱歉，AI 助手没有返回有效结果。')).not.toBeInTheDocument();
+    });
+  });
+
   it('发送失败时显示错误提示消息', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Failed to fetch'));
 

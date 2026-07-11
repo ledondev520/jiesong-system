@@ -513,12 +513,13 @@ export function AIAssistant({ presentation = 'floating' }: AIAssistantProps) {
                 updateMessageById(assistantMessage.id, { content: accumulatedText });
                 break;
               case 'done': {
+                const finalContent = accumulatedText || payload.content || '';
                 const pendingActions: PendingActionState[] | undefined =
                   payload.pendingActions?.length
                     ? payload.pendingActions.map((a: AgentPendingAction) => ({ ...a, status: 'pending' as const }))
                     : undefined;
                 updateMessageById(assistantMessage.id, {
-                  content: accumulatedText || '抱歉，AI 助手没有返回有效结果。',
+                  content: finalContent || '抱歉，AI 助手没有返回有效结果。',
                   model: payload.model,
                   actionRecommendations: payload.actionRecommendations,
                   pendingActions,
