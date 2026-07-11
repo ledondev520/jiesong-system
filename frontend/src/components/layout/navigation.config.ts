@@ -160,7 +160,6 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
       '/dashboard/users',
       '/dashboard/about',
       '/dashboard/system',
-      '/dashboard/dev',
       '/dashboard/products',
     ],
     tabs: ADMIN_TABS,

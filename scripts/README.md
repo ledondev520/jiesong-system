@@ -77,7 +77,6 @@
 | backfill_wps_purchase_mismatch_source_notes.js | 数据修复 | 基于 WPS 采购 PDF 文件名合同号和同目录 DOCX 正文合同号冲突，只在供应商/日期/金额可对齐时回填 mismatch 来源 note；不改业务字段，默认 dry-run |
 | merge_export_data.py | 数据合并 | 合并出口数据 |
 | debug_contract.py | 调试工具 | 调试合同数据 |
-| dev-cockpit-tunnel.sh | 开发穿透 | 把本地前端驾驶舱透到公网，供手机查看 |
 
 ## 使用说明
 
@@ -228,12 +227,6 @@ node scripts/backfill_wps_purchase_mismatch_source_notes.js --apply
 
 # 操作性缺口重复覆盖复核：只读，不写库、不删除
 node scripts/analyze_wps_operational_duplicate_coverage.js
-```
-
-### 本地项目驾驶舱穿透
-```bash
-# 在 frontend 目录下执行，默认透出 http://127.0.0.1:3000
-npm run tunnel:cockpit
 ```
 
 ### Python 脚本

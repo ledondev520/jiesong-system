@@ -98,20 +98,12 @@ export default function AboutAgentPage() {
         title="关于 Agent 使用"
         description="让内部同事的 Agent 用几句话或几条命令，就能接上这套系统。"
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button asChild variant="outline">
-              <Link href="/dashboard/dev">
-                <WandSparkles className="mr-2 h-4 w-4" />
-                打开项目驾驶舱
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/dashboard/users">
-                <KeyRound className="mr-2 h-4 w-4" />
-                打开账号管理
-              </Link>
-            </Button>
-          </div>
+          <Button asChild variant="outline">
+            <Link href="/dashboard/users">
+              <KeyRound className="mr-2 h-4 w-4" />
+              打开账号管理
+            </Link>
+          </Button>
         }
       />
 

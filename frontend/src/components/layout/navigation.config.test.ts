@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Role } from '@/types';
 import {
@@ -42,6 +43,12 @@ describe('navigation.config helpers', () => {
     const visibleForAdmin = getVisibleModuleNavItems(Role.ADMIN).map((item) => item.key);
 
     expect(visibleForAdmin).not.toContain('dev');
+  });
+
+  it('生产前端不再携带会追踪整个仓库的项目驾驶舱路由', () => {
+    expect(existsSync('src/app/dashboard/dev/page.tsx')).toBe(false);
+    expect(existsSync('src/app/api/dev/status/route.ts')).toBe(false);
+    expect(existsSync('src/lib/dev-cockpit.ts')).toBe(false);
   });
 
   it('采购模块 Tab 不再把合同模板作为独立页面', () => {

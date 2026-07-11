@@ -6,7 +6,6 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "tunnel:cockpit": "bash ../scripts/dev-cockpit-tunnel.sh",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
