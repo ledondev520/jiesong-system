@@ -40,12 +40,15 @@ vi.mock('next/link', () => ({
   default: ({
     href,
     children,
+    prefetch,
     ...props
-  }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; children: ReactNode }) => (
-    <a href={href} {...props}>
-      {children}
-    </a>
-  ),
+  }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; children: ReactNode; prefetch?: boolean }) => {
+    return (
+      <a href={href} data-prefetch={prefetch === undefined ? 'auto' : String(prefetch)} {...props}>
+        {children}
+      </a>
+    );
+  },
 }));
 
 describe('Sidebar', () => {
@@ -121,7 +124,7 @@ describe('Sidebar', () => {
     vi.useRealTimers();
   });
 
-  it('只在用户表达导航意图时预取记忆目标且同一路由只预取一次', () => {
+  it('记忆目标直接写入 Link，hover/focus/click 均不启动竞争预取', () => {
     vi.useFakeTimers();
     vi.mocked(localStorage.getItem).mockImplementation((key) => (
       key === 'tab_memory_/dashboard/finance' ? '/dashboard/finance/statements' : null
@@ -134,11 +137,12 @@ describe('Sidebar', () => {
     fireEvent.focus(financeLink!);
     fireEvent.mouseEnter(financeLink!);
 
-    expect(mockPrefetch).toHaveBeenCalledTimes(1);
-    expect(mockPrefetch).toHaveBeenCalledWith('/dashboard/finance/statements');
+    expect(mockPrefetch).not.toHaveBeenCalled();
+    expect(financeLink).toHaveAttribute('href', '/dashboard/finance/statements');
+    expect(financeLink).toHaveAttribute('data-prefetch', 'auto');
 
     fireEvent.click(financeLink!);
-    expect(mockPush).toHaveBeenCalledWith('/dashboard/finance/statements');
+    expect(mockPush).not.toHaveBeenCalled();
 
     vi.useRealTimers();
   });

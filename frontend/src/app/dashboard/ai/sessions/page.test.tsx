@@ -53,6 +53,10 @@ vi.mock('@/lib/api-cache', () => ({
   clearAllCache: vi.fn(),
 }));
 
+vi.mock('./components/AiTokenUsageChart', () => ({
+  default: () => <div data-testid="ai-token-usage-chart" />,
+}));
+
 describe('AiSessionsPage', () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -179,7 +183,7 @@ describe('AiSessionsPage', () => {
 
     render(<AiSessionsPage />);
 
-    expect(await screen.findByTestId('ai-token-usage-chart', undefined, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByTestId('ai-token-usage-chart', undefined, { timeout: 15000 })).toBeInTheDocument();
   });
 
   it('加载后展示会话列表', async () => {

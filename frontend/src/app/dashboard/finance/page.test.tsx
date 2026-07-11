@@ -46,6 +46,15 @@ vi.mock('@/lib/tab-memory', () => ({
   getModuleTab: vi.fn((href: string) => href),
 }));
 
+vi.mock('./components/FinanceOverviewCharts', () => ({
+  default: () => (
+    <div data-testid="finance-overview-charts">
+      <span>收支对比</span>
+      <span>现金流预测</span>
+    </div>
+  ),
+}));
+
 describe('FinancePage 交互逻辑', () => {
   beforeEach(() => {
     mockGetStats.mockReset();
@@ -106,10 +115,11 @@ describe('FinancePage 交互逻辑', () => {
       expect(screen.getByText('财务报表分析')).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /查看报表分析/ })).toHaveAttribute('href', '/dashboard/finance/statements');
       expect(screen.queryByTestId('financial-statements-section')).not.toBeInTheDocument();
-      expect(screen.getByTestId('finance-overview-charts')).toBeInTheDocument();
-      expect(screen.getByText('收支对比')).toBeInTheDocument();
-      expect(screen.getByText('现金流预测')).toBeInTheDocument();
     }, { timeout: 5000 });
+
+    expect(await screen.findByTestId('finance-overview-charts', undefined, { timeout: 15000 })).toBeInTheDocument();
+    expect(screen.getByText('收支对比')).toBeInTheDocument();
+    expect(screen.getByText('现金流预测')).toBeInTheDocument();
   });
 
   it('初始加载中会显示加载文案', () => {

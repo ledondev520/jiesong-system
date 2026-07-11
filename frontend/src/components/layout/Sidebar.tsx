@@ -13,13 +13,13 @@
  * - AI 助手：AI 会话
  * - 系统管理：系统配置、用户管理、商品档案、系统日志
  *
- * 侧边栏只负责模块入口与选中态，不拉取业务数据、不显示待办数量徽标。
+ * 侧边栏只负责模块入口与选中态，不拉取业务数据、不显示待办数量徽标、不竞争预取。
  */
 
 'use client';
 
-import { useRef } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { useSyncExternalStore } from 'react';
+import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Ship } from 'lucide-react';
@@ -33,6 +33,10 @@ import {
 
 // ==================== 组件 ====================
 
+const subscribeHydration = () => () => {};
+const getClientHydrationSnapshot = () => true;
+const getServerHydrationSnapshot = () => false;
+
 /**
  * 职责：渲染侧边导航栏（顶级模块入口）
  * 思路：
@@ -40,13 +44,16 @@ import {
  *   2. 模块激活判断：当前路径属于该模块任一子路由前缀即高亮
  *   3. 子页面切换由各页面顶部的 ModuleTabHeader 水平 Tab 栏负责
  *   4. 不显示跨模块待办数量，避免导航与业务数据耦合
- *   5. 仅在 hover/focus 表达导航意图时预取唯一目标路由
+ *   5. 记忆目标直接写入 Link href，由 Next Link 统一处理生产预取与原生导航
  */
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const user = useAuthStore((state) => state.user);
-  const prefetchedRoutesRef = useRef<Set<string>>(new Set());
+  const hydrated = useSyncExternalStore(
+    subscribeHydration,
+    getClientHydrationSnapshot,
+    getServerHydrationSnapshot,
+  );
 
   const visibleItems = getVisibleModuleNavItems(user?.role);
 
@@ -68,27 +75,15 @@ export function Sidebar() {
           <div className="grid gap-1">
             {visibleItems.map((item) => {
               const isActive = isModuleRouteActive(pathname, item);
-              // 点击模块时，优先跳转到上次记忆的子页面
-              const handleModuleClick = (e: React.MouseEvent) => {
-                e.preventDefault();
-                router.push(getModuleTargetHref(item));
-              };
-              const handleModuleIntent = () => {
-                const targetHref = getModuleTargetHref(item);
-                if (prefetchedRoutesRef.current.has(targetHref)) {
-                  return;
-                }
-                prefetchedRoutesRef.current.add(targetHref);
-                router.prefetch(targetHref);
-              };
-
+              // SSR 首屏使用默认地址；hydration 后将真实记忆目标写进 href，
+              // 让 Next Link 原生导航，不再阻止默认跳转后额外执行 router.push。
+              const targetHref = hydrated
+                ? (isActive ? pathname : getModuleTargetHref(item))
+                : item.defaultHref;
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
-                  onClick={handleModuleClick}
-                  onMouseEnter={handleModuleIntent}
-                  onFocus={handleModuleIntent}
+                  href={targetHref}
                   className={cn(
                     'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                     isActive
