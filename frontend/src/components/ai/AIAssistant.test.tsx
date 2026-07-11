@@ -71,6 +71,15 @@ describe('AIAssistant', () => {
     expect(screen.getByText('JIESONG 助手')).toBeInTheDocument();
   });
 
+  it('工作区模式直接展示完整对话面板且不渲染悬浮触发器', async () => {
+    render(<AIAssistant presentation="workspace" />);
+
+    expect(screen.queryByRole('button', { name: 'AI 助手' })).not.toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'AI 助手工作区' })).toHaveClass('min-h-[420px]');
+    expect(screen.getByPlaceholderText('输入问题或粘贴图片...')).toBeVisible();
+    expect(screen.queryByRole('button', { name: '收起AI助手' })).not.toBeInTheDocument();
+  });
+
   it('流式发送消息显示逐步内容', async () => {
     const reader = createMockSseReader([
       'data: {"type":"session","sessionId":"unified_1"}\n\n',

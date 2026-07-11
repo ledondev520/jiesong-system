@@ -82,8 +82,8 @@ describe('navigation.config helpers', () => {
     const admin = MODULE_NAV_ITEMS.find((item) => item.key === 'admin');
 
     expect(ai?.label).toBe('AI 助手');
-    expect(ai?.defaultHref).toBe('/dashboard/ai/sessions');
-    expect(ai?.tabs.map((tab) => tab.label)).toEqual(['AI 会话']);
+    expect(ai?.defaultHref).toBe('/dashboard/ai');
+    expect(ai?.tabs.map((tab) => tab.label)).toEqual(['开始对话', '会话记录']);
     expect(admin?.tabs.map((tab) => tab.label)).not.toContain('AI 会话');
     expect(admin?.childPrefixes).not.toContain('/dashboard/ai');
   });

@@ -61,7 +61,8 @@ export const FINANCE_TABS: TabConfig[] = [
 ];
 
 export const AI_TABS: TabConfig[] = [
-  { href: '/dashboard/ai/sessions', label: 'AI 会话' },
+  { href: '/dashboard/ai', label: '开始对话' },
+  { href: '/dashboard/ai/sessions', label: '会话记录' },
 ];
 
 export const ADMIN_TABS: TabConfig[] = [
@@ -137,8 +138,8 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
   },
   {
     key: 'ai',
-    href: '/dashboard/ai/sessions',
-    defaultHref: '/dashboard/ai/sessions',
+    href: '/dashboard/ai',
+    defaultHref: '/dashboard/ai',
     label: 'AI 助手',
     icon: Bot,
     childPrefixes: ['/dashboard/ai'],

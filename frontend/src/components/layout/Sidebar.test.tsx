@@ -146,4 +146,14 @@ describe('Sidebar', () => {
 
     vi.useRealTimers();
   });
+
+  it('AI 助手顶层入口始终打开开始对话，不被会话记录记忆覆盖', () => {
+    vi.mocked(localStorage.getItem).mockImplementation((key) => (
+      key === 'tab_memory_/dashboard/ai' ? '/dashboard/ai/sessions' : null
+    ));
+
+    const { getByText } = render(<Sidebar />);
+
+    expect(getByText('AI 助手').closest('a')).toHaveAttribute('href', '/dashboard/ai');
+  });
 });

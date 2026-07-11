@@ -1,7 +1,7 @@
 /**
  * Input: Kimi AI API (via Open Agent SDK, SSE streaming)
- * Output: AI 统一智能助手悬浮组件（财务/出口/系统配置一体，流式输出+图片上传+写操作二步确认）
- * Pos: 全局组件，单入口 SSE 流式调用 unified agent
+ * Output: AI 统一智能助手（业务页悬浮模式 + AI 模块工作区模式，流式输出+图片上传+写操作二步确认）
+ * Pos: 全局 AI 对话模块，单入口 SSE 流式调用 unified agent
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -53,6 +53,12 @@ type FabPosition = {
   y: number;
 };
 
+type AIAssistantPresentation = 'floating' | 'workspace';
+
+interface AIAssistantProps {
+  presentation?: AIAssistantPresentation;
+}
+
 const formatRecommendationPriority = (priority?: AiActionRecommendation['priority']) => {
   if (priority === 'high') return '高优先';
   if (priority === 'low') return '低优先';
@@ -68,12 +74,13 @@ const formatRecommendationMode = (mode?: AiActionRecommendation['executionMode']
 /**
  * 职责：渲染AI智能助手侧边面板
  * 思路：
- *   1. 默认以低存在感触发器驻留在业务页
- *   2. 展开后以右侧面板承载对话与图片分析
- *   3. 使用SSE流式输出
+ *   1. floating：以低存在感触发器驻留在业务页，展开后显示右侧面板
+ *   2. workspace：在 AI 模块内直接展示完整对话工作区
+ *   3. 两种形态复用同一套 SSE、图片分析、历史会话与二步确认逻辑
  */
-export function AIAssistant() {
-  const [isOpen, setIsOpen] = useState(false);
+export function AIAssistant({ presentation = 'floating' }: AIAssistantProps) {
+  const isWorkspace = presentation === 'workspace';
+  const [isOpen, setIsOpen] = useState(isWorkspace);
   const [input, setInput] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -146,15 +153,15 @@ export function AIAssistant() {
   }, [messages, isOpen]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
+    if (isWorkspace || typeof window === 'undefined') {
       return;
     }
 
     setFabPosition((current) => current ?? resolveDefaultFabPosition());
-  }, [resolveDefaultFabPosition]);
+  }, [isWorkspace, resolveDefaultFabPosition]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
+    if (isWorkspace || typeof window === 'undefined') {
       return;
     }
 
@@ -207,7 +214,7 @@ export function AIAssistant() {
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('pointercancel', handlePointerUp);
     };
-  }, [clampFabPosition, resolveDefaultFabPosition]);
+  }, [clampFabPosition, isWorkspace, resolveDefaultFabPosition]);
 
   useEffect(() => {
     if (messages.length === 0) setMessages([INITIAL_MESSAGE]);
@@ -567,39 +574,46 @@ export function AIAssistant() {
 
   return (
     <>
-      <Button
-        ref={triggerRef}
-        variant="outline"
-        className={cn(
-          'fixed z-[140] h-11 rounded-full border bg-background/95 px-4 text-foreground shadow-lg backdrop-blur transition-all duration-300 supports-[backdrop-filter]:bg-background/80 touch-none',
-          // 手机底部留出更多空间，避免被系统手势区遮挡
-          'mb-safe-area-inset-bottom',
-          isOpen ? 'translate-y-2 opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
-        )}
-        style={
-          fabPosition
-            ? { left: `${fabPosition.x}px`, top: `${fabPosition.y}px` }
-            : undefined
-        }
-        onPointerDown={handleTriggerPointerDown}
-        onClick={handleTriggerClick}
-        aria-label="AI 助手"
-      >
-        <Bot className="h-4 w-4 text-primary" />
-        <span className="text-sm font-medium">AI 助手</span>
-      </Button>
+      {!isWorkspace && (
+        <Button
+          ref={triggerRef}
+          variant="outline"
+          className={cn(
+            'fixed z-[140] h-11 rounded-full border bg-background/95 px-4 text-foreground shadow-lg backdrop-blur transition-all duration-300 supports-[backdrop-filter]:bg-background/80 touch-none',
+            // 手机底部留出更多空间，避免被系统手势区遮挡
+            'mb-safe-area-inset-bottom',
+            isOpen ? 'translate-y-2 opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
+          )}
+          style={
+            fabPosition
+              ? { left: `${fabPosition.x}px`, top: `${fabPosition.y}px` }
+              : undefined
+          }
+          onPointerDown={handleTriggerPointerDown}
+          onClick={handleTriggerClick}
+          aria-label="AI 助手"
+        >
+          <Bot className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium">AI 助手</span>
+        </Button>
+      )}
 
       <aside
         role="complementary"
-        aria-label="AI 助手侧边面板"
+        aria-label={isWorkspace ? 'AI 助手工作区' : 'AI 助手侧边面板'}
         className={cn(
-          // 手机端：全屏铺满（inset-0）；桌面端：右侧悬浮面板
-          'fixed z-[150] transition-all duration-300',
-          'inset-0 md:inset-y-4 md:left-auto md:right-4 md:w-[24rem]',
-          isOpen ? 'translate-x-0 opacity-100' : 'translate-x-6 opacity-0 pointer-events-none'
+          isWorkspace
+            ? 'relative h-[calc(100dvh-20rem)] min-h-[420px] max-h-[760px] w-full'
+            : 'fixed inset-0 z-[150] transition-all duration-300 md:inset-y-4 md:left-auto md:right-4 md:w-[24rem]',
+          isWorkspace || isOpen
+            ? 'translate-x-0 opacity-100'
+            : 'translate-x-6 opacity-0 pointer-events-none'
         )}
       >
-        <Card className="flex h-full flex-col border-border/70 bg-background/95 shadow-2xl backdrop-blur supports-[backdrop-filter]:bg-background/85 rounded-none md:rounded-xl">
+        <Card className={cn(
+          'flex h-full flex-col border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85',
+          isWorkspace ? 'rounded-xl shadow-sm' : 'rounded-none shadow-2xl md:rounded-xl'
+        )}>
           <CardHeader className="border-b bg-muted/30 p-0">
             <div className="flex items-center justify-between px-4 py-3">
               <CardTitle className="flex items-center gap-2 text-base">
@@ -627,15 +641,17 @@ export function AIAssistant() {
                 >
                   <History className="h-4 w-4" />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => setIsOpen(false)}
-                  aria-label="收起AI助手"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                {!isWorkspace && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setIsOpen(false)}
+                    aria-label="收起AI助手"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
             {showSessionList && (

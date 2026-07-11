@@ -77,9 +77,11 @@ export function Sidebar() {
               const isActive = isModuleRouteActive(pathname, item);
               // SSR 首屏使用默认地址；hydration 后将真实记忆目标写进 href，
               // 让 Next Link 原生导航，不再阻止默认跳转后额外执行 router.push。
-              const targetHref = hydrated
-                ? (isActive ? pathname : getModuleTargetHref(item))
-                : item.defaultHref;
+              const targetHref = item.key === 'ai'
+                ? item.defaultHref
+                : hydrated
+                  ? (isActive ? pathname : getModuleTargetHref(item))
+                  : item.defaultHref;
               return (
                 <Link
                   key={item.href}
