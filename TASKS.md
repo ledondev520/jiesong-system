@@ -1,5 +1,18 @@
 # Frontend Polish Tasks
 
+## 2026-07-11 FLOW-AUDIT-08 本地全流程、导航与性能终验
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| FLOW-AUDIT-08A | P0 | 15m | 1 | DONE | 恢复工程记忆、运行态、真实数据与既有流程基线 |
+| FLOW-AUDIT-08B | P0 | 20m | 1 | DONE | 真实 Chrome 只读点击六个顶层 Module、采购详情、出口详情五页签、财务与系统页面并保存截图 |
+| FLOW-AUDIT-08C | P0 | 20m | 1 | DONE | 审计 47 笔专项单八阶段完成度、财务证据和历史异常，不修改真实业务事实 |
+| FLOW-AUDIT-08D | P0 | 20m | 1 | DONE | 修复 launchd 开发模式根因并默认运行生产构建 |
+| FLOW-AUDIT-08E | P0 | 15m | 1 | DONE | 修复报关同 HS 异商品误合并、缺 HS 阻塞入口和工作台最新账期 |
+| FLOW-AUDIT-08F | P0 | 15m | 1 | DONE | 将侧栏记忆目标收敛为真实 Link href，删除手工 router.push 与竞争预取 |
+| FLOW-AUDIT-08G | P0 | 25m | 1 | DONE | 全量测试、类型、lint、构建、生产重启、HTTP 与 Chrome 最终复点 |
+| FLOW-AUDIT-08H | P1 | 10m | 1 | DONE | 更新计划、任务、风险、指标、截图报告、结果与 ByteRover 工程结论 |
+
 ## 2026-07-10 PERF-FE-12 顶层 Module 切换性能优化
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
