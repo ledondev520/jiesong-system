@@ -1,7 +1,7 @@
 /**
  * Input: crypto, 配置
- * Output: API Key 加解密与脱敏工具
- * Pos: 系统配置中敏感字段的加密存储与安全响应
+ * Output: API Key 加解密与只写式脱敏工具
+ * Pos: 系统配置中敏感字段的加密存储与安全响应，响应永不回传完整密钥
  */
 
 const crypto = require('crypto');
@@ -119,16 +119,16 @@ const decryptApiKeyFromStorage = (storedValue) => {
 
 /**
  * 职责：对 API Key 做安全展示处理
- * 思路：管理员端口已通过 roleAuth('ADMIN') 保护，直接返回明文密钥供管理员查看和管理
+ * 思路：响应仅保留末四位用于确认配置身份，完整密钥只允许写入、不允许读回
  * @param {string} apiKey 解密后的明文
- * @returns {string} 完整密钥（空串表示未配置）
+ * @returns {string} 脱敏密钥（空串表示未配置）
  */
 const maskApiKeyForApiResponse = (apiKey) => {
   if (typeof apiKey !== 'string' || !apiKey) {
     return '';
   }
 
-  return apiKey;
+  return `••••${apiKey.slice(-4)}`;
 };
 
 const normalizeConfigValueForStorage = (key, value) => {

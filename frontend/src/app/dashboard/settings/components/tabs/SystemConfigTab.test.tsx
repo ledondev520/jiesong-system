@@ -76,4 +76,26 @@ describe('SystemConfigTab', () => {
       expect(hasMax).toBe(true);
     });
   });
+
+  it('从不渲染后端返回的完整 Kimi 密钥，只展示已配置状态', async () => {
+    const secret = 'sk-test-secret-should-never-render';
+    mockGetSystemConfig.mockResolvedValueOnce({
+      data: {
+        exchangeRate: 7.2,
+        profitRate: 1.3,
+        units: ['件'],
+        brokers: ['捷淞'],
+        apiKey: secret,
+      },
+    });
+
+    render(<SystemConfigTab />);
+
+    await waitFor(() => {
+      expect(screen.getByText('已配置（只写）')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(secret)).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(secret);
+  });
 });

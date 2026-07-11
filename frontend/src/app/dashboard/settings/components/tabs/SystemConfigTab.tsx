@@ -28,7 +28,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { Cpu, X, Save, Loader2, Eye, EyeOff, Key, ExternalLink, Globe } from 'lucide-react';
+import { Cpu, X, Save, Loader2, Key, ExternalLink, Globe } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE, UNITS as INITIAL_UNITS } from '@/lib/constants';
 import { configService } from '@/services/config.service';
@@ -68,10 +68,9 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
   const [newBroker, setNewBroker] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  // Kimi API Key 相关状态（后端返回完整密钥，仅管理员可见）
-  const [kimiApiKeyCurrent, setKimiApiKeyCurrent] = useState('');
+  // Kimi API Key 只写式配置：后端仅返回脱敏状态，页面永不渲染完整密钥
+  const [kimiApiKeyConfigured, setKimiApiKeyConfigured] = useState(false);
   const [kimiApiKeyNew, setKimiApiKeyNew] = useState('');
-  const [showApiKey, setShowApiKey] = useState(false);
   // 场景化模型配置
   const [chatModel, setChatModel] = useState('kimi-k2-turbo-preview');
   const [hsCodeModel, setHsCodeModel] = useState('kimi-k2-turbo-preview');
@@ -106,9 +105,9 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
           if (typeof configs.profitRate === 'number') form.setValue('profitRate', configs.profitRate);
           if (Array.isArray(configs.units)) setUnits(configs.units);
           if (Array.isArray(configs.brokers)) setBrokers(configs.brokers);
-          // 1.1. Kimi API Key（后端返回完整密钥）
+          // 1.1. Kimi API Key（后端只返回脱敏状态，不回传完整密钥）
           if (typeof configs.apiKey === 'string' && configs.apiKey) {
-            setKimiApiKeyCurrent(configs.apiKey);
+            setKimiApiKeyConfigured(true);
           }
           // 1.2. 场景化模型配置（优先新 key，兼容旧 key）
           if (typeof configs.aiChatModel === 'string' && configs.aiChatModel) {
@@ -185,7 +184,7 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
       tasks.push(saveConfig('invoiceTitleInfo', invoiceTitleInfo.trim()));
       await Promise.all(tasks);
       if (kimiApiKeyNew.trim()) {
-        setKimiApiKeyCurrent(kimiApiKeyNew.trim());
+        setKimiApiKeyConfigured(true);
         setKimiApiKeyNew('');
       }
       toast.success('系统配置已保存');
@@ -541,28 +540,17 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                         控制台
                       </a>
                     </div>
-                    {kimiApiKeyCurrent && (
-                      <p className="text-xs text-muted-foreground font-mono break-all leading-relaxed select-all">{kimiApiKeyCurrent}</p>
+                    {kimiApiKeyConfigured && (
+                      <Badge variant="secondary" className="w-fit text-[10px]">已配置（只写）</Badge>
                     )}
-                    <div className="relative">
-                      <Input
-                        type={showApiKey ? 'text' : 'password'}
-                        placeholder={kimiApiKeyCurrent ? '输入新 Key 以覆盖' : '输入 Kimi API Key (sk-...)'}
-                        value={kimiApiKeyNew}
-                        onChange={(e) => setKimiApiKeyNew(e.target.value)}
-                        className="pr-10"
-                        autoComplete="off"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
-                        onClick={() => setShowApiKey((v) => !v)}
-                      >
-                        {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
+                    <Input
+                      type="password"
+                      placeholder={kimiApiKeyConfigured ? '输入新 Key 以覆盖' : '输入 Kimi API Key (sk-...)'}
+                      value={kimiApiKeyNew}
+                      onChange={(e) => setKimiApiKeyNew(e.target.value)}
+                      autoComplete="new-password"
+                    />
+                    <p className="text-xs text-muted-foreground">密钥只允许覆盖写入，保存后不会再从系统读回或显示。</p>
                   </div>
                 </div>
               </div>

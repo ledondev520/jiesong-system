@@ -27,6 +27,7 @@
 - Classify data by tier per `data-classification.json` and apply处理规则 in code and documents.
 - Treat supplier bank routing fields, signed/generated contract artifacts, carrier packing lists, and their review records as Restricted data; do not include their values in logs, engineering memory, or test fixtures copied from production.
 - Store secrets in `.env` only, never in repository tracked text.
+- Treat system-configured API keys as write-only: encrypt at rest, never return the complete value from any HTTP response, and render only a configured/masked status in administrator pages.
 - Redact PII/敏感字段 in logs and exports; avoid writing raw identifiers to audit channels unless authorized.
 - Use prepared statements/ORM boundaries and strict参数校验 before persistence.
 

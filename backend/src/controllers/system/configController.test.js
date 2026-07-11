@@ -48,6 +48,32 @@ test('getConfigs: JSON 配置解析为对象，非 JSON 保留原字符串', asy
   }
 });
 
+test('getConfigs: 敏感配置只返回脱敏状态，不返回完整密钥', async () => {
+  const originalFindMany = prisma.systemConfig.findMany;
+  const secret = 'sk-test-secret-should-never-leave-the-server';
+  prisma.systemConfig.findMany = async () => ([
+    { key: 'apiKey', value: JSON.stringify(secret) },
+  ]);
+
+  try {
+    const req = {};
+    const res = createMockRes();
+    let capturedError = null;
+
+    await configController.getConfigs(req, res, (error) => {
+      capturedError = error;
+    });
+
+    assert.equal(capturedError, null);
+    assert.equal(res.payload.code, 200);
+    assert.notEqual(res.payload.data.apiKey, secret);
+    assert.equal(res.payload.data.apiKey, '••••rver');
+    assert.doesNotMatch(JSON.stringify(res.payload), /sk-test-secret/);
+  } finally {
+    prisma.systemConfig.findMany = originalFindMany;
+  }
+});
+
 test('updateConfig: upsert 时会 JSON.stringify(value)', async () => {
   const originalUpsert = prisma.systemConfig.upsert;
   let upsertArgs = null;
@@ -73,6 +99,36 @@ test('updateConfig: upsert 时会 JSON.stringify(value)', async () => {
     assert.equal(upsertArgs.where.key, 'exchangeRate');
     assert.equal(upsertArgs.update.value, JSON.stringify({ rate: 7.0, buffer: 0.1 }));
     assert.equal(res.payload.message, '配置更新成功');
+  } finally {
+    prisma.systemConfig.upsert = originalUpsert;
+  }
+});
+
+test('updateConfig: 敏感配置写入后响应不回传完整密钥', async () => {
+  const originalUpsert = prisma.systemConfig.upsert;
+  const secret = 'sk-test-updated-secret-value';
+
+  prisma.systemConfig.upsert = async (args) => ({
+    key: args.where.key,
+    value: args.update.value,
+  });
+
+  try {
+    const req = {
+      params: { key: 'apiKey' },
+      body: { value: secret },
+    };
+    const res = createMockRes();
+    let capturedError = null;
+
+    await configController.updateConfig(req, res, (error) => {
+      capturedError = error;
+    });
+
+    assert.equal(capturedError, null);
+    assert.notEqual(res.payload.data.value, secret);
+    assert.equal(res.payload.data.value, '••••alue');
+    assert.doesNotMatch(JSON.stringify(res.payload), /sk-test-updated-secret/);
   } finally {
     prisma.systemConfig.upsert = originalUpsert;
   }

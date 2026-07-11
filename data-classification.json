@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updatedAt": "2026-07-10",
+  "updatedAt": "2026-07-11",
   "owner": "security-team",
   "tiers": [
     {
@@ -22,6 +22,7 @@
       "controls": {
         "storage": [
           "Secrets only in .env or secret manager",
+          "System-configured API keys are write-only; encrypted storage is permitted but complete values must never be returned or rendered",
           "Restricted business records only in the application database or protected contract-evidence storage",
           "Least privilege file mode (<=600 for backend .env)",
           "Contract artifact directories use 0700 and files use 0600",
