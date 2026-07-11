@@ -17,6 +17,12 @@ test('launchd 后端默认使用生产运行模式，避免 nodemon 与查询日
   assert.match(script, /npm.*run start|NPM_BIN.*run start/);
 });
 
+test('launchd 生产模式为本机前端设置显式 CORS 白名单', () => {
+  assert.match(script, /CORS_ORIGIN/);
+  assert.match(script, /http:\/\/localhost:3000/);
+  assert.match(script, /http:\/\/127\.0\.0\.1:3000/);
+});
+
 test('launchd 后端仅在显式 development 模式下启动 nodemon', () => {
   assert.match(script, /MODE.*development.*MODE.*dev/s);
   assert.match(script, /npm.*run dev|NPM_BIN.*run dev/);

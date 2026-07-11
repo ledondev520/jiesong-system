@@ -22,5 +22,6 @@ if [[ "$MODE" != "production" && "$MODE" != "prod" ]]; then
 fi
 
 export NODE_ENV="production"
+export CORS_ORIGIN="${CORS_ORIGIN:-http://localhost:3000,http://127.0.0.1:3000}"
 echo "[jiesong-backend] 以生产模式启动 http://localhost:3001"
 exec "$NPM_BIN" run start
