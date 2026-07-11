@@ -1,6 +1,6 @@
 /**
  * Input: open-agent-sdk, Kimi API (via anthropicCompatService), 业务服务层
- * Output: 预置业务 Agent 运行时：只读查询 + 两阶段确认写工具 + SSE 流式输出
+ * Output: 预置业务 Agent 运行时：只读查询 + 两阶段确认写工具 + SSE 流式输出 + 原子运行记录
  * Pos: 后端 Agent Runtime 核心，衔接 LLM 与业务数据
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -2486,14 +2486,8 @@ const persistAgentRun = async ({
     routePlan: routePlan || null,
     selectedToolNames: selectedToolNames || [],
   });
-  const replaySummaryRecord = buildReplaySummaryRecord({
-    userId,
-    sessionId,
-    governanceReplayProfile: metadataPayload.governanceReplayProfile,
-  });
-
-  await prisma.$transaction([
-    prisma.chatHistory.create({
+  await prisma.$transaction(async (tx) => {
+    await tx.chatHistory.create({
       data: {
         userId,
         sessionId,
@@ -2501,8 +2495,8 @@ const persistAgentRun = async ({
         content: message,
         metadata,
       },
-    }),
-    prisma.chatHistory.create({
+    });
+    await tx.chatHistory.create({
       data: {
         userId,
         sessionId,
@@ -2513,8 +2507,8 @@ const persistAgentRun = async ({
         outputTokens: Number(usage?.output_tokens || 0),
         modelUsed: model,
       },
-    }),
-    prisma.tokenUsage.create({
+    });
+    await tx.tokenUsage.create({
       data: {
         userId,
         sessionId,
@@ -2526,8 +2520,8 @@ const persistAgentRun = async ({
         promptBrief: message.slice(0, 200),
         detailSnapshot: responseText.slice(0, 2000),
       },
-    }),
-    prisma.operationLog.create({
+    });
+    await tx.operationLog.create({
       data: {
         actorType: 'USER',
         userId,
@@ -2547,8 +2541,8 @@ const persistAgentRun = async ({
           governanceReplayProfile: metadataPayload.governanceReplayProfile,
         }),
       },
-    }),
-    prisma.operationLog.create({
+    });
+    await tx.operationLog.create({
       data: {
         actorType: 'USER',
         userId,
@@ -2557,13 +2551,13 @@ const persistAgentRun = async ({
         entityId: sessionId,
         newValue: JSON.stringify(replaySnapshotValue),
       },
-    }),
-    upsertReplaySummary({
+    });
+    await upsertReplaySummary({
       userId,
       sessionId,
       governanceReplayProfile: metadataPayload.governanceReplayProfile,
-    }),
-  ]);
+    }, tx);
+  });
 };
 
 const buildAgentRunMetadata = ({
@@ -2864,6 +2858,7 @@ module.exports = {
   buildReplaySnapshotLogValue,
   buildReplaySummaryRecord,
   resolveSdkSessionConfig,
+  persistAgentRun,
   runAgentPrompt,
   runAgentPromptStream,
   executeAction,

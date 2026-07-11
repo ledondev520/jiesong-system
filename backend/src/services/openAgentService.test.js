@@ -72,6 +72,55 @@ test('unified preset: 作为唯一主公开入口，legacy preset 退为内部�
   assert.equal(finance.isLegacy, true);
 });
 
+test('persistAgentRun: 使用交互式事务统一持久化运行记录与回放摘要', async () => {
+  const writes = [];
+  const tx = {
+    chatHistory: {
+      create: async ({ data }) => writes.push(['chatHistory', data.role]),
+    },
+    tokenUsage: {
+      create: async () => writes.push(['tokenUsage']),
+    },
+    operationLog: {
+      create: async ({ data }) => writes.push(['operationLog', data.action]),
+    },
+    agentReplaySummary: {
+      upsert: async () => writes.push(['agentReplaySummary']),
+    },
+  };
+
+  await withPatched({
+    'prisma.$transaction': async (transaction) => {
+      assert.equal(typeof transaction, 'function');
+      return transaction(tx);
+    },
+  }, async () => {
+    await openAgentService.persistAgentRun({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      agentType: 'unified',
+      message: '检查运行状态',
+      responseText: '运行正常',
+      usage: { input_tokens: 2, output_tokens: 2 },
+      model: 'test-model',
+      routePlan: null,
+      selectedToolNames: [],
+      toolTraceSummary: null,
+      actionRecommendations: [],
+      pendingActionSummary: [],
+    });
+  });
+
+  assert.deepEqual(writes, [
+    ['chatHistory', 'user'],
+    ['chatHistory', 'assistant'],
+    ['tokenUsage'],
+    ['operationLog', 'AGENT_RUN'],
+    ['operationLog', 'AGENT_REPLAY_SNAPSHOT'],
+    ['agentReplaySummary'],
+  ]);
+});
+
 test('listToolRegistry: 暴露通用主 Agent 的跨域工具面与写操作确认标记', () => {
   const registry = openAgentService.listToolRegistry();
   const names = registry.map((item) => item.name);

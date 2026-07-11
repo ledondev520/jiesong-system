@@ -1,5 +1,5 @@
 /**
- * Input: prisma、replay profile
+ * Input: prisma 或事务客户端、replay profile
  * Output: Agent replay summary 持久化与读取服务
  * Pos: 后端服务层
  */
@@ -51,15 +51,15 @@ const upsertReplaySummary = async ({
   userId,
   sessionId,
   governanceReplayProfile,
-}) => {
-  if (!prisma.agentReplaySummary?.upsert) return null;
+}, prismaClient = prisma) => {
+  if (!prismaClient.agentReplaySummary?.upsert) return null;
   const record = buildReplaySummaryRecord({
     userId,
     sessionId,
     governanceReplayProfile,
   });
   try {
-    return await prisma.agentReplaySummary.upsert({
+    return await prismaClient.agentReplaySummary.upsert({
       where: {
         userId_sessionId: {
           userId,

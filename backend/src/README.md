@@ -42,7 +42,10 @@
 |------|------|
 | authService.js | 登录验证、Token生成、密码管理、找回密码 |
 | financeService.js | 付款记录幂等写入、应收应付聚合（支持按合同过滤） |
-| aiService.js | Kimi API集成、智能问答、内容解析 |
+| aiService.js | Kimi 集成、智能问答、内容解析与管理员模型配置缓存 |
+| anthropicCompatService.js | Open Agent 与 Kimi 的协议适配、模型不可用时单次稳定降级 |
+| openAgentService.js | 通用业务 Agent、工具授权、流式输出与原子运行记录 |
+| agentReplaySummaryService.js | Agent 回放摘要持久化，支持复用外层事务客户端 |
 | importService.js | CSV数据解析与导入 |
 | exportService.js | 多格式数据导出（CSV + 出口合同五 Sheet Excel 含商业发票/税务测算） |
 | pdfExportService.js | 销售合同 / 系统数据 PDF 导出 |

@@ -1,3 +1,9 @@
+/**
+ * Input: Anthropic 兼容请求、Kimi OpenAI 兼容客户端、管理员模型配置
+ * Output: Anthropic 兼容响应；配置模型不可用时仅降级一次到稳定模型
+ * Pos: Open Agent SDK 与 Kimi 之间的协议适配层
+ */
+
 const crypto = require('node:crypto');
 const OpenAI = require('openai');
 const config = require('../config');
@@ -153,24 +159,57 @@ const mapKimiResponseToAnthropic = ({ response, model }) => {
   };
 };
 
-const createMessage = async (payload) => {
-  const { defaultModel } = await aiService.getConfiguredModels();
-  const model = payload?.model || defaultModel;
+const isModelUnavailableError = (error) => (
+  Number(error?.status || error?.statusCode) === 404
+  || /not found the model|model[^\n]*not found|permission denied/i.test(String(error?.message || ''))
+);
+
+const createMessageWithClient = async ({
+  payload,
+  client,
+  defaultModel,
+  fallbackModel,
+}) => {
+  const requestedModel = payload?.model || defaultModel;
   const messages = mapAnthropicMessagesToOpenAI(payload || {});
   const tools = mapAnthropicToolsToOpenAI(payload?.tools);
+  const candidates = Array.from(new Set([requestedModel, fallbackModel].filter(Boolean)));
+
+  let lastError;
+  for (const [index, model] of candidates.entries()) {
+    try {
+      const response = await client.chat.completions.create({
+        model,
+        messages,
+        tools,
+        tool_choice: tools?.length ? 'auto' : undefined,
+        temperature: 0.2,
+        max_tokens: payload?.max_tokens || 4096,
+        stream: false,
+      });
+
+      return mapKimiResponseToAnthropic({ response, model });
+    } catch (error) {
+      lastError = error;
+      const canTryFallback = index < candidates.length - 1 && isModelUnavailableError(error);
+      if (!canTryFallback) throw error;
+      console.warn(`AI 模型不可用，自动切换稳定模型（${model} -> ${candidates[index + 1]}）`);
+    }
+  }
+
+  throw lastError || new Error('未配置可用的 AI 模型');
+};
+
+const createMessage = async (payload) => {
+  const { defaultModel } = await aiService.getConfiguredModels();
 
   const client = buildKimiClient();
-  const response = await client.chat.completions.create({
-    model,
-    messages,
-    tools,
-    tool_choice: tools?.length ? 'auto' : undefined,
-    temperature: 0.2,
-    max_tokens: payload?.max_tokens || 4096,
-    stream: false,
+  return createMessageWithClient({
+    payload,
+    client,
+    defaultModel,
+    fallbackModel: aiService.MODELS.fast,
   });
-
-  return mapKimiResponseToAnthropic({ response, model });
 };
 
 const countTokens = async (payload) => {
@@ -185,7 +224,9 @@ const countTokens = async (payload) => {
 
 module.exports = {
   createMessage,
+  createMessageWithClient,
   countTokens,
   mapAnthropicMessagesToOpenAI,
   mapKimiResponseToAnthropic,
+  isModelUnavailableError,
 };
