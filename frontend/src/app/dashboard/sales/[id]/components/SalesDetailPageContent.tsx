@@ -633,20 +633,29 @@ export default function SalesDetailPage({ params }: PageProps) {
     for (const item of contract.packingItems) {
       const hs = item.product?.hsCode;
       if (!hs) continue;
-      const existing = map.get(hs);
+      const productName = item.product?.customsName || '未知商品';
+      const groupKey = `${hs}\u0000${productName}`;
+      const existing = map.get(groupKey);
       if (existing) {
         existing.quantity += item.quantity;
         existing.totalPrice += item.totalPrice || 0;
       } else {
-        map.set(hs, {
+        map.set(groupKey, {
           hsCode: hs,
-          productName: item.product?.customsName || '未知商品',
+          productName,
           quantity: item.quantity,
           totalPrice: item.totalPrice || 0,
         });
       }
     }
     return Array.from(map.values());
+  }, [contract?.packingItems]);
+
+  const missingHsItems = useMemo(() => {
+    if (!contract?.packingItems) return [];
+    return contract.packingItems
+      .filter((item) => !item.product?.hsCode)
+      .map((item) => item.product?.customsName || '未知商品');
   }, [contract?.packingItems]);
 
   if (loading) {
@@ -1180,6 +1189,29 @@ export default function SalesDetailPage({ params }: PageProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {missingHsItems.length > 0 && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1">
+                      <p className="font-medium">仍有 {missingHsItems.length} 项装箱商品未匹配 HS 编码</p>
+                      <p>未匹配：{missingHsItems.join('、')}</p>
+                      <p className="text-xs">
+                        为避免申报遗漏，请先通过历史记录、AI 建议或人工确认补齐；申报三表会阻止不完整单据生成。
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() => setThreeFormsDialogOpen(true)}
+                    >
+                      处理未匹配 HS 编码
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
               {hsCodeList.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground">
                   暂无报关信息，请先在装箱明细中添加带有 HS 编码的商品

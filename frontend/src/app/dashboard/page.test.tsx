@@ -145,6 +145,19 @@ describe('DashboardPage 交互逻辑', () => {
     expect(screen.getByText('EXP-001')).toBeInTheDocument();
   });
 
+  it('财务账期按年月显示最新一项，不依赖列表返回顺序', async () => {
+    mockListStatements.mockResolvedValue([
+      { id: 'fs-1', year: 2025, month: 1, periodLabel: '2025年1账期' },
+      { id: 'fs-2', year: 2025, month: 12, periodLabel: '2025年12账期' },
+      { id: 'fs-3', year: 2025, month: 6, periodLabel: '2025年6账期' },
+    ]);
+
+    render(<DashboardPage />);
+
+    expect(await screen.findByText('2025年12账期')).toBeInTheDocument();
+    expect(screen.queryByText('2025年1账期')).not.toBeInTheDocument();
+  });
+
   it('首页只给出该专项单的唯一下一动作', async () => {
     const user = userEvent.setup();
     render(<DashboardPage />);

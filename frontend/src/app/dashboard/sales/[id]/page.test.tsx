@@ -7,7 +7,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Suspense } from 'react';
 import SalesDetailPage from './page';
@@ -95,6 +95,12 @@ vi.mock('@/components/sales/ContractInfoEditor', () => ({
 
 vi.mock('@/components/container/Container3DView', () => ({
   default: () => <div>3D容器视图</div>,
+}));
+
+vi.mock('@/components/dialog/GenerateThreeFormsDialog', () => ({
+  GenerateThreeFormsDialog: ({ open }: { open: boolean }) => (
+    open ? <div>申报三表 HS 处理区</div> : null
+  ),
 }));
 
 describe('SalesDetailPage 交互逻辑', () => {
@@ -245,6 +251,90 @@ describe('SalesDetailPage 交互逻辑', () => {
     await user.click(exportButton);
 
     expect(mockExportExcel).toHaveBeenCalledWith('s-1', 'EXP260008');
+  });
+
+  it('报关汇总明确警示缺失 HS 编码的装箱商品并提供处理入口', async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: 's-1',
+        contractNo: 'EXP260008',
+        status: 'PACKING',
+        totalBoxes: 2,
+        volume: 2,
+        grossWeight: 200,
+        totalAmount: 200,
+        packingItems: [
+          {
+            id: 'pk-ready',
+            productId: 'p-ready',
+            quantity: 1,
+            boxes: 1,
+            totalPrice: 100,
+            product: { id: 'p-ready', customsName: '灯具', hsCode: '9405110000' },
+          },
+          {
+            id: 'pk-missing',
+            productId: 'p-missing',
+            quantity: 1,
+            boxes: 1,
+            totalPrice: 100,
+            product: { id: 'p-missing', customsName: '隔断', hsCode: null },
+          },
+        ],
+        port: { name: 'Oakland' },
+      },
+    });
+    const user = userEvent.setup();
+    renderPage('s-1');
+
+    await user.click(await screen.findByRole('tab', { name: '报关信息' }));
+
+    expect(screen.getByText('仍有 1 项装箱商品未匹配 HS 编码')).toBeInTheDocument();
+    expect(screen.getByText('未匹配：隔断')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '处理未匹配 HS 编码' }));
+    expect(await screen.findByText('申报三表 HS 处理区')).toBeInTheDocument();
+  });
+
+  it('报关汇总不会把相同 HS 编码的不同商品合并成一行', async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: 's-1',
+        contractNo: 'EXP260008',
+        status: 'PACKING',
+        totalBoxes: 2,
+        volume: 2,
+        grossWeight: 200,
+        totalAmount: 4200,
+        packingItems: [
+          {
+            id: 'pk-bar',
+            productId: 'p-bar',
+            quantity: 3,
+            boxes: 1,
+            totalPrice: 1200,
+            product: { id: 'p-bar', customsName: '1.2米常温调酒台', hsCode: '9403200000' },
+          },
+          {
+            id: 'pk-screen',
+            productId: 'p-screen',
+            quantity: 1,
+            boxes: 1,
+            totalPrice: 3000,
+            product: { id: 'p-screen', customsName: '隔断', hsCode: '9403200000' },
+          },
+        ],
+        port: { name: 'Oakland' },
+      },
+    });
+    const user = userEvent.setup();
+    renderPage('s-1');
+
+    await user.click(await screen.findByRole('tab', { name: '报关信息' }));
+    const customsPanel = screen.getByRole('tabpanel', { name: '报关信息' });
+
+    expect(within(customsPanel).getByRole('row', { name: /1\.2米常温调酒台 3/ })).toBeInTheDocument();
+    expect(within(customsPanel).getByRole('row', { name: /隔断 1/ })).toBeInTheDocument();
   });
 
   it('商业利用率达标但有箱件未装下时禁止确认发运', async () => {

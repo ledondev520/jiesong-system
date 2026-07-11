@@ -83,13 +83,18 @@ export default function DashboardPage() {
         const purchases = purchaseRes.data?.items || [];
         const sales = salesRes.data?.items || [];
         const analytics = analyticsRes?.data;
+        const latestFinancePeriod = periods.reduce<(typeof periods)[number] | null>((latest, period) => {
+          if (!latest) return period;
+          if (period.year !== latest.year) return period.year > latest.year ? period : latest;
+          return period.month > latest.month ? period : latest;
+        }, null);
         setMetrics({
           draftPurchases: purchases.filter((contract) => contract.status === PurchaseStatus.DRAFT).length,
           exportPendingParams: sales.filter((contract) => hasExportExecutionMetrics(contract)).length,
           receivable: analytics?.contracts.sales.receivable || 0,
           unpaidAmount: analytics?.contracts.purchase.unpaidAmount || 0,
           inventoryRecords: analytics?.inventory.recordCount || 0,
-          latestFinancePeriod: periods[0]?.periodLabel || null,
+          latestFinancePeriod: latestFinancePeriod?.periodLabel || null,
         });
       } catch {
         if (active) setMetrics(EMPTY_METRICS);
