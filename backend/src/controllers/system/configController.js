@@ -92,8 +92,16 @@ const resolveExchangeRateConfig = async () => {
   return rate;
 };
 
-const fetchUsdCnyRate = async () => new Promise((resolve, reject) => {
+const fetchUsdCnyRate = async ({ timeoutMs = EXCHANGE_RATE_SYNC_TIMEOUT_MS } = {}) => new Promise((resolve, reject) => {
   const url = 'https://open.er-api.com/v6/latest/USD';
+  let overallTimeout;
+  let settled = false;
+  const finish = (callback, value) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(overallTimeout);
+    callback(value);
+  };
   const request = https.get(url, (response) => {
     let data = '';
     response.on('data', (chunk) => { data += chunk; });
@@ -102,20 +110,26 @@ const fetchUsdCnyRate = async () => new Promise((resolve, reject) => {
         const parsed = JSON.parse(data);
         const cnyRate = parsed?.rates?.CNY;
         if (typeof cnyRate !== 'number' || cnyRate <= 0) {
-          reject(new Error('汇率数据异常'));
+          finish(reject, new Error('汇率数据异常'));
         } else {
-          resolve(Math.round(cnyRate * 100) / 100);
+          finish(resolve, Math.round(cnyRate * 100) / 100);
         }
       } catch {
-        reject(new Error('解析汇率响应失败'));
+        finish(reject, new Error('解析汇率响应失败'));
       }
     });
   });
 
-  request.setTimeout(EXCHANGE_RATE_SYNC_TIMEOUT_MS, () => {
-    request.destroy(new Error(`汇率同步超时 ${EXCHANGE_RATE_SYNC_TIMEOUT_MS}ms`));
+  const timeoutError = () => new Error(`汇率同步超时 ${timeoutMs}ms`);
+  overallTimeout = setTimeout(() => {
+    const error = timeoutError();
+    request.destroy(error);
+    finish(reject, error);
+  }, timeoutMs);
+  request.setTimeout(timeoutMs, () => {
+    request.destroy(timeoutError());
   });
-  request.on('error', reject);
+  request.on('error', (error) => finish(reject, error));
 });
 
 /**
@@ -271,6 +285,7 @@ const syncExchangeRate = async (req, res, next) => {
 };
 
 module.exports = {
+  fetchUsdCnyRate,
   getConfigs,
   getConfigsByDomain,
   updateConfig,

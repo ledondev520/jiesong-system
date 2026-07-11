@@ -88,6 +88,40 @@ test('withAuditLog: UPDATE 时记录 before/after 快照', async () => {
   }
 });
 
+test('withAuditLog: 路由参数名不应被误当成 Prisma 唯一字段名', async () => {
+  const originalFindUnique = prisma.contractFile.findUnique;
+  const originalLogOperation = auditLogUtils.logOperation;
+  let capturedWhere = null;
+
+  prisma.contractFile.findUnique = async ({ where }) => {
+    capturedWhere = where;
+    return { id: 'file-1', fileName: 'contract.pdf' };
+  };
+  auditLogUtils.logOperation = async () => {};
+
+  try {
+    const middleware = withAuditLog(
+      { entity: 'ContractFile', action: 'DELETE', model: 'contractFile', idParam: 'fileId' },
+      async (req, res) => res.status(200).json({ code: 200, data: null }),
+    );
+    const req = {
+      method: 'DELETE',
+      params: { fileId: 'file-1' },
+      user: { id: 'user-1' },
+      body: {},
+      headers: {},
+    };
+
+    await middleware(req, createMockRes(), () => {});
+    await waitForAsyncTasks();
+
+    assert.deepEqual(capturedWhere, { id: 'file-1' });
+  } finally {
+    prisma.contractFile.findUnique = originalFindUnique;
+    auditLogUtils.logOperation = originalLogOperation;
+  }
+});
+
 test('withAuditLog: 非2xx响应不记录日志', async () => {
   const originalLogOperation = auditLogUtils.logOperation;
   let called = false;

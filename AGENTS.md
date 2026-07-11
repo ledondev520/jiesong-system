@@ -28,6 +28,7 @@
 - If temporary test credentials are introduced, mark them clearly as non-production and require environment-variable override before上线.
 - Use environment variables for secrets and validate their presence during startup.
 - Do not print sensitive values to logs. Redact secrets from debug output and structured logs.
+- Structured HTTP logs may retain request shape for diagnosis, but must not retain body/query values, AI prompts, tool schemas, or user messages.
 - System-configured API keys are write-only: response Interfaces may expose only a configured flag or masked suffix, and frontend pages must never render a complete stored key even for administrators.
 - Keep dependencies updated with minimal privilege; avoid adding packages that require elevated permissions or execute shell by default.
 - Enforce permission checks before loading `.env` and config files as implemented in `backend/src/config/index.js`.

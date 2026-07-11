@@ -199,7 +199,7 @@ const withAuditLog = (options = {}, handler) => {
   return async (req, res, next) => {
     const action = String(options.action || ACTION_BY_METHOD[req.method] || 'ACTION').toUpperCase();
     const entity = options.entity || 'Unknown';
-    const idField = options.idField || options.idParam || 'id';
+    const idField = options.idField || 'id';
     const requestEntityId = resolveRequestEntityId(req, options.idParam || 'id');
     const captured = {
       payload: undefined,

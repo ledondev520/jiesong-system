@@ -32,6 +32,54 @@ const getRequestId = (req) =>
   req.get('traceparent') ||
   null;
 
+const parseContentLength = (value) => {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+};
+
+const summarizeRequestFields = (value, contentLength = null) => {
+  if (value === null || value === undefined) {
+    return { present: false, contentLength: parseContentLength(contentLength) };
+  }
+
+  if (Array.isArray(value)) {
+    return {
+      present: true,
+      type: 'array',
+      itemCount: value.length,
+      contentLength: parseContentLength(contentLength),
+    };
+  }
+
+  if (typeof value !== 'object') {
+    return {
+      present: true,
+      type: typeof value,
+      contentLength: parseContentLength(contentLength),
+    };
+  }
+
+  const keys = Object.keys(value);
+  const visibleFields = keys.slice(0, 24);
+  return {
+    present: keys.length > 0,
+    type: 'object',
+    fieldCount: keys.length,
+    fields: visibleFields,
+    ...(keys.length > visibleFields.length ? { omittedFieldCount: keys.length - visibleFields.length } : {}),
+    contentLength: parseContentLength(contentLength),
+  };
+};
+
+const getLogRoutePath = (req) => {
+  const baseUrl = typeof req?.baseUrl === 'string' ? req.baseUrl : '';
+  const routePath = typeof req?.route?.path === 'string' ? req.route.path : '';
+  if (routePath) {
+    return `${baseUrl}${routePath === '/' ? '' : routePath}`.replace(/\/+/g, '/') || '/';
+  }
+  return String(req?.originalUrl || '').split('?')[0] || '/';
+};
+
 const requestLogger = (req, res, next) => {
   const startedAt = Date.now();
   let logged = false;
@@ -53,10 +101,10 @@ const requestLogger = (req, res, next) => {
       requestId: getRequestId(req),
       request: {
         method: req.method,
-        url: req.originalUrl,
+        url: getLogRoutePath(req),
         ip: req.ip,
-        query: req.query || {},
-        body: req.body || null,
+        query: summarizeRequestFields(req.query || {}),
+        body: summarizeRequestFields(req.body, req.get('content-length')),
         userAgent: req.get('user-agent') || null,
         referer: req.get('referer') || null,
       },
@@ -88,4 +136,4 @@ const requestLogger = (req, res, next) => {
   next();
 };
 
-module.exports = { requestLogger };
+module.exports = { requestLogger, summarizeRequestFields, getLogRoutePath };

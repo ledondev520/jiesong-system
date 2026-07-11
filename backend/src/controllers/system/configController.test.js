@@ -204,6 +204,37 @@ test('syncExchangeRate: 外部同步失败时快速降级返回当前汇率', as
   }
 });
 
+test('fetchUsdCnyRate: 总超时覆盖尚未建立 socket 的连接阶段', async () => {
+  const originalHttpsGet = https.get;
+  let destroyed = false;
+
+  https.get = () => {
+    const request = {
+      handlers: {},
+      setTimeout: () => request,
+      on: (event, handler) => {
+        request.handlers[event] = handler;
+        return request;
+      },
+      destroy: (error) => {
+        destroyed = true;
+        request.handlers.error?.(error);
+      },
+    };
+    return request;
+  };
+
+  try {
+    await assert.rejects(
+      configController.fetchUsdCnyRate({ timeoutMs: 5 }),
+      /汇率同步超时 5ms/,
+    );
+    assert.equal(destroyed, true);
+  } finally {
+    https.get = originalHttpsGet;
+  }
+});
+
 test('syncExchangeRate: 外部同步成功时写入当前 schema 支持的配置字段', async () => {
   const originalFindUnique = prisma.systemConfig.findUnique;
   const originalUpsert = prisma.systemConfig.upsert;

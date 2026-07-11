@@ -26,7 +26,8 @@
           "Restricted business records only in the application database or protected contract-evidence storage",
           "Least privilege file mode (<=600 for backend .env)",
           "Contract artifact directories use 0700 and files use 0600",
-          "Carrier packing-list raw extracted text is not persisted; structured check records retain their original file reference"
+          "Carrier packing-list raw extracted text is not persisted; structured check records retain their original file reference",
+          "HTTP request logs retain route, timing, and request shape only; request/query values, AI prompts, tool schemas, and user messages are excluded"
         ],
         "transfer": [
           "Encrypt in transit (TLS)",

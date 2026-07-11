@@ -8,6 +8,8 @@
 const fs = require('fs');
 const path = require('path');
 const { performance } = require('perf_hooks');
+const ROOT = path.resolve(__dirname, '..');
+const AdmZip = require(require.resolve('adm-zip', { paths: [path.join(ROOT, 'backend')] }));
 
 const BASE_URL = process.env.API_BASE_URL;
 const USERNAME = process.env.API_BENCH_USERNAME || 'admin';
@@ -17,7 +19,6 @@ const TIMEOUT_MS = Number(process.env.API_BENCH_TIMEOUT_MS || 10000);
 const DELAY_MS = Number(process.env.API_BENCH_DELAY_MS || 700);
 const OUTPUT_DIR = path.resolve(process.cwd(), 'tmp/performance');
 const UPLOAD_DIR = path.resolve(process.cwd(), 'backend/uploads');
-const CONTRACTS_UPLOAD_DIR = path.join(UPLOAD_DIR, 'contracts');
 
 const state = {
   runId: `perf-${Date.now()}`,
@@ -29,6 +30,9 @@ const requireDisposableTarget = () => {
   }
   if (process.env.API_PERF_DISPOSABLE_DB !== 'true') {
     throw new Error('Refusing to run write audit: set API_PERF_DISPOSABLE_DB=true after pointing backend at a copied database.');
+  }
+  if (process.env.API_PERF_ISOLATED_FILES !== 'true') {
+    throw new Error('Refusing to run write audit: set API_PERF_ISOLATED_FILES=true only after the disposable backend uses isolated UPLOAD_DIR and CONTRACT_DOC_TEMPLATE_PATH values.');
   }
   if (!BASE_URL) {
     throw new Error('Refusing to run write audit: API_BASE_URL must point at the disposable backend instance.');
@@ -81,25 +85,26 @@ const createUploadForm = (fileName, fields = {}, options = {}) => {
   return form;
 };
 
-const findContractDocxTemplate = () => {
+const readContractDocxTemplate = () => {
   if (process.env.API_PERF_CONTRACT_DOCX_TEMPLATE) {
-    return process.env.API_PERF_CONTRACT_DOCX_TEMPLATE;
+    return fs.readFileSync(process.env.API_PERF_CONTRACT_DOCX_TEMPLATE);
   }
-  const firstDocx = fs
-    .readdirSync(CONTRACTS_UPLOAD_DIR)
-    .find((fileName) => fileName.toLowerCase().endsWith('.docx'));
-  if (!firstDocx) {
-    throw new Error(`Missing DOCX fixture in ${CONTRACTS_UPLOAD_DIR}`);
-  }
-  return path.join(CONTRACTS_UPLOAD_DIR, firstDocx);
+
+  const zip = new AdmZip();
+  zip.addFile('[Content_Types].xml', Buffer.from('<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>'));
+  zip.addFile('word/document.xml', Buffer.from(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
+      <w:p><w:r><w:t>{{contractNo}}</w:t></w:r></w:p>
+      <w:tbl><w:tr><w:tc><w:p><w:r><w:t>{{productName}}</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>{{unit}}</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>{{quantity}}</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>{{unitPrice}}</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>{{amount}}</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>{{taxRate}}</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>{{taxAmount}}</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>{{totalAmount}}</w:t></w:r></w:p></w:tc></w:tr></w:tbl>
+    </w:body></w:document>`));
+  return zip.toBuffer();
 };
 
 const createContractTemplateForm = () => {
-  const templatePath = findContractDocxTemplate();
   return createUploadForm(`perf-template-${state.runId}.docx`, {}, {
     fieldName: 'template',
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    content: fs.readFileSync(templatePath),
+    content: readContractDocxTemplate(),
   });
 };
 
@@ -379,6 +384,13 @@ const cases = [
     body: () => ({}),
   },
   {
+    id: 'notification_generate_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/notifications/generate',
+    body: () => ({}),
+  },
+  {
     id: 'system_notification_mark_read_success',
     category: 'write_success',
     method: 'PUT',
@@ -524,11 +536,18 @@ const cases = [
     expectedStatuses: [201],
   },
   {
+    id: 'purchase_invoice_numbers_success',
+    category: 'write_success',
+    method: 'PUT',
+    path: () => `/api/v1/purchases/${state.purchaseId}/invoice-numbers`,
+    body: () => ({ invoiceNumbers: [`PERF-${state.runId}`] }),
+  },
+  {
     id: 'purchase_status_success',
     category: 'write_success',
     method: 'PUT',
     path: () => `/api/v1/purchases/${state.purchaseId}/status`,
-    body: () => ({ status: 'PENDING_INSPECTION' }),
+    body: () => ({ status: 'SIGNED' }),
   },
   {
     id: 'purchase_suppliers_by_products_success',
@@ -575,24 +594,68 @@ const cases = [
         unit: '件',
         unitPrice: 10,
         specification: 'performance inventory fixture',
+        boxes: 1,
+        grossWeight: 1.2,
+        netWeight: 1,
+        volume: 0.03,
       }],
     }),
-    save: saveId('inventoryPurchaseId'),
+    save: (json) => {
+      saveId('inventoryPurchaseId')(json);
+      savePath('inventoryPurchaseItemId', ['data', 'items', 0, 'id'])(json);
+    },
     expectedStatuses: [201],
   },
   {
-    id: 'inventory_fixture_purchase_pending_success',
+    id: 'inventory_fixture_production_details_success',
     category: 'write_success_fixture',
     method: 'PUT',
-    path: () => `/api/v1/purchases/${state.inventoryPurchaseId}/status`,
-    body: () => ({ status: 'PENDING_INSPECTION' }),
+    path: () => `/api/v1/purchases/${state.inventoryPurchaseId}/production-details`,
+    body: () => ({
+      items: [{
+        id: state.inventoryPurchaseItemId,
+        specification: 'performance inventory fixture',
+        boxes: 1,
+        grossWeight: 1.2,
+        netWeight: 1,
+        volume: 0.03,
+      }],
+    }),
   },
   {
-    id: 'inventory_fixture_purchase_in_stock_success',
+    id: 'inventory_fixture_purchase_signed_success',
     category: 'write_success_fixture',
     method: 'PUT',
     path: () => `/api/v1/purchases/${state.inventoryPurchaseId}/status`,
-    body: () => ({ status: 'IN_STOCK' }),
+    body: () => ({ status: 'SIGNED' }),
+  },
+  {
+    id: 'inventory_fixture_purchase_producing_success',
+    category: 'write_success_fixture',
+    method: 'PUT',
+    path: () => `/api/v1/purchases/${state.inventoryPurchaseId}/status`,
+    body: () => ({ status: 'PRODUCING' }),
+  },
+  {
+    id: 'inventory_fixture_purchase_ready_success',
+    category: 'write_success_fixture',
+    method: 'PUT',
+    path: () => `/api/v1/purchases/${state.inventoryPurchaseId}/status`,
+    body: () => ({ status: 'READY' }),
+  },
+  {
+    id: 'inventory_fixture_purchase_shipped_success',
+    category: 'write_success_fixture',
+    method: 'PUT',
+    path: () => `/api/v1/purchases/${state.inventoryPurchaseId}/status`,
+    body: () => ({ status: 'SHIPPED' }),
+  },
+  {
+    id: 'inventory_fixture_purchase_received_success',
+    category: 'write_success_fixture',
+    method: 'PUT',
+    path: () => `/api/v1/purchases/${state.inventoryPurchaseId}/status`,
+    body: () => ({ status: 'RECEIVED' }),
   },
   {
     id: 'inventory_list_for_status_success',
@@ -637,6 +700,15 @@ const cases = [
     method: 'PUT',
     path: () => `/api/v1/sales/${state.salesId}`,
     body: () => ({ exchangeRate: 7.1, portId: state.contractPortId, note: 'performance sales update audit' }),
+  },
+  {
+    id: 'sales_import_purchase_items_success',
+    category: 'write_success',
+    method: 'POST',
+    path: () => `/api/v1/sales/${state.salesId}/import-purchase-items`,
+    body: () => ({ items: [{ purchaseItemId: state.inventoryPurchaseItemId, boxes: 1 }] }),
+    save: savePath('salesImportedPackingItemId', ['data', 'items', 0, 'id']),
+    expectedStatuses: [201],
   },
   {
     id: 'sales_add_item_success',
@@ -698,6 +770,13 @@ const cases = [
     }),
   },
   {
+    id: 'three_forms_preview_success',
+    category: 'write_success',
+    method: 'POST',
+    path: '/api/v1/three-forms/preview',
+    body: () => ({ salesContractId: state.salesId, items: [] }),
+  },
+  {
     id: 'customs_auto_drafts_success',
     category: 'write_success',
     method: 'POST',
@@ -729,7 +808,7 @@ const cases = [
     category: 'write_success',
     method: 'PUT',
     path: () => `/api/v1/sales/${state.salesId}/status`,
-    body: () => ({ status: 'PENDING_SHIPMENT' }),
+    body: () => ({ status: 'CONFIRMED' }),
   },
   {
     id: 'container_create_success',
@@ -1094,6 +1173,13 @@ const cases = [
     body: () => ({ productNames: ['改良种用濒危野马'] }),
   },
   {
+    id: 'hs_code_update_success',
+    category: 'write_success',
+    method: 'PUT',
+    path: '/api/v1/hs-codes/0101210010',
+    body: () => ({ note: 'performance write success audit' }),
+  },
+  {
     id: 'hs_code_ai_recommend_local_success',
     category: 'ai_external',
     method: 'POST',
@@ -1311,6 +1397,7 @@ const writeOutputs = (results) => {
     safety: {
       allowWrites: process.env.API_PERF_ALLOW_WRITES === 'true',
       disposableDb: process.env.API_PERF_DISPOSABLE_DB === 'true',
+      isolatedFiles: process.env.API_PERF_ISOLATED_FILES === 'true',
     },
   };
 
@@ -1342,7 +1429,7 @@ const writeOutputs = (results) => {
 - Generated at: ${summary.generatedAt}
 
 ## Scope
-This audit writes to a disposable database copy only. It covers selected success-path write interfaces for users, suppliers, products, stores, system dictionaries, contract templates, purchase contracts, sales contracts, containers, Agent credentials, notifications, customs declarations, tax refunds, tax rates, forex verifications, inventory status changes, finance matching/allocation, operations checklists, store recommendation, file upload/delete, selected exports/imports, patrol trigger, HS local batch match, AI config/session cleanup, AI local/degraded provider paths, exchange-rate sync degraded fallback, contract-doc template generation, and price calculation.
+This audit writes only to a disposable database copy and isolated upload/template directories. It covers selected success-path write interfaces for users, suppliers, products, stores, system dictionaries, contract templates, purchase contracts, sales contracts, containers, Agent credentials, notifications, customs declarations, tax refunds, tax rates, forex verifications, inventory status changes, finance matching/allocation, operations checklists, store recommendation, file upload/delete, selected exports/imports, patrol trigger, HS local batch match, AI config/session cleanup, AI local/degraded provider paths, exchange-rate sync degraded fallback, contract-doc template generation, and price calculation.
 
 ## Over Threshold Or Error
 ${problemLines}

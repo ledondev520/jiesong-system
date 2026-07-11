@@ -101,6 +101,7 @@ const coreCases = [
 
   { id: 'dashboard_stats', method: 'GET', path: '/api/v1/dashboard/stats' },
   { id: 'dashboard_analytics', method: 'GET', path: '/api/v1/dashboard/analytics' },
+  { id: 'dashboard_trade_workflows', method: 'GET', path: '/api/v1/dashboard/trade-workflows' },
   { id: 'reports_business_overview', method: 'GET', path: '/api/v1/reports/business-overview' },
 
   { id: 'suppliers_list', method: 'GET', path: '/api/v1/suppliers?page=1&pageSize=20', save: saveFirstId('supplierId') },
@@ -120,6 +121,7 @@ const coreCases = [
   { id: 'purchase_next_no', method: 'GET', path: '/api/v1/purchases/options/next-no' },
   { id: 'purchase_detail', method: 'GET', path: optionalPath('purchaseId', (id) => `/api/v1/purchases/${id}`) },
   { id: 'purchase_files', method: 'GET', path: optionalPath('purchaseId', (id) => `/api/v1/purchases/${id}/files`) },
+  { id: 'purchase_invoice_preparation', method: 'GET', path: optionalPath('purchaseId', (id) => `/api/v1/purchases/${id}/invoice-preparation`) },
   { id: 'purchase_export', method: 'GET', path: '/api/v1/purchases/export', acceptsBlob: true },
   { id: 'purchase_product_price_history', method: 'GET', path: optionalPath('productId', (id) => `/api/v1/purchases/price-history/${id}`) },
 
@@ -127,6 +129,11 @@ const coreCases = [
   { id: 'sales_next_no', method: 'GET', path: '/api/v1/sales/options/next-no' },
   { id: 'sales_detail', method: 'GET', path: optionalPath('salesId', (id) => `/api/v1/sales/${id}`) },
   { id: 'sales_files', method: 'GET', path: optionalPath('salesId', (id) => `/api/v1/sales/${id}/files`) },
+  { id: 'sales_available_purchase_items', method: 'GET', path: optionalPath('salesId', (id) => `/api/v1/sales/${id}/available-purchase-items`) },
+  { id: 'sales_finance_summary', method: 'GET', path: optionalPath('salesId', (id) => `/api/v1/sales/${id}/finance-summary`) },
+  { id: 'sales_packing_list_checks', method: 'GET', path: optionalPath('salesId', (id) => `/api/v1/sales/${id}/packing-list-checks`) },
+  { id: 'sales_tax_refund_preparation', method: 'GET', path: optionalPath('salesId', (id) => `/api/v1/sales/${id}/tax-refund-preparation`) },
+  { id: 'sales_tax_refund_preparation_export', method: 'GET', path: optionalPath('salesId', (id) => `/api/v1/sales/${id}/tax-refund-preparation/export`), acceptsBlob: true },
 
   { id: 'containers_list', method: 'GET', path: '/api/v1/containers?page=1&pageSize=20', save: saveFirstId('containerId') },
   { id: 'container_next_no', method: 'GET', path: optionalPath('portId', (id) => `/api/v1/containers/next-no/${id}`) },
