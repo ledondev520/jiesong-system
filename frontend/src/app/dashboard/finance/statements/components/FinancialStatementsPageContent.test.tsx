@@ -1,7 +1,7 @@
 /**
- * Input: 财务报表页状态编排、预览/确认服务与上传对话框 mock
- * Output: 文件不能绕过预览直接写入的主线路交互测试
- * Pos: 月度会计报表独立页编排测试
+ * Input: 财务报表页状态编排、三文件预览/确认服务与上传对话框 mock
+ * Output: 三类来源不能绕过预览直接写入的主线路交互测试
+ * Pos: 月度财务数据独立页编排测试
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,8 +11,8 @@ import { FinancialStatementsPageContent } from './FinancialStatementsPageContent
 
 const mockGetAnalytics = vi.fn();
 const mockListStatements = vi.fn();
-const mockPreviewFile = vi.fn();
-const mockConfirmFile = vi.fn();
+const mockPreviewBundle = vi.fn();
+const mockConfirmBundle = vi.fn();
 
 vi.mock('@/components/layout/ModuleTabHeader', () => ({
   FINANCE_TABS: [],
@@ -29,8 +29,8 @@ vi.mock('@/services/financialStatements.service', () => ({
     getAnalytics: (...args: unknown[]) => mockGetAnalytics(...args),
     listStatements: (...args: unknown[]) => mockListStatements(...args),
     getStatementDetail: vi.fn(),
-    previewFile: (...args: unknown[]) => mockPreviewFile(...args),
-    confirmFile: (...args: unknown[]) => mockConfirmFile(...args),
+    previewBundle: (...args: unknown[]) => mockPreviewBundle(...args),
+    confirmBundle: (...args: unknown[]) => mockConfirmBundle(...args),
   },
 }));
 
@@ -53,7 +53,7 @@ vi.mock('./FinancialStatementsUploadDialog', () => ({
   }: {
     open: boolean;
     preview: { previewId: string } | null;
-    onUploadFileChange: (file: File) => void;
+    onUploadFileChange: (type: 'statement' | 'trialBalance' | 'generalLedger', file: File) => void;
     onYearChange: (value: string) => void;
     onMonthChange: (value: string) => void;
     onPreview: () => void;
@@ -63,12 +63,14 @@ vi.mock('./FinancialStatementsUploadDialog', () => ({
       <button
         type="button"
         onClick={() => {
-          onUploadFileChange(new File(['workbook'], 'month.xlsx'));
+          onUploadFileChange('statement', new File(['statement'], '会计报表.xlsx'));
+          onUploadFileChange('trialBalance', new File(['trial'], '科目余额.xls'));
+          onUploadFileChange('generalLedger', new File(['ledger'], '明细账.xlsx'));
           onYearChange('2026');
           onMonthChange('7');
         }}
       >
-        选择测试月报
+        选择三份测试文件
       </button>
       <button type="button" onClick={onPreview}>执行只读预览</button>
       {preview && <button type="button" onClick={onConfirm}>确认写入预览</button>}
@@ -87,6 +89,11 @@ const preview = {
   summary: {
     balanceSheetFieldCount: 3,
     incomeStatementFieldCount: 3,
+    cashFlowFieldCount: 0,
+    accountBalanceRowCount: 3,
+    generalLedgerRowCount: 5,
+    sourceFileCount: 3,
+    trialBalanceChecks: { periodDifference: 0, endingDifference: 0 },
     totalAssets: 1000,
     totalLiabilities: 400,
     totalEquity: 600,
@@ -105,6 +112,8 @@ const preview = {
   },
   blockers: [],
   warnings: [],
+  sources: [],
+  cashFlowStatement: null,
 };
 
 describe('FinancialStatementsPageContent', () => {
@@ -112,26 +121,30 @@ describe('FinancialStatementsPageContent', () => {
     vi.clearAllMocks();
     mockGetAnalytics.mockResolvedValue({ trends: [], alerts: [], historicalAlerts: [], latestPeriod: null, totalPeriods: 0 });
     mockListStatements.mockResolvedValue([]);
-    mockPreviewFile.mockResolvedValue(preview);
-    mockConfirmFile.mockResolvedValue({ message: '2026年7账期 已确认写入', data: { imported: 1 } });
+    mockPreviewBundle.mockResolvedValue(preview);
+    mockConfirmBundle.mockResolvedValue({ message: '2026年7账期 已确认写入', data: { imported: 3 } });
   });
 
-  it('选择文件后必须先生成预览，确认动作才会出现并写入', async () => {
+  it('选择三份文件后必须先生成预览，确认动作才会写入同一数据包', async () => {
     const user = userEvent.setup();
     render(<FinancialStatementsPageContent />);
 
     await user.click(await screen.findByRole('button', { name: '上传月度会计报表' }));
-    await user.click(screen.getByRole('button', { name: '选择测试月报' }));
+    await user.click(screen.getByRole('button', { name: '选择三份测试文件' }));
     expect(screen.queryByRole('button', { name: '确认写入预览' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '执行只读预览' }));
-    await waitFor(() => expect(mockPreviewFile).toHaveBeenCalledTimes(1));
-    expect(mockConfirmFile).not.toHaveBeenCalled();
+    await waitFor(() => expect(mockPreviewBundle).toHaveBeenCalledTimes(1));
+    expect(mockConfirmBundle).not.toHaveBeenCalled();
 
     await user.click(await screen.findByRole('button', { name: '确认写入预览' }));
     await waitFor(() => {
-      expect(mockConfirmFile).toHaveBeenCalledWith(
-        expect.any(File),
+      expect(mockConfirmBundle).toHaveBeenCalledWith(
+        {
+          statement: expect.any(File),
+          trialBalance: expect.any(File),
+          generalLedger: expect.any(File),
+        },
         2026,
         7,
         'preview-1',

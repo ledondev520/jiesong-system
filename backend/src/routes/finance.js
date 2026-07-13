@@ -1,7 +1,7 @@
 /**
  * Input: 财务控制器、财务报表控制器、multer
- * Output: 财务管理路由（付款记录 + 财务报表分析 + 文件预览确认导入）
- * Pos: 财务路由，处理付款记录、账款查询，以及不可绕过预览的月报写入
+ * Output: 财务管理路由（付款记录 + 财务报表分析 + 三文件预览确认导入）
+ * Pos: 财务路由，处理付款记录、账款查询，以及不可绕过预览的账期数据包写入
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -26,6 +26,23 @@ const excelUpload = multer({
     cb(null, true);
   },
 });
+
+const financialBundleUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 3 },
+  fileFilter: (req, file, cb) => {
+    if (!file.originalname.match(/\.xls(x)?$/i)) {
+      return cb(new Error('只支持 .xls 或 .xlsx 格式的财务文件'), false);
+    }
+    cb(null, true);
+  },
+});
+
+const bundleFields = [
+  { name: 'statement', maxCount: 1 },
+  { name: 'trialBalance', maxCount: 1 },
+  { name: 'generalLedger', maxCount: 1 },
+];
 
 const router = Router();
 
@@ -95,6 +112,22 @@ router.post(
   roleAuth('ADMIN', 'FINANCE'),
   excelUpload.single('file'),
   financialStatementsController.confirmFile,
+);
+
+// POST /api/v1/finance/statements/import-bundle/preview - 三类来源只读解析
+router.post(
+  '/statements/import-bundle/preview',
+  roleAuth('ADMIN', 'FINANCE'),
+  financialBundleUpload.fields(bundleFields),
+  financialStatementsController.previewBundle,
+);
+
+// POST /api/v1/finance/statements/import-bundle/confirm - 三类来源单事务确认写入
+router.post(
+  '/statements/import-bundle/confirm',
+  roleAuth('ADMIN', 'FINANCE'),
+  financialBundleUpload.fields(bundleFields),
+  financialStatementsController.confirmBundle,
 );
 
 // GET /api/v1/finance/statements - 获取所有账期列表

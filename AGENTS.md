@@ -16,6 +16,7 @@
 - Before substantive coding or debugging, run a focused memory lookup with `scripts/brv-local.sh query "<topic>"` or `scripts/brv-local.sh search "<topic>" --limit 5 --format json`. If no provider is connected, the wrapper automatically downgrades `query` to local search.
 - After meaningful fixes, migrations, deployment changes, or repo-specific lessons, run `scripts/brv-local.sh curate "<durable technical conclusion>"` and include up to five relevant repo files with `-f`.
 - Store only reusable technical memory. Do not put secrets, credentials, customer financial data, contract values, or personal/user-profile memory in `.brv/context-tree/`.
+- Monthly financial statements, account balances, general-ledger rows, and their source filenames/hashes are Confidential; raw workbooks must not be committed, logged, or copied into ordinary attachment storage.
 
 ## UI Design System (强制)
 - **所有前端页面开发必须遵循 SHADCN/UI 设计风格**.

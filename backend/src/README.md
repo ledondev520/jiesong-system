@@ -33,6 +33,7 @@
 | containerController.js | 货柜管理 + 装箱明细 |
 | inventoryController.js | 库存状态管理 |
 | financeController.js | 付款与账款管理 |
+| financialStatementsController.js | 月度财务三文件预览、确认导入与账期查询 |
 | systemController.js | 系统配置 + 数据导入导出 |
 | aiController.js | AI问答 + 辅助录入 |
 
@@ -42,6 +43,7 @@
 |------|------|
 | authService.js | 登录验证、Token生成、密码管理、找回密码 |
 | financeService.js | 付款记录幂等写入、应收应付聚合（支持按合同过滤） |
+| financialStatementsService.js | 会计报表、科目余额、明细账同账期校验，单事务写入与下钻查询 |
 | aiService.js | Kimi 集成、智能问答、内容解析与管理员模型配置缓存 |
 | anthropicCompatService.js | Open Agent 与 Kimi 的协议适配、模型不可用时单次稳定降级 |
 | openAgentService.js | 通用业务 Agent、工具授权、流式输出与原子运行记录 |

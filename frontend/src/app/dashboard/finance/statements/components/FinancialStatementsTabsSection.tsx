@@ -4,7 +4,7 @@
  * Pos: 财务报表主分析区
  */
 
-import { Building2, DollarSign, AlertTriangle, AlertCircle, BarChart3, Loader2, Scale, TrendingUp, Wallet, PieChart as PieChartIcon, Activity } from 'lucide-react';
+import { Building2, DollarSign, AlertTriangle, AlertCircle, BarChart3, BookOpen, FileCheck2, Loader2, Scale, TrendingUp, Wallet, PieChart as PieChartIcon, Activity } from 'lucide-react';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, LineChart, Pie, PieChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -217,6 +217,129 @@ function IncomeStatementTable({ statement }: { statement: NonNullable<FinancialP
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function amount(value: number | null | undefined) {
+  return value === null || value === undefined
+    ? <span className="text-muted-foreground">—</span>
+    : value.toLocaleString('zh-CN', { minimumFractionDigits: 2 });
+}
+
+function CashFlowTable({ statement }: { statement: NonNullable<FinancialPeriod['cashFlowStatement']> }) {
+  const rows = [
+    ['销售商品、提供劳务收到的现金', statement.salesCashMonth, statement.salesCashYTD],
+    ['收到的其他经营活动现金', statement.otherOperatingCashInflowMonth, statement.otherOperatingCashInflowYTD],
+    ['购买商品、接受劳务支付的现金', statement.purchaseCashPaidMonth, statement.purchaseCashPaidYTD],
+    ['支付给职工及为职工支付的现金', statement.employeeCashPaidMonth, statement.employeeCashPaidYTD],
+    ['支付的各项税费', statement.taxCashPaidMonth, statement.taxCashPaidYTD],
+    ['支付的其他经营活动现金', statement.otherOperatingCashPaidMonth, statement.otherOperatingCashPaidYTD],
+    ['经营活动产生的现金流量净额', statement.netOperatingCashFlowMonth, statement.netOperatingCashFlowYTD],
+    ['投资活动产生的现金流量净额', statement.netInvestingCashFlowMonth, statement.netInvestingCashFlowYTD],
+    ['筹资活动产生的现金流量净额', statement.netFinancingCashFlowMonth, statement.netFinancingCashFlowYTD],
+    ['现金及现金等价物净增加额', statement.netCashIncreaseMonth, statement.netCashIncreaseYTD],
+    ['期初现金及现金等价物余额', statement.openingCashMonth, statement.openingCashYTD],
+    ['期末现金及现金等价物余额', statement.endingCashMonth, statement.endingCashYTD],
+  ] as const;
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b">
+            <th className="py-3 text-left font-medium text-muted-foreground">项目</th>
+            <th className="py-3 text-right font-medium text-muted-foreground">本月金额（元）</th>
+            <th className="py-3 text-right font-medium text-muted-foreground">本年累计（元）</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(([label, month, ytd], index) => (
+            <tr key={label} className={`border-b border-border/50 hover:bg-muted/30 ${index >= 6 ? 'font-semibold' : ''}`}>
+              <td className="py-1.5 pr-4">{label}</td>
+              <td className="py-1.5 text-right font-mono">{amount(month)}</td>
+              <td className="py-1.5 text-right font-mono">{amount(ytd)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AccountBalancesTable({ rows }: { rows: NonNullable<FinancialPeriod['accountBalances']> }) {
+  return (
+    <div className="max-h-[32rem] overflow-auto rounded-md border">
+      <table className="min-w-[980px] w-full text-xs">
+        <thead className="sticky top-0 z-10 bg-card">
+          <tr className="border-b">
+            <th className="px-3 py-2 text-left">科目</th>
+            {['期初借方', '期初贷方', '本期借方', '本期贷方', '本年借方', '本年贷方', '期末借方', '期末贷方'].map((label) => (
+              <th key={label} className="px-3 py-2 text-right font-medium text-muted-foreground">{label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id ?? row.sourceRow} className={`border-b border-border/50 hover:bg-muted/30 ${row.rowType !== 'ACCOUNT' ? 'bg-muted/20 font-semibold' : ''}`}>
+              <td className="whitespace-nowrap px-3 py-1.5">
+                <span className="font-mono text-muted-foreground">{row.accountCode ?? ''}</span>{' '}{row.accountName}
+              </td>
+              {[row.openingDebit, row.openingCredit, row.periodDebit, row.periodCredit, row.yearDebit, row.yearCredit, row.endingDebit, row.endingCredit].map((value, index) => (
+                <td key={index} className="whitespace-nowrap px-3 py-1.5 text-right font-mono">{amount(value)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function GeneralLedgerTable({ rows }: { rows: NonNullable<FinancialPeriod['generalLedgerEntries']> }) {
+  return (
+    <div className="max-h-[36rem] overflow-auto rounded-md border">
+      <table className="min-w-[1040px] w-full text-xs">
+        <thead className="sticky top-0 z-10 bg-card">
+          <tr className="border-b">
+            {['科目', '日期', '凭证字号', '摘要', '借方', '贷方', '方向', '余额'].map((label) => (
+              <th key={label} className={`px-3 py-2 font-medium text-muted-foreground ${['借方', '贷方', '余额'].includes(label) ? 'text-right' : 'text-left'}`}>{label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id ?? row.sourceRow} className={`border-b border-border/50 hover:bg-muted/30 ${row.rowType !== 'ENTRY' ? 'bg-muted/20 font-semibold' : ''}`}>
+              <td className="whitespace-nowrap px-3 py-1.5"><span className="font-mono text-muted-foreground">{row.accountCode}</span> {row.accountName}</td>
+              <td className="whitespace-nowrap px-3 py-1.5">{row.entryDate ? new Date(row.entryDate).toLocaleDateString('zh-CN') : '—'}</td>
+              <td className="whitespace-nowrap px-3 py-1.5">{row.voucherNumber || '—'}</td>
+              <td className="min-w-52 px-3 py-1.5">{row.summary}</td>
+              <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono">{amount(row.debit)}</td>
+              <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono">{amount(row.credit)}</td>
+              <td className="whitespace-nowrap px-3 py-1.5">{row.direction || '—'}</td>
+              <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono">{amount(row.balance)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function DataSourceList({ sources }: { sources: NonNullable<FinancialPeriod['dataSources']> }) {
+  const labels = { STATEMENT: '会计报表', TRIAL_BALANCE: '科目余额表', GENERAL_LEDGER: '明细账' };
+  return (
+    <div className="grid gap-3 md:grid-cols-3">
+      {sources.map((source) => (
+        <div key={source.id} className="rounded-lg border bg-muted/10 p-3 text-sm">
+          <div className="flex items-center justify-between gap-2">
+            <Badge variant="secondary">{labels[source.type]}</Badge>
+            <span className="text-xs text-muted-foreground">{source.rowCount.toLocaleString('zh-CN')} 行</span>
+          </div>
+          <p className="mt-2 break-all font-medium">{source.fileName}</p>
+          <p className="mt-1 font-mono text-xs text-muted-foreground">SHA-256 {source.sha256.slice(0, 12)}… · {(source.fileSize / 1024).toFixed(1)} KB</p>
+        </div>
+      ))}
     </div>
   );
 }
@@ -549,7 +672,7 @@ export function FinancialStatementsTabsSection({
         <section id="finance-period-detail" className="scroll-mt-24 space-y-4">
           <div>
             <h3 className="text-lg font-semibold tracking-tight">账期详情</h3>
-            <p className="text-sm text-muted-foreground">下钻查看当前账期的资产负债表和利润表明细。</p>
+            <p className="text-sm text-muted-foreground">下钻查看当前账期的三张报表、科目余额、明细账与来源校验。</p>
           </div>
             {detailLoading ? (
               <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
@@ -593,6 +716,46 @@ export function FinancialStatementsTabsSection({
                     ) : (
                       <p className="text-sm text-muted-foreground">暂无数据</p>
                     )}
+                  </CardContent>
+                </Card>
+
+                <Card className="md:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span className="flex items-center gap-2"><Wallet className="h-5 w-5 text-primary" />现金流量表</span>
+                      <Badge variant="outline">{currentDetail.periodLabel}</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {currentDetail.cashFlowStatement ? <CashFlowTable statement={currentDetail.cashFlowStatement} /> : <p className="text-sm text-muted-foreground">该账期来源文件未包含现金流量表</p>}
+                  </CardContent>
+                </Card>
+
+                <Card className="md:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Scale className="h-5 w-5 text-primary" />科目余额表（{currentDetail.accountBalances?.length ?? 0} 行）</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {currentDetail.accountBalances?.length ? <AccountBalancesTable rows={currentDetail.accountBalances} /> : <p className="text-sm text-muted-foreground">暂无数据</p>}
+                  </CardContent>
+                </Card>
+
+                <Card className="md:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-primary" />明细账（{currentDetail.generalLedgerEntries?.length ?? 0} 行）</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {currentDetail.generalLedgerEntries?.length ? <GeneralLedgerTable rows={currentDetail.generalLedgerEntries} /> : <p className="text-sm text-muted-foreground">暂无数据</p>}
+                  </CardContent>
+                </Card>
+
+                <Card className="md:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><FileCheck2 className="h-5 w-5 text-primary" />来源校验（{currentDetail.dataSources?.length ?? 0} 份）</CardTitle>
+                    <CardDescription>保留文件名、行数、大小和摘要，用于追溯本账期数据来源。</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {currentDetail.dataSources?.length ? <DataSourceList sources={currentDetail.dataSources} /> : <p className="text-sm text-muted-foreground">暂无来源记录</p>}
                   </CardContent>
                 </Card>
               </div>

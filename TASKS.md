@@ -1,5 +1,18 @@
 # Frontend Polish Tasks
 
+## 2026-07-13 FIN-IMPORT-14 三类 2026 年 1—6 月财务数据导入
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| FIN-IMPORT-14A | P0 | 15m | 1 | DONE | 安全解压并检查 1—6 月三类源文件 Sheet、账期、行数和真实字段结构 |
+| FIN-IMPORT-14B | P0 | 20m | 1 | DONE | 用失败测试定义三文件预览、期间一致、借贷平衡与事务覆盖 |
+| FIN-IMPORT-14C | P0 | 30m | 1 | DONE | 备份数据库并新增现金流、科目余额、明细账和来源元数据模型/迁移 |
+| FIN-IMPORT-14D | P0 | 30m | 1 | DONE | 实现后端三文件 Import Interface 与前端单入口上传/下钻查看 |
+| FIN-IMPORT-14E | P0 | 25m | 1 | DONE | 预检并导入真实 2026-01—06 数据，核验计数、来源与 SQLite |
+| FIN-IMPORT-14F | P1 | 20m | 1 | DONE | 全量验证、结果/风险/指标/Patch/ByteRover 更新并提交 |
+
+说明：仓库规则禁止在未获用户明确授权时启动 subagent，本轮所有 WU 串行执行，`MaxParallel` 实际为 1。
+
 ## 2026-07-11 PERF-AI-13 管理员配置、AI 与全链路性能收口
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |

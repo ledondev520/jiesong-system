@@ -1,13 +1,14 @@
 /**
- * Input: Excel 会计报表 Buffer、账期与 Prisma 数据库
- * Output: 只读解析预览、确认后事务写入、财务报表查询、趋势分析和预警
- * Pos: 财务报表业务服务层；上传文件必须跨越“预览 → 明确确认”Interface 后才能写库
+ * Input: 会计报表/科目余额/明细账 Buffer、账期与 Prisma 数据库
+ * Output: 三文件只读预览、确认后事务写入、财务报表查询、趋势分析和预警
+ * Pos: 财务报表业务服务层；三类来源必须跨越“预览 → 明确确认”Interface 后才能写库
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const crypto = require('crypto');
 const ExcelJS = require('exceljs');
+const XLSX = require('xlsx');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 
@@ -77,6 +78,22 @@ function parseIncomeStatement(ws) {
     }
   });
 
+  return map;
+}
+
+/** 从现金流量表按行次提取本年累计和本月金额。 */
+function parseCashFlowStatement(ws) {
+  const map = {};
+  ws.eachRow((row, rowNumber) => {
+    if (rowNumber <= 4) return;
+    const lineNo = row.getCell(2).value;
+    if (lineNo && !Number.isNaN(Number(lineNo))) {
+      map[String(Number(lineNo))] = {
+        ytd: toNum(row.getCell(3).value),
+        month: toNum(row.getCell(4).value),
+      };
+    }
+  });
   return map;
 }
 
@@ -159,6 +176,184 @@ const buildIncomeStatementData = (isMap) => ({
   incomeTaxYTD: isMap['31']?.ytd ?? null,
   netProfitYTD: isMap['32']?.ytd ?? null,
 });
+
+const buildCashFlowStatementData = (cashMap) => ({
+  salesCashMonth: cashMap['1']?.month ?? null,
+  otherOperatingCashInflowMonth: cashMap['2']?.month ?? null,
+  purchaseCashPaidMonth: cashMap['3']?.month ?? null,
+  employeeCashPaidMonth: cashMap['4']?.month ?? null,
+  taxCashPaidMonth: cashMap['5']?.month ?? null,
+  otherOperatingCashPaidMonth: cashMap['6']?.month ?? null,
+  netOperatingCashFlowMonth: cashMap['7']?.month ?? null,
+  netInvestingCashFlowMonth: cashMap['13']?.month ?? null,
+  netFinancingCashFlowMonth: cashMap['19']?.month ?? null,
+  netCashIncreaseMonth: cashMap['20']?.month ?? null,
+  openingCashMonth: cashMap['21']?.month ?? null,
+  endingCashMonth: cashMap['22']?.month ?? null,
+  salesCashYTD: cashMap['1']?.ytd ?? null,
+  otherOperatingCashInflowYTD: cashMap['2']?.ytd ?? null,
+  purchaseCashPaidYTD: cashMap['3']?.ytd ?? null,
+  employeeCashPaidYTD: cashMap['4']?.ytd ?? null,
+  taxCashPaidYTD: cashMap['5']?.ytd ?? null,
+  otherOperatingCashPaidYTD: cashMap['6']?.ytd ?? null,
+  netOperatingCashFlowYTD: cashMap['7']?.ytd ?? null,
+  netInvestingCashFlowYTD: cashMap['13']?.ytd ?? null,
+  netFinancingCashFlowYTD: cashMap['19']?.ytd ?? null,
+  netCashIncreaseYTD: cashMap['20']?.ytd ?? null,
+  openingCashYTD: cashMap['21']?.ytd ?? null,
+  endingCashYTD: cashMap['22']?.ytd ?? null,
+});
+
+const normalizeCellText = (value) => String(value ?? '').trim();
+
+const extractCompanyName = (values) => {
+  const match = values
+    .map(normalizeCellText)
+    .find((value) => /(?:企业名称|核算单位|编制单位)[：:]/.test(value));
+  return match ? match.replace(/^.*?(?:企业名称|核算单位|编制单位)[：:]\s*/, '').trim() : null;
+};
+
+const extractPeriod = (values) => {
+  for (const raw of values) {
+    const value = normalizeCellText(raw);
+    const match = value.match(/(20\d{2})[年-](\d{1,2})(?:月)?/);
+    if (match) return { year: Number(match[1]), month: Number(match[2]) };
+  }
+  return null;
+};
+
+const worksheetHeaderValues = (worksheet, rowLimit = 5, columnLimit = 10) => {
+  const values = [];
+  for (let row = 1; row <= Math.min(worksheet.rowCount, rowLimit); row += 1) {
+    for (let column = 1; column <= columnLimit; column += 1) {
+      values.push(worksheet.getRow(row).getCell(column).value);
+    }
+  }
+  return values;
+};
+
+const parseStatementBundleBuffer = async (buffer) => {
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw createError('会计报表文件为空', 400);
+  const workbook = new ExcelJS.Workbook();
+  try {
+    await workbook.xlsx.load(buffer);
+  } catch {
+    throw createError('无法解析会计报表，请确认文件是有效的 .xlsx 工作簿', 400);
+  }
+  const balanceSheet = workbook.getWorksheet('资产负债表');
+  const incomeStatement = workbook.getWorksheet('利润表');
+  const cashFlowStatement = workbook.getWorksheet('现金流量表');
+  if (!balanceSheet || !incomeStatement) {
+    throw createError('会计报表缺少必要的 Sheet（资产负债表、利润表）', 400);
+  }
+  const headerValues = [
+    ...worksheetHeaderValues(balanceSheet),
+    ...worksheetHeaderValues(incomeStatement),
+    ...(cashFlowStatement ? worksheetHeaderValues(cashFlowStatement) : []),
+  ];
+  return {
+    balanceSheet: buildBalanceSheetData(parseBalanceSheet(balanceSheet)),
+    incomeStatement: buildIncomeStatementData(parseIncomeStatement(incomeStatement)),
+    cashFlowStatement: cashFlowStatement
+      ? buildCashFlowStatementData(parseCashFlowStatement(cashFlowStatement))
+      : null,
+    statementSheetCount: cashFlowStatement ? 3 : 2,
+    companyName: extractCompanyName(headerValues),
+    period: extractPeriod(headerValues),
+  };
+};
+
+const parseSheetRows = (buffer, sheetName, label) => {
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw createError(`${label}文件为空`, 400);
+  let workbook;
+  try {
+    workbook = XLSX.read(buffer, { type: 'buffer', raw: true, cellDates: true });
+  } catch {
+    throw createError(`无法解析${label}文件`, 400);
+  }
+  const actualSheetName = workbook.SheetNames.find((name) => name.trim() === sheetName);
+  if (!actualSheetName) throw createError(`${label}文件缺少「${sheetName}」Sheet`, 400);
+  const rows = XLSX.utils.sheet_to_json(workbook.Sheets[actualSheetName], {
+    header: 1,
+    defval: null,
+    blankrows: true,
+    raw: true,
+  });
+  return rows;
+};
+
+const parseTrialBalanceBuffer = (buffer) => {
+  const rows = parseSheetRows(buffer, '科目余额表', '科目余额表');
+  const headerValues = rows.slice(0, 4).flat();
+  const entries = rows.slice(4).flatMap((row, index) => {
+    const accountCode = normalizeCellText(row[0]) || null;
+    const accountName = normalizeCellText(row[1]);
+    if (!accountCode && !accountName) return [];
+    const rowType = accountCode ? 'ACCOUNT' : (accountName.includes('总计') ? 'TOTAL' : 'SUBTOTAL');
+    return [{
+      sourceRow: index + 5,
+      rowType,
+      accountCode,
+      accountName,
+      openingDebit: toNum(row[2]),
+      openingCredit: toNum(row[3]),
+      periodDebit: toNum(row[4]),
+      periodCredit: toNum(row[5]),
+      yearDebit: toNum(row[6]),
+      yearCredit: toNum(row[7]),
+      endingDebit: toNum(row[8]),
+      endingCredit: toNum(row[9]),
+    }];
+  });
+  return {
+    entries,
+    companyName: extractCompanyName(headerValues),
+    period: extractPeriod(headerValues),
+  };
+};
+
+const parseLedgerDate = (value) => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  const text = normalizeCellText(value);
+  if (!/^20\d{2}-\d{2}-\d{2}$/.test(text)) return null;
+  return new Date(`${text}T00:00:00.000Z`);
+};
+
+const parseGeneralLedgerBuffer = (buffer) => {
+  const rows = parseSheetRows(buffer, '明细账', '明细账');
+  const headerValues = rows.slice(0, 3).flat();
+  const entries = rows.slice(3).flatMap((row, index) => {
+    const accountCode = normalizeCellText(row[0]);
+    const accountName = normalizeCellText(row[1]);
+    const summary = normalizeCellText(row[4]);
+    if (!accountCode || !accountName || !summary) return [];
+    const rowType = summary === '期初余额'
+      ? 'OPENING'
+      : summary === '本期合计'
+        ? 'PERIOD_TOTAL'
+        : summary === '本年累计'
+          ? 'YTD_TOTAL'
+          : 'ENTRY';
+    return [{
+      sourceRow: index + 4,
+      rowType,
+      accountCode,
+      accountName,
+      entryDate: parseLedgerDate(row[2]),
+      voucherNumber: normalizeCellText(row[3]) || null,
+      summary,
+      debit: toNum(row[5]),
+      credit: toNum(row[6]),
+      direction: normalizeCellText(row[7]) || null,
+      balance: toNum(row[8]),
+    }];
+  });
+  return {
+    entries,
+    companyName: extractCompanyName(headerValues),
+    period: extractPeriod(headerValues),
+  };
+};
 
 const parseWorkbook = (workbook) => {
   const bsSheet = workbook.getWorksheet('资产负债表');
@@ -290,6 +485,162 @@ const previewFromBuffer = async (
   return buildStatementPreview({ buffer, year, month, periodLabel, parsed, existing });
 };
 
+const BUNDLE_SOURCE_ORDER = [
+  ['statement', 'STATEMENT', '会计报表', '资产负债表/利润表/现金流量表'],
+  ['trialBalance', 'TRIAL_BALANCE', '科目余额表', '科目余额表'],
+  ['generalLedger', 'GENERAL_LEDGER', '明细账', '明细账'],
+];
+
+const assertBundleSources = (sources) => {
+  for (const [key, , label] of BUNDLE_SOURCE_ORDER) {
+    if (!Buffer.isBuffer(sources?.[key]?.buffer) || sources[key].buffer.length === 0) {
+      throw createError(`请上传${label}文件`, 400);
+    }
+  }
+};
+
+const createBundlePreviewId = (sources, year, month, periodLabel) => {
+  const hash = crypto.createHash('sha256');
+  for (const [key] of BUNDLE_SOURCE_ORDER) {
+    hash.update(key);
+    hash.update(normalizeCellText(sources[key].fileName));
+    hash.update(sources[key].buffer);
+  }
+  return hash.update(JSON.stringify({ year, month, periodLabel })).digest('hex');
+};
+
+const buildSourceMetadata = (sources, parsed) => BUNDLE_SOURCE_ORDER.map(([
+  key,
+  type,
+  label,
+  sheetName,
+]) => {
+  const source = sources[key];
+  const rowCount = key === 'statement'
+    ? parsed.statement.statementSheetCount
+    : key === 'trialBalance'
+      ? parsed.trialBalance.entries.length
+      : parsed.generalLedger.entries.length;
+  return {
+    type,
+    label,
+    fileName: normalizeCellText(source.fileName) || `${label}.xlsx`,
+    fileSize: source.buffer.length,
+    sha256: crypto.createHash('sha256').update(source.buffer).digest('hex'),
+    sheetName,
+    rowCount,
+  };
+});
+
+const periodMatches = (period, year, month) => period?.year === year && period?.month === month;
+
+const buildTrialBalanceChecks = (entries) => {
+  const total = [...entries].reverse().find((entry) => entry.rowType === 'TOTAL');
+  if (!total) return null;
+  return {
+    openingDifference: roundMoney(Number(total.openingDebit || 0) - Number(total.openingCredit || 0)),
+    periodDifference: roundMoney(Number(total.periodDebit || 0) - Number(total.periodCredit || 0)),
+    yearDifference: roundMoney(Number(total.yearDebit || 0) - Number(total.yearCredit || 0)),
+    endingDifference: roundMoney(Number(total.endingDebit || 0) - Number(total.endingCredit || 0)),
+    openingDebit: total.openingDebit,
+    openingCredit: total.openingCredit,
+    periodDebit: total.periodDebit,
+    periodCredit: total.periodCredit,
+    endingDebit: total.endingDebit,
+    endingCredit: total.endingCredit,
+  };
+};
+
+const parseBundleSources = async (sources) => {
+  assertBundleSources(sources);
+  const [statement, trialBalance, generalLedger] = await Promise.all([
+    parseStatementBundleBuffer(sources.statement.buffer),
+    Promise.resolve(parseTrialBalanceBuffer(sources.trialBalance.buffer)),
+    Promise.resolve(parseGeneralLedgerBuffer(sources.generalLedger.buffer)),
+  ]);
+  return { statement, trialBalance, generalLedger };
+};
+
+const previewBundleFromBuffers = async (
+  sources,
+  year,
+  month,
+  periodLabel,
+  prismaClient = prisma,
+) => {
+  const parsed = await parseBundleSources(sources);
+  const existing = await prismaClient.financialPeriod.findUnique({
+    where: { year_month: { year, month } },
+    select: { id: true },
+  });
+  const base = buildStatementPreview({
+    buffer: sources.statement.buffer,
+    year,
+    month,
+    periodLabel,
+    parsed: parsed.statement,
+    existing,
+  });
+  const blockers = [...base.blockers];
+  const warnings = [...base.warnings];
+  const sourcePeriods = [
+    ['会计报表', parsed.statement.period],
+    ['科目余额表', parsed.trialBalance.period],
+    ['明细账', parsed.generalLedger.period],
+  ];
+  for (const [label, sourcePeriod] of sourcePeriods) {
+    if (!sourcePeriod) blockers.push(`${label}未识别到账期`);
+    else if (!periodMatches(sourcePeriod, year, month)) {
+      blockers.push(`${label}账期为 ${sourcePeriod.year}-${String(sourcePeriod.month).padStart(2, '0')}，与选择账期不一致`);
+    }
+  }
+  const companyNames = [
+    ['会计报表', parsed.statement.companyName],
+    ['科目余额表', parsed.trialBalance.companyName],
+    ['明细账', parsed.generalLedger.companyName],
+  ];
+  const recognizedCompanies = companyNames.map(([, name]) => name).filter(Boolean);
+  if (recognizedCompanies.length !== companyNames.length) blockers.push('至少一份来源文件未识别到企业名称');
+  if (new Set(recognizedCompanies).size > 1) blockers.push('三份来源文件的企业名称不一致');
+
+  const trialBalanceChecks = buildTrialBalanceChecks(parsed.trialBalance.entries);
+  if (!trialBalanceChecks) {
+    blockers.push('科目余额表未识别到总计行');
+  } else {
+    for (const [label, difference] of [
+      ['期初', trialBalanceChecks.openingDifference],
+      ['本期', trialBalanceChecks.periodDifference],
+      ['本年累计', trialBalanceChecks.yearDifference],
+      ['期末', trialBalanceChecks.endingDifference],
+    ]) {
+      if (Math.abs(difference) > 0.01) blockers.push(`科目余额表${label}借贷不平，差额 CNY ${difference.toFixed(2)}`);
+    }
+  }
+  if (parsed.generalLedger.entries.length === 0) blockers.push('明细账未识别到可导入数据行');
+  if (!parsed.statement.cashFlowStatement) warnings.push('会计报表未包含现金流量表，本账期现金流数据保留为空');
+
+  const sourcesMetadata = buildSourceMetadata(sources, parsed);
+  return {
+    ...base,
+    previewId: createBundlePreviewId(sources, year, month, periodLabel),
+    ready: blockers.length === 0,
+    summary: {
+      ...base.summary,
+      cashFlowFieldCount: parsed.statement.cashFlowStatement
+        ? countPopulatedFields(parsed.statement.cashFlowStatement)
+        : 0,
+      accountBalanceRowCount: parsed.trialBalance.entries.length,
+      generalLedgerRowCount: parsed.generalLedger.entries.length,
+      sourceFileCount: sourcesMetadata.length,
+      trialBalanceChecks,
+    },
+    blockers,
+    warnings,
+    cashFlowStatement: parsed.statement.cashFlowStatement,
+    sources: sourcesMetadata,
+  };
+};
+
 const persistStatement = async (preview, prismaClient = prisma) => prismaClient.$transaction(async (tx) => {
   const reportDate = getLastDayOfMonth(preview.period.year, preview.period.month);
   const fp = await tx.financialPeriod.upsert({
@@ -313,6 +664,60 @@ const persistStatement = async (preview, prismaClient = prisma) => prismaClient.
     where: { periodId: fp.id },
     create: incomeData,
     update: preview.incomeStatement,
+  });
+  return fp;
+});
+
+const persistBundle = async (preview, parsed, prismaClient = prisma) => prismaClient.$transaction(async (tx) => {
+  const reportDate = getLastDayOfMonth(preview.period.year, preview.period.month);
+  const fp = await tx.financialPeriod.upsert({
+    where: { year_month: { year: preview.period.year, month: preview.period.month } },
+    update: { periodLabel: preview.period.periodLabel, reportDate, updatedAt: new Date() },
+    create: {
+      year: preview.period.year,
+      month: preview.period.month,
+      periodLabel: preview.period.periodLabel,
+      reportDate,
+    },
+  });
+  await tx.balanceSheetEntry.upsert({
+    where: { periodId: fp.id },
+    create: { periodId: fp.id, ...parsed.statement.balanceSheet },
+    update: parsed.statement.balanceSheet,
+  });
+  await tx.incomeStatementEntry.upsert({
+    where: { periodId: fp.id },
+    create: { periodId: fp.id, ...parsed.statement.incomeStatement },
+    update: parsed.statement.incomeStatement,
+  });
+  if (parsed.statement.cashFlowStatement) {
+    await tx.cashFlowStatementEntry.upsert({
+      where: { periodId: fp.id },
+      create: { periodId: fp.id, ...parsed.statement.cashFlowStatement },
+      update: parsed.statement.cashFlowStatement,
+    });
+  } else {
+    await tx.cashFlowStatementEntry.deleteMany({ where: { periodId: fp.id } });
+  }
+  await tx.accountBalanceEntry.deleteMany({ where: { periodId: fp.id } });
+  await tx.accountBalanceEntry.createMany({
+    data: parsed.trialBalance.entries.map((entry) => ({ periodId: fp.id, ...entry })),
+  });
+  await tx.generalLedgerEntry.deleteMany({ where: { periodId: fp.id } });
+  await tx.generalLedgerEntry.createMany({
+    data: parsed.generalLedger.entries.map((entry) => ({ periodId: fp.id, ...entry })),
+  });
+  await tx.financialDataSource.deleteMany({ where: { periodId: fp.id } });
+  await tx.financialDataSource.createMany({
+    data: preview.sources.map((source) => ({
+      periodId: fp.id,
+      type: source.type,
+      fileName: source.fileName,
+      fileSize: source.fileSize,
+      sha256: source.sha256,
+      sheetName: source.sheetName,
+      rowCount: source.rowCount,
+    })),
   });
   return fp;
 });
@@ -344,10 +749,17 @@ async function listPeriods() {
  * @param {number} month
  * @returns {object|null}
  */
-async function getPeriodDetail(year, month) {
-  return prisma.financialPeriod.findUnique({
+async function getPeriodDetail(year, month, prismaClient = prisma) {
+  return prismaClient.financialPeriod.findUnique({
     where: { year_month: { year, month } },
-    include: { balanceSheet: true, incomeStatement: true },
+    include: {
+      balanceSheet: true,
+      incomeStatement: true,
+      cashFlowStatement: true,
+      accountBalances: { orderBy: { sourceRow: 'asc' } },
+      generalLedgerEntries: { orderBy: { sourceRow: 'asc' } },
+      dataSources: { orderBy: { type: 'asc' } },
+    },
   });
 }
 
@@ -571,9 +983,42 @@ async function confirmImportFromBuffer(
   };
 }
 
+/** 三文件确认入口：重算全部来源预览凭证，并在单事务覆盖同一账期的六类数据。 */
+async function confirmBundleImportFromBuffers(
+  sources,
+  year,
+  month,
+  periodLabel,
+  { previewId, allowOverwrite = false } = {},
+  prismaClient = prisma,
+) {
+  const [preview, parsed] = await Promise.all([
+    previewBundleFromBuffers(sources, year, month, periodLabel, prismaClient),
+    parseBundleSources(sources),
+  ]);
+  if (!previewId || preview.previewId !== previewId) {
+    throw createError('预览已失效，请重新解析当前三份文件和账期', 409);
+  }
+  if (!preview.ready) throw createError(preview.blockers.join('；'), 400);
+  if (preview.period.existing && !allowOverwrite) {
+    throw createError(`账期 ${periodLabel} 已存在，请明确确认覆盖后再写入`, 409);
+  }
+  await persistBundle(preview, parsed, prismaClient);
+  return {
+    imported: preview.sources.length,
+    skipped: 0,
+    errors: [],
+    overwritten: preview.period.existing,
+    period: preview.period,
+    summary: preview.summary,
+  };
+}
+
 module.exports = {
   previewFromBuffer,
+  previewBundleFromBuffers,
   confirmImportFromBuffer,
+  confirmBundleImportFromBuffers,
   listPeriods,
   getPeriodDetail,
   getAnalytics,

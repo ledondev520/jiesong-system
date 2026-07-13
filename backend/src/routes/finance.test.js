@@ -21,6 +21,8 @@ test('finance: 月报上传必须先预览再确认，不暴露直接写入或�
 
   assert.notEqual(getRouteIndex(router, '/statements/import-file/preview', 'post'), -1);
   assert.notEqual(getRouteIndex(router, '/statements/import-file/confirm', 'post'), -1);
+  assert.notEqual(getRouteIndex(router, '/statements/import-bundle/preview', 'post'), -1);
+  assert.notEqual(getRouteIndex(router, '/statements/import-bundle/confirm', 'post'), -1);
   assert.equal(getRouteIndex(router, '/statements/import-file', 'post'), -1);
   assert.equal(getRouteIndex(router, '/statements/import-folder', 'post'), -1);
 });

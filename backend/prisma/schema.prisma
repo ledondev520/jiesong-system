@@ -394,8 +394,8 @@ model SalesItem {
 
   salesContract SalesContract @relation(fields: [salesContractId], references: [id], onDelete: Cascade)
   product       Product       @relation(fields: [productId], references: [id])
-  store             Store              @relation(fields: [storeId], references: [id])
-  inventories       Inventory[]
+  store         Store         @relation(fields: [storeId], references: [id])
+  inventories   Inventory[]
 
   @@index([salesContractId])
   @@index([productId])
@@ -642,8 +642,8 @@ model TaxRate {
   product                 Product                  @relation(fields: [productId], references: [id], onDelete: Cascade)
   customsDeclarationItems CustomsDeclarationItem[]
 
-  @@index([productId, isActive])
   @@unique([productId, effectiveFrom])
+  @@index([productId, isActive])
   @@map("tax_rates")
 }
 
@@ -883,8 +883,12 @@ model FinancialPeriod {
   importedAt  DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  balanceSheet    BalanceSheetEntry?
-  incomeStatement IncomeStatementEntry?
+  balanceSheet         BalanceSheetEntry?
+  incomeStatement      IncomeStatementEntry?
+  cashFlowStatement    CashFlowStatementEntry?
+  accountBalances      AccountBalanceEntry[]
+  generalLedgerEntries GeneralLedgerEntry[]
+  dataSources          FinancialDataSource[]
 
   @@unique([year, month])
   @@map("financial_periods")
@@ -968,6 +972,104 @@ model IncomeStatementEntry {
   period FinancialPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
 
   @@map("income_statement_entries")
+}
+
+model CashFlowStatementEntry {
+  id       String @id @default(cuid())
+  periodId String @unique
+
+  salesCashMonth                Float?
+  otherOperatingCashInflowMonth Float?
+  purchaseCashPaidMonth         Float?
+  employeeCashPaidMonth         Float?
+  taxCashPaidMonth              Float?
+  otherOperatingCashPaidMonth   Float?
+  netOperatingCashFlowMonth     Float?
+  netInvestingCashFlowMonth     Float?
+  netFinancingCashFlowMonth     Float?
+  netCashIncreaseMonth          Float?
+  openingCashMonth              Float?
+  endingCashMonth               Float?
+  salesCashYTD                  Float?
+  otherOperatingCashInflowYTD   Float?
+  purchaseCashPaidYTD           Float?
+  employeeCashPaidYTD           Float?
+  taxCashPaidYTD                Float?
+  otherOperatingCashPaidYTD     Float?
+  netOperatingCashFlowYTD       Float?
+  netInvestingCashFlowYTD       Float?
+  netFinancingCashFlowYTD       Float?
+  netCashIncreaseYTD            Float?
+  openingCashYTD                Float?
+  endingCashYTD                 Float?
+
+  period FinancialPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@map("cash_flow_statement_entries")
+}
+
+model AccountBalanceEntry {
+  id            String  @id @default(cuid())
+  periodId      String
+  sourceRow     Int
+  rowType       String
+  accountCode   String?
+  accountName   String
+  openingDebit  Float?
+  openingCredit Float?
+  periodDebit   Float?
+  periodCredit  Float?
+  yearDebit     Float?
+  yearCredit    Float?
+  endingDebit   Float?
+  endingCredit  Float?
+
+  period FinancialPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@unique([periodId, sourceRow])
+  @@index([periodId, accountCode])
+  @@map("account_balance_entries")
+}
+
+model GeneralLedgerEntry {
+  id            String    @id @default(cuid())
+  periodId      String
+  sourceRow     Int
+  rowType       String
+  accountCode   String
+  accountName   String
+  entryDate     DateTime?
+  voucherNumber String?
+  summary       String
+  debit         Float?
+  credit        Float?
+  direction     String?
+  balance       Float?
+
+  period FinancialPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@unique([periodId, sourceRow])
+  @@index([periodId, accountCode, entryDate])
+  @@index([periodId, voucherNumber])
+  @@map("general_ledger_entries")
+}
+
+model FinancialDataSource {
+  id         String   @id @default(cuid())
+  periodId   String
+  type       String
+  fileName   String
+  fileSize   Int
+  sha256     String
+  sheetName  String
+  rowCount   Int
+  importedAt DateTime @default(now())
+
+  period FinancialPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@unique([periodId, type])
+  @@index([sha256])
+  @@map("financial_data_sources")
 }
 
 // ==================== 合同模板 ====================

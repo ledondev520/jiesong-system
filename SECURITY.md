@@ -30,6 +30,7 @@
 - Treat system-configured API keys as write-only: encrypt at rest, never return the complete value from any HTTP response, and render only a configured/masked status in administrator pages.
 - Redact PII/敏感字段 in logs and exports; avoid writing raw identifiers to audit channels unless authorized.
 - HTTP request logs must record only route, timing, and request shape (field names/count/content length); never persist request body/query values, AI prompts, tool schemas, or user messages.
+- Monthly statements, account balances, and general-ledger rows are Confidential: parse uploaded workbooks in memory, persist only structured rows and source metadata/hash, and never copy raw workbooks into ordinary attachment storage or logs.
 - Use prepared statements/ORM boundaries and strict参数校验 before persistence.
 
 ### 5) 监控与响应层（Detection & Response）

@@ -1,7 +1,7 @@
 /**
- * Input: 后端 /api/v1/finance/statements/* 接口
- * Output: 财务报表数据（账期列表、详情、趋势分析、文件预览与确认写入）
- * Pos: 财务报表前端服务层；不暴露跳过预览的上传写入 Interface
+ * Input: 后端 /api/v1/finance/statements/* 接口与三类财务来源文件
+ * Output: 账期详情、趋势分析、三文件预览与确认写入
+ * Pos: 财务报表前端服务层；不暴露跳过预览的三类数据写入 Interface
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -70,6 +70,77 @@ interface IncomeStatement {
   netProfitYTD: number | null;
 }
 
+export interface CashFlowStatement {
+  id?: string;
+  periodId?: string;
+  salesCashMonth: number | null;
+  otherOperatingCashInflowMonth: number | null;
+  purchaseCashPaidMonth: number | null;
+  employeeCashPaidMonth: number | null;
+  taxCashPaidMonth: number | null;
+  otherOperatingCashPaidMonth: number | null;
+  netOperatingCashFlowMonth: number | null;
+  netInvestingCashFlowMonth: number | null;
+  netFinancingCashFlowMonth: number | null;
+  netCashIncreaseMonth: number | null;
+  openingCashMonth: number | null;
+  endingCashMonth: number | null;
+  salesCashYTD: number | null;
+  otherOperatingCashInflowYTD: number | null;
+  purchaseCashPaidYTD: number | null;
+  employeeCashPaidYTD: number | null;
+  taxCashPaidYTD: number | null;
+  otherOperatingCashPaidYTD: number | null;
+  netOperatingCashFlowYTD: number | null;
+  netInvestingCashFlowYTD: number | null;
+  netFinancingCashFlowYTD: number | null;
+  netCashIncreaseYTD: number | null;
+  openingCashYTD: number | null;
+  endingCashYTD: number | null;
+}
+
+export interface AccountBalanceEntry {
+  id: string;
+  sourceRow: number;
+  rowType: 'ACCOUNT' | 'SUBTOTAL' | 'TOTAL';
+  accountCode: string | null;
+  accountName: string;
+  openingDebit: number | null;
+  openingCredit: number | null;
+  periodDebit: number | null;
+  periodCredit: number | null;
+  yearDebit: number | null;
+  yearCredit: number | null;
+  endingDebit: number | null;
+  endingCredit: number | null;
+}
+
+export interface GeneralLedgerEntry {
+  id: string;
+  sourceRow: number;
+  rowType: 'OPENING' | 'ENTRY' | 'PERIOD_TOTAL' | 'YTD_TOTAL';
+  accountCode: string;
+  accountName: string;
+  entryDate: string | null;
+  voucherNumber: string | null;
+  summary: string;
+  debit: number | null;
+  credit: number | null;
+  direction: string | null;
+  balance: number | null;
+}
+
+export interface FinancialDataSource {
+  id: string;
+  type: 'STATEMENT' | 'TRIAL_BALANCE' | 'GENERAL_LEDGER';
+  fileName: string;
+  fileSize: number;
+  sha256: string;
+  sheetName: string;
+  rowCount: number;
+  importedAt: string;
+}
+
 export interface FinancialPeriod {
   id: string;
   year: number;
@@ -79,6 +150,10 @@ export interface FinancialPeriod {
   importedAt: string;
   balanceSheet: BalanceSheet | null;
   incomeStatement: IncomeStatement | null;
+  cashFlowStatement?: CashFlowStatement | null;
+  accountBalances?: AccountBalanceEntry[];
+  generalLedgerEntries?: GeneralLedgerEntry[];
+  dataSources?: FinancialDataSource[];
 }
 
 interface TrendDataPoint {
@@ -126,6 +201,12 @@ interface ImportResult {
   overwritten?: boolean;
 }
 
+export interface FinancialSourceBundle {
+  statement: File;
+  trialBalance: File;
+  generalLedger: File;
+}
+
 export interface FinancialStatementImportPreview {
   previewId: string;
   ready: boolean;
@@ -154,9 +235,35 @@ export interface FinancialStatementImportPreview {
       financialExpenses: number;
       total: number;
     };
+    cashFlowFieldCount?: number;
+    accountBalanceRowCount?: number;
+    generalLedgerRowCount?: number;
+    sourceFileCount?: number;
+    trialBalanceChecks?: {
+      openingDifference?: number;
+      periodDifference: number;
+      yearDifference?: number;
+      endingDifference: number;
+      openingDebit?: number | null;
+      openingCredit?: number | null;
+      periodDebit?: number | null;
+      periodCredit?: number | null;
+      endingDebit?: number | null;
+      endingCredit?: number | null;
+    } | null;
   };
   blockers: string[];
   warnings: string[];
+  cashFlowStatement?: CashFlowStatement | null;
+  sources?: Array<{
+    type: string;
+    label: string;
+    fileName: string;
+    fileSize: number;
+    sha256: string;
+    sheetName: string;
+    rowCount: number;
+  }>;
 }
 
 // ==================== API 调用 ====================
@@ -198,6 +305,22 @@ const buildStatementFormData = (file: File, year: number, month: number, periodL
   return formData;
 };
 
+const buildBundleFormData = (
+  files: FinancialSourceBundle,
+  year: number,
+  month: number,
+  periodLabel?: string,
+) => {
+  const formData = new FormData();
+  formData.append('statement', files.statement);
+  formData.append('trialBalance', files.trialBalance);
+  formData.append('generalLedger', files.generalLedger);
+  formData.append('year', String(year));
+  formData.append('month', String(month));
+  if (periodLabel) formData.append('periodLabel', periodLabel);
+  return formData;
+};
+
 /** 上传工作簿生成只读解析预览；此调用不会写入账期。 */
 async function previewFile(
   file: File,
@@ -230,9 +353,43 @@ async function confirmFile(
   return { message: res.message, data: res.data };
 }
 
+/** 上传会计报表、科目余额表和明细账生成同一账期的只读预览。 */
+async function previewBundle(
+  files: FinancialSourceBundle,
+  year: number,
+  month: number,
+  periodLabel?: string,
+): Promise<FinancialStatementImportPreview> {
+  const formData = buildBundleFormData(files, year, month, periodLabel);
+  const res = await api.post('/finance/statements/import-bundle/preview', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }) as { code: number; message: string; data: FinancialStatementImportPreview };
+  return res.data;
+}
+
+/** 携同一组三份原文件和预览凭证确认单事务写入。 */
+async function confirmBundle(
+  files: FinancialSourceBundle,
+  year: number,
+  month: number,
+  previewId: string,
+  allowOverwrite: boolean,
+  periodLabel?: string,
+): Promise<{ message: string; data: ImportResult }> {
+  const formData = buildBundleFormData(files, year, month, periodLabel);
+  formData.append('previewId', previewId);
+  formData.append('allowOverwrite', String(allowOverwrite));
+  const res = await api.post('/finance/statements/import-bundle/confirm', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }) as { code: number; message: string; data: ImportResult };
+  return { message: res.message, data: res.data };
+}
+
 export const financialStatementsService = {
   previewFile,
   confirmFile,
+  previewBundle,
+  confirmBundle,
   listStatements,
   getStatementDetail,
   getAnalytics,

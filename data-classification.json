@@ -48,13 +48,14 @@
       "examples": [
         "purchase contract and sales records",
         "supplier pricing and margins",
-        "financial summary reports",
+        "financial summary reports, cash-flow statements, account balances, and general-ledger entries",
         "inventory and shipment operational history"
       ],
       "controls": {
         "storage": [
           "Restrict DB/service read access",
-          "Use role-based filtering at API response layer"
+          "Use role-based filtering at API response layer",
+          "Monthly financial source files are parsed in memory; persist structured rows plus filename, size, and SHA-256 only"
         ],
         "transfer": [
           "Use authenticated session only",

@@ -1,5 +1,5 @@
 /**
- * Input: 财务报表服务层、缓存层与页面交互状态
+ * Input: 财务报表服务层、三类来源文件、缓存层与页面交互状态
  * Output: 财务报表分析页内容容器
  * Pos: 财务报表页状态编排层
  */
@@ -12,6 +12,7 @@ import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import {
   financialStatementsService,
   type AnalyticsData,
+  type FinancialSourceBundle,
   type FinancialStatementImportPreview,
   type FinancialPeriod,
 } from '@/services/financialStatements.service';
@@ -20,7 +21,11 @@ import {
   FinancialStatementsLoadingState,
   FinancialStatementsOverview,
 } from './FinancialStatementsOverview';
-import { FinancialStatementsUploadDialog } from './FinancialStatementsUploadDialog';
+import {
+  FinancialStatementsUploadDialog,
+  type FinancialUploadFiles,
+  type FinancialUploadFileType,
+} from './FinancialStatementsUploadDialog';
 
 const FinancialStatementsTabsSection = lazy(() =>
   import('./FinancialStatementsTabsSection').then((module) => ({
@@ -36,7 +41,11 @@ export function FinancialStatementsPageContent() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<FinancialUploadFiles>({
+    statement: null,
+    trialBalance: null,
+    generalLedger: null,
+  });
   const [uploadYear, setUploadYear] = useState(String(new Date().getFullYear()));
   const [uploadMonth, setUploadMonth] = useState(String(new Date().getMonth() + 1));
   const [statementPreview, setStatementPreview] = useState<FinancialStatementImportPreview | null>(null);
@@ -44,7 +53,9 @@ export function FinancialStatementsPageContent() {
   const [confirming, setConfirming] = useState(false);
   const [overwriteConfirmed, setOverwriteConfirmed] = useState(false);
   const [showDrilldowns, setShowDrilldowns] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const statementFileInputRef = useRef<HTMLInputElement>(null);
+  const trialBalanceFileInputRef = useRef<HTMLInputElement>(null);
+  const generalLedgerFileInputRef = useRef<HTMLInputElement>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -108,15 +119,13 @@ export function FinancialStatementsPageContent() {
   };
 
   const handleFilePreview = async () => {
-    if (!uploadFile) {
-      return;
-    }
+    if (!uploadFiles.statement || !uploadFiles.trialBalance || !uploadFiles.generalLedger) return;
     const period = getUploadPeriod();
     if (!period) return;
     setPreviewing(true);
     try {
-      const preview = await financialStatementsService.previewFile(
-        uploadFile,
+      const preview = await financialStatementsService.previewBundle(
+        uploadFiles as FinancialSourceBundle,
         period.year,
         period.month,
         period.periodLabel,
@@ -134,20 +143,22 @@ export function FinancialStatementsPageContent() {
   };
 
   const resetUpload = () => {
-    setUploadFile(null);
+    setUploadFiles({ statement: null, trialBalance: null, generalLedger: null });
     setStatementPreview(null);
     setOverwriteConfirmed(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    [statementFileInputRef, trialBalanceFileInputRef, generalLedgerFileInputRef].forEach((inputRef) => {
+      if (inputRef.current) inputRef.current.value = '';
+    });
   };
 
   const handleFileConfirm = async () => {
-    if (!uploadFile || !statementPreview) return;
+    if (!uploadFiles.statement || !uploadFiles.trialBalance || !uploadFiles.generalLedger || !statementPreview) return;
     const period = getUploadPeriod();
     if (!period) return;
     setConfirming(true);
     try {
-      const result = await financialStatementsService.confirmFile(
-        uploadFile,
+      const result = await financialStatementsService.confirmBundle(
+        uploadFiles as FinancialSourceBundle,
         period.year,
         period.month,
         statementPreview.previewId,
@@ -232,9 +243,9 @@ export function FinancialStatementsPageContent() {
               setUploadDialogOpen(open);
               if (!open) resetUpload();
             }}
-            uploadFile={uploadFile}
-            onUploadFileChange={(file) => {
-              setUploadFile(file);
+            uploadFiles={uploadFiles}
+            onUploadFileChange={(type: FinancialUploadFileType, file) => {
+              setUploadFiles((current) => ({ ...current, [type]: file }));
               setStatementPreview(null);
               setOverwriteConfirmed(false);
             }}
@@ -257,8 +268,12 @@ export function FinancialStatementsPageContent() {
             onOverwriteConfirmedChange={setOverwriteConfirmed}
             onPreview={handleFilePreview}
             onConfirm={handleFileConfirm}
-            fileInputRef={fileInputRef}
-            onClearFile={resetUpload}
+            fileInputRefs={{
+              statement: statementFileInputRef,
+              trialBalance: trialBalanceFileInputRef,
+              generalLedger: generalLedgerFileInputRef,
+            }}
+            onClearFiles={resetUpload}
           />
         </>
       )}

@@ -85,4 +85,61 @@ describe('financialStatementsService', () => {
     expect(formData.get('allowOverwrite')).toBe('true');
     expect(result.message).toBe('确认导入成功');
   });
+
+  it('应该用固定角色字段上传会计报表、科目余额和明细账生成预览', async () => {
+    const files = {
+      statement: new File(['statement'], '会计报表.xlsx'),
+      trialBalance: new File(['trial'], '科目余额.xls'),
+      generalLedger: new File(['ledger'], '明细账.xlsx'),
+    };
+    vi.mocked(api.post).mockResolvedValueOnce({
+      code: 200,
+      message: '预览完成',
+      data: { previewId: 'bundle-preview', ready: true },
+    });
+
+    const result = await financialStatementsService.previewBundle(files, 2026, 6);
+
+    expect(api.post).toHaveBeenCalledWith(
+      '/finance/statements/import-bundle/preview',
+      expect.any(FormData),
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    const formData = vi.mocked(api.post).mock.calls[0][1] as FormData;
+    expect(formData.get('statement')).toBe(files.statement);
+    expect(formData.get('trialBalance')).toBe(files.trialBalance);
+    expect(formData.get('generalLedger')).toBe(files.generalLedger);
+    expect(result.previewId).toBe('bundle-preview');
+  });
+
+  it('应该携三份原文件和同一预览凭证确认数据包写入', async () => {
+    const files = {
+      statement: new File(['statement'], '会计报表.xlsx'),
+      trialBalance: new File(['trial'], '科目余额.xls'),
+      generalLedger: new File(['ledger'], '明细账.xlsx'),
+    };
+    vi.mocked(api.post).mockResolvedValueOnce({
+      code: 200,
+      message: '三类财务数据已写入',
+      data: { imported: 3 },
+    });
+
+    const result = await financialStatementsService.confirmBundle(
+      files,
+      2026,
+      6,
+      'bundle-preview',
+      true,
+    );
+
+    expect(api.post).toHaveBeenCalledWith(
+      '/finance/statements/import-bundle/confirm',
+      expect.any(FormData),
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    const formData = vi.mocked(api.post).mock.calls[0][1] as FormData;
+    expect(formData.get('previewId')).toBe('bundle-preview');
+    expect(formData.get('allowOverwrite')).toBe('true');
+    expect(result.data.imported).toBe(3);
+  });
 });
