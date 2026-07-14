@@ -64,6 +64,54 @@ test('parseInvoices: 解析通用模板发票', () => {
   assert.strictEqual(result.records[0].total, 11300);
 });
 
+test('parseInvoices: 识别标题行后的进项表头并补全购买方方向', () => {
+  const xlsx = require('xlsx');
+  const wb = xlsx.utils.book_new();
+  const data = [
+    ['进项发票导出'],
+    ['序号', '发票类型', '发票号码', '销方名称', '销方税号', '税收编码', '开票项目', '金额', '税额', '价税合计', '开票日期'],
+    [1, '增值税专用发票', 'TEST-IN-001', '示例供应商有限公司', 'TEST-TAX-ID', 'TEST-CODE', '示例服务', 100, 6, 106, '2026-04-02'],
+  ];
+  xlsx.utils.book_append_sheet(wb, xlsx.utils.aoa_to_sheet(data), '进项');
+  const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+  const result = financeImportService.parseInvoices(buf, 'input');
+
+  assert.strictEqual(result.records.length, 1);
+  assert.ok(result.records[0].buyer);
+  assert.strictEqual(result.records[0].invNo, 'TEST-IN-001');
+  assert.strictEqual(result.records[0].itemName, '示例服务');
+  assert.strictEqual(result.records[0].taxClassCode, 'TEST-CODE');
+  assert.strictEqual(result.previewMapping.invNo, '发票号码');
+  assert.strictEqual(result.headerRow, 2);
+});
+
+test('parseInvoices: 同一发票的续行明细聚合且忽略汇总行', () => {
+  const xlsx = require('xlsx');
+  const wb = xlsx.utils.book_new();
+  const data = [
+    ['进项发票导出'],
+    ['序号', '发票号码', '销方名称', '开票项目', '规格型号', '计量单位', '数量', '单价', '金额', '税率', '税额', '价税合计', '开票日期'],
+    [1, 'TEST-IN-002', '示例供应商有限公司', '示例服务A', 'A型', '项', 2, 50, 100, '6%', 6, 106, '2026-04-03'],
+    ['', '', '', '示例服务B', 'B型', '项', 1, 200, 200, '6%', 12, 212, ''],
+    ['合计', '', '', '', '', '', '', '', 300, '', 18, 318, ''],
+    ['电子发票(普通发票)', 1, 0, 1],
+  ];
+  xlsx.utils.book_append_sheet(wb, xlsx.utils.aoa_to_sheet(data), '进项');
+  const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+  const result = financeImportService.parseInvoices(buf, 'input');
+
+  assert.strictEqual(result.records.length, 1);
+  assert.strictEqual(result.records[0].itemName, '示例服务A；示例服务B');
+  assert.strictEqual(result.records[0].amount, 300);
+  assert.strictEqual(result.records[0].tax, 18);
+  assert.strictEqual(result.records[0].total, 318);
+  assert.strictEqual(result.records[0].qty, null);
+  assert.strictEqual(result.records[0].unitPrice, null);
+  assert.strictEqual(result.errors.length, 0);
+});
+
 test('parseBankStatement: 日期格式容错', () => {
   const xlsx = require('xlsx');
   const wb = xlsx.utils.book_new();

@@ -1,5 +1,17 @@
 # Frontend Polish Tasks
 
+## 2026-07-14 FIN-INVOICE-15 进项发票清单补录
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| FIN-INVOICE-15A | P0 | 10m | 1 | DONE | 审计现有解析、预览、去重和 1—6 月清单结构，确认缺失候选与不可导入范围 |
+| FIN-INVOICE-15B | P0 | 15m | 1 | DONE | 用失败测试定义第二行表头、隐含进项方向、多明细聚合和旧模板兼容 |
+| FIN-INVOICE-15C | P0 | 20m | 1 | DONE | 实现发票清单解析 Module 并运行目标/后端回归测试 |
+| FIN-INVOICE-15D | P0 | 20m | 1 | DONE | 安全解压、预检、备份并补录 4—6 月缺失进项发票 |
+| FIN-INVOICE-15E | P1 | 15m | 1 | DONE | 核验号码覆盖、批次、SQLite，更新台账、ByteRover 与提交 |
+
+说明：未获得本轮 subagent 明确授权，按仓库硬规则串行执行，`MaxParallel` 实际为 1。
+
 ## 2026-07-13 FIN-IMPORT-14 三类 2026 年 1—6 月财务数据导入
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |

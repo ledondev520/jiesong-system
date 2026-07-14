@@ -43,6 +43,7 @@
 |------|------|
 | authService.js | 登录验证、Token生成、密码管理、找回密码 |
 | financeService.js | 付款记录幂等写入、应收应付聚合（支持按合同过滤） |
+| financeImportService.js | 银行流水与发票清单解析、发票多明细聚合、批次去重写入 |
 | financialStatementsService.js | 会计报表、科目余额、明细账同账期校验，单事务写入与下钻查询 |
 | aiService.js | Kimi 集成、智能问答、内容解析与管理员模型配置缓存 |
 | anthropicCompatService.js | Open Agent 与 Kimi 的协议适配、模型不可用时单次稳定降级 |

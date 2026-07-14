@@ -1,7 +1,7 @@
 /**
  * Input: Excel/CSV 文件 buffer、银行类型/发票类型
  * Output: 解析后的银行流水/发票记录、导入结果
- * Pos: 财务数据导入服务，处理银行对账单和发票解析
+ * Pos: 财务数据导入服务，处理银行对账单和发票清单解析（含标题行和发票多明细聚合）
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -65,7 +65,7 @@ const INVOICE_COLS = {
   buyer: ['购方名称', '购买方名称', '买方名称', '购买方', '购方'],
   buyerTaxId: ['购方识别号', '购买方纳税人识别号', '购方税号', '购买方税号'],
   invDate: ['开票日期', '日期', '开票时间'],
-  itemName: ['货物或应税劳务名称', '商品名称', '项目名称', '货物名称', '名称', '货物或应税劳务、服务名称'],
+  itemName: ['货物或应税劳务名称', '商品名称', '项目名称', '开票项目', '货物名称', '名称', '货物或应税劳务、服务名称'],
   spec: ['规格型号', '规格', '型号'],
   unit: ['单位', '计量单位'],
   qty: ['数量', 'Qty', 'qty'],
@@ -80,7 +80,7 @@ const INVOICE_COLS = {
   riskLevel: ['发票风险等级', '风险等级'],
   issuer: ['开票人', '开票员'],
   remark: ['备注', '备注信息'],
-  taxClassCode: ['税收分类编码', '分类编码'],
+  taxClassCode: ['税收分类编码', '税收编码', '分类编码'],
 };
 
 // ==================== 辅助函数 ====================
@@ -93,14 +93,39 @@ function findCol(headers, candidates) {
   return -1;
 }
 
-function normalizeHeaders(sheet) {
+function normalizeHeaders(sheet, rowIndex) {
   const range = xlsx.utils.decode_range(sheet['!ref']);
+  const headerRow = rowIndex === undefined ? range.s.r : rowIndex;
   const headers = [];
   for (let C = range.s.c; C <= range.e.c; ++C) {
-    const cell = sheet[xlsx.utils.encode_cell({ r: range.s.r, c: C })];
+    const cell = sheet[xlsx.utils.encode_cell({ r: headerRow, c: C })];
     headers.push(cell ? String(cell.v).trim() : '');
   }
   return headers;
+}
+
+function findInvoiceHeaderRow(sheet) {
+  const range = xlsx.utils.decode_range(sheet['!ref']);
+  const lastRow = Math.min(range.e.r, range.s.r + 19);
+  let best = { row: range.s.r, score: -1 };
+
+  for (let row = range.s.r; row <= lastRow; row++) {
+    const headers = normalizeHeaders(sheet, row);
+    const hasSeller = findCol(headers, INVOICE_COLS.seller) !== -1;
+    const hasBuyer = findCol(headers, INVOICE_COLS.buyer) !== -1;
+    const hasDate = findCol(headers, INVOICE_COLS.invDate) !== -1;
+    const hasAmount = findCol(headers, INVOICE_COLS.amount) !== -1 || findCol(headers, INVOICE_COLS.total) !== -1;
+    const score = Object.values(INVOICE_COLS).reduce(
+      (matched, candidates) => matched + (findCol(headers, candidates) !== -1 ? 1 : 0),
+      0
+    );
+
+    if ((hasSeller || hasBuyer) && hasDate && hasAmount && score > best.score) {
+      best = { row, score };
+    }
+  }
+
+  return best.row;
 }
 
 function parseDateCell(value) {
@@ -133,6 +158,24 @@ function parseQtyCell(value) {
   const num = parseAmountCell(value);
   if (num === null) return null;
   return Number.isInteger(num) ? num : num;
+}
+
+function textCell(row, colIndex) {
+  if (colIndex === -1) return null;
+  const value = row[colIndex];
+  if (value === null || value === undefined) return null;
+  return String(value).trim() || null;
+}
+
+function roundMoney(value) {
+  return Math.sign(value) * Math.round((Math.abs(value) + Number.EPSILON) * 100) / 100;
+}
+
+function appendUniqueText(current, incoming) {
+  if (!incoming) return current || null;
+  const values = current ? current.split('；') : [];
+  if (!values.includes(incoming)) values.push(incoming);
+  return values.join('；');
 }
 
 // ==================== 银行对账单解析 ====================
@@ -254,7 +297,8 @@ function parseInvoices(buffer, invoiceType) {
   const workbook = xlsx.read(buffer, { type: 'buffer', cellDates: true });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
-  const headers = normalizeHeaders(sheet);
+  const headerRowIndex = findInvoiceHeaderRow(sheet);
+  const headers = normalizeHeaders(sheet, headerRowIndex);
 
   const colMap = {};
   for (const [key, candidates] of Object.entries(INVOICE_COLS)) {
@@ -266,71 +310,118 @@ function parseInvoices(buffer, invoiceType) {
     if (idx !== -1) previewMapping[key] = headers[idx];
   }
 
-  const rows = xlsx.utils.sheet_to_json(sheet, { header: 1, range: 1 });
+  const sequenceCol = findCol(headers, ['序号']);
+  const rows = xlsx.utils.sheet_to_json(sheet, { header: 1, range: headerRowIndex + 1 });
   const records = [];
   const errors = [];
+  const implicitInputBuyer = invoiceType === 'input' && colMap.buyer === -1 && colMap.seller !== -1;
+  let currentInputRecord = null;
 
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || row.every((c) => !c && c !== 0)) continue;
-
-    const sellerVal = colMap.seller !== -1 ? row[colMap.seller] : null;
-    const seller = sellerVal ? String(sellerVal).trim() : '';
+  function parseInvoiceRow(row, sourceRow) {
+    const seller = textCell(row, colMap.seller) || '';
     if (!seller) {
-      errors.push({ row: i + 2, reason: '缺少销方名称', data: row });
-      continue;
+      errors.push({ row: sourceRow, reason: '缺少销方名称', data: row });
+      return null;
     }
 
     const invDate = colMap.invDate !== -1 ? parseDateCell(row[colMap.invDate]) : null;
     if (!invDate) {
-      errors.push({ row: i + 2, reason: '无法识别的开票日期', data: row });
-      continue;
+      errors.push({ row: sourceRow, reason: '无法识别的开票日期', data: row });
+      return null;
     }
 
     const amount = colMap.amount !== -1 ? parseAmountCell(row[colMap.amount]) : null;
     const tax = colMap.tax !== -1 ? parseAmountCell(row[colMap.tax]) : null;
-    let total = colMap.total !== -1 ? parseAmountCell(row[colMap.total]) : null;
+    const total = colMap.total !== -1 ? parseAmountCell(row[colMap.total]) : null;
     if ((amount === null || amount === 0) && (total === null || total === 0)) {
-      errors.push({ row: i + 2, reason: '金额无效', data: row });
-      continue;
+      errors.push({ row: sourceRow, reason: '金额无效', data: row });
+      return null;
     }
 
     const computedAmount = amount !== null ? amount : (total !== null && tax !== null ? total - tax : 0);
     const computedTax = tax !== null ? tax : (total !== null && amount !== null ? total - amount : 0);
     const computedTotal = total !== null ? total : (computedAmount + computedTax);
 
-    let taxRate = colMap.taxRate !== -1 ? String(row[colMap.taxRate] || '').trim() || null : null;
+    let taxRate = textCell(row, colMap.taxRate);
     if (!taxRate && computedAmount > 0 && computedTax > 0) {
       const rate = Math.round((computedTax / computedAmount) * 100);
       taxRate = `${rate}%`;
     }
 
-    const record = {
-      invNo: colMap.invNo !== -1 ? String(row[colMap.invNo] || '').trim() || null : null,
-      invCode: colMap.invCode !== -1 ? String(row[colMap.invCode] || '').trim() || null : null,
+    return {
+      invNo: textCell(row, colMap.invNo),
+      invCode: textCell(row, colMap.invCode),
       seller,
-      sellerTaxId: colMap.sellerTaxId !== -1 ? String(row[colMap.sellerTaxId] || '').trim() || null : null,
-      buyer: colMap.buyer !== -1 ? String(row[colMap.buyer] || '').trim() || null : null,
-      buyerTaxId: colMap.buyerTaxId !== -1 ? String(row[colMap.buyerTaxId] || '').trim() || null : null,
+      sellerTaxId: textCell(row, colMap.sellerTaxId),
+      buyer: implicitInputBuyer ? COMPANY_NAME : textCell(row, colMap.buyer),
+      buyerTaxId: textCell(row, colMap.buyerTaxId),
       invDate,
       invDateFull: invDate,
-      itemName: colMap.itemName !== -1 ? String(row[colMap.itemName] || '').trim() || null : null,
-      spec: colMap.spec !== -1 ? String(row[colMap.spec] || '').trim() || null : null,
-      unit: colMap.unit !== -1 ? String(row[colMap.unit] || '').trim() || null : null,
+      itemName: textCell(row, colMap.itemName),
+      spec: textCell(row, colMap.spec),
+      unit: textCell(row, colMap.unit),
       qty: colMap.qty !== -1 ? parseQtyCell(row[colMap.qty]) : null,
       unitPrice: colMap.unitPrice !== -1 ? parseAmountCell(row[colMap.unitPrice]) : null,
-      amount: computedAmount,
+      amount: roundMoney(computedAmount),
       taxRate,
-      tax: computedTax,
-      total: computedTotal,
-      invoiceType: colMap.invoiceType !== -1 ? String(row[colMap.invoiceType] || '').trim() || null : null,
-      status: colMap.status !== -1 ? String(row[colMap.status] || '').trim() || '正常' : '正常',
-      isPositive: colMap.isPositive !== -1 ? String(row[colMap.isPositive] || '').trim() || '是' : '是',
-      riskLevel: colMap.riskLevel !== -1 ? String(row[colMap.riskLevel] || '').trim() || null : null,
-      issuer: colMap.issuer !== -1 ? String(row[colMap.issuer] || '').trim() || null : null,
-      remark: colMap.remark !== -1 ? String(row[colMap.remark] || '').trim() || null : null,
-      taxClassCode: colMap.taxClassCode !== -1 ? String(row[colMap.taxClassCode] || '').trim() || null : null,
+      tax: roundMoney(computedTax),
+      total: roundMoney(computedTotal),
+      invoiceType: textCell(row, colMap.invoiceType),
+      status: textCell(row, colMap.status) || '正常',
+      isPositive: textCell(row, colMap.isPositive) || '是',
+      riskLevel: textCell(row, colMap.riskLevel),
+      issuer: textCell(row, colMap.issuer),
+      remark: textCell(row, colMap.remark),
+      taxClassCode: textCell(row, colMap.taxClassCode),
     };
+  }
+
+  function appendInvoiceDetail(record, row) {
+    const itemName = textCell(row, colMap.itemName);
+    const spec = textCell(row, colMap.spec);
+    const unit = textCell(row, colMap.unit);
+    const taxClassCode = textCell(row, colMap.taxClassCode);
+    const amount = colMap.amount !== -1 ? parseAmountCell(row[colMap.amount]) : null;
+    const tax = colMap.tax !== -1 ? parseAmountCell(row[colMap.tax]) : null;
+    const total = colMap.total !== -1 ? parseAmountCell(row[colMap.total]) : null;
+    const computedAmount = amount !== null ? amount : (total !== null && tax !== null ? total - tax : 0);
+    const computedTax = tax !== null ? tax : (total !== null && amount !== null ? total - amount : 0);
+    const computedTotal = total !== null ? total : (computedAmount + computedTax);
+
+    record.itemName = appendUniqueText(record.itemName, itemName);
+    record.spec = appendUniqueText(record.spec, spec);
+    record.unit = appendUniqueText(record.unit, unit);
+    record.taxClassCode = appendUniqueText(record.taxClassCode, taxClassCode);
+    record.taxRate = appendUniqueText(record.taxRate, textCell(row, colMap.taxRate));
+    record.amount = roundMoney(record.amount + computedAmount);
+    record.tax = roundMoney(record.tax + computedTax);
+    record.total = roundMoney(record.total + computedTotal);
+    record.qty = null;
+    record.unitPrice = null;
+  }
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.every((c) => !c && c !== 0)) continue;
+    const sourceRow = headerRowIndex + i + 2;
+    const sequence = textCell(row, sequenceCol);
+    if (sequence && /^(合计|总计|小计|说明)/.test(sequence)) continue;
+    // 税务导出清单尾部还有按票种统计的小表；真实发票序号只允许纯数字。
+    if (implicitInputBuyer && sequence && !/^\d+$/.test(sequence)) continue;
+
+    if (implicitInputBuyer && !textCell(row, colMap.invNo)) {
+      const hasDetail = Boolean(
+        textCell(row, colMap.itemName) ||
+        textCell(row, colMap.spec) ||
+        textCell(row, colMap.taxClassCode) ||
+        (colMap.qty !== -1 && parseQtyCell(row[colMap.qty]) !== null)
+      );
+      if (currentInputRecord && hasDetail) appendInvoiceDetail(currentInputRecord, row);
+      continue;
+    }
+
+    const record = parseInvoiceRow(row, sourceRow);
+    if (!record) continue;
 
     // 发票类型筛选（进项/销项）
     if (invoiceType && invoiceType !== 'all') {
@@ -341,9 +432,16 @@ function parseInvoices(buffer, invoiceType) {
     }
 
     records.push(record);
+    currentInputRecord = implicitInputBuyer ? record : null;
   }
 
-  return { records, errors, previewMapping, totalRows: rows.length };
+  return {
+    records,
+    errors,
+    previewMapping,
+    totalRows: rows.length,
+    headerRow: headerRowIndex + 1,
+  };
 }
 
 // ==================== 去重与导入 ====================
