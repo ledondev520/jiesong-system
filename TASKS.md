@@ -1,5 +1,18 @@
 # Frontend Polish Tasks
 
+## 2026-07-14 FIN-EVIDENCE-16 剩余财务资料结构化分析库
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| FIN-EVIDENCE-16A | P0 | 15m | 1 | DONE | 解压并盘点 101 份来源，确认 24 份已入专用 Module、77 份进入候选分析库且 0 读取失败 |
+| FIN-EVIDENCE-16B | P0 | 20m | 1 | DONE | 失败测试定义分类、脱敏、空行过滤、幂等替换和查询 Interface |
+| FIN-EVIDENCE-16C | P0 | 30m | 1 | DONE | 备份、正式 migration、来源文档/Sheet/行模型与导入 Implementation |
+| FIN-EVIDENCE-16D | P0 | 30m | 1 | DONE | ADMIN/FINANCE 查询 Adapter 与财务页资料库摘要/筛选/下钻 |
+| FIN-EVIDENCE-16E | P0 | 25m | 1 | DONE | 预检并导入 77 份真实来源，核验文件、Sheet、行、哈希、脱敏与幂等 |
+| FIN-EVIDENCE-16F | P1 | 20m | 1 | DONE | 全量验证、台账/Patch/ByteRover 更新、运行态复验与提交 |
+
+说明：仓库规则要求用户明确授权才能启动 subagent；本轮未获该授权，`MaxParallel` 实际为 1。
+
 ## 2026-07-14 FIN-INVOICE-15 进项发票清单补录
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |

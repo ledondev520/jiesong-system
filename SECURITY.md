@@ -31,6 +31,7 @@
 - Redact PII/敏感字段 in logs and exports; avoid writing raw identifiers to audit channels unless authorized.
 - HTTP request logs must record only route, timing, and request shape (field names/count/content length); never persist request body/query values, AI prompts, tool schemas, or user messages.
 - Monthly statements, account balances, and general-ledger rows are Confidential: parse uploaded workbooks in memory, persist only structured rows and source metadata/hash, and never copy raw workbooks into ordinary attachment storage or logs.
+- Payroll, social-security, tax-return, voucher, and journal evidence rows are Confidential: parse source workbooks in memory, redact personal identifiers before persistence, never archive the source workbook, and restrict row-level reads to ADMIN/FINANCE.
 - Use prepared statements/ORM boundaries and strict参数校验 before persistence.
 
 ### 5) 监控与响应层（Detection & Response）

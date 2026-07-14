@@ -17,6 +17,7 @@
 - After meaningful fixes, migrations, deployment changes, or repo-specific lessons, run `scripts/brv-local.sh curate "<durable technical conclusion>"` and include up to five relevant repo files with `-f`.
 - Store only reusable technical memory. Do not put secrets, credentials, customer financial data, contract values, or personal/user-profile memory in `.brv/context-tree/`.
 - Monthly financial statements, account balances, general-ledger rows, and their source filenames/hashes are Confidential; raw workbooks must not be committed, logged, or copied into ordinary attachment storage.
+- Payroll, social-security, tax-return, voucher, and journal evidence rows are Confidential; redact personal identifiers before persistence, never archive source workbooks, and allow row-level reads only to ADMIN/FINANCE.
 
 ## UI Design System (强制)
 - **所有前端页面开发必须遵循 SHADCN/UI 设计风格**.

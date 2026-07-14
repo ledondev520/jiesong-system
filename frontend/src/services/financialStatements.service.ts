@@ -1,7 +1,7 @@
 /**
  * Input: 后端 /api/v1/finance/statements/* 接口与三类财务来源文件
- * Output: 账期详情、趋势分析、三文件预览与确认写入
- * Pos: 财务报表前端服务层；不暴露跳过预览的三类数据写入 Interface
+ * Output: 账期详情、趋势分析、脱敏资料库、三文件预览与确认写入
+ * Pos: 财务报表前端服务层；提供受限资料下钻且不暴露跳过预览的三类数据写入 Interface
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -266,6 +266,81 @@ export interface FinancialStatementImportPreview {
   }>;
 }
 
+export interface FinancialEvidenceCategory {
+  category: string;
+  categoryLabel: string;
+  analysisScope: string;
+  documentCount: number;
+  sheetCount: number;
+  rowCount: number;
+  redactionCount: number;
+}
+
+export interface FinancialEvidenceSummary {
+  totals: {
+    documentCount: number;
+    sheetCount: number;
+    rowCount: number;
+    redactionCount: number;
+  };
+  categories: FinancialEvidenceCategory[];
+  periods: string[];
+  latestImportedAt: string | null;
+}
+
+export interface FinancialEvidenceDocument {
+  id: string;
+  fileName: string;
+  relativePath: string;
+  category: string;
+  categoryLabel: string;
+  analysisScope: string;
+  periodYear: number | null;
+  periodMonth: number | null;
+  importedSheetCount: number;
+  rowCount: number;
+  numericCellCount: number;
+  textCellCount: number;
+  redactionCount: number;
+  originalArchived: false;
+  importedAt: string;
+}
+
+export interface FinancialEvidenceSheet {
+  id: string;
+  sheetIndex: number;
+  sheetName: string;
+  sourceRange: string | null;
+  rowCount: number;
+  columnCount: number;
+  redactionCount: number;
+}
+
+export interface FinancialEvidenceRow {
+  id: string;
+  sourceRow: number;
+  rowKind: 'HEADER' | 'DATA' | 'TOTAL' | 'NOTE';
+  values: Array<string | number | boolean | null>;
+  numericCellCount: number;
+  textCellCount: number;
+  redactionCount: number;
+}
+
+export interface FinancialEvidenceDocumentPage {
+  items: FinancialEvidenceDocument[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface FinancialEvidenceDocumentDetail extends FinancialEvidenceDocument {
+  sheets: FinancialEvidenceSheet[];
+  selectedSheet: FinancialEvidenceSheet | null;
+  rows: FinancialEvidenceRow[];
+  pagination: { page: number; pageSize: number; total: number; totalPages: number } | null;
+}
+
 // ==================== API 调用 ====================
 
 /**
@@ -293,6 +368,36 @@ async function getStatementDetail(year: number, month: number): Promise<Financia
  */
 async function getAnalytics(): Promise<AnalyticsData> {
   const res = await api.get('/finance/statements/analytics') as { code: number; data: AnalyticsData };
+  return res.data;
+}
+
+async function getEvidenceSummary(): Promise<FinancialEvidenceSummary> {
+  const res = await api.get('/finance/statements/evidence/summary') as { code: number; data: FinancialEvidenceSummary };
+  return res.data;
+}
+
+async function listEvidenceDocuments(filters: {
+  category?: string;
+  year?: number;
+  month?: number;
+  page?: number;
+  pageSize?: number;
+} = {}): Promise<FinancialEvidenceDocumentPage> {
+  const res = await api.get('/finance/statements/evidence/documents', { params: filters }) as {
+    code: number;
+    data: FinancialEvidenceDocumentPage;
+  };
+  return res.data;
+}
+
+async function getEvidenceDocument(
+  id: string,
+  options: { sheetId?: string; page?: number; pageSize?: number } = {},
+): Promise<FinancialEvidenceDocumentDetail> {
+  const res = await api.get(`/finance/statements/evidence/documents/${id}`, { params: options }) as {
+    code: number;
+    data: FinancialEvidenceDocumentDetail;
+  };
   return res.data;
 }
 
@@ -393,4 +498,7 @@ export const financialStatementsService = {
   listStatements,
   getStatementDetail,
   getAnalytics,
+  getEvidenceSummary,
+  listEvidenceDocuments,
+  getEvidenceDocument,
 };

@@ -1,7 +1,7 @@
 /**
  * Input: 财务控制器、财务报表控制器、multer
- * Output: 财务管理路由（付款记录 + 财务报表分析 + 三文件预览确认导入）
- * Pos: 财务路由，处理付款记录、账款查询，以及不可绕过预览的账期数据包写入
+ * Output: 财务管理路由（付款记录 + 财务报表分析 + 脱敏资料库 + 三文件预览确认导入）
+ * Pos: 财务路由，处理付款记录、账款查询、受限资料下钻，以及不可绕过预览的账期数据包写入
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -10,6 +10,7 @@ const { Router } = require('express');
 const multer = require('multer');
 const financeController = require('../controllers/financeController');
 const financialStatementsController = require('../controllers/financialStatementsController');
+const financialEvidenceController = require('../controllers/financialEvidenceController');
 const financeMatchController = require('../controllers/financeMatchController');
 const { authenticate, roleAuth } = require('../middleware/auth');
 const { withPaginationValidation, body, handleValidation } = require('../utils/validators');
@@ -97,6 +98,11 @@ router.post(
 
 // GET /api/v1/finance/statements/analytics - 获取趋势分析数据和预警列表（必须在 /:year/:month 之前注册）
 router.get('/statements/analytics', financialStatementsController.getAnalytics);
+
+// 财务资料库包含工资、社保和税务结构化行，只允许财务角色下钻。
+router.get('/statements/evidence/summary', roleAuth('ADMIN', 'FINANCE'), financialEvidenceController.getSummary);
+router.get('/statements/evidence/documents', roleAuth('ADMIN', 'FINANCE'), financialEvidenceController.listDocuments);
+router.get('/statements/evidence/documents/:id', roleAuth('ADMIN', 'FINANCE'), financialEvidenceController.getDocument);
 
 // POST /api/v1/finance/statements/import-file/preview - 只读解析，不写数据库
 router.post(

@@ -34,6 +34,7 @@
 | inventoryController.js | 库存状态管理 |
 | financeController.js | 付款与账款管理 |
 | financialStatementsController.js | 月度财务三文件预览、确认导入与账期查询 |
+| financialEvidenceController.js | 脱敏财务资料摘要、文档列表与 Sheet 行级下钻 |
 | systemController.js | 系统配置 + 数据导入导出 |
 | aiController.js | AI问答 + 辅助录入 |
 
@@ -45,6 +46,7 @@
 | financeService.js | 付款记录幂等写入、应收应付聚合（支持按合同过滤） |
 | financeImportService.js | 银行流水与发票清单解析、发票多明细聚合、批次去重写入 |
 | financialStatementsService.js | 会计报表、科目余额、明细账同账期校验，单事务写入与下钻查询 |
+| financialEvidenceService.js | 工资、税务、凭证与日记账等资料的分类、脱敏、幂等导入与受限查询 |
 | aiService.js | Kimi 集成、智能问答、内容解析与管理员模型配置缓存 |
 | anthropicCompatService.js | Open Agent 与 Kimi 的协议适配、模型不可用时单次稳定降级 |
 | openAgentService.js | 通用业务 Agent、工具授权、流式输出与原子运行记录 |

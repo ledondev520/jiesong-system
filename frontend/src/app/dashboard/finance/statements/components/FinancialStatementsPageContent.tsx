@@ -33,6 +33,10 @@ const FinancialStatementsTabsSection = lazy(() =>
   }))
 );
 
+const FinancialEvidenceLibrary = lazy(() =>
+  import('./FinancialEvidenceLibrary').then((module) => ({ default: module.FinancialEvidenceLibrary }))
+);
+
 export function FinancialStatementsPageContent() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [periods, setPeriods] = useState<FinancialPeriod[]>([]);
@@ -236,6 +240,10 @@ export function FinancialStatementsPageContent() {
               />
             </Suspense>
           )}
+
+          <Suspense fallback={<FinancialStatementsLoadingState count={2} />}>
+            <FinancialEvidenceLibrary />
+          </Suspense>
 
           <FinancialStatementsUploadDialog
             open={uploadDialogOpen}

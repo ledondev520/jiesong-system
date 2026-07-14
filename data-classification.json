@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updatedAt": "2026-07-11",
+  "updatedAt": "2026-07-14",
   "owner": "security-team",
   "tiers": [
     {
@@ -48,14 +48,15 @@
       "examples": [
         "purchase contract and sales records",
         "supplier pricing and margins",
-        "financial summary reports, cash-flow statements, account balances, and general-ledger entries",
+        "financial summary reports, cash-flow statements, account balances, general-ledger entries, payroll, social-security, and tax-return structured rows",
         "inventory and shipment operational history"
       ],
       "controls": {
         "storage": [
           "Restrict DB/service read access",
           "Use role-based filtering at API response layer",
-          "Monthly financial source files are parsed in memory; persist structured rows plus filename, size, and SHA-256 only"
+          "Monthly financial source files are parsed in memory; persist structured rows plus filename, size, and SHA-256 only",
+          "Financial evidence workbooks are never archived; sensitive personal identifiers are redacted before persistence and row-level reads require ADMIN or FINANCE"
         ],
         "transfer": [
           "Use authenticated session only",

@@ -91,7 +91,17 @@ test('数据库 schema 可推送并包含核心数据表', async (t) => {
   const rows = await prisma.$queryRawUnsafe("SELECT name FROM sqlite_master WHERE type='table'");
   const tableNames = rows.map((row) => row.name);
 
-  ['users', 'ports', 'products', 'purchase_contracts', 'sales_contracts', 'system_configs'].forEach((name) => {
+  [
+    'users',
+    'ports',
+    'products',
+    'purchase_contracts',
+    'sales_contracts',
+    'system_configs',
+    'financial_evidence_documents',
+    'financial_evidence_sheets',
+    'financial_evidence_rows',
+  ].forEach((name) => {
     assert.equal(tableNames.includes(name), true, `缺少核心表: ${name}`);
   });
 });

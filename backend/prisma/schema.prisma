@@ -889,6 +889,7 @@ model FinancialPeriod {
   accountBalances      AccountBalanceEntry[]
   generalLedgerEntries GeneralLedgerEntry[]
   dataSources          FinancialDataSource[]
+  evidenceDocuments    FinancialEvidenceDocument[]
 
   @@unique([year, month])
   @@map("financial_periods")
@@ -1070,6 +1071,79 @@ model FinancialDataSource {
   @@unique([periodId, type])
   @@index([sha256])
   @@map("financial_data_sources")
+}
+
+model FinancialEvidenceDocument {
+  id                 String   @id @default(cuid())
+  periodId           String?
+  sourceKey          String   @unique
+  contentSha256      String
+  parseVersion       String
+  relativePath       String
+  fileName           String
+  fileSize           Int
+  category           String
+  categoryLabel      String
+  analysisScope      String
+  periodYear         Int?
+  periodMonth        Int?
+  sourceSheetCount   Int
+  importedSheetCount Int
+  rowCount           Int
+  numericCellCount   Int
+  textCellCount      Int
+  redactionCount     Int
+  originalArchived   Boolean  @default(false)
+  importedAt         DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  period FinancialPeriod?         @relation(fields: [periodId], references: [id], onDelete: SetNull)
+  sheets FinancialEvidenceSheet[]
+
+  @@index([periodYear, periodMonth, category])
+  @@index([contentSha256])
+  @@index([periodId])
+  @@map("financial_evidence_documents")
+}
+
+model FinancialEvidenceSheet {
+  id                String @id @default(cuid())
+  documentId        String
+  sheetIndex        Int
+  sheetName         String
+  sourceRange       String?
+  rowCount          Int
+  columnCount       Int
+  nonEmptyCellCount Int
+  formulaCellCount  Int
+  numericCellCount  Int
+  textCellCount     Int
+  redactionCount    Int
+
+  document FinancialEvidenceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  rows     FinancialEvidenceRow[]
+
+  @@unique([documentId, sheetIndex])
+  @@index([documentId])
+  @@map("financial_evidence_sheets")
+}
+
+model FinancialEvidenceRow {
+  id               String @id @default(cuid())
+  sheetId          String
+  sourceRow        Int
+  rowKind          String
+  valuesJson       String
+  searchText       String
+  numericCellCount Int
+  textCellCount    Int
+  redactionCount   Int
+
+  sheet FinancialEvidenceSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  @@unique([sheetId, sourceRow])
+  @@index([sheetId, rowKind])
+  @@map("financial_evidence_rows")
 }
 
 // ==================== 合同模板 ====================
