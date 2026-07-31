@@ -1,5 +1,27 @@
 # Ops Execution Center Plan
 
+## 2026-07-31 GREENFIELD-SQLITE-19（单服务器 SQLite 架构收敛）
+
+### Goal
+- 接受业务负责人“减少外部中间件、优先快速落地”的架构取舍，将绿地版从 PostgreSQL/对象存储/独立 Worker 收敛为单服务器方案。
+- 让 SQLite 成为首版正式生产数据库，同时补齐单写进程、WAL、文件权限、在线备份、恢复演练和升级触发线。
+
+### Work Units
+- GREENFIELD-SQLITE-19A：核对当前 Prisma + SQLite、VPS/PM2/Nginx 运行经验和既有备份规则。
+- GREENFIELD-SQLITE-19B：重写架构结论、部署拓扑、数据精度、文件、任务、备份、恢复和测试方案。
+- GREENFIELD-SQLITE-19C：同步 PRD 的运行边界、P0 范围、成功指标和完成定义。
+- GREENFIELD-SQLITE-19D：执行全文残留、Mermaid、链接、敏感信息和 Git 范围校验并独立提交。
+
+### DoD
+- 在线运行只依赖一台服务器、一个 Next.js 进程、一个 SQLite 文件和一个私有附件目录。
+- 明确不引入 PostgreSQL、Redis、对象存储、消息队列和独立 Worker。
+- PM2 单实例、SQLite WAL/外键/忙等待、金额整数、在线备份、附件恢复和禁止 `db push` 均有明确约束。
+- 只有真实达到并发、RTO 或高可用触发线时才评估外部数据库。
+
+### Status
+- SQLite 架构正文与 PRD 已完成修订；一致性、链接、敏感信息和 Git 范围校验通过，进入独立提交。
+- 未启动 subagent：仓库硬规则要求用户显式授权，本轮未获得该授权。
+
 ## 2026-07-31 GREENFIELD-DOCS-18（绿地重建 PRD 与架构基线）
 
 ### Goal

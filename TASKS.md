@@ -1,5 +1,16 @@
 # Frontend Polish Tasks
 
+## 2026-07-31 GREENFIELD-SQLITE-19 单服务器 SQLite 架构收敛
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| GREENFIELD-SQLITE-19A | P0 | 10m | 1 | DONE | 核对当前 SQLite、VPS、PM2/Nginx 与备份迁移经验 |
+| GREENFIELD-SQLITE-19B | P0 | 20m | 1 | DONE | 将技术架构重写为单 Next.js + SQLite WAL + 私有本地文件 + 进程内任务执行器 |
+| GREENFIELD-SQLITE-19C | P0 | 10m | 1 | DONE | 同步 PRD 的首版运行边界、P0 文件/备份范围、指标和完成定义 |
+| GREENFIELD-SQLITE-19D | P1 | 10m | 1 | DONE | 校验全文一致性、链接、敏感信息、差异范围并提交独立 commit |
+
+说明：未获得本轮 subagent 明确授权，按仓库硬规则串行执行，`MaxParallel` 实际为 1。
+
 ## 2026-07-31 GREENFIELD-DOCS-18 绿地重建 PRD 与架构基线
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
