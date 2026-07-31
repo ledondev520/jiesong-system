@@ -1,5 +1,28 @@
 # Frontend Polish Tasks
 
+## 2026-07-31 GREENFIELD-DOCS-18 绿地重建 PRD 与架构基线
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| GREENFIELD-DOCS-18A | P0 | 15m | 1 | DONE | 恢复 Codex Memory / ByteRover 并盘点当前 Module、八阶段主线、导航、页面、路由、模型与兼容结构 |
+| GREENFIELD-DOCS-18B | P0 | 20m | 1 | DONE | 撰写绿地版 PRD：定位、角色、主线、规则、MVP、非目标、指标、迁移与待确认项 |
+| GREENFIELD-DOCS-18C | P0 | 20m | 1 | DONE | 撰写模块化单体技术架构：Module、Interface、数据、文件、权限、Worker、测试、迁移与实施阶段 |
+| GREENFIELD-DOCS-18D | P1 | 15m | 1 | DONE | 校验文档一致性、敏感信息、链接、差异范围并提交独立 commit |
+
+说明：未获得本轮 subagent 明确授权，按仓库硬规则串行执行，`MaxParallel` 实际为 1。
+
+## 2026-07-31 DATA-SCHEMA-17 进销存核心 Schema 与快速迁移手册
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| DATA-SCHEMA-17A | P0 | 15m | 1 | DONE | 盘点核心模型、关系、约束和当前记录规模 |
+| DATA-SCHEMA-17B | P0 | 20m | 1 | DONE | 检查业务键、空值、重复、孤儿和跨表关联覆盖率 |
+| DATA-SCHEMA-17C | P0 | 25m | 1 | DONE | 编写迁移 Schema、字段字典、数据链路图和导入顺序 |
+| DATA-SCHEMA-17D | P1 | 15m | 1 | DONE | 补充只读质量检查 SQL、缺口优先级和迁移验收清单 |
+| DATA-SCHEMA-17E | P1 | 10m | 1 | DONE | 验证文档与 SQL，更新台账、ByteRover 并提交 |
+
+说明：用户未授权启动 subagent；按仓库硬规则串行执行，`MaxParallel` 实际为 1。
+
 ## 2026-07-14 FIN-EVIDENCE-16 剩余财务资料结构化分析库
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
