@@ -67,7 +67,6 @@ flowchart LR
 | `ports` | 一个目的港 | `id` | `name`、`code` 均唯一 | 1:N 门店、出口合同 | 3 |
 | `stores` | 一个海外门店/收货点 | `id` | `name` 唯一 | N:1 港口；1:N 销售/装箱明细 | 21 |
 | `suppliers` | 一个供应商主体 | `id` | **名称目前不唯一**；税号也未设唯一 | 1:N 采购合同；N:M 商品 | 95 |
-| `supplier_aliases` | 一个供应商别名 | `id` | `alias` 唯一 | N:1 供应商 | 0 |
 | `product_categories` | 一个商品分类 | `id` | `name` 唯一 | 自关联父子；1:N 商品 | 14 |
 | `products` | 一个商品主数据 | `id` | 当前无 SKU；仅有报关名等候选字段 | N:M 供应商；关联采购/销售/库存 | 201 |
 | `product_suppliers` | 一组商品—供应商关系 | `id` | `(productId, supplierId)` 唯一 | N:1 商品、N:1 供应商 | 156 |
@@ -161,7 +160,9 @@ LEFT JOIN purchase_contracts pc ON pc.id = pi.purchaseContractId
 LEFT JOIN suppliers s ON s.id = pc.supplierId;
 ```
 
-历史 449 条装箱记录的 `purchaseItemId` 当前均为空，所以不得把 `manufacturer` 文本自动当成已经确认的供应商主数据。可先标准化名称和别名，生成候选匹配，再由业务人员确认。
+历史 449 条装箱记录的 `purchaseItemId` 当前均为空，所以不得把 `manufacturer` 文本自动当成已经确认的供应商主数据。应优先按采购合同号定位供应商；无合同号时再用正式名称和唯一税号生成候选，由业务人员确认。
+
+当前库虽然保留空的 `supplier_aliases` 历史表，但它不属于目标迁移必需数据，也不再要求维护独立别名目录。合同名称与系统正式名称不一致时，保留来源差异和裁决记录即可。
 
 ## 5. 目标 Schema：最小增量设计
 
@@ -255,7 +256,6 @@ model SalesAllocation {
 | 文件 | 一行粒度 | 必填键 | 重要推荐字段 |
 |---|---|---|---|
 | `supplier_master.csv` | 一个供应商主体 | `supplier_code`, `name` | `tax_id`, `short_name`, `address`, `contact_*`, `bank_*`, `active` |
-| `supplier_alias.csv` | 一个别名 | `alias`, `supplier_code` | `source_system` |
 | `product_master.csv` | 一个 SKU | `sku`, `customs_name` | `specification`, `unit`, `category`, `hs_code`, 包装/重量/尺寸 |
 | `product_supplier.csv` | 一个 SKU—供应商组合 | `sku`, `supplier_code` | `reference_price`, `effective_from` |
 | `purchase_contract.csv` | 一份采购合同 | `contract_no`, `supplier_code` | 状态、日期、税率、金额 |
@@ -272,7 +272,7 @@ model SalesAllocation {
 
 1. 建立迁移批次、源系统标识和源键映射；
 2. 导入港口、客户、门店、仓库、分类等字典；
-3. 导入供应商主体，再导入供应商别名；
+3. 导入供应商主体；合同名称差异进入裁决清单，不另建别名目录；
 4. 导入商品，再导入商品—供应商关系；
 5. 导入采购合同和采购明细；
 6. 导入库存期初批次和库存流水；
@@ -299,7 +299,6 @@ model SalesAllocation {
 | P0 | 历史库存无采购/销售来源 | 302/302 均无 `purchaseItemId`、`salesItemId` | 无法审计库存成本与出库来源 | 作为“历史快照”单独迁移；有正式证据才转换成批次 |
 | P0 | 缺仓库、库位、批次和库存流水 | 当前 Schema 无对应表 | 无法做准确进销存结存 | 落地 Warehouse、InventoryLot、InventoryMovement |
 | P0 | 主数据无稳定编码 | 供应商无 code，商品无 SKU | 跨系统迁移易误合并 | 生成并冻结编码；名称只用于候选匹配 |
-| P1 | 供应商别名未入库 | 0 条别名；95 个供应商均无 alias | 厂家昵称难自动归一 | 从已确认映射导入，未知别名进入待裁决 |
 | P1 | 供应商关键资料不完整 | 税号缺 19、地址缺 16、银行账号缺 17、完全无联系方式 1 | 合同、付款和去重受影响 | 从正式合同/发票补齐并记录来源 |
 | P1 | 商品资料不完整 | 规格缺 90、单位缺 29、HS 缺 133、分类缺 2 | 采购、装箱、报关分析受限 | 优先补活跃商品和出口商品 |
 | P1 | 66 个商品无供应商关系 | 66/201 无映射且无采购历史 | 无法给采购建议 | 查正式采购/装箱证据；无法确认则保留未知 |
@@ -329,7 +328,7 @@ model SalesAllocation {
 
 推荐分两期：
 
-- 第一期先完成供应商编码、商品 SKU、别名、商品—供应商关系和历史待裁决清单，快速获得可靠的采购分析；
+- 第一期先完成供应商编码、商品 SKU、商品—供应商关系和合同名称差异裁决清单，快速获得可靠的采购分析；
 - 第二期新增仓库/批次/流水/销售分配，从一个全新的真实采购—销售业务单开始跑通，再决定历史数据回填范围。
 
 这样不会阻塞当前系统使用，也不会为了追求“历史全连通”而制造错误事实。

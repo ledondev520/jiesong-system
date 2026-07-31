@@ -14,7 +14,6 @@ SELECT 'foreign_key_violations' AS metric, COUNT(*) AS value
 FROM pragma_foreign_key_check;
 
 SELECT 'suppliers' AS table_name, COUNT(*) AS row_count FROM suppliers
-UNION ALL SELECT 'supplier_aliases', COUNT(*) FROM supplier_aliases
 UNION ALL SELECT 'products', COUNT(*) FROM products
 UNION ALL SELECT 'product_suppliers', COUNT(*) FROM product_suppliers
 UNION ALL SELECT 'purchase_contracts', COUNT(*) FROM purchase_contracts
@@ -51,13 +50,6 @@ SELECT 'supplier_missing_bank_account',
        SUM(CASE WHEN bankAccount IS NULL OR TRIM(bankAccount) = '' THEN 1 ELSE 0 END),
        COUNT(*)
 FROM suppliers
-UNION ALL
-SELECT 'supplier_without_alias',
-       SUM(CASE WHEN NOT EXISTS (
-         SELECT 1 FROM supplier_aliases a WHERE a.supplierId = s.id
-       ) THEN 1 ELSE 0 END),
-       COUNT(*)
-FROM suppliers s
 UNION ALL
 SELECT 'product_missing_specification',
        SUM(CASE WHEN specification IS NULL OR TRIM(specification) = '' THEN 1 ELSE 0 END),

@@ -1,5 +1,17 @@
 # Frontend Polish Tasks
 
+## 2026-07-31 SUPPLIER-DIR-21 Word 合同供应商名录与捷淞文档去重
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| SUPPLIER-DIR-21A | P0 | 15m | 1 | DONE | 盘点捷淞目录、Office 文件规模、重复内容和独有文件 |
+| SUPPLIER-DIR-21B | P0 | 25m | 1 | DONE | 复用采购合同证据解析并关联当前供应商主体 |
+| SUPPLIER-DIR-21C | P0 | 25m | 1 | DONE | 生成供应商名录、字段建议、名称冲突和来源工作簿 |
+| SUPPLIER-DIR-21D | P1 | 10m | 1 | DONE | 移除迁移蓝图中的别名目录要求并更新校验口径 |
+| SUPPLIER-DIR-21E | P1 | 15m | 1 | DONE | 验证工作簿、权限、来源覆盖、文档和提交 |
+
+说明：用户未授权启动 subagent；按仓库硬规则串行执行，`MaxParallel` 实际为 1。仓库规则禁止在项目外直接写入或删除，因此本轮对外部 Downloads/Documents 形成内容哈希清单和主目录建议，不执行不可逆删除。
+
 ## 2026-07-31 GREENFIELD-DESIGN-20 商务极简前端原则补充
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |

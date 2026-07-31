@@ -30,6 +30,7 @@
 | cleanup_wps_pending_packing_items_covered_by_formal_sources.js | 数据修复 | 删除已被唯一正式 `EXP*` WPS 装箱来源覆盖的无报关引用 `PENDING-*` 装箱占位，并把占位备注追加到正式装箱行；默认 dry-run |
 | import_wps_export_evidence.js | 数据导入 | 基于真实凭证抽取结果幂等写入报关单、报关明细、退税草稿，以及可由正式 PDF 或出货/申报清单安全命中的报关明细申报要素；申报要素必须完整分段并与现有正式报关明细 itemNo/品名/HS 完全匹配，5 段正式字段仅在末段不是明显断句时放行，只补空字段不覆盖；会去重同一报关单重复底单，且只有退税联明细才生成退税草稿；默认 dry-run，显式 `--apply` 后才写库 |
 | extract_wps_purchase_evidence.py | 数据核对 | 从 WPS 采购合同 DOCX/XLSX/PDF 附件抽取供应商、合同头和采购明细；DOCX 图片 CRC 损坏或异常条目导致 `python-docx` 失败时可退回读取正文 XML；PDF 文本合同可抽表格明细和乙方税号/地址/银行信息；对已人工复核的扫描 PDF 保留路径级 OCR 兜底；同合同号签章 PDF 可回填 XLSX 空乙方但不回填税号/地址/银行；无逐项明细但合同头完整时标记 `header_ready_for_import`；生成缺失采购合同差异报告，不写库 |
+| build_supplier_directory.py | 数据核对 | 汇总当前 SQLite 供应商、采购合同证据和本机独有 Word；按合同号/正式名称/唯一税号定位主体，清洗长文本污染候选，输出字段建议、名称差异、来源和 SHA-256 文档去重清单；只写受限 JSON，不回填数据库、不删除外部文件 |
 | import_wps_purchase_evidence.js | 数据导入 | 基于采购合同凭证抽取结果幂等补齐供应商字段、商品、采购合同和采购明细；默认 dry-run，显式 `--apply` 后才写库；显式 `--allow-header-only-contracts` 后可只创建合同头 DRAFT、不创建明细 |
 | import_wps_202607_update.js | 数据导入 | WPS 2026-07 增量幂等导入：EXP260008/EXP260009 出口合同全量（明细/装箱/附件）、EXP260004 头修复、CG2600035/CG2600040 采购补建、招行 2026-05/06 流水付款收款登记（按 idempotencyKey 去重）；源文件在 `docs/wps-import/2026-07/`；默认 dry-run，`--apply` 写库；本地与 VPS 各跑一次即两侧一致 |
 | import_shipment_summary_incremental.js | 数据导入 | 对受限归档的最新 `出货汇总.xlsx` 做严格 SHA-256 校验，只新增 EXP260010/EXP260011、已裁决的 PENDING 异常占位与对应装箱行；不覆盖现有合同/明细，不把人民币采购金额写成 USD 装箱售价；默认 dry-run，`--apply` 单事务写库 |
@@ -244,6 +245,13 @@ python scripts/inventory_wps_cloud_metadata.py --parsed-dir tmp/wps_11_export_li
 # 真实凭证抽取需要 pypdf/openpyxl；优先使用 Codex Python，避免系统 Python 缺 PDF 依赖导致 empty_text 假 blocked
 /Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/extract_wps_export_evidence.py
 python scripts/extract_wps_purchase_evidence.py
+
+# 生成供应商名录工作簿的受限来源 JSON；stdout 只输出聚合计数
+/Users/helena/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/build_supplier_directory.py \
+  --canonical-root /Users/helena/Documents/捷淞/11-报关记录 \
+  --extra-root /Users/helena/Documents/捷淞/11-报关记录 \
+  --extra-root /Users/helena/Downloads \
+  --output tmp/supplier-directory/supplier-directory-source.json
 
 # 汇总当前无法自动判断的业务裁决事项
 python scripts/build_wps_import_decision_packet.py
