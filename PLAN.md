@@ -1,5 +1,26 @@
 # Ops Execution Center Plan
 
+## 2026-07-31 GREENFIELD-DESIGN-20（商务极简前端原则补充）
+
+### Goal
+- 只在 PRD 与技术架构中补充“简约大气、商务特色、奥卡姆剃刀”的产品与前端重构基线。
+- 明确本轮不启动前端改造、不修改业务代码、不运行浏览器 QA。
+
+### Work Units
+- GREENFIELD-DESIGN-20A：定义产品删减原则、四入口信息架构、视觉目标和体验验收。
+- GREENFIELD-DESIGN-20B：定义设计 Token、页面模板、前端目录、交互/无障碍和工程删减规则。
+- GREENFIELD-DESIGN-20C：检查 PRD/架构一致性、Markdown、敏感信息和 Git 范围并提交。
+
+### DoD
+- PRD 能清楚说明什么要保留、合并、隐藏或删除，以及“好看、简约大气、商务”的可验收含义。
+- 技术文档给出四入口、单主动作、单一强调色、模板化页面和不新增 UI 框架的约束。
+- 文档包含桌面/移动截图验收和五秒测试，但本轮不执行代码或 UI 改造。
+- 提交只包含文档与 Checkpoint，不包含 `TUNNEL_URL.txt` 或任何前后端源码。
+
+### Status
+- PRD 与技术架构补充完成；Markdown、敏感信息和源码零改动校验通过，进入独立提交。
+- 未启动 subagent；未执行实现或 QA。
+
 ## 2026-07-31 GREENFIELD-SQLITE-19（单服务器 SQLite 架构收敛）
 
 ### Goal

@@ -1,5 +1,15 @@
 # Frontend Polish Tasks
 
+## 2026-07-31 GREENFIELD-DESIGN-20 商务极简前端原则补充
+
+| ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
+|---|---|---:|---:|---|---|
+| GREENFIELD-DESIGN-20A | P0 | 10m | 1 | DONE | 补充 PRD 的奥卡姆剃刀、四入口、视觉方向、交互和截图验收标准 |
+| GREENFIELD-DESIGN-20B | P0 | 15m | 1 | DONE | 补充架构的设计 Token、页面模板、前端目录、删减与无障碍约束 |
+| GREENFIELD-DESIGN-20C | P1 | 10m | 1 | DONE | 校验文档一致性和提交范围；不修改前后端源码、不执行 QA |
+
+说明：用户明确限定为 PRD/技术文档补充，本轮不进入代码实现。
+
 ## 2026-07-31 GREENFIELD-SQLITE-19 单服务器 SQLite 架构收敛
 
 | ID | 优先级 | 预计时长 | 并行槽位 | 状态 | 任务 |
