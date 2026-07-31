@@ -278,6 +278,14 @@ def disambiguate_sales_mapping(ws: Any, header_row: int, mapping: dict[str, int]
     return next_mapping
 
 
+def disambiguate_packing_mapping(mapping: dict[str, int]) -> dict[str, int]:
+    """采购金额是人民币分摊成本，不得同时落入 USD total_price。"""
+    next_mapping = dict(mapping)
+    if next_mapping.get("purchase_cost") == next_mapping.get("total_price"):
+        next_mapping.pop("total_price", None)
+    return next_mapping
+
+
 def contract_from_workbook(ws: Any) -> dict[str, Any]:
     all_values: list[Any] = []
     for row in ws.iter_rows(min_row=1, max_row=min(ws.max_row, 20), values_only=True):
@@ -353,6 +361,7 @@ def parse_packing_sheet(parsed: ParsedSource, ws: Any, source_path: Path, workbo
     header_row, mapping = find_header(ws, PACKING_HEADER_ALIASES, ("product_name",))
     if not header_row:
         return
+    mapping = disambiguate_packing_mapping(mapping)
     has_data_shape = any(
         key in mapping
         for key in (
