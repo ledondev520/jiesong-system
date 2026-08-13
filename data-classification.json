@@ -25,7 +25,7 @@
           "System-configured API keys are write-only; encrypted storage is permitted but complete values must never be returned or rendered",
           "Restricted business records only in the application database or protected contract-evidence storage",
           "Least privilege file mode (<=600 for backend .env)",
-          "Contract artifact directories use 0700 and files use 0600",
+          "Contract artifact and SQLite backup directories use 0700 and files use 0600",
           "Carrier packing-list raw extracted text is not persisted; structured check records retain their original file reference",
           "HTTP request logs retain route, timing, and request shape only; request/query values, AI prompts, tool schemas, and user messages are excluded"
         ],

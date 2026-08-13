@@ -126,3 +126,23 @@ test('人工确认编码覆盖历史编码，但必须能在当前税则快照�
   assert.equal(result.customsReady, false);
   assert.equal(result.taxRefundReady, false);
 });
+
+test('本票装箱确认的 HS 和申报要素优先于历史与共享商品档案', () => {
+  const base = makeContract();
+  const result = evaluateExportReadiness(makeContract({
+    packingItems: [{
+      ...base.packingItems[0],
+      hsCode: '7610100000',
+      declarationElements: '0|0|铝合金|型材|挤压喷涂|||无品牌',
+      origin: '广东省佛山市',
+    }],
+  }), {
+    historicalItems: [{ productId: 'p-1', hsCode: '6907219000' }],
+    hsRecords: [currentHs({ hsCode: '7610100000', refundRate: 13 })],
+  });
+
+  assert.equal(result.lines[0].hsCode, '7610100000');
+  assert.equal(result.lines[0].hsSource, 'packing_confirmation');
+  assert.equal(result.lines[0].declarationElements, '0|0|铝合金|型材|挤压喷涂|||无品牌');
+  assert.equal(result.lines[0].origin, '广东省佛山市');
+});

@@ -69,6 +69,11 @@ const resolveHsChoice = (item, override, historicalItem) => {
     return { hsCode: overrideCode, hsSource: 'manual_confirmation' };
   }
 
+  const packingCode = normalizeHsCode(item?.hsCode);
+  if (packingCode) {
+    return { hsCode: packingCode, hsSource: 'packing_confirmation' };
+  }
+
   const historicalCode = normalizeHsCode(historicalItem?.hsCode);
   if (historicalCode) {
     return { hsCode: historicalCode, hsSource: 'customs_history' };
@@ -149,7 +154,9 @@ const evaluateExportReadiness = (contract = {}, {
       ));
     }
 
-    const declarationElements = String(item?.product?.declaration || '').trim();
+    const declarationElements = String(
+      item?.declarationElements || item?.product?.declaration || '',
+    ).trim();
     if (!declarationElements) {
       issues.push(makeIssue(
         'MISSING_DECLARATION_ELEMENTS',
@@ -219,6 +226,7 @@ const evaluateExportReadiness = (contract = {}, {
         sourceUrl: hsRecord.sourceUrl || null,
       } : null,
       declarationElements,
+      origin: String(item?.origin || '').trim(),
       declarationTemplate: hsRecord?.declarationElements || '',
       unitPriceUsd: unitPriceUsd || 0,
       totalPriceUsd: calculatedTotalPriceUsd || 0,

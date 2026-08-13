@@ -90,6 +90,7 @@ function SourceBadge({ source }: { source: HsSource }) {
 
 function toUiHsSource(source: ExportReadinessLine['hsSource']): HsSource {
   if (source === 'customs_history') return 'history';
+  if (source === 'packing_confirmation') return 'manual';
   if (source === 'product_archive') return 'stored';
   if (source === 'manual_confirmation') return 'manual';
   return 'missing';

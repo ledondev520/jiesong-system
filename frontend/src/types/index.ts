@@ -474,6 +474,10 @@ export interface PackingItem {
   netWeight?: number;
   volume?: number;
   specification?: string;
+  supplement?: string;
+  hsCode?: string;
+  declarationElements?: string;
+  origin?: string;
   manufacturer?: string;
   purchaseContractNo?: string;
   purchaseCost?: number;

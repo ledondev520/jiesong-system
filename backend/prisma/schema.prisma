@@ -423,6 +423,9 @@ model PackingItem {
   // 商品详情（来自出货清单）
   supplement         String? // 商品补充信息（如型号、颜色、用途等）
   specification      String? // 规格/尺寸（如 "510*510*810"）
+  hsCode              String? // 本票确认的 10 位 HS 编码，优先于共享商品档案
+  declarationElements String? // 本票逐行确认的申报要素
+  origin              String? // 本票逐行确认的境内货源地
   manufacturer       String? // 厂家名称
   invoiceNo          String? // 发票号码（增值税发票，退税核销用）
   purchaseContractNo String? // 购销合同号（对应采购合同）

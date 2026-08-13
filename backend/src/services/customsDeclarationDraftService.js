@@ -46,12 +46,13 @@ const buildItems = async (packingItems) => {
   const items = [];
 
   for (const packingItem of packingItems) {
-    const declarationElements = await resolveDeclarationElements(packingItem.product);
+    const declarationElements = packingItem.declarationElements
+      || await resolveDeclarationElements(packingItem.product);
     items.push({
       productId: packingItem.productId,
       packingItemId: packingItem.id,
       customsName: packingItem.product?.customsName || '未命名商品',
-      hsCode: packingItem.product?.hsCode || null,
+      hsCode: packingItem.hsCode || packingItem.product?.hsCode || null,
       declarationElements: declarationElements || null,
       quantity: packingItem.quantity || 0,
       unit: packingItem.unit || packingItem.product?.unit || null,

@@ -67,7 +67,7 @@ export interface ExportReadinessLine {
   quantity: number;
   unit: string;
   hsCode: string;
-  hsSource: 'customs_history' | 'product_archive' | 'manual_confirmation' | 'missing';
+  hsSource: 'customs_history' | 'product_archive' | 'packing_confirmation' | 'manual_confirmation' | 'missing';
   hsEvidence: {
     productName: string;
     refundRate: number | null;
@@ -77,6 +77,7 @@ export interface ExportReadinessLine {
     sourceUrl: string | null;
   } | null;
   declarationElements: string;
+  origin?: string;
   declarationTemplate: string;
   unitPriceUsd: number;
   totalPriceUsd: number;

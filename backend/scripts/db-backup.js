@@ -33,8 +33,9 @@ function backup() {
 
   // 1. 创建 backups 目录
   if (!fs.existsSync(BACKUP_DIR)) {
-    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    fs.mkdirSync(BACKUP_DIR, { recursive: true, mode: 0o700 });
   }
+  fs.chmodSync(BACKUP_DIR, 0o700);
 
   // 2. 以时间戳命名复制数据库文件
   const now = new Date();
@@ -42,6 +43,7 @@ function backup() {
   const backupFile = path.join(BACKUP_DIR, `dev_${timestamp}.db`);
 
   fs.copyFileSync(DB_PATH, backupFile);
+  fs.chmodSync(backupFile, 0o600);
   const sizeKB = Math.round(fs.statSync(backupFile).size / 1024);
   console.log(`[db-backup] 已备份 -> ${path.relative(process.cwd(), backupFile)} (${sizeKB} KB)`);
 

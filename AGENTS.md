@@ -55,6 +55,7 @@
 - **禁止直接运行 `prisma db push`**。SQLite 下 `db push` 在表结构变更时会丢弃数据。
 - 表结构变更必须通过 `npm run db:migrate`（即 `prisma migrate dev`），该命令会先自动备份数据库。
 - 手动备份：`npm run db:backup`，备份文件保存在 `prisma/backups/`，保留最近 5 个。
+- SQLite 备份目录权限必须为 `0700`，备份数据库文件权限必须为 `0600`。
 - 任何涉及数据库 schema 变更的操作前，必须确认 `prisma/backups/` 中有最新备份。
 - 回滚方案：将 `prisma/backups/` 中的备份文件复制为 `prisma/dev.db` 即可恢复。
 

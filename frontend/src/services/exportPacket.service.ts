@@ -34,6 +34,7 @@ export interface ExportPacketLine {
   productName: string;
   specification: string;
   declaration: string;
+  origin: string;
   hsCode: string;
   refundRate: number | null;
   quantity: number;

@@ -133,7 +133,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
   const lines = (contract.packingItems || []).map((item, index) => {
     const evidence = readinessById.get(item.id) || {};
     const productName = evidence.productName || item.product?.customsName || '';
-    const declaration = evidence.declarationElements || item.product?.declaration || '';
+    const declaration = evidence.declarationElements || item.declarationElements || item.product?.declaration || '';
     const specification = String(
       item.specification
       || item.supplement
@@ -220,6 +220,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
       productName,
       specification,
       declaration,
+      origin: item.origin || evidence.origin || '',
       hsCode: evidence.hsCode || '',
       refundRate: refundRate ?? null,
       hsSource: evidence.hsSource || 'missing',
@@ -439,9 +440,9 @@ const buildExportPacketWorkbook = async (packet) => {
   configureSheet(invoiceSheet);
   applyTitle(invoiceSheet, 'COMMERCIAL INVOICE / 商业发票', `Invoice No. ${packet.contractNo}`);
   addDocumentMeta(invoiceSheet, packet);
-  invoiceSheet.getRow(9).values = ['No.', 'Description', 'Specification', 'HS Code', 'Quantity', 'Unit', 'Unit Price (USD)', 'Amount (USD)', 'Store/Project', 'Declaration'];
+  invoiceSheet.getRow(9).values = ['No.', 'Description', 'Specification', 'HS Code', 'Quantity', 'Unit', 'Unit Price (USD)', 'Amount (USD)', 'Origin', 'Declaration'];
   packet.lines.forEach((line, index) => {
-    invoiceSheet.getRow(10 + index).values = [line.index, line.productName, line.specification, line.hsCode, line.quantity, line.unit, line.unitPriceUsd, line.totalUsd, line.storeName, line.declaration];
+    invoiceSheet.getRow(10 + index).values = [line.index, line.productName, line.specification, line.hsCode, line.quantity, line.unit, line.unitPriceUsd, line.totalUsd, line.origin, line.declaration];
   });
   const invoiceTotalRow = 10 + packet.lines.length;
   invoiceSheet.mergeCells(invoiceTotalRow, 1, invoiceTotalRow, 7);
