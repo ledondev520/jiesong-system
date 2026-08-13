@@ -45,12 +45,17 @@ test('tax modules: tax refunds router exposes CRUD routes', () => {
   assertCrudRoutes(taxRefundsRouter, 'taxRefunds');
   const autoDraftIndex = getRouteIndex(taxRefundsRouter, '/auto-drafts', 'post');
   const exportIndex = getRouteIndex(taxRefundsRouter, '/export', 'post');
+  const workbenchIndex = getRouteIndex(taxRefundsRouter, '/workbench', 'get');
+  const invoiceVerificationIndex = getRouteIndex(taxRefundsRouter, '/workbench/:salesContractId/invoice-verification', 'get');
   const detailIndex = getRouteIndex(taxRefundsRouter, '/:id', 'get');
 
   assert.notEqual(autoDraftIndex, -1, 'taxRefunds 缺少 POST /auto-drafts');
   assert.notEqual(exportIndex, -1, 'taxRefunds 缺少 POST /export');
+  assert.notEqual(workbenchIndex, -1, 'taxRefunds 缺少 GET /workbench');
+  assert.notEqual(invoiceVerificationIndex, -1, 'taxRefunds 缺少 GET /workbench/:salesContractId/invoice-verification');
   assert.ok(autoDraftIndex < detailIndex, 'taxRefunds /auto-drafts 必须位于 /:id 之前');
   assert.ok(exportIndex < detailIndex, 'taxRefunds /export 必须位于 /:id 之前');
+  assert.ok(workbenchIndex < detailIndex, 'taxRefunds /workbench 必须位于 /:id 之前');
 });
 
 test('tax modules: tax rates router exposes CRUD routes', () => {

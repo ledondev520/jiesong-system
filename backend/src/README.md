@@ -63,6 +63,7 @@
 | packingListCheckService.js | 船司装箱单 PDF 受限归档、逐商品比对、历史记录与人工复核结论 |
 | purchaseInvoiceService.js | 从采购事实生成催票清单，规范化多发票号码并读取选填附件 |
 | taxRefundPreparationService.js | 2026 外贸企业退税材料、期限、关联校验与内部 Excel 准备清单 |
+| taxRefundWorkbenchService.js | 聚合出口合同、报关、采购发票台账和退税草稿，形成网页端退税工作台与逐合同发票核验 |
 | taxRefundExportService.js | 退税记录与采购合同、发票号码、征税率的导出前严格匹配 |
 | exportReminderService.js | 次月5号内部退税材料准备提醒、已出货缺发票提醒（幂等通知） |
 | patrolService.js | 业务 / 系统巡检、管理员通知、系统操作日志 |

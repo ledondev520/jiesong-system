@@ -14,6 +14,8 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get('/workbench', taxRefundController.getWorkbench);
+router.get('/workbench/:salesContractId/invoice-verification', taxRefundController.getInvoiceVerification);
 router.get('/', withPaginationValidation, taxRefundController.list);
 router.post(
   '/auto-drafts',

@@ -10,6 +10,7 @@ const taxRefundController = require('./taxRefundController');
 const taxRefundService = require('../services/taxRefundService');
 const taxRefundDraftService = require('../services/taxRefundDraftService');
 const taxRefundExportService = require('../services/taxRefundExportService');
+const taxRefundWorkbenchService = require('../services/taxRefundWorkbenchService');
 
 const createMockRes = () => {
   const res = {
@@ -75,6 +76,49 @@ test('listTaxRefunds: 透传分页和筛选参数', async () => {
     assert.equal(res.payload.data.pagination.total, 1);
   } finally {
     taxRefundService.listTaxRefunds = original;
+  }
+});
+
+test('getWorkbench: 返回退税工作台汇总与候选合同', async () => {
+  const original = taxRefundWorkbenchService.getTaxRefundWorkbench;
+  taxRefundWorkbenchService.getTaxRefundWorkbench = async (query) => ({
+    items: [{ salesContractId: 'sc-1', contractNo: 'EXP260001' }],
+    total: 1,
+    page: Number(query.page),
+    pageSize: Number(query.pageSize),
+    summary: { contracts: 1, readyToExport: 0 },
+  });
+  try {
+    const req = { query: { page: '2', pageSize: '10', stage: 'PREPARATION' } };
+    const res = createMockRes();
+    let capturedError = null;
+    await taxRefundController.getWorkbench(req, res, (error) => { capturedError = error; });
+    assert.equal(capturedError, null);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.payload.data.items[0].contractNo, 'EXP260001');
+    assert.equal(res.payload.data.page, 2);
+  } finally {
+    taxRefundWorkbenchService.getTaxRefundWorkbench = original;
+  }
+});
+
+test('getInvoiceVerification: 返回单份出口合同的逐票核验', async () => {
+  const original = taxRefundWorkbenchService.getContractInvoiceVerification;
+  let capturedId = null;
+  taxRefundWorkbenchService.getContractInvoiceVerification = async (id) => {
+    capturedId = id;
+    return { salesContractId: id, contractNo: 'EXP260001', summary: { pass: 1 }, results: [] };
+  };
+  try {
+    const req = { params: { salesContractId: 'sc-1' } };
+    const res = createMockRes();
+    let capturedError = null;
+    await taxRefundController.getInvoiceVerification(req, res, (error) => { capturedError = error; });
+    assert.equal(capturedError, null);
+    assert.equal(capturedId, 'sc-1');
+    assert.equal(res.payload.data.summary.pass, 1);
+  } finally {
+    taxRefundWorkbenchService.getContractInvoiceVerification = original;
   }
 });
 
@@ -247,6 +291,41 @@ test('exportTaxRefunds: 校验通过时返回导出结果', async () => {
     assert.equal(res.payload.message, '退税导出成功');
     assert.equal(res.payload.data.exportedCount, 1);
     assert.equal(res.payload.data.items[0].match_status, 'passed');
+  } finally {
+    taxRefundExportService.exportTaxRefunds = original;
+  }
+});
+
+test('exportTaxRefunds: download=1 时返回 UTF-8 CSV 附件', async () => {
+  const original = taxRefundExportService.exportTaxRefunds;
+  taxRefundExportService.exportTaxRefunds = async () => ({
+    blocked: false,
+    exportedCount: 1,
+    items: [{ refund_no: 'TR-001' }],
+    warnings: [],
+    fixes: [],
+    errors: [],
+    csv: 'refund_no\nTR-001',
+  });
+  try {
+    const headers = {};
+    const res = {
+      statusCode: null,
+      body: null,
+      setHeader: (name, value) => { headers[name] = value; },
+      status(code) { this.statusCode = code; return this; },
+      send(body) { this.body = body; return this; },
+    };
+    let capturedError = null;
+    await taxRefundController.exportTaxRefunds(
+      { body: { ids: ['tr-1'] }, query: { download: '1' } },
+      res,
+      (error) => { capturedError = error; },
+    );
+    assert.equal(capturedError, null);
+    assert.equal(res.statusCode, 200);
+    assert.match(headers['Content-Disposition'], /\.csv/);
+    assert.equal(res.body, '\uFEFFrefund_no\nTR-001');
   } finally {
     taxRefundExportService.exportTaxRefunds = original;
   }

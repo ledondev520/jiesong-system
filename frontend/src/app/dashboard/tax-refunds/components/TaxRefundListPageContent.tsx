@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { TaxRefundStatusBadge, taxRefundStatusOptions } from './TaxRefundStatusBadge';
 import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { MobileListCard } from '@/components/mobile';
+import { TaxRefundWorkbench } from './TaxRefundWorkbench';
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -40,7 +41,8 @@ const CustomsDeclarationListPageContent = lazy(() =>
 export function TaxRefundListPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activeView = searchParams.get('view') === 'customs' ? 'customs' : 'refunds';
+  const requestedView = searchParams.get('view');
+  const activeView = requestedView === 'customs' || requestedView === 'refunds' ? requestedView : 'workbench';
   const initialKeyword = searchParams.get('keyword') || '';
   const initialStatus = searchParams.get('status') || 'ALL';
 
@@ -127,7 +129,12 @@ export function TaxRefundListPageContent() {
   };
 
   const handleViewChange = (view: string) => {
-    router.replace(view === 'customs' ? '/dashboard/tax-refunds?view=customs' : '/dashboard/tax-refunds', { scroll: false });
+    const href = view === 'customs'
+      ? '/dashboard/tax-refunds?view=customs'
+      : view === 'refunds'
+        ? '/dashboard/tax-refunds?view=refunds'
+        : '/dashboard/tax-refunds';
+    router.replace(href, { scroll: false });
   };
 
   return (
@@ -135,7 +142,7 @@ export function TaxRefundListPageContent() {
       <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
         title="出口退税"
-        description="合并查看报关单与退税记录，跟进出口申报、退税批次与到账状态。"
+        description="从待申报清单、进项发票核验到申报明细生成，在一个工作台完成税局操作前准备。"
         actions={
           activeView === 'refunds' ? (
             <>
@@ -186,10 +193,15 @@ export function TaxRefundListPageContent() {
       />
 
       <Tabs value={activeView} onValueChange={handleViewChange} className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-2 border bg-background">
+        <TabsList className="grid w-full max-w-xl grid-cols-3 border bg-background">
+          <TabsTrigger value="workbench">退税工作台</TabsTrigger>
           <TabsTrigger value="customs">报关单</TabsTrigger>
           <TabsTrigger value="refunds">退税记录</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="workbench" className="mt-0">
+          {activeView === 'workbench' && <TaxRefundWorkbench />}
+        </TabsContent>
 
         <TabsContent value="customs" className="mt-0">
           {activeView === 'customs' && (

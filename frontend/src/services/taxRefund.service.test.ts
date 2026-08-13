@@ -8,6 +8,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import api from '@/lib/axios';
 import { taxRefundService } from './taxRefund.service';
 
+const mockFetch = vi.fn();
+
 vi.mock('@/lib/axios', () => ({
   default: {
     get: vi.fn(),
@@ -19,6 +21,7 @@ vi.mock('@/lib/axios', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubGlobal('fetch', mockFetch);
 });
 
 describe('taxRefundService', () => {
@@ -85,5 +88,16 @@ describe('taxRefundService', () => {
     await taxRefundService.generateDrafts(payload);
 
     expect(api.post).toHaveBeenCalledWith('/tax-refunds/auto-drafts', payload);
+  });
+
+  it('getWorkbench 读取聚合退税工作台', async () => {
+    const params = { page: 1, pageSize: 20, stage: 'PREPARATION' as const };
+    await taxRefundService.getWorkbench(params);
+    expect(api.get).toHaveBeenCalledWith('/tax-refunds/workbench', { params });
+  });
+
+  it('getInvoiceVerification 读取逐合同发票核验', async () => {
+    await taxRefundService.getInvoiceVerification('sc-1');
+    expect(api.get).toHaveBeenCalledWith('/tax-refunds/workbench/sc-1/invoice-verification');
   });
 });
