@@ -227,6 +227,20 @@ def realized_markup(
     return unit_price_usd * quantity * effective_rate / cost_cny - 1
 
 
+def historical_quote_allowed(
+    unit_price_usd: float,
+    quantity: float,
+    effective_rate: float,
+    cost_cny: float,
+    refund_rate: float,
+    no_refund_markup_cap: float,
+) -> tuple[bool, float]:
+    markup = realized_markup(unit_price_usd, quantity, effective_rate, cost_cny)
+    if refund_rate == 0 and math.isfinite(markup):
+        return markup <= no_refund_markup_cap + 1e-9, markup
+    return True, markup
+
+
 def calculate_price(
     cost_cny: float,
     quantity: float,
@@ -332,14 +346,38 @@ def build_proposal(args: argparse.Namespace) -> dict[str, Any]:
         )
         historical = choose_historical_quote(history, name, specification)
         name_only_references = same_name_history(history, name)[:5]
+        rejected_historical: dict[str, Any] | None = None
+        if historical and refund and cost_cny > 0 and quantity > 0:
+            allowed, historical_markup = historical_quote_allowed(
+                unit_price_usd=historical.unit_price_usd,
+                quantity=quantity,
+                effective_rate=effective_rate,
+                cost_cny=cost_cny,
+                refund_rate=refund.refund_rate,
+                no_refund_markup_cap=args.no_refund_markup,
+            )
+            if not allowed:
+                rejected_historical = {
+                    "contract_no": historical.contract_no,
+                    "unit_price_usd": historical.unit_price_usd,
+                    "realized_markup_at_effective_fx": round(historical_markup, 6),
+                    "reason": "zero_refund_markup_exceeds_cap",
+                }
+                historical = None
         pricing: dict[str, Any]
         if historical:
             unit_price = historical.unit_price_usd
             total_usd = round(unit_price * quantity, 4)
+            current_markup = realized_markup(
+                unit_price, quantity, effective_rate, cost_cny
+            )
             pricing = {
                 "source": "historical_quote",
                 "unit_price_usd": unit_price,
                 "total_usd": total_usd,
+                "realized_markup_at_effective_fx": (
+                    round(current_markup, 6) if math.isfinite(current_markup) else None
+                ),
                 "reference_contract": historical.contract_no,
                 "reference_specification": historical.specification,
                 "reference_workbook": historical.workbook,
@@ -399,6 +437,7 @@ def build_proposal(args: argparse.Namespace) -> dict[str, Any]:
                     for reference in name_only_references
                     if reference != historical
                 ],
+                "rejected_historical_quote": rejected_historical,
                 "missing_fields": list(dict.fromkeys(missing)),
             }
         )

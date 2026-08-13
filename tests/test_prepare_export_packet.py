@@ -59,6 +59,18 @@ class PricingTests(unittest.TestCase):
             MODULE.choose_historical_quote([quote], "餐盘", "380*320*310"), quote
         )
 
+    def test_zero_refund_history_cannot_break_markup_cap(self):
+        allowed, markup = MODULE.historical_quote_allowed(
+            unit_price_usd=35,
+            quantity=100,
+            effective_rate=6.6,
+            cost_cny=20000,
+            refund_rate=0,
+            no_refund_markup_cap=0.10,
+        )
+        self.assertFalse(allowed)
+        self.assertGreater(markup, 0.10)
+
 
 if __name__ == "__main__":
     unittest.main()
