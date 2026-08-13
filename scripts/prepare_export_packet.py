@@ -39,6 +39,12 @@ def normalize_hs(value: Any) -> str:
     return re.sub(r"\D", "", str(value))
 
 
+def json_safe_value(value: Any) -> Any:
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    return value
+
+
 def parse_iso_day(value: str) -> str:
     datetime.strptime(value, "%Y-%m-%d")
     return value.replace("-", "")
@@ -215,6 +221,17 @@ def same_name_history(
     return sorted(matches, key=lambda quote: quote.workbook_mtime, reverse=True)
 
 
+def exclude_current_contract(
+    quotes: Iterable[HistoricalQuote], contract_no: str
+) -> list[HistoricalQuote]:
+    current = normalize_text(contract_no).upper()
+    return [
+        quote
+        for quote in quotes
+        if normalize_text(quote.contract_no).upper() != current
+    ]
+
+
 def nearest_multiple_of_five(value: float) -> int:
     return int(round(value / 5.0) * 5)
 
@@ -234,11 +251,35 @@ def historical_quote_allowed(
     cost_cny: float,
     refund_rate: float,
     no_refund_markup_cap: float,
+    refundable_markup: float = 0.30,
+    refundable_tolerance: float = 0.05,
 ) -> tuple[bool, float]:
     markup = realized_markup(unit_price_usd, quantity, effective_rate, cost_cny)
     if refund_rate == 0 and math.isfinite(markup):
-        return markup <= no_refund_markup_cap + 1e-9, markup
+        return -1e-9 <= markup <= no_refund_markup_cap + 1e-9, markup
+    if refund_rate > 0 and math.isfinite(markup):
+        return abs(markup - refundable_markup) <= refundable_tolerance + 1e-9, markup
     return True, markup
+
+
+def unit_for_rounded_total(total: float, quantity: float) -> float:
+    exact = total / quantity
+    for precision in range(0, 11):
+        factor = 10**precision
+        candidates = {
+            math.floor(exact * factor) / factor,
+            round(exact, precision),
+            math.ceil(exact * factor) / factor,
+        }
+        for unit in sorted(candidates, key=lambda value: abs(value - exact)):
+            product = unit * quantity
+            roundup_one_decimal = math.ceil((product - 1e-10) * 10) / 10
+            if (
+                round(product, 1) == round(total, 1)
+                and abs(roundup_one_decimal - round(total, 1)) <= 1e-9
+            ):
+                return unit
+    return round(total / quantity, 10)
 
 
 def calculate_price(
@@ -266,8 +307,8 @@ def calculate_price(
     target_total = nearest_multiple_of_five(raw_total)
     for offset in range(-10, 11, 5):
         total = max(target_total + offset, 5)
-        unit = round(total / quantity, 4)
-        actual_markup = realized_markup(unit, quantity, effective_rate, cost_cny)
+        unit = unit_for_rounded_total(total, quantity)
+        actual_markup = total * effective_rate / cost_cny - 1
         if strict_cap and actual_markup > markup + 1e-9:
             continue
         candidates.append((unit, float(total), actual_markup, "total_ends_0_or_5"))
@@ -316,13 +357,210 @@ def fetch_contract_rows(database: Path, contract_no: str) -> tuple[dict[str, Any
     return dict(header), [dict(row) for row in rows]
 
 
+def read_catalog(path: Path) -> dict[str, dict[str, Any]]:
+    try:
+        from openpyxl import load_workbook
+    except ImportError as exc:  # pragma: no cover - environment guard
+        raise RuntimeError("openpyxl is required for catalog reading") from exc
+
+    workbook = load_workbook(path, read_only=True, data_only=True)
+    sheet = workbook["货品目录"]
+    rows = sheet.iter_rows(values_only=True)
+    headers = [normalize_text(value) for value in next(rows)]
+    index = {header: position for position, header in enumerate(headers)}
+    catalog: dict[str, dict[str, Any]] = {}
+    for values in rows:
+        name = values[index["商品品名"]]
+        if not name:
+            continue
+        catalog[normalize_text(name)] = {
+            "hsCode": values[index["HSCode"]],
+            "declaration": values[index["商品要素聚合"]],
+            "origin": values[index["境内货源地"]],
+        }
+    return catalog
+
+
+def read_confirmed_goods(path: Path) -> tuple[dict[tuple[str, str], dict[str, Any]], dict[str, dict[str, Any]]]:
+    try:
+        from openpyxl import load_workbook
+    except ImportError as exc:  # pragma: no cover - environment guard
+        raise RuntimeError("openpyxl is required for confirmed-workbook reading") from exc
+
+    workbook = load_workbook(path, read_only=True, data_only=True)
+    sheet_name = next((name for name in workbook.sheetnames if normalize_text(name) == "箱单"), None)
+    if not sheet_name:
+        raise ValueError("Confirmed workbook missing packing-list sheet")
+    sheet = workbook[sheet_name]
+    exact: dict[tuple[str, str], dict[str, Any]] = {}
+    by_spec_candidates: dict[str, list[dict[str, Any]]] = {}
+    for row in sheet.iter_rows(min_row=9, max_row=min(sheet.max_row, 200), values_only=True):
+        item, name, hs_code, specification = row[:4]
+        if not isinstance(item, (int, float)) or not name:
+            continue
+        evidence = {
+            "customsName": str(name).strip(),
+            "hsCode": hs_code,
+            "specification": str(specification or "").strip(),
+            "declaration": row[10] if len(row) > 10 else None,
+            "origin": row[11] if len(row) > 11 else None,
+            "boxes": row[4] if len(row) > 4 else None,
+            "grossWeight": row[5] if len(row) > 5 else None,
+            "netWeight": row[6] if len(row) > 6 else None,
+            "volume": row[7] if len(row) > 7 else None,
+            "quantity": row[8] if len(row) > 8 else None,
+            "unit": row[9] if len(row) > 9 else None,
+            "source": str(path),
+        }
+        name_key = normalize_text(name)
+        spec_key = normalize_text(specification)
+        exact[(name_key, spec_key)] = evidence
+        if spec_key:
+            by_spec_candidates.setdefault(spec_key, []).append(evidence)
+    by_spec = {
+        spec: candidates[0]
+        for spec, candidates in by_spec_candidates.items()
+        if len(candidates) == 1
+    }
+    return exact, by_spec
+
+
+def fetch_shipment_summary_rows(
+    workbook_path: Path,
+    contract_no: str,
+    catalog_path: Path,
+    confirmed_workbook: Path | None = None,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    try:
+        from openpyxl import load_workbook
+    except ImportError as exc:  # pragma: no cover - environment guard
+        raise RuntimeError("openpyxl is required for shipment-summary reading") from exc
+
+    workbook = load_workbook(workbook_path, read_only=True, data_only=True)
+    sheet = workbook["出货总清单"]
+    values = sheet.iter_rows(values_only=True)
+    headers = [normalize_text(value) for value in next(values)]
+    index = {header: position for position, header in enumerate(headers) if header}
+    required = (
+        "报关名", "门店", "港口", "报关数量", "单位", "厂家", "规格", "箱数",
+        "毛重", "净重", "体积", "柜子编号", "出货日期", "合同号", "报关公司",
+        "购销合同号", "采购金额", "商品补充信息",
+    )
+    missing_headers = [header for header in required if header not in index]
+    if missing_headers:
+        raise ValueError(f"Shipment summary missing headers: {', '.join(missing_headers)}")
+
+    catalog = read_catalog(catalog_path)
+    confirmed_exact: dict[tuple[str, str], dict[str, Any]] = {}
+    confirmed_by_spec: dict[str, dict[str, Any]] = {}
+    if confirmed_workbook:
+        confirmed_exact, confirmed_by_spec = read_confirmed_goods(confirmed_workbook)
+    matched: list[dict[str, Any]] = []
+    for row_number, row in enumerate(values, start=2):
+        source_contract = normalize_text(row[index["合同号"]]).upper()
+        if source_contract != contract_no.upper():
+            continue
+        source_name = str(row[index["报关名"]] or "").strip()
+        specification = str(row[index["规格"]] or "").strip()
+        product = catalog.get(normalize_text(source_name), {})
+        confirmed = confirmed_exact.get(
+            (normalize_text(source_name), normalize_text(specification))
+        ) or confirmed_by_spec.get(normalize_text(specification))
+        if confirmed:
+            product = confirmed
+        output_name = confirmed.get("customsName") if confirmed else source_name
+        evidence_conflicts: list[dict[str, Any]] = []
+        if confirmed:
+            source_values = {
+                "quantity": row[index["报关数量"]],
+                "unit": row[index["单位"]],
+                "boxes": row[index["箱数"]],
+                "grossWeight": row[index["毛重"]],
+                "netWeight": row[index["净重"]],
+                "volume": row[index["体积"]],
+            }
+            for field, source_value in source_values.items():
+                confirmed_value = confirmed.get(field)
+                if source_value in (None, "") or confirmed_value in (None, ""):
+                    continue
+                if isinstance(source_value, (int, float)) and isinstance(
+                    confirmed_value, (int, float)
+                ):
+                    matches = abs(float(source_value) - float(confirmed_value)) <= 1e-6
+                else:
+                    matches = normalize_text(source_value) == normalize_text(confirmed_value)
+                if not matches:
+                    evidence_conflicts.append(
+                        {
+                            "field": field,
+                            "shipment_summary": source_value,
+                            "confirmed_workbook": confirmed_value,
+                        }
+                    )
+        matched.append(
+            {
+                "id": f"shipment-summary:{row_number}",
+                "sourceRow": row_number,
+                "customsName": output_name,
+                "hsCode": product.get("hsCode"),
+                "declaration": product.get("declaration"),
+                "origin": product.get("origin"),
+                "quantity": row[index["报关数量"]],
+                "unit": row[index["单位"]],
+                "boxes": row[index["箱数"]],
+                "grossWeight": row[index["毛重"]],
+                "netWeight": row[index["净重"]],
+                "volume": row[index["体积"]],
+                "purchaseCost": row[index["采购金额"]],
+                "specification": specification,
+                "supplement": row[index["商品补充信息"]],
+                "manufacturer": row[index["厂家"]],
+                "purchaseContractNo": row[index["购销合同号"]],
+                "store": row[index["门店"]],
+                "port": row[index["港口"]],
+                "containerLabel": row[index["柜子编号"]],
+                "shippedAt": json_safe_value(row[index["出货日期"]]),
+                "customsBroker": row[index["报关公司"]],
+                "productEvidenceSource": (
+                    "confirmed_workbook" if confirmed else "declaration_catalog"
+                ),
+                "evidenceConflicts": evidence_conflicts,
+            }
+        )
+    if not matched:
+        raise ValueError(f"Contract not found in shipment summary: {contract_no}")
+    header = {
+        "contractNo": contract_no,
+        "exchangeRate": None,
+        "totalAmount": None,
+        "containerLabel": next((row["containerLabel"] for row in matched if row["containerLabel"]), None),
+        "shippedAt": next((row["shippedAt"] for row in matched if row["shippedAt"]), None),
+        "customsBroker": next((row["customsBroker"] for row in matched if row["customsBroker"]), None),
+        "port": next((row["port"] for row in matched if row["port"]), None),
+        "sourceWorkbook": str(workbook_path),
+    }
+    return header, matched
+
+
 def build_proposal(args: argparse.Namespace) -> dict[str, Any]:
     export_day = parse_iso_day(args.export_date)
     effective_rate = round(args.spot_rate - args.fx_buffer, 6)
     if effective_rate <= 0:
         raise ValueError("Effective FX rate must be positive")
-    header, rows = fetch_contract_rows(args.database, args.contract)
-    history = scan_historical_quotes(args.history_root)
+    if args.shipment_summary:
+        if not args.declaration_catalog:
+            raise ValueError("--declaration-catalog is required with --shipment-summary")
+        header, rows = fetch_shipment_summary_rows(
+            args.shipment_summary,
+            args.contract,
+            args.declaration_catalog,
+            args.confirmed_workbook,
+        )
+    else:
+        header, rows = fetch_contract_rows(args.database, args.contract)
+    history = exclude_current_contract(
+        scan_historical_quotes(args.history_root), args.contract
+    )
     proposal_rows: list[dict[str, Any]] = []
     blockers: list[str] = []
 
@@ -332,10 +570,13 @@ def build_proposal(args: argparse.Namespace) -> dict[str, Any]:
         quantity = float(row.get("quantity") or 0)
         cost_cny = float(row.get("purchaseCost") or 0)
         specification = row.get("specification") or ""
+        required_fields = [
+            "hsCode", "quantity", "unit", "boxes", "grossWeight", "netWeight", "volume"
+        ]
+        if args.shipment_summary:
+            required_fields.extend(("declaration", "origin"))
         missing = [
-            field
-            for field in ("hsCode", "quantity", "unit", "boxes", "grossWeight", "netWeight", "volume")
-            if row.get(field) in (None, "")
+            field for field in required_fields if row.get(field) in (None, "")
         ]
         if quantity <= 0:
             missing.append("positive_quantity")
@@ -355,13 +596,19 @@ def build_proposal(args: argparse.Namespace) -> dict[str, Any]:
                 cost_cny=cost_cny,
                 refund_rate=refund.refund_rate,
                 no_refund_markup_cap=args.no_refund_markup,
+                refundable_markup=args.refundable_markup,
+                refundable_tolerance=args.history_markup_tolerance,
             )
             if not allowed:
                 rejected_historical = {
                     "contract_no": historical.contract_no,
                     "unit_price_usd": historical.unit_price_usd,
                     "realized_markup_at_effective_fx": round(historical_markup, 6),
-                    "reason": "zero_refund_markup_exceeds_cap",
+                    "reason": (
+                        "zero_refund_markup_outside_allowed_range"
+                        if refund.refund_rate == 0
+                        else "refundable_markup_outside_target_band"
+                    ),
                 }
                 historical = None
         pricing: dict[str, Any]
@@ -409,6 +656,10 @@ def build_proposal(args: argparse.Namespace) -> dict[str, Any]:
 
         if missing:
             blockers.append(f"{name}: missing {', '.join(dict.fromkeys(missing))}")
+        evidence_conflicts = row.get("evidenceConflicts") or []
+        if evidence_conflicts:
+            fields = ", ".join(conflict["field"] for conflict in evidence_conflicts)
+            blockers.append(f"{name}: source_conflict {fields}")
         if pricing.get("source") == "blocked":
             blockers.append(f"{name}: {pricing['reason']}")
         proposal_rows.append(
@@ -426,6 +677,10 @@ def build_proposal(args: argparse.Namespace) -> dict[str, Any]:
                 "purchase_contract_no": row.get("purchaseContractNo"),
                 "hs_code": hs_code,
                 "declaration": row.get("declaration"),
+                "origin": row.get("origin"),
+                "source_row": row.get("sourceRow"),
+                "product_evidence_source": row.get("productEvidenceSource"),
+                "evidence_conflicts": evidence_conflicts,
                 "refund": asdict(refund) if refund else None,
                 "pricing": pricing,
                 "name_only_history_references": [
@@ -475,6 +730,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--refundable-markup", type=float, default=0.30)
     parser.add_argument("--no-refund-markup", type=float, default=0.10)
     parser.add_argument("--database", type=Path, default=DEFAULT_DB)
+    parser.add_argument("--shipment-summary", type=Path)
+    parser.add_argument("--declaration-catalog", type=Path)
+    parser.add_argument("--confirmed-workbook", type=Path)
+    parser.add_argument("--history-markup-tolerance", type=float, default=0.05)
     parser.add_argument("--history-root", type=Path, default=DEFAULT_HISTORY_ROOT)
     parser.add_argument("--refund-dbf", type=Path, required=True)
     parser.add_argument("--refund-version", default="2026B")
