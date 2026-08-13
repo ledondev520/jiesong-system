@@ -1,6 +1,6 @@
 /**
  * Input: contractId、contractType、文件列表 API
- * Output: 合同附件管理区域（上传、列表、下载、删除、预览）
+ * Output: 合同附件管理区域（上传、系统生成 XLSX 展示、列表、下载、删除、预览）
  * Pos: 合同详情页通用附件组件，支持采购/出口合同复用
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -48,6 +48,7 @@ const CATEGORY_LABELS: Record<ContractFileCategory, string> = {
   CARRIER_DOCUMENT: '船司文件',
   SYSTEM_GENERATED_WORD: '系统生成 Word',
   SYSTEM_GENERATED_PDF: '系统生成 PDF',
+  SYSTEM_GENERATED_XLSX: '系统生成 Excel',
 };
 
 interface ContractFilesProps {

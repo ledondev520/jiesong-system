@@ -14,6 +14,7 @@ const packingListCheckService = require('../services/packingListCheckService');
 const fileService = require('../services/fileService');
 const taxRefundPreparationService = require('../services/taxRefundPreparationService');
 const salesFinanceService = require('../services/salesFinanceService');
+const exportPacketService = require('../services/exportPacketService');
 
 const list = async (req, res, next) => {
   try {
@@ -383,6 +384,42 @@ const getFinanceSummary = async (req, res, next) => {
   }
 };
 
+/** 只读预览出口合同、商业发票、装箱单的资料完整度和建议价格。 */
+const previewExportPacket = async (req, res, next) => {
+  try {
+    const packet = await exportPacketService.previewExportPacket(req.params.id, req.body || {});
+    success(res, packet);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** 确认后统一回写采用价格，生成三 Sheet 工作簿并归档到当前 EXP。 */
+const generateExportPacket = async (req, res, next) => {
+  try {
+    const result = await exportPacketService.generateExportPacket(req.params.id, req.body || {});
+    await auditLog.logOperation({
+      userId: req.user?.id,
+      action: 'GENERATE_EXPORT_PACKET',
+      entity: 'SalesContract',
+      entityId: req.params.id,
+      newValue: {
+        fileId: result.file.id,
+        fileName: result.file.fileName,
+        totalAmountUsd: result.packet.summary.totalUsd,
+        spotRate: result.packet.pricingPolicy.spotRate,
+        effectiveRate: result.packet.pricingPolicy.effectiveRate,
+        lineCount: result.packet.summary.lineCount,
+      },
+      req,
+      note: '生成并归档出口三单（外销合同、商业发票、装箱单）',
+    });
+    created(res, result, '出口三单已生成并归档');
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   list,
   getById,
@@ -408,4 +445,6 @@ module.exports = {
   getTaxRefundPreparation,
   exportTaxRefundPreparation,
   getFinanceSummary,
+  previewExportPacket,
+  generateExportPacket,
 };

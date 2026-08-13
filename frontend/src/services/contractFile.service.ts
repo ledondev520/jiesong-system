@@ -32,7 +32,8 @@ export type ContractFileCategory =
   | 'SUPPLIER_INVOICE'
   | 'CARRIER_DOCUMENT'
   | 'SYSTEM_GENERATED_WORD'
-  | 'SYSTEM_GENERATED_PDF';
+  | 'SYSTEM_GENERATED_PDF'
+  | 'SYSTEM_GENERATED_XLSX';
 
 /**
  * 职责：获取合同附件列表

@@ -1,6 +1,6 @@
 /**
  * Input: 出口合同详情、采购来源、40HQ 排柜、单证核对、退税准备与单柜财务 Interface
- * Output: 排柜/发运、出口单证、船司核对、退税材料和财务结算的专项单主页面
+ * Output: 排柜/发运、出口三单、申报单证、船司核对、退税材料和财务结算的专项单主页面
  * Pos: 出口专项单装柜主页面，复用采购完工资料并承载排柜到发运的唯一主线路
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -70,6 +70,11 @@ const Container3DView = lazy(() => import('@/components/container/Container3DVie
 const GenerateThreeFormsDialog = lazy(() =>
   import('@/components/dialog/GenerateThreeFormsDialog').then((module) => ({
     default: module.GenerateThreeFormsDialog,
+  })),
+);
+const ExportPacketWorkbenchDialog = lazy(() =>
+  import('@/components/dialog/ExportPacketWorkbenchDialog').then((module) => ({
+    default: module.ExportPacketWorkbenchDialog,
   })),
 );
 const PackingListCheckDialog = lazy(() =>
@@ -158,6 +163,7 @@ export default function SalesDetailPage({ params }: PageProps) {
 
   // 一键生成三张表对话框状态
   const [threeFormsDialogOpen, setThreeFormsDialogOpen] = useState(false);
+  const [exportPacketOpen, setExportPacketOpen] = useState(false);
   // 船司装箱单核对对话框状态
   const [packingCheckOpen, setPackingCheckOpen] = useState(false);
   const [taxPreparationOpen, setTaxPreparationOpen] = useState(false);
@@ -720,6 +726,10 @@ export default function SalesDetailPage({ params }: PageProps) {
                 {exportingWorkbook ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                 导出出口工作簿
               </Button>
+              <Button variant="default" onClick={() => setExportPacketOpen(true)}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                出口三单工作台
+              </Button>
               <Button variant="outline" onClick={handleSaveAsImage}>
                 <Camera className="mr-2 h-4 w-4" />
                 保存为图片
@@ -733,7 +743,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                 检查退税材料
               </Button>
               <Button
-                variant="default"
+                variant="outline"
                 onClick={() => setThreeFormsDialogOpen(true)}
               >
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
@@ -1505,6 +1515,17 @@ export default function SalesDetailPage({ params }: PageProps) {
             onOpenChange={setThreeFormsDialogOpen}
             salesContract={contract}
             onGenerated={handleThreeFormsGenerated}
+          />
+        </Suspense>
+      )}
+
+      {exportPacketOpen && (
+        <Suspense fallback={null}>
+          <ExportPacketWorkbenchDialog
+            open={exportPacketOpen}
+            onOpenChange={setExportPacketOpen}
+            salesContract={contract}
+            onGenerated={loadData}
           />
         </Suspense>
       )}

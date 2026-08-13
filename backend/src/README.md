@@ -57,6 +57,7 @@
 | exportService.js | 多格式数据导出（CSV + 出口合同五 Sheet Excel 含商业发票/税务测算） |
 | pdfExportService.js | 销售合同 / 系统数据 PDF 导出 |
 | exportReadinessService.js | 全量出口装箱行、HS 当前证据、出口价格与采购专票口径退税准备度 |
+| exportPacketService.js | 出口三单预检、现汇减 0.2 定价、历史报价筛选、三 Sheet 生成与受限归档 |
 | threeFormsService.js | 基于出口准备度预览/生成报关单、外汇核销单、出口退税单与三 Sheet Excel |
 | taxCalculationEngine.js | 将出口准备度转换为统一税务摘要与 Excel/PDF，不内置税则小表 |
 | hsCodeService.js | HS 本地/AI 检索与强制来源证据的人工税则更新 |

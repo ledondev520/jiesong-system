@@ -1,6 +1,6 @@
 /**
  * Input: 销售控制器、exportService
- * Output: 出口合同管理路由（含装箱、单证核对、退税准备与单柜财务结算）
+ * Output: 出口合同管理路由（含装箱、出口三单、单证核对、退税准备与单柜财务结算）
  * Pos: 销售路由，处理出口合同CRUD操作
  * 
  * 2026-01-20 重构：合并货柜功能，EXP号即货柜号
@@ -91,6 +91,25 @@ router.delete('/:id/packing-items/:itemId', withIdValidation, roleAuth(...WRITE_
 ));
 
 // ==================== 其他功能 ====================
+
+const exportPacketValidation = [
+  body('spotRate').isFloat({ gt: 0.2, lt: 20 }).withMessage('现汇必须大于 0.2 且小于 20'),
+  body('sellerName').trim().notEmpty().withMessage('卖方名称不能为空').isLength({ max: 200 }).withMessage('卖方名称不能超过 200 字'),
+  body('buyerName').trim().notEmpty().withMessage('买方名称不能为空').isLength({ max: 200 }).withMessage('买方名称不能超过 200 字'),
+  body('packageKind').trim().notEmpty().withMessage('包装种类不能为空').isLength({ max: 80 }).withMessage('包装种类不能超过 80 字'),
+  body('tradeTerm').trim().notEmpty().withMessage('贸易术语不能为空').isLength({ max: 40 }).withMessage('贸易术语不能超过 40 字'),
+  body('documentDate').isISO8601({ strict: true }).withMessage('单证日期格式无效'),
+  body('priceOverrides').optional().isArray({ max: 1000 }).withMessage('人工价格覆盖格式无效'),
+  body('priceOverrides.*.packingItemId').notEmpty().withMessage('装箱明细 ID 不能为空'),
+  body('priceOverrides.*.unitPriceUsd').isFloat({ gt: 0 }).withMessage('人工单价必须大于 0'),
+  handleValidation,
+];
+
+// POST /api/v1/sales/:id/export-packet/preview - 只读预检和定价草案
+router.post('/:id/export-packet/preview', withIdValidation, roleAuth(...WRITE_ROLES), exportPacketValidation, salesController.previewExportPacket);
+
+// POST /api/v1/sales/:id/export-packet/generate - 确认价格后生成、归档出口三单
+router.post('/:id/export-packet/generate', withIdValidation, roleAuth(...WRITE_ROLES), exportPacketValidation, salesController.generateExportPacket);
 
 // POST /api/v1/sales/:id/files - 上传出口合同附件
 router.post('/:id/files', withIdValidation, roleAuth(...WRITE_ROLES), upload.single('file'), withAuditLog(

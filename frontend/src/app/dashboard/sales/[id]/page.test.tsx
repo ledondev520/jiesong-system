@@ -103,6 +103,12 @@ vi.mock('@/components/dialog/GenerateThreeFormsDialog', () => ({
   ),
 }));
 
+vi.mock('@/components/dialog/ExportPacketWorkbenchDialog', () => ({
+  ExportPacketWorkbenchDialog: ({ open }: { open: boolean }) => (
+    open ? <div>出口三单预检区</div> : null
+  ),
+}));
+
 describe('SalesDetailPage 交互逻辑', () => {
   beforeEach(() => {
     mockGetById.mockReset();
@@ -251,6 +257,30 @@ describe('SalesDetailPage 交互逻辑', () => {
     await user.click(exportButton);
 
     expect(mockExportExcel).toHaveBeenCalledWith('s-1', 'EXP260008');
+  });
+
+  it('详情页区分出口三单工作台与申报三表入口', async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: 's-1',
+        contractNo: 'EXP260011',
+        status: 'DRAFT',
+        exchangeRate: 6.8,
+        totalBoxes: 0,
+        volume: 0,
+        grossWeight: 0,
+        netWeight: 0,
+        totalAmount: 0,
+        packingItems: [],
+        port: { name: '洛杉矶' },
+      },
+    });
+    const user = userEvent.setup();
+    renderPage('s-1');
+
+    await user.click(await screen.findByRole('button', { name: '出口三单工作台' }));
+    expect(await screen.findByText('出口三单预检区')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '生成申报三表' })).toBeInTheDocument();
   });
 
   it('报关汇总明确警示缺失 HS 编码的装箱商品并提供处理入口', async () => {
