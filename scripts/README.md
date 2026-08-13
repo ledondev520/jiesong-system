@@ -34,6 +34,7 @@
 | import_wps_purchase_evidence.js | 数据导入 | 基于采购合同凭证抽取结果幂等补齐供应商字段、商品、采购合同和采购明细；默认 dry-run，显式 `--apply` 后才写库；显式 `--allow-header-only-contracts` 后可只创建合同头 DRAFT、不创建明细 |
 | import_wps_202607_update.js | 数据导入 | WPS 2026-07 增量幂等导入：EXP260008/EXP260009 出口合同全量（明细/装箱/附件）、EXP260004 头修复、CG2600035/CG2600040 采购补建、招行 2026-05/06 流水付款收款登记（按 idempotencyKey 去重）；源文件在 `docs/wps-import/2026-07/`；默认 dry-run，`--apply` 写库；本地与 VPS 各跑一次即两侧一致 |
 | import_shipment_summary_incremental.js | 数据导入 | 对受限归档的最新 `出货汇总.xlsx` 做严格 SHA-256 校验，只新增 EXP260010/EXP260011、已裁决的 PENDING 异常占位与对应装箱行；不覆盖现有合同/明细，不把人民币采购金额写成 USD 装箱售价；默认 dry-run，`--apply` 单事务写库 |
+| verify_tax_refund_invoices.js | 数据核对 | 按出货汇总的发票号码精确查询本地发票记录或税务数字账户导出清单，核验销方、价税合计、品名与状态；只读，输出受限 JSON/CSV，不绕过验证码 |
 | build_wps_import_decision_packet.py | 数据核对 | 聚合 WPS 导入剩余待业务裁决事项，补充旧装箱候选、销售源行、同商品装箱候选、现库销售摘要、销售门店冲突、路径门店推断复核项，以及真实凭证缺口的同目录云端索引/正式编号对照，输出 CSV/JSON/Markdown 裁决包，不写库 |
 | build_wps_remaining_decision_dossier.py | 数据核对 | 把 WPS 剩余 2 个裁决项结构化为源文件、现库、库存/报关引用、反证和可选动作证据包，输出 JSON/CSV/Markdown，不写库 |
 | build_wps_remaining_decision_execution_plan.py | 数据核对 | 为 WPS 剩余 2 个裁决项生成只读执行方案，列出收到业务裁决或正式材料后可能操作的目标行、必要输入和安全检查；不写库 |
@@ -81,6 +82,20 @@
 | debug_contract.py | 调试工具 | 调试合同数据 |
 
 ## 使用说明
+
+### 出口退税发票核验
+
+```bash
+# 默认核验 EXP260004-EXP260009、报关公司=捷淞、是否报出口退税为空的行
+npm --prefix backend run invoice:verify -- --source ~/Downloads/出货汇总.xlsx
+
+# 7 月发票尚未导入数据库时，可直接叠加税务数字账户导出的进项发票清单，无需先写库
+npm --prefix backend run invoice:verify -- \
+  --source ~/Downloads/出货汇总.xlsx \
+  --invoice-file ~/Downloads/2026年7账期_进项发票列表.xlsx
+```
+
+核验报告默认写入 `tmp/tax-refund-invoice-verification/`，目录权限为 `0700`、文件权限为 `0600`。命令只在控制台显示数量摘要和报告路径，不打印供应商税号或逐票金额。
 
 ### JavaScript 脚本
 ```bash

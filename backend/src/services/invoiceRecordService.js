@@ -33,6 +33,21 @@ async function listInvoices({ search, status, isPositive, dateFrom, dateTo, batc
 }
 
 /**
+ * 职责：按完整发票号码批量精确查询，供只读核验使用
+ * @param {string[]} invoiceNumbers
+ * @returns {Promise<Array>}
+ */
+async function findByExactNumbers(invoiceNumbers = []) {
+  const normalized = [...new Set(invoiceNumbers.map((value) => String(value || '').trim()).filter(Boolean))];
+  if (normalized.length === 0) return [];
+  return prisma.invoiceRecord.findMany({
+    where: { invNo: { in: normalized } },
+    include: { batch: { select: { fileName: true, importedAt: true } } },
+    orderBy: [{ invNo: 'asc' }, { invDate: 'desc' }],
+  });
+}
+
+/**
  * 职责：构建发票记录通用筛选条件
  * @param {object} filters - search, status, isPositive, dateFrom, dateTo, batchId
  * @returns {object} Prisma where clause
@@ -123,4 +138,4 @@ async function groupBySeller({ dateFrom, dateTo, limit = 50 } = {}) {
   }));
 }
 
-module.exports = { listInvoices, getStats, groupBySeller };
+module.exports = { listInvoices, findByExactNumbers, getStats, groupBySeller };
