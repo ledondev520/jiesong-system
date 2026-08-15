@@ -114,7 +114,7 @@ METRICS.md
 .cc-connect/
 .codepilot-images/
 .codepilot-uploads/
-skills/
+/skills/
 ops/
 state/byterover-home/
 
@@ -161,6 +161,15 @@ docs/analyze_finance.py
 docs/generate_html_report.py
 docs/finance-report.html
 docs/*财务分析报告*.md
+
+# 原始出口/报关业务文件属于本地凭证，不进入源码仓库
+/docs/wps-import/*
+!/docs/wps-import/README.md
+/docs/*.xlsx
+/docs/*.xls
+
+# 单票一次性数据同步 Adapter 仅保留在本机；通用导入 Module 继续纳入版本控制
+/scripts/sync_exp260010_formal_wps.js
 
 # 本地隧道地址会随运行环境变化；TUNNEL_URL.txt 历史上已被跟踪，
 # 因此已跟踪副本仍需在提交时显式排除。
