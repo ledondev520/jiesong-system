@@ -44,7 +44,7 @@
 |------|------|
 | authService.js | 登录验证、Token生成、密码管理、找回密码 |
 | financeService.js | 付款记录幂等写入、应收应付聚合（支持按合同过滤） |
-| financeImportService.js | 银行流水与发票清单解析、发票多明细聚合、批次去重写入 |
+| financeImportService.js | 银行流水与发票清单解析、税务全量导出的数电发票号码识别、同票多明细聚合及批次去重写入 |
 | invoiceRecordService.js | 发票分页、统计、销方汇总及完整发票号码批量精确查询 |
 | invoiceVerificationService.js | 出口退税候选发票的销方、价税合计、品名、状态只读一致性核验 |
 | financialStatementsService.js | 会计报表、科目余额、明细账同账期校验，单事务写入与下钻查询 |

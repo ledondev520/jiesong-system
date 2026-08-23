@@ -112,6 +112,28 @@ test('parseInvoices: 同一发票的续行明细聚合且忽略汇总行', () =>
   assert.strictEqual(result.errors.length, 0);
 });
 
+test('parseInvoices: 税务全量导出优先读取数电发票号码并聚合同票明细', () => {
+  const xlsx = require('xlsx');
+  const wb = xlsx.utils.book_new();
+  const data = [
+    ['序号', '发票代码', '发票号码', '数电发票号码', '销方名称', '购买方名称', '开票日期', '货物或应税劳务名称', '金额', '税额', '价税合计'],
+    [1, '', '', '26312000000000000001', '示例供应商有限公司', '上海捷淞国际物流有限公司', '2026-07-01 10:00:00', '商品A', 100, 13, 113],
+    [2, '', '', '26312000000000000001', '示例供应商有限公司', '上海捷淞国际物流有限公司', '2026-07-01 10:00:00', '商品B', 200, 26, 226],
+  ];
+  xlsx.utils.book_append_sheet(wb, xlsx.utils.aoa_to_sheet(data), '信息汇总表');
+  const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+  const result = financeImportService.parseInvoices(buf, 'all');
+
+  assert.strictEqual(result.previewMapping.invNo, '数电发票号码');
+  assert.strictEqual(result.records.length, 1);
+  assert.strictEqual(result.records[0].invNo, '26312000000000000001');
+  assert.strictEqual(result.records[0].itemName, '商品A；商品B');
+  assert.strictEqual(result.records[0].amount, 300);
+  assert.strictEqual(result.records[0].tax, 39);
+  assert.strictEqual(result.records[0].total, 339);
+});
+
 test('parseBankStatement: 日期格式容错', () => {
   const xlsx = require('xlsx');
   const wb = xlsx.utils.book_new();

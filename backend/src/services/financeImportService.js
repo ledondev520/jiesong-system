@@ -58,7 +58,8 @@ const BANK_TEMPLATES = {
 // ==================== 发票模板列映射 ====================
 
 const INVOICE_COLS = {
-  invNo: ['发票号码', '发票号', '数电票号码', '电子发票号码', '发票编号', 'No', 'no', '发票号码(20位)'],
+  // 税务平台全量导出会同时保留空的“发票号码”和实际有值的“数电发票号码”，数电列必须优先。
+  invNo: ['数电发票号码', '数电票号码', '电子发票号码', '发票号码(20位)', '发票号码', '发票号', '发票编号', 'No', 'no'],
   invCode: ['发票代码', '代码', '发票代码(12位)'],
   seller: ['销方名称', '销售方名称', '卖方名称', '销售方', '销方'],
   sellerTaxId: ['销方识别号', '销售方纳税人识别号', '销方税号', '销售方税号'],
@@ -176,6 +177,20 @@ function appendUniqueText(current, incoming) {
   const values = current ? current.split('；') : [];
   if (!values.includes(incoming)) values.push(incoming);
   return values.join('；');
+}
+
+function mergeInvoiceRecord(target, incoming) {
+  target.itemName = appendUniqueText(target.itemName, incoming.itemName);
+  target.spec = appendUniqueText(target.spec, incoming.spec);
+  target.unit = appendUniqueText(target.unit, incoming.unit);
+  target.taxClassCode = appendUniqueText(target.taxClassCode, incoming.taxClassCode);
+  target.taxRate = appendUniqueText(target.taxRate, incoming.taxRate);
+  target.remark = appendUniqueText(target.remark, incoming.remark);
+  target.amount = roundMoney(target.amount + incoming.amount);
+  target.tax = roundMoney(target.tax + incoming.tax);
+  target.total = roundMoney(target.total + incoming.total);
+  target.qty = null;
+  target.unitPrice = null;
 }
 
 // ==================== 银行对账单解析 ====================
@@ -314,6 +329,7 @@ function parseInvoices(buffer, invoiceType) {
   const rows = xlsx.utils.sheet_to_json(sheet, { header: 1, range: headerRowIndex + 1 });
   const records = [];
   const errors = [];
+  const invoiceRecordMap = new Map();
   const implicitInputBuyer = invoiceType === 'input' && colMap.buyer === -1 && colMap.seller !== -1;
   let currentInputRecord = null;
 
@@ -431,7 +447,16 @@ function parseInvoices(buffer, invoiceType) {
       if (invoiceType === 'output' && !isOutput) continue;
     }
 
+    const invoiceKey = record.invNo ? `${record.invCode || ''}|${record.invNo}` : null;
+    const existingRecord = invoiceKey ? invoiceRecordMap.get(invoiceKey) : null;
+    if (existingRecord) {
+      mergeInvoiceRecord(existingRecord, record);
+      currentInputRecord = implicitInputBuyer ? existingRecord : null;
+      continue;
+    }
+
     records.push(record);
+    if (invoiceKey) invoiceRecordMap.set(invoiceKey, record);
     currentInputRecord = implicitInputBuyer ? record : null;
   }
 
