@@ -17,9 +17,9 @@ const { normalizePagination } = require('../utils/pagination');
 async function listTransactions(req, res, next) {
   try {
     const { page, pageSize } = normalizePagination(req.query);
-    const { search, direction, dateFrom, dateTo, batchId } = req.query;
+    const { search, direction, dateFrom, dateTo, batchId, currency = 'CNY', accountNoMasked } = req.query;
     const result = await bankFlowService.listTransactions({
-      search, direction, dateFrom, dateTo, batchId, page, pageSize,
+      search, direction, dateFrom, dateTo, batchId, currency, accountNoMasked, page, pageSize,
     });
     paginated(res, result.items, result.total, page, pageSize);
   } catch (err) { next(err); }
@@ -30,8 +30,8 @@ async function listTransactions(req, res, next) {
  */
 async function getTransactionStats(req, res, next) {
   try {
-    const { search, direction, dateFrom, dateTo, batchId } = req.query;
-    const stats = await bankFlowService.getStats({ search, direction, dateFrom, dateTo, batchId });
+    const { search, direction, dateFrom, dateTo, batchId, currency = 'CNY', accountNoMasked } = req.query;
+    const stats = await bankFlowService.getStats({ search, direction, dateFrom, dateTo, batchId, currency, accountNoMasked });
     success(res, stats);
   } catch (err) { next(err); }
 }
@@ -96,7 +96,7 @@ async function getReconciliation(req, res, next) {
 
     // 0. 查银行流水
     const txns = await bankFlowService.listTransactions({
-      search: counterpart, page: 1, pageSize: 200,
+      search: counterpart, currency: 'CNY', page: 1, pageSize: 200,
     });
 
     // 1. 查发票

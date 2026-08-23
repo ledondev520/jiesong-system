@@ -172,6 +172,36 @@ function roundMoney(value) {
   return Math.sign(value) * Math.round((Math.abs(value) + Number.EPSILON) * 100) / 100;
 }
 
+function normalizeBankCurrency(value) {
+  return String(value || 'CNY').trim().toUpperCase() || 'CNY';
+}
+
+function normalizeMaskedAccount(value) {
+  const normalized = String(value || '').trim();
+  if (!normalized) return null;
+  const suffix = normalized.replace(/\D/g, '').slice(-4);
+  return suffix ? `****${suffix}` : null;
+}
+
+function buildBankLegacyKey(record) {
+  return [
+    normalizeBankCurrency(record.currency),
+    record.txnDate || '',
+    Number(record.amount || 0).toFixed(2),
+    String(record.counterpart || '').trim(),
+  ].join('|');
+}
+
+function buildBankPreciseKey(record) {
+  return [
+    buildBankLegacyKey(record),
+    normalizeMaskedAccount(record.accountNoMasked) || '',
+    record.balance === null || record.balance === undefined ? '' : Number(record.balance).toFixed(2),
+    String(record.summary || '').trim(),
+    String(record.txnId || '').trim(),
+  ].join('|');
+}
+
 function appendUniqueText(current, incoming) {
   if (!incoming) return current || null;
   const values = current ? current.split('；') : [];
@@ -477,29 +507,55 @@ async function importBankTransactions(records, fileName, importedBy) {
   }
 
   const existingTxns = await prisma.bankTransaction.findMany({
-    select: { txnId: true, txnDate: true, amount: true, counterpart: true },
+    select: {
+      txnId: true,
+      txnDate: true,
+      amount: true,
+      counterpart: true,
+      balance: true,
+      summary: true,
+      currency: true,
+      accountNoMasked: true,
+    },
     take: 50000,
   });
-  const existingKeys = new Set();
+  const existingPreciseKeys = new Set();
+  const legacyKeysWithoutAccount = new Set();
   for (const t of existingTxns) {
-    if (t.txnId) existingKeys.add(`txn:${t.txnId}`);
-    existingKeys.add(`combo:${t.txnDate}|${t.amount}|${t.counterpart || ''}`);
+    existingPreciseKeys.add(buildBankPreciseKey(t));
+    if (!normalizeMaskedAccount(t.accountNoMasked)) {
+      legacyKeysWithoutAccount.add(buildBankLegacyKey(t));
+    }
   }
 
   const deduped = [];
   const dupeErrors = [];
+  const seenPreciseKeys = new Set();
+  const seenLegacyKeysWithoutAccount = new Set();
   for (const r of records) {
-    const key1 = r.txnId ? `txn:${r.txnId}` : null;
-    const key2 = `combo:${r.txnDate}|${r.amount}|${r.counterpart || ''}`;
-    if (key1 && existingKeys.has(key1)) {
-      dupeErrors.push({ reason: `重复流水号: ${r.txnId}`, data: r });
+    const normalized = {
+      ...r,
+      bankName: String(r.bankName || '').trim() || null,
+      accountNoMasked: normalizeMaskedAccount(r.accountNoMasked),
+      currency: normalizeBankCurrency(r.currency),
+    };
+    const preciseKey = buildBankPreciseKey(normalized);
+    const legacyKey = buildBankLegacyKey(normalized);
+    const duplicateByPrecise = existingPreciseKeys.has(preciseKey) || seenPreciseKeys.has(preciseKey);
+    const duplicateByLegacy = legacyKeysWithoutAccount.has(legacyKey)
+      || seenLegacyKeysWithoutAccount.has(legacyKey);
+
+    if (duplicateByPrecise || duplicateByLegacy) {
+      dupeErrors.push({
+        reason: '重复银行流水',
+        data: { txnDate: normalized.txnDate, currency: normalized.currency, accountNoMasked: normalized.accountNoMasked },
+      });
       continue;
     }
-    if (existingKeys.has(key2)) {
-      dupeErrors.push({ reason: `重复记录: ${r.txnDate} ${r.amount} ${r.counterpart || ''}`, data: r });
-      continue;
-    }
-    deduped.push(r);
+
+    deduped.push(normalized);
+    seenPreciseKeys.add(preciseKey);
+    if (!normalized.accountNoMasked) seenLegacyKeysWithoutAccount.add(legacyKey);
   }
 
   if (deduped.length === 0) {

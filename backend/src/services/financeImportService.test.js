@@ -164,3 +164,64 @@ test('parseInvoices: 缺少销方名称应记录错误', () => {
   assert.strictEqual(result.errors.length, 1);
   assert.ok(result.errors[0].reason.includes('销方'));
 });
+
+test('importBankTransactions: 跨币种不误判重复、票据号复用不误删且同批次精确重复会跳过', async (t) => {
+  const prisma = require('../utils/prisma');
+  const originalFindMany = prisma.bankTransaction.findMany;
+  const originalCreateMany = prisma.bankTransaction.createMany;
+  const originalBatchCreate = prisma.financeDataBatch.create;
+  t.after(() => {
+    prisma.bankTransaction.findMany = originalFindMany;
+    prisma.bankTransaction.createMany = originalCreateMany;
+    prisma.financeDataBatch.create = originalBatchCreate;
+  });
+
+  prisma.bankTransaction.findMany = async () => [{
+    txnId: 'EXISTING-CNY',
+    txnDate: '2026-04-10',
+    amount: 68209,
+    counterpart: '示例公司',
+    balance: 79530.56,
+    summary: '结汇',
+    currency: 'CNY',
+    accountNoMasked: null,
+  }];
+  let batchData;
+  let createdRows = [];
+  prisma.financeDataBatch.create = async ({ data }) => {
+    batchData = data;
+    return { id: 'batch-usd' };
+  };
+  prisma.bankTransaction.createMany = async ({ data }) => {
+    createdRows = createdRows.concat(data);
+    return { count: data.length };
+  };
+
+  const shared = {
+    txnTime: '2026-04-10',
+    txnDate: '2026-04-10',
+    amount: 68209,
+    payer: '示例公司',
+    payee: '上海捷淞国际物流有限公司',
+    summary: '结汇',
+    txnType: '中心收汇',
+    balance: 79530.56,
+    counterpart: '示例公司',
+    direction: 'IN',
+    bankName: '示例银行',
+  };
+  const result = await financeImportService.importBankTransactions([
+    { ...shared, txnId: 'PDF-CNY', currency: 'CNY', accountNoMasked: '0001' },
+    { ...shared, txnId: 'PDF-USD', currency: 'USD', accountNoMasked: '****2001' },
+    { ...shared, txnId: 'PDF-USD', currency: 'USD', accountNoMasked: '****2001' },
+    { ...shared, txnId: 'PDF-USD', amount: -68209, direction: 'OUT', summary: '退回', currency: 'USD', accountNoMasked: '****2001' },
+  ], 'statement.pdf', 'test');
+
+  assert.strictEqual(result.success, 2);
+  assert.strictEqual(result.skipped, 2);
+  assert.strictEqual(batchData.recordCount, 2);
+  assert.strictEqual(createdRows.length, 2);
+  assert.strictEqual(createdRows[0].currency, 'USD');
+  assert.strictEqual(createdRows[0].accountNoMasked, '****2001');
+  assert.strictEqual(createdRows[1].amount, -68209);
+});

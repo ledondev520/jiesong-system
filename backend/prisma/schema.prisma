@@ -1205,6 +1205,9 @@ model FinanceDataBatch {
 model BankTransaction {
   id                  String    @id @default(cuid())
   batchId             String
+  bankName            String? // 开户银行名称，不保存完整账号
+  accountNoMasked     String? // 仅保存脱敏账号后四位，例如 ****0001
+  currency            String    @default("CNY") // CNY / USD，禁止跨币种汇总
   txnTime             String // 交易时间（原始字符串，保留精度）
   txnDate             String // 交易日期 yyyy-MM-dd（用于筛选）
   amount              Float // 正=收入，负=支出
@@ -1227,6 +1230,7 @@ model BankTransaction {
   batch FinanceDataBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
   @@index([batchId])
+  @@index([currency, accountNoMasked, txnDate])
   @@index([txnDate])
   @@index([counterpart])
   @@index([direction])

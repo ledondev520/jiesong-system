@@ -17,8 +17,8 @@ const COMPANY = '上海捷淞国际物流有限公司';
  * @param {number} pageSize
  * @returns {{ items, total }}
  */
-async function listTransactions({ search, direction, dateFrom, dateTo, batchId, page = 1, pageSize = 20 }) {
-  const where = buildTxnWhere({ search, direction, dateFrom, dateTo, batchId });
+async function listTransactions({ search, direction, dateFrom, dateTo, batchId, currency = 'CNY', accountNoMasked, page = 1, pageSize = 20 }) {
+  const where = buildTxnWhere({ search, direction, dateFrom, dateTo, batchId, currency, accountNoMasked });
 
   const [items, total] = await Promise.all([
     prisma.bankTransaction.findMany({
@@ -39,10 +39,12 @@ async function listTransactions({ search, direction, dateFrom, dateTo, batchId, 
  * @param {object} filters - search, direction, dateFrom, dateTo, batchId
  * @returns {object} Prisma where clause
  */
-function buildTxnWhere({ search, direction, dateFrom, dateTo, batchId } = {}) {
+function buildTxnWhere({ search, direction, dateFrom, dateTo, batchId, currency, accountNoMasked } = {}) {
   const where = {};
   if (direction) where.direction = direction;
   if (batchId) where.batchId = batchId;
+  if (currency) where.currency = String(currency).toUpperCase();
+  if (accountNoMasked) where.accountNoMasked = accountNoMasked;
   if (dateFrom || dateTo) {
     where.txnDate = {};
     if (dateFrom) where.txnDate.gte = dateFrom;
@@ -64,7 +66,8 @@ function buildTxnWhere({ search, direction, dateFrom, dateTo, batchId } = {}) {
  * @returns {{ totalIn, totalOut, netFlow, txnCount }}
  */
 async function getStats(filters = {}) {
-  const baseWhere = buildTxnWhere(filters);
+  const currency = String(filters.currency || 'CNY').toUpperCase();
+  const baseWhere = buildTxnWhere({ ...filters, currency });
 
   // 若筛选了单方向，仅统计该方向
   const inResult = await prisma.bankTransaction.aggregate({
@@ -86,6 +89,7 @@ async function getStats(filters = {}) {
     totalOut,
     netFlow: totalIn - totalOut,
     txnCount: (inResult._count || 0) + (outResult._count || 0),
+    currency,
   };
 }
 
@@ -109,8 +113,8 @@ async function listBatches(type) {
  * @param {object} opts - limit
  * @returns {Array} 按交易总额降序排列的对方汇总
  */
-async function groupByCounterpart({ dateFrom, dateTo, limit = 50 } = {}) {
-  const where = {};
+async function groupByCounterpart({ dateFrom, dateTo, limit = 50, currency = 'CNY' } = {}) {
+  const where = { currency: String(currency).toUpperCase() };
   if (dateFrom || dateTo) {
     where.txnDate = {};
     if (dateFrom) where.txnDate.gte = dateFrom;
@@ -169,6 +173,7 @@ function normalizeName(name) {
 async function runReconciliation() {
   // 0. 获取全量银行流水（按 counterpart 汇总）
   const allTxns = await prisma.bankTransaction.findMany({
+    where: { currency: 'CNY' },
     select: { counterpart: true, direction: true, amount: true },
   });
 
@@ -320,7 +325,7 @@ async function runReconciliation() {
  */
 async function getIncomingSummary() {
   const txns = await prisma.bankTransaction.findMany({
-    where: { direction: 'IN' },
+    where: { direction: 'IN', currency: 'USD' },
     select: { counterpart: true, amount: true },
   });
 

@@ -46,6 +46,7 @@
 ## Data classification
 - See `data-classification.json` for the authoritative classification map.
 - Restricted data: secrets, credentials, migration credentials, payment-related keys, supplier bank routing details, signed/generated contract documents, carrier packing-list originals, and packing-list review records.
+- Company bank statements, transaction identifiers, balances, and account identifiers are Restricted; raw statement PDFs must not enter Git or ordinary attachment storage, and structured rows may persist only a masked account suffix plus currency and bank name.
 - Agent/service-account credentials and credential hashes are also Restricted data and must never be printed in logs or committed to docs/tests.
 - Confidential data: internal business data (customer orders, contract amounts, supplier/客户联系人信息, operational KPIs).
 - Internal data: non-sensitive operational metrics, general feature flags, status enums, and non-production run metadata.

@@ -12,6 +12,9 @@ import type { PaginatedResponse } from '@/types';
 export interface BankTransaction {
   id: string;
   batchId: string;
+  bankName: string | null;
+  accountNoMasked: string | null;
+  currency: 'CNY' | 'USD' | string;
   txnTime: string;
   txnDate: string;
   amount: number;
@@ -75,6 +78,7 @@ export interface BankFlowStats {
   totalOut: number;
   netFlow: number;
   txnCount: number;
+  currency: string;
 }
 
 export interface InvoiceStats {
@@ -94,6 +98,8 @@ export interface TransactionQuery {
   dateFrom?: string;
   dateTo?: string;
   batchId?: string;
+  currency?: string;
+  accountNoMasked?: string;
 }
 
 export interface InvoiceQuery {
@@ -120,7 +126,7 @@ export async function getTransactions(params: TransactionQuery): Promise<Paginat
  * 职责：获取银行流水统计（支持全部筛选条件）
  */
 export async function getTransactionStats(params?: {
-  search?: string; direction?: string; dateFrom?: string; dateTo?: string;
+  search?: string; direction?: string; dateFrom?: string; dateTo?: string; currency?: string; accountNoMasked?: string;
 }): Promise<BankFlowStats> {
   const res: { data: BankFlowStats } = await api.get('/bank-flow/transactions/stats', { params });
   return res.data;

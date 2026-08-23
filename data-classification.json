@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updatedAt": "2026-07-14",
+  "updatedAt": "2026-08-23",
   "owner": "security-team",
   "tiers": [
     {
@@ -17,6 +17,7 @@
         "backend environment overrides containing real secrets",
         "signed and system-generated legal/financial contract artifacts",
         "supplier bank account names, account numbers, branches, and bank routing codes",
+        "company bank statements, transaction identifiers, account balances, and even masked account identifiers when combined with transaction rows",
         "carrier packing-list originals and persistent packing-list review records"
       ],
       "controls": {

@@ -220,6 +220,7 @@ async function loadSalesContracts() {
  */
 function matchBankToPurchase(txn, contracts) {
   const best = { score: 0, contract: null, details: null };
+  if (String(txn.currency || 'CNY').toUpperCase() !== 'CNY') return best;
 
   for (const contract of contracts) {
     if (contract.unpaidAmount <= 0) continue;
@@ -251,6 +252,7 @@ function matchBankToPurchase(txn, contracts) {
  */
 function matchBankToSales(txn, contracts) {
   const best = { score: 0, contract: null, details: null };
+  if (String(txn.currency || 'CNY').toUpperCase() !== 'USD') return best;
 
   for (const contract of contracts) {
     if (contract.unpaidAmount <= 0) continue;

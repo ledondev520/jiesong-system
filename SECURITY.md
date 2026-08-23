@@ -26,7 +26,7 @@
 
 ### 4) 数据与隐私层（Data Protection）
 - Classify data by tier per `data-classification.json` and apply处理规则 in code and documents.
-- Treat supplier bank routing fields, signed/generated contract artifacts, carrier packing lists, and their review records as Restricted data; do not include their values in logs, engineering memory, or test fixtures copied from production.
+- Treat supplier bank routing fields, company bank statements and transaction identifiers, signed/generated contract artifacts, carrier packing lists, and their review records as Restricted data; persist only masked company account identifiers with structured bank rows, and do not include production values in logs, engineering memory, or test fixtures.
 - Store secrets in `.env` only, never in repository tracked text.
 - Treat system-configured API keys as write-only: encrypt at rest, never return the complete value from any HTTP response, and render only a configured/masked status in administrator pages.
 - Redact PII/敏感字段 in logs and exports; avoid writing raw identifiers to audit channels unless authorized.
