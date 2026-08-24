@@ -47,6 +47,34 @@ test('parseBankStatement: 解析通用模板银行流水', () => {
   assert.strictEqual(result.records[0].txnId, 'TXN001');
 });
 
+test('parseBankStatement: 识别标题行后的招商银行美元收支记录并保留账户元数据', () => {
+  const xlsx = require('xlsx');
+  const wb = xlsx.utils.book_new();
+  const data = [
+    ['2025-01-01至2025-12-31收支记录汇总'],
+    ['付方账户', '付方名称', '付方开户行', '付方账户币种', '收方账户', '收方名称', '收方开户银行', '收方账户币种', '交易金额', '余额', '交易时间', '交易流水号', '交易类型', '摘要'],
+    ['***********2001', '上海捷淞国际物流有限公司', '上海分行', '美元', '***********0001', '上海捷淞国际物流有限公司', '招商银行上海浦江镇支行', '美元', -1000, 19000, '2025-01-03 09:01:02', 'USD-OUT-001', '对公结汇', '测试结汇'],
+    ['********4362', '示例境外客户', '境外银行', '美元', '***********2001', '上海捷淞国际物流有限公司', '上海分行', '美元', 20000, 20000, '2025-01-02 16:16:20', 'USD-IN-001', '国际结算解付款项', '测试汇入'],
+  ];
+  xlsx.utils.book_append_sheet(wb, xlsx.utils.aoa_to_sheet(data), '美元流水');
+  const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+  const result = financeImportService.parseBankStatement(buf, 'GENERIC');
+
+  assert.strictEqual(result.headerRow, 2);
+  assert.strictEqual(result.records.length, 2);
+  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.records[0].txnTime, '2025-01-03 09:01:02');
+  assert.strictEqual(result.records[0].currency, 'USD');
+  assert.strictEqual(result.records[0].accountNoMasked, '****2001');
+  assert.strictEqual(result.records[0].direction, 'OUT');
+  assert.strictEqual(result.records[0].counterpart, '上海捷淞国际物流有限公司');
+  assert.strictEqual(result.records[1].currency, 'USD');
+  assert.strictEqual(result.records[1].accountNoMasked, '****2001');
+  assert.strictEqual(result.records[1].direction, 'IN');
+  assert.strictEqual(result.records[1].counterpart, '示例境外客户');
+});
+
 test('parseInvoices: 解析通用模板发票', () => {
   const xlsx = require('xlsx');
   const wb = xlsx.utils.book_new();
@@ -224,4 +252,49 @@ test('importBankTransactions: 跨币种不误判重复、票据号复用不误�
   assert.strictEqual(createdRows[0].currency, 'USD');
   assert.strictEqual(createdRows[0].accountNoMasked, '****2001');
   assert.strictEqual(createdRows[1].amount, -68209);
+});
+
+test('importBankTransactions: PDF与Excel流水号摘要不同但余额轨迹一致时跳过跨来源重复', async (t) => {
+  const prisma = require('../utils/prisma');
+  const originalFindMany = prisma.bankTransaction.findMany;
+  const originalBatchCreate = prisma.financeDataBatch.create;
+  t.after(() => {
+    prisma.bankTransaction.findMany = originalFindMany;
+    prisma.financeDataBatch.create = originalBatchCreate;
+  });
+
+  prisma.bankTransaction.findMany = async () => [{
+    txnId: 'PDF-USD-001',
+    txnDate: '2025-03-15',
+    amount: 12345.67,
+    counterpart: '示例境外客户',
+    balance: 23456.78,
+    summary: 'PDF摘要',
+    currency: 'USD',
+    accountNoMasked: '****2001',
+  }];
+  prisma.financeDataBatch.create = async () => {
+    throw new Error('跨来源重复不应创建新批次');
+  };
+
+  const result = await financeImportService.importBankTransactions([{
+    txnTime: '2025-03-15 09:30:00',
+    txnDate: '2025-03-15',
+    amount: 12345.67,
+    payer: '示例境外客户',
+    payee: '上海捷淞国际物流有限公司',
+    summary: 'Excel摘要不同',
+    txnType: '国际结算解付款项',
+    txnId: 'EXCEL-USD-999',
+    balance: 23456.78,
+    counterpart: '示例境外客户',
+    direction: 'IN',
+    bankName: '招商银行股份有限公司',
+    currency: '美元',
+    accountNoMasked: '2001',
+  }], 'usd.xlsx', 'test');
+
+  assert.strictEqual(result.success, 0);
+  assert.strictEqual(result.skipped, 1);
+  assert.strictEqual(result.batchId, null);
 });

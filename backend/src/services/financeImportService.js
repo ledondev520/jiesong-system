@@ -1,7 +1,7 @@
 /**
  * Input: Excel/CSV 文件 buffer、银行类型/发票类型
  * Output: 解析后的银行流水/发票记录、导入结果
- * Pos: 财务数据导入服务，处理银行对账单和发票清单解析（含标题行和发票多明细聚合）
+ * Pos: 财务数据导入服务，处理银行对账单和发票清单解析（含标题行、币种账号和发票多明细聚合）
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -53,6 +53,16 @@ const BANK_TEMPLATES = {
     payerCols: ['付方名称', '付款方', 'payer', '付款人', '转出方'],
     payeeCols: ['收方名称', '收款方', 'payee', '收款人', '转入方'],
   },
+};
+
+const BANK_COMMON_COLS = {
+  signedAmount: ['交易金额', '发生额', 'amount', 'Amount'],
+  payerAccount: ['付方账户', '付款方账户', '付款账号'],
+  payerBank: ['付方开户行', '付款方开户行', '付款银行'],
+  payerCurrency: ['付方账户币种', '付款方币种', '付方币种'],
+  payeeAccount: ['收方账户', '收款方账户', '收款账号'],
+  payeeBank: ['收方开户银行', '收方开户行', '收款方开户行', '收款银行'],
+  payeeCurrency: ['收方账户币种', '收款方币种', '收方币种'],
 };
 
 // ==================== 发票模板列映射 ====================
@@ -129,6 +139,32 @@ function findInvoiceHeaderRow(sheet) {
   return best.row;
 }
 
+function findBankHeaderRow(sheet, template) {
+  const range = xlsx.utils.decode_range(sheet['!ref']);
+  const lastRow = Math.min(range.e.r, range.s.r + 19);
+  let best = { row: range.s.r, score: -1 };
+
+  for (let row = range.s.r; row <= lastRow; row++) {
+    const headers = normalizeHeaders(sheet, row);
+    const hasDate = findCol(headers, template.dateCols) !== -1;
+    const hasAmount = findCol(headers, BANK_COMMON_COLS.signedAmount) !== -1
+      || findCol(headers, template.incomeCols) !== -1
+      || findCol(headers, template.expenseCols) !== -1;
+    const candidates = [
+      ...Object.values(template),
+      ...Object.values(BANK_COMMON_COLS),
+    ];
+    const score = candidates.reduce(
+      (matched, cols) => matched + (findCol(headers, cols) !== -1 ? 1 : 0),
+      0
+    );
+
+    if (hasDate && hasAmount && score > best.score) best = { row, score };
+  }
+
+  return best.row;
+}
+
 function parseDateCell(value) {
   if (!value) return null;
   if (value instanceof Date) {
@@ -173,7 +209,10 @@ function roundMoney(value) {
 }
 
 function normalizeBankCurrency(value) {
-  return String(value || 'CNY').trim().toUpperCase() || 'CNY';
+  const normalized = String(value || 'CNY').trim().toUpperCase();
+  if (['人民币', 'RMB', 'CNY'].includes(normalized)) return 'CNY';
+  if (['美元', '美金', 'USD', 'US$'].includes(normalized)) return 'USD';
+  return normalized || 'CNY';
 }
 
 function normalizeMaskedAccount(value) {
@@ -199,6 +238,19 @@ function buildBankPreciseKey(record) {
     record.balance === null || record.balance === undefined ? '' : Number(record.balance).toFixed(2),
     String(record.summary || '').trim(),
     String(record.txnId || '').trim(),
+  ].join('|');
+}
+
+function buildBankBalanceCounterpartKey(record) {
+  const account = normalizeMaskedAccount(record.accountNoMasked);
+  if (!account || record.balance === null || record.balance === undefined) return null;
+  return [
+    normalizeBankCurrency(record.currency),
+    account,
+    record.txnDate || '',
+    Number(record.amount || 0).toFixed(2),
+    Number(record.balance).toFixed(2),
+    String(record.counterpart || '').trim(),
   ].join('|');
 }
 
@@ -229,8 +281,9 @@ function parseBankStatement(buffer, bankType) {
   const workbook = xlsx.read(buffer, { type: 'buffer', cellDates: true });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
-  const headers = normalizeHeaders(sheet);
   const template = BANK_TEMPLATES[bankType] || BANK_TEMPLATES.GENERIC;
+  const headerRowIndex = findBankHeaderRow(sheet, template);
+  const headers = normalizeHeaders(sheet, headerRowIndex);
 
   const colMap = {
     date: findCol(headers, template.dateCols),
@@ -244,6 +297,13 @@ function parseBankStatement(buffer, bankType) {
     txnId: findCol(headers, template.txnIdCols),
     payer: findCol(headers, template.payerCols),
     payee: findCol(headers, template.payeeCols),
+    signedAmount: findCol(headers, BANK_COMMON_COLS.signedAmount),
+    payerAccount: findCol(headers, BANK_COMMON_COLS.payerAccount),
+    payerBank: findCol(headers, BANK_COMMON_COLS.payerBank),
+    payerCurrency: findCol(headers, BANK_COMMON_COLS.payerCurrency),
+    payeeAccount: findCol(headers, BANK_COMMON_COLS.payeeAccount),
+    payeeBank: findCol(headers, BANK_COMMON_COLS.payeeBank),
+    payeeCurrency: findCol(headers, BANK_COMMON_COLS.payeeCurrency),
   };
 
   const previewMapping = {};
@@ -251,7 +311,7 @@ function parseBankStatement(buffer, bankType) {
     if (idx !== -1) previewMapping[key] = headers[idx];
   }
 
-  const rows = xlsx.utils.sheet_to_json(sheet, { header: 1, range: 1 });
+  const rows = xlsx.utils.sheet_to_json(sheet, { header: 1, range: headerRowIndex + 1 });
   const records = [];
   const errors = [];
 
@@ -262,16 +322,20 @@ function parseBankStatement(buffer, bankType) {
     const dateVal = colMap.date !== -1 ? row[colMap.date] : null;
     const txnDate = parseDateCell(dateVal);
     if (!txnDate) {
-      errors.push({ row: i + 2, reason: '无法识别的交易日期', data: row });
+      errors.push({ row: headerRowIndex + i + 2, reason: '无法识别的交易日期', data: row });
       continue;
     }
 
+    const signedAmount = colMap.signedAmount !== -1 ? parseAmountCell(row[colMap.signedAmount]) : null;
     const income = colMap.income !== -1 ? parseAmountCell(row[colMap.income]) : null;
     const expense = colMap.expense !== -1 ? parseAmountCell(row[colMap.expense]) : null;
 
     let amount = 0;
     let direction = 'IN';
-    if (income !== null && income > 0) {
+    if (signedAmount !== null && signedAmount !== 0) {
+      amount = signedAmount;
+      direction = signedAmount > 0 ? 'IN' : 'OUT';
+    } else if (income !== null && income > 0) {
       amount = income;
       direction = 'IN';
     } else if (expense !== null && expense > 0) {
@@ -292,17 +356,29 @@ function parseBankStatement(buffer, bankType) {
     }
 
     if (amount === 0) {
-      errors.push({ row: i + 2, reason: '金额为0或无法解析', data: row });
+      errors.push({ row: headerRowIndex + i + 2, reason: '金额为0或无法解析', data: row });
       continue;
     }
 
-    const counterpart = colMap.counterpart !== -1 ? String(row[colMap.counterpart] || '').trim() || null : null;
     const summary = colMap.summary !== -1 ? String(row[colMap.summary] || '').trim() || null : null;
     const txnType = colMap.txnType !== -1 ? String(row[colMap.txnType] || '').trim() || null : null;
     const txnId = colMap.txnId !== -1 ? String(row[colMap.txnId] || '').trim() || null : null;
     const balance = colMap.balance !== -1 ? parseAmountCell(row[colMap.balance]) : null;
     const payer = colMap.payer !== -1 ? String(row[colMap.payer] || '').trim() || null : null;
     const payee = colMap.payee !== -1 ? String(row[colMap.payee] || '').trim() || null : null;
+    const counterpart = colMap.counterpart !== -1
+      ? String(row[colMap.counterpart] || '').trim() || null
+      : (direction === 'OUT' ? payee : payer);
+
+    const payerAccount = textCell(row, colMap.payerAccount);
+    const payerBank = textCell(row, colMap.payerBank);
+    const payerCurrency = textCell(row, colMap.payerCurrency);
+    const payeeAccount = textCell(row, colMap.payeeAccount);
+    const payeeBank = textCell(row, colMap.payeeBank);
+    const payeeCurrency = textCell(row, colMap.payeeCurrency);
+    const selectedAccount = direction === 'OUT' ? payerAccount : payeeAccount;
+    const selectedBank = direction === 'OUT' ? payerBank : payeeBank;
+    const selectedCurrency = direction === 'OUT' ? payerCurrency : payeeCurrency;
 
     const timeVal = colMap.time !== -1 ? row[colMap.time] : null;
     let txnTime = txnDate;
@@ -314,7 +390,8 @@ function parseBankStatement(buffer, bankType) {
         txnTime = `${txnDate} ${h}:${m}:${s}`;
       } else {
         const t = String(timeVal).trim();
-        txnTime = t.includes(':') ? `${txnDate} ${t}` : txnDate;
+        const timeMatch = t.match(/(?:^|\s)(\d{1,2}:\d{2}(?::\d{2})?)/);
+        txnTime = timeMatch ? `${txnDate} ${timeMatch[1]}` : txnDate;
       }
     }
 
@@ -330,10 +407,13 @@ function parseBankStatement(buffer, bankType) {
       balance,
       counterpart,
       direction,
+      bankName: selectedBank,
+      accountNoMasked: normalizeMaskedAccount(selectedAccount),
+      currency: normalizeBankCurrency(selectedCurrency),
     });
   }
 
-  return { records, errors, previewMapping, totalRows: rows.length };
+  return { records, errors, previewMapping, totalRows: rows.length, headerRow: headerRowIndex + 1 };
 }
 
 // ==================== 发票解析 ====================
@@ -520,9 +600,12 @@ async function importBankTransactions(records, fileName, importedBy) {
     take: 50000,
   });
   const existingPreciseKeys = new Set();
+  const existingBalanceCounterpartKeys = new Set();
   const legacyKeysWithoutAccount = new Set();
   for (const t of existingTxns) {
     existingPreciseKeys.add(buildBankPreciseKey(t));
+    const balanceCounterpartKey = buildBankBalanceCounterpartKey(t);
+    if (balanceCounterpartKey) existingBalanceCounterpartKeys.add(balanceCounterpartKey);
     if (!normalizeMaskedAccount(t.accountNoMasked)) {
       legacyKeysWithoutAccount.add(buildBankLegacyKey(t));
     }
@@ -531,6 +614,7 @@ async function importBankTransactions(records, fileName, importedBy) {
   const deduped = [];
   const dupeErrors = [];
   const seenPreciseKeys = new Set();
+  const seenBalanceCounterpartKeys = new Set();
   const seenLegacyKeysWithoutAccount = new Set();
   for (const r of records) {
     const normalized = {
@@ -540,12 +624,16 @@ async function importBankTransactions(records, fileName, importedBy) {
       currency: normalizeBankCurrency(r.currency),
     };
     const preciseKey = buildBankPreciseKey(normalized);
+    const balanceCounterpartKey = buildBankBalanceCounterpartKey(normalized);
     const legacyKey = buildBankLegacyKey(normalized);
     const duplicateByPrecise = existingPreciseKeys.has(preciseKey) || seenPreciseKeys.has(preciseKey);
+    const duplicateByBalanceCounterpart = balanceCounterpartKey
+      && (existingBalanceCounterpartKeys.has(balanceCounterpartKey)
+        || seenBalanceCounterpartKeys.has(balanceCounterpartKey));
     const duplicateByLegacy = legacyKeysWithoutAccount.has(legacyKey)
       || seenLegacyKeysWithoutAccount.has(legacyKey);
 
-    if (duplicateByPrecise || duplicateByLegacy) {
+    if (duplicateByPrecise || duplicateByBalanceCounterpart || duplicateByLegacy) {
       dupeErrors.push({
         reason: '重复银行流水',
         data: { txnDate: normalized.txnDate, currency: normalized.currency, accountNoMasked: normalized.accountNoMasked },
@@ -555,6 +643,7 @@ async function importBankTransactions(records, fileName, importedBy) {
 
     deduped.push(normalized);
     seenPreciseKeys.add(preciseKey);
+    if (balanceCounterpartKey) seenBalanceCounterpartKeys.add(balanceCounterpartKey);
     if (!normalized.accountNoMasked) seenLegacyKeysWithoutAccount.add(legacyKey);
   }
 
