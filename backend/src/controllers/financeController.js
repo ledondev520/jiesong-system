@@ -9,6 +9,7 @@
 const { success, created, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
 const financeService = require('../services/financeService');
+const receivableReconciliationService = require('../services/receivableReconciliationService');
 const { createError } = require('../middleware/errorHandler');
 
 /**
@@ -108,6 +109,20 @@ const getStats = async (req, res, next) => {
 };
 
 /**
+ * 职责：按同一账期截止日桥接美元经营应收与人民币会计应收
+ */
+const getReceivableReconciliation = async (req, res, next) => {
+  try {
+    const year = req.query.year ? Number(req.query.year) : undefined;
+    const month = req.query.month ? Number(req.query.month) : undefined;
+    const result = await receivableReconciliationService.getReceivableReconciliation({ year, month });
+    success(res, result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * 职责：获取近 N 天收付款趋势（按周聚合）
  * @param {Request} req - query.days: 30 | 90，默认 90
  */
@@ -190,6 +205,7 @@ module.exports = {
   getPayables,
   getReceivables,
   getStats,
+  getReceivableReconciliation,
   getPaymentTrends,
   getOverdueReceivables,
   listUnallocatedPayments,

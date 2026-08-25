@@ -150,3 +150,23 @@ test('buildSalesFinanceSummary: 非美元销售收款不进入美元已收且形
   assert.equal(result.revenue.receivedUsd, 0);
   assert.ok(result.issues.some((issue) => issue.code === 'UNSUPPORTED_RECEIPT_CURRENCY'));
 });
+
+test('buildSalesFinanceSummary: 正式合同金额不再扣减第三方装箱货值', () => {
+  const result = buildSalesFinanceSummary({
+    salesContract: {
+      ...salesContract,
+      amountSource: 'FORMAL_DOCUMENT',
+      totalAmount: 600,
+      receivedAmount: 300,
+      payments: [],
+      taxRefunds: [],
+    },
+    purchases,
+    exportReadiness,
+  });
+
+  assert.equal(result.revenue.contractTotalUsd, 600);
+  assert.equal(result.revenue.ownedRevenueUsd, 600);
+  assert.equal(result.revenue.receivedUsd, 300);
+  assert.equal(result.revenue.outstandingUsd, 300);
+});

@@ -1,4 +1,5 @@
 const prisma = require('../utils/prisma');
+const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
 const { createError } = require('../middleware/errorHandler');
 const {
   generateNextContractNo,
@@ -637,10 +638,16 @@ const getItemsSummary = async (id) => {
 };
 
 const recalculateContainerStats = async (salesContractId) => {
-  const stats = await prisma.packingItem.aggregate({
-    where: { salesContractId },
-    _sum: { boxes: true, grossWeight: true, netWeight: true, volume: true, totalPrice: true },
-  });
+  const [contract, stats] = await Promise.all([
+    prisma.salesContract.findUnique({
+      where: { id: salesContractId },
+      select: { amountSource: true },
+    }),
+    prisma.packingItem.aggregate({
+      where: { salesContractId },
+      _sum: { boxes: true, grossWeight: true, netWeight: true, volume: true, totalPrice: true },
+    }),
+  ]);
 
   await prisma.salesContract.update({
     where: { id: salesContractId },
@@ -649,7 +656,7 @@ const recalculateContainerStats = async (salesContractId) => {
       grossWeight: stats._sum.grossWeight || 0,
       netWeight: stats._sum.netWeight || 0,
       volume: stats._sum.volume || 0,
-      totalAmount: stats._sum.totalPrice || 0,
+      ...buildDerivedSalesAmountUpdate(contract, stats._sum.totalPrice || 0),
     },
   });
 };

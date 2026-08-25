@@ -6,6 +6,12 @@
 
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
+const {
+  getEffectiveSalesContractTotal,
+  getEffectiveSalesReceived,
+  isFormalSalesAmount,
+  isJiesongOwnedPackingItem,
+} = require('./salesContractAmount');
 
 const PAYMENT_TYPES = {
   PAYABLE: 'PAYABLE',
@@ -84,13 +90,6 @@ const includePaymentRelations = {
   sourcePayment: true,
 };
 
-const OWNERSHIP_EXCLUSION_KEYWORDS = [
-  '非捷淞报关',
-  '拼船',
-  '他方自行报关',
-  '共用发票',
-];
-
 const withDefaultCustomerName = (value) => {
   const normalized = typeof value === 'string' ? value.trim() : '';
   return normalized || DEFAULT_RECEIVABLE_CUSTOMER_NAME;
@@ -113,39 +112,6 @@ const getReceiptAllocationTotals = async (receiptIds, db = prisma) => {
   return new Map(
     grouped.map((row) => [row.sourcePaymentId, Number(row._sum.amount || 0)]),
   );
-};
-
-const isJiesongOwnedPackingItem = (item) => {
-  if (typeof item?.isOwnedByJiesong === 'boolean') {
-    return item.isOwnedByJiesong;
-  }
-
-  const note = String(item?.note || '');
-  return !OWNERSHIP_EXCLUSION_KEYWORDS.some((keyword) => note.includes(keyword));
-};
-
-const getEffectiveSalesContractTotal = (contract) => {
-  if (!Array.isArray(contract?.packingItems) || contract.packingItems.length === 0) {
-    return Number(contract?.totalAmount || 0);
-  }
-
-  const excludedAmount = contract.packingItems.reduce((sum, item) => {
-    if (isJiesongOwnedPackingItem(item)) {
-      return sum;
-    }
-    return sum + Number(item.totalPrice || 0);
-  }, 0);
-
-  return Number(Math.max(Number(contract.totalAmount || 0) - excludedAmount, 0).toFixed(2));
-};
-
-/** 混柜合同的已收款按自有收入占合同总额的比例归属，不能把第三方回款算入捷淞。 */
-const getEffectiveSalesReceived = (contract, ownedTotalAmount = getEffectiveSalesContractTotal(contract)) => {
-  const contractTotal = Number(contract?.totalAmount || 0);
-  const received = Number(contract?.receivedAmount || 0);
-  if (contractTotal <= 0 || ownedTotalAmount <= 0 || received <= 0) return 0;
-  const ownershipRatio = Math.min(Math.max(ownedTotalAmount / contractTotal, 0), 1);
-  return Number(Math.min(received * ownershipRatio, ownedTotalAmount).toFixed(2));
 };
 
 const getOwnedStores = (packingItems = [], port) => {
@@ -732,6 +698,7 @@ const getStats = async () => {
     select: {
       id: true,
       totalAmount: true,
+      amountSource: true,
       receivedAmount: true,
     },
   });
@@ -773,12 +740,12 @@ const getStats = async () => {
     const packingTotal = packingTotalMap.get(contract.id) || 0;
     const nonOwnedTotal = nonOwnedMap.get(contract.id) || 0;
 
-    // 如果合同有 packingItems，effectiveTotal = totalAmount - nonOwnedTotal
-    // 因为 recalculateContractStats 保证 totalAmount = sum(all packingItems.totalPrice)
-    // 如果没有 packingItems，packingTotal 为 0，此时 effectiveTotal = totalAmount
-    const ownedTotalAmount = packingTotal > 0
-      ? Math.max(Number(contract.totalAmount || 0) - nonOwnedTotal, 0)
-      : Number(contract.totalAmount || 0);
+    // 正式合同金额已经是捷淞销售额；仅历史 DERIVED 数据继续扣除第三方装箱货值。
+    const ownedTotalAmount = isFormalSalesAmount(contract)
+      ? Number(contract.totalAmount || 0)
+      : (packingTotal > 0
+          ? Math.max(Number(contract.totalAmount || 0) - nonOwnedTotal, 0)
+          : Number(contract.totalAmount || 0));
 
     acc.total += ownedTotalAmount;
     acc.received += getEffectiveSalesReceived(contract, ownedTotalAmount);

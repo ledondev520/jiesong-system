@@ -6,6 +6,7 @@
 
 const ExcelJS = require('exceljs');
 const prisma = require('../utils/prisma');
+const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
 const { createError } = require('../middleware/errorHandler');
 const { getExportReadiness } = require('./exportReadinessService');
 const fileService = require('./fileService');
@@ -496,7 +497,10 @@ const generateExportPacket = async (salesContractId, options = {}, prismaClient 
     }
     await tx.salesContract.update({
       where: { id: salesContractId },
-      data: { totalAmount: packet.summary.totalUsd, exchangeRate: packet.pricingPolicy.spotRate },
+      data: {
+        ...buildDerivedSalesAmountUpdate(sources.contract, packet.summary.totalUsd),
+        exchangeRate: packet.pricingPolicy.spotRate,
+      },
     });
     file = await fileService.archiveGeneratedFile({
       contractId: salesContractId,

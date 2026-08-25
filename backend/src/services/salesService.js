@@ -13,6 +13,7 @@ const {
 const inventorySnapshot = require('./inventorySnapshot');
 const { evaluateShipmentReadiness } = require('./shipmentReadinessService');
 const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
+const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
 
 const READY_PURCHASE_STATUSES = Object.freeze([
   'READY',
@@ -479,10 +480,16 @@ const removePackingItem = async (id, itemId) => {
 };
 
 const recalculateContractStats = async (contractId, prismaClient = prisma) => {
-  const stats = await prismaClient.packingItem.aggregate({
-    where: { salesContractId: contractId },
-    _sum: { boxes: true, grossWeight: true, netWeight: true, volume: true, totalPrice: true },
-  });
+  const [contract, stats] = await Promise.all([
+    prismaClient.salesContract.findUnique({
+      where: { id: contractId },
+      select: { amountSource: true },
+    }),
+    prismaClient.packingItem.aggregate({
+      where: { salesContractId: contractId },
+      _sum: { boxes: true, grossWeight: true, netWeight: true, volume: true, totalPrice: true },
+    }),
+  ]);
 
   await prismaClient.salesContract.update({
     where: { id: contractId },
@@ -491,7 +498,7 @@ const recalculateContractStats = async (contractId, prismaClient = prisma) => {
       grossWeight: stats._sum.grossWeight || 0,
       netWeight: stats._sum.netWeight || 0,
       volume: stats._sum.volume || 0,
-      totalAmount: stats._sum.totalPrice || 0,
+      ...buildDerivedSalesAmountUpdate(contract, stats._sum.totalPrice || 0),
     },
   });
 };

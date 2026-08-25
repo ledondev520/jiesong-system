@@ -718,6 +718,36 @@ test('getReceivables: 混柜合同回款按自有收入比例归属', async () =
   }
 });
 
+test('getReceivables: 正式合同金额不再扣除第三方装箱货值', async () => {
+  const originalFindMany = prisma.salesContract.findMany;
+  const originalCount = prisma.salesContract.count;
+
+  prisma.salesContract.findMany = async () => ([{
+    id: 'sc-formal',
+    contractNo: 'EXP260020',
+    amountSource: 'FORMAL_DOCUMENT',
+    totalAmount: 600,
+    receivedAmount: 300,
+    status: 'SHIPPED',
+    packingItems: [
+      { totalPrice: 600, isOwnedByJiesong: true, store: null },
+      { totalPrice: 400, isOwnedByJiesong: false, sourceParty: '第三方拼柜', store: null },
+    ],
+    port: null,
+  }]);
+  prisma.salesContract.count = async () => 1;
+
+  try {
+    const result = await financeService.getReceivables({ page: 1, pageSize: 20, skip: 0 });
+    assert.equal(result.receivables[0].totalAmount, 600);
+    assert.equal(result.receivables[0].receivedAmount, 300);
+    assert.equal(result.receivables[0].unreceiveAmount, 300);
+  } finally {
+    prisma.salesContract.findMany = originalFindMany;
+    prisma.salesContract.count = originalCount;
+  }
+});
+
 test('getStats: 排除第三方拼柜金额后计算真实应收', async () => {
   const originalPurchaseAggregate = prisma.purchaseContract.aggregate;
   const originalSalesFindMany = prisma.salesContract.findMany;

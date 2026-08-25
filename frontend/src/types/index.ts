@@ -385,6 +385,8 @@ export interface SalesContract {
   contractNo: string;  // EXP 编号，同时作为货柜标识
   // 销售信息
   totalAmount: number;
+  amountSource?: 'DERIVED' | 'FORMAL_DOCUMENT';
+  amountVerifiedAt?: string;
   receivedAmount: number;
   exchangeRate: number;
   status: SalesStatus;  // DRAFT/CONFIRMED/PACKING/SHIPPED/ARRIVED/COMPLETED

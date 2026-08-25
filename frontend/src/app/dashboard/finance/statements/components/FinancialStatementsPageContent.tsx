@@ -26,6 +26,7 @@ import {
   type FinancialUploadFiles,
   type FinancialUploadFileType,
 } from './FinancialStatementsUploadDialog';
+import { ReceivableReconciliationCard } from './ReceivableReconciliationCard';
 
 const FinancialStatementsTabsSection = lazy(() =>
   import('./FinancialStatementsTabsSection').then((module) => ({
@@ -229,6 +230,10 @@ export function FinancialStatementsPageContent() {
             selectedPeriod={selectedPeriod}
             warningAlerts={warningAlerts}
           />
+
+          {currentPeriod && (
+            <ReceivableReconciliationCard year={currentPeriod.year} month={currentPeriod.month} />
+          )}
 
           {hasData && analytics && showDrilldowns && (
             <Suspense fallback={<FinancialStatementsLoadingState count={2} />}>

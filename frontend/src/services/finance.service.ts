@@ -17,6 +17,31 @@ export interface FinanceOverviewStats {
   };
 }
 
+export interface ReceivableReconciliation {
+  period: { year: number; month: number; label: string };
+  cutoffDate: string;
+  contractCount: number;
+  formalSalesUsd: number;
+  receivedUsd: number;
+  operatingReceivableUsd: number;
+  reportedReceivableCny: number;
+  effectiveExchangeRate: number | null;
+  translatedOperatingReceivableCny: number | null;
+  correctedAccountingReceivableCny: number;
+  residualCny: number | null;
+  anomalies: {
+    duplicateDebitCny: number;
+    duplicateContracts: string[];
+    missingDebitCny: number;
+    missingContracts: Array<{
+      contractNo: string;
+      amountUsd: number;
+      estimatedAmountCny: number | null;
+    }>;
+  };
+  assumptions: string[];
+}
+
 interface FinanceContractRecord {
   id: string;
   contractNo: string;
@@ -154,6 +179,14 @@ export const financeService = {
   getStats: async () => {
     const response = await api.get<ApiResponse<FinanceOverviewStats>, ApiResponse<FinanceOverviewStats>>('/finance/stats');
     return response.data || DEFAULT_FINANCE_STATS;
+  },
+
+  getReceivableReconciliation: async (year?: number, month?: number) => {
+    const response = await api.get<
+      ApiResponse<ReceivableReconciliation | null>,
+      ApiResponse<ReceivableReconciliation | null>
+    >('/finance/receivable-reconciliation', { params: { year, month } });
+    return response.data || null;
   },
 
   exportReportPdf: async (type: FinanceReportPdfType, fallbackFilename?: string) => {

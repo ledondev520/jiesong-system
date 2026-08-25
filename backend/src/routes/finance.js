@@ -71,6 +71,13 @@ router.get('/receivables', withPaginationValidation, financeController.getReceiv
 // GET /api/v1/finance/stats - 获取财务统计
 router.get('/stats', financeController.getStats);
 
+// GET /api/v1/finance/receivable-reconciliation - 美元经营应收与会计应收差异桥接
+router.get(
+  '/receivable-reconciliation',
+  roleAuth('ADMIN', 'FINANCE'),
+  financeController.getReceivableReconciliation,
+);
+
 // GET /api/v1/finance/payment-trends - 获取近N天收付款趋势（按周聚合，用于折线图）
 router.get('/payment-trends', financeController.getPaymentTrends);
 

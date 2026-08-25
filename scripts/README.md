@@ -14,6 +14,8 @@
 | import_contracts_data.js | 数据导入 | 导入采购合同数据 |
 | import_declaration_data.js | 数据导入 | 导入报关单数据 |
 | import_export_contracts.js | 数据导入 | 导入出口合同数据 |
+| import_formal_sales_contract_amounts.js | 数据修复 | 从受限 JSON 导入已核验的正式 EXP 美元合同金额并锁定金额来源，防止装箱明细覆盖；默认 dry-run，`--apply` 写库，日志不输出合同金额 |
+| import_prices_from_excel.js | 数据修复 | 从历史发票表补装箱单价和货值；已锁定的正式合同金额保持不变 |
 | extract_contracts.py | 数据提取 | Python脚本，提取合同数据 |
 | extract_export_contracts.py | 数据提取 | 提取出口合同数据 |
 | extract_export_complete.py | 数据提取 | 完整提取出口数据 |

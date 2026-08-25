@@ -14,10 +14,12 @@ const {
 } = require('./inventorySnapshot');
 
 test('reconcileSalesFinancials: 按 quantity * 单价 对齐合同金额与成本', async () => {
+  const originalFindUnique = prisma.salesContract.findUnique;
   const originalFindMany = prisma.salesItem.findMany;
   const originalUpdate = prisma.salesContract.update;
   let updateArgs = null;
 
+  prisma.salesContract.findUnique = async () => ({ amountSource: 'DERIVED' });
   prisma.salesItem.findMany = async () => [
     { quantity: 2, sellingPrice: 100, costPrice: 40 },
     { quantity: 3, sellingPrice: 50, costPrice: 30 },
@@ -40,6 +42,28 @@ test('reconcileSalesFinancials: 按 quantity * 单价 对齐合同金额与成�
       grossProfit: 180,
     });
   } finally {
+    prisma.salesItem.findMany = originalFindMany;
+    prisma.salesContract.findUnique = originalFindUnique;
+    prisma.salesContract.update = originalUpdate;
+  }
+});
+
+test('reconcileSalesFinancials: 正式合同金额不被销售明细重算覆盖', async () => {
+  const originalFindUnique = prisma.salesContract.findUnique;
+  const originalFindMany = prisma.salesItem.findMany;
+  const originalUpdate = prisma.salesContract.update;
+  let updateArgs = null;
+
+  prisma.salesContract.findUnique = async () => ({ amountSource: 'FORMAL_DOCUMENT' });
+  prisma.salesItem.findMany = async () => [{ quantity: 2, sellingPrice: 100, costPrice: 40 }];
+  prisma.salesContract.update = async (args) => { updateArgs = args; return { id: 'sc-1' }; };
+
+  try {
+    const result = await reconcileSalesFinancials(prisma, 'sc-1');
+    assert.deepEqual(updateArgs, { where: { id: 'sc-1' }, data: {} });
+    assert.equal(result.totalAmount, 200);
+  } finally {
+    prisma.salesContract.findUnique = originalFindUnique;
     prisma.salesItem.findMany = originalFindMany;
     prisma.salesContract.update = originalUpdate;
   }
@@ -90,3 +114,4 @@ test('revertSalesOutStock: 回滚销售出库操作', async () => {
   const result = await revertSalesOutStock(mockTx, 'sc-1');
   assert.equal(result.reverted, 2);
 });
+  prisma.salesContract.findUnique = async () => ({ amountSource: 'DERIVED' });

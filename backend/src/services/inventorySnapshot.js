@@ -6,6 +6,7 @@
 
 const { createError } = require('../middleware/errorHandler');
 const prisma = require('../utils/prisma');
+const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
 const { INVENTORY_STATUS } = require('../config/constants');
 
 const clampNumber = (value, fallback = 0) => {
@@ -101,18 +102,25 @@ const reconcilePurchaseFinancials = async (tx, purchaseContractId) => {
 };
 
 /**
- * 重新计算销售合同财务金额（totalAmount）。
- * 说明：销售明细 sellingPrice/costPrice 为单价，合同金额需按 quantity * 单价对齐。
+ * 重新计算销售明细金额和成本；仅 DERIVED 合同同步 totalAmount。
+ * 说明：FORMAL_DOCUMENT 金额来自正式合同，销售明细变化不得覆盖。
  */
 const reconcileSalesFinancials = async (tx, salesContractId) => {
-  const items = await getDefaultSnapshotInput(tx).salesItem.findMany({
-    where: { salesContractId },
-    select: {
-      quantity: true,
-      sellingPrice: true,
-      costPrice: true,
-    },
-  });
+  const db = getDefaultSnapshotInput(tx);
+  const [contract, items] = await Promise.all([
+    db.salesContract.findUnique({
+      where: { id: salesContractId },
+      select: { amountSource: true },
+    }),
+    db.salesItem.findMany({
+      where: { salesContractId },
+      select: {
+        quantity: true,
+        sellingPrice: true,
+        costPrice: true,
+      },
+    }),
+  ]);
 
   const totalAmountRaw = items.reduce(
     (sum, item) => sum + clampNumber(item.quantity, 0) * clampNumber(item.sellingPrice, 0),
@@ -127,9 +135,9 @@ const reconcileSalesFinancials = async (tx, salesContractId) => {
   const totalCost = toMoney(totalCostRaw, 2);
   const grossProfit = toMoney(totalAmountRaw - totalCostRaw, 2);
 
-  await getDefaultSnapshotInput(tx).salesContract.update({
+  await db.salesContract.update({
     where: { id: salesContractId },
-    data: { totalAmount },
+    data: buildDerivedSalesAmountUpdate(contract, totalAmount),
   });
 
   return {

@@ -340,6 +340,8 @@ model SalesContract {
   contractNo       String    @unique // EXP 编号，同时作为货柜标识
   // 销售信息
   totalAmount      Float     @default(0)
+  amountSource     String    @default("DERIVED") // DERIVED / FORMAL_DOCUMENT；正式合同金额不得被装箱明细覆盖
+  amountVerifiedAt DateTime?
   receivedAmount   Float     @default(0)
   exchangeRate     Float
   status           String    @default("DRAFT") // DRAFT/CONFIRMED/PACKING/SHIPPED/ARRIVED/COMPLETED
@@ -373,6 +375,7 @@ model SalesContract {
   packingListChecks   PackingListCheck[]
 
   @@index([status])
+  @@index([amountSource])
   @@index([portId])
   @@index([createdAt])
   @@map("sales_contracts")
