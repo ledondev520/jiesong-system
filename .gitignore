@@ -117,6 +117,7 @@ METRICS.md
 /skills/
 ops/
 state/byterover-home/
+/state/wechat-group-agent/
 
 # ============================================================
 # docs 下的内部过程产物（保留 api-contracts、PRD、架构文档）
