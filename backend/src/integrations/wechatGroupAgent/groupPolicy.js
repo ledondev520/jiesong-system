@@ -16,18 +16,28 @@ const assertAllowedGroup = (groupName, allowedGroups = parseGroupAllowlist()) =>
   return normalized;
 };
 
-const normalizeTitle = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+const normalizeTitleKey = (value) => String(value || '')
+  .normalize('NFKC')
+  .toLocaleLowerCase('zh-CN')
+  .replace(/[^\p{L}\p{N}]/gu, '');
 
 const assertSnapshotMatchesGroup = (snapshot, groupName) => {
   const observations = Array.isArray(snapshot?.observations) ? snapshot.observations : [];
-  const matched = observations.some((item) => {
-    const box = item.boundingBox || item.box || {};
-    const x = Number(box.x ?? item.x ?? 0);
-    const y = Number(box.y ?? item.y ?? 0);
-    const text = normalizeTitle(item.text || item.value);
-    if (x < 0.25 || y < 0.88) return false;
-    return text === groupName || text.startsWith(`${groupName}(`) || text.startsWith(`${groupName}（`);
-  });
+  const expected = normalizeTitleKey(groupName);
+  if (expected.length < 6) throw new Error('allowed group title anchor is too short');
+  const titleLine = observations
+    .filter((item) => {
+      const box = item.boundingBox || item.box || {};
+      return Number(box.x ?? item.x ?? 0) >= 0.25 && Number(box.y ?? item.y ?? 0) >= 0.92;
+    })
+    .sort((a, b) => {
+      const aBox = a.boundingBox || a.box || {};
+      const bBox = b.boundingBox || b.box || {};
+      return Number(aBox.x ?? a.x ?? 0) - Number(bBox.x ?? b.x ?? 0);
+    })
+    .map((item) => item.text || item.value || '')
+    .join(' ');
+  const matched = normalizeTitleKey(titleLine).includes(expected);
   if (!matched) throw new Error('visible WeChat title does not match the allowed group');
   return true;
 };
@@ -36,4 +46,5 @@ module.exports = {
   parseGroupAllowlist,
   assertAllowedGroup,
   assertSnapshotMatchesGroup,
+  normalizeTitleKey,
 };

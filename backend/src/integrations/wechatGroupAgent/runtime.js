@@ -31,7 +31,7 @@ class WechatGroupAgentRuntime {
     };
   }
 
-  async ingestSnapshot({ groupName, snapshot }) {
+  async ingestSnapshot({ groupName, snapshot, includeCurrent = false }) {
     const candidates = parseOcrSnapshot(snapshot, { groupName });
     const state = this.store.readState();
     const stateKey = crypto.createHash('sha256').update(groupName).digest('hex').slice(0, 16);
@@ -39,7 +39,7 @@ class WechatGroupAgentRuntime {
     const previous = new Set(state.snapshots?.[stateKey] || []);
     const current = candidates.map((item) => item.sourceFingerprint);
     const results = [];
-    if (hasBaseline) {
+    if (hasBaseline || includeCurrent) {
       for (const candidate of candidates) {
         if (!previous.has(candidate.sourceFingerprint)) {
           results.push(await this.ingest(candidate));

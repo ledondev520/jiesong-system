@@ -104,6 +104,7 @@ const main = async () => {
     const results = await runtime.ingestSnapshot({
       groupName,
       snapshot,
+      includeCurrent: values['include-current'] === true || values['include-current'] === 'true',
     });
     process.stdout.write(`${JSON.stringify({
       newMessages: results.filter((item) => item.created).length,
@@ -118,12 +119,22 @@ const main = async () => {
     const results = await runtime.ingestSnapshot({
       groupName,
       snapshot,
+      includeCurrent: values['include-current'] === true || values['include-current'] === 'true',
     });
     process.stdout.write(`${JSON.stringify({
       observations: snapshot.observations.length,
       newMessages: results.filter((item) => item.created).length,
       triggers: results.filter((item) => item.triggered).length,
     }, null, 2)}\n`);
+    return;
+  }
+
+  if (command === 'ack-draft') {
+    const result = new SecureDraftAdapter(stateDir).markSent({
+      groupName,
+      expectedCreatedAt: values['created-at'] ? String(values['created-at']) : null,
+    });
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
   }
 

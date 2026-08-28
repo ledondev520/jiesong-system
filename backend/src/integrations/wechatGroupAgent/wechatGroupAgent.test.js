@@ -15,6 +15,7 @@ const { parseOcrSnapshot } = require('./ocrSnapshotParser');
 const { buildSummaryMessages } = require('./summaryPrompt');
 const { WechatGroupAgentRuntime } = require('./runtime');
 const { parseGroupAllowlist, assertAllowedGroup, assertSnapshotMatchesGroup } = require('./groupPolicy');
+const { SecureDraftAdapter } = require('./draftAdapter');
 
 test('group allowlist uses exact names and fails closed', () => {
   const allowed = parseGroupAllowlist('捷淞工作群, 内部测试群\n采购群');
@@ -26,11 +27,12 @@ test('group allowlist uses exact names and fails closed', () => {
 
 test('snapshot group title must match the selected allowlisted group', () => {
   const snapshot = { observations: [
-    { text: '捷淞工作群(12)', boundingBox: { x: 0.45, y: 0.94, width: 0.2, height: 0.03 } },
+    { text: '丸捷淞 Seapot沟通', boundingBox: { x: 0.35, y: 0.94, width: 0.2, height: 0.03 } },
+    { text: '6 （4）', boundingBox: { x: 0.56, y: 0.94, width: 0.1, height: 0.03 } },
     { text: '客户需求', boundingBox: { x: 0.40, y: 0.55, width: 0.2, height: 0.03 } },
   ] };
-  assert.equal(assertSnapshotMatchesGroup(snapshot, '捷淞工作群'), true);
-  assert.throws(() => assertSnapshotMatchesGroup(snapshot, '其他群'), /does not match/);
+  assert.equal(assertSnapshotMatchesGroup(snapshot, '捷淞 Seapot沟通'), true);
+  assert.throws(() => assertSnapshotMatchesGroup(snapshot, '其他业务工作群'), /does not match/);
 });
 
 test('detectSummaryTrigger recognizes direct and mentioned summary requests', () => {
@@ -59,6 +61,7 @@ test('parseOcrSnapshot keeps chat pane observations and infers own side', () => 
   assert.equal(messages.length, 2);
   assert.equal(messages[0].isOwn, false);
   assert.equal(messages[1].isOwn, true);
+  assert.equal(messages[1].sender, '我');
 });
 
 test('summary prompt treats chat content as untrusted evidence', () => {
@@ -140,4 +143,34 @@ test('first OCR snapshot establishes a baseline and only later messages can trig
   assert.equal(calls.length, 1);
   assert.equal(calls[0].messages.length, 1);
   assert.equal(calls[0].messages[0].text, '新需求200个');
+});
+
+test('includeCurrent explicitly processes a visible trigger on the first snapshot', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wechat-group-current-'));
+  const store = new SecureJsonlMessageStore(root);
+  const calls = [];
+  const runtime = new WechatGroupAgentRuntime({
+    store,
+    summaryService: { summarize: async (args) => { calls.push(args); return '【群聊摘要】'; } },
+    outputAdapter: new SecureDraftAdapter(root),
+  });
+  const snapshot = { observations: [
+    { text: '灯厂至少30天', boundingBox: { x: 0.40, y: 0.55, width: 0.20, height: 0.04 } },
+    { text: '总结下', boundingBox: { x: 0.76, y: 0.30, width: 0.14, height: 0.04 } },
+  ] };
+  const results = await runtime.ingestSnapshot({ groupName: '测试群', snapshot, includeCurrent: true });
+  assert.equal(results.length, 2);
+  assert.equal(results[1].triggered, true);
+  assert.equal(calls[0].messages[0].text, '灯厂至少30天');
+});
+
+test('draft acknowledgement is atomic and bound to group and creation time', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wechat-group-draft-'));
+  const adapter = new SecureDraftAdapter(root);
+  await adapter.deliver({ groupName: '测试群', summary: '摘要', trigger: null });
+  const draft = adapter.read();
+  assert.throws(() => adapter.markSent({ groupName: '其他群' }), /does not match/);
+  const receipt = adapter.markSent({ groupName: '测试群', expectedCreatedAt: draft.createdAt });
+  assert.equal(receipt.status, 'sent');
+  assert.equal(adapter.read().status, 'sent');
 });

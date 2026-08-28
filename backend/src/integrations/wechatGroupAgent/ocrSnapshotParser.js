@@ -15,12 +15,13 @@ const toMessageCandidate = (item, { groupName, capturedAt }) => {
   const y = Number(box.y ?? item.y ?? 0);
   const width = Number(box.width ?? item.width ?? 0);
   const centerX = x + (width / 2);
+  const isOwn = centerX >= 0.68;
   return {
     groupName,
-    sender: '待识别成员',
+    sender: isOwn ? '我' : '待识别成员',
     kind: 'text',
     text,
-    isOwn: centerX >= 0.68,
+    isOwn,
     capturedAt,
     source: 'macos-vision-ocr',
     sourceFingerprint: crypto.createHash('sha256')
@@ -34,7 +35,7 @@ const parseOcrSnapshot = (snapshot, {
   capturedAt = snapshot?.capturedAt || new Date().toISOString(),
   minChatX = 0.30,
   minY = 0.10,
-  maxY = 0.90,
+  maxY = 0.87,
 } = {}) => {
   if (!groupName) throw new Error('groupName is required');
   const observations = Array.isArray(snapshot) ? snapshot : snapshot.observations;

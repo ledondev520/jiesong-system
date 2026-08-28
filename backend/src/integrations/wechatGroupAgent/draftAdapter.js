@@ -26,6 +26,27 @@ class SecureDraftAdapter {
     fs.chmodSync(this.draftPath, 0o600);
     return { delivered: false, mode: 'draft', path: this.draftPath };
   }
+
+  read() {
+    if (!fs.existsSync(this.draftPath)) return null;
+    return JSON.parse(fs.readFileSync(this.draftPath, 'utf8'));
+  }
+
+  markSent({ groupName, expectedCreatedAt }) {
+    const draft = this.read();
+    if (!draft) throw new Error('summary draft does not exist');
+    if (draft.groupName !== groupName) throw new Error('summary draft group does not match');
+    if (expectedCreatedAt && draft.createdAt !== expectedCreatedAt) {
+      throw new Error('summary draft changed before delivery acknowledgement');
+    }
+    const tempPath = `${this.draftPath}.tmp`;
+    const next = { ...draft, status: 'sent', sentAt: new Date().toISOString() };
+    fs.writeFileSync(tempPath, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
+    fs.chmodSync(tempPath, 0o600);
+    fs.renameSync(tempPath, this.draftPath);
+    fs.chmodSync(this.draftPath, 0o600);
+    return { status: next.status, sentAt: next.sentAt };
+  }
 }
 
 module.exports = {

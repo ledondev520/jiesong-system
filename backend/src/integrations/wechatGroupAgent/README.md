@@ -37,8 +37,14 @@ node src/agent/wechat-group/index.js snapshot \
 # 只读抓取当前可见微信窗口；首次运行会在受限 state 目录编译本机 OCR Helper
 node src/agent/wechat-group/index.js capture --group "测试群"
 
+# 仅用于人工确认后补捞当前可见画面；会处理首帧中的触发词
+node src/agent/wechat-group/index.js capture --group "测试群" --include-current
+
 # 常驻轮询；微信必须停留在该群，顶部群名必须与白名单精确匹配
 node src/agent/wechat-group/index.js watch --group "测试群" --interval 4
+
+# 群内发送成功后，将当前草稿标记为已发送，防止重复回发
+node src/agent/wechat-group/index.js ack-draft --group "测试群" --created-at "<draft createdAt>"
 ```
 
 ## Safety
