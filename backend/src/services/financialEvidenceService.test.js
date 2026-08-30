@@ -1,12 +1,13 @@
 /**
- * Input: financialEvidenceService、示例工作簿与 Prisma 测试 Adapter
- * Output: 财务分析资料分类、脱敏、幂等导入和查询契约测试
+ * Input: financialEvidenceService、示例工作簿/PDF 与 Prisma 测试 Adapter
+ * Output: 财务税务资料分类、脱敏、期间识别、幂等导入和查询契约测试
  * Pos: 财务分析资料库服务测试
  */
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const XLSX = require('xlsx');
+const PDFDocument = require('pdfkit');
 
 const createPayrollBuffer = () => {
   const workbook = XLSX.utils.book_new();
@@ -21,6 +22,26 @@ const createPayrollBuffer = () => {
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([[]]), '空白说明');
   return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 };
+
+const createTaxRefundBuffer = () => {
+  const workbook = XLSX.utils.book_new();
+  const sheet = XLSX.utils.aoa_to_sheet([
+    ['申报年月', '申报批次', '关联号', '退税额'],
+    ['202407', '001', '20240700100000001', 1.23],
+    ['202408', '001', '20240800100000001', 2.34],
+  ]);
+  XLSX.utils.book_append_sheet(workbook, sheet, '出口明细');
+  return XLSX.write(workbook, { type: 'buffer', bookType: 'xls' });
+};
+
+const createPdfBuffer = () => new Promise((resolve) => {
+  const chunks = [];
+  const document = new PDFDocument({ size: 'A4' });
+  document.on('data', (chunk) => chunks.push(chunk));
+  document.on('end', () => resolve(Buffer.concat(chunks)));
+  document.text('TAX REFUND ACCEPTANCE NOTICE');
+  document.end();
+});
 
 test('classifyFinancialEvidenceFile: 区分专用 Module 与剩余分析资料', () => {
   const service = require('./financialEvidenceService');
@@ -38,6 +59,48 @@ test('classifyFinancialEvidenceFile: 区分专用 Module 与剩余分析资料',
   assert.equal(voucher.category, 'VOUCHER');
   assert.equal(voucher.handledElsewhere, false);
   assert.equal(voucher.analysisScope, 'LEDGER');
+
+  assert.equal(
+    service.classifyFinancialEvidenceFile('外贸企业出口退税出口明细申报表_测试.xls').category,
+    'TAX_REFUND_EXPORT_DETAIL',
+  );
+  assert.equal(
+    service.classifyFinancialEvidenceFile('外贸企业出口退税进货明细申报表_测试.xls').category,
+    'TAX_REFUND_PURCHASE_DETAIL',
+  );
+  assert.equal(
+    service.classifyFinancialEvidenceFile('准予受理通知书_测试.pdf').category,
+    'TAX_REFUND_ACCEPTANCE_NOTICE',
+  );
+});
+
+test('parseFinancialEvidenceSource: 从退税明细行推断年度且不强行归到单月', () => {
+  const service = require('./financialEvidenceService');
+  const parsed = service.parseFinancialEvidenceSource({
+    buffer: createTaxRefundBuffer(),
+    fileName: '外贸企业出口退税出口明细申报表_测试.xls',
+    relativePath: '外贸企业出口退税出口明细申报表_测试.xls',
+  });
+
+  assert.equal(parsed.category, 'TAX_REFUND_EXPORT_DETAIL');
+  assert.equal(parsed.periodYear, 2024);
+  assert.equal(parsed.periodMonth, null);
+  assert.equal(parsed.rowCount, 3);
+});
+
+test('parseFinancialEvidencePdfSource: 将通知书每页作为结构化证据保存', async () => {
+  const service = require('./financialEvidenceService');
+  const parsed = await service.parseFinancialEvidencePdfSource({
+    buffer: await createPdfBuffer(),
+    fileName: '准予受理通知书.pdf',
+    relativePath: '准予受理通知书.pdf',
+  });
+
+  assert.equal(parsed.category, 'TAX_REFUND_ACCEPTANCE_NOTICE');
+  assert.equal(parsed.sourceSheetCount, 1);
+  assert.equal(parsed.importedSheetCount, 1);
+  assert.equal(parsed.rowCount, 1);
+  assert.match(parsed.sheets[0].rows[0].searchText, /TAX REFUND ACCEPTANCE NOTICE/);
 });
 
 test('parseFinancialEvidenceSource: 只保留非空行并在持久化前脱敏个人字段', () => {

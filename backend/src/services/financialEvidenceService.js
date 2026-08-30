@@ -1,7 +1,7 @@
 /**
- * Input: 财务工作簿 buffer、来源文件名/相对路径、Prisma Adapter 与查询筛选
+ * Input: 财务工作簿/PDF buffer、来源文件名/相对路径、Prisma Adapter 与查询筛选
  * Output: 分类后的脱敏结构化文档、幂等导入结果、资料库摘要与行级下钻
- * Pos: 剩余财务资料分析库深 Module；原始工作簿不落盘，个人敏感字段在持久化前脱敏
+ * Pos: 财务与税务证据分析库深 Module；原始文件不落盘，个人敏感字段在持久化前脱敏
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -10,10 +10,13 @@ const crypto = require('crypto');
 const XLSX = require('xlsx');
 const prisma = require('../utils/prisma');
 
-const PARSE_VERSION = 'financial-evidence-v1';
+const PARSE_VERSION = 'financial-evidence-v2';
 const REDACTED_VALUE = '<已脱敏>';
 
 const CATEGORY_RULES = [
+  { category: 'TAX_REFUND_EXPORT_DETAIL', label: '出口退税出口明细', analysisScope: 'TAX_REFUND', handledElsewhere: false, pattern: /外贸企业出口退税出口明细申报表.*\.xlsx?$/ },
+  { category: 'TAX_REFUND_PURCHASE_DETAIL', label: '出口退税进货明细', analysisScope: 'TAX_REFUND', handledElsewhere: false, pattern: /外贸企业出口退税进货明细申报表.*\.xlsx?$/ },
+  { category: 'TAX_REFUND_ACCEPTANCE_NOTICE', label: '出口退税准予受理通知书', analysisScope: 'TAX_REFUND', handledElsewhere: false, pattern: /准予受理通知书.*\.pdf$/ },
   { category: 'MONTHLY_STATEMENT', label: '会计报表', analysisScope: 'STATEMENT', handledElsewhere: true, pattern: /会计报表\.xlsx$/ },
   { category: 'ACCOUNT_BALANCE', label: '科目余额', analysisScope: 'LEDGER', handledElsewhere: true, pattern: /科目余额\.(xlsx|xls)$/ },
   { category: 'GENERAL_LEDGER_DETAIL', label: '明细账', analysisScope: 'LEDGER', handledElsewhere: true, pattern: /明细账\.xlsx$/ },
@@ -36,11 +39,18 @@ const CATEGORY_RULES = [
 ];
 
 const SENSITIVE_HEADER_PATTERN = /(姓名|证件|身份证|护照|手机|联系电话|电话号码|银行账号|银行卡|卡号|对方账号|个人账号|家庭住址|联系地址|邮箱|社保编号)/i;
+const BUSINESS_IDENTIFIER_HEADER_PATTERN = /(关联号|报关单号|发票号|进货凭证号|供货方纳税号|税票号|商品代码|证明号)/i;
 const SENSITIVE_VALUE_PATTERNS = [
   /(^|\D)\d{17}[\dXx](?=\D|$)/,
   /(^|\D)1[3-9]\d{9}(?=\D|$)/,
   /(^|\D)\d{16,19}(?=\D|$)/,
   /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i,
+];
+const PDF_SENSITIVE_VALUE_PATTERNS = [
+  /(?<!\d)\d{17}[\dXx](?!\d)/g,
+  /(?<!\d)1[3-9]\d{9}(?!\d)/g,
+  /(?<!\d)\d{16,19}(?!\d)/g,
+  /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,
 ];
 
 function classifyFinancialEvidenceFile(fileName) {
@@ -80,6 +90,25 @@ function detectPeriod(relativePath, fileName) {
     : { periodYear: null, periodMonth: null };
 }
 
+function inferPeriodFromValues(values) {
+  const periods = values
+    .flatMap((value) => {
+      const normalized = String(value ?? '').trim();
+      return /^(20\d{2})(0[1-9]|1[0-2])$/.test(normalized) ? [normalized] : [];
+    });
+  const uniquePeriods = [...new Set(periods)];
+  const years = [...new Set(uniquePeriods.map((period) => Number(period.slice(0, 4))))];
+  if (years.length !== 1) return { periodYear: null, periodMonth: null };
+  return {
+    periodYear: years[0],
+    periodMonth: uniquePeriods.length === 1 ? Number(uniquePeriods[0].slice(4, 6)) : null,
+  };
+}
+
+function inferPeriodFromSheets(sheets) {
+  return inferPeriodFromValues(sheets.flatMap((sheet) => sheet.rows.flatMap((row) => JSON.parse(row.valuesJson))));
+}
+
 function normalizeRelativePath(relativePath, fileName) {
   const normalized = String(relativePath || fileName || '')
     .replace(/\\/g, '/')
@@ -106,14 +135,27 @@ function isSensitiveHeader(value) {
   return typeof value === 'string' && SENSITIVE_HEADER_PATTERN.test(value);
 }
 
-function sanitizeValue(value, sensitiveColumn) {
+function sanitizeValue(value, sensitiveColumn, businessIdentifierColumn = false) {
   if (!isNonEmpty(value)) return { value: null, redacted: false };
   if (isSensitiveHeader(value)) return { value, redacted: false };
+  if (businessIdentifierColumn) return { value, redacted: false };
   const text = String(value);
   if (sensitiveColumn || SENSITIVE_VALUE_PATTERNS.some((pattern) => pattern.test(text))) {
     return { value: REDACTED_VALUE, redacted: true };
   }
   return { value, redacted: false };
+}
+
+function sanitizePdfText(value) {
+  let text = String(value || '');
+  let redactionCount = 0;
+  for (const pattern of PDF_SENSITIVE_VALUE_PATTERNS) {
+    text = text.replace(pattern, () => {
+      redactionCount += 1;
+      return REDACTED_VALUE;
+    });
+  }
+  return { value: text, redactionCount };
 }
 
 function inferRowKind(values, sourceRow, numericCellCount) {
@@ -128,12 +170,14 @@ function parseSheet(sheet, sheetName, sheetIndex) {
   if (!sheet?.['!ref']) return null;
   const range = XLSX.utils.decode_range(sheet['!ref']);
   const sensitiveColumns = new Set();
+  const businessIdentifierColumns = new Set();
   const scanEndRow = Math.min(range.e.r, range.s.r + 39);
 
   for (let row = range.s.r; row <= scanEndRow; row++) {
     for (let column = range.s.c; column <= range.e.c; column++) {
       const value = rawCellValue(sheet[XLSX.utils.encode_cell({ r: row, c: column })]);
       if (isSensitiveHeader(value)) sensitiveColumns.add(column);
+      if (typeof value === 'string' && BUSINESS_IDENTIFIER_HEADER_PATTERN.test(value)) businessIdentifierColumns.add(column);
     }
   }
 
@@ -159,7 +203,7 @@ function parseSheet(sheet, sheetName, sheetIndex) {
         rowNonEmpty = true;
         nonEmptyCellCount += 1;
       }
-      const sanitized = sanitizeValue(raw, sensitiveColumns.has(column));
+      const sanitized = sanitizeValue(raw, sensitiveColumns.has(column), businessIdentifierColumns.has(column));
       if (sanitized.redacted) {
         rowRedactions += 1;
         redactionCount += 1;
@@ -220,19 +264,22 @@ function parseFinancialEvidenceSource({ buffer, fileName, relativePath }) {
   }
 
   const safeRelativePath = normalizeRelativePath(relativePath, fileName);
-  const period = detectPeriod(safeRelativePath, fileName);
+  const pathPeriod = detectPeriod(safeRelativePath, fileName);
   const contentSha256 = sha256(buffer);
+  const sheets = workbook.SheetNames
+    .map((sheetName, sheetIndex) => parseSheet(workbook.Sheets[sheetName], sheetName, sheetIndex))
+    .filter(Boolean);
+
+  if (sheets.length === 0) throw new Error(`${fileName}: 没有可利用的非空 Sheet`);
+
+  const inferredPeriod = inferPeriodFromSheets(sheets);
+  const period = pathPeriod.periodYear ? pathPeriod : inferredPeriod;
   const sourceKey = sha256([
     classification.category,
     period.periodYear || '',
     period.periodMonth || '',
     safeRelativePath,
   ].join('|'));
-  const sheets = workbook.SheetNames
-    .map((sheetName, sheetIndex) => parseSheet(workbook.Sheets[sheetName], sheetName, sheetIndex))
-    .filter(Boolean);
-
-  if (sheets.length === 0) throw new Error(`${fileName}: 没有可利用的非空 Sheet`);
 
   return {
     sourceKey,
@@ -249,6 +296,98 @@ function parseFinancialEvidenceSource({ buffer, fileName, relativePath }) {
     numericCellCount: sheets.reduce((sum, sheet) => sum + sheet.numericCellCount, 0),
     textCellCount: sheets.reduce((sum, sheet) => sum + sheet.textCellCount, 0),
     redactionCount: sheets.reduce((sum, sheet) => sum + sheet.redactionCount, 0),
+    originalArchived: false,
+    sheets,
+  };
+}
+
+function normalizePdfText(items) {
+  return items
+    .map((item) => String(item?.str || '').trim())
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function parseFinancialEvidencePdfSource({ buffer, fileName, relativePath }) {
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw new Error('财务资料文件为空');
+  const classification = classifyFinancialEvidenceFile(fileName);
+  if (!classification.eligible || classification.category !== 'TAX_REFUND_ACCEPTANCE_NOTICE') {
+    throw new Error(`${fileName}: 未识别的出口退税 PDF 资料类型`);
+  }
+
+  let pdf;
+  try {
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer), disableWorker: true }).promise;
+  } catch (error) {
+    throw new Error(`${fileName}: PDF 解析失败（${error.message}）`);
+  }
+
+  const sheets = [];
+  const periodValues = [];
+  let redactionCount = 0;
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const text = normalizePdfText((await page.getTextContent()).items);
+    if (!text) continue;
+    const sanitized = sanitizePdfText(text);
+    const value = sanitized.value;
+    const monthMatch = value.match(/申报\s*年月\s*[:：]?\s*(20\d{2})(0[1-9]|1[0-2])/);
+    if (monthMatch) periodValues.push(`${monthMatch[1]}${monthMatch[2]}`);
+    redactionCount += sanitized.redactionCount;
+    sheets.push({
+      sheetIndex: pageNumber - 1,
+      sheetName: `第${pageNumber}页`,
+      sourceRange: `PDF:${pageNumber}`,
+      rowCount: 1,
+      columnCount: 1,
+      nonEmptyCellCount: 1,
+      formulaCellCount: 0,
+      numericCellCount: 0,
+      textCellCount: 1,
+      redactionCount: sanitized.redactionCount,
+      rows: [{
+        sourceRow: 1,
+        rowKind: 'DATA',
+        valuesJson: JSON.stringify([value]),
+        searchText: value.slice(0, 2000),
+        numericCellCount: 0,
+        textCellCount: 1,
+        redactionCount: sanitized.redactionCount,
+      }],
+    });
+  }
+  if (sheets.length === 0) throw new Error(`${fileName}: PDF 没有可利用的文本页`);
+
+  const safeRelativePath = normalizeRelativePath(relativePath, fileName);
+  const pathPeriod = detectPeriod(safeRelativePath, fileName);
+  const inferredPeriod = inferPeriodFromValues(periodValues);
+  const period = pathPeriod.periodYear ? pathPeriod : inferredPeriod;
+  const contentSha256 = sha256(buffer);
+  const sourceKey = sha256([
+    classification.category,
+    period.periodYear || '',
+    period.periodMonth || '',
+    safeRelativePath,
+  ].join('|'));
+
+  return {
+    sourceKey,
+    contentSha256,
+    parseVersion: PARSE_VERSION,
+    relativePath: safeRelativePath,
+    fileName: String(fileName).slice(0, 500),
+    fileSize: buffer.length,
+    ...classification,
+    ...period,
+    sourceSheetCount: pdf.numPages,
+    importedSheetCount: sheets.length,
+    rowCount: sheets.length,
+    numericCellCount: 0,
+    textCellCount: sheets.length,
+    redactionCount,
     originalArchived: false,
     sheets,
   };
@@ -450,6 +589,7 @@ module.exports = {
   REDACTED_VALUE,
   classifyFinancialEvidenceFile,
   parseFinancialEvidenceSource,
+  parseFinancialEvidencePdfSource,
   importFinancialEvidenceDocuments,
   getFinancialEvidenceSummary,
   listFinancialEvidenceDocuments,
