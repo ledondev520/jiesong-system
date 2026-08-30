@@ -12,6 +12,11 @@ const {
   parseGroupAllowlist,
   assertAllowedGroup,
   assertSnapshotMatchesGroup,
+  ListenerHealthStore,
+  LocalListenerManager,
+  runListener,
+  superviseListener,
+  summarizeListenerStatus,
 } = require('../../integrations/wechatGroupAgent');
 
 const PROJECT_ROOT = path.resolve(__dirname, '../../../..');
@@ -40,8 +45,6 @@ const requireValue = (values, key) => {
   return value;
 };
 
-const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
-
 const buildRuntime = (stateDir) => {
   const store = new SecureJsonlMessageStore(stateDir);
   return new WechatGroupAgentRuntime({
@@ -64,6 +67,22 @@ const main = async () => {
   const stateDir = path.resolve(values.state || process.env.WECHAT_GROUP_AGENT_STATE_DIR || DEFAULT_STATE_DIR);
   const runtime = buildRuntime(stateDir);
   const allowedGroups = parseGroupAllowlist();
+  const localListenerManager = new LocalListenerManager(stateDir);
+  const healthStore = new ListenerHealthStore(stateDir);
+
+  if (command === 'status') {
+    const managerStatus = localListenerManager.status();
+    process.stdout.write(`${JSON.stringify({ ...summarizeListenerStatus({
+      health: healthStore.read(),
+      loaded: managerStatus.running,
+    }), ...managerStatus }, null, 2)}\n`);
+    return;
+  }
+
+  if (command === 'stop') {
+    process.stdout.write(`${JSON.stringify(localListenerManager.stop(), null, 2)}\n`);
+    return;
+  }
 
   if (command === 'doctor') {
     process.stdout.write(`${JSON.stringify({
@@ -79,6 +98,38 @@ const main = async () => {
   }
 
   const groupName = assertAllowedGroup(requireValue(values, 'group'), allowedGroups);
+
+  if (command === 'start') {
+    const intervalSeconds = Math.max(2, Math.min(Number(values.interval) || 4, 60));
+    const result = localListenerManager.start({
+      nodePath: process.execPath,
+      scriptPath: __filename,
+      workingDirectory: path.join(PROJECT_ROOT, 'backend'),
+      groupName,
+      intervalSeconds,
+    });
+    process.stdout.write(`${JSON.stringify({
+      ...result,
+      groupName,
+      intervalSeconds,
+      mode: 'draft',
+      autoSendEnabled: false,
+    }, null, 2)}\n`);
+    return;
+  }
+
+  if (command === 'supervise-child') {
+    const intervalSeconds = Math.max(2, Math.min(Number(values.interval) || 4, 60));
+    await superviseListener({
+      nodePath: process.execPath,
+      scriptPath: __filename,
+      workingDirectory: path.join(PROJECT_ROOT, 'backend'),
+      stateDir,
+      groupName,
+      intervalSeconds,
+    });
+    return;
+  }
 
   if (command === 'ingest') {
     const result = await runtime.ingest({
@@ -138,11 +189,10 @@ const main = async () => {
     return;
   }
 
-  if (command === 'watch') {
+  if (command === 'watch' || command === 'run-supervised') {
     const captureAdapter = buildCaptureAdapter(stateDir);
     const intervalSeconds = Math.max(2, Math.min(Number(values.interval) || 4, 60));
     let stopped = false;
-    let lastError = null;
     process.once('SIGINT', () => { stopped = true; });
     process.once('SIGTERM', () => { stopped = true; });
     process.stdout.write(`${JSON.stringify({
@@ -151,25 +201,22 @@ const main = async () => {
       intervalSeconds,
       mode: 'draft',
     })}\n`);
-    while (!stopped) {
-      try {
-        const snapshot = captureAdapter.captureWechatWindow();
-        assertSnapshotMatchesGroup(snapshot, groupName);
-        lastError = null;
-        const results = await runtime.ingestSnapshot({ groupName, snapshot });
-        const newMessages = results.filter((item) => item.created).length;
-        const triggers = results.filter((item) => item.triggered).length;
-        if (newMessages > 0 || triggers > 0) {
-          process.stdout.write(`${JSON.stringify({ newMessages, triggers, at: new Date().toISOString() })}\n`);
-        }
-      } catch (error) {
-        if (error.message !== lastError) {
-          process.stderr.write(`wechat-group-agent watch: ${error.message}\n`);
-          lastError = error.message;
-        }
-      }
-      if (!stopped) await delay(intervalSeconds * 1_000);
-    }
+    let lastEventKey = null;
+    await runListener({
+      groupName,
+      intervalSeconds,
+      capture: () => captureAdapter.captureWechatWindow(),
+      validate: assertSnapshotMatchesGroup,
+      ingestSnapshot: (input) => runtime.ingestSnapshot(input),
+      healthStore,
+      shouldStop: () => stopped,
+      onEvent: (event) => {
+        const eventKey = event.degraded ? `degraded:${event.errorCode}` : 'messages';
+        if (eventKey === lastEventKey && event.degraded) return;
+        lastEventKey = eventKey;
+        process.stdout.write(`${JSON.stringify(event)}\n`);
+      },
+    });
     return;
   }
 

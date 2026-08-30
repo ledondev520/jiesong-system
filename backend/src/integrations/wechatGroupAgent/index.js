@@ -8,6 +8,15 @@ const { detectSummaryTrigger } = require('./triggerPolicy');
 const { parseOcrSnapshot } = require('./ocrSnapshotParser');
 const { MacOcrCaptureAdapter } = require('./macOcrCaptureAdapter');
 const { parseGroupAllowlist, assertAllowedGroup, assertSnapshotMatchesGroup } = require('./groupPolicy');
+const {
+  ListenerHealthStore,
+  LocalListenerManager,
+  classifyListenerError,
+  detectWechatLoginRequired,
+  runListener,
+  superviseListener,
+  summarizeListenerStatus,
+} = require('./listenerSupervisor');
 
 module.exports = {
   SecureJsonlMessageStore,
@@ -20,4 +29,11 @@ module.exports = {
   parseGroupAllowlist,
   assertAllowedGroup,
   assertSnapshotMatchesGroup,
+  ListenerHealthStore,
+  LocalListenerManager,
+  classifyListenerError,
+  detectWechatLoginRequired,
+  runListener,
+  superviseListener,
+  summarizeListenerStatus,
 };

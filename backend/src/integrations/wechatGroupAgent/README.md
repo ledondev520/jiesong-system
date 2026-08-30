@@ -43,6 +43,15 @@ node src/agent/wechat-group/index.js capture --group "测试群" --include-curre
 # 常驻轮询；微信必须停留在该群，顶部群名必须与白名单精确匹配
 node src/agent/wechat-group/index.js watch --group "测试群" --interval 4
 
+# 后台启动（推荐）：父进程守护监听子进程，异常退出后自动拉起
+node src/agent/wechat-group/index.js start --group "测试群" --interval 4
+
+# 查看真实健康状态；不能只看 PID，heartbeatFresh 和 lastSuccessAt 才代表采集链路可用
+node src/agent/wechat-group/index.js status
+
+# 停止后台守护和监听子进程
+node src/agent/wechat-group/index.js stop
+
 # 群内发送成功后，将当前草稿标记为已发送，防止重复回发
 node src/agent/wechat-group/index.js ack-draft --group "测试群" --created-at "<draft createdAt>"
 ```
@@ -55,3 +64,6 @@ node src/agent/wechat-group/index.js ack-draft --group "测试群" --created-at 
 - 自动发送 Adapter 尚未启用；接入前必须补充群白名单、当前群标题复核和速率限制。
 - 每次采集都复核微信顶部群标题；标题缺失、白屏或切到其他群时只报错，不采集。
 - OCR 只能读取当前可见窗口；锁屏、微信最小化或群未打开时失败关闭。
+- 后台模式写入 `listener-health.json` 和 `listener-supervisor.json`：前者记录心跳、成功采集、连续错误和消息计数，后者记录父子进程及重启次数；两者均为 `0600`，不保存错误原文或聊天正文。
+- 微信退出登录、白屏或切到其他群时，守护进程继续存活并标记 `degraded`，不会把其他窗口当成目标群；恢复登录并重新打开白名单群后可自动回到 `healthy`。
+- 当前采用从已获屏幕录制权限的本地会话启动的守护进程。macOS `launchd` 直接启动会失去现有屏幕录制授权，因此没有采用“PID 在线但无法抓图”的伪常驻方案。电脑重启后需再次执行 `start`。

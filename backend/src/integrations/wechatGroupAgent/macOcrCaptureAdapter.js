@@ -32,7 +32,10 @@ class MacOcrCaptureAdapter {
   }
 
   ensureCompiled() {
-    if (!fs.existsSync(this.binaryPath)) this.compile();
+    const binaryMissing = !fs.existsSync(this.binaryPath);
+    const sourceIsNewer = !binaryMissing
+      && fs.statSync(this.sourcePath).mtimeMs > fs.statSync(this.binaryPath).mtimeMs;
+    if (binaryMissing || sourceIsNewer) this.compile();
   }
 
   captureWechatWindow() {

@@ -16,6 +16,13 @@ const { buildSummaryMessages } = require('./summaryPrompt');
 const { WechatGroupAgentRuntime } = require('./runtime');
 const { parseGroupAllowlist, assertAllowedGroup, assertSnapshotMatchesGroup } = require('./groupPolicy');
 const { SecureDraftAdapter } = require('./draftAdapter');
+const { MacOcrCaptureAdapter } = require('./macOcrCaptureAdapter');
+const {
+  ListenerHealthStore,
+  detectWechatLoginRequired,
+  runListener,
+  summarizeListenerStatus,
+} = require('./listenerSupervisor');
 
 test('group allowlist uses exact names and fails closed', () => {
   const allowed = parseGroupAllowlist('捷淞工作群, 内部测试群\n采购群');
@@ -173,4 +180,105 @@ test('draft acknowledgement is atomic and bound to group and creation time', asy
   const receipt = adapter.markSent({ groupName: '测试群', expectedCreatedAt: draft.createdAt });
   assert.equal(receipt.status, 'sent');
   assert.equal(adapter.read().status, 'sent');
+});
+
+test('listener health is private, advances counters, and redacts capture errors', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wechat-group-health-'));
+  const timestamps = [
+    new Date('2026-08-30T10:00:00.000Z'),
+    new Date('2026-08-30T10:00:04.000Z'),
+    new Date('2026-08-30T10:00:08.000Z'),
+  ];
+  const health = new ListenerHealthStore(root, { now: () => timestamps.shift() });
+  health.begin({ groupName: '捷淞工作群', intervalSeconds: 4, pid: 123 });
+  health.recordSuccess({ observations: 30, newMessages: 2, triggers: 1 });
+  const degraded = health.recordFailure(new Error('customer secret body should never enter health'));
+
+  assert.equal(degraded.status, 'degraded');
+  assert.equal(degraded.totalCaptureAttempts, 2);
+  assert.equal(degraded.totalCaptureSuccesses, 1);
+  assert.equal(degraded.totalNewMessages, 2);
+  assert.equal(degraded.totalTriggers, 1);
+  assert.equal(degraded.lastErrorCode, 'CAPTURE_FAILED');
+  assert.doesNotMatch(JSON.stringify(degraded), /customer secret body/);
+  assert.equal(fs.statSync(root).mode & 0o777, 0o700);
+  assert.equal(fs.statSync(path.join(root, 'listener-health.json')).mode & 0o777, 0o600);
+});
+
+test('listener loop stays alive across a failed capture and reports only safe codes', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wechat-group-loop-'));
+  const healthStore = new ListenerHealthStore(root);
+  let captureCount = 0;
+  const events = [];
+  const snapshot = { observations: [{ text: '捷淞工作群', boundingBox: { x: 0.3, y: 0.95 } }] };
+
+  await runListener({
+    groupName: '捷淞工作群',
+    intervalSeconds: 2,
+    capture: () => {
+      captureCount += 1;
+      if (captureCount === 2) throw new Error('raw confidential message');
+      return snapshot;
+    },
+    validate: () => true,
+    ingestSnapshot: async () => [{ created: true, triggered: false }],
+    healthStore,
+    wait: async () => {},
+    maxIterations: 2,
+    onEvent: (event) => events.push(event),
+  });
+
+  const health = healthStore.read();
+  assert.equal(captureCount, 2);
+  assert.equal(health.status, 'stopped');
+  assert.equal(health.totalCaptureAttempts, 2);
+  assert.equal(health.totalCaptureSuccesses, 1);
+  assert.equal(health.lastErrorCode, 'CAPTURE_FAILED');
+  assert.deepEqual(events.map((item) => item.errorCode || 'message'), ['message', 'CAPTURE_FAILED']);
+  assert.doesNotMatch(JSON.stringify(events), /raw confidential message/);
+});
+
+test('listener identifies a logged-out WeChat snapshot without storing message text', () => {
+  assert.equal(detectWechatLoginRequired({ observations: [{ text: '为了你的账号安全，请重新登录。' }] }), true);
+  assert.equal(detectWechatLoginRequired({ observations: [{ text: '需在手机上完成登录' }] }), true);
+  assert.equal(detectWechatLoginRequired({ observations: [{ text: '正常群消息' }] }), false);
+});
+
+test('listener status distinguishes fresh, stale, and unloaded processes', () => {
+  const base = {
+    status: 'healthy',
+    intervalSeconds: 4,
+    heartbeatAt: '2026-08-30T10:00:00.000Z',
+  };
+  assert.equal(summarizeListenerStatus({
+    health: base,
+    loaded: true,
+    now: new Date('2026-08-30T10:00:20.000Z'),
+  }).status, 'healthy');
+  assert.equal(summarizeListenerStatus({
+    health: base,
+    loaded: true,
+    now: new Date('2026-08-30T10:02:00.000Z'),
+  }).status, 'stale');
+  assert.equal(summarizeListenerStatus({
+    health: base,
+    loaded: false,
+    now: new Date('2026-08-30T10:00:20.000Z'),
+  }).status, 'not-loaded');
+});
+
+test('macOS capture adapter recompiles when its source is newer than the helper', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wechat-group-compile-'));
+  const sourcePath = path.join(root, 'helper.m');
+  const binaryPath = path.join(root, 'helper');
+  fs.writeFileSync(sourcePath, 'source');
+  fs.writeFileSync(binaryPath, 'binary');
+  const now = Date.now() / 1_000;
+  fs.utimesSync(binaryPath, now - 10, now - 10);
+  fs.utimesSync(sourcePath, now, now);
+  const adapter = new MacOcrCaptureAdapter({ sourcePath, binaryPath });
+  let compiled = 0;
+  adapter.compile = () => { compiled += 1; };
+  adapter.ensureCompiled();
+  assert.equal(compiled, 1);
 });

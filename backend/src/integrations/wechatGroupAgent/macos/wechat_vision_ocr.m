@@ -34,15 +34,28 @@ static CGImageRef captureWechatWindow(void) {
             }
 
             SCWindow *bestWindow = nil;
-            CGFloat bestArea = 0;
+            CGFloat bestScore = 0;
             for (SCWindow *window in content.windows) {
                 NSString *owner = window.owningApplication.applicationName ?: @"";
+                NSString *bundleIdentifier = window.owningApplication.bundleIdentifier ?: @"";
+                NSString *title = window.title ?: @"";
                 BOOL isWechat = [owner localizedCaseInsensitiveContainsString:@"wechat"] || [owner containsString:@"微信"];
+                BOOL isPrimaryWechat = [bundleIdentifier isEqualToString:@"com.tencent.xinWeChat"];
+                BOOL hasMainTitle = [title isEqualToString:@"微信"] || [title localizedCaseInsensitiveCompare:@"WeChat"] == NSOrderedSame;
                 CGFloat area = window.frame.size.width * window.frame.size.height;
+                CGFloat score = area + (isPrimaryWechat ? 100000000 : 0) + (hasMainTitle ? 1000000000 : 0);
                 if (window.windowLayer == 0 && window.isOnScreen && isWechat &&
-                    window.frame.size.width >= 500 && window.frame.size.height >= 400 && area > bestArea) {
+                    window.frame.size.width >= 250 && window.frame.size.height >= 350 &&
+                    isPrimaryWechat && hasMainTitle) {
+                    // ScreenCaptureKit lists windows front-to-back. The first exact main window
+                    // avoids a larger stale/blank WeChat surface left behind during re-login.
                     bestWindow = window;
-                    bestArea = area;
+                    break;
+                }
+                if (window.windowLayer == 0 && window.isOnScreen && isWechat &&
+                    window.frame.size.width >= 250 && window.frame.size.height >= 350 && score > bestScore) {
+                    bestWindow = window;
+                    bestScore = score;
                 }
             }
             if (bestWindow == nil) {
@@ -75,6 +88,45 @@ static CGImageRef captureWechatWindow(void) {
             failure ?: @"unknown error"]);
     }
     return capturedImage;
+}
+
+static NSArray *listWechatWindows(void) {
+    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+    __block NSArray *result = nil;
+    __block NSString *failure = nil;
+    [SCShareableContent getShareableContentExcludingDesktopWindows:YES
+        onScreenWindowsOnly:YES
+        completionHandler:^(SCShareableContent *content, NSError *error) {
+            if (error != nil || content == nil) {
+                failure = error.localizedDescription ?: @"unable to read shareable windows";
+                dispatch_semaphore_signal(semaphore);
+                return;
+            }
+            NSMutableArray *windows = [NSMutableArray array];
+            for (SCWindow *window in content.windows) {
+                NSString *owner = window.owningApplication.applicationName ?: @"";
+                BOOL isWechat = [owner localizedCaseInsensitiveContainsString:@"wechat"] || [owner containsString:@"微信"];
+                if (!isWechat) continue;
+                NSString *title = window.title ?: @"";
+                [windows addObject:@{
+                    @"owner": owner,
+                    @"bundleIdentifier": window.owningApplication.bundleIdentifier ?: @"",
+                    @"width": @(window.frame.size.width),
+                    @"height": @(window.frame.size.height),
+                    @"layer": @(window.windowLayer),
+                    @"isOnScreen": @(window.isOnScreen),
+                    @"titleLength": @(title.length),
+                    @"titleIsMain": @([title isEqualToString:@"微信"] || [title localizedCaseInsensitiveCompare:@"WeChat"] == NSOrderedSame),
+                }];
+            }
+            result = windows;
+            dispatch_semaphore_signal(semaphore);
+        }];
+    if (dispatch_semaphore_wait(semaphore, dispatch_time(DISPATCH_TIME_NOW, 15 * NSEC_PER_SEC)) != 0) {
+        fail(@"timed out while listing WeChat windows");
+    }
+    if (result == nil) fail(failure ?: @"unable to list WeChat windows");
+    return result;
 }
 
 static NSDictionary *recognize(CGImageRef image, NSString *source) {
@@ -135,6 +187,12 @@ int main(int argc, const char *argv[]) {
             fwrite("\n", 1, 1, stdout);
             return 0;
         }
-        fail(@"usage: wechat-vision-ocr --image /absolute/path.png | --wechat-window");
+        if (argc == 2 && strcmp(argv[1], "--list-wechat-windows") == 0) {
+            NSData *json = [NSJSONSerialization dataWithJSONObject:listWechatWindows() options:0 error:nil];
+            fwrite(json.bytes, 1, json.length, stdout);
+            fwrite("\n", 1, 1, stdout);
+            return 0;
+        }
+        fail(@"usage: wechat-vision-ocr --image /absolute/path.png | --wechat-window | --list-wechat-windows");
     }
 }
