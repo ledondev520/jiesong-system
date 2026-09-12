@@ -9,6 +9,8 @@ const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const ROOT = path.resolve(__dirname, '..');
 const STATUS = path.join(ROOT, 'backend/state/wps-sync/status.json');
+// 预览、备份和写库各自限时；超时由既有失败路径记录并释放锁，下一轮重新核对。
+const runCommand = (command, args, options = {}) => execFileSync(command, args, { timeout: 120000, stdio: 'pipe', ...options });
 function save(file, value) {
   fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
   fs.chmodSync(path.dirname(file), 0o700);
@@ -53,18 +55,18 @@ async function main() {
     const out = path.join(dir, `${runId}-${mode}.json`);
     const args = [path.join(__dirname,'sync_shipment_summary.js'),'--source',data.source,'--sha256',data.digest,'--out',out];
     if (mode === 'apply') args.push('--apply-plan',data.previewDigest);
-    execFileSync(process.execPath,args,{cwd:ROOT,env:{...process.env,NODE_ENV:'production',DATABASE_URL:`file:${db}`},stdio:'pipe'});
+    runCommand(process.execPath,args,{cwd:ROOT,env:{...process.env,NODE_ENV:'production',DATABASE_URL:`file:${db}`}});
     return read(out);
   };
   const backup = async () => {
     const folder = path.join(ROOT,'backend/prisma/backups');
     fs.mkdirSync(folder,{recursive:true,mode:0o700}); fs.chmodSync(folder,0o700);
     const target = path.join(folder,`wps-sync-${runId}.db`);
-    execFileSync('python3',['-c',"import sqlite3,sys,os; os.umask(0o077); a=sqlite3.connect('file:'+sys.argv[1]+'?mode=ro',uri=True); b=sqlite3.connect(sys.argv[2]); a.backup(b); assert b.execute('pragma quick_check').fetchone()[0]=='ok'; b.close(); a.close()",db,target],{stdio:'pipe'});
+    runCommand('python3',['-c',"import sqlite3,sys,os; os.umask(0o077); a=sqlite3.connect('file:'+sys.argv[1]+'?mode=ro',uri=True); b=sqlite3.connect(sys.argv[2]); a.backup(b); assert b.execute('pragma quick_check').fetchone()[0]=='ok'; b.close(); a.close()",db,target]);
     fs.chmodSync(target,0o600);
   };
   const result = await runSync({source:flag==='--source'?path.resolve(value):undefined,failed:flag==='--failed'?value:undefined,execute,backup});
   console.log(JSON.stringify(result));
 }
-module.exports = {runSync};
+module.exports = {runSync, runCommand};
 if (require.main === module) main().catch(()=>{console.error('WPS同步未完成；检查受限回执及首页状态。');process.exitCode=1;});
