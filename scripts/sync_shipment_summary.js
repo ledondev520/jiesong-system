@@ -11,7 +11,9 @@ const { PrismaClient } = require('../backend/node_modules/@prisma/client');
 
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const text = value => value == null ? '' : String(value).trim();
-const storeKey = value => text(value).toLowerCase();
+const storeKey = value => text(value).toLowerCase().replace(/^安娜汉姆$/, '安纳汉姆');
+// 历史源表名称经同合同箱单与现有装箱行核实；不做模糊名称匹配。
+const productKey = value => ({ '玻璃瓶（玻璃酒瓶': '玻璃酒瓶', '电磁炉（餐桌': '餐桌', '泉州铁艺酒架（铁艺屏风': '铁艺酒架屏风' }[text(value)] || text(value));
 const unique = values => [...new Set(values.filter(Boolean))];
 const numericColumns = { quantity: '报关数量', boxes: '箱数', grossWeight: '毛重', netWeight: '净重', volume: '体积' };
 const textColumns = { unit: '单位', specification: '规格', supplement: '商品补充信息', manufacturer: '厂家', purchaseContractNo: '购销合同号' };
@@ -76,6 +78,7 @@ function parseSource(buffer) {
 }
 
 function buildPlan(source, state, today) {
+  source = { ...source, rows: source.rows.map(row => ({ ...row, productName: productKey(row.productName) })) };
   const operations = [], conflicts = [...source.conflicts];
   const contracts = new Map(state.contracts.map(c => [c.contractNo, c]));
   const groups = new Map();
@@ -120,6 +123,11 @@ function buildPlan(source, state, today) {
         const batchMatches = data => row.data.quantity > 0 && row.data.boxes > 0 && equal(data.quantity, row.data.quantity) && equal(data.boxes, row.data.boxes);
         duplicates = duplicates.filter(r => batchMatches(r.data));
         candidates = candidates.filter(batchMatches);
+        if (duplicates.length > 1 || candidates.length > 1) {
+          const weightsMatch = data => row.data.grossWeight > 0 && row.data.netWeight > 0 && equal(data.grossWeight, row.data.grossWeight) && equal(data.netWeight, row.data.netWeight);
+          duplicates = duplicates.filter(r => weightsMatch(r.data));
+          candidates = candidates.filter(weightsMatch);
+        }
         if (candidates.length !== 1) {
           conflicts.push({ row: row.row, contractNo, reason: '商品、门店、采购合同组合不唯一' }); complete = false; continue;
         }

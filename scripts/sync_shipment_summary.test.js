@@ -80,3 +80,14 @@ test('已确认出货源可纠正未被报关引用的装箱数量，保留销�
  const plan=buildPlan({rows:[row],conflicts:[]},s,'2026-09-12');const op=plan.operations.find(o=>o.id==='p');
  assert.equal(op.data.quantity,10);assert(!('unitPrice' in op.data));assert(!('totalPrice' in op.data));
 });
+test('核实的历史名称别名只匹配同一商品门店，不新增主数据',()=>{
+ const s=structuredClone(state);s.packing[0].product.customsName='玻璃酒瓶';s.packing[0].store.name='安纳汉姆';
+ const r={...row,productName:'玻璃瓶（玻璃酒瓶',storeName:'安娜汉姆'};
+ const plan=buildPlan({rows:[r],conflicts:[]},s,'2026-09-12');assert(plan.operations.some(o=>o.id==='p'));assert(!plan.operations.some(o=>o.create));
+});
+test('同数量箱数的不同批次需毛重净重双向唯一，完全重复源行仍拒绝',()=>{
+ const s=structuredClone(state);s.packing=[{...s.packing[0],quantity:10,boxes:2,grossWeight:8,netWeight:7},{...s.packing[0],id:'p2',quantity:10,boxes:2,grossWeight:9,netWeight:8}];
+ const rows=[{...row,data:{...row.data,netWeight:7,manufacturer:'A'}},{...row,row:3,data:{...row.data,grossWeight:9,netWeight:8,manufacturer:'B'}}];
+ const ops=buildPlan({rows,conflicts:[]},s,'2026-09-12').operations.filter(o=>o.model==='packingItem');
+ assert.deepEqual(ops.map(o=>[o.id,o.data.manufacturer]),[['p','A'],['p2','B']]);
+});
