@@ -18,6 +18,18 @@ const textColumns = { unit: '单位', specification: '规格', supplement: '商�
 const equal = (a, b) => typeof b === 'number' ? a != null && Math.abs(a - b) < 0.000001 : a === b;
 const changes = (old, data) => Object.fromEntries(Object.entries(data).filter(([key, value]) => !equal(old[key], value)));
 
+function parseQuantity(value) {
+  const raw = text(value).replace(/,/g, '');
+  if (/^\d+(?:\.\d+)?$/.test(raw)) return Number(raw);
+  // 只接受单个前括号、同单位加法、明确“报”数量；其他注释不猜测。
+  const bracket = raw.match(/^[（(](\d+(?:\.\d+)?)[）)]?$/);
+  if (bracket) return Number(bracket[1]);
+  const sum = raw.match(/^(\d+(?:\.\d+)?)(方|平方米)\+(\d+(?:\.\d+)?)\2$/);
+  if (sum) return Number(sum[1]) + Number(sum[3]);
+  const declared = raw.match(/^\d+(?:\.\d+)?[（(]报(\d+(?:\.\d+)?)(?:平|平方米)[）)]$/);
+  return declared ? Number(declared[1]) : NaN;
+}
+
 function parseSource(buffer) {
   // Excel 日期是无时区的日历值；保留序列号，不能经本地 Date 转 UTC 导致减一天。
   const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false });
@@ -45,7 +57,7 @@ function parseSource(buffer) {
       for (const [key, column] of Object.entries(numericColumns)) {
         const value = get(column);
         if (value == null || value === '') continue;
-        const n = Number(typeof value === 'string' ? value.replace(/,/g, '') : value);
+        const n = key === 'quantity' ? parseQuantity(value) : Number(typeof value === 'string' ? value.replace(/,/g, '') : value);
         if (!Number.isFinite(n) || n < 0 || (key === 'boxes' && !Number.isInteger(n))) throw new Error(`${column}不是有效非负数字`);
         row.data[key] = n;
       }
@@ -123,7 +135,7 @@ function buildPlan(source, state, today) {
         if (Object.keys(data).length) {
           if (candidate._count.customsDeclarationItems || contract._count.inventories || contract._count.items) {
             // 用户确认出货汇总为主准；纠正装箱资料，不改历史报关快照或财务关联。
-            const metadata = Object.fromEntries(Object.entries(data).filter(([key]) => ['boxes', 'grossWeight', 'netWeight', 'volume', 'unit', 'specification', 'supplement', 'manufacturer'].includes(key) || (key === 'purchaseContractNo' && !candidate.purchaseContractNo)));
+            const metadata = Object.fromEntries(Object.entries(data).filter(([key]) => ['boxes', 'grossWeight', 'netWeight', 'volume', 'unit', 'specification', 'supplement', 'manufacturer'].includes(key) || (key === 'purchaseContractNo' && !candidate.purchaseContractNo) || (key === 'quantity' && !candidate._count.customsDeclarationItems)));
             if (Object.keys(metadata).length) operations.push({ model: 'packingItem', id: candidate.id, data: metadata, row: row.row, contractNo });
             for (const key of Object.keys(metadata)) delete data[key];
             if (Object.keys(data).length) {
@@ -215,5 +227,5 @@ async function main() {
   } finally { await db.$disconnect(); }
 }
 
-module.exports = { parseSource, buildPlan };
+module.exports = { parseSource, buildPlan, parseQuantity };
 if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });

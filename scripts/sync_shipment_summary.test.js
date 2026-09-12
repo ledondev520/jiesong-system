@@ -69,3 +69,14 @@ test('门店英文大小写一致；缺采购号的唯一同数量同规格记�
  s.packing[0].purchaseContractNo='CG002';assert(!buildPlan({rows:[r],conflicts:[]},s,'2026-09-12').operations.some(o=>o.model==='packingItem'));
  s.packing[0].purchaseContractNo=null;s.packing.push({...s.packing[0],id:'p2'});assert(!buildPlan({rows:[r],conflicts:[]},s,'2026-09-12').operations.some(o=>o.model==='packingItem'));
 });
+test('只解析明确数量表达，不替含两种无标注数量或算式的单元格猜数',()=>{
+ const {parseQuantity}=require('./sync_shipment_summary');
+ assert.equal(parseQuantity('（6'),6);assert.equal(parseQuantity('(1480'),1480);
+ assert.equal(parseQuantity('50方+50方'),100);assert.equal(parseQuantity('27.36（报75平）'),75);
+ for(const raw of ['6（2','29（60','17（48.96','=3.6*1.2（8)','淘宝购买','50方+50个'])assert(Number.isNaN(parseQuantity(raw)));
+});
+test('已确认出货源可纠正未被报关引用的装箱数量，保留销售价格与库存记录',()=>{
+ const s=structuredClone(state);s.contracts[0]._count.items=1;s.contracts[0].status='SHIPPED';
+ const plan=buildPlan({rows:[row],conflicts:[]},s,'2026-09-12');const op=plan.operations.find(o=>o.id==='p');
+ assert.equal(op.data.quantity,10);assert(!('unitPrice' in op.data));assert(!('totalPrice' in op.data));
+});
