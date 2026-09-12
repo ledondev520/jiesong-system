@@ -161,6 +161,7 @@ export default function DashboardPage() {
           never: '尚未完成同步', current: '已核对', needs_review: '已核对，仍有历史差异',
           running: '同步中', failed: '本轮失败', stale: '超过90分钟未成功核对',
         })[syncStatus.state]}</p>
+        {syncStatus?.message && <p className="mt-1 text-muted-foreground">{syncStatus.message}</p>}
         <p className="mt-1 text-muted-foreground">
           最近成功核对：{syncStatus?.lastSuccessAt ? new Date(syncStatus.lastSuccessAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) : '暂无'}
           {syncStatus && syncStatus.conflicts > 0 ? `；${syncStatus.conflicts} 项待核对，未强行覆盖。` : ''}

@@ -5,6 +5,7 @@ test('过期、失败或未运行不能显示同步正常；仅返回汇总字�
  assert.equal(presentStatus({},now).state,'never');
  assert.equal(presentStatus({state:'current',lastSuccessAt:'2026-09-12T05:00:00Z'},now).state,'stale');
  assert.equal(presentStatus({state:'failed',lastSuccessAt:'2026-09-12T07:59:00Z'},now).state,'failed');
+ assert.equal(presentStatus({state:'failed',reason:'login_required'},now).message,'请在 ego lite 中重新登录 WPS。');
  const s=presentStatus({state:'needs_review',lastSuccessAt:'2026-09-12T07:59:00Z',conflicts:418,source:'/private/file',digest:'secret'},now);
  assert.equal(s.state,'needs_review');assert.equal(s.source,undefined);assert.equal(s.digest,undefined);
 });

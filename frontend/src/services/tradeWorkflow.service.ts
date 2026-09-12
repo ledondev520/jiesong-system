@@ -71,4 +71,5 @@ export interface WpsSyncStatus {
   lastSuccessAt: string | null;
   lastAttemptAt: string | null;
   conflicts: number;
+  message?: string | null;
 }
