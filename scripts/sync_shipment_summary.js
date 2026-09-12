@@ -105,7 +105,15 @@ function buildPlan(source, state, today) {
         const data = changes(candidate, row.data);
         if (Object.keys(data).length) {
           if (candidate._count.customsDeclarationItems || contract._count.inventories || contract._count.items) {
-            conflicts.push({ row: row.row, contractNo, reason: '已有报关、销售或库存关联，保留原明细等待核对' }); complete = false;
+            // 只允许云表厂家与同一采购合同供应商全名双重一致的描述纠正，不触及已报关数值。
+            const purchase = (state.purchases || []).find(p => p.contractNo === candidate.purchaseContractNo);
+            if (data.manufacturer && purchase?.supplier.name === data.manufacturer) {
+              operations.push({ model: 'packingItem', id: candidate.id, data: { manufacturer: data.manufacturer }, row: row.row, contractNo });
+              delete data.manufacturer;
+            }
+            if (Object.keys(data).length) {
+              conflicts.push({ row: row.row, contractNo, reason: '已有报关、销售或库存关联，保留原明细等待核对' }); complete = false;
+            }
           } else operations.push({ model: 'packingItem', id: candidate.id, data, row: row.row, contractNo });
         }
       } else {
@@ -132,13 +140,14 @@ function buildPlan(source, state, today) {
 }
 
 async function readState(db) {
-  const [contracts, packing, products, stores] = await Promise.all([
+  const [contracts, packing, products, stores, purchases] = await Promise.all([
     db.salesContract.findMany({ orderBy: { id: 'asc' }, include: { _count: { select: { items: true, inventories: true } } } }),
     db.packingItem.findMany({ orderBy: { id: 'asc' }, include: { product: { select: { customsName: true } }, store: { select: { name: true } }, salesContract: { select: { contractNo: true } }, _count: { select: { customsDeclarationItems: true } } } }),
     db.product.findMany({ orderBy: { id: 'asc' }, select: { id: true, customsName: true } }),
     db.store.findMany({ orderBy: { id: 'asc' }, select: { id: true, name: true } }),
+    db.purchaseContract.findMany({ orderBy: { id: 'asc' }, select: { contractNo: true, supplier: { select: { name: true } } } }),
   ]);
-  return { contracts, packing: packing.map(p => ({ ...p, contractNo: p.salesContract.contractNo })), products, stores };
+  return { contracts, packing: packing.map(p => ({ ...p, contractNo: p.salesContract.contractNo })), products, stores, purchases };
 }
 
 function savePrivate(file, data) {
