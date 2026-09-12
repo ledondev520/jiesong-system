@@ -172,7 +172,7 @@ function buildPlan(source, state, today) {
       for (const key of ['boxes', 'grossWeight', 'netWeight', 'volume']) {
         if (rows.every(r => r.data[key] != null)) contractData[key === 'boxes' ? 'totalBoxes' : key] = Number(rows.reduce((n, r) => n + r.data[key], 0).toFixed(6));
       }
-    } else conflicts.push({ contractNo, reason: '明细尚未完整对齐，保留合同汇总数' });
+    } else conflicts.push({ contractNo, reason: '明细尚未完整对齐，保留合同汇总数', unmatchedPackingIds: existing.filter(p => !used.has(p.id)).map(p => p.id) });
     const data = changes(contract, contractData);
     if (contract.id.startsWith('new:')) Object.assign(operations.find(o => o.model === 'salesContract' && o.create && o.contractNo === contractNo).data, data);
     else if (Object.keys(data).length) operations.push({ model: 'salesContract', id: contract.id, data, contractNo });

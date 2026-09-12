@@ -97,3 +97,8 @@ test('完全相同两批货只有源库行数相等时可分别更新，不能�
  const ops=buildPlan({rows,conflicts:[]},s,'2026-09-12').operations.filter(o=>o.model==='packingItem');assert.deepEqual(ops.map(o=>o.id),['p','p2']);assert(ops.every(o=>!o.create));
  s.packing.pop();assert.equal(buildPlan({rows,conflicts:[]},s,'2026-09-12').operations.filter(o=>o.model==='packingItem').length,0);
 });
+test('合同汇总提示列出未匹配旧装箱行，便于逐条审计而不是只报总数',()=>{
+ const s=structuredClone(state);s.packing.push({...s.packing[0],id:'extra',product:{customsName:'旧货物'}});
+ const p=buildPlan({rows:[row],conflicts:[]},s,'2026-09-12');
+ assert.deepEqual(p.conflicts.find(c=>c.reason==='明细尚未完整对齐，保留合同汇总数').unmatchedPackingIds,['extra']);
+});
