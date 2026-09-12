@@ -91,3 +91,9 @@ test('同数量箱数的不同批次需毛重净重双向唯一，完全重复�
  const ops=buildPlan({rows,conflicts:[]},s,'2026-09-12').operations.filter(o=>o.model==='packingItem');
  assert.deepEqual(ops.map(o=>[o.id,o.data.manufacturer]),[['p','A'],['p2','B']]);
 });
+test('完全相同两批货只有源库行数相等时可分别更新，不能合并或凭空补行',()=>{
+ const s=structuredClone(state);s.packing=[{...s.packing[0],quantity:10,boxes:2,grossWeight:8,netWeight:7},{...s.packing[0],id:'p2',quantity:10,boxes:2,grossWeight:8,netWeight:7}];
+ const r={...row,data:{...row.data,netWeight:7,manufacturer:'A'}};const rows=[r,{...r,row:3}];
+ const ops=buildPlan({rows,conflicts:[]},s,'2026-09-12').operations.filter(o=>o.model==='packingItem');assert.deepEqual(ops.map(o=>o.id),['p','p2']);assert(ops.every(o=>!o.create));
+ s.packing.pop();assert.equal(buildPlan({rows,conflicts:[]},s,'2026-09-12').operations.filter(o=>o.model==='packingItem').length,0);
+});

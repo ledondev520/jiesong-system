@@ -128,6 +128,12 @@ function buildPlan(source, state, today) {
           duplicates = duplicates.filter(r => weightsMatch(r.data));
           candidates = candidates.filter(weightsMatch);
         }
+        if (candidates.length > 1 && candidates.length === duplicates.length && duplicates.every(r => JSON.stringify(r.data) === JSON.stringify(row.data))) {
+          // 同样货物的多个独立行：源库数量相等且目标值完全相同，保持多行，不合并。
+          const index = duplicates.indexOf(row);
+          candidates = [candidates.sort((a, b) => a.id.localeCompare(b.id))[index]];
+          duplicates = [row];
+        }
         if (candidates.length !== 1) {
           conflicts.push({ row: row.row, contractNo, reason: '商品、门店、采购合同组合不唯一' }); complete = false; continue;
         }
