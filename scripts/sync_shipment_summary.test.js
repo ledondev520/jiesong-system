@@ -34,8 +34,10 @@ test('重复业务键、已报关行和未来日期不被猜测覆盖，新合�
 test('解析工作簿时拒绝非法数字，空单元格不生成清空操作', () => {
   const headers = ['报关名', '门店', '合同号', '出货日期', '报关数量', '箱数', '毛重', '净重', '体积', '单位', '规格', '商品补充信息', '厂家', '购销合同号'];
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([headers, ['test', 'store', 'EXP260011', new Date('2026-09-11T00:00:00Z'), 10], ['bad', 'store', 'EXP260011', null, -1]]), '出货总清单');
+  const serial = Date.UTC(2026, 8, 11) / 86400000 + 25569;
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([headers, ['test', 'store', 'EXP260011', serial, 10], ['bad', 'store', 'EXP260011', null, -1]]), '出货总清单');
   const source = parseSource(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
   assert.equal(source.rows.length, 2); assert.equal(source.conflicts.length, 1); assert.equal(source.rows[1].invalid, true);
   assert.deepEqual(source.rows[0].data, { quantity: 10 });
+  assert.equal(source.rows[0].shippedAt, '2026-09-11');
 });

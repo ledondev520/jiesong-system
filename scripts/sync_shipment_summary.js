@@ -18,7 +18,8 @@ const equal = (a, b) => typeof b === 'number' ? a != null && Math.abs(a - b) < 0
 const changes = (old, data) => Object.fromEntries(Object.entries(data).filter(([key, value]) => !equal(old[key], value)));
 
 function parseSource(buffer) {
-  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
+  // Excel 日期是无时区的日历值；保留序列号，不能经本地 Date 转 UTC 导致减一天。
+  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false });
   const sheet = workbook.Sheets['出货总清单'];
   if (!sheet) throw new Error('缺少出货总清单');
   const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
@@ -35,8 +36,9 @@ function parseSource(buffer) {
     try {
       const date = get('出货日期');
       if (date != null && date !== '') {
-        if (!(date instanceof Date) || Number.isNaN(date.getTime())) throw new Error('出货日期无法识别');
-        row.shippedAt = date.toISOString().slice(0, 10);
+        const parts = typeof date === 'number' && XLSX.SSF.parse_date_code(date, { date1904: Boolean(workbook.Workbook?.WBProps?.date1904) });
+        if (!parts || parts.y < 2000 || parts.y > 2099) throw new Error('出货日期无法识别');
+        row.shippedAt = `${parts.y}-${String(parts.m).padStart(2, '0')}-${String(parts.d).padStart(2, '0')}`;
       }
       if (!/^EXP\d{6,8}$/.test(row.contractNo)) throw new Error('缺少正式 EXP 归属');
       for (const [key, column] of Object.entries(numericColumns)) {
