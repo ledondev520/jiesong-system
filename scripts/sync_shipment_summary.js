@@ -105,14 +105,12 @@ function buildPlan(source, state, today) {
         const data = changes(candidate, row.data);
         if (Object.keys(data).length) {
           if (candidate._count.customsDeclarationItems || contract._count.inventories || contract._count.items) {
-            // 只允许云表厂家与同一采购合同供应商全名双重一致的描述纠正，不触及已报关数值。
-            const purchase = (state.purchases || []).find(p => p.contractNo === candidate.purchaseContractNo);
-            if (data.manufacturer && purchase?.supplier.name === data.manufacturer) {
-              operations.push({ model: 'packingItem', id: candidate.id, data: { manufacturer: data.manufacturer }, row: row.row, contractNo });
-              delete data.manufacturer;
-            }
+            // 用户确认出货汇总为主准；纠正装箱资料，不改历史报关快照或财务关联。
+            const metadata = Object.fromEntries(Object.entries(data).filter(([key]) => ['boxes', 'grossWeight', 'netWeight', 'volume', 'unit', 'specification', 'supplement', 'manufacturer'].includes(key)));
+            if (Object.keys(metadata).length) operations.push({ model: 'packingItem', id: candidate.id, data: metadata, row: row.row, contractNo });
+            for (const key of Object.keys(metadata)) delete data[key];
             if (Object.keys(data).length) {
-              conflicts.push({ row: row.row, contractNo, reason: '已有报关、销售或库存关联，保留原明细等待核对' }); complete = false;
+              conflicts.push({ row: row.row, contractNo, reason: '数量变化涉及已有报关、销售或库存关联，需核对分配关系' }); complete = false;
             }
           } else operations.push({ model: 'packingItem', id: candidate.id, data, row: row.row, contractNo });
         }

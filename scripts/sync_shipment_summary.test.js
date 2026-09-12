@@ -24,7 +24,7 @@ test('重复业务键、已报关行和未来日期不被猜测覆盖，新合�
   const duplicate = buildPlan({ rows: [row, { ...row, row: 3 }], conflicts: [] }, state, '2026-09-12');
   assert(!duplicate.operations.some(o => o.model === 'packingItem'));
   const linked = structuredClone(state); linked.packing[0]._count.customsDeclarationItems = 1;
-  assert(!buildPlan({ rows: [row], conflicts: [] }, linked, '2026-09-12').operations.some(o => o.model === 'packingItem'));
+  assert(!buildPlan({ rows: [row], conflicts: [] }, linked, '2026-09-12').operations.some(o => o.model === 'packingItem' && 'quantity' in o.data));
   const future = buildPlan({ rows: [{ ...row, shippedAt: '2027-01-01' }], conflicts: [] }, state, '2026-09-12');
   assert(!future.operations.some(o => o.data.status === 'SHIPPED'));
   const fresh = buildPlan({ rows: [{ ...row, contractNo: 'EXP260012', shippedAt: undefined }], conflicts: [] }, state, '2026-09-12');
@@ -41,13 +41,13 @@ test('解析工作簿时拒绝非法数字，空单元格不生成清空操作',
   assert.deepEqual(source.rows[0].data, { quantity: 10 });
   assert.equal(source.rows[0].shippedAt, '2026-09-11');
 });
-test('已关联行的厂家需云表与同采购合同供应商双重一致才补齐，重量等仍保留',()=>{
+test('出货汇总优先纠正已关联行的装箱资料，数量和财务关联继续单独核对',()=>{
  const linked=structuredClone(state);linked.packing[0]._count.customsDeclarationItems=1;
  linked.packing[0].purchaseContractNo='CG001';linked.packing[0].manufacturer='旧简称';
- linked.purchases=[{contractNo:'CG001',supplier:{name:'正式厂家有限公司'}}];
- const source={rows:[{...row,data:{...row.data,purchaseContractNo:'CG001',manufacturer:'正式厂家有限公司'}}],conflicts:[]};
- const ops=buildPlan(source,linked,'2026-09-12').operations.filter(o=>o.model==='packingItem');
- assert.deepEqual(ops.map(o=>o.data),[{manufacturer:'正式厂家有限公司'}]);
- linked.purchases[0].supplier.name='其他公司';
- assert.equal(buildPlan(source,linked,'2026-09-12').operations.filter(o=>o.model==='packingItem').length,0);
+ const source={rows:[{...row,data:{...row.data,purchaseContractNo:'CG001',manufacturer:'正式厂家有限公司',specification:'720*470*470',supplement:'新款',unit:'个'}}],conflicts:[]};
+ const plan=buildPlan(source,linked,'2026-09-12');
+ const ops=plan.operations.filter(o=>o.model==='packingItem');
+ assert.deepEqual(ops.map(o=>o.data),[{boxes:2,grossWeight:8,manufacturer:'正式厂家有限公司',specification:'720*470*470',supplement:'新款',unit:'个'}]);
+ assert(plan.conflicts.some(c=>c.reason.includes('数量')));
+ assert(!ops.some(o=>'unitPrice' in o.data || 'quantity' in o.data || 'purchaseContractNo' in o.data));
 });
