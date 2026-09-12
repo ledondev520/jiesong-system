@@ -1,6 +1,6 @@
 /**
  * Input: 出口合同、关联采购合同、装箱/单证/退税/收付记录
- * Output: 单笔出口专项单的八阶段进度、阻塞原因和唯一下一动作
+ * Output: 单笔出口专项单的八阶段进度、阻塞原因和唯一下一动作；已发运单据保留资料补录提示
  * Pos: 经营中台与详情页共享的出口专项单主线路 Module
  */
 
@@ -97,6 +97,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   const purchaseMissingSignedArchive = linkedPurchases.find((contract) => !hasSignedContractArchive(contract));
   const salesStatus = normalizeSalesStatus(salesContract.status);
   const salesRank = SALES_RANK[salesStatus] ?? 0;
+  const shipped = salesRank >= SALES_RANK[SALES_STATUS.SHIPPED];
   const readiness = evaluateShipmentReadiness(salesContract);
   const packingListChecks = [...(salesContract.packingListChecks || [])].sort((left, right) => (
     new Date(right.checkedAt || right.createdAt || 0).getTime()
@@ -173,7 +174,9 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
         };
 
   let loadingStage;
-  if (readiness.overloaded) {
+  if (shipped) {
+    loadingStage = { key: 'loading', label: '排柜与出货', status: 'completed', reason: '已确认发运' };
+  } else if (readiness.overloaded) {
     loadingStage = {
       key: 'loading', label: '排柜与出货', status: 'blocked',
       reason: readiness.overloadReasons.includes('weight') ? '毛重超过 22 吨安全上限' : '体积超过 68 立方米安全上限',
@@ -189,8 +192,6 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
       key: 'loading', label: '排柜与出货', status: 'blocked', reason: '箱数或装箱明细未填写完整',
       action: { label: '补充箱规数据', href: `/dashboard/sales/${salesContract.id}` },
     };
-  } else if (salesRank >= SALES_RANK[SALES_STATUS.SHIPPED]) {
-    loadingStage = { key: 'loading', label: '排柜与出货', status: 'completed', reason: '已确认发运' };
   } else if (readiness.ready) {
     loadingStage = {
       key: 'loading', label: '排柜与出货', status: 'current', reason: '利用率达标且全部箱件可装下',
@@ -261,13 +262,21 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
     taxStage,
     financeStage,
   ];
+  if (shipped) {
+    for (const stage of [procurementStage, productionStage]) {
+      if (stage.status === 'completed') continue;
+      stage.status = 'current';
+      stage.reason = `已发运，待补录：${stage.reason}`;
+      if (stage.action) stage.action.label = stage.key === 'procurement' ? '补录采购关联与签约资料' : '补录生产资料';
+    }
+  }
   const nextStage = stages.find((stage) => stage.status === 'blocked' || stage.status === 'current')
     || stages.find((stage) => stage.status !== 'completed');
   const issues = [];
   if (purchasePaid > purchaseTotal + 0.01) issues.push('采购已付金额超过合同金额');
   if (productionIncompletePurchase) issues.push('采购生产状态已完成，但装柜输入资料不完整');
-  if (readiness.overloaded) issues.push('货柜超过 40HQ 安全上限');
-  if (readiness.unplacedBoxCount > 0) issues.push(`仍有 ${readiness.unplacedBoxCount} 箱无法装入`);
+  if (readiness.overloaded) issues.push(shipped ? '历史装箱数据超出 40HQ 参数，待核对' : '货柜超过 40HQ 安全上限');
+  if (readiness.unplacedBoxCount > 0) issues.push(shipped ? '历史箱规与 3D 排柜结果不一致，待核对' : `仍有 ${readiness.unplacedBoxCount} 箱无法装入`);
   if (salesContract.shippedAt && salesContract.createdAt && new Date(salesContract.shippedAt) < new Date(salesContract.createdAt)) {
     issues.push('发运时间早于系统创建时间，请确认是否为历史补录');
   }

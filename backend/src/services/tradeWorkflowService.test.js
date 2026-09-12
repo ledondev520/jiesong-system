@@ -57,6 +57,18 @@ const basePurchase = {
   files: [{ id: 'cf-1', fileName: '盖章合同.pdf', category: 'SIGNED_CONTRACT' }],
 };
 
+test('已发运不再受发运前排柜门槛阻塞，缺失采购资料仍需补录', () => {
+  for (const packingItems of [[], [{ ...baseSales.packingItems[0], length: 13000 }]]) {
+    const result = buildTradeWorkflow({ ...baseSales, status: 'SHIPPED', grossWeight: 23000, packingItems });
+    assert.equal(result.stages.find(s => s.key === 'loading').status, 'completed');
+    assert.equal(result.stages.find(s => s.key === 'procurement').status, 'current');
+    assert.match(result.stages.find(s => s.key === 'procurement').reason, /已发运，待补录/);
+    assert(!result.issues.some(issue => issue.includes('仍有')));
+    const before = buildTradeWorkflow({ ...baseSales, status: 'PACKING', grossWeight: 23000, packingItems });
+    assert.equal(before.stages.find(s => s.key === 'loading').status, 'blocked');
+  }
+});
+
 test('从采购合同号关联整笔专项单并给出最早下一动作', () => {
   const workflow = buildTradeWorkflow(baseSales, new Map([[basePurchase.contractNo, basePurchase]]));
 
