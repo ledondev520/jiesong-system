@@ -102,3 +102,10 @@ test('合同汇总提示列出未匹配旧装箱行，便于逐条审计而不�
  const p=buildPlan({rows:[row],conflicts:[]},s,'2026-09-12');
  assert.deepEqual(p.conflicts.find(c=>c.reason==='明细尚未完整对齐，保留合同汇总数').unmatchedPackingIds,['extra']);
 });
+test('正式装箱行的喷涂铝型材与汇总基础名匹配，保留价格且不创建副本',()=>{
+ const s=structuredClone(state);s.packing[0].product.customsName='铝型材（喷涂）';s.packing[0].unitPrice=7;s.packing[0].totalPrice=70;
+ const r={...row,productName:'铝型材'};const plan=buildPlan({rows:[r],conflicts:[]},s,'2026-09-12');
+ const op=plan.operations.find(o=>o.id==='p');assert(op);assert(!('unitPrice' in op.data));assert(!('totalPrice' in op.data));assert(!plan.operations.some(o=>o.create));
+ s.packing.push({...s.packing[0],id:'other',product:{customsName:'铝型材'}});
+ assert.equal(buildPlan({rows:[r],conflicts:[]},s,'2026-09-12').operations.filter(o=>o.model==='packingItem').length,0);
+});

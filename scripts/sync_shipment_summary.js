@@ -13,7 +13,7 @@ const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const text = value => value == null ? '' : String(value).trim();
 const storeKey = value => text(value).toLowerCase().replace(/^安娜汉姆$/, '安纳汉姆');
 // 历史源表名称经同合同箱单与现有装箱行核实；不做模糊名称匹配。
-const productKey = value => ({ '玻璃瓶（玻璃酒瓶': '玻璃酒瓶', '电磁炉（餐桌': '餐桌', '泉州铁艺酒架（铁艺屏风': '铁艺酒架屏风' }[text(value)] || text(value));
+const productKey = value => ({ '铝型材（喷涂）': '铝型材', '玻璃瓶（玻璃酒瓶': '玻璃酒瓶', '电磁炉（餐桌': '餐桌', '泉州铁艺酒架（铁艺屏风': '铁艺酒架屏风' }[text(value)] || text(value));
 const unique = values => [...new Set(values.filter(Boolean))];
 const numericColumns = { quantity: '报关数量', boxes: '箱数', grossWeight: '毛重', netWeight: '净重', volume: '体积' };
 const textColumns = { unit: '单位', specification: '规格', supplement: '商品补充信息', manufacturer: '厂家', purchaseContractNo: '购销合同号' };
@@ -111,9 +111,9 @@ function buildPlan(source, state, today) {
       if (row.invalid) { complete = false; continue; }
       const keyMatches = r => r.productName === row.productName && storeKey(r.storeName) === storeKey(row.storeName) && (r.data.purchaseContractNo || '') === (row.data.purchaseContractNo || '');
       let duplicates = rows.filter(keyMatches);
-      let candidates = existing.filter(p => p.product.customsName === row.productName && storeKey(p.store?.name) === storeKey(row.storeName) && (p.purchaseContractNo || '') === (row.data.purchaseContractNo || ''));
+      let candidates = existing.filter(p => productKey(p.product.customsName) === row.productName && storeKey(p.store?.name) === storeKey(row.storeName) && (p.purchaseContractNo || '') === (row.data.purchaseContractNo || ''));
       if (!candidates.length && row.data.purchaseContractNo && row.data.quantity > 0 && row.data.specification) {
-        const sameGoods = p => p.product.customsName === row.productName && storeKey(p.store?.name) === storeKey(row.storeName) && equal(p.quantity, row.data.quantity) && p.specification === row.data.specification;
+        const sameGoods = p => productKey(p.product.customsName) === row.productName && storeKey(p.store?.name) === storeKey(row.storeName) && equal(p.quantity, row.data.quantity) && p.specification === row.data.specification;
         const missingNumber = existing.filter(p => !p.purchaseContractNo && sameGoods(p));
         const sourceMatches = rows.filter(r => r.productName === row.productName && storeKey(r.storeName) === storeKey(row.storeName) && equal(r.data.quantity, row.data.quantity) && r.data.specification === row.data.specification);
         if (missingNumber.length === 1 && sourceMatches.length === 1) candidates = missingNumber;
@@ -159,8 +159,8 @@ function buildPlan(source, state, today) {
         }
       } else {
         // 同商品或旧 PENDING 的归属可能变更；不能把弱匹配当新增，避免重复货物。
-        const related = state.packing.some(p => p.product.customsName === row.productName && (p.salesContractId === contract.id || (p.contractNo.startsWith('PENDING') && storeKey(p.store?.name) === storeKey(row.storeName))));
-        const products = state.products.filter(p => p.customsName === row.productName);
+        const related = state.packing.some(p => productKey(p.product.customsName) === row.productName && (p.salesContractId === contract.id || (p.contractNo.startsWith('PENDING') && storeKey(p.store?.name) === storeKey(row.storeName))));
+        const products = state.products.filter(p => productKey(p.customsName) === row.productName);
         const stores = state.stores.filter(s => storeKey(s.name) === storeKey(row.storeName));
         if (related || products.length !== 1 || stores.length !== 1 || !(row.data.quantity > 0)) {
           conflicts.push({ row: row.row, contractNo, reason: '新行主数据或历史归属不能唯一匹配' }); complete = false;
