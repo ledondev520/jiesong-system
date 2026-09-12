@@ -18,6 +18,7 @@ const mockPurchaseGetAll = vi.fn();
 const mockSalesGetAll = vi.fn();
 const mockListStatements = vi.fn();
 const mockListTradeWorkflows = vi.fn();
+const mockSyncStatus = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -59,12 +60,14 @@ vi.mock('@/services/financialStatements.service', () => ({
 
 vi.mock('@/services/tradeWorkflow.service', () => ({
   tradeWorkflowService: {
+    syncStatus: (...args: unknown[]) => mockSyncStatus(...args),
     list: (...args: unknown[]) => mockListTradeWorkflows(...args),
   },
 }));
 
 describe('DashboardPage 交互逻辑', () => {
   beforeEach(() => {
+    mockSyncStatus.mockResolvedValue({ data: { state: 'needs_review', lastSuccessAt: '2026-09-12T07:00:00Z', conflicts: 418 } });
     mockPush.mockReset();
     mockGetDashboardAnalytics.mockReset();
     mockPurchaseGetAll.mockReset();
@@ -128,6 +131,16 @@ describe('DashboardPage 交互逻辑', () => {
         },
       }],
     });
+  });
+
+  it('展示真实同步时间和历史差异；接口失败明确提示而不冒充同步正常', async () => {
+    const view = render(<DashboardPage />);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('418 项待核对'));
+    expect(screen.getByRole('status')).toHaveTextContent('2026/9/12');
+    view.unmount();
+    mockSyncStatus.mockRejectedValueOnce(new Error('unavailable'));
+    render(<DashboardPage />);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('状态读取失败'));
   });
 
   it('渲染工作台首屏核心结构', async () => {

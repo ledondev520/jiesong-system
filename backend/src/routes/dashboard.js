@@ -1,6 +1,6 @@
 /**
  * Input: dashboardController
- * Output: 仪表盘API路由
+ * Output: 仪表盘API路由及WPS同步汇总状态
  * Pos: 仪表盘路由定义
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -13,6 +13,11 @@ const { authenticate } = require('../middleware/auth');
 
 // 所有路由需要认证
 router.use(authenticate);
+
+router.get('/wps-sync', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  require('../utils/response').success(res, require('../services/wpsSyncStatusService').getStatus());
+});
 
 // GET /api/v1/dashboard/stats - 获取仪表盘统计数据
 router.get('/stats', dashboardController.getStats);

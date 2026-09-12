@@ -1,5 +1,5 @@
 /**
- * Input: 专项单主线路、采购/出口摘要、财务账期与当前用户
+ * Input: 专项单主线路、采购/出口摘要、财务账期、WPS同步状态与当前用户
  * Output: 以“每笔专项单唯一下一动作”为核心的经营中台工作台
  * Pos: 经营中台首页；主线路是执行入口，指标和快速动作仅作辅助
  */
@@ -26,7 +26,7 @@ import { purchaseService } from '@/services/purchase.service';
 import { salesService } from '@/services/sales.service';
 import { financialStatementsService } from '@/services/financialStatements.service';
 import { aiService } from '@/services/ai.service';
-import { tradeWorkflowService, type TradeWorkflow } from '@/services/tradeWorkflow.service';
+import { tradeWorkflowService, type TradeWorkflow, type WpsSyncStatus } from '@/services/tradeWorkflow.service';
 import { useAuthStore } from '@/store/auth.store';
 
 type DashboardMetrics = {
@@ -66,6 +66,21 @@ export default function DashboardPage() {
   const [workflows, setWorkflows] = useState<TradeWorkflow[]>([]);
   const [workflowLoading, setWorkflowLoading] = useState(true);
   const [workflowUnavailable, setWorkflowUnavailable] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<WpsSyncStatus | null>(null);
+  const [syncUnavailable, setSyncUnavailable] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      try {
+        const response = await tradeWorkflowService.syncStatus();
+        if (active) { setSyncStatus(response.data || null); setSyncUnavailable(false); }
+      } catch { if (active) setSyncUnavailable(true); }
+    };
+    void refresh();
+    const timer = setInterval(() => { void refresh(); }, 60000);
+    return () => { active = false; clearInterval(timer); };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -140,6 +155,18 @@ export default function DashboardPage() {
         description="按专项单执行采购、出口、退税与财务结清的唯一下一步。"
         showBack={false}
       />
+
+      <div className="rounded-lg border bg-card p-4 text-sm" role="status" aria-live="polite">
+        <p className="font-medium">WPS 出货同步 · {syncUnavailable ? '状态读取失败' : !syncStatus ? '正在查询' : ({
+          never: '尚未完成同步', current: '已核对', needs_review: '已核对，仍有历史差异',
+          running: '同步中', failed: '本轮失败', stale: '超过90分钟未成功核对',
+        })[syncStatus.state]}</p>
+        <p className="mt-1 text-muted-foreground">
+          最近成功核对：{syncStatus?.lastSuccessAt ? new Date(syncStatus.lastSuccessAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) : '暂无'}
+          {syncStatus && syncStatus.conflicts > 0 ? `；${syncStatus.conflicts} 项待核对，未强行覆盖。` : ''}
+          {' '}以 WPS 已上传内容为准；电脑及 Codex 在线时每小时检查，失败在当前任务提醒。
+        </p>
+      </div>
 
       <TradeWorkflowBoard
         workflows={workflows}

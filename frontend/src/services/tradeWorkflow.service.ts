@@ -59,8 +59,16 @@ export interface TradeWorkflow {
 }
 
 export const tradeWorkflowService = {
+  syncStatus: () => api.get<ApiResponse<WpsSyncStatus>, ApiResponse<WpsSyncStatus>>('/dashboard/wps-sync'),
   list: (limit = 6) => api.get<ApiResponse<TradeWorkflow[]>, ApiResponse<TradeWorkflow[]>>(
     '/dashboard/trade-workflows',
     { params: { limit } },
   ),
 };
+
+export interface WpsSyncStatus {
+  state: 'never' | 'current' | 'needs_review' | 'running' | 'failed' | 'stale';
+  lastSuccessAt: string | null;
+  lastAttemptAt: string | null;
+  conflicts: number;
+}

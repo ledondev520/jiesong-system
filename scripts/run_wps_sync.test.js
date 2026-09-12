@@ -1,0 +1,24 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { runSync } = require('./run_wps_sync');
+test('旧下载不冒充最新同步，失败保留最近成功；新下载先备份再写并复核', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wps-run-'));
+  const source = path.join(dir, 'source.xlsx'); fs.writeFileSync(source, 'test');
+  const now = Date.now(); fs.utimesSync(source, new Date(now - 3600000), new Date(now - 3600000));
+  const statusFile = path.join(dir, 'status.json');
+  fs.writeFileSync(statusFile, JSON.stringify({ lastSuccessAt: '2026-09-01T00:00:00.000Z' }));
+  const steps = [];
+  const execute = async mode => { steps.push(mode); return { summary: { updates: mode === 'recheck' ? 0 : 1, creates: 0, conflicts: 2 }, previewDigest: 'preview' }; };
+  await assert.rejects(runSync({source, statusFile, now, execute, backup: async()=>steps.push('backup')}), /fresh_download_required/);
+  assert.equal(JSON.parse(fs.readFileSync(statusFile)).lastSuccessAt, '2026-09-01T00:00:00.000Z');
+  assert.deepEqual(steps, []);
+  fs.utimesSync(source, new Date(now), new Date(now));
+  await runSync({source, statusFile, now, execute, backup: async()=>steps.push('backup')});
+  assert.deepEqual(steps, ['preview', 'backup', 'apply', 'recheck']);
+  assert.equal(JSON.parse(fs.readFileSync(statusFile)).state, 'needs_review');
+  assert.equal(fs.statSync(statusFile).mode & 0o777, 0o600);
+  fs.rmSync(dir, {recursive:true});
+});

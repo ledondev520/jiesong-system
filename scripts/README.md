@@ -36,6 +36,7 @@
 | import_wps_purchase_evidence.js | 数据导入 | 基于采购合同凭证抽取结果幂等补齐供应商字段、商品、采购合同和采购明细；默认 dry-run，显式 `--apply` 后才写库；显式 `--allow-header-only-contracts` 后可只创建合同头 DRAFT、不创建明细 |
 | import_wps_202607_update.js | 数据导入 | WPS 2026-07 增量幂等导入：EXP260008/EXP260009 出口合同全量（明细/装箱/附件）、EXP260004 头修复、CG2600035/CG2600040 采购补建、招行 2026-05/06 流水付款收款登记（按 idempotencyKey 去重）；源文件在 `docs/wps-import/2026-07/`；默认 dry-run，`--apply` 写库；本地与 VPS 各跑一次即两侧一致 |
 | import_shipment_summary_incremental.js | 数据导入 | 对受限归档的最新 `出货汇总.xlsx` 做严格 SHA-256 校验，只新增 EXP260010/EXP260011、已裁决的 PENDING 异常占位与对应装箱行；不覆盖现有合同/明细，不把人民币采购金额写成 USD 装箱售价；默认 dry-run，`--apply` 单事务写库 |
+| run_wps_sync.js | 自动同步执行 | 消费本轮新下载xlsx，串行锁、在线SQLite备份、摘要事务写入和复核；保存受限状态与回执；旧下载/失败保留上次成功时间，浏览器重连与每小时调度由当前Codex任务负责 |
 | sync_shipment_summary.js | 数据同步 | WPS 并行期完整下载表的差异同步；调用者确认云端版本，以 SHA-256 和预览摘要锁定输入，备份后指定 `--apply-plan` 写入；唯一匹配装箱行与实际发运日期可更新，报关/库存关联冲突保留；新合同沿用系统默认参考汇率并标注待确认，无日期不标发运；不删除、不改已有财务金额；结果目录 0700、文件 0600 |
 | resolve_pending_shipments.js | 数据归并 | 同步后按唯一源行和正式装箱核对 PENDING；无引用的零数量占位可补全迁移，等价重复行保留来源后合并；库存需源行与正式装箱双重匹配且无重复；父占位全部关联和金额归零才删除；默认预览，备份后用 `--apply-plan` 摘要写入 |
 | verify_tax_refund_invoices.js | 数据核对 | 按出货汇总的发票号码精确查询本地发票记录或税务数字账户导出清单，核验销方、价税合计、品名与状态；只读，输出受限 JSON/CSV，不绕过验证码 |
