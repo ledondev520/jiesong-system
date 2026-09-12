@@ -11,6 +11,7 @@ const { PrismaClient } = require('../backend/node_modules/@prisma/client');
 
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const text = value => value == null ? '' : String(value).trim();
+const storeKey = value => text(value).toLowerCase();
 const unique = values => [...new Set(values.filter(Boolean))];
 const numericColumns = { quantity: '报关数量', boxes: '箱数', grossWeight: '毛重', netWeight: '净重', volume: '体积' };
 const textColumns = { unit: '单位', specification: '规格', supplement: '商品补充信息', manufacturer: '厂家', purchaseContractNo: '购销合同号' };
@@ -93,20 +94,36 @@ function buildPlan(source, state, today) {
     let complete = !source.conflicts.some(c => c.contractNo === contractNo);
     for (const row of rows) {
       if (row.invalid) { complete = false; continue; }
-      const keyMatches = r => r.productName === row.productName && r.storeName === row.storeName && (r.data.purchaseContractNo || '') === (row.data.purchaseContractNo || '');
-      const duplicates = rows.filter(keyMatches);
-      const candidates = existing.filter(p => p.product.customsName === row.productName && (p.store?.name || '') === row.storeName && (p.purchaseContractNo || '') === (row.data.purchaseContractNo || ''));
+      const keyMatches = r => r.productName === row.productName && storeKey(r.storeName) === storeKey(row.storeName) && (r.data.purchaseContractNo || '') === (row.data.purchaseContractNo || '');
+      let duplicates = rows.filter(keyMatches);
+      let candidates = existing.filter(p => p.product.customsName === row.productName && storeKey(p.store?.name) === storeKey(row.storeName) && (p.purchaseContractNo || '') === (row.data.purchaseContractNo || ''));
+      if (!candidates.length && row.data.purchaseContractNo && row.data.quantity > 0 && row.data.specification) {
+        const sameGoods = p => p.product.customsName === row.productName && storeKey(p.store?.name) === storeKey(row.storeName) && equal(p.quantity, row.data.quantity) && p.specification === row.data.specification;
+        const missingNumber = existing.filter(p => !p.purchaseContractNo && sameGoods(p));
+        const sourceMatches = rows.filter(r => r.productName === row.productName && storeKey(r.storeName) === storeKey(row.storeName) && equal(r.data.quantity, row.data.quantity) && r.data.specification === row.data.specification);
+        if (missingNumber.length === 1 && sourceMatches.length === 1) candidates = missingNumber;
+      }
+      if (duplicates.length > 1 || candidates.length > 1) {
+        // 同一商品可有多批货；数量和箱数必须在源与库中双向唯一，不能按位置配对。
+        const batchMatches = data => row.data.quantity > 0 && row.data.boxes > 0 && equal(data.quantity, row.data.quantity) && equal(data.boxes, row.data.boxes);
+        duplicates = duplicates.filter(r => batchMatches(r.data));
+        candidates = candidates.filter(batchMatches);
+        if (candidates.length !== 1) {
+          conflicts.push({ row: row.row, contractNo, reason: '商品、门店、采购合同组合不唯一' }); complete = false; continue;
+        }
+      }
       if (duplicates.length !== 1 || candidates.length > 1) {
         conflicts.push({ row: row.row, contractNo, reason: '商品、门店、采购合同组合不唯一' }); complete = false; continue;
       }
       const candidate = candidates[0];
       if (candidate) {
+        if (used.has(candidate.id)) { conflicts.push({ row: row.row, contractNo, reason: '源行重复匹配同一装箱记录' }); complete = false; continue; }
         used.add(candidate.id);
         const data = changes(candidate, row.data);
         if (Object.keys(data).length) {
           if (candidate._count.customsDeclarationItems || contract._count.inventories || contract._count.items) {
             // 用户确认出货汇总为主准；纠正装箱资料，不改历史报关快照或财务关联。
-            const metadata = Object.fromEntries(Object.entries(data).filter(([key]) => ['boxes', 'grossWeight', 'netWeight', 'volume', 'unit', 'specification', 'supplement', 'manufacturer'].includes(key)));
+            const metadata = Object.fromEntries(Object.entries(data).filter(([key]) => ['boxes', 'grossWeight', 'netWeight', 'volume', 'unit', 'specification', 'supplement', 'manufacturer'].includes(key) || (key === 'purchaseContractNo' && !candidate.purchaseContractNo)));
             if (Object.keys(metadata).length) operations.push({ model: 'packingItem', id: candidate.id, data: metadata, row: row.row, contractNo });
             for (const key of Object.keys(metadata)) delete data[key];
             if (Object.keys(data).length) {
@@ -116,9 +133,9 @@ function buildPlan(source, state, today) {
         }
       } else {
         // 同商品或旧 PENDING 的归属可能变更；不能把弱匹配当新增，避免重复货物。
-        const related = state.packing.some(p => p.product.customsName === row.productName && (p.salesContractId === contract.id || (p.contractNo.startsWith('PENDING') && p.store?.name === row.storeName)));
+        const related = state.packing.some(p => p.product.customsName === row.productName && (p.salesContractId === contract.id || (p.contractNo.startsWith('PENDING') && storeKey(p.store?.name) === storeKey(row.storeName))));
         const products = state.products.filter(p => p.customsName === row.productName);
-        const stores = state.stores.filter(s => s.name === row.storeName);
+        const stores = state.stores.filter(s => storeKey(s.name) === storeKey(row.storeName));
         if (related || products.length !== 1 || stores.length !== 1 || !(row.data.quantity > 0)) {
           conflicts.push({ row: row.row, contractNo, reason: '新行主数据或历史归属不能唯一匹配' }); complete = false;
         } else operations.push({ model: 'packingItem', create: true, row: row.row, contractNo, data: { salesContractId: contract.id, productId: products[0].id, storeId: stores[0].id, ...row.data } });

@@ -51,3 +51,21 @@ test('出货汇总优先纠正已关联行的装箱资料，数量和财务关�
  assert(plan.conflicts.some(c=>c.reason.includes('数量')));
  assert(!ops.some(o=>'unitPrice' in o.data || 'quantity' in o.data || 'purchaseContractNo' in o.data));
 });
+test('同商品多批次用数量和箱数双向唯一匹配，不靠行顺序或重复复用记录',()=>{
+ const s=structuredClone(state);s.packing=[{...s.packing[0],quantity:10,boxes:2},{...s.packing[0],id:'p2',quantity:20,boxes:4}];
+ const rows=[row,{...row,row:3,data:{quantity:20,boxes:4,grossWeight:18}}];
+ const plan=buildPlan({rows,conflicts:[]},s,'2026-09-12');
+ assert.equal(plan.conflicts.length,0);
+ assert.deepEqual(plan.operations.filter(o=>o.model==='packingItem').map(o=>[o.id,o.data.grossWeight]),[['p',8],['p2',18]]);
+ const duplicate=buildPlan({rows:[row,{...row,row:3}],conflicts:[]},s,'2026-09-12');
+ assert.equal(duplicate.operations.filter(o=>o.model==='packingItem').length,0);
+});
+test('门店英文大小写一致；缺采购号的唯一同数量同规格记录可补号，非空号不覆盖',()=>{
+ const s=structuredClone(state);s.packing[0].quantity=10;s.packing[0].specification='100*200';s.packing[0]._count.customsDeclarationItems=1;
+ const r={...row,storeName:'STORE',data:{quantity:10,boxes:2,specification:'100*200',purchaseContractNo:'CG001'}};
+ const plan=buildPlan({rows:[r],conflicts:[]},s,'2026-09-12');
+ assert(plan.operations.some(o=>o.id==='p'&&o.data.purchaseContractNo==='CG001'));
+ assert(!plan.operations.some(o=>o.create));
+ s.packing[0].purchaseContractNo='CG002';assert(!buildPlan({rows:[r],conflicts:[]},s,'2026-09-12').operations.some(o=>o.model==='packingItem'));
+ s.packing[0].purchaseContractNo=null;s.packing.push({...s.packing[0],id:'p2'});assert(!buildPlan({rows:[r],conflicts:[]},s,'2026-09-12').operations.some(o=>o.model==='packingItem'));
+});
