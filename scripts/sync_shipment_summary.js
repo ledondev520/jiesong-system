@@ -56,6 +56,13 @@ function parseSource(buffer) {
         row.shippedAt = `${parts.y}-${String(parts.m).padStart(2, '0')}-${String(parts.d).padStart(2, '0')}`;
       }
       if (!/^EXP\d{6,8}$/.test(row.contractNo)) throw new Error('缺少正式 EXP 归属');
+      // 采购金额参与差异核对，不能混入装箱售价或自动覆盖历史财务值。
+      const cost = get('采购金额');
+      if (cost != null && cost !== '') {
+        const amount = Number(typeof cost === 'string' ? cost.replace(/,/g, '') : cost);
+        if (!Number.isFinite(amount) || amount < 0) throw new Error('采购金额不是有效非负数字');
+        row.sourcePurchaseCost = amount;
+      }
       for (const [key, column] of Object.entries(numericColumns)) {
         const value = get(column);
         if (value == null || value === '') continue;
@@ -145,6 +152,9 @@ function buildPlan(source, state, today) {
       if (candidate) {
         if (used.has(candidate.id)) { conflicts.push({ row: row.row, contractNo, reason: '源行重复匹配同一装箱记录' }); complete = false; continue; }
         used.add(candidate.id);
+        if (row.sourcePurchaseCost != null && !equal(candidate.purchaseCost, row.sourcePurchaseCost)) {
+          conflicts.push({ row: row.row, contractNo, reason: candidate.purchaseCost == null ? '采购金额缺失，需按出货汇总核验' : '采购金额与出货汇总不同，保留原值待核验' });
+        }
         const data = changes(candidate, row.data);
         if (Object.keys(data).length) {
           if (candidate._count.customsDeclarationItems || contract._count.inventories || contract._count.items) {

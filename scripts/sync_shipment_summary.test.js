@@ -9,6 +9,20 @@ const state = {
   packing: [{ id: 'p', salesContractId: 'c', contractNo: row.contractNo, product: { customsName: 'test' }, store: { name: 'store' }, quantity: 5, boxes: 1, grossWeight: 4, unitPrice: 9, _count: { customsDeclarationItems: 0 } }],
   products: [{ id: 'prod', customsName: 'test' }], stores: [{ id: 'store', name: 'store' }],
 };
+test('采购金额变化或缺失必须进入核对提示，不改收付款或装箱售价', () => {
+  const headers = ['报关名', '门店', '合同号', '出货日期', '报关数量', '箱数', '毛重', '净重', '体积', '单位', '规格', '商品补充信息', '厂家', '购销合同号', '采购金额'];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([headers, ['test', 'store', row.contractNo, null, 10, 2, 8, null, null, null, null, null, null, null, '1,234.50']]), '出货总清单');
+  const source = parseSource(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
+  assert.equal(source.rows[0].sourcePurchaseCost, 1234.5);
+  assert(!('purchaseCost' in source.rows[0].data));
+  for (const cost of [null, 999, 1234.5]) {
+    const current = structuredClone(state); current.packing[0].purchaseCost = cost;
+    const plan = buildPlan(source, current, '2026-09-12');
+    assert.equal(plan.conflicts.some(c => c.reason.includes('采购金额')), cost !== 1234.5);
+    assert(!plan.operations.some(op => ['purchaseCost', 'unitPrice', 'totalPrice', 'paidAmount'].some(k => k in op.data)));
+  }
+});
 test('同步实际发运和唯一装箱行，保留价格，重复执行无变更', () => {
   const source = { rows: [row], conflicts: [] };
   const plan = buildPlan(source, state, '2026-09-12');
