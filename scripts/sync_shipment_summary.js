@@ -8,6 +8,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const XLSX = require('../backend/node_modules/xlsx');
 const { PrismaClient } = require('../backend/node_modules/@prisma/client');
+const { roundMoney } = require('../backend/src/services/purchaseAmountService');
 
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const text = value => value == null ? '' : String(value).trim();
@@ -154,7 +155,7 @@ function buildPlan(source, state, today) {
         used.add(candidate.id);
         if (row.sourcePurchaseCost != null && candidate.purchaseCost == null) {
           operations.push({ model: 'packingItem', id: candidate.id, data: { purchaseCost: row.sourcePurchaseCost }, row: row.row, contractNo });
-        } else if (row.sourcePurchaseCost != null && !equal(candidate.purchaseCost, row.sourcePurchaseCost)) {
+        } else if (row.sourcePurchaseCost != null && roundMoney(candidate.purchaseCost) !== roundMoney(row.sourcePurchaseCost)) {
           conflicts.push({ row: row.row, contractNo, packingItemId: candidate.id, reason: '采购金额与出货汇总不同，保留原值待核验' });
         }
         const data = changes(candidate, row.data);

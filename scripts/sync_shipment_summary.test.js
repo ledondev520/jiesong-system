@@ -30,6 +30,11 @@ test('唯一匹配的空采购成本按源补齐，已有差异只提示，不�
   const sameGoods = { ...source.rows[0], data: { ...source.rows[0].data, netWeight: 7 } };
   const ambiguous = buildPlan({ rows: [sameGoods, { ...sameGoods, row: 3, sourcePurchaseCost: 2345 }], conflicts: [] }, duplicate, '2026-09-12');
   assert(!ambiguous.operations.some(op => op.model === 'packingItem'));
+  const rounded = structuredClone(state); rounded.packing[0].purchaseCost = 1234.5;
+  for (const value of [1234.504, 1234.506]) {
+    const plan = buildPlan({ rows: [{ ...source.rows[0], sourcePurchaseCost: value }], conflicts: [] }, rounded, '2026-09-12');
+    assert.equal(plan.conflicts.some(c => c.reason.includes('采购金额')), value === 1234.506);
+  }
 });
 test('同步实际发运和唯一装箱行，保留价格，重复执行无变更', () => {
   const source = { rows: [row], conflicts: [] };
