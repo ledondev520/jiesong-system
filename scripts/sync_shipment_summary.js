@@ -14,7 +14,7 @@ const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const text = value => value == null ? '' : String(value).trim();
 const storeKey = value => text(value).toLowerCase().replace(/^安娜汉姆$/, '安纳汉姆');
 // 历史源表名称经同合同箱单与现有装箱行核实；不做模糊名称匹配。
-const productKey = value => ({ '铝型材（喷涂）': '铝型材', '玻璃瓶（玻璃酒瓶': '玻璃酒瓶', '电磁炉（餐桌': '餐桌', '泉州铁艺酒架（铁艺屏风': '铁艺酒架屏风' }[text(value)] || text(value));
+const productKey = value => ({ '铝型材（喷涂）': '铝型材', '玻璃瓶（玻璃酒瓶': '玻璃酒瓶', '电磁炉（餐桌': '餐桌', '泉州铁艺酒架（铁艺屏风': '铁艺酒架屏风', '岩板（瓷砖': '岩板' }[text(value)] || text(value));
 const unique = values => [...new Set(values.filter(Boolean))];
 const numericColumns = { quantity: '报关数量', boxes: '箱数', grossWeight: '毛重', netWeight: '净重', volume: '体积' };
 const textColumns = { unit: '单位', specification: '规格', supplement: '商品补充信息', manufacturer: '厂家', purchaseContractNo: '购销合同号' };
@@ -68,6 +68,12 @@ function parseSource(buffer) {
         row.shippedAt = `${parts.y}-${String(parts.m).padStart(2, '0')}-${String(parts.d).padStart(2, '0')}`;
       }
       if (!/^EXP\d{6,8}$/.test(row.contractNo)) throw new Error('缺少正式 EXP 归属');
+      const pieceArea = text(get('报关数量')).match(/^(\d+)[（(](\d+(?:\.\d+)?)[）)]?$/);
+      const panelSize = text(get('规格')).match(/^(\d+(?:\.\d+)?)[*xX×](\d+(?:\.\d+)?)$/);
+      // 此表板材规格以毫米计；只有片数、面积和规格三者一致才拆解双单位。
+      const verifiedPieceArea = /^片[（(]平方米[）)]?$/.test(text(get('单位'))) && pieceArea && panelSize
+        && Number(pieceArea[1]) > 0 && Number(pieceArea[2]) > 0
+        && equal(Number(pieceArea[1]) * Number(panelSize[1]) * Number(panelSize[2]) / 1e6, Number(pieceArea[2]));
       // 采购金额只补空采购成本或核对差异，不能混入装箱售价或覆盖已有金额。
       const cost = get('采购金额');
       if (cost != null && cost !== '') {
@@ -79,6 +85,7 @@ function parseSource(buffer) {
         const value = get(column);
         if (value == null || value === '') continue;
         let n = key === 'quantity' ? parseQuantity(value) : Number(typeof value === 'string' ? value.replace(/,/g, '') : value);
+        if (key === 'quantity' && verifiedPieceArea) n = Number(pieceArea[1]);
         if (key === 'quantity' && !Number.isFinite(n)) n = quantityFromStoreTotal(cells);
         if (!Number.isFinite(n) || n < 0 || (key === 'boxes' && !Number.isInteger(n))) throw new Error(`${column}不是有效非负数字`);
         row.data[key] = n;
@@ -86,6 +93,10 @@ function parseSource(buffer) {
       for (const [key, column] of Object.entries(textColumns)) {
         const value = text(get(column));
         if (value) row.data[key] = value;
+      }
+      if (verifiedPieceArea) {
+        row.data.unit = '片';
+        row.data.supplement = [row.data.supplement, `源表对应面积${pieceArea[2]}平方米`].filter(Boolean).join('；');
       }
       rows.push(row);
     } catch (error) {

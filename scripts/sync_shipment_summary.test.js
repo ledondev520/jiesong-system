@@ -9,6 +9,21 @@ const state = {
   packing: [{ id: 'p', salesContractId: 'c', contractNo: row.contractNo, product: { customsName: 'test' }, store: { name: 'store' }, quantity: 5, boxes: 1, grossWeight: 4, unitPrice: 9, _count: { customsDeclarationItems: 0 } }],
   products: [{ id: 'prod', customsName: 'test' }], stores: [{ id: 'store', name: 'store' }],
 };
+test('片数和平方米按板材毫米规格交叉验证，单位或面积不符仍保留冲突', () => {
+  const headers = ['报关名', '门店', '合同号', '出货日期', '报关数量', '箱数', '毛重', '净重', '体积', '单位', '规格', '商品补充信息', '厂家', '购销合同号'];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([headers,
+    ['岩板（瓷砖', 'A', 'EXP260001', null, '17（48.96', 1, 1452, 1350, 3, '片（平方米', '1200*2400', '小样'],
+    ['岩板', 'A', 'EXP260002', null, '17（49', 1, 1452, 1350, 3, '片（平方米', '1200*2400'],
+    ['门', 'A', 'EXP260003', null, '17（48.96', 1, null, null, null, '套（平方米', '1200*2400'],
+  ]), '出货总清单');
+  const source = parseSource(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
+  assert.equal(source.rows[0].data.quantity, 17);
+  assert.equal(source.rows[0].data.unit, '片');
+  assert.match(source.rows[0].data.supplement, /48.96平方米/);
+  assert.equal(source.rows[1].invalid, true);
+  assert.equal(source.rows[2].invalid, true);
+});
 test('分店数量加总精确等于括号合计时识别分店数，不接受无法抵平的注释', () => {
   const headers = ['报关名', '门店', '合同号', '出货日期', '报关数量', '箱数', '毛重', '净重', '体积', '单位', '规格', '商品补充信息', '厂家', '购销合同号'];
   const workbook = XLSX.utils.book_new();
