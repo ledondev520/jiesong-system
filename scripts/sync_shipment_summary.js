@@ -98,6 +98,14 @@ function parseSource(buffer) {
         row.data.unit = '片';
         row.data.supplement = [row.data.supplement, `源表对应面积${pieceArea[2]}平方米`].filter(Boolean).join('；');
       }
+      const remainingGoods = row.productName === '剩余货' && text(row.data.supplement).match(/^([1-9]\d*)玻璃门[，,]\s*([1-9]\d*)不锈钢门[，,]\s*淘宝买$/);
+      if (remainingGoods && [1, 2].every(index => Number.isSafeInteger(Number(remainingGoods[index]))) && row.sourcePurchaseCost == null && Object.keys(row.data).every(key => key === 'supplement')) {
+        // 明确商品数量可以拆行；任何共用箱重、价格或规格都不能猜分配。
+        for (const [index, productName] of [[1, '玻璃门'], [2, '不锈钢门']]) {
+          rows.push({ ...row, productName, data: { quantity: Number(remainingGoods[index]), supplement: `源表剩余货：${row.data.supplement}` } });
+        }
+        return;
+      }
       rows.push(row);
     } catch (error) {
       conflicts.push({ row: row.row, contractNo: row.contractNo, reason: error.message });

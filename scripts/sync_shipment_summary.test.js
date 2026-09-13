@@ -9,6 +9,18 @@ const state = {
   packing: [{ id: 'p', salesContractId: 'c', contractNo: row.contractNo, product: { customsName: 'test' }, store: { name: 'store' }, quantity: 5, boxes: 1, grossWeight: 4, unitPrice: 9, _count: { customsDeclarationItems: 0 } }],
   products: [{ id: 'prod', customsName: 'test' }], stores: [{ id: 'store', name: 'store' }],
 };
+test('无箱重金额的剩余货按明确两件商品拆解，不能重复分摊已有箱数', () => {
+  const headers = ['报关名', '门店', '合同号', '出货日期', '报关数量', '箱数', '毛重', '净重', '体积', '单位', '规格', '商品补充信息', '厂家', '购销合同号'];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([headers,
+    ['剩余货', 'A', 'EXP260001', null, null, null, null, null, null, null, null, '1玻璃门，1不锈钢门，淘宝买'],
+    ['剩余货', 'A', 'EXP260002', null, null, 2, null, null, null, null, null, '1玻璃门，1不锈钢门，淘宝买'],
+  ]), '出货总清单');
+  const source = parseSource(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
+  assert.deepEqual(source.rows.slice(0, 2).map(r => [r.productName, r.data.quantity, r.row]), [['玻璃门', 1, 2], ['不锈钢门', 1, 2]]);
+  assert.equal(source.rows[2].productName, '剩余货');
+  assert(!('boxes' in source.rows[0].data));
+});
 test('片数和平方米按板材毫米规格交叉验证，单位或面积不符仍保留冲突', () => {
   const headers = ['报关名', '门店', '合同号', '出货日期', '报关数量', '箱数', '毛重', '净重', '体积', '单位', '规格', '商品补充信息', '厂家', '购销合同号'];
   const workbook = XLSX.utils.book_new();
