@@ -348,3 +348,5 @@ python scripts/analyze_wps_formal_customs_source_gaps.py
 
 ## 更新记录
 - 2026-01-26: 修正 fix_export_contracts.js 中的箱数逻辑，新增 fix_boxes_data.js
+
+采购凭据税率解析保留显式 `%/％` 单位（1%→1），仅无百分号的小数按Excel比例换算；PDF和正文提取不得丢失百分号语义。回归：`python3 -m unittest scripts.test_wps_purchase_tax_rate`。
