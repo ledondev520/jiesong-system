@@ -9,6 +9,7 @@ const crypto = require('node:crypto');
 const XLSX = require('../backend/node_modules/xlsx');
 const { PrismaClient } = require('../backend/node_modules/@prisma/client');
 const { roundMoney } = require('../backend/src/services/purchaseAmountService');
+const { normalizeInvoiceNumbers } = require('../backend/src/services/purchaseInvoiceService');
 
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const text = value => value == null ? '' : String(value).trim();
@@ -68,6 +69,13 @@ function parseSource(buffer) {
         row.shippedAt = `${parts.y}-${String(parts.m).padStart(2, '0')}-${String(parts.d).padStart(2, '0')}`;
       }
       if (!/^EXP\d{6,8}$/.test(row.contractNo)) throw new Error('缺少正式 EXP 归属');
+      const invoice = get('发票号码');
+      if (text(invoice)) {
+        const numbers = normalizeInvoiceNumbers(invoice);
+        if ((typeof invoice === 'number' && !Number.isSafeInteger(invoice)) || !numbers.every(number => /^(?:\d{8}|\d{20})$/.test(number))) {
+          conflicts.push({ row: row.row, contractNo: row.contractNo, reason: '发票号码格式或数值精度异常，需核对原票' });
+        } else row.sourceInvoiceNo = numbers.join(',');
+      }
       const pieceArea = text(get('报关数量')).match(/^(\d+)[（(](\d+(?:\.\d+)?)[）)]?$/);
       const panelSize = text(get('规格')).match(/^(\d+(?:\.\d+)?)[*xX×](\d+(?:\.\d+)?)$/);
       // 此表板材规格以毫米计；只有片数、面积和规格三者一致才拆解双单位。
@@ -99,7 +107,7 @@ function parseSource(buffer) {
         row.data.supplement = [row.data.supplement, `源表对应面积${pieceArea[2]}平方米`].filter(Boolean).join('；');
       }
       const remainingGoods = row.productName === '剩余货' && text(row.data.supplement).match(/^([1-9]\d*)玻璃门[，,]\s*([1-9]\d*)不锈钢门[，,]\s*淘宝买$/);
-      if (remainingGoods && [1, 2].every(index => Number.isSafeInteger(Number(remainingGoods[index]))) && row.sourcePurchaseCost == null && Object.keys(row.data).every(key => key === 'supplement')) {
+      if (remainingGoods && [1, 2].every(index => Number.isSafeInteger(Number(remainingGoods[index]))) && row.sourcePurchaseCost == null && row.sourceInvoiceNo == null && Object.keys(row.data).every(key => key === 'supplement')) {
         // 明确商品数量可以拆行；任何共用箱重、价格或规格都不能猜分配。
         for (const [index, productName] of [[1, '玻璃门'], [2, '不锈钢门']]) {
           rows.push({ ...row, productName, data: { quantity: Number(remainingGoods[index]), supplement: `源表剩余货：${row.data.supplement}` } });
@@ -167,7 +175,7 @@ function buildPlan(source, state, today) {
           duplicates = duplicates.filter(r => weightsMatch(r.data));
           candidates = candidates.filter(weightsMatch);
         }
-        if (candidates.length > 1 && candidates.length === duplicates.length && duplicates.every(r => JSON.stringify(r.data) === JSON.stringify(row.data) && r.sourcePurchaseCost === row.sourcePurchaseCost)) {
+        if (candidates.length > 1 && candidates.length === duplicates.length && duplicates.every(r => JSON.stringify(r.data) === JSON.stringify(row.data) && r.sourcePurchaseCost === row.sourcePurchaseCost && r.sourceInvoiceNo === row.sourceInvoiceNo)) {
           // 同样货物的多个独立行：源库数量相等且目标值完全相同，保持多行，不合并。
           const index = duplicates.indexOf(row);
           candidates = [candidates.sort((a, b) => a.id.localeCompare(b.id))[index]];
@@ -184,6 +192,11 @@ function buildPlan(source, state, today) {
       if (candidate) {
         if (used.has(candidate.id)) { conflicts.push({ row: row.row, contractNo, reason: '源行重复匹配同一装箱记录' }); complete = false; continue; }
         used.add(candidate.id);
+        if (row.sourceInvoiceNo && !text(candidate.invoiceNo)) {
+          operations.push({ model: 'packingItem', id: candidate.id, data: { invoiceNo: row.sourceInvoiceNo }, row: row.row, contractNo });
+        } else if (row.sourceInvoiceNo && normalizeInvoiceNumbers(candidate.invoiceNo).sort().join(',') !== normalizeInvoiceNumbers(row.sourceInvoiceNo).sort().join(',')) {
+          conflicts.push({ row: row.row, contractNo, packingItemId: candidate.id, reason: '发票号码与出货汇总不同，保留原号待核验' });
+        }
         if (row.sourcePurchaseCost != null && candidate.purchaseCost == null) {
           operations.push({ model: 'packingItem', id: candidate.id, data: { purchaseCost: row.sourcePurchaseCost }, row: row.row, contractNo });
         } else if (row.sourcePurchaseCost != null && roundMoney(candidate.purchaseCost) !== roundMoney(row.sourcePurchaseCost)) {
@@ -208,7 +221,7 @@ function buildPlan(source, state, today) {
         const stores = state.stores.filter(s => storeKey(s.name) === storeKey(row.storeName));
         if (related || products.length !== 1 || stores.length !== 1 || !(row.data.quantity > 0)) {
           conflicts.push({ row: row.row, contractNo, reason: '新行主数据或历史归属不能唯一匹配' }); complete = false;
-        } else operations.push({ model: 'packingItem', create: true, row: row.row, contractNo, data: { salesContractId: contract.id, productId: products[0].id, storeId: stores[0].id, ...row.data, ...(row.sourcePurchaseCost != null ? { purchaseCost: row.sourcePurchaseCost } : {}) } });
+        } else operations.push({ model: 'packingItem', create: true, row: row.row, contractNo, data: { salesContractId: contract.id, productId: products[0].id, storeId: stores[0].id, ...row.data, ...(row.sourcePurchaseCost != null ? { purchaseCost: row.sourcePurchaseCost } : {}), ...(row.sourceInvoiceNo ? { invoiceNo: row.sourceInvoiceNo } : {}) } });
       }
     }
     // 总量仅在源行全部处理且没有遗留系统行时更新，否则避免总表与明细脱节。

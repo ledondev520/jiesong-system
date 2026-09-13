@@ -9,6 +9,24 @@ const state = {
   packing: [{ id: 'p', salesContractId: 'c', contractNo: row.contractNo, product: { customsName: 'test' }, store: { name: 'store' }, quantity: 5, boxes: 1, grossWeight: 4, unitPrice: 9, _count: { customsDeclarationItems: 0 } }],
   products: [{ id: 'prod', customsName: 'test' }], stores: [{ id: 'store', name: 'store' }],
 };
+test('发票号码按文本保留精度，仅补空值，异号和异常格式需核对', () => {
+  const headers = ['报关名', '门店', '合同号', '出货日期', '报关数量', '箱数', '毛重', '净重', '体积', '单位', '规格', '商品补充信息', '厂家', '购销合同号', '发票号码'];
+  const workbook = XLSX.utils.book_new();
+  const invoice = '26000000000000000001';
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([headers,
+    ['test', 'store', row.contractNo, null, 10, 2, 8, null, null, null, null, null, null, null, invoice],
+    ['bad', 'store', 'EXP260002', null, 1, null, null, null, null, null, null, null, null, null, '260000000000000001'],
+  ]), '出货总清单');
+  const source = parseSource(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
+  assert.equal(source.rows[0].sourceInvoiceNo, invoice);
+  assert(source.conflicts.some(c => c.row === 3 && c.reason.includes('发票')));
+  for (const old of [null, invoice, '26000000000000000002']) {
+    const current = structuredClone(state); current.packing[0].invoiceNo = old;
+    const plan = buildPlan({ rows: [source.rows[0]], conflicts: [] }, current, '2026-09-12');
+    assert.equal(plan.operations.some(o => o.data.invoiceNo === invoice), old === null);
+    assert.equal(plan.conflicts.some(c => c.reason.includes('发票')), old != null && old !== invoice);
+  }
+});
 test('无箱重金额的剩余货按明确两件商品拆解，不能重复分摊已有箱数', () => {
   const headers = ['报关名', '门店', '合同号', '出货日期', '报关数量', '箱数', '毛重', '净重', '体积', '单位', '规格', '商品补充信息', '厂家', '购销合同号'];
   const workbook = XLSX.utils.book_new();
