@@ -77,7 +77,11 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   const purchaseReferenceNotes = missingPurchaseNos.filter((no) => ['单独购买', '补充合同'].includes(no));
   const purchaseTotal = linkedPurchases.reduce((sum, contract) => sum + (Number(contract.totalAmount) || 0), 0);
   const purchasePaid = linkedPurchases.reduce((sum, contract) => sum + (Number(contract.paidAmount) || 0), 0);
-  const allPurchasesPaid = linkedPurchases.length > 0
+  // ponytail: 复用历史补录的明确备注标记；多来源核验接入时改用结构化核验状态。
+  // 默认零值不能作为未付款事实。
+  const paymentUnverifiedPurchase = linkedPurchases.find(contract => Number(contract.paidAmount) === 0
+    && /付款(?:记录)?(?:尚未|未|待)核验/.test(contract.note || ''));
+  const allPurchasesPaid = !paymentUnverifiedPurchase && linkedPurchases.length > 0
     && purchaseTotal > 0
     && purchasePaid >= purchaseTotal - 0.01;
   const productionReadiness = linkedPurchases.map((contract) => ({
@@ -154,6 +158,11 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
 
   const paymentStage = linkedPurchases.length === 0
     ? { key: 'payment', label: '采购付款', status: 'pending', reason: '先关联购销合同' }
+    : paymentUnverifiedPurchase
+      ? {
+          key: 'payment', label: '采购付款', status: 'current', reason: '历史采购付款待核验，默认已付零值不代表尚未付款',
+          action: { label: '核验采购付款', href: `/dashboard/purchase/${paymentUnverifiedPurchase.id}` },
+        }
     : allPurchasesPaid
       ? { key: 'payment', label: '采购付款', status: 'completed', reason: `已付清 ¥${roundMoney(purchasePaid).toLocaleString('zh-CN')}` }
       : {
@@ -255,7 +264,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
     ? { key: 'finance', label: '财务结清', status: 'completed', reason: '采购成本已付清、美元货款已收齐' }
     : {
         key: 'finance', label: '财务结清', status: salesRank >= SALES_RANK[SALES_STATUS.SHIPPED] ? 'current' : 'pending',
-        reason: `采购${allPurchasesPaid ? '已付清' : '未付清'}，货款${receivableComplete ? '已收齐' : '未收齐'}`,
+        reason: `采购${paymentUnverifiedPurchase ? '付款待核验' : allPurchasesPaid ? '已付清' : '未付清'}，货款${receivableComplete ? '已收齐' : '未收齐'}`,
         action: { label: '查看收付与单柜毛利', href: `/dashboard/sales/${salesContract.id}` },
       };
 

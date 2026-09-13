@@ -57,6 +57,21 @@ const basePurchase = {
   files: [{ id: 'cf-1', fileName: '盖章合同.pdf', category: 'SIGNED_CONTRACT' }],
 };
 
+test('历史补录付款未核验时不把默认零值当成未付定金', () => {
+  for (const note of ['付款待核验', '付款未核验', '付款记录尚未核验', '付款记录未核验']) {
+    const purchase = { ...basePurchase, paidAmount: 0, note };
+    const workflow = buildTradeWorkflow(baseSales, new Map([[purchase.contractNo, purchase]]));
+    const payment = workflow.stages.find(s => s.key === 'payment');
+    assert.match(payment.reason, /付款.*待核验/);
+    assert(!payment.reason.includes('待付'));
+    assert.equal(payment.action.label, '核验采购付款');
+    assert.equal(payment.action.href, '/dashboard/purchase/pc-1');
+    assert.match(workflow.stages.find(s => s.key === 'finance').reason, /付款待核验/);
+    const verified = buildTradeWorkflow(baseSales, new Map([[purchase.contractNo, { ...purchase, paidAmount: 5000 }]]));
+    assert.equal(verified.stages.find(s => s.key === 'payment').status, 'completed');
+  }
+});
+
 test('已发运不再受发运前排柜门槛阻塞，缺失采购资料仍需补录', () => {
   for (const packingItems of [[], [{ ...baseSales.packingItems[0], length: 13000 }]]) {
     const result = buildTradeWorkflow({ ...baseSales, status: 'SHIPPED', grossWeight: 23000, packingItems });
