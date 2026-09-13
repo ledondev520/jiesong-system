@@ -56,7 +56,7 @@ function parseSource(buffer) {
         row.shippedAt = `${parts.y}-${String(parts.m).padStart(2, '0')}-${String(parts.d).padStart(2, '0')}`;
       }
       if (!/^EXP\d{6,8}$/.test(row.contractNo)) throw new Error('缺少正式 EXP 归属');
-      // 采购金额参与差异核对，不能混入装箱售价或自动覆盖历史财务值。
+      // 采购金额只补空采购成本或核对差异，不能混入装箱售价或覆盖已有金额。
       const cost = get('采购金额');
       if (cost != null && cost !== '') {
         const amount = Number(typeof cost === 'string' ? cost.replace(/,/g, '') : cost);
@@ -135,7 +135,7 @@ function buildPlan(source, state, today) {
           duplicates = duplicates.filter(r => weightsMatch(r.data));
           candidates = candidates.filter(weightsMatch);
         }
-        if (candidates.length > 1 && candidates.length === duplicates.length && duplicates.every(r => JSON.stringify(r.data) === JSON.stringify(row.data))) {
+        if (candidates.length > 1 && candidates.length === duplicates.length && duplicates.every(r => JSON.stringify(r.data) === JSON.stringify(row.data) && r.sourcePurchaseCost === row.sourcePurchaseCost)) {
           // 同样货物的多个独立行：源库数量相等且目标值完全相同，保持多行，不合并。
           const index = duplicates.indexOf(row);
           candidates = [candidates.sort((a, b) => a.id.localeCompare(b.id))[index]];
@@ -152,8 +152,10 @@ function buildPlan(source, state, today) {
       if (candidate) {
         if (used.has(candidate.id)) { conflicts.push({ row: row.row, contractNo, reason: '源行重复匹配同一装箱记录' }); complete = false; continue; }
         used.add(candidate.id);
-        if (row.sourcePurchaseCost != null && !equal(candidate.purchaseCost, row.sourcePurchaseCost)) {
-          conflicts.push({ row: row.row, contractNo, reason: candidate.purchaseCost == null ? '采购金额缺失，需按出货汇总核验' : '采购金额与出货汇总不同，保留原值待核验' });
+        if (row.sourcePurchaseCost != null && candidate.purchaseCost == null) {
+          operations.push({ model: 'packingItem', id: candidate.id, data: { purchaseCost: row.sourcePurchaseCost }, row: row.row, contractNo });
+        } else if (row.sourcePurchaseCost != null && !equal(candidate.purchaseCost, row.sourcePurchaseCost)) {
+          conflicts.push({ row: row.row, contractNo, packingItemId: candidate.id, reason: '采购金额与出货汇总不同，保留原值待核验' });
         }
         const data = changes(candidate, row.data);
         if (Object.keys(data).length) {
@@ -174,7 +176,7 @@ function buildPlan(source, state, today) {
         const stores = state.stores.filter(s => storeKey(s.name) === storeKey(row.storeName));
         if (related || products.length !== 1 || stores.length !== 1 || !(row.data.quantity > 0)) {
           conflicts.push({ row: row.row, contractNo, reason: '新行主数据或历史归属不能唯一匹配' }); complete = false;
-        } else operations.push({ model: 'packingItem', create: true, row: row.row, contractNo, data: { salesContractId: contract.id, productId: products[0].id, storeId: stores[0].id, ...row.data } });
+        } else operations.push({ model: 'packingItem', create: true, row: row.row, contractNo, data: { salesContractId: contract.id, productId: products[0].id, storeId: stores[0].id, ...row.data, ...(row.sourcePurchaseCost != null ? { purchaseCost: row.sourcePurchaseCost } : {}) } });
       }
     }
     // 总量仅在源行全部处理且没有遗留系统行时更新，否则避免总表与明细脱节。
