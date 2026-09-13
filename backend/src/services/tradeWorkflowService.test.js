@@ -250,6 +250,13 @@ test('较新的差异记录覆盖旧通过记录，出口单证重新变为待�
 });
 
 test('采购备注不是丢失合同；已有合同仍需明确采购明细分配', () => {
+  for (const reference of ['另采', '乙方合同']) {
+    const workflow = buildTradeWorkflow({ ...baseSales, packingItems: [{ ...baseSales.packingItems[0], purchaseContractNo: reference }] });
+    assert.match(workflow.stages[0].reason, /采购引用填写为备注/);
+  }
+  const combined = buildTradeWorkflow({ ...baseSales, packingItems: [{ ...baseSales.packingItems[0], purchaseContractNo: 'CG2500033，71' }] });
+  assert.match(combined.stages[0].reason, /多个采购合同号混写/);
+  assert(!combined.stages[0].reason.includes('找不到'));
   const memo = buildTradeWorkflow({ ...baseSales, packingItems: [{ ...baseSales.packingItems[0], purchaseContractNo: '单独购买' }] });
   assert.match(memo.stages[0].reason, /采购引用填写为备注/);
   assert(!memo.stages[0].reason.includes('找不到购销合同'));

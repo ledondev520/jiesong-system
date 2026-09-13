@@ -74,7 +74,8 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   const missingPurchaseNos = purchaseContractNos.filter(
     (contractNo) => !getPurchaseByNo(purchaseMap, contractNo),
   );
-  const purchaseReferenceNotes = missingPurchaseNos.filter((no) => ['单独购买', '补充合同'].includes(no));
+  const purchaseReferenceNotes = missingPurchaseNos.filter((no) => ['单独购买', '补充合同', '另采', '乙方合同'].includes(no));
+  const combinedPurchaseReferences = missingPurchaseNos.filter(no => /^(?:CG|PO)\d{7}(?:[，,]\s*(?:(?:CG|PO)\d{7}|\d{1,7}))+$/.test(no));
   const purchaseTotal = linkedPurchases.reduce((sum, contract) => sum + (Number(contract.totalAmount) || 0), 0);
   const purchasePaid = linkedPurchases.reduce((sum, contract) => sum + (Number(contract.paidAmount) || 0), 0);
   // ponytail: 复用历史补录的明确备注标记；多来源核验接入时改用结构化核验状态。
@@ -135,6 +136,12 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
           key: 'procurement', label: '采购签约', status: 'blocked',
           reason: `采购引用填写为备注（${purchaseReferenceNotes.join('、')}），请补充正式合同号`,
           action: { label: '补充采购合同号', href: `/dashboard/sales/${salesContract.id}` },
+        }
+    : combinedPurchaseReferences.length > 0
+      ? {
+          key: 'procurement', label: '采购签约', status: 'blocked',
+          reason: `多个采购合同号混写（${combinedPurchaseReferences.join('、')}），需明确明细分配`,
+          action: { label: '核对采购合同分配', href: `/dashboard/sales/${salesContract.id}` },
         }
     : missingPurchaseNos.length > 0
       ? {
