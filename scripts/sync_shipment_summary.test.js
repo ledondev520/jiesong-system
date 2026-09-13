@@ -9,6 +9,26 @@ const state = {
   packing: [{ id: 'p', salesContractId: 'c', contractNo: row.contractNo, product: { customsName: 'test' }, store: { name: 'store' }, quantity: 5, boxes: 1, grossWeight: 4, unitPrice: 9, _count: { customsDeclarationItems: 0 } }],
   products: [{ id: 'prod', customsName: 'test' }], stores: [{ id: 'store', name: 'store' }],
 };
+test('分店数量加总精确等于括号合计时识别分店数，不接受无法抵平的注释', () => {
+  const headers = ['报关名', '门店', '合同号', '出货日期', '报关数量', '箱数', '毛重', '净重', '体积', '单位', '规格', '商品补充信息', '厂家', '购销合同号'];
+  const workbook = XLSX.utils.book_new();
+  const values = [
+    ['板材', 'A', 'EXP260001', null, '29（60', null, null, null, null, '平方米'],
+    ['板材', 'B', 'EXP260001', null, 31, null, null, null, null, '平方米'],
+    ['机柜', 'A', 'EXP260002', null, '2（6）', null, null, null, null, '个'],
+    ['机柜', 'B', 'EXP260002', null, 2, null, null, null, null, '个'],
+    ['机柜', 'C', 'EXP260002', null, 2, null, null, null, null, '个'],
+    ['门', 'A', 'EXP260003', null, '6（2', null, null, null, null, '套'],
+    ['其他板材', 'A', 'EXP260004', null, '29（60', null, null, null, null, '平方米'],
+    ['其他板材', 'B', 'EXP260004', null, 30, null, null, null, null, '平方米'],
+  ];
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([headers, ...values]), '出货总清单');
+  const source = parseSource(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
+  assert.equal(source.rows[0].data.quantity, 29);
+  assert.equal(source.rows[2].data.quantity, 2);
+  assert.equal(source.rows[5].invalid, true);
+  assert.equal(source.rows[6].invalid, true);
+});
 test('唯一匹配的空采购成本按源补齐，已有差异只提示，不改收付款或售价', () => {
   const headers = ['报关名', '门店', '合同号', '出货日期', '报关数量', '箱数', '毛重', '净重', '体积', '单位', '规格', '商品补充信息', '厂家', '购销合同号', '采购金额'];
   const workbook = XLSX.utils.book_new();

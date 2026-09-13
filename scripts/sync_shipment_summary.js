@@ -43,6 +43,17 @@ function parseSource(buffer) {
   for (const name of ['报关名', '门店', '合同号', '出货日期', ...Object.values(numericColumns), ...Object.values(textColumns)]) {
     if (headers.filter(h => h === name).length !== 1) throw new Error(`列缺失或重复：${name}`);
   }
+  const quantityFromStoreTotal = cells => {
+    const value = (row, column) => row[headers.indexOf(column)];
+    const pair = text(value(cells, '报关数量')).match(/^(\d+(?:\.\d+)?)[（(](\d+(?:\.\d+)?)[）)]?$/);
+    if (!pair || !(Number(pair[2]) > Number(pair[1]) && Number(pair[1]) > 0)) return NaN;
+    // ponytail: 当前数百行表按组扫描；万行以上再给业务键建索引。
+    const group = matrix.filter(other => ['报关名', '合同号', '购销合同号', '单位'].every(column => text(value(other, column)) === text(value(cells, column))));
+    const stores = group.map(other => storeKey(value(other, '门店')));
+    if (group.length < 2 || stores.some(store => !store) || new Set(stores).size !== group.length) return NaN;
+    const counts = group.map(other => other === cells ? Number(pair[1]) : parseQuantity(value(other, '报关数量')));
+    return counts.every(n => Number.isFinite(n) && n > 0) && equal(counts.reduce((a, b) => a + b, 0), Number(pair[2])) ? Number(pair[1]) : NaN;
+  };
   const rows = [], conflicts = [];
   matrix.forEach((cells, i) => {
     const get = name => cells[headers.indexOf(name)];
@@ -67,7 +78,8 @@ function parseSource(buffer) {
       for (const [key, column] of Object.entries(numericColumns)) {
         const value = get(column);
         if (value == null || value === '') continue;
-        const n = key === 'quantity' ? parseQuantity(value) : Number(typeof value === 'string' ? value.replace(/,/g, '') : value);
+        let n = key === 'quantity' ? parseQuantity(value) : Number(typeof value === 'string' ? value.replace(/,/g, '') : value);
+        if (key === 'quantity' && !Number.isFinite(n)) n = quantityFromStoreTotal(cells);
         if (!Number.isFinite(n) || n < 0 || (key === 'boxes' && !Number.isInteger(n))) throw new Error(`${column}不是有效非负数字`);
         row.data[key] = n;
       }
