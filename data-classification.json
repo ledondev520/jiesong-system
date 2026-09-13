@@ -23,6 +23,7 @@
       "controls": {
         "storage": [
           "Secrets only in .env or secret manager",
+          "Browser access tokens remain tab-scoped in sessionStorage; missing-token login messaging never grants access or exposes token values",
           "System-configured API keys are write-only; encrypted storage is permitted but complete values must never be returned or rendered",
           "Restricted business records only in the application database or protected contract-evidence storage",
           "Least privilege file mode (<=600 for backend .env)",

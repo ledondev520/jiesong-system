@@ -78,3 +78,6 @@
 - **每次功能迭代完成后必须提交一个 commit**。禁止积累大量改动后一次性提交。
 - Commit message 遵循 `<type>: <subject>` 格式，type 可选：`feat`（新功能）、`fix`（修复）、`refactor`（重构）、`chore`（杂项）、`docs`（文档）。
 - 若一次迭代涉及多个独立功能，拆分为多个 commit。
+
+## 登录提示边界
+- `frontend/src/lib/auth-session.ts` 对无本标签令牌的 401 只要求登录，不能据此声称用户会话过期；不改变 sessionStorage、JWT 或权限校验。

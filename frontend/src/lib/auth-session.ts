@@ -1,12 +1,12 @@
 /**
  * Input: API 401 响应、浏览器认证持久化状态
- * Output: 会话过期后的统一清理、单次提示与登录页跳转
+ * Output: 区分未登录与会话失效，统一清理、单次提示与登录页跳转
  * Pos: 前端认证基础设施，收敛失效会话处理入口
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-import { clearAuthToken } from '@/lib/auth-token';
+import { clearAuthToken, getAuthToken } from '@/lib/auth-token';
 
 const AUTH_STORAGE_KEY = 'auth-storage';
 const EXPIRED_LOGIN_URL = '/login?expired=1';
@@ -78,7 +78,13 @@ export const handleExpiredAuthSession = (options: ExpiredSessionOptions = {}): v
   }
 
   expiredSessionHandled = true;
+  const hadToken = Boolean(getAuthToken());
   clearExpiredAuthSessionState();
+  // 新标签没有本标签令牌，401 只能证明需要登录，不能证明会话过期。
+  if (!hadToken) {
+    (options.redirect ?? defaultRedirect)('/login');
+    return;
+  }
 
   const toastDelayMs = options.toastDelayMs ?? 0;
   const redirectDelayMs = options.redirectDelayMs ?? 300;

@@ -75,3 +75,5 @@ npm run test:e2e
 - 前端 API 默认走 `/api/v1`，由 Next.js 代理到 `http://localhost:3000/api/v1`
 - 出现登录 `500` 时，优先确认后端 `backend` 服务是否已启动（`cd backend && npm run dev`）
 - 主题支持白天/夜间模式切换（Header 右上角主题按钮）
+
+认证提示由 `src/lib/auth-session.ts` 统一处理：无本标签令牌的 401 进入普通登录页；持有失效令牌才显示会话过期。令牌仍按标签保存在 sessionStorage。

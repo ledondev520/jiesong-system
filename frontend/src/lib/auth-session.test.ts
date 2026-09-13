@@ -79,6 +79,15 @@ describe('auth-session', () => {
     expect(sessionStorage.getItem('auth-storage')).toBeNull();
   });
 
+  it('新标签未持有令牌时只要求登录，不误报会话过期', () => {
+    clearExpiredAuthSessionState();
+    const toast = vi.fn();
+    const redirect = vi.fn();
+    handleExpiredAuthSession({ pathname: '/dashboard', redirectDelayMs: 0, toast, redirect });
+    expect(redirect).toHaveBeenCalledWith('/login');
+    expect(toast).not.toHaveBeenCalled();
+  });
+
   it('handleExpiredAuthSession: 认证页请求失败不触发会话跳转', () => {
     const toast = vi.fn();
     const redirect = vi.fn();

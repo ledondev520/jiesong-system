@@ -3,6 +3,7 @@
 ## 5-Layer Defense Architecture
 
 ### 1) 访问控制与身份层（Identity & Access）
+- `frontend/src/lib/auth-session.ts` distinguishes missing tab-local tokens from expired tokens for login messaging only; both require authentication, and tokens remain in sessionStorage.
 - Enforce explicit身份校验 (JWT + role checks) for all sensitive routes.
 - Treat Agent / Service Account credentials as independent machine identities; never reuse employee passwords or browser sessions for automation.
 - Keep authentication middleware as single entry for route groups and validate user context before业务处理.
