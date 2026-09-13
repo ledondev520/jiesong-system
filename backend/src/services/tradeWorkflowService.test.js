@@ -233,3 +233,14 @@ test('较新的差异记录覆盖旧通过记录，出口单证重新变为待�
   assert.equal(documents.status, 'current');
   assert.match(documents.reason, /存在差异/);
 });
+
+test('采购备注不是丢失合同；已有合同仍需明确采购明细分配', () => {
+  const memo = buildTradeWorkflow({ ...baseSales, packingItems: [{ ...baseSales.packingItems[0], purchaseContractNo: '单独购买' }] });
+  assert.match(memo.stages[0].reason, /采购引用填写为备注/);
+  assert(!memo.stages[0].reason.includes('找不到购销合同'));
+  const map = new Map([[basePurchase.contractNo, basePurchase]]);
+  const unassigned = buildTradeWorkflow(baseSales, map);
+  assert(unassigned.issues.includes('采购明细待分配：CG260001'));
+  const assigned = buildTradeWorkflow({ ...baseSales, packingItems: [{ ...baseSales.packingItems[0], purchaseItemId: 'pi-1' }] }, map);
+  assert(!assigned.issues.some(x => x.startsWith('采购明细待分配')));
+});

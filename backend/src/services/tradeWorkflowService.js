@@ -1,6 +1,6 @@
 /**
  * Input: 出口合同、关联采购合同、装箱/单证/退税/收付记录
- * Output: 单笔出口专项单的八阶段进度、阻塞原因和唯一下一动作；已发运单据保留资料补录提示
+ * Output: 单笔出口专项单的八阶段进度、阻塞原因和唯一下一动作；已发运单据保留资料补录提示，区分备注引用与缺失合同并提示未分配采购明细
  * Pos: 经营中台与详情页共享的出口专项单主线路 Module
  */
 
@@ -74,6 +74,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   const missingPurchaseNos = purchaseContractNos.filter(
     (contractNo) => !getPurchaseByNo(purchaseMap, contractNo),
   );
+  const purchaseReferenceNotes = missingPurchaseNos.filter((no) => ['单独购买', '补充合同'].includes(no));
   const purchaseTotal = linkedPurchases.reduce((sum, contract) => sum + (Number(contract.totalAmount) || 0), 0);
   const purchasePaid = linkedPurchases.reduce((sum, contract) => sum + (Number(contract.paidAmount) || 0), 0);
   const allPurchasesPaid = linkedPurchases.length > 0
@@ -125,6 +126,12 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
         key: 'procurement', label: '采购签约', status: 'blocked', reason: '装箱明细未关联购销合同',
         action: { label: '关联购销合同', href: `/dashboard/sales/${salesContract.id}` },
       }
+    : purchaseReferenceNotes.length > 0
+      ? {
+          key: 'procurement', label: '采购签约', status: 'blocked',
+          reason: `采购引用填写为备注（${purchaseReferenceNotes.join('、')}），请补充正式合同号`,
+          action: { label: '补充采购合同号', href: `/dashboard/sales/${salesContract.id}` },
+        }
     : missingPurchaseNos.length > 0
       ? {
           key: 'procurement', label: '采购签约', status: 'blocked', reason: `找不到购销合同 ${missingPurchaseNos.join('、')}`,
@@ -273,6 +280,11 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   const nextStage = stages.find((stage) => stage.status === 'blocked' || stage.status === 'current')
     || stages.find((stage) => stage.status !== 'completed');
   const issues = [];
+  const unallocated = unique(packingItems.filter((item) => {
+    const purchase = getPurchaseByNo(purchaseMap, item.purchaseContractNo);
+    return purchase?.items?.length && !purchase.items.some((line) => line.id === item.purchaseItemId);
+  }).map((item) => item.purchaseContractNo));
+  if (unallocated.length) issues.push(`采购明细待分配：${unallocated.join('、')}`);
   if (purchasePaid > purchaseTotal + 0.01) issues.push('采购已付金额超过合同金额');
   if (productionIncompletePurchase) issues.push('采购生产状态已完成，但装柜输入资料不完整');
   if (readiness.overloaded) issues.push(shipped ? '历史装箱数据超出 40HQ 参数，待核对' : '货柜超过 40HQ 安全上限');
