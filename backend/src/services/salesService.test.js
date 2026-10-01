@@ -60,11 +60,23 @@ test('getSalesContracts: 组装筛选条件并分页查询', async () => {
     });
     assert.equal(findManyArgs.skip, 10);
     assert.equal(findManyArgs.take, 5);
+    assert.deepEqual(findManyArgs.include.packingItems, {
+      select: {
+        isOwnedByJiesong: true,
+        sourceParty: true,
+        store: { select: { id: true, name: true } },
+      },
+    });
     assert.equal(result.total, 1);
     assert.equal(result.contracts.length, 1);
     assert.deepEqual(result.contracts[0].stores, ['圣荷西2115', '禧瑞都']);
     assert.equal(result.contracts[0].hasThirdPartyCargo, true);
     assert.deepEqual(result.contracts[0].sourceParties, ['阿珍贵州']);
+    assert.equal(result.contracts[0].packingItems, undefined);
+
+    const liteResult = await salesService.getSalesContracts({ page: 1, pageSize: 20, lite: true });
+    assert.ok(findManyArgs.include.packingItems.select);
+    assert.deepEqual(liteResult.contracts, result.contracts);
   } finally {
     prisma.salesContract.findMany = originalFindMany;
     prisma.salesContract.count = originalCount;

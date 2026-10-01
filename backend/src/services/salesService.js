@@ -54,23 +54,16 @@ const getSalesContracts = async ({ page, pageSize, status, storeId, keyword, lit
       where,
       skip,
       take: pageSize,
-      include: lite
-        ? {
-            port: { select: { id: true, name: true } },
-            packingItems: {
-              include: {
-                store: { select: { id: true, name: true } },
-              },
-            },
-          }
-        : {
-            port: true,
-            packingItems: {
-              include: {
-                store: { select: { id: true, name: true } },
-              },
-            },
+      include: {
+        port: lite ? { select: { id: true, name: true } } : true,
+        packingItems: {
+          select: {
+            isOwnedByJiesong: true,
+            sourceParty: true,
+            store: { select: { id: true, name: true } },
           },
+        },
+      },
       orderBy: { contractNo: 'desc' },
     }),
     prisma.salesContract.count({ where }),

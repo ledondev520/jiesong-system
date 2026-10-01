@@ -45,6 +45,7 @@
 | authService.js | 登录验证、Token生成、密码管理、找回密码 |
 | financeService.js | 付款记录幂等写入、应收应付聚合（支持按合同过滤） |
 | salesFinanceService.js | 按共享所有权判定查询自有采购合同，聚合单柜收入、成本、退税与现金流 |
+| salesService.js | 出口合同及装箱管理；列表仅投影用于门店与第三方来源汇总的明细字段 |
 | financeImportService.js | 银行流水与发票清单解析、识别标题行后的招商银行中英文币种和脱敏账号、按银行/币种/账号及余额轨迹跨来源去重、税务全量导出的数电发票号码识别、同票多明细聚合及批次写入 |
 | bankFlowService.js | 银行流水按币种与脱敏账号查询、人民币发票对账和美元到账汇总 |
 | financeMatchService.js | 银行流水/发票与购销合同匹配；人民币只匹配采购、美元收入只匹配销售 |
