@@ -8,6 +8,7 @@
 
 'use client';
 
+import { BusinessWrite, useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -15,6 +16,8 @@ import { PurchaseContract, PurchaseStatus, PurchaseItem } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useAuthStore } from '@/store/auth.store';
 import { ErrorState } from '@/components/ui/data-state';
 import { EmptyState } from '@/components/ui/empty-state';
 import {
@@ -210,6 +213,8 @@ function formatAmount(amount: number) {
 }
 
 export default function ContractsPageContent() {
+  const readOnly = useBusinessReadOnly();
+  const canImportHistory = useAuthStore((state) => state.user?.role === 'ADMIN');
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusFromUrl = searchParams.get('status') || 'ALL';
@@ -298,6 +303,8 @@ export default function ContractsPageContent() {
 
   // 批量导入导出状态
   const [importLoading, setImportLoading] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [historicalImport, setHistoricalImport] = useState(false);
   const [importResultOpen, setImportResultOpen] = useState(false);
   const [importResult, setImportResult] = useState<{
     successRows: number;
@@ -412,17 +419,23 @@ export default function ContractsPageContent() {
 
   // 7. 批量导入
   const handleImportClick = () => {
-    fileInputRef.current?.click();
+    if (readOnly || importLoading) return;
+    setHistoricalImport(false);
+    setImportDialogOpen(true);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || readOnly || importLoading) return;
+    const historical = canImportHistory && historicalImport;
+    setImportDialogOpen(false);
     e.target.value = '';
 
     setImportLoading(true);
     try {
-      const response = await purchaseService.importExcel(file);
+      const response = historical
+        ? await purchaseService.importExcel(file, { historical: true })
+        : await purchaseService.importExcel(file);
       setImportResult(response.data);
       setImportResultOpen(true);
       if (response.data?.failedRows === 0) {
@@ -432,7 +445,8 @@ export default function ContractsPageContent() {
           `导入完成：成功 ${response.data.successRows} 条，失败 ${response.data.failedRows} 条`
         );
       }
-      // 刷新列表
+      // 导入完成后同时失效自定义列表缓存。
+      invalidateCache('purchase-contracts-list');
       await loadPurchaseContracts();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '导入失败';
@@ -591,9 +605,9 @@ export default function ContractsPageContent() {
       <PageHeader title="采购合同" />
 
       <div className="grid grid-cols-2 gap-3 md:hidden">
-        <Button className="h-11 rounded-2xl" onClick={() => router.push('/dashboard/purchase/create')}>
+        <BusinessWrite><Button className="h-11 rounded-2xl" onClick={() => router.push('/dashboard/purchase/create')}>
           <Plus className="mr-2 h-4 w-4" /> 新增采购
-        </Button>
+        </Button></BusinessWrite>
         <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
           <SheetTrigger asChild>
             <Button variant="outline" className="h-11 rounded-xl">
@@ -611,15 +625,15 @@ export default function ContractsPageContent() {
             <div className="space-y-5 px-5 py-5">
               {renderFilterControls('mobile')}
               <div className="grid grid-cols-1 gap-3 border-t pt-4">
-                <Button variant="outline" className="h-11 rounded-2xl" onClick={handleExport}>
+                <BusinessWrite><Button variant="outline" className="h-11 rounded-2xl" onClick={handleExport}>
                   <Download className="mr-2 h-4 w-4" /> 导出 Excel
-                </Button>
-                <Button variant="outline" className="h-11 rounded-2xl" onClick={handleImportClick} disabled={importLoading}>
+                </Button></BusinessWrite>
+                <BusinessWrite><Button variant="outline" className="h-11 rounded-2xl" onClick={handleImportClick} disabled={importLoading}>
                   <Upload className="mr-2 h-4 w-4" /> 批量导入
-                </Button>
-                <Button variant="outline" className="h-11 rounded-2xl" onClick={() => setTemplateDialogOpen(true)}>
+                </Button></BusinessWrite>
+                <BusinessWrite><Button variant="outline" className="h-11 rounded-2xl" onClick={() => setTemplateDialogOpen(true)}>
                   <FileText className="mr-2 h-4 w-4" /> 合同模板
-                </Button>
+                </Button></BusinessWrite>
               </div>
             </div>
             <div className="flex gap-3 border-t px-5 py-4">
@@ -717,27 +731,27 @@ export default function ContractsPageContent() {
           </div>
 
           <div className="hidden md:flex md:items-center md:gap-2">
-            <Button variant="outline" className="h-9 rounded-md text-xs" onClick={handleExport}>
+            <BusinessWrite><Button variant="outline" className="h-9 rounded-md text-xs" onClick={handleExport}>
               <Download className="mr-1.5 h-3.5 w-3.5" /> 导出 Excel
-            </Button>
-            <Button
+            </Button></BusinessWrite>
+            <BusinessWrite><Button
               variant="outline"
               className="h-9 rounded-md text-xs"
               onClick={handleImportClick}
               disabled={importLoading}
             >
               <Upload className="mr-1.5 h-3.5 w-3.5" /> 批量导入
-            </Button>
-            <Button
+            </Button></BusinessWrite>
+            <BusinessWrite><Button
               variant="outline"
               className="h-9 rounded-md text-xs"
               onClick={() => setTemplateDialogOpen(true)}
             >
               <FileText className="mr-1.5 h-3.5 w-3.5" /> 合同模板
-            </Button>
-            <Button className="h-9 rounded-md text-xs" onClick={() => router.push('/dashboard/purchase/create')}>
+            </Button></BusinessWrite>
+            <BusinessWrite><Button className="h-9 rounded-md text-xs" onClick={() => router.push('/dashboard/purchase/create')}>
               <Plus className="mr-1.5 h-3.5 w-3.5" /> 新增采购
-            </Button>
+            </Button></BusinessWrite>
           </div>
         </div>
 
@@ -809,14 +823,14 @@ export default function ContractsPageContent() {
                         <Eye className="mr-1.5 h-3.5 w-3.5" />
                         查看详情
                       </Button>
-                      <Button
+                      <BusinessWrite><Button
                         className="h-9 rounded-lg text-xs"
                         onClick={() => openGenerateDialog(contract.id)}
                         aria-label={`为 ${contract.contractNo} 生成购销合同`}
                       >
                         <FileDown className="mr-1.5 h-3.5 w-3.5" />
                         生成合同
-                      </Button>
+                      </Button></BusinessWrite>
                     </div>
                   </CardContent>
                 </Card>
@@ -835,7 +849,7 @@ export default function ContractsPageContent() {
                 icon={<ShoppingCart className="h-8 w-8" />}
                 title={hasActiveFilters ? '没有符合筛选条件的合同' : '暂无采购合同'}
                 description={hasActiveFilters ? '请调整或清空筛选后重试' : '还没有创建任何采购合同，点击下方的按钮开始创建'}
-                action={{ label: '新建采购合同', onClick: () => router.push('/dashboard/purchase/create') }}
+                action={readOnly ? undefined : { label: '新建采购合同', onClick: () => router.push('/dashboard/purchase/create') }}
               />
             </div>
           ) : (
@@ -960,7 +974,7 @@ export default function ContractsPageContent() {
                             >
                               <Eye className="h-3.5 w-3.5" />
                             </Button>
-                            <Button
+                            <BusinessWrite><Button
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 rounded-md"
@@ -970,7 +984,7 @@ export default function ContractsPageContent() {
                               }}
                             >
                               <FileDown className="h-3.5 w-3.5" />
-                            </Button>
+                            </Button></BusinessWrite>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1316,9 +1330,32 @@ export default function ContractsPageContent() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={importDialogOpen && !readOnly} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>导入采购合同</DialogTitle>
+            <DialogDescription>正常导入不代表收货或验货。已收货、已完成或已取消的历史合同仅能由管理员明确选择历史补录。</DialogDescription>
+          </DialogHeader>
+          {canImportHistory && (
+            <div className="space-y-2 rounded-md border p-3">
+              <div className="flex items-start gap-2">
+                <Checkbox id="historical-import" checked={historicalImport} onCheckedChange={(checked) => setHistoricalImport(checked === true)} />
+                <Label htmlFor="historical-import" className="leading-relaxed">我确认这是历史采购补录，允许导入历史收货或完成状态</Label>
+              </div>
+              <p className="text-xs text-muted-foreground">历史补录保留账面记录，不生成库存或分批验货证据，不能用于重复入库。</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportDialogOpen(false)}>取消</Button>
+            <Button onClick={() => fileInputRef.current?.click()} disabled={importLoading}>选择文件并导入</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* 隐藏的文件选择器 */}
       <input
         id="contract-import-file-input"
+        disabled={readOnly || importLoading}
         ref={fileInputRef}
         type="file"
         accept=".xlsx,.xls"

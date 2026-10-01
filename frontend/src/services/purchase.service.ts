@@ -240,9 +240,10 @@ export const purchaseService = {
   /**
    * 批量导入采购合同 Excel。
    */
-  importExcel: async (file: File) => {
+  importExcel: async (file: File, options?: { historical?: boolean }) => {
     const formData = new FormData();
     formData.append('file', file);
+    if (options?.historical === true) formData.append('historical', 'true');
     const response = await api.post<ApiResponse<ImportResult>, ApiResponse<ImportResult>, FormData>(
       '/purchases/import',
       formData,

@@ -8,6 +8,7 @@
 
 'use client';
 
+import { BusinessWrite, useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { MobileListCard } from '@/components/mobile';
@@ -99,6 +100,7 @@ const formatMoney = (n: number) => `¥${n.toLocaleString('zh-CN', { minimumFract
  */
 export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: PurchaseFlowPanelProps) {
   const isMobile = useMobile();
+  const readOnly = useBusinessReadOnly();
   const invoiceFileInputRef = useRef<HTMLInputElement>(null);
   const [remitOpen, setRemitOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
@@ -215,6 +217,7 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
    * @param data PaymentDialog 提交的金额/日期/方式/备注
    */
   const handleCreatePayment = async (data: PaymentSubmitData) => {
+    if (readOnly) return;
     try {
       await financeService.createPayment({
         type: PaymentType.PAYABLE,
@@ -240,6 +243,7 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
    * 职责：保存发票号到采购合同（催票后登记）
    */
   const handleSaveInvoiceNo = async () => {
+    if (readOnly) return;
     const values = invoiceNoInput
       .split(/[\s,，;；]+/)
       .map((value) => value.trim())
@@ -280,6 +284,7 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
   };
 
   const handleInvoiceFileUpload = async (file: File) => {
+    if (readOnly) return;
     setUploadingInvoice(true);
     try {
       const response = await uploadContractFile(
@@ -334,13 +339,13 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
             <Copy className="mr-1.5 h-3.5 w-3.5" />
             复制汇款信息
           </Button>
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setPayOpen(true)}>
+          <BusinessWrite><Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setPayOpen(true)}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             登记付款
-          </Button>
+          </Button></BusinessWrite>
           <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => handleInvoiceOpenChange(true)}>
             <ReceiptText className="mr-1.5 h-3.5 w-3.5" />
-            催开发票
+            {readOnly ? '查看发票' : '催开发票'}
           </Button>
         </div>
       </CardHeader>
@@ -463,7 +468,7 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
 
       {/* 登记付款弹窗（复用收付管理的 PaymentDialog） */}
       <PaymentDialog
-        open={payOpen}
+        open={payOpen && !readOnly}
         onOpenChange={setPayOpen}
         type={PaymentType.PAYABLE}
         contractNo={contract.contractNo}
@@ -478,7 +483,7 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-primary" />
-              催开发票
+              {readOnly ? '查看发票' : '催开发票'}
             </DialogTitle>
             <DialogDescription>
               将清单发给供应商开具增值税专用发票；号码必须登记，原件附件选填。
@@ -507,14 +512,15 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
               <div className="flex items-end gap-2">
                 <Textarea
                   id="invoice-no-input"
+                  readOnly={readOnly}
                   rows={3}
                   placeholder={'例如：\n25442000000012345678\n25442000000012345679'}
                   value={invoiceNoInput}
                   onChange={(e) => setInvoiceNoInput(e.target.value)}
                 />
-                <Button onClick={handleSaveInvoiceNo} disabled={savingInvoiceNo}>
+                <BusinessWrite><Button onClick={handleSaveInvoiceNo} disabled={savingInvoiceNo}>
                   {savingInvoiceNo ? '保存中...' : '保存'}
-                </Button>
+                </Button></BusinessWrite>
               </div>
             </div>
             <div className="space-y-2 border-t pt-4">
@@ -527,6 +533,7 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
                   ref={invoiceFileInputRef}
                   id="supplier-invoice-file-input"
                   name="supplierInvoiceFile"
+                  disabled={readOnly || uploadingInvoice}
                   type="file"
                   className="hidden"
                   aria-label="上传供应商发票原件"
@@ -536,7 +543,7 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
                     if (file) void handleInvoiceFileUpload(file);
                   }}
                 />
-                <Button
+                <BusinessWrite><Button
                   type="button"
                   variant="outline"
                   size="sm"
@@ -547,7 +554,7 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
                     ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                     : <FileUp className="mr-1.5 h-3.5 w-3.5" />}
                   {uploadingInvoice ? '上传中...' : '上传发票原件'}
-                </Button>
+                </Button></BusinessWrite>
               </div>
               {(invoicePreparation?.invoiceFiles.length || 0) > 0 && (
                 <div className="flex flex-wrap gap-2">

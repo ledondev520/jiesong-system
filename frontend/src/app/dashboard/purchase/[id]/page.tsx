@@ -1,6 +1,6 @@
 /**
  * Input: 采购合同详情API、购销合同生成服务、系统配置（盖章平台/开票抬头）、PurchaseFlowPanel、SortableTableHead、useTableSort
- * Output: 支持手机商品明细卡片的采购合同详情页面（商品明细、合同归档、付款、生产资料、实物图与发票面板）
+ * Output: 支持手机商品明细卡片的采购合同详情页面（商品明细、合同归档、付款、生产资料、分批到货验货与发票面板）
  * Pos: 采购管理子页面，承载「签合同→盖章→付款→生产完工→催票」的单合同主线路
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,6 +8,7 @@
 
 'use client';
 
+import { BusinessWrite, useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
 import { useState, useEffect, use, useCallback, useMemo } from 'react';
 import { PurchaseContract, PurchaseItem, PurchaseStatus } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
@@ -70,6 +71,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { PageHeader } from '@/components/layout/PageHeader';
 import ContractFiles from '@/components/contract/ContractFiles';
+import { PurchaseReceiptPanel } from './components/PurchaseReceiptPanel';
 import { PurchaseFlowPanel } from './components/PurchaseFlowPanel';
 import { PurchaseProductionPanel } from './components/PurchaseProductionPanel';
 import { configService } from '@/services/config.service';
@@ -85,7 +87,6 @@ const PURCHASE_NEXT_ACTIONS: Partial<Record<PurchaseStatus, { status: PurchaseSt
   [PurchaseStatus.SIGNED]: { status: PurchaseStatus.READY, label: '登记完工资料' },
   [PurchaseStatus.PRODUCING]: { status: PurchaseStatus.READY, label: '登记完工资料' },
   [PurchaseStatus.READY]: { status: PurchaseStatus.SHIPPED, label: '确认供应商已发货' },
-  [PurchaseStatus.SHIPPED]: { status: PurchaseStatus.RECEIVED, label: '全部到齐并验收入库' },
 };
 
 /**
@@ -248,6 +249,7 @@ function ContractTimeline({ currentStatus }: { currentStatus: PurchaseStatus }) 
 }
 
 export default function PurchaseDetailPage({ params }: PageProps) {
+  const readOnly = useBusinessReadOnly();
   const isMobile = useMobile();
   const router = useRouter();
   const [loadError, setLoadError] = useState(false);
@@ -310,6 +312,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
 
   // 加载系统配置（盖章平台链接、开票抬头），失败不阻塞页面
   useEffect(() => {
+    if (readOnly) return;
     const fetchConfigs = async () => {
       try {
         const response = await configService.getSystemConfig();
@@ -321,7 +324,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
       }
     };
     void fetchConfigs();
-  }, []);
+  }, [readOnly]);
 
   /**
    * 职责：跳转线上盖章平台（系统配置 stampPlatformUrl）
@@ -406,7 +409,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
 
   /** 顺序推进采购状态，成功后刷新整份合同与付款汇总。 */
   const handleAdvanceStatus = async () => {
-    if (!contract) return;
+    if (!contract || readOnly) return;
     const nextAction = PURCHASE_NEXT_ACTIONS[contract.status];
     if (!nextAction) return;
 
@@ -506,18 +509,17 @@ export default function PurchaseDetailPage({ params }: PageProps) {
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={contract.status} />
             {contract.status === PurchaseStatus.DRAFT && contract.paidAmount === 0 && !(contract.payments?.length) && !contract.invoiceNo && contractFiles.length === 0 && (
-              <Button variant="outline" onClick={() => router.push(`/dashboard/purchase/create?editId=${contract.id}`)}>更正草稿</Button>
+              <BusinessWrite><Button variant="outline" onClick={() => router.push(`/dashboard/purchase/create?editId=${contract.id}`)}>更正草稿</Button></BusinessWrite>
             )}
             {[PurchaseStatus.DRAFT, PurchaseStatus.SIGNED].includes(contract.status) && contract.paidAmount === 0 && !(contract.payments?.length) && !contract.invoiceNo && (
-              <Button variant="outline" onClick={handleCancel} disabled={statusUpdating}>取消合同</Button>
+              <BusinessWrite><Button variant="outline" onClick={handleCancel} disabled={statusUpdating}>取消合同</Button></BusinessWrite>
             )}
             {nextPurchaseAction && (
-              <Button
+              <BusinessWrite><Button
                 className="h-9 rounded-md text-xs"
                 onClick={handleAdvanceStatus}
                 disabled={statusUpdating || productionCompletionBlocked}
-                title={productionCompletionBlocked ? '请先补齐所有商品的规格、箱数、毛净重和体积'
-                  : contract.status === PurchaseStatus.SHIPPED ? '仅全部商品到齐且验收合格时登记；分批或不合格不要执行整单入库' : undefined}
+                title={productionCompletionBlocked ? '请先补齐所有商品的规格、箱数、毛净重和体积' : undefined}
               >
                 {statusUpdating ? (
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -525,32 +527,32 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                   <ArrowRight className="mr-1.5 h-3.5 w-3.5" />
                 )}
                 {nextPurchaseAction.label}
-              </Button>
+              </Button></BusinessWrite>
             )}
-            <Button variant="outline" className="h-9 rounded-md text-xs" onClick={handleExportPdf} disabled={exportingPdf}>
+            <BusinessWrite><Button variant="outline" className="h-9 rounded-md text-xs" onClick={handleExportPdf} disabled={exportingPdf}>
               {exportingPdf ? (
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Download className="mr-1.5 h-3.5 w-3.5" />
               )}
               导出 PDF
-            </Button>
-            <Button variant="outline" className="h-9 rounded-md text-xs" onClick={viewContractPdf} disabled={pdfLoading}>
+            </Button></BusinessWrite>
+            <BusinessWrite><Button variant="outline" className="h-9 rounded-md text-xs" onClick={viewContractPdf} disabled={pdfLoading}>
               {pdfLoading ? (
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Eye className="mr-1.5 h-3.5 w-3.5" />
               )}
               查看合同
-            </Button>
-            <Button variant="outline" className="h-9 rounded-md text-xs" onClick={handleOpenStampPlatform}>
+            </Button></BusinessWrite>
+            <BusinessWrite><Button variant="outline" className="h-9 rounded-md text-xs" onClick={handleOpenStampPlatform}>
               <Stamp className="mr-1.5 h-3.5 w-3.5" />
               在线盖章
-            </Button>
-            <Button className="h-9 rounded-md text-xs" onClick={() => setGenerateOpen(true)}>
+            </Button></BusinessWrite>
+            <BusinessWrite><Button className="h-9 rounded-md text-xs" onClick={() => setGenerateOpen(true)}>
               <FileDown className="mr-1.5 h-3.5 w-3.5" />
               生成购销合同
-            </Button>
+            </Button></BusinessWrite>
           </div>
         }
       />
@@ -632,8 +634,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
 
       {/* 时间线 */}
       <ContractTimeline currentStatus={contract.status} />
-      {contract.status === PurchaseStatus.SHIPPED && <p className="text-sm text-muted-foreground">仅全部商品到齐并验收合格时执行整单入库；分批到货或不合格时不要执行整单入库。</p>}
+      {contract.status === PurchaseStatus.SHIPPED && <p className="text-sm text-muted-foreground">请在下方分批到货与验货区域处理；到齐并合格后自动收货，付款结清后自动完成。</p>}
       {contract.status === PurchaseStatus.RECEIVED && <p className="text-sm text-muted-foreground">已收货，付款记录结清后自动完成采购，无需再确认完成。</p>}
+
+      <PurchaseReceiptPanel purchaseContractId={id} readOnly={readOnly} onChanged={loadData} />
 
       {/* 付款与发票（复制汇款信息 / 登记付款 / 催开发票） */}
       <PurchaseFlowPanel contract={contract} onUpdated={loadData} invoiceTitleInfo={invoiceTitleInfo} />

@@ -20,6 +20,8 @@ const mockGetById = vi.fn();
 const mockToastError = vi.fn();
 const mockExportPurchasePdf = vi.fn();
 const mockUpdatePurchaseStatus = vi.fn();
+const mockReceiptSummary = vi.fn();
+let mockReadOnly = false;
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react');
@@ -84,9 +86,20 @@ vi.mock('@/lib/axios', () => ({
 }));
 
 
+vi.mock('@/lib/hooks/useBusinessReadOnly', () => ({
+  useBusinessReadOnly: () => mockReadOnly,
+  BusinessWrite: ({ children }: { children: React.ReactNode }) => mockReadOnly ? null : <>{children}</>,
+}));
+vi.mock('@/services/purchaseReceipt.service', () => ({ purchaseReceiptService: { list: (...args: unknown[]) => mockReceiptSummary(...args) } }));
+vi.mock('./components/PurchaseReceiptPanel', () => ({
+  PurchaseReceiptPanel: ({ purchaseContractId, readOnly, onChanged }: { purchaseContractId: string; readOnly?: boolean; onChanged: () => void }) => <div data-testid="receipt-panel" data-contract={purchaseContractId} data-readonly={String(readOnly)}><button onClick={onChanged}>模拟验货更新</button></div>,
+}));
+
 describe('PurchaseDetailPage 交互逻辑', () => {
   beforeEach(() => {
     mockIsMobile.mockReturnValue(false);
+    mockReadOnly = false;
+    mockReceiptSummary.mockResolvedValue({ data: { summary: { complete: false } } });
     mockGetById.mockReset();
     mockToastError.mockReset();
     mockExportPurchasePdf.mockReset();
@@ -351,4 +364,24 @@ describe('PurchaseDetailPage 交互逻辑', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(screen.getByText('不含税单价')).toBeInTheDocument();
   });
+  it('已发货只能走分批验货，不暴露整单收货按钮且验货后刷新合同状态', async () => {
+    const contract = { id: 'p-1', contractNo: 'CG-TEST', status: 'SHIPPED', totalAmount: 100, paidAmount: 0, supplier: { name: '合成供应商' }, items: [] };
+    mockGetById.mockResolvedValueOnce({ data: contract }).mockResolvedValue({ data: { ...contract, status: 'RECEIVED' } });
+    renderPage();
+    const panel = await screen.findByTestId('receipt-panel');
+    expect(panel).toHaveAttribute('data-contract', 'p-1');
+    expect(screen.queryByRole('button', { name: '全部到齐并验收入库' })).not.toBeInTheDocument();
+    expect(screen.getByText('请在下方分批到货与验货区域处理；到齐并合格后自动收货，付款结清后自动完成。')).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByText('模拟验货更新'));
+    expect(await screen.findByText('已收货，付款记录结清后自动完成采购，无需再确认完成。')).toBeInTheDocument();
+    expect(mockUpdatePurchaseStatus).not.toHaveBeenCalled();
+  });
+  it('老板的分批记录面板只读，不展示手动收货或完成动作', async () => {
+    mockReadOnly = true;
+    mockGetById.mockResolvedValue({ data: { id: 'p-1', contractNo: 'CG-TEST', status: 'SHIPPED', totalAmount: 100, paidAmount: 0, supplier: { name: '合成供应商' }, items: [] } });
+    renderPage();
+    expect(await screen.findByTestId('receipt-panel')).toHaveAttribute('data-readonly', 'true');
+    expect(screen.queryByRole('button', { name: /全部到齐并验收入库|确认完成/ })).not.toBeInTheDocument();
+  });
+
 });

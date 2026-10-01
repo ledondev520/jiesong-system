@@ -7,7 +7,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ContractsPage from './page';
 
@@ -16,6 +16,8 @@ const mockSearchParamGet = vi.fn();
 const mockGetAll = vi.fn();
 const mockGetTemplates = vi.fn();
 const mockToastError = vi.fn();
+const mockImportExcel = vi.fn();
+let mockRole = 'ADMIN';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -32,6 +34,7 @@ vi.mock('@/services/purchase.service', () => ({
   purchaseService: {
     getAll: (...args: unknown[]) => mockGetAll(...args),
     getById: vi.fn(),
+    importExcel: (...args: unknown[]) => mockImportExcel(...args),
   },
 }));
 
@@ -58,9 +61,13 @@ vi.mock('@/lib/api-cache', () => ({
   clearAllCache: vi.fn(),
 }));
 
+vi.mock('@/store/auth.store', () => ({ useAuthStore: (selector: (state: unknown) => unknown) => selector({ user: { role: mockRole } }) }));
+
 describe('ContractsPage 交互逻辑', () => {
   beforeEach(() => {
     mockPush.mockReset();
+    mockRole = 'ADMIN';
+    mockImportExcel.mockResolvedValue({ data: { successRows: 1, failedRows: 0, errors: [] } });
     mockSearchParamGet.mockReset();
     mockGetAll.mockReset();
     mockGetTemplates.mockReset();
@@ -159,4 +166,27 @@ describe('ContractsPage 交互逻辑', () => {
     expect(screen.getAllByRole('button', { name: '查看 CG2500001 详情' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: '为 CG2500001 生成购销合同' }).length).toBeGreaterThan(0);
   });
+  it('管理员每次导入默认正常，明确勾选历史确认才提交historical', async () => {
+    mockGetAll.mockResolvedValue({ data: { items: [] } });
+    render(<ContractsPage />);
+    await screen.findByRole('heading', { name: '采购合同' });
+    await userEvent.setup().click(screen.getAllByRole('button', { name: '批量导入' })[0]);
+    expect(screen.getByRole('heading', { name: '导入采购合同' })).toBeInTheDocument();
+    const checkbox = screen.getByRole('checkbox', { name: /我确认这是历史采购补录/ });
+    expect(checkbox).not.toBeChecked();
+    fireEvent.click(checkbox);
+    const file = new File(['synthetic'], 'synthetic.xlsx');
+    fireEvent.change(document.querySelector('#contract-import-file-input')!, { target: { files: [file] } });
+    await waitFor(() => expect(mockImportExcel).toHaveBeenCalledWith(file, { historical: true }));
+  });
+  it('采购员没有历史确认，正常导入不携带历史参数', async () => {
+    mockRole = 'PURCHASE';mockGetAll.mockResolvedValue({ data: { items: [] } });
+    render(<ContractsPage />);await screen.findByRole('heading', { name: '采购合同' });
+    await userEvent.setup().click(screen.getAllByRole('button', { name: '批量导入' })[0]);
+    expect(screen.queryByRole('checkbox', { name: /历史采购补录/ })).not.toBeInTheDocument();
+    const file = new File(['synthetic'], 'synthetic.xlsx');
+    fireEvent.change(document.querySelector('#contract-import-file-input')!, { target: { files: [file] } });
+    await waitFor(() => expect(mockImportExcel).toHaveBeenCalledWith(file));
+  });
+
 });

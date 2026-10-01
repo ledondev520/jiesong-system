@@ -16,6 +16,7 @@ vi.mock('@/lib/hooks/useMobile', () => ({ useMobile: () => mockIsMobile() }));
 const mockGetPreparation = vi.fn();
 const mockRegisterNumbers = vi.fn();
 const mockUploadFile = vi.fn();
+let mockReadOnly = false;
 
 vi.mock('@/services/purchase.service', () => ({
   purchaseService: {
@@ -99,8 +100,14 @@ const contract = {
   payments: [],
 } as unknown as PurchaseContract;
 
+vi.mock('@/lib/hooks/useBusinessReadOnly', () => ({
+  useBusinessReadOnly: () => mockReadOnly,
+  BusinessWrite: ({ children }: { children: React.ReactNode }) => mockReadOnly ? null : <>{children}</>,
+}));
+
 describe('PurchaseFlowPanel supplier invoice flow', () => {
   beforeEach(() => {
+    mockReadOnly = false;
     mockIsMobile.mockReturnValue(false);
     vi.clearAllMocks();
     mockGetPreparation.mockResolvedValue({ data: preparation });
@@ -160,4 +167,17 @@ describe('PurchaseFlowPanel supplier invoice flow', () => {
     });
     expect(onUpdated).toHaveBeenCalled();
   });
+  it('老板可查看发票资料，但号码只读且无付款或上传动作', async () => {
+    mockReadOnly = true;
+    mockGetPreparation.mockResolvedValue({ data: preparation });
+    render(<PurchaseFlowPanel contract={contract} onUpdated={vi.fn()} />);
+    expect(screen.queryByText('登记付款')).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: '查看发票' }));
+    const field = await screen.findByLabelText('发票号码登记（每行或逗号分隔）');
+    expect(field).toHaveAttribute('readonly');
+    expect(screen.queryByText('保存')).not.toBeInTheDocument();
+    expect(screen.queryByText('上传发票原件')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('上传供应商发票原件')).toBeDisabled();
+  });
+
 });
