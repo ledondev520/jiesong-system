@@ -146,6 +146,8 @@ export interface Store {
 
 export interface Product {
   id: string;
+  lowStockThreshold?: number;
+  availableStock?: number;
   customsName: string;
   description?: string;
   specification?: string;

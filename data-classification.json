@@ -25,6 +25,7 @@
           "Secrets only in .env or secret manager",
           "Browser access tokens remain tab-scoped in sessionStorage; missing-token login messaging never grants access or exposes token values",
           "System-configured API keys are write-only; encrypted storage is permitted but complete values must never be returned or rendered",
+          "System configuration environment-key fallbacks use the same masked response helper as database keys",
           "Restricted business records only in the application database or protected contract-evidence storage",
           "Least privilege file mode (<=600 for backend .env)",
           "Contract artifact and SQLite backup directories use 0700 and files use 0600",
@@ -61,7 +62,8 @@
           "Use role-based filtering at API response layer",
           "Procurement-template reads require authentication at backend/src/routes/procurementTemplate.js before historical data is loaded",
           "Monthly financial source files are parsed in memory; persist structured rows plus filename, size, and SHA-256 only",
-          "Financial evidence workbooks are never archived; sensitive personal identifiers are redacted before persistence and row-level reads require ADMIN or FINANCE"
+          "Financial evidence workbooks are never archived; sensitive personal identifiers are redacted before persistence and row-level reads require ADMIN or FINANCE",
+          "Product navigation belongs to procurement at frontend/src/components/layout/navigation.config.ts; backend/src/routes/products.js remains the authority for read/write role checks"
         ],
         "transfer": [
           "Use authenticated session only",

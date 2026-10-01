@@ -19,6 +19,8 @@
 - Monthly financial statements, account balances, general-ledger rows, and their source filenames/hashes are Confidential; raw workbooks must not be committed, logged, or copied into ordinary attachment storage.
 - Payroll, social-security, tax-return, voucher, and journal evidence rows are Confidential; redact personal identifiers before persistence, never archive source workbooks, and allow row-level reads only to ADMIN/FINANCE.
 
+- 商品档案在 `frontend/src/components/layout/navigation.config.ts` 归采购模块，使已有权限的采购员可达现有页面；后端 `backend/src/routes/products.js` 继续执行读写角色校验，导航不授予额外 API 权限。
+
 ## UI Design System (强制)
 - **所有前端页面开发必须遵循 SHADCN/UI 设计风格**.
 - 优先使用 shadcn/ui 组件库 (https://ui.shadcn.com)，禁止自行造轮子.
@@ -32,6 +34,7 @@
 - Do not print sensitive values to logs. Redact secrets from debug output and structured logs.
 - Structured HTTP logs may retain request shape for diagnosis, but must not retain body/query values, AI prompts, tool schemas, or user messages.
 - System-configured API keys are write-only: response Interfaces may expose only a configured flag or masked suffix, and frontend pages must never render a complete stored key even for administrators.
+- Environment-key fallback in `backend/src/controllers/system/configController.js` must mask the key with the same response helper as database configuration.
 - `backend/src/routes/procurementTemplate.js` must authenticate every procurement-template read before loading Confidential historical store/purchase data.
 - Keep dependencies updated with minimal privilege; avoid adding packages that require elevated permissions or execute shell by default.
 - Enforce permission checks before loading `.env` and config files as implemented in `backend/src/config/index.js`.

@@ -8,7 +8,7 @@
 
 'use client';
 
-import { Suspense, useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Product } from '@/types';
 import { productService } from '@/services/product.service';
@@ -70,6 +70,7 @@ const DEFAULT_PAGE_SIZE = 20;
 function ProductsPageContent() {
   const searchParams = useSearchParams();
   const initialKeyword = searchParams.get('keyword') || '';
+  const lowStockParam = searchParams.get('lowStock') === 'true';
   
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,34 +83,33 @@ function ProductsPageContent() {
   const [deleting, setDeleting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [total, setTotal] = useState(0);
+  const [loadError, setLoadError] = useState(false);
+  const [lowStock, setLowStock] = useState(lowStockParam);
+  const latestRequest = useRef(0);
 
-  // 0. 输入停止一段时间后再触发查询，降低请求频率
-  useEffect(() => {
-    setCurrentPage(1);
-    loadProducts(debouncedKeyword);
-  }, [debouncedKeyword]);
-
-  // 从URL参数初始化关键字
-  useEffect(() => {
-    setKeyword(initialKeyword);
-  }, [initialKeyword]);
-
-  const loadProducts = async (searchKeyword?: string) => {
+  const loadProducts = useCallback(async () => {
+    const request = ++latestRequest.current;
     setLoading(true);
+    setLoadError(false);
     try {
-      const response = await productService.getAll({ 
-        page: 1, 
-        pageSize: 100,
-        keyword: searchKeyword || undefined,
-        lite: true,
-      });
+      const response = await productService.getAll({ page: currentPage, pageSize, keyword: debouncedKeyword || undefined, lite: true, ...(lowStock ? { lowStock: true } : {}) });
+      if (request !== latestRequest.current) return;
       setProducts(response.data?.items || []);
+      setTotal(response.data?.pagination?.total ?? response.data?.items?.length ?? 0);
     } catch {
+      if (request !== latestRequest.current) return;
+      setLoadError(true);
       toast.error('加载商品失败');
     } finally {
-      setLoading(false);
+      if (request === latestRequest.current) setLoading(false);
     }
-  };
+  }, [currentPage, pageSize, debouncedKeyword, lowStock]);
+
+  useEffect(() => { setCurrentPage(1); }, [debouncedKeyword, lowStock]);
+  useEffect(() => { void loadProducts(); }, [loadProducts]);
+  useEffect(() => { setKeyword(initialKeyword); }, [initialKeyword]);
+  useEffect(() => { setLowStock(lowStockParam); }, [lowStockParam]);
 
   const handleCreate = () => {
     setEditingProduct(null);
@@ -152,6 +152,8 @@ function ProductsPageContent() {
         prevProducts.filter((product) => product.id !== productToDelete.id)
       );
       toast.success('商品已删除');
+      if (products.length === 1 && currentPage > 1) setCurrentPage(page => page - 1);
+      else void loadProducts();
       setDeleteDialogOpen(false);
       setProductToDelete(null);
     } catch {
@@ -171,7 +173,7 @@ function ProductsPageContent() {
         toast.success('商品创建成功');
       }
       setIsDialogOpen(false);
-      loadProducts();
+      void loadProducts();
     } catch {
       toast.error(editingProduct ? '更新失败' : '创建失败');
     }
@@ -201,8 +203,8 @@ function ProductsPageContent() {
 
   const productSort = useTableSort(products, productAccessor);
 
-  const totalPages = Math.ceil(productSort.sortedData.length / pageSize);
-  const pagedProducts = productSort.sortedData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const pagedProducts = productSort.sortedData;
 
   return (
     <div className="space-y-6">
@@ -244,13 +246,16 @@ function ProductsPageContent() {
             </Button>
           </div>
 
+          <Button variant={lowStock ? 'default' : 'outline'} onClick={() => setLowStock(value => !value)} aria-pressed={lowStock}>只看低库存商品</Button>
+          {lowStock && <p className="text-sm text-muted-foreground">按已入库可用数量与商品阈值核对，包含零库存商品。</p>}
+          {loadError && <div role="alert" className="rounded-lg border border-destructive/30 p-4 text-sm">商品读取失败，不能视为没有商品。<Button variant="outline" onClick={() => void loadProducts()}>重试</Button></div>}
           {/* 移动端卡片列表 */}
           <div className="space-y-3 md:hidden">
             {loading ? (
               <div className="surface-panel py-10 text-center text-sm text-muted-foreground">加载中...</div>
-            ) : products.length === 0 ? (
+            ) : loadError ? null : products.length === 0 ? (
               <div className="surface-panel py-10 text-center text-sm text-muted-foreground">
-                {keyword ? '没有匹配的商品' : '暂无商品，点击右上角新增'}
+                {lowStock ? '没有低库存商品' : keyword ? '没有匹配的商品' : '暂无商品，点击右上角新增'}
               </div>
             ) : (
               pagedProducts.map((product) => (
@@ -259,6 +264,7 @@ function ProductsPageContent() {
                   title={product.customsName}
                   subtitle={[product.specification, product.unit].filter(Boolean).join(' · ') || '-'}
                   fields={[
+                    ...(lowStock ? [{ label: '可用库存 / 阈值', value: `${product.availableStock ?? 0} / ${product.lowStockThreshold ?? 0}` }] : []),
                     { label: '包装规格', value: product.packingSpec || '-' },
                     { label: '毛重', value: product.grossWeight != null ? `${product.grossWeight} kg` : '-' },
                     { label: '净重', value: product.netWeight != null ? `${product.netWeight} kg` : '-' },
@@ -285,11 +291,11 @@ function ProductsPageContent() {
           <div className="hidden md:block">
             {loading ? (
               <div className="py-12 text-center text-muted-foreground">加载中...</div>
-            ) : products.length === 0 ? (
+            ) : loadError ? null : products.length === 0 ? (
               <EmptyState
                 icon={<Package className="h-8 w-8" />}
-                title="暂无商品"
-                description="还没有添加任何商品，点击下方的按钮开始创建"
+                title={lowStock ? "没有低库存商品" : "暂无商品"}
+                description={lowStock ? "已启用预警阈值的商品均有足够可用库存。" : "还没有添加任何商品，点击下方的按钮开始创建"}
                 action={{ label: '新增商品', onClick: () => setIsDialogOpen(true) }}
               />
             ) : (
@@ -313,6 +319,7 @@ function ProductsPageContent() {
                         </Badge>
                       </div>
 
+                      {lowStock && <p className="text-sm text-destructive">可用库存 {product.availableStock ?? 0} / 阈值 {product.lowStockThreshold ?? 0}</p>}
                       {/* 规格信息 */}
                       <div className="grid grid-cols-3 gap-2 text-center">
                         <div className="rounded-lg bg-muted/40 p-2">
@@ -372,7 +379,7 @@ function ProductsPageContent() {
 
           {/* 分页控制 */}
           <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span>共 {products.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
+            <span>共 {total} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
             <div className="flex items-center gap-2">
               <PageSizeSelect
                 value={pageSize}

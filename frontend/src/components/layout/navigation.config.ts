@@ -46,6 +46,7 @@ export const PROCUREMENT_TABS: TabConfig[] = [
   { href: '/dashboard/contracts', label: '采购合同' },
   { href: '/dashboard/suppliers', label: '供应商管理' },
   { href: '/dashboard/inventory-status', label: '库存状态' },
+  { href: '/dashboard/products', label: '商品档案' },
 ];
 
 export const EXPORT_TABS: TabConfig[] = [
@@ -68,7 +69,6 @@ export const AI_TABS: TabConfig[] = [
 export const ADMIN_TABS: TabConfig[] = [
   { href: '/dashboard/settings', label: '系统配置' },
   { href: '/dashboard/users', label: '账号管理' },
-  { href: '/dashboard/products', label: '商品档案' },
   { href: '/dashboard/system/logs', label: '系统日志' },
 ];
 
@@ -106,7 +106,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     defaultHref: '/dashboard/contracts',
     label: '采购',
     icon: ShoppingCart,
-    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers', '/dashboard/inventory-status', '/dashboard/logistics'],
+    childPrefixes: ['/dashboard/contracts', '/dashboard/suppliers', '/dashboard/inventory-status', '/dashboard/logistics', '/dashboard/products'],
     tabs: PROCUREMENT_TABS,
     mobilePrimary: true,
   },
@@ -160,7 +160,6 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
       '/dashboard/users',
       '/dashboard/about',
       '/dashboard/system',
-      '/dashboard/products',
     ],
     tabs: ADMIN_TABS,
     visibleRoles: [Role.ADMIN],

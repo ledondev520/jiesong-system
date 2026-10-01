@@ -7,6 +7,7 @@
  */
 
 const prisma = require('../utils/prisma');
+const { listLowStockAlerts } = require('../services/inventoryAlertService');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const { normalizePagination, parsePositiveInt } = require('../utils/pagination');
@@ -48,6 +49,11 @@ const list = async (req, res, next) => {
       where.categoryId = categoryId;
     }
     
+    const lowStock = req.query.lowStock === 'true' || req.query.lowStock === true;
+    const alerts = lowStock ? (await listLowStockAlerts(prisma, { keyword })).alerts : [];
+    if (lowStock) where.id = { in: alerts.map(alert => alert.productId) };
+    const alertByProduct = new Map(alerts.map(alert => [alert.productId, alert]));
+
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,
@@ -70,6 +76,7 @@ const list = async (req, res, next) => {
                 length: true,
                 width: true,
                 height: true,
+                lowStockThreshold: true,
                 isActive: true,
                 createdAt: true,
                 updatedAt: true,
@@ -83,7 +90,8 @@ const list = async (req, res, next) => {
       prisma.product.count({ where }),
     ]);
     
-    paginated(res, products, total, page, pageSize);
+    const items = lowStock ? products.map(product => ({ ...product, availableStock: alertByProduct.get(product.id)?.currentStock ?? 0 })) : products;
+    paginated(res, items, total, page, pageSize);
   } catch (error) {
     next(error);
   }

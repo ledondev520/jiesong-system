@@ -63,6 +63,16 @@ describe('ProductsPage 交互逻辑', () => {
     mockSearchParamGet.mockImplementation((key: string) => (key === 'keyword' ? '' : null));
   });
 
+  it('按服务端总数翻到第二页，保留低库存筛选', async () => {
+    mockSearchParamGet.mockImplementation((key: string) => key === 'lowStock' ? 'true' : null);
+    mockGetAll.mockResolvedValue({ data: { items: [], pagination: { total: 140, page: 1, pageSize: 20, totalPages: 7 } } });
+    const user = userEvent.setup();
+    render(<ProductsPage />);
+    await waitFor(() => expect(screen.getByRole('button', { name: '下一页' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: '下一页' }));
+    await waitFor(() => expect(mockGetAll).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, pageSize: 20, lowStock: true })));
+  });
+
   it('根据URL关键词初始化并拉取列表', async () => {
     mockSearchParamGet.mockImplementation((key: string) => (key === 'keyword' ? '苹果' : null));
     mockGetAll.mockResolvedValue({ data: { items: [] } });
@@ -72,7 +82,7 @@ describe('ProductsPage 交互逻辑', () => {
     await waitFor(() => {
       expect(mockGetAll).toHaveBeenCalledWith({
         page: 1,
-        pageSize: 100,
+        pageSize: 20,
         keyword: '苹果',
         lite: true,
       });
@@ -92,7 +102,7 @@ describe('ProductsPage 交互逻辑', () => {
     await waitFor(() => {
       expect(mockGetAll).toHaveBeenLastCalledWith({
         page: 1,
-        pageSize: 100,
+        pageSize: 20,
         keyword: '香蕉',
         lite: true,
       });
@@ -109,12 +119,12 @@ describe('ProductsPage 交互逻辑', () => {
     await user.clear(input);
     await user.type(input, '香蕉');
     await waitFor(() => {
-      expect(mockGetAll).toHaveBeenLastCalledWith({ page: 1, pageSize: 100, keyword: '香蕉', lite: true });
+      expect(mockGetAll).toHaveBeenLastCalledWith({ page: 1, pageSize: 20, keyword: '香蕉', lite: true });
     });
 
     await user.clear(input);
     await waitFor(() => {
-      expect(mockGetAll).toHaveBeenLastCalledWith({ page: 1, pageSize: 100, keyword: undefined, lite: true });
+      expect(mockGetAll).toHaveBeenLastCalledWith({ page: 1, pageSize: 20, keyword: undefined, lite: true });
     });
   });
 

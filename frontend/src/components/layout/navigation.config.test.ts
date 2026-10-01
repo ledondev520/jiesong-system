@@ -7,6 +7,7 @@ import {
   getSecondaryMobileModuleNavItems,
   getModuleTargetHref,
   getVisibleModuleNavItems,
+  getModuleByPath,
   isTabRouteActive,
   MODULE_NAV_ITEMS,
 } from './navigation.config';
@@ -29,6 +30,11 @@ describe('navigation.config helpers', () => {
     const visibleForAdmin = getVisibleModuleNavItems(Role.ADMIN);
     expect(visibleForAdmin.some((item) => item.key === 'admin')).toBe(true);
     expect(visibleForAdmin.some((item) => item.key === 'ai')).toBe(true);
+  });
+
+  it('采购员可从采购模块维护同一商品档案，管理模块仍仅管理员可见', () => {
+    expect(getModuleByPath('/dashboard/products')?.key).toBe('procurement');
+    expect(getVisibleModuleNavItems(Role.PURCHASE).some(item => item.key === 'admin')).toBe(false);
   });
 
   it('移动端主 Tab 和更多入口按配置分组', () => {
@@ -54,7 +60,7 @@ describe('navigation.config helpers', () => {
   it('采购模块 Tab 不再把合同模板作为独立页面', () => {
     const procurement = MODULE_NAV_ITEMS.find((item) => item.key === 'procurement');
 
-    expect(procurement?.tabs.map((tab) => tab.label)).toEqual(['采购合同', '供应商管理', '库存状态']);
+    expect(procurement?.tabs.map((tab) => tab.label)).toEqual(['采购合同', '供应商管理', '库存状态', '商品档案']);
     expect(procurement?.childPrefixes).not.toContain('/dashboard/contract-templates');
   });
 
@@ -81,7 +87,7 @@ describe('navigation.config helpers', () => {
   it('系统管理只保留常规管理入口', () => {
     const admin = MODULE_NAV_ITEMS.find((item) => item.key === 'admin');
 
-    expect(admin?.tabs.map((tab) => tab.label)).toEqual(['系统配置', '账号管理', '商品档案', '系统日志']);
+    expect(admin?.tabs.map((tab) => tab.label)).toEqual(['系统配置', '账号管理', '系统日志']);
   });
 
   it('AI 助手作为独立模块，不挂在系统管理 Tab 下', () => {
