@@ -293,7 +293,7 @@ describe('AiSessionsPage', () => {
       expect(screen.getAllByText(/5 \/ 失败 1/).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/动作 2 · 已执行 1 · 失败 1/).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/失败动作/).length).toBeGreaterThan(0);
-      expect(screen.getByText(/2026-04-04 12:06:00/)).toBeInTheDocument();
+      expect(screen.getAllByText(/2026-04-04 12:06:00/)).toHaveLength(2);
       expect(screen.getByText('Agent 工具注册表')).toBeInTheDocument();
       expect(screen.getByText('主入口 unified')).toBeInTheDocument();
       expect(screen.getByText('当前角色 FINANCE')).toBeInTheDocument();
@@ -1173,7 +1173,7 @@ describe('AiSessionsPage', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /失败动作 1/ })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /待确认 1/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^待确认 1$/ })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /待处理 2/ })).toBeInTheDocument();
     });
 
@@ -1234,10 +1234,10 @@ describe('AiSessionsPage', () => {
     render(<AiSessionsPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /待确认 1/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^待确认 1$/ })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: /待确认 1/ }));
+    await user.click(screen.getByRole('button', { name: /^待确认 1$/ }));
 
     await waitFor(() => {
       const rows = Array.from(document.querySelectorAll('tbody tr'));
