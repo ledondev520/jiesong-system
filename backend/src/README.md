@@ -28,7 +28,7 @@
 | supplierController.js | 供应商管理 CRUD |
 | storeController.js | 门店管理 CRUD + 港口 |
 | productController.js | 商品管理 + 历史价格 |
-| purchaseController.js | 采购合同 + 文件上传 |
+| purchaseController.js | 采购合同 + 经 fileService 收紧权限的附件上传 + 从 UPLOAD_DIR 解析附件下载 |
 | salesController.js | 出口合同 + 价格计算 + 源文件附件 |
 | containerController.js | 货柜管理 + 装箱明细 |
 | inventoryController.js | 库存状态管理 |

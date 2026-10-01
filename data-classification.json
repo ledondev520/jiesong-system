@@ -28,6 +28,7 @@
           "Restricted business records only in the application database or protected contract-evidence storage",
           "Least privilege file mode (<=600 for backend .env)",
           "Contract artifact and SQLite backup directories use 0700 and files use 0600",
+          "Legacy procurement attachment handlers reuse fileService permission enforcement and resolve downloads against UPLOAD_DIR",
           "Carrier packing-list raw extracted text is not persisted; structured check records retain their original file reference",
           "HTTP request logs retain route, timing, and request shape only; request/query values, AI prompts, tool schemas, and user messages are excluded"
         ],

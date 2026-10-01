@@ -1,12 +1,13 @@
 /**
- * Input: Prisma客户端
+ * Input: Prisma客户端、统一附件服务与上传路径工具
  * Output: 采购合同相关的HTTP响应
- * Pos: 采购控制器，处理采购合同CRUD请求
+ * Pos: 采购控制器，处理采购合同CRUD请求与受限附件存储、下载
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');
+const fileService = require('../services/fileService');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const {
@@ -458,7 +459,7 @@ const updateStatus = async (req, res, next) => {
  * 职责：上传合同文件
  * 思路：
  * 1. multer中间件处理文件上传
- * 2. 保存文件信息到数据库
+ * 2. 统一附件服务收紧目录/文件权限后保存文件信息到数据库
  * 3. 返回文件记录
  */
 const uploadFile = async (req, res, next) => {
@@ -469,19 +470,13 @@ const uploadFile = async (req, res, next) => {
       throw createError('请选择要上传的文件', 400);
     }
     
-    const file = req.file;
-    const { getRelativePath } = require('../utils/upload');
-    
-    // 保存文件记录
-    const contractFile = await prisma.contractFile.create({
-      data: {
-        purchaseContractId: id,
-        fileName: file.originalname,
-        filePath: getRelativePath(file.path),
-        fileType: file.mimetype,
-        fileSize: file.size,
-      },
-    });
+    const contractFile = await fileService.createFile(
+      id,
+      fileService.CONTRACT_TYPE.PURCHASE,
+      req.file,
+      req.body?.description,
+      req.body?.category,
+    );
     
     created(res, contractFile, '文件上传成功');
   } catch (error) {
@@ -540,19 +535,20 @@ const deleteFile = async (req, res, next) => {
 
 /**
  * 职责：下载合同附件
- * 思路：查找文件记录，构造绝对路径，通过 res.download 返回文件流
+ * 思路：查找文件记录，相对路径从 UPLOAD_DIR 解析，通过 res.download 返回文件流
  */
 const downloadFile = async (req, res, next) => {
   try {
     const { fileId } = req.params;
     const path = require('path');
+    const { getFullPath } = require('../utils/upload');
 
     const file = await prisma.contractFile.findUnique({ where: { id: fileId } });
     if (!file) throw createError('文件不存在', 404);
 
     const absolutePath = path.isAbsolute(file.filePath)
       ? file.filePath
-      : path.join(process.cwd(), file.filePath);
+      : getFullPath(file.filePath);
 
     res.download(absolutePath, file.fileName, (err) => {
       if (err && !res.headersSent) next(err);

@@ -16,6 +16,7 @@
 - Run Node进程 with最小权限 (non-root, locked-down directories) and mount config with read-only policy where possible.
 - Keep upload/storage directories explicitly created and scoped to应用用户.
 - Contract evidence written by `backend/src/services/fileService.js` must use `0700` directories and `0600` files; permission tightening must succeed before the database record is created.
+- Procurement attachment handlers in `backend/src/controllers/purchaseController.js` must reuse that file service for persistence and resolve downloads against `UPLOAD_DIR`, so legacy routes cannot bypass protected storage or lose uploaded files.
 - SQLite backup directories must use `0700` and backup database files must use `0600`; `backend/scripts/db-backup.js` is the enforcement point.
 - Carrier packing-list originals are Restricted evidence: `packingListCheckService.js` must archive them through `fileService.js`, persist only structured comparison results (never raw extracted PDF text), and prevent deletion while a check record references the file.
 - Add startup checks for config file accessibility and permission drift.

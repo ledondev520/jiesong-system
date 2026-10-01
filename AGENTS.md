@@ -37,6 +37,7 @@
 - Enforce permission checks before loading `.env` and config files as implemented in `backend/src/config/index.js`.
 - Use least privilege for files and directories created by the system, especially upload directories and temporary files.
 - Contract attachments and generated documents must be stored in `0700` directories with `0600` file mode; `backend/src/services/fileService.js` is the enforcement point and must fail before persistence if permission tightening fails.
+- Procurement attachment handlers in `backend/src/controllers/purchaseController.js` must use the shared file service for persistence and resolve downloads against `UPLOAD_DIR`.
 - Carrier packing-list checks must archive the original PDF through `backend/src/services/fileService.js`, store only structured comparison output (not raw extracted text), and retain the referenced original while any `PackingListCheck` exists.
 - Any privileged operation must fail closed (`throw`) in production and log with full context in non-production.
 
