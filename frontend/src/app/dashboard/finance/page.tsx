@@ -1,7 +1,7 @@
 /**
  * Input: 后端财务 Interface、银行流水/发票统计 Interface、按需图表 Module
  * Output: 财务概览页面（收付进度 + 汇率 + 银行流水/发票摘要 + 紧迫信号 + 趋势折线图 + 快捷导航）
- * Pos: 财务模块首页，提供公司财务进度驾驶舱
+ * Pos: 财务模块首页，提供公司财务进度驾驶舱；手动刷新失效两层请求缓存
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -41,9 +41,9 @@ import {
   getTransactionStats, getInvoiceStats,
   type BankFlowStats, type InvoiceStats,
 } from '@/services/bankFlow.service';
-import api from '@/lib/axios';
+import api, { clearApiGetCache } from '@/lib/axios';
 import { type ApiResponse } from '@/types';
-import { cachedFetch } from '@/lib/api-cache';
+import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState, LoadingState } from '@/components/ui/data-state';
 import { KpiCard } from '@/components/finance/KpiCard';
@@ -127,6 +127,10 @@ export default function FinancePage() {
   const hasLoadedRef = useRef(false);
 
   const loadData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      invalidateCache('fin-');
+      clearApiGetCache();
+    }
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     setLoadError(false);
