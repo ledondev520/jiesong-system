@@ -17,9 +17,9 @@ const { normalizePagination } = require('../utils/pagination');
 async function listTransactions(req, res, next) {
   try {
     const { page, pageSize } = normalizePagination(req.query);
-    const { search, direction, dateFrom, dateTo, batchId, currency = 'CNY', accountNoMasked } = req.query;
+    const { search, direction, dateFrom, dateTo, batchId, currency = 'CNY', accountNoMasked, amountMin, amountMax } = req.query;
     const result = await bankFlowService.listTransactions({
-      search, direction, dateFrom, dateTo, batchId, currency, accountNoMasked, page, pageSize,
+      search, direction, dateFrom, dateTo, batchId, currency, accountNoMasked, amountMin, amountMax, page, pageSize,
     });
     paginated(res, result.items, result.total, page, pageSize);
   } catch (err) { next(err); }
@@ -30,8 +30,8 @@ async function listTransactions(req, res, next) {
  */
 async function getTransactionStats(req, res, next) {
   try {
-    const { search, direction, dateFrom, dateTo, batchId, currency = 'CNY', accountNoMasked } = req.query;
-    const stats = await bankFlowService.getStats({ search, direction, dateFrom, dateTo, batchId, currency, accountNoMasked });
+    const { search, direction, dateFrom, dateTo, batchId, currency = 'CNY', accountNoMasked, amountMin, amountMax } = req.query;
+    const stats = await bankFlowService.getStats({ search, direction, dateFrom, dateTo, batchId, currency, accountNoMasked, amountMin, amountMax });
     success(res, stats);
   } catch (err) { next(err); }
 }

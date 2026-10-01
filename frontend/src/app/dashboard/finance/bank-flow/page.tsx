@@ -27,6 +27,9 @@ import {
   getTransactions, getTransactionStats, getBatches,
   type BankTransaction, type BankFlowStats, type FinanceDataBatch,
 } from '@/services/bankFlow.service';
+import { ErrorState } from '@/components/ui/data-state';
+import { clearApiGetCache } from '@/lib/axios';
+import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { PaymentListCard } from '@/components/finance/PaymentListCard';
 import { BankFlowImportDialog } from './components/BankFlowImportDialog';
 
@@ -41,9 +44,11 @@ export default function BankFlowPage() {
   const [items, setItems] = useState<BankTransaction[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState(urlSearch);
   const [direction, setDirection] = useState('');
+  const [currency, setCurrency] = useState('CNY');
+  const [loadError, setLoadError] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [amountMin, setAmountMin] = useState('');
@@ -55,18 +60,19 @@ export default function BankFlowPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const [txnRes, statsRes, batchRes] = await Promise.all([
-        getTransactions({ page, pageSize, search: search || undefined, direction: direction || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }),
-        getTransactionStats({ search: search || undefined, direction: direction || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }),
+        getTransactions({ page, pageSize, search: search || undefined, direction: direction || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, currency, amountMin: amountMin ? Number(amountMin) : undefined, amountMax: amountMax ? Number(amountMax) : undefined }),
+        getTransactionStats({ search: search || undefined, direction: direction || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, currency, amountMin: amountMin ? Number(amountMin) : undefined, amountMax: amountMax ? Number(amountMax) : undefined }),
         getBatches('BANK_FLOW'),
       ]);
       setItems(txnRes.items || []);
       setTotal(txnRes.pagination?.total || 0);
       setStats(statsRes);
       setBatches(batchRes || []);
-    } catch { /* toast on error */ } finally { setLoading(false); }
-  }, [page, pageSize, search, direction, dateFrom, dateTo]);
+    } catch { setLoadError(true); } finally { setLoading(false); }
+  }, [page, pageSize, search, direction, dateFrom, dateTo, currency, amountMin, amountMax]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -90,18 +96,12 @@ export default function BankFlowPage() {
     }, [])
   );
 
-  // 客户端金额过滤
-  const filteredByAmount = sort.sortedData.filter(item => {
-    const abs = Math.abs(item.amount);
-    if (amountMin && abs < Number(amountMin)) return false;
-    if (amountMax && abs > Number(amountMax)) return false;
-    return true;
-  });
+  const filteredByAmount = sort.sortedData;
 
   const totalPages = Math.ceil(total / pageSize);
 
   const resetFilters = () => {
-    setSearch(''); setDirection(''); setDateFrom(''); setDateTo(''); setAmountMin(''); setAmountMax(''); setPage(1);
+    setSearch(''); setDirection(''); setDateFrom(''); setDateTo(''); setAmountMin(''); setAmountMax(''); setCurrency('CNY'); setPage(1);
   };
 
   const hasFilters = search || direction || dateFrom || dateTo || amountMin || amountMax;
@@ -110,9 +110,15 @@ export default function BankFlowPage() {
     <div className="space-y-4">
       <ModuleTabHeader tabs={FINANCE_TABS} />
 
+      {loadError && <ErrorState title="银行流水读取失败" description="当前明细和统计未更新，请重试。" action={<Button variant="outline" onClick={() => { clearApiGetCache(); void loadData(); }}>重试</Button>} />}
       <div className="px-1">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <Select value={currency} onValueChange={(value) => { setCurrency(value); setPage(1); }}><SelectTrigger className="w-28" aria-label="币种"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="CNY">CNY 人民币</SelectItem><SelectItem value="USD">USD 美元</SelectItem></SelectContent></Select>
+          <PageSizeSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} />
+          <span className="text-xs text-muted-foreground">金额与汇总币种：{currency}；表头为本页排序</span>
+        </div>
         {/* KPI */}
-        {stats && (
+        {stats && !loadError && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             <Card>
               <CardContent className="pt-4 pb-3 px-4">
@@ -145,8 +151,8 @@ export default function BankFlowPage() {
         {batches.length > 0 && (
           <div className="text-xs text-muted-foreground mb-3">
             数据来源：{batches.map(b => (
-              <span key={b.id} className="inline-flex items-center gap-1 mr-3">
-                <Badge variant="outline" className="text-[10px]">{b.fileName}</Badge>
+              <span key={b.id} className="inline-flex max-w-full min-w-0 flex-wrap items-center gap-1 mr-3">
+                <Badge variant="outline" className="max-w-full whitespace-normal break-all text-[10px]">{b.fileName}</Badge>
                 {b.dataStartDate}~{b.dataEndDate}
                 ・导入于 {new Date(b.importedAt).toLocaleDateString('zh-CN')}
               </span>
@@ -205,7 +211,7 @@ export default function BankFlowPage() {
         <div className="space-y-2 md:hidden mb-4">
           {loading ? (
             <div className="py-10 text-center text-sm text-muted-foreground">加载中...</div>
-          ) : filteredByAmount.length === 0 ? (
+          ) : loadError ? (<p className="py-8 text-center text-destructive">读取失败，请使用上方重试</p>) : filteredByAmount.length === 0 ? (
             <div className="py-10 text-center text-sm text-muted-foreground">
               {hasFilters ? '没有匹配当前筛选条件的记录' : '暂无数据'}
             </div>
@@ -215,6 +221,7 @@ export default function BankFlowPage() {
                 key={item.id}
                 direction={item.direction === 'IN' ? 'IN' : 'OUT'}
                 amount={Math.abs(item.amount)}
+                currency={`${item.currency} `}
                 date={item.txnDate}
                 counterpart={item.counterpart || undefined}
                 summary={item.summary || undefined}
@@ -278,7 +285,7 @@ export default function BankFlowPage() {
               <TableBody>
                 {loading ? (
                   <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">加载中...</TableCell></TableRow>
-                ) : filteredByAmount.length === 0 ? (
+                ) : loadError ? (<TableRow><TableCell colSpan={6} className="text-center py-8 text-destructive">读取失败，请重试</TableCell></TableRow>) : filteredByAmount.length === 0 ? (
                   <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">{hasFilters ? '没有匹配当前筛选条件的记录' : '暂无数据'}</TableCell></TableRow>
                 ) : filteredByAmount.map(item => (
                   <TableRow key={item.id}>
@@ -289,7 +296,7 @@ export default function BankFlowPage() {
                         : <Badge variant="outline" className="text-red-600 border-red-200 text-[10px]"><ArrowUpRight className="h-3 w-3 mr-0.5" />付</Badge>}
                     </TableCell>
                     <TableCell className={`text-right tabular-nums font-medium ${item.direction === 'IN' ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {item.direction === 'IN' ? '+' : '-'}{fmt(Math.abs(item.amount))}
+                      {item.currency} {item.direction === 'IN' ? '+' : '-'}{fmt(Math.abs(item.amount))}
                     </TableCell>
                     <TableCell className="max-w-[200px]">
                       {item.counterpart ? (
@@ -321,18 +328,18 @@ export default function BankFlowPage() {
         </Card>
 
         {/* 合计栏 */}
-        {stats && (
+        {stats && !loadError && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
               <span className="text-muted-foreground">本页合计</span>
               <span className="font-semibold text-emerald-600">
-                收 ¥{fmt(filteredByAmount.filter(i => i.direction === 'IN').reduce((s, i) => s + Math.abs(i.amount), 0))}
+                收 {currency} {fmt(filteredByAmount.filter(i => i.direction === 'IN').reduce((s, i) => s + Math.abs(i.amount), 0))}
               </span>
               <span className="font-semibold text-red-600">
-                付 ¥{fmt(filteredByAmount.filter(i => i.direction === 'OUT').reduce((s, i) => s + Math.abs(i.amount), 0))}
+                付 {currency} {fmt(filteredByAmount.filter(i => i.direction === 'OUT').reduce((s, i) => s + Math.abs(i.amount), 0))}
               </span>
               <span className="font-semibold text-foreground">
-                净 ¥{fmt(
+                净 {currency} {fmt(
                   filteredByAmount.filter(i => i.direction === 'IN').reduce((s, i) => s + Math.abs(i.amount), 0) -
                   filteredByAmount.filter(i => i.direction === 'OUT').reduce((s, i) => s + Math.abs(i.amount), 0)
                 )}

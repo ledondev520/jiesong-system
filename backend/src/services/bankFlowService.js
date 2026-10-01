@@ -7,6 +7,7 @@
  */
 
 const prisma = require('../utils/prisma');
+const { createError } = require('../middleware/errorHandler');
 
 const COMPANY = '上海捷淞国际物流有限公司';
 
@@ -17,8 +18,8 @@ const COMPANY = '上海捷淞国际物流有限公司';
  * @param {number} pageSize
  * @returns {{ items, total }}
  */
-async function listTransactions({ search, direction, dateFrom, dateTo, batchId, currency = 'CNY', accountNoMasked, page = 1, pageSize = 20 }) {
-  const where = buildTxnWhere({ search, direction, dateFrom, dateTo, batchId, currency, accountNoMasked });
+async function listTransactions({ search, direction, dateFrom, dateTo, batchId, currency = 'CNY', accountNoMasked, amountMin, amountMax, page = 1, pageSize = 20 }) {
+  const where = buildTxnWhere({ search, direction, dateFrom, dateTo, batchId, currency, accountNoMasked, amountMin, amountMax });
 
   const [items, total] = await Promise.all([
     prisma.bankTransaction.findMany({
@@ -39,8 +40,19 @@ async function listTransactions({ search, direction, dateFrom, dateTo, batchId, 
  * @param {object} filters - search, direction, dateFrom, dateTo, batchId
  * @returns {object} Prisma where clause
  */
-function buildTxnWhere({ search, direction, dateFrom, dateTo, batchId, currency, accountNoMasked } = {}) {
+function buildTxnWhere({ search, direction, dateFrom, dateTo, batchId, currency, accountNoMasked, amountMin, amountMax } = {}) {
   const where = {};
+  if (amountMin !== undefined && amountMin !== '' || amountMax !== undefined && amountMax !== '') {
+    const min = amountMin === undefined || amountMin === '' ? 0 : Number(amountMin);
+    const max = amountMax === undefined || amountMax === '' ? null : Number(amountMax);
+    if (!Number.isFinite(min) || min < 0 || max !== null && (!Number.isFinite(max) || max < min)) {
+      throw createError('金额区间无效：金额须非负，最大金额不得小于最小金额', 400);
+    }
+    where.AND = [{ OR: [
+      { amount: { gte: min, ...(max !== null ? { lte: max } : {}) } },
+      { amount: { lte: -min, ...(max !== null ? { gte: -max } : {}) } },
+    ] }];
+  }
   if (direction) where.direction = direction;
   if (batchId) where.batchId = batchId;
   if (currency) where.currency = String(currency).toUpperCase();
