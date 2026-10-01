@@ -104,3 +104,5 @@
 - Agent 普通与流式入口必须检查 SDK query 的终止结果（`backend/src/services/openAgentService.js`）；上游错误返回 503/SSE error，不写入成功回放，不自动重试。
 
 - `frontend/src/lib/api-base-url.ts` 统一普通请求与 Next 代理地址：裸后端 origin 自动添加 `/api/v1`，完整 API 路径和显式自定义路径保持不重复拼接；不修改实际部署环境值。
+
+- `backend/src/utils/inventoryStateMachine.js` 拒绝手工修改采购/验货来源库存；普通、批量及 AI 确认执行均重新检查来源与当前状态。相同状态不改入出库时间；库存页面隐藏业务来源记录的重复手工流转入口。

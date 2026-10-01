@@ -40,7 +40,8 @@
           "AI provider calls bound full response waits, disable SDK automatic retry/logging and reuse streamed token usage without resending prompts for estimation",
           "Customs draft replacement retains identity and is atomic; released records cannot be replaced. Shipment confirmation versions retain business facts and evidence while excluding technical createdAt/updatedAt timestamps",
           "Agent normal and streaming requests inspect SDK termination status; upstream errors are not persisted as successful runs and do not automatically retry",
-          "Ordinary frontend requests and protected Next proxy downloads share API base parsing; bare origins gain /api/v1 while explicit API paths are retained without duplication"
+          "Ordinary frontend requests and protected Next proxy downloads share API base parsing; bare origins gain /api/v1 while explicit API paths are retained without duplication",
+          "Purchase/inspection inventory cannot be manually transitioned through normal, bulk or AI endpoints; execution rechecks provenance and same-status requests preserve inventory timestamps"
         ],
         "transfer": [
           "Encrypt in transit (TLS)",

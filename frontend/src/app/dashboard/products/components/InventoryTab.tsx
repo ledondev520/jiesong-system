@@ -1,6 +1,6 @@
 /**
  * Input: 库存服务、SortableTableHead、useTableSort
- * Output: 支持窄屏操作与长名称显示的库存状态管理 Tab 组件（单条/批量状态流转、桌面表列排序）
+ * Output: 支持窄屏操作与长名称显示的库存状态管理 Tab 组件（单条/批量状态流转、桌面表列排序；采购/验货来源库存自动流转）
  * Pos: 商品档案页面的子 Tab
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -169,7 +169,9 @@ export function InventoryTab() {
    * @param status 当前库存状态
    * @returns 可切换状态列表
    */
-  const getAllowedNextStatuses = (status: InventoryStatus): InventoryStatus[] => {
+  const getAllowedNextStatuses = (item: Inventory): InventoryStatus[] => {
+    if (item.purchaseItemId || item.receiptInspectionId) return [];
+    const status = item.status;
     const transitionMap: Record<InventoryStatus, InventoryStatus[]> = {
       [InventoryStatus.PRODUCING]: [InventoryStatus.PACKING],
       [InventoryStatus.PACKING]: [InventoryStatus.SHIPPING],
@@ -218,7 +220,7 @@ export function InventoryTab() {
    */
   const toggleSelectAll = (checked: boolean): void => {
     if (checked) {
-      setSelectedIds(inventory.map((item) => item.id));
+      setSelectedIds(inventory.filter(item => !item.purchaseItemId && !item.receiptInspectionId).map(item => item.id));
       return;
     }
     setSelectedIds([]);
@@ -276,6 +278,7 @@ export function InventoryTab() {
   const totalPages = Math.ceil(total / pageSize);
   const pagedInventory = inventorySort.sortedData;
 
+  const hasManualInventory = inventory.some(item => !item.purchaseItemId && !item.receiptInspectionId);
   return (
     <div className="space-y-6">
       <div className="hidden flex-wrap items-center gap-2 md:flex">
@@ -299,20 +302,20 @@ export function InventoryTab() {
             重置
           </Button>
         )}
-        <BusinessWrite><Button
+        {hasManualInventory && (<BusinessWrite><Button
           variant="outline"
           disabled={batchUpdating || selectedIds.length === 0}
           onClick={() => handleBatchStatusChange(InventoryStatus.INBOUND)}
         >
           批量设为已入库
-        </Button></BusinessWrite>
-        <BusinessWrite><Button
+        </Button></BusinessWrite>)}
+        {hasManualInventory && (<BusinessWrite><Button
           variant="outline"
           disabled={batchUpdating || selectedIds.length === 0}
           onClick={() => handleBatchStatusChange(InventoryStatus.OUTBOUND)}
         >
           批量设为已出库
-        </Button></BusinessWrite>
+        </Button></BusinessWrite>)}
       </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 md:hidden">
@@ -352,22 +355,22 @@ export function InventoryTab() {
                 当前已选 {selectedIds.length} 条库存记录
               </div>
               <div className="grid grid-cols-1 gap-3">
-                <BusinessWrite><Button
+                {hasManualInventory && (<BusinessWrite><Button
                   variant="outline"
                   className="h-11 rounded-2xl"
                   disabled={batchUpdating || selectedIds.length === 0}
                   onClick={() => void handleBatchStatusChange(InventoryStatus.INBOUND)}
                 >
                   批量设为已入库
-                </Button></BusinessWrite>
-                <BusinessWrite><Button
+                </Button></BusinessWrite>)}
+                {hasManualInventory && (<BusinessWrite><Button
                   variant="outline"
                   className="h-11 rounded-2xl"
                   disabled={batchUpdating || selectedIds.length === 0}
                   onClick={() => void handleBatchStatusChange(InventoryStatus.OUTBOUND)}
                 >
                   批量设为已出库
-                </Button></BusinessWrite>
+                </Button></BusinessWrite>)}
               </div>
             </div>
             <div className="border-t px-5 py-4">
@@ -410,7 +413,7 @@ export function InventoryTab() {
           </Card>
         ) : (
           pagedInventory.map((item) => {
-            const nextStatuses = getAllowedNextStatuses(item.status);
+            const nextStatuses = getAllowedNextStatuses(item);
             const itemLabel = item.product?.customsName || item.id;
 
             return (
@@ -420,6 +423,7 @@ export function InventoryTab() {
                     <div className="flex min-w-0 flex-1 items-start gap-3">
                       <Checkbox
                         checked={selectedIds.includes(item.id)}
+                        disabled={Boolean(item.purchaseItemId || item.receiptInspectionId)}
                         onCheckedChange={() => toggleSelectedId(item.id)}
                         aria-label={`选择库存 ${itemLabel}`}
                         className="mt-1"
@@ -447,7 +451,7 @@ export function InventoryTab() {
 
                   {nextStatuses.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-border/70 px-4 py-3 text-sm text-muted-foreground">
-                      当前记录没有可用下一状态
+                      {item.purchaseItemId || item.receiptInspectionId ? '库存随到货验货、出口发运自动更新' : '当前记录没有可用下一状态'}
                     </div>
                   ) : (
                     <div className="grid gap-3">
@@ -540,6 +544,7 @@ export function InventoryTab() {
                   <TableCell>
                     <Checkbox
                       checked={selectedIds.includes(item.id)}
+                      disabled={Boolean(item.purchaseItemId || item.receiptInspectionId)}
                       onCheckedChange={() => toggleSelectedId(item.id)}
                       aria-label={`选择库存 ${item.product?.customsName || item.id}`}
                     />
@@ -551,17 +556,17 @@ export function InventoryTab() {
                   <TableCell>{item.quantity} {item.product?.unit}</TableCell>
                   <TableCell>{getStatusBadge(item.status)}</TableCell>
                   <TableCell>
-                    <BusinessWrite>                    <DropdownMenu>
+                    {item.purchaseItemId || item.receiptInspectionId ? <span className="text-sm text-muted-foreground">自动流转</span> : (<BusinessWrite><DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="rounded-xl border border-border/65 bg-background/55">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {getAllowedNextStatuses(item.status).length === 0 ? (
+                        {getAllowedNextStatuses(item).length === 0 ? (
                           <DropdownMenuItem disabled>无可用下一状态</DropdownMenuItem>
                         ) : (
-                          getAllowedNextStatuses(item.status).map((nextStatus) => (
+                          getAllowedNextStatuses(item).map((nextStatus) => (
                             <BusinessWrite key={`${item.id}-${nextStatus}`}><DropdownMenuItem
                               key={`${item.id}-${nextStatus}`}
                               onClick={() => handleStatusChange(item.id, nextStatus)}
@@ -571,7 +576,7 @@ export function InventoryTab() {
                           ))
                         )}
                       </DropdownMenuContent>
-                    </DropdownMenu></BusinessWrite>
+                    </DropdownMenu></BusinessWrite>)}
                   </TableCell>
                 </TableRow>
               ))

@@ -33,7 +33,7 @@
 | fileController.js | 合同附件；退税确认清单含核验行，下载及删除仅允许管理员/财务 |
 | taxRefundController.js | 退税记录与工作台、出货材料确认和受限月度导出 |
 | containerController.js | 货柜管理 + 装箱明细 |
-| inventoryController.js | 库存状态管理 |
+| inventoryController.js | 库存查询；采购/验货来源状态由业务事实驱动，手工和批量不可绕过 |
 | financeController.js | 付款与账款管理 |
 | financialStatementsController.js | 月度财务三文件预览、确认导入与账期查询 |
 | financialEvidenceController.js | 脱敏财务资料摘要、文档列表与 Sheet 行级下钻 |
@@ -97,3 +97,5 @@
 
 - `inventorySnapshot.js`：以自有装箱行扣减对应采购来源、单位的合格库存，旧销售明细兼容不双计；回滚保留验货来源。
 - `customsDeclarationDraftService.js`：编号包含出口合同号，原子替换仅限 DRAFT，保留 ID 与编号并拒绝覆盖已放行单。
+
+- `utils/inventoryStateMachine.js` 的来源约束用于普通/批量库存接口和 AI 工具，AI 确认时重新检查；相同状态请求不修改 FIFO 时间。

@@ -170,6 +170,8 @@ const updateStatus = async (req, res, next) => {
         id: true,
         status: true,
         salesContractId: true,
+        purchaseItemId: true,
+        receiptInspectionId: true,
       },
     });
     if (!existingInventory) {
@@ -186,6 +188,7 @@ const updateStatus = async (req, res, next) => {
       throw createError(validationResult.message || '非法库存状态流转', 400);
     }
     
+    if (existingInventory.status === status) return success(res, existingInventory, '状态未变化');
     const updateData = { status };
     
     // 根据状态更新时间
@@ -196,7 +199,7 @@ const updateStatus = async (req, res, next) => {
     }
     
     const inventory = await prisma.inventory.update({
-      where: { id },
+      where: { id, status: existingInventory.status },
       data: updateData,
     });
     
@@ -233,6 +236,8 @@ const batchUpdateStatus = async (req, res, next) => {
         id: true,
         status: true,
         salesContractId: true,
+        purchaseItemId: true,
+        receiptInspectionId: true,
       },
     });
 
@@ -258,6 +263,7 @@ const batchUpdateStatus = async (req, res, next) => {
         continue;
       }
 
+      if (existingInventory.status === status) { successCount += 1; continue; }
       const updateData = { status };
       if (status === 'INBOUND') {
         updateData.inboundAt = new Date();
@@ -267,7 +273,7 @@ const batchUpdateStatus = async (req, res, next) => {
 
       // 1. 执行更新
       await prisma.inventory.update({
-        where: { id },
+        where: { id, status: existingInventory.status },
         data: updateData,
       });
       successCount += 1;

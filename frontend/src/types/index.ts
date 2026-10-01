@@ -446,6 +446,7 @@ export enum InventoryStatus {
 
 export interface Inventory {
   id: string;
+  receiptInspectionId?: string | null;
   productId: string;
   purchaseItemId?: string;
   salesItemId?: string;

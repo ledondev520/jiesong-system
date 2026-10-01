@@ -71,3 +71,5 @@
 - `backend/src/services/openAgentService.js` inspects SDK query termination for both normal and streamed requests. Upstream errors propagate as 503/SSE error before success persistence; the SDK prompt convenience method drops the failure subtype and must not be used here.
 
 - `frontend/src/lib/api-base-url.ts` and `frontend/next.config.ts` share base-address parsing so login/AI requests and protected file downloads reach the same API. Bare backend origins gain `/api/v1`; explicit API paths remain intact. Existing environment values and credentials are unchanged.
+
+- `inventoryStateMachine.js` denies manual transitions for purchase/inspection-sourced inventory; `inventoryController.js` and `openAgentService.js` load provenance before checking, and Agent confirmation revalidates before writing. Conditional updates check the current status. Same-status requests preserve FIFO timestamps; business workflows retain their transactional inventory writes.

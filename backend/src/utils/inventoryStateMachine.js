@@ -1,7 +1,7 @@
 /**
  * Input: 库存当前状态、目标状态、库存记录上下文
  * Output: 状态流转校验结果（允许/拒绝与原因）
- * Pos: 库存状态机工具，统一约束库存状态流转规则
+ * Pos: 库存状态机工具，统一约束库存状态流转规则，业务来源库存由验货/发运驱动
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -32,6 +32,10 @@ const validateInventoryTransition = (currentStatus, nextStatus, inventory = {}) 
   // 0. 初始化：快速放行同状态更新，避免无意义报错
   if (currentStatus === nextStatus) {
     return { valid: true };
+  }
+
+  if (inventory.purchaseItemId || inventory.receiptInspectionId) {
+    return { valid: false, message: '采购来源库存由到货验货与出口发运自动更新，请在对应合同登记业务事实' };
   }
 
   // 1. 校验目标状态是否受支持

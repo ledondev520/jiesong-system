@@ -1859,7 +1859,7 @@ const WRITE_TOOL_SPECS = [
     async call(input, { userId, collectedIds }) {
       const inventory = await prisma.inventory.findUnique({
         where: { id: input?.id },
-        select: { id: true, status: true, salesContractId: true },
+        select: { id: true, status: true, salesContractId: true, purchaseItemId: true, receiptInspectionId: true },
       });
       if (!inventory) return toJson({ error: '库存记录不存在', id: input?.id });
       const validationResult = validateInventoryTransition(inventory.status, input?.status, inventory);
@@ -2274,6 +2274,11 @@ const ACTION_EXECUTORS = {
     return { success: true, detail: `已更新采购合同 ${record.contractNo || params.id}`, record };
   },
   async UpdateInventoryStatus(params) {
+    const inventory = await prisma.inventory.findUnique({ where: { id: params.id } });
+    if (!inventory) throw createError('库存记录不存在', 404);
+    const validation = validateInventoryTransition(inventory.status, params.status, inventory);
+    if (!validation.valid) throw createError(validation.message, 400);
+    if (inventory.status === params.status) return { success: true, detail: '库存状态未变化', record: inventory };
     const updateData = { status: params.status };
     if (params.status === 'INBOUND') {
       updateData.inboundAt = new Date();
@@ -2281,7 +2286,7 @@ const ACTION_EXECUTORS = {
       updateData.outboundAt = new Date();
     }
     const record = await prisma.inventory.update({
-      where: { id: params.id },
+      where: { id: params.id, status: inventory.status },
       data: updateData,
     });
     return { success: true, detail: `库存 ${params.id} 状态已更新为 ${params.status}`, record };

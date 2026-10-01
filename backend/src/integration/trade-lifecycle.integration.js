@@ -135,6 +135,16 @@ test('HTTP/SQLite：一笔采购两次出货守恒，库存与清单实际落库
   const after = await call('GET', `/tax-refunds/workbench/${a.id}/preparation`, undefined, { role: 'FINANCE' });
   assert.equal(after.sourceVersion, before.sourceVersion, '相同业务资料重复保存不能无故要求重新确认');
   assert.equal(await db.taxRefund.count(), 0, '确认准备不能冒充正式退税申报');
+  const outbound = await db.inventory.findFirst({ where: { status: 'OUTBOUND' } });
+  await call('PUT', `/inventory/${outbound.id}/status`, { status: 'OUTBOUND' }, { role: 'WAREHOUSE' });
+  assert.equal((await db.inventory.findUnique({ where: { id: outbound.id } })).outboundAt.getTime(), outbound.outboundAt.getTime());
+  const legacy = await db.inventory.create({ data: { purchaseItemId: pi.id, productId: product.id, quantity: 1, unit: '件', status: 'SHIPPING' } });
+  await call('PUT', `/inventory/${legacy.id}/status`, { status: 'INBOUND' }, { role: 'WAREHOUSE', expected: 400 });
+  const bulk = await call('PUT', '/inventory/batch-status', { ids: [legacy.id], status: 'INBOUND' }, { role: 'WAREHOUSE' });
+  assert.equal(bulk.success, 0);
+  assert.equal(bulk.failed, 1);
+  assert.equal((await db.inventory.findUnique({ where: { id: legacy.id } })).status, 'SHIPPING');
+  await db.inventory.delete({ where: { id: legacy.id } });
   for (const [role, method, url, expected] of [
     ['BOSS','GET','/finance/stats',200], ['BOSS','POST','/finance/payments',403],
     ['BOSS','POST','/ai/chat',403], ['FINANCE','POST',`/purchases/${purchase.id}/receipts`,403],

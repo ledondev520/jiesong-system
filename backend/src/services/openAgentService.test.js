@@ -791,3 +791,20 @@ test('Agent 上游失败：普通和流式请求均拒绝，不能落库成功�
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+test('AI 库存确认执行时重新检查来源，不能绕开验货/发运', async () => {
+  let managed = false;
+  let updates = 0;
+  await withPatched({
+    'prisma.inventory.findUnique': async () => ({ id: 'synthetic-stock', status: 'INBOUND', salesContractId: 'synthetic-sale', ...(managed ? { purchaseItemId: 'synthetic-purchase' } : {}) }),
+    'prisma.inventory.update': async () => { updates++; return {}; },
+    'prisma.operationLog.create': async () => ({}),
+  }, async () => {
+    const tool = openAgentService.buildWriteToolPool(spec => spec, 'synthetic-user', 'WAREHOUSE', [], [])
+      .find(item => item.name === 'UpdateInventoryStatus');
+    const action = JSON.parse(await tool.call({ id: 'synthetic-stock', status: 'OUTBOUND' }));
+    managed = true;
+    await assert.rejects(openAgentService.executeAction(action.actionId, 'synthetic-user'), /验货.*发运/);
+    assert.equal(updates, 0);
+  });
+});
