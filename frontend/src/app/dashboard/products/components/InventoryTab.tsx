@@ -456,8 +456,7 @@ export function InventoryTab() {
                   ) : (
                     <div className="grid gap-3">
                       {nextStatuses.map((nextStatus) => (
-                        <BusinessWrite><Button
-                          key={`${item.id}-${nextStatus}-mobile`}
+                        <BusinessWrite key={`${item.id}-${nextStatus}-mobile`}><Button
                           variant="outline"
                           className="h-11 rounded-2xl"
                           onClick={() => void handleStatusChange(item.id, nextStatus)}

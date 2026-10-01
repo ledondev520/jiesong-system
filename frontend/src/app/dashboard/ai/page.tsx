@@ -14,7 +14,7 @@ export default function AiAssistantModulePage() {
       <ModuleTabHeader tabs={AI_TABS} moduleName="AI 助手" />
       <PageHeader
         title="AI 助手"
-        description="直接查询采购、出口、财务与系统数据；涉及修改的操作会先列出变更并等待确认。"
+        description="直接查询采购、出口、财务与系统数据；内部草稿按请求直接生成，付款、实物状态与异常操作确认一次。"
       />
       <AIAssistant presentation="workspace" />
     </div>

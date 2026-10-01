@@ -1,6 +1,6 @@
 /**
  * Input: Prisma客户端、库存状态机工具
- * Output: 库存相关的HTTP响应（含单条/批量状态更新）
+ * Output: 库存相关的HTTP响应；采购/验货来源拒绝手改，相同状态保留时间
  * Pos: 库存控制器，处理库存查询、状态变更与批量操作
  * 
  * 2026-01-20 更新：Container已合并到SalesContract
