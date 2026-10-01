@@ -97,4 +97,5 @@ const createPurchaseWithItems = async ({ input, prismaClient = prisma } = {}) =>
 
 module.exports = {
   createPurchaseWithItems,
+  normalizeItem,
 };
