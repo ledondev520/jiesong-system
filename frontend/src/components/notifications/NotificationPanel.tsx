@@ -10,6 +10,7 @@
 
 import { useRouter } from 'next/navigation';
 import { FileText, Ship, TrendingUp, AlertTriangle, Check, CheckCheck, Loader2, ReceiptText, Landmark } from 'lucide-react';
+import { notificationLink } from '@/lib/notification-link';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -56,12 +57,10 @@ export function NotificationPanel({
     if (!n.isRead) {
       onMarkRead(n.id);
     }
-    if (n.link) {
-      if (onNavigate) {
-        onNavigate(n.link);
-      } else {
-        router.push(n.link);
-      }
+    const href = notificationLink(n);
+    if (href) {
+      router.push(href);
+      onNavigate?.(href);
     }
   };
 

@@ -7,6 +7,8 @@
  */
 
 const prisma = require('../utils/prisma');
+const { getOverdueReceivables } = require('./financeService');
+const { listLowStockAlerts } = require('./inventoryAlertService');
 
 const NOTIFICATION_TYPES = {
   PURCHASE_DRAFT: 'PURCHASE_DRAFT',
@@ -148,16 +150,8 @@ const generateForUser = async (userId) => {
     }
   }
 
-  // 3. 逾期应收款（已发运但已收金额 < 总金额）
-  const overdueSales = await prisma.salesContract.findMany({
-    where: {
-      status: { in: ['SHIPPED', 'ARRIVED', 'COMPLETED'] },
-      totalAmount: { gt: prisma.salesContract.fields.receivedAmount },
-    },
-    select: { id: true, contractNo: true },
-    orderBy: { shippedAt: 'desc' },
-    take: 5,
-  });
+  // 3. 与财务/经营报表共用发运后30天仍未收的运营预警。
+  const overdueSales = await getOverdueReceivables();
   if (overdueSales.length > 0) {
     const existing = await prisma.notification.findFirst({
       where: {
@@ -167,14 +161,14 @@ const generateForUser = async (userId) => {
       },
     });
     if (!existing) {
-      const titles = overdueSales.map((c) => c.contractNo).join('、');
+      const titles = overdueSales.slice(0, 5).map((c) => c.contractNo).join('、');
       const n = await prisma.notification.create({
         data: {
           userId,
           type: NOTIFICATION_TYPES.OVERDUE_RECEIVABLE,
-          title: `有逾期应收款 ${overdueSales.length} 份`,
+          title: `发运超过30天仍未收齐 ${overdueSales.length} 份`,
           content: titles + (overdueSales.length >= 5 ? ' 等' : ''),
-          link: '/dashboard/finance',
+          link: '/dashboard/payments?tab=receivable&overdue=true',
         },
       });
       results.push(n);
@@ -182,16 +176,7 @@ const generateForUser = async (userId) => {
   }
 
   // 4. 低库存（数量低于预警线，使用 Product.lowStockThreshold）
-  const lowStockProducts = await prisma.$queryRaw`
-    SELECT p.id, p.customsName, SUM(i.quantity) as totalQty, p.lowStockThreshold
-    FROM products p
-    LEFT JOIN inventories i ON i.productId = p.id
-    WHERE p.isActive = 1
-    GROUP BY p.id
-    HAVING totalQty < p.lowStockThreshold OR (totalQty IS NULL AND p.lowStockThreshold > 0)
-    ORDER BY totalQty ASC
-    LIMIT 5
-  `;
+  const { alerts: lowStockProducts } = await listLowStockAlerts(prisma);
   if (lowStockProducts.length > 0) {
     const existing = await prisma.notification.findFirst({
       where: {
@@ -201,14 +186,14 @@ const generateForUser = async (userId) => {
       },
     });
     if (!existing) {
-      const titles = lowStockProducts.map((p) => p.customsName).join('、');
+      const titles = lowStockProducts.slice(0, 5).map((p) => p.productName).join('、');
       const n = await prisma.notification.create({
         data: {
           userId,
           type: NOTIFICATION_TYPES.LOW_STOCK,
           title: `有 ${lowStockProducts.length} 个商品库存低于预警线`,
           content: titles + (lowStockProducts.length >= 5 ? ' 等' : ''),
-          link: '/dashboard/inventory',
+          link: '/dashboard/products?lowStock=true',
         },
       });
       results.push(n);

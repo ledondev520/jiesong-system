@@ -126,10 +126,15 @@ const getNotifications = async (req, res, next) => {
   try {
     const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
     const { unreadOnly } = req.query;
+    const keyword = parseOptionalText(req.query.keyword);
 
     const where = { userId: req.user.id };
     if (unreadOnly === 'true') {
       where.isRead = false;
+    }
+
+    if (keyword) {
+      where.OR = ['title', 'content', 'type'].map((field) => ({ [field]: { contains: keyword } }));
     }
 
     const [notifications, total] = await Promise.all([
