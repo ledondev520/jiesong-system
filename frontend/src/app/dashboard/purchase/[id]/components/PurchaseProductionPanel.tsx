@@ -1,12 +1,12 @@
 /**
  * Input: 采购合同生产资料完整性、采购明细与生产实物图
- * Output: 完工缺项、汇总指标、批量录入与选填照片归档
+ * Output: 完工资料一次保存并登记、缺项提示和选填照片归档
  * Pos: 采购详情生产阶段 Module，录入结果直接供待装柜导入使用
  */
 
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Boxes, Loader2, PackageCheck, PencilLine, Scale } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PurchaseContract, PurchaseItem } from '@/types';
@@ -38,6 +38,8 @@ interface PurchaseProductionPanelProps {
   photoFiles: ContractFile[];
   onPhotoFilesChange: (files: ContractFile[]) => void;
   onUpdated: () => void | Promise<void>;
+  editorOpen?: boolean;
+  onEditorOpenChange?: (open: boolean) => void;
 }
 
 const toText = (value: number | null | undefined) => (
@@ -69,11 +71,17 @@ export function PurchaseProductionPanel({
   photoFiles,
   onPhotoFilesChange,
   onUpdated,
+  editorOpen,
+  onEditorOpenChange,
 }: PurchaseProductionPanelProps) {
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  const dialogOpen = editorOpen ?? localOpen;
+  const setDialogOpen = (open: boolean) => { setLocalOpen(open); onEditorOpenChange?.(open); };
   const [saving, setSaving] = useState(false);
   const [rows, setRows] = useState<ProductionFormRow[]>(() => buildFormRows(contract.items));
   const readiness = contract.productionReadiness;
+  const canComplete = ['SIGNED', 'PRODUCING'].includes(contract.status);
+  useEffect(() => { if (dialogOpen) setRows(buildFormRows(contract.items)); }, [dialogOpen, contract.items]);
   const itemById = useMemo(
     () => new Map((contract.items || []).map((item) => [item.id, item])),
     [contract.items],
@@ -90,7 +98,7 @@ export function PurchaseProductionPanel({
     )));
   };
 
-  const handleSave = async () => {
+  const handleSave = async (completeProduction = false) => {
     const payload: PurchaseProductionDetailPayload[] = rows.map((row) => ({
       id: row.id,
       specification: row.specification.trim(),
@@ -128,8 +136,9 @@ export function PurchaseProductionPanel({
 
     setSaving(true);
     try {
-      await purchaseService.updateProductionDetails(contract.id, payload);
-      toast.success('生产资料已保存');
+      if (completeProduction) await purchaseService.updateProductionDetails(contract.id, payload, { completeProduction: true });
+      else await purchaseService.updateProductionDetails(contract.id, payload);
+      toast.success(completeProduction ? '完工资料已保存，已自动进入待装柜' : '生产资料已保存');
       setDialogOpen(false);
       await onUpdated();
     } catch (error: unknown) {
@@ -151,7 +160,7 @@ export function PurchaseProductionPanel({
               </h2>
             </CardTitle>
             <CardDescription className="mt-1">
-              供应商确认完工后，按商品录入规格、总箱数、总毛净重和总体积；单箱尺寸可选填。
+              供应商报告完工后，一次保存规格、箱数和重量体积并登记完工，系统自动进入待装柜；单箱尺寸可选填。
             </CardDescription>
             {contract.productionCompletedAt ? (
               <p className="mt-1 text-xs text-muted-foreground">
@@ -254,7 +263,7 @@ export function PurchaseProductionPanel({
           <DialogHeader>
             <DialogTitle>录入生产资料</DialogTitle>
             <DialogDescription>
-              可先保存部分资料；只有所有商品的规格、箱数、总毛重、总净重和总体积完整后，才能确认生产完成。
+              可先保存部分资料。供应商已报告完工时，点击“保存并登记完工”，系统检查完整性并自动推进，无需另点开始生产或确认完工。
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -294,6 +303,9 @@ export function PurchaseProductionPanel({
               {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <PackageCheck className="mr-1.5 h-4 w-4" />}
               保存生产资料
             </Button>
+            {canComplete && <Button onClick={() => void handleSave(true)} disabled={saving || rows.length === 0}>
+              {saving && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}保存并登记完工
+            </Button>}
           </DialogFooter>
         </DialogContent>
       </Dialog>

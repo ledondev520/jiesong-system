@@ -169,7 +169,7 @@ test('downloadFile: 相对附件路径从 UPLOAD_DIR 解析，兼容已有绝对
 test('updateStatus: 已收货正向完成保留库存', async (t) => {
   t.mock.method(prisma, '$transaction', async (callback) => callback({
     purchaseContract: {
-      findUnique: async () => ({ id: 'pc-1', status: 'RECEIVED', items: [{ id: 'pi-1' }] }),
+      findUnique: async () => ({ id: 'pc-1', status: 'RECEIVED', totalAmount: 100, paidAmount: 100, items: [{ id: 'pi-1' }] }),
       update: async ({ data }) => ({ id: 'pc-1', ...data }),
     },
     inventory: { deleteMany: async () => { assert.fail('正向完成不可删除库存'); } },

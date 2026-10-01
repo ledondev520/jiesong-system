@@ -229,7 +229,7 @@ describe('PurchaseDetailPage 交互逻辑', () => {
     expect(mockUpdatePurchaseStatus).toHaveBeenCalledWith('p-1', 'SIGNED');
   });
 
-  it('生产中合同的下一动作是确认生产完成', async () => {
+  it('生产中合同直接登记完工资料，无需单独推进生产状态', async () => {
     mockGetById.mockResolvedValue({
       data: {
         id: 'p-1',
@@ -244,10 +244,10 @@ describe('PurchaseDetailPage 交互逻辑', () => {
 
     renderPage('p-1');
 
-    expect(await screen.findByRole('button', { name: '确认生产完成' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '登记完工资料' })).toBeInTheDocument();
   });
 
-  it('生产资料缺项时禁用确认生产完成，避免只改状态不留箱规', async () => {
+  it('生产资料缺项时可直接打开补件表单，不能只改完工状态', async () => {
     mockGetById.mockResolvedValue({
       data: {
         id: 'p-1',
@@ -277,7 +277,10 @@ describe('PurchaseDetailPage 交互逻辑', () => {
 
     renderPage('p-1');
 
-    expect(await screen.findByRole('button', { name: '确认生产完成' })).toBeDisabled();
+    const button = await screen.findByRole('button', { name: '登记完工资料' });
+    expect(button).toBeEnabled();
+    await userEvent.setup().click(button);
+    expect(await screen.findByRole('button', { name: '保存并登记完工' })).toBeInTheDocument();
     expect(screen.getByText(/测试商品：箱数/)).toBeInTheDocument();
   });
 

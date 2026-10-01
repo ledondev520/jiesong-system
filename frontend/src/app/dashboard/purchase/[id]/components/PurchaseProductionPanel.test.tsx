@@ -97,6 +97,18 @@ describe('PurchaseProductionPanel', () => {
     expect(screen.getByLabelText('上传合同附件')).toHaveAttribute('accept', '.jpg,.jpeg,.png');
   });
 
+  it('供应商完工报告一次保存并推进，无需另调状态接口', async () => {
+    const complete = { ...contract, status: 'SIGNED', items: contract.items?.map(item => ({
+      ...item, specification: '标准箱', boxes: 10, grossWeight: 100, netWeight: 90, volume: 1,
+    })) } as PurchaseContract;
+    render(<PurchaseProductionPanel contract={complete} photoFiles={[]} onPhotoFilesChange={vi.fn()} onUpdated={vi.fn()} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '录入生产资料' }));
+    await user.click(screen.getByRole('button', { name: '保存并登记完工' }));
+    await waitFor(() => expect(mockUpdateProductionDetails).toHaveBeenCalledWith('pc-1', expect.any(Array), { completeProduction: true }));
+    expect(mockToastSuccess).toHaveBeenCalledWith('完工资料已保存，已自动进入待装柜');
+  });
+
   it('将规格、箱数、总毛净重、总体积和可选单箱尺寸一次保存', async () => {
     const onUpdated = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();

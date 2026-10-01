@@ -13,6 +13,7 @@ const { createError } = require('../middleware/errorHandler');
 const {
   validatePurchaseTransition,
   normalizePurchaseStatus,
+  getPurchaseSettlementStatus,
   PURCHASE_STATUS,
 } = require('../services/purchaseStateMachine');
 const { applyPurchaseInStock } = require('../services/inventorySnapshot');
@@ -342,7 +343,9 @@ const addItem = async (req, res, next) => {
  */
 const updateProductionDetails = async (req, res, next) => {
   try {
-    const contract = await updatePurchaseProductionDetails(req.params.id, req.body?.items);
+    const contract = await updatePurchaseProductionDetails(req.params.id, req.body?.items, prisma, {
+      completeProduction: req.body?.completeProduction ?? false,
+    });
     await auditLog.logOperation({
       userId: req.user?.id,
       action: 'UPDATE_PRODUCTION_DETAILS',
@@ -351,11 +354,13 @@ const updateProductionDetails = async (req, res, next) => {
       newValue: {
         itemIds: (req.body?.items || []).map((item) => item.id),
         itemCount: (req.body?.items || []).length,
+        completeProduction: req.body?.completeProduction === true,
+        status: contract.status,
       },
       req,
       note: '更新采购生产资料（规格、箱数、重量、体积和可选箱体尺寸）',
     });
-    success(res, contract, '生产资料已保存');
+    success(res, contract, req.body?.completeProduction === true ? '完工报告已保存，已进入待装柜' : '生产资料已保存');
   } catch (error) {
     next(error);
   }
@@ -381,6 +386,7 @@ const updateStatus = async (req, res, next) => {
         select: {
           id: true,
           status: true,
+          totalAmount: true,
           paidAmount: true,
           invoiceNo: true,
           _count: { select: { payments: true } },
@@ -411,6 +417,10 @@ const updateStatus = async (req, res, next) => {
       }
 
       const isTransition = existingContract.status !== targetStatus;
+      const settledStatus = getPurchaseSettlementStatus(targetStatus, existingContract.totalAmount, existingContract.paidAmount);
+      if (targetStatus === PURCHASE_STATUS.COMPLETED && settledStatus !== PURCHASE_STATUS.COMPLETED) {
+        throw createError('采购款项尚未结清或存在金额差异，请先处理付款记录', 400);
+      }
       if (isTransition && targetStatus === PURCHASE_STATUS.CANCELLED && (
         ![PURCHASE_STATUS.DRAFT, PURCHASE_STATUS.SIGNED].includes(normalizePurchaseStatus(existingContract.status))
         || existingContract.paidAmount > 0 || existingContract.invoiceNo || existingContract._count.payments > 0
@@ -428,7 +438,7 @@ const updateStatus = async (req, res, next) => {
       const contract = await tx.purchaseContract.update({
         where: { id },
         data: {
-          status: targetStatus,
+          status: settledStatus,
           ...(isTransition && targetStatus === PURCHASE_STATUS.READY
             ? { productionCompletedAt: new Date() }
             : {}),

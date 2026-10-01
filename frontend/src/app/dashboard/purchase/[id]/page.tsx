@@ -82,11 +82,10 @@ interface PageProps {
 
 const PURCHASE_NEXT_ACTIONS: Partial<Record<PurchaseStatus, { status: PurchaseStatus; label: string }>> = {
   [PurchaseStatus.DRAFT]: { status: PurchaseStatus.SIGNED, label: '确认已签约' },
-  [PurchaseStatus.SIGNED]: { status: PurchaseStatus.PRODUCING, label: '开始生产' },
-  [PurchaseStatus.PRODUCING]: { status: PurchaseStatus.READY, label: '确认生产完成' },
+  [PurchaseStatus.SIGNED]: { status: PurchaseStatus.READY, label: '登记完工资料' },
+  [PurchaseStatus.PRODUCING]: { status: PurchaseStatus.READY, label: '登记完工资料' },
   [PurchaseStatus.READY]: { status: PurchaseStatus.SHIPPED, label: '确认供应商已发货' },
-  [PurchaseStatus.SHIPPED]: { status: PurchaseStatus.RECEIVED, label: '确认收货' },
-  [PurchaseStatus.RECEIVED]: { status: PurchaseStatus.COMPLETED, label: '完成采购' },
+  [PurchaseStatus.SHIPPED]: { status: PurchaseStatus.RECEIVED, label: '全部到齐并验收入库' },
 };
 
 /**
@@ -274,6 +273,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const [exportingPdf, setExportingPdf] = useState(false);
   const [contractFiles, setContractFiles] = useState<ContractFile[]>([]);
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [productionEditorOpen, setProductionEditorOpen] = useState(false);
 
   // 系统配置：线上盖章平台链接 + 我方开票抬头（选填）
   const [stampPlatformUrl, setStampPlatformUrl] = useState('');
@@ -410,7 +410,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     const nextAction = PURCHASE_NEXT_ACTIONS[contract.status];
     if (!nextAction) return;
 
-    if (nextAction.status === PurchaseStatus.RECEIVED && !window.confirm('确认所有商品均已到齐并验收合格？此操作会按合同全部数量入库；分批到货或不合格请勿确认。')) return;
+    if ([PurchaseStatus.SIGNED, PurchaseStatus.PRODUCING].includes(contract.status)) {
+      setProductionEditorOpen(true);
+      return;
+    }
     setStatusUpdating(true);
     try {
       await purchaseService.updateStatus(contract.id, nextAction.status);
@@ -480,9 +483,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     ? Math.min((amountSummary.paidAmount / amountSummary.grossAmount) * 100, 100)
     : 0;
   const nextPurchaseAction = PURCHASE_NEXT_ACTIONS[contract.status];
-  const productionCompletionBlocked = [PurchaseStatus.PRODUCING, PurchaseStatus.READY].includes(contract.status)
+  const productionCompletionBlocked = contract.status === PurchaseStatus.READY
     && contract.productionReadiness?.ready === false;
   const productionStageVisible = [
+    PurchaseStatus.SIGNED,
     PurchaseStatus.PRODUCING,
     PurchaseStatus.READY,
     PurchaseStatus.SHIPPED,
@@ -512,7 +516,8 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                 className="h-9 rounded-md text-xs"
                 onClick={handleAdvanceStatus}
                 disabled={statusUpdating || productionCompletionBlocked}
-                title={productionCompletionBlocked ? '请先补齐所有商品的规格、箱数、毛净重和体积' : undefined}
+                title={productionCompletionBlocked ? '请先补齐所有商品的规格、箱数、毛净重和体积'
+                  : contract.status === PurchaseStatus.SHIPPED ? '仅全部商品到齐且验收合格时登记；分批或不合格不要执行整单入库' : undefined}
               >
                 {statusUpdating ? (
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -627,6 +632,8 @@ export default function PurchaseDetailPage({ params }: PageProps) {
 
       {/* 时间线 */}
       <ContractTimeline currentStatus={contract.status} />
+      {contract.status === PurchaseStatus.SHIPPED && <p className="text-sm text-muted-foreground">仅全部商品到齐并验收合格时执行整单入库；分批到货或不合格时不要执行整单入库。</p>}
+      {contract.status === PurchaseStatus.RECEIVED && <p className="text-sm text-muted-foreground">已收货，付款记录结清后自动完成采购，无需再确认完成。</p>}
 
       {/* 付款与发票（复制汇款信息 / 登记付款 / 催开发票） */}
       <PurchaseFlowPanel contract={contract} onUpdated={loadData} invoiceTitleInfo={invoiceTitleInfo} />
@@ -634,6 +641,8 @@ export default function PurchaseDetailPage({ params }: PageProps) {
       {productionStageVisible ? (
         <PurchaseProductionPanel
           contract={contract}
+          editorOpen={productionEditorOpen}
+          onEditorOpenChange={setProductionEditorOpen}
           photoFiles={productionPhotoFiles}
           onPhotoFilesChange={(files) => setContractFiles((current) => [
             ...files,

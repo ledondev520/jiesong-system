@@ -9,6 +9,7 @@ const {
 const {
   SALES_STATUS,
   normalizeSalesStatus,
+  getSalesSettlementStatus,
   validateSalesTransition,
 } = require('./salesStateMachine');
 const inventorySnapshot = require('./inventorySnapshot');
@@ -204,7 +205,6 @@ const updateSalesStatus = async (id, status, context = {}) => {
     throw createError('status 不能为空', 400);
   }
 
-  let revertResult = null;
   let applyResult = null;
 
   const contract = await prisma.$transaction(async (tx) => {
@@ -213,6 +213,8 @@ const updateSalesStatus = async (id, status, context = {}) => {
       select: {
         id: true,
         status: true,
+        totalAmount: true,
+        receivedAmount: true,
         grossWeight: true,
         volume: true,
         packingItems: {
@@ -248,6 +250,10 @@ const updateSalesStatus = async (id, status, context = {}) => {
     }
 
     const isTransition = existingContract.status !== targetStatus;
+    const settledStatus = getSalesSettlementStatus(targetStatus, existingContract.totalAmount, existingContract.receivedAmount);
+    if (targetStatus === SALES_STATUS.COMPLETED && settledStatus !== SALES_STATUS.COMPLETED) {
+      throw createError('销售款项尚未结清或存在金额差异，请先处理收款记录', 400);
+    }
     if (isTransition && targetStatus === SALES_STATUS.SHIPPED) {
       const readiness = evaluateShipmentReadiness(existingContract);
       if (!readiness.ready) {
@@ -267,7 +273,7 @@ const updateSalesStatus = async (id, status, context = {}) => {
     const contract = await tx.salesContract.update({
       where: { id },
       data: {
-        status: targetStatus,
+        status: settledStatus,
         ...(isTransition && targetStatus === SALES_STATUS.SHIPPED ? { shippedAt: new Date() } : {}),
       },
     });
@@ -277,24 +283,8 @@ const updateSalesStatus = async (id, status, context = {}) => {
       applyResult = await inventorySnapshot.applySalesOutStock(tx, id);
     }
 
-    // 反向流转：从出库状态回退时，恢复库存
-    if (isTransition && normalizeSalesStatus(existingContract.status) === SALES_STATUS.SHIPPED) {
-      revertResult = await inventorySnapshot.revertSalesOutStock(tx, id);
-    }
-
     return contract;
   });
-
-  // 记录回滚操作的日志
-  if (revertResult && revertResult.reverted > 0) {
-    console.log(`[库存回滚] 销售合同 ${id}: 恢复 ${revertResult.reverted} 条出库记录`);
-    // 将回滚信息附加到返回结果中，供控制器层记录审计日志
-    contract._revertInfo = {
-      action: 'REVERT_OUT_STOCK',
-      revertedCount: revertResult.reverted,
-      note: `销售出库回滚：恢复 ${revertResult.reverted} 条库存记录`,
-    };
-  }
 
   // 记录出库操作的日志
   if (applyResult && applyResult.results) {
@@ -491,7 +481,7 @@ const recalculateContractStats = async (contractId, prismaClient = prisma) => {
   const [contract, stats] = await Promise.all([
     prismaClient.salesContract.findUnique({
       where: { id: contractId },
-      select: { amountSource: true },
+      select: { amountSource: true, status: true },
     }),
     prismaClient.packingItem.aggregate({
       where: { salesContractId: contractId },
@@ -507,6 +497,8 @@ const recalculateContractStats = async (contractId, prismaClient = prisma) => {
       netWeight: stats._sum.netWeight || 0,
       volume: stats._sum.volume || 0,
       ...buildDerivedSalesAmountUpdate(contract, stats._sum.totalPrice || 0),
+      ...(normalizeSalesStatus(contract?.status) === SALES_STATUS.CONFIRMED && Number(stats._sum.boxes) > 0
+        ? { status: SALES_STATUS.PACKING } : {}),
     },
   });
 };

@@ -6,6 +6,8 @@
 
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
+const { getPurchaseSettlementStatus } = require('./purchaseStateMachine');
+const { getSalesSettlementStatus } = require('./salesStateMachine');
 const {
   getEffectiveSalesContractTotal,
   getEffectiveSalesReceived,
@@ -345,10 +347,12 @@ const syncContractPaymentAmounts = async (tx, { purchaseContractId, salesContrac
       where: { purchaseContractId, currency: 'CNY' },
       _sum: { amount: true },
     });
-    await tx.purchaseContract.update({
+    const contract = await tx.purchaseContract.update({
       where: { id: purchaseContractId },
       data: { paidAmount: total._sum.amount || 0 },
     });
+    const status = getPurchaseSettlementStatus(contract.status, contract.totalAmount, total._sum.amount || 0);
+    if (status && status !== contract.status) await tx.purchaseContract.update({ where: { id: purchaseContractId }, data: { status } });
   }
 
   if (salesContractId) {
@@ -360,10 +364,12 @@ const syncContractPaymentAmounts = async (tx, { purchaseContractId, salesContrac
       },
       _sum: { amount: true },
     });
-    await tx.salesContract.update({
+    const contract = await tx.salesContract.update({
       where: { id: salesContractId },
       data: { receivedAmount: total._sum.amount || 0 },
     });
+    const status = getSalesSettlementStatus(contract.status, contract.totalAmount, total._sum.amount || 0);
+    if (status && status !== contract.status) await tx.salesContract.update({ where: { id: salesContractId }, data: { status } });
   }
 };
 
@@ -498,18 +504,7 @@ const allocatePaymentToContracts = async (paymentId, allocations) => {
 
     // 批量更新：一次性聚合所有受影响合同的收款总额
     for (const salesContractId of affectedSalesContractIds) {
-      const total = await tx.payment.aggregate({
-        where: {
-          salesContractId,
-          type: { in: RECEIVABLE_SETTLEMENT_TYPES },
-          currency: 'USD',
-        },
-        _sum: { amount: true },
-      });
-      await tx.salesContract.update({
-        where: { id: salesContractId },
-        data: { receivedAmount: total._sum.amount || 0 },
-      });
+      await syncContractPaymentAmounts(tx, { salesContractId });
     }
 
     const allocatedAfter = await getPaymentAllocatedAmount(paymentId, tx);

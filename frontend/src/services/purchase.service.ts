@@ -190,12 +190,12 @@ export const purchaseService = {
   },
 
   /** 批量保存供应商完工后的规格、箱数、重量、体积与可选单箱尺寸。 */
-  updateProductionDetails: async (id: string, items: PurchaseProductionDetailPayload[]) => {
+  updateProductionDetails: async (id: string, items: PurchaseProductionDetailPayload[], options: { completeProduction?: boolean } = {}) => {
     return api.put<
       ApiResponse<PurchaseContract>,
       ApiResponse<PurchaseContract>,
-      { items: PurchaseProductionDetailPayload[] }
-    >(`/purchases/${id}/production-details`, { items });
+      { items: PurchaseProductionDetailPayload[]; completeProduction?: boolean }
+    >(`/purchases/${id}/production-details`, { items, ...options });
   },
 
   /** 读取由采购明细推导的催票清单、已登记号码和选填附件。 */

@@ -10,6 +10,27 @@ const prisma = require('../utils/prisma');
 const salesService = require('./salesService');
 const inventorySnapshot = require('./inventorySnapshot');
 
+test('登记到港后保留出库，已收齐合同自动完成；未收齐不能手动假结清', async () => {
+  const originalTransaction = prisma.$transaction;
+  const originalRevert = inventorySnapshot.revertSalesOutStock;
+  let receivedAmount = 100;
+  let currentStatus = 'SHIPPED';
+  let reverted = false;
+  prisma.$transaction = async fn => fn({ salesContract: {
+    findUnique: async () => ({ id: 'sc-1', status: currentStatus, totalAmount: 100, receivedAmount, packingItems: [] }),
+    update: async ({ data }) => ({ id: 'sc-1', ...data }),
+  } });
+  inventorySnapshot.revertSalesOutStock = async () => { reverted = true; return { reverted: 1 }; };
+  try {
+    assert.equal((await salesService.updateSalesStatus('sc-1', 'ARRIVED')).status, 'COMPLETED');
+    assert.equal(reverted, false);
+    receivedAmount = 50;
+    assert.equal((await salesService.updateSalesStatus('sc-1', 'ARRIVED')).status, 'ARRIVED');
+    currentStatus = 'ARRIVED';
+    await assert.rejects(salesService.updateSalesStatus('sc-1', 'COMPLETED'), /款项尚未结清/);
+  } finally { prisma.$transaction = originalTransaction; inventorySnapshot.revertSalesOutStock = originalRevert; }
+});
+
 test('getSalesContracts: 组装筛选条件并分页查询', async () => {
   const originalFindMany = prisma.salesContract.findMany;
   const originalCount = prisma.salesContract.count;
@@ -422,7 +443,7 @@ test('importPurchasePackingItems: 按选中箱数同比例带入数量、重量�
   };
   prisma.$transaction = async (callback) => callback({
     salesContract: {
-      findUnique: async () => ({ id: 'sc-1' }),
+      findUnique: async () => ({ id: 'sc-1', status: 'CONFIRMED' }),
       update: async (args) => {
         updatedStats = args.data;
         return args.data;
@@ -472,6 +493,7 @@ test('importPurchasePackingItems: 按选中箱数同比例带入数量、重量�
       note: '从采购合同 CG260001 完工资料导入',
     });
     assert.deepEqual(updatedStats, {
+      status: 'PACKING',
       totalBoxes: 4,
       grossWeight: 400,
       netWeight: 380,

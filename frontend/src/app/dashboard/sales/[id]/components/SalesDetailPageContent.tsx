@@ -134,7 +134,6 @@ const SALES_NEXT_ACTIONS: Partial<Record<SalesStatus, { status: SalesStatus; lab
   [SalesStatus.CONFIRMED]: { status: SalesStatus.PACKING, label: '开始装柜' },
   [SalesStatus.PACKING]: { status: SalesStatus.SHIPPED, label: '确认发运' },
   [SalesStatus.SHIPPED]: { status: SalesStatus.ARRIVED, label: '确认到港' },
-  [SalesStatus.ARRIVED]: { status: SalesStatus.COMPLETED, label: '确认收款完成' },
 };
 
 export default function SalesDetailPage({ params }: PageProps) {
@@ -698,9 +697,6 @@ export default function SalesDetailPage({ params }: PageProps) {
   const currentStepIndex = STATUS_ORDER[contract.status] ?? 0;
   const nextSalesAction = SALES_NEXT_ACTIONS[contract.status];
   const shipmentBlocked = nextSalesAction?.status === SalesStatus.SHIPPED && !readiness.ready;
-  const collectionBlocked = nextSalesAction?.status === SalesStatus.COMPLETED
-    && (contract.receivedAmount || 0) < (contract.totalAmount || 0);
-  const nextActionBlocked = shipmentBlocked || collectionBlocked;
   const readinessHeadline = readiness.overloaded
     ? `不可出货：${readiness.overloadReasons.includes('weight') ? '毛重超过 22t' : ''}${readiness.overloadReasons.length === 2 ? '、' : ''}${readiness.overloadReasons.includes('volume') ? '体积超过 68 CBM' : ''}`
     : !readiness.physicalFit
@@ -724,8 +720,8 @@ export default function SalesDetailPage({ params }: PageProps) {
               {nextSalesAction && (
                 <Button
                   onClick={() => handleAdvanceStatus(nextSalesAction.status)}
-                  disabled={statusUpdating || nextActionBlocked}
-                  title={shipmentBlocked ? readinessHeadline : collectionBlocked ? '合同尚未收齐货款' : undefined}
+                  disabled={statusUpdating || shipmentBlocked}
+                  title={shipmentBlocked ? readinessHeadline : undefined}
                 >
                   {statusUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
                   {nextSalesAction.label}

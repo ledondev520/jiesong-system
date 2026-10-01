@@ -30,6 +30,16 @@ const normalizePurchaseStatus = (status) => {
   return LEGACY_STATUS_ALIASES[normalized] || normalized;
 };
 
+// 只推导已有收货事实后的结清状态，零额、缺金额、超付或欠款仍需处理。
+const getPurchaseSettlementStatus = (status, totalAmount, paidAmount) => {
+  const current = normalizePurchaseStatus(status);
+  if (![PURCHASE_STATUS.RECEIVED, PURCHASE_STATUS.COMPLETED].includes(current)) return current;
+  const total = Number(totalAmount), paid = Number(paidAmount);
+  return Number.isFinite(total) && Number.isFinite(paid) && total > 0 && paid > 0
+    && Math.abs(Math.round(total * 100) - Math.round(paid * 100)) <= 1
+    ? PURCHASE_STATUS.COMPLETED : PURCHASE_STATUS.RECEIVED;
+};
+
 const validatePurchaseTransition = (currentStatus, nextStatus) => {
   const normalizedCurrent = normalizePurchaseStatus(currentStatus);
   const normalizedNext = normalizePurchaseStatus(nextStatus);
@@ -55,5 +65,6 @@ const validatePurchaseTransition = (currentStatus, nextStatus) => {
 module.exports = {
   PURCHASE_STATUS,
   normalizePurchaseStatus,
+  getPurchaseSettlementStatus,
   validatePurchaseTransition,
 };

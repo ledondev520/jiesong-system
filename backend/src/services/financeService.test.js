@@ -9,6 +9,26 @@ const assert = require('node:assert/strict');
 const prisma = require('../utils/prisma');
 const financeService = require('./financeService');
 
+test('收付款记录自动结清已收货/已到港合同，金额差异重新打开待结清且不改物理状态', async (t) => {
+  const cases = [
+    ['purchase', 'RECEIVED', 100, 'COMPLETED'], ['purchase', 'RECEIVED', 50, 'RECEIVED'],
+    ['purchase', 'SIGNED', 100, 'SIGNED'], ['purchase', 'COMPLETED', 90, 'RECEIVED'],
+    ['sales', 'ARRIVED', 100, 'COMPLETED'], ['sales', 'SHIPPED', 100, 'SHIPPED'],
+    ['sales', 'COMPLETED', 110, 'ARRIVED'], ['sales', 'ARRIVED', 0, 'ARRIVED'],
+  ];
+  for (const [kind, initialStatus, amount, expected] of cases) {
+    let status = initialStatus;
+    const model = { update: async ({ data }) => { status = data.status || status; return { status, totalAmount: 100, ...data }; } };
+    t.mock.method(prisma, '$transaction', async fn => fn({
+      payment: { create: async ({ data }) => ({ id: 'test-payment', ...data }), aggregate: async () => ({ _sum: { amount } }) },
+      purchaseContract: model, salesContract: model,
+    }));
+    await financeService.createPayment({ type: kind === 'purchase' ? 'PAYABLE_PAYMENT' : 'RECEIVABLE_COLLECTION',
+      [kind === 'purchase' ? 'purchaseContractId' : 'salesContractId']: 'test-contract', amount, currency: kind === 'purchase' ? 'CNY' : 'USD', paymentDate: '2026-10-01' });
+    assert.equal(status, expected);
+  }
+});
+
 test('createPayment: 幂等键命中时直接返回历史记录', async () => {
   const originalFindUnique = prisma.payment.findUnique;
   const originalTransaction = prisma.$transaction;
