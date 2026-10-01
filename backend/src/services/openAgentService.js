@@ -1,6 +1,6 @@
 /**
  * Input: open-agent-sdk, Kimi API (via anthropicCompatService), 业务服务层
- * Output: AI 只读查询、内部草稿直接执行、业务事实一次确认与可回放执行记录
+ * Output: AI 只读查询、内部草稿直接执行、业务事实一次确认与可回放执行记录，上游失败不记成功
  * Pos: 后端 Agent Runtime 核心，衔接 LLM 与业务数据
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -2642,6 +2642,13 @@ const buildReplaySnapshotLogValue = ({
   selectedToolNames: selectedToolNames || [],
 });
 
+// SDK prompt() 会丢弃 result.subtype；两种入口都直接校验 query 的终止事件。
+const assertAgentResult = (result) => {
+  if (result.is_error || (result.subtype && result.subtype !== 'success')) {
+    throw createError('AI 服务本次执行失败，请稍后重新发起请求', 503);
+  }
+};
+
 /**
  * 职责：运行一次 Agent prompt（含只读 + 写工具）
  * 思路：
@@ -2682,7 +2689,19 @@ const runAgentPrompt = async ({ userId, userRole, agentType, message, sessionId 
   });
 
   try {
-    const result = await agent.prompt(message);
+    const startedAt = Date.now();
+    const result = { text: '', usage: {}, num_turns: 0, duration_ms: 0 };
+    for await (const event of agent.query(message)) {
+      if (event.type === 'assistant') {
+        const text = event.message.content.filter(item => item.type === 'text').map(item => item.text).join('');
+        if (text) result.text = text;
+      } else if (event.type === 'result') {
+        assertAgentResult(event);
+        result.usage = event.usage || {};
+        result.num_turns = event.num_turns || 0;
+      }
+    }
+    result.duration_ms = Date.now() - startedAt;
 
     const actionRecommendations = summarizeActionRecommendations(actionRecommendationTrace);
     materializeRecommendationPendingActions({
@@ -2815,6 +2834,7 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
           break;
         }
         case 'result':
+          assertAgentResult(ev);
           usage = {
             input_tokens: ev.usage?.input_tokens ?? 0,
             output_tokens: ev.usage?.output_tokens ?? 0,

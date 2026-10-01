@@ -758,3 +758,36 @@ test('buildReplaySnapshotLogValue: 会生成专用 replay snapshot 日志载荷'
     selectedToolNames: ['SearchEntities'],
   });
 });
+
+test('Agent 上游失败：普通和流式请求均拒绝，不能落库成功记录', async () => {
+  const http = require('node:http');
+  const aiService = require('./aiService');
+  const originalClient = aiService.getOpenAIClient;
+  const originalModels = aiService.getConfiguredModels;
+  const originalPort = config.port;
+  let calls = 0;
+  const server = http.createServer((_req, res) => {
+    calls++;
+    res.writeHead(500, { 'content-type': 'application/json', 'x-should-retry': 'false' });
+    res.end(JSON.stringify({ type: 'error', error: { type: 'api_error', message: 'synthetic failure' } }));
+  });
+  try {
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    config.port = server.address().port;
+    aiService.getOpenAIClient = async () => ({});
+    aiService.getConfiguredModels = async () => ({ defaultModel: 'synthetic-model' });
+    const input = { userId: 'synthetic-user', userRole: 'ADMIN', agentType: 'unified', message: '合成只读验收' };
+    await assert.rejects(openAgentService.runAgentPrompt(input), error => error.statusCode === 503);
+    const events = [];
+    await assert.rejects(async () => {
+      for await (const event of openAgentService.runAgentPromptStream(input)) events.push(event);
+    }, error => error.statusCode === 503);
+    assert.equal(events.some(event => event.type === 'done'), false);
+    assert.equal(calls, 2, '每种入口只调用一次上游');
+  } finally {
+    config.port = originalPort;
+    aiService.getOpenAIClient = originalClient;
+    aiService.getConfiguredModels = originalModels;
+    await new Promise(resolve => server.close(resolve));
+  }
+});

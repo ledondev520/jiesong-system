@@ -38,7 +38,8 @@
           "HTTP request logs retain route, timing, and request shape only; request/query values, AI prompts, tool schemas, and user messages are excluded",
           "HSCIQ upstream error bodies are excluded from service errors and logs; pending queries are bounded by a total timeout and quota reservation",
           "AI provider calls bound full response waits, disable SDK automatic retry/logging and reuse streamed token usage without resending prompts for estimation",
-          "Customs draft replacement retains identity and is atomic; released records cannot be replaced. Shipment confirmation versions retain business facts and evidence while excluding technical createdAt/updatedAt timestamps"
+          "Customs draft replacement retains identity and is atomic; released records cannot be replaced. Shipment confirmation versions retain business facts and evidence while excluding technical createdAt/updatedAt timestamps",
+          "Agent normal and streaming requests inspect SDK termination status; upstream errors are not persisted as successful runs and do not automatically retry"
         ],
         "transfer": [
           "Encrypt in transit (TLS)",
