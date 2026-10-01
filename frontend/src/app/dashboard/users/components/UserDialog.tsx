@@ -9,10 +9,12 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import {
   Form,
   FormControl,
@@ -34,6 +36,7 @@ const userSchema = z.object({
   name: z.string().min(1, '姓名必填'),
   password: z.string().optional(), // Optional for edit
   role: z.nativeEnum(Role),
+  isActive: z.boolean(),
 });
 
 type UserFormValues = z.infer<typeof userSchema>;
@@ -58,12 +61,14 @@ export function UserDialog({
       name: '',
       password: '',
       role: Role.SALES,
+      isActive: true,
     },
     values: user ? {
       username: user.username,
       name: user.name,
       password: '',
       role: user.role,
+      isActive: user.isActive,
     } : undefined,
   });
 
@@ -77,6 +82,7 @@ export function UserDialog({
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{user ? '编辑用户' : '新增用户'}</DialogTitle>
+          <DialogDescription>核对身份与角色权限，管理账号的登录资格。</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -143,6 +149,12 @@ export function UserDialog({
                 </FormItem>
               )}
             />
+            {user && <FormField control={form.control} name="isActive" render={({ field }) => (
+              <FormItem className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div><FormLabel>账号开通</FormLabel><p className="mt-1 text-xs text-muted-foreground">确认身份与角色后开启，关闭后无法登录。</p></div>
+                <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+              </FormItem>
+            )} />}
             <DialogFooter>
               <Button type="submit" disabled={!form.formState.isValid || form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? '保存中...' : '保存'}

@@ -78,9 +78,16 @@ test('真实 SQLite：限制验证码尝试、过期和重放；新账号待审�
   await assert.rejects(service.sendCode(payload.email), /已有账号/);
   const auth = require('./authService');
   await assert.rejects(auth.login(payload.email, payload.password), /尚未开通/);
-  await prisma.user.update({ where: { id: user.id }, data: { isActive: true } });
+  await auth.updateUser(user.id, { isActive: true });
   const login = await auth.login('NEW@EXAMPLE.COM', payload.password);
   assert.ok(login.token); assert.equal(login.user.id, user.id);
+  const { authenticate } = require('../middleware/auth');
+  const checkToken = () => new Promise((resolve, reject) => authenticate({ headers: { authorization: `Bearer ${login.token}` } }, {}, (error) => error ? reject(error) : resolve()));
+  await checkToken();
+  const response = { status() { return this; }, json() {} };
+  await require('../controllers/userController').update({ params: { id: user.id }, body: { isActive: false } }, response, (error) => { throw error; });
+  await assert.rejects(checkToken(), /禁用/);
+
   await service.sendCode('failure@example.com');
   const old = delivered;
   await prisma.emailRegistrationChallenge.updateMany({ where: { email: 'failure@example.com' }, data: { createdAt: new Date(Date.now() - 61000) } });

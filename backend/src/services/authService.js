@@ -9,6 +9,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const prisma = require('../utils/prisma');
+const { clearAuthCache } = require('../middleware/auth');
 const config = require('../config');
 const { createError } = require('../middleware/errorHandler');
 const { log: auditLog } = require('../utils/auditLog');
@@ -234,6 +235,7 @@ const updateUser = async (id, userData) => {
     },
   });
   
+  clearAuthCache(id);
   return user;
 };
 

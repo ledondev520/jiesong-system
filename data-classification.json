@@ -34,7 +34,7 @@
           "Carrier packing-list raw extracted text is not persisted; structured check records retain their original file reference",
           "HTTP request logs retain route, timing, and request shape only; request/query values, AI prompts, tool schemas, and user messages are excluded",
           "VPS runtime migration backups keep private environment files and SQLite snapshots in 0700 directories with 0600 files; deployment verification never prints process environments or credentials",
-          "Environment file permissions are checked before loading mail credentials; email registration uses keyed hashes, persistent send quotas and single-use verification; new users remain inactive until administrator approval (backend/src/services/emailRegistrationService.js)"
+          "Environment file permissions are checked before loading mail credentials; email registration uses keyed hashes, persistent send quotas and single-use verification; new users remain inactive until administrator approval; user updates clear authentication caches immediately (backend/src/services/emailRegistrationService.js)"
         ],
         "transfer": [
           "Encrypt in transit (TLS)",

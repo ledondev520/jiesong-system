@@ -7,6 +7,7 @@
  */
 
 const prisma = require('../utils/prisma');
+const { clearAuthCache } = require('../middleware/auth');
 const bcrypt = require('bcrypt');
 const { success, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
@@ -142,6 +143,7 @@ const update = async (req, res, next) => {
       },
     });
 
+    clearAuthCache(id);
     success(res, user, '用户更新成功');
   } catch (error) {
     next(error);

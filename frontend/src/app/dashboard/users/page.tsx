@@ -303,7 +303,7 @@ export default function UsersPage() {
                 subtitle={user.username}
                 badge={getRoleBadge(user.role)}
                 fields={[
-                  { label: '状态', value: user.isActive ? '正常' : '禁用', emphasis: user.isActive ? 'primary' : undefined },
+                  { label: '状态', value: user.isActive ? '正常' : '未开通/停用', emphasis: user.isActive ? 'primary' : undefined },
                   { label: '最后登录', value: user.lastLoginAt ? format(new Date(user.lastLoginAt), 'MM-dd HH:mm') : '从未登录' },
                 ]}
                 action={
@@ -387,7 +387,7 @@ export default function UsersPage() {
                     <TableCell>{getRoleBadge(user.role)}</TableCell>
                     <TableCell>
                       <Badge variant={user.isActive ? 'outline' : 'secondary'} className={user.isActive ? 'border-primary/20 bg-primary/5 text-primary' : ''}>
-                        {user.isActive ? '正常' : '禁用'}
+                        {user.isActive ? '正常' : '未开通/停用'}
                       </Badge>
                     </TableCell>
                     <TableCell>
