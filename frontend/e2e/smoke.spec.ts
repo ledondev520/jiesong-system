@@ -139,10 +139,12 @@ test.describe('关键按钮交互', () => {
     await expect(page.getByText('批量更新完成：成功 1 条')).toBeVisible();
   });
 
-  test('门店采购建议页：核心筛选入口可见', async ({ page }) => {
-    await signInAsAdmin(page, '/dashboard/store-recommend');
-    await expect(page.getByRole('heading', { name: '采购建议清单' })).toBeVisible();
-    await expect(page.getByRole('button', { name: '只看必须采买' })).toBeVisible();
+  test('采购模块：供应商与库存入口可达', async ({ page }) => {
+    await signInAsAdmin(page, '/dashboard/contracts');
+    await page.getByRole('link', { name: '供应商管理', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '供应商管理', exact: true })).toBeVisible();
+    await page.getByRole('link', { name: '库存状态', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '库存状态', exact: true })).toBeVisible();
   });
 
   test('通知中心：未读筛选入口可见', async ({ page }) => {
