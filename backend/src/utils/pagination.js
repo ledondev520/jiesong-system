@@ -1,8 +1,11 @@
 /**
  * 输入：分页查询参数
  * 输出：规范化的分页参数
- * 说明：为列表接口提供统一分页边界，兼容非法值与兜底。
+ * 说明：为列表接口提供统一分页边界，兼容非法值与兜底，避免数据库 offset 超出安全整数。
  */
+
+// 统一列表校验最多 500 条，页码上限保证 offset 仍是 JavaScript 安全整数。
+const MAX_PAGE = Math.floor(Number.MAX_SAFE_INTEGER / 500);
 
 /**
  * @typedef {Object} PaginationOptions
@@ -37,7 +40,7 @@ const parsePositiveInt = (value, fallback, min = 1, max) => {
  * @returns {PaginationOptions}
  */
 const normalizePagination = (query = {}, options = {}) => {
-  const page = parsePositiveInt(query.page, options.page ?? 1, 1);
+  const page = parsePositiveInt(query.page, options.page ?? 1, 1, MAX_PAGE);
   const maxPageSize = options.maxPageSize ?? 500;
   const pageSize = parsePositiveInt(query.pageSize, options.pageSize ?? 20, 1, maxPageSize);
 
@@ -81,6 +84,7 @@ const buildPaginatedPayload = (items, total, page, pageSize, extras = {}) => ({
 });
 
 module.exports = {
+  MAX_PAGE,
   parsePositiveInt,
   normalizePagination,
   buildPaginationMeta,

@@ -1,21 +1,21 @@
 /**
  * Input: 通知服务
  * Output: 通知相关的 HTTP 响应
- * Pos: 通知控制器，处理通知列表、已读、生成逻辑
+ * Pos: 通知控制器，处理有统一分页边界的通知列表、已读、生成逻辑
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const notificationService = require('../services/notificationService');
 const { success, paginated } = require('../utils/response');
+const { normalizePagination } = require('../utils/pagination');
 
 /**
  * 职责：获取当前用户通知列表
  */
 const list = async (req, res, next) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 20));
+    const { page, pageSize } = normalizePagination(req.query, { maxPageSize: 100 });
     const result = await notificationService.list(req.user.id, { page, pageSize });
     paginated(res, result.items, result.total, result.page, result.pageSize);
   } catch (error) {

@@ -1,13 +1,14 @@
 /**
  * Input: Kimi API, Prisma客户端
  * Output: AI助手相关的HTTP响应
- * Pos: AI控制器，处理智能问答和辅助录入（含图像）
+ * Pos: AI控制器，处理智能问答、辅助录入（含图像）与有分页边界的历史查询
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');
 const { success, paginated } = require('../utils/response');
+const { normalizePagination } = require('../utils/pagination');
 const { createError } = require('../middleware/errorHandler');
 const aiService = require('../services/aiService');
 const openAgentService = require('../services/openAgentService');
@@ -458,10 +459,8 @@ const anthropicCompatCountTokens = async (req, res, next) => {
  */
 const getChatHistory = async (req, res, next) => {
   try {
-    const { sessionId, page = 1, pageSize = 50 } = req.query;
-    const parsedPage = parsePositiveInt(page, 1);
-    const parsedPageSize = parsePositiveInt(pageSize, 50);
-    const skip = (parsedPage - 1) * parsedPageSize;
+    const { sessionId } = req.query;
+    const { page: parsedPage, pageSize: parsedPageSize, skip } = normalizePagination(req.query, { pageSize: 50 });
     
     const where = { userId: req.user.id };
     if (sessionId) where.sessionId = sessionId;

@@ -36,7 +36,9 @@
 | financialStatementsController.js | 月度财务三文件预览、确认导入与账期查询 |
 | financialEvidenceController.js | 脱敏财务资料摘要、文档列表与 Sheet 行级下钻 |
 | systemController.js | 系统配置 + 数据导入导出 |
-| aiController.js | AI问答 + 辅助录入 |
+| aiController.js | AI问答 + 辅助录入 + 统一分页边界的对话历史 |
+| aiUsageController.js | AI 用量趋势日期校验、调用明细有界分页与用量汇总 |
+| notificationController.js | 统一分页边界的通知列表、已读与生成 |
 
 ## 服务清单
 
@@ -79,7 +81,8 @@
 |------|------|
 | prisma.js | Prisma 客户端实例 |
 | response.js | 统一响应格式 |
-| validators.js | 参数验证规则 |
+| pagination.js | 统一分页归一化与安全整数 offset 上限 |
+| validators.js | 参数验证规则，非法或超大列表页码返回 400 |
 | upload.js | 文件上传 (multer) |
 | auditLog.js | 操作日志记录 |
 

@@ -141,3 +141,16 @@ test('validateId: ID参数不能为空', async () => {
   assert.equal(capture.error.statusCode, 400);
   assert.match(capture.error.message, /ID不能为空/);
 });
+
+test('validatePagination: 超大页码拒绝为 400，正常最大 pageSize 保持可用', async () => {
+  for (const [query, expectedStatus] of [
+    [{ page: '99999999999999999999999999', pageSize: '500' }, 400],
+    [{ page: '2', pageSize: '500' }, undefined],
+  ]) {
+    const req = createRequest({ query });
+    await runValidations(validatePagination, req);
+    const { next, capture } = createNextCapture();
+    handleValidation(req, {}, next);
+    assert.equal(capture.error?.statusCode, expectedStatus);
+  }
+});

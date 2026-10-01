@@ -1,6 +1,6 @@
 /**
  * Input: express-validator库
- * Output: 通用验证规则（登录、注册、找回密码等）
+ * Output: 通用验证规则（登录、注册、找回密码和安全整数分页边界）
  * Pos: 参数验证工具，提供常用验证规则
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -9,6 +9,7 @@
 const { body, param, query, validationResult } = require('express-validator');
 const { createError } = require('../middleware/errorHandler');
 const { ROLES } = require('../config/constants');
+const { MAX_PAGE } = require('./pagination');
 
 /**
  * 职责：处理验证结果，抛出验证错误
@@ -34,7 +35,7 @@ const validateId = param('id')
 
 // 分页参数验证
 const validatePagination = [
-  query('page').optional().isInt({ min: 1 }).withMessage('页码必须大于0'),
+  query('page').optional().isInt({ min: 1, max: MAX_PAGE }).withMessage(`页码必须在1-${MAX_PAGE}之间`),
   query('pageSize').optional().isInt({ min: 1, max: 500 }).withMessage('每页数量必须在1-500之间'),
 ];
 
