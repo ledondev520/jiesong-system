@@ -106,7 +106,7 @@ describe('PaymentsPage 交互逻辑', () => {
 
     await waitFor(() => {
       expect(mockGetStats).toHaveBeenCalledTimes(1);
-      expect(mockGetPayables).toHaveBeenCalledWith({ pageSize: 100 });
+      expect(mockGetPayables).toHaveBeenCalledWith({ page: 1, pageSize: 20, search: '', outstandingOnly: true, pastDelivery: false });
       expect(mockGetUnallocatedPayments).toHaveBeenCalledTimes(1);
     });
     expect(mockGetReceivables).not.toHaveBeenCalled();
@@ -130,7 +130,7 @@ describe('PaymentsPage 交互逻辑', () => {
     await user.click(await screen.findByRole('tab', { name: /应收账款/ }));
 
     await waitFor(() => {
-      expect(mockGetReceivables).toHaveBeenCalledWith({ pageSize: 100 });
+      expect(mockGetReceivables).toHaveBeenCalledWith({ page: 1, pageSize: 20, search: '', outstandingOnly: true, overdue: false });
       expect(mockGetIncomingSummary).toHaveBeenCalledTimes(1);
     });
   });
@@ -244,7 +244,7 @@ describe('PaymentsPage 交互逻辑', () => {
     await waitFor(() => {
       expect(mockAutoMatchUnallocatedPayments).toHaveBeenCalledTimes(1);
       expect(mockGetUnallocatedPayments.mock.calls.length).toBeGreaterThan(1);
-      expect(mockGetReceivables).toHaveBeenCalledWith({ pageSize: 100 });
+      expect(mockGetReceivables).toHaveBeenCalledWith({ page: 1, pageSize: 20, search: '', outstandingOnly: true, overdue: false });
       expect(mockGetStats.mock.calls.length).toBeGreaterThan(1);
     });
   });

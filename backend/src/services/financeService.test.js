@@ -802,3 +802,22 @@ test('getStats: 排除第三方拼柜金额后计算真实应收', async () => {
     prisma.packingItem.groupBy = originalPackingItemGroupBy;
   }
 });
+
+test('getReceivables: 先过滤所有权及未收金额，再分页，total为全量匹配数', async () => {
+ const original=prisma.salesContract.findMany;
+ const contracts=[
+  {id:'third-party',contractNo:'EXP-9',totalAmount:100,receivedAmount:0,packingItems:[{totalPrice:100,isOwnedByJiesong:false}]},
+  {id:'paid',contractNo:'EXP-8',totalAmount:100,receivedAmount:100,packingItems:[]},
+  {id:'first',contractNo:'EXP-7',totalAmount:100,receivedAmount:20,packingItems:[]},
+  {id:'second',contractNo:'EXP-6',totalAmount:100,receivedAmount:0,packingItems:[]},
+ ];
+ prisma.salesContract.findMany=async(args)=> args.take ? contracts.slice(args.skip,args.skip+args.take) : contracts;
+ const originalCount=prisma.salesContract.count;prisma.salesContract.count=async()=>contracts.length;
+ try {
+  const result=await financeService.getReceivables({page:2,pageSize:1,skip:1,outstandingOnly:true});
+  assert.equal(result.total,2);
+  assert.deepEqual(result.receivables.map(c=>c.id),['second']);
+  const searched=await financeService.getReceivables({page:1,pageSize:1,skip:0,search:'EXP-6',outstandingOnly:true});
+  assert.equal(searched.total,1);assert.equal(searched.receivables[0].id,'second');
+ } finally {prisma.salesContract.findMany=original;prisma.salesContract.count=originalCount;}
+});

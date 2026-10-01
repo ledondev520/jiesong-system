@@ -65,6 +65,10 @@ const getPayables = async (req, res, next) => {
       page,
       pageSize,
       skip,
+      search: req.query.search,
+      outstandingOnly: req.query.outstandingOnly === 'true',
+      pastDelivery: req.query.pastDelivery === 'true',
+      overdue: req.query.overdue === 'true',
     });
 
     paginated(res, payables, total, page, pageSize);
@@ -88,6 +92,9 @@ const getReceivables = async (req, res, next) => {
       page,
       pageSize,
       skip,
+      search: req.query.search,
+      outstandingOnly: req.query.outstandingOnly === 'true',
+      overdue: req.query.overdue === 'true',
     });
 
     paginated(res, receivables, total, page, pageSize);

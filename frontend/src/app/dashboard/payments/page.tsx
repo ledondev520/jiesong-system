@@ -42,6 +42,8 @@ import {
   getIncomingSummary,
   type IncomingSummaryResult,
 } from '@/services/bankFlow.service';
+import { clearApiGetCache } from '@/lib/axios';
+import { PageSizeSelect } from '@/components/ui/page-size-select';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { errorLogger } from '@/lib/error-logger';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -114,6 +116,13 @@ function PaymentsPageContent() {
   const [selectedReceivable, setSelectedReceivable] = useState<ReceivableContract | null>(null);
   // 列表关键词（客户端过滤：合同号 / 供应商或门店）
   const [keyword, setKeyword] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [payableTotal, setPayableTotal] = useState(0);
+  const [receivableTotal, setReceivableTotal] = useState(0);
+  const overdue = searchParams.get('overdue') === 'true';
+  const pastDelivery = searchParams.get('pastDelivery') === 'true';
+  useEffect(() => { setPage(1); }, [activeTab, keyword, pageSize, overdue, pastDelivery]);
 
   // 待分配收款
   const [unallocatedPayments, setUnallocatedPayments] = useState<Payment[]>([]);
@@ -144,7 +153,8 @@ function PaymentsPageContent() {
     setPayableLoading(true);
     setPayableError(false);
     try {
-      const response = await cachedFetch('fin-payables-p1', () => financeService.getPayables({ pageSize: 100 }));
+      const response = await cachedFetch(`fin-payables-${page}-${pageSize}-${keyword}-${pastDelivery}`, () => financeService.getPayables({ page, pageSize, search: keyword, outstandingOnly: true, pastDelivery }));
+      setPayableTotal(response.data?.pagination?.total ?? response.data?.items?.length ?? 0);
       setPayables(
         (response.data?.items || []).map((item) => ({
           id: item.id,
@@ -162,7 +172,7 @@ function PaymentsPageContent() {
     } finally {
       setPayableLoading(false);
     }
-  }, []);
+  }, [page, pageSize, keyword, pastDelivery]);
 
   // 3a. 加载待分配收款
   const fetchUnallocated = useCallback(async () => {
@@ -179,7 +189,8 @@ function PaymentsPageContent() {
     setReceivableLoading(true);
     setReceivableError(false);
     try {
-      const response = await cachedFetch('fin-receivables-p1', () => financeService.getReceivables({ pageSize: 100 }));
+      const response = await cachedFetch(`fin-receivables-${page}-${pageSize}-${keyword}-${overdue}`, () => financeService.getReceivables({ page, pageSize, search: keyword, outstandingOnly: true, overdue }));
+      setReceivableTotal(response.data?.pagination?.total ?? response.data?.items?.length ?? 0);
       setReceivables(
         (response.data?.items || []).map((item) => ({
           id: item.id,
@@ -202,7 +213,7 @@ function PaymentsPageContent() {
     } finally {
       setReceivableLoading(false);
     }
-  }, []);
+  }, [page, pageSize, keyword, overdue]);
 
   const fetchReconciliation = useCallback(async (force = false) => {
     if (!force && reconciliationLoadedRef.current) {
@@ -218,9 +229,6 @@ function PaymentsPageContent() {
   }, []);
 
   const loadPayableData = useCallback(async (force = false) => {
-    if (!force && payableDataLoadedRef.current) {
-      return;
-    }
     payableDataLoadedRef.current = true;
     await Promise.all([
       fetchPayables(),
@@ -229,9 +237,6 @@ function PaymentsPageContent() {
   }, [fetchPayables]);
 
   const loadReceivableData = useCallback(async (force = false) => {
-    if (!force && receivableDataLoadedRef.current) {
-      return;
-    }
     receivableDataLoadedRef.current = true;
     await Promise.all([
       fetchReceivables(),
@@ -275,7 +280,7 @@ function PaymentsPageContent() {
         amount: Number(data.amount),
         currency: 'CNY',
         paymentMethod: data.paymentMethod,
-        paymentDate: new Date().toISOString(),
+        paymentDate: data.paymentDate.toISOString(),
         note: data.note,
       });
       toast.success('付款记录已保存');
@@ -299,7 +304,7 @@ function PaymentsPageContent() {
         amount: Number(data.amount),
         currency: 'USD',
         paymentMethod: data.paymentMethod,
-        paymentDate: new Date().toISOString(),
+        paymentDate: data.paymentDate.toISOString(),
         note: data.note,
       });
       toast.success('收款记录已保存');
@@ -397,29 +402,8 @@ function PaymentsPageContent() {
     [receivables]
   );
 
-  const unpaidContracts = useMemo(() => {
-    if (!keyword.trim()) {
-      return unpaidBase;
-    }
-    const q = keyword.toLowerCase().trim();
-    return unpaidBase.filter(
-      (c) =>
-        (c.contractNo || '').toLowerCase().includes(q) ||
-        (c.supplier?.name || '').toLowerCase().includes(q)
-    );
-  }, [unpaidBase, keyword]);
-
-  const unreceiveContracts = useMemo(() => {
-    if (!keyword.trim()) {
-      return unreceiveBase;
-    }
-    const q = keyword.toLowerCase().trim();
-    return unreceiveBase.filter(
-      (c) =>
-        (c.contractNo || '').toLowerCase().includes(q) ||
-        getStoreNames(c).toLowerCase().includes(q)
-    );
-  }, [unreceiveBase, keyword]);
+  const unpaidContracts = unpaidBase;
+  const unreceiveContracts = unreceiveBase;
 
   // 银行流水 -> 供应商付款映射（用于给合同列表注入实际已付金额）
   type BankPayRow = { name: string; netPaid: number; totalInvoice: number; gap: number; category: string; txnCount: number; invCount: number };
@@ -444,7 +428,7 @@ function PaymentsPageContent() {
     const key = norm(supplierName);
     if (bankPayMap[key]) return bankPayMap[key];
     for (const [k, v] of Object.entries(bankPayMap)) {
-      if (k.includes(key) || key.includes(k)) return v;
+      if (k === key) return v;
     }
     return null;
   };
@@ -469,7 +453,7 @@ function PaymentsPageContent() {
     return allBankPayRows.filter(r => r.name.toLowerCase().includes(q));
   }, [allBankPayRows, keyword]);
 
-  const hasContracts = unpaidBase.length > 0;
+  const hasContracts = payableTotal > 0 || payableLoading || payableError;
 
   // 银行流水应收数据
   const bankReceivableRows = useMemo(() => {
@@ -483,7 +467,7 @@ function PaymentsPageContent() {
     return bankReceivableRows.filter(r => r.name.toLowerCase().includes(q));
   }, [bankReceivableRows, keyword]);
 
-  const hasReceivableContracts = unreceiveBase.length > 0;
+  const hasReceivableContracts = receivableTotal > 0 || receivableLoading || receivableError;
 
   // 合同应付列表排序（含银行流水注入数据）
   const contractPaySort = useTableSort(
@@ -494,9 +478,9 @@ function PaymentsPageContent() {
         case 'contractNo': return item.contractNo;
         case 'supplier': return item.supplier?.name ?? '';
         case 'totalAmount': return item.totalAmount;
-        case 'bankPaid': return bp ? bp.netPaid : item.paidAmount;
+        case 'bankPaid': return item.paidAmount;
         case 'invoice': return bp?.totalInvoice ?? 0;
-        case 'unpaid': return Math.max(0, item.totalAmount - (bp ? bp.netPaid : item.paidAmount));
+        case 'unpaid': return item.unpaidAmount;
         default: return null;
       }
     }
@@ -559,6 +543,8 @@ function PaymentsPageContent() {
               size="sm"
               className="h-10"
               onClick={() => {
+                clearApiGetCache();
+                invalidateCache('fin-');
                 void fetchStats();
                 void fetchUnallocated();
                 if (activeTab === 'receivable') {
@@ -703,6 +689,17 @@ function PaymentsPageContent() {
         )}
       </div>
 
+      {pastDelivery && activeTab === 'payable' && <p className="text-sm text-muted-foreground">筛选：超过预计交期且仍待付</p>}
+      {overdue && activeTab === 'receivable' && <p className="text-sm text-muted-foreground">筛选：发运后30天仍未收齐（运营提示）</p>}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+        <span>共 {activeTab === 'payable' ? payableTotal : receivableTotal} 笔合同；本页排序</span>
+        <div className="flex items-center gap-2">
+          <PageSizeSelect value={pageSize} onChange={setPageSize} />
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button>
+          <span>第 {page} 页</span>
+          <Button variant="outline" size="sm" disabled={page * pageSize >= (activeTab === 'payable' ? payableTotal : receivableTotal)} onClick={() => setPage(page + 1)}>下一页</Button>
+        </div>
+      </div>
       {/* Tab切换 */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="border bg-background">
@@ -735,7 +732,7 @@ function PaymentsPageContent() {
               ) : (
                 unpaidContracts.map((contract) => {
                   const bp = lookupBankPaid(contract.supplier?.name);
-                  const actualPaid = bp ? bp.netPaid : contract.paidAmount;
+                  const actualPaid = contract.paidAmount;
                   const actualUnpaid = Math.max(0, contract.totalAmount - actualPaid);
                   return (
                     <MobileListCard
@@ -745,7 +742,7 @@ function PaymentsPageContent() {
                       badge={<Badge variant="outline" className="text-xs">{contract.status}</Badge>}
                       fields={[
                         { label: '总金额', value: `¥${contract.totalAmount.toLocaleString()}` },
-                        { label: '已付(流水)', value: `¥${fmtCny(actualPaid)}`, emphasis: 'primary' },
+                        { label: '合同已付', value: `¥${fmtCny(actualPaid)}`, emphasis: 'primary' },
                       ]}
                       amount={{ label: '待付', value: `¥${fmtCny(actualUnpaid)}`, emphasis: actualUnpaid > 0 ? 'danger' : undefined }}
                       action={
@@ -788,8 +785,8 @@ function PaymentsPageContent() {
                     <SortableTableHead sortKey="supplier" currentSortKey={contractPaySort.sortKey} currentSortDir={contractPaySort.sortDir} onSort={contractPaySort.onSort}>供应商</SortableTableHead>
                     <TableHead>状态</TableHead>
                     <SortableTableHead sortKey="totalAmount" currentSortKey={contractPaySort.sortKey} currentSortDir={contractPaySort.sortDir} onSort={contractPaySort.onSort} className="text-right">合同金额 (¥)</SortableTableHead>
-                    <SortableTableHead sortKey="bankPaid" currentSortKey={contractPaySort.sortKey} currentSortDir={contractPaySort.sortDir} onSort={contractPaySort.onSort} className="text-right">已付(银行流水)</SortableTableHead>
-                    <SortableTableHead sortKey="invoice" currentSortKey={contractPaySort.sortKey} currentSortDir={contractPaySort.sortDir} onSort={contractPaySort.onSort} className="text-right">发票金额</SortableTableHead>
+                    <SortableTableHead sortKey="bankPaid" currentSortKey={contractPaySort.sortKey} currentSortDir={contractPaySort.sortDir} onSort={contractPaySort.onSort} className="text-right">合同已付</SortableTableHead>
+                    <SortableTableHead sortKey="invoice" currentSortKey={contractPaySort.sortKey} currentSortDir={contractPaySort.sortDir} onSort={contractPaySort.onSort} className="text-right">供应商发票汇总</SortableTableHead>
                     <SortableTableHead sortKey="unpaid" currentSortKey={contractPaySort.sortKey} currentSortDir={contractPaySort.sortDir} onSort={contractPaySort.onSort} className="text-right">待付 (¥)</SortableTableHead>
                     <TableHead>票据</TableHead>
                     <TableHead className="w-[100px]">操作</TableHead>
@@ -822,7 +819,7 @@ function PaymentsPageContent() {
                   ) : (
                     contractPaySort.sortedData.map((contract) => {
                       const bp = lookupBankPaid(contract.supplier?.name);
-                      const actualPaid = bp ? bp.netPaid : contract.paidAmount;
+                      const actualPaid = contract.paidAmount;
                       const actualUnpaid = Math.max(0, contract.totalAmount - actualPaid);
                       return (
                         <TableRow key={contract.id} className={bp && bp.category === 'under_invoiced' ? 'bg-red-50/20 dark:bg-red-950/5' : ''}>
@@ -833,11 +830,7 @@ function PaymentsPageContent() {
                           </TableCell>
                           <TableCell className="text-right tabular-nums">{contract.totalAmount.toLocaleString()}</TableCell>
                           <TableCell className="text-right tabular-nums">
-                            {bp ? (
-                              <span className="font-medium text-green-600">¥{fmtCny(bp.netPaid)}</span>
-                            ) : (
-                              <span className="text-muted-foreground">{contract.paidAmount > 0 ? `¥${contract.paidAmount.toLocaleString()}` : '-'}</span>
-                            )}
+                            <span>{contract.paidAmount > 0 ? `¥${fmtCny(contract.paidAmount)}` : '-'}</span>
                           </TableCell>
                           <TableCell className="text-right tabular-nums text-xs">
                             {bp && bp.totalInvoice > 0 ? `¥${fmtCny(bp.totalInvoice)}` : '-'}

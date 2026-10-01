@@ -147,14 +147,14 @@ export const financeService = {
     return api.post<ApiResponse<FinanceAutoMatchResult>, ApiResponse<FinanceAutoMatchResult>>('/finance/payments/auto-match');
   },
 
-  getPayables: async (params?: { page?: number; pageSize?: number }) => {
+  getPayables: async (params?: { page?: number; pageSize?: number; search?: string; outstandingOnly?: boolean; overdue?: boolean; pastDelivery?: boolean }) => {
     return api.get<
       ApiResponse<PaginatedResponse<FinanceContractRecord>>,
       ApiResponse<PaginatedResponse<FinanceContractRecord>>
     >('/finance/payables', { params });
   },
 
-  getReceivables: async (params?: { page?: number; pageSize?: number }) => {
+  getReceivables: async (params?: { page?: number; pageSize?: number; search?: string; outstandingOnly?: boolean; overdue?: boolean; pastDelivery?: boolean }) => {
     return api.get<
       ApiResponse<PaginatedResponse<FinanceContractRecord>>,
       ApiResponse<PaginatedResponse<FinanceContractRecord>>

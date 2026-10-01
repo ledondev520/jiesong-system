@@ -613,53 +613,40 @@ const createPayment = async (data = {}, options = {}) => {
   }
 };
 
-const getPayables = async ({ page, pageSize, skip }) => {
+const getPayables = async ({ page, pageSize, skip, search, outstandingOnly = false, pastDelivery = false }) => {
   const where = {
     totalAmount: { gt: 0 },
     NOT: { status: 'CANCELLED' },
   };
 
-  const [contracts, total] = await Promise.all([
-    prisma.purchaseContract.findMany({
-      where,
-      skip,
-      take: pageSize,
-      include: { supplier: true },
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.purchaseContract.count({ where }),
-  ]);
-
-  return {
-    payables: contracts.map((contract) => ({
-      ...contract,
-      unpaidAmount: contract.totalAmount - contract.paidAmount,
-    })),
-    total,
-    page,
-    pageSize,
-  };
+  if (pastDelivery) where.expectedDate = { lt: new Date() };
+  // ponytail: balances use JS filtering; move to a SQL projection if dataset size becomes costly.
+  const contracts = await prisma.purchaseContract.findMany({
+    where,
+    include: { supplier: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  const payables = contracts.map((contract) => ({
+    ...contract,
+    unpaidAmount: Math.max(0, contract.totalAmount - contract.paidAmount),
+  })).filter((contract) => (!outstandingOnly || contract.unpaidAmount > 0)
+    && (!search || `${contract.contractNo} ${contract.supplier?.name || ''}`.toLowerCase().includes(search.trim().toLowerCase())));
+  return { payables: payables.slice(skip, skip + pageSize), total: payables.length, page, pageSize };
 };
 
-const getReceivables = async ({ page, pageSize, skip }) => {
+const getReceivables = async ({ page, pageSize, skip, search, outstandingOnly = false, overdue = false }) => {
   const where = {
     totalAmount: { gt: 0 },
     NOT: { status: 'CANCELLED' },
   };
 
-  const [contracts, total] = await Promise.all([
-    prisma.salesContract.findMany({
-      where,
-      skip,
-      take: pageSize,
-      include: {
-        packingItems: { include: { store: true } },
-        port: true,
-      },
-      orderBy: { contractNo: 'desc' },
-    }),
-    prisma.salesContract.count({ where }),
-  ]);
+  // ponytail: effective ownership is computed in JS; move projection to SQL if contract volume becomes costly.
+  const contracts = await prisma.salesContract.findMany({
+    where,
+    include: { packingItems: { include: { store: true } }, port: true },
+    orderBy: { contractNo: 'desc' },
+  });
+  const overdueIds = overdue ? new Set((await getOverdueReceivables()).map((contract) => contract.id)) : null;
 
   const receivables = contracts.map((contract) => {
     const ownedTotalAmount = getEffectiveSalesContractTotal(contract);
@@ -678,9 +665,12 @@ const getReceivables = async ({ page, pageSize, skip }) => {
       packingItems: undefined,
       port: undefined,
     };
-  }).filter((contract) => contract.totalAmount > 0);
+  }).filter((contract) => contract.totalAmount > 0
+    && (!outstandingOnly || contract.unreceiveAmount > 0)
+    && (!overdueIds || overdueIds.has(contract.id))
+    && (!search || `${contract.contractNo} ${contract.stores.join(' ')}`.toLowerCase().includes(search.trim().toLowerCase())));
 
-  return { receivables, total: receivables.length, page, pageSize };
+  return { receivables: receivables.slice(skip, skip + pageSize), total: receivables.length, page, pageSize };
 };
 
 const getStats = async () => {

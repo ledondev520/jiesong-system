@@ -60,6 +60,7 @@ export function PaymentDialog({
   const currencySymbol = resolvedCurrency === 'USD' ? '$' : resolvedCurrency === 'CNY' ? '¥' : '';
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
+    mode: 'onChange',
     defaultValues: {
       amount: remainingAmount, // Default to full remaining
       paymentDate: new Date(),
@@ -111,7 +112,7 @@ export function PaymentDialog({
                 <FormItem>
                   <FormLabel>{label}</FormLabel>
                   <FormControl>
-                    <Input type="number" min="0.01" step="0.01" {...field} />
+                    <Input type="number" min="0.01" step="0.01" {...field} value={Number.isNaN(field.value) ? '' : field.value} onChange={(event) => field.onChange(event.target.valueAsNumber)} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
