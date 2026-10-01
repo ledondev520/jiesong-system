@@ -16,6 +16,7 @@
         "HSCIQ API keys",
         "backend environment overrides containing real secrets",
         "signed and system-generated legal/financial contract artifacts",
+        "generated shipment tax-refund confirmation checklists and material-version references",
         "supplier bank account names, account numbers, branches, and bank routing codes",
         "company bank statements, transaction identifiers, account balances, and even masked account identifiers when combined with transaction rows",
         "carrier packing-list originals and persistent packing-list review records"
@@ -65,6 +66,7 @@
           "Procurement-template reads require authentication at backend/src/routes/procurementTemplate.js before historical data is loaded",
           "Monthly financial source files are parsed in memory; persist structured rows plus filename, size, and SHA-256 only",
           "Financial evidence workbooks are never archived; sensitive personal identifiers are redacted before persistence and row-level reads require ADMIN or FINANCE",
+          "Shipment invoice-row preparations and exports require ADMIN/FINANCE; generated confirmation attachments keep the same download/delete restriction and use protected contract storage",
           "Product navigation belongs to procurement at frontend/src/components/layout/navigation.config.ts; backend/src/routes/products.js remains the authority for read/write role checks"
         ],
         "transfer": [

@@ -5,6 +5,7 @@
  */
 
 const ExcelJS = require('exceljs');
+const crypto = require('node:crypto');
 const prisma = require('../utils/prisma');
 const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
 const { createError } = require('../middleware/errorHandler');
@@ -17,6 +18,18 @@ const REFUNDABLE_MARKUP = 0.3;
 const NO_REFUND_MARKUP_CAP = 0.1;
 const REFUNDABLE_TOLERANCE = 0.05;
 const MONEY_EPSILON = 0.01;
+const EXPORT_PACKET_DESCRIPTION = '出口三单生成版本（外销合同、商业发票、装箱单）';
+const buildPackingSourceVersion = (items) => crypto.createHash('sha256').update(JSON.stringify(
+  [...items].sort((a, b) => a.id.localeCompare(b.id)).map((item) => ({
+    id: item.id, productId: item.productId, quantity: item.quantity, unit: item.unit,
+    boxes: item.boxes, grossWeight: item.grossWeight, netWeight: item.netWeight,
+    volume: item.volume, unitPrice: item.unitPrice, totalPrice: item.totalPrice,
+    name: item.product?.customsName, supplement: item.supplement,
+    specification: item.specification, origin: item.origin,
+    hsCode: item.hsCode, declarationElements: item.declarationElements,
+    productHsCode: item.product?.hsCode, productDeclaration: item.product?.declaration,
+  })),
+)).digest('hex');
 
 const toNumber = (value) => {
   const number = Number(value);
@@ -509,7 +522,10 @@ const generateExportPacket = async (salesContractId, options = {}, prismaClient 
       fileName,
       mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       category: fileService.CONTRACT_FILE_CATEGORY.SYSTEM_GENERATED_XLSX,
-      description: '出口三单生成版本（外销合同、商业发票、装箱单）',
+      description: `${EXPORT_PACKET_DESCRIPTION}:${buildPackingSourceVersion(sources.contract.packingItems.map((item) => {
+        const line = packet.lines.find((entry) => entry.packingItemId === item.id);
+        return line ? { ...item, unitPrice: line.unitPriceUsd, totalPrice: line.totalUsd } : item;
+      }))}`,
       prismaClient: tx,
     });
   });
@@ -517,6 +533,8 @@ const generateExportPacket = async (salesContractId, options = {}, prismaClient 
 };
 
 module.exports = {
+  EXPORT_PACKET_DESCRIPTION,
+  buildPackingSourceVersion,
   DEFAULT_SELLER_NAME,
   FX_BUFFER,
   NO_REFUND_MARKUP_CAP,

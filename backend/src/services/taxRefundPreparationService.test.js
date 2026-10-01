@@ -85,7 +85,8 @@ const salesContract = {
   packingListChecks: [{
     id: 'check-1',
     status: 'APPROVED',
-    file: { id: 'carrier-1', category: 'CARRIER_DOCUMENT', fileName: '提单.pdf' },
+    checkedAt: '2026-06-20T00:00:00Z',
+    file: { id: 'carrier-packing', category: 'CARRIER_DOCUMENT', fileName: '船司装箱单.pdf' },
   }],
   files: [{ id: 'carrier-1', category: 'CARRIER_DOCUMENT', fileName: '提单.pdf' }],
 };

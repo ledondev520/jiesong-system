@@ -215,6 +215,7 @@ export default function SalesDetailPage({ params }: PageProps) {
       await salesService.updateStatus(contract.id, nextStatus);
       toast.success('出口合同阶段已更新');
       await loadData();
+      if (nextStatus === SalesStatus.SHIPPED) setTaxPreparationOpen(true);
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : '状态推进失败');
     } finally {

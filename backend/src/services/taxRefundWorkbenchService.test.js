@@ -98,6 +98,11 @@ test('buildShipmentInvoiceRows: 优先使用装箱行发票号并保留业务来
   assert.equal(rows[0].expectedTotal, 113);
 });
 
+test('发票核验优先采购合同开票主体，不用厂家品牌别名制造差异', () => {
+  const rows = buildShipmentInvoiceRows({ ...contract, packingItems: contract.packingItems.map(x => ({ ...x, manufacturer: '产品品牌别名' })) }, new Map([['CG260001', purchase]]));
+  assert.equal(rows[0].expectedSeller, purchase.supplier.name);
+});
+
 test('getTaxRefundWorkbench: 资料和发票全通过时进入可生成申报明细阶段', async () => {
   const result = await getTaxRefundWorkbench({}, createPrisma());
   assert.equal(result.total, 1);

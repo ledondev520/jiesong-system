@@ -15,6 +15,10 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/workbench', taxRefundController.getWorkbench);
+router.get('/workbench/monthly-export', roleAuth('ADMIN', 'FINANCE'), taxRefundController.exportMonthlyPreparations);
+router.get('/workbench/:salesContractId/preparation', roleAuth('ADMIN', 'FINANCE'), taxRefundController.getShipmentPreparation);
+router.get('/workbench/:salesContractId/preparation-export', roleAuth('ADMIN', 'FINANCE'), taxRefundController.exportShipmentPreparation);
+router.post('/workbench/:salesContractId/confirm', roleAuth('ADMIN', 'FINANCE'), taxRefundController.confirmShipmentPreparation);
 router.get('/workbench/:salesContractId/invoice-verification', taxRefundController.getInvoiceVerification);
 router.get('/', withPaginationValidation, taxRefundController.list);
 router.post(

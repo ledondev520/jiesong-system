@@ -35,6 +35,7 @@ vi.mock('@/services/taxRefund.service', () => ({
     generateDrafts: (...args: unknown[]) => mockGenerateDrafts(...args),
     getWorkbench: (...args: unknown[]) => mockGetWorkbench(...args),
     exportDeclarationCsv: vi.fn(),
+    exportMonthlyPreparations: vi.fn(),
     getInvoiceVerification: vi.fn(),
   },
 }));
@@ -214,8 +215,8 @@ describe('TaxRefundsDashboardPage 交互逻辑', () => {
     render(<TaxRefundsDashboardPage />);
     expect(await screen.findByRole('heading', { name: '出口退税工作台' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '导入进项发票' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '生成退税草稿' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '生成本页申报明细' })).toBeDisabled();
-    await waitFor(() => expect(mockGetWorkbench).toHaveBeenCalledWith({ page: 1, pageSize: 20, keyword: undefined, stage: 'ALL' }));
+    expect(screen.getByRole('button', { name: '导出月度准备清单' })).toBeInTheDocument();
+    expect(screen.getByLabelText('申报月份')).toBeInTheDocument();
+    await waitFor(() => expect(mockGetWorkbench).toHaveBeenCalledWith({ page: 1, pageSize: 20, keyword: undefined, stage: 'ALL', filingMonth: expect.stringMatching(/^\d{4}-\d{2}$/) }));
   });
 });

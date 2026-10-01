@@ -28,6 +28,7 @@
 - 自定义组件必须基于 shadcn/ui 的设计规范扩展.
 
 ## Security rules
+- 出货退税清单确认及含票面核验行的导出仅供 ADMIN/FINANCE；`backend/src/routes/taxRefunds.js` 校验入口，`backend/src/controllers/fileController.js` 同步限制确认附件下载/删除，避免绕过行级权限。生成文件继续通过 `fileService.js` 的 0700/0600 归档，确认不等于正式申报。
 - Never commit secrets (API keys, tokens, passwords, private keys, DB credentials), including in `.env`, `.env.*`, `*.example`, scripts, logs, and tests.
 - If temporary test credentials are introduced, mark them clearly as non-production and require environment-variable override before上线.
 - Use environment variables for secrets and validate their presence during startup.

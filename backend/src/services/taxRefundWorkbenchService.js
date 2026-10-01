@@ -1,6 +1,6 @@
 /**
  * Input: 出口合同、装箱明细、报关/退税记录、采购主数据与发票台账
- * Output: 出口退税工作台汇总、逐合同准备状态与发票一致性核验
+ * Output: 出口退税工作台、按申报月份逐次出货的准备状态与确认版本
  * Pos: 出口退税网页工作台聚合 Module；复用既有退税、采购和发票 Module，不直接提交税局
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -47,7 +47,7 @@ const buildShipmentInvoiceRows = (contract, purchasesByContractNo) => contract.p
         sourceRow: index + 1,
         contractNo: contract.contractNo,
         invoiceNo: null,
-        expectedSeller: item.manufacturer || purchase?.supplier?.name || null,
+        expectedSeller: purchase?.supplier?.name || item.manufacturer || null,
         itemName: item.product?.customsName || null,
         supplement: item.supplement || null,
         expectedTotal: item.purchaseCost ?? null,
@@ -58,7 +58,7 @@ const buildShipmentInvoiceRows = (contract, purchasesByContractNo) => contract.p
       sourceRow: index + 1,
       contractNo: contract.contractNo,
       invoiceNo,
-      expectedSeller: item.manufacturer || purchase?.supplier?.name || null,
+      expectedSeller: purchase?.supplier?.name || item.manufacturer || null,
       itemName: item.product?.customsName || null,
       supplement: item.supplement || null,
       expectedTotal,
@@ -160,9 +160,38 @@ const getTaxRefundWorkbench = async ({
   pageSize = DEFAULT_PAGE_SIZE,
   keyword,
   stage,
+  filingMonth,
 } = {}, prismaClient = prisma) => {
   const safePage = Math.max(1, Number.parseInt(page, 10) || 1);
   const safePageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Number.parseInt(pageSize, 10) || DEFAULT_PAGE_SIZE));
+  if (filingMonth) {
+    const preparations = await require('./taxRefundShipmentService').listShipmentPreparations({ filingMonth }, { prismaClient });
+    const items = preparations.map((preparation) => ({
+      shipmentKey: preparation.shipmentKey,
+      salesContractId: preparation.salesContractId,
+      contractNo: preparation.contractNo,
+      shippedAt: preparation.shippedAt,
+      contractStatus: preparation.contractStatus,
+      stage: !preparation.materialReady ? 'PREPARATION' : preparation.confirmationStatus === 'CONFIRMED' ? 'DRAFT' : 'VERIFICATION',
+      // 内部材料确认不代表官方申报明细已经可导入。
+      ready: false,
+      declaration: preparation.customsDeclarationId ? { id: preparation.customsDeclarationId, declarationNo: preparation.declarationNo, status: preparation.declarationStatus, exportDate: preparation.exportDate } : null,
+      taxRefund: null,
+      purchaseContractNos: preparation.invoiceLinks.map((link) => link.purchaseContractNo),
+      invoiceSummary: preparation.invoiceVerification.summary,
+      estimatedRefundableAmount: 0,
+      materialReady: preparation.materialReady,
+      confirmationStatus: preparation.confirmationStatus,
+      confirmedFile: preparation.confirmedFile,
+      issues: preparation.materialBlockers,
+    }));
+    const filtered = filterItems(items, { keyword, stage });
+    const start = (safePage - 1) * safePageSize;
+    return { items: filtered.slice(start, start + safePageSize), total: filtered.length, page: safePage, pageSize: safePageSize,
+      filingMonth, summary: { ...buildSummary(items, null), materialReadyCount: items.filter((item) => item.materialReady).length,
+        confirmedCount: items.filter((item) => item.confirmationStatus === 'CONFIRMED').length },
+      disclaimer: '自动汇总本期及历史待申报出货；资料确认与归档不代表税务机关受理。' };
+  }
   const [contracts, latestInvoiceBatch] = await Promise.all([
     prismaClient.salesContract.findMany({
       where: {

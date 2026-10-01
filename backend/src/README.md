@@ -30,6 +30,8 @@
 | productController.js | 商品管理 + 历史价格 |
 | purchaseController.js | 采购合同 + 经 fileService 收紧权限的附件上传 + 从 UPLOAD_DIR 解析附件下载 |
 | salesController.js | 出口合同 + 价格计算 + 源文件附件 |
+| fileController.js | 合同附件；退税确认清单含核验行，下载及删除仅允许管理员/财务 |
+| taxRefundController.js | 退税记录与工作台、出货材料确认和受限月度导出 |
 | containerController.js | 货柜管理 + 装箱明细 |
 | inventoryController.js | 库存状态管理 |
 | financeController.js | 付款与账款管理 |
@@ -70,8 +72,9 @@
 | hsciqService.js | HSCIQ 查询缓存、并发请求共享、配额预留、可校准总超时与受控上游错误 |
 | packingListCheckService.js | 船司装箱单 PDF 受限归档、逐商品比对、历史记录与人工复核结论 |
 | purchaseInvoiceService.js | 从采购事实生成催票清单，规范化多发票号码并读取选填附件 |
-| taxRefundPreparationService.js | 2026 外贸企业退税材料、期限、关联校验与内部 Excel 准备清单 |
-| taxRefundWorkbenchService.js | 聚合出口合同、报关、采购发票台账和退税草稿，形成网页端退税工作台与逐合同发票核验 |
+| taxRefundPreparationService.js | 2026 退税材料清单；区分签署件/生成件、提运单/装箱单；导出出货关联与自动核验 |
+| taxRefundShipmentService.js | 按报关单归集出货资料、机器核验、版本确认归档与全量跨月准备汇总 |
+| taxRefundWorkbenchService.js | 保留既有查询；按申报月份展示逐次出货准备与确认状态，不冒充正式申报 |
 | taxRefundExportService.js | 退税记录与采购合同、发票号码、征税率的导出前严格匹配 |
 | exportReminderService.js | 次月5号内部退税材料准备提醒、已出货缺发票提醒（幂等通知） |
 | patrolService.js | 业务 / 系统巡检、管理员通知、系统操作日志 |

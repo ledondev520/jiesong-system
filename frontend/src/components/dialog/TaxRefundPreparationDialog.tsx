@@ -1,12 +1,13 @@
 /**
  * Input: 出口专项单退税准备 Interface、2026 官方规则版本和内部清单导出
- * Output: 申报凭证/备案单证/收汇材料、期限、阻塞与 Excel 导出对话框
+ * Output: 自动汇总、报关单选择、异常补件及一次确认生成归档清单
  * Pos: 出口详情内的退税材料唯一准备入口
  */
 
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useAuthStore } from '@/store/auth.store';
 import {
   AlertTriangle,
   CalendarClock,
@@ -43,12 +44,18 @@ import {
   type TaxRefundPreparation,
 } from '@/services/sales.service';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
+import { taxRefundService, type ShipmentPreparation } from '@/services/taxRefund.service';
+import { exportPacketService } from '@/services/exportPacket.service';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface TaxRefundPreparationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   salesContractId: string;
   contractNo: string;
+  customsDeclarationId?: string;
+  onConfirmed?: () => void | Promise<void>;
 }
 
 const STATUS_META: Record<TaxPreparationStatus, { label: string; className: string }> = {
@@ -83,16 +90,25 @@ export function TaxRefundPreparationDialog({
   onOpenChange,
   salesContractId,
   contractNo,
+  customsDeclarationId,
+  onConfirmed,
 }: TaxRefundPreparationDialogProps) {
-  const [preparation, setPreparation] = useState<TaxRefundPreparation | null>(null);
+  const role = useAuthStore(state => state.user?.role);
+  const canConfirm = role === 'ADMIN' || role === 'FINANCE';
+  const [preparation, setPreparation] = useState<(TaxRefundPreparation & Partial<ShipmentPreparation>) | null>(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [selectedDeclarationId, setSelectedDeclarationId] = useState(customsDeclarationId);
+  const [refreshKey, setRefreshKey] = useState(0);
+  useEffect(() => { setSelectedDeclarationId(customsDeclarationId); }, [customsDeclarationId, salesContractId]);
 
   useEffect(() => {
     if (!open) return;
     let active = true;
     setLoading(true);
-    void salesService.getTaxRefundPreparation(salesContractId)
+    setPreparation(null);
+    void (canConfirm ? taxRefundService.getShipmentPreparation(salesContractId, selectedDeclarationId) : salesService.getTaxRefundPreparation(salesContractId))
       .then((response) => {
         if (active) setPreparation(response.data || null);
       })
@@ -105,12 +121,13 @@ export function TaxRefundPreparationDialog({
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [open, salesContractId]);
+  }, [open, salesContractId, selectedDeclarationId, refreshKey, canConfirm]);
 
   const handleExport = async () => {
     setExporting(true);
     try {
-      await salesService.exportTaxRefundPreparation(salesContractId, contractNo);
+      if (canConfirm) await taxRefundService.exportShipmentPreparation(salesContractId, preparation?.customsDeclarationId || selectedDeclarationId);
+      else await salesService.exportTaxRefundPreparation(salesContractId, contractNo);
       toast.success('退税材料准备清单已导出');
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : '退税材料准备清单导出失败');
@@ -118,6 +135,27 @@ export function TaxRefundPreparationDialog({
       setExporting(false);
     }
   };
+
+  const handleConfirm = async () => {
+    if (!preparation?.materialReady || !preparation.customsDeclarationId || !preparation.sourceVersion) return;
+    setConfirming(true);
+    try {
+      const response = await taxRefundService.confirmShipmentPreparation(salesContractId, {
+        customsDeclarationId: preparation.customsDeclarationId, sourceVersion: preparation.sourceVersion,
+      });
+      setPreparation(response.data.preparation);
+      toast.success('出货资料已确认，清单已归档');
+      await onConfirmed?.();
+      await exportPacketService.download(response.data.file.id, response.data.file.fileName);
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : '确认或下载失败，请刷新后重试');
+      setRefreshKey(key => key + 1);
+    } finally { setConfirming(false); }
+  };
+  const ready = preparation?.materialReady ?? preparation?.preparationReady;
+  const blockers = preparation?.materialBlockers ?? preparation?.blockers ?? [];
+  const dailyChecklist = (preparation?.checklist ?? []).filter(item => !preparation?.sourceVersion || !['export-detail-form', 'purchase-detail-form', 'filing-catalog'].includes(item.id));
+  const visibleChecklist = preparation?.sourceVersion ? dailyChecklist.filter(item => item.status === 'missing' || item.status === 'review') : dailyChecklist;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -128,7 +166,7 @@ export function TaxRefundPreparationDialog({
             出口退税材料准备
           </DialogTitle>
           <DialogDescription>
-            专项单 {contractNo}：核对申报凭证、备案单证、收汇节点和当前规则版本；这里只做内部准备，不代表税务机关已受理。
+            专项单 {contractNo}：系统自动关联三单、报关及进项发票。处理缺件和差异后，一次确认生成出货清单。
           </DialogDescription>
         </DialogHeader>
 
@@ -142,17 +180,28 @@ export function TaxRefundPreparationDialog({
           </div>
         ) : (
           <div className="min-h-0 flex-1 space-y-4 overflow-auto pr-1">
-            <Alert className={preparation.preparationReady ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}>
-              {preparation.preparationReady
+            <Alert className={ready ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}>
+              {ready
                 ? <CheckCircle2 className="h-4 w-4 text-emerald-700" />
                 : <AlertTriangle className="h-4 w-4 text-red-700" />}
-              <AlertDescription className={preparation.preparationReady ? 'text-emerald-800' : 'text-red-800'}>
-                {preparation.preparationReady
-                  ? '系统内材料准备记录已齐，请在电子税务局提交前再次人工复核。'
-                  : `仍有 ${preparation.blockers.length} 项材料准备阻塞：${preparation.blockers.join('；')}`}
+              <AlertDescription className={ready ? 'text-emerald-800' : 'text-red-800'}>
+                {ready
+                  ? preparation.confirmationStatus === 'CONFIRMED' ? '本次资料已确认并归档。' : '自动核验通过，可以确认并生成清单。'
+                  : `仍有 ${blockers.length} 项材料准备阻塞：${blockers.join('；')}`}
               </AlertDescription>
             </Alert>
 
+            {preparation.declarations && preparation.declarations.length > 1 && <Select value={selectedDeclarationId || preparation.customsDeclarationId || undefined} onValueChange={setSelectedDeclarationId}>
+              <SelectTrigger aria-label="本次出货报关单"><SelectValue placeholder="选择报关单" /></SelectTrigger>
+              <SelectContent>{preparation.declarations.map(item => <SelectItem key={item.id} value={item.id}>{item.declarationNo}</SelectItem>)}</SelectContent>
+            </Select>}
+            {preparation.confirmationStatus === 'CHANGED' && <Alert><AlertTriangle className="h-4 w-4" /><AlertDescription>资料已有变化，原归档保留；请重新确认当前清单。</AlertDescription></Alert>}
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => setRefreshKey(key => key + 1)}>刷新补件状态</Button>
+              <Button variant="outline" size="sm" asChild><Link href={`/dashboard/sales/${salesContractId}`}>补充出货资料</Link></Button>
+            </div>
+            <details className="space-y-3 rounded-lg border p-3" open={!preparation.sourceVersion || undefined}>
+              <summary className="cursor-pointer text-sm font-medium">查看期限与规则</summary>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <DateCard label="报关/期限基准日" value={preparation.deadlines.basisDate} note="优先取报关单出口日期" />
               <DateCard label="内部准备节点" value={preparation.deadlines.internalPrepareOn} note="次月5日，不是法定截止日" />
@@ -187,8 +236,10 @@ export function TaxRefundPreparationDialog({
               </div>
             </div>
 
+            </details>
             <div className="overflow-hidden rounded-lg border">
-              <Table>
+              {!visibleChecklist.length && <p className="p-3 text-sm text-muted-foreground">本次资料已自动核验，无需逐项复核。</p>}
+              {visibleChecklist.length > 0 && <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40">
                     <TableHead className="w-28 text-xs">分类</TableHead>
@@ -199,7 +250,7 @@ export function TaxRefundPreparationDialog({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {preparation.checklist.map((item) => {
+                  {visibleChecklist.map((item) => {
                     const meta = STATUS_META[item.status];
                     return (
                       <TableRow key={item.id} className={item.status === 'missing' ? 'bg-red-50/50' : ''}>
@@ -219,9 +270,12 @@ export function TaxRefundPreparationDialog({
                     );
                   })}
                 </TableBody>
-              </Table>
+              </Table>}
             </div>
 
+            <details className="space-y-3 rounded-lg border p-3">
+              <summary className="cursor-pointer text-sm font-medium">查看已关联资料（{dailyChecklist.length} 项）</summary>
+              <ul className="space-y-2 text-xs text-muted-foreground">{dailyChecklist.map(item => <li key={item.id}><span className="font-medium text-foreground">{item.label}：</span>{STATUS_META[item.status].label} {item.evidence || item.message}</li>)}</ul>
             {preparation.invoiceLinks.length > 0 && (
               <div className="space-y-2">
                 <h3 className="text-sm font-medium">关联供应商发票</h3>
@@ -247,6 +301,7 @@ export function TaxRefundPreparationDialog({
               </div>
             )}
 
+            </details>
             <Alert>
               <CalendarClock className="h-4 w-4" />
               <AlertDescription>{preparation.officialRules.internalReminderDisclaimer} {preparation.disclaimer}</AlertDescription>
@@ -256,10 +311,14 @@ export function TaxRefundPreparationDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>关闭</Button>
-          <Button onClick={() => void handleExport()} disabled={!preparation || exporting}>
+          <Button variant="outline" onClick={() => void handleExport()} disabled={!preparation || exporting || loading}>
             {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
             {exporting ? '导出中...' : '导出材料准备 Excel'}
           </Button>
+          {canConfirm && preparation?.sourceVersion && <Button onClick={() => void handleConfirm()} disabled={!preparation.materialReady || loading || confirming}>
+            {confirming && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {preparation.confirmationStatus === 'CONFIRMED' ? '下载已确认清单' : '确认并生成清单'}
+          </Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

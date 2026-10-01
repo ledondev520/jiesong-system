@@ -8,6 +8,7 @@ const taxRefundService = require('../services/taxRefundService');
 const taxRefundDraftService = require('../services/taxRefundDraftService');
 const taxRefundExportService = require('../services/taxRefundExportService');
 const taxRefundWorkbenchService = require('../services/taxRefundWorkbenchService');
+const taxRefundShipmentService = require('../services/taxRefundShipmentService');
 const { createCrudController } = require('./shared/createCrudController');
 const { success, error } = require('../utils/response');
 
@@ -25,6 +26,35 @@ const controller = createCrudController({
 
 module.exports = {
   ...controller,
+  getShipmentPreparation: async (req, res, next) => {
+    try {
+      success(res, await taxRefundShipmentService.getShipmentPreparation(req.params.salesContractId, req.query.customsDeclarationId));
+    } catch (error) { next(error); }
+  },
+  confirmShipmentPreparation: async (req, res, next) => {
+    try {
+      success(res, await taxRefundShipmentService.confirmShipmentPreparation(req.params.salesContractId, req.body), '出货资料已确认并生成清单');
+    } catch (error) { next(error); }
+  },
+  exportShipmentPreparation: async (req, res, next) => {
+    try {
+      const preparation = await taxRefundShipmentService.getShipmentPreparation(req.params.salesContractId, req.query.customsDeclarationId);
+      const buffer = await require('../services/taxRefundPreparationService').buildTaxRefundPreparationWorkbook(preparation);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`退税出货准备清单-${preparation.contractNo}-${preparation.declarationNo || '待补'}.xlsx`)}`);
+      res.send(buffer);
+    } catch (error) { next(error); }
+  },
+  exportMonthlyPreparations: async (req, res, next) => {
+    try {
+      const items = await taxRefundShipmentService.listShipmentPreparations({ filingMonth: req.query.filingMonth });
+      const buffer = await taxRefundShipmentService.buildMonthlyPreparationWorkbook(req.query.filingMonth, items);
+      const fileName = `退税月度准备清单-${req.query.filingMonth}.xlsx`;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+      res.send(buffer);
+    } catch (error) { next(error); }
+  },
   getWorkbench: async (req, res, next) => {
     try {
       const result = await taxRefundWorkbenchService.getTaxRefundWorkbench(req.query || {});
