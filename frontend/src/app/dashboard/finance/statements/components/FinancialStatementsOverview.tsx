@@ -95,7 +95,7 @@ interface FinancialStatementsOverviewProps {
 }
 
 function calcTrend(current: number | null | undefined, previous: number | null | undefined): { dir: 'up' | 'down' | 'neutral'; text: string } {
-  if (current == null || previous == null || previous === 0) return { dir: 'neutral', text: '环比持平' };
+  if (current == null || previous == null || previous === 0) return { dir: 'neutral', text: '无可比上期数据' };
   const diff = ((current - previous) / Math.abs(previous)) * 100;
   const sign = diff > 0 ? '+' : '';
   if (Math.abs(diff) < 0.1) return { dir: 'neutral', text: '环比持平' };
@@ -169,6 +169,7 @@ export function FinancialStatementsOverview({
 
       {hasData && (
         <>
+          <p className="text-xs text-muted-foreground">健康提示与预警基于最新账期：{analytics?.latestPeriod?.periodLabel || '未知'}</p>
           {(dangerAlerts.length > 0 || warningAlerts.length > 0) && (
             <div className="space-y-2">
               {dangerAlerts.map((alert, index) => (
@@ -193,7 +194,9 @@ export function FinancialStatementsOverview({
             )}
             {(() => {
               const trends = analytics?.trends ?? [];
-              const prev = trends.length >= 2 ? trends[trends.length - 2] : null;
+              const selected = currentDetail ?? currentPeriod;
+              const previousDate = selected ? new Date(selected.year, selected.month - 2, 1) : null;
+              const prev = previousDate ? trends.find((point) => point.year === previousDate.getFullYear() && point.month === previousDate.getMonth() + 1) : null;
               const revenueTrend = calcTrend(latestIncomeStatement?.revenueMonth, prev?.revenue);
               const profitTrend = calcTrend(latestIncomeStatement?.netProfitMonth, prev?.netProfit);
               const prevDebtRatio = prev && prev.totalAssets ? prev.totalLiabilities / prev.totalAssets : null;

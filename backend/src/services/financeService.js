@@ -630,7 +630,7 @@ const getPayables = async ({ page, pageSize, skip, search, outstandingOnly = fal
     ...contract,
     unpaidAmount: Math.max(0, contract.totalAmount - contract.paidAmount),
   })).filter((contract) => (!outstandingOnly || contract.unpaidAmount > 0)
-    && (!search || `${contract.contractNo} ${contract.supplier?.name || ''}`.toLowerCase().includes(search.trim().toLowerCase())));
+    && (!search || `${contract.contractNo} ${contract.supplier?.name || ''}`.toLowerCase().includes(String(search).trim().toLowerCase())));
   return { payables: payables.slice(skip, skip + pageSize), total: payables.length, page, pageSize };
 };
 
@@ -668,7 +668,7 @@ const getReceivables = async ({ page, pageSize, skip, search, outstandingOnly = 
   }).filter((contract) => contract.totalAmount > 0
     && (!outstandingOnly || contract.unreceiveAmount > 0)
     && (!overdueIds || overdueIds.has(contract.id))
-    && (!search || `${contract.contractNo} ${contract.stores.join(' ')}`.toLowerCase().includes(search.trim().toLowerCase())));
+    && (!search || `${contract.contractNo} ${contract.stores.join(' ')}`.toLowerCase().includes(String(search).trim().toLowerCase())));
 
   return { receivables: receivables.slice(skip, skip + pageSize), total: receivables.length, page, pageSize };
 };

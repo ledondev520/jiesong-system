@@ -132,10 +132,9 @@ function PaymentsPageContent() {
 
   // 银行流水对账数据（当合同为空时作为 fallback 填充列表）
   const [reconData, setReconData] = useState<FullReconciliationResult | null>(null);
+  const [auxiliaryError, setAuxiliaryError] = useState(false);
   const [bankStats, setBankStats] = useState<BankFlowStats | null>(null);
   const [incomingData, setIncomingData] = useState<IncomingSummaryResult | null>(null);
-  const payableDataLoadedRef = useRef(false);
-  const receivableDataLoadedRef = useRef(false);
   const reconciliationLoadedRef = useRef(false);
 
   // 1. 加载统计数据
@@ -180,7 +179,7 @@ function PaymentsPageContent() {
       const res = await financeService.getUnallocatedPayments();
       setUnallocatedPayments(res.data || []);
     } catch {
-      // 非关键错误，静默处理
+      setAuxiliaryError(true);
     }
   }, []);
 
@@ -225,23 +224,22 @@ function PaymentsPageContent() {
       setReconData(data);
     } catch {
       reconciliationLoadedRef.current = false;
+      setAuxiliaryError(true);
     }
   }, []);
 
-  const loadPayableData = useCallback(async (force = false) => {
-    payableDataLoadedRef.current = true;
+  const loadPayableData = useCallback(async (_force = false) => {
     await Promise.all([
       fetchPayables(),
-      getTransactionStats().then(setBankStats).catch(() => {}),
+      getTransactionStats().then(setBankStats).catch(() => { setAuxiliaryError(true); }),
     ]);
   }, [fetchPayables]);
 
-  const loadReceivableData = useCallback(async (force = false) => {
-    receivableDataLoadedRef.current = true;
+  const loadReceivableData = useCallback(async (_force = false) => {
     await Promise.all([
       fetchReceivables(),
-      getIncomingSummary().then(setIncomingData).catch(() => {}),
-      getTransactionStats().then(setBankStats).catch(() => {}),
+      getIncomingSummary().then(setIncomingData).catch(() => { setAuxiliaryError(true); }),
+      getTransactionStats().then(setBankStats).catch(() => { setAuxiliaryError(true); }),
     ]);
   }, [fetchReceivables]);
 
@@ -405,7 +403,7 @@ function PaymentsPageContent() {
   const unpaidContracts = unpaidBase;
   const unreceiveContracts = unreceiveBase;
 
-  // 银行流水 -> 供应商付款映射（用于给合同列表注入实际已付金额）
+  // 银行流水 -> 供应商付款映射（仅展示供应商核对信息，不参与合同余额）
   type BankPayRow = { name: string; netPaid: number; totalInvoice: number; gap: number; category: string; txnCount: number; invCount: number };
   const bankPayMap = useMemo<Record<string, BankPayRow>>(() => {
     if (!reconData) return {};
@@ -427,9 +425,6 @@ function PaymentsPageContent() {
     const norm = (s: string) => s.replace(/[\uff08\u3008]/g, '(').replace(/[\uff09\u3009]/g, ')').replace(/\s+/g, '').toLowerCase();
     const key = norm(supplierName);
     if (bankPayMap[key]) return bankPayMap[key];
-    for (const [k, v] of Object.entries(bankPayMap)) {
-      if (k === key) return v;
-    }
     return null;
   };
 
@@ -543,6 +538,7 @@ function PaymentsPageContent() {
               size="sm"
               className="h-10"
               onClick={() => {
+                setAuxiliaryError(false);
                 clearApiGetCache();
                 invalidateCache('fin-');
                 void fetchStats();
@@ -614,6 +610,7 @@ function PaymentsPageContent() {
         </Card>
       )}
 
+      {auxiliaryError && <div className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/30 p-3 text-sm text-destructive">银行汇总、收款池或对账数据读取失败 <Button variant="outline" size="sm" onClick={() => { clearApiGetCache(); invalidateCache('fin-'); setAuxiliaryError(false); void fetchUnallocated(); void loadPayableData(true); void loadReceivableData(true); void fetchReconciliation(true); }}>重试</Button></div>}
       {/* 统计卡片 */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="kpi-card">
@@ -623,7 +620,7 @@ function PaymentsPageContent() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              ¥{fmtCny(bankStats?.totalOut ?? 0)}
+              {bankStats && !auxiliaryError ? `¥${fmtCny(bankStats.totalOut)}` : '—'}
             </div>
             <p className="text-xs text-muted-foreground">
               {reconData ? `${reconData.summary.matchedCount + reconData.summary.unmatchedPaymentCount} 家供应商` : '加载中...'}
@@ -637,7 +634,7 @@ function PaymentsPageContent() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              ¥{fmtCny(bankStats?.totalIn ?? 0)}
+              {bankStats && !auxiliaryError ? `¥${fmtCny(bankStats.totalIn)}` : '—'}
             </div>
             <p className="text-xs text-muted-foreground">
               {incomingData ? `${incomingData.items.length} 家付款方` : '加载中...'}
@@ -767,7 +764,7 @@ function PaymentsPageContent() {
                   badge={categoryBadge(r.category)}
                   fields={[
                     { label: '已付', value: `¥${fmtCny(r.netPaid)}`, emphasis: 'primary' },
-                    { label: '发票', value: `¥${fmtCny(r.totalInvoice)}` },
+                    { label: '供应商发票汇总', value: `¥${fmtCny(r.totalInvoice)}` },
                   ]}
                   amount={{ label: '差额', value: `¥${fmtCny(r.gap)}`, emphasis: r.gap > 0 ? 'danger' : undefined }}
                 />
@@ -867,7 +864,7 @@ function PaymentsPageContent() {
               {allBankPayRows.length > 0 && (
                 <div className="flex items-center gap-2 border-b px-4 py-2 text-xs text-blue-700 bg-blue-50/40 dark:bg-blue-950/20 dark:text-blue-300">
                   <Landmark className="h-4 w-4 shrink-0" />
-                  <span>以下数据来自<strong>银行流水</strong>按供应商汇总，已付金额与发票自动对账。</span>
+                  <span>以下为<strong>银行流水供应商汇总</strong>，用于对账，不代表各张合同已结清。</span>
                   <Button size="sm" variant="link" className="ml-auto h-auto p-0 text-xs text-blue-600" asChild>
                     <Link href="/dashboard/finance/reconciliation">完整对账 &rarr;</Link>
                   </Button>
@@ -1140,7 +1137,6 @@ function PaymentsPageContent() {
         open={!!allocateTarget}
         onOpenChange={(open) => !open && setAllocateTarget(null)}
         payment={allocateTarget}
-        receivables={receivables}
         onSubmit={handleAllocateSubmit}
       />
     </div>
