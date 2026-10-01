@@ -266,17 +266,21 @@ const inferRoutePlan = ({ agentType, message } = {}) => {
 };
 
 const loadSdk = async () => {
+  let sdk;
   try {
-    return await import('@codeany/open-agent-sdk');
+    sdk = await import('@codeany/open-agent-sdk');
   } catch (error) {
     const localBuildPath = path.resolve(__dirname, '../../../.tmp/open-agent-sdk-typescript/dist/index.js');
-    return import(pathToFileURL(localBuildPath).href);
+    sdk = await import(pathToFileURL(localBuildPath).href);
   }
+  // 不让 Agent 外层重试与 Anthropic transport 重试叠加上游请求。
+  sdk.DEFAULT_RETRY_CONFIG.maxRetries = 0;
+  return sdk;
 };
 
 const ensureRuntimeConfig = async () => {
-  if (!config.kimi.apiKey) {
-    throw createError('请先配置当前系统的 KIMI_API_KEY 后再启用 Agent Runtime', 503);
+  if (!await aiService.getOpenAIClient()) {
+    throw createError('请先配置当前系统的 AI API Key 后再启用 Agent Runtime', 503);
   }
   const { defaultModel } = await aiService.getConfiguredModels();
   return {
@@ -2879,6 +2883,7 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
 }
 
 module.exports = {
+  loadSdk,
   SUPPORTED_AGENT_TYPES,
   PRIMARY_AGENT_TYPE,
   LEGACY_AGENT_TYPES,

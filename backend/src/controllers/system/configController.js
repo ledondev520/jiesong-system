@@ -41,6 +41,7 @@ const CONFIG_DOMAIN_MAP = {
 
   // AI 集成域：外部 AI 服务鉴权与参数
   apiKey:         { domain: 'ai', label: 'AI集成', note: 'Kimi API 密钥（脱敏存储）' },
+  deepseekApiKey: { domain: 'ai', label: 'AI集成', note: 'DeepSeek API 密钥（脱敏存储）' },
   kimiModel:      { domain: 'ai', label: 'AI集成', note: 'Kimi 模型名称' },
   aiChatModel:     { domain: 'ai', label: 'AI集成', note: 'AI 助手问答场景使用的模型' },
   aiHsCodeModel:   { domain: 'ai', label: 'AI集成', note: 'HS Code 推荐与申报要素场景使用的模型' },
@@ -147,8 +148,14 @@ const getConfigs = async (req, res, next) => {
 
     // 环境变量回退与数据库配置遵守同一只写式密钥响应约束。
     const config = require('../../config');
-    if (!formatted.apiKey && config.kimi?.apiKey) {
-      formatted.apiKey = normalizeConfigValueForResponse('apiKey', config.kimi.apiKey);
+    const activeAi = config.ai || config.kimi;
+    formatted.aiProvider = activeAi.provider || 'kimi';
+    if (formatted.aiProvider === 'deepseek') {
+      formatted.deepseekApiKey = formatted.deepseekApiKey ||
+        normalizeConfigValueForResponse('deepseekApiKey', activeAi.apiKey || '');
+      formatted.apiKey = formatted.deepseekApiKey;
+    } else if (!formatted.apiKey && activeAi.apiKey) {
+      formatted.apiKey = normalizeConfigValueForResponse('apiKey', activeAi.apiKey);
     }
 
     success(res, formatted);

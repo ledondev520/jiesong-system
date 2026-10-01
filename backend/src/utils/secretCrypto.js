@@ -157,4 +157,5 @@ const normalizeConfigValueForResponse = (key, rawValue) => {
 module.exports = {
   normalizeConfigValueForStorage,
   normalizeConfigValueForResponse,
+  decryptApiKeyFromStorage,
 };

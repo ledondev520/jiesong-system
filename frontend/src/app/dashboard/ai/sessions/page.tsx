@@ -1,6 +1,6 @@
 /**
  * Input: AI 会话 Interface、Token 统计 Interface、独立 Token 记录 Interface（含 promptBrief）、按需图表 Module
- * Output: AI 会话管理页面（用量折线图、24h/30d 摘要卡片；聊天/独立调用 Tabs、列排序与费用展示）
+ * Output: AI 会话管理页面（用量折线图、24h/30d 摘要卡片；聊天/独立调用与已知单价的费用估算，未知单价显示暂无价格）
  * Pos: Dashboard AI 管理模块
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -681,33 +681,38 @@ const MODEL_PRICING_PER_K: Record<string, number> = {
   'minimax-m2.7': 0.003,
 };
 
-const DEFAULT_PRICE_PER_K = 0.012;
-
-/** 匹配模型每千 token 单价（元），无规则时用默认 */
-const pricePerKForModel = (model: string): number => {
+/** 匹配模型每千 token 单价（元），未知模型没有估算单价 */
+const pricePerKForModel = (model: string): number | undefined => {
   const matchedKey = Object.keys(MODEL_PRICING_PER_K)
     .filter((k) => model?.includes(k))
     .sort((a, b) => b.length - a.length)[0];
-  return matchedKey ? MODEL_PRICING_PER_K[matchedKey] : DEFAULT_PRICE_PER_K;
+  return matchedKey ? MODEL_PRICING_PER_K[matchedKey] : undefined;
 };
 
 /** 估算 token 消耗费用（人民币元），不含税 */
 const estimateCost = (model: string, tokens: number): string | null => {
   if (!tokens) return null;
-  const cost = (tokens / 1000) * pricePerKForModel(model || '');
+  const price = pricePerKForModel(model || '');
+  if (price === undefined) return '暂无价格';
+  const cost = (tokens / 1000) * price;
   if (cost < 0.001) return '<¥0.001';
   return `≈¥${cost.toFixed(3)}`;
 };
 
 /** 按模型分组汇总估算费用（元） */
-const estimateSumYuan = (byModel: { model: string; tokens: number }[]): number => {
-  return byModel.reduce((sum, m) => {
-    if (!m.tokens) return sum;
-    return sum + (m.tokens / 1000) * pricePerKForModel(m.model || '');
-  }, 0);
+const estimateSumYuan = (byModel: { model: string; tokens: number }[]): number | null => {
+  let sum = 0;
+  for (const m of byModel) {
+    if (!m.tokens) continue;
+    const price = pricePerKForModel(m.model || '');
+    if (price === undefined) return null;
+    sum += (m.tokens / 1000) * price;
+  }
+  return sum;
 };
 
-const formatYuanSum = (yuan: number) => {
+const formatYuanSum = (yuan: number | null) => {
+  if (yuan === null) return '暂无价格';
   if (!yuan || yuan < 0.0001) return '≈ ¥0.00';
   return `≈ ¥${yuan.toFixed(2)}`;
 };

@@ -11,7 +11,7 @@
 | 文件/目录 | 地位 | 功能 |
 |-----------|------|------|
 | app.js | 入口 | Express 应用初始化和启动（含定时任务启动） |
-| config/ | 配置层 | 环境变量和常量定义（含配置/常量单元测试） |
+| config/ | 配置层 | 权限校验后的环境加载、活动 AI 供应商与常量（含单元测试） |
 | controllers/ | 控制层 | 处理 HTTP 请求，调用服务层 |
 | integration/ | 集成测试层 | 数据库集成测试（schema/事务/seed 幂等） |
 | jobs/ | 定时任务层 | 库存预警、出口提醒（每月5号退税/缺票提醒）等定时任务 |
@@ -37,8 +37,8 @@
 | financeController.js | 付款与账款管理 |
 | financialStatementsController.js | 月度财务三文件预览、确认导入与账期查询 |
 | financialEvidenceController.js | 脱敏财务资料摘要、文档列表与 Sheet 行级下钻 |
-| systemController.js | 系统配置（环境密钥回退仅返回脱敏状态）+ 数据导入导出 |
-| aiController.js | AI问答 + 辅助录入 + 统一分页边界的对话历史 |
+| systemController.js | 系统配置（活动 AI 供应商与独立密钥均仅返回脱敏状态）+ 数据导入导出 |
+| aiController.js | AI问答 + 辅助录入 + 当前供应商模型说明 + Anthropic 禁止隐式重试 + 统一分页边界的对话历史 |
 | aiUsageController.js | AI 用量趋势日期校验、调用明细有界分页与用量汇总 |
 | notificationController.js | 统一分页边界的通知列表、已读与生成 |
 
@@ -57,9 +57,9 @@
 | invoiceVerificationService.js | 出口退税候选发票的销方、价税合计、品名、状态只读一致性核验 |
 | financialStatementsService.js | 会计报表、科目余额、明细账同账期校验，单事务写入与下钻查询 |
 | financialEvidenceService.js | 工资、税务、凭证与日记账等资料的分类、脱敏、幂等导入与受限查询 |
-| aiService.js | Kimi 集成、完整请求时限、零自动重试、直接读取流式用量及管理员模型配置缓存 |
-| anthropicCompatService.js | Open Agent 与 Kimi 的协议适配，共用请求时限、配置温度与唯一模型候选 |
-| openAgentService.js | 内部草稿按请求直接执行；其他写操作一次确认；工具角色与执行回放 |
+| aiService.js | DeepSeek/Kimi 活动供应商、DeepSeek 独立密钥与 flash thinking/high、完整时限、零重试与流式用量 |
+| anthropicCompatService.js | Open Agent 的 OpenAI 协议适配，保留思考/工具回合与图像，共用请求时限及模型参数 |
+| openAgentService.js | 内部草稿按请求直接执行；其他写操作一次确认；当前 AI 客户端校验与零自动重试、工具角色与执行回放 |
 | agentReplaySummaryService.js | Agent 回放摘要持久化，支持复用外层事务客户端 |
 | importService.js | CSV数据解析与导入 |
 | exportService.js | 多格式数据导出（CSV + 出口合同五 Sheet Excel 含商业发票/税务测算） |

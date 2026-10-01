@@ -93,6 +93,30 @@ test('getConfigs: 环境变量密钥回退也只返回脱敏状态', async () =>
   }
 });
 
+test('getConfigs: DeepSeek 使用独立密钥，旧 Kimi 配置不冒充当前密钥', async () => {
+  const config = require('../../config');
+  const originalAi = config.ai;
+  const originalFindMany = prisma.systemConfig.findMany;
+  try {
+    for (const stored of [false, true]) {
+      config.ai = { provider: 'deepseek', apiKey: 'test-only-deepseek-env-4321' };
+      prisma.systemConfig.findMany = async () => [
+        { key: 'apiKey', value: JSON.stringify('test-only-legacy-kimi-1111') },
+        ...(stored ? [{ key: 'deepseekApiKey', value: JSON.stringify('test-only-deepseek-stored-9876') }] : []),
+      ];
+      const res = createMockRes();
+      await configController.getConfigs({}, res, (error) => { throw error; });
+      assert.equal(res.payload.data.aiProvider, 'deepseek');
+      assert.equal(res.payload.data.apiKey, stored ? '••••9876' : '••••4321');
+      assert.equal(res.payload.data.deepseekApiKey, res.payload.data.apiKey);
+      assert.equal(JSON.stringify(res.payload).includes('test-only-'), false);
+    }
+  } finally {
+    config.ai = originalAi;
+    prisma.systemConfig.findMany = originalFindMany;
+  }
+});
+
 test('updateConfig: upsert 时会 JSON.stringify(value)', async () => {
   const originalUpsert = prisma.systemConfig.upsert;
   let upsertArgs = null;

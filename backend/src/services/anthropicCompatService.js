@@ -1,7 +1,7 @@
 /**
- * Input: Anthropic 兼容请求、Kimi OpenAI 兼容客户端、管理员模型配置
+ * Input: Anthropic 兼容请求、当前 provider 的 OpenAI 兼容客户端、管理员模型配置
  * Output: Anthropic 兼容响应；配置模型不可用时仅降级一次到稳定模型
- * Pos: Open Agent SDK 与 Kimi 之间的协议适配层，共用请求 deadline 且不重复重试认证错误
+ * Pos: Open Agent SDK 与当前 provider 的协议适配层，保留思考/工具回合与图像、共用 profile/deadline
  */
 
 const crypto = require('node:crypto');
@@ -10,21 +10,31 @@ const { createError } = require('../middleware/errorHandler');
 
 const normalizeText = (value) => (typeof value === 'string' ? value : '');
 
-const flattenToolResultContent = (content) => {
+const mapContentToOpenAI = (content) => {
   if (typeof content === 'string') {
     return content;
   }
   if (Array.isArray(content)) {
-    return content
-      .map((block) => normalizeText(block?.text || block?.content || ''))
-      .filter(Boolean)
-      .join('\n');
+    const blocks = content.flatMap((block) => {
+      if (block?.type === 'image_url') return [block];
+      if (block?.type === 'image' && block.source?.type === 'base64') {
+        return [{ type: 'image_url', image_url: { url: `data:${block.source.media_type};base64,${block.source.data}` } }];
+      }
+      if (block?.type === 'image' && block.source?.type === 'url') {
+        return [{ type: 'image_url', image_url: { url: block.source.url } }];
+      }
+      const text = normalizeText(block?.text || block?.content || '');
+      return text ? [{ type: 'text', text }] : [];
+    });
+    return blocks.some((block) => block.type === 'image_url') ? blocks : blocks.map((block) => block.text).join('\n');
   }
   return '';
 };
 
-const mapAnthropicMessagesToOpenAI = ({ system, messages = [] }) => {
+const mapAnthropicMessagesToOpenAI = ({ system, messages = [] }, modelOptions = {}) => {
   const result = [];
+  // 旧 Kimi 会话没有思考记录；DeepSeek tools 请求要求字段存在，空串不伪造内容。
+  const legacyReasoning = modelOptions.model === 'deepseek-flash' ? { reasoning_content: '' } : {};
 
   if (typeof system === 'string' && system.trim()) {
     result.push({ role: 'system', content: system.trim() });
@@ -35,7 +45,7 @@ const mapAnthropicMessagesToOpenAI = ({ system, messages = [] }) => {
     const content = message?.content;
 
     if (typeof content === 'string') {
-      result.push({ role, content });
+      result.push({ role, content, ...(role === 'assistant' ? legacyReasoning : {}), ...(role === 'assistant' && typeof message.reasoning_content === 'string' ? { reasoning_content: message.reasoning_content } : {}) });
       continue;
     }
 
@@ -59,24 +69,23 @@ const mapAnthropicMessagesToOpenAI = ({ system, messages = [] }) => {
             arguments: JSON.stringify(block.input || {}),
           },
         }));
+      const thinking = content.filter((block) => block?.type === 'thinking');
 
-      if (text || toolCalls.length > 0) {
+      if (text || toolCalls.length > 0 || thinking.length > 0) {
         result.push({
           role: 'assistant',
           content: text || null,
+          ...legacyReasoning,
           ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+          ...(thinking.length > 0 ? { reasoning_content: thinking.map((block) => normalizeText(block.thinking)).join('') } : {}),
         });
       }
       continue;
     }
 
-    const text = content
-      .filter((block) => block?.type === 'text')
-      .map((block) => normalizeText(block.text))
-      .join('\n')
-      .trim();
-    if (text) {
-      result.push({ role: 'user', content: text });
+    const userContent = mapContentToOpenAI(content.filter((block) => block?.type !== 'tool_result'));
+    if (userContent.length) {
+      result.push({ role: 'user', content: typeof userContent === 'string' ? userContent.trim() : userContent });
     }
 
     const toolResults = content.filter((block) => block?.type === 'tool_result');
@@ -84,7 +93,7 @@ const mapAnthropicMessagesToOpenAI = ({ system, messages = [] }) => {
       result.push({
         role: 'tool',
         tool_call_id: toolResult.tool_use_id,
-        content: flattenToolResultContent(toolResult.content),
+        content: mapContentToOpenAI(toolResult.content),
       });
     }
   }
@@ -116,6 +125,9 @@ const mapKimiResponseToAnthropic = ({ response, model }) => {
   const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
 
   const content = [];
+  if (typeof message.reasoning_content === 'string') {
+    content.push({ type: 'thinking', thinking: message.reasoning_content, signature: '' });
+  }
   if (text) {
     content.push({ type: 'text', text });
   }
@@ -164,11 +176,12 @@ const createMessageWithClient = async ({
   defaultModel,
   fallbackModel,
   temperature = 0.2,
+  modelOptions = aiService.getAIModelOptions(),
 }) => {
-  const requestedModel = payload?.model || defaultModel;
-  const messages = mapAnthropicMessagesToOpenAI(payload || {});
+  const requestedModel = modelOptions.model || payload?.model || defaultModel;
+  const messages = mapAnthropicMessagesToOpenAI(payload || {}, modelOptions);
   const tools = mapAnthropicToolsToOpenAI(payload?.tools);
-  const candidates = Array.from(new Set([requestedModel, fallbackModel].filter(Boolean)));
+  const candidates = Array.from(new Set([requestedModel, modelOptions.model || fallbackModel].filter(Boolean)));
   const requestOptions = aiService.getAIRequestOptions();
 
   let lastError;
@@ -179,9 +192,10 @@ const createMessageWithClient = async ({
         messages,
         tools,
         tool_choice: tools?.length ? 'auto' : undefined,
-        temperature,
+        ...(modelOptions.thinking ? {} : { temperature }),
         max_tokens: payload?.max_tokens || 4096,
         stream: false,
+        ...modelOptions,
       }, requestOptions);
 
       return mapKimiResponseToAnthropic({ response, model });
@@ -199,7 +213,7 @@ const createMessageWithClient = async ({
 const createMessage = async (payload) => {
   const { defaultModel, temperature } = await aiService.getConfiguredModels();
 
-  const client = aiService.getOpenAIClient();
+  const client = await aiService.getOpenAIClient();
   if (!client) throw createError('AI 服务未配置或当前运行环境禁用外部调用', 503);
   return createMessageWithClient({
     payload,

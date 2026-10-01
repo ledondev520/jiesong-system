@@ -98,4 +98,47 @@ describe('SystemConfigTab', () => {
     expect(screen.queryByText(secret)).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain(secret);
   });
+
+  it('Kimi 配置仍将新密钥写入原 apiKey 字段', async () => {
+    const user = userEvent.setup();
+    render(<SystemConfigTab />);
+    const input = await screen.findByPlaceholderText('输入 Kimi API Key (sk-...)');
+    // 合成测试占位符，不是生产凭据。
+    await user.type(input, 'test-only-nonproduction-placeholder');
+    await user.click(screen.getByRole('button', { name: /保存配置/ }));
+    await waitFor(() => expect(mockUpdateSystemConfig).toHaveBeenCalledWith({ apiKey: 'test-only-nonproduction-placeholder' }));
+  });
+
+  it('DeepSeek 限定 Flash 模型、思考模式和专用密钥字段，保留原温度', async () => {
+    // 合成测试占位符，不是生产凭据。
+    const newKey = 'test-only-nonproduction-placeholder';
+    mockGetSystemConfig.mockResolvedValueOnce({ data: {
+      exchangeRate: 7.2, profitRate: 1.3, aiProvider: 'deepseek',
+      apiKey: '********configured', deepseekApiKey: '********configured',
+      aiChatModel: 'kimi-k2-turbo-preview', aiHsCodeModel: 'moonshot-v1-8k',
+      aiThinking: true, aiReasoningEffort: 'high', aiTemperature: 0.7,
+    } });
+    const user = userEvent.setup();
+    render(<SystemConfigTab />);
+
+    expect(await screen.findByText('DeepSeek API Key')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '控制台' })).toHaveAttribute('href', 'https://platform.deepseek.com/api_keys');
+    expect(screen.getByText(/思考模式已开启.*high/)).toBeInTheDocument();
+    expect(screen.getByText(/0\.7 — 均衡/)).toBeInTheDocument();
+    expect(screen.getByRole('slider')).toHaveAttribute('data-disabled');
+    const keyInput = screen.getByPlaceholderText('输入新 Key 以覆盖');
+    expect(keyInput).toHaveValue('');
+    await user.click(screen.getAllByRole('combobox')[0]);
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    expect(screen.getByRole('option', { name: /deepseek-flash/ })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await user.type(keyInput, newKey);
+    await user.click(screen.getByRole('button', { name: /保存配置/ }));
+
+    await waitFor(() => expect(mockUpdateSystemConfig).toHaveBeenCalledWith({ deepseekApiKey: newKey }));
+    const writes = Object.assign({}, ...mockUpdateSystemConfig.mock.calls.map(c => c[0]));
+    expect(writes).toMatchObject({ aiChatModel: 'deepseek-flash', aiHsCodeModel: 'deepseek-flash' });
+    expect(writes).not.toHaveProperty('apiKey');
+    expect(writes).not.toHaveProperty('aiTemperature');
+  });
 });

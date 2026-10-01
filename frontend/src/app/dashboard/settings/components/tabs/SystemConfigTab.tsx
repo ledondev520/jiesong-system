@@ -1,6 +1,6 @@
 /**
  * Input: 后端 /system/configs API（通过 configService）、/hs-codes/hsciq-usage API
- * Output: 手机单列配置表单、系统参数表单（汇率/利润率）+ 业务流程参数（盖章平台链接/开票抬头）+ AI 模型/采样参数（仅 Kimi/Moonshot）+ HSCIQ API 开关 + 数据字典（单位/报关公司）
+ * Output: 手机单列配置表单、系统/业务参数、当前 AI 供应商的模型与只写密钥配置、HSCIQ 开关与数据字典
  * Pos: 设置页 > 系统配置 Tab，管理员调整全局运营参数与外部 API 集成
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -68,9 +68,12 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
   const [newBroker, setNewBroker] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  // Kimi API Key 只写式配置：后端仅返回脱敏状态，页面永不渲染完整密钥
-  const [kimiApiKeyConfigured, setKimiApiKeyConfigured] = useState(false);
-  const [kimiApiKeyNew, setKimiApiKeyNew] = useState('');
+  // API Key 只写式配置：后端仅返回脱敏状态，页面永不渲染完整密钥
+  const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
+  const [apiKeyNew, setApiKeyNew] = useState('');
+  const [aiProvider, setAiProvider] = useState<'deepseek' | 'kimi'>('kimi');
+  const isDeepSeek = aiProvider === 'deepseek';
+  const providerLabel = isDeepSeek ? 'DeepSeek' : 'Kimi';
   // 场景化模型配置
   const [chatModel, setChatModel] = useState('kimi-k2-turbo-preview');
   const [hsCodeModel, setHsCodeModel] = useState('kimi-k2-turbo-preview');
@@ -105,20 +108,26 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
           if (typeof configs.profitRate === 'number') form.setValue('profitRate', configs.profitRate);
           if (Array.isArray(configs.units)) setUnits(configs.units);
           if (Array.isArray(configs.brokers)) setBrokers(configs.brokers);
-          // 1.1. Kimi API Key（后端只返回脱敏状态，不回传完整密钥）
-          if (typeof configs.apiKey === 'string' && configs.apiKey) {
-            setKimiApiKeyConfigured(true);
-          }
+          // 1.1. 当前供应商的只写密钥状态
+          const deepseek = configs.aiProvider === 'deepseek';
+          setAiProvider(deepseek ? 'deepseek' : 'kimi');
+          const configuredKey = deepseek ? configs.deepseekApiKey || configs.apiKey : configs.apiKey;
+          setApiKeyConfigured(typeof configuredKey === 'string' && Boolean(configuredKey));
           // 1.2. 场景化模型配置（优先新 key，兼容旧 key）
-          if (typeof configs.aiChatModel === 'string' && configs.aiChatModel) {
-            setChatModel(configs.aiChatModel);
-          } else if (typeof configs.aiPrimaryModel === 'string' && configs.aiPrimaryModel) {
-            setChatModel(configs.aiPrimaryModel);
-          }
-          if (typeof configs.aiHsCodeModel === 'string' && configs.aiHsCodeModel) {
-            setHsCodeModel(configs.aiHsCodeModel);
-          } else if (typeof configs.aiPrimaryModel === 'string' && configs.aiPrimaryModel) {
-            setHsCodeModel(configs.aiPrimaryModel);
+          if (deepseek) {
+            setChatModel('deepseek-flash');
+            setHsCodeModel('deepseek-flash');
+          } else {
+            if (typeof configs.aiChatModel === 'string' && configs.aiChatModel) {
+              setChatModel(configs.aiChatModel);
+            } else if (typeof configs.aiPrimaryModel === 'string' && configs.aiPrimaryModel) {
+              setChatModel(configs.aiPrimaryModel);
+            }
+            if (typeof configs.aiHsCodeModel === 'string' && configs.aiHsCodeModel) {
+              setHsCodeModel(configs.aiHsCodeModel);
+            } else if (typeof configs.aiPrimaryModel === 'string' && configs.aiPrimaryModel) {
+              setHsCodeModel(configs.aiPrimaryModel);
+            }
           }
           if (typeof configs.aiTemperature === 'number') setTemperature(configs.aiTemperature);
           if (typeof configs.aiMaxTokens === 'number') setMaxTokens(configs.aiMaxTokens);
@@ -170,22 +179,22 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
         saveConfig('units', units),
         saveConfig('brokers', brokers),
       ];
-      // 1.1. 若用户填写了新 Kimi API Key，一并保存
-      if (kimiApiKeyNew.trim()) {
-        tasks.push(saveConfig('apiKey', kimiApiKeyNew.trim()));
+      // 1.1. 密钥仅写入当前供应商的专用字段
+      if (apiKeyNew.trim()) {
+        tasks.push(saveConfig(isDeepSeek ? 'deepseekApiKey' : 'apiKey', apiKeyNew.trim()));
       }
       // 1.2. 场景化模型与采样参数
       tasks.push(saveConfig('aiChatModel', chatModel));
       tasks.push(saveConfig('aiHsCodeModel', hsCodeModel));
-      tasks.push(saveConfig('aiTemperature', temperature));
+      if (!isDeepSeek) tasks.push(saveConfig('aiTemperature', temperature));
       tasks.push(saveConfig('aiMaxTokens', maxTokens));
       // 1.3. 业务流程参数（盖章平台/开票抬头）
       tasks.push(saveConfig('stampPlatformUrl', stampPlatformUrl.trim()));
       tasks.push(saveConfig('invoiceTitleInfo', invoiceTitleInfo.trim()));
       await Promise.all(tasks);
-      if (kimiApiKeyNew.trim()) {
-        setKimiApiKeyConfigured(true);
-        setKimiApiKeyNew('');
+      if (apiKeyNew.trim()) {
+        setApiKeyConfigured(true);
+        setApiKeyNew('');
       }
       toast.success('系统配置已保存');
     } catch (error) {
@@ -484,7 +493,9 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                 AI 模型配置
               </CardTitle>
               <CardDescription>
-                为不同使用场景选择合适的模型，配置采样参数与 API 密钥。每个场景内置自动降级，无需手动配置备用模型。
+                {isDeepSeek
+                  ? 'DeepSeek Flash 思考模式已开启，推理强度 high；问答与 HS 推荐使用同一模型。'
+                  : '为不同使用场景选择合适的模型，配置采样参数与 API 密钥。每个场景内置自动降级，无需手动配置备用模型。'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -499,9 +510,11 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        {isDeepSeek ? <SelectItem value="deepseek-flash">deepseek-flash（思考模式）</SelectItem> : <>
                         <SelectItem value="kimi-k2-turbo-preview">kimi-k2-turbo-preview（均衡）</SelectItem>
                         <SelectItem value="moonshot-v1-8k">moonshot-v1-8k（快速）</SelectItem>
                         <SelectItem value="kimi-k2-thinking-turbo">kimi-k2-thinking-turbo（深度推理）</SelectItem>
+                        </>}
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">用于 AI 聊天助手的日常问答。</p>
@@ -513,9 +526,11 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        {isDeepSeek ? <SelectItem value="deepseek-flash">deepseek-flash（思考模式）</SelectItem> : <>
                         <SelectItem value="kimi-k2-turbo-preview">kimi-k2-turbo-preview（均衡）</SelectItem>
                         <SelectItem value="moonshot-v1-8k">moonshot-v1-8k（快速）</SelectItem>
                         <SelectItem value="kimi-k2-thinking-turbo">kimi-k2-thinking-turbo（深度推理）</SelectItem>
+                        </>}
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">用于智能 HS 编码推荐与申报要素自动填写。</p>
@@ -528,10 +543,10 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium flex items-center gap-1.5">
                         <Key className="h-3.5 w-3.5 text-muted-foreground" />
-                        Kimi API Key
+                        {providerLabel} API Key
                       </label>
                       <a
-                        href="https://platform.moonshot.cn/console/account"
+                        href={isDeepSeek ? 'https://platform.deepseek.com/api_keys' : 'https://platform.moonshot.cn/console/account'}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-1 text-xs text-primary hover:underline"
@@ -540,14 +555,14 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                         控制台
                       </a>
                     </div>
-                    {kimiApiKeyConfigured && (
+                    {apiKeyConfigured && (
                       <Badge variant="secondary" className="w-fit text-[10px]">已配置（只写）</Badge>
                     )}
                     <Input
                       type="password"
-                      placeholder={kimiApiKeyConfigured ? '输入新 Key 以覆盖' : '输入 Kimi API Key (sk-...)'}
-                      value={kimiApiKeyNew}
-                      onChange={(e) => setKimiApiKeyNew(e.target.value)}
+                      placeholder={apiKeyConfigured ? '输入新 Key 以覆盖' : `输入 ${providerLabel} API Key (sk-...)`}
+                      value={apiKeyNew}
+                      onChange={(e) => setApiKeyNew(e.target.value)}
                       autoComplete="new-password"
                     />
                     <p className="text-xs text-muted-foreground">密钥只允许覆盖写入，保存后不会再从系统读回或显示。</p>
@@ -574,9 +589,10 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                       step={0.1}
                       value={[temperature ?? 0.7]}
                       onValueChange={([v]) => setTemperature(v ?? 0.7)}
+                      disabled={isDeepSeek}
                     />
                     <p className="text-xs text-muted-foreground">
-                      0–0.3 偏保守，0.4–0.7 均衡，0.8–1 更富创意。
+                      {isDeepSeek ? 'DeepSeek 思考模式不使用温度参数；保留原配置值。' : '0–0.3 偏保守，0.4–0.7 均衡，0.8–1 更富创意。'}
                     </p>
                   </div>
 

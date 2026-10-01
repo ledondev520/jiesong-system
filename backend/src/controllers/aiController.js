@@ -437,6 +437,8 @@ const cancelAgentAction = async (req, res, next) => {
 };
 
 const anthropicCompatMessage = async (req, res, next) => {
+  // Anthropic transport 默认重试两次；失败由用户发起重试。
+  res.setHeader('x-should-retry', 'false');
   try {
     const result = await anthropicCompatService.createMessage(req.body);
     res.status(200).json(result);
@@ -821,9 +823,16 @@ const getTokenStats = async (req, res, next) => {
  */
 const getModels = async (req, res, next) => {
   try {
+    const config = require('../config');
+    const provider = (config.ai || config.kimi).provider || 'kimi';
     success(res, {
+      provider,
       models: aiService.MODELS,
-      description: {
+      description: provider === 'deepseek' ? {
+        thinking: 'deepseek-flash - 启用思考模式，推理强度 high',
+        vision: 'deepseek-flash - 支持图像理解',
+        fast: 'deepseek-flash - 当前统一模型',
+      } : {
         thinking: 'Kimi K2 推理增强模型 - 适合复杂推理和分析',
         vision: '视觉模型 - 支持图像理解',
         fast: '快速响应模型 - 适合简单问答',

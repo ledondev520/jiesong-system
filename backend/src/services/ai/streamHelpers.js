@@ -1,7 +1,7 @@
 /**
  * 职责：流式调用聊天补全并聚合正文、推理分片与上游 usage，转交 SDK deadline
  * 参数：temperature / maxTokens 可选；未传时非思考模型 temperature=0.6，思考模型 temperature=1.0
- * 思考模型 max_tokens 取 max(16000, 配置的 maxTokens)，非思考模型仅在有 maxTokens 时传入
+ * Kimi 思考模型 max_tokens 取 max(16000, 配置的 maxTokens)；DeepSeek 使用配置上限和 thinking/high profile
  */
 const collectStreamedChat = async ({
   client,
@@ -13,13 +13,14 @@ const collectStreamedChat = async ({
   temperature: temperatureOverride,
   maxTokens: maxTokensOverride,
   requestOptions,
+  modelOptions = {},
 }) => {
   const temperature = isThinkingModel
     ? (temperatureOverride !== undefined ? temperatureOverride : 1.0)
     : (temperatureOverride !== undefined ? temperatureOverride : 0.6);
 
   let max_tokens;
-  if (isThinkingModel) {
+  if (isThinkingModel && !modelOptions.thinking) {
     const base = maxTokensOverride !== undefined && Number.isFinite(Number(maxTokensOverride))
       ? Number(maxTokensOverride)
       : 16000;
@@ -31,10 +32,11 @@ const collectStreamedChat = async ({
   const stream = await client.chat.completions.create({
     model,
     messages,
-    temperature,
+    ...(modelOptions.thinking ? {} : { temperature }),
     ...(max_tokens !== undefined ? { max_tokens } : {}),
     stream: true,
     stream_options: { include_usage: true },
+    ...modelOptions,
   }, requestOptions);
 
   let fullContent = '';

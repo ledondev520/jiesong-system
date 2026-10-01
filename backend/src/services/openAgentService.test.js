@@ -591,9 +591,10 @@ test('getAgentPreset: 非法 agent 类型抛出错误', () => {
   );
 });
 
-test('runAgentPrompt: 未配置当前系统 KIMI_API_KEY 时返回 503', async () => {
-  const originalKimiApiKey = config.kimi.apiKey;
-  config.kimi.apiKey = '';
+test('runAgentPrompt: 当前 AI 客户端不可用时返回 503', async () => {
+  const aiService = require('./aiService');
+  const originalGetClient = aiService.getOpenAIClient;
+  aiService.getOpenAIClient = async () => null;
 
   try {
     await assert.rejects(
@@ -602,10 +603,47 @@ test('runAgentPrompt: 未配置当前系统 KIMI_API_KEY 时返回 503', async (
         agentType: 'finance',
         message: '当前客户还欠多少钱？',
       }),
-      (error) => error.statusCode === 503 && /KIMI_API_KEY/.test(error.message),
+      (error) => error.statusCode === 503 && /AI API Key/.test(error.message),
     );
   } finally {
-    config.kimi.apiKey = originalKimiApiKey;
+    aiService.getOpenAIClient = originalGetClient;
+  }
+});
+
+test('loadSdk: Anthropic 与 Agent 两层重试均关闭，一次失败只发一次请求', async () => {
+  const http = require('node:http');
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const sdk = await openAgentService.loadSdk();
+  const previous = { ...sdk.DEFAULT_RETRY_CONFIG };
+  // Keep the red run fast: the old SDK loader leaves this single retry enabled.
+  Object.assign(sdk.DEFAULT_RETRY_CONFIG, { maxRetries: 1, baseDelayMs: 1, maxDelayMs: 1 });
+  await openAgentService.loadSdk();
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'synthetic-agent-retry-'));
+  fs.chmodSync(cwd, 0o700);
+  let calls = 0;
+  const server = http.createServer((_req, res) => {
+    calls++;
+    res.writeHead(500, { 'content-type': 'application/json', 'x-should-retry': 'false' });
+    res.end(JSON.stringify({ type: 'error', error: { type: 'api_error', message: 'synthetic failure' } }));
+  });
+  try {
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const engine = new sdk.QueryEngine({
+      model: 'synthetic-model', apiKey: 'test-only-non-production-sdk-key',
+      baseURL: `http://127.0.0.1:${server.address().port}`, cwd,
+      tools: [], maxTurns: 1, maxTokens: 256, systemPrompt: 'Synthetic test only.',
+      abortSignal: AbortSignal.timeout(2000),
+    });
+    const events = [];
+    for await (const event of engine.submitMessage('synthetic')) events.push(event);
+    assert.equal(calls, 1);
+    assert.ok(events.some(event => event.type === 'result' && event.subtype === 'error'));
+  } finally {
+    Object.assign(sdk.DEFAULT_RETRY_CONFIG, previous);
+    await new Promise(resolve => server.close(resolve));
+    fs.rmSync(cwd, { recursive: true, force: true });
   }
 });
 

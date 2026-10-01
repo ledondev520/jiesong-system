@@ -124,3 +124,19 @@ test('collectStreamedChat: 超时不把半截输出当作完成，回调异常�
   await assert.rejects(collectStreamedChat({ client, model: 'synthetic', messages: [], onChunk() { throw callbackError; } }), callbackError);
   assert.equal(aborted, true);
 });
+
+test('DeepSeek stream: thinking/high 使用配置 token 上限，不沿用 Kimi 16000 下限', async () => {
+  let body;
+  const client = { chat: { completions: { create: async (value) => { body = value; return createAsyncStream([
+    { choices: [{ delta: { reasoning_content: 'synthetic reasoning', content: 'OK' } }] },
+    { choices: [], usage: { prompt_tokens: 4, completion_tokens: 7 } },
+  ]); } } } };
+  const result = await collectStreamedChat({ client, model: 'deepseek-flash', messages: [], isThinkingModel: true, maxTokens: 4096,
+    modelOptions: { thinking: { type: 'enabled' }, reasoning_effort: 'high' },
+  });
+  assert.equal(body.max_tokens, 4096);
+  assert.deepEqual(body.thinking, { type: 'enabled' });
+  assert.equal(body.reasoning_effort, 'high');
+  assert.equal(result.thinkingContent, 'synthetic reasoning');
+  assert.deepEqual(result.tokenUsage, { promptTokens: 4, outputTokens: 7 });
+});

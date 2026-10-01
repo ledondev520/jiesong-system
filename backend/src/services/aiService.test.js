@@ -127,3 +127,74 @@ test('AI SDK: 单次流请求使用 usage，失败不重试，问候 deadline �
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /transport checks completed/);
 });
+
+test('DeepSeek service: DB 密钥优先、ENV 回退、profile/预算/本地问候与统一 completion', () => {
+  const { spawnSync } = require('node:child_process');
+  // All keys and configuration in this child are synthetic; transport is stubbed before any call.
+  const code = `
+    const assert = require('node:assert/strict');
+    const config = require('./src/config');
+    config.kimi.apiKey = 'test-only-kimi-key';
+    config.ai = { provider: 'deepseek', apiKey: 'test-only-env-key', baseUrl: 'https://synthetic.invalid' };
+    const prisma = require('./src/utils/prisma');
+    const secrets = require('./src/utils/secretCrypto');
+    let stored = { value: secrets.normalizeConfigValueForStorage('deepseekApiKey', 'test-only-stored-key') };
+    prisma.systemConfig.findUnique = async () => stored;
+    prisma.systemConfig.findMany = async () => [{ key: 'aiChatModel', value: '"configured-override"' }];
+    let calls = 0;
+    global.fetch = async (url, options) => {
+      calls += 1;
+      const body = JSON.parse(options.body);
+      assert.ok(new URL(url).hostname === 'synthetic.invalid');
+      assert.equal(body.model, 'deepseek-flash');
+      assert.deepEqual(body.thinking, { type: 'enabled' });
+      assert.equal(body.reasoning_effort, 'high');
+      const chunks = [{ choices: [{ delta: { reasoning_content: 'synthetic', content: 'OK' } }] }, { choices: [], usage: { prompt_tokens: 4, completion_tokens: 7 } }];
+      return new Response(chunks.map(chunk => 'data: ' + JSON.stringify(chunk) + '\\n\\n').join('') + 'data: [DONE]\\n\\n', { headers: { 'content-type': 'text/event-stream' } });
+    };
+    const ai = require('./src/services/aiService');
+    (async () => {
+      assert.ok(Object.values(ai.MODELS).every(model => model === 'deepseek-flash'));
+      assert.deepEqual(ai.getAIModelOptions(), { model: 'deepseek-flash', thinking: { type: 'enabled' }, reasoning_effort: 'high' });
+      const first = await ai.getOpenAIClient();
+      assert.ok(first.apiKey === 'test-only-stored-key', 'must use synthetic stored key');
+      assert.ok(first.baseURL === 'https://synthetic.invalid', 'must use synthetic active base');
+      stored = null;
+      const second = await ai.getOpenAIClient();
+      assert.ok(second.apiKey === 'test-only-env-key', 'must fall back to synthetic env key');
+      const models = await ai.getConfiguredModels();
+      assert.equal(models.chatModel, 'deepseek-flash');
+      assert.equal(models.hsCodeModel, 'deepseek-flash');
+      const budget = await ai.estimateTokens([{ role: 'user', content: 'synthetic' }]);
+      assert.ok(budget.data.total_tokens > 0);
+      assert.equal(calls, 0);
+      assert.equal((await ai.generateGreeting()).source, 'local');
+      assert.equal(calls, 0);
+      const result = await ai.callAI([{ role: 'user', content: 'synthetic' }], 'moonshot-v1-8k');
+      assert.equal(result.content, 'OK');
+      assert.equal(result.model, 'deepseek-flash');
+      assert.deepEqual(result.tokenUsage, { promptTokens: 4, outputTokens: 7 });
+      assert.equal(calls, 1);
+      const adapter = require('./src/services/anthropicCompatService');
+      const requestedModels = [];
+      await adapter.createMessageWithClient({
+        payload: { model: 'moonshot-v1-8k', messages: [] }, defaultModel: 'legacy-default', fallbackModel: 'legacy-fallback',
+        client: { chat: { completions: { create: async (body) => {
+          requestedModels.push(body.model);
+          assert.deepEqual(body.thinking, { type: 'enabled' });
+          assert.equal(body.reasoning_effort, 'high');
+          return { choices: [{ message: { content: 'OK', reasoning_content: 'synthetic' }, finish_reason: 'stop' }], usage: { prompt_tokens: 4, completion_tokens: 7 } };
+        } } } },
+      });
+      assert.deepEqual(requestedModels, ['deepseek-flash']);
+      console.log('deepseek synthetic checks completed');
+    })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => prisma.$disconnect());
+  `;
+  const result = spawnSync(process.execPath, ['-e', code], {
+    cwd: require('node:path').resolve(__dirname, '../..'),
+    env: { ...process.env, NODE_ENV: 'test', AI_ALLOW_REMOTE: 'true', AI_PROVIDER: 'kimi', DEEPSEEK_API_KEY: '' },
+    encoding: 'utf8', timeout: 5000,
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /deepseek synthetic checks completed/);
+});
