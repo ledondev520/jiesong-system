@@ -157,7 +157,28 @@ describe('PurchaseDetailPage 交互逻辑', () => {
 
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('加载合同详情失败');
+      expect(screen.getByText('采购合同读取失败')).toBeInTheDocument();
+      expect(screen.queryByText('合同不存在')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
     });
+  });
+
+  it('仅404显示不存在，未履行草稿提供更正和确认取消', async () => {
+    mockGetById.mockRejectedValueOnce({ code: 404, message: '采购合同不存在' });
+    const view = renderPage();
+    expect(await screen.findByText('合同不存在')).toBeInTheDocument();
+    expect(screen.queryByText('采购合同读取失败')).not.toBeInTheDocument();
+    view.unmount();
+    mockGetById.mockResolvedValue({ data: { id: 'p-1', contractNo: 'synthetic', status: 'DRAFT', paidAmount: 0, totalAmount: 100, expectedDate: '2026-10-20', items: [] } });
+    mockUpdatePurchaseStatus.mockResolvedValue({ data: {} });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderPage();
+    expect(await screen.findByRole('button', { name: '更正草稿' })).toBeInTheDocument();
+    expect(screen.getByText('2026-10-20')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '取消合同' }));
+    expect(mockUpdatePurchaseStatus).toHaveBeenCalledWith('p-1', 'CANCELLED');
+    expect(confirm).toHaveBeenCalled();
+    confirm.mockRestore();
   });
 
   it('点击导出 PDF 会调用服务', async () => {

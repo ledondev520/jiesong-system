@@ -8,12 +8,15 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Product, Supplier } from '@/types';
+import { loadPaginatedCatalog } from '@/services/paginatedCatalog';
+import { invalidateCache } from '@/lib/api-cache';
+import { ErrorState } from '@/components/ui/data-state';
+import { Product, Supplier, PurchaseContract } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -98,6 +101,7 @@ const purchaseSchema = z.object({
   supplierId: z.string().min(1, '请选择供应商'),
   contractNo: z.string().optional(),
   signedAt: z.date().optional(),
+  expectedDate: z.date().optional(),
   taxRate: z.number().min(0).max(100),
   note: z.string().optional(),
   items: z
@@ -223,6 +227,9 @@ function PriceSummary({
 
 export default function CreatePurchasePage() {
   const router = useRouter();
+  const editId = useSearchParams().get('editId');
+  const [loadError, setLoadError] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
 
   // 基础数据
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -347,29 +354,34 @@ export default function CreatePurchasePage() {
     void loadTemplates();
   }, []);
 
-  // ============== 加载数据 ==============
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [suppliersRes, productsRes, contractNoRes] = await Promise.all([
-          supplierService.getAll({ pageSize: 100, lite: true }),
-          productService.getAll({ pageSize: 100, lite: true }),
-          purchaseService.getNextContractNo(),
-        ]);
-        setSuppliers(suppliersRes.data?.items || []);
-        setProducts(productsRes.data?.items || []);
-        if (contractNoRes.data?.contractNo) {
-          form.setValue('contractNo', contractNoRes.data.contractNo);
-        }
-      } catch (error) {
-        console.error('加载数据失败:', error);
-        toast.error('加载数据失败');
-      } finally {
-        setContractNoLoading(false);
+  // 创建与草稿更正复用完整目录和同一表单。
+  const loadData = useCallback(async () => {
+    setDataLoading(true);
+    setLoadError(false);
+    try {
+      const [allSuppliers, allProducts, contractRes] = await Promise.all([
+        loadPaginatedCatalog((page) => supplierService.getAll({ page, pageSize: 100, lite: true })),
+        loadPaginatedCatalog((page) => productService.getAll({ page, pageSize: 100, lite: true })),
+        editId ? purchaseService.getById(editId) : purchaseService.getNextContractNo(),
+      ]);
+      setSuppliers(allSuppliers);
+      setProducts(allProducts);
+      if (editId && contractRes.data && 'items' in contractRes.data) {
+        const draft = contractRes.data as PurchaseContract;
+        if (draft.status !== 'DRAFT') throw new Error('仅草稿可更正');
+        form.reset({ supplierId: draft.supplierId, contractNo: draft.contractNo, signedAt: draft.signedAt ? new Date(draft.signedAt) : undefined, expectedDate: draft.expectedDate ? new Date(draft.expectedDate) : undefined, taxRate: draft.taxRate, note: draft.note ?? '', items: (draft.items ?? []).map((item) => ({ productId: item.productId, quantity: item.quantity, unitPrice: item.unitPrice, unit: item.unit ?? '', note: item.note ?? '', priceNote: '' })) });
+      } else if (contractRes.data?.contractNo) {
+        form.setValue('contractNo', contractRes.data.contractNo);
       }
-    };
-    loadData();
-  }, [form]);
+    } catch {
+      setLoadError(true);
+      toast.error('加载数据失败');
+    } finally {
+      setDataLoading(false);
+      setContractNoLoading(false);
+    }
+  }, [editId, form]);
+  useEffect(() => { void loadData(); }, [loadData]);
 
   // ============== 根据选中商品推荐供应商 ==============
   useEffect(() => {
@@ -428,6 +440,7 @@ export default function CreatePurchasePage() {
     try {
       const response = await supplierService.create(newSupplierForm);
       const newSupplier = response.data;
+      invalidateCache('suppliers-list');
       setSuppliers((prev) => [newSupplier, ...prev]);
       form.setValue('supplierId', newSupplier.id);
       setShowNewSupplierDialog(false);
@@ -616,6 +629,8 @@ export default function CreatePurchasePage() {
         const history = item.productId ? priceHistoryMap[item.productId] : null;
         if (history && history.averagePrice !== null && item.unitPrice > history.averagePrice * 1.1) {
           if (!item.priceNote || item.priceNote.trim().length === 0) {
+            setCurrentStep(1);
+            form.setError(`items.${i}.priceNote`, { message: '请填写价格上涨原因' });
             toast.error(`第 ${i + 1} 项商品价格高于历史均价，请填写备注说明原因`);
             return;
           }
@@ -627,6 +642,7 @@ export default function CreatePurchasePage() {
         supplierId: data.supplierId,
         contractNo: data.contractNo,
         signedAt: data.signedAt?.toISOString(),
+        expectedDate: data.expectedDate?.toISOString() ?? null,
         taxRate: data.taxRate,
         note: data.note,
         items: data.items.map((item) => {
@@ -642,18 +658,25 @@ export default function CreatePurchasePage() {
           };
         }),
       };
-      await purchaseService.create(submitData);
-      toast.success('采购合同创建成功');
-      router.push('/dashboard/contracts');
-    } catch {
-      toast.error('创建失败');
+      if (editId) {
+        await purchaseService.update(editId, submitData);
+        toast.success('草稿更正已保存');
+      } else {
+        const response = await purchaseService.create(submitData);
+        toast.success('采购合同创建成功');
+        if (response.data && 'warnings' in response.data) response.data.warnings.forEach((warning) => toast.warning(warning.message, { duration: 10000 }));
+      }
+      invalidateCache('purchase-contracts-list');
+      router.push(editId ? `/dashboard/purchase/${editId}` : '/dashboard/contracts');
+    } catch (error) {
+      toast.error(typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : '保存失败');
     }
   };
 
   const goToStep1 = () => setCurrentStep(1);
 
   const goToStep2 = async () => {
-    const valid = await form.trigger('items');
+    const valid = await form.trigger('items', { shouldFocus: true });
     if (!valid) {
       toast.error('请完善采购明细信息');
       return;
@@ -667,9 +690,12 @@ export default function CreatePurchasePage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-10">
       <PageHeader
-        title="新增采购合同"
+        title={editId ? '更正采购草稿' : '新增采购合同'}
         description="先添加商品，系统会推荐曾供应过该商品的供应商"
+        actions={<Button type="button" variant="outline" onClick={() => window.open('/dashboard/products', '_blank', 'noopener,noreferrer')}>维护商品</Button>}
       />
+
+      {loadError && <ErrorState title="采购资料加载失败" action={<Button type="button" onClick={() => void loadData()}>重试</Button>} />}
 
       {/* 模板选择器 */}
       <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)] md:col-span-2">
@@ -711,12 +737,12 @@ export default function CreatePurchasePage() {
       <StepIndicator
         steps={['采购明细', '合同信息']}
         currentStep={currentStep}
-        onChange={setCurrentStep}
+        onChange={(step) => { if (step === 1) goToStep1(); else void goToStep2(); }}
       />
 
       <div className="grid gap-6 md:grid-cols-2">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="contents">
+          <form onSubmit={form.handleSubmit(onSubmit, (errors) => { setCurrentStep(errors.items ? 1 : 2); toast.error(errors.items ? '请完善采购明细信息' : '请完善合同信息'); })} className="contents">
             {currentStep === 1 && (
               <>
                 {/* AI 智能录入 */}
@@ -927,7 +953,7 @@ export default function CreatePurchasePage() {
                             <div className="md:col-span-12">
                               <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                                 <span>
-                                  历史采购：均价 ¥{history.averagePrice} / 最低 ¥
+                                  历史采购（不含税）：均价 ¥{history.averagePrice} / 最低 ¥
                                   {history.minPrice} / 最高 ¥{history.maxPrice}（共 {history.count}{' '}
                                   笔）
                                 </span>
@@ -1207,6 +1233,14 @@ export default function CreatePurchasePage() {
                       )}
                     />
 
+                    <FormField control={form.control} name="expectedDate" render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <Label htmlFor="purchase-expected-date" className="mb-1.5 text-xs">预计交期</Label>
+                        <DatePicker date={field.value} setDate={field.onChange} triggerProps={{ id: 'purchase-expected-date', name: 'expectedDate' }} />
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
                     {/* 税率 */}
                     <FormField
                       control={form.control}
@@ -1280,9 +1314,9 @@ export default function CreatePurchasePage() {
                   <Button
                     type="submit"
                     className="h-10 rounded-md text-sm"
-                    disabled={form.formState.isSubmitting}
+                    disabled={form.formState.isSubmitting || dataLoading || loadError}
                   >
-                    {form.formState.isSubmitting ? '提交中...' : '创建合同'}
+                    {form.formState.isSubmitting ? '提交中...' : editId ? '保存更正' : '创建合同'}
                   </Button>
                 </div>
               </>

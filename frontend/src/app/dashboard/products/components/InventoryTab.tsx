@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Inventory, InventoryStatus } from '@/types';
 import { inventoryService } from '@/services/inventory.service';
 import {
@@ -63,6 +63,8 @@ const STATUS_LABEL_MAP: Record<InventoryStatus, string> = {
 export function InventoryTab() {
   // 库存状态
   const [inventory, setInventory] = useState<Inventory[]>([]);
+  const inventoryRequest = useRef(0);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [keyword, setKeyword] = useState('');
@@ -91,7 +93,7 @@ export function InventoryTab() {
    */
   useEffect(() => {
     loadInventory(debouncedKeyword);
-  }, [debouncedKeyword]);
+  }, [debouncedKeyword, currentPage, pageSize]);
 
   /**
    * 职责：加载库存列表并同步清空失效选中项。
@@ -103,26 +105,30 @@ export function InventoryTab() {
    * @returns Promise<void>
    */
   const loadInventory = async (searchKeyword = ''): Promise<void> => {
+    const request = ++inventoryRequest.current;
     setLoading(true);
     setLoadError(false);
     try {
-      const cacheKey = `inventory-list-${searchKeyword}`;
+      const cacheKey = `inventory-list-${currentPage}-${pageSize}-${searchKeyword}`;
       const response = await cachedFetch(
         cacheKey,
-        () => inventoryService.getAll({ page: 1, pageSize: 100, keyword: searchKeyword || undefined }),
+        () => inventoryService.getAll({ page: currentPage, pageSize, keyword: searchKeyword || undefined }),
         15_000, // 库存状态变更频繁，TTL 降至 15s
       );
+      if (request !== inventoryRequest.current) return;
       const nextInventory = response.data?.items || [];
       setInventory(nextInventory);
+      setTotal(response.data?.pagination?.total ?? 0);
       setSelectedIds((prevSelectedIds) => {
         const availableIds = new Set(nextInventory.map((item) => item.id));
         return prevSelectedIds.filter((id) => availableIds.has(id));
       });
     } catch {
+      if (request !== inventoryRequest.current) return;
       setLoadError(true);
       toast.error('加载库存失败');
     } finally {
-      setLoading(false);
+      if (request === inventoryRequest.current) setLoading(false);
     }
   };
 
@@ -266,12 +272,8 @@ export function InventoryTab() {
 
   const inventorySort = useTableSort(inventory, inventoryAccessor);
 
-  // 客户端分页计算（在排序结果上切片）
-  const totalPages = Math.ceil(inventorySort.sortedData.length / pageSize);
-  const pagedInventory = inventorySort.sortedData.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
+  const totalPages = Math.ceil(total / pageSize);
+  const pagedInventory = inventorySort.sortedData;
 
   return (
     <div className="space-y-6">
@@ -579,7 +581,7 @@ export function InventoryTab() {
 
       {/* 分页控制 */}
       <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-        <span>共 {inventory.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
+        <span>共 {total} 条（表列排序仅当前页）{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
         <div className="flex items-center gap-2">
           <PageSizeSelect
             value={pageSize}

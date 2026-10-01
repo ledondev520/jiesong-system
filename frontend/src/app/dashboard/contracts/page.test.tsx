@@ -81,6 +81,17 @@ describe('ContractsPage 交互逻辑', () => {
     });
   });
 
+  it('总数和翻页使用后端目录，商品查询发送到后端', async () => {
+    mockGetAll.mockResolvedValue({ data: { items: [], pagination: { total: 223, page: 1, pageSize: 20, totalPages: 12 }, summary: { statusCounts: { DRAFT: 123 }, stores: ['第二页店铺'] } } });
+    const user = userEvent.setup();
+    render(<ContractsPage />);
+    expect(await screen.findByText(/共 223 条/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '12' }));
+    await waitFor(() => expect(mockGetAll).toHaveBeenLastCalledWith(expect.objectContaining({ page: 12, pageSize: 20 })));
+    await user.type(screen.getByPlaceholderText('搜索商品名称...'), '第二商品');
+    await waitFor(() => expect(mockGetAll).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, productKeyword: '第二商品' })));
+  });
+
   it('点击新增采购按钮会跳转创建页', async () => {
     mockGetAll.mockResolvedValue({ data: { items: [] } });
     const user = userEvent.setup();

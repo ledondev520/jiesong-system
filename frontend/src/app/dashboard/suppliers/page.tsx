@@ -8,6 +8,9 @@
 
 'use client';
 
+import { loadPaginatedCatalog } from '@/services/paginatedCatalog';
+import { ErrorState } from '@/components/ui/data-state';
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -149,6 +152,7 @@ export default function SuppliersPage() {
   const isMobile = useMobile();
   const formSectionRef = useRef<HTMLElement>(null);
   const [suppliers, setSuppliers] = useState<SupplierDisplay[]>([]);
+  const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeSupplierId, setActiveSupplierId] = useState<string | null>(null);
   const [keyword, setKeyword] = useState('');
@@ -169,12 +173,13 @@ export default function SuppliersPage() {
 
   const loadSuppliers = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
-      const response = await cachedFetch('suppliers-list', () => supplierService.getAll({ page: 1, pageSize: 100 }));
-      const items = (response.data?.items || []) as SupplierDisplay[];
+      const items = await cachedFetch('suppliers-list', () => loadPaginatedCatalog((page) => supplierService.getAll({ page, pageSize: 100 }))) as SupplierDisplay[];
       setSuppliers(items);
       return items;
     } catch {
+      setLoadError(true);
       toast.error('加载供应商失败');
       return [];
     } finally {
@@ -288,8 +293,8 @@ export default function SuppliersPage() {
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
-        <aside className="rounded-xl border border-border/50 bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
+        <aside className="min-w-0 rounded-xl border border-border/50 bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
           <div className="space-y-4 border-b border-border/50 p-4">
             <div>
               <p className="text-sm font-semibold">供应商索引</p>
@@ -341,7 +346,7 @@ export default function SuppliersPage() {
           </div>
 
           <div className="max-h-[320px] overflow-y-auto overscroll-contain p-2 lg:max-h-[620px]">
-            {loading ? (
+            {loadError ? (<ErrorState title="供应商加载失败" action={<Button onClick={() => { invalidateCache('suppliers-list'); void loadSuppliers(); }}>重试</Button>} />) : loading ? (
               <div className="py-10 text-center text-sm text-muted-foreground">加载中...</div>
             ) : filteredSuppliers.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border/70 px-4 py-10 text-center text-sm text-muted-foreground">

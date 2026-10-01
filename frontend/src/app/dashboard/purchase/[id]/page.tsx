@@ -13,6 +13,9 @@ import { PurchaseContract, PurchaseItem, PurchaseStatus } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
 import { contractDocService } from '@/services/contractDoc.service';
 import { listContractFiles, type ContractFile } from '@/services/contractFile.service';
+import { useRouter } from 'next/navigation';
+import { ErrorState } from '@/components/ui/data-state';
+import { invalidateCache } from '@/lib/api-cache';
 import { Button } from '@/components/ui/button';
 import { MobileListCard } from '@/components/mobile';
 import { useMobile } from '@/lib/hooks/useMobile';
@@ -247,6 +250,9 @@ function ContractTimeline({ currentStatus }: { currentStatus: PurchaseStatus }) 
 
 export default function PurchaseDetailPage({ params }: PageProps) {
   const isMobile = useMobile();
+  const router = useRouter();
+  const [loadError, setLoadError] = useState(false);
+  const [notFound, setNotFound] = useState(false);
   const { id } = use(params);
   const [contract, setContract] = useState<PurchaseContract | null>(null);
   const [loading, setLoading] = useState(true);
@@ -278,15 +284,21 @@ export default function PurchaseDetailPage({ params }: PageProps) {
    */
   const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
+    setNotFound(false);
     try {
-      const [contractRes, filesRes] = await Promise.all([
-        purchaseService.getById(id),
-        listContractFiles(id, 'PURCHASE'),
-      ]);
+      const contractRes = await purchaseService.getById(id);
       setContract(contractRes.data || null);
-      if (filesRes.data) setContractFiles(filesRes.data);
-    } catch {
-      toast.error('加载合同详情失败');
+      setNotFound(!contractRes.data);
+      try {
+        const filesRes = await listContractFiles(id, 'PURCHASE');
+        if (filesRes.data) setContractFiles(filesRes.data);
+      } catch { toast.error('附件读取失败，请重试刷新详情'); }
+    } catch (error) {
+      const missing = typeof error === 'object' && error !== null && 'code' in error && error.code === 404;
+      setNotFound(missing);
+      setLoadError(!missing);
+      if (!missing) toast.error('加载合同详情失败');
     } finally {
       setLoading(false);
     }
@@ -398,9 +410,12 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     const nextAction = PURCHASE_NEXT_ACTIONS[contract.status];
     if (!nextAction) return;
 
+    if (nextAction.status === PurchaseStatus.RECEIVED && !window.confirm('确认所有商品均已到齐并验收合格？此操作会按合同全部数量入库；分批到货或不合格请勿确认。')) return;
     setStatusUpdating(true);
     try {
       await purchaseService.updateStatus(contract.id, nextAction.status);
+      invalidateCache('purchase-contracts-list');
+      invalidateCache('inventory-list');
       toast.success(`已推进到「${nextAction.label}」阶段`);
       await loadData();
     } catch (error: unknown) {
@@ -408,6 +423,19 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     } finally {
       setStatusUpdating(false);
     }
+  };
+
+  const handleCancel = async () => {
+    if (!contract || !window.confirm('取消这份未履行采购合同？取消后不能再推进或恢复，请确认尚未生产、付款或关联出口。')) return;
+    setStatusUpdating(true);
+    try {
+      await purchaseService.updateStatus(contract.id, PurchaseStatus.CANCELLED);
+      invalidateCache('purchase-contracts-list');
+      toast.success('采购合同已取消');
+      await loadData();
+    } catch (error) {
+      toast.error(typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : '取消失败');
+    } finally { setStatusUpdating(false); }
   };
 
   const purchaseLineItems = useMemo(() => contract?.items ?? [], [contract?.items]);
@@ -438,9 +466,8 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     return <div className="flex h-64 items-center justify-center">加载中...</div>;
   }
 
-  if (!contract) {
-    return <div className="py-10 text-center">合同不存在</div>;
-  }
+  if (loadError) return <ErrorState title="采购合同读取失败" action={<Button onClick={() => void loadData()}>重试</Button>} />;
+  if (notFound || !contract) return <div className="py-10 text-center">合同不存在</div>;
 
   // 计算付款进度
   const amountSummary = summarizePurchaseAmounts({
@@ -474,6 +501,12 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={contract.status} />
+            {contract.status === PurchaseStatus.DRAFT && contract.paidAmount === 0 && !(contract.payments?.length) && !contract.invoiceNo && contractFiles.length === 0 && (
+              <Button variant="outline" onClick={() => router.push(`/dashboard/purchase/create?editId=${contract.id}`)}>更正草稿</Button>
+            )}
+            {[PurchaseStatus.DRAFT, PurchaseStatus.SIGNED].includes(contract.status) && contract.paidAmount === 0 && !(contract.payments?.length) && !contract.invoiceNo && (
+              <Button variant="outline" onClick={handleCancel} disabled={statusUpdating}>取消合同</Button>
+            )}
             {nextPurchaseAction && (
               <Button
                 className="h-9 rounded-md text-xs"
@@ -633,6 +666,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                   {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '—'}
                 </p>
               </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div><p className="text-xs text-muted-foreground">预计交期</p><p className="text-sm">{contract.expectedDate ? format(new Date(contract.expectedDate), 'yyyy-MM-dd') : '未填写'}</p></div>
             </div>
             <div className="flex items-start gap-3">
               <Store className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />

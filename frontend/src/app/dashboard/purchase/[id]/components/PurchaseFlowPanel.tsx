@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { MobileListCard } from '@/components/mobile';
 import { useMobile } from '@/lib/hooks/useMobile';
 import { toast } from 'sonner';
+import { invalidateCache } from '@/lib/api-cache';
 import {
   Banknote,
   Copy,
@@ -224,6 +225,9 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
         paymentDate: data.paymentDate.toISOString(),
         note: data.note || undefined,
       });
+      invalidateCache('purchase-contracts-list');
+      invalidateCache('fin-payables');
+      invalidateCache('fin-stats');
       toast.success('付款已登记');
       setPayOpen(false);
       onUpdated();

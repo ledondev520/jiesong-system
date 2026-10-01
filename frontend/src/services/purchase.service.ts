@@ -1,9 +1,17 @@
 import api, { type ApiRequestConfig } from '@/lib/axios';
-import type { ApiResponse, PurchaseContract } from '@/types';
+import type { ApiResponse, PaginatedResponse, PurchaseContract } from '@/types';
 import type { ContractFile } from './contractFile.service';
 import { createCrudService } from './crudService';
 
-type PurchaseContractQuery = { page?: number; pageSize?: number; keyword?: string; lite?: boolean };
+type PurchaseContractQuery = { page?: number; pageSize?: number; keyword?: string; status?: string; supplierId?: string; productKeyword?: string; storeName?: string; lite?: boolean };
+
+type PurchaseListResult = PaginatedResponse<PurchaseContract> & {
+  summary?: { statusCounts: Record<string, number>; stores: string[] };
+};
+type PurchaseCreateResult = PurchaseContract | {
+  contract: PurchaseContract;
+  warnings: Array<{ message: string }>;
+};
 
 type PurchaseCreateItemPayload = {
   productId: string;
@@ -17,6 +25,7 @@ export type PurchaseCreatePayload = {
   supplierId: string;
   contractNo?: string;
   signedAt?: string;
+  expectedDate?: string | null;
   taxRate: number;
   note?: string;
   items: PurchaseCreateItemPayload[];
@@ -83,7 +92,7 @@ const normalizeParsedItems = (raw: unknown): ParsedQuoteItem[] => {
     .filter((item) => item.quantity > 0 || item.unitPrice > 0 || Boolean(item.productId) || Boolean(item.productName));
 };
 
-const crud = createCrudService<PurchaseContract, PurchaseCreatePayload, Partial<PurchaseContract>, PurchaseContractQuery>(
+const crud = createCrudService<PurchaseContract, PurchaseCreatePayload, Partial<PurchaseCreatePayload> & { expectedDate?: string | null }, PurchaseContractQuery>(
   '/purchases'
 );
 
@@ -151,6 +160,10 @@ export interface PurchaseInvoicePreparation {
  */
 export const purchaseService = {
   ...crud,
+
+  getAll: async (params?: PurchaseContractQuery) => api.get<ApiResponse<PurchaseListResult>, ApiResponse<PurchaseListResult>>('/purchases', params ? { params } : undefined),
+
+  create: async (data: PurchaseCreatePayload) => api.post<ApiResponse<PurchaseCreateResult>, ApiResponse<PurchaseCreateResult>, PurchaseCreatePayload>('/purchases', data),
 
   /**
    * 获取下一个采购合同编号。

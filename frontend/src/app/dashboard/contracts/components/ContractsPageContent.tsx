@@ -15,6 +15,7 @@ import { PurchaseContract, PurchaseStatus, PurchaseItem } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { Button } from '@/components/ui/button';
+import { ErrorState } from '@/components/ui/data-state';
 import { EmptyState } from '@/components/ui/empty-state';
 import {
   Table,
@@ -231,25 +232,12 @@ export default function ContractsPageContent() {
   // 采购合同状态
   const [purchaseContracts, setPurchaseContracts] = useState<PurchaseContract[]>([]);
   const [purchaseLoading, setPurchaseLoading] = useState(true);
+  const [purchaseError, setPurchaseError] = useState(false);
+  const purchaseRequest = useRef(0);
+  const [purchaseTotal, setPurchaseTotal] = useState(0);
+  const [listSummary, setListSummary] = useState<{ statusCounts: Record<string, number>; stores: string[] }>({ statusCounts: {}, stores: [] });
 
-  // 计算筛选后的采购合同（用于分页显示）
-  const filteredPurchaseContracts = useMemo(() => {
-    let filtered = purchaseContracts;
-    if (purchaseStatusFilter && purchaseStatusFilter !== 'ALL') {
-      filtered = filtered.filter((c) => c.status === purchaseStatusFilter);
-    }
-    if (storeFilter && storeFilter !== 'ALL') {
-      filtered = filtered.filter((c) => c.storeName?.includes(storeFilter));
-    }
-    if (productSearch.trim()) {
-      const search = productSearch.trim().toLowerCase();
-      filtered = filtered.filter((c) => {
-        const productName = c.items?.[0]?.product?.customsName || '';
-        return productName.toLowerCase().includes(search);
-      });
-    }
-    return filtered;
-  }, [purchaseContracts, purchaseStatusFilter, storeFilter, productSearch]);
+  const filteredPurchaseContracts = purchaseContracts;
 
   /**
    * 职责：按列从采购合同中取出用于排序的可比字段
@@ -278,32 +266,14 @@ export default function ContractsPageContent() {
 
   const purchaseSort = useTableSort(filteredPurchaseContracts, purchaseAccessor);
 
-  const purchaseTotalPages = Math.ceil(purchaseSort.sortedData.length / pageSize);
-  const pagedPurchaseContracts = purchaseSort.sortedData.slice(
-    (purchasePage - 1) * pageSize,
-    purchasePage * pageSize
-  );
-  const procurementOverview = useMemo(() => {
-    const activeContracts = purchaseContracts.filter((contract) =>
-      [PurchaseStatus.DRAFT, PurchaseStatus.SIGNED, PurchaseStatus.PRODUCING, PurchaseStatus.READY].includes(contract.status)
-    ).length;
-    const producingContracts = purchaseContracts.filter(
-      (contract) => contract.status === PurchaseStatus.PRODUCING
-    ).length;
-    const shippedPendingReceipt = purchaseContracts.filter(
-      (contract) => contract.status === PurchaseStatus.SHIPPED
-    ).length;
-    const activeStores = new Set(
-      purchaseContracts.map((contract) => contract.storeName).filter(Boolean)
-    ).size;
-
-    return {
-      activeContracts,
-      producingContracts,
-      shippedPendingReceipt,
-      activeStores,
-    };
-  }, [purchaseContracts]);
+  const purchaseTotalPages = Math.ceil(purchaseTotal / pageSize);
+  const pagedPurchaseContracts = purchaseSort.sortedData;
+  const procurementOverview = {
+    activeContracts: ['DRAFT', 'SIGNED', 'PRODUCING', 'READY'].reduce((sum, status) => sum + (listSummary.statusCounts[status] ?? 0), 0),
+    producingContracts: listSummary.statusCounts.PRODUCING ?? 0,
+    shippedPendingReceipt: listSummary.statusCounts.SHIPPED ?? 0,
+    activeStores: listSummary.stores.length,
+  };
 
   // 筛选或每页条数变化时重置页码
   useEffect(() => {
@@ -345,7 +315,7 @@ export default function ContractsPageContent() {
   // 0. 初始化加载
   useEffect(() => {
     loadPurchaseContracts();
-  }, []);
+  }, [purchasePage, pageSize, purchaseStatusFilter, storeFilter, productSearch]);
 
   const currentTemplate = useMemo(
     () => templateItems.find((item) => item.exists) || templateItems[0] || null,
@@ -372,16 +342,22 @@ export default function ContractsPageContent() {
 
   // 1. 加载采购合同（带缓存，pageSize 降至 100 减少负载）
   const loadPurchaseContracts = async () => {
+    const request = ++purchaseRequest.current;
     setPurchaseLoading(true);
+    setPurchaseError(false);
     try {
-      const response = await cachedFetch('purchase-contracts-list', () =>
-        purchaseService.getAll({ page: 1, pageSize: 100 })
-      );
+      const params = { page: purchasePage, pageSize, status: purchaseStatusFilter !== 'ALL' ? purchaseStatusFilter : undefined, storeName: storeFilter && storeFilter !== 'ALL' ? storeFilter : undefined, productKeyword: productSearch.trim() || undefined };
+      const response = await cachedFetch(`purchase-contracts-list-${JSON.stringify(params)}`, () => purchaseService.getAll(params));
+      if (request !== purchaseRequest.current) return;
       setPurchaseContracts(response.data?.items || []);
+      setPurchaseTotal(response.data?.pagination?.total ?? 0);
+      if (response.data?.summary) setListSummary(response.data.summary);
     } catch {
+      if (request !== purchaseRequest.current) return;
+      setPurchaseError(true);
       toast.error('加载采购合同失败');
     } finally {
-      setPurchaseLoading(false);
+      if (request === purchaseRequest.current) setPurchaseLoading(false);
     }
   };
 
@@ -514,14 +490,8 @@ export default function ContractsPageContent() {
     setPurchaseDetail(null);
   };
 
-  const hasActiveFilters = purchaseStatusFilter !== 'ALL' || Boolean(storeFilter) || Boolean(productSearch);
-  const storeOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(purchaseContracts.filter((c) => c.storeName).map((c) => c.storeName!))
-      ).sort(),
-    [purchaseContracts]
-  );
+  const hasActiveFilters = purchaseStatusFilter !== 'ALL' || Boolean(storeFilter && storeFilter !== 'ALL') || Boolean(productSearch);
+  const storeOptions = [...listSummary.stores].sort();
 
   const resetFilters = () => {
     setPurchaseStatusFilter('ALL');
@@ -563,6 +533,7 @@ export default function ContractsPageContent() {
               <SelectItem value="SHIPPED">已发货</SelectItem>
               <SelectItem value="RECEIVED">已收货</SelectItem>
               <SelectItem value="COMPLETED">已完成</SelectItem>
+              <SelectItem value="CANCELLED">已取消</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -671,7 +642,7 @@ export default function ContractsPageContent() {
             variant="outline"
             className="rounded-full border-border/60 bg-background px-3 py-1 text-xs shadow-[0_1px_3px_rgba(0,0,0,0.05)]"
           >
-            当前活跃合同 {procurementOverview.activeContracts}
+            当前活跃合同 {purchaseError || purchaseLoading ? '—' : procurementOverview.activeContracts}
           </Badge>
         </div>
         <div className="grid grid-cols-2 gap-2 md:gap-3 xl:grid-cols-4">
@@ -680,7 +651,7 @@ export default function ContractsPageContent() {
               <div>
                 <p className="text-xs text-muted-foreground md:text-sm">待推进合同</p>
                 <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
-                  {procurementOverview.activeContracts}
+                  {purchaseError || purchaseLoading ? '—' : procurementOverview.activeContracts}
                 </p>
               </div>
               <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-primary/10">
@@ -693,7 +664,7 @@ export default function ContractsPageContent() {
               <div>
                 <p className="text-xs text-muted-foreground md:text-sm">生产中</p>
                 <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
-                  {procurementOverview.producingContracts}
+                  {purchaseError || purchaseLoading ? '—' : procurementOverview.producingContracts}
                 </p>
               </div>
               <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-amber-500/10">
@@ -706,7 +677,7 @@ export default function ContractsPageContent() {
               <div>
                 <p className="text-xs text-muted-foreground md:text-sm">已发货待收货</p>
                 <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
-                  {procurementOverview.shippedPendingReceipt}
+                  {purchaseError || purchaseLoading ? '—' : procurementOverview.shippedPendingReceipt}
                 </p>
               </div>
               <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-emerald-500/10">
@@ -719,7 +690,7 @@ export default function ContractsPageContent() {
               <div>
                 <p className="text-xs text-muted-foreground md:text-sm">合作店铺</p>
                 <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
-                  {procurementOverview.activeStores}
+                  {purchaseError || purchaseLoading ? '—' : procurementOverview.activeStores}
                 </p>
               </div>
               <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-sky-500/10">
@@ -772,7 +743,7 @@ export default function ContractsPageContent() {
 
         {/* 移动端卡片 */}
         <div className="grid gap-3 md:hidden">
-          {purchaseLoading ? (
+          {purchaseError ? (<ErrorState title="采购合同加载失败" action={<Button onClick={() => { invalidateCache('purchase-contracts-list'); void loadPurchaseContracts(); }}>重试</Button>} />) : purchaseLoading ? (
             <Card className="border-dashed border-border/70">
               <CardContent className="py-10 text-center text-sm text-muted-foreground">
                 加载中...
@@ -856,14 +827,14 @@ export default function ContractsPageContent() {
 
         {/* 桌面端表格视图 */}
         <div className="hidden overflow-hidden rounded-xl border border-border/40 bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] md:block">
-          {purchaseLoading ? (
+          {purchaseError ? (<ErrorState title="采购合同加载失败" action={<Button onClick={() => { invalidateCache('purchase-contracts-list'); void loadPurchaseContracts(); }}>重试</Button>} />) : purchaseLoading ? (
             <div className="py-12 text-center text-sm text-muted-foreground">加载中...</div>
           ) : pagedPurchaseContracts.length === 0 ? (
             <div className="py-12">
               <EmptyState
                 icon={<ShoppingCart className="h-8 w-8" />}
-                title="暂无采购合同"
-                description="还没有创建任何采购合同，点击下方的按钮开始创建"
+                title={hasActiveFilters ? '没有符合筛选条件的合同' : '暂无采购合同'}
+                description={hasActiveFilters ? '请调整或清空筛选后重试' : '还没有创建任何采购合同，点击下方的按钮开始创建'}
                 action={{ label: '新建采购合同', onClick: () => router.push('/dashboard/purchase/create') }}
               />
             </div>
@@ -1015,7 +986,7 @@ export default function ContractsPageContent() {
         {purchaseTotalPages > 0 && (
           <div className="flex flex-col gap-3 py-2 md:flex-row md:items-center md:justify-between">
             <div className="text-sm text-muted-foreground">
-              共 {filteredPurchaseContracts.length} 条
+              共 {purchaseTotal} 条（表列排序仅当前页）
               {purchaseTotalPages > 1 && `，第 ${purchasePage}/${purchaseTotalPages} 页`}
             </div>
             <div className="flex flex-wrap items-center gap-2">
