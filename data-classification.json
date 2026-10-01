@@ -31,7 +31,8 @@
           "Contract artifact and SQLite backup directories use 0700 and files use 0600",
           "Legacy procurement attachment handlers reuse fileService permission enforcement and resolve downloads against UPLOAD_DIR",
           "Carrier packing-list raw extracted text is not persisted; structured check records retain their original file reference",
-          "HTTP request logs retain route, timing, and request shape only; request/query values, AI prompts, tool schemas, and user messages are excluded"
+          "HTTP request logs retain route, timing, and request shape only; request/query values, AI prompts, tool schemas, and user messages are excluded",
+          "VPS runtime migration backups keep private environment files and SQLite snapshots in 0700 directories with 0600 files; deployment verification never prints process environments or credentials"
         ],
         "transfer": [
           "Encrypt in transit (TLS)",
@@ -42,7 +43,8 @@
       "paths": [
         "backend/.env",
         "backend/src/config/index.js",
-        "backend/uploads/"
+        "backend/uploads/",
+        "/opt/jiesong_system/deploy-backups/"
       ]
     },
     {

@@ -1,5 +1,17 @@
 # 捷淞系统 线上部署指南
 
+## 当前 VPS 部署
+
+公网入口为 `https://celerada.link`（`www.celerada.link` 同样支持 HTTPS）。Nginx 将页面代理到 3002、API 代理到 3001。
+
+Git 构建目录为 `/opt/jiesong-system`。PM2 的 `jiesong-backend` 和 `jiesong-frontend` 必须分别使用该目录内的 `backend`、`frontend`，不能继续指向 `/opt/jiesong_system/releases/` 中的旧代码。PM2 重启不会自动纠正旧脚本路径；首次切换需要备份配置、使用正确路径重新创建这两个进程，并保留回滚配置。
+
+生产数据库和附件沿用 `/opt/jiesong_system/current/backend/` 下既有数据位置，环境配置中的 DATABASE_URL 与 UPLOAD_DIR 使用绝对路径。迁移时复制现用的私密配置并设为 0600，不使用构建目录里另一份数据库代替生产数据；先创建一致的数据库备份。
+
+每次发布后执行 `node scripts/verify-vps-runtime.cjs https://celerada.link`。它核对 PM2 运行目录、后端健康、公网登录页 BUILD_ID、手机缩放和 API 认证边界；GitHub Actions 已调用此检查。首次切换还应从 VPS 核对根域名及 www 的 DNS、HTTPS 证书、HTTP 跳转，再在手机尺寸下检查公网登录页。
+
+以下保留其他部署方案供参考。
+
 ## 方案概览
 
 提供三套部署方案，按推荐优先级排序：
