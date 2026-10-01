@@ -143,7 +143,7 @@ describe('ContractsPage 交互逻辑', () => {
     render(<ContractsPage />);
 
     expect(await screen.findByRole('button', { name: '筛选与搜索' })).toBeInTheDocument();
-    expect(screen.getAllByText('CG2500001').length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('CG2500001')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('上海店').length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: '查看 CG2500001 详情' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: '为 CG2500001 生成购销合同' }).length).toBeGreaterThan(0);
