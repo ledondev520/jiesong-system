@@ -26,6 +26,7 @@ const mockToastError = vi.fn();
 const mockExportPdf = vi.fn();
 const mockExportExcel = vi.fn();
 const mockUpdateSalesStatus = vi.fn();
+const mockForexRender = vi.fn();
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react');
@@ -113,6 +114,16 @@ vi.mock('@/components/dialog/ExportPacketWorkbenchDialog', () => ({
   ),
 }));
 
+vi.mock('./components/SalesFinancePanel', () => ({
+  SalesFinancePanel: () => <div>单柜财务测试面板</div>,
+}));
+vi.mock('@/components/finance/ForexVerificationPanel', () => ({
+  ForexVerificationPanel: ({ salesContractId }: { salesContractId: string }) => {
+    mockForexRender(salesContractId);
+    return <div>合同核销跟进测试面板</div>;
+  },
+}));
+
 describe('SalesDetailPage 交互逻辑', () => {
   beforeEach(() => {
     mockIsMobile.mockReturnValue(false);
@@ -126,6 +137,7 @@ describe('SalesDetailPage 交互逻辑', () => {
     mockExportPdf.mockReset();
     mockExportExcel.mockReset();
     mockUpdateSalesStatus.mockReset();
+    mockForexRender.mockReset();
     mockApiGet.mockResolvedValue({ data: [] });
   });
 
@@ -490,4 +502,19 @@ describe('SalesDetailPage 交互逻辑', () => {
     expect(screen.getByRole('spinbutton', { name: '体积' })).toBeDisabled();
     expect(screen.getByRole('spinbutton', { name: '单价' })).toBeEnabled();
   });
+  it('核销跟进只在财务标签加载并绑定当前合同', async () => {
+    mockGetById.mockResolvedValue({ data: {
+      id: 's-1', contractNo: 'EXP-TEST', status: 'DRAFT', totalBoxes: 0,
+      volume: 0, grossWeight: 0, totalAmount: 0, packingItems: [], port: { name: '测试港' },
+    } });
+    const user = userEvent.setup();
+    renderPage('s-1');
+    await screen.findByRole('heading', { name: 'EXP-TEST' });
+    expect(mockForexRender).not.toHaveBeenCalled();
+    expect(screen.queryByText('合同核销跟进测试面板')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: '财务结算' }));
+    expect(await screen.findByText('合同核销跟进测试面板')).toBeInTheDocument();
+    expect(mockForexRender).toHaveBeenCalledWith('s-1');
+  });
+
 });

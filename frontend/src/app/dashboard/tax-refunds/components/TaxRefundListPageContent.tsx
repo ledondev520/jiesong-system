@@ -16,7 +16,9 @@ import { Search, ReceiptText, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TaxRefund } from '@/types';
 import { taxRefundService } from '@/services/taxRefund.service';
-import { cachedFetch } from '@/lib/api-cache';
+import { ErrorState } from '@/components/ui/data-state';
+import { clearApiGetCache } from '@/lib/axios';
+import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
 import { Button } from '@/components/ui/button';
@@ -51,29 +53,35 @@ export function TaxRefundListPageContent() {
   const [taxRefunds, setTaxRefunds] = useState<TaxRefund[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingDrafts, setGeneratingDrafts] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loadError, setLoadError] = useState(false);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const deferredKeyword = useDeferredValue(keyword);
 
   const loadTaxRefunds = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
-      const cacheKey = `tax-refunds-${deferredKeyword}-${status}-${pageSize}`;
+      const cacheKey = `tax-refunds-${deferredKeyword}-${status}-${pageSize}-${page}`;
       const response = await cachedFetch(
         cacheKey,
         () => taxRefundService.getAll({
-          page: 1,
+          page,
           pageSize,
           keyword: deferredKeyword || undefined,
           status: status === 'ALL' ? undefined : status,
         }),
       );
       setTaxRefunds(response?.data?.items || []);
+      setTotal(response?.data?.pagination?.total ?? 0);
     } catch {
+      setLoadError(true);
       toast.error('加载退税记录失败');
     } finally {
       setLoading(false);
     }
-  }, [deferredKeyword, status, pageSize]);
+  }, [deferredKeyword, status, pageSize, page]);
 
   useEffect(() => {
     if (activeView !== 'refunds') {
@@ -150,13 +158,13 @@ export function TaxRefundListPageContent() {
               <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
               <Input
                 value={keyword}
-                onChange={(event) => setKeyword(event.target.value)}
+                onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
                 placeholder="搜索退税单号、备注..."
                 className="h-11 rounded-xl border-border/70 bg-background/70 pl-10"
               />
             </div>
 
-            <Select value={status} onValueChange={setStatus}>
+            <Select value={status} onValueChange={(value) => { setStatus(value); setPage(1); }}>
               <SelectTrigger className="h-11 w-40 rounded-xl">
                 <SelectValue placeholder="全部状态" />
               </SelectTrigger>
@@ -244,7 +252,7 @@ export function TaxRefundListPageContent() {
       <div className="space-y-3 md:hidden">
         {loading ? (
           <div className="surface-panel py-10 text-center text-sm text-muted-foreground">加载中...</div>
-        ) : taxRefunds.length === 0 ? (
+        ) : loadError ? (<p className="py-8 text-center text-destructive">读取失败，请使用下方重试</p>) : taxRefunds.length === 0 ? (
           <div className="surface-panel py-10 text-center text-sm text-muted-foreground">暂无退税记录</div>
         ) : (
           sort.sortedData.map((taxRefund) => (
@@ -336,7 +344,7 @@ export function TaxRefundListPageContent() {
                     加载中...
                   </TableCell>
                 </TableRow>
-              ) : taxRefunds.length === 0 ? (
+              ) : loadError ? (<TableRow><TableCell colSpan={8} className="py-8 text-center text-destructive">读取失败，请重试</TableCell></TableRow>) : taxRefunds.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="py-14 text-center text-muted-foreground">
                     暂无退税记录。
@@ -372,11 +380,17 @@ export function TaxRefundListPageContent() {
         </CardContent>
       </Card>
 
+      {loadError && <ErrorState title="退税记录读取失败" action={<Button variant="outline" onClick={() => { clearApiGetCache(); invalidateCache('tax-refunds-'); void loadTaxRefunds(); }}>重试</Button>} />}
+      <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        <span>共 {total} 条，第 {page} 页</span>
+        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button>
+        <Button variant="outline" size="sm" disabled={page * pageSize >= total} onClick={() => setPage(page + 1)}>下一页</Button>
+      </div>
       <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-        <span>已退金额合计：{totalRefunded.toLocaleString()}</span>
+        <span>本页已退金额合计：{loadError ? '—' : totalRefunded.toLocaleString()}</span>
         <PageSizeSelect
           value={pageSize}
-          onChange={(size) => setPageSize(size)}
+          onChange={(size) => { setPageSize(size); setPage(1); }}
         />
       </div>
         </TabsContent>

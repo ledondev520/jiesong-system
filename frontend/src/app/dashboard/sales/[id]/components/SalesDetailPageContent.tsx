@@ -1,6 +1,6 @@
 /**
  * Input: 出口合同详情、采购来源、40HQ 排柜、单证核对、退税准备与单柜财务 Interface
- * Output: 含手机装箱明细卡片的排柜/发运、出口三单、申报单证、船司核对、退税材料和财务结算的专项单主页面
+ * Output: 含手机装箱明细卡片的排柜/发运、出口三单、申报单证、船司核对、退税材料、财务结算与核销跟进的专项单主页面
  * Pos: 出口专项单装柜主页面，复用采购完工资料并承载排柜到发运的唯一主线路
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -97,6 +97,11 @@ const ImportPurchaseItemsDialog = lazy(() =>
 const SalesFinancePanel = lazy(() =>
   import('./SalesFinancePanel').then((module) => ({
     default: module.SalesFinancePanel,
+  })),
+);
+const ForexVerificationPanel = lazy(() =>
+  import('@/components/finance/ForexVerificationPanel').then((module) => ({
+    default: module.ForexVerificationPanel,
   })),
 );
 import { ContractInfoEditor } from '@/components/sales/ContractInfoEditor';
@@ -1289,7 +1294,7 @@ export default function SalesDetailPage({ params }: PageProps) {
         </TabsContent>
 
         {/* 单柜财务结算：仅进入标签时加载，避免阻塞装柜首屏。 */}
-        <TabsContent value="finance">
+        <TabsContent value="finance" className="space-y-4">
           {activeTab === 'finance' && (
             <Suspense fallback={<div className="py-10 text-center text-sm text-muted-foreground">正在汇总财务数据...</div>}>
               <SalesFinancePanel
@@ -1297,6 +1302,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                 contractNo={contract.contractNo}
                 onChanged={loadData}
               />
+              <ForexVerificationPanel salesContractId={contract.id} />
             </Suspense>
           )}
         </TabsContent>

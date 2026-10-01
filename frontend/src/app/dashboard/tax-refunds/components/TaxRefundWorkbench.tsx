@@ -27,6 +27,9 @@ import {
   type TaxRefundWorkbenchItem,
   type TaxRefundWorkbenchStage,
 } from '@/services/taxRefund.service';
+import { PageSizeSelect } from '@/components/ui/page-size-select';
+import { ErrorState } from '@/components/ui/data-state';
+import { clearApiGetCache } from '@/lib/axios';
 import { InvoiceVerificationDialog } from './InvoiceVerificationDialog';
 
 const stageMeta: Record<Exclude<TaxRefundWorkbenchStage, 'ALL'>, { label: string; className: string }> = {
@@ -53,6 +56,9 @@ export function TaxRefundWorkbench() {
   const [data, setData] = useState<WorkbenchData | null>(null);
   const [loading, setLoading] = useState(true);
   const [keyword, setKeyword] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [loadError, setLoadError] = useState(false);
   const [stage, setStage] = useState<TaxRefundWorkbenchStage>('ALL');
   const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -63,20 +69,22 @@ export function TaxRefundWorkbench() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const response = await taxRefundService.getWorkbench({
-        page: 1,
-        pageSize: 100,
+        page,
+        pageSize,
         keyword: keyword || undefined,
         stage,
       });
       setData(response.data);
     } catch {
+      setLoadError(true);
       toast.error('出口退税工作台加载失败');
     } finally {
       setLoading(false);
     }
-  }, [keyword, stage]);
+  }, [keyword, stage, page, pageSize]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -117,7 +125,7 @@ export function TaxRefundWorkbench() {
     setVerificationOpen(true);
   };
 
-  const summary = data?.summary;
+  const summary = loadError ? undefined : data?.summary;
   return (
     <div className="space-y-5">
       <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-background">
@@ -133,8 +141,8 @@ export function TaxRefundWorkbench() {
             <Button variant="outline" onClick={() => void handleGenerateDrafts()} disabled={generating}>
               {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileCheck2 className="mr-2 h-4 w-4" />}生成退税草稿
             </Button>
-            <Button onClick={() => void handleExport()} disabled={exporting || !summary?.readyToExport}>
-              {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}生成申报明细
+            <Button onClick={() => void handleExport()} disabled={exporting || !data?.items.some((item) => item.ready && item.taxRefund)}>
+              {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}生成本页申报明细
             </Button>
           </div>
         </CardHeader>
@@ -154,18 +162,25 @@ export function TaxRefundWorkbench() {
       </Card>
 
       <div className="flex flex-wrap gap-2">
-        <Input className="max-w-sm" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索 EXP、报关单号、退税单号或问题" />
-        <Select value={stage} onValueChange={(value) => setStage(value as TaxRefundWorkbenchStage)}>
+        <Input className="max-w-sm" value={keyword} onChange={(event) => { setKeyword(event.target.value); setPage(1); }} placeholder="搜索 EXP、报关单号、退税单号或问题" />
+        <Select value={stage} onValueChange={(value) => { setStage(value as TaxRefundWorkbenchStage); setPage(1); }}>
           <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
           <SelectContent>{stageOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
         </Select>
-        {(keyword || stage !== 'ALL') && <Button variant="ghost" onClick={() => { setKeyword(''); setStage('ALL'); }}>重置</Button>}
+        {(keyword || stage !== 'ALL') && <Button variant="ghost" onClick={() => { setKeyword(''); setStage('ALL'); setPage(1); }}>重置</Button>}
       </div>
 
+      {loadError && <ErrorState title="退税工作台读取失败" action={<Button variant="outline" onClick={() => { clearApiGetCache(); void load(); }}>重试</Button>} />}
+      <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        <span>共 {data?.total ?? 0} 条，第 {page} 页</span>
+        <PageSizeSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} />
+        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button>
+        <Button variant="outline" size="sm" disabled={page * pageSize >= (data?.total ?? 0)} onClick={() => setPage(page + 1)}>下一页</Button>
+      </div>
       <div className="space-y-3 md:hidden">
         {loading ? (
           <p className="py-10 text-center text-sm text-muted-foreground">加载中...</p>
-        ) : !data?.items.length ? (
+        ) : loadError ? (<p className="py-8 text-center text-destructive">读取失败，请使用上方重试</p>) : !data?.items.length ? (
           <p className="py-10 text-center text-sm text-muted-foreground">当前没有符合条件的待退税出口</p>
         ) : data.items.map((item) => (
           <MobileListCard
@@ -204,7 +219,7 @@ export function TaxRefundWorkbench() {
               <TableBody>
                 {loading ? (
                   <TableRow><TableCell colSpan={7} className="py-14 text-center text-muted-foreground"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />加载中...</TableCell></TableRow>
-                ) : !data?.items.length ? (
+                ) : loadError ? (<TableRow><TableCell colSpan={7} className="py-8 text-center text-destructive">读取失败，请重试</TableCell></TableRow>) : !data?.items.length ? (
                   <TableRow><TableCell colSpan={7} className="py-14 text-center text-muted-foreground">当前没有符合条件的待退税出口</TableCell></TableRow>
                 ) : data.items.map((item) => (
                   <TableRow key={item.salesContractId}>

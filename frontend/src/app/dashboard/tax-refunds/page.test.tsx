@@ -215,7 +215,7 @@ describe('TaxRefundsDashboardPage 交互逻辑', () => {
     expect(await screen.findByRole('heading', { name: '出口退税工作台' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '导入进项发票' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '生成退税草稿' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '生成申报明细' })).toBeDisabled();
-    await waitFor(() => expect(mockGetWorkbench).toHaveBeenCalledWith({ page: 1, pageSize: 100, keyword: undefined, stage: 'ALL' }));
+    expect(screen.getByRole('button', { name: '生成本页申报明细' })).toBeDisabled();
+    await waitFor(() => expect(mockGetWorkbench).toHaveBeenCalledWith({ page: 1, pageSize: 20, keyword: undefined, stage: 'ALL' }));
   });
 });

@@ -10,6 +10,7 @@ export type CustomsDeclarationListQuery = {
   pageSize?: number;
   keyword?: string;
   status?: string;
+  salesContractId?: string;
 };
 
 export type CustomsDeclarationItemInput = Omit<CustomsDeclarationItem, 'id'>;

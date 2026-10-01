@@ -6,7 +6,7 @@
 
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { FilePenLine } from 'lucide-react';
 import { toast } from 'sonner';
@@ -16,6 +16,9 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ForexVerificationPanel } from '@/components/finance/ForexVerificationPanel';
+import { ErrorState } from '@/components/ui/data-state';
+import { clearApiGetCache } from '@/lib/axios';
 import { TaxRefundStatusBadge } from './TaxRefundStatusBadge';
 
 interface TaxRefundDetailPageContentProps {
@@ -25,7 +28,6 @@ interface TaxRefundDetailPageContentProps {
 const detailFields = (taxRefund: TaxRefund) => [
   { label: '出口合同 ID', value: taxRefund.salesContractId },
   { label: '报关单 ID', value: taxRefund.customsDeclarationId },
-  { label: '核销记录 ID', value: taxRefund.forexVerificationId || '-' },
   { label: '申请日期', value: taxRefund.appliedAt },
   { label: '到账日期', value: taxRefund.refundedAt || '-' },
 ];
@@ -35,26 +37,28 @@ export function TaxRefundDetailPageContent({ params }: TaxRefundDetailPageConten
   const router = useRouter();
   const [taxRefund, setTaxRefund] = useState<TaxRefund | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    const loadTaxRefund = async () => {
+  const loadTaxRefund = useCallback(async () => {
       setLoading(true);
+      setError(false);
       try {
         const response = await taxRefundService.getById(id);
         setTaxRefund(response?.data || null);
       } catch {
+        setError(true);
         toast.error('加载退税详情失败');
       } finally {
         setLoading(false);
       }
-    };
-
-    void loadTaxRefund();
   }, [id]);
+  useEffect(() => { void loadTaxRefund(); }, [loadTaxRefund]);
 
   if (loading) {
     return <div className="py-14 text-center text-muted-foreground">加载中...</div>;
   }
+
+  if (error) return <ErrorState title="退税详情读取失败" action={<Button onClick={() => { clearApiGetCache(); void loadTaxRefund(); }}>重试</Button>} />;
 
   if (!taxRefund) {
     return <div className="py-14 text-center text-muted-foreground">退税记录不存在</div>;
@@ -99,6 +103,7 @@ export function TaxRefundDetailPageContent({ params }: TaxRefundDetailPageConten
         </Card>
       </div>
 
+      <ForexVerificationPanel salesContractId={taxRefund.salesContractId} />
       <Card className="surface-panel">
         <CardHeader>
           <CardTitle>单证关联</CardTitle>

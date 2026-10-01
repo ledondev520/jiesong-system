@@ -44,6 +44,10 @@ vi.mock('@/services/taxRefund.service', () => ({
   },
 }));
 
+vi.mock('@/services/sales.service', () => ({ salesService: { getAll: async () => ({ data: { items: [] } }) } }));
+vi.mock('@/services/customsDeclaration.service', () => ({ customsDeclarationService: { getAll: async () => ({ data: { items: [] } }) } }));
+vi.mock('@/services/forexVerification.service', () => ({ forexVerificationService: { getAll: async () => ({ data: { items: [], pagination: { total: 0 } } }) } }));
+
 vi.mock('sonner', () => ({
   toast: {
     error: (...args: unknown[]) => mockToastError(...args),
