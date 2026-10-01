@@ -368,7 +368,6 @@ router.post(
     } else {
       const cached = aiCache.get(keyword);
       if (cached) {
-        await aiCache.simulateDelay();
         return success(res, cached);
       }
     }

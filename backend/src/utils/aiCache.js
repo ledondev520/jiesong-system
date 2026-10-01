@@ -1,7 +1,7 @@
 /**
  * Input: 缓存文件路径、TTL 配置
  * Output: 内存 + 文件持久化的 AI 结果缓存工具
- * Pos: 工具层，为 AI 推荐接口提供透明缓存，节省 API 成本
+ * Pos: 工具层，为 AI 推荐接口提供直接返回的缓存，节省 API 成本与等待
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -130,15 +130,6 @@ function remove(query) {
   }
 }
 
-/**
- * 职责：模拟 AI 思考延迟，使缓存命中对用户透明
- * @returns {Promise<void>}
- */
-function simulateDelay() {
-  const delay = 400 + Math.random() * 600;
-  return new Promise((resolve) => setTimeout(resolve, delay));
-}
-
 loadFromDisk();
 
-module.exports = { get, set, remove, simulateDelay };
+module.exports = { get, set, remove };
