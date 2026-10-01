@@ -5,6 +5,7 @@
  */
 
 const prisma = require('../utils/prisma');
+const { createError } = require('../middleware/errorHandler');
 const { evaluateShipmentReadiness } = require('./shipmentReadinessService');
 const { normalizePurchaseStatus, PURCHASE_STATUS } = require('./purchaseStateMachine');
 const { normalizeSalesStatus, SALES_STATUS } = require('./salesStateMachine');
@@ -330,11 +331,13 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   };
 };
 
-const listTradeWorkflows = async ({ limit = 20 } = {}) => {
-  const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 100));
+const listTradeWorkflows = async ({ limit = 20, scope = 'recent' } = {}) => {
+  const safeLimit = Math.max(1, Math.min(Math.floor(Number(limit)) || 20, 100));
+  if (!['recent', 'pending', 'blocked', 'risk'].includes(scope)) throw createError('专项单范围无效', 400);
+  // ponytail: 非最近范围全量计算以免漏历史风险；数据规模增大后再持久化阶段并分页。
   const salesContracts = await prisma.salesContract.findMany({
     where: { status: { not: SALES_STATUS.CANCELLED } },
-    take: safeLimit,
+    ...(scope === 'recent' ? { take: safeLimit } : {}),
     orderBy: [{ updatedAt: 'desc' }, { contractNo: 'desc' }],
     include: {
       packingItems: { include: { product: true } },
@@ -369,7 +372,14 @@ const listTradeWorkflows = async ({ limit = 20 } = {}) => {
     purchaseMap.set(contract.contractNo.replace(/^CG/, 'PO'), contract);
   });
 
-  return salesContracts.map((contract) => buildTradeWorkflow(contract, purchaseMap));
+  let workflows = salesContracts.map((contract) => buildTradeWorkflow(contract, purchaseMap));
+  if (scope === 'pending') workflows = workflows.filter((item) => item.completedStageCount < item.stageCount);
+  if (scope === 'blocked') workflows = workflows.filter((item) => item.stages.some((stage) => stage.status === 'blocked'));
+  if (scope === 'risk') workflows.sort((a, b) => {
+    const weight = (item) => item.stages.filter((stage) => stage.status === 'blocked').length * 100 + item.issues.length;
+    return weight(b) - weight(a);
+  });
+  return workflows.slice(0, safeLimit);
 };
 
 module.exports = {

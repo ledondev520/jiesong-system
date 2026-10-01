@@ -171,6 +171,18 @@ describe('DashboardPage 交互逻辑', () => {
     expect(screen.queryByText('2025年1账期')).not.toBeInTheDocument();
   });
 
+  it('资金与账期失败分别显示读取失败并可重试，不回退到零或未上传', async () => {
+    mockGetDashboardAnalytics.mockRejectedValueOnce(new Error('offline'));
+    mockListStatements.mockRejectedValueOnce(new Error('offline'));
+    render(<DashboardPage />);
+    expect(await screen.findByText('资金读取失败')).toBeInTheDocument();
+    expect(await screen.findByText('账期读取失败')).toBeInTheDocument();
+    expect(screen.queryByText('$0')).not.toBeInTheDocument();
+    expect(screen.queryByText('未上传')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '重试资金' }));
+    expect(await screen.findByText('$3,000')).toBeInTheDocument();
+  });
+
   it('首页只给出该专项单的唯一下一动作', async () => {
     const user = userEvent.setup();
     render(<DashboardPage />);

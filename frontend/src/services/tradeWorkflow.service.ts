@@ -60,9 +60,9 @@ export interface TradeWorkflow {
 
 export const tradeWorkflowService = {
   syncStatus: () => api.get<ApiResponse<WpsSyncStatus>, ApiResponse<WpsSyncStatus>>('/dashboard/wps-sync'),
-  list: (limit = 6) => api.get<ApiResponse<TradeWorkflow[]>, ApiResponse<TradeWorkflow[]>>(
+  list: (limit = 6, scope: 'recent' | 'pending' | 'blocked' | 'risk' = 'recent') => api.get<ApiResponse<TradeWorkflow[]>, ApiResponse<TradeWorkflow[]>>(
     '/dashboard/trade-workflows',
-    { params: { limit } },
+    { params: { limit, scope } },
   ),
 };
 

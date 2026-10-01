@@ -266,3 +266,26 @@ test('采购备注不是丢失合同；已有合同仍需明确采购明细分�
   const assigned = buildTradeWorkflow({ ...baseSales, packingItems: [{ ...baseSales.packingItems[0], purchaseItemId: 'pi-1' }] }, map);
   assert(!assigned.issues.some(x => x.startsWith('采购明细待分配')));
 });
+
+test('待处理/阻塞/风险范围从全量合同筛选后限量，避免先取最近6笔漏历史风险', async () => {
+  const prisma = require('../utils/prisma');
+  const { listTradeWorkflows } = require('./tradeWorkflowService');
+  const originalSales = prisma.salesContract.findMany;
+  const originalPurchase = prisma.purchaseContract.findMany;
+  const calls = [];
+  prisma.salesContract.findMany = async (args) => {
+    calls.push(args);
+    return [{ ...baseSales, id: 'older-risk', grossWeight: 23000 }, { ...baseSales, id: 'newer', status: 'SHIPPED', packingItems: [] }];
+  };
+  prisma.purchaseContract.findMany = async () => [basePurchase];
+  try {
+    const risk = await listTradeWorkflows({ limit: 1, scope: 'risk' });
+    assert.equal(calls[0].take, undefined); assert.equal(risk[0].id, 'older-risk');
+    const blocked = await listTradeWorkflows({ limit: 1, scope: 'blocked' });
+    assert.ok(blocked[0].stages.some((stage) => stage.status === 'blocked'));
+    const pending = await listTradeWorkflows({ limit: 1, scope: 'pending' });
+    assert.ok(pending[0].completedStageCount < pending[0].stageCount);
+    await listTradeWorkflows({ limit: 6, scope: 'recent' });
+    assert.equal(calls.at(-1).take, 6);
+  } finally { prisma.salesContract.findMany = originalSales; prisma.purchaseContract.findMany = originalPurchase; }
+});

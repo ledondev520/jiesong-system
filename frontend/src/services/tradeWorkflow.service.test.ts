@@ -26,7 +26,7 @@ describe('tradeWorkflowService', () => {
     await expect(tradeWorkflowService.list(6)).resolves.toEqual(response);
 
     expect(api.get).toHaveBeenCalledWith('/dashboard/trade-workflows', {
-      params: { limit: 6 },
+      params: { limit: 6, scope: 'recent' },
     });
   });
 });

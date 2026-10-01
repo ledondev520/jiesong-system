@@ -200,6 +200,7 @@ export interface AiAgentToolRegistryResponse {
 }
 
 export interface DashboardAnalytics {
+  alerts?: { draftPurchases: number; exportPendingParams: number };
   contracts: {
     purchase: { count: number; totalAmount: number; paidAmount: number; unpaidAmount: number };
     sales: { count: number; totalAmount: number; receivedAmount: number; receivable: number };

@@ -75,6 +75,13 @@ describe('TradeWorkflowBoard', () => {
     expect(mockPush).toHaveBeenCalledWith('/dashboard/sales/sc-1');
   });
 
+  it('风险长文本局部允许折行，不继承短状态徽标的不换行约束', () => {
+    render(<TradeWorkflowBoard workflows={[{ ...workflow, issues: ['长风险说明'.repeat(40)] }]} scope="risk" />);
+    const risk = screen.getByText('长风险说明'.repeat(40));
+    expect(risk).toHaveClass('whitespace-normal', 'max-w-full', 'min-w-0');
+    expect(screen.getByText(/全量主线路中按阻塞和风险优先的6笔/)).toBeInTheDocument();
+  });
+
   it('无专项单时给出创建出口专项单的明确入口', async () => {
     const user = userEvent.setup();
     render(<TradeWorkflowBoard workflows={[]} />);

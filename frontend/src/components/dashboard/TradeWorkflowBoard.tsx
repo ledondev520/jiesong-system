@@ -27,6 +27,7 @@ type Props = {
   workflows: TradeWorkflow[];
   loading?: boolean;
   unavailable?: boolean;
+  scope?: 'recent' | 'pending' | 'blocked' | 'risk';
 };
 
 const stagePresentation: Record<TradeWorkflowStageStatus, {
@@ -66,7 +67,7 @@ function WorkflowCard({ workflow }: { workflow: TradeWorkflow }) {
     : 0;
 
   return (
-    <article className="rounded-lg border border-border/70 bg-background p-4 shadow-sm">
+    <article className="min-w-0 rounded-lg border border-border/70 bg-background p-4 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -147,10 +148,10 @@ function WorkflowCard({ workflow }: { workflow: TradeWorkflow }) {
         )}
 
         {workflow.issues.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1.5 text-xs text-destructive" aria-label="数据风险">
+          <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5 text-xs text-destructive" aria-label="数据风险">
             <AlertTriangle className="h-3.5 w-3.5" />
             {workflow.issues.map((issue) => (
-              <Badge key={issue} variant="destructive" className="font-normal">{issue}</Badge>
+              <Badge key={issue} variant="destructive" className="min-w-0 max-w-full shrink whitespace-normal break-all text-left font-normal">{issue}</Badge>
             ))}
           </div>
         ) : null}
@@ -159,7 +160,7 @@ function WorkflowCard({ workflow }: { workflow: TradeWorkflow }) {
   );
 }
 
-export function TradeWorkflowBoard({ workflows, loading = false, unavailable = false }: Props) {
+export function TradeWorkflowBoard({ workflows, loading = false, unavailable = false, scope = 'recent' }: Props) {
   const router = useRouter();
 
   return (
@@ -172,7 +173,7 @@ export function TradeWorkflowBoard({ workflows, loading = false, unavailable = f
               出口专项单主线路
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              每张卡片对应一笔出口专项单；只执行卡片上的下一步。
+              {({ recent: '最近更新的6笔单，覆盖未取消合同', pending: '全量未完成主线路中最近更新的6笔', blocked: '全量阻塞主线路中最近更新的6笔', risk: '全量主线路中按阻塞和风险优先的6笔' })[scope]}；更多单据请查看全部。
             </p>
           </div>
           {workflows.length > 0 ? (
