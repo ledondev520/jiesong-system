@@ -638,7 +638,7 @@ function PaymentsPageContent() {
               {bankStats && !auxiliaryError ? `¥${fmtCny(bankStats.totalIn)}` : '—'}
             </div>
             <p className="text-xs text-muted-foreground">
-              {incomingData ? `${incomingData.items.length} 家付款方` : '加载中...'}
+              {incomingData ? `${incomingData.items.length} 家付款方` : '切换应收账款查看'}
             </p>
           </CardContent>
         </Card>

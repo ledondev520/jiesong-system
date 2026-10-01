@@ -69,3 +69,5 @@
 - `backend/src/services/customsDeclarationDraftService.js` replaces only DRAFT records atomically while retaining identity; released declarations fail with 409 instead of being deleted. Shipment allocation in `inventorySnapshot.js` uses owned packing rows and their purchase/unit provenance. `taxRefundShipmentService.js` excludes technical creation/update timestamps from confirmation versions while retaining business facts and evidence.
 
 - `backend/src/services/openAgentService.js` inspects SDK query termination for both normal and streamed requests. Upstream errors propagate as 503/SSE error before success persistence; the SDK prompt convenience method drops the failure subtype and must not be used here.
+
+- `frontend/src/lib/api-base-url.ts` and `frontend/next.config.ts` share base-address parsing so login/AI requests and protected file downloads reach the same API. Bare backend origins gain `/api/v1`; explicit API paths remain intact. Existing environment values and credentials are unchanged.

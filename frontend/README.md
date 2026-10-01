@@ -72,7 +72,7 @@ npm run test:e2e
 ## 登录与联调排查
 
 - 管理员账号：`admin`，密码来自 `backend/.env` 的 `DEFAULT_ADMIN_PASSWORD`
-- 前端 API 默认走 `/api/v1`，由 Next.js 代理到 `http://localhost:3000/api/v1`
+- 前端 API 默认走 `/api/v1`，由 Next.js 代理到 `http://localhost:3001/api/v1`
 - 出现登录 `500` 时，优先确认后端 `backend` 服务是否已启动（`cd backend && npm run dev`）
 - 主题支持白天/夜间模式切换（Header 右上角主题按钮）
 
@@ -101,3 +101,5 @@ npm run test:e2e
 采购详情将生产资料保存与完工登记合并为一次操作，已签约合同可直接登记供应商完工报告；缺项仍可先保存。已确认出口合同添加装箱资料后自动进入装柜，采购收货及销售到港后的结清由收付款事实推导，无需再点完成。收货、发运、到港仍登记实际事实，后续库存自动联动。
 
 AI 创建内部采购、报关、核销和退税草稿按用户请求直接执行；执行成功后不再显示待确认卡片，实际付款及实物状态保留一次确认。只读诊断建议不会自动执行；草稿不代表签约、出入库或官方申报。
+
+`src/lib/api-base-url.ts` 同时用于客户端与 Next 文件代理：`NEXT_PUBLIC_API_BASE_URL` 支持裸后端 origin 或完整 `/api/v1` 地址，兼容 `NEXT_PUBLIC_API_URL`；显式自定义 API 路径保留。收付页未读取应收汇总时提示切换应收页签，避免显示永久加载。

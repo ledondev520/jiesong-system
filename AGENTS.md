@@ -102,3 +102,5 @@
 - 报关自动生成只允许原子替换 DRAFT，保留单据 ID 与编号；已放行等业务状态必须拒绝替换（`backend/src/services/customsDeclarationDraftService.js`）。出货按自有装箱行与采购来源扣减合格库存，重复保存相同业务资料不使退税确认失效。
 
 - Agent 普通与流式入口必须检查 SDK query 的终止结果（`backend/src/services/openAgentService.js`）；上游错误返回 503/SSE error，不写入成功回放，不自动重试。
+
+- `frontend/src/lib/api-base-url.ts` 统一普通请求与 Next 代理地址：裸后端 origin 自动添加 `/api/v1`，完整 API 路径和显式自定义路径保持不重复拼接；不修改实际部署环境值。
