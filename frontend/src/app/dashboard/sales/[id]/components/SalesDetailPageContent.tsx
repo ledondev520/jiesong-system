@@ -1,6 +1,6 @@
 /**
  * Input: 出口合同详情、采购来源、40HQ 排柜、单证核对、退税准备与单柜财务 Interface
- * Output: 排柜/发运、出口三单、申报单证、船司核对、退税材料和财务结算的专项单主页面
+ * Output: 含手机装箱明细卡片的排柜/发运、出口三单、申报单证、船司核对、退税材料和财务结算的专项单主页面
  * Pos: 出口专项单装柜主页面，复用采购完工资料并承载排柜到发运的唯一主线路
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -16,6 +16,8 @@ import { storeService } from '@/services/store.service';
 import { inventoryService } from '@/services/inventory.service';
 import { listContractFiles, type ContractFile } from '@/services/contractFile.service';
 import { Button } from '@/components/ui/button';
+import { MobileListCard } from '@/components/mobile';
+import { useMobile } from '@/lib/hooks/useMobile';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -131,6 +133,7 @@ const SALES_NEXT_ACTIONS: Partial<Record<SalesStatus, { status: SalesStatus; lab
 };
 
 export default function SalesDetailPage({ params }: PageProps) {
+  const isMobile = useMobile();
   const { id } = use(params);
   const [contract, setContract] = useState<SalesContract | null>(null);
   const [loading, setLoading] = useState(true);
@@ -702,7 +705,7 @@ export default function SalesDetailPage({ params }: PageProps) {
   const readinessIsBlocking = readiness.overloaded || !readiness.physicalFit;
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="min-w-0 space-y-6 pb-10">
       {/* 页头 */}
       <div ref={headerRef}>
         <PageHeader
@@ -764,7 +767,7 @@ export default function SalesDetailPage({ params }: PageProps) {
             : 'flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/40'
         }
       >
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {readinessIsBlocking ? (
             <AlertTriangle className="h-5 w-5 text-red-600" />
           ) : readiness.ready ? (
@@ -811,7 +814,7 @@ export default function SalesDetailPage({ params }: PageProps) {
       </div>
 
       {/* 容量概览 */}
-      <div ref={statsRef} className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div ref={statsRef} className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
@@ -873,9 +876,9 @@ export default function SalesDetailPage({ params }: PageProps) {
       </div>
 
       {/* 货柜详情 + 物流时间线 + 报关/收款 概览 */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* 货柜详情卡片 */}
-        <Card className="lg:col-span-1">
+        <Card className="min-w-0 lg:col-span-1">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-sm font-semibold">
               <Container className="h-4 w-4 text-primary" />
@@ -895,7 +898,7 @@ export default function SalesDetailPage({ params }: PageProps) {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">尺寸</p>
-                <p className="text-sm font-medium tabular-nums">
+                <p className="break-words text-sm font-medium tabular-nums">
                   {CONTAINER_40HQ.length}×{CONTAINER_40HQ.width}×{CONTAINER_40HQ.height} mm
                 </p>
               </div>
@@ -929,15 +932,15 @@ export default function SalesDetailPage({ params }: PageProps) {
         </Card>
 
         {/* 物流时间线 */}
-        <Card className="lg:col-span-2">
+        <Card className="min-w-0 lg:col-span-2">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-sm font-semibold">
               <Truck className="h-4 w-4 text-primary" />
               物流时间线
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex items-center gap-1.5 mb-4 overflow-x-auto pb-1">
+          <CardContent className="min-w-0 pt-0">
+            <div className="flex min-w-0 items-center gap-1.5 mb-4 overflow-x-auto pb-1">
               {LOGISTICS_EVENTS.map((event, idx) => {
                 const EventIcon = event.icon;
                 const isCompleted = idx <= currentStepIndex;
@@ -990,7 +993,7 @@ export default function SalesDetailPage({ params }: PageProps) {
       </div>
 
       {/* 标签页 */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0">
         <TabsList>
           <TabsTrigger value="packing">装箱明细</TabsTrigger>
           <TabsTrigger value="3d">3D 可视化</TabsTrigger>
@@ -1002,7 +1005,7 @@ export default function SalesDetailPage({ params }: PageProps) {
         {/* 装箱明细 */}
         <TabsContent value="packing">
           <Card ref={packingRef}>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Package className="h-5 w-5" />
@@ -1020,6 +1023,36 @@ export default function SalesDetailPage({ params }: PageProps) {
               </div>
             </CardHeader>
             <CardContent>
+              {isMobile ? (
+                <div className="space-y-3">
+                  {packingSort.sortedData.length === 0 ? (
+                    <p className="py-10 text-center text-sm text-muted-foreground">暂无装箱商品，可从已完工采购导入，也可手动添加</p>
+                  ) : packingSort.sortedData.map((item) => (
+                    <MobileListCard
+                      key={item.id}
+                      title={item.product?.customsName || '未知商品'}
+                      subtitle={[item.specification || item.product?.specification, item.purchaseContractNo ? `来源 ${item.purchaseContractNo}` : null].filter(Boolean).join(' · ')}
+                      fields={[
+                        { label: '数量', value: item.quantity ?? '-' },
+                        { label: '箱数', value: item.boxes ?? '-' },
+                        { label: '单价', value: item.unitPrice != null ? `$${item.unitPrice.toLocaleString()}` : '-' },
+                        { label: '毛重', value: item.grossWeight != null ? `${item.grossWeight} kg` : '-' },
+                      ]}
+                      amount={{ label: '总价', value: item.totalPrice != null ? `$${item.totalPrice.toLocaleString()}` : '-', emphasis: 'primary' }}
+                      action={
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button variant="outline" className="h-11" aria-label={`编辑 ${item.product?.customsName || '装箱商品'}`} onClick={() => handleEditItem(item)}>
+                            <Pencil className="mr-1.5 h-4 w-4" />编辑
+                          </Button>
+                          <Button variant="outline" className="h-11 text-destructive" aria-label={`删除 ${item.product?.customsName || '装箱商品'}`} onClick={() => handleDeleteItem(item.id)}>
+                            <Trash className="mr-1.5 h-4 w-4" />删除
+                          </Button>
+                        </div>
+                      }
+                    />
+                  ))}
+                </div>
+              ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1136,6 +1169,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                   )}
                 </TableBody>
               </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1356,7 +1390,7 @@ export default function SalesDetailPage({ params }: PageProps) {
             {/* 商品规格尺寸（用于3D可视化） */}
             {itemForm.productId && (
               <div className="p-3 bg-primary/7 rounded-lg border border-primary/22">
-                <div className="flex items-center justify-between mb-2">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <span className="text-sm font-medium text-primary">
                     商品规格尺寸（用于3D可视化）
                   </span>
@@ -1366,7 +1400,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                     </span>
                   )}
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">长度 (mm)</label>
                     <Input 
@@ -1449,7 +1483,7 @@ export default function SalesDetailPage({ params }: PageProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <label className="text-sm font-medium">毛重 (kg)</label>
                 <Input 

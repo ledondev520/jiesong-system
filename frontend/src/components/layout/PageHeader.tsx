@@ -1,6 +1,6 @@
 /**
  * Input: 页面标题、描述、返回链接
- * Output: 页面头部组件（含返回按钮）
+ * Output: 页面头部组件（含可访问返回按钮，手机端完整描述与换行操作）
  * Pos: 通用布局组件，提供统一的页面头部样式
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -52,13 +52,14 @@ export function PageHeader({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 pb-3 md:items-start md:gap-4 md:pb-4">
-      <div className="flex min-w-0 items-center gap-2 md:items-start md:gap-3">
+      <div className="flex min-w-0 max-w-full items-center gap-2 md:items-start md:gap-3">
         {/* 返回按钮：有 backHref 时自动显示；可通过 showBack 强制控制 */}
         {shouldShowBack && (
           <Button
             variant="outline"
             size="sm"
             onClick={handleBack}
+            aria-label={backLabel}
             className="h-9 shrink-0 gap-1 rounded-lg border-border/50 md:mt-0.5"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -74,16 +75,16 @@ export function PageHeader({
             </p>
           )}
           <h2 className="break-words text-xl font-semibold tracking-tight md:text-2xl">{title}</h2>
-          {/* 描述文字：移动端隐藏，节省屏幕高度 */}
+          {/* 描述可能包含操作提示，手机端同样完整显示 */}
           {description && (
-            <p className="hidden break-words text-sm text-muted-foreground md:block">{description}</p>
+            <p className="mt-1 break-words text-sm text-muted-foreground">{description}</p>
           )}
         </div>
       </div>
 
       {/* 右侧操作按钮 */}
       {actions && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 md:w-auto">
           {actions}
         </div>
       )}

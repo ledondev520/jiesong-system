@@ -206,13 +206,6 @@
     font-family: var(--font-ui-mono), monospace;
   }
 
-  /* iOS Safari：防止输入框自动缩放（font-size < 16px 时 Safari 会缩放页面） */
-  input,
-  select,
-  textarea {
-    font-size: max(16px, 1em);
-  }
-
   /* 移动端表格/数据文字可读性：确保不低于 13px */
   @media (max-width: 767px) {
     td,
@@ -224,6 +217,41 @@
     .text-xs {
       font-size: max(11px, 0.6875rem);
     }
+  }
+}
+
+/* 放在工具类层之外，避免业务页 text-sm 覆盖手机输入字号与最小触摸尺寸。 */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+
+  [data-slot="button"],
+  [data-slot="input"],
+  [data-slot="select-trigger"],
+  [data-slot="select-item"],
+  [data-slot="dropdown-menu-item"],
+  [data-slot="command-item"] {
+    min-height: 44px;
+  }
+
+  [data-slot="button"][data-size^="icon"] {
+    min-width: 44px;
+  }
+
+  [data-slot="tabs-list"] {
+    display: flex;
+    max-width: 100%;
+    min-height: 52px;
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+
+  [data-slot="tabs-trigger"] {
+    flex: 0 0 auto;
+    min-height: 44px;
   }
 }
 

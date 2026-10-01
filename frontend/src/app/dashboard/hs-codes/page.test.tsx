@@ -75,7 +75,7 @@ describe('HsCodesPage', () => {
     await waitFor(() => {
       expect(mockList).toHaveBeenCalledWith(expect.objectContaining({ page: 1, pageSize: 20 }));
     });
-    expect(await screen.findByText('抛光瓷砖')).toBeInTheDocument();
+    expect(await screen.findByRole('cell', { name: '抛光瓷砖' })).toBeInTheDocument();
   });
 
   it('输入关键字后按关键字重新加载列表', async () => {
@@ -92,7 +92,7 @@ describe('HsCodesPage', () => {
   it('详情页将申报要素拆分为更直观的分项展示', async () => {
     render(<HsCodesPage />);
 
-    fireEvent.click(await screen.findByText('抛光瓷砖'));
+    fireEvent.click(await screen.findByRole('cell', { name: '抛光瓷砖' }));
 
     expect(await screen.findByText('申报要素')).toBeInTheDocument();
     expect(screen.getByText('品牌类型')).toBeInTheDocument();
@@ -104,7 +104,7 @@ describe('HsCodesPage', () => {
   it('详情页将监管条件与检验检疫拆分为可视化条目', async () => {
     render(<HsCodesPage />);
 
-    fireEvent.click(await screen.findByText('抛光瓷砖'));
+    fireEvent.click(await screen.findByRole('cell', { name: '抛光瓷砖' }));
 
     expect(await screen.findByText('监管条件')).toBeInTheDocument();
     expect(screen.getByText('入境货物通关单')).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe('HsCodesPage', () => {
   it('详情页可人工更新退税率并强制留存生效日期和来源', async () => {
     render(<HsCodesPage />);
 
-    fireEvent.click(await screen.findByText('抛光瓷砖'));
+    fireEvent.click(await screen.findByRole('cell', { name: '抛光瓷砖' }));
     fireEvent.click(await screen.findByRole('button', { name: '人工更新税则' }));
 
     fireEvent.change(screen.getByLabelText('出口退税率（%）'), { target: { value: '0' } });

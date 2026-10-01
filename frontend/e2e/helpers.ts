@@ -364,6 +364,86 @@ export const mockApiRoutes = async (page: Page) => {
     inventories: 1,
   };
 
+  // 合成验收数据：仅用于本地移动端流程，不来自业务数据库或文件。
+  const customsDeclaration = {
+    id: 'cd-1', declarationNo: 'CUS-E2E-001', status: 'RELEASED',
+    salesContractId: salesContract.id, exporter: '验收出口企业', consignee: '验收海外门店',
+    destinationCountry: '美国', portOfLoading: '上海', portOfDestination: '洛杉矶', transportMode: 'SEA',
+    declarationDate: '2026-03-01', releaseDate: '2026-03-04', currency: 'USD',
+    totalAmount: 22000, totalPackages: 20, grossWeight: 15000, netWeight: 14000,
+    remarks: '合成记录：已放行，等待运输安排。',
+    items: [{ id: 'cdi-1', productName: '验收用不锈钢门及配套五金组件', hsCode: '73083000', quantity: 20, unit: '扇', unitPrice: 1100, totalPrice: 22000 }],
+    createdAt: now, updatedAt: now,
+  };
+  const taxRefund = {
+    id: 'tr-1', refundNo: 'TR-E2E-001', status: 'APPLIED', salesContractId: salesContract.id,
+    customsDeclarationId: customsDeclaration.id, declaredAmount: 10000, refundableAmount: 1300,
+    refundedAmount: 0, appliedAt: '2026-03-05', receivedAt: null, refundRate: 13,
+    matchStatus: 'MATCHED', note: '合成验收退税记录，待跟进审批。', createdAt: now, updatedAt: now,
+  };
+  const invoiceSummary = { shipmentRows: 1, uniqueInvoices: 1, found: 1, pass: 1, review: 0, missing: 0, invalidInvoiceNumber: 0 };
+  const workbenchItem = {
+    salesContractId: salesContract.id, contractNo: salesContract.contractNo, shippedAt: now,
+    customsBroker: '验收报关行', contractStatus: 'SHIPPED', stage: 'READY_TO_EXPORT', ready: true,
+    declaration: customsDeclaration, taxRefund, purchaseContractNos: [purchaseContract.contractNo],
+    invoiceSummary, estimatedRefundableAmount: 1300, issues: [],
+  };
+  const hsCode = {
+    id: 'hs-1', hsCode: '73083000', productName: '验收用铁或钢制门窗及其框架、门槛',
+    unit: '千克', refundRate: 13, vatRate: 13, taxRate: 0, exportTaxRate: 0,
+    supervisionConditions: 'A:入境货物通关单 | B:出境货物通关单',
+    inspectionQuarantine: 'M:进口商品检验 | N:出口商品检验',
+    declarationElements: '品牌类型|出口享惠情况|用途|材质|品牌|型号',
+    effectiveDate: '2026-01-01T00:00:00.000Z', sourceUrl: 'https://example.invalid/e2e-tariff',
+    note: '合成税则记录，不用于实际申报。', similarity: 0.95,
+  };
+  const balanceSheet = {
+    id: 'bs-e2e', periodId: 'period-2026-03', cashAndEquivalents: 80000, shortTermInvestments: 0,
+    accountsReceivable: 170000, prepaidExpenses: 10000, otherReceivables: 10000, inventory: 130000,
+    totalCurrentAssets: 400000, totalNonCurrentAssets: 100000, totalAssets: 500000,
+    accountsPayable: 90000, advancedReceipts: 50000, staffWagesPayable: 10000, taxesPayable: 10000,
+    otherPayables: 10000, totalCurrentLiabilities: 170000, totalNonCurrentLiabilities: 30000,
+    totalLiabilities: 200000, paidInCapital: 200000, capitalReserve: 0, surplusReserve: 0,
+    retainedEarnings: 100000, totalEquity: 300000,
+  };
+  const incomeStatement = {
+    id: 'is-e2e', periodId: 'period-2026-03', revenueMonth: 220000, costOfSalesMonth: 120000,
+    taxesMonth: 0, sellingExpensesMonth: 5000, adminExpensesMonth: 10000, financialExpensesMonth: 3000,
+    investmentIncomeMonth: 0, operatingProfitMonth: 82000, nonOperatingIncomeMonth: 0,
+    nonOperatingExpensesMonth: 0, totalProfitMonth: 82000, incomeTaxMonth: 12000, netProfitMonth: 70000,
+    revenueYTD: 220000, costOfSalesYTD: 120000, taxesYTD: 0, sellingExpensesYTD: 5000,
+    adminExpensesYTD: 10000, financialExpensesYTD: 3000, investmentIncomeYTD: 0,
+    operatingProfitYTD: 82000, nonOperatingIncomeYTD: 0, nonOperatingExpensesYTD: 0,
+    totalProfitYTD: 82000, incomeTaxYTD: 12000, netProfitYTD: 70000,
+  };
+  const financialPeriod = {
+    id: 'period-2026-03', year: 2026, month: 3, periodLabel: '2026年3月账期', reportDate: now, importedAt: now,
+    balanceSheet, incomeStatement, cashFlowStatement: null,
+    accountBalances: [{ id: 'ab-e2e', sourceRow: 2, rowType: 'ACCOUNT', accountCode: '1002', accountName: '银行存款', openingDebit: 70000, openingCredit: 0, periodDebit: 30000, periodCredit: 20000, yearDebit: 30000, yearCredit: 20000, endingDebit: 80000, endingCredit: 0 }],
+    generalLedgerEntries: [{ id: 'gl-e2e', sourceRow: 2, rowType: 'ENTRY', accountCode: '1002', accountName: '银行存款', entryDate: '2026-03-01', voucherNumber: 'E2E-1', summary: '合成验收记录', debit: 30000, credit: null, direction: '借', balance: 100000 }],
+    dataSources: [{ id: 'fs-e2e', type: 'STATEMENT', fileName: 'e2e-synthetic-statements.xlsx', fileSize: 1024, sha256: 'e'.repeat(64), sheetName: '合成报表', rowCount: 1, importedAt: now }],
+  };
+  const bankTransaction = {
+    id: 'bank-e2e-1', batchId: 'batch-bank-e2e', bankName: '合成验收银行', accountNoMasked: '****0000', currency: 'CNY',
+    txnTime: now, txnDate: '2026-03-01', amount: 10000, payer: '验收付款企业', payee: '验收供应商',
+    summary: '合成验收材料付款，用于检查手机卡片和对账匹配', txnType: '转账', txnId: 'E2E-TXN-0001',
+    balance: 80000, counterpart: '验收供应商', direction: 'OUT',
+    matchedContractId: null, matchedContractType: null, matchScore: null, matchStatus: 'PENDING', matchedAt: null,
+  };
+  const invoiceRecord = {
+    id: 'invoice-e2e-1', batchId: 'batch-invoice-e2e', invNo: '00000000000000000001', seller: '验收供应商', buyer: '验收采购企业',
+    invDate: '2026-03-01', itemName: '验收用不锈钢门及配套五金组件', spec: '900x2100', unit: '扇', qty: 10,
+    amount: 8849.56, taxRate: '13%', tax: 1150.44, total: 10000, invoiceType: '增值税专用发票', status: '正常',
+    isPositive: '是', riskLevel: null, matchedContractId: null, matchedContractType: null, matchScore: null, matchStatus: 'PENDING', matchedAt: null,
+  };
+
+  const evidenceDocument = {
+    id: 'ev-e2e', fileName: 'e2e-synthetic-evidence.xlsx', relativePath: 'e2e/synthetic',
+    category: 'ACCOUNTING_STATEMENT', categoryLabel: '合成会计资料', analysisScope: '仅用于界面验收',
+    periodYear: 2026, periodMonth: 3, importedSheetCount: 1, rowCount: 1,
+    numericCellCount: 1, textCellCount: 1, redactionCount: 0, originalArchived: false, importedAt: now,
+  };
+
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const pathname = getPathname(request.url());
@@ -415,6 +495,24 @@ export const mockApiRoutes = async (page: Page) => {
         user: mockUser,
         token: mockToken,
       });
+      return;
+    }
+
+    if (pathname === '/api/v1/dashboard/wps-sync' && method === 'GET') {
+      await fulfillJson(route, { state: 'current', lastSuccessAt: now, lastAttemptAt: now, conflicts: 0 });
+      return;
+    }
+
+    if (pathname === '/api/v1/dashboard/trade-workflows' && method === 'GET') {
+      const labels = ['采购准备', '采购签订', '生产跟进', '入库验收', '出口装箱', '报关出运', '出口退税', '财务结清'];
+      await fulfillJson(route, [{
+        id: salesContract.id, contractNo: salesContract.contractNo, status: 'DRAFT',
+        purchaseContractNos: [purchaseContract.contractNo], completedStageCount: 2, stageCount: 8,
+        stages: labels.map((label, index) => ({ key: `stage-${index}`, label,
+          status: index < 2 ? 'completed' : index === 2 ? 'current' : 'pending',
+          reason: index === 2 ? '核对生产进度后安排到货验收。' : '按业务进度完成此阶段。' })),
+        nextAction: { label: '查看生产进度', href: '/dashboard/purchase/pc-001' }, issues: [],
+      }]);
       return;
     }
 
@@ -493,6 +591,111 @@ export const mockApiRoutes = async (page: Page) => {
           ],
         },
       });
+      return;
+    }
+
+    if (pathname === '/api/v1/tax-refunds/workbench' && method === 'GET') {
+      const stage = searchParams.get('stage');
+      const keyword = searchParams.get('keyword') || '';
+      const items = (!stage || stage === 'ALL' || stage === workbenchItem.stage) && (!keyword || workbenchItem.contractNo.includes(keyword)) ? [workbenchItem] : [];
+      await fulfillJson(route, {
+        items, total: items.length, page: 1, pageSize: 100,
+        summary: { contracts: 1, readyToExport: 1, needsReview: 0, missingInvoices: 0, draftCount: 1, submittedCount: 0, estimatedRefundableAmount: 1300, latestInvoiceBatch: null },
+        disclaimer: '合成验收数据，仅用于内部准备界面。',
+      });
+      return;
+    }
+
+    if (/^\/api\/v1\/tax-refunds\/workbench\/[^/]+\/invoice-verification$/.test(pathname) && method === 'GET') {
+      await fulfillJson(route, {
+        salesContractId: salesContract.id, contractNo: salesContract.contractNo, summary: invoiceSummary,
+        results: [{ status: 'PASS', sourceRows: [2], contracts: [purchaseContract.contractNo], invoiceNo: '00000000000000000001', invoiceNumberValid: true, expectedSellers: ['验收供应商'], expectedItems: ['验收不锈钢门'], expectedTotal: 10000, found: true, actualSeller: '验收供应商', actualDate: '2026-03-01', actualItems: '验收不锈钢门', actualTotal: 10000, issues: [] }],
+      });
+      return;
+    }
+
+    if (/^\/api\/v1\/sales\/[^/]+\/tax-refund-preparation$/.test(pathname) && method === 'GET') {
+      await fulfillJson(route, {
+        salesContractId: salesContract.id, contractNo: salesContract.contractNo, preparationReady: true, collectionReady: true,
+        checklist: [{ id: 'check-e2e', label: '报关与发票材料', category: '申报凭证', requirement: 'required', status: 'ready', evidence: '合成验收记录', message: '材料已齐，仅用于界面验收' }],
+        blockers: [], warnings: [], invoiceLinks: [],
+        deadlines: { basisDate: '2026-03-01', internalPrepareOn: '2026-04-05', primaryFilingEnd: '2027-04-30', supplementaryWindowEnd: '2029-03-01', filingArchiveDueRule: '合成期限展示', retentionYears: 5 },
+        officialRules: { effectiveFrom: '2026-01-01', policyDocument: '合成规则展示', managementDocument: '合成管理规则', filingRule: '仅用于界面验收', externalTradeMaterials: '材料核对', filingArchiveRule: '材料归档', collectionRule: '收汇核对', internalReminderDisclaimer: '内部提醒为合成数据。', sources: { policy: 'https://example.invalid', management: 'https://example.invalid', interpretation: 'https://example.invalid' } },
+        disclaimer: '合成验收内容，不用于实际申报。',
+      });
+      return;
+    }
+
+    if ((pathname === '/api/v1/customs-declarations/auto-drafts' || pathname === '/api/v1/tax-refunds/auto-drafts') && method === 'POST') {
+      await fulfillJson(route, { created: 0, skipped: 1 });
+      return;
+    }
+
+    if (pathname === '/api/v1/tax-refunds/export' && method === 'POST') {
+      await route.fulfill({ status: 200, contentType: 'text/csv; charset=utf-8', headers: { 'Content-Disposition': 'attachment; filename=e2e-tax-refunds.csv' }, body: 'refundNo,amount\nTR-E2E-001,1300\n' });
+      return;
+    }
+
+    if ((pathname === '/api/v1/customs-declarations' || pathname === '/api/v1/tax-refunds') && method === 'GET') {
+      const item = pathname.endsWith('/tax-refunds') ? taxRefund : customsDeclaration;
+      const status = searchParams.get('status');
+      const keyword = searchParams.get('keyword') || '';
+      const items = (!status || status === 'ALL' || item.status === status) && (!keyword || JSON.stringify(item).includes(keyword)) ? [item] : [];
+      await fulfillJson(route, asPaginated(items, Number(searchParams.get('page') || 1), Number(searchParams.get('pageSize') || 20)));
+      return;
+    }
+
+    if (/^\/api\/v1\/(customs-declarations|tax-refunds)\/[^/]+$/.test(pathname) && (method === 'GET' || method === 'PUT')) {
+      const item = pathname.includes('/tax-refunds/') ? taxRefund : customsDeclaration;
+      await fulfillJson(route, method === 'PUT' ? { ...item, ...parseJsonBody(route) } : item);
+      return;
+    }
+
+    if ((pathname === '/api/v1/customs-declarations' || pathname === '/api/v1/tax-refunds') && method === 'POST') {
+      await fulfillJson(route, { ...(pathname.endsWith('/tax-refunds') ? taxRefund : customsDeclaration), ...parseJsonBody(route) });
+      return;
+    }
+
+    if (pathname === '/api/v1/hs-codes' && method === 'GET') {
+      const keyword = searchParams.get('keyword') || '';
+      const code = searchParams.get('code') || '';
+      const items = (!keyword || hsCode.productName.includes(keyword)) && (!code || hsCode.hsCode.startsWith(code)) ? [hsCode] : [];
+      await fulfillJson(route, asPaginated(items, Number(searchParams.get('page') || 1), Number(searchParams.get('pageSize') || 20)));
+      return;
+    }
+
+    if (pathname === '/api/v1/hs-codes/search' && method === 'GET') {
+      await fulfillJson(route, [hsCode]);
+      return;
+    }
+
+    if (/^\/api\/v1\/hs-codes\/[^/]+$/.test(pathname) && (method === 'GET' || method === 'PUT')) {
+      await fulfillJson(route, method === 'PUT' ? { ...hsCode, ...parseJsonBody(route) } : hsCode);
+      return;
+    }
+
+    if (pathname === '/api/v1/finance/statements/evidence/summary' && method === 'GET') {
+      await fulfillJson(route, {
+        totals: { documentCount: 1, sheetCount: 1, rowCount: 1, redactionCount: 0 },
+        categories: [{ category: evidenceDocument.category, categoryLabel: evidenceDocument.categoryLabel, analysisScope: evidenceDocument.analysisScope, documentCount: 1, sheetCount: 1, rowCount: 1, redactionCount: 0 }],
+        periods: ['2026-03'], latestImportedAt: now,
+      });
+      return;
+    }
+
+    if (pathname === '/api/v1/finance/statements/evidence/documents' && method === 'GET') {
+      await fulfillJson(route, { items: [evidenceDocument], ...buildPagination(1, 1, 20) });
+      return;
+    }
+
+    if (/^\/api\/v1\/finance\/statements\/evidence\/documents\/[^/]+$/.test(pathname) && method === 'GET') {
+      const sheet = { id: 'sheet-e2e', sheetIndex: 0, sheetName: '合成验收资料', sourceRange: 'A1:B1', rowCount: 1, columnCount: 2, redactionCount: 0 };
+      await fulfillJson(route, { ...evidenceDocument, sheets: [sheet], selectedSheet: sheet, rows: [{ id: 'row-e2e', sourceRow: 1, rowKind: 'DATA', values: ['合成验收记录', 100], numericCellCount: 1, textCellCount: 1, redactionCount: 0 }], pagination: buildPagination(1, 1, 50) });
+      return;
+    }
+
+    if (pathname === '/api/v1/finance/receivable-reconciliation' && method === 'GET') {
+      await fulfillJson(route, { period: { year: 2026, month: 3, label: '2026年3月账期' }, cutoffDate: '2026-03-31', contractCount: 1, formalSalesUsd: 22000, receivedUsd: 5000, operatingReceivableUsd: 17000, reportedReceivableCny: 122400, effectiveExchangeRate: 7.2, translatedOperatingReceivableCny: 122400, correctedAccountingReceivableCny: 122400, residualCny: 0, anomalies: { duplicateDebitCny: 0, duplicateContracts: [], missingDebitCny: 0, missingContracts: [] }, assumptions: ['合成验收数据'] });
       return;
     }
 
@@ -746,18 +949,7 @@ export const mockApiRoutes = async (page: Page) => {
     }
 
     if (pathname === '/api/v1/finance/statements' && method === 'GET') {
-      await fulfillJson(route, [
-        {
-          id: 'period-2026-03',
-          year: 2026,
-          month: 3,
-          periodLabel: '2026年3月账期',
-          reportDate: now,
-          importedAt: now,
-          balanceSheet: null,
-          incomeStatement: null,
-        },
-      ]);
+      await fulfillJson(route, [financialPeriod]);
       return;
     }
 
@@ -786,8 +978,8 @@ export const mockApiRoutes = async (page: Page) => {
         historicalAlerts: [],
         latestPeriod: {
           periodLabel: '2026年3月账期',
-          balanceSheet: null,
-          incomeStatement: null,
+          balanceSheet,
+          incomeStatement,
         },
         totalPeriods: 1,
       });
@@ -795,16 +987,42 @@ export const mockApiRoutes = async (page: Page) => {
     }
 
     if (/^\/api\/v1\/finance\/statements\/\d{4}\/\d{1,2}$/.test(pathname) && method === 'GET') {
-      await fulfillJson(route, {
-        id: 'period-2026-03',
-        year: 2026,
-        month: 3,
-        periodLabel: '2026年3月账期',
-        reportDate: now,
-        importedAt: now,
-        balanceSheet: null,
-        incomeStatement: null,
-      });
+      await fulfillJson(route, financialPeriod);
+      return;
+    }
+
+    if (pathname === '/api/v1/finance/unmatched' && method === 'GET') {
+      await fulfillJson(route, { bankItems: [bankTransaction], invoiceItems: [invoiceRecord], bankTotal: 1, invoiceTotal: 1, page: 1, pageSize: 100 });
+      return;
+    }
+
+    if (pathname === '/api/v1/finance/contracts-for-match' && method === 'GET') {
+      const contract = searchParams.get('contractType') === 'SALES'
+        ? { ...salesContract, portId: salesContract.port.id, packingItems: [{ id: 'pk-e2e', store: stores[0] }] }
+        : { ...purchaseContract, supplierId: suppliers[0].id };
+      const search = searchParams.get('search') || '';
+      await fulfillJson(route, !search || JSON.stringify(contract).includes(search) ? [contract] : []);
+      return;
+    }
+
+    if (pathname === '/api/v1/bank-flow/transactions' && method === 'GET') {
+      const search = searchParams.get('search') || '';
+      const direction = searchParams.get('direction');
+      const items = (!search || JSON.stringify(bankTransaction).includes(search)) && (!direction || direction === bankTransaction.direction) ? [bankTransaction] : [];
+      await fulfillJson(route, asPaginated(items, 1, 20));
+      return;
+    }
+
+    if (pathname === '/api/v1/bank-flow/invoices' && method === 'GET') {
+      const search = searchParams.get('search') || '';
+      const status = searchParams.get('status');
+      const items = (!search || JSON.stringify(invoiceRecord).includes(search)) && (!status || status === invoiceRecord.status) ? [invoiceRecord] : [];
+      await fulfillJson(route, asPaginated(items, 1, 20));
+      return;
+    }
+
+    if (pathname === '/api/v1/bank-flow/batches' && method === 'GET') {
+      await fulfillJson(route, []);
       return;
     }
 

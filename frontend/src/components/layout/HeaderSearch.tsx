@@ -1,6 +1,6 @@
 /**
  * Input: 搜索关键字、统一搜索服务、Command 组件
- * Output: Header 全局搜索输入与 Command 弹窗面板，仅展示当前查询结果
+ * Output: 手机端图标 / 桌面端搜索入口与可滚动 Command 弹窗，仅展示当前查询结果
  * Pos: 前端布局子组件
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -120,11 +120,12 @@ export function HeaderSearch() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="relative w-full max-w-md"
+        aria-label="搜索商品、供应商、合同"
+        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-input bg-background hover:bg-accent md:h-auto md:w-full md:max-w-md md:justify-start md:border-0"
       >
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <div className="flex h-10 items-center rounded-lg border border-input/80 bg-muted/50 pl-9 pr-3 text-sm text-muted-foreground shadow-sm transition-colors hover:border-primary/30 hover:bg-muted">
-          <span className="flex-1 text-left">搜索商品、供应商、合同...</span>
+        <Search className="h-5 w-5 text-muted-foreground md:absolute md:left-3 md:top-1/2 md:h-4 md:w-4 md:-translate-y-1/2" />
+        <div className="hidden h-10 w-full min-w-0 items-center rounded-lg border border-input/80 bg-muted/50 pl-9 pr-3 text-sm text-muted-foreground shadow-sm transition-colors hover:border-primary/30 hover:bg-muted md:flex">
+          <span className="min-w-0 flex-1 truncate text-left">搜索商品、供应商、合同...</span>
           <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium opacity-100 sm:inline-flex">
             <span className="text-xs">⌘</span>K
           </kbd>
@@ -133,18 +134,19 @@ export function HeaderSearch() {
 
       {/* Command 弹窗搜索面板 */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogHeader className="sr-only">
-          <DialogTitle>全局搜索</DialogTitle>
-          <DialogDescription>搜索采购合同、出口合同、供应商、商品</DialogDescription>
-        </DialogHeader>
-        <DialogContent className="overflow-hidden p-0">
-          <Command shouldFilter={false}>
+        <DialogContent className="flex flex-col gap-0 overflow-hidden px-0 pt-[calc(env(safe-area-inset-top)+1rem)] pb-[env(safe-area-inset-bottom)] sm:p-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>全局搜索</DialogTitle>
+            <DialogDescription>搜索采购合同、出口合同、供应商、商品</DialogDescription>
+          </DialogHeader>
+          <Command shouldFilter={false} className="min-h-0 flex-1">
             <CommandInput
+              className="pr-12"
               placeholder="输入关键词搜索..."
               value={searchQuery}
               onValueChange={setSearchQuery}
             />
-            <CommandList>
+            <CommandList className="min-h-0 flex-1 max-h-none sm:max-h-[300px]">
               {isSearching ? (
                 <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

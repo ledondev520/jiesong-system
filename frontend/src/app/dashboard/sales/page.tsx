@@ -1,6 +1,6 @@
 /**
  * Input: 出口合同服务 (salesService)、binPacking（出柜双80%判定）、通用表格排序 hook、按需 Excel 导入 Module
- * Output: 出口合同列表页面（含删除、列排序、分页与搜索、出柜条件徽章）
+ * Output: 出口合同列表页面（含前置搜索、删除、列排序和分页、出柜条件徽章）
  * Pos: 出口合同管理入口，展示合同列表、货柜信息与出柜双80%指标，支持删除操作
  *
  * 2026-01-26 新增：管理员可删除出口合同（带确认对话框）
@@ -462,7 +462,7 @@ export default function SalesPage() {
       <PageHeader
         title="出口合同"
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               className="h-10 rounded-xl"
@@ -477,10 +477,31 @@ export default function SalesPage() {
         }
       />
 
+      {/* 搜索栏 */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            data-testid="sales-search-input"
+            placeholder="搜索合同号、港口、门店..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+              updateUrlParams({ q: e.target.value, page: 1 });
+            }}
+            className="pl-9 rounded-xl"
+          />
+        </div>
+        <span className="text-sm text-muted-foreground">
+          {searchQuery ? `找到 ${filteredContracts.length} 条结果` : `共 ${contracts.length} 个合同`}
+        </span>
+      </div>
+
       {/* 出运概览 — 紧凑统计行 */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Card className="border-border/60">
-          <CardContent className="flex items-center justify-between px-4 py-3">
+        <Card className="border-border/60 py-0 md:py-6">
+          <CardContent className="flex items-center justify-between px-3 py-3 md:px-4">
             <div>
               <p className="text-xs text-muted-foreground">待装柜</p>
               <p className="text-xl font-semibold tabular-nums">{exportOverview.preparing}</p>
@@ -488,8 +509,8 @@ export default function SalesPage() {
             <Boxes className="h-4 w-4 text-primary" />
           </CardContent>
         </Card>
-        <Card className="border-border/60">
-          <CardContent className="flex items-center justify-between px-4 py-3">
+        <Card className="border-border/60 py-0 md:py-6">
+          <CardContent className="flex items-center justify-between px-3 py-3 md:px-4">
             <div>
               <p className="text-xs text-muted-foreground">在途</p>
               <p className="text-xl font-semibold tabular-nums">{exportOverview.inTransit}</p>
@@ -497,8 +518,8 @@ export default function SalesPage() {
             <Container className="h-4 w-4 text-sky-600" />
           </CardContent>
         </Card>
-        <Card className="border-border/60">
-          <CardContent className="flex items-center justify-between px-4 py-3">
+        <Card className="border-border/60 py-0 md:py-6">
+          <CardContent className="flex items-center justify-between px-3 py-3 md:px-4">
             <div>
               <p className="text-xs text-muted-foreground">已到港</p>
               <p className="text-xl font-semibold tabular-nums">{exportOverview.arrivedPendingClose}</p>
@@ -506,8 +527,8 @@ export default function SalesPage() {
             <Anchor className="h-4 w-4 text-emerald-600" />
           </CardContent>
         </Card>
-        <Card className="border-border/60">
-          <CardContent className="flex items-center justify-between px-4 py-3">
+        <Card className="border-border/60 py-0 md:py-6">
+          <CardContent className="flex items-center justify-between px-3 py-3 md:px-4">
             <div>
               <p className="text-xs text-muted-foreground">总箱数</p>
               <p className="text-xl font-semibold tabular-nums">{exportOverview.totalBoxes}</p>
@@ -772,27 +793,6 @@ export default function SalesPage() {
             ))}
           </div>
         )}
-      </div>
-
-      {/* 搜索栏 */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            data-testid="sales-search-input"
-            placeholder="搜索合同号、港口、门店..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-              updateUrlParams({ q: e.target.value, page: 1 });
-            }}
-            className="pl-9 rounded-xl"
-          />
-        </div>
-        <span className="text-sm text-muted-foreground">
-          {searchQuery ? `找到 ${filteredContracts.length} 条结果` : `共 ${contracts.length} 个合同`}
-        </span>
       </div>
 
       {/* 分页控制 */}

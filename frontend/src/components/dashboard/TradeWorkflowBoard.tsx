@@ -1,6 +1,6 @@
 /**
  * Input: 出口专项单八阶段主线路、当前阻塞和唯一下一动作
- * Output: 工作台专项单进度卡片与可执行入口
+ * Output: 工作台专项单进度卡片与可执行入口，手机端收紧留白并保留完整长文本
  * Pos: 经营中台首页的主任务 Module，替代静态流程说明和重复待办
  */
 
@@ -70,7 +70,7 @@ function WorkflowCard({ workflow }: { workflow: TradeWorkflow }) {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-semibold tracking-tight">{workflow.contractNo}</h3>
+            <h3 className="break-all font-semibold tracking-tight">{workflow.contractNo}</h3>
             <Badge variant="outline" className="tabular-nums">
               {workflow.completedStageCount}/{workflow.stageCount} 阶段
             </Badge>
@@ -89,7 +89,7 @@ function WorkflowCard({ workflow }: { workflow: TradeWorkflow }) {
 
         <Button
           type="button"
-          className="shrink-0 justify-between rounded-md lg:min-w-48"
+          className="h-auto min-h-11 shrink-0 justify-between whitespace-normal rounded-md text-left lg:min-w-48"
           aria-label={`${workflow.contractNo} 下一步：${workflow.nextAction.label}`}
           onClick={() => router.push(workflow.nextAction.href)}
         >
@@ -163,8 +163,8 @@ export function TradeWorkflowBoard({ workflows, loading = false, unavailable = f
   const router = useRouter();
 
   return (
-    <Card className="border-border/70">
-      <CardHeader className="pb-3">
+    <Card className="gap-4 border-border/70 py-4 md:gap-6 md:py-6">
+      <CardHeader className="px-4 pb-0 md:px-6 md:pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <CardTitle role="heading" aria-level={2} className="flex items-center gap-2 text-base">
@@ -183,7 +183,7 @@ export function TradeWorkflowBoard({ workflows, loading = false, unavailable = f
           ) : null}
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 px-4 md:px-6">
         {loading ? (
           <div className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
             正在加载专项单主线路…

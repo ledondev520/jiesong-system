@@ -1,6 +1,6 @@
 /**
  * Input: 采购合同服务、SortableTableHead、useTableSort
- * Output: 采购合同管理页面（筛选、分页、桌面表列排序）
+ * Output: 手机前置操作与双列紧凑概览的采购合同管理页面（筛选、分页、桌面表列排序）
  * Pos: 核心业务页面，管理供应商采购合同
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -615,12 +615,56 @@ export default function ContractsPageContent() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
       <PageHeader title="采购合同" />
 
+      <div className="grid grid-cols-2 gap-3 md:hidden">
+        <Button className="h-11 rounded-2xl" onClick={() => router.push('/dashboard/purchase/create')}>
+          <Plus className="mr-2 h-4 w-4" /> 新增采购
+        </Button>
+        <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" className="h-11 rounded-xl">
+              <Filter className="mr-2 h-4 w-4" />
+              筛选与搜索
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="rounded-t-3xl px-0 pb-0">
+            <SheetHeader className="border-b px-5 pb-4">
+              <SheetTitle>筛选与搜索</SheetTitle>
+              <SheetDescription>
+                筛选并定位合同，也可导出、导入和管理合同模板。
+              </SheetDescription>
+            </SheetHeader>
+            <div className="space-y-5 px-5 py-5">
+              {renderFilterControls('mobile')}
+              <div className="grid grid-cols-1 gap-3 border-t pt-4">
+                <Button variant="outline" className="h-11 rounded-2xl" onClick={handleExport}>
+                  <Download className="mr-2 h-4 w-4" /> 导出 Excel
+                </Button>
+                <Button variant="outline" className="h-11 rounded-2xl" onClick={handleImportClick} disabled={importLoading}>
+                  <Upload className="mr-2 h-4 w-4" /> 批量导入
+                </Button>
+                <Button variant="outline" className="h-11 rounded-2xl" onClick={() => setTemplateDialogOpen(true)}>
+                  <FileText className="mr-2 h-4 w-4" /> 合同模板
+                </Button>
+              </div>
+            </div>
+            <div className="flex gap-3 border-t px-5 py-4">
+              <Button variant="outline" className="h-11 flex-1 rounded-2xl" onClick={resetFilters}>
+                重置
+              </Button>
+              <Button className="h-11 flex-1 rounded-2xl" onClick={() => setMobileFiltersOpen(false)}>
+                查看结果
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+
       {/* 概览卡片 */}
-      <section className="space-y-4">
+      <section className="space-y-3 md:space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h3 className="text-sm font-medium text-muted-foreground">采购执行概览</h3>
           <Badge
@@ -630,55 +674,55 @@ export default function ContractsPageContent() {
             当前活跃合同 {procurementOverview.activeContracts}
           </Badge>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-            <CardContent className="flex items-center justify-between gap-3 pt-5">
+        <div className="grid grid-cols-2 gap-2 md:gap-3 xl:grid-cols-4">
+          <Card className="overflow-hidden py-0 md:py-6 rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+            <CardContent className="flex items-center justify-between gap-2 px-3 py-3 md:gap-3 md:px-6 md:pb-0 md:pt-5">
               <div>
-                <p className="text-sm text-muted-foreground">待推进合同</p>
+                <p className="text-xs text-muted-foreground md:text-sm">待推进合同</p>
                 <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
                   {procurementOverview.activeContracts}
                 </p>
               </div>
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+              <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-primary/10">
                 <ShoppingCart className="h-4 w-4 text-primary" />
               </div>
             </CardContent>
           </Card>
-          <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-            <CardContent className="flex items-center justify-between gap-3 pt-5">
+          <Card className="overflow-hidden py-0 md:py-6 rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+            <CardContent className="flex items-center justify-between gap-2 px-3 py-3 md:gap-3 md:px-6 md:pb-0 md:pt-5">
               <div>
-                <p className="text-sm text-muted-foreground">生产中</p>
+                <p className="text-xs text-muted-foreground md:text-sm">生产中</p>
                 <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
                   {procurementOverview.producingContracts}
                 </p>
               </div>
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
+              <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-amber-500/10">
                 <Package className="h-4 w-4 text-amber-600" />
               </div>
             </CardContent>
           </Card>
-          <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-            <CardContent className="flex items-center justify-between gap-3 pt-5">
+          <Card className="overflow-hidden py-0 md:py-6 rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+            <CardContent className="flex items-center justify-between gap-2 px-3 py-3 md:gap-3 md:px-6 md:pb-0 md:pt-5">
               <div>
-                <p className="text-sm text-muted-foreground">已发货待收货</p>
+                <p className="text-xs text-muted-foreground md:text-sm">已发货待收货</p>
                 <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
                   {procurementOverview.shippedPendingReceipt}
                 </p>
               </div>
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10">
+              <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-emerald-500/10">
                 <Truck className="h-4 w-4 text-emerald-600" />
               </div>
             </CardContent>
           </Card>
-          <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-            <CardContent className="flex items-center justify-between gap-3 pt-5">
+          <Card className="overflow-hidden py-0 md:py-6 rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+            <CardContent className="flex items-center justify-between gap-2 px-3 py-3 md:gap-3 md:px-6 md:pb-0 md:pt-5">
               <div>
-                <p className="text-sm text-muted-foreground">合作店铺</p>
+                <p className="text-xs text-muted-foreground md:text-sm">合作店铺</p>
                 <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
                   {procurementOverview.activeStores}
                 </p>
               </div>
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-500/10">
+              <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-sky-500/10">
                 <Store className="h-4 w-4 text-sky-600" />
               </div>
             </CardContent>
@@ -688,7 +732,7 @@ export default function ContractsPageContent() {
 
       {/* 采购合同内容 */}
       <div className="space-y-4">
-        <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-4">
+        <div className="hidden md:flex md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-4">
           {/* 筛选区域 */}
           <div className="hidden flex-wrap items-center gap-2 rounded-md border border-border/60 bg-background p-1.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] md:flex">
             <Filter className="ml-1 h-3.5 w-3.5 text-muted-foreground" />
@@ -699,46 +743,6 @@ export default function ContractsPageContent() {
                 重置
               </Button>
             )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 md:hidden">
-            <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" className="h-11 rounded-xl">
-                  <Filter className="mr-2 h-4 w-4" />
-                  筛选与搜索
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="bottom" className="rounded-t-3xl px-0 pb-0">
-                <SheetHeader className="border-b px-5 pb-4">
-                  <SheetTitle>筛选与搜索</SheetTitle>
-                  <SheetDescription>
-                    先收窄范围，再快速定位合同，避免在手机上来回滑动。
-                  </SheetDescription>
-                </SheetHeader>
-                <div className="space-y-5 px-5 py-5">{renderFilterControls('mobile')}</div>
-                <div className="flex gap-3 border-t px-5 py-4">
-                  <Button variant="outline" className="h-11 flex-1 rounded-2xl" onClick={resetFilters}>
-                    重置
-                  </Button>
-                  <Button className="h-11 flex-1 rounded-2xl" onClick={() => setMobileFiltersOpen(false)}>
-                    查看结果
-                  </Button>
-                </div>
-              </SheetContent>
-            </Sheet>
-            <Button variant="outline" className="h-11 rounded-2xl" onClick={handleExport}>
-              <Download className="mr-2 h-4 w-4" /> 导出 Excel
-            </Button>
-            <Button variant="outline" className="h-11 rounded-2xl" onClick={handleImportClick} disabled={importLoading}>
-              <Upload className="mr-2 h-4 w-4" /> 批量导入
-            </Button>
-            <Button variant="outline" className="h-11 rounded-2xl" onClick={() => setTemplateDialogOpen(true)}>
-              <FileText className="mr-2 h-4 w-4" /> 合同模板
-            </Button>
-            <Button className="h-11 rounded-2xl" onClick={() => router.push('/dashboard/purchase/create')}>
-              <Plus className="mr-2 h-4 w-4" /> 新增采购
-            </Button>
           </div>
 
           <div className="hidden md:flex md:items-center md:gap-2">
@@ -1093,7 +1097,7 @@ export default function ContractsPageContent() {
 
               <div className="space-y-4">
                 {/* 金额汇总 */}
-                <div className="grid grid-cols-3 gap-4 rounded-lg bg-muted p-4">
+                <div className="grid grid-cols-1 gap-4 rounded-lg bg-muted p-4 sm:grid-cols-3">
                   <div>
                     <p className="text-sm text-muted-foreground">合同金额</p>
                     <p className="text-xl font-bold">¥{purchaseDetail.totalAmount.toLocaleString()}</p>

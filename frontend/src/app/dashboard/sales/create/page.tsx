@@ -1,6 +1,6 @@
 /**
  * Input: 商品、门店、销售服务
- * Output: 出口合同创建页面（含分步向导、门店搜索卡片选择、商品定价实时利润计算、货柜选择器）
+ * Output: 窄屏单列与日期输入自适应的出口合同创建页面（含分步向导、门店搜索卡片选择、商品定价实时利润计算、货柜选择器）
  * Pos: 出口管理创建入口
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -202,7 +202,7 @@ export default function CreateSalesPage() {
   }, [products, productSearch]);
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-10">
+    <div className="min-w-0 space-y-6 max-w-5xl mx-auto pb-10">
       <PageHeader
         title="创建出口合同"
         description="创建新的出口合同并自动计算报价。"
@@ -258,7 +258,7 @@ export default function CreateSalesPage() {
                   基本信息
                 </CardTitle>
               </CardHeader>
-              <CardContent className="grid gap-6 md:grid-cols-3">
+              <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-3">
                 <FormField
                   control={form.control}
                   name="contractNo"
@@ -279,6 +279,7 @@ export default function CreateSalesPage() {
                     <FormItem className="flex flex-col">
                       <Label htmlFor="sales-signed-at" className="mb-1.5">签订日期</Label>
                       <DatePicker
+                        className="w-full min-w-0"
                         date={field.value}
                         setDate={field.onChange}
                         triggerProps={{ id: 'sales-signed-at', name: 'signedAt' }}
@@ -319,7 +320,7 @@ export default function CreateSalesPage() {
                   />
                 </div>
               </CardContent>
-              <div className="px-6 pb-6 flex justify-end gap-4">
+              <div className="px-6 pb-6 flex flex-wrap justify-end gap-3">
                 <Button type="button" variant="outline" onClick={() => router.back()}>取消</Button>
                 <Button type="button" onClick={goToStep2}>
                   下一步：出口明细
@@ -387,7 +388,7 @@ export default function CreateSalesPage() {
                         )}
                       </div>
 
-                      <div className="grid gap-4 md:grid-cols-12 items-end">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-12 items-end">
                         {/* 商品选择 */}
                         <div className="md:col-span-4">
                           <FormField
@@ -409,7 +410,7 @@ export default function CreateSalesPage() {
                                 </div>
                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                   <FormControl>
-                                    <SelectTrigger className="h-9">
+                                    <SelectTrigger className="h-9 w-full">
                                       <SelectValue placeholder="选择商品" />
                                     </SelectTrigger>
                                   </FormControl>
@@ -454,7 +455,7 @@ export default function CreateSalesPage() {
                                 </div>
                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                   <FormControl>
-                                    <SelectTrigger className="h-9">
+                                    <SelectTrigger className="h-9 w-full">
                                       <SelectValue placeholder="选择门店" />
                                     </SelectTrigger>
                                   </FormControl>
@@ -514,7 +515,7 @@ export default function CreateSalesPage() {
                       </div>
 
                       {/* 定价行 */}
-                      <div className="grid gap-4 md:grid-cols-12 items-end">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-12 items-end">
                         <div className="md:col-span-3">
                           <FormField
                             control={form.control}
@@ -563,7 +564,7 @@ export default function CreateSalesPage() {
                               <Calculator className="h-3 w-3 text-muted-foreground" />
                               <span className="text-[11px] text-muted-foreground">实时计算</span>
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex flex-wrap items-center gap-4">
                               <div>
                                 <p className="text-[10px] text-muted-foreground">小计 ($)</p>
                                 <p className="text-sm font-semibold tabular-nums">
@@ -623,7 +624,7 @@ export default function CreateSalesPage() {
                     <Plus className="h-4 w-4 mr-2" /> 添加商品
                   </Button>
                 </CardContent>
-                <div className="px-6 pb-6 flex justify-end gap-4">
+                <div className="px-6 pb-6 flex flex-wrap justify-end gap-3">
                   <Button type="button" variant="outline" onClick={goToStep1}>
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     上一步

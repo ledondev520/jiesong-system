@@ -12,6 +12,10 @@ import userEvent from '@testing-library/user-event';
 import { Suspense } from 'react';
 import SalesDetailPage from './page';
 
+const mockIsMobile = vi.fn(() => false);
+
+vi.mock('@/lib/hooks/useMobile', () => ({ useMobile: () => mockIsMobile() }));
+
 const mockGetById = vi.fn();
 const mockProductGetAll = vi.fn();
 const mockStoreGetAll = vi.fn();
@@ -111,6 +115,7 @@ vi.mock('@/components/dialog/ExportPacketWorkbenchDialog', () => ({
 
 describe('SalesDetailPage 交互逻辑', () => {
   beforeEach(() => {
+    mockIsMobile.mockReturnValue(false);
     mockGetById.mockReset();
     mockProductGetAll.mockReset();
     mockStoreGetAll.mockReset();
@@ -437,7 +442,8 @@ describe('SalesDetailPage 交互逻辑', () => {
     expect(mockUpdateSalesStatus).toHaveBeenCalledWith('s-1', 'SHIPPED');
   });
 
-  it('采购导入的装箱行锁定来源数量、箱数、重量和尺寸，避免破坏剩余量', async () => {
+  it('手机装箱卡片编辑保持采购来源数量、箱数、重量和尺寸锁定', async () => {
+    mockIsMobile.mockReturnValue(true);
     mockGetById.mockResolvedValue({
       data: {
         id: 's-1',
@@ -472,7 +478,9 @@ describe('SalesDetailPage 交互逻辑', () => {
     const user = userEvent.setup();
     renderPage('s-1');
 
-    await user.click(await screen.findByRole('button', { name: '编辑 已完工商品' }));
+    const editButton = await screen.findByRole('button', { name: '编辑 已完工商品' });
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    await user.click(editButton);
 
     expect(screen.getByText(/若需改变箱数，请删除后重新导入/)).toBeInTheDocument();
     expect(screen.getByRole('spinbutton', { name: '数量' })).toBeDisabled();

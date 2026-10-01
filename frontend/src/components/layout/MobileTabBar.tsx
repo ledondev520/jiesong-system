@@ -1,6 +1,6 @@
 /**
  * Input: 用户认证状态、路由导航配置、当前路径
- * Output: 移动端底部固定 TabBar 导航组件
+ * Output: 移动端底部固定 TabBar 导航组件与可滚动更多菜单
  * Pos: 移动端全局导航层，替代桌面端侧边栏，提供拇指可达的5 Tab 快速跳转
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -64,7 +64,7 @@ function TabButton({
       aria-current={active ? 'page' : undefined}
     >
       <Icon className={cn('h-5 w-5 shrink-0 transition-transform', active && 'scale-110')} />
-      <span className={cn('text-[10px] font-medium leading-none', active && 'font-semibold')}>
+      <span className={cn('text-[11px] font-medium leading-none', active && 'font-semibold')}>
         {label}
       </span>
     </button>
@@ -156,7 +156,7 @@ export function MobileTabBar({
           className="rounded-t-2xl px-0 pb-0"
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
         >
-          <SheetHeader className="border-b px-5 pb-4">
+          <SheetHeader className="border-b px-5 pb-4 pr-14">
             <SheetTitle asChild>
               <Link
                 href="/dashboard"

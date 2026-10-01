@@ -1,6 +1,6 @@
 /**
  * Input: 报关单服务、URL 查询参数、router
- * Output: 报关单列表页
+ * Output: 报关单列表页（手机卡片与桌面表格）
  * Pos: 报关单管理主列表页
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -38,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { MobileListCard } from '@/components/mobile';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
 import { Search, Plus, FileText } from 'lucide-react';
@@ -246,7 +247,29 @@ export function CustomsDeclarationListPageContent({ embedded = false }: { embedd
         </Card>
       </div>
 
-      <Card className="surface-panel overflow-hidden">
+      <div className="space-y-3 md:hidden">
+        {loading ? (
+          <div className="py-10 text-center text-sm text-muted-foreground">加载中...</div>
+        ) : declarations.length === 0 ? (
+          <div className="py-10 text-center text-sm text-muted-foreground">暂无报关单数据。</div>
+        ) : sort.sortedData.map((declaration) => (
+          <MobileListCard
+            key={declaration.id}
+            title={declaration.declarationNo}
+            subtitle={`${declaration.exporter} → ${declaration.consignee}`}
+            badge={<CustomsDeclarationStatusBadge status={declaration.status} />}
+            fields={[
+              { label: '目的国', value: declaration.destinationCountry },
+              { label: '申报日期', value: declaration.declarationDate || '-' },
+            ]}
+            amount={{ label: '货值', value: formatAmount(declaration.totalAmount, declaration.currency) }}
+            onClick={() => openDetail(declaration.id)}
+            action={<Button variant="outline" className="h-11 w-full" onClick={() => openDetail(declaration.id)}>查看详情</Button>}
+          />
+        ))}
+      </div>
+
+      <Card className="surface-panel hidden overflow-hidden md:block">
         <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-4 w-4" />

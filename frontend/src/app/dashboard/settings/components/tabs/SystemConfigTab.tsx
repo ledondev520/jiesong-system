@@ -1,6 +1,6 @@
 /**
  * Input: 后端 /system/configs API（通过 configService）、/hs-codes/hsciq-usage API
- * Output: 系统参数表单（汇率/利润率）+ 业务流程参数（盖章平台链接/开票抬头）+ AI 模型/采样参数（仅 Kimi/Moonshot）+ HSCIQ API 开关 + 数据字典（单位/报关公司）
+ * Output: 手机单列配置表单、系统参数表单（汇率/利润率）+ 业务流程参数（盖章平台链接/开票抬头）+ AI 模型/采样参数（仅 Kimi/Moonshot）+ HSCIQ API 开关 + 数据字典（单位/报关公司）
  * Pos: 设置页 > 系统配置 Tab，管理员调整全局运营参数与外部 API 集成
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -386,7 +386,7 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
               <CardDescription>影响智能定价与汇率计算的全局参数，修改后需点击「保存配置」生效。</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="exchangeRate"

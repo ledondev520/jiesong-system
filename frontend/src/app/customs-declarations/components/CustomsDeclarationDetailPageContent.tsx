@@ -1,6 +1,6 @@
 /**
  * Input: 报关单 ID、报关单服务、router、SortableTableHead、useTableSort
- * Output: 报关单详情页（含可排序商品明细表）
+ * Output: 报关单详情页（手机商品卡片与桌面可排序明细表）
  * Pos: 报关单管理详情展示页
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -12,6 +12,7 @@ import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CustomsDeclaration, CustomsDeclarationItem } from '@/types';
 import { customsDeclarationService } from '@/services/customsDeclaration.service';
+import { MobileListCard } from '@/components/mobile';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
 import { Button } from '@/components/ui/button';
@@ -173,12 +174,12 @@ export function CustomsDeclarationDetailPageContent({
           {detailFields(declaration).map((field) => (
             <div key={field.label} className="space-y-1">
               <div className="text-sm text-muted-foreground">{field.label}</div>
-              <div className="font-medium">{field.value}</div>
+              <div className="break-words font-medium">{field.value}</div>
             </div>
           ))}
           <div className="space-y-1 md:col-span-2 xl:col-span-3">
             <div className="text-sm text-muted-foreground">备注</div>
-            <div className="font-medium">{declaration.remarks || declaration.note || '-'}</div>
+            <div className="whitespace-pre-wrap break-words font-medium">{declaration.remarks || declaration.note || '-'}</div>
           </div>
         </CardContent>
       </Card>
@@ -188,6 +189,21 @@ export function CustomsDeclarationDetailPageContent({
           <CardTitle>商品明细</CardTitle>
         </CardHeader>
         <CardContent className="px-0">
+          <div className="space-y-3 px-4 md:hidden">
+            {customsLineSort.sortedData.length ? customsLineSort.sortedData.map((item, index) => (
+              <MobileListCard
+                key={item.id || `${item.productName}-${index}`}
+                title={item.productName}
+                subtitle={`HS ${item.hsCode}`}
+                fields={[
+                  { label: '数量', value: `${item.quantity.toLocaleString()} ${item.unit || ''}` },
+                  { label: '单价', value: item.unitPrice ?? '-' },
+                ]}
+                amount={{ label: '总价', value: `${declaration.currency} ${item.totalPrice ?? '-'}` }}
+              />
+            )) : <p className="py-10 text-center text-sm text-muted-foreground">暂无商品明细。</p>}
+          </div>
+          <div className="hidden md:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -271,6 +287,7 @@ export function CustomsDeclarationDetailPageContent({
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

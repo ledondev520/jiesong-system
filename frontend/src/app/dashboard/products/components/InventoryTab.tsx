@@ -1,6 +1,6 @@
 /**
  * Input: 库存服务、SortableTableHead、useTableSort
- * Output: 库存状态管理 Tab 组件（单条/批量状态流转、桌面表列排序）
+ * Output: 支持窄屏操作与长名称显示的库存状态管理 Tab 组件（单条/批量状态流转、桌面表列排序）
  * Pos: 商品档案页面的子 Tab
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -312,10 +312,10 @@ export function InventoryTab() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:hidden">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 md:hidden">
         <Sheet open={mobileActionsOpen} onOpenChange={setMobileActionsOpen}>
           <SheetTrigger asChild>
-            <Button variant="outline" className="h-11 rounded-2xl">
+            <Button variant="outline" className="h-11 rounded-2xl px-3 text-xs sm:text-sm">
               <Search className="mr-2 h-4 w-4" />
               搜索与批量操作
             </Button>
@@ -374,7 +374,7 @@ export function InventoryTab() {
             </div>
           </SheetContent>
         </Sheet>
-        <div className="flex h-11 items-center justify-center rounded-2xl border border-border/70 bg-muted/35 text-sm font-medium text-foreground">
+        <div className="flex h-11 items-center justify-center rounded-2xl px-3 border border-border/70 bg-muted/35 text-sm font-medium text-foreground">
           已选 {selectedIds.length} 条
         </div>
       </div>
@@ -414,14 +414,14 @@ export function InventoryTab() {
               <Card key={item.id} className="border-border/70">
                 <CardContent className="space-y-4 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
                       <Checkbox
                         checked={selectedIds.includes(item.id)}
                         onCheckedChange={() => toggleSelectedId(item.id)}
                         aria-label={`选择库存 ${itemLabel}`}
                         className="mt-1"
                       />
-                      <div className="space-y-1">
+                      <div className="min-w-0 space-y-1 break-words">
                         <p className="text-base font-semibold tracking-tight">{item.product?.customsName}</p>
                         <p className="text-sm text-muted-foreground">
                           合同号：{item.purchaseItem?.purchaseContract?.contractNo || '-'}

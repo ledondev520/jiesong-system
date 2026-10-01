@@ -1,12 +1,12 @@
 /**
  * Input: 当前路由路径、搜索关键词
- * Output: Mac 风格设置左侧导航栏（含搜索过滤）
- * Pos: 系统管理 > 设置布局左侧导航
+ * Output: 设置导航（含搜索过滤），手机端使用可收起的原生菜单
+ * Pos: 系统管理 > 设置布局侧栏与手机菜单
  */
 
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -72,9 +72,11 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function SettingsNav() {
+export function SettingsNav({ mobile = false }: { mobile?: boolean }) {
   const pathname = usePathname();
   const [query, setQuery] = useState('');
+  const menuRef = useRef<HTMLDetailsElement>(null);
+  const currentItem = navGroups.flatMap((group) => group.items).find((item) => isActive(pathname, item.href));
 
   const filteredGroups = useMemo(() => {
     if (!query.trim()) return navGroups;
@@ -87,7 +89,7 @@ export function SettingsNav() {
       .filter((g) => g.items.length > 0);
   }, [query]);
 
-  return (
+  const content = (
     <div className="flex h-full flex-col">
       {/* 搜索 */}
       <div className="px-3 pb-4 pt-2">
@@ -117,8 +119,10 @@ export function SettingsNav() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    aria-current={active ? 'page' : undefined}
+                    onClick={() => { if (menuRef.current) menuRef.current.open = false; }}
                     className={cn(
-                      'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors',
+                      'group flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors md:min-h-0',
                       active
                         ? 'bg-primary/10 text-primary'
                         : 'text-foreground/80 hover:bg-accent hover:text-foreground'
@@ -135,5 +139,19 @@ export function SettingsNav() {
         ))}
       </div>
     </div>
+  );
+
+  if (!mobile) return content;
+
+  return (
+    <details key={pathname} ref={menuRef} className="group rounded-xl border bg-card">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
+        <SlidersHorizontal className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <span>设置菜单</span>
+        <span className="min-w-0 flex-1 truncate text-muted-foreground">· {currentItem?.label ?? '系统设置'}</span>
+        <ChevronRight className="h-4 w-4 shrink-0 transition-transform group-open:rotate-90" />
+      </summary>
+      <div className="max-h-[60dvh] overflow-y-auto border-t pt-2">{content}</div>
+    </details>
   );
 }

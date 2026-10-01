@@ -1,6 +1,6 @@
 /**
  * Input: 一笔待分配收款，当前所有未收齐的销售合同列表
- * Output: 将收款金额按用户指定比例分配到多张合同
+ * Output: 窄屏可换行分配操作、将收款金额按用户指定比例分配到多张合同
  * Pos: 财务收款流程第二步 - 把到账款分配到具体合同
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -178,7 +178,7 @@ export function AllocateDialog({ open, onOpenChange, payment, receivables, onSub
               rows.map((row) => (
                 <div
                   key={row.contractId}
-                  className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
+                  className={`flex flex-wrap items-center gap-3 rounded-lg border p-3 transition-colors ${
                     row.selected ? 'border-primary/50 bg-primary/5' : 'bg-background'
                   }`}
                 >
@@ -187,7 +187,7 @@ export function AllocateDialog({ open, onOpenChange, payment, receivables, onSub
                     checked={row.selected}
                     onCheckedChange={() => toggleRow(row.contractId)}
                   />
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1 basis-32">
                     <Label htmlFor={`alloc-${row.contractId}`} className="font-medium text-sm cursor-pointer">
                       {row.contractNo}
                     </Label>

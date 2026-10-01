@@ -1,6 +1,6 @@
 /**
  * Input: 发票查询 API
- * Output: 发票台账查询页面（表头可排序：开票日期、销方、金额类列）
+ * Output: 发票台账查询页面（手机卡片与可排序桌面表格）
  * Pos: 财务模块-发票台账子页面
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/lib/hooks/useTableSort';
 import { useSearchParams } from 'next/navigation';
+import { MobileListCard } from '@/components/mobile';
 import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -174,8 +175,39 @@ export default function InvoicesPage() {
           </Button>
         </div>
 
-        {/* 表格 */}
-        <Card>
+        <div className="space-y-3 md:hidden">
+          {loading ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">加载中...</p>
+          ) : items.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">暂无数据</p>
+          ) : sort.sortedData.map(item => (
+            <MobileListCard
+              key={item.id}
+              title={item.seller}
+              subtitle={item.itemName || '未填写品名'}
+              badge={statusBadge(item.status, item.isPositive)}
+              fields={[
+                { label: '开票日期', value: item.invDate },
+                { label: '票种', value: item.invoiceType?.includes('专用') ? '专票' : '普票' },
+                { label: '金额', value: `¥${fmt(item.amount)}` },
+                { label: '税额', value: `¥${fmt(item.tax)}` },
+              ]}
+              amount={{ label: '价税合计', value: `¥${fmt(item.total)}` }}
+              action={
+                <div className="space-y-2">
+                  <p className="break-words text-xs text-muted-foreground">{item.seller} · {item.itemName || '未填写品名'}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" className="h-11" onClick={() => { setSearch(item.seller); setPage(1); }}>筛选销方</Button>
+                    <Button variant="outline" className="h-11" asChild><Link href={`/dashboard/finance/bank-flow?search=${encodeURIComponent(item.seller)}`}>相关流水</Link></Button>
+                  </div>
+                </div>
+              }
+            />
+          ))}
+        </div>
+
+        {/* 桌面端表格 */}
+        <Card className="hidden md:block">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>

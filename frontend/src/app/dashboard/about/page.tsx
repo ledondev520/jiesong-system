@@ -30,8 +30,8 @@ const copyText = async (text: string, successMessage: string) => {
 };
 
 const CodeBlock = ({ title, code, copyLabel }: { title: string; code: string; copyLabel: string }) => (
-  <Card className="border-border/70 bg-muted/20">
-    <CardHeader className="flex flex-row items-center justify-between pb-3">
+  <Card className="min-w-0 border-border/70 bg-muted/20">
+    <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 pb-3">
       <CardTitle className="text-sm">{title}</CardTitle>
       <Button variant="outline" size="sm" onClick={() => void copyText(code, `${copyLabel}已复制`)}>
         <Copy className="mr-2 h-4 w-4" />
@@ -39,7 +39,7 @@ const CodeBlock = ({ title, code, copyLabel }: { title: string; code: string; co
       </Button>
     </CardHeader>
     <CardContent>
-      <pre className="overflow-x-auto rounded-lg bg-background p-4 text-xs leading-6 text-foreground">
+      <pre tabIndex={0} aria-label={title} className="max-w-full overflow-x-auto rounded-lg bg-background p-4 text-xs leading-6 text-foreground">
         <code>{code}</code>
       </pre>
     </CardContent>
@@ -92,7 +92,7 @@ export default function AboutAgentPage() {
   ].join('\n'), [origin]);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6 break-words">
       <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
       <PageHeader
         title="关于 Agent 使用"
@@ -107,7 +107,7 @@ export default function AboutAgentPage() {
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <Card className="border-primary/15 bg-gradient-to-br from-background via-background to-primary/5">
           <CardHeader className="space-y-3">
             <div className="flex items-center gap-2">
@@ -168,7 +168,7 @@ export default function AboutAgentPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <CodeBlock title="一键安装命令（推荐给内部同事）" code={oneLineInstallSnippet} copyLabel="复制安装命令" />
         <CodeBlock title="环境变量（远程 Agent / 本机 CLI 都通用）" code={envSnippet} copyLabel="复制环境变量" />
         <CodeBlock title="远程 HTTP MCP 最小探活（推荐）" code={mcpSnippet} copyLabel="复制探活命令" />
@@ -196,7 +196,7 @@ export default function AboutAgentPage() {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[0.95fr_1.05fr]">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">一句话提示词示例</CardTitle>

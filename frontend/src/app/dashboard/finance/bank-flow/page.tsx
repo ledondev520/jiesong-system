@@ -1,6 +1,6 @@
 /**
  * Input: 银行流水 API
- * Output: 银行流水查询页面（表头可排序：日期、金额、对方名称）
+ * Output: 手机合计栏自动换行、银行流水查询页面（表头可排序：日期、金额、对方名称）
  * Pos: 财务模块-银行流水子页面
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -323,7 +323,7 @@ export default function BankFlowPage() {
         {/* 合计栏 */}
         {stats && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3">
-            <div className="flex items-center gap-4 text-sm">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
               <span className="text-muted-foreground">本页合计</span>
               <span className="font-semibold text-emerald-600">
                 收 ¥{fmt(filteredByAmount.filter(i => i.direction === 'IN').reduce((s, i) => s + Math.abs(i.amount), 0))}

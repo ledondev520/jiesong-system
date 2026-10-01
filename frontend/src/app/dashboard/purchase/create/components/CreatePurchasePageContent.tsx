@@ -1,6 +1,6 @@
 /**
  * Input: purchaseService, supplierService, productService
- * Output: 创建采购合同页面
+ * Output: 支持窄屏供应商选择和单列表单的创建采购合同页面
  * Pos: 采购合同创建入口
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -146,7 +146,7 @@ function StepIndicator({
             <button
               type="button"
               onClick={() => onChange(stepNum)}
-              className="flex items-center gap-2.5 rounded-full px-4 py-2.5 text-sm font-medium transition-all"
+              className="flex items-center gap-2 rounded-full px-2 py-2.5 sm:gap-2.5 sm:px-4 text-sm font-medium transition-all"
             >
               <span
                 className={cn(
@@ -169,7 +169,7 @@ function StepIndicator({
               </span>
             </button>
             {idx < steps.length - 1 && (
-              <div className={cn('mx-2 h-px w-8', isCompleted ? 'bg-emerald-500' : 'bg-border')} />
+              <div className={cn('mx-1 h-px w-4 sm:mx-2 sm:w-8', isCompleted ? 'bg-emerald-500' : 'bg-border')} />
             )}
           </div>
         );
@@ -683,7 +683,7 @@ export default function CreatePurchasePage() {
             onValueChange={handleApplyTemplate}
             disabled={templatesLoading}
           >
-            <SelectTrigger className="h-9 w-[240px] rounded-md text-xs">
+            <SelectTrigger className="h-10 w-full rounded-md text-xs sm:w-[240px]">
               <SelectValue placeholder={templatesLoading ? '加载中...' : '选择合同模板'} />
             </SelectTrigger>
             <SelectContent>
@@ -1074,7 +1074,7 @@ export default function CreatePurchasePage() {
                                 </Button>
                               </FormControl>
                             </PopoverTrigger>
-                            <PopoverContent className="w-[400px] p-0" align="start">
+                            <PopoverContent className="w-[400px] max-w-[calc(100vw-2rem)] p-0" align="start">
                               <Command shouldFilter={false}>
                                 <Label htmlFor="purchase-supplier-search" className="sr-only">
                                   搜索供应商
@@ -1437,7 +1437,7 @@ export default function CreatePurchasePage() {
                 placeholder="例如：佛山市某某陶瓷有限公司"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="new-supplier-contact-name">联系人</Label>
                 <Input

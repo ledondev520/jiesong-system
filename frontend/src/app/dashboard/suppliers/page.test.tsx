@@ -11,6 +11,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SuppliersPage from './page';
 
+const mockIsMobile = vi.fn(() => false);
+
+vi.mock('@/lib/hooks/useMobile', () => ({ useMobile: () => mockIsMobile() }));
+
 const mockGetAll = vi.fn();
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
@@ -50,6 +54,7 @@ vi.mock('@/lib/api-cache', () => ({
 
 describe('SuppliersPage 表单页交互逻辑', () => {
   beforeEach(() => {
+    mockIsMobile.mockReturnValue(false);
     mockGetAll.mockReset();
     mockCreate.mockReset();
     mockUpdate.mockReset();
@@ -96,7 +101,9 @@ describe('SuppliersPage 表单页交互逻辑', () => {
     });
   });
 
-  it('选择已有供应商后在同一页表单编辑保存', async () => {
+  it('手机选择供应商后定位表单并编辑保存', async () => {
+    mockIsMobile.mockReturnValue(true);
+    const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
     mockGetAll
       .mockResolvedValueOnce({
         data: {
@@ -125,6 +132,8 @@ describe('SuppliersPage 表单页交互逻辑', () => {
     expect(screen.getByLabelText('公司名称 *')).toHaveValue('佛山陶瓷有限公司');
     expect(screen.getByLabelText('联系人')).toHaveValue('李总');
     expect(screen.getByText('编辑现有档案')).toBeInTheDocument();
+    expect(scroll).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    scroll.mockRestore();
 
     await user.clear(screen.getByLabelText('联系人'));
     await user.type(screen.getByLabelText('联系人'), '李经理');

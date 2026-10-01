@@ -10,6 +10,9 @@ import userEvent from '@testing-library/user-event';
 import { PurchaseFlowPanel } from './PurchaseFlowPanel';
 import type { PurchaseContract } from '@/types';
 
+const mockIsMobile = vi.fn(() => false);
+vi.mock('@/lib/hooks/useMobile', () => ({ useMobile: () => mockIsMobile() }));
+
 const mockGetPreparation = vi.fn();
 const mockRegisterNumbers = vi.fn();
 const mockUploadFile = vi.fn();
@@ -98,6 +101,7 @@ const contract = {
 
 describe('PurchaseFlowPanel supplier invoice flow', () => {
   beforeEach(() => {
+    mockIsMobile.mockReturnValue(false);
     vi.clearAllMocks();
     mockGetPreparation.mockResolvedValue({ data: preparation });
     mockRegisterNumbers.mockResolvedValue({
@@ -106,6 +110,16 @@ describe('PurchaseFlowPanel supplier invoice flow', () => {
     mockUploadFile.mockResolvedValue({
       data: { ...preparation.invoiceFiles[0], id: 'file-2', fileName: '新发票.pdf' },
     });
+  });
+
+  it('手机付款卡片完整显示金额、日期、方式和备注', () => {
+    mockIsMobile.mockReturnValue(true);
+    render(<PurchaseFlowPanel contract={{ ...contract, payments: [{ id: 'payment-1', paymentDate: '2026-07-06T00:00:00.000Z', amount: 100, paymentMethod: '转账', note: '手机付款备注' }] } as PurchaseContract} onUpdated={vi.fn()} />);
+    expect(screen.getByText('2026-07-06')).toBeInTheDocument();
+    expect(screen.getByText('转账')).toBeInTheDocument();
+    expect(screen.getByText('手机付款备注')).toBeInTheDocument();
+    expect(screen.getByText('¥100.00')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
   it('打开催票弹窗时读取权威准备状态，并通过专用入口保存多个号码', async () => {

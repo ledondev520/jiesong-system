@@ -11,6 +11,9 @@ import { render, screen } from '@testing-library/react';
 import { LazyAIAssistantMount } from './LazyAIAssistantMount';
 
 let mockPathname = '/dashboard';
+let mockMobile = false;
+
+vi.mock('@/lib/hooks/useMobile', () => ({ useMobile: () => mockMobile }));
 
 vi.mock('next/dynamic', () => ({
   default: () => () => <div>AI 助手挂载体</div>,
@@ -33,5 +36,13 @@ describe('LazyAIAssistantMount', () => {
     render(<LazyAIAssistantMount />);
 
     expect(screen.queryByText('AI 助手挂载体')).not.toBeInTheDocument();
+  });
+
+  it('手机工作台通过更多进入 AI，不再用悬浮入口遮挡列表', () => {
+    mockPathname = '/dashboard/contracts';
+    mockMobile = true;
+    render(<LazyAIAssistantMount />);
+    expect(screen.queryByText('AI 助手挂载体')).not.toBeInTheDocument();
+    mockMobile = false;
   });
 });

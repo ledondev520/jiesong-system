@@ -1,7 +1,7 @@
 /**
  * Input: 用户状态、导航配置
  * Output: 顶部导航栏组件
- * Pos: 全局 Header，负责装配移动导航、搜索、通知、用户菜单
+ * Pos: 全局 Header，移动端使用紧凑搜索入口，负责装配导航、通知、用户菜单
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -51,8 +51,8 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-6"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    <header className="sticky top-0 z-30 flex min-h-16 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:gap-4 md:px-6"
+      style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(4rem + env(safe-area-inset-top))' }}
     >
       {/* 汉堡菜单：移动端已有底部 TabBar，此处完全隐藏；仅保留 SSR 结构避免 hydration mismatch */}
       <div className="hidden" aria-hidden="true">
@@ -68,24 +68,24 @@ export function Header() {
       {/* 移动端品牌标识（仅移动端展示，桌面端侧边栏已有） */}
       <Link
         href="/dashboard"
-        className="flex items-center gap-2 md:hidden"
+        className="flex min-w-0 flex-1 items-center gap-2 md:hidden"
         aria-label="捷淞国际物流首页"
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
           <Ship className="h-3.5 w-3.5" />
         </span>
-        <span className="text-sm font-semibold">捷淞国际物流</span>
+        <span className="truncate text-sm font-semibold">捷淞国际物流</span>
       </Link>
 
-      <div className="flex flex-1 items-center gap-4">
-        <div className="lg:hidden">
+      <div className="flex min-w-0 shrink-0 items-center gap-4 md:flex-1">
+        <div className="hidden md:block lg:hidden">
           <HeaderContextPills todayLabel={todayLabel} />
         </div>
 
         <HeaderSearch />
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-1 md:gap-2">
         <ThemeToggle />
         <HeaderNotifications />
         {/* 用户菜单：桌面端保留，移动端通过底部TabBar"更多"入口访问 */}

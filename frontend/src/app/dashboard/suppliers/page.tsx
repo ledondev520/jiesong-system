@@ -1,6 +1,6 @@
 /**
  * Input: 供应商服务API、React Hook Form、ModuleTabHeader
- * Output: 供应商管理表单页（左侧选择供应商，右侧维护档案表单）
+ * Output: 手机选中后定位表单的供应商管理页（左侧选择供应商，右侧维护档案表单）
  * Pos: 采购模块基础档案表单页
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -30,6 +30,7 @@ import {
 import type { Supplier } from '@/types';
 import { supplierService } from '@/services/supplier.service';
 import { Button } from '@/components/ui/button';
+import { useMobile } from '@/lib/hooks/useMobile';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -145,6 +146,8 @@ function SupplierStatusBadge({ hasIssue }: { hasIssue: boolean }) {
 }
 
 export default function SuppliersPage() {
+  const isMobile = useMobile();
+  const formSectionRef = useRef<HTMLElement>(null);
   const [suppliers, setSuppliers] = useState<SupplierDisplay[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeSupplierId, setActiveSupplierId] = useState<string | null>(null);
@@ -229,10 +232,12 @@ export default function SuppliersPage() {
   const startNewSupplier = () => {
     setActiveSupplierId(null);
     form.reset(emptySupplierValues);
+    if (isMobile) formSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const selectSupplier = (supplier: SupplierDisplay) => {
     setActiveSupplierId(supplier.id);
+    if (isMobile) formSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleSubmit = async (values: SupplierFormValues) => {
@@ -335,7 +340,7 @@ export default function SuppliersPage() {
             )}
           </div>
 
-          <div className="max-h-[620px] overflow-y-auto p-2">
+          <div className="max-h-[320px] overflow-y-auto overscroll-contain p-2 lg:max-h-[620px]">
             {loading ? (
               <div className="py-10 text-center text-sm text-muted-foreground">加载中...</div>
             ) : filteredSuppliers.length === 0 ? (
@@ -390,10 +395,10 @@ export default function SuppliersPage() {
           </div>
         </aside>
 
-        <section className="rounded-xl border border-border/50 bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+        <section ref={formSectionRef} className="min-w-0 scroll-mt-20 rounded-xl border border-border/50 bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
           <div className="flex flex-col gap-3 border-b border-border/50 p-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Building2 className="h-5 w-5 text-primary" />
                 <h2 className="text-lg font-semibold">供应商档案表单</h2>
                 <Badge variant={activeSupplier ? 'outline' : 'secondary'} className="rounded-full">

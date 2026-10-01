@@ -1,6 +1,6 @@
 /**
  * Input: 当前 pathname、路由配置
- * Output: 面包屑导航组件
+ * Output: 可换行的面包屑导航组件与可访问首页入口
  * Pos: 全局面包屑，显示用户当前位置
  */
 
@@ -68,12 +68,13 @@ export function Breadcrumbs({ className }: { className?: string }) {
     <nav
       aria-label="面包屑"
       className={cn(
-        'flex items-center gap-1.5 text-sm text-muted-foreground',
+        'flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground',
         className,
       )}
     >
       <Link
         href="/dashboard"
+        aria-label="工作台"
         className="flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors hover:bg-accent hover:text-foreground"
       >
         <Home className="h-3.5 w-3.5" />
@@ -81,10 +82,10 @@ export function Breadcrumbs({ className }: { className?: string }) {
       </Link>
 
       {crumbs.map((crumb) => (
-        <div key={crumb.href} className="flex items-center gap-1.5">
+        <div key={crumb.href} className="flex min-w-0 items-center gap-1.5">
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />
           {crumb.isLast ? (
-            <span className="font-medium text-foreground">{crumb.label}</span>
+            <span className="break-words font-medium text-foreground">{crumb.label}</span>
           ) : (
             <Link
               href={crumb.href}

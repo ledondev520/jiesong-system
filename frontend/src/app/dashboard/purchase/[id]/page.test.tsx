@@ -12,6 +12,10 @@ import userEvent from '@testing-library/user-event';
 import { Suspense } from 'react';
 import PurchaseDetailPage from './page';
 
+const mockIsMobile = vi.fn(() => false);
+
+vi.mock('@/lib/hooks/useMobile', () => ({ useMobile: () => mockIsMobile() }));
+
 const mockGetById = vi.fn();
 const mockToastError = vi.fn();
 const mockExportPurchasePdf = vi.fn();
@@ -82,6 +86,7 @@ vi.mock('@/lib/axios', () => ({
 
 describe('PurchaseDetailPage 交互逻辑', () => {
   beforeEach(() => {
+    mockIsMobile.mockReturnValue(false);
     mockGetById.mockReset();
     mockToastError.mockReset();
     mockExportPurchasePdf.mockReset();
@@ -288,7 +293,8 @@ describe('PurchaseDetailPage 交互逻辑', () => {
     expect(await screen.findByRole('button', { name: '确认供应商已发货' })).toBeDisabled();
   });
 
-  it('采购详情把单价解释为不含税、明细与合同总额解释为含税且不重复加税', async () => {
+  it('手机商品卡片展示不含税单价和含税合计且不重复加税', async () => {
+    mockIsMobile.mockReturnValue(true);
     mockGetById.mockResolvedValue({
       data: {
         id: 'p-1',
@@ -318,5 +324,7 @@ describe('PurchaseDetailPage 交互逻辑', () => {
     expect(screen.getByText('¥1,000')).toBeInTheDocument();
     expect(screen.getByText('¥130')).toBeInTheDocument();
     expect(screen.queryByText('¥1,276.9')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.getByText('不含税单价')).toBeInTheDocument();
   });
 });

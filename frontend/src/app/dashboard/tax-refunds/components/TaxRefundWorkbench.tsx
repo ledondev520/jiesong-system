@@ -1,6 +1,6 @@
 /**
  * Input: 出口退税工作台 Interface、进项发票导入与退税草稿/申报明细操作
- * Output: 准备清单、发票核验、申报明细三段式网页工作台
+ * Output: 手机卡片与桌面表格展示准备清单、发票核验、申报明细工作台
  * Pos: 出口退税页面主操作面；税局登录、勾选和提交仍由用户在官方系统完成
  */
 
@@ -12,6 +12,7 @@ import {
   AlertTriangle, CheckCircle2, Download, FileCheck2, FileSearch, Loader2, ReceiptText, Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { MobileListCard } from '@/components/mobile';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -161,7 +162,40 @@ export function TaxRefundWorkbench() {
         {(keyword || stage !== 'ALL') && <Button variant="ghost" onClick={() => { setKeyword(''); setStage('ALL'); }}>重置</Button>}
       </div>
 
-      <Card className="overflow-hidden">
+      <div className="space-y-3 md:hidden">
+        {loading ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">加载中...</p>
+        ) : !data?.items.length ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">当前没有符合条件的待退税出口</p>
+        ) : data.items.map((item) => (
+          <MobileListCard
+            key={item.salesContractId}
+            title={item.contractNo}
+            subtitle={item.declaration?.declarationNo || '未关联报关单'}
+            badge={<Badge variant="outline" className={stageMeta[item.stage].className}>{stageMeta[item.stage].label}</Badge>}
+            fields={[
+              { label: '核验通过', value: item.invoiceSummary.pass },
+              { label: '待复核', value: item.invoiceSummary.review },
+              { label: '缺失发票', value: item.invoiceSummary.missing },
+              { label: '出货日期', value: item.shippedAt ? new Date(item.shippedAt).toLocaleDateString('zh-CN') : '未登记' },
+            ]}
+            amount={{ label: '草稿可退税额', value: `¥${item.estimatedRefundableAmount.toLocaleString()}` }}
+            onClick={() => router.push(`/dashboard/sales/${item.salesContractId}`)}
+            action={
+              <div className="space-y-3">
+                <p className="break-words text-xs text-muted-foreground">{item.issues.length ? item.issues.join('；') : '内部校验通过'}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button className="h-11 flex-1" variant="outline" onClick={() => openPreparation(item)}><FileCheck2 className="mr-1 h-4 w-4" />材料</Button>
+                  <Button className="h-11 flex-1" variant="outline" onClick={() => openVerification(item)}><FileSearch className="mr-1 h-4 w-4" />发票</Button>
+                  {item.taxRefund && <Button className="h-11" variant="outline" onClick={() => router.push(`/dashboard/tax-refunds/${item.taxRefund?.id}`)}>退税单</Button>}
+                </div>
+              </div>
+            }
+          />
+        ))}
+      </div>
+
+      <Card className="hidden overflow-hidden md:block">
         <CardHeader className="border-b"><CardTitle className="text-base">待申报清单</CardTitle></CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">

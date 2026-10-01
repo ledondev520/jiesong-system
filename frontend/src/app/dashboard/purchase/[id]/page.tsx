@@ -1,6 +1,6 @@
 /**
  * Input: 采购合同详情API、购销合同生成服务、系统配置（盖章平台/开票抬头）、PurchaseFlowPanel、SortableTableHead、useTableSort
- * Output: 采购合同详情页面（商品明细、合同归档、付款、生产资料、实物图与发票面板）
+ * Output: 支持手机商品明细卡片的采购合同详情页面（商品明细、合同归档、付款、生产资料、实物图与发票面板）
  * Pos: 采购管理子页面，承载「签合同→盖章→付款→生产完工→催票」的单合同主线路
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -14,6 +14,8 @@ import { purchaseService } from '@/services/purchase.service';
 import { contractDocService } from '@/services/contractDoc.service';
 import { listContractFiles, type ContractFile } from '@/services/contractFile.service';
 import { Button } from '@/components/ui/button';
+import { MobileListCard } from '@/components/mobile';
+import { useMobile } from '@/lib/hooks/useMobile';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -244,6 +246,7 @@ function ContractTimeline({ currentStatus }: { currentStatus: PurchaseStatus }) 
 }
 
 export default function PurchaseDetailPage({ params }: PageProps) {
+  const isMobile = useMobile();
   const { id } = use(params);
   const [contract, setContract] = useState<PurchaseContract | null>(null);
   const [loading, setLoading] = useState(true);
@@ -614,7 +617,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">基本信息</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 pt-0">
+          <CardContent className="space-y-3 break-words pt-0">
             <div className="flex items-start gap-3">
               <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div>
@@ -659,7 +662,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">供应商信息</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 pt-0">
+          <CardContent className="space-y-3 break-words pt-0">
             <div className="flex items-start gap-3">
               <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div>
@@ -717,6 +720,26 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         <CardContent>
           {!purchaseLineSort.sortedData.length ? (
             <div className="py-10 text-center text-sm text-muted-foreground">暂无商品明细</div>
+          ) : isMobile ? (
+            <div className="space-y-3">
+              {purchaseLineSort.sortedData.map((item: PurchaseItem) => (
+                <MobileListCard
+                  key={item.id}
+                  title={item.product?.customsName || '未知商品'}
+                  subtitle={item.specification || item.product?.specification || '-'}
+                  fields={[
+                    { label: '数量', value: `${item.quantity} ${item.unit || item.product?.unit || ''}` },
+                    { label: '不含税单价', value: `¥${(Number(item.unitPrice) || 0).toLocaleString()}` },
+                  ]}
+                  amount={{ label: '含税小计', value: `¥${calculatePurchaseLineAmounts(item, amountSummary.taxRate).grossAmount.toLocaleString()}`, emphasis: 'success' }}
+                />
+              ))}
+              <dl className="space-y-2 rounded-lg bg-muted/40 p-4 text-sm">
+                <div className="flex flex-wrap justify-between gap-2"><dt>不含税合计</dt><dd className="font-mono">¥{amountSummary.netAmount.toLocaleString()}</dd></div>
+                <div className="flex flex-wrap justify-between gap-2"><dt>其中税额 ({amountSummary.taxRate}%)</dt><dd className="font-mono">¥{amountSummary.taxAmount.toLocaleString()}</dd></div>
+                <div className="flex flex-wrap justify-between gap-2 font-semibold"><dt>含税合计</dt><dd className="font-mono">¥{amountSummary.lineGrossAmount.toLocaleString()}</dd></div>
+              </dl>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>

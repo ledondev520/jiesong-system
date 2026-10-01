@@ -1,6 +1,6 @@
 /**
  * Input: 报关单初始数据、提交动作
- * Output: 报关单创建/编辑共享表单
+ * Output: 报关单创建/编辑共享表单（窄屏操作栏换行）
  * Pos: 报关单管理共享表单组件
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -468,9 +468,9 @@ export function CustomsDeclarationForm({
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>商品明细</CardTitle>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
                 variant="outline"
@@ -617,7 +617,7 @@ export function CustomsDeclarationForm({
         </Card>
 
         <div className="flex justify-end">
-          <Button type="submit" className="rounded-xl" disabled={form.formState.isSubmitting}>
+          <Button type="submit" className="h-11 w-full rounded-xl sm:w-auto" disabled={form.formState.isSubmitting}>
             {submitLabel}
           </Button>
         </div>

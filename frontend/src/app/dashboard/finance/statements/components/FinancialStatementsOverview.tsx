@@ -1,6 +1,6 @@
 /**
  * Input: 财务报表概览数据、操作回调与状态
- * Output: 可独立或嵌入展示的页面头部、空态、预警、KPI 与营运资金概览
+ * Output: 可独立或嵌入展示的响应式页面头部、空态、预警、KPI 与营运资金概览
  * Pos: 财务报表概览分区
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -129,7 +129,7 @@ export function FinancialStatementsOverview({
           title="财务报表分析"
           description="月度会计数据看板：资产负债表 · 利润表 · 智能预警"
           actions={
-            <div className="flex items-center gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
               {hasData && (
                 <Select value={selectedPeriod} onValueChange={onSelectPeriod}>
                   <SelectTrigger className="w-36">
@@ -144,7 +144,7 @@ export function FinancialStatementsOverview({
                   </SelectContent>
                 </Select>
               )}
-              <Button onClick={onOpenUploadDialog} variant="default" className="h-10">
+              <Button onClick={onOpenUploadDialog} variant="default" className="h-11 w-full sm:w-auto">
                 <Upload className="mr-2 h-4 w-4" />
                 上传月度会计报表
               </Button>
@@ -186,7 +186,7 @@ export function FinancialStatementsOverview({
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {detailLoading && (
-              <div className="col-span-4 flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="col-span-full flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 加载账期数据...
               </div>

@@ -1,6 +1,6 @@
 /**
  * Input: 采购合同详情（含供应商/明细/付款记录）、付款与供应商发票准备 Interface
- * Output: 付款轨迹、汇款文本、催票清单、规范化发票号码和选填发票附件
+ * Output: 支持手机付款卡片的付款轨迹、汇款文本、催票清单、规范化发票号码和选填发票附件
  * Pos: 采购合同详情页子组件，覆盖「签合同 → 付定金 → 付尾款 → 催发票」链路动作
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -10,6 +10,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
+import { MobileListCard } from '@/components/mobile';
+import { useMobile } from '@/lib/hooks/useMobile';
 import { toast } from 'sonner';
 import {
   Banknote,
@@ -95,6 +97,7 @@ const formatMoney = (n: number) => `¥${n.toLocaleString('zh-CN', { minimumFract
  *   4. 「催开发票」生成开票信息文本 + 登记发票号（PurchaseContract.invoiceNo）
  */
 export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: PurchaseFlowPanelProps) {
+  const isMobile = useMobile();
   const invoiceFileInputRef = useRef<HTMLInputElement>(null);
   const [remitOpen, setRemitOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
@@ -342,6 +345,18 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
           <div className="rounded-lg bg-muted/40 py-6 text-center text-sm text-muted-foreground">
             暂无付款记录。付定金后点击「登记付款」，系统将自动计算剩余尾款。
           </div>
+        ) : isMobile ? (
+          <div className="space-y-3">
+            {payments.map((payment) => (
+              <MobileListCard
+                key={payment.id}
+                title={format(new Date(payment.paymentDate), 'yyyy-MM-dd')}
+                subtitle={payment.note || '无备注'}
+                fields={[{ label: '付款方式', value: payment.paymentMethod || '—' }]}
+                amount={{ label: '付款金额', value: formatMoney(payment.amount) }}
+              />
+            ))}
+          </div>
         ) : (
           <Table>
             <TableHeader>
@@ -383,7 +398,7 @@ export function PurchaseFlowPanel({ contract, onUpdated, invoiceTitleInfo }: Pur
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="remit-purpose">付款用途</Label>
                 <Select value={remitPurpose} onValueChange={(v) => setRemitPurpose(v as RemitPurpose)}>

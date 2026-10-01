@@ -1,6 +1,6 @@
 /**
  * Input: 退税服务、URL 查询参数、router
- * Output: 退税列表页
+ * Output: 窄屏单列汇总、退税列表页
  * Pos: 退税管理主列表页
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -219,7 +219,7 @@ export function TaxRefundListPageContent() {
         <span>退税单通过<strong>出口合同 → 一键生成三张表</strong>自动创建。此页面用于查看和跟进已生成的退税记录。</span>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 md:gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 md:gap-4">
         <Card className="surface-panel">
           <CardHeader>
             <CardTitle className="text-sm text-muted-foreground">当前记录数</CardTitle>

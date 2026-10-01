@@ -1,6 +1,6 @@
 /**
  * Input: 专项单主线路、采购/出口摘要、财务账期、WPS同步状态与当前用户
- * Output: 以“每笔专项单唯一下一动作”为核心的经营中台工作台
+ * Output: 以“每笔专项单唯一下一动作”为核心、手机端紧凑展示的经营中台工作台
  * Pos: 经营中台首页；主线路是执行入口，指标和快速动作仅作辅助
  */
 
@@ -148,7 +148,7 @@ export default function DashboardPage() {
   if (!user) return null;
 
   return (
-    <div className="space-y-8 pb-16">
+    <div className="space-y-5 pb-4 md:space-y-8 md:pb-16">
       <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
       <PageHeader
         title="工作台"
@@ -175,10 +175,10 @@ export default function DashboardPage() {
         unavailable={workflowUnavailable}
       />
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="经营指标">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="经营指标">
         {indicators.map((item) => (
-          <Card key={item.label} className="border-border/70">
-            <CardContent className="flex items-center justify-between p-4">
+          <Card key={item.label} className="border-border/70 py-0 md:py-6">
+            <CardContent className="flex items-center justify-between gap-2 p-3 md:p-4">
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">{item.label}</p>
                 <p className="mt-1 truncate text-2xl font-semibold tabular-nums">{item.value}</p>
@@ -217,14 +217,14 @@ export default function DashboardPage() {
             <CardTitle className="text-base">资金摘要</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
-            <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/60 px-3 py-2.5">
               <span className="flex items-center gap-2 text-muted-foreground">
                 <Banknote className="h-4 w-4" />
                 出口待收（USD）
               </span>
               <span className="font-medium tabular-nums">{formatCurrency(metrics.receivable, 'USD')}</span>
             </div>
-            <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/60 px-3 py-2.5">
               <span className="flex items-center gap-2 text-muted-foreground">
                 <Receipt className="h-4 w-4" />
                 采购待付（CNY）

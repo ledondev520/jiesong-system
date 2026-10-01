@@ -1,6 +1,6 @@
 /**
  * Input: 商品数据
- * Output: 商品编辑对话框
+ * Output: 适配手机单列编辑的商品编辑对话框
  * Pos: 商品管理组件，支持录入报关名、HS编码、申报要素、规格、体积、重量等信息
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -268,7 +268,7 @@ export function ProductDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{product ? '编辑商品' : '新增商品'}</DialogTitle>
           <DialogDescription>
@@ -278,12 +278,12 @@ export function ProductDialog({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             {/* 基本信息 */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="customsName"
                 render={({ field }) => (
-                  <FormItem className="col-span-2">
+                  <FormItem className="sm:col-span-2">
                     <FormLabel>报关名称 *</FormLabel>
                     <FormControl>
                       <Input placeholder="请输入商品报关名" {...field} />
@@ -292,7 +292,7 @@ export function ProductDialog({
                   </FormItem>
                 )}
               />
-              <div className="col-span-2 rounded-xl border border-border/70 bg-muted/30 p-4">
+              <div className="sm:col-span-2 rounded-xl border border-border/70 bg-muted/30 p-4">
                 <div className="space-y-3">
                   <div>
                     <p className="text-sm font-medium">HS 编码智能匹配</p>
@@ -317,7 +317,7 @@ export function ProductDialog({
                         <button
                           key={`${suggestion.hsCode}-${suggestion.productName}`}
                           type="button"
-                          className="flex w-full items-center justify-between rounded-lg border border-border/70 bg-background px-3 py-2 text-left transition hover:border-primary/40 hover:bg-muted/50"
+                          className="flex w-full items-center justify-between gap-3 rounded-lg border border-border/70 bg-background px-3 py-2 text-left transition hover:border-primary/40 hover:bg-muted/50"
                           onClick={() => void handleSelectHsCode(suggestion)}
                           disabled={fillingCode === suggestion.hsCode}
                         >
@@ -329,7 +329,7 @@ export function ProductDialog({
                               {suggestion.hsCode}
                             </span>
                           </span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="shrink-0 text-xs text-muted-foreground">
                             {fillingCode === suggestion.hsCode
                               ? '填充中...'
                               : `税率 ${suggestion.taxRate}%`}
@@ -411,7 +411,7 @@ export function ProductDialog({
                 control={form.control}
                 name="declaration"
                 render={({ field }) => (
-                  <FormItem className="col-span-2">
+                  <FormItem className="sm:col-span-2">
                     <FormLabel>申报要素</FormLabel>
                     <FormControl>
                       <Input placeholder="例如: 抛光瓷砖，釉面，600x600mm" {...field} />
@@ -425,7 +425,7 @@ export function ProductDialog({
             {/* 尺寸信息（用于3D可视化） */}
             <div className="border-t pt-4">
               <h4 className="text-sm font-medium mb-3">尺寸信息（用于3D装箱可视化）</h4>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <FormField
                   control={form.control}
                   name="length"
@@ -489,12 +489,12 @@ export function ProductDialog({
             {/* 包装与重量信息 */}
             <div className="border-t pt-4">
               <h4 className="text-sm font-medium mb-3">包装与重量信息</h4>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="packingSpec"
                   render={({ field }) => (
-                    <FormItem className="col-span-2">
+                    <FormItem className="sm:col-span-2">
                       <FormLabel>包装规格</FormLabel>
                       <FormControl>
                         <Input placeholder="例如: 4片/箱, 10个/包" {...field} />

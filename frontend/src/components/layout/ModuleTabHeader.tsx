@@ -1,6 +1,6 @@
 /**
  * Input: 模块Tab配置数组、当前路由
- * Output: 模块内水平Tab导航栏（点击切换子页面）
+ * Output: 模块内Tab导航栏（手机换行且保证触摸高度，点击切换子页面）
  * Pos: 通用布局组件，给各业务模块提供统一的Tab切换导航
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -69,7 +69,7 @@ export function ModuleTabHeader({ tabs, moduleName }: ModuleTabHeaderProps) {
               key={tab.href}
               href={tab.href}
               className={cn(
-                'relative flex min-h-[40px] items-center whitespace-nowrap rounded-lg border border-border/60 bg-background px-3 py-2',
+                'relative flex min-h-[44px] items-center whitespace-nowrap rounded-lg border border-border/60 bg-background px-3 py-2',
                 'text-sm font-medium transition-colors md:min-h-[44px] md:rounded-none md:border-transparent md:bg-transparent md:px-4',
                 'hover:text-foreground',
                 active

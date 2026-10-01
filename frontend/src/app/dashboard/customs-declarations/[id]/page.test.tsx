@@ -108,7 +108,7 @@ describe('CustomsDeclarationDetailPage 交互逻辑', () => {
 
     expect(screen.getByText('Lima Tiles SAC')).toBeInTheDocument();
     expect(screen.getByText('已放行，待船开')).toBeInTheDocument();
-    expect(screen.getByText('釉面砖')).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: '釉面砖' })).toBeInTheDocument();
     expect(screen.getByText('69072190')).toBeInTheDocument();
   });
 
