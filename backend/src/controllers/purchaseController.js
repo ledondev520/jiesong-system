@@ -15,7 +15,7 @@ const {
   normalizePurchaseStatus,
   PURCHASE_STATUS,
 } = require('../services/purchaseStateMachine');
-const { applyPurchaseInStock, revertPurchaseInStock } = require('../services/inventorySnapshot');
+const { applyPurchaseInStock } = require('../services/inventorySnapshot');
 const { normalizePagination } = require('../utils/pagination');
 const auditLog = require('../utils/auditLog');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
@@ -58,7 +58,7 @@ const checkPriceWarnings = async (items, prismaClient) => {
     const averagePrice = prices.reduce((sum, p) => sum + p, 0) / prices.length;
     if (averagePrice <= 0) continue;
 
-    const currentPrice = item.unitPrice;
+    const currentPrice = Number(item.unitPrice);
     const diffPct = ((currentPrice - averagePrice) / averagePrice) * 100;
 
     if (diffPct > 10) {
@@ -77,25 +77,39 @@ const checkPriceWarnings = async (items, prismaClient) => {
 
 /**
  * 职责：获取采购合同列表
- * 思路：支持关键字搜索合同编号和供应商名称
+ * 思路：服务端分页与全部采购明细搜索共用筛选，汇总覆盖完整合同目录
  */
 const list = async (req, res, next) => {
   try {
     const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
-    const { status, supplierId, keyword } = req.query;
+    const { status, supplierId } = req.query;
+    const searchText = (key) => {
+      const value = req.query[key];
+      if (value === undefined) return '';
+      if (typeof value !== 'string') throw createError(`${key} 必须为文本`, 400);
+      return value.trim();
+    };
+    const keyword = searchText('keyword');
+    const productKeyword = searchText('productKeyword');
+    const storeName = searchText('storeName');
     const lite = req.query.lite === 'true' || req.query.lite === true;
     
     const where = {};
     if (status) where.status = status;
     if (supplierId) where.supplierId = supplierId;
+    if (storeName) where.storeName = { contains: storeName };
+    if (productKeyword) {
+      where.items = { some: { product: { customsName: { contains: productKeyword } } } };
+    }
     if (keyword) {
       where.OR = [
         { contractNo: { contains: keyword } },
         { supplier: { name: { contains: keyword } } },
+        { items: { some: { product: { customsName: { contains: keyword } } } } },
       ];
     }
     
-    const [contracts, total] = await Promise.all([
+    const [contracts, total, statusCounts, stores] = await Promise.all([
       prisma.purchaseContract.findMany({
         where,
         skip,
@@ -135,9 +149,13 @@ const list = async (req, res, next) => {
         orderBy: { contractNo: 'desc' }, // 按合同编号倒序
       }),
       prisma.purchaseContract.count({ where }),
+      prisma.purchaseContract.groupBy({ by: ['status'], _count: { _all: true } }),
+      prisma.purchaseContract.findMany({ where: { storeName: { not: null } }, select: { storeName: true }, distinct: ['storeName'] }),
     ]);
     
-    paginated(res, contracts, total, page, pageSize);
+    paginated(res, contracts, total, page, pageSize, {
+      summary: { statusCounts: Object.fromEntries(statusCounts.map((row) => [row.status, row._count._all])), stores: stores.map((row) => row.storeName).filter(Boolean) },
+    });
   } catch (error) {
     next(error);
   }
@@ -355,7 +373,6 @@ const updateStatus = async (req, res, next) => {
       throw createError('status 不能为空', 400);
     }
 
-    let revertResult = null;
     let applyResult = null;
 
     const contract = await prisma.$transaction(async (tx) => {
@@ -364,9 +381,13 @@ const updateStatus = async (req, res, next) => {
         select: {
           id: true,
           status: true,
+          paidAmount: true,
+          invoiceNo: true,
+          _count: { select: { payments: true } },
           items: {
             select: {
               id: true,
+              _count: { select: { inventories: true, packingItems: true } },
               specification: true,
               boxes: true,
               grossWeight: true,
@@ -390,6 +411,14 @@ const updateStatus = async (req, res, next) => {
       }
 
       const isTransition = existingContract.status !== targetStatus;
+      if (isTransition && targetStatus === PURCHASE_STATUS.CANCELLED && (
+        ![PURCHASE_STATUS.DRAFT, PURCHASE_STATUS.SIGNED].includes(normalizePurchaseStatus(existingContract.status))
+        || existingContract.paidAmount > 0 || existingContract.invoiceNo || existingContract._count.payments > 0
+        || existingContract.items.some((item) => item._count.inventories > 0 || item._count.packingItems > 0)
+      )) {
+        throw createError('仅尚未生产、未付款、未入库且未关联出口的合同可取消；已履行合同请先处理对应业务', 400);
+      }
+
       if (
         isTransition
         && [PURCHASE_STATUS.READY, PURCHASE_STATUS.SHIPPED].includes(targetStatus)
@@ -411,28 +440,8 @@ const updateStatus = async (req, res, next) => {
         applyResult = await applyPurchaseInStock(tx, id);
       }
 
-      // 反向流转：从入库状态回退时，回滚库存记录
-      if (isTransition && normalizePurchaseStatus(existingContract.status) === PURCHASE_STATUS.RECEIVED) {
-        revertResult = await revertPurchaseInStock(tx, id);
-      }
-
       return contract;
     });
-
-    // 记录回滚操作的审计日志
-    if (revertResult && revertResult.reverted > 0) {
-      await auditLog.logOperation({
-        userId: req.user?.id,
-        action: 'REVERT_IN_STOCK',
-        entity: 'PurchaseContract',
-        entityId: id,
-        oldValue: { status: PURCHASE_STATUS.RECEIVED, revertedInventoryCount: revertResult.reverted },
-        newValue: { status: targetStatus },
-        req,
-        note: `采购入库回滚：恢复 ${revertResult.reverted} 条库存记录`,
-      });
-      console.log(`[库存回滚] 采购合同 ${id}: 恢复 ${revertResult.reverted} 条入库记录`);
-    }
 
     // 记录入库操作的审计日志
     if (applyResult && (applyResult.created > 0 || applyResult.skipped > 0)) {
@@ -607,7 +616,7 @@ const getProductPriceHistory = async (req, res, next) => {
     const prices = historyItems
       .map((h) => ({
         contractNo: h.purchaseContract.contractNo,
-        price: h.totalPrice / h.quantity,
+        price: Number(h.unitPrice),
         date: h.purchaseContract.createdAt,
       }))
       .filter((h) => Number.isFinite(h.price) && h.price > 0);

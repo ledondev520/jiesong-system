@@ -165,3 +165,61 @@ test('downloadFile: 相对附件路径从 UPLOAD_DIR 解析，兼容已有绝对
     assert.equal(fs.readFileSync(file.filePath, 'utf8'), contents);
   }
 });
+
+test('updateStatus: 已收货正向完成保留库存', async (t) => {
+  t.mock.method(prisma, '$transaction', async (callback) => callback({
+    purchaseContract: {
+      findUnique: async () => ({ id: 'pc-1', status: 'RECEIVED', items: [{ id: 'pi-1' }] }),
+      update: async ({ data }) => ({ id: 'pc-1', ...data }),
+    },
+    inventory: { deleteMany: async () => { assert.fail('正向完成不可删除库存'); } },
+  }));
+  const res = { status() { return this; }, json(value) { this.payload = value; } };
+  await purchaseController.updateStatus({ params: { id: 'pc-1' }, body: { status: 'COMPLETED' } }, res, (error) => { throw error; });
+  assert.equal(res.payload.data.status, 'COMPLETED');
+});
+
+test('list: 服务端分页、商品全部明细搜索与店铺筛选共用条件', async (t) => {
+  let query;
+  const oldFind = prisma.purchaseContract.findMany; const oldCount = prisma.purchaseContract.count;
+  t.after(() => { prisma.purchaseContract.findMany = oldFind; prisma.purchaseContract.count = oldCount; });
+  prisma.purchaseContract.findMany = async (args) => { if (args.skip !== undefined) query = args; return []; };
+  const oldGroup = prisma.purchaseContract.groupBy; t.after(() => { prisma.purchaseContract.groupBy = oldGroup; });
+  prisma.purchaseContract.groupBy = async () => [];
+  prisma.purchaseContract.count = async ({ where }) => { assert.deepEqual(where, query.where); return 223; };
+  const res = { status() { return this; }, json(value) { this.payload = value; } };
+  await purchaseController.list({ query: { page: '6', pageSize: '20', productKeyword: '第二商品', storeName: '合成店铺' } }, res, (error) => { throw error; });
+  assert.equal(query.skip, 100);
+  assert.equal(query.take, 20);
+  assert.deepEqual(query.where.items, { some: { product: { customsName: { contains: '第二商品' } } } });
+  assert.deepEqual(query.where.storeName, { contains: '合成店铺' });
+  assert.equal(res.payload.data.pagination.total, 223);
+});
+
+test('getProductPriceHistory: 比价采用不含税单价', async (t) => {
+  const oldFind = prisma.purchaseItem.findMany; t.after(() => { prisma.purchaseItem.findMany = oldFind; });
+  prisma.purchaseItem.findMany = async () => [{ quantity: 10, unitPrice: 100, totalPrice: 1130, purchaseContract: { contractNo: 'synthetic', createdAt: new Date(0) } }];
+  const res = { status() { return this; }, json(value) { this.payload = value; } };
+  await purchaseController.getProductPriceHistory({ params: { productId: 'product-1' } }, res, (error) => { throw error; });
+  assert.equal(res.payload.data.averagePrice, 100);
+  assert.equal(res.payload.data.history[0].price, 100);
+});
+
+test('updateStatus: 仅未履行合同允许取消，已付款或已发货不得借取消回滚', async (t) => {
+  const oldTransaction = prisma.$transaction; t.after(() => { prisma.$transaction = oldTransaction; });
+  for (const existing of [
+    { status: 'DRAFT', paidAmount: 0, _count: { payments: 0 }, items: [] },
+    { status: 'SIGNED', paidAmount: 1, _count: { payments: 1 }, items: [] },
+    { status: 'SHIPPED', paidAmount: 0, _count: { payments: 0 }, items: [] },
+    { status: 'RECEIVED', paidAmount: 0, _count: { payments: 0 }, items: [] },
+    { status: 'DRAFT', paidAmount: 0, _count: { payments: 0 }, items: [{ _count: { inventories: 1, packingItems: 0 } }] },
+  ]) {
+    let updated = false;
+    prisma.$transaction = async (run) => run({ purchaseContract: { findUnique: async () => existing, update: async () => { updated = true; return { status: 'CANCELLED' }; } } });
+    let caught;
+    const res = { status() { return this; }, json() {} };
+    await purchaseController.updateStatus({ params: { id: 'p-1' }, body: { status: 'CANCELLED' } }, res, (error) => { caught = error; });
+    if (existing.status === 'DRAFT' && existing.items.length === 0) { assert.equal(caught, undefined); assert.equal(updated, true); }
+    else { assert.equal(caught?.statusCode, 400); assert.equal(updated, false); }
+  }
+});
