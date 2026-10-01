@@ -8,6 +8,7 @@
 
 const { Router } = require('express');
 const purchaseController = require('../controllers/purchaseController');
+const purchaseReceiptController = require('../controllers/purchaseReceiptController');
 const { authenticate, roleAuth } = require('../middleware/auth');
 const { accessAuth } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
@@ -54,6 +55,22 @@ router.put(
     }),
   }, purchaseController.registerInvoiceNumbers),
 );
+
+// 到货与验货是独立业务证据；普通审计日志仅保留动作形状，不复制数量、备注或操作结果正文。
+router.get('/:id/receipts', withIdValidation, withPaginationValidation, purchaseReceiptController.list);
+router.get('/:id/receipts/:receiptId/inspections', withIdValidation, withPaginationValidation, purchaseReceiptController.listInspections);
+router.post('/:id/receipts', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'WAREHOUSE'), withAuditLog({
+  entity: 'PurchaseReceipt', action: 'RECEIVE_BATCH', model: 'purchaseReceipt', captureBefore: false, captureAfter: false,
+  getEntityId: ({ responseData }) => responseData?.receipt?.id,
+  shouldLog: ({ responseData }) => responseData?.idempotentReplay !== true,
+  getNewValue: ({ responseData }) => ({ receiptId: responseData?.receipt?.id, itemCount: responseData?.receipt?.items?.length || 0, idempotentReplay: responseData?.idempotentReplay === true }),
+}, purchaseReceiptController.create));
+router.post('/:id/receipts/:receiptId/inspection', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'WAREHOUSE'), withAuditLog({
+  entity: 'PurchaseReceipt', action: 'INSPECT_BATCH', model: 'purchaseReceipt', captureBefore: false, captureAfter: false,
+  getEntityId: ({ responseData }) => responseData?.receipt?.id,
+  shouldLog: ({ responseData }) => responseData?.idempotentReplay !== true,
+  getNewValue: ({ responseData }) => ({ receiptId: responseData?.receipt?.id, status: responseData?.status, idempotentReplay: responseData?.idempotentReplay === true }),
+}, purchaseReceiptController.inspect));
 
 // GET /api/v1/purchases/:id - 获取采购合同详情
 router.get('/:id', withIdValidation, purchaseController.getById);
@@ -120,7 +137,7 @@ router.delete('/files/:fileId', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE'
 router.get('/files/:fileId/download', purchaseController.downloadFile);
 
 // GET /api/v1/purchases/price-history/:productId - 获取商品历史采购价格统计
-router.get('/price-history/:productId', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), purchaseController.getProductPriceHistory);
+router.get('/price-history/:productId', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE', 'BOSS'), purchaseController.getProductPriceHistory);
 
 // POST /api/v1/purchases/suppliers-by-products - 根据商品获取曾供应过的供应商
 router.post('/suppliers-by-products', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), purchaseController.getSuppliersByProducts);

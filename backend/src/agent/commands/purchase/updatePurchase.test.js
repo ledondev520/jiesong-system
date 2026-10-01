@@ -31,3 +31,10 @@ test('已签约或已关联付款/库存/出口/归档的草稿不可更换采�
     assert.equal(calls.length, 0);
   }
 });
+
+
+test('只有待验而未入库的到货证据也禁止HTTP/CLI/MCP共享更正', async () => {
+  const calls = [];
+  await assert.rejects(() => updatePurchase({ id: 'p-1', input: { note: '不能覆盖收货后的采购记录' }, prismaClient: client({ ...draft, _count: { payments: 0, files: 0, receipts: 1 } }, calls) }), /已有到货记录/);
+  assert.equal(calls.length, 0);
+});

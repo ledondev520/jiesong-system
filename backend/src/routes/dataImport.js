@@ -52,10 +52,10 @@ router.post('/', roleAuth('ADMIN'), systemUpload.single('file'), withAuditLog(
 ));
 
 // POST /api/v1/import/preview - 上传并预览CSV
-router.post('/preview', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), memoryUpload.single('file'), dataImportController.previewImport);
+router.post('/preview', roleAuth('ADMIN'), memoryUpload.single('file'), dataImportController.previewImport);
 
 // POST /api/v1/import/execute - 执行导入
-router.post('/execute', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.post('/execute', roleAuth('ADMIN'), withAuditLog(
   {
     entity: 'DataImport',
     action: 'IMPORT',

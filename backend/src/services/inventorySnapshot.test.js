@@ -9,6 +9,8 @@ const assert = require('node:assert/strict');
 const prisma = require('../utils/prisma');
 const {
   reconcileSalesFinancials,
+  applyPurchaseInStock,
+  applySalesOutStock,
   revertPurchaseInStock,
   revertSalesOutStock,
 } = require('./inventorySnapshot');
@@ -78,6 +80,7 @@ test('revertPurchaseInStock: 回滚采购入库操作', async () => {
       }),
       update: async () => ({}),
     },
+    purchaseReceipt: { count: async () => 0 },
     inventory: {
       deleteMany: async () => ({ count: 2 }),
     },
@@ -115,3 +118,37 @@ test('revertSalesOutStock: 回滚销售出库操作', async () => {
   assert.equal(result.reverted, 2);
 });
   prisma.salesContract.findUnique = async () => ({ amountSource: 'DERIVED' });
+
+
+test('旧整单入库能力不能绕过批次验货，已有验货证据不得直接回滚', async () => {
+  await assert.rejects(() => applyPurchaseInStock({
+    purchaseContract: { findUnique: async () => ({ status: 'SHIPPED', _count: { receipts: 0 }, items: [{ id: 'pi-1', quantity: 10 }] }) },
+    purchaseReceiptItem: { groupBy: async () => [] },
+    inventory: { findMany: async () => [] },
+  }, 'pc-1'), /到货和验货/);
+  await assert.rejects(() => revertPurchaseInStock({ purchaseReceipt: { count: async () => 1 } }, 'pc-1'), /不可直接回滚/);
+});
+
+test('FIFO拆分和销售回滚保留验货来源及原入库时间', async () => {
+  const inboundAt = new Date('2026-10-01T00:00:00Z');
+  const stock = { id: 'inv-1', productId: 'product-1', purchaseItemId: 'pi-1', receiptInspectionId: 'inspection-1', inboundAt, quantity: 10, status: 'INBOUND', purchaseItem: { unitPrice: 100 } };
+  let child;
+  const tx = {
+    salesContract: { findUnique: async () => ({ id: 'sc-1', amountSource: 'DERIVED', items: [{ id: 'si-1', productId: 'product-1', quantity: 4 }] }), update: async () => ({}) },
+    salesItem: { update: async () => ({}), findMany: async () => [{ quantity: 4, sellingPrice: 150, costPrice: 100 }] },
+    inventory: {
+      findMany: async ({ where }) => where.status === 'INBOUND' ? [stock] : [child],
+      update: async ({ where, data }) => { Object.assign(where.id === stock.id ? stock : child, data); return {}; },
+      create: async ({ data }) => { child = { id: 'child-1', ...data }; return child; },
+    },
+  };
+  await applySalesOutStock(tx, 'sc-1');
+  assert.equal(stock.quantity, 6);
+  assert.equal(child.quantity, 4);
+  assert.equal(child.receiptInspectionId, 'inspection-1');
+  assert.equal(child.inboundAt, inboundAt);
+  await revertSalesOutStock(tx, 'sc-1');
+  assert.equal(child.status, 'INBOUND');
+  assert.equal(child.receiptInspectionId, 'inspection-1');
+  assert.equal(child.inboundAt, inboundAt);
+});

@@ -213,13 +213,47 @@ test('updateStatus: 仅未履行合同允许取消，已付款或已发货不得
     { status: 'SHIPPED', paidAmount: 0, _count: { payments: 0 }, items: [] },
     { status: 'RECEIVED', paidAmount: 0, _count: { payments: 0 }, items: [] },
     { status: 'DRAFT', paidAmount: 0, _count: { payments: 0 }, items: [{ _count: { inventories: 1, packingItems: 0 } }] },
+    { status: 'DRAFT', paidAmount: 0, _count: { payments: 0, receipts: 1 }, items: [] },
   ]) {
     let updated = false;
     prisma.$transaction = async (run) => run({ purchaseContract: { findUnique: async () => existing, update: async () => { updated = true; return { status: 'CANCELLED' }; } } });
     let caught;
     const res = { status() { return this; }, json() {} };
     await purchaseController.updateStatus({ params: { id: 'p-1' }, body: { status: 'CANCELLED' } }, res, (error) => { caught = error; });
-    if (existing.status === 'DRAFT' && existing.items.length === 0) { assert.equal(caught, undefined); assert.equal(updated, true); }
+    if (existing.status === 'DRAFT' && existing.items.length === 0 && !existing._count.receipts) { assert.equal(caught, undefined); assert.equal(updated, true); }
     else { assert.equal(caught?.statusCode, 400); assert.equal(updated, false); }
+  }
+});
+
+test('updateStatus: 直接已发货→已收货不能绕过批次验货入库', async (t) => {
+  let stockCreated = false;
+  t.mock.method(prisma, '$transaction', async (run) => run({
+    purchaseContract: {
+      findUnique: async () => ({ id: 'pc-1', status: 'SHIPPED', _count: { receipts: 0 }, items: [{ id: 'pi-1', productId: 'product-1', quantity: 10 }] }),
+      update: async () => ({ status: 'RECEIVED' }),
+    },
+    purchaseReceiptItem: { groupBy: async () => [] },
+    inventory: { findMany: async () => [], createMany: async () => { stockCreated = true; return {}; } },
+    purchaseItem: { aggregate: async () => ({ _sum: { totalPrice: 0 } }) },
+  }));
+  let caught;
+  const res = { status() { return this; }, json() {} };
+  await purchaseController.updateStatus({ params: { id: 'pc-1' }, body: { status: 'RECEIVED' } }, res, (error) => { caught = error; });
+  assert.equal(caught?.statusCode, 400);
+  assert.equal(stockCreated, false);
+});
+
+test('addItem: 与共享草稿更正一致，已签约/发货/完成/付款/归档不能加行', async (t) => {
+  const oldTransaction = prisma.$transaction;
+  t.after(() => { prisma.$transaction = oldTransaction; });
+  const draft = { status: 'DRAFT', taxRate: 13, paidAmount: 0, _count: { receipts: 0, payments: 0, files: 0 }, items: [] };
+  for (const contract of [draft, { ...draft, status: 'SIGNED' }, { ...draft, status: 'SHIPPED' }, { ...draft, status: 'COMPLETED' }, { ...draft, paidAmount: 1 }, { ...draft, _count: { ...draft._count, files: 1 } }]) {
+    let added = false;
+    prisma.$transaction = async (run) => run({ purchaseContract: { findUnique: async () => contract, update: async () => ({}) }, purchaseItem: { create: async ({ data }) => { added = true; return data; }, aggregate: async () => ({ _sum: { totalPrice: 11.3 } }) } });
+    let caught;
+    const res = { status() { return this; }, json() {} };
+    await purchaseController.addItem({ params: { id: 'pc-1' }, body: { productId: 'product-1', quantity: 1, unitPrice: 10 } }, res, (error) => { caught = error; });
+    if (contract === draft) { assert.equal(caught, undefined); assert.equal(added, true); }
+    else { assert.equal(caught?.statusCode, 400); assert.equal(added, false); }
   }
 });

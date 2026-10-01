@@ -193,10 +193,17 @@ const exportPurchasesExcel = async (query = {}) => {
  *   5. 写入数据库
  *   6. 返回成功/失败统计及错误明细
  * @param {string} filePath - 上传的 Excel 文件路径
- * @param {string} _userId - 操作用户 ID（预留）
+ * @param {string} userId - 认证操作者
+ * @param {{ historical?: boolean }} options - ADMIN显式历史补录；不创建库存或验货证据
  * @returns {Promise<{successRows: number, failedRows: number, errors: Array}>}
  */
-const importPurchasesExcel = async (filePath, _userId) => {
+const importPurchasesExcel = async (filePath, userId, options = {}) => {
+  let allowHistorical = false;
+  if (options.historical === true) {
+    const user = typeof userId === 'string' && userId ? await prisma.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true } }) : null;
+    if (user?.role !== 'ADMIN' || !user.isActive) throw createError('历史采购补录仅允许有效管理员执行', 403);
+    allowHistorical = true;
+  }
   if (!fs.existsSync(filePath)) {
     throw createError('上传文件不存在', 400);
   }
@@ -292,6 +299,10 @@ const importPurchasesExcel = async (filePath, _userId) => {
           }
           status = STATUS_VALUE_MAP[statusInput];
         }
+      }
+
+      if (['RECEIVED', 'COMPLETED'].includes(status) && !allowHistorical) {
+        throw new Error('已收货/已完成仅管理员明确确认历史补录后可导入；普通采购请登记分批到货与验货');
       }
 
       const note = colIndex.note !== -1 ? String(row[colIndex.note] || '').trim() : '';

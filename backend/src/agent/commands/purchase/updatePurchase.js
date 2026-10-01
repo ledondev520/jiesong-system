@@ -8,19 +8,25 @@ const { createError } = require('../../../middleware/errorHandler');
 const { normalizeItem } = require('./createPurchaseWithItems');
 const { normalizePurchaseTaxRate } = require('../../../services/purchaseAmountService');
 
+const assertPurchaseDraftEditable = (contract) => {
+  if (contract._count.receipts > 0) throw createError('已有到货记录的合同不可直接更正，请保留原采购与验货证据', 400);
+  if (contract.status !== 'DRAFT' || contract.paidAmount > 0 || contract.invoiceNo
+    || contract._count.payments > 0 || contract._count.files > 0
+    || contract.items.some((item) => item._count.inventories > 0 || item._count.packingItems > 0 || item._count.receiptItems > 0)) {
+    throw createError('仅未履行、未归档的草稿可更正供应商、税率和明细', 400);
+  }
+};
+
 const updatePurchase = async ({ id, input = {}, prismaClient = prisma } = {}) => {
   return prismaClient.$transaction(async (tx) => {
     const contract = await tx.purchaseContract.findUnique({
       where: { id },
-      include: { items: { include: { _count: { select: { inventories: true, packingItems: true } } } }, _count: { select: { payments: true, files: true } } },
+      include: { items: { include: { _count: { select: { inventories: true, packingItems: true, receiptItems: true } } } }, _count: { select: { payments: true, files: true, receipts: true } } },
     });
     if (!contract) throw createError('采购合同不存在', 404);
+    if (contract._count.receipts > 0) throw createError('已有到货记录的合同不可直接更正，请保留原采购与验货证据', 400);
     const changingLines = input.items !== undefined || input.supplierId !== undefined || input.taxRate !== undefined;
-    if (changingLines && (contract.status !== 'DRAFT' || contract.paidAmount > 0 || contract.invoiceNo
-      || contract._count.payments > 0 || contract._count.files > 0
-      || contract.items.some((item) => item._count.inventories > 0 || item._count.packingItems > 0))) {
-      throw createError('仅未履行、未归档的草稿可更正供应商、税率和明细', 400);
-    }
+    if (changingLines) assertPurchaseDraftEditable(contract);
     if (input.supplierId !== undefined && !input.supplierId) throw createError('供应商不能为空', 400);
     if (input.items !== undefined && (!Array.isArray(input.items) || input.items.length === 0)) throw createError('至少提供一条采购明细', 400);
     const taxRate = normalizePurchaseTaxRate(input.taxRate ?? contract.taxRate);
@@ -46,4 +52,4 @@ const updatePurchase = async ({ id, input = {}, prismaClient = prisma } = {}) =>
   });
 };
 
-module.exports = { updatePurchase };
+module.exports = { updatePurchase, assertPurchaseDraftEditable };

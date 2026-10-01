@@ -16,12 +16,14 @@ const {
   getPurchaseSettlementStatus,
   PURCHASE_STATUS,
 } = require('../services/purchaseStateMachine');
-const { applyPurchaseInStock } = require('../services/inventorySnapshot');
+const { assertPurchaseReceiptComplete } = require('../services/purchaseReceiptService');
 const { normalizePagination } = require('../utils/pagination');
 const auditLog = require('../utils/auditLog');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
+const { assertPurchaseDraftEditable } = require('../agent/commands/purchase/updatePurchase');
+const { normalizeItem } = require('../agent/commands/purchase/createPurchaseWithItems');
 const contractTemplateService = require('../services/contractTemplateService');
-const { calculateNewLineTotal, normalizePurchaseTaxRate } = require('../services/purchaseAmountService');
+const { normalizePurchaseTaxRate } = require('../services/purchaseAmountService');
 const {
   assertPurchaseProductionReady,
   evaluatePurchaseProductionReadiness,
@@ -283,6 +285,9 @@ const remove = async (req, res, next) => {
   try {
     const { id } = req.params;
     
+    const contract = await prisma.purchaseContract.findUnique({ where: { id }, select: { _count: { select: { receipts: true } } } });
+    if (!contract) throw createError('采购合同不存在', 404);
+    if (contract._count.receipts > 0) throw createError('已有到货记录的合同不可删除', 400);
     await prisma.purchaseContract.delete({ where: { id } });
     
     success(res, null, '采购合同删除成功');
@@ -302,22 +307,14 @@ const addItem = async (req, res, next) => {
     const item = await prisma.$transaction(async (tx) => {
       const contract = await tx.purchaseContract.findUnique({
         where: { id },
-        select: { taxRate: true },
+        include: { items: { include: { _count: { select: { inventories: true, packingItems: true, receiptItems: true } } } }, _count: { select: { payments: true, files: true, receipts: true } } },
       });
       if (!contract) throw createError('采购合同不存在', 404);
+      assertPurchaseDraftEditable(contract);
 
       const taxRate = normalizePurchaseTaxRate(contract.taxRate);
       const createdItem = await tx.purchaseItem.create({
-        data: {
-          purchaseContractId: id,
-          productId: data.productId,
-          quantity: data.quantity,
-          unit: data.unit,
-          unitPrice: data.unitPrice,
-          totalPrice: calculateNewLineTotal(data, taxRate),
-          specification: data.specification,
-          note: data.note,
-        },
+        data: { purchaseContractId: id, ...normalizeItem(data, 0, taxRate) },
         include: { product: true },
       });
 
@@ -378,8 +375,6 @@ const updateStatus = async (req, res, next) => {
       throw createError('status 不能为空', 400);
     }
 
-    let applyResult = null;
-
     const contract = await prisma.$transaction(async (tx) => {
       const existingContract = await tx.purchaseContract.findUnique({
         where: { id },
@@ -389,11 +384,11 @@ const updateStatus = async (req, res, next) => {
           totalAmount: true,
           paidAmount: true,
           invoiceNo: true,
-          _count: { select: { payments: true } },
+          _count: { select: { payments: true, receipts: true } },
           items: {
             select: {
               id: true,
-              _count: { select: { inventories: true, packingItems: true } },
+              _count: { select: { inventories: true, packingItems: true, receiptItems: true } },
               specification: true,
               boxes: true,
               grossWeight: true,
@@ -423,8 +418,8 @@ const updateStatus = async (req, res, next) => {
       }
       if (isTransition && targetStatus === PURCHASE_STATUS.CANCELLED && (
         ![PURCHASE_STATUS.DRAFT, PURCHASE_STATUS.SIGNED].includes(normalizePurchaseStatus(existingContract.status))
-        || existingContract.paidAmount > 0 || existingContract.invoiceNo || existingContract._count.payments > 0
-        || existingContract.items.some((item) => item._count.inventories > 0 || item._count.packingItems > 0)
+        || existingContract.paidAmount > 0 || existingContract.invoiceNo || existingContract._count.payments > 0 || existingContract._count.receipts > 0
+        || existingContract.items.some((item) => item._count.inventories > 0 || item._count.packingItems > 0 || item._count.receiptItems > 0)
       )) {
         throw createError('仅尚未生产、未付款、未入库且未关联出口的合同可取消；已履行合同请先处理对应业务', 400);
       }
@@ -434,6 +429,9 @@ const updateStatus = async (req, res, next) => {
         && [PURCHASE_STATUS.READY, PURCHASE_STATUS.SHIPPED].includes(targetStatus)
       ) {
         assertPurchaseProductionReady(existingContract.items);
+      }
+      if (isTransition && targetStatus === PURCHASE_STATUS.RECEIVED) {
+        await assertPurchaseReceiptComplete(tx, id);
       }
       const contract = await tx.purchaseContract.update({
         where: { id },
@@ -445,28 +443,8 @@ const updateStatus = async (req, res, next) => {
         },
       });
 
-      // 正向流转：入库时创建库存记录
-      if (isTransition && targetStatus === PURCHASE_STATUS.RECEIVED) {
-        applyResult = await applyPurchaseInStock(tx, id);
-      }
-
       return contract;
     });
-
-    // 记录入库操作的审计日志
-    if (applyResult && (applyResult.created > 0 || applyResult.skipped > 0)) {
-      await auditLog.logOperation({
-        userId: req.user?.id,
-        action: 'APPLY_IN_STOCK',
-        entity: 'PurchaseContract',
-        entityId: id,
-        oldValue: { status: contract.status },
-        newValue: { status: PURCHASE_STATUS.RECEIVED, createdCount: applyResult.created, skippedCount: applyResult.skipped },
-        req,
-        note: `采购入库：创建 ${applyResult.created} 条库存记录，跳过 ${applyResult.skipped} 条`,
-      });
-      console.log(`[库存入库] 采购合同 ${id}: 创建 ${applyResult.created} 条记录，跳过 ${applyResult.skipped} 条`);
-    }
 
     success(res, contract, '状态更新成功');
   } catch (error) {

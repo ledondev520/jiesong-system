@@ -39,6 +39,8 @@ model User {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  purchaseReceiptsCreated    PurchaseReceipt[] @relation("ReceiptCreatedBy")
+  purchaseReceiptInspections PurchaseReceiptInspection[] @relation("ReceiptInspectedBy")
   operationLogs             OperationLog[]
   chatHistories             ChatHistory[]
   agentReplaySummaries      AgentReplaySummary[]
@@ -295,6 +297,7 @@ model PurchaseContract {
   items    PurchaseItem[]
   payments Payment[]
   files    ContractFile[]
+  receipts PurchaseReceipt[]
 
   @@index([status])
   @@index([supplierId])
@@ -326,10 +329,74 @@ model PurchaseItem {
   product          Product          @relation(fields: [productId], references: [id])
   inventories      Inventory[]
   packingItems     PackingItem[]
+  receiptItems     PurchaseReceiptItem[]
 
   @@index([purchaseContractId])
   @@index([productId])
   @@map("purchase_items")
+}
+
+// 分批到货与验货证据独立持久化；合格数量只能递增，没有退货或冲销入口。
+model PurchaseReceipt {
+  id                 String   @id @default(cuid())
+  purchaseContractId String
+  requestId          String
+  requestHash        String
+  arrivedAt          DateTime
+  note               String?
+  createdById        String
+  createdAt          DateTime @default(now())
+
+  purchaseContract PurchaseContract @relation(fields: [purchaseContractId], references: [id], onDelete: Restrict)
+  createdBy        User @relation("ReceiptCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  items            PurchaseReceiptItem[]
+  inspections      PurchaseReceiptInspection[]
+
+  @@unique([purchaseContractId, requestId])
+  @@index([purchaseContractId, arrivedAt])
+  @@map("purchase_receipts")
+}
+
+model PurchaseReceiptItem {
+  id                   String @id @default(cuid())
+  receiptId            String
+  purchaseItemId       String
+  arrivedQuantity      Float
+  acceptedQuantity     Float @default(0)
+  reinspectionQuantity Float @default(0)
+
+  receipt      PurchaseReceipt @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  purchaseItem PurchaseItem @relation(fields: [purchaseItemId], references: [id], onDelete: Restrict)
+  inspections  PurchaseReceiptInspection[]
+
+  @@unique([receiptId, purchaseItemId])
+  @@index([purchaseItemId])
+  @@map("purchase_receipt_items")
+}
+
+model PurchaseReceiptInspection {
+  id                   String   @id @default(cuid())
+  receiptId            String
+  receiptItemId        String
+  requestId            String
+  requestHash          String
+  acceptedQuantity     Float
+  acceptedIncrement    Float
+  reinspectionQuantity Float
+  pendingQuantity      Float
+  note                 String
+  inspectedById        String
+  inspectedAt          DateTime @default(now())
+
+  receipt     PurchaseReceipt @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  receiptItem PurchaseReceiptItem @relation(fields: [receiptItemId], references: [id], onDelete: Restrict)
+  inspectedBy User @relation("ReceiptInspectedBy", fields: [inspectedById], references: [id], onDelete: Restrict)
+  inventories Inventory[]
+
+  @@unique([receiptId, requestId, receiptItemId])
+  @@index([receiptItemId, inspectedAt])
+  @@index([receiptId, inspectedAt])
+  @@map("purchase_receipt_inspections")
 }
 
 // ==================== 销售管理（含货柜/装箱） ====================
@@ -464,6 +531,7 @@ model Inventory {
   id              String    @id @default(cuid())
   productId       String
   purchaseItemId  String?
+  receiptInspectionId String? // 合格增量的验货来源；FIFO分拆必须保留
   salesItemId     String?
   salesContractId String? // 关联出口合同（代替原 containerId）
   quantity        Float
@@ -477,12 +545,14 @@ model Inventory {
 
   product       Product        @relation(fields: [productId], references: [id])
   purchaseItem  PurchaseItem?  @relation(fields: [purchaseItemId], references: [id])
+  receiptInspection PurchaseReceiptInspection? @relation(fields: [receiptInspectionId], references: [id], onDelete: Restrict)
   salesItem     SalesItem?     @relation(fields: [salesItemId], references: [id])
   salesContract SalesContract? @relation(fields: [salesContractId], references: [id])
 
   @@index([status])
   @@index([productId])
   @@index([salesContractId])
+  @@index([receiptInspectionId])
   @@index([createdAt])
   @@map("inventories")
 }
