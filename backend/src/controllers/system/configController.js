@@ -1,6 +1,6 @@
 /**
  * Input: prisma.systemConfig KV 存储
- * Output: 系统配置读写接口（平铺格式 + 分域格式）；仅 Kimi/Moonshot AI 密钥
+ * Output: 系统配置读写接口（平铺格式 + 分域格式）；数据库与环境密钥均仅返回脱敏状态
  * Pos: 系统配置控制层，支持向后兼容的平铺 getConfigs 与新增的分域 getConfigsByDomain
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -145,10 +145,10 @@ const getConfigs = async (req, res, next) => {
       return acc;
     }, {});
 
-    // 若数据库未存储 API Key，降级读取环境变量（管理员需要看到实际使用的 Key）
+    // 环境变量回退与数据库配置遵守同一只写式密钥响应约束。
     const config = require('../../config');
     if (!formatted.apiKey && config.kimi?.apiKey) {
-      formatted.apiKey = config.kimi.apiKey;
+      formatted.apiKey = normalizeConfigValueForResponse('apiKey', config.kimi.apiKey);
     }
 
     success(res, formatted);

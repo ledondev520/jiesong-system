@@ -35,7 +35,7 @@
 | financeController.js | 付款与账款管理 |
 | financialStatementsController.js | 月度财务三文件预览、确认导入与账期查询 |
 | financialEvidenceController.js | 脱敏财务资料摘要、文档列表与 Sheet 行级下钻 |
-| systemController.js | 系统配置 + 数据导入导出 |
+| systemController.js | 系统配置（环境密钥回退仅返回脱敏状态）+ 数据导入导出 |
 | aiController.js | AI问答 + 辅助录入 + 统一分页边界的对话历史 |
 | aiUsageController.js | AI 用量趋势日期校验、调用明细有界分页与用量汇总 |
 | notificationController.js | 统一分页边界的通知列表、已读与生成 |

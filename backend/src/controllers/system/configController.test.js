@@ -74,6 +74,25 @@ test('getConfigs: 敏感配置只返回脱敏状态，不返回完整密钥', as
   }
 });
 
+test('getConfigs: 环境变量密钥回退也只返回脱敏状态', async () => {
+  const config = require('../../config');
+  const originalKey = config.kimi.apiKey;
+  const originalFindMany = prisma.systemConfig.findMany;
+  // Synthetic, non-production value; never use this fixture as a deployed credential.
+  const syntheticKey = 'test-only-non-production-env-key-1234';
+  config.kimi.apiKey = syntheticKey;
+  prisma.systemConfig.findMany = async () => [];
+  try {
+    const res = createMockRes();
+    await configController.getConfigs({}, res, (error) => { throw error; });
+    assert.equal(res.payload.data.apiKey, '••••1234');
+    assert.equal(JSON.stringify(res.payload).includes(syntheticKey), false);
+  } finally {
+    config.kimi.apiKey = originalKey;
+    prisma.systemConfig.findMany = originalFindMany;
+  }
+});
+
 test('updateConfig: upsert 时会 JSON.stringify(value)', async () => {
   const originalUpsert = prisma.systemConfig.upsert;
   let upsertArgs = null;
