@@ -42,6 +42,8 @@
 ## Subagent policy
 - 禁止在 Cursor 场景下自动/默认启动 subagent。
 - 当且仅当用户显式要求 Codex 进行子任务分发时，允许使用 `spawn_agent`，并且只用于该明确授权范围内。
+- 获得子任务分发授权后，所有子代理默认使用 `model: "gpt-6.1-sol"`、`reasoning_effort: "high"`；后续分发沿用此默认值，除非用户明确指定其他配置。
+- 调用 `spawn_agent` 时显式传入上述属性；需要显式模型属性时使用 `fork_turns: "none"` 或正整数，并在任务说明中补齐必要上下文。不修改产品自身的 AI 模型、供应商或部署配置。
 
 ## Data classification
 - See `data-classification.json` for the authoritative classification map.
