@@ -1,6 +1,6 @@
 /**
  * Input: HSCIQ API (https://www.hsciq.com/mcp)、config.hsciq（API Key + Base URL）
- * Output: 海关编码归类实例搜索、编码搜索、编码详情、统一搜索（含文件持久化缓存 + 每日调用计数）
+ * Output: 海关只读查询，含缓存、并发请求共享、配额预留、总超时与受控上游错误
  * Pos: 服务层，封装 HSCIQ 外部 API 调用，为 HS 编码推荐与申报要素提供权威数据源
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -9,6 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const config = require('../config');
+const { createError } = require('../middleware/errorHandler');
 
 const BASE_URL = config.hsciq.baseUrl || 'https://www.hsciq.com/mcp';
 const API_KEY = config.hsciq.apiKey || '';
@@ -16,6 +17,8 @@ const API_KEY = config.hsciq.apiKey || '';
 const CACHE_DIR = path.join(__dirname, '../../data');
 const CACHE_FILE = path.join(CACHE_DIR, 'hsciq-cache.json');
 const DAILY_LIMIT = 150;
+// HSCIQ_TIMEOUT_MS 可校准网络等待；总超时包含 DNS、连接及响应正文读取。
+const REQUEST_TIMEOUT_MS = Math.min(Math.max(parseInt(process.env.HSCIQ_TIMEOUT_MS, 10) || 10000, 1000), 30000);
 
 const CODE_DETAIL_TTL = 7 * 24 * 60 * 60 * 1000;   // 编码详情 7 天
 const SEARCH_TTL = 3 * 24 * 60 * 60 * 1000;         // 搜索结果 3 天
@@ -28,6 +31,8 @@ let saveTimer = null;
 
 let dailyCallCount = 0;          // 今日已调用次数
 let dailyCountDate = '';         // 对应日期 'YYYY-MM-DD'
+let pendingCallCount = 0;
+const pendingCalls = new Map();
 
 /**
  * 职责：获取今天的日期字符串
@@ -54,7 +59,7 @@ function ensureDailyReset() {
  */
 function hasQuota() {
   ensureDailyReset();
-  return dailyCallCount < DAILY_LIMIT;
+  return dailyCallCount + pendingCallCount < DAILY_LIMIT;
 }
 
 /**
@@ -147,7 +152,7 @@ function cacheSet(key, data, ttl) {
  * @param {object} args - 工具参数
  * @returns {Promise<any>} API 返回数据
  */
-async function callTool(toolName, args) {
+async function requestTool(toolName, args) {
   if (!API_KEY) {
     throw new Error('[hsciqService] HSCIQ_API_KEY 未配置');
   }
@@ -157,31 +162,51 @@ async function callTool(toolName, args) {
 
   const url = `${BASE_URL}/tools/call`;
   const body = JSON.stringify({ toolName, arguments: args });
+  pendingCallCount++;
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': API_KEY,
+      },
+      body,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': API_KEY,
-    },
-    body,
-  });
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => {});
+      throw createError(`HSCIQ 服务返回 ${response.status}`, response.status === 429 ? 503 : 502);
+    }
 
-  if (!response.ok) {
-    const errText = await response.text().catch(() => '');
-    throw new Error(`[hsciqService] API 返回 ${response.status}: ${errText.slice(0, 200)}`);
+    const result = await response.json();
+    ensureDailyReset();
+    dailyCallCount++;
+    scheduleSave();
+
+    if (result.ok === false) throw createError('HSCIQ 查询失败，请稍后重试', 502);
+    return result.data ?? result;
+  } catch (error) {
+    if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+      throw createError('HSCIQ 请求超时，请稍后重试', 504);
+    }
+    if (error.statusCode) throw error;
+    throw createError('HSCIQ 服务暂时不可用，请稍后重试', 502);
+  } finally {
+    pendingCallCount--;
   }
+}
 
-  const result = await response.json();
-  dailyCallCount++;
-  ensureDailyReset();
-  scheduleSave();
-
-  if (result.ok === false) {
-    throw new Error(`[hsciqService] API 错误: ${result.error || JSON.stringify(result)}`);
+async function callTool(toolName, args) {
+  const key = JSON.stringify([toolName, args]);
+  if (pendingCalls.has(key)) return pendingCalls.get(key);
+  const pending = requestTool(toolName, args);
+  pendingCalls.set(key, pending);
+  try {
+    return await pending;
+  } finally {
+    pendingCalls.delete(key);
   }
-
-  return result.data ?? result;
 }
 
 /**
@@ -218,7 +243,7 @@ async function searchInstance(keywords, { pageIndex = 1, pageSize = 10 } = {}) {
  * @returns {Promise<{ items: object[], totalItemCount: number }>}
  */
 async function searchCode(keywords, { country = 'CN', pageIndex = 1, pageSize = 10, filterFailureCode = true } = {}) {
-  const cacheKey = `code:${country}:${keywords}:${pageIndex}:${pageSize}`;
+  const cacheKey = `code:${country}:${keywords}:${pageIndex}:${pageSize}:${filterFailureCode}`;
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
 
@@ -293,7 +318,7 @@ function getUsageStats() {
   return {
     used: dailyCallCount,
     limit: DAILY_LIMIT,
-    remaining: Math.max(0, DAILY_LIMIT - dailyCallCount),
+    remaining: Math.max(0, DAILY_LIMIT - dailyCallCount - pendingCallCount),
   };
 }
 

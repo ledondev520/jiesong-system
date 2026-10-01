@@ -67,6 +67,7 @@
 | threeFormsService.js | 基于出口准备度预览/生成报关单、外汇核销单、出口退税单与三 Sheet Excel |
 | taxCalculationEngine.js | 将出口准备度转换为统一税务摘要与 Excel/PDF，不内置税则小表 |
 | hsCodeService.js | HS 本地/AI 检索与强制来源证据的人工税则更新 |
+| hsciqService.js | HSCIQ 查询缓存、并发请求共享、配额预留、可校准总超时与受控上游错误 |
 | packingListCheckService.js | 船司装箱单 PDF 受限归档、逐商品比对、历史记录与人工复核结论 |
 | purchaseInvoiceService.js | 从采购事实生成催票清单，规范化多发票号码并读取选填附件 |
 | taxRefundPreparationService.js | 2026 外贸企业退税材料、期限、关联校验与内部 Excel 准备清单 |

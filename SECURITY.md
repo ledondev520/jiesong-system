@@ -24,6 +24,7 @@
 ### 3) 网络与应用边界层（Application & Network）
 - Apply CORS whitelist (`CORS_ORIGIN`) and avoid `*` in生产 environments.
 - Enforce request size limits, rate limiting at API网关 (or reverse proxy), and strict MIME/type checks on uploads.
+- `backend/src/services/hsciqService.js` bounds connection and response-body waits with `HSCIQ_TIMEOUT_MS` (default 10000ms, clamped to 1000–30000ms), shares identical pending queries and reserves their quota; upstream response bodies are never embedded in errors or logs.
 - Keep internal errors server-side; expose only最小化错误码 to clients.
 - Require HTTPS in external endpoints and internal服务间连接。
 
