@@ -131,7 +131,7 @@ const STATUS_ORDER: Record<SalesStatus, number> = {
 
 const SALES_NEXT_ACTIONS: Partial<Record<SalesStatus, { status: SalesStatus; label: string }>> = {
   [SalesStatus.DRAFT]: { status: SalesStatus.CONFIRMED, label: '确认出口合同' },
-  [SalesStatus.CONFIRMED]: { status: SalesStatus.PACKING, label: '开始装柜' },
+  [SalesStatus.CONFIRMED]: { status: SalesStatus.PACKING, label: '选择采购装柜' },
   [SalesStatus.PACKING]: { status: SalesStatus.SHIPPED, label: '确认发运' },
   [SalesStatus.SHIPPED]: { status: SalesStatus.ARRIVED, label: '确认到港' },
 };
@@ -209,6 +209,10 @@ export default function SalesDetailPage({ params }: PageProps) {
 
   const handleAdvanceStatus = async (nextStatus: SalesStatus) => {
     if (!contract) return;
+    if (nextStatus === SalesStatus.PACKING && contract.status === SalesStatus.CONFIRMED) {
+      setImportPurchaseOpen(true);
+      return;
+    }
     setStatusUpdating(true);
     try {
       await salesService.updateStatus(contract.id, nextStatus);

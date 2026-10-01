@@ -254,6 +254,8 @@ const updateSalesStatus = async (id, status, context = {}) => {
     if (targetStatus === SALES_STATUS.COMPLETED && settledStatus !== SALES_STATUS.COMPLETED) {
       throw createError('销售款项尚未结清或存在金额差异，请先处理收款记录', 400);
     }
+    const finalStatus = targetStatus === SALES_STATUS.CONFIRMED
+      && existingContract.packingItems.some(item => Number(item.boxes) > 0) ? SALES_STATUS.PACKING : settledStatus;
     if (isTransition && targetStatus === SALES_STATUS.SHIPPED) {
       const readiness = evaluateShipmentReadiness(existingContract);
       if (!readiness.ready) {
@@ -273,7 +275,7 @@ const updateSalesStatus = async (id, status, context = {}) => {
     const contract = await tx.salesContract.update({
       where: { id },
       data: {
-        status: settledStatus,
+        status: finalStatus,
         ...(isTransition && targetStatus === SALES_STATUS.SHIPPED ? { shippedAt: new Date() } : {}),
       },
     });

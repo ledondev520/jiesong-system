@@ -15,9 +15,10 @@ test('登记到港后保留出库，已收齐合同自动完成；未收齐不�
   const originalRevert = inventorySnapshot.revertSalesOutStock;
   let receivedAmount = 100;
   let currentStatus = 'SHIPPED';
+  let packingItems = [];
   let reverted = false;
   prisma.$transaction = async fn => fn({ salesContract: {
-    findUnique: async () => ({ id: 'sc-1', status: currentStatus, totalAmount: 100, receivedAmount, packingItems: [] }),
+    findUnique: async () => ({ id: 'sc-1', status: currentStatus, totalAmount: 100, receivedAmount, packingItems }),
     update: async ({ data }) => ({ id: 'sc-1', ...data }),
   } });
   inventorySnapshot.revertSalesOutStock = async () => { reverted = true; return { reverted: 1 }; };
@@ -28,6 +29,11 @@ test('登记到港后保留出库，已收齐合同自动完成；未收齐不�
     assert.equal((await salesService.updateSalesStatus('sc-1', 'ARRIVED')).status, 'ARRIVED');
     currentStatus = 'ARRIVED';
     await assert.rejects(salesService.updateSalesStatus('sc-1', 'COMPLETED'), /款项尚未结清/);
+    currentStatus = 'DRAFT';
+    packingItems = [{ id: 'packing-test', boxes: 2 }];
+    assert.equal((await salesService.updateSalesStatus('sc-1', 'CONFIRMED')).status, 'PACKING');
+    packingItems = [];
+    assert.equal((await salesService.updateSalesStatus('sc-1', 'CONFIRMED')).status, 'CONFIRMED');
   } finally { prisma.$transaction = originalTransaction; inventorySnapshot.revertSalesOutStock = originalRevert; }
 });
 
