@@ -1,20 +1,14 @@
 /**
  * Input: Anthropic 兼容请求、Kimi OpenAI 兼容客户端、管理员模型配置
  * Output: Anthropic 兼容响应；配置模型不可用时仅降级一次到稳定模型
- * Pos: Open Agent SDK 与 Kimi 之间的协议适配层
+ * Pos: Open Agent SDK 与 Kimi 之间的协议适配层，共用请求 deadline 且不重复重试认证错误
  */
 
 const crypto = require('node:crypto');
-const OpenAI = require('openai');
-const config = require('../config');
 const aiService = require('./aiService');
+const { createError } = require('../middleware/errorHandler');
 
 const normalizeText = (value) => (typeof value === 'string' ? value : '');
-
-const buildKimiClient = () => new OpenAI({
-  apiKey: config.kimi.apiKey,
-  baseURL: config.kimi.baseUrl,
-});
 
 const flattenToolResultContent = (content) => {
   if (typeof content === 'string') {
@@ -159,21 +153,23 @@ const mapKimiResponseToAnthropic = ({ response, model }) => {
   };
 };
 
-const isModelUnavailableError = (error) => (
-  Number(error?.status || error?.statusCode) === 404
-  || /not found the model|model[^\n]*not found|permission denied/i.test(String(error?.message || ''))
-);
+const isModelUnavailableError = (error) => {
+  const status = Number(error?.status || error?.statusCode);
+  return status === 404 || (!status && /not found the model|model[^\n]*not found|permission denied/i.test(String(error?.message || '')));
+};
 
 const createMessageWithClient = async ({
   payload,
   client,
   defaultModel,
   fallbackModel,
+  temperature = 0.2,
 }) => {
   const requestedModel = payload?.model || defaultModel;
   const messages = mapAnthropicMessagesToOpenAI(payload || {});
   const tools = mapAnthropicToolsToOpenAI(payload?.tools);
   const candidates = Array.from(new Set([requestedModel, fallbackModel].filter(Boolean)));
+  const requestOptions = aiService.getAIRequestOptions();
 
   let lastError;
   for (const [index, model] of candidates.entries()) {
@@ -183,10 +179,10 @@ const createMessageWithClient = async ({
         messages,
         tools,
         tool_choice: tools?.length ? 'auto' : undefined,
-        temperature: 0.2,
+        temperature,
         max_tokens: payload?.max_tokens || 4096,
         stream: false,
-      });
+      }, requestOptions);
 
       return mapKimiResponseToAnthropic({ response, model });
     } catch (error) {
@@ -201,13 +197,15 @@ const createMessageWithClient = async ({
 };
 
 const createMessage = async (payload) => {
-  const { defaultModel } = await aiService.getConfiguredModels();
+  const { defaultModel, temperature } = await aiService.getConfiguredModels();
 
-  const client = buildKimiClient();
+  const client = aiService.getOpenAIClient();
+  if (!client) throw createError('AI 服务未配置或当前运行环境禁用外部调用', 503);
   return createMessageWithClient({
     payload,
     client,
     defaultModel,
+    temperature,
     fallbackModel: aiService.MODELS.fast,
   });
 };

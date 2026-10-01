@@ -32,7 +32,8 @@
           "Legacy procurement attachment handlers reuse fileService permission enforcement and resolve downloads against UPLOAD_DIR",
           "Carrier packing-list raw extracted text is not persisted; structured check records retain their original file reference",
           "HTTP request logs retain route, timing, and request shape only; request/query values, AI prompts, tool schemas, and user messages are excluded",
-          "HSCIQ upstream error bodies are excluded from service errors and logs; pending queries are bounded by a total timeout and quota reservation"
+          "HSCIQ upstream error bodies are excluded from service errors and logs; pending queries are bounded by a total timeout and quota reservation",
+          "AI provider calls bound full response waits, disable SDK automatic retry/logging and reuse streamed token usage without resending prompts for estimation"
         ],
         "transfer": [
           "Encrypt in transit (TLS)",

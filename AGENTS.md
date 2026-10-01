@@ -33,6 +33,7 @@
 - Use environment variables for secrets and validate their presence during startup.
 - Do not print sensitive values to logs. Redact secrets from debug output and structured logs.
 - Structured HTTP logs may retain request shape for diagnosis, but must not retain body/query values, AI prompts, tool schemas, or user messages.
+- AI requests in `backend/src/services/aiService.js` and `anthropicCompatService.js` share a full-response deadline (default 30000ms via `KIMI_REQUEST_TIMEOUT_MS`, explicit 500–30000ms); SDK automatic retry/logging is disabled, and streamed usage avoids a second prompt-bearing estimation request.
 - `backend/src/services/hsciqService.js` must bound full response waits, reserve pending-call quota and omit upstream response bodies from errors; `HSCIQ_TIMEOUT_MS` calibrates its 10000ms default within 1000–30000ms.
 - System-configured API keys are write-only: response Interfaces may expose only a configured flag or masked suffix, and frontend pages must never render a complete stored key even for administrators.
 - Environment-key fallback in `backend/src/controllers/system/configController.js` must mask the key with the same response helper as database configuration.

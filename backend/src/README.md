@@ -55,8 +55,8 @@
 | invoiceVerificationService.js | 出口退税候选发票的销方、价税合计、品名、状态只读一致性核验 |
 | financialStatementsService.js | 会计报表、科目余额、明细账同账期校验，单事务写入与下钻查询 |
 | financialEvidenceService.js | 工资、税务、凭证与日记账等资料的分类、脱敏、幂等导入与受限查询 |
-| aiService.js | Kimi 集成、智能问答、内容解析与管理员模型配置缓存 |
-| anthropicCompatService.js | Open Agent 与 Kimi 的协议适配、模型不可用时单次稳定降级 |
+| aiService.js | Kimi 集成、完整请求时限、零自动重试、直接读取流式用量及管理员模型配置缓存 |
+| anthropicCompatService.js | Open Agent 与 Kimi 的协议适配，共用请求时限、配置温度与唯一模型候选 |
 | openAgentService.js | 通用业务 Agent、工具授权、流式输出与原子运行记录 |
 | agentReplaySummaryService.js | Agent 回放摘要持久化，支持复用外层事务客户端 |
 | importService.js | CSV数据解析与导入 |

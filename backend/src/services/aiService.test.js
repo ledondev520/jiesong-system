@@ -63,3 +63,67 @@ test('generateGreeting 在测试环境默认走本地降级且输出稳定', asy
     '今天也要加油哦',
   ]);
 });
+
+test('AI SDK: 单次流请求使用 usage，失败不重试，问候 deadline 覆盖 body', () => {
+  const { spawnSync } = require('node:child_process');
+  // Isolated transport stubs only. The public synthetic key cannot reach any real endpoint.
+  const code = `
+    const assert = require('node:assert/strict');
+    const testDeadline = setTimeout(() => { console.error('synthetic test deadline'); process.exitCode = 1; }, 2000);
+    const config = require('./src/config');
+    config.kimi.apiKey = 'test-only-non-production-key';
+    config.kimi.baseUrl = 'https://synthetic.invalid/v1';
+    const prisma = require('./src/utils/prisma');
+    prisma.systemConfig.findMany = async () => [];
+    let phase = 'completion';
+    const calls = [];
+    let aborted = false;
+    let greetingBody;
+    global.fetch = async (url, options) => {
+      calls.push(new URL(url).pathname);
+      if (phase === 'failure') return new Response(JSON.stringify({ error: { message: 'synthetic error', type: 'server_error' } }), { status: 503, headers: { 'content-type': 'application/json', 'retry-after': '0' } });
+      if (new URL(url).pathname.includes('tokenizers')) return new Response(JSON.stringify({ data: { total_tokens: 99 } }), { headers: { 'content-type': 'application/json' } });
+      if (phase === 'greeting' || phase === 'completion-timeout') {
+        greetingBody = JSON.parse(options.body);
+        const body = new ReadableStream({ start(controller) {
+          if (phase === 'completion-timeout') controller.enqueue(new TextEncoder().encode('data: ' + JSON.stringify({ choices: [{ delta: { content: 'partial' } }] }) + '\\n\\n'));
+          options.signal.addEventListener('abort', () => { aborted = true; controller.error(new DOMException('synthetic abort', 'AbortError')); }, { once: true });
+        } });
+        return new Response(body, { headers: { 'content-type': 'text/event-stream' } });
+      }
+      const chunks = [{ choices: [{ delta: { content: 'OK' } }] }, { choices: [], usage: { prompt_tokens: 12, completion_tokens: 15 } }];
+      return new Response(chunks.map(chunk => 'data: ' + JSON.stringify(chunk) + '\\n\\n').join('') + 'data: [DONE]\\n\\n', { headers: { 'content-type': 'text/event-stream' } });
+    };
+    const ai = require('./src/services/aiService');
+    (async () => {
+      const result = await ai.callKimiAPI([{ role: 'user', content: 'synthetic' }], 'synthetic-model');
+      assert.equal(result.content, 'OK');
+      assert.deepEqual(result.tokenUsage, { promptTokens: 12, outputTokens: 15 });
+      assert.deepEqual(calls, ['/v1/chat/completions']);
+      phase = 'failure'; calls.length = 0;
+      await ai.callKimiAPI([], 'synthetic-model');
+      assert.equal(calls.length, 1);
+      phase = 'completion-timeout'; calls.length = 0;
+      const stalledAt = Date.now();
+      const incomplete = await ai.callKimiAPI([], 'synthetic-model');
+      assert.match(incomplete.content, /超时/);
+      assert.equal(calls.length, 1);
+      assert.ok(Date.now() - stalledAt >= 450 && Date.now() - stalledAt < 1000);
+      phase = 'greeting'; calls.length = 0;
+      const started = Date.now();
+      const greeting = await ai.generateGreeting();
+      assert.equal(greeting.source, 'local');
+      assert.equal(aborted, true);
+      assert.equal(Object.hasOwn(greetingBody, 'signal'), false);
+      assert.ok(Date.now() - started < 1000);
+      console.log('transport checks completed');
+    })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => { clearTimeout(testDeadline); return prisma.$disconnect(); });
+  `;
+  const result = spawnSync(process.execPath, ['-e', code], {
+    cwd: require('node:path').resolve(__dirname, '../..'),
+    env: { ...process.env, NODE_ENV: 'test', AI_ALLOW_REMOTE: 'true', KIMI_REQUEST_TIMEOUT_MS: '500', KIMI_GREETING_TIMEOUT_MS: '200' },
+    encoding: 'utf8', timeout: 5000,
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /transport checks completed/);
+});
