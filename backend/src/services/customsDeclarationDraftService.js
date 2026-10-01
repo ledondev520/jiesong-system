@@ -1,19 +1,20 @@
 /**
  * Input: sales contracts, packing items, live HSCode declarations
- * Output: 自动生成的报关单草稿
+ * Output: 按出口合同唯一生成的报关草稿，原子更新草稿且保留正式记录
  * Pos: 报关单草稿自动生成服务
  */
 
 const prisma = require('../utils/prisma');
+const { createError } = require('../middleware/errorHandler');
 
-const buildDeclarationNo = (now, index) => {
+const buildDeclarationNo = (now, contractNo) => {
   const datePart = [
     now.getUTCFullYear(),
     String(now.getUTCMonth() + 1).padStart(2, '0'),
     String(now.getUTCDate()).padStart(2, '0'),
   ].join('');
 
-  return `CUS-AUTO-${datePart}-${String(index).padStart(3, '0')}`;
+  return `CUS-AUTO-${datePart}-${contractNo}`;
 };
 
 const buildWhere = ({ salesContractId } = {}) => {
@@ -64,11 +65,11 @@ const buildItems = async (packingItems) => {
   return items;
 };
 
-const buildDraftPayload = async (salesContract, now, index) => {
+const buildDraftPayload = async (salesContract, now) => {
   const items = await buildItems(salesContract.packingItems || []);
 
   return {
-    declarationNo: buildDeclarationNo(now, index),
+    declarationNo: buildDeclarationNo(now, salesContract.contractNo),
     salesContractId: salesContract.id,
     declaredAt: now,
     exportDate: null,
@@ -104,7 +105,6 @@ const generateCustomsDeclarationDrafts = async (filters = {}) => {
   });
 
   const now = new Date();
-  let sequence = 1;
   let created = 0;
   let skipped = 0;
   const items = [];
@@ -125,11 +125,7 @@ const generateCustomsDeclarationDrafts = async (filters = {}) => {
       continue;
     }
 
-    if (existing && filters.replaceExisting) {
-      await prisma.customsDeclaration.delete({
-        where: { id: existing.id },
-      });
-    }
+    if (existing && filters.replaceExisting && existing.status !== 'DRAFT') throw createError('正式报关记录不可由自动草稿替换，请按实际报关记录处理', 409);
 
     if (!salesContract.packingItems?.length) {
       skipped += 1;
@@ -141,11 +137,14 @@ const generateCustomsDeclarationDrafts = async (filters = {}) => {
       continue;
     }
 
-    const data = await buildDraftPayload(salesContract, now, sequence);
-    const record = await prisma.customsDeclaration.create({ data });
+    const data = await buildDraftPayload(salesContract, now);
+    // 嵌套更新是一笔事务，保留原ID/编号；状态条件避免生成期间被放行的记录遭覆盖。
+    const record = existing ? await prisma.customsDeclaration.update({
+      where: { id: existing.id, status: 'DRAFT' },
+      data: { ...data, declarationNo: existing.declarationNo, items: { deleteMany: {}, create: data.items.create } },
+    }) : await prisma.customsDeclaration.create({ data });
 
     created += 1;
-    sequence += 1;
     items.push({
       salesContractId: salesContract.id,
       customsDeclarationId: record.id,

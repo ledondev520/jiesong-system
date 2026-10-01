@@ -6,7 +6,7 @@
 
 const { createError } = require('../middleware/errorHandler');
 const prisma = require('../utils/prisma');
-const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
+const { buildDerivedSalesAmountUpdate, isJiesongOwnedPackingItem } = require('./salesContractAmount');
 const { INVENTORY_STATUS } = require('../config/constants');
 
 const clampNumber = (value, fallback = 0) => {
@@ -110,7 +110,7 @@ const reconcileSalesFinancials = async (tx, salesContractId) => {
   const [contract, items] = await Promise.all([
     db.salesContract.findUnique({
       where: { id: salesContractId },
-      select: { amountSource: true },
+      select: { amountSource: true, packingItems: { select: { totalPrice: true, purchaseCost: true, isOwnedByJiesong: true, note: true } } },
     }),
     db.salesItem.findMany({
       where: { salesContractId },
@@ -122,11 +122,12 @@ const reconcileSalesFinancials = async (tx, salesContractId) => {
     }),
   ]);
 
-  const totalAmountRaw = items.reduce(
+  const packingItems = contract?.packingItems || [];
+  const totalAmountRaw = packingItems.length ? packingItems.reduce((sum, item) => sum + clampNumber(item.totalPrice, 0), 0) : items.reduce(
     (sum, item) => sum + clampNumber(item.quantity, 0) * clampNumber(item.sellingPrice, 0),
     0,
   );
-  const totalCostRaw = items.reduce(
+  const totalCostRaw = packingItems.length ? packingItems.filter(isJiesongOwnedPackingItem).reduce((sum, item) => sum + clampNumber(item.purchaseCost, 0), 0) : items.reduce(
     (sum, item) => sum + clampNumber(item.quantity, 0) * clampNumber(item.costPrice, 0),
     0,
   );
@@ -143,7 +144,8 @@ const reconcileSalesFinancials = async (tx, salesContractId) => {
   return {
     totalAmount,
     totalCost,
-    grossProfit,
+    // 装箱收入为USD、采购成本为CNY，毛利交由 salesFinanceService 换汇计算。
+    grossProfit: packingItems.length ? null : grossProfit,
   };
 };
 
@@ -159,6 +161,7 @@ const allocateInboundInventory = async ({
   productId,
   salesItemId,
   salesContractId,
+  purchaseItemId,
   quantity,
   unit,
   at,
@@ -172,6 +175,8 @@ const allocateInboundInventory = async ({
   const availableInventories = await getDefaultSnapshotInput(tx).inventory.findMany({
     where: {
       productId,
+      ...(purchaseItemId ? { purchaseItemId } : {}),
+      ...(normalizedUnit ? { OR: [{ unit: normalizedUnit }, { unit: null }] } : {}),
       status: INVENTORY_STATUS.INBOUND,
       salesItemId: null,
     },
@@ -274,7 +279,7 @@ const allocateInboundInventory = async ({
 const applySalesOutStock = async (tx, salesContractId) => {
   const contract = await getDefaultSnapshotInput(tx).salesContract.findUnique({
     where: { id: salesContractId },
-    include: { items: true },
+    include: { items: true, packingItems: true },
   });
 
   if (!contract) {
@@ -284,7 +289,10 @@ const applySalesOutStock = async (tx, salesContractId) => {
   const now = new Date();
   const results = [];
 
-  for (const item of contract.items || []) {
+  // 装箱是当前出口的主来源；旧销售明细只在没有装箱行时兼容，不能双计。
+  const packingItems = contract.packingItems || [];
+  const shipmentItems = packingItems.length ? packingItems.filter(isJiesongOwnedPackingItem) : (contract.items || []);
+  for (const item of shipmentItems) {
     const needed = clampNumber(item.quantity, 0);
     if (needed <= 0) {
       continue;
@@ -293,8 +301,9 @@ const applySalesOutStock = async (tx, salesContractId) => {
     const allocation = await allocateInboundInventory({
       tx,
       productId: item.productId,
-      salesItemId: item.id,
+      salesItemId: packingItems.length ? null : item.id,
       salesContractId,
+      purchaseItemId: item.purchaseItemId,
       quantity: needed,
       unit: item.unit,
       at: now,
@@ -304,13 +313,14 @@ const applySalesOutStock = async (tx, salesContractId) => {
       continue;
     }
 
-    await getDefaultSnapshotInput(tx).salesItem.update({
+    if (!packingItems.length) await getDefaultSnapshotInput(tx).salesItem.update({
       where: { id: item.id },
       data: { costPrice: allocation.averageCost },
     });
 
     results.push({
-      salesItemId: item.id,
+      salesItemId: packingItems.length ? null : item.id,
+      ...(packingItems.length ? { packingItemId: item.id } : {}),
       productId: item.productId,
       ...allocation,
     });
@@ -381,14 +391,10 @@ const revertSalesOutStock = async (tx, salesContractId) => {
     .map(item => item.id)
     .filter(id => !!id);
 
-  if (salesItemIds.length === 0) {
-    return { reverted: 0 };
-  }
-
   // 查找相关的出库库存记录
   const outboundInventories = await getDefaultSnapshotInput(tx).inventory.findMany({
     where: {
-      salesItemId: { in: salesItemIds },
+      OR: [{ salesContractId }, ...(salesItemIds.length ? [{ salesItemId: { in: salesItemIds } }] : [])],
       status: INVENTORY_STATUS.OUTBOUND,
     },
     orderBy: { outboundAt: 'desc' },

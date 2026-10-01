@@ -13,7 +13,7 @@
 | app.js | 入口 | Express 应用初始化和启动（含定时任务启动） |
 | config/ | 配置层 | 权限校验后的环境加载、活动 AI 供应商与常量（含单元测试） |
 | controllers/ | 控制层 | 处理 HTTP 请求，调用服务层 |
-| integration/ | 集成测试层 | 数据库集成测试（schema/事务/seed 幂等） |
+| integration/ | 集成测试层 | 数据库集成测试（空结构/事务/seed 幂等及真实 HTTP 进销存闭环） |
 | jobs/ | 定时任务层 | 库存预警、出口提醒（每月5号退税/缺票提醒）等定时任务 |
 | middleware/ | 中间件层 | 认证、仅记录请求结构的性能日志、错误处理（含单元测试） |
 | routes/ | 路由层 | 定义 API 路由和参数验证 |
@@ -73,7 +73,7 @@
 | packingListCheckService.js | 船司装箱单 PDF 受限归档、逐商品比对、历史记录与人工复核结论 |
 | purchaseInvoiceService.js | 从采购事实生成催票清单，规范化多发票号码并读取选填附件 |
 | taxRefundPreparationService.js | 2026 退税材料清单；区分签署件/生成件、提运单/装箱单；导出出货关联与自动核验 |
-| taxRefundShipmentService.js | 按报关单归集出货资料、机器核验、版本确认归档与全量跨月准备汇总 |
+| taxRefundShipmentService.js | 按报关单归集出货资料、机器核验、版本确认归档与全量跨月准备汇总；技术时间戳不触发重新确认 |
 | taxRefundWorkbenchService.js | 保留既有查询；按申报月份展示逐次出货准备与确认状态，不冒充正式申报 |
 | taxRefundExportService.js | 退税记录与采购合同、发票号码、征税率的导出前严格匹配 |
 | exportReminderService.js | 次月5号内部退税材料准备提醒、已出货缺发票提醒（幂等通知） |
@@ -94,3 +94,6 @@
 - WPS同步状态：`services/wpsSyncStatusService.js` 从受限本机回执提供汇总；认证后的 `GET /dashboard/wps-sync` 返回最近成功时间、失败/过期状态及待核对数量，不返回源文件、摘要或业务明细。超过90分钟未核对标记过期。
 
 - 采购模板：`routes/procurementTemplate.js` 的门店列表、通用模板、历史采购明细三个读取入口均先执行 `authenticate`，保持既有响应格式。
+
+- `inventorySnapshot.js`：以自有装箱行扣减对应采购来源、单位的合格库存，旧销售明细兼容不双计；回滚保留验货来源。
+- `customsDeclarationDraftService.js`：编号包含出口合同号，原子替换仅限 DRAFT，保留 ID 与编号并拒绝覆盖已放行单。

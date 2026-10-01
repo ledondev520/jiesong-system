@@ -25,7 +25,7 @@ cp env.example .env
 
 ```bash
 npm run db:generate   # 生成 Prisma 客户端
-npm run db:push       # 同步数据库结构到 Supabase（开发环境）
+npm run db:migrate    # 自动备份后应用迁移，禁止 db push
 npm run db:seed       # 初始化种子数据
 ```
 
@@ -42,7 +42,7 @@ npm start     # 生产模式
 
 ```bash
 npm run test      # 单元/模块测试
-npm run test:db   # 数据库集成测试（临时 SQLite：schema + 事务 + seed 幂等）
+npm run test:db   # 数据库集成测试（临时 SQLite：schema + 事务 + seed 幂等 + 真实 HTTP 业务闭环）
 npm run test:all  # 全量（test + test:db）
 ```
 
@@ -195,3 +195,5 @@ Authorization: Bearer <token>
 - **数据库**: Supabase PostgreSQL
 - **认证**: JWT
 - **密码加密**: bcryptjs
+
+`test:db` 需要 Python 3 自带的 sqlite3；从 schema 生成空库，使用合成资料验证分批验货、两次出货、库存守恒、单据归档和权限，不读取现有业务库。

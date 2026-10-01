@@ -105,7 +105,7 @@ const buildShipmentPreparation = ({ salesContract, purchases = [], declaration =
     : invoiceVerification.results.flatMap(x => x.issues.map(issue => `${x.invoiceNo || '缺票号'}：${issue}`)).join('；') || '缺少可核验的进项发票';
   const materialBlockers = [...new Set([...scopeIssues, ...preparation.checklist.filter(x => !['export-detail-form', 'purchase-detail-form'].includes(x.id)
     && (x.requirement === 'required' || x.id === invoiceCheck.id) && x.status !== 'ready').map(x => x.message)])];
-  // 确认仅绑定实际资料与核验结果，排除确认文件本身，重复读取不会让版本失效。
+  // 绑定实际资料与核验结果，排除确认文件及技术时间戳；相同资料重复保存不要求重新确认。
   const sourceVersion = crypto.createHash('sha256').update(JSON.stringify({
     id: salesContract.id, shippedAt: salesContract.shippedAt, declaration, packingItems,
     purchases: linkedPurchases, packet: publicFile(packet), signed: publicFile(signed),
@@ -118,7 +118,7 @@ const buildShipmentPreparation = ({ salesContract, purchases = [], declaration =
     materialBlockers,
     allocations: invoiceVerification.results.map(x => ({ invoiceNo: x.invoiceNo,
       usages: [...(invoiceUsages[x.invoiceNo] || [])].sort(), allocation: invoiceAllocations[x.invoiceNo] })),
-  })).digest('hex');
+  }, (key, value) => ['createdAt', 'updatedAt'].includes(key) ? undefined : value)).digest('hex');
   const confirmationDescription = `${CONFIRM_PREFIX}${declaration?.id || 'pending'}:${sourceVersion}`;
   const confirmedFile = (salesContract.files || []).find(x => x.category === 'SYSTEM_GENERATED_XLSX'
     && /^[a-f0-9]{64}$/.test(x.checksum || '') && x.description === confirmationDescription);
