@@ -34,6 +34,7 @@ import { MobileListCard } from '@/components/mobile';
 
 
 const ROLE_META: Record<Role, { label: string; className: string }> = {
+  [Role.BOSS]: { label: '老板（只读）', className: 'bg-sky-50 text-sky-700 border-sky-200' },
   [Role.ADMIN]: { label: '管理员', className: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800' },
   [Role.PURCHASE]: { label: '采购', className: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800' },
   [Role.SALES]: { label: '销售', className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800' },

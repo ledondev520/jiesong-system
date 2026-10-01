@@ -401,3 +401,10 @@ test('getPeriodDetail: 账期下钻按源行返回现金流、科目余额、明
   assert.deepEqual(query.include.generalLedgerEntries, { orderBy: { sourceRow: 'asc' } });
   assert.deepEqual(query.include.dataSources, { orderBy: { type: 'asc' } });
 });
+
+test('getPeriodDetail: 只读经营视图在查询前排除账簿行及来源文件元数据', async () => {
+  let query;
+  const db = { financialPeriod: { findUnique: async (args) => { query = args; return { id: 'synthetic-period' }; } } };
+  await require('./financialStatementsService').getPeriodDetail(2026, 6, db, { includeEvidence: false });
+  assert.deepEqual(query.include, { balanceSheet: true, incomeStatement: true, cashFlowStatement: true });
+});

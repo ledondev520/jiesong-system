@@ -7,6 +7,8 @@
 - Enforce explicit身份校验 (JWT + role checks) for all sensitive routes.
 - Treat Agent / Service Account credentials as independent machine identities; never reuse employee passwords or browser sessions for automation.
 - Keep authentication middleware as single entry for route groups and validate user context before业务处理.
+- `backend/src/middleware/bossReadOnly.js` gates BOSS after database-backed authentication: explicit business GET/HEAD queries only, with own-password and own-notification-read exceptions. Business writes, AI/MCP calls and artifact-generating GETs fail closed; both `authService.updateUser` and `userController.update` invalidate cached roles. `financialStatementsController.js` omits ledger rows and source metadata before querying for BOSS; existing ADMIN/FINANCE evidence limits remain.
+- `backend/src/services/purchaseReceiptService.js` stores Confidential arrivals and immutable inspection evidence atomically, enforces per-item ordered limits and request-content idempotency, and admits only accepted increments to stock. `backend/src/routes/purchases.js` limits these writes to authenticated human ADMIN/PURCHASE/WAREHOUSE; FIFO/rollback in `inventorySnapshot.js` retain inspection provenance. Pending/reinspection stock is unavailable; there is no return operation. Legacy records receive no invented evidence; finalized historical imports require active ADMIN plus explicit confirmation in `purchaseImportExportService.js`.
 - `backend/src/routes/procurementTemplate.js` must authenticate all procurement-template reads before parsing historical store/purchase data; these records are Confidential.
 - Use least-privilege账号 and role-to-resource mapping for every service boundary.
 - Disable默认凭证 and rotate all secrets periodically.

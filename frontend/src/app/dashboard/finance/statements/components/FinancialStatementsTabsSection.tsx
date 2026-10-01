@@ -4,6 +4,7 @@
  * Pos: 财务报表主分析区
  */
 
+import { useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
 import { Building2, DollarSign, AlertTriangle, AlertCircle, BarChart3, BookOpen, FileCheck2, Loader2, Scale, TrendingUp, Wallet, PieChart as PieChartIcon, Activity } from 'lucide-react';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, LineChart, Pie, PieChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Badge } from '@/components/ui/badge';
@@ -357,6 +358,7 @@ export function FinancialStatementsTabsSection({
   currentDetail,
   detailLoading,
 }: FinancialStatementsTabsSectionProps) {
+  const readOnly = useBusinessReadOnly();
   // 支出分类占比数据（取最新一期）
   const latestTrend = analytics.trends[analytics.trends.length - 1];
   const expensePieData = latestTrend
@@ -731,25 +733,25 @@ export function FinancialStatementsTabsSection({
                   </CardContent>
                 </Card>
 
-                <Card className="md:col-span-2">
+                {!readOnly && (<Card className="md:col-span-2">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2"><Scale className="h-5 w-5 text-primary" />科目余额表（{currentDetail.accountBalances?.length ?? 0} 行）</CardTitle>
                   </CardHeader>
                   <CardContent>
                     {currentDetail.accountBalances?.length ? <AccountBalancesTable rows={currentDetail.accountBalances} /> : <p className="text-sm text-muted-foreground">暂无数据</p>}
                   </CardContent>
-                </Card>
+                </Card>)}
 
-                <Card className="md:col-span-2">
+                {!readOnly && (<Card className="md:col-span-2">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-primary" />明细账（{currentDetail.generalLedgerEntries?.length ?? 0} 行）</CardTitle>
                   </CardHeader>
                   <CardContent>
                     {currentDetail.generalLedgerEntries?.length ? <GeneralLedgerTable rows={currentDetail.generalLedgerEntries} /> : <p className="text-sm text-muted-foreground">暂无数据</p>}
                   </CardContent>
-                </Card>
+                </Card>)}
 
-                <Card className="md:col-span-2">
+                {!readOnly && (<Card className="md:col-span-2">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2"><FileCheck2 className="h-5 w-5 text-primary" />来源校验（{currentDetail.dataSources?.length ?? 0} 份）</CardTitle>
                     <CardDescription>保留文件名、行数、大小和摘要，用于追溯本账期数据来源。</CardDescription>
@@ -757,7 +759,7 @@ export function FinancialStatementsTabsSection({
                   <CardContent>
                     {currentDetail.dataSources?.length ? <DataSourceList sources={currentDetail.dataSources} /> : <p className="text-sm text-muted-foreground">暂无来源记录</p>}
                   </CardContent>
-                </Card>
+                </Card>)}
               </div>
             ) : (
               <Card>

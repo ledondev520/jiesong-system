@@ -8,6 +8,7 @@
 
 'use client';
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
@@ -197,9 +198,9 @@ export default function ReconciliationPage() {
             <Button variant="outline" size="sm" onClick={() => { clearApiGetCache(); void loadAll(); }} disabled={matchLoading || reconLoading}>
               <RefreshCw className={`h-4 w-4 mr-1 ${(matchLoading || reconLoading) ? 'animate-spin' : ''}`} />刷新
             </Button>
-            <Button size="sm" onClick={handleAutoMatch} disabled={matchLoading}>
+            <BusinessWrite><Button size="sm" onClick={handleAutoMatch} disabled={matchLoading}>
               <Zap className="h-4 w-4 mr-1" />自动匹配
-            </Button>
+            </Button></BusinessWrite>
           </div>
         </div>
 
@@ -259,9 +260,9 @@ export default function ReconciliationPage() {
               )}
             </span>
             <div className="flex-1" />
-            <Button size="sm" variant="default" disabled={!canLink} onClick={handleLink}>
+            <BusinessWrite><Button size="sm" variant="default" disabled={!canLink} onClick={handleLink}>
               <Link2 className="h-4 w-4 mr-1" />确认关联
-            </Button>
+            </Button></BusinessWrite>
             <Button size="sm" variant="ghost" onClick={() => { setSelectedBankId(null); setSelectedInvoiceId(null); }}>
               <Unlink className="h-4 w-4 mr-1" />取消选择
             </Button>
@@ -327,9 +328,9 @@ export default function ReconciliationPage() {
                             <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{txn.summary || ''}</span>
                           </div>
                           <div className="flex justify-end gap-1 mt-1">
-                            <Button size="sm" variant="ghost" className="h-6 text-[10px] px-1" onClick={(e) => { e.stopPropagation(); handleIgnore('BANK', txn.id); }}>
+                            <BusinessWrite><Button size="sm" variant="ghost" className="h-6 text-[10px] px-1" onClick={(e) => { e.stopPropagation(); handleIgnore('BANK', txn.id); }}>
                               <EyeOff className="h-3 w-3 mr-0.5" />忽略
-                            </Button>
+                            </Button></BusinessWrite>
                           </div>
                         </div>
                       ))}
@@ -437,9 +438,9 @@ export default function ReconciliationPage() {
                             <span className="text-[10px] text-muted-foreground">{inv.invNo || '-'}</span>
                           </div>
                           <div className="flex justify-end gap-1 mt-1">
-                            <Button size="sm" variant="ghost" className="h-6 text-[10px] px-1" onClick={(e) => { e.stopPropagation(); handleIgnore('INVOICE', inv.id); }}>
+                            <BusinessWrite><Button size="sm" variant="ghost" className="h-6 text-[10px] px-1" onClick={(e) => { e.stopPropagation(); handleIgnore('INVOICE', inv.id); }}>
                               <EyeOff className="h-3 w-3 mr-0.5" />忽略
-                            </Button>
+                            </Button></BusinessWrite>
                           </div>
                         </div>
                       ))}

@@ -8,6 +8,7 @@
 
 'use client';
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { useCallback, useEffect, useState } from 'react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/lib/hooks/useTableSort';
@@ -202,9 +203,9 @@ export default function BankFlowPage() {
               <X className="h-3 w-3 mr-1" />清除
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+          <BusinessWrite><Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
             <Upload className="h-3 w-3 mr-1" />导入
-          </Button>
+          </Button></BusinessWrite>
         </div>
 
         {/* 移动端卡片视图 */}

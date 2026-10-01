@@ -6,6 +6,7 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -144,10 +145,10 @@ export function FinancialStatementsOverview({
                   </SelectContent>
                 </Select>
               )}
-              <Button onClick={onOpenUploadDialog} variant="default" className="h-11 w-full sm:w-auto">
+              <BusinessWrite><Button onClick={onOpenUploadDialog} variant="default" className="h-11 w-full sm:w-auto">
                 <Upload className="mr-2 h-4 w-4" />
                 上传月度会计报表
-              </Button>
+              </Button></BusinessWrite>
             </div>
           }
         />

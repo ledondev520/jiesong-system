@@ -13,6 +13,7 @@
 
 'use client';
 
+import { isBossRestrictedPath, useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -45,6 +46,7 @@ interface ModuleTabHeaderProps {
  *   3. 点击 Tab 导航至对应子页面
  */
 export function ModuleTabHeader({ tabs, moduleName }: ModuleTabHeaderProps) {
+  const readOnly = useBusinessReadOnly();
   const pathname = usePathname();
 
   // 0. 每次路径变化时，将当前 URL 存入模块记忆（以第一个 tab 的 href 为模块 key）
@@ -62,7 +64,7 @@ export function ModuleTabHeader({ tabs, moduleName }: ModuleTabHeaderProps) {
         /* 移动端横向滚动时不触发页面纵向滚动 */
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        {tabs.map((tab) => {
+        {tabs.filter((tab) => !readOnly || !isBossRestrictedPath(tab.href)).map((tab) => {
           const active = isTabRouteActive(pathname, tab.href);
           return (
             <Link

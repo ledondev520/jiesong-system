@@ -39,6 +39,7 @@ const PERMISSIONS: Permission[] = [
 ];
 
 const ROLE_PERMISSIONS: Record<Role, string[]> = {
+  [Role.BOSS]: ['dashboard', 'purchase', 'sales', 'finance', 'logistics', 'customs'],
   [Role.ADMIN]: PERMISSIONS.map((p) => p.key),
   [Role.PURCHASE]: ['dashboard', 'purchase', 'logistics', 'customs', 'export'],
   [Role.SALES]: ['dashboard', 'sales', 'logistics', 'customs', 'export'],
@@ -47,6 +48,7 @@ const ROLE_PERMISSIONS: Record<Role, string[]> = {
 };
 
 const ROLE_META: Record<Role, { label: string; color: string }> = {
+  [Role.BOSS]: { label: '老板（只读）', color: 'bg-sky-50 text-sky-700 border-sky-200' },
   [Role.ADMIN]: { label: '管理员', color: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800' },
   [Role.PURCHASE]: { label: '采购', color: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800' },
   [Role.SALES]: { label: '销售', color: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800' },
@@ -59,7 +61,7 @@ export function PermissionMatrix() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">权限矩阵</CardTitle>
-        <CardDescription>各角色默认功能权限一览（只读）</CardDescription>
+        <CardDescription>各角色默认功能权限一览；老板仅可查看业务，不含写入、生成文件和受限财务证据</CardDescription>
       </CardHeader>
       <CardContent className="overflow-auto">
         <Table>

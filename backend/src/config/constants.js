@@ -8,7 +8,8 @@
 
 // 用户角色
 const ROLES = {
-  ADMIN: 'ADMIN',       // 管理员/老板
+  ADMIN: 'ADMIN',       // 管理员
+  BOSS: 'BOSS',         // 老板（业务只读）
   PURCHASE: 'PURCHASE', // 采购
   SALES: 'SALES',       // 销售
   FINANCE: 'FINANCE',   // 财务

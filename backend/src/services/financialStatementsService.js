@@ -749,16 +749,18 @@ async function listPeriods() {
  * @param {number} month
  * @returns {object|null}
  */
-async function getPeriodDetail(year, month, prismaClient = prisma) {
+async function getPeriodDetail(year, month, prismaClient = prisma, { includeEvidence = true } = {}) {
   return prismaClient.financialPeriod.findUnique({
     where: { year_month: { year, month } },
     include: {
       balanceSheet: true,
       incomeStatement: true,
       cashFlowStatement: true,
-      accountBalances: { orderBy: { sourceRow: 'asc' } },
-      generalLedgerEntries: { orderBy: { sourceRow: 'asc' } },
-      dataSources: { orderBy: { type: 'asc' } },
+      ...(includeEvidence ? {
+        accountBalances: { orderBy: { sourceRow: 'asc' } },
+        generalLedgerEntries: { orderBy: { sourceRow: 'asc' } },
+        dataSources: { orderBy: { type: 'asc' } },
+      } : {}),
     },
   });
 }

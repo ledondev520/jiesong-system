@@ -56,6 +56,8 @@
 - 调用 `spawn_agent` 时显式传入上述属性；需要显式模型属性时使用 `fork_turns: "none"` 或正整数，并在任务说明中补齐必要上下文。不修改产品自身的 AI 模型、供应商或部署配置。
 
 ## Data classification
+- 老板业务只读：`backend/src/middleware/bossReadOnly.js` 在数据库用户认证后使用明确GET白名单，业务写、AI/MCP和生成文件入口默认拒绝；仅自身密码及自身通知已读可写。两套用户管理入口变更角色后必须清除认证缓存。账簿行、来源文件元数据及工资/税务证据仍仅ADMIN/FINANCE可读，账期经营汇总可供老板查看。
+- 分批到货/验货证据是Confidential：`backend/src/services/purchaseReceiptService.js` 在事务中保存真实认证操作者与不可变验货记录，仅合格增量入库；待验/待复验不可出库，FIFO拆分和销售回滚保留验货来源。仅ADMIN/PURCHASE/WAREHOUSE人类用户可登记；没有退货操作。历史数据不补造验货，普通导入不能跳过收货，历史完成数据仅有效ADMIN显式确认补录。
 - See `data-classification.json` for the authoritative classification map.
 - Restricted data: secrets, credentials, migration credentials, payment-related keys, supplier bank routing details, signed/generated contract documents, carrier packing-list originals, and packing-list review records.
 - Company bank statements, transaction identifiers, balances, and account identifiers are Restricted; raw statement PDFs must not enter Git or ordinary attachment storage, and structured rows may persist only a masked account suffix plus currency and bank name.

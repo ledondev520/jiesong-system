@@ -7,6 +7,8 @@
  */
 
 const prisma = require('../utils/prisma');
+const { clearAuthCache } = require('../middleware/auth');
+const { ROLES } = require('../config/constants');
 const bcrypt = require('bcrypt');
 const { success, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
@@ -81,6 +83,7 @@ const getById = async (req, res, next) => {
 const create = async (req, res, next) => {
   try {
     const { username, password, name, role } = req.body;
+    if (role !== undefined && !Object.values(ROLES).includes(role)) throw createError('角色无效', 400);
 
     const existing = await prisma.user.findUnique({ where: { username } });
     if (existing) {
@@ -120,6 +123,7 @@ const update = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { name, role, isActive, password } = req.body;
+    if (role !== undefined && !Object.values(ROLES).includes(role)) throw createError('角色无效', 400);
 
     const updateData = {};
     if (name !== undefined) updateData.name = name;
@@ -142,6 +146,7 @@ const update = async (req, res, next) => {
       },
     });
 
+    clearAuthCache(id);
     success(res, user, '用户更新成功');
   } catch (error) {
     next(error);
@@ -160,6 +165,7 @@ const remove = async (req, res, next) => {
     }
 
     await prisma.user.delete({ where: { id } });
+    clearAuthCache(id);
     success(res, null, '用户已删除');
   } catch (error) {
     next(error);

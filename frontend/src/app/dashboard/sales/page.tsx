@@ -11,6 +11,7 @@
 
 'use client';
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import { SalesContract, SalesStatus } from '@/types';
 import { salesService } from '@/services/sales.service';
@@ -454,16 +455,16 @@ export default function SalesPage() {
         title="出口合同"
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Button
+            <BusinessWrite><Button
               variant="outline"
               className="h-10 rounded-xl"
               onClick={() => setImportDialogOpen(true)}
             >
               <Upload className="mr-2 h-4 w-4" /> 批量导入
-            </Button>
-            <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/sales/create')}>
+            </Button></BusinessWrite>
+            <BusinessWrite><Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/sales/create')}>
               <Plus className="mr-2 h-4 w-4" /> 新增出口合同
-            </Button>
+            </Button></BusinessWrite>
           </div>
         }
       />
@@ -550,9 +551,9 @@ export default function SalesPage() {
             <p className="text-sm text-muted-foreground mb-6 max-w-xs">
               还没有创建任何出口合同，点击下方的按钮开始创建
             </p>
-            <Button onClick={() => router.push('/dashboard/sales/create')}>
+            <BusinessWrite><Button onClick={() => router.push('/dashboard/sales/create')}>
               <Plus className="mr-2 h-4 w-4" /> 新建出口合同
-            </Button>
+            </Button></BusinessWrite>
           </div>
         ) : (
           pagedContracts.map((contract) => (
@@ -585,7 +586,7 @@ export default function SalesPage() {
                       <Eye className="mr-1 h-3.5 w-3.5" /> 详情
                     </Button>
                   </Link>
-                  <Button
+                  <BusinessWrite><Button
                     variant="outline"
                     className="h-10 rounded-xl text-xs"
                     disabled={exportingId === contract.id}
@@ -595,14 +596,14 @@ export default function SalesPage() {
                       ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       : <FileSpreadsheet className="mr-1 h-3.5 w-3.5 text-emerald-600" />}
                     Excel
-                  </Button>
-                  <Button
+                  </Button></BusinessWrite>
+                  <BusinessWrite><Button
                     variant="outline"
                     className="h-10 rounded-xl text-xs text-destructive hover:bg-destructive/10"
                     onClick={() => openDeleteDialog(contract)}
                   >
                     <Trash2 className="mr-1 h-3.5 w-3.5" /> 删除
-                  </Button>
+                  </Button></BusinessWrite>
                 </div>
               }
             />
@@ -655,9 +656,9 @@ export default function SalesPage() {
             <p className="text-sm text-muted-foreground mb-6 max-w-xs">
               还没有创建任何出口合同，点击下方的按钮开始创建
             </p>
-            <Button onClick={() => router.push('/dashboard/sales/create')}>
+            <BusinessWrite><Button onClick={() => router.push('/dashboard/sales/create')}>
               <Plus className="mr-2 h-4 w-4" /> 新建出口合同
-            </Button>
+            </Button></BusinessWrite>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -762,7 +763,7 @@ export default function SalesPage() {
                         <span className="text-xs">详情</span>
                       </Button>
                     </Link>
-                    <Button
+                    <BusinessWrite><Button
                       variant="outline"
                       size="sm"
                       className="h-8 rounded-lg text-xs"
@@ -776,8 +777,8 @@ export default function SalesPage() {
                         ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         : <FileSpreadsheet className="mr-1 h-3.5 w-3.5 text-emerald-600" />}
                       Excel
-                    </Button>
-                    <Button
+                    </Button></BusinessWrite>
+                    <BusinessWrite><Button
                       variant="outline"
                       size="sm"
                       className="h-8 rounded-lg text-xs text-destructive hover:bg-destructive/10"
@@ -787,7 +788,7 @@ export default function SalesPage() {
                       onClick={() => openDeleteDialog(contract)}
                     >
                       <Trash2 className="mr-1 h-3.5 w-3.5" /> 删除
-                    </Button>
+                    </Button></BusinessWrite>
                   </div>
                 </CardContent>
               </Card>

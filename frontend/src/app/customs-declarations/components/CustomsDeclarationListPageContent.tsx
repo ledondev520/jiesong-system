@@ -8,6 +8,7 @@
 
 'use client';
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { startTransition, useCallback, useDeferredValue, useEffect, useState } from 'react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/lib/hooks/useTableSort';
@@ -198,22 +199,22 @@ export function CustomsDeclarationListPageContent({ embedded = false }: { embedd
               </Button>
             )}
 
-            <Button
+            <BusinessWrite><Button
               variant="outline"
               className="h-11 rounded-xl"
               onClick={handleGenerateDrafts}
               disabled={generatingDrafts}
             >
               自动生成草稿
-            </Button>
+            </Button></BusinessWrite>
 
-            <Button
+            <BusinessWrite><Button
               className="h-11 rounded-xl"
               onClick={() => router.push('/dashboard/customs-declarations/create')}
             >
               <Plus className="mr-2 h-4 w-4" />
               新建报关单
-            </Button>
+            </Button></BusinessWrite>
           </>
         }
       />

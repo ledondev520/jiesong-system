@@ -8,6 +8,7 @@
 
 'use client';
 
+import { BusinessWrite, useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
 import { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -108,6 +109,7 @@ export default function ContractFiles({
   categoryOptions,
   accept = '.pdf,.jpg,.jpeg,.png,.xlsx,.docx',
 }: ContractFilesProps) {
+  const readOnly = useBusinessReadOnly();
   const [uploading, setUploading] = useState(false);
   const [previewFile, setPreviewFile] = useState<ContractFile | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -124,7 +126,7 @@ export default function ContractFiles({
   const handleUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (!file) return;
+      if (!file || readOnly) return;
 
       setUploading(true);
       try {
@@ -140,11 +142,12 @@ export default function ContractFiles({
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     },
-    [contractId, contractType, files, onChange, uploadCategory]
+    [contractId, contractType, files, onChange, uploadCategory, readOnly]
   );
 
   const handleDelete = useCallback(
     async (fileId: string, fileName: string) => {
+      if (readOnly) return;
       try {
         await deleteContractFile(fileId);
         onChange(files.filter((f) => f.id !== fileId));
@@ -153,7 +156,7 @@ export default function ContractFiles({
         toast.error('删除附件失败');
       }
     },
-    [files, onChange]
+    [files, onChange, readOnly]
   );
 
   const formatFileSize = (size: number) => {
@@ -171,7 +174,7 @@ export default function ContractFiles({
               <CardDescription className="text-xs">{description}</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              {resolvedCategoryOptions.length > 1 ? (
+              {!readOnly && resolvedCategoryOptions.length > 1 ? (
                 <Select value={uploadCategory} onValueChange={(value) => setUploadCategory(value as ContractFileCategory)}>
                   <SelectTrigger className="h-8 w-[150px] text-xs" aria-label="附件类型">
                     <SelectValue />
@@ -183,7 +186,7 @@ export default function ContractFiles({
                   </SelectContent>
                 </Select>
               ) : null}
-              <Button
+              <BusinessWrite><Button
                 variant="outline"
                 size="sm"
                 className="h-8 rounded-md text-xs"
@@ -195,10 +198,11 @@ export default function ContractFiles({
                 ) : (
                   <><Upload className="mr-1.5 h-3.5 w-3.5" />上传附件</>
                 )}
-              </Button>
+              </Button></BusinessWrite>
             </div>
             <input
               id="contract-file-upload"
+              disabled={readOnly}
               ref={fileInputRef}
               type="file"
               aria-label="上传合同附件"
@@ -262,7 +266,7 @@ export default function ContractFiles({
                         <Download className="h-3.5 w-3.5" />
                       </a>
                     </Button>
-                    <Button
+                    <BusinessWrite><Button
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 rounded-md text-destructive hover:text-destructive"
@@ -270,7 +274,7 @@ export default function ContractFiles({
                       onClick={() => handleDelete(file.id, file.fileName)}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    </Button></BusinessWrite>
                   </div>
                 </div>
               ))}

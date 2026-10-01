@@ -81,7 +81,7 @@ router.get('/me', authenticate, authController.getCurrentUser);
 router.post(
   '/change-password',
   authenticate,
-  roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  roleAuth('ADMIN', 'BOSS', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
   withAuditLog(
     {
       entity: 'User',

@@ -8,6 +8,7 @@
 
 'use client';
 
+import { BusinessWrite, useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
 import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Product } from '@/types';
@@ -68,6 +69,7 @@ function useDebouncedValue<T>(value: T, delay: number): T {
 const DEFAULT_PAGE_SIZE = 20;
 
 function ProductsPageContent() {
+  const readOnly = useBusinessReadOnly();
   const searchParams = useSearchParams();
   const initialKeyword = searchParams.get('keyword') || '';
   const lowStockParam = searchParams.get('lowStock') === 'true';
@@ -241,9 +243,9 @@ function ProductsPageContent() {
                 重置
               </Button>
             )}
-            <Button onClick={handleCreate} className="h-10 rounded-xl">
+            <BusinessWrite><Button onClick={handleCreate} className="h-10 rounded-xl">
               <Plus className="mr-2 h-4 w-4" /> 新增商品
-            </Button>
+            </Button></BusinessWrite>
           </div>
 
           <Button variant={lowStock ? 'default' : 'outline'} onClick={() => setLowStock(value => !value)} aria-pressed={lowStock}>只看低库存商品</Button>
@@ -272,12 +274,12 @@ function ProductsPageContent() {
                   ]}
                   action={
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" className="h-10 flex-1 rounded-xl" onClick={() => handleEdit(product)}>
+                      <BusinessWrite><Button variant="outline" size="sm" className="h-10 flex-1 rounded-xl" onClick={() => handleEdit(product)}>
                         <Pencil className="mr-1 h-4 w-4" /> 编辑
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-10 rounded-xl px-3" onClick={() => openDeleteDialog(product)}>
+                      </Button></BusinessWrite>
+                      <BusinessWrite><Button variant="ghost" size="sm" className="h-10 rounded-xl px-3" onClick={() => openDeleteDialog(product)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      </Button></BusinessWrite>
                     </div>
                   }
                 />
@@ -296,7 +298,7 @@ function ProductsPageContent() {
                 icon={<Package className="h-8 w-8" />}
                 title={lowStock ? "没有低库存商品" : "暂无商品"}
                 description={lowStock ? "已启用预警阈值的商品均有足够可用库存。" : "还没有添加任何商品，点击下方的按钮开始创建"}
-                action={{ label: '新增商品', onClick: () => setIsDialogOpen(true) }}
+                action={readOnly ? undefined : { label: '新增商品', onClick: () => setIsDialogOpen(true) }}
               />
             ) : (
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
@@ -352,22 +354,22 @@ function ProductsPageContent() {
 
                       {/* 操作 */}
                       <div className="flex gap-2 pt-1 border-t border-border/30">
-                        <Button
+                        <BusinessWrite><Button
                           variant="outline"
                           size="sm"
                           className="h-8 flex-1 rounded-lg text-xs"
                           onClick={(e) => { e.stopPropagation(); handleEdit(product); }}
                         >
                           <Pencil className="mr-1 h-3 w-3" /> 编辑
-                        </Button>
-                        <Button
+                        </Button></BusinessWrite>
+                        <BusinessWrite><Button
                           variant="outline"
                           size="sm"
                           className="h-8 flex-1 rounded-lg text-xs text-destructive hover:bg-destructive/10"
                           onClick={(e) => { e.stopPropagation(); openDeleteDialog(product); }}
                         >
                           <Trash2 className="mr-1 h-3 w-3" /> 删除
-                        </Button>
+                        </Button></BusinessWrite>
                       </div>
                     </CardContent>
                   </Card>

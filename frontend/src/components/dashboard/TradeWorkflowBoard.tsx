@@ -6,6 +6,7 @@
 
 'use client';
 
+import { BusinessWrite, useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
 import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
@@ -58,6 +59,7 @@ const stagePresentation: Record<TradeWorkflowStageStatus, {
 };
 
 function WorkflowCard({ workflow }: { workflow: TradeWorkflow }) {
+  const readOnly = useBusinessReadOnly();
   const router = useRouter();
   const nextStage = workflow.stages.find((stage) => (
     stage.status === 'blocked' || stage.status === 'current'
@@ -91,10 +93,10 @@ function WorkflowCard({ workflow }: { workflow: TradeWorkflow }) {
         <Button
           type="button"
           className="h-auto min-h-11 shrink-0 justify-between whitespace-normal rounded-md text-left lg:min-w-48"
-          aria-label={`${workflow.contractNo} 下一步：${workflow.nextAction.label}`}
-          onClick={() => router.push(workflow.nextAction.href)}
+          aria-label={`${workflow.contractNo} ${readOnly ? '查看专项单详情' : `下一步：${workflow.nextAction.label}`}`}
+          onClick={() => router.push(readOnly ? `/dashboard/sales/${workflow.id}` : workflow.nextAction.href)}
         >
-          {workflow.nextAction.label}
+          {readOnly ? '查看专项单详情' : workflow.nextAction.label}
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
@@ -201,9 +203,9 @@ export function TradeWorkflowBoard({ workflows, loading = false, unavailable = f
               <p className="text-sm font-medium">暂无出口专项单</p>
               <p className="mt-1 text-xs text-muted-foreground">新建后会在这里形成采购到退税、财务结清的完整线路。</p>
             </div>
-            <Button type="button" size="sm" onClick={() => router.push('/dashboard/sales/create')}>
+            <BusinessWrite><Button type="button" size="sm" onClick={() => router.push('/dashboard/sales/create')}>
               新建出口专项单
-            </Button>
+            </Button></BusinessWrite>
           </div>
         )}
       </CardContent>

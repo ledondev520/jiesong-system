@@ -30,7 +30,7 @@ model User {
   username    String    @unique
   password    String
   name        String
-  role        String    @default("SALES") // ADMIN, PURCHASE, SALES, FINANCE, WAREHOUSE
+  role        String    @default("SALES") // ADMIN, BOSS(业务只读), PURCHASE, SALES, FINANCE, WAREHOUSE
   email       String?
   phone       String?
   avatar      String?

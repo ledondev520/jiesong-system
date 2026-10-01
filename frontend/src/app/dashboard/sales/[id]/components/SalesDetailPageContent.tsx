@@ -8,6 +8,7 @@
 
 'use client';
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { useState, useEffect, use, lazy, Suspense, useMemo, useRef, useCallback } from 'react';
 import { SalesContract, PackingItem, Product, Store, SalesStatus, Inventory } from '@/types';
 import { salesService } from '@/services/sales.service';
@@ -722,42 +723,42 @@ export default function SalesDetailPage({ params }: PageProps) {
             <div className="flex flex-wrap items-center gap-2">
               {getStatusBadge(contract.status)}
               {nextSalesAction && (
-                <Button
+                <BusinessWrite><Button
                   onClick={() => handleAdvanceStatus(nextSalesAction.status)}
                   disabled={statusUpdating || shipmentBlocked}
                   title={shipmentBlocked ? readinessHeadline : undefined}
                 >
                   {statusUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
                   {nextSalesAction.label}
-                </Button>
+                </Button></BusinessWrite>
               )}
-              <Button variant="outline" onClick={handleExportWorkbook} disabled={exportingWorkbook}>
+              <BusinessWrite><Button variant="outline" onClick={handleExportWorkbook} disabled={exportingWorkbook}>
                 {exportingWorkbook ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                 导出出口工作簿
-              </Button>
-              <Button variant="default" onClick={() => setExportPacketOpen(true)}>
+              </Button></BusinessWrite>
+              <BusinessWrite><Button variant="default" onClick={() => setExportPacketOpen(true)}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
                 出口三单工作台
-              </Button>
+              </Button></BusinessWrite>
               <Button variant="outline" onClick={handleSaveAsImage}>
                 <Camera className="mr-2 h-4 w-4" />
                 保存为图片
               </Button>
-              <Button variant="outline" onClick={() => setPackingCheckOpen(true)}>
+              <BusinessWrite><Button variant="outline" onClick={() => setPackingCheckOpen(true)}>
                 <FileSearch className="mr-2 h-4 w-4" />
                 核对船司装箱单
-              </Button>
-              <Button variant="outline" onClick={() => setTaxPreparationOpen(true)}>
+              </Button></BusinessWrite>
+              <BusinessWrite><Button variant="outline" onClick={() => setTaxPreparationOpen(true)}>
                 <FileCheck2 className="mr-2 h-4 w-4" />
                 检查退税材料
-              </Button>
-              <Button
+              </Button></BusinessWrite>
+              <BusinessWrite><Button
                 variant="outline"
                 onClick={() => setThreeFormsDialogOpen(true)}
               >
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
                 生成申报三表
-              </Button>
+              </Button></BusinessWrite>
             </div>
           }
         />
@@ -1020,12 +1021,12 @@ export default function SalesDetailPage({ params }: PageProps) {
                 <CardDescription>管理货柜内的商品</CardDescription>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Button variant="outline" onClick={() => setImportPurchaseOpen(true)}>
+                <BusinessWrite><Button variant="outline" onClick={() => setImportPurchaseOpen(true)}>
                   <PackageCheck className="mr-2 h-4 w-4" /> 从已完工采购导入
-                </Button>
-                <Button onClick={handleAddItem}>
+                </Button></BusinessWrite>
+                <BusinessWrite><Button onClick={handleAddItem}>
                   <Plus className="mr-2 h-4 w-4" /> 手动添加商品
-                </Button>
+                </Button></BusinessWrite>
               </div>
             </CardHeader>
             <CardContent>
@@ -1047,12 +1048,12 @@ export default function SalesDetailPage({ params }: PageProps) {
                       amount={{ label: '总价', value: item.totalPrice != null ? `$${item.totalPrice.toLocaleString()}` : '-', emphasis: 'primary' }}
                       action={
                         <div className="grid grid-cols-2 gap-2">
-                          <Button variant="outline" className="h-11" aria-label={`编辑 ${item.product?.customsName || '装箱商品'}`} onClick={() => handleEditItem(item)}>
+                          <BusinessWrite><Button variant="outline" className="h-11" aria-label={`编辑 ${item.product?.customsName || '装箱商品'}`} onClick={() => handleEditItem(item)}>
                             <Pencil className="mr-1.5 h-4 w-4" />编辑
-                          </Button>
-                          <Button variant="outline" className="h-11 text-destructive" aria-label={`删除 ${item.product?.customsName || '装箱商品'}`} onClick={() => handleDeleteItem(item.id)}>
+                          </Button></BusinessWrite>
+                          <BusinessWrite><Button variant="outline" className="h-11 text-destructive" aria-label={`删除 ${item.product?.customsName || '装箱商品'}`} onClick={() => handleDeleteItem(item.id)}>
                             <Trash className="mr-1.5 h-4 w-4" />删除
-                          </Button>
+                          </Button></BusinessWrite>
                         </div>
                       }
                     />
@@ -1152,22 +1153,22 @@ export default function SalesDetailPage({ params }: PageProps) {
                           </TableCell>
                           <TableCell className="text-right">{item.grossWeight || '-'}</TableCell>
                           <TableCell className="flex gap-1">
-                            <Button
+                            <BusinessWrite><Button
                               variant="ghost"
                               size="icon"
                               aria-label={`编辑 ${item.product?.customsName || '装箱商品'}`}
                               onClick={() => handleEditItem(item)}
                             >
                               <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
+                            </Button></BusinessWrite>
+                            <BusinessWrite><Button
                               variant="ghost"
                               size="icon"
                               aria-label={`删除 ${item.product?.customsName || '装箱商品'}`}
                               onClick={() => handleDeleteItem(item.id)}
                             >
                               <Trash className="h-4 w-4 text-destructive" />
-                            </Button>
+                            </Button></BusinessWrite>
                           </TableCell>
                         </TableRow>
                       );
@@ -1250,7 +1251,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                         为避免申报遗漏，请先通过历史记录、AI 建议或人工确认补齐；申报三表会阻止不完整单据生成。
                       </p>
                     </div>
-                    <Button
+                    <BusinessWrite><Button
                       type="button"
                       variant="outline"
                       size="sm"
@@ -1258,7 +1259,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                       onClick={() => setThreeFormsDialogOpen(true)}
                     >
                       处理未匹配 HS 编码
-                    </Button>
+                    </Button></BusinessWrite>
                   </AlertDescription>
                 </Alert>
               )}

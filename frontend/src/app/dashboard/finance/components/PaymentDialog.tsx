@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -56,6 +57,7 @@ export function PaymentDialog({
   currency,
   onSubmit,
 }: PaymentDialogProps) {
+  const readOnly = useBusinessReadOnly();
   const resolvedCurrency = currency || (type === PaymentType.PAYABLE ? 'CNY' : 'USD');
   const currencySymbol = resolvedCurrency === 'USD' ? '$' : resolvedCurrency === 'CNY' ? '¥' : '';
   const form = useForm<PaymentFormValues>({
@@ -80,6 +82,7 @@ export function PaymentDialog({
   }, [form, open, remainingAmount]);
 
   const handleSubmit = async (data: PaymentFormValues) => {
+    if (readOnly) return;
     await onSubmit(data);
     form.reset({
       amount: remainingAmount,
@@ -92,6 +95,7 @@ export function PaymentDialog({
   const title = type === PaymentType.PAYABLE ? '录入付款' : '录入收款';
   const label = type === PaymentType.PAYABLE ? '付款金额' : '收款金额';
 
+  if (readOnly) return null;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]" aria-describedby={undefined}>

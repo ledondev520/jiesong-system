@@ -9,6 +9,8 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const prisma = require('../utils/prisma');
+const { clearAuthCache } = require('../middleware/auth');
+const { ROLES } = require('../config/constants');
 const config = require('../config');
 const { createError } = require('../middleware/errorHandler');
 const { log: auditLog } = require('../utils/auditLog');
@@ -76,6 +78,7 @@ const login = async (username, password) => {
  */
 const register = async (userData) => {
   const { username, password, name, role = 'SALES', email, phone } = userData;
+  if (!Object.values(ROLES).includes(role)) throw createError('角色无效', 400);
   
   // 1. 检查用户名
   const existing = await prisma.user.findUnique({
@@ -268,6 +271,7 @@ const getUsers = async (page = 1, pageSize = 20) => {
  */
 const updateUser = async (id, userData) => {
   const { name, role, email, phone, isActive } = userData;
+  if (role !== undefined && !Object.values(ROLES).includes(role)) throw createError('角色无效', 400);
   
   const user = await prisma.user.update({
     where: { id },
@@ -290,6 +294,7 @@ const updateUser = async (id, userData) => {
     },
   });
   
+  clearAuthCache(id);
   return user;
 };
 

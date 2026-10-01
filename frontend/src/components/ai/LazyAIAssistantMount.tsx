@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
+import { useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
 import { useMobile } from '@/lib/hooks/useMobile';
 
 const LazyAIAssistant = dynamic(
@@ -16,6 +17,7 @@ const LazyAIAssistant = dynamic(
  * 仅在业务页面挂载 AI 助手；手机工作台通过底部「更多」进入，避免悬浮入口遮挡业务内容。
  */
 export function LazyAIAssistantMount() {
+  const readOnly = useBusinessReadOnly();
   const pathname = usePathname();
   const isMobile = useMobile();
   const isAiWorkspace = pathname.startsWith('/dashboard/ai');
@@ -25,7 +27,7 @@ export function LazyAIAssistantMount() {
       pathname.startsWith('/tax-refunds')
     );
 
-  if (!shouldMount || (isMobile && pathname.startsWith('/dashboard'))) {
+  if (readOnly || !shouldMount || (isMobile && pathname.startsWith('/dashboard'))) {
     return null;
   }
 

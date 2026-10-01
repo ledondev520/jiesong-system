@@ -9,6 +9,8 @@
 'use client';
 
 import { useEffect, useSyncExternalStore } from 'react';
+import { Role } from '@/types';
+import { isBossRestrictedPath } from '@/lib/hooks/useBusinessReadOnly';
 import { useAuthStore } from '@/store/auth.store';
 import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -95,6 +97,7 @@ export default function DashboardLayout({
       return;
     }
 
+    if (pathname === '/dashboard/system/notifications') return;
     const currentModule = getModuleByPath(pathname);
     if (!currentModule) {
       return;
@@ -130,7 +133,9 @@ export default function DashboardLayout({
           style={{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom) + 1.25rem)' }}
         >
           <Breadcrumbs />
-          {children}
+          {user?.role === Role.BOSS && isBossRestrictedPath(pathname) ? (
+            <div role="alert" className="rounded-md border p-4 text-sm">老板角色仅可查看经营和业务信息，该页面包含管理或写入操作。</div>
+          ) : children}
         </main>
       </div>
       {/* 移动端底部 TabBar：桌面端由 CSS md:hidden 控制不渲染 */}

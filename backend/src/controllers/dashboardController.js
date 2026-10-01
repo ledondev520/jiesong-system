@@ -124,7 +124,7 @@ const getStats = async (req, res, next) => {
     };
 
     // 3. 异步生成通知（不阻塞响应）
-    if (req.user?.id) {
+    if (req.user?.id && req.user.role !== 'BOSS') {
       generateForUser(req.user.id).catch(() => {});
     }
 

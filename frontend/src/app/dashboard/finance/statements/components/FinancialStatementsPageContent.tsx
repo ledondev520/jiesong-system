@@ -6,6 +6,7 @@
 
 'use client';
 
+import { BusinessWrite, useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
 import { ErrorState } from '@/components/ui/data-state';
@@ -42,6 +43,7 @@ const FinancialEvidenceLibrary = lazy(() =>
 );
 
 export function FinancialStatementsPageContent() {
+  const readOnly = useBusinessReadOnly();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [periods, setPeriods] = useState<FinancialPeriod[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState('');
@@ -256,10 +258,10 @@ export function FinancialStatementsPageContent() {
           )}
 
           <Suspense fallback={<FinancialStatementsLoadingState count={2} />}>
-            <FinancialEvidenceLibrary />
+            {!readOnly && <FinancialEvidenceLibrary />}
           </Suspense>
 
-          <FinancialStatementsUploadDialog
+          <BusinessWrite>          <FinancialStatementsUploadDialog
             open={uploadDialogOpen}
             onOpenChange={(open) => {
               setUploadDialogOpen(open);
@@ -296,7 +298,7 @@ export function FinancialStatementsPageContent() {
               generalLedger: generalLedgerFileInputRef,
             }}
             onClearFiles={resetUpload}
-          />
+          /></BusinessWrite>
         </>
       )}
     </div>

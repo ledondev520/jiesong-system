@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updatedAt": "2026-10-01",
+  "updatedAt": "2026-10-02",
   "owner": "security-team",
   "tiers": [
     {
@@ -57,6 +57,7 @@
       "purpose": "Business-sensitive internal data that is not publicly shareable.",
       "examples": [
         "purchase contract and sales records",
+        "purchase batch arrivals, immutable inspection evidence, human operator references and inventory inspection provenance",
         "historical procurement templates and their store/purchase details",
         "supplier pricing and margins",
         "financial summary reports, cash-flow statements, account balances, general-ledger entries, payroll, social-security, and tax-return structured rows",
@@ -66,6 +67,9 @@
         "storage": [
           "Restrict DB/service read access",
           "Use role-based filtering at API response layer",
+          "backend/src/middleware/bossReadOnly.js permits BOSS explicit business GET/HEAD queries and own-password/notification-read exceptions only; authenticated database role overrides token claims and role changes invalidate caches",
+          "backend/src/controllers/financialStatementsController.js excludes account/ledger rows and source-file metadata before loading BOSS period summaries; evidence rows remain ADMIN/FINANCE only",
+          "backend/src/services/purchaseReceiptService.js atomically persists arrival/inspection evidence and accepted stock increments; routes/purchases.js requires human ADMIN/PURCHASE/WAREHOUSE, FIFO/rollback retain provenance, and historical data never gains fabricated evidence",
           "Procurement-template reads require authentication at backend/src/routes/procurementTemplate.js before historical data is loaded",
           "Monthly financial source files are parsed in memory; persist structured rows plus filename, size, and SHA-256 only",
           "Financial evidence workbooks are never archived; sensitive personal identifiers are redacted before persistence and row-level reads require ADMIN or FINANCE",

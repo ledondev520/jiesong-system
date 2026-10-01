@@ -8,6 +8,7 @@
 
 'use client';
 
+import { BusinessWrite, useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
 import { loadPaginatedCatalog } from '@/services/paginatedCatalog';
 import { ErrorState } from '@/components/ui/data-state';
 
@@ -149,6 +150,7 @@ function SupplierStatusBadge({ hasIssue }: { hasIssue: boolean }) {
 }
 
 export default function SuppliersPage() {
+  const readOnly = useBusinessReadOnly();
   const isMobile = useMobile();
   const formSectionRef = useRef<HTMLElement>(null);
   const [suppliers, setSuppliers] = useState<SupplierDisplay[]>([]);
@@ -286,10 +288,10 @@ export default function SuppliersPage() {
       <PageHeader
         title="供应商管理"
         actions={
-          <Button onClick={startNewSupplier} className="h-9 rounded-lg text-sm">
+          <BusinessWrite><Button onClick={startNewSupplier} className="h-9 rounded-lg text-sm">
             <Plus className="mr-1.5 h-4 w-4" />
             新建供应商档案
-          </Button>
+          </Button></BusinessWrite>
         }
       />
 
@@ -415,11 +417,11 @@ export default function SuppliersPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" className="h-9 rounded-lg text-sm" onClick={startNewSupplier}>
+              <BusinessWrite><Button type="button" variant="outline" className="h-9 rounded-lg text-sm" onClick={startNewSupplier}>
                 <RotateCcw className="mr-1.5 h-4 w-4" />
                 清空新建
-              </Button>
-              <Button
+              </Button></BusinessWrite>
+              <BusinessWrite><Button
                 type="button"
                 variant="outline"
                 className="h-9 rounded-lg border-destructive/30 text-sm text-destructive hover:bg-destructive/5 hover:text-destructive"
@@ -428,12 +430,13 @@ export default function SuppliersPage() {
               >
                 <Trash2 className="mr-1.5 h-4 w-4" />
                 删除当前
-              </Button>
+              </Button></BusinessWrite>
             </div>
           </div>
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 p-5">
+              <fieldset disabled={readOnly} className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}
@@ -469,10 +472,10 @@ export default function SuppliersPage() {
                     <p className="text-sm font-semibold">供应商别名</p>
                     <p className="mt-1 text-xs text-muted-foreground">用于搜索和匹配采购合同里的历史称呼。</p>
                   </div>
-                  <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg" onClick={() => append({ alias: '' })}>
+                  <BusinessWrite><Button type="button" variant="outline" size="sm" className="h-8 rounded-lg" onClick={() => append({ alias: '' })}>
                     <Plus className="mr-1 h-3.5 w-3.5" />
                     添加别名
-                  </Button>
+                  </Button></BusinessWrite>
                 </div>
                 <div className="space-y-2">
                   {fields.length === 0 ? (
@@ -494,9 +497,9 @@ export default function SuppliersPage() {
                             </FormItem>
                           )}
                         />
-                        <Button type="button" variant="ghost" size="icon" className="h-10 w-10" onClick={() => remove(index)}>
+                        <BusinessWrite><Button type="button" variant="ghost" size="icon" className="h-10 w-10" onClick={() => remove(index)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        </Button></BusinessWrite>
                       </div>
                     ))
                   )}
@@ -708,14 +711,15 @@ export default function SuppliersPage() {
               </div>
 
               <div className="flex flex-col-reverse gap-2 border-t border-border/50 pt-5 sm:flex-row sm:justify-end">
-                <Button type="button" variant="outline" className="h-10 rounded-lg" onClick={startNewSupplier}>
+                <BusinessWrite><Button type="button" variant="outline" className="h-10 rounded-lg" onClick={startNewSupplier}>
                   取消并新建
-                </Button>
-                <Button type="submit" className="h-10 rounded-lg" disabled={form.formState.isSubmitting}>
+                </Button></BusinessWrite>
+                <BusinessWrite><Button type="submit" className="h-10 rounded-lg" disabled={form.formState.isSubmitting}>
                   <Save className="mr-1.5 h-4 w-4" />
                   {form.formState.isSubmitting ? '保存中...' : activeSupplier ? '保存修改' : '创建供应商'}
-                </Button>
+                </Button></BusinessWrite>
               </div>
+            </fieldset>
             </form>
           </Form>
         </section>

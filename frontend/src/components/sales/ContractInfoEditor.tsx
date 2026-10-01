@@ -8,6 +8,7 @@
 
 'use client';
 
+import { BusinessWrite, useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
 import { useState, useEffect } from 'react';
 import { SalesContract, Store, SalesStatus } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -35,7 +36,9 @@ interface ContractInfoEditorProps {
  * 思路：显示合同信息，支持编辑目的港、预计到达、签订日期、汇率
  */
 export function ContractInfoEditor({ contract, stores, onSave }: ContractInfoEditorProps) {
-  const [isEditing, setIsEditing] = useState(false);
+  const readOnly = useBusinessReadOnly();
+  const [editingRequested, setIsEditing] = useState(false);
+  const isEditing = editingRequested && !readOnly;
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     exchangeRate: contract.exchangeRate,
@@ -207,9 +210,9 @@ export function ContractInfoEditor({ contract, stores, onSave }: ContractInfoEdi
           </CardDescription>
         </div>
         {!isEditing && (
-          <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+          <BusinessWrite><Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
             <Pencil className="mr-2 h-4 w-4" /> 编辑
-          </Button>
+          </Button></BusinessWrite>
         )}
       </CardHeader>
       <CardContent>

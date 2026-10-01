@@ -8,6 +8,7 @@
 
 'use client';
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { lazy, startTransition, Suspense, useCallback, useDeferredValue, useEffect, useState } from 'react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/lib/hooks/useTableSort';
@@ -187,14 +188,14 @@ export function TaxRefundListPageContent() {
               </Button>
             )}
 
-            <Button
+            <BusinessWrite><Button
               variant="outline"
               className="h-11 rounded-xl"
               onClick={handleGenerateDrafts}
               disabled={generatingDrafts}
             >
               批量生成草稿
-            </Button>
+            </Button></BusinessWrite>
             </>
           ) : undefined
         }

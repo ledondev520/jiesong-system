@@ -226,3 +226,32 @@ test('authenticate: Agent token 认证成功后附加 agent 与 authActor', asyn
     prisma.agentCredential = originalAgentCredential;
   }
 });
+
+test('BOSS以数据库角色判定：拒绝业务/AI/MCP写及生成文件GET，允许明确汇总GET', async () => {
+  const config = require('../config');
+  const { clearAuthCache } = require('./auth');
+  const original = prisma.user.findUnique;
+  const id = 'boss-synthetic-role-test';
+  const token = jwt.sign({ userId: id, role: 'ADMIN' }, config.jwt.secret);
+  prisma.user.findUnique = async () => ({ id, role: 'BOSS', isActive: true });
+  try {
+    for (const [method, path, allowed] of [
+      ['GET', '/api/v1/reports/business-overview', true], ['GET', '/api/v1/finance/stats', true],
+      ['GET', '/api/v1/sales/record/finance-summary', true], ['GET', '/api/v1/purchases/record/receipts', true],
+      ['GET', '/api/v1/purchases/record/receipts/batch/inspections', true],
+      ['GET', '/api/v1/containers/record/items', true], ['GET', '/api/v1/containers/record/items/summary', true],
+      ['GET', '/api/v1/containers/record/products', true], ['GET', '/api/v1/containers/record/visualization', true],
+      ['POST', '/api/v1/finance/payments', false], ['PUT', '/api/v1/purchases/record', false],
+      ['POST', '/api/v1/ai/agents/execute-action', false], ['POST', '/mcp', false],
+      ['GET', '/api/v1/sales/record/export-excel', false], ['GET', '/api/v1/purchases/export', false],
+      ['GET', '/api/v1/contract-doc/pdf/record', false], ['GET', '/api/v1/system/configs', false],
+      ['GET', '/api/v1/users', false], ['GET', '/api/v1/finance/statements/evidence/documents', false],
+      ['POST', '/api/v1/auth/change-password', true], ['POST', '/api/v1/notifications/read-all', true],
+      ['PUT', '/api/v1/system/notifications/record/read', true], ['POST', '/api/v1/notifications/generate', false],
+    ]) {
+      const { next, capture } = createNextCapture();
+      await authenticate({ headers: { authorization: `Bearer ${token}` }, method, originalUrl: path }, {}, next);
+      assert.equal(capture.error?.statusCode ?? 200, allowed ? 200 : 403, `${method} ${path}`);
+    }
+  } finally { prisma.user.findUnique = original; clearAuthCache(id); }
+});

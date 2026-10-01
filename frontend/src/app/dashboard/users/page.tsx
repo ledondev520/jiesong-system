@@ -100,6 +100,7 @@ export default function UsersPage() {
   // ── 用户操作 ──
   const getRoleBadge = (role: Role) => {
     switch (role) {
+      case Role.BOSS: return <SemanticBadge tone="info">老板（只读）</SemanticBadge>;
       case Role.ADMIN: return <SemanticBadge tone="danger">管理员</SemanticBadge>;
       case Role.PURCHASE: return <SemanticBadge tone="info">采购</SemanticBadge>;
       case Role.SALES: return <SemanticBadge tone="success">销售</SemanticBadge>;

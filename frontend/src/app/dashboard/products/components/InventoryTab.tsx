@@ -8,6 +8,7 @@
 
 'use client';
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Inventory, InventoryStatus } from '@/types';
 import { inventoryService } from '@/services/inventory.service';
@@ -298,20 +299,20 @@ export function InventoryTab() {
             重置
           </Button>
         )}
-        <Button
+        <BusinessWrite><Button
           variant="outline"
           disabled={batchUpdating || selectedIds.length === 0}
           onClick={() => handleBatchStatusChange(InventoryStatus.INBOUND)}
         >
           批量设为已入库
-        </Button>
-        <Button
+        </Button></BusinessWrite>
+        <BusinessWrite><Button
           variant="outline"
           disabled={batchUpdating || selectedIds.length === 0}
           onClick={() => handleBatchStatusChange(InventoryStatus.OUTBOUND)}
         >
           批量设为已出库
-        </Button>
+        </Button></BusinessWrite>
       </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 md:hidden">
@@ -351,22 +352,22 @@ export function InventoryTab() {
                 当前已选 {selectedIds.length} 条库存记录
               </div>
               <div className="grid grid-cols-1 gap-3">
-                <Button
+                <BusinessWrite><Button
                   variant="outline"
                   className="h-11 rounded-2xl"
                   disabled={batchUpdating || selectedIds.length === 0}
                   onClick={() => void handleBatchStatusChange(InventoryStatus.INBOUND)}
                 >
                   批量设为已入库
-                </Button>
-                <Button
+                </Button></BusinessWrite>
+                <BusinessWrite><Button
                   variant="outline"
                   className="h-11 rounded-2xl"
                   disabled={batchUpdating || selectedIds.length === 0}
                   onClick={() => void handleBatchStatusChange(InventoryStatus.OUTBOUND)}
                 >
                   批量设为已出库
-                </Button>
+                </Button></BusinessWrite>
               </div>
             </div>
             <div className="border-t px-5 py-4">
@@ -451,7 +452,7 @@ export function InventoryTab() {
                   ) : (
                     <div className="grid gap-3">
                       {nextStatuses.map((nextStatus) => (
-                        <Button
+                        <BusinessWrite><Button
                           key={`${item.id}-${nextStatus}-mobile`}
                           variant="outline"
                           className="h-11 rounded-2xl"
@@ -459,7 +460,7 @@ export function InventoryTab() {
                           aria-label={`将 ${itemLabel} 状态更新为 ${STATUS_LABEL_MAP[nextStatus]}`}
                         >
                           设为: {STATUS_LABEL_MAP[nextStatus]}
-                        </Button>
+                        </Button></BusinessWrite>
                       ))}
                     </div>
                   )}
@@ -550,7 +551,7 @@ export function InventoryTab() {
                   <TableCell>{item.quantity} {item.product?.unit}</TableCell>
                   <TableCell>{getStatusBadge(item.status)}</TableCell>
                   <TableCell>
-                    <DropdownMenu>
+                    <BusinessWrite>                    <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="rounded-xl border border-border/65 bg-background/55">
                           <MoreHorizontal className="h-4 w-4" />
@@ -561,16 +562,16 @@ export function InventoryTab() {
                           <DropdownMenuItem disabled>无可用下一状态</DropdownMenuItem>
                         ) : (
                           getAllowedNextStatuses(item.status).map((nextStatus) => (
-                            <DropdownMenuItem
+                            <BusinessWrite key={`${item.id}-${nextStatus}`}><DropdownMenuItem
                               key={`${item.id}-${nextStatus}`}
                               onClick={() => handleStatusChange(item.id, nextStatus)}
                             >
                               设为: {STATUS_LABEL_MAP[nextStatus]}
-                            </DropdownMenuItem>
+                            </DropdownMenuItem></BusinessWrite>
                           ))
                         )}
                       </DropdownMenuContent>
-                    </DropdownMenu>
+                    </DropdownMenu></BusinessWrite>
                   </TableCell>
                 </TableRow>
               ))

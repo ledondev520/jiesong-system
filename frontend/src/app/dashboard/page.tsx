@@ -6,6 +6,7 @@
 
 'use client';
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -204,14 +205,14 @@ export default function DashboardPage() {
             <CardTitle className="text-base">快速动作</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-2 sm:grid-cols-3">
-            <Button className="justify-start rounded-md" onClick={() => router.push('/dashboard/purchase/create')}>
+            <BusinessWrite><Button className="justify-start rounded-md" onClick={() => router.push('/dashboard/purchase/create')}>
               <ShoppingCart className="mr-2 h-4 w-4" />
               新建采购合同
-            </Button>
-            <Button className="justify-start rounded-md" variant="outline" onClick={() => router.push('/dashboard/sales/create')}>
+            </Button></BusinessWrite>
+            <BusinessWrite><Button className="justify-start rounded-md" variant="outline" onClick={() => router.push('/dashboard/sales/create')}>
               <Ship className="mr-2 h-4 w-4" />
               新建出口合同
-            </Button>
+            </Button></BusinessWrite>
             <Button className="justify-start rounded-md" variant="outline" onClick={() => router.push('/dashboard/tax-refunds?view=customs')}>
               <FileText className="mr-2 h-4 w-4" />
               查看报关单

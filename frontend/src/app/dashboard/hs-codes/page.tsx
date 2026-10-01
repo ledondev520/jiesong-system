@@ -8,6 +8,7 @@
 
 'use client';
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import type { HsCodeRecord } from '@/types';
@@ -457,14 +458,14 @@ function HsCodesPageContent() {
         title="HS 编码查询"
         description="默认展示全量列表。输入商品名称（可模糊）或 4–12 位纯数字 HS 编码（支持首尾空格，自动 trim）即可检索；编码按库内 hsCode 前缀精确匹配。"
         actions={
-          <Button
+          <BusinessWrite><Button
             variant="outline"
             size="sm"
             onClick={() => { setAiRecommendOpen(true); setAiRecommendInput(keyword); setAiRecommendResult(null); }}
           >
             <Sparkles className="mr-2 h-4 w-4 text-primary" />
             AI 智能推荐
-          </Button>
+          </Button></BusinessWrite>
         }
       />
 
@@ -553,10 +554,10 @@ function HsCodesPageContent() {
               {isExpiredHsCode(selectedRecord) && (
                 <Badge variant="destructive" className="text-xs">已过期</Badge>
               )}
-              <Button variant="outline" size="sm" className="ml-auto" onClick={openEvidenceEditor}>
+              <BusinessWrite><Button variant="outline" size="sm" className="ml-auto" onClick={openEvidenceEditor}>
                 <Pencil className="mr-2 h-4 w-4" />
                 人工更新税则
-              </Button>
+              </Button></BusinessWrite>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -1015,10 +1016,10 @@ function HsCodesPageContent() {
             <Button type="button" variant="outline" onClick={() => setEditOpen(false)} disabled={editSaving}>
               取消
             </Button>
-            <Button type="button" onClick={() => void saveEvidenceUpdate()} disabled={editSaving}>
+            <BusinessWrite><Button type="button" onClick={() => void saveEvidenceUpdate()} disabled={editSaving}>
               {editSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               保存税则证据
-            </Button>
+            </Button></BusinessWrite>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1099,7 +1100,7 @@ function HsCodesPageContent() {
                         >
                           使用此编码搜索
                         </Button>
-                        <Button
+                        <BusinessWrite><Button
                           variant="ghost"
                           size="sm"
                           className="text-muted-foreground"
@@ -1107,7 +1108,7 @@ function HsCodesPageContent() {
                           onClick={() => void runAiRecommend(aiRecommendInput, true)}
                         >
                           刷新推荐
-                        </Button>
+                        </Button></BusinessWrite>
                       </div>
                     </div>
 

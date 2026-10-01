@@ -6,6 +6,7 @@
 
 'use client';
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Boxes, Loader2, PackageCheck, PencilLine, Scale } from 'lucide-react';
 import { toast } from 'sonner';
@@ -172,10 +173,10 @@ export function PurchaseProductionPanel({
             <Badge variant={readiness?.ready ? 'default' : 'outline'}>
               {readiness?.ready ? '资料完整，可确认完工' : `待补 ${readiness?.incompleteItemCount || contract.items?.length || 0} 条明细`}
             </Badge>
-            <Button size="sm" variant="outline" onClick={openEditor} disabled={!contract.items?.length}>
+            <BusinessWrite><Button size="sm" variant="outline" onClick={openEditor} disabled={!contract.items?.length}>
               <PencilLine className="mr-1.5 h-3.5 w-3.5" />
               {readiness?.ready ? '更新生产资料' : '录入生产资料'}
-            </Button>
+            </Button></BusinessWrite>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">

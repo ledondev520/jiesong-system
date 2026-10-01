@@ -145,6 +145,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     childPrefixes: ['/dashboard/ai'],
     tabs: AI_TABS,
   },
+  { key: 'notifications', href: '/dashboard/system/notifications', defaultHref: '/dashboard/system/notifications', label: '通知中心', icon: Bell, childPrefixes: [], tabs: [], visibleRoles: [Role.BOSS] },
   {
     key: 'admin',
     href: '/dashboard/settings',
@@ -167,7 +168,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
 ];
 
 export const getVisibleModuleNavItems = (role?: Role | null) =>
-  MODULE_NAV_ITEMS.filter((item) => !item.visibleRoles || (role ? item.visibleRoles.includes(role) : false));
+  MODULE_NAV_ITEMS.filter((item) => (role !== Role.BOSS || item.key !== 'ai') && (!item.visibleRoles || (role ? item.visibleRoles.includes(role) : false)));
 
 export const getPrimaryMobileModuleNavItems = (role?: Role | null) =>
   getVisibleModuleNavItems(role).filter((item) => item.mobilePrimary);

@@ -8,6 +8,7 @@
 
 'use client';
 
+import { BusinessWrite, useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -81,6 +82,7 @@ export function ProductDialog({
   product,
   onSubmit,
 }: ProductDialogProps) {
+  const readOnly = useBusinessReadOnly();
   const [hsSuggestions, setHsSuggestions] = useState<HsCodeMatch[]>([]);
   const [hsLoading, setHsLoading] = useState(false);
   const [hsLookupMessage, setHsLookupMessage] = useState<string | null>(null);
@@ -270,13 +272,14 @@ export function ProductDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{product ? '编辑商品' : '新增商品'}</DialogTitle>
+          <DialogTitle>{readOnly ? '商品详情' : product ? '编辑商品' : '新增商品'}</DialogTitle>
           <DialogDescription>
             维护商品基础资料，并可通过商品名称自动匹配 HSCode 与税率。
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+              <fieldset disabled={readOnly} className="space-y-4">
             {/* 基本信息 */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
@@ -582,11 +585,12 @@ export function ProductDialog({
             </div>
 
             <DialogFooter>
-              <Button type="submit" disabled={!form.formState.isValid || form.formState.isSubmitting}>
+              <BusinessWrite><Button type="submit" disabled={!form.formState.isValid || form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? '保存中...' : '保存'}
-              </Button>
+              </Button></BusinessWrite>
             </DialogFooter>
-          </form>
+          </fieldset>
+            </form>
         </Form>
       </DialogContent>
     </Dialog>

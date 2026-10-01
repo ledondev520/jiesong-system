@@ -45,7 +45,7 @@ router.get('/logs/export/csv', roleAuth('ADMIN'), systemController.exportOperati
 router.get('/notifications', withPaginationValidation, systemController.getNotifications);
 
 // PUT /api/v1/system/notifications/:id/read - 标记通知已读
-router.put('/notifications/:id/read', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.put('/notifications/:id/read', roleAuth('ADMIN', 'BOSS', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
   { entity: 'Notification', action: 'UPDATE', model: 'notification' },
   systemController.markNotificationRead
 ));

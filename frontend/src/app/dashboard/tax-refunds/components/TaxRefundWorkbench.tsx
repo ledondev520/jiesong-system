@@ -6,6 +6,7 @@
 
 'use client';
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
@@ -114,13 +115,13 @@ export function TaxRefundWorkbench() {
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setInvoiceImportOpen(true)}><Upload className="mr-2 h-4 w-4" />导入进项发票</Button>
-            <Button disabled={exporting || !filingMonth || loadError || !canExport} title={canExport ? undefined : '由财务或管理员导出票面核验清单'} onClick={async () => {
+            <BusinessWrite><Button variant="outline" onClick={() => setInvoiceImportOpen(true)}><Upload className="mr-2 h-4 w-4" />导入进项发票</Button></BusinessWrite>
+            <BusinessWrite><Button disabled={exporting || !filingMonth || loadError || !canExport} title={canExport ? undefined : '由财务或管理员导出票面核验清单'} onClick={async () => {
               setExporting(true);
               try { await taxRefundService.exportMonthlyPreparations(filingMonth); toast.success('月度准备清单已导出'); }
               catch (error: unknown) { toast.error(error instanceof Error ? error.message : '月度导出失败'); }
               finally { setExporting(false); }
-            }}>{exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}导出月度准备清单</Button>
+            }}>{exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}导出月度准备清单</Button></BusinessWrite>
           </div>
         </CardHeader>
         <CardContent>
@@ -178,8 +179,8 @@ export function TaxRefundWorkbench() {
               <div className="space-y-3">
                 <p className="break-words text-xs text-muted-foreground">{item.issues.length ? item.issues.join('；') : '内部校验通过'}</p>
                 <div className="flex flex-wrap gap-2">
-                  <Button className="h-11 flex-1" variant="outline" onClick={() => openPreparation(item)}><FileCheck2 className="mr-1 h-4 w-4" />清单</Button>
-                  <Button className="h-11 flex-1" variant="outline" onClick={() => openVerification(item)}><FileSearch className="mr-1 h-4 w-4" />发票</Button>
+                  <BusinessWrite><Button className="h-11 flex-1" variant="outline" onClick={() => openPreparation(item)}><FileCheck2 className="mr-1 h-4 w-4" />清单</Button></BusinessWrite>
+                  <BusinessWrite><Button className="h-11 flex-1" variant="outline" onClick={() => openVerification(item)}><FileSearch className="mr-1 h-4 w-4" />发票</Button></BusinessWrite>
                   {item.taxRefund && <Button className="h-11" variant="outline" onClick={() => router.push(`/dashboard/tax-refunds/${item.taxRefund?.id}`)}>退税单</Button>}
                 </div>
               </div>
@@ -207,7 +208,7 @@ export function TaxRefundWorkbench() {
                     <TableCell className="text-xs"><p><span className="text-emerald-700">通过 {item.invoiceSummary.pass}</span> · <span className="text-amber-700">复核 {item.invoiceSummary.review}</span> · <span className="text-red-700">缺失 {item.invoiceSummary.missing}</span></p></TableCell>
                     <TableCell>{item.confirmationStatus === 'CONFIRMED' ? '已确认' : item.confirmationStatus === 'CHANGED' ? '资料变化，需重新确认' : item.materialReady ? '待确认' : '待补件'}</TableCell>
                     <TableCell className="max-w-sm text-xs text-muted-foreground">{item.issues.length ? item.issues.slice(0, 3).join('；') : <span className="text-emerald-700"><CheckCircle2 className="mr-1 inline h-3 w-3" />内部校验通过</span>}</TableCell>
-                    <TableCell><div className="flex justify-end gap-1"><Button size="sm" variant="ghost" onClick={() => openPreparation(item)}><FileCheck2 className="mr-1 h-3 w-3" />清单</Button><Button size="sm" variant="ghost" onClick={() => openVerification(item)}><FileSearch className="mr-1 h-3 w-3" />发票</Button>{item.taxRefund && <Button size="sm" variant="outline" onClick={() => router.push(`/dashboard/tax-refunds/${item.taxRefund?.id}`)}>退税单</Button>}</div></TableCell>
+                    <TableCell><div className="flex justify-end gap-1"><BusinessWrite><Button size="sm" variant="ghost" onClick={() => openPreparation(item)}><FileCheck2 className="mr-1 h-3 w-3" />清单</Button></BusinessWrite><BusinessWrite><Button size="sm" variant="ghost" onClick={() => openVerification(item)}><FileSearch className="mr-1 h-3 w-3" />发票</Button></BusinessWrite>{item.taxRefund && <Button size="sm" variant="outline" onClick={() => router.push(`/dashboard/tax-refunds/${item.taxRefund?.id}`)}>退税单</Button>}</div></TableCell>
                   </TableRow>
                 ))}
               </TableBody>

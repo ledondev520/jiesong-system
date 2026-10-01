@@ -8,6 +8,7 @@
 
 'use client';
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CustomsDeclaration, CustomsDeclarationItem } from '@/types';
@@ -120,13 +121,13 @@ export function CustomsDeclarationDetailPageContent({
         actions={
           <>
             <CustomsDeclarationStatusBadge status={declaration.status} />
-            <Button
+            <BusinessWrite><Button
               className="rounded-xl"
               onClick={() => router.push(`/dashboard/customs-declarations/${declaration.id}/edit`)}
             >
               <FilePenLine className="mr-2 h-4 w-4" />
               编辑报关单
-            </Button>
+            </Button></BusinessWrite>
           </>
         }
       />

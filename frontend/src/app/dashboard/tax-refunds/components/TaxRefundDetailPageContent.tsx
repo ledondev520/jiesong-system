@@ -6,6 +6,7 @@
 
 'use client';
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { use, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { FilePenLine } from 'lucide-react';
@@ -74,10 +75,10 @@ export function TaxRefundDetailPageContent({ params }: TaxRefundDetailPageConten
         actions={
           <>
             <TaxRefundStatusBadge status={taxRefund.status} />
-            <Button className="rounded-xl" onClick={() => router.push(`/dashboard/tax-refunds/${taxRefund.id}/edit`)}>
+            <BusinessWrite><Button className="rounded-xl" onClick={() => router.push(`/dashboard/tax-refunds/${taxRefund.id}/edit`)}>
               <FilePenLine className="mr-2 h-4 w-4" />
               编辑退税单
-            </Button>
+            </Button></BusinessWrite>
           </>
         }
       />

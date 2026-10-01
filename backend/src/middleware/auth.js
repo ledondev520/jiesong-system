@@ -9,6 +9,7 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 const { createError } = require('./errorHandler');
+const { enforceBossReadOnly } = require('./bossReadOnly');
 const { roleAuth, adminOnly } = require('./roleAuth');
 const prisma = require('../utils/prisma');
 const { parseAgentBearerToken, verifyAgentSecret } = require('../utils/agentCredentials');
@@ -209,6 +210,7 @@ const authenticate = async (req, res, next) => {
     
     // 4. 附加用户信息
     attachUserActor(req, user);
+    enforceBossReadOnly(req);
     next();
   } catch (error) {
     next(error);

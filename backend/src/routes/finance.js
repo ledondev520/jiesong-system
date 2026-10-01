@@ -74,7 +74,7 @@ router.get('/stats', financeController.getStats);
 // GET /api/v1/finance/receivable-reconciliation - 美元经营应收与会计应收差异桥接
 router.get(
   '/receivable-reconciliation',
-  roleAuth('ADMIN', 'FINANCE'),
+  roleAuth('ADMIN', 'FINANCE', 'BOSS'),
   financeController.getReceivableReconciliation,
 );
 

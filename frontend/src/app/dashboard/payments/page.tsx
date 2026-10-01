@@ -8,6 +8,7 @@
 
 'use client';
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { Suspense, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { PaymentType } from '@/types';
@@ -530,9 +531,9 @@ function PaymentsPageContent() {
         description="管理应付账款与应收账款"
         actions={
           <div className="flex gap-2">
-            <Button size="sm" className="h-10" onClick={() => setReceiptDialogOpen(true)}>
+            <BusinessWrite><Button size="sm" className="h-10" onClick={() => setReceiptDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" /> 记录到账
-            </Button>
+            </Button></BusinessWrite>
             <Button
               variant="outline"
               size="sm"
@@ -565,7 +566,7 @@ function PaymentsPageContent() {
               <Split className="h-4 w-4" />
               待分配款项（{unallocatedPayments.length} 笔）
             </CardTitle>
-            <Button
+            <BusinessWrite><Button
               size="sm"
               variant="outline"
               className="h-8 border-orange-300 bg-background text-xs text-orange-700 hover:bg-orange-100 dark:border-orange-800 dark:text-orange-300 dark:hover:bg-orange-950"
@@ -574,7 +575,7 @@ function PaymentsPageContent() {
             >
               <RefreshCw className={`mr-1 h-3.5 w-3.5 ${autoMatching ? 'animate-spin' : ''}`} />
               {autoMatching ? '自动匹配中' : '自动匹配'}
-            </Button>
+            </Button></BusinessWrite>
           </CardHeader>
           <CardContent className="space-y-2">
             {unallocatedPayments.map((p) => (
@@ -596,14 +597,14 @@ function PaymentsPageContent() {
                     {p.note && ` · ${p.note}`}
                   </span>
                 </div>
-                <Button
+                <BusinessWrite><Button
                   size="sm"
                   variant="outline"
                   className="h-7 text-xs"
                   onClick={() => setAllocateTarget(p)}
                 >
                   <Split className="mr-1 h-3 w-3" /> 分配
-                </Button>
+                </Button></BusinessWrite>
               </div>
             ))}
           </CardContent>
@@ -743,9 +744,9 @@ function PaymentsPageContent() {
                       ]}
                       amount={{ label: '待付', value: `¥${fmtCny(actualUnpaid)}`, emphasis: actualUnpaid > 0 ? 'danger' : undefined }}
                       action={
-                        <Button size="sm" className="h-10 w-full rounded-xl" onClick={() => setSelectedPayable(contract)}>
+                        <BusinessWrite><Button size="sm" className="h-10 w-full rounded-xl" onClick={() => setSelectedPayable(contract)}>
                           <CreditCard className="mr-2 h-4 w-4" /> 记录付款
-                        </Button>
+                        </Button></BusinessWrite>
                       }
                     />
                   );
@@ -839,9 +840,9 @@ function PaymentsPageContent() {
                           <TableCell>
                             <div className="flex items-center gap-1">
                               {actualUnpaid > 0 && (
-                                <Button size="sm" variant="outline" onClick={() => setSelectedPayable(contract)}>
+                                <BusinessWrite><Button size="sm" variant="outline" onClick={() => setSelectedPayable(contract)}>
                                   <CreditCard className="mr-1 h-3 w-3" /> 付款
-                                </Button>
+                                </Button></BusinessWrite>
                               )}
                               {contract.supplier?.name && (
                                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0" asChild>
@@ -958,9 +959,9 @@ function PaymentsPageContent() {
                     ]}
                     amount={{ label: '待收', value: `$${contract.unreceiveAmount.toLocaleString()}`, emphasis: 'danger' }}
                     action={
-                      <Button size="sm" className="h-10 w-full rounded-xl" onClick={() => setSelectedReceivable(contract)}>
+                      <BusinessWrite><Button size="sm" className="h-10 w-full rounded-xl" onClick={() => setSelectedReceivable(contract)}>
                         <CreditCard className="mr-2 h-4 w-4" /> 记录收款
-                      </Button>
+                      </Button></BusinessWrite>
                     }
                   />
                 ))
@@ -1045,9 +1046,9 @@ function PaymentsPageContent() {
                           {contract.unreceiveAmount.toLocaleString()}
                         </TableCell>
                         <TableCell>
-                          <Button size="sm" variant="outline" onClick={() => setSelectedReceivable(contract)} title={contract.sourceParties?.length ? `来源方: ${contract.sourceParties.join(', ')}` : undefined}>
+                          <BusinessWrite><Button size="sm" variant="outline" onClick={() => setSelectedReceivable(contract)} title={contract.sourceParties?.length ? `来源方: ${contract.sourceParties.join(', ')}` : undefined}>
                             <CreditCard className="mr-1 h-3 w-3" /> 收款
-                          </Button>
+                          </Button></BusinessWrite>
                         </TableCell>
                       </TableRow>
                     ))

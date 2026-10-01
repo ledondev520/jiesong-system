@@ -6,6 +6,7 @@
 
 'use client';
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { useCallback, useEffect, useState } from 'react';
 import {
   AlertCircle,
@@ -156,10 +157,10 @@ export function SalesFinancePanel({
                 : '（未录入）'}。
             </CardDescription>
           </div>
-          <Button onClick={() => setPaymentOpen(true)} disabled={summary.revenue.outstandingUsd <= 0}>
+          <BusinessWrite><Button onClick={() => setPaymentOpen(true)} disabled={summary.revenue.outstandingUsd <= 0}>
             <BanknoteArrowDown className="h-4 w-4" />
             登记美元收款
-          </Button>
+          </Button></BusinessWrite>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
