@@ -1,6 +1,6 @@
 /**
  * Input: 单份出口合同、关联采购合同与出口退税准备度
- * Output: 排除第三方拼柜后的美元收入、人民币采购成本、预计商品毛利与现金流
+ * Output: 复用共享所有权判定的美元收入、人民币采购成本、预计商品毛利与现金流
  * Pos: 一个出口专项单的一站式财务结算 Module；不把不同币种直接相加
  */
 
@@ -306,7 +306,7 @@ const getSalesFinanceSummary = async (
   if (!salesContract) throw createError('出口合同不存在', 404);
 
   const sourceContractNos = unique((salesContract.packingItems || [])
-    .filter(isOwnedPackingItem)
+    .filter(isJiesongOwnedPackingItem)
     .map((item) => normalizeContractNo(item.purchaseContractNo)));
   const purchaseAliases = unique(sourceContractNos.flatMap(contractNoAliases));
   const purchases = purchaseAliases.length > 0
