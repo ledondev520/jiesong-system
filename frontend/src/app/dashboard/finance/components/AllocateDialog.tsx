@@ -8,7 +8,10 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { financeService } from '@/services/finance.service';
+import { loadPaginatedCatalog } from '@/services/paginatedCatalog';
+import { clearApiGetCache } from '@/lib/axios';
 import { Payment } from '@/types';
 import {
   Dialog,
@@ -25,15 +28,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { AlertCircle } from 'lucide-react';
 
-interface ReceivableContract {
-  id: string;
-  contractNo: string;
-  totalAmount: number;
-  receivedAmount: number;
-  unreceiveAmount: number;
-  status: string;
-}
-
 interface AllocationRow {
   contractId: string;
   contractNo: string;
@@ -46,7 +40,6 @@ interface AllocateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   payment: Payment | null;
-  receivables: ReceivableContract[];
   onSubmit: (paymentId: string, allocations: { salesContractId: string; amount: number }[]) => Promise<void>;
 }
 
@@ -58,27 +51,28 @@ interface AllocateDialogProps {
  *   3. 校验总分配额不超过到账总额
  *   4. 提交分配
  */
-export function AllocateDialog({ open, onOpenChange, payment, receivables, onSubmit }: AllocateDialogProps) {
+export function AllocateDialog({ open, onOpenChange, payment, onSubmit }: AllocateDialogProps) {
   const [rows, setRows] = useState<AllocationRow[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  // 每次打开时初始化行
-  const handleOpenChange = (isOpen: boolean) => {
-    if (isOpen && payment) {
-      setRows(
-        receivables
-          .filter((r) => r.unreceiveAmount > 0)
-          .map((r) => ({
-            contractId: r.id,
-            contractNo: r.contractNo,
-            unreceiveAmount: r.unreceiveAmount,
-            amount: '',
-            selected: false,
-          }))
-      );
-    }
-    onOpenChange(isOpen);
-  };
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    if (!open || !payment) return;
+    let cancelled = false;
+    setLoading(true); setLoadError(false); setRows([]);
+    void loadPaginatedCatalog((page) => financeService.getReceivables({ page, pageSize: 100, outstandingOnly: true }))
+      .then((contracts) => {
+        if (!cancelled) setRows(contracts.map((contract) => ({
+          contractId: contract.id, contractNo: contract.contractNo,
+          unreceiveAmount: contract.unreceiveAmount ?? Math.max(0, contract.totalAmount - (contract.receivedAmount || 0)),
+          amount: '', selected: false,
+        })));
+      }).catch(() => { if (!cancelled) setLoadError(true); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [open, payment?.id, retry]);
 
   const totalAmount = payment?.remainingAmount ?? payment?.amount ?? 0;
   const currency = payment?.currency ?? 'USD';
@@ -136,7 +130,7 @@ export function AllocateDialog({ open, onOpenChange, payment, receivables, onSub
   if (!payment) return null;
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[560px]">
         <DialogHeader>
           <DialogTitle>分配收款</DialogTitle>
@@ -172,7 +166,7 @@ export function AllocateDialog({ open, onOpenChange, payment, receivables, onSub
         {/* 合同列表 */}
         <ScrollArea className="max-h-[300px]">
           <div className="space-y-2 pr-2">
-            {rows.length === 0 ? (
+            {loading ? <p role="status">加载待收合同...</p> : loadError ? <p className="text-sm text-destructive">待收合同读取失败 <Button variant="outline" onClick={() => { clearApiGetCache(); setRetry(retry + 1); }}>重试</Button></p> : rows.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">暂无待收合同</p>
             ) : (
               rows.map((row) => (

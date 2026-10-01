@@ -452,7 +452,7 @@ async function runAutoMatch() {
 /**
  * 职责：获取未匹配项列表（分页）
  */
-async function getUnmatchedItems({ page = 1, pageSize = 20, type } = {}) {
+async function getUnmatchedItems({ page = 1, pageSize = 20, type, search } = {}) {
   const skip = (page - 1) * pageSize;
   const where = { matchStatus: MATCH_STATUS.PENDING };
 
@@ -464,26 +464,26 @@ async function getUnmatchedItems({ page = 1, pageSize = 20, type } = {}) {
   if (!type || type === 'BANK') {
     [bankItems, bankTotal] = await Promise.all([
       prisma.bankTransaction.findMany({
-        where,
+        where: { ...where, ...(search ? { OR: [{ counterpart: { contains: search } }, { summary: { contains: search } }, { txnId: { contains: search } }] } : {}) },
         orderBy: { txnDate: 'desc' },
         skip,
         take: pageSize,
         include: { batch: { select: { fileName: true } } },
       }),
-      prisma.bankTransaction.count({ where }),
+      prisma.bankTransaction.count({ where: { ...where, ...(search ? { OR: [{ counterpart: { contains: search } }, { summary: { contains: search } }, { txnId: { contains: search } }] } : {}) } }),
     ]);
   }
 
   if (!type || type === 'INVOICE') {
     [invoiceItems, invoiceTotal] = await Promise.all([
       prisma.invoiceRecord.findMany({
-        where,
+        where: { ...where, ...(search ? { OR: [{ seller: { contains: search } }, { invNo: { contains: search } }, { itemName: { contains: search } }] } : {}) },
         orderBy: { invDate: 'desc' },
         skip,
         take: pageSize,
         include: { batch: { select: { fileName: true } } },
       }),
-      prisma.invoiceRecord.count({ where }),
+      prisma.invoiceRecord.count({ where: { ...where, ...(search ? { OR: [{ seller: { contains: search } }, { invNo: { contains: search } }, { itemName: { contains: search } }] } : {}) } }),
     ]);
   }
 

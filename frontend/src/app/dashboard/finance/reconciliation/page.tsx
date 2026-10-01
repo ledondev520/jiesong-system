@@ -11,6 +11,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
+import { ErrorState } from '@/components/ui/data-state';
+import { PageSizeSelect } from '@/components/ui/page-size-select';
+import { clearApiGetCache } from '@/lib/axios';
+import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -66,6 +70,12 @@ export default function ReconciliationPage() {
   const [reconData, setReconData] = useState<FullReconciliationResult | null>(null);
   const [reconLoading, setReconLoading] = useState(true);
   const [tab, setTab] = useState('analysis');
+  const [reconError, setReconError] = useState(false);
+  const [unmatchedError, setUnmatchedError] = useState(false);
+  const [contractsError, setContractsError] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [search, setSearch] = useState('');
 
   // ========== 智能关联数据 ==========
   const [bankItems, setBankItems] = useState<BankTransaction[]>([]);
@@ -85,28 +95,31 @@ export default function ReconciliationPage() {
 
   const loadRecon = useCallback(async () => {
     setReconLoading(true);
+    setReconError(false);
     try {
       const result = await getFullReconciliation();
       setReconData(result);
-    } catch { /* */ } finally { setReconLoading(false); }
+    } catch { setReconError(true); } finally { setReconLoading(false); }
   }, []);
 
   const loadUnmatched = useCallback(async () => {
+    setUnmatchedError(false);
     try {
-      const result = await getUnmatchedItems({ page: 1, pageSize: 100 });
+      const result = await getUnmatchedItems({ page, pageSize, search: search || undefined });
       setBankItems(result.bankItems);
       setInvoiceItems(result.invoiceItems);
       setBankTotal(result.bankTotal);
       setInvoiceTotal(result.invoiceTotal);
-    } catch { /* */ }
-  }, []);
+    } catch { setUnmatchedError(true); }
+  }, [page, pageSize, search]);
 
   const loadContracts = useCallback(async () => {
     setContractsLoading(true);
+    setContractsError(false);
     try {
       const list = await getContractsForMatch(contractType, contractSearch || undefined);
       setContracts(list);
-    } catch { /* */ } finally { setContractsLoading(false); }
+    } catch { setContractsError(true); } finally { setContractsLoading(false); }
   }, [contractType, contractSearch]);
 
   const loadAll = useCallback(async () => {
@@ -127,7 +140,7 @@ export default function ReconciliationPage() {
     try {
       await postAutoMatch();
       await loadAll();
-    } catch { /* */ } finally { setMatchLoading(false); }
+    } catch { toast.error('对账操作失败，请重试'); } finally { setMatchLoading(false); }
   };
 
   const handleLink = async () => {
@@ -146,7 +159,7 @@ export default function ReconciliationPage() {
       setSelectedContractId(null);
       await loadUnmatched();
       await loadRecon();
-    } catch { /* */ }
+    } catch { toast.error('对账操作失败，请重试'); }
   };
 
   const handleIgnore = async (entityType: 'BANK' | 'INVOICE', entityId: string) => {
@@ -155,16 +168,25 @@ export default function ReconciliationPage() {
       if (entityType === 'BANK' && selectedBankId === entityId) setSelectedBankId(null);
       if (entityType === 'INVOICE' && selectedInvoiceId === entityId) setSelectedInvoiceId(null);
       await loadUnmatched();
-    } catch { /* */ }
+    } catch { toast.error('对账操作失败，请重试'); }
   };
 
-  const s = reconData?.summary;
+  const s = reconError ? undefined : reconData?.summary;
 
   return (
     <div className="space-y-4">
       <ModuleTabHeader tabs={FINANCE_TABS} />
 
+      {(reconError || unmatchedError || contractsError) && <ErrorState title="对账数据读取失败" description="汇总、未匹配项或合同列表尚未更新。" action={<Button variant="outline" onClick={() => { clearApiGetCache(); void loadAll(); void loadContracts(); }}>重试</Button>} />}
       <div className="px-1 space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Input className="max-w-sm" value={search} placeholder="搜索未匹配对手方、发票号或摘要" onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
+          {search && <Button variant="ghost" onClick={() => { setSearch(''); setPage(1); }}>重置</Button>}
+          <PageSizeSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} />
+          <span className="text-xs text-muted-foreground">银行 {bankTotal} 条 / 发票 {invoiceTotal} 条，第 {page} 页</span>
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button>
+          <Button variant="outline" size="sm" disabled={page * pageSize >= Math.max(bankTotal, invoiceTotal)} onClick={() => setPage(page + 1)}>下一页</Button>
+        </div>
         {/* 操作栏 */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
@@ -172,7 +194,7 @@ export default function ReconciliationPage() {
             <p className="text-xs text-muted-foreground">银行流水与发票自动匹配 + 合同智能关联引擎</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={loadAll} disabled={matchLoading || reconLoading}>
+            <Button variant="outline" size="sm" onClick={() => { clearApiGetCache(); void loadAll(); }} disabled={matchLoading || reconLoading}>
               <RefreshCw className={`h-4 w-4 mr-1 ${(matchLoading || reconLoading) ? 'animate-spin' : ''}`} />刷新
             </Button>
             <Button size="sm" onClick={handleAutoMatch} disabled={matchLoading}>
@@ -256,7 +278,7 @@ export default function ReconciliationPage() {
           <TabsContent value="analysis">
             {reconLoading ? (
               <Card><CardContent className="py-16 text-center text-muted-foreground">正在分析数据...</CardContent></Card>
-            ) : !reconData ? (
+            ) : reconError ? (<p className="py-8 text-center text-destructive">汇总读取失败，请重试</p>) : !reconData ? (
               <Card><CardContent className="py-16 text-center text-muted-foreground">暂无数据</CardContent></Card>
             ) : (
               <ReconciliationAnalysisView data={reconData} />
@@ -276,7 +298,7 @@ export default function ReconciliationPage() {
                   </div>
                 </CardHeader>
                 <div className="flex-1 overflow-auto px-4 pb-4">
-                  {bankItems.length === 0 ? (
+                  {unmatchedError ? (<p className="text-sm text-destructive">未匹配流水读取失败</p>) : bankItems.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-8">暂无未匹配流水</p>
                   ) : (
                     <div className="space-y-2">
@@ -388,7 +410,7 @@ export default function ReconciliationPage() {
                   </div>
                 </CardHeader>
                 <div className="flex-1 overflow-auto px-4 pb-4">
-                  {invoiceItems.length === 0 ? (
+                  {unmatchedError ? (<p className="text-sm text-destructive">未匹配发票读取失败</p>) : invoiceItems.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-8">暂无未匹配发票</p>
                   ) : (
                     <div className="space-y-2">

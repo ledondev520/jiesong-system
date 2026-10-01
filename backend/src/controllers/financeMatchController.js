@@ -29,9 +29,9 @@ const autoMatch = async (req, res, next) => {
 const getUnmatched = async (req, res, next) => {
   try {
     const { page, pageSize } = normalizePagination(req.query);
-    const { type } = req.query;
+    const { type, search } = req.query;
 
-    const result = await financeMatchService.getUnmatchedItems({ page, pageSize, type });
+    const result = await financeMatchService.getUnmatchedItems({ page, pageSize, type, search });
 
     success(res, {
       bankItems: result.bankItems,
