@@ -32,6 +32,7 @@
 - Do not print sensitive values to logs. Redact secrets from debug output and structured logs.
 - Structured HTTP logs may retain request shape for diagnosis, but must not retain body/query values, AI prompts, tool schemas, or user messages.
 - System-configured API keys are write-only: response Interfaces may expose only a configured flag or masked suffix, and frontend pages must never render a complete stored key even for administrators.
+- `backend/src/routes/procurementTemplate.js` must authenticate every procurement-template read before loading Confidential historical store/purchase data.
 - Keep dependencies updated with minimal privilege; avoid adding packages that require elevated permissions or execute shell by default.
 - Enforce permission checks before loading `.env` and config files as implemented in `backend/src/config/index.js`.
 - Use least privilege for files and directories created by the system, especially upload directories and temporary files.

@@ -7,6 +7,7 @@
 - Enforce explicit身份校验 (JWT + role checks) for all sensitive routes.
 - Treat Agent / Service Account credentials as independent machine identities; never reuse employee passwords or browser sessions for automation.
 - Keep authentication middleware as single entry for route groups and validate user context before业务处理.
+- `backend/src/routes/procurementTemplate.js` must authenticate all procurement-template reads before parsing historical store/purchase data; these records are Confidential.
 - Use least-privilege账号 and role-to-resource mapping for every service boundary.
 - Disable默认凭证 and rotate all secrets periodically.
 

@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updatedAt": "2026-08-23",
+  "updatedAt": "2026-10-01",
   "owner": "security-team",
   "tiers": [
     {
@@ -49,6 +49,7 @@
       "purpose": "Business-sensitive internal data that is not publicly shareable.",
       "examples": [
         "purchase contract and sales records",
+        "historical procurement templates and their store/purchase details",
         "supplier pricing and margins",
         "financial summary reports, cash-flow statements, account balances, general-ledger entries, payroll, social-security, and tax-return structured rows",
         "inventory and shipment operational history"
@@ -57,6 +58,7 @@
         "storage": [
           "Restrict DB/service read access",
           "Use role-based filtering at API response layer",
+          "Procurement-template reads require authentication at backend/src/routes/procurementTemplate.js before historical data is loaded",
           "Monthly financial source files are parsed in memory; persist structured rows plus filename, size, and SHA-256 only",
           "Financial evidence workbooks are never archived; sensitive personal identifiers are redacted before persistence and row-level reads require ADMIN or FINANCE"
         ],
