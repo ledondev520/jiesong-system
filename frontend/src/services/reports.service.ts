@@ -1,4 +1,4 @@
-import api from '@/lib/axios';
+import api, { type ApiRequestConfig } from '@/lib/axios';
 import { ApiResponse, PaginatedResponse } from '@/types';
 
 interface SupplierLite {
@@ -29,17 +29,26 @@ export interface DashboardStats {
 }
 
 export interface BusinessOverview {
+  period: { startDate: string | null; endDate: string | null; dateField: 'shippedAt' };
   overview: {
-    totalSales: number;
-    totalPurchases: number;
-    grossProfit: number;
-    profitMargin: number;
+    totalSales: number | null;
+    totalPurchases: number | null;
+    grossProfit: number | null;
+    profitMargin: number | null;
+    marginReady: boolean;
+    cashReady: boolean;
+    currency: 'CNY';
+    contractCount: number;
+    netCashCny: number | null;
+    scope: string;
+    unavailableContracts: Array<{ id: string; reasons: string[] }>;
   };
   funds: {
     totalReceivable: number;
     totalPayable: number;
     overdueReceivable: number;
     overduePayable: number;
+    overdueRule: string;
   };
   inventory: {
     totalItems: number;
@@ -47,7 +56,7 @@ export interface BusinessOverview {
     inTransitContainers: number;
   };
   trends: {
-    monthlySales: Array<{ month: string; amount: number }>;
+    monthlySales: Array<{ month: string; amount: number | null }>;
   };
 }
 
@@ -82,7 +91,8 @@ export const reportsService = {
     });
   },
 
-  getBusinessOverview: async () => {
-    return api.get<ApiResponse<BusinessOverview>, ApiResponse<BusinessOverview>>('/reports/business-overview');
+  getBusinessOverview: async (params?: { startDate?: string; endDate?: string }) => {
+    const config: ApiRequestConfig = { params, cache: { enabled: false } };
+    return api.get<ApiResponse<BusinessOverview>, ApiResponse<BusinessOverview>>('/reports/business-overview', config);
   },
 };

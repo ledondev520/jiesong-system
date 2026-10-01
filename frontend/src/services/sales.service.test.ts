@@ -8,6 +8,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import api from '@/lib/axios';
+import { SalesStatus } from '@/types';
 import { salesService } from './sales.service';
 
 vi.mock('@/lib/axios', () => ({
@@ -32,6 +33,13 @@ describe('salesService api', () => {
     expect(api.get).toHaveBeenCalledWith('/sales', {
       params: { page: 1, pageSize: 20, keyword: 'keyword' },
     });
+  });
+
+  it('getAll: 保留经营钻取的发运状态、上海日期及页码', async () => {
+    const params = { page: 6, pageSize: 20, shipped: true, shippedFrom: '2026-09-01', shippedTo: '2026-09-30', status: SalesStatus.SHIPPED, keyword: '目标港口' };
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+    await salesService.getAll(params);
+    expect(api.get).toHaveBeenCalledWith('/sales', { params });
   });
 
   it('getById: 使用id拼接路径', async () => {

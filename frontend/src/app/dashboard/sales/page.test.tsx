@@ -12,6 +12,8 @@ import userEvent from '@testing-library/user-event';
 import SalesPage from './page';
 
 const mockPush = vi.fn();
+const mockReplace = vi.fn();
+let mockParams = new URLSearchParams();
 const mockGetAll = vi.fn();
 const mockDelete = vi.fn();
 const mockToastError = vi.fn();
@@ -30,13 +32,10 @@ vi.mock('@/components/batch-import', () => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
-    replace: vi.fn(),
+    replace: mockReplace,
   }),
   usePathname: () => '/dashboard/sales',
-  useSearchParams: () => ({
-    get: vi.fn(() => null),
-    toString: vi.fn(() => ''),
-  }),
+  useSearchParams: () => mockParams,
 }));
 
 vi.mock('@/services/sales.service', () => ({
@@ -62,6 +61,8 @@ vi.mock('@/lib/api-cache', () => ({
 describe('SalesPage 交互逻辑', () => {
   beforeEach(() => {
     mockPush.mockReset();
+    mockReplace.mockReset();
+    mockParams = new URLSearchParams();
     mockGetAll.mockReset();
     mockDelete.mockReset();
     mockToastError.mockReset();
@@ -79,6 +80,18 @@ describe('SalesPage 交互逻辑', () => {
       expect(screen.getByText('在途')).toBeInTheDocument();
       expect(screen.getAllByText('暂无出口合同')).toHaveLength(2);
     });
+  });
+
+  it('报表期间保留至第6页，第101条可达且服务端搜索后回首页', async () => {
+    mockParams = new URLSearchParams('shipped=true&shippedFrom=2026-09-01&shippedTo=2026-09-30&page=6');
+    mockGetAll.mockResolvedValue({ data: { items: [{ id: 'sales-101', contractNo: 'SYNTHETIC101', status: 'SHIPPED', signedAt: null, totalAmount: 100, receivedAmount: 0, totalBoxes: 0, volume: 0, grossWeight: 0 }], pagination: { total: 121 } } });
+    render(<SalesPage />);
+    expect(await screen.findByTestId('contract-row-SYNTHETIC101')).toBeInTheDocument();
+    expect(mockGetAll).toHaveBeenLastCalledWith(expect.objectContaining({ page: 6, pageSize: 20, shipped: true, shippedFrom: '2026-09-01', shippedTo: '2026-09-30' }));
+    expect(screen.getByText('共 121 条，第 6/7 页')).toBeInTheDocument();
+    await userEvent.type(screen.getByTestId('sales-search-input'), '目标港口');
+    await waitFor(() => expect(mockGetAll).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, keyword: '目标港口', shipped: true, shippedFrom: '2026-09-01', shippedTo: '2026-09-30' })));
+    expect(mockReplace).toHaveBeenLastCalledWith('/dashboard/sales?shipped=true&shippedFrom=2026-09-01&shippedTo=2026-09-30&q=%E7%9B%AE%E6%A0%87%E6%B8%AF%E5%8F%A3', { scroll: false });
   });
 
   it('点击新增出口合同按钮会跳转创建页', async () => {
@@ -113,6 +126,17 @@ describe('SalesPage 交互逻辑', () => {
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('加载出口合同失败');
     });
+  });
+
+  it('加载失败不显示正常空态；重试保留SHIPPED范围', async () => {
+    mockParams = new URLSearchParams('status=SHIPPED');
+    mockGetAll.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ data: { items: [], pagination: { total: 0 } } });
+    render(<SalesPage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('出口合同读取失败');
+    expect(screen.queryByText('暂无出口合同')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '重试' }));
+    await waitFor(() => expect(mockGetAll).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, status: 'SHIPPED' })));
+    expect(await screen.findAllByText('暂无出口合同')).toHaveLength(2);
   });
 
   it('删除成功后提示并刷新列表', async () => {

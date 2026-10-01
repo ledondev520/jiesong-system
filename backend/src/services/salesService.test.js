@@ -56,7 +56,12 @@ test('getSalesContracts: 组装筛选条件并分页查询', async () => {
     assert.deepEqual(findManyArgs.where, {
       status: 'DRAFT',
       items: { some: { storeId: 'store-1' } },
-      contractNo: { contains: 'EXP' },
+      OR: [
+        { contractNo: { contains: 'EXP' } },
+        { port: { is: { name: { contains: 'EXP' } } } },
+        { packingItems: { some: { store: { is: { name: { contains: 'EXP' } } } } } },
+        { items: { some: { store: { is: { name: { contains: 'EXP' } } } } } },
+      ],
     });
     assert.equal(findManyArgs.skip, 10);
     assert.equal(findManyArgs.take, 5);
@@ -555,4 +560,27 @@ test('removePackingItem: 不能通过其他出口合同编号删除不属于当�
     prisma.packingItem.aggregate = originalAggregate;
     prisma.salesContract.update = originalSalesUpdate;
   }
+});
+
+test('经营钻取按上海发运日期过滤三种已发运状态，搜索港口/门店覆盖第101条', async () => {
+  const originalFindMany = prisma.salesContract.findMany;
+  const originalCount = prisma.salesContract.count;
+  let args; let countWhere;
+  prisma.salesContract.findMany = async (value) => { args = value; return [{ id: 'sale-101', contractNo: 'SYNTHETIC101', status: 'SHIPPED', packingItems: [] }]; };
+  prisma.salesContract.count = async ({ where }) => { countWhere = where; return 121; };
+  try {
+    const result = await salesService.getSalesContracts({ page: 6, pageSize: 20, shipped: true, shippedFrom: '2026-09-01', shippedTo: '2026-09-30', keyword: '目标港口' });
+    assert.equal(args.skip, 100); assert.equal(args.take, 20);
+    assert.deepEqual(args.where.status, { in: ['SHIPPED', 'ARRIVED', 'COMPLETED'] });
+    assert.equal(args.where.shippedAt.gte.toISOString(), '2026-08-31T16:00:00.000Z');
+    assert.equal(args.where.shippedAt.lte.toISOString(), '2026-09-30T15:59:59.999Z');
+    assert.ok(args.where.OR.some((item) => item.port?.is?.name?.contains === '目标港口'));
+    assert.ok(args.where.OR.some((item) => item.packingItems?.some?.store?.is?.name?.contains === '目标港口'));
+    assert.deepEqual(countWhere, args.where); assert.equal(result.total, 121);
+    assert.equal(result.contracts[0].id, 'sale-101');
+    await salesService.getSalesContracts({ page: 1, pageSize: 20, status: 'SHIPPED' });
+    assert.equal(args.where.status, 'SHIPPED');
+    await assert.rejects(salesService.getSalesContracts({ page: 1, pageSize: 20, shippedFrom: '2026-02-30' }), (error) => error.statusCode === 400);
+    await assert.rejects(salesService.getSalesContracts({ page: 1, pageSize: 20, shippedFrom: '2026-10-01', shippedTo: '2026-09-30' }), /不能晚于/);
+  } finally { prisma.salesContract.findMany = originalFindMany; prisma.salesContract.count = originalCount; }
 });

@@ -1,4 +1,5 @@
 const prisma = require('../utils/prisma');
+const { parseShanghaiDateRange } = require('../utils/dateRange');
 const { createError } = require('../middleware/errorHandler');
 const {
   generateNextContractNo,
@@ -36,16 +37,30 @@ const getThirdPartySources = (packingItems = []) => Array.from(new Set(
     .filter(Boolean),
 ));
 
-const getSalesContracts = async ({ page, pageSize, status, storeId, keyword, lite = false }) => {
+const getSalesContracts = async ({ page, pageSize, status, storeId, keyword, shipped = false, shippedFrom, shippedTo, lite = false }) => {
   const where = {};
+  if (shipped !== false && shipped !== true && shipped !== 'false' && shipped !== 'true') throw createError('shipped 必须为true或false', 400);
+  const shippedOnly = shipped === true || shipped === 'true';
+  if (shippedOnly) where.status = { in: ['SHIPPED', 'ARRIVED', 'COMPLETED'] };
   if (status) {
-    where.status = normalizeFilterStatus(status);
+    if (typeof status !== 'string') throw createError('status 必须为状态文本', 400);
+    if (shippedOnly) where.AND = [{ status: normalizeFilterStatus(status) }];
+    else where.status = normalizeFilterStatus(status);
   }
+  const dateRange = parseShanghaiDateRange(shippedFrom, shippedTo);
+  if (Object.keys(dateRange).length > 0) where.shippedAt = dateRange;
   if (storeId) {
     where.items = { some: { storeId } };
   }
   if (keyword) {
-    where.contractNo = { contains: keyword };
+    if (typeof keyword !== 'string') throw createError('keyword 必须为文本', 400);
+    const text = keyword.trim();
+    if (text) where.OR = [
+      { contractNo: { contains: text } },
+      { port: { is: { name: { contains: text } } } },
+      { packingItems: { some: { store: { is: { name: { contains: text } } } } } },
+      { items: { some: { store: { is: { name: { contains: text } } } } } },
+    ];
   }
 
   const skip = (page - 1) * pageSize;

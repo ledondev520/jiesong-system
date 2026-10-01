@@ -11,6 +11,10 @@
 const prisma = require('../utils/prisma');
 const { success } = require('../utils/response');
 const { generateForUser } = require('../services/notificationService');
+const { buildSalesFinanceSummary } = require('../services/salesFinanceService');
+const { getOverdueReceivables, getStats: getFinanceStats } = require('../services/financeService');
+const { listLowStockAlerts } = require('../services/inventoryAlertService');
+const { parseShanghaiDateRange } = require('../utils/dateRange');
 const { listTradeWorkflows } = require('../services/tradeWorkflowService');
 
 /**
@@ -18,7 +22,7 @@ const { listTradeWorkflows } = require('../services/tradeWorkflowService');
  */
 const getTradeWorkflows = async (req, res, next) => {
   try {
-    const workflows = await listTradeWorkflows({ limit: req.query?.limit });
+    const workflows = await listTradeWorkflows({ limit: req.query?.limit, scope: req.query?.scope });
     success(res, workflows);
   } catch (error) {
     next(error);
@@ -256,19 +260,24 @@ const trackProduct = async (req, res, next) => {
 const getAnalytics = async (req, res, next) => {
   try {
     // 1. 合同统计
-    const [purchaseStats, salesStats] = await Promise.all([
+    const [purchaseStats, salesStats, financeStats, draftPurchases, exportPendingParams] = await Promise.all([
       prisma.purchaseContract.aggregate({
+        where: { status: { not: 'CANCELLED' } },
         _count: true,
         _sum: { totalAmount: true, paidAmount: true },
       }),
       prisma.salesContract.aggregate({
+        where: { status: { not: 'CANCELLED' } },
         _count: true,
         _sum: { totalAmount: true, receivedAmount: true },
       }),
+      getFinanceStats(),
+      prisma.purchaseContract.count({ where: { status: 'DRAFT' } }),
+      prisma.salesContract.count({ where: { status: { in: ['DRAFT', 'CONFIRMED', 'PACKING'] }, OR: [{ totalBoxes: { lte: 0 } }, { grossWeight: { lte: 0 } }, { volume: { lte: 0 } }] } }),
     ]);
 
     // 2. 应收账款（待收美金）
-    const receivable = (salesStats._sum.totalAmount || 0) - (salesStats._sum.receivedAmount || 0);
+    const receivable = financeStats.receivable.unreceived;
     
     // 3. 库存概览
     const [inventoryStats, productCount] = await Promise.all([
@@ -365,12 +374,13 @@ const getAnalytics = async (req, res, next) => {
 
     // 组装返回数据
     const data = {
+      alerts: { draftPurchases, exportPendingParams },
       contracts: {
         purchase: {
           count: purchaseStats._count,
           totalAmount: purchaseStats._sum.totalAmount || 0,
           paidAmount: purchaseStats._sum.paidAmount || 0,
-          unpaidAmount: (purchaseStats._sum.totalAmount || 0) - (purchaseStats._sum.paidAmount || 0),
+          unpaidAmount: financeStats.payable.unpaid,
         },
         sales: {
           count: salesStats._count,
@@ -399,129 +409,85 @@ const getAnalytics = async (req, res, next) => {
 };
 
 /**
- * 职责：获取经营数据报表（老板视角）
- * 思路：
- *   1. 聚合销售/采购合同金额，计算毛利与利润率
- *   2. 通过原始查询计算应收、应付及逾期金额
- *   3. 统计库存总量、低库存预警、在途货柜
- *   4. 按月聚合近 6 个月销售趋势
+ * 职责：按发运期间汇总自有商品人民币毛利；资金与库存是当前全量快照。
+ * 复用单柜财务 Interface；本报表不估算退税，不作为公司净利润。
  */
 const getBusinessOverview = async (req, res, next) => {
   try {
-    // 1. 经营概览聚合
-    const [salesAgg, purchaseAgg] = await Promise.all([
-      prisma.salesContract.aggregate({
-        _sum: { totalAmount: true, receivedAmount: true },
+    const { gte: start, lte: end } = parseShanghaiDateRange(req.query?.startDate, req.query?.endDate);
+    const [sales, purchases, productCount, inTransitContainers, overdue, lowStock] = await Promise.all([
+      prisma.salesContract.findMany({
+        where: { status: { not: 'CANCELLED' } },
+        include: { packingItems: true, payments: true, taxRefunds: true },
       }),
-      prisma.purchaseContract.aggregate({
-        _sum: { totalAmount: true, paidAmount: true },
+      prisma.purchaseContract.findMany({
+        where: { status: { not: 'CANCELLED' } },
+        select: { id: true, contractNo: true, totalAmount: true, paidAmount: true, expectedDate: true },
       }),
+      prisma.product.count({ where: { isActive: true } }),
+      prisma.salesContract.count({ where: { status: 'SHIPPED' } }),
+      getOverdueReceivables(),
+      listLowStockAlerts(prisma),
     ]);
-
-    const totalSales = salesAgg._sum.totalAmount || 0;
-    const totalPurchases = purchaseAgg._sum.totalAmount || 0;
-    const grossProfit = totalSales - totalPurchases;
-    const profitMargin = totalSales > 0 ? grossProfit / totalSales : 0;
-
-    // 2. 资金状况（原始查询精确计算差额，避免全表扫描）
-    const [
-      receivableResult,
-      payableResult,
-      overdueReceivableResult,
-      overduePayableResult,
-    ] = await Promise.all([
-      prisma.$queryRaw`
-        SELECT COALESCE(SUM(totalAmount - receivedAmount), 0) as amount
-        FROM sales_contracts
-        WHERE totalAmount > receivedAmount
-      `,
-      prisma.$queryRaw`
-        SELECT COALESCE(SUM(totalAmount - paidAmount), 0) as amount
-        FROM purchase_contracts
-        WHERE totalAmount > paidAmount
-      `,
-      prisma.$queryRaw`
-        SELECT COALESCE(SUM(totalAmount - receivedAmount), 0) as amount
-        FROM sales_contracts
-        WHERE totalAmount > receivedAmount
-          AND (
-            (estimatedArrival IS NOT NULL AND estimatedArrival < datetime('now'))
-            OR (estimatedArrival IS NULL AND shippedAt IS NOT NULL AND shippedAt < datetime('now'))
-          )
-      `,
-      prisma.$queryRaw`
-        SELECT COALESCE(SUM(totalAmount - paidAmount), 0) as amount
-        FROM purchase_contracts
-        WHERE totalAmount > paidAmount
-          AND expectedDate IS NOT NULL
-          AND expectedDate < datetime('now')
-      `,
-    ]);
-
-    const totalReceivable = Number(receivableResult[0]?.amount || 0);
-    const totalPayable = Number(payableResult[0]?.amount || 0);
-    const overdueReceivable = Number(overdueReceivableResult[0]?.amount || 0);
-    const overduePayable = Number(overduePayableResult[0]?.amount || 0);
-
-    // 3. 库存与物流
-    const [inventoryCount, lowStockResult, inTransitContainers] = await Promise.all([
-      prisma.inventory.count(),
-      prisma.$queryRaw`
-        SELECT COUNT(*) as count
-        FROM inventories i
-        JOIN products p ON i.productId = p.id
-        WHERE i.quantity < p.lowStockThreshold AND p.lowStockThreshold > 0
-      `,
-      prisma.salesContract.count({
-        where: { status: { in: ['SHIPPED', 'ARRIVED'] } },
-      }),
-    ]);
-
-    const lowStockItems = Number(lowStockResult[0]?.count || 0);
-
-    // 4. 月度销售趋势（近 6 个月）
-    const monthlySalesResult = await prisma.$queryRaw`
-      SELECT
-        strftime('%Y-%m', signedAt) as month,
-        SUM(totalAmount) as amount
-      FROM sales_contracts
-      WHERE signedAt >= datetime('now', '-6 months')
-        AND signedAt IS NOT NULL
-      GROUP BY strftime('%Y-%m', signedAt)
-      ORDER BY month ASC
-    `;
-
-    const monthlySales = Array.isArray(monthlySalesResult)
-      ? monthlySalesResult.map((row) => ({
-          month: String(row.month),
-          amount: Number(row.amount || 0),
-        }))
-      : [];
-
-    const data = {
+    const round = (value) => Number(value.toFixed(2));
+    const sum = (items, pick) => round(items.reduce((total, item) => total + Number(pick(item) || 0), 0));
+    // ponytail: 逐合同复用现有单柜计算；规模扩大后再共享批量采购索引。
+    const allSummaries = sales.map((contract) => ({
+      contract,
+      summary: buildSalesFinanceSummary({ salesContract: contract, purchases }),
+    }));
+    const sold = allSummaries.filter(({ contract }) => {
+      const shipped = contract.shippedAt && new Date(contract.shippedAt);
+      return ['SHIPPED', 'ARRIVED', 'COMPLETED'].includes(contract.status) && shipped
+        && (!start || shipped >= start) && (!end || shipped <= end);
+    });
+    const unavailable = sold.filter(({ contract, summary }) => !summary.marginReady || !contract.packingItems?.length);
+    const marginReady = unavailable.length === 0;
+    const revenueReady = sold.every(({ summary }) => summary.currencyPolicy.conversionRate !== null);
+    const totalSales = revenueReady ? sum(sold, ({ summary }) => summary.profit.expectedRevenueCny) : null;
+    const totalPurchases = marginReady ? sum(sold, ({ summary }) => summary.cost.purchaseCostCny) : null;
+    const grossProfit = marginReady ? sum(sold, ({ summary }) => summary.profit.estimatedGrossProfitCny) : null;
+    const cashReady = marginReady && sold.every(({ summary }) => summary.cashReady && !summary.issues.some((issue) =>
+      ['PURCHASE_CONTRACT_NOT_FOUND', 'MISSING_PURCHASE_LINK', 'MISSING_PURCHASE_COST'].includes(issue.code)));
+    const trendStart = new Date();
+    trendStart.setMonth(trendStart.getMonth() - 5, 1);
+    trendStart.setHours(0, 0, 0, 0);
+    const months = new Map();
+    sold.filter(({ contract }) => start || end || new Date(contract.shippedAt) >= trendStart).forEach(({ contract, summary }) => {
+      const month = new Date(new Date(contract.shippedAt).getTime() + 8 * 3600000).toISOString().slice(0, 7);
+      const current = months.get(month) || { month, amount: 0 };
+      current.amount = current.amount === null || summary.currencyPolicy.conversionRate === null
+        ? null : round(current.amount + summary.profit.expectedRevenueCny);
+      months.set(month, current);
+    });
+    success(res, {
+      period: { startDate: req.query?.startDate || null, endDate: req.query?.endDate || null, dateField: 'shippedAt' },
       overview: {
-        totalSales,
-        totalPurchases,
-        grossProfit,
-        profitMargin,
+        totalSales, totalPurchases, grossProfit,
+        profitMargin: marginReady && totalSales > 0 ? grossProfit / totalSales : marginReady ? 0 : null,
+        marginReady, cashReady, currency: 'CNY', contractCount: sold.length,
+        netCashCny: cashReady ? sum(sold, ({ summary }) => summary.cashFlow.netCashCny) : null,
+        scope: '发运商品口径：自有美元收入按各合同汇率折算 − 对应装箱明细含税采购成本；不含预计退税、海运、报关、银行及管理费用。资金/库存风险为当前全量快照。',
+        unavailableContracts: unavailable.map(({ contract, summary }) => ({
+          id: contract.id,
+          reasons: contract.packingItems?.length ? summary.issues.filter((issue) => issue.severity === 'error').map((issue) => issue.message) : ['缺少装箱明细，无法匹配已售成本'],
+        })),
       },
       funds: {
-        totalReceivable,
-        totalPayable,
-        overdueReceivable,
-        overduePayable,
+        totalReceivable: sum(allSummaries, ({ summary }) => summary.revenue.outstandingUsd),
+        totalPayable: sum(purchases, (contract) => Math.max(contract.totalAmount - contract.paidAmount, 0)),
+        overdueReceivable: sum(overdue, (contract) => contract.unreceived),
+        overduePayable: sum(purchases.filter((contract) => contract.expectedDate && new Date(contract.expectedDate) < new Date()),
+          (contract) => Math.max(contract.totalAmount - contract.paidAmount, 0)),
+        overdueRule: '发运超过30天仍未收齐；这是运营预警，不代表已核对合同付款到期条款',
       },
       inventory: {
-        totalItems: inventoryCount,
-        lowStockItems,
+        totalItems: productCount,
+        lowStockItems: lowStock.alerts.length,
         inTransitContainers,
       },
-      trends: {
-        monthlySales,
-      },
-    };
-
-    success(res, data);
+      trends: { monthlySales: Array.from(months.values()).sort((a, b) => a.month.localeCompare(b.month)) },
+    });
   } catch (error) {
     next(error);
   }
