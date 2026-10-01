@@ -89,6 +89,13 @@ if (envResult.error && envResult.error.code !== 'ENOENT') {
   { filePath: path.join(__dirname, 'constants.js'), expectedMode: 0o644, required: true, label: 'backend/src/config/constants.js' },
 ].forEach(assertSecureFilePermissions);
 
+// Optional email registration must be either fully configured or disabled.
+const emailKeys = ['ALIBABA_CLOUD_ACCESS_KEY_ID', 'ALIBABA_CLOUD_ACCESS_KEY_SECRET', 'JIESONG_EMAIL_FROM'];
+if (emailKeys.some((key) => process.env[key]?.trim()) &&
+    (!emailKeys.every((key) => process.env[key]?.trim()) || !/^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(process.env.JIESONG_EMAIL_FROM.trim()))) {
+  throw new Error('邮箱注册需完整配置阿里云凭据与有效的 JIESONG_EMAIL_FROM');
+}
+
 const config = {
   // 服务器配置
   port: parseInt(process.env.PORT, 10) || 3000,

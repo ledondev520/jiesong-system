@@ -81,3 +81,11 @@ test('config: 读取环境变量覆盖', () => {
   assert.deepEqual(config.cors.origin, ['http://localhost:3000', 'https://test.example.com']);
   assert.equal(config.cors.credentials, true);
 });
+
+// Synthetic configuration only; never sent to a provider.
+test('config: 邮箱服务允许关闭，但拒绝部分配置与无效发信地址', () => {
+  const base = { JWT_SECRET: require('crypto').randomBytes(32).toString('hex'), ALIBABA_CLOUD_ACCESS_KEY_ID: '', ALIBABA_CLOUD_ACCESS_KEY_SECRET: '', JIESONG_EMAIL_FROM: '' };
+  assert.doesNotThrow(() => loadConfigWithEnv(base));
+  assert.throws(() => loadConfigWithEnv({ ...base, ALIBABA_CLOUD_ACCESS_KEY_ID: 'synthetic-id' }), /邮箱注册需完整配置/);
+  assert.throws(() => loadConfigWithEnv({ ...base, ALIBABA_CLOUD_ACCESS_KEY_ID: 'synthetic-id', ALIBABA_CLOUD_ACCESS_KEY_SECRET: 'synthetic-secret', JIESONG_EMAIL_FROM: 'invalid' }), /邮箱注册需完整配置/);
+});

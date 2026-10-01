@@ -213,3 +213,11 @@ A:
 - Render: Dashboard → Logs
 - Fly.io: `flyctl logs`
 - Vercel: Dashboard → Functions → Logs
+
+## 邮箱注册
+
+私有后端环境配置 `ALIBABA_CLOUD_ACCESS_KEY_ID`、`ALIBABA_CLOUD_ACCESS_KEY_SECRET`、`JIESONG_EMAIL_FROM`，可选 `ALIBABA_CLOUD_SECURITY_TOKEN`。发信地址必须已在阿里云中国杭州邮件推送中验证，RAM权限只需 `dm:SingleSendMail`。不配置时注册发码返回服务不可用；部分配置在启动时拒绝。
+
+上线前备份实际 `DATABASE_URL` 指向的SQLite，权限0700/0600，然后运行迁移新增 `email_registration_challenges` 表。不要执行 db push。重启后访问 `/register`，完成邮件验证码注册并由管理员在用户管理开通角色和状态；现有账号登录不变。
+
+阿里云受理回执不等于收件箱送达；必须使用用户指定邮箱确认真实收信。接口依据：[SingleSendMail](https://help.aliyun.com/zh/direct-mail/api-dm-2015-11-23-singlesendmail)。

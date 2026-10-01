@@ -56,7 +56,7 @@ describe('LoginPage 交互逻辑', () => {
     render(<LoginPage />);
 
     expect(screen.getByText('请输入账号密码登录捷淞进销存系统。')).toBeInTheDocument();
-    expect(screen.getByLabelText('用户名')).toBeInTheDocument();
+    expect(screen.getByLabelText('用户名或邮箱')).toBeInTheDocument();
     expect(screen.getByLabelText('密码')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '登录' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /一键登录/ })).not.toBeInTheDocument();
@@ -157,7 +157,7 @@ describe('LoginPage 交互逻辑', () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText('用户名'), 'admin');
+    await user.type(screen.getByLabelText('用户名或邮箱'), 'admin');
     await user.type(screen.getByLabelText('密码'), '123456');
     await user.click(screen.getByRole('button', { name: '登录' }));
 
@@ -206,7 +206,7 @@ describe('LoginPage 交互逻辑', () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText('用户名'), 'admin');
+    await user.type(screen.getByLabelText('用户名或邮箱'), 'admin');
     await user.type(screen.getByLabelText('密码'), 'wrong-password');
     await user.click(screen.getByRole('button', { name: '登录' }));
 
@@ -221,7 +221,7 @@ describe('LoginPage 交互逻辑', () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText('用户名'), 'admin');
+    await user.type(screen.getByLabelText('用户名或邮箱'), 'admin');
     await user.type(screen.getByLabelText('密码'), '123456');
     await user.click(screen.getByRole('button', { name: '登录' }));
 
@@ -237,7 +237,7 @@ describe('LoginPage 交互逻辑', () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText('用户名'), 'admin');
+    await user.type(screen.getByLabelText('用户名或邮箱'), 'admin');
     await user.type(screen.getByLabelText('密码'), '123456');
     await user.click(screen.getByRole('button', { name: '登录' }));
 

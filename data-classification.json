@@ -18,7 +18,8 @@
         "signed and system-generated legal/financial contract artifacts",
         "supplier bank account names, account numbers, branches, and bank routing codes",
         "company bank statements, transaction identifiers, account balances, and even masked account identifiers when combined with transaction rows",
-        "carrier packing-list originals and persistent packing-list review records"
+        "carrier packing-list originals and persistent packing-list review records",
+        "email verification code hashes and Alibaba Cloud mail credentials"
       ],
       "controls": {
         "storage": [
@@ -32,7 +33,8 @@
           "Legacy procurement attachment handlers reuse fileService permission enforcement and resolve downloads against UPLOAD_DIR",
           "Carrier packing-list raw extracted text is not persisted; structured check records retain their original file reference",
           "HTTP request logs retain route, timing, and request shape only; request/query values, AI prompts, tool schemas, and user messages are excluded",
-          "VPS runtime migration backups keep private environment files and SQLite snapshots in 0700 directories with 0600 files; deployment verification never prints process environments or credentials"
+          "VPS runtime migration backups keep private environment files and SQLite snapshots in 0700 directories with 0600 files; deployment verification never prints process environments or credentials",
+          "Email registration uses keyed hashes, persistent send quotas and single-use verification; new users remain inactive until administrator approval (backend/src/services/emailRegistrationService.js)"
         ],
         "transfer": [
           "Encrypt in transit (TLS)",
@@ -44,7 +46,9 @@
         "backend/.env",
         "backend/src/config/index.js",
         "backend/uploads/",
-        "/opt/jiesong_system/deploy-backups/"
+        "/opt/jiesong_system/deploy-backups/",
+        "backend/src/services/emailService.js",
+        "backend/src/services/emailRegistrationService.js"
       ]
     },
     {

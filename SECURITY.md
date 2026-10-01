@@ -60,3 +60,8 @@
 - `.github/workflows/deploy.yml` 在 SSH 内启用失败即停止，并固定触发提交 SHA，防止失败被后续命令掩盖或发布版本漂移。
 - `scripts/verify-vps-runtime.cjs` 只输出校验结论，拒绝 PM2 仍指向旧目录、公网 BUILD_ID 不匹配、后端健康失败或未认证 API 返回非 401；不得记录完整 PM2 环境、响应正文或凭据。
 - VPS 运行目录迁移保留现有数据库与附件的绝对路径；`/opt/jiesong_system/deploy-backups/` 中的环境配置和 SQLite 快照属于 Restricted，目录 0700、文件 0600。
+
+## 邮箱注册边界
+- `backend/src/services/emailService.js` 复用阿里云杭州 DirectMail；仅私有环境配置 `ALIBABA_CLOUD_ACCESS_KEY_ID`、`ALIBABA_CLOUD_ACCESS_KEY_SECRET`、`JIESONG_EMAIL_FROM`，可选 STS token。密钥不返回浏览器，部分配置在启动时拒绝。
+- `backend/src/services/emailRegistrationService.js` 持久保存带密钥验证码哈希，10分钟有效、最多5次验证；60秒重发冷却、每邮箱每小时5次、全站每小时60次，失败发信仍计数且旧码失效。成功注册与消费验证码在同一事务，角色固定SALES且未激活，管理员审核后方可访问业务。
+- 注册邮箱作为用户名，登录兼容原用户名；管理员创建用户仍需ADMIN。邮件正文、验证码与云服务响应正文不得进入日志。验证码记录超过24小时后在下一次发码时清理。

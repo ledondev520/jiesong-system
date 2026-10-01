@@ -1,7 +1,7 @@
 /**
  * Input: 认证服务
  * Output: 认证相关的HTTP响应
- * Pos: 认证控制器，处理登录/注册/用户管理/找回密码请求
+ * Pos: 认证控制器，处理登录、邮箱验证注册、用户管理、找回密码请求
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -52,12 +52,12 @@ const register = async (req, res, next) => {
  */
 const publicRegister = async (req, res, next) => {
   try {
-    const { username, password, name, phone } = req.body;
+    const { email, code, password, name } = req.body;
     const user = await authService.publicRegister({
-      username,
+      email,
+      code,
       password,
       name,
-      phone,
     });
     created(res, user, '注册成功，请等待管理员审核');
   } catch (error) {
