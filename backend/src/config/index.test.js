@@ -89,3 +89,21 @@ test('config: 邮箱服务允许关闭，但拒绝部分配置与无效发信地
   assert.throws(() => loadConfigWithEnv({ ...base, ALIBABA_CLOUD_ACCESS_KEY_ID: 'synthetic-id' }), /邮箱注册需完整配置/);
   assert.throws(() => loadConfigWithEnv({ ...base, ALIBABA_CLOUD_ACCESS_KEY_ID: 'synthetic-id', ALIBABA_CLOUD_ACCESS_KEY_SECRET: 'synthetic-secret', JIESONG_EMAIL_FROM: 'invalid' }), /邮箱注册需完整配置/);
 });
+
+test('config: 生产环境先验证文件权限，再读取环境密钥', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const vm = require('node:vm');
+  let environmentReads = 0;
+  const context = {
+    module: { exports: {} }, __dirname,
+    process: { env: { NODE_ENV: 'production' } }, console,
+    require: (name) => {
+      if (name === 'fs') return { statSync: () => ({ mode: 0o644 }) };
+      if (name === 'dotenv') return { config: () => { environmentReads++; return {}; } };
+      return require(name);
+    },
+  };
+  assert.throws(() => vm.runInNewContext(fs.readFileSync(path.join(__dirname, 'index.js'), 'utf8'), context), /权限过宽/);
+  assert.equal(environmentReads, 0);
+});

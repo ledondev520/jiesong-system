@@ -78,16 +78,17 @@ const assertSecureFilePermissions = ({
   }
 };
 
-const envResult = dotenv.config({ path: ENV_PATH });
-if (envResult.error && envResult.error.code !== 'ENOENT') {
-  throw envResult.error;
-}
-
 [
   { filePath: ENV_PATH, expectedMode: 0o600, required: false, label: '.env' },
   { filePath: path.join(PROJECT_ROOT, 'env.example'), expectedMode: 0o644, required: false, label: 'env.example' },
   { filePath: path.join(__dirname, 'constants.js'), expectedMode: 0o644, required: true, label: 'backend/src/config/constants.js' },
 ].forEach(assertSecureFilePermissions);
+
+// 在读取环境密钥前检查文件权限。
+const envResult = dotenv.config({ path: ENV_PATH });
+if (envResult.error && envResult.error.code !== 'ENOENT') {
+  throw envResult.error;
+}
 
 // Optional email registration must be either fully configured or disabled.
 const emailKeys = ['ALIBABA_CLOUD_ACCESS_KEY_ID', 'ALIBABA_CLOUD_ACCESS_KEY_SECRET', 'JIESONG_EMAIL_FROM'];
