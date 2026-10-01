@@ -7,6 +7,7 @@ const forexVerificationService = require('./forexVerificationService');
 const taxRefundService = require('./taxRefundService');
 const financeService = require('./financeService');
 const openAgentService = require('./openAgentService');
+const salesService = require('./salesService');
 
 const withPatched = async (patchMap, callback) => {
   const originals = [];
@@ -15,6 +16,7 @@ const withPatched = async (patchMap, callback) => {
     const root = {
       prisma,
       financeService,
+      salesService,
       customsDeclarationService,
       forexVerificationService,
       taxRefundService,
@@ -59,6 +61,53 @@ test('getAgentPreset: 支持三类业务 agent', () => {
   assert.match(finance.prompt, /财务/);
   assert.match(exportAgent.prompt, /出口|单证/);
   assert.match(executive.prompt, /老板|经营|驾驶舱/);
+});
+
+test('AI 内部草稿直接创建，同一轮重复调用复用结果，保留角色校验及执行日志', async () => {
+  let created = 0;
+  const logs = [];
+  await withPatched({
+    'prisma.salesContract.findUnique': async () => ({ id: 'test-sales', contractNo: 'EXP-TEST', totalAmount: 100 }),
+    'prisma.customsDeclaration.findFirst': async () => null,
+    'customsDeclarationService.createCustomsDeclaration': async input => { created++; return { id: 'test-draft', ...input }; },
+    'prisma.operationLog.create': async input => { logs.push(input.data); return {}; },
+  }, async () => {
+    const ids = [];
+    const tool = openAgentService.buildWriteToolPool(spec => spec, 'test-user', 'SALES', ids, [])
+      .find(item => item.name === 'CreateCustomsDeclarationDraft');
+    const first = JSON.parse(await tool.call({ salesContractId: 'test-sales' }));
+    const second = JSON.parse(await tool.call({ salesContractId: 'test-sales' }));
+    assert.equal(first.automatic, true);
+    assert.equal(first.record.status, 'DRAFT');
+    assert.equal(first.__pendingAction, undefined);
+    assert.equal(second.record.id, first.record.id);
+    assert.equal(created, 1);
+    assert.equal(ids.length, 1);
+    assert.equal(JSON.parse(logs[0].newValue).automatic, true);
+    const denied = openAgentService.buildWriteToolPool(spec => spec, 'other-user', 'PURCHASE', [], [])
+      .find(item => item.name === 'CreateCustomsDeclarationDraft');
+    await assert.rejects(denied.call({ salesContractId: 'test-sales' }), /无权/);
+  });
+  const registry = openAgentService.listToolRegistry();
+  for (const name of ['CreatePurchaseContract', 'CreateCustomsDeclarationDraft', 'CreateForexVerificationDraft', 'CreateTaxRefundDraft']) {
+    assert.equal(registry.find(item => item.name === name).confirmationRequired, false);
+  }
+});
+
+test('AI 登记实际发运复用销售状态接口，执行结果不再虚报成功', async () => {
+  let changed = false;
+  await withPatched({
+    'prisma.salesContract.findFirst': async () => ({ id: 'test-sales', contractNo: 'EXP-TEST', status: 'PACKING' }),
+    'salesService.updateSalesStatus': async (id, status) => { assert.equal(id, 'test-sales'); assert.equal(status, 'SHIPPED'); changed = true; return { status }; },
+    'prisma.operationLog.create': async () => ({}),
+  }, async () => {
+    const tool = openAgentService.buildWriteToolPool(spec => spec, 'test-user', 'SALES', [], [])
+      .find(item => item.name === 'UpdateExportContractStatus');
+    const action = JSON.parse(await tool.call({ contractNo: 'EXP-TEST', newStatus: 'SHIPPED' }));
+    assert.equal(changed, false);
+    await openAgentService.executeAction(action.actionId, 'test-user');
+    assert.equal(changed, true);
+  });
 });
 
 test('unified preset: 作为唯一主公开入口，legacy preset 退为内部兼容态', () => {

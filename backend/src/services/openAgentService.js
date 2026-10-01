@@ -1,6 +1,6 @@
 /**
  * Input: open-agent-sdk, Kimi API (via anthropicCompatService), 业务服务层
- * Output: 预置业务 Agent 运行时：只读查询 + 两阶段确认写工具 + SSE 流式输出 + 原子运行记录
+ * Output: AI 只读查询、内部草稿直接执行、业务事实一次确认与可回放执行记录
  * Pos: 后端 Agent Runtime 核心，衔接 LLM 与业务数据
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -58,8 +58,10 @@ const WRITE_CONFIRMATION_INSTRUCTION = [
   '',
   '【写操作规则】',
   '你拥有写工具（如 AllocatePayment、UpdateSystemConfig 等）。',
-  '调用写工具后，系统会生成一个"待确认操作"，你需要在回复中清晰告知用户该操作的内容，',
-  '并提示"请在下方确认后执行"。你**不要**自行重复调用写工具，也不要说操作已完成。',
+  '用户明确要求建内部草稿时，CreatePurchaseContract、CreateCustomsDeclarationDraft、CreateForexVerificationDraft、CreateTaxRefundDraft 会直接执行；成功后说明已生成草稿，不再要求重复确认。',
+  '数量、单价和关联对象必须来自用户提供或系统事实，缺项不能猜；草稿不代表签约、付款、实物出入库或税局受理。',
+  '其他写工具返回待确认操作时，说明操作内容并提示一次确认后执行；收到成功结果前不要宣称已完成。',
+  '只读诊断中的建议不构成执行请求；不要自行创建草稿或重复调用写工具。',
 ].join('\n');
 
 const UNIFIED_SYSTEM_PROMPT = [
@@ -1758,9 +1760,9 @@ const WRITE_TOOL_SPECS = [
     name: 'CreatePurchaseContract',
     domain: 'procurement',
     access: 'write',
-    confirmationRequired: true,
+    confirmationRequired: false,
     allowedRoles: [ROLES.ADMIN, ROLES.PURCHASE],
-    description: '创建采购合同及明细（需用户确认后执行）',
+    description: '按用户请求直接创建内部采购草稿及明细，不签约或付款；先查询已有草稿，避免跨轮重复创建',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1870,9 +1872,9 @@ const WRITE_TOOL_SPECS = [
     name: 'CreateCustomsDeclarationDraft',
     domain: 'trade-compliance',
     access: 'write',
-    confirmationRequired: true,
+    confirmationRequired: false,
     allowedRoles: [ROLES.ADMIN, ROLES.SALES, ROLES.FINANCE, ROLES.WAREHOUSE],
-    description: '为出口合同创建报关草稿（需用户确认后执行）',
+    description: '按用户请求直接创建内部报关草稿，不进行正式报关',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1911,9 +1913,9 @@ const WRITE_TOOL_SPECS = [
     name: 'CreateForexVerificationDraft',
     domain: 'trade-compliance',
     access: 'write',
-    confirmationRequired: true,
+    confirmationRequired: false,
     allowedRoles: [ROLES.ADMIN, ROLES.SALES, ROLES.FINANCE],
-    description: '为出口合同创建收汇核销草稿（需用户确认后执行）',
+    description: '按用户请求直接创建内部收汇核销草稿，不代表银行或官方已核销',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1952,9 +1954,9 @@ const WRITE_TOOL_SPECS = [
     name: 'CreateTaxRefundDraft',
     domain: 'trade-compliance',
     access: 'write',
-    confirmationRequired: true,
+    confirmationRequired: false,
     allowedRoles: [ROLES.ADMIN, ROLES.SALES, ROLES.FINANCE],
-    description: '为出口合同创建退税草稿（需用户确认后执行）',
+    description: '按用户请求直接创建内部退税草稿，不提交税局',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2144,7 +2146,10 @@ const createPendingAction = (userId, actionType, params, description, collectedI
  * @param {string[]} collectedIds - 本次 run 收集到的 pendingAction IDs
  * @param {Array<object>} toolSpecs - 写工具定义
  */
-const buildWriteToolPool = (defineTool, userId, userRole, collectedIds, traceStore, toolSpecs = WRITE_TOOL_SPECS) => toolSpecs.map((tool) => defineTool({
+const buildWriteToolPool = (defineTool, userId, userRole, collectedIds, traceStore, toolSpecs = WRITE_TOOL_SPECS) => toolSpecs.map((tool) => {
+  // ponytail: 单轮调用去重；跨轮采购草稿重试需先查询现有草稿，规模扩大时再增加业务幂等键。
+  const automaticResults = new Map();
+  return defineTool({
   name: tool.name,
   description: tool.description,
   inputSchema: tool.inputSchema,
@@ -2153,7 +2158,17 @@ const buildWriteToolPool = (defineTool, userId, userRole, collectedIds, traceSto
     const startedAt = Date.now();
     try {
       assertToolAllowedForRole(tool.name, userRole);
-      const result = await tool.call(input || {}, { userId, collectedIds });
+      const key = JSON.stringify(input || {});
+      if (!tool.confirmationRequired && automaticResults.has(key)) return automaticResults.get(key);
+      let result = await tool.call(input || {}, { userId, collectedIds });
+      if (!tool.confirmationRequired) {
+        const pending = JSON.parse(result);
+        if (pending.__pendingAction) {
+          pendingActionStore.get(pending.actionId).automatic = true;
+          result = toJson({ ...await executeAction(pending.actionId, userId), automatic: true });
+          automaticResults.set(key, result);
+        }
+      }
       pushToolTrace(traceStore, {
         name: tool.name,
         domain: tool.domain,
@@ -2174,7 +2189,8 @@ const buildWriteToolPool = (defineTool, userId, userRole, collectedIds, traceSto
       throw error;
     }
   },
-}));
+  });
+});
 
 // ── 执行已确认的 pendingAction ──────────────────────────
 
@@ -2194,10 +2210,8 @@ const ACTION_EXECUTORS = {
    * 职责：更新出口合同状态
    */
   async UpdateExportContractStatus(params, userId) {
-    await salesService.updateSalesContract(params.salesContractId, {
-      status: params.newStatus,
-    });
-    return { success: true, detail: `合同 ${params.contractNo} 状态已更新为 ${params.newStatus}` };
+    const record = await salesService.updateSalesStatus(params.salesContractId, params.newStatus, { userId });
+    return { success: true, detail: `合同 ${params.contractNo} 状态已更新为 ${record.status}` };
   },
 
   /**
@@ -2382,6 +2396,7 @@ const executeAction = async (actionId, userId) => {
           sessionId: action.sessionId || null,
           actionType: action.actionType,
           status: 'executed',
+          automatic: action.automatic === true,
           params: action.params,
           result: { success: result.success, detail: result.detail },
         }),
@@ -2671,7 +2686,7 @@ const runAgentPrompt = async ({ userId, userRole, agentType, message, sessionId 
       collectedIds: collectedActionIds,
       recommendations: actionRecommendations,
     });
-    const pendingActions = collectedActionIds
+    const actions = collectedActionIds
       .map((id) => {
         const action = pendingActionStore.get(id);
         if (!action) return null;
@@ -2681,9 +2696,11 @@ const runAgentPrompt = async ({ userId, userRole, agentType, message, sessionId 
           actionType: action.actionType,
           description: action.description,
           params: action.params,
+          status: action.status,
         };
       })
       .filter(Boolean);
+    const pendingActions = actions.filter(action => action.status === 'pending');
 
     // 3. 持久化
     await persistAgentRun({
@@ -2698,11 +2715,11 @@ const runAgentPrompt = async ({ userId, userRole, agentType, message, sessionId 
       selectedToolNames,
       toolTraceSummary: summarizeToolTrace(toolTrace),
       actionRecommendations,
-      pendingActionSummary: pendingActions.map((item) => ({
+      pendingActionSummary: actions.map((item) => ({
         actionId: item.actionId,
         actionType: item.actionType,
         description: item.description,
-        status: 'pending',
+        status: item.status,
       })),
     });
 
@@ -2808,7 +2825,7 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
       collectedIds: collectedActionIds,
       recommendations: actionRecommendations,
     });
-    const pendingActions = collectedActionIds
+    const actions = collectedActionIds
       .map((id) => {
         const action = pendingActionStore.get(id);
         if (!action) return null;
@@ -2818,9 +2835,11 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
           actionType: action.actionType,
           description: action.description,
           params: action.params,
+          status: action.status,
         };
       })
       .filter(Boolean);
+    const pendingActions = actions.filter(action => action.status === 'pending');
 
     // 3. 持久化
     await persistAgentRun({
@@ -2835,11 +2854,11 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
       selectedToolNames,
       toolTraceSummary: summarizeToolTrace(toolTrace),
       actionRecommendations,
-      pendingActionSummary: pendingActions.map((item) => ({
+      pendingActionSummary: actions.map((item) => ({
         actionId: item.actionId,
         actionType: item.actionType,
         description: item.description,
-        status: 'pending',
+        status: item.status,
       })),
     });
 
@@ -2868,6 +2887,7 @@ module.exports = {
   resolveSystemPrompt,
   inferRoutePlan,
   listToolRegistry,
+  buildWriteToolPool,
   buildToolRegistryPayload,
   buildSalesContractFlowDiagnostic,
   buildPurchaseExecutionDiagnostic,

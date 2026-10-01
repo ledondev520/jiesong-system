@@ -109,6 +109,20 @@ describe('PurchaseProductionPanel', () => {
     expect(mockToastSuccess).toHaveBeenCalledWith('完工资料已保存，已自动进入待装柜');
   });
 
+  it('完工保存失败时保留输入并允许重试，不推进页面状态', async () => {
+    mockUpdateProductionDetails.mockRejectedValueOnce(new Error('资料已变化'));
+    const onUpdated = vi.fn();
+    render(<PurchaseProductionPanel contract={contract} photoFiles={[]} onPhotoFilesChange={vi.fn()} onUpdated={onUpdated} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '录入生产资料' }));
+    fireEvent.change(screen.getByLabelText('规格（测试瓷砖）'), { target: { value: '保留的规格' } });
+    await user.click(screen.getByRole('button', { name: '保存并登记完工' }));
+    await waitFor(() => expect(mockUpdateProductionDetails).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole('button', { name: '保存并登记完工' })).toBeEnabled();
+    expect(screen.getByLabelText('规格（测试瓷砖）')).toHaveValue('保留的规格');
+    expect(onUpdated).not.toHaveBeenCalled();
+  });
+
   it('将规格、箱数、总毛净重、总体积和可选单箱尺寸一次保存', async () => {
     const onUpdated = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();

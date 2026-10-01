@@ -59,7 +59,7 @@
 | financialEvidenceService.js | 工资、税务、凭证与日记账等资料的分类、脱敏、幂等导入与受限查询 |
 | aiService.js | Kimi 集成、完整请求时限、零自动重试、直接读取流式用量及管理员模型配置缓存 |
 | anthropicCompatService.js | Open Agent 与 Kimi 的协议适配，共用请求时限、配置温度与唯一模型候选 |
-| openAgentService.js | 通用业务 Agent、工具授权、流式输出与原子运行记录 |
+| openAgentService.js | 内部草稿按请求直接执行；其他写操作一次确认；工具角色与执行回放 |
 | agentReplaySummaryService.js | Agent 回放摘要持久化，支持复用外层事务客户端 |
 | importService.js | CSV数据解析与导入 |
 | exportService.js | 多格式数据导出（CSV + 出口合同五 Sheet Excel 含商业发票/税务测算） |

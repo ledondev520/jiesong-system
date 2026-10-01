@@ -67,6 +67,7 @@
           "Monthly financial source files are parsed in memory; persist structured rows plus filename, size, and SHA-256 only",
           "Financial evidence workbooks are never archived; sensitive personal identifiers are redacted before persistence and row-level reads require ADMIN or FINANCE",
           "Shipment invoice-row preparations and exports require ADMIN/FINANCE; generated confirmation attachments keep the same download/delete restriction and use protected contract storage",
+          "Automatic internal draft creation in openAgentService.js retains per-tool roles and execution/replay records; physical, financial and configuration writes still require confirmation",
           "Product navigation belongs to procurement at frontend/src/components/layout/navigation.config.ts; backend/src/routes/products.js remains the authority for read/write role checks"
         ],
         "transfer": [

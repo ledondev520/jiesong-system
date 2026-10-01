@@ -91,3 +91,6 @@
 
 ## 登录提示边界
 - `frontend/src/lib/auth-session.ts` 对无本标签令牌的 401 只要求登录，不能据此声称用户会话过期；不改变 sessionStorage、JWT 或权限校验。
+
+## 流程自动化边界
+- `backend/src/services/openAgentService.js` 中仅内部采购、报关、核销、退税草稿按请求直接执行，沿用工具角色校验、执行日志与单轮去重；签约、付款、实物状态及异常处理保留一次业务确认。AI 发运登记必须调用 `salesService.updateSalesStatus`，不能用合同头更新接口虚报状态已变化。

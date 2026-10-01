@@ -59,3 +59,5 @@
 - 商品档案导航归入采购模块（`frontend/src/components/layout/navigation.config.ts`），修复采购员已有建档权限但前台不可达的问题；API读写角色限制仍由 `backend/src/routes/products.js` 执行。
 
 - Shipment tax-refund preparations: `backend/src/routes/taxRefunds.js` limits invoice-row preparation, confirmation and exports to ADMIN/FINANCE; `backend/src/controllers/fileController.js` enforces the same roles for generated confirmation attachments so the generic download/delete endpoints cannot bypass this boundary. `taxRefundShipmentService.js` rechecks the material version before confirmation, reuses protected `fileService.js` archiving, and does not set official submission state.
+
+- Workflow automation in `backend/src/services/openAgentService.js` directly executes only the four internal draft tools (purchase, customs, forex verification, tax refund) on request. Tool-role checks and operation logs remain mandatory; executed actions stay in replay metadata but never appear again as pending confirmation cards. Physical/financial/configuration writes retain confirmation. Export status execution reuses `salesService.updateSalesStatus` so state checks and inventory effects remain shared with the normal API.

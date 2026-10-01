@@ -921,7 +921,7 @@ export function AIAssistant({ presentation = 'floating' }: AIAssistantProps) {
               </Button>
             </form>
             <p className="text-[10px] text-muted-foreground text-center">
-              AI 助手会自动调用系统数据回答，写操作需确认后执行
+              内部草稿按请求直接生成；付款、实物状态和异常操作需一次确认
             </p>
           </CardFooter>
         </Card>
