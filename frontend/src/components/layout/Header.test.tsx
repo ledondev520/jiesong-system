@@ -7,7 +7,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Role } from '@/types';
 import { Header } from './Header';
@@ -108,6 +108,26 @@ describe('Header', () => {
 
     expect(mockPush).toHaveBeenCalledWith('/dashboard/products?keyword=%E7%93%B7%E7%A0%96%20A');
     expect(screen.queryByPlaceholderText('输入关键词搜索...')).not.toBeInTheDocument();
+  });
+
+  it('较慢的旧查询不会覆盖新查询结果', async () => {
+    let resolveOld!: (results: Array<{ type: string; id: string; title: string }>) => void;
+    mockSearchDashboard.mockImplementation((query: string) => query === '旧查询'
+      ? new Promise((resolve) => { resolveOld = resolve; })
+      : Promise.resolve([{ type: 'product', id: 'new', title: '新查询结果' }]));
+    const user = userEvent.setup();
+    render(<Header />);
+    await user.click(screen.getByRole('button', { name: /搜索商品、供应商、合同/ }));
+    const input = screen.getByPlaceholderText('输入关键词搜索...');
+    await user.type(input, '旧查询');
+    await waitFor(() => expect(mockSearchDashboard).toHaveBeenCalledWith('旧查询'));
+    await user.clear(input);
+    await user.type(input, '新查询');
+    expect(await screen.findByText('新查询结果')).toBeInTheDocument();
+
+    await act(async () => resolveOld([{ type: 'product', id: 'old', title: '旧查询结果' }]));
+    expect(screen.getByText('新查询结果')).toBeInTheDocument();
+    expect(screen.queryByText('旧查询结果')).not.toBeInTheDocument();
   });
 
   it('点击个人设置后打开用户弹窗，而不是跳转系统配置', async () => {

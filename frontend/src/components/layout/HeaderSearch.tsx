@@ -1,6 +1,6 @@
 /**
  * Input: 搜索关键字、统一搜索服务、Command 组件
- * Output: Header 全局搜索输入与 Command 弹窗面板
+ * Output: Header 全局搜索输入与 Command 弹窗面板，仅展示当前查询结果
  * Pos: 前端布局子组件
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -89,19 +89,21 @@ export function HeaderSearch() {
     }
 
     setIsSearching(true);
+    let active = true;
     const timer = window.setTimeout(async () => {
       try {
         const results = await searchDashboard(normalizedQuery);
-        setSearchResults(results);
+        if (active) setSearchResults(results);
       } catch (error) {
+        if (!active) return;
         console.error('搜索失败:', error);
         setSearchResults([]);
       } finally {
-        setIsSearching(false);
+        if (active) setIsSearching(false);
       }
     }, 300);
 
-    return () => window.clearTimeout(timer);
+    return () => { active = false; window.clearTimeout(timer); };
   }, [searchQuery]);
 
   const handleSelect = (result: DashboardSearchResult) => {

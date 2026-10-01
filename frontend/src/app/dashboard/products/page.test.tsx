@@ -99,6 +99,25 @@ describe('ProductsPage 交互逻辑', () => {
     });
   });
 
+  it('从全局搜索进入后允许修改和清空 URL 初始关键词', async () => {
+    mockSearchParamGet.mockImplementation((key: string) => (key === 'keyword' ? '苹果' : null));
+    mockGetAll.mockResolvedValue({ data: { items: [] } });
+    const user = userEvent.setup();
+    render(<ProductsPage />);
+
+    const input = screen.getByPlaceholderText('搜索商品...');
+    await user.clear(input);
+    await user.type(input, '香蕉');
+    await waitFor(() => {
+      expect(mockGetAll).toHaveBeenLastCalledWith({ page: 1, pageSize: 100, keyword: '香蕉', lite: true });
+    });
+
+    await user.clear(input);
+    await waitFor(() => {
+      expect(mockGetAll).toHaveBeenLastCalledWith({ page: 1, pageSize: 100, keyword: undefined, lite: true });
+    });
+  });
+
   it('点击新增商品会打开弹窗', async () => {
     mockGetAll.mockResolvedValue({ data: { items: [] } });
     const user = userEvent.setup();

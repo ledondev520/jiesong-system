@@ -1,5 +1,5 @@
 /**
- * Input: 商品服务API、库存服务API、SortableTableHead、useTableSort
+ * Input: 商品服务API、库存服务API、URL 初始关键词、SortableTableHead、useTableSort
  * Output: 商品管理页面（含商品档案列排序、库存状态两个子 Tab）
  * Pos: 采购模块子页面
  *
@@ -91,11 +91,8 @@ function ProductsPageContent() {
 
   // 从URL参数初始化关键字
   useEffect(() => {
-    const urlKeyword = searchParams.get('keyword');
-    if (urlKeyword && urlKeyword !== keyword) {
-      setKeyword(urlKeyword);
-    }
-  }, [searchParams, keyword]);
+    setKeyword(initialKeyword);
+  }, [initialKeyword]);
 
   const loadProducts = async (searchKeyword?: string) => {
     setLoading(true);
