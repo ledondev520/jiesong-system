@@ -104,9 +104,9 @@ test("email ownership resets a real account once and revokes existing JWTs", asy
   );
   await page.getByLabel("邮箱验证码").fill(code);
   await page.getByRole("button", { name: "重置密码", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "密码重置成功！" }),
-  ).toBeVisible();
+  await expect(page.locator('[data-slot="card-title"]')).toHaveText(
+    "密码重置成功！",
+  );
   await expect(page.getByText(/已有登录会话已失效/)).toBeVisible();
   expect(
     (
