@@ -16,6 +16,7 @@ const WRITE_METHODS = ['post', 'put', 'patch', 'delete'];
 const PUBLIC_WRITE_ROUTES = new Set([
   'auth POST /login',
   'auth POST /reset-password',
+  'auth POST /reset-password-code',
   // 邮箱验证码注册在登录前完成；限流和校验由 auth 路由与注册服务执行。
   'auth POST /email-code',
   'auth POST /email-register',
@@ -81,7 +82,7 @@ test('RBAC: all write routes include roleAuth protection', () => {
 test('RBAC: 邮箱注册公开入口保留限流校验，管理员创建用户仍受保护', () => {
   const source = fs.readFileSync(path.join(ROUTES_DIR, 'auth.js'), 'utf8');
   const blocks = getWriteRouteBlocks(source);
-  for (const routePath of ['/email-code', '/email-register']) {
+  for (const routePath of ['/email-code', '/email-register', '/reset-password-code']) {
     const block = blocks.find((item) => getRouteInfo('auth.js', item).routeKey === `auth POST ${routePath}`);
     assert.ok(block, `${routePath} 必须显式存在`);
     assert.match(block, /strictRateLimit\(/);

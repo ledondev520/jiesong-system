@@ -46,7 +46,7 @@
 
 | 文件 | 功能 |
 |------|------|
-| authService.js | 登录验证、Token生成、密码管理、找回密码 |
+| authService.js | 登录验证、版本化Token、统一密码策略、邮箱验证码找回密码 |
 | financeService.js | 付款幂等、应收应付聚合；已收货/已到港合同按真实款项自动结清，差异重新打开待结清 |
 | salesFinanceService.js | 按共享所有权判定查询自有采购合同，聚合单柜收入、成本、退税与现金流 |
 | salesService.js | 导入装箱后自动进入装柜；登记到港保留出库，收款齐套自动完成；正式表头金额不被派生金额覆盖 |
@@ -83,7 +83,7 @@
 
 | 文件 | 功能 |
 |------|------|
-| prisma.js | Prisma 客户端实例 |
+| prisma.js | Prisma 客户端实例，不打印查询/异常参数 |
 | response.js | 统一响应格式 |
 | pagination.js | 统一分页归一化与安全整数 offset 上限 |
 | validators.js | 参数验证规则，非法或超大列表页码返回 400 |
@@ -103,3 +103,5 @@
 邮箱注册由 `services/emailService.js` 对接阿里云杭州 DirectMail，`services/emailRegistrationService.js` 负责持久化限流、验证码消费和待审核账号；公开接口为 `POST /auth/email-code`、`POST /auth/email-register`。管理员创建和审核入口保持不变。
 
 `routes/rbac-write-routes.test.js` 明确列举登录前邮箱注册入口，检查限流/校验与管理员创建账号权限。`services/openAgentService.js` 只加载锁定的已发布 SDK 构建；两种 Agent 入口显式使用本地 Anthropic 协议，加载、单次请求和失败终止由 `openAgentService.test.js` 回归。
+
+密码找回由 `services/passwordResetService.js` 处理，使用独立于注册的挑战表、持久配额和SQLite单例写锁；公开发码响应不泄露账号存在性，成功消费与改密、会话版本撤销和审计同事务。`middleware/auth.js` 每请求实时校验状态及版本；`utils/passwordPolicy.js` 统一新密码策略。真实HTTP/SQLite及跨进程消费覆盖在 `integration/password-recovery.integration.js`，浏览器真实后端夹具在 `testHelpers/`，详细约束见 `docs/security/password-recovery.md`。

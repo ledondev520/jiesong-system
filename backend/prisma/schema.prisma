@@ -1,5 +1,5 @@
 // Input: 数据库设计文档 (docs/数据库设计.md)
-// Output: Prisma ORM 数据模型定义
+// Output: Prisma ORM 数据模型定义，含持久密码找回挑战和会话撤销版本
 // Pos: 数据层核心Schema，定义所有实体及关系
 // Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 // 
@@ -40,10 +40,38 @@ model EmailRegistrationChallenge {
   @@map("email_registration_challenges")
 }
 
+// SQLite singleton writer lock; seeded by the additive recovery migration.
+model PasswordResetLock {
+  id Int @id
+
+  @@map("password_reset_lock")
+}
+
+// Restricted: keyed hashes only; unknown addresses reserve the same quotas.
+model PasswordResetChallenge {
+  id             String   @id
+  email          String
+  requesterHash  String
+  userId         String?
+  sessionVersion Int      @default(0)
+  codeHash       String
+  expiresAt      DateTime
+  attempts       Int      @default(0)
+  ready          Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([requesterHash, createdAt])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("password_reset_challenges")
+}
+
 model User {
   id          String    @id @default(cuid())
   username    String    @unique
   password    String
+  sessionVersion Int    @default(0)
   name        String
   role        String    @default("SALES") // ADMIN, BOSS(业务只读), PURCHASE, SALES, FINANCE, WAREHOUSE
   email       String?

@@ -120,3 +120,11 @@
 - 注册邮箱作为用户名，登录兼容原用户名；管理员创建用户仍需ADMIN。邮件正文、验证码与云服务响应正文不得进入日志。验证码记录超过24小时后在下一次发码时清理。
 - RBAC 路由扫描仅明确豁免登录前的 `/auth/email-code` 与 `/auth/email-register`；回归检查它们保留限流及校验，`/auth/register` 继续要求认证和ADMIN。
 - `frontend/src/app/dashboard/users/components/UserDialog.tsx` 提供管理员账号开通开关；两套用户更新入口更新状态或角色后立即清除认证缓存，避免停用/改权延迟。
+
+## 密码找回与会话撤销
+- `backend/src/services/passwordResetService.js` 仅验证唯一绑定且激活账号的邮箱 OTP，不从用户名推导邮箱、不使用手机号比对；未知/停用/重复邮箱返回相同发码响应并预留同样的持久配额。旧无邮箱账号须由管理员离线核实身份后，经现有 ADMIN 接口设置密码或绑定可信邮箱，禁止公开绕过。
+- `password_reset_lock` 单例行在增量迁移中初始化。SQLite 事务先获取写锁再检查配额/尝试，跨进程串行化；缺失锁行或数据库异常默认拒绝。验证码10分钟、5次验证，重发60秒，每邮箱5次/小时、每IP10次/小时、全站60次/小时；发信失败/不确定仍计数且不可消费。未知邮箱同样受限，超过24小时的记录在下次发码清理。
+- HTTP 发码不等待邮箱服务，避免邮件耗时泄露账号存在性；后台单次 DirectMail 发送确认后才激活验证码，没有自动重试或持久投递队列。进程退出/发送不确定时需用户冷却后重新发码，不可放宽验证。
+- 消费验证码、更新密码、递增 `User.sessionVersion`、清除该账号其他验证码及最小审计元数据在同一事务中完成。`backend/src/middleware/auth.js` 每请求实时读取状态和版本，旧无版本JWT按0兼容但首次改密后永久失效；Agent credential 流程保持独立。认证缓存失效 API 保留兼容入口，用户认证不再依赖60秒缓存。
+- 新密码统一至少8个Unicode字符且UTF-8不超过bcrypt的72字节上限，覆盖注册、管理员创建/重设、已登录修改及找回；旧密码登录规则不变。前后端策略文件分别为 `backend/src/utils/passwordPolicy.js` 和 `frontend/src/lib/password-policy.ts`，修改时必须一起调整边界测试。
+- 禁止打印验证码、密码/哈希、收件人、云服务响应正文；Prisma关闭原始query/error输出以避免参数泄露（`backend/src/utils/prisma.js`）。隔离回归见 `backend/src/integration/password-recovery.integration.js`、`frontend/e2e/password-recovery.spec.ts`。

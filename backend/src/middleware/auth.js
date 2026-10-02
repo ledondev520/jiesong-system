@@ -1,6 +1,6 @@
 /**
  * Input: JWT Token, 用户角色
- * Output: 认证/授权结果
+ * Output: 实时用户状态与会话版本认证/授权结果
  * Pos: 认证授权中间件，保护API路由
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -14,47 +14,9 @@ const { roleAuth, adminOnly } = require('./roleAuth');
 const prisma = require('../utils/prisma');
 const { parseAgentBearerToken, verifyAgentSecret } = require('../utils/agentCredentials');
 
-/**
- * 认证用户信息内存缓存（LRU 简化实现）
- * - Key: userId（string）
- * - Value: { user, expiresAt }
- * - TTL: 60s（与 JWT 有效期相比极短，仅用于降低 DB 频率）
- * - 容量: 1000 条（超出按 FIFO 淘汰）
- *
- * 安全说明：
- *   用户被禁用（isActive=false）时，最多延迟 60s 才失效。
- *   如需即时踢出，可在禁用时调用 clearAuthCache(userId)。
- */
-const AUTH_CACHE_TTL_MS = 60 * 1000;
-const AUTH_CACHE_MAX_SIZE = 1000;
-const authCache = new Map();
-
-const getCachedUser = (userId) => {
-  const entry = authCache.get(userId);
-  if (!entry) return null;
-  if (entry.expiresAt <= Date.now()) {
-    authCache.delete(userId);
-    return null;
-  }
-  return entry.user;
-};
-
-const setCachedUser = (userId, user) => {
-  // 简单 FIFO 淘汰：超过容量时删最旧的 key
-  if (authCache.size >= AUTH_CACHE_MAX_SIZE) {
-    const oldestKey = authCache.keys().next().value;
-    if (oldestKey) authCache.delete(oldestKey);
-  }
-  authCache.set(userId, { user, expiresAt: Date.now() + AUTH_CACHE_TTL_MS });
-};
-
-/**
- * 职责：主动清除某用户的认证缓存（适用于禁用/修改角色等场景）
- * @param {string} userId
- */
-const clearAuthCache = (userId) => {
-  if (userId) authCache.delete(userId);
-};
+// Authentication state is read from SQLite on every request, across all workers.
+// Retain the exported invalidation API for existing user-management callers.
+const clearAuthCache = () => {};
 
 const attachUserActor = (req, user) => {
   req.user = user;
@@ -176,40 +138,22 @@ const authenticate = async (req, res, next) => {
       throw createError('无效的Token', 401);
     }
     
-    // 3. 查询用户（优先读缓存，降低 DB 频率）
-    let user = getCachedUser(decoded.userId);
-
-    if (!user) {
-      user = await prisma.user.findUnique({
-        where: { id: decoded.userId },
-        select: {
-          id: true,
-          username: true,
-          name: true,
-          role: true,
-          isActive: true,
-        },
-      });
-
-      if (!user) {
-        throw createError('用户不存在', 401);
-      }
-
-      if (!user.isActive) {
-        // 被禁用的用户不写入缓存，每次都打 DB 确保即时拦截
-        throw createError('用户已被禁用', 401);
-      }
-
-      setCachedUser(decoded.userId, user);
+    // Live reads are required for immediate revocation; cached versions permit old JWTs.
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { id: true, username: true, name: true, role: true, isActive: true, sessionVersion: true },
+    });
+    if (!user) throw createError('用户不存在', 401);
+    if (!user.isActive) throw createError('用户已被禁用', 401);
+    // Pre-migration JWTs have version 0; the first password change permanently revokes them.
+    const version = decoded.sessionVersion === undefined ? 0 : decoded.sessionVersion;
+    if (!Number.isSafeInteger(version) || version < 0 || version !== user.sessionVersion) {
+      throw createError('登录已失效，请重新登录', 401);
     }
+    const { sessionVersion: _version, ...publicUser } = user;
 
-    if (!user.isActive) {
-      clearAuthCache(decoded.userId);
-      throw createError('用户已被禁用', 401);
-    }
-    
     // 4. 附加用户信息
-    attachUserActor(req, user);
+    attachUserActor(req, publicUser);
     enforceBossReadOnly(req);
     next();
   } catch (error) {

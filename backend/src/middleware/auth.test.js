@@ -150,6 +150,7 @@ test('authenticate: Bearer JWT 用户令牌认证成功后附加 user 与 authAc
     name: '管理员',
     role: 'ADMIN',
     isActive: true,
+    sessionVersion: 0,
   });
 
   try {
@@ -233,7 +234,7 @@ test('BOSS以数据库角色判定：拒绝业务/AI/MCP写及生成文件GET，
   const original = prisma.user.findUnique;
   const id = 'boss-synthetic-role-test';
   const token = jwt.sign({ userId: id, role: 'ADMIN' }, config.jwt.secret);
-  prisma.user.findUnique = async () => ({ id, role: 'BOSS', isActive: true });
+  prisma.user.findUnique = async () => ({ id, role: 'BOSS', isActive: true, sessionVersion: 0 });
   try {
     for (const [method, path, allowed] of [
       ['GET', '/api/v1/reports/business-overview', true], ['GET', '/api/v1/finance/stats', true],

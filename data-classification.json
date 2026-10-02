@@ -21,7 +21,8 @@
         "supplier bank account names, account numbers, branches, and bank routing codes",
         "company bank statements, transaction identifiers, account balances, and even masked account identifiers when combined with transaction rows",
         "carrier packing-list originals and persistent packing-list review records",
-        "email verification code hashes and Alibaba Cloud mail credentials"
+        "email verification code hashes and Alibaba Cloud mail credentials",
+        "password reset code hashes, bound recovery email and persistent requester HMAC digests"
       ],
       "controls": {
         "storage": [
@@ -45,7 +46,8 @@
           "Ordinary frontend requests and protected Next proxy downloads share API base parsing; bare origins gain /api/v1 while explicit API paths are retained without duplication",
           "Purchase/inspection inventory cannot be manually transitioned through normal, bulk or AI endpoints; execution rechecks provenance and same-status requests preserve inventory timestamps",
           "VPS runtime migration backups keep private environment files and SQLite snapshots in 0700 directories with 0600 files; deployment verification never prints process environments or credentials",
-          "Environment file permissions are checked before loading mail credentials; email registration uses keyed hashes, persistent send quotas and single-use verification; new users remain inactive until administrator approval; user updates clear authentication caches immediately (backend/src/services/emailRegistrationService.js)"
+          "Environment file permissions are checked before loading mail credentials; email registration uses keyed hashes, persistent send quotas and single-use verification; new users remain inactive until administrator approval; user updates clear authentication caches immediately (backend/src/services/emailRegistrationService.js)",
+          "Email password recovery uses domain-separated keyed hashes, persistent cross-worker quotas and atomic single-use consumption; live sessionVersion checks immediately revoke old JWTs after any password write; unknown/disabled/ambiguous/legacy-without-email accounts never bypass proof of ownership; raw Prisma query/error logging is disabled"
         ],
         "transfer": [
           "Encrypt in transit (TLS)",
@@ -59,7 +61,9 @@
         "backend/uploads/",
         "/opt/jiesong_system/deploy-backups/",
         "backend/src/services/emailService.js",
-        "backend/src/services/emailRegistrationService.js"
+        "backend/src/services/emailRegistrationService.js",
+        "backend/src/services/passwordResetService.js",
+        "backend/prisma/migrations/20261002113919_email_password_recovery/"
       ]
     },
     {
