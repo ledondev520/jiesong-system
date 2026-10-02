@@ -1,3 +1,9 @@
+/**
+ * Input: 合成 API 夹具与手机、平板、桌面视口
+ * Output: 页面可达、延迟账簿内部滚动、注册申请及核心交互验收
+ * Pos: Playwright 移动端回归，保持运行时异常与整页宽度检查
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
 import { expect, test, type Page } from '@playwright/test';
 import { mockApiRoutes, signInAsAdmin } from './helpers';
 
@@ -46,6 +52,9 @@ for (const width of [320, 390, 430]) {
           await expect(page.locator('main').first()).not.toBeEmpty();
           await expect(page.getByText('页面出现异常')).toHaveCount(0);
           await page.waitForLoadState('networkidle');
+          if (route === '/dashboard/finance/statements') {
+            await expect(page.getByTestId('financial-statements-drilldowns')).toBeVisible();
+          }
           await expectFitsViewport(page);
           if (width === 390) await page.screenshot({ path: test.info().outputPath(route.replaceAll('/', '-').replaceAll('?', '-') + '.png') });
         });
@@ -83,6 +92,23 @@ for (const width of [320, 390, 430]) {
       await expect(save).toBeInViewport();
       await expectFitsViewport(page);
     });
+
+    test('财务明细加载后宽账簿在卡片内滚动', async ({ page }) => {
+      await signInAsAdmin(page, '/dashboard/finance/statements');
+      await expect(page.getByTestId('financial-statements-drilldowns')).toBeVisible();
+      const ledger = page.locator('#finance-period-detail table').last();
+      await expect(ledger).toBeVisible();
+      const container = await ledger.evaluate((table) => {
+        const scroller = table.parentElement!;
+        const bounds = scroller.getBoundingClientRect();
+        scroller.scrollLeft = scroller.scrollWidth;
+        return { left: bounds.left, right: bounds.right, scrollLeft: scroller.scrollLeft };
+      });
+      expect(container.left).toBeGreaterThanOrEqual(0);
+      expect(container.right).toBeLessThanOrEqual(width);
+      expect(container.scrollLeft).toBeGreaterThan(0);
+      await expectFitsViewport(page);
+    });
   });
 }
 
@@ -93,8 +119,25 @@ test.describe('手机核心操作', () => {
   test('登录、公共页面与退出', async ({ page }) => {
     for (const route of ['/login', '/register', '/forgot-password']) {
       await page.goto(route);
-      if (route === '/register') await expect(page.getByText('账号注册已关闭')).toBeVisible();
-      else await expect(page.locator('form')).toBeVisible();
+      await expect(page.locator('form')).toBeVisible();
+      if (route === '/register') {
+        await expect(page.getByText('邮箱注册', { exact: true })).toBeVisible();
+        await page.getByLabel('邮箱', { exact: true }).fill('mobile@example.com');
+        const sent = page.waitForRequest((request) => new URL(request.url()).pathname === '/api/v1/auth/email-code' && request.method() === 'POST');
+        await page.getByRole('button', { name: '获取验证码', exact: true }).click();
+        expect((await sent).postDataJSON()).toEqual({ email: 'mobile@example.com' });
+        await expect(page.getByRole('status')).toContainText('验证码已发送');
+        await expect(page.getByRole('button', { name: /秒后重发/ })).toBeDisabled();
+        await page.getByLabel('邮箱验证码', { exact: true }).fill('123456');
+        await page.getByLabel('姓名', { exact: true }).fill('合成手机测试');
+        await page.getByLabel('密码', { exact: true }).fill('non-production-preview');
+        const submitted = page.waitForRequest((request) => new URL(request.url()).pathname === '/api/v1/auth/email-register' && request.method() === 'POST');
+        await page.getByRole('button', { name: '注册并申请开通', exact: true }).click();
+        expect((await submitted).postDataJSON()).toMatchObject({ email: 'mobile@example.com', code: '123456', name: '合成手机测试' });
+        await expect(page.getByText('注册申请已提交', { exact: true })).toBeVisible();
+        await expect(page.getByText('请联系管理员审核开通，开通后可用邮箱和密码登录。')).toBeVisible();
+        expect(await page.evaluate(() => sessionStorage.getItem('jiesong_access_token'))).toBeNull();
+      }
       await expectFitsViewport(page);
     }
     await page.goto('/login');

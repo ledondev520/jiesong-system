@@ -1,4 +1,11 @@
+/**
+ * Input: Playwright 页面与业务服务 DTO
+ * Output: 合成 API 夹具、认证会话与页面异常断言
+ * Pos: 浏览器验收共用辅助；注册仅申请审核，采购汇总遵循 receipts DTO
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
 import { expect, type Page, type Route } from '@playwright/test';
+import type { PurchaseReceiptList } from '../src/services/purchaseReceipt.service';
 
 const now = '2026-03-01T08:00:00.000Z';
 
@@ -244,6 +251,30 @@ export const mockApiRoutes = async (page: Page) => {
         unitPrice: 1000,
       },
     ],
+  };
+
+  // 与真实 receipts DTO 对齐，不能使用未知接口的空分页回退冒充验货汇总。
+  const purchaseReceipts: PurchaseReceiptList = {
+    ...asPaginated([], 1, 20),
+    status: purchaseContract.status,
+    summary: {
+      legacy: false,
+      complete: false,
+      canReceive: false,
+      totals: { orderedQuantity: 120, arrivedQuantity: 0, acceptedQuantity: 0, pendingQuantity: 0, reinspectionQuantity: 0 },
+      items: purchaseContract.items.map((item) => ({
+        purchaseItemId: item.id,
+        productId: item.product.id,
+        productName: item.product.customsName,
+        unit: item.product.unit,
+        orderedQuantity: item.quantity,
+        arrivedQuantity: 0,
+        acceptedQuantity: 0,
+        pendingQuantity: 0,
+        reinspectionQuantity: 0,
+        remainingQuantity: item.quantity,
+      })),
+    },
   };
 
   const salesContract = {
@@ -495,6 +526,17 @@ export const mockApiRoutes = async (page: Page) => {
         user: mockUser,
         token: mockToken,
       });
+      return;
+    }
+
+    if (pathname === '/api/v1/auth/email-code' && method === 'POST') {
+      await fulfillJson(route, { cooldownSeconds: 60 });
+      return;
+    }
+
+    if (pathname === '/api/v1/auth/email-register' && method === 'POST') {
+      // 合成注册结果只表示待审核，不能返回登录令牌或已开通权限。
+      await fulfillJson(route, { pendingApproval: true });
       return;
     }
 
@@ -751,6 +793,13 @@ export const mockApiRoutes = async (page: Page) => {
 
     if (/^\/api\/v1\/purchases\/[^/]+$/.test(pathname) && method === 'GET') {
       await fulfillJson(route, purchaseContract);
+      return;
+    }
+
+    if (/^\/api\/v1\/purchases\/[^/]+\/receipts$/.test(pathname) && method === 'GET') {
+      const pageNumber = Number(searchParams.get('page') || 1);
+      const pageSize = Number(searchParams.get('pageSize') || 20);
+      await fulfillJson(route, { ...purchaseReceipts, pagination: buildPagination(0, pageNumber, pageSize) });
       return;
     }
 

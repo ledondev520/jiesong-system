@@ -1,6 +1,6 @@
 /**
  * Input: 财务趋势、账期列表与当前详情
- * Output: 财务总览页内下钻图表区与历史预警区
+ * Output: 财务页内下钻图表、卡片内滚动的宽账簿与历史预警区
  * Pos: 财务报表主分析区
  */
 
@@ -682,8 +682,9 @@ export function FinancialStatementsTabsSection({
                 加载账期详情...
               </div>
             ) : currentDetail ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                <Card>
+              /* 手机使用明确的 minmax(0, 1fr) 列；宽账簿只在自身容器内滚动。 */
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Card className="min-w-0">
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
                       <span className="flex items-center gap-2">
@@ -702,7 +703,7 @@ export function FinancialStatementsTabsSection({
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="min-w-0">
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
                       <span className="flex items-center gap-2">
@@ -721,7 +722,7 @@ export function FinancialStatementsTabsSection({
                   </CardContent>
                 </Card>
 
-                <Card className="md:col-span-2">
+                <Card className="min-w-0 md:col-span-2">
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
                       <span className="flex items-center gap-2"><Wallet className="h-5 w-5 text-primary" />现金流量表</span>
@@ -733,7 +734,7 @@ export function FinancialStatementsTabsSection({
                   </CardContent>
                 </Card>
 
-                {!readOnly && (<Card className="md:col-span-2">
+                {!readOnly && (<Card className="min-w-0 md:col-span-2">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2"><Scale className="h-5 w-5 text-primary" />科目余额表（{currentDetail.accountBalances?.length ?? 0} 行）</CardTitle>
                   </CardHeader>
@@ -742,7 +743,7 @@ export function FinancialStatementsTabsSection({
                   </CardContent>
                 </Card>)}
 
-                {!readOnly && (<Card className="md:col-span-2">
+                {!readOnly && (<Card className="min-w-0 md:col-span-2">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-primary" />明细账（{currentDetail.generalLedgerEntries?.length ?? 0} 行）</CardTitle>
                   </CardHeader>
@@ -751,7 +752,7 @@ export function FinancialStatementsTabsSection({
                   </CardContent>
                 </Card>)}
 
-                {!readOnly && (<Card className="md:col-span-2">
+                {!readOnly && (<Card className="min-w-0 md:col-span-2">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2"><FileCheck2 className="h-5 w-5 text-primary" />来源校验（{currentDetail.dataSources?.length ?? 0} 份）</CardTitle>
                     <CardDescription>保留文件名、行数、大小和摘要，用于追溯本账期数据来源。</CardDescription>
