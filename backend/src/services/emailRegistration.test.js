@@ -10,7 +10,7 @@ test('阿里云发信仅提交一封验证码邮件，失败不泄露上游内�
   process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET = crypto.randomBytes(32).toString('hex');
   process.env.JIESONG_EMAIL_FROM = 'login@example.com';
   const mail = require('./emailService');
-  let calls = 0; let fail = false;
+  let calls = 0; let fail = false; let reset = false;
   t.mock.method(global, 'fetch', async (url, options) => {
     calls++;
     if (fail) throw new Error('private-provider-details');
@@ -19,17 +19,23 @@ test('阿里云发信仅提交一封验证码邮件，失败不泄露上游内�
     assert.equal(body.get('ToAddress'), 'new@example.com');
     assert.equal(body.get('FromAlias'), '捷淞');
     assert.equal(body.get('Action'), 'SingleSendMail');
+    assert.equal(body.get('Subject'), reset ? '捷淞密码重置验证码' : '捷淞邮箱注册验证码');
+    assert.ok(body.get('TextBody').includes(reset ? '已有登录会话将失效' : '管理员审核'));
+    if (reset) assert.equal(body.get('TextBody').includes('注册后需'), false);
     assert.ok(body.get('Signature'));
     return { ok: true, json: async () => ({ RequestId: 'test', EnvId: 'test' }) };
   });
   await mail.sendRegistrationCode('new@example.com', '123456', crypto.randomUUID());
   assert.equal(calls, 1);
+  reset = true;
+  await mail.sendPasswordResetCode('new@example.com', '123456', crypto.randomUUID());
+  assert.equal(calls, 2);
   fail = true;
   await assert.rejects(mail.sendRegistrationCode('new@example.com', '123456', crypto.randomUUID()), /验证码发送未确认/);
-  assert.equal(calls, 2);
+  assert.equal(calls, 3);
   delete process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET;
   await assert.rejects(mail.sendRegistrationCode('new@example.com', '123456', crypto.randomUUID()), /服务暂不可用/);
-  assert.equal(calls, 2);
+  assert.equal(calls, 3);
 });
 
 test('真实 SQLite：限制验证码尝试、过期和重放；新账号待审核，审核后邮箱登录', async (t) => {
@@ -42,7 +48,8 @@ test('真实 SQLite：限制验证码尝试、过期和重放；新账号待审�
   process.env.JWT_SECRET = crypto.randomBytes(32).toString('hex');
   const migrations = path.resolve(__dirname, '../../prisma/migrations');
   const baseline = fs.readFileSync(path.join(migrations, '20260307090000_baseline/migration.sql'), 'utf8').split(';')[0] + ';';
-  const migration = fs.readFileSync(path.join(migrations, '20261001163213_email_registration/migration.sql'), 'utf8');
+  const migration = fs.readFileSync(path.join(migrations, '20261001163213_email_registration/migration.sql'), 'utf8')
+    + fs.readFileSync(path.join(migrations, '20261002113919_email_password_recovery/migration.sql'), 'utf8');
   execFileSync('sqlite3', [path.join(dir, 'test.db')], { input: baseline + '\nCREATE UNIQUE INDEX users_username_key ON users(username);\n' + migration });
   fs.chmodSync(path.join(dir, 'test.db'), 0o600);
   const prisma = require('../utils/prisma');

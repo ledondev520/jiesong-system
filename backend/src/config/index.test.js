@@ -131,3 +131,13 @@ test('config: 生产环境先验证文件权限，再读取环境密钥', () => 
   assert.throws(() => vm.runInNewContext(fs.readFileSync(path.join(__dirname, 'index.js'), 'utf8'), context), /权限过宽/);
   assert.equal(environmentReads, 0);
 });
+
+test('config: 代理信任默认关闭，仅接受明确 IP/CIDR，非法配置启动拒绝', () => {
+  const base = { JWT_SECRET: 'test-only-jwt-secret-for-ci-123456', TRUSTED_PROXY_CIDRS: '' };
+  assert.deepEqual(loadConfigWithEnv(base).trustedProxyCidrs, []);
+  assert.deepEqual(loadConfigWithEnv({ ...base, TRUSTED_PROXY_CIDRS: '127.0.0.1/32, ::1/128,127.0.0.1/32' }).trustedProxyCidrs,
+    ['127.0.0.1/32', '::1/128']);
+  for (const value of ['true', '1', 'loopback', '*', '0.0.0.0/0', '::/0', '127.0.0.1/33', '::1/129', '127.0.0.1/', '127.0.0.1,,::1', 'not-an-ip']) {
+    assert.throws(() => loadConfigWithEnv({ ...base, TRUSTED_PROXY_CIDRS: value }), /TRUSTED_PROXY_CIDRS/);
+  }
+});

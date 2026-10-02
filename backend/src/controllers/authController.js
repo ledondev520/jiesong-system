@@ -141,15 +141,15 @@ const updateUser = async (req, res, next) => {
 };
 
 /**
- * 职责：找回密码（通过用户名+手机号验证身份后重置密码）
+ * 职责：找回密码（验证绑定邮箱验证码并撤销已有会话）
  * @param {Request} req - Express请求对象
  * @param {Response} res - Express响应对象
  * @param {NextFunction} next - 下一个中间件
  */
 const resetPassword = async (req, res, next) => {
   try {
-    const { username, phone, newPassword } = req.body;
-    const result = await authService.verifyAndResetPassword(username, phone, newPassword);
+    const { email, code, newPassword } = req.body;
+    const result = await authService.verifyAndResetPassword({ email, code, newPassword });
     success(res, result, '密码重置成功，请使用新密码登录');
   } catch (error) {
     next(error);

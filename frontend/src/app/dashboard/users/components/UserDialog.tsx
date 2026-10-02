@@ -1,9 +1,10 @@
-'use client';
+"use client";
 
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { User, Role } from '@/types';
+import { isValidPassword, PASSWORD_MESSAGE } from "@/lib/password-policy";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { User, Role } from "@/types";
 import {
   Dialog,
   DialogContent,
@@ -11,10 +12,10 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Form,
   FormControl,
@@ -22,19 +23,22 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
+} from "@/components/ui/form";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 
 const userSchema = z.object({
-  username: z.string().min(1, '用户名必填'),
-  name: z.string().min(1, '姓名必填'),
-  password: z.string().optional(), // Optional for edit
+  username: z.string().min(1, "用户名必填"),
+  name: z.string().min(1, "姓名必填"),
+  password: z
+    .string()
+    .refine((value) => !value || isValidPassword(value), PASSWORD_MESSAGE)
+    .optional(), // Empty only for edit
   role: z.nativeEnum(Role),
   isActive: z.boolean(),
 });
@@ -57,22 +61,28 @@ export function UserDialog({
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userSchema),
     defaultValues: {
-      username: '',
-      name: '',
-      password: '',
+      username: "",
+      name: "",
+      password: "",
       role: Role.SALES,
       isActive: true,
     },
-    values: user ? {
-      username: user.username,
-      name: user.name,
-      password: '',
-      role: user.role,
-      isActive: user.isActive,
-    } : undefined,
+    values: user
+      ? {
+          username: user.username,
+          name: user.name,
+          password: "",
+          role: user.role,
+          isActive: user.isActive,
+        }
+      : undefined,
   });
 
   const handleSubmit = async (data: UserFormValues) => {
+    if (!user && !data.password) {
+      form.setError("password", { message: PASSWORD_MESSAGE });
+      return;
+    }
     await onSubmit(data);
     form.reset();
   };
@@ -81,11 +91,16 @@ export function UserDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{user ? '编辑用户' : '新增用户'}</DialogTitle>
-          <DialogDescription>核对身份与角色权限，管理账号的登录资格。</DialogDescription>
+          <DialogTitle>{user ? "编辑用户" : "新增用户"}</DialogTitle>
+          <DialogDescription>
+            核对身份与角色权限，管理账号的登录资格。
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form
+            onSubmit={form.handleSubmit(handleSubmit)}
+            className="space-y-4"
+          >
             <FormField
               control={form.control}
               name="username"
@@ -93,7 +108,11 @@ export function UserDialog({
                 <FormItem>
                   <FormLabel>用户名 (登录账号)</FormLabel>
                   <FormControl>
-                    <Input placeholder="例如: admin" {...field} disabled={!!user} />
+                    <Input
+                      placeholder="例如: admin"
+                      {...field}
+                      disabled={!!user}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -117,9 +136,13 @@ export function UserDialog({
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>密码 {user && '(留空则不修改)'}</FormLabel>
+                  <FormLabel>密码 {user && "(留空则不修改)"}</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="******" {...field} />
+                    <Input
+                      type="password"
+                      placeholder="至少8个字符，最多72字节"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -131,15 +154,22 @@ export function UserDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>角色权限</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="选择角色" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value={Role.BOSS}>老板（业务只读）</SelectItem>
-                      <SelectItem value={Role.ADMIN}>管理员 (所有权限)</SelectItem>
+                      <SelectItem value={Role.BOSS}>
+                        老板（业务只读）
+                      </SelectItem>
+                      <SelectItem value={Role.ADMIN}>
+                        管理员 (所有权限)
+                      </SelectItem>
                       <SelectItem value={Role.PURCHASE}>采购人员</SelectItem>
                       <SelectItem value={Role.SALES}>销售人员</SelectItem>
                       <SelectItem value={Role.FINANCE}>财务人员</SelectItem>
@@ -150,15 +180,36 @@ export function UserDialog({
                 </FormItem>
               )}
             />
-            {user && <FormField control={form.control} name="isActive" render={({ field }) => (
-              <FormItem className="flex items-center justify-between gap-4 rounded-lg border p-3">
-                <div><FormLabel>账号开通</FormLabel><p className="mt-1 text-xs text-muted-foreground">确认身份与角色后开启，关闭后无法登录。</p></div>
-                <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-              </FormItem>
-            )} />}
+            {user && (
+              <FormField
+                control={form.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                    <div>
+                      <FormLabel>账号开通</FormLabel>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        确认身份与角色后开启，关闭后无法登录。
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            )}
             <DialogFooter>
-              <Button type="submit" disabled={!form.formState.isValid || form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? '保存中...' : '保存'}
+              <Button
+                type="submit"
+                disabled={
+                  !form.formState.isValid || form.formState.isSubmitting
+                }
+              >
+                {form.formState.isSubmitting ? "保存中..." : "保存"}
               </Button>
             </DialogFooter>
           </form>

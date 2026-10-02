@@ -1,5 +1,5 @@
-import api from '@/lib/axios';
-import type { ApiResponse, User } from '@/types';
+import api from "@/lib/axios";
+import type { ApiResponse, User } from "@/types";
 
 export interface LoginCredentials {
   username: string;
@@ -7,8 +7,8 @@ export interface LoginCredentials {
 }
 
 export interface ResetPasswordPayload {
-  username: string;
-  phone: string;
+  email: string;
+  code: string;
   newPassword: string;
 }
 
@@ -18,13 +18,27 @@ export interface LoginResponse {
 }
 
 export const authService = {
-  sendEmailCode: (email: string) => api.post('/auth/email-code', { email }),
-  registerEmail: (payload: { email: string; code: string; name: string; password: string }) => api.post('/auth/email-register', payload),
+  sendResetPasswordCode: (email: string) =>
+    api.post("/auth/reset-password-code", { email }),
+  sendEmailCode: (email: string) => api.post("/auth/email-code", { email }),
+  registerEmail: (payload: {
+    email: string;
+    code: string;
+    name: string;
+    password: string;
+  }) => api.post("/auth/email-register", payload),
   login: async (payload: LoginCredentials) => {
-    return api.post<ApiResponse<LoginResponse>, ApiResponse<LoginResponse>, LoginCredentials>('/auth/login', payload);
+    return api.post<
+      ApiResponse<LoginResponse>,
+      ApiResponse<LoginResponse>,
+      LoginCredentials
+    >("/auth/login", payload);
   },
 
   resetPassword: async (payload: ResetPasswordPayload) => {
-    return api.post<ApiResponse<null>, ApiResponse<null>, ResetPasswordPayload>('/auth/reset-password', payload);
+    return api.post<ApiResponse<null>, ApiResponse<null>, ResetPasswordPayload>(
+      "/auth/reset-password",
+      payload,
+    );
   },
 };

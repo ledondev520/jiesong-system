@@ -1,6 +1,6 @@
 /**
  * Input: 环境变量 (.env)
- * Output: 统一配置对象（含 JWT、活动 AI/Kimi、HSCIQ、上传、CORS 配置）
+ * Output: 统一配置对象（含显式代理白名单、JWT、活动 AI/Kimi、HSCIQ、上传、CORS 配置）
  * Pos: 配置中心，集中管理所有环境变量
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -9,6 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
+const { parseTrustedProxyCidrs } = require('./trustedProxies');
 
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
 const ENV_PATH = path.join(PROJECT_ROOT, '.env');
@@ -111,6 +112,7 @@ const config = {
   // 服务器配置
   port: parseInt(process.env.PORT, 10) || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
+  trustedProxyCidrs: parseTrustedProxyCidrs(process.env.TRUSTED_PROXY_CIDRS || ''),
   
   // JWT配置
   jwt: {
