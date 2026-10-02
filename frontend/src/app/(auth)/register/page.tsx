@@ -1,47 +1,73 @@
-/**
- * Input: 注册API
- * Output: 邀请制注册说明页
- * Pos: 认证模块，处理新用户注册
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
- */
-
+/** Input: email registration API; Output: verified account pending administrator approval. */
 'use client';
 
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { authService } from '@/services/auth.service';
 
 export default function RegisterPage() {
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [sending, setSending] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [done, setDone] = useState(false);
+  const emailInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!seconds) return;
+    const timer = setTimeout(() => setSeconds(seconds - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [seconds]);
+  const sendCode = async () => {
+    if (!emailInput.current?.reportValidity()) return;
+    setSending(true); setError(''); setNotice('');
+    try {
+      await authService.sendEmailCode(email.trim().toLowerCase());
+      setSeconds(60); setNotice('验证码已发送，10分钟内有效；未收到可查看垃圾邮件。');
+    } catch (error) { setError(error && typeof error === 'object' && 'message' in error ? String(error.message) : '发送失败，请稍后重试'); }
+    finally { setSending(false); }
+  };
+  const submit = async (event: FormEvent) => {
+    event.preventDefault(); setSubmitting(true); setError('');
+    try {
+      await authService.registerEmail({ email: email.trim().toLowerCase(), name: name.trim(), password, code });
+      setPassword(''); setCode(''); setDone(true);
+    } catch (error) { setError(error && typeof error === 'object' && 'message' in error ? String(error.message) : '注册失败，请稍后重试'); }
+    finally { setSubmitting(false); }
+  };
   return (
     <div className="auth-shell">
       <Card className="auth-card">
         <CardHeader>
-          <CardTitle>账号注册已关闭</CardTitle>
-          <CardDescription>
-            系统当前采用“管理员邀请注册”模式
-          </CardDescription>
+          <CardTitle>{done ? '注册申请已提交' : '邮箱注册'}</CardTitle>
+          <CardDescription>{done ? '请联系管理员审核开通，开通后可用邮箱和密码登录。' : '验证邮箱并设置密码，管理员审核后即可使用。'}</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4 rounded-lg border border-muted bg-muted/20 p-4 text-sm text-muted-foreground">
-            <p>
-              为了保障系统安全，捷淞进销存系统采用管理员邀请制注册。
-            </p>
-            <p>
-              请联系系统管理员，由管理员在后台创建新账号后再登录。
-            </p>
-            <p>
-              如需开通账号，请说明您的姓名、部门及联系方式。
-            </p>
-          </div>
-        </CardContent>
-        <CardFooter className="flex flex-col gap-2">
-          <Button asChild className="h-10 w-full rounded-xl">
-            <Link href="/login">
-              返回登录
-            </Link>
-          </Button>
-        </CardFooter>
+        {!done && <CardContent>
+          <form onSubmit={submit} className="space-y-4">
+            <div className="space-y-2"><Label htmlFor="email">邮箱</Label>
+              <Input ref={emailInput} id="email" type="email" autoComplete="email" required maxLength={254} value={email} disabled={sending || submitting} onChange={(e) => { setEmail(e.target.value); setCode(''); setNotice(''); }} placeholder="请输入邮箱地址" />
+            </div>
+            <div className="space-y-2"><Label htmlFor="code">邮箱验证码</Label>
+              <div className="flex gap-2"><Input id="code" className="min-w-0" inputMode="numeric" autoComplete="one-time-code" required pattern="[0-9]{6}" maxLength={6} value={code} onChange={(e) => setCode(e.target.value)} placeholder="6位验证码" />
+                <Button type="button" variant="outline" className="shrink-0" disabled={sending || submitting || seconds > 0} onClick={sendCode}>{sending ? '发送中…' : seconds ? `${seconds}秒后重发` : '获取验证码'}</Button>
+              </div>
+            </div>
+            <div className="space-y-2"><Label htmlFor="name">姓名</Label><Input id="name" autoComplete="name" required maxLength={50} value={name} onChange={(e) => setName(e.target.value)} placeholder="便于管理员确认身份" /></div>
+            <div className="space-y-2"><Label htmlFor="password">密码</Label><Input id="password" type="password" autoComplete="new-password" required minLength={8} maxLength={72} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="至少8位" /></div>
+            {notice && <p role="status" className="text-sm text-muted-foreground">{notice}</p>}
+            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+            <Button type="submit" className="w-full" disabled={submitting || sending}>{submitting ? '提交中…' : '注册并申请开通'}</Button>
+          </form>
+        </CardContent>}
+        <CardFooter><Button asChild variant="ghost" className="w-full"><Link href="/login">返回登录</Link></Button></CardFooter>
       </Card>
     </div>
   );

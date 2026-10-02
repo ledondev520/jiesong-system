@@ -11,7 +11,7 @@ GitHub Actions 工作流配置，实现完整的自动化开发循环。
 | **PR Review** | `pr-review.yml` | PR | PR 代码审查 |
 | **Security** | `security.yml` | PR / Weekly | 安全扫描 |
 | **Weekly Retro** | `weekly-retro.yml` | Weekly | 每周工程回顾 |
-| **Deploy** | `deploy.yml` | Tag / Manual | 部署工作流 |
+| **Deploy** | `deploy.yml` | main Push / Tag / Manual | 部署并核对 PM2 运行目录与公网构建 |
 
 ## 🔄 流程图
 
@@ -94,3 +94,5 @@ act -j test
 [![QA](https://github.com/OWNER/REPO/actions/workflows/qa.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/qa.yml)
 [![Security](https://github.com/OWNER/REPO/actions/workflows/security.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/security.yml)
 ```
+
+发布流程固定触发提交 SHA，并以 `scripts/verify-vps-runtime.cjs` 验证运行目录、健康、公网 BUILD_ID 和 API 登录边界；PM2 启动成功不能单独作为新版生效的证据。

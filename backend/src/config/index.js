@@ -100,6 +100,13 @@ const kimi = {
   baseUrl: process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1',
 };
 
+// Optional email registration must be either fully configured or disabled.
+const emailKeys = ['ALIBABA_CLOUD_ACCESS_KEY_ID', 'ALIBABA_CLOUD_ACCESS_KEY_SECRET', 'JIESONG_EMAIL_FROM'];
+if (emailKeys.some((key) => process.env[key]?.trim()) &&
+    (!emailKeys.every((key) => process.env[key]?.trim()) || !/^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(process.env.JIESONG_EMAIL_FROM.trim()))) {
+  throw new Error('邮箱注册需完整配置阿里云凭据与有效的 JIESONG_EMAIL_FROM');
+}
+
 const config = {
   // 服务器配置
   port: parseInt(process.env.PORT, 10) || 3000,

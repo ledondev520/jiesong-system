@@ -195,7 +195,7 @@ export default function SettingsUsersPage() {
                 subtitle={user.username}
                 badge={<RoleBadge role={user.role} />}
                 fields={[
-                  { label: '状态', value: user.isActive ? '正常' : '禁用' },
+                  { label: '状态', value: user.isActive ? '正常' : '未开通/停用' },
                   { label: '最后登录', value: user.lastLoginAt ? format(new Date(user.lastLoginAt), 'MM-dd HH:mm') : '从未登录' },
                 ]}
                 action={
@@ -275,7 +275,7 @@ export default function SettingsUsersPage() {
                     <TableCell><RoleBadge role={user.role} /></TableCell>
                     <TableCell>
                       <Badge variant={user.isActive ? 'outline' : 'secondary'} className={user.isActive ? 'border-primary/20 bg-primary/5 text-primary text-[11px]' : 'text-[11px]'}>
-                        {user.isActive ? '正常' : '禁用'}
+                        {user.isActive ? '正常' : '未开通/停用'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">

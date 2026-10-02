@@ -34,7 +34,7 @@ import { authService, type LoginResponse } from '@/services/auth.service';
 import { clearLegacyQuickLoginState } from '@/lib/legacy-auth-cleanup';
 
 const loginSchema = z.object({
-  username: z.string().min(1, '请输入用户名'),
+  username: z.string().min(1, '请输入用户名或邮箱'),
   password: z.string().min(1, '请输入密码'),
 });
 
@@ -176,10 +176,10 @@ function LoginFormClient() {
                   name="username"
                   render={({ field }) => (
                     <FormItem className="space-y-2">
-                      <FormLabel className="text-sm font-medium">用户名</FormLabel>
+                      <FormLabel className="text-sm font-medium">用户名或邮箱</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="请输入用户名"
+                          placeholder="请输入用户名或邮箱"
                           className="h-11 rounded-xl border-border/40 bg-background/50 shadow-sm transition-all duration-200 focus:bg-background focus:shadow-md focus:ring-2 focus:ring-primary/15"
                           {...field}
                         />
