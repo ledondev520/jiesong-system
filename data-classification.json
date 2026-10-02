@@ -26,6 +26,7 @@
       "controls": {
         "storage": [
           "Secrets only in .env or secret manager",
+          "PR Review reporting uses zero GITHUB_TOKEN permissions and Actions summaries; failed check states are retained, and its locked formatter rejects incomplete history or unreadable changed source (scripts/check-pr-format.cjs)",
           "Browser access tokens remain tab-scoped in sessionStorage; missing-token login messaging never grants access or exposes token values",
           "System-configured API keys are write-only; encrypted storage is permitted but complete values must never be returned or rendered",
           "System configuration environment-key fallbacks use the same masked response helper as database keys",

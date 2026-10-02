@@ -9,6 +9,7 @@
 - Applies to the whole repository rooted at `/Users/helena/Cursor/jiesong_system`.
 - Security requirements are mandatory for code, scripts, docs, and operational procedures.
 - All automation and scripts in this repo should follow the controls below unless explicitly overridden by an approved incident procedure.
+- PR Review locks Prettier 3.9.9 and checks changed frontend TS/TSX source with full Git history and event base/head SHAs (`scripts/check-pr-format.cjs`); missing history/paths fail closed. Full unit/E2E checks remain enabled. Its report job uses zero token permissions and writes `GITHUB_STEP_SUMMARY`, preserving failed/cancelled check states instead of requiring comment-write access.
 
 ## ByteRover project memory
 - This repo has local ByteRover engineering memory in `.brv/context-tree/`.

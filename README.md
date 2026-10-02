@@ -35,7 +35,7 @@
 jiesong_system/
 ├── .cursor/agents/           # 项目级 Cursor 子代理（AI委派配置）
 ├── .cursor/skills/           # 项目级 Cursor Skills（可复用工作流）
-├── .github/workflows/       # CI工作流（单元测试+自动化验收）
+├── .github/workflows/       # CI工作流（单元测试+自动化验收+PR变更格式检查）
 ├── docs/                    # 项目文档
 ├── PLAN.md                  # 前端美化路线图与里程碑
 ├── TASKS.md                 # 前端美化任务清单与状态

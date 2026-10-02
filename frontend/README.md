@@ -58,6 +58,9 @@ npm run build
 # 运行 Lint
 npm run lint
 
+# PR 改动源码格式检查（需完整 Git 历史与明确 base/head SHA）
+PR_BASE_SHA=$(git merge-base origin/main HEAD) PR_HEAD_SHA=$(git rev-parse HEAD) npm run format:pr
+
 # 运行单元测试
 npm run test
 
@@ -70,6 +73,8 @@ npm run test:coverage
 # 自动化验收测试
 npm run test:e2e
 ```
+
+PR 格式工具精确锁定 Prettier 3.9.9。`scripts/check-pr-format.cjs` 以完整 SHA 和 NUL 路径读取 PR 改动，检查新增、修改及重命名目标的 TS/TSX 源码；浅历史、缺失引用及读文件错误均失败。历史未改动源码不做批量格式迁移，单测和 E2E 仍完整运行。工具回归：`node --test ../scripts/check-pr-format.test.cjs`。
 
 ## 登录与联调排查
 

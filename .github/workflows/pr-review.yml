@@ -54,6 +54,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -70,62 +72,42 @@ jobs:
         working-directory: ./frontend
         run: npm run lint
 
-      - name: Check code formatting
+      - name: Test PR tooling
         working-directory: ./frontend
-        run: npx prettier --check "src/**/*.{ts,tsx}"
+        run: node --test ../scripts/check-pr-format.test.cjs
 
-  # PR 评论
+      - name: Check changed source formatting
+        working-directory: ./frontend
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: npm run format:pr
+
+  # PR 检查结果摘要：不需要 GitHub 写权限，保留类型和 lint 的结果。
   comment:
-    name: PR Comment
+    name: PR Review Summary
     runs-on: ubuntu-latest
     needs: [type-safety, lint]
     if: always()
+    permissions: {}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Comment PR
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const botComment = comments.find(comment =>
-              comment.user.type === 'Bot' &&
-              comment.body.includes('## G-Stack PR Review')
-            );
-
-            const typeCheckStatus = '${{ needs.type-safety.result }}' === 'success' ? '✅' : '❌';
-            const lintStatus = '${{ needs.lint.result }}' === 'success' ? '✅' : '❌';
-
-            const body = `## G-Stack PR Review
-
-            ### 检查结果
-            - ${typeCheckStatus} TypeScript 类型检查
-            - ${lintStatus} ESLint 代码风格
-
-            ### 下一步
-            - 所有检查通过后，可以进行代码审查
-            - 合并前请确保 QA 测试通过
-
-            ---
-            *自动生成的 PR Review 报告*`;
-
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: body,
-              });
-            }
+      - name: Publish review summary
+        env:
+          TYPE_CHECK_RESULT: ${{ needs.type-safety.result }}
+          LINT_RESULT: ${{ needs.lint.result }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const icon = (result) => result === 'success' ? '✅' : '❌';
+          const body = [
+            '## G-Stack PR Review',
+            '',
+            `- ${icon(process.env.TYPE_CHECK_RESULT)} TypeScript 类型检查 (${process.env.TYPE_CHECK_RESULT})`,
+            `- ${icon(process.env.LINT_RESULT)} ESLint 与格式检查 (${process.env.LINT_RESULT})`,
+            '',
+            '完整检查结果见本次 Actions 各 job；合并前需通过所有验收。',
+            '',
+          ].join('\n');
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, body);
+          if (process.env.TYPE_CHECK_RESULT !== 'success' || process.env.LINT_RESULT !== 'success') process.exitCode = 1;
+          NODE

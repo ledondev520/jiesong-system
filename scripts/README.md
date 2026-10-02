@@ -9,6 +9,7 @@
 
 | 文件名 | 地位 | 功能 |
 |--------|------|------|
+| check-pr-format.cjs / check-pr-format.test.cjs | CI 工具与回归 | 完整历史下按 PR base/head 检查改动 TS/TSX 源码；特殊路径、浅历史和失败摘要回归 |
 | fix_export_contracts.js | 数据修复 | 修复出口合同的美元金额 + 创建装箱明细（已修正箱数逻辑） |
 | fix_boxes_data.js | 数据修复 | 修复EXP25合同中被错误填充的箱数数据（置空处理） |
 | import_contracts_data.js | 数据导入 | 导入采购合同数据 |

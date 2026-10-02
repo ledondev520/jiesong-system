@@ -1,5 +1,7 @@
 # Security Playbook
 
+PR Review (`.github/workflows/pr-review.yml`) reports checks through Actions `GITHUB_STEP_SUMMARY` with `permissions: {}`; it does not need GitHub comment-write access. Failed/cancelled type or lint/format checks remain failed. The locked formatter uses full Git history and explicit PR SHAs, preserves literal NUL-separated paths and fails on missing history/file reads (`scripts/check-pr-format.cjs`).
+
 ## 5-Layer Defense Architecture
 
 ### 1) 访问控制与身份层（Identity & Access）
