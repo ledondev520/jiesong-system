@@ -58,13 +58,16 @@ test('isolated password recovery security boundaries', async (t) => {
   }
   const payload = (code) => ({ email, code, newPassword: crypto.randomBytes(18).toString('hex') });
   const check = (token) => new Promise((resolve, reject) => authenticate({ headers: { authorization: `Bearer ${token}` } }, {}, (error) => error ? reject(error) : resolve()));
-  const express = require('express'); const app = express(); app.use(express.json()); app.use('/auth', require('../routes/auth'));
+  const express = require('express'); const app = express(); app.use(express.json());
+  const authRouter = require('../routes/auth'); app.use('/auth', authRouter);
+  const { ipKeyGenerator } = require('express-rate-limit');
+  const routeLimiter = (route) => authRouter.stack.find((layer) => layer.route?.path === route).route.stack[0].handle;
   app.use((err, _req, res, _next) => res.status(err.statusCode || 500).json({ code: err.statusCode || 500, message: err.message, data: null }));
   server = await new Promise((r) => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
   const base = `http://127.0.0.1:${server.address().port}/auth`;
-  const post = async (route, body, token) => {
-    const res = await fetch(base + route, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
-    return { status: res.status, body: await res.json() };
+  const post = async (route, body, token, headers = {}) => {
+    const res = await fetch(base + route, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}), ...headers }, body: JSON.stringify(body) });
+    return { status: res.status, body: await res.json(), retryAfter: res.headers.get('retry-after') };
   };
   await t.test('unknown, disabled, duplicate and legacy accounts have the same send response', async () => {
     let reference;
@@ -203,10 +206,68 @@ test('isolated password recovery security boundaries', async (t) => {
       await assert.rejects(auth.changePassword(user.id, 'synthetic-unused', newPassword), { statusCode: 400 });
       await assert.rejects(require('../services/emailRegistrationService').register({ email, code: '123456', password: newPassword }), { statusCode: 400 });
     }
-    const limited = require('../middleware/rateLimit'); limited.resetLimit('reset-send:127.0.0.1');
+    await routeLimiter('/reset-password-code').resetKey('127.0.0.1');
     for (let i = 0; i < 10; i++) assert.equal((await post('/reset-password-code', { email: `ip-${i}@example.com` })).status, 200);
     assert.equal((await post('/reset-password-code', { email: 'ip-block@example.com' })).status, 429);
     const configured = t.mock.method(mail, 'isConfigured', () => false);
     await assert.rejects(service.sendCode(email, 'synthetic-ip'), { statusCode: 503 }); configured.mock.restore();
+  });
+
+  await t.test('real route limiters reject header spoofing, separate clients and normalize durable IPv6 quotas', async () => {
+    const sendLimiter = routeLimiter('/reset-password-code');
+    const verifyLimiter = routeLimiter('/reset-password');
+    const invalid = { email: 'invalid' };
+    app.set('trust proxy', false);
+    await sendLimiter.resetKey('127.0.0.1');
+    for (let i = 0; i < 10; i++) {
+      assert.equal((await post('/reset-password-code', invalid, null, { 'X-Forwarded-For': `198.51.100.${i + 1}` })).status, 400);
+    }
+    const blocked = await post('/reset-password-code', invalid, null, { 'X-Forwarded-For': '198.51.100.99' });
+    assert.equal(blocked.status, 429); assert.ok(Number(blocked.retryAfter) > 0);
+    // Only our synthetic same-host reverse proxy is trusted. An injected leftmost
+    // address cannot replace the rightmost untrusted client appended by that proxy.
+    app.set('trust proxy', ['127.0.0.1/32', '::1/128']);
+    for (let i = 0; i < 10; i++) {
+      assert.equal((await post('/reset-password-code', invalid, null, { 'X-Forwarded-For': `198.51.100.${i + 1}, 203.0.113.7` })).status, 400);
+    }
+    assert.equal((await post('/reset-password-code', invalid, null, { 'X-Forwarded-For': '198.51.100.99, 203.0.113.7' })).status, 429);
+    assert.equal((await post('/reset-password-code', invalid, null, { 'X-Forwarded-For': '203.0.113.8' })).status, 400);
+    app.set('trust proxy', ['192.0.2.100/32']);
+    assert.equal((await post('/reset-password-code', invalid, null, { 'X-Forwarded-For': '203.0.113.9' })).status, 429);
+
+    app.set('trust proxy', ['127.0.0.1/32', '::1/128']);
+    await db.passwordResetChallenge.deleteMany();
+    const headers = (ip) => ({ 'X-Forwarded-For': ip });
+    // Reset only the process-local limiter between requests to simulate worker
+    // changes/restarts. The shared SQLite /56 quota must still stop request 11.
+    for (let i = 0; i < 10; i++) {
+      const ip = `2001:db8:1234:56${i.toString(16).padStart(2, '0')}::1`;
+      await sendLimiter.resetKey(ipKeyGenerator(ip));
+      assert.equal((await post('/reset-password-code', { email: `ipv6-${i}@example.com` }, null, headers(ip))).status, 200);
+    }
+    await sendLimiter.resetKey(ipKeyGenerator('2001:db8:1234:56ff::2'));
+    assert.equal((await post('/reset-password-code', { email: 'ipv6-block@example.com' }, null, headers('2001:db8:1234:56ff::2'))).status, 429);
+    assert.equal((await post('/reset-password-code', { email: 'ipv6-other@example.com' }, null, headers('2001:db8:1234:5700::1'))).status, 200);
+    const buckets = await db.passwordResetChallenge.groupBy({ by: ['requesterHash'], _count: true });
+    assert.deepEqual(buckets.map((b) => b._count).sort((a, b) => a - b), [1, 10]);
+    await db.passwordResetChallenge.deleteMany();
+
+    await sendLimiter.resetKey('203.0.113.42');
+    for (let i = 0; i < 10; i++) {
+      const ip = i % 2 ? '::ffff:203.0.113.42' : '203.0.113.42';
+      await sendLimiter.resetKey(ipKeyGenerator(ip));
+      assert.equal((await post('/reset-password-code', { email: `mapped-${i}@example.com` }, null, headers(ip))).status, 200);
+    }
+    await sendLimiter.resetKey('203.0.113.42');
+    assert.equal((await post('/reset-password-code', { email: 'mapped-block@example.com' }, null, headers('::ffff:203.0.113.42'))).status, 429);
+    assert.equal((await db.passwordResetChallenge.groupBy({ by: ['requesterHash'] })).length, 1);
+
+    await verifyLimiter.resetKey('203.0.113.7');
+    for (let i = 0; i < 20; i++) {
+      assert.equal((await post('/reset-password', invalid, null, headers(`198.51.100.${i + 1}, 203.0.113.7`))).status, 400);
+    }
+    const verifyBlocked = await post('/reset-password', invalid, null, headers('198.51.100.99, 203.0.113.7'));
+    assert.equal(verifyBlocked.status, 429); assert.ok(Number(verifyBlocked.retryAfter) > 0);
+    assert.equal((await post('/reset-password', invalid, null, headers('203.0.113.8'))).status, 400);
   });
 });

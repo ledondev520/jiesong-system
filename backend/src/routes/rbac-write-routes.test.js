@@ -85,7 +85,7 @@ test('RBAC: 邮箱注册公开入口保留限流校验，管理员创建用户�
   for (const routePath of ['/email-code', '/email-register', '/reset-password-code']) {
     const block = blocks.find((item) => getRouteInfo('auth.js', item).routeKey === `auth POST ${routePath}`);
     assert.ok(block, `${routePath} 必须显式存在`);
-    assert.match(block, /strictRateLimit\(/);
+    assert.match(block, /(?:strictRateLimit|rateLimit)\(/);
     assert.match(block, /emailRule\(\)/);
     assert.match(block, /handleValidation/);
   }

@@ -47,7 +47,8 @@
           "Purchase/inspection inventory cannot be manually transitioned through normal, bulk or AI endpoints; execution rechecks provenance and same-status requests preserve inventory timestamps",
           "VPS runtime migration backups keep private environment files and SQLite snapshots in 0700 directories with 0600 files; deployment verification never prints process environments or credentials",
           "Environment file permissions are checked before loading mail credentials; email registration uses keyed hashes, persistent send quotas and single-use verification; new users remain inactive until administrator approval; user updates clear authentication caches immediately (backend/src/services/emailRegistrationService.js)",
-          "Email password recovery uses domain-separated keyed hashes, persistent cross-worker quotas and atomic single-use consumption; live sessionVersion checks immediately revoke old JWTs after any password write; unknown/disabled/ambiguous/legacy-without-email accounts never bypass proof of ownership; raw Prisma query/error logging is disabled"
+          "Email password recovery uses domain-separated keyed hashes, persistent cross-worker quotas and atomic single-use consumption; live sessionVersion checks immediately revoke old JWTs after any password write; unknown/disabled/ambiguous/legacy-without-email accounts never bypass proof of ownership; raw Prisma query/error logging is disabled",
+          "Recovery HTTP rate limits use locked express-rate-limit and canonical IPv4-mapped/IPv6 subnet keys shared with persistent IP HMAC quotas; forwarded client identity requires an explicit TRUSTED_PROXY_CIDRS IP/CIDR allowlist, disabled by default; production database backup must follow the actual DATABASE_URL with consistent SQLite backup API and protected permissions before migration"
         ],
         "transfer": [
           "Encrypt in transit (TLS)",

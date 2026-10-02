@@ -12,6 +12,7 @@ const { validateLogin, validateRegister, validateResetPassword, validateChangePa
 const { authenticate, roleAuth } = require('../middleware/auth');
 const { withAuditLog } = require('../middleware/auditLog');
 const { strictRateLimit } = require('../middleware/rateLimit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 
 const { body } = require('express-validator');
 const emailRegistration = require('../services/emailRegistrationService');
@@ -67,7 +68,9 @@ router.post(
 
 // Public recovery endpoints: persistent quotas additionally protect across workers/restarts.
 router.post('/reset-password-code',
-  strictRateLimit({ windowMs: 3600000, max: 10, keyGenerator: (req) => `reset-send:${req.ip}` }),
+  rateLimit({ windowMs: 3600000, limit: 10, keyGenerator: (req) => ipKeyGenerator(req.ip),
+    standardHeaders: 'draft-7', legacyHeaders: false,
+    message: { code: 429, message: '验证码请求过于频繁，请一小时后重试', data: null } }),
   emailRule(), handleValidation,
   async (req, res, next) => {
     try {
@@ -76,7 +79,9 @@ router.post('/reset-password-code',
     } catch (error) { next(error); }
   });
 router.post('/reset-password',
-  strictRateLimit({ windowMs: 900000, max: 20, keyGenerator: (req) => `reset-verify:${req.ip}` }),
+  rateLimit({ windowMs: 900000, limit: 20, keyGenerator: (req) => ipKeyGenerator(req.ip),
+    standardHeaders: 'draft-7', legacyHeaders: false,
+    message: { code: 429, message: '验证请求过于频繁，请15分钟后重试', data: null } }),
   validateResetPassword, handleValidation, authController.resetPassword);
 
 // ==================== 需认证路由 ====================

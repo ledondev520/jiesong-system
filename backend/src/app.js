@@ -1,6 +1,6 @@
 /**
  * Input: 所有路由模块、中间件
- * Output: Express 应用实例
+ * Output: Express 应用实例（显式代理白名单默认关闭）
  * Pos: 应用入口，初始化 Express 服务器
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -21,6 +21,8 @@ const { startPatrolJob } = require('./jobs/patrolJob');
 const { startExportReminderJob } = require('./jobs/exportReminderJob');
 
 const app = express();
+// Opt-in only: trust concrete proxy addresses, never a client-supplied forwarding header by default.
+app.set('trust proxy', config.trustedProxyCidrs?.length ? config.trustedProxyCidrs : false);
 // JSON API 通过前端 dev rewrite 代理时，304 空响应会让 axios/页面层误判为失败，因此关闭 ETag。
 app.disable('etag');
 

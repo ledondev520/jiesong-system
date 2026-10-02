@@ -5,6 +5,7 @@
  */
 const { randomInt, randomUUID, createHmac, timingSafeEqual } = require('node:crypto');
 const bcrypt = require('bcrypt');
+const { ipKeyGenerator } = require('express-rate-limit');
 const prisma = require('../utils/prisma');
 const config = require('../config');
 const mail = require('./emailService');
@@ -61,7 +62,8 @@ async function sendCode(rawEmail, requesterIp) {
   const id = randomUUID();
   const code = String(randomInt(0, 1000000)).padStart(6, '0');
   const codeHash = digest('code', `${id}:${code}`);
-  const requesterHash = digest('ip', requesterIp || 'unknown');
+  // Same canonical key as HTTP: IPv4-mapped IPv6 is IPv4; IPv6 privacy addresses share /56.
+  const requesterHash = digest('ip', ipKeyGenerator(requesterIp || 'unknown'));
   const challenge = await lockedTransaction(async (tx) => {
     const now = new Date();
     const hourAgo = new Date(now.getTime() - 3600000);
