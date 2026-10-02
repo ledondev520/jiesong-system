@@ -1,13 +1,11 @@
 /**
- * Input: open-agent-sdk, Kimi API (via anthropicCompatService), 业务服务层
+ * Input: 已发布的 open-agent-sdk, Anthropic 兼容 API, 业务服务层
  * Output: AI 只读查询、内部草稿直接执行、业务事实一次确认与可回放执行记录，上游失败不记成功
  * Pos: 后端 Agent Runtime 核心，衔接 LLM 与业务数据
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-const path = require('node:path');
-const { pathToFileURL } = require('node:url');
 const prisma = require('../utils/prisma');
 const config = require('../config');
 const { createError } = require('../middleware/errorHandler');
@@ -266,13 +264,8 @@ const inferRoutePlan = ({ agentType, message } = {}) => {
 };
 
 const loadSdk = async () => {
-  let sdk;
-  try {
-    sdk = await import('@codeany/open-agent-sdk');
-  } catch (error) {
-    const localBuildPath = path.resolve(__dirname, '../../../.tmp/open-agent-sdk-typescript/dist/index.js');
-    sdk = await import(pathToFileURL(localBuildPath).href);
-  }
+  // 使用锁定的已发布构建，干净 checkout 不依赖开发机 .tmp 目录。
+  const sdk = await import('@codeany/open-agent-sdk');
   // 不让 Agent 外层重试与 Anthropic transport 重试叠加上游请求。
   sdk.DEFAULT_RETRY_CONFIG.maxRetries = 0;
   return sdk;
@@ -2683,6 +2676,8 @@ const runAgentPrompt = async ({ userId, userRole, agentType, message, sessionId 
   const resolvedSessionId = sessionConfig.sessionId;
 
   const agent = sdk.createAgent({
+    // 此本地代理固定使用 Anthropic 协议，不能按 DeepSeek/GPT 模型名自动切换。
+    apiType: 'anthropic-messages',
     model: runtimeConfig.model,
     apiKey: runtimeConfig.apiKey,
     baseURL: runtimeConfig.baseURL,
@@ -2803,6 +2798,7 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
   yield { type: 'session', sessionId: resolvedSessionId, routePlan };
 
   const agent = sdk.createAgent({
+    apiType: 'anthropic-messages',
     model: runtimeConfig.model,
     apiKey: runtimeConfig.apiKey,
     baseURL: runtimeConfig.baseURL,

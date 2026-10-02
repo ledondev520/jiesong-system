@@ -197,3 +197,5 @@ Authorization: Bearer <token>
 - **密码加密**: bcryptjs
 
 `test:db` 需要 Python 3 自带的 sqlite3；从 schema 生成空库，使用合成资料验证分批验货、两次出货、库存守恒、单据归档和权限，不读取现有业务库。
+
+Agent SDK 固定为含 `dist/index.js` 的发布版本 `0.2.4`，`npm ci` 后可直接加载，不依赖本地 `.tmp` 构建。普通与流式入口均走本地 Anthropic 兼容代理，保留关闭重试、失败不写成功记录的测试。

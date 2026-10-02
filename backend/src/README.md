@@ -101,3 +101,5 @@
 - `utils/inventoryStateMachine.js` 的来源约束用于普通/批量库存接口和 AI 工具，AI 确认时重新检查；相同状态请求不修改 FIFO 时间。
 
 邮箱注册由 `services/emailService.js` 对接阿里云杭州 DirectMail，`services/emailRegistrationService.js` 负责持久化限流、验证码消费和待审核账号；公开接口为 `POST /auth/email-code`、`POST /auth/email-register`。管理员创建和审核入口保持不变。
+
+`routes/rbac-write-routes.test.js` 明确列举登录前邮箱注册入口，检查限流/校验与管理员创建账号权限。`services/openAgentService.js` 只加载锁定的已发布 SDK 构建；两种 Agent 入口显式使用本地 Anthropic 协议，加载、单次请求和失败终止由 `openAgentService.test.js` 回归。

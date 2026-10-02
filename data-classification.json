@@ -40,7 +40,7 @@
           "HSCIQ upstream error bodies are excluded from service errors and logs; pending queries are bounded by a total timeout and quota reservation",
           "AI provider calls bound full response waits, disable SDK automatic retry/logging and reuse streamed token usage without resending prompts for estimation",
           "Customs draft replacement retains identity and is atomic; released records cannot be replaced. Shipment confirmation versions retain business facts and evidence while excluding technical createdAt/updatedAt timestamps",
-          "Agent normal and streaming requests inspect SDK termination status; upstream errors are not persisted as successful runs and do not automatically retry",
+          "Agent normal and streaming requests explicitly use the local Anthropic protocol and the locked published SDK build without developer-local fallback; they inspect termination status, do not persist upstream errors as successful runs and do not automatically retry",
           "Ordinary frontend requests and protected Next proxy downloads share API base parsing; bare origins gain /api/v1 while explicit API paths are retained without duplication",
           "Purchase/inspection inventory cannot be manually transitioned through normal, bulk or AI endpoints; execution rechecks provenance and same-status requests preserve inventory timestamps",
           "VPS runtime migration backups keep private environment files and SQLite snapshots in 0700 directories with 0600 files; deployment verification never prints process environments or credentials",
