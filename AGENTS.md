@@ -9,6 +9,7 @@
 - Applies to the whole repository rooted at `/Users/helena/Cursor/jiesong_system`.
 - Security requirements are mandatory for code, scripts, docs, and operational procedures.
 - All automation and scripts in this repo should follow the controls below unless explicitly overridden by an approved incident procedure.
+- PR Review locks Prettier 3.9.9 and checks changed frontend TS/TSX source with full Git history and event base/head SHAs (`scripts/check-pr-format.cjs`); missing history/paths fail closed. Full unit/E2E checks remain enabled. Its report job uses zero token permissions and writes `GITHUB_STEP_SUMMARY`, preserving failed/cancelled check states instead of requiring comment-write access.
 
 ## ByteRover project memory
 - This repo has local ByteRover engineering memory in `.brv/context-tree/`.
@@ -37,6 +38,7 @@
 - AI requests in `backend/src/services/aiService.js` and `anthropicCompatService.js` share a full-response deadline (default 30000ms via `KIMI_REQUEST_TIMEOUT_MS`, explicit 500–30000ms); SDK automatic retry/logging is disabled, and streamed usage avoids a second prompt-bearing estimation request.
 - `AI_PROVIDER=deepseek` selects `DEEPSEEK_API_KEY`/`DEEPSEEK_BASE_URL` for the main AI flow without replacing separate Kimi integrations. `deepseekApiKey` overrides are encrypted and write-only; DeepSeek uses `deepseek-flash` with thinking enabled/high and preserves assistant reasoning across tool rounds. File permissions are checked before `.env` is loaded in `backend/src/config/index.js`.
 - Agent retries must not multiply upstream calls: `openAgentService.loadSdk` disables the SDK's exported outer retry configuration, and `aiController.anthropicCompatMessage` sets `x-should-retry: false` for Anthropic transport; failed calls require an explicit new user request.
+- Agent Runtime uses the published, locked `@codeany/open-agent-sdk` build (no developer `.tmp` fallback) and explicitly selects `anthropic-messages` for the local proxy regardless of the upstream model name.
 - `backend/src/services/hsciqService.js` must bound full response waits, reserve pending-call quota and omit upstream response bodies from errors; `HSCIQ_TIMEOUT_MS` calibrates its 10000ms default within 1000–30000ms.
 - System-configured API keys are write-only: response Interfaces may expose only a configured flag or masked suffix, and frontend pages must never render a complete stored key even for administrators.
 - Environment-key fallback in `backend/src/controllers/system/configController.js` must mask the key with the same response helper as database configuration.
@@ -116,4 +118,5 @@
 - `backend/src/services/emailService.js` 复用阿里云杭州 DirectMail；仅私有环境配置 `ALIBABA_CLOUD_ACCESS_KEY_ID`、`ALIBABA_CLOUD_ACCESS_KEY_SECRET`、`JIESONG_EMAIL_FROM`，可选 STS token。密钥不返回浏览器，部分配置在启动时拒绝，`backend/src/config/index.js` 在读取环境密钥前先验证文件权限。
 - `backend/src/services/emailRegistrationService.js` 持久保存带密钥验证码哈希，10分钟有效、最多5次验证；60秒重发冷却、每邮箱每小时5次、全站每小时60次，失败发信仍计数且旧码失效。成功注册与消费验证码在同一事务，角色固定SALES且未激活，管理员审核后方可访问业务。
 - 注册邮箱作为用户名，登录兼容原用户名；管理员创建用户仍需ADMIN。邮件正文、验证码与云服务响应正文不得进入日志。验证码记录超过24小时后在下一次发码时清理。
+- RBAC 路由扫描仅明确豁免登录前的 `/auth/email-code` 与 `/auth/email-register`；回归检查它们保留限流及校验，`/auth/register` 继续要求认证和ADMIN。
 - `frontend/src/app/dashboard/users/components/UserDialog.tsx` 提供管理员账号开通开关；两套用户更新入口更新状态或角色后立即清除认证缓存，避免停用/改权延迟。

@@ -24,8 +24,10 @@
 - `src/types`: TypeScript 类型定义 (与数据库 Schema 对齐)
 - `src/**/*.test.ts`: 前端单元测试文件
 - `e2e`: Playwright 自动化验收测试
+  - `e2e/README.md`: 合成 API 夹具与移动端注册、采购验货汇总的验收约定
 - `vitest.config.ts`: Vitest 测试配置
 - `playwright.config.ts`: Playwright 配置
+- `eslint.config.mjs`: 源码 lint；忽略构建、覆盖率及 Playwright 生成报告
 
 ## 核心依赖
 
@@ -56,6 +58,9 @@ npm run build
 # 运行 Lint
 npm run lint
 
+# PR 改动源码格式检查（需完整 Git 历史与明确 base/head SHA）
+PR_BASE_SHA=$(git merge-base origin/main HEAD) PR_HEAD_SHA=$(git rev-parse HEAD) npm run format:pr
+
 # 运行单元测试
 npm run test
 
@@ -68,6 +73,8 @@ npm run test:coverage
 # 自动化验收测试
 npm run test:e2e
 ```
+
+PR 格式工具精确锁定 Prettier 3.9.9。`scripts/check-pr-format.cjs` 以完整 SHA 和 NUL 路径读取 PR 改动，检查新增、修改及重命名目标的 TS/TSX 源码；浅历史、缺失引用及读文件错误均失败。历史未改动源码不做批量格式迁移，单测和 E2E 仍完整运行。工具回归：`node --test ../scripts/check-pr-format.test.cjs`。
 
 ## 登录与联调排查
 
@@ -89,6 +96,8 @@ npm run test:e2e
 采购与出口详情、报关商品、退税工作台、发票和 HS 查询在手机上使用明细卡片；采购首页优先展示新增与搜索，统计为紧凑双列。手机通过底部「更多」进入 AI，避免悬浮按钮遮住列表；设置二级菜单在手机和平板上可展开，保留港口、分类、报关公司与导出入口。
 
 移动端回归：`npm run test:e2e -- e2e/mobile.spec.ts`（需安装 Playwright Chromium）。使用合成 API 数据，覆盖 320/390/430px 页面、长表单与横屏、核心操作和失败恢复；768/1440px 验证主要页面。该检查验证界面与客户端交互，不代表真实后端业务写入或 iOS 真机验收。
+
+财务报表账期详情使用明确的单列网格和可收缩卡片，科目余额/明细账宽表只在卡片内横向滚动。移动验收等待延迟报表明细完成后检查整页宽度及内部滚动，避免只验证加载前的概览。
 
 ## 出货退税准备
 

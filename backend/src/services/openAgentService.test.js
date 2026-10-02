@@ -1,3 +1,9 @@
+/**
+ * Input: Agent 服务、已发布 SDK 与合成业务/HTTP 数据
+ * Output: Agent 路由、权限、幂等性和上游协议及失败语义回归结果
+ * Pos: 后端 Agent Runtime 单测，验证干净安装与单次失败不重试
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const config = require('../config');
@@ -610,6 +616,12 @@ test('runAgentPrompt: 当前 AI 客户端不可用时返回 503', async () => {
   }
 });
 
+test('loadSdk: 干净安装可加载已发布 SDK', async () => {
+  const published = await import('@codeany/open-agent-sdk');
+  assert.equal(await openAgentService.loadSdk(), published);
+  assert.equal(typeof published.createAgent, 'function');
+});
+
 test('loadSdk: Anthropic 与 Agent 两层重试均关闭，一次失败只发一次请求', async () => {
   const http = require('node:http');
   const fs = require('node:fs');
@@ -630,14 +642,19 @@ test('loadSdk: Anthropic 与 Agent 两层重试均关闭，一次失败只发一
   });
   try {
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-    const engine = new sdk.QueryEngine({
+    const agent = sdk.createAgent({
+      apiType: 'anthropic-messages',
       model: 'synthetic-model', apiKey: 'test-only-non-production-sdk-key',
       baseURL: `http://127.0.0.1:${server.address().port}`, cwd,
       tools: [], maxTurns: 1, maxTokens: 256, systemPrompt: 'Synthetic test only.',
-      abortSignal: AbortSignal.timeout(2000),
+      persistSession: false,
     });
     const events = [];
-    for await (const event of engine.submitMessage('synthetic')) events.push(event);
+    try {
+      for await (const event of agent.query('synthetic')) events.push(event);
+    } finally {
+      await agent.close();
+    }
     assert.equal(calls, 1);
     assert.ok(events.some(event => event.type === 'result' && event.subtype === 'error'));
   } finally {
@@ -775,7 +792,8 @@ test('Agent 上游失败：普通和流式请求均拒绝，不能落库成功�
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     config.port = server.address().port;
     aiService.getOpenAIClient = async () => ({});
-    aiService.getConfiguredModels = async () => ({ defaultModel: 'synthetic-model' });
+    // 新 SDK 会按模型名猜协议；业务代理即使使用 DeepSeek 也必须走 Anthropic。
+    aiService.getConfiguredModels = async () => ({ defaultModel: 'deepseek-flash' });
     const input = { userId: 'synthetic-user', userRole: 'ADMIN', agentType: 'unified', message: '合成只读验收' };
     await assert.rejects(openAgentService.runAgentPrompt(input), error => error.statusCode === 503);
     const events = [];
