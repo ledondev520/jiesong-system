@@ -28,13 +28,13 @@ SQLite事务先更新迁移初始化的单例写锁，然后读取与预留配�
 
 `20261002113919_email_password_recovery` 只增加两张挑战/锁表、索引与 `users.sessionVersion` 列，使用 `ALTER TABLE ADD COLUMN` 保留所有历史用户、密码哈希及外键。不能使用 `prisma db push`。
 
-发布由另行人工批准，本PR不合并/部署。后续维护者需先停止服务写入并按现有SQLite备份流程保存受保护快照（目录0700/文件0600），验证备份可读，再应用已审阅迁移、生成Prisma Client并重启所有后端worker。保持现有JWT签名密钥和私有DirectMail环境配置；不要打印配置值。邮件配置缺失应拒绝找回。
+发布仍须明确批准。针对本次已审阅的纯增量迁移，维护者先通过 SQLite 在线 backup API 保存事务一致的受保护快照（目录0700/文件0600），验证快照可读，再应用迁移、生成 Prisma Client 并重启所有后端 worker。在线快照不要求提前停止全部 writer，也不声称服务已停写；若后续迁移含破坏性变更，应另行评估维护窗口。保持现有JWT签名密钥和私有DirectMail环境配置；不要打印配置值。邮件配置缺失应拒绝找回。
 
-具体备份前置：先只读确认当前部署SHA、实际绝对DATABASE_URL、所有writer、磁盘容量与迁移状态，再进入批准的维护窗口停全部writer（后端停机也停止其内置定时任务）。使用SQLite backup API对确认的实际路径创建独立快照，权限0700/0600；验证快照 `PRAGMA quick_check` 为ok、大小/时间/校验和，必要时对受保护恢复副本做只读完整性检查，绝不输出业务行。上次部署日志的实际路径为 `/opt/jiesong_system/current/backend/prisma/dev.db`，不能未经再次确认就照抄。
+具体备份前置：先核对当前部署 SHA、实际绝对 DATABASE_URL 候选及后端打开的同一数据库文件（路径与设备号/inode 一致）、磁盘容量和增量迁移。在线 SQLite backup API 包含已提交 WAL 数据，并处理并发写入；设置有界超时，超时或任何校验失败不得合并。独占创建新快照目录，权限0700/0600；关闭连接后验证快照 `PRAGMA quick_check` 为ok、大小、起止时间、SHA-256及持久化回执，绝不输出业务行或上传数据库。2026-10-04只读预检观察到数据库路径 `/opt/jiesong_system/current/backend/prisma/dev.db`，执行时仍须再次核对实际文件身份，不仅照抄路径。
 
 仓库自动Deploy直接执行migrate deploy，没有备份步骤，main合并会更新当前celerada.link；必须**先验收一致备份，再合并触发部署**。migrate deploy应只剩本次已审阅迁移pending。`backend/scripts/db-backup.js`只复制固定构建目录prisma/dev.db，不保证实际生产路径/WAL一致性；`scripts/backup.sh`直接cp且校验函数定义顺序有问题，均不作为本次生产保障。不要执行有db push回退和pm2 delete all的旧deploy.sh。
 
-在已授权维护窗口且实际路径确认后，最小快照命令如下（本PR未执行）：
+在已授权备份且实际路径确认后，SQLite backup API 的最小示意命令如下；实际发布使用带超时、文件身份和权限验证的已审阅在线备份流程，不以此简例替代完整核验：
 
 ```sh
 set -eu
@@ -51,7 +51,7 @@ test "$(sqlite3 -readonly "$RECOVERY_BACKUP_DIR/pre-release.sqlite3" 'PRAGMA qui
 sha256sum "$RECOVERY_BACKUP_DIR/pre-release.sqlite3" > "$RECOVERY_BACKUP_DIR/pre-release.sqlite3.sha256"
 ```
 
-以上需每步成功且quick_check精确为ok后才能继续，不能仅看到文件存在就合并。journal_mode仅在**新快照**上设为DELETE，归档为无需WAL/SHM的单文件，不修改源库；临时合成WAL库已验证已提交且尚未checkpoint的行能进入快照并通过只读校验。维护窗口保持停写直至新版本迁移、Client、所有进程与只读健康校验完成；失败继续停写。仅在另行指定并授权的受控测试邮箱/账号验证真实投递，不能用真实用户密码做实验。尚未核实有可靠生产备份，不代表断言没有备份。
+以上需每步成功且quick_check精确为ok后才能继续，不能仅看到文件存在就合并。journal_mode仅在**新快照**上设为DELETE，归档为无需WAL/SHM的单文件，不修改源库；临时合成WAL库已验证已提交且尚未checkpoint的行能进入快照并通过只读校验。在线备份必须明确记录开始/完成区间以及 writer 未停止。并发写入可能使 backup API 重试，因此不承诺某一精确时间点；快照之外的后续写入不包含在备份内，若将来手动恢复会丢失这些变化。绝不自动恢复整库。备份失败时保持现有服务，不合并、不迁移；备份成功后才部署增量迁移、生成 Client、重启全部后端 worker，并验收运行路径、健康和认证边界。迁移/部署失败应停止后续发布并诊断，不能把在线备份视作自动回滚授权。仅在另行指定并授权的受控测试邮箱/账号验证真实投递，不能用真实用户密码做实验。尚未核实有可靠生产备份，不代表断言没有备份。
 
 如确需回滚，先停写并恢复批准前数据库快照及匹配代码。回滚到旧代码会重新开放不安全的手机号重置接口，必须在网关关闭该公开入口，不能在未封堵时恢复旧版本。恢复快照也会恢复旧会话版本和旧密码状态，应由运营明确评估会话撤销和数据回滚影响。
 
@@ -66,3 +66,5 @@ sha256sum "$RECOVERY_BACKUP_DIR/pre-release.sqlite3" > "$RECOVERY_BACKUP_DIR/pre
 - `frontend/e2e/password-recovery.spec.ts`：真实浏览器表单转发至临时Express/SQLite服务，仅邮件传输使用合成邮箱文件；验证一次消费和旧JWT401。无生产测试路由。
 
 运行后端 `npm run test:all`、前端lint/type/unit/coverage/build及 `npm run test:e2e`。CI的E2E作业安装锁定后端依赖并生成Client以运行隔离夹具。工程ByteRover工具在本环境不可用，仓库无`.agents/skills`及`.brv/context-tree`；安全结论已写入仓库指引与本文档。
+
+发布顺序更新：PR33审批体验已先合并到main，PR32须在该基线上完成冲突整合及全部检查。运维准备使用独立手工触发分支，不把维护工作流合并到main；主机信任沿用既有授权部署通道，若提供独立SSH指纹则必须精确匹配，不能忽略不匹配警告。
