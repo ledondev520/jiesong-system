@@ -1,25 +1,25 @@
 /**
  * Input: 登录API、认证状态存储
- * Output: 登录页面
+ * Output: 登录页面及可通过键盘操作、关联校验提示的认证表单
  * Pos: 认证模块入口，负责用户登录与旧快捷登录缓存清理
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  * Security: 登录页不保存或提交浏览器缓存密码；旧快捷登录缓存仅清理，不再作为登录凭据
  */
 
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useAuthStore } from '@/store/auth.store';
-import type { ApiResponse } from '@/types';
-import { useSearchParams } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useCallback, useEffect, useState, Suspense } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useAuthStore } from "@/store/auth.store";
+import type { ApiResponse } from "@/types";
+import { useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
@@ -27,21 +27,42 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserPlus, KeyRound, Eye, EyeOff, Ship, AlertCircle, Loader2 } from 'lucide-react';
-import { authService, type LoginResponse } from '@/services/auth.service';
-import { clearLegacyQuickLoginState } from '@/lib/legacy-auth-cleanup';
+} from "@/components/ui/form";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  UserPlus,
+  KeyRound,
+  Eye,
+  EyeOff,
+  Ship,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
+import { authService, type LoginResponse } from "@/services/auth.service";
+import { RegistrationReceiptPanel } from "@/components/auth/RegistrationReceiptPanel";
+import {
+  clearRegistrationReceipt,
+  useRegistrationReceipt,
+} from "@/lib/registration-receipt";
+import { clearLegacyQuickLoginState } from "@/lib/legacy-auth-cleanup";
 
 const loginSchema = z.object({
-  username: z.string().min(1, '请输入用户名或邮箱'),
-  password: z.string().min(1, '请输入密码'),
+  username: z.string().min(1, "请输入用户名或邮箱"),
+  password: z.string().min(1, "请输入密码"),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 function LoginFormClient() {
   const router = useRouter();
+  const registrationReceipt = useRegistrationReceipt();
   const searchParams = useSearchParams();
   const login = useAuthStore((state) => state.login);
   const [isLoading, setIsLoading] = useState(false);
@@ -51,17 +72,17 @@ function LoginFormClient() {
 
   // 检查会话过期参数
   useEffect(() => {
-    const expired = searchParams.get('expired');
-    if (expired === '1') {
-      setError('登录会话已过期，请重新登录');
+    const expired = searchParams.get("expired");
+    if (expired === "1") {
+      setError("登录会话已过期，请重新登录");
     }
   }, [searchParams]);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      username: '',
-      password: '',
+      username: "",
+      password: "",
     },
   });
 
@@ -85,51 +106,63 @@ function LoginFormClient() {
    * @param {string} password - 密码
    * @returns {Promise<void>} 登录流程执行结果
    */
-  const performLogin = useCallback(async (username: string, password: string) => {
-    setIsLoading(true);
-    setError(null);
+  const performLogin = useCallback(
+    async (username: string, password: string) => {
+      setIsLoading(true);
+      setError(null);
 
-    try {
-      const result: ApiResponse<LoginResponse> = await authService.login({
-        username,
-        password,
-      });
+      try {
+        const result: ApiResponse<LoginResponse> = await authService.login({
+          username,
+          password,
+        });
 
-      if (result.code === 200 && result.data) {
-        clearLegacyQuickLoginProfile();
-        login(result.data.user, result.data.token);
-        router.push('/dashboard');
-      } else {
-        throw new Error(result.message || '登录失败');
+        if (result.code === 200 && result.data) {
+          clearLegacyQuickLoginProfile();
+          clearRegistrationReceipt();
+          login(result.data.user, result.data.token);
+          router.push("/dashboard");
+        } else {
+          throw new Error(result.message || "登录失败");
+        }
+      } catch (err: unknown) {
+        const retryAfter =
+          typeof err === "object" && err !== null && "retryAfter" in err
+            ? Number((err as { retryAfter?: unknown }).retryAfter)
+            : null;
+        const rawMessage =
+          err instanceof Error
+            ? err.message
+            : typeof err === "object" && err !== null && "message" in err
+              ? String((err as { message: unknown }).message)
+              : "";
+
+        if (
+          /ECONNREFUSED|Failed to proxy|Network Error|fetch failed|timeout/i.test(
+            rawMessage,
+          )
+        ) {
+          setError("后端服务未连接，请先启动 backend 服务（默认端口 3001）");
+        } else if (
+          retryAfter &&
+          Number.isFinite(retryAfter) &&
+          retryAfter > 0
+        ) {
+          const minutes = Math.ceil(retryAfter / 60);
+          setError(
+            `登录尝试过于频繁，请 ${minutes} 分钟后再试，或切换账号后重试。`,
+          );
+        } else if (rawMessage) {
+          setError(rawMessage);
+        } else {
+          setError("登录失败，请检查用户名和密码");
+        }
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err: unknown) {
-      const retryAfter =
-        typeof err === 'object' && err !== null && 'retryAfter' in err
-          ? Number((err as { retryAfter?: unknown }).retryAfter)
-          : null;
-      const rawMessage =
-        err instanceof Error
-          ? err.message
-          : typeof err === 'object' && err !== null && 'message' in err
-            ? String((err as { message: unknown }).message)
-            : '';
-
-      if (
-        /ECONNREFUSED|Failed to proxy|Network Error|fetch failed|timeout/i.test(rawMessage)
-      ) {
-        setError('后端服务未连接，请先启动 backend 服务（默认端口 3001）');
-      } else if (retryAfter && Number.isFinite(retryAfter) && retryAfter > 0) {
-        const minutes = Math.ceil(retryAfter / 60);
-        setError(`登录尝试过于频繁，请 ${minutes} 分钟后再试，或切换账号后重试。`);
-      } else if (rawMessage) {
-        setError(rawMessage);
-      } else {
-        setError('登录失败，请检查用户名和密码');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [clearLegacyQuickLoginProfile, login, router]);
+    },
+    [clearLegacyQuickLoginProfile, login, router],
+  );
 
   /**
    * 职责：提交登录表单并处理登录结果
@@ -168,15 +201,23 @@ function LoginFormClient() {
               请输入账号密码登录捷淞进销存系统。
             </CardDescription>
           </CardHeader>
-          <CardContent className="pb-5">
+          <CardContent className="space-y-4 pb-5">
+            {registrationReceipt && (
+              <RegistrationReceiptPanel receipt={registrationReceipt} />
+            )}
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-4"
+              >
                 <FormField
                   control={form.control}
                   name="username"
                   render={({ field }) => (
                     <FormItem className="space-y-2">
-                      <FormLabel className="text-sm font-medium">用户名或邮箱</FormLabel>
+                      <FormLabel className="text-sm font-medium">
+                        用户名或邮箱
+                      </FormLabel>
                       <FormControl>
                         <Input
                           placeholder="请输入用户名或邮箱"
@@ -193,27 +234,33 @@ function LoginFormClient() {
                   name="password"
                   render={({ field }) => (
                     <FormItem className="space-y-2">
-                      <FormLabel className="text-sm font-medium">密码</FormLabel>
-                      <FormControl>
-                        <div className="relative">
+                      <FormLabel className="text-sm font-medium">
+                        密码
+                      </FormLabel>
+                      <div className="relative">
+                        <FormControl>
                           <Input
-                            type={showPassword ? 'text' : 'password'}
+                            type={showPassword ? "text" : "password"}
                             aria-label="密码"
                             placeholder="••••••"
                             className="h-11 rounded-xl border-border/40 bg-background/50 pr-10 shadow-sm transition-all duration-200 focus:bg-background focus:shadow-md focus:ring-2 focus:ring-primary/15"
                             {...field}
                           />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            aria-label={showPassword ? '隐藏密码' : '显示密码'}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
-                            tabIndex={-1}
-                          >
-                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </button>
-                        </div>
-                      </FormControl>
+                        </FormControl>
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
+                          aria-pressed={showPassword}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -237,7 +284,7 @@ function LoginFormClient() {
                       登录中...
                     </>
                   ) : (
-                    '登录'
+                    "登录"
                   )}
                 </Button>
               </form>
@@ -246,22 +293,32 @@ function LoginFormClient() {
           <CardFooter className="flex flex-col gap-3 pt-0">
             <div className="relative flex w-full items-center gap-3">
               <div className="h-px flex-1 bg-border/40" />
-              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">或</span>
+              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">
+                或
+              </span>
               <div className="h-px flex-1 bg-border/40" />
             </div>
             <div className="flex w-full gap-2">
-              <Link href="/register" className="flex-1">
-                <Button variant="outline" className="h-10 w-full gap-2 rounded-xl border-border/30 bg-background/40 text-sm font-medium transition-all hover:bg-accent/40 hover:border-border/50">
+              <Button
+                asChild
+                variant="outline"
+                className="h-10 flex-1 gap-2 rounded-xl border-border/30 bg-background/40 text-sm font-medium transition-all hover:bg-accent/40 hover:border-border/50"
+              >
+                <Link href="/register">
                   <UserPlus className="h-4 w-4" />
                   立即注册
-                </Button>
-              </Link>
-              <Link href="/forgot-password" className="flex-1">
-                <Button variant="outline" className="h-10 w-full gap-2 rounded-xl border-border/30 bg-background/40 text-sm font-medium transition-all hover:bg-accent/40 hover:border-border/50">
+                </Link>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                className="h-10 flex-1 gap-2 rounded-xl border-border/30 bg-background/40 text-sm font-medium transition-all hover:bg-accent/40 hover:border-border/50"
+              >
+                <Link href="/forgot-password">
                   <KeyRound className="h-4 w-4" />
                   忘记密码
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </div>
           </CardFooter>
         </Card>
@@ -289,7 +346,9 @@ export default function LoginPage() {
                 </div>
               </div>
               <div className="text-center">
-                <h1 className="text-2xl font-bold tracking-tight">捷淞国际物流</h1>
+                <h1 className="text-2xl font-bold tracking-tight">
+                  捷淞国际物流
+                </h1>
                 <p className="mt-1 text-sm text-muted-foreground/80">JIESONG</p>
               </div>
             </div>
