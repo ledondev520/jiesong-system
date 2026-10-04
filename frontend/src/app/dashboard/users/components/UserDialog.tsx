@@ -1,5 +1,7 @@
+/** Input: selected user; Output: explicit identity/role review and account activation, preserving inactive state until confirmed. */
 "use client";
 
+import { useState } from "react";
 import { isValidPassword, PASSWORD_MESSAGE } from "@/lib/password-policy";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -52,12 +54,21 @@ interface UserDialogProps {
   onSubmit: (data: UserFormValues) => Promise<void>;
 }
 
-export function UserDialog({
+export function UserDialog(props: UserDialogProps) {
+  // A dismissed review must not retain an unsaved activation or another user's edits.
+  // Failed saves remain in the same open session, so their edits are preserved.
+  return props.open ? (
+    <UserDialogSession key={props.user?.id ?? "new"} {...props} />
+  ) : null;
+}
+
+function UserDialogSession({
   open,
   onOpenChange,
   user,
   onSubmit,
 }: UserDialogProps) {
+  const [submitError, setSubmitError] = useState("");
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userSchema),
     defaultValues: {
@@ -79,21 +90,34 @@ export function UserDialog({
   });
 
   const handleSubmit = async (data: UserFormValues) => {
+    setSubmitError("");
     if (!user && !data.password) {
       form.setError("password", { message: PASSWORD_MESSAGE });
       return;
     }
-    await onSubmit(data);
-    form.reset();
+    try {
+      await onSubmit(data);
+      form.reset();
+    } catch {
+      setSubmitError("保存失败，修改内容已保留，请重试。");
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{user ? "编辑用户" : "新增用户"}</DialogTitle>
+          <DialogTitle>
+            {user
+              ? user.isActive
+                ? "编辑用户"
+                : "核对并开通账号"
+              : "新增用户"}
+          </DialogTitle>
           <DialogDescription>
-            核对身份与角色权限，管理账号的登录资格。
+            {user && !user.isActive
+              ? "核对申请人、账号邮箱和角色。当前账号可能尚未开通或已停用；确认可以访问后，再打开下方「账号开通」并保存。不要向申请人索取密码或验证码。"
+              : "核对身份与角色权限，管理账号的登录资格。"}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -201,6 +225,11 @@ export function UserDialog({
                   </FormItem>
                 )}
               />
+            )}
+            {submitError && (
+              <p role="alert" className="text-sm text-destructive">
+                {submitError}
+              </p>
             )}
             <DialogFooter>
               <Button

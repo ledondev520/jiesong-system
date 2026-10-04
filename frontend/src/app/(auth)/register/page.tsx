@@ -14,6 +14,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { RegistrationReceiptPanel } from "@/components/auth/RegistrationReceiptPanel";
+import {
+  clearRegistrationReceipt,
+  saveRegistrationReceipt,
+  useRegistrationReceipt,
+} from "@/lib/registration-receipt";
 import { authService } from "@/services/auth.service";
 import { isValidPassword, PASSWORD_MESSAGE } from "@/lib/password-policy";
 
@@ -27,7 +33,8 @@ export default function RegisterPage() {
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [done, setDone] = useState(false);
+  const receipt = useRegistrationReceipt();
+  const done = Boolean(receipt);
   const emailInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!seconds) return;
@@ -70,7 +77,7 @@ export default function RegisterPage() {
       });
       setPassword("");
       setCode("");
-      setDone(true);
+      saveRegistrationReceipt(email.trim().toLowerCase());
     } catch (error) {
       setError(
         error && typeof error === "object" && "message" in error
@@ -88,10 +95,15 @@ export default function RegisterPage() {
           <CardTitle>{done ? "注册申请已提交" : "邮箱注册"}</CardTitle>
           <CardDescription>
             {done
-              ? "请联系管理员审核开通，开通后可用邮箱和密码登录。"
-              : "验证邮箱并设置密码，管理员审核后即可使用。"}
+              ? "邮箱验证和账号申请已完成，请按下面步骤联系管理员开通。"
+              : "先验证邮箱并设置密码，再由企业管理员核对身份和角色后开通；注册不会直接进入业务系统。"}
           </CardDescription>
         </CardHeader>
+        {receipt && (
+          <CardContent>
+            <RegistrationReceiptPanel receipt={receipt} />
+          </CardContent>
+        )}
         {!done && (
           <CardContent>
             <form onSubmit={submit} className="space-y-4">
@@ -190,10 +202,30 @@ export default function RegisterPage() {
             </form>
           </CardContent>
         )}
-        <CardFooter>
-          <Button asChild variant="ghost" className="w-full">
+        <CardFooter className="flex-col gap-2">
+          <Button
+            asChild
+            variant={done ? "default" : "ghost"}
+            className="w-full"
+          >
             <Link href="/login">返回登录</Link>
           </Button>
+          {done && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={() => {
+                clearRegistrationReceipt();
+                setEmail("");
+                setName("");
+                setError("");
+                setNotice("");
+              }}
+            >
+              注册其他邮箱
+            </Button>
+          )}
         </CardFooter>
       </Card>
     </div>
