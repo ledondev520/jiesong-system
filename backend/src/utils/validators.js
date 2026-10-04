@@ -1,6 +1,6 @@
 /**
  * Input: express-validator库
- * Output: 通用验证规则（登录、注册、找回密码和安全整数分页边界）
+ * Output: 通用验证规则（统一新密码策略、邮箱找回、注册及安全整数分页边界）
  * Pos: 参数验证工具，提供常用验证规则
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -10,6 +10,10 @@ const { body, param, query, validationResult } = require('express-validator');
 const { createError } = require('../middleware/errorHandler');
 const { ROLES } = require('../config/constants');
 const { MAX_PAGE } = require('./pagination');
+const { isValidPassword, PASSWORD_MESSAGE } = require('./passwordPolicy');
+const passwordRule = (field) => body(field).custom(isValidPassword).withMessage(PASSWORD_MESSAGE);
+const emailRule = () => body('email').isString().bail().trim().isLength({ max: 254 }).isEmail()
+  .withMessage('请输入有效邮箱地址').bail().customSanitizer((email) => email.toLowerCase());
 
 /**
  * 职责：处理验证结果，抛出验证错误
@@ -50,23 +54,20 @@ const validateRegister = [
   body('username')
     .notEmpty().withMessage('用户名不能为空')
     .isLength({ min: 3, max: 20 }).withMessage('用户名长度3-20字符'),
-  body('password')
-    .notEmpty().withMessage('密码不能为空')
-    .isLength({ min: 6 }).withMessage('密码至少6个字符'),
+  passwordRule('password'),
   body('name').notEmpty().withMessage('姓名不能为空'),
   body('role').optional().isIn(Object.values(ROLES)).withMessage('角色无效'),
 ];
 
-// 找回密码验证
+// 邮箱验证码找回密码；旧用户名+手机号请求不再通过校验。
 const validateResetPassword = [
-  body('username')
-    .notEmpty().withMessage('用户名不能为空'),
-  body('phone')
-    .notEmpty().withMessage('手机号不能为空')
-    .matches(/^1[3-9]\d{9}$/).withMessage('手机号格式无效'),
-  body('newPassword')
-    .notEmpty().withMessage('新密码不能为空')
-    .isLength({ min: 6 }).withMessage('新密码至少6个字符'),
+  emailRule(),
+  body('code').isString().bail().matches(/^\d{6}$/).withMessage('请输入6位验证码'),
+  passwordRule('newPassword'),
+];
+const validateChangePassword = [
+  body('oldPassword').isString().bail().notEmpty().withMessage('请输入原密码'),
+  passwordRule('newPassword'),
 ];
 
 /**
@@ -92,6 +93,9 @@ module.exports = {
   validateLogin,
   validateRegister,
   validateResetPassword,
+  validateChangePassword,
+  passwordRule,
+  emailRule,
   withPaginationValidation,
   withIdValidation,
   body,

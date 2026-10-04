@@ -126,3 +126,5 @@ AI 主页面与对话框保持相同确认口径：内部草稿直接生成，�
 - 验证：登录、注册、registration-receipt、账号页、UserDialog 单测；`e2e/onboarding.spec.ts` 使用合成数据验证390/1440px核对、取消与保存，`e2e/mobile.spec.ts` 验证回执刷新。没有新增公开查询接口、改变ADMIN权限或邮箱注册默认角色。
 
 TabSync 单测用 fake timers 执行并清理所有回退计时器，防止覆盖率运行在 jsdom 销毁后出现异步 localStorage 错误；不跳过回退行为断言。
+
+PR32 与审批体验整合：邮箱注册、管理员新增用户均保留统一 Unicode/UTF-8 密码规则；超72字节拒绝后可修正重试，注册成功仍生成仅邮箱/时间的待审批回执，管理员取消或保存失败行为不变。

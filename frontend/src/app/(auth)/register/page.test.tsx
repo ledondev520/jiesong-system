@@ -90,4 +90,32 @@ describe("邮箱注册", () => {
     ).not.toBeInTheDocument();
     expect(sessionStorage.getItem("jiesong_registration_receipt")).toBeNull();
   });
+  it("密码超过72字节时拒绝提交且不创建回执，修正后保留新的申请回执流程", async () => {
+    vi.mocked(authService.registerEmail).mockResolvedValue({} as never);
+    render(<RegisterPage />);
+    fireEvent.change(screen.getByLabelText("邮箱"), {
+      target: { value: "policy@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("邮箱验证码"), {
+      target: { value: "123456" },
+    });
+    fireEvent.change(screen.getByLabelText("姓名"), {
+      target: { value: "合成测试" },
+    });
+    fireEvent.change(screen.getByLabelText("密码"), {
+      target: { value: "字".repeat(25) },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "注册并申请开通" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("72");
+    expect(authService.registerEmail).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem("jiesong_registration_receipt")).toBeNull();
+    fireEvent.change(screen.getByLabelText("密码"), {
+      target: { value: "合成测试密码八字" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "注册并申请开通" }));
+    expect(
+      await screen.findByRole("region", { name: "注册申请回执" }),
+    ).toBeInTheDocument();
+    expect(authService.registerEmail).toHaveBeenCalledTimes(1);
+  });
 });

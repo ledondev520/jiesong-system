@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { isValidPassword, PASSWORD_MESSAGE } from "@/lib/password-policy";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -36,7 +37,10 @@ import {
 const userSchema = z.object({
   username: z.string().min(1, "用户名必填"),
   name: z.string().min(1, "姓名必填"),
-  password: z.string().optional(), // Optional for edit
+  password: z
+    .string()
+    .refine((value) => !value || isValidPassword(value), PASSWORD_MESSAGE)
+    .optional(), // Empty only for edit
   role: z.nativeEnum(Role),
   isActive: z.boolean(),
 });
@@ -87,6 +91,10 @@ function UserDialogSession({
 
   const handleSubmit = async (data: UserFormValues) => {
     setSubmitError("");
+    if (!user && !data.password) {
+      form.setError("password", { message: PASSWORD_MESSAGE });
+      return;
+    }
     try {
       await onSubmit(data);
       form.reset();
@@ -154,7 +162,11 @@ function UserDialogSession({
                 <FormItem>
                   <FormLabel>密码 {user && "(留空则不修改)"}</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="******" {...field} />
+                    <Input
+                      type="password"
+                      placeholder="至少8个字符，最多72字节"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

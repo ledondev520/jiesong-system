@@ -136,3 +136,37 @@ it("失败保存后关闭并打开另一个账号，清除错误与未保存的�
   expect(screen.getByRole("switch", { name: "账号开通" })).not.toBeChecked();
   expect(screen.getByLabelText("显示姓名")).toHaveValue("第二位");
 });
+
+it("新增用户不能缺少密码，超72字节密码也不会提交，修正后仍可保存", async () => {
+  const submit = vi.fn().mockResolvedValue(undefined);
+  render(<UserDialog open onOpenChange={() => {}} onSubmit={submit} />);
+  fireEvent.change(screen.getByLabelText("用户名 (登录账号)"), {
+    target: { value: "synthetic-user" },
+  });
+  fireEvent.change(screen.getByLabelText("显示姓名"), {
+    target: { value: "合成测试" },
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "保存" })).toBeEnabled(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  expect(await screen.findByText(/至少.*8/)).toBeInTheDocument();
+  expect(submit).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText("密码"), {
+    target: { value: "字".repeat(25) },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled(),
+  );
+  expect(screen.getByText(/不超过72/)).toBeInTheDocument();
+  expect(submit).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText("密码"), {
+    target: { value: "synthetic-valid-password" },
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "保存" })).toBeEnabled(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
+});

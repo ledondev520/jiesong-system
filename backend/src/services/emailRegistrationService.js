@@ -5,6 +5,7 @@ const prisma = require('../utils/prisma');
 const config = require('../config');
 const mail = require('./emailService');
 const { createError } = require('../middleware/errorHandler');
+const { assertPassword } = require('../utils/passwordPolicy');
 const digest = (id, code) => createHmac('sha256', config.jwt.secret).update(`${id}:${code}`).digest('hex');
 const existingAccount = async (tx, email) => (await tx.$queryRaw`SELECT id FROM users WHERE lower(username) = ${email} OR lower(email) = ${email} LIMIT 1`).length > 0;
 
@@ -34,6 +35,7 @@ async function sendCode(email) {
 }
 
 async function register({ email, code, password, name }) {
+  assertPassword(password);
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await prisma.$transaction(async (tx) => {
     const challenge = await tx.emailRegistrationChallenge.findFirst({ where: { email }, orderBy: { createdAt: 'desc' } });

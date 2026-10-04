@@ -9,7 +9,7 @@
 const { Router } = require('express');
 const userController = require('../controllers/userController');
 const { authenticate, roleAuth } = require('../middleware/auth');
-const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
+const { withIdValidation, withPaginationValidation, body, passwordRule, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 
 const router = Router();
@@ -27,7 +27,7 @@ router.get('/:id', withIdValidation, userController.getById);
 // POST /api/v1/users - 创建用户
 router.post('/', [
   body('username').notEmpty().withMessage('用户名不能为空'),
-  body('password').isLength({ min: 6 }).withMessage('密码至少6位'),
+  passwordRule('password'),
   body('name').notEmpty().withMessage('姓名不能为空'),
 ], handleValidation, withAuditLog(
   { entity: 'User', action: 'CREATE', model: 'user' },

@@ -58,6 +58,11 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
         working-directory: frontend
+      - name: Install isolated recovery backend fixture
+        run: |
+          npm ci
+          npx prisma generate
+        working-directory: backend
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
         working-directory: frontend

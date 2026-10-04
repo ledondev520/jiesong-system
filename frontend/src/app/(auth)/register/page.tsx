@@ -21,6 +21,7 @@ import {
   useRegistrationReceipt,
 } from "@/lib/registration-receipt";
 import { authService } from "@/services/auth.service";
+import { isValidPassword, PASSWORD_MESSAGE } from "@/lib/password-policy";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
@@ -61,8 +62,12 @@ export default function RegisterPage() {
   };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    setSubmitting(true);
     setError("");
+    if (!isValidPassword(password)) {
+      setError(PASSWORD_MESSAGE);
+      return;
+    }
+    setSubmitting(true);
     try {
       await authService.registerEmail({
         email: email.trim().toLowerCase(),
@@ -174,7 +179,7 @@ export default function RegisterPage() {
                   maxLength={72}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="至少8位"
+                  placeholder="至少8个字符，最多72字节"
                 />
               </div>
               {notice && (

@@ -93,7 +93,7 @@ test('validateRegister: 角色无效', async () => {
 
 test('validateRegister: 新角色 FINANCE 可通过', async () => {
   const req = createRequest({
-    body: { username: 'user2', password: 'pass123', name: '李四', role: 'FINANCE' },
+    body: { username: 'user2', password: 'test-only-password', name: '李四', role: 'FINANCE' },
   });
 
   await runValidations(validateRegister, req);

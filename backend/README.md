@@ -6,6 +6,8 @@
 
 本目录包含进销存系统的后端 API 服务，基于 Node.js + Express + Prisma + Supabase PostgreSQL 构建。
 
+当前VPS使用SQLite与绝对DATABASE_URL（见DEPLOY.md）。密码找回路由使用锁定express-rate-limit；`TRUSTED_PROXY_CIDRS` 默认空，显式可信IP/CIDR配置及生产一致备份前置条件见 `../docs/security/password-recovery.md`。不要使用固定本地dev.db备份替代生产数据库。
+
 ## 快速开始
 
 ### 1. 安装依赖
