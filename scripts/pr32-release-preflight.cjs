@@ -96,7 +96,7 @@ function inspect() {
     writer_inventory_complete:false,
     release_gate:'BLOCKED: verify runtime DB configuration, all writers/schedulers/managers, migration state, proxy chain and trusted host identity before maintenance'},null,2));
 }
-if(require.main===module) {
+if(require.main===module || process.argv[1] === '-') {
   try {inspect();} catch {console.error('Strict read-only preflight incomplete. No maintenance action taken.');process.exitCode=1;}
 }
 module.exports={summarizeProcess,databasePath,parseSetting,safeText};

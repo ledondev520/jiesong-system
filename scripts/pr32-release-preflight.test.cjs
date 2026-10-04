@@ -22,3 +22,18 @@ test('metadata rejects controls and oversized text',()=>{
  for(const x of ['node\n::error::payload','node\rvalue','x'.repeat(3000)]) assert.throws(()=>safeText(x,'comm'));
  assert.throws(()=>safeText('/opt/a\nvalue','path'));
 });
+
+test('stdin entrypoint actually executes inventory instead of silent success',()=>{
+ const {spawnSync}=require('node:child_process');
+ const fs=require('node:fs');
+ const source=fs.readFileSync(require.resolve('./pr32-release-preflight.cjs'),'utf8');
+ const temp=fs.mkdtempSync(require('node:path').join(require('node:os').tmpdir(),'preflight-stdin-'));
+ const missing=require('node:path').join(temp,'absent');
+ const script=source.replace("const root = '/opt/jiesong-system';",`const root = ${JSON.stringify(missing)};`);
+ assert.notEqual(script,source);
+ const result=spawnSync(process.execPath,['-'],{input:script,encoding:'utf8'});
+ fs.rmdirSync(temp);
+ assert.equal(result.status,1);
+ assert.match(result.stderr,/Strict read-only preflight incomplete/);
+ assert.equal(result.stdout,'');
+});
