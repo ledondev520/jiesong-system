@@ -1,170 +1,70 @@
-# G-Stack Deploy
-# 部署工作流 — 自动通过 SSH 部署到 VPS
-
-name: Deploy
-
+# DRAFT: replace the existing deploy.yml ON A DEDICATED MAINTENANCE BRANCH ONLY.
+# No main push/PR trigger; dispatch only after independent review and owner approval.
+# Uses existing staging-scoped SSH credentials for the same host as current main deployment.
+name: PR32 Read-only Release Preflight
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Deployment environment'
-        required: true
-        default: 'staging'
-        type: choice
-        options:
-          - staging
-          - production
-
-env:
-  NODE_VERSION: '20.19.0'
-
+      host_key_sha256:
+        description: Optional independently verified VPS SSH public host-key fingerprint
+        required: false
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: pr32-release-preflight
+  cancel-in-progress: false
 jobs:
-  # 预部署检查
-  pre-deploy:
-    name: Pre-deploy Checks
+  preflight:
+    if: github.ref == 'refs/heads/ops/pr32-release-preflight-20261004' && github.actor == 'ledondev520'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Verify deployment check behavior
-        run: node --test scripts/verify-vps-runtime.test.cjs
-
-      - name: Install frontend dependencies
-        working-directory: ./frontend
-        run: npm ci
-
-      - name: Lint & TypeScript check
-        working-directory: ./frontend
-        run: |
-          npm run lint
-          npx tsc --noEmit
-
-      - name: Test frontend
-        working-directory: ./frontend
-        run: npm test -- --run
-
-      - name: Build frontend
-        working-directory: ./frontend
-        run: npm run build
+          persist-credentials: false
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          log-public-key: false
+      - name: Read-only remote inventory
         env:
-          NODE_ENV: production
-          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL || '/api/v1' }}
-
-  # 部署到 Staging
-  deploy-staging:
-    name: Deploy to Staging
-    runs-on: ubuntu-latest
-    needs: pre-deploy
-    if: github.event.inputs.environment == 'staging' || (github.ref == 'refs/heads/main' && github.event.inputs.environment == '') || startsWith(github.ref, 'refs/tags/v')
-    environment:
-      name: staging
-      url: ${{ vars.STAGING_URL || 'https://staging.jiesong-system.com' }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          log-public-key: false
-
-      - name: Add host to known_hosts
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+          EXPECTED_HOST_FINGERPRINT: ${{ inputs.host_key_sha256 }}
+        shell: bash
         run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -p ${{ secrets.SSH_PORT || '22' }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      - name: Deploy to Staging via SSH
-        run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || '22' }} '
-            set -eu
-            cd /opt/jiesong-system || exit 1
-            git fetch origin
-            git reset --hard ${{ github.sha }}
-            cd backend
-            npm ci --production
-            npx prisma generate
-            npx prisma migrate deploy
-            cd ../frontend
-            npm ci
-            npm run build
-            pm2 restart jiesong-backend || pm2 start ecosystem.config.js --only jiesong-backend
-            pm2 restart jiesong-frontend || pm2 start ecosystem.config.js --only jiesong-frontend
-            pm2 save
-            sudo nginx -t && sudo systemctl reload nginx
-            node /opt/jiesong-system/scripts/verify-vps-runtime.cjs "${{ vars.STAGING_URL || 'https://staging.jiesong-system.com' }}"
-          '
-
-      - name: Notify Slack
-        if: failure()
-        run: |
-          echo "Staging deploy failed"
-
-  # 部署到 Production
-  deploy-production:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: [pre-deploy, deploy-staging]
-    if: github.event.inputs.environment == 'production' || (startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, 'rc'))
-    environment:
-      name: production
-      url: ${{ vars.PRODUCTION_URL || 'https://jiesong-system.com' }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          log-public-key: false
-
-      - name: Add host to known_hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -p ${{ secrets.SSH_PORT || '22' }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      - name: Deploy to Production via SSH
-        run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || '22' }} '
-            set -eu
-            cd /opt/jiesong-system || exit 1
-            git fetch origin
-            git checkout ${{ github.ref_name }}
-            git reset --hard ${{ github.sha }}
-            cd backend
-            npm ci --production
-            npx prisma generate
-            npx prisma migrate deploy
-            cd ../frontend
-            npm ci
-            npm run build
-            pm2 restart jiesong-backend || pm2 start ecosystem.config.js --only jiesong-backend
-            pm2 restart jiesong-frontend || pm2 start ecosystem.config.js --only jiesong-frontend
-            pm2 save
-            sudo nginx -t && sudo systemctl reload nginx
-            node /opt/jiesong-system/scripts/verify-vps-runtime.cjs "${{ vars.PRODUCTION_URL || 'https://jiesong-system.com' }}"
-          '
-
-      - name: Notify deployment status
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: context.sha,
-              state: 'success',
-              context: 'Deployment',
-              description: 'Deployed to production',
-            });
+          set -euo pipefail
+          test -n "$SSH_HOST" && test -n "$SSH_USER"
+          [[ "$SSH_PORT" =~ ^[0-9]+$ ]]
+          [[ "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ ]]
+          [[ "$SSH_USER" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_-]*$ ]]
+          if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
+            [[ "$EXPECTED_HOST_FINGERPRINT" =~ ^SHA256:[a-zA-Z0-9+/]{43}$ ]]
+          fi
+          umask 077
+          # No pin: inherit the already-authorized deploy channel's host-key discovery.
+          # A supplied independent pin is mandatory to match; never bypass a mismatch.
+          known_hosts="$(mktemp)"
+          scanned="$(mktemp)"
+          one="$(mktemp)"
+          trap 'rm -f "$known_hosts" "$scanned" "$one"' EXIT
+          ssh-keyscan -T 10 -p "$SSH_PORT" -H "$SSH_HOST" > "$scanned" 2>/dev/null
+          if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
+            while IFS= read -r host_key; do
+              printf '%s\n' "$host_key" > "$one"
+              observed="$(ssh-keygen -lf "$one" -E sha256 | awk '{print $2}')"
+              if [[ "$observed" == "$EXPECTED_HOST_FINGERPRINT" ]]; then
+                cat "$one" >> "$known_hosts"
+              fi
+            done < "$scanned"
+          else
+            cat "$scanned" > "$known_hosts"
+            echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
+          fi
+          test -s "$known_hosts"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            'node -' < scripts/pr32-release-preflight.cjs

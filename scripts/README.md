@@ -353,3 +353,5 @@ python scripts/analyze_wps_formal_customs_source_gaps.py
 采购凭据税率解析保留显式 `%/％` 单位（1%→1），仅无百分号的小数按Excel比例换算；PDF和正文提取不得丢失百分号语义。回归：`python3 -m unittest scripts.test_wps_purchase_tax_rate`。
 
 VPS 发布后运行 `node scripts/verify-vps-runtime.cjs https://celerada.link` 核对真实进程与公网构建；其回归检查为 `node --test scripts/verify-vps-runtime.test.cjs`。
+
+PR32 运维只读预检：`pr32-release-preflight.cjs` 仅在独立维护分支手工运行，读取 /proc 与文件元数据，不调用 PM2、SQLite、应用初始化，不证明 writer 已停或数据库已备份。现有 SSH 通道可继承其主机信任方式；提供独立指纹时必须精确匹配，绝不忽略不匹配。
