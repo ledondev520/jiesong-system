@@ -124,3 +124,5 @@ AI 主页面与对话框保持相同确认口径：内部草稿直接生成，�
 - 账号列表沿用 loadPaginatedCatalog 读取所有分页，避免只看前100条；刷新失败有明确提示。保存失败保留表单修改，取消不写入。
 - 登录密码标签/错误说明关联实际输入，显示密码可通过键盘切换，注册和找回密码入口各一个焦点。
 - 验证：登录、注册、registration-receipt、账号页、UserDialog 单测；`e2e/onboarding.spec.ts` 使用合成数据验证390/1440px核对、取消与保存，`e2e/mobile.spec.ts` 验证回执刷新。没有新增公开查询接口、改变ADMIN权限或邮箱注册默认角色。
+
+TabSync 单测用 fake timers 执行并清理所有回退计时器，防止覆盖率运行在 jsdom 销毁后出现异步 localStorage 错误；不跳过回退行为断言。
