@@ -15,3 +15,5 @@
 | visual.spec.ts / snapshots | 可选视觉验收 | 平台相关截图，仅在 VISUAL_REGRESSION=1 时运行 |
 
 运行：`CI=1 npm run test:e2e -- --reporter=list,html`（先 `npx playwright install chromium`）。注册验收验证合成发送请求、冷却按钮、待审核提示及无自动登录令牌；后端 `emailRegistration.test.js` 验证真实校验和限流。采购夹具保持 SIGNED/无到货事实，汇总与明细不得伪造已验收库存。
+
+- `business-qa.spec.ts`：390/1440px 合成采购单号搜索，验证既有 keyword 参数、具名详情/合同生成入口及无水平溢出；不写入生产数据。
