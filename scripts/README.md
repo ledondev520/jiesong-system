@@ -355,3 +355,5 @@ python scripts/analyze_wps_formal_customs_source_gaps.py
 VPS 发布后运行 `node scripts/verify-vps-runtime.cjs https://celerada.link` 核对真实进程与公网构建；其回归检查为 `node --test scripts/verify-vps-runtime.test.cjs`。
 
 PR32 运维只读预检：`pr32-release-preflight.cjs` 仅在独立维护分支手工运行，读取 /proc 与文件元数据，不调用 PM2、SQLite、应用初始化，不证明 writer 已停或数据库已备份。现有 SSH 通道可继承其主机信任方式；提供独立指纹时必须精确匹配，绝不忽略不匹配。
+
+在线快照：`pr32-online-backup.py` 对核实的PR32 SQLite源通过backup API生成事务一致副本，服务不停写；保护目录和文件、记录校验回执，之后写入不包含在快照内，不自动恢复、不上传、不执行迁移或重启。

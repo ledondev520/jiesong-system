@@ -1,10 +1,18 @@
 # DRAFT: replace the existing deploy.yml ON A DEDICATED MAINTENANCE BRANCH ONLY.
 # No main push/PR trigger; dispatch only after independent review and owner approval.
 # Uses existing staging-scoped SSH credentials for the same host as current main deployment.
-name: PR32 Read-only Release Preflight
+name: PR32 Bounded Release Preparation
 on:
   workflow_dispatch:
     inputs:
+      operation:
+        description: Bounded operation, no migrations or restarts
+        required: true
+        default: inventory
+        type: choice
+        options:
+          - inventory
+          - snapshot
       host_key_sha256:
         description: Optional independently verified VPS SSH public host-key fingerprint
         required: false
@@ -28,11 +36,13 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           log-public-key: false
-      - name: Read-only remote inventory
+      - name: Bounded release preparation
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+          RELEASE_OPERATION: ${{ inputs.operation }}
+          RELEASE_RUN_ID: ${{ github.run_id }}
           EXPECTED_HOST_FINGERPRINT: ${{ inputs.host_key_sha256 }}
         shell: bash
         run: |
@@ -44,6 +54,8 @@ jobs:
           if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
             [[ "$EXPECTED_HOST_FINGERPRINT" =~ ^SHA256:[a-zA-Z0-9+/]{43}$ ]]
           fi
+          [[ "$RELEASE_OPERATION" == inventory || "$RELEASE_OPERATION" == snapshot ]]
+          [[ "$RELEASE_RUN_ID" =~ ^[0-9]+$ ]]
           umask 077
           # No pin: inherit the already-authorized deploy channel's host-key discovery.
           # A supplied independent pin is mandatory to match; never bypass a mismatch.
@@ -65,6 +77,12 @@ jobs:
             echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
           fi
           test -s "$known_hosts"
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
-            -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
-            'node -' < scripts/pr32-release-preflight.cjs
+          if [[ "$RELEASE_OPERATION" == inventory ]]; then
+            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+              -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+              'node -' < scripts/pr32-release-preflight.cjs
+          else
+            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+              -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+              "python3 - $RELEASE_RUN_ID" < scripts/pr32-online-backup.py
+          fi
