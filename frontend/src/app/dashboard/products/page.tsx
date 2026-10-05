@@ -1,32 +1,38 @@
 /**
- * Input: 商品服务API、库存服务API、URL 初始关键词、SortableTableHead、useTableSort
- * Output: 商品管理页面（含商品档案列排序、库存状态两个子 Tab）
+ * Input: 商品服务API、库存服务API、URL 初始关键词、独立商品编辑/保存会话
+ * Output: 商品管理页面，失败保留草稿、旧保存不干扰新会话或当前筛选
  * Pos: 采购模块子页面
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { BusinessWrite, useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
-import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Product } from '@/types';
-import { productService } from '@/services/product.service';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2, Search, Package, X } from 'lucide-react';
-import { EmptyState } from '@/components/ui/empty-state';
-import { ProductDialog } from './components/ProductDialog';
-import { InventoryTab } from './components/InventoryTab';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { ModuleTabHeader, PROCUREMENT_TABS } from '@/components/layout/ModuleTabHeader';
-import { MobileListCard } from '@/components/mobile';
-import { PageSizeSelect } from '@/components/ui/page-size-select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toast } from 'sonner';
+import {
+  BusinessWrite,
+  useBusinessReadOnly,
+} from "@/lib/hooks/useBusinessReadOnly";
+import { Suspense, useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
+import { Product } from "@/types";
+import { productService } from "@/services/product.service";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Pencil, Trash2, Search, Package, X } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ProductDialog } from "./components/ProductDialog";
+import { InventoryTab } from "./components/InventoryTab";
+import { PageHeader } from "@/components/layout/PageHeader";
+import {
+  ModuleTabHeader,
+  PROCUREMENT_TABS,
+} from "@/components/layout/ModuleTabHeader";
+import { MobileListCard } from "@/components/mobile";
+import { PageSizeSelect } from "@/components/ui/page-size-select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,8 +42,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { useTableSort } from '@/lib/hooks/useTableSort';
+} from "@/components/ui/alert-dialog";
+import { useTableSort } from "@/lib/hooks/useTableSort";
 
 /**
  * 职责：将输入值延迟一段时间后再稳定输出，避免高频副作用触发。
@@ -71,9 +77,9 @@ const DEFAULT_PAGE_SIZE = 20;
 function ProductsPageContent() {
   const readOnly = useBusinessReadOnly();
   const searchParams = useSearchParams();
-  const initialKeyword = searchParams.get('keyword') || '';
-  const lowStockParam = searchParams.get('lowStock') === 'true';
-  
+  const initialKeyword = searchParams.get("keyword") || "";
+  const lowStockParam = searchParams.get("lowStock") === "true";
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -89,38 +95,63 @@ function ProductsPageContent() {
   const [loadError, setLoadError] = useState(false);
   const [lowStock, setLowStock] = useState(lowStockParam);
   const latestRequest = useRef(0);
+  const dialogSession = useRef(0);
+  const [reloadVersion, setReloadVersion] = useState(0);
 
   const loadProducts = useCallback(async () => {
     const request = ++latestRequest.current;
     setLoading(true);
     setLoadError(false);
     try {
-      const response = await productService.getAll({ page: currentPage, pageSize, keyword: debouncedKeyword || undefined, lite: true, ...(lowStock ? { lowStock: true } : {}) });
+      const response = await productService.getAll({
+        page: currentPage,
+        pageSize,
+        keyword: debouncedKeyword || undefined,
+        lite: true,
+        ...(lowStock ? { lowStock: true } : {}),
+      });
       if (request !== latestRequest.current) return;
       setProducts(response.data?.items || []);
-      setTotal(response.data?.pagination?.total ?? response.data?.items?.length ?? 0);
+      setTotal(
+        response.data?.pagination?.total ?? response.data?.items?.length ?? 0,
+      );
     } catch {
       if (request !== latestRequest.current) return;
       setLoadError(true);
-      toast.error('加载商品失败');
+      toast.error("加载商品失败");
     } finally {
       if (request === latestRequest.current) setLoading(false);
     }
   }, [currentPage, pageSize, debouncedKeyword, lowStock]);
 
-  useEffect(() => { setCurrentPage(1); }, [debouncedKeyword, lowStock]);
-  useEffect(() => { void loadProducts(); }, [loadProducts]);
-  useEffect(() => { setKeyword(initialKeyword); }, [initialKeyword]);
-  useEffect(() => { setLowStock(lowStockParam); }, [lowStockParam]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedKeyword, lowStock]);
+  useEffect(() => {
+    void loadProducts();
+  }, [loadProducts, reloadVersion]);
+  useEffect(() => {
+    setKeyword(initialKeyword);
+  }, [initialKeyword]);
+  useEffect(() => {
+    setLowStock(lowStockParam);
+  }, [lowStockParam]);
 
   const handleCreate = () => {
+    dialogSession.current += 1;
     setEditingProduct(null);
     setIsDialogOpen(true);
   };
 
   const handleEdit = (product: Product) => {
+    dialogSession.current += 1;
     setEditingProduct(product);
     setIsDialogOpen(true);
+  };
+
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) dialogSession.current += 1;
+    setIsDialogOpen(nextOpen);
   };
 
   /**
@@ -151,33 +182,38 @@ function ProductsPageContent() {
     try {
       await productService.delete(productToDelete.id);
       setProducts((prevProducts) =>
-        prevProducts.filter((product) => product.id !== productToDelete.id)
+        prevProducts.filter((product) => product.id !== productToDelete.id),
       );
-      toast.success('商品已删除');
-      if (products.length === 1 && currentPage > 1) setCurrentPage(page => page - 1);
+      toast.success("商品已删除");
+      if (products.length === 1 && currentPage > 1)
+        setCurrentPage((page) => page - 1);
       else void loadProducts();
       setDeleteDialogOpen(false);
       setProductToDelete(null);
     } catch {
-      toast.error('删除失败');
+      toast.error("删除失败");
     } finally {
       setDeleting(false);
     }
   };
 
   const handleSubmit = async (data: Record<string, unknown>) => {
+    const session = dialogSession.current;
     try {
       if (editingProduct) {
         await productService.update(editingProduct.id, data);
-        toast.success('商品更新成功');
+        toast.success("商品更新成功");
       } else {
         await productService.create(data);
-        toast.success('商品创建成功');
+        toast.success("商品创建成功");
       }
-      setIsDialogOpen(false);
-      void loadProducts();
-    } catch {
-      toast.error(editingProduct ? '更新失败' : '创建失败');
+      if (session === dialogSession.current) handleDialogOpenChange(false);
+      // Refresh from the latest render, not the filters captured before the save.
+      setReloadVersion((version) => version + 1);
+    } catch (error) {
+      toast.error(editingProduct ? "更新失败" : "创建失败");
+      // The dialog must distinguish a failed save from a successful cancellation.
+      throw error;
     }
   };
 
@@ -186,18 +222,18 @@ function ProductsPageContent() {
    */
   const productAccessor = useCallback((item: Product, key: string) => {
     switch (key) {
-      case 'customsName':
+      case "customsName":
         return item.customsName;
-      case 'grossWeight':
+      case "grossWeight":
         return item.grossWeight ?? null;
-      case 'netWeight':
+      case "netWeight":
         return item.netWeight ?? null;
-      case 'volume':
+      case "volume":
         return item.volume ?? null;
-      case 'specification':
-        return item.specification ?? '';
-      case 'unit':
-        return item.unit ?? '';
+      case "specification":
+        return item.specification ?? "";
+      case "unit":
+        return item.unit ?? "";
       default:
         return null;
     }
@@ -211,9 +247,7 @@ function ProductsPageContent() {
   return (
     <div className="space-y-6">
       <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
-      <PageHeader
-        title="商品管理"
-      />
+      <PageHeader title="商品管理" />
 
       <Tabs defaultValue="products" className="space-y-4">
         <TabsList>
@@ -237,49 +271,121 @@ function ProductsPageContent() {
                 variant="ghost"
                 size="sm"
                 className="h-10 rounded-xl"
-                onClick={() => { setKeyword(''); setCurrentPage(1); }}
+                onClick={() => {
+                  setKeyword("");
+                  setCurrentPage(1);
+                }}
               >
                 <X className="h-4 w-4 mr-1" />
                 重置
               </Button>
             )}
-            <BusinessWrite><Button onClick={handleCreate} className="h-10 rounded-xl">
-              <Plus className="mr-2 h-4 w-4" /> 新增商品
-            </Button></BusinessWrite>
+            <BusinessWrite>
+              <Button onClick={handleCreate} className="h-10 rounded-xl">
+                <Plus className="mr-2 h-4 w-4" /> 新增商品
+              </Button>
+            </BusinessWrite>
           </div>
 
-          <Button variant={lowStock ? 'default' : 'outline'} onClick={() => setLowStock(value => !value)} aria-pressed={lowStock}>只看低库存商品</Button>
-          {lowStock && <p className="text-sm text-muted-foreground">按已入库可用数量与商品阈值核对，包含零库存商品。</p>}
-          {loadError && <div role="alert" className="rounded-lg border border-destructive/30 p-4 text-sm">商品读取失败，不能视为没有商品。<Button variant="outline" onClick={() => void loadProducts()}>重试</Button></div>}
+          <Button
+            variant={lowStock ? "default" : "outline"}
+            onClick={() => setLowStock((value) => !value)}
+            aria-pressed={lowStock}
+          >
+            只看低库存商品
+          </Button>
+          {lowStock && (
+            <p className="text-sm text-muted-foreground">
+              按已入库可用数量与商品阈值核对，包含零库存商品。
+            </p>
+          )}
+          {loadError && (
+            <div
+              role="alert"
+              className="rounded-lg border border-destructive/30 p-4 text-sm"
+            >
+              商品读取失败，不能视为没有商品。
+              <Button variant="outline" onClick={() => void loadProducts()}>
+                重试
+              </Button>
+            </div>
+          )}
           {/* 移动端卡片列表 */}
           <div className="space-y-3 md:hidden">
             {loading ? (
-              <div className="surface-panel py-10 text-center text-sm text-muted-foreground">加载中...</div>
+              <div className="surface-panel py-10 text-center text-sm text-muted-foreground">
+                加载中...
+              </div>
             ) : loadError ? null : products.length === 0 ? (
               <div className="surface-panel py-10 text-center text-sm text-muted-foreground">
-                {lowStock ? '没有低库存商品' : keyword ? '没有匹配的商品' : '暂无商品，点击右上角新增'}
+                {lowStock
+                  ? "没有低库存商品"
+                  : keyword
+                    ? "没有匹配的商品"
+                    : "暂无商品，点击右上角新增"}
               </div>
             ) : (
               pagedProducts.map((product) => (
                 <MobileListCard
                   key={product.id}
                   title={product.customsName}
-                  subtitle={[product.specification, product.unit].filter(Boolean).join(' · ') || '-'}
+                  subtitle={
+                    [product.specification, product.unit]
+                      .filter(Boolean)
+                      .join(" · ") || "-"
+                  }
                   fields={[
-                    ...(lowStock ? [{ label: '可用库存 / 阈值', value: `${product.availableStock ?? 0} / ${product.lowStockThreshold ?? 0}` }] : []),
-                    { label: '包装规格', value: product.packingSpec || '-' },
-                    { label: '毛重', value: product.grossWeight != null ? `${product.grossWeight} kg` : '-' },
-                    { label: '净重', value: product.netWeight != null ? `${product.netWeight} kg` : '-' },
-                    { label: '体积', value: product.volume != null ? `${product.volume} CBM` : '-' },
+                    ...(lowStock
+                      ? [
+                          {
+                            label: "可用库存 / 阈值",
+                            value: `${product.availableStock ?? 0} / ${product.lowStockThreshold ?? 0}`,
+                          },
+                        ]
+                      : []),
+                    { label: "包装规格", value: product.packingSpec || "-" },
+                    {
+                      label: "毛重",
+                      value:
+                        product.grossWeight != null
+                          ? `${product.grossWeight} kg`
+                          : "-",
+                    },
+                    {
+                      label: "净重",
+                      value:
+                        product.netWeight != null
+                          ? `${product.netWeight} kg`
+                          : "-",
+                    },
+                    {
+                      label: "体积",
+                      value:
+                        product.volume != null ? `${product.volume} CBM` : "-",
+                    },
                   ]}
                   action={
                     <div className="flex gap-2">
-                      <BusinessWrite><Button variant="outline" size="sm" className="h-10 flex-1 rounded-xl" onClick={() => handleEdit(product)}>
-                        <Pencil className="mr-1 h-4 w-4" /> 编辑
-                      </Button></BusinessWrite>
-                      <BusinessWrite><Button variant="ghost" size="sm" className="h-10 rounded-xl px-3" onClick={() => openDeleteDialog(product)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button></BusinessWrite>
+                      <BusinessWrite>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-10 flex-1 rounded-xl"
+                          onClick={() => handleEdit(product)}
+                        >
+                          <Pencil className="mr-1 h-4 w-4" /> 编辑
+                        </Button>
+                      </BusinessWrite>
+                      <BusinessWrite>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-10 rounded-xl px-3"
+                          onClick={() => openDeleteDialog(product)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </BusinessWrite>
                     </div>
                   }
                 />
@@ -289,103 +395,157 @@ function ProductsPageContent() {
 
           {/* 桌面端表格 */}
           <div className="surface-panel hidden overflow-hidden md:block">
-          {/* 桌面端卡片视图 */}
-          <div className="hidden md:block">
-            {loading ? (
-              <div className="py-12 text-center text-muted-foreground">加载中...</div>
-            ) : loadError ? null : products.length === 0 ? (
-              <EmptyState
-                icon={<Package className="h-8 w-8" />}
-                title={lowStock ? "没有低库存商品" : "暂无商品"}
-                description={lowStock ? "已启用预警阈值的商品均有足够可用库存。" : "还没有添加任何商品，点击下方的按钮开始创建"}
-                action={readOnly ? undefined : { label: '新增商品', onClick: () => setIsDialogOpen(true) }}
-              />
-            ) : (
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
-                {pagedProducts.map((product) => (
-                  <Card
-                    key={product.id}
-                    className="cursor-pointer border-border/40 border-l-[3px] bg-card/60 transition-all duration-300 hover:border-primary/20 hover:bg-card hover:shadow-md hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/10"
-                    style={{ borderLeftColor: 'oklch(0.55 0.14 150)' }}
-                    onClick={() => handleEdit(product)}
-                  >
-                    <CardContent className="space-y-3 p-4">
-                      {/* 名称 + 分类 */}
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-foreground truncate">{product.customsName}</p>
-                          <p className="text-xs text-muted-foreground">{product.specification || '—'}</p>
-                        </div>
-                        <Badge variant="outline" className="shrink-0 text-[11px]">
-                          {product.unit || '件'}
-                        </Badge>
-                      </div>
-
-                      {lowStock && <p className="text-sm text-destructive">可用库存 {product.availableStock ?? 0} / 阈值 {product.lowStockThreshold ?? 0}</p>}
-                      {/* 规格信息 */}
-                      <div className="grid grid-cols-3 gap-2 text-center">
-                        <div className="rounded-lg bg-muted/40 p-2">
-                          <p className="text-[10px] text-muted-foreground">毛重</p>
-                          <p className="text-sm font-bold tabular-nums">{product.grossWeight || 0}kg</p>
-                        </div>
-                        <div className="rounded-lg bg-muted/40 p-2">
-                          <p className="text-[10px] text-muted-foreground">净重</p>
-                          <p className="text-sm font-bold tabular-nums">{product.netWeight || 0}kg</p>
-                        </div>
-                        <div className="rounded-lg bg-muted/40 p-2">
-                          <p className="text-[10px] text-muted-foreground">体积</p>
-                          <p className="text-sm font-bold tabular-nums">{product.volume || 0}CBM</p>
-                        </div>
-                      </div>
-
-                      {/* 包装 + HS */}
-                      <div className="space-y-0.5 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1.5">
-                          <span className="shrink-0">包装:</span>
-                          <span className="text-foreground">{product.packingSpec || '—'}</span>
-                        </div>
-                        {product.hsCode && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="shrink-0">HS编码:</span>
-                            <span className="font-mono text-foreground">{product.hsCode}</span>
+            {/* 桌面端卡片视图 */}
+            <div className="hidden md:block">
+              {loading ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  加载中...
+                </div>
+              ) : loadError ? null : products.length === 0 ? (
+                <EmptyState
+                  icon={<Package className="h-8 w-8" />}
+                  title={lowStock ? "没有低库存商品" : "暂无商品"}
+                  description={
+                    lowStock
+                      ? "已启用预警阈值的商品均有足够可用库存。"
+                      : "还没有添加任何商品，点击下方的按钮开始创建"
+                  }
+                  action={
+                    readOnly
+                      ? undefined
+                      : { label: "新增商品", onClick: handleCreate }
+                  }
+                />
+              ) : (
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+                  {pagedProducts.map((product) => (
+                    <Card
+                      key={product.id}
+                      className="cursor-pointer border-border/40 border-l-[3px] bg-card/60 transition-all duration-300 hover:border-primary/20 hover:bg-card hover:shadow-md hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/10"
+                      style={{ borderLeftColor: "oklch(0.55 0.14 150)" }}
+                      onClick={() => handleEdit(product)}
+                    >
+                      <CardContent className="space-y-3 p-4">
+                        {/* 名称 + 分类 */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-foreground truncate">
+                              {product.customsName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {product.specification || "—"}
+                            </p>
                           </div>
-                        )}
-                      </div>
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 text-[11px]"
+                          >
+                            {product.unit || "件"}
+                          </Badge>
+                        </div>
 
-                      {/* 操作 */}
-                      <div className="flex gap-2 pt-1 border-t border-border/30">
-                        <BusinessWrite><Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 flex-1 rounded-lg text-xs"
-                          onClick={(e) => { e.stopPropagation(); handleEdit(product); }}
-                        >
-                          <Pencil className="mr-1 h-3 w-3" /> 编辑
-                        </Button></BusinessWrite>
-                        <BusinessWrite><Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 flex-1 rounded-lg text-xs text-destructive hover:bg-destructive/10"
-                          onClick={(e) => { e.stopPropagation(); openDeleteDialog(product); }}
-                        >
-                          <Trash2 className="mr-1 h-3 w-3" /> 删除
-                        </Button></BusinessWrite>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
+                        {lowStock && (
+                          <p className="text-sm text-destructive">
+                            可用库存 {product.availableStock ?? 0} / 阈值{" "}
+                            {product.lowStockThreshold ?? 0}
+                          </p>
+                        )}
+                        {/* 规格信息 */}
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          <div className="rounded-lg bg-muted/40 p-2">
+                            <p className="text-[10px] text-muted-foreground">
+                              毛重
+                            </p>
+                            <p className="text-sm font-bold tabular-nums">
+                              {product.grossWeight || 0}kg
+                            </p>
+                          </div>
+                          <div className="rounded-lg bg-muted/40 p-2">
+                            <p className="text-[10px] text-muted-foreground">
+                              净重
+                            </p>
+                            <p className="text-sm font-bold tabular-nums">
+                              {product.netWeight || 0}kg
+                            </p>
+                          </div>
+                          <div className="rounded-lg bg-muted/40 p-2">
+                            <p className="text-[10px] text-muted-foreground">
+                              体积
+                            </p>
+                            <p className="text-sm font-bold tabular-nums">
+                              {product.volume || 0}CBM
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* 包装 + HS */}
+                        <div className="space-y-0.5 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1.5">
+                            <span className="shrink-0">包装:</span>
+                            <span className="text-foreground">
+                              {product.packingSpec || "—"}
+                            </span>
+                          </div>
+                          {product.hsCode && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="shrink-0">HS编码:</span>
+                              <span className="font-mono text-foreground">
+                                {product.hsCode}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 操作 */}
+                        <div className="flex gap-2 pt-1 border-t border-border/30">
+                          <BusinessWrite>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 flex-1 rounded-lg text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(product);
+                              }}
+                            >
+                              <Pencil className="mr-1 h-3 w-3" /> 编辑
+                            </Button>
+                          </BusinessWrite>
+                          <BusinessWrite>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 flex-1 rounded-lg text-xs text-destructive hover:bg-destructive/10"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openDeleteDialog(product);
+                              }}
+                            >
+                              <Trash2 className="mr-1 h-3 w-3" /> 删除
+                            </Button>
+                          </BusinessWrite>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* 分页控制 */}
           <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span>共 {total} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
+            <span>
+              共 {total} 条
+              {totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ""}
+            </span>
             <div className="flex items-center gap-2">
               <PageSizeSelect
                 value={pageSize}
-                onChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+                onChange={(size) => {
+                  setPageSize(size);
+                  setCurrentPage(1);
+                }}
               />
               <Button
                 variant="outline"
@@ -398,7 +558,9 @@ function ProductsPageContent() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
                 disabled={currentPage === totalPages || totalPages <= 1}
               >
                 下一页
@@ -408,17 +570,21 @@ function ProductsPageContent() {
 
           <ProductDialog
             open={isDialogOpen}
-            onOpenChange={setIsDialogOpen}
+            onOpenChange={handleDialogOpenChange}
             product={editingProduct}
             onSubmit={handleSubmit}
           />
 
-          <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialog
+            open={deleteDialogOpen}
+            onOpenChange={setDeleteDialogOpen}
+          >
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>确认删除</AlertDialogTitle>
                 <AlertDialogDescription>
-                  确定要删除商品 <strong>{productToDelete?.customsName}</strong> 吗？
+                  确定要删除商品 <strong>{productToDelete?.customsName}</strong>{" "}
+                  吗？
                   <br />
                   此操作无法撤销。
                 </AlertDialogDescription>
@@ -435,7 +601,7 @@ function ProductsPageContent() {
                   disabled={deleting}
                   className="bg-destructive hover:bg-destructive/90"
                 >
-                  {deleting ? '删除中...' : '确认删除'}
+                  {deleting ? "删除中..." : "确认删除"}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -452,7 +618,11 @@ function ProductsPageContent() {
 
 export default function ProductsPage() {
   return (
-    <Suspense fallback={<div className="py-12 text-center text-muted-foreground">加载中...</div>}>
+    <Suspense
+      fallback={
+        <div className="py-12 text-center text-muted-foreground">加载中...</div>
+      }
+    >
       <ProductsPageContent />
     </Suspense>
   );
