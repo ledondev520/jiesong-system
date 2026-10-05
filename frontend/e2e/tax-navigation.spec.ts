@@ -112,7 +112,9 @@ for (const width of [390, 1440]) {
     ).toBeVisible();
     await expect(customsTab).toHaveAttribute("aria-selected", "true");
 
-    await search.fill("TEST");
+    await search.clear();
+    await search.pressSequentially("TEST", { delay: 0 });
+    await expect(search).toHaveValue("TEST");
     await expect
       .poll(() => new URL(page.url()).searchParams.get("keyword"))
       .toBe("TEST");
