@@ -1,4 +1,4 @@
-/** 出口合同与装箱服务；发运后的货物数量、单位及行集与出库记录保持一致，单证资料可补录。 */
+/** 出口合同与装箱服务；历史状态别名的发运重放不重复扣库，发运后货物与出库保持一致。 */
 const prisma = require('../utils/prisma');
 const { parseShanghaiDateRange } = require('../utils/dateRange');
 const { createError } = require('../middleware/errorHandler');
@@ -256,7 +256,7 @@ const updateSalesStatus = async (id, status, context = {}) => {
       throw createError(validationResult.message || '非法销售合同状态流转', 400);
     }
 
-    const isTransition = existingContract.status !== targetStatus;
+    const isTransition = normalizeSalesStatus(existingContract.status) !== targetStatus;
     const settledStatus = getSalesSettlementStatus(targetStatus, existingContract.totalAmount, existingContract.receivedAmount);
     if (targetStatus === SALES_STATUS.COMPLETED && settledStatus !== SALES_STATUS.COMPLETED) {
       throw createError('销售款项尚未结清或存在金额差异，请先处理收款记录', 400);

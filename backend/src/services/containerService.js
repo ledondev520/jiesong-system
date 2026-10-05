@@ -1,8 +1,9 @@
-/** 旧货柜接口仍复用出口合同；装箱增删改在事务内检查发运/出库事实，不能改变已出库货物。 */
+/** 旧货柜接口复用出口合同状态机及出库事务；创建仅为草稿，表头不能绕过状态流转。 */
 const prisma = require('../utils/prisma');
 const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
 const { createError } = require('../middleware/errorHandler');
 const { getSalesCargoState, assertSalesCargoMutable, assertSalesCargoUpdate } = require('./salesCargoLifecycle');
+const { SALES_STATUS, normalizeSalesStatus } = require('./salesStateMachine');
 const {
   generateNextContractNo,
   normalizeFilterStatus,
@@ -294,7 +295,10 @@ const getById = async (id) => {
 };
 
 const create = async (data = {}) => {
-  const status = normalizeFilterStatus(data.status || 'DRAFT');
+  const status = data.status === undefined ? SALES_STATUS.DRAFT : normalizeSalesStatus(data.status);
+  if (status !== SALES_STATUS.DRAFT) {
+    throw createError('新货柜必须为草稿，请通过状态入口登记后续流转', 400);
+  }
   const contractNo = data.contractNo || (await generateNextContainerNo(data.portId));
   const exchangeRate = parseNullableNumber(data.exchangeRate, 7.0);
 
@@ -324,7 +328,6 @@ const create = async (data = {}) => {
 const update = async (id, data = {}) => {
   const updateData = {};
   if (data.portId !== undefined) updateData.portId = data.portId;
-  if (data.status !== undefined) updateData.status = normalizeFilterStatus(data.status);
   if (data.contractNo !== undefined) updateData.contractNo = data.contractNo;
   if (data.signedAt !== undefined) updateData.signedAt = data.signedAt ? new Date(data.signedAt) : null;
   if (data.estimatedArrival !== undefined) {
@@ -343,12 +346,18 @@ const update = async (id, data = {}) => {
     updateData.exchangeRate = parseNullableNumber(data.exchangeRate);
   }
 
-  const contract = await prisma.salesContract.update({
-    where: { id },
-    data: updateData,
+  return prisma.$transaction(async tx => {
+    // Keep legacy full-header saves compatible when their status is unchanged.
+    // A state change must use the shared transition/shipment transaction instead.
+    if (data.status !== undefined) {
+      const current = await tx.salesContract.findUnique({ where: { id }, select: { status: true } });
+      if (!current) throw createError('货柜不存在', 404);
+      if (normalizeSalesStatus(data.status) !== normalizeSalesStatus(current.status)) {
+        throw createError('请通过状态入口变更货柜状态，表头资料不能跳过业务流转', 400);
+      }
+    }
+    return tx.salesContract.update({ where: { id }, data: updateData });
   });
-
-  return contract;
 };
 
 const remove = async (id) => prisma.$transaction(async (tx) => {
@@ -387,17 +396,8 @@ const addItem = async (id, data) => prisma.$transaction(async (tx) => {
   return item;
 });
 
-const updateStatus = async (id, status) => {
-  const contract = await prisma.salesContract.update({
-    where: { id },
-    data: {
-      status: normalizeFilterStatus(status),
-      ...(status === 'SHIPPED' ? { shippedAt: new Date() } : {}),
-    },
-  });
-
-  return contract;
-};
+// Both routes operate on SalesContract; do not maintain a second state machine.
+const updateStatus = (id, status) => require('./salesService').updateSalesStatus(id, status);
 
 const getNextContainerNo = async (portId) => {
   const contractNo = await generateNextContainerNo(portId);

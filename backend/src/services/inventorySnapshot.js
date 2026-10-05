@@ -1,6 +1,6 @@
 /**
  * Input: PrismaClient、库存/采购/销售模型
- * Output: 库存快照与库存出入库服务能力
+ * Output: 库存快照与库存出入库服务能力；自有货物无效数量拒绝登记发运
  * Pos: 统一处理库存快照、采购入库建档和销售出库扣减，确保财务金额对齐
  */
 
@@ -293,9 +293,10 @@ const applySalesOutStock = async (tx, salesContractId) => {
   const packingItems = contract.packingItems || [];
   const shipmentItems = packingItems.length ? packingItems.filter(isJiesongOwnedPackingItem) : (contract.items || []);
   for (const item of shipmentItems) {
-    const needed = clampNumber(item.quantity, 0);
-    if (needed <= 0) {
-      continue;
+    // 草稿可以暂存未完成数量；实际发运不得静默跳过自有货物的无效出库量。
+    const needed = Number(item.quantity);
+    if (!Number.isFinite(needed) || needed <= 0) {
+      throw createError('自有出库商品数量必须为正数，请先完善装箱或销售明细', 400);
     }
 
     const allocation = await allocateInboundInventory({

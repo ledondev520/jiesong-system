@@ -13,7 +13,7 @@
 | app.js | 入口 | Express 应用初始化和启动（含定时任务启动） |
 | config/ | 配置层 | 权限校验后的环境加载、活动 AI 供应商与常量（含单元测试） |
 | controllers/ | 控制层 | 处理 HTTP 请求，调用服务层 |
-| integration/ | 集成测试层 | 数据库集成测试（空结构/事务/seed 幂等、真实 HTTP 进销存闭环及首个门店创建/RBAC） |
+| integration/ | 集成测试层 | 数据库集成测试（空结构/事务/seed 幂等、真实 HTTP 进销存闭环、首个门店创建/RBAC 与仓储异常出库/FIFO/来源守恒） |
 | jobs/ | 定时任务层 | 库存预警、出口提醒（每月5号退税/缺票提醒）等定时任务 |
 | middleware/ | 中间件层 | 认证、仅记录请求结构的性能日志、错误处理（含单元测试） |
 | routes/ | 路由层 | 定义 API 路由和参数验证 |
@@ -100,7 +100,9 @@
 
 - 采购模板：`routes/procurementTemplate.js` 的门店列表、通用模板、历史采购明细三个读取入口均先执行 `authenticate`，保持既有响应格式。
 
-- `inventorySnapshot.js`：以自有装箱行扣减对应采购来源、单位的合格库存，旧销售明细兼容不双计；回滚保留验货来源。
+- `inventorySnapshot.js`：以自有装箱行扣减对应采购来源、单位的合格库存，旧销售明细兼容不双计；回滚保留验货来源；实际自有出库数量必须有限且为正，草稿零值、非自有拼柜与价格/单证补录不受影响。
+- `containerService.js`：旧货柜状态入口委托 `salesService.updateSalesStatus`，沿用单向流转、装载校验、结清检查与原子扣库；新建只允许草稿，表头保存只能携带未改变的状态。真实权限拒绝、取消重试、旧入口绕过及缺库存回滚见 `integration/sales-role-exceptions.integration.js`。
+- `salesService.updateSalesStatus` 以规范化后的当前状态判断真实流转，历史 `OUT_STOCK` 重放 `SHIPPED` 只规范状态，不重新校验装载、改发运时间或扣库。
 - `customsDeclarationDraftService.js`：编号包含出口合同号，原子替换仅限 DRAFT，保留 ID 与编号并拒绝覆盖已放行单。
 
 - `utils/inventoryStateMachine.js` 的来源约束用于普通/批量库存接口和 AI 工具，AI 确认时重新检查；相同状态请求不修改 FIFO 时间。
@@ -122,6 +124,8 @@
 
 - `services/batchImportService.js` 的 JSON 采购导入逐行事务提交合同与明细；自动编号冲突或事务写冲突最多尝试五次，不更改显式编号，不重试无关错误；失败行回滚且后续行继续
 - `integration/purchase-batch-import.integration.js` 通过真实 HTTP/临时 SQLite 验证四请求并发、SQL 明细故障无孤立合同、部分成功、显式/溢出编号及原有 RBAC，由 `npm run test:db` 执行
+
+- `integration/purchase-receipt-exceptions.integration.js` 使用实际 PURCHASE HTTP 认证、临时 SQLite 及第二个 HTTP 进程，补充并发同请求/内容冲突、合法到齐/竞争超订、累计复验、跨批引用、整批回滚、真实库存 SQL 故障后原请求重试和既有受限财务/管理 RBAC；不修改既有普通销售与付款权限，由 `npm run test:db` 执行
 
 ## 浏览器会话
 

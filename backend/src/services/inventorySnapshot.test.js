@@ -152,3 +152,33 @@ test('FIFO拆分和销售回滚保留验货来源及原入库时间', async () =
   assert.equal(child.receiptInspectionId, 'inspection-1');
   assert.equal(child.inboundAt, inboundAt);
 });
+
+test('实际自有出库数量无效时拒绝，不静默跳过装箱或旧销售明细', async () => {
+  for (const usePacking of [true, false]) {
+    for (const quantity of [0, -1, NaN, Infinity, undefined]) {
+      const invalid = { id: 'synthetic-invalid', productId: 'synthetic-product', quantity, isOwnedByJiesong: true };
+      let inventoryRead = false;
+      const tx = {
+        salesContract: { findUnique: async () => ({ id: 'synthetic-sale', items: usePacking ? [] : [invalid], packingItems: usePacking ? [invalid] : [] }) },
+        inventory: { findMany: async () => { inventoryRead = true; return []; } },
+      };
+      await assert.rejects(() => applySalesOutStock(tx, 'synthetic-sale'), error => error.statusCode === 400 && /数量必须为正数/.test(error.message));
+      assert.equal(inventoryRead, false, '无效出库量不得读取或扣减库存');
+    }
+  }
+});
+
+test('非自有零值拼柜行不参与自有库存数量校验', async () => {
+  const row = { id: 'synthetic-third-party', quantity: 0, isOwnedByJiesong: false };
+  let inventoryRead = false;
+  const tx = {
+    salesContract: {
+      findUnique: async () => ({ id: 'synthetic-sale', amountSource: 'DERIVED', items: [], packingItems: [row] }),
+      update: async () => ({}),
+    },
+    salesItem: { findMany: async () => [] },
+    inventory: { findMany: async () => { inventoryRead = true; return []; } },
+  };
+  assert.deepEqual((await applySalesOutStock(tx, 'synthetic-sale')).results, []);
+  assert.equal(inventoryRead, false);
+});
