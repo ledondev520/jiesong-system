@@ -96,7 +96,7 @@
 - 若一次迭代涉及多个独立功能，拆分为多个 commit。
 
 ## 登录提示边界
-- `frontend/src/lib/auth-session.ts` 对无本标签令牌的 401 只要求登录，不能据此声称用户会话过期；不改变 sessionStorage、JWT 或权限校验。
+- `frontend/src/lib/auth-session.ts` 对无本标签令牌的 401 只要求登录，不能据此声称用户会话过期；默认Bearer仍按标签保存；可选HttpOnly浏览器会话详见下节，权限始终由服务端实时验证。
 
 ## 流程自动化边界
 - `backend/src/services/openAgentService.js` 中仅内部采购、报关、核销、退税草稿按请求直接执行，沿用工具角色校验、执行日志与单轮去重；签约、付款、实物状态及异常处理保留一次业务确认。AI 发运登记必须调用 `salesService.updateSalesStatus`，不能用合同头更新接口虚报状态已变化。
@@ -130,3 +130,13 @@
 - 消费验证码、更新密码、递增 `User.sessionVersion`、清除该账号其他验证码及最小审计元数据在同一事务中完成。`backend/src/middleware/auth.js` 每请求实时读取状态和版本，旧无版本JWT按0兼容但首次改密后永久失效；Agent credential 流程保持独立。认证缓存失效 API 保留兼容入口，用户认证不再依赖60秒缓存。
 - 新密码统一至少8个Unicode字符且UTF-8不超过bcrypt的72字节上限，覆盖注册、管理员创建/重设、已登录修改及找回；旧密码登录规则不变。前后端策略文件分别为 `backend/src/utils/passwordPolicy.js` 和 `frontend/src/lib/password-policy.ts`，修改时必须一起调整边界测试。
 - 禁止打印验证码、密码/哈希、收件人、云服务响应正文；Prisma关闭原始query/error输出以避免参数泄露（`backend/src/utils/prisma.js`）。隔离回归见 `backend/src/integration/password-recovery.integration.js`、`frontend/e2e/password-recovery.spec.ts`。
+
+## 可选保持登录
+- `browserSessionService.js` 仅显式 `rememberMe: true` 创建固定原JWT有效期的随机HttpOnly Cookie；生产强制Secure、SameSite=Strict、__Host前缀和Path=/，数据库只存摘要，不续期、不向JS返回该凭据。
+- Cookie写请求必须同时通过精确CORS_ORIGIN来源和会话绑定CSRF；兄弟来源同站读取同样检查来源。Bearer优先且无效时不回退，Agent流程保持独立。退出仅撤销当前浏览器，实时sessionVersion/停用/到期均使会话失效。
+- 401/退出/改密响应不发送可能擦掉新登录的延迟Cookie删除头；失效Cookie不能认证，原到期或新成功登录时自然过期/替换。登录响应和恢复响应禁止缓存。三处前端业务缓存及延迟401按认证代次隔离，取消登录不得回写状态。
+- 新表增量迁移前必须由发布协调者使用已审查预检完成真实DATABASE_URL的一致性在线SQLite快照，验证完整性及0700/0600权限；不能用默认路径文件复制或历史备份代替本次发布门槛。设计/回滚见 `docs/security/browser-sessions.md`。
+
+- `backend/src/middleware/apiRateLimit.js` 通过锁定express-rate-limit执行原全局100次/分钟预算，继续在解析和路由之前生效；保留429 JSON、Retry-After秒值及原X-RateLimit-Reset毫秒契约。IP使用ipKeyGenerator规范化IPv4映射和IPv6/56，不读取原始XFF、不增加代理信任；登录额外10次/15分钟仍保留。隔离HTTP测试也必须挂载同一实际限流，不能隐藏/豁免CodeQL的认证成本告警。
+
+- 全局API和原登录计数仍为进程内存：重启会重置、多worker各自计数，并非跨进程持久配额；邮箱/找回密码的SQLite持久配额继续独立执行。

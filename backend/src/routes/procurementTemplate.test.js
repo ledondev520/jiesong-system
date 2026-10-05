@@ -6,6 +6,8 @@ const procurementTemplateRoutes = require('./procurementTemplate');
 // No credentials or live database are needed: authentication must reject before loading the CSV.
 test('采购模板三个读取入口在未登录时返回 401', async (t) => {
   const app = express();
+  const { createApiRateLimiter, exposeApiRateLimitHeaders } = require("../middleware/apiRateLimit");
+  app.use(createApiRateLimiter(), exposeApiRateLimitHeaders);
   app.use('/procurement-template', procurementTemplateRoutes);
   app.use((error, req, res, next) => res.status(error.statusCode || 500).json({ code: error.statusCode || 500 }));
   const server = await new Promise((resolve) => {

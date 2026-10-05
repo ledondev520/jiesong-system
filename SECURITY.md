@@ -5,7 +5,7 @@ PR Review (`.github/workflows/pr-review.yml`) reports checks through Actions `GI
 ## 5-Layer Defense Architecture
 
 ### 1) 访问控制与身份层（Identity & Access）
-- `frontend/src/lib/auth-session.ts` distinguishes missing tab-local tokens from expired tokens for login messaging only; both require authentication, and tokens remain in sessionStorage.
+- `frontend/src/lib/auth-session.ts` distinguishes absent credentials from expired sessions. Unchecked-login JWTs remain tab-scoped; optional persistent browser sessions use HttpOnly credentials and live server validation.
 - Enforce explicit身份校验 (JWT + role checks) for all sensitive routes.
 - Treat Agent / Service Account credentials as independent machine identities; never reuse employee passwords or browser sessions for automation.
 - Keep authentication middleware as single entry for route groups and validate user context before业务处理.
@@ -98,4 +98,14 @@ Agent Runtime 仅加载锁定版本的已发布 SDK 构建，加载错误直接�
 - 新密码策略为至少8个Unicode字符且UTF-8不超过72字节；保留旧密码登录兼容。原始Prisma查询/错误输出禁用，安全找回错误仅输出固定文案，RESET_PASSWORD审计只包含账号ID与动作，密码、验证码、收件人、云响应不入日志。
 - 增量迁移、管理员处理策略、隔离测试与待发布检查详见 `docs/security/password-recovery.md`。本变更不执行生产验证攻击、不改真实用户密码；发布必须在备份和人工确认后进行。
 - 找回HTTP入口使用锁定版本 `express-rate-limit`；其IP键与持久请求摘要共同归一IPv4映射及IPv6 /56地址。每请求代理身份依Express明确白名单决定，`TRUSTED_PROXY_CIDRS` 默认不信任，禁止布尔/跳数/全网范围；上线前须确认实际代理链与Nginx追加的真实客户端地址，不能信任外部任意转发头。
-- 生产备份以实际绝对 `DATABASE_URL` 为准，先停全部writer，再用SQLite backup API创建一致快照、验证完整性及校验和并保护0700/0600；不能把构建目录的固定dev.db复制或未验证的在线cp当作生产备份。自动部署没有备份步骤，备份前置验收失败不得合并触发迁移。
+- 生产备份以实际绝对 `DATABASE_URL` 为准，使用已审查的SQLite online backup API创建包含已提交WAL的一致快照（无需停writer；若使用离线文件复制则必须先停全部writer）、验证完整性及校验和并保护0700/0600；不能把构建目录的固定dev.db复制或未验证的在线cp当作生产备份。自动部署没有备份步骤，备份前置验收失败不得合并触发迁移。
+
+## Fixed-expiry browser sessions
+
+See `docs/security/browser-sessions.md`. `backend/src/services/browserSessionService.js` uses explicit opt-in, 256-bit random opaque cookies, hashed server storage and the existing JWT absolute expiry, with no refresh or global logout. Production uses Secure/HttpOnly/SameSite=Strict `__Host-` cookies. Origin plus session-bound CSRF protects cookie mutations and logout; sibling-origin reads also fail closed. Bearer precedence preserves legacy/Agent access without invalid-token cookie fallback. All auth responses are no-store; persistence failures are sanitized. Revocation responses never delete a newer cookie accidentally. Frontend caches and delayed failures are isolated by auth generation.
+
+The additive session-table rollout requires a fresh verified online SQLite snapshot of the actual configured database before migration, via the reviewed release preflight, with integrity checking and 0700/0600 permissions. Development's hard-coded backup path/copy is not production backup evidence; no database restoration may overwrite subsequent business writes without an explicit reconciliation plan.
+
+- Global API admission uses the locked `express-rate-limit` implementation in `backend/src/middleware/apiRateLimit.js`, still 100 requests/minute before request parsing and routing. Legacy JSON/Retry-After and millisecond X-RateLimit reset headers remain compatible; canonical IP keys collapse mapped IPv4 and IPv6 /56 without trusting forwarded headers beyond the existing explicit proxy allowlist. The tighter login 10/15min and recovery quotas remain independent. Standalone synthetic auth servers use the same recognized limiter; no security rule is disabled or suppressed.
+
+- Global and legacy login HTTP counters remain process-local, as before: restarts reset them and multiple workers have independent counters. This change does not claim a distributed/persistent quota. Existing SQLite email/recovery quotas remain independent.

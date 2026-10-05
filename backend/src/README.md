@@ -120,3 +120,11 @@
 
 - `services/batchImportService.js` 的 JSON 采购导入逐行事务提交合同与明细；自动编号冲突或事务写冲突最多尝试五次，不更改显式编号，不重试无关错误；失败行回滚且后续行继续
 - `integration/purchase-batch-import.integration.js` 通过真实 HTTP/临时 SQLite 验证四请求并发、SQL 明细故障无孤立合同、部分成功、显式/溢出编号及原有 RBAC，由 `npm run test:db` 执行
+
+## 浏览器会话
+
+`services/browserSessionService.js` 与 auth Controller/routes/middleware 提供可选HttpOnly固定期限会话、来源/CSRF验证和逐浏览器撤销，保留Bearer兼容。`integration/browser-session.integration.js` 与 `testHelpers/browser-session-server.js` 使用隔离SQLite验证，不访问生产。设计及回滚：`docs/security/browser-sessions.md`。
+
+`middleware/apiRateLimit.js` 使用已锁定express-rate-limit保留全局100/min和原429/重试响应，挂载在JSON解析与所有路由之前；规范IP但不自动信任代理。`apiRateLimit.test.js` 验证100/101边界、恶意XFF、IPv4/IPv6归一、显式代理与原10/15min登录限制。所有独立认证HTTP测试服务器同样挂载此门槛。
+
+全局及原登录HTTP配额仍按进程内存计数，重启清空、worker独立；数据库持久的邮箱/密码找回配额保持独立，不把HTTP计数当作分布式持久限制。

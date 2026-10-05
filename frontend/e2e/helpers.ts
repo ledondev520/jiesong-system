@@ -521,6 +521,19 @@ export const mockApiRoutes = async (page: Page) => {
       return;
     }
 
+    // Business mocks have no server cookie; browser-session.spec uses a real isolated backend.
+    if (pathname === '/api/v1/auth/session' && method === 'GET') {
+      await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ code: 401, message: '请登录', data: null }) });
+      return;
+    }
+    if (pathname === '/api/v1/auth/logout-csrf' && method === 'GET') {
+      await fulfillJson(route, { csrfToken: null });
+      return;
+    }
+    if (pathname === '/api/v1/auth/logout' && method === 'POST') {
+      await fulfillJson(route, null);
+      return;
+    }
     if (pathname === '/api/v1/auth/login' && method === 'POST') {
       await fulfillJson(route, {
         user: mockUser,

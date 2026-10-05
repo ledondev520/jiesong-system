@@ -1,6 +1,6 @@
 /**
  * Input: 登录API、认证状态存储
- * Output: 登录页面及可通过键盘操作、关联校验提示的认证表单
+ * Output: 可选固定期限保持登录、会话恢复与无缓存密码的认证表单
  * Pos: 认证模块入口，负责用户登录与旧快捷登录缓存清理
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -9,7 +9,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useState, Suspense } from "react";
+import { useCallback, useEffect, useState, useRef, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
@@ -19,6 +19,8 @@ import { useAuthStore } from "@/store/auth.store";
 import type { ApiResponse } from "@/types";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { getAuthToken, clearAuthToken } from "@/lib/auth-token";
 import { Input } from "@/components/ui/input";
 import {
   Form,
@@ -65,6 +67,11 @@ function LoginFormClient() {
   const registrationReceipt = useRegistrationReceipt();
   const searchParams = useSearchParams();
   const login = useAuthStore((state) => state.login);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const submitted = useRef(false);
+  const loginRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => loginRequest.current?.abort(), []);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -96,6 +103,42 @@ function LoginFormClient() {
     clearLegacyQuickLoginState();
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    const token = getAuthToken();
+    let restored = false;
+    void authService
+      .restoreSession(controller.signal)
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        if (
+          result.code !== 200 ||
+          !result.data?.user ||
+          (!token && !result.data.csrfToken)
+        )
+          throw result;
+        login(result.data.user, token, result.data.csrfToken);
+        restored = true;
+        router.replace("/dashboard");
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return;
+        const code =
+          typeof err === "object" && err !== null && "code" in err
+            ? Number(err.code)
+            : null;
+        if (code === 401) {
+          clearAuthToken();
+        } else {
+          setError("暂时无法确认登录状态，请重试登录");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted && !restored) setCheckingSession(false);
+      });
+    return () => controller.abort();
+  }, [login, router]);
+
   const clearLegacyQuickLoginProfile = useCallback(() => {
     clearLegacyQuickLoginState();
   }, []);
@@ -108,24 +151,34 @@ function LoginFormClient() {
    */
   const performLogin = useCallback(
     async (username: string, password: string) => {
+      if (submitted.current) return;
+      submitted.current = true;
+      const controller = new AbortController();
+      loginRequest.current = controller;
       setIsLoading(true);
       setError(null);
 
       try {
-        const result: ApiResponse<LoginResponse> = await authService.login({
-          username,
-          password,
-        });
+        const result: ApiResponse<LoginResponse> = await authService.login(
+          {
+            username,
+            password,
+            ...(rememberMe ? { rememberMe: true } : {}),
+          },
+          controller.signal,
+        );
+        if (controller.signal.aborted) return;
 
         if (result.code === 200 && result.data) {
           clearLegacyQuickLoginProfile();
           clearRegistrationReceipt();
-          login(result.data.user, result.data.token);
+          login(result.data.user, result.data.token, result.data.csrfToken);
           router.push("/dashboard");
         } else {
           throw new Error(result.message || "登录失败");
         }
       } catch (err: unknown) {
+        if (controller.signal.aborted) return;
         const retryAfter =
           typeof err === "object" && err !== null && "retryAfter" in err
             ? Number((err as { retryAfter?: unknown }).retryAfter)
@@ -158,10 +211,12 @@ function LoginFormClient() {
           setError("登录失败，请检查用户名和密码");
         }
       } finally {
+        if (controller.signal.aborted) return;
+        submitted.current = false;
         setIsLoading(false);
       }
     },
-    [clearLegacyQuickLoginProfile, login, router],
+    [clearLegacyQuickLoginProfile, login, rememberMe, router],
   );
 
   /**
@@ -207,6 +262,7 @@ function LoginFormClient() {
             )}
             <Form {...form}>
               <form
+                method="post"
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-4"
               >
@@ -220,6 +276,10 @@ function LoginFormClient() {
                       </FormLabel>
                       <FormControl>
                         <Input
+                          autoComplete="username"
+                          autoCapitalize="none"
+                          spellCheck={false}
+                          disabled={checkingSession || isLoading}
                           placeholder="请输入用户名或邮箱"
                           className="h-11 rounded-xl border-border/40 bg-background/50 shadow-sm transition-all duration-200 focus:bg-background focus:shadow-md focus:ring-2 focus:ring-primary/15"
                           {...field}
@@ -241,6 +301,8 @@ function LoginFormClient() {
                         <FormControl>
                           <Input
                             type={showPassword ? "text" : "password"}
+                            autoComplete="current-password"
+                            disabled={checkingSession || isLoading}
                             aria-label="密码"
                             placeholder="••••••"
                             className="h-11 rounded-xl border-border/40 bg-background/50 pr-10 shadow-sm transition-all duration-200 focus:bg-background focus:shadow-md focus:ring-2 focus:ring-primary/15"
@@ -266,6 +328,26 @@ function LoginFormClient() {
                   )}
                 />
 
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="remember-login"
+                      checked={rememberMe}
+                      disabled={checkingSession || isLoading}
+                      onCheckedChange={(value) => setRememberMe(value === true)}
+                      aria-describedby="remember-login-description"
+                    />
+                    <label htmlFor="remember-login" className="text-sm">
+                      保持登录
+                    </label>
+                  </div>
+                  <p
+                    id="remember-login-description"
+                    className="text-xs leading-relaxed text-muted-foreground"
+                  >
+                    仅在此浏览器保留至本次会话到期；退出或修改密码后失效。共用设备请勿勾选。
+                  </p>
+                </div>
                 {error && (
                   <div className="flex items-start gap-2.5 rounded-xl border border-destructive/20 bg-destructive/[0.06] px-4 py-3 text-sm text-destructive">
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -276,12 +358,12 @@ function LoginFormClient() {
                 <Button
                   type="submit"
                   className="h-11 w-full rounded-xl text-sm font-medium shadow-md shadow-primary/20 transition-all duration-200 hover:shadow-lg hover:shadow-primary/25 hover:brightness-105 active:scale-[0.985]"
-                  disabled={!isClientReady || isLoading}
+                  disabled={!isClientReady || isLoading || checkingSession}
                 >
-                  {isLoading ? (
+                  {isLoading || checkingSession ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      登录中...
+                      {checkingSession ? "正在确认登录状态..." : "登录中..."}
                     </>
                   ) : (
                     "登录"

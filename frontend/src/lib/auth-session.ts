@@ -1,3 +1,12 @@
+import { clearIdempotentCache } from "@/lib/idempotentRequest";
+import { clearAllCache } from "@/lib/api-cache";
+import { clearApiGetCache } from "@/lib/axios";
+import {
+  getBrowserCsrf,
+  setBrowserCsrf,
+  advanceAuthGeneration,
+  getAuthGeneration,
+} from "@/lib/browser-session";
 /**
  * Input: API 401 响应、浏览器认证持久化状态
  * Output: 区分未登录与会话失效，统一清理、单次提示与登录页跳转
@@ -6,11 +15,11 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-import { clearAuthToken, getAuthToken } from '@/lib/auth-token';
+import { clearAuthToken, getAuthToken } from "@/lib/auth-token";
 
-const AUTH_STORAGE_KEY = 'auth-storage';
-const EXPIRED_LOGIN_URL = '/login?expired=1';
-const EXPIRED_SESSION_TOAST_ID = 'auth-session-expired';
+const AUTH_STORAGE_KEY = "auth-storage";
+const EXPIRED_LOGIN_URL = "/login?expired=1";
+const EXPIRED_SESSION_TOAST_ID = "auth-session-expired";
 
 type SessionToast = (
   message: string,
@@ -36,13 +45,20 @@ let expiredSessionHandled = false;
 let redirectTimer: number | null = null;
 
 const canUseBrowserStorage = (): boolean =>
-  typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined';
+  typeof window !== "undefined" && typeof window.sessionStorage !== "undefined";
 
 export const isAuthRoute = (pathname: string): boolean =>
-  ['/login', '/register', '/forgot-password'].some((path) => pathname.startsWith(path));
+  ["/login", "/register", "/forgot-password"].some((path) =>
+    pathname.startsWith(path),
+  );
 
 export const clearExpiredAuthSessionState = (): void => {
+  advanceAuthGeneration();
+  clearApiGetCache();
+  clearAllCache();
+  clearIdempotentCache();
   clearAuthToken();
+  setBrowserCsrf(null);
   if (canUseBrowserStorage()) {
     window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
   }
@@ -56,19 +72,25 @@ const showExpiredSessionToast = async (
   toast: SessionToast | undefined,
   redirect: (url: string) => void,
 ): Promise<void> => {
-  const toastFn = toast ?? (await import('sonner')).toast.error;
-  toastFn('登录会话已过期，请重新登录', {
+  const generation = getAuthGeneration();
+  const toastFn = toast ?? (await import("sonner")).toast.error;
+  if (generation !== getAuthGeneration()) return;
+  toastFn("登录会话已过期，请重新登录", {
     id: EXPIRED_SESSION_TOAST_ID,
     duration: 3000,
     action: {
-      label: '去登录',
-      onClick: () => redirect(EXPIRED_LOGIN_URL),
+      label: "去登录",
+      onClick: () => {
+        if (generation === getAuthGeneration()) redirect(EXPIRED_LOGIN_URL);
+      },
     },
   });
 };
 
-export const handleExpiredAuthSession = (options: ExpiredSessionOptions = {}): void => {
-  if (typeof window === 'undefined') {
+export const handleExpiredAuthSession = (
+  options: ExpiredSessionOptions = {},
+): void => {
+  if (typeof window === "undefined") {
     return;
   }
 
@@ -78,11 +100,11 @@ export const handleExpiredAuthSession = (options: ExpiredSessionOptions = {}): v
   }
 
   expiredSessionHandled = true;
-  const hadToken = Boolean(getAuthToken());
+  const hadToken = Boolean(getAuthToken() || getBrowserCsrf());
   clearExpiredAuthSessionState();
   // 新标签没有本标签令牌，401 只能证明需要登录，不能证明会话过期。
   if (!hadToken) {
-    (options.redirect ?? defaultRedirect)('/login');
+    (options.redirect ?? defaultRedirect)("/login");
     return;
   }
 
@@ -90,7 +112,9 @@ export const handleExpiredAuthSession = (options: ExpiredSessionOptions = {}): v
   const redirectDelayMs = options.redirectDelayMs ?? 300;
   const redirect = options.redirect ?? defaultRedirect;
 
+  const generation = getAuthGeneration();
   const showToast = () => {
+    if (generation !== getAuthGeneration()) return;
     void showExpiredSessionToast(options.toast, redirect);
   };
 
@@ -100,7 +124,9 @@ export const handleExpiredAuthSession = (options: ExpiredSessionOptions = {}): v
     window.setTimeout(showToast, toastDelayMs);
   }
 
-  const goLogin = () => redirect(EXPIRED_LOGIN_URL);
+  const goLogin = () => {
+    if (generation === getAuthGeneration()) redirect(EXPIRED_LOGIN_URL);
+  };
   if (redirectDelayMs <= 0) {
     goLogin();
   } else {
@@ -108,10 +134,12 @@ export const handleExpiredAuthSession = (options: ExpiredSessionOptions = {}): v
   }
 };
 
-export const resetExpiredAuthSessionForTest = (): void => {
+export const resetExpiredAuthSession = (): void => {
   expiredSessionHandled = false;
   if (redirectTimer) {
     clearTimeout(redirectTimer);
     redirectTimer = null;
   }
 };
+
+export const resetExpiredAuthSessionForTest = resetExpiredAuthSession;
