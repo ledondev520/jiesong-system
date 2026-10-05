@@ -6,7 +6,13 @@ import path from "node:path";
 import { expect, type Page } from "@playwright/test";
 
 export type Role = "PURCHASE" | "WAREHOUSE" | "SALES" | "BOSS" | "FINANCE";
-type Scenario = "purchase" | "warehouse" | "sales" | "boss" | "receipt-pool";
+type Scenario =
+  | "purchase"
+  | "warehouse"
+  | "sales"
+  | "boss"
+  | "receipt-pool"
+  | "notification-state";
 export const testPassword = "test-only-role-browser-password-never-production";
 export interface RoleFixture {
   server: ChildProcess;
@@ -46,6 +52,17 @@ export interface ReceiptPoolSnapshot {
     totalAmount: number;
     receivedAmount: number;
   }[];
+}
+export interface NotificationSnapshot {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  content: string | null;
+  link: string | null;
+  metadata: string | null;
+  isRead: number;
+  createdAt: number;
 }
 export interface DomainSnapshot {
   purchases: { id: string; status: string }[];
@@ -188,6 +205,29 @@ c.close()`;
       { encoding: "utf8", timeout: 10000 },
     ),
   ) as ReceiptPoolSnapshot;
+}
+
+export function readPurchaseNotifications(
+  fixture: RoleFixture,
+): NotificationSnapshot[] {
+  // Read only the synthetic PURCHASE user's own rows through a separate connection.
+  const script = `import sqlite3,sys,json
+c=sqlite3.connect('file:'+sys.argv[1]+'?mode=ro',uri=True)
+c.row_factory=sqlite3.Row
+print(json.dumps([dict(row) for row in c.execute('SELECT * FROM notifications WHERE userId=? ORDER BY id',(sys.argv[2],))]))
+c.close()`;
+  return JSON.parse(
+    execFileSync(
+      "python3",
+      [
+        "-c",
+        script,
+        path.join(fixture.directory, "synthetic.db"),
+        fixture.users.PURCHASE.id,
+      ],
+      { encoding: "utf8", timeout: 10000 },
+    ),
+  ) as NotificationSnapshot[];
 }
 
 export async function forwardRealApi(page: Page, fixture: RoleFixture) {

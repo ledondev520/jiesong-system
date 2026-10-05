@@ -2,6 +2,8 @@
 
 若本文件夹结构或内容变化，请更新本文件。所有夹具仅用于合成测试，不能指向业务数据库。
 
+`role-browser-server.js` 的 `notification-state` 场景只给当前合成 PURCHASE 用户预置四条现有通知（三条未读），不调用通知生成器或访问生产。新增同场景夹具合同测试通过真实登录、重复单条已读请求和独立只读 SQLite 核对未读数为二；可用 `node --test --test-name-pattern='own notification mark-one' src/testHelpers/role-browser-server.test.js` 单独执行。角色及其他场景语义不变。
+
 - `password-recovery-server.js`：真实认证/SQLite找回流程，邮件仅写入私有合成邮箱文件
 - `browser-session-server.js`：真实浏览器会话与认证服务，私有数据库与测试账号
 - `purchase-receipt-server.js`：第二个采购HTTP进程，校验多客户端事务

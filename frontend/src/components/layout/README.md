@@ -4,4 +4,6 @@ Header/MobileTabBar退出登录先等待服务端撤销当前浏览器会话，�
 
 仪表盘布局在Cookie会话验证完成前不呈现保护内容或使用旧角色导航。业务授权继续由实时后端认证和角色校验决定。
 
+`HeaderNotifications` 对同一通知的待完成已读请求按 ID 去重，成功只减少一次未读计数；其他通知可独立处理，失败后可重试。组件回归覆盖重复点击、失败重试、不同通知并发完成、重新挂载读取，以及全部已读响应丢失后重试。
+
 `PageHeader` 未传 `onBack` 时保持原有 `backHref → router.push` 和显式 `showBack → router.back`。只有调用方显式提供 `onBack` 才执行该动作；目前仅报关详情明确返回使用它，按钮样式、可访问名称与显示规则不变。`PageHeader.test.tsx` 同时覆盖默认导航和显式动作优先级。
