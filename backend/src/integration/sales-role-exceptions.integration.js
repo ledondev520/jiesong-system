@@ -184,4 +184,53 @@ test('HTTP/SQLite: sales permissions, cancellations and forbidden lifecycle tran
     await call('PUT', `/containers/${a.id}/status`, { status: 'SHIPPED' }, { expected: 400 });
     await call('PUT', `/containers/${a.id}/status`, { status: 'CANCELLED' }, { expected: 400 });
   });
+
+  await t.test('legacy OUT_STOCK shipment replay preserves the existing allocation and timestamp', async () => {
+    const legacyProduct = await db.product.create({ data: { customsName: 'SYNTHETIC ALIAS RETRY WIDGET', unit: '件' } });
+    await db.inventory.create({ data: { productId: legacyProduct.id, quantity: 200, unit: '件', status: 'INBOUND', inboundAt: new Date('2026-10-01') } });
+    const sale = await createSale();
+    await call('POST', `/sales/${sale.id}/packing-items`, cargo(60, legacyProduct.id), { expected: 201 });
+    await call('PUT', `/sales/${sale.id}/status`, { status: 'CONFIRMED' });
+    const original = await call('PUT', `/sales/${sale.id}/status`, { status: 'SHIPPED' });
+    // Simulate a persisted pre-normalization alias, keeping real outbound evidence.
+    await db.salesContract.update({ where: { id: sale.id }, data: { status: 'OUT_STOCK' } });
+    const before = (await snapshot()).inventory;
+    for (const root of ['sales', 'containers']) {
+      await db.salesContract.update({ where: { id: sale.id }, data: { status: 'OUT_STOCK' } });
+      const replay = await call('PUT', `/${root}/${sale.id}/status`, { status: 'SHIPPED' });
+      const actual = (await snapshot()).inventory;
+      assert.equal(actual.filter(row => row.productId === legacyProduct.id && row.status === 'OUTBOUND').reduce((sum, row) => sum + row.quantity, 0), 60, 'OUT_STOCK is already SHIPPED; replay must not allocate another 60 units');
+      assert.equal(replay.shippedAt, original.shippedAt);
+      assert.equal(replay.status, 'SHIPPED');
+      assert.deepEqual(actual, before);
+    }
+  });
+
+  await t.test('unchanged legacy custom-state metadata stays editable without permitting a transition', async () => {
+    const sale = await createSale();
+    await db.salesContract.update({ where: { id: sale.id }, data: { status: 'CUSTOM_LEGACY' } });
+    const edited = await call('PUT', `/containers/${sale.id}`, { status: 'custom_legacy', note: 'synthetic historical metadata' });
+    assert.equal(edited.status, 'CUSTOM_LEGACY');
+    assert.equal(edited.note, 'synthetic historical metadata');
+    const before = await snapshot();
+    await call('PUT', `/containers/${sale.id}`, { status: 'SHIPPED', note: 'must not bypass' }, { expected: 400 });
+    await call('PUT', `/containers/${sale.id}/status`, { status: 'SHIPPED' }, { expected: 400 });
+    assert.deepEqual(await snapshot(), before);
+  });
+
+  await t.test('third-party-only legacy cargo ships without consuming owned stock or sales-item fallback', async () => {
+    const sale = await createSale({ items: [{ productId: missingStockProduct.id, storeId: store.id, quantity: 10, costPrice: 10, sellingPrice: 3 }] });
+    // Ownership is historical packing evidence, not a mocked authorization result.
+    await db.packingItem.create({ data: { salesContractId: sale.id, ...cargo(50, missingStockProduct.id), totalPrice: 150, isOwnedByJiesong: false, sourceParty: 'Synthetic third-party cargo owner' } });
+    await db.salesContract.update({ where: { id: sale.id }, data: { grossWeight: 20000, volume: 5, totalBoxes: 5, totalAmount: 150 } });
+    const before = (await snapshot()).inventory;
+    await call('PUT', `/containers/${sale.id}/status`, { status: 'CONFIRMED' });
+    const shipped = await call('PUT', `/containers/${sale.id}/status`, { status: 'SHIPPED' });
+    assert.equal(shipped.status, 'SHIPPED');
+    assert.deepEqual((await snapshot()).inventory, before);
+    assert.equal((await call('GET', `/sales/${sale.id}`)).hasThirdPartyCargo, true);
+    const replay = await call('PUT', `/sales/${sale.id}/status`, { status: 'SHIPPED' });
+    assert.equal(replay.shippedAt, shipped.shippedAt);
+    assert.deepEqual((await snapshot()).inventory, before);
+  });
 });

@@ -22,6 +22,24 @@ test.afterEach(() => {
 });
 const inventorySnapshot = require('./inventorySnapshot');
 
+test('historical OUT_STOCK replay does not reapply shipment inventory or time', async () => {
+  const originalUpdate = prisma.salesContract.update;
+  const originalApply = inventorySnapshot.applySalesOutStock;
+  let data;
+  let applied = 0;
+  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', status: 'OUT_STOCK', totalAmount: 100, receivedAmount: 0, packingItems: [] });
+  prisma.salesContract.update = async args => { data = args.data; return { id: 'sc-1', ...data }; };
+  inventorySnapshot.applySalesOutStock = async () => { applied += 1; return { results: [] }; };
+  try {
+    assert.equal((await salesService.updateSalesStatus('sc-1', 'SHIPPED')).status, 'SHIPPED');
+    assert.equal(applied, 0);
+    assert.deepEqual(data, { status: 'SHIPPED' });
+  } finally {
+    prisma.salesContract.update = originalUpdate;
+    inventorySnapshot.applySalesOutStock = originalApply;
+  }
+});
+
 test('登记到港后保留出库，已收齐合同自动完成；未收齐不能手动假结清', async () => {
   const originalTransaction = prisma.$transaction;
   const originalRevert = inventorySnapshot.revertSalesOutStock;
