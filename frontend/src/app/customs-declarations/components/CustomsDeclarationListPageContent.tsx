@@ -1,6 +1,6 @@
 /**
  * Input: 报关单服务、URL 查询参数、router
- * Output: 报关单列表页（保留所属页签的筛选同步、服务端分页、手机卡片与桌面表格）
+ * Output: 报关单列表页（保留所属页签、跟随历史筛选且仅由用户编辑 URL，服务端分页、手机卡片与桌面表格）
  * Pos: 报关单管理主列表页
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -75,6 +75,21 @@ export function CustomsDeclarationListPageContent({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [total, setTotal] = useState(0);
+  const [urlFilters, setUrlFilters] = useState({
+    keyword: initialKeyword,
+    status: initialStatus,
+  });
+
+  // 历史导航先采用 URL 筛选；只在用户编辑筛选时写 URL，避免旧状态覆写 Back/Forward。
+  if (
+    urlFilters.keyword !== initialKeyword ||
+    urlFilters.status !== initialStatus
+  ) {
+    setUrlFilters({ keyword: initialKeyword, status: initialStatus });
+    setKeyword(initialKeyword);
+    setStatus(initialStatus);
+    setPage(1);
+  }
   const deferredKeyword = useDeferredValue(keyword);
 
   // 同步搜索状态到 URL
@@ -93,11 +108,6 @@ export function CustomsDeclarationListPageContent({
     },
     [pathname, router, queryString],
   );
-
-  // 关键词变化时更新 URL
-  useEffect(() => {
-    updateUrlParams(deferredKeyword, status);
-  }, [deferredKeyword, status, updateUrlParams]);
 
   const [declarations, setDeclarations] = useState<CustomsDeclaration[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,8 +203,10 @@ export function CustomsDeclarationListPageContent({
               <Input
                 value={keyword}
                 onChange={(event) => {
-                  setKeyword(event.target.value);
+                  const nextKeyword = event.target.value;
+                  setKeyword(nextKeyword);
                   setPage(1);
+                  updateUrlParams(nextKeyword, status);
                 }}
                 placeholder="搜索报关单号或报关行..."
                 className="h-11 rounded-xl border-border/70 bg-background/70 pl-10"
@@ -206,6 +218,7 @@ export function CustomsDeclarationListPageContent({
               onValueChange={(value) => {
                 setStatus(value);
                 setPage(1);
+                updateUrlParams(keyword, value);
               }}
             >
               <SelectTrigger className="h-11 w-40 rounded-xl">
