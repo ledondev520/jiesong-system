@@ -80,7 +80,7 @@ describe("SuppliersPage 表单页交互逻辑", () => {
     expect(
       screen.getByRole("heading", { name: "供应商档案表单" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("暂无供应商")).toBeInTheDocument();
+    expect(await screen.findByText("暂无供应商")).toBeInTheDocument();
     expect(screen.getByLabelText("公司名称 *")).toBeInTheDocument();
     expect(screen.getByLabelText("收款户名")).toBeInTheDocument();
     expect(screen.getByLabelText("开户支行")).toBeInTheDocument();
