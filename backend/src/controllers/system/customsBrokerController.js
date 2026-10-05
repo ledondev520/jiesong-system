@@ -1,8 +1,19 @@
+/**
+ * Input: broker form payloads and Prisma
+ * Output: broker persistence with nonblank names and explicit optional-field clearing
+ * Pos: ordinary system catalogue controller; omitted optional fields remain unchanged
+ */
 const prisma = require('../../utils/prisma');
 const { success, paginated } = require('../../utils/response');
 const { createError } = require('../../middleware/errorHandler');
 const { normalizePagination } = require('../../utils/pagination');
 const { parseOptionalText } = require('../../utils/text');
+
+const normalizeOptionalBrokerField = value => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return String(value).trim() || null;
+};
 
 const getCustomsBrokers = async (req, res, next) => {
   try {
@@ -73,11 +84,14 @@ const updateCustomsBroker = async (req, res, next) => {
       throw createError('报关公司不存在', 404);
     }
 
-    const name = req.body.name === undefined ? undefined : String(req.body.name).trim();
-    const contact = req.body.contact === undefined ? undefined : (String(req.body.contact).trim() || null);
-    const phone = req.body.phone === undefined ? undefined : (String(req.body.phone).trim() || null);
-    const email = req.body.email === undefined ? undefined : (String(req.body.email).trim() || null);
-    const address = req.body.address === undefined ? undefined : (String(req.body.address).trim() || null);
+    const name = req.body.name === undefined ? undefined : String(req.body.name ?? '').trim();
+    if (name === '') {
+      throw createError('报关公司名称不能为空', 400);
+    }
+    const contact = normalizeOptionalBrokerField(req.body.contact);
+    const phone = normalizeOptionalBrokerField(req.body.phone);
+    const email = normalizeOptionalBrokerField(req.body.email);
+    const address = normalizeOptionalBrokerField(req.body.address);
     const isActive = req.body.isActive;
 
     const broker = await prisma.customsBroker.update({

@@ -88,6 +88,9 @@
 
 ## 工具清单
 
+- `controllers/system/portCategoryController.js` 和 `customsBrokerController.js` 沿用档案表单的必填名称/港口代码规则：显式空白或 null 更新在持久化前返回 400，省略字段仍保留；报关行选填字段显式 null 清空为数据库 null，避免保存字符串“null”。不新增唯一性或删除规则。
+- `integration/catalog-form-lifecycle.integration.js` 在迁移后的私有合成 SQLite 中，以真实 HTTP 验证港口、商品分类和报关行三类创建/编辑/列表回读。独立只读 SQLite 回读检查空白、现有重复键和缺失父级导致的失败不改变既有字段或时间戳；不覆盖浏览器、权限或生产数据。
+
 | 文件 | 功能 |
 |------|------|
 | prisma.js | Prisma 客户端实例，不打印查询/异常参数 |
