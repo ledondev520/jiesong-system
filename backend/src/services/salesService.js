@@ -141,7 +141,11 @@ const getSalesContractById = async (id) => {
   };
 };
 
-const createSalesContract = async (data = {}) => {
+// 完整明细及带请求键的创建走原子服务；既有仅建表头的调用保持兼容。
+const createSalesContract = async (data = {}, context = {}) => {
+  if (data.items !== undefined || context.idempotencyKey) {
+    return require('./salesCreationService').createSalesContractAtomically(data, context);
+  }
   const year = getCurrentYear();
   const contractNo = data.contractNo || (await generateNextContractNo({ prisma, year }));
   const exchangeRate = parseNullableNumber(data.exchangeRate, 7.0);

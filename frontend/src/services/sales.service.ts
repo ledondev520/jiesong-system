@@ -1,12 +1,36 @@
-import { getAuthToken } from '@/lib/auth-token';
-import api from '@/lib/axios';
-import type { ApiResponse, PackingItem, SalesContract } from '@/types';
-import { createCrudService } from './crudService';
-import { downloadResponseBlob } from './fileDownload';
+/** 出口合同 Interface；完整创建复用请求键合并并发提交，表头和明细由后端原子持久化。 */
+import { getAuthToken } from "@/lib/auth-token";
+import api from "@/lib/axios";
+import type { ApiResponse, PackingItem, SalesContract } from "@/types";
+import { createCrudService } from "./crudService";
+import { downloadResponseBlob } from "./fileDownload";
+import { runIdempotentRequest } from "@/lib/idempotentRequest";
 
-type SalesListQuery = { page?: number; pageSize?: number; keyword?: string; lite?: boolean; status?: SalesContract['status']; storeId?: string; shipped?: boolean; shippedFrom?: string; shippedTo?: string };
+type SalesListQuery = {
+  page?: number;
+  pageSize?: number;
+  keyword?: string;
+  lite?: boolean;
+  status?: SalesContract["status"];
+  storeId?: string;
+  shipped?: boolean;
+  shippedFrom?: string;
+  shippedTo?: string;
+};
 type SalesCreatePayload = Partial<SalesContract>;
 type SalesUpdatePayload = Partial<SalesContract>;
+export interface SalesCreationItem {
+  productId: string;
+  storeId: string;
+  quantity: number;
+  unit?: string;
+  costPrice: number;
+  sellingPrice: number;
+  note?: string;
+}
+export type SalesCreationPayload = Omit<SalesCreatePayload, "items"> & {
+  items: SalesCreationItem[];
+};
 
 /** 装箱单核对：单个字段比对结果（matched=null 表示系统未录入、跳过比对） */
 export interface PackingListCheckField {
@@ -24,8 +48,16 @@ export interface PackingListCheckItem {
   productName: string;
   hsCode?: string;
   identity: { expected: string; matched: boolean; closest: string | null };
-  boxes: { expected: number | null; matched: boolean | null; closest: number | null };
-  quantity: { expected: number | null; matched: boolean | null; closest: number | null };
+  boxes: {
+    expected: number | null;
+    matched: boolean | null;
+    closest: number | null;
+  };
+  quantity: {
+    expected: number | null;
+    matched: boolean | null;
+    closest: number | null;
+  };
 }
 
 /** 装箱单核对：整体结果 */
@@ -45,11 +77,7 @@ export interface PackingListCheckResult {
 }
 
 export type PackingListCheckStatus =
-  | 'PASSED'
-  | 'DIFFERENCE'
-  | 'NEEDS_MANUAL_REVIEW'
-  | 'APPROVED'
-  | 'REJECTED';
+  "PASSED" | "DIFFERENCE" | "NEEDS_MANUAL_REVIEW" | "APPROVED" | "REJECTED";
 
 export interface PackingListCheckRecord {
   id: string;
@@ -69,8 +97,10 @@ export interface PackingListCheckRecord {
   comparison: PackingListCheckResult;
 }
 
-export type TaxPreparationStatus = 'ready' | 'missing' | 'review' | 'not_applicable';
-export type TaxPreparationRequirement = 'required' | 'conditional' | 'post_submission';
+export type TaxPreparationStatus =
+  "ready" | "missing" | "review" | "not_applicable";
+export type TaxPreparationRequirement =
+  "required" | "conditional" | "post_submission";
 
 export interface TaxRefundPreparation {
   salesContractId: string;
@@ -125,15 +155,15 @@ export interface TaxRefundPreparation {
   disclaimer: string;
 }
 
-export type SalesFinanceIssueSeverity = 'error' | 'warning' | 'info';
+export type SalesFinanceIssueSeverity = "error" | "warning" | "info";
 
 /** 单份出口专项单的收入、采购成本、退税与现金流统一口径。 */
 export interface SalesFinanceSummary {
   salesContractId: string;
   contractNo: string;
   currencyPolicy: {
-    salesReceiptCurrency: 'USD';
-    purchasePaymentCurrency: 'CNY';
+    salesReceiptCurrency: "USD";
+    purchasePaymentCurrency: "CNY";
     conversionRate: number | null;
   };
   marginReady: boolean;
@@ -143,7 +173,7 @@ export interface SalesFinanceSummary {
     ownedRevenueUsd: number;
     receivedUsd: number;
     outstandingUsd: number;
-    receivedSource: 'payment_records' | 'legacy_contract_balance';
+    receivedSource: "payment_records" | "legacy_contract_balance";
   };
   cost: {
     purchaseCostCny: number;
@@ -225,7 +255,12 @@ export interface AvailablePurchasePackingItem {
   };
 }
 
-const crud = createCrudService<SalesContract, SalesCreatePayload, SalesUpdatePayload, SalesListQuery>('/sales');
+const crud = createCrudService<
+  SalesContract,
+  SalesCreatePayload,
+  SalesUpdatePayload,
+  SalesListQuery
+>("/sales");
 
 /**
  * 销售服务。
@@ -233,15 +268,32 @@ const crud = createCrudService<SalesContract, SalesCreatePayload, SalesUpdatePay
 export const salesService = {
   ...crud,
 
+  /** 表头和明细原子提交；同一尝试的网络重试复用请求键。 */
+  createWithItems: (data: SalesCreationPayload, requestKey: string) =>
+    runIdempotentRequest(["sales-create", requestKey, data], () =>
+      api.post<
+        ApiResponse<SalesContract>,
+        ApiResponse<SalesContract>,
+        SalesCreationPayload
+      >("/sales", data, { headers: { "X-Idempotency-Key": requestKey } }),
+    ),
+
   getNextContractNo: async () => {
-    return api.get<ApiResponse<{ contractNo: string }>, ApiResponse<{ contractNo: string }>>('/sales/options/next-no');
+    return api.get<
+      ApiResponse<{ contractNo: string }>,
+      ApiResponse<{ contractNo: string }>
+    >("/sales/options/next-no");
   },
 
-  addPackingItem: async (salesContractId: string, data: Partial<PackingItem>) => {
-    return api.post<ApiResponse<PackingItem>, ApiResponse<PackingItem>, Partial<PackingItem>>(
-      `/sales/${salesContractId}/packing-items`,
-      data,
-    );
+  addPackingItem: async (
+    salesContractId: string,
+    data: Partial<PackingItem>,
+  ) => {
+    return api.post<
+      ApiResponse<PackingItem>,
+      ApiResponse<PackingItem>,
+      Partial<PackingItem>
+    >(`/sales/${salesContractId}/packing-items`, data);
   },
 
   addItem: async (
@@ -257,18 +309,28 @@ export const salesService = {
       note?: string;
     },
   ) => {
-    return api.post<ApiResponse<void>, ApiResponse<void>, typeof data>(`/sales/${salesContractId}/items`, data);
-  },
-
-  updatePackingItem: async (salesContractId: string, itemId: string, data: Partial<PackingItem>) => {
-    return api.put<ApiResponse<PackingItem>, ApiResponse<PackingItem>, Partial<PackingItem>>(
-      `/sales/${salesContractId}/packing-items/${itemId}`,
+    return api.post<ApiResponse<void>, ApiResponse<void>, typeof data>(
+      `/sales/${salesContractId}/items`,
       data,
     );
   },
 
+  updatePackingItem: async (
+    salesContractId: string,
+    itemId: string,
+    data: Partial<PackingItem>,
+  ) => {
+    return api.put<
+      ApiResponse<PackingItem>,
+      ApiResponse<PackingItem>,
+      Partial<PackingItem>
+    >(`/sales/${salesContractId}/packing-items/${itemId}`, data);
+  },
+
   removePackingItem: async (salesContractId: string, itemId: string) => {
-    return api.delete<ApiResponse<void>, ApiResponse<void>>(`/sales/${salesContractId}/packing-items/${itemId}`);
+    return api.delete<ApiResponse<void>, ApiResponse<void>>(
+      `/sales/${salesContractId}/packing-items/${itemId}`,
+    );
   },
 
   /** 查询已完工且仍有未排箱数的采购明细。 */
@@ -292,11 +354,12 @@ export const salesService = {
   },
 
   /** 按出口合同状态机推进到下一阶段。 */
-  updateStatus: async (id: string, status: SalesContract['status']) => {
-    return api.put<ApiResponse<SalesContract>, ApiResponse<SalesContract>, { status: SalesContract['status'] }>(
-      `/sales/${id}/status`,
-      { status },
-    );
+  updateStatus: async (id: string, status: SalesContract["status"]) => {
+    return api.put<
+      ApiResponse<SalesContract>,
+      ApiResponse<SalesContract>,
+      { status: SalesContract["status"] }
+    >(`/sales/${id}/status`, { status });
   },
 
   /**
@@ -306,7 +369,7 @@ export const salesService = {
     const token = getAuthToken();
     const response = await fetch(`/api/v1/sales/${id}/export-excel`, {
       headers: {
-        Authorization: token ? `Bearer ${token}` : '',
+        Authorization: token ? `Bearer ${token}` : "",
       },
     });
     await downloadResponseBlob(response, `${contractNo}_出口模板.xlsx`);
@@ -319,7 +382,7 @@ export const salesService = {
     const token = getAuthToken();
     const response = await fetch(`/api/v1/sales/${id}/export-pdf`, {
       headers: {
-        Authorization: token ? `Bearer ${token}` : '',
+        Authorization: token ? `Bearer ${token}` : "",
       },
     });
     await downloadResponseBlob(response, `${contractNo}_sales_contract.pdf`);
@@ -330,60 +393,74 @@ export const salesService = {
    */
   checkPackingList: async (id: string, file: File) => {
     const formData = new FormData();
-    formData.append('file', file);
-    return api.post<ApiResponse<PackingListCheckRecord>, ApiResponse<PackingListCheckRecord>, FormData>(
-      `/sales/${id}/packing-list-check`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
-    );
+    formData.append("file", file);
+    return api.post<
+      ApiResponse<PackingListCheckRecord>,
+      ApiResponse<PackingListCheckRecord>,
+      FormData
+    >(`/sales/${id}/packing-list-check`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
   },
 
   listPackingListChecks: async (id: string, limit = 20) => {
-    return api.get<ApiResponse<PackingListCheckRecord[]>, ApiResponse<PackingListCheckRecord[]>>(
-      `/sales/${id}/packing-list-checks`,
-      { params: { limit } },
-    );
+    return api.get<
+      ApiResponse<PackingListCheckRecord[]>,
+      ApiResponse<PackingListCheckRecord[]>
+    >(`/sales/${id}/packing-list-checks`, { params: { limit } });
   },
 
   reviewPackingListCheck: async (
     id: string,
     checkId: string,
-    decision: 'APPROVED' | 'REJECTED',
+    decision: "APPROVED" | "REJECTED",
     note: string,
   ) => {
-    return api.put<ApiResponse<PackingListCheckRecord>, ApiResponse<PackingListCheckRecord>>(
-      `/sales/${id}/packing-list-checks/${checkId}/review`,
-      { decision, note },
-    );
+    return api.put<
+      ApiResponse<PackingListCheckRecord>,
+      ApiResponse<PackingListCheckRecord>
+    >(`/sales/${id}/packing-list-checks/${checkId}/review`, { decision, note });
   },
 
   /** 读取专项单的退税申报凭证、备案单证、收汇与期限清单。 */
   getTaxRefundPreparation: async (id: string) => {
-    return api.get<ApiResponse<TaxRefundPreparation>, ApiResponse<TaxRefundPreparation>>(
-      `/sales/${id}/tax-refund-preparation`,
-    );
+    return api.get<
+      ApiResponse<TaxRefundPreparation>,
+      ApiResponse<TaxRefundPreparation>
+    >(`/sales/${id}/tax-refund-preparation`);
   },
 
   /** 读取单柜美元收入、人民币成本、退税和现金流的统一财务口径。 */
   getFinanceSummary: async (id: string) => {
-    return api.get<ApiResponse<SalesFinanceSummary>, ApiResponse<SalesFinanceSummary>>(
-      `/sales/${id}/finance-summary`,
-    );
+    return api.get<
+      ApiResponse<SalesFinanceSummary>,
+      ApiResponse<SalesFinanceSummary>
+    >(`/sales/${id}/finance-summary`);
   },
 
   /** 下载内部材料准备 Excel，不将其表述为税务机关正式回执。 */
   exportTaxRefundPreparation: async (id: string, contractNo: string) => {
     const token = getAuthToken();
-    const response = await fetch(`/api/v1/sales/${id}/tax-refund-preparation/export`, {
-      headers: { Authorization: token ? `Bearer ${token}` : '' },
-    });
-    await downloadResponseBlob(response, `出口退税材料准备清单-${contractNo}.xlsx`);
+    const response = await fetch(
+      `/api/v1/sales/${id}/tax-refund-preparation/export`,
+      {
+        headers: { Authorization: token ? `Bearer ${token}` : "" },
+      },
+    );
+    await downloadResponseBlob(
+      response,
+      `出口退税材料准备清单-${contractNo}.xlsx`,
+    );
   },
 
   /**
    * 计算推荐售价。
    */
-  calculatePrice: (costPrice: number, exchangeRate: number, profitRate: number) => {
+  calculatePrice: (
+    costPrice: number,
+    exchangeRate: number,
+    profitRate: number,
+  ) => {
     const effectiveRate = Math.max(0.1, exchangeRate - 0.2);
     return Math.ceil((costPrice / effectiveRate) * profitRate);
   },
