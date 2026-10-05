@@ -37,22 +37,18 @@ vi.mock("@/services/purchase.service", () => ({
 }));
 vi.mock("@/services/supplier.service", () => ({
   supplierService: {
-    getAll: vi
-      .fn()
-      .mockResolvedValue({
-        data: { items: [{ id: "supplier-1", name: "合成供应商" }] },
-      }),
+    getAll: vi.fn().mockResolvedValue({
+      data: { items: [{ id: "supplier-1", name: "合成供应商" }] },
+    }),
   },
 }));
 vi.mock("@/services/product.service", () => ({
   productService: {
-    getAll: vi
-      .fn()
-      .mockResolvedValue({
-        data: {
-          items: [{ id: "product-1", customsName: "合成商品", unit: "件" }],
-        },
-      }),
+    getAll: vi.fn().mockResolvedValue({
+      data: {
+        items: [{ id: "product-1", customsName: "合成商品", unit: "件" }],
+      },
+    }),
   },
 }));
 vi.mock("@/services/contractTemplate.service", () => ({
