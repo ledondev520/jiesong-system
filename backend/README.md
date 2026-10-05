@@ -201,3 +201,5 @@ Authorization: Bearer <token>
 `test:db` 需要 Python 3 自带的 sqlite3；从 schema 生成空库，使用合成资料验证分批验货、两次出货、库存守恒、单据归档和权限，不读取现有业务库。`warehouse-exceptions.integration.js` 补充 WAREHOUSE 的跨批次 FIFO、来源库存隔离、待验/复验排除、超分配与失败发运原子回滚；负数/零自有出库量拒绝发运，空草稿与非自有拼柜保持可用。
 
 Agent SDK 固定为含 `dist/index.js` 的发布版本 `0.2.4`，`npm ci` 后可直接加载，不依赖本地 `.tmp` 构建。普通与流式入口均走本地 Anthropic 兼容代理，保留关闭重试、失败不写成功记录的测试。
+
+`sales-transition-races.integration.js` 使用两个真实 HTTP 进程共享专用临时 SQLite，覆盖同一销售合同的取消/发运、到港/结清及陈旧状态请求。测试在真实查询完成后短暂暂停首个事务，再排入另一个请求，验证当前状态重读、一次扣库、发运时间及收款账簿守恒；不模拟数据库结果、不访问既有业务库。
