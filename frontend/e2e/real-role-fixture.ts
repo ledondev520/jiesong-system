@@ -12,7 +12,8 @@ type Scenario =
   | "sales"
   | "boss"
   | "receipt-pool"
-  | "notification-state";
+  | "notification-state"
+  | "tax-record-forms";
 export const testPassword = "test-only-role-browser-password-never-production";
 export interface RoleFixture {
   server: ChildProcess;
@@ -29,6 +30,14 @@ export interface RoleFixture {
     usdReceiptId: string;
     cnyReceiptId: string;
     contracts: { id: string; contractNo: string; totalAmount: number }[];
+  };
+  taxRecords?: {
+    customsId: string;
+    customsNo: string;
+    refundId: string;
+    refundNo: string;
+    contractId: string;
+    contractNo: string;
   };
   users: Record<Role, { id: string; username: string }>;
 }
@@ -51,6 +60,49 @@ export interface ReceiptPoolSnapshot {
     contractNo: string;
     totalAmount: number;
     receivedAmount: number;
+  }[];
+}
+export interface TaxRecordSnapshot {
+  customs: {
+    id: string;
+    declarationNo: string;
+    salesContractId: string;
+    status: string;
+    note: string;
+    declaredAt: number | null;
+    exportDate: number | null;
+    totalAmount: number;
+    totalQuantity: number;
+  }[];
+  items: {
+    id: string;
+    customsDeclarationId: string;
+    productId: string;
+    customsName: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+    declarationElements: string;
+  }[];
+  refunds: {
+    id: string;
+    refundNo: string;
+    salesContractId: string;
+    customsDeclarationId: string;
+    status: string;
+    appliedAt: number;
+    refundedAt: number | null;
+    declaredAmount: number;
+    refundableAmount: number;
+    refundedAmount: number;
+    note: string;
+  }[];
+  audit: {
+    id: string;
+    entity: string;
+    entityId: string;
+    action: string;
+    userId: string | null;
   }[];
 }
 export interface NotificationSnapshot {
@@ -228,6 +280,27 @@ c.close()`;
       { encoding: "utf8", timeout: 10000 },
     ),
   ) as NotificationSnapshot[];
+}
+
+export function readTaxRecords(fixture: RoleFixture): TaxRecordSnapshot {
+  // Full ordinary record rows and audit evidence from independent read-only SQLite.
+  const script = `import sqlite3,sys,json
+c=sqlite3.connect('file:'+sys.argv[1]+'?mode=ro',uri=True)
+c.row_factory=sqlite3.Row
+queries={
+'customs':'SELECT * FROM customs_declarations ORDER BY id',
+'items':'SELECT * FROM customs_declaration_items ORDER BY id',
+'refunds':'SELECT * FROM tax_refunds ORDER BY id',
+'audit':"SELECT * FROM operation_logs WHERE entity IN ('CustomsDeclaration','TaxRefund') ORDER BY id"}
+print(json.dumps({key:[dict(row) for row in c.execute(query)] for key,query in queries.items()}))
+c.close()`;
+  return JSON.parse(
+    execFileSync(
+      "python3",
+      ["-c", script, path.join(fixture.directory, "synthetic.db")],
+      { encoding: "utf8", timeout: 10000 },
+    ),
+  ) as TaxRecordSnapshot;
 }
 
 export async function forwardRealApi(page: Page, fixture: RoleFixture) {

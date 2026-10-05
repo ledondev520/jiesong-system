@@ -1,4 +1,4 @@
-/** Test-only role browser backend: real Express/auth/services, receipt allocation, own notifications and private synthetic SQLite. */
+/** Test-only role browser backend: real Express/auth/services, receipt allocation, own notifications, internal tax record forms and private synthetic SQLite. */
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -11,7 +11,7 @@ const password = 'test-only-role-browser-password-never-production';
 if (process.env.NODE_ENV !== 'test' || !process.send
   || !directory?.startsWith(path.join(os.tmpdir(), 'jiesong-role-browser-e2e-'))
   || fs.realpathSync(directory) !== directory
-  || !['purchase', 'warehouse', 'sales', 'boss', 'receipt-pool', 'notification-state'].includes(scenario)
+  || !['purchase', 'warehouse', 'sales', 'boss', 'receipt-pool', 'notification-state', 'tax-record-forms'].includes(scenario)
   || fs.existsSync(path.resolve(__dirname, '../../.env'))) process.exit(2);
 process.umask(0o077);
 fs.chmodSync(directory, 0o700);
@@ -20,8 +20,21 @@ process.env.UPLOAD_DIR = path.join(directory, 'uploads');
 process.env.JWT_SECRET = 'test-only-role-browser-jwt-secret-never-production';
 
 async function start() {
-  const ddl = execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'diff', '--from-empty', '--to-schema-datamodel', path.resolve(__dirname, '../../prisma/schema.prisma'), '--script'], { encoding: 'utf8', timeout: 30000 });
-  execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', path.join(directory, 'synthetic.db')], { input: `${ddl}\nINSERT INTO password_reset_lock (id) VALUES (1);` });
+  if (scenario === 'tax-record-forms') {
+    // This form roundtrip uses the committed migration chain, never db push or
+    // client generation. Prisma's executable children need normal execute bits;
+    // the database is created 0600 first inside the already-private 0700 root.
+    fs.closeSync(fs.openSync(path.join(directory, 'synthetic.db'), 'wx', 0o600));
+    const previousUmask = process.umask(0o022);
+    try {
+      execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'], {
+        cwd: path.resolve(__dirname, '../..'), stdio: 'ignore', timeout: 30000,
+      });
+    } finally { process.umask(previousUmask); }
+  } else {
+    const ddl = execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'diff', '--from-empty', '--to-schema-datamodel', path.resolve(__dirname, '../../prisma/schema.prisma'), '--script'], { encoding: 'utf8', timeout: 30000 });
+    execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', path.join(directory, 'synthetic.db')], { input: `${ddl}\nINSERT INTO password_reset_lock (id) VALUES (1);` });
+  }
   fs.chmodSync(path.join(directory, 'synthetic.db'), 0o600);
   const db = require('../utils/prisma');
   const users = {};
@@ -87,12 +100,38 @@ async function start() {
       contracts: contracts.map(({ id, contractNo, totalAmount }) => ({ id, contractNo, totalAmount })),
     };
   }
+  let taxRecords;
+  if (scenario === 'tax-record-forms') {
+    // Form-independent starting records only. Browser create/update requests use
+    // ordinary authenticated CRUD; no filing, confirmation or settlement route.
+    sale = await db.salesContract.create({ data: {
+      contractNo: 'EXP-SYNTHETIC-TAX-FORM', portId: port.id, exchangeRate: 7.2, status: 'DRAFT',
+    } });
+    const declaration = await db.customsDeclaration.create({ data: {
+      declarationNo: 'CD-SYNTHETIC-FORM-SEED', salesContractId: sale.id, status: 'DRAFT',
+      declaredAt: new Date('2026-10-01T00:00:00.000Z'), exportDate: null,
+      customsBroker: '合成内部报关行', currency: 'USD', exchangeRate: 7.2,
+      totalAmount: 100, totalQuantity: 10, totalGrossWeight: 12, totalNetWeight: 10,
+      note: '合成报关已保存备注',
+      items: { create: { productId: product.id, itemNo: 1, customsName: product.customsName,
+        hsCode: product.hsCode, quantity: 10, unit: '件', unitPrice: 10, totalPrice: 100,
+        declarationElements: '合成已保存申报要素' } },
+    } });
+    const refund = await db.taxRefund.create({ data: {
+      refundNo: 'TR-SYNTHETIC-FORM-SEED', salesContractId: sale.id, customsDeclarationId: declaration.id,
+      status: 'DRAFT', declaredAmount: 100, refundableAmount: 13, refundedAmount: 0,
+      appliedAt: new Date('2026-10-01T00:00:00.000Z'), refundedAt: null,
+      note: '合成退税已保存备注',
+    } });
+    taxRecords = { customsId: declaration.id, customsNo: declaration.declarationNo,
+      refundId: refund.id, refundNo: refund.refundNo, contractId: sale.id, contractNo: sale.contractNo };
+  }
   const app = require('../app'); // Imported app never starts scheduled/provider jobs.
   const server = app.listen(0, '127.0.0.1', () => process.send({
     baseURL: `http://127.0.0.1:${server.address().port}`,
     purchaseId: purchase.id, purchaseItemId: purchaseItem.id, productId: product.id,
     receiptId: receipt?.id, receiptItemId: receipt?.items[0].id, salesId: sale?.id, salesNo: sale?.contractNo,
-    receiptPool,
+    receiptPool, taxRecords,
     users: Object.fromEntries(Object.entries(users).map(([role, user]) => [role, { id: user.id, username: user.username }])),
   }));
   let closing = false;

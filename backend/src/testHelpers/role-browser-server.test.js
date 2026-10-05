@@ -1,4 +1,4 @@
-/** Fixture contract validation including receipt allocation and own notification state, without browser execution, production data or provider calls. */
+/** Fixture contract validation including receipt allocation and own notification state and internal tax forms, without browser execution, production data or provider calls. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -230,3 +230,74 @@ test('role browser fixture: BOSS reads receipt balances but allocation and autom
     assert.deepEqual(readPool(f), before);
   }
 });
+
+for (const kind of ['customs', 'refunds']) {
+  test(`role browser fixture: FINANCE internal ${kind} forms use migrated SQLite, reject duplicate then create/edit/read back`, { timeout: 60000 }, async t => {
+    const f = await fixtureFor(t, 'tax-record-forms');
+    const token = await f.login('FINANCE');
+    const seed = f.taxRecords;
+    const route = kind === 'customs' ? '/customs-declarations' : '/tax-refunds';
+    const table = kind === 'customs' ? 'customs_declarations' : 'tax_refunds';
+    const numberField = kind === 'customs' ? 'declarationNo' : 'refundNo';
+    const payload = kind === 'customs' ? {
+      declarationNo: seed.customsNo, salesContractId: seed.contractId, status: 'DRAFT',
+      declaredAt: '2026-10-02', exportDate: '2026-10-03', customsBroker: '合成内部报关行', currency: 'USD', exchangeRate: 7.2,
+      totalAmount: 200, totalQuantity: 20, totalGrossWeight: 24, totalNetWeight: 20, note: '合成新建记录',
+      items: [{ productId: f.productId, itemNo: 1, customsName: '合成内部表单商品', hsCode: '9999999999', quantity: 20, unit: '件', unitPrice: 10, totalPrice: 200, declarationElements: '合成申报要素' }],
+    } : {
+      refundNo: seed.refundNo, salesContractId: seed.contractId, customsDeclarationId: seed.customsId, forexVerificationId: null, status: 'DRAFT',
+      declaredAmount: 200, refundableAmount: 26, refundedAmount: 0, appliedAt: '2026-10-02', refundedAt: null, note: '合成新建记录',
+    };
+    const snapshot = () => ({
+      customs: f.read('SELECT * FROM customs_declarations ORDER BY id'),
+      items: f.read('SELECT * FROM customs_declaration_items ORDER BY id'),
+      refunds: f.read('SELECT * FROM tax_refunds ORDER BY id'),
+      audit: f.read("SELECT * FROM operation_logs WHERE entity IN ('CustomsDeclaration','TaxRefund') ORDER BY id"),
+    });
+    const before = snapshot();
+    assert.ok(f.read('SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL').length > 10);
+    assert.equal((await f.call('POST', route, payload, token)).status, 500);
+    assert.deepEqual(snapshot(), before);
+    payload[numberField] = `${kind === 'customs' ? 'CD' : 'TR'}-SYNTHETIC-HTTP-NEW`;
+    const created = await f.call('POST', route, payload, token);
+    assert.equal(created.status, 201);
+    const id = created.body.data.id;
+    const waitAudit = async count => {
+      const deadline = Date.now() + 5000;
+      while (snapshot().audit.length !== count && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20));
+      assert.equal(snapshot().audit.length, count);
+    };
+    await waitAudit(1);
+    const saved = snapshot();
+    assert.equal(f.read(`SELECT * FROM ${table}`).length, 2);
+    assert.equal(saved.audit[0].userId, f.users.FINANCE.id);
+    assert.equal(saved.audit[0].entityId, id);
+    const readback = await f.call('GET', `${route}/${id}`, undefined, token);
+    assert.equal(readback.status, 200);
+    const dateField = kind === 'customs' ? 'declaredAt' : 'appliedAt';
+    assert.equal(readback.body.data[dateField], '2026-10-02T00:00:00.000Z');
+    const editedPayload = { ...payload, note: '合成内部记录编辑后备注' };
+    if (kind === 'customs') editedPayload.items = readback.body.data.items.map(({ id: itemId }) => ({ ...payload.items[0], id: itemId }));
+    const updated = await f.call('PUT', `${route}/${id}`, editedPayload, token);
+    assert.equal(updated.status, 200);
+    await waitAudit(2);
+    const edited = snapshot();
+    const record = f.read(`SELECT * FROM ${table}`).find(row => row.id === id);
+    const original = (kind === 'customs' ? saved.customs : saved.refunds).find(row => row.id === id);
+    assert.deepEqual({ ...record, updatedAt: original.updatedAt }, { ...original, note: editedPayload.note });
+    if (kind === 'customs') {
+      const item = edited.items.find(row => row.customsDeclarationId === id);
+      const prior = saved.items.find(row => row.customsDeclarationId === id);
+      assert.deepEqual({ ...item, updatedAt: prior.updatedAt }, prior);
+    }
+    assert.equal(edited.audit[1].action, 'UPDATE');
+    assert.equal(edited.audit[1].userId, f.users.FINANCE.id);
+    const reloaded = await f.call('GET', `${route}/${id}`, undefined, token);
+    assert.equal(reloaded.status, 200);
+    assert.equal(reloaded.body.data.note, editedPayload.note);
+    assert.equal(reloaded.body.data[dateField], '2026-10-02T00:00:00.000Z');
+    assert.equal(reloaded.body.data.status, 'DRAFT');
+    if (kind === 'refunds') assert.equal(reloaded.body.data.refundedAmount, 0);
+    assert.deepEqual(snapshot(), edited);
+  });
+}

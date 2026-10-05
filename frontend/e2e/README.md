@@ -39,3 +39,5 @@
 - `tax-navigation.spec.ts`：390/1440px 实际 Next 路由下的合成报关列表，验证原生 Back/Forward 筛选与第 1 页恢复、快速逐字搜索输入及关键词/状态/重置保留 `view` 和 `source`、带关键词/状态的详情经 Back/Forward 与明确返回恢复完整来源筛选、随后中断筛选并切换退税页签，以及重复点击/方向键导航。报关/退税 API 写请求直接拒绝；不访问生产数据。定义可由 CI 执行，本地添加定义不代表浏览器验收已通过。
 
 - `dashboard-return-context.spec.ts`：390/1440px 实际 Next 路由下的合成只读工作台/经营报表，验证阻塞范围与已应用日期经销售明细返回、Back/Forward 和整页刷新保留，范围快速切换/原生历史、未应用草稿、倒序日期禁用以及全部期间重置。业务写请求拒绝，检查未捕获页面异常；定义与实际浏览器通过情况分别报告。
+
+- `real-role-lifecycle.spec.ts` 新增六项1440px FINANCE内部报关/退税表单验收（每种三项）：新建完整草稿经返回取消/刷新/重开零业务与审计写入；真实重复编号拒绝后保留全部输入，纠正编号重试创建一次，整页重载读回及备注编辑保存/重载，报关明细ID不变；已有记录编辑金额/日期/备注后返回取消，重开恢复原始日期与输入。每项独占 `tax-record-forms` 私有迁移SQLite及真实Express，不mock业务响应，独立只读连接核对整条记录与FINANCE审计操作者。退税编辑使用真实API ISO日期以防空白回填。全部保持DRAFT/已退金额0，不调用正式申报、确认、资金结算、导出、上传或外部服务。`playwright test real-role-lifecycle.spec.ts --list --grep='FINANCE (customs|refunds)'` 仅验证六项定义；浏览器执行以既有hosted CI为准。

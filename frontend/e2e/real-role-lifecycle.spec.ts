@@ -7,6 +7,7 @@ import {
   loginAs,
   readDomain,
   readPurchaseNotifications,
+  readTaxRecords,
   testPassword,
   type RoleFixture,
 } from "./real-role-fixture";
@@ -383,3 +384,335 @@ test("BOSS reads purchase and sales UI, hides write controls and cannot mutate r
   ).toHaveCount(0);
   expect(readDomain(fixture)).toEqual(before);
 });
+
+// Six bounded internal-record scenarios. Draft status throughout; no filing,
+// confirmation, exports, uploads, money movement or external provider actions.
+const customsDraft = {
+  报关单号: "CD-SYNTHETIC-FORM-NEW",
+  报关行: "合成内部报关行新草稿",
+  申报日期: "2026-10-02",
+  出口日期: "2026-10-03",
+  成交币种: "USD",
+  汇率: "7.2",
+  货值总额: "200",
+  申报总数量: "20",
+  "毛重（kg）": "24",
+  "净重（kg）": "20",
+  备注: "合成报关新建草稿",
+  申报品名: "合成内部表单商品",
+  "HS 编码": "9999999999",
+  数量: "20",
+  单位: "件",
+  单价: "10",
+  金额: "200",
+  申报要素: "合成新建申报要素",
+};
+const refundDraft = {
+  退税单号: "TR-SYNTHETIC-FORM-NEW",
+  申请日期: "2026-10-02",
+  申报金额: "200",
+  可退金额: "26",
+  已退金额: "0",
+  到账日期: "",
+  备注: "合成退税新建草稿",
+};
+async function assertFormValues(page: Page, values: Record<string, string>) {
+  for (const [label, value] of Object.entries(values)) {
+    await expect(page.getByLabel(label, { exact: true })).toHaveValue(value);
+  }
+}
+async function fillTaxRecordDraft(
+  page: Page,
+  kind: "customs" | "refunds",
+  number?: string,
+) {
+  const seed = fixture.taxRecords!;
+  await expect(
+    page.getByRole("combobox", { name: "出口合同", exact: true }),
+  ).toBeEnabled();
+  await page.getByRole("combobox", { name: "出口合同", exact: true }).click();
+  await page
+    .getByRole("option", { name: seed.contractNo, exact: true })
+    .click();
+  if (kind === "customs") {
+    await page.getByRole("combobox", { name: "商品档案", exact: true }).click();
+    await page.getByRole("option", { name: productName, exact: true }).click();
+  } else {
+    await expect(
+      page.getByRole("combobox", { name: "报关单", exact: true }),
+    ).toBeEnabled();
+    await page.getByRole("combobox", { name: "报关单", exact: true }).click();
+    await page
+      .getByRole("option", { name: seed.customsNo, exact: true })
+      .click();
+  }
+  const values =
+    kind === "customs"
+      ? { ...customsDraft, 报关单号: number || customsDraft.报关单号 }
+      : { ...refundDraft, 退税单号: number || refundDraft.退税单号 };
+  for (const [label, value] of Object.entries(values)) {
+    await page.getByLabel(label, { exact: true }).fill(value);
+  }
+  await assertFormValues(page, values);
+  await expect(
+    page.getByRole("combobox", { name: "状态", exact: true }),
+  ).toContainText("草稿");
+  return values;
+}
+for (const kind of ["customs", "refunds"] as const) {
+  const pathname =
+    kind === "customs" ? "/customs-declarations" : "/tax-refunds";
+  const numberLabel = kind === "customs" ? "报关单号" : "退税单号";
+  const editLabel = kind === "customs" ? "编辑报关单" : "编辑退税单";
+  const listURL =
+    kind === "customs"
+      ? /\/dashboard\/tax-refunds\?view=customs$/
+      : /\/dashboard\/tax-refunds$/;
+
+  test(`FINANCE ${kind} unsaved create return cancels with zero record or audit writes`, async ({
+    page,
+  }) => {
+    fixture = await startRoleFixture("tax-record-forms");
+    await forwardRealApi(page, fixture);
+    await loginAs(page, fixture, "FINANCE");
+    const before = readTaxRecords(fixture);
+    let writes = 0;
+    page.on("request", (request) => {
+      if (
+        new URL(request.url()).pathname.startsWith(`/api/v1${pathname}`) &&
+        ["POST", "PUT", "DELETE"].includes(request.method())
+      )
+        writes += 1;
+    });
+    await page.goto(`/dashboard${pathname}/create`);
+    await fillTaxRecordDraft(page, kind);
+    await page.getByRole("button", { name: "返回", exact: true }).click();
+    await expect(page).toHaveURL(listURL);
+    expect(readTaxRecords(fixture)).toEqual(before);
+    expect(writes).toBe(0);
+    await page.reload();
+    await page.goto(`/dashboard${pathname}/create`);
+    await expect(page.getByLabel(numberLabel, { exact: true })).toHaveValue("");
+    await expect(page.getByLabel("备注", { exact: true })).toHaveValue("");
+    expect(readTaxRecords(fixture)).toEqual(before);
+    expect(writes).toBe(0);
+  });
+
+  test(`FINANCE ${kind} real create failure retains draft, corrected retry persists and edited save survives reload`, async ({
+    page,
+  }) => {
+    fixture = await startRoleFixture("tax-record-forms");
+    await forwardRealApi(page, fixture);
+    await loginAs(page, fixture, "FINANCE");
+    const seed = fixture.taxRecords!;
+    const before = readTaxRecords(fixture);
+    await page.goto(`/dashboard${pathname}/create`);
+    const values = await fillTaxRecordDraft(
+      page,
+      kind,
+      kind === "customs" ? seed.customsNo : seed.refundNo,
+    );
+    const rejected = mutation(page, pathname);
+    await page
+      .getByRole("button", { name: "保存并查看详情", exact: true })
+      .click();
+    expect((await rejected).status()).toBe(500); // Genuine unique-key rejection, no mock error.
+    await expect(
+      page.getByText(
+        kind === "customs" ? "创建报关单失败" : "创建退税记录失败",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "保存并查看详情", exact: true }),
+    ).toBeEnabled();
+    await assertFormValues(page, values);
+    await expect(
+      page.getByRole("combobox", { name: "出口合同", exact: true }),
+    ).toContainText(seed.contractNo);
+    if (kind === "customs")
+      await expect(
+        page.getByRole("combobox", { name: "商品档案", exact: true }),
+      ).toContainText(productName);
+    else
+      await expect(
+        page.getByRole("combobox", { name: "报关单", exact: true }),
+      ).toContainText(seed.customsNo);
+    expect(readTaxRecords(fixture)).toEqual(before);
+
+    const number =
+      kind === "customs" ? customsDraft.报关单号 : refundDraft.退税单号;
+    await page.getByLabel(numberLabel, { exact: true }).fill(number);
+    const created = mutation(page, pathname);
+    await page
+      .getByRole("button", { name: "保存并查看详情", exact: true })
+      .click();
+    const response = await created;
+    expect(response.status()).toBe(201);
+    const id = (await response.json()).data.id as string;
+    await expect(page).toHaveURL(`/dashboard${pathname}/${id}`);
+    await expect(
+      page.getByRole("heading", { name: number, exact: true }),
+    ).toBeVisible();
+    await expect.poll(() => readTaxRecords(fixture).audit.length).toBe(1);
+    const saved = readTaxRecords(fixture);
+    expect(saved.customs).toHaveLength(kind === "customs" ? 2 : 1);
+    expect(saved.refunds).toHaveLength(kind === "refunds" ? 2 : 1);
+    expect(saved.audit[0]).toMatchObject({
+      action: "CREATE",
+      entityId: id,
+      userId: fixture.users.FINANCE.id,
+    });
+    let itemId: string | undefined;
+    if (kind === "customs") {
+      expect(saved.customs.find((row) => row.id === id)).toMatchObject({
+        declarationNo: number,
+        salesContractId: seed.contractId,
+        status: "DRAFT",
+        declaredAt: Date.parse("2026-10-02T00:00:00.000Z"),
+        exportDate: Date.parse("2026-10-03T00:00:00.000Z"),
+        note: customsDraft.备注,
+        totalAmount: 200,
+        totalQuantity: 20,
+      });
+      const item = saved.items.find((row) => row.customsDeclarationId === id)!;
+      itemId = item.id;
+      expect(item).toMatchObject({
+        productId: fixture.productId,
+        customsName: customsDraft.申报品名,
+        quantity: 20,
+        unitPrice: 10,
+        totalPrice: 200,
+        declarationElements: customsDraft.申报要素,
+      });
+    } else {
+      expect(saved.refunds.find((row) => row.id === id)).toMatchObject({
+        refundNo: number,
+        salesContractId: seed.contractId,
+        customsDeclarationId: seed.customsId,
+        status: "DRAFT",
+        declaredAmount: 200,
+        refundableAmount: 26,
+        refundedAmount: 0,
+        appliedAt: Date.parse("2026-10-02T00:00:00.000Z"),
+        refundedAt: null,
+        note: refundDraft.备注,
+      });
+    }
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { name: number, exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        kind === "customs" ? customsDraft.备注 : refundDraft.备注,
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await page.getByRole("button", { name: editLabel, exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "保存变更", exact: true }),
+    ).toBeEnabled();
+    await assertFormValues(page, { ...values, [numberLabel]: number }); // Real API ISO dates must display correctly.
+    const note = "合成内部记录编辑后备注";
+    await page.getByLabel("备注", { exact: true }).fill(note);
+    const updated = mutation(page, `${pathname}/${id}`, "PUT");
+    await page.getByRole("button", { name: "保存变更", exact: true }).click();
+    expect((await updated).status()).toBe(200);
+    await expect(page).toHaveURL(`/dashboard${pathname}/${id}`);
+    await page.reload();
+    await expect(page.getByText(note, { exact: true })).toBeVisible();
+    await expect.poll(() => readTaxRecords(fixture).audit.length).toBe(2);
+    const edited = readTaxRecords(fixture);
+    expect(edited.audit[1]).toMatchObject({
+      action: "UPDATE",
+      entityId: id,
+      userId: fixture.users.FINANCE.id,
+    });
+    const oldRecord = (kind === "customs" ? saved.customs : saved.refunds).find(
+      (row) => row.id === id,
+    )!;
+    const newRecord = (
+      kind === "customs" ? edited.customs : edited.refunds
+    ).find((row) => row.id === id)!;
+    expect(newRecord).toMatchObject({
+      ...oldRecord,
+      note,
+      updatedAt: expect.any(Number),
+    });
+    if (kind === "customs") {
+      expect(edited.items.find((row) => row.id === itemId)).toMatchObject({
+        ...saved.items.find((row) => row.id === itemId),
+        updatedAt: expect.any(Number),
+      });
+    }
+    await page.getByRole("button", { name: editLabel, exact: true }).click();
+    await assertFormValues(page, {
+      ...values,
+      [numberLabel]: number,
+      备注: note,
+    });
+    expect(readTaxRecords(fixture)).toEqual(edited);
+  });
+
+  test(`FINANCE ${kind} unsaved edit return preserves saved record and reopening restores dates and inputs`, async ({
+    page,
+  }) => {
+    fixture = await startRoleFixture("tax-record-forms");
+    await forwardRealApi(page, fixture);
+    await loginAs(page, fixture, "FINANCE");
+    const id =
+      kind === "customs"
+        ? fixture.taxRecords!.customsId
+        : fixture.taxRecords!.refundId;
+    const before = readTaxRecords(fixture);
+    let writes = 0;
+    page.on("request", (request) => {
+      if (
+        new URL(request.url()).pathname.startsWith(`/api/v1${pathname}`) &&
+        ["POST", "PUT", "DELETE"].includes(request.method())
+      )
+        writes += 1;
+    });
+    await page.goto(`/dashboard${pathname}/${id}/edit`);
+    await expect(
+      page.getByRole("button", { name: "保存变更", exact: true }),
+    ).toBeEnabled();
+    const dateLabel = kind === "customs" ? "申报日期" : "申请日期";
+    const originalNote =
+      kind === "customs" ? "合成报关已保存备注" : "合成退税已保存备注";
+    await expect(page.getByLabel(dateLabel, { exact: true })).toHaveValue(
+      "2026-10-01",
+    );
+    await expect(
+      page.getByLabel(kind === "customs" ? "出口日期" : "到账日期", {
+        exact: true,
+      }),
+    ).toHaveValue("");
+    await page.getByLabel("备注", { exact: true }).fill("合成编辑取消草稿");
+    await page.getByLabel(dateLabel, { exact: true }).fill("2026-10-04");
+    await page
+      .getByLabel(kind === "customs" ? "货值总额" : "申报金额", { exact: true })
+      .fill("999");
+    await page.getByRole("button", { name: "返回", exact: true }).click();
+    await expect(page).toHaveURL(`/dashboard${pathname}/${id}`);
+    await expect(page.getByText(originalNote, { exact: true })).toBeVisible();
+    expect(readTaxRecords(fixture)).toEqual(before);
+    expect(writes).toBe(0);
+    await page.reload();
+    await page.getByRole("button", { name: editLabel, exact: true }).click();
+    await expect(page.getByLabel("备注", { exact: true })).toHaveValue(
+      originalNote,
+    );
+    await expect(page.getByLabel(dateLabel, { exact: true })).toHaveValue(
+      "2026-10-01",
+    );
+    await expect(
+      page.getByLabel(kind === "customs" ? "货值总额" : "申报金额", {
+        exact: true,
+      }),
+    ).toHaveValue("100");
+    expect(readTaxRecords(fixture)).toEqual(before);
+    expect(writes).toBe(0);
+  });
+}
