@@ -9,6 +9,7 @@
 const fs = require('fs');
 const prisma = require('../utils/prisma');
 const { IMPORT_STATUS } = require('../config/constants');
+const { getSalesCargoState, assertSalesCargoMutable } = require('./salesCargoLifecycle');
 
 /**
  * 职责：解析CSV文件内容
@@ -115,6 +116,7 @@ const importCSVData = async (filePath, userId) => {
     products: new Map(),
     ports: new Map(),
     containers: new Map(),
+    createdContainers: new Map(),
   };
   
   // 预加载港口数据
@@ -238,6 +240,7 @@ const processRow = async (row, cache, db) => {
     container = cache.containers.get(containerNo);
     if (!container) {
       const port = cache.ports.get(portName) || cache.ports.get('洛杉矶');
+      const existing = await db.salesContract.findUnique({ where: { contractNo: containerNo }, select: { id: true } });
       container = await db.salesContract.upsert({
         where: { contractNo: containerNo },
         update: {
@@ -257,6 +260,7 @@ const processRow = async (row, cache, db) => {
           exchangeRate: 7.0,
         },
       });
+      if (!existing) cache.createdContainers.set(container.id, true);
       if (container) cache.containers.set(containerNo, container);
     }
   }
@@ -270,6 +274,10 @@ const processRow = async (row, cache, db) => {
     const volume = parseFloat(row['体积']) || 0;
     
     if (quantity > 0 || boxes > 0) {
+      // 本次新建的历史货柜允许继续逐行补录，既有合同沿用销售模块出库约束。
+      if (!cache.createdContainers.has(container.id)) {
+        assertSalesCargoMutable(await getSalesCargoState(db, container.id));
+      }
       await db.packingItem.create({
         data: {
           salesContractId: container.id,

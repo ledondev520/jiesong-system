@@ -63,6 +63,14 @@ test('历史CSV导入遵守当前唯一键并按行回滚失败写入', async (t
       assert.equal(productResult.failedRows, 1);
       assert.match(productResult.errors[0].error, /多条/);
     });
+    await t.test('旧CSV不能向已发运合同追加货物而绕过出库一致性约束', async () => {
+      const before = await db.packingItem.count();
+      const result = await run(['合成供应商,合成门店,合成港,合成商品,件,EXP-TEST-1,99,9,2026-01-01']);
+      assert.equal(result.successRows, 0);
+      assert.equal(result.failedRows, 1);
+      assert.match(result.errors[0].error, /已发运|出库/);
+      assert.equal(await db.packingItem.count(), before);
+    });
     await t.test('后续写入失败回滚本行，新行不复用已回滚实体缓存', async () => {
       const result = await run([
         '合成回滚供应商,合成回滚门店,合成港,合成回滚商品,件,EXP-ROLLBACK-BAD,10,1,invalid-date',
