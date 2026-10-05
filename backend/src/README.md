@@ -53,6 +53,7 @@
 | salesFinanceService.js | 按共享所有权判定查询自有采购合同，聚合单柜收入、成本、退税与现金流 |
 | salesCreationService.js | 出口表头与明细原子创建；既有日志表保存按认证操作者隔离的请求摘要，断线或并发重试复用结果且路由不重复记新建审计；模板失败全部回滚 |
 | salesService.js | 装箱增删改与统计在同一事务；发运后禁止增删行或修改数量/单位，单证资料可补录；导入装箱后自动进入装柜；登记到港保留出库，收款齐套自动完成；正式表头金额不被派生金额覆盖 |
+| importService.js | 历史CSV按非唯一名称检查重名，按id更新；单行事务提交后才计成功并更新缓存，失败回滚且不吞数据库异常，既有合同沿用销售出库约束 |
 | financeImportService.js | 银行流水与发票清单解析、识别标题行后的招商银行中英文币种和脱敏账号、按银行/币种/账号及余额轨迹跨来源去重、税务全量导出的数电发票号码识别、同票多明细聚合及批次写入 |
 | bankFlowService.js | 银行流水按币种与脱敏账号查询、人民币发票对账和美元到账汇总 |
 | financeMatchService.js | 银行流水/发票与购销合同匹配；人民币只匹配采购、美元收入只匹配销售 |
@@ -60,9 +61,10 @@
 | invoiceVerificationService.js | 出口退税候选发票的销方、价税合计、品名、状态只读一致性核验 |
 | financialStatementsService.js | 会计报表、科目余额、明细账同账期校验，单事务写入与下钻查询 |
 | financialEvidenceService.js | 工资、税务、凭证与日记账等资料的分类、脱敏、幂等导入与受限查询 |
+| ai/contextService.js | 按当前销售合同港口关联构造美元上下文；局部查询失败保留其他资料并提示不可用，解析汇率后继续拼接财务概况 |
 | aiService.js | DeepSeek/Kimi 活动供应商、DeepSeek 独立密钥与 flash thinking/high、完整时限、零重试与流式用量 |
 | anthropicCompatService.js | Open Agent 的 OpenAI 协议适配，保留思考/工具回合与图像，共用请求时限及模型参数 |
-| openAgentService.js | 内部草稿按请求直接执行；其他写操作一次确认；当前 AI 客户端校验与零自动重试、工具角色与执行回放；SDK 错误终止传播为 503/SSE error，不写成功记录 |
+| openAgentService.js | 出口详情复用销售服务从装箱行计算拼柜来源；内部草稿按请求直接执行；其他写操作一次确认；当前 AI 客户端校验与零自动重试、工具角色与执行回放；SDK 错误终止传播为 503/SSE error，不写成功记录 |
 | agentReplaySummaryService.js | Agent 回放摘要持久化，支持复用外层事务客户端 |
 | importService.js | CSV数据解析与导入 |
 | exportService.js | 多格式数据导出（CSV + 出口合同五 Sheet Excel 含商业发票/税务测算） |
