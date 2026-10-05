@@ -199,6 +199,15 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     const replay = await call('POST', `/finance/payments/${source.id}/allocate`, { allocations: [{ salesContractId: a.id, amount: 20 }] });
     assert.equal(replay.status, 400);
     assert.deepEqual(snapshot(), finished);
+    // Historical source types may predate the fully-allocated marker. A positive
+    // receipt with zero available balance cannot use the cent tolerance as funds.
+    const legacySale = await sale({ receivedAmount: 100 });
+    const legacySource = await receipt();
+    await db.payment.create({ data: { type: 'RECEIVABLE_COLLECTION', sourcePaymentId: legacySource.id, salesContractId: legacySale.id, amount: 100, currency: 'USD', paymentDate: legacySource.paymentDate } });
+    const legacyFinished = snapshot();
+    const legacyReplay = await call('POST', `/finance/payments/${legacySource.id}/allocate`, { allocations: [{ salesContractId: legacySale.id, amount: 0.005 }] });
+    assert.equal(legacyReplay.status, 400, 'zero remaining balance rejects even a sub-cent historical replay');
+    assert.deepEqual(snapshot(), legacyFinished);
     // No new allocation idempotency/undo operation is assumed: the existing endpoint rejects a spent source.
   });
 

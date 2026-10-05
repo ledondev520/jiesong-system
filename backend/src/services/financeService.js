@@ -496,6 +496,9 @@ const allocatePaymentToContracts = async (paymentId, allocations) => {
     }
     const allocatedBefore = await getPaymentAllocatedAmount(paymentId, tx);
     const remainingBefore = Math.max(Number(receipt.amount || 0) - allocatedBefore, 0);
+    if (remainingBefore <= 0) {
+      throw createError('该笔收款已无剩余可分配金额', 400);
+    }
     if (requestedAmount - remainingBefore > AUTO_MATCH_AMOUNT_TOLERANCE) {
       throw createError('分配金额超出该笔收款剩余可分配金额', 400);
     }
