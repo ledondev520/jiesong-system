@@ -9,6 +9,18 @@ const assert = require('node:assert/strict');
 const prisma = require('../utils/prisma');
 const containerService = require('./containerService');
 
+// 单元测试只运行合成事务桩；真实事务/SQLite 的一致性由 sales-cargo-lifecycle.integration.js 验证。
+const baseTransaction = prisma.$transaction;
+const baseSalesFindUnique = prisma.salesContract.findUnique;
+test.beforeEach(() => {
+  prisma.$transaction = async callback => callback(prisma);
+  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', status: 'DRAFT', inventories: [] });
+});
+test.afterEach(() => {
+  prisma.$transaction = baseTransaction;
+  prisma.salesContract.findUnique = baseSalesFindUnique;
+});
+
 test('list: 组装筛选条件并返回合同号字段', async () => {
   const originalFindMany = prisma.salesContract.findMany;
   const originalCount = prisma.salesContract.count;
@@ -107,8 +119,8 @@ test('addItem: 计算 totalPrice 并回写货柜统计', async () => {
 });
 
 test('updateItem: 装箱明细不存在时抛出404', async () => {
-  const originalFindUnique = prisma.packingItem.findUnique;
-  prisma.packingItem.findUnique = async () => null;
+  const originalFindUnique = prisma.packingItem.findFirst;
+  prisma.packingItem.findFirst = async () => null;
 
   try {
     await assert.rejects(
@@ -116,18 +128,18 @@ test('updateItem: 装箱明细不存在时抛出404', async () => {
       (error) => error.statusCode === 404 && error.message === '装箱明细不存在',
     );
   } finally {
-    prisma.packingItem.findUnique = originalFindUnique;
+    prisma.packingItem.findFirst = originalFindUnique;
   }
 });
 
 test('updateItem: 更新数量和单价时重算 totalPrice', async () => {
-  const originalFindUnique = prisma.packingItem.findUnique;
+  const originalFindUnique = prisma.packingItem.findFirst;
   const originalUpdate = prisma.packingItem.update;
   const originalAggregate = prisma.packingItem.aggregate;
   const originalContractUpdate = prisma.salesContract.update;
   let updateArgs = null;
 
-  prisma.packingItem.findUnique = async () => ({ quantity: 3, unitPrice: 6 });
+  prisma.packingItem.findFirst = async () => ({ quantity: 3, unitPrice: 6 });
   prisma.packingItem.update = async (args) => {
     updateArgs = args;
     return { id: 'item-1', ...args.data, product: { id: 'p-1' } };
@@ -149,7 +161,7 @@ test('updateItem: 更新数量和单价时重算 totalPrice', async () => {
     assert.equal(updateArgs.data.totalPrice, 20);
     assert.equal(updateArgs.data.unit, '件');
   } finally {
-    prisma.packingItem.findUnique = originalFindUnique;
+    prisma.packingItem.findFirst = originalFindUnique;
     prisma.packingItem.update = originalUpdate;
     prisma.packingItem.aggregate = originalAggregate;
     prisma.salesContract.update = originalContractUpdate;

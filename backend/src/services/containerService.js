@@ -1,6 +1,8 @@
+/** 旧货柜接口仍复用出口合同；装箱增删改在事务内检查发运/出库事实，不能改变已出库货物。 */
 const prisma = require('../utils/prisma');
 const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
 const { createError } = require('../middleware/errorHandler');
+const { getSalesCargoState, assertSalesCargoMutable, assertSalesCargoUpdate } = require('./salesCargoLifecycle');
 const {
   generateNextContractNo,
   normalizeFilterStatus,
@@ -349,16 +351,18 @@ const update = async (id, data = {}) => {
   return contract;
 };
 
-const remove = async (id) => {
-  await prisma.salesContract.delete({ where: { id } });
-};
+const remove = async (id) => prisma.$transaction(async (tx) => {
+  assertSalesCargoMutable(await getSalesCargoState(tx, id));
+  await tx.salesContract.delete({ where: { id } });
+});
 
-const addItem = async (id, data) => {
+const addItem = async (id, data) => prisma.$transaction(async (tx) => {
+  assertSalesCargoMutable(await getSalesCargoState(tx, id));
   const quantity = parseNullableNumber(data.quantity, 0);
   const unitPrice = parseNullableNumber(data.unitPrice, null);
   const totalPrice = unitPrice === null ? null : unitPrice * (quantity || 0);
 
-  const item = await prisma.packingItem.create({
+  const item = await tx.packingItem.create({
     data: {
       salesContractId: id,
       productId: data.productId,
@@ -379,9 +383,9 @@ const addItem = async (id, data) => {
     include: { product: true },
   });
 
-  await recalculateContainerStats(id);
+  await recalculateContainerStats(id, tx);
   return item;
-};
+});
 
 const updateStatus = async (id, status) => {
   const contract = await prisma.salesContract.update({
@@ -492,10 +496,10 @@ const getVisualization = async (id) => {
   };
 };
 
-const updateItem = async (id, itemId, data = {}) => {
-  const item = await prisma.packingItem.findUnique({
-    where: { id: itemId },
-    select: { quantity: true, unitPrice: true },
+const updateItem = async (id, itemId, data = {}) => prisma.$transaction(async (tx) => {
+  const item = await tx.packingItem.findFirst({
+    where: { id: itemId, salesContractId: id },
+    select: { purchaseItemId: true, quantity: true, unit: true, unitPrice: true, boxes: true, grossWeight: true, netWeight: true, volume: true, length: true, width: true, height: true },
   });
   if (!item) {
     throw createError('装箱明细不存在', 404);
@@ -539,26 +543,30 @@ const updateItem = async (id, itemId, data = {}) => {
     updateData.unitPrice = parseNullableNumber(data.unitPrice, null);
   }
 
+  assertSalesCargoUpdate(await getSalesCargoState(tx, id), item, updateData);
   const nextQuantity = updateData.quantity ?? item.quantity;
   const nextUnitPrice = updateData.unitPrice ?? item.unitPrice;
   if (nextUnitPrice !== undefined) {
     updateData.totalPrice = nextUnitPrice === null ? null : nextUnitPrice * nextQuantity;
   }
 
-  const updatedItem = await prisma.packingItem.update({
+  const updatedItem = await tx.packingItem.update({
     where: { id: itemId },
     data: { ...updateData },
     include: { product: true },
   });
 
-  await recalculateContainerStats(id);
+  await recalculateContainerStats(id, tx);
   return updatedItem;
-};
+});
 
-const removeItem = async (id, itemId) => {
-  await prisma.packingItem.delete({ where: { id: itemId } });
-  await recalculateContainerStats(id);
-};
+const removeItem = async (id, itemId) => prisma.$transaction(async (tx) => {
+  const item = await tx.packingItem.findFirst({ where: { id: itemId, salesContractId: id }, select: { id: true } });
+  if (!item) throw createError('装箱明细不存在', 404);
+  assertSalesCargoMutable(await getSalesCargoState(tx, id));
+  await tx.packingItem.delete({ where: { id: itemId } });
+  await recalculateContainerStats(id, tx);
+});
 
 /**
  * 职责：获取货柜所有装箱明细行，含商品和门店信息
@@ -637,19 +645,19 @@ const getItemsSummary = async (id) => {
   };
 };
 
-const recalculateContainerStats = async (salesContractId) => {
+const recalculateContainerStats = async (salesContractId, prismaClient = prisma) => {
   const [contract, stats] = await Promise.all([
-    prisma.salesContract.findUnique({
+    prismaClient.salesContract.findUnique({
       where: { id: salesContractId },
       select: { amountSource: true },
     }),
-    prisma.packingItem.aggregate({
+    prismaClient.packingItem.aggregate({
       where: { salesContractId },
       _sum: { boxes: true, grossWeight: true, netWeight: true, volume: true, totalPrice: true },
     }),
   ]);
 
-  await prisma.salesContract.update({
+  await prismaClient.salesContract.update({
     where: { id: salesContractId },
     data: {
       totalBoxes: stats._sum.boxes || 0,

@@ -1,6 +1,6 @@
 /**
  * Input: 出口合同详情、采购来源、40HQ 排柜、单证核对、退税准备与单柜财务 Interface
- * Output: 区分历史发运资料核对与实时出货门禁，含手机装箱明细卡片的排柜/发运、出口三单、申报单证、船司核对、退税材料、财务结算与核销跟进的专项单主页面
+ * Output: 区分历史发运资料核对与实时出货门禁，含发运后货物锁定与手机装箱明细卡片的排柜/发运、出口三单、申报单证、船司核对、退税材料、财务结算与核销跟进的专项单主页面
  * Pos: 出口专项单装柜主页面，复用采购完工资料并承载排柜到发运的唯一主线路
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -1262,19 +1262,24 @@ export default function SalesDetailPage({ params }: PageProps) {
                   <Package className="h-5 w-5" />
                   装箱明细
                 </CardTitle>
-                <CardDescription>管理货柜内的商品</CardDescription>
+                <CardDescription>
+                  {hasShipped
+                    ? "已发运：不能增删商品或修改出库数量，仍可补充单证资料"
+                    : "管理货柜内的商品"}
+                </CardDescription>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <BusinessWrite>
                   <Button
                     variant="outline"
                     onClick={() => setImportPurchaseOpen(true)}
+                    disabled={hasShipped}
                   >
                     <PackageCheck className="mr-2 h-4 w-4" /> 从已完工采购导入
                   </Button>
                 </BusinessWrite>
                 <BusinessWrite>
-                  <Button onClick={handleAddItem}>
+                  <Button onClick={handleAddItem} disabled={hasShipped}>
                     <Plus className="mr-2 h-4 w-4" /> 手动添加商品
                   </Button>
                 </BusinessWrite>
@@ -1345,6 +1350,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                                 className="h-11 text-destructive"
                                 aria-label={`删除 ${item.product?.customsName || "装箱商品"}`}
                                 onClick={() => handleDeleteItem(item.id)}
+                                disabled={hasShipped}
                               >
                                 <Trash className="mr-1.5 h-4 w-4" />
                                 删除
@@ -1483,6 +1489,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                                   size="icon"
                                   aria-label={`删除 ${item.product?.customsName || "装箱商品"}`}
                                   onClick={() => handleDeleteItem(item.id)}
+                                  disabled={hasShipped}
                                 >
                                   <Trash className="h-4 w-4 text-destructive" />
                                 </Button>
@@ -1818,7 +1825,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                   aria-label="数量"
                   type="number"
                   value={itemForm.quantity}
-                  disabled={sourceFieldsLocked}
+                  disabled={sourceFieldsLocked || hasShipped}
                   onChange={(e) =>
                     setItemForm((prev) => ({
                       ...prev,
