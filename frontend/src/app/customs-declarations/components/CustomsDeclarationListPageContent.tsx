@@ -404,7 +404,7 @@ export function CustomsDeclarationListPageContent({
               {loading ? (
                 <TableRow>
                   <TableCell
-                    colSpan={8}
+                    colSpan={7}
                     className="py-14 text-center text-muted-foreground"
                   >
                     加载中...
@@ -413,7 +413,7 @@ export function CustomsDeclarationListPageContent({
               ) : declarations.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={8}
+                    colSpan={7}
                     className="py-14 text-center text-muted-foreground"
                   >
                     暂无报关单数据。
