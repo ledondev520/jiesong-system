@@ -30,4 +30,6 @@
 - 角色验收 API 仅透传到 `127.0.0.1` 隔离 Express，没有业务响应 mock 或测试HTTP入口；独立只读 SQLite 连接核对落库。沿用既有 hosted Playwright workflow 与锁定依赖，不改变产品权限、Schema或CI权限。`playwright test real-role-lifecycle.spec.ts --list` 仅验证定义；真实浏览器通过情况以 hosted CI 为准，不把本地HTTP/DB、类型或lint通过称为浏览器通过。
 - 角色夹具对子进程显式传递同一 `TMPDIR`，确保自定义临时根目录与后端启动校验一致；仍只传递测试所需环境，不继承数据库或供应商凭据。
 
-- `tax-navigation.spec.ts`：390/1440px 实际 Next 路由下的合成报关列表，验证原生 Back/Forward 筛选与第 1 页恢复、快速逐字搜索输入及关键词/状态/重置保留 `view` 和 `source`、详情返回后中断筛选并切换退税页签，以及重复点击/方向键导航。报关/退税 API 写请求直接拒绝；不访问生产数据。定义可由 CI 执行，本地添加定义不代表浏览器验收已通过。
+- `tax-navigation.spec.ts`：390/1440px 实际 Next 路由下的合成报关列表，验证原生 Back/Forward 筛选与第 1 页恢复、快速逐字搜索输入及关键词/状态/重置保留 `view` 和 `source`、带关键词/状态的详情经 Back/Forward 与明确返回恢复完整来源筛选、随后中断筛选并切换退税页签，以及重复点击/方向键导航。报关/退税 API 写请求直接拒绝；不访问生产数据。定义可由 CI 执行，本地添加定义不代表浏览器验收已通过。
+
+- `dashboard-return-context.spec.ts`：390/1440px 实际 Next 路由下的合成只读工作台/经营报表，验证阻塞范围与已应用日期经销售明细返回、Back/Forward 和整页刷新保留，范围快速切换/原生历史、未应用草稿、倒序日期禁用以及全部期间重置。业务写请求拒绝，检查未捕获页面异常；定义与实际浏览器通过情况分别报告。

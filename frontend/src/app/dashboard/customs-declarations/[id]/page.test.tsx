@@ -1,5 +1,5 @@
 /**
- * Input: 报关单详情页、customsDeclarationService、router、toast
+ * Input: 报关单详情页、customsDeclarationService、浏览器查询、router、toast
  * Output: 真实报关摘要、出口日期与明细展示测试
  * Pos: 报关单管理详情页测试
  *
@@ -31,6 +31,7 @@ vi.mock("react", async () => {
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/dashboard/customs-declarations/cd-1",
+  useSearchParams: () => new URLSearchParams(window.location.search),
   useRouter: () => ({
     push: mockRouterPush,
     back: vi.fn(),
@@ -52,6 +53,7 @@ vi.mock("sonner", () => ({
 
 describe("CustomsDeclarationDetailPage 交互逻辑", () => {
   beforeEach(() => {
+    window.history.replaceState({}, "", "/dashboard/customs-declarations/cd-1");
     mockGetById.mockReset();
     mockToastError.mockReset();
     mockRouterPush.mockReset();

@@ -1,6 +1,6 @@
 /**
  * Input: 报关单服务、URL 查询参数、router
- * Output: 报关单列表页（浏览器筛选、输入草稿与最新请求一致，原生历史同步、分页与响应式列表）
+ * Output: 报关单列表页（筛选与历史同步，详情携带安全的当前列表返回上下文）
  * Pos: 报关单管理主列表页
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -58,6 +58,8 @@ import {
   CustomsDeclarationStatusBadge,
   customsDeclarationStatusOptions,
 } from "./CustomsDeclarationStatusBadge";
+
+import { resolveCustomsReturnTo } from "./customs-return-context";
 
 const PAGE_SIZE = 20;
 
@@ -193,8 +195,12 @@ export function CustomsDeclarationListPageContent({
   );
 
   const openDetail = (id: string) => {
+    const returnTo = resolveCustomsReturnTo(
+      window.location.pathname + window.location.search + window.location.hash,
+    );
+    const detailQuery = new URLSearchParams({ returnTo });
     startTransition(() => {
-      router.push(`/dashboard/customs-declarations/${id}`);
+      router.push(`/dashboard/customs-declarations/${id}?${detailQuery}`);
     });
   };
 
