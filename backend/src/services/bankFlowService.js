@@ -1,6 +1,6 @@
 /**
  * Input: Prisma client、BankTransaction / FinanceDataBatch 模型
- * Output: 银行流水查询、导入、统计接口
+ * Output: 同币种银行流水查询、导入、统计接口（空币种仍使用默认人民币）
  * Pos: 财务模块-银行流水业务逻辑层
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -55,7 +55,8 @@ function buildTxnWhere({ search, direction, dateFrom, dateTo, batchId, currency,
   }
   if (direction) where.direction = direction;
   if (batchId) where.batchId = batchId;
-  if (currency) where.currency = String(currency).toUpperCase();
+  // Blank query values must use the same CNY default as statistics, never all currencies.
+  where.currency = String(currency || 'CNY').toUpperCase();
   if (accountNoMasked) where.accountNoMasked = accountNoMasked;
   if (dateFrom || dateTo) {
     where.txnDate = {};
