@@ -1,6 +1,6 @@
 /**
  * Input: 实际退税页签、嵌入报关列表/详情、可观察的浏览器历史与合成服务数据
- * Output: 列表/详情返回后的页签切换及历史筛选回归结果
+ * Output: 列表/详情返回后的页签、历史筛选与异步列表结果一致性回归结果
  * Pos: 退税工作台路由集成测试
  */
 
@@ -45,6 +45,7 @@ const mocks = vi.hoisted(() => {
     customsGetAll: vi.fn(),
     customsGetById: vi.fn(),
     refundsGetAll: vi.fn(),
+    toastError: vi.fn(),
   };
 });
 
@@ -76,12 +77,39 @@ vi.mock("@/services/taxRefund.service", () => ({
 vi.mock("@/lib/api-cache", () => ({
   cachedFetch: (_key: string, fetcher: () => unknown) => fetcher(),
 }));
-vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock("sonner", () => ({
+  toast: { error: mocks.toastError, success: vi.fn() },
+}));
 vi.mock("./TaxRefundWorkbench", () => ({
   TaxRefundWorkbench: () => <h2>合成工作台</h2>,
 }));
 
 const detailParams = Promise.resolve({ id: "qa-customs" });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+const listResponse = (declarationNo: string, total: number) => ({
+  data: {
+    items: [
+      {
+        id: declarationNo,
+        declarationNo,
+        status: "DRAFT",
+        currency: "USD",
+        totalAmount: 0,
+      },
+    ],
+    pagination: { total },
+  },
+});
 
 function TestRoutes() {
   const pathname = useSyncExternalStore(
@@ -299,6 +327,104 @@ describe("退税页签实际组件的路由流转", () => {
     expect(window.location.search).toBe("?view=customs&source=qa");
     expect(input).toHaveValue("");
     expect(screen.getByRole("tab", { name: "报关单" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("历史筛选 NEW 的结果先返回后，OLD 的迟到结果不能覆盖行和分页", async () => {
+    const oldRequest = deferred<ReturnType<typeof listResponse>>();
+    const newRequest = deferred<ReturnType<typeof listResponse>>();
+    mocks.customsGetAll.mockImplementation(({ keyword }) =>
+      keyword === "OLD" ? oldRequest.promise : newRequest.promise,
+    );
+    window.history.replaceState(
+      {},
+      "",
+      "/dashboard/tax-refunds?view=customs&keyword=OLD",
+    );
+    await act(async () => render(<TestRoutes />));
+    await waitFor(() =>
+      expect(mocks.customsGetAll).toHaveBeenCalledWith(
+        expect.objectContaining({ keyword: "OLD" }),
+      ),
+    );
+    await act(async () => {
+      mocks.router.push("/dashboard/tax-refunds?view=customs&keyword=NEW");
+    });
+    await waitFor(() =>
+      expect(mocks.customsGetAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({ keyword: "NEW" }),
+      ),
+    );
+    await act(async () => newRequest.resolve(listResponse("ROW-NEW", 37)));
+    expect(screen.getByTestId("declaration-row-ROW-NEW")).toBeVisible();
+    await act(async () => oldRequest.resolve(listResponse("ROW-OLD", 1)));
+    expect(screen.getByDisplayValue("NEW")).toBeVisible();
+    expect(window.location.search).toBe("?view=customs&keyword=NEW");
+    expect(screen.getByTestId("declaration-row-ROW-NEW")).toBeVisible();
+    expect(screen.queryByTestId("declaration-row-ROW-OLD")).toBeNull();
+    expect(screen.getByRole("button", { name: "下一页" })).toBeEnabled();
+  });
+
+  it("OLD 的迟到失败不能关闭 NEW 的加载状态或显示旧请求错误", async () => {
+    const oldRequest = deferred<ReturnType<typeof listResponse>>();
+    const newRequest = deferred<ReturnType<typeof listResponse>>();
+    mocks.customsGetAll.mockImplementation(({ keyword }) =>
+      keyword === "OLD" ? oldRequest.promise : newRequest.promise,
+    );
+    window.history.replaceState(
+      {},
+      "",
+      "/dashboard/tax-refunds?view=customs&keyword=OLD",
+    );
+    await act(async () => render(<TestRoutes />));
+    await waitFor(() => expect(mocks.customsGetAll).toHaveBeenCalled());
+    await act(async () => {
+      mocks.router.push("/dashboard/tax-refunds?view=customs&keyword=NEW");
+    });
+    await waitFor(() =>
+      expect(mocks.customsGetAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({ keyword: "NEW" }),
+      ),
+    );
+    await act(async () => oldRequest.reject(new Error("synthetic old error")));
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(screen.getAllByText("加载中...").length).toBeGreaterThan(0);
+    await act(async () => newRequest.resolve(listResponse("ROW-NEW", 37)));
+    expect(screen.getByTestId("declaration-row-ROW-NEW")).toBeVisible();
+    expect(screen.queryAllByText("加载中...")).toHaveLength(0);
+  });
+
+  it("当前列表请求失败仍显示错误并结束加载", async () => {
+    const request = deferred<ReturnType<typeof listResponse>>();
+    mocks.customsGetAll.mockReturnValue(request.promise);
+    window.history.replaceState(
+      {},
+      "",
+      "/dashboard/tax-refunds?view=customs&keyword=NEW",
+    );
+    await act(async () => render(<TestRoutes />));
+    await waitFor(() => expect(mocks.customsGetAll).toHaveBeenCalled());
+    await act(async () => request.reject(new Error("synthetic current error")));
+    expect(mocks.toastError).toHaveBeenCalledExactlyOnceWith("加载报关单失败");
+    expect(screen.queryAllByText("加载中...")).toHaveLength(0);
+  });
+
+  it("离开报关页签后，未完成列表请求的失败不再显示错误", async () => {
+    const request = deferred<ReturnType<typeof listResponse>>();
+    mocks.customsGetAll.mockReturnValue(request.promise);
+    window.history.replaceState({}, "", "/dashboard/tax-refunds?view=customs");
+    await act(async () => render(<TestRoutes />));
+    await waitFor(() => expect(mocks.customsGetAll).toHaveBeenCalled());
+    await act(async () => {
+      mocks.router.replace("/dashboard/tax-refunds?view=refunds");
+    });
+    await act(async () =>
+      request.reject(new Error("synthetic abandoned error")),
+    );
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(screen.getByRole("tab", { name: "退税记录" })).toHaveAttribute(
       "aria-selected",
       "true",
     );

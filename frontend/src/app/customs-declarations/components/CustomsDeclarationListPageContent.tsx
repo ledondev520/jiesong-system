@@ -1,6 +1,6 @@
 /**
  * Input: 报关单服务、URL 查询参数、router
- * Output: 报关单列表页（保留所属页签、跟随历史筛选且仅由用户编辑 URL，服务端分页、手机卡片与桌面表格）
+ * Output: 报关单列表页（历史筛选与最新请求结果一致、仅由用户编辑 URL，服务端分页、手机卡片与桌面表格）
  * Pos: 报关单管理主列表页
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -14,6 +14,7 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
@@ -112,12 +113,20 @@ export function CustomsDeclarationListPageContent({
   const [declarations, setDeclarations] = useState<CustomsDeclaration[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingDrafts, setGeneratingDrafts] = useState(false);
+  const activeQueryRef = useRef<string | null>(null);
+  const requestGenerationRef = useRef(0);
+  const queryKey = `customs-declarations-${deferredKeyword}-${status}-${page}-${pageSize}`;
 
   const loadDeclarations = useCallback(async () => {
+    // 旧筛选回调或卸载后的刷新不能启动/提交列表请求。
+    if (activeQueryRef.current !== queryKey) return;
+    const requestGeneration = ++requestGenerationRef.current;
+    const isCurrent = () =>
+      activeQueryRef.current === queryKey &&
+      requestGenerationRef.current === requestGeneration;
     setLoading(true);
     try {
-      const cacheKey = `customs-declarations-${deferredKeyword}-${status}-${page}-${pageSize}`;
-      const response = await cachedFetch(cacheKey, () =>
+      const response = await cachedFetch(queryKey, () =>
         customsDeclarationService.getAll({
           page,
           pageSize,
@@ -125,18 +134,24 @@ export function CustomsDeclarationListPageContent({
           status: status === "ALL" ? undefined : status,
         }),
       );
+      if (!isCurrent()) return;
       setDeclarations(response?.data?.items || []);
       setTotal(response?.data?.pagination?.total ?? 0);
     } catch {
-      toast.error("加载报关单失败");
+      if (isCurrent()) toast.error("加载报关单失败");
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [deferredKeyword, status, page, pageSize]);
+  }, [deferredKeyword, status, page, pageSize, queryKey]);
 
   useEffect(() => {
+    activeQueryRef.current = queryKey;
     void loadDeclarations();
-  }, [loadDeclarations]);
+    return () => {
+      activeQueryRef.current = null;
+      requestGenerationRef.current += 1;
+    };
+  }, [loadDeclarations, queryKey]);
 
   const sort = useTableSort<CustomsDeclaration, string>(
     declarations,
