@@ -41,6 +41,7 @@
 - Do not print sensitive values to logs. Redact secrets from debug output and structured logs.
 - Structured HTTP logs may retain request shape for diagnosis, but must not retain body/query values, AI prompts, tool schemas, or user messages.
 - AI requests in `backend/src/services/aiService.js` and `anthropicCompatService.js` share a full-response deadline (default 30000ms via `KIMI_REQUEST_TIMEOUT_MS`, explicit 500–30000ms); SDK automatic retry/logging is disabled, and streamed usage avoids a second prompt-bearing estimation request.
+- VPS 切换主 AI 时同时更新受保护的 backend/.env 与 PM2 运行环境，先保留 0700/0600 私密配置备份，再以合成输入检查实际模型与完整助手响应；禁止输出密钥或完整 PM2 环境。
 - `AI_PROVIDER=deepseek` selects `DEEPSEEK_API_KEY`/`DEEPSEEK_BASE_URL` for the main AI flow without replacing separate Kimi integrations. `deepseekApiKey` overrides are encrypted and write-only; DeepSeek uses `deepseek-flash` with thinking enabled/high and preserves assistant reasoning across tool rounds. File permissions are checked before `.env` is loaded in `backend/src/config/index.js`.
 - Agent retries must not multiply upstream calls: `openAgentService.loadSdk` disables the SDK's exported outer retry configuration, and `aiController.anthropicCompatMessage` sets `x-should-retry: false` for Anthropic transport; failed calls require an explicit new user request.
 - Agent Runtime uses the published, locked `@codeany/open-agent-sdk` build (no developer `.tmp` fallback) and explicitly selects `anthropic-messages` for the local proxy regardless of the upstream model name.
