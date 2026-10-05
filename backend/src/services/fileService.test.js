@@ -165,8 +165,34 @@ test('createFile: 清理失败不覆盖原始错误或泄露文件路径', async
     });
     assert.deepEqual(messages, ['[fileService] rejected upload cleanup failed']);
     assert.equal(fs.existsSync(current), true);
+    assert.equal(fs.statSync(current).mode & 0o777, 0o600);
+    assert.equal(fs.statSync(directory).mode & 0o777, 0o700);
   } finally {
     fs.unlinkSync = originalUnlink;
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('createFile: 首次异步合同查询前已收紧新附件权限', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-upload-lookup-permissions-'));
+  fs.chmodSync(directory, 0o755);
+  const current = path.join(directory, 'synthetic-current.pdf');
+  fs.writeFileSync(current, '%PDF synthetic', { mode: 0o644 });
+  try {
+    await withMockDelegates({
+      purchaseContract: { findUnique: async () => {
+        assert.equal(fs.statSync(current).mode & 0o777, 0o600, 'new payload must be protected before the lookup begins');
+        assert.equal(fs.statSync(directory).mode & 0o777, 0o700);
+        return { id: 'purchase-1' };
+      } },
+      contractFile: { create: async ({ data }) => ({ id: 'synthetic-file', ...data }) },
+    }, async () => {
+      const file = await fileService.createFile('purchase-1', 'PURCHASE', {
+        originalname: 'synthetic.pdf', path: current, mimetype: 'application/pdf', size: 14,
+      });
+      assert.equal(file.id, 'synthetic-file');
+    });
+  } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });

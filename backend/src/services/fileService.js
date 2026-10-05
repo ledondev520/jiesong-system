@@ -76,7 +76,11 @@ const validateUploadedFileCategory = (file, category) => {
  */
 const createFile = async (contractId, contractType, file, description, category) => {
   try {
+    // Tighten the new payload before any asynchronous lookup, including failure paths.
+    secureStoredFile(file.path);
     assertContractType(contractType);
+    const normalizedCategory = normalizeCategory(category);
+    validateUploadedFileCategory(file, normalizedCategory);
     const isSales = contractType === CONTRACT_TYPE.SALES;
     const contract = await (isSales ? prisma.salesContract : prisma.purchaseContract).findUnique({
       where: { id: contractId }, select: { id: true },
@@ -84,9 +88,6 @@ const createFile = async (contractId, contractType, file, description, category)
     if (!contract) throw createError('合同不存在或已被删除', 404);
 
     const { getRelativePath } = require('../utils/upload');
-    const normalizedCategory = normalizeCategory(category);
-    validateUploadedFileCategory(file, normalizedCategory);
-    secureStoredFile(file.path);
     const baseData = {
       fileName: file.originalname,
       filePath: getRelativePath(file.path),
