@@ -1,0 +1,7 @@
+# Export-contract creation
+
+The existing sales form selects products and customer stores. `components/StoreSelect.tsx` offers an inline store-creation dialog to the same business roles permitted by POST `/stores`, without adding another primary management page. The server remains the authority for writes; BOSS and unknown roles never see the creation action.
+
+`CreateStoreDialog.tsx` requires a trimmed name and active destination port, with optional contact and address fields. It reads `/stores/options/ports` fresh on each open/retry. Cancel, Escape, and close perform no writes and discard the unsubmitted dialog; a failed save keeps the entered values for an explicit retry. While saving, repeat submission and dismissal are blocked. Successful creation adds the returned record to every line's catalog and selects it only on the invoking line. Dialog submit propagation is stopped so it cannot submit the surrounding contract form. Dismissal restores focus to the invoking button; late save results after navigation or dialog replacement cannot update another form or announce a stale selection.
+
+Regression coverage: `components/StoreSelect.test.tsx`, `store-first-use.test.tsx`, `frontend/src/services/store.service.test.ts`, and `backend/src/integration/store-first-use.integration.js`. The page regression also creates the first store and submits it with numeric line fields through the single atomic contract request. All fixtures are synthetic; no production browser/data is required.
