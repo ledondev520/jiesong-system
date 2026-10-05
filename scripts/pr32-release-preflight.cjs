@@ -30,13 +30,24 @@ function databasePath(value) {
   assert(fs.statSync(resolved).isFile(), 'database must be regular file');
   return safeText(resolved,'path');
 }
+function nodeEnvStatus(initialValue, fileValue) {
+  // dotenv does not override a variable already present at process startup.
+  return {node_env_production:(initialValue ?? fileValue)==='production',
+    node_env_candidate_source:initialValue != null?'initial-process-environment':
+      fileValue != null?'dotenv-file-only':'default-development'};
+}
 function summarizeProcess(p) {
   assert(Number.isInteger(p.pid) && p.pid > 0, 'invalid PID');
   safeText(p.comm,'comm'); safeText(p.cwd,'path');
   assert(['backend-cwd','frontend-cwd','root-cwd'].includes(p.role), 'invalid role');
   if(p.database_candidate) safeText(p.database_candidate,'path');
+  if(p.node_env_production !== undefined || p.node_env_candidate_source !== undefined) {
+    assert(typeof p.node_env_production==='boolean', 'invalid runtime environment status');
+    assert(['initial-process-environment','dotenv-file-only','default-development'].includes(p.node_env_candidate_source), 'invalid runtime environment source');
+  }
   return {pid:p.pid,comm:p.comm,cwd:p.cwd,role:p.role,pm_id:p.pm_id,
-    database_candidate:p.database_candidate,database_candidate_source:p.database_candidate_source};
+    database_candidate:p.database_candidate,database_candidate_source:p.database_candidate_source,
+    node_env_production:p.node_env_production,node_env_candidate_source:p.node_env_candidate_source};
 }
 function inspect() {
   const actualRoot = safeText(fs.realpathSync(root),'path');
@@ -48,7 +59,9 @@ function inspect() {
   const envPath = path.join(backend,'.env');
   const envStat = fs.statSync(envPath);
   assert((envStat.mode & 0o077)===0, 'private env permissions too broad');
-  const fileCandidate = parseSetting(fs.readFileSync(envPath,'utf8'),'DATABASE_URL');
+  const envText = fs.readFileSync(envPath,'utf8');
+  const fileCandidate = parseSetting(envText,'DATABASE_URL');
+  const fileNodeEnv = parseSetting(envText,'NODE_ENV');
   const processes = [], unreadable = [];
   for (const pidText of fs.readdirSync('/proc').filter(n=>/^\d+$/.test(n))) {
     try {
@@ -60,6 +73,7 @@ function inspect() {
       const row = {pid:Number(pidText),comm,cwd,role:cwd===backend?'backend-cwd':cwd===frontend?'frontend-cwd':'root-cwd'};
       if (/^\d+$/.test(initial.pm_id || '')) row.pm_id=Number(initial.pm_id);
       if (cwd===backend) {
+        Object.assign(row,nodeEnvStatus(initial.NODE_ENV,fileNodeEnv));
         const candidate = initial.DATABASE_URL ?? fileCandidate;
         if (candidate) {
           row.database_candidate=databasePath(candidate);
@@ -99,4 +113,4 @@ function inspect() {
 if(require.main===module || process.argv[1] === '-') {
   try {inspect();} catch {console.error('Strict read-only preflight incomplete. No maintenance action taken.');process.exitCode=1;}
 }
-module.exports={summarizeProcess,databasePath,parseSetting,safeText};
+module.exports={summarizeProcess,databasePath,parseSetting,safeText,nodeEnvStatus};

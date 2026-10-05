@@ -1,6 +1,6 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {summarizeProcess,databasePath,parseSetting,safeText}=require('./pr32-release-preflight.cjs');
+const {summarizeProcess,databasePath,parseSetting,safeText,nodeEnvStatus}=require('./pr32-release-preflight.cjs');
 test('process output is strictly allowlisted',()=>{
  const output=JSON.stringify(summarizeProcess({pid:42,comm:'node',cwd:'/opt/app',role:'backend-cwd',
  env:{PASSWORD:'SHOULD_NOT_LEAK'},argv:['SHOULD_NOT_LEAK'],secret:'SHOULD_NOT_LEAK'}));
@@ -21,6 +21,21 @@ test('ambiguous or complex dotenv values fail closed',()=>{
 test('metadata rejects controls and oversized text',()=>{
  for(const x of ['node\n::error::payload','node\rvalue','x'.repeat(3000)]) assert.throws(()=>safeText(x,'comm'));
  assert.throws(()=>safeText('/opt/a\nvalue','path'));
+});
+test('runtime production status follows process precedence without emitting values',()=>{
+ assert.deepEqual(nodeEnvStatus('production','development'),{node_env_production:true,node_env_candidate_source:'initial-process-environment'});
+ assert.deepEqual(nodeEnvStatus('development','production'),{node_env_production:false,node_env_candidate_source:'initial-process-environment'});
+ assert.equal(nodeEnvStatus('','production').node_env_production,false);
+ assert.deepEqual(nodeEnvStatus(undefined,'production'),{node_env_production:true,node_env_candidate_source:'dotenv-file-only'});
+ assert.deepEqual(nodeEnvStatus(undefined,null),{node_env_production:false,node_env_candidate_source:'default-development'});
+ assert.ok(!JSON.stringify(nodeEnvStatus('SHOULD_NOT_LEAK','SHOULD_NOT_LEAK')).includes('SHOULD_NOT_LEAK'));
+});
+test('runtime status output is boolean and source allowlisted',()=>{
+ const process={pid:42,comm:'node',cwd:'/opt/app',role:'backend-cwd',...nodeEnvStatus('production',null)};
+ assert.equal(summarizeProcess(process).node_env_production,true);
+ assert.throws(()=>summarizeProcess({...process,node_env_production:'production'}));
+ assert.throws(()=>summarizeProcess({...process,node_env_candidate_source:'SHOULD_NOT_LEAK'}));
+ assert.throws(()=>summarizeProcess({...process,node_env_production:undefined,node_env_candidate_source:'SHOULD_NOT_LEAK'}));
 });
 
 test('stdin entrypoint actually executes inventory instead of silent success',()=>{
