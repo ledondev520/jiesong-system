@@ -1,3 +1,8 @@
+/**
+ * Input: 用户查询、当前Prisma模型
+ * Output: 有效数据库上下文与局部查询不可用提示
+ * Pos: AI上下文聚合；独立查询失败不抹去其他已读取资料
+ */
 const prisma = require('../../utils/prisma');
 
 const STOP_WORDS = ['是什么', '在哪', '多少', '有没有', '能不能', '怎么', '哪里', '哪个', '什么', '请', '帮我', '查询', '查一下', '找', '看看'];
@@ -109,7 +114,7 @@ const buildContextQueries = (message) => {
         safe(prisma.salesContract.findMany({
           orderBy: { createdAt: 'desc' },
           take: 5,
-          include: { supplier: true },
+          include: { port: true },
         }))
       );
     }
@@ -178,7 +183,7 @@ const safe = async (promise) => {
 const collectContextData = async (tasks) => {
   const taskEntries = await Promise.all(tasks.map(async ({ name, query }) => ({
     name,
-    value: await query(),
+    value: await safe(Promise.resolve().then(query)),
   })));
   return taskEntries.reduce((acc, entry) => {
     acc[entry.name] = entry.value;
@@ -187,6 +192,9 @@ const collectContextData = async (tasks) => {
 };
 
 const appendContextLines = (context, byName, salesKeyword) => {
+  if (Object.entries(byName).some(([name, value]) => value === null && name !== 'exchange')) {
+    context.push('【数据查询提示】部分资料暂时无法读取，请勿将查询失败解释为没有业务数据。');
+  }
   if (Array.isArray(byName.stats)) {
     const [productCount, supplierCount, purchaseCount, salesCount] = byName.stats;
     context.push(`【系统统计】商品${productCount}种, 供应商${supplierCount}家, 采购合同${purchaseCount}份, 销售合同${salesCount}份, 货柜${salesCount}个`);
@@ -216,17 +224,17 @@ const appendContextLines = (context, byName, salesKeyword) => {
   });
 
   const exactSales = Object.entries(byName).find(([name]) => name.startsWith('sales:exact:'));
-  if (exactSales && exactSales[1].length > 0) {
+  if (exactSales && Array.isArray(exactSales[1]) && exactSales[1].length > 0) {
     exactSales[1].forEach((contract) => {
       const itemDetails = contract.items?.map((item) =>
         `${item.product?.customsName || '未知商品'}(${item.quantity}${item.product?.unit || ''}, 售价$${item.sellingPrice}, 门店:${item.store?.name || '未知'})`
       ).join(', ') || '无商品明细';
       context.push(`【销售合同${contract.contractNo}】状态:${contract.status}, 金额:$${contract.totalAmount}, 已收:$${contract.receivedAmount}\\n  商品明细: ${itemDetails}\\n  链接: /dashboard/contracts?tab=sales`);
     });
-  } else if (salesKeyword && exactSales) {
+  } else if (salesKeyword && exactSales && Array.isArray(exactSales[1])) {
     const fuzzyResult = Object.entries(byName).find(([name]) => name.startsWith('sales:fuzzy:'));
-    if (fuzzyResult && fuzzyResult[1].length > 0) {
-      context.push(`【提示】未找到精确匹配的\"${byName.salesKeyword}\"，但找到以下相似合同:`);
+    if (fuzzyResult && Array.isArray(fuzzyResult[1]) && fuzzyResult[1].length > 0) {
+      context.push(`【提示】未找到精确匹配的\"${salesKeyword}\"，但找到以下相似合同:`);
       fuzzyResult[1].forEach((contract) => {
         const itemDetails = contract.items?.map((item) =>
           `${item.product?.customsName || '未知商品'}(${item.quantity}${item.product?.unit || ''})`
@@ -248,7 +256,7 @@ const appendContextLines = (context, byName, salesKeyword) => {
     }
 
     if (name === 'sales:recent') {
-      context.push('【最近销售合同】' + value.map((s) => `${s.contractNo}(${s.supplier?.shortName || s.supplier?.name || '未知'}, ¥${s.totalAmount})`).join(', '));
+      context.push('【最近销售合同】' + value.map((s) => `${s.contractNo}(港口:${s.port?.name || '未指定'}, $${s.totalAmount})`).join(', '));
     }
 
     if (name.startsWith('container:exact:')) {
@@ -270,16 +278,16 @@ const appendContextLines = (context, byName, salesKeyword) => {
   });
 
   if (byName.exchange) {
-    if (typeof byName.exchange.value === 'string') {
-      context.push(`【汇率配置】当前汇率${byName.exchange.value}`);
-      return;
-    }
-
+    let rate = byName.exchange.value;
     try {
-      const rate = JSON.parse(byName.exchange.value);
-      context.push(`【汇率配置】当前汇率${rate.rate || rate}, 缓冲值${rate.buffer || 0.2}`);
+      if (typeof rate === 'string') rate = JSON.parse(rate);
     } catch {
-      context.push(`【汇率配置】当前汇率${byName.exchange.value}`);
+      // 兼容历史纯文本配置；不能提前返回而丢弃后面的财务资料。
+    }
+    if (rate && typeof rate === 'object') {
+      context.push(`【汇率配置】当前汇率${rate.rate}, 缓冲值${rate.buffer ?? 0.2}`);
+    } else {
+      context.push(`【汇率配置】当前汇率${rate}`);
     }
   }
 
