@@ -1,5 +1,7 @@
 若本文件夹结构或内容变化，请更新本文件。
 
+`real-role-lifecycle.spec.ts` 增加一项同一用户单条通知已读回归：`notification-state` 场景真实 PURCHASE 登录，只预置该用户的四条通知；双击期间暂缓首条真实 Express 成功响应的交付，不改响应内容。Header 和面板未读数为二，与真实未读 API 及独立只读 SQLite 一致，整页重载仍为二且再点已读行不重写。沿用既有 hosted Playwright 门槛；`--list --grep='repeated notification mark-one'` 仅核对定义，不表示浏览器通过。不涉及生产通知或其他用户权限。
+
 `onboarding.spec.ts`：390/1440px 合成账号核对流程，确认打开/取消不写入、明确开通后保存一次及列表刷新；不访问生产账号。移动注册回执刷新后仍显示，且明确不是实时审批状态。
 
 目的：验收生产构建的页面和客户端交互；多数用合成 API，明确标注的集成用私有 SQLite 与真实 Express。

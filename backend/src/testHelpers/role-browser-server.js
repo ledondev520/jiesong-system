@@ -1,4 +1,4 @@
-/** Test-only role browser backend: real Express/auth/services, receipt allocation and private synthetic SQLite. */
+/** Test-only role browser backend: real Express/auth/services, receipt allocation, own notifications and private synthetic SQLite. */
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -11,7 +11,7 @@ const password = 'test-only-role-browser-password-never-production';
 if (process.env.NODE_ENV !== 'test' || !process.send
   || !directory?.startsWith(path.join(os.tmpdir(), 'jiesong-role-browser-e2e-'))
   || fs.realpathSync(directory) !== directory
-  || !['purchase', 'warehouse', 'sales', 'boss', 'receipt-pool'].includes(scenario)
+  || !['purchase', 'warehouse', 'sales', 'boss', 'receipt-pool', 'notification-state'].includes(scenario)
   || fs.existsSync(path.resolve(__dirname, '../../.env'))) process.exit(2);
 process.umask(0o077);
 fs.chmodSync(directory, 0o700);
@@ -28,6 +28,17 @@ async function start() {
   const hash = await require('bcrypt').hash(password, 4);
   for (const role of ['PURCHASE', 'WAREHOUSE', 'SALES', 'BOSS', 'FINANCE']) {
     users[role] = await db.user.create({ data: { username: `synthetic-role-${role.toLowerCase()}`, name: `合成${role}`, role, password: hash } });
+  }
+  if (scenario === 'notification-state') {
+    // Only this scenario's signed-in user's existing rows; nullable links keep
+    // the panel open while the hosted test repeats the same mark-one click.
+    for (let index = 0; index < 4; index += 1) {
+      await db.notification.create({ data: {
+        userId: users.PURCHASE.id, type: 'PURCHASE_DRAFT', title: `合成通知 ${index + 1}`,
+        content: '合成普通通知', isRead: index === 3,
+        createdAt: new Date(`2026-10-0${index + 1}T12:00:00.000Z`),
+      } });
+    }
   }
   const product = await db.product.create({ data: { customsName: '合成角色验收商品', unit: '件', hsCode: '9999999999', declaration: '合成测试要素' } });
   const supplier = await db.supplier.create({ data: { name: '合成角色验收供应商' } });

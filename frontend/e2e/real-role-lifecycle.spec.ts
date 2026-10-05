@@ -6,6 +6,7 @@ import {
   forwardRealApi,
   loginAs,
   readDomain,
+  readPurchaseNotifications,
   testPassword,
   type RoleFixture,
 } from "./real-role-fixture";
@@ -34,6 +35,92 @@ test.beforeEach(async ({ page }) => {
 test.afterEach(async () => {
   if (fixture) await stopRoleFixture(fixture);
   expect(pageErrors).toEqual([]);
+});
+
+test("PURCHASE repeated notification mark-one keeps the displayed count equal to real persisted unread count", async ({
+  page,
+  request,
+}) => {
+  fixture = await startRoleFixture("notification-state");
+  await forwardRealApi(page, fixture);
+  const token = await loginAs(page, fixture, "PURCHASE");
+  const before = readPurchaseNotifications(fixture);
+  expect(before).toHaveLength(4);
+  expect(before.filter((row) => !row.isRead)).toHaveLength(3);
+  const notification = before.find((row) => row.title === "合成通知 1")!;
+  const trigger = page
+    .locator('button[data-slot="dropdown-menu-trigger"]')
+    .filter({ hasText: "通知" });
+  await expect(trigger.locator('[data-slot="badge"]')).toHaveText("3");
+  await trigger.click();
+  const menu = page.getByRole("menu");
+  await expect(menu.getByText("3 条未读", { exact: true })).toBeVisible();
+
+  const pathname = `/api/v1/notifications/${notification.id}/read`;
+  let markRequests = 0;
+  let firstFetched = false;
+  let releaseFirst!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  const forwarded: Promise<void>[] = [];
+  // Delay delivery only. Each intercepted request still reaches unchanged Express
+  // auth/service/SQLite once, and its genuine response is fulfilled without edits.
+  await page.route(`http://127.0.0.1:3004${pathname}`, (route) => {
+    const work = (async () => {
+      expect(route.request().method()).toBe("POST");
+      const sequence = ++markRequests;
+      const response = await route.fetch({
+        url: `${fixture.baseURL}${pathname}`,
+        maxRedirects: 0,
+      });
+      expect(response.status()).toBe(200);
+      if (sequence === 1) {
+        firstFetched = true;
+        await gate;
+      }
+      await route.fulfill({ response });
+    })();
+    forwarded.push(work);
+    return work;
+  });
+  const completed = mutation(page, `/notifications/${notification.id}/read`);
+  try {
+    await menu.getByRole("button", { name: /合成通知 1/ }).dblclick();
+    await expect.poll(() => firstFetched).toBe(true);
+    expect(
+      readPurchaseNotifications(fixture).filter((row) => !row.isRead),
+    ).toHaveLength(2);
+  } finally {
+    releaseFirst();
+  }
+  expect((await completed).status()).toBe(200);
+  await Promise.all(forwarded);
+  await expect(menu.getByText("2 条未读", { exact: true })).toBeVisible();
+  await expect(trigger.locator('[data-slot="badge"]')).toHaveText("2");
+  expect(markRequests).toBe(1);
+  const after = readPurchaseNotifications(fixture);
+  expect(after).toEqual(
+    before.map((row) =>
+      row.id === notification.id ? { ...row, isRead: 1 } : row,
+    ),
+  );
+  const unread = await request.get(
+    `${fixture.baseURL}/api/v1/notifications/unread-count`,
+    {
+      headers: { authorization: `Bearer ${token}` },
+    },
+  );
+  expect(unread.status()).toBe(200);
+  expect((await unread.json()).data.count).toBe(2);
+
+  await page.reload();
+  await expect(trigger.locator('[data-slot="badge"]')).toHaveText("2");
+  await trigger.click();
+  await expect(menu.getByText("2 条未读", { exact: true })).toBeVisible();
+  await menu.getByRole("button", { name: /合成通知 1/ }).click();
+  expect(markRequests).toBe(1);
+  expect(readPurchaseNotifications(fixture)).toEqual(after);
 });
 
 test("PURCHASE arrival survives reload and stays pending until inspection", async ({

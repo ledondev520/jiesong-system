@@ -1,4 +1,4 @@
-/** Fixture contract validation including receipt allocation, without browser execution, production data or provider calls. */
+/** Fixture contract validation including receipt allocation and own notification state, without browser execution, production data or provider calls. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -64,6 +64,25 @@ test('role browser fixture: custom temporary root starts with private SQLite and
     await f.login('PURCHASE');
     assert.deepEqual(f.read('SELECT COUNT(*) count FROM users'), [{ count: 5 }]);
   });
+});
+
+test('role browser fixture: own notification mark-one persists once under repeated HTTP completion', { timeout: 60000 }, async t => {
+  const f = await fixtureFor(t, 'notification-state');
+  const token = await f.login('PURCHASE');
+  const before = f.read('SELECT * FROM notifications ORDER BY id');
+  assert.equal(before.length, 4);
+  assert.ok(before.every(row => row.userId === f.users.PURCHASE.id));
+  assert.equal(before.filter(row => !row.isRead).length, 3);
+  const notification = before.find(row => row.title === '合成通知 1');
+  const results = await Promise.all([
+    f.call('POST', `/notifications/${notification.id}/read`, undefined, token),
+    f.call('POST', `/notifications/${notification.id}/read`, undefined, token),
+  ]);
+  results.forEach(response => assert.equal(response.status, 200));
+  assert.deepEqual(f.read('SELECT * FROM notifications ORDER BY id'), before.map(row => row.id === notification.id ? { ...row, isRead: 1 } : row));
+  const count = await f.call('GET', '/notifications/unread-count', undefined, token);
+  assert.equal(count.status, 200);
+  assert.equal(count.body.data.count, 2);
 });
 
 test('role browser fixture: PURCHASE authenticates and arrival is persisted without eligible stock', { timeout: 60000 }, async t => {
