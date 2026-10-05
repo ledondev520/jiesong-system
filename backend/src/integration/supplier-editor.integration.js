@@ -17,8 +17,28 @@ test("HTTP/SQLite: supplier editor preserves aliases, quality state and optional
   process.env.NODE_ENV = "test";
   process.env.JWT_SECRET = "test-only-supplier-editor-never-for-production";
   let db, server;
+  let requestNumber = 0;
+  const expectedAuditRequests = new Set();
   t.after(async () => {
     if (server) await new Promise((resolve) => server.close(resolve));
+    // HTTP close does not await the middleware's async response-finish audit writes.
+    // Wait for this fixture's successful mutations before disconnecting/removing SQLite.
+    if (db && expectedAuditRequests.size) {
+      const deadline = Date.now() + 5000;
+      while (true) {
+        const saved = await db.operationLog.findMany({
+          where: { requestId: { in: [...expectedAuditRequests] } },
+          select: { requestId: true },
+        });
+        const persisted = new Set(saved.map((row) => row.requestId));
+        if ([...expectedAuditRequests].every((id) => persisted.has(id))) break;
+        assert.ok(
+          Date.now() < deadline,
+          "supplier fixture audit writes did not settle",
+        );
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    }
     if (db) await db.$disconnect();
     fs.rmSync(directory, { recursive: true, force: true });
   });
@@ -73,15 +93,24 @@ test("HTTP/SQLite: supplier editor preserves aliases, quality state and optional
   });
   const base = `http://127.0.0.1:${server.address().port}/api/v1`;
   const call = async (method, url, body, role = "PURCHASE", expected = 200) => {
+    const requestId = `synthetic-supplier-editor-${++requestNumber}`;
     const response = await fetch(base + url, {
       method,
       headers: {
         ...(tokens[role] ? { authorization: `Bearer ${tokens[role]}` } : {}),
         "Content-Type": "application/json",
+        "x-request-id": requestId,
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     const result = await response.json();
+    if (
+      ["POST", "PUT", "DELETE"].includes(method) &&
+      response.status >= 200 &&
+      response.status < 300
+    ) {
+      expectedAuditRequests.add(requestId);
+    }
     assert.equal(
       response.status,
       expected,
