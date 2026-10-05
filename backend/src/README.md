@@ -14,6 +14,7 @@
 | config/ | 配置层 | 权限校验后的环境加载、活动 AI 供应商与常量（含单元测试） |
 | controllers/ | 控制层 | 处理 HTTP 请求，调用服务层 |
 | integration/ | 集成测试层 | 数据库集成测试（空结构/事务/seed 幂等、真实 HTTP 进销存闭环、首个门店创建/RBAC、仓储异常出库/FIFO/来源守恒、收验货后采购更正/补录边界与合同附件 multipart/权限/失败留存矩阵，以及银行流水/发票查询筛选、币种、分类与既有角色边界） |
+| testHelpers/ | 隔离测试夹具 | 登录/找回/采购多进程及真实角色浏览器的私有合成HTTP/SQLite服务；role-browser-server.test.js仅验证夹具真实HTTP和落库，不执行浏览器 |
 | jobs/ | 定时任务层 | 库存预警、出口提醒（每月5号退税/缺票提醒）等定时任务 |
 | middleware/ | 中间件层 | 认证、仅记录请求结构的性能日志、错误处理（含单元测试） |
 | routes/ | 路由层 | 定义 API 路由和参数验证 |
@@ -53,7 +54,7 @@
 | salesCargoLifecycle.js | 销售与旧货柜共用发运/出库证据检查；禁止已出库货物变更及合同删除 |
 | salesFinanceService.js | 按共享所有权判定查询自有采购合同，聚合单柜收入、成本、退税与现金流 |
 | salesCreationService.js | 出口表头与明细原子创建；既有日志表保存按认证操作者隔离的请求摘要，断线或并发重试复用结果且路由不重复记新建审计；模板失败全部回滚 |
-| salesService.js | 装箱增删改与统计在同一事务；发运后禁止增删行或修改数量/单位，单证资料可补录；导入装箱后自动进入装柜；登记到港保留出库，收款齐套自动完成；正式表头金额不被派生金额覆盖 |
+| salesService.js | 装箱增删改与统计在同一事务；发运后禁止增删行或修改数量/单位，单证资料可补录；导入装箱后自动进入装柜；登记到港保留出库，收款齐套自动完成；正式表头金额不被派生金额覆盖；局部保存保留省略汇率，显式无效汇率在写入前返回 400，不改变既有角色及发运后货物边界 |
 | importService.js | 历史CSV按非唯一名称检查重名，按id更新；单行事务提交后才计成功并更新缓存，失败回滚且不吞数据库异常，既有合同沿用销售出库约束 |
 | financeImportService.js | 银行流水与发票清单解析、识别标题行后的招商银行中英文币种和脱敏账号、按银行/币种/账号及余额轨迹跨来源去重、税务全量导出的数电发票号码识别、同票多明细聚合及批次写入 |
 | bankFlowService.js | 银行流水按币种与脱敏账号查询（空币种沿用人民币默认值）、人民币发票对账和美元到账汇总 |
@@ -104,6 +105,8 @@
 - `inventorySnapshot.js`：以自有装箱行扣减对应采购来源、单位的合格库存，旧销售明细兼容不双计；回滚保留验货来源；实际自有出库数量必须有限且为正，草稿零值、非自有拼柜与价格/单证补录不受影响。
 - `containerService.js`：旧货柜状态入口委托 `salesService.updateSalesStatus`，沿用单向流转、装载校验、结清检查与原子扣库；新建只允许草稿，表头保存只能携带未改变的状态。真实权限拒绝、取消重试、旧入口绕过及缺库存回滚见 `integration/sales-role-exceptions.integration.js`。
 - `salesService.updateSalesStatus` 以规范化后的当前状态判断真实流转，历史 `OUT_STOCK` 重放 `SHIPPED` 只规范状态，不重新校验装载、改发运时间或扣库。
+- `integration/sales-partial-metadata.integration.js` 使用真实认证 HTTP 和独立只读 SQLite 回读，验证备注/日期/港口局部保存、必填汇率省略与显式无效输入、既有可写角色/BOSS 拒绝以及发运/结清后的货物与出库保护；仅创建 0700/0600 临时合成库。
+- `integration/supplier-editor.integration.js` 的成功写请求带唯一合成请求ID；关闭HTTP后先确认这些请求的真实审计行全部落库，再断开并删除临时SQLite，避免异步 response-finish 审计与清理竞争；不修改生产审计行为。
 - `customsDeclarationDraftService.js`：编号包含出口合同号，原子替换仅限 DRAFT，保留 ID 与编号并拒绝覆盖已放行单。
 
 - `utils/inventoryStateMachine.js` 的来源约束用于普通/批量库存接口和 AI 工具，AI 确认时重新检查；相同状态请求不修改 FIFO 时间。

@@ -1,4 +1,4 @@
-/** 出口合同与装箱服务；历史状态别名的发运重放不重复扣库，发运后货物与出库保持一致。 */
+/** 出口合同与装箱服务；表头局部保存保留省略字段，历史发运重放不重复扣库，发运后货物与出库保持一致。 */
 const prisma = require('../utils/prisma');
 const { parseShanghaiDateRange } = require('../utils/dateRange');
 const { createError } = require('../middleware/errorHandler');
@@ -165,10 +165,19 @@ const createSalesContract = async (data = {}, context = {}) => {
 };
 
 const updateSalesContract = async (id, data = {}) => {
+  let exchangeRate;
+  // Passing undefined as the parser fallback activates its default null; omitted
+  // metadata must never clear this required field or invent a replacement rate.
+  if (data.exchangeRate !== undefined) {
+    exchangeRate = parseNullableNumber(data.exchangeRate);
+    if (!['number', 'string'].includes(typeof data.exchangeRate) || exchangeRate === null || exchangeRate <= 0) {
+      throw createError('汇率必须为正数', 400);
+    }
+  }
   return prisma.salesContract.update({
     where: { id },
     data: {
-      exchangeRate: parseNullableNumber(data.exchangeRate, undefined),
+      exchangeRate,
       signedAt: data.signedAt ? new Date(data.signedAt) : undefined,
       estimatedArrival: data.estimatedArrival ? new Date(data.estimatedArrival) : undefined,
       portId: data.portId || undefined,

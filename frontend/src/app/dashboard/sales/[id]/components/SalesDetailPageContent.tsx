@@ -1,6 +1,6 @@
 /**
  * Input: 出口合同详情、采购来源、40HQ 排柜、单证核对、退税准备与单柜财务 Interface
- * Output: 区分历史发运资料核对与实时出货门禁，含发运后货物锁定与手机装箱明细卡片的排柜/发运、出口三单、申报单证、船司核对、退税材料、财务结算与核销跟进的专项单主页面
+ * Output: 区分历史发运资料核对与实时出货门禁，原样提示后端阶段门禁错误，含发运后货物锁定与手机装箱明细卡片的排柜/发运、出口三单、申报单证、船司核对、退税材料、财务结算与核销跟进的专项单主页面
  * Pos: 出口专项单装柜主页面，复用采购完工资料并承载排柜到发运的唯一主线路
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -280,7 +280,16 @@ export default function SalesDetailPage({ params }: PageProps) {
       await loadData();
       if (nextStatus === SalesStatus.SHIPPED) setTaxPreparationOpen(true);
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "状态推进失败");
+      // Shared Axios rejects HTTP response DTOs; Error-only checks hide stock/RBAC guards.
+      const message =
+        typeof error === "object" &&
+        error !== null &&
+        "message" in error &&
+        typeof error.message === "string" &&
+        error.message.trim()
+          ? error.message
+          : "状态推进失败";
+      toast.error(message);
     } finally {
       setStatusUpdating(false);
     }

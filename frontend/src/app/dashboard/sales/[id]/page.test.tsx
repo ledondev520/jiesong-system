@@ -1,6 +1,6 @@
 /**
  * Input: 销售合同详情页、sales/product/store/inventory 服务、router、toast
- * Output: 销售合同详情页交互逻辑测试结果
+ * Output: 销售合同详情页交互逻辑与阶段错误重试测试结果，隔离并等待成功后的延迟退税弹窗
  * Pos: 前端详情页交互测试
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -110,6 +110,12 @@ vi.mock("@/components/dialog/GenerateThreeFormsDialog", () => ({
 vi.mock("@/components/dialog/ExportPacketWorkbenchDialog", () => ({
   ExportPacketWorkbenchDialog: ({ open }: { open: boolean }) =>
     open ? <div>出口三单预检区</div> : null,
+}));
+
+// This suite tests the parent flow; preparation API details have their own dialog tests.
+vi.mock("@/components/dialog/TaxRefundPreparationDialog", () => ({
+  TaxRefundPreparationDialog: ({ open }: { open: boolean }) =>
+    open ? <div role="dialog" aria-label="退税准备测试弹窗" /> : null,
 }));
 
 vi.mock("./components/SalesFinancePanel", () => ({
@@ -537,6 +543,72 @@ describe("SalesDetailPage 交互逻辑", () => {
     await user.click(shipButton);
 
     expect(mockUpdateSalesStatus).toHaveBeenCalledWith("s-1", "SHIPPED");
+  });
+
+  it("发运HTTP错误DTO保留库存不足原因，阶段不推进且允许原样重试", async () => {
+    const contract = {
+      id: "s-1",
+      contractNo: "SYNTHETIC-STOCK-GUARD",
+      status: "PACKING",
+      totalBoxes: 1,
+      volume: 60,
+      grossWeight: 1000,
+      totalAmount: 100,
+      packingItems: [
+        {
+          id: "pk-fit",
+          productId: "p-1",
+          boxes: 1,
+          quantity: 50,
+          volume: 60,
+          length: 1000,
+          width: 1000,
+          height: 1000,
+          product: { id: "p-1", customsName: "合成发运商品" },
+        },
+      ],
+      port: { name: "合成港口" },
+    };
+    mockGetById.mockResolvedValue({ data: contract });
+    const message = "商品 p-1 库存不足，需出库 50，可用 30";
+    // Shared Axios rejects response.data, not an Error instance, for HTTP errors.
+    mockUpdateSalesStatus.mockRejectedValueOnce({
+      code: 400,
+      message,
+      data: null,
+    });
+    const user = userEvent.setup();
+    renderPage("s-1");
+    const ship = await screen.findByRole("button", { name: "确认发运" });
+    await user.click(ship);
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith(message));
+    expect(mockToastError).not.toHaveBeenCalledWith("状态推进失败");
+    expect(mockGetById).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "确认发运" })).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "确认到港" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: "退税准备测试弹窗" }),
+    ).not.toBeInTheDocument();
+
+    mockUpdateSalesStatus.mockResolvedValueOnce({
+      data: { ...contract, status: "SHIPPED" },
+    });
+    mockGetById.mockResolvedValue({ data: { ...contract, status: "SHIPPED" } });
+    await user.click(ship);
+    await waitFor(() => expect(mockUpdateSalesStatus).toHaveBeenCalledTimes(2));
+    expect(mockUpdateSalesStatus).toHaveBeenNthCalledWith(1, "s-1", "SHIPPED");
+    expect(mockUpdateSalesStatus).toHaveBeenNthCalledWith(2, "s-1", "SHIPPED");
+    expect(
+      await screen.findByRole("button", { name: "确认到港" }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "确认发运" }),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("dialog", { name: "退税准备测试弹窗" }),
+    ).toBeInTheDocument();
   });
 
   it("手机装箱卡片编辑保持采购来源数量、箱数、重量和尺寸锁定", async () => {

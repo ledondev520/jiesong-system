@@ -1,6 +1,6 @@
 /**
  * Input: 报关单服务、URL 查询参数、router
- * Output: 报关单列表页（保留所属页签的筛选同步、服务端分页、手机卡片与桌面表格）
+ * Output: 报关单列表页（浏览器筛选、输入草稿与最新请求一致，原生历史同步、分页与响应式列表）
  * Pos: 报关单管理主列表页
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -14,8 +14,13 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
+  useRef,
   useState,
 } from "react";
+import {
+  replaceBrowserUrl,
+  useBrowserQuery,
+} from "@/lib/hooks/useBrowserQuery";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useTableSort } from "@/lib/hooks/useTableSort";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -64,50 +69,72 @@ export function CustomsDeclarationListPageContent({
 }: { embedded?: boolean } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const pathname =
-    typeof window !== "undefined" ? window.location.pathname : "";
-  const queryString = searchParams.toString();
-  const initialKeyword = searchParams.get("keyword") || "";
-  const initialStatus = searchParams.get("status") || "ALL";
+  // 延迟的 Next 查询确认不能覆盖浏览器已发布的输入；每次提交后重新检查实际地址。
+  const queryString = useBrowserQuery(searchParams.toString());
+  const currentParams = new URLSearchParams(queryString);
+  const initialKeyword = currentParams.get("keyword") || "";
+  const initialStatus = currentParams.get("status") || "ALL";
 
   const [keyword, setKeyword] = useState(initialKeyword);
   const [status, setStatus] = useState(initialStatus);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [total, setTotal] = useState(0);
+  const [urlFilters, setUrlFilters] = useState({
+    keyword: initialKeyword,
+    status: initialStatus,
+  });
+
+  // 历史导航先采用 URL 筛选；只在用户编辑筛选时写 URL，避免旧状态覆写 Back/Forward。
+  if (
+    urlFilters.keyword !== initialKeyword ||
+    urlFilters.status !== initialStatus
+  ) {
+    setUrlFilters({ keyword: initialKeyword, status: initialStatus });
+    setKeyword(initialKeyword);
+    setStatus(initialStatus);
+    setPage(1);
+  }
   const deferredKeyword = useDeferredValue(keyword);
 
   // 同步搜索状态到 URL
   const updateUrlParams = useCallback(
     (newKeyword: string, newStatus: string) => {
-      // 嵌入退税页时保留 view=customs 等父页面参数，只更新本列表的筛选。
-      const params = new URLSearchParams(queryString);
+      // 使用最新地址保留父页签/来源参数；Next 原生 history 补丁同步查询，不为每个按键启动路由请求。
+      const params = new URLSearchParams(window.location.search);
+      if (embedded && params.get("view") !== "customs") return;
       if (newKeyword) params.set("keyword", newKeyword);
       else params.delete("keyword");
       if (newStatus && newStatus !== "ALL") params.set("status", newStatus);
       else params.delete("status");
       const nextQuery = params.toString();
-      if (nextQuery === queryString) return;
-      const newUrl = nextQuery ? `${pathname}?${nextQuery}` : pathname;
-      router.replace(newUrl, { scroll: false });
+      if (nextQuery === window.location.search.slice(1)) return;
+      const newUrl =
+        window.location.pathname +
+        (nextQuery ? `?${nextQuery}` : "") +
+        window.location.hash;
+      replaceBrowserUrl(newUrl);
     },
-    [pathname, router, queryString],
+    [embedded],
   );
-
-  // 关键词变化时更新 URL
-  useEffect(() => {
-    updateUrlParams(deferredKeyword, status);
-  }, [deferredKeyword, status, updateUrlParams]);
 
   const [declarations, setDeclarations] = useState<CustomsDeclaration[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingDrafts, setGeneratingDrafts] = useState(false);
+  const activeQueryRef = useRef<string | null>(null);
+  const requestGenerationRef = useRef(0);
+  const queryKey = `customs-declarations-${deferredKeyword}-${status}-${page}-${pageSize}`;
 
   const loadDeclarations = useCallback(async () => {
+    // 旧筛选回调或卸载后的刷新不能启动/提交列表请求。
+    if (activeQueryRef.current !== queryKey) return;
+    const requestGeneration = ++requestGenerationRef.current;
+    const isCurrent = () =>
+      activeQueryRef.current === queryKey &&
+      requestGenerationRef.current === requestGeneration;
     setLoading(true);
     try {
-      const cacheKey = `customs-declarations-${deferredKeyword}-${status}-${page}-${pageSize}`;
-      const response = await cachedFetch(cacheKey, () =>
+      const response = await cachedFetch(queryKey, () =>
         customsDeclarationService.getAll({
           page,
           pageSize,
@@ -115,18 +142,24 @@ export function CustomsDeclarationListPageContent({
           status: status === "ALL" ? undefined : status,
         }),
       );
+      if (!isCurrent()) return;
       setDeclarations(response?.data?.items || []);
       setTotal(response?.data?.pagination?.total ?? 0);
     } catch {
-      toast.error("加载报关单失败");
+      if (isCurrent()) toast.error("加载报关单失败");
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [deferredKeyword, status, page, pageSize]);
+  }, [deferredKeyword, status, page, pageSize, queryKey]);
 
   useEffect(() => {
+    activeQueryRef.current = queryKey;
     void loadDeclarations();
-  }, [loadDeclarations]);
+    return () => {
+      activeQueryRef.current = null;
+      requestGenerationRef.current += 1;
+    };
+  }, [loadDeclarations, queryKey]);
 
   const sort = useTableSort<CustomsDeclaration, string>(
     declarations,
@@ -193,8 +226,10 @@ export function CustomsDeclarationListPageContent({
               <Input
                 value={keyword}
                 onChange={(event) => {
-                  setKeyword(event.target.value);
+                  const nextKeyword = event.target.value;
+                  setKeyword(nextKeyword);
                   setPage(1);
+                  updateUrlParams(nextKeyword, status);
                 }}
                 placeholder="搜索报关单号或报关行..."
                 className="h-11 rounded-xl border-border/70 bg-background/70 pl-10"
@@ -206,6 +241,7 @@ export function CustomsDeclarationListPageContent({
               onValueChange={(value) => {
                 setStatus(value);
                 setPage(1);
+                updateUrlParams(keyword, value);
               }}
             >
               <SelectTrigger className="h-11 w-40 rounded-xl">

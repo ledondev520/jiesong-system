@@ -4,10 +4,10 @@
  * Pos: 前端业务页交互测试
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import TaxRefundsDashboardPage from './page';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import TaxRefundsDashboardPage from "./page";
 
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
@@ -18,18 +18,19 @@ const mockSearchParamGet = vi.fn();
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
 
-vi.mock('next/navigation', () => ({
+vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
     replace: mockReplace,
   }),
   useSearchParams: () => ({
     get: (...args: unknown[]) => mockSearchParamGet(...args),
+    toString: () => window.location.search.slice(1),
   }),
-  usePathname: () => '/dashboard/tax-refunds',
+  usePathname: () => "/dashboard/tax-refunds",
 }));
 
-vi.mock('@/services/taxRefund.service', () => ({
+vi.mock("@/services/taxRefund.service", () => ({
   taxRefundService: {
     getAll: (...args: unknown[]) => mockGetAll(...args),
     generateDrafts: (...args: unknown[]) => mockGenerateDrafts(...args),
@@ -40,20 +41,34 @@ vi.mock('@/services/taxRefund.service', () => ({
   },
 }));
 
-vi.mock('sonner', () => ({
+vi.mock("sonner", () => ({
   toast: {
     error: (...args: unknown[]) => mockToastError(...args),
     success: (...args: unknown[]) => mockToastSuccess(...args),
   },
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock("@/lib/api-cache", () => ({
   cachedFetch: async (_key: string, fetcher: () => unknown) => fetcher(),
   invalidateCache: vi.fn(),
   clearAllCache: vi.fn(),
 }));
 
-describe('TaxRefundsDashboardPage 交互逻辑', () => {
+function renderTaxRefundsPage() {
+  const params = new URLSearchParams();
+  for (const key of ["view", "keyword", "status"]) {
+    const value = mockSearchParamGet(key);
+    if (value && !(key === "status" && value === "ALL")) params.set(key, value);
+  }
+  window.history.replaceState(
+    {},
+    "",
+    "/dashboard/tax-refunds" + (params.size ? "?" + params.toString() : ""),
+  );
+  return render(<TaxRefundsDashboardPage />);
+}
+
+describe("TaxRefundsDashboardPage 交互逻辑", () => {
   beforeEach(() => {
     mockPush.mockReset();
     mockReplace.mockReset();
@@ -64,8 +79,8 @@ describe('TaxRefundsDashboardPage 交互逻辑', () => {
     mockToastSuccess.mockReset();
     mockSearchParamGet.mockReset();
     mockSearchParamGet.mockImplementation((key: string) => {
-      if (key === 'keyword') return '';
-      if (key === 'status') return 'ALL';
+      if (key === "keyword") return "";
+      if (key === "status") return "ALL";
       return null;
     });
     mockGetWorkbench.mockResolvedValue({
@@ -84,97 +99,109 @@ describe('TaxRefundsDashboardPage 交互逻辑', () => {
           estimatedRefundableAmount: 0,
           latestInvoiceBatch: null,
         },
-        disclaimer: '仅用于内部准备',
+        disclaimer: "仅用于内部准备",
       },
     });
   });
 
-  it('根据 URL 查询参数初始化筛选并加载退税记录', async () => {
+  it("根据 URL 查询参数初始化筛选并加载退税记录", async () => {
     mockSearchParamGet.mockImplementation((key: string) => {
-      if (key === 'keyword') return 'TR-2026';
-      if (key === 'status') return 'APPLIED';
-      if (key === 'view') return 'refunds';
+      if (key === "keyword") return "TR-2026";
+      if (key === "status") return "APPLIED";
+      if (key === "view") return "refunds";
       return null;
     });
     mockGetAll.mockResolvedValue({
       data: {
         items: [
           {
-            id: 'tr-1',
-            refundNo: 'TR-2026-001',
-            status: 'APPLIED',
-            salesContractId: 'sc-1',
-            customsDeclarationId: 'cd-1',
-            forexVerificationId: 'fv-1',
+            id: "tr-1",
+            refundNo: "TR-2026-001",
+            status: "APPLIED",
+            salesContractId: "sc-1",
+            customsDeclarationId: "cd-1",
+            forexVerificationId: "fv-1",
             declaredAmount: 128000,
             refundableAmount: 116500,
             refundedAmount: 0,
-            appliedAt: '2026-03-07',
+            appliedAt: "2026-03-07",
             refundedAt: null,
-            note: '等待税局反馈',
-            createdAt: '2026-03-07T00:00:00.000Z',
-            updatedAt: '2026-03-07T00:00:00.000Z',
+            note: "等待税局反馈",
+            createdAt: "2026-03-07T00:00:00.000Z",
+            updatedAt: "2026-03-07T00:00:00.000Z",
           },
         ],
       },
     });
 
-    render(<TaxRefundsDashboardPage />);
+    renderTaxRefundsPage();
 
     await waitFor(() => {
       expect(mockGetAll).toHaveBeenCalledWith({
         page: 1,
         pageSize: 20,
-        keyword: 'TR-2026',
-        status: 'APPLIED',
+        keyword: "TR-2026",
+        status: "APPLIED",
       });
     });
 
-    expect(screen.getByDisplayValue('TR-2026')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: '报关单' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: '退税工作台' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: '退税记录' })).toBeInTheDocument();
-    expect((await screen.findAllByText('TR-2026-001')).length).toBeGreaterThan(0);
-    expect((await screen.findAllByText('等待税局反馈')).length).toBeGreaterThan(0);
+    expect(screen.getByDisplayValue("TR-2026")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "报关单" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "退税工作台" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "退税记录" })).toBeInTheDocument();
+    expect((await screen.findAllByText("TR-2026-001")).length).toBeGreaterThan(
+      0,
+    );
+    expect((await screen.findAllByText("等待税局反馈")).length).toBeGreaterThan(
+      0,
+    );
   });
 
-  it('新建退税单按钮已移除，详情跳转仍正常', async () => {
-    mockSearchParamGet.mockImplementation((key: string) => key === 'view' ? 'refunds' : key === 'status' ? 'ALL' : '');
+  it("新建退税单按钮已移除，详情跳转仍正常", async () => {
+    mockSearchParamGet.mockImplementation((key: string) =>
+      key === "view" ? "refunds" : key === "status" ? "ALL" : "",
+    );
     mockGetAll.mockResolvedValue({
       data: {
         items: [
           {
-            id: 'tr-2',
-            refundNo: 'TR-2026-002',
-            status: 'REFUNDED',
-            salesContractId: 'sc-2',
-            customsDeclarationId: 'cd-2',
+            id: "tr-2",
+            refundNo: "TR-2026-002",
+            status: "REFUNDED",
+            salesContractId: "sc-2",
+            customsDeclarationId: "cd-2",
             forexVerificationId: null,
             declaredAmount: 86000,
             refundableAmount: 80000,
             refundedAmount: 79000,
-            appliedAt: '2026-03-05',
-            refundedAt: '2026-03-18',
-            note: '',
-            createdAt: '2026-03-05T00:00:00.000Z',
-            updatedAt: '2026-03-18T00:00:00.000Z',
+            appliedAt: "2026-03-05",
+            refundedAt: "2026-03-18",
+            note: "",
+            createdAt: "2026-03-05T00:00:00.000Z",
+            updatedAt: "2026-03-18T00:00:00.000Z",
           },
         ],
       },
     });
     const user = userEvent.setup();
 
-    render(<TaxRefundsDashboardPage />);
+    renderTaxRefundsPage();
 
     // 新建退税单按钮已移除，退税单通过出口合同流程创建
-    expect(screen.queryByRole('button', { name: '新建退税单' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "新建退税单" }),
+    ).not.toBeInTheDocument();
 
-    await user.click(await screen.findByRole('button', { name: /查看详情 TR-2026-002/ }));
-    expect(mockPush).toHaveBeenCalledWith('/dashboard/tax-refunds/tr-2');
+    await user.click(
+      await screen.findByRole("button", { name: /查看详情 TR-2026-002/ }),
+    );
+    expect(mockPush).toHaveBeenCalledWith("/dashboard/tax-refunds/tr-2");
   });
 
-  it('点击自动生成草稿后提示结果并刷新列表', async () => {
-    mockSearchParamGet.mockImplementation((key: string) => key === 'view' ? 'refunds' : key === 'status' ? 'ALL' : '');
+  it("点击自动生成草稿后提示结果并刷新列表", async () => {
+    mockSearchParamGet.mockImplementation((key: string) =>
+      key === "view" ? "refunds" : key === "status" ? "ALL" : "",
+    );
     mockGetAll.mockResolvedValue({
       data: {
         items: [],
@@ -188,35 +215,53 @@ describe('TaxRefundsDashboardPage 交互逻辑', () => {
     });
     const user = userEvent.setup();
 
-    render(<TaxRefundsDashboardPage />);
+    renderTaxRefundsPage();
 
-    await user.click(screen.getByRole('button', { name: '批量生成草稿' }));
+    await user.click(screen.getByRole("button", { name: "批量生成草稿" }));
 
     await waitFor(() => {
       expect(mockGenerateDrafts).toHaveBeenCalledWith({});
     });
 
-    expect(mockToastSuccess).toHaveBeenCalledWith('自动生成完成：新增 2 条，跳过 1 条');
+    expect(mockToastSuccess).toHaveBeenCalledWith(
+      "自动生成完成：新增 2 条，跳过 1 条",
+    );
     expect(mockGetAll).toHaveBeenCalledTimes(2);
   });
 
-  it('加载失败时提示错误', async () => {
-    mockSearchParamGet.mockImplementation((key: string) => key === 'view' ? 'refunds' : key === 'status' ? 'ALL' : '');
-    mockGetAll.mockRejectedValue(new Error('load failed'));
+  it("加载失败时提示错误", async () => {
+    mockSearchParamGet.mockImplementation((key: string) =>
+      key === "view" ? "refunds" : key === "status" ? "ALL" : "",
+    );
+    mockGetAll.mockRejectedValue(new Error("load failed"));
 
-    render(<TaxRefundsDashboardPage />);
+    renderTaxRefundsPage();
 
     await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalledWith('加载退税记录失败');
+      expect(mockToastError).toHaveBeenCalledWith("加载退税记录失败");
     });
   });
 
-  it('默认进入退税工作台并展示三段式操作入口', async () => {
-    render(<TaxRefundsDashboardPage />);
-    expect(await screen.findByRole('heading', { name: '出口退税工作台' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '导入进项发票' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '导出月度准备清单' })).toBeInTheDocument();
-    expect(screen.getByLabelText('申报月份')).toBeInTheDocument();
-    await waitFor(() => expect(mockGetWorkbench).toHaveBeenCalledWith({ page: 1, pageSize: 20, keyword: undefined, stage: 'ALL', filingMonth: expect.stringMatching(/^\d{4}-\d{2}$/) }));
+  it("默认进入退税工作台并展示三段式操作入口", async () => {
+    renderTaxRefundsPage();
+    expect(
+      await screen.findByRole("heading", { name: "出口退税工作台" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "导入进项发票" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "导出月度准备清单" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("申报月份")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mockGetWorkbench).toHaveBeenCalledWith({
+        page: 1,
+        pageSize: 20,
+        keyword: undefined,
+        stage: "ALL",
+        filingMonth: expect.stringMatching(/^\d{4}-\d{2}$/),
+      }),
+    );
   });
 });

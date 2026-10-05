@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CustomsDeclarationListPageContent } from "./CustomsDeclarationListPageContent";
 
@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({
   useRouter: () => mocks.router,
   useSearchParams: () => mocks.params,
+  usePathname: () => window.location.pathname,
 }));
 vi.mock("@/services/customsDeclaration.service", () => ({
   customsDeclarationService: { getAll: mocks.getAll, generateDrafts: vi.fn() },
@@ -41,6 +42,14 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     expect(mocks.router.replace).not.toHaveBeenCalled();
   });
 
+  it("浏览器已离开报关页签时旧嵌入列表事件不能再发布筛选", async () => {
+    render(<CustomsDeclarationListPageContent embedded />);
+    const input = screen.getByPlaceholderText("搜索报关单号或报关行...");
+    window.history.replaceState({}, "", "/dashboard/tax-refunds?view=refunds");
+    fireEvent.change(input, { target: { value: "LATE" } });
+    expect(window.location.search).toBe("?view=refunds");
+  });
+
   it("搜索和重置只改变筛选条件，保留所属页签与其他参数", async () => {
     mocks.params = new URLSearchParams("view=customs&source=qa&keyword=OLD");
     window.history.replaceState(
@@ -54,16 +63,14 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     await user.clear(input);
     await user.type(input, "TEST");
     await waitFor(() =>
-      expect(mocks.router.replace).toHaveBeenLastCalledWith(
-        "/dashboard/tax-refunds?view=customs&source=qa&keyword=TEST",
-        { scroll: false },
+      expect(window.location.search).toBe(
+        "?view=customs&source=qa&keyword=TEST",
       ),
     );
     await user.click(screen.getByTestId("reset-filters"));
-    expect(mocks.router.replace).toHaveBeenLastCalledWith(
-      "/dashboard/tax-refunds?view=customs&source=qa",
-      { scroll: false },
-    );
+    expect(window.location.search).toBe("?view=customs&source=qa");
+    expect(input).toHaveValue("");
+    expect(mocks.router.replace).not.toHaveBeenCalled();
   });
   it("可翻到第2页，搜索后回到第1页，不漏掉20条以后的报关单", async () => {
     mocks.getAll.mockImplementation(async ({ page }) => ({
@@ -118,5 +125,55 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
         expect.objectContaining({ page: 1, pageSize: 50 }),
       ),
     );
+  });
+
+  it("独立列表采用历史筛选，编辑与重置保留当前路径和非筛选参数", async () => {
+    const user = userEvent.setup();
+    mocks.params = new URLSearchParams("source=qa&keyword=OLD&status=RELEASED");
+    window.history.replaceState(
+      {},
+      "",
+      "/dashboard/customs-declarations?" + mocks.params.toString(),
+    );
+    const { rerender } = render(<CustomsDeclarationListPageContent />);
+    await screen.findByDisplayValue("OLD");
+    await waitFor(() => expect(mocks.getAll).toHaveBeenCalled());
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+
+    mocks.params = new URLSearchParams("source=qa&keyword=NEW&status=DRAFT");
+    window.history.replaceState(
+      {},
+      "",
+      "/dashboard/customs-declarations?" + mocks.params.toString(),
+    );
+    rerender(<CustomsDeclarationListPageContent />);
+    const input = await screen.findByDisplayValue("NEW");
+    await waitFor(() =>
+      expect(mocks.getAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({ keyword: "NEW", status: "DRAFT", page: 1 }),
+      ),
+    );
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+
+    await user.clear(input);
+    await user.type(input, "TEST");
+    expect(window.location.pathname).toBe("/dashboard/customs-declarations");
+    expect(
+      Object.fromEntries(new URLSearchParams(window.location.search)),
+    ).toEqual({
+      source: "qa",
+      keyword: "TEST",
+      status: "DRAFT",
+    });
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("reset-filters"));
+    expect(window.location.pathname).toBe("/dashboard/customs-declarations");
+    expect(
+      Object.fromEntries(new URLSearchParams(window.location.search)),
+    ).toEqual({
+      source: "qa",
+    });
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+    expect(input).toHaveValue("");
   });
 });
