@@ -1,3 +1,8 @@
+/**
+ * Input: catalogue form payloads and Prisma
+ * Output: port/category persistence with nonblank required fields
+ * Pos: ordinary system catalogue controller; rejected edits do not change saved fields
+ */
 const prisma = require('../../utils/prisma');
 const { success, paginated } = require('../../utils/response');
 const { createError } = require('../../middleware/errorHandler');
@@ -51,6 +56,10 @@ const createPort = async (req, res, next) => {
     const code = (req.body.code || '').trim().toUpperCase();
     const isActive = req.body.isActive !== false;
 
+    if (!name || !code) {
+      throw createError('港口名称和代码不能为空', 400);
+    }
+
     const duplicated = await prisma.port.findFirst({
       where: {
         OR: [{ name }, { code }],
@@ -75,8 +84,8 @@ const createPort = async (req, res, next) => {
 const updatePort = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const name = req.body.name === undefined ? undefined : String(req.body.name).trim();
-    const code = req.body.code === undefined ? undefined : String(req.body.code).trim().toUpperCase();
+    const name = req.body.name === undefined ? undefined : String(req.body.name ?? '').trim();
+    const code = req.body.code === undefined ? undefined : String(req.body.code ?? '').trim().toUpperCase();
     const isActive = req.body.isActive;
 
     const existing = await prisma.port.findUnique({
@@ -86,6 +95,10 @@ const updatePort = async (req, res, next) => {
 
     if (!existing) {
       throw createError('港口不存在', 404);
+    }
+
+    if (name === '' || code === '') {
+      throw createError('港口名称和代码不能为空', 400);
     }
 
     if (name || code) {
@@ -184,6 +197,10 @@ const createCategory = async (req, res, next) => {
     const name = (req.body.name || '').trim();
     const parentId = normalizePortPayload(req.body.parentId);
 
+    if (!name) {
+      throw createError('分类名称不能为空', 400);
+    }
+
     if (parentId) {
       const parent = await prisma.productCategory.findUnique({ where: { id: parentId }, select: { id: true } });
       if (!parent) {
@@ -214,7 +231,10 @@ const updateCategory = async (req, res, next) => {
       throw createError('商品分类不存在', 404);
     }
 
-    const name = req.body.name === undefined ? undefined : String(req.body.name).trim();
+    const name = req.body.name === undefined ? undefined : String(req.body.name ?? '').trim();
+    if (name === '') {
+      throw createError('分类名称不能为空', 400);
+    }
     let parentId = req.body.parentId;
 
     if (parentId === '') {
