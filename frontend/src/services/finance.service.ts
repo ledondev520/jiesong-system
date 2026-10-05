@@ -78,6 +78,7 @@ export interface FinanceCreatePaymentInput {
   type: PaymentType;
   purchaseContractId?: string;
   salesContractId?: string;
+  /** @deprecated New source-linked collections must use allocatePayment; retained for historical keyed replay. */
   sourcePaymentId?: string;
   customerName?: string;
   amount: number;

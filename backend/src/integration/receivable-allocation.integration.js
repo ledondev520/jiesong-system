@@ -20,6 +20,8 @@ test('HTTP/SQLite: receivable allocations preserve ledger and existing role boun
   process.env.JWT_SECRET = 'test-only-receivable-secret-never-for-production';
   process.env.TZ = 'UTC';
   let db, server, worker;
+  let requestNumber = 0;
+  const expectedAuditRequests = new Set();
   t.after(async () => {
     if (worker?.child.connected) {
       worker.child.send({ type: 'stop' });
@@ -29,6 +31,16 @@ test('HTTP/SQLite: receivable allocations preserve ledger and existing role boun
       });
     }
     if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+    if (db && expectedAuditRequests.size) {
+      const deadline = Date.now() + 5000;
+      while (true) {
+        const logs = await db.operationLog.findMany({ where: { requestId: { in: [...expectedAuditRequests] } }, select: { requestId: true } });
+        const saved = new Set(logs.map(row => row.requestId));
+        if ([...expectedAuditRequests].every(id => saved.has(id))) break;
+        assert.ok(Date.now() < deadline, 'synthetic payment audit writes did not settle');
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    }
     if (db) await db.$disconnect();
     fs.rmSync(directory, { recursive: true, force: true });
   });
@@ -51,8 +63,10 @@ test('HTTP/SQLite: receivable allocations preserve ledger and existing role boun
   const app = require('../app'); // Import does not start background jobs/provider calls.
   server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   const base = `http://127.0.0.1:${server.address().port}/api/v1`;
-  const call = async (method, route, body, role = 'SALES', origin = base) => {
-    const response = await fetch(origin + route, { method, headers: { ...(tokens[role] ? { authorization: `Bearer ${tokens[role]}` } : {}), 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  const call = async (method, route, body, role = 'SALES', origin = base, extraHeaders = {}) => {
+    const requestId = `synthetic-receivable-request-${++requestNumber}`;
+    const response = await fetch(origin + route, { method, headers: { ...(tokens[role] ? { authorization: `Bearer ${tokens[role]}` } : {}), 'content-type': 'application/json', 'x-request-id': requestId, ...extraHeaders }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    if (method === 'POST' && route === '/finance/payments' && [200, 201].includes(response.status)) expectedAuditRequests.add(requestId);
     return { status: response.status, body: await response.json() };
   };
   const good = async (...args) => {
@@ -101,6 +115,25 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     await good('POST', `/finance/payments/${legacy.id}/allocate`, { allocations: [{ salesContractId: a.id, amount: 10 }] });
     assert.equal(balance(a.id), 50, 'accepted legacy USD spelling must contribute to the USD ledger');
     assert.equal(rowsFor(legacy.id)[0].currency, 'USD');
+    const automaticTarget = await sale({ contractNo: 'EXP269006', totalAmount: 40 });
+    const automaticSource = await receipt({ note: 'EXP269006 synthetic remaining receipt' });
+    await good('POST', `/finance/payments/${automaticSource.id}/allocate`, { allocations: [{ salesContractId: b.id, amount: 60 }] });
+    const match = await good('POST', '/finance/payments/auto-match', undefined, 'FINANCE');
+    assert.equal(match.matchedCount, 1);
+    assert.equal(match.matched[0].amount, 40, 'auto-match records remaining allocation rather than original source amount');
+    assert.equal(match.matched[0].salesContractId, automaticTarget.id);
+    assert.equal(balance(automaticTarget.id), 40);
+    assert.equal(allocated(automaticSource.id), 100);
+    const ordinary = await call('POST', '/finance/payments', { type: 'RECEIVABLE_RECEIPT', amount: 5, currency: 'USD', paymentDate: '2026-10-01' });
+    assert.equal(ordinary.status, 201, 'ordinary unlinked receipt creation remains supported');
+    const direct = { type: 'RECEIVABLE_COLLECTION', salesContractId: a.id, amount: 5, currency: 'USD', paymentDate: '2026-10-01' };
+    const headers = { 'X-Idempotency-Key': 'synthetic-ordinary-receivable-collection' };
+    const created = await call('POST', '/finance/payments', direct, 'SALES', base, headers);
+    const retry = await call('POST', '/finance/payments', direct, 'SALES', base, headers);
+    assert.equal(created.status, 201, 'ordinary direct collection creation remains supported');
+    assert.equal(retry.status, 200);
+    assert.equal(retry.body.data.id, created.body.data.id);
+    assert.equal(balance(a.id), 55, 'ordinary keyed collection retry does not double the contract ledger');
   });
 
   await t.test('invalid split lines, linked sources, other currencies and over-allocation reject atomically', async () => {
@@ -120,11 +153,14 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
       const result = await call('POST', `/finance/payments/${source.id}/allocate`, { allocations });
       if (result.status !== 400 || JSON.stringify(snapshot()) !== JSON.stringify(before)) failures.push({ allocations, status: result.status, allocated: allocated(source.id), aBalance: balance(a.id), bBalance: balance(b.id) });
     }
-    for (const fields of [{ currency: 'CNY' }, { type: 'INCOME', salesContractId: a.id }]) {
+    for (const fields of [{ currency: 'CNY' }, { type: 'INCOME', salesContractId: a.id }, { amount: 0 }, { amount: -100 }]) {
       const source = await receipt(fields), before = snapshot();
-      const result = await call('POST', `/finance/payments/${source.id}/allocate`, { allocations: [{ salesContractId: b.id, amount: 10 }] });
+      const result = await call('POST', `/finance/payments/${source.id}/allocate`, { allocations: [{ salesContractId: b.id, amount: 0.005 }] });
       if (result.status !== 400 || JSON.stringify(snapshot()) !== JSON.stringify(before)) failures.push({ fields, status: result.status, allocated: allocated(source.id) });
     }
+    const bypassSource = await receipt(), beforeBypass = snapshot();
+    const bypass = await call('POST', '/finance/payments', { type: 'RECEIVABLE_COLLECTION', sourcePaymentId: bypassSource.id, salesContractId: a.id, amount: 101, currency: 'USD', paymentDate: '2026-10-01' });
+    if (bypass.status !== 400 || JSON.stringify(snapshot()) !== JSON.stringify(beforeBypass)) failures.push({ bypass: true, status: bypass.status, allocated: allocated(bypassSource.id) });
     assert.deepEqual(failures, [], `invalid allocations changed persisted ledger: ${JSON.stringify(failures)}`);
   });
 

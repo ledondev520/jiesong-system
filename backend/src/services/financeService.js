@@ -1,7 +1,7 @@
 /**
  * Input: 财务请求参数
  * Output: 付款记录与应收应付统计
- * Pos: 财务业务服务层，负责幂等写入与聚合计算
+ * Pos: 财务业务服务层，负责幂等写入、收款分配事务守恒与聚合计算
  */
 
 const prisma = require('../utils/prisma');
@@ -427,9 +427,10 @@ const autoMatchUnallocatedPayments = async () => {
       continue;
     }
 
+    const amount = Number(attachReceiptBalance(payment, allocationTotals).remainingAmount);
     await allocatePaymentToContracts(payment.id, [{
       salesContractId: candidate.contract.id,
-      amount: Number(payment.amount),
+      amount,
       note: `自动匹配 ${candidate.contract.contractNo} [${candidate.rule}]`,
     }]);
 
@@ -437,7 +438,7 @@ const autoMatchUnallocatedPayments = async () => {
       paymentId: payment.id,
       salesContractId: candidate.contract.id,
       contractNo: candidate.contract.contractNo,
-      amount: Number(payment.amount),
+      amount,
       rule: candidate.rule,
       confidence: candidate.confidence,
     });
@@ -462,25 +463,46 @@ const autoMatchUnallocatedPayments = async () => {
  * @param {Array<{salesContractId: string, amount: number, note?: string}>} allocations - 分配明细
  */
 const allocatePaymentToContracts = async (paymentId, allocations) => {
-  const receipt = await prisma.payment.findUnique({ where: { id: paymentId } });
-  if (!receipt) throw new Error('收款记录不存在');
-  if (!RECEIPT_POOL_TYPES.has(receipt.type)) throw new Error('该记录不是待分配收款');
-  if (normalizeCurrency(receipt.currency, '') !== 'USD') {
-    throw createError('出口合同收款分配只支持 USD；当前到账币种无法直接计入美元应收', 400);
+  if (!Array.isArray(allocations) || allocations.length === 0) {
+    throw createError('allocations 不能为空', 400);
   }
-
-  const allocatedBefore = await getPaymentAllocatedAmount(paymentId);
-  const remainingBefore = Math.max(Number(receipt.amount || 0) - allocatedBefore, 0);
-  const requestedAmount = allocations.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-
-  if (requestedAmount <= 0) {
-    throw new Error('分配金额必须大于 0');
+  for (const alloc of allocations) {
+    if (!alloc || typeof alloc.salesContractId !== 'string' || !alloc.salesContractId.trim()) {
+      throw createError('每条分配必须关联销售合同', 400);
+    }
+    if (typeof alloc.amount !== 'number' || !Number.isFinite(alloc.amount) || alloc.amount <= 0) {
+      throw createError('每条分配金额必须是大于 0 的有限数值', 400);
+    }
   }
-  if (requestedAmount - remainingBefore > AUTO_MATCH_AMOUNT_TOLERANCE) {
-    throw new Error('分配金额超出该笔收款剩余可分配金额');
-  }
+  const requestedAmount = allocations.reduce((sum, item) => sum + item.amount, 0);
+  if (!Number.isFinite(requestedAmount)) throw createError('分配金额无效', 400);
 
   const result = await prisma.$transaction(async (tx) => {
+    // SQLite: obtain the writer lock before any receipt/balance read, including
+    // independent HTTP workers. The no-op preserves historical source fields.
+    const locked = await tx.$executeRaw`UPDATE payments SET id = id WHERE id = ${paymentId}`;
+    if (locked !== 1) throw createError('收款记录不存在', 400);
+    const receipt = await tx.payment.findUnique({ where: { id: paymentId } });
+    if (!receipt || !RECEIPT_POOL_TYPES.has(receipt.type)
+      || receipt.salesContractId || receipt.purchaseContractId || receipt.sourcePaymentId) {
+      throw createError('该记录不是待分配收款', 400);
+    }
+    if (!Number.isFinite(receipt.amount) || receipt.amount <= 0) {
+      throw createError('到账来源金额必须是大于 0 的有限数值', 400);
+    }
+    const currency = normalizeCurrency(receipt.currency, '');
+    if (currency !== 'USD') {
+      throw createError('出口合同收款分配只支持 USD；当前到账币种无法直接计入美元应收', 400);
+    }
+    const allocatedBefore = await getPaymentAllocatedAmount(paymentId, tx);
+    const remainingBefore = Math.max(Number(receipt.amount || 0) - allocatedBefore, 0);
+    if (requestedAmount - remainingBefore > AUTO_MATCH_AMOUNT_TOLERANCE) {
+      throw createError('分配金额超出该笔收款剩余可分配金额', 400);
+    }
+    const targetIds = [...new Set(allocations.map(item => item.salesContractId))];
+    const targets = await tx.salesContract.findMany({ where: { id: { in: targetIds } }, select: { id: true } });
+    if (targets.length !== targetIds.length) throw createError('销售合同不存在', 400);
+
     const created = [];
     const affectedSalesContractIds = new Set();
 
@@ -492,7 +514,7 @@ const allocatePaymentToContracts = async (paymentId, allocations) => {
           sourcePaymentId: paymentId,
           customerName: withDefaultCustomerName(receipt.customerName),
           amount: alloc.amount,
-          currency: receipt.currency,
+          currency,
           paymentMethod: receipt.paymentMethod,
           paymentDate: receipt.paymentDate,
           note: alloc.note || `来自收款 #${paymentId.slice(-6)}`,
@@ -562,6 +584,13 @@ const createPayment = async (data = {}, options = {}) => {
     if (existing) {
       return { payment: existing, reused: true };
     }
+  }
+
+  // Source-linked collections must use the allocation transaction above. The
+  // general creation endpoint cannot bypass receipt eligibility/balance checks.
+  // Existing keyed records still replay without writing a second collection.
+  if (data.sourcePaymentId != null && data.sourcePaymentId !== '') {
+    throw createError('关联到账来源的收款请通过收款分配操作登记', 400);
   }
 
   try {
