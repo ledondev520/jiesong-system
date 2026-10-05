@@ -1,10 +1,11 @@
 /**
  * Input: 采购合同头信息 + 明细列表
- * Output: 原子化创建后的完整采购合同
+ * Output: 原子化创建后的完整采购合同；删除草稿不使自动编号重复，竞争冲突整笔重试
  * Pos: Agent 命令层采购录入能力，供 HTTP / CLI / MCP 复用
  */
 
 const prisma = require('../../../utils/prisma');
+const { generateNextPurchaseContractNo, isPurchaseNumberConflict } = require('../../../services/purchaseContractNumberService');
 const { createError } = require('../../../middleware/errorHandler');
 const {
   calculateNewLineTotal,
@@ -53,46 +54,49 @@ const createPurchaseWithItems = async ({ input, prismaClient = prisma } = {}) =>
   const normalizedItems = data.items.map((item, index) => normalizeItem(item, index, taxRate));
   const totalAmount = normalizedItems.reduce((sum, item) => sum + item.totalPrice, 0);
 
-  return prismaClient.$transaction(async (tx) => {
-    const year = new Date().getFullYear().toString().slice(-2);
-    const contractNo = data.contractNo || (() => null)();
-    const nextContractNo = contractNo || `CG${year}${String(
-      (await tx.purchaseContract.count({
-        where: { contractNo: { startsWith: `CG${year}` } },
-      })) + 1,
-    ).padStart(5, '0')}`;
+  // 自动编号与合同/明细在同一事务中提交；仅可恢复竞争重试，显式编号冲突不改号。
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await prismaClient.$transaction(async (tx) => {
+        const nextContractNo = data.contractNo || await generateNextPurchaseContractNo(tx);
 
-    const contract = await tx.purchaseContract.create({
-      data: {
-        contractNo: nextContractNo,
-        supplierId: data.supplierId,
-        taxRate,
-        signedAt: data.signedAt ? new Date(data.signedAt) : null,
-        expectedDate: data.expectedDate ? new Date(data.expectedDate) : null,
-        note: data.note || null,
-        totalAmount,
-      },
-    });
-
-    await tx.purchaseItem.createMany({
-      data: normalizedItems.map((item) => ({
-        purchaseContractId: contract.id,
-        ...item,
-      })),
-    });
-
-    return tx.purchaseContract.findUnique({
-      where: { id: contract.id },
-      include: {
-        supplier: true,
-        items: {
-          include: {
-            product: true,
+        const contract = await tx.purchaseContract.create({
+          data: {
+            contractNo: nextContractNo,
+            supplierId: data.supplierId,
+            taxRate,
+            signedAt: data.signedAt ? new Date(data.signedAt) : null,
+            expectedDate: data.expectedDate ? new Date(data.expectedDate) : null,
+            note: data.note || null,
+            totalAmount,
           },
-        },
-      },
-    });
-  });
+        });
+
+        await tx.purchaseItem.createMany({
+          data: normalizedItems.map((item) => ({
+            purchaseContractId: contract.id,
+            ...item,
+          })),
+        });
+
+        return tx.purchaseContract.findUnique({
+          where: { id: contract.id },
+          include: {
+            supplier: true,
+            items: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        });
+      });
+    } catch (error) {
+      const retryable = error?.code === 'P2034' || (!data.contractNo && isPurchaseNumberConflict(error));
+      if (!retryable) throw error;
+      if (attempt === 2) throw createError('采购编号正在分配，请稍后重试', 409);
+    }
+  }
 };
 
 module.exports = {

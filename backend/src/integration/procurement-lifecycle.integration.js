@@ -1,0 +1,102 @@
+/** 采购与仓储 HTTP 回归：只创建临时合成 SQLite，不接触业务数据库。 */
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+
+test('HTTP/SQLite：采购收验货闭环、库存查询与草稿删除后编号分配', async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-lifecycle-test-'));
+  fs.chmodSync(directory, 0o700);
+  const dbFile = path.join(directory, 'synthetic.db');
+  process.env.DATABASE_URL = `file:${dbFile}`;
+  process.env.UPLOAD_DIR = path.join(directory, 'uploads');
+  process.env.NODE_ENV = 'test';
+  process.env.JWT_SECRET = 'test-only-lifecycle-secret-never-for-production';
+  let db, server;
+  t.after(async () => { if (server) await new Promise(resolve => server.close(resolve)); if (db) await db.$disconnect(); fs.rmSync(directory, { recursive: true, force: true }); });
+  const ddl = execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'diff', '--from-empty', '--to-schema-datamodel', path.resolve(__dirname, '../../prisma/schema.prisma'), '--script'], { encoding: 'utf8', timeout: 30000 });
+  execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', dbFile], { input: ddl });
+  fs.chmodSync(dbFile, 0o600);
+  db = require('../utils/prisma');
+  const jwt = require('jsonwebtoken');
+  const config = require('../config');
+  const users = {};
+  for (const role of ['ADMIN', 'PURCHASE', 'WAREHOUSE', 'SALES', 'FINANCE', 'BOSS']) {
+    const user = await db.user.create({ data: { username: `synthetic-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
+    users[role] = { id: user.id, token: jwt.sign({ userId: user.id }, config.jwt.secret) };
+  }
+  const supplier = await db.supplier.create({ data: { name: '合成供应商', taxId: 'SYNTHETIC-TAX-ID' } });
+  const product = await db.product.create({ data: { customsName: 'SYNTHETIC WIDGET', unit: '件', hsCode: '9999999999', declaration: '合成测试要素' } });
+  const port = await db.port.create({ data: { name: '合成港口', code: 'QA' } });
+  await db.hsCode.create({ data: { hsCode: '9999999999', productName: '合成测试商品', taxRate: 0, vatRate: 13, refundRate: 13, effectiveDate: new Date('2026-01-01') } });
+  const app = require('../app');
+  server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+  const base = `http://127.0.0.1:${server.address().port}/api/v1`;
+  const call = async (method, url, body, { role = 'ADMIN', expected = 200, headers = {} } = {}) => {
+    const response = await fetch(base + url, { method, headers: { authorization: `Bearer ${users[role].token}`, ...(body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...headers }, ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }) });
+    const result = await response.json();
+    assert.equal(response.status, expected, `${method} ${url}: ${result.message || result.error || ''}`);
+    return result.data;
+  };
+  const create = async () => {
+    const result = await call('POST', '/purchases', { supplierId: supplier.id, taxRate: 13, items: [{ productId: product.id, quantity: 10, unit: '件', unitPrice: 10 }] }, { role: 'PURCHASE', expected: 201 });
+    return result.contract || result;
+  };
+  const purchase = await create();
+  const pi = purchase.items[0];
+  await call('PUT', `/purchases/${purchase.id}/status`, { status: 'SHIPPED' }, { role: 'PURCHASE', expected: 400 });
+  await call('PUT', `/purchases/${purchase.id}/status`, { status: 'SIGNED' }, { role: 'PURCHASE' });
+  await call('PUT', `/purchases/${purchase.id}/status`, { status: 'SIGNED' }, { role: 'PURCHASE' });
+  await call('PUT', `/purchases/${purchase.id}/production-details`, { completeProduction: true, items: [{ id: pi.id, specification: '合成箱', boxes: 2 }] }, { role: 'PURCHASE', expected: 400 });
+  assert.equal((await db.purchaseContract.findUnique({ where: { id: purchase.id } })).status, 'SIGNED');
+  assert.equal((await db.purchaseItem.findUnique({ where: { id: pi.id } })).boxes, null);
+  const production = { completeProduction: true, items: [{ id: pi.id, specification: '合成箱', boxes: 2, grossWeight: 20, netWeight: 18, volume: 0.2 }] };
+  await call('PUT', `/purchases/${purchase.id}/production-details`, production, { role: 'PURCHASE' });
+  const completedAt = (await db.purchaseContract.findUnique({ where: { id: purchase.id } })).productionCompletedAt;
+  await call('PUT', `/purchases/${purchase.id}/production-details`, production, { role: 'PURCHASE' });
+  assert.equal((await db.purchaseContract.findUnique({ where: { id: purchase.id } })).productionCompletedAt.getTime(), completedAt.getTime());
+  await call('PUT', `/purchases/${purchase.id}/status`, { status: 'SHIPPED' }, { role: 'PURCHASE' });
+  const arrival = { requestId: 'synthetic-arrival', arrivedAt: '2026-10-01', items: [{ purchaseItemId: pi.id, arrivedQuantity: 10 }] };
+  const receipt = await call('POST', `/purchases/${purchase.id}/receipts`, arrival, { role: 'WAREHOUSE' });
+  assert.equal((await call('POST', `/purchases/${purchase.id}/receipts`, arrival, { role: 'WAREHOUSE' })).idempotentReplay, true);
+  await call('POST', `/purchases/${purchase.id}/receipts`, { ...arrival, requestId: 'over-arrival' }, { role: 'WAREHOUSE', expected: 400 });
+  const emptyStock = await call('GET', '/inventory', undefined, { role: 'WAREHOUSE' });
+  assert.equal(emptyStock.pagination.total, 0);
+  const inspection = { requestId: 'synthetic-inspection', note: '合成验货', items: [{ receiptItemId: receipt.receipt.items[0].id, acceptedQuantity: 6, reinspectionQuantity: 4 }] };
+  await call('POST', `/purchases/${purchase.id}/receipts/${receipt.receipt.id}/inspection`, inspection, { role: 'WAREHOUSE' });
+  assert.equal((await call('POST', `/purchases/${purchase.id}/receipts/${receipt.receipt.id}/inspection`, inspection, { role: 'WAREHOUSE' })).idempotentReplay, true);
+  const inventory = await call('GET', `/inventory?keyword=${purchase.contractNo}`, undefined, { role: 'WAREHOUSE' });
+  assert.equal(inventory.items.length, 1);
+  assert.equal(inventory.items[0].quantity, 6);
+  assert.equal(inventory.items[0].status, 'INBOUND');
+  const detail = await call('GET', `/inventory/${inventory.items[0].id}`, undefined, { role: 'WAREHOUSE' });
+  assert.equal(detail.purchaseItem.purchaseContract.id, purchase.id);
+  assert.ok(detail.receiptInspectionId);
+  await call('PUT', `/inventory/${detail.id}/status`, { status: 'OUTBOUND' }, { role: 'WAREHOUSE', expected: 400 });
+  await call('PUT', `/purchases/${purchase.id}/status`, { status: 'RECEIVED' }, { role: 'PURCHASE', expected: 400 });
+  const reinspection = { ...inspection, requestId: 'synthetic-reinspection', items: [{ ...inspection.items[0], acceptedQuantity: 10, reinspectionQuantity: 0 }] };
+  const received = await call('POST', `/purchases/${purchase.id}/receipts/${receipt.receipt.id}/inspection`, reinspection, { role: 'WAREHOUSE' });
+  assert.equal(received.status, 'RECEIVED');
+  assert.equal(received.summary.complete, true);
+  assert.equal((await call('POST', `/purchases/${purchase.id}/receipts/${receipt.receipt.id}/inspection`, reinspection, { role: 'WAREHOUSE' })).idempotentReplay, true);
+  const stock = await call('GET', `/inventory?keyword=${purchase.contractNo}`, undefined, { role: 'PURCHASE' });
+  assert.equal(stock.items.reduce((sum, row) => sum + row.quantity, 0), 10);
+  const history = await call('GET', `/purchases/${purchase.id}/receipts/${receipt.receipt.id}/inspections?page=2&pageSize=1`, undefined, { role: 'WAREHOUSE' });
+  assert.equal(history.pagination.total, 2);
+  assert.equal(history.items.length, 1);
+  assert.equal(history.items[0].acceptedQuantity, 6);
+  await call('DELETE', `/purchases/${purchase.id}`, undefined, { role: 'PURCHASE', expected: 400 });
+
+  // 删除较早的草稿后，后续编号不能依赖记录总数而撞上仍存在的合同。
+  const deletedDraft = await create();
+  const retainedDraft = await create();
+  await call('DELETE', `/purchases/${deletedDraft.id}`, undefined, { role: 'PURCHASE' });
+  const preview = await call('GET', '/purchases/options/next-no', undefined, { role: 'PURCHASE' });
+  const next = await create();
+  assert.equal(next.contractNo, preview.contractNo);
+  assert.notEqual(next.contractNo, retainedDraft.contractNo);
+  const concurrent = await Promise.all([create(), create()]);
+  assert.notEqual(concurrent[0].contractNo, concurrent[1].contractNo);
+});
