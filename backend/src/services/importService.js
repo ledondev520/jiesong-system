@@ -1,6 +1,6 @@
 /**
  * Input: CSV文件、Prisma客户端
- * Output: 导入结果统计
+ * Output: 按行事务导入结果、重名冲突与真实失败统计
  * Pos: 数据导入服务，处理CSV历史数据导入
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -127,7 +127,13 @@ const importCSVData = async (filePath, userId) => {
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
     try {
-      await processRow(row, cache);
+      const committedCache = await prisma.$transaction(async (tx) => {
+        // 只在提交后发布缓存，避免下一行引用已回滚的实体。
+        const rowCache = Object.fromEntries(Object.entries(cache).map(([key, value]) => [key, new Map(value)]));
+        await processRow(row, rowCache, tx);
+        return rowCache;
+      });
+      Object.assign(cache, committedCache);
       result.successRows++;
     } catch (error) {
       result.failedRows++;
@@ -159,18 +165,16 @@ const importCSVData = async (filePath, userId) => {
  * @param {Object} row - CSV数据行
  * @param {Object} cache - 实体缓存
  */
-const processRow = async (row, cache) => {
+const processRow = async (row, cache, db) => {
   // 1. 处理供应商
   const supplierName = row['厂家'] || row['供应商'];
   let supplier = null;
   if (supplierName) {
     supplier = cache.suppliers.get(supplierName);
     if (!supplier) {
-      supplier = await prisma.supplier.upsert({
-        where: { name: supplierName },
-        update: {},
-        create: { name: supplierName },
-      }).catch(() => null);
+      const matches = await db.supplier.findMany({ where: { name: supplierName }, take: 2 });
+      if (matches.length > 1) throw new Error('存在多条同名供应商，请先核对供应商档案后再导入');
+      supplier = matches[0] || await db.supplier.create({ data: { name: supplierName } });
       if (supplier) cache.suppliers.set(supplierName, supplier);
     }
   }
@@ -188,11 +192,11 @@ const processRow = async (row, cache) => {
         port = cache.ports.get('洛杉矶'); // 默认洛杉矶
       }
       if (port) {
-        store = await prisma.store.upsert({
+        store = await db.store.upsert({
           where: { name: storeName },
           update: {},
           create: { name: storeName, portId: port.id },
-        }).catch(() => null);
+        });
         if (store) cache.stores.set(storeName, store);
       }
     }
@@ -204,20 +208,25 @@ const processRow = async (row, cache) => {
   if (customsName) {
     product = cache.products.get(customsName);
     if (!product) {
-      product = await prisma.product.upsert({
-        where: { customsName },
-        update: {
-          description: row['商品补充信息'] || undefined,
-          specification: row['规格'] || undefined,
-          unit: row['单位'] || undefined,
-        },
-        create: {
-          customsName,
-          description: row['商品补充信息'] || null,
-          specification: row['规格'] || null,
-          unit: row['单位'] || null,
-        },
-      }).catch(() => null);
+      const matches = await db.product.findMany({ where: { customsName }, take: 2 });
+      if (matches.length > 1) throw new Error('存在多条同名商品，请先核对商品档案后再导入');
+      product = matches[0]
+        ? await db.product.update({
+          where: { id: matches[0].id },
+          data: {
+            description: row['商品补充信息'] || undefined,
+            specification: row['规格'] || undefined,
+            unit: row['单位'] || undefined,
+          },
+        })
+        : await db.product.create({
+          data: {
+            customsName,
+            description: row['商品补充信息'] || null,
+            specification: row['规格'] || null,
+            unit: row['单位'] || null,
+          },
+        });
       if (product) cache.products.set(customsName, product);
     }
   }
@@ -229,7 +238,7 @@ const processRow = async (row, cache) => {
     container = cache.containers.get(containerNo);
     if (!container) {
       const port = cache.ports.get(portName) || cache.ports.get('洛杉矶');
-      container = await prisma.salesContract.upsert({
+      container = await db.salesContract.upsert({
         where: { contractNo: containerNo },
         update: {
           shippedAt: row['出货日期'] ? new Date(row['出货日期']) : undefined,
@@ -247,7 +256,7 @@ const processRow = async (row, cache) => {
           status: 'SHIPPED',
           exchangeRate: 7.0,
         },
-      }).catch(() => null);
+      });
       if (container) cache.containers.set(containerNo, container);
     }
   }
@@ -261,7 +270,7 @@ const processRow = async (row, cache) => {
     const volume = parseFloat(row['体积']) || 0;
     
     if (quantity > 0 || boxes > 0) {
-      await prisma.packingItem.create({
+      await db.packingItem.create({
         data: {
           salesContractId: container.id,
           productId: product.id,
@@ -274,7 +283,7 @@ const processRow = async (row, cache) => {
           volume,
           note: row['备注'] || null,
         },
-      }).catch(() => null);
+      });
     }
   }
 };
