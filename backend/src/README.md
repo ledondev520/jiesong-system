@@ -58,7 +58,7 @@
 | importService.js | 历史CSV按非唯一名称检查重名，按id更新；单行事务提交后才计成功并更新缓存，失败回滚且不吞数据库异常，既有合同沿用销售出库约束 |
 | financeImportService.js | 银行流水与发票清单解析、识别标题行后的招商银行中英文币种和脱敏账号、按银行/币种/账号及余额轨迹跨来源去重、税务全量导出的数电发票号码识别、同票多明细聚合及批次写入 |
 | bankFlowService.js | 银行流水按币种与脱敏账号查询（空币种沿用人民币默认值）、人民币发票对账和美元到账汇总 |
-| financeMatchService.js | 银行流水/发票与购销合同匹配；人民币只匹配采购、美元收入只匹配销售 |
+| financeMatchService.js | 银行流水/发票与购销合同匹配；人民币只匹配采购、美元收入只匹配销售；发票自动写入重验 PENDING，人工目标沿用有效且未取消的购销合同规则 |
 | invoiceRecordService.js | 发票分页、筛选后有效/红冲分类统计、销方汇总及完整发票号码批量精确查询 |
 | invoiceVerificationService.js | 出口退税候选发票的销方、价税合计、品名、状态只读一致性核验 |
 | financialStatementsService.js | 会计报表、科目余额、明细账同账期校验，单事务写入与下钻查询 |
@@ -107,6 +107,8 @@
 - `salesService.updateSalesStatus` 以规范化后的当前状态判断真实流转，历史 `OUT_STOCK` 重放 `SHIPPED` 只规范状态，不重新校验装载、改发运时间或扣库。
 - `integration/sales-partial-metadata.integration.js` 使用真实认证 HTTP 和独立只读 SQLite 回读，验证备注/日期/港口局部保存、必填汇率省略与显式无效输入、既有可写角色/BOSS 拒绝以及发运/结清后的货物与出库保护；仅创建 0700/0600 临时合成库。
 - `integration/bank-import-lifecycle.integration.js` 用已提交迁移和真实认证 HTTP 验证银行预览放弃不落库、混合行按既有语义部分导入、账号/币种及批次行数/余额、重放保留已关联/忽略来源及老板只读边界；工作簿仅在内存中生成，独立只读 SQLite 回查且不改合同/付款/会计余额，由 `npm run test:db` 执行。
+- `integration/invoice-linkage-boundaries.integration.js` 仅以迁移后的私有合成 SQLite、内存工作簿及真实认证 HTTP 验证三类发票链路：预览/重复导入保留来源与分类，失败/重复解除关联及既有角色边界；不存在、错类型、已取消的人工目标不覆盖确认；跨进程旧自动候选不覆盖较新的人工确认/忽略，且正常匹配与重放仍可用。独立只读回读验证匹配不改会计/付款/合同金额；不覆盖真实导入文件、银行导入、浏览器或同分候选规则。
+  `InvoiceRecord` 没有更新时间或匹配版本字段；解除关联把匹配字段还原为空并重置为 `PENDING`。若旧自动请求读取后先人工确认、再解除回到相同 `PENDING` 状态，现有字段无法区分该 ABA 序列，继续沿用待匹配发票可重新自动匹配的语义；此回归不扩展 schema。
 - `integration/supplier-editor.integration.js` 的成功写请求带唯一合成请求ID；关闭HTTP后先确认这些请求的真实审计行全部落库，再断开并删除临时SQLite，避免异步 response-finish 审计与清理竞争；不修改生产审计行为。
 - `customsDeclarationDraftService.js`：编号包含出口合同号，原子替换仅限 DRAFT，保留 ID 与编号并拒绝覆盖已放行单。
 
