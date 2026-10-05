@@ -1,6 +1,6 @@
 /**
  * Input: multer库、配置
- * Output: 文件上传中间件（通用 upload、合同附件 contractUpload、装箱单核对内存接收 pdfCheckUpload）
+ * Output: 文件上传中间件；磁盘上传写流前校验并保护可信根下的日期目录，非法格式返回客户端错误
  * Pos: 文件上传工具，处理合同文件等上传
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -10,6 +10,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const config = require('../config');
+const { createError } = require('../middleware/errorHandler');
 
 // 确保上传目录存在
 const uploadDir = config.upload.dir;
@@ -23,8 +24,18 @@ const storage = multer.diskStorage({
     // 按日期分目录
     const dateDir = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const destDir = path.join(uploadDir, dateDir);
-    if (!fs.existsSync(destDir)) {
-      fs.mkdirSync(destDir, { recursive: true });
+    try {
+      const realRoot = fs.realpathSync(path.resolve(uploadDir));
+      if (!fs.existsSync(destDir)) {
+        fs.mkdirSync(destDir, { recursive: true, mode: 0o700 });
+      }
+      const stat = fs.lstatSync(destDir);
+      if (!stat.isDirectory() || stat.isSymbolicLink()) throw createError('上传目录存储路径无效', 400);
+      const realDestination = fs.realpathSync(destDir);
+      if (realDestination !== path.join(realRoot, dateDir)) throw createError('上传目录存储路径无效', 400);
+      fs.chmodSync(realDestination, 0o700);
+    } catch (error) {
+      return cb(error); // Refuse storage before Multer starts a file stream.
     }
     cb(null, destDir);
   },
@@ -54,7 +65,7 @@ const fileFilter = (req, file, cb) => {
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('不支持的文件类型'), false);
+    cb(createError('不支持的文件类型', 400), false);
   }
 };
 
@@ -80,7 +91,7 @@ const contractFileFilter = (req, file, cb) => {
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('仅支持 PDF、JPG、PNG、XLSX、DOCX 格式'), false);
+    cb(createError('仅支持 PDF、JPG、PNG、XLSX、DOCX 格式', 400), false);
   }
 };
 
@@ -99,7 +110,7 @@ const pdfCheckUpload = multer({
     if (file.mimetype === 'application/pdf') {
       cb(null, true);
     } else {
-      cb(new Error('仅支持 PDF 格式的装箱单'), false);
+      cb(createError('仅支持 PDF 格式的装箱单', 400), false);
     }
   },
   limits: {

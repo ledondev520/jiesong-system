@@ -1,6 +1,6 @@
 /**
  * Input: Prisma客户端、统一附件服务与上传路径工具
- * Output: 采购合同相关的HTTP响应，编号预览沿用统一序列规则
+ * Output: 采购合同相关的HTTP响应，编号预览沿用统一序列规则；附件下载/删除复用财务凭证访问边界
  * Pos: 采购控制器，处理采购合同CRUD请求与受限附件存储、下载
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -506,7 +506,6 @@ const getFiles = async (req, res, next) => {
 const deleteFile = async (req, res, next) => {
   try {
     const { fileId } = req.params;
-    const { deleteFile: removeFile } = require('../utils/upload');
     
     // 获取文件记录
     const file = await prisma.contractFile.findUnique({
@@ -516,9 +515,9 @@ const deleteFile = async (req, res, next) => {
     if (!file) {
       throw createError('文件不存在', 404);
     }
+    fileService.assertFileAccess(file, req.user);
     
-    // 删除物理文件（可选，根据PRD要求保留文件）
-    // removeFile(file.filePath);
+    // 旧采购入口继续保留物理归档；不改变现有留存约定。
     
     // 删除数据库记录
     await prisma.contractFile.delete({
@@ -543,6 +542,7 @@ const downloadFile = async (req, res, next) => {
 
     const file = await prisma.contractFile.findUnique({ where: { id: fileId } });
     if (!file) throw createError('文件不存在', 404);
+    fileService.assertFileAccess(file, req.user);
 
     const absolutePath = path.isAbsolute(file.filePath)
       ? file.filePath

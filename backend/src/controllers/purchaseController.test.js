@@ -95,7 +95,10 @@ test('updateStatus: 生产资料缺失时后端拒绝从生产中推进到完成
   }
 });
 
-test('uploadFile: 登记附件前收紧目录和文件权限，保持 201 响应', async () => {
+test('uploadFile: 登记附件前收紧目录和文件权限，保持 201 响应', async t => {
+  const originalFind = prisma.purchaseContract.findUnique;
+  prisma.purchaseContract.findUnique = async () => ({ id: 'purchase-1' });
+  t.after(() => { prisma.purchaseContract.findUnique = originalFind; });
   const directory = path.join(uploadRoot, 'permission-success');
   fs.mkdirSync(directory, { mode: 0o755 });
   const filePath = path.join(directory, 'synthetic.pdf');
@@ -127,7 +130,11 @@ test('uploadFile: 登记附件前收紧目录和文件权限，保持 201 响应
 });
 
 test('uploadFile: 权限收紧失败时不建立数据库附件记录', async (t) => {
+  const originalFind = prisma.purchaseContract.findUnique;
+  prisma.purchaseContract.findUnique = async () => ({ id: 'purchase-1' });
+  t.after(() => { prisma.purchaseContract.findUnique = originalFind; });
   const permissionError = new Error('synthetic chmod failure');
+  fs.writeFileSync(path.join(uploadRoot, 'synthetic.pdf'), '%PDF generated fixture', { mode: 0o600 });
   t.mock.method(fs, 'chmodSync', () => { throw permissionError; });
   let createCalled = false;
   const originalCreate = prisma.contractFile.create;

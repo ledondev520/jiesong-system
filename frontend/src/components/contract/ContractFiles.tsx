@@ -1,18 +1,27 @@
 /**
- * Input: contractId、contractType、文件列表 API
- * Output: 合同附件管理区域（上传、系统生成 XLSX 展示、列表、下载、删除、预览）
+ * Input: contractId、contractType、附件列表与共享认证二进制读取
+ * Output: 合同附件管理、可取消认证下载/预览、文件与浏览器错误反馈
  * Pos: 合同详情页通用附件组件，支持采购/出口合同复用
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { BusinessWrite, useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
-import { useState, useRef, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  BusinessWrite,
+  useBusinessReadOnly,
+} from "@/lib/hooks/useBusinessReadOnly";
+import { useState, useRef, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import {
   Upload,
   Loader2,
@@ -23,33 +32,45 @@ import {
   Download,
   Trash2,
   Eye,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { format } from 'date-fns';
+} from "lucide-react";
+import { toast } from "sonner";
+import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import type { ContractFile, ContractFileCategory, ContractType } from '@/services/contractFile.service';
+  DialogDescription,
+} from "@/components/ui/dialog";
+import type {
+  ContractFile,
+  ContractFileCategory,
+  ContractType,
+} from "@/services/contractFile.service";
 import {
   uploadContractFile,
   deleteContractFile,
-  getContractFileDownloadUrl,
-} from '@/services/contractFile.service';
-import { cn } from '@/lib/utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+  isContractFilePreviewMime,
+} from "@/services/contractFile.service";
+import { cn } from "@/lib/utils";
+import { useContractFileAccess } from "@/lib/hooks/useContractFileAccess";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const CATEGORY_LABELS: Record<ContractFileCategory, string> = {
-  OTHER: '其他附件',
-  SIGNED_CONTRACT: '供应商盖章件',
-  PRODUCTION_PHOTO: '生产实物图',
-  SUPPLIER_INVOICE: '供应商发票',
-  CARRIER_DOCUMENT: '船司文件',
-  SYSTEM_GENERATED_WORD: '系统生成 Word',
-  SYSTEM_GENERATED_PDF: '系统生成 PDF',
-  SYSTEM_GENERATED_XLSX: '系统生成 Excel',
+  OTHER: "其他附件",
+  SIGNED_CONTRACT: "供应商盖章件",
+  PRODUCTION_PHOTO: "生产实物图",
+  SUPPLIER_INVOICE: "供应商发票",
+  CARRIER_DOCUMENT: "船司文件",
+  SYSTEM_GENERATED_WORD: "系统生成 Word",
+  SYSTEM_GENERATED_PDF: "系统生成 PDF",
+  SYSTEM_GENERATED_XLSX: "系统生成 Excel",
 };
 
 interface ContractFilesProps {
@@ -67,35 +88,41 @@ interface ContractFilesProps {
 /**
  * 职责：根据文件类型返回对应图标
  */
-function FileTypeIcon({ fileName, className }: { fileName: string; className?: string }) {
-  const ext = fileName.split('.').pop()?.toLowerCase() || '';
-  if (['pdf', 'doc', 'docx'].includes(ext)) {
-    return <FileText className={cn('text-blue-600', className)} />;
+function FileTypeIcon({
+  fileName,
+  className,
+}: {
+  fileName: string;
+  className?: string;
+}) {
+  const ext = fileName.split(".").pop()?.toLowerCase() || "";
+  if (["pdf", "doc", "docx"].includes(ext)) {
+    return <FileText className={cn("text-blue-600", className)} />;
   }
-  if (['xls', 'xlsx', 'csv'].includes(ext)) {
-    return <FileSpreadsheet className={cn('text-emerald-600', className)} />;
+  if (["xls", "xlsx", "csv"].includes(ext)) {
+    return <FileSpreadsheet className={cn("text-emerald-600", className)} />;
   }
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
-    return <FileImage className={cn('text-violet-600', className)} />;
+  if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) {
+    return <FileImage className={cn("text-violet-600", className)} />;
   }
-  return <File className={cn('text-slate-500', className)} />;
+  return <File className={cn("text-slate-500", className)} />;
 }
 
 /**
  * 职责：根据文件类型返回背景色
  */
 function FileTypeBg({ fileName }: { fileName: string }) {
-  const ext = fileName.split('.').pop()?.toLowerCase() || '';
-  if (['pdf', 'doc', 'docx'].includes(ext)) {
-    return 'bg-blue-50 dark:bg-blue-950';
+  const ext = fileName.split(".").pop()?.toLowerCase() || "";
+  if (["pdf", "doc", "docx"].includes(ext)) {
+    return "bg-blue-50 dark:bg-blue-950";
   }
-  if (['xls', 'xlsx', 'csv'].includes(ext)) {
-    return 'bg-emerald-50 dark:bg-emerald-950';
+  if (["xls", "xlsx", "csv"].includes(ext)) {
+    return "bg-emerald-50 dark:bg-emerald-950";
   }
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
-    return 'bg-violet-50 dark:bg-violet-950';
+  if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) {
+    return "bg-violet-50 dark:bg-violet-950";
   }
-  return 'bg-slate-50 dark:bg-slate-900';
+  return "bg-slate-50 dark:bg-slate-900";
 }
 
 export default function ContractFiles({
@@ -103,24 +130,38 @@ export default function ContractFiles({
   contractType,
   files,
   onChange,
-  title = '合同附件',
-  description = '支持 PDF、JPG、PNG、XLSX、DOCX 格式，单文件最大 10MB',
-  emptyHint = '暂无附件，点击「上传附件」归档合同文件',
+  title = "合同附件",
+  description = "支持 PDF、JPG、PNG、XLSX、DOCX 格式，单文件最大 10MB",
+  emptyHint = "暂无附件，点击「上传附件」归档合同文件",
   categoryOptions,
-  accept = '.pdf,.jpg,.jpeg,.png,.xlsx,.docx',
+  accept = ".pdf,.jpg,.jpeg,.png,.xlsx,.docx",
 }: ContractFilesProps) {
   const readOnly = useBusinessReadOnly();
   const [uploading, setUploading] = useState(false);
-  const [previewFile, setPreviewFile] = useState<ContractFile | null>(null);
+  const {
+    preview,
+    openPreview,
+    closePreview,
+    failPreview,
+    downloadFile,
+    downloadingIds,
+  } = useContractFileAccess(`${contractType}:${contractId}`);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resolvedCategoryOptions = categoryOptions?.length
     ? categoryOptions
-    : [{ value: 'OTHER' as ContractFileCategory, label: CATEGORY_LABELS.OTHER }];
-  const [uploadCategory, setUploadCategory] = useState<ContractFileCategory>(resolvedCategoryOptions[0].value);
+    : [
+        {
+          value: "OTHER" as ContractFileCategory,
+          label: CATEGORY_LABELS.OTHER,
+        },
+      ];
+  const [uploadCategory, setUploadCategory] = useState<ContractFileCategory>(
+    resolvedCategoryOptions[0].value,
+  );
 
   const isPreviewable = (file: ContractFile) => {
-    const mime = file.mimeType || file.fileType || '';
-    return mime.startsWith('image/') || mime === 'application/pdf';
+    const mime = file.mimeType || file.fileType || "";
+    return isContractFilePreviewMime(mime);
   };
 
   const handleUpload = useCallback(
@@ -130,19 +171,25 @@ export default function ContractFiles({
 
       setUploading(true);
       try {
-        const res = await uploadContractFile(contractId, contractType, file, undefined, uploadCategory);
+        const res = await uploadContractFile(
+          contractId,
+          contractType,
+          file,
+          undefined,
+          uploadCategory,
+        );
         if (res.data) {
           onChange([res.data, ...files]);
           toast.success(`「${file.name}」上传成功`);
         }
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : '附件上传失败');
+        toast.error(err instanceof Error ? err.message : "附件上传失败");
       } finally {
         setUploading(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
+        if (fileInputRef.current) fileInputRef.current.value = "";
       }
     },
-    [contractId, contractType, files, onChange, uploadCategory, readOnly]
+    [contractId, contractType, files, onChange, uploadCategory, readOnly],
   );
 
   const handleDelete = useCallback(
@@ -153,10 +200,10 @@ export default function ContractFiles({
         onChange(files.filter((f) => f.id !== fileId));
         toast.success(`「${fileName}」已删除`);
       } catch {
-        toast.error('删除附件失败');
+        toast.error("删除附件失败");
       }
     },
-    [files, onChange, readOnly]
+    [files, onChange, readOnly],
   );
 
   const formatFileSize = (size: number) => {
@@ -171,34 +218,54 @@ export default function ContractFiles({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <CardTitle className="text-sm font-medium">{title}</CardTitle>
-              <CardDescription className="text-xs">{description}</CardDescription>
+              <CardDescription className="text-xs">
+                {description}
+              </CardDescription>
             </div>
             <div className="flex items-center gap-2">
               {!readOnly && resolvedCategoryOptions.length > 1 ? (
-                <Select value={uploadCategory} onValueChange={(value) => setUploadCategory(value as ContractFileCategory)}>
-                  <SelectTrigger className="h-8 w-[150px] text-xs" aria-label="附件类型">
+                <Select
+                  value={uploadCategory}
+                  onValueChange={(value) =>
+                    setUploadCategory(value as ContractFileCategory)
+                  }
+                >
+                  <SelectTrigger
+                    className="h-8 w-[150px] text-xs"
+                    aria-label="附件类型"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {resolvedCategoryOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               ) : null}
-              <BusinessWrite><Button
-                variant="outline"
-                size="sm"
-                className="h-8 rounded-md text-xs"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-              >
-                {uploading ? (
-                  <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />上传中...</>
-                ) : (
-                  <><Upload className="mr-1.5 h-3.5 w-3.5" />上传附件</>
-                )}
-              </Button></BusinessWrite>
+              <BusinessWrite>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 rounded-md text-xs"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      上传中...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-1.5 h-3.5 w-3.5" />
+                      上传附件
+                    </>
+                  )}
+                </Button>
+              </BusinessWrite>
             </div>
             <input
               id="contract-file-upload"
@@ -227,54 +294,70 @@ export default function ContractFiles({
                 >
                   <div
                     className={cn(
-                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-md',
-                      FileTypeBg({ fileName: file.fileName })
+                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-md",
+                      FileTypeBg({ fileName: file.fileName }),
                     )}
                   >
-                    <FileTypeIcon fileName={file.fileName} className="h-5 w-5" />
+                    <FileTypeIcon
+                      fileName={file.fileName}
+                      className="h-5 w-5"
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium" title={file.fileName}>
+                    <p
+                      className="truncate text-sm font-medium"
+                      title={file.fileName}
+                    >
                       {file.fileName}
                     </p>
-                    <Badge variant="outline" className="mt-1 rounded px-1.5 py-0 text-[10px] font-normal">
-                      {CATEGORY_LABELS[file.category || 'OTHER']}
+                    <Badge
+                      variant="outline"
+                      className="mt-1 rounded px-1.5 py-0 text-[10px] font-normal"
+                    >
+                      {CATEGORY_LABELS[file.category || "OTHER"]}
                     </Badge>
                     <p className="text-[11px] text-muted-foreground">
-                      {formatFileSize(file.fileSize)} · {format(new Date(file.uploadedAt), 'yyyy-MM-dd')}
+                      {formatFileSize(file.fileSize)} ·{" "}
+                      {format(new Date(file.uploadedAt), "yyyy-MM-dd")}
                     </p>
                   </div>
-                  <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+                  <div className="flex items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
                     {isPreviewable(file) && (
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 rounded-md"
                         aria-label={`预览${file.fileName}`}
-                        onClick={() => setPreviewFile(file)}
+                        onClick={() => void openPreview(file)}
                       >
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
                     )}
-                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md" asChild>
-                      <a
-                        href={getContractFileDownloadUrl(file.id)}
-                        target="_blank"
-                        download={file.fileName}
-                        aria-label={`下载${file.fileName}`}
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                      </a>
-                    </Button>
-                    <BusinessWrite><Button
+                    <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 rounded-md text-destructive hover:text-destructive"
-                      aria-label={`删除${file.fileName}`}
-                      onClick={() => handleDelete(file.id, file.fileName)}
+                      className="h-7 w-7 rounded-md"
+                      aria-label={`下载${file.fileName}`}
+                      disabled={downloadingIds.has(file.id)}
+                      onClick={() => void downloadFile(file)}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button></BusinessWrite>
+                      {downloadingIds.has(file.id) ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Download className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                    <BusinessWrite>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-md text-destructive hover:text-destructive"
+                        aria-label={`删除${file.fileName}`}
+                        onClick={() => handleDelete(file.id, file.fileName)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </BusinessWrite>
                   </div>
                 </div>
               ))}
@@ -283,27 +366,75 @@ export default function ContractFiles({
         </CardContent>
       </Card>
 
-      {/* 预览弹窗 */}
-      <Dialog open={!!previewFile} onOpenChange={(open) => !open && setPreviewFile(null)}>
-        <DialogContent className="h-[80vh] max-w-4xl">
-          <DialogHeader className="flex flex-row items-center justify-between">
-            <DialogTitle className="truncate pr-8">{previewFile?.fileName}</DialogTitle>
+      {/* 预览文件先经共享认证请求读取，弹窗只展示本次有效会话的临时对象 URL。 */}
+      <Dialog open={!!preview} onOpenChange={(open) => !open && closePreview()}>
+        <DialogContent className="h-[80dvh] grid-rows-[auto_minmax(0,1fr)] sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="truncate">
+              {preview?.file.fileName}
+            </DialogTitle>
+            <DialogDescription>
+              在线预览仅支持图片和 PDF；PDF
+              显示取决于浏览器支持，无法显示时可下载查看
+            </DialogDescription>
           </DialogHeader>
-          <div className="h-full flex-1 overflow-hidden">
-            {previewFile &&
-            (previewFile.mimeType || previewFile.fileType)?.startsWith('image/') ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={getContractFileDownloadUrl(previewFile.id)}
-                alt={previewFile.fileName}
-                className="h-full w-full object-contain"
-              />
-            ) : previewFile ? (
-              <iframe
-                src={getContractFileDownloadUrl(previewFile.id)}
-                className="h-full w-full rounded border"
-                title={previewFile.fileName}
-              />
+          <div className="min-h-0 overflow-auto">
+            {preview?.loading ? (
+              <div
+                role="status"
+                className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground"
+              >
+                <Loader2 className="h-4 w-4 animate-spin" />
+                正在加载附件...
+              </div>
+            ) : preview?.error ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center">
+                <p role="alert" className="text-sm">
+                  {preview.error}
+                </p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => void openPreview(preview.file)}
+                  >
+                    重试预览
+                  </Button>
+                  <Button
+                    disabled={downloadingIds.has(preview.file.id)}
+                    onClick={() => void downloadFile(preview.file)}
+                  >
+                    下载附件
+                  </Button>
+                </div>
+              </div>
+            ) : preview?.url ? (
+              <div className="flex h-full flex-col gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="self-end"
+                  disabled={downloadingIds.has(preview.file.id)}
+                  onClick={() => void downloadFile(preview.file)}
+                >
+                  下载附件
+                </Button>
+                {preview.mime.startsWith("image/") ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={preview.url}
+                    alt={preview.file.fileName}
+                    onError={() => failPreview(preview.url!)}
+                    className="min-h-0 w-full flex-1 object-contain"
+                  />
+                ) : (
+                  <iframe
+                    src={preview.url}
+                    title={preview.file.fileName}
+                    onError={() => failPreview(preview.url!)}
+                    className="min-h-0 w-full flex-1 rounded border"
+                  />
+                )}
+              </div>
             ) : null}
           </div>
         </DialogContent>

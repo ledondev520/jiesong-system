@@ -5,3 +5,5 @@
 `axios.ts` 为Cookie请求携带credentials/CSRF，GET缓存忽略旧代次晚到响应，恢复会话明确绕过缓存；只有当前认证请求的401可清理登录。`api-cache.ts` 与 `idempotentRequest.ts` 按认证代次隔离，登录/退出/失效清空，后者不改变HTTP幂等键。
 
 设计与部署边界见 `docs/security/browser-sessions.md`；单元测试与工具文件同目录。
+
+`browser-session.ts` 的认证代次订阅仅同步撤销内存文件视图；登录/退出/401 清理仍沿用原策略。`hooks/useContractFileAccess.ts` 为合同附件与船司原件共用认证 Blob 读取、取消和临时 URL 生命周期，不保存文件或新增凭据。

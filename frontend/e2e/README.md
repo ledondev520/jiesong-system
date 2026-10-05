@@ -21,3 +21,5 @@
 - `payment-roundtrip.spec.ts`：390/1440px 中文付款备注通过真实浏览器 XHR，以 83 字符 ASCII SHA-256 幂等键提交；取消不写入、重复提交拦截、失败保留全部草稿、原样重试键不变、成功关闭并刷新及整页重载。API 使用合成路由夹具，真实数据库语义由 `trade-lifecycle.integration.js` 覆盖。
 
 - `product-editor.spec.ts`：390/1440px 合成商品编辑验收，关闭/Escape/历史返回后恢复已保存资料，迟到 HS 详情不能回填取消会话；新增/编辑保存失败保留全部输入并原样重试，重复提交拦截，旧保存不关闭新草稿或恢复旧筛选。所有商品和 HS API 均本地路由 mock，不访问生产数据或付费匹配。
+
+- `contract-attachment-auth.spec.ts`：390/1440px 标签 Bearer 登录下的合成文件下载/PNG 解码/PDF Blob 嵌入、403 错误原样显示并重试、关闭后迟到响应与历史返回。检查下载文件名/字节、临时 URL 释放、请求头无凭据 URL 与移动无溢出；不访问生产数据。PDF 仅验证认证读取与嵌入路径，显示仍取决于浏览器 PDF 支持。

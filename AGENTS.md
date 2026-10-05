@@ -30,6 +30,10 @@
 
 ## Security rules
 - 出货退税清单确认及含票面核验行的导出仅供 ADMIN/FINANCE；`backend/src/routes/taxRefunds.js` 校验入口，`backend/src/controllers/fileController.js` 同步限制确认附件下载/删除，避免绕过行级权限。生成文件继续通过 `fileService.js` 的 0700/0600 归档，确认不等于正式申报。
+- 附件财务边界由 `backend/src/services/fileService.js` 的 `assertFileAccess` 共用，通用及旧采购/销售下载与删除入口必须调用；普通附件角色权限不增加所有者限制。`createFile` 失败只清理本次新上传文件，不触碰既有/生成附件；清理自身失败保留原错误且不日志记录路径。旧采购删除保留现有物理归档。
+- `backend/src/utils/upload.js` 的 Multer destination 在启动磁盘文件流前以 0700 创建/收紧日期目录，失败经回调拒绝存储；不改变上传根目录共享策略。0600 文件收紧仍在 `fileService.createFile` 的首次异步查询前执行，不声称覆盖完整上传流阶段。
+- `fileService.createFile` 在 chmod/清理前校验规范化路径及真实路径均在可信 `UPLOAD_DIR` 内，拒绝子路径穿越、子符号链接、非普通文件与多链接文件；可信根目录自身可为符号链接或相对路径。只记录本次文件 dev/ino，在异步失败后重验身份再清理；拒绝或清理失败保持原业务错误，不扫描或删除其他附件。
+- Multer destination 的日期子目录必须是可信配置根真实路径下的普通目录，拒绝子目录符号链接/别名后才 chmod 或成功回调；可信根符号链接、相对根以及原 Multer 返回路径/数据库相对路径格式继续兼容。
 - Never commit secrets (API keys, tokens, passwords, private keys, DB credentials), including in `.env`, `.env.*`, `*.example`, scripts, logs, and tests.
 - 本地被 Git 忽略的运维笔记（如 `PLAN.md`）同样不得保存真实登录凭据；登录验证只记录结果，避免检查笔记时再次暴露凭据。
 - If temporary test credentials are introduced, mark them clearly as non-production and require environment-variable override before上线.
