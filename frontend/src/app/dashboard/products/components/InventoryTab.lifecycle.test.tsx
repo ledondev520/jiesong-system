@@ -1,5 +1,11 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { InventoryStatus, type Inventory } from "@/types";
 import { clearAllCache } from "@/lib/api-cache";
 import { InventoryTab } from "./InventoryTab";
@@ -76,4 +82,99 @@ it("验货后重新进入库存页面立即读取新增合格库存", async () =
   render(<InventoryTab />);
   await waitFor(() => expect(getAll).toHaveBeenCalledTimes(2));
   expect(await screen.findByText("自动流转")).toBeInTheDocument();
+});
+
+it("批量更新等待期间切换搜索，完成后只刷新当前搜索结果", async () => {
+  let finish!: (value: {
+    data: { success: number; failed: number; errors: never[] };
+  }) => void;
+  batchUpdateStatus.mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  const filteredStock = { ...stock, id: "synthetic-filtered-stock" };
+  getAll.mockImplementation(async ({ keyword }: { keyword?: string }) =>
+    response(keyword ? [filteredStock] : [stock]),
+  );
+  render(<InventoryTab />);
+  fireEvent.click(
+    (
+      await screen.findAllByRole("checkbox", {
+        name: "选择库存 synthetic-stock",
+      })
+    )[0],
+  );
+  fireEvent.click(screen.getByRole("button", { name: "批量设为已入库" }));
+  await waitFor(() => expect(batchUpdateStatus).toHaveBeenCalledTimes(1));
+  fireEvent.change(screen.getByPlaceholderText("搜索商品/采购合同..."), {
+    target: { value: "新搜索" },
+  });
+  await screen.findAllByRole("checkbox", {
+    name: "选择库存 synthetic-filtered-stock",
+  });
+  await act(async () => {
+    finish({ data: { success: 1, failed: 0, errors: [] } });
+  });
+  await waitFor(() => expect(getAll).toHaveBeenCalledTimes(3));
+  expect(getAll).toHaveBeenLastCalledWith({
+    page: 1,
+    pageSize: 20,
+    keyword: "新搜索",
+  });
+  expect(
+    await screen.findAllByRole("checkbox", {
+      name: "选择库存 synthetic-filtered-stock",
+    }),
+  ).toHaveLength(2);
+  expect(
+    screen.queryByRole("checkbox", { name: "选择库存 synthetic-stock" }),
+  ).not.toBeInTheDocument();
+});
+
+it("批量更新等待期间翻页，完成后继续显示当前页", async () => {
+  let finish!: (value: {
+    data: { success: number; failed: number; errors: never[] };
+  }) => void;
+  batchUpdateStatus.mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  getAll.mockImplementation(async ({ page }: { page: number }) => ({
+    data: {
+      items: [{ ...stock, id: `synthetic-page-${page}` }],
+      pagination: { total: 40, totalPages: 2 },
+    },
+  }));
+  render(<InventoryTab />);
+  fireEvent.click(
+    (
+      await screen.findAllByRole("checkbox", {
+        name: "选择库存 synthetic-page-1",
+      })
+    )[0],
+  );
+  fireEvent.click(screen.getByRole("button", { name: "批量设为已入库" }));
+  await waitFor(() => expect(batchUpdateStatus).toHaveBeenCalledTimes(1));
+  fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+  await screen.findAllByRole("checkbox", { name: "选择库存 synthetic-page-2" });
+  await act(async () => {
+    finish({ data: { success: 1, failed: 0, errors: [] } });
+  });
+  await waitFor(() => expect(getAll).toHaveBeenCalledTimes(3));
+  expect(getAll).toHaveBeenLastCalledWith({
+    page: 2,
+    pageSize: 20,
+    keyword: undefined,
+  });
+  expect(
+    await screen.findAllByRole("checkbox", {
+      name: "选择库存 synthetic-page-2",
+    }),
+  ).toHaveLength(2);
+  expect(
+    screen.queryByRole("checkbox", { name: "选择库存 synthetic-page-1" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByText(/第 2\/2 页/)).toBeInTheDocument();
 });
