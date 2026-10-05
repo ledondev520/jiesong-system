@@ -1,6 +1,6 @@
 /**
  * Input: 所有路由模块、中间件
- * Output: Express 应用实例（显式代理白名单默认关闭）
+ * Output: Express应用实例、标准100/min全局限流（显式代理白名单默认关闭）
  * Pos: 应用入口，初始化 Express 服务器
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -14,7 +14,7 @@ const routes = require('./routes');
 const mcpRoutes = require('./routes/mcp');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./middleware/logger');
-const { gentleRateLimit } = require('./middleware/rateLimit');
+const { createApiRateLimiter, exposeApiRateLimitHeaders } = require('./middleware/apiRateLimit');
 const { startInventoryAlertJob } = require('./jobs/inventoryAlertJob');
 const { startAgentCredentialAlertJob } = require('./jobs/agentCredentialAlertJob');
 const { startPatrolJob } = require('./jobs/patrolJob');
@@ -61,11 +61,7 @@ app.use(
 );
 
 // 0.5. 速率限制（全局宽松限制）
-app.use(gentleRateLimit({
-  windowMs: 60 * 1000, // 1 分钟
-  max: 100, // 100 次/分钟
-  message: '请求过于频繁，请稍后再试',
-}));
+app.use(createApiRateLimiter(), exposeApiRateLimitHeaders);
 
 // 1. 请求体解析
 app.use(express.json({ limit: '10mb' }));

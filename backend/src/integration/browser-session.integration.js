@@ -28,7 +28,11 @@ test('fixed-expiry opt-in browser sessions and CSRF boundaries', async (t) => {
   const browser = require('../services/browserSessionService');
   const password = crypto.randomBytes(18).toString('hex');
   const user = await db.user.create({ data: { username: 'synthetic-browser', password: await require('bcrypt').hash(password, 4), name: 'Synthetic', role: 'ADMIN' } });
-  const express = require('express'); const app = express(); app.use(express.json());
+  const express = require('express'); const app = express();
+  const { createApiRateLimiter, exposeApiRateLimitHeaders } = require('../middleware/apiRateLimit');
+  const apiLimiter = createApiRateLimiter(); app.use(apiLimiter, exposeApiRateLimitHeaders);
+  t.beforeEach(() => apiLimiter.resetKey('127.0.0.1')); // Independent synthetic scenarios; each retains the real budget.
+  app.use(express.json());
   const routes = require('../routes/auth'); app.use('/api/v1/auth', routes);
   const { authenticate } = require('../middleware/auth');
   app.post('/write', authenticate, (_req, res) => res.json({ code: 200 }));

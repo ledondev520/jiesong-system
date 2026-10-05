@@ -58,7 +58,11 @@ test('isolated password recovery security boundaries', async (t) => {
   }
   const payload = (code) => ({ email, code, newPassword: crypto.randomBytes(18).toString('hex') });
   const check = (token) => new Promise((resolve, reject) => authenticate({ headers: { authorization: `Bearer ${token}` } }, {}, (error) => error ? reject(error) : resolve()));
-  const express = require('express'); const app = express(); app.use(express.json());
+  const express = require('express'); const app = express();
+  const { createApiRateLimiter, exposeApiRateLimitHeaders } = require('../middleware/apiRateLimit');
+  const apiLimiter = createApiRateLimiter(); app.use(apiLimiter, exposeApiRateLimitHeaders);
+  t.beforeEach(() => apiLimiter.resetKey('127.0.0.1')); // Independent synthetic scenarios; each retains the real budget.
+  app.use(express.json());
   const authRouter = require('../routes/auth'); app.use('/auth', authRouter);
   const { ipKeyGenerator } = require('express-rate-limit');
   const routeLimiter = (route) => authRouter.stack.find((layer) => layer.route?.path === route).route.stack[0].handle;

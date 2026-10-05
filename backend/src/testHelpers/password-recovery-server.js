@@ -14,7 +14,10 @@ async function start() {
   mail.isConfigured = () => true;
   mail.sendPasswordResetCode = async (email, code) => fs.writeFileSync(path.join(directory, 'mailbox.json'), JSON.stringify({ email, code }), { mode: 0o600 });
   await db.user.create({ data: { username: 'synthetic-recovery', email: 'recovery@example.com', name: 'Synthetic', password: await require('bcrypt').hash(process.env.RECOVERY_TEST_PASSWORD, 12) } });
-  const express = require('express'); const app = express(); app.use(express.json()); app.use('/api/v1/auth', require('../routes/auth'));
+  const express = require('express'); const app = express();
+  const { createApiRateLimiter, exposeApiRateLimitHeaders } = require('../middleware/apiRateLimit');
+  const apiLimiter = createApiRateLimiter(); app.use(apiLimiter, exposeApiRateLimitHeaders);
+  app.use(express.json()); app.use('/api/v1/auth', require('../routes/auth'));
   app.use((error, _req, res, _next) => res.status(error.statusCode || 500).json({ code: error.statusCode || 500, message: error.statusCode ? error.message : 'synthetic server failure', data: null }));
   const server = app.listen(0, '127.0.0.1', () => process.send({ baseURL: `http://127.0.0.1:${server.address().port}` }));
   const close = async () => { server.closeAllConnections(); await new Promise((r) => server.close(r)); await db.$disconnect(); process.exit(0); };

@@ -136,3 +136,7 @@
 - Cookie写请求必须同时通过精确CORS_ORIGIN来源和会话绑定CSRF；兄弟来源同站读取同样检查来源。Bearer优先且无效时不回退，Agent流程保持独立。退出仅撤销当前浏览器，实时sessionVersion/停用/到期均使会话失效。
 - 401/退出/改密响应不发送可能擦掉新登录的延迟Cookie删除头；失效Cookie不能认证，原到期或新成功登录时自然过期/替换。登录响应和恢复响应禁止缓存。三处前端业务缓存及延迟401按认证代次隔离，取消登录不得回写状态。
 - 新表增量迁移前必须由发布协调者使用已审查预检完成真实DATABASE_URL的一致性在线SQLite快照，验证完整性及0700/0600权限；不能用默认路径文件复制或历史备份代替本次发布门槛。设计/回滚见 `docs/security/browser-sessions.md`。
+
+- `backend/src/middleware/apiRateLimit.js` 通过锁定express-rate-limit执行原全局100次/分钟预算，继续在解析和路由之前生效；保留429 JSON、Retry-After秒值及原X-RateLimit-Reset毫秒契约。IP使用ipKeyGenerator规范化IPv4映射和IPv6/56，不读取原始XFF、不增加代理信任；登录额外10次/15分钟仍保留。隔离HTTP测试也必须挂载同一实际限流，不能隐藏/豁免CodeQL的认证成本告警。
+
+- 全局API和原登录计数仍为进程内存：重启会重置、多worker各自计数，并非跨进程持久配额；邮箱/找回密码的SQLite持久配额继续独立执行。

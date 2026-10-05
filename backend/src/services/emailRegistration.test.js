@@ -106,7 +106,10 @@ test('真实 SQLite：限制验证码尝试、过期和重放；新账号待审�
   for (let i = 0; i < 60; i++) await prisma.emailRegistrationChallenge.create({ data: { id: crypto.randomUUID(), email: 'quota@example.com', codeHash: '', expiresAt: new Date() } });
   await assert.rejects(service.sendCode('fresh@example.com'), /过于频繁/);
   const express = require('express');
-  const app = express(); app.use(express.json()); app.use('/auth', require('../routes/auth'));
+  const app = express();
+  const { createApiRateLimiter, exposeApiRateLimitHeaders } = require('../middleware/apiRateLimit');
+  const apiLimiter = createApiRateLimiter(); app.use(apiLimiter, exposeApiRateLimitHeaders);
+  app.use(express.json()); app.use('/auth', require('../routes/auth'));
   app.use((error, _req, res, _next) => res.status(error.statusCode || 500).json({ message: error.message }));
   const server = app.listen(0, '127.0.0.1'); await new Promise((resolve) => server.once('listening', resolve));
   t.after(() => { server.closeAllConnections(); server.close(); });
