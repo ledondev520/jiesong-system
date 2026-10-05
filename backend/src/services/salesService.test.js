@@ -8,6 +8,18 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const prisma = require('../utils/prisma');
 const salesService = require('./salesService');
+
+// 单元测试只运行合成事务桩；真实事务/SQLite 的一致性由 sales-cargo-lifecycle.integration.js 验证。
+const baseTransaction = prisma.$transaction;
+const baseSalesFindUnique = prisma.salesContract.findUnique;
+test.beforeEach(() => {
+  prisma.$transaction = async callback => callback(prisma);
+  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', status: 'DRAFT', inventories: [] });
+});
+test.afterEach(() => {
+  prisma.$transaction = baseTransaction;
+  prisma.salesContract.findUnique = baseSalesFindUnique;
+});
 const inventorySnapshot = require('./inventorySnapshot');
 
 test('登记到港后保留出库，已收齐合同自动完成；未收齐不能手动假结清', async () => {

@@ -1,3 +1,4 @@
+/** 出口合同与装箱服务；发运后的货物数量、单位及行集与出库记录保持一致，单证资料可补录。 */
 const prisma = require('../utils/prisma');
 const { parseShanghaiDateRange } = require('../utils/dateRange');
 const { createError } = require('../middleware/errorHandler');
@@ -16,6 +17,7 @@ const inventorySnapshot = require('./inventorySnapshot');
 const { evaluateShipmentReadiness } = require('./shipmentReadinessService');
 const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
 const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
+const { getSalesCargoState, assertSalesCargoMutable, assertSalesCargoUpdate } = require('./salesCargoLifecycle');
 
 const READY_PURCHASE_STATUSES = Object.freeze([
   'READY',
@@ -171,9 +173,10 @@ const updateSalesContract = async (id, data = {}) => {
   });
 };
 
-const removeSalesContract = async (id) => {
-  await prisma.salesContract.delete({ where: { id } });
-};
+const removeSalesContract = async (id) => prisma.$transaction(async (tx) => {
+  assertSalesCargoMutable(await getSalesCargoState(tx, id));
+  await tx.salesContract.delete({ where: { id } });
+});
 
 const addSalesItem = async (id, data = {}) => {
   const contract = await prisma.salesContract.findUnique({ where: { id } });
@@ -329,11 +332,12 @@ const calculateSellingPrice = ({ costPrice, exchangeRate, profitRate = 1.3 }) =>
   };
 };
 
-const addPackingItem = async (id, data = {}) => {
+const addPackingItem = async (id, data = {}) => prisma.$transaction(async (tx) => {
+  assertSalesCargoMutable(await getSalesCargoState(tx, id));
   const unitPrice = data.unitPrice || null;
   const totalPrice = unitPrice && data.quantity ? unitPrice * data.quantity : null;
 
-  const item = await prisma.packingItem.create({
+  const item = await tx.packingItem.create({
     data: {
       salesContractId: id,
       productId: data.productId,
@@ -363,50 +367,19 @@ const addPackingItem = async (id, data = {}) => {
     include: { product: true, store: true },
   });
 
-  await recalculateContractStats(id);
+  await recalculateContractStats(id, tx);
 
   return item;
-};
-
-const SOURCE_LOCKED_PACKING_FIELDS = Object.freeze([
-  'quantity',
-  'boxes',
-  'grossWeight',
-  'netWeight',
-  'volume',
-  'length',
-  'width',
-  'height',
-]);
-
-const SOURCE_LOCKED_PACKING_LABELS = Object.freeze({
-  quantity: '数量',
-  boxes: '箱数',
-  grossWeight: '毛重',
-  netWeight: '净重',
-  volume: '体积',
-  length: '长度',
-  width: '宽度',
-  height: '高度',
 });
 
-const hasOwn = (value, field) => Object.prototype.hasOwnProperty.call(value, field);
-
-const samePackingNumber = (current, next) => {
-  const currentNumber = current === null || current === undefined || current === '' ? 0 : Number(current);
-  const nextNumber = next === null || next === undefined || next === '' ? 0 : Number(next);
-  return Number.isFinite(currentNumber)
-    && Number.isFinite(nextNumber)
-    && Math.abs(currentNumber - nextNumber) <= 0.000001;
-};
-
-const updatePackingItem = async (id, itemId, data = {}) => {
-  const existing = await prisma.packingItem.findFirst({
+const updatePackingItem = async (id, itemId, data = {}) => prisma.$transaction(async (tx) => {
+  const existing = await tx.packingItem.findFirst({
     where: { id: itemId, salesContractId: id },
     select: {
       id: true,
       purchaseItemId: true,
       quantity: true,
+      unit: true,
       boxes: true,
       grossWeight: true,
       netWeight: true,
@@ -418,24 +391,13 @@ const updatePackingItem = async (id, itemId, data = {}) => {
     },
   });
   if (!existing) throw createError('装箱明细不存在', 404);
-
-  if (existing.purchaseItemId) {
-    const changedField = SOURCE_LOCKED_PACKING_FIELDS.find((field) => (
-      hasOwn(data, field) && !samePackingNumber(existing[field], data[field])
-    ));
-    if (changedField) {
-      throw createError(
-        `该装箱明细来源于采购，${SOURCE_LOCKED_PACKING_LABELS[changedField]}由导入比例锁定；若需调整，请删除后重新按箱数导入`,
-        400,
-      );
-    }
-  }
+  assertSalesCargoUpdate(await getSalesCargoState(tx, id), existing, data);
 
   const unitPrice = data.unitPrice === undefined ? existing.unitPrice : (data.unitPrice || null);
   const quantity = data.quantity === undefined ? existing.quantity : data.quantity;
   const totalPrice = unitPrice && quantity ? unitPrice * quantity : null;
 
-  const item = await prisma.packingItem.update({
+  const item = await tx.packingItem.update({
     where: { id: itemId },
     data: {
       quantity: data.quantity,
@@ -464,20 +426,21 @@ const updatePackingItem = async (id, itemId, data = {}) => {
     include: { product: true, store: true },
   });
 
-  await recalculateContractStats(id);
+  await recalculateContractStats(id, tx);
   return item;
-};
+});
 
-const removePackingItem = async (id, itemId) => {
-  const existing = await prisma.packingItem.findFirst({
+const removePackingItem = async (id, itemId) => prisma.$transaction(async (tx) => {
+  const existing = await tx.packingItem.findFirst({
     where: { id: itemId, salesContractId: id },
     select: { id: true },
   });
   if (!existing) throw createError('装箱明细不存在', 404);
+  assertSalesCargoMutable(await getSalesCargoState(tx, id));
 
-  await prisma.packingItem.delete({ where: { id: itemId } });
-  await recalculateContractStats(id);
-};
+  await tx.packingItem.delete({ where: { id: itemId } });
+  await recalculateContractStats(id, tx);
+});
 
 const recalculateContractStats = async (contractId, prismaClient = prisma) => {
   const [contract, stats] = await Promise.all([
@@ -631,11 +594,7 @@ const importPurchasePackingItems = async (salesContractId, selections = []) => {
   }
 
   return prisma.$transaction(async (tx) => {
-    const salesContract = await tx.salesContract.findUnique({
-      where: { id: salesContractId },
-      select: { id: true },
-    });
-    if (!salesContract) throw createError('出口合同不存在', 404);
+    assertSalesCargoMutable(await getSalesCargoState(tx, salesContractId));
 
     const sources = await tx.purchaseItem.findMany({
       where: {
