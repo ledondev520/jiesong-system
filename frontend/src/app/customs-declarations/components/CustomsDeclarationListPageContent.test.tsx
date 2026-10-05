@@ -149,15 +149,23 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
 
     await user.clear(input);
     await user.type(input, "TEST");
-    expect(mocks.router.replace).toHaveBeenLastCalledWith(
-      "/dashboard/customs-declarations?source=qa&keyword=TEST&status=DRAFT",
-      { scroll: false },
-    );
+    expect(window.location.pathname).toBe("/dashboard/customs-declarations");
+    expect(
+      Object.fromEntries(new URLSearchParams(window.location.search)),
+    ).toEqual({
+      source: "qa",
+      keyword: "TEST",
+      status: "DRAFT",
+    });
+    expect(mocks.router.replace).not.toHaveBeenCalled();
     await user.click(screen.getByTestId("reset-filters"));
-    expect(mocks.router.replace).toHaveBeenLastCalledWith(
-      "/dashboard/customs-declarations?source=qa",
-      { scroll: false },
-    );
+    expect(window.location.pathname).toBe("/dashboard/customs-declarations");
+    expect(
+      Object.fromEntries(new URLSearchParams(window.location.search)),
+    ).toEqual({
+      source: "qa",
+    });
+    expect(mocks.router.replace).not.toHaveBeenCalled();
     expect(input).toHaveValue("");
   });
 });
