@@ -91,6 +91,10 @@ test('HTTP/SQLite：销售表头明细原子创建，同一请求重试不产生
   const fromTemplate = await call('POST', `/sales?templateId=${template.id}`, { exchangeRate: 7.2 }, { key: 'synthetic-template' });
   assert.equal(fromTemplate.items.length, 1);
   assert.equal(fromTemplate.totalAmount, 6);
+  for (const contractId of [created.id, concurrent[0].id]) {
+    assert.equal(await db.operationLog.count({ where: { entity: 'SalesContract', entityId: contractId, action: 'CREATE' } }), 1,
+      '相同请求的串行或并发重放不能重复记录业务新建成功');
+  }
   // 通用日志即使被维护任务清理，也不能让相同请求创建重复合同；缺证据时明确拒绝。
   const marker = await db.operationLog.findFirst({ where: { entity: 'SalesCreationRequest', entityId: custom.id } });
   assert.equal(marker.action, 'IDEMPOTENCY');
