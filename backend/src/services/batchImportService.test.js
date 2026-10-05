@@ -55,7 +55,7 @@ test('batchImportPurchaseContracts: 使用现有 schema 创建采购合同与明
   const originals = {
     supplierFindFirst: prisma.supplier.findFirst,
     productFindFirst: prisma.product.findFirst,
-    purchaseContractCount: prisma.purchaseContract.count,
+    purchaseContractFindMany: prisma.purchaseContract.findMany,
     purchaseContractCreate: prisma.purchaseContract.create,
     purchaseItemCreate: prisma.purchaseItem.create,
   };
@@ -63,7 +63,7 @@ test('batchImportPurchaseContracts: 使用现有 schema 创建采购合同与明
 
   prisma.supplier.findFirst = async () => ({ id: 'sup-1' });
   prisma.product.findFirst = async () => ({ id: 'prod-1' });
-  prisma.purchaseContract.count = async () => 12;
+  prisma.purchaseContract.findMany = async () => [{ contractNo: `CG${new Date().getFullYear().toString().slice(-2)}00012` }];
   prisma.purchaseContract.create = async (args) => {
     captured.contract = args;
     return { id: 'pc-1', ...args.data };
@@ -92,7 +92,7 @@ test('batchImportPurchaseContracts: 使用现有 schema 创建采购合同与明
   } finally {
     prisma.supplier.findFirst = originals.supplierFindFirst;
     prisma.product.findFirst = originals.productFindFirst;
-    prisma.purchaseContract.count = originals.purchaseContractCount;
+    prisma.purchaseContract.findMany = originals.purchaseContractFindMany;
     prisma.purchaseContract.create = originals.purchaseContractCreate;
     prisma.purchaseItem.create = originals.purchaseItemCreate;
   }

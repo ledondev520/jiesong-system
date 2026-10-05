@@ -1,24 +1,24 @@
 /**
  * Input: purchaseService, supplierService, productService
- * Output: 支持窄屏供应商选择和单列表单的创建采购合同页面
+ * Output: 支持窄屏供应商选择的采购表单；新增编号仅预览，提交时由后端分配
  * Pos: 采购合同创建入口
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useForm, useFieldArray, useWatch } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { loadPaginatedCatalog } from '@/services/paginatedCatalog';
-import { invalidateCache } from '@/lib/api-cache';
-import { ErrorState } from '@/components/ui/data-state';
-import { Product, Supplier, PurchaseContract } from '@/types';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { loadPaginatedCatalog } from "@/services/paginatedCatalog";
+import { invalidateCache } from "@/lib/api-cache";
+import { ErrorState } from "@/components/ui/data-state";
+import { Product, Supplier, PurchaseContract } from "@/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
@@ -26,17 +26,17 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
+} from "@/components/ui/form";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
-import { DatePicker } from '@/components/ui/date-picker';
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -44,9 +44,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Command,
   CommandEmpty,
@@ -54,8 +58,8 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '@/components/ui/command';
-import { Badge } from '@/components/ui/badge';
+} from "@/components/ui/command";
+import { Badge } from "@/components/ui/badge";
 import {
   Wand2,
   Plus,
@@ -72,21 +76,21 @@ import {
   Calculator,
   ArrowRight,
   ArrowLeft,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   ParsedQuoteItem,
   PurchaseCreatePayload,
   purchaseService,
   ProductPriceHistory,
-} from '@/services/purchase.service';
-import { supplierService } from '@/services/supplier.service';
-import { productService } from '@/services/product.service';
-import { contractTemplateService } from '@/services/contractTemplate.service';
-import { ContractTemplate } from '@/types';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { PriceGuard } from '@/components/purchase/PriceGuard';
+} from "@/services/purchase.service";
+import { supplierService } from "@/services/supplier.service";
+import { productService } from "@/services/product.service";
+import { contractTemplateService } from "@/services/contractTemplate.service";
+import { ContractTemplate } from "@/types";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { PriceGuard } from "@/components/purchase/PriceGuard";
 import {
   Table,
   TableBody,
@@ -94,11 +98,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 
 // ============== Schema ==============
 const purchaseSchema = z.object({
-  supplierId: z.string().min(1, '请选择供应商'),
+  supplierId: z.string().min(1, "请选择供应商"),
   contractNo: z.string().optional(),
   signedAt: z.date().optional(),
   expectedDate: z.date().optional(),
@@ -107,15 +111,15 @@ const purchaseSchema = z.object({
   items: z
     .array(
       z.object({
-        productId: z.string().min(1, '请选择商品'),
-        quantity: z.number().min(0.01, '数量必须大于0'),
-        unitPrice: z.number().min(0, '单价必须大于等于0'),
+        productId: z.string().min(1, "请选择商品"),
+        quantity: z.number().min(0.01, "数量必须大于0"),
+        unitPrice: z.number().min(0, "单价必须大于等于0"),
         unit: z.string().optional(),
         note: z.string().optional(),
         priceNote: z.string().optional(),
-      })
+      }),
     )
-    .min(1, '至少添加一项商品'),
+    .min(1, "至少添加一项商品"),
 });
 
 type PurchaseFormValues = z.infer<typeof purchaseSchema>;
@@ -154,26 +158,35 @@ function StepIndicator({
             >
               <span
                 className={cn(
-                  'flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold transition-colors',
+                  "flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold transition-colors",
                   isCurrent
-                    ? 'bg-primary text-primary-foreground'
+                    ? "bg-primary text-primary-foreground"
                     : isCompleted
-                      ? 'bg-emerald-500 text-white'
-                      : 'bg-muted text-muted-foreground'
+                      ? "bg-emerald-500 text-white"
+                      : "bg-muted text-muted-foreground",
                 )}
               >
                 {isCompleted ? <Check className="h-3.5 w-3.5" /> : stepNum}
               </span>
               <span
                 className={cn(
-                  isCurrent ? 'text-primary' : isCompleted ? 'text-foreground' : 'text-muted-foreground'
+                  isCurrent
+                    ? "text-primary"
+                    : isCompleted
+                      ? "text-foreground"
+                      : "text-muted-foreground",
                 )}
               >
                 {step}
               </span>
             </button>
             {idx < steps.length - 1 && (
-              <div className={cn('mx-1 h-px w-4 sm:mx-2 sm:w-8', isCompleted ? 'bg-emerald-500' : 'bg-border')} />
+              <div
+                className={cn(
+                  "mx-1 h-px w-4 sm:mx-2 sm:w-8",
+                  isCompleted ? "bg-emerald-500" : "bg-border",
+                )}
+              />
             )}
           </div>
         );
@@ -204,7 +217,9 @@ function PriceSummary({
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">商品小计</span>
-          <span className="font-mono font-medium tabular-nums">¥{subtotal.toLocaleString()}</span>
+          <span className="font-mono font-medium tabular-nums">
+            ¥{subtotal.toLocaleString()}
+          </span>
         </div>
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">税额 ({taxRate}%)</span>
@@ -227,7 +242,7 @@ function PriceSummary({
 
 export default function CreatePurchasePage() {
   const router = useRouter();
-  const editId = useSearchParams().get('editId');
+  const editId = useSearchParams().get("editId");
   const [loadError, setLoadError] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
 
@@ -238,73 +253,92 @@ export default function CreatePurchasePage() {
 
   // 供应商 Combobox
   const [supplierOpen, setSupplierOpen] = useState(false);
-  const [supplierSearch, setSupplierSearch] = useState('');
+  const [supplierSearch, setSupplierSearch] = useState("");
 
   // 推荐供应商（根据选中商品）
-  const [recommendedSupplierIds, setRecommendedSupplierIds] = useState<Set<string>>(new Set());
+  const [recommendedSupplierIds, setRecommendedSupplierIds] = useState<
+    Set<string>
+  >(new Set());
 
   // 新增供应商弹窗
   const [showNewSupplierDialog, setShowNewSupplierDialog] = useState(false);
   const [newSupplierForm, setNewSupplierForm] = useState({
-    name: '',
-    contactName: '',
-    contactPhone: '',
-    address: '',
-    taxId: '',
-    bankAccountName: '',
-    bankName: '',
-    bankBranch: '',
-    bankCode: '',
-    bankAccount: '',
+    name: "",
+    contactName: "",
+    contactPhone: "",
+    address: "",
+    taxId: "",
+    bankAccountName: "",
+    bankName: "",
+    bankBranch: "",
+    bankCode: "",
+    bankAccount: "",
   });
   const [savingSupplier, setSavingSupplier] = useState(false);
 
   // AI 解析
-  const [parseText, setParseText] = useState('');
+  const [parseText, setParseText] = useState("");
   const [isParsing, setIsParsing] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
 
   // 合同模板
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(true);
-  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
-  const [templateName, setTemplateName] = useState('');
+  const [templateName, setTemplateName] = useState("");
   const [savingTemplate, setSavingTemplate] = useState(false);
 
   // 批量商品选择器
   const [showBatchSelector, setShowBatchSelector] = useState(false);
-  const [batchSearch, setBatchSearch] = useState('');
-  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [batchSearch, setBatchSearch] = useState("");
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   // 表单
   const form = useForm<PurchaseFormValues>({
     resolver: zodResolver(purchaseSchema),
     defaultValues: {
-      supplierId: '',
-      contractNo: '',
+      supplierId: "",
+      contractNo: "",
       signedAt: undefined,
       taxRate: 13,
-      note: '',
-      items: [{ productId: '', quantity: 0, unitPrice: 0, unit: '', note: '', priceNote: '' }],
+      note: "",
+      items: [
+        {
+          productId: "",
+          quantity: 0,
+          unitPrice: 0,
+          unit: "",
+          note: "",
+          priceNote: "",
+        },
+      ],
     },
   });
 
   // 商品价格历史缓存（按 productId）
-  const [priceHistoryMap, setPriceHistoryMap] = useState<Record<string, ProductPriceHistory>>({});
+  const [priceHistoryMap, setPriceHistoryMap] = useState<
+    Record<string, ProductPriceHistory>
+  >({});
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
-    name: 'items',
+    name: "items",
   });
 
-  const watchItems = useWatch({ control: form.control, name: 'items' });
-  const watchSupplierId = useWatch({ control: form.control, name: 'supplierId' });
-  const watchTaxRate = useWatch({ control: form.control, name: 'taxRate' }) ?? 13;
+  const watchItems = useWatch({ control: form.control, name: "items" });
+  const watchSupplierId = useWatch({
+    control: form.control,
+    name: "supplierId",
+  });
+  const watchTaxRate =
+    useWatch({ control: form.control, name: "taxRate" }) ?? 13;
 
   useEffect(() => {
-    if (!form.getValues('signedAt')) {
-      form.setValue('signedAt', new Date(), { shouldDirty: false });
+    if (!form.getValues("signedAt")) {
+      form.setValue("signedAt", new Date(), { shouldDirty: false });
     }
   }, [form]);
 
@@ -315,8 +349,13 @@ export default function CreatePurchasePage() {
 
   // ============== 加载商品价格历史 ==============
   const productIdsKey = useMemo(
-    () => watchItems.map((i) => i.productId).filter(Boolean).sort().join(','),
-    [watchItems]
+    () =>
+      watchItems
+        .map((i) => i.productId)
+        .filter(Boolean)
+        .sort()
+        .join(","),
+    [watchItems],
   );
 
   useEffect(() => {
@@ -343,7 +382,7 @@ export default function CreatePurchasePage() {
   useEffect(() => {
     const loadTemplates = async () => {
       try {
-        const res = await contractTemplateService.getByType('PURCHASE');
+        const res = await contractTemplateService.getByType("PURCHASE");
         setTemplates(res.data || []);
       } catch {
         // 静默失败，模板功能是辅助性的
@@ -360,32 +399,59 @@ export default function CreatePurchasePage() {
     setLoadError(false);
     try {
       const [allSuppliers, allProducts, contractRes] = await Promise.all([
-        loadPaginatedCatalog((page) => supplierService.getAll({ page, pageSize: 100, lite: true })),
-        loadPaginatedCatalog((page) => productService.getAll({ page, pageSize: 100, lite: true })),
-        editId ? purchaseService.getById(editId) : purchaseService.getNextContractNo(),
+        loadPaginatedCatalog((page) =>
+          supplierService.getAll({ page, pageSize: 100, lite: true }),
+        ),
+        loadPaginatedCatalog((page) =>
+          productService.getAll({ page, pageSize: 100, lite: true }),
+        ),
+        editId
+          ? purchaseService.getById(editId)
+          : purchaseService.getNextContractNo(),
       ]);
       setSuppliers(allSuppliers);
       setProducts(allProducts);
-      if (editId && contractRes.data && 'items' in contractRes.data) {
+      if (editId && contractRes.data && "items" in contractRes.data) {
         const draft = contractRes.data as PurchaseContract;
-        if (draft.status !== 'DRAFT') throw new Error('仅草稿可更正');
-        form.reset({ supplierId: draft.supplierId, contractNo: draft.contractNo, signedAt: draft.signedAt ? new Date(draft.signedAt) : undefined, expectedDate: draft.expectedDate ? new Date(draft.expectedDate) : undefined, taxRate: draft.taxRate, note: draft.note ?? '', items: (draft.items ?? []).map((item) => ({ productId: item.productId, quantity: item.quantity, unitPrice: item.unitPrice, unit: item.unit ?? '', note: item.note ?? '', priceNote: '' })) });
+        if (draft.status !== "DRAFT") throw new Error("仅草稿可更正");
+        form.reset({
+          supplierId: draft.supplierId,
+          contractNo: draft.contractNo,
+          signedAt: draft.signedAt ? new Date(draft.signedAt) : undefined,
+          expectedDate: draft.expectedDate
+            ? new Date(draft.expectedDate)
+            : undefined,
+          taxRate: draft.taxRate,
+          note: draft.note ?? "",
+          items: (draft.items ?? []).map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            unit: item.unit ?? "",
+            note: item.note ?? "",
+            priceNote: "",
+          })),
+        });
       } else if (contractRes.data?.contractNo) {
-        form.setValue('contractNo', contractRes.data.contractNo);
+        form.setValue("contractNo", contractRes.data.contractNo);
       }
     } catch {
       setLoadError(true);
-      toast.error('加载数据失败');
+      toast.error("加载数据失败");
     } finally {
       setDataLoading(false);
       setContractNoLoading(false);
     }
   }, [editId, form]);
-  useEffect(() => { void loadData(); }, [loadData]);
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   // ============== 根据选中商品推荐供应商 ==============
   useEffect(() => {
-    const selectedProductIds = watchItems.map((item) => item.productId).filter((id) => id && id.length > 0);
+    const selectedProductIds = watchItems
+      .map((item) => item.productId)
+      .filter((id) => id && id.length > 0);
 
     if (selectedProductIds.length === 0) {
       setRecommendedSupplierIds(new Set());
@@ -395,7 +461,8 @@ export default function CreatePurchasePage() {
     // 查询曾经供应过这些商品的供应商
     const fetchRecommendedSuppliers = async () => {
       try {
-        const res = await purchaseService.getSuppliersByProducts(selectedProductIds);
+        const res =
+          await purchaseService.getSuppliersByProducts(selectedProductIds);
         if (res.data?.supplierIds) {
           setRecommendedSupplierIds(new Set(res.data.supplierIds));
         }
@@ -413,7 +480,10 @@ export default function CreatePurchasePage() {
       ? suppliers.filter(
           (s) =>
             s.name.toLowerCase().includes(supplierSearch.toLowerCase()) ||
-            (s.contactName && s.contactName.toLowerCase().includes(supplierSearch.toLowerCase()))
+            (s.contactName &&
+              s.contactName
+                .toLowerCase()
+                .includes(supplierSearch.toLowerCase())),
         )
       : suppliers;
 
@@ -426,39 +496,39 @@ export default function CreatePurchasePage() {
         // 推荐的排在前面
         if (a.isRecommended && !b.isRecommended) return -1;
         if (!a.isRecommended && b.isRecommended) return 1;
-        return a.name.localeCompare(b.name, 'zh-CN');
+        return a.name.localeCompare(b.name, "zh-CN");
       });
   }, [suppliers, supplierSearch, recommendedSupplierIds]);
 
   // ============== 新增供应商 ==============
   const handleSaveNewSupplier = async () => {
     if (!newSupplierForm.name.trim()) {
-      toast.error('请输入供应商名称');
+      toast.error("请输入供应商名称");
       return;
     }
     setSavingSupplier(true);
     try {
       const response = await supplierService.create(newSupplierForm);
       const newSupplier = response.data;
-      invalidateCache('suppliers-list');
+      invalidateCache("suppliers-list");
       setSuppliers((prev) => [newSupplier, ...prev]);
-      form.setValue('supplierId', newSupplier.id);
+      form.setValue("supplierId", newSupplier.id);
       setShowNewSupplierDialog(false);
       setNewSupplierForm({
-        name: '',
-        contactName: '',
-        contactPhone: '',
-        address: '',
-        taxId: '',
-        bankAccountName: '',
-        bankName: '',
-        bankBranch: '',
-        bankCode: '',
-        bankAccount: '',
+        name: "",
+        contactName: "",
+        contactPhone: "",
+        address: "",
+        taxId: "",
+        bankAccountName: "",
+        bankName: "",
+        bankBranch: "",
+        bankCode: "",
+        bankAccount: "",
       });
-      toast.success('供应商创建成功');
+      toast.success("供应商创建成功");
     } catch {
-      toast.error('创建供应商失败');
+      toast.error("创建供应商失败");
     } finally {
       setSavingSupplier(false);
     }
@@ -476,36 +546,42 @@ export default function CreatePurchasePage() {
             ? products.find((product) => product.id === item.productId)
             : products.find((product) => {
                 if (!item.productName) return false;
-                return product.customsName.toLowerCase().includes(item.productName.toLowerCase());
+                return product.customsName
+                  .toLowerCase()
+                  .includes(item.productName.toLowerCase());
               });
 
-          const fallbackNote = item.productName ? `AI识别商品：${item.productName}` : undefined;
+          const fallbackNote = item.productName
+            ? `AI识别商品：${item.productName}`
+            : undefined;
 
           return {
-            productId: matchedProduct?.id || item.productId || '',
+            productId: matchedProduct?.id || item.productId || "",
             quantity: item.quantity || 0,
             unitPrice: item.unitPrice || 0,
-            unit: item.unit || matchedProduct?.unit || '',
-            note: item.note || fallbackNote || '',
+            unit: item.unit || matchedProduct?.unit || "",
+            note: item.note || fallbackNote || "",
           };
         });
 
-        const unresolvedCount = normalizedItems.filter((item) => !item.productId).length;
+        const unresolvedCount = normalizedItems.filter(
+          (item) => !item.productId,
+        ).length;
         normalizedItems.forEach((item) => append(item));
 
         if (unresolvedCount > 0) {
           toast.success(
-            `解析完成，已添加 ${normalizedItems.length} 条，${unresolvedCount} 条需手动选择商品`
+            `解析完成，已添加 ${normalizedItems.length} 条，${unresolvedCount} 条需手动选择商品`,
           );
         } else {
           toast.success(`解析完成，已添加 ${normalizedItems.length} 条报价`);
         }
-        setParseText('');
+        setParseText("");
       } else {
-        toast.error(result.message || '解析失败');
+        toast.error(result.message || "解析失败");
       }
     } catch {
-      toast.error('解析失败');
+      toast.error("解析失败");
     } finally {
       setIsParsing(false);
     }
@@ -514,7 +590,7 @@ export default function CreatePurchasePage() {
   // ============== 应用模板 ==============
   const handleApplyTemplate = (templateId: string) => {
     if (!templateId) {
-      setSelectedTemplateId('');
+      setSelectedTemplateId("");
       return;
     }
     const template = templates.find((t) => t.id === templateId);
@@ -522,31 +598,33 @@ export default function CreatePurchasePage() {
 
     // 预填充表单
     if (template.supplierId) {
-      form.setValue('supplierId', template.supplierId);
+      form.setValue("supplierId", template.supplierId);
     }
     if (template.taxRate !== null && template.taxRate !== undefined) {
-      form.setValue('taxRate', template.taxRate);
+      form.setValue("taxRate", template.taxRate);
     }
     if (template.note) {
-      form.setValue('note', template.note);
+      form.setValue("note", template.note);
     }
 
     // 应用明细（仅保留当前仍存在的商品）
-    const validItems = (template.items || []).filter((item) => products.some((p) => p.id === item.productId));
+    const validItems = (template.items || []).filter((item) =>
+      products.some((p) => p.id === item.productId),
+    );
     if (validItems.length > 0) {
       form.setValue(
-        'items',
+        "items",
         validItems.map((item) => ({
           productId: item.productId,
           quantity: item.quantity || 0,
           unitPrice: item.unitPrice || 0,
-          unit: item.unit || '',
-          note: item.note || '',
-          priceNote: '',
-        }))
+          unit: item.unit || "",
+          note: item.note || "",
+          priceNote: "",
+        })),
       );
       if (validItems.length < (template.items || []).length) {
-        toast.warning('部分模板商品已不存在，已自动过滤');
+        toast.warning("部分模板商品已不存在，已自动过滤");
       }
     }
 
@@ -557,12 +635,12 @@ export default function CreatePurchasePage() {
   // ============== 保存为模板 ==============
   const handleSaveTemplate = async () => {
     if (!templateName.trim()) {
-      toast.error('请输入模板名称');
+      toast.error("请输入模板名称");
       return;
     }
     const data = form.getValues();
     if (!data.items || data.items.length === 0) {
-      toast.error('请至少添加一项商品');
+      toast.error("请至少添加一项商品");
       return;
     }
 
@@ -570,7 +648,7 @@ export default function CreatePurchasePage() {
     try {
       await contractTemplateService.create({
         name: templateName.trim(),
-        type: 'PURCHASE',
+        type: "PURCHASE",
         supplierId: data.supplierId || null,
         taxRate: data.taxRate,
         note: data.note || null,
@@ -582,14 +660,14 @@ export default function CreatePurchasePage() {
           note: item.note,
         })),
       });
-      toast.success('模板保存成功');
+      toast.success("模板保存成功");
       setShowSaveTemplateDialog(false);
-      setTemplateName('');
+      setTemplateName("");
       // 刷新模板列表
-      const res = await contractTemplateService.getByType('PURCHASE');
+      const res = await contractTemplateService.getByType("PURCHASE");
       setTemplates(res.data || []);
     } catch {
-      toast.error('保存模板失败');
+      toast.error("保存模板失败");
     } finally {
       setSavingTemplate(false);
     }
@@ -603,14 +681,14 @@ export default function CreatePurchasePage() {
         productId: p.id,
         quantity: 0,
         unitPrice: 0,
-        unit: p.unit || '',
-        note: '',
-        priceNote: '',
+        unit: p.unit || "",
+        note: "",
+        priceNote: "",
       });
     });
     setSelectedProductIds(new Set());
     setShowBatchSelector(false);
-    setBatchSearch('');
+    setBatchSearch("");
     toast.success(`已添加 ${toAdd.length} 项商品`);
   };
 
@@ -627,11 +705,19 @@ export default function CreatePurchasePage() {
       for (let i = 0; i < data.items.length; i++) {
         const item = data.items[i];
         const history = item.productId ? priceHistoryMap[item.productId] : null;
-        if (history && history.averagePrice !== null && item.unitPrice > history.averagePrice * 1.1) {
+        if (
+          history &&
+          history.averagePrice !== null &&
+          item.unitPrice > history.averagePrice * 1.1
+        ) {
           if (!item.priceNote || item.priceNote.trim().length === 0) {
             setCurrentStep(1);
-            form.setError(`items.${i}.priceNote`, { message: '请填写价格上涨原因' });
-            toast.error(`第 ${i + 1} 项商品价格高于历史均价，请填写备注说明原因`);
+            form.setError(`items.${i}.priceNote`, {
+              message: "请填写价格上涨原因",
+            });
+            toast.error(
+              `第 ${i + 1} 项商品价格高于历史均价，请填写备注说明原因`,
+            );
             return;
           }
         }
@@ -640,7 +726,8 @@ export default function CreatePurchasePage() {
       // 转换数据格式以匹配后端期望（将 priceNote 合并到 note）
       const submitData: PurchaseCreatePayload = {
         supplierId: data.supplierId,
-        contractNo: data.contractNo,
+        // 新增页的禁用编号只是预览，不能把过期预览作为显式编号提交。
+        ...(editId ? { contractNo: data.contractNo } : {}),
         signedAt: data.signedAt?.toISOString(),
         expectedDate: data.expectedDate?.toISOString() ?? null,
         taxRate: data.taxRate,
@@ -654,31 +741,40 @@ export default function CreatePurchasePage() {
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             unit: item.unit,
-            note: notes.join(' | ') || undefined,
+            note: notes.join(" | ") || undefined,
           };
         }),
       };
       if (editId) {
         await purchaseService.update(editId, submitData);
-        toast.success('草稿更正已保存');
+        toast.success("草稿更正已保存");
       } else {
         const response = await purchaseService.create(submitData);
-        toast.success('采购合同创建成功');
-        if (response.data && 'warnings' in response.data) response.data.warnings.forEach((warning) => toast.warning(warning.message, { duration: 10000 }));
+        toast.success("采购合同创建成功");
+        if (response.data && "warnings" in response.data)
+          response.data.warnings.forEach((warning) =>
+            toast.warning(warning.message, { duration: 10000 }),
+          );
       }
-      invalidateCache('purchase-contracts-list');
-      router.push(editId ? `/dashboard/purchase/${editId}` : '/dashboard/contracts');
+      invalidateCache("purchase-contracts-list");
+      router.push(
+        editId ? `/dashboard/purchase/${editId}` : "/dashboard/contracts",
+      );
     } catch (error) {
-      toast.error(typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : '保存失败');
+      toast.error(
+        typeof error === "object" && error !== null && "message" in error
+          ? String(error.message)
+          : "保存失败",
+      );
     }
   };
 
   const goToStep1 = () => setCurrentStep(1);
 
   const goToStep2 = async () => {
-    const valid = await form.trigger('items', { shouldFocus: true });
+    const valid = await form.trigger("items", { shouldFocus: true });
     if (!valid) {
-      toast.error('请完善采购明细信息');
+      toast.error("请完善采购明细信息");
       return;
     }
     setCurrentStep(2);
@@ -690,12 +786,35 @@ export default function CreatePurchasePage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-10">
       <PageHeader
-        title={editId ? '更正采购草稿' : '新增采购合同'}
+        title={editId ? "更正采购草稿" : "新增采购合同"}
         description="先添加商品，系统会推荐曾供应过该商品的供应商"
-        actions={<Button type="button" variant="outline" onClick={() => window.open('/dashboard/products', '_blank', 'noopener,noreferrer')}>维护商品</Button>}
+        actions={
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() =>
+              window.open(
+                "/dashboard/products",
+                "_blank",
+                "noopener,noreferrer",
+              )
+            }
+          >
+            维护商品
+          </Button>
+        }
       />
 
-      {loadError && <ErrorState title="采购资料加载失败" action={<Button type="button" onClick={() => void loadData()}>重试</Button>} />}
+      {loadError && (
+        <ErrorState
+          title="采购资料加载失败"
+          action={
+            <Button type="button" onClick={() => void loadData()}>
+              重试
+            </Button>
+          }
+        />
+      )}
 
       {/* 模板选择器 */}
       <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)] md:col-span-2">
@@ -710,7 +829,9 @@ export default function CreatePurchasePage() {
             disabled={templatesLoading}
           >
             <SelectTrigger className="h-10 w-full rounded-md text-xs sm:w-[240px]">
-              <SelectValue placeholder={templatesLoading ? '加载中...' : '选择合同模板'} />
+              <SelectValue
+                placeholder={templatesLoading ? "加载中..." : "选择合同模板"}
+              />
             </SelectTrigger>
             <SelectContent>
               {templates.map((t) => (
@@ -735,14 +856,25 @@ export default function CreatePurchasePage() {
 
       {/* Stepper */}
       <StepIndicator
-        steps={['采购明细', '合同信息']}
+        steps={["采购明细", "合同信息"]}
         currentStep={currentStep}
-        onChange={(step) => { if (step === 1) goToStep1(); else void goToStep2(); }}
+        onChange={(step) => {
+          if (step === 1) goToStep1();
+          else void goToStep2();
+        }}
       />
 
       <div className="grid gap-6 md:grid-cols-2">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit, (errors) => { setCurrentStep(errors.items ? 1 : 2); toast.error(errors.items ? '请完善采购明细信息' : '请完善合同信息'); })} className="contents">
+          <form
+            onSubmit={form.handleSubmit(onSubmit, (errors) => {
+              setCurrentStep(errors.items ? 1 : 2);
+              toast.error(
+                errors.items ? "请完善采购明细信息" : "请完善合同信息",
+              );
+            })}
+            className="contents"
+          >
             {currentStep === 1 && (
               <>
                 {/* AI 智能录入 */}
@@ -755,7 +887,9 @@ export default function CreatePurchasePage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="purchase-ai-quote-input">采购报价原文</Label>
+                      <Label htmlFor="purchase-ai-quote-input">
+                        采购报价原文
+                      </Label>
                       <Textarea
                         id="purchase-ai-quote-input"
                         name="quoteText"
@@ -772,7 +906,7 @@ export default function CreatePurchasePage() {
                       variant="default"
                       className="h-9 rounded-md text-xs shadow-sm"
                     >
-                      {isParsing ? '解析中...' : '解析报价'}
+                      {isParsing ? "解析中..." : "解析报价"}
                     </Button>
                   </CardContent>
                 </Card>
@@ -785,7 +919,9 @@ export default function CreatePurchasePage() {
                         <Package className="h-4 w-4" />
                         采购明细
                       </CardTitle>
-                      <p className="mt-1 text-xs text-muted-foreground">先选择商品，系统会推荐供应商</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        先选择商品，系统会推荐供应商
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button
@@ -802,7 +938,10 @@ export default function CreatePurchasePage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {/* 价格汇总 */}
-                    <PriceSummary subtotal={totalAmount} taxRate={watchTaxRate} />
+                    <PriceSummary
+                      subtotal={totalAmount}
+                      taxRate={watchTaxRate}
+                    />
 
                     {fields.map((field, index) => (
                       <div
@@ -817,9 +956,13 @@ export default function CreatePurchasePage() {
                               return (
                                 <FormItem>
                                   <FormLabel className="text-xs">
-                                    商品 <span className="text-destructive">*</span>
+                                    商品{" "}
+                                    <span className="text-destructive">*</span>
                                   </FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value}>
+                                  <Select
+                                    onValueChange={field.onChange}
+                                    value={field.value}
+                                  >
                                     <FormControl>
                                       <SelectTrigger className="h-9 rounded-md text-xs">
                                         <SelectValue placeholder="选择商品" />
@@ -846,7 +989,8 @@ export default function CreatePurchasePage() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel className="text-xs">
-                                  数量 <span className="text-destructive">*</span>
+                                  数量{" "}
+                                  <span className="text-destructive">*</span>
                                 </FormLabel>
                                 <FormControl>
                                   <Input
@@ -855,7 +999,9 @@ export default function CreatePurchasePage() {
                                     className="h-9 rounded-md text-xs"
                                     {...field}
                                     onChange={(e) =>
-                                      field.onChange(parseFloat(e.target.value) || 0)
+                                      field.onChange(
+                                        parseFloat(e.target.value) || 0,
+                                      )
                                     }
                                   />
                                 </FormControl>
@@ -890,7 +1036,8 @@ export default function CreatePurchasePage() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel className="text-xs">
-                                  单价 (¥) <span className="text-destructive">*</span>
+                                  单价 (¥){" "}
+                                  <span className="text-destructive">*</span>
                                 </FormLabel>
                                 <FormControl>
                                   <Input
@@ -899,7 +1046,9 @@ export default function CreatePurchasePage() {
                                     className="h-9 rounded-md text-xs"
                                     {...field}
                                     onChange={(e) =>
-                                      field.onChange(parseFloat(e.target.value) || 0)
+                                      field.onChange(
+                                        parseFloat(e.target.value) || 0,
+                                      )
                                     }
                                   />
                                 </FormControl>
@@ -908,8 +1057,10 @@ export default function CreatePurchasePage() {
                                 {watchItems[index]?.productId && (
                                   <PriceGuard
                                     productId={watchItems[index].productId}
-                                    currentPrice={watchItems[index]?.unitPrice || 0}
-                                    supplierId={form.watch('supplierId')}
+                                    currentPrice={
+                                      watchItems[index]?.unitPrice || 0
+                                    }
+                                    supplierId={form.watch("supplierId")}
                                   />
                                 )}
                               </FormItem>
@@ -917,7 +1068,9 @@ export default function CreatePurchasePage() {
                           />
                         </div>
                         <div className="md:col-span-1 text-right">
-                          <p className="text-[11px] text-muted-foreground">小计</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            小计
+                          </p>
                           <p className="font-mono text-sm font-semibold tabular-nums text-emerald-600">
                             ¥
                             {(
@@ -942,7 +1095,9 @@ export default function CreatePurchasePage() {
                         {/* 价格历史对比与预警备注 */}
                         {(() => {
                           const item = watchItems[index];
-                          const history = item?.productId ? priceHistoryMap[item.productId] : null;
+                          const history = item?.productId
+                            ? priceHistoryMap[item.productId]
+                            : null;
                           const showHistory = history && history.count > 0;
                           const isHighPrice =
                             showHistory &&
@@ -953,17 +1108,19 @@ export default function CreatePurchasePage() {
                             <div className="md:col-span-12">
                               <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                                 <span>
-                                  历史采购（不含税）：均价 ¥{history.averagePrice} / 最低 ¥
-                                  {history.minPrice} / 最高 ¥{history.maxPrice}（共 {history.count}{' '}
-                                  笔）
+                                  历史采购（不含税）：均价 ¥
+                                  {history.averagePrice} / 最低 ¥
+                                  {history.minPrice} / 最高 ¥{history.maxPrice}
+                                  （共 {history.count} 笔）
                                 </span>
                               </div>
                               {isHighPrice && (
                                 <div className="mt-2 space-y-2">
                                   <p className="text-xs font-medium text-destructive">
-                                    当前价格高于历史均价{' '}
+                                    当前价格高于历史均价{" "}
                                     {(
-                                      ((item.unitPrice - history.averagePrice!) /
+                                      ((item.unitPrice -
+                                        history.averagePrice!) /
                                         history.averagePrice!) *
                                       100
                                     ).toFixed(1)}
@@ -998,12 +1155,12 @@ export default function CreatePurchasePage() {
                       className="h-9 rounded-md text-xs"
                       onClick={() =>
                         append({
-                          productId: '',
+                          productId: "",
                           quantity: 0,
                           unitPrice: 0,
-                          unit: '',
-                          note: '',
-                          priceNote: '',
+                          unit: "",
+                          note: "",
+                          priceNote: "",
                         })
                       }
                     >
@@ -1021,7 +1178,11 @@ export default function CreatePurchasePage() {
                   >
                     取消
                   </Button>
-                  <Button type="button" className="h-10 rounded-md text-sm" onClick={goToStep2}>
+                  <Button
+                    type="button"
+                    className="h-10 rounded-md text-sm"
+                    onClick={goToStep2}
+                  >
                     下一步：合同信息
                     <ArrowRight className="ml-1.5 h-4 w-4" />
                   </Button>
@@ -1034,7 +1195,9 @@ export default function CreatePurchasePage() {
                 {/* 合同详情 */}
                 <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)] md:col-span-2">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">合同信息</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      合同信息
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="grid gap-5 md:grid-cols-3">
                     {/* 合同编号 */}
@@ -1083,7 +1246,10 @@ export default function CreatePurchasePage() {
                               新增
                             </Button>
                           </div>
-                          <Popover open={supplierOpen} onOpenChange={setSupplierOpen}>
+                          <Popover
+                            open={supplierOpen}
+                            onOpenChange={setSupplierOpen}
+                          >
                             <PopoverTrigger asChild>
                               <FormControl>
                                 <Button
@@ -1091,18 +1257,26 @@ export default function CreatePurchasePage() {
                                   role="combobox"
                                   aria-expanded={supplierOpen}
                                   className={cn(
-                                    'h-10 justify-between rounded-md text-xs font-normal',
-                                    !field.value && 'text-muted-foreground'
+                                    "h-10 justify-between rounded-md text-xs font-normal",
+                                    !field.value && "text-muted-foreground",
                                   )}
                                 >
-                                  {selectedSupplier ? selectedSupplier.name : '搜索或选择供应商...'}
+                                  {selectedSupplier
+                                    ? selectedSupplier.name
+                                    : "搜索或选择供应商..."}
                                   <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
                                 </Button>
                               </FormControl>
                             </PopoverTrigger>
-                            <PopoverContent className="w-[400px] max-w-[calc(100vw-2rem)] p-0" align="start">
+                            <PopoverContent
+                              className="w-[400px] max-w-[calc(100vw-2rem)] p-0"
+                              align="start"
+                            >
                               <Command shouldFilter={false}>
-                                <Label htmlFor="purchase-supplier-search" className="sr-only">
+                                <Label
+                                  htmlFor="purchase-supplier-search"
+                                  className="sr-only"
+                                >
                                   搜索供应商
                                 </Label>
                                 <CommandInput
@@ -1116,7 +1290,9 @@ export default function CreatePurchasePage() {
                                 <CommandList>
                                   <CommandEmpty>
                                     <div className="py-2">
-                                      <p className="text-muted-foreground">未找到匹配供应商</p>
+                                      <p className="text-muted-foreground">
+                                        未找到匹配供应商
+                                      </p>
                                       <Button
                                         type="button"
                                         variant="link"
@@ -1135,7 +1311,9 @@ export default function CreatePurchasePage() {
                                     </div>
                                   </CommandEmpty>
                                   {recommendedSupplierIds.size > 0 &&
-                                    sortedSuppliers.some((s) => s.isRecommended) && (
+                                    sortedSuppliers.some(
+                                      (s) => s.isRecommended,
+                                    ) && (
                                       <CommandGroup heading="推荐供应商">
                                         {sortedSuppliers
                                           .filter((s) => s.isRecommended)
@@ -1146,15 +1324,15 @@ export default function CreatePurchasePage() {
                                               onSelect={() => {
                                                 field.onChange(s.id);
                                                 setSupplierOpen(false);
-                                                setSupplierSearch('');
+                                                setSupplierSearch("");
                                               }}
                                             >
                                               <Check
                                                 className={cn(
-                                                  'mr-2 h-4 w-4',
+                                                  "mr-2 h-4 w-4",
                                                   field.value === s.id
-                                                    ? 'opacity-100'
-                                                    : 'opacity-0'
+                                                    ? "opacity-100"
+                                                    : "opacity-0",
                                                 )}
                                               />
                                               <Star className="mr-1 h-3 w-3 text-primary" />
@@ -1164,7 +1342,10 @@ export default function CreatePurchasePage() {
                                                   ({s.contactName})
                                                 </span>
                                               )}
-                                              <Badge variant="secondary" className="ml-auto text-xs">
+                                              <Badge
+                                                variant="secondary"
+                                                className="ml-auto text-xs"
+                                              >
                                                 曾供应
                                               </Badge>
                                             </CommandItem>
@@ -1173,7 +1354,9 @@ export default function CreatePurchasePage() {
                                     )}
                                   <CommandGroup
                                     heading={
-                                      recommendedSupplierIds.size > 0 ? '全部供应商' : '供应商列表'
+                                      recommendedSupplierIds.size > 0
+                                        ? "全部供应商"
+                                        : "供应商列表"
                                     }
                                   >
                                     {sortedSuppliers
@@ -1185,15 +1368,15 @@ export default function CreatePurchasePage() {
                                           onSelect={() => {
                                             field.onChange(s.id);
                                             setSupplierOpen(false);
-                                            setSupplierSearch('');
+                                            setSupplierSearch("");
                                           }}
                                         >
                                           <Check
                                             className={cn(
-                                              'mr-2 h-4 w-4',
+                                              "mr-2 h-4 w-4",
                                               field.value === s.id
-                                                ? 'opacity-100'
-                                                : 'opacity-0'
+                                                ? "opacity-100"
+                                                : "opacity-0",
                                             )}
                                           />
                                           <span>{s.name}</span>
@@ -1220,26 +1403,48 @@ export default function CreatePurchasePage() {
                       name="signedAt"
                       render={({ field }) => (
                         <FormItem className="flex flex-col">
-                          <Label htmlFor="purchase-signed-at" className="mb-1.5 text-xs">
+                          <Label
+                            htmlFor="purchase-signed-at"
+                            className="mb-1.5 text-xs"
+                          >
                             签订日期
                           </Label>
                           <DatePicker
                             date={field.value}
                             setDate={field.onChange}
-                            triggerProps={{ id: 'purchase-signed-at', name: 'signedAt' }}
+                            triggerProps={{
+                              id: "purchase-signed-at",
+                              name: "signedAt",
+                            }}
                           />
                           <FormMessage />
                         </FormItem>
                       )}
                     />
 
-                    <FormField control={form.control} name="expectedDate" render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <Label htmlFor="purchase-expected-date" className="mb-1.5 text-xs">预计交期</Label>
-                        <DatePicker date={field.value} setDate={field.onChange} triggerProps={{ id: 'purchase-expected-date', name: 'expectedDate' }} />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
+                    <FormField
+                      control={form.control}
+                      name="expectedDate"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <Label
+                            htmlFor="purchase-expected-date"
+                            className="mb-1.5 text-xs"
+                          >
+                            预计交期
+                          </Label>
+                          <DatePicker
+                            date={field.value}
+                            setDate={field.onChange}
+                            triggerProps={{
+                              id: "purchase-expected-date",
+                              name: "expectedDate",
+                            }}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
                     {/* 税率 */}
                     <FormField
@@ -1260,8 +1465,12 @@ export default function CreatePurchasePage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="1">1% (小规模纳税人)</SelectItem>
-                              <SelectItem value="13">13% (一般纳税人)</SelectItem>
+                              <SelectItem value="1">
+                                1% (小规模纳税人)
+                              </SelectItem>
+                              <SelectItem value="13">
+                                13% (一般纳税人)
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -1314,9 +1523,15 @@ export default function CreatePurchasePage() {
                   <Button
                     type="submit"
                     className="h-10 rounded-md text-sm"
-                    disabled={form.formState.isSubmitting || dataLoading || loadError}
+                    disabled={
+                      form.formState.isSubmitting || dataLoading || loadError
+                    }
                   >
-                    {form.formState.isSubmitting ? '提交中...' : editId ? '保存更正' : '创建合同'}
+                    {form.formState.isSubmitting
+                      ? "提交中..."
+                      : editId
+                        ? "保存更正"
+                        : "创建合同"}
                   </Button>
                 </div>
               </>
@@ -1333,7 +1548,9 @@ export default function CreatePurchasePage() {
               <Package className="h-4 w-4" />
               批量添加商品
             </DialogTitle>
-            <DialogDescription>选择本次购销合同要采购的一个或多个商品。</DialogDescription>
+            <DialogDescription>
+              选择本次购销合同要采购的一个或多个商品。
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="relative">
@@ -1356,12 +1573,14 @@ export default function CreatePurchasePage() {
                         className="h-3.5 w-3.5 rounded border-border"
                         checked={
                           filteredBatchProducts.length > 0 &&
-                          filteredBatchProducts.every((p) => selectedProductIds.has(p.id))
+                          filteredBatchProducts.every((p) =>
+                            selectedProductIds.has(p.id),
+                          )
                         }
                         onChange={(e) => {
                           if (e.target.checked) {
                             setSelectedProductIds(
-                              new Set(filteredBatchProducts.map((p) => p.id))
+                              new Set(filteredBatchProducts.map((p) => p.id)),
                             );
                           } else {
                             setSelectedProductIds(new Set());
@@ -1377,7 +1596,10 @@ export default function CreatePurchasePage() {
                 <TableBody>
                   {filteredBatchProducts.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="py-6 text-center text-xs text-muted-foreground">
+                      <TableCell
+                        colSpan={4}
+                        className="py-6 text-center text-xs text-muted-foreground"
+                      >
                         未找到匹配商品
                       </TableCell>
                     </TableRow>
@@ -1405,12 +1627,14 @@ export default function CreatePurchasePage() {
                             onChange={() => {}}
                           />
                         </TableCell>
-                        <TableCell className="text-sm">{product.customsName}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {product.specification || '-'}
+                        <TableCell className="text-sm">
+                          {product.customsName}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
-                          {product.unit || '-'}
+                          {product.specification || "-"}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {product.unit || "-"}
                         </TableCell>
                       </TableRow>
                     ))
@@ -1449,14 +1673,19 @@ export default function CreatePurchasePage() {
       </Dialog>
 
       {/* 新增供应商弹窗 */}
-      <Dialog open={showNewSupplierDialog} onOpenChange={setShowNewSupplierDialog}>
+      <Dialog
+        open={showNewSupplierDialog}
+        onOpenChange={setShowNewSupplierDialog}
+      >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm font-medium">
               <UserPlus className="h-4 w-4" />
               新增供应商
             </DialogTitle>
-            <DialogDescription>录入签约、汇款和开票所需的供应商档案。</DialogDescription>
+            <DialogDescription>
+              录入签约、汇款和开票所需的供应商档案。
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -1466,7 +1695,10 @@ export default function CreatePurchasePage() {
                 name="name"
                 value={newSupplierForm.name}
                 onChange={(e) =>
-                  setNewSupplierForm((prev) => ({ ...prev, name: e.target.value }))
+                  setNewSupplierForm((prev) => ({
+                    ...prev,
+                    name: e.target.value,
+                  }))
                 }
                 placeholder="例如：佛山市某某陶瓷有限公司"
               />
@@ -1479,7 +1711,10 @@ export default function CreatePurchasePage() {
                   name="contactName"
                   value={newSupplierForm.contactName}
                   onChange={(e) =>
-                    setNewSupplierForm((prev) => ({ ...prev, contactName: e.target.value }))
+                    setNewSupplierForm((prev) => ({
+                      ...prev,
+                      contactName: e.target.value,
+                    }))
                   }
                   placeholder="例如：张经理"
                 />
@@ -1491,7 +1726,10 @@ export default function CreatePurchasePage() {
                   name="contactPhone"
                   value={newSupplierForm.contactPhone}
                   onChange={(e) =>
-                    setNewSupplierForm((prev) => ({ ...prev, contactPhone: e.target.value }))
+                    setNewSupplierForm((prev) => ({
+                      ...prev,
+                      contactPhone: e.target.value,
+                    }))
                   }
                   placeholder="例如：138xxxxxxxx"
                 />
@@ -1504,7 +1742,10 @@ export default function CreatePurchasePage() {
                 name="address"
                 value={newSupplierForm.address}
                 onChange={(e) =>
-                  setNewSupplierForm((prev) => ({ ...prev, address: e.target.value }))
+                  setNewSupplierForm((prev) => ({
+                    ...prev,
+                    address: e.target.value,
+                  }))
                 }
                 placeholder="例如：广东省佛山市禅城区xxx"
               />
@@ -1519,18 +1760,28 @@ export default function CreatePurchasePage() {
                     name="taxId"
                     value={newSupplierForm.taxId}
                     onChange={(e) =>
-                      setNewSupplierForm((prev) => ({ ...prev, taxId: e.target.value }))
+                      setNewSupplierForm((prev) => ({
+                        ...prev,
+                        taxId: e.target.value,
+                      }))
                     }
                     placeholder="例如：91440000xxxxxxxxxx"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="new-supplier-bank-account-name">收款户名</Label>
+                  <Label htmlFor="new-supplier-bank-account-name">
+                    收款户名
+                  </Label>
                   <Input
                     id="new-supplier-bank-account-name"
                     name="bankAccountName"
                     value={newSupplierForm.bankAccountName}
-                    onChange={(e) => setNewSupplierForm((prev) => ({ ...prev, bankAccountName: e.target.value }))}
+                    onChange={(e) =>
+                      setNewSupplierForm((prev) => ({
+                        ...prev,
+                        bankAccountName: e.target.value,
+                      }))
+                    }
                     placeholder="供应商银行账户户名"
                   />
                 </div>
@@ -1541,7 +1792,10 @@ export default function CreatePurchasePage() {
                     name="bankName"
                     value={newSupplierForm.bankName}
                     onChange={(e) =>
-                      setNewSupplierForm((prev) => ({ ...prev, bankName: e.target.value }))
+                      setNewSupplierForm((prev) => ({
+                        ...prev,
+                        bankName: e.target.value,
+                      }))
                     }
                     placeholder="例如：中国银行佛山禅城支行"
                   />
@@ -1552,17 +1806,29 @@ export default function CreatePurchasePage() {
                     id="new-supplier-bank-branch"
                     name="bankBranch"
                     value={newSupplierForm.bankBranch}
-                    onChange={(e) => setNewSupplierForm((prev) => ({ ...prev, bankBranch: e.target.value }))}
+                    onChange={(e) =>
+                      setNewSupplierForm((prev) => ({
+                        ...prev,
+                        bankBranch: e.target.value,
+                      }))
+                    }
                     placeholder="例如：佛山祖庙支行"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="new-supplier-bank-code">联行号 / 银行编号</Label>
+                  <Label htmlFor="new-supplier-bank-code">
+                    联行号 / 银行编号
+                  </Label>
                   <Input
                     id="new-supplier-bank-code"
                     name="bankCode"
                     value={newSupplierForm.bankCode}
-                    onChange={(e) => setNewSupplierForm((prev) => ({ ...prev, bankCode: e.target.value }))}
+                    onChange={(e) =>
+                      setNewSupplierForm((prev) => ({
+                        ...prev,
+                        bankCode: e.target.value,
+                      }))
+                    }
                     placeholder="银行联行号或编号"
                   />
                 </div>
@@ -1573,7 +1839,10 @@ export default function CreatePurchasePage() {
                     name="bankAccount"
                     value={newSupplierForm.bankAccount}
                     onChange={(e) =>
-                      setNewSupplierForm((prev) => ({ ...prev, bankAccount: e.target.value }))
+                      setNewSupplierForm((prev) => ({
+                        ...prev,
+                        bankAccount: e.target.value,
+                      }))
                     }
                     placeholder="例如：6217xxxxxxxxxxxxxxxx"
                   />
@@ -1582,7 +1851,10 @@ export default function CreatePurchasePage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewSupplierDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowNewSupplierDialog(false)}
+            >
               取消
             </Button>
             <Button onClick={handleSaveNewSupplier} disabled={savingSupplier}>
@@ -1592,7 +1864,7 @@ export default function CreatePurchasePage() {
                   保存中...
                 </>
               ) : (
-                '保存供应商'
+                "保存供应商"
               )}
             </Button>
           </DialogFooter>
@@ -1600,11 +1872,18 @@ export default function CreatePurchasePage() {
       </Dialog>
 
       {/* 保存模板弹窗 */}
-      <Dialog open={showSaveTemplateDialog} onOpenChange={setShowSaveTemplateDialog}>
+      <Dialog
+        open={showSaveTemplateDialog}
+        onOpenChange={setShowSaveTemplateDialog}
+      >
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle className="text-sm font-medium">保存为模板</DialogTitle>
-            <DialogDescription>将当前采购明细保存为之后可重复使用的合同模板。</DialogDescription>
+            <DialogTitle className="text-sm font-medium">
+              保存为模板
+            </DialogTitle>
+            <DialogDescription>
+              将当前采购明细保存为之后可重复使用的合同模板。
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <Label htmlFor="template-name">模板名称</Label>
@@ -1616,11 +1895,14 @@ export default function CreatePurchasePage() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSaveTemplateDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowSaveTemplateDialog(false)}
+            >
               取消
             </Button>
             <Button onClick={handleSaveTemplate} disabled={savingTemplate}>
-              {savingTemplate ? '保存中...' : '保存'}
+              {savingTemplate ? "保存中..." : "保存"}
             </Button>
           </DialogFooter>
         </DialogContent>

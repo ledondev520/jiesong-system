@@ -1,19 +1,13 @@
 /**
  * 批量导入服务
- * 支持销售合同、采购合同等业务的批量导入
+ * 支持销售合同、采购合同等业务的批量导入；采购编号复用统一序列规则
  */
 
 const prisma = require('../utils/prisma');
 const { generateNextContractNo } = require('./shared/contractUtils');
+const { generateNextPurchaseContractNo } = require('./purchaseContractNumberService');
 
 const getCurrentYear = () => new Date().getFullYear().toString().slice(-2);
-const generateNextPurchaseContractNo = async () => {
-  const year = getCurrentYear();
-  const count = await prisma.purchaseContract.count({
-    where: { contractNo: { startsWith: `CG${year}` } },
-  });
-  return `CG${year}${String(count + 1).padStart(5, '0')}`;
-};
 
 /**
  * 批量导入销售合同
@@ -121,7 +115,7 @@ async function batchImportPurchaseContracts(data, userId) {
       // 创建合同
       const contract = await prisma.purchaseContract.create({
         data: {
-          contractNo: row.contractNo || await generateNextPurchaseContractNo(),
+          contractNo: row.contractNo || await generateNextPurchaseContractNo(prisma),
           supplierId: supplier.id,
           status: 'DRAFT',
           totalAmount: parseFloat(row.quantity) * parseFloat(row.price),
