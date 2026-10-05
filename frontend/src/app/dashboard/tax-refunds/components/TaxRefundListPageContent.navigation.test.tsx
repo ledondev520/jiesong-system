@@ -1,6 +1,6 @@
 /**
  * Input: 预加载的真实报关组件、退税页签/详情、可观察的浏览器历史与合成服务数据
- * Output: 列表/详情返回后的页签、历史筛选与异步列表结果一致性回归结果
+ * Output: 列表/详情安全返回的筛选上下文、页签与异步结果一致性回归
  * Pos: 退税工作台路由集成测试
  */
 
@@ -191,6 +191,145 @@ describe("退税页签实际组件的路由流转", () => {
     await waitFor(() => expect(window.location.search).toBe("?view=customs"));
     await user.keyboard("{ArrowRight}");
     await waitFor(() => expect(window.location.search).toBe("?view=refunds"));
+  });
+
+  it("关键词和状态筛选进入详情后，明确返回恢复最新浏览器上下文且可再次进入", async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(
+      {},
+      "",
+      "/dashboard/tax-refunds?view=customs&source=qa&keyword=OLD&status=RELEASED#declarations",
+    );
+    await act(async () => render(<TestRoutes />));
+    const input = await screen.findByDisplayValue("OLD");
+    // 详情入口必须采用已发布的实际地址，即使 Next 搜索快照仍滞后。
+    mocks.searchSnapshot = window.location.search;
+    await user.clear(input);
+    await user.type(input, "QA-CUSTOMS");
+    const expectedReturn =
+      "/dashboard/tax-refunds?view=customs&source=qa&status=RELEASED&keyword=QA-CUSTOMS#declarations";
+    for (let visit = 0; visit < 2; visit += 1) {
+      const detailButton = await screen.findByRole("button", {
+        name: "查看详情 QA-CUSTOMS",
+      });
+      await act(async () => {
+        mocks.searchSnapshot = null;
+      });
+      await user.click(detailButton);
+      expect(new URLSearchParams(window.location.search).get("returnTo")).toBe(
+        expectedReturn,
+      );
+      await user.click(await screen.findByRole("button", { name: "返回" }));
+      await screen.findByDisplayValue("QA-CUSTOMS");
+      expect(
+        window.location.pathname +
+          window.location.search +
+          window.location.hash,
+      ).toBe(expectedReturn);
+      expect(screen.getAllByRole("combobox")[0]).toHaveTextContent("已放行");
+      expect(screen.getByRole("tab", { name: "报关单" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      await waitFor(() =>
+        expect(mocks.customsGetAll).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            keyword: "QA-CUSTOMS",
+            status: "RELEASED",
+            page: 1,
+          }),
+        ),
+      );
+    }
+  });
+
+  it("刷新或直接打开含合法 returnTo 的详情仍可明确返回原筛选", async () => {
+    const user = userEvent.setup();
+    const returnTo =
+      "/dashboard/tax-refunds?view=customs&source=qa&keyword=QA-CUSTOMS&status=DRAFT";
+    window.history.replaceState(
+      {},
+      "",
+      "/dashboard/customs-declarations/qa-customs?" +
+        new URLSearchParams({ returnTo }),
+    );
+    await act(async () => render(<TestRoutes />));
+    await user.click(await screen.findByRole("button", { name: "返回" }));
+    await screen.findByDisplayValue("QA-CUSTOMS");
+    expect(window.location.pathname + window.location.search).toBe(returnTo);
+    expect(screen.getAllByRole("combobox")[0]).toHaveTextContent("草稿");
+  });
+
+  it.each([
+    null,
+    "https://example.invalid/dashboard/tax-refunds?view=customs",
+    "//example.invalid/dashboard/tax-refunds?view=customs",
+    "%2Fdashboard%2Ftax-refunds%3Fview%3Dcustoms",
+    "/dashboard/sales?keyword=QA",
+    "/dashboard/tax-refunds?view=refunds",
+  ])("直接详情 returnTo=%s 的明确返回只使用报关页签回退", async (returnTo) => {
+    const user = userEvent.setup();
+    const query =
+      returnTo === null ? "" : "?" + new URLSearchParams({ returnTo });
+    window.history.replaceState(
+      {},
+      "",
+      "/dashboard/customs-declarations/qa-customs" + query,
+    );
+    await act(async () => render(<TestRoutes />));
+    await user.click(await screen.findByRole("button", { name: "返回" }));
+    expect(mocks.router.push).toHaveBeenLastCalledWith(
+      "/dashboard/tax-refunds?view=customs",
+    );
+    await screen.findByRole("heading", { name: "报关单管理" });
+    expect(screen.getByPlaceholderText("搜索报关单号或报关行...")).toHaveValue(
+      "",
+    );
+  });
+
+  it("详情含重复 returnTo 时拒绝歧义并采用报关页签回退", async () => {
+    const user = userEvent.setup();
+    const query = new URLSearchParams({
+      returnTo: "/dashboard/tax-refunds?view=customs&keyword=QA",
+    });
+    query.append("returnTo", "https://example.invalid");
+    window.history.replaceState(
+      {},
+      "",
+      "/dashboard/customs-declarations/qa-customs?" + query,
+    );
+    await act(async () => render(<TestRoutes />));
+    await user.click(await screen.findByRole("button", { name: "返回" }));
+    expect(mocks.router.push).toHaveBeenLastCalledWith(
+      "/dashboard/tax-refunds?view=customs",
+    );
+  });
+
+  it("详情挂载后原生查询变更采用最新地址，不采用滞后的 Next 返回目标", async () => {
+    const user = userEvent.setup();
+    const oldReturn = "/dashboard/tax-refunds?view=customs&keyword=OLD";
+    const newReturn =
+      "/dashboard/tax-refunds?view=customs&keyword=NEW&status=RELEASED";
+    window.history.replaceState(
+      {},
+      "",
+      "/dashboard/customs-declarations/qa-customs?" +
+        new URLSearchParams({ returnTo: oldReturn }),
+    );
+    await act(async () => render(<TestRoutes />));
+    await screen.findByRole("button", { name: "返回" });
+    mocks.searchSnapshot = window.location.search;
+    await act(async () => {
+      window.history.replaceState(
+        {},
+        "",
+        "/dashboard/customs-declarations/qa-customs?" +
+          new URLSearchParams({ returnTo: newReturn }),
+      );
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    await user.click(screen.getByRole("button", { name: "返回" }));
+    expect(mocks.router.push).toHaveBeenLastCalledWith(newReturn);
   });
 
   it("挂载中的报关列表跟随历史 URL 的筛选变化，不用旧筛选覆写新 URL", async () => {

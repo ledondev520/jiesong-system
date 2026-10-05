@@ -1,6 +1,6 @@
 /**
  * Input: 真实 Next 路由、390/1440px 视口与本地合成报关/退税 API
- * Output: 历史筛选、详情返回与退税页签切换的浏览器验收
+ * Output: 历史筛选、带关键词/状态的详情明确返回与退税页签切换浏览器验收
  * Pos: 报关列表导航回归；不访问生产数据、不执行业务写入
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -132,13 +132,36 @@ for (const width of [390, 1440]) {
     await expect(search).toHaveValue("");
     await expect(page.getByRole("combobox").first()).toHaveText("全部状态");
 
+    // 明确返回必须恢复已筛选的来源地址，不能只回到空白报关页签。
+    await search.fill(declaration.declarationNo);
+    await page.getByRole("combobox").first().click();
+    await page.getByRole("option", { name: "草稿", exact: true }).click();
+    await expect(search).toHaveValue(declaration.declarationNo);
+    const filteredReturn =
+      "/dashboard/tax-refunds?view=customs&source=qa&keyword=" +
+      declaration.declarationNo +
+      "&status=DRAFT";
+    await expect(page).toHaveURL(new URL(filteredReturn, page.url()).href);
     const detailName =
       width < 768 ? "查看详情" : `查看详情 ${declaration.declarationNo}`;
     await page.getByRole("button", { name: detailName, exact: true }).click();
-    await expect(page).toHaveURL(
-      /\/dashboard\/customs-declarations\/qa-customs-navigation$/,
-    );
+    const expectedDetail = new URL(
+      "/dashboard/customs-declarations/qa-customs-navigation?" +
+        new URLSearchParams({ returnTo: filteredReturn }),
+      page.url(),
+    ).href;
+    await expect(page).toHaveURL(expectedDetail);
+    await page.goBack();
+    await expect(page).toHaveURL(new URL(filteredReturn, page.url()).href);
+    await expect(search).toHaveValue(declaration.declarationNo);
+    await expect(page.getByRole("combobox").first()).toHaveText("草稿");
+    await page.goForward();
+    await expect(page).toHaveURL(expectedDetail);
     await page.getByRole("button", { name: "返回", exact: true }).click();
+    await expect(page).toHaveURL(new URL(filteredReturn, page.url()).href);
+    await expect(search).toHaveValue(declaration.declarationNo);
+    await expect(page.getByRole("combobox").first()).toHaveText("草稿");
+    await expect(customsTab).toHaveAttribute("aria-selected", "true");
     await expect(
       page.getByRole("heading", { name: "报关单管理", exact: true }),
     ).toBeVisible();

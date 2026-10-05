@@ -1,6 +1,6 @@
 /**
- * Input: 报关单 ID、报关单服务、router、SortableTableHead、useTableSort
- * Output: 报关单详情页（手机商品卡片与桌面可排序明细表）
+ * Input: 报关单 ID、服务、浏览器 returnTo 查询、router 与商品明细排序
+ * Output: 报关单详情页（安全恢复来源列表筛选，手机卡片与桌面可排序明细表）
  * Pos: 报关单管理详情展示页
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -10,7 +10,8 @@
 
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useBrowserQuery } from "@/lib/hooks/useBrowserQuery";
 import type { CustomsDeclaration, CustomsDeclarationItem } from "@/types";
 import { customsDeclarationService } from "@/services/customsDeclaration.service";
 import { MobileListCard } from "@/components/mobile";
@@ -34,6 +35,8 @@ import { FilePenLine } from "lucide-react";
 import { toast } from "sonner";
 import { CustomsDeclarationStatusBadge } from "./CustomsDeclarationStatusBadge";
 
+import { resolveCustomsReturnTo } from "./customs-return-context";
+
 interface CustomsDeclarationDetailPageContentProps {
   params: Promise<{ id: string }>;
 }
@@ -50,6 +53,12 @@ export function CustomsDeclarationDetailPageContent({
 }: CustomsDeclarationDetailPageContentProps) {
   const { id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const query = useBrowserQuery(searchParams.toString());
+  const returnTargets = new URLSearchParams(query).getAll("returnTo");
+  const backHref = resolveCustomsReturnTo(
+    returnTargets.length === 1 ? returnTargets[0] : null,
+  );
 
   const [declaration, setDeclaration] = useState<CustomsDeclaration | null>(
     null,
@@ -124,7 +133,7 @@ export function CustomsDeclarationDetailPageContent({
       <PageHeader
         title={declaration.declarationNo}
         description={declaration.customsBroker || "未填写报关行"}
-        backHref="/dashboard/tax-refunds?view=customs"
+        backHref={backHref}
         actions={
           <>
             <CustomsDeclarationStatusBadge status={declaration.status} />

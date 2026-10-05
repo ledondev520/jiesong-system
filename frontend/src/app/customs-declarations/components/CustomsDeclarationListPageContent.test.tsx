@@ -1,3 +1,9 @@
+/**
+ * Input: 真实报关列表组件、模拟服务与浏览器列表地址
+ * Output: 嵌入/独立筛选、分页与详情安全返回上下文的组件回归
+ * Pos: 报关列表交互测试
+ */
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -72,6 +78,48 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     expect(input).toHaveValue("");
     expect(mocks.router.replace).not.toHaveBeenCalled();
   });
+  it.each(["/customs-declarations", "/dashboard/customs-declarations"])(
+    "旧独立列表 %s 进入详情只传递内部的规范报关返回上下文",
+    async (pathname) => {
+      const user = userEvent.setup();
+      window.history.replaceState(
+        {},
+        "",
+        pathname +
+          "?source=qa&keyword=QA&status=DRAFT&returnTo=https%3A%2F%2Fexample.invalid#rows",
+      );
+      mocks.params = new URLSearchParams(window.location.search);
+      mocks.getAll.mockResolvedValue({
+        data: {
+          items: [
+            {
+              id: "qa",
+              declarationNo: "QA",
+              status: "DRAFT",
+              totalAmount: 0,
+              currency: "USD",
+            },
+          ],
+          pagination: { total: 1 },
+        },
+      });
+      render(<CustomsDeclarationListPageContent />);
+      await user.click(
+        await screen.findByRole("button", { name: "查看详情 QA" }),
+      );
+      const href = mocks.router.push.mock.calls.at(-1)?.[0];
+      expect(href).toBeTypeOf("string");
+      const detailUrl = new URL(href, window.location.origin);
+      expect(detailUrl.pathname).toBe("/dashboard/customs-declarations/qa");
+      const returnTo = detailUrl.searchParams.get("returnTo");
+      expect(returnTo).toBe(
+        "/dashboard/tax-refunds?source=qa&keyword=QA&status=DRAFT&view=customs#rows",
+      );
+      expect(returnTo).not.toContain(window.location.origin);
+      expect(returnTo).not.toContain("returnTo=");
+    },
+  );
+
   it("可翻到第2页，搜索后回到第1页，不漏掉20条以后的报关单", async () => {
     mocks.getAll.mockImplementation(async ({ page }) => ({
       data: {
