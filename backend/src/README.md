@@ -50,7 +50,7 @@
 | authService.js | 登录验证、版本化Token、统一密码策略、邮箱验证码找回密码 |
 | fileService.js | 合同附件与生成文件受限归档；共用财务凭证访问边界；chmod/失败清理前校验可信上传根路径与本次文件身份，只清理本次新文件，保留其他版本 |
 | patrolService.js | 使用 SalesContract 与财务共享发运30天逾期规则；同管理员同标题未读或24小时内告警去重，保留真实汇率过期提醒 |
-| financeService.js | 付款幂等、应收应付聚合；已收货/已到港合同按真实款项自动结清，差异重新打开待结清 |
+| financeService.js | 付款幂等、应收应付聚合；收款分配逐行正数/合同校验，SQLite 写锁后检查未关联合同的到账来源和剩余金额，分配子行规范化为 USD；通用创建不得携来源 ID 绕过分配；已收货/已到港合同按真实款项自动结清，差异重新打开待结清 |
 | salesCargoLifecycle.js | 销售与旧货柜共用发运/出库证据检查；禁止已出库货物变更及合同删除 |
 | salesFinanceService.js | 按共享所有权判定查询自有采购合同，聚合单柜收入、成本、退税与现金流 |
 | salesCreationService.js | 出口表头与明细原子创建；既有日志表保存按认证操作者隔离的请求摘要，断线或并发重试复用结果且路由不重复记新建审计；模板失败全部回滚 |
@@ -126,8 +126,8 @@
 - `services/purchaseImportExportService.js` 的实际 Excel 导入复用统一序列；每行校验通过后原子写入，仅空编号的唯一冲突最多尝试五次，保留显式编号及逐行失败统计
 - `integration/procurement-lifecycle.integration.js` 仅用临时合成 SQLite 和实际 PURCHASE/WAREHOUSE HTTP 请求验证签约、完工回滚/重复、到货与复验幂等、库存列表/详情、删除后编号及同时创建；还验证实际 Excel 导入的自定义编号、五位序列溢出、失败行无写入及四请求并发，由 `npm run test:db` 执行
 
-- `services/batchImportService.js` 的 JSON 采购导入逐行事务提交合同与明细；自动编号冲突或事务写冲突最多尝试五次，不更改显式编号，不重试无关错误；失败行回滚且后续行继续
-- `integration/purchase-batch-import.integration.js` 通过真实 HTTP/临时 SQLite 验证四请求并发、SQL 明细故障无孤立合同、部分成功、显式/溢出编号及原有 RBAC，由 `npm run test:db` 执行
+- `services/batchImportService.js` 的 JSON 采购导入先拒绝非对象行、空白/非文本供应商与商品名称，避免缺省查询条件误选首条目录记录；数量必须有限且大于零，单价必须有限且非负，只接受数字或非空数值字符串，保留零单价。每行事务提交合同与明细；自动编号冲突或事务写冲突最多尝试五次，不更改显式编号，不重试无关错误；失败行回滚且后续行继续
+- `integration/purchase-batch-import.integration.js` 通过真实认证 HTTP/30次迁移后的临时 SQLite 验证四请求并发、SQL 明细故障无孤立合同、部分成功、显式/溢出编号及原有 RBAC；补充非法行形状前后继续、缺省名称不误配、数量/单价范围与类型、跨请求显式编号重试，以及编号预览不保存/多明细创建失败全回滚和修正重试。拒绝操作对合同、明细、目录及来源库存使用完整落库快照校验，由 `npm run test:db` 执行；这不是采购页面 Excel 导入或浏览器预览验收
 
 - `integration/purchase-receipt-exceptions.integration.js` 使用实际 PURCHASE HTTP 认证、临时 SQLite 及第二个 HTTP 进程，补充并发同请求/内容冲突、合法到齐/竞争超订、累计复验、跨批引用、整批回滚、真实库存 SQL 故障后原请求重试和既有受限财务/管理 RBAC；不修改既有普通销售与付款权限，由 `npm run test:db` 执行
 

@@ -281,7 +281,9 @@ test('allocatePaymentToContracts: 兼容历史 INCOME 收款进行分配', async
     customerName: 'Sp food trading LLC',
   });
   prisma.$transaction = async (callback) => callback({
+    $executeRaw: async () => 1,
     payment: {
+      findUnique: prisma.payment.findUnique,
       create: async (args) => {
         createArgs = args;
         return { id: 'alloc-1', ...args.data };
@@ -289,7 +291,7 @@ test('allocatePaymentToContracts: 兼容历史 INCOME 收款进行分配', async
       aggregate: async (args) => {
         aggregateCalls.push(args);
         if (args.where?.sourcePaymentId === 'legacy-income-2') {
-          return { _sum: { amount: 300 } };
+          return { _sum: { amount: createArgs ? 300 : 0 } };
         }
         return { _sum: { amount: 300 } };
       },
@@ -299,6 +301,7 @@ test('allocatePaymentToContracts: 兼容历史 INCOME 收款进行分配', async
       },
     },
     salesContract: {
+      findMany: async ({ where }) => where.id.in.map(id => ({ id })),
       update: async (args) => ({ id: args.where.id }),
     },
   });
@@ -460,18 +463,21 @@ test('autoMatchUnallocatedPayments: 命中唯一合同号且金额一致时自�
     return null;
   };
   prisma.$transaction = async (callback) => callback({
+    $executeRaw: async () => 1,
     payment: {
+      findUnique: prisma.payment.findUnique,
       create: async (args) => {
         createArgs = args;
         return { id: 'alloc-auto-1', ...args.data };
       },
-      aggregate: async () => ({ _sum: { amount: 68006 } }),
+      aggregate: async () => ({ _sum: { amount: createArgs ? 68006 : 0 } }),
       update: async (args) => {
         paymentUpdateArgs = args;
         return { id: args.where.id };
       },
     },
     salesContract: {
+      findMany: async ({ where }) => where.id.in.map(id => ({ id })),
       update: async (args) => ({ id: args.where.id }),
     },
   });
@@ -620,6 +626,7 @@ test('allocatePaymentToContracts: 部分分配后保留在收款池', async () =
   const originalFindUnique = prisma.payment.findUnique;
   const originalTransaction = prisma.$transaction;
   let updateArgs = null;
+  let created = false;
 
   prisma.payment.findUnique = async () => ({
     id: 'receipt-partial-2',
@@ -631,11 +638,13 @@ test('allocatePaymentToContracts: 部分分配后保留在收款池', async () =
     customerName: 'Sp food trading LLC',
   });
   prisma.$transaction = async (callback) => callback({
+    $executeRaw: async () => 1,
     payment: {
-      create: async (args) => ({ id: 'alloc-partial-1', ...args.data }),
+      findUnique: prisma.payment.findUnique,
+      create: async (args) => { created = true; return { id: 'alloc-partial-1', ...args.data }; },
       aggregate: async (args) => {
         if (args.where?.sourcePaymentId === 'receipt-partial-2') {
-          return { _sum: { amount: 30000 } };
+          return { _sum: { amount: created ? 30000 : 0 } };
         }
         return { _sum: { amount: 30000 } };
       },
@@ -645,6 +654,7 @@ test('allocatePaymentToContracts: 部分分配后保留在收款池', async () =
       },
     },
     salesContract: {
+      findMany: async ({ where }) => where.id.in.map(id => ({ id })),
       update: async (args) => ({ id: args.where.id }),
     },
   });

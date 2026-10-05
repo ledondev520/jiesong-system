@@ -1,4 +1,4 @@
-/** JSON 采购批量导入 HTTP/SQLite 回归；只使用临时合成数据及测试 SQL 故障。 */
+/** JSON 采购导入与创建边界 HTTP/迁移 SQLite 回归；只使用临时合成数据及测试 SQL 故障。 */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -14,15 +14,18 @@ test('HTTP/SQLite：JSON 采购导入并发、逐行原子性、显式编号与�
   process.env.UPLOAD_DIR = path.join(directory, 'uploads');
   process.env.NODE_ENV = 'test';
   process.env.JWT_SECRET = 'test-only-import-secret-never-for-production';
+  process.env.TZ = 'UTC';
   let db, server;
   t.after(async () => {
     if (server) await new Promise(resolve => server.close(resolve));
     if (db) await db.$disconnect();
     fs.rmSync(directory, { recursive: true, force: true });
   });
-  const ddl = execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'diff', '--from-empty', '--to-schema-datamodel', path.resolve(__dirname, '../../prisma/schema.prisma'), '--script'], { encoding: 'utf8', timeout: 30000 });
-  execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', dbFile], { input: ddl });
+  fs.writeFileSync(dbFile, '', { mode: 0o600 });
+  execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy', '--schema', path.resolve(__dirname, '../../prisma/schema.prisma')], { stdio: 'pipe', timeout: 30000 });
   fs.chmodSync(dbFile, 0o600);
+  assert.equal(fs.statSync(directory).mode & 0o777, 0o700);
+  assert.equal(fs.statSync(dbFile).mode & 0o777, 0o600);
   db = require('../utils/prisma');
   const jwt = require('jsonwebtoken');
   const config = require('../config');
@@ -43,6 +46,15 @@ test('HTTP/SQLite：JSON 采购导入并发、逐行原子性、显式编号与�
     assert.equal(response.status, expected, body.message || 'Unexpected HTTP status');
     return body.data;
   };
+  const snapshot = async () => ({
+    contracts: await db.purchaseContract.findMany({ orderBy: { id: 'asc' } }),
+    items: await db.purchaseItem.findMany({ orderBy: { id: 'asc' } }),
+    inventory: await db.inventory.findMany({ orderBy: { id: 'asc' } }),
+    receipts: await db.purchaseReceipt.findMany({ orderBy: { id: 'asc' } }),
+    inspections: await db.purchaseReceiptInspection.findMany({ orderBy: { id: 'asc' } }),
+    suppliers: await db.supplier.findMany({ orderBy: { id: 'asc' } }),
+    products: await db.product.findMany({ orderBy: { id: 'asc' } }),
+  });
 
   await t.test('同时空编号请求均成功，每个合同恰有一条明细', async () => {
     const before = await db.purchaseContract.count();
@@ -117,5 +129,142 @@ test('HTTP/SQLite：JSON 采购导入并发、逐行原子性、显式编号与�
     await importRows([row], { role: null, expected: 401 });
     await importRows([], { expected: 400 });
     assert.equal(await db.purchaseContract.count(), before);
+  });
+
+  await t.test('空值、数组和基本类型逐行失败，前后合法行提交且跨请求重试不重复', async () => {
+    const before = await snapshot();
+    const valid = [
+      { ...row, _rowNum: 31, contractNo: 'SYNTHETIC-SHAPE-BEFORE' },
+      { ...row, _rowNum: 36, contractNo: 'SYNTHETIC-SHAPE-AFTER' },
+    ];
+    const result = await importRows([valid[0], null, [], 7, 'synthetic invalid row', valid[1]]);
+    assert.equal(result.success, 2);
+    assert.equal(result.failed, 4);
+    assert.deepEqual(result.errors.map(error => error.row), [2, 3, 4, 5]);
+    const after = await snapshot();
+    assert.equal(after.contracts.length, before.contracts.length + 2);
+    assert.equal(after.items.length, before.items.length + 2);
+    for (const field of ['inventory', 'receipts', 'inspections', 'suppliers', 'products']) {
+      assert.deepEqual(after[field], before[field]);
+    }
+    for (const input of valid) {
+      const contract = await db.purchaseContract.findUnique({ where: { contractNo: input.contractNo }, include: { items: true } });
+      assert.equal(contract.items.length, 1);
+      assert.equal(contract.supplierId, supplier.id);
+      assert.equal(contract.items[0].productId, product.id);
+    }
+    const replay = await importRows(valid);
+    assert.equal(replay.success, 0);
+    assert.equal(replay.failed, 2);
+    assert.deepEqual(await snapshot(), after, '显式编号的已成功行重试不能新增合同、明细或来源库存');
+  });
+
+  await t.test('省略、空白或非法名称必须失败，不得退化成首条目录匹配', async () => {
+    const invalid = [];
+    for (const field of ['supplierName', 'productName']) {
+      const omitted = { ...row, contractNo: `SYNTHETIC-OMITTED-${field}` };
+      delete omitted[field];
+      invalid.push(omitted);
+      for (const value of [null, '', '   ', 7, [], {}, false]) {
+        invalid.push({ ...row, [field]: value });
+      }
+    }
+    const before = await snapshot();
+    const result = await importRows(invalid);
+    assert.equal(result.success, 0);
+    assert.equal(result.failed, invalid.length);
+    assert.deepEqual(result.errors.map(error => error.row), invalid.map((_, index) => index + 1));
+    assert.deepEqual(await snapshot(), before);
+  });
+
+  await t.test('数量与价格沿用采购创建的有效范围，保留小数字符串和零单价', async () => {
+    const before = await snapshot();
+    const invalid = [
+      { ...row, quantity: 0 },
+      { ...row, quantity: '-2' },
+      { ...row, quantity: 'Infinity' },
+      { ...row, price: '-3' },
+      { ...row, price: 'Infinity' },
+    ];
+    for (const field of ['quantity', 'price']) {
+      const omitted = { ...row };
+      delete omitted[field];
+      invalid.push(omitted);
+      for (const value of [null, '', '   ', false, true, [], [1], {}, '6 invalid']) {
+        invalid.push({ ...row, [field]: value });
+      }
+    }
+    const result = await importRows(invalid);
+    assert.equal(result.success, 0);
+    assert.equal(result.failed, invalid.length);
+    assert.deepEqual(result.errors.map(error => error.row), invalid.map((_, index) => index + 1));
+    assert.deepEqual(await snapshot(), before);
+    const compatible = await importRows([
+      { ...row, contractNo: 'SYNTHETIC-ZERO-PRICE', quantity: '6.5', price: '0' },
+      { ...row, contractNo: 'SYNTHETIC-DECIMAL-PRICE', quantity: '2.5', price: '1.2' },
+    ]);
+    assert.deepEqual(compatible, { success: 2, failed: 0, errors: [] });
+    for (const [contractNo, quantity, unitPrice, totalPrice] of [
+      ['SYNTHETIC-ZERO-PRICE', 6.5, 0, 0],
+      ['SYNTHETIC-DECIMAL-PRICE', 2.5, 1.2, 3],
+    ]) {
+      const contract = await db.purchaseContract.findUnique({ where: { contractNo }, include: { items: true } });
+      assert.equal(contract.totalAmount, totalPrice);
+      assert.equal(contract.items.length, 1);
+      assert.equal(contract.items[0].quantity, quantity);
+      assert.equal(contract.items[0].unitPrice, unitPrice);
+      assert.equal(contract.items[0].totalPrice, totalPrice);
+    }
+    const after = await snapshot();
+    for (const field of ['inventory', 'receipts', 'inspections', 'suppliers', 'products']) {
+      assert.deepEqual(after[field], before[field]);
+    }
+  });
+
+  await t.test('编号预览不保存，创建第二行关联失败全部回滚，修正后可复用编号', async () => {
+    const before = await snapshot();
+    const call = async (method, route, input) => {
+      const response = await fetch(url.replace('/batch-import/purchase', route), {
+        method,
+        headers: { authorization: `Bearer ${users.PURCHASE}`, 'Content-Type': 'application/json' },
+        ...(input === undefined ? {} : { body: JSON.stringify(input) }),
+      });
+      return { status: response.status, body: await response.json() };
+    };
+    const preview = await call('GET', '/purchases/options/next-no');
+    assert.equal(preview.status, 200);
+    assert.deepEqual(await snapshot(), before, '取消编号预览不会占号或保存任何业务数据');
+    const input = {
+      supplierId: supplier.id,
+      contractNo: preview.body.data.contractNo,
+      items: [
+        { productId: product.id, quantity: 2, unit: '件', unitPrice: 10 },
+        { productId: 'synthetic-missing-product', quantity: 3, unit: '件', unitPrice: 10 },
+      ],
+    };
+    const failed = await call('POST', '/purchases', input);
+    assert.ok(failed.status >= 400, '既有关联错误必须拒绝保存；本回归不改变原有HTTP状态码');
+    assert.deepEqual(await snapshot(), before, '第二行失败不能留下表头或第一行');
+    input.items[1].productId = product.id;
+    const retry = await call('POST', '/purchases', input);
+    assert.equal(retry.status, 201);
+    const contract = retry.body.data.contract || retry.body.data;
+    assert.equal(contract.contractNo, preview.body.data.contractNo);
+    assert.equal(contract.items.length, 2);
+    assert.equal(contract.totalAmount, 56.5);
+    const persisted = await db.purchaseContract.findUnique({ where: { id: contract.id }, include: { items: true } });
+    assert.equal(persisted.items.length, 2);
+    const after = await snapshot();
+    assert.equal(after.contracts.length, before.contracts.length + 1);
+    assert.equal(after.items.length, before.items.length + 2);
+    for (const field of ['inventory', 'receipts', 'inspections', 'suppliers', 'products']) {
+      assert.deepEqual(after[field], before[field]);
+    }
+    // 等待真实 response-finish 审计写入后再清理私有数据库，不更改生产审计行为。
+    const deadline = Date.now() + 3000;
+    while (!await db.operationLog.findFirst({ where: { entity: 'PurchaseContract', entityId: contract.id, action: 'CREATE' } })) {
+      assert.ok(Date.now() < deadline, '合成创建成功的审计必须在隔离库清理前落库');
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
   });
 });

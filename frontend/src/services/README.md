@@ -8,6 +8,8 @@
 
 `purchaseReceipt.service.ts` 仅复用已有 `runIdempotentRequest`，其请求编号与后端协议不变。
 
+新建有 `sourcePaymentId` 的收款必须通过 `finance.service.ts` 的 `allocatePayment` 使用后端同一事务余额校验；通用创建请求保留该字段仅用于历史幂等键的只读重放，并标注弃用。普通到账/直接合同收款保持原接口，历史 Payment 响应中的来源关联字段不删除。
+
 ## 浏览器会话
 
 `auth.service.ts` 提供无缓存恢复、可取消登录和单次退出请求；Axios、合同附件multipart、退税POST导出和AI流式POST均兼容HttpOnly Cookie与内存CSRF。未勾选保持登录仍使用本标签Bearer。完整安全边界见 `docs/security/browser-sessions.md`。
