@@ -4,7 +4,7 @@
  * Pos: 退税工作台路由集成测试
  */
 
-import { Suspense, useSyncExternalStore } from "react";
+import { Suspense, useInsertionEffect, useSyncExternalStore } from "react";
 import {
   act,
   fireEvent,
@@ -213,6 +213,115 @@ describe("退税页签实际组件的路由流转", () => {
       expect(screen.getByDisplayValue("NEW")).toBeVisible();
     });
     expect(mocks.router.replace).not.toHaveBeenCalled();
+  });
+
+  it("清空后延迟的 OLD 路由确认不能恢复旧输入，零延迟连续输入与地址保持 TEST", async () => {
+    const user = userEvent.setup({ delay: 0 });
+    const oldQuery = "?view=customs&source=qa&keyword=OLD";
+    window.history.replaceState({}, "", "/dashboard/tax-refunds" + oldQuery);
+    await act(async () => render(<TestRoutes />));
+    const input = await screen.findByDisplayValue("OLD");
+    mocks.searchSnapshot = oldQuery;
+    await user.clear(input);
+    expect(input).toHaveValue("");
+    const clearQuery = window.location.search;
+    await act(async () => {
+      mocks.searchSnapshot = clearQuery;
+      mocks.notify();
+    });
+    await act(async () => {
+      mocks.searchSnapshot = oldQuery;
+      mocks.notify();
+    });
+    expect(input).toHaveValue("");
+    await user.type(input, "TEST");
+    expect(input).toHaveValue("TEST");
+    expect(window.location.search).toBe("?view=customs&source=qa&keyword=TEST");
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+  });
+
+  it("较旧自有输入确认不能覆盖更新的本地草稿或地址", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/dashboard/tax-refunds?view=customs&source=qa",
+    );
+    await act(async () => render(<TestRoutes />));
+    const input = await screen.findByPlaceholderText("搜索报关单号或报关行...");
+    mocks.searchSnapshot = window.location.search;
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "A" } });
+    });
+    const olderOwnQuery = window.location.search;
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "AB" } });
+    });
+    await act(async () => {
+      mocks.searchSnapshot = olderOwnQuery;
+      mocks.notify();
+    });
+    expect(input).toHaveValue("AB");
+    expect(window.location.search).toBe("?view=customs&source=qa&keyword=AB");
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+  });
+
+  it("Next 查询快照延迟时原生 Back/Forward 仍恢复浏览器实际筛选", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/dashboard/tax-refunds?view=customs&source=qa&keyword=OLD",
+    );
+    window.history.pushState(
+      {},
+      "",
+      "/dashboard/tax-refunds?view=customs&source=qa&keyword=NEW",
+    );
+    await act(async () => render(<TestRoutes />));
+    await screen.findByDisplayValue("NEW");
+    mocks.searchSnapshot = window.location.search;
+    window.history.back();
+    await waitFor(() => {
+      expect(window.location.search).toBe(
+        "?view=customs&source=qa&keyword=OLD",
+      );
+      expect(screen.getByDisplayValue("OLD")).toBeVisible();
+    });
+    window.history.forward();
+    await waitFor(() => {
+      expect(window.location.search).toBe(
+        "?view=customs&source=qa&keyword=NEW",
+      );
+      expect(screen.getByDisplayValue("NEW")).toBeVisible();
+    });
+  });
+
+  it("Next 路由先渲染后在 insertion effect 提交地址时仍采用新筛选", async () => {
+    function CommitHistory({ query }: { query: string }) {
+      useInsertionEffect(() => {
+        window.history.replaceState({}, "", "/dashboard/tax-refunds" + query);
+      }, [query]);
+      return <TestRoutes />;
+    }
+    const oldQuery = "?view=customs&source=qa&keyword=OLD";
+    const newQuery = "?view=customs&source=qa&keyword=NEW";
+    window.history.replaceState({}, "", "/dashboard/tax-refunds" + oldQuery);
+    mocks.searchSnapshot = oldQuery;
+    const view = await act(async () =>
+      render(<CommitHistory query={oldQuery} />),
+    );
+    await screen.findByDisplayValue("OLD");
+    await act(async () => {
+      mocks.searchSnapshot = newQuery;
+      view.rerender(<CommitHistory query={newQuery} />);
+      mocks.notify();
+    });
+    expect(window.location.search).toBe(newQuery);
+    expect(screen.getByDisplayValue("NEW")).toBeVisible();
+    await waitFor(() =>
+      expect(mocks.customsGetAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({ keyword: "NEW" }),
+      ),
+    );
   });
 
   it("退税记录导航已改变地址但旧报关列表仍挂载时，延迟筛选工作不能写回报关页签", async () => {

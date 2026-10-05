@@ -1,6 +1,6 @@
 /**
  * Input: 报关单服务、URL 查询参数、router
- * Output: 报关单列表页（历史筛选与最新请求结果一致、仅由用户编辑 URL，服务端分页、手机卡片与桌面表格）
+ * Output: 报关单列表页（浏览器筛选、输入草稿与最新请求一致，原生历史同步、分页与响应式列表）
  * Pos: 报关单管理主列表页
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -16,6 +16,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useTableSort } from "@/lib/hooks/useTableSort";
@@ -57,6 +58,11 @@ import {
 
 const PAGE_SIZE = 20;
 
+function subscribeToBrowserQuery(onChange: () => void) {
+  window.addEventListener("popstate", onChange);
+  return () => window.removeEventListener("popstate", onChange);
+}
+
 const formatAmount = (amount: number, currency: string) =>
   `${currency} ${amount.toLocaleString()}`;
 
@@ -65,11 +71,15 @@ export function CustomsDeclarationListPageContent({
 }: { embedded?: boolean } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const pathname =
-    typeof window !== "undefined" ? window.location.pathname : "";
-  const queryString = searchParams.toString();
-  const initialKeyword = searchParams.get("keyword") || "";
-  const initialStatus = searchParams.get("status") || "ALL";
+  // 延迟的 Next 查询确认不能覆盖浏览器已发布的输入；每次提交后重新检查实际地址。
+  const queryString = useSyncExternalStore(
+    subscribeToBrowserQuery,
+    () => window.location.search.slice(1),
+    () => searchParams.toString(),
+  );
+  const currentParams = new URLSearchParams(queryString);
+  const initialKeyword = currentParams.get("keyword") || "";
+  const initialStatus = currentParams.get("status") || "ALL";
 
   const [keyword, setKeyword] = useState(initialKeyword);
   const [status, setStatus] = useState(initialStatus);
@@ -96,18 +106,21 @@ export function CustomsDeclarationListPageContent({
   // 同步搜索状态到 URL
   const updateUrlParams = useCallback(
     (newKeyword: string, newStatus: string) => {
-      // 嵌入退税页时保留 view=customs 等父页面参数，只更新本列表的筛选。
-      const params = new URLSearchParams(queryString);
+      // 使用最新地址保留父页签/来源参数；Next 原生 history 补丁同步查询，不为每个按键启动路由请求。
+      const params = new URLSearchParams(window.location.search);
       if (newKeyword) params.set("keyword", newKeyword);
       else params.delete("keyword");
       if (newStatus && newStatus !== "ALL") params.set("status", newStatus);
       else params.delete("status");
       const nextQuery = params.toString();
-      if (nextQuery === queryString) return;
-      const newUrl = nextQuery ? `${pathname}?${nextQuery}` : pathname;
-      router.replace(newUrl, { scroll: false });
+      if (nextQuery === window.location.search.slice(1)) return;
+      const newUrl =
+        window.location.pathname +
+        (nextQuery ? `?${nextQuery}` : "") +
+        window.location.hash;
+      window.history.replaceState(null, "", newUrl);
     },
-    [pathname, router, queryString],
+    [],
   );
 
   const [declarations, setDeclarations] = useState<CustomsDeclaration[]>([]);

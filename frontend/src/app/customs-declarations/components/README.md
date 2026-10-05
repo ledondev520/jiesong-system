@@ -1,6 +1,6 @@
 # 报关单页面组件
 
-`CustomsDeclarationListPageContent.tsx` 可独立显示，也可嵌入退税工作台。用户编辑关键词、状态或重置时只改对应 URL 筛选，保留 `view=customs` 和其他查询参数。浏览器 Back/Forward 的关键词、状态变化更新本地控件并回到第 1 页，不由挂载/同步 effect 将旧筛选写回 URL。
+`CustomsDeclarationListPageContent.tsx` 可独立显示，也可嵌入退税工作台。用户编辑关键词、状态或重置时用 Next 支持的原生 `history.replaceState(null, "", url)` 浅同步，只改对应 URL 筛选，保留当前地址中的 `view=customs`、其他查询参数及 hash。每个按键不再启动异步路由导航。筛选从浏览器地址的外部存储快照读取；延迟的 Next 查询确认不能擦掉更新的输入草稿。原生 Back/Forward 事件更新本地控件并回到第 1 页，Next 路由提交后也会复核当前地址，不由同步 effect 将旧筛选写回 URL。
 
 列表请求以当前查询和请求代次隔离。历史筛选、分页变化及卸载会使旧请求失效；旧成功结果不得覆盖新行/总数，旧失败不得弹出错误或结束新请求的加载状态。异步业务操作保留的旧筛选刷新回调同样不会重启旧查询。
 

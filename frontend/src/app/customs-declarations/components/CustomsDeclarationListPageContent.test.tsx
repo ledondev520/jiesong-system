@@ -55,16 +55,14 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     await user.clear(input);
     await user.type(input, "TEST");
     await waitFor(() =>
-      expect(mocks.router.replace).toHaveBeenLastCalledWith(
-        "/dashboard/tax-refunds?view=customs&source=qa&keyword=TEST",
-        { scroll: false },
+      expect(window.location.search).toBe(
+        "?view=customs&source=qa&keyword=TEST",
       ),
     );
     await user.click(screen.getByTestId("reset-filters"));
-    expect(mocks.router.replace).toHaveBeenLastCalledWith(
-      "/dashboard/tax-refunds?view=customs&source=qa",
-      { scroll: false },
-    );
+    expect(window.location.search).toBe("?view=customs&source=qa");
+    expect(input).toHaveValue("");
+    expect(mocks.router.replace).not.toHaveBeenCalled();
   });
   it("可翻到第2页，搜索后回到第1页，不漏掉20条以后的报关单", async () => {
     mocks.getAll.mockImplementation(async ({ page }) => ({
