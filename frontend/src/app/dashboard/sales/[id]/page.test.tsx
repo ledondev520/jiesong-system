@@ -1,6 +1,6 @@
 /**
  * Input: 销售合同详情页、sales/product/store/inventory 服务、router、toast
- * Output: 销售合同详情页交互逻辑测试结果
+ * Output: 销售合同详情页交互逻辑与阶段错误重试测试结果，隔离并等待成功后的延迟退税弹窗
  * Pos: 前端详情页交互测试
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -110,6 +110,12 @@ vi.mock("@/components/dialog/GenerateThreeFormsDialog", () => ({
 vi.mock("@/components/dialog/ExportPacketWorkbenchDialog", () => ({
   ExportPacketWorkbenchDialog: ({ open }: { open: boolean }) =>
     open ? <div>出口三单预检区</div> : null,
+}));
+
+// This suite tests the parent flow; preparation API details have their own dialog tests.
+vi.mock("@/components/dialog/TaxRefundPreparationDialog", () => ({
+  TaxRefundPreparationDialog: ({ open }: { open: boolean }) =>
+    open ? <div role="dialog" aria-label="退税准备测试弹窗" /> : null,
 }));
 
 vi.mock("./components/SalesFinancePanel", () => ({
@@ -582,6 +588,9 @@ describe("SalesDetailPage 交互逻辑", () => {
     expect(
       screen.queryByRole("button", { name: "确认到港" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: "退税准备测试弹窗" }),
+    ).not.toBeInTheDocument();
 
     mockUpdateSalesStatus.mockResolvedValueOnce({
       data: { ...contract, status: "SHIPPED" },
@@ -597,6 +606,9 @@ describe("SalesDetailPage 交互逻辑", () => {
     expect(
       screen.queryByRole("button", { name: "确认发运" }),
     ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("dialog", { name: "退税准备测试弹窗" }),
+    ).toBeInTheDocument();
   });
 
   it("手机装箱卡片编辑保持采购来源数量、箱数、重量和尺寸锁定", async () => {
