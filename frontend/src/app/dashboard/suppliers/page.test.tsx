@@ -219,11 +219,9 @@ describe("supplier editor interrupted sessions (synthetic fixtures)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsMobile.mockReturnValue(false);
-    mockGetAll
-      .mockReset()
-      .mockResolvedValue({
-        data: { items: syntheticSuppliers.map((item) => ({ ...item })) },
-      });
+    mockGetAll.mockReset().mockResolvedValue({
+      data: { items: syntheticSuppliers.map((item) => ({ ...item })) },
+    });
     mockCreate.mockReset();
     mockUpdate.mockReset();
     mockDelete.mockReset();
