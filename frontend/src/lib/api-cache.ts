@@ -1,10 +1,12 @@
 /**
  * Input: API 请求 key + 数据获取函数
- * Output: 带内存缓存的请求结果（stale-while-revalidate 模式）
+ * Output: 按认证代次隔离的内存缓存请求结果
  * Pos: 轻量级前端请求缓存层，用于减少 Tab 切换时重复发起相同请求
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
+
+import { getAuthGeneration } from "@/lib/browser-session";
 
 interface CacheEntry<T> {
   data: T;
@@ -12,6 +14,7 @@ interface CacheEntry<T> {
 }
 
 // 全局内存 Map，生命周期与浏览器标签一致
+let cacheGeneration = 0;
 const cache = new Map<string, CacheEntry<unknown>>();
 
 const DEFAULT_TTL_MS = 30_000; // 30 秒
@@ -19,7 +22,7 @@ const MAX_CACHE_SIZE = 200; // 最大条目数，防止无界增长
 const GC_INTERVAL_MS = 5 * 60_000; // 每 5 分钟清理一次过期条目
 
 // 定期扫描并删除过期条目，防止长期运行时内存泄漏
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of cache.entries()) {
@@ -45,8 +48,11 @@ export async function cachedFetch<T>(
   fetcher: () => Promise<T>,
   ttl = DEFAULT_TTL_MS,
 ): Promise<T> {
+  const generation = getAuthGeneration();
+  const cacheVersion = cacheGeneration;
+  const cacheKey = `${generation}|${key}`;
   const now = Date.now();
-  const entry = cache.get(key) as CacheEntry<T> | undefined;
+  const entry = cache.get(cacheKey) as CacheEntry<T> | undefined;
 
   // 1. 缓存命中且未过期
   if (entry && entry.expiresAt > now) {
@@ -69,7 +75,8 @@ export async function cachedFetch<T>(
     if (oldestKey) cache.delete(oldestKey);
   }
 
-  cache.set(key, { data, expiresAt: now + ttl });
+  if (generation === getAuthGeneration() && cacheVersion === cacheGeneration)
+    cache.set(cacheKey, { data, expiresAt: now + ttl });
   return data;
 }
 
@@ -78,8 +85,9 @@ export async function cachedFetch<T>(
  * @param keyOrPrefix 精确 key 或以此开头的 key 前缀
  */
 export function invalidateCache(keyOrPrefix: string): void {
+  const prefix = `${getAuthGeneration()}|${keyOrPrefix}`;
   for (const key of cache.keys()) {
-    if (key === keyOrPrefix || key.startsWith(keyOrPrefix)) {
+    if (key.startsWith(prefix)) {
       cache.delete(key);
     }
   }
@@ -89,5 +97,6 @@ export function invalidateCache(keyOrPrefix: string): void {
  * 职责：清空整个缓存（用于登出或数据全局刷新）
  */
 export function clearAllCache(): void {
+  cacheGeneration += 1;
   cache.clear();
 }

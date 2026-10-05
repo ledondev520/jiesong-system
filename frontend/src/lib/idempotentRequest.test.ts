@@ -8,6 +8,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
+import { advanceAuthGeneration } from "./browser-session";
 import { runIdempotentRequest, buildIdempotencyKey } from "./idempotentRequest";
 
 describe("idempotentRequest", () => {
@@ -86,6 +87,27 @@ describe("idempotentRequest", () => {
 
     expect(result).toBe("new-value");
     expect(newRunner).toHaveBeenCalledTimes(1);
+  });
+  it("新会话不会共享或命中旧会话的业务提交结果", async () => {
+    let finish!: (value: string) => void;
+    const old = runIdempotentRequest(
+      "same-payload",
+      () =>
+        new Promise<string>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    advanceAuthGeneration();
+    const runner = vi.fn().mockResolvedValue("current-owner");
+    expect(await runIdempotentRequest("same-payload", runner)).toBe(
+      "current-owner",
+    );
+    finish("old-owner");
+    await old;
+    expect(await runIdempotentRequest("same-payload", runner)).toBe(
+      "current-owner",
+    );
+    expect(runner).toHaveBeenCalledOnce();
   });
 });
 

@@ -1,7 +1,7 @@
 /**
  * Input: 认证控制器
  * Output: 认证相关路由
- * Pos: 认证路由，处理邮箱验证码注册、登录、邮箱验证码找回密码
+ * Pos: 认证路由，处理邮箱验证码注册、登录/浏览器会话、邮箱验证码找回密码
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -18,6 +18,9 @@ const { body } = require('express-validator');
 const emailRegistration = require('../services/emailRegistrationService');
 const passwordReset = require('../services/passwordResetService');
 const router = Router();
+const browserSessions = require('../services/browserSessionService');
+// Tokens, CSRF proofs and profile responses must never be cached by intermediaries.
+router.use((_req, res, next) => { res.set('Cache-Control', 'private, no-store'); next(); });
 
 router.post('/email-code',
   strictRateLimit({ windowMs: 3600000, max: 10, keyGenerator: (req) => `email-send:${req.ip}` }),
@@ -51,7 +54,9 @@ router.post(
     },
   }),
   validateLogin,
+  body('rememberMe').optional().isBoolean({ strict: true }).withMessage('保持登录选项无效'),
   handleValidation,
+  browserSessions.protectLogin,
   withAuditLog(
     {
       entity: 'User',
@@ -98,6 +103,14 @@ router.post(
     authController.register
   )
 );
+
+// Cookie bootstrap never renews expiry. Logout verifies its own cookie/CSRF, even after expiry.
+router.get('/session', authenticate, authController.getSession);
+router.get('/logout-csrf', (req, res, next) => {
+  try { res.json({ code: 200, data: browserSessions.logoutProof(req), message: '获取成功' }); }
+  catch (error) { next(error); }
+});
+router.post('/logout', authController.logout);
 
 // GET /api/v1/auth/me - 获取当前用户信息
 router.get('/me', authenticate, authController.getCurrentUser);

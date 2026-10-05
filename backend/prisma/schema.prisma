@@ -1,5 +1,5 @@
 // Input: 数据库设计文档 (docs/数据库设计.md)
-// Output: Prisma ORM 数据模型定义，含持久密码找回挑战和会话撤销版本
+// Output: Prisma ORM 数据模型定义，含固定期限浏览器会话、密码找回挑战和会话撤销版本
 // Pos: 数据层核心Schema，定义所有实体及关系
 // Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 // 
@@ -67,6 +67,20 @@ model PasswordResetChallenge {
   @@map("password_reset_challenges")
 }
 
+// Restricted: only SHA-256 of a cryptographically random browser credential.
+model BrowserSession {
+  tokenHash      String   @id
+  userId         String
+  sessionVersion Int
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId])
+  @@map("browser_sessions")
+}
+
 model User {
   id          String    @id @default(cuid())
   username    String    @unique
@@ -84,6 +98,7 @@ model User {
 
   purchaseReceiptsCreated    PurchaseReceipt[] @relation("ReceiptCreatedBy")
   purchaseReceiptInspections PurchaseReceiptInspection[] @relation("ReceiptInspectedBy")
+  browserSessions           BrowserSession[]
   operationLogs             OperationLog[]
   chatHistories             ChatHistory[]
   agentReplaySummaries      AgentReplaySummary[]

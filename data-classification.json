@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updatedAt": "2026-10-02",
+  "updatedAt": "2026-10-05",
   "owner": "security-team",
   "tiers": [
     {
@@ -22,13 +22,14 @@
         "company bank statements, transaction identifiers, account balances, and even masked account identifiers when combined with transaction rows",
         "carrier packing-list originals and persistent packing-list review records",
         "email verification code hashes and Alibaba Cloud mail credentials",
-        "password reset code hashes, bound recovery email and persistent requester HMAC digests"
+        "password reset code hashes, bound recovery email and persistent requester HMAC digests",
+        "opaque browser session credentials, SHA-256 session digests and session-bound CSRF proofs"
       ],
       "controls": {
         "storage": [
           "Secrets only in .env or secret manager",
           "PR Review reporting uses zero GITHUB_TOKEN permissions and Actions summaries; failed check states are retained, and its locked formatter rejects incomplete history or unreadable changed source (scripts/check-pr-format.cjs)",
-          "Browser access tokens remain tab-scoped in sessionStorage; missing-token login messaging never grants access or exposes token values",
+          "Unchecked-login bearer tokens remain tab-scoped in sessionStorage; optional browser credentials are HttpOnly/Secure/SameSite=Strict cookies with existing absolute expiry and only hashed server-side; JavaScript holds only a session-bound CSRF proof",
           "System-configured API keys are write-only; encrypted storage is permitted but complete values must never be returned or rendered",
           "System configuration environment-key fallbacks use the same masked response helper as database keys",
           "Main AI provider keys remain separate; DeepSeek environment/DB overrides are write-only and file permissions are checked before environment loading",
@@ -48,7 +49,8 @@
           "VPS runtime migration backups keep private environment files and SQLite snapshots in 0700 directories with 0600 files; deployment verification never prints process environments or credentials",
           "Environment file permissions are checked before loading mail credentials; email registration uses keyed hashes, persistent send quotas and single-use verification; new users remain inactive until administrator approval; user updates clear authentication caches immediately (backend/src/services/emailRegistrationService.js)",
           "Email password recovery uses domain-separated keyed hashes, persistent cross-worker quotas and atomic single-use consumption; live sessionVersion checks immediately revoke old JWTs after any password write; unknown/disabled/ambiguous/legacy-without-email accounts never bypass proof of ownership; raw Prisma query/error logging is disabled",
-          "Recovery HTTP rate limits use locked express-rate-limit and canonical IPv4-mapped/IPv6 subnet keys shared with persistent IP HMAC quotas; forwarded client identity requires an explicit TRUSTED_PROXY_CIDRS IP/CIDR allowlist, disabled by default; production database backup must follow the actual DATABASE_URL with consistent SQLite backup API and protected permissions before migration"
+          "Recovery HTTP rate limits use locked express-rate-limit and canonical IPv4-mapped/IPv6 subnet keys shared with persistent IP HMAC quotas; forwarded client identity requires an explicit TRUSTED_PROXY_CIDRS IP/CIDR allowlist, disabled by default; production database backup must follow the actual DATABASE_URL with consistent SQLite backup API and protected permissions before migration",
+          "browserSessionService.js enforces origin plus session-bound CSRF, live expiry/active/sessionVersion checks and per-browser revocation without global logout; auth responses are no-store, no renewal occurs, expired records are pruned at the next successful checked login, and revocation responses do not modify cookies"
         ],
         "transfer": [
           "Encrypt in transit (TLS)",
@@ -64,7 +66,9 @@
         "backend/src/services/emailService.js",
         "backend/src/services/emailRegistrationService.js",
         "backend/src/services/passwordResetService.js",
-        "backend/prisma/migrations/20261002113919_email_password_recovery/"
+        "backend/prisma/migrations/20261002113919_email_password_recovery/",
+        "backend/src/services/browserSessionService.js",
+        "backend/prisma/migrations/20261005070032_browser_sessions/"
       ]
     },
     {

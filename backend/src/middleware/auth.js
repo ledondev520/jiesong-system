@@ -1,5 +1,5 @@
 /**
- * Input: JWT Token, 用户角色
+ * Input: JWT Bearer、HttpOnly浏览器会话、用户角色
  * Output: 实时用户状态与会话版本认证/授权结果
  * Pos: 认证授权中间件，保护API路由
  * 
@@ -7,6 +7,7 @@
  */
 
 const jwt = require('jsonwebtoken');
+const browserSessions = require('../services/browserSessionService');
 const config = require('../config');
 const { createError } = require('./errorHandler');
 const { enforceBossReadOnly } = require('./bossReadOnly');
@@ -116,9 +117,13 @@ const authenticate = async (req, res, next) => {
   try {
     // 1. 获取Token
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw createError('未提供认证Token', 401);
+    if (!authHeader) {
+      attachUserActor(req, await browserSessions.authenticate(req));
+      enforceBossReadOnly(req);
+      return next();
     }
+    // An explicit malformed/expired bearer must never fall back to another identity.
+    if (!/^Bearer \S+$/.test(authHeader)) throw createError('无效的Token', 401);
     
     const token = authHeader.split(' ')[1];
 

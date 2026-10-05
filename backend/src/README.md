@@ -120,3 +120,7 @@
 
 - `services/batchImportService.js` 的 JSON 采购导入逐行事务提交合同与明细；自动编号冲突或事务写冲突最多尝试五次，不更改显式编号，不重试无关错误；失败行回滚且后续行继续
 - `integration/purchase-batch-import.integration.js` 通过真实 HTTP/临时 SQLite 验证四请求并发、SQL 明细故障无孤立合同、部分成功、显式/溢出编号及原有 RBAC，由 `npm run test:db` 执行
+
+## 浏览器会话
+
+`services/browserSessionService.js` 与 auth Controller/routes/middleware 提供可选HttpOnly固定期限会话、来源/CSRF验证和逐浏览器撤销，保留Bearer兼容。`integration/browser-session.integration.js` 与 `testHelpers/browser-session-server.js` 使用隔离SQLite验证，不访问生产。设计及回滚：`docs/security/browser-sessions.md`。

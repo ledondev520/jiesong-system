@@ -15,6 +15,8 @@ const ROUTES_DIR = path.resolve(__dirname);
 const WRITE_METHODS = ['post', 'put', 'patch', 'delete'];
 const PUBLIC_WRITE_ROUTES = new Set([
   'auth POST /login',
+  // Self-cookie revocation has session-bound CSRF verification, even after account expiry.
+  'auth POST /logout',
   'auth POST /reset-password',
   'auth POST /reset-password-code',
   // 邮箱验证码注册在登录前完成；限流和校验由 auth 路由与注册服务执行。
@@ -93,4 +95,9 @@ test('RBAC: 邮箱注册公开入口保留限流校验，管理员创建用户�
   assert.ok(adminRegistration);
   assert.match(adminRegistration, /authenticate/);
   assert.match(adminRegistration, /roleAuth\('ADMIN'\)/);
+});
+
+test('logout owns cookie CSRF validation rather than bearer role authorization', () => {
+  const service = fs.readFileSync(path.resolve(ROUTES_DIR, '../services/browserSessionService.js'), 'utf8');
+  assert.match(service, /if \(token\) \{ requireCsrf\(req, token\); await revoke\(token\); \}/);
 });

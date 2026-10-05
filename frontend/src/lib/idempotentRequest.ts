@@ -1,3 +1,6 @@
+/** Business-result deduplication is auth-generation scoped; HTTP idempotency keys stay unchanged. */
+import { getAuthGeneration } from "@/lib/browser-session";
+
 type IdempotentCacheEntry = {
   promise?: Promise<unknown>;
   value?: unknown;
@@ -51,7 +54,8 @@ export const runIdempotentRequest = async <T>(
   options?: { ttlMs?: number },
 ): Promise<T> => {
   const ttlMs = options?.ttlMs ?? defaultWindowMs;
-  const key = buildCacheKey(rawKey);
+  const generation = getAuthGeneration();
+  const key = `${generation}|${buildCacheKey(rawKey)}`;
   const now = Date.now();
   const cached = inFlightCache.get(key);
 
@@ -71,12 +75,13 @@ export const runIdempotentRequest = async <T>(
 
   const promise = runner()
     .then((value) => {
-      inFlightCache.set(key, {
-        hasValue: true,
-        value,
-        promise: undefined,
-        expiresAt: Date.now() + ttlMs,
-      });
+      if (generation === getAuthGeneration())
+        inFlightCache.set(key, {
+          hasValue: true,
+          value,
+          promise: undefined,
+          expiresAt: Date.now() + ttlMs,
+        });
       return value;
     })
     .catch((error) => {
@@ -116,4 +121,8 @@ export const buildIdempotencyKey = async (value: unknown): Promise<string> => {
     byte.toString(16).padStart(2, "0"),
   ).join("");
   return `idempotency:sha256:${hex}`;
+};
+
+export const clearIdempotentCache = (): void => {
+  inFlightCache.clear();
 };

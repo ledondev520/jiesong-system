@@ -1,32 +1,36 @@
 /**
  * Input: 用户状态、导航配置
- * Output: 顶部导航栏组件
+ * Output: 顶部导航栏及等待服务端确认、按认证代次保护的逐浏览器退出
  * Pos: 全局 Header，移动端使用紧凑搜索入口，负责装配导航、通知、用户菜单
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useSyncExternalStore } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Ship } from 'lucide-react';
-import { useAuthStore } from '@/store/auth.store';
-import { ThemeToggle } from '@/components/layout/ThemeToggle';
-import { getVisibleModuleNavItems } from './navigation.config';
-import { HeaderContextPills } from './HeaderContextPills';
-import { HeaderMobileNav } from './HeaderMobileNav';
-import { HeaderNotifications } from './HeaderNotifications';
-import { HeaderSearch } from './HeaderSearch';
-import { HeaderUserMenu } from './HeaderUserMenu';
+import { getAuthGeneration } from "@/lib/browser-session";
+import { authService } from "@/services/auth.service";
+import { toast } from "sonner";
+
+import { useSyncExternalStore } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Ship } from "lucide-react";
+import { useAuthStore } from "@/store/auth.store";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { getVisibleModuleNavItems } from "./navigation.config";
+import { HeaderContextPills } from "./HeaderContextPills";
+import { HeaderMobileNav } from "./HeaderMobileNav";
+import { HeaderNotifications } from "./HeaderNotifications";
+import { HeaderSearch } from "./HeaderSearch";
+import { HeaderUserMenu } from "./HeaderUserMenu";
 
 const subscribeNoop = () => () => {};
-const headerDateFormatter = new Intl.DateTimeFormat('zh-CN', {
-  timeZone: 'Asia/Shanghai',
-  month: '2-digit',
-  day: '2-digit',
-  weekday: 'short',
+const headerDateFormatter = new Intl.DateTimeFormat("zh-CN", {
+  timeZone: "Asia/Shanghai",
+  month: "2-digit",
+  day: "2-digit",
+  weekday: "short",
 });
 
 export function Header() {
@@ -38,21 +42,33 @@ export function Header() {
   const todayLabel = useSyncExternalStore(
     subscribeNoop,
     () => headerDateFormatter.format(new Date()),
-    () => '',
+    () => "",
   );
 
-  const initials = (user?.name || user?.username || '用')
+  const initials = (user?.name || user?.username || "用")
     .slice(0, 2)
     .toUpperCase();
 
-  const handleLogout = () => {
-    logout();
-    window.location.href = '/login';
+  const handleLogout = async () => {
+    const generation = getAuthGeneration();
+    try {
+      await authService.logout();
+      if (generation !== getAuthGeneration()) return;
+      logout();
+      window.location.href = "/login";
+    } catch {
+      if (generation !== getAuthGeneration()) return;
+      toast.error("退出未完成，请检查网络后重试");
+    }
   };
 
   return (
-    <header className="sticky top-0 z-30 flex min-h-16 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:gap-4 md:px-6"
-      style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(4rem + env(safe-area-inset-top))' }}
+    <header
+      className="sticky top-0 z-30 flex min-h-16 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:gap-4 md:px-6"
+      style={{
+        paddingTop: "env(safe-area-inset-top)",
+        height: "calc(4rem + env(safe-area-inset-top))",
+      }}
     >
       {/* 汉堡菜单：移动端已有底部 TabBar，此处完全隐藏；仅保留 SSR 结构避免 hydration mismatch */}
       <div className="hidden" aria-hidden="true">
