@@ -1,6 +1,6 @@
 /**
- * Input: 预加载的真实报关组件、退税页签/详情、可观察的浏览器历史与合成服务数据
- * Output: 列表/详情安全返回的筛选上下文、页签与异步结果一致性回归
+ * Input: 真实报关组件、退税页签/详情、合成历史/新文档导航与服务数据
+ * Output: 列表/详情原生明确返回、缓存 canonical 查询与异步结果一致性回归
  * Pos: 退税工作台路由集成测试
  */
 
@@ -42,6 +42,11 @@ const mocks = vi.hoisted(() => {
       }),
       back: vi.fn(() => window.history.back()),
     },
+    documentNavigate: vi.fn((href: string) => {
+      // 合成新文档导航：不用 Next 缓存，重新读取当前请求查询。
+      window.history.pushState({}, "", href);
+      notify();
+    }),
     customsGetAll: vi.fn(),
     customsGetById: vi.fn(),
     refundsGetAll: vi.fn(),
@@ -61,6 +66,15 @@ vi.mock("next/navigation", () => ({
   usePathname: () =>
     useSyncExternalStore(mocks.subscribe, () => window.location.pathname),
 }));
+vi.mock(
+  "@/app/customs-declarations/components/customs-return-context",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("@/app/customs-declarations/components/customs-return-context")
+    >()),
+    navigateToCustomsList: mocks.documentNavigate,
+  }),
+);
 vi.mock("@/services/customsDeclaration.service", () => ({
   customsDeclarationService: {
     getAll: mocks.customsGetAll,
@@ -193,6 +207,40 @@ describe("退税页签实际组件的路由流转", () => {
     await waitFor(() => expect(window.location.search).toBe("?view=refunds"));
   });
 
+  it("Next 缓存误用旧 canonical 筛选时，明确返回走新文档恢复已验证的最新地址", async () => {
+    const user = userEvent.setup();
+    const returnTo =
+      "/dashboard/tax-refunds?view=customs&source=qa&keyword=QA-CUSTOMS&status=DRAFT#rows";
+    const staleUrl =
+      "/dashboard/tax-refunds?view=customs&source=qa&keyword=OLD&status=RELEASED";
+    window.history.replaceState(
+      {},
+      "",
+      "/dashboard/customs-declarations/qa-customs?" +
+        new URLSearchParams({ returnTo }),
+    );
+    const originalPush = mocks.router.push.getMockImplementation();
+    mocks.router.push.mockImplementation(() => {
+      window.history.pushState({}, "", staleUrl);
+      mocks.notify();
+    });
+    try {
+      await act(async () => render(<TestRoutes />));
+      await user.click(await screen.findByRole("button", { name: "返回" }));
+      expect(
+        window.location.pathname +
+          window.location.search +
+          window.location.hash,
+      ).toBe(returnTo);
+      expect(mocks.documentNavigate).toHaveBeenCalledExactlyOnceWith(returnTo);
+      expect(mocks.router.push).not.toHaveBeenCalled();
+      await screen.findByDisplayValue("QA-CUSTOMS");
+      expect(screen.getAllByRole("combobox")[0]).toHaveTextContent("草稿");
+    } finally {
+      mocks.router.push.mockImplementation(originalPush!);
+    }
+  });
+
   it("关键词和状态筛选进入详情后，明确返回恢复最新浏览器上下文且可再次进入", async () => {
     const user = userEvent.setup();
     window.history.replaceState(
@@ -278,7 +326,7 @@ describe("退税页签实际组件的路由流转", () => {
     );
     await act(async () => render(<TestRoutes />));
     await user.click(await screen.findByRole("button", { name: "返回" }));
-    expect(mocks.router.push).toHaveBeenLastCalledWith(
+    expect(mocks.documentNavigate).toHaveBeenLastCalledWith(
       "/dashboard/tax-refunds?view=customs",
     );
     await screen.findByRole("heading", { name: "报关单管理" });
@@ -300,7 +348,7 @@ describe("退税页签实际组件的路由流转", () => {
     );
     await act(async () => render(<TestRoutes />));
     await user.click(await screen.findByRole("button", { name: "返回" }));
-    expect(mocks.router.push).toHaveBeenLastCalledWith(
+    expect(mocks.documentNavigate).toHaveBeenLastCalledWith(
       "/dashboard/tax-refunds?view=customs",
     );
   });
@@ -329,7 +377,7 @@ describe("退税页签实际组件的路由流转", () => {
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
     await user.click(screen.getByRole("button", { name: "返回" }));
-    expect(mocks.router.push).toHaveBeenLastCalledWith(newReturn);
+    expect(mocks.documentNavigate).toHaveBeenLastCalledWith(newReturn);
   });
 
   it("挂载中的报关列表跟随历史 URL 的筛选变化，不用旧筛选覆写新 URL", async () => {

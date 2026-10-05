@@ -1,14 +1,42 @@
 /**
  * Input: 合成列表路径、筛选编码与不受信任的详情 returnTo
- * Output: 报关返回路径的允许列表、原始筛选语义与安全回退回归
+ * Output: 报关原生明确返回、路径允许列表、筛选语义与安全回退回归
  * Pos: 报关只读返回上下文测试
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   CUSTOMS_RETURN_FALLBACK,
+  navigateToCustomsList,
   resolveCustomsReturnTo,
 } from "./customs-return-context";
+
+describe("报关明确返回的原生新文档导航", () => {
+  it.each([
+    [
+      "/dashboard/tax-refunds?view=customs&keyword=QA%2BTEST&status=DRAFT#rows",
+      "/dashboard/tax-refunds?view=customs&keyword=QA%2BTEST&status=DRAFT#rows",
+    ],
+    [null, CUSTOMS_RETURN_FALLBACK],
+    [
+      "https://example.invalid/dashboard/tax-refunds?view=customs",
+      CUSTOMS_RETURN_FALLBACK,
+    ],
+    [
+      "/customs-declarations?keyword=QA&status=RELEASED",
+      "/dashboard/tax-refunds?keyword=QA&status=RELEASED&view=customs",
+    ],
+  ])("只把已验证目标 %s 交给 location.assign", (target, expected) => {
+    const assign = vi.fn();
+    vi.stubGlobal("window", { location: { assign } });
+    try {
+      navigateToCustomsList(target);
+      expect(assign).toHaveBeenCalledExactlyOnceWith(expected);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
 
 describe("报关详情的有限返回上下文", () => {
   it("仅携带内部路径，特殊关键词、重复普通参数与 hash 的语义不变", () => {

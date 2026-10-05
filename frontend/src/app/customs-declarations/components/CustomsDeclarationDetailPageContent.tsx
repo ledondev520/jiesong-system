@@ -1,6 +1,6 @@
 /**
  * Input: 报关单 ID、服务、浏览器 returnTo 查询、router 与商品明细排序
- * Output: 报关单详情页（安全恢复来源列表筛选，手机卡片与桌面可排序明细表）
+ * Output: 报关单详情页（新文档安全恢复来源筛选，手机卡片与桌面可排序明细表）
  * Pos: 报关单管理详情展示页
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -35,7 +35,10 @@ import { FilePenLine } from "lucide-react";
 import { toast } from "sonner";
 import { CustomsDeclarationStatusBadge } from "./CustomsDeclarationStatusBadge";
 
-import { resolveCustomsReturnTo } from "./customs-return-context";
+import {
+  navigateToCustomsList,
+  resolveCustomsReturnTo,
+} from "./customs-return-context";
 
 interface CustomsDeclarationDetailPageContentProps {
   params: Promise<{ id: string }>;
@@ -134,6 +137,7 @@ export function CustomsDeclarationDetailPageContent({
         title={declaration.declarationNo}
         description={declaration.customsBroker || "未填写报关行"}
         backHref={backHref}
+        onBack={() => navigateToCustomsList(backHref)}
         actions={
           <>
             <CustomsDeclarationStatusBadge status={declaration.status} />

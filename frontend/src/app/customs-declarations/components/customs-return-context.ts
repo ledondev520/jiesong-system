@@ -1,7 +1,7 @@
 /**
  * Input: 根相对的报关列表地址或详情 returnTo 查询值
- * Output: 只允许报关列表的规范返回地址，非法/缺失值回退到报关页签
- * Pos: 报关列表到详情的只读导航边界
+ * Output: 安全的规范报关返回地址及明确返回的新文档导航
+ * Pos: 报关列表/详情的有限返回上下文与原生导航边界
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
@@ -39,4 +39,9 @@ export function resolveCustomsReturnTo(returnTo: string | null) {
   params.delete("returnTo");
   params.set("view", "customs");
   return `${CUSTOMS_LIST_PATH}?${params.toString()}${hash}`;
+}
+
+export function navigateToCustomsList(returnTo: string | null) {
+  // Next 缓存的 canonical 查询可能过时；明确返回只加载已验证的报关列表新文档。
+  window.location.assign(resolveCustomsReturnTo(returnTo));
 }

@@ -13,3 +13,5 @@
 `customs-return-context.ts` 只接受 `/dashboard/tax-refunds?view=customs` 与 `/customs-declarations`、`/dashboard/customs-declarations` 两个旧列表地址。详情入口从实际浏览器的 pathname/query/hash 生成根相对 `returnTo`，不复制 origin；明确返回恢复关键词、状态、其他普通参数与 hash，旧入口规范到现有报关页签，避免原有重定向丢掉筛选。路径不再次解码，外部/协议相对/编码路径、非报关页签与重复页签目标一律回退；全部嵌套 `returnTo` 被移除，详情的重复 `returnTo` 也回退。直接详情没有上下文时保留原有报关页签回退，编辑与旧页面重定向保持原有行为；既有 `dashboard/customs-declarations/[id]/page.test.tsx` 只补齐浏览器查询 mock，继续核对摘要、编辑入口和加载错误。
 
 `customs-return-context.test.ts` 覆盖特殊关键词编码、普通重复参数、旧独立路径与恶意目标。真实组件集成测试覆盖已编辑筛选连续两次进入/明确返回、刷新/直接打开含上下文详情、非法及重复目标回退，以及详情挂载后的原生查询更新；原生历史与页签迟到工作防护继续由既有测试覆盖。
+
+报关详情的明确「返回」通过 `PageHeader.onBack` 调用 `navigateToCustomsList`，把经过同一允许列表校验的 `backHref` 交给 `window.location.assign` 加载新文档。原因是 Next 16 缓存的 canonical 查询可在软导航中恢复先前 OLD/RELEASED，覆盖详情携带的当前关键词/状态；新文档导航绕过该缓存，不修补历史或全局路由。直接详情/非法目标仍使用现有报关页签回退；旧列表和其他 PageHeader 调用方、编辑/API/认证流程不变。缓存误用回归明确要求跳过 `router.push`，原生导航单测核对实际 assign 接口只收到已验证目标；现有 hosted `tax-navigation.spec.ts` 断言原样保留。

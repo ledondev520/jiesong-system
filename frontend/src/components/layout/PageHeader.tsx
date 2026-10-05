@@ -1,49 +1,53 @@
 /**
- * Input: 页面标题、描述、返回链接
+ * Input: 页面标题、描述、返回链接与可选返回动作
  * Output: 页面头部组件（含可访问返回按钮，手机端完整描述与换行操作）
  * Pos: 通用布局组件，提供统一的页面头部样式
- * 
+ *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 
 interface PageHeaderProps {
   eyebrow?: string; // 标题上方的小引导词，用于标明工作场景
   title: string;
   description?: string;
-  backHref?: string;   // 指定返回链接，不指定则使用router.back()
-  backLabel?: string;  // 返回按钮文字，默认"返回"
-  showBack?: boolean;  // 是否显示返回按钮，顶层页面传 false
+  backHref?: string; // 默认指定返回链接，不指定则使用router.back()
+  onBack?: () => void; // 显式提供时只执行调用方返回动作
+  backLabel?: string; // 返回按钮文字，默认"返回"
+  showBack?: boolean; // 是否显示返回按钮，顶层页面传 false
   actions?: React.ReactNode; // 右侧操作按钮
 }
 
 /**
  * 职责：渲染页面头部
  * 思路：
- *   1. 显示返回按钮（如果有backHref或默认使用router.back）
+ *   1. 显示返回按钮，指定动作仅在调用方显式提供时执行
  *   2. 显示标题和描述
  *   3. 显示右侧操作按钮
  */
-export function PageHeader({ 
+export function PageHeader({
   eyebrow,
-  title, 
-  description, 
-  backHref, 
-  backLabel = '返回',
+  title,
+  description,
+  backHref,
+  onBack,
+  backLabel = "返回",
   showBack,
-  actions 
+  actions,
 }: PageHeaderProps) {
   // 0. 若未显式传入 showBack，则有 backHref 时才显示返回按钮
   const shouldShowBack = showBack !== undefined ? showBack : Boolean(backHref);
   const router = useRouter();
 
   const handleBack = () => {
-    if (backHref) {
+    if (onBack) {
+      onBack();
+    } else if (backHref) {
       router.push(backHref);
     } else {
       router.back();
@@ -74,10 +78,14 @@ export function PageHeader({
               {eyebrow}
             </p>
           )}
-          <h2 className="break-words text-xl font-semibold tracking-tight md:text-2xl">{title}</h2>
+          <h2 className="break-words text-xl font-semibold tracking-tight md:text-2xl">
+            {title}
+          </h2>
           {/* 描述可能包含操作提示，手机端同样完整显示 */}
           {description && (
-            <p className="mt-1 break-words text-sm text-muted-foreground">{description}</p>
+            <p className="mt-1 break-words text-sm text-muted-foreground">
+              {description}
+            </p>
           )}
         </div>
       </div>
