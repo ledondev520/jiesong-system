@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, type Page } from "@playwright/test";
 
-export type Role = "PURCHASE" | "WAREHOUSE" | "SALES" | "BOSS";
-type Scenario = "purchase" | "warehouse" | "sales" | "boss";
+export type Role = "PURCHASE" | "WAREHOUSE" | "SALES" | "BOSS" | "FINANCE";
+type Scenario = "purchase" | "warehouse" | "sales" | "boss" | "receipt-pool";
 export const testPassword = "test-only-role-browser-password-never-production";
 export interface RoleFixture {
   server: ChildProcess;
@@ -19,7 +19,33 @@ export interface RoleFixture {
   receiptItemId?: string;
   salesId?: string;
   salesNo?: string;
+  receiptPool?: {
+    usdReceiptId: string;
+    cnyReceiptId: string;
+    contracts: { id: string; contractNo: string; totalAmount: number }[];
+  };
   users: Record<Role, { id: string; username: string }>;
+}
+
+export interface ReceiptPoolSnapshot {
+  payments: {
+    id: string;
+    type: string;
+    sourcePaymentId: string | null;
+    salesContractId: string | null;
+    amount: number;
+    currency: string;
+    customerName: string | null;
+    paymentMethod: string | null;
+    paymentDate: number;
+    note: string | null;
+  }[];
+  contracts: {
+    id: string;
+    contractNo: string;
+    totalAmount: number;
+    receivedAmount: number;
+  }[];
 }
 export interface DomainSnapshot {
   purchases: { id: string; status: string }[];
@@ -67,6 +93,7 @@ export async function startRoleFixture(
       env: {
         PATH: process.env.PATH,
         TMPDIR: tmpdir(), // The child validates its directory against the same temporary root.
+        TZ: "UTC",
         NODE_ENV: "test",
         ROLE_BROWSER_TEST_DIR: directory,
         ROLE_BROWSER_TEST_SCENARIO: scenario,
@@ -142,6 +169,25 @@ c.close()`;
       { encoding: "utf8", timeout: 10000 },
     ),
   ) as DomainSnapshot;
+}
+
+export function readReceiptPool(fixture: RoleFixture): ReceiptPoolSnapshot {
+  // Real independent read-only SQLite evidence, never a mutable test endpoint.
+  const script = `import sqlite3,sys,json
+c=sqlite3.connect('file:'+sys.argv[1]+'?mode=ro',uri=True)
+c.row_factory=sqlite3.Row
+queries={
+'payments':'SELECT id,type,sourcePaymentId,salesContractId,amount,currency,customerName,paymentMethod,paymentDate,note FROM payments ORDER BY id',
+'contracts':'SELECT id,contractNo,totalAmount,receivedAmount FROM sales_contracts ORDER BY contractNo'}
+print(json.dumps({key:[dict(row) for row in c.execute(query)] for key,query in queries.items()}))
+c.close()`;
+  return JSON.parse(
+    execFileSync(
+      "python3",
+      ["-c", script, path.join(fixture.directory, "synthetic.db")],
+      { encoding: "utf8", timeout: 10000 },
+    ),
+  ) as ReceiptPoolSnapshot;
 }
 
 export async function forwardRealApi(page: Page, fixture: RoleFixture) {

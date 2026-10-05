@@ -1,4 +1,4 @@
-/** Fixture contract validation without browser execution, production data or provider calls. */
+/** Fixture contract validation including receipt allocation, without browser execution, production data or provider calls. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -12,7 +12,7 @@ async function fixtureFor(t, scenario, temporaryRoot = os.tmpdir()) {
   fs.chmodSync(directory, 0o700);
   const server = spawn(process.execPath, [path.join(__dirname, 'role-browser-server.js')], {
     // Keep os.tmpdir() consistent without inheriting provider or database credentials.
-    env: { PATH: process.env.PATH, TMPDIR: temporaryRoot, NODE_ENV: 'test', ROLE_BROWSER_TEST_DIR: directory, ROLE_BROWSER_TEST_SCENARIO: scenario },
+    env: { PATH: process.env.PATH, TMPDIR: temporaryRoot, TZ: 'UTC', NODE_ENV: 'test', ROLE_BROWSER_TEST_DIR: directory, ROLE_BROWSER_TEST_SCENARIO: scenario },
     stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
   });
   t.after(async () => {
@@ -62,7 +62,7 @@ test('role browser fixture: custom temporary root starts with private SQLite and
   await t.test('child preserves the selected temporary root', async child => {
     const f = await fixtureFor(child, 'purchase', temporaryRoot);
     await f.login('PURCHASE');
-    assert.deepEqual(f.read('SELECT COUNT(*) count FROM users'), [{ count: 4 }]);
+    assert.deepEqual(f.read('SELECT COUNT(*) count FROM users'), [{ count: 5 }]);
   });
 });
 
@@ -132,4 +132,82 @@ test('role browser fixture: BOSS permitted reads succeed and attempted mutation 
   assert.equal(denied.status, 403);
   assert.match(denied.body.message, /老板角色仅可查看业务/);
   assert.deepEqual(f.read('SELECT status,shippedAt FROM sales_contracts'), before);
+});
+
+const readPool = f => ({
+  payments: f.read('SELECT id,type,sourcePaymentId,salesContractId,amount,currency,customerName,paymentMethod,paymentDate,note FROM payments ORDER BY id'),
+  contracts: f.read('SELECT id,contractNo,totalAmount,receivedAmount FROM sales_contracts ORDER BY contractNo'),
+});
+
+test('role browser fixture: FINANCE partial split preserves source and readback consumes only remainder', { timeout: 60000 }, async t => {
+  const f = await fixtureFor(t, 'receipt-pool');
+  const finance = await f.login('FINANCE');
+  const { usdReceiptId, cnyReceiptId, contracts: [first, second] } = f.receiptPool;
+  const original = readPool(f).payments.find(row => row.id === usdReceiptId);
+  const split = await f.call('POST', `/finance/payments/${usdReceiptId}/allocate`, {
+    allocations: [{ salesContractId: first.id, amount: 300 }, { salesContractId: second.id, amount: 200 }],
+  }, finance);
+  assert.equal(split.status, 200);
+  const partial = readPool(f);
+  assert.deepEqual(partial.payments.find(row => row.id === usdReceiptId), original);
+  const allocations = partial.payments.filter(row => row.sourcePaymentId === usdReceiptId);
+  assert.equal(allocations.length, 2);
+  assert.deepEqual(allocations.map(row => [row.salesContractId, row.amount]).sort(), [[first.id, 300], [second.id, 200]].sort());
+  assert.ok(allocations.every(row => row.type === 'RECEIVABLE_COLLECTION' && row.currency === 'USD'));
+  assert.deepEqual(partial.contracts.map(row => row.receivedAmount), [300, 200]);
+  const pool = await f.call('GET', '/finance/unallocated-payments', undefined, finance);
+  assert.equal(pool.status, 200);
+  assert.equal(pool.body.data.find(row => row.id === usdReceiptId).remainingAmount, 500);
+  const contract = await f.call('GET', `/sales/${first.id}`, undefined, finance);
+  assert.equal(contract.status, 200);
+  assert.equal(contract.body.data.receivedAmount, 300);
+  const receivables = await f.call('GET', '/finance/receivables?page=1&pageSize=100&outstandingOnly=true', undefined, finance);
+  assert.equal(receivables.status, 200);
+  assert.deepEqual(receivables.body.data.items.map(row => [row.contractNo, row.receivedAmount, row.unreceiveAmount]).sort(), [[first.contractNo, 300, 500], [second.contractNo, 200, 800]].sort());
+  const remainder = await f.call('POST', `/finance/payments/${usdReceiptId}/allocate`, {
+    allocations: [{ salesContractId: second.id, amount: 500 }],
+  }, finance);
+  assert.equal(remainder.status, 200);
+  const full = readPool(f);
+  assert.deepEqual(full.payments.find(row => row.id === usdReceiptId), { ...original, type: 'RECEIVABLE_RECEIPT_ALLOCATED' });
+  assert.equal(full.payments.filter(row => row.sourcePaymentId === usdReceiptId).length, 3);
+  assert.equal(full.payments.filter(row => row.sourcePaymentId === usdReceiptId).reduce((sum, row) => sum + row.amount, 0), original.amount);
+  assert.deepEqual(full.contracts.map(row => row.receivedAmount), [300, 700]);
+  const remainingPool = await f.call('GET', '/finance/unallocated-payments', undefined, finance);
+  assert.equal(remainingPool.status, 200);
+  assert.deepEqual(remainingPool.body.data.map(row => [row.id, row.remainingAmount]), [[cnyReceiptId, 500]]);
+});
+
+test('role browser fixture: FINANCE rejected CNY retries preserve both source and contracts', { timeout: 60000 }, async t => {
+  const f = await fixtureFor(t, 'receipt-pool');
+  const finance = await f.login('FINANCE');
+  const { cnyReceiptId, contracts: [contract] } = f.receiptPool;
+  const before = readPool(f);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const rejected = await f.call('POST', `/finance/payments/${cnyReceiptId}/allocate`, {
+      allocations: [{ salesContractId: contract.id, amount: 125 }],
+    }, finance);
+    assert.equal(rejected.status, 400);
+    assert.match(rejected.body.message, /只支持 USD/);
+    assert.deepEqual(readPool(f), before);
+  }
+});
+
+test('role browser fixture: BOSS reads receipt balances but allocation and automatch are forbidden', { timeout: 60000 }, async t => {
+  const f = await fixtureFor(t, 'receipt-pool');
+  const boss = await f.login('BOSS');
+  const { usdReceiptId, contracts: [contract] } = f.receiptPool;
+  const before = readPool(f);
+  for (const route of ['/finance/unallocated-payments', '/finance/receivables', `/sales/${contract.id}`]) {
+    assert.equal((await f.call('GET', route, undefined, boss)).status, 200);
+  }
+  for (const [route, data] of [
+    [`/finance/payments/${usdReceiptId}/allocate`, { allocations: [{ salesContractId: contract.id, amount: 100 }] }],
+    ['/finance/payments/auto-match', {}],
+  ]) {
+    const denied = await f.call('POST', route, data, boss);
+    assert.equal(denied.status, 403);
+    assert.match(denied.body.message, /老板角色仅可查看业务/);
+    assert.deepEqual(readPool(f), before);
+  }
 });

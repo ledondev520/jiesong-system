@@ -1,4 +1,4 @@
-/** Test-only role browser backend: real Express/auth/services and private synthetic SQLite. */
+/** Test-only role browser backend: real Express/auth/services, receipt allocation and private synthetic SQLite. */
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -11,7 +11,7 @@ const password = 'test-only-role-browser-password-never-production';
 if (process.env.NODE_ENV !== 'test' || !process.send
   || !directory?.startsWith(path.join(os.tmpdir(), 'jiesong-role-browser-e2e-'))
   || fs.realpathSync(directory) !== directory
-  || !['purchase', 'warehouse', 'sales', 'boss'].includes(scenario)
+  || !['purchase', 'warehouse', 'sales', 'boss', 'receipt-pool'].includes(scenario)
   || fs.existsSync(path.resolve(__dirname, '../../.env'))) process.exit(2);
 process.umask(0o077);
 fs.chmodSync(directory, 0o700);
@@ -26,7 +26,7 @@ async function start() {
   const db = require('../utils/prisma');
   const users = {};
   const hash = await require('bcrypt').hash(password, 4);
-  for (const role of ['PURCHASE', 'WAREHOUSE', 'SALES', 'BOSS']) {
+  for (const role of ['PURCHASE', 'WAREHOUSE', 'SALES', 'BOSS', 'FINANCE']) {
     users[role] = await db.user.create({ data: { username: `synthetic-role-${role.toLowerCase()}`, name: `合成${role}`, role, password: hash } });
   }
   const product = await db.product.create({ data: { customsName: '合成角色验收商品', unit: '件', hsCode: '9999999999', declaration: '合成测试要素' } });
@@ -42,7 +42,7 @@ async function start() {
   const purchaseItem = purchase.items[0];
   let receipt, sale;
   const receipts = require('../services/purchaseReceiptService');
-  if (scenario !== 'purchase') {
+  if (['warehouse', 'sales', 'boss'].includes(scenario)) {
     const arrival = await receipts.createPurchaseReceipt(purchase.id, {
       requestId: 'synthetic-seed-arrival', arrivedAt: '2026-10-01',
       items: [{ purchaseItemId: purchaseItem.id, arrivedQuantity: scenario === 'warehouse' ? 40 : 100 }],
@@ -59,11 +59,29 @@ async function start() {
     await sales.importPurchasePackingItems(sale.id, [{ purchaseItemId: purchaseItem.id, boxes: 5 }]);
     await sales.updateSalesStatus(sale.id, 'CONFIRMED');
   }
+  let receiptPool;
+  if (scenario === 'receipt-pool') {
+    // Only seed form-independent starting records. Browser allocation always uses
+    // the unchanged authenticated finance route and its real SQLite transaction.
+    const contracts = [];
+    for (const [contractNo, totalAmount] of [['EXP-SYNTHETIC-POOL-A', 800], ['EXP-SYNTHETIC-POOL-B', 1000]]) {
+      contracts.push(await db.salesContract.create({ data: { contractNo, totalAmount, amountSource: 'FORMAL_DOCUMENT', exchangeRate: 7.2, status: 'SHIPPED', portId: port.id } }));
+    }
+    const sources = {};
+    for (const [currency, amount] of [['USD', 1000], ['CNY', 500]]) {
+      sources[currency] = await db.payment.create({ data: { type: 'RECEIVABLE_RECEIPT', customerName: `合成收款池${currency}客户`, amount, currency, paymentMethod: 'BANK_TRANSFER', paymentDate: new Date('2026-10-01T00:00:00.000Z'), note: '合成手工分配验收来源' } });
+    }
+    receiptPool = {
+      usdReceiptId: sources.USD.id, cnyReceiptId: sources.CNY.id,
+      contracts: contracts.map(({ id, contractNo, totalAmount }) => ({ id, contractNo, totalAmount })),
+    };
+  }
   const app = require('../app'); // Imported app never starts scheduled/provider jobs.
   const server = app.listen(0, '127.0.0.1', () => process.send({
     baseURL: `http://127.0.0.1:${server.address().port}`,
     purchaseId: purchase.id, purchaseItemId: purchaseItem.id, productId: product.id,
     receiptId: receipt?.id, receiptItemId: receipt?.items[0].id, salesId: sale?.id, salesNo: sale?.contractNo,
+    receiptPool,
     users: Object.fromEntries(Object.entries(users).map(([role, user]) => [role, { id: user.id, username: user.username }])),
   }));
   let closing = false;
