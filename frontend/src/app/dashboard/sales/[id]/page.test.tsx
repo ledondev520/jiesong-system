@@ -539,6 +539,66 @@ describe("SalesDetailPage 交互逻辑", () => {
     expect(mockUpdateSalesStatus).toHaveBeenCalledWith("s-1", "SHIPPED");
   });
 
+  it("发运HTTP错误DTO保留库存不足原因，阶段不推进且允许原样重试", async () => {
+    const contract = {
+      id: "s-1",
+      contractNo: "SYNTHETIC-STOCK-GUARD",
+      status: "PACKING",
+      totalBoxes: 1,
+      volume: 60,
+      grossWeight: 1000,
+      totalAmount: 100,
+      packingItems: [
+        {
+          id: "pk-fit",
+          productId: "p-1",
+          boxes: 1,
+          quantity: 50,
+          volume: 60,
+          length: 1000,
+          width: 1000,
+          height: 1000,
+          product: { id: "p-1", customsName: "合成发运商品" },
+        },
+      ],
+      port: { name: "合成港口" },
+    };
+    mockGetById.mockResolvedValue({ data: contract });
+    const message = "商品 p-1 库存不足，需出库 50，可用 30";
+    // Shared Axios rejects response.data, not an Error instance, for HTTP errors.
+    mockUpdateSalesStatus.mockRejectedValueOnce({
+      code: 400,
+      message,
+      data: null,
+    });
+    const user = userEvent.setup();
+    renderPage("s-1");
+    const ship = await screen.findByRole("button", { name: "确认发运" });
+    await user.click(ship);
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith(message));
+    expect(mockToastError).not.toHaveBeenCalledWith("状态推进失败");
+    expect(mockGetById).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "确认发运" })).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "确认到港" }),
+    ).not.toBeInTheDocument();
+
+    mockUpdateSalesStatus.mockResolvedValueOnce({
+      data: { ...contract, status: "SHIPPED" },
+    });
+    mockGetById.mockResolvedValue({ data: { ...contract, status: "SHIPPED" } });
+    await user.click(ship);
+    await waitFor(() => expect(mockUpdateSalesStatus).toHaveBeenCalledTimes(2));
+    expect(mockUpdateSalesStatus).toHaveBeenNthCalledWith(1, "s-1", "SHIPPED");
+    expect(mockUpdateSalesStatus).toHaveBeenNthCalledWith(2, "s-1", "SHIPPED");
+    expect(
+      await screen.findByRole("button", { name: "确认到港" }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "确认发运" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("手机装箱卡片编辑保持采购来源数量、箱数、重量和尺寸锁定", async () => {
     mockIsMobile.mockReturnValue(true);
     mockGetById.mockResolvedValue({
