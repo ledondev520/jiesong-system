@@ -18,7 +18,7 @@
     "invoice:verify": "node ../scripts/verify_tax_refund_invoices.js",
     "test": "NODE_ENV=test JWT_SECRET=test-only-jwt-secret-for-ci-123456 node --test",
     "test:wechat-group": "NODE_ENV=test JWT_SECRET=test-only-jwt-secret-for-ci-123456 node --test src/integrations/wechatGroupAgent/wechatGroupAgent.test.js",
-    "test:db": "NODE_ENV=test JWT_SECRET=test-only-jwt-secret-for-ci-123456 node --test src/integration/database.integration.js src/integration/trade-lifecycle.integration.js src/integration/sales-creation.integration.js src/integration/password-recovery.integration.js",
+    "test:db": "NODE_ENV=test JWT_SECRET=test-only-jwt-secret-for-ci-123456 node --test src/integration/database.integration.js src/integration/trade-lifecycle.integration.js src/integration/sales-cargo-lifecycle.integration.js src/integration/sales-creation.integration.js src/integration/password-recovery.integration.js",
     "test:all": "npm run test && npm run test:db",
     "db:backup": "node scripts/db-backup.js",
     "db:generate": "prisma generate",

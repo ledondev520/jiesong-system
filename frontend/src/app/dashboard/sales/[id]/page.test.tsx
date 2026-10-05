@@ -616,4 +616,73 @@ describe("SalesDetailPage 交互逻辑", () => {
     expect(await screen.findByText("合同核销跟进测试面板")).toBeInTheDocument();
     expect(mockForexRender).toHaveBeenCalledWith("s-1");
   });
+  it.each([false, true])(
+    "发运后保留资料编辑并锁定增删与数量（手机：%s）",
+    async (mobile) => {
+      mockIsMobile.mockReturnValue(mobile);
+      mockGetById.mockResolvedValue({
+        data: {
+          id: "s-1",
+          contractNo: "SYNTHETIC-SHIPPED",
+          status: "SHIPPED",
+          totalBoxes: 5,
+          grossWeight: 20000,
+          volume: 5,
+          totalAmount: 600,
+          packingItems: [
+            {
+              id: "pk-1",
+              productId: "p-1",
+              quantity: 50,
+              boxes: 5,
+              unitPrice: 12,
+              grossWeight: 20000,
+              netWeight: 19000,
+              volume: 5,
+              length: 1000,
+              width: 1000,
+              height: 1000,
+              product: { id: "p-1", customsName: "合成商品" },
+            },
+          ],
+        },
+      });
+      mockProductGetAll.mockResolvedValue({
+        data: { items: [{ id: "p-1", customsName: "合成商品" }] },
+      });
+      mockStoreGetAll.mockResolvedValue({ data: { items: [] } });
+      mockInventoryGetAll.mockResolvedValue({ data: { items: [] } });
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByRole("heading", { name: "SYNTHETIC-SHIPPED" });
+      expect(
+        screen.getByRole("button", { name: "从已完工采购导入" }),
+      ).toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: "手动添加商品" }),
+      ).toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: "删除 合成商品" }),
+      ).toBeDisabled();
+      await user.click(screen.getByRole("button", { name: "编辑 合成商品" }));
+      expect(screen.getByRole("spinbutton", { name: "数量" })).toBeDisabled();
+      expect(
+        screen.getByRole("spinbutton", { name: "单价" }),
+      ).not.toBeDisabled();
+      expect(
+        screen.getByRole("spinbutton", { name: "长度" }),
+      ).not.toBeDisabled();
+      // 关闭后不遗留编辑弹层，重新打开仍然保持货物锁定。
+      await user.click(
+        within(screen.getByRole("dialog")).getByRole("button", {
+          name: "取消",
+        }),
+      );
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
+      await user.click(screen.getByRole("button", { name: "编辑 合成商品" }));
+      expect(screen.getByRole("spinbutton", { name: "数量" })).toBeDisabled();
+    },
+  );
 });
