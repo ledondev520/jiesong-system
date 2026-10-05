@@ -676,6 +676,7 @@ const importPurchasePackingItems = async (salesContractId, selections = []) => {
 };
 
 module.exports = {
+  getThirdPartySources,
   getSalesContracts,
   getSalesContractById,
   createSalesContract,

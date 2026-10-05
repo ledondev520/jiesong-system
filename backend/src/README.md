@@ -64,7 +64,7 @@
 | ai/contextService.js | 按当前销售合同港口关联构造美元上下文；局部查询失败保留其他资料并提示不可用，解析汇率后继续拼接财务概况 |
 | aiService.js | DeepSeek/Kimi 活动供应商、DeepSeek 独立密钥与 flash thinking/high、完整时限、零重试与流式用量 |
 | anthropicCompatService.js | Open Agent 的 OpenAI 协议适配，保留思考/工具回合与图像，共用请求时限及模型参数 |
-| openAgentService.js | 内部草稿按请求直接执行；其他写操作一次确认；当前 AI 客户端校验与零自动重试、工具角色与执行回放；SDK 错误终止传播为 503/SSE error，不写成功记录 |
+| openAgentService.js | 出口详情复用销售服务从装箱行计算拼柜来源；内部草稿按请求直接执行；其他写操作一次确认；当前 AI 客户端校验与零自动重试、工具角色与执行回放；SDK 错误终止传播为 503/SSE error，不写成功记录 |
 | agentReplaySummaryService.js | Agent 回放摘要持久化，支持复用外层事务客户端 |
 | importService.js | CSV数据解析与导入 |
 | exportService.js | 多格式数据导出（CSV + 出口合同五 Sheet Excel 含商业发票/税务测算） |

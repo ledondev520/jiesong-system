@@ -1,6 +1,6 @@
 /**
  * Input: 已发布的 open-agent-sdk, Anthropic 兼容 API, 业务服务层
- * Output: AI 只读查询、内部草稿直接执行、业务事实一次确认与可回放执行记录，上游失败不记成功
+ * Output: AI 只读查询（含真实拼柜来源）、内部草稿直接执行、业务事实一次确认与可回放执行记录，上游失败不记成功
  * Pos: 后端 Agent Runtime 核心，衔接 LLM 与业务数据
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -1163,6 +1163,7 @@ const READ_TOOL_SPECS = [
         },
       });
       if (!contract) return toJson({ error: `出口合同 ${keyword} 不存在` });
+      const sourceParties = salesService.getThirdPartySources(contract.packingItems || []);
       return toJson({
         id: contract.id,
         contractNo: contract.contractNo,
@@ -1170,8 +1171,8 @@ const READ_TOOL_SPECS = [
         totalAmount: contract.totalAmount,
         receivedAmount: contract.receivedAmount,
         port: contract.port || null,
-        hasThirdPartyCargo: Boolean(contract.hasThirdPartyCargo),
-        sourceParties: contract.sourceParties || [],
+        hasThirdPartyCargo: sourceParties.length > 0,
+        sourceParties,
         items: (contract.items || []).map((item) => ({
           id: item.id,
           quantity: item.quantity,
