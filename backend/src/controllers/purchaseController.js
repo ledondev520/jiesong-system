@@ -1,12 +1,13 @@
 /**
  * Input: Prisma客户端、统一附件服务与上传路径工具
- * Output: 采购合同相关的HTTP响应
+ * Output: 采购合同相关的HTTP响应，编号预览沿用统一序列规则
  * Pos: 采购控制器，处理采购合同CRUD请求与受限附件存储、下载
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');
+const { generateNextPurchaseContractNo } = require('../services/purchaseContractNumberService');
 const fileService = require('../services/fileService');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
@@ -560,11 +561,7 @@ const downloadFile = async (req, res, next) => {
  */
 const getNextContractNo = async (req, res, next) => {
   try {
-    const year = new Date().getFullYear().toString().slice(-2);
-    const count = await prisma.purchaseContract.count({
-      where: { contractNo: { startsWith: `CG${year}` } },
-    });
-    const contractNo = `CG${year}${String(count + 1).padStart(5, '0')}`;
+    const contractNo = await generateNextPurchaseContractNo(prisma);
     
     success(res, { contractNo });
   } catch (error) {

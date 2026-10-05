@@ -110,3 +110,10 @@
 密码找回由 `services/passwordResetService.js` 处理，使用独立于注册的挑战表、持久配额和SQLite单例写锁；公开发码响应不泄露账号存在性，成功消费与改密、会话版本撤销和审计同事务。`middleware/auth.js` 每请求实时校验状态及版本；`utils/passwordPolicy.js` 统一新密码策略。真实HTTP/SQLite及跨进程消费覆盖在 `integration/password-recovery.integration.js`，浏览器真实后端夹具在 `testHelpers/`，详细约束见 `docs/security/password-recovery.md`。
 
 找回路由直接使用锁定 `express-rate-limit` 并与持久IP配额共用IPv4映射/IPv6 /56归一化。`config/trustedProxies.js` 验证显式代理IP/CIDR，`app.js` 默认不信任转发头；只有经运行环境核实后设置 `TRUSTED_PROXY_CIDRS` 才启用。真实HTTP回归覆盖无信任/非白名单代理头不能绕过、白名单代理停止在首个不可信地址、不同客户端配额独立及IPv6/映射地址跨进程本地计数重置仍受数据库配额保护。
+
+## 采购合同编号与生命周期回归
+
+- `services/purchaseContractNumberService.js` 统一采购创建、编号预览和批量导入的 `CGyy` 序列：按现存合法数字后缀最大值加一，删除早期草稿不会与仍存在的编号碰撞；预览不预留编号
+- `agent/commands/purchase/createPurchaseWithItems.js` 在合同与明细事务内分配编号，对自动编号唯一冲突或事务写冲突最多重试三次；不更改用户指定编号，也不重试无关数据库错误
+- `services/purchaseImportExportService.js` 的实际 Excel 导入复用统一序列；每行校验通过后原子写入，仅空编号的唯一冲突最多尝试五次，保留显式编号及逐行失败统计
+- `integration/procurement-lifecycle.integration.js` 仅用临时合成 SQLite 和实际 PURCHASE/WAREHOUSE HTTP 请求验证签约、完工回滚/重复、到货与复验幂等、库存列表/详情、删除后编号及同时创建；还验证实际 Excel 导入的自定义编号、五位序列溢出、失败行无写入及四请求并发，由 `npm run test:db` 执行

@@ -1,6 +1,6 @@
 /**
  * Input: 实时库存服务、SortableTableHead、useTableSort
- * Output: 支持窄屏操作与长名称显示的库存状态管理 Tab 组件（单条/批量状态流转、桌面表列排序；采购/验货来源库存自动流转）
+ * Output: 支持当前筛选刷新、窄屏操作与长名称显示的库存状态管理 Tab 组件（单条/批量状态流转、桌面表列排序；采购/验货来源库存自动流转）
  * Pos: 商品档案页面的子 Tab
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -78,6 +78,7 @@ export function InventoryTab() {
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [refreshVersion, setRefreshVersion] = useState(0);
 
   /**
    * 职责：将关键词输入做轻量防抖，避免请求风暴。
@@ -91,14 +92,6 @@ export function InventoryTab() {
   }, [keyword]);
 
   /**
-   * 职责：根据防抖关键词触发后端查询。
-   * 思路：仅当 debouncedKeyword 改变时重拉列表。
-   */
-  useEffect(() => {
-    loadInventory(debouncedKeyword);
-  }, [debouncedKeyword, currentPage, pageSize]);
-
-  /**
    * 职责：加载库存列表并同步清空失效选中项。
    * 思路：
    * 1. 带 keyword 调用后端查询；
@@ -107,33 +100,44 @@ export function InventoryTab() {
    * @param searchKeyword 搜索关键词
    * @returns Promise<void>
    */
-  const loadInventory = async (searchKeyword = ""): Promise<void> => {
-    const request = ++inventoryRequest.current;
-    setLoading(true);
-    setLoadError(false);
-    try {
-      // 到货验货、出货与批量流转均会改变库存；每次进入或刷新都读取服务器事实。
-      const response = await inventoryService.getAll({
-        page: currentPage,
-        pageSize,
-        keyword: searchKeyword || undefined,
-      });
-      if (request !== inventoryRequest.current) return;
-      const nextInventory = response.data?.items || [];
-      setInventory(nextInventory);
-      setTotal(response.data?.pagination?.total ?? 0);
-      setSelectedIds((prevSelectedIds) => {
-        const availableIds = new Set(nextInventory.map((item) => item.id));
-        return prevSelectedIds.filter((id) => availableIds.has(id));
-      });
-    } catch {
-      if (request !== inventoryRequest.current) return;
-      setLoadError(true);
-      toast.error("加载库存失败");
-    } finally {
-      if (request === inventoryRequest.current) setLoading(false);
-    }
-  };
+  const loadInventory = useCallback(
+    async (searchKeyword = ""): Promise<void> => {
+      const request = ++inventoryRequest.current;
+      setLoading(true);
+      setLoadError(false);
+      try {
+        // 到货验货、出货与批量流转均会改变库存；每次进入或刷新都读取服务器事实。
+        const response = await inventoryService.getAll({
+          page: currentPage,
+          pageSize,
+          keyword: searchKeyword || undefined,
+        });
+        if (request !== inventoryRequest.current) return;
+        const nextInventory = response.data?.items || [];
+        setInventory(nextInventory);
+        setTotal(response.data?.pagination?.total ?? 0);
+        setSelectedIds((prevSelectedIds) => {
+          const availableIds = new Set(nextInventory.map((item) => item.id));
+          return prevSelectedIds.filter((id) => availableIds.has(id));
+        });
+      } catch {
+        if (request !== inventoryRequest.current) return;
+        setLoadError(true);
+        toast.error("加载库存失败");
+      } finally {
+        if (request === inventoryRequest.current) setLoading(false);
+      }
+    },
+    [currentPage, pageSize],
+  );
+
+  // 操作完成时只发出刷新信号；效果使用最新筛选，避免旧操作覆盖新查询。
+  useEffect(() => {
+    void loadInventory(debouncedKeyword);
+    return () => {
+      inventoryRequest.current += 1;
+    };
+  }, [debouncedKeyword, loadInventory, refreshVersion]);
 
   /**
    * 获取库存状态徽章
@@ -264,7 +268,7 @@ export function InventoryTab() {
         toast.error(`失败 ${result.failed} 条：${firstError}`);
       }
       setSelectedIds([]);
-      await loadInventory(debouncedKeyword);
+      setRefreshVersion((version) => version + 1);
     } catch (error) {
       toast.error(resolveErrorMessage(error));
     } finally {
