@@ -1,5 +1,5 @@
 /**
- * Input: 实际退税页签、嵌入报关列表/详情、可观察的浏览器历史与合成服务数据
+ * Input: 预加载的真实报关组件、退税页签/详情、可观察的浏览器历史与合成服务数据
  * Output: 列表/详情返回后的页签、历史筛选与异步列表结果一致性回归结果
  * Pos: 退税工作台路由集成测试
  */
@@ -13,7 +13,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { TaxRefundListPageContent } from "./TaxRefundListPageContent";
 import { CustomsDeclarationDetailPageContent } from "@/app/customs-declarations/components/CustomsDeclarationDetailPageContent";
 
@@ -128,6 +128,15 @@ function TestRoutes() {
 }
 
 describe("退税页签实际组件的路由流转", () => {
+  beforeAll(async () => {
+    // 冷模块转换属于测试准备，不能消耗首个 UI 查询的等待预算；仍使用真实 lazy 组件。
+    const customsModule =
+      await import("@/app/customs-declarations/components/CustomsDeclarationListPageContent");
+    expect(customsModule.CustomsDeclarationListPageContent).toBeTypeOf(
+      "function",
+    );
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.searchSnapshot = null;
