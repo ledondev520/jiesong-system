@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
+const { createHash } = require('node:crypto');
 
 test('HTTP/SQLite：一笔采购两次出货守恒，库存与清单实际落库', async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-lifecycle-test-'));
@@ -47,8 +48,22 @@ test('HTTP/SQLite：一笔采购两次出货守恒，库存与清单实际落库
   await call('PUT', `/purchases/${purchase.id}/production-details`, { completeProduction: true, items: [{ id: pi.id, specification: '合成重型箱', boxes: 10, grossWeight: 40000, netWeight: 38000, volume: 10, length: 1000, width: 1000, height: 1000 }] }, { role: 'PURCHASE' });
   assert.equal((await db.purchaseContract.findUnique({ where: { id: purchase.id } })).status, 'READY');
   await call('PUT', `/purchases/${purchase.id}/status`, { status: 'SHIPPED' }, { role: 'PURCHASE' });
-  const payment = (amount, key) => call('POST', '/finance/payments', { type: 'PAYABLE_PAYMENT', purchaseContractId: purchase.id, amount, currency: 'CNY', paymentDate: '2026-10-01' }, { role: 'FINANCE', expected: 201, headers: { 'X-Idempotency-Key': key } });
-  await payment(339, 'synthetic-deposit');
+  // Browser-side SHA-256 keys are covered by frontend tests; verify real HTTP/SQLite
+  // accepts the complete ASCII header and preserves Chinese notes/legacy PAYABLE.
+  const payment = (amount, label, expected = 201) => {
+    const body = { type: 'PAYABLE', purchaseContractId: purchase.id, amount, currency: 'CNY', paymentMethod: 'other', paymentDate: '2026-10-01', note: `${'合成付款备注'.repeat(100)}${label}` };
+    const canonical = JSON.stringify(Object.fromEntries(Object.entries(body).sort(([a], [b]) => a.localeCompare(b))));
+    const key = `idempotency:sha256:${createHash('sha256').update(canonical).digest('hex')}`;
+    assert.equal(key.length, 83);
+    return call('POST', '/finance/payments', body, { role: 'PURCHASE', expected, headers: { 'X-Idempotency-Key': key } });
+  };
+  const deposit = await payment(339, 'synthetic-deposit');
+  const replay = await payment(339, 'synthetic-deposit', 200);
+  assert.equal(replay.id, deposit.id);
+  assert.equal(replay.paymentMethod, 'other');
+  assert.equal(replay.note, `${'合成付款备注'.repeat(100)}synthetic-deposit`);
+  assert.equal(await db.payment.count({ where: { purchaseContractId: purchase.id } }), 1);
+  assert.equal((await call('GET', `/purchases/${purchase.id}`)).paidAmount, 339);
   const receive = (requestId, amount) => call('POST', `/purchases/${purchase.id}/receipts`, { requestId, arrivedAt: '2026-10-01', items: [{ purchaseItemId: pi.id, arrivedQuantity: amount }] }, { role: 'WAREHOUSE' });
   const inspect = (receipt, requestId, acceptedQuantity, reinspectionQuantity = 0) => call('POST', `/purchases/${purchase.id}/receipts/${receipt.receipt.id}/inspection`, { requestId, note: '合成验货依据', items: [{ receiptItemId: receipt.receipt.items[0].id, acceptedQuantity, reinspectionQuantity }] }, { role: 'WAREHOUSE' });
   const arrival = await receive('synthetic-arrival-1', 40);
@@ -70,7 +85,12 @@ test('HTTP/SQLite：一笔采购两次出货守恒，库存与清单实际落库
   await inspect(arrival, 'synthetic-inspection-2', 40);
   const second = await receive('synthetic-arrival-2', 60);
   await inspect(second, 'synthetic-inspection-3', 60);
-  await payment(791, 'synthetic-final-payment');
+  // Distinct long notes sharing their entire prefix must remain distinct records.
+  const finalA = await payment(395.5, 'synthetic-final-a');
+  const finalB = await payment(395.5, 'synthetic-final-b');
+  assert.notEqual(finalA.id, finalB.id);
+  assert.equal(await db.payment.count({ where: { purchaseContractId: purchase.id } }), 3);
+  assert.equal((await call('GET', `/purchases/${purchase.id}`)).paidAmount, 1130);
   assert.equal((await db.purchaseContract.findUnique({ where: { id: purchase.id } })).status, 'COMPLETED');
   const b = await prepareExport();
   for (const sale of [a, b]) {

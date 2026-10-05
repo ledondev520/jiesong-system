@@ -1,13 +1,13 @@
 /**
  * Input: 单柜财务汇总 Interface 与美元收款写入 Interface
- * Output: 收入、采购成本、退税、商品毛利、现金流和逐笔收付的一站式结算界面
+ * Output: 统一财务结算与收款登记，保存失败交由弹窗保留草稿并提示
  * Pos: 出口专项单详情页唯一财务主界面，替代重复的只读收款列表
  */
 
-'use client';
+"use client";
 
-import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
-import { useCallback, useEffect, useState } from 'react';
+import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
+import { useCallback, useEffect, useState } from "react";
 import {
   AlertCircle,
   ArrowDownLeft,
@@ -18,17 +18,26 @@ import {
   ReceiptText,
   RefreshCw,
   TrendingUp,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { PaymentType } from '@/types';
-import { salesService, type SalesFinanceSummary } from '@/services/sales.service';
-import { financeService } from '@/services/finance.service';
-import { formatDate } from '@/lib/date-format';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { SemanticBadge } from '@/components/ui/semantic-badge';
-import { Skeleton } from '@/components/ui/skeleton';
+} from "lucide-react";
+import { toast } from "sonner";
+import { PaymentType } from "@/types";
+import {
+  salesService,
+  type SalesFinanceSummary,
+} from "@/services/sales.service";
+import { financeService } from "@/services/finance.service";
+import { formatDate } from "@/lib/date-format";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { SemanticBadge } from "@/components/ui/semantic-badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -36,11 +45,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   PaymentDialog,
   type PaymentSubmitData,
-} from '@/app/dashboard/finance/components/PaymentDialog';
+} from "@/app/dashboard/finance/components/PaymentDialog";
 
 interface SalesFinancePanelProps {
   salesContractId: string;
@@ -48,19 +57,18 @@ interface SalesFinancePanelProps {
   onChanged?: () => void | Promise<void>;
 }
 
-const amountFormatter = new Intl.NumberFormat('zh-CN', {
+const amountFormatter = new Intl.NumberFormat("zh-CN", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
-const formatAmount = (currency: 'USD' | 'CNY', value: number) => (
-  `${currency} ${amountFormatter.format(Number(value || 0))}`
-);
+const formatAmount = (currency: "USD" | "CNY", value: number) =>
+  `${currency} ${amountFormatter.format(Number(value || 0))}`;
 
-const issueTone = (severity: 'error' | 'warning' | 'info') => {
-  if (severity === 'error') return 'danger' as const;
-  if (severity === 'warning') return 'warning' as const;
-  return 'info' as const;
+const issueTone = (severity: "error" | "warning" | "info") => {
+  if (severity === "error") return "danger" as const;
+  if (severity === "warning") return "warning" as const;
+  return "info" as const;
 };
 
 export function SalesFinancePanel({
@@ -91,29 +99,32 @@ export function SalesFinancePanel({
   }, [loadSummary]);
 
   const handleReceipt = async (data: PaymentSubmitData) => {
+    await financeService.createPayment({
+      type: PaymentType.RECEIVABLE,
+      salesContractId,
+      amount: Number(data.amount),
+      currency: "USD",
+      paymentMethod: data.paymentMethod,
+      paymentDate: data.paymentDate.toISOString(),
+      note: data.note,
+    });
+    setPaymentOpen(false);
+    toast.success("美元收款已登记");
+    // Refresh failures must not invite retrying a payment already saved.
+    await loadSummary();
     try {
-      await financeService.createPayment({
-        type: PaymentType.RECEIVABLE,
-        salesContractId,
-        amount: Number(data.amount),
-        currency: 'USD',
-        paymentMethod: data.paymentMethod,
-        paymentDate: data.paymentDate.toISOString(),
-        note: data.note,
-      });
-      setPaymentOpen(false);
-      toast.success('美元收款已登记');
-      await loadSummary();
       await onChanged?.();
     } catch {
-      toast.error('登记美元收款失败');
-      throw new Error('登记美元收款失败');
+      toast.error("收款已保存，合同刷新失败，请刷新页面查看");
     }
   };
 
   if (loading && !summary) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="财务结算加载中">
+      <div
+        className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+        aria-label="财务结算加载中"
+      >
         {Array.from({ length: 4 }, (_, index) => (
           <Skeleton key={index} className="h-36 w-full" />
         ))}
@@ -128,7 +139,11 @@ export function SalesFinancePanel({
         <AlertTitle>单柜财务汇总加载失败</AlertTitle>
         <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
           <span>现有财务数据没有被修改，可以重新读取。</span>
-          <Button variant="outline" size="sm" onClick={() => void loadSummary()}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void loadSummary()}
+          >
             <RefreshCw className="h-4 w-4" />
             重新加载
           </Button>
@@ -137,7 +152,9 @@ export function SalesFinancePanel({
     );
   }
 
-  const issueErrors = summary.issues.filter((issue) => issue.severity === 'error');
+  const issueErrors = summary.issues.filter(
+    (issue) => issue.severity === "error",
+  );
 
   return (
     <div className="space-y-4">
@@ -154,13 +171,19 @@ export function SalesFinancePanel({
               收款固定按 USD，采购付款固定按 CNY；人民币结果使用合同汇率
               {summary.currencyPolicy.conversionRate
                 ? ` ${summary.currencyPolicy.conversionRate.toFixed(4)}`
-                : '（未录入）'}。
+                : "（未录入）"}
+              。
             </CardDescription>
           </div>
-          <BusinessWrite><Button onClick={() => setPaymentOpen(true)} disabled={summary.revenue.outstandingUsd <= 0}>
-            <BanknoteArrowDown className="h-4 w-4" />
-            登记美元收款
-          </Button></BusinessWrite>
+          <BusinessWrite>
+            <Button
+              onClick={() => setPaymentOpen(true)}
+              disabled={summary.revenue.outstandingUsd <= 0}
+            >
+              <BanknoteArrowDown className="h-4 w-4" />
+              登记美元收款
+            </Button>
+          </BusinessWrite>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -169,10 +192,16 @@ export function SalesFinancePanel({
                 <span>自有货物收入</span>
                 <ArrowDownLeft className="h-4 w-4" />
               </div>
-              <p className="mt-2 text-2xl font-semibold tabular-nums">{formatAmount('USD', summary.revenue.ownedRevenueUsd)}</p>
+              <p className="mt-2 text-2xl font-semibold tabular-nums">
+                {formatAmount("USD", summary.revenue.ownedRevenueUsd)}
+              </p>
               <div className="mt-3 flex justify-between text-xs text-muted-foreground">
-                <span>已收 {formatAmount('USD', summary.revenue.receivedUsd)}</span>
-                <span>待收 {formatAmount('USD', summary.revenue.outstandingUsd)}</span>
+                <span>
+                  已收 {formatAmount("USD", summary.revenue.receivedUsd)}
+                </span>
+                <span>
+                  待收 {formatAmount("USD", summary.revenue.outstandingUsd)}
+                </span>
               </div>
             </div>
 
@@ -181,10 +210,17 @@ export function SalesFinancePanel({
                 <span>自有货物采购成本</span>
                 <ReceiptText className="h-4 w-4" />
               </div>
-              <p className="mt-2 text-2xl font-semibold tabular-nums">{formatAmount('CNY', summary.cost.purchaseCostCny)}</p>
+              <p className="mt-2 text-2xl font-semibold tabular-nums">
+                {formatAmount("CNY", summary.cost.purchaseCostCny)}
+              </p>
               <div className="mt-3 flex justify-between text-xs text-muted-foreground">
-                <span>已付 {formatAmount('CNY', summary.cost.paidPurchaseCostCny)}</span>
-                <span>待付 {formatAmount('CNY', summary.cost.outstandingPurchaseCostCny)}</span>
+                <span>
+                  已付 {formatAmount("CNY", summary.cost.paidPurchaseCostCny)}
+                </span>
+                <span>
+                  待付{" "}
+                  {formatAmount("CNY", summary.cost.outstandingPurchaseCostCny)}
+                </span>
               </div>
             </div>
 
@@ -193,10 +229,14 @@ export function SalesFinancePanel({
                 <span>预计商品毛利</span>
                 <TrendingUp className="h-4 w-4" />
               </div>
-              <p className="mt-2 text-2xl font-semibold tabular-nums">{formatAmount('CNY', summary.profit.estimatedGrossProfitCny)}</p>
+              <p className="mt-2 text-2xl font-semibold tabular-nums">
+                {formatAmount("CNY", summary.profit.estimatedGrossProfitCny)}
+              </p>
               <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
                 <span>预计毛利率</span>
-                <span className="font-medium text-foreground">{summary.profit.estimatedGrossMarginPct.toFixed(2)}%</span>
+                <span className="font-medium text-foreground">
+                  {summary.profit.estimatedGrossMarginPct.toFixed(2)}%
+                </span>
               </div>
             </div>
 
@@ -205,12 +245,18 @@ export function SalesFinancePanel({
                 <span>本柜实际净现金流</span>
                 <Landmark className="h-4 w-4" />
               </div>
-              <p className={`mt-2 text-2xl font-semibold tabular-nums ${summary.cashFlow.netCashCny < 0 ? 'text-destructive' : ''}`}>
-                {formatAmount('CNY', summary.cashFlow.netCashCny)}
+              <p
+                className={`mt-2 text-2xl font-semibold tabular-nums ${summary.cashFlow.netCashCny < 0 ? "text-destructive" : ""}`}
+              >
+                {formatAmount("CNY", summary.cashFlow.netCashCny)}
               </p>
               <div className="mt-3 flex justify-between text-xs text-muted-foreground">
-                <span>预计退税 {formatAmount('CNY', summary.tax.estimatedRefundCny)}</span>
-                <span>实退 {formatAmount('CNY', summary.tax.actualRefundedCny)}</span>
+                <span>
+                  预计退税 {formatAmount("CNY", summary.tax.estimatedRefundCny)}
+                </span>
+                <span>
+                  实退 {formatAmount("CNY", summary.tax.actualRefundedCny)}
+                </span>
               </div>
             </div>
           </div>
@@ -222,25 +268,45 @@ export function SalesFinancePanel({
           {summary.issues.length > 0 && (
             <div className="space-y-2" aria-label="财务口径提示">
               {summary.issues.map((issue) => (
-                <div key={`${issue.code}-${issue.message}`} className="flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm">
-                  <SemanticBadge tone={issueTone(issue.severity)} className="mt-0.5 shrink-0">
-                    {issue.severity === 'error' ? '阻塞' : issue.severity === 'warning' ? '复核' : '说明'}
+                <div
+                  key={`${issue.code}-${issue.message}`}
+                  className="flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm"
+                >
+                  <SemanticBadge
+                    tone={issueTone(issue.severity)}
+                    className="mt-0.5 shrink-0"
+                  >
+                    {issue.severity === "error"
+                      ? "阻塞"
+                      : issue.severity === "warning"
+                        ? "复核"
+                        : "说明"}
                   </SemanticBadge>
-                  <span className={issue.severity === 'error' ? 'text-destructive' : 'text-muted-foreground'}>{issue.message}</span>
+                  <span
+                    className={
+                      issue.severity === "error"
+                        ? "text-destructive"
+                        : "text-muted-foreground"
+                    }
+                  >
+                    {issue.message}
+                  </span>
                 </div>
               ))}
             </div>
           )}
 
           <div className="flex flex-wrap gap-2">
-            <SemanticBadge tone={summary.marginReady ? 'success' : 'danger'}>
-              商品毛利{summary.marginReady ? '可用' : '不可用'}
+            <SemanticBadge tone={summary.marginReady ? "success" : "danger"}>
+              商品毛利{summary.marginReady ? "可用" : "不可用"}
             </SemanticBadge>
-            <SemanticBadge tone={summary.cashReady ? 'success' : 'danger'}>
-              现金流{summary.cashReady ? '可用' : '不可用'}
+            <SemanticBadge tone={summary.cashReady ? "success" : "danger"}>
+              现金流{summary.cashReady ? "可用" : "不可用"}
             </SemanticBadge>
             {issueErrors.length > 0 && (
-              <span className="text-xs text-destructive">请先处理 {issueErrors.length} 个阻塞项</span>
+              <span className="text-xs text-destructive">
+                请先处理 {issueErrors.length} 个阻塞项
+              </span>
             )}
           </div>
         </CardContent>
@@ -250,11 +316,15 @@ export function SalesFinancePanel({
         <Card>
           <CardHeader>
             <CardTitle>关联采购付款</CardTitle>
-            <CardDescription>同一采购合同按本柜实际采购成本占比，分摊已付款金额。</CardDescription>
+            <CardDescription>
+              同一采购合同按本柜实际采购成本占比，分摊已付款金额。
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {summary.linkedPurchases.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">暂无已关联的采购合同</p>
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                暂无已关联的采购合同
+              </p>
             ) : (
               <>
                 <div className="hidden md:block">
@@ -271,12 +341,22 @@ export function SalesFinancePanel({
                       {summary.linkedPurchases.map((purchase) => (
                         <TableRow key={purchase.contractNo}>
                           <TableCell>
-                            <div className="font-medium">{purchase.contractNo}</div>
-                            <div className="text-xs text-muted-foreground">{purchase.supplierName || '未匹配供应商'}</div>
+                            <div className="font-medium">
+                              {purchase.contractNo}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {purchase.supplierName || "未匹配供应商"}
+                            </div>
                           </TableCell>
-                          <TableCell className="text-right tabular-nums">{formatAmount('CNY', purchase.allocatedCostCny)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{formatAmount('CNY', purchase.allocatedPaidCny)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{formatAmount('CNY', purchase.outstandingCny)}</TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatAmount("CNY", purchase.allocatedCostCny)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatAmount("CNY", purchase.allocatedPaidCny)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatAmount("CNY", purchase.outstandingCny)}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -284,20 +364,44 @@ export function SalesFinancePanel({
                 </div>
                 <div className="space-y-3 md:hidden">
                   {summary.linkedPurchases.map((purchase) => (
-                    <div key={purchase.contractNo} className="rounded-lg border p-3">
+                    <div
+                      key={purchase.contractNo}
+                      className="rounded-lg border p-3"
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="font-medium">{purchase.contractNo}</p>
-                          <p className="text-xs text-muted-foreground">{purchase.supplierName || '未匹配供应商'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {purchase.supplierName || "未匹配供应商"}
+                          </p>
                         </div>
-                        <SemanticBadge tone={purchase.outstandingCny > 0 ? 'warning' : 'success'}>
-                          {purchase.outstandingCny > 0 ? '待付' : '已付清'}
+                        <SemanticBadge
+                          tone={
+                            purchase.outstandingCny > 0 ? "warning" : "success"
+                          }
+                        >
+                          {purchase.outstandingCny > 0 ? "待付" : "已付清"}
                         </SemanticBadge>
                       </div>
                       <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                        <div><dt className="text-muted-foreground">本柜成本</dt><dd className="mt-1 tabular-nums">{formatAmount('CNY', purchase.allocatedCostCny)}</dd></div>
-                        <div><dt className="text-muted-foreground">已付</dt><dd className="mt-1 tabular-nums">{formatAmount('CNY', purchase.allocatedPaidCny)}</dd></div>
-                        <div><dt className="text-muted-foreground">待付</dt><dd className="mt-1 tabular-nums">{formatAmount('CNY', purchase.outstandingCny)}</dd></div>
+                        <div>
+                          <dt className="text-muted-foreground">本柜成本</dt>
+                          <dd className="mt-1 tabular-nums">
+                            {formatAmount("CNY", purchase.allocatedCostCny)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground">已付</dt>
+                          <dd className="mt-1 tabular-nums">
+                            {formatAmount("CNY", purchase.allocatedPaidCny)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground">待付</dt>
+                          <dd className="mt-1 tabular-nums">
+                            {formatAmount("CNY", purchase.outstandingCny)}
+                          </dd>
+                        </div>
                       </dl>
                     </div>
                   ))}
@@ -311,25 +415,37 @@ export function SalesFinancePanel({
           <CardHeader>
             <CardTitle>美元收款流水</CardTitle>
             <CardDescription>
-              {summary.revenue.receivedSource === 'legacy_contract_balance'
-                ? '历史合同余额，仅作过渡展示。'
-                : '逐笔 USD 收款；第三方拼柜按自有收入比例排除。'}
+              {summary.revenue.receivedSource === "legacy_contract_balance"
+                ? "历史合同余额，仅作过渡展示。"
+                : "逐笔 USD 收款；第三方拼柜按自有收入比例排除。"}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {summary.receipts.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">暂无逐笔美元收款</p>
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                暂无逐笔美元收款
+              </p>
             ) : (
               <div className="space-y-3">
                 {summary.receipts.map((receipt) => (
-                  <div key={receipt.id} className="flex items-start justify-between gap-4 rounded-lg border p-3">
+                  <div
+                    key={receipt.id}
+                    className="flex items-start justify-between gap-4 rounded-lg border p-3"
+                  >
                     <div>
-                      <p className="text-sm font-medium">{receipt.note || '出口货款'}</p>
+                      <p className="text-sm font-medium">
+                        {receipt.note || "出口货款"}
+                      </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {formatDate(receipt.paymentDate)}{receipt.paymentMethod ? ` · ${receipt.paymentMethod}` : ''}
+                        {formatDate(receipt.paymentDate)}
+                        {receipt.paymentMethod
+                          ? ` · ${receipt.paymentMethod}`
+                          : ""}
                       </p>
                     </div>
-                    <span className="font-semibold tabular-nums text-emerald-600">+{formatAmount('USD', receipt.amountUsd)}</span>
+                    <span className="font-semibold tabular-nums text-emerald-600">
+                      +{formatAmount("USD", receipt.amountUsd)}
+                    </span>
                   </div>
                 ))}
               </div>
