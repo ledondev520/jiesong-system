@@ -7,3 +7,5 @@ Header/MobileTabBar退出登录先等待服务端撤销当前浏览器会话，�
 `HeaderNotifications` 对同一通知的待完成已读请求按 ID 去重，成功只减少一次未读计数；其他通知可独立处理，失败后可重试。组件回归覆盖重复点击、失败重试、不同通知并发完成、重新挂载读取，以及全部已读响应丢失后重试。
 
 `PageHeader` 未传 `onBack` 时保持原有 `backHref → router.push` 和显式 `showBack → router.back`。只有调用方显式提供 `onBack` 才执行该动作；目前仅报关详情明确返回使用它，按钮样式、可访问名称与显示规则不变。`PageHeader.test.tsx` 同时覆盖默认导航和显式动作优先级。
+
+`HeaderProfileDialog` 捕获同步本地保存失败，显示可访问的“保存未完成”提示并保留显示名称和个人偏好草稿，用户可重试；取消或重新打开仍由 `HeaderUserMenu` 重新加载保存值。原保存顺序保持为先写偏好、再调用资料回调、成功后关闭；偏好写入失败不调用资料回调，资料回调失败时偏好可能已保存，不保证原子保存。`HeaderUserMenu.lifecycle.test.tsx` 在 jsdom 隔离存储中覆盖取消丢弃、重开读取、存储/资料回调失败重试及保存后重开，不代表真实 HTTP、生产浏览器存储或偏好对其他页面的应用效果。

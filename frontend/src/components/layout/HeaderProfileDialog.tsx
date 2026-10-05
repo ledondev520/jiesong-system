@@ -1,15 +1,16 @@
 /**
  * Input: 个人资料草稿、偏好项、保存动作
- * Output: Header 个人设置弹窗
+ * Output: Header 个人设置弹窗，保存失败显示提示并保留草稿供重试
  * Pos: 前端布局子组件
  */
 
-'use client';
+"use client";
 
-import { ChangeEvent, FormEvent, useMemo, useRef, useState } from 'react';
-import { X } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
+import { ChangeEvent, FormEvent, useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -17,12 +18,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 export interface HeaderUserMenuPreferences {
   desktopNotifications: boolean;
@@ -44,7 +45,10 @@ interface HeaderProfileDialogProps {
   initials: string;
   avatar?: string;
   preferences: HeaderUserMenuPreferences;
-  onSave: (profile: HeaderProfileDraft, preferences: HeaderUserMenuPreferences) => void;
+  onSave: (
+    profile: HeaderProfileDraft,
+    preferences: HeaderUserMenuPreferences,
+  ) => void;
 }
 
 export function HeaderProfileDialog({
@@ -59,11 +63,12 @@ export function HeaderProfileDialog({
 }: HeaderProfileDialogProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [nameDraft, setNameDraft] = useState(displayName);
-  const [avatarDraft, setAvatarDraft] = useState(avatar ?? '');
+  const [avatarDraft, setAvatarDraft] = useState(avatar ?? "");
   const [preferencesDraft, setPreferencesDraft] = useState(preferences);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const fallbackText = useMemo(() => {
-    const base = nameDraft.trim() || username || initials || '用户';
+    const base = nameDraft.trim() || username || initials || "用户";
     return base.slice(0, 2).toUpperCase();
   }, [initials, nameDraft, username]);
 
@@ -76,30 +81,35 @@ export function HeaderProfileDialog({
 
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === 'string') {
+      if (typeof reader.result === "string") {
         setAvatarDraft(reader.result);
       }
     };
     reader.readAsDataURL(file);
-    event.target.value = '';
+    event.target.value = "";
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setSaveError(null);
 
     const nextName = nameDraft.trim() || displayName;
     const nextAvatar = avatarDraft.trim();
 
-    onSave(
-      {
-        avatar: nextAvatar || undefined,
-        name: nextName,
-      },
-      {
-        ...preferencesDraft,
-        signature: preferencesDraft.signature.trim(),
-      },
-    );
+    try {
+      onSave(
+        {
+          avatar: nextAvatar || undefined,
+          name: nextName,
+        },
+        {
+          ...preferencesDraft,
+          signature: preferencesDraft.signature.trim(),
+        },
+      );
+    } catch {
+      setSaveError("个人设置保存未完成，当前草稿已保留，请重试");
+    }
   };
 
   return (
@@ -124,13 +134,22 @@ export function HeaderProfileDialog({
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Avatar className="h-24 w-24 border border-border/70 shadow-sm">
-                      {avatarDraft ? <AvatarImage src={avatarDraft} alt={nameDraft || displayName} /> : null}
-                      <AvatarFallback className="text-base font-semibold">{fallbackText}</AvatarFallback>
+                      {avatarDraft ? (
+                        <AvatarImage
+                          src={avatarDraft}
+                          alt={nameDraft || displayName}
+                        />
+                      ) : null}
+                      <AvatarFallback className="text-base font-semibold">
+                        {fallbackText}
+                      </AvatarFallback>
                     </Avatar>
                     <span
                       className={cn(
-                        'absolute inset-0 flex items-end justify-center rounded-full px-3 pb-2 text-center text-[11px] font-medium text-white transition',
-                        avatarDraft ? 'bg-black/10 group-hover:bg-black/45' : 'bg-primary/75 group-hover:bg-primary/85',
+                        "absolute inset-0 flex items-end justify-center rounded-full px-3 pb-2 text-center text-[11px] font-medium text-white transition",
+                        avatarDraft
+                          ? "bg-black/10 group-hover:bg-black/45"
+                          : "bg-primary/75 group-hover:bg-primary/85",
                       )}
                     >
                       点击上传或替换
@@ -143,7 +162,7 @@ export function HeaderProfileDialog({
                       size="icon-sm"
                       className="absolute -top-1 -right-1 rounded-full border border-border/70 shadow-sm"
                       aria-label="移除当前头像"
-                      onClick={() => setAvatarDraft('')}
+                      onClick={() => setAvatarDraft("")}
                     >
                       <X className="h-3.5 w-3.5" />
                     </Button>
@@ -171,7 +190,7 @@ export function HeaderProfileDialog({
                   </p>
                 </div>
                 <div className="rounded-lg border bg-background px-3 py-2 text-sm text-muted-foreground">
-                  当前账号：{username ?? '未命名账号'}
+                  当前账号：{username ?? "未命名账号"}
                 </div>
               </div>
             </div>
@@ -189,59 +208,83 @@ export function HeaderProfileDialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor="header-profile-username">账号</Label>
-              <Input id="header-profile-username" value={username ?? ''} readOnly />
+              <Input
+                id="header-profile-username"
+                value={username ?? ""}
+                readOnly
+              />
             </div>
           </div>
 
           <div className="space-y-4 rounded-xl border p-4">
             <div className="space-y-1">
               <h3 className="text-sm font-semibold">个人偏好</h3>
-              <p className="text-xs text-muted-foreground">这些设置只服务于当前账号的使用习惯。</p>
+              <p className="text-xs text-muted-foreground">
+                这些设置只服务于当前账号的使用习惯。
+              </p>
             </div>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-4 rounded-lg border bg-background px-3 py-2">
                 <div className="space-y-1">
-                  <Label htmlFor="header-profile-desktop-notifications">桌面通知</Label>
-                  <p className="text-xs text-muted-foreground">关键提醒优先出现在桌面端。</p>
+                  <Label htmlFor="header-profile-desktop-notifications">
+                    桌面通知
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    关键提醒优先出现在桌面端。
+                  </p>
                 </div>
                 <Switch
                   id="header-profile-desktop-notifications"
                   checked={preferencesDraft.desktopNotifications}
-                  onCheckedChange={(checked) => setPreferencesDraft((current) => ({
-                    ...current,
-                    desktopNotifications: checked,
-                  }))}
+                  onCheckedChange={(checked) =>
+                    setPreferencesDraft((current) => ({
+                      ...current,
+                      desktopNotifications: checked,
+                    }))
+                  }
                 />
               </div>
 
               <div className="flex items-center justify-between gap-4 rounded-lg border bg-background px-3 py-2">
                 <div className="space-y-1">
-                  <Label htmlFor="header-profile-compact-mode">紧凑信息密度</Label>
-                  <p className="text-xs text-muted-foreground">列表和摘要卡片更偏向高密度展示。</p>
+                  <Label htmlFor="header-profile-compact-mode">
+                    紧凑信息密度
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    列表和摘要卡片更偏向高密度展示。
+                  </p>
                 </div>
                 <Switch
                   id="header-profile-compact-mode"
                   checked={preferencesDraft.compactMode}
-                  onCheckedChange={(checked) => setPreferencesDraft((current) => ({
-                    ...current,
-                    compactMode: checked,
-                  }))}
+                  onCheckedChange={(checked) =>
+                    setPreferencesDraft((current) => ({
+                      ...current,
+                      compactMode: checked,
+                    }))
+                  }
                 />
               </div>
 
               <div className="flex items-center justify-between gap-4 rounded-lg border bg-background px-3 py-2">
                 <div className="space-y-1">
-                  <Label htmlFor="header-profile-remember-module">默认回到最近模块</Label>
-                  <p className="text-xs text-muted-foreground">下次进入工作台时优先回到上次处理的模块。</p>
+                  <Label htmlFor="header-profile-remember-module">
+                    默认回到最近模块
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    下次进入工作台时优先回到上次处理的模块。
+                  </p>
                 </div>
                 <Switch
                   id="header-profile-remember-module"
                   checked={preferencesDraft.rememberLastModule}
-                  onCheckedChange={(checked) => setPreferencesDraft((current) => ({
-                    ...current,
-                    rememberLastModule: checked,
-                  }))}
+                  onCheckedChange={(checked) =>
+                    setPreferencesDraft((current) => ({
+                      ...current,
+                      rememberLastModule: checked,
+                    }))
+                  }
                 />
               </div>
             </div>
@@ -251,17 +294,29 @@ export function HeaderProfileDialog({
               <Textarea
                 id="header-profile-signature"
                 value={preferencesDraft.signature}
-                onChange={(event) => setPreferencesDraft((current) => ({
-                  ...current,
-                  signature: event.target.value,
-                }))}
+                onChange={(event) =>
+                  setPreferencesDraft((current) => ({
+                    ...current,
+                    signature: event.target.value,
+                  }))
+                }
                 placeholder="例如：优先关注财务风险、喜欢高密度列表、通知尽量前置。"
               />
             </div>
           </div>
 
+          {saveError ? (
+            <Alert variant="destructive">
+              <AlertDescription>{saveError}</AlertDescription>
+            </Alert>
+          ) : null}
+
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               取消
             </Button>
             <Button type="submit">保存个人设置</Button>
