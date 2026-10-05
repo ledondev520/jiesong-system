@@ -1,6 +1,6 @@
 /**
  * Input: purchaseService, supplierService, productService
- * Output: 支持窄屏供应商选择的采购表单；新增编号仅预览，提交时由后端分配
+ * Output: 支持独立内联供应商编辑会话的采购表单；迟到保存不覆盖当前选择或草稿
  * Pos: 采购合同创建入口
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -123,6 +123,19 @@ const purchaseSchema = z.object({
 });
 
 type PurchaseFormValues = z.infer<typeof purchaseSchema>;
+
+const emptyNewSupplier = {
+  name: "",
+  contactName: "",
+  contactPhone: "",
+  address: "",
+  taxId: "",
+  bankAccountName: "",
+  bankName: "",
+  bankBranch: "",
+  bankCode: "",
+  bankAccount: "",
+};
 
 // ============== 供应商推荐类型 ==============
 interface RecommendedSupplier extends Supplier {
@@ -262,19 +275,38 @@ export default function CreatePurchasePage() {
 
   // 新增供应商弹窗
   const [showNewSupplierDialog, setShowNewSupplierDialog] = useState(false);
-  const [newSupplierForm, setNewSupplierForm] = useState({
-    name: "",
-    contactName: "",
-    contactPhone: "",
-    address: "",
-    taxId: "",
-    bankAccountName: "",
-    bankName: "",
-    bankBranch: "",
-    bankCode: "",
-    bankAccount: "",
-  });
+  const [newSupplierForm, setNewSupplierForm] = useState(emptyNewSupplier);
   const [savingSupplier, setSavingSupplier] = useState(false);
+  const supplierSession = useRef(0);
+  const pendingSupplierSave = useRef<number | null>(null);
+  const mounted = useRef(false);
+  const contractContext = useRef(0);
+  const catalogRequest = useRef(0);
+
+  const changeSupplierDialog = useCallback((open: boolean, name = "") => {
+    supplierSession.current += 1;
+    pendingSupplierSave.current = null;
+    setSavingSupplier(false);
+    setNewSupplierForm({ ...emptyNewSupplier, name });
+    setShowNewSupplierDialog(open);
+  }, []);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      supplierSession.current += 1;
+      contractContext.current += 1;
+      catalogRequest.current += 1;
+    };
+  }, []);
+
+  useEffect(() => {
+    contractContext.current += 1;
+    setSupplierOpen(false);
+    setSupplierSearch("");
+    changeSupplierDialog(false);
+  }, [editId, changeSupplierDialog]);
 
   // AI 解析
   const [parseText, setParseText] = useState("");
@@ -395,6 +427,7 @@ export default function CreatePurchasePage() {
 
   // 创建与草稿更正复用完整目录和同一表单。
   const loadData = useCallback(async () => {
+    const request = ++catalogRequest.current;
     setDataLoading(true);
     setLoadError(false);
     try {
@@ -409,6 +442,7 @@ export default function CreatePurchasePage() {
           ? purchaseService.getById(editId)
           : purchaseService.getNextContractNo(),
       ]);
+      if (!mounted.current || request !== catalogRequest.current) return;
       setSuppliers(allSuppliers);
       setProducts(allProducts);
       if (editId && contractRes.data && "items" in contractRes.data) {
@@ -436,11 +470,15 @@ export default function CreatePurchasePage() {
         form.setValue("contractNo", contractRes.data.contractNo);
       }
     } catch {
-      setLoadError(true);
-      toast.error("加载数据失败");
+      if (mounted.current && request === catalogRequest.current) {
+        setLoadError(true);
+        toast.error("加载数据失败");
+      }
     } finally {
-      setDataLoading(false);
-      setContractNoLoading(false);
+      if (mounted.current && request === catalogRequest.current) {
+        setDataLoading(false);
+        setContractNoLoading(false);
+      }
     }
   }, [editId, form]);
   useEffect(() => {
@@ -502,35 +540,46 @@ export default function CreatePurchasePage() {
 
   // ============== 新增供应商 ==============
   const handleSaveNewSupplier = async () => {
+    const session = supplierSession.current;
+    const context = contractContext.current;
+    if (
+      !mounted.current ||
+      dataLoading ||
+      loadError ||
+      !showNewSupplierDialog ||
+      pendingSupplierSave.current === session
+    )
+      return;
     if (!newSupplierForm.name.trim()) {
       toast.error("请输入供应商名称");
       return;
     }
+    pendingSupplierSave.current = session;
     setSavingSupplier(true);
+    const isCurrent = () =>
+      mounted.current && session === supplierSession.current;
     try {
       const response = await supplierService.create(newSupplierForm);
       const newSupplier = response.data;
       invalidateCache("suppliers-list");
-      setSuppliers((prev) => [newSupplier, ...prev]);
+      // Closing the editor cannot undo a write; only its original session may select the result.
+      if (mounted.current && context === contractContext.current) {
+        setSuppliers((prev) => [
+          newSupplier,
+          ...prev.filter((item) => item.id !== newSupplier.id),
+        ]);
+      }
+      if (!isCurrent()) return;
       form.setValue("supplierId", newSupplier.id);
-      setShowNewSupplierDialog(false);
-      setNewSupplierForm({
-        name: "",
-        contactName: "",
-        contactPhone: "",
-        address: "",
-        taxId: "",
-        bankAccountName: "",
-        bankName: "",
-        bankBranch: "",
-        bankCode: "",
-        bankAccount: "",
-      });
+      setSupplierSearch("");
+      changeSupplierDialog(false);
       toast.success("供应商创建成功");
     } catch {
-      toast.error("创建供应商失败");
+      if (isCurrent()) toast.error("创建供应商失败");
     } finally {
-      setSavingSupplier(false);
+      if (pendingSupplierSave.current === session)
+        pendingSupplierSave.current = null;
+      if (isCurrent()) setSavingSupplier(false);
     }
   };
 
@@ -1240,7 +1289,8 @@ export default function CreatePurchasePage() {
                               variant="ghost"
                               size="sm"
                               className="h-6 text-xs"
-                              onClick={() => setShowNewSupplierDialog(true)}
+                              disabled={dataLoading || loadError}
+                              onClick={() => changeSupplierDialog(true)}
                             >
                               <UserPlus className="mr-1 h-3 w-3" />
                               新增
@@ -1255,6 +1305,7 @@ export default function CreatePurchasePage() {
                                 <Button
                                   variant="outline"
                                   role="combobox"
+                                  disabled={dataLoading || loadError}
                                   aria-expanded={supplierOpen}
                                   className={cn(
                                     "h-10 justify-between rounded-md text-xs font-normal",
@@ -1297,12 +1348,12 @@ export default function CreatePurchasePage() {
                                         type="button"
                                         variant="link"
                                         size="sm"
+                                        disabled={dataLoading || loadError}
                                         onClick={() => {
-                                          setNewSupplierForm((prev) => ({
-                                            ...prev,
-                                            name: supplierSearch,
-                                          }));
-                                          setShowNewSupplierDialog(true);
+                                          changeSupplierDialog(
+                                            true,
+                                            supplierSearch,
+                                          );
                                           setSupplierOpen(false);
                                         }}
                                       >
@@ -1321,6 +1372,9 @@ export default function CreatePurchasePage() {
                                             <CommandItem
                                               key={s.id}
                                               value={s.id}
+                                              disabled={
+                                                dataLoading || loadError
+                                              }
                                               onSelect={() => {
                                                 field.onChange(s.id);
                                                 setSupplierOpen(false);
@@ -1365,6 +1419,7 @@ export default function CreatePurchasePage() {
                                         <CommandItem
                                           key={s.id}
                                           value={s.id}
+                                          disabled={dataLoading || loadError}
                                           onSelect={() => {
                                             field.onChange(s.id);
                                             setSupplierOpen(false);
@@ -1673,10 +1728,7 @@ export default function CreatePurchasePage() {
       </Dialog>
 
       {/* 新增供应商弹窗 */}
-      <Dialog
-        open={showNewSupplierDialog}
-        onOpenChange={setShowNewSupplierDialog}
-      >
+      <Dialog open={showNewSupplierDialog} onOpenChange={changeSupplierDialog}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm font-medium">
@@ -1687,7 +1739,7 @@ export default function CreatePurchasePage() {
               录入签约、汇款和开票所需的供应商档案。
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <fieldset disabled={savingSupplier} className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="new-supplier-name">供应商名称 *</Label>
               <Input
@@ -1849,15 +1901,18 @@ export default function CreatePurchasePage() {
                 </div>
               </div>
             </div>
-          </div>
+          </fieldset>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setShowNewSupplierDialog(false)}
+              onClick={() => changeSupplierDialog(false)}
             >
               取消
             </Button>
-            <Button onClick={handleSaveNewSupplier} disabled={savingSupplier}>
+            <Button
+              onClick={handleSaveNewSupplier}
+              disabled={savingSupplier || dataLoading || loadError}
+            >
               {savingSupplier ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
