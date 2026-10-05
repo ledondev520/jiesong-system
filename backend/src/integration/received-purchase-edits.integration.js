@@ -102,6 +102,12 @@ test('HTTP/SQLite：分批收验货及分配出库后拒绝破坏性采购更正
   });
 
   const first = await arrival('received-edit-first', [[0, 4]]);
+  await t.test('通用备注更正也保留到货后的原采购证据', async () => {
+    const before = await snapshot();
+    // 仅改备注不触发草稿明细更正门槛，明确验证独立的到货保护。
+    await call('PUT', url, { note: '合成不应覆盖原采购的备注' }, 400);
+    assert.deepEqual(await snapshot(), before, '仅改备注也不能改变收货后的采购记录、证据、库存或义务');
+  });
   await verify('部分到货未验货', 'PURCHASE', true);
   assert.equal((await snapshot()).inventory.length, 0);
   await inspect(first, 'received-edit-initial-inspection', [[0, 2, 1]]);
