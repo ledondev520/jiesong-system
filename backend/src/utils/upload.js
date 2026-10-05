@@ -1,6 +1,6 @@
 /**
  * Input: multer库、配置
- * Output: 文件上传中间件（通用 upload、合同附件 contractUpload、装箱单核对内存接收 pdfCheckUpload）；非法格式返回客户端错误
+ * Output: 文件上传中间件；磁盘上传写流前保护日期目录，非法格式返回客户端错误
  * Pos: 文件上传工具，处理合同文件等上传
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -24,8 +24,13 @@ const storage = multer.diskStorage({
     // 按日期分目录
     const dateDir = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const destDir = path.join(uploadDir, dateDir);
-    if (!fs.existsSync(destDir)) {
-      fs.mkdirSync(destDir, { recursive: true });
+    try {
+      if (!fs.existsSync(destDir)) {
+        fs.mkdirSync(destDir, { recursive: true, mode: 0o700 });
+      }
+      fs.chmodSync(destDir, 0o700);
+    } catch (error) {
+      return cb(error); // Refuse storage before Multer starts a file stream.
     }
     cb(null, destDir);
   },

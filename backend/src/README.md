@@ -93,7 +93,7 @@
 | response.js | 统一响应格式 |
 | pagination.js | 统一分页归一化与安全整数 offset 上限 |
 | validators.js | 参数验证规则，非法或超大列表页码返回 400 |
-| upload.js | 文件上传 (multer) |
+| upload.js | 文件上传 (multer)；启动磁盘流前保护日期目录为 0700，目录故障经回调拒绝；文件 0600 仍由附件服务在异步查询前收紧 |
 | auditLog.js | 操作日志记录 |
 | aiCache.js | HS AI 推荐结果缓存；命中直接返回，不模拟等待 |
 
