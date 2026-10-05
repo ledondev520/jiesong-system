@@ -1,29 +1,30 @@
 /**
  * Input: 报关单服务、URL 查询参数、router
- * Output: 报关单列表页（手机卡片与桌面表格）
+ * Output: 报关单列表页（保留所属页签的筛选同步、手机卡片与桌面表格）
  * Pos: 报关单管理主列表页
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
-import { startTransition, useCallback, useDeferredValue, useEffect, useState } from 'react';
-import { SortableTableHead } from '@/components/ui/sortable-table-head';
-import { useTableSort } from '@/lib/hooks/useTableSort';
-import { useRouter, useSearchParams } from 'next/navigation';
-import type { CustomsDeclaration } from '@/types';
-import { customsDeclarationService } from '@/services/customsDeclaration.service';
-import { cachedFetch } from '@/lib/api-cache';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+  startTransition,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useState,
+} from "react";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { useTableSort } from "@/lib/hooks/useTableSort";
+import { useRouter, useSearchParams } from "next/navigation";
+import type { CustomsDeclaration } from "@/types";
+import { customsDeclarationService } from "@/services/customsDeclaration.service";
+import { cachedFetch } from "@/lib/api-cache";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -31,48 +32,63 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { MobileListCard } from '@/components/mobile';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { ModuleTabHeader, EXPORT_TABS } from '@/components/layout/ModuleTabHeader';
-import { Search, Plus, FileText } from 'lucide-react';
-import { toast } from 'sonner';
+} from "@/components/ui/select";
+import { MobileListCard } from "@/components/mobile";
+import { PageHeader } from "@/components/layout/PageHeader";
+import {
+  ModuleTabHeader,
+  EXPORT_TABS,
+} from "@/components/layout/ModuleTabHeader";
+import { Search, Plus, FileText } from "lucide-react";
+import { toast } from "sonner";
 import {
   CustomsDeclarationStatusBadge,
   customsDeclarationStatusOptions,
-} from './CustomsDeclarationStatusBadge';
+} from "./CustomsDeclarationStatusBadge";
 
 const PAGE_SIZE = 20;
 
 const formatAmount = (amount: number, currency: string) =>
   `${currency} ${amount.toLocaleString()}`;
 
-export function CustomsDeclarationListPageContent({ embedded = false }: { embedded?: boolean } = {}) {
+export function CustomsDeclarationListPageContent({
+  embedded = false,
+}: { embedded?: boolean } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
-  const initialKeyword = searchParams.get('keyword') || '';
-  const initialStatus = searchParams.get('status') || 'ALL';
+  const pathname =
+    typeof window !== "undefined" ? window.location.pathname : "";
+  const queryString = searchParams.toString();
+  const initialKeyword = searchParams.get("keyword") || "";
+  const initialStatus = searchParams.get("status") || "ALL";
 
   const [keyword, setKeyword] = useState(initialKeyword);
   const [status, setStatus] = useState(initialStatus);
   const deferredKeyword = useDeferredValue(keyword);
 
   // 同步搜索状态到 URL
-  const updateUrlParams = useCallback((newKeyword: string, newStatus: string) => {
-    const params = new URLSearchParams();
-    if (newKeyword) params.set('keyword', newKeyword);
-    if (newStatus && newStatus !== 'ALL') params.set('status', newStatus);
-    const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
-    router.replace(newUrl, { scroll: false });
-  }, [pathname, router]);
+  const updateUrlParams = useCallback(
+    (newKeyword: string, newStatus: string) => {
+      // 嵌入退税页时保留 view=customs 等父页面参数，只更新本列表的筛选。
+      const params = new URLSearchParams(queryString);
+      if (newKeyword) params.set("keyword", newKeyword);
+      else params.delete("keyword");
+      if (newStatus && newStatus !== "ALL") params.set("status", newStatus);
+      else params.delete("status");
+      const nextQuery = params.toString();
+      if (nextQuery === queryString) return;
+      const newUrl = nextQuery ? `${pathname}?${nextQuery}` : pathname;
+      router.replace(newUrl, { scroll: false });
+    },
+    [pathname, router, queryString],
+  );
 
   // 关键词变化时更新 URL
   useEffect(() => {
@@ -87,18 +103,17 @@ export function CustomsDeclarationListPageContent({ embedded = false }: { embedd
     setLoading(true);
     try {
       const cacheKey = `customs-declarations-${deferredKeyword}-${status}`;
-      const response = await cachedFetch(
-        cacheKey,
-        () => customsDeclarationService.getAll({
+      const response = await cachedFetch(cacheKey, () =>
+        customsDeclarationService.getAll({
           page: 1,
           pageSize: PAGE_SIZE,
           keyword: deferredKeyword || undefined,
-          status: status === 'ALL' ? undefined : status,
+          status: status === "ALL" ? undefined : status,
         }),
       );
       setDeclarations(response?.data?.items || []);
     } catch {
-      toast.error('加载报关单失败');
+      toast.error("加载报关单失败");
     } finally {
       setLoading(false);
     }
@@ -112,25 +127,32 @@ export function CustomsDeclarationListPageContent({ embedded = false }: { embedd
     declarations,
     useCallback((item, key) => {
       switch (key) {
-        case 'declarationNo':
-          return item.declarationNo ?? '';
-        case 'exporter':
-          return item.exporter ?? '';
-        case 'destinationCountry':
-          return item.destinationCountry ?? '';
-        case 'declarationDate':
-          return item.declarationDate ?? '';
-        case 'totalAmount':
+        case "declarationNo":
+          return item.declarationNo ?? "";
+        case "exporter":
+          return item.exporter ?? "";
+        case "destinationCountry":
+          return item.destinationCountry ?? "";
+        case "declarationDate":
+          return item.declarationDate ?? "";
+        case "totalAmount":
           return item.totalAmount;
         default:
           return null;
       }
-    }, [])
+    }, []),
   );
 
-  const draftCount = declarations.filter((item) => item.status === 'DRAFT').length;
-  const releasedCount = declarations.filter((item) => item.status === 'RELEASED').length;
-  const totalAmount = declarations.reduce((sum, item) => sum + item.totalAmount, 0);
+  const draftCount = declarations.filter(
+    (item) => item.status === "DRAFT",
+  ).length;
+  const releasedCount = declarations.filter(
+    (item) => item.status === "RELEASED",
+  ).length;
+  const totalAmount = declarations.reduce(
+    (sum, item) => sum + item.totalAmount,
+    0,
+  );
 
   const openDetail = (id: string) => {
     startTransition(() => {
@@ -147,7 +169,7 @@ export function CustomsDeclarationListPageContent({ embedded = false }: { embedd
       toast.success(`自动生成完成：新增 ${created} 条，跳过 ${skipped} 条`);
       await loadDeclarations();
     } catch {
-      toast.error('自动生成报关单草稿失败');
+      toast.error("自动生成报关单草稿失败");
     } finally {
       setGeneratingDrafts(false);
     }
@@ -184,14 +206,14 @@ export function CustomsDeclarationListPageContent({ embedded = false }: { embedd
               </SelectContent>
             </Select>
 
-            {(keyword || status !== 'ALL') && (
+            {(keyword || status !== "ALL") && (
               <Button
                 variant="ghost"
                 className="h-11 rounded-xl"
                 onClick={() => {
-                  setKeyword('');
-                  setStatus('ALL');
-                  updateUrlParams('', 'ALL');
+                  setKeyword("");
+                  setStatus("ALL");
+                  updateUrlParams("", "ALL");
                 }}
                 data-testid="reset-filters"
               >
@@ -199,22 +221,28 @@ export function CustomsDeclarationListPageContent({ embedded = false }: { embedd
               </Button>
             )}
 
-            <BusinessWrite><Button
-              variant="outline"
-              className="h-11 rounded-xl"
-              onClick={handleGenerateDrafts}
-              disabled={generatingDrafts}
-            >
-              自动生成草稿
-            </Button></BusinessWrite>
+            <BusinessWrite>
+              <Button
+                variant="outline"
+                className="h-11 rounded-xl"
+                onClick={handleGenerateDrafts}
+                disabled={generatingDrafts}
+              >
+                自动生成草稿
+              </Button>
+            </BusinessWrite>
 
-            <BusinessWrite><Button
-              className="h-11 rounded-xl"
-              onClick={() => router.push('/dashboard/customs-declarations/create')}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              新建报关单
-            </Button></BusinessWrite>
+            <BusinessWrite>
+              <Button
+                className="h-11 rounded-xl"
+                onClick={() =>
+                  router.push("/dashboard/customs-declarations/create")
+                }
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                新建报关单
+              </Button>
+            </BusinessWrite>
           </>
         }
       />
@@ -222,7 +250,9 @@ export function CustomsDeclarationListPageContent({ embedded = false }: { embedd
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="surface-panel">
           <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">当前列表总单量</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">
+              当前列表总单量
+            </CardTitle>
           </CardHeader>
           <CardContent className="text-3xl font-semibold">
             {declarations.length}
@@ -231,7 +261,9 @@ export function CustomsDeclarationListPageContent({ embedded = false }: { embedd
 
         <Card className="surface-panel">
           <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">草稿 / 待完善</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">
+              草稿 / 待完善
+            </CardTitle>
           </CardHeader>
           <CardContent className="text-3xl font-semibold">
             {draftCount}
@@ -240,7 +272,9 @@ export function CustomsDeclarationListPageContent({ embedded = false }: { embedd
 
         <Card className="surface-panel">
           <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">当前列表货值</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">
+              当前列表货值
+            </CardTitle>
           </CardHeader>
           <CardContent className="text-3xl font-semibold">
             USD {totalAmount.toLocaleString()}
@@ -250,24 +284,49 @@ export function CustomsDeclarationListPageContent({ embedded = false }: { embedd
 
       <div className="space-y-3 md:hidden">
         {loading ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">加载中...</div>
+          <div className="py-10 text-center text-sm text-muted-foreground">
+            加载中...
+          </div>
         ) : declarations.length === 0 ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">暂无报关单数据。</div>
-        ) : sort.sortedData.map((declaration) => (
-          <MobileListCard
-            key={declaration.id}
-            title={declaration.declarationNo}
-            subtitle={`${declaration.exporter} → ${declaration.consignee}`}
-            badge={<CustomsDeclarationStatusBadge status={declaration.status} />}
-            fields={[
-              { label: '目的国', value: declaration.destinationCountry },
-              { label: '申报日期', value: declaration.declarationDate || '-' },
-            ]}
-            amount={{ label: '货值', value: formatAmount(declaration.totalAmount, declaration.currency) }}
-            onClick={() => openDetail(declaration.id)}
-            action={<Button variant="outline" className="h-11 w-full" onClick={() => openDetail(declaration.id)}>查看详情</Button>}
-          />
-        ))}
+          <div className="py-10 text-center text-sm text-muted-foreground">
+            暂无报关单数据。
+          </div>
+        ) : (
+          sort.sortedData.map((declaration) => (
+            <MobileListCard
+              key={declaration.id}
+              title={declaration.declarationNo}
+              subtitle={`${declaration.exporter} → ${declaration.consignee}`}
+              badge={
+                <CustomsDeclarationStatusBadge status={declaration.status} />
+              }
+              fields={[
+                { label: "目的国", value: declaration.destinationCountry },
+                {
+                  label: "申报日期",
+                  value: declaration.declarationDate || "-",
+                },
+              ]}
+              amount={{
+                label: "货值",
+                value: formatAmount(
+                  declaration.totalAmount,
+                  declaration.currency,
+                ),
+              }}
+              onClick={() => openDetail(declaration.id)}
+              action={
+                <Button
+                  variant="outline"
+                  className="h-11 w-full"
+                  onClick={() => openDetail(declaration.id)}
+                >
+                  查看详情
+                </Button>
+              }
+            />
+          ))
+        )}
       </div>
 
       <Card className="surface-panel hidden overflow-hidden md:block">
@@ -330,13 +389,19 @@ export function CustomsDeclarationListPageContent({ embedded = false }: { embedd
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-14 text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={8}
+                    className="py-14 text-center text-muted-foreground"
+                  >
                     加载中...
                   </TableCell>
                 </TableRow>
               ) : declarations.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-14 text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={8}
+                    className="py-14 text-center text-muted-foreground"
+                  >
                     暂无报关单数据。
                   </TableCell>
                 </TableRow>
@@ -348,18 +413,28 @@ export function CustomsDeclarationListPageContent({ embedded = false }: { embedd
                     onClick={() => openDetail(declaration.id)}
                     data-testid={`declaration-row-${declaration.declarationNo}`}
                   >
-                    <TableCell className="font-medium">{declaration.declarationNo}</TableCell>
+                    <TableCell className="font-medium">
+                      {declaration.declarationNo}
+                    </TableCell>
                     <TableCell>{declaration.exporter}</TableCell>
                     <TableCell>{declaration.consignee}</TableCell>
                     <TableCell>{declaration.destinationCountry}</TableCell>
                     <TableCell>
-                      <CustomsDeclarationStatusBadge status={declaration.status} />
+                      <CustomsDeclarationStatusBadge
+                        status={declaration.status}
+                      />
                     </TableCell>
                     <TableCell>{declaration.declarationDate}</TableCell>
                     <TableCell className="text-right">
-                      {formatAmount(declaration.totalAmount, declaration.currency)}
+                      {formatAmount(
+                        declaration.totalAmount,
+                        declaration.currency,
+                      )}
                     </TableCell>
-                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                    <TableCell
+                      className="text-right"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <Button
                         variant="default"
                         size="sm"
