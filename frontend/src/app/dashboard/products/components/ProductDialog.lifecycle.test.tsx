@@ -1,6 +1,6 @@
 /**
  * Input: 商品编辑会话、关闭/重开/切换操作、可延迟的 HSCode 查询
- * Output: 取消编辑恢复已保存资料、异步匹配仅更新当前会话的回归测试
+ * Output: 取消恢复已保存资料、建议稳定后验证详情顺序及当前会话异步隔离
  * Pos: 商品档案组件生命周期测试
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -191,10 +191,14 @@ describe("ProductDialog 编辑会话", () => {
     fireEvent.change(screen.getByLabelText("报关名称 *"), {
       target: { value: "合成瓷砖" },
     });
-    await user.click(screen.getByRole("button", { name: "HSCode 智能匹配" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: /合成瓷砖.*69072190/ }),
+    // Settle automatic suggestions before testing detail selection order. Mixing
+    // a manual lookup here would leave a separate debounced search in flight.
+    const recommendation = await screen.findByRole(
+      "button",
+      { name: /合成瓷砖.*69072190/ },
+      { timeout: 5000 },
     );
+    fireEvent.click(recommendation);
     expect(mockGetByCode).toHaveBeenCalledWith("69072190");
     await user.click(screen.getByRole("button", { name: "关闭" }));
     await user.click(screen.getByRole("button", { name: "重新打开" }));
@@ -241,15 +245,18 @@ describe("ProductDialog 编辑会话", () => {
     mockGetByCode.mockImplementation((code: string) =>
       code === firstMatch.hsCode ? older.promise : newer.promise,
     );
-    const user = userEvent.setup();
     render(<EditorHarness />);
     fireEvent.change(screen.getByLabelText("报关名称 *"), {
       target: { value: "合成商品" },
     });
-    await user.click(screen.getByRole("button", { name: "HSCode 智能匹配" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: /合成瓷砖.*69072190/ }),
+    // Settle automatic suggestions before testing detail selection order. Mixing
+    // a manual lookup here would leave a separate debounced search in flight.
+    const recommendation = await screen.findByRole(
+      "button",
+      { name: /合成瓷砖.*69072190/ },
+      { timeout: 5000 },
     );
+    fireEvent.click(recommendation);
     fireEvent.click(screen.getByRole("button", { name: /合成玻璃.*69072290/ }));
     await act(async () => newer.resolve({ data: secondMatch }));
     await waitFor(() =>
