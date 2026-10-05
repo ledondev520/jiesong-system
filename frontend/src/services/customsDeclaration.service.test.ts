@@ -6,12 +6,12 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import api from '@/lib/axios';
-import { customsDeclarationService } from './customsDeclaration.service';
-import { CustomsDeclarationStatus } from '@/types';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import api from "@/lib/axios";
+import { customsDeclarationService } from "./customsDeclaration.service";
+import { CustomsDeclarationStatus } from "@/types";
 
-vi.mock('@/lib/axios', () => ({
+vi.mock("@/lib/axios", () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
@@ -24,81 +24,81 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('customsDeclarationService', () => {
-  it('getAll 传递筛选参数', async () => {
-    const params = { page: 1, pageSize: 20, keyword: 'CUS', status: 'SUBMITTED' };
+describe("customsDeclarationService", () => {
+  it("getAll 传递筛选参数", async () => {
+    const params = {
+      page: 1,
+      pageSize: 20,
+      keyword: "CUS",
+      status: "SUBMITTED",
+    };
 
     await customsDeclarationService.getAll(params);
 
-    expect(api.get).toHaveBeenCalledWith('/customs-declarations', { params });
+    expect(api.get).toHaveBeenCalledWith("/customs-declarations", { params });
   });
 
-  it('getById 调用详情接口', async () => {
-    await customsDeclarationService.getById('cd-1');
+  it("getById 调用详情接口", async () => {
+    await customsDeclarationService.getById("cd-1");
 
-    expect(api.get).toHaveBeenCalledWith('/customs-declarations/cd-1');
+    expect(api.get).toHaveBeenCalledWith("/customs-declarations/cd-1");
   });
 
-  it('create 调用新增接口', async () => {
+  it("create 调用新增接口", async () => {
     const payload = {
-      declarationNo: 'CUS-2026-001',
+      declarationNo: "CUS-2026-001",
       status: CustomsDeclarationStatus.DRAFT,
-      exporter: '捷淞供应链',
-      consignee: 'Lima Tiles SAC',
-      destinationCountry: '秘鲁',
-      portOfLoading: '上海',
-      portOfDestination: 'Callao',
-      transportMode: 'SEA',
-      declarationDate: '2026-03-01',
-      releaseDate: null,
-      currency: 'USD',
+      salesContractId: "synthetic-sales",
+      customsBroker: "合成报关行",
+      declaredAt: "2026-03-01",
+      exportDate: null,
+      currency: "USD",
       totalAmount: 120000,
-      totalPackages: 1800,
-      grossWeight: 21500,
-      netWeight: 20800,
-      remarks: '',
+      totalQuantity: 1800,
+      totalGrossWeight: 21500,
+      totalNetWeight: 20800,
+      note: "",
       items: [],
     };
 
     await customsDeclarationService.create(payload);
 
-    expect(api.post).toHaveBeenCalledWith('/customs-declarations', payload);
+    expect(api.post).toHaveBeenCalledWith("/customs-declarations", payload);
   });
 
-  it('update 调用更新接口', async () => {
+  it("update 调用更新接口", async () => {
     const payload = {
-      declarationNo: 'CUS-2026-001',
-      status: CustomsDeclarationStatus.SUBMITTED,
-      exporter: '捷淞供应链',
-      consignee: 'Lima Tiles SAC',
-      destinationCountry: '秘鲁',
-      portOfLoading: '上海',
-      portOfDestination: 'Callao',
-      transportMode: 'SEA',
-      declarationDate: '2026-03-01',
-      releaseDate: null,
-      currency: 'USD',
+      declarationNo: "CUS-2026-001",
+      status: CustomsDeclarationStatus.DECLARED,
+      salesContractId: "synthetic-sales",
+      customsBroker: "合成报关行",
+      declaredAt: "2026-03-01",
+      exportDate: null,
+      currency: "USD",
       totalAmount: 120000,
-      totalPackages: 1800,
-      grossWeight: 21500,
-      netWeight: 20800,
-      remarks: '待放行',
+      totalQuantity: 1800,
+      totalGrossWeight: 21500,
+      totalNetWeight: 20800,
+      note: "待放行",
       items: [],
     };
 
-    await customsDeclarationService.update('cd-1', payload);
+    await customsDeclarationService.update("cd-1", payload);
 
-    expect(api.put).toHaveBeenCalledWith('/customs-declarations/cd-1', payload);
+    expect(api.put).toHaveBeenCalledWith("/customs-declarations/cd-1", payload);
   });
 
-  it('generateDrafts 调用自动草稿接口', async () => {
+  it("generateDrafts 调用自动草稿接口", async () => {
     const payload = {
-      salesContractId: 'sc-1',
+      salesContractId: "sc-1",
       replaceExisting: true,
     };
 
     await customsDeclarationService.generateDrafts(payload);
 
-    expect(api.post).toHaveBeenCalledWith('/customs-declarations/auto-drafts', payload);
+    expect(api.post).toHaveBeenCalledWith(
+      "/customs-declarations/auto-drafts",
+      payload,
+    );
   });
 });

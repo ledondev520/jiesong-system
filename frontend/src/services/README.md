@@ -15,3 +15,7 @@
 ## 合同附件二进制
 
 `contractFile.service.ts` 的 `fetchContractFileBlob` 复用共享 Axios 的标签 Bearer/可选 Cookie 请求与取消信号，明确关闭 JSON GET 缓存；JSON Blob 错误保留可读的服务端错误，空响应/成功 JSON 不冒充文件。`isContractFilePreviewMime` 只允许 PDF 和栅格图片嵌入；角色和受保护文档权限仍由后端实时执行。测试使用真实 Axios 拦截器和本地合成 adapter，不访问业务文件。
+
+## 报关单
+
+报关 `customsDeclaration.service.ts` 的写入 DTO 仅包含真实表头字段及带 productId/customsName 的商品明细；明细 id 用于编辑，declaredAt 与 exportDate 分别表示申报、出口日期。

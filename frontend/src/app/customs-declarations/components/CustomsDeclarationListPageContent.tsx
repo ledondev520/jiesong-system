@@ -134,12 +134,12 @@ export function CustomsDeclarationListPageContent({
       switch (key) {
         case "declarationNo":
           return item.declarationNo ?? "";
-        case "exporter":
-          return item.exporter ?? "";
-        case "destinationCountry":
-          return item.destinationCountry ?? "";
-        case "declarationDate":
-          return item.declarationDate ?? "";
+        case "customsBroker":
+          return item.customsBroker ?? "";
+        case "currency":
+          return item.currency ?? "";
+        case "declaredAt":
+          return item.declaredAt ?? "";
         case "totalAmount":
           return item.totalAmount;
         default:
@@ -196,7 +196,7 @@ export function CustomsDeclarationListPageContent({
                   setKeyword(event.target.value);
                   setPage(1);
                 }}
-                placeholder="搜索报关单号、客户或目的国..."
+                placeholder="搜索报关单号或报关行..."
                 className="h-11 rounded-xl border-border/70 bg-background/70 pl-10"
               />
             </div>
@@ -311,15 +311,15 @@ export function CustomsDeclarationListPageContent({
             <MobileListCard
               key={declaration.id}
               title={declaration.declarationNo}
-              subtitle={`${declaration.exporter} → ${declaration.consignee}`}
+              subtitle={declaration.customsBroker || "未填写报关行"}
               badge={
                 <CustomsDeclarationStatusBadge status={declaration.status} />
               }
               fields={[
-                { label: "目的国", value: declaration.destinationCountry },
+                { label: "币种", value: declaration.currency },
                 {
                   label: "申报日期",
-                  value: declaration.declarationDate || "-",
+                  value: declaration.declaredAt?.slice(0, 10) || "-",
                 },
               ]}
               amount={{
@@ -364,25 +364,24 @@ export function CustomsDeclarationListPageContent({
                   报关单号
                 </SortableTableHead>
                 <SortableTableHead
-                  sortKey="exporter"
+                  sortKey="customsBroker"
                   currentSortKey={sort.sortKey}
                   currentSortDir={sort.sortDir}
                   onSort={sort.onSort}
                 >
-                  发货人
+                  报关行
                 </SortableTableHead>
-                <TableHead>收货人</TableHead>
                 <SortableTableHead
-                  sortKey="destinationCountry"
+                  sortKey="currency"
                   currentSortKey={sort.sortKey}
                   currentSortDir={sort.sortDir}
                   onSort={sort.onSort}
                 >
-                  目的国
+                  币种
                 </SortableTableHead>
                 <TableHead>状态</TableHead>
                 <SortableTableHead
-                  sortKey="declarationDate"
+                  sortKey="declaredAt"
                   currentSortKey={sort.sortKey}
                   currentSortDir={sort.sortDir}
                   onSort={sort.onSort}
@@ -431,15 +430,16 @@ export function CustomsDeclarationListPageContent({
                     <TableCell className="font-medium">
                       {declaration.declarationNo}
                     </TableCell>
-                    <TableCell>{declaration.exporter}</TableCell>
-                    <TableCell>{declaration.consignee}</TableCell>
-                    <TableCell>{declaration.destinationCountry}</TableCell>
+                    <TableCell>{declaration.customsBroker || "-"}</TableCell>
+                    <TableCell>{declaration.currency}</TableCell>
                     <TableCell>
                       <CustomsDeclarationStatusBadge
                         status={declaration.status}
                       />
                     </TableCell>
-                    <TableCell>{declaration.declarationDate}</TableCell>
+                    <TableCell>
+                      {declaration.declaredAt?.slice(0, 10) || "-"}
+                    </TableCell>
                     <TableCell className="text-right">
                       {formatAmount(
                         declaration.totalAmount,

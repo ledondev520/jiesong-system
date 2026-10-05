@@ -213,6 +213,8 @@ interface ProductSupplier {
 
 export enum CustomsDeclarationStatus {
   DRAFT = 'DRAFT',
+  DECLARED = 'DECLARED',
+  VOID = 'VOID',
   SUBMITTED = 'SUBMITTED',
   INSPECTING = 'INSPECTING',
   RELEASED = 'RELEASED',
@@ -222,7 +224,13 @@ export enum CustomsDeclarationStatus {
 
 export interface CustomsDeclarationItem {
   id: string;
-  productName: string;
+  productId?: string;
+  customsName?: string;
+  packingItemId?: string | null;
+  taxRateId?: string | null;
+  itemNo?: number | null;
+  declarationElements?: string | null;
+  productName?: string;
   hsCode: string;
   quantity: number;
   unit?: string;
@@ -245,12 +253,12 @@ export interface CustomsDeclaration {
   declarationDate?: string | null;
   releaseDate?: string | null;
   declaredAt?: string | null;    // Prisma schema 实际字段名
-  exportDate?: string | null;    // Prisma schema 实际字段名（对应放行日期）
+  exportDate?: string | null;    // 实际出口日期
   customsBroker?: string | null;
   currency: string;
   exchangeRate?: number | null;
   totalAmount: number;
-  totalPackages?: number | null;  // 旧字段名（schema 中为 totalQuantity）
+  totalPackages?: number | null;  // 历史接口字段，仅供读取兼容
   totalQuantity?: number | null;  // Prisma schema 实际字段名
   grossWeight?: number | null;    // 旧字段名（schema 中为 totalGrossWeight）
   totalGrossWeight?: number | null; // Prisma schema 实际字段名

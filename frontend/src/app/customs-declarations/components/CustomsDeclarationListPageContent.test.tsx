@@ -50,7 +50,7 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     );
     const user = userEvent.setup();
     render(<CustomsDeclarationListPageContent embedded />);
-    const input = screen.getByPlaceholderText("搜索报关单号、客户或目的国...");
+    const input = screen.getByPlaceholderText("搜索报关单号或报关行...");
     await user.clear(input);
     await user.type(input, "TEST");
     await waitFor(() =>
@@ -94,7 +94,7 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     expect((await screen.findAllByText("QA-PAGE-2")).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "下一页" })).toBeDisabled();
     await user.type(
-      screen.getByPlaceholderText("搜索报关单号、客户或目的国..."),
+      screen.getByPlaceholderText("搜索报关单号或报关行..."),
       "TEST",
     );
     await waitFor(() =>
