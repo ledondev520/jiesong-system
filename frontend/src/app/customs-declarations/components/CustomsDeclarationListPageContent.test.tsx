@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CustomsDeclarationListPageContent } from "./CustomsDeclarationListPageContent";
 
@@ -40,6 +40,14 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     render(<CustomsDeclarationListPageContent embedded />);
     await waitFor(() => expect(mocks.getAll).toHaveBeenCalled());
     expect(mocks.router.replace).not.toHaveBeenCalled();
+  });
+
+  it("浏览器已离开报关页签时旧嵌入列表事件不能再发布筛选", async () => {
+    render(<CustomsDeclarationListPageContent embedded />);
+    const input = screen.getByPlaceholderText("搜索报关单号或报关行...");
+    window.history.replaceState({}, "", "/dashboard/tax-refunds?view=refunds");
+    fireEvent.change(input, { target: { value: "LATE" } });
+    expect(window.location.search).toBe("?view=refunds");
   });
 
   it("搜索和重置只改变筛选条件，保留所属页签与其他参数", async () => {

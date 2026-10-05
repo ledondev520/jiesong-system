@@ -16,8 +16,11 @@ import {
   useEffect,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react";
+import {
+  replaceBrowserUrl,
+  useBrowserQuery,
+} from "@/lib/hooks/useBrowserQuery";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useTableSort } from "@/lib/hooks/useTableSort";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -58,11 +61,6 @@ import {
 
 const PAGE_SIZE = 20;
 
-function subscribeToBrowserQuery(onChange: () => void) {
-  window.addEventListener("popstate", onChange);
-  return () => window.removeEventListener("popstate", onChange);
-}
-
 const formatAmount = (amount: number, currency: string) =>
   `${currency} ${amount.toLocaleString()}`;
 
@@ -72,11 +70,7 @@ export function CustomsDeclarationListPageContent({
   const router = useRouter();
   const searchParams = useSearchParams();
   // 延迟的 Next 查询确认不能覆盖浏览器已发布的输入；每次提交后重新检查实际地址。
-  const queryString = useSyncExternalStore(
-    subscribeToBrowserQuery,
-    () => window.location.search.slice(1),
-    () => searchParams.toString(),
-  );
+  const queryString = useBrowserQuery(searchParams.toString());
   const currentParams = new URLSearchParams(queryString);
   const initialKeyword = currentParams.get("keyword") || "";
   const initialStatus = currentParams.get("status") || "ALL";
@@ -108,6 +102,7 @@ export function CustomsDeclarationListPageContent({
     (newKeyword: string, newStatus: string) => {
       // 使用最新地址保留父页签/来源参数；Next 原生 history 补丁同步查询，不为每个按键启动路由请求。
       const params = new URLSearchParams(window.location.search);
+      if (embedded && params.get("view") !== "customs") return;
       if (newKeyword) params.set("keyword", newKeyword);
       else params.delete("keyword");
       if (newStatus && newStatus !== "ALL") params.set("status", newStatus);
@@ -118,9 +113,9 @@ export function CustomsDeclarationListPageContent({
         window.location.pathname +
         (nextQuery ? `?${nextQuery}` : "") +
         window.location.hash;
-      window.history.replaceState(null, "", newUrl);
+      replaceBrowserUrl(newUrl);
     },
-    [],
+    [embedded],
   );
 
   const [declarations, setDeclarations] = useState<CustomsDeclaration[]>([]);

@@ -215,6 +215,45 @@ describe("退税页签实际组件的路由流转", () => {
     expect(mocks.router.replace).not.toHaveBeenCalled();
   });
 
+  it("LATE 搜索后立即选退税记录，旧 Next 快照和缓存导航不能恢复报关页签", async () => {
+    const user = userEvent.setup();
+    const oldHref =
+      "/dashboard/tax-refunds?view=customs&source=qa&keyword=OLD&status=RELEASED";
+    window.history.replaceState({}, "", oldHref);
+    mocks.searchSnapshot = window.location.search;
+    await act(async () => render(<TestRoutes />));
+    const input = await screen.findByDisplayValue("OLD");
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "LATE" } });
+    });
+    expect(input).toHaveValue("LATE");
+    const originalReplace = mocks.router.replace.getMockImplementation();
+    mocks.router.replace.mockImplementation(() => {
+      // 对应真实 Next 缓存导航使用旧 canonical query 的已确认浏览器轨迹。
+      window.history.replaceState({}, "", oldHref);
+      mocks.notify();
+    });
+    try {
+      await user.click(screen.getByRole("tab", { name: "退税记录" }));
+      expect(window.location.search).toBe("?view=refunds");
+      expect(screen.getByRole("tab", { name: "退税记录" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(screen.queryByRole("heading", { name: "报关单管理" })).toBeNull();
+      await act(async () => mocks.notify());
+      expect(window.location.search).toBe("?view=refunds");
+      expect(mocks.router.replace).not.toHaveBeenCalled();
+      await waitFor(() =>
+        expect(mocks.refundsGetAll).toHaveBeenLastCalledWith(
+          expect.objectContaining({ keyword: undefined, status: undefined }),
+        ),
+      );
+    } finally {
+      mocks.router.replace.mockImplementation(originalReplace!);
+    }
+  });
+
   it("清空后延迟的 OLD 路由确认不能恢复旧输入，零延迟连续输入与地址保持 TEST", async () => {
     const user = userEvent.setup({ delay: 0 });
     const oldQuery = "?view=customs&source=qa&keyword=OLD";
