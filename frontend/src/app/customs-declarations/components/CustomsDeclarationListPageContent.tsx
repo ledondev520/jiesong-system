@@ -1,6 +1,6 @@
 /**
  * Input: 报关单服务、URL 查询参数、router
- * Output: 报关单列表页（保留所属页签的筛选同步、手机卡片与桌面表格）
+ * Output: 报关单列表页（保留所属页签的筛选同步、服务端分页、手机卡片与桌面表格）
  * Pos: 报关单管理主列表页
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -24,6 +24,7 @@ import { customsDeclarationService } from "@/services/customsDeclaration.service
 import { cachedFetch } from "@/lib/api-cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -71,6 +72,9 @@ export function CustomsDeclarationListPageContent({
 
   const [keyword, setKeyword] = useState(initialKeyword);
   const [status, setStatus] = useState(initialStatus);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
+  const [total, setTotal] = useState(0);
   const deferredKeyword = useDeferredValue(keyword);
 
   // 同步搜索状态到 URL
@@ -102,22 +106,23 @@ export function CustomsDeclarationListPageContent({
   const loadDeclarations = useCallback(async () => {
     setLoading(true);
     try {
-      const cacheKey = `customs-declarations-${deferredKeyword}-${status}`;
+      const cacheKey = `customs-declarations-${deferredKeyword}-${status}-${page}-${pageSize}`;
       const response = await cachedFetch(cacheKey, () =>
         customsDeclarationService.getAll({
-          page: 1,
-          pageSize: PAGE_SIZE,
+          page,
+          pageSize,
           keyword: deferredKeyword || undefined,
           status: status === "ALL" ? undefined : status,
         }),
       );
       setDeclarations(response?.data?.items || []);
+      setTotal(response?.data?.pagination?.total ?? 0);
     } catch {
       toast.error("加载报关单失败");
     } finally {
       setLoading(false);
     }
-  }, [deferredKeyword, status]);
+  }, [deferredKeyword, status, page, pageSize]);
 
   useEffect(() => {
     void loadDeclarations();
@@ -187,13 +192,22 @@ export function CustomsDeclarationListPageContent({
               <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
               <Input
                 value={keyword}
-                onChange={(event) => setKeyword(event.target.value)}
+                onChange={(event) => {
+                  setKeyword(event.target.value);
+                  setPage(1);
+                }}
                 placeholder="搜索报关单号、客户或目的国..."
                 className="h-11 rounded-xl border-border/70 bg-background/70 pl-10"
               />
             </div>
 
-            <Select value={status} onValueChange={setStatus}>
+            <Select
+              value={status}
+              onValueChange={(value) => {
+                setStatus(value);
+                setPage(1);
+              }}
+            >
               <SelectTrigger className="h-11 w-40 rounded-xl">
                 <SelectValue placeholder="全部状态" />
               </SelectTrigger>
@@ -213,6 +227,7 @@ export function CustomsDeclarationListPageContent({
                 onClick={() => {
                   setKeyword("");
                   setStatus("ALL");
+                  setPage(1);
                   updateUrlParams("", "ALL");
                 }}
                 data-testid="reset-filters"
@@ -251,7 +266,7 @@ export function CustomsDeclarationListPageContent({
         <Card className="surface-panel">
           <CardHeader>
             <CardTitle className="text-sm text-muted-foreground">
-              当前列表总单量
+              本页单量
             </CardTitle>
           </CardHeader>
           <CardContent className="text-3xl font-semibold">
@@ -273,7 +288,7 @@ export function CustomsDeclarationListPageContent({
         <Card className="surface-panel">
           <CardHeader>
             <CardTitle className="text-sm text-muted-foreground">
-              当前列表货值
+              本页货值
             </CardTitle>
           </CardHeader>
           <CardContent className="text-3xl font-semibold">
@@ -454,8 +469,33 @@ export function CustomsDeclarationListPageContent({
         </CardContent>
       </Card>
 
-      <div className="text-sm text-muted-foreground">
-        已放行单量：{releasedCount}
+      <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        <span>
+          共 {total} 条，第 {page} 页；本页已放行 {releasedCount} 条
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={loading || page <= 1}
+          onClick={() => setPage(page - 1)}
+        >
+          上一页
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={loading || page * pageSize >= total}
+          onClick={() => setPage(page + 1)}
+        >
+          下一页
+        </Button>
+        <PageSizeSelect
+          value={pageSize}
+          onChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
       </div>
     </div>
   );

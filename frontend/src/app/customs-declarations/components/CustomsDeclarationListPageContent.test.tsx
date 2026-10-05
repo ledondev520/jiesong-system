@@ -65,4 +65,58 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
       { scroll: false },
     );
   });
+  it("可翻到第2页，搜索后回到第1页，不漏掉20条以后的报关单", async () => {
+    mocks.getAll.mockImplementation(async ({ page }) => ({
+      data: {
+        items: [
+          {
+            id: `qa-${page}`,
+            declarationNo: `QA-PAGE-${page}`,
+            status: "DRAFT",
+            totalAmount: 100,
+            currency: "USD",
+          },
+        ],
+        pagination: { total: 37 },
+      },
+    }));
+    const user = userEvent.setup();
+    render(<CustomsDeclarationListPageContent embedded />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "下一页" })).toBeEnabled(),
+    );
+    await user.click(screen.getByRole("button", { name: "下一页" }));
+    await waitFor(() =>
+      expect(mocks.getAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 2, pageSize: 20 }),
+      ),
+    );
+    expect((await screen.findAllByText("QA-PAGE-2")).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "下一页" })).toBeDisabled();
+    await user.type(
+      screen.getByPlaceholderText("搜索报关单号、客户或目的国..."),
+      "TEST",
+    );
+    await waitFor(() =>
+      expect(mocks.getAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 1, keyword: "TEST" }),
+      ),
+    );
+  });
+
+  it("切换每页条数按服务端重新分页", async () => {
+    mocks.getAll.mockResolvedValue({
+      data: { items: [], pagination: { total: 37 } },
+    });
+    const user = userEvent.setup();
+    render(<CustomsDeclarationListPageContent embedded />);
+    await waitFor(() => expect(mocks.getAll).toHaveBeenCalled());
+    await user.click(screen.getAllByRole("combobox")[1]);
+    await user.click(screen.getByRole("option", { name: "每页 50 条" }));
+    await waitFor(() =>
+      expect(mocks.getAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 1, pageSize: 50 }),
+      ),
+    );
+  });
 });

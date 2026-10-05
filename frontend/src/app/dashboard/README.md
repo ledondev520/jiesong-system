@@ -5,3 +5,5 @@
 导航本身不授予API权限，后端仍逐请求校验用户状态、角色和会话版本。安全协议及回滚见 `docs/security/browser-sessions.md`。
 
 出口退税内嵌报关列表同步搜索/状态时保留 `view=customs` 及父页面参数；初次挂载不重写相同URL，避免报关页签自动跳回工作台。回归见 `app/customs-declarations/components/CustomsDeclarationListPageContent.test.tsx`。
+
+报关单列表按后端总数翻页并支持20/50/100条；搜索、状态及每页条数变化回到第1页，缓存按页隔离，汇总明确为本页口径。
