@@ -1,6 +1,6 @@
 /**
  * Input: sales、packingListCheck 与单柜财务服务层
- * Output: 出口合同及模板明细原子创建、装箱单核对、退税准备和单柜财务结算 HTTP 适配
+ * Output: 出口合同及模板明细原子创建、装箱单核对、退税准备和单柜财务结算 HTTP 适配；附件复用财务凭证访问边界
  * Pos: 纯路由适配层，业务逻辑收敛至 services Module
  */
 
@@ -278,6 +278,7 @@ const deleteFile = async (req, res, next) => {
 
     const file = await fileService.findFileById(fileId);
     if (!file || file.contractType !== fileService.CONTRACT_TYPE.SALES) throw createError('文件不存在', 404);
+    fileService.assertFileAccess(file, req.user);
     await fileService.deleteFileRecord(fileId);
 
     success(res, null, '文件删除成功');
@@ -294,6 +295,7 @@ const downloadFile = async (req, res, next) => {
 
     const file = await fileService.findFileById(fileId);
     if (!file || file.contractType !== fileService.CONTRACT_TYPE.SALES) throw createError('文件不存在', 404);
+    fileService.assertFileAccess(file, req.user);
 
     const absolutePath = path.isAbsolute(file.filePath)
       ? file.filePath

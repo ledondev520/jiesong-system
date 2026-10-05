@@ -1,6 +1,6 @@
 /**
  * Input: multer库、配置
- * Output: 文件上传中间件（通用 upload、合同附件 contractUpload、装箱单核对内存接收 pdfCheckUpload）
+ * Output: 文件上传中间件（通用 upload、合同附件 contractUpload、装箱单核对内存接收 pdfCheckUpload）；非法格式返回客户端错误
  * Pos: 文件上传工具，处理合同文件等上传
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -10,6 +10,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const config = require('../config');
+const { createError } = require('../middleware/errorHandler');
 
 // 确保上传目录存在
 const uploadDir = config.upload.dir;
@@ -54,7 +55,7 @@ const fileFilter = (req, file, cb) => {
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('不支持的文件类型'), false);
+    cb(createError('不支持的文件类型', 400), false);
   }
 };
 
@@ -80,7 +81,7 @@ const contractFileFilter = (req, file, cb) => {
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('仅支持 PDF、JPG、PNG、XLSX、DOCX 格式'), false);
+    cb(createError('仅支持 PDF、JPG、PNG、XLSX、DOCX 格式', 400), false);
   }
 };
 
@@ -99,7 +100,7 @@ const pdfCheckUpload = multer({
     if (file.mimetype === 'application/pdf') {
       cb(null, true);
     } else {
-      cb(new Error('仅支持 PDF 格式的装箱单'), false);
+      cb(createError('仅支持 PDF 格式的装箱单', 400), false);
     }
   },
   limits: {

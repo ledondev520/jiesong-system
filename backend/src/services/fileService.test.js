@@ -60,6 +60,7 @@ test('createFile: 用户上传的合同凭证落盘后收紧为 0600 权限', as
 
   try {
     await withMockDelegates({
+      purchaseContract: { findUnique: async () => ({ id: 'purchase-1' }) },
       contractFile: { create: async ({ data }) => ({ id: 'f-secure', ...data }) },
     }, async () => {
       await fileService.createFile('purchase-1', 'PURCHASE', {
@@ -83,18 +84,90 @@ test('createFile: 生产实物图分类只接受 JPG/PNG，错误文件不留在
   fs.writeFileSync(filePath, '%PDF');
 
   try {
-    await assert.rejects(
-      () => fileService.createFile('purchase-1', 'PURCHASE', {
-        originalname: 'not-photo.pdf',
-        path: filePath,
-        mimetype: 'application/pdf',
-        size: 4,
-      }, null, 'PRODUCTION_PHOTO'),
-      (error) => error.statusCode === 400 && /生产实物图仅支持 JPG、PNG/.test(error.message),
-    );
+    await withMockDelegates({ purchaseContract: { findUnique: async () => ({ id: 'purchase-1' }) } }, async () => {
+      await assert.rejects(
+        () => fileService.createFile('purchase-1', 'PURCHASE', {
+          originalname: 'not-photo.pdf',
+          path: filePath,
+          mimetype: 'application/pdf',
+          size: 4,
+        }, null, 'PRODUCTION_PHOTO'),
+        (error) => error.statusCode === 400 && /生产实物图仅支持 JPG、PNG/.test(error.message),
+      );
+    });
     assert.equal(fs.existsSync(filePath), false);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('createFile: 验证/权限/持久化失败仅清理当前上传，保留既有凭证', async t => {
+  for (const failure of ['invalid-type', 'missing-contract', 'category', 'chmod', 'database', 'deleted-contract']) {
+    await t.test(failure, async () => {
+      const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-upload-failure-'));
+      const current = path.join(directory, 'current.pdf');
+      const retained = path.join(directory, 'previous.pdf');
+      fs.writeFileSync(current, '%PDF synthetic new upload');
+      fs.writeFileSync(retained, '%PDF synthetic previous archive', { mode: 0o600 });
+      const originalChmod = fs.chmodSync;
+      let persisted = 0;
+      try {
+        if (failure === 'chmod') fs.chmodSync = () => { throw new Error('synthetic chmod failure'); };
+        await withMockDelegates({
+          purchaseContract: { findUnique: async () => failure === 'missing-contract' ? null : { id: 'purchase-1' } },
+          contractFile: { create: async () => { persisted++; throw Object.assign(new Error('synthetic persistence failure'), failure === 'deleted-contract' ? { code: 'P2003' } : {}); } },
+        }, async () => {
+          await assert.rejects(() => fileService.createFile('purchase-1', failure === 'invalid-type' ? 'TYPO' : 'PURCHASE', {
+            originalname: 'current.pdf', path: current, mimetype: 'application/pdf', size: 25,
+          }, null, failure === 'category' ? 'PRODUCTION_PHOTO' : 'SIGNED_CONTRACT'), error => {
+            if (['invalid-type', 'category'].includes(failure)) return error.statusCode === 400;
+            if (['missing-contract', 'deleted-contract'].includes(failure)) return error.statusCode === 404;
+            return error.message === `synthetic ${failure === 'chmod' ? 'chmod' : 'persistence'} failure`;
+          });
+        });
+        assert.equal(persisted, ['database', 'deleted-contract'].includes(failure) ? 1 : 0);
+        assert.equal(fs.existsSync(current), false);
+        assert.equal(fs.readFileSync(retained, 'utf8'), '%PDF synthetic previous archive');
+      } finally {
+        fs.chmodSync = originalChmod;
+        fs.rmSync(directory, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+test('assertFileAccess: 财务确认附件权限共享，普通附件不增加业务所有者限制', () => {
+  const protectedFile = { description: '退税出货清单确认:synthetic:version' };
+  for (const role of ['SALES', 'PURCHASE', 'WAREHOUSE', 'BOSS']) {
+    assert.throws(() => fileService.assertFileAccess(protectedFile, { role }), error => error.statusCode === 403);
+  }
+  for (const role of ['ADMIN', 'FINANCE']) assert.doesNotThrow(() => fileService.assertFileAccess(protectedFile, { role }));
+  assert.doesNotThrow(() => fileService.assertFileAccess({ description: '普通合成附件' }, { role: 'SALES' }));
+});
+
+test('createFile: 清理失败不覆盖原始错误或泄露文件路径', async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-upload-cleanup-failure-'));
+  const current = path.join(directory, 'synthetic-current.pdf');
+  fs.writeFileSync(current, '%PDF synthetic');
+  const originalUnlink = fs.unlinkSync;
+  const messages = [];
+  t.mock.method(console, 'error', message => messages.push(message));
+  const originalFailure = new Error('synthetic persistence failure');
+  try {
+    fs.unlinkSync = () => { throw new Error(`synthetic unlink failure ${current}`); };
+    await withMockDelegates({
+      purchaseContract: { findUnique: async () => ({ id: 'purchase-1' }) },
+      contractFile: { create: async () => { throw originalFailure; } },
+    }, async () => {
+      await assert.rejects(() => fileService.createFile('purchase-1', 'PURCHASE', {
+        originalname: 'synthetic.pdf', path: current, mimetype: 'application/pdf', size: 14,
+      }), error => error === originalFailure && error.uploadCleanupFailed === true);
+    });
+    assert.deepEqual(messages, ['[fileService] rejected upload cleanup failed']);
+    assert.equal(fs.existsSync(current), true);
+  } finally {
+    fs.unlinkSync = originalUnlink;
+    fs.rmSync(directory, { recursive: true, force: true });
   }
 });
 

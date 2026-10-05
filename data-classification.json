@@ -38,6 +38,7 @@
           "Least privilege file mode (<=600 for backend .env)",
           "Contract artifact and SQLite backup directories use 0700 and files use 0600",
           "Legacy procurement attachment handlers reuse fileService permission enforcement and resolve downloads against UPLOAD_DIR",
+          "fileService.assertFileAccess shares existing ADMIN/FINANCE tax-confirmation access rules across generic and legacy purchase/sales download/delete routes; failed createFile writes clean only that request's new payload, never existing/generated attachments, and cleanup failures preserve the original error without logging paths; legacy purchase physical-archive retention is unchanged",
           "Carrier packing-list raw extracted text is not persisted; structured check records retain their original file reference",
           "HTTP request logs retain route, timing, and request shape only; request/query values, AI prompts, tool schemas, and user messages are excluded",
           "HSCIQ upstream error bodies are excluded from service errors and logs; pending queries are bounded by a total timeout and quota reservation",

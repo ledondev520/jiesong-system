@@ -1,6 +1,6 @@
 /**
  * Input: Prisma Client、文件上传工具
- * Output: 统一合同附件服务、Buffer 归档与受保护凭证删除约束
+ * Output: 统一合同附件服务、失败上传清理、Buffer 归档与受保护凭证访问/删除约束
  * Pos: 文件管理领域服务，屏蔽采购/出口合同附件的底层表差异
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -34,6 +34,20 @@ const normalizeCategory = (value) => (
   Object.values(CONTRACT_FILE_CATEGORY).includes(value) ? value : CONTRACT_FILE_CATEGORY.OTHER
 );
 
+// 已确认清单含财务核验行；所有附件入口复用现有 ADMIN/FINANCE 边界。
+const assertFileAccess = (file, user) => {
+  if (String(file?.description || '').startsWith('退税出货清单确认:')
+    && !['ADMIN', 'FINANCE'].includes(user?.role)) {
+    throw createError('仅管理员或财务可访问已确认退税清单', 403);
+  }
+};
+
+const assertContractType = (contractType) => {
+  if (!Object.values(CONTRACT_TYPE).includes(contractType)) {
+    throw createError('合同类型仅支持 PURCHASE 或 SALES', 400);
+  }
+};
+
 /**
  * 职责：在建立数据库记录前收紧用户上传附件的落盘权限。
  * 权限变更失败时抛错，避免留下已登记但未受保护的合同凭证。
@@ -49,7 +63,6 @@ const validateUploadedFileCategory = (file, category) => {
     category === CONTRACT_FILE_CATEGORY.PRODUCTION_PHOTO
     && !['image/jpeg', 'image/png'].includes(file?.mimetype)
   ) {
-    if (file?.path && fs.existsSync(file.path)) fs.unlinkSync(file.path);
     throw createError('生产实物图仅支持 JPG、PNG 格式', 400);
   }
 };
@@ -62,30 +75,43 @@ const validateUploadedFileCategory = (file, category) => {
  * @param {string} [description] - 文件描述
  */
 const createFile = async (contractId, contractType, file, description, category) => {
-  const { getRelativePath } = require('../utils/upload');
-  const normalizedCategory = normalizeCategory(category);
-  validateUploadedFileCategory(file, normalizedCategory);
-  secureStoredFile(file.path);
-  const baseData = {
-    fileName: file.originalname,
-    filePath: getRelativePath(file.path),
-    fileType: file.mimetype,
-    mimeType: file.mimetype,
-    fileSize: file.size,
-    description: description || null,
-    category: normalizedCategory,
-    checksum: null,
-  };
-
-  if (contractType === CONTRACT_TYPE.SALES) {
-    return prisma.salesContractFile.create({
-      data: { ...baseData, salesContractId: contractId },
+  try {
+    assertContractType(contractType);
+    const isSales = contractType === CONTRACT_TYPE.SALES;
+    const contract = await (isSales ? prisma.salesContract : prisma.purchaseContract).findUnique({
+      where: { id: contractId }, select: { id: true },
     });
-  }
+    if (!contract) throw createError('合同不存在或已被删除', 404);
 
-  return prisma.contractFile.create({
-    data: { ...baseData, purchaseContractId: contractId },
-  });
+    const { getRelativePath } = require('../utils/upload');
+    const normalizedCategory = normalizeCategory(category);
+    validateUploadedFileCategory(file, normalizedCategory);
+    secureStoredFile(file.path);
+    const baseData = {
+      fileName: file.originalname,
+      filePath: getRelativePath(file.path),
+      fileType: file.mimetype,
+      mimeType: file.mimetype,
+      fileSize: file.size,
+      description: description || null,
+      category: normalizedCategory,
+      checksum: null,
+    };
+    return await (isSales ? prisma.salesContractFile : prisma.contractFile).create({
+      data: { ...baseData, [isSales ? 'salesContractId' : 'purchaseContractId']: contractId },
+    });
+  } catch (error) {
+    // req.file is this request's new multer payload; never remove another version.
+    try {
+      if (file?.path && fs.existsSync(file.path)) fs.unlinkSync(file.path);
+    } catch {
+      // Keep the original failure classification; never log payload paths or bytes.
+      error.uploadCleanupFailed = true;
+      console.error('[fileService] rejected upload cleanup failed');
+    }
+    if (error.code === 'P2003') throw createError('合同不存在或已被删除', 404);
+    throw error;
+  }
 };
 
 /**
@@ -159,7 +185,8 @@ const archiveGeneratedFile = async (options = {}) => archiveBufferFile({
  * @param {string} contractId - 合同ID
  * @param {string} contractType - PURCHASE | SALES
  */
-const listFiles = async (contractId, contractType) => {
+const listFiles = async (contractId, contractType = CONTRACT_TYPE.PURCHASE) => {
+  assertContractType(contractType);
   if (contractType === CONTRACT_TYPE.SALES) {
     const files = await prisma.salesContractFile.findMany({
       where: { salesContractId: contractId },
@@ -219,6 +246,7 @@ const deleteFileRecord = async (fileId) => {
 module.exports = {
   CONTRACT_TYPE,
   CONTRACT_FILE_CATEGORY,
+  assertFileAccess,
   archiveBufferFile,
   archiveGeneratedFile,
   createFile,

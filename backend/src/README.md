@@ -13,7 +13,7 @@
 | app.js | 入口 | Express 应用初始化和启动（含定时任务启动） |
 | config/ | 配置层 | 权限校验后的环境加载、活动 AI 供应商与常量（含单元测试） |
 | controllers/ | 控制层 | 处理 HTTP 请求，调用服务层 |
-| integration/ | 集成测试层 | 数据库集成测试（空结构/事务/seed 幂等、真实 HTTP 进销存闭环、首个门店创建/RBAC、仓储异常出库/FIFO/来源守恒及收验货后采购更正/补录边界） |
+| integration/ | 集成测试层 | 数据库集成测试（空结构/事务/seed 幂等、真实 HTTP 进销存闭环、首个门店创建/RBAC、仓储异常出库/FIFO/来源守恒、收验货后采购更正/补录边界与合同附件 multipart/权限/失败留存矩阵） |
 | jobs/ | 定时任务层 | 库存预警、出口提醒（每月5号退税/缺票提醒）等定时任务 |
 | middleware/ | 中间件层 | 认证、仅记录请求结构的性能日志、错误处理（含单元测试） |
 | routes/ | 路由层 | 定义 API 路由和参数验证 |
@@ -28,9 +28,9 @@
 | supplierController.js | 供应商管理 CRUD |
 | storeController.js | 门店管理 CRUD + 港口 |
 | productController.js | 商品管理 + 历史价格 |
-| purchaseController.js | 采购合同 + 经 fileService 收紧权限的附件上传 + 从 UPLOAD_DIR 解析附件下载 |
-| salesController.js | 出口合同 + 价格计算 + 源文件附件 |
-| fileController.js | 合同附件；退税确认清单含核验行，下载及删除仅允许管理员/财务 |
+| purchaseController.js | 采购合同 + 经 fileService 收紧权限的附件上传 + 从 UPLOAD_DIR 解析附件下载；旧下载/删除入口复用财务凭证访问边界，旧删除保留既有物理归档 |
+| salesController.js | 出口合同 + 价格计算 + 源文件附件；旧下载/删除入口复用财务凭证访问边界 |
+| fileController.js | 合同附件；退税确认清单含核验行，所有下载及删除入口经 fileService.assertFileAccess 限制为管理员/财务 |
 | taxRefundController.js | 退税记录与工作台、出货材料确认和受限月度导出 |
 | containerController.js | 货柜管理 + 装箱明细 |
 | inventoryController.js | 库存查询；采购/验货来源状态由业务事实驱动，手工和批量不可绕过 |
@@ -47,6 +47,7 @@
 | 文件 | 功能 |
 |------|------|
 | authService.js | 登录验证、版本化Token、统一密码策略、邮箱验证码找回密码 |
+| fileService.js | 合同附件与生成文件受限归档；共用财务凭证访问边界；上传验证/权限/落库失败只清理本次新文件，保留其他版本 |
 | patrolService.js | 使用 SalesContract 与财务共享发运30天逾期规则；同管理员同标题未读或24小时内告警去重，保留真实汇率过期提醒 |
 | financeService.js | 付款幂等、应收应付聚合；已收货/已到港合同按真实款项自动结清，差异重新打开待结清 |
 | salesCargoLifecycle.js | 销售与旧货柜共用发运/出库证据检查；禁止已出库货物变更及合同删除 |
