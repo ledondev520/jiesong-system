@@ -1,6 +1,6 @@
 /**
  * Input: 已保存商品数据、独立编辑会话、HSCode 查询
- * Output: 关闭即丢弃未保存编辑、异步匹配仅更新当前会话的手机适配对话框
+ * Output: 取消丢弃编辑、同名手动匹配不被重复防抖隐藏、异步结果仅更新当前会话
  * Pos: 商品管理组件，支持录入报关名、HS编码、申报要素、规格、体积、重量等信息
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -104,6 +104,7 @@ function ProductDialogSession({
   const activeSession = useRef(true);
   const latestSearch = useRef(0);
   const latestSelection = useRef(0);
+  const requestedName = useRef<string | null>(null);
 
   useEffect(() => {
     activeSession.current = true;
@@ -157,6 +158,7 @@ function ProductDialogSession({
 
   useEffect(() => {
     // A new name also invalidates requests when the user returns to an earlier name.
+    requestedName.current = null;
     latestSearch.current += 1;
     latestSelection.current += 1;
     setHsSuggestions([]);
@@ -193,6 +195,7 @@ function ProductDialogSession({
         return;
       }
 
+      requestedName.current = keyword;
       setHsLoading(true);
       setHsLookupMessage(null);
 
@@ -218,8 +221,13 @@ function ProductDialogSession({
   );
 
   useEffect(() => {
-    void loadHsSuggestions(debouncedCustomsName);
-  }, [debouncedCustomsName, loadHsSuggestions]);
+    const keyword = debouncedCustomsName.trim();
+    // Manual matching already requested this name, even when that attempt failed.
+    // Only automatic duplicates are skipped; the button still performs real retries.
+    if (keyword !== customsName.trim() || requestedName.current === keyword)
+      return;
+    void loadHsSuggestions(keyword);
+  }, [customsName, debouncedCustomsName, loadHsSuggestions]);
 
   const handleSelectHsCode = async (suggestion: HsCodeMatch): Promise<void> => {
     const request = ++latestSelection.current;

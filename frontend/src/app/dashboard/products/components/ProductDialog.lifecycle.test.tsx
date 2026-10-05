@@ -269,4 +269,127 @@ describe("ProductDialog 编辑会话", () => {
       screen.getByText(`已匹配 HSCode ${secondMatch.hsCode}`),
     ).toBeInTheDocument();
   });
+
+  it("手动匹配后的防抖到期不隐藏已有建议或清除刚选择的编码提示", async () => {
+    vi.useFakeTimers();
+    try {
+      const retry = deferred<{ data: (typeof firstMatch)[] }>();
+      mockSearch
+        .mockResolvedValueOnce({ data: [firstMatch] })
+        .mockReturnValue(retry.promise);
+      render(<EditorHarness />);
+      fireEvent.change(screen.getByLabelText("报关名称 *"), {
+        target: { value: "合成瓷砖" },
+      });
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: "HSCode 智能匹配" }),
+        );
+      });
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: /合成瓷砖.*69072190/ }),
+        );
+      });
+      await act(async () => vi.advanceTimersByTimeAsync(350));
+
+      expect(
+        screen.getByRole("button", { name: /合成瓷砖.*69072190/ }),
+      ).toBeInTheDocument();
+      expect(screen.getByText("已匹配 HSCode 69072190")).toBeInTheDocument();
+      expect(mockSearch).toHaveBeenCalledTimes(1);
+
+      // A second explicit match remains a real retry rather than a cached no-op.
+      fireEvent.click(screen.getByRole("button", { name: "HSCode 智能匹配" }));
+      expect(mockSearch).toHaveBeenCalledTimes(2);
+      await act(async () => retry.resolve({ data: [firstMatch] }));
+      expect(
+        screen.getByRole("button", { name: /合成瓷砖.*69072190/ }),
+      ).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("同名手动匹配失败后不会在防抖到期时自动重试，但允许显式重试", async () => {
+    vi.useFakeTimers();
+    try {
+      mockSearch
+        .mockRejectedValueOnce(new Error("synthetic lookup failure"))
+        .mockResolvedValue({ data: [firstMatch] });
+      render(<EditorHarness />);
+      fireEvent.change(screen.getByLabelText("报关名称 *"), {
+        target: { value: "合成瓷砖" },
+      });
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: "HSCode 智能匹配" }),
+        );
+      });
+      await act(async () => vi.advanceTimersByTimeAsync(350));
+
+      expect(
+        screen.getByText("HSCode 建议加载失败，请稍后重试"),
+      ).toBeInTheDocument();
+      expect(mockSearch).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: "HSCode 智能匹配" }),
+        );
+      });
+      expect(mockSearch).toHaveBeenCalledTimes(2);
+      expect(
+        screen.getByRole("button", { name: /合成瓷砖.*69072190/ }),
+      ).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("改名自动匹配和 A→B→A 返回不会复用旧名称的去重标记", async () => {
+    vi.useFakeTimers();
+    try {
+      mockSearch.mockImplementation((keyword: string) =>
+        Promise.resolve({
+          data: [keyword === "合成瓷砖" ? firstMatch : secondMatch],
+        }),
+      );
+      render(<EditorHarness />);
+      const name = screen.getByLabelText("报关名称 *");
+      fireEvent.change(name, { target: { value: "合成瓷砖" } });
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: "HSCode 智能匹配" }),
+        );
+      });
+      await act(async () => vi.advanceTimersByTimeAsync(350));
+      expect(mockSearch).toHaveBeenCalledTimes(1);
+
+      fireEvent.change(name, { target: { value: "合成玻璃" } });
+      await act(async () => vi.advanceTimersByTimeAsync(350));
+      expect(
+        screen.getByRole("button", { name: /合成玻璃.*69072290/ }),
+      ).toBeInTheDocument();
+      fireEvent.change(name, { target: { value: "合成瓷砖" } });
+      await act(async () => vi.advanceTimersByTimeAsync(350));
+      expect(mockSearch.mock.calls.map(([keyword]) => keyword)).toEqual([
+        "合成瓷砖",
+        "合成玻璃",
+        "合成瓷砖",
+      ]);
+
+      // Return to the stable name before B's debounce expires; it is still a new
+      // name generation and must not leave the recommendations permanently blank.
+      fireEvent.change(name, { target: { value: "合成玻璃" } });
+      fireEvent.change(name, { target: { value: "合成瓷砖" } });
+      await act(async () => vi.advanceTimersByTimeAsync(350));
+      expect(mockSearch).toHaveBeenCalledTimes(4);
+      expect(mockSearch).toHaveBeenLastCalledWith("合成瓷砖");
+      expect(
+        screen.getByRole("button", { name: /合成瓷砖.*69072190/ }),
+      ).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
