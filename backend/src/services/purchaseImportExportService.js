@@ -1,6 +1,6 @@
 /**
  * Input: Prisma 客户端、Excel 文件路径或查询参数
- * Output: Excel Buffer 或导入结果统计
+ * Output: Excel Buffer 或逐行导入统计；留空编号使用统一序列并重试并发占号
  * Pos: 采购合同批量导入导出服务
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -10,6 +10,7 @@ const xlsx = require('xlsx');
 const fs = require('fs');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
+const { generateNextPurchaseContractNo, isPurchaseNumberConflict } = require('./purchaseContractNumberService');
 
 const STATUS_LABEL_MAP = {
   DRAFT: '草稿',
@@ -35,35 +36,20 @@ const STATUS_VALUE_MAP = {
 const VALID_STATUSES = Object.keys(STATUS_VALUE_MAP);
 
 /**
- * 职责：生成下一个采购合同编号
- * 思路：按 CG + 年份后两位 + 5 位序号；若冲突则递增重试
+ * 职责：原子写入单行合同；仅自动编号被并发占用时重新分配
+ * 思路：数据库唯一约束兜底，最多尝试五次；显式编号和其他错误不改号重试
  */
-const generateNextContractNo = async () => {
-  const year = new Date().getFullYear().toString().slice(-2);
-  const prefix = `CG${year}`;
-  const count = await prisma.purchaseContract.count({
-    where: { contractNo: { startsWith: prefix } },
-  });
-  let seq = count + 1;
-  let contractNo = `${prefix}${String(seq).padStart(5, '0')}`;
-
-  // 避免极端并发或残留数据导致冲突
-  const existing = await prisma.purchaseContract.findUnique({
-    where: { contractNo },
-    select: { id: true },
-  });
-  if (existing) {
-    const maxRecord = await prisma.purchaseContract.findFirst({
-      where: { contractNo: { startsWith: prefix } },
-      orderBy: { contractNo: 'desc' },
-      select: { contractNo: true },
-    });
-    const maxSeq = maxRecord ? parseInt(maxRecord.contractNo.slice(prefix.length), 10) : 0;
-    seq = maxSeq + 1;
-    contractNo = `${prefix}${String(seq).padStart(5, '0')}`;
+const createImportedContract = async (data) => {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      return await prisma.purchaseContract.create({
+        data: { ...data, contractNo: data.contractNo || await generateNextPurchaseContractNo(prisma) },
+      });
+    } catch (error) {
+      if (data.contractNo || !isPurchaseNumberConflict(error)) throw error;
+      if (attempt === 4) throw createError('采购编号正在分配，请稍后重试', 409);
+    }
   }
-
-  return contractNo;
 };
 
 /**
@@ -267,10 +253,8 @@ const importPurchasesExcel = async (filePath, userId, options = {}) => {
         throw new Error(`第 ${rowNum} 行：供应商「${supplierName}」不存在，请先创建供应商`);
       }
 
-      let contractNo = colIndex.contractNo !== -1 ? String(row[colIndex.contractNo] || '').trim() : '';
-      if (!contractNo) {
-        contractNo = await generateNextContractNo();
-      } else {
+      const contractNo = colIndex.contractNo !== -1 ? String(row[colIndex.contractNo] || '').trim() : '';
+      if (contractNo) {
         // 检查合同编号是否已存在
         const existing = await prisma.purchaseContract.findUnique({
           where: { contractNo },
@@ -307,15 +291,13 @@ const importPurchasesExcel = async (filePath, userId, options = {}) => {
 
       const note = colIndex.note !== -1 ? String(row[colIndex.note] || '').trim() : '';
 
-      await prisma.purchaseContract.create({
-        data: {
-          contractNo,
-          supplierId,
-          signedAt,
-          totalAmount: totalAmount ?? 0,
-          status,
-          note: note || null,
-        },
+      await createImportedContract({
+        contractNo,
+        supplierId,
+        signedAt,
+        totalAmount: totalAmount ?? 0,
+        status,
+        note: note || null,
       });
 
       successRows++;

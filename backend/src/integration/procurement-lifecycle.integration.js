@@ -99,4 +99,51 @@ test('HTTP/SQLite：采购收验货闭环、库存查询与草稿删除后编号
   assert.notEqual(next.contractNo, retainedDraft.contractNo);
   const concurrent = await Promise.all([create(), create()]);
   assert.notEqual(concurrent[0].contractNo, concurrent[1].contractNo);
+
+  // 实际Excel导入入口也使用同一编号规则；旧回退不能把自定义后缀变成NaN。
+  const year = new Date().getFullYear().toString().slice(-2);
+  const prefix = `CG${year}`;
+  const count = await db.purchaseContract.count();
+  for (const suffix of ['ZZZ-CUSTOM', '99999', '100000', String(count + 5).padStart(5, '0')]) {
+    await db.purchaseContract.create({ data: { supplierId: supplier.id, contractNo: prefix + suffix } });
+  }
+  const xlsx = require('xlsx');
+  const importRows = async (rows) => {
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, xlsx.utils.aoa_to_sheet([
+      ['合同编号', '供应商名称', '总金额', '状态'], ...rows,
+    ]), '采购合同');
+    const excel = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    const form = new FormData();
+    form.append('file', new Blob([excel], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'synthetic-purchases.xlsx');
+    return call('POST', '/purchases/import', form, { role: 'PURCHASE' });
+  };
+  const imported = await importRows([['', supplier.name, 100, '草稿']]);
+  assert.equal(imported.successRows, 1);
+  assert.equal(imported.failedRows, 0);
+  assert.ok(await db.purchaseContract.findUnique({ where: { contractNo: `${prefix}100001` } }));
+  assert.equal(await db.purchaseContract.count({ where: { contractNo: { contains: 'NaN' } } }), 0);
+
+  const beforeImport = await db.purchaseContract.count();
+  const mixed = await importRows([
+    ['', supplier.name, 100, '无效状态'],
+    ['SYNTHETIC-EXPLICIT', supplier.name, 100, '草稿'],
+    ['SYNTHETIC-EXPLICIT', supplier.name, 100, '草稿'],
+    ['', supplier.name, 100, '草稿'],
+  ]);
+  assert.equal(mixed.successRows, 2);
+  assert.equal(mixed.failedRows, 2);
+  assert.deepEqual(mixed.errors.map(error => error.row), [2, 4]);
+  assert.equal(await db.purchaseContract.count(), beforeImport + 2);
+  assert.ok(await db.purchaseContract.findUnique({ where: { contractNo: 'SYNTHETIC-EXPLICIT' } }));
+  assert.ok(await db.purchaseContract.findUnique({ where: { contractNo: `${prefix}100002` } }));
+
+  const concurrentImports = await Promise.all(Array.from({ length: 4 }, () => importRows([['', supplier.name, 100, '草稿']])));
+  for (const result of concurrentImports) {
+    assert.equal(result.successRows, 1);
+    assert.equal(result.failedRows, 0);
+  }
+  for (let sequence = 100003; sequence <= 100006; sequence++) {
+    assert.ok(await db.purchaseContract.findUnique({ where: { contractNo: `${prefix}${sequence}` } }));
+  }
 });
