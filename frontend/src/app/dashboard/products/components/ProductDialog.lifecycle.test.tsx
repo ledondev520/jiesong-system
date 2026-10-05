@@ -1,6 +1,6 @@
 /**
  * Input: 商品编辑会话、关闭/重开/切换操作、可延迟的 HSCode 查询
- * Output: 取消恢复已保存资料、建议稳定后验证详情顺序及当前会话异步隔离
+ * Output: 取消恢复资料，假时钟/按名称延迟响应验证匹配顺序及会话隔离
  * Pos: 商品档案组件生命周期测试
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -211,32 +211,62 @@ describe("ProductDialog 编辑会话", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("输入新名称后，旧手动匹配不能覆盖新的自动建议", async () => {
-    const pending = deferred<{ data: (typeof firstMatch)[] }>();
-    mockSearch.mockImplementation((keyword: string) =>
-      keyword === "合成瓷砖"
-        ? pending.promise
-        : Promise.resolve({ data: [secondMatch] }),
-    );
-    const user = userEvent.setup();
-    render(<EditorHarness />);
-    fireEvent.change(screen.getByLabelText("报关名称 *"), {
-      target: { value: "合成瓷砖" },
-    });
-    await user.click(screen.getByRole("button", { name: "HSCode 智能匹配" }));
-    fireEvent.change(screen.getByLabelText("报关名称 *"), {
-      target: { value: "合成玻璃" },
-    });
-    await screen.findByRole("button", { name: /合成玻璃.*69072290/ });
-    await act(async () => pending.resolve({ data: [firstMatch] }));
+  it.each(["resolve", "reject"] as const)(
+    "输入新名称后，旧手动匹配的迟到 %s 不能覆盖新的自动建议",
+    async (outcome) => {
+      vi.useFakeTimers();
+      try {
+        const older = deferred<{ data: (typeof firstMatch)[] }>();
+        const newer = deferred<{ data: (typeof secondMatch)[] }>();
+        mockSearch.mockImplementation((keyword: string) => {
+          if (keyword === "合成瓷砖") return older.promise;
+          if (keyword === "合成玻璃") return newer.promise;
+          throw new Error("unexpected synthetic lookup keyword");
+        });
+        render(<EditorHarness />);
+        const name = screen.getByLabelText("报关名称 *");
+        fireEvent.change(name, { target: { value: "合成瓷砖" } });
+        await act(async () => {
+          fireEvent.click(
+            screen.getByRole("button", { name: "HSCode 智能匹配" }),
+          );
+        });
+        expect(mockSearch.mock.calls.map(([keyword]) => keyword)).toEqual([
+          "合成瓷砖",
+        ]);
 
-    expect(
-      screen.getByRole("button", { name: /合成玻璃.*69072290/ }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /合成瓷砖.*69072190/ }),
-    ).not.toBeInTheDocument();
-  });
+        fireEvent.change(name, { target: { value: "合成玻璃" } });
+        // Advance the real debounce boundary, then settle each name's response
+        // explicitly. This tests response ordering without wall-clock polling.
+        await act(async () => vi.advanceTimersByTimeAsync(350));
+        expect(mockSearch.mock.calls.map(([keyword]) => keyword)).toEqual([
+          "合成瓷砖",
+          "合成玻璃",
+        ]);
+        await act(async () => newer.resolve({ data: [secondMatch] }));
+        expect(
+          screen.getByRole("button", { name: /合成玻璃.*69072290/ }),
+        ).toBeInTheDocument();
+
+        await act(async () => {
+          if (outcome === "resolve") older.resolve({ data: [firstMatch] });
+          else older.reject(new Error("synthetic stale lookup failure"));
+        });
+        expect(
+          screen.getByRole("button", { name: /合成玻璃.*69072290/ }),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByRole("button", { name: /合成瓷砖.*69072190/ }),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByText("HSCode 建议加载失败，请稍后重试"),
+        ).not.toBeInTheDocument();
+        expect(mockSearch).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
 
   it("连续选不同 HS 建议时，后选编码优先于迟到的旧详情", async () => {
     const older = deferred<{ data: typeof firstMatch }>();
