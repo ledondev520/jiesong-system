@@ -134,6 +134,7 @@ test('uploadFile: 权限收紧失败时不建立数据库附件记录', async (t
   prisma.purchaseContract.findUnique = async () => ({ id: 'purchase-1' });
   t.after(() => { prisma.purchaseContract.findUnique = originalFind; });
   const permissionError = new Error('synthetic chmod failure');
+  fs.writeFileSync(path.join(uploadRoot, 'synthetic.pdf'), '%PDF generated fixture', { mode: 0o600 });
   t.mock.method(fs, 'chmodSync', () => { throw permissionError; });
   let createCalled = false;
   const originalCreate = prisma.contractFile.create;

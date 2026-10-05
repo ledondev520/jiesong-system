@@ -1,6 +1,6 @@
 /**
  * Input: Prisma Client、文件上传工具
- * Output: 统一合同附件服务、失败上传清理、Buffer 归档与受保护凭证访问/删除约束
+ * Output: 统一合同附件服务、受限路径与文件身份校验后的失败上传清理、Buffer 归档与受保护凭证访问/删除约束
  * Pos: 文件管理领域服务，屏蔽采购/出口合同附件的底层表差异
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -48,6 +48,32 @@ const assertContractType = (contractType) => {
   }
 };
 
+/** Validate the new Multer payload before chmod or unlink; configured-root symlinks are trusted. */
+const resolveUploadedPayload = (filePath, uploadRoot) => {
+  const invalidPath = () => createError('上传文件存储路径无效', 400);
+  if (typeof filePath !== 'string' || !filePath || filePath.includes('\0')) throw invalidPath();
+
+  // A trusted relative UPLOAD_DIR may itself contain '..'; reject traversal only
+  // in the supplied suffix, while still accepting Multer's path.join(root, name).
+  const normalizedRoot = path.normalize(uploadRoot);
+  const configuredPrefix = normalizedRoot.endsWith(path.sep) ? normalizedRoot : `${normalizedRoot}${path.sep}`;
+  const suffix = filePath.startsWith(configuredPrefix) ? filePath.slice(configuredPrefix.length) : filePath;
+  if (suffix.split(/[\\/]/).includes('..')) throw invalidPath();
+
+  const absoluteRoot = path.resolve(uploadRoot);
+  const absolutePath = path.resolve(filePath);
+  if (!absolutePath.startsWith(`${absoluteRoot}${path.sep}`)) throw invalidPath();
+  const relativePath = path.relative(absoluteRoot, absolutePath);
+  const realRoot = fs.realpathSync(absoluteRoot);
+  const realPath = fs.realpathSync(absolutePath);
+  if (!realPath.startsWith(`${realRoot}${path.sep}`)
+    || realPath !== path.resolve(realRoot, relativePath)) throw invalidPath();
+
+  const stat = fs.lstatSync(realPath);
+  if (!stat.isFile() || stat.nlink !== 1) throw invalidPath();
+  return { path: realPath, relativePath, dev: stat.dev, ino: stat.ino };
+};
+
 /**
  * 职责：在建立数据库记录前收紧用户上传附件的落盘权限。
  * 权限变更失败时抛错，避免留下已登记但未受保护的合同凭证。
@@ -75,9 +101,13 @@ const validateUploadedFileCategory = (file, category) => {
  * @param {string} [description] - 文件描述
  */
 const createFile = async (contractId, contractType, file, description, category) => {
+  const filePath = file?.path;
+  const uploadRoot = config.upload.dir;
+  let payload;
   try {
+    payload = resolveUploadedPayload(filePath, uploadRoot);
     // Tighten the new payload before any asynchronous lookup, including failure paths.
-    secureStoredFile(file.path);
+    secureStoredFile(payload.path);
     assertContractType(contractType);
     const normalizedCategory = normalizeCategory(category);
     validateUploadedFileCategory(file, normalizedCategory);
@@ -87,10 +117,9 @@ const createFile = async (contractId, contractType, file, description, category)
     });
     if (!contract) throw createError('合同不存在或已被删除', 404);
 
-    const { getRelativePath } = require('../utils/upload');
     const baseData = {
       fileName: file.originalname,
-      filePath: getRelativePath(file.path),
+      filePath: payload.relativePath,
       fileType: file.mimetype,
       mimeType: file.mimetype,
       fileSize: file.size,
@@ -104,11 +133,20 @@ const createFile = async (contractId, contractType, file, description, category)
   } catch (error) {
     // req.file is this request's new multer payload; never remove another version.
     try {
-      if (file?.path && fs.existsSync(file.path)) fs.unlinkSync(file.path);
-    } catch {
+      if (payload) {
+        // Recheck after awaited lookups/writes; path or inode replacement is not this upload.
+        const current = resolveUploadedPayload(filePath, uploadRoot);
+        if (current.path !== payload.path || current.dev !== payload.dev || current.ino !== payload.ino) {
+          throw createError('上传文件已变更，不能清理其他文件', 400);
+        }
+        fs.unlinkSync(current.path);
+      }
+    } catch (cleanupError) {
       // Keep the original failure classification; never log payload paths or bytes.
-      error.uploadCleanupFailed = true;
-      console.error('[fileService] rejected upload cleanup failed');
+      if (cleanupError.code !== 'ENOENT') {
+        error.uploadCleanupFailed = true;
+        console.error('[fileService] rejected upload cleanup failed');
+      }
     }
     if (error.code === 'P2003') throw createError('合同不存在或已被删除', 404);
     throw error;
