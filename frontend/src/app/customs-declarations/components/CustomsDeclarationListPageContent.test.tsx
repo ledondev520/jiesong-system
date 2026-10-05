@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({
   useRouter: () => mocks.router,
   useSearchParams: () => mocks.params,
+  usePathname: () => window.location.pathname,
 }));
 vi.mock("@/services/customsDeclaration.service", () => ({
   customsDeclarationService: { getAll: mocks.getAll, generateDrafts: vi.fn() },
@@ -118,5 +119,47 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
         expect.objectContaining({ page: 1, pageSize: 50 }),
       ),
     );
+  });
+
+  it("独立列表采用历史筛选，编辑与重置保留当前路径和非筛选参数", async () => {
+    const user = userEvent.setup();
+    mocks.params = new URLSearchParams("source=qa&keyword=OLD&status=RELEASED");
+    window.history.replaceState(
+      {},
+      "",
+      "/dashboard/customs-declarations?" + mocks.params.toString(),
+    );
+    const { rerender } = render(<CustomsDeclarationListPageContent />);
+    await screen.findByDisplayValue("OLD");
+    await waitFor(() => expect(mocks.getAll).toHaveBeenCalled());
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+
+    mocks.params = new URLSearchParams("source=qa&keyword=NEW&status=DRAFT");
+    window.history.replaceState(
+      {},
+      "",
+      "/dashboard/customs-declarations?" + mocks.params.toString(),
+    );
+    rerender(<CustomsDeclarationListPageContent />);
+    const input = await screen.findByDisplayValue("NEW");
+    await waitFor(() =>
+      expect(mocks.getAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({ keyword: "NEW", status: "DRAFT", page: 1 }),
+      ),
+    );
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+
+    await user.clear(input);
+    await user.type(input, "TEST");
+    expect(mocks.router.replace).toHaveBeenLastCalledWith(
+      "/dashboard/customs-declarations?source=qa&keyword=TEST&status=DRAFT",
+      { scroll: false },
+    );
+    await user.click(screen.getByTestId("reset-filters"));
+    expect(mocks.router.replace).toHaveBeenLastCalledWith(
+      "/dashboard/customs-declarations?source=qa",
+      { scroll: false },
+    );
+    expect(input).toHaveValue("");
   });
 });
