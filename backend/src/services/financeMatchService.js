@@ -1,12 +1,13 @@
 /**
  * Input: Prisma client、BankTransaction / InvoiceRecord / PurchaseContract / SalesContract 模型
- * Output: 智能关联引擎：银行流水↔合同、发票↔合同的自动匹配与人工核对
+ * Output: 智能关联引擎；发票自动写入重验待匹配状态，人工关联验证有效购销目标
  * Pos: 财务模块-智能关联业务逻辑层
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');
+const { createError } = require('../middleware/errorHandler');
 
 // ==================== 常量配置 ====================
 
@@ -410,8 +411,10 @@ async function runAutoMatch() {
     }
 
     if (best.score >= SCORE_THRESHOLD) {
-      await prisma.invoiceRecord.update({
-        where: { id: inv.id },
+      // A user may confirm/ignore this invoice after the candidate read. Keep the
+      // existing PENDING-only rule at the write so that newer decisions survive.
+      const updated = await prisma.invoiceRecord.updateMany({
+        where: { id: inv.id, matchStatus: MATCH_STATUS.PENDING },
         data: {
           matchedContractId: best.contract.id,
           matchedContractType: contractType,
@@ -420,6 +423,11 @@ async function runAutoMatch() {
           matchedAt: new Date(),
         },
       });
+
+      if (updated.count === 0) {
+        invoiceResults.push({ id: inv.id, matched: false, score: best.score });
+        continue;
+      }
 
       invoiceResults.push({
         id: inv.id,
@@ -505,6 +513,26 @@ async function getUnmatchedItems({ page = 1, pageSize = 20, type, search } = {})
  * @param {string} contractType - 'PURCHASE' | 'SALES'
  */
 async function manualMatch(entityType, entityId, contractId, contractType) {
+  if (entityType === 'INVOICE') {
+    // Invoice match IDs are polymorphic strings, not foreign keys. Mirror the
+    // existing selectable-contract rule without changing any accounting rows.
+    return prisma.$transaction(async tx => {
+      const contractModel = contractType === CONTRACT_TYPE.PURCHASE ? tx.purchaseContract : tx.salesContract;
+      const contract = await contractModel.findUnique({ where: { id: contractId }, select: { status: true } });
+      if (!contract || contract.status === 'CANCELLED') throw createError('关联合同不存在或已取消', 400);
+      return tx.invoiceRecord.update({
+        where: { id: entityId },
+        data: {
+          matchedContractId: contractId,
+          matchedContractType: contractType,
+          matchScore: 100,
+          matchStatus: MATCH_STATUS.MATCHED,
+          matchedAt: new Date(),
+        },
+      });
+    });
+  }
+
   const model = entityType === 'BANK' ? prisma.bankTransaction : prisma.invoiceRecord;
 
   const updated = await model.update({
