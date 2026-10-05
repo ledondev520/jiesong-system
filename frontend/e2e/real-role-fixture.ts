@@ -66,6 +66,7 @@ export async function startRoleFixture(
       // Do not inherit production/provider credentials or database configuration.
       env: {
         PATH: process.env.PATH,
+        TMPDIR: tmpdir(), // The child validates its directory against the same temporary root.
         NODE_ENV: "test",
         ROLE_BROWSER_TEST_DIR: directory,
         ROLE_BROWSER_TEST_SCENARIO: scenario,

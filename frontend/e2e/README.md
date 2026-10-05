@@ -28,5 +28,6 @@
 
 - `real-role-lifecycle.spec.ts` / `real-role-fixture.ts`：4项1440px真实角色浏览器验收并检查未捕获页面异常，分别覆盖 PURCHASE 到货取消/保存/重载且待验不入库，WAREHOUSE 30件合格与10件待复验/操作者/验货来源/库存自动流转，SALES 缺合格库存发运失败原子回滚、仓库真实HTTP复验后50件发运及重复请求不再扣库，BOSS 采购/销售只读UI与真实403不改业务库。每项/重试独占临时0700目录和0600 SQLite，固定测试账号和密钥仅用于合成夹具；跳过创建表单，不跳过登录或被验收的写事务。
 - 角色验收 API 仅透传到 `127.0.0.1` 隔离 Express，没有业务响应 mock 或测试HTTP入口；独立只读 SQLite 连接核对落库。沿用既有 hosted Playwright workflow 与锁定依赖，不改变产品权限、Schema或CI权限。`playwright test real-role-lifecycle.spec.ts --list` 仅验证定义；真实浏览器通过情况以 hosted CI 为准，不把本地HTTP/DB、类型或lint通过称为浏览器通过。
+- 角色夹具对子进程显式传递同一 `TMPDIR`，确保自定义临时根目录与后端启动校验一致；仍只传递测试所需环境，不继承数据库或供应商凭据。
 
 - `tax-navigation.spec.ts`：390/1440px 实际 Next 路由下的合成报关列表，验证原生 Back/Forward 筛选与第 1 页恢复、快速逐字搜索输入及关键词/状态/重置保留 `view` 和 `source`、详情返回后中断筛选并切换退税页签，以及重复点击/方向键导航。报关/退税 API 写请求直接拒绝；不访问生产数据。定义可由 CI 执行，本地添加定义不代表浏览器验收已通过。

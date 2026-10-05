@@ -7,11 +7,12 @@ const path = require('node:path');
 const { spawn, execFileSync } = require('node:child_process');
 const password = 'test-only-role-browser-password-never-production';
 
-async function fixtureFor(t, scenario) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-role-browser-e2e-'));
+async function fixtureFor(t, scenario, temporaryRoot = os.tmpdir()) {
+  const directory = fs.mkdtempSync(path.join(temporaryRoot, 'jiesong-role-browser-e2e-'));
   fs.chmodSync(directory, 0o700);
   const server = spawn(process.execPath, [path.join(__dirname, 'role-browser-server.js')], {
-    env: { PATH: process.env.PATH, NODE_ENV: 'test', ROLE_BROWSER_TEST_DIR: directory, ROLE_BROWSER_TEST_SCENARIO: scenario },
+    // Keep os.tmpdir() consistent without inheriting provider or database credentials.
+    env: { PATH: process.env.PATH, TMPDIR: temporaryRoot, NODE_ENV: 'test', ROLE_BROWSER_TEST_DIR: directory, ROLE_BROWSER_TEST_SCENARIO: scenario },
     stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
   });
   t.after(async () => {
@@ -52,6 +53,18 @@ async function fixtureFor(t, scenario) {
   };
   return { ...metadata, read, call, login };
 }
+
+test('role browser fixture: custom temporary root starts with private SQLite and real login', { timeout: 60000 }, async t => {
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-role-fixture-root-'));
+  fs.chmodSync(temporaryRoot, 0o700);
+  t.after(() => fs.rmSync(temporaryRoot, { recursive: true, force: true }));
+  // The nested fixture closes before its parent temporary root is removed.
+  await t.test('child preserves the selected temporary root', async child => {
+    const f = await fixtureFor(child, 'purchase', temporaryRoot);
+    await f.login('PURCHASE');
+    assert.deepEqual(f.read('SELECT COUNT(*) count FROM users'), [{ count: 4 }]);
+  });
+});
 
 test('role browser fixture: PURCHASE authenticates and arrival is persisted without eligible stock', { timeout: 60000 }, async t => {
   const f = await fixtureFor(t, 'purchase');
