@@ -31,6 +31,7 @@
 ## Security rules
 - 出货退税清单确认及含票面核验行的导出仅供 ADMIN/FINANCE；`backend/src/routes/taxRefunds.js` 校验入口，`backend/src/controllers/fileController.js` 同步限制确认附件下载/删除，避免绕过行级权限。生成文件继续通过 `fileService.js` 的 0700/0600 归档，确认不等于正式申报。
 - Never commit secrets (API keys, tokens, passwords, private keys, DB credentials), including in `.env`, `.env.*`, `*.example`, scripts, logs, and tests.
+- 本地被 Git 忽略的运维笔记（如 `PLAN.md`）同样不得保存真实登录凭据；登录验证只记录结果，避免检查笔记时再次暴露凭据。
 - If temporary test credentials are introduced, mark them clearly as non-production and require environment-variable override before上线.
 - Use environment variables for secrets and validate their presence during startup.
 - Do not print sensitive values to logs. Redact secrets from debug output and structured logs.

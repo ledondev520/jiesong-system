@@ -109,3 +109,7 @@ The additive session-table rollout requires a fresh verified online SQLite snaps
 - Global API admission uses the locked `express-rate-limit` implementation in `backend/src/middleware/apiRateLimit.js`, still 100 requests/minute before request parsing and routing. Legacy JSON/Retry-After and millisecond X-RateLimit reset headers remain compatible; canonical IP keys collapse mapped IPv4 and IPv6 /56 without trusting forwarded headers beyond the existing explicit proxy allowlist. The tighter login 10/15min and recovery quotas remain independent. Standalone synthetic auth servers use the same recognized limiter; no security rule is disabled or suppressed.
 
 - Global and legacy login HTTP counters remain process-local, as before: restarts reset them and multiple workers have independent counters. This change does not claim a distributed/persistent quota. Existing SQLite email/recovery quotas remain independent.
+
+## 运维验证笔记
+
+本地被 Git 忽略的 `PLAN.md` 等运维记录也不得保存真实账号与密码组合；仅记录验证结果。发现残留时先对当前笔记脱敏，单独评估凭据轮换；脱敏笔记不等于撤销已有凭据，也不能据此声称 Git 历史已清理。
