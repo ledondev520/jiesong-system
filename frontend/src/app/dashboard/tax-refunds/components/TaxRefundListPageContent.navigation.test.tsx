@@ -1,5 +1,5 @@
 /**
- * Input: 真实报关组件、退税页签/详情、合成历史/新文档导航与服务数据
+ * Input: 真实 lazy 报关组件、首次异步 act 初始化、合成导航与服务数据
  * Output: 列表/详情原生明确返回、缓存 canonical 查询与异步结果一致性回归
  * Pos: 退税工作台路由集成测试
  */
@@ -175,14 +175,24 @@ describe("退税页签实际组件的路由流转", () => {
   it("报关详情返回后鼠标点击退税记录会切换 URL、选中页签与内容", async () => {
     const user = userEvent.setup();
     await act(async () => render(<TestRoutes />));
-    await user.click(screen.getByRole("tab", { name: "报关单" }));
+    // 首次页签激活才初始化真实 React.lazy；等待其 Suspense 工作，避免同步事件 act 遗留队列。
+    await act(async () => {
+      const customsTab = screen.getByRole("tab", { name: "报关单" });
+      // Radix 的真实激活入口是未按 Ctrl 的左键 mouseDown；不替换 lazy 子组件。
+      fireEvent.mouseDown(customsTab, { button: 0, ctrlKey: false });
+      fireEvent.mouseUp(customsTab, { button: 0 });
+      fireEvent.click(customsTab, { button: 0 });
+    });
     expect(window.location.search).toBe("?view=customs");
     const detailButton = (
       await screen.findAllByRole("button", {
         name: /查看详情 QA-CUSTOMS/,
       })
     )[0];
-    await user.click(detailButton);
+    // 首次详情导航会使用真实 use(params) 并加载服务数据，同样等待该异步提交完成。
+    await act(async () => {
+      fireEvent.click(detailButton);
+    });
     expect(window.location.pathname).toBe(
       "/dashboard/customs-declarations/qa-customs",
     );

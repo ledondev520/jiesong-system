@@ -5,3 +5,5 @@
 `TaxRefundListPageContent.navigation.test.tsx` 保留真实页签、列表和详情组件，覆盖旧 Next 快照/缓存导航、立即搜索后切换、迟到列表响应、Back/Forward 和 insertion-effect URL 提交顺序。另覆盖筛选关键词/状态经详情明确返回后的恢复、重复进入、含上下文的直接详情、非法/重复返回目标回退和详情查询更新。真实 Next 的 390/1440px 浏览器验收在 `frontend/e2e/tax-navigation.spec.ts`。
 
 报关详情明确返回用受限的新文档导航绕过 Next 缓存 canonical 查询；集成回归模拟软导航错误恢复 OLD/RELEASED，要求来源筛选恢复且不调用缓存 router.push。其余原生历史、嵌入列表、页签与迟到工作边界不变。
+
+导航组件测试首次点击报关页签和进入详情时使用 awaited async `act`，等待真实 React.lazy、`use(params)` 与详情服务加载的异步初始化。`beforeAll` 预加载模块只避免冷转换，不能代替 lazy 自身的首次 promise；这两个准备步骤使用 Radix 真实的左键/无 Ctrl mouseDown 激活及详情按钮 click，配合异步 act，防止同步事件包装遗留渲染队列，并避免在 userEvent 的 act 环境关闭包装内嵌套异步 act；之后被验收的退税点击/方向键交互继续使用 userEvent。组件、导航断言、等待超时与生产代码均不因此调整。
