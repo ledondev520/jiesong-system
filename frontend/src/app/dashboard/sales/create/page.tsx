@@ -1,6 +1,6 @@
 /**
  * Input: 商品、门店、销售服务
- * Output: 原子提交与失败重试防重复的出口合同创建向导，保留合同编号及完整明细
+ * Output: 原子提交与失败重试防重复的出口合同创建向导，支持原位创建门店并保留合同编号及完整明细
  * Pos: 出口管理创建入口
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -40,7 +40,6 @@ import {
   Plus,
   Trash,
   Search,
-  Store as StoreIcon,
   Package,
   ArrowRight,
   ArrowLeft,
@@ -54,6 +53,7 @@ import { productService } from "@/services/product.service";
 import { storeService } from "@/services/store.service";
 import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE } from "@/lib/constants";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { StoreSelect } from "./components/StoreSelect";
 const salesSchema = z.object({
   contractNo: z.string().optional(),
   signedAt: z.date().optional(),
@@ -163,7 +163,15 @@ export default function CreateSalesPage() {
           salesService.getNextContractNo(),
         ]);
         setProducts(productsRes.data?.items || []);
-        setStores(storesRes.data?.items || []);
+        setStores((current) => {
+          const loaded = storesRes.data?.items || [];
+          return [
+            ...loaded,
+            ...current.filter(
+              (store) => !loaded.some((item) => item.id === store.id),
+            ),
+          ];
+        });
         if (contractNoRes.data?.contractNo) {
           form.setValue("contractNo", contractNoRes.data.contractNo);
         }
@@ -251,18 +259,7 @@ export default function CreateSalesPage() {
     { id: 2, label: "出口明细", description: "门店、商品、定价" },
   ];
 
-  const [storeSearch, setStoreSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
-
-  const filteredStores = useMemo(() => {
-    if (!storeSearch.trim()) return stores;
-    const q = storeSearch.toLowerCase();
-    return stores.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        s.port?.name?.toLowerCase().includes(q),
-    );
-  }, [stores, storeSearch]);
 
   const filteredProducts = useMemo(() => {
     if (!productSearch.trim()) return products;
@@ -585,42 +582,19 @@ export default function CreateSalesPage() {
                                     门店{" "}
                                     <span className="text-destructive">*</span>
                                   </FormLabel>
-                                  <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground z-10" />
-                                    <Input
-                                      placeholder="搜索门店..."
-                                      value={storeSearch}
-                                      onChange={(e) =>
-                                        setStoreSearch(e.target.value)
-                                      }
-                                      className="pl-8 h-9 text-sm mb-1.5"
-                                    />
-                                  </div>
-                                  <Select
-                                    onValueChange={field.onChange}
-                                    defaultValue={field.value}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger className="h-9 w-full">
-                                        <SelectValue placeholder="选择门店" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent className="max-h-[280px]">
-                                      {filteredStores.map((s) => (
-                                        <SelectItem key={s.id} value={s.id}>
-                                          <div className="flex items-center gap-2">
-                                            <StoreIcon className="h-3 w-3 text-muted-foreground" />
-                                            <span>{s.name}</span>
-                                            {s.port?.name && (
-                                              <span className="text-[10px] text-muted-foreground">
-                                                {s.port.name}
-                                              </span>
-                                            )}
-                                          </div>
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
+                                  <StoreSelect
+                                    stores={stores}
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    onCreated={(store) =>
+                                      setStores((current) => [
+                                        ...current.filter(
+                                          (item) => item.id !== store.id,
+                                        ),
+                                        store,
+                                      ])
+                                    }
+                                  />
                                   <FormMessage />
                                 </FormItem>
                               )}

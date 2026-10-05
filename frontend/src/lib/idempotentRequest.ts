@@ -9,7 +9,7 @@ const defaultWindowMs = 10_000;
 const inFlightCache = new Map<string, IdempotentCacheEntry>();
 
 const sortObjectKeys = (value: unknown): unknown => {
-  if (value === null || typeof value !== 'object') {
+  if (value === null || typeof value !== "object") {
     return value;
   }
 
@@ -19,15 +19,19 @@ const sortObjectKeys = (value: unknown): unknown => {
 
   const sortedEntries = Object.keys(value as Record<string, unknown>)
     .sort()
-    .map((key) => [key, sortObjectKeys((value as Record<string, unknown>)[key])]);
+    .map((key) => [
+      key,
+      sortObjectKeys((value as Record<string, unknown>)[key]),
+    ]);
 
   return Object.fromEntries(sortedEntries);
 };
 
-const isFresh = (entry?: IdempotentCacheEntry) => entry && entry.expiresAt > Date.now();
+const isFresh = (entry?: IdempotentCacheEntry) =>
+  entry && entry.expiresAt > Date.now();
 
 const buildCacheKey = (input: unknown): string => {
-  if (typeof input === 'string') {
+  if (typeof input === "string") {
     return input;
   }
 
@@ -67,7 +71,12 @@ export const runIdempotentRequest = async <T>(
 
   const promise = runner()
     .then((value) => {
-      inFlightCache.set(key, { hasValue: true, value, promise: undefined, expiresAt: Date.now() + ttlMs });
+      inFlightCache.set(key, {
+        hasValue: true,
+        value,
+        promise: undefined,
+        expiresAt: Date.now() + ttlMs,
+      });
       return value;
     })
     .catch((error) => {
@@ -85,6 +94,26 @@ export const runIdempotentRequest = async <T>(
   return promise;
 };
 
-export const buildIdempotencyKey = (value: unknown): string => {
-  return `idempotency:${buildCacheKey(value)}`;
+/**
+ * HTTP headers must contain only ByteString characters. Hash the complete JSON
+ * payload, rather than placing notes/customer names in headers or truncating them.
+ * Web Crypto requires HTTPS (or localhost); never fall back to a weak hash.
+ */
+export const buildIdempotencyKey = async (value: unknown): Promise<string> => {
+  if (!globalThis.crypto?.subtle) {
+    throw new Error("无法生成安全请求标识，请使用 HTTPS 或更新浏览器后重试");
+  }
+  // Match JSON wire semantics (dates, omitted undefined fields), then sort keys.
+  // Invalid/non-JSON inputs must fail instead of collapsing to "[object Object]".
+  const serialized = JSON.stringify(
+    sortObjectKeys(JSON.parse(JSON.stringify(value))),
+  );
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(serialized),
+  );
+  const hex = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+  return `idempotency:sha256:${hex}`;
 };

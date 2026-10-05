@@ -1,6 +1,6 @@
 /**
  * Input: 收付款页面、finance API、URL参数、PaymentDialog
- * Output: 收付款页交互逻辑测试结果
+ * Output: 收付款页交互与弹窗保存失败传播测试
  * Pos: 前端业务页交互测试
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -10,8 +10,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import PaymentsPage from "./page";
+import { PaymentDialog } from "../../dashboard/finance/components/PaymentDialog";
 
 const mockSearchParamGet = vi.fn();
+const mockCreatePayment = vi.fn();
 const mockGetStats = vi.fn();
 const mockGetPayables = vi.fn();
 const mockGetReceivables = vi.fn();
@@ -34,6 +36,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/services/finance.service", () => ({
   financeService: {
+    createPayment: (...args: unknown[]) => mockCreatePayment(...args),
     getStats: (...args: unknown[]) => mockGetStats(...args),
     getPayables: (...args: unknown[]) => mockGetPayables(...args),
     getReceivables: (...args: unknown[]) => mockGetReceivables(...args),
@@ -52,7 +55,7 @@ vi.mock("@/services/bankFlow.service", () => ({
 }));
 
 vi.mock("../../dashboard/finance/components/PaymentDialog", () => ({
-  PaymentDialog: () => null,
+  PaymentDialog: vi.fn(() => null),
 }));
 
 vi.mock("@/lib/api-cache", () => ({
@@ -101,6 +104,55 @@ describe("PaymentsPage 交互逻辑", () => {
     });
     mockGetIncomingSummary.mockResolvedValue({ items: [], total: 0 });
   });
+
+  it.each(["payable", "receivable"])(
+    "%s 保存失败会拒绝弹窗回调，保留当前合同",
+    async (tab) => {
+      mockSearchParamGet.mockImplementation((key: string) =>
+        key === "tab" ? tab : null,
+      );
+      mockCreatePayment.mockRejectedValue({ message: "合成保存失败" });
+      mockGetStats.mockResolvedValue({ payable: {}, receivable: {} });
+      const contract = {
+        id: "synthetic",
+        contractNo: "SYNTHETIC",
+        totalAmount: 100,
+        paidAmount: 0,
+        unpaidAmount: 100,
+        receivedAmount: 0,
+        unreceiveAmount: 100,
+        status: "SIGNED",
+        items: [],
+        supplier: { name: "合成供应商" },
+      };
+      mockGetPayables.mockResolvedValue({ data: { items: [contract] } });
+      mockGetReceivables.mockResolvedValue({ data: { items: [contract] } });
+      render(<PaymentsPage />);
+      await userEvent.setup().click(
+        await screen.findByRole("button", {
+          name: tab === "payable" ? "付款" : "收款",
+        }),
+      );
+      const props = vi.mocked(PaymentDialog).mock.calls.at(-1)![0];
+      const data = {
+        amount: 22.6,
+        paymentDate: new Date("2026-10-01"),
+        paymentMethod: "other",
+        note: "合成中文备注",
+      };
+      await expect(props.onSubmit(data)).rejects.toEqual({
+        message: "合成保存失败",
+      });
+      expect(props.open).toBe(true);
+      expect(mockCreatePayment).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          amount: 22.6,
+          paymentMethod: "other",
+          note: "合成中文备注",
+        }),
+      );
+    },
+  );
 
   it("初始化只请求统计/应付数据，不预拉应收数据", async () => {
     mockGetStats.mockResolvedValue({

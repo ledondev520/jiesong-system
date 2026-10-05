@@ -1,0 +1,9 @@
+# 前端业务 API 服务
+
+此目录封装业务 API 和 DTO，界面通过服务调用后端；鉴权仍由共享 Axios 和后端校验。
+
+## 收付请求
+
+`finance.service.ts` / `.test.ts`：创建付款前复制平面输入，使用 `lib/idempotentRequest.ts` 的异步 SHA-256 标识。HTTP 标识固定 83 个 ASCII 字符，完整 UTF-8 JSON 内容参与摘要；相同 JSON 重试稳定、不同长备注不截断。失败清除短期本地缓存，再次点击沿用同一标识。
+
+`purchaseReceipt.service.ts` 仅复用已有 `runIdempotentRequest`，其请求编号与后端协议不变。

@@ -1,6 +1,6 @@
 /**
  * Input: 后端 finance API、bank-flow reconciliation/incoming-summary API
- * Output: 以采购/出口中文状态展示的收付管理页面（应付+应收 Tab，合同为空时自动用银行流水 fallback 填充）
+ * Output: 应付/应收与银行流水界面；合同付款/收款失败保留弹窗草稿并提示重试
  * Pos: 核心业务页面，管理所有收付款，银行流水数据直接嵌入应付/应收列表
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -379,50 +379,42 @@ function PaymentsPageContent() {
 
   // 处理付款提交
   const handlePayableSubmit = async (data: PaymentSubmitData) => {
-    if (!selectedPayable) return;
-    try {
-      await financeService.createPayment({
-        type: PaymentType.PAYABLE,
-        purchaseContractId: selectedPayable.id,
-        amount: Number(data.amount),
-        currency: "CNY",
-        paymentMethod: data.paymentMethod,
-        paymentDate: data.paymentDate.toISOString(),
-        note: data.note,
-      });
-      toast.success("付款记录已保存");
-      setSelectedPayable(null);
-      invalidateCache("fin-payables");
-      invalidateCache("fin-stats");
-      fetchPayables();
-      fetchStats();
-    } catch {
-      toast.error("记录付款失败");
-    }
+    if (!selectedPayable) throw new Error("请选择付款合同后重试");
+    await financeService.createPayment({
+      type: PaymentType.PAYABLE,
+      purchaseContractId: selectedPayable.id,
+      amount: Number(data.amount),
+      currency: "CNY",
+      paymentMethod: data.paymentMethod,
+      paymentDate: data.paymentDate.toISOString(),
+      note: data.note,
+    });
+    toast.success("付款记录已保存");
+    setSelectedPayable(null);
+    invalidateCache("fin-payables");
+    invalidateCache("fin-stats");
+    fetchPayables();
+    fetchStats();
   };
 
   // 处理收款提交（保留：直接绑定合同的旧流程）
   const handleReceivableSubmit = async (data: PaymentSubmitData) => {
-    if (!selectedReceivable) return;
-    try {
-      await financeService.createPayment({
-        type: PaymentType.RECEIVABLE,
-        salesContractId: selectedReceivable.id,
-        amount: Number(data.amount),
-        currency: "USD",
-        paymentMethod: data.paymentMethod,
-        paymentDate: data.paymentDate.toISOString(),
-        note: data.note,
-      });
-      toast.success("收款记录已保存");
-      setSelectedReceivable(null);
-      invalidateCache("fin-receivables");
-      invalidateCache("fin-stats");
-      fetchReceivables();
-      fetchStats();
-    } catch {
-      toast.error("记录收款失败");
-    }
+    if (!selectedReceivable) throw new Error("请选择收款合同后重试");
+    await financeService.createPayment({
+      type: PaymentType.RECEIVABLE,
+      salesContractId: selectedReceivable.id,
+      amount: Number(data.amount),
+      currency: "USD",
+      paymentMethod: data.paymentMethod,
+      paymentDate: data.paymentDate.toISOString(),
+      note: data.note,
+    });
+    toast.success("收款记录已保存");
+    setSelectedReceivable(null);
+    invalidateCache("fin-receivables");
+    invalidateCache("fin-stats");
+    fetchReceivables();
+    fetchStats();
   };
 
   // 处理"先记录到账"提交（新流程：无合同，进入待分配池）
