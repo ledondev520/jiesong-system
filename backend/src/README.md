@@ -99,6 +99,7 @@
 - 采购模板：`routes/procurementTemplate.js` 的门店列表、通用模板、历史采购明细三个读取入口均先执行 `authenticate`，保持既有响应格式。
 
 - `inventorySnapshot.js`：以自有装箱行扣减对应采购来源、单位的合格库存，旧销售明细兼容不双计；回滚保留验货来源；实际自有出库数量必须有限且为正，草稿零值、非自有拼柜与价格/单证补录不受影响。
+- `containerService.js`：旧货柜状态入口委托 `salesService.updateSalesStatus`，沿用单向流转、装载校验、结清检查与原子扣库；新建只允许草稿，表头保存只能携带未改变的状态。真实权限拒绝、取消重试、旧入口绕过及缺库存回滚见 `integration/sales-role-exceptions.integration.js`。
 - `customsDeclarationDraftService.js`：编号包含出口合同号，原子替换仅限 DRAFT，保留 ID 与编号并拒绝覆盖已放行单。
 
 - `utils/inventoryStateMachine.js` 的来源约束用于普通/批量库存接口和 AI 工具，AI 确认时重新检查；相同状态请求不修改 FIFO 时间。

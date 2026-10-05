@@ -168,21 +168,35 @@ test('updateItem: 更新数量和单价时重算 totalPrice', async () => {
   }
 });
 
-test('updateStatus: SHIPPED 状态会写入 shippedAt', async () => {
-  const originalUpdate = prisma.salesContract.update;
-  let updateArgs = null;
-
-  prisma.salesContract.update = async (args) => {
-    updateArgs = args;
-    return { id: 'sc-1', contractNo: '25-001-LA', status: 'SHIPPED' };
+test('updateStatus: delegates to the authoritative sales shipment transaction', async () => {
+  const salesService = require('./salesService');
+  const originalUpdate = salesService.updateSalesStatus;
+  const calls = [];
+  salesService.updateSalesStatus = async (...args) => {
+    calls.push(args);
+    return { id: 'sc-1', status: 'SHIPPED' };
   };
-
   try {
-    const result = await containerService.updateStatus('sc-1', 'SHIPPED');
+    assert.equal((await containerService.updateStatus('sc-1', 'SHIPPED')).status, 'SHIPPED');
+    assert.deepEqual(calls, [['sc-1', 'SHIPPED']]);
+  } finally {
+    salesService.updateSalesStatus = originalUpdate;
+  }
+});
 
-    assert.equal(updateArgs.data.status, 'SHIPPED');
-    assert.ok(updateArgs.data.shippedAt instanceof Date);
-    assert.equal(result.contractNo, '25-001-LA');
+test('create: cannot fabricate non-draft lifecycle facts', async () => {
+  for (const status of ['CONFIRMED', 'SHIPPED', 'ARRIVED', 'COMPLETED', 'CANCELLED', 'unknown']) {
+    await assert.rejects(containerService.create({ status }), error => error.statusCode === 400);
+  }
+});
+
+test('update: rejects status bypass before changing any header metadata', async () => {
+  const originalUpdate = prisma.salesContract.update;
+  let writes = 0;
+  prisma.salesContract.update = async () => { writes += 1; };
+  try {
+    await assert.rejects(containerService.update('sc-1', { status: 'SHIPPED', note: 'must not save' }), error => error.statusCode === 400);
+    assert.equal(writes, 0);
   } finally {
     prisma.salesContract.update = originalUpdate;
   }
