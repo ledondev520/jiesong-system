@@ -51,49 +51,136 @@ test('batchImportSalesContracts: 使用现有 schema 创建销售合同与明细
   }
 });
 
-test('batchImportPurchaseContracts: 使用现有 schema 创建采购合同与明细', async () => {
-  const originals = {
-    supplierFindFirst: prisma.supplier.findFirst,
-    productFindFirst: prisma.product.findFirst,
-    purchaseContractFindMany: prisma.purchaseContract.findMany,
-    purchaseContractCreate: prisma.purchaseContract.create,
-    purchaseItemCreate: prisma.purchaseItem.create,
-  };
-  const captured = { contract: null, item: null };
+const purchaseRow = {
+  _rowNum: 3,
+  supplierName: '合成供应商',
+  productName: '合成商品',
+  quantity: '6',
+  price: '80',
+  deliveryDate: '2026-04-10',
+};
 
-  prisma.supplier.findFirst = async () => ({ id: 'sup-1' });
-  prisma.product.findFirst = async () => ({ id: 'prod-1' });
-  prisma.purchaseContract.findMany = async () => [{ contractNo: `CG${new Date().getFullYear().toString().slice(-2)}00012` }];
-  prisma.purchaseContract.create = async (args) => {
-    captured.contract = args;
-    return { id: 'pc-1', ...args.data };
+const mockPurchaseImport = (t) => {
+  // Prisma delegates are proxies, so restore assigned methods explicitly.
+  const mockMethod = (object, key, implementation) => {
+    const original = object[key];
+    object[key] = implementation;
+    t.after(() => { object[key] = original; });
   };
-  prisma.purchaseItem.create = async (args) => {
-    captured.item = args;
-    return { id: 'pi-1', ...args.data };
+  const calls = { transactions: 0, numbers: 0, contracts: [], items: [] };
+  const prefix = `CG${new Date().getFullYear().toString().slice(-2)}`;
+  const tx = {
+    purchaseContract: {
+      findMany: async () => {
+        calls.numbers++;
+        return [{ contractNo: `${prefix}${String(11 + calls.numbers).padStart(5, '0')}` }];
+      },
+      create: async ({ data }) => {
+        calls.contracts.push(data);
+        return { id: `synthetic-purchase-${calls.contracts.length}`, ...data };
+      },
+    },
+    purchaseItem: {
+      create: async ({ data }) => {
+        calls.items.push(data);
+        return { id: 'synthetic-item', ...data };
+      },
+    },
   };
+  mockMethod(prisma.supplier, 'findFirst', async () => ({ id: 'synthetic-supplier' }));
+  mockMethod(prisma.product, 'findFirst', async () => ({ id: 'synthetic-product' }));
+  const outsideTransaction = async () => { throw new Error('采购编号/写入必须使用同一事务客户端'); };
+  mockMethod(prisma.purchaseContract, 'findMany', outsideTransaction);
+  mockMethod(prisma.purchaseContract, 'create', outsideTransaction);
+  mockMethod(prisma.purchaseItem, 'create', outsideTransaction);
+  mockMethod(prisma, '$transaction', async (handler) => {
+    calls.transactions++;
+    return handler(tx);
+  });
+  return { calls, tx, prefix };
+};
 
-  try {
-    const result = await batchImportService.batchImportPurchaseContracts([{
-      _rowNum: 3,
-      supplierName: '供应商A',
-      productName: '瓷砖',
-      quantity: '6',
-      price: '80',
-      deliveryDate: '2026-04-10',
-    }], 'user-1');
+const conflict = (code = 'P2002', target = ['contractNo']) => Object.assign(
+  new Error('synthetic database failure'), { code, meta: { target } },
+);
 
-    assert.equal(result.success, 1);
-    assert.equal(result.failed, 0);
-    assert.equal(captured.contract.data.contractNo, `CG${new Date().getFullYear().toString().slice(-2)}00013`);
-    assert.equal(captured.item.data.purchaseContractId, 'pc-1');
-    assert.equal(captured.item.data.unitPrice, 80);
-    assert.equal(captured.item.data.totalPrice, 480);
-  } finally {
-    prisma.supplier.findFirst = originals.supplierFindFirst;
-    prisma.product.findFirst = originals.productFindFirst;
-    prisma.purchaseContract.findMany = originals.purchaseContractFindMany;
-    prisma.purchaseContract.create = originals.purchaseContractCreate;
-    prisma.purchaseItem.create = originals.purchaseItemCreate;
-  }
+test('batchImportPurchaseContracts: 编号、合同与明细使用同一事务客户端', async t => {
+  const { calls, prefix } = mockPurchaseImport(t);
+  const result = await batchImportService.batchImportPurchaseContracts([purchaseRow], 'synthetic-user');
+  assert.deepEqual(result, { success: 1, failed: 0, errors: [] });
+  assert.equal(calls.transactions, 1);
+  assert.equal(calls.numbers, 1);
+  assert.equal(calls.contracts[0].contractNo, `${prefix}00013`);
+  assert.equal(calls.contracts[0].status, 'DRAFT');
+  assert.equal(calls.contracts[0].totalAmount, 480);
+  assert.equal(calls.items[0].purchaseContractId, 'synthetic-purchase-1');
+  assert.equal(calls.items[0].unitPrice, 80);
+  assert.equal(calls.items[0].totalPrice, 480);
+});
+
+test('batchImportPurchaseContracts: 自动编号唯一竞争重新分配后只统计一次成功', async t => {
+  const { calls, tx, prefix } = mockPurchaseImport(t);
+  const create = tx.purchaseContract.create;
+  tx.purchaseContract.create = async args => {
+    if (calls.transactions === 1) throw conflict();
+    return create(args);
+  };
+  const result = await batchImportService.batchImportPurchaseContracts([purchaseRow], 'synthetic-user');
+  assert.deepEqual(result, { success: 1, failed: 0, errors: [] });
+  assert.equal(calls.transactions, 2);
+  assert.equal(calls.numbers, 2);
+  assert.equal(calls.contracts[0].contractNo, `${prefix}00014`);
+  assert.equal(calls.items.length, 1);
+});
+
+test('batchImportPurchaseContracts: 明细阶段写冲突整行重试，保留显式编号', async t => {
+  const { calls, tx } = mockPurchaseImport(t);
+  const create = tx.purchaseItem.create;
+  tx.purchaseItem.create = async args => {
+    if (calls.transactions === 1) throw conflict('P2034');
+    return create(args);
+  };
+  const result = await batchImportService.batchImportPurchaseContracts([{ ...purchaseRow, contractNo: 'SYNTHETIC-EXPLICIT' }], 'synthetic-user');
+  assert.deepEqual(result, { success: 1, failed: 0, errors: [] });
+  assert.equal(calls.transactions, 2);
+  assert.equal(calls.numbers, 0);
+  assert.deepEqual(calls.contracts.map(row => row.contractNo), ['SYNTHETIC-EXPLICIT', 'SYNTHETIC-EXPLICIT']);
+  assert.equal(calls.items[0].purchaseContractId, 'synthetic-purchase-2');
+});
+
+test('batchImportPurchaseContracts: 显式编号重复、其他唯一冲突和未知错误不重试', async t => {
+  const { calls, tx } = mockPurchaseImport(t);
+  const rows = [
+    { ...purchaseRow, contractNo: 'SYNTHETIC-EXPLICIT' },
+    { ...purchaseRow, _rowNum: 4 },
+    { ...purchaseRow, _rowNum: 5 },
+    { ...purchaseRow, _rowNum: 6 },
+  ];
+  const failures = [conflict(), conflict('P2002', ['id']), conflict('P2028')];
+  const create = tx.purchaseContract.create;
+  tx.purchaseContract.create = async args => {
+    const failure = failures[calls.transactions - 1];
+    if (failure) throw failure;
+    return create(args);
+  };
+  const result = await batchImportService.batchImportPurchaseContracts(rows, 'synthetic-user');
+  assert.equal(result.success, 1);
+  assert.equal(result.failed, 3);
+  assert.deepEqual(result.errors.map(error => error.row), [3, 4, 5]);
+  assert.equal(calls.transactions, 4);
+  assert.equal(calls.items.length, 1);
+});
+
+test('batchImportPurchaseContracts: 连续竞争最多五次，失败后继续下一行', async t => {
+  const { calls, tx } = mockPurchaseImport(t);
+  const create = tx.purchaseContract.create;
+  tx.purchaseContract.create = async args => {
+    if (calls.transactions <= 5) throw conflict();
+    return create(args);
+  };
+  const result = await batchImportService.batchImportPurchaseContracts([purchaseRow, { ...purchaseRow, _rowNum: 4 }], 'synthetic-user');
+  assert.deepEqual(result, { success: 1, failed: 1, errors: [{ row: 3, message: '采购编号正在分配，请稍后重试' }] });
+  assert.equal(calls.transactions, 6);
+  assert.equal(calls.numbers, 6);
+  assert.equal(calls.items.length, 1);
 });

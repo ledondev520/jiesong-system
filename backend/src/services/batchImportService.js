@@ -1,11 +1,11 @@
 /**
  * 批量导入服务
- * 支持销售合同、采购合同等业务的批量导入；采购编号复用统一序列规则
+ * 支持销售合同、采购合同等业务的批量导入；采购逐行原子写入并重试编号/事务竞争
  */
 
 const prisma = require('../utils/prisma');
 const { generateNextContractNo } = require('./shared/contractUtils');
-const { generateNextPurchaseContractNo } = require('./purchaseContractNumberService');
+const { generateNextPurchaseContractNo, isPurchaseNumberConflict } = require('./purchaseContractNumberService');
 
 const getCurrentYear = () => new Date().getFullYear().toString().slice(-2);
 
@@ -112,28 +112,38 @@ async function batchImportPurchaseContracts(data, userId) {
         throw new Error(`商品 "${row.productName}" 不存在`);
       }
 
-      // 创建合同
-      const contract = await prisma.purchaseContract.create({
-        data: {
-          contractNo: row.contractNo || await generateNextPurchaseContractNo(prisma),
-          supplierId: supplier.id,
-          status: 'DRAFT',
-          totalAmount: parseFloat(row.quantity) * parseFloat(row.price),
-          expectedDate: row.deliveryDate ? new Date(row.deliveryDate) : null,
-        },
-      });
+      // 每行独立提交，失败行不留合同头；竞争重试整行，不能只补写明细。
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          await prisma.$transaction(async (tx) => {
+            const contract = await tx.purchaseContract.create({
+              data: {
+                contractNo: row.contractNo || await generateNextPurchaseContractNo(tx),
+                supplierId: supplier.id,
+                status: 'DRAFT',
+                totalAmount: parseFloat(row.quantity) * parseFloat(row.price),
+                expectedDate: row.deliveryDate ? new Date(row.deliveryDate) : null,
+              },
+            });
 
-      // 创建合同明细
-      await prisma.purchaseItem.create({
-        data: {
-          purchaseContractId: contract.id,
-          productId: product.id,
-          quantity: parseFloat(row.quantity),
-          unit: row.unit || '件',
-          unitPrice: parseFloat(row.price),
-          totalPrice: parseFloat(row.quantity) * parseFloat(row.price),
-        },
-      });
+            await tx.purchaseItem.create({
+              data: {
+                purchaseContractId: contract.id,
+                productId: product.id,
+                quantity: parseFloat(row.quantity),
+                unit: row.unit || '件',
+                unitPrice: parseFloat(row.price),
+                totalPrice: parseFloat(row.quantity) * parseFloat(row.price),
+              },
+            });
+          });
+          break;
+        } catch (error) {
+          const retryable = error?.code === 'P2034' || (!row.contractNo && isPurchaseNumberConflict(error));
+          if (!retryable) throw error;
+          if (attempt === 4) throw new Error('采购编号正在分配，请稍后重试');
+        }
+      }
 
       results.success++;
     } catch (error) {
