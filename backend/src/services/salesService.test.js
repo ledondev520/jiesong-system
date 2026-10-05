@@ -204,6 +204,35 @@ test('createSalesContract: 未传合同号时自动生成并写入', async () =>
   }
 });
 
+test('updateSalesContract: omitted rate stays undefined while explicit valid numeric rates are parsed', async () => {
+  const originalUpdate = prisma.salesContract.update;
+  let updateData;
+  prisma.salesContract.update = async ({ data }) => { updateData = data; return { id: 'sc-1', ...data }; };
+  try {
+    for (const input of [undefined, {}, { note: 'Synthetic note' }, { exchangeRate: undefined, note: null }]) {
+      await salesService.updateSalesContract('sc-1', input);
+      assert.equal(updateData.exchangeRate, undefined);
+      assert.equal(updateData.note, input?.note);
+    }
+    for (const [input, expected] of [[7.2, 7.2], [' 6.9 ', 6.9]]) {
+      await salesService.updateSalesContract('sc-1', { exchangeRate: input });
+      assert.equal(updateData.exchangeRate, expected);
+    }
+  } finally { prisma.salesContract.update = originalUpdate; }
+});
+
+test('updateSalesContract: explicit invalid rates are rejected before any database update', async () => {
+  const originalUpdate = prisma.salesContract.update;
+  let updates = 0;
+  prisma.salesContract.update = async () => { updates += 1; };
+  try {
+    for (const exchangeRate of [null, '', ' ', 'not-a-rate', 'Infinity', Infinity, NaN, 0, -7.2, true, false, [], [7.2], {}]) {
+      await assert.rejects(salesService.updateSalesContract('sc-1', { exchangeRate, note: 'Must not save' }), error => error.statusCode === 400 && error.message === '汇率必须为正数');
+    }
+    assert.equal(updates, 0);
+  } finally { prisma.salesContract.update = originalUpdate; }
+});
+
 test('addSalesItem: 未传 sellingPrice 时按汇率与利润率计算并回写总额', async () => {
   const originalFindUnique = prisma.salesContract.findUnique;
   const originalCreate = prisma.salesItem.create;

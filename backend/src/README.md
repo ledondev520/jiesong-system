@@ -52,6 +52,7 @@
 | patrolService.js | 使用 SalesContract 与财务共享发运30天逾期规则；同管理员同标题未读或24小时内告警去重，保留真实汇率过期提醒 |
 | financeService.js | 付款幂等、应收应付聚合；已收货/已到港合同按真实款项自动结清，差异重新打开待结清 |
 | salesCargoLifecycle.js | 销售与旧货柜共用发运/出库证据检查；禁止已出库货物变更及合同删除 |
+| salesService.js | 出口合同与装箱；表头局部保存保留省略汇率，显式无效汇率在写入前返回 400，不改变既有角色及发运后货物边界 |
 | salesFinanceService.js | 按共享所有权判定查询自有采购合同，聚合单柜收入、成本、退税与现金流 |
 | salesCreationService.js | 出口表头与明细原子创建；既有日志表保存按认证操作者隔离的请求摘要，断线或并发重试复用结果且路由不重复记新建审计；模板失败全部回滚 |
 | salesService.js | 装箱增删改与统计在同一事务；发运后禁止增删行或修改数量/单位，单证资料可补录；导入装箱后自动进入装柜；登记到港保留出库，收款齐套自动完成；正式表头金额不被派生金额覆盖 |
@@ -105,6 +106,7 @@
 - `inventorySnapshot.js`：以自有装箱行扣减对应采购来源、单位的合格库存，旧销售明细兼容不双计；回滚保留验货来源；实际自有出库数量必须有限且为正，草稿零值、非自有拼柜与价格/单证补录不受影响。
 - `containerService.js`：旧货柜状态入口委托 `salesService.updateSalesStatus`，沿用单向流转、装载校验、结清检查与原子扣库；新建只允许草稿，表头保存只能携带未改变的状态。真实权限拒绝、取消重试、旧入口绕过及缺库存回滚见 `integration/sales-role-exceptions.integration.js`。
 - `salesService.updateSalesStatus` 以规范化后的当前状态判断真实流转，历史 `OUT_STOCK` 重放 `SHIPPED` 只规范状态，不重新校验装载、改发运时间或扣库。
+- `integration/sales-partial-metadata.integration.js` 使用真实认证 HTTP 和独立只读 SQLite 回读，验证备注/日期/港口局部保存、必填汇率省略与显式无效输入、既有可写角色/BOSS 拒绝以及发运/结清后的货物与出库保护；仅创建 0700/0600 临时合成库。
 - `customsDeclarationDraftService.js`：编号包含出口合同号，原子替换仅限 DRAFT，保留 ID 与编号并拒绝覆盖已放行单。
 
 - `utils/inventoryStateMachine.js` 的来源约束用于普通/批量库存接口和 AI 工具，AI 确认时重新检查；相同状态请求不修改 FIFO 时间。
