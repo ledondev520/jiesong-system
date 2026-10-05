@@ -97,7 +97,7 @@ if __name__ == '__main__':
         run_id = sys.argv[1]
         if not run_id.isdigit() or len(run_id) > 30:
             raise ValueError('Exact Actions run identifier required')
-        expected_sha = 'a808b151191b009343ee2acd06339df391f9aecf'
+        expected_sha = '40efbaab2352a89b8dae8b4e4e4a1f8dc75eebdc'
         root = Path('/opt/jiesong-system')
         source = Path('/opt/jiesong_system/current/backend/prisma/dev.db')
         actual_sha = subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'],
@@ -139,7 +139,7 @@ if __name__ == '__main__':
             current_sha=subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True,timeout=10,stderr=subprocess.DEVNULL).strip()
             if current_sha != expected_sha or observed_identity != identity:
                 raise RuntimeError('Deployment or source identity changed')
-        receipt = snapshot(str(source),str(parent / ('pr32-' + run_id)),actual_sha,verify_source)
+        receipt = snapshot(str(source),str(parent / ('browser-session-' + run_id)),actual_sha,verify_source)
         print(json.dumps(receipt, sort_keys=True))
     except Exception as error:
         print(json.dumps({'status':'backup_failed','error_type':type(error).__name__,
