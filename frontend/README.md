@@ -27,6 +27,7 @@
   - `e2e/README.md`: 合成 API 夹具与移动端注册、采购验货汇总的验收约定
   - `e2e/real-export-3d.spec.ts`: 真实 SALES 菜单下既有3D货物绘制、鼠标控制、390/1440px尺寸及返回/重载验收；实际浏览器结果以 hosted CI 为准
   - `e2e/profile-preference-lifecycle.spec.ts` / `e2e/profile-preference-fixture.ts`: Header 个人设置取消、同标签保存/重开/重载及两种本地写失败重试的真实合成登录定义；只读安全用户字段，浏览器执行以 hosted CI 为准
+  - `e2e/real-hs-catalog.spec.ts` / `real-hs-fixture.ts`: 四项真实本地HS查询/详情/手工证据取消、失败纠正、保存回读与BOSS只读验收定义；已提交迁移私有SQLite，不调用外部HS或AI，也不把AI结果复制算作普通本地路径
 - `vitest.config.ts`: Vitest 测试配置
 - `playwright.config.ts`: Playwright 配置
 - `eslint.config.mjs`: 源码 lint；忽略构建、覆盖率及 Playwright 生成报告

@@ -1,5 +1,7 @@
 若本文件夹结构或内容变化，请更新本文件。
 
+`real-hs-catalog.spec.ts` / `real-hs-fixture.ts`：四项1440px真实本地HS验收定义，登录后经出口菜单与HS页签进入；名称与数字编码组合交集、详情、返回/重载保留查询，手工证据取消/Escape/重开零写入，真正无效来源400保留所有输入、明确纠正后保存、待响应按钮禁用/重复点击拦截、API/列表/整页重载回读，以及BOSS详情可读、写入口隐藏与真实PUT403。每项独占已提交迁移的0700目录/0600SQLite，字典由独立SQLite字面量预置，真实API只透传登录、本地查询与已有手工更新；HS的AI/外部供应商路径和其他业务写入直接拒绝，独立只读回查完整HS行与现有角色审计/其他业务表守恒。普通本地详情没有复制入口，现有两处复制仅在AI结果后出现，因此本轮没有复制通过证据，也不新增功能或调用AI来补覆盖。`playwright test e2e/real-hs-catalog.spec.ts --list`只验证四项定义，真实浏览器执行须走既有hosted CI；本地未执行，不改启动参数、安装浏览器或绕过loopback限制。
+
 `real-role-lifecycle.spec.ts` 增加一项同一用户单条通知已读回归：`notification-state` 场景真实 PURCHASE 登录，只预置该用户的四条通知；双击期间暂缓首条真实 Express 成功响应的交付，不改响应内容。Header 和面板未读数为二，与真实未读 API 及独立只读 SQLite 一致，整页重载仍为二且再点已读行不重写。沿用既有 hosted Playwright 门槛；`--list --grep='repeated notification mark-one'` 仅核对定义，不表示浏览器通过。不涉及生产通知或其他用户权限。
 
 `real-sales-header.spec.ts`：四项1440px真实SALES合同头补充验收，经出口菜单进入既有合同信息。完整草稿取消/重开/重载零写入；四项已有字段普通保存，暂缓交付真正成功响应期间按钮禁用且重复点击只写一次；汇率0的真正400保留全部草稿与原始原因，明确纠正后重试一次；真实认证GET、整页重载及后来取消编辑保持已保存资料。每项独占 `sales-header` 已提交迁移0700/0600私有SQLite，独立只读连接逐行核对金额、采购/装箱、库存、付款和内部单据事实不变及SALES审计。沿用真实Express透传，不mock业务响应、改变空日期/港口既有语义或新增字段，不访问生产、资金转移、发运、单据生成/签约、上传或外部服务。`playwright test real-sales-header.spec.ts --list` 仅核对四项定义，浏览器结果以hosted CI为准。
