@@ -25,6 +25,7 @@
 - `src/**/*.test.ts`: 前端单元测试文件
 - `e2e`: Playwright 自动化验收测试
   - `e2e/README.md`: 合成 API 夹具与移动端注册、采购验货汇总的验收约定
+  - `e2e/real-export-3d.spec.ts`: 真实 SALES 菜单下既有3D货物绘制、鼠标控制、390/1440px尺寸及返回/重载验收；实际浏览器结果以 hosted CI 为准
 - `vitest.config.ts`: Vitest 测试配置
 - `playwright.config.ts`: Playwright 配置
 - `eslint.config.mjs`: 源码 lint；忽略构建、覆盖率及 Playwright 生成报告

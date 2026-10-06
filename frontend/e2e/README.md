@@ -17,6 +17,7 @@
 | button-coverage.spec.ts | 交互验收 | 主要页面按钮、弹窗与无运行时异常检查 |
 | smoke.spec.ts | 冒烟验收 | 主要页面与业务入口 |
 | visual.spec.ts / snapshots | 可选视觉验收 | 平台相关截图，仅在 VISUAL_REGRESSION=1 时运行 |
+| real-export-3d.spec.ts | 真实 SALES 场景验收 | 既有缺尺寸货物的实际绘制、旋转/缩放/平移、响应式尺寸与页签/重载返回，独立 SQLite 零业务写入核对 |
 
 运行：`CI=1 npm run test:e2e -- --reporter=list,html`（先 `npx playwright install chromium`）。注册验收验证合成发送请求、冷却按钮、待审核提示及无自动登录令牌；后端 `emailRegistration.test.js` 验证真实校验和限流。采购夹具保持 SIGNED/无到货事实，汇总与明细不得伪造已验收库存。
 
@@ -45,3 +46,5 @@
 - `real-role-lifecycle.spec.ts` 新增六项1440px FINANCE内部报关/退税表单验收（每种三项）：新建完整草稿经返回取消/刷新/重开零业务与审计写入；真实重复编号拒绝后保留全部输入，纠正编号重试创建一次，整页重载读回及备注编辑保存/重载，报关明细ID不变；已有记录编辑金额/日期/备注后返回取消，重开恢复原始日期与输入。每项独占 `tax-record-forms` 私有迁移SQLite及真实Express，不mock业务响应，独立只读连接核对整条记录与FINANCE审计操作者。退税编辑使用真实API ISO日期以防空白回填。全部保持DRAFT/已退金额0，不调用正式申报、确认、资金结算、导出、上传或外部服务。`playwright test real-role-lifecycle.spec.ts --list --grep='FINANCE (customs|refunds)'` 仅验证六项定义；浏览器执行以既有hosted CI为准。
 
 - `real-menu-export-documents.spec.ts`：六项1440px真实SALES菜单验收，从登录后的出口合同入口进入详情；覆盖申报三表资料门禁/取消，生成三条关联内部记录/整页重载与报关/退税菜单读回，实际下载XLSX完整标题/表头/明细/金额，双击只发一次但明确再次生成沿用追加版本，商业三单元数据门禁与只读预检取消，确认生成/归档/实际三Sheet下载与重载后归档同字节再下载，以及资料变化导致真正400后保留弹窗、修复并明确重试。每项独占 `menu-export-documents` 的已提交迁移0700/0600私有SQLite和真实Express；只透传真正响应，可暂缓交付但不改业务结果，下载字节复用后端锁定ExcelJS解析。只用合成当前税则和业务资料，不访问生产或真实发票/附件、AI供应商、正式申报、签约或资金/出货操作。`playwright test real-menu-export-documents.spec.ts --list` 仅验证六项定义；真实浏览器执行沿用hosted CI门槛，不尝试绕过本地Chromium或loopback限制。
+
+- `real-export-3d.spec.ts`：一项真实 SALES 菜单验收，复用 `menu-export-documents` 的两箱/0.2CBM缺尺寸合成资料与迁移 SQLite，不增加夹具或改写 HTTP 结果。打开既有3D页签，核对箱数与一项尺寸预估；通过画布自身已保留的 GPU 绘制输出验证有色商品确实可见，旋转/滚轮缩放/右键平移均改变稳定像素，1440→390→1440响应尺寸后仍可操作，页签返回及整页重载再次绘制。就绪条件是跨浏览器动画帧后的实际像素连续三次一致、有色商品像素及画布比例与可见尺寸匹配；不使用任意 sleep、截图基线、Three内部状态或仅Canvas存在断言。鼠标在前后观测时移出画布，排除悬浮高亮；DOM统计/提示不进入像素读取。业务写请求必须为零，独立只读 SQLite 核对合同/装箱/单据/附件完整行不变；pageerror 从测试开始持续检查。严格 console error 观测从 `loginAs` 确认真正 SALES 登录成功后、出口菜单导航前开始，覆盖全部后续业务/3D/重载错误，不按状态码或 WebGL 文本过滤（含不抛异常的 Three 着色器链接错误，橙色边框仍绘制也不能放行）。该边界只把登录准备阶段的无会话 `/auth/session` 探测与被验收业务分开；首轮 hosted trace 已确认唯一控制台错误是登录成功前该 GET 的401，不修改真实认证响应。不涉及截图下载、空货物/WebGL不可用分支、生产资料、上传或外部业务服务。`playwright test real-export-3d.spec.ts --list` 只核对一项定义，浏览器实际执行须由既有 hosted Chromium CI 完成；禁止跳过有色绘制断言、过滤401/WebGL错误或增加浏览器权限/启动参数来绕过环境限制。
