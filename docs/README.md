@@ -39,6 +39,7 @@
 | api-contracts/库存链路联调面板.md | 联调台账 | 跟踪库存链路 READY/BLOCKED/DONE 与阻塞解除 |
 | api-contracts/合同附件链路验收.md | 验收矩阵 | 真实 HTTP/SQLite 附件上传、版本留存、旧入口权限与失败清理证据 |
 | quality/README.md | 子目录索引 | 维护质量门禁与发布结论文档导航 |
+| quality/财务工作簿导入回归_20261006.md | 聚焦验收 | 数字公式缓存、空结果兼容、真实财务 XLSX 预览确认回读、替换/回滚和既有角色边界的隔离证据 |
 | qa/purchase-excel-import-2026-10-06.md | 聚焦验收 | 当前采购 Excel 的非法值、错误/无缓存公式单元格、保留缓存值、重传及组件取消/结果/失败恢复证据 |
 | qa/carrier-pdf-edges-2026-10-06.md | 聚焦验收 | 真实多页 PDF、局部商品数量差异、纯图片人工复核及损坏文件拒绝的 HTTP/SQLite、原件归档与准备度证据 |
 | wps-import/README.md | 子目录索引 | WPS 增量导入源文件归档（按月），供幂等导入脚本在本地/VPS 使用 |

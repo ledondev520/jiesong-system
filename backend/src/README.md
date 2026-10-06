@@ -14,6 +14,8 @@
 
 `integration/financial-snapshot-readbacks.integration.js` 用已提交迁移和独立写入/只读回查的 0700/0600 合成 SQLite，通过真实认证 HTTP 验证四类财务读取：跨年账期的独立月度/YTD 报表快照；有序、可空/零/负值及汇总行证据与现有财务/老板边界；全历史人民币供应商差异和分组总计；当前名称搜索下钻的来源 ID、批次元数据、分类与重复读取不改已关联/忽略状态。名称搜索是发现链接，可能包含重叠名称；银行下钻默认 CNY，发票模型无币种字段。不访问真实文件、上传、正式申报或生产数据，不改变报表/对账口径。
 
+`integration/financial-workbook-import.integration.js` 以真实认证 multipart、内存合成 XLSX 和已提交迁移创建的私有 SQLite 验证十类财务导入：数字公式缓存（含0/负数/小数）、可区分的无缓存及错误/非金额缓存、合法字面量与空值兼容、字符串类型无缓存的已知残余边界、单文件预览凭证/覆盖、三文件现金流/证据/来源回读、整期替换、阻塞输入不写库、晚期 SQLite 失败完整回滚和原请求重试、既有角色/停用/匿名边界。金额只读已有缓存；ExcelJS 的 `cell.result` 保留缓存0，仅undefined时惰性查询已使用的SheetJS。两库均不能区分字符串类型缺 `<v>` 与合法空字符串缓存，继续按旧空值兼容，不声称全部缺缓存可检测。由 `npm run test:db` 执行；原文件不归档，不访问生产、浏览器或外部服务。
+
 ## 文件清单
 
 | 文件/目录 | 地位 | 功能 |
@@ -69,7 +71,7 @@
 | financeMatchService.js | 银行流水/发票与购销合同匹配；人民币只匹配采购、美元收入只匹配销售；发票自动写入重验 PENDING，人工目标沿用有效且未取消的购销合同规则 |
 | invoiceRecordService.js | 发票分页、筛选后有效/红冲分类统计、销方汇总及完整发票号码批量精确查询 |
 | invoiceVerificationService.js | 出口退税候选发票的销方、价税合计、品名、状态只读一致性核验 |
-| financialStatementsService.js | 会计报表、科目余额、明细账同账期校验，单事务写入与下钻查询 |
+| financialStatementsService.js | 会计报表数字公式缓存/既有空值兼容与明确错误指引、科目余额/明细账同账期校验，单事务写入与下钻查询 |
 | financialEvidenceService.js | 工资、税务、凭证与日记账等资料的分类、脱敏、幂等导入与受限查询 |
 | ai/contextService.js | 按当前销售合同港口关联构造美元上下文；局部查询失败保留其他资料并提示不可用，解析汇率后继续拼接财务概况 |
 | aiService.js | DeepSeek/Kimi 活动供应商、DeepSeek 独立密钥与 flash thinking/high、完整时限、零重试与流式用量 |

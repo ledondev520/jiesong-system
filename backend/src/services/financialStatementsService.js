@@ -1,6 +1,6 @@
 /**
  * Input: 会计报表/科目余额/明细账 Buffer、账期与 Prisma 数据库
- * Output: 三文件只读预览、确认后事务写入、财务报表查询、趋势分析和预警
+ * Output: 保留数字公式缓存的三文件只读预览、确认后事务写入、财务报表查询、趋势分析和预警
  * Pos: 财务报表业务服务层；三类来源必须跨越“预览 → 明确确认”Interface 后才能写库
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -18,12 +18,13 @@ const { createError } = require('../middleware/errorHandler');
  * 职责：从资产负债表 sheet 中按行次提取关键字段
  * 思路：
  *   1. 遍历所有数据行，找到包含"行次"数字的行
- *   2. 资产侧：列索引 0(科目)、1(行次)、2(期末余额)、3(年初余额)
+ *   2. 资产侧：列索引 0(科目)、1(行次)、2(期末余额)、3(年初余额)，金额读取已有公式缓存
  *   3. 负债侧：列索引 4(科目)、5(行次)、6(期末余额)、7(年初余额)
  * @param {import('exceljs').Worksheet} ws - 资产负债表 worksheet
+ * @param {Function} isFormulaBlank - 已有SheetJS对空字符串公式结果的惰性兼容查询
  * @returns {{ [lineNo: string]: { end: number|null, begin: number|null } }}
  */
-function parseBalanceSheet(ws) {
+function parseBalanceSheet(ws, isFormulaBlank) {
   // 按行次 -> { end: 期末余额, begin: 年初余额 }
   const map = {};
 
@@ -35,8 +36,8 @@ function parseBalanceSheet(ws) {
     if (lineNoLeft && !isNaN(Number(lineNoLeft))) {
       const key = String(Number(lineNoLeft));
       map[key] = {
-        end: toNum(row.getCell(3).value),
-        begin: toNum(row.getCell(4).value),
+        end: readStatementAmount(row.getCell(3), '期末余额', isFormulaBlank),
+        begin: readStatementAmount(row.getCell(4), '年初余额', isFormulaBlank),
       };
     }
 
@@ -46,8 +47,8 @@ function parseBalanceSheet(ws) {
       const key = String(Number(lineNoRight));
       // 如果左侧已经记录了相同行次（不太可能），右侧覆盖
       map[key] = {
-        end: toNum(row.getCell(7).value),
-        begin: toNum(row.getCell(8).value),
+        end: readStatementAmount(row.getCell(7), '期末余额', isFormulaBlank),
+        begin: readStatementAmount(row.getCell(8), '年初余额', isFormulaBlank),
       };
     }
   });
@@ -58,11 +59,12 @@ function parseBalanceSheet(ws) {
 /**
  * 职责：从利润表 sheet 中按行次提取关键字段
  * 思路：
- *   1. 列索引 1(行次)、2(本年累计)、3(本月金额)
+ *   1. 列索引 1(行次)、2(本年累计)、3(本月金额)，金额保留已有数字公式缓存
  * @param {import('exceljs').Worksheet} ws - 利润表 worksheet
+ * @param {Function} isFormulaBlank - 已有SheetJS对空字符串公式结果的惰性兼容查询
  * @returns {{ [lineNo: string]: { ytd: number|null, month: number|null } }}
  */
-function parseIncomeStatement(ws) {
+function parseIncomeStatement(ws, isFormulaBlank) {
   const map = {};
 
   ws.eachRow((row, rowNumber) => {
@@ -72,8 +74,8 @@ function parseIncomeStatement(ws) {
     if (lineNo && !isNaN(Number(lineNo))) {
       const key = String(Number(lineNo));
       map[key] = {
-        ytd: toNum(row.getCell(3).value),
-        month: toNum(row.getCell(4).value),
+        ytd: readStatementAmount(row.getCell(3), '本年累计金额', isFormulaBlank),
+        month: readStatementAmount(row.getCell(4), '本月金额', isFormulaBlank),
       };
     }
   });
@@ -81,16 +83,22 @@ function parseIncomeStatement(ws) {
   return map;
 }
 
-/** 从现金流量表按行次提取本年累计和本月金额。 */
-function parseCashFlowStatement(ws) {
+/**
+ * 职责：按现金流行次提取已有本年/本月金额，保留数字缓存及既有空字符串兼容。
+ * @param {import('exceljs').Worksheet} ws 现金流量表
+ * @param {Function} isFormulaBlank 原字符串空结果兼容查询
+ * @returns {object} 行次到本年/本月源值的映射
+ * @throws {Error} 可区分的公式缓存不可用时给出单元格指引
+ */
+function parseCashFlowStatement(ws, isFormulaBlank) {
   const map = {};
   ws.eachRow((row, rowNumber) => {
     if (rowNumber <= 4) return;
     const lineNo = row.getCell(2).value;
     if (lineNo && !Number.isNaN(Number(lineNo))) {
       map[String(Number(lineNo))] = {
-        ytd: toNum(row.getCell(3).value),
-        month: toNum(row.getCell(4).value),
+        ytd: readStatementAmount(row.getCell(3), '本年累计金额', isFormulaBlank),
+        month: readStatementAmount(row.getCell(4), '本月金额', isFormulaBlank),
       };
     }
   });
@@ -106,6 +114,40 @@ function toNum(val) {
   if (val === null || val === undefined || val === '') return null;
   const n = Number(val);
   return isNaN(n) ? null : n;
+}
+
+/**
+ * 职责：读取月报金额的已有数字缓存；可区分的缓存缺失/非金额结果指出原单元格，不计算公式。
+ * 思路：公开result保留缓存0；仅undefined查询原字符串空结果，真实空白仍沿用空值规则。
+ * @param {import('exceljs').Cell} cell 原工作表单元格
+ * @param {string} label 金额列名称
+ * @param {Function} isFormulaBlank 字符串空结果兼容查询
+ * @returns {number|null} 已存数值或兼容空值，不计算公式
+ * @throws {Error} 可区分的缺缓存/错误/非金额结果返回400及重新计算/保存指引
+ */
+function readStatementAmount(cell, label, isFormulaBlank) {
+  if (cell.type !== ExcelJS.ValueType.Formula) return toNum(cell.value);
+  const result = cell.result;
+  if (result === '' || (result === undefined && isFormulaBlank(cell))) return null;
+  if (typeof result !== 'number' || !Number.isFinite(result)) {
+    throw createError(`${cell.worksheet.name} 第${cell.row}行 ${cell.address}（${label}）公式缺少有效数字缓存，请在 Excel 或 WPS 中重新计算并保存工作簿后重试`, 400);
+  }
+  return result;
+}
+
+/**
+ * 职责：只在ExcelJS丢失空字符串result时，惰性读取已有SheetJS原单元格表示。
+ * 思路：普通缺缓存不产生字符串空单元格；字符串类型无<v>与合法空缓存均解析为空，维持旧兼容。
+ * @param {Buffer} buffer 当前内存工作簿
+ * @returns {Function} 空字符串兼容判定，不把SheetJS占位值推定为金额
+ */
+function createFormulaBlankLookup(buffer) {
+  let source;
+  return (cell) => {
+    if (!source) source = XLSX.read(buffer, { type: 'buffer', raw: true, cellDates: true });
+    const original = source.Sheets[cell.worksheet.name]?.[cell.address];
+    return original?.t === 's' && original.v === '' && typeof original.f === 'string';
+  };
 }
 
 /**
@@ -232,6 +274,12 @@ const worksheetHeaderValues = (worksheet, rowLimit = 5, columnLimit = 10) => {
   return values;
 };
 
+/**
+ * 职责：解析三文件来源中的月报及可选现金流，金额沿用缓存读取和空值兼容边界。
+ * @param {Buffer} buffer 当前内存XLSX
+ * @returns {Promise<object>} 源报表、企业/账期和Sheet计数
+ * @throws {Error} 工作簿/必需Sheet或公式缓存不可用
+ */
 const parseStatementBundleBuffer = async (buffer) => {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw createError('会计报表文件为空', 400);
   const workbook = new ExcelJS.Workbook();
@@ -251,11 +299,12 @@ const parseStatementBundleBuffer = async (buffer) => {
     ...worksheetHeaderValues(incomeStatement),
     ...(cashFlowStatement ? worksheetHeaderValues(cashFlowStatement) : []),
   ];
+  const isFormulaBlank = createFormulaBlankLookup(buffer);
   return {
-    balanceSheet: buildBalanceSheetData(parseBalanceSheet(balanceSheet)),
-    incomeStatement: buildIncomeStatementData(parseIncomeStatement(incomeStatement)),
+    balanceSheet: buildBalanceSheetData(parseBalanceSheet(balanceSheet, isFormulaBlank)),
+    incomeStatement: buildIncomeStatementData(parseIncomeStatement(incomeStatement, isFormulaBlank)),
     cashFlowStatement: cashFlowStatement
-      ? buildCashFlowStatementData(parseCashFlowStatement(cashFlowStatement))
+      ? buildCashFlowStatementData(parseCashFlowStatement(cashFlowStatement, isFormulaBlank))
       : null,
     statementSheetCount: cashFlowStatement ? 3 : 2,
     companyName: extractCompanyName(headerValues),
@@ -355,18 +404,31 @@ const parseGeneralLedgerBuffer = (buffer) => {
   };
 };
 
-const parseWorkbook = (workbook) => {
+/**
+ * 职责：按既有Sheet和行次读取单工作簿报表，保留已有缓存金额与兼容空值。
+ * @param {import('exceljs').Workbook} workbook 已解析月报
+ * @param {Function} isFormulaBlank 原字符串空结果兼容查询
+ * @returns {object} 资产负债表与利润表源字段
+ * @throws {Error} 必需Sheet或可区分的金额公式缓存不可用
+ */
+const parseWorkbook = (workbook, isFormulaBlank) => {
   const bsSheet = workbook.getWorksheet('资产负债表');
   const isSheet = workbook.getWorksheet('利润表');
   if (!bsSheet || !isSheet) {
     throw createError('文件缺少必要的 Sheet（资产负债表、利润表）', 400);
   }
   return {
-    balanceSheet: buildBalanceSheetData(parseBalanceSheet(bsSheet)),
-    incomeStatement: buildIncomeStatementData(parseIncomeStatement(isSheet)),
+    balanceSheet: buildBalanceSheetData(parseBalanceSheet(bsSheet, isFormulaBlank)),
+    incomeStatement: buildIncomeStatementData(parseIncomeStatement(isSheet, isFormulaBlank)),
   };
 };
 
+/**
+ * 职责：加载单工作簿并提供原字符串空结果的惰性兼容查询，不计算公式。
+ * @param {Buffer} buffer 当前内存XLSX
+ * @returns {Promise<object>} 已解析报表源字段
+ * @throws {Error} 空/损坏工作簿或必需报表/金额缓存不可用
+ */
 const parseStatementBuffer = async (buffer) => {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
     throw createError('会计报表文件为空', 400);
@@ -377,7 +439,7 @@ const parseStatementBuffer = async (buffer) => {
   } catch {
     throw createError('无法解析会计报表，请确认文件是有效的 .xlsx 工作簿', 400);
   }
-  return parseWorkbook(workbook);
+  return parseWorkbook(workbook, createFormulaBlankLookup(buffer));
 };
 
 const createPreviewId = (buffer, year, month, periodLabel) => crypto
