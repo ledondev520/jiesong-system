@@ -8,6 +8,8 @@
 
 当前VPS使用SQLite与绝对DATABASE_URL（见DEPLOY.md）。密码找回路由使用锁定express-rate-limit；`TRUSTED_PROXY_CIDRS` 默认空，显式可信IP/CIDR配置及生产一致备份前置条件见 `../docs/security/password-recovery.md`。不要使用固定本地dev.db备份替代生产数据库。
 
+`src/testHelpers/account-name-server.js` 为两个用户页面的普通名称回归提供已提交迁移初始化的私有SQLite/localhost服务，不查询凭据字段或调用外部服务；夹具目录边界见 `src/testHelpers/README.md`，真实HTTP与React执行层级见 `../docs/qa/account-name-lifecycle-2026-10-06.md`。
+
 ## 快速开始
 
 ### 1. 安装依赖

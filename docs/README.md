@@ -46,6 +46,8 @@
 | qa/purchase-excel-import-2026-10-06.md | 聚焦验收 | 当前采购 Excel 的非法值、错误/无缓存公式单元格、保留缓存值、重传及组件取消/结果/失败恢复证据 |
 | qa/carrier-pdf-edges-2026-10-06.md | 聚焦验收 | 真实多页 PDF、局部商品数量差异、纯图片人工复核及损坏文件拒绝的 HTTP/SQLite、原件归档与准备度证据 |
 | qa/financial-library-source-readbacks-2026-10-06.md | 聚焦验收 | 现有资料库CLI合成来源入库、脱敏/有序行/来源身份回读、空筛选和迟到旧Sheet修复及hosted定义边界 |
+| qa/README.md | 子目录索引 | 维护聚焦QA证据及执行层级 |
+| qa/account-name-lifecycle-2026-10-06.md | 聚焦验收 | 两个人类用户入口的名称取消、后页目录、真实失败保留和重试；明确Agent客户端隔离及浏览器未执行 |
 | wps-import/README.md | 子目录索引 | WPS 增量导入源文件归档（按月），供幂等导入脚本在本地/VPS 使用 |
 | quality/发布结论_M5_20260212.md | 发布报告 | 记录 M5 门禁证据、风险评估与 Go/No-Go 结论 |
 | 周节奏指标看板.md | 指标看板 | 追踪每周质量/效率/回归率并给出迭代建议 |

@@ -10,6 +10,7 @@
 - `financial-library-data.js`：只按固定字面量生成两份合成XLS/XLSX及两份应忽略来源，应用已提交迁移、执行原有CLI并提供独立只读SQL；不复制真实文件，不调用月报上传或外部服务
 - `financial-library-server.js`：仅在显式NODE_ENV=test、IPC和私有0700临时根下运行；0600 SQLite先迁移，再通过原CLI入库后暴露真实Express现有路由及测试ADMIN/FINANCE身份。来源不进入普通附件归档，无测试HTTP入口或生产配置
 - `financial-library-server.test.js`：无浏览器检查同一hosted夹具的真实ADMIN/FINANCE登录、来源金额/页数读回和零库写入；由 `npm test` 发现。浏览器六项定义在 `frontend/e2e/real-financial-library.spec.ts`，本地合同测试不代表浏览器通过
+- `account-name-server.js`：名称限定的真实localhost Express服务；使用已提交迁移、0700/0600私有SQLite、不可用测试密码占位及合成ADMIN/普通目标，仅IPC返回安全字段。人的列表/详情/名称更新经真实认证和API；不登录、不改密、不操作Agent、角色或启用状态。前端夹具及6项回归见 `frontend/src/test/account-name-fixture.ts` 与 `frontend/src/app/dashboard/users/name-lifecycle.test.tsx`；执行边界见 `docs/qa/account-name-lifecycle-2026-10-06.md`。
 
 `role-browser-server.js` 的 `notification-state` 场景只给当前合成 PURCHASE 用户预置四条现有通知（三条未读），不调用通知生成器或访问生产。新增同场景夹具合同测试通过真实登录、重复单条已读请求和独立只读 SQLite 核对未读数为二；可用 `node --test --test-name-pattern='own notification mark-one' src/testHelpers/role-browser-server.test.js` 单独执行。角色及其他场景语义不变。
 

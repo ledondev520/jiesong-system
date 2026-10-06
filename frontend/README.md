@@ -22,6 +22,7 @@
 - `src/services`: API 服务层
 - `src/store`: 全局状态管理 (Zustand)
 - `src/types`: TypeScript 类型定义 (与数据库 Schema 对齐)
+- `src/test`: jsdom初始化与私有真实API夹具，普通名称生命周期边界见 `src/test/README.md`
 - `src/**/*.test.ts`: 前端单元测试文件
 - `src/app/dashboard/settings/README.md`: 当前配置路由与普通固定文本组件放弃编辑证据；整表保存含汇率/AI 参数，不与单键接口验收混淆
 - `e2e`: Playwright 自动化验收测试
