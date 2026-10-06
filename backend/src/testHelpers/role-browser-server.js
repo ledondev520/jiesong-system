@@ -1,7 +1,7 @@
 /**
  * Input: Explicit test scenario, private temporary root and synthetic role/business data
  * Output: Isolated real Express/auth backend and scenario metadata for browser/HTTP tests
- * Pos: Test-only role fixture including internal records, menu documents and sales header drafts
+ * Pos: Test-only role fixture including internal records, documents, header drafts and dashboard sources
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -17,7 +17,7 @@ const password = 'test-only-role-browser-password-never-production';
 if (process.env.NODE_ENV !== 'test' || !process.send
   || !directory?.startsWith(path.join(os.tmpdir(), 'jiesong-role-browser-e2e-'))
   || fs.realpathSync(directory) !== directory
-  || !['purchase', 'warehouse', 'sales', 'boss', 'receipt-pool', 'notification-state', 'tax-record-forms', 'menu-export-documents', 'sales-header'].includes(scenario)
+  || !['purchase', 'warehouse', 'sales', 'boss', 'receipt-pool', 'notification-state', 'tax-record-forms', 'menu-export-documents', 'sales-header', 'dashboard-sources'].includes(scenario)
   || fs.existsSync(path.resolve(__dirname, '../../.env'))) process.exit(2);
 process.umask(0o077);
 fs.chmodSync(directory, 0o700);
@@ -31,8 +31,8 @@ process.env.JWT_SECRET = 'test-only-role-browser-jwt-secret-never-production';
  * @throws 迁移、合成资料构建或服务启动失败
  */
 async function start() {
-  if (['tax-record-forms', 'menu-export-documents', 'sales-header'].includes(scenario)) {
-    // This form roundtrip uses the committed migration chain, never db push or
+  if (['tax-record-forms', 'menu-export-documents', 'sales-header', 'dashboard-sources'].includes(scenario)) {
+    // These form/document/dashboard scenarios use committed migrations, never db push or
     // client generation. Prisma's executable children need normal execute bits;
     // the database is created 0600 first inside the already-private 0700 root.
     fs.closeSync(fs.openSync(path.join(directory, 'synthetic.db'), 'wx', 0o600));
@@ -75,6 +75,11 @@ async function start() {
       specification: '合成箱', boxes: 10, grossWeight: 40000, netWeight: 38000, volume: 10, length: 1000, width: 1000, height: 1000 } },
   }, include: { items: true } });
   const purchaseItem = purchase.items[0];
+  const dashboardSources = scenario === 'dashboard-sources'
+    ? require('./dashboard-source-seed').seedDashboardSources(path.join(directory, 'synthetic.db'), {
+        productId: product.id, supplierId: supplier.id, portId: port.id,
+        purchaseId: purchase.id, purchaseItemId: purchaseItem.id,
+      }) : undefined;
   let receipt, sale;
   const receipts = require('../services/purchaseReceiptService');
   if (['warehouse', 'sales', 'boss'].includes(scenario)) {
@@ -180,7 +185,7 @@ async function start() {
     baseURL: `http://127.0.0.1:${server.address().port}`,
     purchaseId: purchase.id, purchaseItemId: purchaseItem.id, productId: product.id,
     receiptId: receipt?.id, receiptItemId: receipt?.items[0].id, salesId: sale?.id, salesNo: sale?.contractNo,
-    receiptPool, taxRecords, exportDocuments, salesHeader,
+    receiptPool, taxRecords, exportDocuments, salesHeader, dashboardSources,
     users: Object.fromEntries(Object.entries(users).map(([role, user]) => [role, { id: user.id, username: user.username }])),
   }));
   let closing = false;

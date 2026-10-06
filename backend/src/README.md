@@ -2,6 +2,8 @@
 
 > 若本文件夹结构或内容变化，请更新本文件。
 
+`testHelpers/dashboard-source-seed.js` 与 `role-browser-dashboard.test.js` 增加当前工作台的已提交迁移/真实角色 HTTP 验收：独立 SQL 已知例题核对 KPI、原资金定义、最近六笔之外的历史风险/阻塞、已完成单排除和 PURCHASE/BOSS 实际详情200，并逐表确认业务事实不变。商品追踪仅为额外兼容 API 证据，当前页面未挂载该组件。运行与边界见 `testHelpers/README.md`；不覆盖经营执行/报表或声称浏览器通过。
+
 ## 目的
 
 存放后端 API 所有源代码文件，实现进销存系统的完整业务逻辑。
@@ -19,6 +21,8 @@
 `integration/financial-workbook-import.integration.js` 以真实认证 multipart、内存合成 XLSX 和已提交迁移创建的私有 SQLite 验证十类财务导入：数字公式缓存（含0/负数/小数）、可区分的无缓存及错误/非金额缓存、合法字面量与空值兼容、字符串类型无缓存的已知残余边界、单文件预览凭证/覆盖、三文件现金流/证据/来源回读、整期替换、阻塞输入不写库、晚期 SQLite 失败完整回滚和原请求重试、既有角色/停用/匿名边界。成功写入及覆盖还通过独立只读SQL直接与夹具字面量比较资产、月度/YTD、0、负数、合法空值和现金流/证据金额；三来源类型、文件名、Sheet和计数与固定期望比较，字节数/哈希与原合成文件独立比较，避免HTTP读取服务掩盖错误。金额只读已有缓存；ExcelJS 的 `cell.result` 保留缓存0，仅undefined时惰性查询已使用的SheetJS。两库均不能区分字符串类型缺 `<v>` 与合法空字符串缓存，继续按旧空值兼容，不声称全部缺缓存可检测。由 `npm run test:db` 执行；原文件不归档，不访问生产、浏览器或外部服务。
 
 ## 文件清单
+
+`integration/financial-library-source-readbacks.integration.js` 通过原有本地资料库CLI干跑/确认和真实ADMIN/FINANCE认证GET，在已提交迁移、0700/0600私有SQLite中验证两份合成XLS/XLSX来源、三Sheet和61行：专用月报/未知文件跳过、重复导入零写入、原始字节的哈希/大小和来源元数据、账期关联、物理行号/空行间隙、缓存/空值/零/负数/布尔值、分页、持久化前脱敏、分类账期筛选以及其他当前角色/停用/匿名拒绝。独立只读SQL核对固定字面量和全部无关表不变；普通附件目录保持空。随 `npm run test:db` 执行，不构成浏览器或生产验收；与月度工作簿上传入口独立。
 
 | 文件/目录 | 地位 | 功能 |
 |-----------|------|------|
@@ -99,6 +103,8 @@
 | patrolService.js | 业务 / 系统巡检、管理员通知、系统操作日志 |
 
 ## 工具清单
+
+- `testHelpers/hs-code-browser-server.js` / `.test.js`：独占0700目录/0600SQLite，通过已提交迁移初始化三条独立SQLite字面量HS记录与六种现有角色；真实登录/HTTP和独立只读回查验证本地组合查询及已有ADMIN/PURCHASE/FINANCE人工证据维护。组合查询用已召回候选ID限定既有Prisma名称contains查询，只收紧候选集合，保留原候选分数与组合截短回退；名称单独的模糊召回、数字检索及code-only截短回退保持原实现。所有来源链接为合成example.invalid，不访问外部来源或AI；随`npm test`执行，完整证据见`../../docs/quality/HS本地字典回归_20261006.md`。
 
 - `controllers/system/portCategoryController.js` 和 `customsBrokerController.js` 沿用档案表单的必填名称/港口代码规则：显式空白或 null 更新在持久化前返回 400，省略字段仍保留；报关行选填字段显式 null 清空为数据库 null，避免保存字符串“null”。不新增唯一性或删除规则。
 - `integration/catalog-form-lifecycle.integration.js` 在迁移后的私有合成 SQLite 中，以真实 HTTP 验证港口、商品分类和报关行三类创建/编辑/列表回读。独立只读 SQLite 回读检查空白、现有重复键和缺失父级导致的失败不改变既有字段或时间戳；不覆盖浏览器、权限或生产数据。

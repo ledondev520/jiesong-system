@@ -14,11 +14,12 @@
 - 📝 **采购管理** - 采购合同、AI辅助录入、在线盖章跳转、汇款信息复制、付款与多发票号码登记、选填发票原件
 - 💰 **出口管理** - 出口合同、合同头草稿取消复原/失败保留重试、智能定价、3D 排柜、双80%出柜判定、船司装箱单核对（真实隔离验收见 `frontend/e2e/real-sales-header.spec.ts` 与 `backend/src/testHelpers/role-browser-header.test.js`）
 - 📄 **出口单证** - 一键生成三张表、五 Sheet 出口 Excel（含商业发票）、HS 编码匹配与无退税警示
+- 🔎 **本地 HS 字典** - 商品名称与编码组合检索、详情、已有角色手工证据保存/回读的隔离验收见 `docs/quality/HS本地字典回归_20261006.md`；浏览器定义与实际执行结果分别记录
 - 📊 **库存管理** - 入库出库、状态流转
 - 🚢 **货柜管理** - 自动编号、装箱管理、位置查询
 - 🔔 **流程提醒** - 次月5号内部退税材料准备提醒、已出货缺发票提醒（法定期限以主管税务机关和当期申报期为准）
 - 🤖 **AI助手** - 智能问答、辅助录入
-- 📈 **财务报表** - 收付款跟踪、月度报表预览确认导入、数字公式缓存保留、成本结构分析
+- 📈 **财务报表** - 收付款跟踪、月度报表预览确认导入、数字公式缓存保留、成本结构分析；同页财务资料库通过独立CLI脱敏入库，来源/Sheet/分页读取不会恢复旧来源（隔离验收见 `backend/src/integration/financial-library-source-readbacks.integration.js` 和 `frontend/e2e/real-financial-library.spec.ts`）
 - 🧭 **工作台** - 出口全流程导航（签约→付款→排柜→单证→发票→退税→财务）
 
 ## 技术栈
@@ -154,7 +155,7 @@ npm run dev -- -p 3001
 - [前端美化指标](METRICS.md) - 每轮质量与过程指标
 - [前端文档](frontend/README.md) - 前端开发指南
 - [后端测试](backend/README.md#5-运行测试) - 真实只读概览来源验收已接入 test:db，覆盖上海发运期间、CNY 毛利/净现金、当前所有权账款与 UTC 收付趋势
-- [前端浏览器验收](frontend/e2e/README.md) - 真实角色与合成资料验收约定，含出口3D实际绘制/控制/响应式返回的 hosted CI 用例
+- [前端浏览器验收](frontend/e2e/README.md) - 真实角色与合成资料验收约定，含出口3D绘制/控制/响应式返回和 Header 个人设置本地保存/重载/部分失败重试的 hosted CI 定义；定义检查不代表浏览器通过
 - [Supabase 迁移指南](docs/Supabase迁移指南.md) - SQLite → Supabase 迁移步骤与 MCP 配置
 
 ## License

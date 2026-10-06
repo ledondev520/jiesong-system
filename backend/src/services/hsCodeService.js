@@ -1,6 +1,6 @@
 /**
  * Input: 商品名或 HSCode 查询参数、Prisma 客户端、aiService（懒加载）
- * Output: HSCode 查询结果、税率与带来源证据的人工更新
+ * Output: 本地名称/编码组合交集查询、税率与带来源证据的人工更新
  * Pos: HSCode 服务层，负责本地商品编码检索与当前税则快照维护；batchMatchHsCodes 采用两轮策略提升准确率
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -448,7 +448,7 @@ ${productList}
  *      0.1 若精确前缀无结果，递减截断前缀长度（10→8→6→4）重试，扩大召回范围
  *   1. 非数字关键词：做商品名 contains 精确包含匹配（限量 300）
  *   2. 非数字关键词：用关键词各 bigram 追加候选（OR LIKE 查询）
- *   3. 对未预置 similarity 的候选用 Dice 计算相似度，过滤 < 0.2 的噪声
+ *   3. 对未预置 similarity 的候选用 Dice 计算相似度；组合查询保留名称交集，过滤 < 0.2 的噪声
  *   4. 降序排列后分页返回
  * @param {{ keyword: string, code: string, page: number, pageSize: number }} params
  */
@@ -564,24 +564,19 @@ const fuzzySearchHsCodes = async ({ keyword = '', code = '', page = 1, pageSize 
       }
     }
   } else if (q && !isNumericQuery) {
-    // 同时有 code 和非数字 keyword 时：按商品名过滤已有 code 前缀候选
+    // 同时有 code 和 keyword 时：按名称收紧已召回候选，保留截短回退与分数。
     const nameFiltered = await prisma.hsCode.findMany({
       where: {
         AND: [
-          codePrefix ? { hsCode: { startsWith: codePrefix } } : {},
+          { id: { in: candidates.map((item) => item.id) } },
           { productName: { contains: q } },
         ],
       },
-      take: 300,
+      take: candidates.length,
     });
-    for (const row of nameFiltered) {
-      if (seenIds.has(row.id)) continue;
-      seenIds.add(row.id);
-      candidates.push(row);
-    }
+    candidates.splice(0, candidates.length, ...candidates.filter((item) => nameFiltered.some((row) => row.id === item.id)));
   }
-
-  // 3. 相似度评分并过滤（步骤 0 已写入 similarity 的编码命中行保持不变）
+  // 3. 相似度评分并过滤；编码候选也必须满足同时填写的商品名称。
   const THRESHOLD = 0.2;
   const scored = candidates
     .map((item) => {
