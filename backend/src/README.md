@@ -9,6 +9,7 @@
 存放后端 API 所有源代码文件，实现进销存系统的完整业务逻辑。
 
 `integration/application-audit-readback.integration.js` 以真实 Express/认证角色、已提交迁移的私有合成 SQLite 与独立 SQL 字面资料/只读全表快照，验证日志关键词/IP、日期/分页、完整记录与12列 CSV 内容，以及现有 ADMIN-only 边界和真实分类生成审计的重复读取。`controllers/system/notificationController.js` 的共享筛选仅使用 SQLite 支持的 `contains`，不传 PostgreSQL 的 `mode`；保留日期、过滤、导出上限与现有权限。只验收应用合成记录，不访问生产、OS日志或真实执行历史；页面没有独立详情路由，此套不声称浏览器通过。由 `npm run test:db` 执行。
+`integration/email-registration-http.integration.js` 用已提交迁移、0700/0600 私有合成 SQLite 和真实 localhost HTTP 验证邮箱发码 200、注册 201 与同码重放 400。只模拟 `mail.isConfigured/sendRegistrationCode`，保留控制器、校验、bcrypt、事务及原全局/注册限流；独立只读 SQL 仅查询 username/email/name/role/isActive，确认只有一个未激活 SALES 账号。显式环境白名单、环境文件拒绝和本机源 fetch 防护隔离真实数据库及外部发信，不读取凭据/挑战表、激活、登录或声称浏览器验收。由 `npm run test:db` 执行，需要 Node 20.19、Python 3 与现有 Prisma client。
 
 `integration/notification-state-lifecycle.integration.js` 只用一个当前合成用户、真实认证 HTTP 与迁移后的 0700/0600 私有 SQLite，验证单条已读及重复完成、重新读取/未读筛选/计数，和全部已读重试；独立只读连接比较全部通知字段，确认只改变已读状态，不新增通知。由 `npm run test:db` 执行，不访问生产或测试其他用户。
 

@@ -53,6 +53,7 @@ npm run test:all          # 依次执行 test → test:db → test:carrier-pdf�
 
 `src/integration/application-audit-readback.integration.js` 验证系统日志实际 HTTP 查询与 CSV：八类关键词/IP、组合日期/角色/实体过滤、分页独立导出、完整旧新值与空用户、中文引号换行及真实生成审计的重复读取。只用已提交迁移、0700/0600 合成 SQLite 与独立只读全表快照；SQLite `contains` 保留既有 LIKE 子串语义，禁止在日志查询中传入不支持的 Prisma `mode`。现有页面只有摘要列表，完整记录经同一列表 DTO 验证，没有新增详情端点；不构成浏览器通过。证据与边界见 [系统日志回归](../docs/quality/application-audit-readback-2026-10-06.md)。
 `ordinary-setting-text.integration.js` 仅验证既有 `invoiceTitleInfo` 的合成公司固定文本单键保存、重复保存、实际私有库约束失败、明确重试、清空与独立回读。使用已提交迁移、现有合成 ADMIN 与正常限流/审计，配置表始终只含该普通文本键；不能替代当前含汇率/AI 参数的整表 UI 保存验收。范围说明见 `docs/quality/ordinary-setting-text-20261006.md`。
+`test:db` 也包含 `src/integration/email-registration-http.integration.js`：真实 localhost HTTP 发码 200 → 注册 201 → 重放 400，独立安全字段 SQL 回读确认一个未激活 SALES 账号，响应不发 token/Set-Cookie。仅模拟邮件出口，保留真实校验、bcrypt、事务及限流；只创建私有临时合成库，不激活或登录新账号，不覆盖浏览器。
 
 ## 目录结构
 

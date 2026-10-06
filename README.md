@@ -156,7 +156,7 @@ npm run dev -- -p 3001
 - [前端美化风险台账](RISKS.md) - 风险触发与回滚点
 - [前端美化指标](METRICS.md) - 每轮质量与过程指标
 - [前端文档](frontend/README.md) - 前端开发指南
-- [后端测试](backend/README.md#5-运行测试) - 真实只读概览来源验收已接入 test:db，覆盖上海发运期间、CNY 毛利/净现金、当前所有权账款与 UTC 收付趋势
+- [后端测试](backend/README.md#5-运行测试) - test:db 包含真实只读概览来源验收、上海期间与收付趋势，以及合成邮箱注册 HTTP 成功/重放与未激活 SALES 安全字段回读
 - [前端浏览器验收](frontend/e2e/README.md) - 真实角色与合成资料验收约定，含出口3D绘制/控制/响应式返回和 Header 个人设置本地保存/重载/部分失败重试的 hosted CI 定义；定义检查不代表浏览器通过
 - [Supabase 迁移指南](docs/Supabase迁移指南.md) - SQLite → Supabase 迁移步骤与 MCP 配置
 
