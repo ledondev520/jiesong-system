@@ -2,6 +2,7 @@
  * Input: active purchase page with generated synthetic workbook bytes and mocked HTTP service
  * Output: cancel, mixed-result and failed-request/reselection component lifecycle coverage
  * Pos: purchase Excel UI regression; jsdom components, not a browser or database claim
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -54,6 +55,10 @@ vi.mock("sonner", () => ({
   },
 }));
 
+/**
+ * 职责：生成合法合成工作簿字节供页面上传回调使用
+ * @returns {File} 非生产采购 Excel 文件；服务仍由组件测试桩替代
+ */
 const workbookFile = () => {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(
@@ -72,8 +77,17 @@ const workbookFile = () => {
     },
   );
 };
+/**
+ * 职责：定位当前采购页面的隐藏文件选择器
+ * @returns {HTMLInputElement} 已渲染的文件输入元素
+ */
 const fileInput = () =>
   document.querySelector("#contract-import-file-input") as HTMLInputElement;
+/**
+ * 职责：打开当前页面的导入选择弹窗
+ * @param user 组件测试交互实例
+ * @returns 导入选择弹窗元素
+ */
 const openImport = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.click(screen.getAllByRole("button", { name: "批量导入" })[0]);
   return screen.findByRole("dialog");

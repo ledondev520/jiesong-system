@@ -1,6 +1,6 @@
 /**
  * Input: Prisma 客户端、Excel 文件路径或查询参数
- * Output: Excel Buffer 或逐行导入统计；拒绝非空非法金额/日期，留空编号沿用统一序列
+ * Output: Excel Buffer 或逐行导入统计；拒绝非法值、错误及可识别无缓存公式，留空编号沿用统一序列
  * Pos: 采购合同批量导入导出服务
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -77,11 +77,20 @@ const formatDate = (date) => {
 
 /**
  * 职责：解析 Excel 中的日期值
- * 思路：xlsx 读取时日期可能是数字（序列号）或字符串
+ * 思路：沿用数字序列号/日期字符串，拒绝构造后被自动改日的输入
+ * @param {unknown} value 原单元格值
+ * @returns {Date|null} 有效日期或无法解析的标记；可选空值由导入层判断
  */
 const parseExcelDate = (value) => {
   if (value === undefined || value === null || value === '') return null;
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  /**
+   * 职责：构造日期并拒绝 JavaScript 的自动日历归一化
+   * @param {number} year 年
+   * @param {number} month 月（1–12）
+   * @param {number} day 日
+   * @returns {Date|null} 相同年/月/日的日期或 null
+   */
   const calendarDate = (year, month, day) => {
     const date = new Date(year, month - 1, day);
     // JS normalizes impossible days/months; an import must not silently change
@@ -104,16 +113,24 @@ const parseExcelDate = (value) => {
   return null;
 };
 
-// Optional empty cells keep the existing null-date / zero-amount defaults.
+/**
+ * 职责：区分真正可选空值与需要校验的已提供值
+ * @param {unknown} value 原单元格值
+ * @returns {boolean} 是否为非空提供值
+ */
 const hasProvidedValue = value => value !== undefined && value !== null && !(typeof value === 'string' && value.trim() === '');
 
 /**
  * 职责：解析金额
+ * 思路：保留逗号千位/点小数规则，拒绝非有限值及去逗号后的空壳
+ * @param {unknown} value 原单元格值
+ * @returns {number|null} 有限金额或无法解析/可选空值标记
  */
 const parseAmount = (value) => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   if (typeof value === 'string') {
     const cleaned = value.replace(/,/g, '').trim();
+    if (!cleaned) return null; // Comma-only supplied cells must not become zero.
     const n = Number(cleaned);
     return Number.isFinite(n) ? n : null;
   }
@@ -181,7 +198,7 @@ const exportPurchasesExcel = async (query = {}) => {
  * 职责：从 Excel 批量导入采购合同
  * 思路：
  *   1. 读取 Excel 文件
- *   2. 逐行校验（供应商名称必填、日期格式、金额格式、状态有效性）
+ *   2. 逐行校验（供应商必填、金额/日期错误或可识别无缓存公式、值格式、状态）
  *   3. 查找供应商 ID（不存在则报错）
  *   4. 合同编号留空则自动生成
  *   5. 写入数据库
@@ -202,7 +219,9 @@ const importPurchasesExcel = async (filePath, userId, options = {}) => {
     throw createError('上传文件不存在', 400);
   }
 
-  const workbook = xlsx.readFile(filePath);
+  // Retain formula stubs so an unresolved formula is distinguishable from an
+  // optional blank. Cached numeric/empty-string formulas keep their real type.
+  const workbook = xlsx.readFile(filePath, { sheetStubs: true });
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
   const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
@@ -210,6 +229,38 @@ const importPurchasesExcel = async (filePath, userId, options = {}) => {
   if (rawData.length < 2) {
     throw createError('Excel 文件为空或缺少数据行', 400);
   }
+
+  // sheet_to_json replaces Excel error cells with defval, so preserve their
+  // provenance before applying optional-blank defaults. Arrays are relative
+  // to the worksheet range origin, which need not be A1.
+  const sheetRange = xlsx.utils.decode_range(worksheet['!ref']);
+  /**
+   * 职责：按范围起点取得 JSON 解析前的原单元格来源
+   * @param {number} rowIndex 相对工作表范围起点的行号（含表头）
+   * @param {number} columnIndex 相对列号；-1 表示缺列
+   * @returns {object|undefined} 原单元格；缺列/缺单元格返回 undefined
+   */
+  const excelCell = (rowIndex, columnIndex) => columnIndex === -1 ? undefined : worksheet[xlsx.utils.encode_cell({
+    r: sheetRange.s.r + rowIndex,
+    c: sheetRange.s.c + columnIndex,
+  })];
+  /**
+   * 职责：识别被 JSON 空值默认抹掉的原 Excel 错误单元格
+   * @param {number} rowIndex 范围相对行号（含表头）
+   * @param {number} columnIndex 范围相对列号；-1 表示缺列
+   * @returns {boolean} 是否为错误类型
+   */
+  const isExcelErrorCell = (rowIndex, columnIndex) => excelCell(rowIndex, columnIndex)?.t === 'e';
+  /**
+   * 职责：拒绝保留公式但没有结果缓存的 stub，不执行公式
+   * @param {number} rowIndex 范围相对行号（含表头）
+   * @param {number} columnIndex 范围相对列号；-1 表示缺列
+   * @returns {boolean} 是否是无缓存公式；真实缓存零/空字符串均为 false
+   */
+  const isUncachedFormulaCell = (rowIndex, columnIndex) => {
+    const cell = excelCell(rowIndex, columnIndex);
+    return cell?.t === 'z' && typeof cell.f === 'string' && cell.f.trim() !== '';
+  };
 
   // 解析表头（支持中英文及常见别名）
   const headers = rawData[0].map((h) => (typeof h === 'string' ? h.trim() : ''));
@@ -273,15 +324,21 @@ const importPurchasesExcel = async (filePath, userId, options = {}) => {
         }
       }
 
+      if (isUncachedFormulaCell(i + 1, colIndex.signedAt)) {
+        throw new Error(`第 ${rowNum} 行：签订日期公式缺少缓存结果，请在 Excel 中重新计算并保存后导入`);
+      }
       const signedAtInput = colIndex.signedAt !== -1 ? row[colIndex.signedAt] : undefined;
       const signedAt = parseExcelDate(signedAtInput);
-      if (hasProvidedValue(signedAtInput) && signedAt === null) {
+      if (isExcelErrorCell(i + 1, colIndex.signedAt) || (hasProvidedValue(signedAtInput) && signedAt === null)) {
         throw new Error(`第 ${rowNum} 行：签订日期格式不正确`);
       }
 
+      if (isUncachedFormulaCell(i + 1, colIndex.totalAmount)) {
+        throw new Error(`第 ${rowNum} 行：总金额公式缺少缓存结果，请在 Excel 中重新计算并保存后导入`);
+      }
       const totalAmountInput = colIndex.totalAmount !== -1 ? row[colIndex.totalAmount] : undefined;
       const totalAmount = parseAmount(totalAmountInput);
-      if ((hasProvidedValue(totalAmountInput) && totalAmount === null) || (totalAmount !== null && totalAmount < 0)) {
+      if (isExcelErrorCell(i + 1, colIndex.totalAmount) || (hasProvidedValue(totalAmountInput) && totalAmount === null) || (totalAmount !== null && totalAmount < 0)) {
         throw new Error(`第 ${rowNum} 行：总金额格式不正确`);
       }
 
