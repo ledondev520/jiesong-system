@@ -1,5 +1,7 @@
 # 仪表盘路由
 
+系统配置当前普通固定文本回归见 `settings/README.md` 与 `settings/ordinary-text.test.tsx`：加载原文本、编辑或清空后离开并重新挂载时恢复原值，不执行含汇率/AI 参数的整表保存。单键真实 HTTP/SQLite 证据与浏览器未执行范围见 `docs/quality/ordinary-setting-text-20261006.md`。
+
 采购合同当前 Excel 导入的组件回归见 `contracts/excel-import.test.tsx`：取消/空文件选择无上传、历史选项重置、逐行结果和列表刷新、失败后同文件重试。测试服务为桩，不能替代真实浏览器/数据库上传验收；后端实际工作簿证据见 `docs/qa/purchase-excel-import-2026-10-06.md`。
 
 `layout.tsx` 等待认证状态恢复，Cookie模式再次确认真实服务端会话后才渲染保护内容和执行按角色导航；瞬时失败保留重试入口，不误报过期。原标签Bearer保持兼容。过期、退出与新登录由统一认证代次隔离晚到请求和业务缓存。

@@ -32,6 +32,7 @@
 | config/ | 配置层 | 权限校验后的环境加载、活动 AI 供应商与常量（含单元测试） |
 | controllers/ | 控制层 | 处理 HTTP 请求，调用服务层 |
 | integration/ | 集成测试层 | 数据库集成测试（空结构/事务/seed 幂等、真实 HTTP 进销存闭环、首个门店创建/RBAC、仓储异常出库/FIFO/来源守恒、收验货后采购更正/补录边界与合同附件 multipart/权限/失败留存矩阵，以及银行流水/发票查询筛选、币种、分类与既有角色边界）；generic-export-content.integration.js 解析七个设置模块的 CSV 下载，覆盖空表头、文本/日期/金额和重复导出的业务只读性 |
+| integration/ordinary-setting-text.integration.js | 普通文本验收 | 私有迁移库中仅写既有开票固定文本，验证单键保存/错误留存/明确重试/清空与独立回读，不提交含 AI/汇率参数的整表 |
 | testHelpers/ | 隔离测试夹具 | 登录/找回/采购多进程及真实角色浏览器的私有合成HTTP/SQLite服务；role-browser-server.test.js仅验证夹具真实HTTP和落库，不执行浏览器 |
 | jobs/ | 定时任务层 | 库存预警、出口提醒（每月5号退税/缺票提醒）等定时任务 |
 | middleware/ | 中间件层 | 认证、仅记录请求结构的性能日志、错误处理（含单元测试） |

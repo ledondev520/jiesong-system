@@ -147,6 +147,7 @@ npm run dev -- -p 3001
 - [库存链路联调面板](docs/api-contracts/库存链路联调面板.md) - 库存链路 READY/BLOCKED/DONE 联调追踪
 - [发布结论（M5）](docs/quality/发布结论_M5_20260212.md) - 采购链路门禁执行证据与发布建议
 - [系统日志回归](docs/quality/application-audit-readback-2026-10-06.md) - 合成应用审计查询、完整记录、CSV及现有角色的真实HTTP/SQLite证据
+- [系统配置普通文本回归](docs/quality/ordinary-setting-text-20261006.md) - 第 30 行既有文本单键保存/失败/重试/回读与组件放弃编辑；整表混合保存及浏览器仍未验收
 - [周节奏指标看板](docs/周节奏指标看板.md) - 周度质量/效率/回归风险跟踪
 - [项目子代理说明](.cursor/agents/README.md) - 项目级 Cursor 子代理与用途
 - [项目技能说明](.cursor/skills/README.md) - 项目级 Cursor Skills 索引与用途

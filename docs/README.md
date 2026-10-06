@@ -39,6 +39,7 @@
 | api-contracts/库存链路联调面板.md | 联调台账 | 跟踪库存链路 READY/BLOCKED/DONE 与阻塞解除 |
 | api-contracts/合同附件链路验收.md | 验收矩阵 | 真实 HTTP/SQLite 附件上传、版本留存、旧入口权限与失败清理证据 |
 | quality/README.md | 子目录索引 | 维护质量门禁与发布结论文档导航 |
+| quality/ordinary-setting-text-20261006.md | 聚焦验收 | 既有开票固定文本的单键接口保存、错误留存与重试，组件放弃编辑及整表混合保存的范围边界 |
 | quality/财务工作簿导入回归_20261006.md | 聚焦验收 | 数字公式缓存、空结果兼容、真实财务 XLSX 预览确认回读、替换/回滚和既有角色边界的隔离证据 |
 | quality/HS本地字典回归_20261006.md | 聚焦验收 | 本地名称/编码组合检索缺陷、真实角色证据维护/独立SQLite回读与浏览器定义和执行边界 |
 | quality/application-audit-readback-2026-10-06.md | 聚焦验收 | 系统日志合成应用审计查询/完整记录/CSV、现有角色与SQLite关键词故障修复证据 |
