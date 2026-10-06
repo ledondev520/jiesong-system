@@ -153,6 +153,7 @@ npm run dev -- -p 3001
 - [前端美化风险台账](RISKS.md) - 风险触发与回滚点
 - [前端美化指标](METRICS.md) - 每轮质量与过程指标
 - [前端文档](frontend/README.md) - 前端开发指南
+- [前端浏览器验收](frontend/e2e/README.md) - 真实角色与合成资料验收约定，含出口3D实际绘制/控制/响应式返回的 hosted CI 用例
 - [Supabase 迁移指南](docs/Supabase迁移指南.md) - SQLite → Supabase 迁移步骤与 MCP 配置
 
 ## License
