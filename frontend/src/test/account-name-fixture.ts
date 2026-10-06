@@ -9,6 +9,7 @@ import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { setImmediate } from "node:timers";
 import type { User } from "@/types";
 
 type Identity = Pick<User, "id" | "username" | "name" | "role" | "isActive">;
@@ -22,6 +23,7 @@ export interface AccountNameFixture {
   later: Identity;
   requests: { method: string; route: string; body?: NameEdit }[];
   responses: { method: string; route: string; status: number }[];
+  pendingRequests: Set<Promise<unknown>>;
 }
 
 /**
@@ -79,7 +81,14 @@ export async function startAccountNameFixture(): Promise<AccountNameFixture> {
     ) {
       throw new Error("Name fixture must remain private and loopback-only");
     }
-    return { server, directory, ...metadata, requests: [], responses: [] };
+    return {
+      server,
+      directory,
+      ...metadata,
+      requests: [],
+      responses: [],
+      pendingRequests: new Set(),
+    };
   } catch (error) {
     await stopAccountNameFixture({ server, directory });
     throw error;
@@ -155,11 +164,56 @@ export async function accountNameApi<T>(
     route,
     ...(body ? { body: { ...body } } : {}),
   });
+  const pending = fetchAccountNameResponse<T>(fixture, method, route, body);
+  fixture.pendingRequests.add(pending);
+  try {
+    return await pending;
+  } finally {
+    fixture.pendingRequests.delete(pending);
+  }
+}
+
+/**
+ * 职责：等待当前真实HTTP链结算，包括前一页完成后启动的下一页
+ * @param fixture 当前独占夹具
+ * @returns 所有已触发请求结算后的 Promise；原请求拒绝仍交还原调用者
+ * @throws 结算期间观察到的原始请求拒绝，不把网络或业务失败当成完成
+ */
+export async function settleAccountNameRequests(fixture: AccountNameFixture) {
+  const failures: unknown[] = [];
+  do {
+    const results = await Promise.allSettled([...fixture.pendingRequests]);
+    for (const result of results) {
+      if (result.status === "rejected") failures.push(result.reason);
+    }
+    // Give the resolved CRUD/page promises one I/O turn to start the next real page.
+    // This is request completion synchronization, not a timed delay or HTTP retry.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  } while (fixture.pendingRequests.size > 0);
+  if (failures.length) throw failures[0];
+}
+
+/**
+ * 职责：消费真实localhost响应，不依赖测试场景之外的空闲连接复用
+ * @param fixture 当前独占夹具
+ * @param method 已检查的 GET 或名称 PUT
+ * @param route 已检查的用户路径
+ * @param body 已检查的原样表单字段
+ * @returns 真实HTTP响应数据
+ * @throws 真实网络、业务或安全字段边界错误，既不替换响应也不重试
+ */
+async function fetchAccountNameResponse<T>(
+  fixture: AccountNameFixture,
+  method: string,
+  route: string,
+  body?: NameEdit,
+): Promise<T> {
   const response = await fetch(`${fixture.baseURL}/api/v1${route}`, {
     method,
     headers: {
       authorization: `Bearer ${fixture.token}`,
       "content-type": "application/json",
+      connection: "close",
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });

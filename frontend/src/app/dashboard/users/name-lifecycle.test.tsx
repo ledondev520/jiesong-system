@@ -16,6 +16,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -29,6 +30,7 @@ import SettingsUsersPage from "../settings/users/page";
 import {
   accountNameApi,
   readAccountName,
+  settleAccountNameRequests,
   setAccountNameFault,
   startAccountNameFixture,
   stopAccountNameFixture,
@@ -85,7 +87,7 @@ let fixture: AccountNameFixture;
 const searchPlaceholder = "搜索姓名、账号、邮箱、角色...";
 
 /**
- * Opens the ordinary target through its visible search result and real edit form.
+ * Opens the ordinary target after its real HTTP catalog has settled.
  * @param target Synthetic ordinary user shown by the real directory response
  * @returns Resolves after the edit form and unchanged identity fields are verified
  */
@@ -93,9 +95,7 @@ async function openTarget(target: AccountNameFixture["first"]) {
   fireEvent.change(screen.getByPlaceholderText(searchPlaceholder), {
     target: { value: target.username },
   });
-  await waitFor(() =>
-    expect(screen.queryByText("加载中...")).not.toBeInTheDocument(),
-  );
+  await act(async () => settleAccountNameRequests(fixture));
   const row = await screen.findByRole("row", {
     name: new RegExp(target.username),
   });
@@ -160,6 +160,10 @@ describe("ordinary account-name lifecycle through real localhost APIs", () => {
   }, 45000);
   afterAll(async () => {
     if (fixture) await stopAccountNameFixture(fixture);
+  });
+  afterEach(async () => {
+    // Finish real requests before resetting evidence/faults for the next case.
+    if (fixture) await act(async () => settleAccountNameRequests(fixture));
   });
   beforeEach(() => {
     fixture.requests = [];

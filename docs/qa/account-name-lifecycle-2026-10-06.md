@@ -46,3 +46,13 @@ npm run lint -- src/app/dashboard/settings/users/page.tsx src/app/dashboard/user
 ```
 
 本轮仅运行聚焦检查，完整构建/类型及 aggregate 由协调任务执行。没有启动本地浏览器、安装浏览器、改变启动参数、建立隧道或使用用户电脑。ByteRover查询和后续curate因 `brv` 不在 PATH 而不可用；没有为此安装工具。
+
+## 集成后测试同步复核
+
+协调任务的严重并发 coverage 日志记录本文件6项中2项失败：第33项同步门槛 `queryByText('加载中...')` 在页面同时渲染移动卡片和桌面表格的两个 loading 时抛多元素错误；另一项真实 fetch 为 `UND_ERR_SOCKET: other side closed`。此前聚焦通过不能代替该集成失败。未修改夹具的单文件串行对照仍为6/6通过（18.01秒），所以不能据此确认 Socket 的具体根因。
+
+Node20.19.0 实测内置 Undici6.21.1，未设置的 HTTP server `keepAliveTimeout` 为5000ms，`headersTimeout` 为60000ms，`requestTimeout` 为300000ms。日志中的连接已经复用多次；高负载下客户端事件循环阻塞与空闲连接关闭的竞态只是候选解释。
+
+仅修正测试：夹具记录进行中的真实HTTP Promise，给分页完成链一个I/O调度轮次，等待已触发的真实请求及后续页结算；`openTarget` 在 React `act` 中等待该门槛后直接定位目标row，移除单元素 loading 查询。每例清理同样先结算请求再重置下一例证据和故障；结算时观察到的请求拒绝继续抛出，业务与网络失败不会被当成成功。没有改变断言超时、测试超时、响应、自动重试或任何产品代码。
+
+私有localhost测试传输增加 `Connection: close`，只移除普通名称测试对非目标 keep-alive 复用的依赖；它不是产品 Socket 修复，没有改变生产服务的连接设置。修改后6项串行通过，完整集成仍须由协调任务重验，不能把串行绿误记为 coverage 全套通过。

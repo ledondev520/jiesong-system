@@ -15,3 +15,5 @@
 | components/UserDialog.test.tsx | 表单回归 | 验证原有表单与权限字段行为 |
 
 名称测试使用 `src/test/account-name-fixture.ts`，人的列表/详情/更新响应为真实HTTP；仅相邻 Agent 列表在客户端隔离，模块导航壳不在范围。完整边界与证据见 `docs/qa/account-name-lifecycle-2026-10-06.md`。
+
+目标编辑在真实HTTP分页链结算后定位唯一row；不用单元素查询页面同时存在的移动/桌面loading。每例先结算真实请求再重置证据，保持原断言与测试超时，不添加重试。
