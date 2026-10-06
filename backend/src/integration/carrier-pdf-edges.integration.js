@@ -31,6 +31,7 @@ const makePdf = draw => new Promise((resolve, reject) => {
 });
 
 test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness honest', async t => {
+  // 0. 初始化只属于本测试的私有目录、数据库路径和运行配置。
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-carrier-pdf-edges-'));
   fs.chmodSync(directory, 0o700);
   const database = path.join(directory, 'synthetic.db');
@@ -76,7 +77,7 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
     fs.rmSync(directory, { recursive: true, force: true });
     process.umask(originalUmask);
   });
-  // Replay committed migrations. Never touch a business DB, db push or shared generation.
+  // 1. 重放已提交迁移建立私有库，不连接业务库、db push 或生成共享客户端。
   const migrations = path.resolve(__dirname, '../../prisma/migrations');
   const ddl = fs.readdirSync(migrations).sort()
     .filter(name => fs.statSync(path.join(migrations, name)).isDirectory())
@@ -88,6 +89,7 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
   assert.equal(fs.statSync(directory).mode & 0o777, 0o700);
   assert.equal(fs.statSync(uploadRoot).mode & 0o777, 0o700);
   assert.equal(fs.statSync(database).mode & 0o777, 0o600);
+  // 2. 在私有库创建实际认证所需的合成角色。
   db = require('../utils/prisma');
   const tokens = {};
   const users = {};
@@ -98,6 +100,7 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
     } });
     tokens[role] = require('jsonwebtoken').sign({ userId: users[role].id }, process.env.JWT_SECRET);
   }
+  // 3. 启动真实 Express，再以其随机本地端口执行后续 HTTP 请求。
   const app = require('../app'); // Actual authentication, limiter, upload, extractor and archive.
   server = await new Promise(resolve => {
     const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
@@ -176,8 +179,9 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
    * @param {string} label 本测试内唯一的合同与报关编号后缀
    * @returns {Promise<{sale: object, declaration: object, rows: Array<object>}>} 合成出货、报关单及按创建时间排序的装箱行
    * @throws {Error} 夹具持久化、三单请求或响应断言失败时拒绝 Promise
-   */
+  */
   const makeFixture = async label => {
+    // 0. 创建合成采购来源及两条商品明细。
     const sequence = ++fixtureSequence;
     const invoiceNo = String(26110000000000000000n + BigInt(sequence));
     const purchase = await db.purchaseContract.create({ data: {
@@ -188,6 +192,7 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
         totalPrice: costs[index],
       })) },
     }, include: { items: true } });
+    // 1. 建立合成已发运出货，明确装箱行的创建顺序。
     const sale = await db.salesContract.create({ data: {
       contractNo: `EXP-SYNTHETIC-CARRIER-${label}`, exchangeRate: 7.2, status: 'SHIPPED',
       shippedAt: new Date('2026-10-01T12:00:00Z'), hasTaxRefund: true,
@@ -203,11 +208,13 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
         createdAt: new Date(`2026-10-01T12:00:0${index}Z`),
       })) },
     } });
+    // 2. 通过真实 HTTP 生成三单，再回读实际装箱行。
     const packet = (await call('POST', `/sales/${sale.id}/export-packet/generate`, {
       spotRate: 7.2, sellerName: 'Synthetic seller', buyerName: 'Synthetic buyer',
       packageKind: 'CARTON', tradeTerm: 'FOB', documentDate: '2026-10-01',
     }, { expected: 201 })).data;
     const rows = await db.packingItem.findMany({ where: { salesContractId: sale.id }, orderBy: { createdAt: 'asc' } });
+    // 3. 为实际装箱行建立合成已放行报关依据。
     const declaration = await db.customsDeclaration.create({ data: {
       declarationNo: `SYNTHETIC-CARRIER-DECLARATION-${label}`, salesContractId: sale.id,
       status: 'RELEASED', currency: 'USD', exportDate: new Date('2026-10-01T12:00:00Z'),
@@ -218,6 +225,7 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
         unitPrice: row.unitPrice, totalPrice: row.totalPrice,
       })) },
     } });
+    // 4. 建立合成发票批次与完整票面事实，返回该出货夹具。
     const batch = await db.financeDataBatch.create({ data: {
       type: 'INVOICE', fileName: `synthetic-carrier-fixture-${label}`, recordCount: 1,
     } });
@@ -253,8 +261,9 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
    * @param {Buffer} bytes 上传的原始 PDF 字节
    * @returns {Promise<void>} 全部持久化、权限及字节断言通过后完成
    * @throws {Error} 回读、下载或任一档案断言失败时拒绝 Promise
-   */
+  */
   const assertArchived = async (fixture, check, bytes) => {
+    // 0. 回读核对元数据、认证操作者及结构化比较结果。
     const saved = await db.packingListCheck.findUnique({ where: { id: check.id } });
     assert.equal(saved.salesContractId, fixture.sale.id);
     assert.equal(saved.checkedById, users.SALES.id);
@@ -264,17 +273,20 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
     assert.deepEqual(JSON.parse(saved.summaryJson), check.summary);
     assert.deepEqual(JSON.parse(saved.resultJson), check.comparison);
     assert.equal(saved.resultJson.includes('CARRIER EDGE ORIGINAL'), false, 'raw extracted text is not persisted');
+    // 1. 校验关联档案类型、字节长度、校验和和原件存储范围。
     const file = await db.salesContractFile.findUnique({ where: { id: saved.salesContractFileId } });
     assert.equal(file.category, 'CARRIER_DOCUMENT');
     assert.equal(file.mimeType, 'application/pdf');
     assert.equal(file.fileSize, bytes.length);
     assert.equal(file.checksum, createHash('sha256').update(bytes).digest('hex'));
     assert.ok(file.filePath.startsWith(`carrier-documents${path.sep}`));
+    // 2. 比较真实磁盘原件字节，并检查目录 0700、文件 0600。
     const absolutePath = path.resolve(uploadRoot, file.filePath);
     assert.ok(absolutePath.startsWith(`${uploadRoot}${path.sep}`));
     assert.deepEqual(fs.readFileSync(absolutePath), bytes);
     assert.equal(fs.statSync(absolutePath).mode & 0o777, 0o600);
     assert.equal(fs.statSync(path.dirname(absolutePath)).mode & 0o777, 0o700);
+    // 3. 通过实际认证下载入口再次比较原件字节。
     const download = await fetch(`${base}/sales/files/${file.id}/download`, {
       headers: { authorization: `Bearer ${tokens.SALES}` },
     });
