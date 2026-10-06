@@ -202,11 +202,6 @@ test("SALES 3D canvas renders estimated cargo, controls and resize survive tab r
   const consoleErrors: string[] = [];
   const writes: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  // Shader-link failures can log console.error without an uncaught exception.
-  // Keep every console error, including WebGL, even if colored outlines render.
-  page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors.push(message.text());
-  });
   page.on("request", (request) => {
     const pathname = new URL(request.url()).pathname;
     if (
@@ -223,6 +218,13 @@ test("SALES 3D canvas renders estimated cargo, controls and resize survive tab r
     fixture = await startRoleFixture("menu-export-documents");
     await forwardRealApi(page, fixture);
     await loginAs(page, fixture, "SALES");
+    // The login setup first probes /auth/session with no existing session (401).
+    // Observe every console error after loginAs verifies the real SALES login,
+    // before export navigation or 3D loading. Never filter 401/WebGL errors here:
+    // shader-link failures can log console.error while colored outlines render.
+    page.on("console", (message) => {
+      if (message.type() === "error") consoleErrors.push(message.text());
+    });
     await page.getByRole("link", { name: "出口", exact: true }).first().click();
     await expect(page).toHaveURL(/\/dashboard\/sales$/);
     await page
