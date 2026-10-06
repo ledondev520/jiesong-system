@@ -10,6 +10,8 @@
 
 `integration/tax-preparation-content.integration.js` 在已提交迁移构建的私有合成 SQLite 中，使用真实 Express HTTP 验证四类内部退税准备内容：当前出货与五 Sheet 工作簿一致；供应商税号/开票日期缺失时明确列出差异，拒绝确认且不改记录；重复预览/导出保持相同内容且不重复归档；多商品行的数量和人民币进货价税与美元出口报价保持独立来源。独立只读 SQLite 比较源行和时间戳；三单由既有生成器产生，船司核对仅用合成结构化夹具。不覆盖浏览器、真实文件、正式申报或收退款，由 `npm run test:db` 执行。
 
+`integration/carrier-pdf-edges.integration.js` 扩展既有 trade-lifecycle 的真实 PDF 正向链路，以内存 PDFKit、实际 Express/default pdfjs/原件归档和已提交迁移创建的私有 SQLite 验证四类边缘：两商品两页匹配与准备度、预期数字出现在片段外仍拒绝错误行数量、纯图片转人工复核、损坏 PDF 返回既有 422 且数据库/归档/准备度不变。保留现有数字存在性及商品身份分段比较，不提供通用表格解析或 OCR。独立 `npm run test:carrier-pdf` 已接入 `test:all`；本次验证既有 `test:db` 为 173 项、新 PDF 命令为 5 项（含四个子用例及外层测试）。详见 `../../docs/qa/carrier-pdf-edges-2026-10-06.md`。
+
 ## 文件清单
 
 | 文件/目录 | 地位 | 功能 |

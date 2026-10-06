@@ -43,9 +43,10 @@ npm start     # 生产模式
 ### 5. 运行测试
 
 ```bash
-npm run test      # 单元/模块测试
-npm run test:db   # 数据库集成测试（临时 SQLite：schema + 事务 + seed 幂等 + 真实 HTTP 业务闭环）
-npm run test:all  # 全量（test + test:db）
+npm run test              # 单元/模块测试
+npm run test:db           # 数据库集成测试（临时 SQLite：schema + 事务 + seed 幂等 + 真实 HTTP 业务闭环）
+npm run test:carrier-pdf  # 真实船司 PDF 边缘集成（迁移后的临时 SQLite、default pdfjs、原件归档与准备度）
+npm run test:all          # 依次执行 test → test:db → test:carrier-pdf；任一阶段失败即停止
 ```
 
 ## 目录结构
