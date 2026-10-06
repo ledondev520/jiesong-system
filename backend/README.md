@@ -49,7 +49,7 @@ npm run test:carrier-pdf  # 真实船司 PDF 边缘集成（迁移后的临时 S
 npm run test:all          # 依次执行 test → test:db → test:carrier-pdf；任一阶段失败即停止
 ```
 
-`test:db` 包含 `src/integration/overview-source-readbacks.integration.js` 的三类真实只读概览验收：上海发运期间与销售下钻的 CNY 毛利/净现金、当前所有权应收应付、固定 UTC 收付趋势来源。使用已提交迁移、独立 SQL 字面夹具和全库非变更断言，保留合同汇总余额与逐笔 USD 收款的不同用途；需 Node 20+ 与 Python 3，不访问现有业务库。
+`test:db` 包含 `src/integration/overview-source-readbacks.integration.js` 的三类真实只读概览验收：上海发运期间与销售下钻的 CNY 毛利/净现金、当前所有权应收应付、固定 UTC 收付趋势来源。使用已提交迁移、独立 SQL 字面夹具和全库非变更断言，保留合同汇总余额与逐笔 USD 收款的不同用途；已在当前 CI Node 20.19.0 验证，Date/object-form mock timers 最低需 20.11，另需 Python 3，不访问现有业务库。
 
 ## 目录结构
 

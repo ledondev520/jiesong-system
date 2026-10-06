@@ -15,7 +15,8 @@ const { execFileSync } = require('node:child_process');
 const NOW = Date.parse('2026-10-06T12:00:00Z');
 const PAYMENT_DATE = Date.parse('2026-10-01T12:00:00Z');
 const ROLES = ['ADMIN', 'FINANCE', 'BOSS', 'SALES', 'PURCHASE', 'WAREHOUSE'];
-// Requires Node 20+ Date mock timers, Python 3 sqlite3 and the existing installed Prisma client.
+// Verified with CI Node 20.19.0; Date/object-form mock timers require at least 20.11.
+// Also requires Python 3 sqlite3 and the existing installed Prisma client.
 
 /**
  * 职责：project stored or HTTP fields without deriving business expectations.
@@ -181,6 +182,9 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     assert.deepEqual(project(report.funds, ['totalReceivable', 'totalPayable', 'overdueReceivable', 'overduePayable']), {
       totalReceivable: 115, totalPayable: 800, overdueReceivable: 0, overduePayable: 800,
     });
+    // One active source product has the default zero alert threshold; no stock rows exist.
+    // D and X are the two SHIPPED headers; ARRIVED/draft/cancelled headers are not in transit.
+    assert.deepEqual(report.inventory, { totalItems: 1, inTransitContainers: 2, lowStockItems: 0 });
     const detail = await get('/sales', { shipped: 'true', shippedFrom: '2026-10-01', shippedTo: '2026-10-01', pageSize: 100 }, 'BOSS');
     assert.deepEqual(detail.items.map(row => row.id), ['sale-formal', 'sale-derived']);
     assert.equal(detail.pagination.total, 2);
