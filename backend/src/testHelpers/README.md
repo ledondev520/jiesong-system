@@ -2,6 +2,10 @@
 
 若本文件夹结构或内容变化，请更新本文件。所有夹具仅用于合成测试，不能指向业务数据库。
 
+- `dashboard-source-seed.js`：`dashboard-sources` 场景的独立 SQL 已知例题，区分 DRAFT/PENDING/取消采购、正式/派生销售金额、三种库存记录、不同年度账期、最近六笔之外的历史阻塞与八阶段完成单。只预置合成记录；完成阶段仅有虚拟文件元数据，无签约/船司原件、上传或外部操作。
+- `role-browser-dashboard.test.js`：四项真实 PURCHASE/BOSS 登录后的工作台只读 HTTP/SQLite 检查，核对待起草2、待补录1、库存记录3、USD825/CNY1350、账期排序、全量风险/阻塞/待处理来源、实际任务详情200和未登录401；独立只读完整业务快照确保零业务/业务审计写入。额外覆盖兼容商品追踪 API 的销售明细优先去重、装箱来源、门店过滤与空查询；ProductTracker 当前未挂载，不以此声称工作台追踪菜单通过。运行 `node --test src/testHelpers/role-browser-dashboard.test.js`，随 `npm test` 自动发现。
+- `role-browser-server.js` 的 `dashboard-sources` 场景同样通过已提交迁移的 migrate deploy 初始化0700/0600库；浏览器两项实际工作台 KPI/风险/正向跳转另见 `frontend/e2e/real-dashboard-sources.spec.ts`，本地HTTP通过或 `--list` 均不代表浏览器通过。不覆盖经营执行/报表、生产、AI/供应商或权限更改。
+
 `role-browser-server.js` 的 `notification-state` 场景只给当前合成 PURCHASE 用户预置四条现有通知（三条未读），不调用通知生成器或访问生产。新增同场景夹具合同测试通过真实登录、重复单条已读请求和独立只读 SQLite 核对未读数为二；可用 `node --test --test-name-pattern='own notification mark-one' src/testHelpers/role-browser-server.test.js` 单独执行。角色及其他场景语义不变。
 
 - `password-recovery-server.js`：真实认证/SQLite找回流程，邮件仅写入私有合成邮箱文件

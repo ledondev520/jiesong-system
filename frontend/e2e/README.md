@@ -18,6 +18,7 @@
 | smoke.spec.ts | 冒烟验收 | 主要页面与业务入口 |
 | visual.spec.ts / snapshots | 可选视觉验收 | 平台相关截图，仅在 VISUAL_REGRESSION=1 时运行 |
 | real-export-3d.spec.ts | 真实 SALES 场景验收 | 既有缺尺寸货物的实际绘制、旋转/缩放/平移、响应式尺寸与页签/重载返回，独立 SQLite 零业务写入核对 |
+| real-dashboard-sources.spec.ts | 真实工作台验收 | 独立 SQL KPI/资金来源、六笔以外的历史风险、PURCHASE 下一采购任务与 BOSS 只读销售详情、重载和完整业务零写入 |
 
 运行：`CI=1 npm run test:e2e -- --reporter=list,html`（先 `npx playwright install chromium`）。注册验收验证合成发送请求、冷却按钮、待审核提示及无自动登录令牌；后端 `emailRegistration.test.js` 验证真实校验和限流。采购夹具保持 SIGNED/无到货事实，汇总与明细不得伪造已验收库存。
 
@@ -42,6 +43,8 @@
 - `tax-navigation.spec.ts`：390/1440px 实际 Next 路由下的合成报关列表，验证原生 Back/Forward 筛选与第 1 页恢复、快速逐字搜索输入及关键词/状态/重置保留 `view` 和 `source`、带关键词/状态的详情经 Back/Forward 与明确返回恢复完整来源筛选、随后中断筛选并切换退税页签，以及重复点击/方向键导航。报关/退税 API 写请求直接拒绝；不访问生产数据。定义可由 CI 执行，本地添加定义不代表浏览器验收已通过。
 
 - `dashboard-return-context.spec.ts`：390/1440px 实际 Next 路由下的合成只读工作台/经营报表，验证阻塞范围与已应用日期经销售明细返回、Back/Forward 和整页刷新保留，范围快速切换/原生历史、未应用草稿、倒序日期禁用以及全部期间重置。业务写请求拒绝，检查未捕获页面异常；定义与实际浏览器通过情况分别报告。
+
+- `real-dashboard-sources.spec.ts`：两项1440px已挂载工作台验收；每项/重试独占 `dashboard-sources` 已提交迁移0700/0600 SQLite，通过真实 PURCHASE/BOSS 登录和真实 Express 透传，核对待起草2、待补录1、库存记录3、正确最大年月账期、USD825/CNY1350；最近六笔之外的旧合同经阻塞/风险优先出现且取消合同不出现。PURCHASE 点击真正下一步到采购详情，BOSS 点击只读任务到历史销售详情，均要求真实GET200、可见合同号和整页重载；独立只读完整业务/目录/账期/业务审计快照不变且无业务写请求、无未捕获页面异常。只在现有工作台操作，不访问经营执行/报表，也不为未挂载的 ProductTracker 新增入口。`playwright test real-dashboard-sources.spec.ts --list` 只确认两项定义；实际浏览器由既有 hosted CI 执行，不绕过本地 Chromium/loopback 限制。后端独立 HTTP/SQL 来源证据见 `backend/src/testHelpers/role-browser-dashboard.test.js`。
 
 - `real-role-lifecycle.spec.ts` 新增六项1440px FINANCE内部报关/退税表单验收（每种三项）：新建完整草稿经返回取消/刷新/重开零业务与审计写入；真实重复编号拒绝后保留全部输入，纠正编号重试创建一次，整页重载读回及备注编辑保存/重载，报关明细ID不变；已有记录编辑金额/日期/备注后返回取消，重开恢复原始日期与输入。每项独占 `tax-record-forms` 私有迁移SQLite及真实Express，不mock业务响应，独立只读连接核对整条记录与FINANCE审计操作者。退税编辑使用真实API ISO日期以防空白回填。全部保持DRAFT/已退金额0，不调用正式申报、确认、资金结算、导出、上传或外部服务。`playwright test real-role-lifecycle.spec.ts --list --grep='FINANCE (customs|refunds)'` 仅验证六项定义；浏览器执行以既有hosted CI为准。
 
