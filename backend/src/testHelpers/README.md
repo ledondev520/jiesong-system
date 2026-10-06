@@ -7,6 +7,9 @@
 - `role-browser-server.js` 的 `dashboard-sources` 场景同样通过已提交迁移的 migrate deploy 初始化0700/0600库；浏览器两项实际工作台 KPI/风险/正向跳转另见 `frontend/e2e/real-dashboard-sources.spec.ts`，本地HTTP通过或 `--list` 均不代表浏览器通过。不覆盖经营执行/报表、生产、AI/供应商或权限更改。
 - `hs-code-browser-server.js`：本地HS专用真实Express/登录夹具；仅预置三条独立SQLite字面量HS记录与ADMIN/PURCHASE/FINANCE/SALES/WAREHOUSE/BOSS现有用户。只用已提交迁移的`migrate deploy`，不运行db push、diff或generate；0700独占目录、0600数据库、loopback随机端口、显式测试环境白名单。来源链接仅为example.invalid合成证据，不访问外部HS/AI或生产。
 - `hs-code-browser-server.test.js`：六项无浏览器合同检查；真实六角色读查询/详情、数字与编码前缀/现有截短回退/非字面名称模糊召回、名称和编码组合交集/截短回退保留、三种已有写角色证据保存/缓存刷新/回读、无效证据与只读角色拒绝零写入、夹具拒绝非测试/不安全目录/缺少IPC。独立只读SQLite核对完整HS行、真实HS审计与其他业务/AI使用表守恒；不读取用户凭据或登录审计。`node --test src/testHelpers/hs-code-browser-server.test.js`，随`npm test`自动发现。浏览器定义在`frontend/e2e/real-hs-catalog.spec.ts`；定义通过和HTTP通过不代表浏览器通过。本地详情没有普通复制按钮，现有复制仅属于被排除的AI结果界面。
+- `financial-library-data.js`：只按固定字面量生成两份合成XLS/XLSX及两份应忽略来源，应用已提交迁移、执行原有CLI并提供独立只读SQL；不复制真实文件，不调用月报上传或外部服务
+- `financial-library-server.js`：仅在显式NODE_ENV=test、IPC和私有0700临时根下运行；0600 SQLite先迁移，再通过原CLI入库后暴露真实Express现有路由及测试ADMIN/FINANCE身份。来源不进入普通附件归档，无测试HTTP入口或生产配置
+- `financial-library-server.test.js`：无浏览器检查同一hosted夹具的真实ADMIN/FINANCE登录、来源金额/页数读回和零库写入；由 `npm test` 发现。浏览器六项定义在 `frontend/e2e/real-financial-library.spec.ts`，本地合同测试不代表浏览器通过
 
 `role-browser-server.js` 的 `notification-state` 场景只给当前合成 PURCHASE 用户预置四条现有通知（三条未读），不调用通知生成器或访问生产。新增同场景夹具合同测试通过真实登录、重复单条已读请求和独立只读 SQLite 核对未读数为二；可用 `node --test --test-name-pattern='own notification mark-one' src/testHelpers/role-browser-server.test.js` 单独执行。角色及其他场景语义不变。
 

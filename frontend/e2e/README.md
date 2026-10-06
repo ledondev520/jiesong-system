@@ -1,6 +1,7 @@
 若本文件夹结构或内容变化，请更新本文件。
 
 `real-hs-catalog.spec.ts` / `real-hs-fixture.ts`：四项1440px真实本地HS验收定义，登录后经出口菜单与HS页签进入；名称与数字编码组合交集/既有截短回退、详情、返回/重载保留查询，手工证据取消/Escape/重开零写入，真正无效来源400保留所有输入、明确纠正后保存、待响应按钮禁用/重复点击拦截、API/列表/整页重载回读，以及BOSS详情可读、写入口隐藏与真实PUT403。每项独占已提交迁移的0700目录/0600SQLite，字典由独立SQLite字面量预置，真实API只透传登录、本地查询与已有手工更新；HS的AI/外部供应商路径和其他业务写入直接拒绝，独立只读回查完整HS行与现有角色审计/其他业务表守恒。普通本地详情没有复制入口，现有两处复制仅在AI结果后出现，因此本轮没有复制通过证据，也不新增功能或调用AI来补覆盖。`playwright test e2e/real-hs-catalog.spec.ts --list`只验证四项定义，真实浏览器执行须走既有hosted CI；本地未执行，不改启动参数、安装浏览器或绕过loopback限制。
+`real-financial-library.spec.ts` / `financial-library-fixture.ts`：六项390/1440px资料库验收，ADMIN/FINANCE经真实登录查看CLI实际导入的总账XLSX和工资XLS；核对来源/Sheet、物理行号、两页顺序、缓存/零/负数/空值/布尔值、八处脱敏及整页重载。FINANCE另暂缓交付真正旧Sheet响应，切换来源后迟到响应不能覆盖新来源；分类/账期为空时撤下旧明细，恢复筛选后再读真实来源。每项独占已提交迁移0700目录/0600 SQLite，独立只读SQL比较全部表不变，无业务响应mock、月报上传、真实文件/生产、外部服务或权限政策变更。`playwright test real-financial-library.spec.ts --list` 仅核对六项定义，实际浏览器结果以hosted CI为准；本地浏览器受阻时不安装/改启动参数/隧道。
 
 `real-role-lifecycle.spec.ts` 增加一项同一用户单条通知已读回归：`notification-state` 场景真实 PURCHASE 登录，只预置该用户的四条通知；双击期间暂缓首条真实 Express 成功响应的交付，不改响应内容。Header 和面板未读数为二，与真实未读 API 及独立只读 SQLite 一致，整页重载仍为二且再点已读行不重写。沿用既有 hosted Playwright 门槛；`--list --grep='repeated notification mark-one'` 仅核对定义，不表示浏览器通过。不涉及生产通知或其他用户权限。
 
