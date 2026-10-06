@@ -322,7 +322,12 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
       exact: true,
     }),
   ).toBeVisible();
-  await expect(page.getByText("USD 20", { exact: true })).toBeVisible();
+  const customsAmount = page
+    .locator('[data-slot="card"]')
+    .filter({ has: page.getByText("货值总额", { exact: true }) })
+    .locator('[data-slot="card-content"]');
+  await expect(customsAmount).toBeVisible();
+  await expect(customsAmount).toHaveText("USD 20");
   await page
     .getByRole("link", { name: "出口退税", exact: true })
     .first()
@@ -341,7 +346,21 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
       exact: true,
     }),
   ).toBeVisible();
-  await expect(page.getByText("预计值：", { exact: false })).toBeVisible();
+  for (const [label, amount] of [
+    ["申报金额", "100"],
+    ["可退金额", "13"],
+    ["已退金额", "0"],
+  ]) {
+    const refundAmount = page
+      .locator('[data-slot="card"]')
+      .filter({ has: page.getByText(label, { exact: true }) })
+      .locator('[data-slot="card-content"]');
+    await expect(refundAmount).toBeVisible();
+    await expect(refundAmount).toHaveText(amount);
+  }
+  await expect(
+    page.getByText(String(saved.tax_refunds[0].note), { exact: true }),
+  ).toBeVisible();
   expect(readExportDocuments(fixture)).toEqual(saved);
 });
 
