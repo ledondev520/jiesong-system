@@ -146,6 +146,8 @@ npm run dev -- -p 3001
 - [库存链路 API 契约](docs/api-contracts/库存链路契约.md) - 库存查询、状态机流转与批量状态更新契约
 - [库存链路联调面板](docs/api-contracts/库存链路联调面板.md) - 库存链路 READY/BLOCKED/DONE 联调追踪
 - [发布结论（M5）](docs/quality/发布结论_M5_20260212.md) - 采购链路门禁执行证据与发布建议
+- [系统日志回归](docs/quality/application-audit-readback-2026-10-06.md) - 合成应用审计查询、完整记录、CSV及现有角色的真实HTTP/SQLite证据
+- [系统配置普通文本回归](docs/quality/ordinary-setting-text-20261006.md) - 第 30 行既有文本单键保存/失败/重试/回读与组件放弃编辑；整表混合保存及浏览器仍未验收
 - [周节奏指标看板](docs/周节奏指标看板.md) - 周度质量/效率/回归风险跟踪
 - [项目子代理说明](.cursor/agents/README.md) - 项目级 Cursor 子代理与用途
 - [项目技能说明](.cursor/skills/README.md) - 项目级 Cursor Skills 索引与用途
@@ -154,8 +156,9 @@ npm run dev -- -p 3001
 - [前端美化风险台账](RISKS.md) - 风险触发与回滚点
 - [前端美化指标](METRICS.md) - 每轮质量与过程指标
 - [前端文档](frontend/README.md) - 前端开发指南
-- [后端测试](backend/README.md#5-运行测试) - 真实只读概览来源验收已接入 test:db，覆盖上海发运期间、CNY 毛利/净现金、当前所有权账款与 UTC 收付趋势
+- [后端测试](backend/README.md#5-运行测试) - test:db 包含真实只读概览来源验收、上海期间与收付趋势，以及合成邮箱注册 HTTP 成功/重放与未激活 SALES 安全字段回读
 - [前端浏览器验收](frontend/e2e/README.md) - 真实角色与合成资料验收约定，含出口3D绘制/控制/响应式返回和 Header 个人设置本地保存/重载/部分失败重试的 hosted CI 定义；定义检查不代表浏览器通过
+- [普通用户名称验收](docs/qa/account-name-lifecycle-2026-10-06.md) - 两个现有用户管理入口完整目录搜索与真实失败保留草稿重试；仅名称合成HTTP/React检查
 - [Supabase 迁移指南](docs/Supabase迁移指南.md) - SQLite → Supabase 迁移步骤与 MCP 配置
 
 ## License

@@ -12,3 +12,4 @@
 | purchase-excel-import-2026-10-06.md | 导入回归 | 采购Excel无缓存/非法值、重传和结果恢复 |
 | carrier-pdf-edges-2026-10-06.md | PDF回归 | 合成多页、数量差异、图片及损坏PDF的HTTP/归档证据 |
 | financial-library-source-readbacks-2026-10-06.md | 资料库回归 | 现有CLI真实合成来源入库和独立行/来源读回；空筛选及旧Sheet请求修复 |
+| account-name-lifecycle-2026-10-06.md | 名称验收 | 两个人类用户页面的姓名取消、后页搜索、真实失败保留与重试 |

@@ -1,3 +1,10 @@
+/**
+ * Input: authenticated notification/application-audit queries and Prisma SQLite
+ * Output: own notifications, ADMIN application-audit lists and CSV content
+ * Pos: system notification and audit-read controller; query/export share the same filters
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
 const prisma = require('../../utils/prisma');
 const { success, paginated } = require('../../utils/response');
 const { createError } = require('../../middleware/errorHandler');
@@ -28,6 +35,14 @@ const parseDate = (value, options = {}) => {
   return parsed;
 };
 
+/**
+ * 职责：build shared audit filters using SQLite-supported substring queries.
+ * 思路：keep exact actor/entity/action filters and existing date bounds; SQLite
+ * contains already uses LIKE (ASCII case-insensitive), without Prisma's unsupported mode.
+ * @param {object} query list or CSV query parameters
+ * @returns {object} Prisma where input
+ * @throws {Error} invalid or reversed date bounds
+ */
 const buildOperationLogWhere = (query = {}) => {
   const userId = parseOptionalText(query.userId);
   const entity = parseOptionalText(query.entity);
@@ -53,7 +68,7 @@ const buildOperationLogWhere = (query = {}) => {
   if (entity) where.entity = entity;
   if (action) where.action = action;
   if (entityId) where.entityId = entityId;
-  if (ipAddress) where.ipAddress = { contains: ipAddress, mode: 'insensitive' };
+  if (ipAddress) where.ipAddress = { contains: ipAddress };
 
   if (startDate || endDate) {
     where.createdAt = {};
@@ -67,14 +82,14 @@ const buildOperationLogWhere = (query = {}) => {
 
   if (keyword) {
     where.OR = [
-      { action: { contains: keyword, mode: 'insensitive' } },
-      { entity: { contains: keyword, mode: 'insensitive' } },
-      { entityId: { contains: keyword, mode: 'insensitive' } },
-      { oldValue: { contains: keyword, mode: 'insensitive' } },
-      { newValue: { contains: keyword, mode: 'insensitive' } },
-      { ipAddress: { contains: keyword, mode: 'insensitive' } },
-      { user: { is: { name: { contains: keyword, mode: 'insensitive' } } } },
-      { user: { is: { username: { contains: keyword, mode: 'insensitive' } } } },
+      { action: { contains: keyword } },
+      { entity: { contains: keyword } },
+      { entityId: { contains: keyword } },
+      { oldValue: { contains: keyword } },
+      { newValue: { contains: keyword } },
+      { ipAddress: { contains: keyword } },
+      { user: { is: { name: { contains: keyword } } } },
+      { user: { is: { username: { contains: keyword } } } },
     ];
   }
 

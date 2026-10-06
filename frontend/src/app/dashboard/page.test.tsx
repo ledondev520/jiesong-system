@@ -1,13 +1,13 @@
 /**
- * Input: 工作台页面、router、子组件占位
- * Output: 工作台关键入口交互测试结果
+ * Input: 工作台页面、router、合成服务响应及显式延迟的工作流读取
+ * Output: 工作台关键入口与独立工作流加载门槛的交互测试结果
  * Pos: 前端首页交互测试
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import DashboardPage from "./page";
 import { Role } from "@/types";
@@ -208,6 +208,14 @@ describe("DashboardPage 交互逻辑", () => {
   });
 
   it("渲染工作台首屏核心结构", async () => {
+    // 0. Keep the real workflow loader pending while the static first-screen structure renders.
+    const workflowResponse = await mockListTradeWorkflows();
+    let resolveWorkflows!: (response: typeof workflowResponse) => void;
+    mockListTradeWorkflows.mockReturnValueOnce(
+      new Promise<typeof workflowResponse>((resolve) => {
+        resolveWorkflows = resolve;
+      }),
+    );
     render(<DashboardPage />);
 
     await waitFor(() => {
@@ -221,7 +229,14 @@ describe("DashboardPage 交互逻辑", () => {
     expect(screen.queryByText("仓储物流")).not.toBeInTheDocument();
     expect(screen.getByText("库存记录")).toBeInTheDocument();
     expect(screen.getByText("出口专项单主线路")).toBeInTheDocument();
-    expect(screen.getByText("EXP-001")).toBeInTheDocument();
+    expect(screen.getByText("正在加载专项单主线路…")).toBeInTheDocument();
+    expect(screen.queryByText("EXP-001")).not.toBeInTheDocument();
+
+    // 1. Static headings cannot establish that the independently loaded contract is ready.
+    const loadedContract = screen.findByText("EXP-001");
+    await act(async () => resolveWorkflows(workflowResponse));
+    expect(await loadedContract).toBeInTheDocument();
+    expect(screen.queryByText("正在加载专项单主线路…")).not.toBeInTheDocument();
   });
 
   it("财务账期按年月显示最新一项，不依赖列表返回顺序", async () => {

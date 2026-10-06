@@ -22,7 +22,9 @@
 - `src/services`: API 服务层
 - `src/store`: 全局状态管理 (Zustand)
 - `src/types`: TypeScript 类型定义 (与数据库 Schema 对齐)
+- `src/test`: jsdom初始化与私有真实API夹具，普通名称生命周期边界见 `src/test/README.md`
 - `src/**/*.test.ts`: 前端单元测试文件
+- `src/app/dashboard/settings/README.md`: 当前配置路由与普通固定文本组件放弃编辑证据；整表保存含汇率/AI 参数，不与单键接口验收混淆
 - `e2e`: Playwright 自动化验收测试
   - `e2e/README.md`: 合成 API 夹具与移动端注册、采购验货汇总的验收约定
   - `e2e/real-export-3d.spec.ts`: 真实 SALES 菜单下既有3D货物绘制、鼠标控制、390/1440px尺寸及返回/重载验收；实际浏览器结果以 hosted CI 为准
@@ -50,6 +52,8 @@
 4. **API 调用**: 所有 HTTP 请求封装在 `src/services` 中。
 
 ## 常用命令
+
+Vitest包含名称限定的真实HTTP/SQLite测试。请先在不含 `backend/.env` 的隔离checkout中，于backend目录执行锁定依赖 `npm ci` 和现有 `npm run db:generate`；随后运行前端测试。无需创建默认业务数据库，测试自行创建0700目录/0600数据库。CI三个Vitest job的前置见 `.github/workflows/README.md`。
 
 ```bash
 # 启动开发服务器

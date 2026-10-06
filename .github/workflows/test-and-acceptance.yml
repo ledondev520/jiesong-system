@@ -38,6 +38,13 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
         working-directory: frontend
+      - name: Prepare isolated frontend API fixture dependencies
+        working-directory: backend
+        run: |
+          test ! -e .env
+          test ! -L .env
+          npm ci
+          npm run db:generate
       - name: Run frontend unit tests
         run: npm run test
         working-directory: frontend

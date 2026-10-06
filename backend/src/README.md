@@ -8,6 +8,9 @@
 
 存放后端 API 所有源代码文件，实现进销存系统的完整业务逻辑。
 
+`integration/application-audit-readback.integration.js` 以真实 Express/认证角色、已提交迁移的私有合成 SQLite 与独立 SQL 字面资料/只读全表快照，验证日志关键词/IP、日期/分页、完整记录与12列 CSV 内容，以及现有 ADMIN-only 边界和真实分类生成审计的重复读取。`controllers/system/notificationController.js` 的共享筛选仅使用 SQLite 支持的 `contains`，不传 PostgreSQL 的 `mode`；保留日期、过滤、导出上限与现有权限。只验收应用合成记录，不访问生产、OS日志或真实执行历史；页面没有独立详情路由，此套不声称浏览器通过。由 `npm run test:db` 执行。
+`integration/email-registration-http.integration.js` 用已提交迁移、0700/0600 私有合成 SQLite 和真实 localhost HTTP 验证邮箱发码 200、注册 201 与同码重放 400。只模拟 `mail.isConfigured/sendRegistrationCode`，保留控制器、校验、bcrypt、事务及原全局/注册限流；独立只读 SQL 仅查询 username/email/name/role/isActive，确认只有一个未激活 SALES 账号。显式环境白名单、环境文件拒绝和本机源 fetch 防护隔离真实数据库及外部发信，不读取凭据/挑战表、激活、登录或声称浏览器验收。由 `npm run test:db` 执行，需要 Node 20.19、Python 3 与现有 Prisma client。
+
 `integration/notification-state-lifecycle.integration.js` 只用一个当前合成用户、真实认证 HTTP 与迁移后的 0700/0600 私有 SQLite，验证单条已读及重复完成、重新读取/未读筛选/计数，和全部已读重试；独立只读连接比较全部通知字段，确认只改变已读状态，不新增通知。由 `npm run test:db` 执行，不访问生产或测试其他用户。
 
 `integration/tax-preparation-content.integration.js` 在已提交迁移构建的私有合成 SQLite 中，使用真实 Express HTTP 验证四类内部退税准备内容：当前出货与五 Sheet 工作簿一致；供应商税号/开票日期缺失时明确列出差异，拒绝确认且不改记录；重复预览/导出保持相同内容且不重复归档；多商品行的数量和人民币进货价税与美元出口报价保持独立来源。独立只读 SQLite 比较源行和时间戳；三单由既有生成器产生，船司核对仅用合成结构化夹具。不覆盖浏览器、真实文件、正式申报或收退款，由 `npm run test:db` 执行。
@@ -30,6 +33,7 @@
 | config/ | 配置层 | 权限校验后的环境加载、活动 AI 供应商与常量（含单元测试） |
 | controllers/ | 控制层 | 处理 HTTP 请求，调用服务层 |
 | integration/ | 集成测试层 | 数据库集成测试（空结构/事务/seed 幂等、真实 HTTP 进销存闭环、首个门店创建/RBAC、仓储异常出库/FIFO/来源守恒、收验货后采购更正/补录边界与合同附件 multipart/权限/失败留存矩阵，以及银行流水/发票查询筛选、币种、分类与既有角色边界）；generic-export-content.integration.js 解析七个设置模块的 CSV 下载，覆盖空表头、文本/日期/金额和重复导出的业务只读性 |
+| integration/ordinary-setting-text.integration.js | 普通文本验收 | 私有迁移库中仅写既有开票固定文本，验证单键保存/错误留存/明确重试/清空与独立回读，不提交含 AI/汇率参数的整表 |
 | testHelpers/ | 隔离测试夹具 | 登录/找回/采购多进程及真实角色浏览器的私有合成HTTP/SQLite服务；role-browser-server.test.js仅验证夹具真实HTTP和落库，不执行浏览器 |
 | jobs/ | 定时任务层 | 库存预警、出口提醒（每月5号退税/缺票提醒）等定时任务 |
 | middleware/ | 中间件层 | 认证、仅记录请求结构的性能日志、错误处理（含单元测试） |
@@ -58,6 +62,7 @@
 | aiController.js | AI问答 + 辅助录入 + 当前供应商模型说明 + Anthropic 禁止隐式重试 + 统一分页边界的对话历史 |
 | aiUsageController.js | AI 用量趋势日期校验、调用明细有界分页与用量汇总 |
 | notificationController.js | 统一分页边界的通知列表、已读与生成 |
+| system/notificationController.js | 当前用户通知与 ADMIN 应用审计列表/CSV；共用 SQLite 子串、日期及实体筛选 |
 
 ## 服务清单
 

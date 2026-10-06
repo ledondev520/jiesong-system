@@ -1,5 +1,7 @@
 # G-Stack CI/CD 工作流
 
+若本文件夹结构或内容变化，请更新本文件。
+
 GitHub Actions 工作流配置，实现完整的自动化开发循环。
 
 ## 📋 工作流列表
@@ -7,6 +9,7 @@ GitHub Actions 工作流配置，实现完整的自动化开发循环。
 | 工作流 | 文件 | 触发条件 | 说明 |
 |-------|------|---------|------|
 | **CI** | `ci.yml` | PR / Push | 代码质量检查 + 单元测试 |
+| **Test And Acceptance** | `test-and-acceptance.yml` | PR / Push | 后端、前端单测/coverage及hosted Playwright验收 |
 | **QA & Health** | `qa.yml` | Daily / Push | 自动化测试 + 健康度检查 |
 | **PR Review** | `pr-review.yml` | PR | 类型、ESLint、锁定 Prettier 的 PR 源码检查与 Actions 摘要 |
 | **Security** | `security.yml` | PR / Weekly | 安全扫描 |
@@ -56,6 +59,10 @@ act -j quality
 # 运行测试
 act -j test
 ```
+
+前端Vitest会运行 `name-lifecycle.test.tsx` 的真实localhost/SQLite夹具，需要同一checkout的锁定backend依赖与Prisma client。`ci.yml` 的 Unit Tests、`test-and-acceptance.yml` 的 Frontend Unit And Coverage、`deploy.yml` 的 Pre-deploy Checks均在前端测试前于backend目录断言 `.env` 文件/符号链接不存在，执行 `npm ci` 和现有 `npm run db:generate`；不为此创建默认业务数据库。已锁定的 `@prisma/client` 5.22.0 postinstall会尝试generate，但会捕获部分失败，显式命令提供可失败的生成门槛。
+
+名称夹具仍由每次测试独占0700目录、0600 SQLite并通过已提交迁移初始化；子进程只接收测试环境，不读取backend/.env，也不复制共享client。CI后端测试复用已安装的依赖/客户端，既有迁移与测试步骤保持原顺序。前端E2E已有自己的backend安装/生成前置；PR Review的工具测试为Node `--test`，不是Vitest。其他现有workflow没有直接运行前端Vitest，无需加入该前置。生产SSH发布步骤与secret/env策略未变。
 
 ### 查看报告
 
