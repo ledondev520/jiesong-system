@@ -1,4 +1,10 @@
-/** Test-only role browser backend: real Express/auth/services, internal records and menu export documents on private synthetic SQLite. */
+/**
+ * Input: Explicit test scenario, private temporary root and synthetic role/business data
+ * Output: Isolated real Express/auth backend and scenario metadata for browser/HTTP tests
+ * Pos: Test-only role fixture including internal records and menu export documents
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -19,6 +25,11 @@ process.env.DATABASE_URL = `file:${path.join(directory, 'synthetic.db')}`;
 process.env.UPLOAD_DIR = path.join(directory, 'uploads');
 process.env.JWT_SECRET = 'test-only-role-browser-jwt-secret-never-production';
 
+/**
+ * 职责：初始化独占合成数据库并启动真实角色验收 HTTP 服务
+ * @returns 启动完成的 Promise；经 IPC 返回夹具元数据
+ * @throws 迁移、合成资料构建或服务启动失败
+ */
 async function start() {
   if (['tax-record-forms', 'menu-export-documents'].includes(scenario)) {
     // This form roundtrip uses the committed migration chain, never db push or

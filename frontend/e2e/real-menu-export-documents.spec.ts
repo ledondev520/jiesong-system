@@ -1,4 +1,10 @@
-/** Six real SALES menu/document cases. Browser execution is the hosted CI gate. */
+/**
+ * Input: Real role fixture, SALES menu UI, isolated Express/SQLite and XLSX downloads
+ * Output: Six prerequisite, generation, cancellation, retry and workbook-content cases
+ * Pos: Hosted browser acceptance for internal customs/refund and commercial documents
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import {
@@ -19,6 +25,13 @@ import {
 
 type Workbook = { name: string; rows: (string | number | null)[][] }[];
 const productName = "合成角色验收商品";
+/**
+ * 职责：等待指定真实业务写请求的响应
+ * @param page 当前验收页面
+ * @param pathname 不含 API 前缀的业务路径
+ * @returns 匹配 POST 请求的响应 Promise
+ * @throws 页面关闭或等待超时时由 Playwright 拒绝
+ */
 const mutation = (page: Page, pathname: string) =>
   page.waitForResponse(
     (response) =>
@@ -35,6 +48,12 @@ const threeHeaders = [
   "总价 (USD)",
   "申报要素",
 ];
+/**
+ * 职责：读取实际浏览器下载并验证工作簿 ZIP 标记
+ * @param download 当前合成工作簿的下载事件
+ * @returns 完整下载字节
+ * @throws 下载流缺失、读取失败或格式标记不符
+ */
 async function downloadBytes(download: Download) {
   const stream = await download.createReadStream();
   if (!stream) throw new Error("Synthetic workbook download has no stream");
@@ -44,6 +63,12 @@ async function downloadBytes(download: Download) {
   expect(bytes.subarray(0, 2).toString()).toBe("PK");
   return bytes;
 }
+/**
+ * 职责：用锁定的后端 ExcelJS 解析下载字节为可断言的表格数据
+ * @param bytes 实际 XLSX 下载字节
+ * @returns 工作表名称及单元格值
+ * @throws 解析子进程失败、超时或输出不是合法 JSON
+ */
 function workbook(bytes: Buffer): Workbook {
   // Reuse the backend's locked ExcelJS in a normal Node child, no new dependency.
   const script = `const fs=require('node:fs'); const ExcelJS=require('exceljs');
@@ -59,6 +84,13 @@ rows:Array.from({length:s.rowCount},(_,i)=>Array.from({length:s.columnCount},(_,
     }),
   ) as Workbook;
 }
+/**
+ * 职责：按名称取得已解析工作表的行数据
+ * @param data 下载字节解析出的全部工作表
+ * @param name 期望的工作表名称
+ * @returns 指定工作表的单元格行数组
+ * @throws 指定工作表不存在
+ */
 function sheet(data: Workbook, name: string) {
   const result = data.find((entry) => entry.name === name);
   if (!result) throw new Error(`Missing downloaded worksheet ${name}`);
@@ -79,6 +111,12 @@ test.afterEach(async () => {
   if (fixture) await stopRoleFixture(fixture);
   expect(pageErrors).toEqual([]);
 });
+/**
+ * 职责：真实 SALES 登录后经出口菜单和合同卡片进入详情
+ * @param page 当前验收页面
+ * @returns 当前合成 SALES 用户的登录令牌
+ * @throws 登录、菜单导航或详情标题断言失败
+ */
 async function enterFromMenu(page: Page) {
   const token = await loginAs(page, fixture, "SALES");
   await page.getByRole("link", { name: "出口", exact: true }).first().click();
@@ -92,12 +130,25 @@ async function enterFromMenu(page: Page) {
   ).toBeVisible();
   return token;
 }
+/**
+ * 职责：从合同详情打开申报三表并等待真实准备度校验
+ * @param page 已进入合成合同详情的页面
+ * @returns 可以明确提交生成的弹窗定位器
+ * @throws 入口缺失或准备度未通过时断言失败
+ */
 async function openForms(page: Page) {
   await page.getByRole("button", { name: "生成申报三表", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "一键生成出口三张表" });
   await expect(dialog.getByRole("button", { name: /^确认生成/ })).toBeEnabled();
   return dialog;
 }
+/**
+ * 职责：明确生成申报三表并收集真实记录 ID 和下载字节
+ * @param page 当前合同详情页面
+ * @param dialog 已通过准备度校验的申报三表弹窗
+ * @returns 生成记录 ID、下载事件及完整工作簿字节
+ * @throws 真实响应、弹窗关闭或下载断言失败
+ */
 async function generateForms(page: Page, dialog: Locator) {
   const response = mutation(page, "/three-forms/generate");
   const downloading = page.waitForEvent("download");
@@ -113,6 +164,12 @@ async function generateForms(page: Page, dialog: Locator) {
   await expect(dialog).not.toBeVisible();
   return { ids, download, bytes: await downloadBytes(download) };
 }
+/**
+ * 职责：从合同详情打开商业出口三单工作台
+ * @param page 已进入合成合同详情的页面
+ * @returns 当前合同的商业三单弹窗定位器
+ * @throws 入口点击失败或页面关闭
+ */
 async function openPacket(page: Page) {
   await page
     .getByRole("button", { name: "出口三单工作台", exact: true })
@@ -121,6 +178,12 @@ async function openPacket(page: Page) {
     name: `出口三单工作台 · ${fixture.salesNo}`,
   });
 }
+/**
+ * 职责：填写确定性的合成买卖方、包装种类及单证日期
+ * @param dialog 当前商业三单弹窗
+ * @returns 填写完成的 Promise，不提交生成请求
+ * @throws 必要字段不可操作时由 Playwright 拒绝
+ */
 async function fillPacket(dialog: Locator) {
   await dialog
     .getByText("买方名称", { exact: true })
@@ -135,6 +198,13 @@ async function fillPacket(dialog: Locator) {
   await dialog.getByPlaceholder("例如：纸箱、木箱或纸箱+木箱").fill("CARTON");
   await dialog.locator('input[type="date"]').fill("2026-10-01");
 }
+/**
+ * 职责：执行商业三单只读预检并等待可以生成的真实结果
+ * @param page 当前合同详情页面
+ * @param dialog 已填写必需元数据的商业三单弹窗
+ * @returns 后端权威预检数据
+ * @throws 请求失败、解析失败或准备度断言失败
+ */
 async function previewPacket(page: Page, dialog: Locator) {
   const completed = mutation(
     page,

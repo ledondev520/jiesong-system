@@ -1,4 +1,10 @@
-/** Fixture contract validation including receipt allocation and own notification state and internal tax forms, without browser execution, production data or provider calls. */
+/**
+ * Input: Real role fixture, committed migrations, ordinary HTTP routes and synthetic XLSX
+ * Output: Role/business, internal form and six menu-document fixture contract checks
+ * Pos: Backend HTTP/SQLite acceptance; no browser execution or production/provider access
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -7,6 +13,14 @@ const path = require('node:path');
 const { spawn, execFileSync } = require('node:child_process');
 const password = 'test-only-role-browser-password-never-production';
 
+/**
+ * 职责：创建私有角色夹具并提供真实登录、HTTP 和独立只读工具
+ * @param t 注册清理的当前测试上下文
+ * @param scenario 明确允许的合成业务场景
+ * @param temporaryRoot 隔离临时根目录，默认系统临时目录
+ * @returns 夹具元数据、私有目录及读取/请求/登录工具
+ * @throws 启动超时、权限或真实登录断言失败
+ */
 async function fixtureFor(t, scenario, temporaryRoot = os.tmpdir()) {
   const directory = fs.mkdtempSync(path.join(temporaryRoot, 'jiesong-role-browser-e2e-'));
   fs.chmodSync(directory, 0o700);
@@ -304,22 +318,55 @@ for (const kind of ['customs', 'refunds']) {
 
 // Bounded mirror of the six hosted menu/document cases. All requests use the
 // production Express routes, actual role login and committed-migration SQLite.
+/**
+ * 职责：从独立只读连接核对生成文档相关的全部业务行
+ * @param f 当前合成角色 HTTP 夹具
+ * @returns 按表名组织的单据、装箱和归档快照
+ * @throws SQLite 读取或 JSON 解析失败
+ */
 const documentSnapshot = f => Object.fromEntries([
   'sales_contracts', 'packing_items', 'customs_declarations',
   'customs_declaration_items', 'forex_verifications', 'tax_refunds', 'contract_files', 'sales_contract_files',
 ].map(table => [table, f.read(`SELECT * FROM ${table} ORDER BY id`)]));
+/**
+ * 职责：构造全部三张内部单据的确定性生成输入
+ * @param f 带合成合同、商品和装箱行 ID 的夹具
+ * @returns 沿用档案 HS 来源及全部三表选择的请求数据
+ * @throws 夹具缺少预置文档元数据
+ */
 const formsInput = f => ({ salesContractId: f.salesId,
   items: [{ packingItemId: f.exportDocuments.packingItemId, productId: f.productId,
     hsCode: '9999999999', hsSource: 'stored' }],
   generateCustoms: true, generateForex: true, generateTaxRefund: true });
 const packetInput = { spotRate: 7.2, sellerName: '合成卖方', buyerName: '合成买方',
   packageKind: 'CARTON', tradeTerm: 'FOB', documentDate: '2026-10-01' };
+/**
+ * 职责：经真实角色 HTTP 生成全部内部单据并核对成功响应
+ * @param f 当前合成角色 HTTP 夹具
+ * @param token 当前合成 SALES 用户的登录令牌
+ * @returns 真正生成的记录 ID 与警示数据
+ * @throws 请求失败或状态断言不通过
+ */
 const generated = async (f, token) => {
   const response = await f.call('POST', '/three-forms/generate', formsInput(f), token);
   assert.equal(response.status, 200, response.body.message);
   return response.body.data;
 };
+/**
+ * 职责：限定导出参数为此次明确生成的三条记录 ID
+ * @param ids 一次真实生成响应中的单据 ID
+ * @returns 精确指定报关、核销与退税记录的查询参数
+ * @throws 参数构造失败
+ */
 const formsQuery = ids => new URLSearchParams({ customsDeclarationId: ids.customsDeclarationId, forexId: ids.forexId, taxRefundId: ids.taxRefundId });
+/**
+ * 职责：认证下载真实工作簿并解析其完整字节
+ * @param f 当前合成角色 HTTP 夹具
+ * @param token 当前合成 SALES 用户的登录令牌
+ * @param route 不含 API 前缀的受保护下载路径
+ * @returns 下载字节、解析的 ExcelJS 工作簿及文件名响应头
+ * @throws 请求、格式断言或 XLSX 解析失败
+ */
 const binary = async (f, token, route) => {
   const response = await fetch(`${f.baseURL}/api/v1${route}`, { headers: { authorization: `Bearer ${token}` } });
   assert.equal(response.status, 200);
