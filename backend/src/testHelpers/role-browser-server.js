@@ -1,7 +1,7 @@
 /**
  * Input: Explicit test scenario, private temporary root and synthetic role/business data
  * Output: Isolated real Express/auth backend and scenario metadata for browser/HTTP tests
- * Pos: Test-only role fixture including internal records and menu export documents
+ * Pos: Test-only role fixture including internal records, menu documents and sales header drafts
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -17,7 +17,7 @@ const password = 'test-only-role-browser-password-never-production';
 if (process.env.NODE_ENV !== 'test' || !process.send
   || !directory?.startsWith(path.join(os.tmpdir(), 'jiesong-role-browser-e2e-'))
   || fs.realpathSync(directory) !== directory
-  || !['purchase', 'warehouse', 'sales', 'boss', 'receipt-pool', 'notification-state', 'tax-record-forms', 'menu-export-documents'].includes(scenario)
+  || !['purchase', 'warehouse', 'sales', 'boss', 'receipt-pool', 'notification-state', 'tax-record-forms', 'menu-export-documents', 'sales-header'].includes(scenario)
   || fs.existsSync(path.resolve(__dirname, '../../.env'))) process.exit(2);
 process.umask(0o077);
 fs.chmodSync(directory, 0o700);
@@ -31,7 +31,7 @@ process.env.JWT_SECRET = 'test-only-role-browser-jwt-secret-never-production';
  * @throws 迁移、合成资料构建或服务启动失败
  */
 async function start() {
-  if (['tax-record-forms', 'menu-export-documents'].includes(scenario)) {
+  if (['tax-record-forms', 'menu-export-documents', 'sales-header'].includes(scenario)) {
     // This form roundtrip uses the committed migration chain, never db push or
     // client generation. Prisma's executable children need normal execute bits;
     // the database is created 0600 first inside the already-private 0700 root.
@@ -113,6 +113,28 @@ async function start() {
   }
   let taxRecords;
   let exportDocuments;
+  let salesHeader;
+  if (scenario === 'sales-header') {
+    // Existing header inputs only. Cargo/amount facts are starting records;
+    // ordinary edits never execute payment, shipment or document transactions.
+    const nextPort = await db.port.create({ data: { name: '合成合同头补充港口', code: 'HEADER-NEXT' } });
+    for (const item of [port, nextPort]) {
+      await db.store.create({ data: { name: `合成合同头门店${item.code}`, portId: item.id } });
+    }
+    sale = await db.salesContract.create({ data: {
+      contractNo: 'EXP-SYNTHETIC-HEADER', status: 'PACKING', portId: port.id,
+      exchangeRate: 7.2, signedAt: new Date('2026-10-01T00:00:00.000Z'),
+      estimatedArrival: new Date('2026-11-01T00:00:00.000Z'),
+      totalAmount: 20, receivedAmount: 5, totalBoxes: 2, grossWeight: 20, netWeight: 18, volume: 0.2,
+      note: '合成合同头已保存备注',
+      packingItems: { create: { productId: product.id, purchaseItemId: purchaseItem.id,
+        quantity: 10, unit: '件', boxes: 2, grossWeight: 20, netWeight: 18, volume: 0.2,
+        length: 500, width: 500, height: 400, specification: '合成箱', origin: '合成产地',
+        purchaseCost: 113, purchaseContractNo: purchase.contractNo, unitPrice: 2, totalPrice: 20,
+        note: '合成装箱资料保持不变' } },
+    } });
+    salesHeader = { originalPortId: port.id, nextPortId: nextPort.id };
+  }
   if (scenario === 'menu-export-documents') {
     // Only starting cargo/current tariff evidence. Document previews, generation
     // and downloads use unchanged routes; no uploads, filings or provider calls.
@@ -158,7 +180,7 @@ async function start() {
     baseURL: `http://127.0.0.1:${server.address().port}`,
     purchaseId: purchase.id, purchaseItemId: purchaseItem.id, productId: product.id,
     receiptId: receipt?.id, receiptItemId: receipt?.items[0].id, salesId: sale?.id, salesNo: sale?.contractNo,
-    receiptPool, taxRecords, exportDocuments,
+    receiptPool, taxRecords, exportDocuments, salesHeader,
     users: Object.fromEntries(Object.entries(users).map(([role, user]) => [role, { id: user.id, username: user.username }])),
   }));
   let closing = false;

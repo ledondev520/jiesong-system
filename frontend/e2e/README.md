@@ -2,6 +2,8 @@
 
 `real-role-lifecycle.spec.ts` 增加一项同一用户单条通知已读回归：`notification-state` 场景真实 PURCHASE 登录，只预置该用户的四条通知；双击期间暂缓首条真实 Express 成功响应的交付，不改响应内容。Header 和面板未读数为二，与真实未读 API 及独立只读 SQLite 一致，整页重载仍为二且再点已读行不重写。沿用既有 hosted Playwright 门槛；`--list --grep='repeated notification mark-one'` 仅核对定义，不表示浏览器通过。不涉及生产通知或其他用户权限。
 
+`real-sales-header.spec.ts`：四项1440px真实SALES合同头补充验收，经出口菜单进入既有合同信息。完整草稿取消/重开/重载零写入；四项已有字段普通保存，暂缓交付真正成功响应期间按钮禁用且重复点击只写一次；汇率0的真正400保留全部草稿与原始原因，明确纠正后重试一次；真实认证GET、整页重载及后来取消编辑保持已保存资料。每项独占 `sales-header` 已提交迁移0700/0600私有SQLite，独立只读连接逐行核对金额、采购/装箱、库存、付款和内部单据事实不变及SALES审计。沿用真实Express透传，不mock业务响应、改变空日期/港口既有语义或新增字段，不访问生产、资金转移、发运、单据生成/签约、上传或外部服务。`playwright test real-sales-header.spec.ts --list` 仅核对四项定义，浏览器结果以hosted CI为准。
+
 `onboarding.spec.ts`：390/1440px 合成账号核对流程，确认打开/取消不写入、明确开通后保存一次及列表刷新；不访问生产账号。移动注册回执刷新后仍显示，且明确不是实时审批状态。
 
 目的：验收生产构建的页面和客户端交互；多数用合成 API，明确标注的集成用私有 SQLite 与真实 Express。
