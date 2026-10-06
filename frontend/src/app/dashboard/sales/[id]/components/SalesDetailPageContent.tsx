@@ -1,6 +1,6 @@
 /**
  * Input: 出口合同详情、采购来源、40HQ 排柜、单证核对、退税准备与单柜财务 Interface
- * Output: 区分历史发运资料核对与实时出货门禁，原样提示后端阶段门禁错误，含发运后货物锁定与手机装箱明细卡片的排柜/发运、出口三单、申报单证、船司核对、退税材料、财务结算与核销跟进的专项单主页面
+ * Output: 区分历史发运资料核对与实时出货门禁，原样提示阶段/合同头保存错误并保留失败头草稿，含发运后货物锁定与手机装箱明细卡片的排柜/发运、出口三单、申报单证、船司核对、退税材料、财务结算与核销跟进的专项单主页面
  * Pos: 出口专项单装柜主页面，复用采购完工资料并承载排柜到发运的唯一主线路
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -431,18 +431,23 @@ export default function SalesDetailPage({ params }: PageProps) {
   }, [id]);
 
   /**
-   * 职责：按需加载商品、门店、库存列表，避免阻塞首屏。
+   * 职责：按需加载商品、含港口关联的门店及库存，提供头编辑选项且不阻塞首屏。
+   * 参数：无；使用当前引用资料加载状态和页面级服务。
+   * @returns Promise<void>；已加载/加载中则跳过，否则更新引用资料与加载状态
+   * 请求错误不向调用方传播；失败通过现有 toast 反馈并允许重试。
    */
   const loadReferenceData = useCallback(async () => {
+    // 0. 已完成或正在加载时不重复请求。
     if (referenceDataLoadedRef.current || referenceDataLoading) {
       return;
     }
 
+    // 1. 并行读取既有引用资料，门店保留目的港关联。
     setReferenceDataLoading(true);
     try {
       const [productsRes, storesRes, inventoryRes] = await Promise.all([
         productService.getAll({ pageSize: 500, lite: true }),
-        storeService.getAll({ pageSize: 100, lite: true }),
+        storeService.getAll({ pageSize: 100 }),
         inventoryService.getAll({ pageSize: 500, lite: true }),
       ]);
       setProducts(productsRes.data?.items || []);
@@ -1551,7 +1556,7 @@ export default function SalesDetailPage({ params }: PageProps) {
           </Card>
         </TabsContent>
 
-        {/* 合同信息（可编辑） */}
+        {/* 合同信息：普通保存成功后刷新，失败交回编辑器保留草稿供明确重试。 */}
         <TabsContent value="info">
           <ContractInfoEditor
             contract={contract}
@@ -1561,8 +1566,17 @@ export default function SalesDetailPage({ params }: PageProps) {
                 await salesService.update(id, data);
                 toast.success("合同信息更新成功");
                 void loadData();
-              } catch {
-                toast.error("更新失败");
+              } catch (error: unknown) {
+                // A rejected save must reach the editor so it retains the draft.
+                const message =
+                  typeof error === "object" &&
+                  error !== null &&
+                  "message" in error &&
+                  typeof error.message === "string"
+                    ? error.message
+                    : "更新失败";
+                toast.error(message);
+                throw error;
               }
             }}
           />

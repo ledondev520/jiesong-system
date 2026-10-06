@@ -1,6 +1,6 @@
 /**
  * Input: Test-only role scenarios, Express child process and private synthetic SQLite
- * Output: Real login/HTTP forwarding plus independent business and document readback
+ * Output: Real login/HTTP forwarding plus independent business, document and sales header readback
  * Pos: Shared hosted role-browser fixture; never mocks business responses
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -20,7 +20,8 @@ type Scenario =
   | "receipt-pool"
   | "notification-state"
   | "tax-record-forms"
-  | "menu-export-documents";
+  | "menu-export-documents"
+  | "sales-header";
 export const testPassword = "test-only-role-browser-password-never-production";
 export interface RoleFixture {
   server: ChildProcess;
@@ -34,6 +35,7 @@ export interface RoleFixture {
   salesId?: string;
   salesNo?: string;
   exportDocuments?: { packingItemId: string };
+  salesHeader?: { originalPortId: string; nextPortId: string };
   receiptPool?: {
     usdReceiptId: string;
     cnyReceiptId: string;
@@ -330,6 +332,30 @@ c=sqlite3.connect('file:'+sys.argv[1]+'?mode=ro',uri=True)
 c.row_factory=sqlite3.Row
 tables=['sales_contracts','packing_items','customs_declarations','customs_declaration_items','forex_verifications','tax_refunds','contract_files','sales_contract_files']
 print(json.dumps({table:[dict(row) for row in c.execute('SELECT * FROM '+table+' ORDER BY id')] for table in tables}))
+c.close()`;
+  return JSON.parse(
+    execFileSync(
+      "python3",
+      ["-c", script, path.join(fixture.directory, "synthetic.db")],
+      { encoding: "utf8", timeout: 10000 },
+    ),
+  ) as ExportDocumentSnapshot;
+}
+
+/**
+ * 职责：独立只读核对合同头与不应变化的金额、装箱、采购、库存、付款及单据事实
+ * @param fixture 当前验收独占的私有 SQLite 夹具
+ * @returns 完整业务行及合同头审计快照
+ * @throws SQLite 读取失败、子进程超时或 JSON 解析失败
+ */
+export function readSalesHeader(fixture: RoleFixture): ExportDocumentSnapshot {
+  const script = `import sqlite3,sys,json
+c=sqlite3.connect('file:'+sys.argv[1]+'?mode=ro',uri=True)
+c.row_factory=sqlite3.Row
+tables=['sales_contracts','sales_items','packing_items','inventories','payments','purchase_contracts','purchase_items','customs_declarations','customs_declaration_items','forex_verifications','tax_refunds','contract_files','sales_contract_files']
+result={table:[dict(row) for row in c.execute('SELECT * FROM '+table+' ORDER BY id')] for table in tables}
+result['audit']=[dict(row) for row in c.execute("SELECT * FROM operation_logs WHERE entity='SalesContract' ORDER BY id")]
+print(json.dumps(result))
 c.close()`;
   return JSON.parse(
     execFileSync(

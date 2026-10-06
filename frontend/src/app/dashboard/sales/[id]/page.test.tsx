@@ -1,6 +1,6 @@
 /**
  * Input: 销售合同详情页、sales/product/store/inventory 服务、router、toast
- * Output: 销售合同详情页交互逻辑与阶段错误重试测试结果，隔离并等待成功后的延迟退税弹窗
+ * Output: 销售合同详情阶段/合同头失败草稿与明确重试测试，隔离并等待成功后的延迟退税弹窗
  * Pos: 前端详情页交互测试
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -26,6 +26,7 @@ const mockToastError = vi.fn();
 const mockExportPdf = vi.fn();
 const mockExportExcel = vi.fn();
 const mockUpdateSalesStatus = vi.fn();
+const mockUpdateSales = vi.fn();
 const mockForexRender = vi.fn();
 
 vi.mock("react", async () => {
@@ -51,7 +52,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/services/sales.service", () => ({
   salesService: {
     getById: (...args: unknown[]) => mockGetById(...args),
-    update: vi.fn(),
+    update: (...args: unknown[]) => mockUpdateSales(...args),
     addPackingItem: vi.fn(),
     updatePackingItem: vi.fn(),
     removePackingItem: vi.fn(),
@@ -92,10 +93,6 @@ vi.mock("sonner", () => ({
     success: vi.fn(),
     info: vi.fn(),
   },
-}));
-
-vi.mock("@/components/sales/ContractInfoEditor", () => ({
-  ContractInfoEditor: () => <div>合同信息编辑区</div>,
 }));
 
 vi.mock("@/components/container/Container3DView", () => ({
@@ -145,6 +142,7 @@ describe("SalesDetailPage 交互逻辑", () => {
     mockExportPdf.mockReset();
     mockExportExcel.mockReset();
     mockUpdateSalesStatus.mockReset();
+    mockUpdateSales.mockReset();
     mockForexRender.mockReset();
     mockApiGet.mockResolvedValue({ data: [] });
   });
@@ -161,6 +159,111 @@ describe("SalesDetailPage 交互逻辑", () => {
       </Suspense>,
     );
   };
+
+  it("合同头目的港选项使用带港口关联的门店读回而不是 lite 空选项", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP-SYNTHETIC-PORT",
+        status: "PACKING",
+        exchangeRate: 7.2,
+        portId: "port-1",
+        packingItems: [],
+        port: { id: "port-1", name: "合成原始港口" },
+      },
+    });
+    mockProductGetAll.mockResolvedValue({ data: { items: [] } });
+    mockInventoryGetAll.mockResolvedValue({ data: { items: [] } });
+    // The real stores controller omits port relations for lite:true.
+    mockStoreGetAll.mockImplementation(({ lite }: { lite?: boolean }) =>
+      Promise.resolve({
+        data: {
+          items: [
+            {
+              id: "store-2",
+              name: "合成港口门店",
+              portId: "port-2",
+              ...(!lite
+                ? { port: { id: "port-2", name: "合成可选择港口" } }
+                : {}),
+            },
+          ],
+        },
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("tab", { name: "合同信息" }));
+    const panel = within(screen.getByRole("tabpanel", { name: "合同信息" }));
+    await user.click(panel.getByRole("button", { name: "编辑" }));
+    await user.click(panel.getByRole("combobox", { name: "目的港" }));
+    expect(
+      await screen.findByRole("option", { name: "合成可选择港口" }),
+    ).toBeVisible();
+    expect(mockStoreGetAll).toHaveBeenCalledWith({ pageSize: 100 });
+  });
+
+  it("合同头真实编辑器保留失败草稿并仅在明确纠正重试成功后关闭", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP-SYNTHETIC-HEADER",
+        status: "PACKING",
+        exchangeRate: 7.2,
+        signedAt: "2026-10-01T00:00:00.000Z",
+        estimatedArrival: "2026-11-01T00:00:00.000Z",
+        portId: "port-1",
+        totalAmount: 20,
+        receivedAmount: 5,
+        totalBoxes: 2,
+        grossWeight: 20,
+        netWeight: 18,
+        volume: 0.2,
+        packingItems: [],
+        port: { id: "port-1", name: "合成原始港口" },
+      },
+    });
+    mockProductGetAll.mockResolvedValue({ data: { items: [] } });
+    mockStoreGetAll.mockResolvedValue({ data: { items: [] } });
+    mockInventoryGetAll.mockResolvedValue({ data: { items: [] } });
+    mockUpdateSales
+      .mockRejectedValueOnce({ message: "汇率必须为正数" })
+      .mockResolvedValueOnce({ data: {} });
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("tab", { name: "合同信息" }));
+    const panel = within(screen.getByRole("tabpanel", { name: "合同信息" }));
+    await user.click(panel.getByRole("button", { name: "编辑" }));
+    await user.clear(panel.getByRole("spinbutton"));
+    const signedAt = panel.getByDisplayValue("2026-10-01");
+    await user.clear(signedAt);
+    await user.type(signedAt, "2026-10-03");
+    const arrival = panel.getByDisplayValue("2026-11-01");
+    await user.clear(arrival);
+    await user.type(arrival, "2026-11-03");
+    await user.click(panel.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(mockUpdateSales).toHaveBeenCalledTimes(1));
+    expect(mockToastError).toHaveBeenCalledWith("汇率必须为正数");
+    await waitFor(() =>
+      expect(panel.getByRole("button", { name: "保存" })).toBeEnabled(),
+    );
+    expect(panel.getByRole("spinbutton")).toHaveValue(0);
+    expect(panel.getByDisplayValue("2026-10-03")).toBeInTheDocument();
+    expect(panel.getByDisplayValue("2026-11-03")).toBeInTheDocument();
+    expect(mockGetById).toHaveBeenCalledTimes(1);
+    await user.type(panel.getByRole("spinbutton"), "7.4");
+    await user.click(panel.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(mockUpdateSales).toHaveBeenCalledTimes(2));
+    expect(mockUpdateSales).toHaveBeenLastCalledWith("s-1", {
+      exchangeRate: 7.4,
+      signedAt: "2026-10-03",
+      estimatedArrival: "2026-11-03",
+      portId: "port-1",
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "编辑" })).toBeInTheDocument(),
+    );
+  });
 
   it("加载成功后展示合同号与空装箱态", async () => {
     mockGetById.mockResolvedValue({
