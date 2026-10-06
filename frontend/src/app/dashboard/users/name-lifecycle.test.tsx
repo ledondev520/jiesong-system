@@ -84,7 +84,11 @@ vi.mock("sonner", () => ({
 let fixture: AccountNameFixture;
 const searchPlaceholder = "搜索姓名、账号、邮箱、角色...";
 
-/** Opens the ordinary target through its visible search result and real edit form. */
+/**
+ * Opens the ordinary target through its visible search result and real edit form.
+ * @param target Synthetic ordinary user shown by the real directory response
+ * @returns Resolves after the edit form and unchanged identity fields are verified
+ */
 async function openTarget(target: AccountNameFixture["first"]) {
   fireEvent.change(screen.getByPlaceholderText(searchPlaceholder), {
     target: { value: target.username },
@@ -106,7 +110,11 @@ async function openTarget(target: AccountNameFixture["first"]) {
   );
 }
 
-/** Saves only the display-name field after existing form validation completes. */
+/**
+ * Saves only the display-name field after existing form validation completes.
+ * @param name Synthetic display name to enter
+ * @returns Resolves after the enabled save action is clicked
+ */
 async function saveName(name: string) {
   fireEvent.change(screen.getByLabelText("显示姓名"), {
     target: { value: name },
@@ -117,7 +125,13 @@ async function saveName(name: string) {
   await userEvent.click(screen.getByRole("button", { name: "保存" }));
 }
 
-/** Checks outgoing writes retain username/role/activation and leave password blank. */
+/**
+ * Checks outgoing writes retain username/role/activation and leave password blank.
+ * @param target Original ordinary user whose unchanged identity is expected
+ * @param name Expected display name in each write
+ * @param count Expected number of attempted writes
+ * @returns Nothing; assertions fail when a write changes another field
+ */
 function expectNameWrites(
   target: AccountNameFixture["first"],
   name: string,
