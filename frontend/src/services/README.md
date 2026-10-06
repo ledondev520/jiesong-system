@@ -1,5 +1,7 @@
 # 前端业务 API 服务
 
+若本文件夹结构或内容变化，请更新本文件。
+
 此目录封装业务 API 和 DTO，界面通过服务调用后端；鉴权仍由共享 Axios 和后端校验。
 
 ## 收付请求
@@ -21,3 +23,7 @@
 ## 报关单
 
 报关 `customsDeclaration.service.ts` 的写入 DTO 仅包含真实表头字段及带 productId/customsName 的商品明细；明细 id 用于编辑，declaredAt 与 exportDate 分别表示申报、出口日期。
+
+## 三表工作簿下载
+
+`threeForms.service.ts` 沿用共享 Axios 认证传输，在单次请求的 transformResponse 中提取文件名响应头，再消费拦截器直接返回的完整 Blob，明确关闭该二进制请求的 JSON GET 缓存并复用现有文件保存工具。`threeForms.download.test.ts` 通过真实 Axios 拦截器及本地合成 adapter 验证 UTF-8/引号/缺失文件名、字节保持、重复读取当前响应与失败零保存/明确重试；不访问网络、业务文件或启动浏览器，不改变共享拦截器或其他请求的缓存规则。

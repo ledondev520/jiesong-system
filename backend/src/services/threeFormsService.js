@@ -1,6 +1,6 @@
 /**
  * Input: 出口合同 ID、人工确认的 HS 覆盖与额外单据信息
- * Output: 后端权威准备度、一键生成三张表（报关单、外汇核销单、出口退税单）及 Excel 导出
+ * Output: 后端权威准备度、一键生成三张表及保留独立标题/明细表头的 Excel 导出
  * Pos: 出口退税模块服务层，所有生成路径先通过出口单证准备 Module
  */
 
@@ -414,15 +414,20 @@ const exportThreeFormsExcel = async (salesContractId, ids = {}) => {
   const borderStyle = { style: 'thin', color: { argb: 'FFD1D5DB' } };
   const allBorders = { top: borderStyle, left: borderStyle, bottom: borderStyle, right: borderStyle };
 
+  /** 职责：在标题和单据信息之后追加并设置独立明细表头
+   * @param ws 当前工作表，末行位于已写入的单据信息之后
+   * @param cols 按既有顺序提供的列标题和宽度
+   * @returns 无返回值；仅追加表头并应用原有样式和列宽 */
   const applyHeader = (ws, cols) => {
-    ws.getRow(1).values = cols.map((c) => c.header);
-    ws.getRow(1).eachCell((cell) => {
+    // Append below the merged title and document metadata, never overwrite A1.
+    const header = ws.addRow(cols.map((c) => c.header));
+    header.eachCell((cell) => {
       cell.fill = headerFill;
       cell.font = headerFont;
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
       cell.border = allBorders;
     });
-    ws.getRow(1).height = 28;
+    header.height = 28;
     cols.forEach((c, i) => {
       ws.getColumn(i + 1).width = c.width || 18;
     });
@@ -460,7 +465,6 @@ const exportThreeFormsExcel = async (salesContractId, ids = {}) => {
       { header: '申报要素', width: 30 },
     ];
     applyHeader(ws, cols);
-    ws.getRow(ws.lastRow.number).values = cols.map((c) => c.header);
 
     const items = customsDeclaration?.items || [];
     items.forEach((item, idx) => {

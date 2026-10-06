@@ -14,3 +14,5 @@
 浏览器验收位于 `frontend/e2e/real-role-lifecycle.spec.ts` 与 `frontend/e2e/real-receipt-pool.spec.ts`，由既有 hosted Playwright CI 执行。本地HTTP/DB测试与测试定义检查不代表浏览器通过。初始化仅预置创建表单所需的合成业务；收验货来源与销售装箱按现有领域服务构造，收款池仅预置合同和未分配来源，所有分配都经过真实事务，不放宽认证、限流或权限。完整迁移链另由 `receivable-allocation.integration.js` 等后端集成门槛覆盖。
 
 `tax-record-forms` 仅预置一个草稿出口合同、一条草稿报关及退税记录供表单选择、取消与重复编号测试。数据库先以0600创建，迁移子进程暂用022 umask，目录保持0700；不生成共享Prisma client。FINANCE普通CRUD经过真实认证/服务/SQLite；两项无浏览器合同测试覆盖重复编号500零写入、纠正编号后201、日期ISO读回、备注编辑200、报关商品明细ID保留和真实用户审计。运行 `node --test --test-name-pattern='FINANCE internal' src/testHelpers/role-browser-server.test.js`。浏览器的六项创建取消、失败保留/重试/创建及编辑保存、编辑返回取消在既有 `real-role-lifecycle.spec.ts`；本地HTTP通过不代表浏览器通过。所有记录均为合成DRAFT，不调用正式申报、确认、资金结算、附件或外部服务。
+
+`menu-export-documents` 在已提交迁移初始化的同类私有SQLite中，只预置一份PACKING出口合同、自有采购来源装箱行及合成当前HS/13%退税证据。六项同名HTTP合同测试覆盖缺证据预检/拒绝生成/放弃零写入，三表关联DRAFT/PENDING读回与实际XLSX标题/明细/金额，明确再次生成沿用追加版本与精确ID导出，商业三单只读预检/放弃，确认后0700/0600归档及重复下载同字节，资料变化导致真实400零生成后明确修复重试。不改变追加版本语义或税则规则；不上传附件、正式申报、确认退税、签约/资金/实际出货，也不调用外部服务。运行 `node --test --test-name-pattern='menu documents HTTP' src/testHelpers/role-browser-server.test.js`；浏览器定义另在 `real-menu-export-documents.spec.ts`，本地HTTP通过不代表浏览器通过。

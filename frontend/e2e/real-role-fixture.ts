@@ -1,4 +1,10 @@
-/** Hosted-runner fixture only; forwards to real isolated HTTP, never mocks API results. */
+/**
+ * Input: Test-only role scenarios, Express child process and private synthetic SQLite
+ * Output: Real login/HTTP forwarding plus independent business and document readback
+ * Pos: Shared hosted role-browser fixture; never mocks business responses
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
 import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -13,7 +19,8 @@ type Scenario =
   | "boss"
   | "receipt-pool"
   | "notification-state"
-  | "tax-record-forms";
+  | "tax-record-forms"
+  | "menu-export-documents";
 export const testPassword = "test-only-role-browser-password-never-production";
 export interface RoleFixture {
   server: ChildProcess;
@@ -26,6 +33,7 @@ export interface RoleFixture {
   receiptItemId?: string;
   salesId?: string;
   salesNo?: string;
+  exportDocuments?: { packingItemId: string };
   receiptPool?: {
     usdReceiptId: string;
     cnyReceiptId: string;
@@ -301,6 +309,35 @@ c.close()`;
       { encoding: "utf8", timeout: 10000 },
     ),
   ) as TaxRecordSnapshot;
+}
+
+export type ExportDocumentSnapshot = Record<
+  string,
+  Record<string, string | number | null>[]
+>;
+/**
+ * 职责：独立只读核对菜单生成单据、装箱资料和归档版本
+ * @param fixture 当前验收独占的私有 SQLite 夹具
+ * @returns 按表名组织的完整业务行快照
+ * @throws SQLite 读取失败、子进程超时或 JSON 解析失败
+ */
+export function readExportDocuments(
+  fixture: RoleFixture,
+): ExportDocumentSnapshot {
+  // Independent read-only rows, including archived versions, never an API echo.
+  const script = `import sqlite3,sys,json
+c=sqlite3.connect('file:'+sys.argv[1]+'?mode=ro',uri=True)
+c.row_factory=sqlite3.Row
+tables=['sales_contracts','packing_items','customs_declarations','customs_declaration_items','forex_verifications','tax_refunds','contract_files','sales_contract_files']
+print(json.dumps({table:[dict(row) for row in c.execute('SELECT * FROM '+table+' ORDER BY id')] for table in tables}))
+c.close()`;
+  return JSON.parse(
+    execFileSync(
+      "python3",
+      ["-c", script, path.join(fixture.directory, "synthetic.db")],
+      { encoding: "utf8", timeout: 10000 },
+    ),
+  ) as ExportDocumentSnapshot;
 }
 
 export async function forwardRealApi(page: Page, fixture: RoleFixture) {

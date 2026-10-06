@@ -1,6 +1,6 @@
 /**
- * Input: 出口合同装箱明细、后端权威出口准备度、历史/商品档案 HS 与 AI 建议
- * Output: 全量商品 HS/价格/申报要素校验、一键生成三张表与无退税警示
+ * Input: 出口合同装箱明细、后端权威出口准备度、HS 建议与请求错误
+ * Output: 全量单证校验、生成/无退税警示及保留草稿的具体失败提示
  * Pos: 出口合同详情页单证确认 Module，缺任一装箱行时禁止生成
  *
  * 设计原则：HS 编码应维护在商品档案（Product.hsCode）中，此处直接复用；
@@ -10,11 +10,11 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useState, useMemo, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useState, useMemo, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +22,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -30,32 +30,40 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { hsCodeService } from '@/services/hsCode.service';
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { hsCodeService } from "@/services/hsCode.service";
 import {
   threeFormsService,
   type ExportReadinessLine,
   type ExportReadinessResult,
   type ThreeFormsGenerateInput,
-} from '@/services/threeForms.service';
-import { toast } from 'sonner';
+} from "@/services/threeForms.service";
+import { toast } from "sonner";
 import {
-  FileText, DollarSign, ReceiptText, AlertCircle,
-  Loader2, Sparkles,
-} from 'lucide-react';
-import type { SalesContract, PackingItem } from '@/types';
+  FileText,
+  DollarSign,
+  ReceiptText,
+  AlertCircle,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
+import type { SalesContract, PackingItem } from "@/types";
 
 interface GenerateThreeFormsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   salesContract: SalesContract & { packingItems?: PackingItem[] };
-  onGenerated?: (forms: { customsDeclarationId?: string; forexId?: string; taxRefundId?: string }) => void;
+  onGenerated?: (forms: {
+    customsDeclarationId?: string;
+    forexId?: string;
+    taxRefundId?: string;
+  }) => void;
 }
 
 /** 每行商品的 HS 编码来源 */
-type HsSource = 'stored' | 'history' | 'ai' | 'manual' | 'missing';
+type HsSource = "stored" | "history" | "ai" | "manual" | "missing";
 
 /** 每行商品的展示状态 */
 interface ProductRow {
@@ -74,26 +82,103 @@ interface ProductRow {
 }
 
 const THREE_FORMS_CONFIG = [
-  { id: 'customs', name: '报关单', icon: FileText, color: 'text-blue-500', bgColor: 'bg-blue-50', description: '海关出口货物报关单' },
-  { id: 'forex', name: '外汇核销', icon: DollarSign, color: 'text-green-500', bgColor: 'bg-green-50', description: '出口收汇核销单' },
-  { id: 'tax-refund', name: '出口退税', icon: ReceiptText, color: 'text-orange-500', bgColor: 'bg-orange-50', description: '出口货物退税申报表' },
+  {
+    id: "customs",
+    name: "报关单",
+    icon: FileText,
+    color: "text-blue-500",
+    bgColor: "bg-blue-50",
+    description: "海关出口货物报关单",
+  },
+  {
+    id: "forex",
+    name: "外汇核销",
+    icon: DollarSign,
+    color: "text-green-500",
+    bgColor: "bg-green-50",
+    description: "出口收汇核销单",
+  },
+  {
+    id: "tax-refund",
+    name: "出口退税",
+    icon: ReceiptText,
+    color: "text-orange-500",
+    bgColor: "bg-orange-50",
+    description: "出口货物退税申报表",
+  },
 ];
 
 /** 根据来源显示对应徽章 */
 function SourceBadge({ source }: { source: HsSource }) {
-  if (source === 'history') return <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-xs text-emerald-700">历史报关</Badge>;
-  if (source === 'stored') return <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 text-xs">商品档案</Badge>;
-  if (source === 'ai') return <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50 text-xs">AI 建议</Badge>;
-  if (source === 'manual') return <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50 text-xs">手动</Badge>;
-  return <Badge variant="outline" className="text-red-500 border-red-300 bg-red-50 text-xs">未填写</Badge>;
+  if (source === "history")
+    return (
+      <Badge
+        variant="outline"
+        className="border-emerald-300 bg-emerald-50 text-xs text-emerald-700"
+      >
+        历史报关
+      </Badge>
+    );
+  if (source === "stored")
+    return (
+      <Badge
+        variant="outline"
+        className="text-green-600 border-green-300 bg-green-50 text-xs"
+      >
+        商品档案
+      </Badge>
+    );
+  if (source === "ai")
+    return (
+      <Badge
+        variant="outline"
+        className="text-blue-600 border-blue-300 bg-blue-50 text-xs"
+      >
+        AI 建议
+      </Badge>
+    );
+  if (source === "manual")
+    return (
+      <Badge
+        variant="outline"
+        className="text-orange-600 border-orange-300 bg-orange-50 text-xs"
+      >
+        手动
+      </Badge>
+    );
+  return (
+    <Badge
+      variant="outline"
+      className="text-red-500 border-red-300 bg-red-50 text-xs"
+    >
+      未填写
+    </Badge>
+  );
 }
 
-function toUiHsSource(source: ExportReadinessLine['hsSource']): HsSource {
-  if (source === 'customs_history') return 'history';
-  if (source === 'packing_confirmation') return 'manual';
-  if (source === 'product_archive') return 'stored';
-  if (source === 'manual_confirmation') return 'manual';
-  return 'missing';
+function toUiHsSource(source: ExportReadinessLine["hsSource"]): HsSource {
+  if (source === "customs_history") return "history";
+  if (source === "packing_confirmation") return "manual";
+  if (source === "product_archive") return "stored";
+  if (source === "manual_confirmation") return "manual";
+  return "missing";
+}
+
+/**
+ * 职责：保留请求拦截器的响应正文和网络 Error 消息，兼容未展开的 Axios 错误。
+ * @param error 请求拒绝的错误或后端响应正文
+ * @param fallback 错误没有有效消息时的用户提示
+ * @returns 后端具体消息或通用失败提示
+ */
+function getErrorMessage(error: unknown, fallback: string): string {
+  const rejected = error as {
+    message?: unknown;
+    response?: { data?: { message?: unknown } };
+  } | null;
+  const apiMessage = rejected?.response?.data?.message;
+  if (typeof apiMessage === "string" && apiMessage.trim()) return apiMessage;
+  const message = rejected?.message;
+  return typeof message === "string" && message.trim() ? message : fallback;
 }
 
 export function GenerateThreeFormsDialog({
@@ -103,32 +188,42 @@ export function GenerateThreeFormsDialog({
   onGenerated,
 }: GenerateThreeFormsDialogProps) {
   const [generating, setGenerating] = useState(false);
-  const [selectedForms, setSelectedForms] = useState<string[]>(['customs', 'forex', 'tax-refund']);
+  const [selectedForms, setSelectedForms] = useState<string[]>([
+    "customs",
+    "forex",
+    "tax-refund",
+  ]);
   /**
    * rows 存储可变的行数据（HS 编码内联编辑、AI 建议结果）。
    * 当 dialog 关闭时通过 handleOpenChange 重置。
    */
   const [rows, setRows] = useState<ProductRow[]>([]);
   const [batchSuggesting, setBatchSuggesting] = useState(false);
-  const [readiness, setReadiness] = useState<ExportReadinessResult | null>(null);
+  const [readiness, setReadiness] = useState<ExportReadinessResult | null>(
+    null,
+  );
   const [previewLoading, setPreviewLoading] = useState(false);
   const previewRequestIdRef = useRef(0);
 
   // 从合同装箱明细派生初始行（仅 open 切换为 true 时重建，否则保留用户编辑状态）
   // 过滤掉异常数据（null/undefined），确保每行都有合法的 PackingItem
   const initialRows = useMemo<ProductRow[]>(() => {
-    const rawItems = Array.isArray(salesContract.packingItems) ? salesContract.packingItems : [];
+    const rawItems = Array.isArray(salesContract.packingItems)
+      ? salesContract.packingItems
+      : [];
     const packingItems = rawItems.filter(
-      (item): item is PackingItem => !!item && typeof item.quantity === 'number',
+      (item): item is PackingItem =>
+        !!item && typeof item.quantity === "number",
     );
     return packingItems.map((item) => {
-      const stored = item.product?.hsCode || '';
-      const name = item.product?.customsName || item.product?.description || '未知商品';
+      const stored = item.product?.hsCode || "";
+      const name =
+        item.product?.customsName || item.product?.description || "未知商品";
       return {
         packingItem: item,
         productName: name,
         hsCode: stored,
-        source: stored ? ('stored' as HsSource) : ('missing' as HsSource),
+        source: stored ? ("stored" as HsSource) : ("missing" as HsSource),
         refundRate: null,
         suggesting: false,
       };
@@ -162,7 +257,7 @@ export function GenerateThreeFormsDialog({
   const noRefundRows = displayRows.filter((r) => r.refundRate === 0);
   const previewSignature = displayRows
     .map((row) => `${row.packingItem.id}:${row.hsCode.trim()}:${row.source}`)
-    .join('|');
+    .join("|");
 
   // 打开或人工/AI 修改 HS 编码后，重新读取后端权威的全量单证准备度。
   useEffect(() => {
@@ -170,49 +265,60 @@ export function GenerateThreeFormsDialog({
     const requestId = ++previewRequestIdRef.current;
     const baseRows = displayRows;
     setPreviewLoading(true);
-    void threeFormsService.previewThreeForms({
-      salesContractId: salesContract.id,
-      items: baseRows.map((row) => ({
-        productId: row.packingItem.productId,
-        packingItemId: row.packingItem.id,
-        productName: row.productName,
-        hsCode: row.hsCode.trim(),
-        hsSource: row.source,
-        quantity: row.packingItem.quantity,
-        unit: row.packingItem.unit || row.packingItem.product?.unit || '',
-        unitPrice: row.packingItem.unitPrice || 0,
-        totalPrice: row.packingItem.totalPrice || 0,
-      })),
-    }).then((response) => {
-      if (previewRequestIdRef.current !== requestId || !response.data) return;
-      const nextReadiness = response.data;
-      setReadiness(nextReadiness);
-      const lineById = new Map(nextReadiness.lines.map((line) => [line.packingItemId, line]));
-      setRows((current) => {
-        const base = current.length > 0 ? current : initialRows;
-        return base.map((row) => {
-          const line = lineById.get(row.packingItem.id);
-          if (!line) return row;
-          const preserveOverride = row.source === 'manual' || row.source === 'ai';
-          return {
-            ...row,
-            hsCode: preserveOverride ? row.hsCode : line.hsCode,
-            source: preserveOverride ? row.source : toUiHsSource(line.hsSource),
-            refundRate: line.hsEvidence?.refundRate ?? null,
-            readinessLine: line,
-          };
+    void threeFormsService
+      .previewThreeForms({
+        salesContractId: salesContract.id,
+        items: baseRows.map((row) => ({
+          productId: row.packingItem.productId,
+          packingItemId: row.packingItem.id,
+          productName: row.productName,
+          hsCode: row.hsCode.trim(),
+          hsSource: row.source,
+          quantity: row.packingItem.quantity,
+          unit: row.packingItem.unit || row.packingItem.product?.unit || "",
+          unitPrice: row.packingItem.unitPrice || 0,
+          totalPrice: row.packingItem.totalPrice || 0,
+        })),
+      })
+      .then((response) => {
+        if (previewRequestIdRef.current !== requestId || !response.data) return;
+        const nextReadiness = response.data;
+        setReadiness(nextReadiness);
+        const lineById = new Map(
+          nextReadiness.lines.map((line) => [line.packingItemId, line]),
+        );
+        setRows((current) => {
+          const base = current.length > 0 ? current : initialRows;
+          return base.map((row) => {
+            const line = lineById.get(row.packingItem.id);
+            if (!line) return row;
+            const preserveOverride =
+              row.source === "manual" || row.source === "ai";
+            return {
+              ...row,
+              hsCode: preserveOverride ? row.hsCode : line.hsCode,
+              source: preserveOverride
+                ? row.source
+                : toUiHsSource(line.hsSource),
+              refundRate: line.hsEvidence?.refundRate ?? null,
+              readinessLine: line,
+            };
+          });
         });
+      })
+      .catch((error: unknown) => {
+        if (previewRequestIdRef.current !== requestId) return;
+        setReadiness(null);
+        const apiMsg = (error as { response?: { data?: { message?: string } } })
+          ?.response?.data?.message;
+        toast.error(apiMsg || "出口单证准备度校验失败");
+      })
+      .finally(() => {
+        if (previewRequestIdRef.current === requestId) setPreviewLoading(false);
       });
-    }).catch((error: unknown) => {
-      if (previewRequestIdRef.current !== requestId) return;
-      setReadiness(null);
-      const apiMsg = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast.error(apiMsg || '出口单证准备度校验失败');
-    }).finally(() => {
-      if (previewRequestIdRef.current === requestId) setPreviewLoading(false);
-    });
     return () => {
-      if (previewRequestIdRef.current === requestId) previewRequestIdRef.current += 1;
+      if (previewRequestIdRef.current === requestId)
+        previewRequestIdRef.current += 1;
     };
     // previewSignature 只包含用户可变的 HS 值/来源，readinessLine 更新不会触发循环。
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -225,14 +331,15 @@ export function GenerateThreeFormsDialog({
   const getBaseRows = (prev: ProductRow[]): ProductRow[] =>
     prev.length > 0 ? prev : initialRows;
 
-  const blockingIssues = readiness?.issues.filter((issue) => issue.severity === 'error') || [];
-  const requiresCustoms = selectedForms.includes('customs');
-  const requiresTaxRefund = selectedForms.includes('tax-refund');
+  const blockingIssues =
+    readiness?.issues.filter((issue) => issue.severity === "error") || [];
+  const requiresCustoms = selectedForms.includes("customs");
+  const requiresTaxRefund = selectedForms.includes("tax-refund");
   const generationReady = Boolean(
-    readiness
-    && (!requiresCustoms || readiness.customsReady)
-    && (!requiresTaxRefund || readiness.taxRefundReady)
-    && missingCount === 0,
+    readiness &&
+    (!requiresCustoms || readiness.customsReady) &&
+    (!requiresTaxRefund || readiness.taxRefundReady) &&
+    missingCount === 0,
   );
 
   /** 保持报关单 → 外汇核销 → 退税的依赖顺序，避免选择无效组合。 */
@@ -241,20 +348,22 @@ export function GenerateThreeFormsDialog({
       const selected = new Set(current);
       if (selected.has(formId)) {
         selected.delete(formId);
-        if (formId === 'customs') {
-          selected.delete('forex');
-          selected.delete('tax-refund');
+        if (formId === "customs") {
+          selected.delete("forex");
+          selected.delete("tax-refund");
         }
-        if (formId === 'forex') selected.delete('tax-refund');
+        if (formId === "forex") selected.delete("tax-refund");
       } else {
         selected.add(formId);
-        if (formId === 'forex') selected.add('customs');
-        if (formId === 'tax-refund') {
-          selected.add('customs');
-          selected.add('forex');
+        if (formId === "forex") selected.add("customs");
+        if (formId === "tax-refund") {
+          selected.add("customs");
+          selected.add("forex");
         }
       }
-      return THREE_FORMS_CONFIG.map((form) => form.id).filter((id) => selected.has(id));
+      return THREE_FORMS_CONFIG.map((form) => form.id).filter((id) =>
+        selected.has(id),
+      );
     });
   };
 
@@ -265,7 +374,7 @@ export function GenerateThreeFormsDialog({
       next[index] = {
         ...next[index],
         hsCode: value,
-        source: value ? 'manual' : 'missing',
+        source: value ? "manual" : "missing",
         refundRate: null,
       };
       return next;
@@ -279,9 +388,11 @@ export function GenerateThreeFormsDialog({
   const handleSuggestOne = async (index: number) => {
     const row = displayRows[index];
     const parts = [row.productName];
-    if (row.packingItem.product?.declaration) parts.push(row.packingItem.product.declaration);
-    if (row.packingItem.product?.specification) parts.push(row.packingItem.product.specification);
-    const query = parts.join(' ').trim();
+    if (row.packingItem.product?.declaration)
+      parts.push(row.packingItem.product.declaration);
+    if (row.packingItem.product?.specification)
+      parts.push(row.packingItem.product.specification);
+    const query = parts.join(" ").trim();
 
     setRows((prev) => {
       const next = [...getBaseRows(prev)];
@@ -298,7 +409,7 @@ export function GenerateThreeFormsDialog({
           ...next[index],
           suggesting: false,
           hsCode: match?.match?.hsCode || next[index].hsCode,
-          source: match?.match?.hsCode ? 'ai' : next[index].source,
+          source: match?.match?.hsCode ? "ai" : next[index].source,
           refundRate: match?.match?.refundRate ?? null,
         };
         return next;
@@ -314,7 +425,7 @@ export function GenerateThreeFormsDialog({
         next[index] = { ...next[index], suggesting: false };
         return next;
       });
-      toast.error('AI 建议失败');
+      toast.error("AI 建议失败");
     }
   };
 
@@ -327,7 +438,7 @@ export function GenerateThreeFormsDialog({
       .filter(({ row }) => !row.hsCode.trim());
 
     if (missing.length === 0) {
-      toast.info('所有商品均已有 HS 编码');
+      toast.info("所有商品均已有 HS 编码");
       return;
     }
 
@@ -335,9 +446,11 @@ export function GenerateThreeFormsDialog({
     try {
       const queries = missing.map(({ row }) => {
         const parts = [row.productName];
-        if (row.packingItem.product?.declaration) parts.push(row.packingItem.product.declaration);
-        if (row.packingItem.product?.specification) parts.push(row.packingItem.product.specification);
-        return parts.join(' ').trim();
+        if (row.packingItem.product?.declaration)
+          parts.push(row.packingItem.product.declaration);
+        if (row.packingItem.product?.specification)
+          parts.push(row.packingItem.product.specification);
+        return parts.join(" ").trim();
       });
 
       const res = await hsCodeService.batchMatch(queries);
@@ -351,7 +464,7 @@ export function GenerateThreeFormsDialog({
             next[index] = {
               ...next[index],
               hsCode: m.match.hsCode,
-              source: 'ai',
+              source: "ai",
               refundRate: m.match.refundRate ?? null,
             };
           }
@@ -362,42 +475,47 @@ export function GenerateThreeFormsDialog({
       const matched = matches.filter((m) => m?.match?.hsCode).length;
       toast.success(`AI 批量建议：${matched}/${missing.length} 个补全`);
     } catch {
-      toast.error('AI 批量建议失败');
+      toast.error("AI 批量建议失败");
     } finally {
       setBatchSuggesting(false);
     }
   };
 
   /**
-   * 确认生成三张表
-   * 思路：1. 过滤有效行 2. 组装 payload（含 productId、packingItemId）3. 调用后端接口
+   * 职责：校验并生成全部选中单据，失败显示具体消息且保留当前草稿供显式重试。
+   * 思路：1. 检查全量行 2. 组装 payload 3. 单次提交，成功下载，失败恢复按钮。
+   * @returns 请求处理结束，不自动重放生成操作
    */
   const handleGenerateForms = async () => {
     setGenerating(true);
     try {
       if (displayRows.length === 0) {
-        toast.error('当前货柜没有装箱商品，无法生成单据');
+        toast.error("当前货柜没有装箱商品，无法生成单据");
         setGenerating(false);
         return;
       }
       if (missingCount > 0) {
-        toast.error(`仍有 ${missingCount} 个商品缺少 HS 编码，必须全部补齐后再生成`);
+        toast.error(
+          `仍有 ${missingCount} 个商品缺少 HS 编码，必须全部补齐后再生成`,
+        );
         setGenerating(false);
         return;
       }
       if (!generationReady) {
-        toast.error(blockingIssues[0]?.message || '出口单证资料仍有阻塞项，请先补齐');
+        toast.error(
+          blockingIssues[0]?.message || "出口单证资料仍有阻塞项，请先补齐",
+        );
         setGenerating(false);
         return;
       }
 
       const items = displayRows.map((r) => ({
-        productId: r.packingItem.productId,        // Product 主键（必填，FK 约束）
-        packingItemId: r.packingItem.id,           // PackingItem id（可选）
+        productId: r.packingItem.productId, // Product 主键（必填，FK 约束）
+        packingItemId: r.packingItem.id, // PackingItem id（可选）
         productName: r.productName,
         hsCode: r.hsCode.trim(),
         quantity: r.packingItem.quantity,
-        unit: r.packingItem.unit || r.packingItem.product?.unit || '',
+        unit: r.packingItem.unit || r.packingItem.product?.unit || "",
         unitPrice: r.packingItem.unitPrice || 0,
         totalPrice: r.packingItem.totalPrice || 0,
         refundRate: r.refundRate ?? undefined,
@@ -408,12 +526,19 @@ export function GenerateThreeFormsDialog({
         salesContractId: salesContract.id,
         items,
         extraData: {
-          customs: { exporter: '', consignee: '', destinationCountry: '', portOfLoading: '', portOfDestination: '', transportMode: '' },
-          forex: { bankName: '' },
+          customs: {
+            exporter: "",
+            consignee: "",
+            destinationCountry: "",
+            portOfLoading: "",
+            portOfDestination: "",
+            transportMode: "",
+          },
+          forex: { bankName: "" },
         },
-        generateCustoms: selectedForms.includes('customs'),
-        generateForex: selectedForms.includes('forex'),
-        generateTaxRefund: selectedForms.includes('tax-refund'),
+        generateCustoms: selectedForms.includes("customs"),
+        generateForex: selectedForms.includes("forex"),
+        generateTaxRefund: selectedForms.includes("tax-refund"),
       };
 
       const response = await threeFormsService.generateThreeForms(payload);
@@ -424,9 +549,13 @@ export function GenerateThreeFormsDialog({
         taxRefundId: results.taxRefundId ?? undefined,
       };
 
-      toast.success(`生成成功：${selectedForms.length} 张单据，正在下载 Excel...`);
+      toast.success(
+        `生成成功：${selectedForms.length} 张单据，正在下载 Excel...`,
+      );
       if (results.warnings?.length) {
-        toast.warning(`已生成，但有 ${results.warnings.length} 项风险需人工复核`);
+        toast.warning(
+          `已生成，但有 ${results.warnings.length} 项风险需人工复核`,
+        );
       }
       onGenerated?.(generatedFormIds);
 
@@ -437,18 +566,16 @@ export function GenerateThreeFormsDialog({
           forexId: generatedFormIds.forexId,
           taxRefundId: generatedFormIds.taxRefundId,
         });
-        toast.success('Excel 下载成功');
+        toast.success("Excel 下载成功");
       } catch {
-        toast.warning('Excel 下载失败，请稍后从报关单列表重新导出');
+        toast.warning("Excel 下载失败，请稍后从报关单列表重新导出");
       }
 
       handleOpenChange(false);
     } catch (err: unknown) {
-      // 提取后端返回的具体错误信息，方便排查
-      const apiMsg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      const displayMsg = apiMsg || '生成单据失败，请检查数据后重试';
-      console.error('[GenerateThreeForms] 生成失败:', err);
+      // 3.1. 拦截器已展开响应正文；仅恢复按钮，保留 HS 和单据选择供人工修正重试。
+      const displayMsg = getErrorMessage(err, "生成单据失败，请检查数据后重试");
+      console.error("[GenerateThreeForms] 生成失败:", err);
       toast.error(displayMsg);
       setGenerating(false);
     }
@@ -460,10 +587,19 @@ export function GenerateThreeFormsDialog({
         <DialogHeader>
           <DialogTitle>一键生成出口三张表</DialogTitle>
           <DialogDescription>
-            合同编号：{salesContract.contractNo} &nbsp;|&nbsp; 共 {displayRows.length} 个商品，
+            合同编号：{salesContract.contractNo} &nbsp;|&nbsp; 共{" "}
+            {displayRows.length} 个商品，
             {readyCount} 个已有 HS 编码
-            {missingCount > 0 && <span className="text-red-500 ml-1">，{missingCount} 个待填写</span>}
-            {previewLoading && <span className="ml-2 text-muted-foreground">· 正在校验当前税则与价格</span>}
+            {missingCount > 0 && (
+              <span className="text-red-500 ml-1">
+                ，{missingCount} 个待填写
+              </span>
+            )}
+            {previewLoading && (
+              <span className="ml-2 text-muted-foreground">
+                · 正在校验当前税则与价格
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -473,7 +609,9 @@ export function GenerateThreeFormsDialog({
             {THREE_FORMS_CONFIG.map((form) => (
               <Button
                 key={form.id}
-                variant={selectedForms.includes(form.id) ? 'default' : 'outline'}
+                variant={
+                  selectedForms.includes(form.id) ? "default" : "outline"
+                }
                 size="sm"
                 onClick={() => toggleForm(form.id)}
               >
@@ -502,35 +640,63 @@ export function GenerateThreeFormsDialog({
           </div>
 
           {readiness ? (
-            <Card className={blockingIssues.length > 0 ? 'border-amber-300 bg-amber-50/60' : 'border-emerald-200 bg-emerald-50/60'}>
+            <Card
+              className={
+                blockingIssues.length > 0
+                  ? "border-amber-300 bg-amber-50/60"
+                  : "border-emerald-200 bg-emerald-50/60"
+              }
+            >
               <CardContent className="grid gap-3 px-4 py-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
                   <p className="text-xs text-muted-foreground">报关资料</p>
-                  <p className={readiness.customsReady ? 'font-medium text-emerald-700' : 'font-medium text-amber-800'}>
-                    {readiness.customsReady ? '完整' : '有阻塞项'}
+                  <p
+                    className={
+                      readiness.customsReady
+                        ? "font-medium text-emerald-700"
+                        : "font-medium text-amber-800"
+                    }
+                  >
+                    {readiness.customsReady ? "完整" : "有阻塞项"}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">退税估算资料</p>
-                  <p className={readiness.taxRefundReady ? 'font-medium text-emerald-700' : 'font-medium text-amber-800'}>
-                    {readiness.taxRefundReady ? '完整' : '有阻塞项'}
+                  <p
+                    className={
+                      readiness.taxRefundReady
+                        ? "font-medium text-emerald-700"
+                        : "font-medium text-amber-800"
+                    }
+                  >
+                    {readiness.taxRefundReady ? "完整" : "有阻塞项"}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">出口明细合计</p>
-                  <p className="font-medium tabular-nums">${readiness.summary.totalExportAmountUsd.toLocaleString()}</p>
+                  <p className="font-medium tabular-nums">
+                    ${readiness.summary.totalExportAmountUsd.toLocaleString()}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">预计退税</p>
-                  <p className="font-medium tabular-nums">¥{readiness.summary.totalEstimatedRefundCny.toLocaleString()}</p>
+                  <p className="font-medium tabular-nums">
+                    ¥
+                    {readiness.summary.totalEstimatedRefundCny.toLocaleString()}
+                  </p>
                 </div>
                 {blockingIssues.length > 0 ? (
                   <div className="sm:col-span-2 lg:col-span-4">
-                    <p className="text-xs font-medium text-amber-900">生成前必须处理</p>
+                    <p className="text-xs font-medium text-amber-900">
+                      生成前必须处理
+                    </p>
                     <ul className="mt-1 space-y-1 text-xs text-amber-900">
                       {blockingIssues.slice(0, 4).map((issue, index) => (
-                        <li key={`${issue.packingItemId || 'global'}-${issue.code}-${index}`}>
-                          {issue.productName ? `${issue.productName}：` : ''}{issue.message}
+                        <li
+                          key={`${issue.packingItemId || "global"}-${issue.code}-${index}`}
+                        >
+                          {issue.productName ? `${issue.productName}：` : ""}
+                          {issue.message}
                         </li>
                       ))}
                     </ul>
@@ -547,7 +713,9 @@ export function GenerateThreeFormsDialog({
                 <div className="flex items-start gap-2 text-sm text-amber-800">
                   <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                   <p>
-                    系统优先使用该商品最近一次正式报关的 HS 编码，其次使用商品档案编码；都没有时才需要 AI 建议或人工输入。
+                    系统优先使用该商品最近一次正式报关的 HS
+                    编码，其次使用商品档案编码；都没有时才需要 AI
+                    建议或人工输入。
                     人工覆盖只用于本次单证，生成后会作为下一次的历史报关依据。
                   </p>
                 </div>
@@ -563,7 +731,8 @@ export function GenerateThreeFormsDialog({
                   <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                   <p>
                     <strong>{noRefundRows.length} 个商品无出口退税</strong>
-                    （退税率 0%）：{noRefundRows.map((r) => r.productName).join('、')}。
+                    （退税率 0%）：
+                    {noRefundRows.map((r) => r.productName).join("、")}。
                     该部分货值无法申请退税，请在报价与成本核算时留意。
                   </p>
                 </div>
@@ -586,80 +755,113 @@ export function GenerateThreeFormsDialog({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {displayRows.map((row, index) => !row.packingItem ? null : (
-                  <TableRow
-                    key={row.packingItem.id}
-                    className={!row.hsCode.trim() ? 'bg-red-50' : row.refundRate === 0 ? 'bg-amber-50/70' : ''}
-                  >
-                    <TableCell className="font-medium max-w-[160px] truncate" title={row.productName}>
-                      {row.productName}
-                      {row.readinessLine?.issues.some((issue) => issue.severity === 'error') ? (
-                        <p className="mt-1 whitespace-normal text-[11px] font-normal leading-4 text-amber-700">
-                          {row.readinessLine.issues.find((issue) => issue.severity === 'error')?.message}
-                        </p>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {row.packingItem.quantity ?? '-'} {row.packingItem.unit || row.packingItem.product?.unit || ''}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {row.readinessLine?.totalPriceUsd ? (
-                        `$${row.readinessLine.totalPriceUsd.toFixed(2)}`
-                      ) : row.readinessLine?.recommendedUnitPriceUsd ? (
-                        <span className="text-amber-700">
-                          待录入<br />建议单价 ${row.readinessLine.recommendedUnitPriceUsd.toFixed(2)}
-                        </span>
-                      ) : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        aria-label={`${row.productName} HS 编码`}
-                        value={row.hsCode}
-                        onChange={(e) => handleHsCodeChange(index, e.target.value)}
-                        placeholder="输入 10 位 HS 编码"
-                        className="h-7 text-sm font-mono"
-                        maxLength={20}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <SourceBadge source={row.source} />
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {row.refundRate === 0 ? (
-                        <span className="inline-flex items-center gap-1 font-medium text-red-600">
-                          <AlertCircle className="h-3.5 w-3.5" />
-                          0%（无退税）
-                        </span>
-                      ) : row.refundRate !== null && row.refundRate !== undefined ? (
-                        `${row.refundRate}%`
-                      ) : (
-                        <span className="text-xs">—</span>
-                      )}
-                      {row.readinessLine?.hsEvidence?.effectiveDate ? (
-                        <p className="mt-0.5 text-[10px] text-muted-foreground">
-                          生效 {new Date(row.readinessLine.hsEvidence.effectiveDate).toLocaleDateString('zh-CN')}
-                        </p>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleSuggestOne(index)}
-                        disabled={row.suggesting || batchSuggesting}
-                        className="h-7 px-2 text-purple-600 hover:text-purple-700"
-                        title="查询其他 HS 编码建议"
-                        aria-label={`为 ${row.productName} 查询 HS 编码建议`}
+                {displayRows.map((row, index) =>
+                  !row.packingItem ? null : (
+                    <TableRow
+                      key={row.packingItem.id}
+                      className={
+                        !row.hsCode.trim()
+                          ? "bg-red-50"
+                          : row.refundRate === 0
+                            ? "bg-amber-50/70"
+                            : ""
+                      }
+                    >
+                      <TableCell
+                        className="font-medium max-w-[160px] truncate"
+                        title={row.productName}
                       >
-                        {row.suggesting ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
+                        {row.productName}
+                        {row.readinessLine?.issues.some(
+                          (issue) => issue.severity === "error",
+                        ) ? (
+                          <p className="mt-1 whitespace-normal text-[11px] font-normal leading-4 text-amber-700">
+                            {
+                              row.readinessLine.issues.find(
+                                (issue) => issue.severity === "error",
+                              )?.message
+                            }
+                          </p>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {row.packingItem.quantity ?? "-"}{" "}
+                        {row.packingItem.unit ||
+                          row.packingItem.product?.unit ||
+                          ""}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {row.readinessLine?.totalPriceUsd ? (
+                          `$${row.readinessLine.totalPriceUsd.toFixed(2)}`
+                        ) : row.readinessLine?.recommendedUnitPriceUsd ? (
+                          <span className="text-amber-700">
+                            待录入
+                            <br />
+                            建议单价 $
+                            {row.readinessLine.recommendedUnitPriceUsd.toFixed(
+                              2,
+                            )}
+                          </span>
                         ) : (
-                          <Sparkles className="h-3 w-3" />
+                          "-"
                         )}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          aria-label={`${row.productName} HS 编码`}
+                          value={row.hsCode}
+                          onChange={(e) =>
+                            handleHsCodeChange(index, e.target.value)
+                          }
+                          placeholder="输入 10 位 HS 编码"
+                          className="h-7 text-sm font-mono"
+                          maxLength={20}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <SourceBadge source={row.source} />
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {row.refundRate === 0 ? (
+                          <span className="inline-flex items-center gap-1 font-medium text-red-600">
+                            <AlertCircle className="h-3.5 w-3.5" />
+                            0%（无退税）
+                          </span>
+                        ) : row.refundRate !== null &&
+                          row.refundRate !== undefined ? (
+                          `${row.refundRate}%`
+                        ) : (
+                          <span className="text-xs">—</span>
+                        )}
+                        {row.readinessLine?.hsEvidence?.effectiveDate ? (
+                          <p className="mt-0.5 text-[10px] text-muted-foreground">
+                            生效{" "}
+                            {new Date(
+                              row.readinessLine.hsEvidence.effectiveDate,
+                            ).toLocaleDateString("zh-CN")}
+                          </p>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleSuggestOne(index)}
+                          disabled={row.suggesting || batchSuggesting}
+                          className="h-7 px-2 text-purple-600 hover:text-purple-700"
+                          title="查询其他 HS 编码建议"
+                          aria-label={`为 ${row.productName} 查询 HS 编码建议`}
+                        >
+                          {row.suggesting ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-3 w-3" />
+                          )}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ),
+                )}
               </TableBody>
             </Table>
           </div>
@@ -676,12 +878,21 @@ export function GenerateThreeFormsDialog({
           >
             重置
           </Button>
-          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={generating}>
+          <Button
+            variant="outline"
+            onClick={() => handleOpenChange(false)}
+            disabled={generating}
+          >
             取消
           </Button>
           <Button
             onClick={handleGenerateForms}
-            disabled={generating || previewLoading || selectedForms.length === 0 || !generationReady}
+            disabled={
+              generating ||
+              previewLoading ||
+              selectedForms.length === 0 ||
+              !generationReady
+            }
           >
             {generating ? (
               <>
