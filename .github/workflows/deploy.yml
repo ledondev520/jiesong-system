@@ -45,6 +45,14 @@ jobs:
         working-directory: ./frontend
         run: npm ci
 
+      - name: Prepare isolated frontend API fixture dependencies
+        working-directory: ./backend
+        run: |
+          test ! -e .env
+          test ! -L .env
+          npm ci
+          npm run db:generate
+
       - name: Lint & TypeScript check
         working-directory: ./frontend
         run: |

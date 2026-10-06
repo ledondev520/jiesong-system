@@ -56,3 +56,9 @@ Node20.19.0 实测内置 Undici6.21.1，未设置的 HTTP server `keepAliveTimeo
 仅修正测试：夹具记录进行中的真实HTTP Promise，给分页完成链一个I/O调度轮次，等待已触发的真实请求及后续页结算；`openTarget` 在 React `act` 中等待该门槛后直接定位目标row，移除单元素 loading 查询。每例清理同样先结算请求再重置下一例证据和故障；结算时观察到的请求拒绝继续抛出，业务与网络失败不会被当成成功。没有改变断言超时、测试超时、响应、自动重试或任何产品代码。
 
 私有localhost测试传输增加 `Connection: close`，只移除普通名称测试对非目标 keep-alive 复用的依赖；它不是产品 Socket 修复，没有改变生产服务的连接设置。修改后6项串行通过，完整集成仍须由协调任务重验，不能把串行绿误记为 coverage 全套通过。
+
+## Hosted依赖前置补齐
+
+PR61首次hosted执行记录205个其他测试文件通过，名称测试在beforeAll为 `Name fixture exited before startup`，6项尚未执行。此前 `test-and-acceptance.yml` 的 frontend-unit只安装frontend依赖；`ci.yml` 的backend安装/生成在前端测试之后，Deploy的Pre-deploy Checks也只安装frontend，均缺少真实夹具所需的backend运行环境。
+
+仅在这三个Vitest job测试前加入backend/.env文件和符号链接不存在的断言、锁定 `npm ci` 与现有 `npm run db:generate`。Prisma锁定为5.22.0，其client postinstall会尝试generate，但可捕获部分失败，因此保留明确生成门槛；不复制client、不加新依赖、不跳过测试，也不创建默认业务数据库。fixture仍独占0700/0600临时SQLite并由已提交迁移初始化。CI后面的后端测试复用该安装/client，迁移和测试位置不变；生产SSH与secret/env策略不变。工作流静态验证不能代替修复后hosted结果，协调任务负责独立review和后续CI验收。

@@ -53,6 +53,8 @@
 
 ## 常用命令
 
+Vitest包含名称限定的真实HTTP/SQLite测试。请先在不含 `backend/.env` 的隔离checkout中，于backend目录执行锁定依赖 `npm ci` 和现有 `npm run db:generate`；随后运行前端测试。无需创建默认业务数据库，测试自行创建0700目录/0600数据库。CI三个Vitest job的前置见 `.github/workflows/README.md`。
+
 ```bash
 # 启动开发服务器
 npm run dev
