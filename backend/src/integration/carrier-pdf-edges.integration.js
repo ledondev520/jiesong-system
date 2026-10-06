@@ -2,6 +2,8 @@
  * Input: real PDFKit bytes, Express carrier-check routes and private migrated SQLite
  * Output: four bounded multi-page, row-difference, image-only and malformed cases
  * Pos: extends the genuine-PDF happy path already in trade-lifecycle.integration.js
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -12,6 +14,12 @@ const { execFileSync } = require('node:child_process');
 const { createHash, randomBytes } = require('node:crypto');
 const PDFDocument = require('pdfkit');
 
+/**
+ * 职责：收集 PDFKit 输出流，生成仅在内存中的真实 PDF。
+ * @param {(document: PDFDocument) => void} draw 在文档上绘制合成文字或图片的回调
+ * @returns {Promise<Buffer>} 文档结束后的完整 PDF 字节
+ * @throws {Error} 绘制或 PDF 输出流失败时拒绝 Promise
+ */
 const makePdf = draw => new Promise((resolve, reject) => {
   const chunks = [];
   const document = new PDFDocument({ size: 'A4', margin: 40 });
@@ -39,6 +47,11 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
   let requestSequence = 0;
   let fixtureSequence = 0;
   const auditRequests = new Set();
+  /**
+   * 职责：在快照或清理前等待本测试成功请求的异步审计全部落库。
+   * @returns {Promise<void>} 全部审计已保存；没有待检查请求时立即完成
+   * @throws {Error} 数据库查询失败或五秒内审计未齐时拒绝 Promise
+   */
   const waitForAudit = async () => {
     if (!db || !auditRequests.size) return;
     const deadline = Date.now() + 5000;
@@ -90,6 +103,15 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
     const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
   });
   const base = `http://127.0.0.1:${server.address().port}/api/v1`;
+  /**
+   * 职责：以真实角色调用当前 Express 接口，断言状态并登记需等待的审计。
+   * @param {string} method HTTP 方法
+   * @param {string} route 相对于 /api/v1 的接口路径
+   * @param {object|FormData|undefined} body JSON、multipart 请求体或无请求体
+   * @param {{role?: string, expected?: number, audited?: boolean}} [options] 角色、预期状态及成功请求审计标志
+   * @returns {Promise<object>} 解析后的完整 JSON 响应信封
+   * @throws {Error} 请求、响应解析或预期 HTTP 状态断言失败时拒绝 Promise
+   */
   const call = async (method, route, body, { role = 'SALES', expected = 200, audited = false } = {}) => {
     const requestId = `synthetic-carrier-${++requestSequence}`;
     const response = await fetch(base + route, {
@@ -103,14 +125,33 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
     if (audited && response.status >= 200 && response.status < 300) auditRequests.add(requestId);
     return payload;
   };
+  /**
+   * 职责：通过真实 multipart 核对入口提交合成 PDF 字节。
+   * @param {object} fixture 含 sale.id 的合成出货夹具
+   * @param {Buffer} bytes 正常或损坏的内存 PDF 字节
+   * @param {number} [expected=201] 预期 HTTP 状态
+   * @returns {Promise<object>} 核对入口的完整 JSON 响应信封
+   * @throws {Error} 请求或 HTTP 状态断言失败时拒绝 Promise
+   */
   const uploadPdf = async (fixture, bytes, expected = 201) => {
     const body = new FormData();
     body.append('file', new Blob([bytes], { type: 'application/pdf' }), 'synthetic-carrier-packing.pdf');
     return call('POST', `/sales/${fixture.sale.id}/packing-list-check`, body, { expected, audited: true });
   };
+  /**
+   * 职责：以 FINANCE 身份读取指定合成出货及报关单的内部准备度。
+   * @param {object} fixture 含 sale.id 和 declaration.id 的合成夹具
+   * @returns {Promise<object>} 响应 data 中的完整内部准备清单
+   * @throws {Error} 请求、响应解析或 HTTP 状态断言失败时拒绝 Promise
+   */
   const preparation = async fixture => (await call('GET',
     `/tax-refunds/workbench/${fixture.sale.id}/preparation?customsDeclarationId=${fixture.declaration.id}`,
     undefined, { role: 'FINANCE' })).data;
+  /**
+   * 职责：从内部准备清单选取现有船司装箱数据一致性检查项。
+   * @param {{checklist: Array<object>}} result 内部准备度响应
+   * @returns {object|undefined} document-consistency 检查项；未提供该项时为 undefined
+   */
   const consistency = result => result.checklist.find(item => item.id === 'document-consistency');
   const supplier = await db.supplier.create({ data: {
     name: 'Synthetic carrier supplier', taxId: 'SYNTHETIC-CARRIER-TAX',
@@ -129,6 +170,13 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
   const quantities = [47, 83];
   const boxes = [3, 7];
   const costs = [531.1, 1875.8];
+  /**
+   * 职责：建立只缺船司核对的两商品合成出货及真实三单、报关和发票依据。
+   * 思路：私有库创建采购/装箱来源，调用既有三单生成入口，再补合成已放行报关行和票面事实。
+   * @param {string} label 本测试内唯一的合同与报关编号后缀
+   * @returns {Promise<{sale: object, declaration: object, rows: Array<object>}>} 合成出货、报关单及按创建时间排序的装箱行
+   * @throws {Error} 夹具持久化、三单请求或响应断言失败时拒绝 Promise
+   */
   const makeFixture = async label => {
     const sequence = ++fixtureSequence;
     const invoiceNo = String(26110000000000000000n + BigInt(sequence));
@@ -182,6 +230,13 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
     } });
     return { sale, declaration, rows };
   };
+  /**
+   * 职责：生成两页、两商品且包含局部片段外参考数字的合成装箱单。
+   * @param {object} fixture 含 sale.contractNo 的合成出货夹具
+   * @param {boolean} [wrongQuantity=false] 是否仅把第一商品的数量从 47 改成 46
+   * @returns {Promise<Buffer>} 内存中的完整两页 PDF 字节
+   * @throws {Error} 绘制或 PDF 输出流失败时拒绝 Promise
+   */
   const textPdf = (fixture, wrongQuantity = false) => makePdf(document => {
     document.text(`${fixture.sale.contractNo} Packing List\nCARRIER EDGE ORIGINAL\n` +
       'Total boxes 10 Gross Weight 250 Net Weight 220 Volume 1.3\n' +
@@ -190,6 +245,15 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
     document.addPage();
     document.text(`${products[1].customsName} Quantity 83 Boxes 7 HS ${products[1].hsCode}\nExternal reference 47`);
   });
+  /**
+   * 职责：核验真实核对记录、受限归档与认证下载均保留同一份 PDF 原件。
+   * 思路：回读私有库结构化结果及文件关联，核对校验和/权限/磁盘字节，再比较 HTTP 下载字节。
+   * @param {object} fixture 含 sale.id 的合成出货夹具
+   * @param {object} check 真实核对 HTTP 响应中的 data 记录
+   * @param {Buffer} bytes 上传的原始 PDF 字节
+   * @returns {Promise<void>} 全部持久化、权限及字节断言通过后完成
+   * @throws {Error} 回读、下载或任一档案断言失败时拒绝 Promise
+   */
   const assertArchived = async (fixture, check, bytes) => {
     const saved = await db.packingListCheck.findUnique({ where: { id: check.id } });
     assert.equal(saved.salesContractId, fixture.sale.id);
@@ -218,10 +282,26 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
     assert.deepEqual(Buffer.from(await download.arrayBuffer()), bytes);
   };
   // Independent read-only SQLite and archive snapshots prove rejection atomicity.
+  /**
+   * 职责：通过独立只读 SQLite 连接快照全部应用表及完整行值。
+   * @returns {object} 按表名索引、按 rowid 排序的行数组，保留业务字段和时间戳
+   * @throws {Error} 只读查询、子进程或 JSON 解析失败
+   */
   const databaseSnapshot = () => JSON.parse(execFileSync('python3', ['-c',
     "import sqlite3,sys,json; c=sqlite3.connect('file:'+sys.argv[1]+'?mode=ro',uri=True); c.row_factory=sqlite3.Row; tables=[r[0] for r in c.execute(\"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name\")]; print(json.dumps({name:[dict(row) for row in c.execute('SELECT * FROM \\\"'+name+'\\\" ORDER BY rowid')] for name in tables})); c.close()",
     database], { encoding: 'utf8', timeout: 10000 }));
+  /**
+   * 职责：只读快照本测试归档树的相对路径、权限和文件校验和。
+   * @returns {Array<object>} 排序后的目录/文件记录；上传根不存在时返回空数组
+   * @throws {Error} 目录、文件属性或文件内容读取失败
+   */
   const archiveSnapshot = () => {
+    /**
+     * 职责：递归读取当前合成归档目录，按名称排序并保留目录节点。
+     * @param {string} directoryPath 本测试上传根内的绝对目录路径
+     * @returns {Array<object>} 相对上传根的路径、权限以及普通文件 SHA-256 记录
+     * @throws {Error} 目录、文件属性或文件内容读取失败
+     */
     const visit = directoryPath => fs.readdirSync(directoryPath).sort().flatMap(name => {
       const absolutePath = path.join(directoryPath, name);
       const stat = fs.statSync(absolutePath);
