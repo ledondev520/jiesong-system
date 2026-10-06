@@ -41,3 +41,5 @@
 - `dashboard-return-context.spec.ts`：390/1440px 实际 Next 路由下的合成只读工作台/经营报表，验证阻塞范围与已应用日期经销售明细返回、Back/Forward 和整页刷新保留，范围快速切换/原生历史、未应用草稿、倒序日期禁用以及全部期间重置。业务写请求拒绝，检查未捕获页面异常；定义与实际浏览器通过情况分别报告。
 
 - `real-role-lifecycle.spec.ts` 新增六项1440px FINANCE内部报关/退税表单验收（每种三项）：新建完整草稿经返回取消/刷新/重开零业务与审计写入；真实重复编号拒绝后保留全部输入，纠正编号重试创建一次，整页重载读回及备注编辑保存/重载，报关明细ID不变；已有记录编辑金额/日期/备注后返回取消，重开恢复原始日期与输入。每项独占 `tax-record-forms` 私有迁移SQLite及真实Express，不mock业务响应，独立只读连接核对整条记录与FINANCE审计操作者。退税编辑使用真实API ISO日期以防空白回填。全部保持DRAFT/已退金额0，不调用正式申报、确认、资金结算、导出、上传或外部服务。`playwright test real-role-lifecycle.spec.ts --list --grep='FINANCE (customs|refunds)'` 仅验证六项定义；浏览器执行以既有hosted CI为准。
+
+- `real-menu-export-documents.spec.ts`：六项1440px真实SALES菜单验收，从登录后的出口合同入口进入详情；覆盖申报三表资料门禁/取消，生成三条关联内部记录/整页重载与报关/退税菜单读回，实际下载XLSX完整标题/表头/明细/金额，双击只发一次但明确再次生成沿用追加版本，商业三单元数据门禁与只读预检取消，确认生成/归档/实际三Sheet下载与重载后归档同字节再下载，以及资料变化导致真正400后保留弹窗、修复并明确重试。每项独占 `menu-export-documents` 的已提交迁移0700/0600私有SQLite和真实Express；只透传真正响应，可暂缓交付但不改业务结果，下载字节复用后端锁定ExcelJS解析。只用合成当前税则和业务资料，不访问生产或真实发票/附件、AI供应商、正式申报、签约或资金/出货操作。`playwright test real-menu-export-documents.spec.ts --list` 仅验证六项定义；真实浏览器执行沿用hosted CI门槛，不尝试绕过本地Chromium或loopback限制。

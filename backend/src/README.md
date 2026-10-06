@@ -149,3 +149,5 @@
 `middleware/apiRateLimit.js` 使用已锁定express-rate-limit保留全局100/min和原429/重试响应，挂载在JSON解析与所有路由之前；规范IP但不自动信任代理。`apiRateLimit.test.js` 验证100/101边界、恶意XFF、IPv4/IPv6归一、显式代理与原10/15min登录限制。所有独立认证HTTP测试服务器同样挂载此门槛。
 
 全局及原登录HTTP配额仍按进程内存计数，重启清空、worker独立；数据库持久的邮箱/密码找回配额保持独立，不把HTTP计数当作分布式持久限制。
+
+- `services/threeFormsService.js` 的三表XLSX把报关明细表头追加在独立第4行，并对该行应用原有表头样式，保留第1行合并标题与第2行单据信息。真实角色HTTP下载/ExcelJS字节解析回归在 `testHelpers/role-browser-server.test.js` 的六项 `menu documents HTTP`；原生成/编号追加规则不变，不涉及附件上传或正式申报。

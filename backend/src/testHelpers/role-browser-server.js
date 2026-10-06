@@ -1,4 +1,4 @@
-/** Test-only role browser backend: real Express/auth/services, receipt allocation, own notifications, internal tax record forms and private synthetic SQLite. */
+/** Test-only role browser backend: real Express/auth/services, internal records and menu export documents on private synthetic SQLite. */
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -11,7 +11,7 @@ const password = 'test-only-role-browser-password-never-production';
 if (process.env.NODE_ENV !== 'test' || !process.send
   || !directory?.startsWith(path.join(os.tmpdir(), 'jiesong-role-browser-e2e-'))
   || fs.realpathSync(directory) !== directory
-  || !['purchase', 'warehouse', 'sales', 'boss', 'receipt-pool', 'notification-state', 'tax-record-forms'].includes(scenario)
+  || !['purchase', 'warehouse', 'sales', 'boss', 'receipt-pool', 'notification-state', 'tax-record-forms', 'menu-export-documents'].includes(scenario)
   || fs.existsSync(path.resolve(__dirname, '../../.env'))) process.exit(2);
 process.umask(0o077);
 fs.chmodSync(directory, 0o700);
@@ -20,7 +20,7 @@ process.env.UPLOAD_DIR = path.join(directory, 'uploads');
 process.env.JWT_SECRET = 'test-only-role-browser-jwt-secret-never-production';
 
 async function start() {
-  if (scenario === 'tax-record-forms') {
+  if (['tax-record-forms', 'menu-export-documents'].includes(scenario)) {
     // This form roundtrip uses the committed migration chain, never db push or
     // client generation. Prisma's executable children need normal execute bits;
     // the database is created 0600 first inside the already-private 0700 root.
@@ -101,6 +101,22 @@ async function start() {
     };
   }
   let taxRecords;
+  let exportDocuments;
+  if (scenario === 'menu-export-documents') {
+    // Only starting cargo/current tariff evidence. Document previews, generation
+    // and downloads use unchanged routes; no uploads, filings or provider calls.
+    await db.hsCode.create({ data: { hsCode: product.hsCode, productName: product.customsName,
+      taxRate: 0, vatRate: 13, refundRate: 13, effectiveDate: new Date('2026-01-01') } });
+    sale = await db.salesContract.create({ data: {
+      contractNo: 'EXP-SYNTHETIC-MENU-DOCS', status: 'PACKING', portId: port.id,
+      exchangeRate: 7.2, totalAmount: 20, totalBoxes: 2, grossWeight: 20, netWeight: 18, volume: 0.2,
+      packingItems: { create: { productId: product.id, purchaseItemId: purchaseItem.id,
+        quantity: 10, unit: '件', boxes: 2, grossWeight: 20, netWeight: 18, volume: 0.2,
+        specification: '合成箱', origin: '合成产地', purchaseCost: 113,
+        purchaseContractNo: purchase.contractNo, unitPrice: 2, totalPrice: 20 } },
+    }, include: { packingItems: true } });
+    exportDocuments = { packingItemId: sale.packingItems[0].id };
+  }
   if (scenario === 'tax-record-forms') {
     // Form-independent starting records only. Browser create/update requests use
     // ordinary authenticated CRUD; no filing, confirmation or settlement route.
@@ -131,7 +147,7 @@ async function start() {
     baseURL: `http://127.0.0.1:${server.address().port}`,
     purchaseId: purchase.id, purchaseItemId: purchaseItem.id, productId: product.id,
     receiptId: receipt?.id, receiptItemId: receipt?.items[0].id, salesId: sale?.id, salesNo: sale?.contractNo,
-    receiptPool, taxRecords,
+    receiptPool, taxRecords, exportDocuments,
     users: Object.fromEntries(Object.entries(users).map(([role, user]) => [role, { id: user.id, username: user.username }])),
   }));
   let closing = false;

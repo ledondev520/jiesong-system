@@ -13,7 +13,8 @@ type Scenario =
   | "boss"
   | "receipt-pool"
   | "notification-state"
-  | "tax-record-forms";
+  | "tax-record-forms"
+  | "menu-export-documents";
 export const testPassword = "test-only-role-browser-password-never-production";
 export interface RoleFixture {
   server: ChildProcess;
@@ -26,6 +27,7 @@ export interface RoleFixture {
   receiptItemId?: string;
   salesId?: string;
   salesNo?: string;
+  exportDocuments?: { packingItemId: string };
   receiptPool?: {
     usdReceiptId: string;
     cnyReceiptId: string;
@@ -301,6 +303,29 @@ c.close()`;
       { encoding: "utf8", timeout: 10000 },
     ),
   ) as TaxRecordSnapshot;
+}
+
+export type ExportDocumentSnapshot = Record<
+  string,
+  Record<string, string | number | null>[]
+>;
+export function readExportDocuments(
+  fixture: RoleFixture,
+): ExportDocumentSnapshot {
+  // Independent read-only rows, including archived versions, never an API echo.
+  const script = `import sqlite3,sys,json
+c=sqlite3.connect('file:'+sys.argv[1]+'?mode=ro',uri=True)
+c.row_factory=sqlite3.Row
+tables=['sales_contracts','packing_items','customs_declarations','customs_declaration_items','forex_verifications','tax_refunds','contract_files','sales_contract_files']
+print(json.dumps({table:[dict(row) for row in c.execute('SELECT * FROM '+table+' ORDER BY id')] for table in tables}))
+c.close()`;
+  return JSON.parse(
+    execFileSync(
+      "python3",
+      ["-c", script, path.join(fixture.directory, "synthetic.db")],
+      { encoding: "utf8", timeout: 10000 },
+    ),
+  ) as ExportDocumentSnapshot;
 }
 
 export async function forwardRealApi(page: Page, fixture: RoleFixture) {
