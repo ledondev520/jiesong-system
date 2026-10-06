@@ -1,6 +1,6 @@
 /**
  * Input: actual authenticated multipart finance routes, synthetic XLSX and committed migrations
- * Output: financial workbook preview, confirmation and persisted HTTP readback acceptance
+ * Output: financial preview/confirmation, HTTP readback and independent SQL/literal amount/source acceptance
  * Pos: isolated financial import regression; no production data, providers or archived workbooks
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -28,6 +28,13 @@ async function statement({ formulas = false, missingCache, blank = false, cashFl
     sheet.getCell('A2').value = '企业名称: 合成财务验收公司';
     sheet.getCell('E2').value = `2026-${String(month).padStart(2, '0')}`;
   }
+  /**
+   * 职责：写入独立合成数值或其已知公式缓存，不计算公式。
+   * @param {import('exceljs').Worksheet} sheet 合成工作表
+   * @param {string} address 固定单元格地址
+   * @param {number} number 独立夹具字面量
+   * @returns {void} 原地设置合成单元格
+   */
   const value = (sheet, address, number) => {
     sheet.getCell(address).value = formulas ? { formula: String(number), result: number } : number;
   };
@@ -75,6 +82,12 @@ async function statement({ formulas = false, missingCache, blank = false, cashFl
  */
 async function bundle({ month = 12, ledgerSummary = '合成收款', company = '合成财务验收公司', trialPeriod = month, ...statementOptions } = {}) {
   const XLSX = require('xlsx');
+  /**
+   * 职责：按既有布局把合成源行写入内存工作簿。
+   * @param {string} sheetName 真实导入契约Sheet名称
+   * @param {Array[]} rows 独立合成标题和数据行
+   * @returns {Buffer} 合成XLSX字节
+   */
   const bytes = (sheetName, rows) => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), sheetName);
@@ -184,7 +197,59 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     return form;
   };
   const importedTables = new Set(['financial_periods', 'balance_sheet_entries', 'income_statement_entries', 'cash_flow_statement_entries', 'account_balance_entries', 'general_ledger_entries', 'financial_data_sources']);
+  /**
+   * 职责：提取本入口不应改变的全部业务表；参数无。
+   * @returns {object} 独立只读SQL中的非财务导入行
+   */
   const unrelated = () => Object.fromEntries(Object.entries(snapshot()).filter(([table]) => !importedTables.has(table)));
+  /**
+   * 职责：把真实已存金额直接与独立夹具字面量比较，不经HTTP/Prisma读取服务。
+   * @param {number} month 2026年合成账期月份
+   * @param {object} options 明确的空值覆盖、现金流/证据和原文件元数据期望
+   * @returns {void} 断言资产、月度/YTD、0、负数、合法空值、证据金额及来源字面量
+   */
+  const assertStoredAmounts = (month, { incomeOverrides = {}, cashFlow = false, evidence = false, sources, statementSheetCount = 3 } = {}) => {
+    const saved = snapshot();
+    const period = saved.financial_periods.find(row => row.year === 2026 && row.month === month);
+    assert.ok(period, 'independent SQL contains the requested synthetic period');
+    const balance = saved.balance_sheet_entries.find(row => row.periodId === period.id);
+    const income = saved.income_statement_entries.find(row => row.periodId === period.id);
+    assert.ok(balance); assert.ok(income);
+    for (const [field, expected] of Object.entries({ totalAssets: 1000.25, totalLiabilities: 400.1, totalEquity: 600.15, cashAndEquivalents: 300.25, inventory: 0, accountsReceivable: null, retainedEarnings: -25.5 })) assert.equal(balance[field], expected, `SQL balance ${field}`);
+    for (const [field, expected] of Object.entries({ revenueMonth: 800.25, revenueYTD: 5000.75, costOfSalesMonth: 500.1, costOfSalesYTD: 3210.25, netProfitMonth: 120.15, netProfitYTD: 900.5, adminExpensesMonth: 0, adminExpensesYTD: 0, financialExpensesMonth: -5.25, financialExpensesYTD: -20.5, ...incomeOverrides })) assert.equal(income[field], expected, `SQL income ${field}`);
+    const cash = saved.cash_flow_statement_entries.find(row => row.periodId === period.id);
+    if (cashFlow) {
+      assert.ok(cash);
+      for (const [field, expected] of Object.entries({ netOperatingCashFlowMonth: 50.25, netOperatingCashFlowYTD: 730.75, netInvestingCashFlowMonth: 0, netInvestingCashFlowYTD: 0, openingCashMonth: 300, openingCashYTD: 250, endingCashMonth: 350.25, endingCashYTD: 300, salesCashMonth: null })) assert.equal(cash[field], expected, `SQL cashflow ${field}`);
+    } else assert.equal(cash, undefined, 'independent SQL has no retained cashflow row');
+    if (evidence) {
+      const account = saved.account_balance_entries.find(row => row.periodId === period.id && row.rowType === 'ACCOUNT');
+      const entry = saved.general_ledger_entries.find(row => row.periodId === period.id && row.rowType === 'ENTRY');
+      const opening = saved.general_ledger_entries.find(row => row.periodId === period.id && row.rowType === 'OPENING');
+      assert.ok(account); assert.ok(entry); assert.ok(opening);
+      assert.equal(account.accountCode, '001002');
+      assert.equal(account.openingDebit, 300.25); assert.equal(account.openingCredit, 0);
+      assert.equal(account.periodDebit, 50.25); assert.equal(account.periodCredit, 0);
+      assert.equal(account.yearDebit, 730.75); assert.equal(account.yearCredit, 0);
+      assert.equal(entry.debit, 50.25); assert.equal(entry.credit, 0); assert.equal(entry.balance, 350.5);
+      assert.equal(opening.debit, null); assert.equal(opening.credit, null); assert.equal(opening.balance, 300.25);
+    }
+    if (sources) {
+      const metadata = saved.financial_data_sources.filter(row => row.periodId === period.id);
+      assert.equal(metadata.length, 3, 'independent SQL retains exactly three source records');
+      for (const [key, type, fileName, sheetName, rowCount] of [
+        ['statement', 'STATEMENT', 'synthetic-bundle-statement.xlsx', '资产负债表/利润表/现金流量表', statementSheetCount],
+        ['trialBalance', 'TRIAL_BALANCE', 'synthetic-trial.xlsx', '科目余额表', 3],
+        ['generalLedger', 'GENERAL_LEDGER', 'synthetic-ledger.xlsx', '明细账', 4],
+      ]) {
+        const source = metadata.find(row => row.type === type);
+        assert.ok(source);
+        assert.equal(source.fileName, fileName); assert.equal(source.sheetName, sheetName); assert.equal(source.rowCount, rowCount);
+        assert.equal(source.fileSize, sources[key].buffer.length);
+        assert.equal(source.sha256, crypto.createHash('sha256').update(sources[key].buffer).digest('hex'));
+      }
+    }
+  };
   const originalUnrelated = unrelated();
   const prior = (await call('GET', '/finance/statements/2025/12')).data;
 
@@ -210,6 +275,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     assert.equal(detail.incomeStatement.costOfSalesMonth, 500.1);
     assert.equal(detail.incomeStatement.adminExpensesMonth, 0);
     assert.equal(detail.incomeStatement.financialExpensesMonth, -5.25);
+    assertStoredAmounts(10);
     const after = snapshot();
     assert.deepEqual((await call('GET', '/finance/statements/2026/10')).data, detail);
     assert.deepEqual(snapshot(), after, 'HTTP readback does not rewrite stored snapshots');
@@ -245,6 +311,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     assert.equal(detail.balanceSheet.totalAssets, 1000.25);
     assert.equal(detail.incomeStatement.revenueYTD, 5000.75);
     assert.equal(detail.reportDate, '2026-11-30T00:00:00.000Z');
+    assertStoredAmounts(11, { incomeOverrides: { revenueMonth: null, costOfSalesMonth: null, adminExpensesMonth: null } });
     assert.deepEqual(unrelated(), originalUnrelated);
   });
 
@@ -277,6 +344,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     assert.equal(replaced.incomeStatement.revenueMonth, null);
     assert.equal(replaced.incomeStatement.netProfitMonth, 120.15);
     assert.equal(snapshot().financial_periods.filter(row => row.year === 2026 && row.month === 10).length, 1);
+    assertStoredAmounts(10, { incomeOverrides: { revenueMonth: null, costOfSalesMonth: null } });
     assert.deepEqual(unrelated(), originalUnrelated);
   });
 
@@ -295,6 +363,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     assert.equal(detail.cashFlowStatement.netOperatingCashFlowMonth, 50.25);
     assert.equal(detail.cashFlowStatement.netOperatingCashFlowYTD, 730.75);
     assert.equal(detail.cashFlowStatement.netInvestingCashFlowMonth, 0);
+    assertStoredAmounts(12, { cashFlow: true, evidence: true, sources });
     assert.deepEqual(detail.accountBalances.map(row => [row.sourceRow, row.rowType, row.accountCode]), [[5, 'ACCOUNT', '001002'], [6, 'SUBTOTAL', null], [7, 'TOTAL', null]]);
     assert.equal(detail.accountBalances[0].periodDebit, 50.25);
     assert.equal(detail.accountBalances[0].periodCredit, 0);
@@ -345,6 +414,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     assert.equal(replaced.dataSources.length, 3);
     assert.equal(replaced.dataSources.find(row => row.type === 'STATEMENT').rowCount, 2);
     assert.equal(snapshot().cash_flow_statement_entries.some(row => row.periodId === detail.id), false);
+    assertStoredAmounts(12, { evidence: true, sources, statementSheetCount: 2 });
     assert.deepEqual(unrelated(), originalUnrelated);
   });
 
@@ -382,6 +452,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     assert.equal(detail.generalLedgerEntries[1].summary, '合成回滚后收款');
     assert.equal(detail.cashFlowStatement.netOperatingCashFlowMonth, 50.25);
     assert.equal(detail.dataSources.length, 3);
+    assertStoredAmounts(12, { cashFlow: true, evidence: true, sources });
   });
 
   await t.test('all four import routes keep the existing actual role and inactive/anonymous authentication boundaries', async () => {
