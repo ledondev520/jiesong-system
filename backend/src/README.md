@@ -133,7 +133,8 @@
 
 - `services/purchaseContractNumberService.js` 统一采购创建、编号预览和批量导入的 `CGyy` 序列：按现存合法数字后缀最大值加一，删除早期草稿不会与仍存在的编号碰撞；预览不预留编号
 - `agent/commands/purchase/createPurchaseWithItems.js` 在合同与明细事务内分配编号，对自动编号唯一冲突或事务写冲突最多重试三次；不更改用户指定编号，也不重试无关数据库错误
-- `services/purchaseImportExportService.js` 的实际 Excel 导入复用统一序列；每行校验通过后原子写入，仅空编号的唯一冲突最多尝试五次，保留显式编号及逐行失败统计
+- `services/purchaseImportExportService.js` 的实际 Excel 导入复用统一序列；非空非法金额及不存在的日历日期逐行拒绝，空日期/金额沿用 null/0，保留数值日期、逗号千位分隔的点小数金额和零金额；每行校验通过后原子写入，仅空编号的唯一冲突最多尝试五次，保留显式编号及逐行失败统计
+- `integration/purchase-excel-import.integration.js` 以真实 multipart HTTP、合成工作簿和已提交迁移构建的私有 0700/0600 SQLite 验证六类当前采购 Excel 导入：有效值、缺必需表头/文件、逐行错误、非法非空金额/日期拒绝、显式编号与空编号重传、历史完成状态确认。独立只读 SQLite 比较原记录及关联表，不访问生产或宣称浏览器验收。
 - `integration/procurement-lifecycle.integration.js` 仅用临时合成 SQLite 和实际 PURCHASE/WAREHOUSE HTTP 请求验证签约、完工回滚/重复、到货与复验幂等、库存列表/详情、删除后编号及同时创建；还验证实际 Excel 导入的自定义编号、五位序列溢出、失败行无写入及四请求并发，由 `npm run test:db` 执行
 
 - `services/batchImportService.js` 的 JSON 采购导入先拒绝非对象行、空白/非文本供应商与商品名称，避免缺省查询条件误选首条目录记录；数量必须有限且大于零，单价必须有限且非负，只接受数字或非空数值字符串，保留零单价。每行事务提交合同与明细；自动编号冲突或事务写冲突最多尝试五次，不更改显式编号，不重试无关错误；失败行回滚且后续行继续

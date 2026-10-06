@@ -1,6 +1,6 @@
 /**
  * Input: Prisma 客户端、Excel 文件路径或查询参数
- * Output: Excel Buffer 或逐行导入统计；留空编号使用统一序列并重试并发占号
+ * Output: Excel Buffer 或逐行导入统计；拒绝非空非法金额/日期，留空编号沿用统一序列
  * Pos: 采购合同批量导入导出服务
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -81,23 +81,31 @@ const formatDate = (date) => {
  */
 const parseExcelDate = (value) => {
   if (value === undefined || value === null || value === '') return null;
-  if (value instanceof Date) return value;
-  if (typeof value === 'number') {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  const calendarDate = (year, month, day) => {
+    const date = new Date(year, month - 1, day);
+    // JS normalizes impossible days/months; an import must not silently change
+    // the supplied calendar date (including Excel's fictitious 1900-02-29).
+    return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? date : null;
+  };
+  if (typeof value === 'number' && Number.isFinite(value)) {
     // Excel 日期序列号转 JS Date
     const d = xlsx.SSF.parse_date_code(value);
-    if (d) return new Date(d.y, d.m - 1, d.d);
+    if (d) return calendarDate(d.y, d.m, d.d);
   }
   if (typeof value === 'string') {
     const s = value.trim();
     // yyyy-MM-dd / yyyy/MM/dd
     const m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
     if (m) {
-      const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-      if (!Number.isNaN(d.getTime())) return d;
+      return calendarDate(Number(m[1]), Number(m[2]), Number(m[3]));
     }
   }
   return null;
 };
+
+// Optional empty cells keep the existing null-date / zero-amount defaults.
+const hasProvidedValue = value => value !== undefined && value !== null && !(typeof value === 'string' && value.trim() === '');
 
 /**
  * 职责：解析金额
@@ -265,10 +273,15 @@ const importPurchasesExcel = async (filePath, userId, options = {}) => {
         }
       }
 
-      const signedAt = colIndex.signedAt !== -1 ? parseExcelDate(row[colIndex.signedAt]) : null;
+      const signedAtInput = colIndex.signedAt !== -1 ? row[colIndex.signedAt] : undefined;
+      const signedAt = parseExcelDate(signedAtInput);
+      if (hasProvidedValue(signedAtInput) && signedAt === null) {
+        throw new Error(`第 ${rowNum} 行：签订日期格式不正确`);
+      }
 
-      const totalAmount = colIndex.totalAmount !== -1 ? parseAmount(row[colIndex.totalAmount]) : null;
-      if (totalAmount !== null && (totalAmount < 0 || Number.isNaN(totalAmount))) {
+      const totalAmountInput = colIndex.totalAmount !== -1 ? row[colIndex.totalAmount] : undefined;
+      const totalAmount = parseAmount(totalAmountInput);
+      if ((hasProvidedValue(totalAmountInput) && totalAmount === null) || (totalAmount !== null && totalAmount < 0)) {
         throw new Error(`第 ${rowNum} 行：总金额格式不正确`);
       }
 
