@@ -413,7 +413,10 @@ test("SALES commercial prerequisites and cancelled preview do not reprice or arc
   expect(preview.summary.totalUsd).toBe(20);
   expect(preview.summary.purchaseCostCny).toBe(113);
   expect(readExportDocuments(fixture)).toEqual(before);
-  await dialog.getByRole("button", { name: "关闭", exact: true }).click();
+  await dialog
+    .locator('[data-slot="dialog-footer"]')
+    .getByRole("button", { name: "关闭", exact: true })
+    .click();
   await page.reload();
   const reopened = await openPacket(page);
   await expect(
