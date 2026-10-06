@@ -8,6 +8,8 @@
 
 存放后端 API 所有源代码文件，实现进销存系统的完整业务逻辑。
 
+`integration/application-audit-readback.integration.js` 以真实 Express/认证角色、已提交迁移的私有合成 SQLite 与独立 SQL 字面资料/只读全表快照，验证日志关键词/IP、日期/分页、完整记录与12列 CSV 内容，以及现有 ADMIN-only 边界和真实分类生成审计的重复读取。`controllers/system/notificationController.js` 的共享筛选仅使用 SQLite 支持的 `contains`，不传 PostgreSQL 的 `mode`；保留日期、过滤、导出上限与现有权限。只验收应用合成记录，不访问生产、OS日志或真实执行历史；页面没有独立详情路由，此套不声称浏览器通过。由 `npm run test:db` 执行。
+
 `integration/notification-state-lifecycle.integration.js` 只用一个当前合成用户、真实认证 HTTP 与迁移后的 0700/0600 私有 SQLite，验证单条已读及重复完成、重新读取/未读筛选/计数，和全部已读重试；独立只读连接比较全部通知字段，确认只改变已读状态，不新增通知。由 `npm run test:db` 执行，不访问生产或测试其他用户。
 
 `integration/tax-preparation-content.integration.js` 在已提交迁移构建的私有合成 SQLite 中，使用真实 Express HTTP 验证四类内部退税准备内容：当前出货与五 Sheet 工作簿一致；供应商税号/开票日期缺失时明确列出差异，拒绝确认且不改记录；重复预览/导出保持相同内容且不重复归档；多商品行的数量和人民币进货价税与美元出口报价保持独立来源。独立只读 SQLite 比较源行和时间戳；三单由既有生成器产生，船司核对仅用合成结构化夹具。不覆盖浏览器、真实文件、正式申报或收退款，由 `npm run test:db` 执行。
@@ -58,6 +60,7 @@
 | aiController.js | AI问答 + 辅助录入 + 当前供应商模型说明 + Anthropic 禁止隐式重试 + 统一分页边界的对话历史 |
 | aiUsageController.js | AI 用量趋势日期校验、调用明细有界分页与用量汇总 |
 | notificationController.js | 统一分页边界的通知列表、已读与生成 |
+| system/notificationController.js | 当前用户通知与 ADMIN 应用审计列表/CSV；共用 SQLite 子串、日期及实体筛选 |
 
 ## 服务清单
 

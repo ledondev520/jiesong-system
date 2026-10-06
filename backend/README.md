@@ -51,6 +51,8 @@ npm run test:all          # 依次执行 test → test:db → test:carrier-pdf�
 
 `test:db` 包含 `src/integration/overview-source-readbacks.integration.js` 的三类真实只读概览验收：上海发运期间与销售下钻的 CNY 毛利/净现金、当前所有权应收应付、固定 UTC 收付趋势来源。使用已提交迁移、独立 SQL 字面夹具和全库非变更断言，保留合同汇总余额与逐笔 USD 收款的不同用途；已在当前 CI Node 20.19.0 验证，Date/object-form mock timers 最低需 20.11，另需 Python 3，不访问现有业务库。
 
+`src/integration/application-audit-readback.integration.js` 验证系统日志实际 HTTP 查询与 CSV：八类关键词/IP、组合日期/角色/实体过滤、分页独立导出、完整旧新值与空用户、中文引号换行及真实生成审计的重复读取。只用已提交迁移、0700/0600 合成 SQLite 与独立只读全表快照；SQLite `contains` 保留既有 LIKE 子串语义，禁止在日志查询中传入不支持的 Prisma `mode`。现有页面只有摘要列表，完整记录经同一列表 DTO 验证，没有新增详情端点；不构成浏览器通过。证据与边界见 [系统日志回归](../docs/quality/application-audit-readback-2026-10-06.md)。
+
 ## 目录结构
 
 ```

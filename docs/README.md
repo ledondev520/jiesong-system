@@ -41,6 +41,7 @@
 | quality/README.md | 子目录索引 | 维护质量门禁与发布结论文档导航 |
 | quality/财务工作簿导入回归_20261006.md | 聚焦验收 | 数字公式缓存、空结果兼容、真实财务 XLSX 预览确认回读、替换/回滚和既有角色边界的隔离证据 |
 | quality/HS本地字典回归_20261006.md | 聚焦验收 | 本地名称/编码组合检索缺陷、真实角色证据维护/独立SQLite回读与浏览器定义和执行边界 |
+| quality/application-audit-readback-2026-10-06.md | 聚焦验收 | 系统日志合成应用审计查询/完整记录/CSV、现有角色与SQLite关键词故障修复证据 |
 | qa/purchase-excel-import-2026-10-06.md | 聚焦验收 | 当前采购 Excel 的非法值、错误/无缓存公式单元格、保留缓存值、重传及组件取消/结果/失败恢复证据 |
 | qa/carrier-pdf-edges-2026-10-06.md | 聚焦验收 | 真实多页 PDF、局部商品数量差异、纯图片人工复核及损坏文件拒绝的 HTTP/SQLite、原件归档与准备度证据 |
 | qa/financial-library-source-readbacks-2026-10-06.md | 聚焦验收 | 现有资料库CLI合成来源入库、脱敏/有序行/来源身份回读、空筛选和迟到旧Sheet修复及hosted定义边界 |
