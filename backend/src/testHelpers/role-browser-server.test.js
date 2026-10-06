@@ -13,14 +13,11 @@ const path = require('node:path');
 const { spawn, execFileSync } = require('node:child_process');
 const password = 'test-only-role-browser-password-never-production';
 
-/**
- * 职责：创建私有角色夹具并提供真实登录、HTTP 和独立只读工具
- * @param t 注册清理的当前测试上下文
- * @param scenario 明确允许的合成业务场景
- * @param temporaryRoot 隔离临时根目录，默认系统临时目录
- * @returns 夹具元数据、私有目录及读取/请求/登录工具
- * @throws 启动超时、权限或真实登录断言失败
- */
+/** 职责：创建私有角色夹具，提供真实登录、HTTP 和独立只读工具
+ * @param t 当前测试及清理上下文
+ * @param scenario 允许的合成业务场景
+ * @param temporaryRoot 私有临时根，默认系统临时目录
+ * @returns 夹具元数据、目录与工具；启动、权限或登录失败时抛错 */
 async function fixtureFor(t, scenario, temporaryRoot = os.tmpdir()) {
   const directory = fs.mkdtempSync(path.join(temporaryRoot, 'jiesong-role-browser-e2e-'));
   fs.chmodSync(directory, 0o700);
@@ -316,57 +313,34 @@ for (const kind of ['customs', 'refunds']) {
   });
 }
 
-// Bounded mirror of the six hosted menu/document cases. All requests use the
-// production Express routes, actual role login and committed-migration SQLite.
-/**
- * 职责：从独立只读连接核对生成文档相关的全部业务行
- * @param f 当前合成角色 HTTP 夹具
- * @returns 按表名组织的单据、装箱和归档快照
- * @throws SQLite 读取或 JSON 解析失败
- */
+/** 职责：独立只读核对生成单据；@param f 合成 HTTP 夹具；@returns 业务行快照，读取或解析失败时抛错 */
 const documentSnapshot = f => Object.fromEntries([
   'sales_contracts', 'packing_items', 'customs_declarations',
   'customs_declaration_items', 'forex_verifications', 'tax_refunds', 'contract_files', 'sales_contract_files',
 ].map(table => [table, f.read(`SELECT * FROM ${table} ORDER BY id`)]));
-/**
- * 职责：构造全部三张内部单据的确定性生成输入
- * @param f 带合成合同、商品和装箱行 ID 的夹具
- * @returns 沿用档案 HS 来源及全部三表选择的请求数据
- * @throws 夹具缺少预置文档元数据
- */
+/** 职责：构造内部三表输入；@param f 含合同、商品和装箱 ID 的夹具；@returns 档案 HS 三表请求，缺元数据时抛错 */
 const formsInput = f => ({ salesContractId: f.salesId,
   items: [{ packingItemId: f.exportDocuments.packingItemId, productId: f.productId,
     hsCode: '9999999999', hsSource: 'stored' }],
   generateCustoms: true, generateForex: true, generateTaxRefund: true });
 const packetInput = { spotRate: 7.2, sellerName: '合成卖方', buyerName: '合成买方',
   packageKind: 'CARTON', tradeTerm: 'FOB', documentDate: '2026-10-01' };
-/**
- * 职责：经真实角色 HTTP 生成全部内部单据并核对成功响应
+/** 职责：经真实 HTTP 生成三表并核对成功响应
  * @param f 当前合成角色 HTTP 夹具
- * @param token 当前合成 SALES 用户的登录令牌
- * @returns 真正生成的记录 ID 与警示数据
- * @throws 请求失败或状态断言不通过
- */
+ * @param token 当前合成 SALES 登录令牌
+ * @returns 生成记录 ID 与警示；请求或状态断言失败时抛错 */
 const generated = async (f, token) => {
   const response = await f.call('POST', '/three-forms/generate', formsInput(f), token);
   assert.equal(response.status, 200, response.body.message);
   return response.body.data;
 };
-/**
- * 职责：限定导出参数为此次明确生成的三条记录 ID
- * @param ids 一次真实生成响应中的单据 ID
- * @returns 精确指定报关、核销与退税记录的查询参数
- * @throws 参数构造失败
- */
+/** 职责：限定此次三表导出；@param ids 真实生成的单据 ID；@returns 精确指定报关、核销和退税记录的查询参数 */
 const formsQuery = ids => new URLSearchParams({ customsDeclarationId: ids.customsDeclarationId, forexId: ids.forexId, taxRefundId: ids.taxRefundId });
-/**
- * 职责：认证下载真实工作簿并解析其完整字节
+/** 职责：认证下载真实工作簿并解析完整字节
  * @param f 当前合成角色 HTTP 夹具
- * @param token 当前合成 SALES 用户的登录令牌
+ * @param token 当前合成 SALES 登录令牌
  * @param route 不含 API 前缀的受保护下载路径
- * @returns 下载字节、解析的 ExcelJS 工作簿及文件名响应头
- * @throws 请求、格式断言或 XLSX 解析失败
- */
+ * @returns 字节、工作簿和文件名头；请求、格式或解析失败时抛错 */
 const binary = async (f, token, route) => {
   const response = await fetch(`${f.baseURL}/api/v1${route}`, { headers: { authorization: `Bearer ${token}` } });
   assert.equal(response.status, 200);
@@ -377,7 +351,6 @@ const binary = async (f, token, route) => {
   await workbook.xlsx.load(bytes);
   return { bytes, workbook, disposition: response.headers.get('content-disposition') };
 };
-
 test('menu documents HTTP: prerequisites and discarded previews leave migrated records unchanged', { timeout: 60000 }, async t => {
   const f = await fixtureFor(t, 'menu-export-documents');
   const token = await f.login('SALES');
@@ -398,7 +371,6 @@ test('menu documents HTTP: prerequisites and discarded previews leave migrated r
   assert.equal(ready.body.data.taxRefundReady, true);
   assert.deepEqual(documentSnapshot(f), before);
 });
-
 test('menu documents HTTP: three forms generate linked drafts, read back and retain XLSX title/header/content', { timeout: 60000 }, async t => {
   const f = await fixtureFor(t, 'menu-export-documents');
   const token = await f.login('SALES');
@@ -441,7 +413,6 @@ test('menu documents HTTP: three forms generate linked drafts, read back and ret
   assert.equal(workbook.getWorksheet('出口退税申报表').getCell('B5').value, '13.00');
   assert.deepEqual(documentSnapshot(f), rows, 'export/readback are read-only');
 });
-
 test('menu documents HTTP: explicit repeated generation preserves existing append-version contract and exact export IDs', { timeout: 60000 }, async t => {
   const f = await fixtureFor(t, 'menu-export-documents');
   const token = await f.login('SALES');
@@ -464,7 +435,6 @@ test('menu documents HTTP: explicit repeated generation preserves existing appen
   }
   assert.deepEqual(documentSnapshot(f), rows);
 });
-
 test('menu documents HTTP: commercial preview validates metadata and cancel-equivalent remains read-only', { timeout: 60000 }, async t => {
   const f = await fixtureFor(t, 'menu-export-documents');
   const token = await f.login('SALES');
@@ -479,7 +449,6 @@ test('menu documents HTTP: commercial preview validates metadata and cancel-equi
   assert.equal(preview.body.data.summary.totalUsd, 20);
   assert.deepEqual(documentSnapshot(f), before);
 });
-
 test('menu documents HTTP: commercial generation archives private workbook and repeated download preserves bytes', { timeout: 60000 }, async t => {
   const f = await fixtureFor(t, 'menu-export-documents');
   const token = await f.login('SALES');
@@ -511,7 +480,6 @@ test('menu documents HTTP: commercial generation archives private workbook and r
   assert.equal(saved.packing_items[0].unitPrice, packet.lines[0].unitPriceUsd);
   assert.deepEqual(documentSnapshot(f), saved);
 });
-
 test('menu documents HTTP: changed prerequisite causes genuine generation failure, explicit repair retries once', { timeout: 60000 }, async t => {
   const f = await fixtureFor(t, 'menu-export-documents');
   const token = await f.login('SALES');

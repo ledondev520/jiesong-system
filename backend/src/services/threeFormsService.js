@@ -414,6 +414,10 @@ const exportThreeFormsExcel = async (salesContractId, ids = {}) => {
   const borderStyle = { style: 'thin', color: { argb: 'FFD1D5DB' } };
   const allBorders = { top: borderStyle, left: borderStyle, bottom: borderStyle, right: borderStyle };
 
+  /** 职责：在标题和单据信息之后追加并设置独立明细表头
+   * @param ws 当前工作表，末行位于已写入的单据信息之后
+   * @param cols 按既有顺序提供的列标题和宽度
+   * @returns 无返回值；仅追加表头并应用原有样式和列宽 */
   const applyHeader = (ws, cols) => {
     // Append below the merged title and document metadata, never overwrite A1.
     const header = ws.addRow(cols.map((c) => c.header));
