@@ -13,6 +13,8 @@
 | 名字 | 地位 | 功能 |
 | --- | --- | --- |
 | helpers.ts | 合成夹具 | 认证、业务 API 与状态；采购 receipts 必须返回 typed summary，邮箱注册仅返回待审核结果 |
+| profile-preference-fixture.ts | 本地设置辅助 | 复用真实合成 SALES 登录/迁移夹具，透传 HTTP、只读安全用户字段与明确偏好键，注入单次本地写失败 |
+| profile-preference-lifecycle.spec.ts | 个人设置验收定义 | 1440px Header 菜单下完整草稿取消、保存/重开/整页重载、偏好与资料持久化失败后的明确重试 |
 | mobile.spec.ts | 移动验收 | 320/390/430px 页面及延迟财务明细滚动、邮箱验证码注册申请、登录退出、表单及错误恢复 |
 | button-coverage.spec.ts | 交互验收 | 主要页面按钮、弹窗与无运行时异常检查 |
 | smoke.spec.ts | 冒烟验收 | 主要页面与业务入口 |
@@ -51,3 +53,5 @@
 - `real-menu-export-documents.spec.ts`：六项1440px真实SALES菜单验收，从登录后的出口合同入口进入详情；覆盖申报三表资料门禁/取消，生成三条关联内部记录/整页重载与报关/退税菜单读回，实际下载XLSX完整标题/表头/明细/金额，双击只发一次但明确再次生成沿用追加版本，商业三单元数据门禁与只读预检取消，确认生成/归档/实际三Sheet下载与重载后归档同字节再下载，以及资料变化导致真正400后保留弹窗、修复并明确重试。每项独占 `menu-export-documents` 的已提交迁移0700/0600私有SQLite和真实Express；只透传真正响应，可暂缓交付但不改业务结果，下载字节复用后端锁定ExcelJS解析。只用合成当前税则和业务资料，不访问生产或真实发票/附件、AI供应商、正式申报、签约或资金/出货操作。`playwright test real-menu-export-documents.spec.ts --list` 仅验证六项定义；真实浏览器执行沿用hosted CI门槛，不尝试绕过本地Chromium或loopback限制。
 
 - `real-export-3d.spec.ts`：一项真实 SALES 菜单验收，复用 `menu-export-documents` 的两箱/0.2CBM缺尺寸合成资料与迁移 SQLite，不增加夹具或改写 HTTP 结果。打开既有3D页签，核对箱数与一项尺寸预估；通过画布自身已保留的 GPU 绘制输出验证有色商品确实可见，旋转/滚轮缩放/右键平移均改变稳定像素，1440→390→1440响应尺寸后仍可操作，页签返回及整页重载再次绘制。就绪条件是跨浏览器动画帧后的实际像素连续三次一致、有色商品像素及画布比例与可见尺寸匹配；不使用任意 sleep、截图基线、Three内部状态或仅Canvas存在断言。鼠标在前后观测时移出画布，排除悬浮高亮；DOM统计/提示不进入像素读取。业务写请求必须为零，独立只读 SQLite 核对合同/装箱/单据/附件完整行不变；pageerror 从测试开始持续检查。严格 console error 观测从 `loginAs` 确认真正 SALES 登录成功后、出口菜单导航前开始，覆盖全部后续业务/3D/重载错误，不按状态码或 WebGL 文本过滤（含不抛异常的 Three 着色器链接错误，橙色边框仍绘制也不能放行）。该边界只把登录准备阶段的无会话 `/auth/session` 探测与被验收业务分开；首轮 hosted trace 已确认唯一控制台错误是登录成功前该 GET 的401，不修改真实认证响应。不涉及截图下载、空货物/WebGL不可用分支、生产资料、上传或外部业务服务。`playwright test real-export-3d.spec.ts --list` 只核对一项定义，浏览器实际执行须由既有 hosted Chromium CI 完成；禁止跳过有色绘制断言、过滤401/WebGL错误或增加浏览器权限/启动参数来绕过环境限制。
+
+- `profile-preference-lifecycle.spec.ts`：四项1440px Header 用户菜单→个人设置定义，复用 `sales-header` 的已提交迁移0700/0600私有 SQLite 和真实合成 SALES 登录。取消姓名/备注/两项偏好草稿后重开及整页重载恢复保存值；保存规范化姓名、备注、紧凑信息密度和最近模块开关后，同标签重开/重载读回；原生偏好写入失败或后续资料持久化失败均保留全部草稿和明确错误，用户重试后成功并重载。后者按现有非原子顺序验证已写入偏好与已变化的内存姓名，不承诺回滚。仅读取 `jiesong_header_user_preferences`；资料写失败注入只匹配 sessionStorage 的目标键，不检查其值，不读认证存储或 cookies。既有真实 `auth/me` 只读核对 id/username/name/role，借通知 GET 原样透传认证上下文，不提取凭据或修改响应。业务写请求拒绝，只有合成登录可 POST，持续检查 pageerror；不上传头像、不请求桌面通知权限、不访问生产账号。此套只验收本地保存生命周期，不代表服务端资料持久化、跨设备同步或偏好已作用到其他页面。`playwright test profile-preference-lifecycle.spec.ts --list` 仅核对四项定义；实际 Chromium 浏览器执行等待既有 hosted CI，本地执行限制不通过安装、启动参数或隧道绕过。
