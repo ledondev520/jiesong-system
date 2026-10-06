@@ -1,6 +1,6 @@
 /**
  * Input: Real SALES login/menu, existing private role fixture and rendered canvas pixels
- * Output: One 3D render/control/resize/remount/reload case with independent zero-write readback
+ * Output: One 3D lifecycle case with independent zero-write readback and page/console error checks
  * Pos: Hosted Chromium acceptance for the existing export-detail visualization
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -199,8 +199,14 @@ test("SALES 3D canvas renders estimated cargo, controls and resize survive tab r
 }) => {
   test.setTimeout(90000);
   const errors: string[] = [];
+  const consoleErrors: string[] = [];
   const writes: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
+  // Shader-link failures can log console.error without an uncaught exception.
+  // Keep every console error, including WebGL, even if colored outlines render.
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
   page.on("request", (request) => {
     const pathname = new URL(request.url()).pathname;
     if (
@@ -259,6 +265,7 @@ test("SALES 3D canvas renders estimated cargo, controls and resize survive tab r
     expect(readExportDocuments(fixture)).toEqual(before);
     expect(writes).toEqual([]);
     expect(errors).toEqual([]);
+    expect(consoleErrors).toEqual([]);
     await expect(page.getByText("页面出现异常", { exact: true })).toHaveCount(
       0,
     );
