@@ -12,6 +12,8 @@
 
 `integration/carrier-pdf-edges.integration.js` 扩展既有 trade-lifecycle 的真实 PDF 正向链路，以内存 PDFKit、实际 Express/default pdfjs/原件归档和已提交迁移创建的私有 SQLite 验证四类边缘：两商品两页匹配与准备度、预期数字出现在片段外仍拒绝错误行数量、纯图片转人工复核、损坏 PDF 返回既有 422 且数据库/归档/准备度不变。保留现有数字存在性及商品身份分段比较，不提供通用表格解析或 OCR。独立 `npm run test:carrier-pdf` 已接入 `test:all`；本次验证既有 `test:db` 为 173 项、新 PDF 命令为 5 项（含四个子用例及外层测试）。详见 `../../docs/qa/carrier-pdf-edges-2026-10-06.md`。
 
+`integration/financial-snapshot-readbacks.integration.js` 用已提交迁移和独立写入/只读回查的 0700/0600 合成 SQLite，通过真实认证 HTTP 验证四类财务读取：跨年账期的独立月度/YTD 报表快照；有序、可空/零/负值及汇总行证据与现有财务/老板边界；全历史人民币供应商差异和分组总计；当前名称搜索下钻的来源 ID、批次元数据、分类与重复读取不改已关联/忽略状态。名称搜索是发现链接，可能包含重叠名称；银行下钻默认 CNY，发票模型无币种字段。不访问真实文件、上传、正式申报或生产数据，不改变报表/对账口径。
+
 ## 文件清单
 
 | 文件/目录 | 地位 | 功能 |
