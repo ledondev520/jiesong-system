@@ -322,6 +322,18 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
       exact: true,
     })
     .click();
+  // Next client navigation must commit before reload, or reload cancels it.
+  await expect(page).toHaveURL(
+    (url) =>
+      url.pathname ===
+      `/dashboard/customs-declarations/${saved.customs_declarations[0].id}`,
+  );
+  await expect(
+    page.getByRole("heading", {
+      name: String(saved.customs_declarations[0].declarationNo),
+      exact: true,
+    }),
+  ).toBeVisible();
   await page.reload();
   await expect(
     page.getByRole("heading", {
@@ -346,6 +358,16 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
       exact: true,
     })
     .click();
+  await expect(page).toHaveURL(
+    (url) =>
+      url.pathname === `/dashboard/tax-refunds/${saved.tax_refunds[0].id}`,
+  );
+  await expect(
+    page.getByRole("heading", {
+      name: String(saved.tax_refunds[0].refundNo),
+      exact: true,
+    }),
+  ).toBeVisible();
   await page.reload();
   await expect(
     page.getByRole("heading", {
