@@ -102,7 +102,7 @@
 
 ## 工具清单
 
-- `testHelpers/hs-code-browser-server.js` / `.test.js`：独占0700目录/0600SQLite，通过已提交迁移初始化三条独立SQLite字面量HS记录与六种现有角色；真实登录/HTTP和独立只读回查验证本地组合查询及已有ADMIN/PURCHASE/FINANCE人工证据维护。组合查询先用既有Prisma名称与编码AND结果筛掉前缀候选，保留原候选分数；名称单独的模糊召回、数字检索及code-only截短回退保持原实现。所有来源链接为合成example.invalid，不访问外部来源或AI；随`npm test`执行，完整证据见`../../docs/quality/HS本地字典回归_20261006.md`。
+- `testHelpers/hs-code-browser-server.js` / `.test.js`：独占0700目录/0600SQLite，通过已提交迁移初始化三条独立SQLite字面量HS记录与六种现有角色；真实登录/HTTP和独立只读回查验证本地组合查询及已有ADMIN/PURCHASE/FINANCE人工证据维护。组合查询用已召回候选ID限定既有Prisma名称contains查询，只收紧候选集合，保留原候选分数与组合截短回退；名称单独的模糊召回、数字检索及code-only截短回退保持原实现。所有来源链接为合成example.invalid，不访问外部来源或AI；随`npm test`执行，完整证据见`../../docs/quality/HS本地字典回归_20261006.md`。
 
 - `controllers/system/portCategoryController.js` 和 `customsBrokerController.js` 沿用档案表单的必填名称/港口代码规则：显式空白或 null 更新在持久化前返回 400，省略字段仍保留；报关行选填字段显式 null 清空为数据库 null，避免保存字符串“null”。不新增唯一性或删除规则。
 - `integration/catalog-form-lifecycle.integration.js` 在迁移后的私有合成 SQLite 中，以真实 HTTP 验证港口、商品分类和报关行三类创建/编辑/列表回读。独立只读 SQLite 回读检查空白、现有重复键和缺失父级导致的失败不改变既有字段或时间戳；不覆盖浏览器、权限或生产数据。

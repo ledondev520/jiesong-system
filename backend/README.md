@@ -193,7 +193,7 @@ Authorization: Bearer <token>
 - 函数必须有职责注释
 - 单元测试使用 Node 内置 test runner（`node --test`）
 
-本地HS字典的 `src/testHelpers/hs-code-browser-server.test.js` 随 `npm test` 自动发现；五项合同检查使用已提交迁移、真实现有角色登录/HTTP与独立只读SQLite，覆盖名称/数字前缀/组合交集、详情、手工证据保存回读、缓存刷新、失败与现有读角色零写入，以及夹具拒绝非测试/不安全目录/缺少IPC。无AI、外部HS或生产访问；浏览器结果另以hosted CI为准。
+本地HS字典的 `src/testHelpers/hs-code-browser-server.test.js` 随 `npm test` 自动发现；六项合同检查使用已提交迁移、真实现有角色登录/HTTP与独立只读SQLite，覆盖名称/数字前缀/组合交集、详情、手工证据保存回读、缓存刷新、失败与现有读角色零写入，以及夹具拒绝非测试/不安全目录/缺少IPC。无AI、外部HS或生产访问；浏览器结果另以hosted CI为准。
 
 ## 默认账户
 

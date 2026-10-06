@@ -145,12 +145,28 @@ test('HS local HTTP: combined name and numeric prefix narrow the current search'
   const token = await f.login('PURCHASE');
   const query = '/hs-codes?code=999901&keyword=' + encodeURIComponent('编码甲');
   const before = f.snapshot();
-  for (const suffix of ['', '&fuzzy=true']) {
-    const result = await f.call('GET', query + suffix, undefined, token);
-    assert.equal(result.status, 200);
-    assert.deepEqual(result.body.data.items.map(row => row.hsCode), ['9999010001']);
-    assert.equal(result.body.data.pagination.total, 1);
+  for (const [name, expected] of [['编码甲', ['9999010001']], ['合成无匹配名称', []], ['999901', []]]) {
+    for (const suffix of ['', '&fuzzy=true']) {
+      const result = await f.call('GET', query.replace(encodeURIComponent('编码甲'), encodeURIComponent(name)) + suffix, undefined, token);
+      assert.equal(result.status, 200);
+      assert.deepEqual(result.body.data.items.map(row => row.hsCode), expected);
+      assert.equal(result.body.data.pagination.total, expected.length);
+    }
   }
+  const noCandidates = await f.call('GET', '/hs-codes?code=7777&keyword=' + encodeURIComponent('编码甲') + '&fuzzy=true', undefined, token);
+  assert.equal(noCandidates.status, 200);
+  assert.deepEqual(noCandidates.body.data.items, []);
+  assert.deepEqual(f.snapshot(), before);
+});
+
+test('HS local HTTP: combined name filters within the existing truncated prefix fallback', { timeout: 60000 }, async t => {
+  const f = await fixture(t);
+  const token = await f.login('PURCHASE');
+  const before = f.snapshot();
+  const result = await f.call('GET', '/hs-codes?code=9999010999&keyword=' + encodeURIComponent('编码甲') + '&fuzzy=true', undefined, token);
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.data.items.map(row => row.hsCode), ['9999010001']);
+  assert.equal(result.body.data.items[0].similarity, 0.78);
   assert.deepEqual(f.snapshot(), before);
 });
 

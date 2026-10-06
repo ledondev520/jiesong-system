@@ -210,6 +210,22 @@ test("local HS search distinguishes numeric prefix, intersects name, opens detai
   await expect(
     page.getByRole("cell", { name: fixture.productName, exact: true }),
   ).toBeVisible();
+  const fallbackResponse = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      url.pathname === "/api/v1/hs-codes" &&
+      url.searchParams.get("code") === "9999010999"
+    );
+  });
+  await page.getByPlaceholder("编码前缀（4–10位）").fill("9999010999");
+  const fallback = await fallbackResponse;
+  expect(fallback.status()).toBe(200);
+  const fallbackData = (await fallback.json()).data;
+  expect(
+    fallbackData.items.map((row: { hsCode: string }) => row.hsCode),
+  ).toEqual([fixture.hsCode]);
+  expect(fallbackData.items[0].similarity).toBe(0.78);
+  await expect(page).toHaveURL(/code=9999010999/);
   await openDetail(page);
   // The two existing copy controls belong only to excluded AI result interfaces.
   await expect(
@@ -217,7 +233,7 @@ test("local HS search distinguishes numeric prefix, intersects name, opens detai
   ).toHaveCount(0);
   await page.getByRole("button", { name: "返回列表", exact: true }).click();
   await expect(page.getByPlaceholder("编码前缀（4–10位）")).toHaveValue(
-    "999901",
+    "9999010999",
   );
   await expect(page.getByPlaceholder("商品名称（支持模糊匹配）")).toHaveValue(
     "编码甲",
