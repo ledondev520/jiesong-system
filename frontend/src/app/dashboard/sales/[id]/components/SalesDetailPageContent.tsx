@@ -432,12 +432,17 @@ export default function SalesDetailPage({ params }: PageProps) {
 
   /**
    * 职责：按需加载商品、含港口关联的门店及库存，提供头编辑选项且不阻塞首屏。
+   * 参数：无；使用当前引用资料加载状态和页面级服务。
+   * @returns Promise<void>；已加载/加载中则跳过，否则更新引用资料与加载状态
+   * 请求错误不向调用方传播；失败通过现有 toast 反馈并允许重试。
    */
   const loadReferenceData = useCallback(async () => {
+    // 0. 已完成或正在加载时不重复请求。
     if (referenceDataLoadedRef.current || referenceDataLoading) {
       return;
     }
 
+    // 1. 并行读取既有引用资料，门店保留目的港关联。
     setReferenceDataLoading(true);
     try {
       const [productsRes, storesRes, inventoryRes] = await Promise.all([

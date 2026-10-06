@@ -31,7 +31,12 @@ test.afterEach(async () => {
   expect(pageErrors).toEqual([]);
 });
 
-/** 职责：真实 SALES 登录后经唯一出口菜单打开已有合同头信息。 */
+/**
+ * 职责：真实 SALES 登录后经唯一出口菜单打开已有合同头信息。
+ * @param page 当前验收页面，已透传到独占真实后端
+ * @returns 当前合成 SALES 用户的登录令牌
+ * @throws 登录身份、菜单导航或合同信息入口断言失败
+ */
 async function enterHeader(page: Page) {
   const token = await loginAs(page, fixture, "SALES");
   await page.getByRole("link", { name: "出口", exact: true }).first().click();
@@ -43,6 +48,11 @@ async function enterHeader(page: Page) {
   await page.getByRole("tab", { name: "合同信息", exact: true }).click();
   return token;
 }
+/**
+ * 职责：定位当前详情页的合同信息页签面板。
+ * @param page 当前合同详情验收页面
+ * @returns 合同信息 tabpanel 定位器
+ */
 const panelFor = (page: Page) =>
   page.getByRole("tabpanel", { name: "合同信息" });
 const savedValues = {
@@ -58,7 +68,13 @@ const draftValues = {
   port: "合成合同头补充港口",
 };
 
-/** 职责：核对全部现有头字段，不添加新业务字段。 */
+/**
+ * 职责：核对全部现有头字段，不添加新业务字段。
+ * @param panel 当前合同信息编辑面板
+ * @param values 预期的汇率、日期和目的港显示值
+ * @returns 完成四项输入断言的 Promise<void>
+ * @throws 任一输入或目的港显示值不符合预期
+ */
 async function expectValues(panel: Locator, values: typeof savedValues) {
   await expect(panel.getByLabel("汇率", { exact: true })).toHaveValue(
     values.rate,
@@ -73,7 +89,13 @@ async function expectValues(panel: Locator, values: typeof savedValues) {
     panel.getByRole("combobox", { name: "目的港", exact: true }),
   ).toContainText(values.port);
 }
-/** 职责：修改全部四项已有头输入，用真实门店/港口选择资料。 */
+/**
+ * 职责：修改全部四项已有头输入，用真实门店/港口选择资料。
+ * @param page 当前处于头编辑状态的合同详情页面
+ * @param rate 合成汇率输入，默认普通草稿汇率
+ * @returns 填写并核对完整头草稿的 Promise<void>
+ * @throws 输入不可操作、港口选项缺失或草稿断言失败
+ */
 async function fillDraft(page: Page, rate = draftValues.rate) {
   const panel = panelFor(page);
   await panel.getByLabel("汇率", { exact: true }).fill(rate);
@@ -87,6 +109,12 @@ async function fillDraft(page: Page, rate = draftValues.rate) {
     .click();
   await expectValues(panel, { ...draftValues, rate });
 }
+/**
+ * 职责：等待当前合成合同的真实普通头更新响应。
+ * @param page 将明确点击保存的当前验收页面
+ * @returns 当前合同 PUT 响应的 Promise<Response>
+ * @throws 等待响应超时
+ */
 function updateResponse(page: Page) {
   return page.waitForResponse(
     (response) =>
@@ -94,11 +122,19 @@ function updateResponse(page: Page) {
       response.request().method() === "PUT",
   );
 }
-/** 职责：独立 SQLite 核对仅四项头资料及更新时间改变，其余业务事实不变。 */
+/**
+ * 职责：独立 SQLite 核对仅四项头资料及更新时间改变，其余业务事实不变。
+ * 思路：核对合同头变化，再逐表核对守恒和唯一真实 SALES 审计。
+ * @param before 保存前的独立 SQLite 快照
+ * @param after 保存后的独立 SQLite 快照
+ * @returns 无；完成合同头、无关业务事实和审计断言
+ * @throws 字段、业务行或审计操作者不符合预期
+ */
 function assertConserved(
   before: ExportDocumentSnapshot,
   after: ExportDocumentSnapshot,
 ) {
+  // 0. 仅允许四项既有头字段及更新时间变化。
   expect(after.sales_contracts).toEqual([
     {
       ...before.sales_contracts[0],
@@ -109,6 +145,7 @@ function assertConserved(
       updatedAt: expect.any(Number),
     },
   ]);
+  // 1. 其他业务表逐行守恒，并核对唯一真实操作者审计。
   for (const table of Object.keys(before)) {
     if (!["sales_contracts", "audit"].includes(table))
       expect(after[table], table).toEqual(before[table]);
@@ -120,6 +157,12 @@ function assertConserved(
     userId: fixture.users.SALES.id,
   });
 }
+/**
+ * 职责：明确保存当前草稿并等待真实成功、编辑关闭和唯一审计落库。
+ * @param page 当前已填写完整头草稿的验收页面
+ * @returns 完成成功响应、界面和审计断言的 Promise<void>
+ * @throws 响应非 200、编辑未关闭或审计数量不为一
+ */
 async function saveDraft(page: Page) {
   const response = updateResponse(page);
   await panelFor(page)

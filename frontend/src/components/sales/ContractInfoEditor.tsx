@@ -51,7 +51,11 @@ interface ContractInfoEditorProps {
   onSave: (data: Partial<SalesContract>) => Promise<void>;
 }
 
-/** 职责：从已保存合同建立独立编辑草稿，不改变空日期/港口的既有提交语义。 */
+/**
+ * 职责：从已保存合同建立独立编辑草稿，不改变空日期/港口的既有提交语义。
+ * @param contract 当前已保存合同资料
+ * @returns 供编辑或取消复原的四项已有合同头输入值
+ */
 const savedHeaderForm = (contract: SalesContract) => ({
   exchangeRate: contract.exchangeRate,
   signedAt: formatDate(contract.signedAt, ""),
@@ -62,6 +66,8 @@ const savedHeaderForm = (contract: SalesContract) => ({
 /**
  * 职责：合同信息编辑表单
  * 思路：编辑已有头资料；取消恢复保存值，回调拒绝时保留草稿供明确重试
+ * @param props 已保存合同、含港口关联的门店资料及普通异步保存回调
+ * @returns 合同事实展示及可取消、可明确重试的头资料编辑界面
  */
 export function ContractInfoEditor({
   contract,
@@ -79,14 +85,23 @@ export function ContractInfoEditor({
     setForm(savedHeaderForm(contract));
   }, [contract]);
 
-  /** 职责：取消当前草稿并恢复已保存头资料，不触发写入。 */
+  /**
+   * 职责：取消当前草稿并恢复已保存头资料，不触发写入。
+   * 参数：无；使用当前已保存合同资料。
+   * @returns 无；复原四项输入并退出编辑状态
+   */
   const handleCancel = () => {
     setForm(savedHeaderForm(contract));
     setIsEditing(false);
   };
 
-  /** 职责：等待普通保存完成；错误反馈由调用方负责，拒绝不关闭草稿。 */
+  /**
+   * 职责：等待普通保存完成；错误反馈由调用方负责，拒绝不关闭草稿。
+   * 参数：无；向 onSave 提交当前四项头字段草稿。
+   * @returns Promise<void>；成功退出编辑，失败保留草稿，均释放保存状态
+   */
   const handleSave = async () => {
+    // 0. 标记保存中并等待调用方的普通保存结果。
     setSaving(true);
     try {
       await onSave({
@@ -99,6 +114,7 @@ export function ContractInfoEditor({
     } catch {
       // The detail page reports the original HTTP error; keep this draft retryable.
     } finally {
+      // 1. 成功或失败均释放忙状态，允许后续明确操作。
       setSaving(false);
     }
   };
