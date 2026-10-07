@@ -1,18 +1,21 @@
 # DRAFT: replace the existing deploy.yml ON A DEDICATED MAINTENANCE BRANCH ONLY.
 # No main push/PR trigger; dispatch only after independent review and owner approval.
 # Uses existing staging-scoped SSH credentials for the same host as current main deployment.
-name: PR32 Bounded Release Preparation
+name: Nestlet Read-only Host Inventory
 on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Bounded operation, no migrations or restarts
+        description: Read-only inventory, no installs or service changes
         required: true
         default: inventory
         type: choice
         options:
           - inventory
-          - snapshot
+      expected_host_sha256:
+        description: SHA256 of the selected server IPv4 address; checked before SSH
+        required: true
+        type: string
       host_key_sha256:
         description: Optional independently verified VPS SSH public host-key fingerprint
         required: false
@@ -20,11 +23,11 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: pr32-release-preflight
+  group: nestlet-host-inventory
   cancel-in-progress: false
 jobs:
   preflight:
-    if: github.ref == 'refs/heads/ops/pr32-release-preflight-20261004' && github.actor == 'ledondev520'
+    if: github.ref == 'refs/heads/ops/nestlet-host-inventory-20261007' && github.actor == 'ledondev520'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: staging
@@ -36,13 +39,13 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           log-public-key: false
-      - name: Bounded release preparation
+      - name: Read-only host inventory
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
           RELEASE_OPERATION: ${{ inputs.operation }}
-          RELEASE_RUN_ID: ${{ github.run_id }}
+          EXPECTED_HOST_SHA256: ${{ inputs.expected_host_sha256 }}
           EXPECTED_HOST_FINGERPRINT: ${{ inputs.host_key_sha256 }}
         shell: bash
         run: |
@@ -54,8 +57,15 @@ jobs:
           if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
             [[ "$EXPECTED_HOST_FINGERPRINT" =~ ^SHA256:[a-zA-Z0-9+/]{43}$ ]]
           fi
-          [[ "$RELEASE_OPERATION" == inventory || "$RELEASE_OPERATION" == snapshot ]]
-          [[ "$RELEASE_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$RELEASE_OPERATION" == inventory ]]
+          [[ "$EXPECTED_HOST_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          matched=0
+          while IFS= read -r address; do
+            observed="$(printf '%s' "$address" | sha256sum | awk '{print $1}')"
+            if [[ "$observed" == "$EXPECTED_HOST_SHA256" ]]; then matched=1; fi
+          done < <(getent ahostsv4 "$SSH_HOST" | awk '{print $1}' | sort -u)
+          [[ "$matched" == 1 ]] || { echo 'Selected server address does not match the existing SSH target'; exit 1; }
+          echo 'Existing SSH target matches selected server address; no address is logged.'
           umask 077
           # No pin: inherit the already-authorized deploy channel's host-key discovery.
           # A supplied independent pin is mandatory to match; never bypass a mismatch.
@@ -77,12 +87,6 @@ jobs:
             echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
           fi
           test -s "$known_hosts"
-          if [[ "$RELEASE_OPERATION" == inventory ]]; then
-            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
-              -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
-              'node -' < scripts/pr32-release-preflight.cjs
-          else
-            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
-              -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
-              "python3 - $RELEASE_RUN_ID" < scripts/pr32-online-backup.py
-          fi
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            'sh -s' < scripts/nestlet-host-inventory.sh
