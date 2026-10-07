@@ -120,3 +120,7 @@
 - 注册邮箱作为用户名，登录兼容原用户名；管理员创建用户仍需ADMIN。邮件正文、验证码与云服务响应正文不得进入日志。验证码记录超过24小时后在下一次发码时清理。
 - RBAC 路由扫描仅明确豁免登录前的 `/auth/email-code` 与 `/auth/email-register`；回归检查它们保留限流及校验，`/auth/register` 继续要求认证和ADMIN。
 - `frontend/src/app/dashboard/users/components/UserDialog.tsx` 提供管理员账号开通开关；两套用户更新入口更新状态或角色后立即清除认证缓存，避免停用/改权延迟。
+
+## Nestlet same-release configuration reload
+- `scripts/nestlet-reload-config.sh` only recreates the exact existing reviewed Nestlet image using its existing private configuration after operator setup has finished. It shares the Nestlet maintenance lease, checks metadata-only configuration stability and preserves schema3 storage. It never inspects credentials, edits configuration, builds/pulls images, restores data or restarts other services.
+- A failed authentication boolean is a blocker for operator review, never permission to reveal/reset a credential. Compose errors are suppressed to avoid configuration-detail leakage.

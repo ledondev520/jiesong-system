@@ -1,21 +1,26 @@
 # DRAFT: replace the existing deploy.yml ON A DEDICATED MAINTENANCE BRANCH ONLY.
 # No main push/PR trigger; dispatch only after independent review and owner approval.
 # Uses existing staging-scoped SSH credentials for the same host as current main deployment.
-name: Nestlet First SQLite Rollout
+name: Nestlet Same-Release Configuration Reload
 on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Upgrade only Nestlet to a reviewed CI-green pinned release
+        description: Reload only the existing approved Nestlet release configuration
         required: true
-        default: upgrade
+        default: reload
         type: choice
         options:
-          - upgrade
+          - reload
       release_sha:
-        description: Exact approved SQLite-enabled commit with passing Node and container CI
+        description: Existing release only: 2fc15f216714d0331a82456edb1d97b9f76f8498
         required: true
         type: string
+      operator_setup_complete:
+        description: Operator helper has exited and no credential writer or other release is active
+        required: true
+        default: false
+        type: boolean
       expected_host_sha256:
         description: SHA256 of the selected server IPv4 address; checked before SSH
         required: true
@@ -31,9 +36,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   preflight:
-    if: github.repository == 'ledondev520/jiesong-system' && github.repository_owner == 'ledondev520' && github.ref == 'refs/heads/ops/nestlet-sqlite-20261007' && github.actor == 'ledondev520'
+    if: github.repository == 'ledondev520/jiesong-system' && github.repository_owner == 'ledondev520' && github.ref == 'refs/heads/ops/nestlet-config-reload-20261007' && github.actor == 'ledondev520'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 10
     environment: staging
     steps:
       - uses: actions/checkout@v4
@@ -43,13 +48,14 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           log-public-key: false
-      - name: Upgrade pinned Nestlet release
+      - name: Reload existing Nestlet configuration
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
           RELEASE_OPERATION: ${{ inputs.operation }}
           RELEASE_SHA: ${{ inputs.release_sha }}
+          OPERATOR_SETUP_COMPLETE: ${{ inputs.operator_setup_complete }}
           EXPECTED_HOST_SHA256: ${{ inputs.expected_host_sha256 }}
           EXPECTED_HOST_FINGERPRINT: ${{ inputs.host_key_sha256 }}
         shell: bash
@@ -62,8 +68,9 @@ jobs:
           if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
             [[ "$EXPECTED_HOST_FINGERPRINT" =~ ^SHA256:[a-zA-Z0-9+/]{43}$ ]]
           fi
-          [[ "$RELEASE_OPERATION" == upgrade ]]
-          [[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$RELEASE_OPERATION" == reload ]]
+          [[ "$OPERATOR_SETUP_COMPLETE" == true ]]
+          [[ "$RELEASE_SHA" == 2fc15f216714d0331a82456edb1d97b9f76f8498 ]]
           [[ "$EXPECTED_HOST_SHA256" =~ ^[a-f0-9]{64}$ ]]
           matched_address=
           while IFS= read -r address; do
@@ -94,7 +101,7 @@ jobs:
             echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
           fi
           test -s "$known_hosts"
-          echo "b1add7c825d8ab72c19fe417cb2489ad988a81d48b3b882915e65273f07a4860  scripts/nestlet-enable-sqlite.sh" | sha256sum --check --status
+          echo "56bd924e004db340e42f7d66587de84316e86248a0735efc680da29dfbdf8b45  scripts/nestlet-reload-config.sh" | sha256sum --check --status
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
             -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
-            "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA; else exec sudo -n bash -s -- $RELEASE_SHA; fi" < scripts/nestlet-enable-sqlite.sh
+            "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA operator-setup-finished; else exec sudo -n bash -s -- $RELEASE_SHA operator-setup-finished; fi" < scripts/nestlet-reload-config.sh

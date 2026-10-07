@@ -89,3 +89,7 @@ PR Review (`.github/workflows/pr-review.yml`) reports checks through Actions `GI
 - `frontend/src/app/dashboard/users/components/UserDialog.tsx` 提供管理员账号开通开关；两套用户更新入口更新状态或角色后立即清除认证缓存，避免停用/改权延迟。
 
 Agent Runtime 仅加载锁定版本的已发布 SDK 构建，加载错误直接保留，不尝试开发机 `.tmp` 文件；两种请求入口显式使用本地 Anthropic 协议，保留关闭重试与上游失败不归档的回归检查。
+
+## Nestlet same-release configuration reload
+- `scripts/nestlet-reload-config.sh` only recreates the exact existing reviewed Nestlet image using its existing private configuration after operator setup has finished. It shares the Nestlet maintenance lease, checks metadata-only configuration stability and preserves schema3 storage. It never inspects credentials, edits configuration, builds/pulls images, restores data or restarts other services.
+- A failed authentication boolean is a blocker for operator review, never permission to reveal/reset a credential. Compose errors are suppressed to avoid configuration-detail leakage.
