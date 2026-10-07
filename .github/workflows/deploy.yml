@@ -6,15 +6,16 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Verify the predecessor read-only or upgrade the exact pinned release
+        description: Verify the predecessor, upgrade the pinned release, or send the fixed provider test
         required: true
         default: upgrade
         type: choice
         options:
           - upgrade
           - verify-predecessor
+          - mail-proof
       release_sha:
-        description: Exact approved schema5 commit with passing Node and container CI
+        description: Approved upgrade commit; mail-proof requires the pinned running schema4 commit
         required: true
         type: string
       expected_host_sha256:
@@ -44,7 +45,7 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           log-public-key: false
-      - name: Verify or upgrade pinned Nestlet release
+      - name: Run selected bounded Nestlet maintenance operation
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
@@ -63,7 +64,10 @@ jobs:
           if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
             [[ "$EXPECTED_HOST_FINGERPRINT" =~ ^SHA256:[a-zA-Z0-9+/]{43}$ ]]
           fi
-          [[ "$RELEASE_OPERATION" == upgrade || "$RELEASE_OPERATION" == verify-predecessor ]]
+          [[ "$RELEASE_OPERATION" == upgrade || "$RELEASE_OPERATION" == verify-predecessor || "$RELEASE_OPERATION" == mail-proof ]]
+          if [[ "$RELEASE_OPERATION" == mail-proof ]]; then
+            [[ "$RELEASE_SHA" == 4d4c15315d80b5fb7e9f8c2f3f883b10c1121c40 ]]
+          fi
           [[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]
           [[ "$EXPECTED_HOST_SHA256" =~ ^[a-f0-9]{64}$ ]]
           matched_address=
@@ -72,7 +76,7 @@ jobs:
             if [[ "$observed" == "$EXPECTED_HOST_SHA256" ]]; then matched_address="$address"; fi
           done < <(getent ahostsv4 "$SSH_HOST" | awk '{print $1}' | sort -u)
           [[ -n "$matched_address" ]] || { echo 'Selected server address does not match the existing SSH target'; exit 1; }
-          echo 'Existing SSH target matches selected server address; no address is logged.'
+          if [[ "$RELEASE_OPERATION" == upgrade ]]; then echo 'Existing SSH target matches selected server address; no address is logged.'; fi
           echo "::add-mask::$matched_address"
           umask 077
           # No pin: inherit the already-authorized deploy channel's host-key discovery.
@@ -80,7 +84,9 @@ jobs:
           known_hosts="$(mktemp)"
           scanned="$(mktemp)"
           one="$(mktemp)"
-          trap 'rm -f "$known_hosts" "$scanned" "$one"' EXIT
+          proof_output="$(mktemp)"
+          proof_errors="$(mktemp)"
+          trap 'rm -f "$known_hosts" "$scanned" "$one" "$proof_output" "$proof_errors"' EXIT
           ssh-keyscan -T 10 -p "$SSH_PORT" -H "$matched_address" > "$scanned" 2>/dev/null
           if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
             while IFS= read -r host_key; do
@@ -92,9 +98,23 @@ jobs:
             done < "$scanned"
           else
             cat "$scanned" > "$known_hosts"
-            echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
+            if [[ "$RELEASE_OPERATION" == upgrade ]]; then echo 'Host identity trust inherited from existing deploy channel; not independently verified.'; fi
           fi
           test -s "$known_hosts"
+          if [[ "$RELEASE_OPERATION" == mail-proof ]]; then
+            echo "28878764d6bfbcd70ffeb1b091176a8eaf101c29f591d2779dccd1533a31fdcd  scripts/nestlet-mail-proof.py" | sha256sum --check --status
+            if ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+              -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
+              'if [ "$(id -u)" = 0 ]; then exec python3 -; else exec sudo -n python3 -; fi' \
+              < scripts/nestlet-mail-proof.py >"$proof_output" 2>"$proof_errors"; then
+              if [[ "$(cat "$proof_output")" == provider-accepted ]]; then
+                echo provider-accepted
+                exit 0
+              fi
+            fi
+            echo provider-unconfirmed
+            exit 1
+          fi
           if [[ "$RELEASE_OPERATION" == verify-predecessor ]]; then
             echo "d300e0cc5f383bfa84df23835541673774da5cea9b2b55b25c7f95f81c770359  scripts/nestlet-verify-archive.py" | sha256sum --check --status
             ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \

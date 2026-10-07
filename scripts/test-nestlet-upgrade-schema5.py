@@ -60,8 +60,8 @@ class ReleaseSafety(unittest.TestCase):
         for guard in ["github.repository == 'ledondev520/jiesong-system'", "github.repository_owner == 'ledondev520'", "github.actor == 'ledondev520'"]:
             self.assertIn(guard, job['if'])
         step = job['steps'][-1]
-        self.assertEqual(parsed['on']['workflow_dispatch']['inputs']['operation']['options'], ['upgrade', 'verify-predecessor'])
-        for guard in ['[[ "$RELEASE_OPERATION" == upgrade || "$RELEASE_OPERATION" == verify-predecessor ]]', '[[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]', '[[ "$EXPECTED_HOST_SHA256" =~ ^[a-f0-9]{64}$ ]]', '[[ "$observed" == "$EXPECTED_HOST_FINGERPRINT" ]]', 'StrictHostKeyChecking=yes', 'sha256sum --check --status']:
+        self.assertEqual(parsed['on']['workflow_dispatch']['inputs']['operation']['options'], ['upgrade', 'verify-predecessor', 'mail-proof'])
+        for guard in ['[[ "$RELEASE_OPERATION" == upgrade || "$RELEASE_OPERATION" == verify-predecessor || "$RELEASE_OPERATION" == mail-proof ]]', '[[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]', '[[ "$EXPECTED_HOST_SHA256" =~ ^[a-f0-9]{64}$ ]]', '[[ "$observed" == "$EXPECTED_HOST_FINGERPRINT" ]]', 'StrictHostKeyChecking=yes', 'sha256sum --check --status']:
             self.assertIn(guard, step['run'])
         self.assertNotIn('StrictHostKeyChecking=no', step['run'])
         self.assertIn("flock -n 9", TEXT)
