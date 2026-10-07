@@ -95,7 +95,7 @@ class IdentitySafety(unittest.TestCase):
         (base/'.incremental-release.lock').unlink()
         with patch.object(identity,'command',command),self.assertRaises(FileNotFoundError):identity.report(base)
         self.assertEqual(identity.STAGE,'maintenance-lock-open')
-        self.assertEqual(identity.PARTIAL,{'pointerForm':'relative','canonicalManagedTarget':True,'verifiedCurrentCommit':OLD,'checkoutClean':True})
+        self.assertEqual(identity.PARTIAL,{'pointerForm':'relative','canonicalManagedTarget':True,'managedDirectoryCommit':OLD,'originHostMatches':True,'originRepositoryMatches':True,'verifiedCurrentCommit':OLD,'checkoutClean':True})
         self.assertNotIn(str(base),json.dumps(identity.PARTIAL))
         base,item,volume,calls,command=self.fixture()
         def dirty(args):
@@ -106,6 +106,22 @@ class IdentitySafety(unittest.TestCase):
         self.assertFalse(identity.PARTIAL['checkoutClean'])
         self.assertEqual(identity.PARTIAL['verifiedCurrentCommit'],OLD)
         self.assertNotIn('private-file-name',json.dumps(identity.PARTIAL))
+
+    def test_origin_classification_is_redacted_and_never_relaxes_gate(self):
+        for origin in ['https://github.com/ledondev520/nestlet.git', 'https://github.com/ledondev520/nestlet/', 'git@github.com:ledondev520/nestlet.git', 'ssh://git@github.com/ledondev520/nestlet.git', 'https://synthetic-user:synthetic-private@example.invalid/ledondev520/nestlet.git']:
+            good='github.com' in origin
+            self.assertEqual(identity.origin_classification(origin),(good,good))
+        self.assertEqual(identity.origin_classification('https://github.com/unrelated/repository'),(True,False))
+        base,item,volume,calls,command=self.fixture()
+        def alternate(args):
+            if args[-3:]==['remote','get-url','origin']:return 'https://synthetic-user:synthetic-private@github.com/ledondev520/nestlet/'
+            return command(args)
+        with patch.object(identity,'command',alternate),self.assertRaises(RuntimeError):identity.report(base)
+        self.assertEqual(identity.STAGE,'current-repository-identity')
+        self.assertEqual(identity.PARTIAL['managedDirectoryCommit'],OLD)
+        self.assertTrue(identity.PARTIAL['originHostMatches']);self.assertTrue(identity.PARTIAL['originRepositoryMatches'])
+        self.assertNotIn('verifiedCurrentCommit',identity.PARTIAL)
+        self.assertNotIn('synthetic-private',json.dumps(identity.PARTIAL))
 
     def test_header_reads_metadata_without_sqlite_open_or_writes(self):
         with tempfile.TemporaryDirectory() as directory:

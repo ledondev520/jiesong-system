@@ -101,7 +101,7 @@ jobs:
               -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
               "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA; else exec sudo -n bash -s -- $RELEASE_SHA; fi" < scripts/nestlet-upgrade-schema5.sh
           else
-            echo "17c7b400c9b216e07a272a332ea2b0be68f55261c174ea50d3898367706cab6c  scripts/nestlet-release-identity.py" | sha256sum --check --status
+            echo "5709d0a127e6f58ccc1b674d3604b511c06ce2371749aab88e410c03e5f01ebc  scripts/nestlet-release-identity.py" | sha256sum --check --status
             ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
               -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
               'if [ "$(id -u)" = 0 ]; then exec python3 -; else exec sudo -n python3 -; fi' < scripts/nestlet-release-identity.py

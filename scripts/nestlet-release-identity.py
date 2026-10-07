@@ -14,6 +14,7 @@ import re
 import stat
 import subprocess
 import sys
+from urllib.parse import urlsplit
 
 BASE = Path('/opt/nestlet')
 REPO = 'https://github.com/ledondev520/nestlet.git'
@@ -61,6 +62,25 @@ def command(arguments):
     return result.stdout.strip()
 
 
+def origin_classification(value):
+    # Return booleans only. Never return a raw URL, hostname, userinfo or path.
+    try:
+        if '://' in value:
+            parsed = urlsplit(value); host, path = parsed.hostname, parsed.path
+        else:
+            match = re.fullmatch(r'(?:[^/@:]+@)?([^/:]+):(.+)', value)
+            if not match:
+                return False, False
+            host, path = match.groups()
+        host_matches = bool(host and host.lower() == 'github.com')
+        path = path.strip('/').lower()
+        if path.endswith('.git'):
+            path = path[:-4]
+        return host_matches, host_matches and path == 'ledondev520/nestlet'
+    except Exception:
+        return False, False
+
+
 def private_directory(path, uid):
     info = path.lstat()
     require(stat.S_ISDIR(info.st_mode) and info.st_uid == uid and stat.S_IMODE(info.st_mode) == 0o700)
@@ -78,11 +98,16 @@ def current_commit(base, uid):
     target = current.resolve(strict=True)
     PARTIAL['canonicalManagedTarget'] = bool(target.parent == base / 'releases' and SHA.fullmatch(target.name))
     require(PARTIAL['canonicalManagedTarget'])
+    PARTIAL['managedDirectoryCommit'] = target.name  # Directory label only, not verified source.
     stage('current-release-directory')
     require(not (base / 'releases' / target.name).is_symlink())
     private_directory(target, uid)
     stage('current-repository-identity')
-    require(command(['git', '--no-optional-locks', '-C', str(target), 'remote', 'get-url', 'origin']) == REPO)
+    PARTIAL['originHostMatches'] = None
+    PARTIAL['originRepositoryMatches'] = None
+    origin = command(['git', '--no-optional-locks', '-C', str(target), 'remote', 'get-url', 'origin'])
+    PARTIAL['originHostMatches'], PARTIAL['originRepositoryMatches'] = origin_classification(origin)
+    require(origin == REPO)  # Classification is evidence, never a relaxed identity gate.
     stage('current-commit-identity')
     require(command(['git', '--no-optional-locks', '-C', str(target), 'rev-parse', 'HEAD']) == target.name)
     PARTIAL['verifiedCurrentCommit'] = target.name
