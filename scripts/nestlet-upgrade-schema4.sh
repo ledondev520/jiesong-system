@@ -8,7 +8,7 @@ set -euo pipefail
 umask 077
 readonly OLD_SHA='2fc15f216714d0331a82456edb1d97b9f76f8498'
 # Root reviewer must replace this only after exact-SHA application/container CI passes.
-readonly REVIEWED_RELEASE_SHA='REPLACE_WITH_REVIEWED_40_HEX_RELEASE_SHA'
+readonly REVIEWED_RELEASE_SHA='c540c89862bbd4c5534b09e083f1db03de36eaac'
 readonly NEW_SHA="${1:?Supply the exact reviewed schema4 release SHA}"
 [[ "$REVIEWED_RELEASE_SHA" =~ ^[a-f0-9]{40}$ && "$NEW_SHA" = "$REVIEWED_RELEASE_SHA" ]] || { echo 'Draft or unreviewed release; deployment is disabled'; exit 1; }
 [[ "$NEW_SHA" =~ ^[a-f0-9]{40}$ ]] && [[ "$NEW_SHA" != "$OLD_SHA" ]] || { echo 'Expected a new approved 40-hex commit'; exit 1; }
