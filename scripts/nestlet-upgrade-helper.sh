@@ -30,7 +30,7 @@ docker info --format '{{.ServerVersion}}' >/dev/null
 compose() {
     local sha="$1"; shift
     env -u PUBLIC_ORIGIN -u NESTLET_OPERATOR_PASSWORD_HASH -u DEEPSEEK_API_KEY -u DEEPSEEK_MODEL -u ENABLE_LIVE_AI \
-        NESTLET_IMAGE_TAG="$sha" docker compose --project-name nestlet --env-file "$ENVFILE" -f "$BASE/releases/$sha/compose.yaml" "$@"
+        NESTLET_IMAGE_TAG="$sha" docker compose --project-name nestlet --env-file "$ENVFILE" -f "$BASE/releases/$sha/compose.yaml" "$@" </dev/null
 }
 check_container() {
     local sha="$1" id
@@ -132,8 +132,8 @@ finally:
 PY_POINTER
 }
 check_helper_modules() {
-    compose "$NEW_SHA" exec -T nestlet node --check scripts/setup-operator.js
-    compose "$NEW_SHA" exec -T nestlet node --check scripts/operator-setup.js
+    compose "$NEW_SHA" exec -T --interactive=false nestlet node --check scripts/setup-operator.js
+    compose "$NEW_SHA" exec -T --interactive=false nestlet node --check scripts/operator-setup.js
 }
 if [[ "$current" = "$NEW_RELEASE" ]]; then
     validate_release "$NEW_SHA"
@@ -185,6 +185,9 @@ changed=0
 service_changed=0
 rollback() {
     local code=$?
+    # An EOF/consumed-script exit can be zero without reaching the success marker.
+    # Any unfinished mutation must fail CI even when targeted rollback succeeds.
+    if [ "$changed" = 1 ] && [ "$code" = 0 ]; then code=1; fi
     trap - EXIT INT TERM HUP
     if [ "$changed" = 1 ]; then
         echo 'New-release verification failed; restoring only the previous Nestlet image tag/container/pointer.' >&2
