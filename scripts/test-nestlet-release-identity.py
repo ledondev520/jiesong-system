@@ -177,7 +177,7 @@ class IdentitySafety(unittest.TestCase):
         workflow=(ROOT/'.github/workflows/deploy.yml').read_text();parsed=yaml.load(workflow,Loader=yaml.BaseLoader)
         self.assertEqual(set(parsed['on']),{'workflow_dispatch'})
         self.assertEqual(parsed['permissions'],{'contents':'read'})
-        self.assertEqual(parsed['on']['workflow_dispatch']['inputs']['operation']['options'],['upgrade','verify-predecessor','mail-proof'])
+        self.assertEqual(parsed['on']['workflow_dispatch']['inputs']['operation']['options'],['upgrade','verify-predecessor','mail-proof','stream-proof'])
         job=parsed['jobs']['preflight'];self.assertEqual(job['environment'],'staging')
         self.assertIn("github.ref == 'refs/heads/ops/nestlet-schema5-email-release-20261007'",job['if'])
         run=job['steps'][-1]['run'];self.assertIn('StrictHostKeyChecking=yes',run)

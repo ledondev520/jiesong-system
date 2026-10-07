@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Verify the predecessor, upgrade the pinned release, or send the fixed provider test
+        description: Verify the predecessor, upgrade the release, or run a fixed provider proof
         required: true
         default: upgrade
         type: choice
@@ -14,8 +14,9 @@ on:
           - upgrade
           - verify-predecessor
           - mail-proof
+          - stream-proof
       release_sha:
-        description: Approved upgrade commit; mail-proof requires the pinned running schema4 commit
+        description: Approved upgrade commit; provider proofs require the pinned running schema4 commit
         required: true
         type: string
       expected_host_sha256:
@@ -64,8 +65,8 @@ jobs:
           if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
             [[ "$EXPECTED_HOST_FINGERPRINT" =~ ^SHA256:[a-zA-Z0-9+/]{43}$ ]]
           fi
-          [[ "$RELEASE_OPERATION" == upgrade || "$RELEASE_OPERATION" == verify-predecessor || "$RELEASE_OPERATION" == mail-proof ]]
-          if [[ "$RELEASE_OPERATION" == mail-proof ]]; then
+          [[ "$RELEASE_OPERATION" == upgrade || "$RELEASE_OPERATION" == verify-predecessor || "$RELEASE_OPERATION" == mail-proof || "$RELEASE_OPERATION" == stream-proof ]]
+          if [[ "$RELEASE_OPERATION" == mail-proof || "$RELEASE_OPERATION" == stream-proof ]]; then
             [[ "$RELEASE_SHA" == 4d4c15315d80b5fb7e9f8c2f3f883b10c1121c40 ]]
           fi
           [[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]
@@ -109,6 +110,20 @@ jobs:
               < scripts/nestlet-mail-proof.py >"$proof_output" 2>"$proof_errors"; then
               if [[ "$(cat "$proof_output")" == provider-accepted ]]; then
                 echo provider-accepted
+                exit 0
+              fi
+            fi
+            echo provider-unconfirmed
+            exit 1
+          fi
+          if [[ "$RELEASE_OPERATION" == stream-proof ]]; then
+            echo "65d9732c2efbdd2bb2b433e50a473fa7d7543199447b2c9aa4995a3887e13a6f  scripts/nestlet-stream-proof.py" | sha256sum --check --status
+            if ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+              -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
+              'if [ "$(id -u)" = 0 ]; then exec python3 -; else exec sudo -n python3 -; fi' \
+              < scripts/nestlet-stream-proof.py >"$proof_output" 2>"$proof_errors"; then
+              if [[ "$(cat "$proof_output")" == stream-completed ]]; then
+                echo stream-completed
                 exit 0
               fi
             fi

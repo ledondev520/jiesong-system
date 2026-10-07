@@ -121,7 +121,8 @@
         "storage": [
           "Repository standard permissions",
           "Code review for unintended leakage",
-          "Nestlet fixed mail-proof attempt markers contain only a public test reference and stay host-local at 0600 under a 0700 directory; provider credentials, sender and raw responses never enter workflow logs or repository artifacts"
+          "Nestlet fixed mail-proof attempt markers contain only a public test reference and stay host-local at 0600 under a 0700 directory; provider credentials, sender and raw responses never enter workflow logs or repository artifacts",
+          "Nestlet one-shot streaming proof uses only fixed synthetic text and its existing in-container provider key; the exact public parser source is verified internally, attempt markers stay host-local at 0600, and all model text, credentials, configuration and request IDs are excluded from workflow output"
         ],
         "transfer": [
           "Use normal authenticated collaboration channels"
