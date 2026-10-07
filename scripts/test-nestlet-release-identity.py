@@ -123,6 +123,36 @@ class IdentitySafety(unittest.TestCase):
         self.assertNotIn('verifiedCurrentCommit',identity.PARTIAL)
         self.assertNotIn('synthetic-private',json.dumps(identity.PARTIAL))
 
+    def test_collector_does_not_hide_archive_or_container_evidence(self):
+        base,item,volume,calls,command=self.fixture()
+        source=base/'releases'/OLD
+        for name in identity.PUBLIC_SOURCE_FILES:
+            path=source/name;path.parent.mkdir(exist_ok=True);path.write_bytes(b'public synthetic source only')
+        def archived(args):
+            if args[0]=='git':raise RuntimeError('synthetic archive without Git')
+            return command(args)
+        with patch.object(identity,'command',archived):receipt=identity.collect_report(base)
+        self.assertFalse(receipt['inspectionComplete'])
+        self.assertEqual(receipt['failedStage'],'current-repository-identity')
+        self.assertFalse(receipt['gitMetadataPresent']);self.assertIsNone(receipt['observedGitCommit'])
+        self.assertEqual(receipt['managedDirectoryCommit'],OLD)
+        self.assertEqual(receipt['observedImageCommit'],OLD)
+        self.assertTrue(receipt['imageTagAgreement']);self.assertTrue(receipt['imageCommitAgreement']);self.assertTrue(receipt['healthy'])
+        self.assertEqual(receipt['schemaVersion'],4);self.assertTrue(receipt['applicationIdentityValid'])
+        self.assertEqual(set(receipt['publicSourceHashes']),set(identity.PUBLIC_SOURCE_FILES))
+        self.assertTrue(all(value==hashlib.sha256(b'public synthetic source only').hexdigest() for value in receipt['publicSourceHashes'].values()))
+        self.assertNotIn(str(base),json.dumps(receipt))
+        self.assertFalse(any('runtime.env' in str(call) for call in calls))
+
+    def test_public_hashes_reject_links_and_never_read_environment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'runtime.env').write_text('synthetic-not-to-be-read')
+            (root/'auth.js').symlink_to(root/'runtime.env')
+            hashes,missing=identity.public_source_hashes(root)
+            self.assertEqual(hashes,{})
+            self.assertIn('auth.js',missing)
+            self.assertNotIn('runtime.env',missing)
+
     def test_header_reads_metadata_without_sqlite_open_or_writes(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);filename=root/'nestlet.sqlite'

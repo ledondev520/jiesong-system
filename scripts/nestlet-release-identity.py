@@ -7,6 +7,7 @@ application or SQLite connection. WAL/journal/unstable headers are not reported 
 verified schema metadata. No stop/start, image build/run, file write or migration.
 """
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -21,6 +22,9 @@ REPO = 'https://github.com/ledondev520/nestlet.git'
 SHA = re.compile(r'[a-f0-9]{40}')
 STAGE = 'initialization'
 PARTIAL = {}
+TRUSTED_BASE = False
+SOURCE_PATH = None
+PUBLIC_SOURCE_FILES = ('server.js', 'auth.js', 'storage.js', 'compose.yaml', 'package.json', 'package-lock.json', 'Dockerfile', 'chat.js', 'agent-library-tools.js', 'document-context.js', 'case-records.js', 'telemetry.js', 'private-assets.js', 'asset-domain.js', 'asset-records.js', 'asset-image-worker.js', 'public/core.js', 'scripts/private-data.js', 'scripts/private-data-operations.js')
 
 def stage(name):
     global STAGE
@@ -87,6 +91,7 @@ def private_directory(path, uid):
 
 
 def current_commit(base, uid):
+    global SOURCE_PATH
     current = base / 'current'
     stage('current-pointer-type')
     require(current.is_symlink())
@@ -102,6 +107,7 @@ def current_commit(base, uid):
     stage('current-release-directory')
     require(not (base / 'releases' / target.name).is_symlink())
     private_directory(target, uid)
+    SOURCE_PATH = target
     stage('current-repository-identity')
     PARTIAL['originHostMatches'] = None
     PARTIAL['originRepositoryMatches'] = None
@@ -151,6 +157,9 @@ def inspect_container():
 
 
 def report(base=BASE):
+    global TRUSTED_BASE, SOURCE_PATH
+    TRUSTED_BASE = False
+    SOURCE_PATH = None
     PARTIAL.clear()
     stage('managed-directories')
     uid = os.geteuid()
@@ -161,6 +170,7 @@ def report(base=BASE):
     info = marker.lstat()
     require(stat.S_ISREG(info.st_mode) and info.st_uid == uid and info.st_nlink == 1 and info.st_size <= 64)
     require(marker.read_text().strip() == 'nestlet-managed-stage-v1')
+    TRUSTED_BASE = True
     # Source identity is read-only and can be reported even when the later
     # lease/container checks refuse. Partial receipts never authorize upgrade.
     commit, pointer_form = current_commit(base, uid)
@@ -198,9 +208,82 @@ def report(base=BASE):
         os.close(fd)
 
 
-if __name__ == '__main__':
+def public_source_hashes(source):
+    hashes, unavailable = {}, []
+    for name in PUBLIC_SOURCE_FILES:
+        fd = None
+        try:
+            path = source / name
+            require(path.resolve(strict=True) == path)  # No file/ancestor symlinks.
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            info = os.fstat(fd)
+            require(stat.S_ISREG(info.st_mode) and info.st_uid == os.geteuid() and info.st_nlink == 1 and info.st_size <= 2 * 1024 * 1024)
+            digest = hashlib.sha256()
+            while True:
+                chunk = os.read(fd, 65536)
+                if not chunk:
+                    break
+                digest.update(chunk)
+            after = os.fstat(fd)
+            require((info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns) == (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns))
+            hashes[name] = digest.hexdigest()
+        except Exception:
+            unavailable.append(name)  # Fixed PUBLIC filenames only.
+        finally:
+            if fd is not None:
+                os.close(fd)
+    return hashes, unavailable
+
+
+def collect_report(base=BASE):
+    # An incomplete receipt is observational evidence, never release approval.
+    # Retain every strict check, but independently collect other bounded reads.
+    failures = []
     try:
-        print(json.dumps(report(), sort_keys=True))
+        result = report(base)
     except Exception:
-        print(json.dumps({'inspectionComplete': False, 'failedStage': STAGE, **PARTIAL}, sort_keys=True))
-        sys.exit(1)
+        failures.append(STAGE)
+        result = dict(PARTIAL)
+    if SOURCE_PATH is not None:
+        result['gitMetadataPresent'] = os.path.lexists(SOURCE_PATH / '.git')
+        try:
+            observed = command(['git', '--no-optional-locks', '-C', str(SOURCE_PATH), 'rev-parse', 'HEAD'])
+            require(SHA.fullmatch(observed))
+            result['observedGitCommit'] = observed
+        except Exception:
+            result['observedGitCommit'] = None
+            failures.append('observed-git-commit')
+        result['publicSourceHashes'], missing = public_source_hashes(SOURCE_PATH)
+        if missing:
+            result['unavailablePublicSourceFiles'] = missing
+            failures.append('public-source-hashes')
+    if TRUSTED_BASE:
+        try:
+            container, item, tag_id = inspect_container()
+            result['observedImageCommit'] = item['image'][len('nestlet:'):]
+            result['imageTagAgreement'] = item['imageId'] == tag_id
+            result['imageCommitAgreement'] = item['image'] == 'nestlet:' + result.get('managedDirectoryCommit', result.get('verifiedCurrentCommit', '')) and item['imageId'] == tag_id
+            result['healthy'] = item['running'] is True and item['health'] == 'healthy'
+            result['schemaVersion'] = None
+            result['applicationIdentityValid'] = None
+            if item['running'] is True:
+                try:
+                    observed = json.loads(command(['docker', 'exec', '--user', '1000:1000', container, 'node', '--input-type=module', '-e', HEADER_CHECK]))
+                    require(type(observed.get('schemaVersion')) is int and 0 <= observed['schemaVersion'] <= 0x7fffffff and type(observed.get('applicationIdentityValid')) is bool)
+                    result['schemaVersion'] = observed['schemaVersion']
+                    result['applicationIdentityValid'] = observed['applicationIdentityValid']
+                except Exception:
+                    failures.append('sqlite-header')
+        except Exception:
+            failures.append(STAGE)
+    result['inspectionComplete'] = not failures
+    if failures:
+        result['failedStage'] = failures[0]
+        result['failedStages'] = list(dict.fromkeys(failures))
+    return result
+
+
+if __name__ == '__main__':
+    receipt = collect_report()
+    print(json.dumps(receipt, sort_keys=True))
+    sys.exit(0 if receipt['inspectionComplete'] else 1)
