@@ -5,7 +5,8 @@ Prepared 2026-10-07. Local preparation only. This task has not pushed, dispatche
 ## Bounded release and remaining gates
 
 - Exact live predecessor: `c540c89862bbd4c5534b09e083f1db03de36eaac`, schema4
-- Backend source used for these synthetic drills: `a179fbf19e466bd549f1b36b2fb89dcc08416feb`
+- Initial backend source used for these synthetic drills: `a179fbf19e466bd549f1b36b2fb89dcc08416feb`
+- Combined application candidate rechecked with the same recovery and HTTP gates: PR21 head `0e329d0705511b856180de56fc1863330a95be79`. This is a development head, not a production pin
 - Final target: deliberately **unpinned**. The script refuses execution until the reviewer pins the final combined merge SHA after its application, browser and container CI are green. A development head, another schema4 build, or a similarly named branch is not an approved substitute
 - Dedicated maintenance branch: `ops/nestlet-schema5-email-release-20261007`, in Jiesong's maintenance repository only. Do not merge this maintenance workflow into Jiesong main
 - One release directly from live schema4 to the final combined schema5 application. Do not deploy the intermediate same-schema4 addon release first
@@ -52,10 +53,12 @@ Recovery snapshots/manifests, migration copies, future-version copies and operat
 
 ## Local verification evidence
 
+Independent read-only review of maintenance commit `61a157bf962ae7f4f8d5f64bdd13ad3fd2fdec6f` found no confirmed P0/P1. The reviewer independently reran all 12 safety tests and both exact embedded recovery/HTTP drills against c540 and combined application `0e329d0705511b856180de56fc1863330a95be79`; all passed. This does not waive final merged-SHA CI, owner approval or actual host/container gates.
+
 - `python3 scripts/test-nestlet-upgrade-schema5.py`: 12/12 passed on 2026-10-07. Actual YAML parsing/dispatch-only scope, workflow script digest, shell/Python/JavaScript syntax, disabled-pin refusal, Compose boundary/ambient credential guards, atomic tag-only byte preservation and unsafe-file rejection, pre-candidate recovery and unconditional refusal of old-image restart after candidate-start, unknown schema, failed stop or changed image
-- `node scripts/test-nestlet-schema5-recovery.mjs <c540-source-root> <a179-source-root>`: passed on Node 24.19.0. Actual c540 storage produced schema4 with two owners' customers, cases, conversations, messages, artifacts and originals, legacy credentials, telemetry and sequence high-water 777
+- `node scripts/test-nestlet-schema5-recovery.mjs <c540-source-root> <candidate-source-root>`: passed on Node 24.19.0 against both backend a179 and combined PR21 0e329d0. Actual c540 storage produced schema4 with two owners' customers, cases, conversations, messages, artifacts and originals, legacy credentials, telemetry and sequence high-water 777
 - Actual CLI DELETE-mode and committed live-WAL backup→verify→restore, the exact embedded deployment migration and future-refusal JavaScript, late-DDL transactional failure, preserved private modes/original bytes, unchanged recovery point, and schema4 binary refusal of schema5 all passed
-- `node scripts/test-nestlet-schema5-http.mjs <a179-source-root>`: passed using the exact embedded release HTTP gate against the real local server with synthetic operator/mail settings. Confirms configured public flags, 401 boundaries and absent private account/owner diagnostics without any email send
+- `node scripts/test-nestlet-schema5-http.mjs <candidate-source-root>`: passed against both a179 and combined PR21 0e329d0 using the exact embedded release HTTP gate against the real local server with synthetic operator/mail settings. Confirms configured public flags, 401 boundaries and absent private account/owner diagnostics without any email send
 - The local backup drill makes no provider calls and uses no production data. Synthetic test artifacts are removed after the drill; this does not imply production evidence cleanup
 - Docker is unavailable in this preparation executor. Container build/isolation, actual SSH/host storage, real private backup/cutover and real email delivery are **not run here**. The host script makes fresh-image smoke and backup/rehearsal mandatory, and the exact final merged application requires green container/browser/application CI before pinning
 - Rerun all three commands against the final combined release before pinning. This evidence is preparation for a reviewed release, not a production or real-email acceptance pass
