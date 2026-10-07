@@ -83,7 +83,7 @@ if status.get('caseStorageEnabled') is True:
 print('Loopback health and unauthenticated boundaries passed; no provider calls.')
 PY
 }
-# Edit only the unquoted, pinned image-tag declaration. No secret values, file
+# Edit only a literal pinned image-tag value in a dotenv declaration. No secret values, file
 # contents, hashes or backups are printed or retained by this operation.
 set_image_tag() {
     python3 - "$ENVFILE" "$1" "$2" <<'PY'
@@ -98,11 +98,41 @@ fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
 with os.fdopen(fd,'rb') as f:
     st=os.fstat(f.fileno()); original=f.read(65537)
 assert len(original)<=65536 and (st.st_dev,st.st_ino)==(lst.st_dev,lst.st_ino)
-declarations=re.findall(rb'(?m)^[ \t]*(?:export[ \t]+)?NESTLET_IMAGE_TAG[ \t]*=',original)
+# Locate top-level declarations, skipping quoted multiline unrelated values.
+# Never interpolate or evaluate environment text; only one literal tag is accepted.
+declarations=[]; offset=0
+key_pattern=rb'[ \t]*(?:export[ \t]+)?([^ \t=:\r\n]+)[ \t]*[=:][ \t]*'
+while offset<len(original):
+    end=original.find(b'\n',offset)
+    if end<0:end=len(original)
+    line=original[offset:end].removesuffix(b'\r')
+    if line.lstrip(b' \t').startswith(b'#'):offset=end+1;continue
+    key=re.match(key_pattern,line)
+    target=re.match(rb'[ \t]*(?:export[ \t]+)?NESTLET_IMAGE_TAG(?=[ \t=:\r]|$)',line)
+    if target:declarations.append((offset,line))
+    if key and key[1]!=b'NESTLET_IMAGE_TAG' and line[key.end():key.end()+1] in (b"'",b'"'):
+        quote=original[offset+key.end()]; cursor=offset+key.end()+1
+        while cursor<len(original):
+            if original[cursor]==92:cursor+=2;continue
+            if original[cursor]==quote:break
+            cursor+=1
+        assert cursor<len(original),'Malformed environment declaration'
+        end=original.find(b'\n',cursor+1)
+        if end<0:end=len(original)
+        assert re.fullmatch(rb'[ \t]*(?:#[^\r\n]*)?\r?',original[cursor+1:end]),'Ambiguous environment declaration'
+    offset=end+1
 assert len(declarations)==1,'Duplicate or missing image-tag declaration'
-pattern=rb'(?m)^NESTLET_IMAGE_TAG=([a-f0-9]{40})(\r?)$'
-found=list(re.finditer(pattern,original)); assert len(found)==1 and found[0][1].decode() in allowed_before
-updated=re.sub(pattern,lambda m:b'NESTLET_IMAGE_TAG='+after.encode()+m[2],original,count=1)
+offset,line=declarations[0]
+pattern=(rb'[ \t]*(?:export[ \t]+)?NESTLET_IMAGE_TAG[ \t]*[=:][ \t]*'
+         rb'(?:\'(?P<single>[a-f0-9]{40})\'[ \t]*(?:#[^\r\n]*)?'
+         rb'|"(?P<double>[a-f0-9]{40})"[ \t]*(?:#[^\r\n]*)?'
+         rb'|(?P<bare>[a-f0-9]{40})(?:[ \t]* #[^\r\n]*|[ \t]*))')
+found=re.fullmatch(pattern,line)
+assert found is not None,'Unsupported image-tag declaration'
+group=next(name for name in ('single','double','bare') if found[name] is not None)
+assert found[group].decode() in allowed_before,'Unexpected image tag'
+start,end=found.span(group)
+updated=original[:offset+start]+after.encode()+original[offset+end:]
 if original==updated: sys.exit(0)
 fd,tmp=tempfile.mkstemp(prefix='.image-tag-',dir=os.path.dirname(path))
 try:

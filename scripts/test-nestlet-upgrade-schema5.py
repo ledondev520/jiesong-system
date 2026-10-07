@@ -107,6 +107,45 @@ class ReleaseSafety(unittest.TestCase):
             self.assertNotEqual(run(OLD + ',' + NEW, OLD).returncode, 0)
             self.assertIn('b'*40, envfile.read_text())
 
+    def test_tag_edit_accepts_literal_dotenv_forms_and_preserves_all_other_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            envfile=Path(directory)/'runtime.env'
+            prefix='set -euo pipefail\numask 077\nENVFILE='+str(envfile)+'\n'+shell_function('set_image_tag')+'\n'
+            def run(before=OLD,after=NEW):
+                return subprocess.run(['bash','-c',prefix+f'set_image_tag "{before}" "{after}"'],capture_output=True)
+            forms=[b'NESTLET_IMAGE_TAG='+OLD.encode(),b' export NESTLET_IMAGE_TAG = "'+OLD.encode()+b'" # keep',
+                   b"\texport\tNESTLET_IMAGE_TAG\t=\t'"+OLD.encode()+b"'\t# keep",b'NESTLET_IMAGE_TAG : '+OLD.encode()+b' # keep',
+                   b'NESTLET_IMAGE_TAG="'+OLD.encode()+b'"#keep',b"NESTLET_IMAGE_TAG='"+OLD.encode()+b"'",b'NESTLET_IMAGE_TAG = '+OLD.encode()+b'  ']
+            for ending in [b'\n',b'\r\n',b'']:
+                for declaration in forms:
+                    unrelated=b'# synthetic only\n#COMMENT=\"unterminated is comment\nUNCHANGED=\xff\x80literal\nMULTILINE=\'first\nNESTLET_IMAGE_TAG='+OLD.encode()+b"\nlast'\n"
+                    original=unrelated+declaration+ending
+                    envfile.write_bytes(original);envfile.chmod(0o600)
+                    result=run();self.assertEqual(result.returncode,0,result.stderr)
+                    self.assertEqual(envfile.read_bytes(),unrelated+declaration.replace(OLD.encode(),NEW.encode())+ending)
+                    self.assertEqual(run(OLD+','+NEW,OLD).returncode,0)
+                    self.assertEqual(envfile.read_bytes(),original)
+                    inode=envfile.stat().st_ino
+                    self.assertEqual(run(OLD,OLD).returncode,0)
+                    self.assertEqual(envfile.stat().st_ino,inode)
+
+    def test_tag_edit_rejects_ambiguous_malformed_and_unapproved_values(self):
+        with tempfile.TemporaryDirectory() as directory:
+            envfile=Path(directory)/'runtime.env'
+            prefix='set -euo pipefail\numask 077\nENVFILE='+str(envfile)+'\n'+shell_function('set_image_tag')+'\n'
+            good=b'NESTLET_IMAGE_TAG='+OLD.encode()+b'\n'
+            values=[b'"'+OLD.encode()+b"'",OLD.encode()+b'#not-a-comment',OLD.encode()+b'\t#not-a-comment',b'${OTHER}',b'"${OTHER}"',b'$(command)',b'latest',b'b'*40,
+                    b'"'+OLD.encode()+b'" suffix',b'"'+OLD.encode()+b'\n"',b"'"+OLD.encode()+b"'\x00",b'',b'"'+OLD.encode()+b'\\"']
+            inputs=[b'NESTLET_IMAGE_TAG='+value+b'\n' for value in values]
+            inputs += [good+b' export NESTLET_IMAGE_TAG="'+OLD.encode()+b'"\n',good+b'NESTLET_IMAGE_TAG: '+OLD.encode()+b'\n',
+                       good+b'export NESTLET_IMAGE_TAG\n',good+b'UNRELATED="x" NESTLET_IMAGE_TAG='+OLD.encode()+b'\n',b"UNRELATED='\n"+good+b"'\n",b"UNRELATED='unterminated\n"+good]
+            for original in inputs:
+                envfile.write_bytes(original);envfile.chmod(0o600)
+                result=subprocess.run(['bash','-c',prefix+f'set_image_tag "{OLD}" "{NEW}"'],capture_output=True)
+                self.assertNotEqual(result.returncode,0)
+                self.assertEqual(envfile.read_bytes(),original)
+                self.assertNotIn(original,result.stdout+result.stderr)
+
     def simulate_failure(self, schema, stop_ok=True, started=0, image_matches=True):
         with tempfile.TemporaryDirectory() as directory:
             log = Path(directory) / 'calls'
@@ -224,7 +263,7 @@ exit 42
                 self.assertEqual(run().returncode, 0)
                 self.assertEqual(envfile.read_bytes(), original.replace(('NESTLET_IMAGE_TAG='+OLD).encode(), ('NESTLET_IMAGE_TAG='+NEW).encode()))
             original=('NESTLET_IMAGE_TAG='+OLD+'\n').encode()
-            for bad in [original+original, original+b' export NESTLET_IMAGE_TAG=x\n', b'NESTLET_IMAGE_TAG="'+OLD.encode()+b'"\n', b'UNRELATED=yes\n', b'x'*65537]:
+            for bad in [original+original, original+b' export NESTLET_IMAGE_TAG=x\n', b'UNRELATED=yes\n', b'x'*65537]:
                 envfile.write_bytes(bad);envfile.chmod(0o600)
                 self.assertNotEqual(run().returncode, 0)
                 self.assertEqual(envfile.read_bytes(), bad)
