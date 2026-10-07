@@ -23,7 +23,8 @@
         "carrier packing-list originals and persistent packing-list review records",
         "email verification code hashes and Alibaba Cloud mail credentials",
         "Nestlet private SQLite recovery snapshots, manifests and migration-rehearsal copies",
-        "Nestlet email identities, pending email actions, credential fingerprints and durable rate-limit buckets in schema5 recovery snapshots"
+        "Nestlet email identities, pending email actions, credential fingerprints and durable rate-limit buckets in schema5 recovery snapshots",
+        "Nestlet administrator capability and append-only audit rows in schema6 snapshots and recovery copies"
       ],
       "controls": {
         "storage": [

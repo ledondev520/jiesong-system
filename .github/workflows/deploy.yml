@@ -1,30 +1,19 @@
-# Dedicated Nestlet maintenance branch only; never merge this workflow into Jiesong main.
-# No main push/PR trigger; dispatch only after independent review and owner approval.
-# Uses existing staging-scoped SSH credentials for the same host as current main deployment.
-name: Nestlet Schema5 Email Upgrade
+# Dedicated schema6 maintenance branch only. Never merge this workflow into Jiesong main.
+# Exact authorized merge passed application, browser and container CI; source activation is independently reviewed.
+name: Nestlet Schema6 Upgrade
 on:
   workflow_dispatch:
     inputs:
-      operation:
-        description: Verify the predecessor, upgrade the release, or run a fixed provider proof
-        required: true
-        default: upgrade
-        type: choice
-        options:
-          - upgrade
-          - verify-predecessor
-          - mail-proof
-          - stream-proof
       release_sha:
-        description: Approved upgrade commit; provider proofs require the pinned running schema4 commit
+        description: Exact reviewed schema6 merge SHA; all other targets are rejected
         required: true
         type: string
       expected_host_sha256:
-        description: SHA256 of the selected server IPv4 address; checked before SSH
+        description: SHA256 of the existing target IPv4 address
         required: true
         type: string
       host_key_sha256:
-        description: Optional independently verified VPS SSH public host-key fingerprint
+        description: Optional independently verified SSH public host-key fingerprint
         required: false
         type: string
 permissions:
@@ -33,10 +22,10 @@ concurrency:
   group: nestlet-stage
   cancel-in-progress: false
 jobs:
-  preflight:
-    if: github.repository == 'ledondev520/jiesong-system' && github.repository_owner == 'ledondev520' && github.ref == 'refs/heads/ops/nestlet-schema5-email-release-20261007' && github.actor == 'ledondev520'
+  upgrade:
+    if: github.repository == 'ledondev520/jiesong-system' && github.repository_owner == 'ledondev520' && github.ref == 'refs/heads/ops/nestlet-schema6-release-20261008' && github.actor == 'ledondev520'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     environment: staging
     steps:
       - uses: actions/checkout@v4
@@ -46,28 +35,25 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           log-public-key: false
-      - name: Run selected bounded Nestlet maintenance operation
+      - name: Run bounded schema6 upgrade
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
-          RELEASE_OPERATION: ${{ inputs.operation }}
           RELEASE_SHA: ${{ inputs.release_sha }}
           EXPECTED_HOST_SHA256: ${{ inputs.expected_host_sha256 }}
           EXPECTED_HOST_FINGERPRINT: ${{ inputs.host_key_sha256 }}
         shell: bash
         run: |
           set -euo pipefail
+          readonly REVIEWED_RELEASE_SHA=0ad91847e8c04f379f071e76bf8c325f9bb12233
+          [[ "$REVIEWED_RELEASE_SHA" =~ ^[a-f0-9]{40}$ && "$RELEASE_SHA" = "$REVIEWED_RELEASE_SHA" ]] || { echo 'Release SHA does not match the reviewed schema6 merge'; exit 1; }
           test -n "$SSH_HOST" && test -n "$SSH_USER"
           [[ "$SSH_PORT" =~ ^[0-9]+$ ]]
           [[ "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ ]]
           [[ "$SSH_USER" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_-]*$ ]]
           if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
             [[ "$EXPECTED_HOST_FINGERPRINT" =~ ^SHA256:[a-zA-Z0-9+/]{43}$ ]]
-          fi
-          [[ "$RELEASE_OPERATION" == upgrade || "$RELEASE_OPERATION" == verify-predecessor || "$RELEASE_OPERATION" == mail-proof || "$RELEASE_OPERATION" == stream-proof ]]
-          if [[ "$RELEASE_OPERATION" == mail-proof || "$RELEASE_OPERATION" == stream-proof ]]; then
-            [[ "$RELEASE_SHA" == 4d4c15315d80b5fb7e9f8c2f3f883b10c1121c40 ]]
           fi
           [[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]
           [[ "$EXPECTED_HOST_SHA256" =~ ^[a-f0-9]{64}$ ]]
@@ -77,7 +63,7 @@ jobs:
             if [[ "$observed" == "$EXPECTED_HOST_SHA256" ]]; then matched_address="$address"; fi
           done < <(getent ahostsv4 "$SSH_HOST" | awk '{print $1}' | sort -u)
           [[ -n "$matched_address" ]] || { echo 'Selected server address does not match the existing SSH target'; exit 1; }
-          if [[ "$RELEASE_OPERATION" == upgrade ]]; then echo 'Existing SSH target matches selected server address; no address is logged.'; fi
+          echo 'Existing SSH target matches selected server address; no address is logged.'
           echo "::add-mask::$matched_address"
           umask 077
           # No pin: inherit the already-authorized deploy channel's host-key discovery.
@@ -85,9 +71,7 @@ jobs:
           known_hosts="$(mktemp)"
           scanned="$(mktemp)"
           one="$(mktemp)"
-          proof_output="$(mktemp)"
-          proof_errors="$(mktemp)"
-          trap 'rm -f "$known_hosts" "$scanned" "$one" "$proof_output" "$proof_errors"' EXIT
+          trap 'rm -f "$known_hosts" "$scanned" "$one"' EXIT
           ssh-keyscan -T 10 -p "$SSH_PORT" -H "$matched_address" > "$scanned" 2>/dev/null
           if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
             while IFS= read -r host_key; do
@@ -99,45 +83,10 @@ jobs:
             done < "$scanned"
           else
             cat "$scanned" > "$known_hosts"
-            if [[ "$RELEASE_OPERATION" == upgrade ]]; then echo 'Host identity trust inherited from existing deploy channel; not independently verified.'; fi
+            echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
           fi
           test -s "$known_hosts"
-          if [[ "$RELEASE_OPERATION" == mail-proof ]]; then
-            echo "28878764d6bfbcd70ffeb1b091176a8eaf101c29f591d2779dccd1533a31fdcd  scripts/nestlet-mail-proof.py" | sha256sum --check --status
-            if ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
-              -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
-              'if [ "$(id -u)" = 0 ]; then exec python3 -; else exec sudo -n python3 -; fi' \
-              < scripts/nestlet-mail-proof.py >"$proof_output" 2>"$proof_errors"; then
-              if [[ "$(cat "$proof_output")" == provider-accepted ]]; then
-                echo provider-accepted
-                exit 0
-              fi
-            fi
-            echo provider-unconfirmed
-            exit 1
-          fi
-          if [[ "$RELEASE_OPERATION" == stream-proof ]]; then
-            echo "65d9732c2efbdd2bb2b433e50a473fa7d7543199447b2c9aa4995a3887e13a6f  scripts/nestlet-stream-proof.py" | sha256sum --check --status
-            if ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
-              -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
-              'if [ "$(id -u)" = 0 ]; then exec python3 -; else exec sudo -n python3 -; fi' \
-              < scripts/nestlet-stream-proof.py >"$proof_output" 2>"$proof_errors"; then
-              if [[ "$(cat "$proof_output")" == stream-completed ]]; then
-                echo stream-completed
-                exit 0
-              fi
-            fi
-            echo provider-unconfirmed
-            exit 1
-          fi
-          if [[ "$RELEASE_OPERATION" == verify-predecessor ]]; then
-            echo "2e1a219afddc3cd8f174228dcbf66db224850274b76d9bebe8bb2a6bfc5e692b  scripts/nestlet-verify-archive.py" | sha256sum --check --status
-            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
-              -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
-              'if [ "$(id -u)" = 0 ]; then exec python3 -; else exec sudo -n python3 -; fi' < scripts/nestlet-verify-archive.py
-          else
-            echo "c74723c82c9e242fc68c273d4981200ea69fd9150c349050826a5c0decc5d9d2  scripts/nestlet-upgrade-schema5.sh" | sha256sum --check --status
-            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
-              -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
-              "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA; else exec sudo -n bash -s -- $RELEASE_SHA; fi" < scripts/nestlet-upgrade-schema5.sh
-          fi
+          echo "71391e8ecc1e81aca5071198d135397a1c7e168bdb359348ad6ed6771fcd2783  scripts/nestlet-upgrade-schema6.sh" | sha256sum --check --status
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
+            "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA; else exec sudo -n bash -s -- $RELEASE_SHA; fi" < scripts/nestlet-upgrade-schema6.sh
