@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# REVIEW DRAFT. Parent must supply the exact approved, CI-green 40-hex commit.
-# ADDITIVE SCHEMA4 -> SCHEMA5 rollout only. Draft; do not dispatch until reviewed.
+# Reviewed combined merge pin; exact-SHA application, browser and container CI passed.
+# ADDITIVE SCHEMA4 -> SCHEMA5 rollout only; dedicated maintenance dispatch only.
 # Keeps the existing Nestlet volume; never automatically restores or downgrades data.
 # Changes only Nestlet's release, image tag and current pointer. Never run during
 # an operator-setup handoff or any other runtime.env writer.
@@ -8,7 +8,7 @@ set -euo pipefail
 umask 077
 readonly OLD_SHA='c540c89862bbd4c5534b09e083f1db03de36eaac'
 # Root reviewer must replace this only after exact-SHA application/container CI passes.
-readonly REVIEWED_RELEASE_SHA='REPLACE_WITH_REVIEWED_40_HEX_RELEASE_SHA'
+readonly REVIEWED_RELEASE_SHA='73255d90826e4934b1f0f489d3ed836e076096ed'
 readonly NEW_SHA="${1:?Supply the exact reviewed schema5 release SHA}"
 [[ "$REVIEWED_RELEASE_SHA" =~ ^[a-f0-9]{40}$ && "$NEW_SHA" = "$REVIEWED_RELEASE_SHA" ]] || { echo 'Draft or unreviewed release; deployment is disabled'; exit 1; }
 [[ "$NEW_SHA" =~ ^[a-f0-9]{40}$ ]] && [[ "$NEW_SHA" != "$OLD_SHA" ]] || { echo 'Expected a new approved 40-hex commit'; exit 1; }

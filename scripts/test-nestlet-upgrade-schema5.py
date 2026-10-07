@@ -23,6 +23,11 @@ def shell_function(name):
 
 
 class ReleaseSafety(unittest.TestCase):
+    def test_reviewed_release_is_exact_green_merge_pin(self):
+        self.assertIn("readonly REVIEWED_RELEASE_SHA='73255d90826e4934b1f0f489d3ed836e076096ed'", TEXT)
+        self.assertIn('"$NEW_SHA" = "$REVIEWED_RELEASE_SHA"', TEXT)
+        self.assertNotEqual(OLD, '73255d90826e4934b1f0f489d3ed836e076096ed')
+
     def test_bash_syntax_and_embedded_languages(self):
         subprocess.run(['bash', '-n', str(SCRIPT)], check=True)
         python_blocks = re.findall(r"<<'(PY(?:_POINTER)?)'\n(.*?)\n\1", TEXT, re.S)
@@ -35,7 +40,7 @@ class ReleaseSafety(unittest.TestCase):
             result = subprocess.run(['node', '--input-type=module', '--check'], input=code, text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_draft_refuses_before_any_host_access(self):
+    def test_unreviewed_sha_refuses_before_any_host_access(self):
         result = subprocess.run(['bash', str(SCRIPT), NEW], text=True, capture_output=True, env={'PATH': '/usr/bin:/bin'})
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stdout.strip(), 'Draft or unreviewed release; deployment is disabled')

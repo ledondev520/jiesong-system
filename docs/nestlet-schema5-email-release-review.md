@@ -1,13 +1,13 @@
 # Nestlet schema4 → schema5 email release review
 
-Prepared 2026-10-07. Local preparation only. This task has not pushed, dispatched, read production configuration, or accessed production data.
+Prepared and reviewed 2026-10-07. The maintenance branch is approved for publication with the exact green merge pin below. Dispatch remains a separate parent-owned step. This task has not dispatched, read production configuration, or accessed production data.
 
 ## Bounded release and remaining gates
 
 - Exact live predecessor: `c540c89862bbd4c5534b09e083f1db03de36eaac`, schema4
 - Initial backend source used for these synthetic drills: `a179fbf19e466bd549f1b36b2fb89dcc08416feb`
 - Combined application candidate rechecked with the same recovery and HTTP gates: PR21 head `0e329d0705511b856180de56fc1863330a95be79`. This is a development head, not a production pin
-- Final target: deliberately **unpinned**. The script refuses execution until the reviewer pins the final combined merge SHA after its application, browser and container CI are green. A development head, another schema4 build, or a similarly named branch is not an approved substitute
+- Final pinned target: `73255d90826e4934b1f0f489d3ed836e076096ed`, the combined PR21 merge commit. The exact merge application/test, browser and container CI are all green. The script refuses every other SHA; a development head, another schema4 build, or a similarly named branch is not an approved substitute
 - Dedicated maintenance branch: `ops/nestlet-schema5-email-release-20261007`, in Jiesong's maintenance repository only. Do not merge this maintenance workflow into Jiesong main
 - One release directly from live schema4 to the final combined schema5 application. Do not deploy the intermediate same-schema4 addon release first
 - Existing repository/owner/actor/branch, dispatch-operation, selected-host address and optional independently verified host-key checks remain unchanged in meaning. Supplied host-key mismatches fail closed; no relaxed retry. Existing staging environment, `nestlet-stage` workflow concurrency and host maintenance lock remain in force
@@ -62,3 +62,13 @@ Independent read-only review of maintenance commit `61a157bf962ae7f4f8d5f64bdd13
 - The local backup drill makes no provider calls and uses no production data. Synthetic test artifacts are removed after the drill; this does not imply production evidence cleanup
 - Docker is unavailable in this preparation executor. Container build/isolation, actual SSH/host storage, real private backup/cutover and real email delivery are **not run here**. The host script makes fresh-image smoke and backup/rehearsal mandatory, and the exact final merged application requires green container/browser/application CI before pinning
 - Rerun all three commands against the final combined release before pinning. This evidence is preparation for a reviewed release, not a production or real-email acceptance pass
+
+## Final merged-release gate (2026-10-07)
+
+The exact merged tree `73255d90826e4934b1f0f489d3ed836e076096ed` is byte-identical to the independently reviewed PR21 head. All three checks on this exact merge completed successfully:
+
+- Application/test: https://github.com/ledondev520/nestlet/actions/runs/37625744734/job/112806918122
+- Browser: https://github.com/ledondev520/nestlet/actions/runs/37625744690/job/112806918451
+- Container: https://github.com/ledondev520/nestlet/actions/runs/37625744735/job/112806918455
+
+After pinning the merge SHA and updating the workflow's script digest, all 13 safety tests and the exact embedded recovery/HTTP drills were rerun against a separate clean exact-merge source checkout and passed. No provider email was sent. Publication is restricted to the dedicated maintenance branch; the parent owns dispatch with operation `upgrade`, this exact `release_sha`, and the already verified host-address digest/host-key policy. No new host value is inferred or substituted.
