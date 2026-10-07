@@ -22,7 +22,8 @@
         "company bank statements, transaction identifiers, account balances, and even masked account identifiers when combined with transaction rows",
         "carrier packing-list originals and persistent packing-list review records",
         "email verification code hashes and Alibaba Cloud mail credentials",
-        "Nestlet private SQLite recovery snapshots, manifests and migration-rehearsal copies"
+        "Nestlet private SQLite recovery snapshots, manifests and migration-rehearsal copies",
+        "Nestlet email identities, pending email actions, credential fingerprints and durable rate-limit buckets in schema5 recovery snapshots"
       ],
       "controls": {
         "storage": [
@@ -48,7 +49,8 @@
           "VPS runtime migration backups keep private environment files and SQLite snapshots in 0700 directories with 0600 files; deployment verification never prints process environments or credentials",
           "Environment file permissions are checked before loading mail credentials; email registration uses keyed hashes, persistent send quotas and single-use verification; new users remain inactive until administrator approval; user updates clear authentication caches immediately (backend/src/services/emailRegistrationService.js)",
           "scripts/nestlet-upgrade-schema4.sh keeps recovery directories 0700 and files 0600, validates a consistent SQLite API backup, rehearses on a distinct copy, never uploads evidence and never automatically restores or downgrades live storage",
-          "Same-schema Nestlet maintenance keeps database/originals backups and rehearsal copies private; verifies exact persistence compatibility and unchanged schema4 before any old-image recovery; never restores live data or deletes originals"
+          "Same-schema Nestlet maintenance keeps database/originals backups and rehearsal copies private; verifies exact persistence compatibility and unchanged schema4 before any old-image recovery; never restores live data or deletes originals",
+          "scripts/nestlet-upgrade-schema5.sh requires private verified backup and isolated additive/future-version drills, preserves environment bytes, never restores live data, and never starts schema4 after candidate-start; manual old-snapshot recovery must assess revival of credentials and email actions"
         ],
         "transfer": [
           "Encrypt in transit (TLS)",
