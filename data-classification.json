@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updatedAt": "2026-10-02",
+  "updatedAt": "2026-10-07",
   "owner": "security-team",
   "tiers": [
     {
@@ -21,7 +21,8 @@
         "supplier bank account names, account numbers, branches, and bank routing codes",
         "company bank statements, transaction identifiers, account balances, and even masked account identifiers when combined with transaction rows",
         "carrier packing-list originals and persistent packing-list review records",
-        "email verification code hashes and Alibaba Cloud mail credentials"
+        "email verification code hashes and Alibaba Cloud mail credentials",
+        "Nestlet private SQLite recovery snapshots, manifests and migration-rehearsal copies"
       ],
       "controls": {
         "storage": [
@@ -45,7 +46,8 @@
           "Ordinary frontend requests and protected Next proxy downloads share API base parsing; bare origins gain /api/v1 while explicit API paths are retained without duplication",
           "Purchase/inspection inventory cannot be manually transitioned through normal, bulk or AI endpoints; execution rechecks provenance and same-status requests preserve inventory timestamps",
           "VPS runtime migration backups keep private environment files and SQLite snapshots in 0700 directories with 0600 files; deployment verification never prints process environments or credentials",
-          "Environment file permissions are checked before loading mail credentials; email registration uses keyed hashes, persistent send quotas and single-use verification; new users remain inactive until administrator approval; user updates clear authentication caches immediately (backend/src/services/emailRegistrationService.js)"
+          "Environment file permissions are checked before loading mail credentials; email registration uses keyed hashes, persistent send quotas and single-use verification; new users remain inactive until administrator approval; user updates clear authentication caches immediately (backend/src/services/emailRegistrationService.js)",
+          "scripts/nestlet-upgrade-schema4.sh keeps recovery directories 0700 and files 0600, validates a consistent SQLite API backup, rehearses on a distinct copy, never uploads evidence and never automatically restores or downgrades live storage"
         ],
         "transfer": [
           "Encrypt in transit (TLS)",

@@ -1,7 +1,7 @@
 # DRAFT: replace the existing deploy.yml ON A DEDICATED MAINTENANCE BRANCH ONLY.
 # No main push/PR trigger; dispatch only after independent review and owner approval.
 # Uses existing staging-scoped SSH credentials for the same host as current main deployment.
-name: Nestlet First SQLite Rollout
+name: Nestlet Reviewed Schema4 Upgrade
 on:
   workflow_dispatch:
     inputs:
@@ -13,7 +13,7 @@ on:
         options:
           - upgrade
       release_sha:
-        description: Exact approved SQLite-enabled commit with passing Node and container CI
+        description: Exact approved schema4 commit with passing Node and container CI
         required: true
         type: string
       expected_host_sha256:
@@ -31,7 +31,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   preflight:
-    if: github.repository == 'ledondev520/jiesong-system' && github.repository_owner == 'ledondev520' && github.ref == 'refs/heads/ops/nestlet-sqlite-20261007' && github.actor == 'ledondev520'
+    if: github.repository == 'ledondev520/jiesong-system' && github.repository_owner == 'ledondev520' && github.ref == 'refs/heads/ops/nestlet-incremental-20261007' && github.actor == 'ledondev520'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment: staging
@@ -94,7 +94,7 @@ jobs:
             echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
           fi
           test -s "$known_hosts"
-          echo "b1add7c825d8ab72c19fe417cb2489ad988a81d48b3b882915e65273f07a4860  scripts/nestlet-enable-sqlite.sh" | sha256sum --check --status
+          echo "49ff8fc6fb1852d48c08771640c44a5bb578f8443fd4d945257c3667fb55a037  scripts/nestlet-upgrade-schema4.sh" | sha256sum --check --status
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
             -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
-            "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA; else exec sudo -n bash -s -- $RELEASE_SHA; fi" < scripts/nestlet-enable-sqlite.sh
+            "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA; else exec sudo -n bash -s -- $RELEASE_SHA; fi" < scripts/nestlet-upgrade-schema4.sh

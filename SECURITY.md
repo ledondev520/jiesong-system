@@ -89,3 +89,8 @@ PR Review (`.github/workflows/pr-review.yml`) reports checks through Actions `GI
 - `frontend/src/app/dashboard/users/components/UserDialog.tsx` 提供管理员账号开通开关；两套用户更新入口更新状态或角色后立即清除认证缓存，避免停用/改权延迟。
 
 Agent Runtime 仅加载锁定版本的已发布 SDK 构建，加载错误直接保留，不尝试开发机 `.tmp` 文件；两种请求入口显式使用本地 Anthropic 协议，保留关闭重试与上游失败不归档的回归检查。
+
+## Nestlet incremental release boundary
+- `scripts/nestlet-upgrade-schema4.sh` is a dedicated maintenance-only schema3-to-schema4 procedure. It is disabled until an exact reviewed release is pinned. Only the Nestlet Compose service and its existing volume may change.
+- Before live migration, require isolated fresh-image smoke, a SQLite API recovery point with integrity verification, and a migration rehearsal on a separate restored copy. Recovery evidence is Restricted, private-mode, local-only and never logged or uploaded.
+- A schema4 database must never be passed to the schema3 predecessor. Failure can restart the old image only after stopped live storage is verified still schema3; otherwise retain all live data and require forward repair or an explicitly approved separate recovery. No automatic DB restore, downgrade, volume removal or unrelated service restart.
