@@ -24,9 +24,9 @@ def shell_function(name):
 
 class ReleaseSafety(unittest.TestCase):
     def test_reviewed_release_is_exact_green_merge_pin(self):
-        self.assertIn("readonly REVIEWED_RELEASE_SHA='73255d90826e4934b1f0f489d3ed836e076096ed'", TEXT)
+        self.assertIn("readonly REVIEWED_RELEASE_SHA='5335312fd53becaad4bfccace5c1f3e39c6bf4f2'", TEXT)
         self.assertIn('"$NEW_SHA" = "$REVIEWED_RELEASE_SHA"', TEXT)
-        self.assertNotEqual(OLD, '73255d90826e4934b1f0f489d3ed836e076096ed')
+        self.assertNotEqual(OLD, '5335312fd53becaad4bfccace5c1f3e39c6bf4f2')
 
     def test_bash_syntax_and_embedded_languages(self):
         subprocess.run(['bash', '-n', str(SCRIPT)], check=True)
@@ -60,8 +60,8 @@ class ReleaseSafety(unittest.TestCase):
         for guard in ["github.repository == 'ledondev520/jiesong-system'", "github.repository_owner == 'ledondev520'", "github.actor == 'ledondev520'"]:
             self.assertIn(guard, job['if'])
         step = job['steps'][-1]
-        self.assertEqual(parsed['on']['workflow_dispatch']['inputs']['operation']['options'], ['upgrade'])
-        for guard in ['[[ "$RELEASE_OPERATION" == upgrade ]]', '[[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]', '[[ "$EXPECTED_HOST_SHA256" =~ ^[a-f0-9]{64}$ ]]', '[[ "$observed" == "$EXPECTED_HOST_FINGERPRINT" ]]', 'StrictHostKeyChecking=yes', 'sha256sum --check --status']:
+        self.assertEqual(parsed['on']['workflow_dispatch']['inputs']['operation']['options'], ['upgrade', 'verify-predecessor'])
+        for guard in ['[[ "$RELEASE_OPERATION" == upgrade || "$RELEASE_OPERATION" == verify-predecessor ]]', '[[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]', '[[ "$EXPECTED_HOST_SHA256" =~ ^[a-f0-9]{64}$ ]]', '[[ "$observed" == "$EXPECTED_HOST_FINGERPRINT" ]]', 'StrictHostKeyChecking=yes', 'sha256sum --check --status']:
             self.assertIn(guard, step['run'])
         self.assertNotIn('StrictHostKeyChecking=no', step['run'])
         self.assertIn("flock -n 9", TEXT)
@@ -177,6 +177,12 @@ exit 42
         workflow = (ROOT / '.github/workflows/deploy.yml').read_text()
         self.assertNotIn('inspect-release', workflow)
         self.assertNotIn('nestlet-release-identity.py', workflow)
+        readonly = workflow.split('if [[ "$RELEASE_OPERATION" == verify-predecessor ]]; then', 1)[1].split('          else', 1)[0]
+        self.assertIn('< scripts/nestlet-verify-archive.py', readonly)
+        self.assertIn('exec python3 -', readonly)
+        self.assertNotIn('bash -s', readonly)
+        self.assertNotIn('nestlet-upgrade-schema5.sh', readonly)
+        self.assertIn(hashlib.sha256((ROOT/'scripts/nestlet-verify-archive.py').read_bytes()).hexdigest()+'  scripts/nestlet-verify-archive.py', readonly)
         self.assertIn('assert s["environment"].get("PUBLIC_ORIGIN")=="https://nestlet.celerada.link"', TEXT)
         self.assertLess(TEXT.index('check_compose_scope "$NEW_SHA"'), TEXT.index('changed=1\ncompose "$OLD_SHA" stop nestlet'))
 

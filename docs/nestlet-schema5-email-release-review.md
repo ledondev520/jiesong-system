@@ -5,12 +5,12 @@ Local reviewed candidate, 2026-10-07. Publication and execution of this revision
 ## Exact bounded contract
 
 - Permitted predecessor: `4d4c15315d80b5fb7e9f8c2f3f883b10c1121c40`, only after the pinned archive and runtime gates pass
-- Permitted candidate: `73255d90826e4934b1f0f489d3ed836e076096ed`, the reviewed combined PR21 merge
+- Permitted candidate: `5335312fd53becaad4bfccace5c1f3e39c6bf4f2`, the reviewed successor with unchanged storage/authentication/email contracts
 - Dedicated maintenance branch: `ops/nestlet-schema5-email-release-20261007` in the existing maintenance repository. Never merge this workflow into Jiesong main
 - One Nestlet service, its existing private data volume and private configuration. No Jiesong service, PM2 process, ingress, certificate or unrelated volume changes
 - The earlier c540-based preparation is historical and is not this revision's predecessor contract
 
-The exact candidate merge passed [application checks](https://github.com/ledondev520/nestlet/actions/runs/37625744734/job/112806918122), [browser checks](https://github.com/ledondev520/nestlet/actions/runs/37625744690/job/112806918451) and [container checks](https://github.com/ledondev520/nestlet/actions/runs/37625744735/job/112806918455). Its tree matches the reviewed PR21 head.
+The exact candidate merge passed [application checks](https://github.com/ledondev520/nestlet/actions/runs/37645539766/job/112875202085), [browser checks](https://github.com/ledondev520/nestlet/actions/runs/37645539855/job/112875202133) and [container checks](https://github.com/ledondev520/nestlet/actions/runs/37645539713/job/112875199436). Its persistence/authentication/email contracts match the reviewed PR21 baseline.
 
 ## Replacement archive proof
 
@@ -26,7 +26,7 @@ Both proof modes require the exact private maintenance lock. The embedded proces
 
 ## Output and configuration
 
-The active workflow exposes only `upgrade`. The detailed inspection dispatch route is removed. New proof output is solely ordinary verification passed/failed; actual host hashes, filenames, private paths, individual identity fields, configuration values and data records are not printed. Child diagnostics are captured and suppressed. Hash comparison happens internally; masked log values are never reconstructed or treated as complete digests.
+The workflow exposes `upgrade` and standalone read-only `verify-predecessor`. The latter streams only the Python verifier and cannot build, stop, migrate, edit configuration or write data. The detailed inspection route remains removed. Failure output is limited to the fixed classes `environment-lease`, `archive-layout`, `archive-safe-mode`, `archive-content`, or `runtime-proof`; actual host hashes, filenames, private paths, individual identity fields, configuration values and data records are not printed. Child diagnostics are captured and suppressed. Hash comparison happens internally; masked log values are never reconstructed or treated as complete digests.
 
 Only `NESTLET_IMAGE_TAG` changes in the existing environment file, using the existing atomic byte-preserving helper. All other bytes, quoting and line endings are preserved. Ambient operator/provider/mail variables cannot override the private file. The existing resolved-Compose scope gate requires the non-secret public origin to equal `https://nestlet.celerada.link` before any build, service stop or migration; it emits no configured value. No credential is retrieved, copied, rotated or introduced by this procedure.
 
@@ -49,7 +49,9 @@ There is no automatic live restore, downgrade, original replacement, volume remo
 
 ## Local verification
 
-- Archive/runtime verifier: 17 tests passed, covering complete archive copies, private umask, extra private entries rejected before reads, tampering, missing files, links, FIFO, executable/writable modes, source/root races, marker races/bounds, unexpected tmpfs, literal pointers, inherited-lock identity/contention and real Bash→Python fd9 retention
+- Archive/runtime verifier: 21 tests passed, covering complete archive copies, private umask, extra private entries rejected before reads, tampering, missing files, links, FIFO, executable/writable modes, source/root races, marker races/bounds, unexpected tmpfs, literal pointers, inherited-lock identity/contention and real Bash→Python fd9 retention
 - Release safety: 14 tests passed, including exact embedded verifier equivalence, fixed predecessor/candidate pins, generic-only workflow routing, environment preservation and bounded failure handling
-- Exact 4d→732 recovery and HTTP drills passed, including DELETE/committed-WAL backup/verify/restore, additive migration, future refusal, late-DDL rollback and source-copy HTTP boundaries with synthetic mail configuration
+- Exact 4d→533 recovery and HTTP drills passed, including DELETE/committed-WAL backup/verify/restore, additive migration, future refusal, late-DDL rollback and source-copy HTTP boundaries with synthetic mail configuration
 - Independent review found no confirmed P0/P1 in the local gate and wrapper. Docker/SSH production execution and actual private archive verification are not established by these local tests
+
+The fixed classes identify only the validation phase, not a filename, value or inferred cause. Local controls still reject generated/untracked archive files and differing executable semantics; these can be packaging differences, but are hypotheses until the corresponding guard is observed. No archive normalization or guard relaxation is performed. The successor candidate’s exact three CI checks were verified green before the local pin changed; its storage, authentication, email, private-asset, backup, Compose, Docker and package contracts are byte-identical to the prior reviewed candidate.

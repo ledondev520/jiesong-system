@@ -57,8 +57,9 @@ class ArchiveGate(unittest.TestCase):
             root=self.source_fixture();path=root/('PRIVATE_SENTINEL_DIR' if is_directory else '.env')
             if is_directory:path.mkdir(mode=0o700)
             else:path.write_text('SYNTHETIC_PRIVATE_SENTINEL_DO_NOT_READ')
-            with patch.object(gate.os,'read',side_effect=AssertionError('content read before full inventory rejection')):
+            with patch.object(gate.os,'read',side_effect=AssertionError('content read before full inventory rejection')) as read:
                 with self.assertRaises(RuntimeError):self.verify(root)
+                read.assert_not_called()
             self.assertTrue(path.exists())
 
     def test_tamper_missing_hardlink_fifo_and_symlink_fail_closed(self):
@@ -82,7 +83,7 @@ class ArchiveGate(unittest.TestCase):
     def test_root_symlink_and_swapped_directory_fail_no_follow(self):
         root=self.source_fixture();parent=Path(tempfile.mkdtemp(prefix='nestlet-gate-link-'));self.addCleanup(lambda:shutil.rmtree(parent))
         alias=parent/'archive';alias.symlink_to(root,target_is_directory=True)
-        with self.assertRaises(OSError):self.verify(alias)
+        with self.assertRaises((OSError,RuntimeError)):self.verify(alias)
         original=gate.hash_archive_file;changed=False
         def swap(root_fd,entry,before_files,before_dirs,uid):
             nonlocal changed
@@ -147,7 +148,7 @@ class ArchiveGate(unittest.TestCase):
             out,err=io.StringIO(),io.StringIO()
             with contextlib.redirect_stdout(out),contextlib.redirect_stderr(err):
                 code=gate.emit_gate(lambda:(_ for _ in ()).throw(failure))
-            self.assertEqual(code,1);self.assertEqual(out.getvalue(),'Nestlet verification failed.\n');self.assertEqual(err.getvalue(),'')
+            self.assertEqual(code,1);self.assertEqual(out.getvalue(),'Nestlet verification failed [environment-lease].\n');self.assertEqual(err.getvalue(),'')
         out=io.StringIO()
         with contextlib.redirect_stdout(out):code=gate.emit_gate(lambda:None)
         self.assertEqual(code,0);self.assertEqual(out.getvalue(),'Nestlet verification passed.\n')
@@ -238,6 +239,52 @@ class ArchiveGate(unittest.TestCase):
             elif change=='cap-add':item['capAdd']=['SYS_ADMIN']
             else:item['security']=[]
             with patch.object(gate,'command',command),self.assertRaises(RuntimeError):gate.inspect_runtime()
+
+    def test_only_fixed_failure_classes_are_emitted_without_details(self):
+        self.assertEqual(gate.VALIDATION_CLASSES,{'environment-lease','archive-layout','archive-safe-mode','archive-content','runtime-proof'})
+        for category in gate.VALIDATION_CLASSES:
+            out,err=io.StringIO(),io.StringIO()
+            with contextlib.redirect_stdout(out),contextlib.redirect_stderr(err):
+                code=gate.emit_gate(lambda:gate.classed(category,lambda:(_ for _ in ()).throw(OSError('PRIVATE_SENTINEL_PATH_HASH_VALUE'))))
+            self.assertEqual(code,1);self.assertEqual(out.getvalue(),'Nestlet verification failed ['+category+'].\n');self.assertEqual(err.getvalue(),'')
+        error=gate.GateFailure('archive-content');error.category='PRIVATE_SENTINEL'
+        out=io.StringIO()
+        with contextlib.redirect_stdout(out):gate.emit_gate(lambda:(_ for _ in ()).throw(error))
+        self.assertEqual(out.getvalue(),'Nestlet verification failed [environment-lease].\n')
+
+    def test_archive_failures_are_classified_without_relaxing_checks(self):
+        for expected in ['archive-layout','archive-safe-mode','archive-content','archive-content-size']:
+            root=self.source_fixture()
+            if expected=='archive-layout':(root/'public'/'next').mkdir(mode=0o700)
+            elif expected=='archive-safe-mode':(root/'auth.js').chmod(0o666)
+            elif expected=='archive-content-size':
+                with (root/'auth.js').open('ab') as file:file.write(b'x')
+            else:
+                path=root/'auth.js';data=path.read_bytes();path.write_bytes(b'X'+data[1:])
+            with self.assertRaises(gate.GateFailure) as raised:self.verify(root)
+            self.assertEqual(raised.exception.category,'archive-content' if expected=='archive-content-size' else expected)
+
+    def test_child_stderr_and_exception_messages_remain_suppressed(self):
+        out,err=io.StringIO(),io.StringIO()
+        argv=['python3','-c','import sys; print("SYNTHETIC_PRIVATE_SENTINEL", file=sys.stderr); sys.exit(1)']
+        with contextlib.redirect_stdout(out),contextlib.redirect_stderr(err):
+            result=gate.emit_gate(lambda:gate.classed('runtime-proof',gate.command,argv))
+        self.assertEqual(result,1)
+        self.assertEqual(out.getvalue(),'Nestlet verification failed [runtime-proof].\n')
+        self.assertEqual(err.getvalue(),'')
+
+    def test_standalone_gate_never_opens_a_host_file_for_writing(self):
+        base,archive,lock=self.managed_fixture();actual_open=gate.os.open;flags=[];commands=[]
+        def opened(path,mode,*args,**kwargs):
+            flags.append(mode);return actual_open(path,mode,*args,**kwargs)
+        def read_command(args):
+            commands.append(args);self.assertEqual(args[:2],['docker','exec']);return 'PASS'
+        with patch.object(gate,'BASE',base),patch.object(gate,'ARCHIVE',archive),patch.object(gate.os,'open',opened),patch.object(gate,'inspect_runtime',return_value=('a'*12,'sha256:'+'b'*64)),patch.object(gate,'command',read_command):
+            gate.verify_host()
+        forbidden=os.O_WRONLY|os.O_RDWR|os.O_CREAT|os.O_TRUNC|os.O_APPEND
+        self.assertTrue(flags);self.assertTrue(all(not flag&forbidden for flag in flags))
+        self.assertEqual(len(commands),2)
+        self.assertEqual(lock.read_bytes(),b'')
 
     def test_host_commands_do_not_print_environments_or_source_results(self):
         text=(ROOT/'scripts/nestlet-verify-archive.py').read_text()

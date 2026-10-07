@@ -8,7 +8,7 @@ set -euo pipefail
 umask 077
 readonly OLD_SHA='4d4c15315d80b5fb7e9f8c2f3f883b10c1121c40'
 # Root reviewer must replace this only after exact-SHA application/container CI passes.
-readonly REVIEWED_RELEASE_SHA='73255d90826e4934b1f0f489d3ed836e076096ed'
+readonly REVIEWED_RELEASE_SHA='5335312fd53becaad4bfccace5c1f3e39c6bf4f2'
 readonly NEW_SHA="${1:?Supply the exact reviewed schema5 release SHA}"
 [[ "$REVIEWED_RELEASE_SHA" =~ ^[a-f0-9]{40}$ && "$NEW_SHA" = "$REVIEWED_RELEASE_SHA" ]] || { echo 'Draft or unreviewed release; deployment is disabled'; exit 1; }
 [[ "$NEW_SHA" =~ ^[a-f0-9]{40}$ ]] && [[ "$NEW_SHA" != "$OLD_SHA" ]] || { echo 'Expected a new approved 40-hex commit'; exit 1; }
@@ -155,6 +155,27 @@ ARCHIVE_MANIFEST_TEXT = '{\n  "commit": "4d4c15315d80b5fb7e9f8c2f3f883b10c1121c4
 RUNTIME_MANIFEST_TEXT = '{\n  "commit": "4d4c15315d80b5fb7e9f8c2f3f883b10c1121c40",\n  "directories": [\n    "ops",\n    "public",\n    "public/samples",\n    "scripts"\n  ],\n  "fileCount": 31,\n  "files": [\n    {\n      "gitBlob": "38d2865936d021d3c79c82afd83f42cdcf89df27",\n      "gitMode": "100644",\n      "path": "asset-domain.js",\n      "sha256": "ae292757b8b6215824621288ec9a5be1125d97894b53bf4602fd9471b432cf50",\n      "size": 2427,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "014e7eec62554fae4cb21cfc14311289932abbf3",\n      "gitMode": "100644",\n      "path": "asset-image-worker.js",\n      "sha256": "f3902a59e8d5121b7ce49483eb41f8e122ca2fb0ea0ebca6a54bf57fe5dce334",\n      "size": 888,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "35f4a62383372c7339df29705d2a27ec5cbcce09",\n      "gitMode": "100644",\n      "path": "asset-records.js",\n      "sha256": "984cd18fea8e20f0888a5b7a9accd9082e0fa29e46bc869ad3219c58315feea3",\n      "size": 5840,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "e045cdad3a1e87173e7d460d252f4f1c108be0a9",\n      "gitMode": "100644",\n      "path": "auth.js",\n      "sha256": "1873d2e6a6afc66b06652c18144132a860c602b286df0eaa96c2bc8d995b64e2",\n      "size": 7671,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "6dc32c4e7165e10418f6ba3c80136e733f84cab2",\n      "gitMode": "100644",\n      "path": "case-records.js",\n      "sha256": "59a606769082d6dd48737b7c447e762fd1be34e6e1d36de9834c09a7a1f423c8",\n      "size": 11525,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "ee6ba7b84fc4546327bcc9df06bb64955cd7c28c",\n      "gitMode": "100644",\n      "path": "chat.js",\n      "sha256": "fdb895877c19ce71fa8bb8039283b33bce4bcb7cb1ce3f4620ea569cbb1a2c3a",\n      "size": 12143,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "e3766334f4420804cc5fa871bc4211cb1f65ea8b",\n      "gitMode": "100644",\n      "path": "document-context.js",\n      "sha256": "7c17eb96ca2c52220064ef6f34641835b0d8b478442498e79235fd872a676297",\n      "size": 18481,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "7201c4bcb9e940e54065b27c9a4643ba17266dee",\n      "gitMode": "100644",\n      "path": "ops/healthcheck.mjs",\n      "sha256": "20a4903112e9247421a903fb9d71c4eb2b52e74f1c0714aa267fccc4269e3be6",\n      "size": 445,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "732d73b1284c07c50c6507a901b86fa5d1c501ee",\n      "gitMode": "100644",\n      "path": "package.json",\n      "sha256": "efdc025e6d2cf1633384cc454b33c2aa33ee025519ff1033070a45101e1daa88",\n      "size": 2963,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "e379eacf6b7bfb80c48ac81636b29d876f5a0f3e",\n      "gitMode": "100644",\n      "path": "private-assets.js",\n      "sha256": "869f1ca65e8515af209aca8a418b253c22f37f61fbc04e93038016cf96e91044",\n      "size": 15880,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "9e48d74002331588f584d630253944ef7e38f2c9",\n      "gitMode": "100644",\n      "path": "public/agency-guidance.js",\n      "sha256": "89d12a2558389c910d4c388431a55be2a97001e76b0332a5a3a8915687d61bb0",\n      "size": 9391,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "73647791d3b00a642843ca7a8693224f7012c375",\n      "gitMode": "100644",\n      "path": "public/app.js",\n      "sha256": "102831dfe8a282ea6f7655729910c61dd48ce92657371fb14950ff0877e3f6de",\n      "size": 131778,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "472d136c405c91d72bdeadc66c24a23cc3a251a8",\n      "gitMode": "100644",\n      "path": "public/core.js",\n      "sha256": "ec8ec5871b88aa190a7480f2a3065b24c7354c42bb78b63c865010596264e652",\n      "size": 12324,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "6e11e862e6367ad4940a746afa906c66285a33cd",\n      "gitMode": "100644",\n      "path": "public/index.html",\n      "sha256": "053458f587bb3b41eac750cf48fabf430da1274433823db5100ba720ed8afc05",\n      "size": 661,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "64826b9921289a444b573d4de75294947f70c9ad",\n      "gitMode": "100644",\n      "path": "public/logo.svg",\n      "sha256": "b5ee779c5b0b28ee6fcc24c9700e230d82ef9d29fc17894794296db27d5fee08",\n      "size": 477,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "0eabc75e0b3a74f5fa867970675bc73b8493694c",\n      "gitMode": "100644",\n      "path": "public/samples/nestlet-synthetic-case.csv",\n      "sha256": "830db1853880e3e3ac74e8dec99f18b250af2f238e0b65dd9059a508d23d2615",\n      "size": 195,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "fb99b08587e31878e3b4f53686e584b456fc931b",\n      "gitMode": "100644",\n      "path": "public/samples/nestlet-synthetic-case.pdf",\n      "sha256": "1354cfb277b55bc69d8b6dd5de459a972e09de3326e83131fc7292c809f1d3e7",\n      "size": 43936,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "efbd733008d677a9b3b5cf9f39933d8045107a48",\n      "gitMode": "100644",\n      "path": "public/samples/nestlet-synthetic-case.txt",\n      "sha256": "af662f005a6a05d4155612c464c3d48d1adab44c3ee3db1ed011e11c225c9f35",\n      "size": 470,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "1c1ba8b77acab2c442b189f82f9ab4ad97b4824f",\n      "gitMode": "100644",\n      "path": "public/samples/nestlet-synthetic-case.xls",\n      "sha256": "6676c87954898e46e357e80e2c3ce02df82af56f75d49e36096db5c262bf2725",\n      "size": 4096,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "4a573ff5258a64dbb981ed403ae196474863b2f7",\n      "gitMode": "100644",\n      "path": "public/samples/nestlet-synthetic-case.xlsx",\n      "sha256": "a4842c0af9a8418415ca77ff189c49e7aef7d6722f6822f8db134fa2e5af9e43",\n      "size": 3910,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "fd0d722ad52bc0c0954efeef15a03dc0f68e36a6",\n      "gitMode": "100644",\n      "path": "public/style.css",\n      "sha256": "7de39e1e0c5bf157d597ef5caebe1fd906cbe709b997a228324264fb52485dca",\n      "size": 24381,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "95920c45c2b8133e87c136ebb3572ee4c90d0efe",\n      "gitMode": "100644",\n      "path": "scripts/operator-setup.js",\n      "sha256": "b53fbe9f7edc94ddd7a7ad71dd7d3c9e285181c869c1922d0b5806da5bac1b81",\n      "size": 8362,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "bdd45cdc95b95c8cc9217914a8b1e28eb1774db6",\n      "gitMode": "100644",\n      "path": "scripts/private-data-operations.js",\n      "sha256": "2e72b691eb8e60725f7d2ee3aaf31d022d0524e4f462dc2d7755c54d2712aac3",\n      "size": 13036,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "649fec6b5dc4db4fb3a2f2b2cc123f690caf6178",\n      "gitMode": "100644",\n      "path": "scripts/private-data.js",\n      "sha256": "f6597520176d24d52f7e9fb69df9e02d3b8a3a0ce8387ba77db1f0403d72cf5b",\n      "size": 2783,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "27b88dde2eecece6372cef73dc9dd53fd877ca71",\n      "gitMode": "100644",\n      "path": "scripts/setup-operator.js",\n      "sha256": "8b6af85d166172a3f1345b62b1d8807ed60d5ce8b67ffc30b5d206037f387cff",\n      "size": 4279,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "5a95bbe8f5ab7e9b7422a020b7926ecd5336aca8",\n      "gitMode": "100644",\n      "path": "scripts/setup-trial-user.js",\n      "sha256": "4e4633bb561afcd9a660f4b9990d075a96b5453d53c7b75986282d0aa475b09f",\n      "size": 3408,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "9e4552611718fa68442601ef32cb7156c4aa7b06",\n      "gitMode": "100644",\n      "path": "scripts/trial-user-setup.js",\n      "sha256": "041108e5f30c7093a8da5eec2379fd5268e0eafddb7177afa2a727e8fbe79752",\n      "size": 3638,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "68d7fde1f0081a89022b9a8d9406b3b32f5fe5e7",\n      "gitMode": "100644",\n      "path": "server.js",\n      "sha256": "961a7c4952e3dd627302799df8a53c1761b3c1aa758a006d4bfbe999a62ee9ea",\n      "size": 49061,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "d41095f39ac6c734ab2061cd188e90bd7cc25e8e",\n      "gitMode": "100644",\n      "path": "storage.js",\n      "sha256": "f445be690156322540894bb67fd9c355fc6c1d20b4f186b6a8314730f3b7908f",\n      "size": 67096,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "12cd063767caa57906df92547ec45f762d159d95",\n      "gitMode": "100644",\n      "path": "telemetry.js",\n      "sha256": "944a15e0f9f1ec87346bfc1d5108649d5cf8da2b28b3b26210a5b7608a712094",\n      "size": 8976,\n      "type": "regular"\n    },\n    {\n      "gitBlob": "f1dccd4b3fddcbf7f6e51d520afe875d93883b1e",\n      "gitMode": "100644",\n      "path": "workbook-worker.js",\n      "sha256": "11ed19938e06543fa10b5f47c694148a14f0af18edf96c0523dc46a00fee00f3",\n      "size": 8343,\n      "type": "regular"\n    }\n  ],\n  "format": "nestlet-runtime-source-copy-manifest",\n  "gitTree": "1d02f4d8839dfd636bfd2aa6676984e9b98358ac",\n  "repository": "https://github.com/ledondev520/nestlet.git",\n  "scope": "Exact raw source COPY set from approved runtime Dockerfile; excludes built public/next and node_modules",\n  "totalBytes": 478864,\n  "version": 1\n}\n'
 
 
+VALIDATION_CLASSES = frozenset(('environment-lease', 'archive-layout', 'archive-safe-mode', 'archive-content', 'runtime-proof'))
+
+
+class GateFailure(RuntimeError):
+    def __init__(self, category):
+        if category not in VALIDATION_CLASSES:
+            raise ValueError('Unknown validation class')
+        super().__init__('Verification refused')
+        self.category = category
+
+
+def classed(category, operation, *args, **kwargs):
+    try:
+        return operation(*args, **kwargs)
+    except GateFailure:
+        raise
+    except BaseException:
+        # Class only, never an exception message, filename, value or traceback.
+        raise GateFailure(category) from None
+
+
 def require(condition):
     if not condition:
         raise RuntimeError('Verification refused')
@@ -210,7 +231,8 @@ def safe_directory(info, uid, root=False):
 def safe_file(info, entry, uid):
     mode = stat.S_IMODE(info.st_mode)
     require(stat.S_ISREG(info.st_mode) and info.st_uid == uid and info.st_nlink == 1
-            and info.st_size == entry['size'] and not mode & 0o7022 and mode & 0o400)
+            and not mode & 0o7022 and mode & 0o400)
+    classed('archive-content', require, info.st_size == entry['size'])
     require(bool(mode & 0o111) == (entry['gitMode'] == '100755'))
     if entry['gitMode'] == '100755':
         require(mode & 0o100)
@@ -243,7 +265,7 @@ def enumerate_archive(root_fd, manifest, uid):
     seen = 0
     def walk(fd, prefix):
         nonlocal seen
-        safe_directory(os.fstat(fd), uid, root=not prefix)
+        classed('archive-safe-mode', safe_directory, os.fstat(fd), uid, root=not prefix)
         with os.scandir(fd) as iterator:
             names = []
             for entry in iterator:
@@ -254,10 +276,10 @@ def enumerate_archive(root_fd, manifest, uid):
             require(relative in expected or relative in directories)
             info = os.stat(name, dir_fd=fd, follow_symlinks=False)
             if relative in expected:
-                safe_file(info, expected[relative], uid)
+                classed('archive-safe-mode', safe_file, info, expected[relative], uid)
                 files_seen[relative] = fingerprint(info)
             else:
-                safe_directory(info, uid)
+                classed('archive-safe-mode', safe_directory, info, uid)
                 child = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
                 try:
                     require(fingerprint(os.fstat(child)) == fingerprint(info))
@@ -283,7 +305,7 @@ def hash_archive_file(root_fd, entry, before_files, before_dirs, uid):
             require(fingerprint(os.fstat(fd)) == before_dirs[prefix])
         fd = os.open(pieces[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent_fd)
         descriptors.append(fd)
-        info = os.fstat(fd);safe_file(info, entry, uid)
+        info = os.fstat(fd);classed('archive-safe-mode', safe_file, info, entry, uid)
         require(fingerprint(info) == before_files[entry['path']])
         digest = hashlib.sha256();read = 0
         while True:
@@ -300,16 +322,16 @@ def hash_archive_file(root_fd, entry, before_files, before_dirs, uid):
 
 
 def verify_archive(path, manifest, uid):
-    root_fd = open_archive_root(path, uid)
+    root_fd = classed('archive-safe-mode', open_archive_root, path, uid)
     try:
-        before_files, before_dirs = enumerate_archive(root_fd, manifest, uid)
+        before_files, before_dirs = classed('archive-layout', enumerate_archive, root_fd, manifest, uid)
         # Enumeration of every entry completed before any source file bytes are read.
         for entry in manifest['files']:
-            hash_archive_file(root_fd, entry, before_files, before_dirs, uid)
-        require(enumerate_archive(root_fd, manifest, uid) == (before_files, before_dirs))
-        final_fd = open_archive_root(path, uid)
+            classed('archive-content', hash_archive_file, root_fd, entry, before_files, before_dirs, uid)
+        classed('archive-layout', require, classed('archive-layout', enumerate_archive, root_fd, manifest, uid) == (before_files, before_dirs))
+        final_fd = classed('archive-safe-mode', open_archive_root, path, uid)
         try:
-            require(fingerprint(os.fstat(final_fd)) == before_dirs[''])
+            classed('archive-layout', require, fingerprint(os.fstat(final_fd)) == before_dirs[''])
         finally:
             os.close(final_fd)
     finally:
@@ -437,10 +459,12 @@ def verify_host(mode='all', lease_fd=None):
         fcntl.flock(fd, (fcntl.LOCK_EX if lease_fd is not None else fcntl.LOCK_SH) | fcntl.LOCK_NB)
         verify_archive(ARCHIVE, archive_manifest, uid)
         if mode != 'archive':
-            container, image = inspect_runtime()
-            require(command(['docker', 'exec', '--user', '1000:1000', container, 'node', '--input-type=module', '-e', runtime_program(), json.dumps(runtime_manifest, separators=(',', ':'))]) == 'PASS')
-            require(command(['docker', 'exec', '--user', '1000:1000', container, 'node', '--input-type=module', '-e', HEADER_GATE]) == 'PASS')
-            require(inspect_runtime() == (container, image))
+            def runtime_proof():
+                container, image = inspect_runtime()
+                require(command(['docker', 'exec', '--user', '1000:1000', container, 'node', '--input-type=module', '-e', runtime_program(), json.dumps(runtime_manifest, separators=(',', ':'))]) == 'PASS')
+                require(command(['docker', 'exec', '--user', '1000:1000', container, 'node', '--input-type=module', '-e', HEADER_GATE]) == 'PASS')
+                require(inspect_runtime() == (container, image))
+            classed('runtime-proof', runtime_proof)
         require(os.readlink(current) == str(ARCHIVE) and fingerprint(current.lstat()) == pointer)
     finally:
         os.close(fd)
@@ -449,8 +473,9 @@ def verify_host(mode='all', lease_fd=None):
 def emit_gate(operation):
     try:
         operation()
-    except BaseException:
-        print('Nestlet verification failed.')
+    except BaseException as error:
+        category = error.category if isinstance(error, GateFailure) and error.category in VALIDATION_CLASSES else 'environment-lease'
+        print('Nestlet verification failed [' + category + '].')
         return 1
     print('Nestlet verification passed.')
     return 0
