@@ -89,7 +89,7 @@ jobs:
             echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
           fi
           test -s "$known_hosts"
-          echo "b119f8ce035968209f4dfde506672a9d8c4312c475fc417eb98a85017601445a  scripts/nestlet-ingress-preflight.py" | sha256sum --check --status
+          echo "cdcd8a39db87e77715300e38888c318e1a02d82139ff598ab6a2556a2957da35  scripts/nestlet-ingress-preflight.py" | sha256sum --check --status
           # Existing authorized host-key discovery remains unchanged. A supplied pin
           # must match; StrictHostKeyChecking stays enabled. Never retry a mismatch
           # with relaxed checking. Privileged inspection emits allowlisted JSON only.
