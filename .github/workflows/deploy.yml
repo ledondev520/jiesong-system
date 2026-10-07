@@ -1,17 +1,20 @@
-# DRAFT: read-only inspection on the existing dedicated authorized maintenance branch.
+# DRAFT: staged ingress deployment on the existing authorized maintenance branch.
 # No main push/PR trigger. Local preparation only; not published or dispatched.
 # Uses existing staging-scoped SSH credentials for the same host as current main deployment.
-name: Nestlet Read-only Ingress Preflight
+name: Nestlet Guarded HTTPS Ingress
 on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Read-only redacted ingress inspection; no certificate or service changes
+        description: Separate HTTP challenge, existing-account issuance, HTTPS activation or targeted rollback
         required: true
-        default: preflight
+        default: http
         type: choice
         options:
-          - preflight
+          - http
+          - issue
+          - https
+          - rollback
       expected_host_sha256:
         description: SHA256 of the selected server IPv4 address; checked before SSH
         required: true
@@ -29,7 +32,7 @@ jobs:
   preflight:
     if: github.repository == 'ledondev520/jiesong-system' && github.repository_owner == 'ledondev520' && github.ref == 'refs/heads/ops/nestlet-stage-20261007' && github.actor == 'ledondev520'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     environment: staging
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +42,7 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           log-public-key: false
-      - name: Inspect ingress readiness without changes
+      - name: Perform selected guarded ingress stage
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
@@ -57,7 +60,7 @@ jobs:
           if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
             [[ "$EXPECTED_HOST_FINGERPRINT" =~ ^SHA256:[a-zA-Z0-9+/]{43}$ ]]
           fi
-          [[ "$RELEASE_OPERATION" == preflight ]]
+          [[ "$RELEASE_OPERATION" =~ ^(http|issue|https|rollback)$ ]]
           [[ "$EXPECTED_HOST_SHA256" =~ ^[a-f0-9]{64}$ ]]
           matched_address=
           while IFS= read -r address; do
@@ -89,14 +92,29 @@ jobs:
             echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
           fi
           test -s "$known_hosts"
-          echo "cdcd8a39db87e77715300e38888c318e1a02d82139ff598ab6a2556a2957da35  scripts/nestlet-ingress-preflight.py" | sha256sum --check --status
-          # Existing authorized host-key discovery remains unchanged. A supplied pin
-          # must match; StrictHostKeyChecking stays enabled. Never retry a mismatch
-          # with relaxed checking. Privileged inspection emits allowlisted JSON only.
+          # No body is executed by a remote streamed shell: python3 consumes the
+          # whole script, and every subprocess inside it receives /dev/null stdin.
+          echo "0320ff9e97d5ba3e84e528fbc8db25becfb0b30f308aab69ff19d9b1e24d22bc  scripts/nestlet-ingress-final.py" | sha256sum --check --status
+          if [[ "$RELEASE_OPERATION" != rollback ]]; then
+            EXPECTED_HOST_SHA256="$EXPECTED_HOST_SHA256" python3 -c 'import hashlib,os,socket; a={x[4][0] for x in socket.getaddrinfo("nestlet.celerada.link",80,type=socket.SOCK_STREAM)}; assert a and all(":" not in ip and hashlib.sha256(ip.encode()).hexdigest()==os.environ["EXPECTED_HOST_SHA256"] for ip in a), "Public runner DNS gate failed"' 2>"$ssh_errors" || { echo 'DNS does not yet match selected host; no ingress operation performed'; exit 1; }
+          fi
+          if [[ "$RELEASE_OPERATION" == issue ]]; then
+            probe="$(curl --fail --silent --show-error --noproxy '*' --connect-timeout 10 --max-time 20 'http://nestlet.celerada.link/.well-known/acme-challenge/nestlet-readiness' 2>"$ssh_errors")"
+            [[ "$probe" == 'nestlet-acme-ready:b431ea59405cbbf9ab6ec9945010f66f655b1781' ]] || { echo 'External HTTP challenge proof failed'; exit 1; }
+            code="$(curl --silent --noproxy '*' --output /dev/null --write-out '%{http_code}' --connect-timeout 10 --max-time 20 'http://nestlet.celerada.link/')"
+            [[ "$code" == 503 ]] || { echo 'HTTP is not fail-closed; issuance stopped'; exit 1; }
+          fi
+          # All interpolated arguments below are fixed constants or validated enums/hex.
+          arguments="$RELEASE_OPERATION --approved --host-sha256 $EXPECTED_HOST_SHA256 --preflight-sha256 fa1948e97c6e437eaabb025e84660d46be60ee29c7be70283a84a3a509911831 --include conf.d --certificate-lineage /etc/letsencrypt/live/nestlet-ingress --external-challenge-verified"
+          remote="if [ \"\$(id -u)\" = 0 ]; then exec python3 - $arguments; else exec sudo -n python3 - $arguments; fi"
           if ! ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
             -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
-            'if [ "$(id -u)" = 0 ]; then exec python3 -; else exec sudo -n python3 -; fi' \
-            < scripts/nestlet-ingress-preflight.py 2>"$ssh_errors"; then
-            echo 'Read-only inspection failed; SSH or privileged-read details withheld. No relaxed retry.'
+            "$remote" < scripts/nestlet-ingress-final.py 2>"$ssh_errors"; then
+            echo 'Guarded ingress stage failed; raw SSH/account/certificate details withheld. No relaxed retry.'
             exit 1
+          fi
+          if [[ "$RELEASE_OPERATION" == https ]]; then
+            body="$(curl --fail --silent --show-error --noproxy '*' --connect-timeout 10 --max-time 20 'https://nestlet.celerada.link/api/health' 2>"$ssh_errors")"
+            printf '%s' "$body" | python3 -c 'import json,sys; assert json.load(sys.stdin)=={"ok":True}'
+            echo 'External trusted HTTPS health verified; operator setup is still intentionally incomplete.'
           fi
