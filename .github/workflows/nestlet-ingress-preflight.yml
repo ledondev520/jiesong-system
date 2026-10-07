@@ -1,0 +1,102 @@
+# DRAFT: read-only inspection on the existing dedicated authorized maintenance branch.
+# No main push/PR trigger. Local preparation only; not published or dispatched.
+# Uses existing staging-scoped SSH credentials for the same host as current main deployment.
+name: Nestlet Read-only Ingress Preflight
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Read-only redacted ingress inspection; no certificate or service changes
+        required: true
+        default: preflight
+        type: choice
+        options:
+          - preflight
+      expected_host_sha256:
+        description: SHA256 of the selected server IPv4 address; checked before SSH
+        required: true
+        type: string
+      host_key_sha256:
+        description: Optional independently verified VPS SSH public host-key fingerprint
+        required: false
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: nestlet-stage
+  cancel-in-progress: false
+jobs:
+  preflight:
+    if: github.repository == 'ledondev520/jiesong-system' && github.repository_owner == 'ledondev520' && github.ref == 'refs/heads/ops/nestlet-stage-20261007' && github.actor == 'ledondev520'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          log-public-key: false
+      - name: Inspect ingress readiness without changes
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+          RELEASE_OPERATION: ${{ inputs.operation }}
+          EXPECTED_HOST_SHA256: ${{ inputs.expected_host_sha256 }}
+          EXPECTED_HOST_FINGERPRINT: ${{ inputs.host_key_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SSH_HOST" && test -n "$SSH_USER"
+          [[ "$SSH_PORT" =~ ^[0-9]+$ ]]
+          [[ "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ ]]
+          [[ "$SSH_USER" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_-]*$ ]]
+          if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
+            [[ "$EXPECTED_HOST_FINGERPRINT" =~ ^SHA256:[a-zA-Z0-9+/]{43}$ ]]
+          fi
+          [[ "$RELEASE_OPERATION" == preflight ]]
+          [[ "$EXPECTED_HOST_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          matched_address=
+          while IFS= read -r address; do
+            observed="$(printf '%s' "$address" | sha256sum | awk '{print $1}')"
+            if [[ "$observed" == "$EXPECTED_HOST_SHA256" ]]; then matched_address="$address"; fi
+          done < <(getent ahostsv4 "$SSH_HOST" | awk '{print $1}' | sort -u)
+          [[ -n "$matched_address" ]] || { echo 'Selected server address does not match the existing SSH target'; exit 1; }
+          echo 'Existing SSH target matches selected server address; no address is logged.'
+          echo "::add-mask::$matched_address"
+          umask 077
+          # No pin: inherit the already-authorized deploy channel's host-key discovery.
+          # A supplied independent pin is mandatory to match; never bypass a mismatch.
+          known_hosts="$(mktemp)"
+          scanned="$(mktemp)"
+          one="$(mktemp)"
+          ssh_errors="$(mktemp)"
+          trap 'rm -f "$known_hosts" "$scanned" "$one" "$ssh_errors"' EXIT
+          ssh-keyscan -T 10 -p "$SSH_PORT" -H "$matched_address" > "$scanned" 2>/dev/null
+          if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
+            while IFS= read -r host_key; do
+              printf '%s\n' "$host_key" > "$one"
+              observed="$(ssh-keygen -lf "$one" -E sha256 | awk '{print $2}')"
+              if [[ "$observed" == "$EXPECTED_HOST_FINGERPRINT" ]]; then
+                cat "$one" >> "$known_hosts"
+              fi
+            done < "$scanned"
+          else
+            cat "$scanned" > "$known_hosts"
+            echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
+          fi
+          test -s "$known_hosts"
+          echo "b119f8ce035968209f4dfde506672a9d8c4312c475fc417eb98a85017601445a  scripts/nestlet-ingress-preflight.py" | sha256sum --check --status
+          # Existing authorized host-key discovery remains unchanged. A supplied pin
+          # must match; StrictHostKeyChecking stays enabled. Never retry a mismatch
+          # with relaxed checking. Privileged inspection emits allowlisted JSON only.
+          if ! ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
+            'if [ "$(id -u)" = 0 ]; then exec python3 -; else exec sudo -n python3 -; fi' \
+            < scripts/nestlet-ingress-preflight.py 2>"$ssh_errors"; then
+            echo 'Read-only inspection failed; SSH or privileged-read details withheld. No relaxed retry.'
+            exit 1
+          fi
