@@ -71,7 +71,8 @@ class ReleaseSafety(unittest.TestCase):
         for guard in ['[[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]','[[ "$EXPECTED_HOST_SHA256" =~ ^[a-f0-9]{64}$ ]]','[[ "$observed" == "$EXPECTED_HOST_FINGERPRINT" ]]','StrictHostKeyChecking=yes','sha256sum --check --status']:
             self.assertIn(guard,run)
         self.assertNotIn('StrictHostKeyChecking=no',run)
-        self.assertNotIn('RELEASE_OPERATION',workflow)
+        self.assertEqual(parsed['on']['workflow_dispatch']['inputs']['operation']['default'],'upgrade')
+        self.assertEqual(parsed['on']['workflow_dispatch']['inputs']['operation']['options'],['upgrade','provider-proof'])
         self.assertNotIn('nestlet-upgrade-schema5.sh',run)
         self.assertNotIn('nestlet-mail-proof.py',run)
         self.assertNotIn('nestlet-stream-proof.py',run)

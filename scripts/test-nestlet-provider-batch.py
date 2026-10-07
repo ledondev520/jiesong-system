@@ -11,6 +11,7 @@ import stat
 import subprocess
 import tempfile
 import unittest
+import yaml
 from unittest import mock
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -155,6 +156,51 @@ class ApprovedBatch(unittest.TestCase):
         for y in range(96):
             self.assertEqual(pixels[y*289],0)
             for x in range(96):self.assertEqual(pixels[y*289+1+x*3:y*289+4+x*3],bytes((220,30,30) if 16<=x<80 and 16<=y<80 else (255,255,255)))
+
+    def test_workflow_routing_and_output_allowlist(self):
+        text=(ROOT/'.github/workflows/deploy.yml').read_text()
+        workflow=yaml.load(text,Loader=yaml.BaseLoader)
+        self.assertEqual(set(workflow['on']),{'workflow_dispatch'})
+        operation=workflow['on']['workflow_dispatch']['inputs']['operation']
+        self.assertEqual(operation['default'],'upgrade');self.assertEqual(operation['required'],'false')
+        self.assertEqual(operation['options'],['upgrade','provider-proof'])
+        self.assertEqual(workflow['permissions'],{'contents':'read'})
+        self.assertEqual(workflow['concurrency'],{'group':'nestlet-stage','cancel-in-progress':'false'})
+        job=workflow['jobs']['upgrade'];self.assertEqual(job['environment'],'staging')
+        self.assertIn("github.ref == 'refs/heads/ops/nestlet-schema6-release-20261008'",job['if'])
+        self.assertIn("github.actor == 'ledondev520'",job['if'])
+        command=job['steps'][-1]['run']
+        self.assertIn(hashlib.sha256(SCRIPT.read_bytes()).hexdigest()+'  scripts/nestlet-provider-batch.py',command)
+        self.assertIn('REVIEWED_RELEASE_SHA='+proof.PIN,command)
+        prior=subprocess.check_output(['git','show','e78b6f29ccb3b7bd911d3116673b1c4dca6713ed:.github/workflows/deploy.yml'],cwd=ROOT,text=True)
+        marker='          echo "71391e8ecc1e81aca5071198d135397a1c7e168bdb359348ad6ed6771fcd2783  scripts/nestlet-upgrade-schema6.sh"'
+        self.assertEqual(text[text.index(marker):],prior[prior.index(marker):])
+        self.assertEqual(hashlib.sha256((ROOT/'scripts/nestlet-upgrade-schema6.sh').read_bytes()).hexdigest(),'71391e8ecc1e81aca5071198d135397a1c7e168bdb359348ad6ed6771fcd2783')
+        self.assertEqual(subprocess.run(['bash','-n'],input=command,text=True,capture_output=True).returncode,0)
+        preamble=r'''
+getent() { printf '192.0.2.8 STREAM synthetic\n'; }
+ssh-keyscan() { printf 'synthetic-host-key\n'; }
+ssh() { cat >/dev/null; printf '%s\n' "$*" > "$CALL_FILE"; printf '%s' "$FAKE_SSH_STDOUT"; printf 'SYNTHETIC PRIVATE STDERR\n' >&2; return "$FAKE_SSH_STATUS"; }
+'''
+        all_pass='text-completed\nimage-completed\nstream-completed\n'
+        mixed='text-completed\nimage-unconfirmed\nstream-completed\n'
+        unknown='text-unconfirmed\nimage-unconfirmed\nstream-unconfirmed\n'
+        cases=[(0,all_pass,all_pass,0),(1,mixed,mixed,1),(255,all_pass,unknown,1),(0,'PRIVATE RESPONSE',unknown,1),(0,all_pass+'EXTRA\n',unknown,1),(1,all_pass,unknown,1),(0,mixed,unknown,1),(0,'',unknown,1)]
+        with tempfile.TemporaryDirectory() as directory:
+            env={'PATH':os.environ['PATH'],'TMPDIR':directory,'SSH_HOST':'synthetic.invalid','SSH_USER':'synthetic','SSH_PORT':'22','RELEASE_SHA':proof.PIN,'EXPECTED_HOST_SHA256':hashlib.sha256(b'192.0.2.8').hexdigest(),'EXPECTED_HOST_FINGERPRINT':'','RELEASE_OPERATION':'provider-proof','CALL_FILE':directory+'/called'}
+            for status,body,expected,code in cases:
+                with self.subTest(status=status,body=body[:8]):
+                    result=subprocess.run(['bash','-c',preamble+command],cwd=ROOT,env={**env,'FAKE_SSH_STATUS':str(status),'FAKE_SSH_STDOUT':body},text=True,capture_output=True,timeout=5)
+                    stdout=''.join(line+'\n' for line in result.stdout.splitlines() if not line.startswith('::add-mask::'))
+                    self.assertEqual((result.returncode,stdout,result.stderr),(code,expected,''))
+                    self.assertIn('python3 -',Path(env['CALL_FILE']).read_text())
+            result=subprocess.run(['bash','-c',preamble+command],cwd=ROOT,env={**env,'RELEASE_OPERATION':'upgrade','FAKE_SSH_STATUS':'0','FAKE_SSH_STDOUT':'SYNTHETIC UPGRADE\n'},text=True,capture_output=True,timeout=5)
+            self.assertEqual(result.returncode,0);self.assertIn('SYNTHETIC UPGRADE',result.stdout)
+            self.assertIn('bash -s -- '+proof.PIN,Path(env['CALL_FILE']).read_text())
+            Path(env['CALL_FILE']).unlink()
+            result=subprocess.run(['bash','-c',preamble+command],cwd=ROOT,env={**env,'RELEASE_SHA':'a'*40,'FAKE_SSH_STATUS':'0','FAKE_SSH_STDOUT':all_pass},text=True,capture_output=True,timeout=5)
+            self.assertEqual((result.returncode,result.stdout,result.stderr),(1,unknown,''))
+            self.assertFalse(Path(env['CALL_FILE']).exists())
 
     def test_exact_public_parser_and_mocked_provider_contracts(self):
         source=Path(os.environ['NESTLET_PROOF_PUBLIC_CHAT_SOURCE']).read_bytes()

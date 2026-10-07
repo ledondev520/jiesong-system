@@ -4,6 +4,14 @@ name: Nestlet Schema6 Upgrade
 on:
   workflow_dispatch:
     inputs:
+      operation:
+        description: Upgrade the exact release or run the approved three-request synthetic proof
+        required: false
+        default: upgrade
+        type: choice
+        options:
+          - upgrade
+          - provider-proof
       release_sha:
         description: Exact reviewed schema6 merge SHA; all other targets are rejected
         required: true
@@ -35,19 +43,24 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           log-public-key: false
-      - name: Run bounded schema6 upgrade
+      - name: Run bounded schema6 maintenance operation
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+          RELEASE_OPERATION: ${{ inputs.operation || 'upgrade' }}
           RELEASE_SHA: ${{ inputs.release_sha }}
           EXPECTED_HOST_SHA256: ${{ inputs.expected_host_sha256 }}
           EXPECTED_HOST_FINGERPRINT: ${{ inputs.host_key_sha256 }}
         shell: bash
         run: |
           set -euo pipefail
+          RELEASE_OPERATION="${RELEASE_OPERATION:-upgrade}"
+          [[ "$RELEASE_OPERATION" == upgrade || "$RELEASE_OPERATION" == provider-proof ]]
+          provider_unconfirmed() { printf '%s\n' text-unconfirmed image-unconfirmed stream-unconfirmed; }
+          if [[ "$RELEASE_OPERATION" == provider-proof ]]; then trap 'provider_unconfirmed' ERR; fi
           readonly REVIEWED_RELEASE_SHA=0ad91847e8c04f379f071e76bf8c325f9bb12233
-          [[ "$REVIEWED_RELEASE_SHA" =~ ^[a-f0-9]{40}$ && "$RELEASE_SHA" = "$REVIEWED_RELEASE_SHA" ]] || { echo 'Release SHA does not match the reviewed schema6 merge'; exit 1; }
+          [[ "$REVIEWED_RELEASE_SHA" =~ ^[a-f0-9]{40}$ && "$RELEASE_SHA" = "$REVIEWED_RELEASE_SHA" ]] || { if [[ "$RELEASE_OPERATION" == provider-proof ]]; then provider_unconfirmed; else echo 'Release SHA does not match the reviewed schema6 merge'; fi; exit 1; }
           test -n "$SSH_HOST" && test -n "$SSH_USER"
           [[ "$SSH_PORT" =~ ^[0-9]+$ ]]
           [[ "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ ]]
@@ -62,8 +75,8 @@ jobs:
             observed="$(printf '%s' "$address" | sha256sum | awk '{print $1}')"
             if [[ "$observed" == "$EXPECTED_HOST_SHA256" ]]; then matched_address="$address"; fi
           done < <(getent ahostsv4 "$SSH_HOST" | awk '{print $1}' | sort -u)
-          [[ -n "$matched_address" ]] || { echo 'Selected server address does not match the existing SSH target'; exit 1; }
-          echo 'Existing SSH target matches selected server address; no address is logged.'
+          [[ -n "$matched_address" ]] || { if [[ "$RELEASE_OPERATION" == provider-proof ]]; then provider_unconfirmed; else echo 'Selected server address does not match the existing SSH target'; fi; exit 1; }
+          if [[ "$RELEASE_OPERATION" == upgrade ]]; then echo 'Existing SSH target matches selected server address; no address is logged.'; fi
           echo "::add-mask::$matched_address"
           umask 077
           # No pin: inherit the already-authorized deploy channel's host-key discovery.
@@ -71,7 +84,9 @@ jobs:
           known_hosts="$(mktemp)"
           scanned="$(mktemp)"
           one="$(mktemp)"
-          trap 'rm -f "$known_hosts" "$scanned" "$one"' EXIT
+          proof_output="$(mktemp)"
+          proof_errors="$(mktemp)"
+          trap 'rm -f "$known_hosts" "$scanned" "$one" "$proof_output" "$proof_errors"' EXIT
           ssh-keyscan -T 10 -p "$SSH_PORT" -H "$matched_address" > "$scanned" 2>/dev/null
           if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
             while IFS= read -r host_key; do
@@ -83,9 +98,36 @@ jobs:
             done < "$scanned"
           else
             cat "$scanned" > "$known_hosts"
-            echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
+            if [[ "$RELEASE_OPERATION" == upgrade ]]; then echo 'Host identity trust inherited from existing deploy channel; not independently verified.'; fi
           fi
           test -s "$known_hosts"
+          if [[ "$RELEASE_OPERATION" == provider-proof ]]; then
+            echo "ad775310295ed9beaa29294ebbfcb819177b90d8fc35e52739405e5348f25c52  scripts/nestlet-provider-batch.py" | sha256sum --check --status
+            proof_status=0
+            if ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+              -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
+              'if [ "$(id -u)" = 0 ]; then exec python3 -; else exec sudo -n python3 -; fi' \
+              < scripts/nestlet-provider-batch.py >"$proof_output" 2>"$proof_errors"; then
+              proof_status=0
+            else
+              proof_status=$?
+            fi
+            if [[ "$proof_status" == 0 || "$proof_status" == 1 ]] && [[ "$(stat -c %s "$proof_output")" -le 96 ]]; then
+              mapfile -t verdicts < "$proof_output"
+              if [[ "${#verdicts[@]}" == 3 && "${verdicts[0]}" =~ ^text-(completed|unconfirmed)$ && "${verdicts[1]}" =~ ^image-(completed|unconfirmed)$ && "${verdicts[2]}" =~ ^stream-(completed|unconfirmed)$ ]]; then
+                if [[ "$proof_status" == 0 && "${verdicts[*]}" == 'text-completed image-completed stream-completed' ]]; then
+                  printf '%s\n' "${verdicts[@]}"
+                  exit 0
+                fi
+                if [[ "$proof_status" == 1 && "${verdicts[*]}" != 'text-completed image-completed stream-completed' ]]; then
+                  printf '%s\n' "${verdicts[@]}"
+                  exit 1
+                fi
+              fi
+            fi
+            provider_unconfirmed
+            exit 1
+          fi
           echo "71391e8ecc1e81aca5071198d135397a1c7e168bdb359348ad6ed6771fcd2783  scripts/nestlet-upgrade-schema6.sh" | sha256sum --check --status
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
             -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
