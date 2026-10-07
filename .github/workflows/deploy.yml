@@ -1,17 +1,17 @@
 # DRAFT: replace the existing deploy.yml ON A DEDICATED MAINTENANCE BRANCH ONLY.
 # No main push/PR trigger; dispatch only after independent review and owner approval.
 # Uses existing staging-scoped SSH credentials for the same host as current main deployment.
-name: Nestlet Read-only Host Inventory
+name: Nestlet Pinned Loopback Stage
 on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Read-only inventory, no installs or service changes
+        description: Stage the pinned Nestlet release on loopback; no proxy or existing app changes
         required: true
-        default: inventory
+        default: stage
         type: choice
         options:
-          - inventory
+          - stage
       expected_host_sha256:
         description: SHA256 of the selected server IPv4 address; checked before SSH
         required: true
@@ -23,13 +23,13 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: nestlet-host-inventory
+  group: nestlet-stage
   cancel-in-progress: false
 jobs:
   preflight:
-    if: github.ref == 'refs/heads/ops/nestlet-host-inventory-20261007' && github.actor == 'ledondev520'
+    if: github.ref == 'refs/heads/ops/nestlet-stage-20261007' && github.actor == 'ledondev520'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     environment: staging
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           log-public-key: false
-      - name: Read-only host inventory
+      - name: Stage pinned loopback release
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
@@ -57,14 +57,14 @@ jobs:
           if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
             [[ "$EXPECTED_HOST_FINGERPRINT" =~ ^SHA256:[a-zA-Z0-9+/]{43}$ ]]
           fi
-          [[ "$RELEASE_OPERATION" == inventory ]]
+          [[ "$RELEASE_OPERATION" == stage ]]
           [[ "$EXPECTED_HOST_SHA256" =~ ^[a-f0-9]{64}$ ]]
-          matched=0
+          matched_address=
           while IFS= read -r address; do
             observed="$(printf '%s' "$address" | sha256sum | awk '{print $1}')"
-            if [[ "$observed" == "$EXPECTED_HOST_SHA256" ]]; then matched=1; fi
+            if [[ "$observed" == "$EXPECTED_HOST_SHA256" ]]; then matched_address="$address"; fi
           done < <(getent ahostsv4 "$SSH_HOST" | awk '{print $1}' | sort -u)
-          [[ "$matched" == 1 ]] || { echo 'Selected server address does not match the existing SSH target'; exit 1; }
+          [[ -n "$matched_address" ]] || { echo 'Selected server address does not match the existing SSH target'; exit 1; }
           echo 'Existing SSH target matches selected server address; no address is logged.'
           umask 077
           # No pin: inherit the already-authorized deploy channel's host-key discovery.
@@ -73,7 +73,7 @@ jobs:
           scanned="$(mktemp)"
           one="$(mktemp)"
           trap 'rm -f "$known_hosts" "$scanned" "$one"' EXIT
-          ssh-keyscan -T 10 -p "$SSH_PORT" -H "$SSH_HOST" > "$scanned" 2>/dev/null
+          ssh-keyscan -T 10 -p "$SSH_PORT" -H "$matched_address" > "$scanned" 2>/dev/null
           if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
             while IFS= read -r host_key; do
               printf '%s\n' "$host_key" > "$one"
@@ -88,5 +88,5 @@ jobs:
           fi
           test -s "$known_hosts"
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
-            -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
-            'sh -s' < scripts/nestlet-host-inventory.sh
+            -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
+            'bash -s' < scripts/nestlet-stage-first.sh
