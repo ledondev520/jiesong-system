@@ -72,3 +72,11 @@ The exact merged tree `73255d90826e4934b1f0f489d3ed836e076096ed` is byte-identic
 - Container: https://github.com/ledondev520/nestlet/actions/runs/37625744735/job/112806918455
 
 After pinning the merge SHA and updating the workflow's script digest, all 13 safety tests and the exact embedded recovery/HTTP drills were rerun against a separate clean exact-merge source checkout and passed. No provider email was sent. Publication is restricted to the dedicated maintenance branch; the parent owns dispatch with operation `upgrade`, this exact `release_sha`, and the already verified host-address digest/host-key policy. No new host value is inferred or substituted.
+
+## Read-only identity inspection
+
+The first upgrade attempt (run 37626659704) refused the literal current-release pointer before any Docker command, service stop, configuration change or migration. The unchanged upgrade guard must not be bypassed. The dedicated workflow adds operation `inspect-release`, with the same repository/owner/actor/branch, selected-host, strict host-key, staging and workflow concurrency guards.
+
+The diagnostic requires the existing private maintenance lock through a read-only descriptor and shared nonblocking lease. It verifies the canonical release is an owned managed release with exact clean Git identity, checks only the dedicated Nestlet container/volume, and emits canonical commit, relative/absolute pointer form, image agreement, schema/application metadata and health. No environment, application rows, credentials, container IDs, image digests or private paths are emitted. No host file, service or data is modified. SQLite is never opened: only a stable 100-byte rollback-mode header is inspected, with WAL/journal/racing or unreadable state explicitly unknown.
+
+Seven synthetic diagnostic tests cover absolute/relative pointers, image mismatch, stopped/unhealthy state, unknown metadata, scope/volume/lock failures, actual SQLite header non-mutation including future-version/WAL handling, parsed workflow guards, and byte-identical unchanged upgrade script. All 13 release-safety tests also pass. Actual host execution remains a subsequent parent-owned read-only dispatch.
