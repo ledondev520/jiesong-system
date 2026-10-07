@@ -162,3 +162,5 @@ Private - All Rights Reserved
 ## Nestlet maintenance release preparation
 
 Dedicated maintenance branches may prepare Nestlet-only operations without changing Jiesong services. The reviewed schema3-to-schema4 draft and its verification/rollback gates are documented in [Nestlet incremental release review](docs/nestlet-incremental-release-review.md). This is preparation, not deployment evidence.
+
+The subsequent Nestlet schema4-to-schema4 maintenance draft has separate [compatibility, backup and rollback gates](docs/nestlet-schema4-update-review.md). Its target remains disabled until the final reviewed release is pinned.

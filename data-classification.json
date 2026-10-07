@@ -47,7 +47,8 @@
           "Purchase/inspection inventory cannot be manually transitioned through normal, bulk or AI endpoints; execution rechecks provenance and same-status requests preserve inventory timestamps",
           "VPS runtime migration backups keep private environment files and SQLite snapshots in 0700 directories with 0600 files; deployment verification never prints process environments or credentials",
           "Environment file permissions are checked before loading mail credentials; email registration uses keyed hashes, persistent send quotas and single-use verification; new users remain inactive until administrator approval; user updates clear authentication caches immediately (backend/src/services/emailRegistrationService.js)",
-          "scripts/nestlet-upgrade-schema4.sh keeps recovery directories 0700 and files 0600, validates a consistent SQLite API backup, rehearses on a distinct copy, never uploads evidence and never automatically restores or downgrades live storage"
+          "scripts/nestlet-upgrade-schema4.sh keeps recovery directories 0700 and files 0600, validates a consistent SQLite API backup, rehearses on a distinct copy, never uploads evidence and never automatically restores or downgrades live storage",
+          "Same-schema Nestlet maintenance keeps database/originals backups and rehearsal copies private; verifies exact persistence compatibility and unchanged schema4 before any old-image recovery; never restores live data or deletes originals"
         ],
         "transfer": [
           "Encrypt in transit (TLS)",

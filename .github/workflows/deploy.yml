@@ -1,7 +1,7 @@
 # DRAFT: replace the existing deploy.yml ON A DEDICATED MAINTENANCE BRANCH ONLY.
 # No main push/PR trigger; dispatch only after independent review and owner approval.
 # Uses existing staging-scoped SSH credentials for the same host as current main deployment.
-name: Nestlet Reviewed Schema4 Upgrade
+name: Nestlet Same-Schema4 Update
 on:
   workflow_dispatch:
     inputs:
@@ -31,7 +31,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   preflight:
-    if: github.repository == 'ledondev520/jiesong-system' && github.repository_owner == 'ledondev520' && github.ref == 'refs/heads/ops/nestlet-incremental-20261007' && github.actor == 'ledondev520'
+    if: github.repository == 'ledondev520/jiesong-system' && github.repository_owner == 'ledondev520' && github.ref == 'refs/heads/ops/nestlet-schema4-update-20261007' && github.actor == 'ledondev520'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment: staging
@@ -94,7 +94,7 @@ jobs:
             echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
           fi
           test -s "$known_hosts"
-          echo "c176ef518eeda01724b99ed685b8a6467772b87b53e5c794b9116b5316bac697  scripts/nestlet-upgrade-schema4.sh" | sha256sum --check --status
+          echo "4f0759fc50692dd616ef519db9b8433c8ed05425e98a7d86baa60dd2727a97d3  scripts/nestlet-update-schema4.sh" | sha256sum --check --status
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
             -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
-            "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA; else exec sudo -n bash -s -- $RELEASE_SHA; fi" < scripts/nestlet-upgrade-schema4.sh
+            "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA; else exec sudo -n bash -s -- $RELEASE_SHA; fi" < scripts/nestlet-update-schema4.sh

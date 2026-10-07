@@ -125,3 +125,7 @@
 - `scripts/nestlet-upgrade-schema4.sh` is a dedicated maintenance-only schema3-to-schema4 procedure. It is disabled until an exact reviewed release is pinned. Only the Nestlet Compose service and its existing volume may change.
 - Before live migration, require isolated fresh-image smoke, a SQLite API recovery point with integrity verification, and a migration rehearsal on a separate restored copy. Recovery evidence is Restricted, private-mode, local-only and never logged or uploaded.
 - A schema4 database must never be passed to the schema3 predecessor. Failure can restart the old image only after stopped live storage is verified still schema3; otherwise retain all live data and require forward repair or an explicitly approved separate recovery. No automatic DB restore, downgrade, volume removal or unrelated service restart.
+
+## Nestlet same-schema4 update boundary
+- `scripts/nestlet-update-schema4.sh` requires byte-identical persisted-data/auth/asset contracts and a separate candidate-to-prior-runtime recovery-copy rehearsal. Schema4 equality alone does not authorize rollback. Private database/original-file backups use the existing verified CLI and bounded native lock wait; no live restore, downgrade or asset deletion is performed.
+- Only the release image-tag line and current pointer may change. The existing environment helper preserves all other bytes; no credentials, data contents or hashes are returned/logged. Actual YAML parsing and dispatch-trigger validation are required before publication.
