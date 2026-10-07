@@ -13,7 +13,7 @@ on:
         options:
           - reload
       release_sha:
-        description: Existing release only: 2fc15f216714d0331a82456edb1d97b9f76f8498
+        description: 'Existing release only: 2fc15f216714d0331a82456edb1d97b9f76f8498'
         required: true
         type: string
       operator_setup_complete:
