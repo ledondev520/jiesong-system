@@ -139,6 +139,8 @@
 
 - Canonical Git archive group-write bits are accepted only inside the verified owned 0700 root with trusted UID/GID and complete manifest checks. Runtime COPY group-write bits require the existing read-only root/no-overlay proof and approved UID/GID. World-write, special bits, untrusted ownership, links, content differences and unsafe ancestry still fail; the verifier never changes permissions.
 
+- The image-tag editor accepts one approved literal 40-hex dotenv value, including quotes, export, spacing and comments, and changes only that value span. It never evaluates interpolation, skips unrelated quoted multiline values, and rejects duplicates, malformed or unapproved tags before writing; all other configuration bytes remain unchanged.
+
 ## Nestlet provider-only mail proof
 - `scripts/nestlet-mail-proof.py` runs one fixed, plain, no-action test inside the existing pinned schema4 container using its existing DirectMail environment. It never reads runtime.env, exports credentials, invokes account APIs, writes user data, or changes deployment/configuration. The official DirectMail endpoint is fixed and no automatic send retry exists.
 - A root-owned 0600 exclusive attempt marker under the existing private shared directory is fsynced before the provider call and never reset. Repeated/uncertain attempts require inbox reconciliation, not rerunning or deleting the marker. Workflow output is allowlisted to provider-accepted/provider-unconfirmed; inbox receipt and signup/reset acceptance remain separate checks.
