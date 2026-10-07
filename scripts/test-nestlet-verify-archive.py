@@ -15,6 +15,7 @@ import subprocess
 import tarfile
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -122,7 +123,7 @@ class ArchiveGate(unittest.TestCase):
         return root
 
     def runtime_check(self,root):
-        return subprocess.run(['node','--input-type=module','-e',gate.runtime_program(str(root),os.geteuid()),json.dumps(RUNTIME)],capture_output=True,text=True)
+        return subprocess.run(['node','--input-type=module','-e',gate.runtime_program(str(root),os.geteuid(),os.getegid()),json.dumps(RUNTIME)],capture_output=True,text=True)
 
     def test_literal_runtime_copy_set_passes_and_does_not_claim_generated_bytes(self):
         root=self.runtime_fixture();before={p:p.read_bytes() for p in root.rglob('*') if p.is_file()}
@@ -231,12 +232,13 @@ class ArchiveGate(unittest.TestCase):
             raise AssertionError('Unexpected command')
         with patch.object(gate,'command',command):self.assertEqual(gate.inspect_runtime(),('a'*12,image))
         original=copy.deepcopy(item)
-        for change in ['tmpfs-config','tmpfs-mount','privileged','cap-add','security']:
+        for change in ['tmpfs-config','tmpfs-mount','privileged','cap-add','security','root-writable']:
             item=copy.deepcopy(original)
             if change=='tmpfs-config':item['tmpfs']['/app']='rw'
             elif change=='tmpfs-mount':item['mounts'].append({'Type':'tmpfs','Destination':'/app'})
             elif change=='privileged':item['privileged']=True
             elif change=='cap-add':item['capAdd']=['SYS_ADMIN']
+            elif change=='root-writable':item['readOnly']=False
             else:item['security']=[]
             with patch.object(gate,'command',command),self.assertRaises(RuntimeError):gate.inspect_runtime()
 
@@ -285,6 +287,53 @@ class ArchiveGate(unittest.TestCase):
         self.assertTrue(flags);self.assertTrue(all(not flag&forbidden for flag in flags))
         self.assertEqual(len(commands),2)
         self.assertEqual(lock.read_bytes(),b'')
+
+    def real_tar_fixture(self):
+        temp=tempfile.TemporaryDirectory(prefix='nestlet-real-git-tar-');self.addCleanup(temp.cleanup);root=Path(temp.name)
+        # Exercise actual git tar metadata, not tarfile.data_filter normalization.
+        result=subprocess.run(['tar','--extract','--same-permissions','--no-same-owner','--file','-','--directory',str(root)],input=self.archive_bytes,capture_output=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(stat.S_IMODE(root.stat().st_mode),0o700)
+        return root
+
+    def test_real_git_archive_group_modes_pass_without_permission_changes(self):
+        root=self.real_tar_fixture()
+        self.assertEqual(stat.S_IMODE((root/'auth.js').stat().st_mode),0o664)
+        self.assertEqual(stat.S_IMODE((root/'public').stat().st_mode),0o775)
+        before={str(p.relative_to(root)):(stat.S_IMODE(p.stat().st_mode),p.stat().st_uid,p.stat().st_gid) for p in root.rglob('*')}
+        self.verify(root)
+        self.assertEqual(before,{str(p.relative_to(root)):(stat.S_IMODE(p.stat().st_mode),p.stat().st_uid,p.stat().st_gid) for p in root.rglob('*')})
+
+    def test_canonical_group_modes_still_require_private_root_and_safe_ancestors(self):
+        root=self.real_tar_fixture();root.chmod(0o770)
+        with self.assertRaises(RuntimeError):self.verify(root)
+        root.chmod(0o700)
+        parent=Path(tempfile.mkdtemp(prefix='nestlet-unsafe-parent-'));self.addCleanup(lambda:shutil.rmtree(parent,ignore_errors=True))
+        moved=parent/'archive';shutil.copytree(root,moved);parent.chmod(0o770)
+        with self.assertRaises(RuntimeError):self.verify(moved)
+        parent.chmod(0o700)
+
+    def test_source_trusted_group_and_owner_are_required(self):
+        root=self.real_tar_fixture();entry=next(e for e in ARCHIVE['files'] if e['path']=='auth.js');info=(root/'auth.js').stat()
+        fields={name:getattr(info,name) for name in ['st_mode','st_uid','st_gid','st_nlink','st_size']}
+        gate.safe_file(info,entry,os.geteuid())
+        for field in ['st_uid','st_gid']:
+            changed=dict(fields);changed[field]+=12345
+            with self.assertRaises(RuntimeError):gate.safe_file(SimpleNamespace(**changed),entry,os.geteuid())
+        info=(root/'public').stat();changed={name:getattr(info,name) for name in ['st_mode','st_uid','st_gid']};changed['st_gid']+=12345
+        with self.assertRaises(RuntimeError):gate.safe_directory(SimpleNamespace(**changed),os.geteuid())
+
+    def test_runtime_canonical_copy_group_bits_and_untrusted_group(self):
+        source=self.real_tar_fixture();runtime=self.runtime_fixture()
+        for entry in RUNTIME['files']:
+            path=runtime/entry['path'];path.chmod(stat.S_IMODE((source/entry['path']).stat().st_mode))
+        for directory in RUNTIME['directories']:(runtime/directory).chmod(0o775)
+        before={p:stat.S_IMODE(p.stat().st_mode) for p in runtime.rglob('*')}
+        result=self.runtime_check(runtime);self.assertEqual(result.returncode,0,result.stderr);self.assertEqual(result.stdout,'PASS\n')
+        self.assertEqual(before,{p:stat.S_IMODE(p.stat().st_mode) for p in runtime.rglob('*')})
+        wrong=gate.runtime_program(str(runtime),os.geteuid(),os.getegid()+12345)
+        result=subprocess.run(['node','--input-type=module','-e',wrong,json.dumps(RUNTIME)],capture_output=True,text=True)
+        self.assertNotEqual(result.returncode,0);self.assertEqual(result.stdout,'')
 
     def test_host_commands_do_not_print_environments_or_source_results(self):
         text=(ROOT/'scripts/nestlet-verify-archive.py').read_text()

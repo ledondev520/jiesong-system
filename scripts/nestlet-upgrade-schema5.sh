@@ -222,16 +222,18 @@ def fingerprint(info):
 
 
 def safe_directory(info, uid, root=False):
-    require(stat.S_ISDIR(info.st_mode) and info.st_uid == uid
-            and not stat.S_IMODE(info.st_mode) & 0o7022)
+    # Descendants are reached only through the verified private0700 root.
+    # Canonical git tar group-write bits grant no pathname access there.
+    require(stat.S_ISDIR(info.st_mode) and info.st_uid == uid and info.st_gid == os.getegid()
+            and not stat.S_IMODE(info.st_mode) & 0o7002)
     if root:
         require(stat.S_IMODE(info.st_mode) == 0o700)
 
 
 def safe_file(info, entry, uid):
     mode = stat.S_IMODE(info.st_mode)
-    require(stat.S_ISREG(info.st_mode) and info.st_uid == uid and info.st_nlink == 1
-            and not mode & 0o7022 and mode & 0o400)
+    require(stat.S_ISREG(info.st_mode) and info.st_uid == uid and info.st_gid == os.getegid() and info.st_nlink == 1
+            and not mode & 0o7002 and mode & 0o400)
     classed('archive-content', require, info.st_size == entry['size'])
     require(bool(mode & 0o111) == (entry['gitMode'] == '100755'))
     if entry['gitMode'] == '100755':
@@ -342,10 +344,12 @@ RUNTIME_CHECK = r'''
 import {constants,openSync,readSync,closeSync,fstatSync,lstatSync} from "node:fs";
 import {createHash} from "node:crypto";
 const manifest=JSON.parse(process.argv[1]);
-const root=__RUNTIME_ROOT__,uid=BigInt(__RUNTIME_UID__);
+const root=__RUNTIME_ROOT__,uid=BigInt(__RUNTIME_UID__),gid=BigInt(__RUNTIME_GID__);
 const fail=()=>{throw Error("Verification refused");};
 const stamp=info=>[info.dev,info.ino,info.mode,info.uid,info.gid,info.nlink,info.size,info.mtimeNs,info.ctimeNs].map(String).join(":");
-const directory=info=>{if(!info.isDirectory()||![0n,uid].includes(info.uid)||(info.mode&0o7022n))fail();};
+// Caller proves readonly root plus no /app overlays before this program runs.
+// Canonical COPY group-write metadata is ineffective under that immutable mount.
+const directory=info=>{if(!info.isDirectory()||![0n,uid].includes(info.uid)||![0n,gid].includes(info.gid)||(info.mode&0o7002n))fail();};
 const rootFd=openSync(root,constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW),observed=[];
 try{
  directory(fstatSync(rootFd,{bigint:true}));
@@ -357,7 +361,7 @@ try{
    const location=`/proc/self/fd/${parent}/${names.at(-1)}`;
    const fd=openSync(location,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);fds.push(fd);
    const info=fstatSync(fd,{bigint:true}),executable=entry.gitMode==="100755";
-   if(!info.isFile()||info.uid!==uid||info.nlink!==1n||info.size!==BigInt(entry.size)||(info.mode&0o7022n)||!(info.mode&0o400n)||Boolean(info.mode&0o111n)!==executable||(executable&&!(info.mode&0o100n)))fail();
+   if(!info.isFile()||info.uid!==uid||info.gid!==gid||info.nlink!==1n||info.size!==BigInt(entry.size)||(info.mode&0o7002n)||!(info.mode&0o400n)||Boolean(info.mode&0o111n)!==executable||(executable&&!(info.mode&0o100n)))fail();
    const hash=createHash("sha256"),buffer=Buffer.alloc(131072);let n,total=0;
    while((n=readSync(fd,buffer,0,buffer.length,null))){total+=n;if(total>entry.size)fail();hash.update(buffer.subarray(0,n));}
    if(total!==entry.size||hash.digest("hex")!==entry.sha256||stamp(fstatSync(fd,{bigint:true}))!==stamp(info)||stamp(lstatSync(location,{bigint:true}))!==stamp(info))fail();
@@ -372,8 +376,9 @@ try{
 '''
 
 
-def runtime_program(root='/app', uid=1000):
-    return RUNTIME_CHECK.replace('__RUNTIME_ROOT__', json.dumps(root)).replace('__RUNTIME_UID__', str(uid))
+def runtime_program(root='/app', uid=1000, gid=None):
+    # Production uses the approved node uid/gid1000; explicit values serve local fixtures only.
+    return RUNTIME_CHECK.replace('__RUNTIME_ROOT__', json.dumps(root)).replace('__RUNTIME_UID__', str(uid)).replace('__RUNTIME_GID__', str(uid if gid is None else gid))
 
 
 def command(arguments):
