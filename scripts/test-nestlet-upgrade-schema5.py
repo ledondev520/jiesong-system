@@ -14,7 +14,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / 'scripts/nestlet-upgrade-schema5.sh'
 TEXT = SCRIPT.read_text()
-OLD = 'c540c89862bbd4c5534b09e083f1db03de36eaac'
+OLD = '4d4c15315d80b5fb7e9f8c2f3f883b10c1121c40'
 NEW = 'a' * 40
 
 
@@ -60,8 +60,8 @@ class ReleaseSafety(unittest.TestCase):
         for guard in ["github.repository == 'ledondev520/jiesong-system'", "github.repository_owner == 'ledondev520'", "github.actor == 'ledondev520'"]:
             self.assertIn(guard, job['if'])
         step = job['steps'][-1]
-        self.assertEqual(parsed['on']['workflow_dispatch']['inputs']['operation']['options'], ['upgrade', 'inspect-release'])
-        for guard in ['[[ "$RELEASE_OPERATION" == upgrade || "$RELEASE_OPERATION" == inspect-release ]]', '[[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]', '[[ "$EXPECTED_HOST_SHA256" =~ ^[a-f0-9]{64}$ ]]', '[[ "$observed" == "$EXPECTED_HOST_FINGERPRINT" ]]', 'StrictHostKeyChecking=yes', 'sha256sum --check --status']:
+        self.assertEqual(parsed['on']['workflow_dispatch']['inputs']['operation']['options'], ['upgrade'])
+        for guard in ['[[ "$RELEASE_OPERATION" == upgrade ]]', '[[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]', '[[ "$EXPECTED_HOST_SHA256" =~ ^[a-f0-9]{64}$ ]]', '[[ "$observed" == "$EXPECTED_HOST_FINGERPRINT" ]]', 'StrictHostKeyChecking=yes', 'sha256sum --check --status']:
             self.assertIn(guard, step['run'])
         self.assertNotIn('StrictHostKeyChecking=no', step['run'])
         self.assertIn("flock -n 9", TEXT)
@@ -73,15 +73,16 @@ class ReleaseSafety(unittest.TestCase):
 
     def test_compose_rejects_scope_expansion(self):
         code = re.search(r"config --format json \| python3 -c '\n(.*?)\n'", TEXT, re.S).group(1)
-        compose = {'services': {'nestlet': {'read_only': True, 'cap_drop': ['ALL'], 'security_opt': ['no-new-privileges:true'], 'ports': [{'host_ip':'127.0.0.1','published':'4173','target':4173}], 'environment': {'NESTLET_DB_PATH':'/data/nestlet.sqlite'}, 'volumes': [{'type':'volume','source':'case_data','target':'/data'}]}}, 'volumes': {'case_data': {'name':'nestlet_case_data','labels': {'com.nestlet.purpose':'private-case-storage'}}}}
+        compose = {'services': {'nestlet': {'read_only': True, 'cap_drop': ['ALL'], 'security_opt': ['no-new-privileges:true'], 'ports': [{'host_ip':'127.0.0.1','published':'4173','target':4173}], 'environment': {'NESTLET_DB_PATH':'/data/nestlet.sqlite','PUBLIC_ORIGIN':'https://nestlet.celerada.link'}, 'volumes': [{'type':'volume','source':'case_data','target':'/data'}]}}, 'volumes': {'case_data': {'name':'nestlet_case_data','labels': {'com.nestlet.purpose':'private-case-storage'}}}}
         variants = [compose]
-        for change in ['service', 'port', 'bind', 'volume', 'privilege']:
+        for change in ['service', 'port', 'bind', 'volume', 'privilege', 'origin']:
             value = copy.deepcopy(compose)
             if change == 'service': value['services']['other'] = {}
             if change == 'port': value['services']['nestlet']['ports'][0]['host_ip'] = '0.0.0.0'
             if change == 'bind': value['services']['nestlet']['volumes'][0]['type'] = 'bind'
             if change == 'volume': value['volumes']['case_data']['name'] = 'other'
             if change == 'privilege': value['services']['nestlet']['security_opt'] = []
+            if change == 'origin': value['services']['nestlet']['environment']['PUBLIC_ORIGIN'] = 'http://127.0.0.1:4173'
             variants.append(value)
         for index, value in enumerate(variants):
             result = subprocess.run(['python3', '-c', code], input=json.dumps(value), text=True, capture_output=True)
@@ -117,6 +118,7 @@ docker() {{ echo {"old-image" if image_matches else "different-image"}; }}
 compose() {{ echo "compose $*" >>"$LOG"; {'return 0' if stop_ok else 'return 1'}; }}
 live_schema() {{ echo {schema}; }}
 set_image_tag() {{ echo "tag $*" >>"$LOG"; }}
+validate_release() {{ echo "archive $*" >>"$LOG"; }}
 check_container() {{ echo "container $*" >>"$LOG"; }}
 check_persistent_mount() {{ echo "mount $*" >>"$LOG"; }}
 check_http() {{ echo http >>"$LOG"; }}
@@ -159,6 +161,24 @@ exit 42
             self.assertNotIn(' up ', calls)
             self.assertNotIn('tag ', calls)
             self.assertIn('NOT restarted', result.stderr)
+
+    def test_archive_proof_is_exact_local_verifier_and_new_release_stays_git_pinned(self):
+        embedded = re.search(r"<<'PY_ARCHIVE'\n(.*?)\nPY_ARCHIVE", TEXT, re.S).group(1)
+        expected = (ROOT / 'scripts/nestlet-verify-archive.py').read_text().replace('sys.exit(emit_gate(verify_host))', 'sys.exit(emit_gate(lambda: verify_host(mode=sys.argv[1], lease_fd=9)))').rstrip()
+        self.assertEqual(embedded, expected)
+        compile(embedded, 'archive verifier', 'exec')
+        validate = shell_function('validate_release')
+        self.assertIn('if [ "$sha" = "$OLD_SHA" ]; then', validate)
+        self.assertIn('verify_predecessor archive', validate)
+        self.assertIn('remote get-url origin', validate)
+        self.assertIn('verify_predecessor runtime ||', TEXT)
+        self.assertLess(TEXT.index('verify_predecessor runtime ||'), TEXT.index('compose "$NEW_SHA" build --pull'))
+        self.assertIn('validate_release "$OLD_SHA" && set_image_tag', shell_function('rollback'))
+        workflow = (ROOT / '.github/workflows/deploy.yml').read_text()
+        self.assertNotIn('inspect-release', workflow)
+        self.assertNotIn('nestlet-release-identity.py', workflow)
+        self.assertIn('assert s["environment"].get("PUBLIC_ORIGIN")=="https://nestlet.celerada.link"', TEXT)
+        self.assertLess(TEXT.index('check_compose_scope "$NEW_SHA"'), TEXT.index('changed=1\ncompose "$OLD_SHA" stop nestlet'))
 
     def test_recovery_is_separate_private_and_precedes_candidate_start(self):
         self.assertIn('--mount "type=volume,source=$DATA_VOLUME,target=/source,readonly"', TEXT)

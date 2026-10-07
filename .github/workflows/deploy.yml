@@ -6,13 +6,12 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Inspect release identity read-only or upgrade only the pinned Nestlet release
+        description: Upgrade only the pinned Nestlet release after generic verified gates
         required: true
         default: upgrade
         type: choice
         options:
           - upgrade
-          - inspect-release
       release_sha:
         description: Exact approved schema5 commit with passing Node and container CI
         required: true
@@ -44,7 +43,7 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           log-public-key: false
-      - name: Inspect or upgrade pinned Nestlet release
+      - name: Upgrade pinned Nestlet release
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
@@ -63,7 +62,7 @@ jobs:
           if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
             [[ "$EXPECTED_HOST_FINGERPRINT" =~ ^SHA256:[a-zA-Z0-9+/]{43}$ ]]
           fi
-          [[ "$RELEASE_OPERATION" == upgrade || "$RELEASE_OPERATION" == inspect-release ]]
+          [[ "$RELEASE_OPERATION" == upgrade ]]
           [[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]
           [[ "$EXPECTED_HOST_SHA256" =~ ^[a-f0-9]{64}$ ]]
           matched_address=
@@ -95,14 +94,7 @@ jobs:
             echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
           fi
           test -s "$known_hosts"
-          if [[ "$RELEASE_OPERATION" == upgrade ]]; then
-            echo "09e965681fc87f3f8a6f65155c7b2d589f4a3b2300ff5d94c7d8ffad5674b824  scripts/nestlet-upgrade-schema5.sh" | sha256sum --check --status
-            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
-              -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
-              "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA; else exec sudo -n bash -s -- $RELEASE_SHA; fi" < scripts/nestlet-upgrade-schema5.sh
-          else
-            echo "a3779701ed190da7ca2fafb29df05a42581ce3abb3cc5c6df63a6a2d7bc8d0a6  scripts/nestlet-release-identity.py" | sha256sum --check --status
-            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
-              -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
-              'if [ "$(id -u)" = 0 ]; then exec python3 -; else exec sudo -n python3 -; fi' < scripts/nestlet-release-identity.py
-          fi
+          echo "e6c071aefb8fc1100beb5e41d11830d1a4ff026bc700de3af9b7383db0e06a45  scripts/nestlet-upgrade-schema5.sh" | sha256sum --check --status
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
+            "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA; else exec sudo -n bash -s -- $RELEASE_SHA; fi" < scripts/nestlet-upgrade-schema5.sh

@@ -173,21 +173,18 @@ class IdentitySafety(unittest.TestCase):
             self.assertEqual(filename.read_bytes(),before);self.assertEqual(sorted(os.listdir(root)),names)
             self.assertNotIn('DatabaseSync',code)
 
-    def test_workflow_preserves_dispatch_identity_and_separate_upgrade(self):
+    def test_detailed_diagnostic_is_not_publicly_dispatchable(self):
         workflow=(ROOT/'.github/workflows/deploy.yml').read_text();parsed=yaml.load(workflow,Loader=yaml.BaseLoader)
         self.assertEqual(set(parsed['on']),{'workflow_dispatch'})
         self.assertEqual(parsed['permissions'],{'contents':'read'})
+        self.assertEqual(parsed['on']['workflow_dispatch']['inputs']['operation']['options'],['upgrade'])
         job=parsed['jobs']['preflight'];self.assertEqual(job['environment'],'staging')
         self.assertIn("github.ref == 'refs/heads/ops/nestlet-schema5-email-release-20261007'",job['if'])
         run=job['steps'][-1]['run'];self.assertIn('StrictHostKeyChecking=yes',run)
-        self.assertIn(hashlib.sha256(SCRIPT.read_bytes()).hexdigest()+'  scripts/nestlet-release-identity.py',run)
-        self.assertIn('if [[ "$RELEASE_OPERATION" == upgrade ]]; then',run)
         self.assertIn('< scripts/nestlet-upgrade-schema5.sh',run)
-        self.assertIn('< scripts/nestlet-release-identity.py',run)
+        self.assertNotIn('inspect-release',workflow)
+        self.assertNotIn('nestlet-release-identity.py',workflow)
         self.assertEqual(subprocess.run(['bash','-n'],input=run,text=True,capture_output=True).returncode,0)
-        # The diagnostic operation must not change the release/migration script at all.
-        committed=subprocess.check_output(['git','show','0a6d59b5b6186afb864875943674142b1080db96:scripts/nestlet-upgrade-schema5.sh'],cwd=ROOT)
-        self.assertEqual((ROOT/'scripts/nestlet-upgrade-schema5.sh').read_bytes(),committed)
 
 
 if __name__=='__main__':unittest.main(verbosity=2)

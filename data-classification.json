@@ -51,7 +51,7 @@
           "scripts/nestlet-upgrade-schema4.sh keeps recovery directories 0700 and files 0600, validates a consistent SQLite API backup, rehearses on a distinct copy, never uploads evidence and never automatically restores or downgrades live storage",
           "Same-schema Nestlet maintenance keeps database/originals backups and rehearsal copies private; verifies exact persistence compatibility and unchanged schema4 before any old-image recovery; never restores live data or deletes originals",
           "scripts/nestlet-upgrade-schema5.sh requires private verified backup and isolated additive/future-version drills, preserves environment bytes, never restores live data, and never starts schema4 after candidate-start; manual old-snapshot recovery must assess revival of credentials and email actions",
-          "scripts/nestlet-release-identity.py emits only allowlisted release identity/health/header metadata, reads no environment or tenant rows, and performs no host writes or recovery; active WAL/journal metadata is not inferred"
+          "scripts/nestlet-verify-archive.py validates only a pinned public-source archive and literal runtime COPY set internally, emits generic pass/fail only, rejects unknown entries before reads, and preserves the inherited maintenance lease; no actual host hashes, private filenames or source-state details are published"
         ],
         "transfer": [
           "Encrypt in transit (TLS)",
