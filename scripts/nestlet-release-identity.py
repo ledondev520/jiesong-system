@@ -18,6 +18,12 @@ import sys
 BASE = Path('/opt/nestlet')
 REPO = 'https://github.com/ledondev520/nestlet.git'
 SHA = re.compile(r'[a-f0-9]{40}')
+STAGE = 'initialization'
+PARTIAL = {}
+
+def stage(name):
+    global STAGE
+    STAGE = name
 
 # These fixed paths are container-local; no host/source paths, rows or values are returned.
 HEADER_CHECK = r'''
@@ -62,21 +68,32 @@ def private_directory(path, uid):
 
 def current_commit(base, uid):
     current = base / 'current'
+    stage('current-pointer-type')
     require(current.is_symlink())
     # Read-only canonical comparison accepts absolute or relative references only
     # when they resolve to the same owned, non-symlink managed release directory.
     pointer_form = 'absolute' if os.path.isabs(os.readlink(current)) else 'relative'
+    PARTIAL['pointerForm'] = pointer_form
+    stage('current-canonical-target')
     target = current.resolve(strict=True)
-    require(target.parent == base / 'releases' and SHA.fullmatch(target.name))
+    PARTIAL['canonicalManagedTarget'] = bool(target.parent == base / 'releases' and SHA.fullmatch(target.name))
+    require(PARTIAL['canonicalManagedTarget'])
+    stage('current-release-directory')
     require(not (base / 'releases' / target.name).is_symlink())
     private_directory(target, uid)
+    stage('current-repository-identity')
     require(command(['git', '--no-optional-locks', '-C', str(target), 'remote', 'get-url', 'origin']) == REPO)
+    stage('current-commit-identity')
     require(command(['git', '--no-optional-locks', '-C', str(target), 'rev-parse', 'HEAD']) == target.name)
-    require(command(['git', '--no-optional-locks', '-C', str(target), 'status', '--porcelain', '--untracked-files=all']) == '')
+    PARTIAL['verifiedCurrentCommit'] = target.name
+    stage('current-checkout-clean')
+    PARTIAL['checkoutClean'] = command(['git', '--no-optional-locks', '-C', str(target), 'status', '--porcelain', '--untracked-files=all']) == ''
+    require(PARTIAL['checkoutClean'])
     return target.name, pointer_form
 
 
 def inspect_container():
+    stage('container-count')
     ids = command(['docker', 'ps', '-aq', '--filter', 'label=com.docker.compose.project=nestlet']).split()
     require(len(ids) == 1 and re.fullmatch(r'[a-f0-9]{12,64}', ids[0]))
     fmt = ('{"image":{{json .Config.Image}},"imageId":{{json .Image}},'
@@ -85,6 +102,7 @@ def inspect_container():
            '"running":{{json .State.Running}},"health":{{json .State.Health.Status}},'
            '"readOnly":{{json .HostConfig.ReadonlyRootfs}},"ports":{{json .HostConfig.PortBindings}},'
            '"mounts":{{json .Mounts}}}')
+    stage('container-scope')
     item = json.loads(command(['docker', 'inspect', '--format', fmt, ids[0]]))
     require(item['project'] == 'nestlet' and item['service'] == 'nestlet')
     require(item['readOnly'] is True)
@@ -94,32 +112,44 @@ def inspect_container():
     mounts = [entry for entry in item['mounts'] if entry['Type'] != 'tmpfs']
     require(len(mounts) == 1 and mounts[0]['Type'] == 'volume' and mounts[0]['Name'] == 'nestlet_case_data'
             and mounts[0]['Destination'] == '/data' and mounts[0]['RW'] is True)
+    PARTIAL['healthy'] = item['running'] is True and item['health'] == 'healthy'
+    stage('volume-scope')
     volume = json.loads(command(['docker', 'volume', 'inspect', 'nestlet_case_data', '--format', '{{json .}}']))
     require(volume['Name'] == 'nestlet_case_data' and volume['Driver'] == 'local' and not volume.get('Options'))
     labels = volume.get('Labels', {})
     require(labels.get('com.docker.compose.project') == 'nestlet'
             and labels.get('com.docker.compose.volume') == 'case_data'
             and labels.get('com.nestlet.purpose') == 'private-case-storage')
+    stage('image-identity')
     tag_id = command(['docker', 'image', 'inspect', '--format', '{{.Id}}', item['image']])
     return ids[0], item, tag_id
 
 
 def report(base=BASE):
+    PARTIAL.clear()
+    stage('managed-directories')
     uid = os.geteuid()
     for directory in [base, base / 'releases', base / 'shared']:
         private_directory(directory, uid)
+    stage('managed-marker')
     marker = base / '.nestlet-managed'
     info = marker.lstat()
     require(stat.S_ISREG(info.st_mode) and info.st_uid == uid and info.st_nlink == 1 and info.st_size <= 64)
     require(marker.read_text().strip() == 'nestlet-managed-stage-v1')
+    # Source identity is read-only and can be reported even when the later
+    # lease/container checks refuse. Partial receipts never authorize upgrade.
+    commit, pointer_form = current_commit(base, uid)
+    stage('maintenance-lock-open')
     lock = base / '.incremental-release.lock'
     fd = os.open(lock, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:
+        stage('maintenance-lock-identity')
         info = os.fstat(fd)
         require(stat.S_ISREG(info.st_mode) and info.st_uid == uid and info.st_nlink == 1 and stat.S_IMODE(info.st_mode) == 0o600)
+        stage('maintenance-lock-acquire')
         fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
-        commit, pointer_form = current_commit(base, uid)
         container, item, tag_id = inspect_container()
+        PARTIAL['imageCommitAgreement'] = item['image'] == 'nestlet:' + commit and item['imageId'] == tag_id
         metadata = {'schemaVersion': None, 'applicationIdentityValid': None}
         if item['running'] is True:
             # Busy/WAL/unreadable metadata stays unknown, never inferred from an image.
@@ -131,9 +161,12 @@ def report(base=BASE):
                 metadata = {key: observed[key] for key in metadata}
             except Exception:
                 pass
-        require(current_commit(base, uid) == (commit, pointer_form))
+        final_identity = current_commit(base, uid)
+        stage('current-identity-stable')
+        require(final_identity == (commit, pointer_form))
         # No tenant rows, credentials, image digests, container IDs or private paths.
-        return {'verifiedCurrentCommit': commit, 'pointerForm': pointer_form,
+        return {'inspectionComplete': True, 'verifiedCurrentCommit': commit, 'pointerForm': pointer_form,
+                'canonicalManagedTarget': True, 'checkoutClean': True,
                 'imageCommitAgreement': item['image'] == 'nestlet:' + commit and item['imageId'] == tag_id,
                 **metadata, 'healthy': item['running'] is True and item['health'] == 'healthy'}
     finally:
@@ -144,5 +177,5 @@ if __name__ == '__main__':
     try:
         print(json.dumps(report(), sort_keys=True))
     except Exception:
-        print('Read-only release identity inspection refused: metadata or maintenance lease could not be verified.', file=sys.stderr)
+        print(json.dumps({'inspectionComplete': False, 'failedStage': STAGE, **PARTIAL}, sort_keys=True))
         sys.exit(1)

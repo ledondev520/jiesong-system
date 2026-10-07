@@ -52,7 +52,7 @@ class IdentitySafety(unittest.TestCase):
         for relative in [False,True]:
             base,item,volume,calls,command=self.fixture(relative)
             with patch.object(identity,'command',command):report=identity.report(base)
-            self.assertEqual(report,{'verifiedCurrentCommit':OLD,'pointerForm':'relative' if relative else 'absolute','imageCommitAgreement':True,'schemaVersion':4,'applicationIdentityValid':True,'healthy':True})
+            self.assertEqual(report,{'inspectionComplete':True,'canonicalManagedTarget':True,'checkoutClean':True,'verifiedCurrentCommit':OLD,'pointerForm':'relative' if relative else 'absolute','imageCommitAgreement':True,'schemaVersion':4,'applicationIdentityValid':True,'healthy':True})
             self.assertNotIn(str(base),json.dumps(report))
             self.assertFalse(any('runtime.env' in str(call) for call in calls))
             self.assertTrue(all(not any(value in call for value in ['stop','start','up','run','build','rm','cp','mv']) for call in calls))
@@ -85,9 +85,27 @@ class IdentitySafety(unittest.TestCase):
         item['mounts'][0]['Name']='nestlet_case_data'
         (base/'current').unlink();(base/'current').symlink_to(base/'shared')
         with patch.object(identity,'command',command),self.assertRaises(RuntimeError):identity.report(base)
+        (base/'current').unlink();(base/'current').symlink_to(base/'releases'/OLD)
         (base/'.incremental-release.lock').unlink()
         with patch.object(identity,'command',command),self.assertRaises(FileNotFoundError):identity.report(base)
         self.assertFalse((base/'.incremental-release.lock').exists())
+
+    def test_partial_receipt_preserves_verified_source_and_safe_stage(self):
+        base,item,volume,calls,command=self.fixture(relative=True)
+        (base/'.incremental-release.lock').unlink()
+        with patch.object(identity,'command',command),self.assertRaises(FileNotFoundError):identity.report(base)
+        self.assertEqual(identity.STAGE,'maintenance-lock-open')
+        self.assertEqual(identity.PARTIAL,{'pointerForm':'relative','canonicalManagedTarget':True,'verifiedCurrentCommit':OLD,'checkoutClean':True})
+        self.assertNotIn(str(base),json.dumps(identity.PARTIAL))
+        base,item,volume,calls,command=self.fixture()
+        def dirty(args):
+            if args[-3:]==['status','--porcelain','--untracked-files=all']:return '?? private-file-name-that-must-not-be-output'
+            return command(args)
+        with patch.object(identity,'command',dirty),self.assertRaises(RuntimeError):identity.report(base)
+        self.assertEqual(identity.STAGE,'current-checkout-clean')
+        self.assertFalse(identity.PARTIAL['checkoutClean'])
+        self.assertEqual(identity.PARTIAL['verifiedCurrentCommit'],OLD)
+        self.assertNotIn('private-file-name',json.dumps(identity.PARTIAL))
 
     def test_header_reads_metadata_without_sqlite_open_or_writes(self):
         with tempfile.TemporaryDirectory() as directory:
