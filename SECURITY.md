@@ -110,6 +110,8 @@ Agent Runtime 仅加载锁定版本的已发布 SDK 构建，加载错误直接�
 
 - The image-tag editor accepts one approved literal 40-hex dotenv value, including quotes, export, spacing and comments, and changes only that value span. It never evaluates interpolation, skips unrelated quoted multiline values, and rejects duplicates, malformed or unapproved tags before writing; all other configuration bytes remain unchanged.
 
+- Only the proved schema4 predecessor branch may reconcile a stale literal image tag to the exact running predecessor SHA, after repeating archive/runtime/schema/health and exclusive-lease checks. Normal tag transitions retain their old-value allowlist. A previous literal receipt is fsynced locally at 0600 before reconciliation; it contains no other configuration and is never logged or uploaded.
+
 ## Nestlet provider-only mail proof
 - `scripts/nestlet-mail-proof.py` runs one fixed, plain, no-action test inside the existing pinned schema4 container using its existing DirectMail environment. It never reads runtime.env, exports credentials, invokes account APIs, writes user data, or changes deployment/configuration. The official DirectMail endpoint is fixed and no automatic send retry exists.
 - A root-owned 0600 exclusive attempt marker under the existing private shared directory is fsynced before the provider call and never reset. Repeated/uncertain attempts require inbox reconciliation, not rerunning or deleting the marker. Workflow output is allowlisted to provider-accepted/provider-unconfirmed; inbox receipt and signup/reset acceptance remain separate checks.

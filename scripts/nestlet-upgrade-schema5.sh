@@ -85,13 +85,22 @@ PY
 }
 # Edit only a literal pinned image-tag value in a dotenv declaration. No secret values, file
 # contents, hashes or backups are printed or retained by this operation.
-set_image_tag() {
-    python3 - "$ENVFILE" "$1" "$2" <<'PY'
-import os,sys,stat,re,tempfile
-path,before,after=sys.argv[1:]
+edit_image_tag() {
+    python3 - "$ENVFILE" "$1" "$2" "$3" <<'PY'
+import os,sys,stat,re,tempfile,fcntl
+sys.excepthook=lambda *_:print('Image-tag verification failed.',file=sys.stderr)
+path,before,after,mode=sys.argv[1:]
+assert mode in ('strict','verified-predecessor')
 allowed_before=before.split(',')
 assert 1<=len(allowed_before)<=2 and all(re.fullmatch(r'[a-f0-9]{40}',v) for v in allowed_before)
 assert re.fullmatch(r'[a-f0-9]{40}',after)
+if mode=='verified-predecessor':
+    assert before==after=='4d4c15315d80b5fb7e9f8c2f3f883b10c1121c40'
+    lock=os.path.join(os.path.dirname(os.path.dirname(path)),'.incremental-release.lock')
+    lease=os.fstat(9); named=os.lstat(lock)
+    assert stat.S_ISREG(lease.st_mode) and lease.st_uid==os.geteuid() and lease.st_nlink==1 and stat.S_IMODE(lease.st_mode)==0o600
+    assert (lease.st_dev,lease.st_ino)==(named.st_dev,named.st_ino) and not stat.S_ISLNK(named.st_mode)
+    fcntl.flock(9,fcntl.LOCK_EX|fcntl.LOCK_NB)
 lst=os.lstat(path)
 assert stat.S_ISREG(lst.st_mode) and lst.st_uid==os.geteuid() and stat.S_IMODE(lst.st_mode)==0o600 and lst.st_nlink==1
 fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
@@ -130,10 +139,17 @@ pattern=(rb'[ \t]*(?:export[ \t]+)?NESTLET_IMAGE_TAG[ \t]*[=:][ \t]*'
 found=re.fullmatch(pattern,line)
 assert found is not None,'Unsupported image-tag declaration'
 group=next(name for name in ('single','double','bare') if found[name] is not None)
-assert found[group].decode() in allowed_before,'Unexpected image tag'
+assert mode=='verified-predecessor' or found[group].decode() in allowed_before,'Unexpected image tag'
 start,end=found.span(group)
 updated=original[:offset+start]+after.encode()+original[offset+end:]
 if original==updated: sys.exit(0)
+if mode=='verified-predecessor':
+    # Preserve only the previous literal, never the rest of private configuration.
+    receipt_fd,receipt=tempfile.mkstemp(prefix='.previous-image-tag-',dir=os.path.dirname(path))
+    with os.fdopen(receipt_fd,'wb') as f:f.write(found[group]+b'\n');f.flush();os.fsync(f.fileno())
+    dfd=os.open(os.path.dirname(path),os.O_RDONLY|os.O_DIRECTORY)
+    try:os.fsync(dfd)
+    finally:os.close(dfd)
 fd,tmp=tempfile.mkstemp(prefix='.image-tag-',dir=os.path.dirname(path))
 try:
     with os.fdopen(fd,'wb') as f: f.write(updated); f.flush(); os.fsync(f.fileno())
@@ -146,6 +162,21 @@ try:
 finally:
     if os.path.exists(tmp): os.unlink(tmp)
 PY
+}
+# All normal transitions retain their explicit old-value allowlist.
+set_image_tag() {
+    edit_image_tag "$1" "$2" strict
+}
+# Only the already-proved, still-running predecessor may reconcile its stale
+# configuration hint. Compose always explicitly supplies the selected SHA.
+reconcile_current_image_tag() {
+    [ "${candidate_started:-0}" = 0 ] || fail 'Image-tag reconciliation refused'
+    verify_predecessor runtime || fail 'Predecessor verification failed'
+    check_container "$OLD_SHA"
+    check_persistent_mount "$OLD_SHA" 4
+    check_http
+    [ -L "$BASE/current" ] && [ "$(readlink "$BASE/current")" = "$OLD_RELEASE" ] || fail 'Image-tag reconciliation refused'
+    edit_image_tag "$OLD_SHA" "$OLD_SHA" verified-predecessor
 }
 # Only the pinned 4d predecessor may use the trusted archive proof. The
 # embedded verifier is maintenance code, never imported from the host archive.
@@ -658,10 +689,9 @@ check_container "$OLD_SHA"
 check_persistent_mount "$OLD_SHA" 4
 verify_predecessor runtime || fail 'Predecessor verification failed'
 check_http
-# If SIGKILL occurred after changing the tag but before recreation, the exact
-# predecessor remains healthy/current. Normalize only an OLD or intended NEW
-# tag back to OLD before retrying; any third tag or malformed assignment stops.
-set_image_tag "$OLD_SHA,$NEW_SHA" "$OLD_SHA"
+# The explicit Compose SHA and verified runtime are authoritative. Reconcile
+# a stale literal configuration hint only after repeating those proofs.
+reconcile_current_image_tag
 [ "$(df -Pk "$BASE" | awk 'NR==2 {print $4}')" -ge 2097152 ] || fail 'At least 2 GiB free disk required'
 if [ -e "$NEW_RELEASE" ] || [ -L "$NEW_RELEASE" ]; then
     [ -d "$NEW_RELEASE" ] && [ ! -L "$NEW_RELEASE" ] && [ "$(stat -c %u "$NEW_RELEASE")" = "$uid" ] && [ "$(stat -c %a "$NEW_RELEASE")" = 700 ] || fail 'Unexpected new-release directory'

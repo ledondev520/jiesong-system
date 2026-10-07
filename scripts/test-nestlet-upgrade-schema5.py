@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Local-only safety tests. No Docker, SSH, deployment or private inputs."""
 import copy
+import fcntl
 import hashlib
 import json
 import os
@@ -19,7 +20,8 @@ NEW = 'a' * 40
 
 
 def shell_function(name):
-    return re.search(r'^' + name + r'\(\) \{\n.*?^\}', TEXT, re.M | re.S).group()
+    value = re.search(r'^' + name + r'\(\) \{\n.*?^\}', TEXT, re.M | re.S).group()
+    return shell_function('edit_image_tag') + '\n' + value if name == 'set_image_tag' else value
 
 
 class ReleaseSafety(unittest.TestCase):
@@ -145,6 +147,62 @@ class ReleaseSafety(unittest.TestCase):
                 self.assertNotEqual(result.returncode,0)
                 self.assertEqual(envfile.read_bytes(),original)
                 self.assertNotIn(original,result.stdout+result.stderr)
+
+    def test_reconcile_is_bounded_to_verified_predecessor_with_private_receipt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base=Path(directory);shared=base/'shared';shared.mkdir(mode=0o700)
+            envfile=shared/'runtime.env';old_release=str(base/'releases'/OLD)
+            (base/'current').symlink_to(old_release)
+            lock=base/'.incremental-release.lock';lock.write_bytes(b'');lock.chmod(0o600)
+            stale=b'b'*40
+            original=b"UNCHANGED_LITERAL='$SYNTHETIC#value'\r\n export NESTLET_IMAGE_TAG = '"+stale+b"' # retain\r\n"
+            envfile.write_bytes(original);envfile.chmod(0o600)
+            prefix='set -euo pipefail\numask 077\n'+f'BASE={base}\nENVFILE={envfile}\nOLD_SHA={OLD}\nOLD_RELEASE={old_release}\n'
+            prefix+='exec 9>"$BASE/.incremental-release.lock"\nflock -n 9\nfail() { exit 41; }\nverify_predecessor() { [ "$1" = runtime ]; }\ncheck_container() { [ "$1" = "$OLD_SHA" ]; }\ncheck_persistent_mount() { [ "$1 $2" = "$OLD_SHA 4" ]; }\ncheck_http() { :; }\n'
+            prefix+=shell_function('edit_image_tag')+'\n'+shell_function('reconcile_current_image_tag')+'\n'
+            result=subprocess.run(['bash','-c',prefix+'reconcile_current_image_tag'],capture_output=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual(envfile.read_bytes(),original.replace(stale,OLD.encode()))
+            receipts=list(shared.glob('.previous-image-tag-*'));self.assertEqual(len(receipts),1)
+            self.assertEqual(receipts[0].read_bytes(),stale+b'\n');self.assertEqual(receipts[0].stat().st_mode&0o777,0o600)
+            self.assertEqual(result.stdout+result.stderr,b'')
+            self.assertEqual(subprocess.run(['bash','-c',prefix+'reconcile_current_image_tag'],capture_output=True).returncode,0)
+            self.assertEqual(list(shared.glob('.previous-image-tag-*')),receipts)
+            body=shell_function('reconcile_current_image_tag')
+            self.assertLess(body.index('verify_predecessor runtime'),body.index('edit_image_tag'))
+            self.assertLess(body.index('check_persistent_mount'),body.index('edit_image_tag'))
+            self.assertEqual(TEXT.count('\nreconcile_current_image_tag\n'),1)
+            self.assertIn('NESTLET_IMAGE_TAG="$sha"',shell_function('compose'))
+
+    def test_reconcile_refuses_failed_proofs_bad_lease_and_malformed_tags_without_writes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base=Path(directory);shared=base/'shared';shared.mkdir(mode=0o700)
+            envfile=shared/'runtime.env';old_release=str(base/'releases'/OLD)
+            pointer=base/'current';pointer.symlink_to(old_release)
+            lock=base/'.incremental-release.lock';lock.write_bytes(b'');lock.chmod(0o600)
+            other=base/'other-lock';other.write_bytes(b'');other.chmod(0o600)
+            prefix='set -euo pipefail\numask 077\n'+f'BASE={base}\nENVFILE={envfile}\nOLD_SHA={OLD}\nOLD_RELEASE={old_release}\n'
+            prefix+='fail() { exit 41; }\nverify_predecessor() { :; }\ncheck_container() { :; }\ncheck_persistent_mount() { :; }\ncheck_http() { :; }\n'
+            prefix+=shell_function('edit_image_tag')+'\n'+shell_function('reconcile_current_image_tag')+'\n'
+            good=b'NESTLET_IMAGE_TAG='+b'b'*40+b'\n'
+            cases=[('pointer','',good),('source','verify_predecessor() { return 1; }\n',good),('runtime','check_container() { return 1; }\n',good),
+                   ('schema','check_persistent_mount() { return 1; }\n',good),('health','check_http() { return 1; }\n',good),
+                   ('started','candidate_started=1\n',good),('missing-lease','',good),('wrong-lease','exec 9>"$BASE/other-lock"\n',good),
+                   ('busy-lease','',good),('duplicate','',good+good),('malformed','',b'NESTLET_IMAGE_TAG=${OTHER}\n')]
+            for case,override,original in cases:
+                envfile.write_bytes(original);envfile.chmod(0o600)
+                if case=='pointer':pointer.unlink();pointer.symlink_to(str(base/'wrong'))
+                lease='' if case=='missing-lease' else 'exec 9>"$BASE/.incremental-release.lock"\n'
+                held=None
+                if case=='busy-lease':held=lock.open('rb');fcntl.flock(held,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                try:result=subprocess.run(['bash','-c',prefix+lease+override+'reconcile_current_image_tag'],capture_output=True)
+                finally:
+                    if held:held.close()
+                self.assertNotEqual(result.returncode,0,case)
+                self.assertEqual(envfile.read_bytes(),original,case)
+                self.assertEqual(list(shared.glob('.previous-image-tag-*')),[],case)
+                self.assertNotIn(b'b'*40,result.stdout+result.stderr)
+                if case=='pointer':pointer.unlink();pointer.symlink_to(old_release)
 
     def simulate_failure(self, schema, stop_ok=True, started=0, image_matches=True):
         with tempfile.TemporaryDirectory() as directory:
