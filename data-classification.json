@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updatedAt": "2026-10-07",
+  "updatedAt": "2026-10-08",
   "owner": "security-team",
   "tiers": [
     {
@@ -52,7 +52,8 @@
           "scripts/nestlet-upgrade-schema4.sh keeps recovery directories 0700 and files 0600, validates a consistent SQLite API backup, rehearses on a distinct copy, never uploads evidence and never automatically restores or downgrades live storage",
           "Same-schema Nestlet maintenance keeps database/originals backups and rehearsal copies private; verifies exact persistence compatibility and unchanged schema4 before any old-image recovery; never restores live data or deletes originals",
           "scripts/nestlet-upgrade-schema5.sh requires private verified backup and isolated additive/future-version drills, preserves environment bytes with a bounded literal-only dotenv image-tag edit and rejects ambiguous tags, allows stale-literal reconciliation only after exact running-predecessor and exclusive-lease proof with a private 0600 previous-literal receipt, never restores live data, and never starts schema4 after candidate-start; manual old-snapshot recovery must assess revival of credentials and email actions",
-          "scripts/nestlet-verify-archive.py validates only a pinned public-source archive and literal runtime COPY set internally, emits only pass/fail with a fixed allowlisted validation class, rejects unknown entries before reads, permits canonical group-write bits only under verified private ancestry or an immutable runtime mount with trusted UID/GID, never changes permissions, and preserves the inherited maintenance lease; no actual host hashes, private filenames or source-state details are published"
+          "scripts/nestlet-verify-archive.py validates only a pinned public-source archive and literal runtime COPY set internally, emits only pass/fail with a fixed allowlisted validation class, rejects unknown entries before reads, permits canonical group-write bits only under verified private ancestry or an immutable runtime mount with trusted UID/GID, never changes permissions, and preserves the inherited maintenance lease; no actual host hashes, private filenames or source-state details are published",
+          "Nestlet same-schema6 update recovery remains private and host-local; exact schema/all-row/original preservation is mandatory on separate copies. No automatic runtime fallback, live restore or downgrade; candidate-written draft/suggestion compatibility is independently tested before activation."
         ],
         "transfer": [
           "Encrypt in transit (TLS)",
