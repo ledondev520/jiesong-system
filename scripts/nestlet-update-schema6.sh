@@ -410,8 +410,8 @@ assert.equal(r.status,200);assert.equal(s.authenticated,false);assert.equal(s.au
 for(const path of ["/api/cases","/api/assets","/api/settings","/api/admin/accounts","/api/admin/account-audit","/api/admin/diagnostics"]){const r=await fetch("http://127.0.0.1:4173"+path);assert.equal(r.status,503);}
 const page=await fetch("http://127.0.0.1:4173/");assert.equal(page.status,200);
 const html=await page.text(),scripts=[...html.matchAll(/<script[^>]+src="([^" ]+)"/g)].map(match=>match[1]);
-assert.ok(scripts.some(path=>path.startsWith("/assets/")),"Compiled UI bundle absent");
-for(const path of scripts){assert.ok(path.startsWith("/assets/")&&!path.startsWith("//"));const asset=await fetch("http://127.0.0.1:4173"+path);assert.equal(asset.status,200);assert.ok((await asset.text()).length>0);}
+assert.deepEqual(scripts,["/next/app.js"],"Compiled UI entry must match the pinned Vite output");
+for(const path of scripts){const asset=await fetch("http://127.0.0.1:4173"+path);assert.equal(asset.status,200);assert.match(asset.headers.get("content-type")??"",/^text\/javascript(?:;|$)/i);assert.ok((await asset.text()).trim().length>0,"Compiled UI JavaScript is empty");}
 console.log("Isolated schema6 startup, compiled UI and unauthenticated boundaries passed.");' </dev/null
 docker rm -f "$SMOKE_NAME" >/dev/null
 smoke_started=0

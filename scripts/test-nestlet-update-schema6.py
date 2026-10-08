@@ -27,6 +27,27 @@ class UpdateSafety(unittest.TestCase):
         for gate in ['StrictHostKeyChecking=yes','EXPECTED_HOST_SHA256','EXPECTED_HOST_FINGERPRINT','sha256sum --check --status']:self.assertIn(gate,run)
         result=subprocess.run(['bash','-c',run],env={'PATH':'/usr/bin:/bin','RELEASE_SHA':'a'*40},capture_output=True,text=True)
         self.assertNotEqual(result.returncode,0);self.assertIn('Release SHA does not match',result.stdout)
+    def test_compiled_ui_requires_exact_pinned_entry_and_javascript(self):
+        start=TEXT.index('const html=await page.text(),scripts=')
+        end=TEXT.index('console.log("Isolated schema6 startup',start)
+        check=TEXT[start:end]
+        # Execute the actual smoke assertions against positive and negative HTTP fixtures.
+        cases=[
+            ('/next/app.js',200,'text/javascript; charset=utf-8','console.log(1);',True),
+            ('/assets/app.js',200,'text/javascript','console.log(1);',False),
+            ('//example.invalid/app.js',200,'text/javascript','console.log(1);',False),
+            ('/next/app.js',404,'text/javascript','missing',False),
+            ('/next/app.js',200,'text/html','<html>fallback</html>',False),
+            ('/next/app.js',200,'text/javascript','  ',False),
+        ]
+        import json
+        for path,status,mime,body,passed in cases:
+            fixture=json.dumps(dict(path=path,status=status,mime=mime,body=body))
+            code='import assert from "node:assert/strict"; const f='+fixture+';'+\
+                'const page={text:async()=>`<script type="module" src="${f.path}"></script>`};'+\
+                'const fetch=async url=>{assert.equal(url,"http://127.0.0.1:4173/next/app.js");return {status:f.status,headers:new Map([["content-type",f.mime]]),text:async()=>f.body};};'+check
+            result=subprocess.run(['node','--input-type=module'],input=code,text=True,capture_output=True)
+            self.assertEqual(result.returncode==0,passed,(path,status,mime,body))
     def test_no_automatic_fallback_even_before_candidate(self):
         fn=prior.shell_function('rollback')
         for started in [0,1]:
