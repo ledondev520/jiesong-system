@@ -1,13 +1,18 @@
-# Pinned same-schema9 grounded review maintenance release. Never merge into Jiesong main.
-# Local activation patch; publication/dispatch held for CI, independent review and release authorization.
-name: Nestlet Schema9 Grounded Review Update
+# Disabled schema10 durable-provider preparation. Never merge into Jiesong main.
+# Activation requires final source/CI, independent review and specific security/release approval.
+name: Nestlet Schema10 Durable Provider Preparation
 on:
   workflow_dispatch:
     inputs:
       release_sha:
-        description: Exact reviewed schema9 merge SHA; all other targets are rejected
+        description: Exact reviewed schema10 merge SHA; all other targets are rejected
         required: true
         type: string
+      security_action_approved:
+        description: Specific approval for private wrapping-key creation and exact provider mounts
+        required: true
+        default: false
+        type: boolean
       expected_host_sha256:
         description: SHA256 of the existing target IPv4 address
         required: true
@@ -23,7 +28,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   upgrade:
-    if: github.repository == 'ledondev520/jiesong-system' && github.repository_owner == 'ledondev520' && github.ref == 'refs/heads/ops/nestlet-schema9-grounded-20261008' && github.actor == 'ledondev520'
+    if: false && github.repository == 'ledondev520/jiesong-system' && github.repository_owner == 'ledondev520' && github.ref == 'refs/heads/ops/nestlet-schema10-durable-prep-20261009' && github.actor == 'ledondev520'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: staging
@@ -35,19 +40,21 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           log-public-key: false
-      - name: Run bounded schema9 update
+      - name: Run bounded schema10 durable-provider preparation
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
           RELEASE_SHA: ${{ inputs.release_sha }}
+          SECURITY_ACTION_APPROVED: ${{ inputs.security_action_approved }}
           EXPECTED_HOST_SHA256: ${{ inputs.expected_host_sha256 }}
           EXPECTED_HOST_FINGERPRINT: ${{ inputs.host_key_sha256 }}
         shell: bash
         run: |
           set -euo pipefail
-          readonly REVIEWED_RELEASE_SHA=f738655ccab834d77d9204ebab25ab1e2a61d8ee
-          [[ "$REVIEWED_RELEASE_SHA" =~ ^[a-f0-9]{40}$ && "$RELEASE_SHA" = "$REVIEWED_RELEASE_SHA" ]] || { echo 'Release SHA does not match the reviewed schema9 merge'; exit 1; }
+          readonly REVIEWED_RELEASE_SHA=UNREVIEWED_SCHEMA10_DURABLE_TARGET
+          [[ "$REVIEWED_RELEASE_SHA" =~ ^[a-f0-9]{40}$ && "$RELEASE_SHA" = "$REVIEWED_RELEASE_SHA" ]] || { echo 'Release SHA does not match the reviewed schema10 merge'; exit 1; }
+          [[ "$SECURITY_ACTION_APPROVED" == true ]] || { echo "Specific security action approval required"; exit 1; }
           test -n "$SSH_HOST" && test -n "$SSH_USER"
           [[ "$SSH_PORT" =~ ^[0-9]+$ ]]
           [[ "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ ]]
@@ -86,7 +93,7 @@ jobs:
             echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
           fi
           test -s "$known_hosts"
-          echo "7a054802be11ff01387e8d69e94dda552060ff0acfaee49df188c5d9abfdcfd5  scripts/nestlet-update-schema9.sh" | sha256sum --check --status
+          echo "480640dd8df83bd983d529bba23454b63dae43384205c0139c036cdc35a108c5  scripts/nestlet-upgrade-schema10.sh" | sha256sum --check --status
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
             -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
-            "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA; else exec sudo -n bash -s -- $RELEASE_SHA; fi" < scripts/nestlet-update-schema9.sh
+            "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA $SECURITY_ACTION_APPROVED; else exec sudo -n bash -s -- $RELEASE_SHA $SECURITY_ACTION_APPROVED; fi" < scripts/nestlet-upgrade-schema10.sh

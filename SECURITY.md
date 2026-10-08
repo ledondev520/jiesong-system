@@ -160,3 +160,16 @@ Agent Runtime 仅加载锁定版本的已发布 SDK 构建，加载错误直接�
 - Updater predecessor is actual live `090d08ee4823c041b1f835d4ac307e7963b6fb93`, schema9. Local candidate adds review-operation.js and bounded protocol behavior without schema/new permission changes. Target/workflow are locally pinned to final merge `f738655ccab834d77d9204ebab25ab1e2a61d8ee`; explicit publication permission, final CI, independent activation review and root release authorization are required.
 - Critical auth/storage/consent/recovery/Compose/package-lock bytes remain exact. Dockerfile and .dockerignore may differ only by the two literal review-operation.js COPY additions and one allowlist line; package.json only by the approved review test/check suffixes. Reject all other packaging changes before build or downtime.
 - Keep session-preserving backup-copy rehearsals and all old/candidate cookie/CSRF/permission/data compatibility checks. Restore-only security-state clearing remains isolated. Never change original history, live security state, credentials or browser handoff; no provider acceptance calls in release preparation.
+
+## Nestlet schema10 durable-provider preparation
+
+The disabled helper requires exact final source pins, independent review and a
+specific security-action approval before creating a host-local wrapping file or
+adding the two provider binds. The private32-byte key stays outside case data,
+source and backups; only service UID1000 can read its0400/0600 file. Never print,
+copy to workflow artifacts, rotate, or replace it automatically. Provider settings
+are AES-256-GCM ciphertext in a separate private directory. Per-release ciphertext
+backups stay private and exclude the key; no automatic retention deletion occurs.
+Case restores never overwrite provider settings. Normal case migration preserves
+all historical rows; isolated restored copies invalidate security actions and pause
+trial service according to the reviewed schema10 whole-directory fence contract.

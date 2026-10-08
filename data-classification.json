@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updatedAt": "2026-10-07",
+  "updatedAt": "2026-10-08",
   "owner": "security-team",
   "tiers": [
     {
@@ -27,7 +27,9 @@
         "Nestlet administrator capability and append-only audit rows in schema6 snapshots and recovery copies",
         "Nestlet schema7 durable review intents, answers, before-state snapshots and recovery receipts",
         "Nestlet durable hashed session records, CSRF tokens, owner credential fingerprints and their schema8 backup snapshots",
-        "Nestlet schema9 remembered library allow/deny decisions, provider/policy binding and recovery copies"
+        "Nestlet schema9 remembered library allow/deny decisions, provider/policy binding and recovery copies",
+        "Nestlet private provider wrapping file, encrypted provider settings and separate ciphertext recovery copies",
+        "Nestlet schema10 service entitlement audit and recovery-fence receipts"
       ],
       "controls": {
         "storage": [
@@ -62,7 +64,9 @@
           "Same-schema9 guidance release rehearses on session-preserving snapshot copies and compares auth/storage contracts; existing live session hashes and library choices remain intact. Restore-only security-state invalidation must never become the release path.",
           "Same-schema9 source-contract repair retains unchanged private-session/storage/consent contracts; only isolated restored copies clear security state, never live data or preserved snapshots.",
           "Same-schema9 tool-observation release preserves source sessions/permissions/business records through snapshot-copy rehearsal; model-only presentation changes cannot alter exact UI proposals or authorize security-state resets outside isolated restoration.",
-          "Grounded-review release retains private histories, sources, sessions and permissions; provider-only history projection does not modify stored material. New module packaging is exact-allowlisted; backup-copy preservation and restore-only clearing remain unchanged."
+          "Grounded-review release retains private histories, sources, sessions and permissions; provider-only history projection does not modify stored material. New module packaging is exact-allowlisted; backup-copy preservation and restore-only clearing remain unchanged.",
+          "Nestlet wrapping file is service UID1000 owned0400/0600, raw32 bytes and outside case/provider databases, source and backups; never automatically replace or export",
+          "Nestlet provider ciphertext database lives in a separate0700 service directory with0600 files and exact private mounts; per-release stopped copies exclude the wrapping key and have no automatic cleanup"
         ],
         "transfer": [
           "Encrypt in transit (TLS)",
