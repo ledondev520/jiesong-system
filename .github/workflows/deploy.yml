@@ -1,11 +1,11 @@
-# Dedicated schema6 maintenance branch only. Never merge this workflow into Jiesong main.
-# Exact authorized merge passed application, browser and container CI; source activation is independently reviewed.
-name: Nestlet Schema6 Upgrade
+# Reviewed schema7-to-schema8 maintenance release. Never merge into Jiesong main.
+# Pinned final merge; publish/dispatch only after exact-source CI and release approval.
+name: Nestlet Schema8 Upgrade
 on:
   workflow_dispatch:
     inputs:
       release_sha:
-        description: Exact reviewed schema6 merge SHA; all other targets are rejected
+        description: Exact reviewed schema8 merge SHA; all other targets are rejected
         required: true
         type: string
       expected_host_sha256:
@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   upgrade:
-    if: github.repository == 'ledondev520/jiesong-system' && github.repository_owner == 'ledondev520' && github.ref == 'refs/heads/ops/nestlet-schema6-release-20261008' && github.actor == 'ledondev520'
+    if: github.repository == 'ledondev520/jiesong-system' && github.repository_owner == 'ledondev520' && github.ref == 'refs/heads/ops/nestlet-schema8-release-20261008' && github.actor == 'ledondev520'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: staging
@@ -35,7 +35,7 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           log-public-key: false
-      - name: Run bounded schema6 upgrade
+      - name: Run bounded schema8 update
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
@@ -46,8 +46,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          readonly REVIEWED_RELEASE_SHA=0ad91847e8c04f379f071e76bf8c325f9bb12233
-          [[ "$REVIEWED_RELEASE_SHA" =~ ^[a-f0-9]{40}$ && "$RELEASE_SHA" = "$REVIEWED_RELEASE_SHA" ]] || { echo 'Release SHA does not match the reviewed schema6 merge'; exit 1; }
+          readonly REVIEWED_RELEASE_SHA=73548035a07adafab9ed63213e8c6ea451f25dbb
+          [[ "$REVIEWED_RELEASE_SHA" =~ ^[a-f0-9]{40}$ && "$RELEASE_SHA" = "$REVIEWED_RELEASE_SHA" ]] || { echo 'Release SHA does not match the reviewed schema8 merge'; exit 1; }
           test -n "$SSH_HOST" && test -n "$SSH_USER"
           [[ "$SSH_PORT" =~ ^[0-9]+$ ]]
           [[ "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ ]]
@@ -86,7 +86,7 @@ jobs:
             echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
           fi
           test -s "$known_hosts"
-          echo "71391e8ecc1e81aca5071198d135397a1c7e168bdb359348ad6ed6771fcd2783  scripts/nestlet-upgrade-schema6.sh" | sha256sum --check --status
+          echo "d611c541034bb95844a66aaadaad1404802b4a1e510a1bdfee85978ec30dfd07  scripts/nestlet-upgrade-schema8.sh" | sha256sum --check --status
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
             -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
-            "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA; else exec sudo -n bash -s -- $RELEASE_SHA; fi" < scripts/nestlet-upgrade-schema6.sh
+            "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA; else exec sudo -n bash -s -- $RELEASE_SHA; fi" < scripts/nestlet-upgrade-schema8.sh
