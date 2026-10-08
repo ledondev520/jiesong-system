@@ -24,7 +24,10 @@
         "email verification code hashes and Alibaba Cloud mail credentials",
         "Nestlet private SQLite recovery snapshots, manifests and migration-rehearsal copies",
         "Nestlet email identities, pending email actions, credential fingerprints and durable rate-limit buckets in schema5 recovery snapshots",
-        "Nestlet administrator capability and append-only audit rows in schema6 snapshots and recovery copies"
+        "Nestlet administrator capability and append-only audit rows in schema6 snapshots and recovery copies",
+        "Nestlet schema7 durable review intents, answers, before-state snapshots and recovery receipts",
+        "Nestlet durable hashed session records, CSRF tokens, owner credential fingerprints and their schema8 backup snapshots",
+        "Nestlet schema9 remembered library allow/deny decisions, provider/policy binding and recovery copies"
       ],
       "controls": {
         "storage": [
@@ -52,7 +55,12 @@
           "scripts/nestlet-upgrade-schema4.sh keeps recovery directories 0700 and files 0600, validates a consistent SQLite API backup, rehearses on a distinct copy, never uploads evidence and never automatically restores or downgrades live storage",
           "Same-schema Nestlet maintenance keeps database/originals backups and rehearsal copies private; verifies exact persistence compatibility and unchanged schema4 before any old-image recovery; never restores live data or deletes originals",
           "scripts/nestlet-upgrade-schema5.sh requires private verified backup and isolated additive/future-version drills, preserves environment bytes with a bounded literal-only dotenv image-tag edit and rejects ambiguous tags, allows stale-literal reconciliation only after exact running-predecessor and exclusive-lease proof with a private 0600 previous-literal receipt, never restores live data, and never starts schema4 after candidate-start; manual old-snapshot recovery must assess revival of credentials and email actions",
-          "scripts/nestlet-verify-archive.py validates only a pinned public-source archive and literal runtime COPY set internally, emits only pass/fail with a fixed allowlisted validation class, rejects unknown entries before reads, permits canonical group-write bits only under verified private ancestry or an immutable runtime mount with trusted UID/GID, never changes permissions, and preserves the inherited maintenance lease; no actual host hashes, private filenames or source-state details are published"
+          "scripts/nestlet-verify-archive.py validates only a pinned public-source archive and literal runtime COPY set internally, emits only pass/fail with a fixed allowlisted validation class, rejects unknown entries before reads, permits canonical group-write bits only under verified private ancestry or an immutable runtime mount with trusted UID/GID, never changes permissions, and preserves the inherited maintenance lease; no actual host hashes, private filenames or source-state details are published",
+          "Pinned schema7 release requires private pre6 backup verification, exact additive row/DDL copy rehearsal and schema7 receipt round-trip; no automatic downgrade or restore, all recovery content host-local0700/0600",
+          "Schema8 backup preserves all source rows; new restored copies intentionally clear only auth_sessions, never source snapshots or live sessions. Every non-session row and DDL object remains identical; recovery evidence stays private0700/0600.",
+          "Consolidated schema7-to9 requires fresh release approval and empty new session/permission tables for legacy accounts. Backups retain all rows; only newly restored copies clear auth_sessions and library_permissions, with all other rows/DDL and original backups reverified unchanged.",
+          "Same-schema9 guidance release rehearses on session-preserving snapshot copies and compares auth/storage contracts; existing live session hashes and library choices remain intact. Restore-only security-state invalidation must never become the release path.",
+          "Same-schema9 source-contract repair retains unchanged private-session/storage/consent contracts; only isolated restored copies clear security state, never live data or preserved snapshots."
         ],
         "transfer": [
           "Encrypt in transit (TLS)",
