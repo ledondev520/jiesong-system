@@ -1,6 +1,6 @@
-# Pinned schema10 durable-provider release. Never merge into Jiesong main.
-# Activation requires final source/CI, independent review and specific security/release approval.
-name: Nestlet Schema10 Durable Provider Release
+# Pinned same-schema10 guidance update. Never merge into Jiesong main.
+# Activation requires final source/CI, independent review and release GO. Existing security files are reused.
+name: Nestlet Same Schema10 Guidance Update
 on:
   workflow_dispatch:
     inputs:
@@ -8,11 +8,6 @@ on:
         description: Exact reviewed schema10 merge SHA; all other targets are rejected
         required: true
         type: string
-      security_action_approved:
-        description: Specific approval for private wrapping-key creation and exact provider mounts
-        required: true
-        default: false
-        type: boolean
       expected_host_sha256:
         description: SHA256 of the existing target IPv4 address
         required: true
@@ -40,21 +35,19 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           log-public-key: false
-      - name: Run bounded schema10 durable-provider preparation
+      - name: Run bounded same-schema10 update
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
           RELEASE_SHA: ${{ inputs.release_sha }}
-          SECURITY_ACTION_APPROVED: ${{ inputs.security_action_approved }}
           EXPECTED_HOST_SHA256: ${{ inputs.expected_host_sha256 }}
           EXPECTED_HOST_FINGERPRINT: ${{ inputs.host_key_sha256 }}
         shell: bash
         run: |
           set -euo pipefail
-          readonly REVIEWED_RELEASE_SHA=1d6c2592118977455a29ed4e7d7c5b1153362d0c
+          readonly REVIEWED_RELEASE_SHA=c5e988afdd8e2513b54e9b9f714246e90e45662e
           [[ "$REVIEWED_RELEASE_SHA" =~ ^[a-f0-9]{40}$ && "$RELEASE_SHA" = "$REVIEWED_RELEASE_SHA" ]] || { echo 'Release SHA does not match the reviewed schema10 merge'; exit 1; }
-          [[ "$SECURITY_ACTION_APPROVED" == true ]] || { echo "Specific security action approval required"; exit 1; }
           test -n "$SSH_HOST" && test -n "$SSH_USER"
           [[ "$SSH_PORT" =~ ^[0-9]+$ ]]
           [[ "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ ]]
@@ -93,7 +86,7 @@ jobs:
             echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
           fi
           test -s "$known_hosts"
-          echo "484f3146b1b7ec4350881b804a7168b73d676b2b5d5b6f686db6aed61810e5fe  scripts/nestlet-upgrade-schema10.sh" | sha256sum --check --status
+          echo "1886b30ddf19c48524af601e4d310e49712d16e1c0ce104c72810c00131be13f  scripts/nestlet-update-schema10.sh" | sha256sum --check --status
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
             -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
-            "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA $SECURITY_ACTION_APPROVED; else exec sudo -n bash -s -- $RELEASE_SHA $SECURITY_ACTION_APPROVED; fi" < scripts/nestlet-upgrade-schema10.sh
+            "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA; else exec sudo -n bash -s -- $RELEASE_SHA; fi" < scripts/nestlet-update-schema10.sh

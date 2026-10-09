@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 /**
- * Local, copy-only schema9 -> schema10 recovery checks. Node >=24 is required.
+ * Local, copy-only schema9 -> schema10 and schema10 update checks. Node >=24 is required.
  * This file never chooses a host, changes Compose, restores live data, or deletes
  * evidence. Invoke it inside the already-reviewed network-disabled container.
  * Runtime and data paths must be explicit. The caller must pin the runtime image.
  * CLI errors are deliberately fixed-class: no rows, credentials, paths or hashes.
  *
  * migration  --runtime ROOT --snapshot BACKUP9 --output NEW_REHEARSAL
+ * same-schema --runtime ROOT --snapshot BACKUP10 --output NEW_REHEARSAL
+ * compatible --runtime OLD_ROOT --source CANDIDATE_COPY10 --output NEW_OLD_COPY
  * roundtrip  --runtime ROOT --source REHEARSAL --snapshot NEW_BACKUP10 --output NEW_RESTORE10
  * historical --runtime ROOT --snapshot BACKUP9 --output NEW_RESTORE9
- * future     --runtime ROOT --snapshot BACKUP9 --output NEW_FUTURE_COPY
+ * future     --runtime ROOT --snapshot BACKUP9_OR_10 --output NEW_FUTURE_COPY
  * predecessor --runtime OLD_ROOT --source RESTORE10
  *
  * Historical recovery keeps the WHOLE output directory, including its private
@@ -238,6 +240,49 @@ export async function rehearseMigration({ runtime, snapshot, output }) {
   return { verified: true, schemaVersion: 10 };
 }
 
+// Ordinary updates and same-schema compatibility must never call restore:
+// valid sessions, email actions, library grants and service state all survive.
+// The caller supplies an already isolated source, never live storage. Opening
+// the predecessor is permitted only on the new backup copy created here.
+async function copyAndOpenSchema10({ runtime, source, output, requireManifest }) {
+  distinct(source, output); check(!existsSync(output), 'Rehearsal output already exists');
+  const original = privateTree(source), before = databaseSnapshot(filenameIn(source));
+  check(before.version === 10, 'Same-schema check requires schema10');
+  check(!existsSync(filenameIn(source) + '.service-reconfirm.json') &&
+    !existsSync(filenameIn(source) + '.service-reconfirm.lock') && !existsSync(join(source, 'INCOMPLETE')),
+  'Ordinary update source has a recovery fence');
+  const originalAssets = privateTree(join(source, 'assets'));
+  const { backupPrivateData, verifyPrivateBackup } = await load(runtime, 'scripts/private-data-operations.js');
+  if (requireManifest) check(verifyPrivateBackup({ input: source }).schemaVersion === 10, 'Same-schema check requires a schema10 backup');
+  await backupPrivateData({ filename: filenameIn(source), assetsDirectory: join(source, 'assets'), output });
+  const checked = verifyPrivateBackup({ input: output });
+  check(checked.schemaVersion === 10 && equal(databaseSnapshot(filenameIn(output)), before), 'Backup-of-backup changed data');
+  check(equal(privateTree(join(output, 'assets')), originalAssets), 'Backup changed original assets');
+  const { openStorage } = await load(runtime, 'storage.js');
+  openStorage({ filename: filenameIn(output) }).close();
+  const after = databaseSnapshot(filenameIn(output));
+  exactSchema(before, after); unchangedTables(before, after);
+  check(equal(after, before), 'Same-schema startup changed rows or sequences');
+  check(!existsSync(filenameIn(output) + '.service-reconfirm.json') &&
+    !existsSync(filenameIn(output) + '.service-reconfirm.lock'), 'Ordinary update gained a recovery fence');
+  await verifyAssets(runtime, output, checked.manifest);
+  check(equal(privateTree(join(output, 'assets')), originalAssets), 'Startup changed original assets');
+  await reopenUnchanged(runtime, output);
+  if (requireManifest) verifyPrivateBackup({ input: source });
+  check(equal(privateTree(source), original), 'Same-schema rehearsal modified its source');
+  return { verified: true, schemaVersion: 10 };
+}
+
+export async function rehearseSameSchema({ runtime, snapshot, output }) {
+  return copyAndOpenSchema10({ runtime, source: snapshot, output, requireManifest: true });
+}
+
+export async function rehearseCompatible({ runtime, source, output }) {
+  // Candidate writes may make its old backup manifest stale. Capture current
+  // SQLite state using the backup API, then open only this isolated new copy.
+  return copyAndOpenSchema10({ runtime, source, output, requireManifest: false });
+}
+
 export async function rehearseRoundTrip({ runtime, source, snapshot, output }) {
   distinct(source, snapshot, output);
   check(!existsSync(snapshot) && !existsSync(output), 'Recovery output already exists');
@@ -301,7 +346,7 @@ export async function rehearseFutureRefusal({ runtime, snapshot, output }) {
   distinct(snapshot, output); check(!existsSync(output), 'Future check output already exists');
   const { backupPrivateData, verifyPrivateBackup, restorePrivateBackup } = await load(runtime, 'scripts/private-data-operations.js');
   const checked = verifyPrivateBackup({ input: snapshot });
-  check(checked.schemaVersion === 9, 'Future check requires schema9 backup');
+  check([9, 10].includes(checked.schemaVersion), 'Future check requires a schema9 or schema10 backup');
   const original = privateTree(snapshot);
   await backupPrivateData({ filename: filenameIn(snapshot), assetsDirectory: join(snapshot, 'assets'), output });
   // Only this newly created isolated copy receives the unsupported header.
@@ -343,6 +388,8 @@ export async function rehearsePredecessorRefusal({ runtime, source }) {
 
 const commands = {
   migration: [rehearseMigration, ['runtime', 'snapshot', 'output']],
+  'same-schema': [rehearseSameSchema, ['runtime', 'snapshot', 'output']],
+  compatible: [rehearseCompatible, ['runtime', 'source', 'output']],
   roundtrip: [rehearseRoundTrip, ['runtime', 'source', 'snapshot', 'output']],
   historical: [rehearseHistoricalRestore, ['runtime', 'snapshot', 'output']],
   future: [rehearseFutureRefusal, ['runtime', 'snapshot', 'output']],
