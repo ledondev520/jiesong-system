@@ -3,7 +3,7 @@
 import hashlib,importlib.util,pathlib,re,subprocess,tempfile,unittest,yaml
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('prior',ROOT/'scripts/test-nestlet-upgrade-schema6.py');prior=importlib.util.module_from_spec(spec);spec.loader.exec_module(prior)
-prior.SCRIPT=ROOT/'scripts/nestlet-update-schema10.sh';prior.TEXT=prior.SCRIPT.read_text();prior.OLD='c5e988afdd8e2513b54e9b9f714246e90e45662e';TEXT=prior.TEXT
+prior.SCRIPT=ROOT/'scripts/nestlet-update-schema10.sh';prior.TEXT=prior.SCRIPT.read_text();prior.OLD='52f6ce549ea847274caaa3b973814bc23f448b3a';TEXT=prior.TEXT
 class Safety(unittest.TestCase):
  def test_disabled_entry(self):
   for sha in ['a'*40,prior.OLD,'UNREVIEWED','$(false)']:
@@ -19,7 +19,7 @@ class Safety(unittest.TestCase):
  def test_workflow_pinned_and_bound(self):
   text=(ROOT/'.github/workflows/deploy.yml').read_text();w=yaml.load(text,Loader=yaml.BaseLoader);self.assertEqual(set(w['on']),{'workflow_dispatch'});self.assertEqual(w['permissions'],{'contents':'read'});self.assertNotIn('false &&',w['jobs']['upgrade']['if']);self.assertNotIn('security_action_approved',w['on']['workflow_dispatch']['inputs'])
   self.assertIn(hashlib.sha256(prior.SCRIPT.read_bytes()).hexdigest()+'  scripts/nestlet-update-schema10.sh',text)
-  for gate in ['StrictHostKeyChecking=yes','EXPECTED_HOST_SHA256','52f6ce549ea847274caaa3b973814bc23f448b3a']:self.assertIn(gate,text)
+  for gate in ['StrictHostKeyChecking=yes','EXPECTED_HOST_SHA256','66725b9d98ecc50b4dadc3f2b224f312943403e8']:self.assertIn(gate,text)
   subprocess.run(['bash','-n'],input=w['jobs']['upgrade']['steps'][-1]['run'],text=True,check=True)
  def test_retention_precedes_stop(self):
   start=TEXT.index('preflight_telemetry_preservation() {');end=TEXT.index('\npreflight_telemetry_preservation ||',start);block=TEXT[start:end]

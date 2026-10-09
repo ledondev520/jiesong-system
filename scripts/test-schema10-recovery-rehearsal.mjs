@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Synthetic only. Run: NESTLET_OLD_SHA=c5e988afdd8e2513b54e9b9f714246e90e45662e NESTLET_CANDIDATE_ROOT=/absolute/app node --test scripts/test-schema10-recovery-rehearsal.mjs
+// Synthetic only. Run: NESTLET_OLD_SHA=52f6ce549ea847274caaa3b973814bc23f448b3a NESTLET_CANDIDATE_ROOT=/absolute/app node --test scripts/test-schema10-recovery-rehearsal.mjs
 // Both exact predecessors are exported from that clone's existing Git objects.
 // NESTLET_CANDIDATE_SHA, when supplied, must equal the candidate checkout HEAD.
 // No fetch, dependency installation, network, Docker, private input or host changes.
@@ -18,7 +18,7 @@ import { databaseSnapshot, privateTree, fileDigest, rehearseMigration, rehearseR
   rehearseSameSchema, rehearseCompatible } from './schema10-recovery-rehearsal.mjs';
 
 const predecessorSHA = 'f738655ccab834d77d9204ebab25ab1e2a61d8ee';
-const oldSHA = process.env.NESTLET_OLD_SHA ?? 'c5e988afdd8e2513b54e9b9f714246e90e45662e';
+const oldSHA = process.env.NESTLET_OLD_SHA ?? '52f6ce549ea847274caaa3b973814bc23f448b3a';
 assert.match(oldSHA, /^[0-9a-f]{40}$/, 'NESTLET_OLD_SHA must be a complete exact schema10 Git commit');
 assert.ok(process.env.NESTLET_CANDIDATE_ROOT, 'Set NESTLET_CANDIDATE_ROOT to the reviewed local schema10 app clone');
 const candidate = resolve(process.env.NESTLET_CANDIDATE_ROOT);

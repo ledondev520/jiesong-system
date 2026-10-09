@@ -1,9 +1,9 @@
 # Same-schema10 guidance correction
 
-Final agency-uncertainty follow-up target is `52f6ce549ea847274caaa3b973814bc23f448b3a`,
-reviewed tree `9efe9e0839d71514739e5b2a160fada9b76b096c`. Main CI, independent
+Final UI workflow follow-up target is `66725b9d98ecc50b4dadc3f2b224f312943403e8`,
+reviewed tree `d60fa23de1eae01b521124555308b4b4877de067`. Main CI, independent
 activation/remote review and release GO remain required before dispatch.
-Live predecessor is `c5e988afdd8e2513b54e9b9f714246e90e45662e` (schema10).
+Live predecessor is `52f6ce549ea847274caaa3b973814bc23f448b3a` (schema10).
 
 This update keeps the established provider directory, wrapping file and exact
 Compose overlay. Missing or changed private metadata fails before downtime;
