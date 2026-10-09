@@ -1,9 +1,9 @@
 # Same-schema10 guidance correction
 
-Final reviewed application merge is `c5e988afdd8e2513b54e9b9f714246e90e45662e`, tree
-`8c12ae65bffaea28f5e44ec54bdcf3700a526dc1`. Exact main CI, independent
-activation/remote review and release GO remain required before dispatch. Live predecessor is
-`1d6c2592118977455a29ed4e7d7c5b1153362d0c` (schema10).
+Final agency-uncertainty follow-up target is `52f6ce549ea847274caaa3b973814bc23f448b3a`,
+reviewed tree `9efe9e0839d71514739e5b2a160fada9b76b096c`. Main CI, independent
+activation/remote review and release GO remain required before dispatch.
+Live predecessor is `c5e988afdd8e2513b54e9b9f714246e90e45662e` (schema10).
 
 This update keeps the established provider directory, wrapping file and exact
 Compose overlay. Missing or changed private metadata fails before downtime;

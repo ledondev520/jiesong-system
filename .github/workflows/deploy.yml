@@ -46,7 +46,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          readonly REVIEWED_RELEASE_SHA=c5e988afdd8e2513b54e9b9f714246e90e45662e
+          readonly REVIEWED_RELEASE_SHA=52f6ce549ea847274caaa3b973814bc23f448b3a
           [[ "$REVIEWED_RELEASE_SHA" =~ ^[a-f0-9]{40}$ && "$RELEASE_SHA" = "$REVIEWED_RELEASE_SHA" ]] || { echo 'Release SHA does not match the reviewed schema10 merge'; exit 1; }
           test -n "$SSH_HOST" && test -n "$SSH_USER"
           [[ "$SSH_PORT" =~ ^[0-9]+$ ]]
@@ -86,7 +86,7 @@ jobs:
             echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
           fi
           test -s "$known_hosts"
-          echo "1886b30ddf19c48524af601e4d310e49712d16e1c0ce104c72810c00131be13f  scripts/nestlet-update-schema10.sh" | sha256sum --check --status
+          echo "7b088c820b8ea096a01dbe49e42cb3a35949beae28e428115c7e95b8ba2f8cdc  scripts/nestlet-update-schema10.sh" | sha256sum --check --status
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
             -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
             "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA; else exec sudo -n bash -s -- $RELEASE_SHA; fi" < scripts/nestlet-update-schema10.sh
