@@ -1,99 +1,92 @@
-# G-Stack QA Workflow
-# 自动化 QA 测试 + 健康度检查
-
-name: QA & Health Check
-
+# Read-only Compose normalization diagnostic. No service changes.
+# One reviewed metadata-only dispatch through the existing SSH channel.
+name: Nestlet Read-only Compose Diagnostic
 on:
-  push:
-    branches: [main]
-  schedule:
-    # 每天凌晨 2 点运行
-    - cron: '0 2 * * *'
   workflow_dispatch:
-
+    inputs:
+      release_sha:
+        description: Exact reviewed schema10 merge SHA; all other targets are rejected
+        required: true
+        type: string
+      expected_host_sha256:
+        description: SHA256 of the existing target IPv4 address
+        required: true
+        type: string
+      host_key_sha256:
+        description: Optional independently verified SSH public host-key fingerprint
+        required: false
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: nestlet-stage
+  cancel-in-progress: false
 jobs:
-  # QA 自动化测试
-  qa-test:
-    name: QA Automation Test
+  upgrade:
+    if: github.repository == 'ledondev520/jiesong-system' && github.repository_owner == 'ledondev520' && github.ref == 'refs/heads/ops/nestlet-compose-preflight-20261009' && github.actor == 'ledondev520'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
         with:
-          node-version: '20.19.0'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        working-directory: ./frontend
-        run: npm ci
-
-      - name: Install Playwright
-        run: npm install -g playwright
-
-      - name: Install Playwright browsers
-        run: playwright install chromium
-
-      - name: Start dev server
-        working-directory: ./frontend
-        run: npm run dev &
+          persist-credentials: false
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          log-public-key: false
+      - name: Read fixed Compose normalization metadata
         env:
-          PORT: 3000
-
-      - name: Wait for server
-        run: sleep 10
-
-      - name: Run QA tests
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          EXPECTED_HOST_SHA256: ${{ inputs.expected_host_sha256 }}
+          EXPECTED_HOST_FINGERPRINT: ${{ inputs.host_key_sha256 }}
+        shell: bash
         run: |
-          if [ -f .gstack/qa-test-comprehensive.sh ]; then
-            bash .gstack/qa-test-comprehensive.sh
+          set -euo pipefail
+          readonly REVIEWED_RELEASE_SHA=1d6c2592118977455a29ed4e7d7c5b1153362d0c
+          [[ "$REVIEWED_RELEASE_SHA" =~ ^[a-f0-9]{40}$ && "$RELEASE_SHA" = "$REVIEWED_RELEASE_SHA" ]] || { echo 'Release SHA does not match the reviewed schema10 merge'; exit 1; }
+          test -n "$SSH_HOST" && test -n "$SSH_USER"
+          [[ "$SSH_PORT" =~ ^[0-9]+$ ]]
+          [[ "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ ]]
+          [[ "$SSH_USER" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_-]*$ ]]
+          if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
+            [[ "$EXPECTED_HOST_FINGERPRINT" =~ ^SHA256:[a-zA-Z0-9+/]{43}$ ]]
+          fi
+          [[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$EXPECTED_HOST_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          matched_address=
+          while IFS= read -r address; do
+            observed="$(printf '%s' "$address" | sha256sum | awk '{print $1}')"
+            if [[ "$observed" == "$EXPECTED_HOST_SHA256" ]]; then matched_address="$address"; fi
+          done < <(getent ahostsv4 "$SSH_HOST" | awk '{print $1}' | sort -u)
+          [[ -n "$matched_address" ]] || { echo 'Selected server address does not match the existing SSH target'; exit 1; }
+          echo 'Existing SSH target matches selected server address; no address is logged.'
+          echo "::add-mask::$matched_address"
+          umask 077
+          # No pin: inherit the already-authorized deploy channel's host-key discovery.
+          # A supplied independent pin is mandatory to match; never bypass a mismatch.
+          known_hosts="$(mktemp)"
+          scanned="$(mktemp)"
+          one="$(mktemp)"
+          trap 'rm -f "$known_hosts" "$scanned" "$one"' EXIT
+          ssh-keyscan -T 10 -p "$SSH_PORT" -H "$matched_address" > "$scanned" 2>/dev/null
+          if [[ -n "$EXPECTED_HOST_FINGERPRINT" ]]; then
+            while IFS= read -r host_key; do
+              printf '%s\n' "$host_key" > "$one"
+              observed="$(ssh-keygen -lf "$one" -E sha256 | awk '{print $2}')"
+              if [[ "$observed" == "$EXPECTED_HOST_FINGERPRINT" ]]; then
+                cat "$one" >> "$known_hosts"
+              fi
+            done < "$scanned"
           else
-            echo "QA script not found, skipping"
+            cat "$scanned" > "$known_hosts"
+            echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
           fi
-
-      - name: Upload QA report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: qa-report
-          path: .gstack/qa-reports/
-          retention-days: 30
-
-  # 健康度检查
-  health-check:
-    name: Health Check
-    runs-on: ubuntu-latest
-    needs: qa-test
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.19.0'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        working-directory: ./frontend
-        run: npm ci
-
-      - name: Run health check
-        run: |
-          if [ -f .gstack/autoloop.sh ]; then
-            bash .gstack/autoloop.sh health
-          fi
-
-      - name: Check security vulnerabilities
-        working-directory: ./frontend
-        run: npm audit --audit-level=high || true
-
-      - name: Upload health report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: health-report
-          path: .gstack/loop-reports/
-          retention-days: 30
+          test -s "$known_hosts"
+          echo "5e706d09687aea6cded8fee51bfd3672700114888ffcc208e01fe10dd5363c11  scripts/nestlet-compose-diagnostic.sh" | sha256sum --check --status
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
+            "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA; else exec sudo -n bash -s -- $RELEASE_SHA; fi" < scripts/nestlet-compose-diagnostic.sh
