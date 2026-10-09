@@ -53,8 +53,10 @@ class Safety(unittest.TestCase):
   import copy,json
   code=re.search(r"config --format json \| python3 -c '\n(.*?)\n'",TEXT,re.S).group(1)
   fixture={'services':{'nestlet':{'read_only':True,'cap_drop':['ALL'],'security_opt':['no-new-privileges:true'],'ports':[{'host_ip':'127.0.0.1','published':'4173','target':4173}],'environment':{'NESTLET_DB_PATH':'/data/nestlet.sqlite','PUBLIC_ORIGIN':'https://nestlet.celerada.link','NESTLET_PROVIDER_CONFIG_PATH':'/provider-config/provider-config.sqlite','NESTLET_PROVIDER_WRAPPING_KEY_FILE':'/run/nestlet-private/provider-wrapping.key'},'volumes':[{'type':'volume','source':'case_data','target':'/data'},{'type':'bind','source':'/opt/nestlet/provider-config','target':'/provider-config','bind':{'create_host_path':False}},{'type':'bind','source':'/opt/nestlet/secrets/provider-wrapping.key','target':'/run/nestlet-private/provider-wrapping.key','read_only':True,'bind':{'create_host_path':False}}]}},'volumes':{'case_data':{'name':'nestlet_case_data','labels':{'com.nestlet.purpose':'private-case-storage'}}}}
-  for kind in ['valid','key-rw','source','target','duplicate','create','missing','old-no-overlay']:
+  for kind in ['valid','omitted-false','omitted-unknown-version','absent-overlay-proof','key-rw','source','target','duplicate','create','missing','old-no-overlay']:
    value=copy.deepcopy(fixture);service=value['services']['nestlet'];mounts=service['volumes']
+   if kind in ['omitted-false','omitted-unknown-version']:
+    mounts[1]['bind']={};mounts[2]['bind']={}
    if kind=='key-rw':mounts[2]['read_only']=False
    if kind=='source':mounts[2]['source']='/opt/nestlet'
    if kind=='target':mounts[2]['target']='/etc'
@@ -62,7 +64,21 @@ class Safety(unittest.TestCase):
    if kind=='create':mounts[2]['bind']['create_host_path']=True
    if kind=='missing':mounts.pop()
    if kind=='old-no-overlay':service['volumes']=mounts[:1];service['environment'].pop('NESTLET_PROVIDER_CONFIG_PATH')
-   result=subprocess.run(['python3','-c',code,'new','new'],input=json.dumps(value),text=True,capture_output=True);self.assertEqual(result.returncode==0,kind=='valid',kind)
+   result=subprocess.run(['python3','-c',code,'new','new','unknown-version' if kind=='omitted-unknown-version' else '2.40.3+ds1-0ubuntu1~24.04.1','false' if kind=='absent-overlay-proof' else 'true'],input=json.dumps(value),text=True,capture_output=True);self.assertEqual(result.returncode==0,kind in ['valid','omitted-false'],kind)
+ def test_explicit_false_overlay_is_verified_before_scope(self):
+  fn=prior.shell_function('prepare_provider_overlay')
+  # Adapt only the expected owner UID for this unprivileged synthetic filesystem.
+  fn=fn.replace('i.st_uid==0','i.st_uid==os.geteuid()')
+  with tempfile.TemporaryDirectory() as d:
+   path=pathlib.Path(d)/'overlay.yml'
+   code='set -euo pipefail\nprovider_overlay_verified=false\nPROVIDER_OVERLAY='+str(path)+'\n'+fn+'\nprepare_provider_overlay\ntest "$provider_overlay_verified" = true\n'
+   result=subprocess.run(['bash','-s'],input=code,text=True,capture_output=True);self.assertEqual(result.returncode,0,result.stderr)
+   original=path.read_bytes();self.assertIn(b'create_host_path: false',original)
+   self.assertEqual(subprocess.run(['bash','-s'],input=code,text=True,capture_output=True).returncode,0)
+   path.write_bytes(original.replace(b'create_host_path: false',b'create_host_path: true'))
+   result=subprocess.run(['bash','-s'],input=code,text=True,capture_output=True);self.assertNotEqual(result.returncode,0)
+  self.assertIn("<<'PY_OVERLAY' || return 1",fn)
+  self.assertLess(TEXT.index('prepare_provider_overlay\ncheck_compose_scope'),TEXT.index('compose "$NEW_SHA" build'))
  def test_recovery_code_exactly_embedded(self):
   embedded=TEXT.split("<<'JS_REHEARSAL'\n",1)[1].split('\nJS_REHEARSAL',1)[0];self.assertEqual(embedded,(ROOT/'scripts/schema10-recovery-rehearsal.mjs').read_text())
   for mode in ['migration','roundtrip','historical','future','predecessor']:self.assertIn('" '+mode+' --runtime /app',TEXT)

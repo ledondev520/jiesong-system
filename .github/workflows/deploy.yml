@@ -93,7 +93,7 @@ jobs:
             echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
           fi
           test -s "$known_hosts"
-          echo "0c4e62c1eec793fb25c31451be16d299675380f9feb47c5f1778ccf8501ebee6  scripts/nestlet-upgrade-schema10.sh" | sha256sum --check --status
+          echo "484f3146b1b7ec4350881b804a7168b73d676b2b5d5b6f686db6aed61810e5fe  scripts/nestlet-upgrade-schema10.sh" | sha256sum --check --status
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
             -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
             "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA $SECURITY_ACTION_APPROVED; else exec sudo -n bash -s -- $RELEASE_SHA $SECURITY_ACTION_APPROVED; fi" < scripts/nestlet-upgrade-schema10.sh

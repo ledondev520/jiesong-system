@@ -39,6 +39,7 @@ flock -n 9 || fail 'Another incremental release is active'
 docker compose version >/dev/null
 docker info --format '{{.ServerVersion}}' >/dev/null
 readonly PROVIDER_OVERLAY="$BASE/shared/provider-compose.yaml"
+provider_overlay_verified=false
 compose() {
     local sha="$1"; shift
     local -a overlays=()
@@ -49,7 +50,7 @@ compose() {
         NESTLET_IMAGE_TAG="$sha" docker compose --project-name nestlet --env-file "$ENVFILE" -f "$BASE/releases/$sha/compose.yaml" "${overlays[@]}" "$@" </dev/null
 }
 prepare_provider_overlay() {
-    python3 - "$PROVIDER_OVERLAY" <<'PY_OVERLAY'
+    python3 - "$PROVIDER_OVERLAY" <<'PY_OVERLAY' || return 1
 import os,stat,sys
 path=sys.argv[1]
 expected=b"""services:
@@ -79,6 +80,7 @@ else:
     fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
     with os.fdopen(fd,'wb') as f:f.write(expected);f.flush();os.fsync(f.fileno())
 PY_OVERLAY
+    provider_overlay_verified=true
 }
 
 prepare_provider_security() {
@@ -340,6 +342,8 @@ validate_release() {
     [ "$(git -C "$release" remote get-url origin)" = "$REPO" ] && [ "$(git -C "$release" rev-parse HEAD)" = "$sha" ] && [ -z "$(git -C "$release" status --porcelain --untracked-files=all)" ] || fail 'Release checkout differs from pinned source'
 }
 check_compose_scope() {
+    local compose_version
+    compose_version="$(docker compose version --short)"
     compose "$1" config --format json | python3 -c '
 import json,sys
 c=json.load(sys.stdin)
@@ -357,6 +361,7 @@ provider=s["environment"].get("NESTLET_PROVIDER_CONFIG_PATH")=="/provider-config
 assert len(mounts)==(3 if provider else 1)
 if len(sys.argv)>1:assert provider==(sys.argv[1]==sys.argv[2])
 if provider:
+    assert len(sys.argv)>4 and sys.argv[4]=="true","Explicit-false overlay proof is required"
     assert {v["target"] for v in mounts}=={"/data","/provider-config","/run/nestlet-private/provider-wrapping.key"}
     assert s["environment"]["NESTLET_PROVIDER_WRAPPING_KEY_FILE"]=="/run/nestlet-private/provider-wrapping.key"
     expected={"/provider-config":("/opt/nestlet/provider-config",False),"/run/nestlet-private/provider-wrapping.key":("/opt/nestlet/secrets/provider-wrapping.key",True)}
@@ -364,7 +369,12 @@ if provider:
         if v["target"]=="/data":continue
         assert v["target"] in expected
         source,ro=expected[v["target"]]
-        assert v["type"]=="bind" and v["source"]==source and v.get("read_only",False)==ro and v.get("bind",{}).get("create_host_path") is False
+        bind=v.get("bind",{});assert isinstance(bind,dict)
+        # This exact installed version omits false during JSON normalization.
+        # prepare_provider_overlay separately verifies immutable explicit-false YAML.
+        omitted_false=("create_host_path" not in bind and len(sys.argv)>3 and sys.argv[3]=="2.40.3+ds1-0ubuntu1~24.04.1")
+        assert v["type"]=="bind" and v["source"]==source and v.get("read_only",False)==ro
+        assert bind.get("create_host_path") is False or omitted_false
 m=next(v for v in mounts if v["target"]=="/data");assert m["type"]=="volume" and m["source"]=="case_data" and m["target"]=="/data" and not m.get("read_only",False)
 assert not m.get("volume",{}).get("nocopy",False)
 assert set(c.get("volumes",{}))=={"case_data"}
@@ -374,7 +384,7 @@ assert v.get("labels",{}).get("com.nestlet.purpose")=="private-case-storage"
 assert s["environment"]["NESTLET_DB_PATH"]=="/data/nestlet.sqlite"
 # Compare this non-secret resolved value before build, downtime or migration.
 assert s["environment"].get("PUBLIC_ORIGIN")=="https://nestlet.celerada.link","Public origin verification failed"
-' "$1" "$NEW_SHA"
+' "$1" "$NEW_SHA" "$compose_version" "$provider_overlay_verified"
 }
 check_data_volume() {
     # A pre-existing volume is accepted only if it carries this task's exact
