@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DISABLED schema9-to10 durable-provider preparation; final pins and security approval required.
+# Pinned schema9-to10 durable-provider release; dispatch requires final CI and release GO.
 # ADDITIVE SCHEMA9 -> SCHEMA10 rollout only; dedicated maintenance dispatch only.
 # Keeps the existing Nestlet volume; never automatically restores or downgrades data.
 # Bounds changes to Nestlet release and specifically approved private provider storage.
@@ -8,7 +8,7 @@ set -euo pipefail
 umask 077
 readonly OLD_SHA='f738655ccab834d77d9204ebab25ab1e2a61d8ee'
 # Root must replace this only after the actual authorized merge SHA passes application, browser and container CI.
-readonly REVIEWED_RELEASE_SHA='UNREVIEWED_SCHEMA10_DURABLE_TARGET'
+readonly REVIEWED_RELEASE_SHA='1d6c2592118977455a29ed4e7d7c5b1153362d0c'
 readonly NEW_SHA="${1:?Supply the exact reviewed schema10 release SHA}"
 [[ "$REVIEWED_RELEASE_SHA" =~ ^[a-f0-9]{40}$ && "$NEW_SHA" = "$REVIEWED_RELEASE_SHA" ]] || { echo 'Draft or unreviewed release; deployment is disabled'; exit 1; }
 [[ "$NEW_SHA" =~ ^[a-f0-9]{40}$ ]] && [[ "$NEW_SHA" != "$OLD_SHA" ]] || { echo 'Expected a new approved 40-hex commit'; exit 1; }
@@ -541,7 +541,7 @@ check_packaging_contract() {
     python3 - "$NEW_RELEASE" <<'PY_PACKAGE'
 import pathlib,hashlib,sys
 root=pathlib.Path(sys.argv[1])
-expected={'Dockerfile': 'aa919074f0724bfdf5c17bdd91d4410b334d9991616ceef04d53255eaa57f9ba', '.dockerignore': '9b43118b6585304ff77b2bda0728553d67b2293cc82a275bdaf4bb324e3fc63a', 'package.json': '7058b3609ccfb339291ee8f6b7ec4c17a8618440be3cfb1100f81cd8ebda1512', 'package-lock.json': '28ebaeeb138cea6ff0d55ae770e11d6699ae47d5d6fef4587c5b87257118fd27', 'compose.yaml': '2e5f6e8d409f38b27a28d262a1031b58aa920fcd511920e9ef4966f71266e4d6'} # Provisional 00a8da7 provider packaging; final combined SHA review required
+expected={'Dockerfile': 'aa919074f0724bfdf5c17bdd91d4410b334d9991616ceef04d53255eaa57f9ba', '.dockerignore': '9b43118b6585304ff77b2bda0728553d67b2293cc82a275bdaf4bb324e3fc63a', 'package.json': '7058b3609ccfb339291ee8f6b7ec4c17a8618440be3cfb1100f81cd8ebda1512', 'package-lock.json': '28ebaeeb138cea6ff0d55ae770e11d6699ae47d5d6fef4587c5b87257118fd27', 'compose.yaml': '2e5f6e8d409f38b27a28d262a1031b58aa920fcd511920e9ef4966f71266e4d6'} # Exact merged 1d6c259 packaging; independently reviewed unchanged contract
 assert set(expected)=={'Dockerfile','.dockerignore','package.json','package-lock.json','compose.yaml'}
 for name,digest in expected.items():assert hashlib.sha256((root/name).read_bytes()).hexdigest()==digest
 PY_PACKAGE

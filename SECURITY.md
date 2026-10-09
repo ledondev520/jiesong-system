@@ -161,9 +161,9 @@ Agent Runtime 仅加载锁定版本的已发布 SDK 构建，加载错误直接�
 - Critical auth/storage/consent/recovery/Compose/package-lock bytes remain exact. Dockerfile and .dockerignore may differ only by the two literal review-operation.js COPY additions and one allowlist line; package.json only by the approved review test/check suffixes. Reject all other packaging changes before build or downtime.
 - Keep session-preserving backup-copy rehearsals and all old/candidate cookie/CSRF/permission/data compatibility checks. Restore-only security-state clearing remains isolated. Never change original history, live security state, credentials or browser handoff; no provider acceptance calls in release preparation.
 
-## Nestlet schema10 durable-provider preparation
+## Nestlet schema10 durable-provider release
 
-The disabled helper requires exact final source pins, independent review and a
+The pinned helper requires exact final source pins, independent review and a
 specific security-action approval before creating a host-local wrapping file or
 adding the two provider binds. The private32-byte key stays outside case data,
 source and backups; only service UID1000 can read its0400/0600 file. Never print,

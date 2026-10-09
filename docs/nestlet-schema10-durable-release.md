@@ -1,8 +1,10 @@
-# Disabled schema10 and durable-provider release preparation
+# Pinned schema10 and durable-provider release
 
-This branch is preparation only. No workflow is enabled. Final merged application
-SHA, exact CI/visual acceptance, independent helper review, remote byte readback,
-specific security-action approval, and release GO are required before execution.
+Final merged application SHA is `1d6c2592118977455a29ed4e7d7c5b1153362d0c`, tree
+`32d8b7bb338974e29c8732e696ec8d18c4a32443`, identical to reviewed PR51.
+The workflow is dispatch-capable; exact main CI, independent activation review,
+remote byte readback and release GO remain required before dispatch. Specific
+security bootstrap and first environment-baseline transition approvals are recorded.
 Live predecessor is f738655ccab834d77d9204ebab25ab1e2a61d8ee (schema9).
 
 ## New security configuration requiring specific approval

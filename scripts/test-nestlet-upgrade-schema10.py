@@ -9,17 +9,17 @@ class Safety(unittest.TestCase):
   for sha in ['a'*40,prior.OLD,'UNREVIEWED','$(false)']:
    p=subprocess.run(['bash',str(prior.SCRIPT),sha],capture_output=True,text=True,env={'PATH':'/usr/bin:/bin'});self.assertNotEqual(p.returncode,0);self.assertIn('deployment is disabled',p.stdout)
  def test_specific_security_gate(self):
-  code=TEXT.replace('UNREVIEWED_SCHEMA10_DURABLE_TARGET','a'*40)
+  code=TEXT.replace('1d6c2592118977455a29ed4e7d7c5b1153362d0c','a'*40)
   for flag in ['', 'false','true;id']:
    p=subprocess.run(['bash','-s','--','a'*40,flag],input=code,capture_output=True,text=True,env={'PATH':'/usr/bin:/bin'});self.assertNotEqual(p.returncode,0);self.assertIn('Specific host security action approval',p.stdout)
  def test_languages(self):
   subprocess.run(['bash','-n',str(prior.SCRIPT)],check=True)
   for name,code in re.findall(r"<<'(PY[A-Z_]*)'\n(.*?)\n\1",TEXT,re.S):compile(code,name,'exec')
   for code in re.findall(r"node --input-type=module -e '\n(.*?)'",TEXT,re.S):subprocess.run(['node','--input-type=module','--check'],input=code,text=True,check=True)
- def test_workflow_disabled_and_bound(self):
-  text=(ROOT/'.github/workflows/deploy.yml').read_text();w=yaml.load(text,Loader=yaml.BaseLoader);self.assertEqual(set(w['on']),{'workflow_dispatch'});self.assertEqual(w['permissions'],{'contents':'read'});self.assertIn('false &&',w['jobs']['upgrade']['if']);self.assertEqual(w['on']['workflow_dispatch']['inputs']['security_action_approved']['default'],'false')
+ def test_workflow_pinned_and_bound(self):
+  text=(ROOT/'.github/workflows/deploy.yml').read_text();w=yaml.load(text,Loader=yaml.BaseLoader);self.assertEqual(set(w['on']),{'workflow_dispatch'});self.assertEqual(w['permissions'],{'contents':'read'});self.assertNotIn('false &&',w['jobs']['upgrade']['if']);self.assertEqual(w['on']['workflow_dispatch']['inputs']['security_action_approved']['default'],'false')
   self.assertIn(hashlib.sha256(prior.SCRIPT.read_bytes()).hexdigest()+'  scripts/nestlet-upgrade-schema10.sh',text)
-  for gate in ['StrictHostKeyChecking=yes','EXPECTED_HOST_SHA256','UNREVIEWED_SCHEMA10_DURABLE_TARGET','SECURITY_ACTION_APPROVED']:self.assertIn(gate,text)
+  for gate in ['StrictHostKeyChecking=yes','EXPECTED_HOST_SHA256','1d6c2592118977455a29ed4e7d7c5b1153362d0c','SECURITY_ACTION_APPROVED']:self.assertIn(gate,text)
   subprocess.run(['bash','-n'],input=w['jobs']['upgrade']['steps'][-1]['run'],text=True,check=True)
  def test_retention_precedes_stop(self):
   start=TEXT.index('preflight_telemetry_preservation() {');end=TEXT.index('\npreflight_telemetry_preservation ||',start);block=TEXT[start:end]
