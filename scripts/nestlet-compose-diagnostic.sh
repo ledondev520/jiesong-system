@@ -19,7 +19,7 @@ p=pathlib.Path('/opt/nestlet/shared/provider-compose.yaml');assert hashlib.sha25
 PY_GATE
 [ "$(git -C "$BASE/releases/$TARGET" rev-parse HEAD)" = "$TARGET" ]
 [ -z "$(git -C "$BASE/releases/$TARGET" status --porcelain --untracked-files=all)" ]
-docker compose version --short | python3 -c 'import re,sys;s=sys.stdin.read().strip();assert re.fullmatch(r"v?[0-9]+[.][0-9]+[.][0-9]+(?:[-+][A-Za-z0-9.-]+)?",s);print("compose_version="+s)'
+docker compose version --short | python3 -c 'import json,sys;s=sys.stdin.read().strip();valid=0<len(s)<=100 and all(32<=ord(c)<=126 for c in s);print(json.dumps({"compose_version":s} if valid else {"compose_version_format_unrecognized":True},sort_keys=True))'
 env -u PUBLIC_ORIGIN -u NESTLET_OPERATOR_USERNAME -u NESTLET_OPERATOR_PASSWORD_HASH -u DEEPSEEK_API_KEY -u DEEPSEEK_MODEL -u ENABLE_LIVE_AI \
  -u ALIBABA_CLOUD_ACCESS_KEY_ID -u ALIBABA_CLOUD_ACCESS_KEY_SECRET -u ALIBABA_CLOUD_SECURITY_TOKEN -u NESTLET_EMAIL_FROM \
  -u NESTLET_PROVIDER_WRAPPING_KEY_FILE -u NESTLET_PROVIDER_CONFIG_PATH \
