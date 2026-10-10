@@ -173,3 +173,8 @@ backups stay private and exclude the key; no automatic retention deletion occurs
 Case restores never overwrite provider settings. Normal case migration preserves
 all historical rows; isolated restored copies invalidate security actions and pause
 trial service according to the reviewed schema10 whole-directory fence contract.
+
+## Nestlet same-schema10 experience release
+
+- The dedicated `codex/nestlet-experience-release-20261010` dispatch workflow and `scripts/nestlet-update-schema10.sh` are pinned to reviewed merge `597e1203413d3d3ca5fcff72ee91e17599fb2f05`, from live predecessor `66725b9d98ecc50b4dadc3f2b224f312943403e8`. PR56 and exact merge application/browser/container CI passed; the user explicitly authorized merge and deployment. Never merge this maintenance workflow into Jiesong main.
+- This release changes client experience and session recovery only. Keep the existing schema10 case volume, valid durable sessions, private provider wrapping file and encrypted settings. Critical server auth/persistence/recovery and packaging contracts remain byte-identical. Require private SQLite backup, strict unchanged-row rehearsal, isolated recovery drills and final runtime/health checks; no live restore, fallback, security-file recreation or provider call.

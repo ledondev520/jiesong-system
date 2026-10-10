@@ -1,6 +1,6 @@
-# Pinned same-schema10 guidance update. Never merge into Jiesong main.
+# Pinned same-schema10 experience update. Never merge into Jiesong main.
 # Activation requires final source/CI, independent review and release GO. Existing security files are reused.
-name: Nestlet Same Schema10 Guidance Update
+name: Nestlet Same Schema10 Experience Update
 on:
   workflow_dispatch:
     inputs:
@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   upgrade:
-    if: github.repository == 'ledondev520/jiesong-system' && github.repository_owner == 'ledondev520' && github.ref == 'refs/heads/ops/nestlet-schema10-durable-prep-20261009' && github.actor == 'ledondev520'
+    if: github.repository == 'ledondev520/jiesong-system' && github.repository_owner == 'ledondev520' && github.ref == 'refs/heads/codex/nestlet-experience-release-20261010' && github.actor == 'ledondev520'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: staging
@@ -46,7 +46,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          readonly REVIEWED_RELEASE_SHA=66725b9d98ecc50b4dadc3f2b224f312943403e8
+          readonly REVIEWED_RELEASE_SHA=597e1203413d3d3ca5fcff72ee91e17599fb2f05
           [[ "$REVIEWED_RELEASE_SHA" =~ ^[a-f0-9]{40}$ && "$RELEASE_SHA" = "$REVIEWED_RELEASE_SHA" ]] || { echo 'Release SHA does not match the reviewed schema10 merge'; exit 1; }
           test -n "$SSH_HOST" && test -n "$SSH_USER"
           [[ "$SSH_PORT" =~ ^[0-9]+$ ]]
@@ -86,7 +86,7 @@ jobs:
             echo 'Host identity trust inherited from existing deploy channel; not independently verified.'
           fi
           test -s "$known_hosts"
-          echo "2addb8e8ce80ba657f834e7ee7371b8229b39502503d8cb2e45e89c74154cab3  scripts/nestlet-update-schema10.sh" | sha256sum --check --status
+          echo "895c88e709fa026f30241e1b9066abc825b546dc6821f994664f81a337aecf60  scripts/nestlet-update-schema10.sh" | sha256sum --check --status
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
             -o UserKnownHostsFile="$known_hosts" -p "$SSH_PORT" "$SSH_USER@$matched_address" \
             "if [ \"\$(id -u)\" = 0 ]; then exec bash -s -- $RELEASE_SHA; else exec sudo -n bash -s -- $RELEASE_SHA; fi" < scripts/nestlet-update-schema10.sh

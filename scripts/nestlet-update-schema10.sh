@@ -6,9 +6,9 @@
 # Never run during an operator-setup handoff or any other runtime.env writer.
 set -euo pipefail
 umask 077
-readonly OLD_SHA='52f6ce549ea847274caaa3b973814bc23f448b3a'
+readonly OLD_SHA='66725b9d98ecc50b4dadc3f2b224f312943403e8'
 # Root must replace this only after the actual authorized merge SHA passes application, browser and container CI.
-readonly REVIEWED_RELEASE_SHA='66725b9d98ecc50b4dadc3f2b224f312943403e8'
+readonly REVIEWED_RELEASE_SHA='597e1203413d3d3ca5fcff72ee91e17599fb2f05'
 readonly NEW_SHA="${1:?Supply the exact reviewed schema10 release SHA}"
 [[ "$REVIEWED_RELEASE_SHA" =~ ^[a-f0-9]{40}$ && "$NEW_SHA" = "$REVIEWED_RELEASE_SHA" ]] || { echo 'Draft or unreviewed release; deployment is disabled'; exit 1; }
 [[ "$NEW_SHA" =~ ^[a-f0-9]{40}$ ]] && [[ "$NEW_SHA" != "$OLD_SHA" ]] || { echo 'Expected a new approved 40-hex commit'; exit 1; }
@@ -188,7 +188,7 @@ allowed_before=before.split(',')
 assert 1<=len(allowed_before)<=2 and all(re.fullmatch(r'[a-f0-9]{40}',v) for v in allowed_before)
 assert re.fullmatch(r'[a-f0-9]{40}',after)
 if mode=='verified-predecessor':
-    assert before==after=='52f6ce549ea847274caaa3b973814bc23f448b3a'
+    assert before==after=='66725b9d98ecc50b4dadc3f2b224f312943403e8'
     lock=os.path.join(os.path.dirname(os.path.dirname(path)),'.incremental-release.lock')
     lease=os.fstat(9); named=os.lstat(lock)
     assert stat.S_ISREG(lease.st_mode) and lease.st_uid==os.geteuid() and lease.st_nlink==1 and stat.S_IMODE(lease.st_mode)==0o600
