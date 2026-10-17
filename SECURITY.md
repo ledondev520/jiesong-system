@@ -120,3 +120,5 @@ The additive session-table rollout requires a fresh verified online SQLite snaps
 本地被 Git 忽略的 `PLAN.md` 等运维记录也不得保存真实账号与密码组合；仅记录验证结果。发现残留时先对当前笔记脱敏，单独评估凭据轮换；脱敏笔记不等于撤销已有凭据，也不能据此声称 Git 历史已清理。
 
 Export proposal paths are configured by `JIESONG_EXPORT_DATABASE` and `JIESONG_HISTORY_ROOT` or explicit CLI options in `scripts/prepare_export_packet.py`. The script remains read-only and does not load `.env`. Business databases and history workbooks must remain outside Git.
+
+Catalog migration endpoints in `backend/src/routes/dataImport.js` require authenticated ADMIN. `catalogImportService.js` previews do not persist rows, files or audits. Execution revalidates in one transaction and audits only kind/count/operator. Opening inventory requires explicit counted-balance confirmation, an active product, matching unit and a unique stable opening reference; it never fabricates purchase/inspection evidence. Supplier bank details are excluded from templates. See `docs/migration/catalog-import.md`.

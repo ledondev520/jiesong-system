@@ -148,3 +148,5 @@
 - 全局API和原登录计数仍为进程内存：重启会重置、多worker各自计数，并非跨进程持久配额；邮箱/找回密码的SQLite持久配额继续独立执行。
 
 - `scripts/prepare_export_packet.py` uses CLI path options before `JIESONG_EXPORT_DATABASE`/`JIESONG_HISTORY_ROOT`, then repository-relative defaults. Preserve read-only behavior and keep source databases/workbooks outside Git.
+
+- 档案与期初导入共用 `backend/src/services/catalogImportService.js` 的模板定义。仅ADMIN可预览或执行；dry-run包括审计表在内不得写库。执行必须重新校验并原子新增，期初使用稳定编号、显式盘点确认，不补造采购/验货。模板不得包含银行账户。

@@ -11,6 +11,7 @@ const { createError } = require('../middleware/errorHandler');
 const express = require('express');
 const multer = require('multer');
 const router = express.Router();
+const catalog = require('../controllers/catalogImportController');
 const dataImportController = require('../controllers/dataImportController');
 const { authenticate, roleAuth } = require('../middleware/auth');
 const systemController = require('../controllers/systemController');
@@ -31,6 +32,12 @@ const memoryUpload = multer({
 
 // 所有路由需要认证
 router.use(authenticate);
+
+// Dry-run handlers deliberately have no audit wrapper or write side effects.
+router.get('/templates', roleAuth('ADMIN'), catalog.listTemplates);
+router.get('/templates/:kind', roleAuth('ADMIN'), catalog.downloadTemplate);
+router.post('/catalog/:kind/preview', roleAuth('ADMIN'), memoryUpload.single('file'), catalog.preview);
+router.post('/catalog/:kind/execute', roleAuth('ADMIN'), memoryUpload.single('file'), catalog.execute);
 
 // POST /api/v1/import - 导入CSV数据（仅管理员）
 router.post('/', roleAuth('ADMIN'), systemUpload.single('file'), withAuditLog(
