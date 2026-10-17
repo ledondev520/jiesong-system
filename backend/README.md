@@ -4,9 +4,9 @@
 
 ## 目录说明
 
-本目录包含进销存系统的后端 API 服务，基于 Node.js + Express + Prisma + Supabase PostgreSQL 构建。
+本目录包含进销存系统的后端 API 服务，基于 Node.js + Express + Prisma + SQLite 构建。
 
-当前VPS使用SQLite与绝对DATABASE_URL（见DEPLOY.md）。密码找回路由使用锁定express-rate-limit；`TRUSTED_PROXY_CIDRS` 默认空，显式可信IP/CIDR配置及生产一致备份前置条件见 `../docs/security/password-recovery.md`。不要使用固定本地dev.db备份替代生产数据库。
+当前schema使用SQLite。历史VPS运行约定记载于DEPLOY.md，本轮未访问或核实部署。密码找回路由使用锁定express-rate-limit；`TRUSTED_PROXY_CIDRS` 默认空，显式可信IP/CIDR配置及生产一致备份前置条件见 `../docs/security/password-recovery.md`。不要使用固定本地dev.db备份替代生产数据库。
 
 `src/testHelpers/account-name-server.js` 为两个用户页面的普通名称回归提供已提交迁移初始化的私有SQLite/localhost服务，不查询凭据字段或调用外部服务；夹具目录边界见 `src/testHelpers/README.md`，真实HTTP与React执行层级见 `../docs/qa/account-name-lifecycle-2026-10-06.md`。
 
@@ -22,15 +22,15 @@ npm install
 
 ```bash
 cp env.example .env
-# 编辑 .env 文件，配置 Supabase 连接字符串与业务参数
+# 编辑 .env 文件，配置私有 SQLite DATABASE_URL、JWT_SECRET 与首次初始化 DEFAULT_ADMIN_PASSWORD
 ```
 
 ### 3. 初始化数据库
 
 ```bash
 npm run db:generate   # 生成 Prisma 客户端
-npm run db:migrate    # 自动备份后应用迁移，禁止 db push
-npm run db:seed       # 初始化种子数据
+./node_modules/.bin/prisma migrate deploy # 空库应用已提交迁移；已有库先备份
+npm run db:seed       # 显式设置初始化密码；不覆盖已有安全密码
 ```
 
 ### 4. 启动服务
@@ -40,7 +40,7 @@ npm run dev   # 开发模式（热重载）
 npm start     # 生产模式
 ```
 
-服务默认运行在 `http://localhost:3000`
+后端端口默认 3000。本地联调使用 `PORT=3001 npm run dev`，前端在 3000，匹配默认代理。根路径 `/health` 为健康检查。
 
 ### 5. 运行测试
 
@@ -122,7 +122,7 @@ Authorization: Bearer <token>
 
 #### 1. 数据导入导出
 
-- **CSV导入**: `POST /api/v1/import` - 导入历史CSV数据
+- **CSV/xlsx导入**: `POST /api/v1/import` - 导入历史表格；四类档案/期初模板与预览见 [批量导入说明](../docs/migration/catalog-import.md)
 - **导入历史**: `GET /api/v1/import/records` - 查看导入历史
 - **数据导出**: `GET /api/v1/export/:type` - 导出各类数据为CSV
 
@@ -205,15 +205,15 @@ Authorization: Bearer <token>
 
 管理员用户名固定为 `admin`，密码来自环境变量 `DEFAULT_ADMIN_PASSWORD`。
 
-- 若未配置 `DEFAULT_ADMIN_PASSWORD`，`db:seed` 默认将管理员密码设为 `123456`（仅测试阶段使用）。
-- 生产环境请务必显式配置强密码并妥善保管。
+- 新库初始化或修复旧默认管理员必须显式配置 `DEFAULT_ADMIN_PASSWORD`，没有默认密码回退。已有安全密码不被 seed 覆盖。
+- 启动在监听端口前检查管理员；修复旧默认密码会撤销旧会话。初始化后移除 bootstrap 密码，日常改密走已有用户接口。
 
 ## 技术栈
 
 - **运行时**: Node.js >= 18
 - **框架**: Express.js 4.x
 - **ORM**: Prisma 5.x
-- **数据库**: Supabase PostgreSQL
+- **数据库**: SQLite，见 prisma/schema.prisma
 - **认证**: JWT
 - **密码加密**: bcryptjs
 
