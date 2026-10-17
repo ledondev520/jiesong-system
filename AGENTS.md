@@ -150,3 +150,5 @@
 - `scripts/prepare_export_packet.py` uses CLI path options before `JIESONG_EXPORT_DATABASE`/`JIESONG_HISTORY_ROOT`, then repository-relative defaults. Preserve read-only behavior and keep source databases/workbooks outside Git.
 
 - 档案与期初导入共用 `backend/src/services/catalogImportService.js` 的模板定义。仅ADMIN可预览或执行；dry-run包括审计表在内不得写库。执行必须重新校验并原子新增，期初使用稳定编号、显式盘点确认，不补造采购/验货。模板不得包含银行账户。
+
+- `bootstrapAdmin.js` 是seed与直接启动的管理员门禁。禁止弱密码回退及seed重置现有安全密码。显式初始化密码沿用统一策略；修复旧默认密码必须原子递增sessionVersion；监听端口/启动任务之前完成检查。正常改密沿用现有认证接口。

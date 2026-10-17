@@ -5,3 +5,5 @@
 `20261002113919_email_password_recovery` 是增量迁移：新增重置挑战表、单例写锁和用户会话版本，保留用户、原密码和外键；锁行必须初始化，否则找回服务拒绝工作。认证每请求实时验证会话版本，改密后旧JWT失效。测试覆盖真实旧结构上增加版本列并保留历史用户/日志。完整运维和回滚条件见 `docs/security/password-recovery.md`。
 
 `20261005070032_browser_sessions` 只新增摘要化浏览器会话表、用户外键和索引，保持现有用户/业务数据及Bearer会话。上线前由发布预检验证真实DATABASE_URL的一致性在线快照，不能仅依赖开发备份脚本默认路径。回滚保留新增表及后续业务写入，详见 `docs/security/browser-sessions.md`。
+
+`seed.js` 调用 `src/services/bootstrapAdmin.js`。新库必须显式提供符合现有密码策略的 `DEFAULT_ADMIN_PASSWORD`。没有弱密码回退。已有安全管理员的密码不会被 seed 覆盖。只允许用显式密码修复旧默认管理员，修复时递增 `sessionVersion`，使旧JWT与浏览器会话失效。

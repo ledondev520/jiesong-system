@@ -11,7 +11,7 @@
         "API tokens",
         "agent/service-account credentials and one-time issued machine tokens",
         "password hashes and auth signing keys",
-        "temporary default test credentials (for example admin/123456)",
+        "explicit administrator bootstrap passwords; legacy default detection is not an allowed credential",
         "database credentials",
         "HSCIQ API keys",
         "DeepSeek API keys and encrypted deepseekApiKey system overrides",
@@ -59,7 +59,8 @@
           "All HTTP auth and business routers pass the locked express-rate-limit global100/min gate before parsing; mapped IPv4 and IPv6 /56 keys are canonical, proxy trust remains explicit, and legacy429/Retry-After/reset headers plus stricter login10/15min remain compatible. Standalone auth test fixtures use the same real bound; CodeQL is neither suppressed nor bypassed. HTTP counters remain process-local and reset on restart; workers do not share counters. Existing persistent SQLite email/recovery quotas remain independent.",
           "Operational verification notes, including ignored PLAN.md, record outcomes only and never real login credentials; redacting a note does not rotate credentials or prove Git history is clean",
           "Export proposal source paths use explicit CLI/environment configuration without reading .env; source databases and history workbooks remain outside Git (scripts/prepare_export_packet.py)",
-          "ADMIN catalog/opening-stock imports never retain uploads; previews are read-only, execution revalidates atomically and retains only minimal audit kind/count/operator. Bank account fields are excluded (catalogImportService.js)."
+          "ADMIN catalog/opening-stock imports never retain uploads; previews are read-only, execution revalidates atomically and retains only minimal audit kind/count/operator. Bank account fields are excluded (catalogImportService.js).",
+          "bootstrapAdmin.js requires an explicit policy-valid password to create/remediate the administrator, blocks legacy-default startup and increments sessionVersion on remediation; seed never overwrites a secure password."
         ],
         "transfer": [
           "Encrypt in transit (TLS)",

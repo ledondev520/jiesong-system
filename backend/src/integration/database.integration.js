@@ -132,7 +132,7 @@ test('数据库事务异常时可正确回滚', async (t) => {
   assert.equal(count, 0);
 });
 
-test('seed 脚本重复执行保持幂等且可更新管理员密码', async (t) => {
+test('seed 脚本重复执行保持幂等且不会覆盖既有管理员密码', async (t) => {
   const { databaseUrl } = createTempDatabase(t, 'seed');
 
   runSeed(databaseUrl, 'SeedAdminPass#1');
@@ -150,7 +150,8 @@ test('seed 脚本重复执行保持幂等且可更新管理员密码', async (t)
   const second = await readSeedSnapshot(databaseUrl);
 
   assert.ok(second.admin);
-  assert.equal(await bcrypt.compare('SeedAdminPass#2', second.admin.password), true);
+  assert.equal(second.admin.password, first.admin.password);
+  assert.equal(await bcrypt.compare('SeedAdminPass#2', second.admin.password), false);
   assert.equal(second.adminCount, first.adminCount);
   assert.equal(second.portCount, first.portCount);
   assert.equal(second.configCount, first.configCount);
