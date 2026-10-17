@@ -22,6 +22,7 @@
     "test:carrier-pdf": "NODE_ENV=test JWT_SECRET=test-only-jwt-secret-for-ci-123456 node --test src/integration/carrier-pdf-edges.integration.js",
     "test:all": "npm run test && npm run test:db && npm run test:carrier-pdf",
     "db:backup": "node scripts/db-backup.js",
+    "db:restore": "node scripts/db-restore.js",
     "db:generate": "prisma generate",
     "db:migrate": "node scripts/db-backup.js && prisma migrate dev",
     "db:migrate:doctor": "node scripts/doctor-prisma-migrations.js",

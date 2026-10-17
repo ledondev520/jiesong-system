@@ -118,6 +118,8 @@ python3 -m unittest discover -s tests -p test_prepare_export_packet.py
 
 测试数量随代码变化，以本次完整输出为准。浏览器 E2E、生产构建和 ESLint 是单独检查，不能由单测数量推导通过。历史 QA 报告保留其日期与当时范围，不代表当前状态。
 
+备份与恢复步骤及实际合成演练见 [SQLite 备份恢复](docs/operations/sqlite-backup-restore.md)。
+
 ## 数据库与部署边界
 
 当前运行模型是 SQLite。`docker-compose`、Render 配置及旧 Supabase 指南中的 PostgreSQL 配置与当前 schema 不兼容，不是本分支可直接使用的部署步骤。切换 PostgreSQL 必须另做 schema、迁移 SQL、查询语义和备份恢复的验证，不能仅替换连接字符串。

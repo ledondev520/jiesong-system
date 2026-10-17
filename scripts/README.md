@@ -365,3 +365,5 @@ VPS 发布后运行 `node scripts/verify-vps-runtime.cjs https://celerada.link` 
 
 Paths support `~`; explicit relative paths resolve against the working directory. The script does not load `.env`.
 Put local history workbooks in the selected directory. An absent/empty history directory gives no historical quotes; it does not fabricate evidence. The SQLite database must already exist. Keep business workbooks and databases outside Git. Pricing formulas are unchanged.
+
+`drill_sqlite_restore.py --directory <不存在的临时目录>` 使用已提交迁移和合成商品/期初库存，调用真实备份恢复CLI并保存独立读回回执。它不访问已有库或.env。详见 `docs/operations/sqlite-backup-restore.md`。

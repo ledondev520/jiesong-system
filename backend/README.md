@@ -222,3 +222,7 @@ Authorization: Bearer <token>
 Agent SDK 固定为含 `dist/index.js` 的发布版本 `0.2.4`，`npm ci` 后可直接加载，不依赖本地 `.tmp` 构建。普通与流式入口均走本地 Anthropic 兼容代理，保留关闭重试、失败不写成功记录的测试。
 
 `sales-transition-races.integration.js` 使用两个真实 HTTP 进程共享专用临时 SQLite，覆盖同一销售合同的取消/发运、到港/结清及陈旧状态请求。测试在真实查询完成后短暂暂停首个事务，再排入另一个请求，验证当前状态重读、一次扣库、发运时间及收款账簿守恒；不模拟数据库结果、不访问既有业务库。
+
+## SQLite 备份与恢复
+
+运行 `npm run db:backup -- --database /absolute/private/application.db`，或先在进程环境中导出 SQLite `DATABASE_URL`。脚本不读取 `.env`，不猜测源库；源库不存在时失败。默认保留5对一致性在线快照及manifest，输出目录0700、文件0600。恢复使用 `npm run db:restore -- --backup <snapshot> --database <new-private-path>`，只写新的目标文件。完整步骤和合成演练见 [备份恢复说明](../docs/operations/sqlite-backup-restore.md)。
