@@ -170,3 +170,5 @@
 全局及原登录HTTP配额仍按进程内存计数，重启清空、worker独立；数据库持久的邮箱/密码找回配额保持独立，不把HTTP计数当作分布式持久限制。
 
 - `services/threeFormsService.js` 的三表XLSX把报关明细表头追加在独立第4行，并对该行应用原有表头样式，保留第1行合并标题与第2行单据信息。真实角色HTTP下载/ExcelJS字节解析回归在 `testHelpers/role-browser-server.test.js` 的六项 `menu documents HTTP`；原生成/编号追加规则不变，不涉及附件上传或正式申报。
+
+- 通用导入共享 `utils/tabularImport.js` 的 CSV/xlsx 解码。只接受一个工作表、最多 5000 行和 100 列，拒绝公式、重复表头、损坏文件，输入错误返回 400。

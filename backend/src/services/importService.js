@@ -1,12 +1,13 @@
 /**
- * Input: CSV文件、Prisma客户端
+ * Input: CSV/xlsx文件、Prisma客户端
  * Output: 按行事务导入结果、重名冲突与真实失败统计
- * Pos: 数据导入服务，处理CSV历史数据导入
+ * Pos: 数据导入服务，处理CSV/xlsx历史数据导入
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');
+const { parseTabularFile } = require('../utils/tabularImport');
 const prisma = require('../utils/prisma');
 const { IMPORT_STATUS } = require('../config/constants');
 const { getSalesCargoState, assertSalesCargoMutable } = require('./salesCargoLifecycle');
@@ -87,8 +88,7 @@ const resolveImportStatus = (failedRows) => (
  * @returns {Object} 导入结果
  */
 const importCSVData = async (filePath, userId) => {
-  const content = fs.readFileSync(filePath, 'utf-8');
-  const data = parseCSV(content);
+  const { data } = await parseTabularFile({ originalname: filePath, buffer: fs.readFileSync(filePath) });
   
   const result = {
     totalRows: data.length,

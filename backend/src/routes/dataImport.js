@@ -1,11 +1,13 @@
 /**
  * Input: dataImportController、multer中间件
- * Output: 数据导入API路由
+ * Output: CSV/xlsx 数据导入API路由
  * Pos: 数据导入路由定义
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
+const { acceptsTabularFile } = require('../utils/tabularImport');
+const { createError } = require('../middleware/errorHandler');
 const express = require('express');
 const multer = require('multer');
 const router = express.Router();
@@ -22,14 +24,8 @@ const memoryUpload = multer({
     fileSize: 10 * 1024 * 1024, // 10MB限制
   },
   fileFilter: (req, file, cb) => {
-    // 只允许CSV文件
-    if (file.mimetype === 'text/csv' || 
-        file.originalname.endsWith('.csv') ||
-        file.mimetype === 'application/vnd.ms-excel') {
-      cb(null, true);
-    } else {
-      cb(new Error('只支持CSV文件格式'), false);
-    }
+    if (acceptsTabularFile(file.originalname)) cb(null, true);
+    else cb(createError('只支持 CSV 或 xlsx 文件', 400));
   },
 });
 
