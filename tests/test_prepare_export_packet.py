@@ -2,6 +2,7 @@ import importlib.util
 import math
 import sys
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 
@@ -11,6 +12,28 @@ MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
+
+
+class PathConfigurationTests(unittest.TestCase):
+    arguments = ["--contract", "SYNTHETIC", "--spot-rate", "7", "--refund-dbf", "synthetic.dbf"]
+
+    def test_portable_defaults(self):
+        with patch.dict("os.environ", {}, clear=True):
+            args = MODULE.parse_args(self.arguments)
+        self.assertEqual(args.database, MODULE.DEFAULT_DB)
+        self.assertEqual(args.history_root, MODULE.DEFAULT_HISTORY_ROOT)
+        self.assertNotIn("/Users/", str(args.history_root))
+
+    def test_environment_and_cli_precedence(self):
+        with patch.dict("os.environ", {"JIESONG_EXPORT_DATABASE": "/tmp/synthetic.db",
+                                       "JIESONG_HISTORY_ROOT": "/tmp/synthetic-history"}):
+            args = MODULE.parse_args(self.arguments)
+            self.assertEqual(args.database, Path("/tmp/synthetic.db"))
+            self.assertEqual(args.history_root, Path("/tmp/synthetic-history"))
+            args = MODULE.parse_args(self.arguments + ["--database", "/tmp/override.db",
+                                                       "--history-root", "/tmp/override-history"])
+            self.assertEqual(args.database, Path("/tmp/override.db"))
+            self.assertEqual(args.history_root, Path("/tmp/override-history"))
 
 
 class PricingTests(unittest.TestCase):

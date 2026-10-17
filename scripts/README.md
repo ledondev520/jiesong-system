@@ -353,3 +353,15 @@ python scripts/analyze_wps_formal_customs_source_gaps.py
 采购凭据税率解析保留显式 `%/％` 单位（1%→1），仅无百分号的小数按Excel比例换算；PDF和正文提取不得丢失百分号语义。回归：`python3 -m unittest scripts.test_wps_purchase_tax_rate`。
 
 VPS 发布后运行 `node scripts/verify-vps-runtime.cjs https://celerada.link` 核对真实进程与公网构建；其回归检查为 `node --test scripts/verify-vps-runtime.test.cjs`。
+
+## Portable export-packet paths
+
+`prepare_export_packet.py` resolves paths in this order: CLI option, environment variable, repository default.
+
+| Option | Environment variable | Default |
+| --- | --- | --- |
+| `--database` | `JIESONG_EXPORT_DATABASE` | `backend/prisma/dev.db` relative to repository |
+| `--history-root` | `JIESONG_HISTORY_ROOT` | `data/export-history` relative to repository |
+
+Paths support `~`; explicit relative paths resolve against the working directory. The script does not load `.env`.
+Put local history workbooks in the selected directory. An absent/empty history directory gives no historical quotes; it does not fabricate evidence. The SQLite database must already exist. Keep business workbooks and databases outside Git. Pricing formulas are unchanged.

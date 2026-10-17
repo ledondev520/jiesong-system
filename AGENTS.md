@@ -146,3 +146,5 @@
 - `backend/src/middleware/apiRateLimit.js` 通过锁定express-rate-limit执行原全局100次/分钟预算，继续在解析和路由之前生效；保留429 JSON、Retry-After秒值及原X-RateLimit-Reset毫秒契约。IP使用ipKeyGenerator规范化IPv4映射和IPv6/56，不读取原始XFF、不增加代理信任；登录额外10次/15分钟仍保留。隔离HTTP测试也必须挂载同一实际限流，不能隐藏/豁免CodeQL的认证成本告警。
 
 - 全局API和原登录计数仍为进程内存：重启会重置、多worker各自计数，并非跨进程持久配额；邮箱/找回密码的SQLite持久配额继续独立执行。
+
+- `scripts/prepare_export_packet.py` uses CLI path options before `JIESONG_EXPORT_DATABASE`/`JIESONG_HISTORY_ROOT`, then repository-relative defaults. Preserve read-only behavior and keep source databases/workbooks outside Git.
