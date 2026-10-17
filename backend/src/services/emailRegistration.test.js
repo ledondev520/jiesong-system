@@ -40,7 +40,6 @@ test('阿里云发信仅提交一封验证码邮件，失败不泄露上游内�
 
 test('真实 SQLite：限制验证码尝试、过期和重放；新账号待审核，审核后邮箱登录', async (t) => {
   const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
-  const { execFileSync } = require('node:child_process');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-email-test-'));
   fs.chmodSync(dir, 0o700);
   process.env.DATABASE_URL = `file:${dir}/test.db`;
@@ -50,10 +49,13 @@ test('真实 SQLite：限制验证码尝试、过期和重放；新账号待审�
   const baseline = fs.readFileSync(path.join(migrations, '20260307090000_baseline/migration.sql'), 'utf8').split(';')[0] + ';';
   const migration = fs.readFileSync(path.join(migrations, '20261001163213_email_registration/migration.sql'), 'utf8')
     + fs.readFileSync(path.join(migrations, '20261002113919_email_password_recovery/migration.sql'), 'utf8');
-  execFileSync('sqlite3', [path.join(dir, 'test.db')], { input: baseline + '\nCREATE UNIQUE INDEX users_username_key ON users(username);\n' + migration });
-  fs.chmodSync(path.join(dir, 'test.db'), 0o600);
   const prisma = require('../utils/prisma');
   t.after(async () => { await prisma.$disconnect(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const ddl = baseline + '\nCREATE UNIQUE INDEX users_username_key ON users(username);\n' + migration;
+  for (const statement of ddl.split(';').map(value => value.trim()).filter(Boolean)) {
+    await prisma.$executeRawUnsafe(statement);
+  }
+  fs.chmodSync(path.join(dir, 'test.db'), 0o600);
   const service = require('./emailRegistrationService'), mail = require('./emailService');
   let delivered = '';
   t.mock.method(mail, 'isConfigured', () => true);

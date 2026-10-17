@@ -223,7 +223,10 @@ test('createPayment: 并发唯一键冲突时返回已创建记录', async () =>
   }
 });
 
-test('listUnallocatedPayments: 兼容历史 INCOME 并按待分配收款返回', async () => {
+test('listUnallocatedPayments: 兼容历史 INCOME 并按待分配收款返回', async (t) => {
+  const originalGroupBy = prisma.payment.groupBy;
+  prisma.payment.groupBy = async () => [];
+  t.after(() => { prisma.payment.groupBy = originalGroupBy; });
   const originalFindMany = prisma.payment.findMany;
   let findManyArgs = null;
 
@@ -367,7 +370,10 @@ test('getPaymentTrends: 兼容历史 INCOME/EXPENSE 流水', async () => {
   }
 });
 
-test('autoMatchUnallocatedPayments: 非 USD 到账不与美元出口合同自动挂账', async () => {
+test('autoMatchUnallocatedPayments: 非 USD 到账不与美元出口合同自动挂账', async (t) => {
+  const originalGroupBy = prisma.payment.groupBy;
+  prisma.payment.groupBy = async () => [];
+  t.after(() => { prisma.payment.groupBy = originalGroupBy; });
   const originalPaymentFindMany = prisma.payment.findMany;
   const originalSalesContractFindMany = prisma.salesContract.findMany;
   const originalTransaction = prisma.$transaction;
@@ -406,7 +412,10 @@ test('autoMatchUnallocatedPayments: 非 USD 到账不与美元出口合同自动
   }
 });
 
-test('autoMatchUnallocatedPayments: 命中唯一合同号且金额一致时自动挂账', async () => {
+test('autoMatchUnallocatedPayments: 命中唯一合同号且金额一致时自动挂账', async (t) => {
+  const originalGroupBy = prisma.payment.groupBy;
+  prisma.payment.groupBy = async () => [];
+  t.after(() => { prisma.payment.groupBy = originalGroupBy; });
   const originalPaymentFindMany = prisma.payment.findMany;
   const originalPaymentFindUnique = prisma.payment.findUnique;
   const originalSalesContractFindUnique = prisma.salesContract.findUnique;
@@ -512,7 +521,10 @@ test('autoMatchUnallocatedPayments: 命中唯一合同号且金额一致时自�
   }
 });
 
-test('autoMatchUnallocatedPayments: 备注模糊或金额不一致时保留在收款池', async () => {
+test('autoMatchUnallocatedPayments: 备注模糊或金额不一致时保留在收款池', async (t) => {
+  const originalGroupBy = prisma.payment.groupBy;
+  prisma.payment.groupBy = async () => [];
+  t.after(() => { prisma.payment.groupBy = originalGroupBy; });
   const originalPaymentFindMany = prisma.payment.findMany;
   const originalSalesContractFindUnique = prisma.salesContract.findUnique;
   const originalSalesContractFindMany = prisma.salesContract.findMany;
