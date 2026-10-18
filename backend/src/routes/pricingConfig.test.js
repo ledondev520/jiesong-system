@@ -7,6 +7,7 @@ const path = require('node:path');
 const defaults = require('../../../config/pricing.json');
 
 test('HTTP pricing settings require ADMIN, persist a real file, reject invalid/stale requests and omit values from audit', async t => {
+  t.mock.method(Date.prototype, 'toISOString', () => '2026-10-18T01:01:01.400Z');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pricing-http-'));
   const target = path.join(dir, 'pricing.json');
   fs.writeFileSync(target, JSON.stringify(defaults));
