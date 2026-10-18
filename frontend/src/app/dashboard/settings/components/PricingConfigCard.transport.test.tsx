@@ -40,13 +40,19 @@ it("shows the actual conflict message after the shared Axios interceptor unwraps
   await screen.findByLabelText("乘数");
   const message = "报价配置已变更，请重新加载后保存";
   adapter.mockImplementationOnce(async (config) => {
-    throw new AxiosError("Conflict", "ERR_BAD_REQUEST", config, {}, {
+    throw new AxiosError(
+      "Conflict",
+      "ERR_BAD_REQUEST",
       config,
-      status: 409,
-      statusText: "Conflict",
-      headers: {},
-      data: { code: 409, message, data: null },
-    });
+      {},
+      {
+        config,
+        status: 409,
+        statusText: "Conflict",
+        headers: {},
+        data: { code: 409, message, data: null },
+      },
+    );
   });
   await user.clear(screen.getByLabelText("乘数"));
   await user.type(screen.getByLabelText("乘数"), "1.5");

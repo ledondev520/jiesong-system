@@ -113,13 +113,16 @@ function AdminPricingConfigCard() {
       setSnapshot(response.data);
       setSaved(true);
     } catch (failure) {
-      const message = (
-        failure as {
-          response?: { data?: { message?: string } };
-          message?: string;
-        }
-      ).response?.data?.message;
-      setError(message || "报价配置保存失败，请重新加载后重试");
+      const rejected = failure as {
+        response?: { data?: { message?: string } };
+        message?: string;
+      } | null;
+      const message = rejected?.response?.data?.message ?? rejected?.message;
+      setError(
+        typeof message === "string" && message.trim()
+          ? message
+          : "报价配置保存失败，请重新加载后重试",
+      );
     } finally {
       setSaving(false);
     }
