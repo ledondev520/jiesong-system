@@ -27,15 +27,14 @@ test('历史CSV导入遵守当前唯一键并按行回滚失败写入', async (t
     db = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
     const module = { exports: {} };
     vm.runInNewContext(fs.readFileSync(require.resolve('./importService'), 'utf8'), {
-      module, exports: module.exports,
+      module, exports: module.exports, Buffer,
       require: (name) => name === '../utils/prisma' ? db : require(name),
     });
     const service = module.exports;
     await db.port.create({ data: { name: '合成港', code: 'LA' } });
-    const csvPath = path.join(dir, 'synthetic.csv');
     const run = async (rows) => {
-      fs.writeFileSync(csvPath, '供应商,门店,港口,报关名,单位,柜子编号,报关数量,箱数,出货日期\n' + rows.join('\n'), { mode: 0o600 });
-      return service.importCSVData(csvPath, 'synthetic-admin');
+      const buffer = Buffer.from('供应商,门店,港口,报关名,单位,柜子编号,报关数量,箱数,出货日期\n' + rows.join('\n'));
+      return service.importCSVData({ originalname: 'synthetic.csv', buffer }, 'synthetic-admin');
     };
     await t.test('按名称查找后以id更新或新建，供应商商品及装箱记录实际落库', async () => {
       const result = await run(['合成供应商,合成门店,合成港,合成商品,件,EXP-TEST-1,10,1,2026-01-01']);
