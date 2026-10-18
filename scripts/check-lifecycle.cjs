@@ -74,7 +74,7 @@ function scanSource(source, file) {
       !method
     ) {
       throw new Error(
-        `${file}:${node.loc.start.line}: dynamic route method cannot be checked; use router.post/put/patch with literal paths`,
+        `${file}:${node.loc.start.line}: dynamic route method cannot be checked; use router.post/put/patch with literal paths; edit ${REGISTRY}; template ${TEMPLATE}`,
       );
     }
     if (!['post', 'put', 'patch', 'all'].includes(method)) return;
@@ -283,7 +283,11 @@ function check(root = ROOT, { baselineRoutes } = {}) {
     )
   )
     fail(`backend/package.json: add ${MATRIX} to test:db`);
-  if (errors.length) throw new Error(errors.join('\n'));
+  if (errors.length)
+    throw new Error(
+      errors.join('\n') +
+        `\nRepair the named file and ${REGISTRY}; template ${TEMPLATE}; tests ${MATRIX} and ${LIST_MATRIX}`,
+    );
   return {
     routes: routes.length,
     resources: registry.resources.length,

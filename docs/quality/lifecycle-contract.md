@@ -34,3 +34,9 @@
 前端列表矩阵自动枚举注册表，挂载真实库存/报关列表组件。服务使用合成mock，覆盖URL筛选、分页、原生history返回、重新挂载刷新及页签、其他参数与hash保留。新列表必须在 `list-lifecycle.test.tsx` 增加实际组件适配器；未知ID直接失败。组件单测另覆盖真实报关returnTo生成及产品页签恢复。HTTP矩阵和组件矩阵分层执行，不代表浏览器端到端验证。
 
 模板只适用于普通档案。具有收货、付款、附件、认证、库存扣减等状态或事务的资源，迁移前需要专用适配器与失败场景；不得为了套用模板改业务口径。剩余待迁写入口以存量JSON为完整清单，上表给出主要边界。
+
+## 重现历史回归
+
+在独立临时worktree保留当前测试，仅恢复历史修复前的产品文件。`git restore --source=c30b243^ -- backend/src/controllers/system/customsBrokerController.js backend/src/controllers/system/portCategoryController.js` 应让检查与资源矩阵失败。`git restore --source=ad8397a^ -- frontend/src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx frontend/src/app/customs-declarations/components/CustomsDeclarationDetailPageContent.tsx` 应让检查与新报关进入/返回测试失败。
+
+每次恢复当前HEAD文件后，运行完全相同的命令确认转绿。资源矩阵命令是 `NODE_ENV=test JWT_SECRET=test-only-jwt-secret-for-ci-123456 node --test src/integration/resource-lifecycle.integration.js`，工作目录backend。报关反证命令是 `npm test -- --maxWorkers=2 src/lib/hooks/list-lifecycle.test.tsx -t 'customs detail receives|customs explicit return'`，工作目录frontend。测试只建立临时合成库，不使用真实配置或业务数据。

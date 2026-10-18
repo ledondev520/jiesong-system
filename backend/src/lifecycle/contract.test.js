@@ -45,7 +45,7 @@ const appendRoute = (temp) =>
 
 test('lifecycle gate accepts the current registry and reasoned legacy baseline', (t) => {
   const f = fixture(t);
-  assert.equal(f.verify().resources, 2);
+  assert.equal(f.verify().resources, f.registry.resources.length);
 });
 
 test('new routes in an existing module fail with registry, template and test paths', (t) => {
