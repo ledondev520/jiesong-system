@@ -80,6 +80,30 @@ class SnapshotTests(unittest.TestCase):
                     self.save()
                 self.assertEqual(list((self.root / 'backups').glob('snapshot_*')), [])
 
+    def test_cli_preserves_literal_percent_names_used_by_prisma(self):
+        for name in ['synthetic%20database.db', 'synthetic%zz.db']:
+            source = self.root / name
+            with sqlite3.connect(source) as db:
+                self.connection.backup(db)
+            decoded = self.root / 'synthetic database.db'
+            if not decoded.exists():
+                with sqlite3.connect(decoded) as db:
+                    db.execute('CREATE TABLE balances (quantity REAL)')
+                    db.execute('INSERT INTO balances VALUES (99)')
+            command = ['node', 'scripts/db-backup.js', '--backup-dir', str(self.root / 'percent-backups')]
+            environment = {'PATH': os.environ['PATH'], 'DATABASE_URL': 'file:' + str(source)}
+            saved = json.loads(subprocess.check_output(command, cwd=ROOT / 'backend', env=environment, text=True))
+            with sqlite3.connect(saved['backup']) as db:
+                self.assertEqual(db.execute('SELECT quantity FROM balances').fetchone()[0], 12.5)
+
+    def test_drill_directory_with_spaces_and_percent_matches_prisma_path_semantics(self):
+        directory = self.root / 'synthetic space%20drill'
+        result = json.loads(subprocess.check_output(
+            ['python3', str(ROOT / 'scripts/drill_sqlite_restore.py'), '--directory', str(directory)],
+            env={'PATH': os.environ['PATH']}, text=True))
+        self.assertEqual(result['status'], 'PASS')
+        self.assertEqual(result['restored_rows'], result['expected_rows'])
+
     def test_live_wal_backup_restore_preserves_committed_snapshot(self):
         self.assertGreater(Path(str(self.db) + '-wal').stat().st_size, 0)
         saved = self.save()

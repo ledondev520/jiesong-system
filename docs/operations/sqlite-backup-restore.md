@@ -62,3 +62,5 @@ python3 scripts/drill_sqlite_restore.py --directory /tmp/jiesong-fix-evidence/re
 CLI 参数支持 `--database <path>` 和 `--database=<path>`；`--backup-dir` 同理，显式值优先于环境与默认目录。
 
 恢复目标的同名 `-wal`、`-shm`、`-journal` 也必须不存在（包括悬空符号链接）。残留 WAL 可改变恢复后的实际读回内容，因此脚本拒绝这类路径，且不删除残留文件。选择无其他写入进程的私有目录。
+
+`DATABASE_URL` 的 SQLite 文件名按当前 Prisma 语义保留 `%20` 等字面字符，不做 URL 解码；复杂路径优先显式传 `--database`。

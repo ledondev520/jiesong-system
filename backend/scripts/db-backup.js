@@ -15,7 +15,8 @@ if (!args.includes('--help')) {
       console.error('[db-backup] Set a SQLite DATABASE_URL in the process environment or pass --database explicitly.');
       process.exit(1);
     }
-    const source = decodeURIComponent(url.slice(5).split('?')[0]);
+    // Prisma SQLite file paths preserve literal percent sequences (including %20).
+    const source = url.slice(5).split('?')[0];
     args.push('--database', path.resolve(__dirname, '../prisma', source));
   }
   if (!hasOption('--backup-dir')) args.push('--backup-dir', path.resolve(__dirname, '../prisma/backups'));
