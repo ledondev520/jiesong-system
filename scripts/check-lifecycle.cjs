@@ -147,6 +147,7 @@ function check(root = ROOT, { baselineRoutes } = {}) {
   const current = new Set(routes.map((route) => route.key));
   const registered = new Set();
   const ids = new Set();
+  const matrixPaths = new Set();
   for (const resource of registry.resources) {
     if (!resource.id || ids.has(resource.id))
       fail(`${REGISTRY}: resource id must be unique`);
@@ -161,6 +162,20 @@ function check(root = ROOT, { baselineRoutes } = {}) {
         fail(`${REGISTRY}: ${key} does not exist; fix routeFile/routes`);
     }
     const m = resource.matrix;
+    const createRoute = resource.routes?.find((route) => route.startsWith('POST '));
+    const collection = createRoute?.slice(5).replace(/\/$/, '');
+    if (
+      collection === undefined ||
+      resource.routes.length !== 2 ||
+      !resource.routes.includes(`PUT ${collection}/:id`) ||
+      typeof m?.path !== 'string' ||
+      (collection && !m.path.replace(/\/$/, '').endsWith(collection)) ||
+      matrixPaths.has(m.path)
+    )
+      fail(
+        `${REGISTRY}: ${resource.id} matrix must exercise its own registered POST collection and PUT /:id routes; copy ${TEMPLATE}`,
+      );
+    matrixPaths.add(m?.path);
     if (
       !m ||
       ![

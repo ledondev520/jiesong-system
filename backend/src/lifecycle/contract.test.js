@@ -180,3 +180,18 @@ test('router aliases cannot hide a new write endpoint', (t) => {
   );
   assert.throws(f.verify, /unregistered.*POST \/synthetic-alias/);
 });
+
+test('registering a new route with an unrelated existing matrix is rejected', (t) => {
+  const f = fixture(t);
+  appendRoute(f.temp);
+  f.registry.resources.push({
+    ...f.registry.resources[0],
+    id: 'synthetic-new-resource',
+    routes: ['POST /synthetic-new-resource'],
+  });
+  fs.writeFileSync(
+    path.join(f.temp, 'lifecycle/resources.json'),
+    JSON.stringify(f.registry),
+  );
+  assert.throws(f.verify, /synthetic-new-resource.*matrix.*routes/);
+});
