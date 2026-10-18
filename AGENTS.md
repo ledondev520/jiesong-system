@@ -154,3 +154,4 @@
 - `bootstrapAdmin.js` 是seed与直接启动的管理员门禁。禁止弱密码回退及seed重置现有安全密码。显式初始化密码沿用统一策略；修复旧默认密码必须原子递增sessionVersion；监听端口/启动任务之前完成检查。正常改密沿用现有认证接口。
 
 - `backend/scripts/sqlite_snapshot.py` 使用SQLite在线backup API读取已提交WAL，快照与manifest为0600、输出目录0700。恢复拒绝既有目标；脚本不备份.env或上传附件，不声称具备异地备份或完整业务灾备。
+- 默认历史工作簿目录 `data/export-history/` 必须保持Git忽略；用 `git check-ignore data/export-history/<file>.xlsx` 验证，不提交源工作簿。
