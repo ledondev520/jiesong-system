@@ -32,9 +32,9 @@ const getCustomsBrokers = async (req, res, next) => {
     }
     if (keyword) {
       where.OR = [
-        { name: { contains: keyword, mode: 'insensitive' } },
-        { contact: { contains: keyword, mode: 'insensitive' } },
-        { phone: { contains: keyword, mode: 'insensitive' } },
+        { name: { contains: keyword } },
+        { contact: { contains: keyword } },
+        { phone: { contains: keyword } },
       ];
     }
 

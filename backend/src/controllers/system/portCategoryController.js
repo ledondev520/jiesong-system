@@ -37,8 +37,8 @@ const getPorts = async (req, res, next) => {
     }
     if (keyword) {
       where.OR = [
-        { name: { contains: keyword, mode: 'insensitive' } },
-        { code: { contains: keyword, mode: 'insensitive' } },
+        { name: { contains: keyword } },
+        { code: { contains: keyword } },
       ];
     }
 
