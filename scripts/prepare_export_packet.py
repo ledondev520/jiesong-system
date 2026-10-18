@@ -326,7 +326,7 @@ def calculate_price(
 
 
 def fetch_contract_rows(database: Path, contract_no: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    connection = sqlite3.connect(database)
+    connection = sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)
     connection.row_factory = sqlite3.Row
     header = connection.execute(
         """
