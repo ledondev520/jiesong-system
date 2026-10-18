@@ -78,6 +78,14 @@ async function runResourceMatrix(t, resource, { call, good, snapshot }) {
         after.items.find((row) => row.id === created.id),
         expected,
       );
+      const excluded = await good(
+        'GET',
+        `${m.path}?keyword=${encodeURIComponent(`${m.filter}-synthetic-no-match`)}&page=1&pageSize=20`,
+      );
+      assert.ok(
+        !excluded.items.some((row) => row.id === created.id),
+        'nonmatching filter must exclude the saved row',
+      );
     },
   );
   return {
