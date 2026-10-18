@@ -1,65 +1,26 @@
 /**
- * Input: prisma/dev.db 数据库文件
- * Output: prisma/backups/<timestamp>.db 备份文件
- * Pos: 数据库安全防护脚本
- *
- * 职责：在 Prisma 迁移/推送之前自动备份 SQLite 数据库文件。
- *       保留最近 10 个备份，自动清理更早的备份。
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ * Input: explicit --database path or process DATABASE_URL (SQLite only)
+ * Output: consistent private snapshot and manifest, retaining five managed pairs
+ * Pos: pre-migration backup CLI; does not load .env or guess a source database
  */
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 
-const fs = require('fs');
-const path = require('path');
-
-const DB_PATH = path.resolve(__dirname, '..', 'prisma', 'dev.db');
-const BACKUP_DIR = path.resolve(__dirname, '..', 'prisma', 'backups');
-const MAX_BACKUPS = 5;
-
-/**
- * 职责：创建数据库备份并清理旧备份
- * 思路：
- *  0. 检查数据库文件是否存在
- *  1. 创建 backups 目录
- *  2. 以时间戳命名复制数据库文件
- *  3. 清理超出保留数量的旧备份
- */
-function backup() {
-  // 0. 检查数据库文件是否存在
-  if (!fs.existsSync(DB_PATH)) {
-    console.log('[db-backup] 数据库文件不存在，跳过备份:', DB_PATH);
-    return;
-  }
-
-  // 1. 创建 backups 目录
-  if (!fs.existsSync(BACKUP_DIR)) {
-    fs.mkdirSync(BACKUP_DIR, { recursive: true, mode: 0o700 });
-  }
-  fs.chmodSync(BACKUP_DIR, 0o700);
-
-  // 2. 以时间戳命名复制数据库文件
-  const now = new Date();
-  const timestamp = now.toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
-  const backupFile = path.join(BACKUP_DIR, `dev_${timestamp}.db`);
-
-  fs.copyFileSync(DB_PATH, backupFile);
-  fs.chmodSync(backupFile, 0o600);
-  const sizeKB = Math.round(fs.statSync(backupFile).size / 1024);
-  console.log(`[db-backup] 已备份 -> ${path.relative(process.cwd(), backupFile)} (${sizeKB} KB)`);
-
-  // 3. 清理超出保留数量的旧备份
-  const backups = fs.readdirSync(BACKUP_DIR)
-    .filter((f) => f.startsWith('dev_') && f.endsWith('.db'))
-    .sort()
-    .reverse();
-
-  if (backups.length > MAX_BACKUPS) {
-    const toDelete = backups.slice(MAX_BACKUPS);
-    for (const old of toDelete) {
-      fs.unlinkSync(path.join(BACKUP_DIR, old));
-      console.log(`[db-backup] 已清理旧备份: ${old}`);
+const args = process.argv.slice(2);
+const hasOption = name => args.some(arg => arg === name || arg.startsWith(name + '='));
+if (!args.includes('--help')) {
+  if (!hasOption('--database')) {
+    const url = process.env.DATABASE_URL || '';
+    if (!url.startsWith('file:') || !url.slice(5).split('?')[0]) {
+      console.error('[db-backup] Set a SQLite DATABASE_URL in the process environment or pass --database explicitly.');
+      process.exit(1);
     }
+    // Prisma SQLite file paths preserve literal percent sequences (including %20).
+    const source = url.slice(5).split('?')[0];
+    args.push('--database', path.resolve(__dirname, '../prisma', source));
   }
+  if (!hasOption('--backup-dir')) args.push('--backup-dir', path.resolve(__dirname, '../prisma/backups'));
 }
-
-backup();
+const result = spawnSync('python3', [path.join(__dirname, 'sqlite_snapshot.py'), 'backup', ...args], { stdio: 'inherit' });
+if (result.error) console.error('[db-backup] Python 3 with sqlite3 is required.');
+process.exitCode = result.status ?? 1;

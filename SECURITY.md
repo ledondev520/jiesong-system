@@ -118,3 +118,27 @@ The additive session-table rollout requires a fresh verified online SQLite snaps
 ## 运维验证笔记
 
 本地被 Git 忽略的 `PLAN.md` 等运维记录也不得保存真实账号与密码组合；仅记录验证结果。发现残留时先对当前笔记脱敏，单独评估凭据轮换；脱敏笔记不等于撤销已有凭据，也不能据此声称 Git 历史已清理。
+
+Export proposal paths are configured by `JIESONG_EXPORT_DATABASE` and `JIESONG_HISTORY_ROOT` or explicit CLI options in `scripts/prepare_export_packet.py`. The script remains read-only and does not load `.env`. Business databases and history workbooks must remain outside Git.
+
+Catalog migration endpoints in `backend/src/routes/dataImport.js` require authenticated ADMIN. `catalogImportService.js` previews do not persist rows, files or audits. Execution revalidates in one transaction and audits only kind/count/operator. Opening inventory requires explicit counted-balance confirmation, an active product, matching unit and a unique stable opening reference; it never fabricates purchase/inspection evidence. Supplier bank details are excluded from templates. See `docs/migration/catalog-import.md`.
+
+`backend/src/services/bootstrapAdmin.js` is shared by seed and direct app startup. New administrators require an explicit `DEFAULT_ADMIN_PASSWORD` meeting the existing 8-character/72-byte policy. Startup blocks an uninitialized or legacy-default administrator. An explicit bootstrap password can remediate the known legacy default with a conditional update and session-version increment. Seed never rotates an existing secure password. Use authenticated password change/reset for ordinary rotation, then remove the bootstrap secret from the runtime environment. No new schema or forced-change session exception is introduced.
+
+SQLite backups now use `backend/scripts/sqlite_snapshot.py` through the backup/restore CLIs. Source selection must be explicit via process DATABASE_URL or --database; no .env or credential files are loaded. The online backup API includes committed WAL pages. Snapshots/manifests are 0600 in 0700 directories, and restore verifies SHA-256 and SQLite integrity before exclusively publishing a new target. It never replaces an existing/live database. Managed retention defaults to five pairs; unrelated files are not swept. This covers the database only, not attachments/configuration or offsite disaster recovery. See `docs/operations/sqlite-backup-restore.md`.
+
+The default local export history directory `/data/export-history/` is excluded by the repository `.gitignore` so portable defaults do not invite accidental source-workbook commits.
+
+Backup CLI `backend/scripts/db-backup.js` preserves explicit space or equals options before environment/default selection.
+
+`bootstrapAdmin.js` validates bootstrap password policy only when creating/remediating an account; unused stale settings cannot block an already-secure administrator.
+
+`sqlite_snapshot.py` restore rejects existing target SQLite `-wal`, `-shm` and `-journal` sidecars (including dangling symlinks); never delete recovery evidence to make a path available. Use a private directory without concurrent writers.
+
+`tabularImport.js` streams ZIP entries before ExcelJS parsing: at most 256 entries and 32 MiB actual expanded bytes. JSZip is declared directly at the already locked version; no files are extracted.
+
+Legacy `/api/v1/import` uses the same 10 MiB in-memory CSV/xlsx filter as preview; `importService.js` accepts only in-memory bytes and rejects filesystem paths, including traversal, absolute paths and symlinks. HTTP never retains raw uploads.
+
+`db-backup.js` preserves literal percent sequences in Prisma SQLite DATABASE_URL paths; URI decoding could silently select a different database.
+
+`tabularImport.js` checks worksheet XML row/cell/column bounds before ExcelJS allocations, rejects merged cells and limits sheet IDs to 65535. This prevents tiny XLSX metadata from expanding unbounded model regions.

@@ -4,12 +4,12 @@
  * Pos: 系统管理 > 设置布局侧栏与手机菜单
  */
 
-'use client';
+"use client";
 
-import { useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import { useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
 import {
   SlidersHorizontal,
   Users,
@@ -21,8 +21,8 @@ import {
   Search,
   ChevronRight,
   type LucideIcon,
-} from 'lucide-react';
-import { Input } from '@/components/ui/input';
+} from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 interface NavItem {
   href: string;
@@ -37,46 +37,60 @@ interface NavGroup {
 
 const navGroups: NavGroup[] = [
   {
-    label: '通用',
+    label: "通用",
     items: [
-      { href: '/dashboard/settings', label: '系统配置', icon: SlidersHorizontal },
-      { href: '/dashboard/settings/users', label: '用户管理', icon: Users },
+      {
+        href: "/dashboard/settings",
+        label: "系统配置",
+        icon: SlidersHorizontal,
+      },
+      { href: "/dashboard/settings/users", label: "用户管理", icon: Users },
     ],
   },
   {
-    label: '基础数据',
+    label: "基础数据",
     items: [
-      { href: '/dashboard/settings/ports', label: '港口管理', icon: Anchor },
-      { href: '/dashboard/settings/categories', label: '商品分类', icon: Tag },
-      { href: '/dashboard/settings/customs-brokers', label: '报关公司', icon: Building2 },
+      { href: "/dashboard/settings/ports", label: "港口管理", icon: Anchor },
+      { href: "/dashboard/settings/categories", label: "商品分类", icon: Tag },
+      {
+        href: "/dashboard/settings/customs-brokers",
+        label: "报关公司",
+        icon: Building2,
+      },
     ],
   },
   {
-    label: '数据工具',
+    label: "数据工具",
     items: [
-      { href: '/dashboard/settings/export', label: '数据导出', icon: Download },
+      {
+        href: "/dashboard/settings/export",
+        label: "数据导入导出",
+        icon: Download,
+      },
     ],
   },
   {
-    label: '运维中心',
+    label: "运维中心",
     items: [
-      { href: '/dashboard/system/logs', label: '系统日志', icon: History },
+      { href: "/dashboard/system/logs", label: "系统日志", icon: History },
     ],
   },
 ];
 
 function isActive(pathname: string, href: string): boolean {
-  if (href === '/dashboard/settings') {
-    return pathname === '/dashboard/settings';
+  if (href === "/dashboard/settings") {
+    return pathname === "/dashboard/settings";
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export function SettingsNav({ mobile = false }: { mobile?: boolean }) {
   const pathname = usePathname();
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const menuRef = useRef<HTMLDetailsElement>(null);
-  const currentItem = navGroups.flatMap((group) => group.items).find((item) => isActive(pathname, item.href));
+  const currentItem = navGroups
+    .flatMap((group) => group.items)
+    .find((item) => isActive(pathname, item.href));
 
   const filteredGroups = useMemo(() => {
     if (!query.trim()) return navGroups;
@@ -119,18 +133,29 @@ export function SettingsNav({ mobile = false }: { mobile?: boolean }) {
                   <Link
                     key={item.href}
                     href={item.href}
-                    aria-current={active ? 'page' : undefined}
-                    onClick={() => { if (menuRef.current) menuRef.current.open = false; }}
+                    aria-current={active ? "page" : undefined}
+                    onClick={() => {
+                      if (menuRef.current) menuRef.current.open = false;
+                    }}
                     className={cn(
-                      'group flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors md:min-h-0',
+                      "group flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors md:min-h-0",
                       active
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-foreground/80 hover:bg-accent hover:text-foreground'
+                        ? "bg-primary/10 text-primary"
+                        : "text-foreground/80 hover:bg-accent hover:text-foreground",
                     )}
                   >
-                    <Icon className={cn('h-4 w-4', active ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground')} />
+                    <Icon
+                      className={cn(
+                        "h-4 w-4",
+                        active
+                          ? "text-primary"
+                          : "text-muted-foreground group-hover:text-foreground",
+                      )}
+                    />
                     <span className="flex-1">{item.label}</span>
-                    {active && <ChevronRight className="h-3.5 w-3.5 text-primary/70" />}
+                    {active && (
+                      <ChevronRight className="h-3.5 w-3.5 text-primary/70" />
+                    )}
                   </Link>
                 );
               })}
@@ -144,14 +169,22 @@ export function SettingsNav({ mobile = false }: { mobile?: boolean }) {
   if (!mobile) return content;
 
   return (
-    <details key={pathname} ref={menuRef} className="group rounded-xl border bg-card">
+    <details
+      key={pathname}
+      ref={menuRef}
+      className="group rounded-xl border bg-card"
+    >
       <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
         <SlidersHorizontal className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span>设置菜单</span>
-        <span className="min-w-0 flex-1 truncate text-muted-foreground">· {currentItem?.label ?? '系统设置'}</span>
+        <span className="min-w-0 flex-1 truncate text-muted-foreground">
+          · {currentItem?.label ?? "系统设置"}
+        </span>
         <ChevronRight className="h-4 w-4 shrink-0 transition-transform group-open:rotate-90" />
       </summary>
-      <div className="max-h-[60dvh] overflow-y-auto border-t pt-2">{content}</div>
+      <div className="max-h-[60dvh] overflow-y-auto border-t pt-2">
+        {content}
+      </div>
     </details>
   );
 }

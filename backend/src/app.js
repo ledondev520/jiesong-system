@@ -1,6 +1,6 @@
 /**
  * Input: 所有路由模块、中间件
- * Output: Express应用实例、标准100/min全局限流（显式代理白名单默认关闭）
+ * Output: Express应用实例、管理员初始化门禁、标准100/min全局限流（显式代理白名单默认关闭）
  * Pos: 应用入口，初始化 Express 服务器
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -111,7 +111,9 @@ app.use(errorHandler);
 
 const PORT = config.port;
 
-if (require.main === module) {
+async function startServer() {
+  await require('./services/bootstrapAdmin').ensureBootstrapAdmin(require('./utils/prisma'));
+
   startInventoryAlertJob();
   startAgentCredentialAlertJob();
   startExportReminderJob();
@@ -128,6 +130,14 @@ if (require.main === module) {
 ║  URL: http://localhost:${String(PORT).padEnd(20)}║
 ╚════════════════════════════════════════════╝
   `);
+  });
+}
+
+if (require.main === module) {
+  startServer().catch(async () => {
+    console.error('启动失败：请检查数据库迁移，并设置符合密码策略的 DEFAULT_ADMIN_PASSWORD；空库请先运行 npm run db:seed。');
+    await require('./utils/prisma').$disconnect();
+    process.exitCode = 1;
   });
 }
 

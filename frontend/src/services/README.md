@@ -27,3 +27,5 @@
 ## 三表工作簿下载
 
 `threeForms.service.ts` 沿用共享 Axios 认证传输，在单次请求的 transformResponse 中提取文件名响应头，再消费拦截器直接返回的完整 Blob，明确关闭该二进制请求的 JSON GET 缓存并复用现有文件保存工具。`threeForms.download.test.ts` 通过真实 Axios 拦截器及本地合成 adapter 验证 UTF-8/引号/缺失文件名、字节保持、重复读取当前响应与失败零保存/明确重试；不访问网络、业务文件或启动浏览器，不改变共享拦截器或其他请求的缓存规则。
+
+- `catalog-import.service.ts` 调用 ADMIN 批量模板、只读预览与执行接口；模板下载使用现有文件保存工具与认证传输。

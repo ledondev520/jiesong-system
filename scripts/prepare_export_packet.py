@@ -9,8 +9,10 @@ historical EXP workbooks, then prints an auditable JSON proposal.
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import json
 import math
+import os
 import re
 import sqlite3
 from dataclasses import asdict, dataclass
@@ -19,12 +21,13 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-DEFAULT_DB = Path(__file__).resolve().parents[1] / "backend/prisma/dev.db"
-DEFAULT_HISTORY_ROOT = Path(
-    "/Users/helena/Library/Containers/com.kingsoft.wpsoffice.mac/Data/Library/"
-    "Application Support/Kingsoft/WPS Cloud Files/userdata/qing/filecache/212320004/"
-    "团队文档/捷淞/11-报关记录"
-)
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_DB = PROJECT_ROOT / "backend/prisma/dev.db"
+DEFAULT_HISTORY_ROOT = PROJECT_ROOT / "data/export-history"
+
+
+def configured_path(value: str) -> Path:
+    return Path(value).expanduser().resolve()
 
 
 def normalize_text(value: Any) -> str:
@@ -324,37 +327,36 @@ def calculate_price(
 
 
 def fetch_contract_rows(database: Path, contract_no: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    connection = sqlite3.connect(database)
-    connection.row_factory = sqlite3.Row
-    header = connection.execute(
-        """
-        SELECT sc.contractNo, sc.exchangeRate, sc.totalAmount, sc.containerLabel,
-               sc.shippedAt, sc.customsBroker, po.name AS port
-          FROM sales_contracts sc
-          LEFT JOIN ports po ON po.id = sc.portId
-         WHERE sc.contractNo = ?
-        """,
-        (contract_no,),
-    ).fetchone()
-    if not header:
-        raise ValueError(f"Contract not found: {contract_no}")
-    rows = connection.execute(
-        """
-        SELECT pi.id, p.customsName, p.hsCode, p.declaration,
-               pi.quantity, pi.unit, pi.boxes, pi.grossWeight, pi.netWeight,
-               pi.volume, pi.purchaseCost, pi.specification, pi.supplement,
-               pi.manufacturer, pi.purchaseContractNo, st.name AS store
-          FROM packing_items pi
-          JOIN sales_contracts sc ON sc.id = pi.salesContractId
-          JOIN products p ON p.id = pi.productId
-          LEFT JOIN stores st ON st.id = pi.storeId
-         WHERE sc.contractNo = ?
-         ORDER BY pi.createdAt, pi.id
-        """,
-        (contract_no,),
-    ).fetchall()
-    connection.close()
-    return dict(header), [dict(row) for row in rows]
+    with closing(sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)) as connection:
+        connection.row_factory = sqlite3.Row
+        header = connection.execute(
+            """
+            SELECT sc.contractNo, sc.exchangeRate, sc.totalAmount, sc.containerLabel,
+                   sc.shippedAt, sc.customsBroker, po.name AS port
+              FROM sales_contracts sc
+              LEFT JOIN ports po ON po.id = sc.portId
+             WHERE sc.contractNo = ?
+            """,
+            (contract_no,),
+        ).fetchone()
+        if not header:
+            raise ValueError(f"Contract not found: {contract_no}")
+        rows = connection.execute(
+            """
+            SELECT pi.id, p.customsName, p.hsCode, p.declaration,
+                   pi.quantity, pi.unit, pi.boxes, pi.grossWeight, pi.netWeight,
+                   pi.volume, pi.purchaseCost, pi.specification, pi.supplement,
+                   pi.manufacturer, pi.purchaseContractNo, st.name AS store
+              FROM packing_items pi
+              JOIN sales_contracts sc ON sc.id = pi.salesContractId
+              JOIN products p ON p.id = pi.productId
+              LEFT JOIN stores st ON st.id = pi.storeId
+             WHERE sc.contractNo = ?
+             ORDER BY pi.createdAt, pi.id
+            """,
+            (contract_no,),
+        ).fetchall()
+        return dict(header), [dict(row) for row in rows]
 
 
 def read_catalog(path: Path) -> dict[str, dict[str, Any]]:
@@ -721,7 +723,7 @@ def build_proposal(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--contract", required=True, help="EXP contract number")
     parser.add_argument("--spot-rate", required=True, type=float)
@@ -729,15 +731,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fx-buffer", type=float, default=0.2)
     parser.add_argument("--refundable-markup", type=float, default=0.30)
     parser.add_argument("--no-refund-markup", type=float, default=0.10)
-    parser.add_argument("--database", type=Path, default=DEFAULT_DB)
+    parser.add_argument(
+        "--database", type=configured_path,
+        default=os.environ.get("JIESONG_EXPORT_DATABASE") or str(DEFAULT_DB),
+        help="SQLite path (JIESONG_EXPORT_DATABASE; default: backend/prisma/dev.db)",
+    )
     parser.add_argument("--shipment-summary", type=Path)
     parser.add_argument("--declaration-catalog", type=Path)
     parser.add_argument("--confirmed-workbook", type=Path)
     parser.add_argument("--history-markup-tolerance", type=float, default=0.05)
-    parser.add_argument("--history-root", type=Path, default=DEFAULT_HISTORY_ROOT)
+    parser.add_argument(
+        "--history-root", type=configured_path,
+        default=os.environ.get("JIESONG_HISTORY_ROOT") or str(DEFAULT_HISTORY_ROOT),
+        help="Local history directory (JIESONG_HISTORY_ROOT; default: data/export-history)",
+    )
     parser.add_argument("--refund-dbf", type=Path, required=True)
     parser.add_argument("--refund-version", default="2026B")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 if __name__ == "__main__":

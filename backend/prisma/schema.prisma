@@ -4,7 +4,7 @@
 // Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 // 
 // 2026-01-20 重构：合并货柜与出口合同，用 EXP 号作为货柜标识
-// 2026-02-21 迁移：SQLite → Supabase (PostgreSQL)
+// 当前运行模型与已提交迁移为 SQLite；旧 Supabase 文档不是当前部署契约。
 // 2026-06-03 新增：SalesContractFile 归档出口合同/装箱/报关源文件附件
 
 generator client {

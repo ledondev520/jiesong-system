@@ -634,7 +634,7 @@ PUT /system/notifications/:id/read
 |--------|------|------|
 | admin | <DEFAULT_ADMIN_PASSWORD> | ADMIN |
 
-> 注意：密码来自环境变量 `DEFAULT_ADMIN_PASSWORD`；未配置时 seed 会生成随机临时密码
+> 注意：新库初始化或修复旧默认管理员必须显式设置符合统一策略的 `DEFAULT_ADMIN_PASSWORD`，没有默认密码或随机密码回退。已有安全管理员的密码不会被 seed 覆盖；初始化后移除该配置。
 
 ---
 

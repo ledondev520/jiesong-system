@@ -77,10 +77,10 @@
 ## Database safety rules
 - **禁止直接运行 `prisma db push`**。SQLite 下 `db push` 在表结构变更时会丢弃数据。
 - 表结构变更必须通过 `npm run db:migrate`（即 `prisma migrate dev`），该命令会先自动备份数据库。
-- 手动备份：`npm run db:backup`，备份文件保存在 `prisma/backups/`，保留最近 5 个。
+- 手动备份：`npm run db:backup`，必须显式传 `--database` 或在进程环境导出SQLite `DATABASE_URL`，不读取.env、不猜测源库；默认保存到 `prisma/backups/`，仅保留最近5个本脚本管理的快照及manifest。
 - SQLite 备份目录权限必须为 `0700`，备份数据库文件权限必须为 `0600`。
 - 任何涉及数据库 schema 变更的操作前，必须确认 `prisma/backups/` 中有最新备份。
-- 回滚方案：将 `prisma/backups/` 中的备份文件复制为 `prisma/dev.db` 即可恢复。
+- 恢复：`npm run db:restore -- --backup <snapshot> --database <new-private-path>`，验证manifest校验和及SQLite完整性，只恢复到不存在的新路径。切换应用前停机并明确切换DATABASE_URL；禁止覆盖在线库或忽略WAL/SHM。详见 `docs/operations/sqlite-backup-restore.md`。
 
 ## Writing constraints
 - Keep security-critical code changes minimal, explicit, and testable.
@@ -146,3 +146,26 @@
 - `backend/src/middleware/apiRateLimit.js` 通过锁定express-rate-limit执行原全局100次/分钟预算，继续在解析和路由之前生效；保留429 JSON、Retry-After秒值及原X-RateLimit-Reset毫秒契约。IP使用ipKeyGenerator规范化IPv4映射和IPv6/56，不读取原始XFF、不增加代理信任；登录额外10次/15分钟仍保留。隔离HTTP测试也必须挂载同一实际限流，不能隐藏/豁免CodeQL的认证成本告警。
 
 - 全局API和原登录计数仍为进程内存：重启会重置、多worker各自计数，并非跨进程持久配额；邮箱/找回密码的SQLite持久配额继续独立执行。
+
+- `scripts/prepare_export_packet.py` uses CLI path options before `JIESONG_EXPORT_DATABASE`/`JIESONG_HISTORY_ROOT`, then repository-relative defaults. Preserve read-only behavior and keep source databases/workbooks outside Git.
+
+- 档案与期初导入共用 `backend/src/services/catalogImportService.js` 的模板定义。仅ADMIN可预览或执行；dry-run包括审计表在内不得写库。执行必须重新校验并原子新增，期初使用稳定编号、显式盘点确认，不补造采购/验货。模板不得包含银行账户。
+
+- `bootstrapAdmin.js` 是seed与直接启动的管理员门禁。禁止弱密码回退及seed重置现有安全密码。显式初始化密码沿用统一策略；修复旧默认密码必须原子递增sessionVersion；监听端口/启动任务之前完成检查。正常改密沿用现有认证接口。
+
+- `backend/scripts/sqlite_snapshot.py` 使用SQLite在线backup API读取已提交WAL，快照与manifest为0600、输出目录0700。恢复拒绝既有目标；脚本不备份.env或上传附件，不声称具备异地备份或完整业务灾备。
+- 默认历史工作簿目录 `data/export-history/` 必须保持Git忽略；用 `git check-ignore data/export-history/<file>.xlsx` 验证，不提交源工作簿。
+
+Backup CLI `backend/scripts/db-backup.js` preserves explicit space or equals options before environment/default selection.
+
+`bootstrapAdmin.js` validates bootstrap password policy only when creating/remediating an account; unused stale settings cannot block an already-secure administrator.
+
+`sqlite_snapshot.py` restore rejects existing target SQLite `-wal`, `-shm` and `-journal` sidecars (including dangling symlinks); never delete recovery evidence to make a path available. Use a private directory without concurrent writers.
+
+`tabularImport.js` streams ZIP entries before ExcelJS parsing: at most 256 entries and 32 MiB actual expanded bytes. JSZip is declared directly at the already locked version; no files are extracted.
+
+Legacy `/api/v1/import` uses the same 10 MiB in-memory CSV/xlsx filter as preview; `importService.js` accepts only in-memory bytes and rejects filesystem paths, including traversal, absolute paths and symlinks. HTTP never retains raw uploads.
+
+`db-backup.js` preserves literal percent sequences in Prisma SQLite DATABASE_URL paths; URI decoding could silently select a different database.
+
+`tabularImport.js` checks worksheet XML row/cell/column bounds before ExcelJS allocations, rejects merged cells and limits sheet IDs to 65535. This prevents tiny XLSX metadata from expanding unbounded model regions.

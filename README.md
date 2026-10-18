@@ -15,7 +15,7 @@
 - 💰 **出口管理** - 出口合同、合同头草稿取消复原/失败保留重试、智能定价、3D 排柜、双80%出柜判定、船司装箱单核对（真实隔离验收见 `frontend/e2e/real-sales-header.spec.ts` 与 `backend/src/testHelpers/role-browser-header.test.js`）
 - 📄 **出口单证** - 一键生成三张表、五 Sheet 出口 Excel（含商业发票）、HS 编码匹配与无退税警示
 - 🔎 **本地 HS 字典** - 商品名称与编码组合检索、详情、已有角色手工证据保存/回读的隔离验收见 `docs/quality/HS本地字典回归_20261006.md`；浏览器定义与实际执行结果分别记录
-- 📊 **库存管理** - 入库出库、状态流转
+- 📊 **库存管理** - 验货入库、出口出库、管理员期初导入及只读预览
 - 🚢 **货柜管理** - 自动编号、装箱管理、位置查询
 - 🔔 **流程提醒** - 次月5号内部退税材料准备提醒、已出货缺发票提醒（法定期限以主管税务机关和当期申报期为准）
 - 🤖 **AI助手** - 智能问答、辅助录入
@@ -27,8 +27,8 @@
 系统采用前后端分离架构：
 
 - **Frontend**: Next.js 16 (App Router) + Tailwind CSS + shadcn/ui
-- **Backend**: Express + Prisma + Supabase (PostgreSQL)（详见 `backend/`）
-- **AI**: Kimi API
+- **Backend**: Express + Prisma 5 + SQLite（当前 schema 与已提交迁移，详见 `backend/`）
+- **AI**: Kimi 或 DeepSeek，由 `AI_PROVIDER` 选择；需另外配置密钥，未配置不代表已验证真实调用
 
 ## 项目结构
 
@@ -56,78 +56,75 @@ jiesong_system/
 └── README.md                # 本文件
 ```
 
-## 开发状态
+## 当前代码状态
 
-| 阶段 | 状态 |
-|------|------|
-| ✅ 需求调研 | 完成 |
-| ✅ PRD文档 | 完成 |
-| ✅ 技术方案 | 完成 |
-| ✅ 数据库设计 | 完成 |
-| 🚧 系统开发 | 进行中 (Frontend Phase 3/5) |
+以下以当前代码和可重复测试为准，不以旧阶段编号或完成度百分比表示上线就绪。
+
+| 能力 | 代码事实与验证入口 | 边界 |
+| --- | --- | --- |
+| 数据库 | `backend/prisma/schema.prisma` 的 provider 为 `sqlite`，`prisma/migrations/` 为 SQLite 增量迁移 | 当前代码不能直接连接 PostgreSQL |
+| 采购、出口、装箱、财务 | `backend/src/routes/`、`services/` 和 `npm run test:db` | 合成链路通过不代表真实迁移对账完成 |
+| 库存 | 验货入库与出口出库；新增管理员库存期初导入 | 期初不是采购验货，也不提供盘点调整或历史成本估值 |
+| 导入导出 | 通用 CSV/xlsx；商品、供应商、门店、期初模板、逐行校验及只读预览 | [批量导入操作说明](docs/migration/catalog-import.md) |
+| 认证 | 角色权限、会话撤销、邮箱注册/找回；显式管理员初始化与启动门禁 | 外部邮件需单独配置与验证 |
+| 单证与退税准备 | HS 证据、装箱、单证生成及内部退税材料校验 | 空库需先维护税则证据；不直接向税局申报 |
+| 定价 | 当前代码存在 30%/10% 与 ×1.3 等入口差异 | 本轮未调整；须业务裁决后另行统一 |
+| 运维 | 本地备份/恢复入口见 `backend/scripts/`；隔离测试见下文 | 不代表部署、异地备份或真实业务恢复已验收 |
 
 ## 快速开始
 
-### 前端 (Frontend)
+需要 Node.js 20.19 或更新的兼容版本、npm 和 Python 3。测试通过 Python 标准库创建隔离 SQLite，不需要系统 sqlite3 CLI。
 
-```bash
-cd frontend
-npm install
-npm run dev
-# 访问 http://localhost:3001
-```
-
-### 后端 (Backend)
+1. 在后端运行 `npm ci` 和 `npm run db:generate`。
+2. 在运行环境设置 `DATABASE_URL`，例如 `file:./dev.db`。Prisma 的相对文件路径基于 `backend/prisma/`。设置至少 32 字符的私有 `JWT_SECRET`。不要将真实密钥或数据库提交到 Git。
+3. 首次初始化时，显式设置 `DEFAULT_ADMIN_PASSWORD`，然后执行迁移及 seed。密码沿用统一策略，至少 8 个 Unicode 字符且 UTF-8 不超过 72 字节。不要使用文档中的字面示例作为密码。
 
 ```bash
 cd backend
-npm install
-npm run dev
-# API 服务运行在 http://localhost:3000
-```
-
-### 联调提示
-
-- 执行 `backend` 的 `db:seed` 前，请先在 `.env` 配置 `DEFAULT_ADMIN_PASSWORD`，管理员账号为 `admin / <DEFAULT_ADMIN_PASSWORD>`
-- 若登录接口报 `500`，先确认后端是否已启动并监听 `3000` 端口
-- 前端会通过 `/api/v1/*` 代理到 `http://localhost:3000/api/v1/*`
-
-## 启动与上线
-
-### 本地启动（Supabase）
-
-1. 配置后端环境变量（`backend/.env`）  
-  必填：`DATABASE_URL`（Pooler 6543）、`DIRECT_URL`（Direct 5432）、`JWT_SECRET`、`DEFAULT_ADMIN_PASSWORD`
-2. 初始化数据库结构与种子：
-```bash
-cd backend
-npm install
-npm run db:generate
-npm run db:migrate
+# 上述配置必须已在运行环境或私有 backend/.env 中设置。
+# 已提交迁移用于空库初始化；已有库升级前先完成一致性备份。
+./node_modules/.bin/prisma migrate deploy
 npm run db:seed
+PORT=3001 npm run dev
 ```
-3. 启动后端：
-```bash
-cd backend
-npm run dev
-```
-4. 启动前端：
+
+管理员用户名为 `admin`。没有默认密码。空库没有管理员时服务拒绝启动。已有旧默认管理员必须通过显式初始化密码修复，修复会撤销旧会话。重复 seed 不覆盖已有安全管理员的密码。正常改密使用现有用户接口，初始化后从运行环境移除 bootstrap 密码。
+
+另一个终端启动前端：
+
 ```bash
 cd frontend
-npm install
-npm run dev -- -p 3001
+npm ci
+npm run dev -- -p 3000
 ```
-5. 访问：`http://localhost:3001`
 
-### 推荐上线方式
+前端地址为 `http://localhost:3000`，默认 API 代理指向 `http://localhost:3001/api/v1`。后端配置本身的端口默认值为 3000，所以这里显式传 `PORT=3001`。健康检查是后端根路径 `/health`，不是 `/api/v1/health`。
 
-1. 数据库：Supabase PostgreSQL（已配置 Prisma `postgresql` provider）
-2. 后端：部署到 Render/Railway/Fly.io 任一 Node 平台
-3. 前端：部署到 Vercel（项目根已配置 `vercel.json`）
-4. Vercel 环境变量设置：
-  `NEXT_PUBLIC_API_BASE_URL=https://<your-backend-domain>`
-5. 后端环境变量设置：
-  `DATABASE_URL`、`DIRECT_URL`、`JWT_SECRET`、`DEFAULT_ADMIN_PASSWORD`、`KIMI_API_KEY`
+开发修改 schema 前，必须先在当前终端显式导出已核对的 SQLite `DATABASE_URL`，再执行 `npm run db:migrate`；该命令先备份再运行 `prisma migrate dev`。仅将连接串放进 `.env` 不足以运行备份步骤，脚本不会读取 `.env`。不要使用 `db push`。仅变更源码或文档无需重新初始化数据库。
+
+## 验证
+
+```bash
+cd backend
+npm test
+npm run test:db
+npm run test:carrier-pdf
+cd ../frontend
+npm test -- --maxWorkers=2
+./node_modules/.bin/tsc --noEmit
+cd ..
+python3 -m unittest discover -s tests -p test_prepare_export_packet.py
+```
+
+测试数量随代码变化，以本次完整输出为准。浏览器 E2E、生产构建和 ESLint 是单独检查，不能由单测数量推导通过。历史 QA 报告保留其日期与当时范围，不代表当前状态。
+
+备份与恢复步骤及实际合成演练见 [SQLite 备份恢复](docs/operations/sqlite-backup-restore.md)。
+
+## 数据库与部署边界
+
+当前运行模型是 SQLite。`docker-compose`、Render 配置及旧 Supabase 指南中的 PostgreSQL 配置与当前 schema 不兼容，不是本分支可直接使用的部署步骤。切换 PostgreSQL 必须另做 schema、迁移 SQL、查询语义和备份恢复的验证，不能仅替换连接字符串。
+
+本轮仅验证本地分支和合成临时库，没有部署。现有部署资料见 `DEPLOY.md`，执行前须核实实际数据库路径、上传目录及备份方案。
 
 ## 文档导航
 
@@ -159,7 +156,7 @@ npm run dev -- -p 3001
 - [后端测试](backend/README.md#5-运行测试) - test:db 包含真实只读概览来源验收、上海期间与收付趋势，以及合成邮箱注册 HTTP 成功/重放与未激活 SALES 安全字段回读
 - [前端浏览器验收](frontend/e2e/README.md) - 真实角色与合成资料验收约定，含出口3D绘制/控制/响应式返回和 Header 个人设置本地保存/重载/部分失败重试的 hosted CI 定义；定义检查不代表浏览器通过
 - [普通用户名称验收](docs/qa/account-name-lifecycle-2026-10-06.md) - 两个现有用户管理入口完整目录搜索与真实失败保留草稿重试；仅名称合成HTTP/React检查
-- [Supabase 迁移指南](docs/Supabase迁移指南.md) - SQLite → Supabase 迁移步骤与 MCP 配置
+- [历史 Supabase 迁移指南](docs/Supabase迁移指南.md) - 历史方案，与当前 SQLite schema 不兼容
 
 ## License
 
