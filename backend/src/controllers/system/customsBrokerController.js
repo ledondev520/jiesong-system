@@ -1,6 +1,6 @@
 /**
  * Input: broker form payloads and Prisma
- * Output: broker persistence with nonblank names and explicit optional-field clearing
+ * Output: broker persistence through the shared partial-update boundary
  * Pos: ordinary system catalogue controller; omitted optional fields remain unchanged
  */
 const prisma = require('../../utils/prisma');
@@ -9,10 +9,15 @@ const { createError } = require('../../middleware/errorHandler');
 const { normalizePagination } = require('../../utils/pagination');
 const { parseOptionalText } = require('../../utils/text');
 
-const normalizeOptionalBrokerField = value => {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
-  return String(value).trim() || null;
+const { partialUpdate } = require('../../utils/partialUpdate');
+
+const brokerFields = {
+  name: { type: 'string', required: true, message: '报关公司名称不能为空' },
+  contact: { type: 'string', nullable: true },
+  phone: { type: 'string', nullable: true },
+  email: { type: 'string', nullable: true },
+  address: { type: 'string', nullable: true },
+  isActive: { type: 'boolean' },
 };
 
 const getCustomsBrokers = async (req, res, next) => {
@@ -84,26 +89,11 @@ const updateCustomsBroker = async (req, res, next) => {
       throw createError('报关公司不存在', 404);
     }
 
-    const name = req.body.name === undefined ? undefined : String(req.body.name ?? '').trim();
-    if (name === '') {
-      throw createError('报关公司名称不能为空', 400);
-    }
-    const contact = normalizeOptionalBrokerField(req.body.contact);
-    const phone = normalizeOptionalBrokerField(req.body.phone);
-    const email = normalizeOptionalBrokerField(req.body.email);
-    const address = normalizeOptionalBrokerField(req.body.address);
-    const isActive = req.body.isActive;
+    const data = partialUpdate(req.body, brokerFields);
 
     const broker = await prisma.customsBroker.update({
       where: { id },
-      data: {
-        ...(name !== undefined ? { name } : {}),
-        ...(contact !== undefined ? { contact } : {}),
-        ...(phone !== undefined ? { phone } : {}),
-        ...(email !== undefined ? { email } : {}),
-        ...(address !== undefined ? { address } : {}),
-        ...(isActive !== undefined ? { isActive } : {}),
-      },
+      data,
     });
 
     success(res, broker, '报关公司更新成功');

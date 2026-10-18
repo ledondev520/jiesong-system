@@ -173,6 +173,14 @@ test('HTTP/SQLite: catalogue forms preserve valid and rejected edits', async t =
     const saved = await listed('/customs-brokers', created.id);
     assert.equal(saved.name, 'Synthetic revised broker');
     for (const [field, value] of Object.entries(fields)) assert.equal(saved[field], value.trim(), 'omitted optional fields retain saved values');
+    for (const body of [{ contact: '', phone: '   ', email: '', address: '' }, { isActive: 'false' }]) {
+      const before = snapshot('customs_brokers');
+      const result = await call('PUT', `/customs-brokers/${created.id}`, body);
+      assert.equal(result.status, body.isActive === undefined ? 200 : 400);
+      const retained = await listed('/customs-brokers', created.id);
+      for (const [field, value] of Object.entries(fields)) assert.equal(retained[field], value.trim());
+      if (result.status === 400) assert.deepEqual(snapshot('customs_brokers'), before);
+    }
     // The existing broker form sends null for every deliberately emptied field.
     const cleared = await good('PUT', `/customs-brokers/${created.id}`, { contact: null, phone: null, email: null, address: null });
     const failures = [];
