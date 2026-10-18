@@ -171,3 +171,12 @@ test('registered lists cannot add a second filter owner beside the shared hook',
     /InventoryTab.tsx.*use frontend\/src\/lib\/hooks\/useListUrlState.ts/,
   );
 });
+
+test('router aliases cannot hide a new write endpoint', (t) => {
+  const f = fixture(t);
+  fs.appendFileSync(
+    path.join(f.temp, 'backend/src/routes/system.js'),
+    "\nconst writeApi = router; writeApi.post('/synthetic-alias', handler);\n",
+  );
+  assert.throws(f.verify, /unregistered.*POST \/synthetic-alias/);
+});

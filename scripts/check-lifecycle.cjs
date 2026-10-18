@@ -54,6 +54,22 @@ function scanSource(source, file) {
     )
       routers.add(node.id.name);
   });
+  let addedAlias;
+  do {
+    addedAlias = false;
+    walk(ast, (node) => {
+      if (
+        node.type === 'VariableDeclarator' &&
+        node.id.type === 'Identifier' &&
+        node.init?.type === 'Identifier' &&
+        routers.has(node.init.name) &&
+        !routers.has(node.id.name)
+      ) {
+        routers.add(node.id.name);
+        addedAlias = true;
+      }
+    });
+  } while (addedAlias);
   const owner = (node) =>
     node?.type === 'Identifier'
       ? node.name
