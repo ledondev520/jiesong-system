@@ -107,8 +107,9 @@ for (const width of [390, 1440]) {
     await page.goForward();
     await expect(search).toHaveValue("NEW");
     await expect(page.getByRole("combobox").first()).toHaveText("草稿");
+    // 历史前进恢复 URL 中的原页码（page=2），不再强制回到第一页。
     await expect(
-      page.getByText("共 37 条，第 1 页；本页已放行 0 条", { exact: true }),
+      page.getByText("共 37 条，第 2 页；本页已放行 0 条", { exact: true }),
     ).toBeVisible();
     await expect(customsTab).toHaveAttribute("aria-selected", "true");
 
