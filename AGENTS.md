@@ -167,3 +167,5 @@ Backup CLI `backend/scripts/db-backup.js` preserves explicit space or equals opt
 Legacy `/api/v1/import` uses the same 10 MiB in-memory CSV/xlsx filter as preview; `importService.js` preserves internal file-path callers but HTTP never retains raw uploads.
 
 `db-backup.js` preserves literal percent sequences in Prisma SQLite DATABASE_URL paths; URI decoding could silently select a different database.
+
+`tabularImport.js` checks worksheet XML row/cell/column bounds before ExcelJS allocations, rejects merged cells and limits sheet IDs to 65535. This prevents tiny XLSX metadata from expanding unbounded model regions.

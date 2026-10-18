@@ -157,6 +157,7 @@
     "sqlite_snapshot.py refuses restore targets with existing WAL/SHM/journal sidecars to prevent old pages replacing verified snapshot data.",
     "tabularImport.js enforces 256 ZIP entries and 32 MiB actual streamed inflation before ExcelJS parsing.",
     "Legacy HTTP import uses in-memory CSV/xlsx upload filtering and never retains original source files.",
-    "db-backup.js preserves Prisma literal percent filenames instead of URI-decoding the source path."
+    "db-backup.js preserves Prisma literal percent filenames instead of URI-decoding the source path.",
+    "tabularImport.js uses streaming XML guards to reject merged cells, out-of-bound row/cell/column coordinates and sheet IDs above 65535 before ExcelJS allocates models."
   ]
 }
