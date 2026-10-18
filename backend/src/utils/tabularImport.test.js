@@ -21,3 +21,19 @@ test('xlsx rejects formulas and multiple worksheets and preserves leading zero s
   sheet.getCell('B2').value = 2; book.addWorksheet('extra');
   await assert.rejects(parse(), { statusCode: 400 });
 });
+
+test('xlsx rejects oversized expanded archives before ExcelJS loads any workbook', async t => {
+  const JSZip = require('jszip');
+  const book = new ExcelJS.Workbook();
+  const sheet = book.addWorksheet('data'); sheet.addRow(['a', 'b']); sheet.addRow(['1', '2']);
+  const zip = await JSZip.loadAsync(await book.xlsx.writeBuffer());
+  zip.file('synthetic-padding.bin', Buffer.alloc(33 * 1024 * 1024, 65));
+  const buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  assert.ok(buffer.length < 100000);
+  let loads = 0;
+  const prototype = Object.getPrototypeOf(book.xlsx);
+  const load = prototype.load;
+  t.mock.method(prototype, 'load', function (...args) { loads++; return load.apply(this, args); });
+  await assert.rejects(parseTabularFile({ originalname: 'expanded.xlsx', buffer }), { statusCode: 400 });
+  assert.equal(loads, 0);
+});

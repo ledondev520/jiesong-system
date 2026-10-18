@@ -49,3 +49,5 @@ NODE_ENV=test JWT_SECRET=test-only-jwt-secret-for-ci-123456 node --test src/serv
 ```
 
 `JIESONG_TEST_EVIDENCE_DIR` 可指定私有输出目录，测试会保存八份实际下载的模板、商品预览和期初落库读回 JSON。测试只创建临时合成数据库，结束后删除夹具。全库快照断言证明模板和预览没有副作用。
+
+- xlsx 在构建工作簿前逐项流式检查 ZIP，最多 256 个条目、实际解压总量最多 32 MiB；超限返回 400，不提取文件到磁盘。

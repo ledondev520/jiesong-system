@@ -6,11 +6,36 @@
 const path = require('node:path');
 const ExcelJS = require('exceljs');
 const Papa = require('papaparse');
+const JSZip = require('jszip');
 const { createError } = require('../middleware/errorHandler');
 
 const MAX_ROWS = 5000;
 const MAX_COLUMNS = 100;
 const acceptsTabularFile = name => /\.(csv|xlsx)$/i.test(name || '');
+
+// Bound actual streamed inflation, not attacker-controlled central-directory sizes.
+async function checkWorkbookArchive(buffer) {
+  const zip = await JSZip.loadAsync(buffer);
+  const entries = Object.values(zip.files);
+  if (entries.length > 256) throw new Error('Too many ZIP entries');
+  let expanded = 0;
+  for (const entry of entries) {
+    if (entry.dir) continue;
+    await new Promise((resolve, reject) => {
+      const stream = entry.nodeStream('nodebuffer');
+      stream.on('error', reject);
+      stream.on('end', resolve);
+      stream.on('data', chunk => {
+        expanded += chunk.length;
+        if (expanded > 32 * 1024 * 1024) {
+          const error = new Error('Expanded workbook exceeds 32 MiB');
+          stream.destroy(error);
+          reject(error);
+        }
+      });
+    });
+  }
+}
 
 async function parseTabularFile({ originalname, buffer }) {
   const extension = path.extname(originalname || '').toLowerCase();
@@ -23,8 +48,11 @@ async function parseTabularFile({ originalname, buffer }) {
     table = parsed.data;
   } else {
     const workbook = new ExcelJS.Workbook();
-    try { await workbook.xlsx.load(buffer); }
-    catch { throw createError('xlsx 文件损坏或格式无效', 400); }
+    try {
+      await checkWorkbookArchive(buffer);
+      await workbook.xlsx.load(buffer);
+    }
+    catch { throw createError('xlsx 文件损坏、格式无效或解压后超出限制', 400); }
     if (workbook.worksheets.length !== 1) throw createError('xlsx 必须只包含一个数据工作表', 400);
     const sheet = workbook.worksheets[0];
     if (sheet.rowCount > MAX_ROWS + 1 || sheet.columnCount > MAX_COLUMNS) throw createError('导入文件超出行列限制', 400);
