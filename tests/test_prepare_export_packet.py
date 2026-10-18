@@ -24,18 +24,23 @@ class PathConfigurationTests(unittest.TestCase):
             args = MODULE.parse_args(self.arguments)
         self.assertEqual(args.database, MODULE.DEFAULT_DB)
         self.assertEqual(args.history_root, MODULE.DEFAULT_HISTORY_ROOT)
-        self.assertNotIn("/Users/", str(args.history_root))
+        self.assertNotIn("com.kingsoft.wpsoffice", str(args.history_root))
 
     def test_environment_and_cli_precedence(self):
         with patch.dict("os.environ", {"JIESONG_EXPORT_DATABASE": "/tmp/synthetic.db",
                                        "JIESONG_HISTORY_ROOT": "/tmp/synthetic-history"}):
             args = MODULE.parse_args(self.arguments)
-            self.assertEqual(args.database, Path("/tmp/synthetic.db"))
-            self.assertEqual(args.history_root, Path("/tmp/synthetic-history"))
+            self.assertEqual(args.database, Path("/tmp/synthetic.db").resolve())
+            self.assertEqual(args.history_root, Path("/tmp/synthetic-history").resolve())
             args = MODULE.parse_args(self.arguments + ["--database", "/tmp/override.db",
                                                        "--history-root", "/tmp/override-history"])
-            self.assertEqual(args.database, Path("/tmp/override.db"))
-            self.assertEqual(args.history_root, Path("/tmp/override-history"))
+            self.assertEqual(args.database, Path("/tmp/override.db").resolve())
+            self.assertEqual(args.history_root, Path("/tmp/override-history").resolve())
+
+    def test_home_expansion_and_relative_paths(self):
+        with tempfile.TemporaryDirectory() as folder, patch.dict("os.environ", {}, clear=True):
+            self.assertEqual(MODULE.configured_path('~/synthetic-history'), (Path.home() / 'synthetic-history').resolve())
+            self.assertEqual(MODULE.configured_path('synthetic-relative.db'), (Path.cwd() / 'synthetic-relative.db').resolve())
 
 
 class ReadOnlySourceTests(unittest.TestCase):
