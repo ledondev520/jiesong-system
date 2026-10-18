@@ -154,3 +154,24 @@ test('async readiness fixes one policy snapshot before loading sources and obser
   assert.equal(second.lines[0].pricingProfitRate, 1.4);
   assert.match(second.lines[0].pricingFormula, /× 1.4/);
 });
+
+test('positive FX adjustments cannot turn missing or invalid spot rates into a ready quote', t => {
+  const write = withPolicy(t);
+  write({ exchangeAdjustment: 1 });
+  for (const exchangeRate of [null, undefined, '', 'invalid', NaN, Infinity, 0, -0.5]) {
+    const contract = { ...fixture.contract, exchangeRate };
+    const readiness = evaluateExportReadiness(contract, fixture.readinessOptions);
+    const actual = evaluateExportPacket(contract, readiness, [], fixture.packetOptions);
+    assert.equal(readiness.lines[0].recommendedUnitPriceUsd, null, String(exchangeRate));
+    assert.equal(actual.lines[0].rawUnitPriceUsd, 0, String(exchangeRate));
+    assert.equal(actual.ready, false, String(exchangeRate));
+    assert.ok(actual.issues.some(issue => issue.code === 'INVALID_SPOT_RATE'));
+  }
+  const readiness = evaluateExportReadiness(fixture.contract, fixture.readinessOptions);
+  const explicitZero = evaluateExportPacket(fixture.contract, readiness, [], { ...fixture.packetOptions, spotRate: 0 });
+  assert.equal(explicitZero.ready, false, 'an explicit zero must not fall back to the contract rate');
+  const smallRate = { ...fixture.contract, exchangeRate: 0.1 };
+  const smallReadiness = evaluateExportReadiness(smallRate, fixture.readinessOptions);
+  assert.ok(smallReadiness.lines[0].recommendedUnitPriceUsd > 0);
+  assert.equal(evaluateExportPacket(smallRate, smallReadiness, [], fixture.packetOptions).ready, true);
+});

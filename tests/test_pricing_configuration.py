@@ -71,3 +71,23 @@ class SharedPricingTests(unittest.TestCase):
         for unit, expected in [(130, True), (110, False), (150, False)]:
             allowed, _ = MODULE.historical_quote_allowed(unit, 10, 6.6, 6600, 0, args.no_refund_markup, args.refundable_markup, mode=args.pricing_mode)
             self.assertEqual(allowed, expected)
+
+    def test_positive_adjustment_cannot_make_a_nonpositive_spot_rate_valid(self):
+        self.write({**DEFAULTS, 'exchangeAdjustment': 1})
+        for spot in ['0', '-0.5']:
+            with self.subTest(spot=spot):
+                with self.assertRaises(SystemExit) as error:
+                    self.args(['--spot-rate', spot])
+                self.assertEqual(error.exception.code, 2)
+        self.assertEqual(self.args(['--spot-rate', '0.1']).spot_rate, 0.1)
+
+    def test_proposal_refuses_invalid_spot_before_reading_sources(self):
+        self.write({**DEFAULTS, 'exchangeAdjustment': 1})
+        args = self.args()
+        with patch.object(MODULE, 'fetch_contract_rows') as source:
+            for spot in [0, -0.5, float('nan'), float('inf')]:
+                with self.subTest(spot=spot):
+                    args.spot_rate = spot
+                    with self.assertRaisesRegex(ValueError, 'FX rate'):
+                        MODULE.build_proposal(args)
+            source.assert_not_called()
