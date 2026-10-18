@@ -1,5 +1,5 @@
 /**
- * Input: 实时库存服务、SortableTableHead、useTableSort
+ * Input: 实时库存服务、共享列表URL状态、SortableTableHead、useTableSort
  * Output: 支持当前筛选刷新、窄屏操作与长名称显示的库存状态管理 Tab 组件（单条/批量状态流转、桌面表列排序；采购/验货来源库存自动流转）
  * Pos: 商品档案页面的子 Tab
  *
@@ -8,6 +8,7 @@
 
 "use client";
 
+import { listUrlFields, useListUrlState } from "@/lib/hooks/useListUrlState";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Inventory, InventoryStatus } from "@/types";
@@ -70,14 +71,13 @@ export function InventoryTab() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [keyword, setKeyword] = useState("");
-  const [debouncedKeyword, setDebouncedKeyword] = useState("");
+  const [{ keyword, page: currentPage, pageSize }, setListState] =
+    useListUrlState(listUrlFields.inventory);
+  const [debouncedKeyword, setDebouncedKeyword] = useState(keyword.trim());
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [batchUpdating, setBatchUpdating] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   // 分页状态
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   const [refreshVersion, setRefreshVersion] = useState(0);
 
   /**
@@ -309,8 +309,7 @@ export function InventoryTab() {
             placeholder="搜索商品/采购合同..."
             value={keyword}
             onChange={(event) => {
-              setKeyword(event.target.value);
-              setCurrentPage(1);
+              setListState({ keyword: event.target.value });
             }}
             className="h-10 rounded-xl border-border/70 bg-background/70 pl-9"
           />
@@ -321,9 +320,8 @@ export function InventoryTab() {
             size="sm"
             className="h-10 rounded-xl"
             onClick={() => {
-              setKeyword("");
+              setListState({ keyword: "" });
               setDebouncedKeyword("");
-              setCurrentPage(1);
             }}
           >
             <X className="h-4 w-4 mr-1" />
@@ -379,8 +377,7 @@ export function InventoryTab() {
                   placeholder="搜索商品/采购合同..."
                   value={keyword}
                   onChange={(event) => {
-                    setKeyword(event.target.value);
-                    setCurrentPage(1);
+                    setListState({ keyword: event.target.value });
                   }}
                   className="h-11 rounded-2xl border-border/70 bg-background/80 pl-9"
                 />
@@ -390,9 +387,8 @@ export function InventoryTab() {
                   variant="outline"
                   className="h-11 w-full rounded-2xl"
                   onClick={() => {
-                    setKeyword("");
+                    setListState({ keyword: "" });
                     setDebouncedKeyword("");
-                    setCurrentPage(1);
                   }}
                 >
                   <X className="mr-2 h-4 w-4" />
@@ -728,14 +724,13 @@ export function InventoryTab() {
           <PageSizeSelect
             value={pageSize}
             onChange={(size) => {
-              setPageSize(size);
-              setCurrentPage(1);
+              setListState({ pageSize: size });
             }}
           />
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            onClick={() => setListState({ page: Math.max(1, currentPage - 1) })}
             disabled={currentPage === 1}
           >
             上一页
@@ -743,7 +738,9 @@ export function InventoryTab() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() =>
+              setListState({ page: Math.min(totalPages, currentPage + 1) })
+            }
             disabled={currentPage === totalPages || totalPages <= 1}
           >
             下一页

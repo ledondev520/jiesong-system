@@ -4,3 +4,5 @@
 - `page.test.tsx`：URL 初始搜索、关键词编辑/清空、分页和新增入口回归
 - `page.lifecycle.test.tsx`：结合真实编辑组件覆盖新增/编辑失败保留全部输入并原样重试、重复提交只保存一次、关闭待保存会话后另开新草稿、旧保存不恢复旧搜索及空列表新增不带入旧编辑
 - `components/`：商品编辑和库存状态组件，生命周期边界与回归见该目录 README
+
+商品/库存页签由 `useListUrlState(listUrlFields.productTabs)` 写入URL的tab字段，库存查询参数独立保留。

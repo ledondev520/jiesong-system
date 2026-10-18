@@ -1,6 +1,6 @@
 /**
  * Input: catalogue form payloads and Prisma
- * Output: port/category persistence with nonblank required fields
+ * Output: port partial updates through a shared boundary and validated category persistence
  * Pos: ordinary system catalogue controller; rejected edits do not change saved fields
  */
 const prisma = require('../../utils/prisma');
@@ -8,6 +8,14 @@ const { success, paginated } = require('../../utils/response');
 const { createError } = require('../../middleware/errorHandler');
 const { normalizePagination } = require('../../utils/pagination');
 const { parseOptionalText } = require('../../utils/text');
+
+const { partialUpdate } = require('../../utils/partialUpdate');
+
+const portFields = {
+  name: { type: 'string', required: true, message: '港口名称和代码不能为空' },
+  code: { type: 'string', required: true, normalize: value => value.toUpperCase(), message: '港口名称和代码不能为空' },
+  isActive: { type: 'boolean' },
+};
 
 const normalizePortPayload = (value) => {
   if (!value) {
@@ -29,8 +37,8 @@ const getPorts = async (req, res, next) => {
     }
     if (keyword) {
       where.OR = [
-        { name: { contains: keyword, mode: 'insensitive' } },
-        { code: { contains: keyword, mode: 'insensitive' } },
+        { name: { contains: keyword } },
+        { code: { contains: keyword } },
       ];
     }
 
@@ -84,10 +92,6 @@ const createPort = async (req, res, next) => {
 const updatePort = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const name = req.body.name === undefined ? undefined : String(req.body.name ?? '').trim();
-    const code = req.body.code === undefined ? undefined : String(req.body.code ?? '').trim().toUpperCase();
-    const isActive = req.body.isActive;
-
     const existing = await prisma.port.findUnique({
       where: { id },
       select: { id: true },
@@ -97,9 +101,8 @@ const updatePort = async (req, res, next) => {
       throw createError('港口不存在', 404);
     }
 
-    if (name === '' || code === '') {
-      throw createError('港口名称和代码不能为空', 400);
-    }
+    const data = partialUpdate(req.body, portFields);
+    const { name, code } = data;
 
     if (name || code) {
       const duplicated = await prisma.port.findFirst({
@@ -120,11 +123,7 @@ const updatePort = async (req, res, next) => {
 
     const port = await prisma.port.update({
       where: { id },
-      data: {
-        ...(name !== undefined ? { name } : {}),
-        ...(code !== undefined ? { code } : {}),
-        ...(isActive !== undefined ? { isActive } : {}),
-      },
+      data,
     });
 
     success(res, port, '港口更新成功');

@@ -6,17 +6,17 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import ProductsPage from './page';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import ProductsPage from "./page";
 
 const mockGetAll = vi.fn();
 const mockToastError = vi.fn();
 const mockSearchParamGet = vi.fn();
 const mockRouterPush = vi.fn();
 
-vi.mock('next/navigation', () => ({
+vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockRouterPush,
     back: vi.fn(),
@@ -24,10 +24,10 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => ({
     get: (...args: unknown[]) => mockSearchParamGet(...args),
   }),
-  usePathname: () => '/dashboard/products',
+  usePathname: () => "/dashboard/products",
 }));
 
-vi.mock('@/services/product.service', () => ({
+vi.mock("@/services/product.service", () => ({
   productService: {
     getAll: (...args: unknown[]) => mockGetAll(...args),
     create: vi.fn(),
@@ -36,45 +36,60 @@ vi.mock('@/services/product.service', () => ({
   },
 }));
 
-vi.mock('sonner', () => ({
+vi.mock("sonner", () => ({
   toast: {
     error: (...args: unknown[]) => mockToastError(...args),
     success: vi.fn(),
   },
 }));
 
-vi.mock('./components/ProductDialog', () => ({
-  ProductDialog: ({
-    open,
-  }: {
-    open: boolean;
-  }) => (open ? <div>商品弹窗已打开</div> : null),
+vi.mock("./components/ProductDialog", () => ({
+  ProductDialog: ({ open }: { open: boolean }) =>
+    open ? <div>商品弹窗已打开</div> : null,
 }));
 
-vi.mock('./components/InventoryTab', () => ({
+vi.mock("./components/InventoryTab", () => ({
   InventoryTab: () => <div>库存状态 Tab</div>,
 }));
 
-describe('ProductsPage 交互逻辑', () => {
+describe("ProductsPage 交互逻辑", () => {
   beforeEach(() => {
+    window.history.replaceState({}, "", "/dashboard/products");
     mockGetAll.mockReset();
     mockToastError.mockReset();
     mockSearchParamGet.mockReset();
-    mockSearchParamGet.mockImplementation((key: string) => (key === 'keyword' ? '' : null));
+    mockSearchParamGet.mockImplementation((key: string) =>
+      key === "keyword" ? "" : null,
+    );
   });
 
-  it('按服务端总数翻到第二页，保留低库存筛选', async () => {
-    mockSearchParamGet.mockImplementation((key: string) => key === 'lowStock' ? 'true' : null);
-    mockGetAll.mockResolvedValue({ data: { items: [], pagination: { total: 140, page: 1, pageSize: 20, totalPages: 7 } } });
+  it("按服务端总数翻到第二页，保留低库存筛选", async () => {
+    mockSearchParamGet.mockImplementation((key: string) =>
+      key === "lowStock" ? "true" : null,
+    );
+    mockGetAll.mockResolvedValue({
+      data: {
+        items: [],
+        pagination: { total: 140, page: 1, pageSize: 20, totalPages: 7 },
+      },
+    });
     const user = userEvent.setup();
     render(<ProductsPage />);
-    await waitFor(() => expect(screen.getByRole('button', { name: '下一页' })).toBeEnabled());
-    await user.click(screen.getByRole('button', { name: '下一页' }));
-    await waitFor(() => expect(mockGetAll).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, pageSize: 20, lowStock: true })));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "下一页" })).toBeEnabled(),
+    );
+    await user.click(screen.getByRole("button", { name: "下一页" }));
+    await waitFor(() =>
+      expect(mockGetAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 2, pageSize: 20, lowStock: true }),
+      ),
+    );
   });
 
-  it('根据URL关键词初始化并拉取列表', async () => {
-    mockSearchParamGet.mockImplementation((key: string) => (key === 'keyword' ? '苹果' : null));
+  it("根据URL关键词初始化并拉取列表", async () => {
+    mockSearchParamGet.mockImplementation((key: string) =>
+      key === "keyword" ? "苹果" : null,
+    );
     mockGetAll.mockResolvedValue({ data: { items: [] } });
 
     render(<ProductsPage />);
@@ -83,57 +98,94 @@ describe('ProductsPage 交互逻辑', () => {
       expect(mockGetAll).toHaveBeenCalledWith({
         page: 1,
         pageSize: 20,
-        keyword: '苹果',
+        keyword: "苹果",
         lite: true,
       });
-      expect(screen.getByDisplayValue('苹果')).toBeInTheDocument();
+      expect(screen.getByDisplayValue("苹果")).toBeInTheDocument();
     });
   });
 
-  it('修改搜索关键词会触发重新查询', async () => {
+  it("修改搜索关键词会触发重新查询", async () => {
     mockGetAll.mockResolvedValue({ data: { items: [] } });
     const user = userEvent.setup();
     render(<ProductsPage />);
 
-    const input = screen.getByPlaceholderText('搜索商品...');
+    const input = screen.getByPlaceholderText("搜索商品...");
     await user.clear(input);
-    await user.type(input, '香蕉');
+    await user.type(input, "香蕉");
 
     await waitFor(() => {
       expect(mockGetAll).toHaveBeenLastCalledWith({
         page: 1,
         pageSize: 20,
-        keyword: '香蕉',
+        keyword: "香蕉",
         lite: true,
       });
     });
   });
 
-  it('从全局搜索进入后允许修改和清空 URL 初始关键词', async () => {
-    mockSearchParamGet.mockImplementation((key: string) => (key === 'keyword' ? '苹果' : null));
+  it("从全局搜索进入后允许修改和清空 URL 初始关键词", async () => {
+    mockSearchParamGet.mockImplementation((key: string) =>
+      key === "keyword" ? "苹果" : null,
+    );
     mockGetAll.mockResolvedValue({ data: { items: [] } });
     const user = userEvent.setup();
     render(<ProductsPage />);
 
-    const input = screen.getByPlaceholderText('搜索商品...');
+    const input = screen.getByPlaceholderText("搜索商品...");
     await user.clear(input);
-    await user.type(input, '香蕉');
+    await user.type(input, "香蕉");
     await waitFor(() => {
-      expect(mockGetAll).toHaveBeenLastCalledWith({ page: 1, pageSize: 20, keyword: '香蕉', lite: true });
+      expect(mockGetAll).toHaveBeenLastCalledWith({
+        page: 1,
+        pageSize: 20,
+        keyword: "香蕉",
+        lite: true,
+      });
     });
 
     await user.clear(input);
     await waitFor(() => {
-      expect(mockGetAll).toHaveBeenLastCalledWith({ page: 1, pageSize: 20, keyword: undefined, lite: true });
+      expect(mockGetAll).toHaveBeenLastCalledWith({
+        page: 1,
+        pageSize: 20,
+        keyword: undefined,
+        lite: true,
+      });
     });
   });
 
-  it('点击新增商品会打开弹窗', async () => {
+  it("点击新增商品会打开弹窗", async () => {
     mockGetAll.mockResolvedValue({ data: { items: [] } });
     const user = userEvent.setup();
     render(<ProductsPage />);
 
-    await user.click(screen.getByRole('button', { name: /新增商品/ }));
-    expect(screen.getByText('商品弹窗已打开')).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /新增商品/ }));
+    expect(screen.getByText("商品弹窗已打开")).toBeInTheDocument();
   });
+});
+
+it("刷新商品页面恢复库存页签并保留库存查询参数", async () => {
+  window.history.replaceState(
+    {},
+    "",
+    "/dashboard/products?tab=inventory&inventoryKeyword=SYN&inventoryPage=3",
+  );
+  mockGetAll.mockResolvedValue({ data: { items: [] } });
+  const view = render(<ProductsPage />);
+  expect(await screen.findByText("库存状态 Tab")).toBeVisible();
+  expect(screen.getByRole("tab", { name: "库存状态" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await userEvent.setup().click(screen.getByRole("tab", { name: "商品档案" }));
+  expect(new URLSearchParams(window.location.search).get("inventoryPage")).toBe(
+    "3",
+  );
+  view.unmount();
+  render(<ProductsPage />);
+  expect(screen.getByRole("tab", { name: "商品档案" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
 });

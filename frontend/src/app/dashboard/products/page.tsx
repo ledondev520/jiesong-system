@@ -1,5 +1,5 @@
 /**
- * Input: 商品服务API、库存服务API、URL 初始关键词、独立商品编辑/保存会话
+ * Input: 商品服务API、库存服务API、URL页签与初始关键词、独立商品编辑/保存会话
  * Output: 商品管理页面，失败保留草稿、旧保存不干扰新会话或当前筛选
  * Pos: 采购模块子页面
  *
@@ -13,6 +13,7 @@ import {
   useBusinessReadOnly,
 } from "@/lib/hooks/useBusinessReadOnly";
 import { Suspense, useState, useEffect, useCallback, useRef } from "react";
+import { listUrlFields, useListUrlState } from "@/lib/hooks/useListUrlState";
 import { useSearchParams } from "next/navigation";
 import { Product } from "@/types";
 import { productService } from "@/services/product.service";
@@ -76,6 +77,7 @@ const DEFAULT_PAGE_SIZE = 20;
 
 function ProductsPageContent() {
   const readOnly = useBusinessReadOnly();
+  const [{ tab }, setTabState] = useListUrlState(listUrlFields.productTabs);
   const searchParams = useSearchParams();
   const initialKeyword = searchParams.get("keyword") || "";
   const lowStockParam = searchParams.get("lowStock") === "true";
@@ -249,7 +251,11 @@ function ProductsPageContent() {
       <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
       <PageHeader title="商品管理" />
 
-      <Tabs defaultValue="products" className="space-y-4">
+      <Tabs
+        value={tab}
+        onValueChange={(tab) => setTabState({ tab })}
+        className="space-y-4"
+      >
         <TabsList>
           <TabsTrigger value="products">商品档案</TabsTrigger>
           <TabsTrigger value="inventory">库存状态</TabsTrigger>

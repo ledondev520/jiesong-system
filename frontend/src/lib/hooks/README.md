@@ -7,3 +7,5 @@
 `useContractFileAccess.test.ts` 直接验证旧媒体错误不会撤销新预览。组件层分别覆盖合同附件和核对原件的流程；其余业务 Hooks 保持既有职责。
 
 `useBrowserQuery.ts` 同样为工作台范围和经营报表已应用期间读取实际浏览器地址，调用方显式提供 Next 服务端查询快照。`replaceBrowserQuery` 只修改所属字段、保留其他参数/片段，并通过同一 `replaceBrowserUrl` 和应用专用事件提交，不启动路由请求或增加第二套通知。
+
+`useListUrlState.ts` 是列表筛选、分页和页签的唯一状态 hook。使用字段定义、空值默认项与枚举校验解析 URL；筛选或每页条数变化原子重置页码。提交只写所属参数，保留其他查询、hash与页签，嵌入视图可检查当前页签后拒绝迟到事件。库存用 inventory 前缀隔离商品查询；报关沿用 keyword/status/page/pageSize。刷新和历史导航直接读取 URL。`useBrowserQuery` 只负责底层订阅与提交。
