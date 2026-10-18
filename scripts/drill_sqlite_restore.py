@@ -37,7 +37,8 @@ def main():
     rows = "SELECT id, productId, quantity, unit, status, note FROM inventories ORDER BY id"
     expected = connection.execute(rows).fetchall()
     environment = {key: value for key, value in os.environ.items() if key in ['PATH', 'LANG', 'LC_ALL']}
-    environment['DATABASE_URL'] = database.as_uri()
+    # Prisma's file: paths preserve literal spaces/percent sequences.
+    environment['DATABASE_URL'] = 'file:' + str(database)
     started = time.monotonic()
     backup_command = ['node', 'scripts/db-backup.js', '--backup-dir', str(directory / 'backups')]
     saved = json.loads(subprocess.check_output(backup_command, cwd=ROOT / 'backend', env=environment, text=True))

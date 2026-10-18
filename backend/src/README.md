@@ -89,7 +89,7 @@
 | anthropicCompatService.js | Open Agent 的 OpenAI 协议适配，保留思考/工具回合与图像，共用请求时限及模型参数 |
 | openAgentService.js | 出口详情复用销售服务从装箱行计算拼柜来源；内部草稿按请求直接执行；其他写操作一次确认；当前 AI 客户端校验与零自动重试、工具角色与执行回放；SDK 错误终止传播为 503/SSE error，不写成功记录 |
 | agentReplaySummaryService.js | Agent 回放摘要持久化，支持复用外层事务客户端 |
-| importService.js | CSV数据解析与导入 |
+| importService.js | 仅内存CSV/xlsx字节导入，拒绝字符串路径与磁盘上传对象，避免路径穿越/绝对路径/符号链接读取 |
 | exportService.js | 多格式数据导出（CSV + 出口合同五 Sheet Excel 含商业发票/税务测算）；收付款 CSV 沿用财务现有 PAYABLE/PAYABLE_PAYMENT/EXPENSE 应付分组，只转换标签 |
 | pdfExportService.js | 销售合同 / 系统数据 PDF 导出 |
 | exportReadinessService.js | 全量出口装箱行、逐行确认优先的 HS/申报要素/货源地、出口价格与采购专票口径退税准备度 |
@@ -174,6 +174,14 @@
 - 通用导入共享 `utils/tabularImport.js` 的 CSV/xlsx 解码。只接受一个工作表、最多 5000 行和 100 列，拒绝公式、重复表头、损坏文件，输入错误返回 400。
 - `services/catalogImportService.js` 在 ADMIN 导入边界共享四类模板，预览无写入，执行重新校验并整批事务新增。库存期初显式确认且保留独立来源编号；详见 `docs/migration/catalog-import.md`。
 - `services/bootstrapAdmin.js` 在 `app.js` 监听端口和启动定时任务之前检查管理员。缺初始化管理员或仍使用旧默认密码且没有新配置时，启动失败。显式新密码仅创建管理员或修复旧默认密码，不覆盖现有安全密码。
+
+- 管理员已有安全密码时忽略未使用的 bootstrap 配置；仅创建或修复时验证初始化密码策略。
+
+- xlsx 在构建工作簿前逐项流式检查 ZIP，最多 256 个条目、实际解压总量最多 32 MiB；超限返回 400，不提取文件到磁盘。
+
+- 旧通用 HTTP 上传入口也使用 10 MiB 内存接收和 CSV/xlsx 扩展名过滤，成功或失败都不归档原始上传文件；旧记录和逐行导入事务保持原有契约。
+
+- xlsx 合并单元格需先拆分并粘贴为值；加载前检查实际行/单元格/列索引（5001 行含表头、100 列）及工作表 ID（最多 65535），避免小文件声明巨型区域耗尽内存。
 
 `services/pricingConfigService.js` 读取共用的 `config/pricing.json` 与 schema，
 `controllers/system/pricingController.js` 提供 ADMIN-only 报价配置 GET/PUT。

@@ -12,6 +12,26 @@ const { ensureBootstrapAdmin } = require('./bootstrapAdmin');
 
 test('bootstrap admin: explicit password, legacy remediation, session revocation and safe reseeding', async t => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-bootstrap-')); fs.chmodSync(dir, 0o700);
+  const runtime = path.join(dir, 'runtime');
+  const backendRoot = path.resolve(__dirname, '../..');
+  // Copy only versioned source, excluding host .env, databases, uploads and runtime state.
+  const tracked = execFileSync('git', ['ls-files', '-z', 'backend/src'], { cwd: path.join(backendRoot, '..'), encoding: 'utf8' }).split('\0').filter(Boolean);
+  for (const name of tracked) {
+    const target = path.join(runtime, name.slice('backend/'.length));
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(path.join(backendRoot, '..', name), target);
+  }
+  fs.symlinkSync(path.join(backendRoot, 'node_modules'), path.join(runtime, 'node_modules'), 'dir');
+  const probe = path.join(dir, 'env-path-probe.js');
+  fs.writeFileSync(probe, `const Module = require('node:module'); const load = Module._load;
+Module._load = function(name, ...args) {
+  const loaded = load.call(this, name, ...args);
+  if (name === 'dotenv') return { ...loaded, config(options) {
+    if (options.path !== ${JSON.stringify(path.join(runtime, '.env'))}) throw new Error('Host environment read attempted');
+    return loaded.config(options);
+  } };
+  return loaded;
+};`, { mode: 0o600 });
   const url = `file:${path.join(dir, 'synthetic.db')}`;
   const migrations = path.resolve(__dirname, '../../prisma/migrations');
   const ddl = fs.readdirSync(migrations).sort().filter(name => fs.statSync(path.join(migrations, name)).isDirectory()).map(name => fs.readFileSync(path.join(migrations, name, 'migration.sql'), 'utf8')).join('\n');
@@ -19,7 +39,7 @@ test('bootstrap admin: explicit password, legacy remediation, session revocation
   const db = new PrismaClient({ datasources: { db: { url } } });
   t.after(async () => { await db.$disconnect(); fs.rmSync(dir, { recursive: true, force: true }); });
   const password = crypto.randomBytes(24).toString('hex');
-  const startup = () => spawnSync(process.execPath, ['src/app.js'], { cwd: path.resolve(__dirname, '../..'), timeout: 10000, encoding: 'utf8', env: {
+  const startup = () => spawnSync(process.execPath, ['--require', probe, 'src/app.js'], { cwd: runtime, timeout: 10000, encoding: 'utf8', env: {
     PATH: process.env.PATH, NODE_ENV: 'test', DATABASE_URL: url, JWT_SECRET: crypto.randomBytes(32).toString('hex'),
   } });
   const missing = startup(); assert.equal(missing.status, 1); assert.match(missing.stderr, /启动失败/);
@@ -38,11 +58,11 @@ test('bootstrap admin: explicit password, legacy remediation, session revocation
   assert.equal(upgraded.sessionVersion, 4); assert.equal(await bcrypt.compare(password, upgraded.password), true);
   assert.equal(await bcrypt.compare('123456', upgraded.password), false);
   assert.equal((await ensureBootstrapAdmin(db, { password: undefined })).sessionVersion, 4);
-  const probe = require('node:net').createServer();
-  await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve));
-  const port = probe.address().port;
-  await new Promise(resolve => probe.close(resolve));
-  const child = spawn(process.execPath, ['src/app.js'], { cwd: path.resolve(__dirname, '../..'), stdio: 'ignore', env: {
+  const portProbe = require('node:net').createServer();
+  await new Promise(resolve => portProbe.listen(0, '127.0.0.1', resolve));
+  const port = portProbe.address().port;
+  await new Promise(resolve => portProbe.close(resolve));
+  const child = spawn(process.execPath, ['--require', probe, 'src/app.js'], { cwd: runtime, stdio: 'ignore', env: {
     PATH: process.env.PATH, NODE_ENV: 'test', DATABASE_URL: url,
     JWT_SECRET: crypto.randomBytes(32).toString('hex'), PORT: String(port), UPLOAD_DIR: path.join(dir, 'uploads'),
   } });

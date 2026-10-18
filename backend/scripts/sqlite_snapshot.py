@@ -51,7 +51,9 @@ def hash_stream(handle):
 
 
 def verify_database(path):
-    with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as connection:
+    # Only sealed temporary copies are verified, never a live source/WAL database.
+    # Immutable reads avoid creating untracked WAL/SHM sidecars for WAL-mode snapshots.
+    with closing(sqlite3.connect(path.as_uri() + "?mode=ro&immutable=1", uri=True)) as connection:
         if connection.execute("PRAGMA integrity_check").fetchall() != [("ok",)]:
             raise ValueError("SQLite integrity check failed")
 
@@ -85,6 +87,7 @@ def backup(database, backup_dir, keep=5):
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     destination = directory / f"snapshot_{timestamp}_{uuid.uuid4().hex[:8]}.db"
     manifest = Path(str(destination) + ".manifest.json")
+    linked = manifest_created = complete = False
     try:
         deadline = time.monotonic() + 60
 
@@ -100,12 +103,16 @@ def backup(database, backup_dir, keep=5):
         metadata = {"version": 1, "created_at": timestamp, "sha256": digest(temporary),
                     "bytes": temporary.stat().st_size, "integrity": "ok", "sqlite_version": sqlite3.sqlite_version}
         os.link(temporary, destination)
-        with os.fdopen(os.open(manifest, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w", encoding="utf8") as handle:
+        linked = True
+        descriptor = os.open(manifest, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        manifest_created = True
+        with os.fdopen(descriptor, "w", encoding="utf8") as handle:
             json.dump(metadata, handle, sort_keys=True, indent=2)
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
         sync_directory(directory)
+        complete = True
         snapshots = sorted((entry for entry in directory.iterdir()
                             if SNAPSHOT_NAME.fullmatch(entry.name)
                             and entry.is_file() and not entry.is_symlink()
@@ -115,14 +122,28 @@ def backup(database, backup_dir, keep=5):
             Path(str(old) + ".manifest.json").unlink()
         return {"backup": str(destination), "manifest": str(manifest), **metadata}
     finally:
+        if not complete:
+            if manifest_created:
+                manifest.unlink(missing_ok=True)
+            if linked:
+                destination.unlink(missing_ok=True)
         temporary.unlink(missing_ok=True)
+
+
+def assert_new_restore_path(target):
+    if target.exists() or target.is_symlink():
+        raise ValueError("Restore target already exists; restore to a new private path")
+    # Even without the main file, an old WAL/hot journal can replace restored pages.
+    for suffix in ("-wal", "-shm", "-journal"):
+        sidecar = Path(str(target) + suffix)
+        if sidecar.exists() or sidecar.is_symlink():
+            raise ValueError("Restore target has an existing SQLite sidecar; choose a new path")
 
 
 def restore(backup_file, database):
     source = regular_file(backup_file)
     target = Path(database).absolute()
-    if target.exists() or target.is_symlink():
-        raise ValueError("Restore target already exists; restore to a new private path")
+    assert_new_restore_path(target)
     directory = private_directory(target.parent)
     manifest = regular_file(str(source) + ".manifest.json")
     if stat.S_IMODE(source.stat().st_mode) & 0o077 or stat.S_IMODE(manifest.stat().st_mode) & 0o077:
@@ -137,6 +158,7 @@ def restore(backup_file, database):
             raise ValueError("Snapshot checksum or size mismatch")
         verify_database(temporary)
         sync_file(temporary)
+        assert_new_restore_path(target)
         os.link(temporary, target)
         sync_directory(directory)
         return {"restored": str(target), "sha256": metadata["sha256"], "bytes": metadata["bytes"], "integrity": "ok"}

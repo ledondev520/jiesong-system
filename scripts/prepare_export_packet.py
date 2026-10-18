@@ -9,6 +9,7 @@ historical EXP workbooks, then prints an auditable JSON proposal.
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import json
 import math
 import os
@@ -335,37 +336,36 @@ def calculate_price(
 
 
 def fetch_contract_rows(database: Path, contract_no: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    connection = sqlite3.connect(database)
-    connection.row_factory = sqlite3.Row
-    header = connection.execute(
-        """
-        SELECT sc.contractNo, sc.exchangeRate, sc.totalAmount, sc.containerLabel,
-               sc.shippedAt, sc.customsBroker, po.name AS port
-          FROM sales_contracts sc
-          LEFT JOIN ports po ON po.id = sc.portId
-         WHERE sc.contractNo = ?
-        """,
-        (contract_no,),
-    ).fetchone()
-    if not header:
-        raise ValueError(f"Contract not found: {contract_no}")
-    rows = connection.execute(
-        """
-        SELECT pi.id, p.customsName, p.hsCode, p.declaration,
-               pi.quantity, pi.unit, pi.boxes, pi.grossWeight, pi.netWeight,
-               pi.volume, pi.purchaseCost, pi.specification, pi.supplement,
-               pi.manufacturer, pi.purchaseContractNo, st.name AS store
-          FROM packing_items pi
-          JOIN sales_contracts sc ON sc.id = pi.salesContractId
-          JOIN products p ON p.id = pi.productId
-          LEFT JOIN stores st ON st.id = pi.storeId
-         WHERE sc.contractNo = ?
-         ORDER BY pi.createdAt, pi.id
-        """,
-        (contract_no,),
-    ).fetchall()
-    connection.close()
-    return dict(header), [dict(row) for row in rows]
+    with closing(sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)) as connection:
+        connection.row_factory = sqlite3.Row
+        header = connection.execute(
+            """
+            SELECT sc.contractNo, sc.exchangeRate, sc.totalAmount, sc.containerLabel,
+                   sc.shippedAt, sc.customsBroker, po.name AS port
+              FROM sales_contracts sc
+              LEFT JOIN ports po ON po.id = sc.portId
+             WHERE sc.contractNo = ?
+            """,
+            (contract_no,),
+        ).fetchone()
+        if not header:
+            raise ValueError(f"Contract not found: {contract_no}")
+        rows = connection.execute(
+            """
+            SELECT pi.id, p.customsName, p.hsCode, p.declaration,
+                   pi.quantity, pi.unit, pi.boxes, pi.grossWeight, pi.netWeight,
+                   pi.volume, pi.purchaseCost, pi.specification, pi.supplement,
+                   pi.manufacturer, pi.purchaseContractNo, st.name AS store
+              FROM packing_items pi
+              JOIN sales_contracts sc ON sc.id = pi.salesContractId
+              JOIN products p ON p.id = pi.productId
+              LEFT JOIN stores st ON st.id = pi.storeId
+             WHERE sc.contractNo = ?
+             ORDER BY pi.createdAt, pi.id
+            """,
+            (contract_no,),
+        ).fetchall()
+        return dict(header), [dict(row) for row in rows]
 
 
 def read_catalog(path: Path) -> dict[str, dict[str, Any]]:

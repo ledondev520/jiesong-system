@@ -148,7 +148,9 @@ describe("fileDownload", () => {
         status: 500,
         message: "文件导出失败（500）",
       });
-      expect(clickSpy).toHaveBeenCalled();
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
+      expect(revokeObjectURL).toHaveBeenCalledTimes(1);
       expect(await createObjectURL.mock.calls[0][0].text()).toBe("excel");
       expect(revokeObjectURL).toHaveBeenCalledWith("blob:ok-url");
     } finally {

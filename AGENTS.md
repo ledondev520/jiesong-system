@@ -156,6 +156,20 @@
 - `backend/scripts/sqlite_snapshot.py` 使用SQLite在线backup API读取已提交WAL，快照与manifest为0600、输出目录0700。恢复拒绝既有目标；脚本不备份.env或上传附件，不声称具备异地备份或完整业务灾备。
 - 默认历史工作簿目录 `data/export-history/` 必须保持Git忽略；用 `git check-ignore data/export-history/<file>.xlsx` 验证，不提交源工作簿。
 
+Backup CLI `backend/scripts/db-backup.js` preserves explicit space or equals options before environment/default selection.
+
+`bootstrapAdmin.js` validates bootstrap password policy only when creating/remediating an account; unused stale settings cannot block an already-secure administrator.
+
+`sqlite_snapshot.py` restore rejects existing target SQLite `-wal`, `-shm` and `-journal` sidecars (including dangling symlinks); never delete recovery evidence to make a path available. Use a private directory without concurrent writers.
+
+`tabularImport.js` streams ZIP entries before ExcelJS parsing: at most 256 entries and 32 MiB actual expanded bytes. JSZip is declared directly at the already locked version; no files are extracted.
+
+Legacy `/api/v1/import` uses the same 10 MiB in-memory CSV/xlsx filter as preview; `importService.js` accepts only in-memory bytes and rejects filesystem paths, including traversal, absolute paths and symlinks. HTTP never retains raw uploads.
+
+`db-backup.js` preserves literal percent sequences in Prisma SQLite DATABASE_URL paths; URI decoding could silently select a different database.
+
+`tabularImport.js` checks worksheet XML row/cell/column bounds before ExcelJS allocations, rejects merged cells and limits sheet IDs to 65535. This prevents tiny XLSX metadata from expanding unbounded model regions.
+
 ## Export pricing configuration
 - `exportReadinessService`, `exportPacketService`, and Python use `config/pricing.json` and `config/pricing.schema.json` as their shared value and validation sources. Readiness recommendations use packet tiered rounding by default; multiplier requires explicit mode selection. Do not add silent defaults in consumers or pricing overrides through ordinary SystemConfig.
 - `backend/src/services/pricingConfigService.js` validates every snapshot, atomically replaces the complete file for ADMIN requests, rejects stale revisions, and logs only actor/field names/hashes. Filesystem edits are logged on next load; offline edits require operator filesystem audit. No pricing loader reads .env.

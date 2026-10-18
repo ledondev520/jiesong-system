@@ -7,17 +7,19 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const args = process.argv.slice(2);
+const hasOption = name => args.some(arg => arg === name || arg.startsWith(name + '='));
 if (!args.includes('--help')) {
-  if (!args.includes('--database')) {
+  if (!hasOption('--database')) {
     const url = process.env.DATABASE_URL || '';
     if (!url.startsWith('file:') || !url.slice(5).split('?')[0]) {
       console.error('[db-backup] Set a SQLite DATABASE_URL in the process environment or pass --database explicitly.');
       process.exit(1);
     }
-    const source = decodeURIComponent(url.slice(5).split('?')[0]);
+    // Prisma SQLite file paths preserve literal percent sequences (including %20).
+    const source = url.slice(5).split('?')[0];
     args.push('--database', path.resolve(__dirname, '../prisma', source));
   }
-  if (!args.includes('--backup-dir')) args.push('--backup-dir', path.resolve(__dirname, '../prisma/backups'));
+  if (!hasOption('--backup-dir')) args.push('--backup-dir', path.resolve(__dirname, '../prisma/backups'));
 }
 const result = spawnSync('python3', [path.join(__dirname, 'sqlite_snapshot.py'), 'backup', ...args], { stdio: 'inherit' });
 if (result.error) console.error('[db-backup] Python 3 with sqlite3 is required.');
