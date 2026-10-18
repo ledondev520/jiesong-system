@@ -16,3 +16,7 @@
 | 报关、核销、退税、税率 | `backend/src/services/{customsDeclarationService,forexVerificationService,taxRefundService,taxRateService}.js` | 草稿替换、业务状态与财务口径须单独测试 |
 | 用户、档案、配置及财务资料 | `backend/src/controllers/userController.js`、`backend/src/services/authService.js`、`backend/src/controllers/system/configController.js`、`backend/src/services/financialLibraryService.js` | 权限、会话、敏感字段与快照约束须单独审查 |
 | 其他存量写入口 | `lifecycle/legacy-routes.json` | 逐路由记录，新增入口不得加入豁免基线 |
+
+## 列表URL状态
+
+`frontend/src/lib/hooks/useListUrlState.ts` 持有列表字段定义。页面只调用setState，不再手写URL拼接或用effect把本地筛选写回URL。库存分页、筛选与商品页签和报关分页、筛选已迁移。已有安全报关returnTo解析与新文档返回仍由 `customs-return-context.ts` 负责，返回地址包含全部分页字段。其他列表为存量，逐步迁移。

@@ -633,7 +633,7 @@ describe("退税页签实际组件的路由流转", () => {
     window.history.forward();
     await waitFor(() => {
       expect(window.location.search).toBe(
-        "?view=customs&source=qa&keyword=NEW&status=RELEASED",
+        "?view=customs&source=qa&keyword=NEW&status=RELEASED&page=2",
       );
       expect(screen.getByDisplayValue("NEW")).toBeVisible();
     });
@@ -642,7 +642,7 @@ describe("退税页签实际组件的路由流转", () => {
         expect.objectContaining({
           keyword: "NEW",
           status: "RELEASED",
-          page: 1,
+          page: 2,
         }),
       ),
     );
