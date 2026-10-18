@@ -1,6 +1,8 @@
 import importlib.util
 import math
 import sys
+import sqlite3
+import tempfile
 import unittest
 from unittest.mock import patch
 from pathlib import Path
@@ -34,6 +36,15 @@ class PathConfigurationTests(unittest.TestCase):
                                                        "--history-root", "/tmp/override-history"])
             self.assertEqual(args.database, Path("/tmp/override.db"))
             self.assertEqual(args.history_root, Path("/tmp/override-history"))
+
+
+class ReadOnlySourceTests(unittest.TestCase):
+    def test_missing_database_is_never_created(self):
+        with tempfile.TemporaryDirectory() as folder:
+            database = Path(folder) / 'missing.db'
+            with self.assertRaises(sqlite3.OperationalError):
+                MODULE.fetch_contract_rows(database, 'SYNTHETIC')
+            self.assertFalse(database.exists())
 
 
 class PricingTests(unittest.TestCase):
