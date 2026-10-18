@@ -128,11 +128,20 @@ def backup(database, backup_dir, keep=5):
         temporary.unlink(missing_ok=True)
 
 
+def assert_new_restore_path(target):
+    if target.exists() or target.is_symlink():
+        raise ValueError("Restore target already exists; restore to a new private path")
+    # Even without the main file, an old WAL/hot journal can replace restored pages.
+    for suffix in ("-wal", "-shm", "-journal"):
+        sidecar = Path(str(target) + suffix)
+        if sidecar.exists() or sidecar.is_symlink():
+            raise ValueError("Restore target has an existing SQLite sidecar; choose a new path")
+
+
 def restore(backup_file, database):
     source = regular_file(backup_file)
     target = Path(database).absolute()
-    if target.exists() or target.is_symlink():
-        raise ValueError("Restore target already exists; restore to a new private path")
+    assert_new_restore_path(target)
     directory = private_directory(target.parent)
     manifest = regular_file(str(source) + ".manifest.json")
     if stat.S_IMODE(source.stat().st_mode) & 0o077 or stat.S_IMODE(manifest.stat().st_mode) & 0o077:
@@ -147,6 +156,7 @@ def restore(backup_file, database):
             raise ValueError("Snapshot checksum or size mismatch")
         verify_database(temporary)
         sync_file(temporary)
+        assert_new_restore_path(target)
         os.link(temporary, target)
         sync_directory(directory)
         return {"restored": str(target), "sha256": metadata["sha256"], "bytes": metadata["bytes"], "integrity": "ok"}

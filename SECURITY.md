@@ -132,3 +132,5 @@ The default local export history directory `/data/export-history/` is excluded b
 Backup CLI `backend/scripts/db-backup.js` preserves explicit space or equals options before environment/default selection.
 
 `bootstrapAdmin.js` validates bootstrap password policy only when creating/remediating an account; unused stale settings cannot block an already-secure administrator.
+
+`sqlite_snapshot.py` restore rejects existing target SQLite `-wal`, `-shm` and `-journal` sidecars (including dangling symlinks); never delete recovery evidence to make a path available. Use a private directory without concurrent writers.

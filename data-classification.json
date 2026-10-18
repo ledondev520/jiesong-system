@@ -153,6 +153,7 @@
   ],
   "reviewControls": [
     "Backup CLI explicit space/equals source and destination options take precedence over environment/defaults.",
-    "bootstrapAdmin.js validates bootstrap passwords only before a password write, preserving secure accounts."
+    "bootstrapAdmin.js validates bootstrap passwords only before a password write, preserving secure accounts.",
+    "sqlite_snapshot.py refuses restore targets with existing WAL/SHM/journal sidecars to prevent old pages replacing verified snapshot data."
   ]
 }

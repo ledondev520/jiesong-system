@@ -101,6 +101,40 @@ class SnapshotTests(unittest.TestCase):
         with self.assertRaises(ValueError): snapshot.restore(saved['backup'], target)
         self.assertEqual(target.read_bytes(), b'keep sentinel')
 
+    def test_restore_refuses_orphan_wal_instead_of_reading_old_data(self):
+        saved = self.save()
+        target = self.root / 'orphan.db'
+        writer = sqlite3.connect(target)
+        try:
+            writer.execute('PRAGMA journal_mode=WAL')
+            writer.execute('CREATE TABLE balances (id TEXT PRIMARY KEY, quantity REAL)')
+            writer.execute("INSERT INTO balances VALUES ('synthetic-opening',99)")
+            writer.commit()
+            target.unlink()
+            wal = Path(str(target) + '-wal')
+            before = wal.read_bytes()
+            with self.assertRaisesRegex(ValueError, 'sidecar'):
+                snapshot.restore(saved['backup'], target)
+            self.assertFalse(target.exists())
+            self.assertEqual(wal.read_bytes(), before)
+        finally:
+            writer.close()
+
+    def test_restore_refuses_each_existing_or_symlink_sidecar(self):
+        saved = self.save()
+        target = self.root / 'sidecars.db'
+        for suffix in ['-wal', '-shm', '-journal']:
+            for link in [False, True]:
+                sidecar = Path(str(target) + suffix)
+                if link:
+                    sidecar.symlink_to(self.root / 'absent-sentinel')
+                else:
+                    sidecar.write_bytes(b'synthetic sentinel')
+                with self.assertRaisesRegex(ValueError, 'sidecar'):
+                    snapshot.restore(saved['backup'], target)
+                self.assertFalse(target.exists())
+                sidecar.unlink()
+
     def test_corrupt_backup_and_bad_manifest_never_create_restore_target(self):
         saved = self.save()
         target = self.root / 'restored' / 'bad.db'
