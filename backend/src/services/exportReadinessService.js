@@ -165,7 +165,7 @@ const evaluateExportReadiness = (contract = {}, {
 
     const refundRate = toFiniteOrNull(hsRecord?.refundRate);
     const targetMarkup = targetMarkupFor(config, refundRate);
-    const formula = purchaseCostCny && effectiveExchangeRate > 0 && quantity
+    const formula = purchaseCostCny && exchangeRate && effectiveExchangeRate > 0 && quantity
       ? calculateFormulaPrice({
           costCny: purchaseCostCny,
           quantity,

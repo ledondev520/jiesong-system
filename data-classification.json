@@ -156,6 +156,7 @@
     }
   ],
   "reviewControls": [
+    "Export pricing requires finite positive spot rates and positive adjusted rates rounded to six decimals; positive policy adjustments cannot validate missing or invalid spot rates.",
     "Backup CLI explicit space/equals source and destination options take precedence over environment/defaults.",
     "bootstrapAdmin.js validates bootstrap passwords only before a password write, preserving secure accounts.",
     "sqlite_snapshot.py refuses restore targets with existing WAL/SHM/journal sidecars to prevent old pages replacing verified snapshot data.",

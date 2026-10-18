@@ -50,8 +50,9 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
   const FX_BUFFER = -config.exchangeAdjustment;
   const REFUNDABLE_MARKUP = config.refundableMarkup;
   const NO_REFUND_MARKUP_CAP = config.noRefundMarkup;
-  const spotRate = toNumber(options.spotRate || contract.exchangeRate);
+  const spotRate = toNumber(options.spotRate ?? contract.exchangeRate);
   const effectiveRate = round(spotRate - FX_BUFFER, 6);
+  const validRate = spotRate > 0 && effectiveRate > 0;
   const buyerName = String(options.buyerName || '').trim();
   const sellerName = String(options.sellerName || '').trim();
   const packageKind = String(options.packageKind || '').trim();
@@ -63,7 +64,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
   ]));
   const issues = [];
 
-  if (spotRate <= FX_BUFFER) issues.push(makeIssue('INVALID_SPOT_RATE', 'error', `现汇必须大于 ${FX_BUFFER}`));
+  if (!validRate) issues.push(makeIssue('INVALID_SPOT_RATE', 'error', `现汇必须大于 ${Math.max(0, FX_BUFFER)}`));
   if (!sellerName) issues.push(makeIssue('MISSING_SELLER', 'error', '请确认卖方名称'));
   if (!buyerName) issues.push(makeIssue('MISSING_BUYER', 'error', '请确认买方名称'));
   if (!packageKind) issues.push(makeIssue('MISSING_PACKAGE_KIND', 'error', '请确认包装种类'));
@@ -108,7 +109,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
     const strictCap = config.mode === 'tiered' && refundRate === 0;
     const manualUnitPrice = priceOverrideMap.get(item.id) || 0;
     const historical = findHistoricalQuote(historicalQuotes, item, productName);
-    const historicalCheck = historical && effectiveRate > 0 && purchaseCostCny > 0 && quantity > 0
+    const historicalCheck = historical && validRate && purchaseCostCny > 0 && quantity > 0
       ? historicalQuoteAllowed({
           unitPriceUsd: historical.unitPriceUsd,
           quantity,
@@ -117,7 +118,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
           refundRate,
         }, config)
       : null;
-    const formula = effectiveRate > 0 && purchaseCostCny > 0 && quantity > 0
+    const formula = validRate && purchaseCostCny > 0 && quantity > 0
       ? calculateFormulaPrice({
           costCny: purchaseCostCny,
           quantity,

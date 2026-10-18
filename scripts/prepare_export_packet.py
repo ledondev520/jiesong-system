@@ -555,6 +555,8 @@ def fetch_shipment_summary_rows(
 
 def build_proposal(args: argparse.Namespace) -> dict[str, Any]:
     export_day = parse_iso_day(args.export_date)
+    if not math.isfinite(args.spot_rate) or args.spot_rate <= 0:
+        raise ValueError("Spot FX rate must be finite and positive")
     effective_rate = round(args.spot_rate - args.fx_buffer, 6)
     if effective_rate <= 0:
         raise ValueError("Effective FX rate must be positive")
@@ -771,8 +773,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         if supplied is not None and (not math.isfinite(supplied) or supplied != value):
             parser.error(f"--{key.replace('_', '-')} 与共用报价配置不一致，请修改 JIESONG_PRICING_CONFIG 指定的文件")
         setattr(args, key, value)
-    if not math.isfinite(args.spot_rate):
-        parser.error("现汇必须是有限数字")
+    if not math.isfinite(args.spot_rate) or args.spot_rate <= 0:
+        parser.error("现汇必须是大于零的有限数字")
     if not math.isfinite(args.history_markup_tolerance) or not 0 <= args.history_markup_tolerance <= 1:
         parser.error("历史报价容差必须是 0 至 1 的有限数字")
     args.pricing_mode = config["mode"]

@@ -24,7 +24,8 @@ readiness 复用 packet 的分档与凑整函数，默认使用调整后的汇�
 校验范围以 `config/pricing.schema.json` 为准。必须提供所有字段。
 字符串数字、布尔值、null、未知字段、NaN、Infinity 和超范围值均拒绝。
 文件不存在、损坏或不合法时停止计算，不使用隐藏默认或旧缓存。
-有效汇率为现汇加 exchangeAdjustment，必须大于零才能形成报价。
+原始现汇必须是大于零的有限数字。有效汇率为现汇加 exchangeAdjustment，
+保留六位小数后也必须大于零才能形成报价。正向调整不能补造缺失或非法现汇。
 
 分档模式对有退税商品使用 refundableMarkup，对零退税商品使用 noRefundMarkup 上限。
 乘数模式对全部已核验退税商品使用 multiplier - 1 的目标加价。

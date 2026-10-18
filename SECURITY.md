@@ -145,6 +145,10 @@ Legacy `/api/v1/import` uses the same 10 MiB in-memory CSV/xlsx filter as previe
 
 ## Export pricing configuration
 
+Pricing requires a finite positive spot rate and a positive adjusted rate rounded
+to six decimal places. Positive adjustments cannot make missing or invalid spot
+rates usable. Python rejects invalid spot rates before reading proposal sources.
+
 `config/pricing.json` contains non-secret policy values. Both export services and
 `scripts/prepare_export_packet.py` use this same file, or the explicit
 `JIESONG_PRICING_CONFIG` path. The shared `config/pricing.schema.json` defines
