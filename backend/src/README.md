@@ -183,3 +183,5 @@
 `services/exportPricing.js` 保留原 packet 的凑整算法，集中模式目标和历史报价校验。
 `exportPacketService.js` 每次计算读取一份配置快照，历史/人工价格校验及提示使用同一口径。
 `exportPricing.configuration.test.js` 用同一临时配置文件对照真实 Python 合成建议输出。
+`routes/pricingConfig.auth.test.js` 另以真实应用认证、合成 JWT 和临时迁移 SQLite
+验证当前数据库角色的 ADMIN-only 边界、管理员改权立即拒绝，以及配置文件保存不写业务表。
