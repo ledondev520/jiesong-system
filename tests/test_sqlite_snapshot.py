@@ -7,6 +7,7 @@ import stat
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location('snapshot', ROOT / 'backend/scripts/sqlite_snapshot.py')
@@ -59,6 +60,25 @@ class SnapshotTests(unittest.TestCase):
             self.assertEqual(db.execute('SELECT quantity FROM balances').fetchone()[0], 12.5)
         environment.pop('DATABASE_URL')
         subprocess.check_output(command, cwd=ROOT / 'backend', env=environment)
+
+    def test_manifest_write_failure_does_not_leave_published_snapshot(self):
+        for operation in ['json.dump', 'os.fsync']:
+            with self.subTest(operation=operation):
+                if operation == 'json.dump':
+                    failure = patch.object(snapshot.json, 'dump', side_effect=OSError('synthetic full disk'))
+                else:
+                    real_sync = snapshot.os.fsync
+                    calls = 0
+                    def fail_manifest_sync(fd):
+                        nonlocal calls
+                        calls += 1
+                        if calls == 2:
+                            raise OSError('synthetic manifest fsync failure')
+                        return real_sync(fd)
+                    failure = patch.object(snapshot.os, 'fsync', side_effect=fail_manifest_sync)
+                with failure, self.assertRaises(OSError):
+                    self.save()
+                self.assertEqual(list((self.root / 'backups').glob('snapshot_*')), [])
 
     def test_live_wal_backup_restore_preserves_committed_snapshot(self):
         self.assertGreater(Path(str(self.db) + '-wal').stat().st_size, 0)

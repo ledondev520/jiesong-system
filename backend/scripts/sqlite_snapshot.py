@@ -85,6 +85,7 @@ def backup(database, backup_dir, keep=5):
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     destination = directory / f"snapshot_{timestamp}_{uuid.uuid4().hex[:8]}.db"
     manifest = Path(str(destination) + ".manifest.json")
+    linked = manifest_created = complete = False
     try:
         deadline = time.monotonic() + 60
 
@@ -100,12 +101,16 @@ def backup(database, backup_dir, keep=5):
         metadata = {"version": 1, "created_at": timestamp, "sha256": digest(temporary),
                     "bytes": temporary.stat().st_size, "integrity": "ok", "sqlite_version": sqlite3.sqlite_version}
         os.link(temporary, destination)
-        with os.fdopen(os.open(manifest, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w", encoding="utf8") as handle:
+        linked = True
+        descriptor = os.open(manifest, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        manifest_created = True
+        with os.fdopen(descriptor, "w", encoding="utf8") as handle:
             json.dump(metadata, handle, sort_keys=True, indent=2)
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
         sync_directory(directory)
+        complete = True
         snapshots = sorted((entry for entry in directory.iterdir()
                             if SNAPSHOT_NAME.fullmatch(entry.name)
                             and entry.is_file() and not entry.is_symlink()
@@ -115,6 +120,11 @@ def backup(database, backup_dir, keep=5):
             Path(str(old) + ".manifest.json").unlink()
         return {"backup": str(destination), "manifest": str(manifest), **metadata}
     finally:
+        if not complete:
+            if manifest_created:
+                manifest.unlink(missing_ok=True)
+            if linked:
+                destination.unlink(missing_ok=True)
         temporary.unlink(missing_ok=True)
 
 
