@@ -100,7 +100,7 @@ npm run dev -- -p 3000
 
 前端地址为 `http://localhost:3000`，默认 API 代理指向 `http://localhost:3001/api/v1`。后端配置本身的端口默认值为 3000，所以这里显式传 `PORT=3001`。健康检查是后端根路径 `/health`，不是 `/api/v1/health`。
 
-开发修改 schema 时执行 `npm run db:migrate`，该命令先备份再运行 `prisma migrate dev`。不要使用 `db push`。仅变更源码或文档无需重新初始化数据库。
+开发修改 schema 前，必须先在当前终端显式导出已核对的 SQLite `DATABASE_URL`，再执行 `npm run db:migrate`；该命令先备份再运行 `prisma migrate dev`。仅将连接串放进 `.env` 不足以运行备份步骤，脚本不会读取 `.env`。不要使用 `db push`。仅变更源码或文档无需重新初始化数据库。
 
 ## 验证
 

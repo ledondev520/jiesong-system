@@ -226,3 +226,5 @@ Agent SDK 固定为含 `dist/index.js` 的发布版本 `0.2.4`，`npm ci` 后可
 ## SQLite 备份与恢复
 
 运行 `npm run db:backup -- --database /absolute/private/application.db`，或先在进程环境中导出 SQLite `DATABASE_URL`。脚本不读取 `.env`，不猜测源库；源库不存在时失败。默认保留5对一致性在线快照及manifest，输出目录0700、文件0600。恢复使用 `npm run db:restore -- --backup <snapshot> --database <new-private-path>`，只写新的目标文件。完整步骤和合成演练见 [备份恢复说明](../docs/operations/sqlite-backup-restore.md)。
+
+开发已有库迁移：先在当前终端显式导出已核对的 SQLite `DATABASE_URL`，再运行 `npm run db:migrate`。Prisma 能读取 `.env`，前置备份不会读取它；只配置 `.env` 时迁移将安全失败。
