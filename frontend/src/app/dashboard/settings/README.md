@@ -27,3 +27,5 @@
 字段范围使用后端提供的共用 schema。百分比界面与小数存储显式转换。
 `PricingConfigCard.test.tsx` 验证角色、加载、全部字段保存、主动切换乘数模式、
 非法值、服务端冲突及重复提交。组件桩测试不代表浏览器端到端通过。
+`PricingConfigCard.transport.test.tsx` 使用真实 Axios 拦截器和合成响应，
+验证冲突正文可见及重新读取时取得当前 revision。报价读取显式禁用客户端 GET 缓存。

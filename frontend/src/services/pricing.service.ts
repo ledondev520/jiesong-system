@@ -1,4 +1,4 @@
-import api from "@/lib/axios";
+import api, { type ApiRequestConfig } from "@/lib/axios";
 import type { ApiResponse } from "@/types";
 
 export interface PricingConfig {
@@ -24,6 +24,7 @@ export const pricingService = {
   get: () =>
     api.get<ApiResponse<PricingSnapshot>, ApiResponse<PricingSnapshot>>(
       "/system/pricing-config",
+      { cache: { enabled: false } } as ApiRequestConfig,
     ),
   save: (config: PricingConfig, revision: string) =>
     api.put<ApiResponse<PricingSnapshot>, ApiResponse<PricingSnapshot>>(
