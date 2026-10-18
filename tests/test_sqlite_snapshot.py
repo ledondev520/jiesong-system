@@ -46,6 +46,20 @@ class SnapshotTests(unittest.TestCase):
         with sqlite3.connect(target) as reader:
             self.assertEqual(reader.execute('SELECT quantity FROM balances').fetchone()[0], 12.5)
 
+    def test_cli_equals_options_override_environment_and_default_directory(self):
+        other = self.root / 'other.db'
+        with sqlite3.connect(other) as db:
+            db.execute('CREATE TABLE sentinel (value TEXT)')
+        folder = self.root / 'equals-backups'
+        command = ['node', 'scripts/db-backup.js', '--database=' + str(self.db), '--backup-dir=' + str(folder)]
+        environment = {'PATH': os.environ['PATH'], 'DATABASE_URL': other.as_uri()}
+        saved = json.loads(subprocess.check_output(command, cwd=ROOT / 'backend', env=environment, text=True))
+        self.assertEqual(Path(saved['backup']).parent, folder)
+        with sqlite3.connect(saved['backup']) as db:
+            self.assertEqual(db.execute('SELECT quantity FROM balances').fetchone()[0], 12.5)
+        environment.pop('DATABASE_URL')
+        subprocess.check_output(command, cwd=ROOT / 'backend', env=environment)
+
     def test_live_wal_backup_restore_preserves_committed_snapshot(self):
         self.assertGreater(Path(str(self.db) + '-wal').stat().st_size, 0)
         saved = self.save()

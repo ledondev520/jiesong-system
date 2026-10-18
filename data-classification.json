@@ -150,5 +150,8 @@
         "PLAN.md"
       ]
     }
+  ],
+  "reviewControls": [
+    "Backup CLI explicit space/equals source and destination options take precedence over environment/defaults."
   ]
 }

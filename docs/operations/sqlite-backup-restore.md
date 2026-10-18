@@ -58,3 +58,5 @@ python3 scripts/drill_sqlite_restore.py --directory /tmp/jiesong-fix-evidence/re
 ```
 
 结果 PASS。恢复得到 `opening:SYN-DRILL` 对应 `synthetic-product` 的 12.5 件 INBOUND，源库保留 99。快照与恢复库各 1,085,440 字节，SHA-256 均为 `e1d935ab841184250d9cd14645168ded45e28535879168e008883a6f38260a2e`。`PRAGMA integrity_check` 为 `ok`，`foreign_key_check` 返回空，文件 0600、恢复目录 0700。机器可读回执位于该目录的 `receipt.json`。这些字节数和摘要仅属于此次合成演练，不是生产数据证明。
+
+CLI 参数支持 `--database <path>` 和 `--database=<path>`；`--backup-dir` 同理，显式值优先于环境与默认目录。
