@@ -135,7 +135,10 @@ The default local export history directory `/data/export-history/` is excluded b
 `scripts/prepare_export_packet.py` use this same file, or the explicit
 `JIESONG_PRICING_CONFIG` path. The shared `config/pricing.schema.json` defines
 strict keys and numeric bounds. Invalid or missing files stop pricing without
-fallback. No environment file or business database is read by the loaders.
+fallback. Readiness recommendations use the same adjusted exchange rate, tiered
+markups and rounding as packet. Request-level profitRate does not override the
+shared file. Multiplier mode requires explicit selection. No environment file or
+business database is read by the loaders.
 
 `GET/PUT /system/pricing-config` require authenticated ADMIN. Updates replace the
 whole validated document atomically, require the last revision, and use an

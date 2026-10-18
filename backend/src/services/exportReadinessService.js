@@ -8,7 +8,8 @@ const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { normalizePurchaseTaxRate, roundMoney } = require('./purchaseAmountService');
 
-const DEFAULT_PROFIT_RATE = 1.3;
+const { loadPricingConfig } = require('./pricingConfigService');
+const { calculateFormulaPrice, targetMarkupFor, round } = require('./exportPricing');
 const PRICE_EPSILON = 0.01;
 
 const toFiniteOrNull = (value) => {
@@ -95,10 +96,9 @@ const evaluateExportReadiness = (contract = {}, {
   historicalItems = [],
   hsRecords = [],
   activeTaxRates = [],
-  profitRate = DEFAULT_PROFIT_RATE,
-} = {}) => {
-  const safeProfitRate = toPositiveOrNull(profitRate) || DEFAULT_PROFIT_RATE;
+} = {}, config = loadPricingConfig()) => {
   const exchangeRate = toPositiveOrNull(contract.exchangeRate);
+  const effectiveExchangeRate = round((toFiniteOrNull(contract.exchangeRate) || 0) + config.exchangeAdjustment, 6);
   const overrideByPackingItem = getFirstByKey(overrides, 'packingItemId');
   const historyByProduct = getFirstByKey(historicalItems, 'productId');
   const hsByCode = new Map(
@@ -122,9 +122,6 @@ const evaluateExportReadiness = (contract = {}, {
       ? roundMoney(unitPriceUsd * quantity)
       : null;
     const storedTotalPriceUsd = toPositiveOrNull(item.totalPrice);
-    const recommendedUnitPriceUsd = purchaseCostCny && exchangeRate && quantity
-      ? roundMoney((purchaseCostCny * safeProfitRate) / exchangeRate / quantity)
-      : null;
 
     if (!hsCode) {
       issues.push(makeIssue('MISSING_HS_CODE', 'error', 'all', '缺少 10 位 HS 编码'));
@@ -167,6 +164,16 @@ const evaluateExportReadiness = (contract = {}, {
     }
 
     const refundRate = toFiniteOrNull(hsRecord?.refundRate);
+    const targetMarkup = targetMarkupFor(config, refundRate);
+    const formula = purchaseCostCny && effectiveExchangeRate > 0 && quantity
+      ? calculateFormulaPrice({
+          costCny: purchaseCostCny,
+          quantity,
+          effectiveRate: effectiveExchangeRate,
+          targetMarkup,
+          strictCap: config.mode === 'tiered' && refundRate === 0,
+        })
+      : null;
     if (refundRate === null) {
       issues.push(makeIssue('MISSING_REFUND_RATE', 'error', 'tax_refund', '当前税则未提供出口退税率'));
     } else if (refundRate === 0) {
@@ -231,9 +238,10 @@ const evaluateExportReadiness = (contract = {}, {
       unitPriceUsd: unitPriceUsd || 0,
       totalPriceUsd: calculatedTotalPriceUsd || 0,
       storedTotalPriceUsd: storedTotalPriceUsd || 0,
-      recommendedUnitPriceUsd,
-      pricingFormula: 'purchaseCostCny × 1.3 ÷ exchangeRate ÷ quantity',
-      pricingProfitRate: safeProfitRate,
+      recommendedUnitPriceUsd: formula?.unitPriceUsd ?? null,
+      pricingFormula: `purchaseCostCny × ${1 + targetMarkup} ÷ effectiveExchangeRate ÷ quantity（整数单价或总额尾数 0/5 凑整）`,
+      pricingProfitRate: 1 + targetMarkup,
+      effectiveExchangeRate,
       exchangeRate: exchangeRate || 0,
       purchaseCostCny: purchaseCostCny || 0,
       purchaseVatRate: vatRate.value,
@@ -284,7 +292,9 @@ const evaluateExportReadiness = (contract = {}, {
     portName: contract.port?.name || '',
     note: contract.note || '',
     exchangeRate: exchangeRate || 0,
-    profitRate: safeProfitRate,
+    profitRate: 1 + targetMarkupFor(config, null),
+    pricingMode: config.mode,
+    effectiveExchangeRate,
     customsReady: !hasErrorsFor('customs'),
     taxRefundReady: !hasErrorsFor('tax_refund'),
     lines,
@@ -306,8 +316,7 @@ const evaluateExportReadiness = (contract = {}, {
 
 const getExportReadiness = async (salesContractId, {
   overrides = [],
-  profitRate = DEFAULT_PROFIT_RATE,
-} = {}, prismaClient = prisma) => {
+} = {}, prismaClient = prisma, config = loadPricingConfig()) => {
   const contract = await prismaClient.salesContract.findUnique({
     where: { id: salesContractId },
     include: {
@@ -377,8 +386,7 @@ const getExportReadiness = async (salesContractId, {
     historicalItems,
     hsRecords,
     activeTaxRates,
-    profitRate,
-  });
+  }, config);
 };
 
 const assertExportReadiness = (readiness, {
@@ -401,7 +409,6 @@ const assertExportReadiness = (readiness, {
 };
 
 module.exports = {
-  DEFAULT_PROFIT_RATE,
   assertExportReadiness,
   evaluateExportReadiness,
   getExportReadiness,

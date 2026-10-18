@@ -252,7 +252,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
   };
 };
 
-const loadPacketSources = async (salesContractId, options = {}, prismaClient = prisma) => {
+const loadPacketSources = async (salesContractId, options = {}, prismaClient = prisma, config = loadPricingConfig()) => {
   const contract = await prismaClient.salesContract.findUnique({
     where: { id: salesContractId },
     include: {
@@ -266,7 +266,7 @@ const loadPacketSources = async (salesContractId, options = {}, prismaClient = p
   if (!contract) throw createError('出口合同不存在', 404);
   const readiness = await getExportReadiness(salesContractId, {
     overrides: options.hsOverrides || [],
-  }, prismaClient);
+  }, prismaClient, config);
   const productIds = Array.from(new Set(contract.packingItems.map((item) => item.productId).filter(Boolean)));
   const historicalItems = productIds.length > 0
     ? await prismaClient.packingItem.findMany({
@@ -294,7 +294,7 @@ const loadPacketSources = async (salesContractId, options = {}, prismaClient = p
 
 const previewExportPacket = async (salesContractId, options = {}, prismaClient = prisma) => {
   const config = loadPricingConfig();
-  const sources = await loadPacketSources(salesContractId, options, prismaClient);
+  const sources = await loadPacketSources(salesContractId, options, prismaClient, config);
   return evaluateExportPacket(sources.contract, sources.readiness, sources.historicalQuotes, options, config);
 };
 
@@ -426,7 +426,7 @@ const buildExportPacketWorkbook = async (packet) => {
 
 const generateExportPacket = async (salesContractId, options = {}, prismaClient = prisma) => {
   const config = loadPricingConfig();
-  const sources = await loadPacketSources(salesContractId, options, prismaClient);
+  const sources = await loadPacketSources(salesContractId, options, prismaClient, config);
   const packet = evaluateExportPacket(sources.contract, sources.readiness, sources.historicalQuotes, options, config);
   if (!packet.ready) {
     const first = packet.issues.find((issue) => issue.severity === 'error');

@@ -137,7 +137,7 @@
         "storage": [
           "Repository standard permissions",
           "Code review for unintended leakage",
-          "pricingConfigService.js and scripts/pricing_config.py read the same validated JSON policy; ADMIN-only file updates log actor, changed fields and hashes without values. External file edits are detected on load; offline editors retain filesystem audit."
+          "exportReadinessService.js, exportPacketService.js and scripts/pricing_config.py consume the same policy validated by pricingConfigService.js or the Python loader; ADMIN-only file updates log actor, changed fields and hashes without values. External file edits are detected on load; offline editors retain filesystem audit."
         ],
         "transfer": [
           "Use normal authenticated collaboration channels"

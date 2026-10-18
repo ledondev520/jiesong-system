@@ -157,5 +157,5 @@
 - 默认历史工作簿目录 `data/export-history/` 必须保持Git忽略；用 `git check-ignore data/export-history/<file>.xlsx` 验证，不提交源工作簿。
 
 ## Export pricing configuration
-- `config/pricing.json` and `config/pricing.schema.json` are the shared value and validation sources for JS/Python. Do not add silent defaults in consumers or pricing overrides through ordinary SystemConfig.
+- `exportReadinessService`, `exportPacketService`, and Python use `config/pricing.json` and `config/pricing.schema.json` as their shared value and validation sources. Readiness recommendations use packet tiered rounding by default; multiplier requires explicit mode selection. Do not add silent defaults in consumers or pricing overrides through ordinary SystemConfig.
 - `backend/src/services/pricingConfigService.js` validates every snapshot, atomically replaces the complete file for ADMIN requests, rejects stale revisions, and logs only actor/field names/hashes. Filesystem edits are logged on next load; offline edits require operator filesystem audit. No pricing loader reads .env.

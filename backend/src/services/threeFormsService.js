@@ -48,11 +48,10 @@ const buildPreparedItems = (readiness) => readiness.lines.map((line) => ({
   estimatedRefundCny: line.estimatedRefundCny,
 }));
 
-const previewThreeForms = async ({ salesContractId, items = [], profitRate } = {}) => {
+const previewThreeForms = async ({ salesContractId, items = [] } = {}) => {
   if (!salesContractId) throw createError('缺少出口合同 ID', 400);
   return getExportReadiness(salesContractId, {
     overrides: extractHsOverrides(items),
-    profitRate,
   });
 };
 
