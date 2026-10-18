@@ -48,6 +48,10 @@ for name, command in commands.items():
 
 fixtures = json.loads((ROOT / 'tests/fixtures/pricing-synthetic.json').read_text())
 expected_readiness = json.loads((ROOT / 'tests/fixtures/pricing-readiness-defaults.json').read_text())
+expected_names = [fixture['name'] for fixture in fixtures]
+for consumer, pair in snapshots.items():
+    require(all([row['name'] for row in snapshot] == expected_names for snapshot in pair),
+            f'Synthetic {consumer} cases differ')
 old_services, new_services = snapshots['services']
 require(len(old_services) == len(new_services) == len(fixtures) == len(expected_readiness) == 27, 'Synthetic case count differs')
 require(all(row['completeJsonEqual'] and row['bytesEqual'] for row in receipt['comparisons']), 'Default pricing regression differs')
