@@ -87,8 +87,10 @@ const resolveImportStatus = (failedRows) => (
  * @param {string} userId - 导入用户ID
  * @returns {Object} 导入结果
  */
-const importCSVData = async (filePath, userId) => {
-  const { data } = await parseTabularFile({ originalname: filePath, buffer: fs.readFileSync(filePath) });
+const importCSVData = async (source, userId) => {
+  // HTTP uploads stay in memory; trusted internal callers may still pass a file path.
+  const file = typeof source === 'string' ? { originalname: source, buffer: fs.readFileSync(source) } : source;
+  const { data } = await parseTabularFile(file);
   
   const result = {
     totalRows: data.length,
@@ -100,7 +102,7 @@ const importCSVData = async (filePath, userId) => {
   // 创建导入记录
   const importRecord = await prisma.importRecord.create({
     data: {
-      fileName: filePath.split('/').pop(),
+      fileName: file.originalname.split('/').pop(),
       totalRows: data.length,
       successRows: 0,
       failedRows: 0,
