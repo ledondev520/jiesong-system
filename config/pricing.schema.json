@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mode", "exchangeAdjustment", "refundableMarkup", "noRefundMarkup", "multiplier"],
+  "properties": {
+    "mode": { "type": "string", "enum": ["tiered", "multiplier"] },
+    "exchangeAdjustment": { "type": "number", "minimum": -2, "maximum": 2 },
+    "refundableMarkup": { "type": "number", "minimum": 0, "maximum": 1 },
+    "noRefundMarkup": { "type": "number", "minimum": 0, "maximum": 1 },
+    "multiplier": { "type": "number", "minimum": 1, "maximum": 5 }
+  }
+}

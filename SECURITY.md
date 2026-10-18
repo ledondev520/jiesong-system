@@ -128,3 +128,20 @@ Catalog migration endpoints in `backend/src/routes/dataImport.js` require authen
 SQLite backups now use `backend/scripts/sqlite_snapshot.py` through the backup/restore CLIs. Source selection must be explicit via process DATABASE_URL or --database; no .env or credential files are loaded. The online backup API includes committed WAL pages. Snapshots/manifests are 0600 in 0700 directories, and restore verifies SHA-256 and SQLite integrity before exclusively publishing a new target. It never replaces an existing/live database. Managed retention defaults to five pairs; unrelated files are not swept. This covers the database only, not attachments/configuration or offsite disaster recovery. See `docs/operations/sqlite-backup-restore.md`.
 
 The default local export history directory `/data/export-history/` is excluded by the repository `.gitignore` so portable defaults do not invite accidental source-workbook commits.
+
+## Export pricing configuration
+
+`config/pricing.json` contains non-secret policy values. Both export services and
+`scripts/prepare_export_packet.py` use this same file, or the explicit
+`JIESONG_PRICING_CONFIG` path. The shared `config/pricing.schema.json` defines
+strict keys and numeric bounds. Invalid or missing files stop pricing without
+fallback. No environment file or business database is read by the loaders.
+
+`GET/PUT /system/pricing-config` require authenticated ADMIN. Updates replace the
+whole validated document atomically, require the last revision, and use an
+exclusive lock file. Structured stderr events retain only operator ID, field
+names and policy hashes. No request values, contract data or secrets are logged.
+Manual file edits are detected and logged on the next read. Operators must use
+an atomic replacement and retain their filesystem change audit for edits made
+while all readers are stopped. A stale lock after a process crash requires an
+operator to confirm no writer is active before removing it.

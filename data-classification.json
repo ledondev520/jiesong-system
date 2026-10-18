@@ -130,12 +130,14 @@
         "test fixtures",
         "build scripts",
         "readme and API contract docs",
-        "ByteRover engineering memory that excludes secrets and business-sensitive data"
+        "ByteRover engineering memory that excludes secrets and business-sensitive data",
+        "non-secret export pricing mode, exchange adjustment and markup settings"
       ],
       "controls": {
         "storage": [
           "Repository standard permissions",
-          "Code review for unintended leakage"
+          "Code review for unintended leakage",
+          "pricingConfigService.js and scripts/pricing_config.py read the same validated JSON policy; ADMIN-only file updates log actor, changed fields and hashes without values. External file edits are detected on load; offline editors retain filesystem audit."
         ],
         "transfer": [
           "Use normal authenticated collaboration channels"
@@ -147,7 +149,9 @@
         ".brv/context-tree/",
         "scripts/",
         "README.md",
-        "PLAN.md"
+        "PLAN.md",
+        "config/pricing.json",
+        "config/pricing.schema.json"
       ]
     }
   ]

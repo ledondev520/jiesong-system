@@ -155,3 +155,7 @@
 
 - `backend/scripts/sqlite_snapshot.py` 使用SQLite在线backup API读取已提交WAL，快照与manifest为0600、输出目录0700。恢复拒绝既有目标；脚本不备份.env或上传附件，不声称具备异地备份或完整业务灾备。
 - 默认历史工作簿目录 `data/export-history/` 必须保持Git忽略；用 `git check-ignore data/export-history/<file>.xlsx` 验证，不提交源工作簿。
+
+## Export pricing configuration
+- `config/pricing.json` and `config/pricing.schema.json` are the shared value and validation sources for JS/Python. Do not add silent defaults in consumers or pricing overrides through ordinary SystemConfig.
+- `backend/src/services/pricingConfigService.js` validates every snapshot, atomically replaces the complete file for ADMIN requests, rejects stale revisions, and logs only actor/field names/hashes. Filesystem edits are logged on next load; offline edits require operator filesystem audit. No pricing loader reads .env.

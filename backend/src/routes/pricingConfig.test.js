@@ -1,0 +1,63 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const express = require('express');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const defaults = require('../../../config/pricing.json');
+
+test('HTTP pricing settings require ADMIN, persist a real file, reject invalid/stale requests and omit values from audit', async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pricing-http-'));
+  const target = path.join(dir, 'pricing.json');
+  fs.writeFileSync(target, JSON.stringify(defaults));
+  const previous = process.env.JIESONG_PRICING_CONFIG;
+  process.env.JIESONG_PRICING_CONFIG = target;
+  t.after(() => { if (previous === undefined) delete process.env.JIESONG_PRICING_CONFIG; else process.env.JIESONG_PRICING_CONFIG = previous; fs.rmSync(dir, { recursive: true }); });
+  const auth = require('../middleware/auth');
+  t.mock.method(auth, 'authenticate', (req, res, next) => {
+    if (req.get('x-synthetic-role')) req.user = { id: 'synthetic-admin', role: req.get('x-synthetic-role') };
+    next();
+  });
+  const logs = [];
+  const originalWrite = process.stderr.write.bind(process.stderr);
+  t.mock.method(process.stderr, 'write', (line, ...rest) => {
+    if (String(line).includes('pricing_config_')) logs.push(JSON.parse(line));
+    return originalWrite(line, ...rest);
+  });
+  const app = express(); app.use(express.json()); app.use('/system', require('./system'));
+  app.use((err, req, res, next) => res.status(err.statusCode || 500).json({ message: err.message }));
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  const send = async (method, role, body) => {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/system/pricing-config`, {
+      method, headers: { 'Content-Type': 'application/json', ...(role ? { 'x-synthetic-role': role } : {}) },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    return { status: response.status, cache: response.headers.get('cache-control'), body: await response.json() };
+  };
+  for (const method of ['GET', 'PUT']) {
+    assert.equal((await send(method)).status, 401);
+    for (const role of ['BOSS', 'SALES', 'PURCHASE', 'WAREHOUSE', 'FINANCE']) assert.equal((await send(method, role)).status, 403);
+  }
+  const initial = await send('GET', 'ADMIN');
+  assert.equal(initial.status, 200); assert.equal(initial.cache, 'no-store');
+  const snapshot = initial.body.data;
+  assert.deepEqual(snapshot.config, defaults);
+  const invalid = await send('PUT', 'ADMIN', { config: { ...defaults, multiplier: '1.4' }, revision: snapshot.revision });
+  assert.equal(invalid.status, 400); assert.match(invalid.body.message, /multiplier.*有限数字/);
+  assert.deepEqual(JSON.parse(fs.readFileSync(target)), defaults);
+  const config = { ...defaults, mode: 'multiplier', multiplier: 1.4 };
+  const saved = await send('PUT', 'ADMIN', { config, revision: snapshot.revision });
+  assert.equal(saved.status, 200);
+  assert.deepEqual(JSON.parse(fs.readFileSync(target)), config);
+  assert.deepEqual((await send('GET', 'ADMIN')).body.data.config, config);
+  assert.equal((await send('PUT', 'ADMIN', { config: defaults, revision: snapshot.revision })).status, 409);
+  const updated = logs.filter(event => event.event === 'pricing_config_updated');
+  assert.equal(updated.length, 1);
+  assert.deepEqual(updated[0].changedFields, ['mode', 'multiplier']);
+  assert.equal(updated[0].actorId, 'synthetic-admin');
+  assert.equal(JSON.stringify(updated).includes('1.4'), false);
+  const evidence = process.env.JIESONG_TEST_EVIDENCE_DIR;
+  if (evidence) { fs.mkdirSync(evidence, { recursive: true }); fs.writeFileSync(path.join(evidence, 'pricing-http-receipt.json'), JSON.stringify({ initial, invalid, saved, fileReadback: JSON.parse(fs.readFileSync(target)), audit: updated }, null, 2)); }
+});

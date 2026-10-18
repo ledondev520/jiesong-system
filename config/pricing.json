@@ -1,0 +1,7 @@
+{
+  "mode": "tiered",
+  "exchangeAdjustment": -0.2,
+  "refundableMarkup": 0.3,
+  "noRefundMarkup": 0.1,
+  "multiplier": 1.3
+}

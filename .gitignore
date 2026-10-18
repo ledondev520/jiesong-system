@@ -183,3 +183,7 @@ backend/state/wps-sync/
 
 # Local export history source workbooks are Confidential, never versioned.
 /data/export-history/
+
+# Atomic export pricing configuration updates
+config/pricing.json.lock
+config/pricing.json.*.tmp
