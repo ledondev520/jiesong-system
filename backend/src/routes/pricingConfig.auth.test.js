@@ -7,9 +7,17 @@ const { execFileSync } = require('node:child_process');
 const defaults = require('../../../config/pricing.json');
 
 test('real authenticated app enforces current database role for pricing file changes without business writes', async t => {
-  assert.equal(fs.existsSync(path.resolve(__dirname, '../../.env')), false);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pricing-real-auth-'));
   fs.chmodSync(dir, 0o700);
+  const root = path.resolve(__dirname, '../../..');
+  const runtime = path.join(dir, 'runtime');
+  fs.cpSync(path.join(root, 'backend/src'), path.join(runtime, 'backend/src'), { recursive: true });
+  fs.mkdirSync(path.join(runtime, 'config'), { recursive: true });
+  for (const name of ['pricing.json', 'pricing.schema.json']) {
+    fs.copyFileSync(path.join(root, 'config', name), path.join(runtime, 'config', name));
+  }
+  fs.symlinkSync(path.join(root, 'backend/node_modules'), path.join(runtime, 'backend/node_modules'), 'dir');
+  assert.equal(fs.existsSync(path.join(runtime, 'backend/.env')), false);
   const database = path.join(dir, 'synthetic.db');
   const configFile = path.join(dir, 'pricing.json');
   fs.writeFileSync(configFile, JSON.stringify(defaults), { mode: 0o600 });
@@ -21,7 +29,7 @@ test('real authenticated app enforces current database role for pricing file cha
   const ddl = fs.readdirSync(migrations).sort().filter(name => fs.statSync(path.join(migrations, name)).isDirectory())
     .map(name => fs.readFileSync(path.join(migrations, name, 'migration.sql'), 'utf8')).join('\n');
   execFileSync('python3', ['-c', 'import sqlite3,sys,os;os.umask(0o077);c=sqlite3.connect(sys.argv[1]);c.executescript(sys.stdin.read());c.close()', database], { input: ddl });
-  const db = require('../utils/prisma');
+  const db = require(path.join(runtime, 'backend/src/utils/prisma'));
   let server;
   t.after(async () => {
     if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
@@ -32,7 +40,7 @@ test('real authenticated app enforces current database role for pricing file cha
   const jwt = require('jsonwebtoken');
   const token = role => jwt.sign({ userId: `synthetic-${role}`, role: 'ADMIN' }, process.env.JWT_SECRET);
   const tokens = Object.fromEntries(roles.map(role => [role, token(role)]));
-  const app = require('../app');
+  const app = require(path.join(runtime, 'backend/src/app'));
   server = await new Promise(resolve => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
   const base = `http://127.0.0.1:${server.address().port}/api/v1/system/pricing-config`;
   const receipts = [];
