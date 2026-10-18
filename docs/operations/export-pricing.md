@@ -85,6 +85,8 @@ python3 -m unittest discover -s tests
 回执保存两个服务的完整 JSON，以及 packet 和 Python 各自完整 JSON 的字节等价结果与 SHA-256。
 readiness-price-changes.md 包含 27 组输入的旧新推荐价，readiness-price-changes.json 保留原数值。
 readiness 除推荐价与公式元数据外，已保存价、汇总、退税估算和准备度问题均与基线相同。
+推荐价和公式元数据另与 `tests/fixtures/pricing-readiness-defaults.json` 的固定获准默认值逐项核对。
+验证失败不保留成功回执。检查在 Python 优化模式下仍然执行。
 参数矩阵核对全部三个消费者，覆盖各参数同步变更及显式 multiplier 模式。
 测试另以全部 27 组输入验证两套 JS 公式价一致，包含小数数量、极低成本、缺成本和无效汇率。
 真实应用认证验收只使用临时迁移 SQLite、合成用户和内存测试 JWT，不输出凭据。

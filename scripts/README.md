@@ -382,3 +382,5 @@ Put local history workbooks in the selected directory. An absent/empty history d
 `verify_pricing_defaults.py --baseline-root <纯Git导出目录> --evidence <临时目录>`
 比较旧、新完整 JSON，并生成 SHA-256 回执。旧目录需能使用原有后端依赖。
 不读取真实库、税则 DBF 或历史工作簿。
+readiness 的新推荐价和定价元数据必须符合 `tests/fixtures/pricing-readiness-defaults.json`。
+`test_verify_pricing_defaults.py` 验证错误价格及元数据会使检查失败。
