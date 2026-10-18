@@ -61,7 +61,8 @@ test('importData: 调用导入服务并返回汇总信息', async () => {
   };
 
   try {
-    const req = { file: { originalname: 'synthetic.csv', buffer: Buffer.from('a,b\n1,2') }, user: { id: 'user-1' } };
+    const file = { originalname: 'synthetic.csv', buffer: Buffer.from('a,b\n1,2') };
+    const req = { file, user: { id: 'user-1' } };
     const res = createMockRes();
     let capturedError = null;
 
@@ -70,7 +71,8 @@ test('importData: 调用导入服务并返回汇总信息', async () => {
     });
 
     assert.equal(capturedError, null);
-    assert.deepEqual(importArgs, [req.file, 'user-1']);
+    assert.deepEqual(importArgs, [file, 'user-1']);
+    assert.equal(importArgs[0], file);
     assert.equal(res.payload.message, '导入完成：成功8条，失败2条');
   } finally {
     importService.importCSVData = originalImport;

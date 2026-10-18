@@ -1,12 +1,12 @@
 /**
- * Input: CSV/xlsx文件、Prisma客户端
+ * Input: 内存CSV/xlsx字节与文件名、Prisma客户端
  * Output: 按行事务导入结果、重名冲突与真实失败统计
  * Pos: 数据导入服务，处理CSV/xlsx历史数据导入
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-const fs = require('fs');
+const { createError } = require('../middleware/errorHandler');
 const { parseTabularFile } = require('../utils/tabularImport');
 const prisma = require('../utils/prisma');
 const { IMPORT_STATUS } = require('../config/constants');
@@ -83,13 +83,14 @@ const resolveImportStatus = (failedRows) => (
  * 2. 遍历数据行，创建相关记录
  * 3. 处理异常数据并标记
  * 4. 返回导入结果统计
- * @param {string} filePath - CSV文件路径
+ * @param {{originalname: string, buffer: Buffer}} file - 内存CSV/xlsx上传
  * @param {string} userId - 导入用户ID
  * @returns {Object} 导入结果
  */
-const importCSVData = async (source, userId) => {
-  // HTTP uploads stay in memory; trusted internal callers may still pass a file path.
-  const file = typeof source === 'string' ? { originalname: source, buffer: fs.readFileSync(source) } : source;
+const importCSVData = async (file, userId) => {
+  if (!file || !Buffer.isBuffer(file.buffer)) {
+    throw createError('导入文件必须提供内存字节', 400);
+  }
   const { data } = await parseTabularFile(file);
   
   const result = {
