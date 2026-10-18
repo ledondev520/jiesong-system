@@ -262,6 +262,7 @@ it("报关详情返回与刷新恢复URL页签、筛选及分页", async () => {
   );
   expect(detail.searchParams.get("returnTo")).toBe(saved);
   view.unmount();
+  mocks.getAll.mockClear();
   view = render(<CustomsDeclarationListPageContent embedded />);
   expect(screen.getByPlaceholderText("搜索报关单号或报关行...")).toHaveValue(
     "SYN",

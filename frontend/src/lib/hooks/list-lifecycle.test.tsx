@@ -94,6 +94,7 @@ for (const list of registry.lists) {
       window.history.back();
       await waitFor(() => expect(window.location.href).toBe(saved));
       for (let refresh = 0; refresh < 2; refresh++) {
+        mocks.getAll.mockClear();
         view = render(component());
         await waitFor(() =>
           expect(mocks.getAll).toHaveBeenLastCalledWith(

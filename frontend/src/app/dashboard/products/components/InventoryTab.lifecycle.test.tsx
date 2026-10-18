@@ -207,6 +207,7 @@ it("库存URL在返回与重新挂载后恢复筛选和分页", async () => {
   );
   const saved = window.location.href;
   view.unmount();
+  getAll.mockClear();
   view = render(<InventoryTab />);
   await waitFor(() =>
     expect(getAll).toHaveBeenLastCalledWith({
