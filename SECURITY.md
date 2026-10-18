@@ -128,3 +128,17 @@ Catalog migration endpoints in `backend/src/routes/dataImport.js` require authen
 SQLite backups now use `backend/scripts/sqlite_snapshot.py` through the backup/restore CLIs. Source selection must be explicit via process DATABASE_URL or --database; no .env or credential files are loaded. The online backup API includes committed WAL pages. Snapshots/manifests are 0600 in 0700 directories, and restore verifies SHA-256 and SQLite integrity before exclusively publishing a new target. It never replaces an existing/live database. Managed retention defaults to five pairs; unrelated files are not swept. This covers the database only, not attachments/configuration or offsite disaster recovery. See `docs/operations/sqlite-backup-restore.md`.
 
 The default local export history directory `/data/export-history/` is excluded by the repository `.gitignore` so portable defaults do not invite accidental source-workbook commits.
+
+Backup CLI `backend/scripts/db-backup.js` preserves explicit space or equals options before environment/default selection.
+
+`bootstrapAdmin.js` validates bootstrap password policy only when creating/remediating an account; unused stale settings cannot block an already-secure administrator.
+
+`sqlite_snapshot.py` restore rejects existing target SQLite `-wal`, `-shm` and `-journal` sidecars (including dangling symlinks); never delete recovery evidence to make a path available. Use a private directory without concurrent writers.
+
+`tabularImport.js` streams ZIP entries before ExcelJS parsing: at most 256 entries and 32 MiB actual expanded bytes. JSZip is declared directly at the already locked version; no files are extracted.
+
+Legacy `/api/v1/import` uses the same 10 MiB in-memory CSV/xlsx filter as preview; `importService.js` accepts only in-memory bytes and rejects filesystem paths, including traversal, absolute paths and symlinks. HTTP never retains raw uploads.
+
+`db-backup.js` preserves literal percent sequences in Prisma SQLite DATABASE_URL paths; URI decoding could silently select a different database.
+
+`tabularImport.js` checks worksheet XML row/cell/column bounds before ExcelJS allocations, rejects merged cells and limits sheet IDs to 65535. This prevents tiny XLSX metadata from expanding unbounded model regions.
