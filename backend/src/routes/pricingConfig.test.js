@@ -58,7 +58,14 @@ test('HTTP pricing settings require ADMIN, persist a real file, reject invalid/s
   assert.equal(updated.length, 1);
   assert.deepEqual(updated[0].changedFields, ['mode', 'multiplier']);
   assert.equal(updated[0].actorId, 'synthetic-admin');
-  assert.equal(JSON.stringify(updated).includes('1.4'), false);
+  assert.deepEqual(updated, [{
+    timestamp: '2026-10-18T01:01:01.400Z',
+    event: 'pricing_config_updated',
+    actorId: 'synthetic-admin',
+    previousRevision: snapshot.revision,
+    revision: saved.body.data.revision,
+    changedFields: ['mode', 'multiplier'],
+  }]);
   const evidence = process.env.JIESONG_TEST_EVIDENCE_DIR;
   if (evidence) { fs.mkdirSync(evidence, { recursive: true }); fs.writeFileSync(path.join(evidence, 'pricing-http-receipt.json'), JSON.stringify({ initial, invalid, saved, fileReadback: JSON.parse(fs.readFileSync(target)), audit: updated }, null, 2)); }
 });
