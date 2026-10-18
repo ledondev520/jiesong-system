@@ -6,11 +6,12 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { Suspense } from 'react';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { SystemConfigTab } from './tabs/SystemConfigTab';
+import { Suspense } from "react";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { PricingConfigCard } from "./PricingConfigCard";
+import { SystemConfigTab } from "./tabs/SystemConfigTab";
 
 /**
  * 职责：渲染系统配置页（参数设置 + AI API Key）
@@ -18,10 +19,8 @@ import { SystemConfigTab } from './tabs/SystemConfigTab';
 export default function SettingsPageContent() {
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="系统配置"
-        description="全局运营参数与 AI 集成配置"
-      />
+      <PageHeader title="系统配置" description="全局运营参数与 AI 集成配置" />
+      <PricingConfigCard />
       <Suspense>
         <SystemConfigTab />
       </Suspense>
