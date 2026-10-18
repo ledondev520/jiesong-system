@@ -1,0 +1,505 @@
+{
+  "baseline": "56426be209e270024008b761dbd835a54a6c4c47",
+  "routes": [
+    {
+      "key": "backend/src/routes/agents.js POST /",
+      "reason": "agents存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/agents.js PUT /:id",
+      "reason": "agents存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/agents.js POST /:id/credentials",
+      "reason": "agents存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/agents.js POST /credentials/:credentialId/revoke",
+      "reason": "agents存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/agents.js POST /credentials/:credentialId/rotate",
+      "reason": "agents存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/ai.js POST /anthropic/v1/messages",
+      "reason": "AI流式及配置入口，需在隔离上游夹具中定义失败与持久化边界"
+    },
+    {
+      "key": "backend/src/routes/ai.js POST /anthropic/v1/messages/count_tokens",
+      "reason": "AI流式及配置入口，需在隔离上游夹具中定义失败与持久化边界"
+    },
+    {
+      "key": "backend/src/routes/ai.js POST /chat",
+      "reason": "AI流式及配置入口，需在隔离上游夹具中定义失败与持久化边界"
+    },
+    {
+      "key": "backend/src/routes/ai.js POST /chat/stream",
+      "reason": "AI流式及配置入口，需在隔离上游夹具中定义失败与持久化边界"
+    },
+    {
+      "key": "backend/src/routes/ai.js POST /parse",
+      "reason": "AI流式及配置入口，需在隔离上游夹具中定义失败与持久化边界"
+    },
+    {
+      "key": "backend/src/routes/ai.js POST /agents/prompt",
+      "reason": "AI流式及配置入口，需在隔离上游夹具中定义失败与持久化边界"
+    },
+    {
+      "key": "backend/src/routes/ai.js POST /agents/prompt-stream",
+      "reason": "AI流式及配置入口，需在隔离上游夹具中定义失败与持久化边界"
+    },
+    {
+      "key": "backend/src/routes/ai.js POST /agents/execute-action",
+      "reason": "AI流式及配置入口，需在隔离上游夹具中定义失败与持久化边界"
+    },
+    {
+      "key": "backend/src/routes/ai.js POST /agents/cancel-action",
+      "reason": "AI流式及配置入口，需在隔离上游夹具中定义失败与持久化边界"
+    },
+    {
+      "key": "backend/src/routes/ai.js PUT /config",
+      "reason": "AI流式及配置入口，需在隔离上游夹具中定义失败与持久化边界"
+    },
+    {
+      "key": "backend/src/routes/auth.js POST /email-code",
+      "reason": "认证、会话及公开验证码入口，需保留限流与身份撤销专用测试后再迁移"
+    },
+    {
+      "key": "backend/src/routes/auth.js POST /email-register",
+      "reason": "认证、会话及公开验证码入口，需保留限流与身份撤销专用测试后再迁移"
+    },
+    {
+      "key": "backend/src/routes/auth.js POST /login",
+      "reason": "认证、会话及公开验证码入口，需保留限流与身份撤销专用测试后再迁移"
+    },
+    {
+      "key": "backend/src/routes/auth.js POST /reset-password-code",
+      "reason": "认证、会话及公开验证码入口，需保留限流与身份撤销专用测试后再迁移"
+    },
+    {
+      "key": "backend/src/routes/auth.js POST /reset-password",
+      "reason": "认证、会话及公开验证码入口，需保留限流与身份撤销专用测试后再迁移"
+    },
+    {
+      "key": "backend/src/routes/auth.js POST /register",
+      "reason": "认证、会话及公开验证码入口，需保留限流与身份撤销专用测试后再迁移"
+    },
+    {
+      "key": "backend/src/routes/auth.js POST /logout",
+      "reason": "认证、会话及公开验证码入口，需保留限流与身份撤销专用测试后再迁移"
+    },
+    {
+      "key": "backend/src/routes/auth.js POST /change-password",
+      "reason": "认证、会话及公开验证码入口，需保留限流与身份撤销专用测试后再迁移"
+    },
+    {
+      "key": "backend/src/routes/auth.js PUT /users/:id",
+      "reason": "认证、会话及公开验证码入口，需保留限流与身份撤销专用测试后再迁移"
+    },
+    {
+      "key": "backend/src/routes/bankFlow.js POST /import/preview",
+      "reason": "银行资料为受限数据，需用脱敏导入夹具覆盖事务与读回"
+    },
+    {
+      "key": "backend/src/routes/bankFlow.js POST /import",
+      "reason": "银行资料为受限数据，需用脱敏导入夹具覆盖事务与读回"
+    },
+    {
+      "key": "backend/src/routes/bankFlow.js POST /invoices/import/preview",
+      "reason": "银行资料为受限数据，需用脱敏导入夹具覆盖事务与读回"
+    },
+    {
+      "key": "backend/src/routes/bankFlow.js POST /invoices/import",
+      "reason": "银行资料为受限数据，需用脱敏导入夹具覆盖事务与读回"
+    },
+    {
+      "key": "backend/src/routes/batchImport.routes.js POST /sales",
+      "reason": "batchImport.routes存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/batchImport.routes.js POST /purchase",
+      "reason": "batchImport.routes存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/containers.js POST /",
+      "reason": "containers存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/containers.js PUT /:id",
+      "reason": "containers存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/containers.js POST /:id/items",
+      "reason": "containers存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/containers.js PUT /:id/items/:itemId",
+      "reason": "containers存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/containers.js PUT /:id/status",
+      "reason": "containers存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/contractDoc.js POST /template",
+      "reason": "contractDoc存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/contractDoc.js POST /generate/:id",
+      "reason": "contractDoc存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/contractTemplates.js POST /",
+      "reason": "contractTemplates存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/customsDeclarations.js POST /auto-drafts",
+      "reason": "customsDeclarations存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/customsDeclarations.js POST /",
+      "reason": "customsDeclarations存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/customsDeclarations.js PUT /:id",
+      "reason": "customsDeclarations存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/dataImport.js POST /catalog/:kind/preview",
+      "reason": "批量导入有dry-run和整批事务专用矩阵"
+    },
+    {
+      "key": "backend/src/routes/dataImport.js POST /catalog/:kind/execute",
+      "reason": "批量导入有dry-run和整批事务专用矩阵"
+    },
+    {
+      "key": "backend/src/routes/dataImport.js POST /",
+      "reason": "批量导入有dry-run和整批事务专用矩阵"
+    },
+    {
+      "key": "backend/src/routes/dataImport.js POST /preview",
+      "reason": "批量导入有dry-run和整批事务专用矩阵"
+    },
+    {
+      "key": "backend/src/routes/dataImport.js POST /execute",
+      "reason": "批量导入有dry-run和整批事务专用矩阵"
+    },
+    {
+      "key": "backend/src/routes/files.js POST /contracts/:contractId/files",
+      "reason": "附件需验证权限、物理文件与失败清理的专用生命周期"
+    },
+    {
+      "key": "backend/src/routes/finance.js POST /payments",
+      "reason": "财务及分配入口需保留口径与幂等核验，本轮不改定价"
+    },
+    {
+      "key": "backend/src/routes/finance.js POST /payments/auto-match",
+      "reason": "财务及分配入口需保留口径与幂等核验，本轮不改定价"
+    },
+    {
+      "key": "backend/src/routes/finance.js POST /payments/:id/allocate",
+      "reason": "财务及分配入口需保留口径与幂等核验，本轮不改定价"
+    },
+    {
+      "key": "backend/src/routes/finance.js POST /statements/import-file/preview",
+      "reason": "财务及分配入口需保留口径与幂等核验，本轮不改定价"
+    },
+    {
+      "key": "backend/src/routes/finance.js POST /statements/import-file/confirm",
+      "reason": "财务及分配入口需保留口径与幂等核验，本轮不改定价"
+    },
+    {
+      "key": "backend/src/routes/finance.js POST /statements/import-bundle/preview",
+      "reason": "财务及分配入口需保留口径与幂等核验，本轮不改定价"
+    },
+    {
+      "key": "backend/src/routes/finance.js POST /statements/import-bundle/confirm",
+      "reason": "财务及分配入口需保留口径与幂等核验，本轮不改定价"
+    },
+    {
+      "key": "backend/src/routes/finance.js POST /auto-match",
+      "reason": "财务及分配入口需保留口径与幂等核验，本轮不改定价"
+    },
+    {
+      "key": "backend/src/routes/finance.js POST /match",
+      "reason": "财务及分配入口需保留口径与幂等核验，本轮不改定价"
+    },
+    {
+      "key": "backend/src/routes/finance.js POST /unmatch",
+      "reason": "财务及分配入口需保留口径与幂等核验，本轮不改定价"
+    },
+    {
+      "key": "backend/src/routes/finance.js POST /ignore",
+      "reason": "财务及分配入口需保留口径与幂等核验，本轮不改定价"
+    },
+    {
+      "key": "backend/src/routes/forexVerifications.js POST /",
+      "reason": "forexVerifications存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/forexVerifications.js PUT /:id",
+      "reason": "forexVerifications存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/hsCodes.js PUT /:code",
+      "reason": "hsCodes存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/hsCodes.js POST /:code/fill-declaration",
+      "reason": "hsCodes存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/hsCodes.js POST /batch-match",
+      "reason": "hsCodes存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/hsCodes.js POST /ai-recommend",
+      "reason": "hsCodes存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/inventory.js PUT /batch-status",
+      "reason": "库存由采购验货来源或手工状态机约束，不适用通用文本更新"
+    },
+    {
+      "key": "backend/src/routes/inventory.js PUT /:id/status",
+      "reason": "库存由采购验货来源或手工状态机约束，不适用通用文本更新"
+    },
+    {
+      "key": "backend/src/routes/mcp.js POST /",
+      "reason": "mcp存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/notifications.js POST /generate",
+      "reason": "notifications存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/notifications.js POST /read-all",
+      "reason": "notifications存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/notifications.js POST /:id/read",
+      "reason": "notifications存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/products.js POST /",
+      "reason": "products存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/products.js PUT /:id",
+      "reason": "products存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/products.js POST /:id/suppliers",
+      "reason": "products存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/products.js POST /:id/price-history",
+      "reason": "products存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/purchases.js POST /import",
+      "reason": "采购及验货事务不可绕过实物来源约束，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/purchases.js PUT /:id/invoice-numbers",
+      "reason": "采购及验货事务不可绕过实物来源约束，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/purchases.js POST /:id/receipts",
+      "reason": "采购及验货事务不可绕过实物来源约束，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/purchases.js POST /:id/receipts/:receiptId/inspection",
+      "reason": "采购及验货事务不可绕过实物来源约束，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/purchases.js POST /",
+      "reason": "采购及验货事务不可绕过实物来源约束，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/purchases.js PUT /:id",
+      "reason": "采购及验货事务不可绕过实物来源约束，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/purchases.js POST /:id/items",
+      "reason": "采购及验货事务不可绕过实物来源约束，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/purchases.js PUT /:id/production-details",
+      "reason": "采购及验货事务不可绕过实物来源约束，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/purchases.js PUT /:id/status",
+      "reason": "采购及验货事务不可绕过实物来源约束，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/purchases.js POST /:id/files",
+      "reason": "采购及验货事务不可绕过实物来源约束，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/purchases.js POST /suppliers-by-products",
+      "reason": "采购及验货事务不可绕过实物来源约束，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/sales.js POST /",
+      "reason": "出口及装箱事务涉及合格库存扣减，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/sales.js PUT /:id",
+      "reason": "出口及装箱事务涉及合格库存扣减，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/sales.js POST /:id/items",
+      "reason": "出口及装箱事务涉及合格库存扣减，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/sales.js POST /:id/import-purchase-items",
+      "reason": "出口及装箱事务涉及合格库存扣减，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/sales.js POST /:id/packing-items",
+      "reason": "出口及装箱事务涉及合格库存扣减，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/sales.js PUT /:id/packing-items/:itemId",
+      "reason": "出口及装箱事务涉及合格库存扣减，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/sales.js POST /:id/export-packet/preview",
+      "reason": "出口及装箱事务涉及合格库存扣减，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/sales.js POST /:id/export-packet/generate",
+      "reason": "出口及装箱事务涉及合格库存扣减，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/sales.js POST /:id/files",
+      "reason": "出口及装箱事务涉及合格库存扣减，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/sales.js POST /:id/packing-list-check",
+      "reason": "出口及装箱事务涉及合格库存扣减，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/sales.js PUT /:id/packing-list-checks/:checkId/review",
+      "reason": "出口及装箱事务涉及合格库存扣减，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/sales.js PUT /:id/status",
+      "reason": "出口及装箱事务涉及合格库存扣减，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/sales.js POST /calculate-price",
+      "reason": "出口及装箱事务涉及合格库存扣减，需专门状态与并发矩阵"
+    },
+    {
+      "key": "backend/src/routes/stores.js POST /",
+      "reason": "stores存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/stores.js PUT /:id",
+      "reason": "stores存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/suppliers.js POST /",
+      "reason": "suppliers存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/suppliers.js PUT /:id",
+      "reason": "suppliers存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/suppliers.js POST /:id/aliases",
+      "reason": "suppliers存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/suppliers.js POST /:id/quality-issue",
+      "reason": "suppliers存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/system.js PUT /configs/:key",
+      "reason": "分类、配置、通知或汇率有旧清空协议及专用状态，尚未迁移共享合同"
+    },
+    {
+      "key": "backend/src/routes/system.js PUT /notifications/:id/read",
+      "reason": "分类、配置、通知或汇率有旧清空协议及专用状态，尚未迁移共享合同"
+    },
+    {
+      "key": "backend/src/routes/system.js POST /exchange-rate/sync",
+      "reason": "分类、配置、通知或汇率有旧清空协议及专用状态，尚未迁移共享合同"
+    },
+    {
+      "key": "backend/src/routes/system.js POST /categories",
+      "reason": "分类、配置、通知或汇率有旧清空协议及专用状态，尚未迁移共享合同"
+    },
+    {
+      "key": "backend/src/routes/system.js PUT /categories/:id",
+      "reason": "分类、配置、通知或汇率有旧清空协议及专用状态，尚未迁移共享合同"
+    },
+    {
+      "key": "backend/src/routes/system.js POST /import",
+      "reason": "分类、配置、通知或汇率有旧清空协议及专用状态，尚未迁移共享合同"
+    },
+    {
+      "key": "backend/src/routes/system.js POST /patrol/trigger",
+      "reason": "分类、配置、通知或汇率有旧清空协议及专用状态，尚未迁移共享合同"
+    },
+    {
+      "key": "backend/src/routes/taxRates.js POST /",
+      "reason": "taxRates存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/taxRates.js PUT /:id",
+      "reason": "taxRates存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/taxRefunds.js POST /workbench/:salesContractId/confirm",
+      "reason": "taxRefunds存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/taxRefunds.js POST /auto-drafts",
+      "reason": "taxRefunds存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/taxRefunds.js POST /export",
+      "reason": "taxRefunds存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/taxRefunds.js POST /",
+      "reason": "taxRefunds存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/taxRefunds.js PUT /:id",
+      "reason": "taxRefunds存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/threeForms.js POST /preview",
+      "reason": "threeForms存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/threeForms.js POST /generate",
+      "reason": "threeForms存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/threeForms.js POST /customs-declaration",
+      "reason": "threeForms存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/threeForms.js POST /forex-verification",
+      "reason": "threeForms存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/threeForms.js POST /tax-refund",
+      "reason": "threeForms存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/users.js POST /",
+      "reason": "users存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    },
+    {
+      "key": "backend/src/routes/users.js PUT /:id",
+      "reason": "users存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 /**
- * Input: 报关单服务、URL 查询参数、router
+ * Input: 报关单服务、共享列表URL状态、router
  * Output: 报关单列表页（筛选与历史同步，详情携带安全的当前列表返回上下文）
  * Pos: 报关单管理主列表页
  *
@@ -17,13 +17,10 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  replaceBrowserUrl,
-  useBrowserQuery,
-} from "@/lib/hooks/useBrowserQuery";
+import { listUrlFields, useListUrlState } from "@/lib/hooks/useListUrlState";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useTableSort } from "@/lib/hooks/useTableSort";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import type { CustomsDeclaration } from "@/types";
 import { customsDeclarationService } from "@/services/customsDeclaration.service";
 import { cachedFetch } from "@/lib/api-cache";
@@ -61,8 +58,6 @@ import {
 
 import { resolveCustomsReturnTo } from "./customs-return-context";
 
-const PAGE_SIZE = 20;
-
 const formatAmount = (amount: number, currency: string) =>
   `${currency} ${amount.toLocaleString()}`;
 
@@ -70,55 +65,12 @@ export function CustomsDeclarationListPageContent({
   embedded = false,
 }: { embedded?: boolean } = {}) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  // 延迟的 Next 查询确认不能覆盖浏览器已发布的输入；每次提交后重新检查实际地址。
-  const queryString = useBrowserQuery(searchParams.toString());
-  const currentParams = new URLSearchParams(queryString);
-  const initialKeyword = currentParams.get("keyword") || "";
-  const initialStatus = currentParams.get("status") || "ALL";
-
-  const [keyword, setKeyword] = useState(initialKeyword);
-  const [status, setStatus] = useState(initialStatus);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(PAGE_SIZE);
-  const [total, setTotal] = useState(0);
-  const [urlFilters, setUrlFilters] = useState({
-    keyword: initialKeyword,
-    status: initialStatus,
-  });
-
-  // 历史导航先采用 URL 筛选；只在用户编辑筛选时写 URL，避免旧状态覆写 Back/Forward。
-  if (
-    urlFilters.keyword !== initialKeyword ||
-    urlFilters.status !== initialStatus
-  ) {
-    setUrlFilters({ keyword: initialKeyword, status: initialStatus });
-    setKeyword(initialKeyword);
-    setStatus(initialStatus);
-    setPage(1);
-  }
-  const deferredKeyword = useDeferredValue(keyword);
-
-  // 同步搜索状态到 URL
-  const updateUrlParams = useCallback(
-    (newKeyword: string, newStatus: string) => {
-      // 使用最新地址保留父页签/来源参数；Next 原生 history 补丁同步查询，不为每个按键启动路由请求。
-      const params = new URLSearchParams(window.location.search);
-      if (embedded && params.get("view") !== "customs") return;
-      if (newKeyword) params.set("keyword", newKeyword);
-      else params.delete("keyword");
-      if (newStatus && newStatus !== "ALL") params.set("status", newStatus);
-      else params.delete("status");
-      const nextQuery = params.toString();
-      if (nextQuery === window.location.search.slice(1)) return;
-      const newUrl =
-        window.location.pathname +
-        (nextQuery ? `?${nextQuery}` : "") +
-        window.location.hash;
-      replaceBrowserUrl(newUrl);
-    },
-    [embedded],
+  const [{ keyword, status, page, pageSize }, setListState] = useListUrlState(
+    listUrlFields.customs,
+    embedded ? ["view", "customs"] : undefined,
   );
+  const [total, setTotal] = useState(0);
+  const deferredKeyword = useDeferredValue(keyword);
 
   const [declarations, setDeclarations] = useState<CustomsDeclaration[]>([]);
   const [loading, setLoading] = useState(true);
@@ -233,9 +185,7 @@ export function CustomsDeclarationListPageContent({
                 value={keyword}
                 onChange={(event) => {
                   const nextKeyword = event.target.value;
-                  setKeyword(nextKeyword);
-                  setPage(1);
-                  updateUrlParams(nextKeyword, status);
+                  setListState({ keyword: nextKeyword });
                 }}
                 placeholder="搜索报关单号或报关行..."
                 className="h-11 rounded-xl border-border/70 bg-background/70 pl-10"
@@ -245,9 +195,7 @@ export function CustomsDeclarationListPageContent({
             <Select
               value={status}
               onValueChange={(value) => {
-                setStatus(value);
-                setPage(1);
-                updateUrlParams(keyword, value);
+                setListState({ status: value });
               }}
             >
               <SelectTrigger className="h-11 w-40 rounded-xl">
@@ -267,10 +215,7 @@ export function CustomsDeclarationListPageContent({
                 variant="ghost"
                 className="h-11 rounded-xl"
                 onClick={() => {
-                  setKeyword("");
-                  setStatus("ALL");
-                  setPage(1);
-                  updateUrlParams("", "ALL");
+                  setListState({ keyword: "", status: "ALL" });
                 }}
                 data-testid="reset-filters"
               >
@@ -519,7 +464,7 @@ export function CustomsDeclarationListPageContent({
           variant="outline"
           size="sm"
           disabled={loading || page <= 1}
-          onClick={() => setPage(page - 1)}
+          onClick={() => setListState({ page: page - 1 })}
         >
           上一页
         </Button>
@@ -527,15 +472,14 @@ export function CustomsDeclarationListPageContent({
           variant="outline"
           size="sm"
           disabled={loading || page * pageSize >= total}
-          onClick={() => setPage(page + 1)}
+          onClick={() => setListState({ page: page + 1 })}
         >
           下一页
         </Button>
         <PageSizeSelect
           value={pageSize}
           onChange={(size) => {
-            setPageSize(size);
-            setPage(1);
+            setListState({ pageSize: size });
           }}
         />
       </div>

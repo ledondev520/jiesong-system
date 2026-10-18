@@ -35,6 +35,7 @@ const response = (items: Inventory[]) => ({
   data: { items, pagination: { total: items.length, totalPages: 1 } },
 });
 beforeEach(() => {
+  window.history.replaceState({}, "", "/dashboard/products?tab=inventory");
   clearAllCache();
   getAll.mockReset();
   batchUpdateStatus.mockReset();
@@ -177,4 +178,61 @@ it("批量更新等待期间翻页，完成后继续显示当前页", async () =
     screen.queryByRole("checkbox", { name: "选择库存 synthetic-page-1" }),
   ).not.toBeInTheDocument();
   expect(screen.getByText(/第 2\/2 页/)).toBeInTheDocument();
+});
+
+it("库存URL在返回与重新挂载后恢复筛选和分页", async () => {
+  window.history.replaceState(
+    {},
+    "",
+    "/dashboard/products?tab=inventory&inventoryKeyword=SYN&inventoryPage=2&inventoryPageSize=50&source=qa#rows",
+  );
+  getAll.mockResolvedValue({
+    data: { items: [stock], pagination: { total: 200 } },
+  });
+  let view = render(<InventoryTab />);
+  await waitFor(() =>
+    expect(getAll).toHaveBeenLastCalledWith({
+      page: 2,
+      pageSize: 50,
+      keyword: "SYN",
+    }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+  await waitFor(() =>
+    expect(getAll).toHaveBeenLastCalledWith({
+      page: 3,
+      pageSize: 50,
+      keyword: "SYN",
+    }),
+  );
+  const saved = window.location.href;
+  view.unmount();
+  getAll.mockClear();
+  view = render(<InventoryTab />);
+  await waitFor(() =>
+    expect(getAll).toHaveBeenLastCalledWith({
+      page: 3,
+      pageSize: 50,
+      keyword: "SYN",
+    }),
+  );
+  expect(screen.getByPlaceholderText("搜索商品/采购合同...")).toHaveValue(
+    "SYN",
+  );
+  expect(new URL(saved).searchParams.get("tab")).toBe("inventory");
+  await act(async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/dashboard/products?tab=inventory&inventoryKeyword=BACK&inventoryPage=2&inventoryPageSize=50",
+    );
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+  await waitFor(() =>
+    expect(getAll).toHaveBeenLastCalledWith({
+      page: 2,
+      pageSize: 50,
+      keyword: "BACK",
+    }),
+  );
 });

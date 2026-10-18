@@ -225,3 +225,51 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     expect(input).toHaveValue("");
   });
 });
+
+it("报关详情返回与刷新恢复URL页签、筛选及分页", async () => {
+  const saved =
+    "/dashboard/tax-refunds?view=customs&keyword=SYN&status=RELEASED&page=2&pageSize=50&source=qa#rows";
+  window.history.replaceState({}, "", saved);
+  mocks.getAll.mockResolvedValue({
+    data: {
+      items: [
+        {
+          id: "syn",
+          declarationNo: "SYN",
+          status: "RELEASED",
+          totalAmount: 0,
+          currency: "USD",
+        },
+      ],
+      pagination: { total: 200 },
+    },
+  });
+  let view = render(<CustomsDeclarationListPageContent embedded />);
+  await waitFor(() =>
+    expect(mocks.getAll).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        keyword: "SYN",
+        status: "RELEASED",
+        page: 2,
+        pageSize: 50,
+      }),
+    ),
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "查看详情 SYN" }));
+  const detail = new URL(
+    mocks.router.push.mock.calls.at(-1)![0],
+    window.location.origin,
+  );
+  expect(detail.searchParams.get("returnTo")).toBe(saved);
+  view.unmount();
+  mocks.getAll.mockClear();
+  view = render(<CustomsDeclarationListPageContent embedded />);
+  expect(screen.getByPlaceholderText("搜索报关单号或报关行...")).toHaveValue(
+    "SYN",
+  );
+  await waitFor(() =>
+    expect(mocks.getAll).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 2, pageSize: 50 }),
+    ),
+  );
+});
