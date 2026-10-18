@@ -25,9 +25,11 @@
 
 从根目录执行 `node scripts/check-lifecycle.cjs`，或在 backend 执行 `npm test`。CI的后端作业执行同一命令，checkout保留完整Git历史供基线核验。`npm run test:db`执行真实HTTP与合成SQLite的通用矩阵。前端 `npm test -- --maxWorkers=2`执行列表矩阵。
 
-`lifecycle/resources.json`登记2项资源、2项列表合同。`lifecycle/legacy-routes.json`逐条登记PR #62已有的125个POST/PUT/PATCH入口和暂留理由。Acorn语法树扫描所有路由子目录，忽略注释与外部HTTP调用，支持字面量方法、数组路径与链式route。动态方法与路径拒绝通过。新增POST全部检查，包含只读POST，避免靠“创建类”命名判断漏检。
+`lifecycle/resources.json`登记2项资源、2项列表合同。`lifecycle/legacy-routes.json`逐条登记PR #62已有的125个POST/PUT/PATCH入口和暂留理由。Acorn语法树递归扫描路由目录，忽略注释与外部HTTP调用，识别直接声明的Router、Express Router解构重命名、变量声明别名及保存的route句柄，支持字面量方法、数组路径与链式route。已识别实例的动态方法与路径拒绝通过。扫描器不执行任意JavaScript，工厂封装或运行时生成的路由需要先扩展扫描与回归用例。新增POST包含只读POST，避免靠“创建类”命名判断漏检。
 
 检查逐路由匹配，既有文件内新加路由也必须登记。基线固定为 `56426be209e270024008b761dbd835a54a6c4c47`；新增路由不能通过追加存量清单逃过检查。存量删除不失败，登记的合同必须仍有效。错误指出资源注册表、更新函数、测试文件和 `lifecycle/resource.template.json`。先复制模板为资源定义，填写全部矩阵输入；测试从注册表自动枚举资源，不能只放一个空测试路径。
+
+当前普通档案矩阵执行POST集合与PUT `/:id`，每项资源必须登记对应的两个入口，集合路径须与matrix.path匹配，不得复制另一资源的matrix.path充当覆盖。其他写方法或特殊动作须先增加实际HTTP适配器及相应检查。更新函数中的partialUpdate调用检查只验证调用存在，实际持久化语义仍由HTTP与SQLite回读验证。
 
 后端矩阵覆盖创建、局部编辑、无效编辑原子拒绝、可选空串保留、显式清空、HTTP刷新及独立只读SQLite回读、带关键词的返回地址回放。港口没有可清空的字段，清空步骤断言400与原记录不变。新矩阵发现并修复本轮两资源keyword过滤的SQLite `mode`不兼容问题。它不假装验证真实浏览器。
 

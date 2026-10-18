@@ -36,24 +36,45 @@ function literal(node) {
     return node.quasis[0].value.cooked;
   return undefined;
 }
-function routeBase(node) {
+function routeBase(node, routePaths) {
+  if (node?.type === 'Identifier') return routePaths.get(node.name);
   if (node?.type !== 'CallExpression') return undefined;
   if (memberName(node.callee) === 'route') return node.arguments[0];
-  return routeBase(node.callee?.object);
+  return routeBase(node.callee?.object, routePaths);
 }
 function scanSource(source, file) {
   const routes = [];
   const ast = parse(source);
   const routers = new Set();
+  const factories = new Set(['Router']);
+  walk(ast, (node) => {
+    if (
+      node.type === 'VariableDeclarator' &&
+      node.id.type === 'ObjectPattern' &&
+      node.init?.callee?.name === 'require' &&
+      literal(node.init.arguments[0]) === 'express'
+    ) {
+      for (const property of node.id.properties)
+        if (property.key?.name === 'Router' && property.value?.type === 'Identifier')
+          factories.add(property.value.name);
+    }
+  });
   walk(ast, (node) => {
     if (
       node.type === 'VariableDeclarator' &&
       node.init?.type === 'CallExpression' &&
-      (node.init.callee.name === 'Router' ||
+      (factories.has(node.init.callee.name) ||
         memberName(node.init.callee) === 'Router')
     )
       routers.add(node.id.name);
   });
+  const owner = (node) =>
+    node?.type === 'Identifier'
+      ? node.name
+      : node?.type === 'CallExpression'
+        ? owner(node.callee?.object)
+        : undefined;
+  const routePaths = new Map();
   let addedAlias;
   do {
     addedAlias = false;
@@ -61,21 +82,16 @@ function scanSource(source, file) {
       if (
         node.type === 'VariableDeclarator' &&
         node.id.type === 'Identifier' &&
-        node.init?.type === 'Identifier' &&
-        routers.has(node.init.name) &&
+        routers.has(owner(node.init)) &&
         !routers.has(node.id.name)
       ) {
         routers.add(node.id.name);
+        const base = routeBase(node.init, routePaths);
+        if (base) routePaths.set(node.id.name, base);
         addedAlias = true;
       }
     });
   } while (addedAlias);
-  const owner = (node) =>
-    node?.type === 'Identifier'
-      ? node.name
-      : node?.type === 'CallExpression'
-        ? owner(node.callee?.object)
-        : undefined;
   walk(ast, (node) => {
     if (
       node.type !== 'CallExpression' ||
@@ -94,7 +110,7 @@ function scanSource(source, file) {
       );
     }
     if (!['post', 'put', 'patch', 'all'].includes(method)) return;
-    const argument = routeBase(node.callee.object) || node.arguments[0];
+    const argument = routeBase(node.callee.object, routePaths) || node.arguments[0];
     const paths =
       argument?.type === 'ArrayExpression' ? argument.elements : [argument];
     for (const item of paths) {

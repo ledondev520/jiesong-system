@@ -195,3 +195,18 @@ test('registering a new route with an unrelated existing matrix is rejected', (t
   );
   assert.throws(f.verify, /synthetic-new-resource.*matrix.*routes/);
 });
+
+test('renamed Express Router factories and saved route handles remain visible', () => {
+  const source = `
+    const { Router: makeRouter } = require('express');
+    const api = makeRouter();
+    const writeApi = api;
+    const item = writeApi.route('/saved');
+    const itemAlias = item;
+    itemAlias.post(handler).patch(handler);
+  `;
+  assert.deepEqual(scanSource(source, 'fixture.js').map((row) => row.key).sort(), [
+    'fixture.js PATCH /saved',
+    'fixture.js POST /saved',
+  ]);
+});
