@@ -95,6 +95,13 @@ class SnapshotTests(unittest.TestCase):
             self.assertEqual(stat.S_IMODE(file.stat().st_mode), 0o600)
         self.assertEqual(stat.S_IMODE(target.parent.stat().st_mode), 0o700)
 
+    def test_verification_does_not_leave_temporary_wal_or_shm_files(self):
+        saved = self.save()
+        target = self.root / 'restored' / 'clean.db'
+        snapshot.restore(saved['backup'], target)
+        self.assertEqual(list((self.root / 'backups').glob('.snapshot-*')), [])
+        self.assertEqual(list(target.parent.glob('.snapshot-*')), [])
+
     def test_restore_refuses_existing_target_without_modifying_it(self):
         saved = self.save()
         target = self.root / 'sentinel.db'; target.write_bytes(b'keep sentinel')

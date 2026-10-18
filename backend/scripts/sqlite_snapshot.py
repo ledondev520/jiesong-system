@@ -51,7 +51,9 @@ def hash_stream(handle):
 
 
 def verify_database(path):
-    with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as connection:
+    # Only sealed temporary copies are verified, never a live source/WAL database.
+    # Immutable reads avoid creating untracked WAL/SHM sidecars for WAL-mode snapshots.
+    with closing(sqlite3.connect(path.as_uri() + "?mode=ro&immutable=1", uri=True)) as connection:
         if connection.execute("PRAGMA integrity_check").fetchall() != [("ok",)]:
             raise ValueError("SQLite integrity check failed")
 
