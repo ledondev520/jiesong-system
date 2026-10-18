@@ -157,3 +157,5 @@
 - 默认历史工作簿目录 `data/export-history/` 必须保持Git忽略；用 `git check-ignore data/export-history/<file>.xlsx` 验证，不提交源工作簿。
 
 Backup CLI `backend/scripts/db-backup.js` preserves explicit space or equals options before environment/default selection.
+
+`bootstrapAdmin.js` validates bootstrap password policy only when creating/remediating an account; unused stale settings cannot block an already-secure administrator.

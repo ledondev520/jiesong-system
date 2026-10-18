@@ -152,6 +152,7 @@
     }
   ],
   "reviewControls": [
-    "Backup CLI explicit space/equals source and destination options take precedence over environment/defaults."
+    "Backup CLI explicit space/equals source and destination options take precedence over environment/defaults.",
+    "bootstrapAdmin.js validates bootstrap passwords only before a password write, preserving secure accounts."
   ]
 }

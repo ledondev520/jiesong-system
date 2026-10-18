@@ -130,3 +130,5 @@ SQLite backups now use `backend/scripts/sqlite_snapshot.py` through the backup/r
 The default local export history directory `/data/export-history/` is excluded by the repository `.gitignore` so portable defaults do not invite accidental source-workbook commits.
 
 Backup CLI `backend/scripts/db-backup.js` preserves explicit space or equals options before environment/default selection.
+
+`bootstrapAdmin.js` validates bootstrap password policy only when creating/remediating an account; unused stale settings cannot block an already-secure administrator.

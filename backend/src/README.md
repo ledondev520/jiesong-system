@@ -174,3 +174,5 @@
 - 通用导入共享 `utils/tabularImport.js` 的 CSV/xlsx 解码。只接受一个工作表、最多 5000 行和 100 列，拒绝公式、重复表头、损坏文件，输入错误返回 400。
 - `services/catalogImportService.js` 在 ADMIN 导入边界共享四类模板，预览无写入，执行重新校验并整批事务新增。库存期初显式确认且保留独立来源编号；详见 `docs/migration/catalog-import.md`。
 - `services/bootstrapAdmin.js` 在 `app.js` 监听端口和启动定时任务之前检查管理员。缺初始化管理员或仍使用旧默认密码且没有新配置时，启动失败。显式新密码仅创建管理员或修复旧默认密码，不覆盖现有安全密码。
+
+- 管理员已有安全密码时忽略未使用的 bootstrap 配置；仅创建或修复时验证初始化密码策略。
