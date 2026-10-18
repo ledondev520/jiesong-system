@@ -46,6 +46,14 @@ class ReadOnlySourceTests(unittest.TestCase):
                 MODULE.fetch_contract_rows(database, 'SYNTHETIC')
             self.assertFalse(database.exists())
 
+    def test_query_failure_always_closes_source_connection(self):
+        connection = unittest.mock.MagicMock()
+        connection.execute.side_effect = sqlite3.OperationalError('synthetic query failure')
+        with patch.object(MODULE.sqlite3, 'connect', return_value=connection):
+            with self.assertRaises(sqlite3.OperationalError):
+                MODULE.fetch_contract_rows(Path('/synthetic.db'), 'SYNTHETIC')
+        connection.close.assert_called_once()
+
 
 class PricingTests(unittest.TestCase):
     def test_refundable_formula_uses_adjusted_rate(self):
