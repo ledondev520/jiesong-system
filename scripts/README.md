@@ -367,3 +367,18 @@ Paths support `~`; explicit relative paths resolve against the working directory
 Put local history workbooks in the selected directory. An absent/empty history directory gives no historical quotes; it does not fabricate evidence. The SQLite database must already exist. Keep business workbooks and databases outside Git. Pricing formulas are unchanged.
 
 `drill_sqlite_restore.py --directory <不存在的临时目录>` 使用已提交迁移和合成商品/期初库存，调用真实备份恢复CLI并保存独立读回回执。它不访问已有库或.env。详见 `docs/operations/sqlite-backup-restore.md`。
+
+## 可配置出口报价
+
+`prepare_export_packet.py` 通过 `pricing_config.py` 读取仓库的
+`config/pricing.json`，或与后端相同的 `JIESONG_PRICING_CONFIG` 显式文件。
+校验范围来自同一 `config/pricing.schema.json`。默认 tiered、汇率调整 -0.2、
+有退税加价 0.3、零退税上限 0.1，multiplier 模式的乘数默认为 1.3。
+所有模式沿用原有凑整规则，multiplier 对全部已核验退税商品使用同一目标加价。
+旧 `--fx-buffer`、`--refundable-markup`、`--no-refund-markup` 仅接受与共用文件一致的值，
+不再允许成为独立的报价配置来源。非法文件或值拒绝运行，日志只含文件指纹。
+
+`pricing_snapshot.cjs` 与 `tests/pricing_snapshot.py` 只运行合成输入和模拟来源。
+`verify_pricing_defaults.py --baseline-root <纯Git导出目录> --evidence <临时目录>`
+比较旧、新完整 JSON，并生成 SHA-256 回执。旧目录需能使用原有后端依赖。
+不读取真实库、税则 DBF 或历史工作簿。

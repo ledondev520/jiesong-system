@@ -179,3 +179,7 @@
 `controllers/system/pricingController.js` 提供 ADMIN-only 报价配置 GET/PUT。
 原子替换、版本冲突及无参数值日志由真实文件/HTTP测试验证。
 `routes/pricingConfig.test.js` 的认证身份为合成桩，角色中间件与文件写入为真实实现。
+
+`services/exportPricing.js` 保留原 packet 的凑整算法，集中模式目标和历史报价校验。
+`exportPacketService.js` 每次计算读取一份配置快照，历史/人工价格校验及提示使用同一口径。
+`exportPricing.configuration.test.js` 用同一临时配置文件对照真实 Python 合成建议输出。
