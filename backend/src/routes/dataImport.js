@@ -15,7 +15,6 @@ const catalog = require('../controllers/catalogImportController');
 const dataImportController = require('../controllers/dataImportController');
 const { authenticate, roleAuth } = require('../middleware/auth');
 const systemController = require('../controllers/systemController');
-const { upload: systemUpload } = require('../utils/upload');
 const { withAuditLog } = require('../middleware/auditLog');
 
 // 配置multer内存存储
@@ -40,7 +39,7 @@ router.post('/catalog/:kind/preview', roleAuth('ADMIN'), memoryUpload.single('fi
 router.post('/catalog/:kind/execute', roleAuth('ADMIN'), memoryUpload.single('file'), catalog.execute);
 
 // POST /api/v1/import - 导入CSV数据（仅管理员）
-router.post('/', roleAuth('ADMIN'), systemUpload.single('file'), withAuditLog(
+router.post('/', roleAuth('ADMIN'), memoryUpload.single('file'), withAuditLog(
   {
     entity: 'DataImport',
     action: 'IMPORT',
