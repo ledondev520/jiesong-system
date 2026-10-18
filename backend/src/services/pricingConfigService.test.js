@@ -61,6 +61,7 @@ test('one file is reloaded by both languages; malformed/missing files fail close
   assert.equal(python.status, 0, python.stderr);
   assert.deepEqual(JSON.parse(python.stdout), next);
   assert.match(python.stderr, /pricing_config_loaded/);
+  assert.equal(JSON.parse(python.stderr.trim()).revision, saved.revision);
   fs.writeFileSync(target, JSON.stringify({ ...next, multiplier: 0 }));
   assert.throws(() => pricing.loadPricingConfig(), /multiplier/);
 });

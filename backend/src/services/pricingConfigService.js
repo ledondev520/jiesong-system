@@ -7,7 +7,7 @@ const defaultPath = path.resolve(__dirname, '../../../config/pricing.json');
 const observed = new Map();
 
 const configPath = () => path.resolve(process.env.JIESONG_PRICING_CONFIG || defaultPath);
-const revisionOf = config => crypto.createHash('sha256').update(JSON.stringify(config)).digest('hex');
+const revisionOf = contents => crypto.createHash('sha256').update(contents).digest('hex');
 const audit = (event, details) => process.stderr.write(`${JSON.stringify({
   timestamp: new Date().toISOString(), event, ...details,
 })}\n`);
@@ -37,13 +37,15 @@ const validatePricingConfig = value => {
 
 const readSnapshot = target => {
   let value;
+  let contents;
   try {
-    value = JSON.parse(fs.readFileSync(target, 'utf8'));
+    contents = fs.readFileSync(target);
+    value = JSON.parse(contents.toString('utf8'));
   } catch {
     throw createError('报价配置文件无法读取或 JSON 格式无效', 503);
   }
   const config = validatePricingConfig(value);
-  return { config, revision: revisionOf(config) };
+  return { config, revision: revisionOf(contents) };
 };
 
 const loadPricingSnapshot = () => {
@@ -78,9 +80,10 @@ const updatePricingConfig = (value, expectedRevision, actorId) => {
   try {
     const previous = readSnapshot(target);
     if (previous.revision !== expectedRevision) throw createError('报价配置已变更，请重新加载后保存', 409);
-    const revision = revisionOf(config);
-    if (revision === previous.revision) return previous;
-    fs.writeFileSync(temporary, `${JSON.stringify(config, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
+    if (schema.required.every(key => config[key] === previous.config[key])) return previous;
+    const contents = `${JSON.stringify(config, null, 2)}\n`;
+    const revision = revisionOf(contents);
+    fs.writeFileSync(temporary, contents, { flag: 'wx', mode: 0o600 });
     fs.renameSync(temporary, target);
     observed.set(target, revision);
     audit('pricing_config_updated', {

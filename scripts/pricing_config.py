@@ -3,6 +3,7 @@ import hashlib
 import json
 import math
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 import sys
 
@@ -32,14 +33,15 @@ def validate_pricing_config(value):
 def load_pricing_config(config_path=None):
     target = Path(config_path or os.environ.get('JIESONG_PRICING_CONFIG') or PROJECT_ROOT / 'config/pricing.json').expanduser().resolve()
     try:
-        value = json.loads(target.read_text())
+        contents = target.read_bytes()
+        value = json.loads(contents)
     except (OSError, ValueError):
         raise ValueError('报价配置文件无法读取或 JSON 格式无效') from None
     config = validate_pricing_config(value)
-    revision = hashlib.sha256(json.dumps(config, separators=(',', ':'), sort_keys=True).encode()).hexdigest()
+    revision = hashlib.sha256(contents).hexdigest()
     previous = _OBSERVED.get(target)
     if previous != revision:
-        event = {'event': 'pricing_config_file_changed' if previous else 'pricing_config_loaded', 'revision': revision}
+        event = {'timestamp': datetime.now(timezone.utc).isoformat(), 'event': 'pricing_config_file_changed' if previous else 'pricing_config_loaded', 'revision': revision}
         if previous:
             event['previousRevision'] = previous
         print(json.dumps(event), file=sys.stderr)
