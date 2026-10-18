@@ -1,21 +1,47 @@
+import { Suspense } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { CustomsDeclarationDetailPageContent } from "@/app/customs-declarations/components/CustomsDeclarationDetailPageContent";
 import registry from "../../../../lifecycle/resources.json";
 import { InventoryTab } from "@/app/dashboard/products/components/InventoryTab";
 import { CustomsDeclarationListPageContent } from "@/app/customs-declarations/components/CustomsDeclarationListPageContent";
 
-const mocks = vi.hoisted(() => ({ getAll: vi.fn(), push: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  getAll: vi.fn(),
+  getById: vi.fn(),
+  push: vi.fn(),
+  documentNavigate: vi.fn((href: string) =>
+    window.history.replaceState({}, "", href),
+  ),
+}));
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(window.location.search),
+  usePathname: () => window.location.pathname,
   useRouter: () => ({ push: mocks.push }),
 }));
+vi.mock(
+  "@/app/customs-declarations/components/customs-return-context",
+  async (original) => ({
+    ...(await original<
+      typeof import("@/app/customs-declarations/components/customs-return-context")
+    >()),
+    navigateToCustomsList: mocks.documentNavigate,
+  }),
+);
 vi.mock("@/services/inventory.service", () => ({
   inventoryService: { getAll: mocks.getAll },
 }));
 vi.mock("@/services/customsDeclaration.service", () => ({
-  customsDeclarationService: { getAll: mocks.getAll },
+  customsDeclarationService: { getAll: mocks.getAll, getById: mocks.getById },
 }));
 vi.mock("@/lib/hooks/useBusinessReadOnly", () => ({
+  useBusinessReadOnly: () => false,
   BusinessWrite: ({ children }: { children: React.ReactNode }) => children,
 }));
 vi.mock("@/lib/api-cache", () => ({
@@ -115,4 +141,39 @@ it("customs detail receives the active filtered return URL", async () => {
     "/dashboard/customs-declarations/synthetic-detail",
   );
   expect(destination.searchParams.get("returnTo")).toBe(saved);
+});
+
+it("customs explicit return restores the active filtered URL from detail", async () => {
+  const saved =
+    "/dashboard/tax-refunds?view=customs&keyword=SYN&status=RELEASED&page=3&pageSize=50&source=qa#rows";
+  window.history.replaceState(
+    {},
+    "",
+    `/dashboard/customs-declarations/synthetic-detail?returnTo=${encodeURIComponent(saved)}`,
+  );
+  mocks.getById.mockResolvedValue({
+    data: {
+      id: "synthetic-detail",
+      declarationNo: "SYN",
+      status: "RELEASED",
+      currency: "USD",
+      totalAmount: 0,
+      totalQuantity: 0,
+      items: [],
+    },
+  });
+  await act(async () => {
+    render(
+      <Suspense fallback={<div>Loading detail</div>}>
+        <CustomsDeclarationDetailPageContent
+          params={Promise.resolve({ id: "synthetic-detail" })}
+        />
+      </Suspense>,
+    );
+  });
+  fireEvent.click(await screen.findByRole("button", { name: "返回" }));
+  expect(mocks.documentNavigate).toHaveBeenCalledWith(saved);
+  expect(
+    window.location.pathname + window.location.search + window.location.hash,
+  ).toBe(saved);
 });
