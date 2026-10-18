@@ -16,7 +16,7 @@ EXPECTED = json.loads((ROOT / 'tests/fixtures/pricing-readiness-defaults.json').
 
 
 class PricingVerifierTests(unittest.TestCase):
-    def verify(self, mutation=None):
+    def verify(self, mutation=None, empty_consumer=None):
         services = []
         for name, pricing in EXPECTED.items():
             services.append({'name': name, 'readiness': {
@@ -31,6 +31,9 @@ class PricingVerifierTests(unittest.TestCase):
         def output(command, **kwargs):
             if command[-1] == 'packet' or command[0] == 'python3':
                 data = [{'name': name, 'unchanged': True} for name in EXPECTED]
+                consumer = 'packet' if command[-1] == 'packet' else 'python'
+                if consumer == empty_consumer:
+                    data = []
             else:
                 data = services if command[-1] == '/synthetic-before' else after
             return subprocess.CompletedProcess(command, 0, json.dumps(data).encode(), b'')
@@ -43,6 +46,11 @@ class PricingVerifierTests(unittest.TestCase):
 
     def test_valid_readiness_prices_and_metadata_pass(self):
         self.assertTrue(self.verify()['readiness']['nonPricingFieldsEqual'])
+
+    def test_rejects_identically_empty_packet_or_python_snapshots(self):
+        for consumer in ['packet', 'python']:
+            with self.subTest(consumer=consumer), self.assertRaisesRegex(AssertionError, 'Synthetic .* cases differ'):
+                self.verify(empty_consumer=consumer)
 
     def test_rejects_missing_or_wrong_recommendations_and_formula_metadata(self):
         mutations = [
