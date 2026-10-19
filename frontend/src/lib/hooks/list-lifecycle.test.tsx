@@ -58,59 +58,85 @@ beforeEach(() => {
 
 for (const list of registry.lists) {
   describe(`${list.id} registered list matrix`, () => {
-    it("filter, paginate, return and refresh use the same URL state", async () => {
-      const url = new URL(list.path, window.location.origin);
-      url.searchParams.set(list.keywordKey, "SYN");
-      url.searchParams.set(list.pageKey, "2");
-      url.searchParams.set(list.pageSizeKey, "50");
-      window.history.replaceState({}, "", url);
-      const component = () => {
-        if (list.id === "inventory") return <InventoryTab />;
-        if (list.id === "customs")
-          return <CustomsDeclarationListPageContent embedded />;
-        throw new Error(
-          `Add an actual component adapter for ${list.id} in list-lifecycle.test.tsx`,
+    it.each(["immediate", "pending"])(
+      "filter, paginate, return and refresh use the same URL state (%s response)",
+      async (responseTiming) => {
+        // A request spy records invocation before the response enables pagination.
+        let completeInitialRead: (() => void) | undefined;
+        if (responseTiming === "pending") {
+          mocks.getAll.mockImplementationOnce(
+            () =>
+              new Promise((resolve) => {
+                completeInitialRead = () =>
+                  resolve({
+                    data: { items: [], pagination: { total: 200 } },
+                  });
+              }),
+          );
+        }
+        const url = new URL(list.path, window.location.origin);
+        url.searchParams.set(list.keywordKey, "SYN");
+        url.searchParams.set(list.pageKey, "2");
+        url.searchParams.set(list.pageSizeKey, "50");
+        window.history.replaceState({}, "", url);
+        const component = () => {
+          if (list.id === "inventory") return <InventoryTab />;
+          if (list.id === "customs")
+            return <CustomsDeclarationListPageContent embedded />;
+          throw new Error(
+            `Add an actual component adapter for ${list.id} in list-lifecycle.test.tsx`,
+          );
+        };
+        let view = render(component());
+        await waitFor(() =>
+          expect(mocks.getAll).toHaveBeenLastCalledWith(
+            expect.objectContaining({ page: 2, pageSize: 50, keyword: "SYN" }),
+          ),
         );
-      };
-      let view = render(component());
-      await waitFor(() =>
-        expect(mocks.getAll).toHaveBeenLastCalledWith(
-          expect.objectContaining({ page: 2, pageSize: 50, keyword: "SYN" }),
-        ),
-      );
-      fireEvent.click(screen.getByRole("button", { name: "下一页" }));
-      await waitFor(() =>
-        expect(mocks.getAll).toHaveBeenLastCalledWith(
-          expect.objectContaining({ page: 3, pageSize: 50, keyword: "SYN" }),
-        ),
-      );
-      const saved = window.location.href;
-      expect(new URL(saved).searchParams.get(list.tabKey)).toBe(list.tab);
-      expect(new URL(saved).searchParams.get(list.pageKey)).toBe("3");
-      expect(new URL(saved).searchParams.get("source")).toBe("qa");
-      expect(new URL(saved).hash).toBe("#rows");
-      view.unmount();
-      window.history.pushState({}, "", "/synthetic-detail");
-      window.history.back();
-      await waitFor(() => expect(window.location.href).toBe(saved));
-      for (let refresh = 0; refresh < 2; refresh++) {
-        mocks.getAll.mockClear();
-        view = render(component());
+        const nextPage = screen.getByRole("button", { name: "下一页" });
+        if (responseTiming === "pending") {
+          expect(nextPage).toBeDisabled();
+          await act(async () => completeInitialRead!());
+        }
+        await waitFor(() => expect(nextPage).toBeEnabled());
+        fireEvent.click(nextPage);
         await waitFor(() =>
           expect(mocks.getAll).toHaveBeenLastCalledWith(
             expect.objectContaining({ page: 3, pageSize: 50, keyword: "SYN" }),
           ),
         );
-        expect(
-          screen.getByPlaceholderText(
-            list.id === "inventory"
-              ? "搜索商品/采购合同..."
-              : "搜索报关单号或报关行...",
-          ),
-        ).toHaveValue("SYN");
+        const saved = window.location.href;
+        expect(new URL(saved).searchParams.get(list.tabKey)).toBe(list.tab);
+        expect(new URL(saved).searchParams.get(list.pageKey)).toBe("3");
+        expect(new URL(saved).searchParams.get("source")).toBe("qa");
+        expect(new URL(saved).hash).toBe("#rows");
         view.unmount();
-      }
-    });
+        window.history.pushState({}, "", "/synthetic-detail");
+        window.history.back();
+        await waitFor(() => expect(window.location.href).toBe(saved));
+        for (let refresh = 0; refresh < 2; refresh++) {
+          mocks.getAll.mockClear();
+          view = render(component());
+          await waitFor(() =>
+            expect(mocks.getAll).toHaveBeenLastCalledWith(
+              expect.objectContaining({
+                page: 3,
+                pageSize: 50,
+                keyword: "SYN",
+              }),
+            ),
+          );
+          expect(
+            screen.getByPlaceholderText(
+              list.id === "inventory"
+                ? "搜索商品/采购合同..."
+                : "搜索报关单号或报关行...",
+            ),
+          ).toHaveValue("SYN");
+          view.unmount();
+        }
+      },
+    );
   });
 }
 

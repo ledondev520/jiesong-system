@@ -18,6 +18,7 @@ function fixture(t) {
   );
   const files = [
     'lifecycle/resources.json',
+    'config/pricing.schema.json',
     'lifecycle/legacy-routes.json',
     'backend/package.json',
     'backend/src/integration/resource-lifecycle.integration.js',
@@ -205,8 +206,152 @@ test('renamed Express Router factories and saved route handles remain visible', 
     const itemAlias = item;
     itemAlias.post(handler).patch(handler);
   `;
-  assert.deepEqual(scanSource(source, 'fixture.js').map((row) => row.key).sort(), [
-    'fixture.js PATCH /saved',
-    'fixture.js POST /saved',
-  ]);
+  assert.deepEqual(
+    scanSource(source, 'fixture.js')
+      .map((row) => row.key)
+      .sort(),
+    ['fixture.js PATCH /saved', 'fixture.js POST /saved'],
+  );
+});
+
+const saveRegistry = (f) =>
+  fs.writeFileSync(
+    path.join(f.temp, 'lifecycle/resources.json'),
+    JSON.stringify(f.registry),
+  );
+const singleton = (f) => {
+  const resource = f.registry.resources.find((r) => r.id === 'pricing-config');
+  assert.ok(
+    resource,
+    'pricing-config must be registered as a singleton-config',
+  );
+  return resource;
+};
+
+test('pricing singleton uses the real schema defaults and a reusable template', (t) => {
+  const f = fixture(t);
+  const resource = singleton(f);
+  assert.equal(resource.kind, 'singleton-config');
+  assert.deepEqual(
+    resource.matrix.initial,
+    require('../../../config/pricing.json'),
+  );
+  assert.deepEqual(
+    resource,
+    require('../../../lifecycle/singleton-config.template.json'),
+  );
+  assert.equal(f.verify().resources, f.registry.resources.length);
+});
+
+test('missing singleton registration fails red and restoring it passes green', (t) => {
+  const f = fixture(t);
+  const resource = singleton(f);
+  f.registry.resources = f.registry.resources.filter((r) => r !== resource);
+  saveRegistry(f);
+  assert.throws(f.verify, /unregistered.*PUT \/pricing-config/);
+  f.registry.resources.push(resource);
+  saveRegistry(f);
+  assert.doesNotThrow(f.verify);
+});
+
+for (const [name, change, message] of [
+  [
+    'kind',
+    (r) => {
+      delete r.kind;
+    },
+    /pricing-config.*matrix.*routes/,
+  ],
+  [
+    'route',
+    (r) => {
+      r.routes = ['PUT /config'];
+    },
+    /singleton matrix/,
+  ],
+  [
+    'path',
+    (r) => {
+      r.matrix.path = '/api/v1/system/ports';
+    },
+    /singleton matrix/,
+  ],
+  [
+    'adapter',
+    (r) => {
+      r.matrix.adapter = 'sqlite';
+    },
+    /singleton matrix/,
+  ],
+  [
+    'handler',
+    (r) => {
+      r.update.handler = 'getPricing';
+    },
+    /updatePricingConfig/,
+  ],
+  [
+    'initial',
+    (r) => {
+      r.matrix.initial = { mode: 'tiered' };
+    },
+    /singleton matrix cases/,
+  ],
+  [
+    'replacement',
+    (r) => {
+      r.matrix.replace.multiplier = 0;
+    },
+    /singleton matrix cases/,
+  ],
+  [
+    'identical replacement',
+    (r) => {
+      r.matrix.replace = r.matrix.initial;
+    },
+    /singleton matrix cases/,
+  ],
+  [
+    'missing invalid',
+    (r) => {
+      r.matrix.invalid = [];
+    },
+    /singleton matrix cases/,
+  ],
+  [
+    'valid invalid',
+    (r) => {
+      r.matrix.invalid = [r.matrix.initial];
+    },
+    /singleton matrix cases/,
+  ],
+]) {
+  test(`wrong singleton ${name} fails red and restoring it passes green`, (t) => {
+    const f = fixture(t);
+    const resource = singleton(f);
+    const original = structuredClone(resource);
+    change(resource);
+    saveRegistry(f);
+    assert.throws(f.verify, message);
+    Object.assign(resource, original);
+    saveRegistry(f);
+    assert.doesNotThrow(f.verify);
+  });
+}
+
+test('singleton update cannot bypass validated complete replacement', (t) => {
+  const f = fixture(t);
+  const resource = singleton(f);
+  const file = path.join(f.temp, resource.update.file);
+  const original = fs.readFileSync(file, 'utf8');
+  fs.writeFileSync(
+    file,
+    original.replace('pricing.updatePricingConfig(', 'pricing.writeUnchecked('),
+  );
+  assert.throws(
+    f.verify,
+    /updatePricing must construct updates with updatePricingConfig/,
+  );
+  fs.writeFileSync(file, original);
+  assert.doesNotThrow(f.verify);
 });

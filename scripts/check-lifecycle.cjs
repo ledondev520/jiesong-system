@@ -7,6 +7,7 @@ const ROOT = path.resolve(__dirname, '..');
 const BASE = '56426be209e270024008b761dbd835a54a6c4c47';
 const REGISTRY = 'lifecycle/resources.json';
 const TEMPLATE = 'lifecycle/resource.template.json';
+const SINGLETON_TEMPLATE = 'lifecycle/singleton-config.template.json';
 const MATRIX = 'backend/src/integration/resource-lifecycle.integration.js';
 const LIST_MATRIX = 'frontend/src/lib/hooks/list-lifecycle.test.tsx';
 
@@ -55,7 +56,10 @@ function scanSource(source, file) {
       literal(node.init.arguments[0]) === 'express'
     ) {
       for (const property of node.id.properties)
-        if (property.key?.name === 'Router' && property.value?.type === 'Identifier')
+        if (
+          property.key?.name === 'Router' &&
+          property.value?.type === 'Identifier'
+        )
           factories.add(property.value.name);
     }
   });
@@ -110,7 +114,8 @@ function scanSource(source, file) {
       );
     }
     if (!['post', 'put', 'patch', 'all'].includes(method)) return;
-    const argument = routeBase(node.callee.object, routePaths) || node.arguments[0];
+    const argument =
+      routeBase(node.callee.object, routePaths) || node.arguments[0];
     const paths =
       argument?.type === 'ArrayExpression' ? argument.elements : [argument];
     for (const item of paths) {
@@ -178,47 +183,111 @@ function check(root = ROOT, { baselineRoutes } = {}) {
         fail(`${REGISTRY}: ${key} does not exist; fix routeFile/routes`);
     }
     const m = resource.matrix;
-    const createRoute = resource.routes?.find((route) => route.startsWith('POST '));
-    const collection = createRoute?.slice(5).replace(/\/$/, '');
+    const singleton = resource.kind === 'singleton-config';
     if (
-      collection === undefined ||
-      resource.routes.length !== 2 ||
-      !resource.routes.includes(`PUT ${collection}/:id`) ||
-      typeof m?.path !== 'string' ||
-      (collection && !m.path.replace(/\/$/, '').endsWith(collection)) ||
-      matrixPaths.has(m.path)
+      resource.kind !== undefined &&
+      !['archive', 'singleton-config'].includes(resource.kind)
+    )
+      fail(`${REGISTRY}: ${resource.id} has unsupported resource kind`);
+    if (singleton) {
+      // Each singleton adapter owns an exact route and persistence contract.
+      if (
+        resource.id !== 'pricing-config' ||
+        resource.routeFile !== 'backend/src/routes/system.js' ||
+        resource.routes?.length !== 1 ||
+        resource.routes[0] !== 'PUT /pricing-config' ||
+        m?.path !== '/api/v1/system/pricing-config' ||
+        matrixPaths.has(m?.path) ||
+        m?.adapter !== 'pricing-config-file'
+      )
+        fail(
+          `${REGISTRY}: ${resource.id} singleton matrix must exercise its own registered PUT route with a supported file adapter; copy ${SINGLETON_TEMPLATE}`,
+        );
+      const schema = readJson(root, 'config/pricing.schema.json');
+      const validConfig = (value) => {
+        if (!value || typeof value !== 'object' || Array.isArray(value))
+          return false;
+        if (
+          Object.keys(value).some(
+            (key) => !Object.hasOwn(schema.properties, key),
+          )
+        )
+          return false;
+        return schema.required.every((key) => {
+          const rule = schema.properties[key];
+          const item = value[key];
+          return rule.type === 'number'
+            ? typeof item === 'number' &&
+                Number.isFinite(item) &&
+                item >= rule.minimum &&
+                item <= rule.maximum
+            : rule.enum.includes(item);
+        });
+      };
+      if (
+        !validConfig(m?.initial) ||
+        !validConfig(m?.replace) ||
+        schema.required.every((key) => m.initial[key] === m.replace[key]) ||
+        !Array.isArray(m?.invalid) ||
+        !m.invalid.length ||
+        m.invalid.some(validConfig)
+      )
+        fail(
+          `${REGISTRY}: ${resource.id} needs all singleton matrix cases (valid distinct complete snapshots and invalid replacements); copy ${SINGLETON_TEMPLATE} and run ${MATRIX}`,
+        );
+    } else {
+      const createRoute = resource.routes?.find((route) =>
+        route.startsWith('POST '),
+      );
+      const collection = createRoute?.slice(5).replace(/\/$/, '');
+      if (
+        collection === undefined ||
+        resource.routes.length !== 2 ||
+        !resource.routes.includes(`PUT ${collection}/:id`) ||
+        typeof m?.path !== 'string' ||
+        (collection && !m.path.replace(/\/$/, '').endsWith(collection)) ||
+        matrixPaths.has(m.path)
+      )
+        fail(
+          `${REGISTRY}: ${resource.id} matrix must exercise its own registered POST collection and PUT /:id routes; copy ${TEMPLATE}`,
+        );
+      if (
+        !m ||
+        ![
+          'path',
+          'table',
+          'create',
+          'edit',
+          'invalid',
+          'blank',
+          'clear',
+          'clearStatus',
+          'filter',
+        ].every((key) => Object.hasOwn(m, key)) ||
+        !m.invalid?.length ||
+        ![200, 400].includes(m.clearStatus) ||
+        !/^[a-z_]+$/.test(m.table) ||
+        !m.path?.startsWith('/api/v1/') ||
+        ![m.create, m.edit, m.blank, m.clear].every(
+          (input) => input && Object.keys(input).length,
+        ) ||
+        !Object.values(m.clear).includes(null)
+      ) {
+        fail(
+          `${REGISTRY}: ${resource.id} needs all lifecycle matrix cases; copy ${TEMPLATE} and run ${MATRIX}`,
+        );
+      }
+    }
+    matrixPaths.add(m?.path);
+    const update = resource.update;
+    if (
+      singleton &&
+      (update?.file !== 'backend/src/controllers/system/pricingController.js' ||
+        update?.handler !== 'updatePricing')
     )
       fail(
-        `${REGISTRY}: ${resource.id} matrix must exercise its own registered POST collection and PUT /:id routes; copy ${TEMPLATE}`,
+        `${REGISTRY}: ${resource.id} must use pricingController.updatePricing with updatePricingConfig; copy ${SINGLETON_TEMPLATE}`,
       );
-    matrixPaths.add(m?.path);
-    if (
-      !m ||
-      ![
-        'path',
-        'table',
-        'create',
-        'edit',
-        'invalid',
-        'blank',
-        'clear',
-        'clearStatus',
-        'filter',
-      ].every((key) => Object.hasOwn(m, key)) ||
-      !m.invalid?.length ||
-      ![200, 400].includes(m.clearStatus) ||
-      !/^[a-z_]+$/.test(m.table) ||
-      !m.path?.startsWith('/api/v1/') ||
-      ![m.create, m.edit, m.blank, m.clear].every(
-        (input) => input && Object.keys(input).length,
-      ) ||
-      !Object.values(m.clear).includes(null)
-    ) {
-      fail(
-        `${REGISTRY}: ${resource.id} needs all lifecycle matrix cases; copy ${TEMPLATE} and run ${MATRIX}`,
-      );
-    }
-    const update = resource.update;
     if (!exists(update?.file)) {
       fail(
         `${REGISTRY}: ${resource.id} needs update.file/handler; use backend/src/utils/partialUpdate.js; template ${TEMPLATE}`,
@@ -238,16 +307,19 @@ function check(root = ROOT, { baselineRoutes } = {}) {
           handler = node;
       });
       let usesHelper = false;
+      const helper = singleton ? 'updatePricingConfig' : 'partialUpdate';
       walk(handler, (node) => {
         if (
           node.type === 'CallExpression' &&
-          node.callee.name === 'partialUpdate'
+          (singleton
+            ? memberName(node.callee) === helper
+            : node.callee.name === helper)
         )
           usesHelper = true;
       });
       if (!usesHelper)
         fail(
-          `${update.file}: ${update.handler} must construct updates with partialUpdate from backend/src/utils/partialUpdate.js; template ${TEMPLATE}`,
+          `${update.file}: ${update.handler} must construct updates with ${helper}${singleton ? ' (validated complete replacement)' : ' from backend/src/utils/partialUpdate.js'}; template ${singleton ? SINGLETON_TEMPLATE : TEMPLATE}`,
         );
     }
   }
