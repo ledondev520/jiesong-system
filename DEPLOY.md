@@ -159,9 +159,9 @@ SQL
 
 ### 触发部署
 
-- **Staging**: 推送到 `main` 分支自动触发
-- **Production**: 推送 `v*` 标签自动触发
-- **手动**: GitHub Actions → Deploy → Run workflow
+- **Staging**: 暂无(同主机无法隔离,push main 只做检查,见下方"触发规则")
+- **Production**: 推送 `v*` 标签(不含 rc)自动触发
+- **手动**: GitHub Actions → Deploy → Run workflow,选 production
 
 ---
 
@@ -221,3 +221,11 @@ A:
 上线前备份实际 `DATABASE_URL` 指向的SQLite，权限0700/0600，然后运行迁移新增 `email_registration_challenges` 表。不要执行 db push。重启后访问 `/register`，完成邮件验证码注册并由管理员在用户管理开通角色和状态；现有账号登录不变。
 
 阿里云受理回执不等于收件箱送达；必须使用用户指定邮箱确认真实收信。接口依据：[SingleSendMail](https://help.aliyun.com/zh/direct-mail/api-dm-2015-11-23-singlesendmail)。
+
+## 触发规则(fix/deploy-split 起)
+
+- push main:只跑 `pre-deploy` 检查,**不部署任何环境**。staging 与生产目前同主机同目录 `/opt/jiesong-system`,无法安全隔离,所以已移除自动 staging 部署。
+- push `v*` tag(tag 名不含 rc):部署生产。
+- 手动 `workflow_dispatch` 选 `production`:部署生产(不再被 staging 连带跳过)。
+- 部署状态回写只在 production job 声明 `statuses: write`,workflow 默认 `contents: read`。
+- 以后需要 staging:先在服务器上建独立目录、`.env`/数据库、端口、pm2 进程和 nginx 站点,并为其写专用运行验证,再单独开 PR 加回 staging job。
