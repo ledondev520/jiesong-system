@@ -75,9 +75,9 @@ for (const width of [390, 1440]) {
           route.fulfill({ json: { code: 200, data: malformed.data } }),
         );
         await signInAsAdmin(page, "/dashboard/settings");
-        await expect(page.getByRole("alert")).toHaveText(
-          "报价配置加载失败，请刷新页面重试",
-        );
+        await expect(
+          page.getByRole("alert").filter({ hasText: "报价配置" }),
+        ).toHaveText("报价配置加载失败，请刷新页面重试");
         await expect(
           page.getByRole("heading", { name: "系统配置" }),
         ).toBeVisible();
@@ -119,9 +119,9 @@ for (const width of [390, 1440]) {
       await page
         .getByRole("button", { name: "保存报价配置", exact: true })
         .click();
-      await expect(page.getByRole("alert")).toHaveText(
-        "报价配置响应无效，请重新加载后重试",
-      );
+      await expect(
+        page.getByRole("alert").filter({ hasText: "报价配置" }),
+      ).toHaveText("报价配置响应无效，请重新加载后重试");
       await expect(page.getByLabel("乘数", { exact: true })).toHaveValue("1.5");
       await expect(
         page.getByText("报价配置已保存", { exact: true }),
