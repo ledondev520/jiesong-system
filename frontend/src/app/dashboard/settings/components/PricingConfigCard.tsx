@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,11 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuthStore } from "@/store/auth.store";
-import {
-  pricingService,
-  type PricingConfig,
-  type PricingSnapshot,
-} from "@/services/pricing.service";
+import { pricingService, type PricingConfig } from "@/services/pricing.service";
 
 type NumericKey = Exclude<keyof PricingConfig, "mode">;
 const fields: {
@@ -43,8 +40,54 @@ const fields: {
   { key: "multiplier", label: "乘数", scale: 1, step: 0.01 },
 ];
 
+const numericRule = z
+  .object({ minimum: z.number().finite(), maximum: z.number().finite() })
+  .refine((rule) => rule.minimum <= rule.maximum);
+// Validate the entire server document before committing any state; bounds have no local fallback.
+const snapshotResponse = z
+  .object({
+    code: z.literal(200),
+    data: z.object({
+      config: z.object({
+        mode: z.enum(["tiered", "multiplier"]),
+        exchangeAdjustment: z.number().finite(),
+        refundableMarkup: z.number().finite(),
+        noRefundMarkup: z.number().finite(),
+        multiplier: z.number().finite(),
+      }),
+      revision: z.string().regex(/^[a-f0-9]{64}$/),
+      schema: z.object({
+        properties: z.object({
+          mode: z.object({ enum: z.array(z.string()).min(1) }),
+          exchangeAdjustment: numericRule,
+          refundableMarkup: numericRule,
+          noRefundMarkup: numericRule,
+          multiplier: numericRule,
+        }),
+      }),
+    }),
+  })
+  .refine(
+    ({ data }) =>
+      data.schema.properties.mode.enum.includes(data.config.mode) &&
+      fields.every(({ key }) => {
+        const rule = data.schema.properties[key];
+        return (
+          data.config[key] >= rule.minimum && data.config[key] <= rule.maximum
+        );
+      }),
+  );
+
+function readSnapshot(response: unknown) {
+  const result = snapshotResponse.safeParse(response);
+  if (!result.success) throw new Error("报价配置响应无效，请重新加载后重试");
+  return result.data.data;
+}
+
 function AdminPricingConfigCard() {
-  const [snapshot, setSnapshot] = useState<PricingSnapshot | null>(null);
+  const [snapshot, setSnapshot] = useState<ReturnType<
+    typeof readSnapshot
+  > | null>(null);
   const [mode, setMode] = useState<PricingConfig["mode"]>("tiered");
   const [values, setValues] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
@@ -58,18 +101,16 @@ function AdminPricingConfigCard() {
       .get()
       .then((response) => {
         if (!active) return;
-        if (response.code !== 200 || !response.data)
-          throw new Error("报价配置加载失败");
-        setSnapshot(response.data);
-        setMode(response.data.config.mode);
-        setValues(
-          Object.fromEntries(
-            fields.map((field) => [
-              field.key,
-              String(response.data!.config[field.key] * field.scale),
-            ]),
-          ),
+        const nextSnapshot = readSnapshot(response);
+        const nextValues = Object.fromEntries(
+          fields.map((field) => [
+            field.key,
+            String(nextSnapshot.config[field.key] * field.scale),
+          ]),
         );
+        setSnapshot(nextSnapshot);
+        setMode(nextSnapshot.config.mode);
+        setValues(nextValues);
       })
       .catch(() => {
         if (active) setError("报价配置加载失败，请刷新页面重试");
@@ -95,11 +136,11 @@ function AdminPricingConfigCard() {
       if (
         !raw ||
         !Number.isFinite(value) ||
-        value < rule.minimum! ||
-        value > rule.maximum!
+        value < rule.minimum ||
+        value > rule.maximum
       ) {
         setError(
-          `${field.label}须在 ${rule.minimum! * field.scale} 至 ${rule.maximum! * field.scale} 之间`,
+          `${field.label}须在 ${rule.minimum * field.scale} 至 ${rule.maximum * field.scale} 之间`,
         );
         return;
       }
@@ -108,9 +149,8 @@ function AdminPricingConfigCard() {
     setSaving(true);
     try {
       const response = await pricingService.save(next, snapshot.revision);
-      if (response.code !== 200 || !response.data)
-        throw new Error("报价配置保存失败");
-      setSnapshot(response.data);
+      const nextSnapshot = readSnapshot(response);
+      setSnapshot(nextSnapshot);
       setSaved(true);
     } catch (failure) {
       const rejected = failure as {
@@ -175,8 +215,8 @@ function AdminPricingConfigCard() {
                           id={`pricing-${field.key}`}
                           type="number"
                           step={field.step}
-                          min={rule.minimum! * field.scale}
-                          max={rule.maximum! * field.scale}
+                          min={rule.minimum * field.scale}
+                          max={rule.maximum * field.scale}
                           value={values[field.key] ?? ""}
                           disabled={saving}
                           onChange={(event) => {
@@ -188,8 +228,8 @@ function AdminPricingConfigCard() {
                           }}
                         />
                         <p className="text-xs text-muted-foreground">
-                          范围 {rule.minimum! * field.scale} 至{" "}
-                          {rule.maximum! * field.scale}
+                          范围 {rule.minimum * field.scale} 至{" "}
+                          {rule.maximum * field.scale}
                         </p>
                       </div>
                     );

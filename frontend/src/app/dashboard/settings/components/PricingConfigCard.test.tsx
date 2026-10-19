@@ -18,6 +18,112 @@ vi.mock("@/store/auth.store", () => ({
     selector({ user: { role: mocks.role } }),
 }));
 const snapshot = { config: defaults, revision: "a".repeat(64), schema };
+const malformedResponses: [name: string, response: unknown][] = [
+  ["missing response", undefined],
+  ["null response", null],
+  ["failed envelope", { code: 503, data: snapshot }],
+  ["missing data", { code: 200 }],
+  ["null data", { code: 200, data: null }],
+  [
+    "generic E2E pagination fallback",
+    {
+      code: 200,
+      data: {
+        items: [],
+        pagination: { total: 0, page: 1, pageSize: 100, totalPages: 0 },
+      },
+    },
+  ],
+  ...(
+    [
+      ["missing config", { ...snapshot, config: undefined }],
+      ["null config", { ...snapshot, config: null }],
+      ["partial config", { ...snapshot, config: { mode: "tiered" } }],
+      [
+        "invalid mode",
+        { ...snapshot, config: { ...defaults, mode: "unknown" } },
+      ],
+      [
+        "non-numeric value",
+        { ...snapshot, config: { ...defaults, multiplier: "1.3" } },
+      ],
+      [
+        "non-finite value",
+        { ...snapshot, config: { ...defaults, multiplier: Infinity } },
+      ],
+      [
+        "out-of-range value",
+        { ...snapshot, config: { ...defaults, multiplier: 0 } },
+      ],
+      ["missing revision", { ...snapshot, revision: undefined }],
+      ["invalid revision", { ...snapshot, revision: "stale" }],
+      ["missing schema", { ...snapshot, schema: undefined }],
+      ["null schema", { ...snapshot, schema: null }],
+      ["missing properties", { ...snapshot, schema: {} }],
+      [
+        "missing numeric rule",
+        {
+          ...snapshot,
+          schema: {
+            properties: { ...schema.properties, multiplier: undefined },
+          },
+        },
+      ],
+      [
+        "missing bound",
+        {
+          ...snapshot,
+          schema: {
+            properties: { ...schema.properties, multiplier: { minimum: 1 } },
+          },
+        },
+      ],
+      [
+        "inverted bounds",
+        {
+          ...snapshot,
+          schema: {
+            properties: {
+              ...schema.properties,
+              multiplier: { minimum: 5, maximum: 1 },
+            },
+          },
+        },
+      ],
+      [
+        "non-finite bound",
+        {
+          ...snapshot,
+          schema: {
+            properties: {
+              ...schema.properties,
+              multiplier: { minimum: 1, maximum: Infinity },
+            },
+          },
+        },
+      ],
+      [
+        "missing mode rule",
+        {
+          ...snapshot,
+          schema: { properties: { ...schema.properties, mode: undefined } },
+        },
+      ],
+      [
+        "mode excluded by schema",
+        {
+          ...snapshot,
+          schema: {
+            properties: {
+              ...schema.properties,
+              mode: { enum: ["multiplier"] },
+            },
+          },
+        },
+      ],
+    ] satisfies [string, unknown][]
+  ).map(([name, data]): [string, unknown] => [name, { code: 200, data }]),
+];
 
 async function ready() {
   const view = render(<PricingConfigCard />);
@@ -108,6 +214,44 @@ describe("ADMIN export pricing settings", () => {
       screen.queryByRole("button", { name: "保存报价配置" }),
     ).not.toBeInTheDocument();
   });
+  it.each(malformedResponses)(
+    "rejects %s on load without rendering an invalid snapshot",
+    async (_name, response) => {
+      mocks.get.mockResolvedValue(response);
+      render(<PricingConfigCard />);
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "报价配置加载失败",
+      );
+      expect(screen.queryByLabelText("乘数")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "保存报价配置" }),
+      ).not.toBeInTheDocument();
+      expect(mocks.save).not.toHaveBeenCalled();
+    },
+  );
+  it.each(malformedResponses)(
+    "rejects %s on save and preserves the valid snapshot and draft",
+    async (_name, response) => {
+      const user = userEvent.setup();
+      await ready();
+      mocks.save.mockResolvedValueOnce(response);
+      await user.clear(screen.getByLabelText("乘数"));
+      await user.type(screen.getByLabelText("乘数"), "1.5");
+      await user.click(screen.getByRole("button", { name: "保存报价配置" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        /报价配置.*(失败|无效)/,
+      );
+      expect(screen.getByLabelText("乘数")).toHaveValue(1.5);
+      expect(screen.queryByText("报价配置已保存")).not.toBeInTheDocument();
+      expect(mocks.save).toHaveBeenCalledTimes(1);
+      await user.click(screen.getByRole("button", { name: "保存报价配置" }));
+      await screen.findByText("报价配置已保存");
+      expect(mocks.save).toHaveBeenLastCalledWith(
+        { ...defaults, multiplier: 1.5 },
+        snapshot.revision,
+      );
+    },
+  );
   it("shows server conflict and keeps edited values for review", async () => {
     const user = userEvent.setup();
     await ready();

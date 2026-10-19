@@ -1,11 +1,14 @@
 /**
  * Input: Playwright 页面与业务服务 DTO
- * Output: 合成 API 夹具、认证会话与页面异常断言
+ * Output: 合成 API 夹具（含版本化报价配置）、认证会话与页面异常断言
  * Pos: 浏览器验收共用辅助；注册仅申请审核，采购汇总遵循 receipts DTO
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { expect, type Page, type Route } from '@playwright/test';
+import { createHash } from 'node:crypto';
 import type { PurchaseReceiptList } from '../src/services/purchaseReceipt.service';
+import pricingDefaults from '../../config/pricing.json';
+import pricingSchema from '../../config/pricing.schema.json';
 
 const now = '2026-03-01T08:00:00.000Z';
 
@@ -200,6 +203,9 @@ const fulfillJson = async (route: Route, data: unknown, message = 'ok', status =
 
 export const mockApiRoutes = async (page: Page) => {
   const state = createInitialState();
+  // Only in-memory synthetic edits; never write the repository pricing file.
+  let pricingConfig = { ...pricingDefaults };
+  const pricingRevision = () => createHash('sha256').update(JSON.stringify(pricingConfig)).digest('hex');
 
   const products = [
     {
@@ -1464,6 +1470,22 @@ export const mockApiRoutes = async (page: Page) => {
         createdAt: now,
         updatedAt: now,
       });
+      return;
+    }
+
+    if (pathname === '/api/v1/system/pricing-config' && (method === 'GET' || method === 'PUT')) {
+      if (method === 'PUT') {
+        const body = request.postDataJSON() as { config: typeof pricingConfig; revision: string };
+        if (body.revision !== pricingRevision()) {
+          await route.fulfill({
+            status: 409,
+            json: { code: 409, message: '报价配置已变更，请重新加载后保存', data: null },
+          });
+          return;
+        }
+        pricingConfig = { ...body.config };
+      }
+      await fulfillJson(route, { config: pricingConfig, revision: pricingRevision(), schema: pricingSchema });
       return;
     }
 
