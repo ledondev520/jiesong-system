@@ -98,8 +98,19 @@ jobs:
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || '22' }} '
             set -eu
             cd /opt/jiesong-system || exit 1
+            PRICING_BACKUP=""
+            if [ -f config/pricing.json ]; then
+              PRICING_BACKUP="$(mktemp)"
+              cp -p config/pricing.json "$PRICING_BACKUP"
+              git checkout -- config/pricing.json 2>/dev/null || true
+            fi
             git fetch origin
             git reset --hard ${{ github.sha }}
+            if [ -n "$PRICING_BACKUP" ]; then
+              cp -p "$PRICING_BACKUP" config/pricing.json
+              rm -f "$PRICING_BACKUP"
+              echo "Preserved runtime pricing config across deploy"
+            fi
             cd backend
             npm ci --production
             npx prisma generate
@@ -147,9 +158,20 @@ jobs:
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || '22' }} '
             set -eu
             cd /opt/jiesong-system || exit 1
+            PRICING_BACKUP=""
+            if [ -f config/pricing.json ]; then
+              PRICING_BACKUP="$(mktemp)"
+              cp -p config/pricing.json "$PRICING_BACKUP"
+              git checkout -- config/pricing.json 2>/dev/null || true
+            fi
             git fetch origin
             git checkout ${{ github.ref_name }}
             git reset --hard ${{ github.sha }}
+            if [ -n "$PRICING_BACKUP" ]; then
+              cp -p "$PRICING_BACKUP" config/pricing.json
+              rm -f "$PRICING_BACKUP"
+              echo "Preserved runtime pricing config across deploy"
+            fi
             cd backend
             npm ci --production
             npx prisma generate

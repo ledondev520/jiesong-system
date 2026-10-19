@@ -25,7 +25,7 @@
 
 从根目录执行 `node scripts/check-lifecycle.cjs`，或在 backend 执行 `npm test`。CI的后端作业执行同一命令，checkout保留完整Git历史供基线核验。`npm run test:db`执行真实HTTP与合成SQLite的通用矩阵。前端 `npm test -- --maxWorkers=2`执行列表矩阵。
 
-`lifecycle/resources.json`登记2项资源、2项列表合同。`lifecycle/legacy-routes.json`逐条登记PR #62已有的125个POST/PUT/PATCH入口和暂留理由。Acorn语法树递归扫描路由目录，忽略注释与外部HTTP调用，识别直接声明的Router、Express Router解构重命名、变量声明别名及保存的route句柄，支持字面量方法、数组路径与链式route。已识别实例的动态方法与路径拒绝通过。扫描器不执行任意JavaScript，工厂封装或运行时生成的路由需要先扩展扫描与回归用例。新增POST包含只读POST，避免靠“创建类”命名判断漏检。
+`lifecycle/resources.json`登记3项资源（2项普通档案、1项 singleton-config）、2项列表合同。`lifecycle/legacy-routes.json`逐条登记PR #62已有的125个POST/PUT/PATCH入口和暂留理由。Acorn语法树递归扫描路由目录，忽略注释与外部HTTP调用，识别直接声明的Router、Express Router解构重命名、变量声明别名及保存的route句柄，支持字面量方法、数组路径与链式route。已识别实例的动态方法与路径拒绝通过。扫描器不执行任意JavaScript，工厂封装或运行时生成的路由需要先扩展扫描与回归用例。新增POST包含只读POST，避免靠“创建类”命名判断漏检。
 
 检查逐路由匹配，既有文件内新加路由也必须登记。基线固定为 `56426be209e270024008b761dbd835a54a6c4c47`；新增路由不能通过追加存量清单逃过检查。存量删除不失败，登记的合同必须仍有效。错误指出资源注册表、更新函数、测试文件和 `lifecycle/resource.template.json`。先复制模板为资源定义，填写全部矩阵输入；测试从注册表自动枚举资源，不能只放一个空测试路径。
 
@@ -35,7 +35,13 @@
 
 前端列表矩阵自动枚举注册表，挂载真实库存/报关列表组件。服务使用合成mock，覆盖URL筛选、分页、原生history返回、重新挂载刷新及页签、其他参数与hash保留。新列表必须在 `list-lifecycle.test.tsx` 增加实际组件适配器；未知ID直接失败。组件单测另覆盖真实报关returnTo生成及产品页签恢复。HTTP矩阵和组件矩阵分层执行，不代表浏览器端到端验证。
 
-模板只适用于普通档案。具有收货、付款、附件、认证、库存扣减等状态或事务的资源，迁移前需要专用适配器与失败场景；不得为了套用模板改业务口径。剩余待迁写入口以存量JSON为完整清单，上表给出主要边界。
+普通档案使用 `lifecycle/resource.template.json`。完整快照替换的文件配置使用 `lifecycle/singleton-config.template.json`，并显式登记 `kind: "singleton-config"`。当前仅支持 `pricing-config-file` 适配器：注册 `backend/src/routes/system.js` 的 `PUT /pricing-config`，绑定 `pricingController.updatePricing` 中的 `updatePricingConfig`，不要求 POST、`/:id` 或 partialUpdate，也不得加入 legacy 豁免。检查器从 `config/pricing.schema.json` 验证 initial/replace 是有效且不同的完整配置，并确认 invalid 中每个输入确实无效；模板 initial 与 `config/pricing.json` 默认值由回归测试核对。新增存储类型需要先增加专用适配器和检查器回归。
+
+singleton 矩阵在0700临时目录创建0600合成配置，通过 `JIESONG_PRICING_CONFIG` 指向该文件，使用真实认证HTTP和独立文件回读。覆盖初始读取、完整原子替换、重复保存不改文件、非法/缺字段配置400、缺失/非法revision 400、过期revision 409及写锁冲突409。拒绝时比较原始字节、哈希、文件身份、权限及修改时间，刷新时核对HTTP内容/revision与文件SHA-256。测试不写仓库配置或真实业务数据。
+
+检查器回归在临时副本中删除注册、改错kind/route/path/adapter/handler、漏矩阵输入或绕过updatePricingConfig，逐项先断言失败、恢复后断言通过。前端矩阵分别使用立即响应和挂起响应：后者先断言分页禁用，完成请求后等待按钮启用再点击；保留全部分页、返回和刷新断言。
+
+具有收货、付款、附件、认证、库存扣减等状态或事务的资源，迁移前需要专用适配器与失败场景；不得为了套用模板改业务口径。剩余待迁写入口以存量JSON为完整清单，上表给出主要边界。
 
 ## 重现历史回归
 

@@ -142,3 +142,27 @@ Legacy `/api/v1/import` uses the same 10 MiB in-memory CSV/xlsx filter as previe
 `db-backup.js` preserves literal percent sequences in Prisma SQLite DATABASE_URL paths; URI decoding could silently select a different database.
 
 `tabularImport.js` checks worksheet XML row/cell/column bounds before ExcelJS allocations, rejects merged cells and limits sheet IDs to 65535. This prevents tiny XLSX metadata from expanding unbounded model regions.
+
+## Export pricing configuration
+
+Pricing requires a finite positive spot rate and a positive adjusted rate rounded
+to six decimal places. Positive adjustments cannot make missing or invalid spot
+rates usable. Python rejects invalid spot rates before reading proposal sources.
+
+`config/pricing.json` contains non-secret policy values. Both export services and
+`scripts/prepare_export_packet.py` use this same file, or the explicit
+`JIESONG_PRICING_CONFIG` path. The shared `config/pricing.schema.json` defines
+strict keys and numeric bounds. Invalid or missing files stop pricing without
+fallback. Readiness recommendations use the same adjusted exchange rate, tiered
+markups and rounding as packet. Request-level profitRate does not override the
+shared file. Multiplier mode requires explicit selection. No environment file or
+business database is read by the loaders.
+
+`GET/PUT /system/pricing-config` require authenticated ADMIN. Updates replace the
+whole validated document atomically, require the last revision, and use an
+exclusive lock file. Structured stderr events retain only operator ID, field
+names and policy hashes. No request values, contract data or secrets are logged.
+Manual file edits are detected and logged on the next read. Operators must use
+an atomic replacement and retain their filesystem change audit for edits made
+while all readers are stopped. A stale lock after a process crash requires an
+operator to confirm no writer is active before removing it.

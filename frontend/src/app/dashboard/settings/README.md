@@ -21,3 +21,16 @@
 | `README.md` | 目录索引 | 记录当前路由与验证边界 |
 
 `export/page.tsx` 复用原数据工具入口，现展示「数据导入导出」。`DataImportTab.tsx` 提供四类 CSV/xlsx 模板、只读预览、逐行错误及库存期初确认。切换文件或类型清除旧预览。组件测试验证预览不会执行导入及期初确认门禁。
+
+`components/PricingConfigCard.tsx` 在当前配置页新增 ADMIN-only 出口报价卡片，
+沿用 shadcn Card/Input/Select/Button，独立保存完整版本到 `/system/pricing-config`。
+字段范围使用后端提供的共用 schema。百分比界面与小数存储显式转换。
+`PricingConfigCard.test.tsx` 验证角色、加载、全部字段保存、主动切换乘数模式、
+非法值、服务端冲突及重复提交。组件桩测试不代表浏览器端到端通过。
+`PricingConfigCard.transport.test.tsx` 使用真实 Axios 拦截器和合成响应，
+验证冲突正文可见及重新读取时取得当前 revision。报价读取显式禁用客户端 GET 缓存。
+
+报价卡片在 GET/PUT 响应写入状态前校验完整配置、SHA-256 revision、schema 枚举与有限数值范围；
+异常加载仅显示卡片内错误且不提供保存，异常保存保留有效快照与用户草稿，不显示保存成功。
+`PricingConfigCard.test.tsx` 另覆盖通用 E2E 分页回退、空值、缺失字段/规则、非法版本及数值，
+同时验证明确重试可用；不通过本地默认值补齐不完整的服务端配置。

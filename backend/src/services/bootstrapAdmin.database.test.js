@@ -12,12 +12,12 @@ const { ensureBootstrapAdmin } = require('./bootstrapAdmin');
 
 test('bootstrap admin: explicit password, legacy remediation, session revocation and safe reseeding', async t => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-bootstrap-')); fs.chmodSync(dir, 0o700);
-  const runtime = path.join(dir, 'runtime');
+  const runtime = path.join(dir, 'runtime', 'backend');
   const backendRoot = path.resolve(__dirname, '../..');
   // Copy only versioned source, excluding host .env, databases, uploads and runtime state.
-  const tracked = execFileSync('git', ['ls-files', '-z', 'backend/src'], { cwd: path.join(backendRoot, '..'), encoding: 'utf8' }).split('\0').filter(Boolean);
+  const tracked = execFileSync('git', ['ls-files', '-z', 'backend/src', 'config/pricing.json', 'config/pricing.schema.json'], { cwd: path.join(backendRoot, '..'), encoding: 'utf8' }).split('\0').filter(Boolean);
   for (const name of tracked) {
-    const target = path.join(runtime, name.slice('backend/'.length));
+    const target = path.join(path.dirname(runtime), name);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.copyFileSync(path.join(backendRoot, '..', name), target);
   }

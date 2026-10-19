@@ -1,0 +1,67 @@
+{
+  "id": "pricing-config",
+  "kind": "singleton-config",
+  "routeFile": "backend/src/routes/system.js",
+  "routes": [
+    "PUT /pricing-config"
+  ],
+  "update": {
+    "file": "backend/src/controllers/system/pricingController.js",
+    "handler": "updatePricing"
+  },
+  "matrix": {
+    "adapter": "pricing-config-file",
+    "path": "/api/v1/system/pricing-config",
+    "initial": {
+      "mode": "tiered",
+      "exchangeAdjustment": -0.2,
+      "refundableMarkup": 0.3,
+      "noRefundMarkup": 0.1,
+      "multiplier": 1.3
+    },
+    "replace": {
+      "mode": "multiplier",
+      "exchangeAdjustment": -0.1,
+      "refundableMarkup": 0.25,
+      "noRefundMarkup": 0.15,
+      "multiplier": 1.5
+    },
+    "invalid": [
+      {},
+      null,
+      [],
+      {
+        "mode": "tiered"
+      },
+      {
+        "mode": "invalid",
+        "exchangeAdjustment": -0.2,
+        "refundableMarkup": 0.3,
+        "noRefundMarkup": 0.1,
+        "multiplier": 1.3
+      },
+      {
+        "mode": "tiered",
+        "exchangeAdjustment": -0.2,
+        "refundableMarkup": 0.3,
+        "noRefundMarkup": 0.1,
+        "multiplier": 0
+      },
+      {
+        "mode": "tiered",
+        "exchangeAdjustment": "-0.2",
+        "refundableMarkup": 0.3,
+        "noRefundMarkup": 0.1,
+        "multiplier": 1.3
+      },
+      {
+        "mode": "tiered",
+        "exchangeAdjustment": -0.2,
+        "refundableMarkup": 0.3,
+        "noRefundMarkup": 0.1,
+        "multiplier": 1.3,
+        "unknown": 1
+      }
+    ]
+  }
+}

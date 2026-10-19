@@ -16,6 +16,7 @@
 | 名字 | 地位 | 功能 |
 | --- | --- | --- |
 | helpers.ts | 合成夹具 | 认证、业务 API 与状态；采购 receipts 必须返回 typed summary，邮箱注册仅返回待审核结果 |
+| pricing-settings.spec.ts | 报价设置验收 | 390/1440px 合成配置加载、保存/重载、异常加载隔离及异常保存保留草稿后明确重试 |
 | profile-preference-fixture.ts | 本地设置辅助 | 复用真实合成 SALES 登录/迁移夹具，透传 HTTP、只读安全用户字段与明确偏好键，注入单次本地写失败 |
 | profile-preference-lifecycle.spec.ts | 个人设置验收定义 | 1440px Header 菜单下完整草稿取消、保存/重开/整页重载、偏好与资料持久化失败后的明确重试 |
 | mobile.spec.ts | 移动验收 | 320/390/430px 页面及延迟财务明细滚动、邮箱验证码注册申请、登录退出、表单及错误恢复 |
@@ -60,3 +61,5 @@
 - `profile-preference-lifecycle.spec.ts`：四项1440px Header 用户菜单→个人设置定义，复用 `sales-header` 的已提交迁移0700/0600私有 SQLite 和真实合成 SALES 登录。取消姓名/备注/两项偏好草稿后重开及整页重载恢复保存值；保存规范化姓名、备注、紧凑信息密度和最近模块开关后，同标签重开/重载读回；原生偏好写入失败或后续资料持久化失败均保留全部草稿和明确错误，用户重试后成功并重载。后者按现有非原子顺序验证已写入偏好与已变化的内存姓名，不承诺回滚。仅读取 `jiesong_header_user_preferences`；资料写失败注入只匹配 sessionStorage 的目标键，不检查其值，不读认证存储或 cookies。既有真实 `auth/me` 只读核对 id/username/name/role，借通知 GET 原样透传认证上下文，不提取凭据或修改响应。业务写请求拒绝，只有合成登录可 POST，持续检查 pageerror；不上传头像、不请求桌面通知权限、不访问生产账号。此套只验收本地保存生命周期，不代表服务端资料持久化、跨设备同步或偏好已作用到其他页面。`playwright test profile-preference-lifecycle.spec.ts --list` 仅核对四项定义；实际 Chromium 浏览器执行等待既有 hosted CI，本地执行限制不通过安装、启动参数或隧道绕过。
 
 - `mobile.spec.ts` 的设置菜单使用精确可访问名称「数据导入导出」，对应同一路由的导入模板、只读校验与导出功能。逐项核对展开、链接可见性和 href，点击后核对 URL、自动收起与视口宽度。不得用模糊名称匹配掩盖入口变化。
+
+- `helpers.ts` 为 `/api/v1/system/pricing-config` 提供专用 GET/PUT 夹具，复用共用 pricing JSON/schema，返回完整 config/revision/schema；PUT 校验版本并仅修改每项测试内存，重载可读回，不写仓库配置或业务数据库。`pricing-settings.spec.ts` 持续检查未捕获页面异常，异常响应不得移除系统配置标题和主导航，不得伪报成功或丢弃草稿。浏览器无法启动时，定义检查和组件回归通过不代表 E2E 执行通过。

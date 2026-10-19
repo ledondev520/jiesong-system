@@ -171,3 +171,8 @@ Legacy `/api/v1/import` uses the same 10 MiB in-memory CSV/xlsx filter as previe
 `db-backup.js` preserves literal percent sequences in Prisma SQLite DATABASE_URL paths; URI decoding could silently select a different database.
 
 `tabularImport.js` checks worksheet XML row/cell/column bounds before ExcelJS allocations, rejects merged cells and limits sheet IDs to 65535. This prevents tiny XLSX metadata from expanding unbounded model regions.
+
+## Export pricing configuration
+- 原始现汇必须为正的有限数字，调整后保留六位小数的有效汇率也必须为正。正向 exchangeAdjustment 不能补造缺失或非法现汇。
+- `exportReadinessService`, `exportPacketService`, and Python use `config/pricing.json` and `config/pricing.schema.json` as their shared value and validation sources. Readiness recommendations use packet tiered rounding by default; multiplier requires explicit mode selection. Do not add silent defaults in consumers or pricing overrides through ordinary SystemConfig.
+- `backend/src/services/pricingConfigService.js` validates every snapshot, atomically replaces the complete file for ADMIN requests, rejects stale revisions, and logs only actor/field names/hashes. Filesystem edits are logged on next load; offline edits require operator filesystem audit. No pricing loader reads .env.

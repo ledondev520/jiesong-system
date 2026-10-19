@@ -13,9 +13,6 @@ const { getExportReadiness } = require('./exportReadinessService');
 const fileService = require('./fileService');
 
 const DEFAULT_SELLER_NAME = '上海捷淞国际物流有限公司';
-const FX_BUFFER = 0.2;
-const REFUNDABLE_MARKUP = 0.3;
-const NO_REFUND_MARKUP_CAP = 0.1;
 const REFUNDABLE_TOLERANCE = 0.05;
 const MONEY_EPSILON = 0.01;
 const EXPORT_PACKET_DESCRIPTION = '出口三单生成版本（外销合同、商业发票、装箱单）';
@@ -31,84 +28,13 @@ const buildPackingSourceVersion = (items) => crypto.createHash('sha256').update(
   })),
 )).digest('hex');
 
-const toNumber = (value) => {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : 0;
-};
-
-const round = (value, digits = 2) => {
-  const factor = 10 ** digits;
-  return Math.round((toNumber(value) + Number.EPSILON) * factor) / factor;
-};
-
+const { loadPricingConfig } = require('./pricingConfigService');
+const { calculateFormulaPrice, historicalQuoteAllowed, realizedMarkup, targetMarkupFor, round } = require('./exportPricing');
+const toNumber = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 const normalizeText = (value) => String(value || '').trim().replace(/\s+/g, '').toLowerCase();
-
 const makeIssue = (code, severity, message, packingItemId = null, productName = '') => ({
-  code,
-  severity,
-  message,
-  packingItemId,
-  productName,
+  code, severity, message, packingItemId, productName,
 });
-
-const realizedMarkup = (unitPriceUsd, quantity, effectiveRate, costCny) => (
-  costCny > 0 ? (unitPriceUsd * quantity * effectiveRate) / costCny - 1 : null
-);
-
-const historicalQuoteAllowed = ({ unitPriceUsd, quantity, effectiveRate, costCny, refundRate }) => {
-  const markup = realizedMarkup(unitPriceUsd, quantity, effectiveRate, costCny);
-  if (markup === null) return { allowed: false, markup };
-  if (refundRate === 0) {
-    return { allowed: markup >= -1e-9 && markup <= NO_REFUND_MARKUP_CAP + 1e-9, markup };
-  }
-  return {
-    allowed: Math.abs(markup - REFUNDABLE_MARKUP) <= REFUNDABLE_TOLERANCE + 1e-9,
-    markup,
-  };
-};
-
-const unitForRoundedTotal = (total, quantity) => {
-  const exact = total / quantity;
-  for (let precision = 0; precision <= 10; precision += 1) {
-    const factor = 10 ** precision;
-    const candidates = [
-      Math.floor(exact * factor) / factor,
-      round(exact, precision),
-      Math.ceil(exact * factor) / factor,
-    ].sort((a, b) => Math.abs(a - exact) - Math.abs(b - exact));
-    const matching = candidates.find((unit) => round(unit * quantity, 1) === round(total, 1));
-    if (matching !== undefined) return matching;
-  }
-  return round(exact, 10);
-};
-
-const calculateFormulaPrice = ({ costCny, quantity, effectiveRate, targetMarkup, strictCap }) => {
-  const rawTotal = (costCny * (1 + targetMarkup)) / effectiveRate;
-  const rawUnit = rawTotal / quantity;
-  const integerUnit = Math.max(1, strictCap ? Math.floor(rawUnit) : Math.round(rawUnit));
-  const candidates = [{
-    unitPriceUsd: integerUnit,
-    totalUsd: round(integerUnit * quantity, 4),
-    markup: realizedMarkup(integerUnit, quantity, effectiveRate, costCny),
-    roundingMethod: 'integer_unit',
-  }];
-  const nearestFive = Math.round(rawTotal / 5) * 5;
-  for (let offset = -10; offset <= 10; offset += 5) {
-    const totalUsd = Math.max(5, nearestFive + offset);
-    const unitPriceUsd = unitForRoundedTotal(totalUsd, quantity);
-    const markup = realizedMarkup(unitPriceUsd, quantity, effectiveRate, costCny);
-    if (strictCap && markup > targetMarkup + 1e-9) continue;
-    candidates.push({ unitPriceUsd, totalUsd, markup, roundingMethod: 'total_ends_0_or_5' });
-  }
-  candidates.sort((a, b) => {
-    const gap = Math.abs(a.markup - targetMarkup) - Math.abs(b.markup - targetMarkup);
-    if (Math.abs(gap) > 1e-12) return gap;
-    const integerPenalty = Number(!Number.isInteger(a.unitPriceUsd)) - Number(!Number.isInteger(b.unitPriceUsd));
-    if (integerPenalty !== 0) return integerPenalty;
-    return Math.abs(a.totalUsd - rawTotal) - Math.abs(b.totalUsd - rawTotal);
-  });
-  return { ...candidates[0], rawUnitPriceUsd: rawUnit, rawTotalUsd: rawTotal };
-};
 
 const findHistoricalQuote = (historicalQuotes, item, productName) => (
   historicalQuotes.find((quote) => (
@@ -120,9 +46,13 @@ const findHistoricalQuote = (historicalQuotes, item, productName) => (
 );
 
 /** 纯函数：用同一组输入形成页面预览和生成器消费的冻结快照。 */
-const evaluateExportPacket = (contract, readiness, historicalQuotes = [], options = {}) => {
-  const spotRate = toNumber(options.spotRate || contract.exchangeRate);
+const evaluateExportPacket = (contract, readiness, historicalQuotes = [], options = {}, config = loadPricingConfig()) => {
+  const FX_BUFFER = -config.exchangeAdjustment;
+  const REFUNDABLE_MARKUP = config.refundableMarkup;
+  const NO_REFUND_MARKUP_CAP = config.noRefundMarkup;
+  const spotRate = toNumber(options.spotRate ?? contract.exchangeRate);
   const effectiveRate = round(spotRate - FX_BUFFER, 6);
+  const validRate = spotRate > 0 && effectiveRate > 0;
   const buyerName = String(options.buyerName || '').trim();
   const sellerName = String(options.sellerName || '').trim();
   const packageKind = String(options.packageKind || '').trim();
@@ -134,7 +64,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
   ]));
   const issues = [];
 
-  if (spotRate <= FX_BUFFER) issues.push(makeIssue('INVALID_SPOT_RATE', 'error', '现汇必须大于 0.2'));
+  if (!validRate) issues.push(makeIssue('INVALID_SPOT_RATE', 'error', `现汇必须大于 ${Math.max(0, FX_BUFFER)}`));
   if (!sellerName) issues.push(makeIssue('MISSING_SELLER', 'error', '请确认卖方名称'));
   if (!buyerName) issues.push(makeIssue('MISSING_BUYER', 'error', '请确认买方名称'));
   if (!packageKind) issues.push(makeIssue('MISSING_PACKAGE_KIND', 'error', '请确认包装种类'));
@@ -175,32 +105,35 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
     if (!declaration) lineIssues.push(makeIssue('MISSING_DECLARATION', 'error', '缺少已确认申报要素', item.id, productName));
     if (purchaseCostCny <= 0) lineIssues.push(makeIssue('MISSING_PURCHASE_COST', 'error', '缺少采购成本', item.id, productName));
 
-    const targetMarkup = refundRate === 0 ? NO_REFUND_MARKUP_CAP : REFUNDABLE_MARKUP;
+    const targetMarkup = targetMarkupFor(config, refundRate);
+    const strictCap = config.mode === 'tiered' && refundRate === 0;
     const manualUnitPrice = priceOverrideMap.get(item.id) || 0;
     const historical = findHistoricalQuote(historicalQuotes, item, productName);
-    const historicalCheck = historical && effectiveRate > 0 && purchaseCostCny > 0 && quantity > 0
+    const historicalCheck = historical && validRate && purchaseCostCny > 0 && quantity > 0
       ? historicalQuoteAllowed({
           unitPriceUsd: historical.unitPriceUsd,
           quantity,
           effectiveRate,
           costCny: purchaseCostCny,
           refundRate,
-        })
+        }, config)
       : null;
-    const formula = effectiveRate > 0 && purchaseCostCny > 0 && quantity > 0
+    const formula = validRate && purchaseCostCny > 0 && quantity > 0
       ? calculateFormulaPrice({
           costCny: purchaseCostCny,
           quantity,
           effectiveRate,
           targetMarkup,
-          strictCap: refundRate === 0,
+          strictCap,
         })
       : null;
 
     let unitPriceUsd = formula?.unitPriceUsd || 0;
     let totalUsd = formula?.totalUsd || 0;
     let pricingSource = 'formula';
-    let pricingReference = refundRate === 0 ? '退税率 0%，加价不超过 10%' : '可退税，目标加价 30%';
+    let pricingReference = config.mode === 'multiplier'
+      ? `固定乘数 ${config.multiplier}，目标加价 ${round(targetMarkup * 100, 6)}%`
+      : refundRate === 0 ? `退税率 0%，加价不超过 ${round(targetMarkup * 100, 6)}%` : `可退税，目标加价 ${round(targetMarkup * 100, 6)}%`;
     let roundingMethod = formula?.roundingMethod || '';
     if (historical && historicalCheck?.allowed) {
       unitPriceUsd = historical.unitPriceUsd;
@@ -219,11 +152,11 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
     const markup = effectiveRate > 0 && purchaseCostCny > 0
       ? realizedMarkup(unitPriceUsd, quantity, effectiveRate, purchaseCostCny)
       : null;
-    if (manualUnitPrice > 0 && refundRate === 0 && markup > NO_REFUND_MARKUP_CAP + 1e-9) {
-      lineIssues.push(makeIssue('NO_REFUND_MARKUP_EXCEEDED', 'error', '人工单价使零退税商品加价超过 10%', item.id, productName));
+    if (manualUnitPrice > 0 && strictCap && markup > targetMarkup + 1e-9) {
+      lineIssues.push(makeIssue('NO_REFUND_MARKUP_EXCEEDED', 'error', `人工单价使零退税商品加价超过 ${round(targetMarkup * 100, 6)}%`, item.id, productName));
     }
-    if (manualUnitPrice > 0 && refundRate > 0 && Math.abs(markup - REFUNDABLE_MARKUP) > REFUNDABLE_TOLERANCE + 1e-9) {
-      lineIssues.push(makeIssue('REFUNDABLE_MARKUP_OUTSIDE_POLICY', 'error', '人工单价偏离 30% 目标超过 5 个百分点', item.id, productName));
+    if (manualUnitPrice > 0 && (refundRate > 0 || (config.mode === 'multiplier' && refundRate === 0)) && Math.abs(markup - targetMarkup) > REFUNDABLE_TOLERANCE + 1e-9) {
+      lineIssues.push(makeIssue('REFUNDABLE_MARKUP_OUTSIDE_POLICY', 'error', `人工单价偏离 ${round(targetMarkup * 100, 6)}% 目标超过 5 个百分点`, item.id, productName));
     }
 
     issues.push(...lineIssues);
@@ -299,6 +232,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
     currency: 'USD',
     tradeTerm,
     pricingPolicy: {
+      ...(config.mode === 'multiplier' ? { mode: config.mode, multiplier: config.multiplier } : {}),
       spotRate,
       fxBuffer: FX_BUFFER,
       effectiveRate,
@@ -319,7 +253,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
   };
 };
 
-const loadPacketSources = async (salesContractId, options = {}, prismaClient = prisma) => {
+const loadPacketSources = async (salesContractId, options = {}, prismaClient = prisma, config = loadPricingConfig()) => {
   const contract = await prismaClient.salesContract.findUnique({
     where: { id: salesContractId },
     include: {
@@ -333,7 +267,7 @@ const loadPacketSources = async (salesContractId, options = {}, prismaClient = p
   if (!contract) throw createError('出口合同不存在', 404);
   const readiness = await getExportReadiness(salesContractId, {
     overrides: options.hsOverrides || [],
-  }, prismaClient);
+  }, prismaClient, config);
   const productIds = Array.from(new Set(contract.packingItems.map((item) => item.productId).filter(Boolean)));
   const historicalItems = productIds.length > 0
     ? await prismaClient.packingItem.findMany({
@@ -360,8 +294,9 @@ const loadPacketSources = async (salesContractId, options = {}, prismaClient = p
 };
 
 const previewExportPacket = async (salesContractId, options = {}, prismaClient = prisma) => {
-  const sources = await loadPacketSources(salesContractId, options, prismaClient);
-  return evaluateExportPacket(sources.contract, sources.readiness, sources.historicalQuotes, options);
+  const config = loadPricingConfig();
+  const sources = await loadPacketSources(salesContractId, options, prismaClient, config);
+  return evaluateExportPacket(sources.contract, sources.readiness, sources.historicalQuotes, options, config);
 };
 
 const border = { style: 'thin', color: { argb: 'FFB7C4CE' } };
@@ -491,8 +426,9 @@ const buildExportPacketWorkbook = async (packet) => {
 };
 
 const generateExportPacket = async (salesContractId, options = {}, prismaClient = prisma) => {
-  const sources = await loadPacketSources(salesContractId, options, prismaClient);
-  const packet = evaluateExportPacket(sources.contract, sources.readiness, sources.historicalQuotes, options);
+  const config = loadPricingConfig();
+  const sources = await loadPacketSources(salesContractId, options, prismaClient, config);
+  const packet = evaluateExportPacket(sources.contract, sources.readiness, sources.historicalQuotes, options, config);
   if (!packet.ready) {
     const first = packet.issues.find((issue) => issue.severity === 'error');
     throw createError(`出口三单资料未完整：${first?.productName ? `${first.productName}：` : ''}${first?.message || '请先完成预检'}`, 400);
@@ -536,9 +472,9 @@ module.exports = {
   EXPORT_PACKET_DESCRIPTION,
   buildPackingSourceVersion,
   DEFAULT_SELLER_NAME,
-  FX_BUFFER,
-  NO_REFUND_MARKUP_CAP,
-  REFUNDABLE_MARKUP,
+  get FX_BUFFER() { return -loadPricingConfig().exchangeAdjustment; },
+  get NO_REFUND_MARKUP_CAP() { return loadPricingConfig().noRefundMarkup; },
+  get REFUNDABLE_MARKUP() { return loadPricingConfig().refundableMarkup; },
   buildExportPacketWorkbook,
   calculateFormulaPrice,
   evaluateExportPacket,

@@ -1,0 +1,1625 @@
+[
+  {
+    "name": "13-normal",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 13,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "13-fractional",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10.24,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6005.54,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 13,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "13-low-cost",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 7,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 1,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 13,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "13-history-allowed",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 13,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [
+      {
+        "productId": "product-1",
+        "productName": "合成商品",
+        "specification": "100*200*300",
+        "unitPriceUsd": 130,
+        "contractNo": "SYNTHETIC-HISTORY"
+      }
+    ],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "13-history-rejected",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 13,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [
+      {
+        "productId": "product-1",
+        "productName": "合成商品",
+        "specification": "100*200*300",
+        "unitPriceUsd": 300,
+        "contractNo": "SYNTHETIC-HISTORY"
+      }
+    ],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "13-manual",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 13,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18",
+      "priceOverrides": [
+        {
+          "packingItemId": "packing-1",
+          "unitPriceUsd": 150
+        }
+      ]
+    }
+  },
+  {
+    "name": "13-missing-cost",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": null,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 13,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "13-invalid-fx",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 0.2,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 13,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "13-missing-spec",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 13,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "0-normal",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 0,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "0-fractional",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10.24,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6005.54,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 0,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "0-low-cost",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 7,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 1,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 0,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "0-history-allowed",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 0,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [
+      {
+        "productId": "product-1",
+        "productName": "合成商品",
+        "specification": "100*200*300",
+        "unitPriceUsd": 110,
+        "contractNo": "SYNTHETIC-HISTORY"
+      }
+    ],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "0-history-rejected",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 0,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [
+      {
+        "productId": "product-1",
+        "productName": "合成商品",
+        "specification": "100*200*300",
+        "unitPriceUsd": 300,
+        "contractNo": "SYNTHETIC-HISTORY"
+      }
+    ],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "0-manual",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 0,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18",
+      "priceOverrides": [
+        {
+          "packingItemId": "packing-1",
+          "unitPriceUsd": 150
+        }
+      ]
+    }
+  },
+  {
+    "name": "0-missing-cost",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": null,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 0,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "0-invalid-fx",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 0.2,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 0,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "0-missing-spec",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": [
+        {
+          "hsCode": "9405110000",
+          "productName": "合成商品",
+          "refundRate": 0,
+          "vatRate": 13,
+          "effectiveDate": "2026-01-01",
+          "fetchedAt": "2026-10-18",
+          "sourceUrl": "synthetic"
+        }
+      ]
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "None-normal",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": []
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "None-fractional",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10.24,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6005.54,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": []
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "None-low-cost",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 7,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 1,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": []
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "None-history-allowed",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": []
+    },
+    "historicalQuotes": [
+      {
+        "productId": "product-1",
+        "productName": "合成商品",
+        "specification": "100*200*300",
+        "unitPriceUsd": 130,
+        "contractNo": "SYNTHETIC-HISTORY"
+      }
+    ],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "None-history-rejected",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": []
+    },
+    "historicalQuotes": [
+      {
+        "productId": "product-1",
+        "productName": "合成商品",
+        "specification": "100*200*300",
+        "unitPriceUsd": 300,
+        "contractNo": "SYNTHETIC-HISTORY"
+      }
+    ],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "None-manual",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": []
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18",
+      "priceOverrides": [
+        {
+          "packingItemId": "packing-1",
+          "unitPriceUsd": 150
+        }
+      ]
+    }
+  },
+  {
+    "name": "None-missing-cost",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": null,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": []
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "None-invalid-fx",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 0.2,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "100*200*300",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": []
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  },
+  {
+    "name": "None-missing-spec",
+    "contract": {
+      "id": "SYNTHETIC",
+      "contractNo": "SYNTHETIC-001",
+      "exchangeRate": 6.8,
+      "totalAmount": 0,
+      "totalBoxes": 2,
+      "grossWeight": 120,
+      "netWeight": 100,
+      "volume": 1.2,
+      "port": {
+        "name": "合成港口"
+      },
+      "packingItems": [
+        {
+          "id": "packing-1",
+          "productId": "product-1",
+          "quantity": 10,
+          "unit": "件",
+          "boxes": 2,
+          "grossWeight": 120,
+          "netWeight": 100,
+          "volume": 1.2,
+          "purchaseCost": 6600,
+          "unitPrice": 100,
+          "totalPrice": 1000,
+          "specification": "",
+          "product": {
+            "customsName": "合成商品",
+            "hsCode": "9405110000",
+            "declaration": "0|0|合成用途|无品牌|无型号"
+          },
+          "store": {
+            "name": "合成门店"
+          }
+        }
+      ]
+    },
+    "readinessOptions": {
+      "hsRecords": []
+    },
+    "historicalQuotes": [],
+    "packetOptions": {
+      "sellerName": "合成卖方",
+      "buyerName": "合成买方",
+      "packageKind": "木箱",
+      "tradeTerm": "FOB",
+      "documentDate": "2026-10-18"
+    }
+  }
+]

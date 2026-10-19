@@ -3,9 +3,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 
-test('registered resource lifecycle matrix over HTTP and private SQLite', async (t) => {
+test('registered resource lifecycle matrix over HTTP, private SQLite and singleton files', async (t) => {
   const directory = fs.mkdtempSync(
     path.join(os.tmpdir(), 'jiesong-resource-matrix-'),
   );
@@ -16,10 +17,20 @@ test('registered resource lifecycle matrix over HTTP and private SQLite', async 
   process.env.NODE_ENV = 'test';
   process.env.JWT_SECRET = 'test-only-catalogue-fixture-never-for-production';
   process.env.TZ = 'UTC';
+  // Never allow the singleton adapter to write the repository or an operator config.
+  const previousPricingPath = process.env.JIESONG_PRICING_CONFIG;
+  const pricingFile = path.join(directory, 'pricing.json');
+  process.env.JIESONG_PRICING_CONFIG = pricingFile;
   const originalUmask = process.umask(0o022);
   let db, server;
   let sequence = 0;
   const auditRequests = new Set();
+  const { resources } = require('../../../lifecycle/resources.json');
+  // Only archive routes use response-finish database audit writes. Pricing audits
+  // hashes/field names in its file service and must not store config in the DB.
+  const auditedPaths = resources
+    .filter((resource) => resource.kind !== 'singleton-config')
+    .map((resource) => resource.matrix.path);
   t.after(async () => {
     if (server) {
       server.closeAllConnections();
@@ -45,6 +56,9 @@ test('registered resource lifecycle matrix over HTTP and private SQLite', async 
     if (db) await db.$disconnect();
     fs.rmSync(directory, { recursive: true, force: true });
     process.umask(originalUmask);
+    if (previousPricingPath === undefined)
+      delete process.env.JIESONG_PRICING_CONFIG;
+    else process.env.JIESONG_PRICING_CONFIG = previousPricingPath;
   });
   // Apply the committed migrations; never use db push or regenerate shared clients.
   const migrations = path.resolve(__dirname, '../../prisma/migrations');
@@ -98,7 +112,14 @@ test('registered resource lifecycle matrix over HTTP and private SQLite', async 
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     const payload = await response.json();
-    if (method !== 'GET' && response.status >= 200 && response.status < 300)
+    if (
+      method !== 'GET' &&
+      response.status >= 200 &&
+      response.status < 300 &&
+      auditedPaths.some(
+        (base) => route === base || route.startsWith(`${base}/`),
+      )
+    )
       auditRequests.add(requestId);
     return { status: response.status, ...payload };
   };
@@ -126,14 +147,52 @@ test('registered resource lifecycle matrix over HTTP and private SQLite', async 
       ),
     );
 
+  const fileSnapshot = () => {
+    const contents = fs.readFileSync(pricingFile, 'utf8');
+    const stat = fs.statSync(pricingFile);
+    return {
+      contents,
+      config: JSON.parse(contents),
+      revision: crypto.createHash('sha256').update(contents).digest('hex'),
+      mode: stat.mode & 0o777,
+      ino: stat.ino,
+      dev: stat.dev,
+      mtimeMs: stat.mtimeMs,
+      ctimeMs: stat.ctimeMs,
+    };
+  };
+  const withFileLock = async (run) => {
+    const lock = `${pricingFile}.lock`;
+    const fd = fs.openSync(lock, 'wx', 0o600);
+    try {
+      await run();
+    } finally {
+      fs.closeSync(fd);
+      fs.unlinkSync(lock);
+    }
+  };
   const { runResourceMatrix } = require('../lifecycle/runResourceMatrix');
-  for (const resource of require('../../../lifecycle/resources.json')
-    .resources) {
+  const {
+    runSingletonConfigMatrix,
+  } = require('../lifecycle/runSingletonConfigMatrix');
+  for (const resource of resources) {
     await t.test(resource.id, async (t) => {
-      const result = await runResourceMatrix(t, resource, {
+      const singleton = resource.kind === 'singleton-config';
+      if (singleton) {
+        assert.equal(resource.matrix.adapter, 'pricing-config-file');
+        fs.writeFileSync(
+          pricingFile,
+          `${JSON.stringify(resource.matrix.initial, null, 2)}\n`,
+          { flag: 'wx', mode: 0o600 },
+        );
+      }
+      const run = singleton ? runSingletonConfigMatrix : runResourceMatrix;
+      const result = await run(t, resource, {
         call,
         good,
         snapshot,
+        fileSnapshot,
+        withFileLock,
       });
       if (process.env.JIESONG_TEST_EVIDENCE_DIR) {
         fs.mkdirSync(process.env.JIESONG_TEST_EVIDENCE_DIR, {

@@ -182,3 +182,14 @@
 - 旧通用 HTTP 上传入口也使用 10 MiB 内存接收和 CSV/xlsx 扩展名过滤，成功或失败都不归档原始上传文件；旧记录和逐行导入事务保持原有契约。
 
 - xlsx 合并单元格需先拆分并粘贴为值；加载前检查实际行/单元格/列索引（5001 行含表头、100 列）及工作表 ID（最多 65535），避免小文件声明巨型区域耗尽内存。
+
+`services/pricingConfigService.js` 读取共用的 `config/pricing.json` 与 schema，
+`controllers/system/pricingController.js` 提供 ADMIN-only 报价配置 GET/PUT。
+原子替换、版本冲突及无参数值日志由真实文件/HTTP测试验证。
+`routes/pricingConfig.test.js` 的认证身份为合成桩，角色中间件与文件写入为真实实现。
+
+`services/exportPricing.js` 保留原 packet 的凑整算法，集中模式目标和历史报价校验。
+`exportPacketService.js` 每次计算读取一份配置快照，历史/人工价格校验及提示使用同一口径。
+`exportPricing.configuration.test.js` 用同一临时配置文件对照真实 Python 合成建议输出。
+`routes/pricingConfig.auth.test.js` 另以真实应用认证、合成 JWT 和临时迁移 SQLite
+验证当前数据库角色的 ADMIN-only 边界、管理员改权立即拒绝，以及配置文件保存不写业务表。
