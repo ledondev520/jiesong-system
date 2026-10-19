@@ -221,3 +221,9 @@ A:
 上线前备份实际 `DATABASE_URL` 指向的SQLite，权限0700/0600，然后运行迁移新增 `email_registration_challenges` 表。不要执行 db push。重启后访问 `/register`，完成邮件验证码注册并由管理员在用户管理开通角色和状态；现有账号登录不变。
 
 阿里云受理回执不等于收件箱送达；必须使用用户指定邮箱确认真实收信。接口依据：[SingleSendMail](https://help.aliyun.com/zh/direct-mail/api-dm-2015-11-23-singlesendmail)。
+
+## Staging 与生产隔离(fix/deploy-split)
+
+- 生产:仅 `v*` tag(非 rc)或手动 `workflow_dispatch` 选 `production` 时部署到 `/opt/jiesong-system`,不再依赖 staging job。
+- Staging:只有设置了仓库变量 `STAGING_DEPLOY_DIR`、`STAGING_PM2_BACKEND`、`STAGING_PM2_FRONTEND` 才会在 push main 或手动选 staging 时部署;目录不得是生产目录,pm2 进程名不得是 `jiesong-backend`/`jiesong-frontend`,否则 job 直接拒绝。未配置时 staging 被跳过,push main 不会更新生产。
+- 部署状态回写只在 production job 声明 `statuses: write`,workflow 默认 `contents: read`。
