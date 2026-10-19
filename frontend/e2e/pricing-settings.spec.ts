@@ -82,7 +82,9 @@ for (const width of [390, 1440]) {
           page.getByRole("heading", { name: "系统配置" }),
         ).toBeVisible();
         await expect(
-          page.getByRole("navigation", { name: "主导航", exact: true }),
+          width < 768
+            ? page.getByRole("navigation", { name: "主导航", exact: true })
+            : page.getByRole("link", { name: "捷淞国际物流" }).first(),
         ).toBeVisible();
         await expect(page.getByLabel("乘数", { exact: true })).toHaveCount(0);
         await expect(
