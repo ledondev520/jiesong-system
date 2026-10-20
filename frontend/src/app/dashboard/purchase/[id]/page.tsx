@@ -12,7 +12,15 @@ import {
   BusinessWrite,
   useBusinessReadOnly,
 } from "@/lib/hooks/useBusinessReadOnly";
-import { useState, useEffect, use, useCallback, useMemo } from "react";
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  use,
+  useCallback,
+  useMemo,
+} from "react";
 import { PurchaseContract, PurchaseItem, PurchaseStatus } from "@/types";
 import { purchaseService } from "@/services/purchase.service";
 import { contractDocService } from "@/services/contractDoc.service";
@@ -298,6 +306,11 @@ function ContractTimeline({
   );
 }
 
+// 同步异常/非 Promise 返回值也走 catch/finally，与原 async try/await 一致。
+function startRequest<T>(fn: () => T | PromiseLike<T>): Promise<T> {
+  return new Promise<T>((resolve) => resolve(fn()));
+}
+
 export default function PurchaseDetailPage({ params }: PageProps) {
   const readOnly = useBusinessReadOnly();
   const isMobile = useMobile();
@@ -334,37 +347,61 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   /**
    * 职责：加载采购合同详情 + 附件列表
    */
-  const loadData = useCallback(async () => {
+  // 被动 effect 尚未发起新请求前，旧响应不得改写渲染期刚重置的 loading/loadError/notFound
+  // （与原先 effect 内同步重置覆盖旧响应的结果一致）。
+  const resetPendingRef = useRef(false);
+  // 仅在请求结果回调中写状态，供 effect 调用；事件/回调中用 loadData 先重置再请求。
+  const fetchData = useCallback(
+    () =>
+      startRequest(() => purchaseService.getById(id))
+        .then((contractRes) => {
+          setContract(contractRes.data || null);
+          if (!resetPendingRef.current) setNotFound(!contractRes.data);
+          return startRequest(() => listContractFiles(id, "PURCHASE"))
+            .then((filesRes) => {
+              if (filesRes.data) setContractFiles(filesRes.data);
+            })
+            .catch(() => {
+              toast.error("附件读取失败，请重试刷新详情");
+            });
+        })
+        .catch((error: unknown) => {
+          const missing =
+            typeof error === "object" &&
+            error !== null &&
+            "code" in error &&
+            error.code === 404;
+          if (!resetPendingRef.current) {
+            setNotFound(missing);
+            setLoadError(!missing);
+          }
+          if (!missing) toast.error("加载合同详情失败");
+        })
+        .finally(() => {
+          if (!resetPendingRef.current) setLoading(false);
+        }),
+    [id],
+  );
+  const loadData = useCallback(() => {
     setLoading(true);
     setLoadError(false);
     setNotFound(false);
-    try {
-      const contractRes = await purchaseService.getById(id);
-      setContract(contractRes.data || null);
-      setNotFound(!contractRes.data);
-      try {
-        const filesRes = await listContractFiles(id, "PURCHASE");
-        if (filesRes.data) setContractFiles(filesRes.data);
-      } catch {
-        toast.error("附件读取失败，请重试刷新详情");
-      }
-    } catch (error) {
-      const missing =
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        error.code === 404;
-      setNotFound(missing);
-      setLoadError(!missing);
-      if (!missing) toast.error("加载合同详情失败");
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
+    return fetchData();
+  }, [fetchData]);
+  const [loadedId, setLoadedId] = useState(id);
+  if (loadedId !== id) {
+    setLoadedId(id);
+    setLoading(true);
+    setLoadError(false);
+    setNotFound(false);
+  }
+  useLayoutEffect(() => {
+    resetPendingRef.current = true;
+  }, [fetchData]);
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    resetPendingRef.current = false;
+    void fetchData();
+  }, [fetchData]);
 
   // 加载系统配置（盖章平台链接、开票抬头），失败不阻塞页面
   useEffect(() => {

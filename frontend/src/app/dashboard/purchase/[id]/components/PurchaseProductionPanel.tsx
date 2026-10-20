@@ -7,7 +7,7 @@
 "use client";
 
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   Boxes,
@@ -110,9 +110,15 @@ export function PurchaseProductionPanel({
   );
   const readiness = contract.productionReadiness;
   const canComplete = ["SIGNED", "PRODUCING"].includes(contract.status);
-  useEffect(() => {
+  // 弹窗打开或打开期间采购明细变化时，按最新明细重建表单（渲染期同步，替代 effect）。
+  const [rowsSync, setRowsSync] = useState({
+    open: dialogOpen,
+    items: contract.items,
+  });
+  if (rowsSync.open !== dialogOpen || rowsSync.items !== contract.items) {
+    setRowsSync({ open: dialogOpen, items: contract.items });
     if (dialogOpen) setRows(buildFormRows(contract.items));
-  }, [dialogOpen, contract.items]);
+  }
   const itemById = useMemo(
     () => new Map((contract.items || []).map((item) => [item.id, item])),
     [contract.items],

@@ -1,7 +1,13 @@
 /** 采购详情分批到货、累计验货与完整验货历史；只允许已发货新批次写入。 */
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useAuthStore } from "@/store/auth.store";
 import { clearApiGetCache } from "@/lib/axios";
 import { formatDate, formatDateTime } from "@/lib/date-format";
@@ -33,6 +39,11 @@ import {
 import { ErrorState } from "@/components/ui/data-state";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { toast } from "sonner";
+
+// 同步异常/非 Promise 返回值也走 catch/finally，与原 async try/await 一致。
+function startRequest<T>(fn: () => T | PromiseLike<T>): Promise<T> {
+  return new Promise<T>((resolve) => resolve(fn()));
+}
 
 // 与后端数量上限容差一致，避免0.1+0.2误报超过0.3。
 const EPSILON = 1e-9;
@@ -92,45 +103,108 @@ export function PurchaseReceiptPanel({
   const remainingItems =
     data?.summary.items.filter((item) => item.remainingQuantity > 0) || [];
 
-  const load = useCallback(async () => {
+  // 被动 effect 尚未发起新请求前，旧响应不得改写渲染期刚重置的 loading/error
+  // （与原先 effect 内同步重置覆盖旧响应的结果一致）。
+  const resetPendingRef = useRef(false);
+  const historyResetPendingRef = useRef(false);
+
+  // 仅在请求结果回调中写状态，供 effect 调用；事件中用 load 先重置再请求。
+  const fetchList = useCallback(
+    () =>
+      startRequest(() =>
+        purchaseReceiptService.list(purchaseContractId, {
+          page,
+          pageSize,
+        }),
+      )
+        .then((response) => {
+          setData(response.data);
+        })
+        .catch(() => {
+          if (!resetPendingRef.current) setError(true);
+        })
+        .finally(() => {
+          if (!resetPendingRef.current) setLoading(false);
+        }),
+    [purchaseContractId, page, pageSize],
+  );
+  const load = useCallback(() => {
     setLoading(true);
     setError(false);
-    try {
-      const response = await purchaseReceiptService.list(purchaseContractId, {
-        page,
-        pageSize,
-      });
-      setData(response.data);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [purchaseContractId, page, pageSize]);
+    return fetchList();
+  }, [fetchList]);
+  const [listDeps, setListDeps] = useState([
+    purchaseContractId,
+    page,
+    pageSize,
+  ] as const);
+  if (
+    listDeps[0] !== purchaseContractId ||
+    listDeps[1] !== page ||
+    listDeps[2] !== pageSize
+  ) {
+    setListDeps([purchaseContractId, page, pageSize]);
+    setLoading(true);
+    setError(false);
+  }
+  useLayoutEffect(() => {
+    resetPendingRef.current = true;
+  }, [fetchList]);
   useEffect(() => {
-    void load();
-  }, [load]);
-  const loadHistory = useCallback(async () => {
-    if (!historyReceipt) return;
-    setHistoryLoading(true);
-    setHistoryError(false);
-    try {
-      const response = await purchaseReceiptService.inspections(
+    resetPendingRef.current = false;
+    void fetchList();
+  }, [fetchList]);
+
+  const fetchHistory = useCallback(() => {
+    if (!historyReceipt) return Promise.resolve();
+    return startRequest(() =>
+      purchaseReceiptService.inspections(
         purchaseContractId,
         historyReceipt.id,
         { page: historyPage, pageSize: 20 },
-      );
-      setHistory(response.data?.items || []);
-      setHistoryTotal(response.data?.pagination?.total || 0);
-    } catch {
-      setHistoryError(true);
-    } finally {
-      setHistoryLoading(false);
-    }
+      ),
+    )
+      .then((response) => {
+        setHistory(response.data?.items || []);
+        setHistoryTotal(response.data?.pagination?.total || 0);
+      })
+      .catch(() => {
+        if (!historyResetPendingRef.current) setHistoryError(true);
+      })
+      .finally(() => {
+        if (!historyResetPendingRef.current) setHistoryLoading(false);
+      });
   }, [purchaseContractId, historyReceipt, historyPage]);
+  const loadHistory = useCallback(() => {
+    if (!historyReceipt) return Promise.resolve();
+    setHistoryLoading(true);
+    setHistoryError(false);
+    return fetchHistory();
+  }, [historyReceipt, fetchHistory]);
+  const [historyDeps, setHistoryDeps] = useState([
+    purchaseContractId,
+    historyReceipt,
+    historyPage,
+  ] as const);
+  if (
+    historyDeps[0] !== purchaseContractId ||
+    historyDeps[1] !== historyReceipt ||
+    historyDeps[2] !== historyPage
+  ) {
+    setHistoryDeps([purchaseContractId, historyReceipt, historyPage]);
+    if (historyReceipt) {
+      setHistoryLoading(true);
+      setHistoryError(false);
+    }
+  }
+  useLayoutEffect(() => {
+    // 关闭历史（historyReceipt 为空）时原 effect 不重置，旧响应照常写入。
+    historyResetPendingRef.current = historyReceipt !== null;
+  }, [fetchHistory, historyReceipt]);
   useEffect(() => {
-    void loadHistory();
-  }, [loadHistory]);
+    historyResetPendingRef.current = false;
+    void fetchHistory();
+  }, [fetchHistory]);
 
   const changeArrival = (patch: Partial<ArrivalForm>) =>
     setArrival(
