@@ -6,7 +6,14 @@
 
 "use client";
 
-import { useEffect, useCallback, useState, useMemo } from "react";
+import {
+  useEffect,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useMemo,
+} from "react";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useTableSort } from "@/lib/hooks/useTableSort";
 import { Button } from "@/components/ui/button";
@@ -37,6 +44,7 @@ import {
   SystemLogItem,
 } from "@/services/system.service";
 import { toast } from "sonner";
+import { runAwait } from "@/lib/run-await";
 import { Role } from "@/types";
 import { useAuthStore } from "@/store/auth.store";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
@@ -124,31 +132,39 @@ export default function SystemLogsPage() {
   const user = useAuthStore((state) => state.user);
   const canAccess = user?.role === Role.ADMIN;
 
-  const loadLogs = useCallback(
-    async (page: number, size: number, kw: string) => {
-      setLoading(true);
-      try {
-        const response = await getSystemLogs({
-          page,
-          pageSize: size,
-          keyword: kw || undefined,
-          action: filterAction || undefined,
-          userId: filterUserId || undefined,
-          startDate: filterStartDate
-            ? filterStartDate.toISOString()
-            : undefined,
-          endDate: filterEndDate ? filterEndDate.toISOString() : undefined,
-        });
-        const items = response.data?.items || [];
-        setLogs(Array.isArray(items) ? items : []);
-        setTotal(response.data?.pagination?.total || 0);
-        setTotalPages(response.data?.pagination?.totalPages || 1);
-      } catch {
-        toast.error("加载日志失败");
-      } finally {
-        setLoading(false);
-      }
-    },
+  // 本次渲染已按新请求参数重置 loading、但对应 effect 尚未发出请求时为 true：
+  // 原先 loading 在 effect 内同步置位，这段窗口内落地的旧请求写入的 loading 会被随后的置位覆盖，
+  // 因此窗口内只跳过旧请求对 loading 的写入，数据与提示照常写入。
+  const resetPendingRef = useRef(false);
+
+  const requestLogs = useCallback(
+    (page: number, size: number, kw: string) =>
+      runAwait(
+        () =>
+          getSystemLogs({
+            page,
+            pageSize: size,
+            keyword: kw || undefined,
+            action: filterAction || undefined,
+            userId: filterUserId || undefined,
+            startDate: filterStartDate
+              ? filterStartDate.toISOString()
+              : undefined,
+            endDate: filterEndDate ? filterEndDate.toISOString() : undefined,
+          }),
+        (response) => {
+          const items = response.data?.items || [];
+          setLogs(Array.isArray(items) ? items : []);
+          setTotal(response.data?.pagination?.total || 0);
+          setTotalPages(response.data?.pagination?.totalPages || 1);
+        },
+        () => {
+          toast.error("加载日志失败");
+        },
+        () => {
+          if (!resetPendingRef.current) setLoading(false);
+        },
+      ),
     [filterAction, filterUserId, filterStartDate, filterEndDate],
   );
 
@@ -159,6 +175,9 @@ export default function SystemLogsPage() {
     return () => clearTimeout(timer);
   }, [keyword]);
 
+  // 保留在 effect 内（react-hooks/set-state-in-effect 警告保留）：筛选或关键词变化且当前不在第 1 页时，
+  // 原先同一次提交里加载 effect 会先按旧页码 + 新条件发一次请求，下一次渲染再请求第 1 页；
+  // 改为渲染期重置页码会少发这次中间请求（GET 缓存与 401 处理可观测），无法逐请求保持一致。
   useEffect(() => {
     setCurrentPage(1);
   }, [
@@ -169,13 +188,38 @@ export default function SystemLogsPage() {
     filterEndDate,
   ]);
 
+  // 与下方加载 effect 的依赖逐项对应：requestLogs 恰在四个筛选条件（Object.is 比较）变化时变化，
+  // 因此以这四个值代替 requestLogs；初值 null 使挂载时同样执行一次。
+  const loadKey = [
+    user,
+    canAccess,
+    currentPage,
+    pageSize,
+    debouncedKeyword,
+    filterAction,
+    filterUserId,
+    filterStartDate,
+    filterEndDate,
+  ] as const;
+  const [prevLoadKey, setPrevLoadKey] = useState<typeof loadKey | null>(null);
+  if (
+    prevLoadKey === null ||
+    loadKey.some((value, index) => !Object.is(value, prevLoadKey[index]))
+  ) {
+    setPrevLoadKey(loadKey);
+    // 原先在加载 effect 内：无权限时置 false，否则在发请求前置 true。
+    setLoading(Boolean(user && canAccess));
+  }
+
+  useLayoutEffect(() => {
+    resetPendingRef.current = true;
+  }, [user, canAccess, currentPage, pageSize, debouncedKeyword, requestLogs]);
+
   useEffect(() => {
-    if (!user || !canAccess) {
-      setLoading(false);
-      return;
-    }
-    loadLogs(currentPage, pageSize, debouncedKeyword);
-  }, [user, canAccess, currentPage, pageSize, debouncedKeyword, loadLogs]);
+    resetPendingRef.current = false;
+    if (!user || !canAccess) return;
+    void requestLogs(currentPage, pageSize, debouncedKeyword);
+  }, [user, canAccess, currentPage, pageSize, debouncedKeyword, requestLogs]);
 
   const sort = useTableSort<SystemLogItem, string>(
     logs,

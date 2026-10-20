@@ -20,6 +20,7 @@ import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { runAwait } from "@/lib/run-await";
 import {
   AlertTriangle,
   Building2,
@@ -197,39 +198,50 @@ export default function SuppliersPage() {
     name: "hasQualityIssue",
   });
 
-  const loadSuppliers = useCallback(async () => {
+  const requestSuppliers = useCallback(() => {
     const request = ++loadRequest.current;
-    setLoading(true);
-    setLoadError(false);
-    try {
-      const items = (await cachedFetch("suppliers-list", () =>
-        loadPaginatedCatalog((page) =>
-          supplierService.getAll({ page, pageSize: 100 }),
+    return runAwait(
+      () =>
+        cachedFetch("suppliers-list", () =>
+          loadPaginatedCatalog((page) =>
+            supplierService.getAll({ page, pageSize: 100 }),
+          ),
         ),
-      )) as SupplierDisplay[];
-      if (mounted.current && request === loadRequest.current)
-        setSuppliers(items);
-      return items;
-    } catch {
-      if (mounted.current && request === loadRequest.current) {
-        setLoadError(true);
-        toast.error("加载供应商失败");
-      }
-      return [];
-    } finally {
-      if (mounted.current && request === loadRequest.current) setLoading(false);
-    }
+      (items) => {
+        if (mounted.current && request === loadRequest.current)
+          setSuppliers(items as SupplierDisplay[]);
+      },
+      () => {
+        if (mounted.current && request === loadRequest.current) {
+          setLoadError(true);
+          toast.error("加载供应商失败");
+        }
+      },
+      () => {
+        if (mounted.current && request === loadRequest.current)
+          setLoading(false);
+      },
+    );
   }, []);
 
+  const loadSuppliers = useCallback(() => {
+    setLoading(true);
+    setLoadError(false);
+    return requestSuppliers();
+  }, [requestSuppliers]);
+
+  // 仅挂载（及 StrictMode 重挂载）时运行：loading 初值 true、loadError 初值 false，
+  // 且两次挂载之间没有任何写入这两个状态的路径（旧请求已被 loadRequest 递增作废），
+  // 原先 effect 内的 setLoading(true)/setLoadError(false) 不改变状态，effect 只需发请求。
   useEffect(() => {
     mounted.current = true;
-    void loadSuppliers();
+    void requestSuppliers();
     return () => {
       mounted.current = false;
       editorSession.current += 1;
       loadRequest.current += 1;
     };
-  }, [loadSuppliers]);
+  }, [requestSuppliers]);
 
   const filteredSuppliers = useMemo(() => {
     const kw = keyword.trim().toLowerCase();

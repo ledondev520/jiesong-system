@@ -27,6 +27,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { toast } from "sonner";
+import { runAwait } from "@/lib/run-await";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { Input } from "@/components/ui/input";
 import { Search, X, Plus, Pencil, Trash2 } from "lucide-react";
@@ -88,28 +89,44 @@ export default function SettingsUsersPage() {
   const [pageSize, setPageSize] = useState(20);
   const [keyword, setKeyword] = useState("");
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
   /**
-   * 职责：逐页加载完整用户目录供现有客户端搜索和分页使用
+   * 职责：逐页加载完整用户目录供现有客户端搜索和分页使用（不含 loading 置位）
    * @returns 完成加载的 Promise；失败时沿用列表错误提示
    */
-  const loadUsers = async () => {
+  const requestUsers = useCallback(
+    () =>
+      runAwait(
+        // 1. 完整装载目录后才执行现有客户端搜索与分页。
+        () =>
+          loadPaginatedCatalog((page) =>
+            userService.getAll({ page, pageSize: 100 }),
+          ),
+        (allUsers) => {
+          setUsers(allUsers);
+        },
+        () => {
+          toast.error("加载用户失败");
+        },
+        () => {
+          setLoading(false);
+        },
+      ),
+    [],
+  );
+
+  /**
+   * 职责：置 loading 后重新加载完整用户目录
+   * @returns 完成加载的 Promise；失败时沿用列表错误提示
+   */
+  const loadUsers = useCallback(() => {
     setLoading(true);
-    try {
-      // 1. 完整装载目录后才执行现有客户端搜索与分页。
-      const allUsers = await loadPaginatedCatalog((page) =>
-        userService.getAll({ page, pageSize: 100 }),
-      );
-      setUsers(allUsers);
-    } catch {
-      toast.error("加载用户失败");
-    } finally {
-      setLoading(false);
-    }
-  };
+    return requestUsers();
+  }, [requestUsers]);
+
+  // loading 初值为 true，挂载时原先的 setLoading(true) 不改变状态，effect 只需发请求。
+  useEffect(() => {
+    void requestUsers();
+  }, [requestUsers]);
 
   const handleCreate = () => {
     setEditingUser(null);

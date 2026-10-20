@@ -6,7 +6,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   getSystemCustomsBrokers,
   createSystemCustomsBroker,
@@ -19,6 +19,7 @@ import { Plus, Pencil, Trash2, Building2, Search, X } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { toast } from "sonner";
+import { runAwait } from "@/lib/run-await";
 import { Input } from "@/components/ui/input";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { Card, CardContent } from "@/components/ui/card";
@@ -61,24 +62,36 @@ export default function CustomsBrokersPage() {
   const [submitting, setSubmitting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    loadBrokers();
-  }, []);
+  const requestBrokers = useCallback(
+    () =>
+      runAwait(
+        () =>
+          getSystemCustomsBrokers({
+            page: 1,
+            pageSize: 100,
+          }),
+        (response) => {
+          setBrokers(response.data?.items || []);
+        },
+        () => {
+          toast.error("加载报关公司失败");
+        },
+        () => {
+          setLoading(false);
+        },
+      ),
+    [],
+  );
 
-  const loadBrokers = async () => {
+  const loadBrokers = useCallback(() => {
     setLoading(true);
-    try {
-      const response = await getSystemCustomsBrokers({
-        page: 1,
-        pageSize: 100,
-      });
-      setBrokers(response.data?.items || []);
-    } catch {
-      toast.error("加载报关公司失败");
-    } finally {
-      setLoading(false);
-    }
-  };
+    return requestBrokers();
+  }, [requestBrokers]);
+
+  // loading 初值为 true，挂载时原先的 setLoading(true) 不改变状态，effect 只需发请求。
+  useEffect(() => {
+    void requestBrokers();
+  }, [requestBrokers]);
 
   const handleCreate = () => {
     setEditingBroker(null);

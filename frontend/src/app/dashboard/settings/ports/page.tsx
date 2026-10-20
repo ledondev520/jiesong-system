@@ -6,7 +6,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   getSystemPorts,
   createSystemPort,
@@ -19,6 +19,7 @@ import { Plus, Pencil, Trash2, Anchor, Search, X } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { toast } from "sonner";
+import { runAwait } from "@/lib/run-await";
 import { Input } from "@/components/ui/input";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { Card, CardContent } from "@/components/ui/card";
@@ -57,21 +58,32 @@ export default function PortsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    loadPorts();
-  }, []);
+  const requestPorts = useCallback(
+    () =>
+      runAwait(
+        () => getSystemPorts({ page: 1, pageSize: 100 }),
+        (response) => {
+          setPorts(response.data?.items || []);
+        },
+        () => {
+          toast.error("加载港口失败");
+        },
+        () => {
+          setLoading(false);
+        },
+      ),
+    [],
+  );
 
-  const loadPorts = async () => {
+  const loadPorts = useCallback(() => {
     setLoading(true);
-    try {
-      const response = await getSystemPorts({ page: 1, pageSize: 100 });
-      setPorts(response.data?.items || []);
-    } catch {
-      toast.error("加载港口失败");
-    } finally {
-      setLoading(false);
-    }
-  };
+    return requestPorts();
+  }, [requestPorts]);
+
+  // loading 初值为 true，挂载时原先的 setLoading(true) 不改变状态，effect 只需发请求。
+  useEffect(() => {
+    void requestPorts();
+  }, [requestPorts]);
 
   const handleCreate = () => {
     setEditingPort(null);
