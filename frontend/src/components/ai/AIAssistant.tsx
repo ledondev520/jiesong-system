@@ -116,7 +116,8 @@ export function AIAssistant({ presentation = "floating" }: AIAssistantProps) {
   const [isOpen, setIsOpen] = useState(isWorkspace);
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // 初值即为欢迎消息：原先初值为空数组，挂载 effect 在 messages 为空时写入欢迎消息（挂载时总为空）。
+  const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
   const [isLoading, setIsLoading] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -143,21 +144,21 @@ export function AIAssistant({ presentation = "floating" }: AIAssistantProps) {
   } | null>(null);
   const suppressNextClickRef = useRef(false);
 
-  const getFabSize = useCallback(() => {
-    const rect = triggerRef.current?.getBoundingClientRect();
-    return {
+  const getFabSize = useCallback(
+    (rect = triggerRef.current?.getBoundingClientRect()) => ({
       width: rect?.width || 124,
       height: rect?.height || 44,
-    };
-  }, []);
+    }),
+    [],
+  );
 
   const clampFabPosition = useCallback(
-    (x: number, y: number) => {
+    (x: number, y: number, size?: { width: number; height: number }) => {
       if (typeof window === "undefined") {
         return { x, y };
       }
 
-      const { width, height } = getFabSize();
+      const { width, height } = size ?? getFabSize();
       const maxX = Math.max(FAB_MARGIN, window.innerWidth - width - FAB_MARGIN);
       const maxY = Math.max(
         FAB_MARGIN,
@@ -172,20 +173,24 @@ export function AIAssistant({ presentation = "floating" }: AIAssistantProps) {
     [getFabSize],
   );
 
-  const resolveDefaultFabPosition = useCallback(() => {
-    if (typeof window === "undefined") {
-      return { x: FAB_MARGIN, y: FAB_MARGIN };
-    }
+  const resolveDefaultFabPosition = useCallback(
+    (size?: { width: number; height: number }) => {
+      if (typeof window === "undefined") {
+        return { x: FAB_MARGIN, y: FAB_MARGIN };
+      }
 
-    const { width, height } = getFabSize();
-    const mobileBottomOffset =
-      window.innerWidth < 768 ? MOBILE_FAB_BOTTOM_CLEARANCE : FAB_MARGIN;
+      const { width, height } = size ?? getFabSize();
+      const mobileBottomOffset =
+        window.innerWidth < 768 ? MOBILE_FAB_BOTTOM_CLEARANCE : FAB_MARGIN;
 
-    return clampFabPosition(
-      window.innerWidth - width - FAB_MARGIN,
-      window.innerHeight - height - mobileBottomOffset,
-    );
-  }, [clampFabPosition, getFabSize]);
+      return clampFabPosition(
+        window.innerWidth - width - FAB_MARGIN,
+        window.innerHeight - height - mobileBottomOffset,
+        size,
+      );
+    },
+    [clampFabPosition, getFabSize],
+  );
 
   // 滚动到底部
   useEffect(() => {
@@ -199,8 +204,10 @@ export function AIAssistant({ presentation = "floating" }: AIAssistantProps) {
       return;
     }
 
-    setFabPosition((current) => current ?? resolveDefaultFabPosition());
-  }, [isWorkspace, resolveDefaultFabPosition]);
+    // 提交后测量触发器尺寸再定默认位置（同一 effect 内的测量值与原先在更新函数内两次测量的结果相同）。
+    const fabSize = getFabSize(triggerRef.current?.getBoundingClientRect());
+    setFabPosition((current) => current ?? resolveDefaultFabPosition(fabSize));
+  }, [getFabSize, isWorkspace, resolveDefaultFabPosition]);
 
   useEffect(() => {
     if (isWorkspace || typeof window === "undefined") {
@@ -264,11 +271,6 @@ export function AIAssistant({ presentation = "floating" }: AIAssistantProps) {
       window.removeEventListener("pointercancel", handlePointerUp);
     };
   }, [clampFabPosition, isWorkspace, resolveDefaultFabPosition]);
-
-  useEffect(() => {
-    if (messages.length === 0) setMessages([INITIAL_MESSAGE]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const loadSessions = useCallback(async () => {
     setIsLoadingSessions(true);

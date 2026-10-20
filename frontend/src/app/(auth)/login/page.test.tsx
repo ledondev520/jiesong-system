@@ -25,12 +25,16 @@ const mockRouter = { push: mockPush, replace: mockPush };
 const mockAuthStoreLogin = vi.fn();
 const mockAuthServiceLogin = vi.fn();
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => mockRouter,
-  useSearchParams: () => ({
+vi.mock("next/navigation", () => {
+  // 与 Next 一致：同一 URL 下 useSearchParams 返回稳定引用。
+  const searchParams = {
     get: vi.fn(() => null),
-  }),
-}));
+  };
+  return {
+    useRouter: () => mockRouter,
+    useSearchParams: () => searchParams,
+  };
+});
 
 vi.mock("@/store/auth.store", () => ({
   useAuthStore: (

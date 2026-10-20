@@ -6,7 +6,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertCircle,
@@ -110,10 +110,30 @@ export function PackingListCheckDialog({
     `packing:${contractId}:${open}:${selectedRecord?.id || ""}`,
   );
 
+  // 打开/切换合同时的加载置位：原先在 effect 内同步写入，改为渲染期执行（初值 null 使挂载时同样执行）。
+  const [historyKey, setHistoryKey] = useState<{
+    contractId: string;
+    open: boolean;
+  } | null>(null);
+  if (
+    historyKey === null ||
+    historyKey.contractId !== contractId ||
+    historyKey.open !== open
+  ) {
+    setHistoryKey({ contractId, open });
+    if (open) setLoadingHistory(true);
+  }
+  // 渲染期已置位、对应被动 effect 尚未执行的窗口内，旧请求仍为 active；原 effect 会随后把 loadingHistory 覆盖为 true，
+  // 因此窗口内旧请求跳过 setLoadingHistory(false)（历史与选中记录写入不受影响，与原先一致）。
+  const loadingPendingRef = useRef(false);
+  useLayoutEffect(() => {
+    loadingPendingRef.current = open;
+  }, [contractId, open]);
+
   useEffect(() => {
+    loadingPendingRef.current = false;
     if (!open) return;
     let active = true;
-    setLoadingHistory(true);
     void salesService
       .listPackingListChecks(contractId, 20)
       .then((response) => {
@@ -127,7 +147,7 @@ export function PackingListCheckDialog({
         if (active) toast.error("核对历史加载失败");
       })
       .finally(() => {
-        if (active) setLoadingHistory(false);
+        if (active && !loadingPendingRef.current) setLoadingHistory(false);
       });
     return () => {
       active = false;
