@@ -26,6 +26,7 @@ import { ErrorState } from "@/components/ui/data-state";
 import { Button } from "@/components/ui/button";
 import { clearApiGetCache } from "@/lib/axios";
 import { cachedFetch, invalidateCache } from "@/lib/api-cache";
+import { runAwait } from "@/lib/run-await";
 import {
   financialStatementsService,
   type AnalyticsData,
@@ -56,14 +57,6 @@ const FinancialEvidenceLibrary = lazy(() =>
     default: module.FinancialEvidenceLibrary,
   })),
 );
-
-/**
- * 与原 `try { await fn() } catch` 等价地启动请求：fn 同步抛错或返回非 Promise 值时，
- * 也会进入返回的 Promise 链并由后续 .catch/.finally 处理
- */
-function startRequest<T>(fn: () => T | PromiseLike<T>): Promise<T> {
-  return new Promise<T>((resolve) => resolve(fn()));
-}
 
 /** 解析 `${year}-${month}` 账期键；无效时返回 null（与原 loadDetail 的 `!year || !month` 判断一致） */
 function parsePeriodKey(periodKey: string) {
@@ -109,17 +102,18 @@ export function FinancialStatementsPageContent() {
   /** 拉取分析与账期列表；状态只在请求回调中更新，可直接在 effect 中调用 */
   const fetchData = useCallback(
     () =>
-      startRequest(() =>
-        Promise.all([
-          cachedFetch("fin-statements-analytics", () =>
-            financialStatementsService.getAnalytics(),
-          ),
-          cachedFetch("fin-statements-list", () =>
-            financialStatementsService.listStatements(),
-          ),
-        ]),
-      )
-        .then(([analyticsData, periodsData]) => {
+      // runAwait 与原 async try/await 时序一致：成功/失败回调落在同一微任务位置
+      runAwait(
+        () =>
+          Promise.all([
+            cachedFetch("fin-statements-analytics", () =>
+              financialStatementsService.getAnalytics(),
+            ),
+            cachedFetch("fin-statements-list", () =>
+              financialStatementsService.listStatements(),
+            ),
+          ]),
+        ([analyticsData, periodsData]) => {
           const safePeriods = Array.isArray(periodsData) ? periodsData : [];
           setAnalytics(analyticsData);
           setPeriods(safePeriods);
@@ -127,54 +121,58 @@ export function FinancialStatementsPageContent() {
             const latest = safePeriods[safePeriods.length - 1];
             setSelectedPeriod(`${latest.year}-${latest.month}`);
           }
-        })
-        .catch(() => {
+        },
+        () => {
           setLoadError(true);
-        })
-        .finally(() => {
+        },
+        () => {
           setLoading(false);
-        }),
+        },
+      ),
     [selectedPeriod],
   );
 
   /** 重试 / 导入确认后重新加载：先进入加载态再拉取 */
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(() => {
     setLoading(true);
     setLoadError(false);
-    await fetchData();
+    return fetchData();
   }, [fetchData]);
 
   /** 拉取账期明细；状态只在请求回调中更新，可直接在 effect 中调用 */
   const fetchDetail = useCallback((periodKey: string) => {
     const period = parsePeriodKey(periodKey);
     if (!period) return Promise.resolve();
-    return startRequest(() =>
-      cachedFetch(`fin-statements-detail-${period.year}-${period.month}`, () =>
-        financialStatementsService.getStatementDetail(
-          period.year,
-          period.month,
+    return runAwait(
+      () =>
+        cachedFetch(
+          `fin-statements-detail-${period.year}-${period.month}`,
+          () =>
+            financialStatementsService.getStatementDetail(
+              period.year,
+              period.month,
+            ),
         ),
-      ),
-    )
-      .then((detail) => {
+      (detail) => {
         setCurrentDetail(detail);
-      })
-      .catch(() => {
+      },
+      () => {
         setDetailError(true);
-      })
-      .finally(() => {
+      },
+      () => {
         setDetailLoading(false);
-      });
+      },
+    );
   }, []);
 
   /** 重试时重新加载明细：先重置明细状态再拉取 */
   const loadDetail = useCallback(
-    async (periodKey: string) => {
-      if (!parsePeriodKey(periodKey)) return;
+    (periodKey: string) => {
+      if (!parsePeriodKey(periodKey)) return Promise.resolve();
       setDetailLoading(true);
       setDetailError(false);
       setCurrentDetail(null);
-      await fetchDetail(periodKey);
+      return fetchDetail(periodKey);
     },
     [fetchDetail],
   );

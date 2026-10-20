@@ -51,6 +51,7 @@ import {
   type AiStandaloneTokenRow,
 } from "@/services/ai.service";
 import { cachedFetch, invalidateCache } from "@/lib/api-cache";
+import { runAwait } from "@/lib/run-await";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertTriangle,
@@ -998,26 +999,28 @@ export default function AiSessionsPage() {
     [],
   );
 
-  /** 拉取会话列表；状态只在请求回调中更新，可直接在 effect 中调用 */
+  /** 拉取会话列表；状态只在请求回调中更新，可直接在 effect 中调用（runAwait 与原 await 时序一致） */
   const fetchSessions = useCallback(
     () =>
-      cachedFetch("ai-sessions", () => aiService.getSessions())
-        .then((response) => {
+      runAwait(
+        () => cachedFetch("ai-sessions", () => aiService.getSessions()),
+        (response) => {
           setSessions(response.data || []);
           setNowMs(Date.now());
-        })
-        .catch(() => {
+        },
+        () => {
           toast.error("加载 AI 会话失败");
-        })
-        .finally(() => {
+        },
+        () => {
           setLoading(false);
-        }),
+        },
+      ),
     [],
   );
 
-  const loadSessions = useCallback(async () => {
+  const loadSessions = useCallback(() => {
     setLoading(true);
-    await fetchSessions();
+    return fetchSessions();
   }, [fetchSessions]);
 
   const loadStandaloneTokens = useCallback(async () => {
@@ -1034,47 +1037,50 @@ export default function AiSessionsPage() {
     }
   }, []);
 
-  /** 拉取 Token 统计；状态只在请求回调中更新，可直接在 effect 中调用 */
+  /** 拉取 Token 统计；状态只在请求回调中更新，可直接在 effect 中调用（runAwait 与原 await 时序一致） */
   const fetchTokenStats = useCallback(
     (days: string) =>
-      Promise.resolve()
-        .then(() =>
+      runAwait(
+        () =>
           api.get<ApiResponse<TokenStats>, ApiResponse<TokenStats>>(
             `/ai/token-stats?days=${days}`,
           ),
-        )
-        .then((response) => {
+        (response) => {
           setTokenStats(response.data || null);
-        })
-        .catch(() => {
+        },
+        () => {
           setStatsError(true);
-        })
-        .finally(() => {
+        },
+        () => {
           setStatsLoading(false);
-        }),
+        },
+      ),
     [],
   );
 
   const loadTokenStats = useCallback(
-    async (days: string) => {
+    (days: string) => {
       setStatsLoading(true);
       setStatsError(false);
-      await fetchTokenStats(days);
+      return fetchTokenStats(days);
     },
     [fetchTokenStats],
   );
 
   const loadToolRegistry = useCallback(
     () =>
-      cachedFetch("ai-agent-tool-registry", () =>
-        aiService.getAgentToolRegistry(),
-      )
-        .then((response) => {
+      runAwait(
+        () =>
+          cachedFetch("ai-agent-tool-registry", () =>
+            aiService.getAgentToolRegistry(),
+          ),
+        (response) => {
           setToolRegistry(response.data ?? null);
-        })
-        .catch(() => {
+        },
+        () => {
           setToolRegistry(null);
-        }),
+        },
+      ),
     [],
   );
 

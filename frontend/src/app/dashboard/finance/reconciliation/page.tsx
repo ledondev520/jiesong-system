@@ -18,6 +18,7 @@ import {
 import { ErrorState } from "@/components/ui/data-state";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { clearApiGetCache } from "@/lib/axios";
+import { runAwait } from "@/lib/run-await";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -130,64 +131,72 @@ export default function ReconciliationPage() {
   // fetch*：状态只在请求回调中更新，可直接在 effect 中调用；load*：先重置加载/错误态再拉取（事件中使用）
   const fetchRecon = useCallback(
     () =>
-      getFullReconciliation()
-        .then((result) => {
+      // runAwait 与原 async try/await 时序一致：成功/失败回调落在同一微任务位置
+      runAwait(
+        () => getFullReconciliation(),
+        (result) => {
           setReconData(result);
-        })
-        .catch(() => {
+        },
+        () => {
           setReconError(true);
-        })
-        .finally(() => {
+        },
+        () => {
           setReconLoading(false);
-        }),
+        },
+      ),
     [],
   );
 
-  const loadRecon = useCallback(async () => {
+  const loadRecon = useCallback(() => {
     setReconLoading(true);
     setReconError(false);
-    await fetchRecon();
+    return fetchRecon();
   }, [fetchRecon]);
 
   const fetchUnmatched = useCallback(
     () =>
-      getUnmatchedItems({ page, pageSize, search: search || undefined })
-        .then((result) => {
+      runAwait(
+        () =>
+          getUnmatchedItems({ page, pageSize, search: search || undefined }),
+        (result) => {
           setBankItems(result.bankItems);
           setInvoiceItems(result.invoiceItems);
           setBankTotal(result.bankTotal);
           setInvoiceTotal(result.invoiceTotal);
-        })
-        .catch(() => {
+        },
+        () => {
           setUnmatchedError(true);
-        }),
+        },
+      ),
     [page, pageSize, search],
   );
 
-  const loadUnmatched = useCallback(async () => {
+  const loadUnmatched = useCallback(() => {
     setUnmatchedError(false);
-    await fetchUnmatched();
+    return fetchUnmatched();
   }, [fetchUnmatched]);
 
   const fetchContracts = useCallback(
     () =>
-      getContractsForMatch(contractType, contractSearch || undefined)
-        .then((list) => {
+      runAwait(
+        () => getContractsForMatch(contractType, contractSearch || undefined),
+        (list) => {
           setContracts(list);
-        })
-        .catch(() => {
+        },
+        () => {
           setContractsError(true);
-        })
-        .finally(() => {
+        },
+        () => {
           setContractsLoading(false);
-        }),
+        },
+      ),
     [contractType, contractSearch],
   );
 
-  const loadContracts = useCallback(async () => {
+  const loadContracts = useCallback(() => {
     setContractsLoading(true);
     setContractsError(false);
-    await fetchContracts();
+    return fetchContracts();
   }, [fetchContracts]);
 
   const loadAll = useCallback(async () => {

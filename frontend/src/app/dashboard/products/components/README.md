@@ -2,6 +2,7 @@
 
 - `InventoryTab.tsx`：库存列表通过 `useListUrlState` 从URL读取 inventoryKeyword/inventoryPage/inventoryPageSize，按当前分页/关键词实时读取服务端，单条及批量状态操作不复用旧缓存；保留请求序号保护，避免旧查询覆盖新筛选结果；批量操作结束只触发当前页/关键词刷新，不使用操作开始时的旧筛选
 - `InventoryTab.lifecycle.test.tsx`：覆盖批量入库后刷新、待处理批量操作期间的搜索/翻页切换，以及验货后重新进入库存页面的即时显示
+- `InventoryTab.same-round.test.tsx`：同一轮完成的库存列表与状态更新请求，旧列表不覆盖新状态、提示顺序与原 async try/await 一致
 - 采购/验货来源库存由对应业务自动流转，页面不提供重复手工入出库入口
 
 - `ProductDialog.tsx`：每次打开或切换商品建立独立编辑会话，关闭/ Escape 丢弃未保存内容；名称变化及会话结束让迟到的 HS 建议/详情失效，推荐选择以最新一次为准；当前名称的手动匹配不会在防抖到期时被重复自动查询隐藏，失败后保留错误直到显式重试，改名/重开会重置自动去重标记；保存期间冻结编辑并拦截重复提交，失败保留完整草稿可重试

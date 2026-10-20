@@ -21,6 +21,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { PurchaseContract, PurchaseStatus, PurchaseItem } from "@/types";
 import { purchaseService } from "@/services/purchase.service";
 import { cachedFetch, invalidateCache } from "@/lib/api-cache";
+import { runAwait } from "@/lib/run-await";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuthStore } from "@/store/auth.store";
@@ -378,8 +379,9 @@ export default function ContractsPageContent() {
   // 只发请求并在回调中写状态，可直接在 effect 中调用；加载态由调用方进入
   const fetchPurchaseContracts = useCallback(() => {
     const request = ++purchaseRequest.current;
-    return Promise.resolve()
-      .then(() => {
+    // runAwait 与原 async try/await 时序一致：请求同步发起，成功/失败回调落在同一微任务位置
+    return runAwait(
+      () => {
         const params = {
           page: purchasePage,
           pageSize,
@@ -393,21 +395,22 @@ export default function ContractsPageContent() {
           `purchase-contracts-list-${JSON.stringify(params)}`,
           () => purchaseService.getAll(params),
         );
-      })
-      .then((response) => {
+      },
+      (response) => {
         if (request !== purchaseRequest.current) return;
         setPurchaseContracts(response.data?.items || []);
         setPurchaseTotal(response.data?.pagination?.total ?? 0);
         if (response.data?.summary) setListSummary(response.data.summary);
-      })
-      .catch(() => {
+      },
+      () => {
         if (request !== purchaseRequest.current) return;
         setPurchaseError(true);
         toast.error("加载采购合同失败");
-      })
-      .finally(() => {
+      },
+      () => {
         if (request === purchaseRequest.current) setPurchaseLoading(false);
-      });
+      },
+    );
   }, [
     purchasePage,
     pageSize,
@@ -417,10 +420,10 @@ export default function ContractsPageContent() {
   ]);
 
   // 手动重新加载（重试、导入完成后）
-  const loadPurchaseContracts = async () => {
+  const loadPurchaseContracts = () => {
     setPurchaseLoading(true);
     setPurchaseError(false);
-    await fetchPurchaseContracts();
+    return fetchPurchaseContracts();
   };
 
   // 查询条件变化时进入加载态（渲染期按输入变化调整状态，替代 effect 内 setState）

@@ -73,6 +73,7 @@ import {
 import { clearApiGetCache } from "@/lib/axios";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { cachedFetch, invalidateCache } from "@/lib/api-cache";
+import { runAwait } from "@/lib/run-await";
 import { errorLogger } from "@/lib/error-logger";
 import { PageHeader } from "@/components/layout/PageHeader";
 import {
@@ -131,14 +132,6 @@ interface ReceivableContract {
 interface FinanceStats {
   payable: { total: number; paid: number; unpaid: number };
   receivable: { total: number; received: number; unreceived: number };
-}
-
-/**
- * 与原 `try { await fn() } catch` 等价地启动请求：fn 同步抛错或返回非 Promise 值时，
- * 也会进入返回的 Promise 链并由后续 .catch/.finally 处理
- */
-function startRequest<T>(fn: () => T | PromiseLike<T>): Promise<T> {
-  return new Promise<T>((resolve) => resolve(fn()));
 }
 
 /**
@@ -221,35 +214,35 @@ function PaymentsPageContent() {
   // 1. 加载统计数据
   const fetchStats = useCallback(
     () =>
-      startRequest(() =>
-        cachedFetch("fin-stats", () => financeService.getStats()),
-      )
-        .then((data) => {
+      runAwait(
+        () => cachedFetch("fin-stats", () => financeService.getStats()),
+        (data) => {
           setStats(data);
-        })
-        .catch(() => {
+        },
+        () => {
           errorLogger.error("Payments", "获取财务统计失败");
-        }),
+        },
+      ),
     [],
   );
 
   // 2. 加载应付账款（带缓存）；状态只在请求回调中更新，可直接在 effect 中调用
   const requestPayables = useCallback(
     () =>
-      startRequest(() =>
-        cachedFetch(
-          `fin-payables-${page}-${pageSize}-${keyword}-${pastDelivery}`,
-          () =>
-            financeService.getPayables({
-              page,
-              pageSize,
-              search: keyword,
-              outstandingOnly: true,
-              pastDelivery,
-            }),
-        ),
-      )
-        .then((response) => {
+      runAwait(
+        () =>
+          cachedFetch(
+            `fin-payables-${page}-${pageSize}-${keyword}-${pastDelivery}`,
+            () =>
+              financeService.getPayables({
+                page,
+                pageSize,
+                search: keyword,
+                outstandingOnly: true,
+                pastDelivery,
+              }),
+          ),
+        (response) => {
           setPayableTotal(
             response.data?.pagination?.total ??
               response.data?.items?.length ??
@@ -268,54 +261,57 @@ function PaymentsPageContent() {
               supplier: item.supplier,
             })),
           );
-        })
-        .catch(() => {
+        },
+        () => {
           if (resetPendingRef.current !== "payable") setPayableError(true);
           toast.error("加载应付账款失败");
-        })
-        .finally(() => {
+        },
+        () => {
           if (resetPendingRef.current !== "payable") setPayableLoading(false);
-        }),
+        },
+      ),
     [page, pageSize, keyword, pastDelivery],
   );
 
   /** 事件中加载应付账款：先进入加载态再拉取 */
-  const fetchPayables = useCallback(async () => {
+  const fetchPayables = useCallback(() => {
     setPayableLoading(true);
     setPayableError(false);
-    await requestPayables();
+    return requestPayables();
   }, [requestPayables]);
 
   // 3a. 加载待分配收款
   const fetchUnallocated = useCallback(
     () =>
-      startRequest(() => financeService.getUnallocatedPayments())
-        .then((res) => {
+      runAwait(
+        () => financeService.getUnallocatedPayments(),
+        (res) => {
           setUnallocatedPayments(res.data || []);
-        })
-        .catch(() => {
+        },
+        () => {
           setAuxiliaryError(true);
-        }),
+        },
+      ),
     [],
   );
 
   // 3. 加载应收账款（带缓存）；状态只在请求回调中更新，可直接在 effect 中调用
   const requestReceivables = useCallback(
     () =>
-      startRequest(() =>
-        cachedFetch(
-          `fin-receivables-${page}-${pageSize}-${keyword}-${overdue}`,
-          () =>
-            financeService.getReceivables({
-              page,
-              pageSize,
-              search: keyword,
-              outstandingOnly: true,
-              overdue,
-            }),
-        ),
-      )
-        .then((response) => {
+      runAwait(
+        () =>
+          cachedFetch(
+            `fin-receivables-${page}-${pageSize}-${keyword}-${overdue}`,
+            () =>
+              financeService.getReceivables({
+                page,
+                pageSize,
+                search: keyword,
+                outstandingOnly: true,
+                overdue,
+              }),
+          ),
+        (response) => {
           setReceivableTotal(
             response.data?.pagination?.total ??
               response.data?.items?.length ??
@@ -342,24 +338,25 @@ function PaymentsPageContent() {
               items: item.items,
             })),
           );
-        })
-        .catch(() => {
+        },
+        () => {
           if (resetPendingRef.current !== "receivable")
             setReceivableError(true);
           toast.error("加载应收账款失败");
-        })
-        .finally(() => {
+        },
+        () => {
           if (resetPendingRef.current !== "receivable")
             setReceivableLoading(false);
-        }),
+        },
+      ),
     [page, pageSize, keyword, overdue],
   );
 
   /** 事件中加载应收账款：先进入加载态再拉取 */
-  const fetchReceivables = useCallback(async () => {
+  const fetchReceivables = useCallback(() => {
     setReceivableLoading(true);
     setReceivableError(false);
-    await requestReceivables();
+    return requestReceivables();
   }, [requestReceivables]);
 
   const fetchReconciliation = useCallback(async (force = false) => {
