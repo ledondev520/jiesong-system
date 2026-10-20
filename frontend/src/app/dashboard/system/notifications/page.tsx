@@ -6,17 +6,23 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
-import { notificationLink } from '@/lib/notification-link';
-import { SortableTableHead } from '@/components/ui/sortable-table-head';
-import { useTableSort } from '@/lib/hooks/useTableSort';
-import { CheckCircle2, Search, X } from 'lucide-react';
-import { PageSizeSelect } from '@/components/ui/page-size-select';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { notificationLink } from "@/lib/notification-link";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { useTableSort } from "@/lib/hooks/useTableSort";
+import { CheckCircle2, Search, X } from "lucide-react";
+import { PageSizeSelect } from "@/components/ui/page-size-select";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -24,45 +30,50 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+} from "@/components/ui/table";
+import { PageHeader } from "@/components/layout/PageHeader";
+import {
+  ModuleTabHeader,
+  ADMIN_TABS,
+} from "@/components/layout/ModuleTabHeader";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   getSystemNotifications,
   markSystemNotificationRead,
   SystemNotificationItem,
-} from '@/services/system.service';
-import { toast } from 'sonner';
-import { formatDateTime } from '@/lib/date-format';
-import { MobileListCard } from '@/components/mobile';
+} from "@/services/system.service";
+import { toast } from "sonner";
+import { formatDateTime } from "@/lib/date-format";
+import { MobileListCard } from "@/components/mobile";
 
-type NotificationFilter = 'all' | 'unread';
+type NotificationFilter = "all" | "unread";
 
 const typeLabelMap: Record<string, string> = {
-  SYSTEM: '系统',
-  IMPORT: '导入',
-  CONTRACT: '合同',
-  PAYMENT: '财务',
-  AGENT_CREDENTIAL: 'Agent 凭证',
+  SYSTEM: "系统",
+  IMPORT: "导入",
+  CONTRACT: "合同",
+  PAYMENT: "财务",
+  AGENT_CREDENTIAL: "Agent 凭证",
 };
 
-const getTypeLabel = (type: string) => typeLabelMap[type] || type || '-';
+const getTypeLabel = (type: string) => typeLabelMap[type] || type || "-";
 
 export default function SystemNotificationsPage() {
   const requestId = useRef(0);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [notifications, setNotifications] = useState<SystemNotificationItem[]>([]);
-  const [filter, setFilter] = useState<NotificationFilter>('all');
+  const [notifications, setNotifications] = useState<SystemNotificationItem[]>(
+    [],
+  );
+  const [filter, setFilter] = useState<NotificationFilter>("all");
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [keyword, setKeyword] = useState('');
+  const [keyword, setKeyword] = useState("");
 
   const loadNotifications = useCallback(async () => {
     const currentRequest = ++requestId.current;
@@ -73,7 +84,7 @@ export default function SystemNotificationsPage() {
         page: currentPage,
         pageSize,
         keyword: keyword.trim() || undefined,
-        unreadOnly: filter === 'unread',
+        unreadOnly: filter === "unread",
       });
       if (currentRequest !== requestId.current) return;
       const items = response.data?.items || [];
@@ -83,7 +94,7 @@ export default function SystemNotificationsPage() {
     } catch {
       if (currentRequest !== requestId.current) return;
       setError(true);
-      toast.error('加载通知失败');
+      toast.error("加载通知失败");
     } finally {
       if (currentRequest === requestId.current) setLoading(false);
     }
@@ -97,16 +108,16 @@ export default function SystemNotificationsPage() {
     notifications,
     useCallback((item, key) => {
       switch (key) {
-        case 'createdAt':
+        case "createdAt":
           return item.createdAt ? new Date(item.createdAt).getTime() : null;
-        case 'type':
+        case "type":
           return getTypeLabel(item.type);
-        case 'title':
-          return item.title ?? '';
+        case "title":
+          return item.title ?? "";
         default:
           return null;
       }
-    }, [])
+    }, []),
   );
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -117,9 +128,9 @@ export default function SystemNotificationsPage() {
     try {
       await markSystemNotificationRead(id);
       await loadNotifications();
-      toast.success('已标记为已读');
+      toast.success("已标记为已读");
     } catch {
-      toast.error('标记失败');
+      toast.error("标记失败");
     } finally {
       setMarkingId(null);
     }
@@ -134,16 +145,22 @@ export default function SystemNotificationsPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button
-              variant={filter === 'all' ? 'default' : 'outline'}
+              variant={filter === "all" ? "default" : "outline"}
               size="sm"
-              onClick={() => { setFilter('all'); setCurrentPage(1); }}
+              onClick={() => {
+                setFilter("all");
+                setCurrentPage(1);
+              }}
             >
               全部通知
             </Button>
             <Button
-              variant={filter === 'unread' ? 'default' : 'outline'}
+              variant={filter === "unread" ? "default" : "outline"}
               size="sm"
-              onClick={() => { setFilter('unread'); setCurrentPage(1); }}
+              onClick={() => {
+                setFilter("unread");
+                setCurrentPage(1);
+              }}
             >
               仅未读
             </Button>
@@ -158,7 +175,8 @@ export default function SystemNotificationsPage() {
         <CardHeader>
           <CardTitle>通知列表</CardTitle>
           <CardDescription>
-            服务端搜索全部历史通知；排序仅作用于当前页。共 {total} 条通知，未读 {unreadCount} 条
+            服务端搜索全部历史通知；排序仅作用于当前页。共 {total} 条通知，未读{" "}
+            {unreadCount} 条
           </CardDescription>
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[200px]">
@@ -178,7 +196,7 @@ export default function SystemNotificationsPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  setKeyword('');
+                  setKeyword("");
                   setCurrentPage(1);
                 }}
               >
@@ -189,33 +207,61 @@ export default function SystemNotificationsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {error && <div role="alert" className="mb-4 rounded-md border border-destructive/30 p-3 text-sm text-destructive">通知读取失败，保留已加载结果。<Button variant="outline" size="sm" onClick={loadNotifications}>重试</Button></div>}
+          {error && (
+            <div
+              role="alert"
+              className="mb-4 rounded-md border border-destructive/30 p-3 text-sm text-destructive"
+            >
+              通知读取失败，保留已加载结果。
+              <Button variant="outline" size="sm" onClick={loadNotifications}>
+                重试
+              </Button>
+            </div>
+          )}
           <div className="md:hidden space-y-3">
             {loading ? (
-              <div className="surface-panel py-12 text-center text-sm text-muted-foreground">加载中...</div>
+              <div className="surface-panel py-12 text-center text-sm text-muted-foreground">
+                加载中...
+              </div>
             ) : sort.sortedData.length === 0 ? (
-              <div className="surface-panel py-12 text-center text-sm text-muted-foreground">暂无通知。</div>
+              <div className="surface-panel py-12 text-center text-sm text-muted-foreground">
+                暂无通知。
+              </div>
             ) : (
               pagedNotifications.map((item) => {
-                const contentPreview = item.content
-                  ? item.content
-                  : '-';
+                const contentPreview = item.content ? item.content : "-";
                 return (
                   <MobileListCard
                     key={item.id}
-                    title={item.title || '（无标题）'}
+                    title={item.title || "（无标题）"}
                     subtitle={contentPreview}
                     badge={
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline">{getTypeLabel(item.type)}</Badge>
-                        <Badge variant={item.isRead ? 'secondary' : 'default'}>
-                          {item.isRead ? '已读' : '未读'}
+                        <Badge variant="outline">
+                          {getTypeLabel(item.type)}
+                        </Badge>
+                        <Badge variant={item.isRead ? "secondary" : "default"}>
+                          {item.isRead ? "已读" : "未读"}
                         </Badge>
                       </div>
                     }
                     fields={[
-                      { label: '时间', value: formatDateTime(item.createdAt) },
-                      ...(notificationLink(item) ? [{ label: '业务明细', value: <Link className="text-primary underline" href={notificationLink(item)!}>打开业务明细</Link> }] : []),
+                      { label: "时间", value: formatDateTime(item.createdAt) },
+                      ...(notificationLink(item)
+                        ? [
+                            {
+                              label: "业务明细",
+                              value: (
+                                <Link
+                                  className="text-primary underline"
+                                  href={notificationLink(item)!}
+                                >
+                                  打开业务明细
+                                </Link>
+                              ),
+                            },
+                          ]
+                        : []),
                     ]}
                     action={
                       !item.isRead ? (
@@ -227,7 +273,7 @@ export default function SystemNotificationsPage() {
                           onClick={() => handleMarkRead(item.id)}
                         >
                           <CheckCircle2 className="mr-1 h-4 w-4" />
-                          {markingId === item.id ? '处理中...' : '标记已读'}
+                          {markingId === item.id ? "处理中..." : "标记已读"}
                         </Button>
                       ) : undefined
                     }
@@ -272,26 +318,49 @@ export default function SystemNotificationsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">加载中...</TableCell>
+                    <TableCell
+                      colSpan={6}
+                      className="py-12 text-center text-muted-foreground"
+                    >
+                      加载中...
+                    </TableCell>
                   </TableRow>
                 ) : sort.sortedData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">暂无通知。</TableCell>
+                    <TableCell
+                      colSpan={6}
+                      className="py-12 text-center text-muted-foreground"
+                    >
+                      暂无通知。
+                    </TableCell>
                   </TableRow>
                 ) : (
                   pagedNotifications.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>{formatDateTime(item.createdAt)}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{getTypeLabel(item.type)}</Badge>
-                      </TableCell>
-                      <TableCell>{notificationLink(item) ? <Link className="text-primary underline" href={notificationLink(item)!}>{item.title || '打开业务明细'}</Link> : item.title || '-'}</TableCell>
-                      <TableCell className="max-w-[420px] whitespace-pre-wrap break-words text-sm text-muted-foreground">
-                        {item.content || '-'}
+                        <Badge variant="outline">
+                          {getTypeLabel(item.type)}
+                        </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={item.isRead ? 'secondary' : 'default'}>
-                          {item.isRead ? '已读' : '未读'}
+                        {notificationLink(item) ? (
+                          <Link
+                            className="text-primary underline"
+                            href={notificationLink(item)!}
+                          >
+                            {item.title || "打开业务明细"}
+                          </Link>
+                        ) : (
+                          item.title || "-"
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-[420px] whitespace-pre-wrap break-words text-sm text-muted-foreground">
+                        {item.content || "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={item.isRead ? "secondary" : "default"}>
+                          {item.isRead ? "已读" : "未读"}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -303,10 +372,12 @@ export default function SystemNotificationsPage() {
                             onClick={() => handleMarkRead(item.id)}
                           >
                             <CheckCircle2 className="mr-1 h-4 w-4" />
-                            {markingId === item.id ? '处理中...' : '标记已读'}
+                            {markingId === item.id ? "处理中..." : "标记已读"}
                           </Button>
                         ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
+                          <span className="text-xs text-muted-foreground">
+                            -
+                          </span>
                         )}
                       </TableCell>
                     </TableRow>
@@ -317,11 +388,17 @@ export default function SystemNotificationsPage() {
           </div>
           {/* 分页控制 */}
           <div className="mt-4 flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span>共 {total} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
+            <span>
+              共 {total} 条
+              {totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ""}
+            </span>
             <div className="flex items-center gap-2">
               <PageSizeSelect
                 value={pageSize}
-                onChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+                onChange={(size) => {
+                  setPageSize(size);
+                  setCurrentPage(1);
+                }}
               />
               <Button
                 variant="outline"
@@ -334,7 +411,9 @@ export default function SystemNotificationsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
                 disabled={currentPage === totalPages || totalPages <= 1}
               >
                 下一页
