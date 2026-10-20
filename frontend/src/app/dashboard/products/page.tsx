@@ -12,7 +12,14 @@ import {
   BusinessWrite,
   useBusinessReadOnly,
 } from "@/lib/hooks/useBusinessReadOnly";
-import { Suspense, useState, useEffect, useCallback, useRef } from "react";
+import {
+  Suspense,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useRef,
+} from "react";
 import { listUrlFields, useListUrlState } from "@/lib/hooks/useListUrlState";
 import { useSearchParams } from "next/navigation";
 import { Product } from "@/types";
@@ -107,6 +114,7 @@ function ProductsPageContent() {
   const latestRequest = useRef(0);
   const dialogSession = useRef(0);
   const [reloadVersion, setReloadVersion] = useState(0);
+  const resetPendingRef = useRef(false);
 
   /** 拉取商品列表；状态只在请求回调中更新，可直接在 effect 中调用 */
   const fetchProducts = useCallback(() => {
@@ -129,11 +137,12 @@ function ProductsPageContent() {
       })
       .catch(() => {
         if (request !== latestRequest.current) return;
-        setLoadError(true);
+        if (!resetPendingRef.current) setLoadError(true);
         toast.error("加载商品失败");
       })
       .finally(() => {
-        if (request === latestRequest.current) setLoading(false);
+        if (request === latestRequest.current && !resetPendingRef.current)
+          setLoading(false);
       });
   }, [currentPage, pageSize, debouncedKeyword, lowStock]);
 
@@ -179,7 +188,13 @@ function ProductsPageContent() {
     setLoadError(false);
   }
 
+  // 加载态已在渲染期重置；原实现在 passive effect 中才重置。为保持原语义：从提交（layout effect）到 passive effect
+  // 发起新请求之间到达的旧响应，不写入加载/错误态（原实现中这些写入会被随后 effect 的重置覆盖）。
+  useLayoutEffect(() => {
+    resetPendingRef.current = true;
+  }, [fetchProducts, reloadVersion]);
   useEffect(() => {
+    resetPendingRef.current = false;
     void fetchProducts();
   }, [fetchProducts, reloadVersion]);
 

@@ -10,7 +10,13 @@
 
 import { listUrlFields, useListUrlState } from "@/lib/hooks/useListUrlState";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
-import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useRef,
+} from "react";
 import { Inventory, InventoryStatus } from "@/types";
 import { inventoryService } from "@/services/inventory.service";
 import {
@@ -76,6 +82,7 @@ export function InventoryTab() {
   // 库存状态
   const [inventory, setInventory] = useState<Inventory[]>([]);
   const inventoryRequest = useRef(0);
+  const resetPendingRef = useRef(false);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -132,11 +139,12 @@ export function InventoryTab() {
         })
         .catch(() => {
           if (request !== inventoryRequest.current) return;
-          setLoadError(true);
+          if (!resetPendingRef.current) setLoadError(true);
           toast.error("加载库存失败");
         })
         .finally(() => {
-          if (request === inventoryRequest.current) setLoading(false);
+          if (request === inventoryRequest.current && !resetPendingRef.current)
+            setLoading(false);
         });
     },
     [currentPage, pageSize],
@@ -167,8 +175,15 @@ export function InventoryTab() {
     setLoadError(false);
   }
 
+  // 加载态已在渲染期重置；原实现在 passive effect 中才重置。为保持原语义：从提交（layout effect）到 passive effect
+  // 发起新请求之间到达的旧响应，不写入加载/错误态（原实现中这些写入会被随后 effect 的重置覆盖）。
+  useLayoutEffect(() => {
+    resetPendingRef.current = true;
+  }, [debouncedKeyword, fetchInventory, refreshVersion]);
+
   // 操作完成时只发出刷新信号；效果使用最新筛选，避免旧操作覆盖新查询。
   useEffect(() => {
+    resetPendingRef.current = false;
     void fetchInventory(debouncedKeyword);
     return () => {
       inventoryRequest.current += 1;

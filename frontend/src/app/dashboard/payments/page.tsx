@@ -13,6 +13,7 @@ import {
   Suspense,
   useState,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useCallback,
@@ -214,6 +215,8 @@ function PaymentsPageContent() {
   const [incomingData, setIncomingData] =
     useState<IncomingSummaryResult | null>(null);
   const reconciliationLoadedRef = useRef(false);
+  /** 当前 Tab 列表的加载态已在渲染期重置、但 passive effect 尚未发起新请求时，记录该 Tab（见下方 layout effect） */
+  const resetPendingRef = useRef<"payable" | "receivable" | null>(null);
 
   // 1. 加载统计数据
   const fetchStats = useCallback(
@@ -267,11 +270,11 @@ function PaymentsPageContent() {
           );
         })
         .catch(() => {
-          setPayableError(true);
+          if (resetPendingRef.current !== "payable") setPayableError(true);
           toast.error("加载应付账款失败");
         })
         .finally(() => {
-          setPayableLoading(false);
+          if (resetPendingRef.current !== "payable") setPayableLoading(false);
         }),
     [page, pageSize, keyword, pastDelivery],
   );
@@ -341,11 +344,13 @@ function PaymentsPageContent() {
           );
         })
         .catch(() => {
-          setReceivableError(true);
+          if (resetPendingRef.current !== "receivable")
+            setReceivableError(true);
           toast.error("加载应收账款失败");
         })
         .finally(() => {
-          setReceivableLoading(false);
+          if (resetPendingRef.current !== "receivable")
+            setReceivableLoading(false);
         }),
     [page, pageSize, keyword, overdue],
   );
@@ -463,7 +468,15 @@ function PaymentsPageContent() {
     void fetchUnallocated();
   }, [fetchStats, fetchUnallocated]);
 
+  // 加载态已在渲染期重置；原实现在 passive effect 中才重置。为保持原语义：从提交（layout effect）到 passive effect
+  // 发起新请求之间到达的当前 Tab 列表旧响应，不写入该 Tab 的加载/错误态（原实现中这些写入会被随后 effect 的重置覆盖）。
+  useLayoutEffect(() => {
+    resetPendingRef.current =
+      activeTab === "receivable" ? "receivable" : "payable";
+  }, [activeTab, requestPayableData, requestReceivableData]);
+
   useEffect(() => {
+    resetPendingRef.current = null;
     if (activeTab === "receivable") {
       void requestReceivableData();
       return;
