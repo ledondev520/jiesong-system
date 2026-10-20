@@ -1,6 +1,6 @@
 /**
  * Input: 系统控制器
- * Output: 系统配置管理路由
+ * Output: 系统配置管理路由；CSV/xlsx 导入经内存上传，不在磁盘留下文件
  * Pos: 系统路由，处理系统配置和日志查询
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -11,7 +11,7 @@ const systemController = require('../controllers/systemController');
 const pricingController = require('../controllers/system/pricingController');
 const { authenticate, roleAuth } = require('../middleware/auth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
-const { upload } = require('../utils/upload');
+const { tabularUpload } = require('../utils/tabularImport');
 const { withAuditLog } = require('../middleware/auditLog');
 
 const router = Router();
@@ -131,7 +131,7 @@ router.delete('/customs-brokers/:id', roleAuth('ADMIN'), withIdValidation, withA
 ));
 
 // POST /api/v1/system/import - 导入CSV数据（仅管理员）
-router.post('/import', roleAuth('ADMIN'), upload.single('file'), withAuditLog(
+router.post('/import', roleAuth('ADMIN'), tabularUpload.single('file'), withAuditLog(
   {
     entity: 'DataImport',
     action: 'IMPORT',

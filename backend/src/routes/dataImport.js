@@ -1,15 +1,13 @@
 /**
- * Input: dataImportController、multer中间件
- * Output: CSV/xlsx 数据导入API路由
+ * Input: dataImportController、tabularImport 共享内存上传中间件
+ * Output: CSV/xlsx 数据导入API路由；上传仅在内存中解析，不落盘
  * Pos: 数据导入路由定义
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-const { acceptsTabularFile } = require('../utils/tabularImport');
-const { createError } = require('../middleware/errorHandler');
+const { tabularUpload } = require('../utils/tabularImport');
 const express = require('express');
-const multer = require('multer');
 const router = express.Router();
 const catalog = require('../controllers/catalogImportController');
 const dataImportController = require('../controllers/dataImportController');
@@ -17,17 +15,8 @@ const { authenticate, roleAuth } = require('../middleware/auth');
 const systemController = require('../controllers/systemController');
 const { withAuditLog } = require('../middleware/auditLog');
 
-// 配置multer内存存储
-const memoryUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB限制
-  },
-  fileFilter: (req, file, cb) => {
-    if (acceptsTabularFile(file.originalname)) cb(null, true);
-    else cb(createError('只支持 CSV 或 xlsx 文件', 400));
-  },
-});
+// CSV/xlsx 内存上传（10MB，仅 .csv/.xlsx），与 /system/import 共用同一配置
+const memoryUpload = tabularUpload;
 
 // 所有路由需要认证
 router.use(authenticate);

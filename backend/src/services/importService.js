@@ -1,6 +1,6 @@
 /**
  * Input: 内存CSV/xlsx字节与文件名、Prisma客户端
- * Output: 按行事务导入结果、重名冲突与真实失败统计
+ * Output: 按行事务导入结果、重名冲突与真实失败统计；导入记录文件名仅作展示（去控制字符、取末段、限长），从不作为文件路径
  * Pos: 数据导入服务，处理CSV/xlsx历史数据导入
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -77,6 +77,16 @@ const resolveImportStatus = (failedRows) => (
 );
 
 /**
+ * 职责：把客户端上传文件名归一为仅供展示的记录名（从不用于文件系统访问）
+ * 去除控制字符/空字节，并同时按 / 与 \\ 截取最后一段，限制长度。
+ * @param {unknown} name - multer originalname
+ * @returns {string} 记录用文件名
+ */
+const toImportRecordFileName = (name) => (
+  String(name ?? '').replace(/[\u0000-\u001f\u007f]/g, '').split(/[\\/]/).pop().slice(0, 255)
+);
+
+/**
  * 职责：导入CSV数据到数据库
  * 思路：
  * 1. 解析CSV文件
@@ -103,7 +113,7 @@ const importCSVData = async (file, userId) => {
   // 创建导入记录
   const importRecord = await prisma.importRecord.create({
     data: {
-      fileName: file.originalname.split('/').pop(),
+      fileName: toImportRecordFileName(file.originalname),
       totalRows: data.length,
       successRows: 0,
       failedRows: 0,
@@ -334,6 +344,7 @@ const getImportRecords = async (page = 1, pageSize = 20, filters = {}) => {
 };
 
 module.exports = {
+  toImportRecordFileName,
   parseCSV,
   resolveImportStatus,
   importCSVData,

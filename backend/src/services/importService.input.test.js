@@ -68,3 +68,82 @@ test('normal in-memory CSV and xlsx imports pass', async t => {
     });
   }
 });
+
+// Traversal-shaped payloads: the service must never treat them as paths.
+const TRAVERSAL_PAYLOADS = [
+  ['dot-dot slash', '../../../../etc/passwd'],
+  ['dot-dot backslash', '..\\..\\..\\windows\\win.ini'],
+  ['absolute posix path', '/etc/passwd'],
+  ['absolute windows path', 'C:\\Windows\\win.ini'],
+  ['percent-encoded traversal', '%2e%2e%2f%2e%2e%2fetc%2fpasswd'],
+  ['double-encoded traversal', '..%252f..%252fetc%252fpasswd'],
+  ['null byte suffix', 'synthetic.csv\u0000../../etc/passwd'],
+  ['file URL', 'file:///etc/passwd'],
+];
+
+function spyFilesystemReads(t) {
+  return ['readFileSync', 'openSync', 'createReadStream', 'readFile', 'open'].map(name => t.mock.method(fs, name));
+}
+
+test('traversal payloads as string sources are rejected without any filesystem read', async t => {
+  for (const [label, source] of TRAVERSAL_PAYLOADS) {
+    await t.test(label, async t => {
+      const create = stubDatabase(t);
+      const reads = spyFilesystemReads(t);
+      const promiseReads = ['readFile', 'open'].map(name => t.mock.method(fs.promises, name));
+      await assert.rejects(importCSVData(source, 'synthetic-admin'), error => {
+        assert.equal(error.statusCode, 400);
+        assert.match(error.message, /内存/);
+        return true;
+      });
+      for (const spy of [...reads, ...promiseReads]) assert.equal(spy.mock.callCount(), 0);
+      assert.equal(create.mock.callCount(), 0);
+    });
+  }
+});
+
+test('traversal payloads as disk-upload paths are rejected even with a safe-looking name', async t => {
+  for (const [label, target] of TRAVERSAL_PAYLOADS) {
+    await t.test(label, async t => {
+      const create = stubDatabase(t);
+      const reads = spyFilesystemReads(t);
+      await assert.rejects(importCSVData({ originalname: 'synthetic.csv', path: target }, 'synthetic-admin'), error => {
+        assert.equal(error.statusCode, 400);
+        return true;
+      });
+      for (const spy of reads) assert.equal(spy.mock.callCount(), 0);
+      assert.equal(create.mock.callCount(), 0);
+    });
+  }
+});
+
+test('traversal-shaped originalname only labels the in-memory import record', async t => {
+  const cases = [
+    ['../../../../tmp/evil.csv', 'evil.csv'],
+    ['..\\..\\evil.csv', 'evil.csv'],
+    ['/etc/cron.d/evil.csv', 'evil.csv'],
+    ['C:\\Windows\\evil.csv', 'evil.csv'],
+    ['..%2F..%2Fevil.csv', '..%2F..%2Fevil.csv'],
+    ['evil\u0000.csv', 'evil.csv'],
+    ['../evil\u0000/../x.csv', 'x.csv'],
+  ];
+  for (const [originalname, expected] of cases) {
+    await t.test(JSON.stringify(originalname), async t => {
+      const create = stubDatabase(t);
+      const reads = spyFilesystemReads(t);
+      const result = await importCSVData({ originalname, buffer: csv }, 'synthetic-admin');
+      assert.equal(result.successRows, 1);
+      for (const spy of reads) assert.equal(spy.mock.callCount(), 0);
+      const { fileName } = create.mock.calls[0].arguments[0].data;
+      assert.equal(fileName, expected);
+      assert.doesNotMatch(fileName, /[\\/\u0000]/);
+    });
+  }
+});
+
+test('toImportRecordFileName bounds length and tolerates missing names', () => {
+  const { toImportRecordFileName } = require('./importService');
+  assert.equal(toImportRecordFileName(undefined), '');
+  assert.equal(toImportRecordFileName(`${'a'.repeat(400)}.csv`).length, 255);
+  assert.equal(toImportRecordFileName('dir/sub\\name.xlsx'), 'name.xlsx');
+});

@@ -1,10 +1,11 @@
 /**
  * Input: uploaded CSV/xlsx bytes
- * Output: string-valued rows and validated headers
- * Pos: shared import boundary; never evaluates workbook formulas
+ * Output: string-valued rows and validated headers; shared in-memory multer upload for CSV/xlsx imports
+ * Pos: shared import boundary; never evaluates workbook formulas and never writes uploads to disk
  */
 const path = require('node:path');
 const ExcelJS = require('exceljs');
+const multer = require('multer');
 const Papa = require('papaparse');
 const JSZip = require('jszip');
 const { SaxesParser } = require('saxes');
@@ -14,6 +15,18 @@ const { createError } = require('../middleware/errorHandler');
 const MAX_ROWS = 5000;
 const MAX_COLUMNS = 100;
 const acceptsTabularFile = name => /\.(csv|xlsx)$/i.test(name || '');
+
+// In-memory only: the client filename is used for the extension check and the
+// import-record label, never for fs/path access, so traversal, absolute,
+// percent-encoded or NUL-byte names cannot reach the filesystem.
+const tabularUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (acceptsTabularFile(file.originalname)) cb(null, true);
+    else cb(createError('只支持 CSV 或 xlsx 文件', 400));
+  },
+});
 
 // Check dimensions before ExcelJS expands sparse arrays, columns or merged regions.
 function workbookXmlGuard(name) {
@@ -113,4 +126,4 @@ async function parseTabularFile({ originalname, buffer }) {
   return { headers, data, errors: [] };
 }
 
-module.exports = { parseTabularFile, acceptsTabularFile, MAX_ROWS };
+module.exports = { parseTabularFile, acceptsTabularFile, tabularUpload, MAX_ROWS };
