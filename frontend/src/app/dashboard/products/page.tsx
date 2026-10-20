@@ -12,7 +12,14 @@ import {
   BusinessWrite,
   useBusinessReadOnly,
 } from "@/lib/hooks/useBusinessReadOnly";
-import { Suspense, useState, useEffect, useCallback, useRef } from "react";
+import {
+  Suspense,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useRef,
+} from "react";
 import { listUrlFields, useListUrlState } from "@/lib/hooks/useListUrlState";
 import { useSearchParams } from "next/navigation";
 import { Product } from "@/types";
@@ -72,6 +79,14 @@ function useDebouncedValue<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
+/**
+ * 与原 `try { await fn() } catch` 等价地启动请求：fn 同步抛错或返回非 Promise 值时，
+ * 也会进入返回的 Promise 链并由后续 .catch/.finally 处理
+ */
+function startRequest<T>(fn: () => T | PromiseLike<T>): Promise<T> {
+  return new Promise<T>((resolve) => resolve(fn()));
+}
+
 // 默认每页条数（由 PageSizeSelect 组件控制）
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -99,45 +114,89 @@ function ProductsPageContent() {
   const latestRequest = useRef(0);
   const dialogSession = useRef(0);
   const [reloadVersion, setReloadVersion] = useState(0);
+  const resetPendingRef = useRef(false);
 
-  const loadProducts = useCallback(async () => {
+  /** 拉取商品列表；状态只在请求回调中更新，可直接在 effect 中调用 */
+  const fetchProducts = useCallback(() => {
     const request = ++latestRequest.current;
-    setLoading(true);
-    setLoadError(false);
-    try {
-      const response = await productService.getAll({
+    return startRequest(() =>
+      productService.getAll({
         page: currentPage,
         pageSize,
         keyword: debouncedKeyword || undefined,
         lite: true,
         ...(lowStock ? { lowStock: true } : {}),
+      }),
+    )
+      .then((response) => {
+        if (request !== latestRequest.current) return;
+        setProducts(response.data?.items || []);
+        setTotal(
+          response.data?.pagination?.total ?? response.data?.items?.length ?? 0,
+        );
+      })
+      .catch(() => {
+        if (request !== latestRequest.current) return;
+        if (!resetPendingRef.current) setLoadError(true);
+        toast.error("加载商品失败");
+      })
+      .finally(() => {
+        if (request === latestRequest.current && !resetPendingRef.current)
+          setLoading(false);
       });
-      if (request !== latestRequest.current) return;
-      setProducts(response.data?.items || []);
-      setTotal(
-        response.data?.pagination?.total ?? response.data?.items?.length ?? 0,
-      );
-    } catch {
-      if (request !== latestRequest.current) return;
-      setLoadError(true);
-      toast.error("加载商品失败");
-    } finally {
-      if (request === latestRequest.current) setLoading(false);
-    }
   }, [currentPage, pageSize, debouncedKeyword, lowStock]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedKeyword, lowStock]);
-  useEffect(() => {
-    void loadProducts();
-  }, [loadProducts, reloadVersion]);
-  useEffect(() => {
+  /** 手动重试 / 保存后重新加载：先进入加载态再拉取 */
+  const loadProducts = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    await fetchProducts();
+  }, [fetchProducts]);
+
+  // 以下均为渲染期按输入变化调整状态（替代 effect 内 setState）：
+  // URL 关键词 / 低库存参数变化时同步到本地筛选
+  const [prevInitialKeyword, setPrevInitialKeyword] = useState(initialKeyword);
+  if (prevInitialKeyword !== initialKeyword) {
+    setPrevInitialKeyword(initialKeyword);
     setKeyword(initialKeyword);
-  }, [initialKeyword]);
-  useEffect(() => {
+  }
+  const [prevLowStockParam, setPrevLowStockParam] = useState(lowStockParam);
+  if (prevLowStockParam !== lowStockParam) {
+    setPrevLowStockParam(lowStockParam);
     setLowStock(lowStockParam);
-  }, [lowStockParam]);
+  }
+  // 防抖关键词 / 低库存筛选变化时回到第 1 页
+  const filterKey = JSON.stringify([debouncedKeyword, lowStock]);
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey);
+    setCurrentPage(1);
+  }
+  // 查询条件或重载信号变化时进入加载态，请求仍在下方 effect 中发起
+  const productsQueryKey = JSON.stringify([
+    currentPage,
+    pageSize,
+    debouncedKeyword,
+    lowStock,
+    reloadVersion,
+  ]);
+  const [prevProductsQueryKey, setPrevProductsQueryKey] =
+    useState(productsQueryKey);
+  if (prevProductsQueryKey !== productsQueryKey) {
+    setPrevProductsQueryKey(productsQueryKey);
+    setLoading(true);
+    setLoadError(false);
+  }
+
+  // 加载态已在渲染期重置；原实现在 passive effect 中才重置。为保持原语义：从提交（layout effect）到 passive effect
+  // 发起新请求之间到达的旧响应，不写入加载/错误态（原实现中这些写入会被随后 effect 的重置覆盖）。
+  useLayoutEffect(() => {
+    resetPendingRef.current = true;
+  }, [fetchProducts, reloadVersion]);
+  useEffect(() => {
+    resetPendingRef.current = false;
+    void fetchProducts();
+  }, [fetchProducts, reloadVersion]);
 
   const handleCreate = () => {
     dialogSession.current += 1;
