@@ -4,7 +4,7 @@
 
 - `SalesDetailPageContent.tsx`：出口专项单详情；阶段/普通合同头保存保留Axios错误DTO中的原始原因；头保存失败向编辑器传播拒绝，保留完整草稿供明确重试；门店读回保留现有港口关联供目的港选择
 - `../page.test.tsx`：阶段错误与原样重试、实际合同头编辑器的失败保留/纠正重试及目的港完整门店DTO选项；隔离延迟加载的退税准备弹窗，失败不打开、成功后明确等待打开，避免依赖异步导入时序
-- `SalesFinancePanel.tsx` / `.test.tsx`：统一财务结算和 USD 收款登记。保存失败向共用付款弹窗传回原始原因；已保存后的合同刷新错误不得诱导再次收款登记；切换合同时在渲染期重置加载/失败状态，请求回调经 `runAwait` 保持原 await 时序
+- `SalesFinancePanel.tsx` / `.test.tsx`：统一财务结算和 USD 收款登记。保存失败向共用付款弹窗传回原始原因；已保存后的合同刷新错误不得诱导再次收款登记；切换合同时在渲染期重置加载/失败状态，请求回调经 `runAwait` 保持原 await 时序；`SalesFinancePanel.reset-window.test.tsx` 在真实调度（非 act）下覆盖切换合同后、被动 effect 发起新请求前到达的旧成功/失败
 - `ImportPurchaseItemsDialog.tsx` / `.test.tsx`：采购商品导入
 
 收款登记是内部记录，不执行银行转账。

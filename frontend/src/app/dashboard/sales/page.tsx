@@ -150,8 +150,16 @@ export default function SalesPage() {
   const urlKeyword = searchParams.get("q") ?? searchParams.get("keyword") ?? "";
 
   // 仅在URL实际改变时同步，避免每次本地输入被旧URL覆盖。
-  // 渲染期按 URL 变化调整状态（替代 effect 内 setState）；初值 null 使首次渲染也按原挂载 effect 同步一次。
-  const urlSyncKey = JSON.stringify([
+  // 保留原 effect 内同步：URL 直接筛选变化时，原实现会先以"新筛选 + 旧页码/关键词"发出一次请求，
+  // 该请求经真实 Axios 缓存/认证拦截器仍有可观测影响（缓存命中、401 处理），改为渲染期同步会省略它，
+  // 故本处 set-state-in-effect 暂不清理（见 jiesong-react-hooks-cleanup 计划 B6 备注）。
+  useEffect(() => {
+    setCurrentPage(Math.max(1, Number.parseInt(urlPage || "1", 10) || 1));
+    setPageSize(
+      [20, 50, 100].includes(Number(urlPageSize)) ? Number(urlPageSize) : 20,
+    );
+    setSearchQuery(urlKeyword);
+  }, [
     urlPage,
     urlPageSize,
     urlKeyword,
@@ -161,15 +169,6 @@ export default function SalesPage() {
     shippedTo,
     storeId,
   ]);
-  const [prevUrlSyncKey, setPrevUrlSyncKey] = useState<string | null>(null);
-  if (prevUrlSyncKey !== urlSyncKey) {
-    setPrevUrlSyncKey(urlSyncKey);
-    setCurrentPage(Math.max(1, Number.parseInt(urlPage || "1", 10) || 1));
-    setPageSize(
-      [20, 50, 100].includes(Number(urlPageSize)) ? Number(urlPageSize) : 20,
-    );
-    setSearchQuery(urlKeyword);
-  }
 
   // 被动 effect 尚未发起新请求前，旧响应不得改写渲染期刚重置的 loading/error
   // （与原先 effect 内同步重置覆盖旧响应的结果一致；旧响应的数据与提示照常写入）。
