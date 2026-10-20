@@ -10,10 +10,8 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "09:00"
-    # 分组后最多 8 个分组 PR 同时打开
+    # frontend 常规版本更新 PR 上限:8 个分组各占 1 个名额(安全更新不计入)
     open-pull-requests-limit: 8
-    reviewers:
-      - "helena"  # 替换为实际 reviewer
     labels:
       - "dependencies"
       - "frontend"
@@ -105,7 +103,7 @@ updates:
         update-types:
           - "minor"
           - "patch"
-    # 安全更新自动合并
+    # 只更新 package.json 中显式声明的直接依赖(dependencies + devDependencies)
     allow:
       - dependency-type: "direct"
     # 忽略某些依赖
