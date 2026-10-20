@@ -249,10 +249,12 @@ export default function ContractsPageContent() {
   const [purchasePage, setPurchasePage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
-  // 同步URL参数变化
-  useEffect(() => {
+  // 同步URL参数变化（渲染期按 URL 参数变化调整状态，替代 effect 内 setState）
+  const [prevStatusFromUrl, setPrevStatusFromUrl] = useState(statusFromUrl);
+  if (prevStatusFromUrl !== statusFromUrl) {
+    setPrevStatusFromUrl(statusFromUrl);
     setPurchaseStatusFilter(statusFromUrl || "ALL");
-  }, [statusFromUrl]);
+  }
 
   // 采购合同状态
   const [purchaseContracts, setPurchaseContracts] = useState<
@@ -311,10 +313,27 @@ export default function ContractsPageContent() {
     activeStores: listSummary.stores.length,
   };
 
-  // 筛选或每页条数变化时重置页码
-  useEffect(() => {
+  // 筛选或每页条数变化时重置页码（渲染期按输入变化调整状态，替代 effect 内 setState）
+  const [prevPageResetDeps, setPrevPageResetDeps] = useState({
+    purchaseStatusFilter,
+    storeFilter,
+    productSearch,
+    pageSize,
+  });
+  if (
+    prevPageResetDeps.purchaseStatusFilter !== purchaseStatusFilter ||
+    prevPageResetDeps.storeFilter !== storeFilter ||
+    prevPageResetDeps.productSearch !== productSearch ||
+    prevPageResetDeps.pageSize !== pageSize
+  ) {
+    setPrevPageResetDeps({
+      purchaseStatusFilter,
+      storeFilter,
+      productSearch,
+      pageSize,
+    });
     setPurchasePage(1);
-  }, [purchaseStatusFilter, storeFilter, productSearch, pageSize]);
+  }
 
   // 采购详情弹窗状态
   const [detailOpen, setDetailOpen] = useState(false);
@@ -355,9 +374,40 @@ export default function ContractsPageContent() {
   const [templateDeleting, setTemplateDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 0. 初始化加载
-  useEffect(() => {
-    loadPurchaseContracts();
+  // 1. 加载采购合同（带缓存，pageSize 降至 100 减少负载）
+  // 只发请求并在回调中写状态，可直接在 effect 中调用；加载态由调用方进入
+  const fetchPurchaseContracts = useCallback(() => {
+    const request = ++purchaseRequest.current;
+    return Promise.resolve()
+      .then(() => {
+        const params = {
+          page: purchasePage,
+          pageSize,
+          status:
+            purchaseStatusFilter !== "ALL" ? purchaseStatusFilter : undefined,
+          storeName:
+            storeFilter && storeFilter !== "ALL" ? storeFilter : undefined,
+          keyword: productSearch.trim() || undefined,
+        };
+        return cachedFetch(
+          `purchase-contracts-list-${JSON.stringify(params)}`,
+          () => purchaseService.getAll(params),
+        );
+      })
+      .then((response) => {
+        if (request !== purchaseRequest.current) return;
+        setPurchaseContracts(response.data?.items || []);
+        setPurchaseTotal(response.data?.pagination?.total ?? 0);
+        if (response.data?.summary) setListSummary(response.data.summary);
+      })
+      .catch(() => {
+        if (request !== purchaseRequest.current) return;
+        setPurchaseError(true);
+        toast.error("加载采购合同失败");
+      })
+      .finally(() => {
+        if (request === purchaseRequest.current) setPurchaseLoading(false);
+      });
   }, [
     purchasePage,
     pageSize,
@@ -365,6 +415,44 @@ export default function ContractsPageContent() {
     storeFilter,
     productSearch,
   ]);
+
+  // 手动重新加载（重试、导入完成后）
+  const loadPurchaseContracts = async () => {
+    setPurchaseLoading(true);
+    setPurchaseError(false);
+    await fetchPurchaseContracts();
+  };
+
+  // 查询条件变化时进入加载态（渲染期按输入变化调整状态，替代 effect 内 setState）
+  const [prevPurchaseQuery, setPrevPurchaseQuery] = useState({
+    purchasePage,
+    pageSize,
+    purchaseStatusFilter,
+    storeFilter,
+    productSearch,
+  });
+  if (
+    prevPurchaseQuery.purchasePage !== purchasePage ||
+    prevPurchaseQuery.pageSize !== pageSize ||
+    prevPurchaseQuery.purchaseStatusFilter !== purchaseStatusFilter ||
+    prevPurchaseQuery.storeFilter !== storeFilter ||
+    prevPurchaseQuery.productSearch !== productSearch
+  ) {
+    setPrevPurchaseQuery({
+      purchasePage,
+      pageSize,
+      purchaseStatusFilter,
+      storeFilter,
+      productSearch,
+    });
+    setPurchaseLoading(true);
+    setPurchaseError(false);
+  }
+
+  // 0. 初始化加载 / 查询条件变化时加载
+  useEffect(() => {
+    void fetchPurchaseContracts();
+  }, [fetchPurchaseContracts]);
 
   const currentTemplate = useMemo(
     () => templateItems.find((item) => item.exists) || templateItems[0] || null,
@@ -385,42 +473,10 @@ export default function ContractsPageContent() {
     }
   }, []);
 
-  useEffect(() => {
-    if (templateDialogOpen) {
-      void loadContractTemplates();
-    }
-  }, [loadContractTemplates, templateDialogOpen]);
-
-  // 1. 加载采购合同（带缓存，pageSize 降至 100 减少负载）
-  const loadPurchaseContracts = async () => {
-    const request = ++purchaseRequest.current;
-    setPurchaseLoading(true);
-    setPurchaseError(false);
-    try {
-      const params = {
-        page: purchasePage,
-        pageSize,
-        status:
-          purchaseStatusFilter !== "ALL" ? purchaseStatusFilter : undefined,
-        storeName:
-          storeFilter && storeFilter !== "ALL" ? storeFilter : undefined,
-        keyword: productSearch.trim() || undefined,
-      };
-      const response = await cachedFetch(
-        `purchase-contracts-list-${JSON.stringify(params)}`,
-        () => purchaseService.getAll(params),
-      );
-      if (request !== purchaseRequest.current) return;
-      setPurchaseContracts(response.data?.items || []);
-      setPurchaseTotal(response.data?.pagination?.total ?? 0);
-      if (response.data?.summary) setListSummary(response.data.summary);
-    } catch {
-      if (request !== purchaseRequest.current) return;
-      setPurchaseError(true);
-      toast.error("加载采购合同失败");
-    } finally {
-      if (request === purchaseRequest.current) setPurchaseLoading(false);
-    }
+  // 打开合同模板弹窗时加载模板（在事件中触发，替代 effect 内 setState）
+  const openTemplateDialog = () => {
+    setTemplateDialogOpen(true);
+    void loadContractTemplates();
   };
 
   // 4. 打开生成合同文档弹窗
@@ -728,7 +784,7 @@ export default function ContractsPageContent() {
                   <Button
                     variant="outline"
                     className="h-11 rounded-2xl"
-                    onClick={() => setTemplateDialogOpen(true)}
+                    onClick={openTemplateDialog}
                   >
                     <FileText className="mr-2 h-4 w-4" /> 合同模板
                   </Button>
@@ -886,7 +942,7 @@ export default function ContractsPageContent() {
               <Button
                 variant="outline"
                 className="h-9 rounded-md text-xs"
-                onClick={() => setTemplateDialogOpen(true)}
+                onClick={openTemplateDialog}
               >
                 <FileText className="mr-1.5 h-3.5 w-3.5" /> 合同模板
               </Button>
