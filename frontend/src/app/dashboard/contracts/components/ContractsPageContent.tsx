@@ -408,7 +408,13 @@ export default function ContractsPageContent() {
       .finally(() => {
         if (request === purchaseRequest.current) setPurchaseLoading(false);
       });
-  }, [purchasePage, pageSize, purchaseStatusFilter, storeFilter, productSearch]);
+  }, [
+    purchasePage,
+    pageSize,
+    purchaseStatusFilter,
+    storeFilter,
+    productSearch,
+  ]);
 
   // 手动重新加载（重试、导入完成后）
   const loadPurchaseContracts = async () => {
