@@ -57,6 +57,7 @@
 - Procurement attachment handlers in `backend/src/controllers/purchaseController.js` must use the shared file service for persistence and resolve downloads against `UPLOAD_DIR`.
 - Carrier packing-list checks must archive the original PDF through `backend/src/services/fileService.js`, store only structured comparison output (not raw extracted text), and retain the referenced original while any `PackingListCheck` exists.
 - Any privileged operation must fail closed (`throw`) in production and log with full context in non-production.
+- `scripts/audit_api_write_success_times.js` 只清理显式 `API_PERF_UPLOAD_DIR`（一次性压测后端自己的 UPLOAD_DIR）内的普通文件：`backend/scripts/perf-upload-cleanup.js` 在任何请求前拒绝与默认 `backend/uploads`、`backend/.env`/启动环境 UPLOAD_DIR 真实路径相同或互相包含（含悬空符号链接）的目录，清理时复核根 dev/ino 并对相对/绝对路径做包含检查；`.env` 只用于拒绝比对。检查与 unlink 之间的竞态无法完全消除，前提是删除路径相关目录仅由可信本地操作者管理。
 
 ## Subagent policy
 - 禁止在 Cursor 场景下自动/默认启动 subagent。

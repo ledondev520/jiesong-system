@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Input: disposable backend instance, development login credentials
+ * Input: disposable backend instance, development login credentials, API_PERF_UPLOAD_DIR (the disposable backend's own UPLOAD_DIR)
  * Output: JSON/Markdown write success-path response-time baseline
  * Pos: Safe success-path SLA audit for selected write interfaces on a disposable database copy
  */
@@ -18,7 +18,9 @@ const THRESHOLD_MS = Number(process.env.API_BENCH_THRESHOLD_MS || 2000);
 const TIMEOUT_MS = Number(process.env.API_BENCH_TIMEOUT_MS || 10000);
 const DELAY_MS = Number(process.env.API_BENCH_DELAY_MS || 700);
 const OUTPUT_DIR = path.resolve(process.cwd(), 'tmp/performance');
-const UPLOAD_DIR = path.resolve(process.cwd(), 'backend/uploads');
+const { resolvePerfUploadDir, removeUploadedFileWithin } = require(path.join(ROOT, 'backend/scripts/perf-upload-cleanup'));
+// 清理目录只能是一次性压测后端自己的 UPLOAD_DIR（显式 API_PERF_UPLOAD_DIR）；不回退 backend/.env 或默认 backend/uploads。
+let perfUploadDir = null;
 
 const state = {
   runId: `perf-${Date.now()}`,
@@ -41,6 +43,7 @@ const requireDisposableTarget = () => {
   if ((url.hostname === 'localhost' || url.hostname === '127.0.0.1') && ['3000', '3001'].includes(url.port)) {
     throw new Error(`Refusing to run write audit against normal local port ${url.port}; use a disposable backend port.`);
   }
+  perfUploadDir = resolvePerfUploadDir({ repoRoot: ROOT });
 };
 
 const buildUrl = (pathname) => new URL(pathname, BASE_URL).toString();
@@ -110,10 +113,8 @@ const createContractTemplateForm = () => {
 
 const removeUploadedFile = (filePath) => {
   if (!filePath) return;
-  const fullPath = path.isAbsolute(filePath) ? filePath : path.join(UPLOAD_DIR, filePath);
-  if (fs.existsSync(fullPath)) {
-    fs.unlinkSync(fullPath);
-  }
+  if (!perfUploadDir) throw new Error('Refusing to remove uploaded file: API_PERF_UPLOAD_DIR was not validated.');
+  removeUploadedFileWithin(perfUploadDir, filePath);
 };
 
 const cases = [
