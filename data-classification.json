@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updatedAt": "2026-10-17",
+  "updatedAt": "2026-10-20",
   "owner": "security-team",
   "tiers": [
     {
@@ -107,7 +107,8 @@
           "Financial evidence workbooks are never archived; sensitive personal identifiers are redacted before persistence and row-level reads require ADMIN or FINANCE",
           "Shipment invoice-row preparations and exports require ADMIN/FINANCE; generated confirmation attachments keep the same download/delete restriction and use protected contract storage",
           "Automatic internal draft creation in openAgentService.js retains per-tool roles and execution/replay records; physical, financial and configuration writes still require confirmation",
-          "Product navigation belongs to procurement at frontend/src/components/layout/navigation.config.ts; backend/src/routes/products.js remains the authority for read/write role checks"
+          "Product navigation belongs to procurement at frontend/src/components/layout/navigation.config.ts; backend/src/routes/products.js remains the authority for read/write role checks",
+          "Purchase Excel HTTP imports use backend/src/utils/purchaseExcelUpload.js memoryStorage after existing authentication/roles, accept only .xlsx/.xls within config.upload.maxSize; purchaseImportExportController passes filename label/Buffer and purchaseImportExportService rejects paths before parsing/database access. Confidential source workbooks never enter ordinary attachment storage."
         ],
         "transfer": [
           "Use authenticated session only",
@@ -163,6 +164,7 @@
     "tabularImport.js enforces 256 ZIP entries and 32 MiB actual streamed inflation before ExcelJS parsing.",
     "Legacy HTTP imports (/api/v1/import and /api/v1/system/import) share the in-memory CSV/xlsx tabularUpload filter, accept in-memory bytes only, reject filesystem path inputs (including traversal, absolute paths and symlinks), use the client filename only as a sanitised record label, and never retain original source files.",
     "db-backup.js preserves Prisma literal percent filenames instead of URI-decoding the source path.",
-    "tabularImport.js uses streaming XML guards to reject merged cells, out-of-bound row/cell/column coordinates and sheet IDs above 65535 before ExcelJS allocates models."
+    "tabularImport.js uses streaming XML guards to reject merged cells, out-of-bound row/cell/column coordinates and sheet IDs above 65535 before ExcelJS allocates models.",
+    "backend/src/middleware/errorHandler.js returns Chinese 400 only for statusCode-absent Busboy request parsing errors matching seven exact messages or the Unsupported content type: prefix, including NUL multipart headers. Explicit status codes, Multer handling and original error logging remain; malformed-upload parser stacks are withheld even in development and unknown internal errors remain 500."
   ]
 }

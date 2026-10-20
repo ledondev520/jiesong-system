@@ -1,6 +1,6 @@
 /**
- * Input: node:test、node:assert/strict、错误处理中间件
- * Output: 错误处理中间件的单元测试结果
+ * Input: node:test、node:assert/strict、错误处理中间件及 Busboy/Multer 合成错误
+ * Output: 错误状态与中文提示回归；精确白名单400、既有状态优先、未知错误500
  * Pos: 后端错误处理测试文件
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -159,4 +159,51 @@ test('errorHandler: 实际Multer限制错误保持400且不把未知内部错误
   const res = createMockResponse();
   errorHandler(new Error('synthetic internal failure'), {}, res, () => {});
   assert.equal(res.statusCode, 500);
+});
+
+test('errorHandler: Busboy精确输入白名单返回400中文，原始消息保留在日志', t => {
+  const log = t.mock.method(console, 'error', () => {});
+  const messages = [
+    'Malformed content type', 'Malformed part header', 'Malformed urlencoded form',
+    'Missing Content-Type', 'Multipart: Boundary not found', 'Unexpected end of file',
+    'Unexpected end of form', 'Unsupported content type: application/synthetic',
+  ];
+  for (const message of messages) {
+    const res = createMockResponse();
+    errorHandler(new Error(message), {}, res, () => {});
+    assert.equal(res.statusCode, 400, message);
+    assert.equal(res.payload.code, 400);
+    assert.equal(res.payload.message, '上传请求格式错误，请检查文件名或重新选择文件后重试');
+    assert.ok(log.mock.calls.some(call => call.arguments[0].endsWith(message)));
+    for (const statusCode of [401, 403, 422, 503]) {
+      const explicit = createMockResponse();
+      errorHandler(createError(message, statusCode), {}, explicit, () => {});
+      assert.equal(explicit.statusCode, statusCode);
+      assert.equal(explicit.payload.message, statusCode >= 500 ? '服务器内部错误，请稍后重试' : '请求处理失败，请检查输入后重试');
+    }
+  }
+  for (const message of ['Malformed part header: server failure', 'Unexpected end of database',
+    'Unexpected end of file during backup', 'Unsupported content type', 'synthetic internal failure']) {
+    const res = createMockResponse();
+    errorHandler(new Error(message), {}, res, () => {});
+    assert.equal(res.statusCode, 500, message);
+    assert.equal(res.payload.message, '服务器内部错误，请稍后重试');
+  }
+});
+
+test('errorHandler: 畸形上传原始英文即使开发环境也仅进日志', t => {
+  const originalEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'development';
+  t.after(() => {
+    if (originalEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalEnv;
+  });
+  const log = t.mock.method(console, 'error', () => {});
+  const error = new Error('Malformed part header');
+  const res = createMockResponse();
+  errorHandler(error, {}, res, () => {});
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.payload.stack, undefined);
+  assert.doesNotMatch(JSON.stringify(res.payload), /Malformed part header/);
+  assert.ok(log.mock.calls.some(call => call.arguments[0] === error.stack));
 });

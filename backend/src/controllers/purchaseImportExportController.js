@@ -1,6 +1,6 @@
 /**
- * Input: HTTP 请求（查询参数 / 上传文件）
- * Output: Excel 文件下载 或 JSON 导入结果
+ * Input: HTTP 请求（查询参数 / 内存上传文件）
+ * Output: Excel 文件下载 或 JSON 导入结果；导入仅传文件名标签与内存字节
  * Pos: 采购合同批量导入导出控制器
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -37,7 +37,7 @@ const importExcel = async (req, res, next) => {
       throw createError('请选择要导入的 Excel 文件', 400);
     }
 
-    const result = await importPurchasesExcel(req.file.path, req.user?.id, { historical: req.body?.historical === 'true' || req.body?.historical === true });
+    const result = await importPurchasesExcel({ originalname: req.file.originalname, buffer: req.file.buffer }, req.user?.id, { historical: req.body?.historical === 'true' || req.body?.historical === true });
     success(res, result, `导入完成：成功 ${result.successRows} 条，失败 ${result.failedRows} 条`);
   } catch (error) {
     next(error);

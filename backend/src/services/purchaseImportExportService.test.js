@@ -1,9 +1,12 @@
-/** 合成Excel与内存Prisma桩；不接触真实供应商、采购合同或业务数据库。 */
+/**
+ * Input: 合成 Excel 内存字节、非法路径载荷与内存 Prisma 桩
+ * Output: 采购导入语义与无文件系统读取/非法输入零写入回归结果
+ * Pos: 采购 Excel 服务单元测试；不接触真实业务数据库
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const path = require('node:path');
 const fs = require('node:fs');
-const os = require('node:os');
 const xlsx = require('xlsx');
 const { exportPurchasesExcel, importPurchasesExcel } = require('./purchaseImportExportService');
 const prisma = require('../utils/prisma');
@@ -24,17 +27,14 @@ const setup = (t) => {
     return { id: `pc-${rows.length}`, ...data };
   });
   stub(prisma.user, 'findUnique', async ({ where }) => ({ id: where.id, role: where.id === 'admin-1' ? 'ADMIN' : 'PURCHASE', isActive: true }));
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-purchase-import-test-'));
-  fs.chmodSync(directory, 0o700);
-  t.after(() => { for (const [model, key, original] of originals.reverse()) model[key] = original; fs.rmSync(directory, { recursive: true, force: true }); });
+  t.after(() => { for (const [model, key, original] of originals.reverse()) model[key] = original; });
   return { rows, stub, file(statuses, contractNos) {
     const book = xlsx.utils.book_new();
     xlsx.utils.book_append_sheet(book, xlsx.utils.aoa_to_sheet([
       ['合同编号', '供应商名称', '签订日期', '总金额', '状态'],
       ...statuses.map((status, index) => [contractNos ? contractNos[index] : `SYNTHETIC-${index}`, '合成供应商', '2026-10-01', 100, status]),
     ]), '采购合同');
-    const file = path.join(directory, 'synthetic.xlsx');
-    xlsx.writeFile(book, file); fs.chmodSync(file, 0o600); return file;
+    return { originalname: 'synthetic.xlsx', buffer: xlsx.write(book, { type: 'buffer', bookType: 'xlsx' }) };
   } };
 };
 
@@ -142,4 +142,44 @@ test('Excel持续占号竞争有界重试，失败统计不包含成功写入', 
   assert.equal(result.errors[0].error, '采购编号正在分配，请稍后重试');
   assert.equal(attempts, 5);
   assert.equal(f.rows.length, 0);
+});
+
+test('采购Excel服务拒绝全部路径载荷，解析前零文件读取、零数据库访问', async t => {
+  const f = setup(t);
+  const reads = ['existsSync', 'readFileSync', 'readFile', 'openSync', 'open'].map(key =>
+    t.mock.method(fs, key, () => { throw new Error('unexpected filesystem read'); }));
+  reads.push(t.mock.method(fs.promises, 'readFile', async () => { throw new Error('unexpected filesystem read'); }));
+  const parse = t.mock.method(xlsx, 'read', () => { throw new Error('unexpected parser call'); });
+  const dbCalls = [
+    [prisma.user, 'findUnique'], [prisma.supplier, 'findMany'],
+    [prisma.purchaseContract, 'findMany'], [prisma.purchaseContract, 'findUnique'],
+    [prisma.purchaseContract, 'count'], [prisma.purchaseContract, 'create'],
+    [prisma.purchaseContract, 'update'], [prisma.purchaseContract, 'delete'],
+    [prisma, '$transaction'],
+  ].map(([model, key]) => {
+    // Prisma delegates are proxies; install explicit spies as in the fixture.
+    const spy = t.mock.fn(async () => { throw new Error('unexpected database access'); });
+    f.stub(model, key, spy);
+    return spy;
+  });
+  const paths = [
+    'synthetic.xlsx', '../evil.xlsx', '..\\evil.xlsx', '/tmp/evil.xlsx', 'C:\\evil.xlsx',
+    '..%2F..%2Fevil.xlsx', '%2e%2e%5cevil.xlsx', '%252e%252e%252fevil.xlsx',
+    'evil\u0000.xlsx', 'file:///tmp/evil.xlsx',
+  ];
+  for (const source of [...paths, ...paths.map(path => ({ originalname: 'synthetic.xlsx', path })),
+    null, {}, { buffer: 'not-a-buffer' }, { buffer: new Uint8Array([1, 2]) }]) {
+    for (const options of [{}, { historical: true }]) {
+      await assert.rejects(() => importPurchasesExcel(source, 'admin-1', options), error => error.statusCode === 400);
+    }
+  }
+  for (const spy of [...reads, parse, ...dbCalls]) assert.equal(spy.mock.callCount(), 0);
+});
+
+test('损坏及非Excel字节返回400且不写采购合同', async t => {
+  const f = setup(t);
+  for (const buffer of [Buffer.alloc(0), Buffer.from('garbage'), Buffer.from([0x50, 0x4b, 3, 4, 0]), Buffer.from('a,b\n1,2')]) {
+    await assert.rejects(() => importPurchasesExcel({ originalname: 'synthetic.xlsx', buffer }, 'purchase-1'), error => error.statusCode === 400);
+    assert.equal(f.rows.length, 0);
+  }
 });

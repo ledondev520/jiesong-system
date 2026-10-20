@@ -176,3 +176,7 @@ Legacy `/api/v1/import` and `/api/v1/system/import` share `tabularUpload` from `
 - 原始现汇必须为正的有限数字，调整后保留六位小数的有效汇率也必须为正。正向 exchangeAdjustment 不能补造缺失或非法现汇。
 - `exportReadinessService`, `exportPacketService`, and Python use `config/pricing.json` and `config/pricing.schema.json` as their shared value and validation sources. Readiness recommendations use packet tiered rounding by default; multiplier requires explicit mode selection. Do not add silent defaults in consumers or pricing overrides through ordinary SystemConfig.
 - `backend/src/services/pricingConfigService.js` validates every snapshot, atomically replaces the complete file for ADMIN requests, rejects stale revisions, and logs only actor/field names/hashes. Filesystem edits are logged on next load; offline edits require operator filesystem audit. No pricing loader reads .env.
+
+
+- 采购 Excel 导入 `/api/v1/purchases/import` 在原认证/角色鉴权后使用 `backend/src/utils/purchaseExcelUpload.js` 的 memoryStorage，仅允许 .xlsx/.xls，沿用 config.upload.maxSize；`purchaseImportExportController.js` 只传文件名标签/Buffer，`purchaseImportExportService.js` 在解析/数据库访问前拒绝路径，仅解析内存字节，不留存 Confidential 原始工作簿于普通附件存储。
+- `backend/src/middleware/errorHandler.js` 将无 statusCode 的 Busboy 请求解析错误按精确消息白名单（七条消息及 `Unsupported content type: ` 前缀）返回中文400，含 NUL 的畸形 multipart 因此不再返回500。显式状态、Multer处理及原始错误日志保持，畸形上传解析错误即使开发环境也不返回英文堆栈，未知内部错误仍500；回归见 `backend/src/routes/purchases.import-upload.test.js` 和 `backend/src/middleware/errorHandler.test.js`。

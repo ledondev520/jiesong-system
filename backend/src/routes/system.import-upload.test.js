@@ -1,4 +1,9 @@
-/** Synthetic uploads only. No host configuration or real database is needed. */
+/**
+ * Input: 合成 multipart CSV/xlsx 与畸形 NUL 文件名、模拟认证
+ * Output: system 导入内存处理、畸形请求400及零磁盘残留回归
+ * Pos: system 导入 HTTP 测试；仅 os.tmpdir()，无真实数据库
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -53,7 +58,7 @@ test('POST /system/import parses in memory, writes nothing to disk and ignores t
   // Busboy rejects NUL bytes in part headers ("Malformed part header") before any storage runs.
   for (const name of ['../../evil.csv\u0000.txt', 'evil\u0000.csv']) {
     const status = (await send(name, 'a,b\n1,2')).status;
-    assert.ok(status >= 400, `${JSON.stringify(name)} -> ${status}`);
+    assert.equal(status, 400, `${JSON.stringify(name)} -> ${status}`);
   }
   for (const name of ['../../evil.sh', '/etc/passwd', '%2e%2e%2fevil', 'no-extension']) {
     assert.equal((await send(name, 'a,b\n1,2')).status, 400, name);
