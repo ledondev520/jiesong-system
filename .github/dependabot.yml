@@ -10,23 +10,100 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "09:00"
-    open-pull-requests-limit: 3
-    reviewers:
-      - "helena"  # 替换为实际 reviewer
+    # frontend 常规版本更新 PR 上限:8 个分组各占 1 个名额(安全更新不计入)
+    open-pull-requests-limit: 8
     labels:
       - "dependencies"
       - "frontend"
     commit-message:
       prefix: "chore(deps)"
       include: "scope"
+    # 分组拆分(替代原先单一的 frontend-minor-patch 大组,见 #29):
+    # 一个依赖只会进入"第一个"匹配的分组,所以兜底组 frontend-other 必须放最后。
     groups:
-      frontend-minor-patch:
+      # 框架:next / react 必须同步升级,需跑 E2E
+      frontend-next-react:
+        patterns:
+          - "next"
+          - "@next/*"
+          - "eslint-config-next"
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+        update-types:
+          - "minor"
+          - "patch"
+      # 测试工具链
+      frontend-test-tooling:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "@testing-library/*"
+          - "playwright"
+          - "@playwright/*"
+          - "jsdom"
+          - "msw"
+        update-types:
+          - "minor"
+          - "patch"
+      # radix/shadcn UI 组件与图标
+      frontend-ui:
+        patterns:
+          - "@radix-ui/*"
+          - "lucide-react"
+          - "cmdk"
+          - "class-variance-authority"
+          - "clsx"
+          - "tailwind-merge"
+          - "sonner"
+          - "next-themes"
+          - "react-day-picker"
+        update-types:
+          - "minor"
+          - "patch"
+      # CSS 构建链
+      frontend-css:
+        patterns:
+          - "tailwindcss"
+          - "@tailwindcss/*"
+          - "tailwindcss-animate"
+          - "postcss"
+          - "autoprefixer"
+        update-types:
+          - "minor"
+          - "patch"
+      # 3D:three 0.x 小版本经常有破坏性变更
+      frontend-three:
+        patterns:
+          - "three"
+          - "@types/three"
+          - "@react-three/*"
+        update-types:
+          - "minor"
+          - "patch"
+      # 监控:@sentry/* 挂在 next 构建上
+      frontend-sentry:
+        patterns:
+          - "@sentry/*"
+        update-types:
+          - "minor"
+          - "patch"
+      # axios 单独成组:1.20+ 的类型变更需先改 src/lib/axios.ts
+      frontend-axios:
+        patterns:
+          - "axios"
+        update-types:
+          - "minor"
+          - "patch"
+      # 兜底:其余依赖
+      frontend-other:
         patterns:
           - "*"
         update-types:
           - "minor"
           - "patch"
-    # 安全更新自动合并
+    # 只更新 package.json 中显式声明的直接依赖(dependencies + devDependencies)
     allow:
       - dependency-type: "direct"
     # 忽略某些依赖
