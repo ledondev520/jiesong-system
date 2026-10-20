@@ -13,6 +13,10 @@ const path = require('path');
 const repoRoot = path.join(__dirname, '..');
 const backendPath = path.join(repoRoot, 'backend');
 process.chdir(backendPath);
+const { resolveWpsUploadRoot, assertUploadSubdir } = require(path.join(backendPath, 'scripts/wps-upload-dir'));
+// 与后端 config.upload.dir 一致：UPLOAD_DIR（启动环境或 backend/.env）或 ./uploads，相对路径按 backend/ 解析。
+// 必须在加载 Prisma 之前解析：Prisma 会自动加载并展开 .env 写回 process.env，而后端 config 不会。
+const uploadRoot = resolveWpsUploadRoot({ backendDir: backendPath });
 
 const { PrismaClient } = require(path.join(backendPath, 'node_modules/@prisma/client'));
 const Papa = require(path.join(backendPath, 'node_modules/papaparse'));
@@ -20,9 +24,6 @@ const Papa = require(path.join(backendPath, 'node_modules/papaparse'));
 const prisma = new PrismaClient();
 const parsedDir = path.join(repoRoot, 'tmp/wps_11_export_list_raw/parsed');
 const sourceRoot = path.join(repoRoot, 'tmp/wps_11_export_list_raw/11-报关记录');
-const { resolveWpsUploadRoot, assertUploadSubdir } = require(path.join(backendPath, 'scripts/wps-upload-dir'));
-// 与后端 config.upload.dir 一致：UPLOAD_DIR（环境变量或 backend/.env）或 ./uploads，相对路径按 backend/ 解析
-const uploadRoot = resolveWpsUploadRoot({ backendDir: backendPath });
 
 const EXCLUDED_CATEGORIES = new Set(['purchase_contract']);
 

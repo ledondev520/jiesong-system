@@ -1,5 +1,5 @@
 /**
- * Input: 运行环境 UPLOAD_DIR、backend/.env 中的 UPLOAD_DIR（仅在环境变量未设置时读取）
+ * Input: 启动环境 UPLOAD_DIR、backend/.env 中的 UPLOAD_DIR（仅在启动环境未设置时读取；.env 权限总是先检查）
  * Output: WPS 附件导入脚本使用的上传根目录绝对路径，以及已存在附件子目录的校验
  * Pos: scripts/import_wps_*_files.js 与 import_wps_202607_update.js 的共享路径解析；与 backend/src/config/index.js 的
  *      `process.env.UPLOAD_DIR || './uploads'` 及后端以 backend/ 为工作目录解析相对路径的规则保持一致
@@ -18,15 +18,15 @@ function isStrictPermissionMode(env) {
 }
 
 /**
- * 职责：在环境变量未提供 UPLOAD_DIR 时，按后端相同来源（backend/.env）读取该键
- * 思路：与 config/index.js 一致，先检查 .env 权限（<= 0600），严格模式下权限过宽直接失败；只返回 UPLOAD_DIR，不写入 process.env、不打印取值
+ * 职责：与 config/index.js 一致，在读取任何键之前检查 backend/.env 权限（<= 0600）
+ * 思路：无论 UPLOAD_DIR 是否已由启动环境提供都检查；严格模式下权限过宽直接失败，否则告警；文件不存在返回 false
  */
-function readUploadDirFromEnvFile(envPath, env) {
+function assertEnvFilePermissions(envPath, env) {
   let stats;
   try {
     stats = fs.statSync(envPath);
   } catch (error) {
-    if (error.code === 'ENOENT') return undefined;
+    if (error.code === 'ENOENT') return false;
     throw new Error(`[wps-import] 无法读取 .env: ${error.message}`);
   }
   const mode = stats.mode & 0o777;
@@ -35,18 +35,22 @@ function readUploadDirFromEnvFile(envPath, env) {
     if (isStrictPermissionMode(env)) throw new Error(message);
     console.warn(message);
   }
-  return dotenv.parse(fs.readFileSync(envPath)).UPLOAD_DIR;
+  return true;
 }
 
 /**
  * 职责：解析后端实际使用的上传根目录
- * 思路：进程环境优先（dotenv 不覆盖已存在的键），否则读 backend/.env，最后回退 './uploads'；相对路径按后端工作目录 backend/ 解析
+ * 思路：先检查 backend/.env 权限；启动环境优先（dotenv 不覆盖已存在的键），否则读 backend/.env（不展开变量），最后回退 './uploads'；
+ *       相对路径按后端工作目录 backend/ 解析。调用方须在加载 Prisma 之前调用，避免 Prisma 自动注入/展开的 .env 值被当作启动环境
  */
 function resolveWpsUploadRoot({ backendDir, env = process.env } = {}) {
   if (!backendDir) throw new Error('[wps-import] 缺少 backendDir');
-  const configured = Object.prototype.hasOwnProperty.call(env, 'UPLOAD_DIR')
-    ? env.UPLOAD_DIR
-    : readUploadDirFromEnvFile(path.join(backendDir, '.env'), env);
+  const envPath = path.join(backendDir, '.env');
+  const envFileExists = assertEnvFilePermissions(envPath, env);
+  // 与后端 dotenv.config 相同：不展开变量、不覆盖启动环境已有的键；只取 UPLOAD_DIR，不写入 process.env、不打印取值
+  let configured;
+  if (Object.prototype.hasOwnProperty.call(env, 'UPLOAD_DIR')) configured = env.UPLOAD_DIR;
+  else if (envFileExists) configured = dotenv.parse(fs.readFileSync(envPath)).UPLOAD_DIR;
   return path.resolve(backendDir, configured || DEFAULT_UPLOAD_DIR);
 }
 
