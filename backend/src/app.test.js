@@ -89,6 +89,14 @@ test('app: 以模块方式加载时不直接监听端口', () => {
   assert.equal(typeof app, 'function');
 });
 
+test('app: 默认不信任代理，显式白名单仅信任给定地址', () => {
+  assert.equal(loadApp().get('trust proxy'), false);
+  const trust = loadApp({ trustedProxyCidrs: ['127.0.0.1/32', '::1/128'] }).get('trust proxy fn');
+  assert.equal(trust('127.0.0.1', 0), true);
+  assert.equal(trust('::1', 0), true);
+  assert.equal(trust('203.0.113.7', 0), false);
+});
+
 test('app: /health 返回基础健康信息', () => {
   const app = loadApp();
   const healthRouteLayer = app._router.stack.find(

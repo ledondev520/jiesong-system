@@ -12,7 +12,9 @@ const createMockRes = () => {
   const res = {
     statusCode: null,
     payload: null,
+    headers: {},
   };
+  res.setHeader = (key, value) => { res.headers[key] = value; };
 
   res.status = (code) => {
     res.statusCode = code;
@@ -30,6 +32,35 @@ const createMockRes = () => {
 test('aiController: 模块可正常加载并导出', () => {
   const mod = require('./aiController');
   assert.ok(mod !== undefined);
+});
+
+test('getModels: DeepSeek 返回当前供应商与思考模式说明', async () => {
+  const config = require('../config');
+  const originalAi = config.ai;
+  config.ai = { provider: 'deepseek' };
+  try {
+    const res = createMockRes();
+    await require('./aiController').getModels({}, res, (error) => { throw error; });
+    assert.equal(res.payload.data.provider, 'deepseek');
+    assert.match(res.payload.data.description.thinking, /deepseek-flash/);
+    assert.doesNotMatch(JSON.stringify(res.payload.data.description), /Kimi/);
+  } finally {
+    config.ai = originalAi;
+  }
+});
+
+test('anthropicCompatMessage: 告知 SDK 不要自动重试失败请求', async () => {
+  const service = require('../services/anthropicCompatService');
+  const originalCreate = service.createMessage;
+  const failure = new Error('synthetic upstream failure');
+  service.createMessage = async () => { throw failure; };
+  try {
+    const res = createMockRes();
+    let captured;
+    await require('./aiController').anthropicCompatMessage({ body: {} }, res, error => { captured = error; });
+    assert.equal(res.headers['x-should-retry'], 'false');
+    assert.equal(captured, failure);
+  } finally { service.createMessage = originalCreate; }
 });
 
 test('aiController: 暴露 agentPrompt 控制器', () => {

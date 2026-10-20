@@ -1,6 +1,6 @@
 /**
  * Input: 系统运维日志 API、logDisplay（动作/实体中文与摘要）
- * Output: 系统日志页面（筛选、日志级别、精致分页）
+ * Output: 系统日志页面（响应式筛选、日志级别与可换行分页）
  * Pos: 运维中心
  */
 
@@ -235,7 +235,7 @@ export default function SystemLogsPage() {
         title="系统日志"
         description="查看系统操作日志，记录所有用户操作与系统变更。"
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => setShowFilters((s) => !s)}>
               <Filter className="mr-1.5 h-4 w-4" />
               筛选
@@ -261,7 +261,7 @@ export default function SystemLogsPage() {
 
             {/* 搜索 */}
             <div className="flex flex-wrap items-center gap-2">
-              <div className="relative flex-1 min-w-[200px]">
+              <div className="relative min-w-0 flex-1 basis-full sm:basis-auto">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="pl-9 h-9 rounded-lg"
@@ -350,7 +350,7 @@ export default function SystemLogsPage() {
                     title={labelForAction(log.action)}
                     subtitle={`${formatDateTime(log.createdAt)} · ${userLabel(log)}`}
                     badge={
-                      <div className="flex gap-1.5">
+                      <div className="flex flex-wrap gap-1.5">
                         <Badge variant="outline" className={`w-fit text-[10px] ${level.className}`}>
                           {level.label}
                         </Badge>
@@ -452,7 +452,7 @@ export default function SystemLogsPage() {
           {/* 分页控制 */}
           <div className="mt-4 flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <span>第 {currentPage}/{Math.max(1, totalPages)} 页，共 {total} 条</span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <PageSizeSelect
                 value={pageSize}
                 onChange={(size) => { setPageSize(size); setCurrentPage(1); }}

@@ -1,6 +1,6 @@
 /**
  * Input: 出口合同服务 (salesService)、binPacking（出柜双80%判定）、通用表格排序 hook、按需 Excel 导入 Module
- * Output: 出口合同列表页面（含删除、列排序、分页与搜索、出柜条件徽章）
+ * Output: 出口合同列表页面（含前置搜索、删除、列排序和分页、出柜条件徽章）
  * Pos: 出口合同管理入口，展示合同列表、货柜信息与出柜双80%指标，支持删除操作
  *
  * 2026-01-26 新增：管理员可删除出口合同（带确认对话框）
@@ -11,11 +11,12 @@
 
 'use client';
 
-import { lazy, Suspense, useState, useEffect, useMemo, useCallback } from 'react';
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
+import { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import { SalesContract, SalesStatus } from '@/types';
 import { salesService } from '@/services/sales.service';
 import { evaluateShippingReadiness } from '@/lib/binPacking';
-import { cachedFetch, invalidateCache } from '@/lib/api-cache';
+import { clearApiGetCache } from '@/lib/axios';
 import { useTabSync } from '@/lib/tab-sync';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -95,6 +96,9 @@ const STATUS_STEP_MAP: Record<SalesStatus, number> = {
 export default function SalesPage() {
   const [contracts, setContracts] = useState<SalesContract[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [total, setTotal] = useState(0);
+  const requestId = useRef(0);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -106,7 +110,7 @@ export default function SalesPage() {
   const [exportingId, setExportingId] = useState<string | null>(null);
 
   // 搜索状态
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || searchParams.get('keyword') || '');
 
   // 批量导入对话框状态
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -114,49 +118,61 @@ export default function SalesPage() {
   // 从 URL 读取分页状态
   const [currentPage, setCurrentPage] = useState(() => {
     const page = searchParams.get('page');
-    return page ? parseInt(page, 10) : 1;
+    return Math.max(1, Number.parseInt(page || '1', 10) || 1);
   });
   const [pageSize, setPageSize] = useState(() => {
     const size = searchParams.get('pageSize');
-    return size ? parseInt(size, 10) : 20;
+    return [20, 50, 100].includes(Number(size)) ? Number(size) : 20;
   });
 
+  const statusFilter = searchParams.get('status') || '';
+  const shipped = searchParams.get('shipped') === 'true';
+  const shippedFrom = searchParams.get('shippedFrom') || '';
+  const shippedTo = searchParams.get('shippedTo') || '';
+  const storeId = searchParams.get('storeId') || '';
+  const urlPage = searchParams.get('page');
+  const urlPageSize = searchParams.get('pageSize');
+  const urlKeyword = searchParams.get('q') ?? searchParams.get('keyword') ?? '';
+
+  // 仅在URL实际改变时同步，避免每次本地输入被旧URL覆盖。
   useEffect(() => {
-    loadContracts();
-  }, []);
+    setCurrentPage(Math.max(1, Number.parseInt(urlPage || '1', 10) || 1));
+    setPageSize([20, 50, 100].includes(Number(urlPageSize)) ? Number(urlPageSize) : 20);
+    setSearchQuery(urlKeyword);
+  }, [urlPage, urlPageSize, urlKeyword, statusFilter, shipped, shippedFrom, shippedTo, storeId]);
 
-  // 监听多标签页数据同步事件
-  useTabSync('sales-contract-created', useCallback(() => {
-    toast.info('新合同已创建，刷新列表');
-    invalidateCache('sales-contracts-list');
-    loadContracts();
-  }, []));
+  const loadContracts = useCallback(async () => {
+    const currentRequest = ++requestId.current;
+    setLoading(true); setError(false);
+    try {
+      const response = await salesService.getAll({
+        page: currentPage, pageSize, lite: true,
+        keyword: searchQuery.trim() || undefined,
+        status: statusFilter ? statusFilter as SalesStatus : undefined,
+        storeId: storeId || undefined,
+        shipped: shipped || undefined,
+        shippedFrom: shippedFrom || undefined, shippedTo: shippedTo || undefined,
+      });
+      if (currentRequest !== requestId.current) return;
+      const items = response.data?.items || [];
+      setContracts(items);
+      setTotal(response.data?.pagination?.total ?? items.length);
+    } catch {
+      if (currentRequest !== requestId.current) return;
+      setError(true); toast.error('加载出口合同失败');
+    } finally {
+      if (currentRequest === requestId.current) setLoading(false);
+    }
+  }, [currentPage, pageSize, searchQuery, statusFilter, storeId, shipped, shippedFrom, shippedTo]);
 
-  useTabSync('sales-contract-updated', useCallback(() => {
-    toast.info('合同已更新，刷新列表');
-    invalidateCache('sales-contracts-list');
-    loadContracts();
-  }, []));
-
-  useTabSync('sales-contract-deleted', useCallback(() => {
-    toast.info('合同已删除，刷新列表');
-    invalidateCache('sales-contracts-list');
-    loadContracts();
-  }, []));
-
-  // 同步 URL 参数到状态
-  useEffect(() => {
-    const page = searchParams.get('page');
-    const size = searchParams.get('pageSize');
-    const q = searchParams.get('q');
-
-    if (page) setCurrentPage(parseInt(page, 10));
-    if (size) setPageSize(parseInt(size, 10));
-    if (q !== null) setSearchQuery(q);
-  }, [searchParams]);
+  useEffect(() => { void loadContracts(); }, [loadContracts]);
+  const refreshContracts = useCallback(() => { clearApiGetCache(); void loadContracts(); }, [loadContracts]);
+  useTabSync('sales-contract-created', refreshContracts);
+  useTabSync('sales-contract-updated', refreshContracts);
+  useTabSync('sales-contract-deleted', refreshContracts);
 
   // 更新 URL 参数
-  const updateUrlParams = (params: { page?: number; pageSize?: number; q?: string }) => {
+  const updateUrlParams = (params: { page?: number; pageSize?: number; q?: string; clearScope?: boolean }) => {
     const newParams = new URLSearchParams(searchParams.toString());
 
     if (params.page !== undefined) {
@@ -167,28 +183,15 @@ export default function SalesPage() {
       if (params.pageSize === 20) newParams.delete('pageSize');
       else newParams.set('pageSize', params.pageSize.toString());
     }
+    if (params.clearScope) ['status', 'shipped', 'shippedFrom', 'shippedTo', 'storeId'].forEach((key) => newParams.delete(key));
     if (params.q !== undefined) {
+      newParams.delete('keyword');
       if (params.q === '') newParams.delete('q');
       else newParams.set('q', params.q);
     }
 
     const newUrl = newParams.toString() ? `${pathname}?${newParams.toString()}` : pathname;
     router.replace(newUrl, { scroll: false });
-  };
-
-  const loadContracts = async () => {
-    setLoading(true);
-    try {
-      const response = await cachedFetch(
-        'sales-contracts-list',
-        () => salesService.getAll({ page: 1, pageSize: 100, lite: true }),
-      );
-      setContracts(response.data?.items || []);
-    } catch {
-      toast.error('加载出口合同失败');
-    } finally {
-      setLoading(false);
-    }
   };
 
   /**
@@ -229,7 +232,7 @@ export default function SalesPage() {
       toast.success(`合同 ${contractToDelete.contractNo} 已删除`);
       setDeleteDialogOpen(false);
       setContractToDelete(null);
-      invalidateCache('sales-contracts-list');
+      clearApiGetCache();
       // 通知其他标签页
       import('@/lib/tab-sync').then(({ getTabSyncManager }) => {
         getTabSyncManager().send('sales-contract-deleted', { contractNo: contractToDelete!.contractNo });
@@ -316,17 +319,6 @@ export default function SalesPage() {
     );
   };
 
-  // 搜索过滤逻辑
-  const filteredContracts = useMemo(() => {
-    if (!searchQuery.trim()) return contracts;
-    const query = searchQuery.toLowerCase();
-    return contracts.filter(contract =>
-      contract.contractNo.toLowerCase().includes(query) ||
-      (contract.port?.name || '').toLowerCase().includes(query) ||
-      contract.stores?.some(store => store.toLowerCase().includes(query))
-    );
-  }, [contracts, searchQuery]);
-
   /**
    * 职责：从出口合同行取出可排序字段（编号、日期时间戳、箱数、体积、金额）
    */
@@ -351,12 +343,12 @@ export default function SalesPage() {
     }
   }, []);
 
-  const salesSort = useTableSort<SalesContract, string>(filteredContracts, salesAccessor, { key: 'signedAt', dir: 'desc' });
+  const salesSort = useTableSort<SalesContract, string>(contracts, salesAccessor, { key: 'signedAt', dir: 'desc' });
   const sortedContracts = salesSort.sortedData;
 
   // 分页逻辑
-  const totalPages = Math.ceil(sortedContracts.length / pageSize);
-  const pagedContracts = sortedContracts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const pagedContracts = sortedContracts;
   const exportOverview = {
     preparing: contracts.filter((contract) => [SalesStatus.CONFIRMED, SalesStatus.PACKING].includes(contract.status)).length,
     inTransit: contracts.filter((contract) => contract.status === SalesStatus.SHIPPED).length,
@@ -462,25 +454,56 @@ export default function SalesPage() {
       <PageHeader
         title="出口合同"
         actions={
-          <div className="flex items-center gap-2">
-            <Button
+          <div className="flex flex-wrap items-center gap-2">
+            <BusinessWrite><Button
               variant="outline"
               className="h-10 rounded-xl"
               onClick={() => setImportDialogOpen(true)}
             >
               <Upload className="mr-2 h-4 w-4" /> 批量导入
-            </Button>
-            <Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/sales/create')}>
+            </Button></BusinessWrite>
+            <BusinessWrite><Button className="h-10 rounded-xl" onClick={() => router.push('/dashboard/sales/create')}>
               <Plus className="mr-2 h-4 w-4" /> 新增出口合同
-            </Button>
+            </Button></BusinessWrite>
           </div>
         }
       />
 
-      {/* 出运概览 — 紧凑统计行 */}
+      {/* 搜索栏 */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            data-testid="sales-search-input"
+            placeholder="搜索合同号、港口、门店..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+              updateUrlParams({ q: e.target.value, page: 1 });
+            }}
+            className="pl-9 rounded-xl"
+          />
+        </div>
+        <span className="text-sm text-muted-foreground">
+          {searchQuery ? `找到 ${total} 条结果` : `共 ${total} 个合同`}
+        </span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <span>全量服务端搜索；概览和排序仅统计当前页。</span>
+        {shipped && <span>已发运、已到港、已完成</span>}
+        {statusFilter && getStatusBadge(statusFilter as SalesStatus)}
+        {(shippedFrom || shippedTo) && <span>上海发运期间：{shippedFrom || '不限'} 至 {shippedTo || '不限'}</span>}
+        <Button variant="outline" size="sm" onClick={refreshContracts}>刷新</Button>
+        {searchQuery && <Button variant="ghost" size="sm" onClick={() => { setSearchQuery(''); setCurrentPage(1); updateUrlParams({ q: '', page: 1 }); }}>清除搜索</Button>}
+        {(shipped || statusFilter || shippedFrom || shippedTo || storeId) && <Button variant="ghost" size="sm" onClick={() => { setCurrentPage(1); updateUrlParams({ clearScope: true, page: 1 }); }}>清除范围筛选</Button>}
+      </div>
+      {error && <div role="alert" className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">出口合同读取失败，保留上次结果。<Button variant="outline" size="sm" className="ml-2" onClick={refreshContracts}>重试</Button></div>}
+      {/* 出运概览 — 当前页统计 */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Card className="border-border/60">
-          <CardContent className="flex items-center justify-between px-4 py-3">
+        <Card className="border-border/60 py-0 md:py-6">
+          <CardContent className="flex items-center justify-between px-3 py-3 md:px-4">
             <div>
               <p className="text-xs text-muted-foreground">待装柜</p>
               <p className="text-xl font-semibold tabular-nums">{exportOverview.preparing}</p>
@@ -488,8 +511,8 @@ export default function SalesPage() {
             <Boxes className="h-4 w-4 text-primary" />
           </CardContent>
         </Card>
-        <Card className="border-border/60">
-          <CardContent className="flex items-center justify-between px-4 py-3">
+        <Card className="border-border/60 py-0 md:py-6">
+          <CardContent className="flex items-center justify-between px-3 py-3 md:px-4">
             <div>
               <p className="text-xs text-muted-foreground">在途</p>
               <p className="text-xl font-semibold tabular-nums">{exportOverview.inTransit}</p>
@@ -497,8 +520,8 @@ export default function SalesPage() {
             <Container className="h-4 w-4 text-sky-600" />
           </CardContent>
         </Card>
-        <Card className="border-border/60">
-          <CardContent className="flex items-center justify-between px-4 py-3">
+        <Card className="border-border/60 py-0 md:py-6">
+          <CardContent className="flex items-center justify-between px-3 py-3 md:px-4">
             <div>
               <p className="text-xs text-muted-foreground">已到港</p>
               <p className="text-xl font-semibold tabular-nums">{exportOverview.arrivedPendingClose}</p>
@@ -506,8 +529,8 @@ export default function SalesPage() {
             <Anchor className="h-4 w-4 text-emerald-600" />
           </CardContent>
         </Card>
-        <Card className="border-border/60">
-          <CardContent className="flex items-center justify-between px-4 py-3">
+        <Card className="border-border/60 py-0 md:py-6">
+          <CardContent className="flex items-center justify-between px-3 py-3 md:px-4">
             <div>
               <p className="text-xs text-muted-foreground">总箱数</p>
               <p className="text-xl font-semibold tabular-nums">{exportOverview.totalBoxes}</p>
@@ -521,16 +544,16 @@ export default function SalesPage() {
       <div className="space-y-3 md:hidden">
         {loading ? (
           <div className="surface-panel py-12 text-center text-sm text-muted-foreground">加载中...</div>
-        ) : contracts.length === 0 ? (
+        ) : error && contracts.length === 0 ? <div className="surface-panel py-12 text-center text-sm text-muted-foreground">列表暂不可用，请重试。</div> : contracts.length === 0 ? (
           <div className="surface-panel flex flex-col items-center justify-center py-16 text-center">
             <Ship className="h-16 w-16 text-muted-foreground/30 mb-4" />
             <h3 className="text-lg font-semibold text-muted-foreground mb-2">暂无出口合同</h3>
             <p className="text-sm text-muted-foreground mb-6 max-w-xs">
               还没有创建任何出口合同，点击下方的按钮开始创建
             </p>
-            <Button onClick={() => router.push('/dashboard/sales/create')}>
+            <BusinessWrite><Button onClick={() => router.push('/dashboard/sales/create')}>
               <Plus className="mr-2 h-4 w-4" /> 新建出口合同
-            </Button>
+            </Button></BusinessWrite>
           </div>
         ) : (
           pagedContracts.map((contract) => (
@@ -563,7 +586,7 @@ export default function SalesPage() {
                       <Eye className="mr-1 h-3.5 w-3.5" /> 详情
                     </Button>
                   </Link>
-                  <Button
+                  <BusinessWrite><Button
                     variant="outline"
                     className="h-10 rounded-xl text-xs"
                     disabled={exportingId === contract.id}
@@ -573,14 +596,14 @@ export default function SalesPage() {
                       ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       : <FileSpreadsheet className="mr-1 h-3.5 w-3.5 text-emerald-600" />}
                     Excel
-                  </Button>
-                  <Button
+                  </Button></BusinessWrite>
+                  <BusinessWrite><Button
                     variant="outline"
                     className="h-10 rounded-xl text-xs text-destructive hover:bg-destructive/10"
                     onClick={() => openDeleteDialog(contract)}
                   >
                     <Trash2 className="mr-1 h-3.5 w-3.5" /> 删除
-                  </Button>
+                  </Button></BusinessWrite>
                 </div>
               }
             />
@@ -592,7 +615,7 @@ export default function SalesPage() {
       <div className="hidden md:block space-y-4">
         {/* 排序栏 */}
         <div className="flex items-center gap-1 flex-wrap border-b border-border/40 pb-3">
-          <span className="text-xs text-muted-foreground mr-2">排序</span>
+          <span className="text-xs text-muted-foreground mr-2">本页排序</span>
           {[
             { key: 'contractNo', label: '合同编号', testId: 'sort-contractNo' },
             { key: 'portName', label: '港口' },
@@ -626,16 +649,16 @@ export default function SalesPage() {
 
         {loading ? (
           <div className="surface-panel py-12 text-center text-sm text-muted-foreground">加载中...</div>
-        ) : contracts.length === 0 ? (
+        ) : error && contracts.length === 0 ? <div className="surface-panel py-12 text-center text-sm text-muted-foreground">列表暂不可用，请重试。</div> : contracts.length === 0 ? (
           <div className="surface-panel flex flex-col items-center justify-center py-16 text-center">
             <Ship className="h-16 w-16 text-muted-foreground/30 mb-4" />
             <h3 className="text-lg font-semibold text-muted-foreground mb-2">暂无出口合同</h3>
             <p className="text-sm text-muted-foreground mb-6 max-w-xs">
               还没有创建任何出口合同，点击下方的按钮开始创建
             </p>
-            <Button onClick={() => router.push('/dashboard/sales/create')}>
+            <BusinessWrite><Button onClick={() => router.push('/dashboard/sales/create')}>
               <Plus className="mr-2 h-4 w-4" /> 新建出口合同
-            </Button>
+            </Button></BusinessWrite>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -740,7 +763,7 @@ export default function SalesPage() {
                         <span className="text-xs">详情</span>
                       </Button>
                     </Link>
-                    <Button
+                    <BusinessWrite><Button
                       variant="outline"
                       size="sm"
                       className="h-8 rounded-lg text-xs"
@@ -754,8 +777,8 @@ export default function SalesPage() {
                         ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         : <FileSpreadsheet className="mr-1 h-3.5 w-3.5 text-emerald-600" />}
                       Excel
-                    </Button>
-                    <Button
+                    </Button></BusinessWrite>
+                    <BusinessWrite><Button
                       variant="outline"
                       size="sm"
                       className="h-8 rounded-lg text-xs text-destructive hover:bg-destructive/10"
@@ -765,7 +788,7 @@ export default function SalesPage() {
                       onClick={() => openDeleteDialog(contract)}
                     >
                       <Trash2 className="mr-1 h-3.5 w-3.5" /> 删除
-                    </Button>
+                    </Button></BusinessWrite>
                   </div>
                 </CardContent>
               </Card>
@@ -774,30 +797,9 @@ export default function SalesPage() {
         )}
       </div>
 
-      {/* 搜索栏 */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            data-testid="sales-search-input"
-            placeholder="搜索合同号、港口、门店..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-              updateUrlParams({ q: e.target.value, page: 1 });
-            }}
-            className="pl-9 rounded-xl"
-          />
-        </div>
-        <span className="text-sm text-muted-foreground">
-          {searchQuery ? `找到 ${filteredContracts.length} 条结果` : `共 ${contracts.length} 个合同`}
-        </span>
-      </div>
-
       {/* 分页控制 */}
       <div className="flex flex-col gap-2 pt-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-        <span>共 {sortedContracts.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
+        <span>共 {total} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
         <div className="flex items-center gap-2">
           <PageSizeSelect
             value={pageSize}
@@ -878,7 +880,7 @@ export default function SalesPage() {
             onImport={handleBatchImport}
             onSuccess={() => {
               loadContracts();
-              invalidateCache('sales-contracts-list');
+              clearApiGetCache();
             }}
           />
         </Suspense>

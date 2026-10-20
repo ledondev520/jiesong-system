@@ -1,4 +1,6 @@
+/** 出口合同与装箱服务；表头局部保存保留省略字段，历史发运重放不重复扣库，发运后货物与出库保持一致。 */
 const prisma = require('../utils/prisma');
+const { parseShanghaiDateRange } = require('../utils/dateRange');
 const { createError } = require('../middleware/errorHandler');
 const {
   generateNextContractNo,
@@ -8,11 +10,14 @@ const {
 const {
   SALES_STATUS,
   normalizeSalesStatus,
+  getSalesSettlementStatus,
   validateSalesTransition,
 } = require('./salesStateMachine');
 const inventorySnapshot = require('./inventorySnapshot');
 const { evaluateShipmentReadiness } = require('./shipmentReadinessService');
 const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
+const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
+const { getSalesCargoState, assertSalesCargoMutable, assertSalesCargoUpdate } = require('./salesCargoLifecycle');
 
 const READY_PURCHASE_STATUSES = Object.freeze([
   'READY',
@@ -35,16 +40,30 @@ const getThirdPartySources = (packingItems = []) => Array.from(new Set(
     .filter(Boolean),
 ));
 
-const getSalesContracts = async ({ page, pageSize, status, storeId, keyword, lite = false }) => {
+const getSalesContracts = async ({ page, pageSize, status, storeId, keyword, shipped = false, shippedFrom, shippedTo, lite = false }) => {
   const where = {};
+  if (shipped !== false && shipped !== true && shipped !== 'false' && shipped !== 'true') throw createError('shipped 必须为true或false', 400);
+  const shippedOnly = shipped === true || shipped === 'true';
+  if (shippedOnly) where.status = { in: ['SHIPPED', 'ARRIVED', 'COMPLETED'] };
   if (status) {
-    where.status = normalizeFilterStatus(status);
+    if (typeof status !== 'string') throw createError('status 必须为状态文本', 400);
+    if (shippedOnly) where.AND = [{ status: normalizeFilterStatus(status) }];
+    else where.status = normalizeFilterStatus(status);
   }
+  const dateRange = parseShanghaiDateRange(shippedFrom, shippedTo);
+  if (Object.keys(dateRange).length > 0) where.shippedAt = dateRange;
   if (storeId) {
     where.items = { some: { storeId } };
   }
   if (keyword) {
-    where.contractNo = { contains: keyword };
+    if (typeof keyword !== 'string') throw createError('keyword 必须为文本', 400);
+    const text = keyword.trim();
+    if (text) where.OR = [
+      { contractNo: { contains: text } },
+      { port: { is: { name: { contains: text } } } },
+      { packingItems: { some: { store: { is: { name: { contains: text } } } } } },
+      { items: { some: { store: { is: { name: { contains: text } } } } } },
+    ];
   }
 
   const skip = (page - 1) * pageSize;
@@ -53,23 +72,16 @@ const getSalesContracts = async ({ page, pageSize, status, storeId, keyword, lit
       where,
       skip,
       take: pageSize,
-      include: lite
-        ? {
-            port: { select: { id: true, name: true } },
-            packingItems: {
-              include: {
-                store: { select: { id: true, name: true } },
-              },
-            },
-          }
-        : {
-            port: true,
-            packingItems: {
-              include: {
-                store: { select: { id: true, name: true } },
-              },
-            },
+      include: {
+        port: lite ? { select: { id: true, name: true } } : true,
+        packingItems: {
+          select: {
+            isOwnedByJiesong: true,
+            sourceParty: true,
+            store: { select: { id: true, name: true } },
           },
+        },
+      },
       orderBy: { contractNo: 'desc' },
     }),
     prisma.salesContract.count({ where }),
@@ -131,7 +143,11 @@ const getSalesContractById = async (id) => {
   };
 };
 
-const createSalesContract = async (data = {}) => {
+// 完整明细及带请求键的创建走原子服务；既有仅建表头的调用保持兼容。
+const createSalesContract = async (data = {}, context = {}) => {
+  if (data.items !== undefined || context.idempotencyKey) {
+    return require('./salesCreationService').createSalesContractAtomically(data, context);
+  }
   const year = getCurrentYear();
   const contractNo = data.contractNo || (await generateNextContractNo({ prisma, year }));
   const exchangeRate = parseNullableNumber(data.exchangeRate, 7.0);
@@ -149,10 +165,19 @@ const createSalesContract = async (data = {}) => {
 };
 
 const updateSalesContract = async (id, data = {}) => {
+  let exchangeRate;
+  // Passing undefined as the parser fallback activates its default null; omitted
+  // metadata must never clear this required field or invent a replacement rate.
+  if (data.exchangeRate !== undefined) {
+    exchangeRate = parseNullableNumber(data.exchangeRate);
+    if (!['number', 'string'].includes(typeof data.exchangeRate) || exchangeRate === null || exchangeRate <= 0) {
+      throw createError('汇率必须为正数', 400);
+    }
+  }
   return prisma.salesContract.update({
     where: { id },
     data: {
-      exchangeRate: parseNullableNumber(data.exchangeRate, undefined),
+      exchangeRate,
       signedAt: data.signedAt ? new Date(data.signedAt) : undefined,
       estimatedArrival: data.estimatedArrival ? new Date(data.estimatedArrival) : undefined,
       portId: data.portId || undefined,
@@ -161,9 +186,10 @@ const updateSalesContract = async (id, data = {}) => {
   });
 };
 
-const removeSalesContract = async (id) => {
-  await prisma.salesContract.delete({ where: { id } });
-};
+const removeSalesContract = async (id) => prisma.$transaction(async (tx) => {
+  assertSalesCargoMutable(await getSalesCargoState(tx, id));
+  await tx.salesContract.delete({ where: { id } });
+});
 
 const addSalesItem = async (id, data = {}) => {
   const contract = await prisma.salesContract.findUnique({ where: { id } });
@@ -195,7 +221,6 @@ const updateSalesStatus = async (id, status, context = {}) => {
     throw createError('status 不能为空', 400);
   }
 
-  let revertResult = null;
   let applyResult = null;
 
   const contract = await prisma.$transaction(async (tx) => {
@@ -204,6 +229,8 @@ const updateSalesStatus = async (id, status, context = {}) => {
       select: {
         id: true,
         status: true,
+        totalAmount: true,
+        receivedAmount: true,
         grossWeight: true,
         volume: true,
         packingItems: {
@@ -238,7 +265,13 @@ const updateSalesStatus = async (id, status, context = {}) => {
       throw createError(validationResult.message || '非法销售合同状态流转', 400);
     }
 
-    const isTransition = existingContract.status !== targetStatus;
+    const isTransition = normalizeSalesStatus(existingContract.status) !== targetStatus;
+    const settledStatus = getSalesSettlementStatus(targetStatus, existingContract.totalAmount, existingContract.receivedAmount);
+    if (targetStatus === SALES_STATUS.COMPLETED && settledStatus !== SALES_STATUS.COMPLETED) {
+      throw createError('销售款项尚未结清或存在金额差异，请先处理收款记录', 400);
+    }
+    const finalStatus = targetStatus === SALES_STATUS.CONFIRMED
+      && existingContract.packingItems.some(item => Number(item.boxes) > 0) ? SALES_STATUS.PACKING : settledStatus;
     if (isTransition && targetStatus === SALES_STATUS.SHIPPED) {
       const readiness = evaluateShipmentReadiness(existingContract);
       if (!readiness.ready) {
@@ -258,7 +291,7 @@ const updateSalesStatus = async (id, status, context = {}) => {
     const contract = await tx.salesContract.update({
       where: { id },
       data: {
-        status: targetStatus,
+        status: finalStatus,
         ...(isTransition && targetStatus === SALES_STATUS.SHIPPED ? { shippedAt: new Date() } : {}),
       },
     });
@@ -268,24 +301,8 @@ const updateSalesStatus = async (id, status, context = {}) => {
       applyResult = await inventorySnapshot.applySalesOutStock(tx, id);
     }
 
-    // 反向流转：从出库状态回退时，恢复库存
-    if (isTransition && normalizeSalesStatus(existingContract.status) === SALES_STATUS.SHIPPED) {
-      revertResult = await inventorySnapshot.revertSalesOutStock(tx, id);
-    }
-
     return contract;
   });
-
-  // 记录回滚操作的日志
-  if (revertResult && revertResult.reverted > 0) {
-    console.log(`[库存回滚] 销售合同 ${id}: 恢复 ${revertResult.reverted} 条出库记录`);
-    // 将回滚信息附加到返回结果中，供控制器层记录审计日志
-    contract._revertInfo = {
-      action: 'REVERT_OUT_STOCK',
-      revertedCount: revertResult.reverted,
-      note: `销售出库回滚：恢复 ${revertResult.reverted} 条库存记录`,
-    };
-  }
 
   // 记录出库操作的日志
   if (applyResult && applyResult.results) {
@@ -328,11 +345,12 @@ const calculateSellingPrice = ({ costPrice, exchangeRate, profitRate = 1.3 }) =>
   };
 };
 
-const addPackingItem = async (id, data = {}) => {
+const addPackingItem = async (id, data = {}) => prisma.$transaction(async (tx) => {
+  assertSalesCargoMutable(await getSalesCargoState(tx, id));
   const unitPrice = data.unitPrice || null;
   const totalPrice = unitPrice && data.quantity ? unitPrice * data.quantity : null;
 
-  const item = await prisma.packingItem.create({
+  const item = await tx.packingItem.create({
     data: {
       salesContractId: id,
       productId: data.productId,
@@ -362,50 +380,19 @@ const addPackingItem = async (id, data = {}) => {
     include: { product: true, store: true },
   });
 
-  await recalculateContractStats(id);
+  await recalculateContractStats(id, tx);
 
   return item;
-};
-
-const SOURCE_LOCKED_PACKING_FIELDS = Object.freeze([
-  'quantity',
-  'boxes',
-  'grossWeight',
-  'netWeight',
-  'volume',
-  'length',
-  'width',
-  'height',
-]);
-
-const SOURCE_LOCKED_PACKING_LABELS = Object.freeze({
-  quantity: '数量',
-  boxes: '箱数',
-  grossWeight: '毛重',
-  netWeight: '净重',
-  volume: '体积',
-  length: '长度',
-  width: '宽度',
-  height: '高度',
 });
 
-const hasOwn = (value, field) => Object.prototype.hasOwnProperty.call(value, field);
-
-const samePackingNumber = (current, next) => {
-  const currentNumber = current === null || current === undefined || current === '' ? 0 : Number(current);
-  const nextNumber = next === null || next === undefined || next === '' ? 0 : Number(next);
-  return Number.isFinite(currentNumber)
-    && Number.isFinite(nextNumber)
-    && Math.abs(currentNumber - nextNumber) <= 0.000001;
-};
-
-const updatePackingItem = async (id, itemId, data = {}) => {
-  const existing = await prisma.packingItem.findFirst({
+const updatePackingItem = async (id, itemId, data = {}) => prisma.$transaction(async (tx) => {
+  const existing = await tx.packingItem.findFirst({
     where: { id: itemId, salesContractId: id },
     select: {
       id: true,
       purchaseItemId: true,
       quantity: true,
+      unit: true,
       boxes: true,
       grossWeight: true,
       netWeight: true,
@@ -417,24 +404,13 @@ const updatePackingItem = async (id, itemId, data = {}) => {
     },
   });
   if (!existing) throw createError('装箱明细不存在', 404);
-
-  if (existing.purchaseItemId) {
-    const changedField = SOURCE_LOCKED_PACKING_FIELDS.find((field) => (
-      hasOwn(data, field) && !samePackingNumber(existing[field], data[field])
-    ));
-    if (changedField) {
-      throw createError(
-        `该装箱明细来源于采购，${SOURCE_LOCKED_PACKING_LABELS[changedField]}由导入比例锁定；若需调整，请删除后重新按箱数导入`,
-        400,
-      );
-    }
-  }
+  assertSalesCargoUpdate(await getSalesCargoState(tx, id), existing, data);
 
   const unitPrice = data.unitPrice === undefined ? existing.unitPrice : (data.unitPrice || null);
   const quantity = data.quantity === undefined ? existing.quantity : data.quantity;
   const totalPrice = unitPrice && quantity ? unitPrice * quantity : null;
 
-  const item = await prisma.packingItem.update({
+  const item = await tx.packingItem.update({
     where: { id: itemId },
     data: {
       quantity: data.quantity,
@@ -463,26 +439,33 @@ const updatePackingItem = async (id, itemId, data = {}) => {
     include: { product: true, store: true },
   });
 
-  await recalculateContractStats(id);
+  await recalculateContractStats(id, tx);
   return item;
-};
+});
 
-const removePackingItem = async (id, itemId) => {
-  const existing = await prisma.packingItem.findFirst({
+const removePackingItem = async (id, itemId) => prisma.$transaction(async (tx) => {
+  const existing = await tx.packingItem.findFirst({
     where: { id: itemId, salesContractId: id },
     select: { id: true },
   });
   if (!existing) throw createError('装箱明细不存在', 404);
+  assertSalesCargoMutable(await getSalesCargoState(tx, id));
 
-  await prisma.packingItem.delete({ where: { id: itemId } });
-  await recalculateContractStats(id);
-};
+  await tx.packingItem.delete({ where: { id: itemId } });
+  await recalculateContractStats(id, tx);
+});
 
 const recalculateContractStats = async (contractId, prismaClient = prisma) => {
-  const stats = await prismaClient.packingItem.aggregate({
-    where: { salesContractId: contractId },
-    _sum: { boxes: true, grossWeight: true, netWeight: true, volume: true, totalPrice: true },
-  });
+  const [contract, stats] = await Promise.all([
+    prismaClient.salesContract.findUnique({
+      where: { id: contractId },
+      select: { amountSource: true, status: true },
+    }),
+    prismaClient.packingItem.aggregate({
+      where: { salesContractId: contractId },
+      _sum: { boxes: true, grossWeight: true, netWeight: true, volume: true, totalPrice: true },
+    }),
+  ]);
 
   await prismaClient.salesContract.update({
     where: { id: contractId },
@@ -491,7 +474,9 @@ const recalculateContractStats = async (contractId, prismaClient = prisma) => {
       grossWeight: stats._sum.grossWeight || 0,
       netWeight: stats._sum.netWeight || 0,
       volume: stats._sum.volume || 0,
-      totalAmount: stats._sum.totalPrice || 0,
+      ...buildDerivedSalesAmountUpdate(contract, stats._sum.totalPrice || 0),
+      ...(normalizeSalesStatus(contract?.status) === SALES_STATUS.CONFIRMED && Number(stats._sum.boxes) > 0
+        ? { status: SALES_STATUS.PACKING } : {}),
     },
   });
 };
@@ -622,11 +607,7 @@ const importPurchasePackingItems = async (salesContractId, selections = []) => {
   }
 
   return prisma.$transaction(async (tx) => {
-    const salesContract = await tx.salesContract.findUnique({
-      where: { id: salesContractId },
-      select: { id: true },
-    });
-    if (!salesContract) throw createError('出口合同不存在', 404);
+    assertSalesCargoMutable(await getSalesCargoState(tx, salesContractId));
 
     const sources = await tx.purchaseItem.findMany({
       where: {
@@ -704,6 +685,7 @@ const importPurchasePackingItems = async (salesContractId, selections = []) => {
 };
 
 module.exports = {
+  getThirdPartySources,
   getSalesContracts,
   getSalesContractById,
   createSalesContract,

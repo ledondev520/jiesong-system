@@ -186,6 +186,26 @@ describe('AiSessionsPage', () => {
     expect(await screen.findByTestId('ai-token-usage-chart', undefined, { timeout: 15000 })).toBeInTheDocument();
   });
 
+  it('DeepSeek 未登记单价时单条与混合模型汇总显示暂无价格', async () => {
+    mockGetSessions.mockResolvedValue({ data: [{
+      sessionId: 'deepseek-session', lastModel: 'deepseek-flash', totalTokens: 1000,
+      preview: '合成测试对话', _count: 1, _max: { createdAt: '2026-10-01T10:00:00.000Z' },
+    }] });
+    vi.mocked(api.get).mockImplementation(async () => ({ data: {
+      period: 'summary', totalRequests: 2, totalTokens: 2000,
+      byModel: [
+        { model: 'deepseek-flash', requests: 1, tokens: 1000 },
+        { model: 'kimi-k2-turbo-preview', requests: 1, tokens: 1000 },
+      ], daily: [],
+    } }));
+
+    render(<AiSessionsPage />);
+    await waitFor(() => expect(screen.getAllByText('暂无价格').length).toBeGreaterThanOrEqual(3));
+    expect(screen.getAllByText('deepseek-flash').length).toBeGreaterThan(0);
+    expect(screen.getByText('≈¥0.012')).toBeInTheDocument();
+    expect(screen.queryByText('≈ ¥0.02')).not.toBeInTheDocument();
+  });
+
   it('加载后展示会话列表', async () => {
     mockGetSessions.mockResolvedValue({
       data: [
@@ -293,7 +313,7 @@ describe('AiSessionsPage', () => {
       expect(screen.getAllByText(/5 \/ 失败 1/).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/动作 2 · 已执行 1 · 失败 1/).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/失败动作/).length).toBeGreaterThan(0);
-      expect(screen.getByText(/2026-04-04 12:06:00/)).toBeInTheDocument();
+      expect(screen.getAllByText(/2026-04-04 12:06:00/)).toHaveLength(2);
       expect(screen.getByText('Agent 工具注册表')).toBeInTheDocument();
       expect(screen.getByText('主入口 unified')).toBeInTheDocument();
       expect(screen.getByText('当前角色 FINANCE')).toBeInTheDocument();
@@ -1173,7 +1193,7 @@ describe('AiSessionsPage', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /失败动作 1/ })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /待确认 1/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^待确认 1$/ })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /待处理 2/ })).toBeInTheDocument();
     });
 
@@ -1234,10 +1254,10 @@ describe('AiSessionsPage', () => {
     render(<AiSessionsPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /待确认 1/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^待确认 1$/ })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: /待确认 1/ }));
+    await user.click(screen.getByRole('button', { name: /^待确认 1$/ }));
 
     await waitFor(() => {
       const rows = Array.from(document.querySelectorAll('tbody tr'));

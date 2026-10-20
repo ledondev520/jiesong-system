@@ -1,5 +1,5 @@
 /**
- * Input: 搜索关键字、聚合搜索配置
+ * Input: 搜索关键字、聚合搜索配置、后端 lite 列表
  * Output: 工作台全局搜索结果与跳转映射
  * Pos: 前端业务服务
  *
@@ -51,7 +51,7 @@ const emptyPaginatedResponse = <T,>(pageSize: number): ApiResponse<PaginatedResp
 const fetchSearchCollection = async <T,>(path: string, query: string, pageSize: number) => {
   return api
     .get<ApiResponse<PaginatedResponse<T>>, ApiResponse<PaginatedResponse<T>>>(path, {
-      params: { keyword: query, pageSize },
+      params: { keyword: query, pageSize, lite: true },
     })
     .catch(() => emptyPaginatedResponse<T>(pageSize));
 };

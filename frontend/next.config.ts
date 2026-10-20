@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import withBundleAnalyzer from "@next/bundle-analyzer";
+import { getApiProxyBaseUrl } from "./src/lib/api-base-url";
 
 /**
  * Input: 环境变量 NEXT_PUBLIC_API_BASE_URL（生产环境后端地址）
@@ -10,8 +11,7 @@ import withBundleAnalyzer from "@next/bundle-analyzer";
  */
 
 // 开发环境默认代理到本地后端，生产环境使用环境变量
-const apiBackendUrl =
-  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+const apiBackendUrl = getApiProxyBaseUrl();
 
 const nextConfig: NextConfig = {
   /* API代理配置 - 将/api/v1/*请求代理到后端 */
@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/v1/:path*',
-        destination: `${apiBackendUrl}/api/v1/:path*`,
+        destination: `${apiBackendUrl}/:path*`,
       },
     ];
   },

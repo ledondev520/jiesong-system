@@ -1,6 +1,6 @@
 /**
  * Input: Prisma 客户端、Excel 文件路径或查询参数
- * Output: Excel Buffer 或导入结果统计
+ * Output: Excel Buffer 或逐行导入统计；拒绝非法值、错误及可识别无缓存公式，留空编号沿用统一序列
  * Pos: 采购合同批量导入导出服务
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -10,6 +10,7 @@ const xlsx = require('xlsx');
 const fs = require('fs');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
+const { generateNextPurchaseContractNo, isPurchaseNumberConflict } = require('./purchaseContractNumberService');
 
 const STATUS_LABEL_MAP = {
   DRAFT: '草稿',
@@ -35,35 +36,20 @@ const STATUS_VALUE_MAP = {
 const VALID_STATUSES = Object.keys(STATUS_VALUE_MAP);
 
 /**
- * 职责：生成下一个采购合同编号
- * 思路：按 CG + 年份后两位 + 5 位序号；若冲突则递增重试
+ * 职责：原子写入单行合同；仅自动编号被并发占用时重新分配
+ * 思路：数据库唯一约束兜底，最多尝试五次；显式编号和其他错误不改号重试
  */
-const generateNextContractNo = async () => {
-  const year = new Date().getFullYear().toString().slice(-2);
-  const prefix = `CG${year}`;
-  const count = await prisma.purchaseContract.count({
-    where: { contractNo: { startsWith: prefix } },
-  });
-  let seq = count + 1;
-  let contractNo = `${prefix}${String(seq).padStart(5, '0')}`;
-
-  // 避免极端并发或残留数据导致冲突
-  const existing = await prisma.purchaseContract.findUnique({
-    where: { contractNo },
-    select: { id: true },
-  });
-  if (existing) {
-    const maxRecord = await prisma.purchaseContract.findFirst({
-      where: { contractNo: { startsWith: prefix } },
-      orderBy: { contractNo: 'desc' },
-      select: { contractNo: true },
-    });
-    const maxSeq = maxRecord ? parseInt(maxRecord.contractNo.slice(prefix.length), 10) : 0;
-    seq = maxSeq + 1;
-    contractNo = `${prefix}${String(seq).padStart(5, '0')}`;
+const createImportedContract = async (data) => {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      return await prisma.purchaseContract.create({
+        data: { ...data, contractNo: data.contractNo || await generateNextPurchaseContractNo(prisma) },
+      });
+    } catch (error) {
+      if (data.contractNo || !isPurchaseNumberConflict(error)) throw error;
+      if (attempt === 4) throw createError('采购编号正在分配，请稍后重试', 409);
+    }
   }
-
-  return contractNo;
 };
 
 /**
@@ -91,35 +77,60 @@ const formatDate = (date) => {
 
 /**
  * 职责：解析 Excel 中的日期值
- * 思路：xlsx 读取时日期可能是数字（序列号）或字符串
+ * 思路：沿用数字序列号/日期字符串，拒绝构造后被自动改日的输入
+ * @param {unknown} value 原单元格值
+ * @returns {Date|null} 有效日期或无法解析的标记；可选空值由导入层判断
  */
 const parseExcelDate = (value) => {
   if (value === undefined || value === null || value === '') return null;
-  if (value instanceof Date) return value;
-  if (typeof value === 'number') {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  /**
+   * 职责：构造日期并拒绝 JavaScript 的自动日历归一化
+   * @param {number} year 年
+   * @param {number} month 月（1–12）
+   * @param {number} day 日
+   * @returns {Date|null} 相同年/月/日的日期或 null
+   */
+  const calendarDate = (year, month, day) => {
+    const date = new Date(year, month - 1, day);
+    // JS normalizes impossible days/months; an import must not silently change
+    // the supplied calendar date (including Excel's fictitious 1900-02-29).
+    return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? date : null;
+  };
+  if (typeof value === 'number' && Number.isFinite(value)) {
     // Excel 日期序列号转 JS Date
     const d = xlsx.SSF.parse_date_code(value);
-    if (d) return new Date(d.y, d.m - 1, d.d);
+    if (d) return calendarDate(d.y, d.m, d.d);
   }
   if (typeof value === 'string') {
     const s = value.trim();
     // yyyy-MM-dd / yyyy/MM/dd
     const m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
     if (m) {
-      const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-      if (!Number.isNaN(d.getTime())) return d;
+      return calendarDate(Number(m[1]), Number(m[2]), Number(m[3]));
     }
   }
   return null;
 };
 
 /**
+ * 职责：区分真正可选空值与需要校验的已提供值
+ * @param {unknown} value 原单元格值
+ * @returns {boolean} 是否为非空提供值
+ */
+const hasProvidedValue = value => value !== undefined && value !== null && !(typeof value === 'string' && value.trim() === '');
+
+/**
  * 职责：解析金额
+ * 思路：保留逗号千位/点小数规则，拒绝非有限值及去逗号后的空壳
+ * @param {unknown} value 原单元格值
+ * @returns {number|null} 有限金额或无法解析/可选空值标记
  */
 const parseAmount = (value) => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   if (typeof value === 'string') {
     const cleaned = value.replace(/,/g, '').trim();
+    if (!cleaned) return null; // Comma-only supplied cells must not become zero.
     const n = Number(cleaned);
     return Number.isFinite(n) ? n : null;
   }
@@ -187,21 +198,30 @@ const exportPurchasesExcel = async (query = {}) => {
  * 职责：从 Excel 批量导入采购合同
  * 思路：
  *   1. 读取 Excel 文件
- *   2. 逐行校验（供应商名称必填、日期格式、金额格式、状态有效性）
+ *   2. 逐行校验（供应商必填、金额/日期错误或可识别无缓存公式、值格式、状态）
  *   3. 查找供应商 ID（不存在则报错）
  *   4. 合同编号留空则自动生成
  *   5. 写入数据库
  *   6. 返回成功/失败统计及错误明细
  * @param {string} filePath - 上传的 Excel 文件路径
- * @param {string} _userId - 操作用户 ID（预留）
+ * @param {string} userId - 认证操作者
+ * @param {{ historical?: boolean }} options - ADMIN显式历史补录；不创建库存或验货证据
  * @returns {Promise<{successRows: number, failedRows: number, errors: Array}>}
  */
-const importPurchasesExcel = async (filePath, _userId) => {
+const importPurchasesExcel = async (filePath, userId, options = {}) => {
+  let allowHistorical = false;
+  if (options.historical === true) {
+    const user = typeof userId === 'string' && userId ? await prisma.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true } }) : null;
+    if (user?.role !== 'ADMIN' || !user.isActive) throw createError('历史采购补录仅允许有效管理员执行', 403);
+    allowHistorical = true;
+  }
   if (!fs.existsSync(filePath)) {
     throw createError('上传文件不存在', 400);
   }
 
-  const workbook = xlsx.readFile(filePath);
+  // Retain formula stubs so an unresolved formula is distinguishable from an
+  // optional blank. Cached numeric/empty-string formulas keep their real type.
+  const workbook = xlsx.readFile(filePath, { sheetStubs: true });
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
   const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
@@ -209,6 +229,38 @@ const importPurchasesExcel = async (filePath, _userId) => {
   if (rawData.length < 2) {
     throw createError('Excel 文件为空或缺少数据行', 400);
   }
+
+  // sheet_to_json replaces Excel error cells with defval, so preserve their
+  // provenance before applying optional-blank defaults. Arrays are relative
+  // to the worksheet range origin, which need not be A1.
+  const sheetRange = xlsx.utils.decode_range(worksheet['!ref']);
+  /**
+   * 职责：按范围起点取得 JSON 解析前的原单元格来源
+   * @param {number} rowIndex 相对工作表范围起点的行号（含表头）
+   * @param {number} columnIndex 相对列号；-1 表示缺列
+   * @returns {object|undefined} 原单元格；缺列/缺单元格返回 undefined
+   */
+  const excelCell = (rowIndex, columnIndex) => columnIndex === -1 ? undefined : worksheet[xlsx.utils.encode_cell({
+    r: sheetRange.s.r + rowIndex,
+    c: sheetRange.s.c + columnIndex,
+  })];
+  /**
+   * 职责：识别被 JSON 空值默认抹掉的原 Excel 错误单元格
+   * @param {number} rowIndex 范围相对行号（含表头）
+   * @param {number} columnIndex 范围相对列号；-1 表示缺列
+   * @returns {boolean} 是否为错误类型
+   */
+  const isExcelErrorCell = (rowIndex, columnIndex) => excelCell(rowIndex, columnIndex)?.t === 'e';
+  /**
+   * 职责：拒绝保留公式但没有结果缓存的 stub，不执行公式
+   * @param {number} rowIndex 范围相对行号（含表头）
+   * @param {number} columnIndex 范围相对列号；-1 表示缺列
+   * @returns {boolean} 是否是无缓存公式；真实缓存零/空字符串均为 false
+   */
+  const isUncachedFormulaCell = (rowIndex, columnIndex) => {
+    const cell = excelCell(rowIndex, columnIndex);
+    return cell?.t === 'z' && typeof cell.f === 'string' && cell.f.trim() !== '';
+  };
 
   // 解析表头（支持中英文及常见别名）
   const headers = rawData[0].map((h) => (typeof h === 'string' ? h.trim() : ''));
@@ -260,10 +312,8 @@ const importPurchasesExcel = async (filePath, _userId) => {
         throw new Error(`第 ${rowNum} 行：供应商「${supplierName}」不存在，请先创建供应商`);
       }
 
-      let contractNo = colIndex.contractNo !== -1 ? String(row[colIndex.contractNo] || '').trim() : '';
-      if (!contractNo) {
-        contractNo = await generateNextContractNo();
-      } else {
+      const contractNo = colIndex.contractNo !== -1 ? String(row[colIndex.contractNo] || '').trim() : '';
+      if (contractNo) {
         // 检查合同编号是否已存在
         const existing = await prisma.purchaseContract.findUnique({
           where: { contractNo },
@@ -274,10 +324,21 @@ const importPurchasesExcel = async (filePath, _userId) => {
         }
       }
 
-      const signedAt = colIndex.signedAt !== -1 ? parseExcelDate(row[colIndex.signedAt]) : null;
+      if (isUncachedFormulaCell(i + 1, colIndex.signedAt)) {
+        throw new Error(`第 ${rowNum} 行：签订日期公式缺少缓存结果，请在 Excel 中重新计算并保存后导入`);
+      }
+      const signedAtInput = colIndex.signedAt !== -1 ? row[colIndex.signedAt] : undefined;
+      const signedAt = parseExcelDate(signedAtInput);
+      if (isExcelErrorCell(i + 1, colIndex.signedAt) || (hasProvidedValue(signedAtInput) && signedAt === null)) {
+        throw new Error(`第 ${rowNum} 行：签订日期格式不正确`);
+      }
 
-      const totalAmount = colIndex.totalAmount !== -1 ? parseAmount(row[colIndex.totalAmount]) : null;
-      if (totalAmount !== null && (totalAmount < 0 || Number.isNaN(totalAmount))) {
+      if (isUncachedFormulaCell(i + 1, colIndex.totalAmount)) {
+        throw new Error(`第 ${rowNum} 行：总金额公式缺少缓存结果，请在 Excel 中重新计算并保存后导入`);
+      }
+      const totalAmountInput = colIndex.totalAmount !== -1 ? row[colIndex.totalAmount] : undefined;
+      const totalAmount = parseAmount(totalAmountInput);
+      if (isExcelErrorCell(i + 1, colIndex.totalAmount) || (hasProvidedValue(totalAmountInput) && totalAmount === null) || (totalAmount !== null && totalAmount < 0)) {
         throw new Error(`第 ${rowNum} 行：总金额格式不正确`);
       }
 
@@ -294,17 +355,19 @@ const importPurchasesExcel = async (filePath, _userId) => {
         }
       }
 
+      if (['RECEIVED', 'COMPLETED'].includes(status) && !allowHistorical) {
+        throw new Error('已收货/已完成仅管理员明确确认历史补录后可导入；普通采购请登记分批到货与验货');
+      }
+
       const note = colIndex.note !== -1 ? String(row[colIndex.note] || '').trim() : '';
 
-      await prisma.purchaseContract.create({
-        data: {
-          contractNo,
-          supplierId,
-          signedAt,
-          totalAmount: totalAmount ?? 0,
-          status,
-          note: note || null,
-        },
+      await createImportedContract({
+        contractNo,
+        supplierId,
+        signedAt,
+        totalAmount: totalAmount ?? 0,
+        status,
+        note: note || null,
       });
 
       successRows++;

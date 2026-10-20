@@ -6,7 +6,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildSalesFinanceSummary } = require('./salesFinanceService');
+const { buildSalesFinanceSummary, getSalesFinanceSummary } = require('./salesFinanceService');
 
 const salesContract = {
   id: 'sales-1',
@@ -55,6 +55,36 @@ const purchases = [{
 const exportReadiness = {
   lines: [{ packingItemId: 'packing-owned', estimatedRefundCny: 200 }],
 };
+
+test('getSalesFinanceSummary: 查询自有采购合同并复用共享所有权判定', async () => {
+  let purchaseQuery;
+  const result = await getSalesFinanceSummary('sales-1', {
+    prismaClient: {
+      salesContract: {
+        findUnique: async () => ({
+          ...salesContract,
+          packingItems: [
+            { ...salesContract.packingItems[0], isOwnedByJiesong: undefined },
+            { ...salesContract.packingItems[1], purchaseContractNo: 'CG260002' },
+            { id: 'legacy-third-party', purchaseContractNo: 'CG260003', note: '非捷淞报关' },
+          ],
+        }),
+      },
+      purchaseContract: {
+        findMany: async (args) => {
+          purchaseQuery = args;
+          return purchases;
+        },
+      },
+    },
+    readinessLoader: async () => exportReadiness,
+  });
+
+  assert.deepEqual(purchaseQuery.where, { contractNo: { in: ['PO260001', 'CG260001'] } });
+  assert.equal(result.cost.purchaseCostCny, 3000);
+  assert.equal(result.tax.estimatedRefundCny, 200);
+  assert.equal(result.linkedPurchases.length, 1);
+});
 
 test('buildSalesFinanceSummary: 排除第三方拼柜并形成美元收入、人民币成本和现金流', () => {
   const result = buildSalesFinanceSummary({ salesContract, purchases, exportReadiness });
@@ -149,4 +179,24 @@ test('buildSalesFinanceSummary: 非美元销售收款不进入美元已收且形
   assert.equal(result.cashReady, false);
   assert.equal(result.revenue.receivedUsd, 0);
   assert.ok(result.issues.some((issue) => issue.code === 'UNSUPPORTED_RECEIPT_CURRENCY'));
+});
+
+test('buildSalesFinanceSummary: 正式合同金额不再扣减第三方装箱货值', () => {
+  const result = buildSalesFinanceSummary({
+    salesContract: {
+      ...salesContract,
+      amountSource: 'FORMAL_DOCUMENT',
+      totalAmount: 600,
+      receivedAmount: 300,
+      payments: [],
+      taxRefunds: [],
+    },
+    purchases,
+    exportReadiness,
+  });
+
+  assert.equal(result.revenue.contractTotalUsd, 600);
+  assert.equal(result.revenue.ownedRevenueUsd, 600);
+  assert.equal(result.revenue.receivedUsd, 300);
+  assert.equal(result.revenue.outstandingUsd, 300);
 });

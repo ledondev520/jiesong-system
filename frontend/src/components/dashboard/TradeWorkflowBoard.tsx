@@ -1,11 +1,12 @@
 /**
  * Input: 出口专项单八阶段主线路、当前阻塞和唯一下一动作
- * Output: 工作台专项单进度卡片与可执行入口
+ * Output: 工作台专项单进度卡片与可执行入口，手机端收紧留白并保留完整长文本
  * Pos: 经营中台首页的主任务 Module，替代静态流程说明和重复待办
  */
 
 'use client';
 
+import { BusinessWrite, useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
 import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
@@ -27,6 +28,7 @@ type Props = {
   workflows: TradeWorkflow[];
   loading?: boolean;
   unavailable?: boolean;
+  scope?: 'recent' | 'pending' | 'blocked' | 'risk';
 };
 
 const stagePresentation: Record<TradeWorkflowStageStatus, {
@@ -57,6 +59,7 @@ const stagePresentation: Record<TradeWorkflowStageStatus, {
 };
 
 function WorkflowCard({ workflow }: { workflow: TradeWorkflow }) {
+  const readOnly = useBusinessReadOnly();
   const router = useRouter();
   const nextStage = workflow.stages.find((stage) => (
     stage.status === 'blocked' || stage.status === 'current'
@@ -66,11 +69,11 @@ function WorkflowCard({ workflow }: { workflow: TradeWorkflow }) {
     : 0;
 
   return (
-    <article className="rounded-lg border border-border/70 bg-background p-4 shadow-sm">
+    <article className="min-w-0 rounded-lg border border-border/70 bg-background p-4 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-semibold tracking-tight">{workflow.contractNo}</h3>
+            <h3 className="break-all font-semibold tracking-tight">{workflow.contractNo}</h3>
             <Badge variant="outline" className="tabular-nums">
               {workflow.completedStageCount}/{workflow.stageCount} 阶段
             </Badge>
@@ -89,11 +92,11 @@ function WorkflowCard({ workflow }: { workflow: TradeWorkflow }) {
 
         <Button
           type="button"
-          className="shrink-0 justify-between rounded-md lg:min-w-48"
-          aria-label={`${workflow.contractNo} 下一步：${workflow.nextAction.label}`}
-          onClick={() => router.push(workflow.nextAction.href)}
+          className="h-auto min-h-11 shrink-0 justify-between whitespace-normal rounded-md text-left lg:min-w-48"
+          aria-label={`${workflow.contractNo} ${readOnly ? '查看专项单详情' : `下一步：${workflow.nextAction.label}`}`}
+          onClick={() => router.push(readOnly ? `/dashboard/sales/${workflow.id}` : workflow.nextAction.href)}
         >
-          {workflow.nextAction.label}
+          {readOnly ? '查看专项单详情' : workflow.nextAction.label}
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
@@ -147,10 +150,10 @@ function WorkflowCard({ workflow }: { workflow: TradeWorkflow }) {
         )}
 
         {workflow.issues.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1.5 text-xs text-destructive" aria-label="数据风险">
+          <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5 text-xs text-destructive" aria-label="数据风险">
             <AlertTriangle className="h-3.5 w-3.5" />
             {workflow.issues.map((issue) => (
-              <Badge key={issue} variant="destructive" className="font-normal">{issue}</Badge>
+              <Badge key={issue} variant="destructive" className="min-w-0 max-w-full shrink whitespace-normal break-all text-left font-normal">{issue}</Badge>
             ))}
           </div>
         ) : null}
@@ -159,12 +162,12 @@ function WorkflowCard({ workflow }: { workflow: TradeWorkflow }) {
   );
 }
 
-export function TradeWorkflowBoard({ workflows, loading = false, unavailable = false }: Props) {
+export function TradeWorkflowBoard({ workflows, loading = false, unavailable = false, scope = 'recent' }: Props) {
   const router = useRouter();
 
   return (
-    <Card className="border-border/70">
-      <CardHeader className="pb-3">
+    <Card className="gap-4 border-border/70 py-4 md:gap-6 md:py-6">
+      <CardHeader className="px-4 pb-0 md:px-6 md:pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <CardTitle role="heading" aria-level={2} className="flex items-center gap-2 text-base">
@@ -172,7 +175,7 @@ export function TradeWorkflowBoard({ workflows, loading = false, unavailable = f
               出口专项单主线路
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              每张卡片对应一笔出口专项单；只执行卡片上的下一步。
+              {({ recent: '最近更新的6笔单，覆盖未取消合同', pending: '全量未完成主线路中最近更新的6笔', blocked: '全量阻塞主线路中最近更新的6笔', risk: '全量主线路中按阻塞和风险优先的6笔' })[scope]}；更多单据请查看全部。
             </p>
           </div>
           {workflows.length > 0 ? (
@@ -183,7 +186,7 @@ export function TradeWorkflowBoard({ workflows, loading = false, unavailable = f
           ) : null}
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 px-4 md:px-6">
         {loading ? (
           <div className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
             正在加载专项单主线路…
@@ -200,9 +203,9 @@ export function TradeWorkflowBoard({ workflows, loading = false, unavailable = f
               <p className="text-sm font-medium">暂无出口专项单</p>
               <p className="mt-1 text-xs text-muted-foreground">新建后会在这里形成采购到退税、财务结清的完整线路。</p>
             </div>
-            <Button type="button" size="sm" onClick={() => router.push('/dashboard/sales/create')}>
+            <BusinessWrite><Button type="button" size="sm" onClick={() => router.push('/dashboard/sales/create')}>
               新建出口专项单
-            </Button>
+            </Button></BusinessWrite>
           </div>
         )}
       </CardContent>

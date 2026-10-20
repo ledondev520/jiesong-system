@@ -1,12 +1,13 @@
 /**
- * Input: PrismaClient, 各业务服务, eventLedgerService, SystemConfig
- * Output: 定时巡检 + 事件驱动告警 + 可自动修复的执行器
+ * Input: PrismaClient, financeService 共享逾期规则, SystemConfig
+ * Output: 当前销售模型巡检 + 未读/24小时通知去重 + 可自动修复的执行器
  * Pos: 自进化Agent核心——业务数据巡检、系统健康检查、异常自动修复
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');
+const { getOverdueReceivables } = require('./financeService');
 
 const PATROL_CATEGORIES = {
   BUSINESS: 'BUSINESS',
@@ -37,34 +38,17 @@ const runBusinessPatrol = async () => {
   const findings = [];
   const now = new Date();
 
-  // 1. 应收账款超期检查（超过 90 天未回款的出口合同）
+  // 1. 与财务看板统一：发运超过30天且仍有未收余额。
   try {
-    const overdueContracts = await prisma.exportContract.findMany({
-      where: {
-        status: { in: ['SHIPPED', 'DELIVERED'] },
-        paymentStatus: { in: ['UNPAID', 'PARTIAL'] },
-        createdAt: { lt: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000) },
-      },
-      select: {
-        id: true,
-        contractNo: true,
-        totalAmount: true,
-        paidAmount: true,
-        createdAt: true,
-        buyerName: true,
-      },
-    });
-
+    const overdueContracts = await getOverdueReceivables();
     for (const c of overdueContracts) {
-      const outstanding = (Number(c.totalAmount) || 0) - (Number(c.paidAmount) || 0);
-      const daysSince = Math.floor((now.getTime() - new Date(c.createdAt).getTime()) / (24 * 60 * 60 * 1000));
       findings.push({
         category: PATROL_CATEGORIES.BUSINESS,
-        severity: daysSince > 180 ? SEVERITY.CRITICAL : SEVERITY.WARNING,
+        severity: c.overdueDays > 150 ? SEVERITY.CRITICAL : SEVERITY.WARNING,
         rule: 'OVERDUE_RECEIVABLE',
         title: `应收账款超期：${c.contractNo}`,
-        detail: `合同 ${c.contractNo}（${c.buyerName || ''}）已 ${daysSince} 天未完成回款，未收金额 $${outstanding.toFixed(2)}`,
-        entityType: 'ExportContract',
+        detail: `合同 ${c.contractNo} 按发运后30天口径已逾期 ${c.overdueDays} 天，未收金额 $${Number(c.unreceived).toFixed(2)}`,
+        entityType: 'SalesContract',
         entityId: c.id,
         autoFixPolicy: AUTO_FIX_POLICY.REPORT_ONLY,
       });
@@ -82,11 +66,11 @@ const runBusinessPatrol = async () => {
 
   // 2. 合同状态一致性（已发货但无报关单的合同）
   try {
-    const shippedWithoutDeclaration = await prisma.exportContract.findMany({
+    const shippedWithoutDeclaration = await prisma.salesContract.findMany({
       where: {
-        status: 'SHIPPED',
+        status: { in: ['SHIPPED', 'ARRIVED', 'COMPLETED'] },
         customsDeclarations: { none: {} },
-        updatedAt: { lt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) },
+        shippedAt: { lt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) },
       },
       select: { id: true, contractNo: true },
     });
@@ -98,7 +82,7 @@ const runBusinessPatrol = async () => {
         rule: 'SHIPPED_NO_DECLARATION',
         title: `已发货但无报关单：${c.contractNo}`,
         detail: `合同 ${c.contractNo} 已标记发货超过 7 天，但未关联任何报关单`,
-        entityType: 'ExportContract',
+        entityType: 'SalesContract',
         entityId: c.id,
         autoFixPolicy: AUTO_FIX_POLICY.REPORT_ONLY,
       });
@@ -116,14 +100,14 @@ const runBusinessPatrol = async () => {
 
   // 3. 支付记录异常（已分配金额 > 合同总金额）
   try {
-    const contracts = await prisma.exportContract.findMany({
-      where: { totalAmount: { gt: 0 } },
-      select: { id: true, contractNo: true, totalAmount: true, paidAmount: true },
+    const contracts = await prisma.salesContract.findMany({
+      where: { totalAmount: { gt: 0 }, NOT: { status: 'CANCELLED' } },
+      select: { id: true, contractNo: true, totalAmount: true, receivedAmount: true },
     });
 
     for (const c of contracts) {
       const total = Number(c.totalAmount) || 0;
-      const paid = Number(c.paidAmount) || 0;
+      const paid = Number(c.receivedAmount) || 0;
       if (paid > total * 1.01) {
         findings.push({
           category: PATROL_CATEGORIES.BUSINESS,
@@ -131,7 +115,7 @@ const runBusinessPatrol = async () => {
           rule: 'OVERPAYMENT',
           title: `超额支付：${c.contractNo}`,
           detail: `合同 ${c.contractNo} 已分配 $${paid.toFixed(2)} 超过合同金额 $${total.toFixed(2)}`,
-          entityType: 'ExportContract',
+          entityType: 'SalesContract',
           entityId: c.id,
           autoFixPolicy: AUTO_FIX_POLICY.CONFIRM,
         });
@@ -273,11 +257,25 @@ const persistPatrolFindings = async (findings) => {
     select: { id: true },
   });
 
+  // 未读告警不重复堆积；已读且距上次通知满24小时才再提醒。标题兼容历史无metadata记录。
+  const recent = await prisma.notification.findMany({
+    where: {
+      type: 'PATROL_ALERT',
+      userId: { in: admins.map((admin) => admin.id) },
+      title: { in: findings.filter((f) => f.severity !== SEVERITY.INFO).map((f) => f.title) },
+      OR: [{ isRead: false }, { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } }],
+    },
+    select: { userId: true, title: true },
+  });
+  const notifiedKeys = new Set(recent.map((row) => JSON.stringify([row.userId, row.title])));
   const notifications = [];
   for (const finding of findings) {
     if (finding.severity === SEVERITY.INFO) continue;
 
     for (const admin of admins) {
+      const key = JSON.stringify([admin.id, finding.title]);
+      if (notifiedKeys.has(key)) continue;
+      notifiedKeys.add(key);
       notifications.push({
         userId: admin.id,
         type: 'PATROL_ALERT',

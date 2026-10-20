@@ -9,6 +9,7 @@
 const { success, created, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
 const financeService = require('../services/financeService');
+const receivableReconciliationService = require('../services/receivableReconciliationService');
 const { createError } = require('../middleware/errorHandler');
 
 /**
@@ -64,6 +65,10 @@ const getPayables = async (req, res, next) => {
       page,
       pageSize,
       skip,
+      search: req.query.search,
+      outstandingOnly: req.query.outstandingOnly === 'true',
+      pastDelivery: req.query.pastDelivery === 'true',
+      overdue: req.query.overdue === 'true',
     });
 
     paginated(res, payables, total, page, pageSize);
@@ -87,6 +92,9 @@ const getReceivables = async (req, res, next) => {
       page,
       pageSize,
       skip,
+      search: req.query.search,
+      outstandingOnly: req.query.outstandingOnly === 'true',
+      overdue: req.query.overdue === 'true',
     });
 
     paginated(res, receivables, total, page, pageSize);
@@ -102,6 +110,20 @@ const getStats = async (req, res, next) => {
   try {
     const stats = await financeService.getStats();
     success(res, stats);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：按同一账期截止日桥接美元经营应收与人民币会计应收
+ */
+const getReceivableReconciliation = async (req, res, next) => {
+  try {
+    const year = req.query.year ? Number(req.query.year) : undefined;
+    const month = req.query.month ? Number(req.query.month) : undefined;
+    const result = await receivableReconciliationService.getReceivableReconciliation({ year, month });
+    success(res, result);
   } catch (error) {
     next(error);
   }
@@ -190,6 +212,7 @@ module.exports = {
   getPayables,
   getReceivables,
   getStats,
+  getReceivableReconciliation,
   getPaymentTrends,
   getOverdueReceivables,
   listUnallocatedPayments,

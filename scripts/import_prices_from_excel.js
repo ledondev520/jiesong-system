@@ -188,18 +188,20 @@ async function main() {
       }
     }
     
-    // 重新计算合同总金额
+    // 重新计算装箱货值；正式合同金额已锁定时不得覆盖合同表头
     const stats = await prisma.packingItem.aggregate({
       where: { salesContractId: contract.id },
       _sum: { totalPrice: true },
     });
     
-    if (stats._sum.totalPrice) {
+    if (stats._sum.totalPrice && contract.amountSource !== 'FORMAL_DOCUMENT') {
       await prisma.salesContract.update({
         where: { id: contract.id },
         data: { totalAmount: stats._sum.totalPrice },
       });
-      console.log(`     = 合同总金额: $${stats._sum.totalPrice.toLocaleString()}`);
+      console.log('     = 装箱货值与派生合同金额已更新');
+    } else if (stats._sum.totalPrice) {
+      console.log('     = 装箱货值已更新；正式合同金额保持不变');
     }
   }
   

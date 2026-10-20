@@ -34,14 +34,14 @@ export function DatePicker({
         <Button
           variant={"outline"}
           className={cn(
-            "w-72 justify-start text-left font-normal",
+            "w-full min-w-0 max-w-full justify-start text-left font-normal",
             !date && "text-muted-foreground",
             className
           )}
           {...triggerProps}
         >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {date ? format(date, "PPP") : <span>{placeholder}</span>}
+          <CalendarIcon className="h-4 w-4" />
+          <span className="min-w-0 whitespace-normal">{date ? format(date, "yyyy-MM-dd") : placeholder}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0">

@@ -8,6 +8,7 @@
 
 const { Router } = require('express');
 const systemController = require('../controllers/systemController');
+const pricingController = require('../controllers/system/pricingController');
 const { authenticate, roleAuth } = require('../middleware/auth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 const { upload } = require('../utils/upload');
@@ -16,6 +17,9 @@ const { withAuditLog } = require('../middleware/auditLog');
 const router = Router();
 
 router.use(authenticate);
+
+router.get('/pricing-config', roleAuth('ADMIN'), pricingController.getPricing);
+router.put('/pricing-config', roleAuth('ADMIN'), pricingController.updatePricing);
 
 // GET /api/v1/system/configs - 获取系统配置（平铺格式，向后兼容）
 router.get('/configs', systemController.getConfigs);
@@ -45,7 +49,7 @@ router.get('/logs/export/csv', roleAuth('ADMIN'), systemController.exportOperati
 router.get('/notifications', withPaginationValidation, systemController.getNotifications);
 
 // PUT /api/v1/system/notifications/:id/read - 标记通知已读
-router.put('/notifications/:id/read', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.put('/notifications/:id/read', roleAuth('ADMIN', 'BOSS', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
   { entity: 'Notification', action: 'UPDATE', model: 'notification' },
   systemController.markNotificationRead
 ));

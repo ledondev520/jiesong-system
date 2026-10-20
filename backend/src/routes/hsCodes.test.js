@@ -33,3 +33,22 @@ test('hsCodes: route index mounts /hs-codes router', () => {
     '缺少 /hs-codes 路由挂载',
   );
 });
+
+test('hsCodes: 已缓存的推荐立即返回，不再模拟 AI 等待', async (t) => {
+  const aiCache = require('../utils/aiCache');
+  const cached = { hsCode: '1234567890', source: 'synthetic-test-cache' };
+  t.mock.method(aiCache, 'get', () => cached);
+  const originalDelay = aiCache.simulateDelay;
+  let delayCalls = 0;
+  aiCache.simulateDelay = async () => { delayCalls++; };
+  t.after(() => {
+    if (originalDelay === undefined) delete aiCache.simulateDelay;
+    else aiCache.simulateDelay = originalDelay;
+  });
+  const route = hsCodesRouter.stack.find((layer) => layer.route?.path === '/ai-recommend').route;
+  const handler = route.stack.at(-1).handle;
+  const res = { status(code) { this.statusCode = code; return this; }, json(payload) { this.payload = payload; } };
+  await handler({ body: { productDescription: 'synthetic cache validation' } }, res, (error) => { throw error; });
+  assert.deepEqual(res.payload.data, cached);
+  assert.equal(delayCalls, 0);
+});

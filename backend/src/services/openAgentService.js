@@ -1,13 +1,11 @@
 /**
- * Input: open-agent-sdk, Kimi API (via anthropicCompatService), 业务服务层
- * Output: 预置业务 Agent 运行时：只读查询 + 两阶段确认写工具 + SSE 流式输出 + 原子运行记录
+ * Input: 已发布的 open-agent-sdk, Anthropic 兼容 API, 业务服务层
+ * Output: AI 只读查询（含真实拼柜来源）、内部草稿直接执行、业务事实一次确认与可回放执行记录，上游失败不记成功
  * Pos: 后端 Agent Runtime 核心，衔接 LLM 与业务数据
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-const path = require('node:path');
-const { pathToFileURL } = require('node:url');
 const prisma = require('../utils/prisma');
 const config = require('../config');
 const { createError } = require('../middleware/errorHandler');
@@ -58,8 +56,10 @@ const WRITE_CONFIRMATION_INSTRUCTION = [
   '',
   '【写操作规则】',
   '你拥有写工具（如 AllocatePayment、UpdateSystemConfig 等）。',
-  '调用写工具后，系统会生成一个"待确认操作"，你需要在回复中清晰告知用户该操作的内容，',
-  '并提示"请在下方确认后执行"。你**不要**自行重复调用写工具，也不要说操作已完成。',
+  '用户明确要求建内部草稿时，CreatePurchaseContract、CreateCustomsDeclarationDraft、CreateForexVerificationDraft、CreateTaxRefundDraft 会直接执行；成功后说明已生成草稿，不再要求重复确认。',
+  '数量、单价和关联对象必须来自用户提供或系统事实，缺项不能猜；草稿不代表签约、付款、实物出入库或税局受理。',
+  '其他写工具返回待确认操作时，说明操作内容并提示一次确认后执行；收到成功结果前不要宣称已完成。',
+  '只读诊断中的建议不构成执行请求；不要自行创建草稿或重复调用写工具。',
 ].join('\n');
 
 const UNIFIED_SYSTEM_PROMPT = [
@@ -264,17 +264,16 @@ const inferRoutePlan = ({ agentType, message } = {}) => {
 };
 
 const loadSdk = async () => {
-  try {
-    return await import('@codeany/open-agent-sdk');
-  } catch (error) {
-    const localBuildPath = path.resolve(__dirname, '../../../.tmp/open-agent-sdk-typescript/dist/index.js');
-    return import(pathToFileURL(localBuildPath).href);
-  }
+  // 使用锁定的已发布构建，干净 checkout 不依赖开发机 .tmp 目录。
+  const sdk = await import('@codeany/open-agent-sdk');
+  // 不让 Agent 外层重试与 Anthropic transport 重试叠加上游请求。
+  sdk.DEFAULT_RETRY_CONFIG.maxRetries = 0;
+  return sdk;
 };
 
 const ensureRuntimeConfig = async () => {
-  if (!config.kimi.apiKey) {
-    throw createError('请先配置当前系统的 KIMI_API_KEY 后再启用 Agent Runtime', 503);
+  if (!await aiService.getOpenAIClient()) {
+    throw createError('请先配置当前系统的 AI API Key 后再启用 Agent Runtime', 503);
   }
   const { defaultModel } = await aiService.getConfiguredModels();
   return {
@@ -1164,6 +1163,7 @@ const READ_TOOL_SPECS = [
         },
       });
       if (!contract) return toJson({ error: `出口合同 ${keyword} 不存在` });
+      const sourceParties = salesService.getThirdPartySources(contract.packingItems || []);
       return toJson({
         id: contract.id,
         contractNo: contract.contractNo,
@@ -1171,8 +1171,8 @@ const READ_TOOL_SPECS = [
         totalAmount: contract.totalAmount,
         receivedAmount: contract.receivedAmount,
         port: contract.port || null,
-        hasThirdPartyCargo: Boolean(contract.hasThirdPartyCargo),
-        sourceParties: contract.sourceParties || [],
+        hasThirdPartyCargo: sourceParties.length > 0,
+        sourceParties,
         items: (contract.items || []).map((item) => ({
           id: item.id,
           quantity: item.quantity,
@@ -1758,9 +1758,9 @@ const WRITE_TOOL_SPECS = [
     name: 'CreatePurchaseContract',
     domain: 'procurement',
     access: 'write',
-    confirmationRequired: true,
+    confirmationRequired: false,
     allowedRoles: [ROLES.ADMIN, ROLES.PURCHASE],
-    description: '创建采购合同及明细（需用户确认后执行）',
+    description: '按用户请求直接创建内部采购草稿及明细，不签约或付款；先查询已有草稿，避免跨轮重复创建',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1853,7 +1853,7 @@ const WRITE_TOOL_SPECS = [
     async call(input, { userId, collectedIds }) {
       const inventory = await prisma.inventory.findUnique({
         where: { id: input?.id },
-        select: { id: true, status: true, salesContractId: true },
+        select: { id: true, status: true, salesContractId: true, purchaseItemId: true, receiptInspectionId: true },
       });
       if (!inventory) return toJson({ error: '库存记录不存在', id: input?.id });
       const validationResult = validateInventoryTransition(inventory.status, input?.status, inventory);
@@ -1870,9 +1870,9 @@ const WRITE_TOOL_SPECS = [
     name: 'CreateCustomsDeclarationDraft',
     domain: 'trade-compliance',
     access: 'write',
-    confirmationRequired: true,
+    confirmationRequired: false,
     allowedRoles: [ROLES.ADMIN, ROLES.SALES, ROLES.FINANCE, ROLES.WAREHOUSE],
-    description: '为出口合同创建报关草稿（需用户确认后执行）',
+    description: '按用户请求直接创建内部报关草稿，不进行正式报关',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1911,9 +1911,9 @@ const WRITE_TOOL_SPECS = [
     name: 'CreateForexVerificationDraft',
     domain: 'trade-compliance',
     access: 'write',
-    confirmationRequired: true,
+    confirmationRequired: false,
     allowedRoles: [ROLES.ADMIN, ROLES.SALES, ROLES.FINANCE],
-    description: '为出口合同创建收汇核销草稿（需用户确认后执行）',
+    description: '按用户请求直接创建内部收汇核销草稿，不代表银行或官方已核销',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1952,9 +1952,9 @@ const WRITE_TOOL_SPECS = [
     name: 'CreateTaxRefundDraft',
     domain: 'trade-compliance',
     access: 'write',
-    confirmationRequired: true,
+    confirmationRequired: false,
     allowedRoles: [ROLES.ADMIN, ROLES.SALES, ROLES.FINANCE],
-    description: '为出口合同创建退税草稿（需用户确认后执行）',
+    description: '按用户请求直接创建内部退税草稿，不提交税局',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2144,7 +2144,10 @@ const createPendingAction = (userId, actionType, params, description, collectedI
  * @param {string[]} collectedIds - 本次 run 收集到的 pendingAction IDs
  * @param {Array<object>} toolSpecs - 写工具定义
  */
-const buildWriteToolPool = (defineTool, userId, userRole, collectedIds, traceStore, toolSpecs = WRITE_TOOL_SPECS) => toolSpecs.map((tool) => defineTool({
+const buildWriteToolPool = (defineTool, userId, userRole, collectedIds, traceStore, toolSpecs = WRITE_TOOL_SPECS) => toolSpecs.map((tool) => {
+  // ponytail: 单轮调用去重；跨轮采购草稿重试需先查询现有草稿，规模扩大时再增加业务幂等键。
+  const automaticResults = new Map();
+  return defineTool({
   name: tool.name,
   description: tool.description,
   inputSchema: tool.inputSchema,
@@ -2153,7 +2156,17 @@ const buildWriteToolPool = (defineTool, userId, userRole, collectedIds, traceSto
     const startedAt = Date.now();
     try {
       assertToolAllowedForRole(tool.name, userRole);
-      const result = await tool.call(input || {}, { userId, collectedIds });
+      const key = JSON.stringify(input || {});
+      if (!tool.confirmationRequired && automaticResults.has(key)) return automaticResults.get(key);
+      let result = await tool.call(input || {}, { userId, collectedIds });
+      if (!tool.confirmationRequired) {
+        const pending = JSON.parse(result);
+        if (pending.__pendingAction) {
+          pendingActionStore.get(pending.actionId).automatic = true;
+          result = toJson({ ...await executeAction(pending.actionId, userId), automatic: true });
+          automaticResults.set(key, result);
+        }
+      }
       pushToolTrace(traceStore, {
         name: tool.name,
         domain: tool.domain,
@@ -2174,7 +2187,8 @@ const buildWriteToolPool = (defineTool, userId, userRole, collectedIds, traceSto
       throw error;
     }
   },
-}));
+  });
+});
 
 // ── 执行已确认的 pendingAction ──────────────────────────
 
@@ -2194,10 +2208,8 @@ const ACTION_EXECUTORS = {
    * 职责：更新出口合同状态
    */
   async UpdateExportContractStatus(params, userId) {
-    await salesService.updateSalesContract(params.salesContractId, {
-      status: params.newStatus,
-    });
-    return { success: true, detail: `合同 ${params.contractNo} 状态已更新为 ${params.newStatus}` };
+    const record = await salesService.updateSalesStatus(params.salesContractId, params.newStatus, { userId });
+    return { success: true, detail: `合同 ${params.contractNo} 状态已更新为 ${record.status}` };
   },
 
   /**
@@ -2256,6 +2268,11 @@ const ACTION_EXECUTORS = {
     return { success: true, detail: `已更新采购合同 ${record.contractNo || params.id}`, record };
   },
   async UpdateInventoryStatus(params) {
+    const inventory = await prisma.inventory.findUnique({ where: { id: params.id } });
+    if (!inventory) throw createError('库存记录不存在', 404);
+    const validation = validateInventoryTransition(inventory.status, params.status, inventory);
+    if (!validation.valid) throw createError(validation.message, 400);
+    if (inventory.status === params.status) return { success: true, detail: '库存状态未变化', record: inventory };
     const updateData = { status: params.status };
     if (params.status === 'INBOUND') {
       updateData.inboundAt = new Date();
@@ -2263,7 +2280,7 @@ const ACTION_EXECUTORS = {
       updateData.outboundAt = new Date();
     }
     const record = await prisma.inventory.update({
-      where: { id: params.id },
+      where: { id: params.id, status: inventory.status },
       data: updateData,
     });
     return { success: true, detail: `库存 ${params.id} 状态已更新为 ${params.status}`, record };
@@ -2382,6 +2399,7 @@ const executeAction = async (actionId, userId) => {
           sessionId: action.sessionId || null,
           actionType: action.actionType,
           status: 'executed',
+          automatic: action.automatic === true,
           params: action.params,
           result: { success: result.success, detail: result.detail },
         }),
@@ -2623,6 +2641,13 @@ const buildReplaySnapshotLogValue = ({
   selectedToolNames: selectedToolNames || [],
 });
 
+// SDK prompt() 会丢弃 result.subtype；两种入口都直接校验 query 的终止事件。
+const assertAgentResult = (result) => {
+  if (result.is_error || (result.subtype && result.subtype !== 'success')) {
+    throw createError('AI 服务本次执行失败，请稍后重新发起请求', 503);
+  }
+};
+
 /**
  * 职责：运行一次 Agent prompt（含只读 + 写工具）
  * 思路：
@@ -2652,6 +2677,8 @@ const runAgentPrompt = async ({ userId, userRole, agentType, message, sessionId 
   const resolvedSessionId = sessionConfig.sessionId;
 
   const agent = sdk.createAgent({
+    // 此本地代理固定使用 Anthropic 协议，不能按 DeepSeek/GPT 模型名自动切换。
+    apiType: 'anthropic-messages',
     model: runtimeConfig.model,
     apiKey: runtimeConfig.apiKey,
     baseURL: runtimeConfig.baseURL,
@@ -2663,7 +2690,19 @@ const runAgentPrompt = async ({ userId, userRole, agentType, message, sessionId 
   });
 
   try {
-    const result = await agent.prompt(message);
+    const startedAt = Date.now();
+    const result = { text: '', usage: {}, num_turns: 0, duration_ms: 0 };
+    for await (const event of agent.query(message)) {
+      if (event.type === 'assistant') {
+        const text = event.message.content.filter(item => item.type === 'text').map(item => item.text).join('');
+        if (text) result.text = text;
+      } else if (event.type === 'result') {
+        assertAgentResult(event);
+        result.usage = event.usage || {};
+        result.num_turns = event.num_turns || 0;
+      }
+    }
+    result.duration_ms = Date.now() - startedAt;
 
     const actionRecommendations = summarizeActionRecommendations(actionRecommendationTrace);
     materializeRecommendationPendingActions({
@@ -2671,7 +2710,7 @@ const runAgentPrompt = async ({ userId, userRole, agentType, message, sessionId 
       collectedIds: collectedActionIds,
       recommendations: actionRecommendations,
     });
-    const pendingActions = collectedActionIds
+    const actions = collectedActionIds
       .map((id) => {
         const action = pendingActionStore.get(id);
         if (!action) return null;
@@ -2681,9 +2720,11 @@ const runAgentPrompt = async ({ userId, userRole, agentType, message, sessionId 
           actionType: action.actionType,
           description: action.description,
           params: action.params,
+          status: action.status,
         };
       })
       .filter(Boolean);
+    const pendingActions = actions.filter(action => action.status === 'pending');
 
     // 3. 持久化
     await persistAgentRun({
@@ -2698,11 +2739,11 @@ const runAgentPrompt = async ({ userId, userRole, agentType, message, sessionId 
       selectedToolNames,
       toolTraceSummary: summarizeToolTrace(toolTrace),
       actionRecommendations,
-      pendingActionSummary: pendingActions.map((item) => ({
+      pendingActionSummary: actions.map((item) => ({
         actionId: item.actionId,
         actionType: item.actionType,
         description: item.description,
-        status: 'pending',
+        status: item.status,
       })),
     });
 
@@ -2758,6 +2799,7 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
   yield { type: 'session', sessionId: resolvedSessionId, routePlan };
 
   const agent = sdk.createAgent({
+    apiType: 'anthropic-messages',
     model: runtimeConfig.model,
     apiKey: runtimeConfig.apiKey,
     baseURL: runtimeConfig.baseURL,
@@ -2794,6 +2836,7 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
           break;
         }
         case 'result':
+          assertAgentResult(ev);
           usage = {
             input_tokens: ev.usage?.input_tokens ?? 0,
             output_tokens: ev.usage?.output_tokens ?? 0,
@@ -2808,7 +2851,7 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
       collectedIds: collectedActionIds,
       recommendations: actionRecommendations,
     });
-    const pendingActions = collectedActionIds
+    const actions = collectedActionIds
       .map((id) => {
         const action = pendingActionStore.get(id);
         if (!action) return null;
@@ -2818,9 +2861,11 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
           actionType: action.actionType,
           description: action.description,
           params: action.params,
+          status: action.status,
         };
       })
       .filter(Boolean);
+    const pendingActions = actions.filter(action => action.status === 'pending');
 
     // 3. 持久化
     await persistAgentRun({
@@ -2835,11 +2880,11 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
       selectedToolNames,
       toolTraceSummary: summarizeToolTrace(toolTrace),
       actionRecommendations,
-      pendingActionSummary: pendingActions.map((item) => ({
+      pendingActionSummary: actions.map((item) => ({
         actionId: item.actionId,
         actionType: item.actionType,
         description: item.description,
-        status: 'pending',
+        status: item.status,
       })),
     });
 
@@ -2860,6 +2905,7 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
 }
 
 module.exports = {
+  loadSdk,
   SUPPORTED_AGENT_TYPES,
   PRIMARY_AGENT_TYPE,
   LEGACY_AGENT_TYPES,
@@ -2868,6 +2914,7 @@ module.exports = {
   resolveSystemPrompt,
   inferRoutePlan,
   listToolRegistry,
+  buildWriteToolPool,
   buildToolRegistryPayload,
   buildSalesContractFlowDiagnostic,
   buildPurchaseExecutionDiagnostic,

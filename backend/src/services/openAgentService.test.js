@@ -1,3 +1,9 @@
+/**
+ * Input: Agent 服务、已发布 SDK 与合成业务/HTTP 数据
+ * Output: Agent 路由、权限、幂等性和上游协议及失败语义回归结果
+ * Pos: 后端 Agent Runtime 单测，验证干净安装与单次失败不重试
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const config = require('../config');
@@ -7,6 +13,7 @@ const forexVerificationService = require('./forexVerificationService');
 const taxRefundService = require('./taxRefundService');
 const financeService = require('./financeService');
 const openAgentService = require('./openAgentService');
+const salesService = require('./salesService');
 
 const withPatched = async (patchMap, callback) => {
   const originals = [];
@@ -15,6 +22,7 @@ const withPatched = async (patchMap, callback) => {
     const root = {
       prisma,
       financeService,
+      salesService,
       customsDeclarationService,
       forexVerificationService,
       taxRefundService,
@@ -59,6 +67,53 @@ test('getAgentPreset: 支持三类业务 agent', () => {
   assert.match(finance.prompt, /财务/);
   assert.match(exportAgent.prompt, /出口|单证/);
   assert.match(executive.prompt, /老板|经营|驾驶舱/);
+});
+
+test('AI 内部草稿直接创建，同一轮重复调用复用结果，保留角色校验及执行日志', async () => {
+  let created = 0;
+  const logs = [];
+  await withPatched({
+    'prisma.salesContract.findUnique': async () => ({ id: 'test-sales', contractNo: 'EXP-TEST', totalAmount: 100 }),
+    'prisma.customsDeclaration.findFirst': async () => null,
+    'customsDeclarationService.createCustomsDeclaration': async input => { created++; return { id: 'test-draft', ...input }; },
+    'prisma.operationLog.create': async input => { logs.push(input.data); return {}; },
+  }, async () => {
+    const ids = [];
+    const tool = openAgentService.buildWriteToolPool(spec => spec, 'test-user', 'SALES', ids, [])
+      .find(item => item.name === 'CreateCustomsDeclarationDraft');
+    const first = JSON.parse(await tool.call({ salesContractId: 'test-sales' }));
+    const second = JSON.parse(await tool.call({ salesContractId: 'test-sales' }));
+    assert.equal(first.automatic, true);
+    assert.equal(first.record.status, 'DRAFT');
+    assert.equal(first.__pendingAction, undefined);
+    assert.equal(second.record.id, first.record.id);
+    assert.equal(created, 1);
+    assert.equal(ids.length, 1);
+    assert.equal(JSON.parse(logs[0].newValue).automatic, true);
+    const denied = openAgentService.buildWriteToolPool(spec => spec, 'other-user', 'PURCHASE', [], [])
+      .find(item => item.name === 'CreateCustomsDeclarationDraft');
+    await assert.rejects(denied.call({ salesContractId: 'test-sales' }), /无权/);
+  });
+  const registry = openAgentService.listToolRegistry();
+  for (const name of ['CreatePurchaseContract', 'CreateCustomsDeclarationDraft', 'CreateForexVerificationDraft', 'CreateTaxRefundDraft']) {
+    assert.equal(registry.find(item => item.name === name).confirmationRequired, false);
+  }
+});
+
+test('AI 登记实际发运复用销售状态接口，执行结果不再虚报成功', async () => {
+  let changed = false;
+  await withPatched({
+    'prisma.salesContract.findFirst': async () => ({ id: 'test-sales', contractNo: 'EXP-TEST', status: 'PACKING' }),
+    'salesService.updateSalesStatus': async (id, status) => { assert.equal(id, 'test-sales'); assert.equal(status, 'SHIPPED'); changed = true; return { status }; },
+    'prisma.operationLog.create': async () => ({}),
+  }, async () => {
+    const tool = openAgentService.buildWriteToolPool(spec => spec, 'test-user', 'SALES', [], [])
+      .find(item => item.name === 'UpdateExportContractStatus');
+    const action = JSON.parse(await tool.call({ contractNo: 'EXP-TEST', newStatus: 'SHIPPED' }));
+    assert.equal(changed, false);
+    await openAgentService.executeAction(action.actionId, 'test-user');
+    assert.equal(changed, true);
+  });
 });
 
 test('unified preset: 作为唯一主公开入口，legacy preset 退为内部兼容态', () => {
@@ -542,9 +597,10 @@ test('getAgentPreset: 非法 agent 类型抛出错误', () => {
   );
 });
 
-test('runAgentPrompt: 未配置当前系统 KIMI_API_KEY 时返回 503', async () => {
-  const originalKimiApiKey = config.kimi.apiKey;
-  config.kimi.apiKey = '';
+test('runAgentPrompt: 当前 AI 客户端不可用时返回 503', async () => {
+  const aiService = require('./aiService');
+  const originalGetClient = aiService.getOpenAIClient;
+  aiService.getOpenAIClient = async () => null;
 
   try {
     await assert.rejects(
@@ -553,10 +609,58 @@ test('runAgentPrompt: 未配置当前系统 KIMI_API_KEY 时返回 503', async (
         agentType: 'finance',
         message: '当前客户还欠多少钱？',
       }),
-      (error) => error.statusCode === 503 && /KIMI_API_KEY/.test(error.message),
+      (error) => error.statusCode === 503 && /AI API Key/.test(error.message),
     );
   } finally {
-    config.kimi.apiKey = originalKimiApiKey;
+    aiService.getOpenAIClient = originalGetClient;
+  }
+});
+
+test('loadSdk: 干净安装可加载已发布 SDK', async () => {
+  const published = await import('@codeany/open-agent-sdk');
+  assert.equal(await openAgentService.loadSdk(), published);
+  assert.equal(typeof published.createAgent, 'function');
+});
+
+test('loadSdk: Anthropic 与 Agent 两层重试均关闭，一次失败只发一次请求', async () => {
+  const http = require('node:http');
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const sdk = await openAgentService.loadSdk();
+  const previous = { ...sdk.DEFAULT_RETRY_CONFIG };
+  // Keep the red run fast: the old SDK loader leaves this single retry enabled.
+  Object.assign(sdk.DEFAULT_RETRY_CONFIG, { maxRetries: 1, baseDelayMs: 1, maxDelayMs: 1 });
+  await openAgentService.loadSdk();
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'synthetic-agent-retry-'));
+  fs.chmodSync(cwd, 0o700);
+  let calls = 0;
+  const server = http.createServer((_req, res) => {
+    calls++;
+    res.writeHead(500, { 'content-type': 'application/json', 'x-should-retry': 'false' });
+    res.end(JSON.stringify({ type: 'error', error: { type: 'api_error', message: 'synthetic failure' } }));
+  });
+  try {
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const agent = sdk.createAgent({
+      apiType: 'anthropic-messages',
+      model: 'synthetic-model', apiKey: 'test-only-non-production-sdk-key',
+      baseURL: `http://127.0.0.1:${server.address().port}`, cwd,
+      tools: [], maxTurns: 1, maxTokens: 256, systemPrompt: 'Synthetic test only.',
+      persistSession: false,
+    });
+    const events = [];
+    try {
+      for await (const event of agent.query('synthetic')) events.push(event);
+    } finally {
+      await agent.close();
+    }
+    assert.equal(calls, 1);
+    assert.ok(events.some(event => event.type === 'result' && event.subtype === 'error'));
+  } finally {
+    Object.assign(sdk.DEFAULT_RETRY_CONFIG, previous);
+    await new Promise(resolve => server.close(resolve));
+    fs.rmSync(cwd, { recursive: true, force: true });
   }
 });
 
@@ -669,5 +773,56 @@ test('buildReplaySnapshotLogValue: 会生成专用 replay snapshot 日志载荷'
     },
     routePlan: { mode: 'cross-domain', selectedDomains: ['finance', 'inventory'] },
     selectedToolNames: ['SearchEntities'],
+  });
+});
+
+test('Agent 上游失败：普通和流式请求均拒绝，不能落库成功记录', async () => {
+  const http = require('node:http');
+  const aiService = require('./aiService');
+  const originalClient = aiService.getOpenAIClient;
+  const originalModels = aiService.getConfiguredModels;
+  const originalPort = config.port;
+  let calls = 0;
+  const server = http.createServer((_req, res) => {
+    calls++;
+    res.writeHead(500, { 'content-type': 'application/json', 'x-should-retry': 'false' });
+    res.end(JSON.stringify({ type: 'error', error: { type: 'api_error', message: 'synthetic failure' } }));
+  });
+  try {
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    config.port = server.address().port;
+    aiService.getOpenAIClient = async () => ({});
+    // 新 SDK 会按模型名猜协议；业务代理即使使用 DeepSeek 也必须走 Anthropic。
+    aiService.getConfiguredModels = async () => ({ defaultModel: 'deepseek-flash' });
+    const input = { userId: 'synthetic-user', userRole: 'ADMIN', agentType: 'unified', message: '合成只读验收' };
+    await assert.rejects(openAgentService.runAgentPrompt(input), error => error.statusCode === 503);
+    const events = [];
+    await assert.rejects(async () => {
+      for await (const event of openAgentService.runAgentPromptStream(input)) events.push(event);
+    }, error => error.statusCode === 503);
+    assert.equal(events.some(event => event.type === 'done'), false);
+    assert.equal(calls, 2, '每种入口只调用一次上游');
+  } finally {
+    config.port = originalPort;
+    aiService.getOpenAIClient = originalClient;
+    aiService.getConfiguredModels = originalModels;
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('AI 库存确认执行时重新检查来源，不能绕开验货/发运', async () => {
+  let managed = false;
+  let updates = 0;
+  await withPatched({
+    'prisma.inventory.findUnique': async () => ({ id: 'synthetic-stock', status: 'INBOUND', salesContractId: 'synthetic-sale', ...(managed ? { purchaseItemId: 'synthetic-purchase' } : {}) }),
+    'prisma.inventory.update': async () => { updates++; return {}; },
+    'prisma.operationLog.create': async () => ({}),
+  }, async () => {
+    const tool = openAgentService.buildWriteToolPool(spec => spec, 'synthetic-user', 'WAREHOUSE', [], [])
+      .find(item => item.name === 'UpdateInventoryStatus');
+    const action = JSON.parse(await tool.call({ id: 'synthetic-stock', status: 'OUTBOUND' }));
+    managed = true;
+    await assert.rejects(openAgentService.executeAction(action.actionId, 'synthetic-user'), /验货.*发运/);
+    assert.equal(updates, 0);
   });
 });

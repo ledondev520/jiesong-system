@@ -146,3 +146,17 @@ test('errorHandler: 生产环境不暴露堆栈信息', () => {
   console.error = originalConsole;
   process.env.NODE_ENV = originalEnv;
 });
+
+test('errorHandler: 实际Multer限制错误保持400且不把未知内部错误当输入错误', t => {
+  t.mock.method(console, 'error', () => {});
+  const multer = require('multer');
+  for (const code of ['LIMIT_FILE_SIZE', 'LIMIT_FILE_COUNT', 'LIMIT_UNEXPECTED_FILE']) {
+    const res = createMockResponse();
+    errorHandler(new multer.MulterError(code), {}, res, () => {});
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.payload.code, 400);
+  }
+  const res = createMockResponse();
+  errorHandler(new Error('synthetic internal failure'), {}, res, () => {});
+  assert.equal(res.statusCode, 500);
+});

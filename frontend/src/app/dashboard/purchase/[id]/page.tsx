@@ -1,6 +1,6 @@
 /**
  * Input: 采购合同详情API、购销合同生成服务、系统配置（盖章平台/开票抬头）、PurchaseFlowPanel、SortableTableHead、useTableSort
- * Output: 采购合同详情页面（商品明细、合同归档、付款、生产资料、实物图与发票面板）
+ * Output: 支持手机商品明细卡片的采购合同详情页面（商品明细、合同归档、付款、生产资料、分批到货验货与发票面板）
  * Pos: 采购管理子页面，承载「签合同→盖章→付款→生产完工→催票」的单合同主线路
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,12 +8,18 @@
 
 'use client';
 
+import { BusinessWrite, useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
 import { useState, useEffect, use, useCallback, useMemo } from 'react';
 import { PurchaseContract, PurchaseItem, PurchaseStatus } from '@/types';
 import { purchaseService } from '@/services/purchase.service';
 import { contractDocService } from '@/services/contractDoc.service';
 import { listContractFiles, type ContractFile } from '@/services/contractFile.service';
+import { useRouter } from 'next/navigation';
+import { ErrorState } from '@/components/ui/data-state';
+import { invalidateCache } from '@/lib/api-cache';
 import { Button } from '@/components/ui/button';
+import { MobileListCard } from '@/components/mobile';
+import { useMobile } from '@/lib/hooks/useMobile';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -65,6 +71,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { PageHeader } from '@/components/layout/PageHeader';
 import ContractFiles from '@/components/contract/ContractFiles';
+import { PurchaseReceiptPanel } from './components/PurchaseReceiptPanel';
 import { PurchaseFlowPanel } from './components/PurchaseFlowPanel';
 import { PurchaseProductionPanel } from './components/PurchaseProductionPanel';
 import { configService } from '@/services/config.service';
@@ -77,11 +84,9 @@ interface PageProps {
 
 const PURCHASE_NEXT_ACTIONS: Partial<Record<PurchaseStatus, { status: PurchaseStatus; label: string }>> = {
   [PurchaseStatus.DRAFT]: { status: PurchaseStatus.SIGNED, label: '确认已签约' },
-  [PurchaseStatus.SIGNED]: { status: PurchaseStatus.PRODUCING, label: '开始生产' },
-  [PurchaseStatus.PRODUCING]: { status: PurchaseStatus.READY, label: '确认生产完成' },
+  [PurchaseStatus.SIGNED]: { status: PurchaseStatus.READY, label: '登记完工资料' },
+  [PurchaseStatus.PRODUCING]: { status: PurchaseStatus.READY, label: '登记完工资料' },
   [PurchaseStatus.READY]: { status: PurchaseStatus.SHIPPED, label: '确认供应商已发货' },
-  [PurchaseStatus.SHIPPED]: { status: PurchaseStatus.RECEIVED, label: '确认收货' },
-  [PurchaseStatus.RECEIVED]: { status: PurchaseStatus.COMPLETED, label: '完成采购' },
 };
 
 /**
@@ -244,6 +249,11 @@ function ContractTimeline({ currentStatus }: { currentStatus: PurchaseStatus }) 
 }
 
 export default function PurchaseDetailPage({ params }: PageProps) {
+  const readOnly = useBusinessReadOnly();
+  const isMobile = useMobile();
+  const router = useRouter();
+  const [loadError, setLoadError] = useState(false);
+  const [notFound, setNotFound] = useState(false);
   const { id } = use(params);
   const [contract, setContract] = useState<PurchaseContract | null>(null);
   const [loading, setLoading] = useState(true);
@@ -265,6 +275,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const [exportingPdf, setExportingPdf] = useState(false);
   const [contractFiles, setContractFiles] = useState<ContractFile[]>([]);
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [productionEditorOpen, setProductionEditorOpen] = useState(false);
 
   // 系统配置：线上盖章平台链接 + 我方开票抬头（选填）
   const [stampPlatformUrl, setStampPlatformUrl] = useState('');
@@ -275,15 +286,21 @@ export default function PurchaseDetailPage({ params }: PageProps) {
    */
   const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
+    setNotFound(false);
     try {
-      const [contractRes, filesRes] = await Promise.all([
-        purchaseService.getById(id),
-        listContractFiles(id, 'PURCHASE'),
-      ]);
+      const contractRes = await purchaseService.getById(id);
       setContract(contractRes.data || null);
-      if (filesRes.data) setContractFiles(filesRes.data);
-    } catch {
-      toast.error('加载合同详情失败');
+      setNotFound(!contractRes.data);
+      try {
+        const filesRes = await listContractFiles(id, 'PURCHASE');
+        if (filesRes.data) setContractFiles(filesRes.data);
+      } catch { toast.error('附件读取失败，请重试刷新详情'); }
+    } catch (error) {
+      const missing = typeof error === 'object' && error !== null && 'code' in error && error.code === 404;
+      setNotFound(missing);
+      setLoadError(!missing);
+      if (!missing) toast.error('加载合同详情失败');
     } finally {
       setLoading(false);
     }
@@ -295,6 +312,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
 
   // 加载系统配置（盖章平台链接、开票抬头），失败不阻塞页面
   useEffect(() => {
+    if (readOnly) return;
     const fetchConfigs = async () => {
       try {
         const response = await configService.getSystemConfig();
@@ -306,7 +324,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
       }
     };
     void fetchConfigs();
-  }, []);
+  }, [readOnly]);
 
   /**
    * 职责：跳转线上盖章平台（系统配置 stampPlatformUrl）
@@ -391,13 +409,19 @@ export default function PurchaseDetailPage({ params }: PageProps) {
 
   /** 顺序推进采购状态，成功后刷新整份合同与付款汇总。 */
   const handleAdvanceStatus = async () => {
-    if (!contract) return;
+    if (!contract || readOnly) return;
     const nextAction = PURCHASE_NEXT_ACTIONS[contract.status];
     if (!nextAction) return;
 
+    if ([PurchaseStatus.SIGNED, PurchaseStatus.PRODUCING].includes(contract.status)) {
+      setProductionEditorOpen(true);
+      return;
+    }
     setStatusUpdating(true);
     try {
       await purchaseService.updateStatus(contract.id, nextAction.status);
+      invalidateCache('purchase-contracts-list');
+      invalidateCache('inventory-list');
       toast.success(`已推进到「${nextAction.label}」阶段`);
       await loadData();
     } catch (error: unknown) {
@@ -405,6 +429,19 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     } finally {
       setStatusUpdating(false);
     }
+  };
+
+  const handleCancel = async () => {
+    if (!contract || !window.confirm('取消这份未履行采购合同？取消后不能再推进或恢复，请确认尚未生产、付款或关联出口。')) return;
+    setStatusUpdating(true);
+    try {
+      await purchaseService.updateStatus(contract.id, PurchaseStatus.CANCELLED);
+      invalidateCache('purchase-contracts-list');
+      toast.success('采购合同已取消');
+      await loadData();
+    } catch (error) {
+      toast.error(typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : '取消失败');
+    } finally { setStatusUpdating(false); }
   };
 
   const purchaseLineItems = useMemo(() => contract?.items ?? [], [contract?.items]);
@@ -435,9 +472,8 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     return <div className="flex h-64 items-center justify-center">加载中...</div>;
   }
 
-  if (!contract) {
-    return <div className="py-10 text-center">合同不存在</div>;
-  }
+  if (loadError) return <ErrorState title="采购合同读取失败" action={<Button onClick={() => void loadData()}>重试</Button>} />;
+  if (notFound || !contract) return <div className="py-10 text-center">合同不存在</div>;
 
   // 计算付款进度
   const amountSummary = summarizePurchaseAmounts({
@@ -450,9 +486,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     ? Math.min((amountSummary.paidAmount / amountSummary.grossAmount) * 100, 100)
     : 0;
   const nextPurchaseAction = PURCHASE_NEXT_ACTIONS[contract.status];
-  const productionCompletionBlocked = [PurchaseStatus.PRODUCING, PurchaseStatus.READY].includes(contract.status)
+  const productionCompletionBlocked = contract.status === PurchaseStatus.READY
     && contract.productionReadiness?.ready === false;
   const productionStageVisible = [
+    PurchaseStatus.SIGNED,
     PurchaseStatus.PRODUCING,
     PurchaseStatus.READY,
     PurchaseStatus.SHIPPED,
@@ -471,8 +508,14 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={contract.status} />
+            {contract.status === PurchaseStatus.DRAFT && contract.paidAmount === 0 && !(contract.payments?.length) && !contract.invoiceNo && contractFiles.length === 0 && (
+              <BusinessWrite><Button variant="outline" onClick={() => router.push(`/dashboard/purchase/create?editId=${contract.id}`)}>更正草稿</Button></BusinessWrite>
+            )}
+            {[PurchaseStatus.DRAFT, PurchaseStatus.SIGNED].includes(contract.status) && contract.paidAmount === 0 && !(contract.payments?.length) && !contract.invoiceNo && (
+              <BusinessWrite><Button variant="outline" onClick={handleCancel} disabled={statusUpdating}>取消合同</Button></BusinessWrite>
+            )}
             {nextPurchaseAction && (
-              <Button
+              <BusinessWrite><Button
                 className="h-9 rounded-md text-xs"
                 onClick={handleAdvanceStatus}
                 disabled={statusUpdating || productionCompletionBlocked}
@@ -484,32 +527,32 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                   <ArrowRight className="mr-1.5 h-3.5 w-3.5" />
                 )}
                 {nextPurchaseAction.label}
-              </Button>
+              </Button></BusinessWrite>
             )}
-            <Button variant="outline" className="h-9 rounded-md text-xs" onClick={handleExportPdf} disabled={exportingPdf}>
+            <BusinessWrite><Button variant="outline" className="h-9 rounded-md text-xs" onClick={handleExportPdf} disabled={exportingPdf}>
               {exportingPdf ? (
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Download className="mr-1.5 h-3.5 w-3.5" />
               )}
               导出 PDF
-            </Button>
-            <Button variant="outline" className="h-9 rounded-md text-xs" onClick={viewContractPdf} disabled={pdfLoading}>
+            </Button></BusinessWrite>
+            <BusinessWrite><Button variant="outline" className="h-9 rounded-md text-xs" onClick={viewContractPdf} disabled={pdfLoading}>
               {pdfLoading ? (
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Eye className="mr-1.5 h-3.5 w-3.5" />
               )}
               查看合同
-            </Button>
-            <Button variant="outline" className="h-9 rounded-md text-xs" onClick={handleOpenStampPlatform}>
+            </Button></BusinessWrite>
+            <BusinessWrite><Button variant="outline" className="h-9 rounded-md text-xs" onClick={handleOpenStampPlatform}>
               <Stamp className="mr-1.5 h-3.5 w-3.5" />
               在线盖章
-            </Button>
-            <Button className="h-9 rounded-md text-xs" onClick={() => setGenerateOpen(true)}>
+            </Button></BusinessWrite>
+            <BusinessWrite><Button className="h-9 rounded-md text-xs" onClick={() => setGenerateOpen(true)}>
               <FileDown className="mr-1.5 h-3.5 w-3.5" />
               生成购销合同
-            </Button>
+            </Button></BusinessWrite>
           </div>
         }
       />
@@ -591,6 +634,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
 
       {/* 时间线 */}
       <ContractTimeline currentStatus={contract.status} />
+      {contract.status === PurchaseStatus.SHIPPED && <p className="text-sm text-muted-foreground">请在下方分批到货与验货区域处理；到齐并合格后自动收货，付款结清后自动完成。</p>}
+      {contract.status === PurchaseStatus.RECEIVED && <p className="text-sm text-muted-foreground">已收货，付款记录结清后自动完成采购，无需再确认完成。</p>}
+
+      <PurchaseReceiptPanel purchaseContractId={id} readOnly={readOnly} onChanged={loadData} />
 
       {/* 付款与发票（复制汇款信息 / 登记付款 / 催开发票） */}
       <PurchaseFlowPanel contract={contract} onUpdated={loadData} invoiceTitleInfo={invoiceTitleInfo} />
@@ -598,6 +645,8 @@ export default function PurchaseDetailPage({ params }: PageProps) {
       {productionStageVisible ? (
         <PurchaseProductionPanel
           contract={contract}
+          editorOpen={productionEditorOpen}
+          onEditorOpenChange={setProductionEditorOpen}
           photoFiles={productionPhotoFiles}
           onPhotoFilesChange={(files) => setContractFiles((current) => [
             ...files,
@@ -614,7 +663,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">基本信息</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 pt-0">
+          <CardContent className="space-y-3 break-words pt-0">
             <div className="flex items-start gap-3">
               <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div>
@@ -630,6 +679,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                   {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '—'}
                 </p>
               </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div><p className="text-xs text-muted-foreground">预计交期</p><p className="text-sm">{contract.expectedDate ? format(new Date(contract.expectedDate), 'yyyy-MM-dd') : '未填写'}</p></div>
             </div>
             <div className="flex items-start gap-3">
               <Store className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -659,7 +712,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">供应商信息</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 pt-0">
+          <CardContent className="space-y-3 break-words pt-0">
             <div className="flex items-start gap-3">
               <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div>
@@ -717,6 +770,26 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         <CardContent>
           {!purchaseLineSort.sortedData.length ? (
             <div className="py-10 text-center text-sm text-muted-foreground">暂无商品明细</div>
+          ) : isMobile ? (
+            <div className="space-y-3">
+              {purchaseLineSort.sortedData.map((item: PurchaseItem) => (
+                <MobileListCard
+                  key={item.id}
+                  title={item.product?.customsName || '未知商品'}
+                  subtitle={item.specification || item.product?.specification || '-'}
+                  fields={[
+                    { label: '数量', value: `${item.quantity} ${item.unit || item.product?.unit || ''}` },
+                    { label: '不含税单价', value: `¥${(Number(item.unitPrice) || 0).toLocaleString()}` },
+                  ]}
+                  amount={{ label: '含税小计', value: `¥${calculatePurchaseLineAmounts(item, amountSummary.taxRate).grossAmount.toLocaleString()}`, emphasis: 'success' }}
+                />
+              ))}
+              <dl className="space-y-2 rounded-lg bg-muted/40 p-4 text-sm">
+                <div className="flex flex-wrap justify-between gap-2"><dt>不含税合计</dt><dd className="font-mono">¥{amountSummary.netAmount.toLocaleString()}</dd></div>
+                <div className="flex flex-wrap justify-between gap-2"><dt>其中税额 ({amountSummary.taxRate}%)</dt><dd className="font-mono">¥{amountSummary.taxAmount.toLocaleString()}</dd></div>
+                <div className="flex flex-wrap justify-between gap-2 font-semibold"><dt>含税合计</dt><dd className="font-mono">¥{amountSummary.lineGrossAmount.toLocaleString()}</dd></div>
+              </dl>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>

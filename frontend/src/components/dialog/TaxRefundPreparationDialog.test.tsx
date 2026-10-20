@@ -11,13 +11,19 @@ import { TaxRefundPreparationDialog } from './TaxRefundPreparationDialog';
 
 const mockGetPreparation = vi.fn();
 const mockExportPreparation = vi.fn();
+const mockConfirmPreparation = vi.fn();
+const mockDownload = vi.fn();
 
-vi.mock('@/services/sales.service', () => ({
-  salesService: {
-    getTaxRefundPreparation: (...args: unknown[]) => mockGetPreparation(...args),
-    exportTaxRefundPreparation: (...args: unknown[]) => mockExportPreparation(...args),
+vi.mock('@/services/taxRefund.service', () => ({
+  taxRefundService: {
+    getShipmentPreparation: (...args: unknown[]) => mockGetPreparation(...args),
+    exportShipmentPreparation: (...args: unknown[]) => mockExportPreparation(...args),
+    confirmShipmentPreparation: (...args: unknown[]) => mockConfirmPreparation(...args),
   },
 }));
+vi.mock('@/services/exportPacket.service', () => ({ exportPacketService: { download: (...args: unknown[]) => mockDownload(...args) } }));
+
+vi.mock('@/store/auth.store', () => ({ useAuthStore: (select: (state: { user: { role: string } }) => unknown) => select({ user: { role: 'ADMIN' } }) }));
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -102,9 +108,28 @@ describe('TaxRefundPreparationDialog', () => {
     expect(screen.getByText('2027-04-30')).toBeInTheDocument();
     expect(screen.getAllByText(/仍有采购合同未登记供应商发票号码/).length).toBeGreaterThan(0);
     expect(screen.getByText(/不是法定申报截止日/)).toBeInTheDocument();
-    expect(mockGetPreparation).toHaveBeenCalledWith('sales-1');
+    expect(mockGetPreparation).toHaveBeenCalledWith('sales-1', undefined);
   });
 
+  it('自动核验通过后一次确认并下载；回传版本防止确认旧资料', async () => {
+    const ready = { ...preparation, materialReady: true, materialBlockers: [], sourceVersion: 'a'.repeat(64), customsDeclarationId: 'cd-1', confirmationStatus: 'PENDING', declarations: [] };
+    mockGetPreparation.mockResolvedValue({ data: ready });
+    mockConfirmPreparation.mockResolvedValue({ data: { preparation: { ...ready, confirmationStatus: 'CONFIRMED' }, file: { id: 'file-1', fileName: '出货清单.xlsx' } } });
+    const onConfirmed = vi.fn();
+    render(<TaxRefundPreparationDialog open onOpenChange={vi.fn()} salesContractId="sales-1" contractNo="EXP260001" onConfirmed={onConfirmed} />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: '确认并生成清单' }));
+    expect(mockConfirmPreparation).toHaveBeenCalledWith('sales-1', { customsDeclarationId: 'cd-1', sourceVersion: 'a'.repeat(64) });
+    expect(mockDownload).toHaveBeenCalledWith('file-1', '出货清单.xlsx');
+    expect(onConfirmed).toHaveBeenCalledOnce();
+    expect(await screen.findByRole('button', { name: '下载已确认清单' })).toBeInTheDocument();
+  });
+  it('有缺件时不能确认，资料变化时明确要求重新确认', async () => {
+    mockGetPreparation.mockResolvedValue({ data: { ...preparation, sourceVersion: 'b'.repeat(64), materialReady: false, materialBlockers: preparation.blockers, confirmationStatus: 'CHANGED', declarations: [] } });
+    render(<TaxRefundPreparationDialog open onOpenChange={vi.fn()} salesContractId="sales-1" contractNo="EXP260001" />);
+    expect(await screen.findByRole('button', { name: '确认并生成清单' })).toBeDisabled();
+    expect(screen.getByText(/原归档保留/)).toBeInTheDocument();
+  });
   it('可导出内部材料准备 Excel', async () => {
     const user = userEvent.setup();
     render(
@@ -118,6 +143,6 @@ describe('TaxRefundPreparationDialog', () => {
     await screen.findByText(/财政部 税务总局公告2026年第11号/);
     await user.click(screen.getByRole('button', { name: '导出材料准备 Excel' }));
 
-    expect(mockExportPreparation).toHaveBeenCalledWith('sales-1', 'EXP260001');
+    expect(mockExportPreparation).toHaveBeenCalledWith('sales-1', undefined);
   });
 });

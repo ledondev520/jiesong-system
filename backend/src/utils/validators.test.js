@@ -93,7 +93,7 @@ test('validateRegister: 角色无效', async () => {
 
 test('validateRegister: 新角色 FINANCE 可通过', async () => {
   const req = createRequest({
-    body: { username: 'user2', password: 'pass123', name: '李四', role: 'FINANCE' },
+    body: { username: 'user2', password: 'test-only-password', name: '李四', role: 'FINANCE' },
   });
 
   await runValidations(validateRegister, req);
@@ -140,4 +140,17 @@ test('validateId: ID参数不能为空', async () => {
   assert.equal(capture.called, true);
   assert.equal(capture.error.statusCode, 400);
   assert.match(capture.error.message, /ID不能为空/);
+});
+
+test('validatePagination: 超大页码拒绝为 400，正常最大 pageSize 保持可用', async () => {
+  for (const [query, expectedStatus] of [
+    [{ page: '99999999999999999999999999', pageSize: '500' }, 400],
+    [{ page: '2', pageSize: '500' }, undefined],
+  ]) {
+    const req = createRequest({ query });
+    await runValidations(validatePagination, req);
+    const { next, capture } = createNextCapture();
+    handleValidation(req, {}, next);
+    assert.equal(capture.error?.statusCode, expectedStatus);
+  }
 });

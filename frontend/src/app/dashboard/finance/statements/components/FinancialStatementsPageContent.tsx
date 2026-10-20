@@ -6,8 +6,12 @@
 
 'use client';
 
+import { BusinessWrite, useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
+import { ErrorState } from '@/components/ui/data-state';
+import { Button } from '@/components/ui/button';
+import { clearApiGetCache } from '@/lib/axios';
 import { cachedFetch, invalidateCache } from '@/lib/api-cache';
 import {
   financialStatementsService,
@@ -26,6 +30,7 @@ import {
   type FinancialUploadFiles,
   type FinancialUploadFileType,
 } from './FinancialStatementsUploadDialog';
+import { ReceivableReconciliationCard } from './ReceivableReconciliationCard';
 
 const FinancialStatementsTabsSection = lazy(() =>
   import('./FinancialStatementsTabsSection').then((module) => ({
@@ -38,12 +43,15 @@ const FinancialEvidenceLibrary = lazy(() =>
 );
 
 export function FinancialStatementsPageContent() {
+  const readOnly = useBusinessReadOnly();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [periods, setPeriods] = useState<FinancialPeriod[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState('');
   const [currentDetail, setCurrentDetail] = useState<FinancialPeriod | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [detailError, setDetailError] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadFiles, setUploadFiles] = useState<FinancialUploadFiles>({
     statement: null,
@@ -63,6 +71,7 @@ export function FinancialStatementsPageContent() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const [analyticsData, periodsData] = await Promise.all([
         cachedFetch('fin-statements-analytics', () => financialStatementsService.getAnalytics()),
@@ -76,7 +85,7 @@ export function FinancialStatementsPageContent() {
         setSelectedPeriod(`${latest.year}-${latest.month}`);
       }
     } catch {
-      // Keep the page recoverable on empty or transient failure responses.
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -89,6 +98,8 @@ export function FinancialStatementsPageContent() {
     }
 
     setDetailLoading(true);
+    setDetailError(false);
+    setCurrentDetail(null);
     try {
       const detail = await cachedFetch(
         `fin-statements-detail-${year}-${month}`,
@@ -96,7 +107,7 @@ export function FinancialStatementsPageContent() {
       );
       setCurrentDetail(detail);
     } catch {
-      setCurrentDetail(null);
+      setDetailError(true);
     } finally {
       setDetailLoading(false);
     }
@@ -185,8 +196,8 @@ export function FinancialStatementsPageContent() {
   };
 
   const currentPeriod = periods.find((period) => `${period.year}-${period.month}` === selectedPeriod) ?? null;
-  const latestBs = currentDetail?.balanceSheet ?? analytics?.latestPeriod?.balanceSheet;
-  const latestIs = currentDetail?.incomeStatement ?? analytics?.latestPeriod?.incomeStatement;
+  const latestBs = selectedPeriod ? currentDetail?.balanceSheet : analytics?.latestPeriod?.balanceSheet;
+  const latestIs = selectedPeriod ? currentDetail?.incomeStatement : analytics?.latestPeriod?.incomeStatement;
   const debtRatioVal =
     latestBs?.totalAssets && latestBs?.totalLiabilities != null
       ? latestBs.totalLiabilities / latestBs.totalAssets
@@ -209,6 +220,7 @@ export function FinancialStatementsPageContent() {
     <div className="space-y-6" data-testid="financial-statements-page-content">
       <ModuleTabHeader tabs={FINANCE_TABS} moduleName="财务" />
 
+      {(loadError || detailError) && <ErrorState title={loadError ? '财务报表读取失败' : '所选账期读取失败'} description="当前金额未核实，请重试。" action={<Button variant="outline" onClick={() => { clearApiGetCache(); invalidateCache('fin-statements'); if (loadError) void loadData(); if (selectedPeriod) void loadDetail(selectedPeriod); }}>重试</Button>} />}
       {loading ? (
         <FinancialStatementsLoadingState />
       ) : (
@@ -230,6 +242,10 @@ export function FinancialStatementsPageContent() {
             warningAlerts={warningAlerts}
           />
 
+          {currentPeriod && (
+            <ReceivableReconciliationCard year={currentPeriod.year} month={currentPeriod.month} />
+          )}
+
           {hasData && analytics && showDrilldowns && (
             <Suspense fallback={<FinancialStatementsLoadingState count={2} />}>
               <FinancialStatementsTabsSection
@@ -242,10 +258,10 @@ export function FinancialStatementsPageContent() {
           )}
 
           <Suspense fallback={<FinancialStatementsLoadingState count={2} />}>
-            <FinancialEvidenceLibrary />
+            {!readOnly && <FinancialEvidenceLibrary />}
           </Suspense>
 
-          <FinancialStatementsUploadDialog
+          <BusinessWrite>          <FinancialStatementsUploadDialog
             open={uploadDialogOpen}
             onOpenChange={(open) => {
               setUploadDialogOpen(open);
@@ -282,7 +298,7 @@ export function FinancialStatementsPageContent() {
               generalLedger: generalLedgerFileInputRef,
             }}
             onClearFiles={resetUpload}
-          />
+          /></BusinessWrite>
         </>
       )}
     </div>

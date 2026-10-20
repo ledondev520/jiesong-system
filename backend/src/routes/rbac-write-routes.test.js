@@ -1,5 +1,5 @@
 /**
- * Input: 路由源码文件
+ * Input: 路由源码文件与明确列举的公开认证入口
  * Output: 写操作路由 RBAC 覆盖测试结果
  * Pos: 后端路由权限测试，确保所有写路由均接入 roleAuth
  *
@@ -15,7 +15,13 @@ const ROUTES_DIR = path.resolve(__dirname);
 const WRITE_METHODS = ['post', 'put', 'patch', 'delete'];
 const PUBLIC_WRITE_ROUTES = new Set([
   'auth POST /login',
+  // Self-cookie revocation has session-bound CSRF verification, even after account expiry.
+  'auth POST /logout',
   'auth POST /reset-password',
+  'auth POST /reset-password-code',
+  // 邮箱验证码注册在登录前完成；限流和校验由 auth 路由与注册服务执行。
+  'auth POST /email-code',
+  'auth POST /email-register',
   'ai POST /anthropic/v1/messages',
   'ai POST /anthropic/v1/messages/count_tokens',
   'mcp POST /',
@@ -73,4 +79,25 @@ test('RBAC: all write routes include roleAuth protection', () => {
     [],
     `以下写路由缺少 roleAuth: ${missingRoleAuth.join(', ')}`
   );
+});
+
+test('RBAC: 邮箱注册公开入口保留限流校验，管理员创建用户仍受保护', () => {
+  const source = fs.readFileSync(path.join(ROUTES_DIR, 'auth.js'), 'utf8');
+  const blocks = getWriteRouteBlocks(source);
+  for (const routePath of ['/email-code', '/email-register', '/reset-password-code']) {
+    const block = blocks.find((item) => getRouteInfo('auth.js', item).routeKey === `auth POST ${routePath}`);
+    assert.ok(block, `${routePath} 必须显式存在`);
+    assert.match(block, /(?:strictRateLimit|rateLimit)\(/);
+    assert.match(block, /emailRule\(\)/);
+    assert.match(block, /handleValidation/);
+  }
+  const adminRegistration = blocks.find((item) => getRouteInfo('auth.js', item).routeKey === 'auth POST /register');
+  assert.ok(adminRegistration);
+  assert.match(adminRegistration, /authenticate/);
+  assert.match(adminRegistration, /roleAuth\('ADMIN'\)/);
+});
+
+test('logout owns cookie CSRF validation rather than bearer role authorization', () => {
+  const service = fs.readFileSync(path.resolve(ROUTES_DIR, '../services/browserSessionService.js'), 'utf8');
+  assert.match(service, /if \(token\) \{ requireCsrf\(req, token\); await revoke\(token\); \}/);
 });

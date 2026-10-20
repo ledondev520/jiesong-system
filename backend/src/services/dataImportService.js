@@ -8,6 +8,7 @@
 
 const Papa = require('papaparse');
 const prisma = require('../utils/prisma');
+const { isFormalSalesAmount } = require('./salesContractAmount');
 
 // ==================== 配置映射 ====================
 
@@ -826,10 +827,12 @@ const addSalesItemIfNeeded = async (record, salesContract, product, store, cache
 
   results.created.salesItems += 1;
 
-  await tx.salesContract.update({
-    where: { id: salesContract.id },
-    data: { totalAmount: { increment: record.sellingPrice * record.quantity } },
-  });
+  if (!isFormalSalesAmount(salesContract)) {
+    await tx.salesContract.update({
+      where: { id: salesContract.id },
+      data: { totalAmount: { increment: record.sellingPrice * record.quantity } },
+    });
+  }
 };
 
 const addContainerItemIfNeeded = async (record, container, product, store, cache, results, tx = prisma) => {

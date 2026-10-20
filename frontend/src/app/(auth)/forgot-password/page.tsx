@@ -1,226 +1,229 @@
-/**
- * Input: 找回密码API
- * Output: 找回密码页面
- * Pos: 认证模块，处理用户忘记密码后的密码重置
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
- */
+/** Input: bound-email OTP API; Output: password recovery and explicit legacy-account support. */
+"use client";
 
-'use client';
-
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import type { ApiResponse } from '@/types';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-  FormDescription,
-} from '@/components/ui/form';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { toast } from 'sonner';
-import { CheckCircle, ArrowLeft, KeyRound } from 'lucide-react';
-import { authService } from '@/services/auth.service';
-
-// 找回密码表单验证Schema
-const forgotPasswordSchema = z.object({
-  username: z.string().min(1, '请输入用户名'),
-  phone: z
-    .string()
-    .regex(/^1[3-9]\d{9}$/, '请输入有效的手机号码'),
-  newPassword: z
-    .string()
-    .min(6, '新密码至少6个字符')
-    .max(32, '密码最多32个字符'),
-  confirmPassword: z.string(),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: '两次输入的密码不一致',
-  path: ['confirmPassword'],
-});
-
-type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { toast } from "sonner";
+import { authService } from "@/services/auth.service";
+import { useAuthStore } from "@/store/auth.store";
+import { isValidPassword, PASSWORD_MESSAGE } from "@/lib/password-policy";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [resetUsername, setResetUsername] = useState('');
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [sending, setSending] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+  const emailInput = useRef<HTMLInputElement>(null);
+  const busy = sending || submitting;
 
-  const form = useForm<ForgotPasswordFormValues>({
-    resolver: zodResolver(forgotPasswordSchema),
-    defaultValues: {
-      username: '',
-      phone: '',
-      newPassword: '',
-      confirmPassword: '',
-    },
-  });
+  useEffect(() => {
+    if (!seconds) return;
+    const timer = setTimeout(() => setSeconds(seconds - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [seconds]);
 
-  /**
-   * 职责：提交找回密码表单
-   * 思路：
-   * 1. 调用后端验证用户名+手机号
-   * 2. 验证通过后重置密码
-   * 3. 显示成功页面
-   */
-  async function onSubmit(data: ForgotPasswordFormValues) {
-    setIsLoading(true);
-
+  const sendCode = async () => {
+    if (!emailInput.current?.reportValidity()) return;
+    setSending(true);
+    setError("");
+    setNotice("");
+    setCode("");
     try {
-      const result: ApiResponse<null> = await authService.resetPassword({
-        username: data.username,
-        phone: data.phone,
-        newPassword: data.newPassword,
+      await authService.sendResetPasswordCode(email.trim().toLowerCase());
+      setSeconds(60);
+      setNotice(
+        "如果该邮箱绑定了可用账号，将收到验证码，10分钟内有效。未收到可查看垃圾邮件或联系管理员。",
+      );
+    } catch (err) {
+      setError(
+        err && typeof err === "object" && "message" in err
+          ? String(err.message)
+          : "发送失败，请稍后重试",
+      );
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    if (!isValidPassword(newPassword)) {
+      setError(PASSWORD_MESSAGE);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("两次输入的密码不一致");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await authService.resetPassword({
+        email: email.trim().toLowerCase(),
+        code,
+        newPassword,
       });
-      
-      if (result.code === 200) {
-        setResetUsername(data.username);
-        setIsSuccess(true);
-        toast.success('密码重置成功！');
-      } else {
-        throw new Error(result.message || '密码重置失败');
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '密码重置失败，请检查信息是否正确';
+      setNewPassword("");
+      setConfirmPassword("");
+      setCode("");
+      useAuthStore.getState().logout();
+      setDone(true);
+      toast.success("密码重置成功！");
+    } catch (err) {
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String(err.message)
+          : "密码重置失败，请重新获取验证码";
+      setError(message);
       toast.error(message);
     } finally {
-      setIsLoading(false);
+      setSubmitting(false);
     }
-  }
-
-  // 重置成功后的展示
-  if (isSuccess) {
-    return (
-      <div className="auth-shell">
-        <Card className="auth-card">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-primary/20 bg-primary/10">
-              <CheckCircle className="h-10 w-10 text-primary" />
-            </div>
-            <CardTitle>密码重置成功！</CardTitle>
-            <CardDescription>
-              您的密码已成功重置，请使用新密码登录。
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg bg-muted p-4 text-sm">
-              <p className="text-muted-foreground">
-                账号：<span className="font-mono text-foreground">{resetUsername}</span>
-              </p>
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button className="h-10 w-full rounded-xl" onClick={() => router.push('/login')}>
-              返回登录
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    );
-  }
+  };
 
   return (
     <div className="auth-shell">
       <Card className="auth-card">
         <CardHeader>
-          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full border border-primary/30 bg-primary/10">
-            <KeyRound className="h-6 w-6 text-primary" />
-          </div>
-          <CardTitle className="text-center">找回密码</CardTitle>
-          <CardDescription className="text-center">
-            请输入您的用户名和注册时绑定的手机号进行验证
+          <CardTitle>{done ? "密码重置成功！" : "找回密码"}</CardTitle>
+          <CardDescription>
+            {done
+              ? "已有登录会话已失效，请使用新密码重新登录。"
+              : "使用账号已绑定的邮箱接收验证码，验证邮箱后重置密码。"}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              {/* 用户名 */}
-              <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>用户名</FormLabel>
-                    <FormControl>
-                      <Input placeholder="请输入您的用户名" className="rounded-xl bg-background/70" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* 手机号验证 */}
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>绑定手机号</FormLabel>
-                    <FormControl>
-                      <Input placeholder="请输入注册时绑定的手机号" type="tel" className="rounded-xl bg-background/70" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      输入注册时填写的手机号以验证身份
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* 新密码 */}
-              <FormField
-                control={form.control}
-                name="newPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>新密码</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="请设置新密码（至少6位）" className="rounded-xl bg-background/70" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* 确认新密码 */}
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>确认新密码</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="请再次输入新密码" className="rounded-xl bg-background/70" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <Button type="submit" className="h-10 w-full rounded-xl" disabled={isLoading}>
-                {isLoading ? '验证中...' : '重置密码'}
+          {done ? (
+            <Button className="w-full" onClick={() => router.push("/login")}>
+              返回登录
+            </Button>
+          ) : (
+            <form onSubmit={submit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="recovery-email">绑定邮箱</Label>
+                <Input
+                  ref={emailInput}
+                  id="recovery-email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  maxLength={254}
+                  disabled={busy}
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setCode("");
+                    setNotice("");
+                  }}
+                  placeholder="请输入账号已绑定的邮箱"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="recovery-code">邮箱验证码</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="recovery-code"
+                    className="min-w-0"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    required
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    disabled={busy}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="6位验证码"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="shrink-0"
+                    disabled={busy || seconds > 0}
+                    onClick={sendCode}
+                  >
+                    {sending
+                      ? "发送中…"
+                      : seconds
+                        ? `${seconds}秒后重发`
+                        : "获取验证码"}
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="recovery-password">新密码</Label>
+                <Input
+                  id="recovery-password"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  maxLength={72}
+                  disabled={busy}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="至少8个字符"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {PASSWORD_MESSAGE}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="recovery-confirm">确认新密码</Label>
+                <Input
+                  id="recovery-confirm"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  disabled={busy}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+              {notice && (
+                <p role="status" className="text-sm text-muted-foreground">
+                  {notice}
+                </p>
+              )}
+              {error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
+              <p className="text-sm text-muted-foreground">
+                旧账号未绑定邮箱、邮箱无法使用或账号尚未开通/已停用，请联系管理员核实身份。手机号和用户名不能用于直接重置密码。
+              </p>
+              <Button type="submit" className="w-full" disabled={busy}>
+                {submitting ? "验证中…" : "重置密码"}
               </Button>
             </form>
-          </Form>
+          )}
         </CardContent>
-        <CardFooter className="flex justify-center">
-          <Link 
-            href="/login" 
-            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            返回登录
-          </Link>
-        </CardFooter>
+        {!done && (
+          <CardFooter>
+            <Button asChild variant="ghost" className="w-full">
+              <Link href="/login">返回登录</Link>
+            </Button>
+          </CardFooter>
+        )}
       </Card>
     </div>
   );

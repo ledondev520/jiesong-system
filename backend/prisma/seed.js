@@ -1,13 +1,13 @@
 /**
- * Input: Prisma客户端、bcryptjs
- * Output: 初始化数据库种子数据
+ * Input: Prisma客户端、显式初始化密码
+ * Output: 初始化数据库种子数据，不重置既有安全密码
  * Pos: 数据库初始化脚本
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcryptjs');
+const { ensureBootstrapAdmin } = require('../src/services/bootstrapAdmin');
 
 const prisma = new PrismaClient();
 
@@ -15,27 +15,9 @@ async function main() {
   console.log('开始初始化数据库...');
   
   // 1. 创建管理员用户
-  const configuredAdminPassword = process.env.DEFAULT_ADMIN_PASSWORD;
-  const adminPlainPassword = configuredAdminPassword || '123456';
-  const adminPassword = await bcrypt.hash(adminPlainPassword, 12);
+  await ensureBootstrapAdmin(prisma, { allowCreate: true });
+  console.log('✓ 管理员已初始化或验证，未覆盖既有安全密码');
 
-  await prisma.user.upsert({
-    where: { username: 'admin' },
-    update: { password: adminPassword },
-    create: {
-      username: 'admin',
-      password: adminPassword,
-      name: '管理员',
-      role: 'ADMIN',
-    },
-  });
-  if (configuredAdminPassword) {
-    console.log('✓ 管理员用户创建成功 (admin / 来自 DEFAULT_ADMIN_PASSWORD)');
-  } else {
-    console.log('✓ 管理员用户创建成功 (admin / 默认测试密码 123456)');
-    console.log('⚠️  当前为测试模式默认密码，请在生产环境配置 DEFAULT_ADMIN_PASSWORD');
-  }
-  
   // 2. 创建港口数据
   const ports = [
     { name: '洛杉矶', code: 'LA' },
@@ -90,7 +72,7 @@ async function main() {
 
 main()
   .catch((e) => {
-    console.error('初始化失败:', e);
+    console.error('初始化失败，请检查管理员初始化配置或数据库结构');
     process.exit(1);
   })
   .finally(async () => {

@@ -1,0 +1,31 @@
+# 前端业务 API 服务
+
+若本文件夹结构或内容变化，请更新本文件。
+
+此目录封装业务 API 和 DTO，界面通过服务调用后端；鉴权仍由共享 Axios 和后端校验。
+
+## 收付请求
+
+`finance.service.ts` / `.test.ts`：创建付款前复制平面输入，使用 `lib/idempotentRequest.ts` 的异步 SHA-256 标识。HTTP 标识固定 83 个 ASCII 字符，完整 UTF-8 JSON 内容参与摘要；相同 JSON 重试稳定、不同长备注不截断。失败清除短期本地缓存，再次点击沿用同一标识。
+
+`purchaseReceipt.service.ts` 仅复用已有 `runIdempotentRequest`，其请求编号与后端协议不变。
+
+新建有 `sourcePaymentId` 的收款必须通过 `finance.service.ts` 的 `allocatePayment` 使用后端同一事务余额校验；通用创建请求保留该字段仅用于历史幂等键的只读重放，并标注弃用。普通到账/直接合同收款保持原接口，历史 Payment 响应中的来源关联字段不删除。
+
+## 浏览器会话
+
+`auth.service.ts` 提供无缓存恢复、可取消登录和单次退出请求；Axios、合同附件multipart、退税POST导出和AI流式POST均兼容HttpOnly Cookie与内存CSRF。未勾选保持登录仍使用本标签Bearer。完整安全边界见 `docs/security/browser-sessions.md`。
+
+## 合同附件二进制
+
+`contractFile.service.ts` 的 `fetchContractFileBlob` 复用共享 Axios 的标签 Bearer/可选 Cookie 请求与取消信号，明确关闭 JSON GET 缓存；JSON Blob 错误保留可读的服务端错误，空响应/成功 JSON 不冒充文件。`isContractFilePreviewMime` 只允许 PDF 和栅格图片嵌入；角色和受保护文档权限仍由后端实时执行。测试使用真实 Axios 拦截器和本地合成 adapter，不访问业务文件。
+
+## 报关单
+
+报关 `customsDeclaration.service.ts` 的写入 DTO 仅包含真实表头字段及带 productId/customsName 的商品明细；明细 id 用于编辑，declaredAt 与 exportDate 分别表示申报、出口日期。
+
+## 三表工作簿下载
+
+`threeForms.service.ts` 沿用共享 Axios 认证传输，在单次请求的 transformResponse 中提取文件名响应头，再消费拦截器直接返回的完整 Blob，明确关闭该二进制请求的 JSON GET 缓存并复用现有文件保存工具。`threeForms.download.test.ts` 通过真实 Axios 拦截器及本地合成 adapter 验证 UTF-8/引号/缺失文件名、字节保持、重复读取当前响应与失败零保存/明确重试；不访问网络、业务文件或启动浏览器，不改变共享拦截器或其他请求的缓存规则。
+
+- `catalog-import.service.ts` 调用 ADMIN 批量模板、只读预览与执行接口；模板下载使用现有文件保存工具与认证传输。

@@ -117,6 +117,7 @@ METRICS.md
 /skills/
 ops/
 state/byterover-home/
+/state/wechat-group-agent/
 
 # ============================================================
 # docs 下的内部过程产物（保留 api-contracts、PRD、架构文档）
@@ -178,3 +179,11 @@ TUNNEL_URL.txt
 # ByteRover — .brv/context-tree/ contains a nested .git managed by brv vc.
 # Without these entries, `git add .` fails with "does not have a commit checked out".
 .brv/
+backend/state/wps-sync/
+
+# Local export history source workbooks are Confidential, never versioned.
+/data/export-history/
+
+# Atomic export pricing configuration updates
+config/pricing.json.lock
+config/pricing.json.*.tmp

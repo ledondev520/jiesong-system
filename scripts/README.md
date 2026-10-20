@@ -9,11 +9,14 @@
 
 | 文件名 | 地位 | 功能 |
 |--------|------|------|
+| check-pr-format.cjs / check-pr-format.test.cjs | CI 工具与回归 | 完整历史下按 PR base/head 检查改动 TS/TSX 源码；特殊路径、浅历史和失败摘要回归 |
 | fix_export_contracts.js | 数据修复 | 修复出口合同的美元金额 + 创建装箱明细（已修正箱数逻辑） |
 | fix_boxes_data.js | 数据修复 | 修复EXP25合同中被错误填充的箱数数据（置空处理） |
 | import_contracts_data.js | 数据导入 | 导入采购合同数据 |
 | import_declaration_data.js | 数据导入 | 导入报关单数据 |
 | import_export_contracts.js | 数据导入 | 导入出口合同数据 |
+| import_formal_sales_contract_amounts.js | 数据修复 | 从受限 JSON 导入已核验的正式 EXP 美元合同金额并锁定金额来源，防止装箱明细覆盖；默认 dry-run，`--apply` 写库，日志不输出合同金额 |
+| import_prices_from_excel.js | 数据修复 | 从历史发票表补装箱单价和货值；已锁定的正式合同金额保持不变 |
 | extract_contracts.py | 数据提取 | Python脚本，提取合同数据 |
 | extract_export_contracts.py | 数据提取 | 提取出口合同数据 |
 | extract_export_complete.py | 数据提取 | 完整提取出口数据 |
@@ -34,6 +37,9 @@
 | import_wps_purchase_evidence.js | 数据导入 | 基于采购合同凭证抽取结果幂等补齐供应商字段、商品、采购合同和采购明细；默认 dry-run，显式 `--apply` 后才写库；显式 `--allow-header-only-contracts` 后可只创建合同头 DRAFT、不创建明细 |
 | import_wps_202607_update.js | 数据导入 | WPS 2026-07 增量幂等导入：EXP260008/EXP260009 出口合同全量（明细/装箱/附件）、EXP260004 头修复、CG2600035/CG2600040 采购补建、招行 2026-05/06 流水付款收款登记（按 idempotencyKey 去重）；源文件在 `docs/wps-import/2026-07/`；默认 dry-run，`--apply` 写库；本地与 VPS 各跑一次即两侧一致 |
 | import_shipment_summary_incremental.js | 数据导入 | 对受限归档的最新 `出货汇总.xlsx` 做严格 SHA-256 校验，只新增 EXP260010/EXP260011、已裁决的 PENDING 异常占位与对应装箱行；不覆盖现有合同/明细，不把人民币采购金额写成 USD 装箱售价；默认 dry-run，`--apply` 单事务写库 |
+| run_wps_sync.js | 自动同步执行 | 消费本轮新下载xlsx，串行锁、步骤限时、在线SQLite备份、摘要事务写入和复核；保存受限状态与回执；旧下载/失败保留上次成功时间，浏览器重连与每小时调度由当前Codex任务负责 |
+| sync_shipment_summary.js | 数据同步 | WPS 并行期完整下载表的差异同步；调用者确认云端版本，以 SHA-256 和预览摘要锁定输入，备份后指定 `--apply-plan` 写入；出货汇总为装箱资料主准，唯一匹配的厂家、箱规及箱重体积可更新；同商品多批次按数量箱数、必要时毛重净重双向唯一匹配；完全相同的独立批次仅在源库行数相等时逐行保留；已核实历史名称别名在来源与已有装箱行两侧统一，喷涂铝型材可匹配基础名，仍拒绝多候选歧义；门店英文忽略大小写；同数量同规格且唯一的历史行可补空采购号；支持单个前括号、同单位加法及明确“报”数量；同合同商品采购号单位的分店数量精确加总等于括号合计时取本店数，无法抵平或门店重复仍拒绝；板材片数与面积按毫米规格精确换算吻合时拆解双单位，片数为主并保留面积补充信息；无共用箱重金额的剩余货备注明确列出玻璃门和不锈钢门数量时拆解为两行，保留源行号且不猜包装或价格；未报关引用的装箱数量按源纠正，不重算历史金额或触发库存；已有报关引用的数量、无法区分的重复键及归属冲突保留核对；新合同沿用系统默认参考汇率并标注待确认，无日期不标发运；不删除、不改已有财务金额；唯一匹配的空采购成本按源补齐，新行记录源采购成本；发票号码按文本规范化，只补唯一匹配空号，新行保留源号；格式/数值精度异常及已有异号只提示，不改原号；已有金额按系统分位精度比较，仅提示真实差异，不按金额不同的同物理批次猜分配；合同汇总提示附未匹配装箱行 ID 供私有审计；结果目录 0700、文件 0600 |
+| resolve_pending_shipments.js | 数据归并 | 同步后按唯一源行和正式装箱核对 PENDING；无引用的零数量占位可补全迁移，等价重复行保留来源后合并；库存需源行与正式装箱双重匹配且无重复；父占位全部关联和金额归零才删除；默认预览，备份后用 `--apply-plan` 摘要写入 |
 | verify_tax_refund_invoices.js | 数据核对 | 按出货汇总的发票号码精确查询本地发票记录或税务数字账户导出清单，核验销方、价税合计、品名与状态；只读，输出受限 JSON/CSV，不绕过验证码 |
 | import_tax_refund_customs_xml.js | 数据导入 | 解析海关解密 XML，按报关品名、数量、已有 HS 与已有金额唯一命中装箱明细后，幂等关联报关单和出口合同；XML 合同号错位必须用 `--map` 显式传入业务确认映射；默认 dry-run，不创建退税草稿 |
 | build_wps_import_decision_packet.py | 数据核对 | 聚合 WPS 导入剩余待业务裁决事项，补充旧装箱候选、销售源行、同商品装箱候选、现库销售摘要、销售门店冲突、路径门店推断复核项，以及真实凭证缺口的同目录云端索引/正式编号对照，输出 CSV/JSON/Markdown 裁决包，不写库 |
@@ -343,3 +349,38 @@ python scripts/analyze_wps_formal_customs_source_gaps.py
 
 ## 更新记录
 - 2026-01-26: 修正 fix_export_contracts.js 中的箱数逻辑，新增 fix_boxes_data.js
+
+采购凭据税率解析保留显式 `%/％` 单位（1%→1），仅无百分号的小数按Excel比例换算；PDF和正文提取不得丢失百分号语义。回归：`python3 -m unittest scripts.test_wps_purchase_tax_rate`。
+
+VPS 发布后运行 `node scripts/verify-vps-runtime.cjs https://celerada.link` 核对真实进程与公网构建；其回归检查为 `node --test scripts/verify-vps-runtime.test.cjs`。
+
+## Portable export-packet paths
+
+`prepare_export_packet.py` resolves paths in this order: CLI option, environment variable, repository default.
+
+| Option | Environment variable | Default |
+| --- | --- | --- |
+| `--database` | `JIESONG_EXPORT_DATABASE` | `backend/prisma/dev.db` relative to repository |
+| `--history-root` | `JIESONG_HISTORY_ROOT` | `data/export-history` relative to repository |
+
+Paths support `~`; explicit relative paths resolve against the working directory. The script does not load `.env`.
+Put local history workbooks in the selected directory. An absent/empty history directory gives no historical quotes; it does not fabricate evidence. The SQLite database must already exist. Keep business workbooks and databases outside Git. Pricing formulas are unchanged.
+
+`drill_sqlite_restore.py --directory <不存在的临时目录>` 使用已提交迁移和合成商品/期初库存，调用真实备份恢复CLI并保存独立读回回执。它不访问已有库或.env。详见 `docs/operations/sqlite-backup-restore.md`。
+
+## 可配置出口报价
+
+`prepare_export_packet.py` 通过 `pricing_config.py` 读取仓库的
+`config/pricing.json`，或与后端相同的 `JIESONG_PRICING_CONFIG` 显式文件。
+校验范围来自同一 `config/pricing.schema.json`。默认 tiered、汇率调整 -0.2、
+有退税加价 0.3、零退税上限 0.1，multiplier 模式的乘数默认为 1.3。
+所有模式沿用原有凑整规则，multiplier 对全部已核验退税商品使用同一目标加价。
+旧 `--fx-buffer`、`--refundable-markup`、`--no-refund-markup` 仅接受与共用文件一致的值，
+不再允许成为独立的报价配置来源。非法文件或值拒绝运行，日志只含文件指纹。
+
+`pricing_snapshot.cjs` 与 `tests/pricing_snapshot.py` 只运行合成输入和模拟来源。
+`verify_pricing_defaults.py --baseline-root <纯Git导出目录> --evidence <临时目录>`
+比较旧、新完整 JSON，并生成 SHA-256 回执。旧目录需能使用原有后端依赖。
+不读取真实库、税则 DBF 或历史工作簿。
+readiness 的新推荐价和定价元数据必须符合 `tests/fixtures/pricing-readiness-defaults.json`。
+`test_verify_pricing_defaults.py` 验证错误价格及元数据会使检查失败。

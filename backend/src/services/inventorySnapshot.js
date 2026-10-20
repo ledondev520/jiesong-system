@@ -1,11 +1,12 @@
 /**
  * Input: PrismaClient、库存/采购/销售模型
- * Output: 库存快照与库存出入库服务能力
+ * Output: 库存快照与库存出入库服务能力；自有货物无效数量拒绝登记发运
  * Pos: 统一处理库存快照、采购入库建档和销售出库扣减，确保财务金额对齐
  */
 
 const { createError } = require('../middleware/errorHandler');
 const prisma = require('../utils/prisma');
+const { buildDerivedSalesAmountUpdate, isJiesongOwnedPackingItem } = require('./salesContractAmount');
 const { INVENTORY_STATUS } = require('../config/constants');
 
 const clampNumber = (value, fallback = 0) => {
@@ -101,24 +102,32 @@ const reconcilePurchaseFinancials = async (tx, purchaseContractId) => {
 };
 
 /**
- * 重新计算销售合同财务金额（totalAmount）。
- * 说明：销售明细 sellingPrice/costPrice 为单价，合同金额需按 quantity * 单价对齐。
+ * 重新计算销售明细金额和成本；仅 DERIVED 合同同步 totalAmount。
+ * 说明：FORMAL_DOCUMENT 金额来自正式合同，销售明细变化不得覆盖。
  */
 const reconcileSalesFinancials = async (tx, salesContractId) => {
-  const items = await getDefaultSnapshotInput(tx).salesItem.findMany({
-    where: { salesContractId },
-    select: {
-      quantity: true,
-      sellingPrice: true,
-      costPrice: true,
-    },
-  });
+  const db = getDefaultSnapshotInput(tx);
+  const [contract, items] = await Promise.all([
+    db.salesContract.findUnique({
+      where: { id: salesContractId },
+      select: { amountSource: true, packingItems: { select: { totalPrice: true, purchaseCost: true, isOwnedByJiesong: true, note: true } } },
+    }),
+    db.salesItem.findMany({
+      where: { salesContractId },
+      select: {
+        quantity: true,
+        sellingPrice: true,
+        costPrice: true,
+      },
+    }),
+  ]);
 
-  const totalAmountRaw = items.reduce(
+  const packingItems = contract?.packingItems || [];
+  const totalAmountRaw = packingItems.length ? packingItems.reduce((sum, item) => sum + clampNumber(item.totalPrice, 0), 0) : items.reduce(
     (sum, item) => sum + clampNumber(item.quantity, 0) * clampNumber(item.sellingPrice, 0),
     0,
   );
-  const totalCostRaw = items.reduce(
+  const totalCostRaw = packingItems.length ? packingItems.filter(isJiesongOwnedPackingItem).reduce((sum, item) => sum + clampNumber(item.purchaseCost, 0), 0) : items.reduce(
     (sum, item) => sum + clampNumber(item.quantity, 0) * clampNumber(item.costPrice, 0),
     0,
   );
@@ -127,89 +136,24 @@ const reconcileSalesFinancials = async (tx, salesContractId) => {
   const totalCost = toMoney(totalCostRaw, 2);
   const grossProfit = toMoney(totalAmountRaw - totalCostRaw, 2);
 
-  await getDefaultSnapshotInput(tx).salesContract.update({
+  await db.salesContract.update({
     where: { id: salesContractId },
-    data: { totalAmount },
+    data: buildDerivedSalesAmountUpdate(contract, totalAmount),
   });
 
   return {
     totalAmount,
     totalCost,
-    grossProfit,
+    // 装箱收入为USD、采购成本为CNY，毛利交由 salesFinanceService 换汇计算。
+    grossProfit: packingItems.length ? null : grossProfit,
   };
 };
 
-/**
- * 自动创建入库库存。
- * - 每个采购明细创建一条 INBOUND 记录
- * - 若历史已存在对应 purchaseItemId 的库存记录，则自动跳过，保证幂等
- */
+/** 兼容旧调用名：收货必须有全量合格证据，库存已在验货事务按增量建立，不能再次整单入库。 */
 const applyPurchaseInStock = async (tx, purchaseContractId) => {
-  const contract = await getDefaultSnapshotInput(tx).purchaseContract.findUnique({
-    where: { id: purchaseContractId },
-    include: {
-      items: {
-        select: {
-          id: true,
-          productId: true,
-          quantity: true,
-          unit: true,
-        },
-      },
-    },
-  });
-
-  if (!contract) {
-    throw createError('采购合同不存在', 404);
-  }
-
-  const eligibleItems = (contract.items || []).filter((item) => clampNumber(item.quantity, 0) > 0);
-
-  if (eligibleItems.length === 0) {
-    await reconcilePurchaseFinancials(tx, purchaseContractId);
-    return { created: 0, skipped: 0 };
-  }
-
-  const purchaseItemIds = eligibleItems
-    .map((item) => item.id)
-    .filter((id) => !!id);
-
-  const existing = purchaseItemIds.length
-    ? await getDefaultSnapshotInput(tx).inventory.findMany({
-      where: { purchaseItemId: { in: purchaseItemIds } },
-      select: { purchaseItemId: true },
-    })
-    : [];
-
-  const existingSet = new Set(existing.map((item) => item.purchaseItemId));
-  const now = new Date();
-  const createdRows = eligibleItems
-    .map((item) => ({
-      productId: item.productId,
-      purchaseItemId: item.id,
-      quantity: clampNumber(item.quantity, 0),
-      unit: item.unit,
-      status: INVENTORY_STATUS.INBOUND,
-      inboundAt: now,
-      note: `采购入库（${contract.contractNo || 'N/A'}）`,
-    }))
-    .filter((item) => item.quantity > 0 && !existingSet.has(item.purchaseItemId));
-
-  if (createdRows.length > 0) {
-    await getDefaultSnapshotInput(tx).inventory.createMany({
-      data: createdRows,
-    });
-  }
-
-  const created = createdRows.length;
-  const skipped = eligibleItems.length - created;
-
-  await reconcilePurchaseFinancials(tx, purchaseContractId);
-
-  return {
-    created,
-    skipped,
-  };
+  const { assertPurchaseReceiptComplete } = require('./purchaseReceiptService');
+  const summary = await assertPurchaseReceiptComplete(tx, purchaseContractId);
+  return { created: 0, skipped: summary.items.length };
 };
 
 const allocateInboundInventory = async ({
@@ -217,6 +161,7 @@ const allocateInboundInventory = async ({
   productId,
   salesItemId,
   salesContractId,
+  purchaseItemId,
   quantity,
   unit,
   at,
@@ -230,6 +175,8 @@ const allocateInboundInventory = async ({
   const availableInventories = await getDefaultSnapshotInput(tx).inventory.findMany({
     where: {
       productId,
+      ...(purchaseItemId ? { purchaseItemId } : {}),
+      ...(normalizedUnit ? { OR: [{ unit: normalizedUnit }, { unit: null }] } : {}),
       status: INVENTORY_STATUS.INBOUND,
       salesItemId: null,
     },
@@ -295,6 +242,8 @@ const allocateInboundInventory = async ({
         data: {
           productId,
           purchaseItemId: item.purchaseItemId,
+          receiptInspectionId: item.receiptInspectionId,
+          inboundAt: item.inboundAt,
           salesItemId,
           salesContractId,
           quantity: outQty,
@@ -330,7 +279,7 @@ const allocateInboundInventory = async ({
 const applySalesOutStock = async (tx, salesContractId) => {
   const contract = await getDefaultSnapshotInput(tx).salesContract.findUnique({
     where: { id: salesContractId },
-    include: { items: true },
+    include: { items: true, packingItems: true },
   });
 
   if (!contract) {
@@ -340,17 +289,22 @@ const applySalesOutStock = async (tx, salesContractId) => {
   const now = new Date();
   const results = [];
 
-  for (const item of contract.items || []) {
-    const needed = clampNumber(item.quantity, 0);
-    if (needed <= 0) {
-      continue;
+  // 装箱是当前出口的主来源；旧销售明细只在没有装箱行时兼容，不能双计。
+  const packingItems = contract.packingItems || [];
+  const shipmentItems = packingItems.length ? packingItems.filter(isJiesongOwnedPackingItem) : (contract.items || []);
+  for (const item of shipmentItems) {
+    // 草稿可以暂存未完成数量；实际发运不得静默跳过自有货物的无效出库量。
+    const needed = Number(item.quantity);
+    if (!Number.isFinite(needed) || needed <= 0) {
+      throw createError('自有出库商品数量必须为正数，请先完善装箱或销售明细', 400);
     }
 
     const allocation = await allocateInboundInventory({
       tx,
       productId: item.productId,
-      salesItemId: item.id,
+      salesItemId: packingItems.length ? null : item.id,
       salesContractId,
+      purchaseItemId: item.purchaseItemId,
       quantity: needed,
       unit: item.unit,
       at: now,
@@ -360,13 +314,14 @@ const applySalesOutStock = async (tx, salesContractId) => {
       continue;
     }
 
-    await getDefaultSnapshotInput(tx).salesItem.update({
+    if (!packingItems.length) await getDefaultSnapshotInput(tx).salesItem.update({
       where: { id: item.id },
       data: { costPrice: allocation.averageCost },
     });
 
     results.push({
-      salesItemId: item.id,
+      salesItemId: packingItems.length ? null : item.id,
+      ...(packingItems.length ? { packingItemId: item.id } : {}),
       productId: item.productId,
       ...allocation,
     });
@@ -385,6 +340,9 @@ const applySalesOutStock = async (tx, salesContractId) => {
  * - 保证幂等性
  */
 const revertPurchaseInStock = async (tx, purchaseContractId) => {
+  if (await tx.purchaseReceipt.count({ where: { purchaseContractId } }) > 0) {
+    throw createError('已有分批验货记录的库存不可直接回滚', 400);
+  }
   const contract = await getDefaultSnapshotInput(tx).purchaseContract.findUnique({
     where: { id: purchaseContractId },
     include: { items: true },
@@ -434,14 +392,10 @@ const revertSalesOutStock = async (tx, salesContractId) => {
     .map(item => item.id)
     .filter(id => !!id);
 
-  if (salesItemIds.length === 0) {
-    return { reverted: 0 };
-  }
-
   // 查找相关的出库库存记录
   const outboundInventories = await getDefaultSnapshotInput(tx).inventory.findMany({
     where: {
-      salesItemId: { in: salesItemIds },
+      OR: [{ salesContractId }, ...(salesItemIds.length ? [{ salesItemId: { in: salesItemIds } }] : [])],
       status: INVENTORY_STATUS.OUTBOUND,
     },
     orderBy: { outboundAt: 'desc' },

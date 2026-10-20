@@ -1,6 +1,6 @@
 /**
  * Input: HSCode 搜索/人工更新服务、AI 推荐接口（集成 HSCIQ 归类实例 + 官方税率）
- * Output: HSCode 查询页面（含双搜索、AI 推荐、证据化人工税则更新、申报要素填写与复制）
+ * Output: HSCode 查询页面（手机检索卡片、双搜索、AI 推荐、证据化人工税则更新、申报要素填写与复制）
  * Pos: 出口模块子页面 - HSCode 检索
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,11 +8,13 @@
 
 'use client';
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import type { HsCodeRecord } from '@/types';
 import { hsCodeService } from '@/services/hsCode.service';
 import { toast } from 'sonner';
+import { MobileListCard } from '@/components/mobile';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -456,14 +458,14 @@ function HsCodesPageContent() {
         title="HS 编码查询"
         description="默认展示全量列表。输入商品名称（可模糊）或 4–12 位纯数字 HS 编码（支持首尾空格，自动 trim）即可检索；编码按库内 hsCode 前缀精确匹配。"
         actions={
-          <Button
+          <BusinessWrite><Button
             variant="outline"
             size="sm"
             onClick={() => { setAiRecommendOpen(true); setAiRecommendInput(keyword); setAiRecommendResult(null); }}
           >
             <Sparkles className="mr-2 h-4 w-4 text-primary" />
             AI 智能推荐
-          </Button>
+          </Button></BusinessWrite>
         }
       />
 
@@ -552,10 +554,10 @@ function HsCodesPageContent() {
               {isExpiredHsCode(selectedRecord) && (
                 <Badge variant="destructive" className="text-xs">已过期</Badge>
               )}
-              <Button variant="outline" size="sm" className="ml-auto" onClick={openEvidenceEditor}>
+              <BusinessWrite><Button variant="outline" size="sm" className="ml-auto" onClick={openEvidenceEditor}>
                 <Pencil className="mr-2 h-4 w-4" />
                 人工更新税则
-              </Button>
+              </Button></BusinessWrite>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -692,8 +694,8 @@ function HsCodesPageContent() {
                     {fillResult.map((item, i) => (
                       <div key={i} className="flex items-start gap-2 rounded-md bg-background px-3 py-2 text-xs border">
                         <span className="shrink-0 w-5 text-center font-medium text-muted-foreground">{i + 1}.</span>
-                        <span className="text-muted-foreground shrink-0">{item.element}：</span>
-                        <span className={cn('flex-1 font-medium', item.uncertain && 'text-amber-600 dark:text-amber-400')}>
+                        <span className="w-24 shrink-0 break-words text-muted-foreground sm:w-auto">{item.element}：</span>
+                        <span className={cn('min-w-0 flex-1 break-words font-medium', item.uncertain && 'text-amber-600 dark:text-amber-400')}>
                           {item.value}
                           {item.uncertain && <span className="ml-1 text-[10px] font-normal opacity-70">（待确认）</span>}
                         </span>
@@ -742,7 +744,30 @@ function HsCodesPageContent() {
                   </span>
                 </div>
 
-                <div className="overflow-hidden rounded-md border">
+                <div className="space-y-3 md:hidden">
+                  {sort.sortedData.map((record) => (
+                    <MobileListCard
+                      key={record.id}
+                      title={record.hsCode}
+                      subtitle={record.productName}
+                      badge={isExpiredHsCode(record) ? <Badge variant="destructive">编码已失效</Badge> : undefined}
+                      fields={[
+                        { label: '单位', value: record.unit || '-' },
+                        { label: '退税率', value: formatPercent(record.refundRate) },
+                      ]}
+                      onClick={() => setSelectedRecord(record)}
+                      action={
+                        <div className="space-y-2">
+                          <p className="break-words text-sm">{record.productName}</p>
+                          {isFuzzy && (keyword.trim() || hsCodeInput.trim()) && record.similarity !== undefined && <p className="text-xs text-muted-foreground">置信分：{Math.round(record.similarity * 100)} 分</p>}
+                          <Button variant="outline" className="h-11 w-full" onClick={() => setSelectedRecord(record)}>查看申报要素与详情</Button>
+                        </div>
+                      }
+                    />
+                  ))}
+                </div>
+
+                <div className="hidden overflow-hidden rounded-md border md:block">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -831,7 +856,7 @@ function HsCodesPageContent() {
                 </div>
 
                 {/* 数字分页 */}
-                <div className="flex items-center justify-center gap-1">
+                <div className="flex flex-wrap items-center justify-center gap-1">
                   <Button
                     variant="outline"
                     size="sm"
@@ -991,10 +1016,10 @@ function HsCodesPageContent() {
             <Button type="button" variant="outline" onClick={() => setEditOpen(false)} disabled={editSaving}>
               取消
             </Button>
-            <Button type="button" onClick={() => void saveEvidenceUpdate()} disabled={editSaving}>
+            <BusinessWrite><Button type="button" onClick={() => void saveEvidenceUpdate()} disabled={editSaving}>
               {editSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               保存税则证据
-            </Button>
+            </Button></BusinessWrite>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1075,7 +1100,7 @@ function HsCodesPageContent() {
                         >
                           使用此编码搜索
                         </Button>
-                        <Button
+                        <BusinessWrite><Button
                           variant="ghost"
                           size="sm"
                           className="text-muted-foreground"
@@ -1083,7 +1108,7 @@ function HsCodesPageContent() {
                           onClick={() => void runAiRecommend(aiRecommendInput, true)}
                         >
                           刷新推荐
-                        </Button>
+                        </Button></BusinessWrite>
                       </div>
                     </div>
 
@@ -1211,7 +1236,7 @@ function HsCodesPageContent() {
                           {aiRecommendResult.filledDeclarationElements.map((item, i) => (
                             <div key={i} className="flex items-start gap-2 text-xs">
                               <span className="shrink-0 w-5 text-center font-medium text-muted-foreground">{i + 1}.</span>
-                              <span className="text-muted-foreground shrink-0">{item.element}：</span>
+                              <span className="w-24 shrink-0 break-words text-muted-foreground sm:w-auto">{item.element}：</span>
                               <span className={cn('flex-1', item.uncertain && 'text-amber-600 dark:text-amber-400')}>
                                 {item.value}
                                 {item.uncertain && <span className="ml-1 text-[10px] opacity-70">（待确认）</span>}

@@ -87,3 +87,56 @@ test('collectStreamedChat: 普通模型使用默认参数并可缺省回调', as
   assert.equal(result.fullContent, '你好，世界');
   assert.equal(result.thinkingContent, '');
 });
+
+test('collectStreamedChat: 转交 SDK request options 并保留流末 usage', async () => {
+  const signal = AbortSignal.timeout(1000);
+  const requestOptions = { signal, timeout: 1000, maxRetries: 0 };
+  let args;
+  let options;
+  const client = { chat: { completions: { create: async (body, suppliedOptions) => {
+    args = body;
+    options = suppliedOptions;
+    return createAsyncStream([
+      { choices: [{ delta: { content: 'OK' } }] },
+      { choices: [], usage: { prompt_tokens: 12, completion_tokens: 15 } },
+    ]);
+  } } } };
+  const result = await collectStreamedChat({ client, model: 'synthetic-model', messages: [], requestOptions });
+  assert.deepEqual(args.stream_options, { include_usage: true });
+  assert.equal(options, requestOptions);
+  assert.equal(result.fullContent, 'OK');
+  assert.deepEqual(result.tokenUsage, { promptTokens: 12, outputTokens: 15 });
+});
+
+test('collectStreamedChat: 超时不把半截输出当作完成，回调异常释放流', async () => {
+  const deadline = new AbortController();
+  const expected = new DOMException('synthetic deadline', 'TimeoutError');
+  let aborted = false;
+  const stream = {
+    controller: { abort() { aborted = true; } },
+    async *[Symbol.asyncIterator]() { yield { choices: [{ delta: { content: 'partial' } }] }; deadline.abort(expected); },
+  };
+  const client = { chat: { completions: { create: async () => stream } } };
+  await assert.rejects(collectStreamedChat({ client, model: 'synthetic', messages: [], requestOptions: { signal: deadline.signal } }), expected);
+  assert.equal(aborted, true);
+  aborted = false;
+  const callbackError = new Error('synthetic callback error');
+  await assert.rejects(collectStreamedChat({ client, model: 'synthetic', messages: [], onChunk() { throw callbackError; } }), callbackError);
+  assert.equal(aborted, true);
+});
+
+test('DeepSeek stream: thinking/high 使用配置 token 上限，不沿用 Kimi 16000 下限', async () => {
+  let body;
+  const client = { chat: { completions: { create: async (value) => { body = value; return createAsyncStream([
+    { choices: [{ delta: { reasoning_content: 'synthetic reasoning', content: 'OK' } }] },
+    { choices: [], usage: { prompt_tokens: 4, completion_tokens: 7 } },
+  ]); } } } };
+  const result = await collectStreamedChat({ client, model: 'deepseek-flash', messages: [], isThinkingModel: true, maxTokens: 4096,
+    modelOptions: { thinking: { type: 'enabled' }, reasoning_effort: 'high' },
+  });
+  assert.equal(body.max_tokens, 4096);
+  assert.deepEqual(body.thinking, { type: 'enabled' });
+  assert.equal(body.reasoning_effort, 'high');
+  assert.equal(result.thinkingContent, 'synthetic reasoning');
+  assert.deepEqual(result.tokenUsage, { promptTokens: 4, outputTokens: 7 });
+});

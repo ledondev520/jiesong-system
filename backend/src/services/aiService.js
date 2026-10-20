@@ -1,7 +1,7 @@
 /**
- * Input: Kimi API（Moonshot 系列模型）、Prisma客户端
+ * Input: 当前 AI provider（DeepSeek / Kimi）、Prisma客户端
  * Output: AI对话和解析结果
- * Pos: AI服务，处理智能问答和辅助录入（含图像理解）；仅支持 Kimi/Moonshot 模型族
+ * Pos: AI服务，处理智能问答和辅助录入（含图像理解）；统一 provider/profile、完整 deadline 与流式 usage
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -12,6 +12,9 @@ const { buildChatSession } = require('./ai/chatOrchestrator');
 const { collectStreamedChat } = require('./ai/streamHelpers');
 
 const OpenAI = require('openai');
+const { decryptApiKeyFromStorage } = require('../utils/secretCrypto');
+const getActiveAIConfig = () => config.ai || config.kimi;
+const isDeepSeek = () => getActiveAIConfig().provider === 'deepseek';
 
 const parsePositiveIntEnv = (value, fallback, min, max) => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -30,16 +33,25 @@ const shouldForceLocalAI =
   process.env.AI_FORCE_LOCAL === 'true' ||
   ((isCiRuntime || isTestRuntime) && process.env.AI_ALLOW_REMOTE !== 'true');
 
-const kimiRequestTimeoutMs = parsePositiveIntEnv(process.env.KIMI_REQUEST_TIMEOUT_MS, 1800, 500, 30000);
+const kimiRequestTimeoutMs = parsePositiveIntEnv(process.env.KIMI_REQUEST_TIMEOUT_MS, 30000, 500, 30000);
 const kimiGreetingTimeoutMs = parsePositiveIntEnv(process.env.KIMI_GREETING_TIMEOUT_MS, 300, 200, 10000);
 
-// Kimi 模型配置
-const MODELS = {
+// DeepSeek 统一四个场景；Kimi 保留既有模型配置。
+const MODELS = isDeepSeek() ? {
+  default: 'deepseek-flash',
+  vision: 'deepseek-flash',
+  fast: 'deepseek-flash',
+  thinking: 'deepseek-flash',
+} : {
   default: 'kimi-k2-turbo-preview', // 默认模型
   vision: 'moonshot-v1-8k-vision-preview', // 视觉模型（8k 版本更稳定）
   fast: 'moonshot-v1-8k', // 快速响应模型
   thinking: 'kimi-k2-thinking-turbo', // 带思考过程的模型
 };
+
+const getAIModelOptions = () => isDeepSeek()
+  ? { model: 'deepseek-flash', thinking: { type: 'enabled' }, reasoning_effort: 'high' }
+  : {};
 
 const safeToNumber = (value) => {
   const parsed = Number(value);
@@ -86,14 +98,17 @@ const extractErrorMessage = (error) => {
   if (error.status === 429 || error.message?.includes('rate limit')) {
     return '错误：请求过于频繁，请稍后再试。';
   }
+  if (error.status === 404) {
+    return '错误：当前AI模型不可用，请联系管理员检查模型配置。';
+  }
   if (error.status === 400 || error.message?.includes('Invalid')) {
-    return `错误：请求参数无效 - ${error.message || '未知错误'}`;
+    return '错误：AI请求参数无效，请联系管理员检查模型参数。';
   }
   if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
     return '错误：无法连接到AI服务，请检查网络连接。';
   }
-  if (error.message) {
-    return `错误：${error.message}`;
+  if (/Timeout|Abort/.test(error.name || '')) {
+    return '错误：AI服务响应超时，请稍后重试。';
   }
 
   return '抱歉，AI服务出错了。';
@@ -116,13 +131,29 @@ const createTimeoutSignal = (timeoutMs) => {
   return AbortSignal.timeout(timeoutMs);
 };
 
+// SDK timeout 仅覆盖响应头，signal 同时限制连接与完整响应体；失败不自动重试。
+const getAIRequestOptions = (timeoutMs = kimiRequestTimeoutMs) => ({
+  timeout: timeoutMs,
+  maxRetries: 0,
+  signal: createTimeoutSignal(timeoutMs),
+});
+
 // 初始化OpenAI客户端（用于流式调用）
-const getOpenAIClient = () => {
-  if (!config.kimi.apiKey || shouldForceLocalAI) return null;
+const getOpenAIClient = async () => {
+  if (shouldForceLocalAI) return null;
+  const active = getActiveAIConfig();
+  let apiKey = active.apiKey;
+  if (isDeepSeek()) {
+    const stored = await prisma.systemConfig.findUnique({ where: { key: 'deepseekApiKey' }, select: { value: true } });
+    apiKey = (stored?.value && decryptApiKeyFromStorage(stored.value)) || apiKey;
+  }
+  if (!apiKey) return null;
   return new OpenAI({
-    apiKey: config.kimi.apiKey,
-    baseURL: config.kimi.baseUrl,
+    apiKey,
+    baseURL: active.baseUrl,
     timeout: kimiRequestTimeoutMs,
+    maxRetries: 0,
+    logLevel: 'off',
   });
 };
 
@@ -179,8 +210,9 @@ const buildZeroTokenUsage = () => ({
 });
 
 const runThinkingChat = async ({ message, model, messages, onChunk, onThinking }) => {
+  model = getAIModelOptions().model || model;
   const tokenUsage = buildZeroTokenUsage();
-  const client = getOpenAIClient();
+  const client = await getOpenAIClient();
   if (!client) {
     return {
       response: await generateLocalResponse(message),
@@ -189,9 +221,6 @@ const runThinkingChat = async ({ message, model, messages, onChunk, onThinking }
   }
 
   try {
-    const tokenEstimate = await estimateTokens(messages, model);
-    tokenUsage.promptTokens = safeToNumber(tokenEstimate.data?.total_tokens);
-
     const { maxTokens: configuredMaxTokens } = await getConfiguredModels();
 
     const streamResult = await collectStreamedChat({
@@ -202,16 +231,19 @@ const runThinkingChat = async ({ message, model, messages, onChunk, onThinking }
       onThinking,
       isThinkingModel: true,
       maxTokens: configuredMaxTokens,
+      modelOptions: getAIModelOptions(),
+      requestOptions: getAIRequestOptions(),
     });
 
-    tokenUsage.outputTokens = Math.ceil((streamResult.fullContent.length + streamResult.thinkingContent.length) / 2);
+    tokenUsage.promptTokens = safeToNumber(streamResult.tokenUsage?.promptTokens);
+    tokenUsage.outputTokens = streamResult.tokenUsage?.outputTokens ?? (isDeepSeek() ? 0 : Math.ceil((streamResult.fullContent.length + streamResult.thinkingContent.length) / 2));
 
     return {
       response: streamResult.fullContent,
       tokenUsage,
     };
   } catch (error) {
-    console.error('流式调用失败:', error.message, error.stack);
+    console.error('流式调用失败:', { name: error.name, status: error.status || null });
     const fallbackResponse = extractErrorMessage(error);
     if (onChunk) {
       onChunk(fallbackResponse);
@@ -244,7 +276,7 @@ const runStandardChat = async ({ messages, model }) => {
 };
 
 const runChatModel = async ({ message, model, useThinking, messages, onChunk, onThinking }) => {
-  if (!config.kimi.apiKey) {
+  if (!getActiveAIConfig().apiKey && !isDeepSeek()) {
     return {
       response: await generateLocalResponse(message),
       tokenUsage: buildZeroTokenUsage(),
@@ -317,9 +349,11 @@ const resolveChatResult = async ({ userId, sessionId, message, imageUrl, useThin
  */
 let _modelConfigCache = null;
 let _modelConfigCacheAt = 0;
+let _modelConfigCacheProvider = null;
 const getConfiguredModels = async () => {
   const now = Date.now();
-  if (_modelConfigCache && now - _modelConfigCacheAt < 30_000) return _modelConfigCache;
+  const provider = getActiveAIConfig().provider || 'kimi';
+  if (_modelConfigCache && _modelConfigCacheProvider === provider && now - _modelConfigCacheAt < 30_000) return _modelConfigCache;
 
   const rows = await prisma.systemConfig.findMany({
     where: { key: { in: ['aiChatModel', 'aiHsCodeModel', 'aiPrimaryModel', 'aiFallbackModel', 'aiTemperature', 'aiMaxTokens'] } },
@@ -329,19 +363,21 @@ const getConfiguredModels = async () => {
   const map = Object.fromEntries(rows.map(r => [r.key, r.value]));
 
   // 场景化模型（优先读新 key，兼容旧 key）
-  const chatModelParsed = parseStoredConfigValue(map.aiChatModel) || parseStoredConfigValue(map.aiPrimaryModel);
-  const hsCodeModelParsed = parseStoredConfigValue(map.aiHsCodeModel) || parseStoredConfigValue(map.aiFallbackModel) || parseStoredConfigValue(map.aiPrimaryModel);
+  const profileModel = getAIModelOptions().model;
+  const chatModelParsed = profileModel || parseStoredConfigValue(map.aiChatModel) || parseStoredConfigValue(map.aiPrimaryModel);
+  const hsCodeModelParsed = profileModel || parseStoredConfigValue(map.aiHsCodeModel) || parseStoredConfigValue(map.aiFallbackModel) || parseStoredConfigValue(map.aiPrimaryModel);
 
   _modelConfigCache = {
     chatModel: (typeof chatModelParsed === 'string' && chatModelParsed) ? chatModelParsed : MODELS.default,
     hsCodeModel: (typeof hsCodeModelParsed === 'string' && hsCodeModelParsed) ? hsCodeModelParsed : MODELS.default,
     // 向后兼容：chatModel 同时作为 defaultModel 供 chatSession 使用
     defaultModel: (typeof chatModelParsed === 'string' && chatModelParsed) ? chatModelParsed : MODELS.default,
-    thinkingModel: MODELS.thinking,
+    thinkingModel: profileModel || MODELS.thinking,
     temperature: parseAiTemperature(map.aiTemperature),
     maxTokens: parseAiMaxTokens(map.aiMaxTokens),
   };
   _modelConfigCacheAt = now;
+  _modelConfigCacheProvider = provider;
   return _modelConfigCache;
 };
 
@@ -538,54 +574,51 @@ const recordTokenUsage = async (
  * 思路：
  * 1. 使用OpenAI SDK进行流式请求
  * 2. 收集所有chunk并拼接完整响应
- * 3. 调用token统计接口获取消耗量
+ * 3. 直接读取上游流式 usage，不串行追加 Token 估算请求
  * @param {Array} messages - 消息列表
  * @param {string} model - 模型名称
  * @returns {Object} { content, model, tokenUsage }
  */
 const callKimiAPI = async (messages, model = MODELS.default) => {
-  const client = getOpenAIClient();
+  model = getAIModelOptions().model || model;
+  const client = await getOpenAIClient();
   if (!client) {
     return {
-      content: '抱歉，Kimi AI 服务未配置 API Key。',
+      content: '抱歉，AI 服务未配置 API Key。',
       model,
       tokenUsage: { promptTokens: 0, outputTokens: 0 },
     };
   }
 
-  const { temperature: configuredTemperature } = await getConfiguredModels();
+  const { temperature: configuredTemperature, maxTokens } = await getConfiguredModels();
   const temperature = typeof configuredTemperature === 'number' && Number.isFinite(configuredTemperature)
     ? configuredTemperature
     : 0.6;
 
   try {
     // 1. 使用流式调用
-    const stream = await client.chat.completions.create({
+    const streamResult = await collectStreamedChat({
+      client,
       model,
       messages,
       temperature,
-      stream: true,
+      maxTokens,
+      modelOptions: getAIModelOptions(),
+      requestOptions: getAIRequestOptions(),
     });
-    
-    const fullContent = await collectStreamText(stream);
-    
-    // 2. Token 统计：调用 Kimi 专用接口
-    const tokenEstimate = await estimateTokens(messages, model);
-    const promptTokens = tokenEstimate.data?.total_tokens || 0;
-    const outputTokens = Math.ceil(fullContent.length / 2);
+    const fullContent = streamResult.fullContent;
+    // ponytail: 上游未提供 usage 时仅保留输出估算；精确计费需要上游 usage。
+    const tokenUsage = streamResult.tokenUsage || { promptTokens: 0, outputTokens: isDeepSeek() ? 0 : Math.ceil(fullContent.length / 2) };
     
     return {
       content: fullContent || '抱歉，我暂时无法回答这个问题。',
       model,
-      tokenUsage: {
-        promptTokens: Math.ceil(promptTokens),
-        outputTokens,
-      },
+      tokenUsage,
     };
   } catch (error) {
-    console.error('Kimi API调用失败:', error.message);
+    console.error('AI API调用失败:', { name: error.name, status: error.status || null });
     return {
-      content: '抱歉，Kimi AI 服务暂时不可用，请稍后再试。',
+      content: extractErrorMessage(error),
       model,
       tokenUsage: { promptTokens: 0, outputTokens: 0 },
     };
@@ -599,7 +632,12 @@ const callKimiAPI = async (messages, model = MODELS.default) => {
  * @returns {Object} Token估算结果 { data: { total_tokens: number } }
  */
 const estimateTokens = async (messages, model = MODELS.default) => {
-  if (!config.kimi.apiKey) {
+  if (isDeepSeek()) {
+    // ponytail: 字符长度只作保守上下文预算，精确计费必须使用 completion usage。
+    return { data: { total_tokens: JSON.stringify(messages).length } };
+  }
+  const active = getActiveAIConfig();
+  if (!active.apiKey || shouldForceLocalAI) {
     return { data: { total_tokens: 0 } };
   }
   
@@ -608,7 +646,7 @@ const estimateTokens = async (messages, model = MODELS.default) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.kimi.apiKey}`,
+        'Authorization': `Bearer ${active.apiKey}`,
       },
       body: JSON.stringify({ model, messages }),
     };
@@ -618,7 +656,7 @@ const estimateTokens = async (messages, model = MODELS.default) => {
       requestOptions.signal = timeoutSignal;
     }
 
-    const response = await fetch(`${config.kimi.baseUrl}/tokenizers/estimate-token-count`, requestOptions);
+    const response = await fetch(`${active.baseUrl}/tokenizers/estimate-token-count`, requestOptions);
     
     if (!response.ok) {
       console.error('Token估算请求失败:', response.status);
@@ -757,7 +795,7 @@ const buildInputContent = (content, type, imageUrl) => {
  * @returns {Object} 解析结果
  */
 const parseInput = async (content, type, imageUrl = null, userId = null) => {
-  if (!config.kimi.apiKey) {
+  if (!getActiveAIConfig().apiKey && !isDeepSeek()) {
     return parseLocally(content, type);
   }
   
@@ -937,7 +975,8 @@ const MAYDAY_SONGS = [
  * 3. 让模型生成问候语
  */
 const generateGreeting = async () => {
-  const client = getOpenAIClient();
+  if (isDeepSeek()) return getLocalGreeting();
+  const client = await getOpenAIClient();
   if (!client) {
     return getLocalGreeting();
   }
@@ -963,14 +1002,11 @@ const generateGreeting = async () => {
       stream: true,
     };
 
-    const timeoutSignal = createTimeoutSignal(kimiGreetingTimeoutMs);
-    if (timeoutSignal) {
-      requestOptions.signal = timeoutSignal;
-    }
-
-    const stream = await client.chat.completions.create(requestOptions);
+    const deadlineOptions = getAIRequestOptions(kimiGreetingTimeoutMs);
+    const stream = await client.chat.completions.create(requestOptions, deadlineOptions);
 
     const fullContent = await collectStreamText(stream);
+    deadlineOptions.signal?.throwIfAborted();
 
     const lines = fullContent.trim().split('\n').filter(line => line.trim());
     
@@ -986,7 +1022,7 @@ const generateGreeting = async () => {
     
     return getLocalGreeting();
   } catch (error) {
-    console.error('生成问候语失败:', error.message);
+    console.error('生成问候语失败:', { name: error.name, status: error.status || null });
     return getLocalGreeting();
   }
 };
@@ -1071,4 +1107,7 @@ module.exports = {
   recordTokenUsage,
   isMissingDetailSnapshotColumnError,
   isMissingPromptBriefColumnError,
+  getOpenAIClient,
+  getAIRequestOptions,
+  getAIModelOptions,
 };

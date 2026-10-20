@@ -10,6 +10,17 @@ const assert = require('node:assert/strict');
 const prisma = require('../utils/prisma');
 const customsDeclarationDraftService = require('./customsDeclarationDraftService');
 
+test('自动草稿不能替换已放行报关记录，缺装箱明细也不能先删原记录', async () => {
+  let deleted = false;
+  await withMockDelegates({
+    salesContract: { findMany: async () => [{ id: 'sc-1', contractNo: 'EXP-TEST', packingItems: [] }] },
+    customsDeclaration: { findFirst: async () => ({ id: 'cd-1', status: 'RELEASED' }), delete: async () => { deleted = true; } },
+  }, async () => {
+    await assert.rejects(customsDeclarationDraftService.generateCustomsDeclarationDrafts({ salesContractId: 'sc-1', replaceExisting: true }), /正式报关|已放行/);
+    assert.equal(deleted, false);
+  });
+});
+
 const withMockDelegates = async (mockMap, callback) => {
   const originals = new Map();
 
@@ -109,7 +120,7 @@ test('generateCustomsDeclarationDrafts: 基于销售合同与装箱明细生成�
     assert.equal(result.created, 1);
     assert.equal(result.skipped, 0);
     assert.equal(createdPayloads.length, 1);
-    assert.match(createdPayloads[0].declarationNo, /^CUS-AUTO-\d{8}-001$/);
+    assert.match(createdPayloads[0].declarationNo, /^CUS-AUTO-\d{8}-EXP2400001$/);
     assert.equal(createdPayloads[0].salesContractId, 'sc-1');
     assert.equal(createdPayloads[0].currency, 'USD');
     assert.equal(createdPayloads[0].exchangeRate, 7.12);
@@ -155,4 +166,3 @@ test('generateCustomsDeclarationDrafts: 已存在报关单时默认跳过', asyn
     assert.equal(result.items[0].reason, 'existing_declaration');
   });
 });
-

@@ -8,13 +8,16 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
+import { clearAllCache } from '@/lib/api-cache';
 import FinancePage from './page';
 
 const mockGetStats = vi.fn();
 const mockApiGet = vi.fn();
 const mockGetTransactionStats = vi.fn();
 const mockGetInvoiceStats = vi.fn();
+const mockClearApiGetCache = vi.fn();
 
 vi.mock('@/services/finance.service', () => ({
   financeService: {
@@ -23,6 +26,7 @@ vi.mock('@/services/finance.service', () => ({
 }));
 
 vi.mock('@/lib/axios', () => ({
+  clearApiGetCache: () => mockClearApiGetCache(),
   default: {
     get: (...args: unknown[]) => mockApiGet(...args),
   },
@@ -57,6 +61,8 @@ vi.mock('./components/FinanceOverviewCharts', () => ({
 
 describe('FinancePage 交互逻辑', () => {
   beforeEach(() => {
+    clearAllCache();
+    mockClearApiGetCache.mockReset();
     mockGetStats.mockReset();
     mockApiGet.mockReset();
     mockGetTransactionStats.mockReset();
@@ -127,5 +133,19 @@ describe('FinancePage 交互逻辑', () => {
     mockApiGet.mockReturnValue(new Promise(() => {}));
     render(<FinancePage />);
     expect(screen.getByText('加载中...')).toBeInTheDocument();
+  });
+
+  it('手动刷新失效两层缓存并重新读取财务统计', async () => {
+    mockGetStats.mockResolvedValue({
+      payable: { total: 0, paid: 0, unpaid: 0 },
+      receivable: { total: 0, received: 0, unreceived: 0 },
+    });
+    const user = userEvent.setup();
+    render(<FinancePage />);
+    await user.click(await screen.findByRole('button', { name: '刷新' }));
+
+    await waitFor(() => expect(mockGetStats).toHaveBeenCalledTimes(2));
+    expect(mockClearApiGetCache).toHaveBeenCalledTimes(1);
+    expect(mockApiGet).toHaveBeenCalledTimes(6);
   });
 });

@@ -31,3 +31,14 @@ test('允许 INBOUND -> OUTBOUND（存在 salesContractId）', () => {
   const result = validateInventoryTransition('INBOUND', 'OUTBOUND', { salesContractId: 'sale-1' });
   assert.equal(result.valid, true);
 });
+
+test('采购及验货来源库存由业务事实驱动，不能手工或 AI 改状态', () => {
+  for (const source of [{ purchaseItemId: 'synthetic-purchase' }, { receiptInspectionId: 'synthetic-inspection' }]) {
+    const inbound = validateInventoryTransition('SHIPPING', 'INBOUND', source);
+    const outbound = validateInventoryTransition('INBOUND', 'OUTBOUND', { ...source, salesContractId: 'synthetic-sale' });
+    assert.equal(inbound.valid, false);
+    assert.equal(outbound.valid, false);
+    assert.match(outbound.message, /验货.*发运/);
+    assert.equal(validateInventoryTransition('INBOUND', 'INBOUND', source).valid, true);
+  }
+});

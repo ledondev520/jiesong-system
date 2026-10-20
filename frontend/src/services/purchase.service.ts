@@ -1,9 +1,17 @@
 import api, { type ApiRequestConfig } from '@/lib/axios';
-import type { ApiResponse, PurchaseContract } from '@/types';
+import type { ApiResponse, PaginatedResponse, PurchaseContract } from '@/types';
 import type { ContractFile } from './contractFile.service';
 import { createCrudService } from './crudService';
 
-type PurchaseContractQuery = { page?: number; pageSize?: number; keyword?: string; lite?: boolean };
+type PurchaseContractQuery = { page?: number; pageSize?: number; keyword?: string; status?: string; supplierId?: string; productKeyword?: string; storeName?: string; lite?: boolean };
+
+type PurchaseListResult = PaginatedResponse<PurchaseContract> & {
+  summary?: { statusCounts: Record<string, number>; stores: string[] };
+};
+type PurchaseCreateResult = PurchaseContract | {
+  contract: PurchaseContract;
+  warnings: Array<{ message: string }>;
+};
 
 type PurchaseCreateItemPayload = {
   productId: string;
@@ -17,6 +25,7 @@ export type PurchaseCreatePayload = {
   supplierId: string;
   contractNo?: string;
   signedAt?: string;
+  expectedDate?: string | null;
   taxRate: number;
   note?: string;
   items: PurchaseCreateItemPayload[];
@@ -83,7 +92,7 @@ const normalizeParsedItems = (raw: unknown): ParsedQuoteItem[] => {
     .filter((item) => item.quantity > 0 || item.unitPrice > 0 || Boolean(item.productId) || Boolean(item.productName));
 };
 
-const crud = createCrudService<PurchaseContract, PurchaseCreatePayload, Partial<PurchaseContract>, PurchaseContractQuery>(
+const crud = createCrudService<PurchaseContract, PurchaseCreatePayload, Partial<PurchaseCreatePayload> & { expectedDate?: string | null }, PurchaseContractQuery>(
   '/purchases'
 );
 
@@ -152,6 +161,10 @@ export interface PurchaseInvoicePreparation {
 export const purchaseService = {
   ...crud,
 
+  getAll: async (params?: PurchaseContractQuery) => api.get<ApiResponse<PurchaseListResult>, ApiResponse<PurchaseListResult>>('/purchases', params ? { params } : undefined),
+
+  create: async (data: PurchaseCreatePayload) => api.post<ApiResponse<PurchaseCreateResult>, ApiResponse<PurchaseCreateResult>, PurchaseCreatePayload>('/purchases', data),
+
   /**
    * 获取下一个采购合同编号。
    */
@@ -177,12 +190,12 @@ export const purchaseService = {
   },
 
   /** 批量保存供应商完工后的规格、箱数、重量、体积与可选单箱尺寸。 */
-  updateProductionDetails: async (id: string, items: PurchaseProductionDetailPayload[]) => {
+  updateProductionDetails: async (id: string, items: PurchaseProductionDetailPayload[], options: { completeProduction?: boolean } = {}) => {
     return api.put<
       ApiResponse<PurchaseContract>,
       ApiResponse<PurchaseContract>,
-      { items: PurchaseProductionDetailPayload[] }
-    >(`/purchases/${id}/production-details`, { items });
+      { items: PurchaseProductionDetailPayload[]; completeProduction?: boolean }
+    >(`/purchases/${id}/production-details`, { items, ...options });
   },
 
   /** 读取由采购明细推导的催票清单、已登记号码和选填附件。 */
@@ -227,9 +240,10 @@ export const purchaseService = {
   /**
    * 批量导入采购合同 Excel。
    */
-  importExcel: async (file: File) => {
+  importExcel: async (file: File, options?: { historical?: boolean }) => {
     const formData = new FormData();
     formData.append('file', file);
+    if (options?.historical === true) formData.append('historical', 'true');
     const response = await api.post<ApiResponse<ImportResult>, ApiResponse<ImportResult>, FormData>(
       '/purchases/import',
       formData,

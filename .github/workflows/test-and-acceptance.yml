@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
           node-version: '20.19.0'
@@ -38,6 +40,13 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
         working-directory: frontend
+      - name: Prepare isolated frontend API fixture dependencies
+        working-directory: backend
+        run: |
+          test ! -e .env
+          test ! -L .env
+          npm ci
+          npm run db:generate
       - name: Run frontend unit tests
         run: npm run test
         working-directory: frontend
@@ -58,6 +67,11 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
         working-directory: frontend
+      - name: Install isolated recovery backend fixture
+        run: |
+          npm ci
+          npx prisma generate
+        working-directory: backend
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
         working-directory: frontend

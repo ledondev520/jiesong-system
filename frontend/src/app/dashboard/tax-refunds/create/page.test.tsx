@@ -28,6 +28,10 @@ vi.mock('@/services/taxRefund.service', () => ({
   },
 }));
 
+vi.mock('@/services/sales.service', () => ({ salesService: { getAll: async () => ({ data: { items: [{ id: 'sc-9', contractNo: 'EXP-9' }, { id: 'sc-10', contractNo: 'EXP-10' }], pagination: { totalPages: 1 } } }) } }));
+vi.mock('@/services/customsDeclaration.service', () => ({ customsDeclarationService: { getAll: async () => ({ data: { items: [{ id: 'cd-9', declarationNo: 'CD-9' }, { id: 'cd-10', declarationNo: 'CD-10' }], pagination: { totalPages: 1 } } }) } }));
+vi.mock('@/services/forexVerification.service', () => ({ forexVerificationService: { getAll: async () => ({ data: { items: [{ id: 'fv-9', verificationNo: 'FX-9', status: 'PENDING' }], pagination: { totalPages: 1 } } }) } }));
+
 vi.mock('sonner', () => ({
   toast: {
     error: (...args: unknown[]) => mockToastError(...args),
@@ -56,9 +60,12 @@ describe('CreateTaxRefundPage 交互逻辑', () => {
     expect(screen.getByRole('heading', { name: '新建退税单' })).toBeInTheDocument();
 
     await user.type(screen.getByLabelText('退税单号'), 'TR-20260307-09');
-    await user.type(screen.getByLabelText('出口合同 ID'), 'sc-9');
-    await user.type(screen.getByLabelText('报关单 ID'), 'cd-9');
-    await user.type(screen.getByLabelText('核销记录 ID'), 'fv-9');
+    await user.click(screen.getByRole('combobox', { name: '出口合同' }));
+    await user.click(await screen.findByRole('option', { name: 'EXP-9' }));
+    await user.click(screen.getByRole('combobox', { name: '报关单' }));
+    await user.click(await screen.findByRole('option', { name: 'CD-9' }));
+    await user.click(screen.getByRole('combobox', { name: '核销记录' }));
+    await user.click(await screen.findByRole('option', { name: 'FX-9 · PENDING' }));
     await user.type(screen.getByLabelText('申报金额'), '128000');
     await user.type(screen.getByLabelText('可退金额'), '116500');
     await user.type(screen.getByLabelText('已退金额'), '0');
@@ -94,8 +101,10 @@ describe('CreateTaxRefundPage 交互逻辑', () => {
     render(<CreateTaxRefundPage />);
 
     await user.type(screen.getByLabelText('退税单号'), 'TR-20260307-10');
-    await user.type(screen.getByLabelText('出口合同 ID'), 'sc-10');
-    await user.type(screen.getByLabelText('报关单 ID'), 'cd-10');
+    await user.click(screen.getByRole('combobox', { name: '出口合同' }));
+    await user.click(await screen.findByRole('option', { name: 'EXP-10' }));
+    await user.click(screen.getByRole('combobox', { name: '报关单' }));
+    await user.click(await screen.findByRole('option', { name: 'CD-10' }));
     await user.type(screen.getByLabelText('申报金额'), '68000');
     await user.type(screen.getByLabelText('可退金额'), '62000');
     await user.type(screen.getByLabelText('已退金额'), '0');

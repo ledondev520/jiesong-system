@@ -9,22 +9,30 @@ historical EXP workbooks, then prints an auditable JSON proposal.
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import json
 import math
+import os
 import re
 import sqlite3
+import sys
 from dataclasses import asdict, dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Iterable
 
 
-DEFAULT_DB = Path(__file__).resolve().parents[1] / "backend/prisma/dev.db"
-DEFAULT_HISTORY_ROOT = Path(
-    "/Users/helena/Library/Containers/com.kingsoft.wpsoffice.mac/Data/Library/"
-    "Application Support/Kingsoft/WPS Cloud Files/userdata/qing/filecache/212320004/"
-    "团队文档/捷淞/11-报关记录"
-)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from pricing_config import load_pricing_config
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_DB = PROJECT_ROOT / "backend/prisma/dev.db"
+DEFAULT_HISTORY_ROOT = PROJECT_ROOT / "data/export-history"
+
+
+def configured_path(value: str) -> Path:
+    return Path(value).expanduser().resolve()
 
 
 def normalize_text(value: Any) -> str:
@@ -251,13 +259,17 @@ def historical_quote_allowed(
     cost_cny: float,
     refund_rate: float,
     no_refund_markup_cap: float,
-    refundable_markup: float = 0.30,
+    refundable_markup: float | None = None,
     refundable_tolerance: float = 0.05,
+    mode: str = "tiered",
 ) -> tuple[bool, float]:
+    if refundable_markup is None:
+        config = load_pricing_config()
+        refundable_markup = round(config["multiplier"] - 1, 10) if mode == "multiplier" else config["refundableMarkup"]
     markup = realized_markup(unit_price_usd, quantity, effective_rate, cost_cny)
-    if refund_rate == 0 and math.isfinite(markup):
+    if mode == "tiered" and refund_rate == 0 and math.isfinite(markup):
         return -1e-9 <= markup <= no_refund_markup_cap + 1e-9, markup
-    if refund_rate > 0 and math.isfinite(markup):
+    if (refund_rate > 0 or mode == "multiplier") and math.isfinite(markup):
         return abs(markup - refundable_markup) <= refundable_tolerance + 1e-9, markup
     return True, markup
 
@@ -324,37 +336,36 @@ def calculate_price(
 
 
 def fetch_contract_rows(database: Path, contract_no: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    connection = sqlite3.connect(database)
-    connection.row_factory = sqlite3.Row
-    header = connection.execute(
-        """
-        SELECT sc.contractNo, sc.exchangeRate, sc.totalAmount, sc.containerLabel,
-               sc.shippedAt, sc.customsBroker, po.name AS port
-          FROM sales_contracts sc
-          LEFT JOIN ports po ON po.id = sc.portId
-         WHERE sc.contractNo = ?
-        """,
-        (contract_no,),
-    ).fetchone()
-    if not header:
-        raise ValueError(f"Contract not found: {contract_no}")
-    rows = connection.execute(
-        """
-        SELECT pi.id, p.customsName, p.hsCode, p.declaration,
-               pi.quantity, pi.unit, pi.boxes, pi.grossWeight, pi.netWeight,
-               pi.volume, pi.purchaseCost, pi.specification, pi.supplement,
-               pi.manufacturer, pi.purchaseContractNo, st.name AS store
-          FROM packing_items pi
-          JOIN sales_contracts sc ON sc.id = pi.salesContractId
-          JOIN products p ON p.id = pi.productId
-          LEFT JOIN stores st ON st.id = pi.storeId
-         WHERE sc.contractNo = ?
-         ORDER BY pi.createdAt, pi.id
-        """,
-        (contract_no,),
-    ).fetchall()
-    connection.close()
-    return dict(header), [dict(row) for row in rows]
+    with closing(sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)) as connection:
+        connection.row_factory = sqlite3.Row
+        header = connection.execute(
+            """
+            SELECT sc.contractNo, sc.exchangeRate, sc.totalAmount, sc.containerLabel,
+                   sc.shippedAt, sc.customsBroker, po.name AS port
+              FROM sales_contracts sc
+              LEFT JOIN ports po ON po.id = sc.portId
+             WHERE sc.contractNo = ?
+            """,
+            (contract_no,),
+        ).fetchone()
+        if not header:
+            raise ValueError(f"Contract not found: {contract_no}")
+        rows = connection.execute(
+            """
+            SELECT pi.id, p.customsName, p.hsCode, p.declaration,
+                   pi.quantity, pi.unit, pi.boxes, pi.grossWeight, pi.netWeight,
+                   pi.volume, pi.purchaseCost, pi.specification, pi.supplement,
+                   pi.manufacturer, pi.purchaseContractNo, st.name AS store
+              FROM packing_items pi
+              JOIN sales_contracts sc ON sc.id = pi.salesContractId
+              JOIN products p ON p.id = pi.productId
+              LEFT JOIN stores st ON st.id = pi.storeId
+             WHERE sc.contractNo = ?
+             ORDER BY pi.createdAt, pi.id
+            """,
+            (contract_no,),
+        ).fetchall()
+        return dict(header), [dict(row) for row in rows]
 
 
 def read_catalog(path: Path) -> dict[str, dict[str, Any]]:
@@ -544,6 +555,8 @@ def fetch_shipment_summary_rows(
 
 def build_proposal(args: argparse.Namespace) -> dict[str, Any]:
     export_day = parse_iso_day(args.export_date)
+    if not math.isfinite(args.spot_rate) or args.spot_rate <= 0:
+        raise ValueError("Spot FX rate must be finite and positive")
     effective_rate = round(args.spot_rate - args.fx_buffer, 6)
     if effective_rate <= 0:
         raise ValueError("Effective FX rate must be positive")
@@ -598,6 +611,7 @@ def build_proposal(args: argparse.Namespace) -> dict[str, Any]:
                 no_refund_markup_cap=args.no_refund_markup,
                 refundable_markup=args.refundable_markup,
                 refundable_tolerance=args.history_markup_tolerance,
+                mode=args.pricing_mode,
             )
             if not allowed:
                 rejected_historical = {
@@ -636,7 +650,7 @@ def build_proposal(args: argparse.Namespace) -> dict[str, Any]:
         elif quantity <= 0:
             pricing = {"source": "blocked", "reason": "quantity_invalid"}
         else:
-            no_refund = refund.refund_rate == 0
+            no_refund = args.pricing_mode == "tiered" and refund.refund_rate == 0
             markup = args.no_refund_markup if no_refund else args.refundable_markup
             unit_price, total_usd, actual_markup, rounding_method = calculate_price(
                 cost_cny=cost_cny,
@@ -705,6 +719,7 @@ def build_proposal(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "contract": header,
         "pricing_policy": {
+            **({"mode": args.pricing_mode, "multiplier": args.multiplier} if args.pricing_mode == "multiplier" else {}),
             "spot_rate": args.spot_rate,
             "fx_buffer": args.fx_buffer,
             "effective_rate": effective_rate,
@@ -721,23 +736,50 @@ def build_proposal(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--contract", required=True, help="EXP contract number")
     parser.add_argument("--spot-rate", required=True, type=float)
     parser.add_argument("--export-date", default=date.today().isoformat())
-    parser.add_argument("--fx-buffer", type=float, default=0.2)
-    parser.add_argument("--refundable-markup", type=float, default=0.30)
-    parser.add_argument("--no-refund-markup", type=float, default=0.10)
-    parser.add_argument("--database", type=Path, default=DEFAULT_DB)
+    parser.add_argument("--fx-buffer", type=float, help="Deprecated: must match the shared pricing file")
+    parser.add_argument("--refundable-markup", type=float, help="Deprecated: must match the shared pricing file")
+    parser.add_argument("--no-refund-markup", type=float, help="Deprecated: must match the shared pricing file")
+    parser.add_argument(
+        "--database", type=configured_path,
+        default=os.environ.get("JIESONG_EXPORT_DATABASE") or str(DEFAULT_DB),
+        help="SQLite path (JIESONG_EXPORT_DATABASE; default: backend/prisma/dev.db)",
+    )
     parser.add_argument("--shipment-summary", type=Path)
     parser.add_argument("--declaration-catalog", type=Path)
     parser.add_argument("--confirmed-workbook", type=Path)
     parser.add_argument("--history-markup-tolerance", type=float, default=0.05)
-    parser.add_argument("--history-root", type=Path, default=DEFAULT_HISTORY_ROOT)
+    parser.add_argument(
+        "--history-root", type=configured_path,
+        default=os.environ.get("JIESONG_HISTORY_ROOT") or str(DEFAULT_HISTORY_ROOT),
+        help="Local history directory (JIESONG_HISTORY_ROOT; default: data/export-history)",
+    )
     parser.add_argument("--refund-dbf", type=Path, required=True)
     parser.add_argument("--refund-version", default="2026B")
-    return parser.parse_args()
+    args = parser.parse_args(argv)
+    try:
+        config = load_pricing_config()
+    except ValueError as error:
+        parser.error(str(error))
+    target = round(config["multiplier"] - 1, 10) if config["mode"] == "multiplier" else config["refundableMarkup"]
+    values = {"fx_buffer": -config["exchangeAdjustment"], "refundable_markup": target,
+              "no_refund_markup": target if config["mode"] == "multiplier" else config["noRefundMarkup"]}
+    for key, value in values.items():
+        supplied = getattr(args, key)
+        if supplied is not None and (not math.isfinite(supplied) or supplied != value):
+            parser.error(f"--{key.replace('_', '-')} 与共用报价配置不一致，请修改 JIESONG_PRICING_CONFIG 指定的文件")
+        setattr(args, key, value)
+    if not math.isfinite(args.spot_rate) or args.spot_rate <= 0:
+        parser.error("现汇必须是大于零的有限数字")
+    if not math.isfinite(args.history_markup_tolerance) or not 0 <= args.history_markup_tolerance <= 1:
+        parser.error("历史报价容差必须是 0 至 1 的有限数字")
+    args.pricing_mode = config["mode"]
+    args.multiplier = config["multiplier"]
+    return args
 
 
 if __name__ == "__main__":

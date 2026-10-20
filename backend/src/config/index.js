@@ -1,6 +1,6 @@
 /**
  * Input: 环境变量 (.env)
- * Output: 统一配置对象（含 JWT、Kimi、HSCIQ、上传、CORS 配置）
+ * Output: 统一配置对象（含显式代理白名单、JWT、活动 AI/Kimi、HSCIQ、上传、CORS 配置）
  * Pos: 配置中心，集中管理所有环境变量
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -9,6 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
+const { parseTrustedProxyCidrs } = require('./trustedProxies');
 
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
 const ENV_PATH = path.join(PROJECT_ROOT, '.env');
@@ -78,21 +79,40 @@ const assertSecureFilePermissions = ({
   }
 };
 
-const envResult = dotenv.config({ path: ENV_PATH });
-if (envResult.error && envResult.error.code !== 'ENOENT') {
-  throw envResult.error;
-}
-
 [
   { filePath: ENV_PATH, expectedMode: 0o600, required: false, label: '.env' },
   { filePath: path.join(PROJECT_ROOT, 'env.example'), expectedMode: 0o644, required: false, label: 'env.example' },
   { filePath: path.join(__dirname, 'constants.js'), expectedMode: 0o644, required: true, label: 'backend/src/config/constants.js' },
 ].forEach(assertSecureFilePermissions);
 
+// 在读取环境密钥前执行权限检查；生产运行模式由启动环境指定。
+const envResult = dotenv.config({ path: ENV_PATH });
+if (envResult.error && envResult.error.code !== 'ENOENT') {
+  throw envResult.error;
+}
+
+const aiProvider = (process.env.AI_PROVIDER || 'kimi').trim().toLowerCase();
+if (!['kimi', 'deepseek'].includes(aiProvider)) {
+  throw new Error('AI_PROVIDER 仅支持 kimi 或 deepseek');
+}
+const kimi = {
+  provider: 'kimi',
+  apiKey: process.env.KIMI_API_KEY || '',
+  baseUrl: process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1',
+};
+
+// Optional email registration must be either fully configured or disabled.
+const emailKeys = ['ALIBABA_CLOUD_ACCESS_KEY_ID', 'ALIBABA_CLOUD_ACCESS_KEY_SECRET', 'JIESONG_EMAIL_FROM'];
+if (emailKeys.some((key) => process.env[key]?.trim()) &&
+    (!emailKeys.every((key) => process.env[key]?.trim()) || !/^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(process.env.JIESONG_EMAIL_FROM.trim()))) {
+  throw new Error('邮箱注册需完整配置阿里云凭据与有效的 JIESONG_EMAIL_FROM');
+}
+
 const config = {
   // 服务器配置
   port: parseInt(process.env.PORT, 10) || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
+  trustedProxyCidrs: parseTrustedProxyCidrs(process.env.TRUSTED_PROXY_CIDRS || ''),
   
   // JWT配置
   jwt: {
@@ -100,11 +120,13 @@ const config = {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   },
   
-  // Kimi API配置
-  kimi: {
-    apiKey: process.env.KIMI_API_KEY || '',
-    baseUrl: process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1',
-  },
+  // 活动 AI 供系统聊天、HS 推荐与 Agent 使用；Kimi 独立配置保留兼容既有集成。
+  ai: aiProvider === 'deepseek' ? {
+    provider: 'deepseek',
+    apiKey: process.env.DEEPSEEK_API_KEY || '',
+    baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+  } : kimi,
+  kimi,
 
   // HSCIQ API 配置（海关编码智能查询）
   hsciq: {

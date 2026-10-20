@@ -100,6 +100,8 @@ export interface TransactionQuery {
   batchId?: string;
   currency?: string;
   accountNoMasked?: string;
+  amountMin?: number;
+  amountMax?: number;
 }
 
 export interface InvoiceQuery {
@@ -126,7 +128,7 @@ export async function getTransactions(params: TransactionQuery): Promise<Paginat
  * 职责：获取银行流水统计（支持全部筛选条件）
  */
 export async function getTransactionStats(params?: {
-  search?: string; direction?: string; dateFrom?: string; dateTo?: string; currency?: string; accountNoMasked?: string;
+  search?: string; direction?: string; dateFrom?: string; dateTo?: string; currency?: string; accountNoMasked?: string; amountMin?: number; amountMax?: number;
 }): Promise<BankFlowStats> {
   const res: { data: BankFlowStats } = await api.get('/bank-flow/transactions/stats', { params });
   return res.data;
@@ -304,7 +306,7 @@ export type ContractForMatch = PurchaseContractForMatch | SalesContractForMatch;
 /**
  * 职责：获取未匹配项列表
  */
-export async function getUnmatchedItems(params?: { page?: number; pageSize?: number; type?: 'BANK' | 'INVOICE' }): Promise<UnmatchedItemsResult> {
+export async function getUnmatchedItems(params?: { page?: number; pageSize?: number; type?: 'BANK' | 'INVOICE'; search?: string }): Promise<UnmatchedItemsResult> {
   const res: { data: UnmatchedItemsResult } = await api.get('/finance/unmatched', { params });
   return res.data;
 }

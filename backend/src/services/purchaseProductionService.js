@@ -1,11 +1,12 @@
 /**
  * Input: 采购明细的规格、箱数、总毛净重、总体积与可选箱体尺寸
- * Output: 可解释的生产资料完整性、汇总指标与批量保存结果
+ * Output: 生产资料完整性、批量保存及完工报告一次登记结果
  * Pos: 采购生产阶段的权威 Module，状态推进和页面共用同一 Interface
  */
 
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
+const { PURCHASE_STATUS, normalizePurchaseStatus } = require('./purchaseStateMachine');
 
 const FIELD_ISSUES = Object.freeze({
   specification: { code: 'MISSING_SPECIFICATION', label: '规格' },
@@ -114,11 +115,13 @@ const updatePurchaseProductionDetails = async (
   contractId,
   inputs,
   prismaClient = prisma,
+  { completeProduction = false } = {},
 ) => {
   if (!contractId) throw createError('采购合同ID不能为空', 400);
   if (!Array.isArray(inputs) || inputs.length === 0) {
     throw createError('至少提交一条生产资料', 400);
   }
+  if (typeof completeProduction !== 'boolean') throw createError('完工标记必须为布尔值', 400);
 
   const normalizedInputs = inputs.map(normalizeProductionDetailInput);
   if (new Set(normalizedInputs.map((item) => item.id)).size !== normalizedInputs.length) {
@@ -130,7 +133,8 @@ const updatePurchaseProductionDetails = async (
       where: { id: contractId },
       select: {
         id: true,
-        items: { select: { id: true } },
+        status: true,
+        items: true,
       },
     });
     if (!contract) throw createError('采购合同不存在', 404);
@@ -139,10 +143,23 @@ const updatePurchaseProductionDetails = async (
     const unknown = normalizedInputs.find((item) => !allowedIds.has(item.id));
     if (unknown) throw createError(`采购明细 ${unknown.id} 不属于当前合同`, 400);
 
+    const status = normalizePurchaseStatus(contract.status);
+    if (completeProduction) {
+      if (![PURCHASE_STATUS.SIGNED, PURCHASE_STATUS.PRODUCING, PURCHASE_STATUS.READY].includes(status)) {
+        throw createError('仅已签约或生产中的合同可登记完工；发货后请只更新资料', 400);
+      }
+      const updates = new Map(normalizedInputs.map(item => [item.id, item]));
+      assertPurchaseProductionReady(contract.items.map(item => ({ ...item, ...updates.get(item.id) })));
+    }
+
     for (const item of normalizedInputs) {
       const { id, ...data } = item;
       await tx.purchaseItem.update({ where: { id }, data });
     }
+    // 完工报告本身包含生产已开始且已结束的事实，省去单独点“开始生产”和“确认完工”。
+    if (completeProduction && status !== PURCHASE_STATUS.READY) await tx.purchaseContract.update({
+      where: { id: contractId }, data: { status: PURCHASE_STATUS.READY, productionCompletedAt: new Date() },
+    });
 
     return tx.purchaseContract.findUnique({
       where: { id: contractId },

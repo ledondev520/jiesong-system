@@ -1,6 +1,6 @@
 /**
  * Input: 销售控制器、exportService
- * Output: 出口合同管理路由（含装箱、出口三单、单证核对、退税准备与单柜财务结算）
+ * Output: 出口合同管理路由（幂等创建重放不重复记新建审计，含装箱、出口三单、单证核对、退税准备与单柜财务结算）
  * Pos: 销售路由，处理出口合同CRUD操作
  * 
  * 2026-01-20 重构：合并货柜功能，EXP号即货柜号
@@ -40,7 +40,10 @@ router.get('/:id', withIdValidation, salesController.getById);
 router.post('/', [
   body('exchangeRate').notEmpty().withMessage('汇率不能为空'),
 ], roleAuth(...WRITE_ROLES), handleValidation, withAuditLog(
-  { entity: 'SalesContract', action: 'CREATE', model: 'salesContract' },
+  {
+    entity: 'SalesContract', action: 'CREATE', model: 'salesContract',
+    shouldLog: ({ responseData }) => responseData?.idempotentReplay !== true,
+  },
   salesController.create
 ));
 

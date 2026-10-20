@@ -1,6 +1,6 @@
 /**
  * Input: 出口合同、报关/收汇/退税事实、关联采购发票与当前出口准备度
- * Output: 2026 现行规则下的退税材料清单、期限、阻塞项和可导出 Excel
+ * Output: 2026 现行规则下的退税材料清单、期限与 Excel；签署件及运输凭证按实际类型核验
  * Pos: 出口专项单发票阶段与退税阶段之间的材料准备 Module
  */
 
@@ -104,7 +104,6 @@ const findInvoiceMatchIssues = (declaration, purchases) => {
 
 const hasSignedPurchaseArchive = (purchase) => (purchase.files || []).some((file) => (
   file.category === 'SIGNED_CONTRACT'
-  || ((!file.category || file.category === 'OTHER') && /\.(pdf|docx?)$/i.test(file.fileName || ''))
 ));
 
 const hasCustomsEntrustmentEvidence = (salesContract) => (salesContract.files || []).some((file) => (
@@ -142,7 +141,7 @@ const hasPassedTaxRecord = (records, contractNo, invoiceNumber) => {
   ));
 };
 
-const buildTaxRefundPreparation = ({ salesContract, purchases = [], exportReadiness = null } = {}) => {
+const buildTaxRefundPreparation = ({ salesContract, purchases = [], exportReadiness = null, packingSourceSalesContract = salesContract } = {}) => {
   if (!salesContract) throw createError('出口合同不存在', 404);
   const declaration = latestByDate(
     (salesContract.customsDeclarations || []).filter((item) => item.status !== 'VOID'),
@@ -189,10 +188,32 @@ const buildTaxRefundPreparation = ({ salesContract, purchases = [], exportReadin
     ))
     ));
   const invoiceMatchIssues = findInvoiceMatchIssues(declaration, purchases);
-  const packingCheckPassed = ['PASSED', 'APPROVED'].includes(latestPackingCheck?.status);
+  let packingComparison;
+  try { packingComparison = latestPackingCheck?.comparison || JSON.parse(latestPackingCheck?.resultJson || 'null'); } catch { packingComparison = null; }
+  const packingSource = packingSourceSalesContract || salesContract;
+  const snapshotItems = packingComparison?.items || [];
+  const packingSnapshotCurrent = snapshotItems.length > 0
+    ? snapshotItems.length === (packingSource.packingItems || []).length
+      && (packingSource.packingItems || []).every((item) => {
+        const old = snapshotItems.find((row) => row.packingItemId === item.id);
+        return old && Number(old.quantity?.expected || 0) === Number(item.quantity || 0)
+          && Number(old.boxes?.expected || 0) === Number(item.boxes || 0)
+          && (!old.productName || normalizeText(old.productName) === normalizeText(item.product?.customsName));
+      })
+      && (packingComparison.fields || []).filter((field) => ['totalBoxes', 'grossWeight', 'netWeight', 'volume'].includes(field.key))
+        .every((field) => Number(field.expected || 0) === Number(packingSource[field.key] || 0))
+    : Boolean(toValidDate(latestPackingCheck?.reviewedAt || latestPackingCheck?.checkedAt))
+      && (packingSource.packingItems || []).every((item) => !item.updatedAt
+        || new Date(item.updatedAt) <= new Date(latestPackingCheck.reviewedAt || latestPackingCheck.checkedAt));
+  const packingCheckPassed = ['PASSED', 'APPROVED'].includes(latestPackingCheck?.status) && packingSnapshotCurrent;
   const purchaseArchivesReady = purchases.length > 0 && purchases.every(hasSignedPurchaseArchive);
-  const transportFile = latestPackingCheck?.file
-    || (salesContract.files || []).find((file) => file.category === 'CARRIER_DOCUMENT');
+  const packingCheckFileIds = new Set((salesContract.packingListChecks || []).map((check) => check.file?.id).filter(Boolean));
+  const transportFile = (salesContract.files || []).find((file) => (
+    file.category === 'CARRIER_DOCUMENT'
+    && !packingCheckFileIds.has(file.id)
+    && /提单|运单|bill[\s_-]*of[\s_-]*lading|\bb[\/_-]?l\b|waybill/i.test(`${file.fileName || ''} ${file.description || ''}`)
+    && !/装箱单|packing[\s_-]*list/i.test(`${file.fileName || ''} ${file.description || ''}`)
+  ));
   const collectionReady = (Number(salesContract.receivedAmount) > 0
     && Number(salesContract.receivedAmount) >= Number(salesContract.totalAmount || 0) - 0.01)
     || (salesContract.forexVerifications || []).some((item) => item.status === 'VERIFIED');
@@ -281,11 +302,11 @@ const buildTaxRefundPreparation = ({ salesContract, purchases = [], exportReadin
       'required',
       packingCheckPassed ? 'ready' : 'missing',
       latestPackingCheck?.file?.fileName || null,
-      packingCheckPassed ? '最新船司装箱单核对已通过' : '最新船司装箱单尚未通过核对',
+      packingCheckPassed ? '船司核对结果与当前出货明细一致' : '船司装箱单未通过核对或出货明细已变化，请重新核对',
     ),
     makeChecklistItem(
       'purchase-contracts',
-      '购销合同（备案单证）',
+      '采购签署合同（备案单证）',
       '备案单证',
       'post_submission',
       purchaseArchivesReady ? 'ready' : 'review',
@@ -299,7 +320,7 @@ const buildTaxRefundPreparation = ({ salesContract, purchases = [], exportReadin
       'post_submission',
       transportFile ? 'ready' : 'review',
       transportFile?.fileName || null,
-      transportFile ? '运输/船司原件已留存' : '申报后15日内整理备案目录前需留存提单等运输单据',
+      transportFile ? '提单/运单已留存' : '需补提单或运单；船司装箱单不能代替运输凭证',
     ),
     makeChecklistItem(
       'customs-entrustment',
@@ -494,6 +515,25 @@ const buildTaxRefundPreparationWorkbook = async (preparation) => {
     ['系统声明', preparation.disclaimer],
   ].forEach(([label, value]) => ruleSheet.addRow({ label, value }));
   ruleSheet.getColumn(2).alignment = { wrapText: true, vertical: 'top' };
+
+  if (preparation.shipmentKey) {
+    const sourceSheet = workbook.addWorksheet('出货关联');
+    sourceSheet.addRows([
+      ['出口专项单', preparation.contractNo], ['报关单', preparation.declarationNo || '待补'],
+      ['资料版本', preparation.sourceVersion], ['确认状态', preparation.confirmationStatus],
+      ['关联资料', (preparation.documentFiles || []).map((file) => file.fileName).join('、')],
+      ['自动核验', preparation.materialReady ? '通过' : preparation.materialBlockers.join('；')],
+      ['说明', '本清单为内部准备归档；确认不代表税局用途确认或正式受理。'],
+    ]);
+    sourceSheet.columns = [{ width: 18 }, { width: 90 }];
+    const verification = workbook.addWorksheet('发票核验');
+    verification.addRow(['发票号', '核验状态', '销方', '销方税号', '开票日期', '票面不含税金额', '票面税额', '票面价税合计', '差异', '本次数量', '本次价税合计']);
+    for (const item of preparation.invoiceVerification.results) verification.addRow([
+      item.invoiceNo, item.status, item.actualSeller, item.actualSellerTaxId, item.actualDate,
+      item.actualAmountExTax, item.actualTax, item.actualTotal, item.issues.join('；'), item.allocatedQuantity, item.allocatedGrossAmount,
+    ]);
+    verification.columns = Array.from({ length: 11 }, () => ({ width: 22 }));
+  }
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);

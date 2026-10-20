@@ -12,6 +12,25 @@ const {
   updatePurchaseProductionDetails,
 } = require('./purchaseProductionService');
 
+test('保存完工报告同时推进已签约采购到待装柜，不重复确认或提前入库', async () => {
+  const items = [{ id: 'pi-1', specification: '标准箱', boxes: 10, grossWeight: 100, netWeight: 90, volume: 1 }];
+  let status = 'SIGNED';
+  const tx = {
+    purchaseContract: {
+      findUnique: async () => ({ id: 'pc-1', status, items }),
+      update: async ({ data }) => { status = data.status; assert.ok(data.productionCompletedAt instanceof Date); },
+    },
+    purchaseItem: { update: async () => {} },
+  };
+  const db = { $transaction: async fn => fn(tx) };
+  assert.equal((await updatePurchaseProductionDetails('pc-1', items, db, { completeProduction: true })).status, 'READY');
+  status = 'SIGNED';
+  await assert.rejects(updatePurchaseProductionDetails('pc-1', [{ ...items[0], boxes: 0 }], db, { completeProduction: true }), /资料未完整/);
+  assert.equal(status, 'SIGNED');
+  status = 'DRAFT';
+  await assert.rejects(updatePurchaseProductionDetails('pc-1', items, db, { completeProduction: true }), /已签约/);
+});
+
 test('生产资料完整且无箱体尺寸时允许完工，并明确使用体积推算3D尺寸', () => {
   const result = evaluatePurchaseProductionReadiness([{
     id: 'pi-1',

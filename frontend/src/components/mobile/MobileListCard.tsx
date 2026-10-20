@@ -1,6 +1,6 @@
 /**
  * Input: 列表条目数据（标题、副标题、状态、金额、操作）
- * Output: 移动端列表卡片组件，替代桌面端 Table 行
+ * Output: 移动端列表卡片组件，替代桌面端 Table 行，完整展示长标题与字段
  * Pos: 移动端通用组件，供财务/合同/采购等列表页使用
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -29,7 +29,7 @@ interface MobileListCardProps {
   subtitle?: React.ReactNode;
   /** 状态标签 */
   badge?: React.ReactNode;
-  /** 列表字段（最多展示 3 个） */
+  /** 列表字段 */
   fields?: MobileListCardField[];
   /** 右侧金额或关键数值（大字显示） */
   amount?: {
@@ -62,7 +62,7 @@ const emphasisClasses = {
  * 职责：渲染移动端列表卡片，作为 Table 行的移动端替代
  * 思路：
  *   1. 顶部行：主标题 + 状态标签 + 可选的金额数值
- *   2. 中间行：副标题 + 关键字段（最多 3 个）
+ *   2. 中间行：副标题 + 关键字段，长文本换行以保留完整信息
  *   3. 底部行：操作按钮（可选）
  *   4. 整张卡片可点击进入详情（有箭头指示）
  */
@@ -88,7 +88,7 @@ export function MobileListCard({
       <Wrapper
         className={cn(
           'w-full text-left',
-          isClickable && 'cursor-pointer active:opacity-80',
+          isClickable && 'cursor-pointer rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-80',
         )}
         onClick={onClick}
         type={isClickable ? 'button' : undefined}
@@ -97,19 +97,19 @@ export function MobileListCard({
         <div className="mb-2 flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-semibold text-foreground">{title}</span>
+              <span className="min-w-0 flex-1 break-words text-sm font-semibold text-foreground">{title}</span>
               {displayArrow && (
                 <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
               )}
             </div>
             {subtitle && (
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</p>
+              <p className="mt-0.5 break-words text-xs text-muted-foreground">{subtitle}</p>
             )}
           </div>
 
           {/* 金额区域 */}
           {amount && (
-            <div className="shrink-0 text-right">
+            <div className="max-w-[45%] shrink-0 break-words text-right">
               <div
                 className={cn(
                   'text-base font-bold',
@@ -118,7 +118,7 @@ export function MobileListCard({
               >
                 {amount.value}
               </div>
-              <div className="text-[10px] text-muted-foreground">{amount.label}</div>
+              <div className="text-[11px] text-muted-foreground">{amount.label}</div>
             </div>
           )}
         </div>
@@ -129,12 +129,12 @@ export function MobileListCard({
         {/* 字段列表 */}
         {fields.length > 0 && (
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            {fields.slice(0, 4).map((field, i) => (
-              <div key={i} className="flex items-baseline gap-1">
-                <span className="shrink-0 text-[10px] text-muted-foreground">{field.label}</span>
+            {fields.map((field, i) => (
+              <div key={i} className="min-w-0 space-y-0.5">
+                <div className="break-words text-[11px] text-muted-foreground">{field.label}</div>
                 <span
                   className={cn(
-                    'truncate text-xs font-medium',
+                    'block break-words text-xs font-medium',
                     field.emphasis ? emphasisClasses[field.emphasis] : 'text-foreground',
                   )}
                 >

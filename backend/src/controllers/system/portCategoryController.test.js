@@ -45,8 +45,8 @@ test('getPorts: 默认仅查询启用港口并支持 keyword 模糊过滤', asyn
     assert.equal(capturedError, null);
     assert.equal(findManyArgs.where.isActive, true);
     assert.deepEqual(findManyArgs.where.OR, [
-      { name: { contains: 'la', mode: 'insensitive' } },
-      { code: { contains: 'la', mode: 'insensitive' } },
+      { name: { contains: 'la' } },
+      { code: { contains: 'la' } },
     ]);
     assert.deepEqual(res.payload.data.items, []);
   } finally {

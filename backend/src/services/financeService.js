@@ -1,11 +1,19 @@
 /**
  * Input: 财务请求参数
  * Output: 付款记录与应收应付统计
- * Pos: 财务业务服务层，负责幂等写入与聚合计算
+ * Pos: 财务业务服务层，负责幂等写入、收款分配事务守恒与聚合计算
  */
 
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
+const { getPurchaseSettlementStatus } = require('./purchaseStateMachine');
+const { getSalesSettlementStatus } = require('./salesStateMachine');
+const {
+  getEffectiveSalesContractTotal,
+  getEffectiveSalesReceived,
+  isFormalSalesAmount,
+  isJiesongOwnedPackingItem,
+} = require('./salesContractAmount');
 
 const PAYMENT_TYPES = {
   PAYABLE: 'PAYABLE',
@@ -84,13 +92,6 @@ const includePaymentRelations = {
   sourcePayment: true,
 };
 
-const OWNERSHIP_EXCLUSION_KEYWORDS = [
-  '非捷淞报关',
-  '拼船',
-  '他方自行报关',
-  '共用发票',
-];
-
 const withDefaultCustomerName = (value) => {
   const normalized = typeof value === 'string' ? value.trim() : '';
   return normalized || DEFAULT_RECEIVABLE_CUSTOMER_NAME;
@@ -113,39 +114,6 @@ const getReceiptAllocationTotals = async (receiptIds, db = prisma) => {
   return new Map(
     grouped.map((row) => [row.sourcePaymentId, Number(row._sum.amount || 0)]),
   );
-};
-
-const isJiesongOwnedPackingItem = (item) => {
-  if (typeof item?.isOwnedByJiesong === 'boolean') {
-    return item.isOwnedByJiesong;
-  }
-
-  const note = String(item?.note || '');
-  return !OWNERSHIP_EXCLUSION_KEYWORDS.some((keyword) => note.includes(keyword));
-};
-
-const getEffectiveSalesContractTotal = (contract) => {
-  if (!Array.isArray(contract?.packingItems) || contract.packingItems.length === 0) {
-    return Number(contract?.totalAmount || 0);
-  }
-
-  const excludedAmount = contract.packingItems.reduce((sum, item) => {
-    if (isJiesongOwnedPackingItem(item)) {
-      return sum;
-    }
-    return sum + Number(item.totalPrice || 0);
-  }, 0);
-
-  return Number(Math.max(Number(contract.totalAmount || 0) - excludedAmount, 0).toFixed(2));
-};
-
-/** 混柜合同的已收款按自有收入占合同总额的比例归属，不能把第三方回款算入捷淞。 */
-const getEffectiveSalesReceived = (contract, ownedTotalAmount = getEffectiveSalesContractTotal(contract)) => {
-  const contractTotal = Number(contract?.totalAmount || 0);
-  const received = Number(contract?.receivedAmount || 0);
-  if (contractTotal <= 0 || ownedTotalAmount <= 0 || received <= 0) return 0;
-  const ownershipRatio = Math.min(Math.max(ownedTotalAmount / contractTotal, 0), 1);
-  return Number(Math.min(received * ownershipRatio, ownedTotalAmount).toFixed(2));
 };
 
 const getOwnedStores = (packingItems = [], port) => {
@@ -379,10 +347,12 @@ const syncContractPaymentAmounts = async (tx, { purchaseContractId, salesContrac
       where: { purchaseContractId, currency: 'CNY' },
       _sum: { amount: true },
     });
-    await tx.purchaseContract.update({
+    const contract = await tx.purchaseContract.update({
       where: { id: purchaseContractId },
       data: { paidAmount: total._sum.amount || 0 },
     });
+    const status = getPurchaseSettlementStatus(contract.status, contract.totalAmount, total._sum.amount || 0);
+    if (status && status !== contract.status) await tx.purchaseContract.update({ where: { id: purchaseContractId }, data: { status } });
   }
 
   if (salesContractId) {
@@ -394,10 +364,12 @@ const syncContractPaymentAmounts = async (tx, { purchaseContractId, salesContrac
       },
       _sum: { amount: true },
     });
-    await tx.salesContract.update({
+    const contract = await tx.salesContract.update({
       where: { id: salesContractId },
       data: { receivedAmount: total._sum.amount || 0 },
     });
+    const status = getSalesSettlementStatus(contract.status, contract.totalAmount, total._sum.amount || 0);
+    if (status && status !== contract.status) await tx.salesContract.update({ where: { id: salesContractId }, data: { status } });
   }
 };
 
@@ -455,9 +427,10 @@ const autoMatchUnallocatedPayments = async () => {
       continue;
     }
 
+    const amount = Number(attachReceiptBalance(payment, allocationTotals).remainingAmount);
     await allocatePaymentToContracts(payment.id, [{
       salesContractId: candidate.contract.id,
-      amount: Number(payment.amount),
+      amount,
       note: `自动匹配 ${candidate.contract.contractNo} [${candidate.rule}]`,
     }]);
 
@@ -465,7 +438,7 @@ const autoMatchUnallocatedPayments = async () => {
       paymentId: payment.id,
       salesContractId: candidate.contract.id,
       contractNo: candidate.contract.contractNo,
-      amount: Number(payment.amount),
+      amount,
       rule: candidate.rule,
       confidence: candidate.confidence,
     });
@@ -490,25 +463,49 @@ const autoMatchUnallocatedPayments = async () => {
  * @param {Array<{salesContractId: string, amount: number, note?: string}>} allocations - 分配明细
  */
 const allocatePaymentToContracts = async (paymentId, allocations) => {
-  const receipt = await prisma.payment.findUnique({ where: { id: paymentId } });
-  if (!receipt) throw new Error('收款记录不存在');
-  if (!RECEIPT_POOL_TYPES.has(receipt.type)) throw new Error('该记录不是待分配收款');
-  if (normalizeCurrency(receipt.currency, '') !== 'USD') {
-    throw createError('出口合同收款分配只支持 USD；当前到账币种无法直接计入美元应收', 400);
+  if (!Array.isArray(allocations) || allocations.length === 0) {
+    throw createError('allocations 不能为空', 400);
   }
-
-  const allocatedBefore = await getPaymentAllocatedAmount(paymentId);
-  const remainingBefore = Math.max(Number(receipt.amount || 0) - allocatedBefore, 0);
-  const requestedAmount = allocations.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-
-  if (requestedAmount <= 0) {
-    throw new Error('分配金额必须大于 0');
+  for (const alloc of allocations) {
+    if (!alloc || typeof alloc.salesContractId !== 'string' || !alloc.salesContractId.trim()) {
+      throw createError('每条分配必须关联销售合同', 400);
+    }
+    if (typeof alloc.amount !== 'number' || !Number.isFinite(alloc.amount) || alloc.amount <= 0) {
+      throw createError('每条分配金额必须是大于 0 的有限数值', 400);
+    }
   }
-  if (requestedAmount - remainingBefore > AUTO_MATCH_AMOUNT_TOLERANCE) {
-    throw new Error('分配金额超出该笔收款剩余可分配金额');
-  }
+  const requestedAmount = allocations.reduce((sum, item) => sum + item.amount, 0);
+  if (!Number.isFinite(requestedAmount)) throw createError('分配金额无效', 400);
 
   const result = await prisma.$transaction(async (tx) => {
+    // SQLite: obtain the writer lock before any receipt/balance read, including
+    // independent HTTP workers. The no-op preserves historical source fields.
+    const locked = await tx.$executeRaw`UPDATE payments SET id = id WHERE id = ${paymentId}`;
+    if (locked !== 1) throw createError('收款记录不存在', 400);
+    const receipt = await tx.payment.findUnique({ where: { id: paymentId } });
+    if (!receipt || !RECEIPT_POOL_TYPES.has(receipt.type)
+      || receipt.salesContractId || receipt.purchaseContractId || receipt.sourcePaymentId) {
+      throw createError('该记录不是待分配收款', 400);
+    }
+    if (!Number.isFinite(receipt.amount) || receipt.amount <= 0) {
+      throw createError('到账来源金额必须是大于 0 的有限数值', 400);
+    }
+    const currency = normalizeCurrency(receipt.currency, '');
+    if (currency !== 'USD') {
+      throw createError('出口合同收款分配只支持 USD；当前到账币种无法直接计入美元应收', 400);
+    }
+    const allocatedBefore = await getPaymentAllocatedAmount(paymentId, tx);
+    const remainingBefore = Math.max(Number(receipt.amount || 0) - allocatedBefore, 0);
+    if (remainingBefore <= 0) {
+      throw createError('该笔收款已无剩余可分配金额', 400);
+    }
+    if (requestedAmount - remainingBefore > AUTO_MATCH_AMOUNT_TOLERANCE) {
+      throw createError('分配金额超出该笔收款剩余可分配金额', 400);
+    }
+    const targetIds = [...new Set(allocations.map(item => item.salesContractId))];
+    const targets = await tx.salesContract.findMany({ where: { id: { in: targetIds } }, select: { id: true } });
+    if (targets.length !== targetIds.length) throw createError('销售合同不存在', 400);
+
     const created = [];
     const affectedSalesContractIds = new Set();
 
@@ -520,7 +517,7 @@ const allocatePaymentToContracts = async (paymentId, allocations) => {
           sourcePaymentId: paymentId,
           customerName: withDefaultCustomerName(receipt.customerName),
           amount: alloc.amount,
-          currency: receipt.currency,
+          currency,
           paymentMethod: receipt.paymentMethod,
           paymentDate: receipt.paymentDate,
           note: alloc.note || `来自收款 #${paymentId.slice(-6)}`,
@@ -532,18 +529,7 @@ const allocatePaymentToContracts = async (paymentId, allocations) => {
 
     // 批量更新：一次性聚合所有受影响合同的收款总额
     for (const salesContractId of affectedSalesContractIds) {
-      const total = await tx.payment.aggregate({
-        where: {
-          salesContractId,
-          type: { in: RECEIVABLE_SETTLEMENT_TYPES },
-          currency: 'USD',
-        },
-        _sum: { amount: true },
-      });
-      await tx.salesContract.update({
-        where: { id: salesContractId },
-        data: { receivedAmount: total._sum.amount || 0 },
-      });
+      await syncContractPaymentAmounts(tx, { salesContractId });
     }
 
     const allocatedAfter = await getPaymentAllocatedAmount(paymentId, tx);
@@ -603,6 +589,13 @@ const createPayment = async (data = {}, options = {}) => {
     }
   }
 
+  // Source-linked collections must use the allocation transaction above. The
+  // general creation endpoint cannot bypass receipt eligibility/balance checks.
+  // Existing keyed records still replay without writing a second collection.
+  if (data.sourcePaymentId != null && data.sourcePaymentId !== '') {
+    throw createError('关联到账来源的收款请通过收款分配操作登记', 400);
+  }
+
   try {
     const payment = await prisma.$transaction(async (tx) => {
       const created = await tx.payment.create({
@@ -647,53 +640,40 @@ const createPayment = async (data = {}, options = {}) => {
   }
 };
 
-const getPayables = async ({ page, pageSize, skip }) => {
+const getPayables = async ({ page, pageSize, skip, search, outstandingOnly = false, pastDelivery = false }) => {
   const where = {
     totalAmount: { gt: 0 },
     NOT: { status: 'CANCELLED' },
   };
 
-  const [contracts, total] = await Promise.all([
-    prisma.purchaseContract.findMany({
-      where,
-      skip,
-      take: pageSize,
-      include: { supplier: true },
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.purchaseContract.count({ where }),
-  ]);
-
-  return {
-    payables: contracts.map((contract) => ({
-      ...contract,
-      unpaidAmount: contract.totalAmount - contract.paidAmount,
-    })),
-    total,
-    page,
-    pageSize,
-  };
+  if (pastDelivery) where.expectedDate = { lt: new Date() };
+  // ponytail: balances use JS filtering; move to a SQL projection if dataset size becomes costly.
+  const contracts = await prisma.purchaseContract.findMany({
+    where,
+    include: { supplier: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  const payables = contracts.map((contract) => ({
+    ...contract,
+    unpaidAmount: Math.max(0, contract.totalAmount - contract.paidAmount),
+  })).filter((contract) => (!outstandingOnly || contract.unpaidAmount > 0)
+    && (!search || `${contract.contractNo} ${contract.supplier?.name || ''}`.toLowerCase().includes(String(search).trim().toLowerCase())));
+  return { payables: payables.slice(skip, skip + pageSize), total: payables.length, page, pageSize };
 };
 
-const getReceivables = async ({ page, pageSize, skip }) => {
+const getReceivables = async ({ page, pageSize, skip, search, outstandingOnly = false, overdue = false }) => {
   const where = {
     totalAmount: { gt: 0 },
     NOT: { status: 'CANCELLED' },
   };
 
-  const [contracts, total] = await Promise.all([
-    prisma.salesContract.findMany({
-      where,
-      skip,
-      take: pageSize,
-      include: {
-        packingItems: { include: { store: true } },
-        port: true,
-      },
-      orderBy: { contractNo: 'desc' },
-    }),
-    prisma.salesContract.count({ where }),
-  ]);
+  // ponytail: effective ownership is computed in JS; move projection to SQL if contract volume becomes costly.
+  const contracts = await prisma.salesContract.findMany({
+    where,
+    include: { packingItems: { include: { store: true } }, port: true },
+    orderBy: { contractNo: 'desc' },
+  });
+  const overdueIds = overdue ? new Set((await getOverdueReceivables()).map((contract) => contract.id)) : null;
 
   const receivables = contracts.map((contract) => {
     const ownedTotalAmount = getEffectiveSalesContractTotal(contract);
@@ -712,9 +692,12 @@ const getReceivables = async ({ page, pageSize, skip }) => {
       packingItems: undefined,
       port: undefined,
     };
-  }).filter((contract) => contract.totalAmount > 0);
+  }).filter((contract) => contract.totalAmount > 0
+    && (!outstandingOnly || contract.unreceiveAmount > 0)
+    && (!overdueIds || overdueIds.has(contract.id))
+    && (!search || `${contract.contractNo} ${contract.stores.join(' ')}`.toLowerCase().includes(String(search).trim().toLowerCase())));
 
-  return { receivables, total: receivables.length, page, pageSize };
+  return { receivables: receivables.slice(skip, skip + pageSize), total: receivables.length, page, pageSize };
 };
 
 const getStats = async () => {
@@ -732,6 +715,7 @@ const getStats = async () => {
     select: {
       id: true,
       totalAmount: true,
+      amountSource: true,
       receivedAmount: true,
     },
   });
@@ -773,12 +757,12 @@ const getStats = async () => {
     const packingTotal = packingTotalMap.get(contract.id) || 0;
     const nonOwnedTotal = nonOwnedMap.get(contract.id) || 0;
 
-    // 如果合同有 packingItems，effectiveTotal = totalAmount - nonOwnedTotal
-    // 因为 recalculateContractStats 保证 totalAmount = sum(all packingItems.totalPrice)
-    // 如果没有 packingItems，packingTotal 为 0，此时 effectiveTotal = totalAmount
-    const ownedTotalAmount = packingTotal > 0
-      ? Math.max(Number(contract.totalAmount || 0) - nonOwnedTotal, 0)
-      : Number(contract.totalAmount || 0);
+    // 正式合同金额已经是捷淞销售额；仅历史 DERIVED 数据继续扣除第三方装箱货值。
+    const ownedTotalAmount = isFormalSalesAmount(contract)
+      ? Number(contract.totalAmount || 0)
+      : (packingTotal > 0
+          ? Math.max(Number(contract.totalAmount || 0) - nonOwnedTotal, 0)
+          : Number(contract.totalAmount || 0));
 
     acc.total += ownedTotalAmount;
     acc.received += getEffectiveSalesReceived(contract, ownedTotalAmount);

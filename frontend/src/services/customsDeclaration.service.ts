@@ -1,37 +1,47 @@
-import api from '@/lib/axios';
-import type {
-  CustomsDeclaration,
-  CustomsDeclarationItem,
-} from '@/types';
-import { createCrudService } from './crudService';
+import api from "@/lib/axios";
+import type { CustomsDeclaration, CustomsDeclarationItem } from "@/types";
+import { createCrudService } from "./crudService";
 
 export type CustomsDeclarationListQuery = {
   page?: number;
   pageSize?: number;
   keyword?: string;
   status?: string;
+  salesContractId?: string;
 };
 
-export type CustomsDeclarationItemInput = Omit<CustomsDeclarationItem, 'id'>;
+export type CustomsDeclarationItemInput = Omit<
+  CustomsDeclarationItem,
+  "id" | "productName"
+> & { id?: string; productId: string; customsName: string };
 
 export type CustomsDeclarationDraftGenerateInput = {
   salesContractId?: string;
   replaceExisting?: boolean;
 };
 
-export type CustomsDeclarationUpsertInput = Omit<
+export type CustomsDeclarationUpsertInput = Pick<
   CustomsDeclaration,
-  'id' | 'createdAt' | 'updatedAt' | 'items'
-> & {
-  items: CustomsDeclarationItemInput[];
-};
+  | "declarationNo"
+  | "status"
+  | "declaredAt"
+  | "exportDate"
+  | "customsBroker"
+  | "currency"
+  | "exchangeRate"
+  | "totalAmount"
+  | "totalQuantity"
+  | "totalNetWeight"
+  | "totalGrossWeight"
+  | "note"
+> & { salesContractId: string; items: CustomsDeclarationItemInput[] };
 
 const crud = createCrudService<
   CustomsDeclaration,
   CustomsDeclarationUpsertInput,
   CustomsDeclarationUpsertInput,
   CustomsDeclarationListQuery
->('/customs-declarations');
+>("/customs-declarations");
 
 export const customsDeclarationService = {
   ...crud,
@@ -43,5 +53,5 @@ export const customsDeclarationService = {
     crud.update!(id, data),
   delete: async (id: string) => crud.delete!(id),
   generateDrafts: async (data: CustomsDeclarationDraftGenerateInput) =>
-    api.post('/customs-declarations/auto-drafts', data),
+    api.post("/customs-declarations/auto-drafts", data),
 };

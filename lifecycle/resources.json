@@ -1,0 +1,131 @@
+{
+  "resources": [
+    {
+      "id": "customs-brokers",
+      "routeFile": "backend/src/routes/system.js",
+      "routes": ["POST /customs-brokers", "PUT /customs-brokers/:id"],
+      "update": { "file": "backend/src/controllers/system/customsBrokerController.js", "handler": "updateCustomsBroker" },
+      "matrix": {
+        "path": "/api/v1/system/customs-brokers",
+        "table": "customs_brokers",
+        "create": { "name": "Synthetic matrix broker", "contact": "Original contact", "phone": "Original phone" },
+        "edit": { "name": "Synthetic edited broker" },
+        "invalid": [{ "name": "   ", "contact": "Unwanted contact" }, { "name": null, "phone": "Unwanted phone" }, { "isActive": "false" }],
+        "blank": { "contact": "", "phone": "   " },
+        "clear": { "contact": null, "phone": null },
+        "clearStatus": 200,
+        "filter": "Synthetic edited broker"
+      }
+    },
+    {
+      "id": "ports",
+      "routeFile": "backend/src/routes/system.js",
+      "routes": ["POST /ports", "PUT /ports/:id"],
+      "update": { "file": "backend/src/controllers/system/portCategoryController.js", "handler": "updatePort" },
+      "matrix": {
+        "path": "/api/v1/system/ports",
+        "table": "ports",
+        "create": { "name": "Synthetic matrix port", "code": "SYN-MATRIX" },
+        "edit": { "name": "Synthetic edited port", "code": "SYN-EDITED" },
+        "invalid": [{ "name": "   ", "code": "UNWANTED" }, { "name": null, "code": "UNWANTED" }, { "name": "Unwanted name", "code": "   " }],
+        "blank": { "isActive": "" },
+        "clear": { "name": null },
+        "clearStatus": 400,
+        "filter": "Synthetic edited port"
+      }
+    },
+    {
+      "id": "pricing-config",
+      "kind": "singleton-config",
+      "routeFile": "backend/src/routes/system.js",
+      "routes": [
+        "PUT /pricing-config"
+      ],
+      "update": {
+        "file": "backend/src/controllers/system/pricingController.js",
+        "handler": "updatePricing"
+      },
+      "matrix": {
+        "adapter": "pricing-config-file",
+        "path": "/api/v1/system/pricing-config",
+        "initial": {
+          "mode": "tiered",
+          "exchangeAdjustment": -0.2,
+          "refundableMarkup": 0.3,
+          "noRefundMarkup": 0.1,
+          "multiplier": 1.3
+        },
+        "replace": {
+          "mode": "multiplier",
+          "exchangeAdjustment": -0.1,
+          "refundableMarkup": 0.25,
+          "noRefundMarkup": 0.15,
+          "multiplier": 1.5
+        },
+        "invalid": [
+          {},
+          null,
+          [],
+          {
+            "mode": "tiered"
+          },
+          {
+            "mode": "invalid",
+            "exchangeAdjustment": -0.2,
+            "refundableMarkup": 0.3,
+            "noRefundMarkup": 0.1,
+            "multiplier": 1.3
+          },
+          {
+            "mode": "tiered",
+            "exchangeAdjustment": -0.2,
+            "refundableMarkup": 0.3,
+            "noRefundMarkup": 0.1,
+            "multiplier": 0
+          },
+          {
+            "mode": "tiered",
+            "exchangeAdjustment": "-0.2",
+            "refundableMarkup": 0.3,
+            "noRefundMarkup": 0.1,
+            "multiplier": 1.3
+          },
+          {
+            "mode": "tiered",
+            "exchangeAdjustment": -0.2,
+            "refundableMarkup": 0.3,
+            "noRefundMarkup": 0.1,
+            "multiplier": 1.3,
+            "unknown": 1
+          }
+        ]
+      }
+    }
+  ],
+  "lists": [
+    {
+      "id": "inventory",
+      "file": "frontend/src/app/dashboard/products/components/InventoryTab.tsx",
+      "test": "frontend/src/app/dashboard/products/components/InventoryTab.lifecycle.test.tsx",
+      "schema": "inventory",
+      "path": "/dashboard/products?tab=inventory&source=qa#rows",
+      "keywordKey": "inventoryKeyword",
+      "pageKey": "inventoryPage",
+      "pageSizeKey": "inventoryPageSize",
+      "tabKey": "tab",
+      "tab": "inventory"
+    },
+    {
+      "id": "customs",
+      "file": "frontend/src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx",
+      "test": "frontend/src/app/customs-declarations/components/CustomsDeclarationListPageContent.test.tsx",
+      "schema": "customs",
+      "path": "/dashboard/tax-refunds?view=customs&source=qa#rows",
+      "keywordKey": "keyword",
+      "pageKey": "page",
+      "pageSizeKey": "pageSize",
+      "tabKey": "view",
+      "tab": "customs"
+    }
+  ]
+}

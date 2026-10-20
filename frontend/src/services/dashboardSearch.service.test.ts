@@ -57,10 +57,10 @@ describe('searchDashboard', () => {
     const results = await searchDashboard('瓷砖', { limit: 4 });
 
     expect(api.get).toHaveBeenNthCalledWith(1, '/products', {
-      params: { keyword: '瓷砖', pageSize: 4 },
+      params: { keyword: '瓷砖', pageSize: 4, lite: true },
     });
     expect(api.get).toHaveBeenNthCalledWith(2, '/suppliers', {
-      params: { keyword: '瓷砖', pageSize: 4 },
+      params: { keyword: '瓷砖', pageSize: 4, lite: true },
     });
     expect(api.get).toHaveBeenCalledTimes(2);
     expect(results.map((result) => result.type)).toEqual([
@@ -102,10 +102,10 @@ describe('searchDashboard', () => {
 
     // 货柜管理已并入出口合同，第二批仅查询采购与出口合同
     expect(api.get).toHaveBeenNthCalledWith(3, '/purchases', {
-      params: { keyword: '瓷砖', pageSize: 3 },
+      params: { keyword: '瓷砖', pageSize: 3, lite: true },
     });
     expect(api.get).toHaveBeenNthCalledWith(4, '/sales', {
-      params: { keyword: '瓷砖', pageSize: 3 },
+      params: { keyword: '瓷砖', pageSize: 3, lite: true },
     });
     expect(api.get).toHaveBeenCalledTimes(4);
     expect(results.map((result) => result.type)).toEqual([

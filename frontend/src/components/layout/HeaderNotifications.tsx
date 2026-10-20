@@ -1,27 +1,28 @@
 /**
  * Input: 后端通知 API
- * Output: Header 通知下拉
- * Pos: 前端布局子组件
+ * Output: Header 通知下拉与按通知去重的待完成已读操作
+ * Pos: 前端布局子组件，重复点击不重复减少未读计数
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState } from 'react';
-import { Bell } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Bell } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
-import { notificationService } from '@/services/notification.service';
-import { NotificationPanel } from '@/components/notifications/NotificationPanel';
-import type { Notification } from '@/types';
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { notificationService } from "@/services/notification.service";
+import { NotificationPanel } from "@/components/notifications/NotificationPanel";
+import type { Notification } from "@/types";
 
 export function HeaderNotifications() {
+  const pendingReadIds = useRef(new Set<string>());
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -53,10 +54,15 @@ export function HeaderNotifications() {
       }
     };
     init();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [loadNotifications]);
 
   const handleMarkRead = async (id: string) => {
+    // 同一通知等待完成时只处理一次；其他通知仍可独立标记，失败后可重试。
+    if (pendingReadIds.current.has(id)) return;
+    pendingReadIds.current.add(id);
     try {
       await notificationService.markRead(id);
       setNotifications((prev) =>
@@ -65,6 +71,8 @@ export function HeaderNotifications() {
       setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch {
       // 忽略失败
+    } finally {
+      pendingReadIds.current.delete(id);
     }
   };
 
@@ -81,7 +89,11 @@ export function HeaderNotifications() {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="relative h-11 w-11 rounded-md">
+        <Button
+          variant="outline"
+          size="icon"
+          className="relative h-11 w-11 rounded-md"
+        >
           <Bell className="h-5 w-5" />
           <span className="sr-only">通知</span>
           {unreadCount > 0 && (
@@ -89,7 +101,7 @@ export function HeaderNotifications() {
               variant="destructive"
               className="absolute -right-1 -top-1 h-5 min-w-[20px] px-1.5 text-[11px]"
             >
-              {unreadCount > 99 ? '99+' : unreadCount}
+              {unreadCount > 99 ? "99+" : unreadCount}
             </Badge>
           )}
         </Button>

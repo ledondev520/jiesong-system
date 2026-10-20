@@ -1,12 +1,13 @@
 /**
  * Input: 认证服务
  * Output: 认证相关的HTTP响应
- * Pos: 认证控制器，处理登录/注册/用户管理/找回密码请求
+ * Pos: 认证控制器，处理固定期限浏览器会话、登录、邮箱验证注册、用户管理、找回密码请求
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const authService = require('../services/authService');
+const browserSessions = require('../services/browserSessionService');
 const { success, created, paginated } = require('../utils/response');
 
 /**
@@ -19,6 +20,12 @@ const login = async (req, res, next) => {
   try {
     const { username, password } = req.body;
     const result = await authService.login(username, password);
+    if (req.body.rememberMe === true) {
+      const session = await browserSessions.create(req, res, result.token);
+      return success(res, { user: result.user, token: null, ...session }, '登录成功');
+    }
+    await browserSessions.revoke(browserSessions.readCookie(req));
+    browserSessions.clearCookie(res);
     success(res, result, '登录成功');
   } catch (error) {
     next(error);
@@ -52,12 +59,12 @@ const register = async (req, res, next) => {
  */
 const publicRegister = async (req, res, next) => {
   try {
-    const { username, password, name, phone } = req.body;
+    const { email, code, password, name } = req.body;
     const user = await authService.publicRegister({
-      username,
+      email,
+      code,
       password,
       name,
-      phone,
     });
     created(res, user, '注册成功，请等待管理员审核');
   } catch (error) {
@@ -141,22 +148,33 @@ const updateUser = async (req, res, next) => {
 };
 
 /**
- * 职责：找回密码（通过用户名+手机号验证身份后重置密码）
+ * 职责：找回密码（验证绑定邮箱验证码并撤销已有会话）
  * @param {Request} req - Express请求对象
  * @param {Response} res - Express响应对象
  * @param {NextFunction} next - 下一个中间件
  */
 const resetPassword = async (req, res, next) => {
   try {
-    const { username, phone, newPassword } = req.body;
-    const result = await authService.verifyAndResetPassword(username, phone, newPassword);
+    const { email, code, newPassword } = req.body;
+    const result = await authService.verifyAndResetPassword({ email, code, newPassword });
     success(res, result, '密码重置成功，请使用新密码登录');
   } catch (error) {
     next(error);
   }
 };
 
+const getSession = async (req, res, next) => {
+  try { success(res, { user: await authService.getUserById(req.user.id), token: null, ...(req.browserSession || {}) }, '获取成功'); }
+  catch (error) { next(error); }
+};
+const logout = async (req, res, next) => {
+  try { await browserSessions.logout(req, res); success(res, null, '退出成功'); }
+  catch (error) { next(error); }
+};
+
 module.exports = {
+  getSession,
+  logout,
   login,
   register,
   publicRegister,

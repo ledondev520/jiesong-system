@@ -78,6 +78,18 @@ vi.mock('./FinancialStatementsUploadDialog', () => ({
   ) : null,
 }));
 
+vi.mock('./FinancialStatementsTabsSection', () => ({
+  FinancialStatementsTabsSection: () => <div>报表下钻</div>,
+}));
+
+vi.mock('./FinancialEvidenceLibrary', () => ({
+  FinancialEvidenceLibrary: () => <div>财务资料库</div>,
+}));
+
+vi.mock('./ReceivableReconciliationCard', () => ({
+  ReceivableReconciliationCard: () => <div>客户美元应收对账</div>,
+}));
+
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));

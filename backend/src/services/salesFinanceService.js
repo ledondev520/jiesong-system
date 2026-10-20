@@ -1,12 +1,17 @@
 /**
  * Input: 单份出口合同、关联采购合同与出口退税准备度
- * Output: 排除第三方拼柜后的美元收入、人民币采购成本、预计商品毛利与现金流
+ * Output: 复用共享所有权判定的美元收入、人民币采购成本、预计商品毛利与现金流
  * Pos: 一个出口专项单的一站式财务结算 Module；不把不同币种直接相加
  */
 
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { getExportReadiness } = require('./exportReadinessService');
+const {
+  getEffectiveSalesContractTotal,
+  getEffectiveSalesReceived,
+  isJiesongOwnedPackingItem,
+} = require('./salesContractAmount');
 
 const SALES_SETTLEMENT_TYPES = new Set(['RECEIVABLE', 'RECEIVABLE_COLLECTION', 'INCOME']);
 const ROUNDING_EPSILON = Number.EPSILON;
@@ -22,8 +27,6 @@ const contractNoAliases = (value) => unique([
   normalizeContractNo(value).replace(/^PO/, 'CG'),
   normalizeContractNo(value).replace(/^CG/, 'PO'),
 ]);
-
-const isOwnedPackingItem = (item) => item?.isOwnedByJiesong !== false;
 
 const makeIssue = (code, severity, message) => ({ code, severity, message });
 const dedupeIssues = (issues) => Array.from(new Map(
@@ -51,16 +54,13 @@ const buildSalesFinanceSummary = ({
   if (!salesContract) throw createError('出口合同不存在', 404);
 
   const packingItems = Array.isArray(salesContract.packingItems) ? salesContract.packingItems : [];
-  const ownedItems = packingItems.filter(isOwnedPackingItem);
-  const thirdPartyItems = packingItems.filter((item) => !isOwnedPackingItem(item));
+  const ownedItems = packingItems.filter(isJiesongOwnedPackingItem);
+  const thirdPartyItems = packingItems.filter((item) => !isJiesongOwnedPackingItem(item));
   const issues = [];
 
   const packedRevenueUsd = roundMoney(packingItems.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0));
-  const thirdPartyRevenueUsd = roundMoney(thirdPartyItems.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0));
   const contractTotalUsd = roundMoney(salesContract.totalAmount);
-  const ownedRevenueUsd = packingItems.length > 0
-    ? roundMoney(Math.max(contractTotalUsd - thirdPartyRevenueUsd, 0))
-    : contractTotalUsd;
+  const ownedRevenueUsd = roundMoney(getEffectiveSalesContractTotal(salesContract));
   const ownershipRatio = contractTotalUsd > 0
     ? Math.min(Math.max(ownedRevenueUsd / contractTotalUsd, 0), 1)
     : 1;
@@ -112,9 +112,13 @@ const buildSalesFinanceSummary = ({
     }
   }
 
-  const receivedUsd = roundMoney(Math.min(totalReceivedUsd * ownershipRatio, ownedRevenueUsd));
+  const receivedUsd = roundMoney(getEffectiveSalesReceived(
+    salesContract,
+    ownedRevenueUsd,
+    totalReceivedUsd,
+  ));
   const outstandingUsd = roundMoney(Math.max(ownedRevenueUsd - receivedUsd, 0));
-  if (totalReceivedUsd * ownershipRatio > ownedRevenueUsd + 0.01) {
+  if (totalReceivedUsd > contractTotalUsd + 0.01) {
     issues.push(makeIssue('RECEIPT_EXCEEDS_REVENUE', 'warning', '美元收款超过当前自有货物收入，超出部分未计入本柜收入'));
   }
   if (
@@ -302,7 +306,7 @@ const getSalesFinanceSummary = async (
   if (!salesContract) throw createError('出口合同不存在', 404);
 
   const sourceContractNos = unique((salesContract.packingItems || [])
-    .filter(isOwnedPackingItem)
+    .filter(isJiesongOwnedPackingItem)
     .map((item) => normalizeContractNo(item.purchaseContractNo)));
   const purchaseAliases = unique(sourceContractNos.flatMap(contractNoAliases));
   const purchases = purchaseAliases.length > 0

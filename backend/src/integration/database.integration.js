@@ -26,15 +26,17 @@ const PRISMA_BIN = path.join(
 
 function createTempDatabase(t, prefix) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `jiesong-${prefix}-`));
+  fs.chmodSync(tempDir, 0o700);
   const dbPath = path.join(tempDir, 'test.db');
   const databaseUrl = `file:${dbPath}`;
-  fs.writeFileSync(dbPath, '');
-
-  execFileSync(PRISMA_BIN, ['db', 'push', '--schema', SCHEMA_PATH, '--skip-generate'], {
+  // 仅从 schema 生成空结构，绝不运行 db push 或连接已有业务库。
+  const ddl = execFileSync(PRISMA_BIN, ['migrate', 'diff', '--from-empty', '--to-schema-datamodel', SCHEMA_PATH, '--script'], {
     cwd: BACKEND_ROOT,
     env: { ...process.env, DATABASE_URL: databaseUrl },
-    stdio: 'pipe',
+    encoding: 'utf8',
   });
+  execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', dbPath], { input: ddl });
+  fs.chmodSync(dbPath, 0o600);
 
   t.after(() => {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -83,7 +85,7 @@ async function readSeedSnapshot(databaseUrl) {
   }
 }
 
-test('数据库 schema 可推送并包含核心数据表', async (t) => {
+test('空数据库可创建并包含核心数据表', async (t) => {
   const { databaseUrl } = createTempDatabase(t, 'schema');
   const prisma = createPrisma(databaseUrl);
   t.after(async () => prisma.$disconnect());
@@ -130,7 +132,7 @@ test('数据库事务异常时可正确回滚', async (t) => {
   assert.equal(count, 0);
 });
 
-test('seed 脚本重复执行保持幂等且可更新管理员密码', async (t) => {
+test('seed 脚本重复执行保持幂等且不会覆盖既有管理员密码', async (t) => {
   const { databaseUrl } = createTempDatabase(t, 'seed');
 
   runSeed(databaseUrl, 'SeedAdminPass#1');
@@ -148,7 +150,8 @@ test('seed 脚本重复执行保持幂等且可更新管理员密码', async (t)
   const second = await readSeedSnapshot(databaseUrl);
 
   assert.ok(second.admin);
-  assert.equal(await bcrypt.compare('SeedAdminPass#2', second.admin.password), true);
+  assert.equal(second.admin.password, first.admin.password);
+  assert.equal(await bcrypt.compare('SeedAdminPass#2', second.admin.password), false);
   assert.equal(second.adminCount, first.adminCount);
   assert.equal(second.portCount, first.portCount);
   assert.equal(second.configCount, first.configCount);

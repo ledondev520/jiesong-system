@@ -1,6 +1,6 @@
 /**
  * Input: Express错误对象
- * Output: 统一格式的错误响应
+ * Output: 统一格式的错误响应，Multer输入限制错误返回400
  * Pos: 错误处理中间件，统一异常响应格式
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -83,7 +83,7 @@ const toClientMessage = (err, statusCode) => {
  */
 const errorHandler = (err, req, res, next) => {
   // 1. 确定状态码
-  const statusCode = err.statusCode || 500;
+  const statusCode = err.statusCode || (err.name === 'MulterError' ? 400 : 500);
   
   // 2. 构建响应对象（统一输出中文提示，原始英文消息只进日志）
   const response = {

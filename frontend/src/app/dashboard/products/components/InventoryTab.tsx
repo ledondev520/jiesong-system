@@ -1,16 +1,18 @@
 /**
- * Input: 库存服务、SortableTableHead、useTableSort
- * Output: 库存状态管理 Tab 组件（单条/批量状态流转、桌面表列排序）
+ * Input: 实时库存服务、共享列表URL状态、SortableTableHead、useTableSort
+ * Output: 支持当前筛选刷新、窄屏操作与长名称显示的库存状态管理 Tab 组件（单条/批量状态流转、桌面表列排序；采购/验货来源库存自动流转）
  * Pos: 商品档案页面的子 Tab
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { Inventory, InventoryStatus } from '@/types';
-import { inventoryService } from '@/services/inventory.service';
+import { listUrlFields, useListUrlState } from "@/lib/hooks/useListUrlState";
+import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Inventory, InventoryStatus } from "@/types";
+import { inventoryService } from "@/services/inventory.service";
 import {
   Table,
   TableBody,
@@ -18,23 +20,25 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { StatusBadge, type StatusBadgeConfig } from '@/components/ui/status-badge';
-import { Button } from '@/components/ui/button';
+} from "@/components/ui/table";
+import {
+  StatusBadge,
+  type StatusBadgeConfig,
+} from "@/components/ui/status-badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, RefreshCw, Search, X } from 'lucide-react';
-import { toast } from 'sonner';
-import { cachedFetch, invalidateCache } from '@/lib/api-cache';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { PageSizeSelect } from '@/components/ui/page-size-select';
-import { TableStateRow } from '@/components/ui/data-state';
-import { Card, CardContent } from '@/components/ui/card';
+} from "@/components/ui/dropdown-menu";
+import { MoreHorizontal, RefreshCw, Search, X } from "lucide-react";
+import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { PageSizeSelect } from "@/components/ui/page-size-select";
+import { TableStateRow } from "@/components/ui/data-state";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Sheet,
   SheetContent,
@@ -42,16 +46,16 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from '@/components/ui/sheet';
-import { SortableTableHead } from '@/components/ui/sortable-table-head';
-import { useTableSort } from '@/lib/hooks/useTableSort';
+} from "@/components/ui/sheet";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { useTableSort } from "@/lib/hooks/useTableSort";
 
 const STATUS_LABEL_MAP: Record<InventoryStatus, string> = {
-  [InventoryStatus.PRODUCING]: '生产中',
-  [InventoryStatus.PACKING]: '包装中',
-  [InventoryStatus.SHIPPING]: '运输中',
-  [InventoryStatus.INBOUND]: '已入库',
-  [InventoryStatus.OUTBOUND]: '已出库',
+  [InventoryStatus.PRODUCING]: "生产中",
+  [InventoryStatus.PACKING]: "包装中",
+  [InventoryStatus.SHIPPING]: "运输中",
+  [InventoryStatus.INBOUND]: "已入库",
+  [InventoryStatus.OUTBOUND]: "已出库",
 };
 
 /**
@@ -63,16 +67,18 @@ const STATUS_LABEL_MAP: Record<InventoryStatus, string> = {
 export function InventoryTab() {
   // 库存状态
   const [inventory, setInventory] = useState<Inventory[]>([]);
+  const inventoryRequest = useRef(0);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [keyword, setKeyword] = useState('');
-  const [debouncedKeyword, setDebouncedKeyword] = useState('');
+  const [{ keyword, page: currentPage, pageSize }, setListState] =
+    useListUrlState(listUrlFields.inventory);
+  const [debouncedKeyword, setDebouncedKeyword] = useState(keyword.trim());
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [batchUpdating, setBatchUpdating] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   // 分页状态
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [refreshVersion, setRefreshVersion] = useState(0);
 
   /**
    * 职责：将关键词输入做轻量防抖，避免请求风暴。
@@ -86,14 +92,6 @@ export function InventoryTab() {
   }, [keyword]);
 
   /**
-   * 职责：根据防抖关键词触发后端查询。
-   * 思路：仅当 debouncedKeyword 改变时重拉列表。
-   */
-  useEffect(() => {
-    loadInventory(debouncedKeyword);
-  }, [debouncedKeyword]);
-
-  /**
    * 职责：加载库存列表并同步清空失效选中项。
    * 思路：
    * 1. 带 keyword 调用后端查询；
@@ -102,40 +100,55 @@ export function InventoryTab() {
    * @param searchKeyword 搜索关键词
    * @returns Promise<void>
    */
-  const loadInventory = async (searchKeyword = ''): Promise<void> => {
-    setLoading(true);
-    setLoadError(false);
-    try {
-      const cacheKey = `inventory-list-${searchKeyword}`;
-      const response = await cachedFetch(
-        cacheKey,
-        () => inventoryService.getAll({ page: 1, pageSize: 100, keyword: searchKeyword || undefined }),
-        15_000, // 库存状态变更频繁，TTL 降至 15s
-      );
-      const nextInventory = response.data?.items || [];
-      setInventory(nextInventory);
-      setSelectedIds((prevSelectedIds) => {
-        const availableIds = new Set(nextInventory.map((item) => item.id));
-        return prevSelectedIds.filter((id) => availableIds.has(id));
-      });
-    } catch {
-      setLoadError(true);
-      toast.error('加载库存失败');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loadInventory = useCallback(
+    async (searchKeyword = ""): Promise<void> => {
+      const request = ++inventoryRequest.current;
+      setLoading(true);
+      setLoadError(false);
+      try {
+        // 到货验货、出货与批量流转均会改变库存；每次进入或刷新都读取服务器事实。
+        const response = await inventoryService.getAll({
+          page: currentPage,
+          pageSize,
+          keyword: searchKeyword || undefined,
+        });
+        if (request !== inventoryRequest.current) return;
+        const nextInventory = response.data?.items || [];
+        setInventory(nextInventory);
+        setTotal(response.data?.pagination?.total ?? 0);
+        setSelectedIds((prevSelectedIds) => {
+          const availableIds = new Set(nextInventory.map((item) => item.id));
+          return prevSelectedIds.filter((id) => availableIds.has(id));
+        });
+      } catch {
+        if (request !== inventoryRequest.current) return;
+        setLoadError(true);
+        toast.error("加载库存失败");
+      } finally {
+        if (request === inventoryRequest.current) setLoading(false);
+      }
+    },
+    [currentPage, pageSize],
+  );
+
+  // 操作完成时只发出刷新信号；效果使用最新筛选，避免旧操作覆盖新查询。
+  useEffect(() => {
+    void loadInventory(debouncedKeyword);
+    return () => {
+      inventoryRequest.current += 1;
+    };
+  }, [debouncedKeyword, loadInventory, refreshVersion]);
 
   /**
    * 获取库存状态徽章
    */
   const getStatusBadge = (status: InventoryStatus) => {
     const statusMap: Record<InventoryStatus, StatusBadgeConfig> = {
-      [InventoryStatus.PRODUCING]: { label: '生产中', tone: 'warning' },
-      [InventoryStatus.PACKING]: { label: '包装中', tone: 'danger' },
-      [InventoryStatus.SHIPPING]: { label: '运输中', tone: 'progress' },
-      [InventoryStatus.INBOUND]: { label: '已入库', tone: 'secondary' },
-      [InventoryStatus.OUTBOUND]: { label: '已出库', tone: 'success' },
+      [InventoryStatus.PRODUCING]: { label: "生产中", tone: "warning" },
+      [InventoryStatus.PACKING]: { label: "包装中", tone: "danger" },
+      [InventoryStatus.SHIPPING]: { label: "运输中", tone: "progress" },
+      [InventoryStatus.INBOUND]: { label: "已入库", tone: "secondary" },
+      [InventoryStatus.OUTBOUND]: { label: "已出库", tone: "success" },
     };
     return <StatusBadge status={status} statusMap={statusMap} />;
   };
@@ -147,14 +160,14 @@ export function InventoryTab() {
    */
   const resolveErrorMessage = (error: unknown): string => {
     if (
-      typeof error === 'object' &&
+      typeof error === "object" &&
       error !== null &&
-      'message' in error &&
-      typeof (error as { message?: unknown }).message === 'string'
+      "message" in error &&
+      typeof (error as { message?: unknown }).message === "string"
     ) {
       return (error as { message: string }).message;
     }
-    return '状态更新失败';
+    return "状态更新失败";
   };
 
   /**
@@ -162,7 +175,9 @@ export function InventoryTab() {
    * @param status 当前库存状态
    * @returns 可切换状态列表
    */
-  const getAllowedNextStatuses = (status: InventoryStatus): InventoryStatus[] => {
+  const getAllowedNextStatuses = (item: Inventory): InventoryStatus[] => {
+    if (item.purchaseItemId || item.receiptInspectionId) return [];
+    const status = item.status;
     const transitionMap: Record<InventoryStatus, InventoryStatus[]> = {
       [InventoryStatus.PRODUCING]: [InventoryStatus.PACKING],
       [InventoryStatus.PACKING]: [InventoryStatus.SHIPPING],
@@ -179,12 +194,16 @@ export function InventoryTab() {
    * @param newStatus 新状态
    * @returns Promise<void>
    */
-  const handleStatusChange = async (id: string, newStatus: InventoryStatus): Promise<void> => {
+  const handleStatusChange = async (
+    id: string,
+    newStatus: InventoryStatus,
+  ): Promise<void> => {
     try {
       await inventoryService.updateStatus(id, newStatus);
-      invalidateCache('inventory-list');
       setInventory((prevInventory) =>
-        prevInventory.map((item) => (item.id === id ? { ...item, status: newStatus } : item))
+        prevInventory.map((item) =>
+          item.id === id ? { ...item, status: newStatus } : item,
+        ),
       );
       toast.success(`状态已更新`);
     } catch (error) {
@@ -211,7 +230,11 @@ export function InventoryTab() {
    */
   const toggleSelectAll = (checked: boolean): void => {
     if (checked) {
-      setSelectedIds(inventory.map((item) => item.id));
+      setSelectedIds(
+        inventory
+          .filter((item) => !item.purchaseItemId && !item.receiptInspectionId)
+          .map((item) => item.id),
+      );
       return;
     }
     setSelectedIds([]);
@@ -222,25 +245,30 @@ export function InventoryTab() {
    * @param status 目标状态
    * @returns Promise<void>
    */
-  const handleBatchStatusChange = async (status: InventoryStatus): Promise<void> => {
+  const handleBatchStatusChange = async (
+    status: InventoryStatus,
+  ): Promise<void> => {
     if (selectedIds.length === 0) {
-      toast.error('请先选择要更新的库存记录');
+      toast.error("请先选择要更新的库存记录");
       return;
     }
 
     setBatchUpdating(true);
     try {
-      const response = await inventoryService.batchUpdateStatus(selectedIds, status);
+      const response = await inventoryService.batchUpdateStatus(
+        selectedIds,
+        status,
+      );
       const result = response.data;
       if (result?.success) {
         toast.success(`批量更新完成：成功 ${result.success} 条`);
       }
       if (result?.failed) {
-        const firstError = result.errors?.[0]?.message || '部分记录更新失败';
+        const firstError = result.errors?.[0]?.message || "部分记录更新失败";
         toast.error(`失败 ${result.failed} 条：${firstError}`);
       }
       setSelectedIds([]);
-      await loadInventory(debouncedKeyword);
+      setRefreshVersion((version) => version + 1);
     } catch (error) {
       toast.error(resolveErrorMessage(error));
     } finally {
@@ -253,11 +281,11 @@ export function InventoryTab() {
    */
   const inventoryAccessor = useCallback((item: Inventory, key: string) => {
     switch (key) {
-      case 'productName':
-        return item.product?.customsName ?? '';
-      case 'contractNo':
-        return item.purchaseItem?.purchaseContract?.contractNo ?? '';
-      case 'quantity':
+      case "productName":
+        return item.product?.customsName ?? "";
+      case "contractNo":
+        return item.purchaseItem?.purchaseContract?.contractNo ?? "";
+      case "quantity":
         return item.quantity;
       default:
         return null;
@@ -266,13 +294,12 @@ export function InventoryTab() {
 
   const inventorySort = useTableSort(inventory, inventoryAccessor);
 
-  // 客户端分页计算（在排序结果上切片）
-  const totalPages = Math.ceil(inventorySort.sortedData.length / pageSize);
-  const pagedInventory = inventorySort.sortedData.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
+  const totalPages = Math.ceil(total / pageSize);
+  const pagedInventory = inventorySort.sortedData;
 
+  const hasManualInventory = inventory.some(
+    (item) => !item.purchaseItemId && !item.receiptInspectionId,
+  );
   return (
     <div className="space-y-6">
       <div className="hidden flex-wrap items-center gap-2 md:flex">
@@ -281,7 +308,9 @@ export function InventoryTab() {
           <Input
             placeholder="搜索商品/采购合同..."
             value={keyword}
-            onChange={(event) => { setKeyword(event.target.value); setCurrentPage(1); }}
+            onChange={(event) => {
+              setListState({ keyword: event.target.value });
+            }}
             className="h-10 rounded-xl border-border/70 bg-background/70 pl-9"
           />
         </div>
@@ -290,32 +319,46 @@ export function InventoryTab() {
             variant="ghost"
             size="sm"
             className="h-10 rounded-xl"
-            onClick={() => { setKeyword(''); setDebouncedKeyword(''); setCurrentPage(1); }}
+            onClick={() => {
+              setListState({ keyword: "" });
+              setDebouncedKeyword("");
+            }}
           >
             <X className="h-4 w-4 mr-1" />
             重置
           </Button>
         )}
-        <Button
-          variant="outline"
-          disabled={batchUpdating || selectedIds.length === 0}
-          onClick={() => handleBatchStatusChange(InventoryStatus.INBOUND)}
-        >
-          批量设为已入库
-        </Button>
-        <Button
-          variant="outline"
-          disabled={batchUpdating || selectedIds.length === 0}
-          onClick={() => handleBatchStatusChange(InventoryStatus.OUTBOUND)}
-        >
-          批量设为已出库
-        </Button>
+        {hasManualInventory && (
+          <BusinessWrite>
+            <Button
+              variant="outline"
+              disabled={batchUpdating || selectedIds.length === 0}
+              onClick={() => handleBatchStatusChange(InventoryStatus.INBOUND)}
+            >
+              批量设为已入库
+            </Button>
+          </BusinessWrite>
+        )}
+        {hasManualInventory && (
+          <BusinessWrite>
+            <Button
+              variant="outline"
+              disabled={batchUpdating || selectedIds.length === 0}
+              onClick={() => handleBatchStatusChange(InventoryStatus.OUTBOUND)}
+            >
+              批量设为已出库
+            </Button>
+          </BusinessWrite>
+        )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:hidden">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 md:hidden">
         <Sheet open={mobileActionsOpen} onOpenChange={setMobileActionsOpen}>
           <SheetTrigger asChild>
-            <Button variant="outline" className="h-11 rounded-2xl">
+            <Button
+              variant="outline"
+              className="h-11 rounded-2xl px-3 text-xs sm:text-sm"
+            >
               <Search className="mr-2 h-4 w-4" />
               搜索与批量操作
             </Button>
@@ -323,7 +366,9 @@ export function InventoryTab() {
           <SheetContent side="bottom" className="rounded-t-3xl px-0 pb-0">
             <SheetHeader className="border-b px-5 pb-4">
               <SheetTitle>搜索与批量操作</SheetTitle>
-              <SheetDescription>先缩小库存范围，再执行批量状态流转。</SheetDescription>
+              <SheetDescription>
+                先缩小库存范围，再执行批量状态流转。
+              </SheetDescription>
             </SheetHeader>
             <div className="space-y-4 px-5 py-5">
               <div className="relative">
@@ -331,7 +376,9 @@ export function InventoryTab() {
                 <Input
                   placeholder="搜索商品/采购合同..."
                   value={keyword}
-                  onChange={(event) => { setKeyword(event.target.value); setCurrentPage(1); }}
+                  onChange={(event) => {
+                    setListState({ keyword: event.target.value });
+                  }}
                   className="h-11 rounded-2xl border-border/70 bg-background/80 pl-9"
                 />
               </div>
@@ -339,7 +386,10 @@ export function InventoryTab() {
                 <Button
                   variant="outline"
                   className="h-11 w-full rounded-2xl"
-                  onClick={() => { setKeyword(''); setDebouncedKeyword(''); setCurrentPage(1); }}
+                  onClick={() => {
+                    setListState({ keyword: "" });
+                    setDebouncedKeyword("");
+                  }}
                 >
                   <X className="mr-2 h-4 w-4" />
                   清空搜索
@@ -349,32 +399,48 @@ export function InventoryTab() {
                 当前已选 {selectedIds.length} 条库存记录
               </div>
               <div className="grid grid-cols-1 gap-3">
-                <Button
-                  variant="outline"
-                  className="h-11 rounded-2xl"
-                  disabled={batchUpdating || selectedIds.length === 0}
-                  onClick={() => void handleBatchStatusChange(InventoryStatus.INBOUND)}
-                >
-                  批量设为已入库
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-11 rounded-2xl"
-                  disabled={batchUpdating || selectedIds.length === 0}
-                  onClick={() => void handleBatchStatusChange(InventoryStatus.OUTBOUND)}
-                >
-                  批量设为已出库
-                </Button>
+                {hasManualInventory && (
+                  <BusinessWrite>
+                    <Button
+                      variant="outline"
+                      className="h-11 rounded-2xl"
+                      disabled={batchUpdating || selectedIds.length === 0}
+                      onClick={() =>
+                        void handleBatchStatusChange(InventoryStatus.INBOUND)
+                      }
+                    >
+                      批量设为已入库
+                    </Button>
+                  </BusinessWrite>
+                )}
+                {hasManualInventory && (
+                  <BusinessWrite>
+                    <Button
+                      variant="outline"
+                      className="h-11 rounded-2xl"
+                      disabled={batchUpdating || selectedIds.length === 0}
+                      onClick={() =>
+                        void handleBatchStatusChange(InventoryStatus.OUTBOUND)
+                      }
+                    >
+                      批量设为已出库
+                    </Button>
+                  </BusinessWrite>
+                )}
               </div>
             </div>
             <div className="border-t px-5 py-4">
-              <Button variant="outline" className="h-11 w-full rounded-2xl" onClick={() => setMobileActionsOpen(false)}>
+              <Button
+                variant="outline"
+                className="h-11 w-full rounded-2xl"
+                onClick={() => setMobileActionsOpen(false)}
+              >
                 查看结果
               </Button>
             </div>
           </SheetContent>
         </Sheet>
-        <div className="flex h-11 items-center justify-center rounded-2xl border border-border/70 bg-muted/35 text-sm font-medium text-foreground">
+        <div className="flex h-11 items-center justify-center rounded-2xl px-3 border border-border/70 bg-muted/35 text-sm font-medium text-foreground">
           已选 {selectedIds.length} 条
         </div>
       </div>
@@ -383,16 +449,27 @@ export function InventoryTab() {
       <div className="grid gap-3 md:hidden">
         {loading ? (
           <Card className="border-dashed border-border/70">
-            <CardContent className="py-10 text-center text-sm text-muted-foreground">加载中...</CardContent>
+            <CardContent className="py-10 text-center text-sm text-muted-foreground">
+              加载中...
+            </CardContent>
           </Card>
         ) : loadError ? (
           <Card className="border-dashed border-border/70">
             <CardContent className="space-y-4 py-10 text-center">
               <div className="space-y-1">
-                <p className="text-sm font-medium text-foreground">数据加载失败</p>
-                <p className="text-sm text-muted-foreground">库存列表暂时不可用，请稍后重试。</p>
+                <p className="text-sm font-medium text-foreground">
+                  数据加载失败
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  库存列表暂时不可用，请稍后重试。
+                </p>
               </div>
-              <Button variant="outline" size="sm" className="rounded-2xl" onClick={() => void loadInventory(debouncedKeyword)}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-2xl"
+                onClick={() => void loadInventory(debouncedKeyword)}
+              >
                 <RefreshCw className="mr-1 h-4 w-4" />
                 重试
               </Button>
@@ -401,30 +478,41 @@ export function InventoryTab() {
         ) : inventory.length === 0 ? (
           <Card className="border-dashed border-border/70">
             <CardContent className="py-10 text-center">
-              <p className="text-sm font-medium text-foreground">暂无库存记录</p>
-              <p className="mt-1 text-sm text-muted-foreground">当前关键词下没有匹配的库存条目。</p>
+              <p className="text-sm font-medium text-foreground">
+                暂无库存记录
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                当前关键词下没有匹配的库存条目。
+              </p>
             </CardContent>
           </Card>
         ) : (
           pagedInventory.map((item) => {
-            const nextStatuses = getAllowedNextStatuses(item.status);
+            const nextStatuses = getAllowedNextStatuses(item);
             const itemLabel = item.product?.customsName || item.id;
 
             return (
               <Card key={item.id} className="border-border/70">
                 <CardContent className="space-y-4 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
                       <Checkbox
                         checked={selectedIds.includes(item.id)}
+                        disabled={Boolean(
+                          item.purchaseItemId || item.receiptInspectionId,
+                        )}
                         onCheckedChange={() => toggleSelectedId(item.id)}
                         aria-label={`选择库存 ${itemLabel}`}
                         className="mt-1"
                       />
-                      <div className="space-y-1">
-                        <p className="text-base font-semibold tracking-tight">{item.product?.customsName}</p>
+                      <div className="min-w-0 space-y-1 break-words">
+                        <p className="text-base font-semibold tracking-tight">
+                          {item.product?.customsName}
+                        </p>
                         <p className="text-sm text-muted-foreground">
-                          合同号：{item.purchaseItem?.purchaseContract?.contractNo || '-'}
+                          合同号：
+                          {item.purchaseItem?.purchaseContract?.contractNo ||
+                            "-"}
                         </p>
                       </div>
                     </div>
@@ -433,31 +521,44 @@ export function InventoryTab() {
 
                   <div className="grid grid-cols-2 gap-3 rounded-2xl bg-muted/55 p-3">
                     <div className="space-y-1">
-                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">数量</p>
-                      <p className="text-sm font-medium">{item.quantity} {item.product?.unit}</p>
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                        数量
+                      </p>
+                      <p className="text-sm font-medium">
+                        {item.quantity} {item.product?.unit}
+                      </p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">当前状态</p>
-                      <p className="text-sm font-medium">{STATUS_LABEL_MAP[item.status]}</p>
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                        当前状态
+                      </p>
+                      <p className="text-sm font-medium">
+                        {STATUS_LABEL_MAP[item.status]}
+                      </p>
                     </div>
                   </div>
 
                   {nextStatuses.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-border/70 px-4 py-3 text-sm text-muted-foreground">
-                      当前记录没有可用下一状态
+                      {item.purchaseItemId || item.receiptInspectionId
+                        ? "库存随到货验货、出口发运自动更新"
+                        : "当前记录没有可用下一状态"}
                     </div>
                   ) : (
                     <div className="grid gap-3">
                       {nextStatuses.map((nextStatus) => (
-                        <Button
-                          key={`${item.id}-${nextStatus}-mobile`}
-                          variant="outline"
-                          className="h-11 rounded-2xl"
-                          onClick={() => void handleStatusChange(item.id, nextStatus)}
-                          aria-label={`将 ${itemLabel} 状态更新为 ${STATUS_LABEL_MAP[nextStatus]}`}
-                        >
-                          设为: {STATUS_LABEL_MAP[nextStatus]}
-                        </Button>
+                        <BusinessWrite key={`${item.id}-${nextStatus}-mobile`}>
+                          <Button
+                            variant="outline"
+                            className="h-11 rounded-2xl"
+                            onClick={() =>
+                              void handleStatusChange(item.id, nextStatus)
+                            }
+                            aria-label={`将 ${itemLabel} 状态更新为 ${STATUS_LABEL_MAP[nextStatus]}`}
+                          >
+                            设为: {STATUS_LABEL_MAP[nextStatus]}
+                          </Button>
+                        </BusinessWrite>
                       ))}
                     </div>
                   )}
@@ -474,8 +575,15 @@ export function InventoryTab() {
             <TableRow>
               <TableHead className="w-[48px]">
                 <Checkbox
-                  checked={pagedInventory.length > 0 && pagedInventory.every((item) => selectedIds.includes(item.id))}
-                  onCheckedChange={(checked) => toggleSelectAll(Boolean(checked))}
+                  checked={
+                    pagedInventory.length > 0 &&
+                    pagedInventory.every((item) =>
+                      selectedIds.includes(item.id),
+                    )
+                  }
+                  onCheckedChange={(checked) =>
+                    toggleSelectAll(Boolean(checked))
+                  }
                   aria-label="全选库存记录"
                 />
               </TableHead>
@@ -517,7 +625,11 @@ export function InventoryTab() {
                 title="数据加载失败"
                 description="库存列表暂时不可用，请稍后重试。"
                 action={
-                  <Button variant="outline" size="sm" onClick={() => void loadInventory(debouncedKeyword)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void loadInventory(debouncedKeyword)}
+                  >
                     <RefreshCw className="mr-1 h-4 w-4" />
                     重试
                   </Button>
@@ -537,38 +649,63 @@ export function InventoryTab() {
                   <TableCell>
                     <Checkbox
                       checked={selectedIds.includes(item.id)}
+                      disabled={Boolean(
+                        item.purchaseItemId || item.receiptInspectionId,
+                      )}
                       onCheckedChange={() => toggleSelectedId(item.id)}
                       aria-label={`选择库存 ${item.product?.customsName || item.id}`}
                     />
                   </TableCell>
-                  <TableCell className="font-medium">{item.product?.customsName}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {item.purchaseItem?.purchaseContract?.contractNo || '-'}
+                  <TableCell className="font-medium">
+                    {item.product?.customsName}
                   </TableCell>
-                  <TableCell>{item.quantity} {item.product?.unit}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {item.purchaseItem?.purchaseContract?.contractNo || "-"}
+                  </TableCell>
+                  <TableCell>
+                    {item.quantity} {item.product?.unit}
+                  </TableCell>
                   <TableCell>{getStatusBadge(item.status)}</TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="rounded-xl border border-border/65 bg-background/55">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {getAllowedNextStatuses(item.status).length === 0 ? (
-                          <DropdownMenuItem disabled>无可用下一状态</DropdownMenuItem>
-                        ) : (
-                          getAllowedNextStatuses(item.status).map((nextStatus) => (
-                            <DropdownMenuItem
-                              key={`${item.id}-${nextStatus}`}
-                              onClick={() => handleStatusChange(item.id, nextStatus)}
+                    {item.purchaseItemId || item.receiptInspectionId ? (
+                      <span className="text-sm text-muted-foreground">
+                        自动流转
+                      </span>
+                    ) : (
+                      <BusinessWrite>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="rounded-xl border border-border/65 bg-background/55"
                             >
-                              设为: {STATUS_LABEL_MAP[nextStatus]}
-                            </DropdownMenuItem>
-                          ))
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {getAllowedNextStatuses(item).length === 0 ? (
+                              <DropdownMenuItem disabled>
+                                无可用下一状态
+                              </DropdownMenuItem>
+                            ) : (
+                              getAllowedNextStatuses(item).map((nextStatus) => (
+                                <BusinessWrite key={`${item.id}-${nextStatus}`}>
+                                  <DropdownMenuItem
+                                    key={`${item.id}-${nextStatus}`}
+                                    onClick={() =>
+                                      handleStatusChange(item.id, nextStatus)
+                                    }
+                                  >
+                                    设为: {STATUS_LABEL_MAP[nextStatus]}
+                                  </DropdownMenuItem>
+                                </BusinessWrite>
+                              ))
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </BusinessWrite>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -579,16 +716,21 @@ export function InventoryTab() {
 
       {/* 分页控制 */}
       <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-        <span>共 {inventory.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
+        <span>
+          共 {total} 条（表列排序仅当前页）
+          {totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ""}
+        </span>
         <div className="flex items-center gap-2">
           <PageSizeSelect
             value={pageSize}
-            onChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+            onChange={(size) => {
+              setListState({ pageSize: size });
+            }}
           />
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            onClick={() => setListState({ page: Math.max(1, currentPage - 1) })}
             disabled={currentPage === 1}
           >
             上一页
@@ -596,7 +738,9 @@ export function InventoryTab() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() =>
+              setListState({ page: Math.min(totalPages, currentPage + 1) })
+            }
             disabled={currentPage === totalPages || totalPages <= 1}
           >
             下一页

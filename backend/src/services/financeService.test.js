@@ -9,6 +9,26 @@ const assert = require('node:assert/strict');
 const prisma = require('../utils/prisma');
 const financeService = require('./financeService');
 
+test('收付款记录自动结清已收货/已到港合同，金额差异重新打开待结清且不改物理状态', async (t) => {
+  const cases = [
+    ['purchase', 'RECEIVED', 100, 'COMPLETED'], ['purchase', 'RECEIVED', 50, 'RECEIVED'],
+    ['purchase', 'SIGNED', 100, 'SIGNED'], ['purchase', 'COMPLETED', 90, 'RECEIVED'],
+    ['sales', 'ARRIVED', 100, 'COMPLETED'], ['sales', 'SHIPPED', 100, 'SHIPPED'],
+    ['sales', 'COMPLETED', 110, 'ARRIVED'], ['sales', 'ARRIVED', 0, 'ARRIVED'],
+  ];
+  for (const [kind, initialStatus, amount, expected] of cases) {
+    let status = initialStatus;
+    const model = { update: async ({ data }) => { status = data.status || status; return { status, totalAmount: 100, ...data }; } };
+    t.mock.method(prisma, '$transaction', async fn => fn({
+      payment: { create: async ({ data }) => ({ id: 'test-payment', ...data }), aggregate: async () => ({ _sum: { amount } }) },
+      purchaseContract: model, salesContract: model,
+    }));
+    await financeService.createPayment({ type: kind === 'purchase' ? 'PAYABLE_PAYMENT' : 'RECEIVABLE_COLLECTION',
+      [kind === 'purchase' ? 'purchaseContractId' : 'salesContractId']: 'test-contract', amount, currency: kind === 'purchase' ? 'CNY' : 'USD', paymentDate: '2026-10-01' });
+    assert.equal(status, expected);
+  }
+});
+
 test('createPayment: 幂等键命中时直接返回历史记录', async () => {
   const originalFindUnique = prisma.payment.findUnique;
   const originalTransaction = prisma.$transaction;
@@ -203,7 +223,10 @@ test('createPayment: 并发唯一键冲突时返回已创建记录', async () =>
   }
 });
 
-test('listUnallocatedPayments: 兼容历史 INCOME 并按待分配收款返回', async () => {
+test('listUnallocatedPayments: 兼容历史 INCOME 并按待分配收款返回', async (t) => {
+  const originalGroupBy = prisma.payment.groupBy;
+  prisma.payment.groupBy = async () => [];
+  t.after(() => { prisma.payment.groupBy = originalGroupBy; });
   const originalFindMany = prisma.payment.findMany;
   let findManyArgs = null;
 
@@ -261,7 +284,9 @@ test('allocatePaymentToContracts: 兼容历史 INCOME 收款进行分配', async
     customerName: 'Sp food trading LLC',
   });
   prisma.$transaction = async (callback) => callback({
+    $executeRaw: async () => 1,
     payment: {
+      findUnique: prisma.payment.findUnique,
       create: async (args) => {
         createArgs = args;
         return { id: 'alloc-1', ...args.data };
@@ -269,7 +294,7 @@ test('allocatePaymentToContracts: 兼容历史 INCOME 收款进行分配', async
       aggregate: async (args) => {
         aggregateCalls.push(args);
         if (args.where?.sourcePaymentId === 'legacy-income-2') {
-          return { _sum: { amount: 300 } };
+          return { _sum: { amount: createArgs ? 300 : 0 } };
         }
         return { _sum: { amount: 300 } };
       },
@@ -279,6 +304,7 @@ test('allocatePaymentToContracts: 兼容历史 INCOME 收款进行分配', async
       },
     },
     salesContract: {
+      findMany: async ({ where }) => where.id.in.map(id => ({ id })),
       update: async (args) => ({ id: args.where.id }),
     },
   });
@@ -344,7 +370,10 @@ test('getPaymentTrends: 兼容历史 INCOME/EXPENSE 流水', async () => {
   }
 });
 
-test('autoMatchUnallocatedPayments: 非 USD 到账不与美元出口合同自动挂账', async () => {
+test('autoMatchUnallocatedPayments: 非 USD 到账不与美元出口合同自动挂账', async (t) => {
+  const originalGroupBy = prisma.payment.groupBy;
+  prisma.payment.groupBy = async () => [];
+  t.after(() => { prisma.payment.groupBy = originalGroupBy; });
   const originalPaymentFindMany = prisma.payment.findMany;
   const originalSalesContractFindMany = prisma.salesContract.findMany;
   const originalTransaction = prisma.$transaction;
@@ -383,7 +412,10 @@ test('autoMatchUnallocatedPayments: 非 USD 到账不与美元出口合同自动
   }
 });
 
-test('autoMatchUnallocatedPayments: 命中唯一合同号且金额一致时自动挂账', async () => {
+test('autoMatchUnallocatedPayments: 命中唯一合同号且金额一致时自动挂账', async (t) => {
+  const originalGroupBy = prisma.payment.groupBy;
+  prisma.payment.groupBy = async () => [];
+  t.after(() => { prisma.payment.groupBy = originalGroupBy; });
   const originalPaymentFindMany = prisma.payment.findMany;
   const originalPaymentFindUnique = prisma.payment.findUnique;
   const originalSalesContractFindUnique = prisma.salesContract.findUnique;
@@ -440,18 +472,21 @@ test('autoMatchUnallocatedPayments: 命中唯一合同号且金额一致时自�
     return null;
   };
   prisma.$transaction = async (callback) => callback({
+    $executeRaw: async () => 1,
     payment: {
+      findUnique: prisma.payment.findUnique,
       create: async (args) => {
         createArgs = args;
         return { id: 'alloc-auto-1', ...args.data };
       },
-      aggregate: async () => ({ _sum: { amount: 68006 } }),
+      aggregate: async () => ({ _sum: { amount: createArgs ? 68006 : 0 } }),
       update: async (args) => {
         paymentUpdateArgs = args;
         return { id: args.where.id };
       },
     },
     salesContract: {
+      findMany: async ({ where }) => where.id.in.map(id => ({ id })),
       update: async (args) => ({ id: args.where.id }),
     },
   });
@@ -486,7 +521,10 @@ test('autoMatchUnallocatedPayments: 命中唯一合同号且金额一致时自�
   }
 });
 
-test('autoMatchUnallocatedPayments: 备注模糊或金额不一致时保留在收款池', async () => {
+test('autoMatchUnallocatedPayments: 备注模糊或金额不一致时保留在收款池', async (t) => {
+  const originalGroupBy = prisma.payment.groupBy;
+  prisma.payment.groupBy = async () => [];
+  t.after(() => { prisma.payment.groupBy = originalGroupBy; });
   const originalPaymentFindMany = prisma.payment.findMany;
   const originalSalesContractFindUnique = prisma.salesContract.findUnique;
   const originalSalesContractFindMany = prisma.salesContract.findMany;
@@ -600,6 +638,7 @@ test('allocatePaymentToContracts: 部分分配后保留在收款池', async () =
   const originalFindUnique = prisma.payment.findUnique;
   const originalTransaction = prisma.$transaction;
   let updateArgs = null;
+  let created = false;
 
   prisma.payment.findUnique = async () => ({
     id: 'receipt-partial-2',
@@ -611,11 +650,13 @@ test('allocatePaymentToContracts: 部分分配后保留在收款池', async () =
     customerName: 'Sp food trading LLC',
   });
   prisma.$transaction = async (callback) => callback({
+    $executeRaw: async () => 1,
     payment: {
-      create: async (args) => ({ id: 'alloc-partial-1', ...args.data }),
+      findUnique: prisma.payment.findUnique,
+      create: async (args) => { created = true; return { id: 'alloc-partial-1', ...args.data }; },
       aggregate: async (args) => {
         if (args.where?.sourcePaymentId === 'receipt-partial-2') {
-          return { _sum: { amount: 30000 } };
+          return { _sum: { amount: created ? 30000 : 0 } };
         }
         return { _sum: { amount: 30000 } };
       },
@@ -625,6 +666,7 @@ test('allocatePaymentToContracts: 部分分配后保留在收款池', async () =
       },
     },
     salesContract: {
+      findMany: async ({ where }) => where.id.in.map(id => ({ id })),
       update: async (args) => ({ id: args.where.id }),
     },
   });
@@ -718,6 +760,36 @@ test('getReceivables: 混柜合同回款按自有收入比例归属', async () =
   }
 });
 
+test('getReceivables: 正式合同金额不再扣除第三方装箱货值', async () => {
+  const originalFindMany = prisma.salesContract.findMany;
+  const originalCount = prisma.salesContract.count;
+
+  prisma.salesContract.findMany = async () => ([{
+    id: 'sc-formal',
+    contractNo: 'EXP260020',
+    amountSource: 'FORMAL_DOCUMENT',
+    totalAmount: 600,
+    receivedAmount: 300,
+    status: 'SHIPPED',
+    packingItems: [
+      { totalPrice: 600, isOwnedByJiesong: true, store: null },
+      { totalPrice: 400, isOwnedByJiesong: false, sourceParty: '第三方拼柜', store: null },
+    ],
+    port: null,
+  }]);
+  prisma.salesContract.count = async () => 1;
+
+  try {
+    const result = await financeService.getReceivables({ page: 1, pageSize: 20, skip: 0 });
+    assert.equal(result.receivables[0].totalAmount, 600);
+    assert.equal(result.receivables[0].receivedAmount, 300);
+    assert.equal(result.receivables[0].unreceiveAmount, 300);
+  } finally {
+    prisma.salesContract.findMany = originalFindMany;
+    prisma.salesContract.count = originalCount;
+  }
+});
+
 test('getStats: 排除第三方拼柜金额后计算真实应收', async () => {
   const originalPurchaseAggregate = prisma.purchaseContract.aggregate;
   const originalSalesFindMany = prisma.salesContract.findMany;
@@ -771,4 +843,23 @@ test('getStats: 排除第三方拼柜金额后计算真实应收', async () => {
     prisma.salesContract.findMany = originalSalesFindMany;
     prisma.packingItem.groupBy = originalPackingItemGroupBy;
   }
+});
+
+test('getReceivables: 先过滤所有权及未收金额，再分页，total为全量匹配数', async () => {
+ const original=prisma.salesContract.findMany;
+ const contracts=[
+  {id:'third-party',contractNo:'EXP-9',totalAmount:100,receivedAmount:0,packingItems:[{totalPrice:100,isOwnedByJiesong:false}]},
+  {id:'paid',contractNo:'EXP-8',totalAmount:100,receivedAmount:100,packingItems:[]},
+  {id:'first',contractNo:'EXP-7',totalAmount:100,receivedAmount:20,packingItems:[]},
+  {id:'second',contractNo:'EXP-6',totalAmount:100,receivedAmount:0,packingItems:[]},
+ ];
+ prisma.salesContract.findMany=async(args)=> args.take ? contracts.slice(args.skip,args.skip+args.take) : contracts;
+ const originalCount=prisma.salesContract.count;prisma.salesContract.count=async()=>contracts.length;
+ try {
+  const result=await financeService.getReceivables({page:2,pageSize:1,skip:1,outstandingOnly:true});
+  assert.equal(result.total,2);
+  assert.deepEqual(result.receivables.map(c=>c.id),['second']);
+  const searched=await financeService.getReceivables({page:1,pageSize:1,skip:0,search:'EXP-6',outstandingOnly:true});
+  assert.equal(searched.total,1);assert.equal(searched.receivables[0].id,'second');
+ } finally {prisma.salesContract.findMany=original;prisma.salesContract.count=originalCount;}
 });

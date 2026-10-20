@@ -150,3 +150,12 @@ describe('purchaseService.parseQuote', () => {
     });
   });
 });
+
+it('采购正常导入默认不携带historical，只有显式历史参数才发送true', async () => {
+  const file = new File(['synthetic'], 'synthetic.xlsx');
+  await purchaseService.importExcel(file);
+  expect(vi.mocked(api.post).mock.calls.at(-1)?.[1]).toBeInstanceOf(FormData);
+  expect((vi.mocked(api.post).mock.calls.at(-1)?.[1] as FormData).has('historical')).toBe(false);
+  await purchaseService.importExcel(file, { historical: true });
+  expect((vi.mocked(api.post).mock.calls.at(-1)?.[1] as FormData).get('historical')).toBe('true');
+});

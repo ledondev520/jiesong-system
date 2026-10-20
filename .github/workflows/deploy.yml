@@ -14,14 +14,17 @@ on:
       environment:
         description: 'Deployment environment'
         required: true
-        default: 'staging'
+        default: 'production'
         type: choice
         options:
-          - staging
           - production
 
 env:
   NODE_VERSION: '20.19.0'
+
+# 默认最小权限;需要写 commit status 的 job 单独声明
+permissions:
+  contents: read
 
 jobs:
   # 预部署检查
@@ -38,9 +41,20 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Verify deployment check behavior
+        run: node --test scripts/verify-vps-runtime.test.cjs
+
       - name: Install frontend dependencies
         working-directory: ./frontend
         run: npm ci
+
+      - name: Prepare isolated frontend API fixture dependencies
+        working-directory: ./backend
+        run: |
+          test ! -e .env
+          test ! -L .env
+          npm ci
+          npm run db:generate
 
       - name: Lint & TypeScript check
         working-directory: ./frontend
@@ -59,59 +73,21 @@ jobs:
           NODE_ENV: production
           NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL || '/api/v1' }}
 
-  # 部署到 Staging
-  deploy-staging:
-    name: Deploy to Staging
-    runs-on: ubuntu-latest
-    needs: pre-deploy
-    if: github.event.inputs.environment == 'staging' || (github.ref == 'refs/heads/main' && github.event.inputs.environment == '') || startsWith(github.ref, 'refs/tags/v')
-    environment:
-      name: staging
-      url: ${{ vars.STAGING_URL || 'https://staging.jiesong-system.com' }}
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.10.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          log-public-key: false
-
-      - name: Add host to known_hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -p ${{ secrets.SSH_PORT || '22' }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      - name: Deploy to Staging via SSH
-        run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || '22' }} '
-            cd /opt/jiesong-system || exit 1
-            git fetch origin
-            git reset --hard origin/main
-            cd backend
-            npm ci --production
-            npx prisma generate
-            npx prisma migrate deploy
-            cd ../frontend
-            npm ci
-            npm run build
-            pm2 restart jiesong-backend || pm2 start ecosystem.config.js --only jiesong-backend
-            pm2 restart jiesong-frontend || pm2 start ecosystem.config.js --only jiesong-frontend
-            pm2 save
-            sudo nginx -t && sudo systemctl reload nginx
-          '
-
-      - name: Notify Slack
-        if: failure()
-        run: |
-          echo "Staging deploy failed"
+  # Staging:当前与生产同主机同目录,无法安全隔离,暂不自动部署。
+  # push main 只跑 pre-deploy;独立 staging 环境搭好后再单独开 PR 加回(见 DEPLOY.md)。
 
   # 部署到 Production
   deploy-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: [pre-deploy, deploy-staging]
-    if: github.event.inputs.environment == 'production' || (startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, 'rc'))
+    # 生产只由 v* tag(非 rc)或手动选择 production 触发;不依赖 staging,避免手动选生产时被连带跳过
+    needs: pre-deploy
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production') ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, 'rc'))
+    permissions:
+      contents: read
+      statuses: write
     environment:
       name: production
       url: ${{ vars.PRODUCTION_URL || 'https://jiesong-system.com' }}
@@ -132,10 +108,22 @@ jobs:
       - name: Deploy to Production via SSH
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || '22' }} '
+            set -eu
             cd /opt/jiesong-system || exit 1
+            PRICING_BACKUP=""
+            if [ -f config/pricing.json ]; then
+              PRICING_BACKUP="$(mktemp)"
+              cp -p config/pricing.json "$PRICING_BACKUP"
+              git checkout -- config/pricing.json 2>/dev/null || true
+            fi
             git fetch origin
             git checkout ${{ github.ref_name }}
-            git reset --hard origin/${{ github.ref_name }}
+            git reset --hard ${{ github.sha }}
+            if [ -n "$PRICING_BACKUP" ]; then
+              cp -p "$PRICING_BACKUP" config/pricing.json
+              rm -f "$PRICING_BACKUP"
+              echo "Preserved runtime pricing config across deploy"
+            fi
             cd backend
             npm ci --production
             npx prisma generate
@@ -147,6 +135,7 @@ jobs:
             pm2 restart jiesong-frontend || pm2 start ecosystem.config.js --only jiesong-frontend
             pm2 save
             sudo nginx -t && sudo systemctl reload nginx
+            node /opt/jiesong-system/scripts/verify-vps-runtime.cjs "${{ vars.PRODUCTION_URL || 'https://jiesong-system.com' }}"
           '
 
       - name: Notify deployment status

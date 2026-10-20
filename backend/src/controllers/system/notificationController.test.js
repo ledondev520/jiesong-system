@@ -218,3 +218,21 @@ test('exportOperationLogsCsv: 返回 CSV 文件', async () => {
     prisma.operationLog.findMany = originalFindMany;
   }
 });
+
+test('getNotifications: 全部历史分页及标题/内容/类型搜索共用服务端where', async () => {
+  const originalFindMany = prisma.notification.findMany;
+  const originalCount = prisma.notification.count;
+  let args;
+  prisma.notification.findMany = async (value) => { args = value; return []; };
+  prisma.notification.count = async (value) => value.where.OR ? 81 : 4;
+  try {
+    const res = createMockRes();
+    await notificationController.getNotifications({ user: { id: 'synthetic-user' }, query: { page: '4', pageSize: '20', keyword: '合成标题' } }, res, (error) => { throw error; });
+    assert.equal(args.skip, 60); assert.equal(args.take, 20);
+    assert.equal(args.where.userId, 'synthetic-user');
+    assert.deepEqual(args.where.OR, ['title', 'content', 'type'].map((field) => ({ [field]: { contains: '合成标题' } })));
+    assert.equal(res.payload.data.pagination.total, 81);
+  } finally {
+    prisma.notification.findMany = originalFindMany; prisma.notification.count = originalCount;
+  }
+});

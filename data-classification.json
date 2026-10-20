@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updatedAt": "2026-08-23",
+  "updatedAt": "2026-10-17",
   "owner": "security-team",
   "tiers": [
     {
@@ -11,24 +11,58 @@
         "API tokens",
         "agent/service-account credentials and one-time issued machine tokens",
         "password hashes and auth signing keys",
-        "temporary default test credentials (for example admin/123456)",
+        "explicit administrator bootstrap passwords; legacy default detection is not an allowed credential",
         "database credentials",
         "HSCIQ API keys",
+        "DeepSeek API keys and encrypted deepseekApiKey system overrides",
         "backend environment overrides containing real secrets",
         "signed and system-generated legal/financial contract artifacts",
+        "generated shipment tax-refund confirmation checklists and material-version references",
         "supplier bank account names, account numbers, branches, and bank routing codes",
         "company bank statements, transaction identifiers, account balances, and even masked account identifiers when combined with transaction rows",
-        "carrier packing-list originals and persistent packing-list review records"
+        "carrier packing-list originals and persistent packing-list review records",
+        "email verification code hashes and Alibaba Cloud mail credentials",
+        "password reset code hashes, bound recovery email and persistent requester HMAC digests",
+        "opaque browser session credentials, SHA-256 session digests and session-bound CSRF proofs"
       ],
       "controls": {
         "storage": [
           "Secrets only in .env or secret manager",
+          "PR Review reporting uses zero GITHUB_TOKEN permissions and Actions summaries; failed check states are retained, and its locked formatter rejects incomplete history or unreadable changed source (scripts/check-pr-format.cjs)",
+          "Unchecked-login bearer tokens remain tab-scoped in sessionStorage; optional browser credentials are HttpOnly/Secure/SameSite=Strict cookies with existing absolute expiry and only hashed server-side; JavaScript holds only a session-bound CSRF proof",
           "System-configured API keys are write-only; encrypted storage is permitted but complete values must never be returned or rendered",
+          "System configuration environment-key fallbacks use the same masked response helper as database keys",
+          "Production AI provider switch backups remain Restricted with 0700 directories and 0600 files; update protected environment and PM2 together, verify using synthetic inputs only",
+          "Main AI provider keys remain separate; DeepSeek environment/DB overrides are write-only and file permissions are checked before environment loading",
+          "AI Agent failures do not trigger nested transport/engine retries; existing request deadlines prevent repeated external prompt transfers",
           "Restricted business records only in the application database or protected contract-evidence storage",
           "Least privilege file mode (<=600 for backend .env)",
           "Contract artifact and SQLite backup directories use 0700 and files use 0600",
+          "Legacy procurement attachment handlers reuse fileService permission enforcement and resolve downloads against UPLOAD_DIR",
+          "fileService.assertFileAccess shares existing ADMIN/FINANCE tax-confirmation access rules across generic and legacy purchase/sales download/delete routes; failed createFile writes clean only that request's new payload, never existing/generated attachments, and cleanup failures preserve the original error without logging paths; legacy purchase physical-archive retention is unchanged",
+          "Multer disk destinations create/tighten date directories to 0700 before streams begin and reject filesystem errors via callback; upload-root sharing remains unchanged. fileService.createFile enforces uploaded file0600 before its first asynchronous lookup, without asserting a whole-stream file-mode guarantee",
+          "Failed-upload cleanup validates normalized/real UPLOAD_DIR containment before chmod/unlink, rejects untrusted suffix traversal, child symlinks/non-files/multiple links, and rechecks captured dev/inode after awaits; intentional configured-root symlinks and trusted relative roots remain compatible, other attachment versions are not swept, and refused cleanup preserves original business errors",
+          "Multer validates the date destination as an ordinary non-alias directory directly beneath the real trusted root before chmod/success callback; child directory symlinks cannot mutate retained/external sentinels, while configured-root symlink/relative-root compatibility and original returned/relative path formats are preserved",
           "Carrier packing-list raw extracted text is not persisted; structured check records retain their original file reference",
-          "HTTP request logs retain route, timing, and request shape only; request/query values, AI prompts, tool schemas, and user messages are excluded"
+          "HTTP request logs retain route, timing, and request shape only; request/query values, AI prompts, tool schemas, and user messages are excluded",
+          "HSCIQ upstream error bodies are excluded from service errors and logs; pending queries are bounded by a total timeout and quota reservation",
+          "AI provider calls bound full response waits, disable SDK automatic retry/logging and reuse streamed token usage without resending prompts for estimation",
+          "Customs draft replacement retains identity and is atomic; released records cannot be replaced. Shipment confirmation versions retain business facts and evidence while excluding technical createdAt/updatedAt timestamps",
+          "Agent normal and streaming requests explicitly use the local Anthropic protocol and the locked published SDK build without developer-local fallback; they inspect termination status, do not persist upstream errors as successful runs and do not automatically retry",
+          "Ordinary frontend requests and protected Next proxy downloads share API base parsing; bare origins gain /api/v1 while explicit API paths are retained without duplication",
+          "Purchase/inspection inventory cannot be manually transitioned through normal, bulk or AI endpoints; execution rechecks provenance and same-status requests preserve inventory timestamps",
+          "VPS runtime migration backups keep private environment files and SQLite snapshots in 0700 directories with 0600 files; deployment verification never prints process environments or credentials",
+          "Environment file permissions are checked before loading mail credentials; email registration uses keyed hashes, persistent send quotas and single-use verification; new users remain inactive until administrator approval; user updates clear authentication caches immediately (backend/src/services/emailRegistrationService.js)",
+          "Email password recovery uses domain-separated keyed hashes, persistent cross-worker quotas and atomic single-use consumption; live sessionVersion checks immediately revoke old JWTs after any password write; unknown/disabled/ambiguous/legacy-without-email accounts never bypass proof of ownership; raw Prisma query/error logging is disabled",
+          "Recovery HTTP rate limits use locked express-rate-limit and canonical IPv4-mapped/IPv6 subnet keys shared with persistent IP HMAC quotas; forwarded client identity requires an explicit TRUSTED_PROXY_CIDRS IP/CIDR allowlist, disabled by default; production database backup must follow the actual DATABASE_URL with consistent SQLite backup API and protected permissions before migration",
+          "browserSessionService.js enforces origin plus session-bound CSRF, live expiry/active/sessionVersion checks and per-browser revocation without global logout; auth responses are no-store, no renewal occurs, expired records are pruned at the next successful checked login, and revocation responses do not modify cookies",
+          "All HTTP auth and business routers pass the locked express-rate-limit global100/min gate before parsing; mapped IPv4 and IPv6 /56 keys are canonical, proxy trust remains explicit, and legacy429/Retry-After/reset headers plus stricter login10/15min remain compatible. Standalone auth test fixtures use the same real bound; CodeQL is neither suppressed nor bypassed. HTTP counters remain process-local and reset on restart; workers do not share counters. Existing persistent SQLite email/recovery quotas remain independent.",
+          "Operational verification notes, including ignored PLAN.md, record outcomes only and never real login credentials; redacting a note does not rotate credentials or prove Git history is clean",
+          "Export proposal source paths use explicit CLI/environment configuration without reading .env; source databases and history workbooks remain outside Git (scripts/prepare_export_packet.py)",
+          "ADMIN catalog/opening-stock imports never retain uploads; previews are read-only, execution revalidates atomically and retains only minimal audit kind/count/operator. Bank account fields are excluded (catalogImportService.js).",
+          "bootstrapAdmin.js requires an explicit policy-valid password to create/remediate the administrator, blocks legacy-default startup and increments sessionVersion on remediation; seed never overwrites a secure password.",
+          "SQLite online snapshots and checksum manifests are 0600 in 0700 directories. Explicit source selection, WAL-consistent backup, integrity/checksum validation and exclusive new-target restore are enforced by backend/scripts/sqlite_snapshot.py; no .env/configuration or attachment copying.",
+          "Default portable history directory data/export-history/ is Git-ignored to prevent accidental commits of Confidential source workbooks."
         ],
         "transfer": [
           "Encrypt in transit (TLS)",
@@ -39,7 +73,14 @@
       "paths": [
         "backend/.env",
         "backend/src/config/index.js",
-        "backend/uploads/"
+        "backend/uploads/",
+        "/opt/jiesong_system/deploy-backups/",
+        "backend/src/services/emailService.js",
+        "backend/src/services/emailRegistrationService.js",
+        "backend/src/services/passwordResetService.js",
+        "backend/prisma/migrations/20261002113919_email_password_recovery/",
+        "backend/src/services/browserSessionService.js",
+        "backend/prisma/migrations/20261005070032_browser_sessions/"
       ]
     },
     {
@@ -48,6 +89,8 @@
       "purpose": "Business-sensitive internal data that is not publicly shareable.",
       "examples": [
         "purchase contract and sales records",
+        "purchase batch arrivals, immutable inspection evidence, human operator references and inventory inspection provenance",
+        "historical procurement templates and their store/purchase details",
         "supplier pricing and margins",
         "financial summary reports, cash-flow statements, account balances, general-ledger entries, payroll, social-security, and tax-return structured rows",
         "inventory and shipment operational history"
@@ -56,8 +99,15 @@
         "storage": [
           "Restrict DB/service read access",
           "Use role-based filtering at API response layer",
+          "backend/src/middleware/bossReadOnly.js permits BOSS explicit business GET/HEAD queries and own-password/notification-read exceptions only; authenticated database role overrides token claims and role changes invalidate caches",
+          "backend/src/controllers/financialStatementsController.js excludes account/ledger rows and source-file metadata before loading BOSS period summaries; evidence rows remain ADMIN/FINANCE only",
+          "backend/src/services/purchaseReceiptService.js atomically persists arrival/inspection evidence and accepted stock increments; routes/purchases.js requires human ADMIN/PURCHASE/WAREHOUSE, FIFO/rollback retain provenance, and historical data never gains fabricated evidence",
+          "Procurement-template reads require authentication at backend/src/routes/procurementTemplate.js before historical data is loaded",
           "Monthly financial source files are parsed in memory; persist structured rows plus filename, size, and SHA-256 only",
-          "Financial evidence workbooks are never archived; sensitive personal identifiers are redacted before persistence and row-level reads require ADMIN or FINANCE"
+          "Financial evidence workbooks are never archived; sensitive personal identifiers are redacted before persistence and row-level reads require ADMIN or FINANCE",
+          "Shipment invoice-row preparations and exports require ADMIN/FINANCE; generated confirmation attachments keep the same download/delete restriction and use protected contract storage",
+          "Automatic internal draft creation in openAgentService.js retains per-tool roles and execution/replay records; physical, financial and configuration writes still require confirmation",
+          "Product navigation belongs to procurement at frontend/src/components/layout/navigation.config.ts; backend/src/routes/products.js remains the authority for read/write role checks"
         ],
         "transfer": [
           "Use authenticated session only",
@@ -80,12 +130,14 @@
         "test fixtures",
         "build scripts",
         "readme and API contract docs",
-        "ByteRover engineering memory that excludes secrets and business-sensitive data"
+        "ByteRover engineering memory that excludes secrets and business-sensitive data",
+        "non-secret export pricing mode, exchange adjustment and markup settings"
       ],
       "controls": {
         "storage": [
           "Repository standard permissions",
-          "Code review for unintended leakage"
+          "Code review for unintended leakage",
+          "exportReadinessService.js, exportPacketService.js and scripts/pricing_config.py consume the same policy validated by pricingConfigService.js or the Python loader; ADMIN-only file updates log actor, changed fields and hashes without values. External file edits are detected on load; offline editors retain filesystem audit."
         ],
         "transfer": [
           "Use normal authenticated collaboration channels"
@@ -97,8 +149,20 @@
         ".brv/context-tree/",
         "scripts/",
         "README.md",
-        "PLAN.md"
+        "PLAN.md",
+        "config/pricing.json",
+        "config/pricing.schema.json"
       ]
     }
+  ],
+  "reviewControls": [
+    "Export pricing requires finite positive spot rates and positive adjusted rates rounded to six decimals; positive policy adjustments cannot validate missing or invalid spot rates.",
+    "Backup CLI explicit space/equals source and destination options take precedence over environment/defaults.",
+    "bootstrapAdmin.js validates bootstrap passwords only before a password write, preserving secure accounts.",
+    "sqlite_snapshot.py refuses restore targets with existing WAL/SHM/journal sidecars to prevent old pages replacing verified snapshot data.",
+    "tabularImport.js enforces 256 ZIP entries and 32 MiB actual streamed inflation before ExcelJS parsing.",
+    "Legacy HTTP import uses in-memory CSV/xlsx upload filtering, accepts in-memory bytes only, rejects filesystem path inputs (including traversal, absolute paths and symlinks), and never retains original source files.",
+    "db-backup.js preserves Prisma literal percent filenames instead of URI-decoding the source path.",
+    "tabularImport.js uses streaming XML guards to reject merged cells, out-of-bound row/cell/column coordinates and sheet IDs above 65535 before ExcelJS allocates models."
   ]
 }

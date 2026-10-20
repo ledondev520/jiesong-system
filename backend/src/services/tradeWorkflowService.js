@@ -1,10 +1,11 @@
 /**
  * Input: 出口合同、关联采购合同、装箱/单证/退税/收付记录
- * Output: 单笔出口专项单的八阶段进度、阻塞原因和唯一下一动作
+ * Output: 单笔出口专项单的八阶段进度、阻塞原因和唯一下一动作；已发运单据保留资料补录提示，区分备注引用与缺失合同并提示未分配采购明细
  * Pos: 经营中台与详情页共享的出口专项单主线路 Module
  */
 
 const prisma = require('../utils/prisma');
+const { createError } = require('../middleware/errorHandler');
 const { evaluateShipmentReadiness } = require('./shipmentReadinessService');
 const { normalizePurchaseStatus, PURCHASE_STATUS } = require('./purchaseStateMachine');
 const { normalizeSalesStatus, SALES_STATUS } = require('./salesStateMachine');
@@ -74,9 +75,15 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   const missingPurchaseNos = purchaseContractNos.filter(
     (contractNo) => !getPurchaseByNo(purchaseMap, contractNo),
   );
+  const purchaseReferenceNotes = missingPurchaseNos.filter((no) => ['单独购买', '补充合同', '另采', '乙方合同'].includes(no));
+  const combinedPurchaseReferences = missingPurchaseNos.filter(no => /^(?:CG|PO)\d{7}(?:[，,]\s*(?:(?:CG|PO)\d{7}|\d{1,7}))+$/.test(no));
   const purchaseTotal = linkedPurchases.reduce((sum, contract) => sum + (Number(contract.totalAmount) || 0), 0);
   const purchasePaid = linkedPurchases.reduce((sum, contract) => sum + (Number(contract.paidAmount) || 0), 0);
-  const allPurchasesPaid = linkedPurchases.length > 0
+  // ponytail: 复用历史补录的明确备注标记；多来源核验接入时改用结构化核验状态。
+  // 默认零值不能作为未付款事实。
+  const paymentUnverifiedPurchase = linkedPurchases.find(contract => Number(contract.paidAmount) === 0
+    && /付款(?:记录)?(?:尚未|未|待)核验/.test(contract.note || ''));
+  const allPurchasesPaid = !paymentUnverifiedPurchase && linkedPurchases.length > 0
     && purchaseTotal > 0
     && purchasePaid >= purchaseTotal - 0.01;
   const productionReadiness = linkedPurchases.map((contract) => ({
@@ -97,6 +104,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   const purchaseMissingSignedArchive = linkedPurchases.find((contract) => !hasSignedContractArchive(contract));
   const salesStatus = normalizeSalesStatus(salesContract.status);
   const salesRank = SALES_RANK[salesStatus] ?? 0;
+  const shipped = salesRank >= SALES_RANK[SALES_STATUS.SHIPPED];
   const readiness = evaluateShipmentReadiness(salesContract);
   const packingListChecks = [...(salesContract.packingListChecks || [])].sort((left, right) => (
     new Date(right.checkedAt || right.createdAt || 0).getTime()
@@ -124,6 +132,18 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
         key: 'procurement', label: '采购签约', status: 'blocked', reason: '装箱明细未关联购销合同',
         action: { label: '关联购销合同', href: `/dashboard/sales/${salesContract.id}` },
       }
+    : purchaseReferenceNotes.length > 0
+      ? {
+          key: 'procurement', label: '采购签约', status: 'blocked',
+          reason: `采购引用填写为备注（${purchaseReferenceNotes.join('、')}），请补充正式合同号`,
+          action: { label: '补充采购合同号', href: `/dashboard/sales/${salesContract.id}` },
+        }
+    : combinedPurchaseReferences.length > 0
+      ? {
+          key: 'procurement', label: '采购签约', status: 'blocked',
+          reason: `多个采购合同号混写（${combinedPurchaseReferences.join('、')}），需明确明细分配`,
+          action: { label: '核对采购合同分配', href: `/dashboard/sales/${salesContract.id}` },
+        }
     : missingPurchaseNos.length > 0
       ? {
           key: 'procurement', label: '采购签约', status: 'blocked', reason: `找不到购销合同 ${missingPurchaseNos.join('、')}`,
@@ -146,6 +166,11 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
 
   const paymentStage = linkedPurchases.length === 0
     ? { key: 'payment', label: '采购付款', status: 'pending', reason: '先关联购销合同' }
+    : paymentUnverifiedPurchase
+      ? {
+          key: 'payment', label: '采购付款', status: 'current', reason: '历史采购付款待核验，默认已付零值不代表尚未付款',
+          action: { label: '核验采购付款', href: `/dashboard/purchase/${paymentUnverifiedPurchase.id}` },
+        }
     : allPurchasesPaid
       ? { key: 'payment', label: '采购付款', status: 'completed', reason: `已付清 ¥${roundMoney(purchasePaid).toLocaleString('zh-CN')}` }
       : {
@@ -173,7 +198,9 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
         };
 
   let loadingStage;
-  if (readiness.overloaded) {
+  if (shipped) {
+    loadingStage = { key: 'loading', label: '排柜与出货', status: 'completed', reason: '已确认发运' };
+  } else if (readiness.overloaded) {
     loadingStage = {
       key: 'loading', label: '排柜与出货', status: 'blocked',
       reason: readiness.overloadReasons.includes('weight') ? '毛重超过 22 吨安全上限' : '体积超过 68 立方米安全上限',
@@ -189,8 +216,6 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
       key: 'loading', label: '排柜与出货', status: 'blocked', reason: '箱数或装箱明细未填写完整',
       action: { label: '补充箱规数据', href: `/dashboard/sales/${salesContract.id}` },
     };
-  } else if (salesRank >= SALES_RANK[SALES_STATUS.SHIPPED]) {
-    loadingStage = { key: 'loading', label: '排柜与出货', status: 'completed', reason: '已确认发运' };
   } else if (readiness.ready) {
     loadingStage = {
       key: 'loading', label: '排柜与出货', status: 'current', reason: '利用率达标且全部箱件可装下',
@@ -247,7 +272,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
     ? { key: 'finance', label: '财务结清', status: 'completed', reason: '采购成本已付清、美元货款已收齐' }
     : {
         key: 'finance', label: '财务结清', status: salesRank >= SALES_RANK[SALES_STATUS.SHIPPED] ? 'current' : 'pending',
-        reason: `采购${allPurchasesPaid ? '已付清' : '未付清'}，货款${receivableComplete ? '已收齐' : '未收齐'}`,
+        reason: `采购${paymentUnverifiedPurchase ? '付款待核验' : allPurchasesPaid ? '已付清' : '未付清'}，货款${receivableComplete ? '已收齐' : '未收齐'}`,
         action: { label: '查看收付与单柜毛利', href: `/dashboard/sales/${salesContract.id}` },
       };
 
@@ -261,13 +286,26 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
     taxStage,
     financeStage,
   ];
+  if (shipped) {
+    for (const stage of [procurementStage, productionStage]) {
+      if (stage.status === 'completed') continue;
+      stage.status = 'current';
+      stage.reason = `已发运，待补录：${stage.reason}`;
+      if (stage.action) stage.action.label = stage.key === 'procurement' ? '补录采购关联与签约资料' : '补录生产资料';
+    }
+  }
   const nextStage = stages.find((stage) => stage.status === 'blocked' || stage.status === 'current')
     || stages.find((stage) => stage.status !== 'completed');
   const issues = [];
+  const unallocated = unique(packingItems.filter((item) => {
+    const purchase = getPurchaseByNo(purchaseMap, item.purchaseContractNo);
+    return purchase?.items?.length && !purchase.items.some((line) => line.id === item.purchaseItemId);
+  }).map((item) => item.purchaseContractNo));
+  if (unallocated.length) issues.push(`采购明细待分配：${unallocated.join('、')}`);
   if (purchasePaid > purchaseTotal + 0.01) issues.push('采购已付金额超过合同金额');
   if (productionIncompletePurchase) issues.push('采购生产状态已完成，但装柜输入资料不完整');
-  if (readiness.overloaded) issues.push('货柜超过 40HQ 安全上限');
-  if (readiness.unplacedBoxCount > 0) issues.push(`仍有 ${readiness.unplacedBoxCount} 箱无法装入`);
+  if (readiness.overloaded) issues.push(shipped ? '历史装箱数据超出 40HQ 参数，待核对' : '货柜超过 40HQ 安全上限');
+  if (readiness.unplacedBoxCount > 0) issues.push(shipped ? '历史箱规与 3D 排柜结果不一致，待核对' : `仍有 ${readiness.unplacedBoxCount} 箱无法装入`);
   if (salesContract.shippedAt && salesContract.createdAt && new Date(salesContract.shippedAt) < new Date(salesContract.createdAt)) {
     issues.push('发运时间早于系统创建时间，请确认是否为历史补录');
   }
@@ -293,11 +331,13 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   };
 };
 
-const listTradeWorkflows = async ({ limit = 20 } = {}) => {
-  const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 100));
+const listTradeWorkflows = async ({ limit = 20, scope = 'recent' } = {}) => {
+  const safeLimit = Math.max(1, Math.min(Math.floor(Number(limit)) || 20, 100));
+  if (!['recent', 'pending', 'blocked', 'risk'].includes(scope)) throw createError('专项单范围无效', 400);
+  // ponytail: 非最近范围全量计算以免漏历史风险；数据规模增大后再持久化阶段并分页。
   const salesContracts = await prisma.salesContract.findMany({
     where: { status: { not: SALES_STATUS.CANCELLED } },
-    take: safeLimit,
+    ...(scope === 'recent' ? { take: safeLimit } : {}),
     orderBy: [{ updatedAt: 'desc' }, { contractNo: 'desc' }],
     include: {
       packingItems: { include: { product: true } },
@@ -332,7 +372,14 @@ const listTradeWorkflows = async ({ limit = 20 } = {}) => {
     purchaseMap.set(contract.contractNo.replace(/^CG/, 'PO'), contract);
   });
 
-  return salesContracts.map((contract) => buildTradeWorkflow(contract, purchaseMap));
+  let workflows = salesContracts.map((contract) => buildTradeWorkflow(contract, purchaseMap));
+  if (scope === 'pending') workflows = workflows.filter((item) => item.completedStageCount < item.stageCount);
+  if (scope === 'blocked') workflows = workflows.filter((item) => item.stages.some((stage) => stage.status === 'blocked'));
+  if (scope === 'risk') workflows.sort((a, b) => {
+    const weight = (item) => item.stages.filter((stage) => stage.status === 'blocked').length * 100 + item.issues.length;
+    return weight(b) - weight(a);
+  });
+  return workflows.slice(0, safeLimit);
 };
 
 module.exports = {

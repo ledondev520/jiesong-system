@@ -1,6 +1,6 @@
 /**
  * Input: fileService、响应工具
- * Output: 统一合同附件控制器
+ * Output: 合同附件接口；通过共享 fileService 边界限制退税确认清单下载/删除为管理员/财务
  * Pos: 合同附件管理控制器，提供上传、列表、下载、删除接口
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -65,6 +65,7 @@ const downloadFile = async (req, res, next) => {
 
     const file = await fileService.findFileById(fileId);
     if (!file) throw createError('文件不存在', 404);
+    fileService.assertFileAccess(file, req.user);
 
     const absolutePath = path.isAbsolute(file.filePath)
       ? file.filePath
@@ -85,7 +86,9 @@ const downloadFile = async (req, res, next) => {
 const deleteFile = async (req, res, next) => {
   try {
     const { fileId } = req.params;
-
+    const existing = await fileService.findFileById(fileId);
+    if (!existing) throw createError('文件不存在', 404);
+    fileService.assertFileAccess(existing, req.user);
     const file = await fileService.deleteFileRecord(fileId);
     if (!file) throw createError('文件不存在', 404);
 

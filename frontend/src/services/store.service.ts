@@ -1,5 +1,6 @@
-import type { Store } from '@/types';
-import { createCrudService } from './crudService';
+import type { ApiResponse, Store } from "@/types";
+import api, { type ApiRequestConfig } from "@/lib/axios";
+import { createCrudService } from "./crudService";
 
 type StoreListQuery = {
   page?: number;
@@ -7,13 +8,25 @@ type StoreListQuery = {
   lite?: boolean;
 };
 
-const crud = createCrudService<Store, Partial<Store>, Partial<Store>, StoreListQuery>('/stores');
+const crud = createCrudService<
+  Store,
+  Partial<Store>,
+  Partial<Store>,
+  StoreListQuery
+>("/stores");
 
 /**
- * 门店服务（列表查询、详情、增删改）。
+ * 门店服务（列表查询、详情、增删改及创建时的实时可用港口）。
  */
 export const storeService = {
   ...crud,
+  getPorts: () =>
+    api.get<
+      ApiResponse<NonNullable<Store["port"]>[]>,
+      ApiResponse<NonNullable<Store["port"]>[]>
+    >("/stores/options/ports", {
+      cache: { enabled: false },
+    } as ApiRequestConfig),
 };
 
 /**

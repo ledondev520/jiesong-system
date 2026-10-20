@@ -1,25 +1,30 @@
 /**
- * Input: Prisma客户端
- * Output: 采购合同相关的HTTP响应
- * Pos: 采购控制器，处理采购合同CRUD请求
+ * Input: Prisma客户端、统一附件服务与上传路径工具
+ * Output: 采购合同相关的HTTP响应，编号预览沿用统一序列规则；附件下载/删除复用财务凭证访问边界
+ * Pos: 采购控制器，处理采购合同CRUD请求与受限附件存储、下载
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');
+const { generateNextPurchaseContractNo } = require('../services/purchaseContractNumberService');
+const fileService = require('../services/fileService');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const {
   validatePurchaseTransition,
   normalizePurchaseStatus,
+  getPurchaseSettlementStatus,
   PURCHASE_STATUS,
 } = require('../services/purchaseStateMachine');
-const { applyPurchaseInStock, revertPurchaseInStock } = require('../services/inventorySnapshot');
+const { assertPurchaseReceiptComplete } = require('../services/purchaseReceiptService');
 const { normalizePagination } = require('../utils/pagination');
 const auditLog = require('../utils/auditLog');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
+const { assertPurchaseDraftEditable } = require('../agent/commands/purchase/updatePurchase');
+const { normalizeItem } = require('../agent/commands/purchase/createPurchaseWithItems');
 const contractTemplateService = require('../services/contractTemplateService');
-const { calculateNewLineTotal, normalizePurchaseTaxRate } = require('../services/purchaseAmountService');
+const { normalizePurchaseTaxRate } = require('../services/purchaseAmountService');
 const {
   assertPurchaseProductionReady,
   evaluatePurchaseProductionReadiness,
@@ -57,7 +62,7 @@ const checkPriceWarnings = async (items, prismaClient) => {
     const averagePrice = prices.reduce((sum, p) => sum + p, 0) / prices.length;
     if (averagePrice <= 0) continue;
 
-    const currentPrice = item.unitPrice;
+    const currentPrice = Number(item.unitPrice);
     const diffPct = ((currentPrice - averagePrice) / averagePrice) * 100;
 
     if (diffPct > 10) {
@@ -76,25 +81,39 @@ const checkPriceWarnings = async (items, prismaClient) => {
 
 /**
  * 职责：获取采购合同列表
- * 思路：支持关键字搜索合同编号和供应商名称
+ * 思路：服务端分页与全部采购明细搜索共用筛选，汇总覆盖完整合同目录
  */
 const list = async (req, res, next) => {
   try {
     const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
-    const { status, supplierId, keyword } = req.query;
+    const { status, supplierId } = req.query;
+    const searchText = (key) => {
+      const value = req.query[key];
+      if (value === undefined) return '';
+      if (typeof value !== 'string') throw createError(`${key} 必须为文本`, 400);
+      return value.trim();
+    };
+    const keyword = searchText('keyword');
+    const productKeyword = searchText('productKeyword');
+    const storeName = searchText('storeName');
     const lite = req.query.lite === 'true' || req.query.lite === true;
     
     const where = {};
     if (status) where.status = status;
     if (supplierId) where.supplierId = supplierId;
+    if (storeName) where.storeName = { contains: storeName };
+    if (productKeyword) {
+      where.items = { some: { product: { customsName: { contains: productKeyword } } } };
+    }
     if (keyword) {
       where.OR = [
         { contractNo: { contains: keyword } },
         { supplier: { name: { contains: keyword } } },
+        { items: { some: { product: { customsName: { contains: keyword } } } } },
       ];
     }
     
-    const [contracts, total] = await Promise.all([
+    const [contracts, total, statusCounts, stores] = await Promise.all([
       prisma.purchaseContract.findMany({
         where,
         skip,
@@ -134,9 +153,13 @@ const list = async (req, res, next) => {
         orderBy: { contractNo: 'desc' }, // 按合同编号倒序
       }),
       prisma.purchaseContract.count({ where }),
+      prisma.purchaseContract.groupBy({ by: ['status'], _count: { _all: true } }),
+      prisma.purchaseContract.findMany({ where: { storeName: { not: null } }, select: { storeName: true }, distinct: ['storeName'] }),
     ]);
     
-    paginated(res, contracts, total, page, pageSize);
+    paginated(res, contracts, total, page, pageSize, {
+      summary: { statusCounts: Object.fromEntries(statusCounts.map((row) => [row.status, row._count._all])), stores: stores.map((row) => row.storeName).filter(Boolean) },
+    });
   } catch (error) {
     next(error);
   }
@@ -263,6 +286,9 @@ const remove = async (req, res, next) => {
   try {
     const { id } = req.params;
     
+    const contract = await prisma.purchaseContract.findUnique({ where: { id }, select: { _count: { select: { receipts: true } } } });
+    if (!contract) throw createError('采购合同不存在', 404);
+    if (contract._count.receipts > 0) throw createError('已有到货记录的合同不可删除', 400);
     await prisma.purchaseContract.delete({ where: { id } });
     
     success(res, null, '采购合同删除成功');
@@ -282,22 +308,14 @@ const addItem = async (req, res, next) => {
     const item = await prisma.$transaction(async (tx) => {
       const contract = await tx.purchaseContract.findUnique({
         where: { id },
-        select: { taxRate: true },
+        include: { items: { include: { _count: { select: { inventories: true, packingItems: true, receiptItems: true } } } }, _count: { select: { payments: true, files: true, receipts: true } } },
       });
       if (!contract) throw createError('采购合同不存在', 404);
+      assertPurchaseDraftEditable(contract);
 
       const taxRate = normalizePurchaseTaxRate(contract.taxRate);
       const createdItem = await tx.purchaseItem.create({
-        data: {
-          purchaseContractId: id,
-          productId: data.productId,
-          quantity: data.quantity,
-          unit: data.unit,
-          unitPrice: data.unitPrice,
-          totalPrice: calculateNewLineTotal(data, taxRate),
-          specification: data.specification,
-          note: data.note,
-        },
+        data: { purchaseContractId: id, ...normalizeItem(data, 0, taxRate) },
         include: { product: true },
       });
 
@@ -323,7 +341,9 @@ const addItem = async (req, res, next) => {
  */
 const updateProductionDetails = async (req, res, next) => {
   try {
-    const contract = await updatePurchaseProductionDetails(req.params.id, req.body?.items);
+    const contract = await updatePurchaseProductionDetails(req.params.id, req.body?.items, prisma, {
+      completeProduction: req.body?.completeProduction ?? false,
+    });
     await auditLog.logOperation({
       userId: req.user?.id,
       action: 'UPDATE_PRODUCTION_DETAILS',
@@ -332,11 +352,13 @@ const updateProductionDetails = async (req, res, next) => {
       newValue: {
         itemIds: (req.body?.items || []).map((item) => item.id),
         itemCount: (req.body?.items || []).length,
+        completeProduction: req.body?.completeProduction === true,
+        status: contract.status,
       },
       req,
       note: '更新采购生产资料（规格、箱数、重量、体积和可选箱体尺寸）',
     });
-    success(res, contract, '生产资料已保存');
+    success(res, contract, req.body?.completeProduction === true ? '完工报告已保存，已进入待装柜' : '生产资料已保存');
   } catch (error) {
     next(error);
   }
@@ -354,18 +376,20 @@ const updateStatus = async (req, res, next) => {
       throw createError('status 不能为空', 400);
     }
 
-    let revertResult = null;
-    let applyResult = null;
-
     const contract = await prisma.$transaction(async (tx) => {
       const existingContract = await tx.purchaseContract.findUnique({
         where: { id },
         select: {
           id: true,
           status: true,
+          totalAmount: true,
+          paidAmount: true,
+          invoiceNo: true,
+          _count: { select: { payments: true, receipts: true } },
           items: {
             select: {
               id: true,
+              _count: { select: { inventories: true, packingItems: true, receiptItems: true } },
               specification: true,
               boxes: true,
               grossWeight: true,
@@ -389,64 +413,39 @@ const updateStatus = async (req, res, next) => {
       }
 
       const isTransition = existingContract.status !== targetStatus;
+      const settledStatus = getPurchaseSettlementStatus(targetStatus, existingContract.totalAmount, existingContract.paidAmount);
+      if (targetStatus === PURCHASE_STATUS.COMPLETED && settledStatus !== PURCHASE_STATUS.COMPLETED) {
+        throw createError('采购款项尚未结清或存在金额差异，请先处理付款记录', 400);
+      }
+      if (isTransition && targetStatus === PURCHASE_STATUS.CANCELLED && (
+        ![PURCHASE_STATUS.DRAFT, PURCHASE_STATUS.SIGNED].includes(normalizePurchaseStatus(existingContract.status))
+        || existingContract.paidAmount > 0 || existingContract.invoiceNo || existingContract._count.payments > 0 || existingContract._count.receipts > 0
+        || existingContract.items.some((item) => item._count.inventories > 0 || item._count.packingItems > 0 || item._count.receiptItems > 0)
+      )) {
+        throw createError('仅尚未生产、未付款、未入库且未关联出口的合同可取消；已履行合同请先处理对应业务', 400);
+      }
+
       if (
         isTransition
         && [PURCHASE_STATUS.READY, PURCHASE_STATUS.SHIPPED].includes(targetStatus)
       ) {
         assertPurchaseProductionReady(existingContract.items);
       }
+      if (isTransition && targetStatus === PURCHASE_STATUS.RECEIVED) {
+        await assertPurchaseReceiptComplete(tx, id);
+      }
       const contract = await tx.purchaseContract.update({
         where: { id },
         data: {
-          status: targetStatus,
+          status: settledStatus,
           ...(isTransition && targetStatus === PURCHASE_STATUS.READY
             ? { productionCompletedAt: new Date() }
             : {}),
         },
       });
 
-      // 正向流转：入库时创建库存记录
-      if (isTransition && targetStatus === PURCHASE_STATUS.RECEIVED) {
-        applyResult = await applyPurchaseInStock(tx, id);
-      }
-
-      // 反向流转：从入库状态回退时，回滚库存记录
-      if (isTransition && normalizePurchaseStatus(existingContract.status) === PURCHASE_STATUS.RECEIVED) {
-        revertResult = await revertPurchaseInStock(tx, id);
-      }
-
       return contract;
     });
-
-    // 记录回滚操作的审计日志
-    if (revertResult && revertResult.reverted > 0) {
-      await auditLog.logOperation({
-        userId: req.user?.id,
-        action: 'REVERT_IN_STOCK',
-        entity: 'PurchaseContract',
-        entityId: id,
-        oldValue: { status: PURCHASE_STATUS.RECEIVED, revertedInventoryCount: revertResult.reverted },
-        newValue: { status: targetStatus },
-        req,
-        note: `采购入库回滚：恢复 ${revertResult.reverted} 条库存记录`,
-      });
-      console.log(`[库存回滚] 采购合同 ${id}: 恢复 ${revertResult.reverted} 条入库记录`);
-    }
-
-    // 记录入库操作的审计日志
-    if (applyResult && (applyResult.created > 0 || applyResult.skipped > 0)) {
-      await auditLog.logOperation({
-        userId: req.user?.id,
-        action: 'APPLY_IN_STOCK',
-        entity: 'PurchaseContract',
-        entityId: id,
-        oldValue: { status: contract.status },
-        newValue: { status: PURCHASE_STATUS.RECEIVED, createdCount: applyResult.created, skippedCount: applyResult.skipped },
-        req,
-        note: `采购入库：创建 ${applyResult.created} 条库存记录，跳过 ${applyResult.skipped} 条`,
-      });
-      console.log(`[库存入库] 采购合同 ${id}: 创建 ${applyResult.created} 条记录，跳过 ${applyResult.skipped} 条`);
-    }
 
     success(res, contract, '状态更新成功');
   } catch (error) {
@@ -458,7 +457,7 @@ const updateStatus = async (req, res, next) => {
  * 职责：上传合同文件
  * 思路：
  * 1. multer中间件处理文件上传
- * 2. 保存文件信息到数据库
+ * 2. 统一附件服务收紧目录/文件权限后保存文件信息到数据库
  * 3. 返回文件记录
  */
 const uploadFile = async (req, res, next) => {
@@ -469,19 +468,13 @@ const uploadFile = async (req, res, next) => {
       throw createError('请选择要上传的文件', 400);
     }
     
-    const file = req.file;
-    const { getRelativePath } = require('../utils/upload');
-    
-    // 保存文件记录
-    const contractFile = await prisma.contractFile.create({
-      data: {
-        purchaseContractId: id,
-        fileName: file.originalname,
-        filePath: getRelativePath(file.path),
-        fileType: file.mimetype,
-        fileSize: file.size,
-      },
-    });
+    const contractFile = await fileService.createFile(
+      id,
+      fileService.CONTRACT_TYPE.PURCHASE,
+      req.file,
+      req.body?.description,
+      req.body?.category,
+    );
     
     created(res, contractFile, '文件上传成功');
   } catch (error) {
@@ -513,7 +506,6 @@ const getFiles = async (req, res, next) => {
 const deleteFile = async (req, res, next) => {
   try {
     const { fileId } = req.params;
-    const { deleteFile: removeFile } = require('../utils/upload');
     
     // 获取文件记录
     const file = await prisma.contractFile.findUnique({
@@ -523,9 +515,9 @@ const deleteFile = async (req, res, next) => {
     if (!file) {
       throw createError('文件不存在', 404);
     }
+    fileService.assertFileAccess(file, req.user);
     
-    // 删除物理文件（可选，根据PRD要求保留文件）
-    // removeFile(file.filePath);
+    // 旧采购入口继续保留物理归档；不改变现有留存约定。
     
     // 删除数据库记录
     await prisma.contractFile.delete({
@@ -540,19 +532,21 @@ const deleteFile = async (req, res, next) => {
 
 /**
  * 职责：下载合同附件
- * 思路：查找文件记录，构造绝对路径，通过 res.download 返回文件流
+ * 思路：查找文件记录，相对路径从 UPLOAD_DIR 解析，通过 res.download 返回文件流
  */
 const downloadFile = async (req, res, next) => {
   try {
     const { fileId } = req.params;
     const path = require('path');
+    const { getFullPath } = require('../utils/upload');
 
     const file = await prisma.contractFile.findUnique({ where: { id: fileId } });
     if (!file) throw createError('文件不存在', 404);
+    fileService.assertFileAccess(file, req.user);
 
     const absolutePath = path.isAbsolute(file.filePath)
       ? file.filePath
-      : path.join(process.cwd(), file.filePath);
+      : getFullPath(file.filePath);
 
     res.download(absolutePath, file.fileName, (err) => {
       if (err && !res.headersSent) next(err);
@@ -567,11 +561,7 @@ const downloadFile = async (req, res, next) => {
  */
 const getNextContractNo = async (req, res, next) => {
   try {
-    const year = new Date().getFullYear().toString().slice(-2);
-    const count = await prisma.purchaseContract.count({
-      where: { contractNo: { startsWith: `CG${year}` } },
-    });
-    const contractNo = `CG${year}${String(count + 1).padStart(5, '0')}`;
+    const contractNo = await generateNextPurchaseContractNo(prisma);
     
     success(res, { contractNo });
   } catch (error) {
@@ -611,7 +601,7 @@ const getProductPriceHistory = async (req, res, next) => {
     const prices = historyItems
       .map((h) => ({
         contractNo: h.purchaseContract.contractNo,
-        price: h.totalPrice / h.quantity,
+        price: Number(h.unitPrice),
         date: h.purchaseContract.createdAt,
       }))
       .filter((h) => Number.isFinite(h.price) && h.price > 0);

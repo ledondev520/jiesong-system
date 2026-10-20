@@ -1,8 +1,11 @@
-import api from '@/lib/axios';
-import { getAuthToken } from '@/lib/auth-token';
-import { buildIdempotencyKey, runIdempotentRequest } from '@/lib/idempotentRequest';
-import { ApiResponse, PaginatedResponse, Payment, PaymentType } from '@/types';
-import { downloadResponseBlob } from './fileDownload';
+import api from "@/lib/axios";
+import { getAuthToken } from "@/lib/auth-token";
+import {
+  buildIdempotencyKey,
+  runIdempotentRequest,
+} from "@/lib/idempotentRequest";
+import { ApiResponse, PaginatedResponse, Payment, PaymentType } from "@/types";
+import { downloadResponseBlob } from "./fileDownload";
 
 export interface FinanceOverviewStats {
   payable: {
@@ -15,6 +18,31 @@ export interface FinanceOverviewStats {
     received: number;
     unreceived: number;
   };
+}
+
+export interface ReceivableReconciliation {
+  period: { year: number; month: number; label: string };
+  cutoffDate: string;
+  contractCount: number;
+  formalSalesUsd: number;
+  receivedUsd: number;
+  operatingReceivableUsd: number;
+  reportedReceivableCny: number;
+  effectiveExchangeRate: number | null;
+  translatedOperatingReceivableCny: number | null;
+  correctedAccountingReceivableCny: number;
+  residualCny: number | null;
+  anomalies: {
+    duplicateDebitCny: number;
+    duplicateContracts: string[];
+    missingDebitCny: number;
+    missingContracts: Array<{
+      contractNo: string;
+      amountUsd: number;
+      estimatedAmountCny: number | null;
+    }>;
+  };
+  assumptions: string[];
 }
 
 interface FinanceContractRecord {
@@ -50,6 +78,7 @@ export interface FinanceCreatePaymentInput {
   type: PaymentType;
   purchaseContractId?: string;
   salesContractId?: string;
+  /** @deprecated New source-linked collections must use allocatePayment; retained for historical keyed replay. */
   sourcePaymentId?: string;
   customerName?: string;
   amount: number;
@@ -59,7 +88,7 @@ export interface FinanceCreatePaymentInput {
   note?: string;
 }
 
-export type FinanceReportPdfType = 'purchases' | 'sales' | 'payments';
+export type FinanceReportPdfType = "purchases" | "sales" | "payments";
 
 const DEFAULT_FINANCE_STATS: FinanceOverviewStats = {
   payable: {
@@ -72,13 +101,6 @@ const DEFAULT_FINANCE_STATS: FinanceOverviewStats = {
     received: 0,
     unreceived: 0,
   },
-};
-
-const createPaymentIdempotencyKey = (payload: FinanceCreatePaymentInput) => {
-  return buildIdempotencyKey({
-    ...payload,
-    paymentDate: payload.paymentDate,
-  });
 };
 
 export interface PaymentAllocation {
@@ -107,44 +129,78 @@ export interface FinanceAutoMatchResult {
 
 export const financeService = {
   getPayments: async (params?: FinancePaymentQuery) => {
-    return api.get<ApiResponse<PaginatedResponse<Payment>>, ApiResponse<PaginatedResponse<Payment>>>('/finance/payments', { params });
+    return api.get<
+      ApiResponse<PaginatedResponse<Payment>>,
+      ApiResponse<PaginatedResponse<Payment>>
+    >("/finance/payments", { params });
   },
 
   getUnallocatedPayments: async () => {
-    return api.get<ApiResponse<Payment[]>, ApiResponse<Payment[]>>('/finance/unallocated-payments');
+    return api.get<ApiResponse<Payment[]>, ApiResponse<Payment[]>>(
+      "/finance/unallocated-payments",
+    );
   },
 
-  allocatePayment: async (paymentId: string, allocations: PaymentAllocation[]) => {
-    return api.post<ApiResponse<Payment[]>, ApiResponse<Payment[]>>(`/finance/payments/${paymentId}/allocate`, { allocations });
+  allocatePayment: async (
+    paymentId: string,
+    allocations: PaymentAllocation[],
+  ) => {
+    return api.post<ApiResponse<Payment[]>, ApiResponse<Payment[]>>(
+      `/finance/payments/${paymentId}/allocate`,
+      { allocations },
+    );
   },
 
   autoMatchUnallocatedPayments: async () => {
-    return api.post<ApiResponse<FinanceAutoMatchResult>, ApiResponse<FinanceAutoMatchResult>>('/finance/payments/auto-match');
+    return api.post<
+      ApiResponse<FinanceAutoMatchResult>,
+      ApiResponse<FinanceAutoMatchResult>
+    >("/finance/payments/auto-match");
   },
 
-  getPayables: async (params?: { page?: number; pageSize?: number }) => {
+  getPayables: async (params?: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    outstandingOnly?: boolean;
+    overdue?: boolean;
+    pastDelivery?: boolean;
+  }) => {
     return api.get<
       ApiResponse<PaginatedResponse<FinanceContractRecord>>,
       ApiResponse<PaginatedResponse<FinanceContractRecord>>
-    >('/finance/payables', { params });
+    >("/finance/payables", { params });
   },
 
-  getReceivables: async (params?: { page?: number; pageSize?: number }) => {
+  getReceivables: async (params?: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    outstandingOnly?: boolean;
+    overdue?: boolean;
+    pastDelivery?: boolean;
+  }) => {
     return api.get<
       ApiResponse<PaginatedResponse<FinanceContractRecord>>,
       ApiResponse<PaginatedResponse<FinanceContractRecord>>
-    >('/finance/receivables', { params });
+    >("/finance/receivables", { params });
   },
 
   createPayment: async (data: FinanceCreatePaymentInput) => {
-    const idempotencyKey = createPaymentIdempotencyKey(data);
+    // Snapshot the flat payment payload before hashing so the body and key agree.
+    const payload = { ...data };
+    const idempotencyKey = await buildIdempotencyKey(payload);
 
     return runIdempotentRequest(
       idempotencyKey,
       () =>
-        api.post<ApiResponse<Payment>, ApiResponse<Payment>, FinanceCreatePaymentInput>('/finance/payments', data, {
+        api.post<
+          ApiResponse<Payment>,
+          ApiResponse<Payment>,
+          FinanceCreatePaymentInput
+        >("/finance/payments", payload, {
           headers: {
-            'X-Idempotency-Key': idempotencyKey,
+            "X-Idempotency-Key": idempotencyKey,
           },
         }),
       { ttlMs: 15000 },
@@ -152,15 +208,29 @@ export const financeService = {
   },
 
   getStats: async () => {
-    const response = await api.get<ApiResponse<FinanceOverviewStats>, ApiResponse<FinanceOverviewStats>>('/finance/stats');
+    const response = await api.get<
+      ApiResponse<FinanceOverviewStats>,
+      ApiResponse<FinanceOverviewStats>
+    >("/finance/stats");
     return response.data || DEFAULT_FINANCE_STATS;
   },
 
-  exportReportPdf: async (type: FinanceReportPdfType, fallbackFilename?: string) => {
+  getReceivableReconciliation: async (year?: number, month?: number) => {
+    const response = await api.get<
+      ApiResponse<ReceivableReconciliation | null>,
+      ApiResponse<ReceivableReconciliation | null>
+    >("/finance/receivable-reconciliation", { params: { year, month } });
+    return response.data || null;
+  },
+
+  exportReportPdf: async (
+    type: FinanceReportPdfType,
+    fallbackFilename?: string,
+  ) => {
     const token = getAuthToken();
     const response = await fetch(`/api/v1/system/export/${type}/pdf`, {
       headers: {
-        Authorization: token ? `Bearer ${token}` : '',
+        Authorization: token ? `Bearer ${token}` : "",
       },
     });
     await downloadResponseBlob(response, fallbackFilename || `${type}.pdf`);

@@ -1,5 +1,9 @@
+/** 旧货柜接口复用出口合同状态机及出库事务；创建仅为草稿，表头不能绕过状态流转。 */
 const prisma = require('../utils/prisma');
+const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
 const { createError } = require('../middleware/errorHandler');
+const { getSalesCargoState, assertSalesCargoMutable, assertSalesCargoUpdate } = require('./salesCargoLifecycle');
+const { SALES_STATUS, normalizeSalesStatus } = require('./salesStateMachine');
 const {
   generateNextContractNo,
   normalizeFilterStatus,
@@ -291,7 +295,10 @@ const getById = async (id) => {
 };
 
 const create = async (data = {}) => {
-  const status = normalizeFilterStatus(data.status || 'DRAFT');
+  const status = data.status === undefined ? SALES_STATUS.DRAFT : normalizeSalesStatus(data.status);
+  if (status !== SALES_STATUS.DRAFT) {
+    throw createError('新货柜必须为草稿，请通过状态入口登记后续流转', 400);
+  }
   const contractNo = data.contractNo || (await generateNextContainerNo(data.portId));
   const exchangeRate = parseNullableNumber(data.exchangeRate, 7.0);
 
@@ -321,7 +328,6 @@ const create = async (data = {}) => {
 const update = async (id, data = {}) => {
   const updateData = {};
   if (data.portId !== undefined) updateData.portId = data.portId;
-  if (data.status !== undefined) updateData.status = normalizeFilterStatus(data.status);
   if (data.contractNo !== undefined) updateData.contractNo = data.contractNo;
   if (data.signedAt !== undefined) updateData.signedAt = data.signedAt ? new Date(data.signedAt) : null;
   if (data.estimatedArrival !== undefined) {
@@ -340,24 +346,32 @@ const update = async (id, data = {}) => {
     updateData.exchangeRate = parseNullableNumber(data.exchangeRate);
   }
 
-  const contract = await prisma.salesContract.update({
-    where: { id },
-    data: updateData,
+  return prisma.$transaction(async tx => {
+    // Keep legacy full-header saves compatible when their status is unchanged.
+    // A state change must use the shared transition/shipment transaction instead.
+    if (data.status !== undefined) {
+      const current = await tx.salesContract.findUnique({ where: { id }, select: { status: true } });
+      if (!current) throw createError('货柜不存在', 404);
+      if (normalizeSalesStatus(data.status) !== normalizeSalesStatus(current.status)) {
+        throw createError('请通过状态入口变更货柜状态，表头资料不能跳过业务流转', 400);
+      }
+    }
+    return tx.salesContract.update({ where: { id }, data: updateData });
   });
-
-  return contract;
 };
 
-const remove = async (id) => {
-  await prisma.salesContract.delete({ where: { id } });
-};
+const remove = async (id) => prisma.$transaction(async (tx) => {
+  assertSalesCargoMutable(await getSalesCargoState(tx, id));
+  await tx.salesContract.delete({ where: { id } });
+});
 
-const addItem = async (id, data) => {
+const addItem = async (id, data) => prisma.$transaction(async (tx) => {
+  assertSalesCargoMutable(await getSalesCargoState(tx, id));
   const quantity = parseNullableNumber(data.quantity, 0);
   const unitPrice = parseNullableNumber(data.unitPrice, null);
   const totalPrice = unitPrice === null ? null : unitPrice * (quantity || 0);
 
-  const item = await prisma.packingItem.create({
+  const item = await tx.packingItem.create({
     data: {
       salesContractId: id,
       productId: data.productId,
@@ -378,21 +392,12 @@ const addItem = async (id, data) => {
     include: { product: true },
   });
 
-  await recalculateContainerStats(id);
+  await recalculateContainerStats(id, tx);
   return item;
-};
+});
 
-const updateStatus = async (id, status) => {
-  const contract = await prisma.salesContract.update({
-    where: { id },
-    data: {
-      status: normalizeFilterStatus(status),
-      ...(status === 'SHIPPED' ? { shippedAt: new Date() } : {}),
-    },
-  });
-
-  return contract;
-};
+// Both routes operate on SalesContract; do not maintain a second state machine.
+const updateStatus = (id, status) => require('./salesService').updateSalesStatus(id, status);
 
 const getNextContainerNo = async (portId) => {
   const contractNo = await generateNextContainerNo(portId);
@@ -491,10 +496,10 @@ const getVisualization = async (id) => {
   };
 };
 
-const updateItem = async (id, itemId, data = {}) => {
-  const item = await prisma.packingItem.findUnique({
-    where: { id: itemId },
-    select: { quantity: true, unitPrice: true },
+const updateItem = async (id, itemId, data = {}) => prisma.$transaction(async (tx) => {
+  const item = await tx.packingItem.findFirst({
+    where: { id: itemId, salesContractId: id },
+    select: { purchaseItemId: true, quantity: true, unit: true, unitPrice: true, boxes: true, grossWeight: true, netWeight: true, volume: true, length: true, width: true, height: true },
   });
   if (!item) {
     throw createError('装箱明细不存在', 404);
@@ -538,26 +543,30 @@ const updateItem = async (id, itemId, data = {}) => {
     updateData.unitPrice = parseNullableNumber(data.unitPrice, null);
   }
 
+  assertSalesCargoUpdate(await getSalesCargoState(tx, id), item, updateData);
   const nextQuantity = updateData.quantity ?? item.quantity;
   const nextUnitPrice = updateData.unitPrice ?? item.unitPrice;
   if (nextUnitPrice !== undefined) {
     updateData.totalPrice = nextUnitPrice === null ? null : nextUnitPrice * nextQuantity;
   }
 
-  const updatedItem = await prisma.packingItem.update({
+  const updatedItem = await tx.packingItem.update({
     where: { id: itemId },
     data: { ...updateData },
     include: { product: true },
   });
 
-  await recalculateContainerStats(id);
+  await recalculateContainerStats(id, tx);
   return updatedItem;
-};
+});
 
-const removeItem = async (id, itemId) => {
-  await prisma.packingItem.delete({ where: { id: itemId } });
-  await recalculateContainerStats(id);
-};
+const removeItem = async (id, itemId) => prisma.$transaction(async (tx) => {
+  const item = await tx.packingItem.findFirst({ where: { id: itemId, salesContractId: id }, select: { id: true } });
+  if (!item) throw createError('装箱明细不存在', 404);
+  assertSalesCargoMutable(await getSalesCargoState(tx, id));
+  await tx.packingItem.delete({ where: { id: itemId } });
+  await recalculateContainerStats(id, tx);
+});
 
 /**
  * 职责：获取货柜所有装箱明细行，含商品和门店信息
@@ -636,20 +645,26 @@ const getItemsSummary = async (id) => {
   };
 };
 
-const recalculateContainerStats = async (salesContractId) => {
-  const stats = await prisma.packingItem.aggregate({
-    where: { salesContractId },
-    _sum: { boxes: true, grossWeight: true, netWeight: true, volume: true, totalPrice: true },
-  });
+const recalculateContainerStats = async (salesContractId, prismaClient = prisma) => {
+  const [contract, stats] = await Promise.all([
+    prismaClient.salesContract.findUnique({
+      where: { id: salesContractId },
+      select: { amountSource: true },
+    }),
+    prismaClient.packingItem.aggregate({
+      where: { salesContractId },
+      _sum: { boxes: true, grossWeight: true, netWeight: true, volume: true, totalPrice: true },
+    }),
+  ]);
 
-  await prisma.salesContract.update({
+  await prismaClient.salesContract.update({
     where: { id: salesContractId },
     data: {
       totalBoxes: stats._sum.boxes || 0,
       grossWeight: stats._sum.grossWeight || 0,
       netWeight: stats._sum.netWeight || 0,
       volume: stats._sum.volume || 0,
-      totalAmount: stats._sum.totalPrice || 0,
+      ...buildDerivedSalesAmountUpdate(contract, stats._sum.totalPrice || 0),
     },
   });
 };

@@ -1,11 +1,12 @@
 /**
  * Input: HTTP请求、dataImportService
  * Output: 数据导入相关的API响应
- * Pos: 数据导入控制器，处理CSV上传、解析、对比、导入请求
+ * Pos: 数据导入控制器，处理CSV/xlsx上传、解析、对比、导入请求
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
+const { parseTabularFile } = require('../utils/tabularImport');
 const dataImportService = require('../services/dataImportService');
 const { success, error } = require('../utils/response');
 
@@ -18,12 +19,11 @@ const previewImport = async (req, res, next) => {
   try {
     // 0. 检查文件上传
     if (!req.file) {
-      return error(res, 'CSV文件未上传', 400);
+      return error(res, 'CSV/xlsx 文件未上传', 400);
     }
     
     // 1. 解析CSV内容
-    const csvContent = req.file.buffer.toString('utf-8');
-    const parsed = dataImportService.parseCSV(csvContent);
+    const parsed = await parseTabularFile(req.file);
     
     if (parsed.errors.length > 0) {
       return error(res, 'CSV解析错误', 400, parsed.errors);

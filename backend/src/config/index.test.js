@@ -26,10 +26,11 @@ const loadConfigWithEnv = (overrides) => {
   });
 
   delete require.cache[require.resolve('./index')];
-  const config = require('./index');
-
-  process.env = originalEnv;
-  return config;
+  try {
+    return require('./index');
+  } finally {
+    process.env = originalEnv;
+  }
 };
 
 test('config: 读取默认值', () => {
@@ -40,6 +41,7 @@ test('config: 读取默认值', () => {
     JWT_EXPIRES_IN: '',
     KIMI_API_KEY: '',
     KIMI_BASE_URL: '',
+    AI_PROVIDER: 'kimi',
     UPLOAD_DIR: '',
     MAX_FILE_SIZE: '',
     CORS_ORIGIN: '',
@@ -65,6 +67,7 @@ test('config: 读取环境变量覆盖', () => {
     JWT_EXPIRES_IN: '1h',
     KIMI_API_KEY: 'kimi-key',
     KIMI_BASE_URL: 'https://example.com',
+    AI_PROVIDER: 'kimi',
     UPLOAD_DIR: './files',
     MAX_FILE_SIZE: '2048',
     CORS_ORIGIN: 'http://localhost:3000,https://test.example.com',
@@ -80,4 +83,61 @@ test('config: 读取环境变量覆盖', () => {
   assert.equal(config.upload.maxSize, 2048);
   assert.deepEqual(config.cors.origin, ['http://localhost:3000', 'https://test.example.com']);
   assert.equal(config.cors.credentials, true);
+});
+
+test('config: DeepSeek 是独立活动配置，不覆盖保留的 Kimi 配置', () => {
+  const config = loadConfigWithEnv({
+    AI_PROVIDER: 'deepseek',
+    DEEPSEEK_API_KEY: 'non-production-deepseek-test-placeholder',
+    DEEPSEEK_BASE_URL: 'https://api.deepseek.com',
+    KIMI_API_KEY: 'non-production-kimi-test-placeholder',
+    JWT_SECRET: 'test-secret-with-32-chars--xxxxxxxx',
+  });
+  assert.equal(config.ai.provider, 'deepseek');
+  assert.equal(config.ai.baseUrl, 'https://api.deepseek.com');
+  assert.equal(config.ai.apiKey, 'non-production-deepseek-test-placeholder');
+  assert.equal(config.kimi.apiKey, 'non-production-kimi-test-placeholder');
+  assert.notEqual(config.ai, config.kimi);
+});
+
+test('config: 未知供应商在启动时拒绝，Kimi 活动配置复用原对象', () => {
+  assert.throws(() => loadConfigWithEnv({ AI_PROVIDER: 'unsupported-provider' }), /AI_PROVIDER/);
+  const config = loadConfigWithEnv({ AI_PROVIDER: 'kimi', JWT_SECRET: 'test-secret-with-32-chars--xxxxxxxx' });
+  assert.equal(config.ai, config.kimi);
+});
+
+// Synthetic configuration only; never sent to a provider.
+test('config: 邮箱服务允许关闭，但拒绝部分配置与无效发信地址', () => {
+  const base = { JWT_SECRET: require('crypto').randomBytes(32).toString('hex'), ALIBABA_CLOUD_ACCESS_KEY_ID: '', ALIBABA_CLOUD_ACCESS_KEY_SECRET: '', JIESONG_EMAIL_FROM: '' };
+  assert.doesNotThrow(() => loadConfigWithEnv(base));
+  assert.throws(() => loadConfigWithEnv({ ...base, ALIBABA_CLOUD_ACCESS_KEY_ID: 'synthetic-id' }), /邮箱注册需完整配置/);
+  assert.throws(() => loadConfigWithEnv({ ...base, ALIBABA_CLOUD_ACCESS_KEY_ID: 'synthetic-id', ALIBABA_CLOUD_ACCESS_KEY_SECRET: 'synthetic-secret', JIESONG_EMAIL_FROM: 'invalid' }), /邮箱注册需完整配置/);
+});
+
+test('config: 生产环境先验证文件权限，再读取环境密钥', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const vm = require('node:vm');
+  let environmentReads = 0;
+  const context = {
+    module: { exports: {} }, __dirname,
+    process: { env: { NODE_ENV: 'production' } }, console,
+    require: (name) => {
+      if (name === 'fs') return { statSync: () => ({ mode: 0o644 }) };
+      if (name === 'dotenv') return { config: () => { environmentReads++; return {}; } };
+      return require(name);
+    },
+  };
+  assert.throws(() => vm.runInNewContext(fs.readFileSync(path.join(__dirname, 'index.js'), 'utf8'), context), /权限过宽/);
+  assert.equal(environmentReads, 0);
+});
+
+test('config: 代理信任默认关闭，仅接受明确 IP/CIDR，非法配置启动拒绝', () => {
+  const base = { JWT_SECRET: 'test-only-jwt-secret-for-ci-123456', TRUSTED_PROXY_CIDRS: '' };
+  assert.deepEqual(loadConfigWithEnv(base).trustedProxyCidrs, []);
+  assert.deepEqual(loadConfigWithEnv({ ...base, TRUSTED_PROXY_CIDRS: '127.0.0.1/32, ::1/128,127.0.0.1/32' }).trustedProxyCidrs,
+    ['127.0.0.1/32', '::1/128']);
+  for (const value of ['true', '1', 'loopback', '*', '0.0.0.0/0', '::/0', '127.0.0.1/33', '::1/129', '127.0.0.1/', '127.0.0.1,,::1', 'not-an-ip']) {
+    assert.throws(() => loadConfigWithEnv({ ...base, TRUSTED_PROXY_CIDRS: value }), /TRUSTED_PROXY_CIDRS/);
+  }
 });

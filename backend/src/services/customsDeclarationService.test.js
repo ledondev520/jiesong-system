@@ -143,3 +143,26 @@ test('removeCustomsDeclaration: 记录存在时执行删除', async () => {
     assert.deepEqual(deleteArgs, { where: { id: 'cd-4' } });
   });
 });
+
+test('详情读取包含有序商品明细', async () => {
+  await withMockDelegate('customsDeclaration', { findUnique: async (args) => {
+    assert.deepEqual(args.include.items, { orderBy: { itemNo: 'asc' } });
+    return { id: 'cd', items: [{ id: 'line' }] };
+  } }, async () => assert.equal((await customsDeclarationService.getCustomsDeclarationById('cd')).items.length, 1));
+});
+
+test('创建把真实商品字段作为嵌套明细写入', async () => {
+  await withMockDelegate('customsDeclaration', { create: async ({ data }) => {
+    assert.equal(data.items.create[0].customsName, '测试商品');
+    assert.equal(data.items.create[0].productId, 'p1');
+    assert.equal(data.items.create[0].quantity, 2);
+    return data;
+  } }, async () => customsDeclarationService.createCustomsDeclaration({
+    declarationNo: 'TEST', salesContractId: 's1', items: [{ productId: 'p1', customsName: '测试商品', quantity: '2' }],
+  }));
+});
+
+test('无效数字和过时字段返回400，不向Prisma传递', async () => {
+  await assert.rejects(() => customsDeclarationService.createCustomsDeclaration({ exporter: 'old' }), e => e.statusCode === 400);
+  await assert.rejects(() => customsDeclarationService.createCustomsDeclaration({ totalAmount: 'bad' }), e => e.statusCode === 400);
+});

@@ -1,6 +1,6 @@
 /**
  * Input: sales、packingListCheck 与单柜财务服务层
- * Output: 出口合同、装箱单核对、退税准备和单柜财务结算 HTTP 适配
+ * Output: 出口合同及模板明细原子创建、装箱单核对、退税准备和单柜财务结算 HTTP 适配；附件复用财务凭证访问边界
  * Pos: 纯路由适配层，业务逻辑收敛至 services Module
  */
 
@@ -19,10 +19,10 @@ const exportPacketService = require('../services/exportPacketService');
 const list = async (req, res, next) => {
   try {
     const { page, pageSize } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
-    const { status, storeId, keyword } = req.query;
+    const { status, storeId, keyword, shipped, shippedFrom, shippedTo } = req.query;
     const lite = req.query.lite === 'true' || req.query.lite === true;
 
-    const result = await salesService.getSalesContracts({ page, pageSize, status, storeId, keyword, lite });
+    const result = await salesService.getSalesContracts({ page, pageSize, status, storeId, keyword, shipped, shippedFrom, shippedTo, lite });
     paginated(res, result.contracts, result.total, page, pageSize);
   } catch (error) {
     next(error);
@@ -56,22 +56,23 @@ const create = async (req, res, next) => {
       };
     }
 
-    const contract = await salesService.createSalesContract(data);
-
-    // 如果模板包含明细，自动添加
+    // 模板明细与表头一并创建；不能在表头提交后留下部分明细。
     if (template && template.items && template.items.length > 0) {
-      for (const item of template.items) {
-        await salesService.addSalesItem(contract.id, {
-          productId: item.productId,
-          storeId: item.storeId,
-          quantity: item.quantity,
-          unit: item.unit,
-          costPrice: item.costPrice,
-          sellingPrice: item.sellingPrice,
-          note: item.note,
-        });
-      }
+      data.items = data.items ?? template.items.map(item => ({
+        productId: item.productId,
+        storeId: item.storeId,
+        quantity: item.quantity,
+        unit: item.unit,
+        costPrice: item.costPrice,
+        sellingPrice: item.sellingPrice,
+        note: item.note,
+      }));
     }
+
+    const contract = await salesService.createSalesContract(data, {
+      idempotencyKey: req.headers?.['x-idempotency-key'],
+      actor: req.authActor,
+    });
 
     created(res, contract, '出口合同创建成功');
   } catch (error) {
@@ -277,6 +278,7 @@ const deleteFile = async (req, res, next) => {
 
     const file = await fileService.findFileById(fileId);
     if (!file || file.contractType !== fileService.CONTRACT_TYPE.SALES) throw createError('文件不存在', 404);
+    fileService.assertFileAccess(file, req.user);
     await fileService.deleteFileRecord(fileId);
 
     success(res, null, '文件删除成功');
@@ -293,6 +295,7 @@ const downloadFile = async (req, res, next) => {
 
     const file = await fileService.findFileById(fileId);
     if (!file || file.contractType !== fileService.CONTRACT_TYPE.SALES) throw createError('文件不存在', 404);
+    fileService.assertFileAccess(file, req.user);
 
     const absolutePath = path.isAbsolute(file.filePath)
       ? file.filePath

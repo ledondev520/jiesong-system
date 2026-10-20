@@ -1,6 +1,6 @@
 /**
  * Input: Prisma客户端、JWT、bcrypt
- * Output: 认证相关业务逻辑（登录、注册、密码管理、找回密码）
+ * Output: 认证相关业务逻辑（版本化登录会话、注册、统一密码管理、邮箱找回密码）
  * Pos: 认证服务，处理用户认证和授权逻辑
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -9,9 +9,11 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const prisma = require('../utils/prisma');
+const { clearAuthCache } = require('../middleware/auth');
+const { ROLES } = require('../config/constants');
 const config = require('../config');
 const { createError } = require('../middleware/errorHandler');
-const { log: auditLog } = require('../utils/auditLog');
+const { assertPassword } = require('../utils/passwordPolicy');
 
 /**
  * 职责：用户登录验证并生成Token
@@ -26,16 +28,15 @@ const { log: auditLog } = require('../utils/auditLog');
  */
 const login = async (username, password) => {
   // 1. 查找用户
-  const user = await prisma.user.findUnique({
-    where: { username },
-  });
+  const user = await prisma.user.findUnique({ where: { username } })
+    || (username.includes('@') ? await prisma.user.findUnique({ where: { username: username.toLowerCase() } }) : null);
   
   if (!user) {
     throw createError('用户名或密码错误', 401);
   }
   
   if (!user.isActive) {
-    throw createError('账号已被禁用', 401);
+    throw createError('账号尚未开通或已停用，请联系管理员审核', 401);
   }
   
   // 2. 验证密码
@@ -46,7 +47,7 @@ const login = async (username, password) => {
   
   // 3. 生成Token
   const token = jwt.sign(
-    { userId: user.id, role: user.role },
+    { userId: user.id, role: user.role, sessionVersion: user.sessionVersion },
     config.jwt.secret,
     { expiresIn: config.jwt.expiresIn }
   );
@@ -58,7 +59,7 @@ const login = async (username, password) => {
   });
   
   // 5. 返回结果（排除密码）
-  const { password: _, ...userWithoutPassword } = user;
+  const { password: _, sessionVersion: _version, ...userWithoutPassword } = user;
   return {
     token,
     user: userWithoutPassword,
@@ -76,6 +77,8 @@ const login = async (username, password) => {
  */
 const register = async (userData) => {
   const { username, password, name, role = 'SALES', email, phone } = userData;
+  assertPassword(password);
+  if (!Object.values(ROLES).includes(role)) throw createError('角色无效', 400);
   
   // 1. 检查用户名
   const existing = await prisma.user.findUnique({
@@ -114,63 +117,8 @@ const register = async (userData) => {
   return user;
 };
 
-/**
- * 职责：公开注册新用户（用户自助注册）
- * 思路：
- * 1. 检查用户名是否已存在
- * 2. 检查手机号是否已被使用
- * 3. 加密密码
- * 4. 创建用户记录（默认角色SALES，默认未激活）
- * @param {Object} userData - 用户数据
- * @returns {Object} 创建的用户（不含密码）
- */
-const publicRegister = async (userData) => {
-  const { username, password, name, phone } = userData;
-  
-  // 1. 检查用户名
-  const existingUsername = await prisma.user.findUnique({
-    where: { username },
-  });
-  
-  if (existingUsername) {
-    throw createError('用户名已被使用，请尝试其他用户名', 400);
-  }
-  
-  // 2. 检查手机号
-  const existingPhone = await prisma.user.findFirst({
-    where: { phone },
-  });
-  
-  if (existingPhone) {
-    throw createError('该手机号已被注册', 400);
-  }
-  
-  // 3. 加密密码
-  const hashedPassword = await bcrypt.hash(password, 12);
-  
-  // 4. 创建用户（默认未激活，需管理员审核）
-  const user = await prisma.user.create({
-    data: {
-      username,
-      password: hashedPassword,
-      name,
-      phone,
-      role: 'SALES',       // 默认角色
-      isActive: false,     // 默认未激活，需审核
-    },
-    select: {
-      id: true,
-      username: true,
-      name: true,
-      role: true,
-      phone: true,
-      isActive: true,
-      createdAt: true,
-    },
-  });
-  
-  return user;
-};
+/** 邮箱验证后创建待审核账号；所有自助注册共用同一验证入口。 */
+const publicRegister = (userData) => require('./emailRegistrationService').register(userData);
 
 /**
  * 职责：根据ID获取用户信息
@@ -208,6 +156,7 @@ const getUserById = async (id) => {
  * @param {string} newPassword - 新密码
  */
 const changePassword = async (userId, oldPassword, newPassword) => {
+  assertPassword(newPassword);
   const user = await prisma.user.findUnique({
     where: { id: userId },
   });
@@ -222,10 +171,17 @@ const changePassword = async (userId, oldPassword, newPassword) => {
   }
   
   const hashedPassword = await bcrypt.hash(newPassword, 12);
-  await prisma.user.update({
-    where: { id: userId },
-    data: { password: hashedPassword },
-  });
+  let updated;
+  try {
+    updated = await prisma.user.updateMany({
+      where: { id: userId, password: user.password, isActive: true },
+      data: { password: hashedPassword, sessionVersion: { increment: 1 } },
+    });
+  } catch {
+    // Do not forward password-bearing Prisma diagnostics to the HTTP error logger.
+    throw createError('密码修改暂不可用，请稍后重试', 503);
+  }
+  if (updated.count !== 1) throw createError('账号状态或密码已变更，请重新登录', 400);
 };
 
 /**
@@ -268,6 +224,7 @@ const getUsers = async (page = 1, pageSize = 20) => {
  */
 const updateUser = async (id, userData) => {
   const { name, role, email, phone, isActive } = userData;
+  if (role !== undefined && !Object.values(ROLES).includes(role)) throw createError('角色无效', 400);
   
   const user = await prisma.user.update({
     where: { id },
@@ -277,6 +234,7 @@ const updateUser = async (id, userData) => {
       email,
       phone,
       isActive,
+      ...(email !== undefined ? { sessionVersion: { increment: 1 } } : {}),
     },
     select: {
       id: true,
@@ -290,52 +248,12 @@ const updateUser = async (id, userData) => {
     },
   });
   
+  clearAuthCache(id);
   return user;
 };
 
-/**
- * 职责：验证用户身份并重置密码（找回密码功能）
- * 思路：
- * 1. 通过用户名查找用户
- * 2. 验证手机号是否匹配
- * 3. 验证通过后更新密码
- * @param {string} username - 用户名
- * @param {string} phone - 注册时绑定的手机号
- * @param {string} newPassword - 新密码
- * @returns {Object} 操作结果
- */
-const verifyAndResetPassword = async (username, phone, newPassword) => {
-  // 1. 查找用户
-  const user = await prisma.user.findUnique({
-    where: { username },
-  });
-  
-  if (!user) {
-    throw createError('用户名不存在', 404);
-  }
-  
-  // 2. 验证手机号
-  if (!user.phone || user.phone !== phone) {
-    throw createError('手机号与注册信息不匹配', 400);
-  }
-  
-  // 3. 检查账号状态
-  if (!user.isActive) {
-    throw createError('该账号已被禁用，请联系管理员', 403);
-  }
-  
-  // 4. 加密新密码并更新
-  const hashedPassword = await bcrypt.hash(newPassword, 12);
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { password: hashedPassword },
-  });
-  
-  // 5. 记录操作日志
-  await auditLog.action(user.id, 'RESET_PASSWORD', 'User', user.id, null, null);
-  
-  return { username: user.username, name: user.name };
-};
+/** 邮箱持有验证、验证码消费及会话撤销在同一事务中完成。 */
+const verifyAndResetPassword = (payload) => require('./passwordResetService').resetPassword(payload);
 
 module.exports = {
   login,

@@ -8,7 +8,9 @@
 
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { notificationLink } from '@/lib/notification-link';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/lib/hooks/useTableSort';
 import { CheckCircle2, Search, X } from 'lucide-react';
@@ -49,6 +51,8 @@ const typeLabelMap: Record<string, string> = {
 const getTypeLabel = (type: string) => typeLabelMap[type] || type || '-';
 
 export default function SystemNotificationsPage() {
+  const requestId = useRef(0);
+  const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<SystemNotificationItem[]>([]);
   const [filter, setFilter] = useState<NotificationFilter>('all');
@@ -61,43 +65,36 @@ export default function SystemNotificationsPage() {
   const [keyword, setKeyword] = useState('');
 
   const loadNotifications = useCallback(async () => {
+    const currentRequest = ++requestId.current;
     setLoading(true);
+    setError(false);
     try {
       const response = await getSystemNotifications({
-        page: 1,
-        pageSize: 50,
+        page: currentPage,
+        pageSize,
+        keyword: keyword.trim() || undefined,
         unreadOnly: filter === 'unread',
       });
+      if (currentRequest !== requestId.current) return;
       const items = response.data?.items || [];
       setNotifications(Array.isArray(items) ? items : []);
       setTotal(response.data?.pagination?.total || 0);
       setUnreadCount(response.data?.unreadCount || 0);
     } catch {
+      if (currentRequest !== requestId.current) return;
+      setError(true);
       toast.error('加载通知失败');
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
-  }, [filter]);
+  }, [filter, currentPage, pageSize, keyword]);
 
   useEffect(() => {
     loadNotifications();
   }, [loadNotifications]);
 
-  const filteredNotifications = useMemo(() => {
-    let result = filter === 'unread' ? notifications.filter((item) => !item.isRead) : notifications;
-    if (keyword.trim()) {
-      const q = keyword.toLowerCase().trim();
-      result = result.filter(
-        (item) =>
-          (item.content || '').toLowerCase().includes(q) ||
-          (item.type || '').toLowerCase().includes(q)
-      );
-    }
-    return result;
-  }, [filter, notifications, keyword]);
-
   const sort = useTableSort<SystemNotificationItem, string>(
-    filteredNotifications,
+    notifications,
     useCallback((item, key) => {
       switch (key) {
         case 'createdAt':
@@ -112,15 +109,14 @@ export default function SystemNotificationsPage() {
     }, [])
   );
 
-  const totalPages = Math.ceil(sort.sortedData.length / pageSize);
-  const pagedNotifications = sort.sortedData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const pagedNotifications = sort.sortedData;
 
   const handleMarkRead = async (id: string) => {
     setMarkingId(id);
     try {
       await markSystemNotificationRead(id);
-      setNotifications((prev) => prev.map((item) => (item.id === id ? { ...item, isRead: true } : item)));
-      setUnreadCount((prev) => Math.max(0, prev - 1));
+      await loadNotifications();
       toast.success('已标记为已读');
     } catch {
       toast.error('标记失败');
@@ -162,14 +158,14 @@ export default function SystemNotificationsPage() {
         <CardHeader>
           <CardTitle>通知列表</CardTitle>
           <CardDescription>
-            共 {total} 条通知，未读 {unreadCount} 条
+            服务端搜索全部历史通知；排序仅作用于当前页。共 {total} 条通知，未读 {unreadCount} 条
           </CardDescription>
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 className="pl-9 h-9"
-                placeholder="搜索内容、类型..."
+                placeholder="搜索标题、内容、类型..."
                 value={keyword}
                 onChange={(e) => {
                   setKeyword(e.target.value);
@@ -193,6 +189,7 @@ export default function SystemNotificationsPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {error && <div role="alert" className="mb-4 rounded-md border border-destructive/30 p-3 text-sm text-destructive">通知读取失败，保留已加载结果。<Button variant="outline" size="sm" onClick={loadNotifications}>重试</Button></div>}
           <div className="md:hidden space-y-3">
             {loading ? (
               <div className="surface-panel py-12 text-center text-sm text-muted-foreground">加载中...</div>
@@ -201,7 +198,7 @@ export default function SystemNotificationsPage() {
             ) : (
               pagedNotifications.map((item) => {
                 const contentPreview = item.content
-                  ? item.content.length > 72 ? `${item.content.slice(0, 72)}…` : item.content
+                  ? item.content
                   : '-';
                 return (
                   <MobileListCard
@@ -218,6 +215,7 @@ export default function SystemNotificationsPage() {
                     }
                     fields={[
                       { label: '时间', value: formatDateTime(item.createdAt) },
+                      ...(notificationLink(item) ? [{ label: '业务明细', value: <Link className="text-primary underline" href={notificationLink(item)!}>打开业务明细</Link> }] : []),
                     ]}
                     action={
                       !item.isRead ? (
@@ -287,7 +285,7 @@ export default function SystemNotificationsPage() {
                       <TableCell>
                         <Badge variant="outline">{getTypeLabel(item.type)}</Badge>
                       </TableCell>
-                      <TableCell>{item.title || '-'}</TableCell>
+                      <TableCell>{notificationLink(item) ? <Link className="text-primary underline" href={notificationLink(item)!}>{item.title || '打开业务明细'}</Link> : item.title || '-'}</TableCell>
                       <TableCell className="max-w-[420px] whitespace-pre-wrap break-words text-sm text-muted-foreground">
                         {item.content || '-'}
                       </TableCell>
@@ -319,7 +317,7 @@ export default function SystemNotificationsPage() {
           </div>
           {/* 分页控制 */}
           <div className="mt-4 flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span>共 {sort.sortedData.length} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
+            <span>共 {total} 条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ''}</span>
             <div className="flex items-center gap-2">
               <PageSizeSelect
                 value={pageSize}

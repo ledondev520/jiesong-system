@@ -1,6 +1,6 @@
 /**
  * Input: Prisma client、InvoiceRecord / FinanceDataBatch 模型
- * Output: 发票查询、统计接口
+ * Output: 发票查询、统计接口（筛选条件与有效/红冲分类取交集）
  * Pos: 财务模块-发票记录业务逻辑层
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -82,9 +82,7 @@ async function getStats(filters = {}) {
   const baseWhere = buildInvWhere(filters);
 
   // 0. 有效发票 = 状态正常 且 正数（在已筛选的基础上）
-  const validWhere = { ...baseWhere };
-  if (!filters.status) validWhere.status = '正常';
-  if (!filters.isPositive) validWhere.isPositive = '是';
+  const validWhere = { AND: [baseWhere, { status: '正常', isPositive: '是' }] };
   const validResult = await prisma.invoiceRecord.aggregate({
     where: validWhere,
     _sum: { total: true, tax: true, amount: true },
@@ -92,8 +90,7 @@ async function getStats(filters = {}) {
   });
 
   // 1. 已红冲
-  const reversedWhere = { ...baseWhere };
-  if (!filters.status) reversedWhere.status = { contains: '红冲' };
+  const reversedWhere = { AND: [baseWhere, { status: { contains: '红冲' } }] };
   const reversedCount = await prisma.invoiceRecord.count({ where: reversedWhere });
 
   // 2. 全部记录数

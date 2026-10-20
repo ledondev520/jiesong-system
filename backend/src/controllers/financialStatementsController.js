@@ -35,7 +35,9 @@ const getStatementDetail = async (req, res) => {
     if (isNaN(year) || isNaN(month)) {
       return res.status(400).json({ code: 400, message: '年份或月份参数无效' });
     }
-    const data = await financialStatementsService.getPeriodDetail(year, month);
+    // 行级账簿与来源文件元数据仅允许ADMIN/FINANCE，在加载之前收窄查询。
+    const includeEvidence = ['ADMIN', 'FINANCE'].includes(req.user?.role);
+    const data = await financialStatementsService.getPeriodDetail(year, month, undefined, { includeEvidence });
     if (!data) {
       return res.status(404).json({ code: 404, message: '未找到该账期数据' });
     }

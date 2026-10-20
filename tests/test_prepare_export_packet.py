@@ -1,7 +1,10 @@
 import importlib.util
 import math
 import sys
+import sqlite3
+import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 
@@ -11,6 +14,50 @@ MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
+
+
+class PathConfigurationTests(unittest.TestCase):
+    arguments = ["--contract", "SYNTHETIC", "--spot-rate", "7", "--refund-dbf", "synthetic.dbf"]
+
+    def test_portable_defaults(self):
+        with patch.dict("os.environ", {}, clear=True):
+            args = MODULE.parse_args(self.arguments)
+        self.assertEqual(args.database, MODULE.DEFAULT_DB)
+        self.assertEqual(args.history_root, MODULE.DEFAULT_HISTORY_ROOT)
+        self.assertNotIn("com.kingsoft.wpsoffice", str(args.history_root))
+
+    def test_environment_and_cli_precedence(self):
+        with patch.dict("os.environ", {"JIESONG_EXPORT_DATABASE": "/tmp/synthetic.db",
+                                       "JIESONG_HISTORY_ROOT": "/tmp/synthetic-history"}):
+            args = MODULE.parse_args(self.arguments)
+            self.assertEqual(args.database, Path("/tmp/synthetic.db").resolve())
+            self.assertEqual(args.history_root, Path("/tmp/synthetic-history").resolve())
+            args = MODULE.parse_args(self.arguments + ["--database", "/tmp/override.db",
+                                                       "--history-root", "/tmp/override-history"])
+            self.assertEqual(args.database, Path("/tmp/override.db").resolve())
+            self.assertEqual(args.history_root, Path("/tmp/override-history").resolve())
+
+    def test_home_expansion_and_relative_paths(self):
+        with tempfile.TemporaryDirectory() as folder, patch.dict("os.environ", {}, clear=True):
+            self.assertEqual(MODULE.configured_path('~/synthetic-history'), (Path.home() / 'synthetic-history').resolve())
+            self.assertEqual(MODULE.configured_path('synthetic-relative.db'), (Path.cwd() / 'synthetic-relative.db').resolve())
+
+
+class ReadOnlySourceTests(unittest.TestCase):
+    def test_missing_database_is_never_created(self):
+        with tempfile.TemporaryDirectory() as folder:
+            database = Path(folder) / 'missing.db'
+            with self.assertRaises(sqlite3.OperationalError):
+                MODULE.fetch_contract_rows(database, 'SYNTHETIC')
+            self.assertFalse(database.exists())
+
+    def test_query_failure_always_closes_source_connection(self):
+        connection = unittest.mock.MagicMock()
+        connection.execute.side_effect = sqlite3.OperationalError('synthetic query failure')
+        with patch.object(MODULE.sqlite3, 'connect', return_value=connection):
+            with self.assertRaises(sqlite3.OperationalError):
+                MODULE.fetch_contract_rows(Path('/synthetic.db'), 'SYNTHETIC')
+        connection.close.assert_called_once()
 
 
 class PricingTests(unittest.TestCase):

@@ -1,32 +1,36 @@
 /**
  * Input: 用户状态、导航配置
- * Output: 顶部导航栏组件
- * Pos: 全局 Header，负责装配移动导航、搜索、通知、用户菜单
+ * Output: 顶部导航栏及等待服务端确认、按认证代次保护的逐浏览器退出
+ * Pos: 全局 Header，移动端使用紧凑搜索入口，负责装配导航、通知、用户菜单
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useSyncExternalStore } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Ship } from 'lucide-react';
-import { useAuthStore } from '@/store/auth.store';
-import { ThemeToggle } from '@/components/layout/ThemeToggle';
-import { getVisibleModuleNavItems } from './navigation.config';
-import { HeaderContextPills } from './HeaderContextPills';
-import { HeaderMobileNav } from './HeaderMobileNav';
-import { HeaderNotifications } from './HeaderNotifications';
-import { HeaderSearch } from './HeaderSearch';
-import { HeaderUserMenu } from './HeaderUserMenu';
+import { getAuthGeneration } from "@/lib/browser-session";
+import { authService } from "@/services/auth.service";
+import { toast } from "sonner";
+
+import { useSyncExternalStore } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Ship } from "lucide-react";
+import { useAuthStore } from "@/store/auth.store";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { getVisibleModuleNavItems } from "./navigation.config";
+import { HeaderContextPills } from "./HeaderContextPills";
+import { HeaderMobileNav } from "./HeaderMobileNav";
+import { HeaderNotifications } from "./HeaderNotifications";
+import { HeaderSearch } from "./HeaderSearch";
+import { HeaderUserMenu } from "./HeaderUserMenu";
 
 const subscribeNoop = () => () => {};
-const headerDateFormatter = new Intl.DateTimeFormat('zh-CN', {
-  timeZone: 'Asia/Shanghai',
-  month: '2-digit',
-  day: '2-digit',
-  weekday: 'short',
+const headerDateFormatter = new Intl.DateTimeFormat("zh-CN", {
+  timeZone: "Asia/Shanghai",
+  month: "2-digit",
+  day: "2-digit",
+  weekday: "short",
 });
 
 export function Header() {
@@ -38,21 +42,33 @@ export function Header() {
   const todayLabel = useSyncExternalStore(
     subscribeNoop,
     () => headerDateFormatter.format(new Date()),
-    () => '',
+    () => "",
   );
 
-  const initials = (user?.name || user?.username || '用')
+  const initials = (user?.name || user?.username || "用")
     .slice(0, 2)
     .toUpperCase();
 
-  const handleLogout = () => {
-    logout();
-    window.location.href = '/login';
+  const handleLogout = async () => {
+    const generation = getAuthGeneration();
+    try {
+      await authService.logout();
+      if (generation !== getAuthGeneration()) return;
+      logout();
+      window.location.href = "/login";
+    } catch {
+      if (generation !== getAuthGeneration()) return;
+      toast.error("退出未完成，请检查网络后重试");
+    }
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-6"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    <header
+      className="sticky top-0 z-30 flex min-h-16 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:gap-4 md:px-6"
+      style={{
+        paddingTop: "env(safe-area-inset-top)",
+        height: "calc(4rem + env(safe-area-inset-top))",
+      }}
     >
       {/* 汉堡菜单：移动端已有底部 TabBar，此处完全隐藏；仅保留 SSR 结构避免 hydration mismatch */}
       <div className="hidden" aria-hidden="true">
@@ -68,24 +84,24 @@ export function Header() {
       {/* 移动端品牌标识（仅移动端展示，桌面端侧边栏已有） */}
       <Link
         href="/dashboard"
-        className="flex items-center gap-2 md:hidden"
+        className="flex min-w-0 flex-1 items-center gap-2 md:hidden"
         aria-label="捷淞国际物流首页"
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
           <Ship className="h-3.5 w-3.5" />
         </span>
-        <span className="text-sm font-semibold">捷淞国际物流</span>
+        <span className="truncate text-sm font-semibold">捷淞国际物流</span>
       </Link>
 
-      <div className="flex flex-1 items-center gap-4">
-        <div className="lg:hidden">
+      <div className="flex min-w-0 shrink-0 items-center gap-4 md:flex-1">
+        <div className="hidden md:block lg:hidden">
           <HeaderContextPills todayLabel={todayLabel} />
         </div>
 
         <HeaderSearch />
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-1 md:gap-2">
         <ThemeToggle />
         <HeaderNotifications />
         {/* 用户菜单：桌面端保留，移动端通过底部TabBar"更多"入口访问 */}

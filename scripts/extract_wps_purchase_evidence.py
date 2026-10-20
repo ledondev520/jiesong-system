@@ -3,7 +3,7 @@
 """
 Input: parsed/attachment_inventory.csv + tmp/wps_11_export_list_raw/11-报关记录
 Output: parsed/purchase_evidence_*.csv/json/md
-Pos: WPS 历史出货采购合同凭证抽取脚本；只抽取供应商、合同头与明细，不写数据库；支持 PDF 文本表格明细抽取，对已人工复核的扫描 PDF 保留路径级 OCR 兜底
+Pos: WPS 历史出货采购合同凭证抽取脚本；只抽取供应商、合同头与明细，不写数据库；保留显式百分号税率语义，支持 PDF 文本表格明细抽取，对已人工复核的扫描 PDF 保留路径级 OCR 兜底
 
 Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
@@ -210,11 +210,13 @@ def parse_number(value: Any) -> float | None:
 
 
 def parse_tax_rate(value: Any) -> int | None:
-    text = clean_text(value).replace("%", "")
+    raw = clean_text(value)
+    explicit_percent = "%" in raw or "％" in raw
+    text = raw.replace("%", "").replace("％", "")
     number = parse_number(text)
     if number is None:
         return None
-    if 0 < number <= 1:
+    if not explicit_percent and 0 < number <= 1:
         number *= 100
     return int(round(number))
 
@@ -543,7 +545,7 @@ def parse_pdf_text_items(text: str, relative_path: str) -> list[dict[str, Any]]:
             "quantity": parse_number(match.group(4)),
             "unit_price": parse_number(match.group(5)),
             "amount_without_tax": parse_number(match.group(6)),
-            "tax_rate": parse_tax_rate(match.group(7)),
+            "tax_rate": parse_tax_rate(match.group(7) + "%"),
             "tax_amount": parse_number(match.group(8)),
             "total_amount": parse_number(match.group(9)),
         })
@@ -573,10 +575,11 @@ def fill_fields(evidence: PurchaseEvidence, text: str, tables: list[list[list[st
             r"总金额为[：:\s|]*￥?\s*([0-9,]+(?:\.\d+)?)\s*元",
         ], one_line))
     if evidence.tax_rate is None:
-        evidence.tax_rate = parse_tax_rate(first_match([
+        rate_text = first_match([
             r"含税[（(]?\s*(\d{1,3})\s*%?\s*增值税",
             r"(\d{1,3})\s*%\s*增值税",
-        ], one_line))
+        ], one_line)
+        evidence.tax_rate = parse_tax_rate(rate_text + "%") if rate_text else None
     evidence.text_preview = one_line[:500]
     return items
 

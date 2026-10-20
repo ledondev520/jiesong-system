@@ -1,6 +1,6 @@
 /**
  * Input: 发票查询 API
- * Output: 发票台账查询页面（表头可排序：开票日期、销方、金额类列）
+ * Output: 发票台账查询页面（手机卡片与可排序桌面表格）
  * Pos: 财务模块-发票台账子页面
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -8,10 +8,12 @@
 
 'use client';
 
+import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
 import { useCallback, useEffect, useState } from 'react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/lib/hooks/useTableSort';
 import { useSearchParams } from 'next/navigation';
+import { MobileListCard } from '@/components/mobile';
 import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -27,6 +29,8 @@ import {
   getInvoices, getInvoiceStats, getBatches,
   type InvoiceRecord, type InvoiceStats, type FinanceDataBatch,
 } from '@/services/bankFlow.service';
+import { ErrorState } from '@/components/ui/data-state';
+import { clearApiGetCache } from '@/lib/axios';
 import { InvoiceImportDialog } from './components/InvoiceImportDialog';
 
 function fmt(n: number) {
@@ -55,9 +59,11 @@ export default function InvoicesPage() {
   const [batches, setBatches] = useState<FinanceDataBatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [importOpen, setImportOpen] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const [invRes, statsRes, batchRes] = await Promise.all([
         getInvoices({ page, pageSize, search: search || undefined, status: status || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }),
@@ -68,7 +74,7 @@ export default function InvoicesPage() {
       setTotal(invRes.pagination?.total || 0);
       setStats(statsRes);
       setBatches(batchRes || []);
-    } catch { /* */ } finally { setLoading(false); }
+    } catch { setLoadError(true); } finally { setLoading(false); }
   }, [page, pageSize, search, status, dateFrom, dateTo]);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -105,9 +111,10 @@ export default function InvoicesPage() {
     <div className="space-y-4">
       <ModuleTabHeader tabs={FINANCE_TABS} />
 
+      {loadError && <ErrorState title="发票台账读取失败" description="明细和统计未更新。" action={<Button variant="outline" onClick={() => { clearApiGetCache(); void loadData(); }}>重试</Button>} />}
       <div className="px-1">
         {/* KPI */}
-        {stats && (
+        {stats && !loadError && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             <Card><CardContent className="pt-4 pb-3 px-4">
               <p className="text-xs text-muted-foreground mb-1">有效发票金额</p>
@@ -132,9 +139,9 @@ export default function InvoicesPage() {
         {batches.length > 0 && (
           <div className="text-xs text-muted-foreground mb-3">
             数据来源：{batches.map(b => (
-              <span key={b.id} className="inline-flex items-center gap-1 mr-3">
+              <span key={b.id} className="inline-flex max-w-full min-w-0 flex-wrap items-center gap-1 mr-3">
                 <FileText className="h-3 w-3" />
-                <Badge variant="outline" className="text-[10px]">{b.fileName}</Badge>
+                <Badge variant="outline" className="max-w-full whitespace-normal break-all text-[10px]">{b.fileName}</Badge>
                 {b.dataStartDate}~{b.dataEndDate}
                 ・导入于 {new Date(b.importedAt).toLocaleDateString('zh-CN')}
               </span>
@@ -169,13 +176,45 @@ export default function InvoicesPage() {
               <X className="h-3 w-3 mr-1" />清除
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+          <BusinessWrite><Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
             <Upload className="h-3 w-3 mr-1" />导入
-          </Button>
+          </Button></BusinessWrite>
         </div>
 
-        {/* 表格 */}
-        <Card>
+        <div className="space-y-3 md:hidden">
+          {loading ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">加载中...</p>
+          ) : loadError ? (<p className="py-8 text-center text-destructive">读取失败，请使用上方重试</p>) : items.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">暂无数据</p>
+          ) : sort.sortedData.map(item => (
+            <MobileListCard
+              key={item.id}
+              title={item.seller}
+              subtitle={item.itemName || '未填写品名'}
+              badge={statusBadge(item.status, item.isPositive)}
+              fields={[
+                { label: '开票日期', value: item.invDate },
+                { label: '发票号码', value: item.invNo || '未提供' },
+                { label: '票种', value: item.invoiceType?.includes('专用') ? '专票' : '普票' },
+                { label: '金额', value: `¥${fmt(item.amount)}` },
+                { label: '税额', value: `¥${fmt(item.tax)}` },
+              ]}
+              amount={{ label: '价税合计', value: `¥${fmt(item.total)}` }}
+              action={
+                <div className="space-y-2">
+                  <p className="break-words text-xs text-muted-foreground">{item.seller} · {item.itemName || '未填写品名'}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" className="h-11" onClick={() => { setSearch(item.seller); setPage(1); }}>筛选销方</Button>
+                    <Button variant="outline" className="h-11" asChild><Link href={`/dashboard/finance/bank-flow?search=${encodeURIComponent(item.seller)}`}>相关流水</Link></Button>
+                  </div>
+                </div>
+              }
+            />
+          ))}
+        </div>
+
+        {/* 桌面端表格 */}
+        <Card className="hidden md:block">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -232,15 +271,16 @@ export default function InvoicesPage() {
                   >
                     价税合计
                   </SortableTableHead>
+                  <TableHead>发票号码</TableHead>
                   <TableHead className="w-[70px]">状态</TableHead>
                   <TableHead className="w-[80px]">票种</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">加载中...</TableCell></TableRow>
-                ) : items.length === 0 ? (
-                  <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">加载中...</TableCell></TableRow>
+                ) : loadError ? (<TableRow><TableCell colSpan={9} className="text-center py-8 text-destructive">读取失败，请重试</TableCell></TableRow>) : items.length === 0 ? (
+                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
                 ) : sort.sortedData.map(item => (
                   <TableRow key={item.id}>
                     <TableCell className="text-xs tabular-nums">{item.invDate}</TableCell>
@@ -266,6 +306,7 @@ export default function InvoicesPage() {
                     <TableCell className="text-right tabular-nums text-sm">{fmt(item.amount)}</TableCell>
                     <TableCell className="text-right tabular-nums text-xs text-muted-foreground">{fmt(item.tax)}</TableCell>
                     <TableCell className="text-right tabular-nums font-medium">{fmt(item.total)}</TableCell>
+                    <TableCell className="font-mono text-xs break-all">{item.invNo || '未提供'}</TableCell>
                     <TableCell>{statusBadge(item.status, item.isPositive)}</TableCell>
                     <TableCell className="text-[10px] text-muted-foreground">
                       {item.invoiceType?.includes('专用') ? (

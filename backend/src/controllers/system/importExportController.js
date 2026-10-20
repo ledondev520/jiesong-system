@@ -11,7 +11,7 @@ const importData = async (req, res, next) => {
       throw createError('请选择要导入的CSV文件', 400);
     }
 
-    const result = await importService.importCSVData(req.file.path, req.user.id);
+    const result = await importService.importCSVData(req.file, req.user.id);
     success(res, result, `导入完成：成功${result.successRows}条，失败${result.failedRows}条`);
   } catch (error) {
     next(error);

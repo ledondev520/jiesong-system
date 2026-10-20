@@ -4,7 +4,7 @@
  * Pos: 前端系统运维服务层
  */
 
-import api from '@/lib/axios';
+import api, { type ApiRequestConfig } from '@/lib/axios';
 import { ApiResponse, PaginatedResponse, User } from '@/types';
 import { getAuthToken } from '@/lib/auth-token';
 
@@ -94,10 +94,12 @@ export interface SystemNotificationItem {
   content: string;
   isRead: boolean;
   metadata?: string | null;
+  link?: string | null;
   createdAt: string;
 }
 
 export interface GetSystemNotificationsParams {
+  keyword?: string;
   page?: number;
   pageSize?: number;
   unreadOnly?: boolean;
@@ -110,9 +112,10 @@ export interface SystemNotificationsResponse extends PaginatedResponse<SystemNot
 export const getSystemNotifications = async (
   params: GetSystemNotificationsParams = { page: 1, pageSize: 50 }
 ) => {
+  const config: ApiRequestConfig = { params, cache: { enabled: false } };
   return api.get<ApiResponse<SystemNotificationsResponse>, ApiResponse<SystemNotificationsResponse>>(
     '/system/notifications',
-    { params }
+    config
   );
 };
 

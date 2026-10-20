@@ -37,3 +37,11 @@ test('buildPaginatedPayload: 组装标准分页响应并保留扩展字段', () 
     unreadCount: 1,
   });
 });
+
+test('normalizePagination: 超大页码不产生不安全的数据库 offset，正常页码保持不变', () => {
+  const { normalizePagination } = require('./pagination');
+  const normalized = normalizePagination({ page: '99999999999999999999999999', pageSize: '500' });
+  assert.ok(Number.isSafeInteger(normalized.skip));
+  assert.ok(normalized.skip >= 0);
+  assert.deepEqual(normalizePagination({ page: '2', pageSize: '100' }), { page: 2, pageSize: 100, skip: 100 });
+});

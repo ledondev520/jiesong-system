@@ -1,11 +1,17 @@
 # Security Playbook
 
+PR Review (`.github/workflows/pr-review.yml`) reports checks through Actions `GITHUB_STEP_SUMMARY` with `permissions: {}`; it does not need GitHub comment-write access. Failed/cancelled type or lint/format checks remain failed. The locked formatter uses full Git history and explicit PR SHAs, preserves literal NUL-separated paths and fails on missing history/file reads (`scripts/check-pr-format.cjs`).
+
 ## 5-Layer Defense Architecture
 
 ### 1) 访问控制与身份层（Identity & Access）
+- `frontend/src/lib/auth-session.ts` distinguishes absent credentials from expired sessions. Unchecked-login JWTs remain tab-scoped; optional persistent browser sessions use HttpOnly credentials and live server validation.
 - Enforce explicit身份校验 (JWT + role checks) for all sensitive routes.
 - Treat Agent / Service Account credentials as independent machine identities; never reuse employee passwords or browser sessions for automation.
 - Keep authentication middleware as single entry for route groups and validate user context before业务处理.
+- `backend/src/middleware/bossReadOnly.js` gates BOSS after database-backed authentication: explicit business GET/HEAD queries only, with own-password and own-notification-read exceptions. Business writes, AI/MCP calls and artifact-generating GETs fail closed; both `authService.updateUser` and `userController.update` invalidate cached roles. `financialStatementsController.js` omits ledger rows and source metadata before querying for BOSS; existing ADMIN/FINANCE evidence limits remain.
+- `backend/src/services/purchaseReceiptService.js` stores Confidential arrivals and immutable inspection evidence atomically, enforces per-item ordered limits and request-content idempotency, and admits only accepted increments to stock. `backend/src/routes/purchases.js` limits these writes to authenticated human ADMIN/PURCHASE/WAREHOUSE; FIFO/rollback in `inventorySnapshot.js` retain inspection provenance. Pending/reinspection stock is unavailable; there is no return operation. Legacy records receive no invented evidence; finalized historical imports require active ADMIN plus explicit confirmation in `purchaseImportExportService.js`.
+- `backend/src/routes/procurementTemplate.js` must authenticate all procurement-template reads before parsing historical store/purchase data; these records are Confidential.
 - Use least-privilege账号 and role-to-resource mapping for every service boundary.
 - Disable默认凭证 and rotate all secrets periodically.
 
@@ -14,6 +20,7 @@
 - Run Node进程 with最小权限 (non-root, locked-down directories) and mount config with read-only policy where possible.
 - Keep upload/storage directories explicitly created and scoped to应用用户.
 - Contract evidence written by `backend/src/services/fileService.js` must use `0700` directories and `0600` files; permission tightening must succeed before the database record is created.
+- Procurement attachment handlers in `backend/src/controllers/purchaseController.js` must reuse that file service for persistence and resolve downloads against `UPLOAD_DIR`, so legacy routes cannot bypass protected storage or lose uploaded files.
 - SQLite backup directories must use `0700` and backup database files must use `0600`; `backend/scripts/db-backup.js` is the enforcement point.
 - Carrier packing-list originals are Restricted evidence: `packingListCheckService.js` must archive them through `fileService.js`, persist only structured comparison results (never raw extracted PDF text), and prevent deletion while a check record references the file.
 - Add startup checks for config file accessibility and permission drift.
@@ -21,6 +28,8 @@
 ### 3) 网络与应用边界层（Application & Network）
 - Apply CORS whitelist (`CORS_ORIGIN`) and avoid `*` in生产 environments.
 - Enforce request size limits, rate limiting at API网关 (or reverse proxy), and strict MIME/type checks on uploads.
+- AI requests in `backend/src/services/aiService.js` and `anthropicCompatService.js` use the same full-response deadline, disable SDK automatic retry/logging, and obtain usage from the response stream; `KIMI_REQUEST_TIMEOUT_MS` defaults to 30000ms (explicit 500–30000ms), while greetings retain a separate 300ms budget via `KIMI_GREETING_TIMEOUT_MS`.
+- `backend/src/services/hsciqService.js` bounds connection and response-body waits with `HSCIQ_TIMEOUT_MS` (default 10000ms, clamped to 1000–30000ms), shares identical pending queries and reserves their quota; upstream response bodies are never embedded in errors or logs.
 - Keep internal errors server-side; expose only最小化错误码 to clients.
 - Require HTTPS in external endpoints and internal服务间连接。
 
@@ -29,6 +38,10 @@
 - Treat supplier bank routing fields, company bank statements and transaction identifiers, signed/generated contract artifacts, carrier packing lists, and their review records as Restricted data; persist only masked company account identifiers with structured bank rows, and do not include production values in logs, engineering memory, or test fixtures.
 - Store secrets in `.env` only, never in repository tracked text.
 - Treat system-configured API keys as write-only: encrypt at rest, never return the complete value from any HTTP response, and render only a configured/masked status in administrator pages.
+- Environment-key fallback in `backend/src/controllers/system/configController.js` must use the same response masking as database keys; absent database configuration never permits returning the complete environment key.
+- Production AI provider changes must update both the protected backend `.env` and PM2 runtime environment after a 0700/0600 private configuration backup; validate with synthetic input and never print full PM2 environments or credentials. `backend/src/config/index.js` and `aiService.js` remain the provider/key enforcement points.
+- Main AI provider selection lives in `backend/src/config/index.js`: DeepSeek uses its own environment key or encrypted `deepseekApiKey` override in `aiService.js`; `configController.js` masks only the active provider's key for the UI. Never reuse a Kimi credential for DeepSeek, and validate file permissions before reading `.env`.
+- `openAgentService.loadSdk` sets the public Agent retry limit to zero and `aiController.anthropicCompatMessage` sends `x-should-retry: false`; this prevents nested SDK retries from repeating provider requests after a bounded failure. Existing per-request deadlines remain in force.
 - Redact PII/敏感字段 in logs and exports; avoid writing raw identifiers to audit channels unless authorized.
 - HTTP request logs must record only route, timing, and request shape (field names/count/content length); never persist request body/query values, AI prompts, tool schemas, or user messages.
 - Monthly statements, account balances, and general-ledger rows are Confidential: parse uploaded workbooks in memory, persist only structured rows and source metadata/hash, and never copy raw workbooks into ordinary attachment storage or logs.
@@ -49,3 +62,107 @@
 - Temporary test credentials (for example default admin passwords) must be explicitly labeled as non-production and replaced via environment variables before deployment.
 - Any runtime permission tightening should include a clear validation path and migration plan for existing environments.
 - Security failures on启动应优先阻断（尤其生产）而不是继续运行.
+
+- 商品档案导航归入采购模块（`frontend/src/components/layout/navigation.config.ts`），修复采购员已有建档权限但前台不可达的问题；API读写角色限制仍由 `backend/src/routes/products.js` 执行。
+
+- Shipment tax-refund preparations: `backend/src/routes/taxRefunds.js` limits invoice-row preparation, confirmation and exports to ADMIN/FINANCE; `backend/src/controllers/fileController.js` enforces the same roles for generated confirmation attachments so the generic download/delete endpoints cannot bypass this boundary. `taxRefundShipmentService.js` rechecks the material version before confirmation, reuses protected `fileService.js` archiving, and does not set official submission state.
+- `fileService.assertFileAccess` applies that existing ADMIN/FINANCE confirmation boundary to generic and legacy purchase/sales attachment downloads and deletions. Ordinary attachment roles remain unchanged. Failed `createFile` validation, permission tightening or metadata writes remove only the new multer payload; existing and generated versions are untouched. A cleanup failure preserves the original error and logs no file paths or bytes. Legacy purchase deletion retains its existing physical-archive behavior. Multipart MIME and Multer input limits return client errors; the isolated HTTP/SQLite attachment matrix uses only generated disposable fixtures with the real global limiter enabled.
+- `utils/upload.js` creates or tightens the date destination directory to `0700` before Multer starts a disk stream, and propagates filesystem failures through the destination callback. The upload-root sharing policy is unchanged. Uploaded file `0600` enforcement happens in `fileService.createFile` before its first asynchronous contract lookup; it is not claimed as a whole-stream file-mode guarantee.
+- `fileService.createFile` validates normalized and real path containment under the trusted upload root before chmod or failed-upload deletion. Untrusted suffix traversal, child file/directory symlinks, non-files and multiple hard links fail closed; intentional configured-root symlinks and relative roots remain supported. Cleanup rechecks the captured payload path/dev/inode after asynchronous work and preserves the original business error if the payload was replaced or cannot be safely removed. No alert suppression or upload-directory sweep is used; these checks do not claim protection from arbitrary privileged OS races.
+- Before Multer's date-directory chmod or successful destination callback, `utils/upload.js` resolves the trusted root, rejects child-directory aliases/symlinks and requires the real destination to equal the root-derived date directory. Existing configured-root symlinks, relative roots and Multer/database path formats remain compatible; rejected destinations leave external or retained directory/file sentinels untouched. Storage, MIME and upload-size policy are unchanged.
+
+- Workflow automation in `backend/src/services/openAgentService.js` directly executes only the four internal draft tools (purchase, customs, forex verification, tax refund) on request. Tool-role checks and operation logs remain mandatory; executed actions stay in replay metadata but never appear again as pending confirmation cards. Physical/financial/configuration writes retain confirmation. Export status execution reuses `salesService.updateSalesStatus` so state checks and inventory effects remain shared with the normal API.
+
+- `backend/src/services/customsDeclarationDraftService.js` replaces only DRAFT records atomically while retaining identity; released declarations fail with 409 instead of being deleted. Shipment allocation in `inventorySnapshot.js` uses owned packing rows and their purchase/unit provenance. `taxRefundShipmentService.js` excludes technical creation/update timestamps from confirmation versions while retaining business facts and evidence.
+
+- `backend/src/services/openAgentService.js` inspects SDK query termination for both normal and streamed requests. Upstream errors propagate as 503/SSE error before success persistence; the SDK prompt convenience method drops the failure subtype and must not be used here.
+
+- `frontend/src/lib/api-base-url.ts` and `frontend/next.config.ts` share base-address parsing so login/AI requests and protected file downloads reach the same API. Bare backend origins gain `/api/v1`; explicit API paths remain intact. Existing environment values and credentials are unchanged.
+
+- `inventoryStateMachine.js` denies manual transitions for purchase/inspection-sourced inventory; `inventoryController.js` and `openAgentService.js` load provenance before checking, and Agent confirmation revalidates before writing. Conditional updates check the current status. Same-status requests preserve FIFO timestamps; business workflows retain their transactional inventory writes.
+
+### VPS 发布验证
+- `.github/workflows/deploy.yml` 在 SSH 内启用失败即停止，并固定触发提交 SHA，防止失败被后续命令掩盖或发布版本漂移。
+- `scripts/verify-vps-runtime.cjs` 只输出校验结论，拒绝 PM2 仍指向旧目录、公网 BUILD_ID 不匹配、后端健康失败或未认证 API 返回非 401；不得记录完整 PM2 环境、响应正文或凭据。
+- VPS 运行目录迁移保留现有数据库与附件的绝对路径；`/opt/jiesong_system/deploy-backups/` 中的环境配置和 SQLite 快照属于 Restricted，目录 0700、文件 0600。
+
+## 邮箱注册边界
+- RBAC 源码扫描明确列举公开的 `POST /auth/email-code` 与 `POST /auth/email-register`，并检查限流及校验；管理员创建账号的 `POST /auth/register` 继续要求认证和ADMIN。此豁免只反映现有公开注册设计，不授予业务访问权。
+- `backend/src/services/emailService.js` 复用阿里云杭州 DirectMail；仅私有环境配置 `ALIBABA_CLOUD_ACCESS_KEY_ID`、`ALIBABA_CLOUD_ACCESS_KEY_SECRET`、`JIESONG_EMAIL_FROM`，可选 STS token。密钥不返回浏览器，部分配置在启动时拒绝，`backend/src/config/index.js` 在读取环境密钥前先验证文件权限。
+- `backend/src/services/emailRegistrationService.js` 持久保存带密钥验证码哈希，10分钟有效、最多5次验证；60秒重发冷却、每邮箱每小时5次、全站每小时60次，失败发信仍计数且旧码失效。成功注册与消费验证码在同一事务，角色固定SALES且未激活，管理员审核后方可访问业务。
+- 注册邮箱作为用户名，登录兼容原用户名；管理员创建用户仍需ADMIN。邮件正文、验证码与云服务响应正文不得进入日志。验证码记录超过24小时后在下一次发码时清理。
+- `frontend/src/app/dashboard/users/components/UserDialog.tsx` 提供管理员账号开通开关；两套用户更新入口更新状态或角色后立即清除认证缓存，避免停用/改权延迟。
+
+Agent Runtime 仅加载锁定版本的已发布 SDK 构建，加载错误直接保留，不尝试开发机 `.tmp` 文件；两种请求入口显式使用本地 Anthropic 协议，保留关闭重试与上游失败不归档的回归检查。
+
+## 邮箱密码找回
+- 公开 `POST /auth/reset-password-code` 只接收绑定邮箱，`POST /auth/reset-password` 只接收邮箱、6位验证码及新密码；旧用户名+手机号重置协议已关闭。无邮箱、重复邮箱、未开通/停用账号不得自助重置，管理员必须通过已认证的管理入口在离线核实身份后人工处理，不能仅据用户名/手机号确认归属。
+- `passwordResetService.js` 使用用途隔离HMAC存储代码，持久IP摘要/邮箱/全站限流，并先获取SQLite单例写锁以避免多进程配额竞态。代码10分钟有效、最多5次验证；60秒重发、每邮箱5次/小时、IP10次/小时、全站60次/小时。旧码即时废弃，错误尝试提交计数，消费与改密/撤销会话/最小审计同事务；账号归属、状态及版本在消费时再次确认。
+- 未知/停用/重复邮箱预留相同配额、返回同样200提示；响应不等待邮件提供方，以避免投递耗时枚举账号。DirectMail只发一次，确认后才激活。后台投递不跨进程重启恢复，任何失败/不确定/进程退出只会使代码不可用，用户需重新申请，无自动重试或绕过。未配置邮件时全局503拒绝。
+- `auth.js` 按数据库实时状态和 `sessionVersion` 验证每个用户JWT；密码写入均递增版本，包括管理员重设。迁移前无版本JWT只在版本0可用；新注册/旧账号初始版本0。每次认证新增实时DB读取，需在后续发布评估数据库容量；不改变独立Agent credential授权。
+- 新密码策略为至少8个Unicode字符且UTF-8不超过72字节；保留旧密码登录兼容。原始Prisma查询/错误输出禁用，安全找回错误仅输出固定文案，RESET_PASSWORD审计只包含账号ID与动作，密码、验证码、收件人、云响应不入日志。
+- 增量迁移、管理员处理策略、隔离测试与待发布检查详见 `docs/security/password-recovery.md`。本变更不执行生产验证攻击、不改真实用户密码；发布必须在备份和人工确认后进行。
+- 找回HTTP入口使用锁定版本 `express-rate-limit`；其IP键与持久请求摘要共同归一IPv4映射及IPv6 /56地址。每请求代理身份依Express明确白名单决定，`TRUSTED_PROXY_CIDRS` 默认不信任，禁止布尔/跳数/全网范围；上线前须确认实际代理链与Nginx追加的真实客户端地址，不能信任外部任意转发头。
+- 生产备份以实际绝对 `DATABASE_URL` 为准，使用已审查的SQLite online backup API创建包含已提交WAL的一致快照（无需停writer；若使用离线文件复制则必须先停全部writer）、验证完整性及校验和并保护0700/0600；不能把构建目录的固定dev.db复制或未验证的在线cp当作生产备份。自动部署没有备份步骤，备份前置验收失败不得合并触发迁移。
+
+## Fixed-expiry browser sessions
+
+See `docs/security/browser-sessions.md`. `backend/src/services/browserSessionService.js` uses explicit opt-in, 256-bit random opaque cookies, hashed server storage and the existing JWT absolute expiry, with no refresh or global logout. Production uses Secure/HttpOnly/SameSite=Strict `__Host-` cookies. Origin plus session-bound CSRF protects cookie mutations and logout; sibling-origin reads also fail closed. Bearer precedence preserves legacy/Agent access without invalid-token cookie fallback. All auth responses are no-store; persistence failures are sanitized. Revocation responses never delete a newer cookie accidentally. Frontend caches and delayed failures are isolated by auth generation.
+
+The additive session-table rollout requires a fresh verified online SQLite snapshot of the actual configured database before migration, via the reviewed release preflight, with integrity checking and 0700/0600 permissions. Development's hard-coded backup path/copy is not production backup evidence; no database restoration may overwrite subsequent business writes without an explicit reconciliation plan.
+
+- Global API admission uses the locked `express-rate-limit` implementation in `backend/src/middleware/apiRateLimit.js`, still 100 requests/minute before request parsing and routing. Legacy JSON/Retry-After and millisecond X-RateLimit reset headers remain compatible; canonical IP keys collapse mapped IPv4 and IPv6 /56 without trusting forwarded headers beyond the existing explicit proxy allowlist. The tighter login 10/15min and recovery quotas remain independent. Standalone synthetic auth servers use the same recognized limiter; no security rule is disabled or suppressed.
+
+- Global and legacy login HTTP counters remain process-local, as before: restarts reset them and multiple workers have independent counters. This change does not claim a distributed/persistent quota. Existing SQLite email/recovery quotas remain independent.
+
+## 运维验证笔记
+
+本地被 Git 忽略的 `PLAN.md` 等运维记录也不得保存真实账号与密码组合；仅记录验证结果。发现残留时先对当前笔记脱敏，单独评估凭据轮换；脱敏笔记不等于撤销已有凭据，也不能据此声称 Git 历史已清理。
+
+Export proposal paths are configured by `JIESONG_EXPORT_DATABASE` and `JIESONG_HISTORY_ROOT` or explicit CLI options in `scripts/prepare_export_packet.py`. The script remains read-only and does not load `.env`. Business databases and history workbooks must remain outside Git.
+
+Catalog migration endpoints in `backend/src/routes/dataImport.js` require authenticated ADMIN. `catalogImportService.js` previews do not persist rows, files or audits. Execution revalidates in one transaction and audits only kind/count/operator. Opening inventory requires explicit counted-balance confirmation, an active product, matching unit and a unique stable opening reference; it never fabricates purchase/inspection evidence. Supplier bank details are excluded from templates. See `docs/migration/catalog-import.md`.
+
+`backend/src/services/bootstrapAdmin.js` is shared by seed and direct app startup. New administrators require an explicit `DEFAULT_ADMIN_PASSWORD` meeting the existing 8-character/72-byte policy. Startup blocks an uninitialized or legacy-default administrator. An explicit bootstrap password can remediate the known legacy default with a conditional update and session-version increment. Seed never rotates an existing secure password. Use authenticated password change/reset for ordinary rotation, then remove the bootstrap secret from the runtime environment. No new schema or forced-change session exception is introduced.
+
+SQLite backups now use `backend/scripts/sqlite_snapshot.py` through the backup/restore CLIs. Source selection must be explicit via process DATABASE_URL or --database; no .env or credential files are loaded. The online backup API includes committed WAL pages. Snapshots/manifests are 0600 in 0700 directories, and restore verifies SHA-256 and SQLite integrity before exclusively publishing a new target. It never replaces an existing/live database. Managed retention defaults to five pairs; unrelated files are not swept. This covers the database only, not attachments/configuration or offsite disaster recovery. See `docs/operations/sqlite-backup-restore.md`.
+
+The default local export history directory `/data/export-history/` is excluded by the repository `.gitignore` so portable defaults do not invite accidental source-workbook commits.
+
+Backup CLI `backend/scripts/db-backup.js` preserves explicit space or equals options before environment/default selection.
+
+`bootstrapAdmin.js` validates bootstrap password policy only when creating/remediating an account; unused stale settings cannot block an already-secure administrator.
+
+`sqlite_snapshot.py` restore rejects existing target SQLite `-wal`, `-shm` and `-journal` sidecars (including dangling symlinks); never delete recovery evidence to make a path available. Use a private directory without concurrent writers.
+
+`tabularImport.js` streams ZIP entries before ExcelJS parsing: at most 256 entries and 32 MiB actual expanded bytes. JSZip is declared directly at the already locked version; no files are extracted.
+
+Legacy `/api/v1/import` uses the same 10 MiB in-memory CSV/xlsx filter as preview; `importService.js` accepts only in-memory bytes and rejects filesystem paths, including traversal, absolute paths and symlinks. HTTP never retains raw uploads.
+
+`db-backup.js` preserves literal percent sequences in Prisma SQLite DATABASE_URL paths; URI decoding could silently select a different database.
+
+`tabularImport.js` checks worksheet XML row/cell/column bounds before ExcelJS allocations, rejects merged cells and limits sheet IDs to 65535. This prevents tiny XLSX metadata from expanding unbounded model regions.
+
+## Export pricing configuration
+
+Pricing requires a finite positive spot rate and a positive adjusted rate rounded
+to six decimal places. Positive adjustments cannot make missing or invalid spot
+rates usable. Python rejects invalid spot rates before reading proposal sources.
+
+`config/pricing.json` contains non-secret policy values. Both export services and
+`scripts/prepare_export_packet.py` use this same file, or the explicit
+`JIESONG_PRICING_CONFIG` path. The shared `config/pricing.schema.json` defines
+strict keys and numeric bounds. Invalid or missing files stop pricing without
+fallback. Readiness recommendations use the same adjusted exchange rate, tiered
+markups and rounding as packet. Request-level profitRate does not override the
+shared file. Multiplier mode requires explicit selection. No environment file or
+business database is read by the loaders.
+
+`GET/PUT /system/pricing-config` require authenticated ADMIN. Updates replace the
+whole validated document atomically, require the last revision, and use an
+exclusive lock file. Structured stderr events retain only operator ID, field
+names and policy hashes. No request values, contract data or secrets are logged.
+Manual file edits are detected and logged on the next read. Operators must use
+an atomic replacement and retain their filesystem change audit for edits made
+while all readers are stopped. A stale lock after a process crash requires an
+operator to confirm no writer is active before removing it.

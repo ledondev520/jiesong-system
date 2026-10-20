@@ -1,0 +1,47 @@
+{
+  "id": "customs-brokers",
+  "routeFile": "backend/src/routes/system.js",
+  "routes": [
+    "POST /customs-brokers",
+    "PUT /customs-brokers/:id"
+  ],
+  "update": {
+    "file": "backend/src/controllers/system/customsBrokerController.js",
+    "handler": "updateCustomsBroker"
+  },
+  "matrix": {
+    "path": "/api/v1/system/customs-brokers",
+    "table": "customs_brokers",
+    "create": {
+      "name": "Synthetic matrix broker",
+      "contact": "Original contact",
+      "phone": "Original phone"
+    },
+    "edit": {
+      "name": "Synthetic edited broker"
+    },
+    "invalid": [
+      {
+        "name": "   ",
+        "contact": "Unwanted contact"
+      },
+      {
+        "name": null,
+        "phone": "Unwanted phone"
+      },
+      {
+        "isActive": "false"
+      }
+    ],
+    "blank": {
+      "contact": "",
+      "phone": "   "
+    },
+    "clear": {
+      "contact": null,
+      "phone": null
+    },
+    "clearStatus": 200,
+    "filter": "Synthetic edited broker"
+  }
+}

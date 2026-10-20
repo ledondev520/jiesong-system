@@ -1,8 +1,24 @@
+/**
+ * Input: broker form payloads and Prisma
+ * Output: broker persistence through the shared partial-update boundary
+ * Pos: ordinary system catalogue controller; omitted optional fields remain unchanged
+ */
 const prisma = require('../../utils/prisma');
 const { success, paginated } = require('../../utils/response');
 const { createError } = require('../../middleware/errorHandler');
 const { normalizePagination } = require('../../utils/pagination');
 const { parseOptionalText } = require('../../utils/text');
+
+const { partialUpdate } = require('../../utils/partialUpdate');
+
+const brokerFields = {
+  name: { type: 'string', required: true, message: '报关公司名称不能为空' },
+  contact: { type: 'string', nullable: true },
+  phone: { type: 'string', nullable: true },
+  email: { type: 'string', nullable: true },
+  address: { type: 'string', nullable: true },
+  isActive: { type: 'boolean' },
+};
 
 const getCustomsBrokers = async (req, res, next) => {
   try {
@@ -16,9 +32,9 @@ const getCustomsBrokers = async (req, res, next) => {
     }
     if (keyword) {
       where.OR = [
-        { name: { contains: keyword, mode: 'insensitive' } },
-        { contact: { contains: keyword, mode: 'insensitive' } },
-        { phone: { contains: keyword, mode: 'insensitive' } },
+        { name: { contains: keyword } },
+        { contact: { contains: keyword } },
+        { phone: { contains: keyword } },
       ];
     }
 
@@ -73,23 +89,11 @@ const updateCustomsBroker = async (req, res, next) => {
       throw createError('报关公司不存在', 404);
     }
 
-    const name = req.body.name === undefined ? undefined : String(req.body.name).trim();
-    const contact = req.body.contact === undefined ? undefined : (String(req.body.contact).trim() || null);
-    const phone = req.body.phone === undefined ? undefined : (String(req.body.phone).trim() || null);
-    const email = req.body.email === undefined ? undefined : (String(req.body.email).trim() || null);
-    const address = req.body.address === undefined ? undefined : (String(req.body.address).trim() || null);
-    const isActive = req.body.isActive;
+    const data = partialUpdate(req.body, brokerFields);
 
     const broker = await prisma.customsBroker.update({
       where: { id },
-      data: {
-        ...(name !== undefined ? { name } : {}),
-        ...(contact !== undefined ? { contact } : {}),
-        ...(phone !== undefined ? { phone } : {}),
-        ...(email !== undefined ? { email } : {}),
-        ...(address !== undefined ? { address } : {}),
-        ...(isActive !== undefined ? { isActive } : {}),
-      },
+      data,
     });
 
     success(res, broker, '报关公司更新成功');

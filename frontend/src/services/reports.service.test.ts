@@ -74,9 +74,9 @@ describe('reportsService', () => {
     };
     vi.mocked(api.get).mockResolvedValueOnce({ data: mockResponse });
 
-    const result = await reportsService.getBusinessOverview();
+    const result = await reportsService.getBusinessOverview({ startDate: '2026-09-01', endDate: '2026-09-30' });
 
-    expect(api.get).toHaveBeenCalledWith('/reports/business-overview');
+    expect(api.get).toHaveBeenCalledWith('/reports/business-overview', { params: { startDate: '2026-09-01', endDate: '2026-09-30' }, cache: { enabled: false } });
     expect(result.data).toEqual(mockResponse);
   });
 });

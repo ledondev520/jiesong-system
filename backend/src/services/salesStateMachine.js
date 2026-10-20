@@ -31,6 +31,16 @@ const normalizeSalesStatus = (status) => {
   return LEGACY_STATUS_ALIASES[normalized] || normalized;
 };
 
+// 到港与收款是独立事实；款项变化可重新打开待结清状态，不重复影响库存。
+const getSalesSettlementStatus = (status, totalAmount, receivedAmount) => {
+  const current = normalizeSalesStatus(status);
+  if (![SALES_STATUS.ARRIVED, SALES_STATUS.COMPLETED].includes(current)) return current;
+  const total = Number(totalAmount), received = Number(receivedAmount);
+  return Number.isFinite(total) && Number.isFinite(received) && total > 0 && received > 0
+    && Math.abs(Math.round(total * 100) - Math.round(received * 100)) <= 1
+    ? SALES_STATUS.COMPLETED : SALES_STATUS.ARRIVED;
+};
+
 const validateSalesTransition = (currentStatus, nextStatus) => {
   const normalizedCurrent = normalizeSalesStatus(currentStatus);
   const normalizedNext = normalizeSalesStatus(nextStatus);
@@ -56,5 +66,6 @@ const validateSalesTransition = (currentStatus, nextStatus) => {
 module.exports = {
   SALES_STATUS,
   normalizeSalesStatus,
+  getSalesSettlementStatus,
   validateSalesTransition,
 };

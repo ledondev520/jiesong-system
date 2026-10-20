@@ -1,6 +1,6 @@
 /**
  * Input: 所有路由模块、中间件
- * Output: Express 应用实例
+ * Output: Express应用实例、管理员初始化门禁、标准100/min全局限流（显式代理白名单默认关闭）
  * Pos: 应用入口，初始化 Express 服务器
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -14,13 +14,15 @@ const routes = require('./routes');
 const mcpRoutes = require('./routes/mcp');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./middleware/logger');
-const { gentleRateLimit } = require('./middleware/rateLimit');
+const { createApiRateLimiter, exposeApiRateLimitHeaders } = require('./middleware/apiRateLimit');
 const { startInventoryAlertJob } = require('./jobs/inventoryAlertJob');
 const { startAgentCredentialAlertJob } = require('./jobs/agentCredentialAlertJob');
 const { startPatrolJob } = require('./jobs/patrolJob');
 const { startExportReminderJob } = require('./jobs/exportReminderJob');
 
 const app = express();
+// Opt-in only: trust concrete proxy addresses, never a client-supplied forwarding header by default.
+app.set('trust proxy', config.trustedProxyCidrs?.length ? config.trustedProxyCidrs : false);
 // JSON API 通过前端 dev rewrite 代理时，304 空响应会让 axios/页面层误判为失败，因此关闭 ETag。
 app.disable('etag');
 
@@ -59,11 +61,7 @@ app.use(
 );
 
 // 0.5. 速率限制（全局宽松限制）
-app.use(gentleRateLimit({
-  windowMs: 60 * 1000, // 1 分钟
-  max: 100, // 100 次/分钟
-  message: '请求过于频繁，请稍后再试',
-}));
+app.use(createApiRateLimiter(), exposeApiRateLimitHeaders);
 
 // 1. 请求体解析
 app.use(express.json({ limit: '10mb' }));
@@ -113,7 +111,9 @@ app.use(errorHandler);
 
 const PORT = config.port;
 
-if (require.main === module) {
+async function startServer() {
+  await require('./services/bootstrapAdmin').ensureBootstrapAdmin(require('./utils/prisma'));
+
   startInventoryAlertJob();
   startAgentCredentialAlertJob();
   startExportReminderJob();
@@ -130,6 +130,14 @@ if (require.main === module) {
 ║  URL: http://localhost:${String(PORT).padEnd(20)}║
 ╚════════════════════════════════════════════╝
   `);
+  });
+}
+
+if (require.main === module) {
+  startServer().catch(async () => {
+    console.error('启动失败：请检查数据库迁移，并设置符合密码策略的 DEFAULT_ADMIN_PASSWORD；空库请先运行 npm run db:seed。');
+    await require('./utils/prisma').$disconnect();
+    process.exitCode = 1;
   });
 }
 

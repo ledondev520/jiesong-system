@@ -12,6 +12,11 @@ import userEvent from '@testing-library/user-event';
 import CreatePurchasePage from './page';
 
 const mockPush = vi.fn();
+let mockEditId: string | null = null;
+const mockGetById = vi.fn();
+const mockUpdate = vi.fn();
+const mockCreate = vi.fn();
+const mockToastWarning = vi.fn();
 const mockGetSuppliers = vi.fn();
 const mockGetProducts = vi.fn();
 const mockGetNextContractNo = vi.fn();
@@ -19,6 +24,7 @@ const mockGetSuppliersByProducts = vi.fn();
 const mockToastError = vi.fn();
 
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(mockEditId ? { editId: mockEditId } : {}),
   useRouter: () => ({
     push: mockPush,
     back: vi.fn(),
@@ -32,6 +38,8 @@ vi.mock('@/services/supplier.service', () => ({
   },
 }));
 
+vi.mock('@/components/purchase/PriceGuard', () => ({ PriceGuard: () => null }));
+
 vi.mock('@/services/product.service', () => ({
   productService: {
     getAll: (...args: unknown[]) => mockGetProducts(...args),
@@ -43,7 +51,9 @@ vi.mock('@/services/purchase.service', () => ({
     getNextContractNo: (...args: unknown[]) => mockGetNextContractNo(...args),
     getSuppliersByProducts: (...args: unknown[]) => mockGetSuppliersByProducts(...args),
     parseQuote: vi.fn(),
-    create: vi.fn(),
+    create: (...args: unknown[]) => mockCreate(...args),
+    getById: (...args: unknown[]) => mockGetById(...args),
+    update: (...args: unknown[]) => mockUpdate(...args),
   },
 }));
 
@@ -51,11 +61,17 @@ vi.mock('sonner', () => ({
   toast: {
     error: (...args: unknown[]) => mockToastError(...args),
     success: vi.fn(),
+    warning: (...args: unknown[]) => mockToastWarning(...args),
   },
 }));
 
 describe('CreatePurchasePage 交互逻辑', () => {
   beforeEach(() => {
+    mockEditId = null;
+    mockGetById.mockReset();
+    mockUpdate.mockReset();
+    mockCreate.mockReset();
+    mockToastWarning.mockReset();
     mockGetSuppliers.mockReset();
     mockGetProducts.mockReset();
     mockGetNextContractNo.mockReset();
@@ -91,6 +107,52 @@ describe('CreatePurchasePage 交互逻辑', () => {
     });
   });
 
+  it('顶部前进也校验明细，错误留在采购明细步骤', async () => {
+    mockGetSuppliers.mockResolvedValue({ data: { items: [] } });
+    mockGetProducts.mockResolvedValue({ data: { items: [] } });
+    mockGetNextContractNo.mockResolvedValue({ data: { contractNo: 'CG2600001' } });
+    render(<CreatePurchasePage />);
+    await userEvent.click(screen.getAllByRole('button', { name: /合同信息/ })[0]);
+    expect(await screen.findByText('请选择商品')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: '供应商 *' })).not.toBeInTheDocument();
+  });
+
+  it('草稿更正复用完整目录，保存既有交期和修改后的数量', async () => {
+    mockEditId = 'draft-1';
+    mockGetSuppliers.mockResolvedValue({ data: { items: [{ id: 'supplier-1', name: '合成供应商' }] } });
+    mockGetProducts.mockResolvedValue({ data: { items: [{ id: 'product-1', customsName: '合成商品' }] } });
+    mockGetById.mockResolvedValue({ data: { id: 'draft-1', status: 'DRAFT', contractNo: 'synthetic', supplierId: 'supplier-1', taxRate: 13, expectedDate: '2026-10-20T00:00:00.000Z', items: [{ productId: 'product-1', quantity: 1, unitPrice: 100 }] } });
+    mockUpdate.mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+    render(<CreatePurchasePage />);
+    await waitFor(() => expect(screen.getByRole('spinbutton', { name: '数量 *' })).toHaveValue(1));
+    const quantity = screen.getByRole('spinbutton', { name: '数量 *' });
+    await user.clear(quantity);
+    await user.type(quantity, '2');
+    await user.click(screen.getAllByRole('button', { name: /合同信息/ })[0]);
+    expect(await screen.findByLabelText('预计交期')).toHaveTextContent('2026-10-20');
+    await user.click(screen.getByRole('button', { name: '保存更正' }));
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith('draft-1', expect.objectContaining({ expectedDate: '2026-10-20T00:00:00.000Z', items: [expect.objectContaining({ productId: 'product-1', quantity: 2 })] })));
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/purchase/draft-1');
+  });
+
+  it('创建成功仍向采购员展示后端价格预警', async () => {
+    mockGetSuppliers.mockResolvedValue({ data: { items: [{ id: 'supplier-1', name: '合成供应商' }] } });
+    mockGetProducts.mockResolvedValue({ data: { items: [{ id: 'product-1', customsName: '合成商品' }] } });
+    mockGetNextContractNo.mockResolvedValue({ data: { contractNo: 'synthetic' } });
+    mockCreate.mockResolvedValue({ data: { contract: { id: 'new-1' }, warnings: [{ message: '合成价格预警' }] } });
+    const user = userEvent.setup();
+    render(<CreatePurchasePage />);
+    await user.click(await screen.findByRole('combobox', { name: '商品 *' }));
+    await user.click(await screen.findByRole('option', { name: '合成商品' }));
+    await user.type(screen.getByRole('spinbutton', { name: '数量 *' }), '1');
+    await user.click(screen.getAllByRole('button', { name: /合同信息/ })[0]);
+    await user.click(await screen.findByRole('combobox', { name: '供应商 *' }));
+    await user.click(await screen.findByRole('option', { name: '合成供应商' }));
+    await user.click(screen.getByRole('button', { name: '创建合同' }));
+    await waitFor(() => expect(mockToastWarning).toHaveBeenCalledWith('合成价格预警', { duration: 10000 }));
+  });
+
   it('关键表单字段具备正确的标签关联与 id/name 属性', async () => {
     const user = userEvent.setup();
 
@@ -105,7 +167,7 @@ describe('CreatePurchasePage 交互逻辑', () => {
         ],
       },
     });
-    mockGetProducts.mockResolvedValue({ data: { items: [] } });
+    mockGetProducts.mockResolvedValue({ data: { items: [{ id: 'product-1', customsName: '合成商品' }] } });
     mockGetNextContractNo.mockResolvedValue({ data: { contractNo: 'CG2600001' } });
     mockGetSuppliersByProducts.mockResolvedValue({ data: { supplierIds: [] } });
 
@@ -117,9 +179,12 @@ describe('CreatePurchasePage 交互逻辑', () => {
 
     expect(screen.getByLabelText('采购报价原文')).toHaveAttribute('name', 'quoteText');
 
+    await user.click(screen.getByRole('combobox', { name: '商品 *' }));
+    await user.click(await screen.findByRole('option', { name: '合成商品' }));
+    await user.type(screen.getByRole('spinbutton', { name: '数量 *' }), '1');
     await user.click(screen.getAllByRole('button', { name: /合同信息/ })[0]);
 
-    await user.click(screen.getByRole('combobox', { name: '供应商 *' }));
+    await user.click(await screen.findByRole('combobox', { name: '供应商 *' }));
     expect(screen.getByLabelText('搜索供应商')).toHaveAttribute('name', 'supplierSearch');
 
     await user.click(screen.getByRole('button', { name: /新增/ }));

@@ -8,7 +8,64 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const prisma = require('../utils/prisma');
 const salesService = require('./salesService');
+
+// 单元测试只运行合成事务桩；真实事务/SQLite 的一致性由 sales-cargo-lifecycle.integration.js 验证。
+const baseTransaction = prisma.$transaction;
+const baseSalesFindUnique = prisma.salesContract.findUnique;
+test.beforeEach(() => {
+  prisma.$transaction = async callback => callback(prisma);
+  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', status: 'DRAFT', inventories: [] });
+});
+test.afterEach(() => {
+  prisma.$transaction = baseTransaction;
+  prisma.salesContract.findUnique = baseSalesFindUnique;
+});
 const inventorySnapshot = require('./inventorySnapshot');
+
+test('historical OUT_STOCK replay does not reapply shipment inventory or time', async () => {
+  const originalUpdate = prisma.salesContract.update;
+  const originalApply = inventorySnapshot.applySalesOutStock;
+  let data;
+  let applied = 0;
+  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', status: 'OUT_STOCK', totalAmount: 100, receivedAmount: 0, packingItems: [] });
+  prisma.salesContract.update = async args => { data = args.data; return { id: 'sc-1', ...data }; };
+  inventorySnapshot.applySalesOutStock = async () => { applied += 1; return { results: [] }; };
+  try {
+    assert.equal((await salesService.updateSalesStatus('sc-1', 'SHIPPED')).status, 'SHIPPED');
+    assert.equal(applied, 0);
+    assert.deepEqual(data, { status: 'SHIPPED' });
+  } finally {
+    prisma.salesContract.update = originalUpdate;
+    inventorySnapshot.applySalesOutStock = originalApply;
+  }
+});
+
+test('登记到港后保留出库，已收齐合同自动完成；未收齐不能手动假结清', async () => {
+  const originalTransaction = prisma.$transaction;
+  const originalRevert = inventorySnapshot.revertSalesOutStock;
+  let receivedAmount = 100;
+  let currentStatus = 'SHIPPED';
+  let packingItems = [];
+  let reverted = false;
+  prisma.$transaction = async fn => fn({ salesContract: {
+    findUnique: async () => ({ id: 'sc-1', status: currentStatus, totalAmount: 100, receivedAmount, packingItems }),
+    update: async ({ data }) => ({ id: 'sc-1', ...data }),
+  } });
+  inventorySnapshot.revertSalesOutStock = async () => { reverted = true; return { reverted: 1 }; };
+  try {
+    assert.equal((await salesService.updateSalesStatus('sc-1', 'ARRIVED')).status, 'COMPLETED');
+    assert.equal(reverted, false);
+    receivedAmount = 50;
+    assert.equal((await salesService.updateSalesStatus('sc-1', 'ARRIVED')).status, 'ARRIVED');
+    currentStatus = 'ARRIVED';
+    await assert.rejects(salesService.updateSalesStatus('sc-1', 'COMPLETED'), /款项尚未结清/);
+    currentStatus = 'DRAFT';
+    packingItems = [{ id: 'packing-test', boxes: 2 }];
+    assert.equal((await salesService.updateSalesStatus('sc-1', 'CONFIRMED')).status, 'PACKING');
+    packingItems = [];
+    assert.equal((await salesService.updateSalesStatus('sc-1', 'CONFIRMED')).status, 'CONFIRMED');
+  } finally { prisma.$transaction = originalTransaction; inventorySnapshot.revertSalesOutStock = originalRevert; }
+});
 
 test('getSalesContracts: 组装筛选条件并分页查询', async () => {
   const originalFindMany = prisma.salesContract.findMany;
@@ -56,15 +113,32 @@ test('getSalesContracts: 组装筛选条件并分页查询', async () => {
     assert.deepEqual(findManyArgs.where, {
       status: 'DRAFT',
       items: { some: { storeId: 'store-1' } },
-      contractNo: { contains: 'EXP' },
+      OR: [
+        { contractNo: { contains: 'EXP' } },
+        { port: { is: { name: { contains: 'EXP' } } } },
+        { packingItems: { some: { store: { is: { name: { contains: 'EXP' } } } } } },
+        { items: { some: { store: { is: { name: { contains: 'EXP' } } } } } },
+      ],
     });
     assert.equal(findManyArgs.skip, 10);
     assert.equal(findManyArgs.take, 5);
+    assert.deepEqual(findManyArgs.include.packingItems, {
+      select: {
+        isOwnedByJiesong: true,
+        sourceParty: true,
+        store: { select: { id: true, name: true } },
+      },
+    });
     assert.equal(result.total, 1);
     assert.equal(result.contracts.length, 1);
     assert.deepEqual(result.contracts[0].stores, ['圣荷西2115', '禧瑞都']);
     assert.equal(result.contracts[0].hasThirdPartyCargo, true);
     assert.deepEqual(result.contracts[0].sourceParties, ['阿珍贵州']);
+    assert.equal(result.contracts[0].packingItems, undefined);
+
+    const liteResult = await salesService.getSalesContracts({ page: 1, pageSize: 20, lite: true });
+    assert.ok(findManyArgs.include.packingItems.select);
+    assert.deepEqual(liteResult.contracts, result.contracts);
   } finally {
     prisma.salesContract.findMany = originalFindMany;
     prisma.salesContract.count = originalCount;
@@ -128,6 +202,35 @@ test('createSalesContract: 未传合同号时自动生成并写入', async () =>
     prisma.salesContract.count = originalCount;
     prisma.salesContract.create = originalCreate;
   }
+});
+
+test('updateSalesContract: omitted rate stays undefined while explicit valid numeric rates are parsed', async () => {
+  const originalUpdate = prisma.salesContract.update;
+  let updateData;
+  prisma.salesContract.update = async ({ data }) => { updateData = data; return { id: 'sc-1', ...data }; };
+  try {
+    for (const input of [undefined, {}, { note: 'Synthetic note' }, { exchangeRate: undefined, note: null }]) {
+      await salesService.updateSalesContract('sc-1', input);
+      assert.equal(updateData.exchangeRate, undefined);
+      assert.equal(updateData.note, input?.note);
+    }
+    for (const [input, expected] of [[7.2, 7.2], [' 6.9 ', 6.9]]) {
+      await salesService.updateSalesContract('sc-1', { exchangeRate: input });
+      assert.equal(updateData.exchangeRate, expected);
+    }
+  } finally { prisma.salesContract.update = originalUpdate; }
+});
+
+test('updateSalesContract: explicit invalid rates are rejected before any database update', async () => {
+  const originalUpdate = prisma.salesContract.update;
+  let updates = 0;
+  prisma.salesContract.update = async () => { updates += 1; };
+  try {
+    for (const exchangeRate of [null, '', ' ', 'not-a-rate', 'Infinity', Infinity, NaN, 0, -7.2, true, false, [], [7.2], {}]) {
+      await assert.rejects(salesService.updateSalesContract('sc-1', { exchangeRate, note: 'Must not save' }), error => error.statusCode === 400 && error.message === '汇率必须为正数');
+    }
+    assert.equal(updates, 0);
+  } finally { prisma.salesContract.update = originalUpdate; }
 });
 
 test('addSalesItem: 未传 sellingPrice 时按汇率与利润率计算并回写总额', async () => {
@@ -405,7 +508,7 @@ test('importPurchasePackingItems: 按选中箱数同比例带入数量、重量�
   };
   prisma.$transaction = async (callback) => callback({
     salesContract: {
-      findUnique: async () => ({ id: 'sc-1' }),
+      findUnique: async () => ({ id: 'sc-1', status: 'CONFIRMED' }),
       update: async (args) => {
         updatedStats = args.data;
         return args.data;
@@ -455,6 +558,7 @@ test('importPurchasePackingItems: 按选中箱数同比例带入数量、重量�
       note: '从采购合同 CG260001 完工资料导入',
     });
     assert.deepEqual(updatedStats, {
+      status: 'PACKING',
       totalBoxes: 4,
       grossWeight: 400,
       netWeight: 380,
@@ -543,4 +647,27 @@ test('removePackingItem: 不能通过其他出口合同编号删除不属于当�
     prisma.packingItem.aggregate = originalAggregate;
     prisma.salesContract.update = originalSalesUpdate;
   }
+});
+
+test('经营钻取按上海发运日期过滤三种已发运状态，搜索港口/门店覆盖第101条', async () => {
+  const originalFindMany = prisma.salesContract.findMany;
+  const originalCount = prisma.salesContract.count;
+  let args; let countWhere;
+  prisma.salesContract.findMany = async (value) => { args = value; return [{ id: 'sale-101', contractNo: 'SYNTHETIC101', status: 'SHIPPED', packingItems: [] }]; };
+  prisma.salesContract.count = async ({ where }) => { countWhere = where; return 121; };
+  try {
+    const result = await salesService.getSalesContracts({ page: 6, pageSize: 20, shipped: true, shippedFrom: '2026-09-01', shippedTo: '2026-09-30', keyword: '目标港口' });
+    assert.equal(args.skip, 100); assert.equal(args.take, 20);
+    assert.deepEqual(args.where.status, { in: ['SHIPPED', 'ARRIVED', 'COMPLETED'] });
+    assert.equal(args.where.shippedAt.gte.toISOString(), '2026-08-31T16:00:00.000Z');
+    assert.equal(args.where.shippedAt.lte.toISOString(), '2026-09-30T15:59:59.999Z');
+    assert.ok(args.where.OR.some((item) => item.port?.is?.name?.contains === '目标港口'));
+    assert.ok(args.where.OR.some((item) => item.packingItems?.some?.store?.is?.name?.contains === '目标港口'));
+    assert.deepEqual(countWhere, args.where); assert.equal(result.total, 121);
+    assert.equal(result.contracts[0].id, 'sale-101');
+    await salesService.getSalesContracts({ page: 1, pageSize: 20, status: 'SHIPPED' });
+    assert.equal(args.where.status, 'SHIPPED');
+    await assert.rejects(salesService.getSalesContracts({ page: 1, pageSize: 20, shippedFrom: '2026-02-30' }), (error) => error.statusCode === 400);
+    await assert.rejects(salesService.getSalesContracts({ page: 1, pageSize: 20, shippedFrom: '2026-10-01', shippedTo: '2026-09-30' }), /不能晚于/);
+  } finally { prisma.salesContract.findMany = originalFindMany; prisma.salesContract.count = originalCount; }
 });
