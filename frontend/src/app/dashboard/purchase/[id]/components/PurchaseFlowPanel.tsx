@@ -12,7 +12,7 @@ import {
   BusinessWrite,
   useBusinessReadOnly,
 } from "@/lib/hooks/useBusinessReadOnly";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { MobileListCard } from "@/components/mobile";
 import { useMobile } from "@/lib/hooks/useMobile";
@@ -114,6 +114,13 @@ const formatMoney = (n: number) =>
  *   3. 「登记付款」复用 PaymentDialog 写入 finance/payments
  *   4. 「催开发票」生成开票信息文本 + 登记发票号（PurchaseContract.invoiceNo）
  */
+/** 发票号输入框的规范化：分隔符统一为换行（与原同步 effect 一致） */
+function normalizeInvoiceNoInput(invoiceNo: string | null | undefined) {
+  return String(invoiceNo || "")
+    .replace(/[，,;；\s]+/g, "\n")
+    .trim();
+}
+
 export function PurchaseFlowPanel({
   contract,
   onUpdated,
@@ -132,8 +139,9 @@ export function PurchaseFlowPanel({
   const [customAmount, setCustomAmount] = useState("");
 
   // 发票号码与选填原件使用同一弹窗完成，避免再建平行发票页面。
-  const [invoiceNoInput, setInvoiceNoInput] = useState(
-    contract.invoiceNo || "",
+  // 初始值即为规范化结果（与原挂载 effect 规范化后的状态一致）
+  const [invoiceNoInput, setInvoiceNoInput] = useState(() =>
+    normalizeInvoiceNoInput(contract.invoiceNo),
   );
   const [savingInvoiceNo, setSavingInvoiceNo] = useState(false);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
@@ -165,13 +173,12 @@ export function PurchaseFlowPanel({
   // 购销合同号：PO 前缀转 CG（与购销合同文档编号规则一致）
   const cgNo = contract.contractNo?.replace("PO", "CG") || contract.contractNo;
 
-  useEffect(() => {
-    setInvoiceNoInput(
-      String(contract.invoiceNo || "")
-        .replace(/[，,;；\s]+/g, "\n")
-        .trim(),
-    );
-  }, [contract.invoiceNo]);
+  // 合同发票号变化时在渲染期同步输入框（替代 effect 内 setState）
+  const [prevInvoiceNo, setPrevInvoiceNo] = useState(contract.invoiceNo);
+  if (prevInvoiceNo !== contract.invoiceNo) {
+    setPrevInvoiceNo(contract.invoiceNo);
+    setInvoiceNoInput(normalizeInvoiceNoInput(contract.invoiceNo));
+  }
 
   const invoiceNumbers = useMemo(
     () =>

@@ -64,6 +64,14 @@ const STATUS_LABEL_MAP: Record<InventoryStatus, string> = {
  *   1. 加载并展示库存列表
  *   2. 支持快速更新库存状态
  */
+/**
+ * 与原 `try { await fn() } catch` 等价地启动请求：fn 同步抛错或返回非 Promise 值时，
+ * 也会进入返回的 Promise 链并由后续 .catch/.finally 处理
+ */
+function startRequest<T>(fn: () => T | PromiseLike<T>): Promise<T> {
+  return new Promise<T>((resolve) => resolve(fn()));
+}
+
 export function InventoryTab() {
   // 库存状态
   const [inventory, setInventory] = useState<Inventory[]>([]);
@@ -100,44 +108,72 @@ export function InventoryTab() {
    * @param searchKeyword 搜索关键词
    * @returns Promise<void>
    */
-  const loadInventory = useCallback(
-    async (searchKeyword = ""): Promise<void> => {
+  const fetchInventory = useCallback(
+    (searchKeyword = ""): Promise<void> => {
       const request = ++inventoryRequest.current;
-      setLoading(true);
-      setLoadError(false);
-      try {
-        // 到货验货、出货与批量流转均会改变库存；每次进入或刷新都读取服务器事实。
-        const response = await inventoryService.getAll({
+      // 到货验货、出货与批量流转均会改变库存；每次进入或刷新都读取服务器事实。
+      // 状态只在请求回调中更新，可直接在 effect 中调用
+      return startRequest(() =>
+        inventoryService.getAll({
           page: currentPage,
           pageSize,
           keyword: searchKeyword || undefined,
+        }),
+      )
+        .then((response) => {
+          if (request !== inventoryRequest.current) return;
+          const nextInventory = response.data?.items || [];
+          setInventory(nextInventory);
+          setTotal(response.data?.pagination?.total ?? 0);
+          setSelectedIds((prevSelectedIds) => {
+            const availableIds = new Set(nextInventory.map((item) => item.id));
+            return prevSelectedIds.filter((id) => availableIds.has(id));
+          });
+        })
+        .catch(() => {
+          if (request !== inventoryRequest.current) return;
+          setLoadError(true);
+          toast.error("加载库存失败");
+        })
+        .finally(() => {
+          if (request === inventoryRequest.current) setLoading(false);
         });
-        if (request !== inventoryRequest.current) return;
-        const nextInventory = response.data?.items || [];
-        setInventory(nextInventory);
-        setTotal(response.data?.pagination?.total ?? 0);
-        setSelectedIds((prevSelectedIds) => {
-          const availableIds = new Set(nextInventory.map((item) => item.id));
-          return prevSelectedIds.filter((id) => availableIds.has(id));
-        });
-      } catch {
-        if (request !== inventoryRequest.current) return;
-        setLoadError(true);
-        toast.error("加载库存失败");
-      } finally {
-        if (request === inventoryRequest.current) setLoading(false);
-      }
     },
     [currentPage, pageSize],
   );
 
+  /** 手动重试：先进入加载态再拉取 */
+  const loadInventory = useCallback(
+    (searchKeyword = ""): Promise<void> => {
+      setLoading(true);
+      setLoadError(false);
+      return fetchInventory(searchKeyword);
+    },
+    [fetchInventory],
+  );
+
+  // 查询条件或刷新信号变化时在渲染期同步进入加载态（替代 effect 内同步 setState），请求仍在下方 effect 中发起
+  const inventoryQueryKey = JSON.stringify([
+    debouncedKeyword,
+    currentPage,
+    pageSize,
+    refreshVersion,
+  ]);
+  const [prevInventoryQueryKey, setPrevInventoryQueryKey] =
+    useState(inventoryQueryKey);
+  if (prevInventoryQueryKey !== inventoryQueryKey) {
+    setPrevInventoryQueryKey(inventoryQueryKey);
+    setLoading(true);
+    setLoadError(false);
+  }
+
   // 操作完成时只发出刷新信号；效果使用最新筛选，避免旧操作覆盖新查询。
   useEffect(() => {
-    void loadInventory(debouncedKeyword);
+    void fetchInventory(debouncedKeyword);
     return () => {
       inventoryRequest.current += 1;
     };
-  }, [debouncedKeyword, loadInventory, refreshVersion]);
+  }, [debouncedKeyword, fetchInventory, refreshVersion]);
 
   /**
    * 获取库存状态徽章
