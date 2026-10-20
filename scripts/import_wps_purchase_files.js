@@ -1,6 +1,6 @@
 /**
  * Input: wps_purchase_file_retention_audit.json + backend/prisma/dev.db
- * Output: optional deterministic file copies under backend/uploads/contracts + ContractFile records
+ * Output: optional deterministic file copies under <UPLOAD_DIR>/contracts (same root as backend config.upload.dir) + ContractFile records
  * Pos: WPS 采购合同附件导入脚本；默认 dry-run，显式 --apply 后才复制文件并创建附件记录，不改采购业务字段
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -13,13 +13,15 @@ const path = require('path');
 const repoRoot = path.join(__dirname, '..');
 const backendPath = path.join(repoRoot, 'backend');
 process.chdir(backendPath);
+const { resolveWpsUploadRoot, assertUploadSubdir } = require(path.join(backendPath, 'scripts/wps-upload-dir'));
+// 与后端 config.upload.dir 一致：UPLOAD_DIR（启动环境或 backend/.env）或 ./uploads，相对路径按 backend/ 解析。
+// 必须在加载 Prisma 之前解析：Prisma 会自动加载并展开 .env 写回 process.env，而后端 config 不会。
+const uploadRoot = resolveWpsUploadRoot({ backendDir: backendPath });
 
 const { PrismaClient } = require(path.join(backendPath, 'node_modules/@prisma/client'));
 
 const prisma = new PrismaClient();
 const parsedDir = path.join(repoRoot, 'tmp/wps_11_export_list_raw/parsed');
-const uploadRoot = path.join(backendPath, 'uploads');
-const uploadContractsDir = path.join(uploadRoot, 'contracts');
 
 function parseArgs(argv) {
   const options = {
@@ -134,7 +136,7 @@ async function main() {
   }
 
   if (options.apply) {
-    fs.mkdirSync(uploadContractsDir, { recursive: true });
+    assertUploadSubdir(uploadRoot, 'contracts');
     for (const item of creates) {
       if (!fs.existsSync(item.destinationAbsolutePath)) {
         fs.copyFileSync(item.sourceAbsolutePath, item.destinationAbsolutePath);
@@ -173,6 +175,7 @@ async function main() {
     skippedCount: skipped.length,
     totalBytesToCopy: plan.totalBytesToCopy,
     out: options.out,
+    uploadRoot,
     mode: plan.mode,
   }, null, 2));
 }
