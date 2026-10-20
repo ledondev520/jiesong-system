@@ -139,6 +139,8 @@ const getSessionCount = (item: AiSessionItem) => {
 const getSessionLastAt = (item: AiSessionItem) => item._max?.createdAt || null;
 const FAILED_ACTION_ESCALATION_MS = 4 * 60 * 60 * 1000;
 const PENDING_ACTION_ESCALATION_MS = 2 * 60 * 60 * 1000;
+/** 超时判断参考时间的刷新间隔 */
+const NOW_TICK_MS = 30 * 1000;
 const formatDomainSummary = (domains?: string[]) => {
   if (!domains?.length) return "—";
   if (domains.length === 1) return domains[0];
@@ -206,21 +208,25 @@ const hasCompletedPendingAction = (items?: AiPendingActionSummary[]) => {
 const isActionGroupAged = (
   items: AiPendingActionSummary[] | undefined,
   thresholdMs: number,
+  nowMs: number,
 ) => {
   const latestActionAt = getLatestPendingActionAt(items);
   if (!latestActionAt) return false;
-  return Date.now() - new Date(latestActionAt).getTime() >= thresholdMs;
+  return nowMs - new Date(latestActionAt).getTime() >= thresholdMs;
 };
 
-const getPendingActionPriority = (items?: AiPendingActionSummary[]) => {
+const getPendingActionPriority = (
+  items: AiPendingActionSummary[] | undefined,
+  nowMs: number,
+) => {
   if (
     hasFailedPendingAction(items) &&
-    isActionGroupAged(items, FAILED_ACTION_ESCALATION_MS)
+    isActionGroupAged(items, FAILED_ACTION_ESCALATION_MS, nowMs)
   )
     return 0;
   if (
     hasPendingPendingAction(items) &&
-    isActionGroupAged(items, PENDING_ACTION_ESCALATION_MS)
+    isActionGroupAged(items, PENDING_ACTION_ESCALATION_MS, nowMs)
   )
     return 1;
   if (hasFailedPendingAction(items)) return 2;
@@ -277,10 +283,14 @@ const getSessionAttentionSignal = (items?: AiPendingActionSummary[]) => {
   return null;
 };
 
-const compareSessionRisk = (a: AiSessionItem, b: AiSessionItem) => {
+const compareSessionRisk = (
+  a: AiSessionItem,
+  b: AiSessionItem,
+  nowMs: number,
+) => {
   const priorityDelta =
-    getPendingActionPriority(a.pendingActionSummary) -
-    getPendingActionPriority(b.pendingActionSummary);
+    getPendingActionPriority(a.pendingActionSummary, nowMs) -
+    getPendingActionPriority(b.pendingActionSummary, nowMs);
   if (priorityDelta !== 0) return priorityDelta;
 
   const latestActionA = getLatestPendingActionAt(a.pendingActionSummary);
@@ -297,33 +307,44 @@ const compareSessionRisk = (a: AiSessionItem, b: AiSessionItem) => {
   return new Date(lastAtB || 0).getTime() - new Date(lastAtA || 0).getTime();
 };
 
-const compareSessionByLatestAction = (a: AiSessionItem, b: AiSessionItem) => {
+const compareSessionByLatestAction = (
+  a: AiSessionItem,
+  b: AiSessionItem,
+  nowMs: number,
+) => {
   const latestActionA = getLatestPendingActionAt(a.pendingActionSummary);
   const latestActionB = getLatestPendingActionAt(b.pendingActionSummary);
   const actionDelta =
     new Date(latestActionB || 0).getTime() -
     new Date(latestActionA || 0).getTime();
   if (actionDelta !== 0) return actionDelta;
-  return compareSessionRisk(a, b);
+  return compareSessionRisk(a, b, nowMs);
 };
 
-const compareSessionByLatestMessage = (a: AiSessionItem, b: AiSessionItem) => {
+const compareSessionByLatestMessage = (
+  a: AiSessionItem,
+  b: AiSessionItem,
+  nowMs: number,
+) => {
   const lastAtA = getSessionLastAt(a);
   const lastAtB = getSessionLastAt(b);
   const delta =
     new Date(lastAtB || 0).getTime() - new Date(lastAtA || 0).getTime();
   if (delta !== 0) return delta;
-  return compareSessionRisk(a, b);
+  return compareSessionRisk(a, b, nowMs);
 };
 
 const compareSessionsByMode = (
   a: AiSessionItem,
   b: AiSessionItem,
   mode: string,
+  nowMs: number,
 ) => {
-  if (mode === "latest-action") return compareSessionByLatestAction(a, b);
-  if (mode === "latest-message") return compareSessionByLatestMessage(a, b);
-  return compareSessionRisk(a, b);
+  if (mode === "latest-action")
+    return compareSessionByLatestAction(a, b, nowMs);
+  if (mode === "latest-message")
+    return compareSessionByLatestMessage(a, b, nowMs);
+  return compareSessionRisk(a, b, nowMs);
 };
 
 const matchesActionFilter = (item: AiSessionItem, filter: string) => {
@@ -954,8 +975,17 @@ export default function AiSessionsPage() {
   const [stats24h, setStats24h] = useState<TokenStats | null>(null);
   const [stats30d, setStats30d] = useState<TokenStats | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
-  /** 超时判断的参考时间：不在渲染期读取时钟，随会话列表加载刷新 */
+  /**
+   * 超时判断（顶部摘要与风险排序共用）的参考时间：不在渲染期读取时钟；
+   * 会话列表加载成功时刷新，并每 NOW_TICK_MS 定时刷新，跨过超时阈值后无需重新加载列表即可更新。
+   */
   const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, NOW_TICK_MS);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const applyGovernancePreset = useCallback(
     (preset: keyof typeof GOVERNANCE_PRESETS) => {
@@ -1264,7 +1294,7 @@ export default function AiSessionsPage() {
   const governanceReplayNote = buildGovernanceReplayNote(sessions);
   const visibleSessions = [...sessions]
     .filter((item) => matchesActionFilter(item, actionFilter))
-    .sort((a, b) => compareSessionsByMode(a, b, sortMode));
+    .sort((a, b) => compareSessionsByMode(a, b, sortMode, nowMs));
 
   const sessionTableSort = useTableSort<AiSessionItem, string>(
     visibleSessions,
