@@ -94,41 +94,68 @@ export default function ReconciliationPage() {
   const [contracts, setContracts] = useState<ContractForMatch[]>([]);
   const [contractsLoading, setContractsLoading] = useState(false);
 
+  // fetch*：状态只在请求回调中更新，可直接在 effect 中调用；load*：先重置加载/错误态再拉取（事件中使用）
+  const fetchRecon = useCallback(() => getFullReconciliation()
+    .then((result) => { setReconData(result); })
+    .catch(() => { setReconError(true); })
+    .finally(() => { setReconLoading(false); }), []);
+
   const loadRecon = useCallback(async () => {
     setReconLoading(true);
     setReconError(false);
-    try {
-      const result = await getFullReconciliation();
-      setReconData(result);
-    } catch { setReconError(true); } finally { setReconLoading(false); }
-  }, []);
+    await fetchRecon();
+  }, [fetchRecon]);
 
-  const loadUnmatched = useCallback(async () => {
-    setUnmatchedError(false);
-    try {
-      const result = await getUnmatchedItems({ page, pageSize, search: search || undefined });
+  const fetchUnmatched = useCallback(() => getUnmatchedItems({ page, pageSize, search: search || undefined })
+    .then((result) => {
       setBankItems(result.bankItems);
       setInvoiceItems(result.invoiceItems);
       setBankTotal(result.bankTotal);
       setInvoiceTotal(result.invoiceTotal);
-    } catch { setUnmatchedError(true); }
-  }, [page, pageSize, search]);
+    })
+    .catch(() => { setUnmatchedError(true); }), [page, pageSize, search]);
+
+  const loadUnmatched = useCallback(async () => {
+    setUnmatchedError(false);
+    await fetchUnmatched();
+  }, [fetchUnmatched]);
+
+  const fetchContracts = useCallback(() => getContractsForMatch(contractType, contractSearch || undefined)
+    .then((list) => { setContracts(list); })
+    .catch(() => { setContractsError(true); })
+    .finally(() => { setContractsLoading(false); }), [contractType, contractSearch]);
 
   const loadContracts = useCallback(async () => {
     setContractsLoading(true);
     setContractsError(false);
-    try {
-      const list = await getContractsForMatch(contractType, contractSearch || undefined);
-      setContracts(list);
-    } catch { setContractsError(true); } finally { setContractsLoading(false); }
-  }, [contractType, contractSearch]);
+    await fetchContracts();
+  }, [fetchContracts]);
 
   const loadAll = useCallback(async () => {
     await Promise.all([loadRecon(), loadUnmatched()]);
   }, [loadRecon, loadUnmatched]);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
-  useEffect(() => { loadContracts(); }, [loadContracts]);
+  // 未匹配项查询条件变化时（与原 loadAll 一致，同时重载汇总）在渲染期同步重置加载/错误态，替代 effect 内同步 setState
+  const unmatchedKey = JSON.stringify([page, pageSize, search]);
+  const [prevUnmatchedKey, setPrevUnmatchedKey] = useState(unmatchedKey);
+  if (prevUnmatchedKey !== unmatchedKey) {
+    setPrevUnmatchedKey(unmatchedKey);
+    setReconLoading(true);
+    setReconError(false);
+    setUnmatchedError(false);
+  }
+
+  // 合同查询条件变化（含首次渲染，与原挂载 effect 一致）时在渲染期同步进入加载态
+  const contractsKey = JSON.stringify([contractType, contractSearch]);
+  const [prevContractsKey, setPrevContractsKey] = useState<string | null>(null);
+  if (prevContractsKey !== contractsKey) {
+    setPrevContractsKey(contractsKey);
+    setContractsLoading(true);
+    setContractsError(false);
+  }
+
+  useEffect(() => { void Promise.all([fetchRecon(), fetchUnmatched()]); }, [fetchRecon, fetchUnmatched]);
+  useEffect(() => { void fetchContracts(); }, [fetchContracts]);
 
   const selectedBank = bankItems.find(b => b.id === selectedBankId);
   const selectedInvoice = invoiceItems.find(i => i.id === selectedInvoiceId);

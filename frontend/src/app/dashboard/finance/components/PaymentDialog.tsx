@@ -156,7 +156,7 @@ export function PaymentDialog({
         </div>
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(handleSubmit)}
+            onSubmit={(event) => form.handleSubmit(handleSubmit)(event)}
             className="space-y-4"
           >
             {submitError && (

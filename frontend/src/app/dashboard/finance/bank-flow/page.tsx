@@ -59,23 +59,35 @@ export default function BankFlowPage() {
   const [loading, setLoading] = useState(true);
   const [importOpen, setImportOpen] = useState(false);
 
+  /** 拉取明细/统计/批次；状态只在请求回调中更新，可直接在 effect 中调用 */
+  const fetchData = useCallback(() => Promise.all([
+    getTransactions({ page, pageSize, search: search || undefined, direction: direction || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, currency, amountMin: amountMin ? Number(amountMin) : undefined, amountMax: amountMax ? Number(amountMax) : undefined }),
+    getTransactionStats({ search: search || undefined, direction: direction || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, currency, amountMin: amountMin ? Number(amountMin) : undefined, amountMax: amountMax ? Number(amountMax) : undefined }),
+    getBatches('BANK_FLOW'),
+  ]).then(([txnRes, statsRes, batchRes]) => {
+    setItems(txnRes.items || []);
+    setTotal(txnRes.pagination?.total || 0);
+    setStats(statsRes);
+    setBatches(batchRes || []);
+  }).catch(() => { setLoadError(true); }).finally(() => { setLoading(false); }), [page, pageSize, search, direction, dateFrom, dateTo, currency, amountMin, amountMax]);
+
+  /** 手动重试 / 导入成功后重新加载：先进入加载态再拉取 */
   const loadData = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
-    try {
-      const [txnRes, statsRes, batchRes] = await Promise.all([
-        getTransactions({ page, pageSize, search: search || undefined, direction: direction || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, currency, amountMin: amountMin ? Number(amountMin) : undefined, amountMax: amountMax ? Number(amountMax) : undefined }),
-        getTransactionStats({ search: search || undefined, direction: direction || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, currency, amountMin: amountMin ? Number(amountMin) : undefined, amountMax: amountMax ? Number(amountMax) : undefined }),
-        getBatches('BANK_FLOW'),
-      ]);
-      setItems(txnRes.items || []);
-      setTotal(txnRes.pagination?.total || 0);
-      setStats(statsRes);
-      setBatches(batchRes || []);
-    } catch { setLoadError(true); } finally { setLoading(false); }
-  }, [page, pageSize, search, direction, dateFrom, dateTo, currency, amountMin, amountMax]);
+    await fetchData();
+  }, [fetchData]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // 查询条件变化时在渲染期同步进入加载态（替代 effect 内同步 setState），请求仍在 effect 中发起
+  const queryKey = JSON.stringify([page, pageSize, search, direction, dateFrom, dateTo, currency, amountMin, amountMax]);
+  const [prevQueryKey, setPrevQueryKey] = useState(queryKey);
+  if (prevQueryKey !== queryKey) {
+    setPrevQueryKey(queryKey);
+    setLoading(true);
+    setLoadError(false);
+  }
+
+  useEffect(() => { void fetchData(); }, [fetchData]);
 
   const sort = useTableSort<BankTransaction, string>(
     items,

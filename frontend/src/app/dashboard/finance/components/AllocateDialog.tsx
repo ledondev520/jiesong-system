@@ -58,10 +58,18 @@ export function AllocateDialog({ open, onOpenChange, payment, onSubmit }: Alloca
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [retry, setRetry] = useState(0);
+  // 打开 / 切换到账款 / 重试时（含首次渲染）在渲染期同步重置加载态与列表，替代 effect 内同步 setState；请求仍在 effect 中发起
+  const loadKey = JSON.stringify([open, payment?.id, retry]);
+  const [prevLoadKey, setPrevLoadKey] = useState<string | null>(null);
+  if (prevLoadKey !== loadKey) {
+    setPrevLoadKey(loadKey);
+    if (open && payment) {
+      setLoading(true); setLoadError(false); setRows([]);
+    }
+  }
   useEffect(() => {
     if (!open || !payment) return;
     let cancelled = false;
-    setLoading(true); setLoadError(false); setRows([]);
     void loadPaginatedCatalog((page) => financeService.getReceivables({ page, pageSize: 100, outstandingOnly: true }))
       .then((contracts) => {
         if (!cancelled) setRows(contracts.map((contract) => ({
