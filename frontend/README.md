@@ -32,7 +32,7 @@
   - `e2e/real-hs-catalog.spec.ts` / `real-hs-fixture.ts`: 四项真实本地HS查询/详情/手工证据取消、失败纠正、保存回读与BOSS只读验收定义；已提交迁移私有SQLite，不调用外部HS或AI，也不把AI结果复制算作普通本地路径
 - `vitest.config.ts`: Vitest 测试配置
 - `playwright.config.ts`: Playwright 配置
-- `eslint.config.mjs`: 源码 lint；忽略构建、覆盖率及 Playwright 生成报告；next/react 升级后 5 条 react-hooks 规则检出 81 处既有违规而暂降为 warn，期间新增违规也只告警；按文件分批清理，某规则清零即恢复 error：preserve-manual-memoization 已于 B6、immutability 已于 B9+B10 恢复，现仍降级 set-state-in-effect、refs、purity 3 条（purity 余 1 处为有意保留：用户管理页渲染期读取当前时间判断凭据过期，故不能恢复 error）
+- `eslint.config.mjs`: 源码 lint；忽略构建、覆盖率及 Playwright 生成报告；next/react 升级后 5 条 react-hooks 规则检出 81 处既有违规而暂降为 warn，期间新增违规也只告警；按文件分批清理，某规则清零即恢复 error：preserve-manual-memoization 已于 B6、immutability 已于 B9+B10 恢复，分批清理已于 B11 完成，仍降级 set-state-in-effect、refs、purity 3 条：剩余 5 处均为有意保留（set-state-in-effect 3 处：sales 列表 URL 同步、系统日志页回第 1 页、退税准备弹窗报关单 id 重置，改渲染期会少一次中间请求；refs 1 处：useContractFileAccess 渲染期写 scope ref；purity 1 处：用户管理页渲染期读当前时间判断凭据过期），故这 3 条不能恢复 error，降级项保留
 
 ## 核心依赖
 

@@ -37,6 +37,9 @@ export function useContractFileAccess(scope: string) {
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
   const mounted = useRef(true);
   const scopeRef = useRef(scope);
+  // react-hooks/refs 警告保留：scope 必须在渲染期写入 ref。scope 变化提交时 layout 阶段的 reset 会中止全部请求，
+  // scopeRef 的作用恰是覆盖"新 scope 已渲染、尚未提交"的窗口（期间完成的旧预览/下载不得写入或触发下载）；
+  // 改为 effect 内写入会让该窗口内的旧下载照常点击保存（行为变化），故不改。
   scopeRef.current = scope;
   const previewRequest = useRef<FileRequest | null>(null);
   const downloads = useRef(new Map<string, FileRequest>());

@@ -8,4 +8,4 @@
 
 `browser-session.ts` 的认证代次订阅仅同步撤销内存文件视图；登录/退出/401 清理仍沿用原策略。`hooks/useContractFileAccess.ts` 为合同附件与船司原件共用认证 Blob 读取、取消和临时 URL 生命周期，不保存文件或新增凭据。
 
-`run-await.ts` 以回调形式执行请求，成功/失败/收尾回调的微任务时机、同步抛错与回调抛错处理均与 `async try { await } catch finally` 一致；页面 effect 内的请求用它替代 `.then().catch().finally()` 链，避免同一轮多个请求的成功/失败处理顺序改变。
+`run-await.ts` 以回调形式执行请求，成功/失败/收尾回调的微任务时机、同步抛错与回调抛错处理均与 `async try { await } catch finally` 一致；页面 effect 内的请求用它替代 `.then().catch().finally()` 链，避免同一轮多个请求的成功/失败处理顺序改变；需要返回值时用 `runAwaitResult`（try/catch 分支 return 回调返回值，Promise 以该值完成，时序相同）。
