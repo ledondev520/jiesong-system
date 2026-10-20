@@ -42,6 +42,13 @@ const FinancialEvidenceLibrary = lazy(() =>
   import('./FinancialEvidenceLibrary').then((module) => ({ default: module.FinancialEvidenceLibrary }))
 );
 
+/** 解析 `${year}-${month}` 账期键；无效时返回 null（与原 loadDetail 的 `!year || !month` 判断一致） */
+function parsePeriodKey(periodKey: string) {
+  const [year, month] = periodKey.split('-').map(Number);
+  if (!year || !month) return null;
+  return { year, month };
+}
+
 export function FinancialStatementsPageContent() {
   const readOnly = useBusinessReadOnly();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
@@ -69,59 +76,79 @@ export function FinancialStatementsPageContent() {
   const trialBalanceFileInputRef = useRef<HTMLInputElement>(null);
   const generalLedgerFileInputRef = useRef<HTMLInputElement>(null);
 
+  /** 拉取分析与账期列表；状态只在请求回调中更新，可直接在 effect 中调用 */
+  const fetchData = useCallback(() => Promise.all([
+    cachedFetch('fin-statements-analytics', () => financialStatementsService.getAnalytics()),
+    cachedFetch('fin-statements-list', () => financialStatementsService.listStatements()),
+  ]).then(([analyticsData, periodsData]) => {
+    const safePeriods = Array.isArray(periodsData) ? periodsData : [];
+    setAnalytics(analyticsData);
+    setPeriods(safePeriods);
+    if (safePeriods.length > 0 && !selectedPeriod) {
+      const latest = safePeriods[safePeriods.length - 1];
+      setSelectedPeriod(`${latest.year}-${latest.month}`);
+    }
+  }).catch(() => {
+    setLoadError(true);
+  }).finally(() => {
+    setLoading(false);
+  }), [selectedPeriod]);
+
+  /** 重试 / 导入确认后重新加载：先进入加载态再拉取 */
   const loadData = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
-    try {
-      const [analyticsData, periodsData] = await Promise.all([
-        cachedFetch('fin-statements-analytics', () => financialStatementsService.getAnalytics()),
-        cachedFetch('fin-statements-list', () => financialStatementsService.listStatements()),
-      ]);
-      const safePeriods = Array.isArray(periodsData) ? periodsData : [];
-      setAnalytics(analyticsData);
-      setPeriods(safePeriods);
-      if (safePeriods.length > 0 && !selectedPeriod) {
-        const latest = safePeriods[safePeriods.length - 1];
-        setSelectedPeriod(`${latest.year}-${latest.month}`);
-      }
-    } catch {
-      setLoadError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedPeriod]);
+    await fetchData();
+  }, [fetchData]);
 
+  /** 拉取账期明细；状态只在请求回调中更新，可直接在 effect 中调用 */
+  const fetchDetail = useCallback((periodKey: string) => {
+    const period = parsePeriodKey(periodKey);
+    if (!period) return Promise.resolve();
+    return cachedFetch(
+      `fin-statements-detail-${period.year}-${period.month}`,
+      () => financialStatementsService.getStatementDetail(period.year, period.month),
+    ).then((detail) => {
+      setCurrentDetail(detail);
+    }).catch(() => {
+      setDetailError(true);
+    }).finally(() => {
+      setDetailLoading(false);
+    });
+  }, []);
+
+  /** 重试时重新加载明细：先重置明细状态再拉取 */
   const loadDetail = useCallback(async (periodKey: string) => {
-    const [year, month] = periodKey.split('-').map(Number);
-    if (!year || !month) {
-      return;
-    }
-
+    if (!parsePeriodKey(periodKey)) return;
     setDetailLoading(true);
     setDetailError(false);
     setCurrentDetail(null);
-    try {
-      const detail = await cachedFetch(
-        `fin-statements-detail-${year}-${month}`,
-        () => financialStatementsService.getStatementDetail(year, month),
-      );
-      setCurrentDetail(detail);
-    } catch {
-      setDetailError(true);
-    } finally {
-      setDetailLoading(false);
+    await fetchDetail(periodKey);
+  }, [fetchDetail]);
+
+  // 所选账期变化时（原 loadData 依赖 selectedPeriod，会随之重新加载）在渲染期同步重置加载/错误态，
+  // 有效账期同时重置明细状态；替代 effect 内同步 setState，请求仍在 effect 中发起
+  const [prevSelectedPeriod, setPrevSelectedPeriod] = useState(selectedPeriod);
+  if (prevSelectedPeriod !== selectedPeriod) {
+    setPrevSelectedPeriod(selectedPeriod);
+    setLoading(true);
+    setLoadError(false);
+    if (selectedPeriod && parsePeriodKey(selectedPeriod)) {
+      setDetailLoading(true);
+      setDetailError(false);
+      setCurrentDetail(null);
     }
-  }, []);
+  }
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    void fetchData();
+  }, [fetchData]);
 
   useEffect(() => {
     if (selectedPeriod) {
-      void loadDetail(selectedPeriod);
+      void fetchDetail(selectedPeriod);
     }
-  }, [selectedPeriod, loadDetail]);
+  }, [selectedPeriod, fetchDetail]);
 
   const getUploadPeriod = () => {
     const year = parseInt(uploadYear, 10);
@@ -206,15 +233,20 @@ export function FinancialStatementsPageContent() {
   const warningAlerts = analytics?.alerts.filter((alert) => alert.level === 'warning') ?? [];
   const hasData = Boolean(analytics && analytics.totalPeriods > 0);
 
+  // 数据未就绪时收起下钻区（渲染期调整，替代 effect 内同步 setState）；就绪后仍由 effect 延时展开
+  const drilldownsBlocked = !hasData || !analytics || loading;
+  if (drilldownsBlocked && showDrilldowns) {
+    setShowDrilldowns(false);
+  }
+
   useEffect(() => {
-    if (!hasData || !analytics || loading) {
-      setShowDrilldowns(false);
+    if (drilldownsBlocked) {
       return;
     }
 
     const timer = window.setTimeout(() => setShowDrilldowns(true), 1200);
     return () => window.clearTimeout(timer);
-  }, [analytics, hasData, loading]);
+  }, [analytics, drilldownsBlocked]);
 
   return (
     <div className="space-y-6" data-testid="financial-statements-page-content">

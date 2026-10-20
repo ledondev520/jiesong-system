@@ -231,13 +231,15 @@ function HsCodesPageContent() {
     note: '',
   });
 
-  // 切换到新记录时重置 AI 填写区状态
-  useEffect(() => {
+  // 切换到新记录时重置 AI 填写区状态（渲染期按记录 id 变化调整，替代 effect 内 setState）
+  const [prevSelectedRecordId, setPrevSelectedRecordId] = useState(selectedRecord?.id);
+  if (prevSelectedRecordId !== selectedRecord?.id) {
+    setPrevSelectedRecordId(selectedRecord?.id);
     setFillProductName('');
     setFillProductDescription('');
     setFillResult(null);
     setFillCopied(false);
-  }, [selectedRecord?.id]);
+  }
 
   const openEvidenceEditor = () => {
     if (!selectedRecord) return;
@@ -318,7 +320,10 @@ function HsCodesPageContent() {
     }
   }, []);
 
-  runAiRecommendRef.current = runAiRecommend;
+  // 渲染期不写 ref：提交后同步最新推荐函数（先于下方自动推荐 effect 执行）
+  useEffect(() => {
+    runAiRecommendRef.current = runAiRecommend;
+  }, [runAiRecommend]);
 
   /**
    * 职责：手动点击「推荐」时校验非空再请求
@@ -354,7 +359,7 @@ function HsCodesPageContent() {
       setAiRecommendLoading(false);
     }
     setAiRecommendOpen(open);
-  }, []);
+  }, [setAiRecommendOpen]);
 
   // 将分页/关键词/编码状态同步写入 URL，支持书签与浏览器回退
   const syncToUrl = useCallback((kw: string, code: string, p: number, ps: number) => {
@@ -367,25 +372,12 @@ function HsCodesPageContent() {
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }, [router, pathname]);
 
-  // 列表/搜索触发（关键词/编码/页码/每页条数变化时重新加载）
-  useEffect(() => {
-    const kw = debouncedKeyword.trim();
-    const code = debouncedHsCode.trim().replace(/\D/g, '');
-    loadResults({ searchKeyword: kw, searchCode: code, nextPage: page, currentPageSize: pageSize });
-    syncToUrl(kw, code, page, pageSize);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedKeyword, debouncedHsCode, page, pageSize]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedKeyword, debouncedHsCode]);
-
   /**
-   * 职责：加载 HS 编码搜索结果
+   * 职责：拉取 HS 编码搜索结果；状态只在请求回调中更新，可直接在 effect 中调用
    * @param searchKeyword - 商品名称关键词
    * @param searchCode - HS 编码前缀（纯数字）
    */
-  const loadResults = async ({
+  const fetchResults = useCallback(({
     searchKeyword,
     searchCode = '',
     nextPage,
@@ -396,29 +388,60 @@ function HsCodesPageContent() {
     nextPage: number;
     currentPageSize?: number;
   }) => {
-    setLoading(true);
-    try {
-      const trimmedKw = searchKeyword.trim();
-      const trimmedCode = searchCode.trim().replace(/\D/g, '');
-      const hasInput = trimmedKw.length >= 2 || trimmedCode.length >= 2;
-      const response = await hsCodeService.list({
-        keyword: trimmedKw,
-        code: trimmedCode,
-        page: nextPage,
-        pageSize: currentPageSize,
-        fuzzy: hasInput,
-      });
+    const trimmedKw = searchKeyword.trim();
+    const trimmedCode = searchCode.trim().replace(/\D/g, '');
+    const hasInput = trimmedKw.length >= 2 || trimmedCode.length >= 2;
+    return hsCodeService.list({
+      keyword: trimmedKw,
+      code: trimmedCode,
+      page: nextPage,
+      pageSize: currentPageSize,
+      fuzzy: hasInput,
+    }).then((response) => {
       setResults(response.data.items || []);
       setIsFuzzy(!!(response.data as { fuzzy?: boolean }).fuzzy && hasInput);
       setTotal(response.data.pagination.total || 0);
       setTotalPages(response.data.pagination.totalPages || 1);
-    } catch (error) {
+    }).catch((error: unknown) => {
       console.error('HSCode 搜索失败:', error);
       toast.error('搜索失败，请稍后重试');
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
+  }, [pageSize]);
+
+  /**
+   * 职责：事件中加载 HS 编码搜索结果（先进入加载态再拉取）
+   */
+  const loadResults = (params: Parameters<typeof fetchResults>[0]) => {
+    setLoading(true);
+    return fetchResults(params);
   };
+
+  // 防抖后的关键词/编码变化时（含首次渲染，与原挂载 effect 一致）回到第 1 页；渲染期调整，替代 effect 内 setState
+  const debouncedSearchKey = JSON.stringify([debouncedKeyword, debouncedHsCode]);
+  const [prevDebouncedSearchKey, setPrevDebouncedSearchKey] = useState<string | null>(null);
+  if (prevDebouncedSearchKey !== debouncedSearchKey) {
+    setPrevDebouncedSearchKey(debouncedSearchKey);
+    setPage(1);
+  }
+
+  // 列表查询条件变化时（含首次渲染）在渲染期同步进入加载态，请求仍在下方 effect 中发起
+  const listQueryKey = JSON.stringify([debouncedKeyword, debouncedHsCode, page, pageSize]);
+  const [prevListQueryKey, setPrevListQueryKey] = useState<string | null>(null);
+  if (prevListQueryKey !== listQueryKey) {
+    setPrevListQueryKey(listQueryKey);
+    setLoading(true);
+  }
+
+  // 列表/搜索触发（关键词/编码/页码/每页条数变化时重新加载）
+  useEffect(() => {
+    const kw = debouncedKeyword.trim();
+    const code = debouncedHsCode.trim().replace(/\D/g, '');
+    void fetchResults({ searchKeyword: kw, searchCode: code, nextPage: page, currentPageSize: pageSize });
+    syncToUrl(kw, code, page, pageSize);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedKeyword, debouncedHsCode, page, pageSize]);
 
   const formatPercent = (value: number | null | undefined) => {
     if (value === null || value === undefined) return '-';
