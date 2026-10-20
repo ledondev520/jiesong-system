@@ -68,6 +68,7 @@ import { AgentAccountDialog } from "@/components/dialog/AgentAccountDialog";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { runAwait } from "@/lib/run-await";
 import { MobileListCard } from "@/components/mobile";
 
 export default function UsersPage() {
@@ -101,39 +102,62 @@ export default function UsersPage() {
   }, [origin, oneTimeToken]);
 
   // ── 数据加载 ──
-  useEffect(() => {
-    loadUsers();
-    loadAgents();
-  }, []);
+  const requestUsers = useCallback(
+    () =>
+      runAwait(
+        () =>
+          loadPaginatedCatalog((page) =>
+            userService.getAll({ page, pageSize: 100 }),
+          ),
+        (allUsers) => {
+          setUsers(allUsers);
+          setCurrentPage(1);
+        },
+        () => {
+          setUsersError(true);
+          toast.error("加载用户失败");
+        },
+        () => {
+          setLoading(false);
+        },
+      ),
+    [],
+  );
 
-  const loadUsers = async () => {
+  const requestAgents = useCallback(
+    () =>
+      runAwait(
+        () => agentService.getAll({ page: 1, pageSize: 100 }),
+        (response) => {
+          setAgents(response.data?.items || []);
+        },
+        () => {
+          toast.error("加载 Agent 列表失败");
+        },
+        () => {
+          setAgentLoading(false);
+        },
+      ),
+    [],
+  );
+
+  const loadUsers = useCallback(() => {
     setLoading(true);
     setUsersError(false);
-    try {
-      const allUsers = await loadPaginatedCatalog((page) =>
-        userService.getAll({ page, pageSize: 100 }),
-      );
-      setUsers(allUsers);
-      setCurrentPage(1);
-    } catch {
-      setUsersError(true);
-      toast.error("加载用户失败");
-    } finally {
-      setLoading(false);
-    }
-  };
+    return requestUsers();
+  }, [requestUsers]);
 
-  const loadAgents = async () => {
+  const loadAgents = useCallback(() => {
     setAgentLoading(true);
-    try {
-      const response = await agentService.getAll({ page: 1, pageSize: 100 });
-      setAgents(response.data?.items || []);
-    } catch {
-      toast.error("加载 Agent 列表失败");
-    } finally {
-      setAgentLoading(false);
-    }
-  };
+    return requestAgents();
+  }, [requestAgents]);
+
+  // loading/agentLoading 初值为 true、usersError 初值为 false，挂载时原先 loadX 内的同步置位不改变状态，
+  // effect 只按原顺序（先用户、后 Agent）发请求。
+  useEffect(() => {
+    void requestUsers();
+    void requestAgents();
+  }, [requestUsers, requestAgents]);
 
   // ── 用户操作 ──
   const getRoleBadge = (role: Role) => {
@@ -210,6 +234,8 @@ export default function UsersPage() {
     toast.success(successMessage);
   };
 
+  // react-hooks/purity 警告保留：渲染期读取当前时间，每次重渲染按当时时间判断过期/即将过期。
+  // 改为挂载或加载时取一次时间会让页面长时间打开后徽标不再更新（行为变化），故不改。
   const getCredentialRisk = (expiresAt?: string | null) => {
     if (!expiresAt) return null;
     const diffMs = new Date(expiresAt).getTime() - Date.now();

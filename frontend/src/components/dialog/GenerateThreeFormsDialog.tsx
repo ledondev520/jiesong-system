@@ -12,7 +12,7 @@
 
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -259,12 +259,41 @@ export function GenerateThreeFormsDialog({
     .map((row) => `${row.packingItem.id}:${row.hsCode.trim()}:${row.source}`)
     .join("|");
 
+  // 预检加载置位：原先在下方 effect 内同步写入，改为渲染期执行（初值 null 使挂载时同样执行）。
+  const [previewKey, setPreviewKey] = useState<{
+    open: boolean;
+    salesContractId: string;
+    previewSignature: string;
+    initialRows: ProductRow[];
+  } | null>(null);
+  if (
+    previewKey === null ||
+    previewKey.open !== open ||
+    previewKey.salesContractId !== salesContract.id ||
+    previewKey.previewSignature !== previewSignature ||
+    previewKey.initialRows !== initialRows
+  ) {
+    setPreviewKey({
+      open,
+      salesContractId: salesContract.id,
+      previewSignature,
+      initialRows,
+    });
+    if (open) setPreviewLoading(true);
+  }
+  // 渲染期已置位、对应被动 effect 尚未执行的窗口内，旧预检仍为当前请求；原 effect 会随后把 previewLoading 覆盖为 true，
+  // 因此窗口内旧预检跳过 setPreviewLoading(false)（准备度与行数据写入不受影响，与原先一致）。
+  const previewLoadingPendingRef = useRef(false);
+  useLayoutEffect(() => {
+    previewLoadingPendingRef.current = open;
+  }, [open, salesContract.id, previewSignature, initialRows]);
+
   // 打开或人工/AI 修改 HS 编码后，重新读取后端权威的全量单证准备度。
   useEffect(() => {
+    previewLoadingPendingRef.current = false;
     if (!open) return;
     const requestId = ++previewRequestIdRef.current;
     const baseRows = displayRows;
-    setPreviewLoading(true);
     void threeFormsService
       .previewThreeForms({
         salesContractId: salesContract.id,
@@ -314,7 +343,11 @@ export function GenerateThreeFormsDialog({
         toast.error(apiMsg || "出口单证准备度校验失败");
       })
       .finally(() => {
-        if (previewRequestIdRef.current === requestId) setPreviewLoading(false);
+        if (
+          previewRequestIdRef.current === requestId &&
+          !previewLoadingPendingRef.current
+        )
+          setPreviewLoading(false);
       });
     return () => {
       if (previewRequestIdRef.current === requestId)

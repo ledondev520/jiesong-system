@@ -14,6 +14,7 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -24,6 +25,7 @@ import { useRouter } from "next/navigation";
 import type { CustomsDeclaration } from "@/types";
 import { customsDeclarationService } from "@/services/customsDeclaration.service";
 import { cachedFetch } from "@/lib/api-cache";
+import { runAwait } from "@/lib/run-await";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
@@ -79,41 +81,77 @@ export function CustomsDeclarationListPageContent({
   const requestGenerationRef = useRef(0);
   const queryKey = `customs-declarations-${deferredKeyword}-${status}-${page}-${pageSize}`;
 
-  const loadDeclarations = useCallback(async () => {
+  // 筛选/分页变化时的 loading 置位：原先在 effect 内（loadDeclarations 开头）同步写入，改为渲染期执行；
+  // 挂载时 loading 初值即为 true，无需写入。
+  const [loadFilters, setLoadFilters] = useState({
+    deferredKeyword,
+    status,
+    page,
+    pageSize,
+  });
+  if (
+    loadFilters.deferredKeyword !== deferredKeyword ||
+    loadFilters.status !== status ||
+    loadFilters.page !== page ||
+    loadFilters.pageSize !== pageSize
+  ) {
+    setLoadFilters({ deferredKeyword, status, page, pageSize });
+    setLoading(true);
+  }
+  // 渲染期已置位、对应被动 effect 尚未执行的窗口内，旧请求仍视为当前请求；原 effect 会随后把 loading 覆盖为 true，
+  // 因此窗口内旧请求跳过 setLoading(false)（列表与总数写入不受影响，与原先一致）。
+  const loadingResetPendingRef = useRef(false);
+
+  const requestDeclarations = useCallback(() => {
     // 旧筛选回调或卸载后的刷新不能启动/提交列表请求。
-    if (activeQueryRef.current !== queryKey) return;
+    if (activeQueryRef.current !== queryKey) return Promise.resolve();
     const requestGeneration = ++requestGenerationRef.current;
     const isCurrent = () =>
       activeQueryRef.current === queryKey &&
       requestGenerationRef.current === requestGeneration;
-    setLoading(true);
-    try {
-      const response = await cachedFetch(queryKey, () =>
-        customsDeclarationService.getAll({
-          page,
-          pageSize,
-          keyword: deferredKeyword || undefined,
-          status: status === "ALL" ? undefined : status,
-        }),
-      );
-      if (!isCurrent()) return;
-      setDeclarations(response?.data?.items || []);
-      setTotal(response?.data?.pagination?.total ?? 0);
-    } catch {
-      if (isCurrent()) toast.error("加载报关单失败");
-    } finally {
-      if (isCurrent()) setLoading(false);
-    }
+    return runAwait(
+      () =>
+        cachedFetch(queryKey, () =>
+          customsDeclarationService.getAll({
+            page,
+            pageSize,
+            keyword: deferredKeyword || undefined,
+            status: status === "ALL" ? undefined : status,
+          }),
+        ),
+      (response) => {
+        if (!isCurrent()) return;
+        setDeclarations(response?.data?.items || []);
+        setTotal(response?.data?.pagination?.total ?? 0);
+      },
+      () => {
+        if (isCurrent()) toast.error("加载报关单失败");
+      },
+      () => {
+        if (isCurrent() && !loadingResetPendingRef.current) setLoading(false);
+      },
+    );
   }, [deferredKeyword, status, page, pageSize, queryKey]);
+
+  const loadDeclarations = useCallback(() => {
+    if (activeQueryRef.current !== queryKey) return Promise.resolve();
+    setLoading(true);
+    return requestDeclarations();
+  }, [requestDeclarations, queryKey]);
+
+  useLayoutEffect(() => {
+    loadingResetPendingRef.current = true;
+  }, [requestDeclarations, queryKey]);
 
   useEffect(() => {
     activeQueryRef.current = queryKey;
-    void loadDeclarations();
+    loadingResetPendingRef.current = false;
+    void requestDeclarations();
     return () => {
       activeQueryRef.current = null;
       requestGenerationRef.current += 1;
     };
-  }, [loadDeclarations, queryKey]);
+  }, [requestDeclarations, queryKey]);
 
   const sort = useTableSort<CustomsDeclaration, string>(
     declarations,

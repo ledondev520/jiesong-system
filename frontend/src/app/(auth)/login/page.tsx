@@ -9,7 +9,15 @@
 
 "use client";
 
-import { useCallback, useEffect, useState, useRef, Suspense } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useRef,
+  useSyncExternalStore,
+  Suspense,
+} from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
@@ -62,6 +70,9 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
+const EXPIRED_MESSAGE = "登录会话已过期，请重新登录";
+const subscribeNoop = () => () => {};
+
 function LoginFormClient() {
   const router = useRouter();
   const registrationReceipt = useRegistrationReceipt();
@@ -75,15 +86,36 @@ function LoginFormClient() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [isClientReady, setIsClientReady] = useState(false);
+  // Hydration 完成前禁用提交，避免浏览器按原生 GET 表单把账号密码拼进 URL：
+  // 服务端与 hydration 渲染取 false，客户端取 true（原先由挂载 effect 置 true）。
+  const isClientReady = useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false,
+  );
 
-  // 检查会话过期参数
-  useEffect(() => {
-    const expired = searchParams.get("expired");
-    if (expired === "1") {
-      setError("登录会话已过期，请重新登录");
+  // 检查会话过期参数：原先在 effect 内随 searchParams 变化同步写入，改为渲染期执行（初值 null 使挂载时同样执行）。
+  // 渲染期已写入、对应被动 effect 尚未执行的窗口内，原 effect 会随后用过期提示覆盖异步回调写入的错误，
+  // 因此窗口内（仅 expired=1 时）异步回调跳过错误写入；事件处理不会落在该窗口（离散事件前会先执行待处理的被动 effect）。
+  const [prevSearchParams, setPrevSearchParams] = useState<
+    typeof searchParams | null
+  >(null);
+  if (prevSearchParams !== searchParams) {
+    setPrevSearchParams(searchParams);
+    if (searchParams.get("expired") === "1") {
+      setError(EXPIRED_MESSAGE);
     }
+  }
+  const expiredPendingRef = useRef(false);
+  useLayoutEffect(() => {
+    expiredPendingRef.current = searchParams.get("expired") === "1";
   }, [searchParams]);
+  useEffect(() => {
+    expiredPendingRef.current = false;
+  }, [searchParams]);
+  const setAsyncError = useCallback((message: string) => {
+    if (!expiredPendingRef.current) setError(message);
+  }, []);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -92,11 +124,6 @@ function LoginFormClient() {
       password: "",
     },
   });
-
-  // Hydration 完成前禁用提交，避免浏览器按原生 GET 表单把账号密码拼进 URL。
-  useEffect(() => {
-    setIsClientReady(true);
-  }, []);
 
   // 清理旧版快捷登录缓存：旧实现保存过密码，不能再作为登录凭据复用。
   useEffect(() => {
@@ -130,14 +157,14 @@ function LoginFormClient() {
         if (code === 401) {
           clearAuthToken();
         } else {
-          setError("暂时无法确认登录状态，请重试登录");
+          setAsyncError("暂时无法确认登录状态，请重试登录");
         }
       })
       .finally(() => {
         if (!controller.signal.aborted && !restored) setCheckingSession(false);
       });
     return () => controller.abort();
-  }, [login, router]);
+  }, [login, router, setAsyncError]);
 
   const clearLegacyQuickLoginProfile = useCallback(() => {
     clearLegacyQuickLoginState();
@@ -195,20 +222,22 @@ function LoginFormClient() {
             rawMessage,
           )
         ) {
-          setError("后端服务未连接，请先启动 backend 服务（默认端口 3001）");
+          setAsyncError(
+            "后端服务未连接，请先启动 backend 服务（默认端口 3001）",
+          );
         } else if (
           retryAfter &&
           Number.isFinite(retryAfter) &&
           retryAfter > 0
         ) {
           const minutes = Math.ceil(retryAfter / 60);
-          setError(
+          setAsyncError(
             `登录尝试过于频繁，请 ${minutes} 分钟后再试，或切换账号后重试。`,
           );
         } else if (rawMessage) {
-          setError(rawMessage);
+          setAsyncError(rawMessage);
         } else {
-          setError("登录失败，请检查用户名和密码");
+          setAsyncError("登录失败，请检查用户名和密码");
         }
       } finally {
         if (controller.signal.aborted) return;
@@ -216,7 +245,7 @@ function LoginFormClient() {
         setIsLoading(false);
       }
     },
-    [clearLegacyQuickLoginProfile, login, rememberMe, router],
+    [clearLegacyQuickLoginProfile, login, rememberMe, router, setAsyncError],
   );
 
   /**
@@ -263,7 +292,7 @@ function LoginFormClient() {
             <Form {...form}>
               <form
                 method="post"
-                onSubmit={form.handleSubmit(onSubmit)}
+                onSubmit={(event) => form.handleSubmit(onSubmit)(event)}
                 className="space-y-4"
               >
                 <FormField

@@ -18,12 +18,13 @@ const eslintConfig = defineConfig([
   // 注意：期间仍降级规则的新增违规也只告警、不阻断 CI，评审时需留意。
   // 清理计划：按文件分批小 PR 逐步修复（团队看板跟踪，见 jiesong-react-hooks-cleanup 计划），
   // 某规则清零后即恢复为 "error"。只降级最初这 5 条中尚未清零的规则，不得在此追加其他规则。
-  // 已清零并恢复为 error（删除降级项，回到 eslint-config-next 默认）：preserve-manual-memoization（B6）。
-  // 当前仍降级 4 条：set-state-in-effect、immutability、refs、purity。
+  // 已清零并恢复为 error（删除降级项，回到 eslint-config-next 默认）：preserve-manual-memoization（B6）、
+  // immutability（B9+B10）。
+  // 当前仍降级 3 条：set-state-in-effect、refs、purity。其中 purity 余 1 处为有意保留（用户管理页渲染期读取
+  // 当前时间判断凭据过期，改为固定时间点会改变行为），该规则不能恢复为 error。
   {
     rules: {
       "react-hooks/set-state-in-effect": "warn",
-      "react-hooks/immutability": "warn",
       "react-hooks/refs": "warn",
       "react-hooks/purity": "warn",
     },
