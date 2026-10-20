@@ -25,7 +25,10 @@ const prisma = new PrismaClient();
 
 const APPLY = process.argv.includes('--apply');
 const SOURCE_DIR = path.join(repoRoot, 'docs/wps-import/2026-07');
-const UPLOAD_DIR = path.join(backendPath, 'uploads/sales-contracts');
+const { resolveWpsUploadRoot, assertUploadSubdir } = require(path.join(backendPath, 'scripts/wps-upload-dir'));
+// 与后端 config.upload.dir 一致：UPLOAD_DIR（环境变量或 backend/.env）或 ./uploads，相对路径按 backend/ 解析
+const UPLOAD_ROOT = resolveWpsUploadRoot({ backendDir: backendPath });
+const UPLOAD_DIR = path.join(UPLOAD_ROOT, 'sales-contracts');
 
 // ==================== 0. 数据常量（源：WPS 工作簿 + 招行对账单） ====================
 
@@ -213,7 +216,7 @@ async function upsertProduct(item) {
  *   0. 港口/门店前置校验
  *   1. upsert 合同头（保留已有 receivedAmount）
  *   2. 删除旧 items/packingItems 后按源数据重建（仅限本脚本管理的合同）
- *   3. 注册附件（拷贝到 uploads/sales-contracts + 建 SalesContractFile 行）
+ *   3. 注册附件（拷贝到 <UPLOAD_DIR>/sales-contracts + 建 SalesContractFile 行）
  * @param {object} spec - EXPORT_CONTRACTS 中的合同定义
  */
 async function importExportContract(spec) {
@@ -309,7 +312,6 @@ async function importExportContract(spec) {
     if (APPLY) {
       const dup = await prisma.salesContractFile.findFirst({ where: { salesContractId: contractId, fileName: file.source } });
       if (dup) continue;
-      fs.mkdirSync(UPLOAD_DIR, { recursive: true });
       const ext = path.extname(file.source);
       const targetName = `WPS-${spec.contractNo}-${sha1Prefix(sourcePath)}${ext}`;
       fs.copyFileSync(sourcePath, path.join(UPLOAD_DIR, targetName));
@@ -492,6 +494,9 @@ async function registerPayments() {
  */
 async function main() {
   console.log(APPLY ? '=== 执行模式（写库） ===' : '=== 演练模式（dry-run，加 --apply 才写库） ===');
+  console.log(`附件目录: ${UPLOAD_DIR}`);
+  // 写库前确认附件目录存在，避免在非运行部署目录执行时写到错误位置或半途失败
+  if (APPLY) assertUploadSubdir(UPLOAD_ROOT, 'sales-contracts');
 
   // 1. 补建缺失采购合同（付款登记依赖）
   await createMissingPurchaseContracts();

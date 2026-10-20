@@ -71,9 +71,9 @@
 | build_wps_remaining_closure_register.py | 数据核对 | 只读汇总所有剩余 DB 来源缺口、业务/正式材料裁决项和 cloud-only 原件，生成关闭总台账；不写库 |
 | build_wps_missing_evidence_intake_package.py | 数据核对 | 汇总行动矩阵、cloud-only 探测和正式报关阻断报告，生成缺失材料收件校验包，列出验收标准、严格字段、校验命令和禁止动作；不写库 |
 | scan_wps_missing_evidence_inbox.py | 数据核对 | 只读扫描项目收件目录和 Downloads，按收件包识别 SHA1 精确 cloud-only 原件，并对正式报关候选做路径/内容命中、重叠目录去重和强候选/参考汇总/弱关键词分层；不写库不复制 |
-| import_wps_export_files.js | 数据导入 | 基于 WPS 附件盘点，把可归属到正式 `EXP*` 的出货/报关源文件确定性复制到 `backend/uploads/sales-contracts` 并创建 `SalesContractFile` 记录；默认 dry-run |
+| import_wps_export_files.js | 数据导入 | 基于 WPS 附件盘点，把可归属到正式 `EXP*` 的出货/报关源文件确定性复制到 `<UPLOAD_DIR>/sales-contracts`（与后端 `config.upload.dir` 同一解析：环境变量或 `backend/.env` 的 `UPLOAD_DIR`，默认 `./uploads`，相对路径按 `backend/` 解析；`--apply` 时目录不存在直接失败）并创建 `SalesContractFile` 记录；默认 dry-run |
 | audit_wps_purchase_file_retention.js | 数据核对 | 只读审计 WPS 首选采购凭证、系统合同附件表和上传目录物理文件的留存覆盖关系；不写库 |
-| import_wps_purchase_files.js | 数据导入 | 基于附件留存审计结果，确定性复制 WPS 首选采购凭证并创建采购合同附件记录；默认 dry-run，显式 `--apply` 后才写库/复制 |
+| import_wps_purchase_files.js | 数据导入 | 基于附件留存审计结果，确定性复制 WPS 首选采购凭证到 `<UPLOAD_DIR>/contracts`（解析规则同上，`--apply` 时目录不存在直接失败）并创建采购合同附件记录；默认 dry-run，显式 `--apply` 后才写库/复制 |
 | recover_wps_purchase_orphan_files.js | 数据修复 | 基于附件留存审计结果，为上传目录中可从文件名推断到现有采购合同的物理孤儿文件恢复 `ContractFile` 记录；默认 dry-run，不复制/删除文件 |
 | backfill_wps_contract_source_notes.js | 数据修复 | 基于已解析源文件和采购凭证导入计划，只给出口/采购合同头回填 WPS 文件来源 note；不改业务字段，默认 dry-run |
 | backfill_wps_purchase_item_source_notes.js | 数据修复 | 基于采购凭证明细和现库采购明细，只在合同号、商品、数量、单价/总额唯一匹配时回填采购明细来源 note；不改业务字段，默认 dry-run |
