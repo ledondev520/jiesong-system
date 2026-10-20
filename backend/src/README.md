@@ -49,6 +49,7 @@
 | supplierController.js | 供应商管理 CRUD |
 | storeController.js | 门店管理 CRUD + 港口 |
 | productController.js | 商品管理 + 历史价格 |
+| purchaseImportExportController.js | 采购 Excel 导出及仅传 originalname/buffer 的内存导入 |
 | purchaseController.js | 采购合同 + 经 fileService 收紧权限的附件上传 + 从 UPLOAD_DIR 解析附件下载；旧下载/删除入口复用财务凭证访问边界，旧删除保留既有物理归档 |
 | salesController.js | 出口合同 + 价格计算 + 源文件附件；旧下载/删除入口复用财务凭证访问边界 |
 | fileController.js | 合同附件；退税确认清单含核验行，所有下载及删除入口经 fileService.assertFileAccess 限制为管理员/财务 |
@@ -120,6 +121,7 @@
 | response.js | 统一响应格式 |
 | pagination.js | 统一分页归一化与安全整数 offset 上限 |
 | validators.js | 参数验证规则，非法或超大列表页码返回 400 |
+| purchaseExcelUpload.js | 采购 Excel 专用 memoryStorage；仅 .xlsx/.xls，沿用 config.upload.maxSize，不创建磁盘存储 |
 | upload.js | 文件上传 (multer)；启动磁盘流前验证可信根下的日期目录无子别名并保护为 0700，目录故障经回调拒绝；文件 0600 仍由附件服务在异步查询前收紧 |
 | auditLog.js | 操作日志记录 |
 | aiCache.js | HS AI 推荐结果缓存；命中直接返回，不模拟等待 |
@@ -152,7 +154,7 @@
 
 - `services/purchaseContractNumberService.js` 统一采购创建、编号预览和批量导入的 `CGyy` 序列：按现存合法数字后缀最大值加一，删除早期草稿不会与仍存在的编号碰撞；预览不预留编号
 - `agent/commands/purchase/createPurchaseWithItems.js` 在合同与明细事务内分配编号，对自动编号唯一冲突或事务写冲突最多重试三次；不更改用户指定编号，也不重试无关数据库错误
-- `services/purchaseImportExportService.js` 的实际 Excel 导入复用统一序列；非空非法金额及不存在的日历日期逐行拒绝，逗号空壳金额及金额/日期 Excel 错误单元格不退化为空值；检测原单元格时计入工作表范围起点。可识别的数值/无类型公式缺少结果缓存时逐行提示重新计算/保存，已有数值、零及空字符串缓存继续使用，不执行公式；字符串空结果与缺缓存的读取歧义见采购 Excel 回归文档。空日期/金额沿用 null/0，保留数值日期、逗号千位分隔的点小数金额和零金额；每行校验通过后原子写入，仅空编号的唯一冲突最多尝试五次，保留显式编号及逐行失败统计
+- `services/purchaseImportExportService.js` 的实际 Excel 导入只接受 Buffer 或含 Buffer 的内存对象，路径在解析/数据库访问前返回400；使用 SheetJS buffer 解析（损坏文件400），不留存 Confidential 原工作簿。导入复用统一序列；非空非法金额及不存在的日历日期逐行拒绝，逗号空壳金额及金额/日期 Excel 错误单元格不退化为空值；检测原单元格时计入工作表范围起点。可识别的数值/无类型公式缺少结果缓存时逐行提示重新计算/保存，已有数值、零及空字符串缓存继续使用，不执行公式；字符串空结果与缺缓存的读取歧义见采购 Excel 回归文档。空日期/金额沿用 null/0，保留数值日期、逗号千位分隔的点小数金额和零金额；每行校验通过后原子写入，仅空编号的唯一冲突最多尝试五次，保留显式编号及逐行失败统计
 - `integration/purchase-excel-import.integration.js` 以真实 multipart HTTP、合成工作簿和已提交迁移构建的私有 0700/0600 SQLite 验证六类当前采购 Excel 导入：有效值、缺必需表头/文件、逐行错误、非法非空金额/日期拒绝、显式编号与空编号重传、历史完成状态确认。独立只读 SQLite 比较原记录及关联表，不访问生产或宣称浏览器验收。
 - `integration/procurement-lifecycle.integration.js` 仅用临时合成 SQLite 和实际 PURCHASE/WAREHOUSE HTTP 请求验证签约、完工回滚/重复、到货与复验幂等、库存列表/详情、删除后编号及同时创建；还验证实际 Excel 导入的自定义编号、五位序列溢出、失败行无写入及四请求并发，由 `npm run test:db` 执行
 
@@ -193,3 +195,9 @@
 `exportPricing.configuration.test.js` 用同一临时配置文件对照真实 Python 合成建议输出。
 `routes/pricingConfig.auth.test.js` 另以真实应用认证、合成 JWT 和临时迁移 SQLite
 验证当前数据库角色的 ADMIN-only 边界、管理员改权立即拒绝，以及配置文件保存不写业务表。
+
+- `routes/purchases.js` 的 `/import` 保留原认证和五角色鉴权顺序，改用 `utils/purchaseExcelUpload.js`；其他采购附件仍走原磁盘上传。
+- `middleware/errorHandler.js` / `errorHandler.test.js`：Busboy 请求解析的七条精确消息和 `Unsupported content type: ` 前缀仅在无 statusCode 时返回中文400；显式状态和 Multer 行为保持，未知错误仍500，日志保留原错误消息；畸形上传解析错误即使开发环境也不向客户端返回英文堆栈。
+- `services/purchaseImportExportService.test.js` 使用内存合成工作簿保持原断言，并验证路径/编码/NUL/磁盘对象输入400、零文件读取及零数据库访问。
+- `routes/purchases.import-upload.test.js` 验证 XLS/XLSX、穿越形标签、大小/扩展名及先鉴权后解析；对采购导入、dataImport、system/import 和 files.js 磁盘附件四类真实 localhost HTTP 入口发送 NUL multipart，均400且临时沙箱无文件残留。`routes/system.import-upload.test.js` 同步加强 NUL 状态为严格400。
+- `utils/purchaseExcelUpload.test.js` 不监听端口，使用真实 Multer/Busboy 和合成 multipart 流验证内存字节、扩展名、配置大小与 NUL400，确认专用模块连上传目录也不创建；不替代 HTTP 验收。

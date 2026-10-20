@@ -1,6 +1,6 @@
 /**
- * Input: 采购控制器
- * Output: 采购合同管理路由
+ * Input: 采购控制器、采购 Excel 专用内存上传中间件
+ * Output: 采购合同管理路由；导入先认证/鉴权，再以内存接收 Excel
  * Pos: 采购路由，处理采购合同CRUD操作
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -13,6 +13,7 @@ const { authenticate, roleAuth } = require('../middleware/auth');
 const { accessAuth } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 const { upload } = require('../utils/upload');
+const { purchaseExcelUpload } = require('../utils/purchaseExcelUpload');
 const { withAuditLog } = require('../middleware/auditLog');
 const purchaseImportExportController = require('../controllers/purchaseImportExportController');
 
@@ -24,7 +25,7 @@ router.use(authenticate);
 router.get('/export', purchaseImportExportController.exportExcel);
 
 // POST /api/v1/purchases/import - 批量导入采购合同 Excel
-router.post('/import', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), upload.single('file'), purchaseImportExportController.importExcel);
+router.post('/import', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), purchaseExcelUpload.single('file'), purchaseImportExportController.importExcel);
 
 // GET /api/v1/purchases - 获取采购合同列表
 router.get('/', withPaginationValidation, purchaseController.list);

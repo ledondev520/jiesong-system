@@ -1,13 +1,12 @@
 /**
- * Input: Prisma 客户端、Excel 文件路径或查询参数
- * Output: Excel Buffer 或逐行导入统计；拒绝非法值、错误及可识别无缓存公式，留空编号沿用统一序列
+ * Input: Prisma 客户端、Excel 内存字节或查询参数
+ * Output: Excel Buffer 或逐行导入统计；拒绝路径输入且不读取/留存原始工作簿；拒绝非法值、错误及可识别无缓存公式，留空编号沿用统一序列
  * Pos: 采购合同批量导入导出服务
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const xlsx = require('xlsx');
-const fs = require('fs');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { generateNextPurchaseContractNo, isPurchaseNumberConflict } = require('./purchaseContractNumberService');
@@ -197,31 +196,38 @@ const exportPurchasesExcel = async (query = {}) => {
 /**
  * 职责：从 Excel 批量导入采购合同
  * 思路：
- *   1. 读取 Excel 文件
+ *   1. 仅解析内存 Excel 字节，拒绝文件系统路径
  *   2. 逐行校验（供应商必填、金额/日期错误或可识别无缓存公式、值格式、状态）
  *   3. 查找供应商 ID（不存在则报错）
  *   4. 合同编号留空则自动生成
  *   5. 写入数据库
  *   6. 返回成功/失败统计及错误明细
- * @param {string} filePath - 上传的 Excel 文件路径
+ * @param {Buffer|{originalname: string, buffer: Buffer}} source - 上传的 Excel 内存字节
  * @param {string} userId - 认证操作者
  * @param {{ historical?: boolean }} options - ADMIN显式历史补录；不创建库存或验货证据
  * @returns {Promise<{successRows: number, failedRows: number, errors: Array}>}
  */
-const importPurchasesExcel = async (filePath, userId, options = {}) => {
+const importPurchasesExcel = async (source, userId, options = {}) => {
+  // HTTP imports never read paths or retain Confidential source workbooks.
+  const buffer = Buffer.isBuffer(source) ? source : source?.buffer;
+  if (!Buffer.isBuffer(buffer)) {
+    throw createError('请提供内存中的 Excel 文件内容，不支持文件路径', 400);
+  }
   let allowHistorical = false;
   if (options.historical === true) {
     const user = typeof userId === 'string' && userId ? await prisma.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true } }) : null;
     if (user?.role !== 'ADMIN' || !user.isActive) throw createError('历史采购补录仅允许有效管理员执行', 403);
     allowHistorical = true;
   }
-  if (!fs.existsSync(filePath)) {
-    throw createError('上传文件不存在', 400);
-  }
 
   // Retain formula stubs so an unresolved formula is distinguishable from an
   // optional blank. Cached numeric/empty-string formulas keep their real type.
-  const workbook = xlsx.readFile(filePath, { sheetStubs: true });
+  let workbook;
+  try {
+    workbook = xlsx.read(buffer, { type: 'buffer', sheetStubs: true });
+  } catch {
+    throw createError('Excel 文件损坏或格式不正确', 400);
+  }
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
   const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });

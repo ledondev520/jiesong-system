@@ -1,6 +1,6 @@
 /**
- * Input: Express错误对象
- * Output: 统一格式的错误响应，Multer输入限制错误返回400
+ * Input: Express错误对象（包括 Multer/Busboy 请求解析错误）
+ * Output: 统一格式的错误响应，Multer输入限制及无 statusCode 的精确白名单 Busboy 畸形输入错误返回400
  * Pos: 错误处理中间件，统一异常响应格式
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -18,7 +18,23 @@ const notFoundHandler = (req, res, next) => {
   next(error);
 };
 
-// 已知技术错误 → 中文提示映射（Prisma / Multer / JWT / JSON 解析）
+// Busboy 1.6 emits plain Errors from request header/body parsing. Match only
+// its explicit client-input messages, never broad fragments or stack paths.
+// Explicit application status codes and existing Multer handling take priority.
+const BUSBOY_INPUT_MESSAGES = new Set([
+  'Malformed content type',
+  'Malformed part header',
+  'Malformed urlencoded form',
+  'Missing Content-Type',
+  'Multipart: Boundary not found',
+  'Unexpected end of file',
+  'Unexpected end of form',
+]);
+const isBusboyInputError = (err) => err.statusCode === undefined && err.name !== 'MulterError' &&
+  (BUSBOY_INPUT_MESSAGES.has(err.message) ||
+    (typeof err.message === 'string' && err.message.startsWith('Unsupported content type: ')));
+
+// 已知技术错误 → 中文提示映射（Prisma / Multer / Busboy / JWT / JSON 解析）
 const PRISMA_ERROR_MESSAGES = {
   P2002: '数据已存在（唯一性冲突），请勿重复提交',
   P2003: '存在关联数据，无法执行该操作',
@@ -41,7 +57,7 @@ const hasChinese = (message) => /[\u4e00-\u9fff]/.test(String(message || ''));
 /**
  * 职责：将技术类英文错误转换为用户可读的中文提示
  * 思路：
- *   1. 命中已知错误族（Prisma 错误码 / Multer 错误码 / JWT / JSON 解析）→ 使用对应中文
+ *   1. 命中已知错误族（Prisma / Multer / Busboy / JWT / JSON 解析）→ 使用对应中文
  *   2. 消息已含中文（业务错误）→ 原样返回
  *   3. 其余英文技术错误 → 按状态码返回通用中文，原始消息只进日志
  * @param {Error} err - 错误对象
@@ -54,6 +70,9 @@ const toClientMessage = (err, statusCode) => {
   }
   if (err?.code && MULTER_ERROR_MESSAGES[err.code]) {
     return MULTER_ERROR_MESSAGES[err.code];
+  }
+  if (isBusboyInputError(err)) {
+    return '上传请求格式错误，请检查文件名或重新选择文件后重试';
   }
   if (err?.name === 'TokenExpiredError') {
     return '登录已过期，请重新登录';
@@ -74,7 +93,7 @@ const toClientMessage = (err, statusCode) => {
  * 职责：统一处理所有错误，返回标准格式响应
  * 思路：
  * 1. 提取错误状态码，将英文技术错误转换为中文提示
- * 2. 开发环境返回详细堆栈信息
+ * 2. 开发环境返回详细堆栈信息，畸形上传解析错误的原文仅进日志
  * 3. 生产环境隐藏敏感信息
  * @param {Error} err - 错误对象
  * @param {Request} req - Express请求对象
@@ -83,7 +102,7 @@ const toClientMessage = (err, statusCode) => {
  */
 const errorHandler = (err, req, res, next) => {
   // 1. 确定状态码
-  const statusCode = err.statusCode || (err.name === 'MulterError' ? 400 : 500);
+  const statusCode = err.statusCode || (err.name === 'MulterError' || isBusboyInputError(err) ? 400 : 500);
   
   // 2. 构建响应对象（统一输出中文提示，原始英文消息只进日志）
   const response = {
@@ -93,7 +112,7 @@ const errorHandler = (err, req, res, next) => {
   };
   
   // 3. 开发环境添加堆栈信息
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV === 'development' && !isBusboyInputError(err)) {
     response.stack = err.stack;
   }
   
