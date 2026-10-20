@@ -1,7 +1,7 @@
 /**
  * Input: 启动环境 UPLOAD_DIR、backend/.env 中的 UPLOAD_DIR（仅在启动环境未设置时读取；.env 权限总是先检查）
  * Output: WPS 附件导入脚本使用的上传根目录绝对路径，以及已存在附件子目录的校验
- * Pos: scripts/import_wps_*_files.js 与 import_wps_202607_update.js 的共享路径解析；与 backend/src/config/index.js 的
+ * Pos: scripts/import_wps_*_files.js、import_wps_202607_update.js、audit_wps_*_file_retention.js、recover_wps_purchase_orphan_files.js 的共享路径解析；与 backend/src/config/index.js 的
  *      `process.env.UPLOAD_DIR || './uploads'` 及后端以 backend/ 为工作目录解析相对路径的规则保持一致
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。

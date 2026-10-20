@@ -12,6 +12,10 @@ const path = require('path');
 const repoRoot = path.join(__dirname, '..');
 const backendPath = path.join(repoRoot, 'backend');
 process.chdir(backendPath);
+const { resolveWpsUploadRoot } = require(path.join(backendPath, 'scripts/wps-upload-dir'));
+// 与后端 config.upload.dir 一致：UPLOAD_DIR（启动环境或 backend/.env）或 ./uploads，相对路径按 backend/ 解析。
+// 必须在加载 Prisma 之前解析：Prisma 会自动加载并展开 .env 写回 process.env，而后端 config 不会。
+const uploadRoot = resolveWpsUploadRoot({ backendDir: backendPath });
 
 const { PrismaClient } = require(path.join(backendPath, 'node_modules/@prisma/client'));
 const Papa = require(path.join(backendPath, 'node_modules/papaparse'));
@@ -280,7 +284,7 @@ async function main() {
   const dbRecordsMissingPhysical = salesContractFiles.filter((file) => {
     const absolutePath = path.isAbsolute(file.filePath)
       ? file.filePath
-      : path.join(repoRoot, 'backend/uploads', file.filePath);
+      : path.join(uploadRoot, file.filePath);
     return !fs.existsSync(absolutePath);
   }).map((file) => ({
     contract_no: file.salesContract.contractNo,

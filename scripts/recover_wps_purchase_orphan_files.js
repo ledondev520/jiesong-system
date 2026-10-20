@@ -1,6 +1,6 @@
 /**
  * Input: wps_purchase_file_retention_audit.json + backend/prisma/dev.db
- * Output: ContractFile records for existing backend/uploads/contracts orphan files
+ * Output: ContractFile records for existing <UPLOAD_DIR>/contracts orphan files (same root as backend config.upload.dir)
  * Pos: WPS 采购合同物理孤儿附件恢复脚本；默认 dry-run，只在文件名可推断现有采购合同且物理文件存在时创建附件记录，不改业务字段
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -12,12 +12,15 @@ const path = require('path');
 const repoRoot = path.join(__dirname, '..');
 const backendPath = path.join(repoRoot, 'backend');
 process.chdir(backendPath);
+const { resolveWpsUploadRoot } = require(path.join(backendPath, 'scripts/wps-upload-dir'));
+// 与后端 config.upload.dir 一致：UPLOAD_DIR（启动环境或 backend/.env）或 ./uploads，相对路径按 backend/ 解析。
+// 必须在加载 Prisma 之前解析：Prisma 会自动加载并展开 .env 写回 process.env，而后端 config 不会。
+const uploadRoot = resolveWpsUploadRoot({ backendDir: backendPath });
 
 const { PrismaClient } = require(path.join(backendPath, 'node_modules/@prisma/client'));
 
 const prisma = new PrismaClient();
 const parsedDir = path.join(repoRoot, 'tmp/wps_11_export_list_raw/parsed');
-const uploadRoot = path.join(backendPath, 'uploads');
 
 function parseArgs(argv) {
   const options = {

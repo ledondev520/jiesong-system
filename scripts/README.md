@@ -62,7 +62,7 @@
 | analyze_wps_candidate_source_ownership.py | 数据核对 | 只读复核候选 WPS 来源当前占用行的库存/报关引用和聚合行占用情况，识别是否存在后续人工拆分/转移候选；不写库 |
 | analyze_wps_operational_source_gaps.py | 数据核对 | 只读复核零值/操作性历史来源缺口，检查库存/报关引用、候选来源数量和占位/操作标记；不写库不删除 |
 | analyze_wps_formal_customs_source_gaps.py | 数据核对 | 只读复核正式报关来源缺口，逐单比对占位报关明细、WPS 装箱源集合和正式报关凭证候选；不写库 |
-| audit_wps_export_file_retention.js | 数据核对 | 只读审计 WPS 出货/报关源文件在项目源目录和 `SalesContractFile` 附件表的留存覆盖，按正式 `EXP*` 出口合同统计文件归属；不写库 |
+| audit_wps_export_file_retention.js | 数据核对 | 只读审计 WPS 出货/报关源文件在项目源目录和 `SalesContractFile` 附件表的留存覆盖，按正式 `EXP*` 出口合同统计文件归属；附件物理存在性按 `<UPLOAD_DIR>`（与后端 `config.upload.dir` 同一解析）检查；不写库 |
 | classify_wps_operational_candidate_conflict_blockers.py | 数据核对 | 只读分类操作性 candidate_conflict_review 来源缺口，区分数量冲突、0 数量冲突、门店冲突和价格冲突；不写库 |
 | classify_wps_no_candidate_source_blockers.py | 数据核对 | 只读分类 no-candidate 来源缺口，区分 PENDING 占位、同合同有源但商品不匹配、标准化源缺同合同等阻断原因；不写库 |
 | classify_wps_formal_evidence_blockers.py | 数据核对 | 只读生成正式报关材料缺口关闭清单，区分占位报关单缺正式原件和明细继承父占位单缺口；不写库 |
@@ -72,9 +72,9 @@
 | build_wps_missing_evidence_intake_package.py | 数据核对 | 汇总行动矩阵、cloud-only 探测和正式报关阻断报告，生成缺失材料收件校验包，列出验收标准、严格字段、校验命令和禁止动作；不写库 |
 | scan_wps_missing_evidence_inbox.py | 数据核对 | 只读扫描项目收件目录和 Downloads，按收件包识别 SHA1 精确 cloud-only 原件，并对正式报关候选做路径/内容命中、重叠目录去重和强候选/参考汇总/弱关键词分层；不写库不复制 |
 | import_wps_export_files.js | 数据导入 | 基于 WPS 附件盘点，把可归属到正式 `EXP*` 的出货/报关源文件确定性复制到 `<UPLOAD_DIR>/sales-contracts`（与后端 `config.upload.dir` 同一解析：环境变量或 `backend/.env` 的 `UPLOAD_DIR`，默认 `./uploads`，相对路径按 `backend/` 解析；`--apply` 时目录不存在直接失败）并创建 `SalesContractFile` 记录；默认 dry-run |
-| audit_wps_purchase_file_retention.js | 数据核对 | 只读审计 WPS 首选采购凭证、系统合同附件表和上传目录物理文件的留存覆盖关系；不写库 |
+| audit_wps_purchase_file_retention.js | 数据核对 | 只读审计 WPS 首选采购凭证、系统合同附件表和上传目录物理文件的留存覆盖关系；上传目录为 `<UPLOAD_DIR>/contracts`（与后端 `config.upload.dir` 同一解析，见 import_wps_export_files.js）；不写库 |
 | import_wps_purchase_files.js | 数据导入 | 基于附件留存审计结果，确定性复制 WPS 首选采购凭证到 `<UPLOAD_DIR>/contracts`（解析规则同上，`--apply` 时目录不存在直接失败）并创建采购合同附件记录；默认 dry-run，显式 `--apply` 后才写库/复制 |
-| recover_wps_purchase_orphan_files.js | 数据修复 | 基于附件留存审计结果，为上传目录中可从文件名推断到现有采购合同的物理孤儿文件恢复 `ContractFile` 记录；默认 dry-run，不复制/删除文件 |
+| recover_wps_purchase_orphan_files.js | 数据修复 | 基于附件留存审计结果，为上传目录（`<UPLOAD_DIR>/contracts`，与后端 `config.upload.dir` 同一解析）中可从文件名推断到现有采购合同的物理孤儿文件恢复 `ContractFile` 记录；默认 dry-run，不复制/删除文件 |
 | backfill_wps_contract_source_notes.js | 数据修复 | 基于已解析源文件和采购凭证导入计划，只给出口/采购合同头回填 WPS 文件来源 note；不改业务字段，默认 dry-run |
 | backfill_wps_purchase_item_source_notes.js | 数据修复 | 基于采购凭证明细和现库采购明细，只在合同号、商品、数量、单价/总额唯一匹配时回填采购明细来源 note；不改业务字段，默认 dry-run |
 | backfill_wps_purchase_item_strict_alias_source_notes.js | 数据修复 | 基于采购凭证明细和首选凭证，只在同合同、金额、单价、数量和商品别名强对齐时补采购明细来源 note；可修复 `quantity=0/unit=源数量` 的历史数量/单位错位；默认 dry-run |
