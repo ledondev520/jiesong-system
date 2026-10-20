@@ -756,12 +756,15 @@ export default function AiSessionsPage() {
   // Token 统计折线图
   const [tokenStats, setTokenStats] = useState<TokenStats | null>(null);
   const [statsDays, setStatsDays] = useState<string>('7');
-  const [statsLoading, setStatsLoading] = useState(false);
+  // 首次渲染即处于加载中（与挂载时立即发起请求一致）
+  const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState(false);
   /** 折线图下方摘要卡片：近 24h / 近 30 天（与图表区间选择独立） */
   const [stats24h, setStats24h] = useState<TokenStats | null>(null);
   const [stats30d, setStats30d] = useState<TokenStats | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
+  /** 超时判断的参考时间：不在渲染期读取时钟，随会话列表加载刷新 */
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const applyGovernancePreset = useCallback((preset: keyof typeof GOVERNANCE_PRESETS) => {
     const next = GOVERNANCE_PRESETS[preset];
@@ -771,17 +774,26 @@ export default function AiSessionsPage() {
     setPrefsDirty(true);
   }, []);
 
+  /** 拉取会话列表；状态只在请求回调中更新，可直接在 effect 中调用 */
+  const fetchSessions = useCallback(
+    () => cachedFetch('ai-sessions', () => aiService.getSessions())
+      .then((response) => {
+        setSessions(response.data || []);
+        setNowMs(Date.now());
+      })
+      .catch(() => {
+        toast.error('加载 AI 会话失败');
+      })
+      .finally(() => {
+        setLoading(false);
+      }),
+    [],
+  );
+
   const loadSessions = useCallback(async () => {
     setLoading(true);
-    try {
-      const response = await cachedFetch('ai-sessions', () => aiService.getSessions());
-      setSessions(response.data || []);
-    } catch {
-      toast.error('加载 AI 会话失败');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    await fetchSessions();
+  }, [fetchSessions]);
 
   const loadStandaloneTokens = useCallback(async () => {
     setStandaloneLoading(true);
@@ -795,33 +807,44 @@ export default function AiSessionsPage() {
     }
   }, []);
 
+  /** 拉取 Token 统计；状态只在请求回调中更新，可直接在 effect 中调用 */
+  const fetchTokenStats = useCallback(
+    (days: string) => Promise.resolve()
+      .then(() => api.get<ApiResponse<TokenStats>, ApiResponse<TokenStats>>(
+        `/ai/token-stats?days=${days}`
+      ))
+      .then((response) => {
+        setTokenStats(response.data || null);
+      })
+      .catch(() => {
+        setStatsError(true);
+      })
+      .finally(() => {
+        setStatsLoading(false);
+      }),
+    [],
+  );
+
   const loadTokenStats = useCallback(async (days: string) => {
     setStatsLoading(true);
     setStatsError(false);
-    try {
-      const response = await api.get<ApiResponse<TokenStats>, ApiResponse<TokenStats>>(
-        `/ai/token-stats?days=${days}`
-      );
-      setTokenStats(response.data || null);
-    } catch {
-      setStatsError(true);
-    } finally {
-      setStatsLoading(false);
-    }
-  }, []);
+    await fetchTokenStats(days);
+  }, [fetchTokenStats]);
 
-  const loadToolRegistry = useCallback(async () => {
-    try {
-      const response = await cachedFetch('ai-agent-tool-registry', () => aiService.getAgentToolRegistry());
-      setToolRegistry(response.data ?? null);
-    } catch {
-      setToolRegistry(null);
-    }
-  }, []);
+  const loadToolRegistry = useCallback(
+    () => cachedFetch('ai-agent-tool-registry', () => aiService.getAgentToolRegistry())
+      .then((response) => {
+        setToolRegistry(response.data ?? null);
+      })
+      .catch(() => {
+        setToolRegistry(null);
+      }),
+    [],
+  );
 
   useEffect(() => {
-    void loadSessions();
-  }, [loadSessions]);
+    void fetchSessions();
+  }, [fetchSessions]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -830,26 +853,42 @@ export default function AiSessionsPage() {
     return () => window.clearTimeout(timer);
   }, [loadStandaloneTokens]);
 
+  // 统计区间变化时，在渲染期同步进入加载态（替代 effect 内同步 setState），请求仍在 effect 中发起
+  const [prevStatsDays, setPrevStatsDays] = useState(statsDays);
+  if (prevStatsDays !== statsDays) {
+    setPrevStatsDays(statsDays);
+    setStatsLoading(true);
+    setStatsError(false);
+  }
+
   useEffect(() => {
-    void loadTokenStats(statsDays);
-  }, [loadTokenStats, statsDays]);
+    void fetchTokenStats(statsDays);
+  }, [fetchTokenStats, statsDays]);
 
   useEffect(() => {
     void loadToolRegistry();
   }, [loadToolRegistry]);
 
-  useEffect(() => {
-    if (loading) return;
-    const next = resolveSessionListGovernanceState({
-      searchParams,
-      stored: readSessionListPreferences(),
-      sessions,
-    });
-    setActionFilter(next.actionFilter);
-    setSortMode(next.sortMode);
-    setPrefsSource(next.source);
-    setPrefsDirty(false);
-  }, [searchParams, sessions, loading]);
+  // URL 参数 / 会话列表 / 加载态变化时重新解析治理视角（渲染期按输入变化调整状态，替代 effect 内 setState）
+  const [governanceInputs, setGovernanceInputs] = useState({ searchParams, sessions, loading });
+  if (
+    governanceInputs.searchParams !== searchParams
+    || governanceInputs.sessions !== sessions
+    || governanceInputs.loading !== loading
+  ) {
+    setGovernanceInputs({ searchParams, sessions, loading });
+    if (!loading) {
+      const next = resolveSessionListGovernanceState({
+        searchParams,
+        stored: readSessionListPreferences(),
+        sessions,
+      });
+      setActionFilter(next.actionFilter);
+      setSortMode(next.sortMode);
+      setPrefsSource(next.source);
+      setPrefsDirty(false);
+    }
+  }
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -882,7 +921,6 @@ export default function AiSessionsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setSummaryLoading(true);
     const timer = window.setTimeout(() => {
       void (async () => {
       try {
@@ -961,7 +999,6 @@ export default function AiSessionsPage() {
   const actionableSessionCount = sessions.filter((item) =>
     hasFailedPendingAction(item.pendingActionSummary) || hasPendingPendingAction(item.pendingActionSummary)
   ).length;
-  const nowMs = Date.now();
   const agedFailedSessionCount = countAgedActionSessions({
     sessions,
     matcher: hasFailedPendingAction,
