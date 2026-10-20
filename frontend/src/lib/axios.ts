@@ -116,9 +116,9 @@ const cachedGet: typeof api.get = async <T = unknown, R = T, D = unknown>(
   url: string,
   config?: AxiosRequestConfig<D>,
 ): Promise<R> => {
-  const requestConfig = config as ApiRequestConfig<D> | undefined;
+  const requestConfig = config as ApiRequestConfig | undefined;
   if (!shouldUseGetCache(requestConfig)) {
-    return rawGet<T, R, D>(url, config);
+    return rawGet<T, R, D>(url, config) as Promise<R>;
   }
 
   cleanupExpiredGetCache();
@@ -136,7 +136,7 @@ const cachedGet: typeof api.get = async <T = unknown, R = T, D = unknown>(
   }
 
   const requestPromise: Promise<R> = (async () => {
-    const response = await rawGet<T, R, D>(url, config);
+    const response = (await rawGet<T, R, D>(url, config)) as R;
     const ttlMs = resolveGetCacheTtlMs(requestConfig);
     if (ttlMs > 0 && generation === cacheGeneration) {
       getResponseCache.set(cacheKey, {
