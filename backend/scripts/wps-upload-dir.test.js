@@ -87,6 +87,24 @@ test('导入脚本在加载 Prisma 之前解析上传目录（避免 Prisma 注�
   }
 });
 
+test('WPS 附件审计/恢复脚本同样在加载 Prisma 之前解析上传目录且不再硬编码 backend/uploads', () => {
+  const repoRoot = path.join(__dirname, '..', '..');
+  for (const script of [
+    'audit_wps_purchase_file_retention.js',
+    'audit_wps_export_file_retention.js',
+    'recover_wps_purchase_orphan_files.js',
+  ]) {
+    const source = fs.readFileSync(path.join(repoRoot, 'scripts', script), 'utf8');
+    const resolveIndex = source.indexOf('resolveWpsUploadRoot({ backendDir: backendPath })');
+    const prismaIndex = source.indexOf("node_modules/@prisma/client'");
+    assert.notEqual(resolveIndex, -1, `${script} 未调用 resolveWpsUploadRoot`);
+    assert.notEqual(prismaIndex, -1, `${script} 未加载 Prisma`);
+    assert.ok(resolveIndex < prismaIndex, `${script} 必须在 require Prisma 之前解析上传目录`);
+    assert.equal(source.includes("path.join(backendPath, 'uploads"), false, `${script} 仍硬编码 backend/uploads`);
+    assert.equal(source.includes("'backend/uploads'"), false, `${script} 仍硬编码 backend/uploads`);
+  }
+});
+
 test('assertUploadSubdir: 子目录不存在或不是目录时直接失败，存在时返回绝对路径', (t) => {
   const uploadRoot = makeBackendDir(t);
   assert.throws(() => assertUploadSubdir(uploadRoot, 'contracts'), /附件目录不存在或不是目录/);

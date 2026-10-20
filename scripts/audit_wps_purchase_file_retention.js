@@ -1,5 +1,5 @@
 /**
- * Input: purchase_evidence_preferred.csv + backend/prisma/dev.db + backend/uploads/contracts
+ * Input: purchase_evidence_preferred.csv + backend/prisma/dev.db + <UPLOAD_DIR>/contracts (same root as backend config.upload.dir)
  * Output: tmp/wps_11_export_list_raw/parsed/wps_purchase_file_retention_audit.{json,csv,md}
  * Pos: WPS 采购合同文件留存只读审计；对比 WPS 已保留凭证、系统附件表和物理上传文件，不写库
  *
@@ -12,6 +12,10 @@ const path = require('path');
 const repoRoot = path.join(__dirname, '..');
 const backendPath = path.join(repoRoot, 'backend');
 process.chdir(backendPath);
+const { resolveWpsUploadRoot } = require(path.join(backendPath, 'scripts/wps-upload-dir'));
+// 与后端 config.upload.dir 一致：UPLOAD_DIR（启动环境或 backend/.env）或 ./uploads，相对路径按 backend/ 解析。
+// 必须在加载 Prisma 之前解析：Prisma 会自动加载并展开 .env 写回 process.env，而后端 config 不会。
+const uploadRoot = resolveWpsUploadRoot({ backendDir: backendPath });
 
 const { PrismaClient } = require(path.join(backendPath, 'node_modules/@prisma/client'));
 const Papa = require(path.join(backendPath, 'node_modules/papaparse'));
@@ -19,7 +23,6 @@ const Papa = require(path.join(backendPath, 'node_modules/papaparse'));
 const prisma = new PrismaClient();
 const parsedDir = path.join(repoRoot, 'tmp/wps_11_export_list_raw/parsed');
 const sourceRoot = path.join(repoRoot, 'tmp/wps_11_export_list_raw/11-报关记录');
-const uploadRoot = path.join(backendPath, 'uploads');
 const uploadContractsDir = path.join(uploadRoot, 'contracts');
 const outJson = path.join(parsedDir, 'wps_purchase_file_retention_audit.json');
 const outCsv = path.join(parsedDir, 'wps_purchase_file_retention_audit.csv');
