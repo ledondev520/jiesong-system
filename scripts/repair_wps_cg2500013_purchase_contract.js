@@ -1,5 +1,5 @@
 /**
- * Input: refreshed purchase_evidence_extracts.csv + purchase_evidence_items.csv + backend/prisma/dev.db
+ * Input: refreshed purchase_evidence_extracts.csv + purchase_evidence_items.csv + backend/prisma/dev.db + 已上传附件（<UPLOAD_DIR>，与后端 config.upload.dir 同一解析）
  * Output: tmp/wps_11_export_list_raw/parsed/cg2500013_purchase_contract_repair_plan.json; optional Prisma repair when --apply is passed
  * Pos: WPS CG2500013 采购合同错挂修复脚本；只在 PDF 正文、附件 SHA1、无付款/库存引用均通过时，把库中重复屏风合同修正为 PDF 证明的釉面砖合同
  *
@@ -13,6 +13,10 @@ const path = require('path');
 const repoRoot = path.join(__dirname, '..');
 const backendPath = path.join(repoRoot, 'backend');
 process.chdir(backendPath);
+const { resolveWpsUploadRoot } = require(path.join(backendPath, 'scripts/wps-upload-dir'));
+// 与后端 config.upload.dir 一致：UPLOAD_DIR（启动环境或 backend/.env）或 ./uploads，相对路径按 backend/ 解析。
+// 必须在加载 Prisma 之前解析：Prisma 会自动加载并展开 .env 写回 process.env，而后端 config 不会。
+const uploadRoot = resolveWpsUploadRoot({ backendDir: backendPath });
 
 const { PrismaClient } = require(path.join(backendPath, 'node_modules/@prisma/client'));
 const Papa = require(path.join(backendPath, 'node_modules/papaparse'));
@@ -182,7 +186,7 @@ async function buildPlan(options) {
 
   const sourceUpload = contract.files.find((file) => file.fileName === '购销合同 CG2500013 釉面砖.pdf');
   if (!sourceUpload) throw new Error(`${CONTRACT_NO} 缺少已上传 PDF 附件记录`);
-  const uploadedPath = path.join(backendPath, 'uploads', sourceUpload.filePath.replace(/^contracts\//, 'contracts/'));
+  const uploadedPath = path.join(uploadRoot, sourceUpload.filePath.replace(/^contracts\//, 'contracts/'));
   const uploadedSha1 = sha1(uploadedPath);
   if (uploadedSha1 !== sourceSha1) throw new Error(`上传附件与 WPS 源 PDF SHA1 不一致: ${uploadedSha1}`);
 

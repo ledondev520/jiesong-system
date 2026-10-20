@@ -78,7 +78,7 @@
 | backfill_wps_contract_source_notes.js | 数据修复 | 基于已解析源文件和采购凭证导入计划，只给出口/采购合同头回填 WPS 文件来源 note；不改业务字段，默认 dry-run |
 | backfill_wps_purchase_item_source_notes.js | 数据修复 | 基于采购凭证明细和现库采购明细，只在合同号、商品、数量、单价/总额唯一匹配时回填采购明细来源 note；不改业务字段，默认 dry-run |
 | backfill_wps_purchase_item_strict_alias_source_notes.js | 数据修复 | 基于采购凭证明细和首选凭证，只在同合同、金额、单价、数量和商品别名强对齐时补采购明细来源 note；可修复 `quantity=0/unit=源数量` 的历史数量/单位错位；默认 dry-run |
-| repair_wps_cg2500013_purchase_contract.js | 数据修复 | 基于 `CG2500013` PDF 正文和已上传附件 SHA1 校验，修正该合同从误重复屏风合同到原文釉面砖合同；默认 dry-run，只处理该合同 |
+| repair_wps_cg2500013_purchase_contract.js | 数据修复 | 基于 `CG2500013` PDF 正文和已上传附件（`<UPLOAD_DIR>`，与后端 `config.upload.dir` 同一解析）SHA1 校验，修正该合同从误重复屏风合同到原文釉面砖合同；默认 dry-run，只处理该合同 |
 | backfill_wps_packing_item_source_notes.js | 数据修复 | 基于 WPS 装箱源行和现库装箱明细，只在合同号、商品、门店、数量和可用装箱字段唯一匹配时回填装箱明细来源 note；不改业务字段，默认 dry-run |
 | backfill_wps_packing_item_all_source_notes.js | 数据修复 | 基于全量 WPS 装箱源和 no-candidate 来源缺口，只在同合同/商品/门店/数量/单位唯一且装箱锚点一致时回填来源 note；不改业务字段，默认 dry-run |
 | backfill_wps_sales_item_strict_alias_source_notes.js | 数据修复 | 基于首选 WPS 销售源和 no-candidate 来源缺口，只在同合同/数量/单价强一致、商品别名唯一且源行未被消费时回填来源 note；不改业务字段，默认 dry-run |
