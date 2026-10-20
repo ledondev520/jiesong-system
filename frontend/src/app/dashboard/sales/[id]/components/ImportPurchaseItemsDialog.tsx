@@ -4,19 +4,29 @@
  * Pos: 出口合同装柜阶段的采购资料复用 Module
  */
 
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import { Boxes, Loader2, PackagePlus, Scale } from 'lucide-react';
-import { toast } from 'sonner';
-import { salesService, type AvailablePurchasePackingItem } from '@/services/sales.service';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { EmptyState } from '@/components/ui/empty-state';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Boxes, Loader2, PackagePlus, Scale } from "lucide-react";
+import { toast } from "sonner";
+import {
+  salesService,
+  type AvailablePurchasePackingItem,
+} from "@/services/sales.service";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { EmptyState } from "@/components/ui/empty-state";
 
 interface ImportPurchaseItemsDialogProps {
   open: boolean;
@@ -32,27 +42,56 @@ export function ImportPurchaseItemsDialog({
   onImported,
 }: ImportPurchaseItemsDialogProps) {
   const [items, setItems] = useState<AvailablePurchasePackingItem[]>([]);
-  const [selectedBoxes, setSelectedBoxes] = useState<Record<string, string>>({});
+  const [selectedBoxes, setSelectedBoxes] = useState<Record<string, string>>(
+    {},
+  );
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // 打开弹窗（含以 open=true 首次挂载）或切换合同时先在渲染期重置加载态与勾选；
+  // effect 只负责发请求。初值 null 使首次渲染也按原挂载 effect 处理。
+  const [loadDeps, setLoadDeps] = useState<{
+    open: boolean;
+    salesContractId: string;
+  } | null>(null);
+  if (
+    loadDeps === null ||
+    loadDeps.open !== open ||
+    loadDeps.salesContractId !== salesContractId
+  ) {
+    setLoadDeps({ open, salesContractId });
+    if (open) {
+      setLoading(true);
+      setSelectedBoxes({});
+    }
+  }
+
+  // 提交后到新请求 effect 执行前，上一轮仍 active 的旧响应不得改写刚重置的 loading
+  // （与原先 effect 内同步重置覆盖旧响应的结果一致）。
+  const resetPendingRef = useRef(false);
+  useLayoutEffect(() => {
+    resetPendingRef.current = open;
+  }, [open, salesContractId]);
+
   useEffect(() => {
+    resetPendingRef.current = false;
     if (!open) return;
     let active = true;
-    setLoading(true);
-    setSelectedBoxes({});
-    void salesService.getAvailablePurchaseItems(salesContractId)
+    void salesService
+      .getAvailablePurchaseItems(salesContractId)
       .then((response) => {
         if (active) setItems(response.data || []);
       })
       .catch((error: unknown) => {
         if (active) {
           setItems([]);
-          toast.error(error instanceof Error ? error.message : '已完工采购资料加载失败');
+          toast.error(
+            error instanceof Error ? error.message : "已完工采购资料加载失败",
+          );
         }
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active && !resetPendingRef.current) setLoading(false);
       });
     return () => {
       active = false;
@@ -76,31 +115,43 @@ export function ImportPurchaseItemsDialog({
   };
 
   const handleImport = async () => {
-    const selections = Object.entries(selectedBoxes).map(([purchaseItemId, value]) => ({
-      purchaseItemId,
-      boxes: Number(value),
-    }));
+    const selections = Object.entries(selectedBoxes).map(
+      ([purchaseItemId, value]) => ({
+        purchaseItemId,
+        boxes: Number(value),
+      }),
+    );
     for (const selection of selections) {
       const item = items.find((entry) => entry.id === selection.purchaseItemId);
-      if (!item || !Number.isInteger(selection.boxes) || selection.boxes <= 0 || selection.boxes > item.remaining.boxes) {
-        toast.error(`${item?.product.customsName || '采购明细'} 的导入箱数应为 1 至 ${item?.remaining.boxes || 0} 的整数`);
+      if (
+        !item ||
+        !Number.isInteger(selection.boxes) ||
+        selection.boxes <= 0 ||
+        selection.boxes > item.remaining.boxes
+      ) {
+        toast.error(
+          `${item?.product.customsName || "采购明细"} 的导入箱数应为 1 至 ${item?.remaining.boxes || 0} 的整数`,
+        );
         return;
       }
     }
     if (selections.length === 0) {
-      toast.error('请先选择要导入的采购明细');
+      toast.error("请先选择要导入的采购明细");
       return;
     }
 
     setSaving(true);
     try {
-      const response = await salesService.importPurchaseItems(salesContractId, selections);
+      const response = await salesService.importPurchaseItems(
+        salesContractId,
+        selections,
+      );
       const importedCount = response.data?.importedCount || selections.length;
       toast.success(`已导入 ${importedCount} 条装箱明细`);
       onOpenChange(false);
       await onImported();
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : '采购明细导入失败');
+      toast.error(error instanceof Error ? error.message : "采购明细导入失败");
     } finally {
       setSaving(false);
     }
@@ -108,7 +159,10 @@ export function ImportPurchaseItemsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto" style={{ maxWidth: '48rem' }}>
+      <DialogContent
+        className="max-h-[90vh] overflow-y-auto"
+        style={{ maxWidth: "48rem" }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <PackagePlus className="h-5 w-5 text-primary" />
@@ -122,7 +176,8 @@ export function ImportPurchaseItemsDialog({
         <div className="space-y-3 py-2">
           {loading ? (
             <div className="flex min-h-40 items-center justify-center text-sm text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />加载已完工采购资料...
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              加载已完工采购资料...
             </div>
           ) : items.length === 0 ? (
             <EmptyState
@@ -132,39 +187,60 @@ export function ImportPurchaseItemsDialog({
             />
           ) : (
             items.map((item) => {
-              const selected = Object.prototype.hasOwnProperty.call(selectedBoxes, item.id);
+              const selected = Object.prototype.hasOwnProperty.call(
+                selectedBoxes,
+                item.id,
+              );
               const checkboxLabel = `选择 ${item.purchaseContract.contractNo} ${item.product.customsName}`;
               return (
-                <div key={item.id} className="rounded-xl border border-border/60 p-4">
+                <div
+                  key={item.id}
+                  className="rounded-xl border border-border/60 p-4"
+                >
                   <div className="flex items-start gap-3">
                     <Checkbox
                       id={`purchase-source-${item.id}`}
                       aria-label={checkboxLabel}
                       checked={selected}
-                      onCheckedChange={(checked) => toggleItem(item, checked === true)}
+                      onCheckedChange={(checked) =>
+                        toggleItem(item, checked === true)
+                      }
                       className="mt-1"
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline" className="font-mono">{item.purchaseContract.contractNo}</Badge>
-                            <p className="font-medium">{item.product.customsName}</p>
+                            <Badge variant="outline" className="font-mono">
+                              {item.purchaseContract.contractNo}
+                            </Badge>
+                            <p className="font-medium">
+                              {item.product.customsName}
+                            </p>
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            {item.purchaseContract.supplier.name} · {item.specification}
+                            {item.purchaseContract.supplier.name} ·{" "}
+                            {item.specification}
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-medium tabular-nums">剩余 {item.remaining.boxes} 箱 · {item.remaining.grossWeight.toLocaleString()} kg · {item.remaining.volume.toFixed(2)} CBM</p>
-                          <p className="text-xs text-muted-foreground">原始 {item.boxes} 箱，已排 {item.allocated.boxes} 箱</p>
+                          <p className="text-sm font-medium tabular-nums">
+                            剩余 {item.remaining.boxes} 箱 ·{" "}
+                            {item.remaining.grossWeight.toLocaleString()} kg ·{" "}
+                            {item.remaining.volume.toFixed(2)} CBM
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            原始 {item.boxes} 箱，已排 {item.allocated.boxes} 箱
+                          </p>
                         </div>
                       </div>
 
                       {selected ? (
                         <div className="mt-3 grid gap-3 rounded-lg bg-muted/35 p-3 sm:grid-cols-[180px_1fr] sm:items-end">
                           <div className="space-y-1.5">
-                            <Label htmlFor={`import-boxes-${item.id}`}>导入箱数（{item.product.customsName}）</Label>
+                            <Label htmlFor={`import-boxes-${item.id}`}>
+                              导入箱数（{item.product.customsName}）
+                            </Label>
                             <Input
                               id={`import-boxes-${item.id}`}
                               type="number"
@@ -172,15 +248,23 @@ export function ImportPurchaseItemsDialog({
                               max={item.remaining.boxes}
                               step="1"
                               value={selectedBoxes[item.id]}
-                              onChange={(event) => setSelectedBoxes((current) => ({
-                                ...current,
-                                [item.id]: event.target.value,
-                              }))}
+                              onChange={(event) =>
+                                setSelectedBoxes((current) => ({
+                                  ...current,
+                                  [item.id]: event.target.value,
+                                }))
+                              }
                             />
                           </div>
                           <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1"><Boxes className="h-3.5 w-3.5" />按箱数拆分</span>
-                            <span className="flex items-center gap-1"><Scale className="h-3.5 w-3.5" />重量同比例</span>
+                            <span className="flex items-center gap-1">
+                              <Boxes className="h-3.5 w-3.5" />
+                              按箱数拆分
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Scale className="h-3.5 w-3.5" />
+                              重量同比例
+                            </span>
                             <span>体积同比例</span>
                           </div>
                         </div>
@@ -194,9 +278,22 @@ export function ImportPurchaseItemsDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>取消</Button>
-          <Button onClick={() => void handleImport()} disabled={saving || selectedCount === 0}>
-            {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <PackagePlus className="mr-1.5 h-4 w-4" />}
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={saving}
+          >
+            取消
+          </Button>
+          <Button
+            onClick={() => void handleImport()}
+            disabled={saving || selectedCount === 0}
+          >
+            {saving ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <PackagePlus className="mr-1.5 h-4 w-4" />
+            )}
             导入到当前货柜
           </Button>
         </DialogFooter>

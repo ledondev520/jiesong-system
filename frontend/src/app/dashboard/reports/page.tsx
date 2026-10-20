@@ -12,7 +12,14 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   replaceBrowserQuery,
   useBrowserQuery,
@@ -96,6 +103,44 @@ function readPeriod(query: string): ReportPeriod {
   };
 }
 
+// 与原 `await fn()` 同一时序：直接在请求返回的 Promise 上 then，不额外增加微任务；
+// 同步异常/非 Promise 返回值也走失败/成功分支。
+function awaitResult<T>(fn: () => T | PromiseLike<T>): Promise<T> {
+  try {
+    return Promise.resolve(fn());
+  } catch (error) {
+    return Promise.reject(error);
+  }
+}
+
+// 等价于 `try { onValue(await fn()) } catch (e) { onError(e) } finally { onFinally() }`
+// 的 async 函数：各分支与返回 Promise 的完成时机均与原实现相同，且从不 reject。
+function runAwait<T>(
+  fn: () => T | PromiseLike<T>,
+  onValue: (value: T) => void,
+  onError: (error: unknown) => void,
+  onFinally: () => void,
+): Promise<void> {
+  return new Promise<void>((done) => {
+    awaitResult(fn).then(
+      (value) => {
+        try {
+          onValue(value);
+        } catch (error) {
+          onError(error);
+        }
+        onFinally();
+        done();
+      },
+      (error: unknown) => {
+        onError(error);
+        onFinally();
+        done();
+      },
+    );
+  });
+}
+
 function BusinessReportsContent() {
   const searchParams = useSearchParams();
   const period = readPeriod(useBrowserQuery(searchParams.toString()));
@@ -117,33 +162,66 @@ function BusinessReportsContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const fetchData = useCallback(async () => {
-    if (activePeriodRef.current !== periodKey) return;
+  // 被动 effect 尚未发起新请求前，旧期间仍有效的响应不得改写渲染期刚重置的 loading/error
+  // （与原先 effect 内同步重置覆盖旧响应的结果一致）。
+  const resetPendingRef = useRef(false);
+
+  // 仅在请求结果回调中写状态，供 effect 调用；按钮中用 loadData 先重置再请求。
+  const fetchData = useCallback(() => {
+    if (activePeriodRef.current !== periodKey) return Promise.resolve();
     const generation = ++requestGenerationRef.current;
     const isCurrent = () =>
       activePeriodRef.current === periodKey &&
       requestGenerationRef.current === generation;
+    return runAwait(
+      () =>
+        reportsService.getBusinessOverview({
+          ...(appliedStart ? { startDate: appliedStart } : {}),
+          ...(appliedEnd ? { endDate: appliedEnd } : {}),
+        }),
+      (res) => {
+        if (!isCurrent()) return;
+        if (res.data.overview.currency !== "CNY")
+          throw new Error("经营报表币种口径尚未更新");
+        setData(res.data);
+      },
+      (e) => {
+        if (!isCurrent()) return;
+        console.error("获取经营报表失败:", e);
+        if (!resetPendingRef.current) setError(true);
+      },
+      () => {
+        if (isCurrent() && !resetPendingRef.current) setLoading(false);
+      },
+    );
+  }, [appliedStart, appliedEnd, periodKey]);
+  const loadData = useCallback(() => {
+    if (activePeriodRef.current !== periodKey) return Promise.resolve();
     setLoading(true);
     setError(false);
-    try {
-      const res = await reportsService.getBusinessOverview({
-        ...(appliedStart ? { startDate: appliedStart } : {}),
-        ...(appliedEnd ? { endDate: appliedEnd } : {}),
-      });
-      if (!isCurrent()) return;
-      if (res.data.overview.currency !== "CNY")
-        throw new Error("经营报表币种口径尚未更新");
-      setData(res.data);
-    } catch (e) {
-      if (!isCurrent()) return;
-      console.error("获取经营报表失败:", e);
-      setError(true);
-    } finally {
-      if (isCurrent()) setLoading(false);
-    }
-  }, [appliedStart, appliedEnd, periodKey]);
+    return fetchData();
+  }, [fetchData, periodKey]);
+
+  const [fetchDeps, setFetchDeps] = useState([
+    appliedStart,
+    appliedEnd,
+    periodKey,
+  ] as const);
+  if (
+    fetchDeps[0] !== appliedStart ||
+    fetchDeps[1] !== appliedEnd ||
+    fetchDeps[2] !== periodKey
+  ) {
+    setFetchDeps([appliedStart, appliedEnd, periodKey]);
+    setLoading(true);
+    setError(false);
+  }
+  useLayoutEffect(() => {
+    resetPendingRef.current = true;
+  }, [fetchData, periodKey]);
 
   useEffect(() => {
+    resetPendingRef.current = false;
     activePeriodRef.current = periodKey;
     void fetchData();
     return () => {
@@ -181,7 +259,7 @@ function BusinessReportsContent() {
               variant="outline"
               size="sm"
               className="rounded-lg h-9 px-4"
-              onClick={fetchData}
+              onClick={() => void loadData()}
             >
               重新加载
             </Button>
@@ -251,7 +329,7 @@ function BusinessReportsContent() {
       {error && (
         <div role="alert" className="text-destructive">
           更新失败，当前仍为上次已加载期间。
-          <Button variant="outline" onClick={fetchData}>
+          <Button variant="outline" onClick={() => void loadData()}>
             重试
           </Button>
         </div>
