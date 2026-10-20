@@ -32,7 +32,7 @@
   - `e2e/real-hs-catalog.spec.ts` / `real-hs-fixture.ts`: 四项真实本地HS查询/详情/手工证据取消、失败纠正、保存回读与BOSS只读验收定义；已提交迁移私有SQLite，不调用外部HS或AI，也不把AI结果复制算作普通本地路径
 - `vitest.config.ts`: Vitest 测试配置
 - `playwright.config.ts`: Playwright 配置
-- `eslint.config.mjs`: 源码 lint；忽略构建、覆盖率及 Playwright 生成报告；next/react 升级新启用的 5 条 react-hooks 规则暂降为 warn（81 处既有违规，按文件分批清理）
+- `eslint.config.mjs`: 源码 lint；忽略构建、覆盖率及 Playwright 生成报告；5 条 react-hooks 规则（next/react 升级后检出 81 处既有违规）暂降为 warn，期间新增违规也只告警；按文件分批清理后恢复 error
 
 ## 核心依赖
 
