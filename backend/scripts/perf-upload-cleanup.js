@@ -11,7 +11,8 @@ const path = require('path');
 const { resolveWpsUploadRoot } = require('./wps-upload-dir');
 
 /**
- * 职责：取路径的规范真实位置；末级不存在时解析最近的已存在祖先的真实路径再拼接剩余部分（避免符号链接祖先绕过重叠比对）
+ * 职责：取路径的规范真实位置；末级不存在时解析最近的已存在祖先的真实路径再拼接剩余部分（避免符号链接祖先绕过重叠比对）；
+ *       路径上存在悬空符号链接时抛错（fail-closed）
  */
 const realOrResolved = (target) => {
   const resolved = path.resolve(target);
@@ -22,6 +23,16 @@ const realOrResolved = (target) => {
       return path.join(fs.realpathSync(current), ...missing);
     } catch (error) {
       if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw error;
+      // 悬空符号链接：条目存在但目标不可解析。其最终指向无法确定，按 fail-closed 拒绝，不能当作缺失的普通组件跳过
+      let entry = null;
+      try {
+        entry = fs.lstatSync(current);
+      } catch (lstatError) {
+        if (lstatError.code !== 'ENOENT' && lstatError.code !== 'ENOTDIR') throw lstatError;
+      }
+      if (entry && entry.isSymbolicLink()) {
+        throw new Error(`Refusing to run write audit: protected upload path contains an unresolvable symlink: ${current}`);
+      }
       const parent = path.dirname(current);
       if (parent === current) return resolved;
       missing.unshift(path.basename(current));
@@ -114,7 +125,9 @@ function assertSameRoot(validated) {
  *   3. 父目录真实路径仍须位于测试根内（拒绝中间层符号链接逃逸）；只删除普通文件，不跟随符号链接；
  *      删除前按真实父目录路径再次 lstat 并比对 dev/ino
  *   4. 文件不存在时与原行为一致直接返回
- * 残余风险：Node 无基于目录句柄的 unlinkat，复核与 unlink 之间仍有极短窗口，需本地参与者能改写测试根或其祖先目录才可利用
+ * 残余风险：Node 无基于目录句柄的 unlinkat，路径检查与 unlink 是多次独立系统调用，竞态无法完全消除（窗口长度无保证，进程可能在检查后被调度暂停）。
+ *   能改写测试根、其祖先或根内任一中间子目录的本地参与者都可能在检查后把路径转向根外；
+ *   前提是整个删除路径上的相关目录只由可信本地操作者管理（一次性测试环境）
  */
 function removeUploadedFileWithin(validated, filePath) {
   if (!filePath) return;

@@ -62,7 +62,8 @@
           "ADMIN catalog/opening-stock imports never retain uploads; previews are read-only, execution revalidates atomically and retains only minimal audit kind/count/operator. Bank account fields are excluded (catalogImportService.js).",
           "bootstrapAdmin.js requires an explicit policy-valid password to create/remediate the administrator, blocks legacy-default startup and increments sessionVersion on remediation; seed never overwrites a secure password.",
           "SQLite online snapshots and checksum manifests are 0600 in 0700 directories. Explicit source selection, WAL-consistent backup, integrity/checksum validation and exclusive new-target restore are enforced by backend/scripts/sqlite_snapshot.py; no .env/configuration or attachment copying.",
-          "Default portable history directory data/export-history/ is Git-ignored to prevent accidental commits of Confidential source workbooks."
+          "Default portable history directory data/export-history/ is Git-ignored to prevent accidental commits of Confidential source workbooks.",
+          "Disposable write-performance audit cleanup deletes only regular files inside an explicit API_PERF_UPLOAD_DIR and refuses directories overlapping backend/uploads or configured UPLOAD_DIR values; backend/.env is read only for that refusal (backend/scripts/perf-upload-cleanup.js)."
         ],
         "transfer": [
           "Encrypt in transit (TLS)",

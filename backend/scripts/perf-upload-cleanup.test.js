@@ -164,6 +164,30 @@ test('resolvePerfUploadDir: 尚不存在的受保护目录经符号链接祖先�
   assert.throws(() => resolveWith(box, { API_PERF_UPLOAD_DIR: box.testUploads }), /overlaps protected upload directory/);
 });
 
+test('resolvePerfUploadDir: 受保护目录路径上有悬空符号链接（默认目录、.env、启动环境三种来源）时拒绝', (t) => {
+  const box = sandbox(t);
+  const future = path.join(box.testUploads, 'future');
+  fs.rmSync(box.defaultUploads, { recursive: true });
+  fs.symlinkSync(future, box.defaultUploads);
+  assert.throws(() => resolveWith(box, { API_PERF_UPLOAD_DIR: box.testUploads }), /unresolvable symlink/);
+  fs.unlinkSync(box.defaultUploads);
+  fs.mkdirSync(box.defaultUploads);
+
+  const envLink = path.join(box.dir, 'env-link');
+  fs.symlinkSync(path.join(box.testUploads, 'future-env'), envLink);
+  fs.writeFileSync(path.join(box.repoRoot, 'backend', '.env'), `UPLOAD_DIR=${path.join(envLink, 'uploads')}\n`, { mode: 0o600 });
+  assert.throws(() => resolveWith(box, { API_PERF_UPLOAD_DIR: box.testUploads }), /unresolvable symlink/);
+  fs.rmSync(path.join(box.repoRoot, 'backend', '.env'));
+
+  const launchLink = path.join(box.dir, 'launch-link');
+  fs.symlinkSync(path.join(box.testUploads, 'future-launch'), launchLink);
+  assert.throws(
+    () => resolveWith(box, { API_PERF_UPLOAD_DIR: box.testUploads, UPLOAD_DIR: launchLink }),
+    /unresolvable symlink/
+  );
+  assert.equal(fs.existsSync(future), false);
+});
+
 test('removeUploadedFileWithin: 经外部符号链接别名给出的绝对路径不在测试根内，拒绝且文件保持不变', (t) => {
   const box = sandbox(t);
   const validated = validatedRoot(box);
