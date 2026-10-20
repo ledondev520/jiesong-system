@@ -20,8 +20,14 @@ const eslintConfig = defineConfig([
   // 某规则清零后即恢复为 "error"。只降级最初这 5 条中尚未清零的规则，不得在此追加其他规则。
   // 已清零并恢复为 error（删除降级项，回到 eslint-config-next 默认）：preserve-manual-memoization（B6）、
   // immutability（B9+B10）。
-  // 当前仍降级 3 条：set-state-in-effect、refs、purity。其中 purity 余 1 处为有意保留（用户管理页渲染期读取
-  // 当前时间判断凭据过期，改为固定时间点会改变行为），该规则不能恢复为 error。
+  // 分批清理已于 B11 完成。仍降级 3 条：set-state-in-effect、refs、purity，剩余 7 处均为有意保留（修复会改变
+  // 请求次数或行为，原因见各处代码注释），因此这 3 条不能恢复为 error，本降级项保留：
+  //   set-state-in-effect 4 处：sales 列表 URL 同步（B6）、系统日志页筛选回第 1 页（B7）、
+  //     TaxRefundPreparationDialog 报关单 id 重置（B9+B10）——改为渲染期会少发一次中间请求；
+  //     useApi 自动请求前置 loading/error（StrictMode 重放 effect 时渲染期重置无法覆盖，B11）；
+  //   refs 2 处：useContractFileAccess 渲染期写入 scope ref（覆盖新 scope 已渲染未提交窗口的过期判断，B11）、
+  //     useApi 渲染期写入最新 request（execute 在提交前调用须用新 request，B11）；
+  //   purity 1 处：用户管理页渲染期读取当前时间判断凭据过期（改为固定时间点会改变行为，B9+B10）。
   {
     rules: {
       "react-hooks/set-state-in-effect": "warn",

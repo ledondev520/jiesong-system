@@ -12,7 +12,7 @@ import {
   BusinessWrite,
   useBusinessReadOnly,
 } from "@/lib/hooks/useBusinessReadOnly";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { SalesContract, Store, SalesStatus } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,10 +80,14 @@ export function ContractInfoEditor({
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(() => savedHeaderForm(contract));
 
-  // 当合同数据变化时同步表单
-  useEffect(() => {
+  // 当合同数据变化时同步表单：原先在 effect 内写入，改为渲染期执行（初值 null 使挂载时同样执行）。
+  const [syncedContract, setSyncedContract] = useState<SalesContract | null>(
+    null,
+  );
+  if (syncedContract !== contract) {
+    setSyncedContract(contract);
     setForm(savedHeaderForm(contract));
-  }, [contract]);
+  }
 
   /**
    * 职责：取消当前草稿并恢复已保存头资料，不触发写入。
