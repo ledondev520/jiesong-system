@@ -57,6 +57,7 @@ import {
 } from "@/services/bankFlow.service";
 import { ErrorState } from "@/components/ui/data-state";
 import { clearApiGetCache } from "@/lib/axios";
+import { runAwait } from "@/lib/run-await";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { PaymentListCard } from "@/components/finance/PaymentListCard";
 import { BankFlowImportDialog } from "./components/BankFlowImportDialog";
@@ -92,41 +93,45 @@ export default function BankFlowPage() {
   /** 拉取明细/统计/批次；状态只在请求回调中更新，可直接在 effect 中调用 */
   const fetchData = useCallback(
     () =>
-      Promise.all([
-        getTransactions({
-          page,
-          pageSize,
-          search: search || undefined,
-          direction: direction || undefined,
-          dateFrom: dateFrom || undefined,
-          dateTo: dateTo || undefined,
-          currency,
-          amountMin: amountMin ? Number(amountMin) : undefined,
-          amountMax: amountMax ? Number(amountMax) : undefined,
-        }),
-        getTransactionStats({
-          search: search || undefined,
-          direction: direction || undefined,
-          dateFrom: dateFrom || undefined,
-          dateTo: dateTo || undefined,
-          currency,
-          amountMin: amountMin ? Number(amountMin) : undefined,
-          amountMax: amountMax ? Number(amountMax) : undefined,
-        }),
-        getBatches("BANK_FLOW"),
-      ])
-        .then(([txnRes, statsRes, batchRes]) => {
+      // runAwait 与原 async try/await 时序一致：成功/失败回调落在同一微任务位置
+      runAwait(
+        () =>
+          Promise.all([
+            getTransactions({
+              page,
+              pageSize,
+              search: search || undefined,
+              direction: direction || undefined,
+              dateFrom: dateFrom || undefined,
+              dateTo: dateTo || undefined,
+              currency,
+              amountMin: amountMin ? Number(amountMin) : undefined,
+              amountMax: amountMax ? Number(amountMax) : undefined,
+            }),
+            getTransactionStats({
+              search: search || undefined,
+              direction: direction || undefined,
+              dateFrom: dateFrom || undefined,
+              dateTo: dateTo || undefined,
+              currency,
+              amountMin: amountMin ? Number(amountMin) : undefined,
+              amountMax: amountMax ? Number(amountMax) : undefined,
+            }),
+            getBatches("BANK_FLOW"),
+          ]),
+        ([txnRes, statsRes, batchRes]) => {
           setItems(txnRes.items || []);
           setTotal(txnRes.pagination?.total || 0);
           setStats(statsRes);
           setBatches(batchRes || []);
-        })
-        .catch(() => {
+        },
+        () => {
           setLoadError(true);
-        })
-        .finally(() => {
+        },
+        () => {
           setLoading(false);
-        }),
+        },
+      ),
     [
       page,
       pageSize,
@@ -141,10 +146,10 @@ export default function BankFlowPage() {
   );
 
   /** 手动重试 / 导入成功后重新加载：先进入加载态再拉取 */
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(() => {
     setLoading(true);
     setLoadError(false);
-    await fetchData();
+    return fetchData();
   }, [fetchData]);
 
   // 查询条件变化时在渲染期同步进入加载态（替代 effect 内同步 setState），请求仍在 effect 中发起

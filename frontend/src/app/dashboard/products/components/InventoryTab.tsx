@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, RefreshCw, Search, X } from "lucide-react";
 import { toast } from "sonner";
+import { runAwait } from "@/lib/run-await";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
@@ -70,14 +71,6 @@ const STATUS_LABEL_MAP: Record<InventoryStatus, string> = {
  *   1. 加载并展示库存列表
  *   2. 支持快速更新库存状态
  */
-/**
- * 与原 `try { await fn() } catch` 等价地启动请求：fn 同步抛错或返回非 Promise 值时，
- * 也会进入返回的 Promise 链并由后续 .catch/.finally 处理
- */
-function startRequest<T>(fn: () => T | PromiseLike<T>): Promise<T> {
-  return new Promise<T>((resolve) => resolve(fn()));
-}
-
 export function InventoryTab() {
   // 库存状态
   const [inventory, setInventory] = useState<Inventory[]>([]);
@@ -120,14 +113,14 @@ export function InventoryTab() {
       const request = ++inventoryRequest.current;
       // 到货验货、出货与批量流转均会改变库存；每次进入或刷新都读取服务器事实。
       // 状态只在请求回调中更新，可直接在 effect 中调用
-      return startRequest(() =>
-        inventoryService.getAll({
-          page: currentPage,
-          pageSize,
-          keyword: searchKeyword || undefined,
-        }),
-      )
-        .then((response) => {
+      return runAwait(
+        () =>
+          inventoryService.getAll({
+            page: currentPage,
+            pageSize,
+            keyword: searchKeyword || undefined,
+          }),
+        (response) => {
           if (request !== inventoryRequest.current) return;
           const nextInventory = response.data?.items || [];
           setInventory(nextInventory);
@@ -136,16 +129,17 @@ export function InventoryTab() {
             const availableIds = new Set(nextInventory.map((item) => item.id));
             return prevSelectedIds.filter((id) => availableIds.has(id));
           });
-        })
-        .catch(() => {
+        },
+        () => {
           if (request !== inventoryRequest.current) return;
           if (!resetPendingRef.current) setLoadError(true);
           toast.error("加载库存失败");
-        })
-        .finally(() => {
+        },
+        () => {
           if (request === inventoryRequest.current && !resetPendingRef.current)
             setLoading(false);
-        });
+        },
+      );
     },
     [currentPage, pageSize],
   );

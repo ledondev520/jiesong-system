@@ -41,6 +41,7 @@ import { MobileListCard } from "@/components/mobile";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { runAwait } from "@/lib/run-await";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -79,14 +80,6 @@ function useDebouncedValue<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-/**
- * 与原 `try { await fn() } catch` 等价地启动请求：fn 同步抛错或返回非 Promise 值时，
- * 也会进入返回的 Promise 链并由后续 .catch/.finally 处理
- */
-function startRequest<T>(fn: () => T | PromiseLike<T>): Promise<T> {
-  return new Promise<T>((resolve) => resolve(fn()));
-}
-
 // 默认每页条数（由 PageSizeSelect 组件控制）
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -119,38 +112,39 @@ function ProductsPageContent() {
   /** 拉取商品列表；状态只在请求回调中更新，可直接在 effect 中调用 */
   const fetchProducts = useCallback(() => {
     const request = ++latestRequest.current;
-    return startRequest(() =>
-      productService.getAll({
-        page: currentPage,
-        pageSize,
-        keyword: debouncedKeyword || undefined,
-        lite: true,
-        ...(lowStock ? { lowStock: true } : {}),
-      }),
-    )
-      .then((response) => {
+    return runAwait(
+      () =>
+        productService.getAll({
+          page: currentPage,
+          pageSize,
+          keyword: debouncedKeyword || undefined,
+          lite: true,
+          ...(lowStock ? { lowStock: true } : {}),
+        }),
+      (response) => {
         if (request !== latestRequest.current) return;
         setProducts(response.data?.items || []);
         setTotal(
           response.data?.pagination?.total ?? response.data?.items?.length ?? 0,
         );
-      })
-      .catch(() => {
+      },
+      () => {
         if (request !== latestRequest.current) return;
         if (!resetPendingRef.current) setLoadError(true);
         toast.error("加载商品失败");
-      })
-      .finally(() => {
+      },
+      () => {
         if (request === latestRequest.current && !resetPendingRef.current)
           setLoading(false);
-      });
+      },
+    );
   }, [currentPage, pageSize, debouncedKeyword, lowStock]);
 
   /** 手动重试 / 保存后重新加载：先进入加载态再拉取 */
-  const loadProducts = useCallback(async () => {
+  const loadProducts = useCallback(() => {
     setLoading(true);
     setLoadError(false);
-    await fetchProducts();
+    return fetchProducts();
   }, [fetchProducts]);
 
   // 以下均为渲染期按输入变化调整状态（替代 effect 内 setState）：

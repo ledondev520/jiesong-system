@@ -57,6 +57,7 @@ import {
 } from "@/services/bankFlow.service";
 import { ErrorState } from "@/components/ui/data-state";
 import { clearApiGetCache } from "@/lib/axios";
+import { runAwait } from "@/lib/run-await";
 import { InvoiceImportDialog } from "./components/InvoiceImportDialog";
 
 function fmt(n: number) {
@@ -110,43 +111,47 @@ export default function InvoicesPage() {
   /** 拉取明细/统计/批次；状态只在请求回调中更新，可直接在 effect 中调用 */
   const fetchData = useCallback(
     () =>
-      Promise.all([
-        getInvoices({
-          page,
-          pageSize,
-          search: search || undefined,
-          status: status || undefined,
-          dateFrom: dateFrom || undefined,
-          dateTo: dateTo || undefined,
-        }),
-        getInvoiceStats({
-          search: search || undefined,
-          status: status || undefined,
-          dateFrom: dateFrom || undefined,
-          dateTo: dateTo || undefined,
-        }),
-        getBatches("INVOICE"),
-      ])
-        .then(([invRes, statsRes, batchRes]) => {
+      // runAwait 与原 async try/await 时序一致：成功/失败回调落在同一微任务位置
+      runAwait(
+        () =>
+          Promise.all([
+            getInvoices({
+              page,
+              pageSize,
+              search: search || undefined,
+              status: status || undefined,
+              dateFrom: dateFrom || undefined,
+              dateTo: dateTo || undefined,
+            }),
+            getInvoiceStats({
+              search: search || undefined,
+              status: status || undefined,
+              dateFrom: dateFrom || undefined,
+              dateTo: dateTo || undefined,
+            }),
+            getBatches("INVOICE"),
+          ]),
+        ([invRes, statsRes, batchRes]) => {
           setItems(invRes.items || []);
           setTotal(invRes.pagination?.total || 0);
           setStats(statsRes);
           setBatches(batchRes || []);
-        })
-        .catch(() => {
+        },
+        () => {
           setLoadError(true);
-        })
-        .finally(() => {
+        },
+        () => {
           setLoading(false);
-        }),
+        },
+      ),
     [page, pageSize, search, status, dateFrom, dateTo],
   );
 
   /** 手动重试 / 导入成功后重新加载：先进入加载态再拉取 */
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(() => {
     setLoading(true);
     setLoadError(false);
-    await fetchData();
+    return fetchData();
   }, [fetchData]);
 
   // 查询条件变化时在渲染期同步进入加载态（替代 effect 内同步 setState），请求仍在 effect 中发起

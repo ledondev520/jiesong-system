@@ -14,6 +14,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import type { HsCodeRecord } from "@/types";
 import { hsCodeService } from "@/services/hsCode.service";
 import { toast } from "sonner";
+import { runAwait } from "@/lib/run-await";
 import { MobileListCard } from "@/components/mobile";
 import { Input } from "@/components/ui/input";
 import {
@@ -64,14 +65,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-
-/**
- * 与原 `try { await fn() } catch` 等价地启动请求：fn 同步抛错或返回非 Promise 值时，
- * 也会进入返回的 Promise 链并由后续 .catch/.finally 处理
- */
-function startRequest<T>(fn: () => T | PromiseLike<T>): Promise<T> {
-  return new Promise<T>((resolve) => resolve(fn()));
-}
 
 /**
  * 防抖 Hook - 延迟输入触发
@@ -459,33 +452,37 @@ function HsCodesPageContent() {
       nextPage: number;
       currentPageSize?: number;
     }) => {
-      const trimmedKw = searchKeyword.trim();
-      const trimmedCode = searchCode.trim().replace(/\D/g, "");
-      const hasInput = trimmedKw.length >= 2 || trimmedCode.length >= 2;
-      return startRequest(() =>
-        hsCodeService.list({
-          keyword: trimmedKw,
-          code: trimmedCode,
-          page: nextPage,
-          pageSize: currentPageSize,
-          fuzzy: hasInput,
-        }),
-      )
-        .then((response) => {
+      // runAwait 与原 async try/await 时序一致；参数整理与原实现一样位于 try 范围内
+      let hasInput = false;
+      return runAwait(
+        () => {
+          const trimmedKw = searchKeyword.trim();
+          const trimmedCode = searchCode.trim().replace(/\D/g, "");
+          hasInput = trimmedKw.length >= 2 || trimmedCode.length >= 2;
+          return hsCodeService.list({
+            keyword: trimmedKw,
+            code: trimmedCode,
+            page: nextPage,
+            pageSize: currentPageSize,
+            fuzzy: hasInput,
+          });
+        },
+        (response) => {
           setResults(response.data.items || []);
           setIsFuzzy(
             !!(response.data as { fuzzy?: boolean }).fuzzy && hasInput,
           );
           setTotal(response.data.pagination.total || 0);
           setTotalPages(response.data.pagination.totalPages || 1);
-        })
-        .catch((error: unknown) => {
+        },
+        (error: unknown) => {
           console.error("HSCode 搜索失败:", error);
           toast.error("搜索失败，请稍后重试");
-        })
-        .finally(() => {
+        },
+        () => {
           setLoading(false);
-        });
+        },
+      );
     },
     [pageSize],
   );
