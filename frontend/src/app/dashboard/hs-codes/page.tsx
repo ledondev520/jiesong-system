@@ -66,6 +66,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 /**
+ * 与原 `try { await fn() } catch` 等价地启动请求：fn 同步抛错或返回非 Promise 值时，
+ * 也会进入返回的 Promise 链并由后续 .catch/.finally 处理
+ */
+function startRequest<T>(fn: () => T | PromiseLike<T>): Promise<T> {
+  return new Promise<T>((resolve) => resolve(fn()));
+}
+
+/**
  * 防抖 Hook - 延迟输入触发
  */
 function useDebouncedValue<T>(value: T, delay: number): T {
@@ -454,14 +462,15 @@ function HsCodesPageContent() {
       const trimmedKw = searchKeyword.trim();
       const trimmedCode = searchCode.trim().replace(/\D/g, "");
       const hasInput = trimmedKw.length >= 2 || trimmedCode.length >= 2;
-      return hsCodeService
-        .list({
+      return startRequest(() =>
+        hsCodeService.list({
           keyword: trimmedKw,
           code: trimmedCode,
           page: nextPage,
           pageSize: currentPageSize,
           fuzzy: hasInput,
-        })
+        }),
+      )
         .then((response) => {
           setResults(response.data.items || []);
           setIsFuzzy(
