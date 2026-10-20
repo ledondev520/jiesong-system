@@ -7,10 +7,18 @@
 "use client";
 
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
-import { use, useEffect, useState, useCallback } from "react";
+import {
+  use,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import { FilePenLine } from "lucide-react";
 import { toast } from "sonner";
+import { runAwait } from "@/lib/run-await";
 import type { TaxRefund } from "@/types";
 import { taxRefundService } from "@/services/taxRefund.service";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -45,22 +53,52 @@ export function TaxRefundDetailPageContent({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const loadTaxRefund = useCallback(async () => {
+  // 本次渲染已按新 id 重置 loading/error、但对应 effect 尚未发出请求时为 true：
+  // 原先这两个状态在 effect 内同步重置，窗口内落地的旧请求对它们的写入会被随后的重置覆盖，
+  // 因此窗口内只跳过这两项写入，数据与提示照常写入。
+  const resetPendingRef = useRef(false);
+
+  const requestTaxRefund = useCallback(
+    () =>
+      runAwait(
+        () => taxRefundService.getById(id),
+        (response) => {
+          setTaxRefund(response?.data || null);
+        },
+        () => {
+          if (!resetPendingRef.current) setError(true);
+          toast.error("加载退税详情失败");
+        },
+        () => {
+          if (!resetPendingRef.current) setLoading(false);
+        },
+      ),
+    [id],
+  );
+
+  const loadTaxRefund = useCallback(() => {
     setLoading(true);
     setError(false);
-    try {
-      const response = await taxRefundService.getById(id);
-      setTaxRefund(response?.data || null);
-    } catch {
-      setError(true);
-      toast.error("加载退税详情失败");
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+    return requestTaxRefund();
+  }, [requestTaxRefund]);
+
+  // 原先 effect 内的 setLoading(true)/setError(false) 改为 id 变化时在渲染期执行；
+  // 挂载时初值即为 true/false，与原先挂载 effect 的写入相同。
+  const [prevId, setPrevId] = useState(id);
+  if (prevId !== id) {
+    setPrevId(id);
+    setLoading(true);
+    setError(false);
+  }
+
+  useLayoutEffect(() => {
+    resetPendingRef.current = true;
+  }, [requestTaxRefund]);
+
   useEffect(() => {
-    void loadTaxRefund();
-  }, [loadTaxRefund]);
+    resetPendingRef.current = false;
+    void requestTaxRefund();
+  }, [requestTaxRefund]);
 
   if (loading) {
     return (

@@ -6,9 +6,18 @@
 
 "use client";
 
-import { Suspense, use, useEffect, useState, useCallback } from "react";
+import {
+  Suspense,
+  use,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { runAwait } from "@/lib/run-await";
 import type { TaxRefund } from "@/types";
 import {
   taxRefundService,
@@ -35,22 +44,52 @@ function EditTaxRefundContent({ params }: EditTaxRefundContentProps) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
-  const loadTaxRefund = useCallback(async () => {
+  // 本次渲染已按新 id 重置 loading/loadError、但对应 effect 尚未发出请求时为 true：
+  // 原先这两个状态在 effect 内同步重置，窗口内落地的旧请求对它们的写入会被随后的重置覆盖，
+  // 因此窗口内只跳过这两项写入，数据与提示照常写入。
+  const resetPendingRef = useRef(false);
+
+  const requestTaxRefund = useCallback(
+    () =>
+      runAwait(
+        () => taxRefundService.getById(id),
+        (response) => {
+          setTaxRefund(response?.data || null);
+        },
+        () => {
+          if (!resetPendingRef.current) setLoadError(true);
+          toast.error("加载退税记录失败");
+        },
+        () => {
+          if (!resetPendingRef.current) setLoading(false);
+        },
+      ),
+    [id],
+  );
+
+  const loadTaxRefund = useCallback(() => {
     setLoading(true);
     setLoadError(false);
-    try {
-      const response = await taxRefundService.getById(id);
-      setTaxRefund(response?.data || null);
-    } catch {
-      setLoadError(true);
-      toast.error("加载退税记录失败");
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+    return requestTaxRefund();
+  }, [requestTaxRefund]);
+
+  // 原先 effect 内的 setLoading(true)/setLoadError(false) 改为 id 变化时在渲染期执行；
+  // 挂载时初值即为 true/false，与原先挂载 effect 的写入相同。
+  const [prevId, setPrevId] = useState(id);
+  if (prevId !== id) {
+    setPrevId(id);
+    setLoading(true);
+    setLoadError(false);
+  }
+
+  useLayoutEffect(() => {
+    resetPendingRef.current = true;
+  }, [requestTaxRefund]);
+
   useEffect(() => {
-    void loadTaxRefund();
-  }, [loadTaxRefund]);
+    resetPendingRef.current = false;
+    void requestTaxRefund();
+  }, [requestTaxRefund]);
 
   const handleSubmit = async (payload: TaxRefundUpsertInput) => {
     try {

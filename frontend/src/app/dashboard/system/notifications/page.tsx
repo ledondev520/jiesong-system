@@ -8,7 +8,13 @@
 
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { notificationLink } from "@/lib/notification-link";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
@@ -44,6 +50,7 @@ import {
   SystemNotificationItem,
 } from "@/services/system.service";
 import { toast } from "sonner";
+import { runAwait } from "@/lib/run-await";
 import { formatDateTime } from "@/lib/date-format";
 import { MobileListCard } from "@/components/mobile";
 
@@ -75,34 +82,65 @@ export default function SystemNotificationsPage() {
   const [pageSize, setPageSize] = useState(20);
   const [keyword, setKeyword] = useState("");
 
-  const loadNotifications = useCallback(async () => {
+  // 本次渲染已按新筛选/分页重置 loading/error、但对应 effect 尚未发出请求时为 true：
+  // 原先请求号在 effect 内才递增，窗口内落地的上一请求仍是"当前"请求，其数据与提示照常写入，
+  // 而 loading/error 会被随后 effect 内的同步重置覆盖，因此窗口内只跳过这两项写入。
+  const resetPendingRef = useRef(false);
+
+  const requestNotifications = useCallback(() => {
     const currentRequest = ++requestId.current;
-    setLoading(true);
-    setError(false);
-    try {
-      const response = await getSystemNotifications({
-        page: currentPage,
-        pageSize,
-        keyword: keyword.trim() || undefined,
-        unreadOnly: filter === "unread",
-      });
-      if (currentRequest !== requestId.current) return;
-      const items = response.data?.items || [];
-      setNotifications(Array.isArray(items) ? items : []);
-      setTotal(response.data?.pagination?.total || 0);
-      setUnreadCount(response.data?.unreadCount || 0);
-    } catch {
-      if (currentRequest !== requestId.current) return;
-      setError(true);
-      toast.error("加载通知失败");
-    } finally {
-      if (currentRequest === requestId.current) setLoading(false);
-    }
+    return runAwait(
+      () =>
+        getSystemNotifications({
+          page: currentPage,
+          pageSize,
+          keyword: keyword.trim() || undefined,
+          unreadOnly: filter === "unread",
+        }),
+      (response) => {
+        if (currentRequest !== requestId.current) return;
+        const items = response.data?.items || [];
+        setNotifications(Array.isArray(items) ? items : []);
+        setTotal(response.data?.pagination?.total || 0);
+        setUnreadCount(response.data?.unreadCount || 0);
+      },
+      () => {
+        if (currentRequest !== requestId.current) return;
+        if (!resetPendingRef.current) setError(true);
+        toast.error("加载通知失败");
+      },
+      () => {
+        if (currentRequest === requestId.current && !resetPendingRef.current)
+          setLoading(false);
+      },
+    );
   }, [filter, currentPage, pageSize, keyword]);
 
+  // 刷新按钮、标记已读后调用：与原先相同，先置 loading/清 error 再请求。
+  const loadNotifications = useCallback(() => {
+    setLoading(true);
+    setError(false);
+    return requestNotifications();
+  }, [requestNotifications]);
+
+  // 原先加载 effect 内的 setLoading(true)/setError(false) 改为筛选/分页变化时在渲染期执行；
+  // 挂载时初值即为 true/false，与原先挂载 effect 的写入相同。
+  const loadKey = [filter, currentPage, pageSize, keyword] as const;
+  const [prevLoadKey, setPrevLoadKey] = useState(loadKey);
+  if (loadKey.some((value, index) => !Object.is(value, prevLoadKey[index]))) {
+    setPrevLoadKey(loadKey);
+    setLoading(true);
+    setError(false);
+  }
+
+  useLayoutEffect(() => {
+    resetPendingRef.current = true;
+  }, [requestNotifications]);
+
   useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
+    resetPendingRef.current = false;
+    void requestNotifications();
+  }, [requestNotifications]);
 
   const sort = useTableSort<SystemNotificationItem, string>(
     notifications,

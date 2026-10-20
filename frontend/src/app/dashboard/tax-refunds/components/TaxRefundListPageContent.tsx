@@ -16,6 +16,8 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
 } from "react";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
@@ -27,6 +29,7 @@ import {
 } from "@/lib/hooks/useBrowserQuery";
 import { Search, ReceiptText, Info } from "lucide-react";
 import { toast } from "sonner";
+import { runAwait } from "@/lib/run-await";
 import type { TaxRefund } from "@/types";
 import { taxRefundService } from "@/services/taxRefund.service";
 import { ErrorState } from "@/components/ui/data-state";
@@ -99,36 +102,75 @@ export function TaxRefundListPageContent() {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const deferredKeyword = useDeferredValue(keyword);
 
-  const loadTaxRefunds = useCallback(async () => {
-    setLoading(true);
-    setLoadError(false);
-    try {
-      const cacheKey = `tax-refunds-${deferredKeyword}-${status}-${pageSize}-${page}`;
-      const response = await cachedFetch(cacheKey, () =>
-        taxRefundService.getAll({
-          page,
-          pageSize,
-          keyword: deferredKeyword || undefined,
-          status: status === "ALL" ? undefined : status,
-        }),
-      );
-      setTaxRefunds(response?.data?.items || []);
-      setTotal(response?.data?.pagination?.total ?? 0);
-    } catch {
-      setLoadError(true);
-      toast.error("加载退税记录失败");
-    } finally {
-      setLoading(false);
-    }
+  // 渲染期已按新加载依赖重置、但对应 effect 尚未执行时，记录原 effect 会同步覆盖哪些状态：
+  // "loading"（非退税列表视图，原先只置 loading=false）或 "loadingAndError"（退税列表视图，
+  // 原先置 loading=true、loadError=false）。窗口内落地的旧请求只跳过这些会被覆盖的写入，数据与提示照常写入。
+  const resetPendingRef = useRef<"loading" | "loadingAndError" | null>(null);
+
+  const requestTaxRefunds = useCallback(() => {
+    const cacheKey = `tax-refunds-${deferredKeyword}-${status}-${pageSize}-${page}`;
+    return runAwait(
+      () =>
+        cachedFetch(cacheKey, () =>
+          taxRefundService.getAll({
+            page,
+            pageSize,
+            keyword: deferredKeyword || undefined,
+            status: status === "ALL" ? undefined : status,
+          }),
+        ),
+      (response) => {
+        setTaxRefunds(response?.data?.items || []);
+        setTotal(response?.data?.pagination?.total ?? 0);
+      },
+      () => {
+        if (resetPendingRef.current !== "loadingAndError") setLoadError(true);
+        toast.error("加载退税记录失败");
+      },
+      () => {
+        if (resetPendingRef.current === null) setLoading(false);
+      },
+    );
   }, [deferredKeyword, status, pageSize, page]);
 
-  useEffect(() => {
+  const loadTaxRefunds = useCallback(() => {
+    setLoading(true);
+    setLoadError(false);
+    return requestTaxRefunds();
+  }, [requestTaxRefunds]);
+
+  // 与下方加载 effect 的依赖逐项对应：requestTaxRefunds 恰在这四个值变化时变化（均为字符串/数字，!== 与 Object.is 等价），
+  // 因此以这四个值代替它；初值 null 使挂载时同样执行一次（非退税列表视图挂载时原先也会置 loading=false）。
+  const loadKey = { activeView, deferredKeyword, status, pageSize, page };
+  const [prevLoadKey, setPrevLoadKey] = useState<typeof loadKey | null>(null);
+  if (
+    prevLoadKey === null ||
+    prevLoadKey.activeView !== activeView ||
+    prevLoadKey.deferredKeyword !== deferredKeyword ||
+    prevLoadKey.status !== status ||
+    prevLoadKey.pageSize !== pageSize ||
+    prevLoadKey.page !== page
+  ) {
+    setPrevLoadKey(loadKey);
+    // 原先在加载 effect 内：非退税列表视图只置 loading=false，否则发请求前置 loading=true、loadError=false。
     if (activeView !== "refunds") {
       setLoading(false);
-      return;
+    } else {
+      setLoading(true);
+      setLoadError(false);
     }
-    void loadTaxRefunds();
-  }, [activeView, loadTaxRefunds]);
+  }
+
+  useLayoutEffect(() => {
+    resetPendingRef.current =
+      activeView === "refunds" ? "loadingAndError" : "loading";
+  }, [activeView, requestTaxRefunds]);
+
+  useEffect(() => {
+    resetPendingRef.current = null;
+    if (activeView !== "refunds") return;
+    void requestTaxRefunds();
+  }, [activeView, requestTaxRefunds]);
 
   const sort = useTableSort<TaxRefund, string>(
     taxRefunds,

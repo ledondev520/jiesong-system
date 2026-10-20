@@ -7,7 +7,13 @@
 "use client";
 
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
 import {
@@ -21,6 +27,7 @@ import {
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
+import { runAwait } from "@/lib/run-await";
 import { MobileListCard } from "@/components/mobile";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -122,34 +129,75 @@ export function TaxRefundWorkbench() {
   const [preparationOpen, setPreparationOpen] = useState(false);
   const [verificationOpen, setVerificationOpen] = useState(false);
 
-  const load = useCallback(async () => {
+  // 渲染期已按新加载依赖重置、但对应 effect 尚未执行时，记录原 effect 会同步覆盖哪些状态：
+  // "loadingAndError"（有申报月份，原先置 loading=true、loadError=false 后发请求）或
+  // "all"（申报月份为空，原先还会置 data=null、loading=false 且不发请求）。
+  // 窗口内落地的旧请求只跳过这些会被覆盖的写入，提示照常写入。
+  const resetPendingRef = useRef<"loadingAndError" | "all" | null>(null);
+
+  const requestWorkbench = useCallback(
+    () =>
+      runAwait(
+        () =>
+          taxRefundService.getWorkbench({
+            page,
+            pageSize,
+            keyword: keyword || undefined,
+            stage,
+            filingMonth,
+          }),
+        (response) => {
+          if (resetPendingRef.current !== "all") setData(response.data);
+        },
+        () => {
+          if (resetPendingRef.current === null) setLoadError(true);
+          toast.error("出口退税工作台加载失败");
+        },
+        () => {
+          if (resetPendingRef.current === null) setLoading(false);
+        },
+      ),
+    [keyword, stage, page, pageSize, filingMonth],
+  );
+
+  // 重试、导入成功后调用：与原 load 相同，先置 loading/清 loadError，申报月份为空时不发请求。
+  const load = useCallback(() => {
     setLoading(true);
     setLoadError(false);
     if (!filingMonth) {
       setData(null);
       setLoading(false);
-      return;
+      return Promise.resolve();
     }
-    try {
-      const response = await taxRefundService.getWorkbench({
-        page,
-        pageSize,
-        keyword: keyword || undefined,
-        stage,
-        filingMonth,
-      });
-      setData(response.data);
-    } catch {
-      setLoadError(true);
-      toast.error("出口退税工作台加载失败");
-    } finally {
+    return requestWorkbench();
+  }, [filingMonth, requestWorkbench]);
+
+  // 原先加载 effect 内的同步写入改为加载依赖变化时在渲染期执行；初值 null 使挂载时同样执行一次。
+  const loadKey = [keyword, stage, page, pageSize, filingMonth] as const;
+  const [prevLoadKey, setPrevLoadKey] = useState<typeof loadKey | null>(null);
+  if (
+    prevLoadKey === null ||
+    loadKey.some((value, index) => !Object.is(value, prevLoadKey[index]))
+  ) {
+    setPrevLoadKey(loadKey);
+    setLoadError(false);
+    if (filingMonth) {
+      setLoading(true);
+    } else {
+      setData(null);
       setLoading(false);
     }
-  }, [keyword, stage, page, pageSize, filingMonth]);
+  }
+
+  useLayoutEffect(() => {
+    resetPendingRef.current = filingMonth ? "loadingAndError" : "all";
+  }, [filingMonth, requestWorkbench]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    resetPendingRef.current = null;
+    if (!filingMonth) return;
+    void requestWorkbench();
+  }, [filingMonth, requestWorkbench]);
 
   const openPreparation = (item: TaxRefundWorkbenchItem) => {
     setSelected(item);
