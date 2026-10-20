@@ -10,6 +10,7 @@
 | 文件名 | 地位 | 功能 |
 |--------|------|------|
 | check-pr-format.cjs / check-pr-format.test.cjs | CI 工具与回归 | 完整历史下按 PR base/head 检查改动 TS/TSX 源码；特殊路径、浅历史和失败摘要回归 |
+| audit_api_write_success_times.js | 性能审计 | 只对一次性（disposable）后端做写接口成功路径耗时审计；须同时设置 `API_PERF_ALLOW_WRITES`/`API_PERF_DISPOSABLE_DB`/`API_PERF_ISOLATED_FILES=true`、`API_BASE_URL`，以及 `API_PERF_UPLOAD_DIR`（该后端自己的 UPLOAD_DIR，绝对路径且已存在）。该目录真实路径与默认 `backend/uploads`（按脚本位置或调用方 cwd）、`backend/.env` 配置的 UPLOAD_DIR、启动环境 UPLOAD_DIR 相同或互相包含时拒绝运行；残留文件清理只删除该目录内普通文件（`backend/scripts/perf-upload-cleanup.js`），不回退 `backend/.env` 或默认目录 |
 | fix_export_contracts.js | 数据修复 | 修复出口合同的美元金额 + 创建装箱明细（已修正箱数逻辑） |
 | fix_boxes_data.js | 数据修复 | 修复EXP25合同中被错误填充的箱数数据（置空处理） |
 | import_contracts_data.js | 数据导入 | 导入采购合同数据 |
