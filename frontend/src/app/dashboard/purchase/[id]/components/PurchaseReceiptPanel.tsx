@@ -40,9 +40,42 @@ import { ErrorState } from "@/components/ui/data-state";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { toast } from "sonner";
 
-// 同步异常/非 Promise 返回值也走 catch/finally，与原 async try/await 一致。
-function startRequest<T>(fn: () => T | PromiseLike<T>): Promise<T> {
-  return new Promise<T>((resolve) => resolve(fn()));
+// 与原 `await fn()` 同一时序：直接在请求返回的 Promise 上 then，不额外增加微任务；
+// 同步异常/非 Promise 返回值也走失败/成功分支。
+function awaitResult<T>(fn: () => T | PromiseLike<T>): Promise<T> {
+  try {
+    return Promise.resolve(fn());
+  } catch (error) {
+    return Promise.reject(error);
+  }
+}
+
+// 等价于 `try { onValue(await fn()) } catch (e) { onError(e) } finally { onFinally() }`
+// 的 async 函数：各分支与返回 Promise 的完成时机均与原实现相同，且从不 reject。
+function runAwait<T>(
+  fn: () => T | PromiseLike<T>,
+  onValue: (value: T) => void,
+  onError: (error: unknown) => void,
+  onFinally: () => void,
+): Promise<void> {
+  return new Promise<void>((done) => {
+    awaitResult(fn).then(
+      (value) => {
+        try {
+          onValue(value);
+        } catch (error) {
+          onError(error);
+        }
+        onFinally();
+        done();
+      },
+      (error: unknown) => {
+        onError(error);
+        onFinally();
+        done();
+      },
+    );
+  });
 }
 
 // 与后端数量上限容差一致，避免0.1+0.2误报超过0.3。
@@ -111,21 +144,22 @@ export function PurchaseReceiptPanel({
   // 仅在请求结果回调中写状态，供 effect 调用；事件中用 load 先重置再请求。
   const fetchList = useCallback(
     () =>
-      startRequest(() =>
-        purchaseReceiptService.list(purchaseContractId, {
-          page,
-          pageSize,
-        }),
-      )
-        .then((response) => {
+      runAwait(
+        () =>
+          purchaseReceiptService.list(purchaseContractId, {
+            page,
+            pageSize,
+          }),
+        (response) => {
           setData(response.data);
-        })
-        .catch(() => {
+        },
+        () => {
           if (!resetPendingRef.current) setError(true);
-        })
-        .finally(() => {
+        },
+        () => {
           if (!resetPendingRef.current) setLoading(false);
-        }),
+        },
+      ),
     [purchaseContractId, page, pageSize],
   );
   const load = useCallback(() => {
@@ -157,23 +191,24 @@ export function PurchaseReceiptPanel({
 
   const fetchHistory = useCallback(() => {
     if (!historyReceipt) return Promise.resolve();
-    return startRequest(() =>
-      purchaseReceiptService.inspections(
-        purchaseContractId,
-        historyReceipt.id,
-        { page: historyPage, pageSize: 20 },
-      ),
-    )
-      .then((response) => {
+    return runAwait(
+      () =>
+        purchaseReceiptService.inspections(
+          purchaseContractId,
+          historyReceipt.id,
+          { page: historyPage, pageSize: 20 },
+        ),
+      (response) => {
         setHistory(response.data?.items || []);
         setHistoryTotal(response.data?.pagination?.total || 0);
-      })
-      .catch(() => {
+      },
+      () => {
         if (!historyResetPendingRef.current) setHistoryError(true);
-      })
-      .finally(() => {
+      },
+      () => {
         if (!historyResetPendingRef.current) setHistoryLoading(false);
-      });
+      },
+    );
   }, [purchaseContractId, historyReceipt, historyPage]);
   const loadHistory = useCallback(() => {
     if (!historyReceipt) return Promise.resolve();

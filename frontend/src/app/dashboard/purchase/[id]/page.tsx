@@ -306,9 +306,14 @@ function ContractTimeline({
   );
 }
 
-// 同步异常/非 Promise 返回值也走 catch/finally，与原 async try/await 一致。
-function startRequest<T>(fn: () => T | PromiseLike<T>): Promise<T> {
-  return new Promise<T>((resolve) => resolve(fn()));
+// 与原 `await fn()` 同一时序：直接在请求返回的 Promise 上 then，不额外增加微任务；
+// 同步异常/非 Promise 返回值也走失败/成功分支。
+function awaitResult<T>(fn: () => T | PromiseLike<T>): Promise<T> {
+  try {
+    return Promise.resolve(fn());
+  } catch (error) {
+    return Promise.reject(error);
+  }
 }
 
 export default function PurchaseDetailPage({ params }: PageProps) {
@@ -351,21 +356,15 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   // （与原先 effect 内同步重置覆盖旧响应的结果一致）。
   const resetPendingRef = useRef(false);
   // 仅在请求结果回调中写状态，供 effect 调用；事件/回调中用 loadData 先重置再请求。
+  // 等价于原 async 嵌套 try/await：各分支与返回 Promise 的完成时机相同，且从不 reject。
   const fetchData = useCallback(
     () =>
-      startRequest(() => purchaseService.getById(id))
-        .then((contractRes) => {
-          setContract(contractRes.data || null);
-          if (!resetPendingRef.current) setNotFound(!contractRes.data);
-          return startRequest(() => listContractFiles(id, "PURCHASE"))
-            .then((filesRes) => {
-              if (filesRes.data) setContractFiles(filesRes.data);
-            })
-            .catch(() => {
-              toast.error("附件读取失败，请重试刷新详情");
-            });
-        })
-        .catch((error: unknown) => {
+      new Promise<void>((done) => {
+        const finish = () => {
+          if (!resetPendingRef.current) setLoading(false);
+          done();
+        };
+        const fail = (error: unknown) => {
           const missing =
             typeof error === "object" &&
             error !== null &&
@@ -376,10 +375,32 @@ export default function PurchaseDetailPage({ params }: PageProps) {
             setLoadError(!missing);
           }
           if (!missing) toast.error("加载合同详情失败");
-        })
-        .finally(() => {
-          if (!resetPendingRef.current) setLoading(false);
-        }),
+          finish();
+        };
+        awaitResult(() => purchaseService.getById(id)).then((contractRes) => {
+          try {
+            setContract(contractRes.data || null);
+            if (!resetPendingRef.current) setNotFound(!contractRes.data);
+          } catch (error) {
+            fail(error);
+            return;
+          }
+          awaitResult(() => listContractFiles(id, "PURCHASE")).then(
+            (filesRes) => {
+              try {
+                if (filesRes.data) setContractFiles(filesRes.data);
+              } catch {
+                toast.error("附件读取失败，请重试刷新详情");
+              }
+              finish();
+            },
+            () => {
+              toast.error("附件读取失败，请重试刷新详情");
+              finish();
+            },
+          );
+        }, fail);
+      }),
     [id],
   );
   const loadData = useCallback(() => {

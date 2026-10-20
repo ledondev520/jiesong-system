@@ -48,15 +48,24 @@ export function ImportPurchaseItemsDialog({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // 打开弹窗或切换合同时先在渲染期重置加载态与勾选；effect 只负责发请求。
-  const [loadDeps, setLoadDeps] = useState({ open, salesContractId });
-  if (loadDeps.open !== open || loadDeps.salesContractId !== salesContractId) {
+  // 打开弹窗（含以 open=true 首次挂载）或切换合同时先在渲染期重置加载态与勾选；
+  // effect 只负责发请求。初值 null 使首次渲染也按原挂载 effect 处理。
+  const [loadDeps, setLoadDeps] = useState<{
+    open: boolean;
+    salesContractId: string;
+  } | null>(null);
+  if (
+    loadDeps === null ||
+    loadDeps.open !== open ||
+    loadDeps.salesContractId !== salesContractId
+  ) {
     setLoadDeps({ open, salesContractId });
     if (open) {
       setLoading(true);
       setSelectedBoxes({});
     }
   }
+
   // 提交后到新请求 effect 执行前，上一轮仍 active 的旧响应不得改写刚重置的 loading
   // （与原先 effect 内同步重置覆盖旧响应的结果一致）。
   const resetPendingRef = useRef(false);

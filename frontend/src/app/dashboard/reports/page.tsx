@@ -103,9 +103,42 @@ function readPeriod(query: string): ReportPeriod {
   };
 }
 
-// 同步异常/非 Promise 返回值也走 catch/finally，与原 async try/await 一致。
-function startRequest<T>(fn: () => T | PromiseLike<T>): Promise<T> {
-  return new Promise<T>((resolve) => resolve(fn()));
+// 与原 `await fn()` 同一时序：直接在请求返回的 Promise 上 then，不额外增加微任务；
+// 同步异常/非 Promise 返回值也走失败/成功分支。
+function awaitResult<T>(fn: () => T | PromiseLike<T>): Promise<T> {
+  try {
+    return Promise.resolve(fn());
+  } catch (error) {
+    return Promise.reject(error);
+  }
+}
+
+// 等价于 `try { onValue(await fn()) } catch (e) { onError(e) } finally { onFinally() }`
+// 的 async 函数：各分支与返回 Promise 的完成时机均与原实现相同，且从不 reject。
+function runAwait<T>(
+  fn: () => T | PromiseLike<T>,
+  onValue: (value: T) => void,
+  onError: (error: unknown) => void,
+  onFinally: () => void,
+): Promise<void> {
+  return new Promise<void>((done) => {
+    awaitResult(fn).then(
+      (value) => {
+        try {
+          onValue(value);
+        } catch (error) {
+          onError(error);
+        }
+        onFinally();
+        done();
+      },
+      (error: unknown) => {
+        onError(error);
+        onFinally();
+        done();
+      },
+    );
+  });
 }
 
 function BusinessReportsContent() {
@@ -140,26 +173,27 @@ function BusinessReportsContent() {
     const isCurrent = () =>
       activePeriodRef.current === periodKey &&
       requestGenerationRef.current === generation;
-    return startRequest(() =>
-      reportsService.getBusinessOverview({
-        ...(appliedStart ? { startDate: appliedStart } : {}),
-        ...(appliedEnd ? { endDate: appliedEnd } : {}),
-      }),
-    )
-      .then((res) => {
+    return runAwait(
+      () =>
+        reportsService.getBusinessOverview({
+          ...(appliedStart ? { startDate: appliedStart } : {}),
+          ...(appliedEnd ? { endDate: appliedEnd } : {}),
+        }),
+      (res) => {
         if (!isCurrent()) return;
         if (res.data.overview.currency !== "CNY")
           throw new Error("经营报表币种口径尚未更新");
         setData(res.data);
-      })
-      .catch((e: unknown) => {
+      },
+      (e) => {
         if (!isCurrent()) return;
         console.error("获取经营报表失败:", e);
         if (!resetPendingRef.current) setError(true);
-      })
-      .finally(() => {
+      },
+      () => {
         if (isCurrent() && !resetPendingRef.current) setLoading(false);
-      });
+      },
+    );
   }, [appliedStart, appliedEnd, periodKey]);
   const loadData = useCallback(() => {
     if (activePeriodRef.current !== periodKey) return Promise.resolve();
