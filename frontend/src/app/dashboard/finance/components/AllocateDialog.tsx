@@ -6,13 +6,13 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useState, useMemo, useEffect } from 'react';
-import { financeService } from '@/services/finance.service';
-import { loadPaginatedCatalog } from '@/services/paginatedCatalog';
-import { clearApiGetCache } from '@/lib/axios';
-import { Payment } from '@/types';
+import { useState, useMemo, useEffect } from "react";
+import { financeService } from "@/services/finance.service";
+import { loadPaginatedCatalog } from "@/services/paginatedCatalog";
+import { clearApiGetCache } from "@/lib/axios";
+import { Payment } from "@/types";
 import {
   Dialog,
   DialogContent,
@@ -20,13 +20,13 @@ import {
   DialogTitle,
   DialogFooter,
   DialogDescription,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { AlertCircle } from 'lucide-react';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { AlertCircle } from "lucide-react";
 
 interface AllocationRow {
   contractId: string;
@@ -40,7 +40,10 @@ interface AllocateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   payment: Payment | null;
-  onSubmit: (paymentId: string, allocations: { salesContractId: string; amount: number }[]) => Promise<void>;
+  onSubmit: (
+    paymentId: string,
+    allocations: { salesContractId: string; amount: number }[],
+  ) => Promise<void>;
 }
 
 /**
@@ -51,31 +54,69 @@ interface AllocateDialogProps {
  *   3. 校验总分配额不超过到账总额
  *   4. 提交分配
  */
-export function AllocateDialog({ open, onOpenChange, payment, onSubmit }: AllocateDialogProps) {
+export function AllocateDialog({
+  open,
+  onOpenChange,
+  payment,
+  onSubmit,
+}: AllocateDialogProps) {
   const [rows, setRows] = useState<AllocationRow[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [retry, setRetry] = useState(0);
+  // 打开 / 切换到账款 / 重试时（含首次渲染）在渲染期同步重置加载态与列表，替代 effect 内同步 setState；请求仍在 effect 中发起
+  const loadKey = JSON.stringify([open, payment?.id, retry]);
+  const [prevLoadKey, setPrevLoadKey] = useState<string | null>(null);
+  if (prevLoadKey !== loadKey) {
+    setPrevLoadKey(loadKey);
+    if (open && payment) {
+      setLoading(true);
+      setLoadError(false);
+      setRows([]);
+    }
+  }
   useEffect(() => {
     if (!open || !payment) return;
     let cancelled = false;
-    setLoading(true); setLoadError(false); setRows([]);
-    void loadPaginatedCatalog((page) => financeService.getReceivables({ page, pageSize: 100, outstandingOnly: true }))
+    void loadPaginatedCatalog((page) =>
+      financeService.getReceivables({
+        page,
+        pageSize: 100,
+        outstandingOnly: true,
+      }),
+    )
       .then((contracts) => {
-        if (!cancelled) setRows(contracts.map((contract) => ({
-          contractId: contract.id, contractNo: contract.contractNo,
-          unreceiveAmount: contract.unreceiveAmount ?? Math.max(0, contract.totalAmount - (contract.receivedAmount || 0)),
-          amount: '', selected: false,
-        })));
-      }).catch(() => { if (!cancelled) setLoadError(true); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+        if (!cancelled)
+          setRows(
+            contracts.map((contract) => ({
+              contractId: contract.id,
+              contractNo: contract.contractNo,
+              unreceiveAmount:
+                contract.unreceiveAmount ??
+                Math.max(
+                  0,
+                  contract.totalAmount - (contract.receivedAmount || 0),
+                ),
+              amount: "",
+              selected: false,
+            })),
+          );
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [open, payment?.id, retry]);
 
   const totalAmount = payment?.remainingAmount ?? payment?.amount ?? 0;
-  const currency = payment?.currency ?? 'USD';
+  const currency = payment?.currency ?? "USD";
 
   // 已分配合计
   const allocatedTotal = useMemo(() => {
@@ -90,13 +131,17 @@ export function AllocateDialog({ open, onOpenChange, payment, onSubmit }: Alloca
 
   const toggleRow = (contractId: string) => {
     setRows((prev) =>
-      prev.map((r) => (r.contractId === contractId ? { ...r, selected: !r.selected } : r))
+      prev.map((r) =>
+        r.contractId === contractId ? { ...r, selected: !r.selected } : r,
+      ),
     );
   };
 
   const updateAmount = (contractId: string, value: string) => {
     setRows((prev) =>
-      prev.map((r) => (r.contractId === contractId ? { ...r, amount: value } : r))
+      prev.map((r) =>
+        r.contractId === contractId ? { ...r, amount: value } : r,
+      ),
     );
   };
 
@@ -109,8 +154,8 @@ export function AllocateDialog({ open, onOpenChange, payment, onSubmit }: Alloca
       prev.map((r) =>
         r.contractId === contractId
           ? { ...r, amount: maxAmount.toFixed(2), selected: true }
-          : r
-      )
+          : r,
+      ),
     );
   };
 
@@ -120,7 +165,10 @@ export function AllocateDialog({ open, onOpenChange, payment, onSubmit }: Alloca
     try {
       const allocations = rows
         .filter((r) => r.selected && parseFloat(r.amount) > 0)
-        .map((r) => ({ salesContractId: r.contractId, amount: parseFloat(r.amount) }));
+        .map((r) => ({
+          salesContractId: r.contractId,
+          amount: parseFloat(r.amount),
+        }));
       await onSubmit(payment.id, allocations);
     } finally {
       setSubmitting(false);
@@ -135,8 +183,11 @@ export function AllocateDialog({ open, onOpenChange, payment, onSubmit }: Alloca
         <DialogHeader>
           <DialogTitle>分配收款</DialogTitle>
           <DialogDescription>
-            {payment.customerName ? `${payment.customerName} · ` : ''}
-            到账 <span className="font-semibold text-foreground">{currency} {totalAmount.toLocaleString()}</span>
+            {payment.customerName ? `${payment.customerName} · ` : ""}
+            到账{" "}
+            <span className="font-semibold text-foreground">
+              {currency} {totalAmount.toLocaleString()}
+            </span>
             {payment.note && ` · ${payment.note}`}
           </DialogDescription>
         </DialogHeader>
@@ -145,13 +196,25 @@ export function AllocateDialog({ open, onOpenChange, payment, onSubmit }: Alloca
         <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">已分配</span>
-            <span className={isOverAllocated ? 'text-destructive font-semibold' : 'font-semibold'}>
+            <span
+              className={
+                isOverAllocated
+                  ? "text-destructive font-semibold"
+                  : "font-semibold"
+              }
+            >
               {currency} {allocatedTotal.toFixed(2)}
             </span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">剩余可分配</span>
-            <span className={remaining < 0 ? 'text-destructive' : 'text-primary font-semibold'}>
+            <span
+              className={
+                remaining < 0
+                  ? "text-destructive"
+                  : "text-primary font-semibold"
+              }
+            >
               {currency} {remaining.toFixed(2)}
             </span>
           </div>
@@ -166,14 +229,33 @@ export function AllocateDialog({ open, onOpenChange, payment, onSubmit }: Alloca
         {/* 合同列表 */}
         <ScrollArea className="max-h-[300px]">
           <div className="space-y-2 pr-2">
-            {loading ? <p role="status">加载待收合同...</p> : loadError ? <p className="text-sm text-destructive">待收合同读取失败 <Button variant="outline" onClick={() => { clearApiGetCache(); setRetry(retry + 1); }}>重试</Button></p> : rows.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">暂无待收合同</p>
+            {loading ? (
+              <p role="status">加载待收合同...</p>
+            ) : loadError ? (
+              <p className="text-sm text-destructive">
+                待收合同读取失败{" "}
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    clearApiGetCache();
+                    setRetry(retry + 1);
+                  }}
+                >
+                  重试
+                </Button>
+              </p>
+            ) : rows.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                暂无待收合同
+              </p>
             ) : (
               rows.map((row) => (
                 <div
                   key={row.contractId}
                   className={`flex flex-wrap items-center gap-3 rounded-lg border p-3 transition-colors ${
-                    row.selected ? 'border-primary/50 bg-primary/5' : 'bg-background'
+                    row.selected
+                      ? "border-primary/50 bg-primary/5"
+                      : "bg-background"
                   }`}
                 >
                   <Checkbox
@@ -182,7 +264,10 @@ export function AllocateDialog({ open, onOpenChange, payment, onSubmit }: Alloca
                     onCheckedChange={() => toggleRow(row.contractId)}
                   />
                   <div className="min-w-0 flex-1 basis-32">
-                    <Label htmlFor={`alloc-${row.contractId}`} className="font-medium text-sm cursor-pointer">
+                    <Label
+                      htmlFor={`alloc-${row.contractId}`}
+                      className="font-medium text-sm cursor-pointer"
+                    >
                       {row.contractNo}
                     </Label>
                     <p className="text-xs text-muted-foreground">
@@ -196,7 +281,9 @@ export function AllocateDialog({ open, onOpenChange, payment, onSubmit }: Alloca
                       className="h-8 w-24 text-right text-sm"
                       value={row.amount}
                       disabled={!row.selected}
-                      onChange={(e) => updateAmount(row.contractId, e.target.value)}
+                      onChange={(e) =>
+                        updateAmount(row.contractId, e.target.value)
+                      }
                     />
                     <Button
                       type="button"
@@ -216,12 +303,16 @@ export function AllocateDialog({ open, onOpenChange, payment, onSubmit }: Alloca
         </ScrollArea>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            取消
+          </Button>
           <Button
             onClick={handleSubmit}
             disabled={!hasSelection || isOverAllocated || submitting}
           >
-            {submitting ? '分配中...' : `确认分配 ${currency} ${allocatedTotal.toFixed(2)}`}
+            {submitting
+              ? "分配中..."
+              : `确认分配 ${currency} ${allocatedTotal.toFixed(2)}`}
           </Button>
         </DialogFooter>
       </DialogContent>
