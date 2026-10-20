@@ -11,6 +11,7 @@
 - All automation and scripts in this repo should follow the controls below unless explicitly overridden by an approved incident procedure.
 - PR Review locks Prettier 3.9.9 and checks changed frontend TS/TSX source with full Git history and event base/head SHAs (`scripts/check-pr-format.cjs`); missing history/paths fail closed. Full unit/E2E checks remain enabled. Its report job uses zero token permissions and writes `GITHUB_STEP_SUMMARY`, preserving failed/cancelled check states instead of requiring comment-write access.
 - `main` is protected by repository ruleset `main-protection` (id 25453471): changes land only through a pull request (0 required approvals), main cannot be deleted or force-pushed, and 9 GitHub Actions checks must pass before merge (Code Quality, Unit Tests, Build Test, Type Safety Check, Lint Check, Backend Unit Tests, Frontend Unit And Coverage, Frontend E2E Acceptance, Secret Detection). Merge with `gh pr checks <N> --required --watch` then `gh pr merge <N> --merge --match-head-commit <sha>`; never use `--admin` (no bypass actors are configured).
+- Reviewers check every PR diff against the root `CODING_STANDARDS.md` (review-time only; do not paste it into implementation prompts). PR descriptions must state one-way vs two-way door, blast radius and rollback (`.github/pull_request_template.md`).
 
 ## ByteRover project memory
 - This repo has local ByteRover engineering memory in `.brv/context-tree/`.
