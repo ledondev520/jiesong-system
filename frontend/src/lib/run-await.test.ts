@@ -1,5 +1,5 @@
 /**
- * Input: runAwait / runAwaitResult 与等价原生 async try/await/catch/finally（含 return 回调值）实现
+ * Input: runAwait 与等价原生 async try/await/catch/finally 实现
  * Output: 成功/失败/同步抛错/非 Promise 返回/thenable/回调抛错各情形下微任务轨迹与结果完全一致的测试
  * Pos: 前端请求回调时序工具单测
  *
@@ -7,17 +7,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { runAwait, runAwaitResult } from "./run-await";
+import { runAwait } from "./run-await";
 
 type Mode = "resolve" | "reject" | "syncThrow" | "plain" | "thenable";
 type Fault = "none" | "onValue" | "onError" | "onFinally" | "onValueAndError";
 
-async function trace(
-  useHelper: boolean,
-  mode: Mode,
-  fault: Fault,
-  withResult = false,
-) {
+async function trace(useHelper: boolean, mode: Mode, fault: Fault) {
   const log: string[] = [];
   const fn = () => {
     log.push("fn");
@@ -35,13 +30,11 @@ async function trace(
     log.push("value:" + v);
     if (fault === "onValue" || fault === "onValueAndError")
       throw new Error("value-fault");
-    return "v:" + v;
   };
   const onError = (e: unknown) => {
     log.push("error:" + (e as Error).message);
     if (fault === "onError" || fault === "onValueAndError")
       throw new Error("error-fault");
-    return "e:" + (e as Error).message;
   };
   const onFinally = () => {
     log.push("finally");
@@ -52,15 +45,6 @@ async function trace(
       onValue(await fn());
     } catch (e) {
       onError(e);
-    } finally {
-      onFinally();
-    }
-  };
-  const originalWithResult = async () => {
-    try {
-      return onValue(await fn());
-    } catch (e) {
-      return onError(e);
     } finally {
       onFinally();
     }
@@ -76,18 +60,12 @@ async function trace(
     }
   })();
   log.push("call");
-  const p: Promise<unknown> = withResult
-    ? useHelper
-      ? runAwaitResult(fn, onValue, onError, onFinally)
-      : originalWithResult()
-    : useHelper
-      ? runAwait(fn, onValue, onError, onFinally)
-      : original();
+  const p = useHelper ? runAwait(fn, onValue, onError, onFinally) : original();
   log.push("returned");
   let outcome = "";
   await p.then(
-    (value) => {
-      outcome = "resolved:" + String(value);
+    () => {
+      outcome = "resolved";
       log.push("settled");
     },
     (e: Error) => {
@@ -120,14 +98,6 @@ describe("runAwait 与原生 async try/await 时序一致", () => {
       it(`${mode} / 回调异常=${fault}`, async () => {
         const expected = await trace(false, mode, fault);
         const actual = await trace(true, mode, fault);
-        expect(actual).toEqual(expected);
-      });
-
-  for (const mode of modes)
-    for (const fault of faults)
-      it(`runAwaitResult ${mode} / 回调异常=${fault}`, async () => {
-        const expected = await trace(false, mode, fault, true);
-        const actual = await trace(true, mode, fault, true);
         expect(actual).toEqual(expected);
       });
 

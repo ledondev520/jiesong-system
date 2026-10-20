@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { runAwaitResult } from "@/lib/run-await";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type AsyncFunction<TArgs extends readonly unknown[], TResult> = (
   ...args: TArgs
@@ -49,77 +41,42 @@ export function useApi<TResult, TArgs extends readonly unknown[] = []>(
   const [hasLoaded, setHasLoaded] = useState(false);
   const requestRef = useRef(request);
 
-  // 最新 request 原先在渲染期写入 ref，改为每次提交后（layout 阶段，早于任何被动 effect 与事件）写入。
-  useLayoutEffect(() => {
-    requestRef.current = request;
-  });
+  // react-hooks/refs 警告保留：最新 request 必须在渲染期写入 ref。改为 layout/被动 effect 写入后，子组件 layout effect、
+  // 渲染期或挂起 transition 提交前调用 execute 会改用上一次提交的 request（B11 第 1 轮复审实测），属行为变化，故不改。
+  requestRef.current = request;
 
-  // 渲染期已重置、对应被动 effect 尚未执行的窗口内完成的旧请求：原 effect 会随后覆盖 loading/error，
-  // 因此窗口内跳过这两项写入（data/hasLoaded 与回调不受影响，与原先一致）。
-  const resetPendingRef = useRef(false);
+  const execute = useCallback(
+    async (...args: TArgs): Promise<TResult | null> => {
+      setLoading(true);
+      setError(null);
 
-  const runRequest = useCallback(
-    (args: TArgs): Promise<TResult | null> =>
-      runAwaitResult<TResult, TResult | null>(
-        () => requestRef.current(...args),
-        (result) => {
-          setData(result);
-          setHasLoaded(true);
-          onSuccess?.(result);
-          return result;
-        },
-        (err) => {
-          const message = normalizeErrorMessage(err);
-          if (!resetPendingRef.current) setError(message);
-          setHasLoaded(true);
-          onError?.(err);
-          return null;
-        },
-        () => {
-          if (!resetPendingRef.current) setLoading(false);
-        },
-      ),
+      try {
+        const result = await requestRef.current(...args);
+        setData(result);
+        setHasLoaded(true);
+        onSuccess?.(result);
+        return result;
+      } catch (err) {
+        const message = normalizeErrorMessage(err);
+        setError(message);
+        setHasLoaded(true);
+        onError?.(err);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
     [onError, onSuccess],
   );
 
-  const execute = useCallback(
-    (...args: TArgs): Promise<TResult | null> => {
-      setLoading(true);
-      setError(null);
-      return runRequest(args);
-    },
-    [runRequest],
-  );
-
-  // immediate 请求的 loading/error 置位：原先在 effect 内（execute 开头）同步写入，改为渲染期执行；
-  // 挂载时初值即为 loading=immediate、error=null，无需写入。
-  // 以 runRequest 的依赖（onError、onSuccess）判断其是否变化，与原 effect 的触发条件一致。
-  const [immediateKey, setImmediateKey] = useState({
-    immediate,
-    onError,
-    onSuccess,
-  });
-  if (
-    immediateKey.immediate !== immediate ||
-    immediateKey.onError !== onError ||
-    immediateKey.onSuccess !== onSuccess
-  ) {
-    setImmediateKey({ immediate, onError, onSuccess });
-    if (immediate) {
-      setLoading(true);
-      setError(null);
-    }
-  }
-  useLayoutEffect(() => {
-    resetPendingRef.current = immediate;
-  }, [immediate, runRequest]);
-
+  // react-hooks/set-state-in-effect 警告保留：每次自动请求开始前须同步置 loading=true、error=null（含 StrictMode/重放 effect
+  // 的第二次 setup，此时依赖未变，渲染期重置无法覆盖）；按 onSuccess/onError 引用做渲染期重置还会让内联回调无限重渲染
+  // （B11 第 1 轮复审实测），故保持原 effect 内调用 execute。
   useEffect(() => {
-    resetPendingRef.current = false;
     if (immediate) {
-      void runRequest([] as unknown as TArgs);
+      void execute(...([] as unknown as TArgs));
     }
-  }, [immediate, runRequest]);
+  }, [immediate, execute]);
 
   return useMemo(
     () => ({

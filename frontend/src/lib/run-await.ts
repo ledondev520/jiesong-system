@@ -1,8 +1,7 @@
 /**
  * Input: 请求函数 + 成功/失败/收尾回调
- * Output: runAwait：与 `async () => { try { onValue(await fn()) } catch (e) { onError(e) } finally { onFinally() } }`
+ * Output: 与 `async () => { try { onValue(await fn()) } catch (e) { onError(e) } finally { onFinally() } }`
  *         时序完全一致的 Promise（各回调执行的微任务位置、返回 Promise 的完成时机、同步异常与回调异常的处理均相同）
- *         runAwaitResult：同上但 try/catch 分支 return 回调返回值，Promise 以该值完成
  * Pos: 供页面在 effect 中调用的请求函数使用：状态只在回调中写入（满足 react-hooks/set-state-in-effect），
  *      又不像 `.then().catch().finally()` 链那样改变同一轮内多个请求成功/失败处理的相对顺序
  *
@@ -11,24 +10,19 @@
 
 const noop = () => {};
 
-/**
- * 与 `async () => { try { return onValue(await fn()) } catch (e) { return onError(e) } finally { onFinally() } }`
- * 时序完全一致，返回 Promise 以回调返回值完成（回调返回值须为非 thenable，与原 async 函数 return 普通值时机相同）。
- */
-export function runAwaitResult<T, R>(
+export function runAwait<T>(
   fn: () => T | PromiseLike<T>,
-  onValue: (value: T) => R,
-  onError: (error: unknown) => R,
+  onValue: (value: T) => void,
+  onError: (error: unknown) => void,
   onFinally: () => void = noop,
-): Promise<R> {
-  return new Promise<R>((resolve, reject) => {
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
     // 对应 try 块结束后的 catch/finally：body 抛错时先执行 finally 再以该错误结束；finally 抛错时以 finally 的错误结束
-    const complete = (body: () => R) => {
+    const complete = (body: () => void) => {
       let failed = false;
       let failure: unknown;
-      let result: R | undefined;
       try {
-        result = body();
+        body();
       } catch (error) {
         failed = true;
         failure = error;
@@ -40,14 +34,14 @@ export function runAwaitResult<T, R>(
         return;
       }
       if (failed) reject(failure);
-      else resolve(result as R);
+      else resolve();
     };
     const handleValue = (value: T) =>
       complete(() => {
         try {
-          return onValue(value);
+          onValue(value);
         } catch (error) {
-          return onError(error);
+          onError(error);
         }
       });
     let pending: T | PromiseLike<T>;
@@ -63,23 +57,4 @@ export function runAwaitResult<T, R>(
       complete(() => onError(error)),
     );
   });
-}
-
-export function runAwait<T>(
-  fn: () => T | PromiseLike<T>,
-  onValue: (value: T) => void,
-  onError: (error: unknown) => void,
-  onFinally: () => void = noop,
-): Promise<void> {
-  // 回调返回值一律丢弃，Promise 以 undefined 完成（与原实现相同）
-  return runAwaitResult<T, void>(
-    fn,
-    (value) => {
-      onValue(value);
-    },
-    (error) => {
-      onError(error);
-    },
-    onFinally,
-  );
 }
