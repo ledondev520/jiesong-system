@@ -332,7 +332,10 @@ export default function CreateSalesPage() {
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="contents">
+        <form
+          onSubmit={(event) => form.handleSubmit(onSubmit)(event)}
+          className="contents"
+        >
           <fieldset disabled={form.formState.isSubmitting} className="contents">
             {currentStep === 1 && (
               <Card>

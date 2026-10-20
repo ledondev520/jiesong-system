@@ -1,11 +1,11 @@
 /**
  * Input: SalesFinancePanel、单柜财务汇总与美元收款写入 mock
- * Output: 统一财务口径、收款保存失败传播与成功刷新交互测试
+ * Output: 统一财务口径、收款保存失败传播与成功刷新、切换合同时重置加载/失败状态的交互测试
  * Pos: 出口专项单财务结算主界面测试
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SalesFinancePanel } from "./SalesFinancePanel";
 import type { PaymentSubmitData } from "@/app/dashboard/finance/components/PaymentDialog";
@@ -208,5 +208,61 @@ describe("SalesFinancePanel", () => {
       expect(mockGetFinanceSummary).toHaveBeenCalledTimes(2);
       expect(onChanged).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("切换合同时清除上一合同的失败状态并进入加载态，随后显示新合同汇总", async () => {
+    mockGetFinanceSummary.mockRejectedValueOnce(new Error("合成读取失败"));
+    const view = render(
+      <SalesFinancePanel salesContractId="sales-1" contractNo="EXP260001" />,
+    );
+    expect(await screen.findByText("单柜财务汇总加载失败")).toBeInTheDocument();
+
+    let resolveNext!: (value: unknown) => void;
+    mockGetFinanceSummary.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveNext = resolve;
+      }),
+    );
+    view.rerender(
+      <SalesFinancePanel salesContractId="sales-2" contractNo="EXP260002" />,
+    );
+    expect(screen.getByLabelText("财务结算加载中")).toBeInTheDocument();
+    expect(screen.queryByText("单柜财务汇总加载失败")).not.toBeInTheDocument();
+    expect(mockGetFinanceSummary).toHaveBeenLastCalledWith("sales-2");
+
+    await act(async () => {
+      resolveNext({ data: { ...summary, salesContractId: "sales-2" } });
+    });
+    expect(
+      await screen.findByRole("heading", { name: "单柜财务结算" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("正在刷新财务口径")).not.toBeInTheDocument();
+  });
+
+  it("已有汇总时切换合同显示刷新提示，新汇总返回后结束", async () => {
+    const view = render(
+      <SalesFinancePanel salesContractId="sales-1" contractNo="EXP260001" />,
+    );
+    expect(
+      await screen.findByRole("heading", { name: "单柜财务结算" }),
+    ).toBeInTheDocument();
+
+    let resolveNext!: (value: unknown) => void;
+    mockGetFinanceSummary.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveNext = resolve;
+      }),
+    );
+    view.rerender(
+      <SalesFinancePanel salesContractId="sales-2" contractNo="EXP260002" />,
+    );
+    expect(screen.getByText("正在刷新财务口径")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveNext({ data: { ...summary, salesContractId: "sales-2" } });
+    });
+    await waitFor(() =>
+      expect(screen.queryByText("正在刷新财务口径")).not.toBeInTheDocument(),
+    );
   });
 });

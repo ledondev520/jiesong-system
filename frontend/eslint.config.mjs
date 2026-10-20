@@ -1,6 +1,6 @@
 /**
  * Input: Next.js ESLint 配置与生成目录清单
- * Output: 前端源码及测试 lint，排除构建和验收生成报告；5 条 react-hooks 规则（升级后检出 81 处既有违规）暂降为 warn
+ * Output: 前端源码及测试 lint，排除构建和验收生成报告；react-hooks 规则升级后检出 81 处既有违规，未清零的规则暂降为 warn
  * Pos: 前端代码质量门禁配置
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -18,12 +18,12 @@ const eslintConfig = defineConfig([
   // 注意：期间这些规则的新增违规也只告警、不阻断 CI，评审时需留意。
   // 清理计划：按文件分批小 PR 逐步修复（团队看板跟踪，见 jiesong-react-hooks-cleanup 计划），
   // 某规则清零后即恢复为 "error"。只降级这 5 条，不得在此追加其他规则。
+  // 已清零并恢复为 error（删除降级项，回到 eslint-config-next 默认）：preserve-manual-memoization（B6）。
   {
     rules: {
       "react-hooks/set-state-in-effect": "warn",
       "react-hooks/immutability": "warn",
       "react-hooks/refs": "warn",
-      "react-hooks/preserve-manual-memoization": "warn",
       "react-hooks/purity": "warn",
     },
   },
